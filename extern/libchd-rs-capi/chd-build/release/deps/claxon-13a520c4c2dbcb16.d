@@ -1,0 +1,13 @@
+/mnt/c/Users/sergiom/Documents/BizHawk/extern/libchd-rs-capi/./chd-build/release/deps/claxon-13a520c4c2dbcb16.d: /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/claxon-0.4.3/src/lib.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/claxon-0.4.3/src/crc.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/claxon-0.4.3/src/error.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/claxon-0.4.3/src/frame.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/claxon-0.4.3/src/input.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/claxon-0.4.3/src/metadata.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/claxon-0.4.3/src/subframe.rs
+
+/mnt/c/Users/sergiom/Documents/BizHawk/extern/libchd-rs-capi/./chd-build/release/deps/libclaxon-13a520c4c2dbcb16.rlib: /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/claxon-0.4.3/src/lib.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/claxon-0.4.3/src/crc.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/claxon-0.4.3/src/error.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/claxon-0.4.3/src/frame.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/claxon-0.4.3/src/input.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/claxon-0.4.3/src/metadata.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/claxon-0.4.3/src/subframe.rs
+
+/mnt/c/Users/sergiom/Documents/BizHawk/extern/libchd-rs-capi/./chd-build/release/deps/libclaxon-13a520c4c2dbcb16.rmeta: /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/claxon-0.4.3/src/lib.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/claxon-0.4.3/src/crc.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/claxon-0.4.3/src/error.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/claxon-0.4.3/src/frame.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/claxon-0.4.3/src/input.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/claxon-0.4.3/src/metadata.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/claxon-0.4.3/src/subframe.rs
+
+/root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/claxon-0.4.3/src/lib.rs:
+/root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/claxon-0.4.3/src/crc.rs:
+/root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/claxon-0.4.3/src/error.rs:
+/root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/claxon-0.4.3/src/frame.rs:
+/root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/claxon-0.4.3/src/input.rs:
+/root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/claxon-0.4.3/src/metadata.rs:
+/root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/claxon-0.4.3/src/subframe.rs:

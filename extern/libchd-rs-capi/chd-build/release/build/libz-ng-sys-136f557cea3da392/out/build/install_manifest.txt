@@ -1,0 +1,8 @@
+/mnt/c/Users/sergiom/Documents/BizHawk/extern/libchd-rs-capi/chd-build/release/build/libz-ng-sys-136f557cea3da392/out/lib/libz-ng.a
+/mnt/c/Users/sergiom/Documents/BizHawk/extern/libchd-rs-capi/chd-build/release/build/libz-ng-sys-136f557cea3da392/out/include/zlib-ng.h
+/mnt/c/Users/sergiom/Documents/BizHawk/extern/libchd-rs-capi/chd-build/release/build/libz-ng-sys-136f557cea3da392/out/include/zlib_name_mangling-ng.h
+/mnt/c/Users/sergiom/Documents/BizHawk/extern/libchd-rs-capi/chd-build/release/build/libz-ng-sys-136f557cea3da392/out/include/zconf-ng.h
+/mnt/c/Users/sergiom/Documents/BizHawk/extern/libchd-rs-capi/chd-build/release/build/libz-ng-sys-136f557cea3da392/out/lib/pkgconfig/zlib-ng.pc
+/mnt/c/Users/sergiom/Documents/BizHawk/extern/libchd-rs-capi/chd-build/release/build/libz-ng-sys-136f557cea3da392/out/lib/libz-ng.a
+/mnt/c/Users/sergiom/Documents/BizHawk/extern/libchd-rs-capi/chd-build/release/build/libz-ng-sys-136f557cea3da392/out/lib/cmake/zlib-ng/zlib-ng.cmake
+/mnt/c/Users/sergiom/Documents/BizHawk/extern/libchd-rs-capi/chd-build/release/build/libz-ng-sys-136f557cea3da392/out/lib/cmake/zlib-ng/zlib-ng-release.cmake

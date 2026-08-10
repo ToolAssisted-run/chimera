@@ -1,0 +1,48 @@
+﻿namespace BizHawk.Client.EmuHawk
+{
+	partial class LuaWinform
+	{
+		/// <summary>
+		/// Required designer variable.
+		/// </summary>
+		private System.ComponentModel.IContainer components = null;
+
+		/// <summary>
+		/// Clean up any resources being used.
+		/// </summary>
+		/// <param name="disposing">true if managed resources should be disposed; otherwise, false.</param>
+		protected override void Dispose(bool disposing)
+		{
+			if (disposing)
+			{
+				// Should we be calling the Lua close callback? Debatable, but we must call the closing event so our list of active forms can be updated.
+				this.OnClosing(new());
+				components?.Dispose();
+			}
+			base.Dispose(disposing);
+		}
+
+		#region Windows Form Designer generated code
+
+		/// <summary>
+		/// Required method for Designer support - do not modify
+		/// the contents of this method with the code editor.
+		/// </summary>
+		private void InitializeComponent()
+		{
+            this.SuspendLayout();
+            // 
+            // LuaWinform
+            // 
+            this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
+            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
+            this.ClientSize = new System.Drawing.Size(284, 262);
+            this.Name = "LuaWinform";
+            this.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
+            this.Text = "Lua Dialog";
+            this.ResumeLayout(false);
+		}
+
+		#endregion
+	}
+}

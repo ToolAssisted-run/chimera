@@ -1,0 +1,23 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<TargetFramework>netstandard2.0</TargetFramework>
+	</PropertyGroup>
+	<Import Project="../MainSlnCommon.props" />
+	<PropertyGroup>
+		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+		<PolySharpUsePublicAccessibilityForGeneratedTypes>true</PolySharpUsePublicAccessibilityForGeneratedTypes>
+	</PropertyGroup>
+	<ItemGroup>
+		<PackageReference Include="CommunityToolkit.HighPerformance" />
+		<PackageReference Include="Microsoft.Bcl.HashCode" />
+		<PackageReference Include="Microsoft.Bcl.Numerics" />
+		<PackageReference Include="Microsoft.Win32.Registry" />
+		<PackageReference Include="PolySharp" />
+		<PackageReference Include="System.ComponentModel.Annotations" />
+		<PackageReference Include="System.Memory" />
+		<PackageReference Include="System.Runtime.CompilerServices.Unsafe" />
+	</ItemGroup>
+	<ItemGroup>
+		<ProjectReference Include="$(MSBuildProjectDirectory)/../../extern/BizHawk.SrcGen.VersionInfo/BizHawk.SrcGen.VersionInfo.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" PrivateAssets="all" />
+	</ItemGroup>
+</Project>

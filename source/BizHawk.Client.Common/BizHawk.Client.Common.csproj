@@ -1,0 +1,31 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<TargetFramework>net48</TargetFramework>
+	</PropertyGroup>
+	<Import Project="../MainSlnCommon.props" />
+	<PropertyGroup>
+		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+		<Nullable>disable</Nullable>
+	</PropertyGroup>
+	<ItemGroup>
+		<ProjectReference Include="$(ProjectDir)../../extern/NLua/NLua.csproj" />
+		<PackageReference Include="Microsoft.Data.Sqlite.Core" />
+		<PackageReference Include="SharpCompress" PrivateAssets="all" NoWarn="NU1902" />
+		<PackageReference Include="SQLitePCLRaw.provider.e_sqlite3" />
+		<PackageReference Include="System.Drawing.Common" PrivateAssets="all" />
+		<PackageReference Include="System.CommandLine" />
+		<ProjectReference Include="$(ProjectDir)../BizHawk.Bizware.Graphics/BizHawk.Bizware.Graphics.csproj" />
+		<ProjectReference Include="$(ProjectDir)../BizHawk.Bizware.Input/BizHawk.Bizware.Input.csproj" />
+		<ProjectReference Include="$(ProjectDir)../BizHawk.Emulation.Common/BizHawk.Emulation.Common.csproj" />
+		<ProjectReference Include="$(ProjectDir)../BizHawk.Emulation.DiscSystem/BizHawk.Emulation.DiscSystem.csproj" />
+		<EmbeddedResource Include="Resources/**/*" />
+	</ItemGroup>
+	<ItemGroup>
+		<Compile Update="movie/bk2/Bk2Movie.HeaderApi.cs" DependentUpon="Bk2Movie.cs" />
+		<Compile Update="movie/bk2/Bk2Movie.InputLog.cs" DependentUpon="Bk2Movie.cs" />
+		<Compile Update="movie/bk2/Bk2Movie.IO.cs" DependentUpon="Bk2Movie.cs" />
+		<Compile Update="movie/bk2/Bk2Movie.ModeApi.cs" DependentUpon="Bk2Movie.cs" />
+		<Compile Update="movie/tasproj/TasMovie.Editing.cs" DependentUpon="TasMovie.cs" />
+		<Compile Update="movie/tasproj/TasMovie.IO.cs" DependentUpon="TasMovie.cs" />
+	</ItemGroup>
+</Project>

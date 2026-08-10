@@ -1,0 +1,46 @@
+<Project>
+	<PropertyGroup>
+		<!-- several projects (NLua, ISOParser, the source generators, ...) are built purely via
+			ProjectReference without being solution members; without this, solution builds would
+			unset Configuration for them and they'd silently build as Debug -->
+		<ShouldUnsetParentConfigurationAndPlatform>false</ShouldUnsetParentConfigurationAndPlatform>
+		<EnableNETAnalyzers>false</EnableNETAnalyzers>
+		<EmitCompilerGeneratedFiles>false</EmitCompilerGeneratedFiles> <!-- enable to copy Roslyn Source Generators' outputs to $(ProjectDir)/obj/.../generated -->
+		<CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+		<ContinuousIntegrationBuild Condition=" '$(GITLAB_CI)' != '' Or '$(APPVEYOR)' != '' ">true</ContinuousIntegrationBuild>
+		<DebugSymbols>true</DebugSymbols>
+		<DebugType>portable</DebugType>
+		<ErrorReport>prompt</ErrorReport>
+		<Features>strict</Features>
+		<GenerateDocumentationFile>true</GenerateDocumentationFile> <!-- it would be nice to rename these to *.api_reference.xml or something, but it seems https://github.com/dotnet/standard/issues/614 was never fixed -->
+		<IsTargetingNetFramework>$(TargetFramework.StartsWith("net4"))</IsTargetingNetFramework> <!-- $(TargetFrameworkIdentifier) is unset here -->
+		<LangVersion>12.0</LangVersion>
+		<ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+		<NoWarn>$(NoWarn);CS1591</NoWarn> <!-- CS1591 wants doc comments on every type/member, which is a recipe for useless generated or blank comments -->
+		<Nullable>enable</Nullable>
+		<PlatformTarget>AnyCPU</PlatformTarget>
+	</PropertyGroup>
+	<PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
+		<Optimize>false</Optimize>
+	</PropertyGroup>
+	<PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
+		<Optimize>true</Optimize>
+		<PathMap>$(MSBuildProjectDirectory)=${$(MSBuildProjectName)}/</PathMap>
+	</PropertyGroup>
+	<PropertyGroup Condition=" '$(MachineExtraCompilationFlag)' != '' ">
+		<DefineConstants>$(DefineConstants);$(MachineExtraCompilationFlag)</DefineConstants>
+	</PropertyGroup>
+	<ItemGroup>
+		<!-- Nullable is a polyfill (nullable-annotation attributes for netstandard2.0), not a code checker -->
+		<PackageReference Include="Nullable" PrivateAssets="all" />
+	</ItemGroup>
+	<PropertyGroup Condition=" $(IsTargetingNetFramework) ">
+		<GenerateResourceUsePreserializedResources>true</GenerateResourceUsePreserializedResources>
+	</PropertyGroup>
+	<ItemGroup Condition=" $(IsTargetingNetFramework) ">
+		<PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" PrivateAssets="all" />
+		<PackageReference Include="System.Resources.Extensions" PrivateAssets="all" />
+		<Reference Include="System.IO.Compression" />
+		<Reference Include="System.Net.Http" />
+	</ItemGroup>
+</Project>

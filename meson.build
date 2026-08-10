@@ -1,0 +1,234 @@
+# miniHawk build — mediated by meson, from a Linux host, for BOTH targets.
+#
+#   Linux artifacts (.so + the platform-neutral managed build):
+#     meson setup build/meson-linux --prefix "$(pwd)/build" --libdir dll
+#     meson compile -C build/meson-linux
+#     meson install -C build/meson-linux
+#
+#   Windows artifacts (.dll, cross-built via mingw-w64):
+#     meson setup build/meson-windows --prefix "$(pwd)/build" --libdir dll \
+#         --cross-file extern/meson/mingw-w64.ini
+#     meson compile -C build/meson-windows
+#     meson install -C build/meson-windows
+#
+# The managed solution (dotnet build) is invoked from the native (Linux) dir only:
+# its IL output is platform-neutral and serves both targets. Native libraries are
+# built per-target. Per the reproducibility pillar, none of this affects movie
+# determinism — that belongs to core packages.
+project(
+  'minihawk',
+  ['c', 'cpp'],
+  version: '0.1',
+  default_options: ['buildtype=release', 'cpp_std=c++17'],
+  meson_version: '>=1.3',
+)
+
+fs = import('fs')
+host_windows = host_machine.system() == 'windows'
+repo_root = meson.project_source_root()
+
+cc = meson.get_compiler('c')
+m_dep = cc.find_library('m', required: false)
+dl_dep = cc.find_library('dl', required: false)
+thread_dep = dependency('threads')
+
+# ---------------------------------------------------------------------------
+# libbizhash — hardware-accelerated hashing (in-repo sources)
+# ---------------------------------------------------------------------------
+bizhash_src = files(
+  'extern/LibBizHash/bizinterface.c',
+  'extern/LibBizHash/common/x86_features.c',
+  'extern/LibBizHash/crc32/crc32_braid.c',
+  'extern/LibBizHash/crc32/crc32_fold_pclmulqdq.c',
+  'extern/LibBizHash/crc32/crc32_fold_vpclmulqdq.c',
+  'extern/LibBizHash/sha1/sha1_sha.c',
+)
+shared_library(
+  'bizhash',
+  bizhash_src,
+  include_directories: include_directories('extern/LibBizHash/common'),
+  gnu_symbol_visibility: 'hidden',
+  install: true,
+  install_dir: 'dll',
+)
+
+# ---------------------------------------------------------------------------
+# lua54 — the Lua 5.4 runtime (stock upstream sources, pinned submodule)
+# ---------------------------------------------------------------------------
+lua_src = []
+foreach f : [
+  'lapi', 'lauxlib', 'lbaselib', 'lcode', 'lcorolib', 'lctype', 'ldblib',
+  'ldebug', 'ldo', 'ldump', 'lfunc', 'lgc', 'linit', 'liolib', 'llex',
+  'lmathlib', 'lmem', 'loadlib', 'lobject', 'lopcodes', 'loslib', 'lparser',
+  'lstate', 'lstring', 'lstrlib', 'ltable', 'ltablib', 'ltm', 'lundump',
+  'lutf8lib', 'lvm', 'lzio',
+]
+  lua_src += files('extern/lua' / f + '.c')
+endforeach
+lua54 = shared_library(
+  'lua54',
+  lua_src,
+  name_prefix: host_windows ? '' : 'lib',
+  c_args: host_windows ? ['-DLUA_BUILD_AS_DLL'] : ['-DLUA_USE_LINUX'],
+  dependencies: [m_dep, dl_dep],
+  install: true,
+  install_dir: 'dll',
+)
+
+# ---------------------------------------------------------------------------
+# e_sqlite3 — SQLite with the canonical SQLitePCLRaw configuration
+# ---------------------------------------------------------------------------
+sqlite_args = [
+  '-DSQLITE_ENABLE_COLUMN_METADATA', '-DSQLITE_ENABLE_FTS3_PARENTHESIS',
+  '-DSQLITE_ENABLE_FTS4', '-DSQLITE_ENABLE_FTS5', '-DSQLITE_ENABLE_JSON1',
+  '-DSQLITE_ENABLE_MATH_FUNCTIONS', '-DSQLITE_ENABLE_RTREE',
+  '-DSQLITE_ENABLE_SNAPSHOT', '-DSQLITE_DEFAULT_FOREIGN_KEYS=1',
+]
+if host_windows
+  sqlite_args += '-DSQLITE_API=__declspec(dllexport)'
+endif
+shared_library(
+  'e_sqlite3',
+  files('extern/sqlite3/sqlite3/sqlite3.c'),
+  name_prefix: host_windows ? '' : 'lib',
+  c_args: sqlite_args,
+  dependencies: [m_dep, dl_dep, thread_dep],
+  install: true,
+  install_dir: 'dll',
+)
+
+# ---------------------------------------------------------------------------
+# cimgui — Dear ImGui C bindings, pinned to ImGui.NET's binding version
+# ---------------------------------------------------------------------------
+cimgui_args = ['-DIMGUI_DISABLE_OBSOLETE_FUNCTIONS=1']
+if host_windows
+  cimgui_args += '-DIMGUI_IMPL_API=extern "C" __declspec(dllexport)'
+else
+  cimgui_args += '-DIMGUI_IMPL_API=extern "C"'
+endif
+shared_library(
+  'cimgui',
+  files(
+    'extern/cimgui/cimgui.cpp',
+    'extern/cimgui/imgui/imgui.cpp',
+    'extern/cimgui/imgui/imgui_demo.cpp',
+    'extern/cimgui/imgui/imgui_draw.cpp',
+    'extern/cimgui/imgui/imgui_tables.cpp',
+    'extern/cimgui/imgui/imgui_widgets.cpp',
+  ),
+  name_prefix: host_windows ? '' : 'lib',
+  cpp_args: cimgui_args,
+  install: true,
+  install_dir: 'dll',
+)
+
+# ---------------------------------------------------------------------------
+# luasocket — socket/core + mime/core Lua modules (for user scripts)
+# ---------------------------------------------------------------------------
+luasocket_common = [
+  'luasocket', 'timeout', 'buffer', 'io', 'auxiliar', 'options', 'inet',
+  'except', 'select', 'tcp', 'udp', 'compat',
+]
+luasocket_src = []
+foreach f : luasocket_common + [host_windows ? 'wsocket' : 'usocket']
+  luasocket_src += files('extern/luasocket/src' / f + '.c')
+endforeach
+luasocket_args = []
+luasocket_deps = []
+if host_windows
+  luasocket_args += '-DLUASOCKET_API=__declspec(dllexport)'
+  luasocket_deps += cc.find_library('ws2_32')
+endif
+# both modules must be named "core" on disk; meson target names and per-dir
+# outputs are unique, so each builds in its own subdir (extern/meson/luasocket-*)
+lua_inc = include_directories('extern/lua')
+subdir('extern/meson/luasocket-socket')
+subdir('extern/meson/luasocket-mime')
+
+# ---------------------------------------------------------------------------
+# zstd — savestate compression; upstream's own meson build, nested
+# ---------------------------------------------------------------------------
+nested_tool = files('extern/meson/nested-build.sh')
+cross_arg = host_windows ? '--cross-file=' + repo_root / 'extern/meson/mingw-w64.ini' : ''
+zstd_out = host_windows ? 'libzstd.dll' : 'libzstd.so'
+custom_target(
+  'zstd',
+  output: zstd_out,
+  command: [
+    nested_tool, 'meson',
+    repo_root / 'extern/zstd/build/meson',
+    '@OUTDIR@' / 'zstd-build',
+    '@OUTPUT@',
+    cross_arg,
+    '-Dbin_programs=false', '-Dbin_tests=false', '-Dbin_contrib=false',
+  ],
+  console: true,
+  install: true,
+  install_dir: 'dll',
+)
+
+# ---------------------------------------------------------------------------
+# SDL2 + OpenAL Soft — cmake-driven, via the wrapper script
+# ---------------------------------------------------------------------------
+cmake_toolchain = host_windows ? repo_root / 'extern/meson/mingw-toolchain.cmake' : ''
+custom_target(
+  'sdl2',
+  output: host_windows ? 'SDL2.dll' : 'libSDL2.so',
+  command: [
+    nested_tool, 'cmake',
+    repo_root / 'extern/SDL2',
+    '@OUTDIR@' / 'sdl2-build',
+    '@OUTPUT@',
+    cmake_toolchain,
+  ],
+  console: true,
+  install: true,
+  install_dir: 'dll',
+)
+custom_target(
+  'openal',
+  output: host_windows ? 'OpenAL32.dll' : 'libopenal.so',
+  command: [
+    nested_tool, 'cmake',
+    repo_root / 'extern/openal-soft',
+    '@OUTDIR@' / 'openal-build',
+    '@OUTPUT@',
+    cmake_toolchain,
+    '-DALSOFT_UTILS=OFF', '-DALSOFT_EXAMPLES=OFF', '-DALSOFT_TESTS=OFF',
+    '-DLIBTYPE=SHARED',
+  ],
+  console: true,
+  install: true,
+  install_dir: 'dll',
+)
+
+# ---------------------------------------------------------------------------
+# chd_capi — Rust, toolchain pinned by extern/libchd-rs-capi/rust-toolchain.toml
+# ---------------------------------------------------------------------------
+custom_target(
+  'chd_capi',
+  output: host_windows ? 'chd_capi.dll' : 'libchd_capi.so',
+  command: [
+    nested_tool, 'cargo',
+    repo_root / 'extern/libchd-rs-capi',
+    '@OUTDIR@' / 'chd-build',
+    '@OUTPUT@',
+    host_windows ? 'x86_64-pc-windows-gnu' : '',
+  ],
+  console: true,
+  install: true,
+  install_dir: 'dll',
+)
+
+# ---------------------------------------------------------------------------
+# The managed solution — one platform-neutral build, from the Linux dir only
+# ---------------------------------------------------------------------------
+if not meson.is_cross_build()
+  dotnet = find_program('dotnet', required: false)
+  if dotnet.found()
+    run_target(
+      'frontend',
+      command: [dotnet, 'build', repo_root / 'source/BizHawk.sln', '-c', 'Release'],
+    )
+  endif
+endif

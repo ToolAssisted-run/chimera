@@ -1,0 +1,22 @@
+<Project>
+	<!--
+		This is a set of MSBuild imports rather than a project because I COULD NOT for the life of me get the latter to work.
+		With the workaround given in dotnet/roslyn#61940, everything built, but then the main solution wouldn't build. Every project gave:
+			warning CS8785: Generator 'VIMGenerator' failed to generate source. It will not contribute to the output and compilation errors may occur as a result.
+			Exception was of type 'FileNotFoundException'
+			with message 'Could not load file or assembly 'BizHawk.Analyzers.Common, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null'. The system cannot find the file specified.
+		Yes, even with an EXPLICIT <Reference/> to the Common project's assembly. So you get this instead. —yoshi
+	-->
+	<Import Project="LibCommon.props" />
+	<PropertyGroup>
+		<EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+		<NoWarn>$(NoWarn);RS2008</NoWarn>
+	</PropertyGroup>
+	<ItemGroup>
+		<EditorConfigFiles Include="$(MSBuildProjectDirectory)/../Analyzers.editorconfig" />
+		<PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
+		<Compile Include="$(MSBuildProjectDirectory)/../AnalyzersCommon/**/*.cs" />
+		<Using Include="Microsoft.CodeAnalysis;Microsoft.CodeAnalysis.CSharp;Microsoft.CodeAnalysis.CSharp.Syntax;Microsoft.CodeAnalysis.Diagnostics;Microsoft.CodeAnalysis.Operations;Microsoft.CodeAnalysis.Text" />
+		<Using Include="System" />
+	</ItemGroup>
+</Project>

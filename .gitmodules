@@ -1,0 +1,33 @@
+[submodule "ExternalProjects/SDL2/SDL"]
+	path = extern/SDL2/SDL
+	url = https://github.com/libsdl-org/SDL.git
+	branch = SDL2
+	ignore = untracked
+[submodule "ExternalProjects/SDL2/libusb"]
+	path = extern/SDL2/libusb
+	url = https://github.com/libusb/libusb.git
+	ignore = untracked
+[submodule "extern/lua"]
+	path = extern/lua
+	url = https://github.com/lua/lua.git
+	ignore = untracked
+[submodule "extern/zstd"]
+	path = extern/zstd
+	url = https://github.com/facebook/zstd.git
+	ignore = untracked
+[submodule "extern/cimgui"]
+	path = extern/cimgui
+	url = https://github.com/cimgui/cimgui.git
+	ignore = untracked
+[submodule "extern/openal-soft"]
+	path = extern/openal-soft
+	url = https://github.com/kcat/openal-soft.git
+	ignore = untracked
+[submodule "extern/luasocket"]
+	path = extern/luasocket
+	url = https://github.com/lunarmodules/luasocket.git
+	ignore = untracked
+[submodule "extern/sqlite3"]
+	path = extern/sqlite3
+	url = https://github.com/ericsink/cb.git
+	ignore = untracked

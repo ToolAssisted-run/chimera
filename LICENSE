@@ -1,0 +1,40 @@
+﻿miniHawk is a derivative fork of BizHawk (https://github.com/TASEmulators/BizHawk).
+
+The upstream BizHawk repository combines an MIT-licensed C# frontend by the
+BizHawk team with many emulation cores under a variety of licenses, and its
+license file therefore describes the whole as a heterogeneous combination. In
+this fork, all emulation cores and their support machinery have been removed:
+what remains is the BizHawk team's original MIT-licensed work â€” the frontend
+and its supporting libraries â€” plus miniHawk's own modifications, which are
+provided under the same MIT License. Copyright in the overwhelming majority of
+this code belongs to the BizHawk team.
+
+Exceptions, clearly separable from the MIT-licensed sources:
+
+- extern/ contains third-party native libraries built from source during the
+  build (SDL2, Lua, zstd, SQLite, OpenAL Soft, cimgui, luasocket, chd-rs, and
+  supporting projects), vendored as pinned git submodules, each under its own
+  open-source license (see each submodule's license file); they are compiled
+  to separate dynamic libraries loaded at runtime.
+- Emulation cores are NOT part of this repository. They are loaded at runtime
+  as external, self-contained packages, each carrying its own license (a core
+  package derived from a GPL emulator is a GPL work, for example). Consult
+  each package's own license.
+- tests/suite is a vendored regression suite whose provenance and
+  licensing (including TASVideos movies under CC-BY 2.0) are described in
+  tests/suite/README.md.
+
+--------------------------
+All of the BizHawk team's original work, and miniHawk's modifications to it,
+are provided under this license:
+--------------------------
+
+MIT License
+
+Copyright (c) BizHawk team
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.

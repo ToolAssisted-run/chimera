@@ -1,0 +1,8 @@
+# Pinned for build reproducibility (dev machines and CI resolve the same
+# toolchain via rustup). Not a determinism requirement — see the
+# reproducibility pillar in MINIHAWK.md.
+[toolchain]
+channel = "1.97.1"
+# windows-gnu is the canonical (Linux-hosted mingw) cross target; the host
+# target (linux-gnu or windows-msvc for the Windows dev shim) is implicit
+targets = ["x86_64-pc-windows-gnu"]

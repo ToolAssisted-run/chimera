@@ -1,0 +1,178 @@
+using System.Drawing;
+
+namespace BizHawk.Client.Common
+{
+	public interface IEmuClientApi : IDisposable, IExternalApi
+	{
+		/// <summary>
+		/// Occurs before a quickload is done (just after user has pressed the shortcut button
+		/// or has click on the item menu)
+		/// </summary>
+		event BeforeQuickLoadEventHandler BeforeQuickLoad;
+
+		/// <summary>
+		/// Occurs before a quicksave is done (just after user has pressed the shortcut button
+		/// or has click on the item menu)
+		/// </summary>
+		event BeforeQuickSaveEventHandler BeforeQuickSave;
+
+		/// <summary>
+		/// Occurs when a ROM is successfully loaded
+		/// </summary>
+		event EventHandler RomLoaded;
+
+		/// <summary>
+		/// Occurs when a savestate is successfully loaded
+		/// </summary>
+		event StateLoadedEventHandler StateLoaded;
+
+		/// <summary>
+		/// Occurs when a savestate is successfully saved
+		/// </summary>
+		event StateSavedEventHandler StateSaved;
+
+		int BorderHeight();
+
+		int BorderWidth();
+
+		int BufferHeight();
+
+		int BufferWidth();
+
+		void ClearAutohold();
+
+		void CloseEmulator(int? exitCode = null);
+
+		void CloseRom();
+
+		void DisplayMessages(bool value);
+
+		/// <summary>
+		/// THE FrameAdvance stuff
+		/// </summary>
+		void DoFrameAdvance();
+
+		/// <summary>
+		/// THE FrameAdvance stuff
+		/// Auto unpause emulation
+		/// </summary>
+		void DoFrameAdvanceAndUnpause();
+
+		void EnableRewind(bool enabled);
+
+		void FrameSkip(int numFrames);
+
+		/// <returns>the (host) framerate, approximated from frame durations</returns>
+		int GetApproxFramerate();
+
+		bool GetSoundOn();
+
+		int GetTargetScanlineIntensity();
+
+		int GetWindowSize();
+
+		bool IsPaused();
+
+		bool IsSeeking();
+
+		bool IsTurbo();
+
+		bool IsRewinding();
+
+		/// <summary>
+		/// Load a savestate specified by its name
+		/// </summary>
+		/// <param name="name">Savestate friendly name</param>
+		/// <returns><see langword="true"/> iff succeeded</returns>
+		bool LoadState(string name);
+
+		bool OpenRom(string path);
+
+		void Pause();
+
+		void PauseAv();
+
+		void RebootCore();
+
+		void SaveRam();
+
+		/// <summary>
+		/// Save a state with specified name
+		/// </summary>
+		/// <param name="name">Savestate friendly name</param>
+		void SaveState(string name);
+
+		int ScreenHeight();
+
+		void Screenshot(string path = null);
+
+		void ScreenshotToClipboard();
+
+		int ScreenWidth();
+
+		/// <summary>
+		/// Sets the extra padding added to the 'native' surface so that you can draw HUD elements in predictable placements
+		/// </summary>
+		/// <param name="left">Left padding</param>
+		/// <param name="top">Top padding</param>
+		/// <param name="right">Right padding</param>
+		/// <param name="bottom">Bottom padding</param>
+		void SetClientExtraPadding(int left, int top = 0, int right = 0, int bottom = 0);
+
+		/// <summary>
+		/// Sets the extra padding added to the 'native' surface so that you can draw HUD elements in predictable placements
+		/// </summary>
+		/// <param name="left">Left padding</param>
+		/// <param name="top">Top padding</param>
+		/// <param name="right">Right padding</param>
+		/// <param name="bottom">Bottom padding</param>
+		void SetGameExtraPadding(int left, int top = 0, int right = 0, int bottom = 0);
+
+		void SetScreenshotOSD(bool value);
+
+		void SetSoundOn(bool enable);
+
+		void SetTargetScanlineIntensity(int val);
+
+		/// <summary>sets the MainForm scale (window size multiplier) for the current rom's system</summary>
+		/// <param name="size">an integer between <c>1</c> and <see cref="EmuClientApi.WINDOW_SCALE_MAX"/>, inclusive</param>
+		void SetWindowSize(int size);
+
+		/// <summary>
+		/// Tell the client to display a frame from the future, instead of the current frame.
+		/// </summary>
+		/// <param name="preFrameCallback">This will be called before emulating each future frame.
+		/// The parameter is the number of frames into the future that have already been emulated.
+		/// Return false to emulate another future frame.
+		/// When the callback returns true, emulation will rewind to the real current frame and the just-run future frame will be displayed.
+		/// <br/>Pass null to disable future frame display.</param>
+		/// <param name="maxFrames">
+		/// The maximum number of future frames to emulate. Useful to avoid freezing the client UI in case of accidentally never returning true from the callback.
+		/// Your timeout can be as low as 1 frame or as high as 32767 frames.
+		/// </param>
+		/// <exception cref="ArgumentOutOfRangeException">
+		/// <paramref name="maxFrames"/> is <c>0</c>
+		/// (and <paramref name="preFrameCallback"/> is a delegate, since <paramref name="maxFrames"/> is ignored when it's <see langword="null"/>)
+		/// or is greater than 32767
+		/// </exception>
+		void ShowFuture(ShowFutureCallback/*?*/ preFrameCallback, ushort maxFrames);
+
+		void SpeedMode(int percent);
+
+		void TogglePause();
+
+		Point TransformPoint(Point point);
+
+		/// <summary>
+		/// Unpauses the emulator. Note that the user can pause again before the next frame, either with the pause key or by releasing frame advance.
+		/// If you wish to force emulation to continue, consider using <see cref="DoFrameAdvance"/> instead.
+		/// </summary>
+		void Unpause();
+
+		void UnpauseAv();
+
+		int Xpos();
+
+		int Ypos();
+	}
+}
