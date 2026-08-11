@@ -66,6 +66,38 @@ hands data to cores. Audit of those points and their standing:
   (no disc cores exist).
 - Firmware: database contents removed; anything a core needs ships inside its package.
 
+## Core flavors and their reproducibility profiles
+
+Three "flavors" of emulation core exist from miniHawk's perspective (user-stated,
+2026-08-11):
+
+- **(a) Native cores** (e.g. QuickerNES): compiled per platform (Windows .dll /
+  Linux .so) and run natively on the host. Their reproducibility depends on a
+  good implementation of their own serialization/deserialization mechanisms.
+  Windows<->Linux inter-reproducibility is desirable but not guaranteed.
+  (Empirical note: the QuickerNES witness core has so far proven byte-exact
+  across compilers and OSes - the 2026-08-11 Linux gate reproduced the
+  Windows-recorded goldens with a Linux-gcc-built core - but that is an
+  observed property of this core, not a guarantee of the flavor.)
+- **(b) Pure cores** (implemented fully in C#, e.g. NesHawk in upstream
+  BizHawk): must equally guarantee reproducible serialization, but are
+  universally cross-compatible as long as the system runs C# and the C#
+  engines are faithful (very slight chance of desync between engines). They
+  require no runtime loading of precompiled native libraries.
+- **(c) Waterboxed cores** (e.g. GPGX, DOSBox-X and many others in upstream
+  BizHawk): use the waterbox closed system to behave as a universal Linux
+  machine whose entire machine state is preserved. These offer the maximum
+  level of reproducibility, but depend on the waterboxing machinery to work,
+  which requires careful integration and other complications that do not
+  exist in native builds.
+
+Relation to the package contract as it stands: the current contract and the
+reference package are flavor (a) (managed adapter + native library). Flavor (b)
+is already expressible - a package whose manifest declares no natives. Flavor
+(c) would require reintroducing the waterbox host machinery, which was removed
+in Phase 2 (recoverable from the transitional fork's history) - a deliberate
+open question for whenever a waterboxed core is wanted.
+
 ## Agreed decisions
 
 - **Core package interface:** managed .NET adapter DLL implementing `IEmulator` (+ service
