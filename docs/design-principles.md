@@ -468,6 +468,58 @@ phase of unverified change.
   error UX, core-author docs. Port a second core to prove the contract isn't
   QuickerNES-shaped.
 
+## THE WATERBOX-ONLY REDESIGN (user-decided, 2026-08-11)
+
+After full analysis of BizHawk's waterbox (docs/waterbox-analysis.md), a
+fundamental design change: miniHawk allows ONLY waterboxed cores, making
+every core reproducible and portable BY FORCE rather than by discipline.
+Decisions, all user-confirmed:
+
+1. **Waterbox-only, no exceptions.** The package format knows only guest
+   images. Flavors (a) native and (b) pure-C# are no longer expressible as
+   packages; the taxonomy above remains as analysis, and the side-effect
+   rule's "cannot be enforced" caveat inverts - the sandbox IS the
+   enforcement.
+2. **The waterbox host lives in miniHawk**, compiled and shipped with
+   miniHawk's OS-dependent artifacts (meson dual-target, like every other
+   native). This amends the reproducibility pillar the same way the frozen
+   movie-mnemonic format does: the WATERBOX MACHINE IS A FROZEN, VERSIONED
+   SPECIFICATION - address layout, syscall semantics, the time constant,
+   scheduling order, callback-slot mechanics, everything the guest can
+   observe - and miniHawk ships a spec-exact implementation. Movies record
+   the machine-spec version; the reproduction contract becomes
+   (movie + core package + machine-spec version), where implementations of
+   a given spec version are interchangeable by definition. The Synth
+   SPEC.md/twins exercise is the working proof that spec-first bit-exact
+   interchangeability is achievable.
+3. **One generic adapter, no per-core managed code.** A core package is a
+   single platform-neutral zip: manifest + core.wbx + data files
+   (controller definitions, settings schemas, system ids, extensions -
+   all DATA, interpreted by miniHawk's one universal adapter over a
+   standardized guest export ABI). Identical zip and identical package
+   SHA1 on every OS; movies therefore carry the same CorePackageSHA1
+   cross-platform. (BizHawk's Nyma layer - one data-driven adapter serving
+   every mednafen core - is the scale precedent.)
+4. **The guest toolchain is the core-author kit**, in its own repository
+   (musl fork, emulibc, libco, libcxx sysroot, linkscript, common.mak,
+   conformance tests): miniHawk never compiles cores and does not carry
+   the toolchain.
+
+Migration order (each step gated by the synthetic witness, plus the
+quickerNES suite until its core is migrated):
+  (i) import + de-nightly the waterbox host runtime; meson dual-target;
+      restore the Windows SysV ABI adapter (MsHostSysVGuest) from the
+      transitional fork;
+  (ii) define guest ABI v1 + package format v2 (data-driven controller/
+      settings declarations); implement the generic adapter;
+  (iii) stand up the toolchain repo; build synth.wbx from synthcore.c; the
+      waterboxed synth becomes the SHIPPED synth package, while the native
+      and pure-C# implementations remain as external ground-truth testers
+      (Level A golden generators - an even cleaner witness split);
+  (iv) migrate quickerNES to a .wbx guest; re-gate the full suite;
+  (v) retire the flavor-(a)/(b) loading paths (manifest v1, natives lists,
+      package-assembly resolution) from miniHawk.
+
 ## The synthetic witness (planned successor to the quickerNES gate)
 
 Plan (user-stated, 2026-08-11), building on the core-flavor taxonomy above:
