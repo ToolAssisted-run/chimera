@@ -11,6 +11,7 @@
 #   .\run-level-b.ps1 -Record        # record goldens from current build
 #   .\run-level-b.ps1 -Mode rerecord # per-frame savestate round-trip variant
 #   .\run-level-b.ps1 -Filter super  # only tests whose name matches
+#   .\run-level-b.ps1 -Quick         # fast smoke subset (~1 min; for CI/dev loops)
 
 param(
     [switch]$Record,
@@ -19,7 +20,8 @@ param(
     [string]$Filter = "",
     [int]$Checkpoint = 0,
     [int]$Parallel = 8,
-    [int]$TimeoutSec = 1800
+    [int]$TimeoutSec = 1800,
+    [switch]$Quick
 )
 
 $ErrorActionPreference = "Stop"
@@ -107,7 +109,21 @@ $runDir     = Join-Path $workDir "run"
 $goldenDir  = Join-Path $harnessDir "goldens\levelB"
 $replayLua  = Join-Path $harnessDir "replay.lua"
 
-# Tests excluded from the witness set (see MINIHAWK.md for rationale)
+# The quick smoke subset: the shortest movies that still cover distinct mappers,
+# both plain-joypad and Arkanoid-paddle input paths, and a sync-settings config
+# variant. NOT a substitute for the full gate - commits still require 26/26+26/26;
+# this is for CI smoke checks and fast dev iteration (~1 min wall clock simple,
+# ~2 min rerecord).
+$quickSet = @(
+    "gimmick.anyPercent",          # 374 frames; Sunsoft FME-7, savestate-sensitive core
+    "metroid.playaround",          # 1729 frames
+    "sprilo.anyPercent",           # 4572 frames
+    "rcProAmII.race1",             # 5482 frames
+    "arkanoid.arkNESController",   # 9342 frames; paddle input + config variant
+    "superMarioBros.warps"         # 17867 frames
+)
+
+# Tests excluded from the witness set (see docs/design-principles.md for rationale)
 $excluded = @(
     "castlevania3.playaround",        # mapper 5 deliberately disabled in pinned core
     "novaTheSquirrel.anyPercent",     # pinned-core segfault (mapper 30 serializeState)
@@ -171,6 +187,7 @@ $tests = Get-ChildItem $testsDir -Filter *.test | Sort-Object Name
 foreach ($testFile in $tests) {
     $name = $testFile.BaseName
     if ($excluded -contains $name) { continue }
+    if ($Quick -and ($quickSet -notcontains $name)) { continue }
     if ($Filter -and ($name -notmatch $Filter)) { continue }
 
     $t = Get-Content -LiteralPath $testFile.FullName -Raw | ConvertFrom-Json
@@ -222,7 +239,7 @@ function Start-TestJob($job) {
     ) | Out-File -LiteralPath $jobFile -Encoding ascii
 
     $env:MINIHAWK_JOB = $jobFile   # snapshotted into the child env at CreateProcess
-    $cmdLine = "`"$emuHawk`" `"--config=$cfgRun`" `"--core=$corePackage`" `"--lua=$replayLua`" `"$($job.RomPath)`""
+    $cmdLine = "`"$emuHawk`" --headless `"--config=$cfgRun`" `"--core=$corePackage`" `"--lua=$replayLua`" `"$($job.RomPath)`""
     $h = [HiddenLauncher]::Launch("minihawk_hidden", $cmdLine, $repoRoot)
     [void]$running.Add([pscustomobject]@{
         Name = $name; Handle = $h; Sw = [System.Diagnostics.Stopwatch]::StartNew()

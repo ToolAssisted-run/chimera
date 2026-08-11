@@ -57,6 +57,11 @@ namespace BizHawk.Client.Common
 			Description = "use the GDI+ display method rather than whatever preference is set in the config file",
 		};
 
+		private static readonly Option<bool> OptionHeadless = new("--headless")
+		{
+			Description = "unattended mode: any modal dialog is printed to the console and, if it would block for an answer, the process exits with code 64 instead of hanging",
+		};
+
 		private static readonly Option<string?> OptionHTTPClientURIGET = new("--url-get", "--url_get")
 		{
 			Description = "string; URI to use for HTTP 'GET' IPC (Lua `comm.http*Get*`)",
@@ -154,6 +159,7 @@ namespace BizHawk.Client.Common
 			root.Add(/* --dump-type */ OptionAVDumpType);
 			root.Add(/* --fullscreen */ OptionLaunchFullscreen);
 			root.Add(/* --gdi */ OptionGDIPlus);
+			root.Add(/* --headless */ OptionHeadless);
 			root.Add(/* --load-slot */ OptionLoadQuicksaveSlot);
 			root.Add(/* --load-state */ OptionLoadSavestateFilePath);
 			root.Add(/* --lua */ OptionLuaFilePath);
@@ -203,6 +209,7 @@ namespace BizHawk.Client.Common
 				EnsureConsole();
 				return result.Invoke();
 			}
+			if (result.GetValue(OptionHeadless)) HeadlessMode.Enabled = true; // also set by a raw pre-parse scan in Program, for dialogs shown before this point
 			if (result.GetValue(OptionQueryAppVersion))
 			{
 				// means e.g. `./EmuHawkMono.sh --version` was passed, so print that and exit immediately

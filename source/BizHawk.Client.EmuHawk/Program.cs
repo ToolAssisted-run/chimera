@@ -106,6 +106,9 @@ namespace BizHawk.Client.EmuHawk
 		[System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
 		private static int SubMain(string[] args)
 		{
+			// raw scan, not ArgParser: several dialogs below can fire before arguments are parsed
+			if (Array.IndexOf(args, "--headless") >= 0) HeadlessMode.Enabled = true;
+
 			// this check has to be done VERY early.  i stepped through a debug build with wrong .dll versions purposely used,
 			// and there was a TypeLoadException before the first line of SubMain was reached (some static ColorType init?)
 			var thisAsmVer = ReflectionCache.AsmVersion;
@@ -123,8 +126,14 @@ namespace BizHawk.Client.EmuHawk
 					ReflectionCache_Biz_Win_Con.AsmVersion,
 				}.Any(asmVer => asmVer != thisAsmVer))
 			{
+				const string MISMATCH_MSG = "One or more of the BizHawk.* assemblies have the wrong version!\n(Did you attempt to update by overwriting an existing install?)";
+				if (HeadlessMode.Enabled)
+				{
+					Console.Error.WriteLine(MISMATCH_MSG);
+					return -1;
+				}
 				EnsureWinFormsInitialized();
-				MessageBox.Show("One or more of the BizHawk.* assemblies have the wrong version!\n(Did you attempt to update by overwriting an existing install?)");
+				MessageBox.Show(MISMATCH_MSG);
 				return -1;
 			}
 
@@ -196,6 +205,11 @@ namespace BizHawk.Client.EmuHawk
 			}
 			catch (ArgParser.ArgParserException e)
 			{
+				if (HeadlessMode.Enabled)
+				{
+					Console.Error.WriteLine(e.Message);
+					return 1;
+				}
 				EnsureWinFormsInitialized();
 				new ExceptionBox(e.Message).ShowDialog();
 				return 1;
@@ -212,18 +226,20 @@ namespace BizHawk.Client.EmuHawk
 			{
 				if (!VersionInfo.DeveloperBuild && !ConfigService.IsFromSameVersion(configPath, out var msg))
 				{
-					new MsgBox(msg, "Mismatched version in config file", MessageBoxIcon.Warning).ShowDialog();
+					if (HeadlessMode.Enabled) HeadlessMode.LogSuppressedWarning(msg);
+					else new MsgBox(msg, "Mismatched version in config file", MessageBoxIcon.Warning).ShowDialog();
 				}
 				initialConfig = ConfigService.Load<Config>(configPath);
 			}
 			catch (Exception e)
 			{
-				new ExceptionBox(string.Join("\n",
+				var corruptConfigMsg = string.Join("\n",
 					"It appears your config file (config.ini) is corrupted; an exception was thrown while loading it.",
 					"On closing this warning, EmuHawk will delete your config file and generate a new one. You can go make a backup now if you'd like to look into diffs.",
 					"The caught exception was:",
-					e.ToString()
-				)).ShowDialog();
+					e.ToString());
+				if (HeadlessMode.Enabled) HeadlessMode.LogSuppressedWarning(corruptConfigMsg);
+				else new ExceptionBox(corruptConfigMsg).ShowDialog();
 				File.Delete(configPath);
 				initialConfig = ConfigService.Load<Config>(configPath);
 			}
@@ -267,7 +283,9 @@ namespace BizHawk.Client.EmuHawk
 					catch (Exception ex)
 					{
 						var (method, name) = ChooseFallback();
-						new ExceptionBox(new Exception($"Initialization of Display Method failed; falling back to {name}", ex)).ShowDialog();
+						var fallbackMsg = $"Initialization of Display Method failed; falling back to {name}";
+						if (HeadlessMode.Enabled) HeadlessMode.LogSuppressedWarning($"{fallbackMsg}\n{ex}");
+						else new ExceptionBox(new Exception(fallbackMsg, ex)).ShowDialog();
 						return TryInitIGL(initialConfig.DispMethod = method);
 					}
 				}
@@ -287,7 +305,9 @@ namespace BizHawk.Client.EmuHawk
 						catch (Exception ex)
 						{
 							var (method, name) = ChooseFallback();
-							new ExceptionBox(new Exception($"Initialization of Direct3D11 Display Method failed; falling back to {name}", ex)).ShowDialog();
+							var d3dFallbackMsg = $"Initialization of Direct3D11 Display Method failed; falling back to {name}";
+							if (HeadlessMode.Enabled) HeadlessMode.LogSuppressedWarning($"{d3dFallbackMsg}\n{ex}");
+							else new ExceptionBox(new Exception(d3dFallbackMsg, ex)).ShowDialog();
 							return TryInitIGL(initialConfig.DispMethod = method);
 						}
 					case EDispMethod.OpenGL:
@@ -295,7 +315,9 @@ namespace BizHawk.Client.EmuHawk
 						{
 							// too old to use, need to fallback to something else
 							var (method, name) = ChooseFallback();
-							new ExceptionBox(new Exception($"Initialization of OpenGL Display Method failed; falling back to {name}")).ShowDialog();
+							var glFallbackMsg = $"Initialization of OpenGL Display Method failed; falling back to {name}";
+							if (HeadlessMode.Enabled) HeadlessMode.LogSuppressedWarning(glFallbackMsg);
+							else new ExceptionBox(new Exception(glFallbackMsg)).ShowDialog();
 							return TryInitIGL(initialConfig.DispMethod = method);
 						}
 						// need to have a context active for checking renderer, will be disposed afterwards
@@ -337,14 +359,22 @@ namespace BizHawk.Client.EmuHawk
 			{
 				if (EmuHawkUtil.CLRHostHasElevatedPrivileges)
 				{
-					using MsgBox dialog = new(
-						title: "This EmuHawk is privileged",
-						message: $"EmuHawk detected it {(OSTailoredCode.IsUnixHost ? "is running as root (Superuser)" : "has Administrator privileges")}.\n"
-							+ $"Regularly using {(OSTailoredCode.IsUnixHost ? "Superuser" : "Administrator")} for things other than system administration makes it easier to hack you.\n"
-							+ "If you're certain, you may continue anyway (and without support).\n"
-							+ $"You'll find a flag \"{nameof(Config.SkipSuperuserPrivsCheck)}\" in the config file, which disables this warning.",
-						boxIcon: MessageBoxIcon.Warning);
-					dialog.ShowDialog();
+					var privsMsg = $"EmuHawk detected it {(OSTailoredCode.IsUnixHost ? "is running as root (Superuser)" : "has Administrator privileges")}.\n"
+						+ $"Regularly using {(OSTailoredCode.IsUnixHost ? "Superuser" : "Administrator")} for things other than system administration makes it easier to hack you.\n"
+						+ "If you're certain, you may continue anyway (and without support).\n"
+						+ $"You'll find a flag \"{nameof(Config.SkipSuperuserPrivsCheck)}\" in the config file, which disables this warning.";
+					if (HeadlessMode.Enabled)
+					{
+						HeadlessMode.LogSuppressedWarning(privsMsg);
+					}
+					else
+					{
+						using MsgBox dialog = new(
+							title: "This EmuHawk is privileged",
+							message: privsMsg,
+							boxIcon: MessageBoxIcon.Warning);
+						dialog.ShowDialog();
+					}
 				}
 				else
 				{
@@ -376,7 +406,8 @@ namespace BizHawk.Client.EmuHawk
 				{
 					if (!VersionInfo.DeveloperBuild && !ConfigService.IsFromSameVersion(iniPath, out var msg))
 					{
-						new MsgBox(msg, "Mismatched version in config file", MessageBoxIcon.Warning).ShowDialog();
+						if (HeadlessMode.Enabled) HeadlessMode.LogSuppressedWarning(msg);
+						else new MsgBox(msg, "Mismatched version in config file", MessageBoxIcon.Warning).ShowDialog();
 					}
 					initialConfig = ConfigService.Load<Config>(iniPath);
 					initialConfig.ResolveDefaults();
@@ -392,21 +423,37 @@ namespace BizHawk.Client.EmuHawk
 				}
 				catch (Exception e) when (movieSession.Movie.IsActive() && !(Debugger.IsAttached || VersionInfo.DeveloperBuild))
 				{
-					var result = MessageBox.Show(
-						"EmuHawk has thrown a fatal exception and is about to close.\nA movie has been detected. Would you like to try to save?\n(Note: Depending on what caused this error, this may or may not succeed)",
-						$"Fatal error: {e.GetType().Name}",
-						MessageBoxButtons.YesNo,
-						MessageBoxIcon.Exclamation
-					);
-					if (result == DialogResult.Yes)
+					if (HeadlessMode.Enabled)
 					{
-						movieSession.Movie.Save();
+						Console.Error.WriteLine($"[headless] fatal exception (movie active, not saving): {e}");
+						exitCode = 1;
+					}
+					else
+					{
+						var result = MessageBox.Show(
+							"EmuHawk has thrown a fatal exception and is about to close.\nA movie has been detected. Would you like to try to save?\n(Note: Depending on what caused this error, this may or may not succeed)",
+							$"Fatal error: {e.GetType().Name}",
+							MessageBoxButtons.YesNo,
+							MessageBoxIcon.Exclamation
+						);
+						if (result == DialogResult.Yes)
+						{
+							movieSession.Movie.Save();
+						}
 					}
 				}
 			}
 			catch (Exception e) when (!Debugger.IsAttached)
 			{
-				new ExceptionBox(e).ShowDialog();
+				if (HeadlessMode.Enabled)
+				{
+					Console.Error.WriteLine($"[headless] fatal exception: {e}");
+					exitCode = 1;
+				}
+				else
+				{
+					new ExceptionBox(e).ShowDialog();
+				}
 			}
 			finally
 			{

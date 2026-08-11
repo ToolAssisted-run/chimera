@@ -8,22 +8,43 @@ namespace BizHawk.Client.EmuHawk
 {
 	public static class DialogControllerWinFormsExtensions
 	{
+		/// <summary>every modal dialog in the app funnels through the extensions below; in --headless mode showing one is fatal (log + exit) rather than an invisible block</summary>
+		private static void HeadlessGuard(string kind, string? detail)
+		{
+			if (HeadlessMode.Enabled) HeadlessMode.FatalDialog(kind, detail);
+		}
+
 		public static IWin32Window AsWinFormsHandle(this IDialogParent dialogParent) => (IWin32Window) dialogParent;
 
 		public static DialogResult ShowDialogAsChild(this IDialogParent dialogParent, CommonDialog dialog)
-			=> dialog.ShowDialog(dialogParent.AsWinFormsHandle());
+		{
+			HeadlessGuard(dialog.GetType().Name, null);
+			return dialog.ShowDialog(dialogParent.AsWinFormsHandle());
+		}
 
 		public static DialogResult ShowDialogAsChild(this IDialogParent dialogParent, Form dialog)
-			=> dialog.ShowDialog(dialogParent.AsWinFormsHandle());
+		{
+			HeadlessGuard(dialog.GetType().Name, dialog.Text);
+			return dialog.ShowDialog(dialogParent.AsWinFormsHandle());
+		}
 
 		public static DialogResult ShowDialogWithTempMute(this IDialogParent dialogParent, CommonDialog dialog)
-			=> dialogParent.DialogController.DoWithTempMute(() => dialog.ShowDialog(dialogParent.AsWinFormsHandle()));
+		{
+			HeadlessGuard(dialog.GetType().Name, null);
+			return dialogParent.DialogController.DoWithTempMute(() => dialog.ShowDialog(dialogParent.AsWinFormsHandle()));
+		}
 
 		public static DialogResult ShowDialogWithTempMute(this IDialogParent dialogParent, Form dialog)
-			=> dialogParent.DialogController.DoWithTempMute(() => dialog.ShowDialog(dialogParent.AsWinFormsHandle()));
+		{
+			HeadlessGuard(dialog.GetType().Name, dialog.Text);
+			return dialogParent.DialogController.DoWithTempMute(() => dialog.ShowDialog(dialogParent.AsWinFormsHandle()));
+		}
 
 		public static DialogResult ShowDialogWithTempMute(this IDialogParent dialogParent, FolderBrowserEx dialog)
-			=> dialogParent.DialogController.DoWithTempMute(() => dialog.ShowDialog(dialogParent.AsWinFormsHandle()));
+		{
+			HeadlessGuard(nameof(FolderBrowserEx), dialog.Description);
+			return dialogParent.DialogController.DoWithTempMute(() => dialog.ShowDialog(dialogParent.AsWinFormsHandle()));
+		}
 
 		public static DialogResult ShowMessageBox(
 			this IDialogController mainForm,
@@ -32,7 +53,9 @@ namespace BizHawk.Client.EmuHawk
 			string? caption,
 			MessageBoxButtons buttons,
 			EMsgBoxIcon? icon)
-				=> MessageBox.Show(
+		{
+			HeadlessGuard(caption ?? "(no caption)", text);
+			return MessageBox.Show(
 					owner?.AsWinFormsHandle(),
 					text,
 					caption ?? string.Empty,
@@ -47,5 +70,6 @@ namespace BizHawk.Client.EmuHawk
 						EMsgBoxIcon.Info => MessageBoxIcon.Information,
 						_ => throw new InvalidOperationException(),
 					});
+		}
 	}
 }
