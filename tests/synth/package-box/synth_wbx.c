@@ -1,0 +1,63 @@
+/* synth.wbx - the waterboxed flavor (c) of the Synth machine.
+ *
+ * The machine itself is the SAME reference implementation as flavors (a)/(b):
+ * native/synthcore.c, compiled unchanged for the guest. This file is only the
+ * thin waterbox ABI layer over it. The whole machine state lives in guest
+ * memory, so the miniBox host savestates it automatically - there is no
+ * explicit serialize/deserialize here, unlike the native and C# adapters.
+ * That is the point of the waterbox flavor: reproducibility by construction.
+ *
+ * The rom arrives as a mounted file "rom" (read at Init, per the side-effect
+ * rule - all data through the host interface, never a host path).
+ */
+#include <emulibc.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+/* synthcore.c public API (see tests/synth/SPEC.md). */
+typedef struct synth synth_t;
+extern synth_t *synth_create(const uint8_t *rom, uint32_t romSize);
+extern void synth_reset(synth_t *s);
+extern void synth_frame(synth_t *s, uint8_t pad);
+extern uint8_t *synth_get_ram(synth_t *s);
+extern const uint8_t *synth_get_framebuffer(synth_t *s);
+extern const int16_t *synth_get_audio(synth_t *s);
+extern uint8_t synth_input_was_read(synth_t *s);
+
+static synth_t *g_synth;
+
+/* Reads the whole mounted "rom" file into a buffer (caller frees). */
+static uint8_t *read_rom(uint32_t *out_len) {
+	FILE *f = fopen("rom", "rb");
+	if (!f) return 0;
+	fseek(f, 0, SEEK_END);
+	long n = ftell(f);
+	fseek(f, 0, SEEK_SET);
+	uint8_t *buf = (uint8_t *)malloc(n > 0 ? (size_t)n : 1);
+	if (fread(buf, 1, (size_t)n, f) != (size_t)n) { free(buf); fclose(f); return 0; }
+	fclose(f);
+	*out_len = (uint32_t)n;
+	return buf;
+}
+
+ECL_EXPORT int Init(void) {
+	uint32_t len = 0;
+	uint8_t *rom = read_rom(&len);
+	if (!rom) return 0;
+	g_synth = synth_create(rom, len);   /* copies the rom internally */
+	free(rom);
+	if (!g_synth) return 0;
+	synth_reset(g_synth);
+	return 1;
+}
+
+ECL_EXPORT void FrameAdvance(uint32_t pad) { synth_frame(g_synth, (uint8_t)pad); }
+
+/* Guest-memory pointers the host reads while active (RAM/VRAM/audio domains). */
+ECL_EXPORT uint8_t *GetRam(void)         { return synth_get_ram(g_synth); }
+ECL_EXPORT uint8_t *GetFramebuffer(void) { return (uint8_t *)synth_get_framebuffer(g_synth); }
+ECL_EXPORT int16_t *GetAudio(void)       { return (int16_t *)synth_get_audio(g_synth); }
+ECL_EXPORT int      InputWasRead(void)   { return synth_input_was_read(g_synth); }
+
+int main(void) { return 0; }

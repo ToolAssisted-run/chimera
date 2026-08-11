@@ -9,3 +9,6 @@ package-sharp/bin/
 package-sharp/obj/
 package-sharp/tester/bin/
 package-sharp/tester/obj/
+package-box/synth.wbx
+package-box/*.o
+package-box/synth-run-box

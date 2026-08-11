@@ -52,6 +52,9 @@ report() { # name result detail
 # Goldens are RECORDED from the native flavor only (the reference); every
 # other flavor must MATCH them - that is the cross-flavor equivalence proof.
 sharp_tester="$here/package-sharp/tester/bin/Release/synth-run-sharp.exe"
+box_tester="$here/package-box/synth-run-box"
+box_wbx="$here/package-box/synth.wbx"
+box_host_dir="$here/../../extern/miniBox/build/runtime-c"
 if [ "$level" = "both" ] || [ "$level" = "a" ]; then
 	for movie in "$here"/movies/*.txt; do
 		name="$(basename "$movie" .txt)"
@@ -94,6 +97,25 @@ if [ "$level" = "both" ] || [ "$level" = "a" ]; then
 			fi
 		else
 			report "A:cs:$name" FAIL "synth-run-sharp.exe not built (run build-package.sh)"
+		fi
+
+		# waterboxed flavor (c): synth.wbx run through the miniBox host, same
+		# goldens. --rerecord here round-trips the WHOLE guest machine via the
+		# waterbox host's save/load state around every frame.
+		if [ -f "$box_tester" ] && [ -f "$box_wbx" ]; then
+			LD_LIBRARY_PATH="$box_host_dir" "$box_tester" "$box_wbx" "$rom" "$movie" > "$work/$name.box.simple.out" 2>/dev/null \
+				|| { report "A:box:$name" FAIL "runner error"; continue; }
+			LD_LIBRARY_PATH="$box_host_dir" "$box_tester" "$box_wbx" "$rom" "$movie" --rerecord > "$work/$name.box.rerecord.out" 2>/dev/null \
+				|| { report "A:box:$name" FAIL "runner error (rerecord)"; continue; }
+			if ! cmp -s "$work/$name.box.simple.out" "$work/$name.box.rerecord.out"; then
+				report "A:box:$name" FAIL "rerecord diverges from simple"
+			elif cmp -s "$work/$name.box.simple.out" "$golden"; then
+				report "A:box:$name" PASS "matches native goldens (waterboxed)"
+			else
+				report "A:box:$name" FAIL "diverges from native: $(diff "$golden" "$work/$name.box.simple.out" | tr '\n' ' ' | head -c 120)"
+			fi
+		else
+			report "A:box:$name" SKIP "synth.wbx not built (run package-box/build-box.sh)"
 		fi
 	done
 fi
