@@ -31,3 +31,6 @@
 	path = extern/sqlite3
 	url = https://github.com/ericsink/cb.git
 	ignore = untracked
+[submodule "extern/miniBox"]
+	url = https://github.com/SergioMartin86/miniBox.git
+	path = extern/miniBox

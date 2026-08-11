@@ -500,10 +500,16 @@ Decisions, all user-confirmed:
    SHA1 on every OS; movies therefore carry the same CorePackageSHA1
    cross-platform. (BizHawk's Nyma layer - one data-driven adapter serving
    every mednafen core - is the scale precedent.)
-4. **The guest toolchain is the core-author kit**, in its own repository
-   (musl fork, emulibc, libco, libcxx sysroot, linkscript, common.mak,
-   conformance tests): miniHawk never compiles cores and does not carry
-   the toolchain.
+4. **Everything waterbox lives in ONE external repository: miniBox**
+   (github.com/SergioMartin86/miniBox), consumed as a submodule at
+   extern/miniBox like every other from-source dependency. It carries all
+   sides: the runtime (sandbox host - miniHawk's meson builds it into the
+   frontend's OS-dependent artifacts), the guest toolchain (the core-author
+   kit: musl fork, emulibc, libco, libcxx sysroot, linkscript, common.mak),
+   the managed host layer, and the waterbox's own conformance tests -
+   independently testable without miniHawk. Plan of record for the runtime:
+   a C/C++ port replacing the imported Rust reference (drops the
+   nightly-Rust requirement; validated differentially against it).
 
 Migration order (each step gated by the synthetic witness, plus the
 quickerNES suite until its core is migrated):
