@@ -54,7 +54,7 @@ report() { # name result detail
 sharp_tester="$here/package-sharp/tester/bin/Release/synth-run-sharp.exe"
 box_tester="$here/package-box/synth-run-box"
 box_wbx="$here/package-box/synth.wbx"
-box_host_dir="$here/../../extern/miniBox/build/runtime-c"
+box_host_dir="$here/../../extern/miniBox/build/meson-linux/source/host"
 if [ "$level" = "both" ] || [ "$level" = "a" ]; then
 	for movie in "$here"/movies/*.txt; do
 		name="$(basename "$movie" .txt)"
