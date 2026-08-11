@@ -1,0 +1,7 @@
+work/
+package/bin/
+package/obj/
+native/synth-run
+native/libsynthcore.so
+native/libsynthcore.dll
+roms/*.testrom

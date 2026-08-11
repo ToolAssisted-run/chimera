@@ -1,0 +1,311 @@
+; gridWalker - the first Synth test game (derived from JaffarPlus's
+; TestEmulator/GridWalker, with the logic moved into the rom per the
+; interpreter architecture, plus video and audio).
+;
+; A cursor walks a 16x15 cell maze (8x8 px cells = the whole 128x120 screen).
+; Walls block; entering a hazard loses; entering the goal wins; exceeding the
+; step budget (1000) loses. Every actual move beeps for one frame; winning
+; plays jingle 0, losing jingle 1; after the game ends the screen background
+; flashes to the win/lose color and the state freezes.
+;
+; RAM layout (the conventions the witness reads):
+;   0x000  status: 0 playing, 1 won, 2 lost
+;   0x001  cursor x (cell)
+;   0x002  cursor y (cell)
+;   0x004  steps taken (32-bit word)
+;   0x008  init flag (0 until first frame ran)
+;
+; DATA: 16x15 cell map, row-major: 0 empty, 1 wall, 2 hazard, 3 goal.
+; Start cell: (1,1). Goal cell: (13,13).
+
+.entry main
+.code
+main:
+    ; R1 = status; non-zero -> frozen end screen (jingle plays itself out)
+    MOVI R0, 0x000
+    LDB R1, R0
+    MOVI R2, 0
+    BNE R1, R2, draw
+
+    ; --- playing ---
+    STOP                      ; end any previous frame's move beep
+
+    ; one-time init: cursor to start cell (1,1)
+    MOVI R0, 8
+    LDB R1, R0
+    MOVI R2, 1
+    BEQ R1, R2, initdone
+    MOVI R1, 1
+    MOVI R0, 0x001
+    STB R1, R0
+    MOVI R0, 0x002
+    STB R1, R0
+    MOVI R0, 8
+    STB R1, R0
+initdone:
+
+    ; R3 = x, R4 = y
+    MOVI R0, 0x001
+    LDB R3, R0
+    MOVI R0, 0x002
+    LDB R4, R0
+
+    ; read pad; propose (R1,R2) = (nx,ny); direction priority U > D > L > R
+    INPUT R5
+    MOV R1, R3
+    MOV R2, R4
+    MOVI R6, 1
+    AND R6, R5, R6
+    MOVI R7, 0
+    BEQ R6, R7, tryD
+    MOVI R6, 1
+    SUB R2, R4, R6
+    JMP haveDir
+tryD:
+    MOVI R6, 2
+    AND R6, R5, R6
+    MOVI R7, 0
+    BEQ R6, R7, tryL
+    MOVI R6, 1
+    ADD R2, R4, R6
+    JMP haveDir
+tryL:
+    MOVI R6, 4
+    AND R6, R5, R6
+    MOVI R7, 0
+    BEQ R6, R7, tryR
+    MOVI R6, 1
+    SUB R1, R3, R6
+    JMP haveDir
+tryR:
+    MOVI R6, 8
+    AND R6, R5, R6
+    MOVI R7, 0
+    BEQ R6, R7, draw
+    MOVI R6, 1
+    ADD R1, R3, R6
+haveDir:
+    ; clamp the proposal to the grid (an off-grid move is a no-op)
+    MOVI R6, 0
+    BGE R1, R6, xlowok
+    MOV R1, R3
+xlowok:
+    MOVI R6, 16
+    BLT R1, R6, xhighok
+    MOV R1, R3
+xhighok:
+    MOVI R6, 0
+    BGE R2, R6, ylowok
+    MOV R2, R4
+ylowok:
+    MOVI R6, 15
+    BLT R2, R6, yhighok
+    MOV R2, R4
+yhighok:
+
+    ; R7 = map cell at (nx,ny)
+    MOVI R6, 16
+    MUL R6, R2, R6
+    ADD R6, R6, R1
+    LDD R7, R6
+
+    ; walls block
+    MOVI R6, 1
+    BEQ R7, R6, draw
+
+    ; no-op unless the cell actually changed
+    BNE R1, R3, doMove
+    BNE R2, R4, doMove
+    JMP draw
+
+doMove:
+    MOV R3, R1
+    MOV R4, R2
+    MOVI R0, 0x001
+    STB R3, R0
+    MOVI R0, 0x002
+    STB R4, R0
+
+    ; steps++ (R1 = new count)
+    MOVI R0, 0x004
+    LDW R1, R0
+    MOVI R2, 1
+    ADD R1, R1, R2
+    STW R1, R0
+
+    ; consequences of the entered cell
+    MOVI R2, 2
+    BEQ R7, R2, lose
+    MOVI R2, 3
+    BEQ R7, R2, win
+    MOVI R2, 1000
+    BGE R1, R2, lose
+
+    ; ordinary move: one-frame beep
+    MOVI R1, 440
+    MOVI R2, 96
+    TONE R1, R2
+    JMP draw
+
+win:
+    MOVI R1, 1
+    MOVI R0, 0x000
+    STB R1, R0
+    MOVI R1, 0
+    PLAY R1
+    JMP draw
+
+lose:
+    MOVI R1, 2
+    MOVI R0, 0x000
+    STB R1, R0
+    MOVI R1, 1
+    PLAY R1
+    JMP draw
+
+draw:
+    ; background: 0 while playing, 5 after win, 6 after loss
+    MOVI R0, 0x000
+    LDB R1, R0
+    MOVI R2, 0
+    BEQ R1, R2, bgplay
+    MOVI R2, 1
+    BEQ R1, R2, bgwin
+    MOVI R6, 6
+    JMP bgset
+bgwin:
+    MOVI R6, 5
+    JMP bgset
+bgplay:
+    MOVI R6, 0
+bgset:
+    CLEAR R6
+
+    ; map pass: cell i in 0..239; tile = cell-1 at (col*8, row*8)
+    MOVI R1, 0
+maploop:
+    LDD R2, R1
+    MOVI R6, 0
+    BEQ R2, R6, mapnext
+    MOVI R6, 15
+    AND R7, R1, R6
+    MOVI R6, 3
+    SHL R7, R7, R6
+    MOVI R6, 4
+    SHR R0, R1, R6
+    MOVI R6, 3
+    SHL R0, R0, R6
+    MOVI R6, 1
+    SUB R2, R2, R6
+    TILE R7, R0, R2
+mapnext:
+    MOVI R6, 1
+    ADD R1, R1, R6
+    MOVI R6, 240
+    BLT R1, R6, maploop
+
+    ; cursor on top (tile 3)
+    MOVI R0, 0x001
+    LDB R1, R0
+    MOVI R6, 3
+    SHL R1, R1, R6
+    MOVI R0, 0x002
+    LDB R2, R0
+    SHL R2, R2, R6
+    MOVI R3, 3
+    TILE R1, R2, R3
+    HALT
+
+.palette
+000000
+707070
+D02020
+20C040
+000000
+60FF60
+802020
+FFFFFF
+000000
+000000
+000000
+000000
+000000
+000000
+000000
+000000
+
+; tile 0: wall
+.tile
+11111111
+11111111
+11111111
+11111111
+11111111
+11111111
+11111111
+11111111
+
+; tile 1: hazard (checkerboard)
+.tile
+20202020
+02020202
+20202020
+02020202
+20202020
+02020202
+20202020
+02020202
+
+; tile 2: goal (ring)
+.tile
+33333333
+30000003
+30000003
+30000003
+30000003
+30000003
+30000003
+33333333
+
+; tile 3: cursor
+.tile
+77777777
+77777777
+77777777
+77777777
+77777777
+77777777
+77777777
+77777777
+
+; jingle 0: win (mechanical ascending ramp, 1:1.5:2:3 frequency ratios)
+.jingle
+320 160 8
+480 160 8
+640 160 8
+960 160 16
+
+; jingle 1: lose (descending)
+.jingle
+400 160 10
+300 160 10
+200 160 10
+100 160 20
+
+; 16x15 map: 0 empty, 1 wall, 2 hazard, 3 goal; border walls all around
+.data
+1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1
+1 0 0 0 1 1 0 0 0 0 2 0 0 0 0 1
+1 0 0 0 1 1 0 0 0 0 1 1 0 0 0 1
+1 0 0 0 0 0 0 0 0 0 1 1 0 0 0 1
+1 0 0 2 0 0 0 0 0 0 0 0 0 0 0 1
+1 0 0 0 0 0 1 1 1 1 0 0 0 0 0 1
+1 0 0 0 0 0 1 0 0 1 0 0 0 0 0 1
+1 0 0 0 0 0 1 0 0 1 2 0 0 0 0 1
+1 0 2 0 0 0 1 0 0 0 0 0 0 0 0 1
+1 0 0 0 0 0 1 0 0 0 1 1 0 0 0 1
+1 0 0 0 0 0 0 0 0 0 1 1 0 0 0 1
+1 0 0 0 2 0 0 0 0 0 0 0 0 0 0 1
+1 0 0 0 0 0 0 0 0 0 0 0 0 3 0 1
+1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1

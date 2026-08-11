@@ -98,6 +98,31 @@ is already expressible - a package whose manifest declares no natives. Flavor
 in Phase 2 (recoverable from the transitional fork's history) - a deliberate
 open question for whenever a waterboxed core is wanted.
 
+**Side-effect freedom (non-waterboxed cores; user-stated, 2026-08-11).** For
+waterboxed cores the sandbox enforces isolation; flavors (a) and (b) must
+uphold it by discipline: a core must contain NO side effects. Like the
+reproducibility pillar, this rule CANNOT be enforced by miniHawk - it is the
+core developer's responsibility. miniHawk states the requirement in the
+contract documentation and trusts core packages to honor it; there is no
+sandbox, no auditing machinery, and none will be added for it. Concretely: no
+writing to the filesystem; no reading directly from the filesystem (ALL data -
+roms, firmware, databases, assets - must arrive through the BizHawk interface);
+no direct I/O of any kind (with rendering-only channels such as OpenGL as the
+one permissible exception); no syscalls; nothing that causes a change in the
+host system that cannot be captured and reverted by a savestate save/load.
+The test is exactly that: if any observable effect of running the core is not
+round-tripped by save/load state, the core is in violation. (Plain memory
+allocation within the core's own lifetime is fine - it is torn down with the
+core and carries no cross-run state.)
+RESOLVED (same day): the QuickerNES adapter's one violation - the BootGod
+cart DB reading NesCarts.xml from its package directory - was reduced to a
+compiled-in PAL/Dendy hash list (PalHashList.cs, 370 SHA1s of PRG+CHR,
+extracted once from the database with first-entry-wins semantics preserved
+for dual-region dumps). The only behavioral use of the database was
+rejecting PAL carts (the core is NTSC-only); the good-dump/name metadata it
+also produced had no remaining consumers and is gone. The QuickerNES core
+now reads nothing from the filesystem at runtime.
+
 ## Agreed decisions
 
 - **Core package interface:** managed .NET adapter DLL implementing `IEmulator` (+ service
@@ -224,6 +249,32 @@ phase of unverified change.
   taking the stale upstream release packaging with it: Package.sh, the packaging bats,
   and the whole nix ecosystem (default.nix, Dist/*.nix, docs, CI workflow) - dead
   since they referenced gamedb/waterbox/defctrl anyway. blip_buf removed (see above).
+  Eighteenth addendum (2026-08-11, user-directed - TOTAL QUICKERNES EVICTION):
+  absolutely nothing from QuickerNES remains in this repository; anything
+  important moved to the quickerNES repo's minihawk/ dir. Concretely: the
+  entire witness apparatus - vendored suite (reversing the earlier vendoring
+  decision), Level A+B goldens, replay.lua, bootstrap.lua, both run-level-b
+  drivers, hidden-run.ps1, native/dumper.cpp, tests/README - moved to
+  quickerNES minihawk/tests/ (drivers grew --minihawk-root/-MiniHawkRoot,
+  defaulting to a sibling miniHawk or BizHawk checkout); stale QuickNesConfig
+  Compile Update items purged from the EmuHawk csproj. The quickerNES witness
+  remains the commit gate, run from its new home, until the synthetic witness
+  (see "The synthetic witness" section) replaces it: three synthetic cores
+  (one per flavor of the core taxonomy) sharing exact emulation logic, video,
+  and audio; a stateful-interpreter emulator whose game logic and assets live
+  in .testrom files; tests that win, lose, and reproduce specific video and
+  audio outputs, byte-compared across all three cores - starting with the
+  native flavor. In the same round the native flavor LANDED in full (see the
+  synthetic-witness section status) and run-witness.sh became THE smoke test,
+  retiring the short-lived --quick subset from the quickerNES drivers; the
+  side-effect-freedom rule for non-waterboxed cores was stated (see the
+  core-flavors section; core-dev responsibility, not enforced by miniHawk)
+  and QuickerNES's NesCarts.xml read - its one violation - was reduced to a
+  compiled-in PAL hash list in the adapter. Also fixed: `meson compile
+  frontend` no longer blocks ~15 minutes on lingering msbuild node-reuse
+  workers (/nodeReuse:false -p:UseSharedCompilation=false). Gate at this
+  round: 26/26 simple + 26/26 rerecord, run from the quickerNES repo against
+  this tree with the PAL-list package; synthetic witness 12/12.
   Seventeenth addendum (2026-08-11, user-directed - LINUX GATE + HEADLESS + layout;
   the sixteenth - an exec-bit fix and charter note - was authored on the Windows box
   and is pending its push): the witness gate now runs on Linux. tests/run-level-b.sh
@@ -417,7 +468,70 @@ phase of unverified change.
   error UX, core-author docs. Port a second core to prove the contract isn't
   QuickerNES-shaped.
 
+## The synthetic witness (planned successor to the quickerNES gate)
+
+Plan (user-stated, 2026-08-11), building on the core-flavor taxonomy above:
+
+1. **Three synthetic cores, one per flavor** - native, pure C#, and waterboxed -
+   with exactly the same emulation logic, video output, and sound output.
+2. **A synthetic game with non-trivial rules** and an input set.
+3. **The test plan**: for a series of input movies, ALL of the memory space, the
+   video output, and the sound output must match across all three cores.
+4. **Each test achieves a different goal**: win the game, lose the game, produce
+   a certain video output, produce a certain audio output.
+
+Architecture (user-stated): the emulator is a **stateful interpreter** with the
+capacity of printing to screen and emitting audio - nothing more. ALL game
+logic, video assets, and audio assets belong to the game, which is provided as
+a **`.testrom` file**; there are multiple test roms. (Consequence: the
+interpreter is a miniature console, the roms are its games, and the rom-routing
+path of the frontend - manifest `extensions` mapping `.testrom` to the
+synthetic system - is exercised exactly like a real system's.)
+
+Derivation: the emulator/game logic derives from the JaffarPlus test emulator
+and its GridWalker test game (a cursor on a bounded W x H grid with clamped
+U/D/L/R moves; goal-cell rules; 2-byte core state), extended with video and
+audio output, and with the logic moved out of the emulator into the rom
+program per the interpreter architecture.
+
+Sequencing: the machinery for waterboxing and for C# core integration is not
+yet defined, so work STARTS WITH THE NATIVE CORE ONLY; the pure-C# and
+waterboxed twins follow when their integration stories exist. Until the
+synthetic witness is complete enough to be the gate, the quickerNES witness
+(now in the quickerNES repository) remains the commit gate.
+
+Status (2026-08-11): the native flavor is fully implemented and passing -
+SPEC.md v1; libsynthcore (the reference interpreter); the .sasm assembler;
+the gridWalker rom (walls/hazards/goal/step budget, per-move beeps, win/lose
+jingles); the synth-native package (adapter + manifest routing .testrom,
+both OS natives); and run-witness.sh, the two-level driver: Level A replays
+the four goal movies (win / lose / video output / audio output) natively and
+checks final RAM plus FULL per-frame video and audio stream hashes against
+goldens, with a serialize-every-frame rerecord self-check; Level B replays
+the same movies through EmuHawk (Mono + Xvfb) and byte-compares the final
+RAM and VRAM domains against the same goldens, both modes. ~10 seconds wall
+clock, and it is THE miniHawk smoke test (user decision, same day): the
+quickerNES --quick smoke subset is retired; quickerNES's suite is the full
+determinism gate only. Audio is Level A-verified only for now (the frontend
+has no scriptable audio tap - an acceptable gap while the frontend audio
+path stays core-agnostic).
+
+Placement note: the synthetic cores are conformance-test fixtures for the
+published contract, not product cores - they live under `tests/` and are built
+by the test harness against `build/dll`, never as members of the solution. The
+"zero core code in the repo" objective refers to the product: miniHawk builds
+and ships with no core in the solution; a test fixture proving the contract
+works is test machinery, same as the witness drivers.
+
 ## Witness harness (two levels, both must pass at every phase boundary)
+
+NOTE (2026-08-11): this section describes the quickerNES witness, which -
+together with the vendored suite, goldens, and drivers - now lives in the
+quickerNES repository (`minihawk/tests/`), per the rule that absolutely
+nothing quickerNES-specific remains in this repository. It is still the
+commit gate (run it from there, `--minihawk-root` pointing here) until the
+synthetic witness above replaces it. The section is kept as the harness's
+design record.
 
 The quickerNES test format: each `.test` is JSON naming a ROM (+ expected SHA1, optional
 initial `.state`, controller types) and a `.sol` input sequence (one line per frame,

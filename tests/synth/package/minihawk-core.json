@@ -1,0 +1,8 @@
+{
+	"formatVersion": 1,
+	"name": "SynthNative",
+	"assembly": "MiniHawk.SynthNative.dll",
+	"factoryTypes": [ "MiniHawk.Cores.Synth.SynthNativeFactory" ],
+	"natives": [ "libsynthcore.dll", "libsynthcore.so" ],
+	"extensions": { ".testrom": "Synth" }
+}
