@@ -516,6 +516,19 @@ determinism gate only. Audio is Level A-verified only for now (the frontend
 has no scriptable audio tap - an acceptable gap while the frontend audio
 path stays core-agnostic).
 
+Flavor (b) LANDED (same day): SynthMachine.cs is a from-spec pure-C#
+reimplementation sharing no code with the native flavor, shipped as
+synth-sharp.zip - a package whose manifest declares an empty natives list;
+nothing is loaded at runtime, upholding side-effect freedom trivially. The
+C# core integration story turned out to already exist: the contract and
+package loader handle a natives-free package unchanged. Cross-flavor
+equivalence is proven by the witness: the C# Level A tester and the
+frontend-loaded package both reproduce the NATIVE-recorded goldens
+bit-exactly - RAM, full per-frame video stream, full audio stream, all
+four goal movies, both replay modes (24/24). Goldens are only ever
+recorded from the native reference; other flavors must match, never
+re-record. Remaining: flavor (c), blocked on the waterbox machinery.
+
 Placement note: the synthetic cores are conformance-test fixtures for the
 published contract, not product cores - they live under `tests/` and are built
 by the test harness against `build/dll`, never as members of the solution. The

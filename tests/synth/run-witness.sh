@@ -49,6 +49,9 @@ report() { # name result detail
 }
 
 # ---------- Level A ----------
+# Goldens are RECORDED from the native flavor only (the reference); every
+# other flavor must MATCH them - that is the cross-flavor equivalence proof.
+sharp_tester="$here/package-sharp/tester/bin/Release/synth-run-sharp.exe"
 if [ "$level" = "both" ] || [ "$level" = "a" ]; then
 	for movie in "$here"/movies/*.txt; do
 		name="$(basename "$movie" .txt)"
@@ -56,33 +59,48 @@ if [ "$level" = "both" ] || [ "$level" = "a" ]; then
 		golden="$golden_dir/$name.expected"
 		"$here/native/synth-run" "$rom" "$movie" \
 			--dump-ram "$work/$name.ram.bin" --dump-vram "$work/$name.vram.bin" \
-			> "$work/$name.simple.out" || { report "A:$name" FAIL "runner error"; continue; }
+			> "$work/$name.simple.out" || { report "A:nat:$name" FAIL "runner error"; continue; }
 		"$here/native/synth-run" "$rom" "$movie" --rerecord > "$work/$name.rerecord.out" \
-			|| { report "A:$name" FAIL "runner error (rerecord)"; continue; }
+			|| { report "A:nat:$name" FAIL "runner error (rerecord)"; continue; }
 		if ! cmp -s "$work/$name.simple.out" "$work/$name.rerecord.out"; then
-			report "A:$name" FAIL "rerecord diverges from simple"
+			report "A:nat:$name" FAIL "rerecord diverges from simple"
 			continue
 		fi
 		if [ "$record" -eq 1 ]; then
 			cp "$work/$name.simple.out" "$golden"
 			cp "$work/$name.ram.bin" "$golden_dir/$name.ram.bin"
 			cp "$work/$name.vram.bin" "$golden_dir/$name.vram.bin"
-			report "A:$name" RECORDED "$(grep -o 'frames=[0-9]*' "$golden")"
+			report "A:nat:$name" RECORDED "$(grep -o 'frames=[0-9]*' "$golden")"
 		elif [ ! -f "$golden" ]; then
-			report "A:$name" NOGOLDEN ""
+			report "A:nat:$name" NOGOLDEN ""
 		elif cmp -s "$work/$name.simple.out" "$golden"; then
-			report "A:$name" PASS "$(grep -o 'frames=[0-9]*' "$golden")"
+			report "A:nat:$name" PASS "$(grep -o 'frames=[0-9]*' "$golden")"
 		else
-			report "A:$name" FAIL "metrics differ: $(diff "$golden" "$work/$name.simple.out" | tr '\n' ' ' | head -c 120)"
+			report "A:nat:$name" FAIL "metrics differ: $(diff "$golden" "$work/$name.simple.out" | tr '\n' ' ' | head -c 120)"
+		fi
+
+		# pure-C# flavor against the SAME goldens (never recorded from it)
+		if [ -f "$sharp_tester" ]; then
+			mono "$sharp_tester" "$rom" "$movie" > "$work/$name.cs.simple.out" 2>/dev/null \
+				|| { report "A:cs:$name" FAIL "runner error"; continue; }
+			mono "$sharp_tester" "$rom" "$movie" --rerecord > "$work/$name.cs.rerecord.out" 2>/dev/null \
+				|| { report "A:cs:$name" FAIL "runner error (rerecord)"; continue; }
+			if ! cmp -s "$work/$name.cs.simple.out" "$work/$name.cs.rerecord.out"; then
+				report "A:cs:$name" FAIL "rerecord diverges from simple"
+			elif cmp -s "$work/$name.cs.simple.out" "$golden"; then
+				report "A:cs:$name" PASS "matches native goldens"
+			else
+				report "A:cs:$name" FAIL "diverges from native: $(diff "$golden" "$work/$name.cs.simple.out" | tr '\n' ' ' | head -c 120)"
+			fi
+		else
+			report "A:cs:$name" FAIL "synth-run-sharp.exe not built (run build-package.sh)"
 		fi
 	done
 fi
 
 # ---------- Level B ----------
 if [ "$level" = "both" ] || [ "$level" = "b" ]; then
-	package="$repo_root/build/Cores/synth-native.zip"
 	emu_hawk="$repo_root/build/EmuHawk.exe"
-	[ -f "$package" ] || { echo "package not found: $package (run build-package.sh)" >&2; exit 1; }
 
 	export LD_LIBRARY_PATH="$repo_root/build/dll:$repo_root/build:/usr/lib/x86_64-linux-gnu"
 	export MONO_CRASH_NOFILE=1 MONO_WINFORMS_XIM_STYLE=disabled ALSOFT_DRIVERS=null
@@ -110,35 +128,40 @@ if [ "$level" = "both" ] || [ "$level" = "b" ]; then
 	# rendering (wasted cores); display method cannot affect emulation
 	sed -i 's/"DispMethod": [0-9]/"DispMethod": 1/' "$config"
 
-	for movie in "$here"/movies/*.txt; do
-		name="$(basename "$movie" .txt)"
-		rom="$here/roms/${name%%.*}.testrom"
-		for mode in simple rerecord; do
-			job="$work/job.$name.$mode.txt"
-			{
-				echo "movie=$movie"
-				echo "outram=$work/$name.b.$mode.ram.bin"
-				echo "outvram=$work/$name.b.$mode.vram.bin"
-				echo "meta=$work/$name.b.$mode.meta.txt"
-				echo "mode=$mode"
-			} > "$job"
-			rm -f "$work/$name.b.$mode.ram.bin" "$work/$name.b.$mode.vram.bin" "$work/$name.b.$mode.meta.txt"
-			cp "$config" "$work/config.$name.$mode.ini"
-			( cd "$repo_root" && MINIHAWK_JOB="$job" timeout 300 mono "$emu_hawk" --headless \
-				"--config=$work/config.$name.$mode.ini" "--core=$package" \
-				"--lua=$here/synth-replay.lua" "$rom" ) > "$work/$name.b.$mode.log" 2>&1
-			if [ ! -f "$work/$name.b.$mode.meta.txt" ] || ! grep -q "^status=OK" "$work/$name.b.$mode.meta.txt"; then
-				report "B:$name:$mode" FAIL "no OK meta (see work/$name.b.$mode.log)"
-				continue
-			fi
-			if [ "$record" -eq 1 ]; then
-				report "B:$name:$mode" PASS "(goldens recorded at level A)"
-			elif cmp -s "$work/$name.b.$mode.ram.bin" "$golden_dir/$name.ram.bin" \
-				&& cmp -s "$work/$name.b.$mode.vram.bin" "$golden_dir/$name.vram.bin"; then
-				report "B:$name:$mode" PASS "RAM+VRAM byte-identical to level A goldens"
-			else
-				report "B:$name:$mode" FAIL "RAM or VRAM differs from level A goldens"
-			fi
+	for flavor in native sharp; do
+		package="$repo_root/build/Cores/synth-$flavor.zip"
+		[ -f "$package" ] || { echo "package not found: $package (run build-package.sh)" >&2; exit 1; }
+		for movie in "$here"/movies/*.txt; do
+			name="$(basename "$movie" .txt)"
+			rom="$here/roms/${name%%.*}.testrom"
+			for mode in simple rerecord; do
+				tag="$name.$flavor.$mode"
+				job="$work/job.$tag.txt"
+				{
+					echo "movie=$movie"
+					echo "outram=$work/$tag.ram.bin"
+					echo "outvram=$work/$tag.vram.bin"
+					echo "meta=$work/$tag.meta.txt"
+					echo "mode=$mode"
+				} > "$job"
+				rm -f "$work/$tag.ram.bin" "$work/$tag.vram.bin" "$work/$tag.meta.txt"
+				cp "$config" "$work/config.$tag.ini"
+				( cd "$repo_root" && MINIHAWK_JOB="$job" timeout 300 mono "$emu_hawk" --headless \
+					"--config=$work/config.$tag.ini" "--core=$package" \
+					"--lua=$here/synth-replay.lua" "$rom" ) > "$work/$tag.log" 2>&1
+				if [ ! -f "$work/$tag.meta.txt" ] || ! grep -q "^status=OK" "$work/$tag.meta.txt"; then
+					report "B:$flavor:$name:$mode" FAIL "no OK meta (see work/$tag.log)"
+					continue
+				fi
+				if [ "$record" -eq 1 ]; then
+					report "B:$flavor:$name:$mode" PASS "(goldens recorded at level A)"
+				elif cmp -s "$work/$tag.ram.bin" "$golden_dir/$name.ram.bin" \
+					&& cmp -s "$work/$tag.vram.bin" "$golden_dir/$name.vram.bin"; then
+					report "B:$flavor:$name:$mode" PASS "RAM+VRAM byte-identical to level A goldens"
+				else
+					report "B:$flavor:$name:$mode" FAIL "RAM or VRAM differs from level A goldens"
+				fi
+			done
 		done
 	done
 fi

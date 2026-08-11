@@ -5,3 +5,7 @@ native/synth-run
 native/libsynthcore.so
 native/libsynthcore.dll
 roms/*.testrom
+package-sharp/bin/
+package-sharp/obj/
+package-sharp/tester/bin/
+package-sharp/tester/obj/

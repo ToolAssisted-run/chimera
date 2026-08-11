@@ -41,10 +41,16 @@ nothing is part of BizHawk.sln, and nothing is quickerNES- or system-specific.
       video output / audio output), Level A native metrics incl. full
       per-frame video+audio stream hashes with a rerecord self-check, Level B
       through EmuHawk with RAM+VRAM byte-compare against the same goldens,
-      both modes. ~10 s wall clock - THE miniHawk smoke test (supersedes the
+      both modes. ~20 s wall clock - THE miniHawk smoke test (supersedes the
       old quickerNES --quick subset).
+- [x] Pure-C# twin (flavor b): SynthMachine.cs, written from SPEC.md alone
+      (no shared code with the native flavor), shipped as synth-sharp.zip -
+      a manifest with an EMPTY natives list; nothing loaded at runtime. Its
+      Level A tester (synth-run-sharp, under Mono) and its frontend package
+      both verify against the NATIVE-recorded goldens: bit-identical RAM,
+      video stream, and audio stream on every movie, first try - the
+      contract needed no changes for a pure-C# core.
 - [ ] Additional test roms (dedicated video-goal and audio-goal roms)
-- [ ] Pure-C# twin (flavor b) - blocked on the C# core integration story
 - [ ] Waterboxed twin (flavor c) - blocked on the waterboxing machinery
 
 ## Provenance

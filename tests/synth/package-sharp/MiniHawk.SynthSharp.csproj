@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+	<!--
+		The pure-C# flavor Synth core package (flavor b of the core taxonomy):
+		managed code only, no natives declared, nothing loaded at runtime.
+		Builds against the published miniHawk core contract from
+		<MiniHawkRoot>/build/dll; deliberately NOT part of BizHawk.sln.
+	-->
+	<PropertyGroup>
+		<MiniHawkRoot Condition=" '$(MiniHawkRoot)' == '' ">$(MSBuildProjectDirectory)/../../..</MiniHawkRoot>
+		<TargetFramework>net48</TargetFramework>
+		<AssemblyName>MiniHawk.SynthSharp</AssemblyName>
+		<RootNamespace>MiniHawk.Cores.SynthSharp</RootNamespace>
+		<LangVersion>preview</LangVersion>
+		<Nullable>disable</Nullable>
+		<EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+		<GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+		<AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+	</PropertyGroup>
+	<ItemGroup>
+		<Using Include="System" />
+		<PackageReference Include="System.Memory" Version="4.6.3" />
+		<Compile Include="source/**/*.cs" />
+		<Reference Include="BizHawk.Common" HintPath="$(MiniHawkRoot)/build/dll/BizHawk.Common.dll" Private="false" />
+		<Reference Include="BizHawk.Emulation.Common" HintPath="$(MiniHawkRoot)/build/dll/BizHawk.Emulation.Common.dll" Private="false" />
+	</ItemGroup>
+</Project>

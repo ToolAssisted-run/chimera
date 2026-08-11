@@ -31,9 +31,13 @@ for src in "$here"/roms/*.sasm; do
 	python3 "$here/asm.py" "$src" "${src%.sasm}.testrom"
 done
 
-# managed adapter
+# managed adapters (both flavors) + the C# level A tester
 dotnet build "$here/package/MiniHawk.SynthNative.csproj" -c "$configuration" \
 	-p:MiniHawkRoot="$minihawk_root" -v q --nologo /nodeReuse:false -p:UseSharedCompilation=false
+dotnet build "$here/package-sharp/MiniHawk.SynthSharp.csproj" -c "$configuration" \
+	-p:MiniHawkRoot="$minihawk_root" -v q --nologo /nodeReuse:false -p:UseSharedCompilation=false
+dotnet build "$here/package-sharp/tester/SynthRunSharp.csproj" -c "$configuration" \
+	-v q --nologo /nodeReuse:false -p:UseSharedCompilation=false
 
 staging="$here/package/bin/package-staging"
 rm -rf "$staging"
@@ -43,6 +47,14 @@ cp "$here/package/defctrl.json" "$staging"
 cp "$here/package/bin/$configuration/MiniHawk.SynthNative.dll" "$staging"
 cp "$here/native/libsynthcore.so" "$staging"
 [ -f "$here/native/libsynthcore.dll" ] && cp "$here/native/libsynthcore.dll" "$staging"
+
+# pure-C# flavor staging: adapter + manifest + defctrl, nothing else
+staging_sharp="$here/package-sharp/bin/package-staging"
+rm -rf "$staging_sharp"
+mkdir -p "$staging_sharp"
+cp "$here/package-sharp/minihawk-core.json" "$staging_sharp"
+cp "$here/package-sharp/defctrl.json" "$staging_sharp"
+cp "$here/package-sharp/bin/$configuration/MiniHawk.SynthSharp.dll" "$staging_sharp"
 
 cores_dir="$minihawk_root/build/Cores"
 mkdir -p "$cores_dir"
@@ -58,7 +70,20 @@ with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as z:
             full = os.path.join(root, name)
             z.write(full, os.path.relpath(full, staging))
 EOF
-for cache in "$minihawk_root"/build/CoreCache/synth-native-*; do
+zip_sharp="$cores_dir/synth-sharp.zip"
+rm -f "$zip_sharp"
+python3 - "$staging_sharp" "$zip_sharp" <<'PYEOF'
+import os, sys, zipfile
+staging, zip_path = sys.argv[1], sys.argv[2]
+with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as z:
+    for root, dirs, files in os.walk(staging):
+        dirs.sort()
+        for name in sorted(files):
+            full = os.path.join(root, name)
+            z.write(full, os.path.relpath(full, staging))
+PYEOF
+for cache in "$minihawk_root"/build/CoreCache/synth-native-* "$minihawk_root"/build/CoreCache/synth-sharp-*; do
 	[ -d "$cache" ] && rm -rf "$cache" || true
 done
 echo "packaged -> $zip_path"
+echo "packaged -> $zip_sharp"
