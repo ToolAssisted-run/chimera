@@ -150,7 +150,10 @@ if [ "$level" = "both" ] || [ "$level" = "b" ]; then
 	# rendering (wasted cores); display method cannot affect emulation
 	sed -i 's/"DispMethod": [0-9]/"DispMethod": 1/' "$config"
 
-	for flavor in native sharp; do
+	# miniHawk is waterbox-only: the frontend only accepts .wbx cores, so the box
+	# flavor is the ONLY Level-B core. native/sharp are Level-A equivalence
+	# references (proving synth.wbx matches the goldens), never frontend cores.
+	for flavor in box; do
 		package="$repo_root/build/Cores/synth-$flavor.zip"
 		[ -f "$package" ] || { echo "package not found: $package (run build-package.sh)" >&2; exit 1; }
 		for movie in "$here"/movies/*.txt; do

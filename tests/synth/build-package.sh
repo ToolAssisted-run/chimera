@@ -39,6 +39,16 @@ dotnet build "$here/package-sharp/MiniHawk.SynthSharp.csproj" -c "$configuration
 dotnet build "$here/package-sharp/tester/SynthRunSharp.csproj" -c "$configuration" \
 	-v q --nologo /nodeReuse:false -p:UseSharedCompilation=false
 
+# waterboxed flavor (c): build the miniBox host + guest toolchain (musl builds in
+# the meson graph), then synth.wbx, then the managed box adapter.
+mb="$minihawk_root/extern/miniBox"
+mbuild="$mb/build/meson-linux"
+[ -f "$mbuild/build.ninja" ] || meson setup "$mbuild" "$mb"
+ninja -C "$mbuild"
+sh "$here/package-box/build-box.sh"
+dotnet build "$here/package-box/MiniHawk.SynthBox.csproj" -c "$configuration" \
+	-p:MiniHawkRoot="$minihawk_root" -v q --nologo /nodeReuse:false -p:UseSharedCompilation=false
+
 staging="$here/package/bin/package-staging"
 rm -rf "$staging"
 mkdir -p "$staging"
@@ -55,6 +65,18 @@ mkdir -p "$staging_sharp"
 cp "$here/package-sharp/minihawk-core.json" "$staging_sharp"
 cp "$here/package-sharp/defctrl.json" "$staging_sharp"
 cp "$here/package-sharp/bin/$configuration/MiniHawk.SynthSharp.dll" "$staging_sharp"
+
+# waterboxed flavor staging: adapter + manifest + defctrl + the guest (synth.wbx)
+# + the miniBox host (libminiboxhost, the declared native).
+staging_box="$here/package-box/bin/package-staging"
+rm -rf "$staging_box"
+mkdir -p "$staging_box"
+cp "$here/package-box/minihawk-core.json" "$staging_box"
+cp "$here/package-box/defctrl.json" "$staging_box"
+cp "$here/package-box/bin/$configuration/MiniHawk.SynthBox.dll" "$staging_box"
+cp "$here/package-box/synth.wbx" "$staging_box"
+cp "$mbuild/source/host/libminiboxhost.so" "$staging_box"
+[ -f "$mbuild/source/host/libminiboxhost.dll" ] && cp "$mbuild/source/host/libminiboxhost.dll" "$staging_box"
 
 cores_dir="$minihawk_root/build/Cores"
 mkdir -p "$cores_dir"
@@ -82,8 +104,21 @@ with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as z:
             full = os.path.join(root, name)
             z.write(full, os.path.relpath(full, staging))
 PYEOF
-for cache in "$minihawk_root"/build/CoreCache/synth-native-* "$minihawk_root"/build/CoreCache/synth-sharp-*; do
+zip_box="$cores_dir/synth-box.zip"
+rm -f "$zip_box"
+python3 - "$staging_box" "$zip_box" <<'PYEOF'
+import os, sys, zipfile
+staging, zip_path = sys.argv[1], sys.argv[2]
+with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as z:
+    for root, dirs, files in os.walk(staging):
+        dirs.sort()
+        for name in sorted(files):
+            full = os.path.join(root, name)
+            z.write(full, os.path.relpath(full, staging))
+PYEOF
+for cache in "$minihawk_root"/build/CoreCache/synth-native-* "$minihawk_root"/build/CoreCache/synth-sharp-* "$minihawk_root"/build/CoreCache/synth-box-*; do
 	[ -d "$cache" ] && rm -rf "$cache" || true
 done
 echo "packaged -> $zip_path"
 echo "packaged -> $zip_sharp"
+echo "packaged -> $zip_box"

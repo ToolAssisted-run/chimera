@@ -24,8 +24,13 @@ extern uint8_t *synth_get_ram(synth_t *s);
 extern const uint8_t *synth_get_framebuffer(synth_t *s);
 extern const int16_t *synth_get_audio(synth_t *s);
 extern uint8_t synth_input_was_read(synth_t *s);
+extern void synth_get_video_bgra(synth_t *s, uint32_t *out);  /* palette-resolved 128x120 BGRA */
+
+#define FB_W 128
+#define FB_H 120
 
 static synth_t *g_synth;
+static uint32_t g_video[FB_W * FB_H];
 
 /* Reads the whole mounted "rom" file into a buffer (caller frees). */
 static uint8_t *read_rom(uint32_t *out_len) {
@@ -59,5 +64,9 @@ ECL_EXPORT uint8_t *GetRam(void)         { return synth_get_ram(g_synth); }
 ECL_EXPORT uint8_t *GetFramebuffer(void) { return (uint8_t *)synth_get_framebuffer(g_synth); }
 ECL_EXPORT int16_t *GetAudio(void)       { return (int16_t *)synth_get_audio(g_synth); }
 ECL_EXPORT int      InputWasRead(void)   { return synth_input_was_read(g_synth); }
+
+/* Palette-resolved presentation for the frontend's IVideoProvider (the raw
+ * palette-index framebuffer is what the witness hashes; this is display only). */
+ECL_EXPORT uint32_t *GetVideoBgra(void)  { synth_get_video_bgra(g_synth, g_video); return g_video; }
 
 int main(void) { return 0; }

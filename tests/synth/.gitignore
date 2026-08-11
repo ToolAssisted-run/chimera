@@ -12,3 +12,5 @@ package-sharp/tester/obj/
 package-box/synth.wbx
 package-box/*.o
 package-box/synth-run-box
+package-box/bin/
+package-box/obj/
