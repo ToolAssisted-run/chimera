@@ -585,7 +585,24 @@ frontend-loaded package both reproduce the NATIVE-recorded goldens
 bit-exactly - RAM, full per-frame video stream, full audio stream, all
 four goal movies, both replay modes (24/24). Goldens are only ever
 recorded from the native reference; other flavors must match, never
-re-record. Remaining: flavor (c), blocked on the waterbox machinery.
+re-record.
+
+Flavor (c) LANDED (2026-08-11): synth.wbx is the SAME synthcore.c
+compiled for the miniBox waterbox sandbox (see the miniBox repository at
+extern/miniBox - a from-scratch C/C++ port of BizHawk's waterbox host,
+GCC-built guest toolchain, machine spec, all meson) and wrapped in the
+waterbox ABI (tests/synth/package-box/). Its whole machine state lives in
+guest memory, so the waterbox host savestates it AUTOMATICALLY - no
+explicit serialize/deserialize, the defining property of the flavor. The
+Level A tester runs it through the miniBox host and reproduces the
+native-recorded goldens byte-exactly on all four movies, in both plain
+mode AND whole-machine-rerecord mode (the waterbox host round-tripping the
+entire guest around every frame). run-witness.sh now checks all THREE
+flavors at Level A. The core-flavor taxonomy is thus demonstrated end to
+end: three independent implementations (native C, pure C#, waterboxed C),
+one frozen spec, bit-identical memory + video + audio. This also validates
+the waterbox-only redesign's foundation - the miniBox host is real,
+GCC-buildable (no clang/nightly-Rust), and reproduces emulation exactly.
 
 Placement note: the synthetic cores are conformance-test fixtures for the
 published contract, not product cores - they live under `tests/` and are built
