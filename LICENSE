@@ -1,13 +1,14 @@
-﻿miniHawk is a derivative fork of BizHawk (https://github.com/TASEmulators/BizHawk).
+miniHawk is a derivative fork of BizHawk (https://github.com/TASEmulators/BizHawk).
 
 The upstream BizHawk repository combines an MIT-licensed C# frontend by the
 BizHawk team with many emulation cores under a variety of licenses, and its
 license file therefore describes the whole as a heterogeneous combination. In
 this fork, all emulation cores and their support machinery have been removed:
-what remains is the BizHawk team's original MIT-licensed work â€” the frontend
-and its supporting libraries â€” plus miniHawk's own modifications, which are
-provided under the same MIT License. Copyright in the overwhelming majority of
-this code belongs to the BizHawk team.
+what remains is the BizHawk team's original MIT-licensed work - the frontend
+and its supporting libraries - plus miniHawk's own modifications and new work,
+which are provided under the same MIT License. Copyright in the code inherited
+from BizHawk belongs to the BizHawk team; copyright in miniHawk's modifications
+and in all new work authored for miniHawk belongs to Sergio Martin.
 
 Exceptions, clearly separable from the MIT-licensed sources:
 
@@ -25,13 +26,14 @@ Exceptions, clearly separable from the MIT-licensed sources:
   tests/suite/README.md.
 
 --------------------------
-All of the BizHawk team's original work, and miniHawk's modifications to it,
-are provided under this license:
+All of the BizHawk team's original work, and miniHawk's modifications and new
+work, are provided under this license:
 --------------------------
 
 MIT License
 
-Copyright (c) BizHawk team
+Copyright (c) BizHawk team (code inherited from BizHawk)
+Copyright (c) 2026 Sergio Martin (miniHawk modifications and new work)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
 

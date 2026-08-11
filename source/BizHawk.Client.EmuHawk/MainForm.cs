@@ -53,7 +53,7 @@ namespace BizHawk.Client.EmuHawk
 			Text = string.Format(FMT_STR_DUMP_STATUS_MENUITEM_LABEL, string.Empty),
 		};
 
-		private readonly ToolStripMenuItemEx NullHawkVSysSubmenu = new() { Enabled = false, Text = "â€”" };
+		private readonly ToolStripMenuItemEx NullHawkVSysSubmenu = new() { Enabled = false, Text = "—" };
 
 		private readonly ToolStripMenuItemEx RealTimeCounterMenuItem = new() { Enabled = false, Text = "00:00.0" };
 
@@ -100,7 +100,7 @@ namespace BizHawk.Client.EmuHawk
 			}
 
 #if BIZHAWKBUILD_SUPERHAWK
-			ToolStripMenuItemEx superHawkThrottleMenuItem = new() { Text = "SUPERÂ·HAWK" };
+			ToolStripMenuItemEx superHawkThrottleMenuItem = new() { Text = "SUPER·HAWK" };
 			superHawkThrottleMenuItem.Click += (_, _) => Config.SuperHawkThrottle = !Config.SuperHawkThrottle;
 			_ = SpeedSkipSubMenu.DropDownItems.InsertBefore(MinimizeSkippingMenuItem, insert: superHawkThrottleMenuItem);
 			ConfigSubMenu.DropDownOpened += (_, _) => superHawkThrottleMenuItem.Checked = Config.SuperHawkThrottle;

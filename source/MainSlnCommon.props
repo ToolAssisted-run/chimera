@@ -55,6 +55,6 @@
 	</ItemGroup>
 	<Target Name="UbuntuMispackagedSDKCheck" BeforeTargets="Build">
 		<Error Condition=" '$(OS)' != 'Windows_NT' AND !Exists('$(MSBuildSDKsPath)/Microsoft.NET.Sdk.WindowsDesktop/targets/Microsoft.NET.Sdk.WindowsDesktop.targets') "
-			Text="Microsoft.NET.Sdk.WindowsDesktop is missingâ€”if you're on Ubuntu, DON'T install the .NET SDK from the official repos" />
+			Text="Microsoft.NET.Sdk.WindowsDesktop is missing - if you're on Ubuntu, DON'T install the .NET SDK from the official repos" />
 	</Target>
 </Project>
