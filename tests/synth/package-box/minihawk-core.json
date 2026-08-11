@@ -1,8 +1,0 @@
-{
-	"formatVersion": 1,
-	"name": "SynthBox",
-	"assembly": "MiniHawk.SynthBox.dll",
-	"factoryTypes": [ "MiniHawk.Cores.SynthBox.SynthBoxFactory" ],
-	"natives": [ "libminiboxhost.dll", "libminiboxhost.so" ],
-	"extensions": { ".testrom": "Synth" }
-}

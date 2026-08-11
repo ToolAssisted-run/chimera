@@ -2,13 +2,13 @@ using System.Runtime.InteropServices;
 
 using BizHawk.BizInvoke;
 
-namespace MiniHawk.Cores.SynthBox
+namespace BizHawk.Emulation.Common.Waterbox
 {
 	/// <summary>
 	/// BizInvoke surface of libminiboxhost - the miniBox waterbox host
-	/// (extern/miniBox/source/host/minibox.h). The wbx_* ABI is the waterbox host
-	/// contract (byte-compatible with BizHawk's Rust waterboxhost), so this binding
-	/// mirrors that host's managed consumer.
+	/// (extern/miniBox/source/host/minibox.h), which ships with miniHawk in
+	/// build/dll. The wbx_* ABI is the waterbox host contract (byte-compatible with
+	/// BizHawk's Rust waterboxhost).
 	///
 	/// Every fallible call takes a trailing <see cref="ReturnData"/> by ref: on
 	/// success ErrorMessage[0] is 0 and Data holds the result.

@@ -7,6 +7,7 @@ using System.Linq;
 using System.Reflection;
 
 using BizHawk.Emulation.Common;
+using BizHawk.Emulation.Common.Waterbox;
 
 using Newtonsoft.Json;
 
@@ -164,6 +165,22 @@ namespace BizHawk.Client.Common
 
 		private static (CorePackageManifest Manifest, IEnumerable<ICoreFactory> Factories) LoadPackageDir(string packageDir)
 		{
+			// A waterbox package carries NO managed assembly: just core.wbx +
+			// waterbox.config, driven by the built-in generic WaterboxCore (miniHawk is
+			// waterbox-only). Detect and route these first; the host (libminiboxhost)
+			// ships with the frontend, so there is no manifest, assembly, or natives.
+			if (WaterboxCoreFactory.IsWaterboxPackage(packageDir))
+			{
+				var wbxFactory = new WaterboxCoreFactory(packageDir);
+				var wbxManifest = new CorePackageManifest
+				{
+					FormatVersion = SUPPORTED_FORMAT_VERSION,
+					Name = wbxFactory.CoreName,
+					Extensions = wbxFactory.Extensions,
+				};
+				return (wbxManifest, new ICoreFactory[] { wbxFactory });
+			}
+
 			var manifestPath = Path.Combine(packageDir, CorePackageManifest.FILE_NAME);
 			if (!File.Exists(manifestPath)) throw new FileNotFoundException($"package has no {CorePackageManifest.FILE_NAME}", manifestPath);
 			var manifest = JsonConvert.DeserializeObject<CorePackageManifest>(File.ReadAllText(manifestPath))

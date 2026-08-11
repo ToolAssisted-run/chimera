@@ -1,56 +1,51 @@
 using System.Collections.Generic;
 using System.IO;
-using System.Reflection;
 using System.Runtime.InteropServices;
 
 using BizHawk.BizInvoke;
 using BizHawk.Common;
-using BizHawk.Emulation.Common;
 
-namespace MiniHawk.Cores.SynthBox
+namespace BizHawk.Emulation.Common.Waterbox
 {
 	/// <summary>
-	/// The waterboxed-flavor Synth core (flavor c): the SAME reference machine
-	/// (native/synthcore.c) compiled into synth.wbx and driven through the miniBox
-	/// waterbox host. The whole machine lives in guest memory, so savestates are
-	/// whole-machine (wbx_save_state/wbx_load_state) - there is no explicit
-	/// serialize. Must be indistinguishable from the native and C# flavors through
-	/// this interface.
+	/// The ONE built-in generic waterbox core adapter. Loads any <c>core.wbx</c>
+	/// through the miniBox host (libminiboxhost, shipped with miniHawk) and presents
+	/// it as an IEmulator, driven entirely by the package's <c>waterbox.config</c>
+	/// (the static machine surface) plus the guest's runtime self-description of its
+	/// memory domains. No per-core managed code: this is the sole adapter for every
+	/// waterboxed core.
 	///
 	/// The host is kept ACTIVE for the core's lifetime (guest memory mapped and
 	/// callable), briefly deactivated only to bracket save/load state. Guest export
-	/// addresses and the RAM/VRAM pointers are fixed (non-PIE guest), so they stay
+	/// addresses and memory-domain pointers are fixed (non-PIE guest), so they stay
 	/// valid across the whole run.
 	/// </summary>
 	[PortedCore(
-		name: "SynthBox",
-		author: "Sergio Martin",
+		name: "Waterbox",
+		author: "miniBox",
 		portedVersion: "1.0.0",
-		portedUrl: "https://github.com/SergioMartin86/miniHawk")]
-	public sealed class SynthBox : IEmulator, IVideoProvider, ISoundProvider, IStatable, IInputPollable
+		portedUrl: "https://github.com/SergioMartin86/miniBox")]
+	public sealed class WaterboxCore : IEmulator, IVideoProvider, ISoundProvider, IStatable, IInputPollable
 	{
-		private const int FbWidth = 128;
-		private const int FbHeight = 120;
-		private const int FbSize = FbWidth * FbHeight;
-		private const int RamSize = 4096;
-		private const int SamplesPerFrame = 735;
-
 		[UnmanagedFunctionPointer(CallingConvention.Cdecl)] private delegate int InitFn();
-		[UnmanagedFunctionPointer(CallingConvention.Cdecl)] private delegate void FrameFn(uint pad);
+		[UnmanagedFunctionPointer(CallingConvention.Cdecl)] private delegate void FrameFn(uint input);
 		[UnmanagedFunctionPointer(CallingConvention.Cdecl)] private delegate IntPtr GetPtrFn();
 		[UnmanagedFunctionPointer(CallingConvention.Cdecl)] private delegate int IntFn();
+		[UnmanagedFunctionPointer(CallingConvention.Cdecl)] private delegate IntPtr MdNameFn(int i);
+		[UnmanagedFunctionPointer(CallingConvention.Cdecl)] private delegate IntPtr MdPtrFn(int i);
+		[UnmanagedFunctionPointer(CallingConvention.Cdecl)] private delegate long MdSizeFn(int i);
+		[UnmanagedFunctionPointer(CallingConvention.Cdecl)] private delegate int MdIntFn(int i);
 
+		private readonly WaterboxConfig _cfg;
 		private readonly LibMiniBoxHost _host;
 		private IntPtr _obj;
 		private bool _active;
 
-		// Guest exports.
 		private readonly FrameFn _frameAdvance;
 		private readonly GetPtrFn _getAudio;
 		private readonly GetPtrFn _getVideoBgra;
-		private readonly IntFn _inputWasRead;
+		private readonly IntFn _inputWasRead; // may be null
 
-		// Host callbacks (kept alive as fields so they are not collected mid-call).
 		private readonly LibMiniBoxHost.ReadCallback _imageRead;
 		private readonly LibMiniBoxHost.ReadCallback _romRead;
 		private readonly LibMiniBoxHost.WriteCallback _stateWrite;
@@ -64,16 +59,25 @@ namespace MiniHawk.Cores.SynthBox
 		private byte[] _loadBuf;
 		private int _loadPos;
 
-		private readonly int[] _videoBuff = new int[FbSize];
-		private readonly short[] _stereoBuff = new short[SamplesPerFrame * 2];
+		private readonly int _width, _height, _samplesPerFrame, _channels;
+		private readonly int[] _videoBuff;
+		private readonly short[] _stereoBuff;
+		private readonly string[] _buttons;
 
-		public SynthBox(byte[] rom)
+		public WaterboxCore(byte[] rom, WaterboxConfig cfg, string wbxPath)
 		{
-			ServiceProvider = new BasicServiceProvider(this);
+			_cfg = cfg;
 			_romBytes = rom;
+			_wbxBytes = File.ReadAllBytes(wbxPath);
+			_width = cfg.Video.Width;
+			_height = cfg.Video.Height;
+			_samplesPerFrame = cfg.Audio.SamplesPerFrame;
+			_channels = cfg.Audio.Channels;
+			_videoBuff = new int[_width * _height];
+			_stereoBuff = new short[_samplesPerFrame * 2];
+			_buttons = cfg.Input.Buttons.ToArray();
 
-			var dir = Path.GetDirectoryName(typeof(SynthBox).Assembly.Location);
-			_wbxBytes = File.ReadAllBytes(Path.Combine(dir, "synth.wbx"));
+			ServiceProvider = new BasicServiceProvider(this);
 
 			_imageRead = ImageRead;
 			_romRead = RomRead;
@@ -84,28 +88,28 @@ namespace MiniHawk.Cores.SynthBox
 				$"libminiboxhost{(OSTailoredCode.IsUnixHost ? ".so" : ".dll")}", hasLimitedLifetime: false);
 			_host = BizInvoker.GetInvoker<LibMiniBoxHost>(resolver, CallingConventionAdapters.Native);
 
+			var mib = cfg.MemoryLayoutMiB;
 			var layout = new LibMiniBoxHost.MemoryLayoutTemplate
 			{
-				SbrkSize = (UIntPtr)(16u << 20),
-				SealedSize = (UIntPtr)(16u << 20),
-				InvisSize = (UIntPtr)(16u << 20),
-				PlainSize = (UIntPtr)(16u << 20),
-				MmapSize = (UIntPtr)(32u << 20),
+				SbrkSize = (UIntPtr)((ulong)mib[0] << 20),
+				SealedSize = (UIntPtr)((ulong)mib[1] << 20),
+				InvisSize = (UIntPtr)((ulong)mib[2] << 20),
+				PlainSize = (UIntPtr)((ulong)mib[3] << 20),
+				MmapSize = (UIntPtr)((ulong)mib[4] << 20),
 			};
 
 			LibMiniBoxHost.ReturnData r = default;
-			_host.wbx_create_host(ref layout, "synth.wbx", _imageRead, UIntPtr.Zero, ref r);
+			_host.wbx_create_host(ref layout, "core.wbx", _imageRead, UIntPtr.Zero, ref r);
 			_obj = r.DataOrThrow();
 
-			// The rom is delivered as a mounted, read-only file named "rom".
-			_host.wbx_mount_file(_obj, "rom", _romRead, UIntPtr.Zero, 0, ref r);
+			_host.wbx_mount_file(_obj, cfg.RomFile, _romRead, UIntPtr.Zero, 0, ref r);
 			r.ThrowIfError();
 
 			Activate();
 			var init = Proc<InitFn>("Init");
 			if (init() != 1)
 			{
-				throw new InvalidOperationException("synth.wbx Init failed (not a valid .testrom; see tests/synth/SPEC.md)");
+				throw new InvalidOperationException($"{cfg.CoreName}: core.wbx Init failed (bad rom?)");
 			}
 			Deactivate();
 			_host.wbx_seal(_obj, ref r); // freeze the post-init image as the savestate baseline
@@ -113,19 +117,27 @@ namespace MiniHawk.Cores.SynthBox
 			Activate();
 
 			_frameAdvance = Proc<FrameFn>("FrameAdvance");
-			_getAudio = Proc<GetPtrFn>("GetAudio");
-			_getVideoBgra = Proc<GetPtrFn>("GetVideoBgra");
-			_inputWasRead = Proc<IntFn>("InputWasRead");
-			var getRam = Proc<GetPtrFn>("GetRam");
-			var getFramebuffer = Proc<GetPtrFn>("GetFramebuffer");
-
-			// RAM/VRAM live in guest memory at fixed addresses; valid while active
-			// (which is the core's whole lifetime except during save/load).
-			var domains = new List<MemoryDomain>
+			_getVideoBgra = Proc<GetPtrFn>(cfg.Video.GetBgra);
+			_getAudio = Proc<GetPtrFn>(cfg.Audio.Get);
+			if (!string.IsNullOrEmpty(cfg.Lag?.InputWasRead))
 			{
-				new MemoryDomainIntPtr("RAM", MemoryDomain.Endian.Little, getRam(), RamSize, true, 1),
-				new MemoryDomainIntPtr("VRAM", MemoryDomain.Endian.Little, getFramebuffer(), FbSize, false, 1),
-			};
+				_inputWasRead = Proc<IntFn>(cfg.Lag.InputWasRead);
+			}
+
+			// Memory domains are self-described by the guest at runtime (size/count
+			// can depend on settings). Query them post-Init and build the list.
+			var mdCount = Proc<IntFn>("GetMemoryDomainCount");
+			var mdName = Proc<MdNameFn>("GetMemoryDomainName");
+			var mdPtr = Proc<MdPtrFn>("GetMemoryDomainPtr");
+			var mdSize = Proc<MdSizeFn>("GetMemoryDomainSize");
+			var mdWritable = Proc<MdIntFn>("GetMemoryDomainWritable");
+			int n = mdCount();
+			var domains = new List<MemoryDomain>(n);
+			for (int i = 0; i < n; i++)
+			{
+				var name = Marshal.PtrToStringAnsi(mdName(i));
+				domains.Add(new MemoryDomainIntPtr(name, MemoryDomain.Endian.Little, mdPtr(i), mdSize(i), mdWritable(i) != 0, 1));
+			}
 			((BasicServiceProvider)ServiceProvider).Register<IMemoryDomains>(new MemoryDomainList(domains));
 		}
 
@@ -153,8 +165,6 @@ namespace MiniHawk.Cores.SynthBox
 			r.ThrowIfError();
 			_active = false;
 		}
-
-		// ---- host callbacks ----
 
 		private static IntPtr ReadInto(byte[] src, ref int pos, IntPtr dst, UIntPtr size)
 		{
@@ -184,48 +194,43 @@ namespace MiniHawk.Cores.SynthBox
 
 		public IEmulatorServiceProvider ServiceProvider { get; }
 
-		public static readonly ControllerDefinition SynthController = MakeControllerDefinition();
+		public ControllerDefinition ControllerDefinition => _controllerDefinition ??= MakeControllerDefinition();
+		private ControllerDefinition _controllerDefinition;
 
-		private static ControllerDefinition MakeControllerDefinition()
+		private ControllerDefinition MakeControllerDefinition()
 		{
-			ControllerDefinition def = new("Synth Controller");
-			foreach (var button in new[] { "P1 Up", "P1 Down", "P1 Left", "P1 Right", "P1 A", "P1 B", "P1 Select", "P1 Start" })
+			var def = new ControllerDefinition(_cfg.Input.Name ?? "Waterbox Controller");
+			foreach (var button in _buttons)
 			{
 				def.BoolButtons.Add(button);
 			}
 			return def.MakeImmutable();
 		}
 
-		public ControllerDefinition ControllerDefinition => SynthController;
-
 		public bool FrameAdvance(IController controller, bool render, bool renderSound = true)
 		{
 			CheckDisposed();
-			byte pad = 0;
-			if (controller.IsPressed("P1 Up")) pad |= 0x01;
-			if (controller.IsPressed("P1 Down")) pad |= 0x02;
-			if (controller.IsPressed("P1 Left")) pad |= 0x04;
-			if (controller.IsPressed("P1 Right")) pad |= 0x08;
-			if (controller.IsPressed("P1 A")) pad |= 0x10;
-			if (controller.IsPressed("P1 B")) pad |= 0x20;
-			if (controller.IsPressed("P1 Select")) pad |= 0x40;
-			if (controller.IsPressed("P1 Start")) pad |= 0x80;
+			uint input = 0;
+			for (int i = 0; i < _buttons.Length; i++)
+			{
+				if (controller.IsPressed(_buttons[i])) input |= 1u << i;
+			}
 
-			_frameAdvance(pad);
+			_frameAdvance(input);
 			Frame++;
-			IsLagFrame = _inputWasRead() == 0;
+			IsLagFrame = _inputWasRead != null && _inputWasRead() == 0;
 			if (IsLagFrame) LagCount++;
 
-			if (render) Marshal.Copy(_getVideoBgra(), _videoBuff, 0, FbSize);
+			if (render) Marshal.Copy(_getVideoBgra(), _videoBuff, 0, _width * _height);
 			DrainAudio();
 			return true;
 		}
 
 		public int Frame { get; private set; }
 
-		public string SystemId => "Synth";
+		public string SystemId => _cfg.SystemId;
 
-		public bool DeterministicEmulation => true;
+		public bool DeterministicEmulation => _cfg.Deterministic;
 
 		public void ResetCounters()
 		{
@@ -246,18 +251,18 @@ namespace MiniHawk.Cores.SynthBox
 
 		private void CheckDisposed()
 		{
-			if (_obj == IntPtr.Zero) throw new ObjectDisposedException(nameof(SynthBox));
+			if (_obj == IntPtr.Zero) throw new ObjectDisposedException(nameof(WaterboxCore));
 		}
 
 		// ---------------- IVideoProvider ----------------
 
-		public int BufferWidth => FbWidth;
-		public int BufferHeight => FbHeight;
-		public int VirtualWidth => 256;
-		public int VirtualHeight => 240;
+		public int BufferWidth => _width;
+		public int BufferHeight => _height;
+		public int VirtualWidth => _cfg.Video.VirtualWidth;
+		public int VirtualHeight => _cfg.Video.VirtualHeight;
 		public int BackgroundColor => unchecked((int)0xFF000000);
-		public int VsyncNumerator => 60;
-		public int VsyncDenominator => 1;
+		public int VsyncNumerator => _cfg.Video.VsyncNumerator;
+		public int VsyncDenominator => _cfg.Video.VsyncDenominator;
 		public int[] GetVideoBuffer() => _videoBuff;
 
 		// ---------------- ISoundProvider ----------------
@@ -268,7 +273,7 @@ namespace MiniHawk.Cores.SynthBox
 		public void GetSamplesSync(out short[] samples, out int nsamp)
 		{
 			samples = _stereoBuff;
-			nsamp = SamplesPerFrame;
+			nsamp = _samplesPerFrame;
 		}
 
 		public void DiscardSamples() { }
@@ -282,14 +287,17 @@ namespace MiniHawk.Cores.SynthBox
 
 		private unsafe void DrainAudio()
 		{
-			var mono = (short*)_getAudio();
-			fixed (short* dst0 = _stereoBuff)
+			var src = (short*)_getAudio();
+			if (_channels == 2)
 			{
-				short* dst = dst0;
-				for (int i = 0; i < SamplesPerFrame; i++)
+				for (int i = 0; i < _samplesPerFrame * 2; i++) _stereoBuff[i] = src[i];
+			}
+			else
+			{
+				for (int i = 0; i < _samplesPerFrame; i++)
 				{
-					*dst++ = mono[i];
-					*dst++ = mono[i];
+					_stereoBuff[i * 2] = src[i];
+					_stereoBuff[i * 2 + 1] = src[i];
 				}
 			}
 		}

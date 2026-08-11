@@ -1,15 +1,15 @@
 #!/bin/bash
 # The synthetic witness driver - miniHawk's own smoke/correctness test.
 #
-# Level A (native): synth-run replays every movie against every rom on
-#   libsynthcore directly and compares frames/RAM/video/audio metrics -
-#   including full per-frame video and audio stream hashes - against goldens,
-#   in both simple and per-frame-serialize (rerecord) modes.
-# Level B (frontend): EmuHawk (Mono + Xvfb on Linux) loads the synth-native
-#   package, replays the same movies through the real input pipeline, and the
-#   final RAM and VRAM (framebuffer) dumps must be byte-identical to the same
-#   goldens Level A verified. Audio is Level A-verified only (the frontend
-#   exposes no scriptable audio tap).
+# miniHawk is waterbox-only. The shipped core is the waterboxed core.wbx; the
+# native C reference exists only to generate/verify the goldens (it is not a core).
+# Level A: native/synth-run (the reference) records goldens; the waterboxed
+#   core.wbx (via the miniBox host) must reproduce them byte-for-byte, in both
+#   simple and per-frame whole-machine-savestate (rerecord) modes.
+# Level B (frontend): EmuHawk (Mono + Xvfb on Linux) loads the core.wbx package
+#   through miniHawk's built-in generic waterbox adapter and replays the same
+#   movies; the final RAM and VRAM dumps must be byte-identical to the Level A
+#   goldens. Audio is Level A-verified only (no scriptable audio tap).
 #
 # Usage:
 #   ./run-witness.sh              # verify (both levels, both modes)
@@ -49,9 +49,9 @@ report() { # name result detail
 }
 
 # ---------- Level A ----------
-# Goldens are RECORDED from the native flavor only (the reference); every
-# other flavor must MATCH them - that is the cross-flavor equivalence proof.
-sharp_tester="$here/package-sharp/tester/bin/Release/synth-run-sharp.exe"
+# native/synth-run is the REFERENCE that records the goldens (it is not a core -
+# just the offline ground truth). The waterboxed core.wbx must MATCH them, which
+# is the equivalence proof for the only shipped flavor.
 box_tester="$here/package-box/synth-run-box"
 box_wbx="$here/package-box/synth.wbx"
 box_host_dir="$here/../../extern/miniBox/build/meson-linux/source/host"
@@ -80,23 +80,6 @@ if [ "$level" = "both" ] || [ "$level" = "a" ]; then
 			report "A:nat:$name" PASS "$(grep -o 'frames=[0-9]*' "$golden")"
 		else
 			report "A:nat:$name" FAIL "metrics differ: $(diff "$golden" "$work/$name.simple.out" | tr '\n' ' ' | head -c 120)"
-		fi
-
-		# pure-C# flavor against the SAME goldens (never recorded from it)
-		if [ -f "$sharp_tester" ]; then
-			mono "$sharp_tester" "$rom" "$movie" > "$work/$name.cs.simple.out" 2>/dev/null \
-				|| { report "A:cs:$name" FAIL "runner error"; continue; }
-			mono "$sharp_tester" "$rom" "$movie" --rerecord > "$work/$name.cs.rerecord.out" 2>/dev/null \
-				|| { report "A:cs:$name" FAIL "runner error (rerecord)"; continue; }
-			if ! cmp -s "$work/$name.cs.simple.out" "$work/$name.cs.rerecord.out"; then
-				report "A:cs:$name" FAIL "rerecord diverges from simple"
-			elif cmp -s "$work/$name.cs.simple.out" "$golden"; then
-				report "A:cs:$name" PASS "matches native goldens"
-			else
-				report "A:cs:$name" FAIL "diverges from native: $(diff "$golden" "$work/$name.cs.simple.out" | tr '\n' ' ' | head -c 120)"
-			fi
-		else
-			report "A:cs:$name" FAIL "synth-run-sharp.exe not built (run build-package.sh)"
 		fi
 
 		# waterboxed flavor (c): synth.wbx run through the miniBox host, same

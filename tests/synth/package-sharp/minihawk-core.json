@@ -1,8 +1,0 @@
-{
-	"formatVersion": 1,
-	"name": "SynthSharp",
-	"assembly": "MiniHawk.SynthSharp.dll",
-	"factoryTypes": [ "MiniHawk.Cores.SynthSharp.SynthSharpFactory" ],
-	"natives": [],
-	"extensions": { ".testrom": "Synth" }
-}

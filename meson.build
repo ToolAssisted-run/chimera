@@ -221,6 +221,40 @@ custom_target(
 )
 
 # ---------------------------------------------------------------------------
+# libminiboxhost — the miniBox waterbox host (from the extern/miniBox submodule).
+# miniHawk is waterbox-only: this host loads every core's core.wbx, so it ships
+# with the frontend. It is self-contained C (no external deps, no guest
+# toolchain), so we compile it directly here rather than driving miniBox's own
+# meson build - the guest toolchain (musl) is a core-author kit, never built here.
+# ---------------------------------------------------------------------------
+minibox_host = repo_root / 'extern/miniBox/source/host'
+minibox_host_src = files(
+  minibox_host / 'sha256.c',
+  minibox_host / 'memblock.c',
+  minibox_host / 'tripguard.c',
+  minibox_host / 'interop_bin.c',
+  minibox_host / 'context.c',
+  minibox_host / 'elf.c',
+  minibox_host / 'fs.c',
+  minibox_host / 'host.c',
+  minibox_host / 'threading.c',
+  minibox_host / 'cinterface.c',
+  minibox_host / 'calling_convention_adapters.c',
+  minibox_host / (host_windows ? 'pal_win.c' : 'pal_linux.c'),
+)
+shared_library(
+  'miniboxhost',
+  minibox_host_src,
+  name_prefix: 'lib',  # libminiboxhost.{so,dll} on both targets (the adapter resolves this name)
+  include_directories: include_directories('extern/miniBox/source/host'),
+  c_args: ['-fno-strict-aliasing'],
+  dependencies: [dl_dep, thread_dep],
+  gnu_symbol_visibility: 'default',
+  install: true,
+  install_dir: 'dll',
+)
+
+# ---------------------------------------------------------------------------
 # The managed solution — one platform-neutral build, from the Linux dir only
 # ---------------------------------------------------------------------------
 if not meson.is_cross_build()

@@ -69,4 +69,30 @@ ECL_EXPORT int      InputWasRead(void)   { return synth_input_was_read(g_synth);
  * palette-index framebuffer is what the witness hashes; this is display only). */
 ECL_EXPORT uint32_t *GetVideoBgra(void)  { synth_get_video_bgra(g_synth, g_video); return g_video; }
 
+/* --- self-described memory domains (guest ABI v1) ---
+ * The generic miniHawk adapter queries these AFTER Init, because a core's domain
+ * sizes/count can depend on runtime settings (synth's are fixed, but the ABI is
+ * uniform). Domain 0 is RAM (writable), domain 1 is VRAM (the palette-index
+ * framebuffer, read-only). */
+#define MD_COUNT 2
+static const char *const md_names[MD_COUNT] = { "RAM", "VRAM" };
+
+ECL_EXPORT int GetMemoryDomainCount(void) { return MD_COUNT; }
+
+ECL_EXPORT const char *GetMemoryDomainName(int i) { return (i >= 0 && i < MD_COUNT) ? md_names[i] : 0; }
+
+ECL_EXPORT uint8_t *GetMemoryDomainPtr(int i) {
+	if (i == 0) return synth_get_ram(g_synth);
+	if (i == 1) return (uint8_t *)synth_get_framebuffer(g_synth);
+	return 0;
+}
+
+ECL_EXPORT int64_t GetMemoryDomainSize(int i) {
+	if (i == 0) return 4096;
+	if (i == 1) return FB_W * FB_H;
+	return 0;
+}
+
+ECL_EXPORT int GetMemoryDomainWritable(int i) { return i == 0 ? 1 : 0; }
+
 int main(void) { return 0; }
