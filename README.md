@@ -56,11 +56,14 @@ defaults, cart databases, and palettes all ship inside core packages.
   full core-author kit in `build/dll`, including the settings source
   generator. The package format is documented in [design-principles.md](docs/design-principles.md),
   and the quickerNES package serves as the reference implementation.
-- **Determinism as the gate.** Every change to this repository must pass the
-  witness harness ([tests/](tests/README.md)): a regression
-  suite replayed through the full frontend stack, byte-comparing emulator RAM
-  against goldens, in both straight-replay and per-frame-savestate modes.
-  Frame-exact reproducibility is the invariant that makes TAS work possible.
+- **Determinism as the gate.** Every change to this repository must pass a
+  witness harness: a regression suite replayed through the full frontend
+  stack, byte-comparing emulator memory against goldens, in both
+  straight-replay and per-frame-savestate modes. Frame-exact reproducibility
+  is the invariant that makes TAS work possible. The current gate is the
+  quickerNES witness suite, which lives with the rest of the quickerNES
+  material in that repository's `minihawk/tests/`; a core-agnostic synthetic
+  witness (in-repo) is planned to replace it - see the design doc.
 - **A reference core.** The first core package is
   [quickerNES](https://github.com/SergioMartin86/quickerNES), whose `minihawk/`
   directory contains the entire quickerNES<->miniHawk interface - this
@@ -101,10 +104,11 @@ self-sufficient as a development convenience (it builds the Windows natives
 via Visual Studio's clang-cl/CMake/Ninja and rustup) - but the Linux meson
 build is the one releases and CI use.
 
-To run on Windows: `build\EmuHawk.exe`. Build a core package first (for
-quickerNES, run `minihawk/build-package.ps1` from a sibling quickerNES
-checkout - it installs `quickernes.zip` into `build\Cores\`), then
-`File > Open Core...` (or `--core=<path>`) followed by the ROM.
+To run on Windows: `build\EmuHawk.exe` (on Linux: `build/EmuHawkMono.sh`).
+Build a core package first (for quickerNES, run `minihawk/build-package.ps1` -
+or `build-package.sh` on Linux - from a sibling quickerNES checkout; it
+installs `quickernes.zip` into `build/Cores/`), then `File > Open Core...`
+(or `--core=<path>`) followed by the ROM.
 
 ## Contributing
 

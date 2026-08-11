@@ -228,7 +228,10 @@ if not meson.is_cross_build()
   if dotnet.found()
     run_target(
       'frontend',
-      command: [dotnet, 'build', repo_root / 'source/BizHawk.sln', '-c', 'Release'],
+      # nodeReuse/shared-compilation off: lingering msbuild worker processes
+      # otherwise hold the output pipe open ~15 minutes after the build ends,
+      # and `meson compile frontend` blocks on them
+      command: [dotnet, 'build', repo_root / 'source/BizHawk.sln', '-c', 'Release', '/nodeReuse:false', '-p:UseSharedCompilation=false'],
     )
   endif
 endif
