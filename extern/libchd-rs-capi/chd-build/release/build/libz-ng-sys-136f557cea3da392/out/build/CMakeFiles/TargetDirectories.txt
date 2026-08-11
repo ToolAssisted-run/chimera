@@ -1,9 +1,0 @@
-/mnt/c/Users/sergiom/Documents/BizHawk/extern/libchd-rs-capi/chd-build/release/build/libz-ng-sys-136f557cea3da392/out/build/CMakeFiles/zlib.dir
-/mnt/c/Users/sergiom/Documents/BizHawk/extern/libchd-rs-capi/chd-build/release/build/libz-ng-sys-136f557cea3da392/out/build/CMakeFiles/package.dir
-/mnt/c/Users/sergiom/Documents/BizHawk/extern/libchd-rs-capi/chd-build/release/build/libz-ng-sys-136f557cea3da392/out/build/CMakeFiles/package_source.dir
-/mnt/c/Users/sergiom/Documents/BizHawk/extern/libchd-rs-capi/chd-build/release/build/libz-ng-sys-136f557cea3da392/out/build/CMakeFiles/edit_cache.dir
-/mnt/c/Users/sergiom/Documents/BizHawk/extern/libchd-rs-capi/chd-build/release/build/libz-ng-sys-136f557cea3da392/out/build/CMakeFiles/rebuild_cache.dir
-/mnt/c/Users/sergiom/Documents/BizHawk/extern/libchd-rs-capi/chd-build/release/build/libz-ng-sys-136f557cea3da392/out/build/CMakeFiles/list_install_components.dir
-/mnt/c/Users/sergiom/Documents/BizHawk/extern/libchd-rs-capi/chd-build/release/build/libz-ng-sys-136f557cea3da392/out/build/CMakeFiles/install.dir
-/mnt/c/Users/sergiom/Documents/BizHawk/extern/libchd-rs-capi/chd-build/release/build/libz-ng-sys-136f557cea3da392/out/build/CMakeFiles/install/local.dir
-/mnt/c/Users/sergiom/Documents/BizHawk/extern/libchd-rs-capi/chd-build/release/build/libz-ng-sys-136f557cea3da392/out/build/CMakeFiles/install/strip.dir

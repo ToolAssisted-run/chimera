@@ -1,1 +1,0 @@
-/mnt/c/Users/sergiom/Documents/BizHawk/extern/libchd-rs-capi/./chd-build/release/libchd_capi.so: /mnt/c/Users/sergiom/Documents/BizHawk/extern/libchd-rs-capi/src/header.rs /mnt/c/Users/sergiom/Documents/BizHawk/extern/libchd-rs-capi/src/lib.rs
