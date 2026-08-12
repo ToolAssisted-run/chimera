@@ -172,6 +172,42 @@ if [ "$level" = "both" ] || [ "$level" = "b" ]; then
 			done
 		done
 	done
+
+	# --- settings -> guest channel ---
+	# Same package + movie, but with initFillByte set non-zero via the core's SYNC
+	# settings (injected into the config exactly as the UI/movie would). The guest
+	# pre-fills RAM, so the RAM dump MUST diverge from the golden - proving the
+	# built-in adapter delivered the user setting to the guest.
+	if [ "$record" -eq 0 ]; then
+		sname=gridWalker.win
+		srom="$here/roms/${sname%%.*}.testrom"
+		scfg="$work/config.settings.ini"
+		python3 - "$config" "$scfg" <<'PY'
+import json, sys
+cfg = json.load(open(sys.argv[1]))
+cfg.setdefault("CoreSyncSettings", {})["BizHawk.Emulation.Common.Waterbox.WaterboxCore"] = {"Values": {"initFillByte": 171}}
+json.dump(cfg, open(sys.argv[2], "w"), indent=2)
+PY
+		sjob="$work/job.settings.txt"
+		{
+			echo "movie=$here/movies/$sname.txt"
+			echo "outram=$work/settings.ram.bin"
+			echo "outvram=$work/settings.vram.bin"
+			echo "meta=$work/settings.meta.txt"
+			echo "mode=simple"
+		} > "$sjob"
+		rm -f "$work/settings.ram.bin" "$work/settings.meta.txt"
+		( cd "$repo_root" && MINIHAWK_JOB="$sjob" timeout 300 mono "$emu_hawk" --headless \
+			"--config=$scfg" "--core=$repo_root/build/Cores/synth-box.zip" \
+			"--lua=$here/synth-replay.lua" "$srom" ) > "$work/settings.log" 2>&1
+		if [ ! -f "$work/settings.meta.txt" ] || ! grep -q "^status=OK" "$work/settings.meta.txt"; then
+			report "S:box:initFillByte" FAIL "no OK meta (see work/settings.log)"
+		elif cmp -s "$work/settings.ram.bin" "$golden_dir/$sname.ram.bin"; then
+			report "S:box:initFillByte" FAIL "RAM identical to golden - setting did NOT reach the guest"
+		else
+			report "S:box:initFillByte" PASS "RAM diverged - user setting reached the guest"
+		fi
+	fi
 fi
 
 echo ""

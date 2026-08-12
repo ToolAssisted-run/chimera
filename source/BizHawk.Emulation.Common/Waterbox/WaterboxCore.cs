@@ -1,6 +1,8 @@
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Text;
 
 using BizHawk.BizInvoke;
 using BizHawk.Common;
@@ -25,7 +27,8 @@ namespace BizHawk.Emulation.Common.Waterbox
 		author: "miniBox",
 		portedVersion: "1.0.0",
 		portedUrl: "https://github.com/SergioMartin86/miniBox")]
-	public sealed class WaterboxCore : IEmulator, IVideoProvider, ISoundProvider, IStatable, IInputPollable
+	public sealed class WaterboxCore : IEmulator, IVideoProvider, ISoundProvider, IStatable, IInputPollable,
+		ISettable<WaterboxCoreSettings, WaterboxCoreSyncSettings>
 	{
 		[UnmanagedFunctionPointer(CallingConvention.Cdecl)] private delegate int InitFn();
 		[UnmanagedFunctionPointer(CallingConvention.Cdecl)] private delegate void FrameFn(uint input);
@@ -48,6 +51,7 @@ namespace BizHawk.Emulation.Common.Waterbox
 
 		private readonly LibMiniBoxHost.ReadCallback _imageRead;
 		private readonly LibMiniBoxHost.ReadCallback _romRead;
+		private readonly LibMiniBoxHost.ReadCallback _settingsRead;
 		private readonly LibMiniBoxHost.WriteCallback _stateWrite;
 		private readonly LibMiniBoxHost.ReadCallback _stateRead;
 
@@ -55,6 +59,9 @@ namespace BizHawk.Emulation.Common.Waterbox
 		private int _wbxPos;
 		private readonly byte[] _romBytes;
 		private int _romPos;
+		private readonly byte[] _settingsBytes;
+		private int _settingsPos;
+		private WaterboxCoreSyncSettings _syncSettings;
 		private MemoryStream _saveBuf;
 		private byte[] _loadBuf;
 		private int _loadPos;
@@ -64,11 +71,17 @@ namespace BizHawk.Emulation.Common.Waterbox
 		private readonly short[] _stereoBuff;
 		private readonly string[] _buttons;
 
-		public WaterboxCore(byte[] rom, WaterboxConfig cfg, string wbxPath)
+		public WaterboxCore(byte[] rom, WaterboxConfig cfg, string wbxPath, WaterboxCoreSyncSettings syncSettings)
 		{
 			_cfg = cfg;
 			_romBytes = rom;
 			_wbxBytes = File.ReadAllBytes(wbxPath);
+
+			// Effective settings = the package's waterbox.config defaults, overlaid
+			// with the user/movie sync-settings. Delivered to the guest as a mounted
+			// "settings" file it reads during Init, so they can shape the machine.
+			_syncSettings = syncSettings?.Clone() ?? new WaterboxCoreSyncSettings();
+			_settingsBytes = SerializeSettings(EffectiveSettings());
 			_width = cfg.Video.Width;
 			_height = cfg.Video.Height;
 			_samplesPerFrame = cfg.Audio.SamplesPerFrame;
@@ -81,6 +94,7 @@ namespace BizHawk.Emulation.Common.Waterbox
 
 			_imageRead = ImageRead;
 			_romRead = RomRead;
+			_settingsRead = SettingsRead;
 			_stateWrite = StateWrite;
 			_stateRead = StateRead;
 
@@ -103,6 +117,11 @@ namespace BizHawk.Emulation.Common.Waterbox
 			_obj = r.DataOrThrow();
 
 			_host.wbx_mount_file(_obj, cfg.RomFile, _romRead, UIntPtr.Zero, 0, ref r);
+			r.ThrowIfError();
+
+			// The settings channel: always mounted (empty when the core has no
+			// settings), so the guest ABI is uniform. Read-only, stable across states.
+			_host.wbx_mount_file(_obj, "settings", _settingsRead, UIntPtr.Zero, 0, ref r);
 			r.ThrowIfError();
 
 			Activate();
@@ -181,7 +200,30 @@ namespace BizHawk.Emulation.Common.Waterbox
 
 		private IntPtr ImageRead(UIntPtr ud, IntPtr data, UIntPtr size) => ReadInto(_wbxBytes, ref _wbxPos, data, size);
 		private IntPtr RomRead(UIntPtr ud, IntPtr data, UIntPtr size) => ReadInto(_romBytes, ref _romPos, data, size);
+		private IntPtr SettingsRead(UIntPtr ud, IntPtr data, UIntPtr size) => ReadInto(_settingsBytes, ref _settingsPos, data, size);
 		private IntPtr StateRead(UIntPtr ud, IntPtr data, UIntPtr size) => ReadInto(_loadBuf, ref _loadPos, data, size);
+
+		// ---- settings ----
+
+		private Dictionary<string, object> EffectiveSettings()
+		{
+			var effective = new Dictionary<string, object>();
+			if (_cfg.Settings != null) foreach (var kv in _cfg.Settings) effective[kv.Key] = kv.Value;
+			if (_syncSettings.Values != null) foreach (var kv in _syncSettings.Values) effective[kv.Key] = kv.Value;
+			return effective;
+		}
+
+		// Simple, stable, C-friendly wire format: "key=value\n" lines, invariant
+		// number formatting. Scalar values only (string/number/bool) in v1.
+		private static byte[] SerializeSettings(Dictionary<string, object> settings)
+		{
+			var sb = new StringBuilder();
+			foreach (var kv in settings)
+			{
+				sb.Append(kv.Key).Append('=').Append(Convert.ToString(kv.Value, CultureInfo.InvariantCulture)).Append('\n');
+			}
+			return Encoding.ASCII.GetBytes(sb.ToString());
+		}
 
 		private int StateWrite(UIntPtr ud, IntPtr data, UIntPtr size)
 		{
@@ -342,6 +384,40 @@ namespace BizHawk.Emulation.Common.Waterbox
 			IsLagFrame = reader.ReadBoolean();
 			LagCount = reader.ReadInt32();
 			Frame = reader.ReadInt32();
+		}
+
+		// ---------------- ISettable ----------------
+		// Sync settings shape the machine at construction (they are mounted for Init),
+		// so changing them requires a core reboot to take effect. There are no plain
+		// (non-sync) settings. GetSyncSettings returns the user overrides (what movies
+		// record); the package defaults are applied by the adapter, not stored here.
+
+		public WaterboxCoreSettings GetSettings() => new();
+
+		public WaterboxCoreSyncSettings GetSyncSettings() => _syncSettings.Clone();
+
+		public PutSettingsDirtyBits PutSettings(WaterboxCoreSettings o) => PutSettingsDirtyBits.None;
+
+		public PutSettingsDirtyBits PutSyncSettings(WaterboxCoreSyncSettings o)
+		{
+			var incoming = o?.Clone() ?? new WaterboxCoreSyncSettings();
+			bool changed = !SettingsEqual(_syncSettings.Values, incoming.Values);
+			_syncSettings = incoming;
+			return changed ? PutSettingsDirtyBits.RebootCore : PutSettingsDirtyBits.None;
+		}
+
+		private static bool SettingsEqual(Dictionary<string, object> a, Dictionary<string, object> b)
+		{
+			a ??= new();
+			b ??= new();
+			if (a.Count != b.Count) return false;
+			foreach (var kv in a)
+			{
+				if (!b.TryGetValue(kv.Key, out var v)) return false;
+				if (!Equals(Convert.ToString(kv.Value, CultureInfo.InvariantCulture),
+					Convert.ToString(v, CultureInfo.InvariantCulture))) return false;
+			}
+			return true;
 		}
 
 		// ---------------- IInputPollable ----------------

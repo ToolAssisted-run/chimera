@@ -4,11 +4,22 @@ using System.Linq;
 
 namespace BizHawk.Emulation.Common.Waterbox
 {
-	/// <summary>Empty settings placeholder (per-core tunables come from waterbox.config's "settings", TBD).</summary>
+	/// <summary>Non-sync settings - none yet (nothing about a waterbox core changes safely mid-run).</summary>
 	public sealed class WaterboxCoreSettings { }
 
-	/// <summary>Empty sync-settings placeholder.</summary>
-	public sealed class WaterboxCoreSyncSettings { }
+	/// <summary>
+	/// The user-tunable sync settings: a bag of key -&gt; value that the adapter merges
+	/// OVER the package's waterbox.config defaults and delivers to the guest before
+	/// Init (so they can shape the machine). Sync (not plain) settings because they
+	/// affect the constructed machine, hence movie determinism; recorded in movies.
+	/// </summary>
+	public sealed class WaterboxCoreSyncSettings
+	{
+		public Dictionary<string, object> Values { get; set; } = new();
+
+		public WaterboxCoreSyncSettings Clone()
+			=> new() { Values = Values is null ? new() : new Dictionary<string, object>(Values) };
+	}
 
 	/// <summary>
 	/// The built-in factory for waterbox packages (core.wbx + waterbox.config). One
@@ -55,7 +66,7 @@ namespace BizHawk.Emulation.Common.Waterbox
 		{
 			var rom = ctx.Roms.FirstOrDefault()
 				?? throw new InvalidOperationException($"{CoreName} needs a rom to load");
-			return new WaterboxCore(rom.FileData, _cfg, _wbxPath);
+			return new WaterboxCore(rom.FileData, _cfg, _wbxPath, ctx.SyncSettings as WaterboxCoreSyncSettings);
 		}
 	}
 }

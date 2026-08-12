@@ -46,6 +46,25 @@ static uint8_t *read_rom(uint32_t *out_len) {
 	return buf;
 }
 
+/* Reads one "key=value" setting from the mounted "settings" file (the miniHawk
+ * settings->guest channel: waterbox.config defaults overlaid with user sync
+ * settings). Returns dflt if the file or key is absent. */
+static long read_setting_long(const char *key, long dflt) {
+	FILE *f = fopen("settings", "rb");
+	if (!f) return dflt;
+	char line[256];
+	size_t klen = strlen(key);
+	long val = dflt;
+	while (fgets(line, (int)sizeof line, f)) {
+		if (strncmp(line, key, klen) == 0 && line[klen] == '=') {
+			val = strtol(line + klen + 1, 0, 0);
+			break;
+		}
+	}
+	fclose(f);
+	return val;
+}
+
 ECL_EXPORT int Init(void) {
 	uint32_t len = 0;
 	uint8_t *rom = read_rom(&len);
@@ -54,6 +73,15 @@ ECL_EXPORT int Init(void) {
 	free(rom);
 	if (!g_synth) return 0;
 	synth_reset(g_synth);
+
+	/* Demonstration setting: pre-fill RAM with a byte before the program runs.
+	 * Default 0 leaves the machine identical to flavors a/b (goldens hold); a
+	 * non-zero value proves the setting reached the guest (observable in RAM). */
+	long fill = read_setting_long("initFillByte", 0);
+	if (fill != 0) {
+		uint8_t *ram = synth_get_ram(g_synth);
+		for (int i = 0; i < 4096; i++) ram[i] = (uint8_t)fill;
+	}
 	return 1;
 }
 
