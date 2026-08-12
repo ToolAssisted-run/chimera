@@ -237,7 +237,7 @@ namespace BizHawk.Client.EmuHawk
 
 			if (fileInfo is not null)
 			{
-				MessageStatusLabel.Text = "Exporting to .bk2...";
+				MessageStatusLabel.Text = "Exporting to .tas...";
 				MessageStatusLabel.Owner.Update();
 
 				Cursor = Cursors.WaitCursor;
@@ -250,7 +250,7 @@ namespace BizHawk.Client.EmuHawk
 				while (saveResult.IsError)
 				{
 					DialogResult d = MessageBox.Show(
-						$"Failed to save .bk2. {saveResult.UserFriendlyErrorMessage()}\nTry again?",
+						$"Failed to save .tas. {saveResult.UserFriendlyErrorMessage()}\nTry again?",
 						"Error",
 						MessageBoxButtons.YesNo);
 					if (d == DialogResult.Yes) saveResult = bk2.Save();

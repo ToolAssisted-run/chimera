@@ -800,9 +800,26 @@ namespace BizHawk.Client.EmuHawk
 
 			InitializeFpsData();
 
+			// Headless runs have no host input, no window to draw and nobody to serve
+			// messages to, but the loop still did all three per emulated frame - and
+			// each one is an X11 round trip, which blocks. That capped a headless
+			// replay at a few hundred frames a second no matter how fast the core was.
+			// Service them on a wall-clock interval instead, so the process still
+			// reacts to a close request promptly while emulation runs free.
+			var headless = HeadlessMode.Enabled;
+			var lastHostServiceTime = DateTime.UtcNow;
+
 			for (; ; )
 			{
-				Input.Instance.Update();
+				bool serviceHost = true;
+				if (headless)
+				{
+					var now = DateTime.UtcNow;
+					serviceHost = (now - lastHostServiceTime).TotalMilliseconds >= 16.0;
+					if (serviceHost) lastHostServiceTime = now;
+				}
+
+				if (serviceHost) Input.Instance.Update();
 
 				// handle events and dispatch as a hotkey action, or a hotkey button, or an input button
 				// ...but prepare haptics first, those get read in ProcessInput
@@ -878,10 +895,10 @@ namespace BizHawk.Client.EmuHawk
 				Tools.GeneralUpdateActiveExtTools();
 
 				StepRunLoop_Core();
-				Render();
+				if (serviceHost) Render();
 				StepRunLoop_Throttle();
 
-				CheckMessages();
+				if (serviceHost) CheckMessages();
 
 				if (_exitRequestPending)
 				{

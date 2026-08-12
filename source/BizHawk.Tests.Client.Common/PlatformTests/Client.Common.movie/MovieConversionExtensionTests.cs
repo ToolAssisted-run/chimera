@@ -8,8 +8,8 @@ namespace BizHawk.Tests.Client.Common.Movie
 		[TestMethod]
 		[DataRow(null, null)]
 		[DataRow("", "")]
-		[DataRow("C:\\Temp\\TestMovie.bk2", "C:\\Temp\\TestMovie.tasproj")]
-		[DataRow("C:\\Temp\\TestMovie.tasproj.bk2", "C:\\Temp\\TestMovie.tasproj.tasproj")]
+		[DataRow("C:\\Temp\\TestMovie.tas", "C:\\Temp\\TestMovie.tasproj")]
+		[DataRow("C:\\Temp\\TestMovie.tasproj.tas", "C:\\Temp\\TestMovie.tasproj.tasproj")]
 		[DataRow("C:\\Temp\\TestMovie.tasproj", "C:\\Temp\\TestMovie.tasproj")]
 		public void ConvertFileNameToTasMovie(string original, string expected)
 		{

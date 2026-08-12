@@ -47,7 +47,11 @@ namespace BizHawk.Client.Common
 
 		public virtual string PreferredExtension => Extension;
 
-		public const string Extension = "bk2";
+		/// <remarks>
+		/// miniHawk's movie extension. The format is unchanged from the one
+		/// BizHawk writes; only the name differs, and the type names still say Bk2.
+		/// </remarks>
+		public const string Extension = "tas";
 
 		public event EventHandler ChangesChanged;
 

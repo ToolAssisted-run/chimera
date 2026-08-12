@@ -345,8 +345,8 @@
 			this.AutosaveBk2Checkbox.Name = "AutosaveBk2Checkbox";
 			this.AutosaveBk2Checkbox.Size = new System.Drawing.Size(89, 17);
 			this.AutosaveBk2Checkbox.TabIndex = 202;
-			this.AutosaveBk2Checkbox.Text = "Save as .bk2";
-			this.toolTip1.SetToolTip(this.AutosaveBk2Checkbox, "Autosave will export the movie to a .bk2 file instead of saving a .tasproj file.");
+			this.AutosaveBk2Checkbox.Text = "Save as .tas";
+			this.toolTip1.SetToolTip(this.AutosaveBk2Checkbox, "Autosave will export the movie to a .tas file instead of saving a .tasproj file.");
 			this.AutosaveBk2Checkbox.UseVisualStyleBackColor = true;
 			// 
 			// label5
