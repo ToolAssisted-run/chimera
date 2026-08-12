@@ -14,10 +14,8 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 
-#define JSMN_STATIC
-#include "jsmn.h"
+#include <waterbox_settings.h>  /* miniBox guest kit: read the host settings channel */
 
 /* synthcore.c public API (see tests/synth/SPEC.md). */
 typedef struct synth synth_t;
@@ -50,38 +48,6 @@ static uint8_t *read_rom(uint32_t *out_len) {
 	return buf;
 }
 
-/* Reads one integer setting from the mounted "settings" file (the miniHawk
- * settings->guest channel: waterbox.config defaults overlaid with user sync
- * settings, delivered as a flat JSON object). Parsed with jsmn. Returns dflt if
- * the file or key is absent. */
-static long read_setting_long(const char *key, long dflt) {
-	FILE *f = fopen("settings", "rb");
-	if (!f) return dflt;
-	char buf[4096];
-	size_t n = fread(buf, 1, sizeof buf - 1, f);
-	fclose(f);
-	buf[n] = 0;
-
-	jsmn_parser p;
-	jsmntok_t tok[128];
-	jsmn_init(&p);
-	int r = jsmn_parse(&p, buf, n, tok, sizeof tok / sizeof tok[0]);
-	if (r < 1 || tok[0].type != JSMN_OBJECT) return dflt;
-
-	/* flat object: tokens are OBJECT, then (key, value) pairs; the value is the
-	 * token right after its key. */
-	size_t klen = strlen(key);
-	for (int i = 1; i + 1 < r; i++) {
-		jsmntok_t *k = &tok[i];
-		if (k->type == JSMN_STRING
-			&& (size_t)(k->end - k->start) == klen
-			&& strncmp(buf + k->start, key, klen) == 0) {
-			return strtol(buf + tok[i + 1].start, 0, 0);
-		}
-	}
-	return dflt;
-}
-
 ECL_EXPORT int Init(void) {
 	uint32_t len = 0;
 	uint8_t *rom = read_rom(&len);
@@ -94,7 +60,7 @@ ECL_EXPORT int Init(void) {
 	/* Demonstration setting: pre-fill RAM with a byte before the program runs.
 	 * Default 0 leaves the machine identical to flavors a/b (goldens hold); a
 	 * non-zero value proves the setting reached the guest (observable in RAM). */
-	long fill = read_setting_long("initFillByte", 0);
+	long fill = wbx_setting_long("initFillByte", 0);
 	if (fill != 0) {
 		uint8_t *ram = synth_get_ram(g_synth);
 		for (int i = 0; i < 4096; i++) ram[i] = (uint8_t)fill;
