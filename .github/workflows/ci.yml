@@ -5,6 +5,9 @@ on:
     branches: [minihawk]
   pull_request:
   workflow_dispatch:
+  schedule:
+    # daily, to catch environment drift even when nothing is committed
+    - cron: '0 4 * * *'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -16,7 +19,7 @@ jobs:
     # goldens, and the waterboxed core.wbx must reproduce them byte-for-byte
     # (including a per-frame whole-machine savestate pass). It needs only gcc,
     # python3 and meson - no .NET, Mono or X - so it runs on every push.
-    # The frontend gate (Level B) is heavy and runs nightly; see nightly.yml.
+    # The full frontend gate (Level B) runs in parallel in witness-full below.
     name: witness level A (core equivalence)
     runs-on: ubuntu-latest
     steps:
@@ -50,4 +53,59 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: witness-level-a-work
+          path: tests/synth/work/
+
+  witness-full:
+    # The full gate, including Level B: EmuHawk runs headless under Mono + Xvfb,
+    # loads the core.wbx package through miniHawk's built-in generic waterbox
+    # adapter, replays the movies, and the RAM/VRAM dumps must be byte-identical
+    # to the Level A goldens - in both simple and rerecord (per-frame
+    # whole-machine savestate) modes.
+    #
+    # This builds the entire frontend: every native dependency (SDL2, OpenAL,
+    # zstd, cimgui, lua, luasocket, sqlite3, chd) plus the .NET solution, so it
+    # takes minutes rather than seconds. It still runs per push - the level A
+    # job above gives fast feedback meanwhile - and on a daily schedule, which
+    # catches environment drift (toolchain/runner image changes) with no commit.
+    name: witness levels A+B (frontend)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            meson ninja-build build-essential cmake pkg-config python3 \
+            mono-complete xvfb \
+            libgl1-mesa-dev libx11-dev libxext-dev libasound2-dev
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0'
+
+      - name: Build native dependencies (installs into build/dll)
+        run: |
+          meson setup build/meson-linux --prefix "$PWD/build" --libdir dll
+          meson compile -C build/meson-linux
+          meson install -C build/meson-linux
+
+      - name: Build the managed solution
+        run: dotnet build source/BizHawk.sln -c Release /nodeReuse:false -p:UseSharedCompilation=false
+
+      - name: Build the waterboxed synth core package
+        run: ./tests/synth/build-package.sh
+
+      - name: Witness - Levels A and B
+        run: ./tests/synth/run-witness.sh
+
+      - name: Upload witness work dir on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: witness-full-work
           path: tests/synth/work/
