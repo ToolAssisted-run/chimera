@@ -44,6 +44,7 @@ namespace BizHawk.Emulation.Common.Waterbox
 
 		private readonly WaterboxConfig _cfg;
 		private readonly LibMiniBoxHost _host;
+		private readonly WaterboxAbiShim _abi;
 		private IntPtr _obj;
 		private bool _active;
 
@@ -108,6 +109,9 @@ namespace BizHawk.Emulation.Common.Waterbox
 			var resolver = new DynamicLibraryImportResolver(
 				$"libminiboxhost{(OSTailoredCode.IsUnixHost ? ".so" : ".dll")}", hasLimitedLifetime: false);
 			_host = BizInvoker.GetInvoker<LibMiniBoxHost>(resolver, CallingConventionAdapters.Native);
+			// The host itself is an ordinary library and speaks the host convention;
+			// the GUEST is always sysv64, so calls into it go through this.
+			_abi = new WaterboxAbiShim(resolver);
 
 			var mib = cfg.MemoryLayoutMiB;
 			var layout = new LibMiniBoxHost.MemoryLayoutTemplate
@@ -176,11 +180,14 @@ namespace BizHawk.Emulation.Common.Waterbox
 			((BasicServiceProvider)ServiceProvider).Register<IMemoryDomains>(new MemoryDomainList(domains));
 		}
 
+		private static int ArgCount<T>() where T : Delegate
+			=> typeof(T).GetMethod("Invoke")!.GetParameters().Length;
+
 		private T Proc<T>(string name) where T : Delegate
 		{
 			LibMiniBoxHost.ReturnData r = default;
 			_host.wbx_get_proc_addr(_obj, name, ref r);
-			return Marshal.GetDelegateForFunctionPointer<T>(r.DataOrThrow());
+			return Marshal.GetDelegateForFunctionPointer<T>(_abi.Wrap(r.DataOrThrow(), ArgCount<T>()));
 		}
 
 		/// <summary>
@@ -193,7 +200,7 @@ namespace BizHawk.Emulation.Common.Waterbox
 			LibMiniBoxHost.ReturnData r = default;
 			_host.wbx_get_proc_addr(_obj, name, ref r);
 			var addr = r.DataOrThrow();
-			return addr == IntPtr.Zero ? null : Marshal.GetDelegateForFunctionPointer<T>(addr);
+			return addr == IntPtr.Zero ? null : Marshal.GetDelegateForFunctionPointer<T>(_abi.Wrap(addr, ArgCount<T>()));
 		}
 
 		private void Activate()
@@ -341,6 +348,7 @@ namespace BizHawk.Emulation.Common.Waterbox
 			LibMiniBoxHost.ReturnData r = default;
 			_host.wbx_destroy_host(_obj, ref r);
 			_obj = IntPtr.Zero;
+			_abi?.Dispose();
 		}
 
 		private void CheckDisposed()
