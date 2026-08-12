@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [minihawk]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  witness-level-a:
+    # Level A is the fast gate: the native C reference records/verifies the
+    # goldens, and the waterboxed core.wbx must reproduce them byte-for-byte
+    # (including a per-frame whole-machine savestate pass). It needs only gcc,
+    # python3 and meson - no .NET, Mono or X - so it runs on every push.
+    # The frontend gate (Level B) is heavy and runs nightly; see nightly.yml.
+    name: witness level A (core equivalence)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # only the waterbox host/toolchain is needed here, not the frontend's
+          # native dependencies (SDL2, OpenAL, ...)
+          submodules: false
+
+      - name: Check out miniBox
+        run: git submodule update --init extern/miniBox
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends meson ninja-build build-essential python3
+
+      - name: Build miniBox (host + guest toolchain)
+        run: |
+          meson setup extern/miniBox/build/meson-linux extern/miniBox
+          meson compile -C extern/miniBox/build/meson-linux
+
+      - name: Build the waterboxed synth core (core.wbx) and its tester
+        run: sh tests/synth/package-box/build-box.sh
+
+      - name: Witness - Level A
+        run: ./tests/synth/run-witness.sh --level a
+
+      - name: Upload witness work dir on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: witness-level-a-work
+          path: tests/synth/work/
