@@ -7,6 +7,8 @@ using System.Text;
 using BizHawk.BizInvoke;
 using BizHawk.Common;
 
+using Newtonsoft.Json;
+
 namespace BizHawk.Emulation.Common.Waterbox
 {
 	/// <summary>
@@ -213,17 +215,10 @@ namespace BizHawk.Emulation.Common.Waterbox
 			return effective;
 		}
 
-		// Simple, stable, C-friendly wire format: "key=value\n" lines, invariant
-		// number formatting. Scalar values only (string/number/bool) in v1.
+		// Delivered as a flat JSON object, e.g. {"initFillByte":171}. The guest
+		// parses it with a small JSON reader (jsmn for C cores, nlohmann for C++).
 		private static byte[] SerializeSettings(Dictionary<string, object> settings)
-		{
-			var sb = new StringBuilder();
-			foreach (var kv in settings)
-			{
-				sb.Append(kv.Key).Append('=').Append(Convert.ToString(kv.Value, CultureInfo.InvariantCulture)).Append('\n');
-			}
-			return Encoding.ASCII.GetBytes(sb.ToString());
-		}
+			=> Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(settings));
 
 		private int StateWrite(UIntPtr ud, IntPtr data, UIntPtr size)
 		{

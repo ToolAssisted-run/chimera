@@ -14,6 +14,10 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+
+#define JSMN_STATIC
+#include "jsmn.h"
 
 /* synthcore.c public API (see tests/synth/SPEC.md). */
 typedef struct synth synth_t;
@@ -46,23 +50,36 @@ static uint8_t *read_rom(uint32_t *out_len) {
 	return buf;
 }
 
-/* Reads one "key=value" setting from the mounted "settings" file (the miniHawk
+/* Reads one integer setting from the mounted "settings" file (the miniHawk
  * settings->guest channel: waterbox.config defaults overlaid with user sync
- * settings). Returns dflt if the file or key is absent. */
+ * settings, delivered as a flat JSON object). Parsed with jsmn. Returns dflt if
+ * the file or key is absent. */
 static long read_setting_long(const char *key, long dflt) {
 	FILE *f = fopen("settings", "rb");
 	if (!f) return dflt;
-	char line[256];
+	char buf[4096];
+	size_t n = fread(buf, 1, sizeof buf - 1, f);
+	fclose(f);
+	buf[n] = 0;
+
+	jsmn_parser p;
+	jsmntok_t tok[128];
+	jsmn_init(&p);
+	int r = jsmn_parse(&p, buf, n, tok, sizeof tok / sizeof tok[0]);
+	if (r < 1 || tok[0].type != JSMN_OBJECT) return dflt;
+
+	/* flat object: tokens are OBJECT, then (key, value) pairs; the value is the
+	 * token right after its key. */
 	size_t klen = strlen(key);
-	long val = dflt;
-	while (fgets(line, (int)sizeof line, f)) {
-		if (strncmp(line, key, klen) == 0 && line[klen] == '=') {
-			val = strtol(line + klen + 1, 0, 0);
-			break;
+	for (int i = 1; i + 1 < r; i++) {
+		jsmntok_t *k = &tok[i];
+		if (k->type == JSMN_STRING
+			&& (size_t)(k->end - k->start) == klen
+			&& strncmp(buf + k->start, key, klen) == 0) {
+			return strtol(buf + tok[i + 1].start, 0, 0);
 		}
 	}
-	fclose(f);
-	return val;
+	return dflt;
 }
 
 ECL_EXPORT int Init(void) {
