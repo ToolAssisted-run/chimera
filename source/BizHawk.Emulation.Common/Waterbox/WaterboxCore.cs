@@ -68,6 +68,7 @@ namespace BizHawk.Emulation.Common.Waterbox
 		private MemoryStream _saveBuf;
 		private byte[] _loadBuf;
 		private int _loadPos;
+		private int _loadLen;
 
 		private readonly int _width, _height, _samplesPerFrame, _channels;
 		private readonly int[] _videoBuff;
@@ -229,7 +230,20 @@ namespace BizHawk.Emulation.Common.Waterbox
 		private IntPtr ImageRead(UIntPtr ud, IntPtr data, UIntPtr size) => ReadInto(_wbxBytes, ref _wbxPos, data, size);
 		private IntPtr RomRead(UIntPtr ud, IntPtr data, UIntPtr size) => ReadInto(_romBytes, ref _romPos, data, size);
 		private IntPtr SettingsRead(UIntPtr ud, IntPtr data, UIntPtr size) => ReadInto(_settingsBytes, ref _settingsPos, data, size);
-		private IntPtr StateRead(UIntPtr ud, IntPtr data, UIntPtr size) => ReadInto(_loadBuf, ref _loadPos, data, size);
+		// _loadBuf is reused and so may be larger than the state in it; _loadLen is
+		// the part that counts.
+		private IntPtr StateRead(UIntPtr ud, IntPtr data, UIntPtr size)
+		{
+			int want = (int)size;
+			int avail = _loadLen - _loadPos;
+			int n = want < avail ? want : avail;
+			if (n > 0)
+			{
+				Marshal.Copy(_loadBuf, _loadPos, data, n);
+				_loadPos += n;
+			}
+			return (IntPtr)n;
+		}
 
 		// ---- settings ----
 
@@ -246,12 +260,17 @@ namespace BizHawk.Emulation.Common.Waterbox
 		private static byte[] SerializeSettings(Dictionary<string, object> settings)
 			=> Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(settings));
 
+		// The host calls this once per flag array and once per dirty page, so a
+		// fresh array per call meant hundreds of allocations per state - and rewind
+		// takes a state every frame. One scratch buffer, grown on demand, instead.
+		private byte[] _stateScratch = [ ];
+
 		private int StateWrite(UIntPtr ud, IntPtr data, UIntPtr size)
 		{
 			int n = (int)size;
-			var tmp = new byte[n];
-			Marshal.Copy(data, tmp, 0, n);
-			_saveBuf.Write(tmp, 0, n);
+			if (_stateScratch.Length < n) _stateScratch = new byte[n];
+			Marshal.Copy(data, _stateScratch, 0, n);
+			_saveBuf.Write(_stateScratch, 0, n);
 			return 0;
 		}
 
@@ -384,7 +403,8 @@ namespace BizHawk.Emulation.Common.Waterbox
 		public void SaveStateBinary(BinaryWriter writer)
 		{
 			CheckDisposed();
-			_saveBuf = new MemoryStream();
+			_saveBuf ??= new MemoryStream();
+			_saveBuf.SetLength(0);
 			LibMiniBoxHost.ReturnData r = default;
 			// No deactivate/activate bracket: the host activates itself for the
 			// duration and restores whatever state it found. Bracketing it costs FOUR
@@ -393,10 +413,11 @@ namespace BizHawk.Emulation.Common.Waterbox
 			_host.wbx_save_state(_obj, _stateWrite, UIntPtr.Zero, ref r);
 			r.ThrowIfError();
 
-			var bytes = _saveBuf.ToArray();
-			_saveBuf = null;
-			writer.Write(bytes.Length);
-			writer.Write(bytes);
+			// GetBuffer, not ToArray: ToArray copies the whole state into a fresh
+			// array every frame purely to hand it to the writer.
+			int len = (int)_saveBuf.Length;
+			writer.Write(len);
+			writer.Write(_saveBuf.GetBuffer(), 0, len);
 			writer.Write(IsLagFrame);
 			writer.Write(LagCount);
 			writer.Write(Frame);
@@ -406,13 +427,20 @@ namespace BizHawk.Emulation.Common.Waterbox
 		{
 			CheckDisposed();
 			int len = reader.ReadInt32();
-			_loadBuf = reader.ReadBytes(len);
+			if (_loadBuf == null || _loadBuf.Length < len) _loadBuf = new byte[len];
+			int got = 0;
+			while (got < len)
+			{
+				int n = reader.Read(_loadBuf, got, len - got);
+				if (n <= 0) throw new EndOfStreamException("truncated waterbox savestate");
+				got += n;
+			}
+			_loadLen = len;
 			_loadPos = 0;
 
 			LibMiniBoxHost.ReturnData r = default;
 			_host.wbx_load_state(_obj, _stateRead, UIntPtr.Zero, ref r); // see SaveStateBinary re: no bracket
 			r.ThrowIfError();
-			_loadBuf = null;
 			RestoreTraceState(); // the guest's tracing flag lives in guest memory, which the state just overwrote
 
 			IsLagFrame = reader.ReadBoolean();
