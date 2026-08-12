@@ -33,7 +33,8 @@ namespace BizHawk.Emulation.Common.Waterbox
 		ISettable<WaterboxCoreSettings, WaterboxCoreSyncSettings>
 	{
 		[UnmanagedFunctionPointer(CallingConvention.Cdecl)] private delegate int InitFn();
-		[UnmanagedFunctionPointer(CallingConvention.Cdecl)] private delegate void FrameFn(uint input);
+		[UnmanagedFunctionPointer(CallingConvention.Cdecl)] private delegate void FrameFn(ulong input);
+		[UnmanagedFunctionPointer(CallingConvention.Cdecl)] private delegate void SetAxisFn(int index, int value);
 		[UnmanagedFunctionPointer(CallingConvention.Cdecl)] private delegate IntPtr GetPtrFn();
 		[UnmanagedFunctionPointer(CallingConvention.Cdecl)] private delegate int IntFn();
 		[UnmanagedFunctionPointer(CallingConvention.Cdecl)] private delegate IntPtr MdNameFn(int i);
@@ -72,6 +73,8 @@ namespace BizHawk.Emulation.Common.Waterbox
 		private readonly int[] _videoBuff;
 		private readonly short[] _stereoBuff;
 		private readonly string[] _buttons;
+		private readonly WaterboxConfig.AxisConfig[] _axes;
+		private readonly SetAxisFn _setAxis; // null iff the package declares no axes
 
 		public WaterboxCore(byte[] rom, WaterboxConfig cfg, string wbxPath, WaterboxCoreSyncSettings syncSettings)
 		{
@@ -91,6 +94,7 @@ namespace BizHawk.Emulation.Common.Waterbox
 			_videoBuff = new int[_width * _height];
 			_stereoBuff = new short[_samplesPerFrame * 2];
 			_buttons = cfg.Input.Buttons.ToArray();
+			_axes = cfg.Input.Axes?.ToArray() ?? [ ];
 
 			ServiceProvider = new BasicServiceProvider(this);
 
@@ -138,6 +142,11 @@ namespace BizHawk.Emulation.Common.Waterbox
 			Activate();
 
 			_frameAdvance = Proc<FrameFn>("FrameAdvance");
+			if (_axes.Length != 0)
+			{
+				_setAxis = TryProc<SetAxisFn>("SetAxis")
+					?? throw new InvalidOperationException($"{cfg.CoreName}: waterbox.config declares axes but core.wbx exports no SetAxis");
+			}
 			_getVideoBgra = Proc<GetPtrFn>(cfg.Video.GetBgra);
 			_getAudio = Proc<GetPtrFn>(cfg.Audio.Get);
 			if (!string.IsNullOrEmpty(cfg.Lag?.InputWasRead))
@@ -258,16 +267,27 @@ namespace BizHawk.Emulation.Common.Waterbox
 			{
 				def.BoolButtons.Add(button);
 			}
+			foreach (var axis in _axes)
+			{
+				def.Axes.Add(axis.Name, new AxisSpec(axis.Min.RangeTo(axis.Max), axis.Neutral));
+			}
 			return def.MakeImmutable();
 		}
 
 		public bool FrameAdvance(IController controller, bool render, bool renderSound = true)
 		{
 			CheckDisposed();
-			uint input = 0;
+			ulong input = 0;
 			for (int i = 0; i < _buttons.Length; i++)
 			{
-				if (controller.IsPressed(_buttons[i])) input |= 1u << i;
+				if (controller.IsPressed(_buttons[i])) input |= 1ul << i;
+			}
+
+			// Analog values don't fit in the button mask, so they go over separately
+			// just before the frame they belong to.
+			for (int i = 0; i < _axes.Length; i++)
+			{
+				_setAxis(i, controller.AxisValue(_axes[i].Name));
 			}
 
 			_frameAdvance(input);
@@ -366,9 +386,11 @@ namespace BizHawk.Emulation.Common.Waterbox
 			CheckDisposed();
 			_saveBuf = new MemoryStream();
 			LibMiniBoxHost.ReturnData r = default;
-			Deactivate();
+			// No deactivate/activate bracket: the host activates itself for the
+			// duration and restores whatever state it found. Bracketing it costs FOUR
+			// full guest-address-space remaps per state, which at rewind's one state
+			// per frame was a 10x slowdown of the whole emulator.
 			_host.wbx_save_state(_obj, _stateWrite, UIntPtr.Zero, ref r);
-			Activate();
 			r.ThrowIfError();
 
 			var bytes = _saveBuf.ToArray();
@@ -388,9 +410,7 @@ namespace BizHawk.Emulation.Common.Waterbox
 			_loadPos = 0;
 
 			LibMiniBoxHost.ReturnData r = default;
-			Deactivate();
-			_host.wbx_load_state(_obj, _stateRead, UIntPtr.Zero, ref r);
-			Activate();
+			_host.wbx_load_state(_obj, _stateRead, UIntPtr.Zero, ref r); // see SaveStateBinary re: no bracket
 			r.ThrowIfError();
 			_loadBuf = null;
 			RestoreTraceState(); // the guest's tracing flag lives in guest memory, which the state just overwrote

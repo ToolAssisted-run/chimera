@@ -54,9 +54,28 @@ namespace BizHawk.Client.Common
 		{
 			// If a controller is specified, we need to iterate over unique button names. If not, we iterate over
 			// ALL button names with P{controller} prefixes
-			foreach (var button in _inputManager.ActiveController.ToBoolButtonNameList(controller))
+			//
+			// Record every button first, then re-latch and apply the overrides ONCE.
+			// Doing that per button (as calling Set in the loop would) runs the whole
+			// input pipeline N times per frame for an N-button definition, and each
+			// pass is itself proportional to N - quadratic, and very visible on a
+			// 34-button definition driven from a script every frame. The end state is
+			// the same either way: the loop's last iteration is what survives.
+			try
 			{
-				Set(button, buttons.TryGetValue(button, out var state) ? state : null, controller);
+				foreach (var button in _inputManager.ActiveController.ToBoolButtonNameList(controller))
+				{
+					var buttonToSet = controller == null ? button : $"P{controller} {button}";
+					if (buttons.TryGetValue(button, out var state)) _inputManager.ButtonOverrideAdapter.SetButton(buttonToSet, state);
+					else _inputManager.ButtonOverrideAdapter.UnSet(buttonToSet);
+				}
+
+				_inputManager.ActiveController.LatchFromPhysical(_inputManager.ControllerInputCoalescer);
+				_inputManager.ActiveController.Overrides(_inputManager.ButtonOverrideAdapter);
+			}
+			catch
+			{
+				// ignored, as in the single-button setter
 			}
 		}
 
@@ -84,6 +103,26 @@ namespace BizHawk.Client.Common
 			catch
 			{
 				// ignored
+			}
+		}
+
+		/// <summary>
+		/// The analog counterpart of <see cref="Set(string,bool?,int?)"/>: pushes the
+		/// value through the override adapter, so it reaches the core THIS frame.
+		/// <see cref="SetAnalog(string,int?,int?)"/> is a different thing - a sticky
+		/// autohold, which never reaches the output controller from a script.
+		/// </summary>
+		public void SetAxis(string control, int value, int? controller = null)
+		{
+			try
+			{
+				_inputManager.ButtonOverrideAdapter.SetAxis(controller == null ? control : $"P{controller} {control}", value);
+				_inputManager.ActiveController.LatchFromPhysical(_inputManager.ControllerInputCoalescer);
+				_inputManager.ActiveController.Overrides(_inputManager.ButtonOverrideAdapter);
+			}
+			catch
+			{
+				// ignored, as with the other setters
 			}
 		}
 

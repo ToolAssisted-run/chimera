@@ -41,7 +41,7 @@ static int32_t mem_write(uintptr_t ud, const uint8_t *d, uintptr_t n){mb_t*m=(mb
 static intptr_t mem_read(uintptr_t ud, uint8_t *d, uintptr_t n){mb_t*m=(mb_t*)ud;uintptr_t a=m->len-m->pos;if(n>a)n=a;memcpy(d,m->b+m->pos,n);m->pos+=n;return (intptr_t)n;}
 
 typedef int (*init_fn)(void);
-typedef void (*frame_fn)(uint32_t);
+typedef void (*frame_fn)(uint64_t);
 typedef uintptr_t (*getptr_fn)(void);
 
 static uintptr_t proc(mb_host *h, const char *n){mb_return r;wbx_get_proc_addr(h,n,&r);if(r.error_message[0]){fprintf(stderr,"proc %s: %s\n",n,r.error_message);exit(2);}return r.data;}
@@ -107,7 +107,7 @@ int main(int argc, char **argv) {
 			wbx_deactivate_host(h, &r); wbx_load_state(h, mem_read, (uintptr_t)&state, &r); wbx_activate_host(h, &r);
 			if (r.error_message[0]) { fprintf(stderr, "rerecord: %s\n", r.error_message); return 1; }
 		}
-		FrameAdvance(pad);
+		FrameAdvance((uint64_t)pad);
 		frames++;
 		sha1_update(&vh, (const void *)GetFramebuffer(), 128 * 120);
 		sha1_update(&ah, (const void *)GetAudio(), 735 * 2);

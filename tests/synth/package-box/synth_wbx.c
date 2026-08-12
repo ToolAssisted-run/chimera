@@ -68,7 +68,9 @@ ECL_EXPORT int Init(void) {
 	return 1;
 }
 
-ECL_EXPORT void FrameAdvance(uint32_t pad) { synth_frame(g_synth, (uint8_t)pad); }
+/* The button mask is 64-bit (guest ABI): button i of waterbox.config is bit i.
+ * The synth machine has 8 buttons, so only the low byte is meaningful here. */
+ECL_EXPORT void FrameAdvance(uint64_t pad) { synth_frame(g_synth, (uint8_t)pad); }
 
 /* Guest-memory pointers the host reads while active (RAM/VRAM/audio domains). */
 ECL_EXPORT uint8_t *GetRam(void)         { return synth_get_ram(g_synth); }

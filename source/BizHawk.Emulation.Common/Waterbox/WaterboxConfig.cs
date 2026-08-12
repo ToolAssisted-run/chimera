@@ -69,8 +69,26 @@ namespace BizHawk.Emulation.Common.Waterbox
 		{
 			public string Name { get; set; }
 
-			/// <summary>Bool button names, in bit order (button i -&gt; bit i of the FrameAdvance mask).</summary>
+			/// <summary>Bool button names, in bit order (button i -&gt; bit i of the 64-bit FrameAdvance mask).</summary>
 			public List<string> Buttons { get; set; }
+
+			/// <summary>
+			/// Analog controls (paddles, sticks, triggers), in index order. They cannot
+			/// travel in the button mask, so the adapter pushes each one to the guest
+			/// with the optional <c>SetAxis(index, value)</c> export before every frame.
+			/// A core that declares axes must export it.
+			/// </summary>
+			public List<AxisConfig> Axes { get; set; }
+		}
+
+		public sealed class AxisConfig
+		{
+			public string Name { get; set; }
+			public int Min { get; set; }
+			public int Max { get; set; }
+
+			/// <summary>Value when the control is untouched (centre for a stick, rest position for a paddle).</summary>
+			public int Neutral { get; set; }
 		}
 
 		public sealed class LagConfig

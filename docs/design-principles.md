@@ -704,3 +704,35 @@ Phase 0 discoveries about frame alignment (validated by per-frame RAM comparison
 - EmuHawk targets `net48`: no assembly unload, hence the load-once model.
 - Determinism is sacred: anything touching emulation, input, or timing must preserve
   frame-exact reproducibility or movies desync.
+
+## The waterbox guest ABI, as built (2026-08-12)
+
+The contract a core package implements. Everything below is the *whole* surface:
+a package is `core.wbx` + `waterbox.config`, and the one generic adapter in
+`BizHawk.Emulation.Common` drives it.
+
+**Required exports.** `Init()` (reads the mounted rom and the mounted
+`settings` JSON, returns 1 on success), `FrameAdvance(uint64 buttons)`, and the
+video/audio getters named by `waterbox.config`. Button *i* of the config's
+`input.buttons` is bit *i* of the mask - 64 buttons, which is what a four-player
+console with peripherals actually needs.
+
+**Runtime self-description.** Memory domains are queried after `Init`
+(`GetMemoryDomain{Count,Name,Ptr,Size,Writable}`), never declared statically:
+their count and size depend on the cartridge and on user settings.
+
+**Analog controls.** `waterbox.config`'s `input.axes` declares them; the adapter
+pushes each value with `SetAxis(index, value)` immediately before the frame it
+belongs to. A package that declares axes must export it.
+
+**Optional tooling groups** (surfaces, registers, buses, trace) - the core
+renders and formats its own tooling, so the frontend needs no system knowledge.
+A missing export is reported by the host as address 0, and the adapter simply
+does not register the corresponding service, which greys the tool out. See
+`WaterboxCore.Tooling.cs`.
+
+**Settings.** `waterbox.config`'s `settings` block holds package defaults; the
+adapter merges the user's sync settings over them and mounts the result as JSON
+for the guest to read during `Init`. They shape the machine, so changing one
+reboots the core. Note the known wrinkle: sync settings are keyed by adapter
+*type*, so every waterbox core currently shares one config key.

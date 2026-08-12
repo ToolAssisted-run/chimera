@@ -44,6 +44,11 @@ namespace BizHawk.Client.Common
 			APIs.Joypad.Set(dict, controller);
 		}
 
+		[LuaMethodExample("joypad.setaxis( \"P2 Paddle\", 100 );")]
+		[LuaMethod("setaxis", "sets an analog control for the current frame (the analog counterpart of joypad.set; unlike setanalog, which sets a sticky autohold)")]
+		public void SetAxis(string control, int value, int? controller = null)
+			=> APIs.Joypad.SetAxis(control, value, controller);
+
 		[LuaMethodExample("joypad.setanalog( { [ \"Tilt X\" ] = -63, [ \"Tilt Y\" ] = 127 } );")]
 		[LuaMethod("setanalog", "Sets the given analog controls to their provided values as autoholds. Set axes to the empty string to clear individual holds.")]
 		public void SetAnalog(LuaTable controls, int? controller = null)
