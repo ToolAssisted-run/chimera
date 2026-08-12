@@ -990,6 +990,12 @@ namespace BizHawk.Client.EmuHawk
 
 			DebuggerMenuItem.Enabled = Tools.IsAvailable<GenericDebugger>();
 
+			// Core-managed tooling: available exactly when the loaded core backs the
+			// service (see ICoreSurfaces / ITraceable), so a core with nothing to show
+			// simply greys these out.
+			TraceLoggerMenuItem.Enabled = Tools.IsAvailable<TraceLogger>();
+			SurfaceViewerMenuItem.Enabled = Tools.IsAvailable<SurfaceViewer>();
+
 			BatchRunnerMenuItem.Visible = VersionInfo.DeveloperBuild;
 
 			BasicBotMenuItem.Enabled = Tools.IsAvailable<BasicBot>();
@@ -1063,6 +1069,16 @@ namespace BizHawk.Client.EmuHawk
 		private void DebuggerMenuItem_Click(object sender, EventArgs e)
 		{
 			Tools.Load<GenericDebugger>();
+		}
+
+		private void TraceLoggerMenuItem_Click(object sender, EventArgs e)
+		{
+			Tools.Load<TraceLogger>();
+		}
+
+		private void SurfaceViewerMenuItem_Click(object sender, EventArgs e)
+		{
+			Tools.Load<SurfaceViewer>();
 		}
 
 		private void CodeDataLoggerMenuItem_Click(object sender, EventArgs e)

@@ -199,6 +199,8 @@ namespace BizHawk.Client.EmuHawk
 			this.TAStudioMenuItem = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
 			this.HexEditorMenuItem = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
 			this.DebuggerMenuItem = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
+			this.TraceLoggerMenuItem = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
+			this.SurfaceViewerMenuItem = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
 			this.CodeDataLoggerMenuItem = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
 			this.MacroToolMenuItem = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
 			this.VirtualPadMenuItem = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
@@ -1239,6 +1241,8 @@ namespace BizHawk.Client.EmuHawk
             this.TAStudioMenuItem,
             this.HexEditorMenuItem,
             this.DebuggerMenuItem,
+            this.TraceLoggerMenuItem,
+            this.SurfaceViewerMenuItem,
             this.CodeDataLoggerMenuItem,
             this.MacroToolMenuItem,
             this.VirtualPadMenuItem,
@@ -1287,7 +1291,17 @@ namespace BizHawk.Client.EmuHawk
 			// 
 			this.DebuggerMenuItem.Text = "&Debugger";
 			this.DebuggerMenuItem.Click += new System.EventHandler(this.DebuggerMenuItem_Click);
-			// 
+			//
+			// TraceLoggerMenuItem
+			//
+			this.TraceLoggerMenuItem.Text = "Trace &Logger";
+			this.TraceLoggerMenuItem.Click += new System.EventHandler(this.TraceLoggerMenuItem_Click);
+			//
+			// SurfaceViewerMenuItem
+			//
+			this.SurfaceViewerMenuItem.Text = "Surface &Viewer";
+			this.SurfaceViewerMenuItem.Click += new System.EventHandler(this.SurfaceViewerMenuItem_Click);
+			//
 			// CodeDataLoggerMenuItem
 			// 
 			this.CodeDataLoggerMenuItem.Text = "Code-Data Logger";
@@ -2198,6 +2212,8 @@ namespace BizHawk.Client.EmuHawk
 		private BizHawk.WinForms.Controls.StatusLabelEx LinkConnectStatusBarButton;
 		private BizHawk.WinForms.Controls.ToolStripMenuItemEx FeaturesMenuItem;
 		private BizHawk.WinForms.Controls.ToolStripMenuItemEx DebuggerMenuItem;
+		private BizHawk.WinForms.Controls.ToolStripMenuItemEx TraceLoggerMenuItem;
+		private BizHawk.WinForms.Controls.ToolStripMenuItemEx SurfaceViewerMenuItem;
 		private BizHawk.WinForms.Controls.ToolStripMenuItemEx SaveRAMSubMenu;
 		private BizHawk.WinForms.Controls.ToolStripMenuItemEx FlushSaveRAMMenuItem;
 		private BizHawk.WinForms.Controls.StatusLabelEx UpdateNotification;

@@ -29,7 +29,7 @@ namespace BizHawk.Emulation.Common.Waterbox
 		author: "miniBox",
 		portedVersion: "1.0.0",
 		portedUrl: "https://github.com/SergioMartin86/miniBox")]
-	public sealed class WaterboxCore : IEmulator, IVideoProvider, ISoundProvider, IStatable, IInputPollable,
+	public sealed partial class WaterboxCore : IEmulator, IVideoProvider, ISoundProvider, IStatable, IInputPollable,
 		ISettable<WaterboxCoreSettings, WaterboxCoreSyncSettings>
 	{
 		[UnmanagedFunctionPointer(CallingConvention.Cdecl)] private delegate int InitFn();
@@ -159,6 +159,10 @@ namespace BizHawk.Emulation.Common.Waterbox
 				var name = Marshal.PtrToStringAnsi(mdName(i));
 				domains.Add(new MemoryDomainIntPtr(name, MemoryDomain.Endian.Little, mdPtr(i), mdSize(i), mdWritable(i) != 0, 1));
 			}
+
+			// The optional tooling ABI (see WaterboxCore.Tooling.cs) - may append bus
+			// domains to the list, so it runs before the domains are published.
+			InitTooling((BasicServiceProvider)ServiceProvider, domains);
 			((BasicServiceProvider)ServiceProvider).Register<IMemoryDomains>(new MemoryDomainList(domains));
 		}
 
@@ -167,6 +171,19 @@ namespace BizHawk.Emulation.Common.Waterbox
 			LibMiniBoxHost.ReturnData r = default;
 			_host.wbx_get_proc_addr(_obj, name, ref r);
 			return Marshal.GetDelegateForFunctionPointer<T>(r.DataOrThrow());
+		}
+
+		/// <summary>
+		/// Like <see cref="Proc{T}"/> but for OPTIONAL exports: the host reports a
+		/// missing symbol as address 0 rather than an error, which is how the adapter
+		/// discovers which tooling groups a core implements.
+		/// </summary>
+		private T TryProc<T>(string name) where T : Delegate
+		{
+			LibMiniBoxHost.ReturnData r = default;
+			_host.wbx_get_proc_addr(_obj, name, ref r);
+			var addr = r.DataOrThrow();
+			return addr == IntPtr.Zero ? null : Marshal.GetDelegateForFunctionPointer<T>(addr);
 		}
 
 		private void Activate()
@@ -254,6 +271,7 @@ namespace BizHawk.Emulation.Common.Waterbox
 			}
 
 			_frameAdvance(input);
+			DrainTrace();
 			Frame++;
 			IsLagFrame = _inputWasRead != null && _inputWasRead() == 0;
 			if (IsLagFrame) LagCount++;
@@ -375,6 +393,7 @@ namespace BizHawk.Emulation.Common.Waterbox
 			Activate();
 			r.ThrowIfError();
 			_loadBuf = null;
+			RestoreTraceState(); // the guest's tracing flag lives in guest memory, which the state just overwrote
 
 			IsLagFrame = reader.ReadBoolean();
 			LagCount = reader.ReadInt32();
