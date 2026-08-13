@@ -164,7 +164,13 @@ namespace BizHawk.Client.Common
 			return failures;
 		}
 
+		/// <summary>
+		/// How a factory's core introduces itself. A factory that knows its own
+		/// identity is asked first: one adapter type can back many packages, so its
+		/// class attribute would name the adapter for all of them.
+		/// </summary>
 		public static CoreAttribute? AttributesFor(ICoreFactory factory)
-			=> factory.CoreType.GetCustomAttributes(typeof(CoreAttribute), false).OfType<CoreAttribute>().FirstOrDefault();
+			=> (factory as ICoreIdentity)?.CoreIdentity
+				?? factory.CoreType.GetCustomAttributes(typeof(CoreAttribute), false).OfType<CoreAttribute>().FirstOrDefault();
 	}
 }

@@ -40,4 +40,16 @@ namespace BizHawk.Emulation.Common
 			PortedVersion = portedVersion;
 		}
 	}
+
+	/// <summary>
+	/// Implemented by a core (or core factory) whose identity is not known at build
+	/// time, and which therefore cannot be described by a <see cref="CoreAttribute"/>
+	/// on its class. One generic adapter type serves every waterbox package, so the
+	/// name, author and version belong to the PACKAGE, not the type; without this
+	/// every such core would introduce itself with the adapter's name.
+	/// </summary>
+	public interface ICoreIdentity
+	{
+		CoreAttribute CoreIdentity { get; }
+	}
 }

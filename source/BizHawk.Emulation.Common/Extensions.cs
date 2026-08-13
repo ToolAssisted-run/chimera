@@ -17,9 +17,16 @@ namespace BizHawk.Emulation.Common
 		public static string SystemIDToDisplayName(string sysID)
 			=> sysID;
 
+		/// <summary>
+		/// How a core introduces itself: name, author, version. A core that knows its
+		/// own identity at runtime (<see cref="ICoreIdentity"/>) is asked, because one
+		/// adapter type can serve many packages and the class attribute could then only
+		/// name the adapter. Everything else falls back to the attribute on its class.
+		/// </summary>
 		public static CoreAttribute Attributes(this IEmulator core)
 		{
-			return (CoreAttribute)Attribute.GetCustomAttribute(core.GetType(), typeof(CoreAttribute));
+			return (core as ICoreIdentity)?.CoreIdentity
+				?? (CoreAttribute)Attribute.GetCustomAttribute(core.GetType(), typeof(CoreAttribute));
 		}
 
 		// todo: most of the special cases involving the NullEmulator should probably go away

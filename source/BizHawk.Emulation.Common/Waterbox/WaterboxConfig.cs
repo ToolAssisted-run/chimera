@@ -21,6 +21,15 @@ namespace BizHawk.Emulation.Common.Waterbox
 
 		public string SystemId { get; set; }
 
+		/// <summary>Who wrote the core. Shown wherever the frontend introduces it.</summary>
+		public string Author { get; set; }
+
+		/// <summary>The core's own version string (not the package format's).</summary>
+		public string Version { get; set; }
+
+		/// <summary>Where the core lives, for the about box.</summary>
+		public string Url { get; set; }
+
 		/// <summary>The mounted file name the guest reads the rom from (default "rom").</summary>
 		public string RomFile { get; set; } = "rom";
 

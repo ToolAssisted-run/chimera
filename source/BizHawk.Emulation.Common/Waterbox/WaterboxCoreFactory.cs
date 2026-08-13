@@ -28,7 +28,7 @@ namespace BizHawk.Emulation.Common.Waterbox
 	/// Constructed by CorePackageLoader when it sees a waterbox package - there is no
 	/// per-core managed assembly.
 	/// </summary>
-	public sealed class WaterboxCoreFactory : ICoreFactory
+	public sealed class WaterboxCoreFactory : ICoreFactory, ICoreIdentity
 	{
 		public const string WbxFileName = "core.wbx";
 		public const string ConfigFileName = "waterbox.config";
@@ -50,6 +50,9 @@ namespace BizHawk.Emulation.Common.Waterbox
 				&& File.Exists(Path.Combine(packageDir, ConfigFileName));
 
 		public string CoreName => _cfg.CoreName ?? "Waterbox";
+
+		/// <summary>The package's identity, so lists of available cores name the core rather than the adapter.</summary>
+		public CoreAttribute CoreIdentity => WaterboxCore.IdentityOf(_cfg);
 
 		/// <summary>Rom-extension -&gt; systemId map from waterbox.config (for the synthesized manifest).</summary>
 		public Dictionary<string, string> Extensions => _cfg.Extensions ?? new Dictionary<string, string>();

@@ -24,14 +24,32 @@ namespace BizHawk.Emulation.Common.Waterbox
 	/// addresses and memory-domain pointers are fixed (non-PIE guest), so they stay
 	/// valid across the whole run.
 	/// </summary>
+	// The attribute names the ADAPTER, which is all a class-level attribute can do
+	// when one class serves every package. It is the fallback; the real identity
+	// comes from the package, through ICoreIdentity below.
 	[PortedCore(
 		name: "Waterbox",
 		author: "miniBox",
 		portedVersion: "1.0.0",
 		portedUrl: "https://github.com/SergioMartin86/miniBox")]
 	public sealed partial class WaterboxCore : IEmulator, IVideoProvider, ISoundProvider, IStatable, IInputPollable,
-		ISettable<WaterboxCoreSettings, WaterboxCoreSyncSettings>
+		ICoreIdentity, ISettable<WaterboxCoreSettings, WaterboxCoreSyncSettings>
 	{
+		/// <summary>
+		/// The identity of the PACKAGE this instance is running - what the status bar,
+		/// the movie header and the about box should say. Falls back to the adapter's
+		/// name only if a package declares no coreName at all.
+		/// </summary>
+		public CoreAttribute CoreIdentity => IdentityOf(_cfg);
+
+		/// <summary>Builds a core's identity from its package declaration.</summary>
+		internal static CoreAttribute IdentityOf(WaterboxConfig cfg)
+			=> new PortedCoreAttribute(
+				name: string.IsNullOrWhiteSpace(cfg.CoreName) ? "Waterbox" : cfg.CoreName,
+				author: cfg.Author ?? "",
+				portedVersion: cfg.Version ?? "",
+				portedUrl: cfg.Url ?? "");
+
 		[UnmanagedFunctionPointer(CallingConvention.Cdecl)] private delegate int InitFn();
 		[UnmanagedFunctionPointer(CallingConvention.Cdecl)] private delegate void FrameFn(ulong input);
 		[UnmanagedFunctionPointer(CallingConvention.Cdecl)] private delegate void SetAxisFn(int index, int value);
