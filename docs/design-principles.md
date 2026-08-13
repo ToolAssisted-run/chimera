@@ -790,3 +790,36 @@ checked without a person:
 windows should follow the same split: if a question about a window can be
 answered without looking at it, the answer belongs in a class that a test can
 call.
+
+## Core settings are declared, not coded (2026-08-13)
+
+`waterbox.config`'s `settings` was a bag of defaults with no types and no
+documentation; the settings dialog rendered it as an uneditable dictionary. It is
+now a list of DECLARATIONS - name, display name, description, type, default,
+options or range, and whether the setting is sync.
+
+**The declaration is the UI.** There is no per-core settings dialog to write, and
+never can be: one adapter serves every package. So `WaterboxSettingsBase`
+implements `ICustomTypeDescriptor` and synthesizes a `PropertyDescriptor` per
+declaration - which is exactly what WinForms' PropertyGrid asks for names, types,
+descriptions, defaults and dropdown values. Every word in that dialog came from
+the core. Adding a setting to a core is a `waterbox.config` edit and nothing else.
+
+**Sync vs non-sync is the frontend's question, not the core's.** The guest gets
+one flat settings object and reads the keys it knows. The `sync` flag decides
+what the FRONTEND does: sync settings are recorded in movie headers and reboot
+the core when changed, because they shape the machine.
+
+**Non-sync settings must actually apply.** A "non-sync" setting that only took
+effect at Init would be a sync setting wearing a disguise, so there is a fifth
+optional guest ABI group: `GetSettingsCapacity` / `GetSettingsBuffer` /
+`PutSettings(len)`. The host writes fresh JSON into the guest's own buffer and
+calls it; `PutSettings` then returns `None` instead of `RebootCore`. A core
+without the group gets a reboot, which is heavier but honest - the setting still
+applies. The buffer must live in `ECL_INVISIBLE` memory: settings are not machine
+state, and a savestate that captured them would restore an old value and make two
+identical runs diverge.
+
+**Storage did not change.** Values are still a flat name -> value map in the
+config file and movie headers, so movies and configs written before this still
+load.

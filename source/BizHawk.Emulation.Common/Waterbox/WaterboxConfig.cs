@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Globalization;
 
 using Newtonsoft.Json;
 
@@ -49,8 +50,113 @@ namespace BizHawk.Emulation.Common.Waterbox
 		/// <summary>Rom file extension (with leading dot, lowercase) to system ID map - how files route to this core.</summary>
 		public Dictionary<string, string> Extensions { get; set; }
 
-		/// <summary>Default user-tunable settings for the core (values TBD).</summary>
-		public Dictionary<string, object> Settings { get; set; }
+		/// <summary>
+		/// The user-tunable settings this core offers, declared by the package. The
+		/// frontend renders them from this and nothing else - it has no per-core
+		/// settings dialogs to render them with.
+		/// </summary>
+		public List<SettingDecl> Settings { get; set; }
+
+		/// <summary>
+		/// One user-tunable setting. Enough for the frontend to draw a labelled,
+		/// typed, documented row without knowing what the setting means.
+		/// </summary>
+		public sealed class SettingDecl
+		{
+			/// <summary>Key the guest reads it under, in the mounted settings JSON.</summary>
+			public string Name { get; set; }
+
+			/// <summary>Label for the settings grid. Falls back to <see cref="Name"/>.</summary>
+			public string Display { get; set; }
+
+			/// <summary>The sentence shown when the row is selected.</summary>
+			public string Description { get; set; }
+
+			/// <summary>"bool", "int" or "enum" (the default is inferred from the other fields).</summary>
+			public string Type { get; set; }
+
+			public object Default { get; set; }
+
+			/// <summary>Allowed values, for an enum setting.</summary>
+			public List<string> Options { get; set; }
+
+			public int? Min { get; set; }
+
+			public int? Max { get; set; }
+
+			/// <summary>
+			/// True if the setting shapes the emulated machine, so it is part of a
+			/// movie's reproduction contract: recorded in movie headers, and changing it
+			/// reboots the core. False for settings that only affect presentation.
+			/// </summary>
+			public bool Sync { get; set; }
+
+			public string DisplayName => string.IsNullOrWhiteSpace(Display) ? Name : Display;
+
+			/// <summary>
+			/// The .NET type the settings grid should edit this as. Enums arrive as
+			/// strings (the guest reads them by name), so an enum is edited as a string
+			/// from a fixed list rather than as a synthesized Enum type.
+			/// </summary>
+			public Type ClrType => EffectiveType switch
+			{
+				"bool" => typeof(bool),
+				"int" => typeof(int),
+				_ => typeof(string),
+			};
+
+			/// <summary>The declared type, or one inferred from the options/default when omitted.</summary>
+			public string EffectiveType
+			{
+				get
+				{
+					if (!string.IsNullOrWhiteSpace(Type)) return Type.ToLowerInvariant();
+					if (Options is { Count: > 0 }) return "enum";
+					return Default switch
+					{
+						bool => "bool",
+						sbyte or byte or short or ushort or int or uint or long or ulong => "int",
+						_ => "string",
+					};
+				}
+			}
+
+			/// <summary>The default, coerced to <see cref="ClrType"/>.</summary>
+			public object DefaultValue => Coerce(Default);
+
+			/// <summary>
+			/// Brings a value (from JSON, so possibly a boxed long or a string) to the
+			/// type this setting is edited as, clamping ints to any declared range.
+			/// </summary>
+			public object Coerce(object value)
+			{
+				switch (EffectiveType)
+				{
+					case "bool":
+						return value switch { null => false, bool b => b, _ => bool.TryParse(value.ToString(), out var pb) && pb };
+					case "int":
+					{
+						var n = value switch
+						{
+							null => 0,
+							int i => i,
+							_ => int.TryParse(Convert.ToString(value, CultureInfo.InvariantCulture), NumberStyles.Integer, CultureInfo.InvariantCulture, out var pi) ? pi : 0,
+						};
+						if (Min is int min && n < min) n = min;
+						if (Max is int max && n > max) n = max;
+						return n;
+					}
+					default:
+					{
+						var s = value?.ToString() ?? "";
+						// an unknown option would leave the grid showing a value the core
+						// will not accept, so fall back to the first legal one
+						if (Options is { Count: > 0 } && !Options.Contains(s)) return Options.Contains(Default?.ToString()) ? Default.ToString() : Options[0];
+						return s;
+					}
+				}
+			}
+		}
 
 		public sealed class VideoConfig
 		{

@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 
@@ -84,6 +85,15 @@ namespace BizHawk.Emulation.Common.Waterbox
 		private readonly byte[] _settingsBytes;
 		private int _settingsPos;
 		private WaterboxCoreSyncSettings _syncSettings;
+		private WaterboxCoreSettings _settings;
+
+		// The optional "live settings" group: a guest that exports all three can be
+		// told about a non-sync setting change without being rebooted. The buffer is
+		// guest-owned (the host cannot hand a host pointer across the sandbox) and
+		// belongs in memory excluded from savestates, since settings are not state.
+		private IntFn _settingsCapacity;
+		private GetPtrFn _settingsBuffer;
+		private VoidIntFn _settingsApply;
 		private MemoryStream _saveBuf;
 		private byte[] _loadBuf;
 		private int _loadPos;
@@ -96,7 +106,7 @@ namespace BizHawk.Emulation.Common.Waterbox
 		private readonly WaterboxConfig.AxisConfig[] _axes;
 		private readonly SetAxisFn _setAxis; // null iff the package declares no axes
 
-		public WaterboxCore(byte[] rom, WaterboxConfig cfg, string wbxPath, WaterboxCoreSyncSettings syncSettings)
+		public WaterboxCore(byte[] rom, WaterboxConfig cfg, string wbxPath, WaterboxCoreSyncSettings syncSettings, WaterboxCoreSettings settings = null)
 		{
 			_cfg = cfg;
 			_romBytes = rom;
@@ -106,6 +116,7 @@ namespace BizHawk.Emulation.Common.Waterbox
 			// with the user/movie sync-settings. Delivered to the guest as a mounted
 			// "settings" file it reads during Init, so they can shape the machine.
 			_syncSettings = syncSettings?.Clone() ?? new WaterboxCoreSyncSettings();
+			_settings = settings?.Clone() ?? new WaterboxCoreSettings();
 			_settingsBytes = SerializeSettings(EffectiveSettings());
 			_width = cfg.Video.Width;
 			_height = cfg.Video.Height;
@@ -170,6 +181,11 @@ namespace BizHawk.Emulation.Common.Waterbox
 				_setAxis = TryProc<SetAxisFn>("SetAxis")
 					?? throw new InvalidOperationException($"{cfg.CoreName}: waterbox.config declares axes but core.wbx exports no SetAxis");
 			}
+			// optional: a core that can take non-sync settings without being rebooted
+			_settingsCapacity = TryProc<IntFn>("GetSettingsCapacity");
+			_settingsBuffer = TryProc<GetPtrFn>("GetSettingsBuffer");
+			_settingsApply = TryProc<VoidIntFn>("PutSettings");
+
 			_getVideoBgra = Proc<GetPtrFn>(cfg.Video.GetBgra);
 			_getAudio = Proc<GetPtrFn>(cfg.Audio.Get);
 			if (!string.IsNullOrEmpty(cfg.Lag?.InputWasRead))
@@ -272,13 +288,54 @@ namespace BizHawk.Emulation.Common.Waterbox
 
 		// ---- settings ----
 
+		/// <summary>
+		/// What the guest is told: every declared setting, at the package's default
+		/// unless the user (or a movie) overrode it. Both kinds go in the same object -
+		/// the guest reads the keys it knows and the sync/non-sync split is a question
+		/// about movies and reboots, which is the frontend's business, not the core's.
+		/// </summary>
 		private Dictionary<string, object> EffectiveSettings()
 		{
 			var effective = new Dictionary<string, object>();
-			if (_cfg.Settings != null) foreach (var kv in _cfg.Settings) effective[kv.Key] = kv.Value;
-			if (_syncSettings.Values != null) foreach (var kv in _syncSettings.Values) effective[kv.Key] = kv.Value;
+			foreach (var decl in Decls) effective[decl.Name] = decl.DefaultValue;
+			foreach (var kv in _settings.Values ?? new()) if (effective.ContainsKey(kv.Key) || Decl(kv.Key) is null) effective[kv.Key] = kv.Value;
+			foreach (var kv in _syncSettings.Values ?? new()) effective[kv.Key] = kv.Value;
 			return effective;
 		}
+
+		/// <summary>
+		/// Hands the running guest the current settings. Returns false if the core
+		/// does not export the live-settings group, in which case the caller must
+		/// reboot instead - the alternative is a settings dialog whose changes quietly
+		/// do nothing.
+		/// </summary>
+		private bool PushSettingsToGuest()
+		{
+			if (_settingsBuffer is null || _settingsApply is null || _settingsCapacity is null) return false;
+			var json = SerializeSettings(EffectiveSettings());
+			Activate();
+			var capacity = _settingsCapacity();
+			if (json.Length > capacity)
+			{
+				throw new InvalidOperationException(
+					$"{_cfg.CoreName}: settings JSON is {json.Length} bytes but the core's buffer holds {capacity}");
+			}
+			var dest = _settingsBuffer();
+			if (dest == IntPtr.Zero) return false;
+			Marshal.Copy(json, 0, dest, json.Length);
+			_settingsApply(json.Length);
+			return true;
+		}
+
+		private IReadOnlyList<WaterboxConfig.SettingDecl> Decls
+			=> _cfg.Settings ?? [ ];
+
+		private WaterboxConfig.SettingDecl Decl(string name)
+			=> Decls.FirstOrDefault(d => d.Name == name);
+
+		/// <summary>The declarations for one half of the split, handed to the settings object so the grid can draw them.</summary>
+		private IReadOnlyList<WaterboxConfig.SettingDecl> DeclsFor(bool sync)
+			=> Decls.Where(d => d.Sync == sync).ToList();
 
 		// Delivered as a flat JSON object, e.g. {"initFillByte":171}. The guest
 		// parses it with a small JSON reader (jsmn for C cores, nlohmann for C++).
@@ -475,37 +532,41 @@ namespace BizHawk.Emulation.Common.Waterbox
 		}
 
 		// ---------------- ISettable ----------------
-		// Sync settings shape the machine at construction (they are mounted for Init),
-		// so changing them requires a core reboot to take effect. There are no plain
-		// (non-sync) settings. GetSyncSettings returns the user overrides (what movies
-		// record); the package defaults are applied by the adapter, not stored here.
+		// The package declares which of its settings are sync. Sync ones shape the
+		// machine, are mounted for Init, are recorded in movies, and need a reboot to
+		// change. Non-sync ones are pushed to the running guest if it exports the
+		// live-settings entry points, and otherwise also need a reboot - a setting
+		// that silently failed to apply would be worse than a reboot.
 
-		public WaterboxCoreSettings GetSettings() => new();
+		public WaterboxCoreSettings GetSettings()
+		{
+			var s = _settings.Clone();
+			s.Declarations = DeclsFor(sync: false);
+			return s;
+		}
 
-		public WaterboxCoreSyncSettings GetSyncSettings() => _syncSettings.Clone();
+		public WaterboxCoreSyncSettings GetSyncSettings()
+		{
+			var s = _syncSettings.Clone();
+			s.Declarations = DeclsFor(sync: true);
+			return s;
+		}
 
-		public PutSettingsDirtyBits PutSettings(WaterboxCoreSettings o) => PutSettingsDirtyBits.None;
+		public PutSettingsDirtyBits PutSettings(WaterboxCoreSettings o)
+		{
+			var incoming = o?.Clone() ?? new WaterboxCoreSettings();
+			var changed = !_settings.ValuesEqual(incoming);
+			_settings = incoming;
+			if (!changed) return PutSettingsDirtyBits.None;
+			return PushSettingsToGuest() ? PutSettingsDirtyBits.None : PutSettingsDirtyBits.RebootCore;
+		}
 
 		public PutSettingsDirtyBits PutSyncSettings(WaterboxCoreSyncSettings o)
 		{
 			var incoming = o?.Clone() ?? new WaterboxCoreSyncSettings();
-			bool changed = !SettingsEqual(_syncSettings.Values, incoming.Values);
+			var changed = !_syncSettings.ValuesEqual(incoming);
 			_syncSettings = incoming;
 			return changed ? PutSettingsDirtyBits.RebootCore : PutSettingsDirtyBits.None;
-		}
-
-		private static bool SettingsEqual(Dictionary<string, object> a, Dictionary<string, object> b)
-		{
-			a ??= new();
-			b ??= new();
-			if (a.Count != b.Count) return false;
-			foreach (var kv in a)
-			{
-				if (!b.TryGetValue(kv.Key, out var v)) return false;
-				if (!Equals(Convert.ToString(kv.Value, CultureInfo.InvariantCulture),
-					Convert.ToString(v, CultureInfo.InvariantCulture))) return false;
-			}
-			return true;
 		}
 
 		// ---------------- IInputPollable ----------------
