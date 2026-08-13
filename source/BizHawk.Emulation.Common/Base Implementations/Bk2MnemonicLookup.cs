@@ -7,7 +7,6 @@ namespace BizHawk.Emulation.Common
 {
 	public static class Bk2MnemonicLookup
 	{
-		/// <remarks>duplicated with <c>LibretroControllerDef</c></remarks>
 		private const string PFX_RETROPAD = "RetroPad ";
 
 		/// <remarks>arcade-only appendix to resolve name clashes</remarks>

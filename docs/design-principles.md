@@ -962,9 +962,17 @@ ambiguous extensions.
   N64 C-button mnemonic prefixing; the hex editor's Arcade/N3DS exception around
   the rom domain, and its N64 matrix viewer (menu item, handler and the nested
   dialog class). Each was a branch on a system ID no package can claim.
-- **The libretro path plumbing**: `RetroSaveRamAbsolutePath` /
-  `RetroSystemAbsolutePath` and the two `ICoreFileProvider` members that existed
-  to hand a libretro core its own directories.
+- **Libretro, entirely** (user, same day). It started as the path plumbing -
+  `RetroSaveRamAbsolutePath` / `RetroSystemAbsolutePath` and the two
+  `ICoreFileProvider` members that handed a libretro core its own directories -
+  and then took the rest: the `OpenAdvanced_Libretro` and
+  `OpenAdvanced_LibretroNoGame` load types with their `IOpenAdvancedLibretro`
+  interface, `RomLoader.LoadRom`'s `launchLibretroCore` parameter (whose one
+  caller passed null), the file filter for picking a libretro `.so`/`.dll`, and
+  the `Libretro` system ID. A libretro core is a foreign plugin ABI loaded from a
+  shared library; miniHawk's cores are waterbox packages with a sandbox and a
+  reproduction contract, which is the opposite trade, so there was never going to
+  be a road back.
 - The **AVI writer** is now hidden on non-Windows rather than removed: it is
   Microsoft's AVIFIL32, so on Linux the only thing offering it achieved was a
   `DllNotFoundException` after the user picked a codec. It still works on Windows,

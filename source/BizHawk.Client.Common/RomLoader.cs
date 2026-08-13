@@ -569,7 +569,7 @@ namespace BizHawk.Client.Common
 			}
 		}
 
-		public bool LoadRom(string path, CoreComm nextComm, string launchLibretroCore, string forcedCoreName = null, int recursiveCount = 0)
+		public bool LoadRom(string path, CoreComm nextComm, string forcedCoreName = null, int recursiveCount = 0)
 		{
 			if (path == null) return false;
 
@@ -600,7 +600,7 @@ namespace BizHawk.Client.Common
 						return false;
 					}
 
-					// not libretro: do extension checking
+					// extension checking
 					var ext = file.Extension;
 					switch (ext)
 					{

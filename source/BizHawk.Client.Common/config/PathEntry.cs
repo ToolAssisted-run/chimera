@@ -39,11 +39,10 @@ namespace BizHawk.Client.Common
 				"External Tools" => 0x1B,
 				"Temp Files" => 0x1C,
 
-				// only Libretro
 				"Cores" => 0x10,
 				"System" => 0x11,
 
-				// all cores incl. Libretro
+				// all cores
 				"Savestates" => 0x20,
 				"Save RAM" => 0x21,
 				"Screenshots" => 0x22,

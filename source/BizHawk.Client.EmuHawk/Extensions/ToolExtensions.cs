@@ -9,7 +9,6 @@ using BizHawk.Common;
 using BizHawk.Emulation.Common;
 using BizHawk.Client.Common;
 
-//todo - add some more options for libretro types
 
 namespace BizHawk.Client.EmuHawk.ToolExtensions
 {

@@ -41,10 +41,6 @@ namespace BizHawk.Client.EmuHawk
 
 		private static readonly FilesystemFilterSet EmuHawkSaveStatesFSFilterSet = new(FilesystemFilter.EmuHawkSaveStates);
 
-		private static readonly FilesystemFilterSet LibretroCoresFSFilterSet = new(
-			appendAllFilesEntry: false,
-			new FilesystemFilter("Libretro Cores", extensions: [ (OSTailoredCode.IsUnixHost ? "so" : "dll") ]));
-
 		private readonly ToolStripMenuItemEx DOSSubMenu = new() { Text = "&DOS" };
 
 		private readonly ToolStripMenuItemEx DumpStatusReportMenuItem = new()
@@ -3581,7 +3577,6 @@ namespace BizHawk.Client.EmuHawk
 				var result = loader.LoadRom(
 					path: path,
 					nextComm,
-					launchLibretroCore: null,
 					forcedCoreName: forcedCoreName);
 
 				// we need to replace the path in the OpenAdvanced with the canonical one the user chose.
