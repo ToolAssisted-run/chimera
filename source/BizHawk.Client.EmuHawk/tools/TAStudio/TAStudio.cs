@@ -435,8 +435,6 @@ namespace BizHawk.Client.EmuHawk
 			_lastAutoSaveSuccess = !saveResult.IsError;
 		}
 
-		private static readonly string[] N64CButtonSuffixes = { " C Up", " C Down", " C Left", " C Right" };
-
 		private void SetUpColumns()
 		{
 			for (int i = 0; i < _inputRolls.Count; i++)
@@ -470,26 +468,6 @@ namespace BizHawk.Client.EmuHawk
 					|| c.Name.EndsWithOrdinal("Block")
 					|| c.Name.EndsWithOrdinal("Status"));
 
-			if (Emulator.SystemId is VSystemID.Raw.Doom)
-			{
-				var doomColsToHide = roll.AllColumns
-					.Where(c =>
-						c.Name.Contains("Forward")
-						|| c.Name.Contains("Backward")
-						|| c.Name.Contains("Automap")
-						|| c.Name.Contains("Camera")
-						|| c.Name.Contains("Gamma")
-						|| c.Name.Contains("Mouse")
-						|| c.Name.Contains("Weapon Select ")
-						|| c.Name.Contains("Turn Speed ")
-						|| c.Name.Contains("Left")
-						|| c.Name.Contains("Right")
-						|| c.Name.EndsWithOrdinal("Strafe")
-						|| c.Name.EndsWithOrdinal("Run"));
-
-				columnsToHide = columnsToHide.Concat(doomColsToHide);
-			}
-
 			return columnsToHide;
 		}
 
@@ -505,12 +483,8 @@ namespace BizHawk.Client.EmuHawk
 			});
 
 			List<RollColumn> columns = new(); // add to list first then AddRange to avoid 100 refreshes
-			foreach ((string name, string mnemonic0, int maxLength) in MnemonicMap())
+			foreach ((string name, string mnemonic, int maxLength) in MnemonicMap())
 			{
-				var mnemonic = Emulator.SystemId is VSystemID.Raw.N64 && N64CButtonSuffixes.Any(name.EndsWithOrdinal)
-					? $"c{mnemonic0.ToUpperInvariant()}" // prepend 'c' to differentiate from L/R buttons -- this only affects the column headers
-					: mnemonic0;
-
 				columns.Add(new(
 					name: name,
 					widthUnscaled: 10,
@@ -540,7 +514,7 @@ namespace BizHawk.Client.EmuHawk
 		private void UpdateColumnWidths(InputRoll roll)
 		{
 			int minColumnWidth = UIHelper.UnscaleX(roll.GetCellWidthForText("W")); // this gives the same width as the old hard-coded width, with default font
-			foreach ((string name, string mnemonic0, int maxLength) in MnemonicMap())
+			foreach ((string name, _, int maxLength) in MnemonicMap())
 			{
 				RollColumn col = roll.AllColumns[name];
 

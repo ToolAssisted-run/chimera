@@ -950,3 +950,26 @@ placeholder in External Tools (an empty submenu never opens, so it cannot
 repopulate itself - the same trap Preferred Cores fell into), and
 `PreferredPlatformsForExtensions`, which the platform chooser still uses for
 ambiguous extensions.
+
+### Second pass: tools and per-console corners (2026-08-13)
+
+- **Code-Data Logger**, entirely. It needs `ICodeDataLogger`, and the guest ABI has
+  no group that could back it, so it greyed itself out for every core that can
+  exist here - along with its drag-and-drop `.cdl` handling and its slot in the
+  file-load ordering. If a "which addresses were code" group ever joins the ABI,
+  the tool comes back with it.
+- **Per-console corners in generic tools**: TAStudio's Doom column-hiding and its
+  N64 C-button mnemonic prefixing; the hex editor's Arcade/N3DS exception around
+  the rom domain, and its N64 matrix viewer (menu item, handler and the nested
+  dialog class). Each was a branch on a system ID no package can claim.
+- **The libretro path plumbing**: `RetroSaveRamAbsolutePath` /
+  `RetroSystemAbsolutePath` and the two `ICoreFileProvider` members that existed
+  to hand a libretro core its own directories.
+- The **AVI writer** is now hidden on non-Windows rather than removed: it is
+  Microsoft's AVIFIL32, so on Linux the only thing offering it achieved was a
+  `DllNotFoundException` after the user picked a codec. It still works on Windows,
+  where miniHawk also runs.
+
+Checked and kept: the seven other video writers (all registered, all working - the
+per-codec dialogs are theirs, not leftovers), and the Cheats tool, which needs
+only `IMemoryDomains` and therefore works with any core package.

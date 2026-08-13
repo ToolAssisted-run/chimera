@@ -301,9 +301,6 @@
 		<Compile Update="tools/BatchRun.cs" SubType="Form" />
 		<Compile Update="tools/BatchRun.Designer.cs" DependentUpon="BatchRun.cs" />
 		<EmbeddedResource Update="tools/BatchRun.resx" DependentUpon="BatchRun.cs" />
-		<Compile Update="tools/CDL.cs" SubType="Form" />
-		<Compile Update="tools/CDL.designer.cs" DependentUpon="CDL.cs" />
-		<EmbeddedResource Update="tools/CDL.resx" DependentUpon="CDL.cs" />
 		<Compile Update="tools/Cheats/CheatEdit.cs" SubType="UserControl" />
 		<Compile Update="tools/Cheats/CheatEdit.Designer.cs" DependentUpon="CheatEdit.cs" />
 		<EmbeddedResource Update="tools/Cheats/CheatEdit.resx" DependentUpon="CheatEdit.cs" />

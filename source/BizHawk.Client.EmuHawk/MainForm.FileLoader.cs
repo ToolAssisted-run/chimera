@@ -15,7 +15,6 @@ namespace BizHawk.Client.EmuHawk
 			Rom,
 			State,
 			Watch,
-			CdFile,
 			LuaSession,
 			LuaScript,
 			Cheat,
@@ -38,15 +37,6 @@ namespace BizHawk.Client.EmuHawk
 		}
 
 		private readonly string[] _nonArchive = { ".ISO", ".CUE", ".CCD", ".CDI", ".MDS", ".NRG" };
-
-		private void LoadCdl(string filename, string archive = null)
-		{
-			if (Tools.IsAvailable<CDL>())
-			{
-				CDL cdl = Tools.Load<CDL>();
-				cdl.LoadFile(filename);
-			}
-		}
 
 		private void LoadCheats(string filename, string archive = null)
 		{
@@ -116,9 +106,6 @@ namespace BizHawk.Client.EmuHawk
 						break;
 					case ".WCH":
 						sortedFiles[LoadOrdering.Watch].Add(fileInformation);
-						break;
-					case ".CDL":
-						sortedFiles[LoadOrdering.CdFile].Add(fileInformation);
 						break;
 					default:
 						if (MovieService.IsValidMovieExtension(ext))
@@ -194,7 +181,6 @@ namespace BizHawk.Client.EmuHawk
 			 *	  1) The ROM
 			 *	  2) State
 			 *	  3) Watch files
-			 *	  4) Code Data Logger (CDL)
 			 *	  5) LUA sessions
 			 *	  6) LUA scripts
 			 *	  7) Cheat files
@@ -238,9 +224,6 @@ namespace BizHawk.Client.EmuHawk
 								break;
 							case LoadOrdering.Watch:
 								LoadWatch(filename, fileInformation.ArchiveName);
-								break;
-							case LoadOrdering.CdFile:
-								LoadCdl(filename, fileInformation.ArchiveName);
 								break;
 							case LoadOrdering.LuaSession:
 								LoadLuaSession(filename, fileInformation.ArchiveName);

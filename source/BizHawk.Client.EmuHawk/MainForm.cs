@@ -257,8 +257,6 @@ namespace BizHawk.Client.EmuHawk
 				= (/*HexEditor.ToolIcon.ToBitmap()*/Properties.Resources.Poke, "Hex Editor");
 			(DebuggerMenuItem.Image, /*DebuggerMenuItem.Text*/_) = ToolManager.IconAndNameCache[typeof(GenericDebugger)]
 				= (/*GenericDebugger.ToolIcon.ToBitmap()*/Properties.Resources.Bug, "Debugger");
-			(CodeDataLoggerMenuItem.Image, /*CodeDataLoggerMenuItem.Text*/_) = ToolManager.IconAndNameCache[typeof(CDL)]
-				= (/*CDL.ToolIcon.ToBitmap()*/Properties.Resources.CdLogger, "Code Data Logger");
 			(VirtualPadMenuItem.Image, /*VirtualPadMenuItem.Text*/_) = ToolManager.IconAndNameCache[typeof(VirtualpadTool)]
 				= (/*VirtualpadTool.ToolIcon.ToBitmap()*/Properties.Resources.GameController, "Virtual Pads");
 			(CheatsMenuItem.Image, /*CheatsMenuItem.Text*/_) = ToolManager.IconAndNameCache[typeof(Cheats)]

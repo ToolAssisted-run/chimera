@@ -22,29 +22,6 @@ namespace BizHawk.Client.EmuHawk
 	// int to long TODO: 32 bit domains have more digits than the hex editor can account for and the address covers up the 0 column
 	public partial class HexEditor : ToolFormBase, IToolFormAutoConfig
 	{
-		private sealed class N64MatrixDisplayDialog : Form
-		{
-			public N64MatrixDisplayDialog(IReadOnlyList<IReadOnlyList<string>> strings)
-			{
-				TableLayoutPanel tlp = new() { Size = new(352, 104) };
-				const int SIZE = 4;
-				for (var y = 0; y < SIZE; y++) tlp.RowStyles.Add(new());
-				for (var x = 0; x < SIZE; x++) tlp.ColumnStyles.Add(new());
-				for (var y = 0; y < SIZE; y++) for (var x = 0; x < SIZE; x++) tlp.Controls.Add(
-					new SzTextBoxEx { ReadOnly = true, Size = new(80, 23), Text = strings[y][x] },
-					row: y,
-					column: x);
-				SzButtonEx btnCopyTSV = new() { Size = new(128, 23), Text = ".tsv --> Clipboard" };
-				btnCopyTSV.Click += (_, _) => Clipboard.SetText(string.Join(
-					"\n",
-					strings.Select(static l => string.Join("\t", l))));
-				ClientSize = new(352, 144);
-				SuspendLayout();
-				Controls.Add(new SingleColumnFLP { Controls = { tlp, btnCopyTSV } });
-				ResumeLayout();
-			}
-		}
-
 		private class NullMemoryDomain : MemoryDomain
 		{
 			public override byte PeekByte(long addr) => 0;
@@ -239,13 +216,10 @@ namespace BizHawk.Client.EmuHawk
 		public override void Restart()
 		{
 			_romDomain = null;
-			if (Emulator.SystemId is not (VSystemID.Raw.Arcade or VSystemID.Raw.N3DS))
+			var rom = GetRomBytes();
+			if (rom is not null)
 			{
-				var rom = GetRomBytes();
-				if (rom is not null)
-				{
-					_romDomain = new MemoryDomainByteArray(ROM_DOMAIN_NAME, MemoryDomain.Endian.Little, rom, writable: true, wordSize: 1);
-				}
+				_romDomain = new MemoryDomainByteArray(ROM_DOMAIN_NAME, MemoryDomain.Endian.Little, rom, writable: true, wordSize: 1);
 			}
 
 			if (_domain.Name == ROM_DOMAIN_NAME && _romDomain is not null)
@@ -1906,10 +1880,6 @@ namespace BizHawk.Client.EmuHawk
 				FreezeContextItem.Text = "&Freeze";
 				FreezeContextItem.Image = Resources.Freeze;
 			}
-
-			var shouldShowN64Matrix = _highlightedAddress is not null && Emulator.SystemId is VSystemID.Raw.N64;
-			toolStripMenuItem1.Visible = viewN64MatrixToolStripMenuItem.Visible = shouldShowN64Matrix;
-			viewN64MatrixToolStripMenuItem.Enabled = shouldShowN64Matrix && (_highlightedAddress.Value & 0b11) is 0;
 		}
 
 		private void IncrementContextItem_Click(object sender, EventArgs e)
@@ -2122,30 +2092,5 @@ namespace BizHawk.Client.EmuHawk
 			}
 		}
 
-		private void viewN64MatrixToolStripMenuItem_Click(object sender, EventArgs e)
-		{
-			static double Wat(uint n)
-				=> unchecked((int) n) / 65536.0;
-			if (_highlightedAddress is null) return;
-			var addr = _highlightedAddress.Value & ~0b11L;
-			const int SIZE = 4;
-			var raw = new ushort[2 * SIZE * SIZE];
-			_domain.BulkPeekUshort(addr.RangeTo(addr + (SIZE * SIZE * sizeof(float) - 1)), bigEndian: true, raw);
-			List<List<string>> strings = new();
-			for (var y = 0; y < SIZE; y++)
-			{
-				strings.Add(new());
-				for (var x = 0; x < SIZE; x++)
-				{
-					var i = y * SIZE + x;
-					uint n = raw[i];
-					n <<= 16;
-					n |= raw[SIZE * SIZE + i];
-					strings[y].Add(((float) Wat(n)).ToString(CultureInfo.InvariantCulture)); // was going to right-pad, as the previous code did (poorly), but I realised that's not necessary and not really helpful, as well as being hard to get right --yoshi
-				}
-			}
-			using N64MatrixDisplayDialog dialog = new(strings);
-			this.ShowDialogAsChild(dialog);
-		}
 	}
 }

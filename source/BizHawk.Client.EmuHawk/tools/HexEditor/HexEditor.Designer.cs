@@ -84,8 +84,6 @@ namespace BizHawk.Client.EmuHawk
 			this.DecrementContextItem = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
 			this.ContextSeparator2 = new BizHawk.WinForms.Controls.ToolStripSeparatorEx();
 			this.GoToContextItem = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
-			this.toolStripMenuItem1 = new BizHawk.WinForms.Controls.ToolStripSeparatorEx();
-			this.viewN64MatrixToolStripMenuItem = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
 			this.MemoryViewerBox = new System.Windows.Forms.GroupBox();
 			this.HexScrollBar = new System.Windows.Forms.VScrollBar();
 			this.AddressLabel = new BizHawk.WinForms.Controls.LocLabelEx();
@@ -335,9 +333,7 @@ namespace BizHawk.Client.EmuHawk
             this.IncrementContextItem,
             this.DecrementContextItem,
             this.ContextSeparator2,
-            this.GoToContextItem,
-            this.toolStripMenuItem1,
-            this.viewN64MatrixToolStripMenuItem});
+            this.GoToContextItem});
 			this.ViewerContextMenuStrip.Name = "ViewerContextMenuStrip";
 			this.ViewerContextMenuStrip.Size = new System.Drawing.Size(222, 264);
 			this.ViewerContextMenuStrip.Opening += new System.ComponentModel.CancelEventHandler(this.ViewerContextMenuStrip_Opening);
@@ -400,11 +396,6 @@ namespace BizHawk.Client.EmuHawk
 			this.GoToContextItem.ShortcutKeyDisplayString = "Ctrl+G";
 			this.GoToContextItem.Text = "&Go to Address...";
 			this.GoToContextItem.Click += new System.EventHandler(this.GoToAddressMenuItem_Click);
-			// 
-			// viewN64MatrixToolStripMenuItem
-			// 
-			this.viewN64MatrixToolStripMenuItem.Text = "View N64 Matrix";
-			this.viewN64MatrixToolStripMenuItem.Click += new System.EventHandler(this.viewN64MatrixToolStripMenuItem_Click);
 			// 
 			// MemoryViewerBox
 			// 
@@ -545,8 +536,6 @@ namespace BizHawk.Client.EmuHawk
 		private BizHawk.WinForms.Controls.ToolStripMenuItemEx noneToolStripMenuItem;
 		private BizHawk.WinForms.Controls.ToolStripMenuItemEx CloseTableFileMenuItem;
 		private BizHawk.WinForms.Controls.ToolStripSeparatorEx toolStripSeparator3;
-		private BizHawk.WinForms.Controls.ToolStripSeparatorEx toolStripMenuItem1;
-		private BizHawk.WinForms.Controls.ToolStripMenuItemEx viewN64MatrixToolStripMenuItem;
 		private BizHawk.WinForms.Controls.ToolStripMenuItemEx ExportContextItem;
 		private BizHawk.WinForms.Controls.ToolStripMenuItemEx ExportMenuItem;
 		private BizHawk.WinForms.Controls.ToolStripMenuItemEx importAsBinaryToolStripMenuItem;

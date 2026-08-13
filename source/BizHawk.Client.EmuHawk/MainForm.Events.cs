@@ -979,7 +979,6 @@ namespace BizHawk.Client.EmuHawk
 			CheatsMenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["Cheats"];
 			TAStudioMenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["TAStudio"];
 			VirtualPadMenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["Virtual Pad"];
-			CodeDataLoggerMenuItem.Enabled = Tools.IsAvailable<CDL>();
 
 			TAStudioMenuItem.Enabled = Tools.IsAvailable<TAStudio>();
 
@@ -1078,11 +1077,6 @@ namespace BizHawk.Client.EmuHawk
 		private void SurfaceViewerMenuItem_Click(object sender, EventArgs e)
 		{
 			Tools.Load<SurfaceViewer>();
-		}
-
-		private void CodeDataLoggerMenuItem_Click(object sender, EventArgs e)
-		{
-			Tools.Load<CDL>();
 		}
 
 		private void MacroToolMenuItem_Click(object sender, EventArgs e)

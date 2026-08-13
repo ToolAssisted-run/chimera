@@ -200,7 +200,6 @@ namespace BizHawk.Client.EmuHawk
 			this.DebuggerMenuItem = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
 			this.TraceLoggerMenuItem = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
 			this.SurfaceViewerMenuItem = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
-			this.CodeDataLoggerMenuItem = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
 			this.MacroToolMenuItem = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
 			this.VirtualPadMenuItem = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
 			this.toolStripSeparator11 = new BizHawk.WinForms.Controls.ToolStripSeparatorEx();
@@ -1234,7 +1233,6 @@ namespace BizHawk.Client.EmuHawk
             this.DebuggerMenuItem,
             this.TraceLoggerMenuItem,
             this.SurfaceViewerMenuItem,
-            this.CodeDataLoggerMenuItem,
             this.MacroToolMenuItem,
             this.VirtualPadMenuItem,
             this.toolStripSeparator11,
@@ -1291,11 +1289,6 @@ namespace BizHawk.Client.EmuHawk
 			//
 			this.SurfaceViewerMenuItem.Text = "Surface &Viewer";
 			this.SurfaceViewerMenuItem.Click += new System.EventHandler(this.SurfaceViewerMenuItem_Click);
-			//
-			// CodeDataLoggerMenuItem
-			// 
-			this.CodeDataLoggerMenuItem.Text = "Code-Data Logger";
-			this.CodeDataLoggerMenuItem.Click += new System.EventHandler(this.CodeDataLoggerMenuItem_Click);
 			// 
 			// MacroToolMenuItem
 			// 
@@ -2202,7 +2195,6 @@ namespace BizHawk.Client.EmuHawk
 		private BizHawk.WinForms.Controls.ToolStripMenuItemEx Speed400MenuItem;
 		private BizHawk.WinForms.Controls.ToolStripMenuItemEx DisplayMessagesMenuItem;
 		private BizHawk.WinForms.Controls.ToolStripMenuItemEx ExternalToolMenuItem;
-		private BizHawk.WinForms.Controls.ToolStripMenuItemEx CodeDataLoggerMenuItem;
 		private BizHawk.WinForms.Controls.ToolStripMenuItemEx dummyExternalTool;
 		private BizHawk.WinForms.Controls.ToolStripMenuItemEx RecordAVMenuItem;
 		private BizHawk.WinForms.Controls.ToolStripMenuItemEx SaveConfigAsMenuItem;

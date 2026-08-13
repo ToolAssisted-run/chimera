@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 
 using BizHawk.Client.Common;
+using BizHawk.Common;
 using BizHawk.Emulation.Common;
 
 namespace BizHawk.Client.EmuHawk
@@ -142,6 +143,9 @@ namespace BizHawk.Client.EmuHawk
 				{
 					var a = t.GetCustomAttributes(typeof(VideoWriterAttribute), false).Cast<VideoWriterAttribute>().FirstOrDefault();
 					if (a == null) continue;
+					// the AVI writer is Microsoft's AVIFIL32; offering it on Linux only gets the user a
+					// DllNotFoundException after they have chosen a codec
+					if (t == typeof(AviWriter) && OSTailoredCode.IsUnixHost) continue;
 					VideoWriters.Add(a.ShortName, new VideoWriterInfo(a, t));
 				}
 			}

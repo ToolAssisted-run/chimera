@@ -27,14 +27,6 @@ namespace BizHawk.Client.Common
 			_firmwareUserSpecifications = firmwareUserSpecifications;
 		}
 
-		// Poop
-		public string GetRetroSaveRAMDirectory(string corePath)
-			=> _pathEntries.RetroSaveRamAbsolutePath(Path.GetFileNameWithoutExtension(corePath));
-
-		// Poop
-		public string GetRetroSystemPath(string corePath)
-			=> _pathEntries.RetroSystemAbsolutePath(Path.GetFileNameWithoutExtension(corePath));
-
 		public string GetUserPath(string sysID, bool temp)
 		{
 			if (temp)
