@@ -36,25 +36,18 @@ namespace BizHawk.Client.EmuHawk
 			return items;
 		}
 
+		/// <summary>
+		/// Rebuilds the "Emulator" menu for whatever core is running.
+		///
+		/// The menu is named "Emulator", always, and never after the system: a
+		/// top-level menu whose title moves around as you load games is a menu the
+		/// user has to re-find every time. It stays in place and greys out when there
+		/// is nothing loaded; its CONTENTS are what varies by core.
+		/// </summary>
 		private void HandlePlatformMenus()
 		{
-			if (GenericCoreSubMenu.Visible)
-			{
-				var i = GenericCoreSubMenu.Text.IndexOf('&');
-				if (i != -1) AvailableAccelerators.Add(GenericCoreSubMenu.Text[i + 1]);
-			}
-			NullHawkVSysSubmenu.Visible = false;
-			GenericCoreSubMenu.Visible = false;
-
-			switch (Emulator.SystemId)
-			{
-				case VSystemID.Raw.NULL:
-					NullHawkVSysSubmenu.Visible = true;
-					break;
-				default:
-					DisplayDefaultCoreMenu();
-					break;
-			}
+			DisplayDefaultCoreMenu();
+			GenericCoreSubMenu.Enabled = Emulator.SystemId is not VSystemID.Raw.NULL;
 		}
 	}
 }

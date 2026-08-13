@@ -1496,7 +1496,7 @@ namespace BizHawk.Client.EmuHawk
 			// 
 			// GenericCoreSubMenu
 			// 
-			this.GenericCoreSubMenu.Text = "&Core";
+			this.GenericCoreSubMenu.Text = "E&mulator";
 			// 
 			// 
 			// 

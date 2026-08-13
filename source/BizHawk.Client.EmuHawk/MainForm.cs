@@ -53,8 +53,6 @@ namespace BizHawk.Client.EmuHawk
 			Text = string.Format(FMT_STR_DUMP_STATUS_MENUITEM_LABEL, string.Empty),
 		};
 
-		private readonly ToolStripMenuItemEx NullHawkVSysSubmenu = new() { Enabled = false, Text = "—" };
-
 		private readonly ToolStripMenuItemEx RealTimeCounterMenuItem = new() { Enabled = false, Text = "00:00.0" };
 
 		private readonly StatusLabelEx StatusBarMuteIndicator = new();
@@ -111,8 +109,6 @@ namespace BizHawk.Client.EmuHawk
 			_ = FileSubMenu.DropDownItems.InsertAfter(OpenCoreMenuItem, insert: corePackagesMenuItem);
 
 			RebuildCoreSettingsMenus();
-
-			_ = MainformMenu.Items.InsertAfter(ToolsSubMenu, insert: NullHawkVSysSubmenu);
 
 			// Hide Status bar icons and general StatusBar prep
 			MainStatusBar.Padding = new Padding(MainStatusBar.Padding.Left, MainStatusBar.Padding.Top, MainStatusBar.Padding.Left, MainStatusBar.Padding.Bottom); // Workaround to remove extra padding on right
@@ -1811,41 +1807,13 @@ namespace BizHawk.Client.EmuHawk
 			typeof(TraceLogger),
 		];
 
-		private ISet<char> _availableAccelerators;
-
-		private ISet<char> AvailableAccelerators
-		{
-			get
-			{
-				if (_availableAccelerators == null)
-				{
-					_availableAccelerators = new HashSet<char>();
-					for (var c = 'A'; c <= 'Z'; c++) _availableAccelerators.Add(c);
-					foreach (ToolStripItem item in MainMenuStrip.Items)
-					{
-						if (!item.Visible) continue;
-						var i = item.Text.IndexOf('&');
-						if (i == -1 || i == item.Text.Length - 1) continue;
-						_availableAccelerators.Remove(char.ToUpperInvariant(item.Text[i + 1]));
-					}
-				}
-				return _availableAccelerators;
-			}
-		}
-
+		/// <summary>
+		/// Fills the "Emulator" menu: the running core's settings, then the tools that
+		/// core provides. The title is fixed (see <see cref="HandlePlatformMenus"/>);
+		/// only what is inside changes.
+		/// </summary>
 		private void DisplayDefaultCoreMenu()
 		{
-			GenericCoreSubMenu.Visible = true;
-			var sysID = Emulator.SystemId;
-			for (var i = 0; i < sysID.Length; i++)
-			{
-				if (AvailableAccelerators.Remove(char.ToUpperInvariant(sysID[i])))
-				{
-					sysID = sysID.Insert(i, "&");
-					break;
-				}
-			}
-			GenericCoreSubMenu.Text = sysID;
 			GenericCoreSubMenu.DropDownItems.Clear();
 
 			var settingsMenuItem = new ToolStripMenuItem { Text = "&Settings" };
