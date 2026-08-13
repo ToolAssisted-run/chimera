@@ -187,11 +187,6 @@ namespace BizHawk.Client.EmuHawk
 
 		public CoreComm CreateCoreComm()
 		{
-			var cfp = new CoreFileProvider(
-				this,
-				FirmwareManager,
-				Config.PathEntries,
-				Config.FirmwareUserSpecifications);
 			var prefs = CoreComm.CorePreferencesFlags.None;
 			if (Config.SkipWaterboxIntegrityChecks)
 				prefs = CoreComm.CorePreferencesFlags.WaterboxMemoryConsistencyCheck;
@@ -200,7 +195,6 @@ namespace BizHawk.Client.EmuHawk
 			return new CoreComm(
 				message => this.ModalMessageBox(message, "Warning", EMsgBoxIcon.Warning),
 				AddOnScreenMessage,
-				cfp,
 				prefs,
 				new OpenGLProvider());
 		}
@@ -233,7 +227,6 @@ namespace BizHawk.Client.EmuHawk
 			DisplayConfigMenuItem.Image = Properties.Resources.TvIcon;
 			SoundMenuItem.Image = Properties.Resources.Audio;
 			PathsMenuItem.Image = Properties.Resources.CopyFolder;
-			FirmwareMenuItem.Image = Properties.Resources.Pcb;
 			MessagesMenuItem.Image = Properties.Resources.MessageConfig;
 			AutofireMenuItem.Image = Properties.Resources.Lightning;
 			RewindOptionsMenuItem.Image = Properties.Resources.Previous;
@@ -288,7 +281,6 @@ namespace BizHawk.Client.EmuHawk
 			toolStripMenuItem8.Image = Properties.Resources.TvIcon;
 			toolStripMenuItem9.Image = Properties.Resources.Audio;
 			toolStripMenuItem10.Image = Properties.Resources.CopyFolder;
-			toolStripMenuItem11.Image = Properties.Resources.Pcb;
 			toolStripMenuItem12.Image = Properties.Resources.MessageConfig;
 			toolStripMenuItem13.Image = Properties.Resources.Lightning;
 			toolStripMenuItem14.Image = Properties.Resources.Previous;
@@ -343,7 +335,6 @@ namespace BizHawk.Client.EmuHawk
 					);
 				},
 			};
-			FirmwareManager = new FirmwareManager();
 			movieSession = MovieSession = new MovieSession(
 				Config.Movies,
 				Config.PathEntries.MovieBackupsAbsolutePath(),
@@ -1125,8 +1116,6 @@ namespace BizHawk.Client.EmuHawk
 			AddOnScreenMessage(Rewinder?.Active == true ? "Rewind started" : "Rewind disabled");
 		}
 
-		public FirmwareManager FirmwareManager { get; }
-
 		protected override void OnActivated(EventArgs e)
 		{
 			base.OnActivated(e);
@@ -1616,7 +1605,6 @@ namespace BizHawk.Client.EmuHawk
 			const string DUMP_KIND_BAD = " (bad dump)";
 			const string DUMP_KIND_GOOD = " (good dump)";
 			const string DUMP_KIND_HACK = " (hack/homebrew)";
-			const string DUMP_KIND_MAME_BADEMU = " (unsupported board)";
 			const string DUMP_KIND_UNRECOGNIZED = " (unrecognized)";
 			var kind = string.Empty;
 			var icon = Properties.Resources.Blank;
@@ -1634,14 +1622,9 @@ namespace BizHawk.Client.EmuHawk
 					RomStatus.Hack => (DUMP_KIND_HACK, Properties.Resources.Hack, "Hacked ROM"),
 					RomStatus.Overdump => (DUMP_KIND_BAD, Properties.Resources.ExclamationRed, "Warning: Overdump"),
 					RomStatus.NotInDatabase => (DUMP_KIND_UNRECOGNIZED, Properties.Resources.RetroQuestion, "Warning: Unknown ROM"),
-					// 3 from MAME:
-					RomStatus.Imperfect => (DUMP_KIND_MAME_BADEMU, Properties.Resources.RetroQuestion, "Warning: Imperfect emulation"),
-					RomStatus.Unimplemented => (DUMP_KIND_MAME_BADEMU, Properties.Resources.ExclamationRed, "Warning: Unemulated features"),
-					RomStatus.NotWorking => (DUMP_KIND_MAME_BADEMU, Properties.Resources.ExclamationRed, "Warning: The game does not work"),
 					/*RomStatus.Unknown or RomStatus.Bios*/_ => (DUMP_KIND_UNRECOGNIZED, Properties.Resources.Hack, "Warning: ROM of Unknown Character"),
 				};
-				if (_multiDiskMode
-					&& kind is not DUMP_KIND_MAME_BADEMU) // don't override the warnings from MAME in this case
+				if (_multiDiskMode)
 				{
 					icon = Properties.Resources.RetroQuestion;
 					tooltip = "Multi-disk bundler";
@@ -3430,34 +3413,13 @@ namespace BizHawk.Client.EmuHawk
 
 		private void ShowLoadError(object sender, RomLoader.RomErrorArgs e)
 		{
-			if (e.Type == RomLoader.LoadErrorType.MissingFirmware)
+			string title = "load error";
+			if (e.AttemptedCoreLoad != null)
 			{
-				if (this.ShowMessageBox2(
-					caption: "Missing Firmware!",
-					icon: EMsgBoxIcon.Error,
-					text: $"{e.Message}\n\nOpen the firmware manager now?",
-					useOKCancel: true))
-				{
-					OpenFWConfigRomLoadFailed(e);
-					if (e.Retry)
-					{
-						// Retry loading the ROM here. This leads to recursion, as the original call to LoadRom has not exited yet,
-						// but unless the user tries and fails to set his firmware a lot of times, nothing should happen.
-						// Refer to how RomLoader implemented its LoadRom method for a potential fix on this.
-						_ = LoadRom(e.RomPath, _currentLoadRomArgs);
-					}
-				}
+				title = $"{e.AttemptedCoreLoad} load error";
 			}
-			else
-			{
-				string title = "load error";
-				if (e.AttemptedCoreLoad != null)
-				{
-					title = $"{e.AttemptedCoreLoad} load error";
-				}
 
-				this.ModalMessageBox(e.Message, title, EMsgBoxIcon.Error);
-			}
+			this.ModalMessageBox(e.Message, title, EMsgBoxIcon.Error);
 		}
 
 		private string ChoosePlatformForRom(RomGame rom)
@@ -3535,7 +3497,6 @@ namespace BizHawk.Client.EmuHawk
 					Deterministic = deterministic,
 					OpenAdvanced = args.OpenAdvanced,
 				};
-				FirmwareManager.RecentlyServed.Clear();
 
 				loader.OnLoadError += ShowLoadError;
 				loader.OnLoadSettings += CoreSettings;
@@ -3695,15 +3656,6 @@ namespace BizHawk.Client.EmuHawk
 					if (!MovieSession.NewMovieQueued && Config.AutoLoadLastSaveSlot && HasSlot(Config.SaveSlot))
 					{
 						_ = LoadstateCurrentSlot();
-					}
-
-					if (FirmwareManager.RecentlyServed.Count > 0)
-					{
-						Console.WriteLine("Active firmware:");
-						foreach (var f in FirmwareManager.RecentlyServed)
-						{
-							Console.WriteLine($"\t{f.ID} : {f.Hash}");
-						}
 					}
 
 					ExtToolManager.BuildToolStrip();

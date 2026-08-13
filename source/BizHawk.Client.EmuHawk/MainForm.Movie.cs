@@ -201,11 +201,6 @@ namespace BizHawk.Client.EmuHawk
 
 			movie.GameName = Game.FilesystemSafeName();
 			movie.Hash = Game.Hash;
-			if (Game.FirmwareHash != null)
-			{
-				movie.FirmwareHash = Game.FirmwareHash;
-			}
-
 			if (Emulator.HasBoardInfo())
 			{
 				movie.BoardName = Emulator.AsBoardInfo().BoardName;
@@ -217,18 +212,6 @@ namespace BizHawk.Client.EmuHawk
 				if (region == DisplayType.PAL)
 				{
 					movie.HeaderEntries.Add(HeaderKeys.Pal, "1");
-				}
-			}
-
-			if (FirmwareManager.RecentlyServed.Count != 0)
-			{
-				foreach (var firmware in FirmwareManager.RecentlyServed)
-				{
-					var key = firmware.ID.MovieHeaderKey;
-					if (!movie.HeaderEntries.ContainsKey(key))
-					{
-						movie.HeaderEntries.Add(key, firmware.Hash);
-					}
 				}
 			}
 

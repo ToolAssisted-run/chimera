@@ -17,19 +17,15 @@ namespace BizHawk.Emulation.Common
 		public CoreComm(
 			ModalMessageBoxCallback showMessage,
 			AddOnScreenMessageCallback notifyMessage,
-			ICoreFileProvider coreFileProvider,
 			CorePreferencesFlags prefs,
 			IOpenGLProvider oglProvider
 			)
 		{
 			ShowMessage = showMessage;
 			Notify = notifyMessage;
-			CoreFileProvider = coreFileProvider;
 			CorePreferences = prefs;
 			OpenGLProvider = oglProvider;
 		}
-
-		public ICoreFileProvider CoreFileProvider { get; }
 
 		/// <summary>
 		/// Gets a message to show. Reasonably annoying (dialog box), shouldn't be used most of the time

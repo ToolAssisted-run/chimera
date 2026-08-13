@@ -102,10 +102,6 @@ namespace BizHawk.Client.Common
 		}
 
 		[JsonIgnore]
-		public string FirmwarePathFragment
-			=> this[GLOBAL, "Firmware"].Path;
-
-		[JsonIgnore]
 		internal string TempFilesFragment => this[GLOBAL, "Temp Files"].Path;
 
 		public static readonly Lazy<IReadOnlyList<PathEntry>> Defaults = new(() => new[]
@@ -113,7 +109,6 @@ namespace BizHawk.Client.Common
 			new[] {
 				BaseEntryFor(GLOBAL, "."),
 				ROMEntryFor(GLOBAL),
-				new(GLOBAL, "Firmware", Path.Combine(".", "Firmware")),
 				new(GLOBAL, "Movies", Path.Combine(".", "Movies")),
 				new(GLOBAL, "Movie backups", Path.Combine(".", "Movies", "backup")),
 				new(GLOBAL, "A/V Dumps", "."),

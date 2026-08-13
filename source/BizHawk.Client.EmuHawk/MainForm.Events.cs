@@ -307,17 +307,9 @@ namespace BizHawk.Client.EmuHawk
 			this.ShowDialogWithTempMute(form);
 		}
 
-		private string CanProvideFirmware(FirmwareID id, string hash)
-			=> FirmwareManager.Resolve(
-				Config.PathEntries,
-				Config.FirmwareUserSpecifications,
-				FirmwareDatabase.FirmwareRecords.First(fr => fr.ID == id),
-//				exactFile: hash, //TODO re-scan FW dir for this file, then try autopatching
-				forbidScan: true)?.Hash;
-
 		private void PlayMovieMenuItem_Click(object sender, EventArgs e)
 		{
-			using var form = new PlayMovie(this, Config, Game, Emulator, MovieSession, CanProvideFirmware);
+			using var form = new PlayMovie(this, Config, Game, Emulator, MovieSession);
 			this.ShowDialogWithTempMute(form);
 		}
 
@@ -709,24 +701,6 @@ namespace BizHawk.Client.EmuHawk
 			InitControls();
 			InputManager.SyncControls(Emulator, MovieSession, Config);
 			if (includedHotkeys) Tools.HandleHotkeyUpdate();
-		}
-
-		private void OpenFWConfigRomLoadFailed(RomLoader.RomErrorArgs args)
-		{
-			using FirmwareConfig configForm = new(
-				this,
-				FirmwareManager,
-				Config.FirmwareUserSpecifications,
-				Config.PathEntries,
-				retryLoadRom: true,
-				reloadRomPath: args.RomPath);
-			args.Retry = this.ShowDialogWithTempMute(configForm) is DialogResult.Retry;
-		}
-
-		private void FirmwareMenuItem_Click(object sender, EventArgs e)
-		{
-			using var configForm = new FirmwareConfig(this, FirmwareManager, Config.FirmwareUserSpecifications, Config.PathEntries);
-			this.ShowDialogWithTempMute(configForm);
 		}
 
 		private void MessagesMenuItem_Click(object sender, EventArgs e)

@@ -35,9 +35,5 @@
 		Bios,
 		Overdump,
 		NotInDatabase,
-		// MAME
-		Imperfect,
-		Unimplemented,
-		NotWorking,
 	}
 }

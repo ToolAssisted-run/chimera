@@ -981,3 +981,34 @@ ambiguous extensions.
 Checked and kept: the seven other video writers (all registered, all working - the
 per-codec dialogs are theirs, not leftovers), and the Cheats tool, which needs
 only `IMemoryDomains` and therefore works with any core package.
+
+### Third pass: MAME, and the core-motivated exceptions (2026-08-13)
+
+The user's instruction was "remove all mame and all core-motivated
+exceptions-to-the-rule", and the second half is the interesting one: a
+core-agnostic frontend should have no code that exists because of one particular
+core.
+
+- **MAME**: the `OpenAdvanced_MAME` load type, the three `RomStatus` values only
+  it produced (`Imperfect`, `Unimplemented`, `NotWorking`) and the status-bar
+  cases and multi-disk exemption built around them, its icon, and the
+  `IsDiscForXML` hack that made a `.chd` not-a-disc "due to MAME wanting CHDs as
+  hard drives (bad design, I know!)" - the comment was BizHawk's own.
+- **The controller artwork**: a table mapping 26 controller-definition names to
+  pictures of consoles, with an "Uberhack" for the C64 keyboard and a special
+  case for the ZX Spectrum. A package declares buttons, not artwork, so the
+  frontend cannot know what any pad looks like; the picture column is collapsed
+  and the images are gone.
+- **Firmware, the whole subsystem**: the manager, the (already empty) database,
+  the config dialog with its hardcoded table of console names, the missing-
+  firmware retry path, the `Firmware` path entry, the movie header's firmware
+  hash, and `ICoreFileProvider` itself - which after the libretro removal existed
+  only to hand cores their BIOS files. Note this overrides an earlier note in
+  `FirmwareDatabase.cs` saying the mechanism would stay for a future
+  package-registers-firmware story: with no ABI channel for it, nothing could
+  ever resolve, so the config dialog opened an empty window. When packages need
+  BIOS files they will mount them like any other data, and the design will be
+  made then rather than inherited.
+- Smaller: `CGBNotSupportedException` (a Game Boy Color error in a frontend with
+  no Game Boy core), and 37 image resources plus 35 image files left orphaned by
+  this and the previous passes.

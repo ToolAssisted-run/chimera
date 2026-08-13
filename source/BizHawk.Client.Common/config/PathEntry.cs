@@ -26,7 +26,6 @@ namespace BizHawk.Client.Common
 				"ROM" => 0x01,
 
 				// only Global
-				"Firmware" => 0x10,
 				"Movies" => 0x11,
 				"Movie backups" => 0x12,
 				"A/V Dumps" => 0x13,

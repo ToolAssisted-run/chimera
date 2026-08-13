@@ -168,18 +168,6 @@ namespace BizHawk.Client.Common
 			}
 		}
 
-		public override string FirmwareHash
-		{
-			set
-			{
-				if (Header[HeaderKeys.FirmwareSha1] != value)
-				{
-					Changes = true;
-					Header[HeaderKeys.FirmwareSha1] = value;
-				}
-			}
-		}
-
 		protected string CommentsString()
 		{
 			var sb = new StringBuilder();

@@ -1,12 +1,5 @@
 namespace BizHawk.Emulation.Common
 {
-	public class MissingFirmwareException : Exception
-	{
-		public MissingFirmwareException(string message) : base(message)
-		{
-		}
-	}
-
 	/// <summary>
 	/// indicates that this core does not support the game, but it may be valid
 	/// </summary>
@@ -22,14 +15,6 @@ namespace BizHawk.Emulation.Common
 	{
 		public NoAvailableCoreException(string system)
 			: base($"System is currently NOT emulated: {system}")
-		{
-		}
-	}
-
-	public class CGBNotSupportedException : Exception
-	{
-		public CGBNotSupportedException()
-			: base("Core does not support CGB only games!")
 		{
 		}
 	}

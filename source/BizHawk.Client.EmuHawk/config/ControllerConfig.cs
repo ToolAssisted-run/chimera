@@ -14,47 +14,10 @@ namespace BizHawk.Client.EmuHawk
 {
 	public partial class ControllerConfig : Form, IDialogParent
 	{
-		private static readonly Dictionary<string, Lazy<Bitmap>> ControllerImages = new Dictionary<string, Lazy<Bitmap>>();
 		private readonly IEmulator _emulator;
 		private readonly Config _config;
 
 		public IDialogController DialogController { get; }
-
-		static ControllerConfig()
-		{
-			ControllerImages.Add("NES Controller", Properties.Resources.NesController);
-			ControllerImages.Add("SNES Controller", Properties.Resources.SnesController);
-			ControllerImages.Add("Nintendo 64 Controller", Properties.Resources.N64);
-			ControllerImages.Add("Gameboy Controller", Properties.Resources.GbController);
-			ControllerImages.Add("Gameboy Controller H", Properties.Resources.GbController);
-			ControllerImages.Add("Gameboy Controller + Tilt", Properties.Resources.GbController);
-			ControllerImages.Add("GBA Controller", Properties.Resources.GbaController);
-			ControllerImages.Add("Dual Gameboy Controller", Properties.Resources.GbController);
-
-			ControllerImages.Add("SMS Controller", Properties.Resources.SmsController);
-			ControllerImages.Add("GPGX Genesis Controller", Properties.Resources.GenesisController);
-			ControllerImages.Add("Saturn Controller", Properties.Resources.SaturnController);
-
-			ControllerImages.Add("Intellivision Controller", Properties.Resources.IntVController);
-			ControllerImages.Add("ColecoVision Basic Controller", Properties.Resources.ColecoVisionController);
-			ControllerImages.Add("Atari 2600 Basic Controller", Properties.Resources.AtariController);
-			ControllerImages.Add("Atari 7800 ProLine Joystick Controller", Properties.Resources.A78Joystick);
-
-			ControllerImages.Add("PC Engine Controller", Properties.Resources.PceController);
-			ControllerImages.Add("Commodore 64 Controller", Properties.Resources.C64Joystick);
-			ControllerImages.Add("TI83 Controller", Properties.Resources.TI83Controller);
-			ControllerImages.Add("3DO Controller", Properties.Resources.ThreeDOController);
-
-			ControllerImages.Add("WonderSwan Controller", Properties.Resources.WonderSwanColor);
-			ControllerImages.Add("Lynx Controller", Properties.Resources.Lynx);
-			ControllerImages.Add("PSX Front Panel", Properties.Resources.PsxDualShockController);
-			ControllerImages.Add("Apple IIe Keyboard", Properties.Resources.AppleIIKeyboard);
-			ControllerImages.Add("VirtualBoy Controller", Properties.Resources.VBoyController);
-			ControllerImages.Add("NeoGeo Portable Controller", Properties.Resources.NgpController);
-			ControllerImages.Add("MAME Controller", Properties.Resources.ArcadeController);
-			ControllerImages.Add("NDS Controller", Properties.Resources.DSController);
-			ControllerImages.Add("Amiga Controller", Properties.Resources.AmigaKeyboard);
-		}
 
 		private void ControllerConfig_Load(object sender, EventArgs e)
 		{
@@ -191,7 +154,9 @@ namespace BizHawk.Client.EmuHawk
 			}
 			checkBoxAutoTab.Checked = _config.InputConfigAutoTab;
 
-			SetControllerPicture(_emulator.ControllerDefinition.Name);
+			// the frontend has no idea what any controller looks like; a package declares buttons,
+			// not artwork, so the picture column stays collapsed
+			tableLayoutPanel1.ColumnStyles[1].Width = 0;
 			ResumeLayout();
 		}
 
@@ -252,56 +217,6 @@ namespace BizHawk.Client.EmuHawk
 		private void LoadPanels(Config c)
 		{
 			LoadPanels(c.AllTrollers, c.AllTrollersAutoFire, c.AllTrollersAnalog, c.AllTrollersFeedbacks);
-		}
-
-		private void SetControllerPicture(string controlName)
-		{
-			_ = ControllerImages.TryGetValue(controlName, out var lazyBmp);
-			if (lazyBmp != null)
-			{
-				var bmp = lazyBmp.Value;
-				pictureBox1.Image = bmp;
-				pictureBox1.Size = bmp.Size;
-				tableLayoutPanel1.ColumnStyles[1].Width = bmp.Width;
-			}
-			else
-			{
-				tableLayoutPanel1.ColumnStyles[1].Width = 0;
-			}
-
-			// Uberhack
-			if (controlName == "Commodore 64 Controller")
-			{
-				var pictureBox2 = new PictureBox
-					{
-						Image = Properties.Resources.C64Keyboard.Value,
-						Size = Properties.Resources.C64Keyboard.Value.Size,
-					};
-				tableLayoutPanel1.ColumnStyles[1].Width = Properties.Resources.C64Keyboard.Value.Width;
-				pictureBox1.Height /= 2;
-				pictureBox1.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-				pictureBox1.Dock = DockStyle.Top;
-				pictureBox2.Location = new Point(pictureBox1.Location.X, pictureBox1.Location.Y + pictureBox1.Size.Height + 10);
-				tableLayoutPanel1.Controls.Add(pictureBox2, 1, 0);
-
-				pictureBox2.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom;
-			}
-
-			if (controlName == "ZXSpectrum Controller")
-			{
-				pictureBox1.Image = Properties.Resources.ZXSpectrumKeyboards.Value;
-				pictureBox1.Size = Properties.Resources.ZXSpectrumKeyboards.Value.Size;
-				tableLayoutPanel1.ColumnStyles[1].Width = Properties.Resources.ZXSpectrumKeyboards.Value.Width;
-			}
-
-			if (controlName == "AmstradCPC Controller")
-			{
-#if false
-				pictureBox1.Image = Properties.Resources.ZXSpectrumKeyboards.Value;
-				pictureBox1.Size = Properties.Resources.ZXSpectrumKeyboards.Value.Size;
-				tableLayoutPanel1.ColumnStyles[1].Width = Properties.Resources.ZXSpectrumKeyboards.Value.Width;
-#endif
-			}
 		}
 
 		// lazy methods, but they're not called often and actually

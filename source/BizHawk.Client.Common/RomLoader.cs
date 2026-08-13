@@ -53,7 +53,6 @@ namespace BizHawk.Client.Common
 		public enum LoadErrorType
 		{
 			Unknown,
-			MissingFirmware,
 			Xml,
 			DiscError,
 		}
@@ -410,11 +409,7 @@ namespace BizHawk.Client.Common
 					};
 					return factory.Create(ctx);
 				}
-				catch (Exception e) when (!_config.DontTryOtherCores && e is not (
-					MissingFirmwareException
-					or InternalCoreException
-					or { InnerException: MissingFirmwareException }
-				))
+				catch (Exception e) when (!_config.DontTryOtherCores && e is not InternalCoreException)
 				{
 					exceptions.Add(e);
 				}
@@ -486,23 +481,14 @@ namespace BizHawk.Client.Common
 			nextEmulator = MakeCoreFromRegistry(lp, forcedCoreName);
 		}
 
-		// HACK due to MAME wanting CHDs as hard drives / handling it on its own (bad design, I know!)
-		// only matters for XML, as CHDs are never the "main" rom for MAME
-		// (in general, this is kind of bad as CHD hard drives might be useful for other future cores?)
-		private static bool IsDiscForXML(string system, string path)
+		private static bool IsDiscForXML(string path)
 		{
 			if (HawkFile.PathContainsPipe(path))
 			{
 				return false;
 			}
 
-			var ext = Path.GetExtension(path);
-			if (system is VSystemID.Raw.Arcade && ".chd".EqualsIgnoreCase(ext))
-			{
-				return false;
-			}
-
-			return Disc.IsValidExtension(ext);
+			return Disc.IsValidExtension(Path.GetExtension(path));
 		}
 
 		private bool LoadXML(
@@ -529,7 +515,7 @@ namespace BizHawk.Client.Common
 					Comm = nextComm,
 					Game = game,
 					Roms = xmlGame.Assets
-						.Where(pfd => !IsDiscForXML(system, pfd.Filename))
+						.Where(pfd => !IsDiscForXML(pfd.Filename))
 						.Select(IRomAsset (pfd) => new RomAsset
 						{
 							RomData = pfd.FileData, // TODO: Do RomGame RomData conversions here
@@ -546,7 +532,7 @@ namespace BizHawk.Client.Common
 						})
 						.ToList(),
 					Discs = xmlGame.Assets
-						.Where(pfd => IsDiscForXML(system, pfd.Path))
+						.Where(pfd => IsDiscForXML(pfd.Path))
 						.Select(pfd => (p: pfd.Path, d: DiscExtensions.CreateAnyType(pfd.Path, str => DoLoadErrorCallback(str, system, LoadErrorType.DiscError))))
 						.Where(a => a.d != null)
 						.Select(object (a) => new DiscAsset
@@ -694,16 +680,7 @@ namespace BizHawk.Client.Common
 			while (ex.InnerException != null)
 				ex = ex.InnerException;
 
-			if (ex is MissingFirmwareException)
-			{
-				DoLoadErrorCallback(ex.Message, system, path, Deterministic, LoadErrorType.MissingFirmware);
-			}
-			else if (ex is CGBNotSupportedException)
-			{
-				// failed to load SGB bios or game does not support SGB mode.
-				DoLoadErrorCallback("Failed to load a GB rom in SGB mode.  You might try disabling SGB Mode.", system);
-			}
-			else if (ex is NoAvailableCoreException)
+			if (ex is NoAvailableCoreException)
 			{
 				// handle exceptions thrown by the new detected systems that BizHawk does not have cores for
 				DoLoadErrorCallback($"{ex.Message}\n\n{ex}", system);

@@ -24,7 +24,6 @@ namespace BizHawk.Client.Common
 	public static class OpenAdvancedTypes
 	{
 		public const string OpenRom = "OpenRom";
-		public const string MAME = "MAME";
 	}
 
 
@@ -62,7 +61,6 @@ namespace BizHawk.Client.Common
 			var ioa = type switch
 			{
 				OpenAdvancedTypes.OpenRom => (IOpenAdvanced)new OpenAdvanced_OpenRom(),
-				OpenAdvancedTypes.MAME => new OpenAdvanced_MAME(),
 				_ => null,
 			};
 
@@ -97,25 +95,6 @@ namespace BizHawk.Client.Common
 		public OpenAdvanced_OpenRom(string path)
 			: this()
 			=> Path = path;
-
-		public void Deserialize(string str)
-		{
-			Path = str;
-		}
-
-		public void Serialize(TextWriter tw)
-		{
-			tw.Write(Path);
-		}
-	}
-
-	public class OpenAdvanced_MAME : IOpenAdvanced
-	{
-		public string Path;
-
-		public string TypeName => "MAME";
-		public string DisplayName => $"{TypeName}: {Path}";
-		public string SimplePath => Path;
 
 		public void Deserialize(string str)
 		{

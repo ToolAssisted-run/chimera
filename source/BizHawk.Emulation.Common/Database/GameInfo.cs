@@ -18,7 +18,6 @@ namespace BizHawk.Emulation.Common
 		string Region { get; }
 		RomStatus Status { get; }
 		bool NotInDatabase { get; }
-		string FirmwareHash { get; }
 		string ForcedCore { get; }
 	}
 
@@ -30,7 +29,6 @@ namespace BizHawk.Emulation.Common
 		public string Region { get; set; }
 		public RomStatus Status { get; set; } = RomStatus.NotInDatabase;
 		public bool NotInDatabase { get; set; } = true;
-		public string FirmwareHash { get; set; }
 		public string ForcedCore { get; private set; }
 
 		private Dictionary<string, string> Options { get; set; } = new Dictionary<string, string>();

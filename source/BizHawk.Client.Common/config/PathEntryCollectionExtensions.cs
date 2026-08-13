@@ -166,11 +166,6 @@ namespace BizHawk.Client.Common
 			return collection.AbsolutePathFor(path, null);
 		}
 
-		public static string FirmwareAbsolutePath(this PathEntryCollection collection)
-		{
-			return collection.AbsolutePathFor(collection.FirmwarePathFragment, null);
-		}
-
 		public static string LogAbsolutePath(this PathEntryCollection collection)
 		{
 			var path = collection.ResolveToolsPath(collection[PathEntryCollection.GLOBAL, "Debug Logs"].Path);

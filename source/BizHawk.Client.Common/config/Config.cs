@@ -43,10 +43,6 @@ namespace BizHawk.Client.Common
 
 		public PathEntryCollection PathEntries { get; set; } = new PathEntryCollection();
 
-		// BIOS Paths
-		// key: sysId+firmwareId; value: absolute path
-		public Dictionary<string, string> FirmwareUserSpecifications { get; set; } = new Dictionary<string, string>();
-
 		// General Client Settings
 		public enum InputPriority
 		{

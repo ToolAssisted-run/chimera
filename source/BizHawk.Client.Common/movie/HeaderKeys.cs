@@ -20,7 +20,6 @@ namespace BizHawk.Client.Common
 		public const string Sha256 = "SHA256";
 		public const string Md5 = "MD5";
 		public const string Crc32 = "CRC32";
-		public const string FirmwareSha1 = "FirmwareSHA1";
 		public const string Pal = "PAL";
 		public const string BoardName = "BoardName";
 		public const string SyncSettings = "SyncSettings";

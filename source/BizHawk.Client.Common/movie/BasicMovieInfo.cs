@@ -134,12 +134,6 @@ namespace BizHawk.Client.Common
 			set => Header[HeaderKeys.OriginalEmulatorVersion] = value;
 		}
 
-		public virtual string FirmwareHash
-		{
-			get => Header[HeaderKeys.FirmwareSha1].ToUpperInvariant();
-			set => Header[HeaderKeys.FirmwareSha1] = value;
-		}
-
 		public IDictionary<string, string> HeaderEntries => Header;
 
 		public bool Load()
