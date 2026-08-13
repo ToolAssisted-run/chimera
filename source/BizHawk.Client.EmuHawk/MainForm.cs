@@ -1796,6 +1796,21 @@ namespace BizHawk.Client.EmuHawk
 				&& t.GetCustomAttribute<SpecializedToolAttribute>() is not null)
 			.ToList();
 
+		/// <summary>
+		/// The tools that exist only because the running core offers them: each is
+		/// backed by an optional guest ABI group, so a core that does not export the
+		/// group simply does not register the service and the tool never appears.
+		/// This is what fills the per-system menu in a frontend that knows nothing
+		/// about any system - where BizHawk listed a hand-written NES PPU viewer, we
+		/// list whatever the loaded core actually provides.
+		/// </summary>
+		private static readonly IList<Type> CoreProvidedTools =
+		[
+			typeof(GenericDebugger),
+			typeof(SurfaceViewer),
+			typeof(TraceLogger),
+		];
+
 		private ISet<char> _availableAccelerators;
 
 		private ISet<char> AvailableAccelerators
@@ -1837,11 +1852,14 @@ namespace BizHawk.Client.EmuHawk
 			settingsMenuItem.Click += GenericCoreSettingsMenuItem_Click;
 			GenericCoreSubMenu.DropDownItems.Add(settingsMenuItem);
 
-			var specializedTools = SpecializedTools.Where(Tools.IsAvailable).OrderBy(static t => t.Name).ToList();
-			if (specializedTools.Count is 0) return;
+			var coreTools = CoreProvidedTools.Concat(SpecializedTools)
+				.Where(Tools.IsAvailable)
+				.OrderBy(static t => t.Name)
+				.ToList();
+			if (coreTools.Count is 0) return;
 
 			GenericCoreSubMenu.DropDownItems.Add(new ToolStripSeparator());
-			foreach (var toolType in specializedTools)
+			foreach (var toolType in coreTools)
 			{
 				var (icon, name) = Tools.GetIconAndNameFor(toolType);
 				ToolStripMenuItem item = new() { Image = icon, Text = $"&{name}" };
