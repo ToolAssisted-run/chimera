@@ -2194,16 +2194,15 @@ namespace BizHawk.Client.EmuHawk
 		private IReadOnlyList<(DiscoveredCorePackage Package, string Error)> _corePackageLoadFailures = [ ];
 
 		/// <summary>
-		/// Scans the core search directories and loads everything the user has not
-		/// switched off. Runs during construction, so it must not touch the UI: a
-		/// failure here is a console line plus an entry the Core Packages dialog
-		/// shows, never a modal that blocks startup.
+		/// Scans the core search directories and loads everything readable it finds.
+		/// Runs during construction, so it must not touch the UI: a failure here is a
+		/// console line plus an entry the Core Packages dialog shows, never a modal
+		/// that blocks startup.
 		/// </summary>
 		private void LoadDiscoveredCorePackages()
 		{
 			_discoveredCorePackages = CorePackageDiscovery.ScanFor(Config);
-			_corePackageLoadFailures = CoreRegistry.Instance.LoadDiscovered(
-				CorePackageDiscovery.NotDisabledIn(_discoveredCorePackages, Config));
+			_corePackageLoadFailures = CoreRegistry.Instance.LoadDiscovered(_discoveredCorePackages);
 			foreach (var (pkg, error) in _corePackageLoadFailures)
 			{
 				Console.WriteLine($"core package not loaded: {pkg.Path}: {error}");
@@ -2219,12 +2218,11 @@ namespace BizHawk.Client.EmuHawk
 
 		/// <summary>The core-package rows as the dialog shows them (also the unit under test for that dialog's logic).</summary>
 		public IReadOnlyList<CorePackageListEntry> BuildCorePackageList()
-			=> CorePackageList.Build(_discoveredCorePackages, CoreRegistry.Instance.LoadedPackages, _corePackageLoadFailures, Config);
+			=> CorePackageList.Build(_discoveredCorePackages, CoreRegistry.Instance.LoadedPackages, _corePackageLoadFailures);
 
 		private void OpenCorePackagesDialog()
 		{
 			using CorePackagesForm form = new(
-				Config,
 				BuildCorePackageList,
 				RescanCorePackages,
 				OpenCore,

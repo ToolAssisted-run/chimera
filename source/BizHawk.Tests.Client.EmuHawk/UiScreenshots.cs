@@ -57,7 +57,6 @@ namespace BizHawk.Tests.Client.EmuHawk
 				Name = name,
 				Path = path,
 				Sha1 = sha1,
-				IsDirectoryForm = sha1 is null, // only a directory has no file to hash
 				Systems = [ system ],
 				Extensions = exts,
 				Error = error,
@@ -69,15 +68,13 @@ namespace BizHawk.Tests.Client.EmuHawk
 		{
 			if (ShotDir is null) { Assert.Inconclusive("set MINIHAWK_UI_SHOTS to write screenshots"); return; }
 
-			// a plausible Cores/ folder: one loaded core, one the user switched off, a
-			// dev build as a directory, and one that will not parse
+			// a plausible Cores/ folder: two working packages, a dev build sitting there
+			// as a directory, and one that will not parse
 			var quicker = Pkg("quickerNES", "/home/you/miniHawk/Cores/quickernes.zip", "3f2a91c47b0e5d8a1122334455667788990aabbc", "NES", null, ".nes", ".fds");
 			var synth = Pkg("synth", "/home/you/miniHawk/Cores/synth-box.zip", "c1d2e3f405162738495a6b7c8d9e0f1122334455", "SYNTH", null, ".synth");
 			var dev = Pkg("quickerNES-dev", "/home/you/quickerNES/waterbox/bin", null, "NES", null, ".nes");
 			var broken = Pkg("mystery.zip", "/home/you/miniHawk/Cores/mystery.zip", "aabbccddeeff00112233445566778899aabbccdd", "?", "waterbox.config is missing systemId");
 
-			Config config = new();
-			CorePackageDiscovery.SetEnabled(config, synth, false);
 			List<CoreRegistry.LoadedCorePackage> loaded =
 			[
 				new() { Name = "quickerNES", Path = quicker.Path, Sha1 = quicker.Sha1, CoreNames = [ "quickerNES" ] },
@@ -85,8 +82,7 @@ namespace BizHawk.Tests.Client.EmuHawk
 			];
 
 			using CorePackagesForm form = new(
-				config,
-				() => CorePackageList.Build([ quicker, synth, dev, broken ], loaded, [ ], config),
+				() => CorePackageList.Build([ quicker, synth, dev, broken ], loaded, [ ]),
 				() => { },
 				() => { },
 				[ "/home/you/miniHawk/Cores" ]);

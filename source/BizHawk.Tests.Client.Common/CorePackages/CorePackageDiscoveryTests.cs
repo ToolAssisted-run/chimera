@@ -178,48 +178,6 @@ namespace BizHawk.Tests.Client.Common.CorePackages
 		}
 
 		[TestMethod]
-		public void DisablingIsRememberedByIdentityAndSurvivesRenaming()
-		{
-			var zip = MakeWaterboxZip("core.zip", "Renamable");
-			Config config = new();
-			var before = CorePackageDiscovery.Scan([ _root ])[0];
-			Assert.IsTrue(CorePackageDiscovery.IsEnabled(config, before), "packages are enabled until the user says otherwise");
-
-			CorePackageDiscovery.SetEnabled(config, before, false);
-			Assert.IsFalse(CorePackageDiscovery.IsEnabled(config, before));
-			Assert.AreEqual(0, CorePackageDiscovery.NotDisabledIn([ before ], config).Count);
-
-			File.Move(zip, Path.Combine(_root, "renamed-by-the-user.zip"));
-			var after = CorePackageDiscovery.Scan([ _root ])[0];
-			Assert.AreNotEqual(before.Path, after.Path);
-			Assert.IsFalse(CorePackageDiscovery.IsEnabled(config, after), "the choice follows the package's hash, not its file name");
-
-			CorePackageDiscovery.SetEnabled(config, after, true);
-			Assert.IsTrue(CorePackageDiscovery.IsEnabled(config, after));
-			Assert.AreEqual(0, config.DisabledCorePackages.Count, "re-enabling removes the entry rather than piling up a second one");
-		}
-
-		[TestMethod]
-		public void SettingEnabledTwiceDoesNotDuplicateTheEntry()
-		{
-			_ = MakeWaterboxZip("core.zip", "Core");
-			Config config = new();
-			var pkg = CorePackageDiscovery.Scan([ _root ])[0];
-			CorePackageDiscovery.SetEnabled(config, pkg, false);
-			CorePackageDiscovery.SetEnabled(config, pkg, false);
-			Assert.AreEqual(1, config.DisabledCorePackages.Count);
-		}
-
-		[TestMethod]
-		public void BrokenPackagesStayInTheEnabledListSoTheUserSeesThem()
-		{
-			_ = MakeZip("broken.zip", ("core.wbx", "stub"), ("waterbox.config", "{ nope"));
-			Config config = new();
-			var found = CorePackageDiscovery.Scan([ _root ]);
-			Assert.AreEqual(1, CorePackageDiscovery.NotDisabledIn(found, config).Count);
-		}
-
-		[TestMethod]
 		public void SearchPathsAlwaysStartWithTheDefaultCoresFolder()
 		{
 			Config config = new();

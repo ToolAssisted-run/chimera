@@ -15,18 +15,23 @@ using Newtonsoft.Json;
 namespace BizHawk.Client.Common
 {
 	/// <summary>
-	/// What a scan found at one path: enough to list it, identify it, and decide
-	/// whether to load it — read WITHOUT loading anything. Loading a package is
-	/// irreversible in-process (it pins native modules and, for adapter packages,
-	/// an assembly), so discovery must be able to describe a package it will never
-	/// load: one the user disabled, one that is broken, one that duplicates another.
+	/// What a scan found at one path: enough to list it and identify it — read
+	/// WITHOUT loading anything. Loading a package is irreversible in-process (it
+	/// pins native modules and, for adapter packages, an assembly), so discovery
+	/// must be able to describe a package it will never load: one that is broken,
+	/// or one that duplicates another.
 	/// </summary>
 	public sealed class DiscoveredCorePackage
 	{
 		/// <summary>Absolute path of the zip (or directory, for dev packages).</summary>
 		public string Path { get; init; } = "";
 
-		public bool IsDirectoryForm { get; init; }
+		/// <summary>
+		/// True for a directory-form (dev) package. Derived from <see cref="Sha1"/>
+		/// rather than stored: a zip is always hashed and a directory never can be, so
+		/// two fields could only ever disagree with each other.
+		/// </summary>
+		public bool IsDirectoryForm => Sha1 is null;
 
 		/// <summary>Display name, from waterbox.config's coreName or the manifest's name; falls back to the file name.</summary>
 		public string Name { get; init; } = "";
@@ -46,9 +51,9 @@ namespace BizHawk.Client.Common
 		public string? Error { get; init; }
 
 		/// <summary>
-		/// Stable key for remembering per-package decisions (the disabled list). The
-		/// SHA1 where there is one, so moving or renaming a zip keeps its setting;
-		/// the path for directory-form packages, which have no identity.
+		/// Identity for deduplication: the SHA1 where there is one, so the same
+		/// package reachable under two names or from two search directories is
+		/// listed once; the path for directory-form packages, which have no hash.
 		/// </summary>
 		public string Key => Sha1 ?? Path;
 
@@ -146,28 +151,6 @@ namespace BizHawk.Client.Common
 			=> Scan(SearchPaths(config));
 
 		/// <summary>
-		/// The subset of <paramref name="packages"/> the user has not switched off.
-		/// Broken packages stay in the list — the caller reports them; dropping them
-		/// here would make a package that fails to parse indistinguishable from one
-		/// that is not there.
-		/// </summary>
-		public static IReadOnlyList<DiscoveredCorePackage> NotDisabledIn(IEnumerable<DiscoveredCorePackage> packages, Config config)
-		{
-			HashSet<string> disabled = new(config.DisabledCorePackages, StringComparer.OrdinalIgnoreCase);
-			return packages.Where(p => !disabled.Contains(p.Key)).ToList();
-		}
-
-		/// <summary>Records whether a discovered package should load at startup.</summary>
-		public static void SetEnabled(Config config, DiscoveredCorePackage package, bool enabled)
-		{
-			config.DisabledCorePackages.RemoveAll(k => string.Equals(k, package.Key, StringComparison.OrdinalIgnoreCase));
-			if (!enabled) config.DisabledCorePackages.Add(package.Key);
-		}
-
-		public static bool IsEnabled(Config config, DiscoveredCorePackage package)
-			=> !config.DisabledCorePackages.Exists(k => string.Equals(k, package.Key, StringComparison.OrdinalIgnoreCase));
-
-		/// <summary>
 		/// Reads one candidate path's identity. Returns null if it is not a core
 		/// package at all (an ordinary zip or folder); returns an entry with
 		/// <see cref="DiscoveredCorePackage.Error"/> set if it looks like one but
@@ -187,7 +170,6 @@ namespace BizHawk.Client.Common
 				return new DiscoveredCorePackage
 				{
 					Path = System.IO.Path.GetFullPath(path),
-					IsDirectoryForm = Directory.Exists(path),
 					Name = System.IO.Path.GetFileNameWithoutExtension(path),
 					Error = ex.Message,
 				};
@@ -200,13 +182,13 @@ namespace BizHawk.Client.Common
 			var fallbackName = System.IO.Path.GetFileName(full.TrimEnd(System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar));
 			if (WaterboxCoreFactory.IsWaterboxPackage(full))
 			{
-				return FromWaterboxConfig(full, isDir: true, sha1: null, fallbackName,
+				return FromWaterboxConfig(full, sha1: null, fallbackName,
 					File.ReadAllText(System.IO.Path.Combine(full, WaterboxCoreFactory.ConfigFileName)));
 			}
 			var manifestPath = System.IO.Path.Combine(full, CorePackageManifest.FILE_NAME);
 			if (File.Exists(manifestPath))
 			{
-				return FromManifest(full, isDir: true, sha1: null, fallbackName, File.ReadAllText(manifestPath));
+				return FromManifest(full, sha1: null, fallbackName, File.ReadAllText(manifestPath));
 			}
 			return null;
 		}
@@ -227,8 +209,8 @@ namespace BizHawk.Client.Common
 			// know to be a package
 			var sha1 = BizHawk.Common.SHA1Checksum.ComputeDigestHex(File.ReadAllBytes(full));
 			return isWaterbox
-				? FromWaterboxConfig(full, isDir: false, sha1, fallbackName, ReadEntry(wbxConfig!))
-				: FromManifest(full, isDir: false, sha1, fallbackName, ReadEntry(manifest!));
+				? FromWaterboxConfig(full, sha1, fallbackName, ReadEntry(wbxConfig!))
+				: FromManifest(full, sha1, fallbackName, ReadEntry(manifest!));
 		}
 
 		private static string ReadEntry(ZipArchiveEntry entry)
@@ -238,7 +220,7 @@ namespace BizHawk.Client.Common
 			return reader.ReadToEnd();
 		}
 
-		private static DiscoveredCorePackage FromWaterboxConfig(string path, bool isDir, string? sha1, string fallbackName, string json)
+		private static DiscoveredCorePackage FromWaterboxConfig(string path, string? sha1, string fallbackName, string json)
 		{
 			var cfg = WaterboxConfig.FromJson(json)
 				?? throw new InvalidOperationException($"{WaterboxCoreFactory.ConfigFileName} is empty or invalid");
@@ -246,7 +228,6 @@ namespace BizHawk.Client.Common
 			return new DiscoveredCorePackage
 			{
 				Path = path,
-				IsDirectoryForm = isDir,
 				Sha1 = sha1,
 				Name = string.IsNullOrWhiteSpace(cfg.CoreName) ? fallbackName : cfg.CoreName,
 				Systems = [ cfg.SystemId ],
@@ -254,7 +235,7 @@ namespace BizHawk.Client.Common
 			};
 		}
 
-		private static DiscoveredCorePackage FromManifest(string path, bool isDir, string? sha1, string fallbackName, string json)
+		private static DiscoveredCorePackage FromManifest(string path, string? sha1, string fallbackName, string json)
 		{
 			var manifest = JsonConvert.DeserializeObject<CorePackageManifest>(json)
 				?? throw new InvalidOperationException($"{CorePackageManifest.FILE_NAME} deserialized to null");
@@ -266,7 +247,6 @@ namespace BizHawk.Client.Common
 			return new DiscoveredCorePackage
 			{
 				Path = path,
-				IsDirectoryForm = isDir,
 				Sha1 = sha1,
 				Name = string.IsNullOrWhiteSpace(manifest.Name) ? fallbackName : manifest.Name!,
 				Systems = extensions.Values.Distinct().OrderBy(static s => s, StringComparer.Ordinal).ToList(),

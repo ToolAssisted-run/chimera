@@ -743,26 +743,25 @@ Objective 1 said packages are "discovered from a `Cores/` directory"; until now
 they were not - a package had to be named on the commandline (`--core`) or picked
 from File > Open Core on every launch. `CorePackageDiscovery` closes that: at
 startup, `Cores/` beside the executable (plus anything in
-`Config.CorePackagePaths`) is scanned, and every package the user has not
-switched off is loaded.
+`Config.CorePackagePaths`) is scanned, and every readable package found is
+loaded.
 
 **Discovery reads, it does not load.** It opens a zip (or directory), reads
 `waterbox.config` or `minihawk-core.json` for a name, systems and extensions,
 and hashes the file - nothing more. That matters because loading is irreversible
 in-process: it pins native modules and, for adapter packages, an assembly. The
-frontend has to be able to *describe* a package it will never load - a disabled
-one, a broken one, one that duplicates another - and it can only do that if
-describing is cheap and separate.
+frontend has to be able to *describe* a package it will never load - a broken
+one, a duplicate - and it can only do that if describing is cheap and separate.
 
-**The consequence the UI must not hide.** Since nothing can be unloaded,
-un-ticking a loaded package cannot take effect until the next launch. The state
-machine in `CorePackageList` names that case (`LoadedDisabled`) and the window
-says so, rather than pretending the core went away.
-
-**Identity, again.** A package's SHA1 is what enable/disable is keyed on, so the
-choice survives renaming and two builds of the same core can coexist with only
-one enabled. Directory-form (dev) packages have no file to hash, so they fall
-back to their path - the same compromise as everywhere else.
+**No enable/disable switch, deliberately.** The first cut of the window had a
+checkbox per package. It was removed the same day, on the user's challenge, and
+the reasoning is worth keeping: loading a package costs a JSON parse (the
+`core.wbx` is untouched until a rom loads), arbitration between two cores for one
+system is what Preferred Cores is for, and a package that fails to load is caught
+and reported rather than fatal. So the switch bought nothing - while costing a
+config list, an enable/disable API, and two extra states whose only job was to
+explain that unticking a loaded core cannot unload it. The way to not load a core
+is to not put it in `Cores/`. The window is a report, not a control panel.
 
 **Ordering trap, found by testing.** The scan must run in the MainForm
 *constructor*, not `MainForm_Load`: the commandline rom load happens in the

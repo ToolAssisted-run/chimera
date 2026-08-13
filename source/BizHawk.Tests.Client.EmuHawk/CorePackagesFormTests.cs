@@ -9,12 +9,11 @@ namespace BizHawk.Tests.Client.EmuHawk
 {
 	/// <summary>
 	/// Drives the Core Packages window without a person: build it over a known
-	/// list, tick and untick rows, and check that what it shows and what it writes
-	/// to the config agree.
+	/// list, press its buttons, and check that what it shows matches.
 	///
-	/// What this can prove is behaviour - rows, states, the effect of a click.
+	/// What this can prove is behaviour - rows, contents, the effect of a click.
 	/// What it cannot prove is that the window looks right; that still needs eyes
-	/// on a screenshot. Keeping the two apart is why the states live in
+	/// on a screenshot. Keeping the two apart is why the rows are computed by
 	/// <see cref="CorePackageList"/> and this class only checks the wiring.
 	/// </summary>
 	[TestClass]
@@ -39,14 +38,12 @@ namespace BizHawk.Tests.Client.EmuHawk
 
 		/// <summary>a form over a fixed set of packages, none of them loaded</summary>
 		private static CorePackagesForm MakeForm(
-			Config config,
 			IReadOnlyList<DiscoveredCorePackage> discovered,
 			IReadOnlyList<CoreRegistry.LoadedCorePackage> loaded = null,
 			Action rescan = null,
 			Action addPackage = null)
 			=> Realise(new CorePackagesForm(
-				config,
-				() => CorePackageList.Build(discovered, loaded ?? [ ], [ ], config),
+				() => CorePackageList.Build(discovered, loaded ?? [ ], [ ]),
 				rescan ?? (() => { }),
 				addPackage ?? (() => { }),
 				[ "/tmp/Cores" ]));
@@ -54,10 +51,8 @@ namespace BizHawk.Tests.Client.EmuHawk
 		[TestMethod]
 		public void RowsShowEveryPackageWithItsStatus()
 		{
-			Config config = new();
 			var loadedPkg = Pkg("quickerNES", "/cores/q.zip", sha1: "0123456789abcdef0123456789abcdef01234567");
 			using var form = MakeForm(
-				config,
 				[ loadedPkg, Pkg("Broken", "/cores/b.zip", sha1: "bb", error: "waterbox.config is empty or invalid") ],
 				loaded: [ new CoreRegistry.LoadedCorePackage { Name = "quickerNES", Path = "/cores/q.zip", Sha1 = "0123456789abcdef0123456789abcdef01234567" } ]);
 
@@ -72,70 +67,23 @@ namespace BizHawk.Tests.Client.EmuHawk
 			Assert.AreEqual("q.zip", quicker.SubItems[3].Text);
 			Assert.AreEqual("01234567", quicker.SubItems[4].Text, "the SHA1 column shows the identity prefix");
 			StringAssert.Contains(broken.SubItems[2].Text, "waterbox.config");
-			Assert.IsTrue(quicker.Checked);
-			Assert.IsFalse(broken.Checked, "an unreadable package is not something the user can switch on");
 		}
 
 		[TestMethod]
-		public void TickingARowWritesTheChoiceToTheConfigAndRedrawsTheRow()
+		public void ADirectoryPackageIsMarkedAsAFolder()
 		{
-			Config config = new();
-			var pkg = Pkg("quickerNES", "/cores/q.zip", sha1: "aa");
-			using var form = MakeForm(config, [ pkg ]);
-			var list = ListOf(form);
-			Assert.AreEqual("loads on restart", list.Items[0].SubItems[2].Text);
-
-			list.Items[0].Checked = false; // exactly what a click does
-
-			CollectionAssert.Contains(config.DisabledCorePackages, "aa");
-			Assert.AreEqual("disabled", ListOf(form).Items[0].SubItems[2].Text, "the row must reflect the new state immediately");
-
-			ListOf(form).Items[0].Checked = true;
-			Assert.AreEqual(0, config.DisabledCorePackages.Count);
-			Assert.AreEqual("loads on restart", ListOf(form).Items[0].SubItems[2].Text);
-		}
-
-		[TestMethod]
-		public void UntickingALoadedPackageSaysItTakesARestart()
-		{
-			Config config = new();
-			var pkg = Pkg("quickerNES", "/cores/q.zip", sha1: "aa");
-			using var form = MakeForm(
-				config,
-				[ pkg ],
-				loaded: [ new CoreRegistry.LoadedCorePackage { Name = "quickerNES", Path = "/cores/q.zip", Sha1 = "aa" } ]);
-
-			ListOf(form).Items[0].Checked = false;
-
-			Assert.AreEqual(CorePackageState.LoadedDisabled, form.Entries[0].State);
-			StringAssert.Contains(ListOf(form).Items[0].SubItems[2].Text, "restart");
-			Assert.IsTrue(
-				form.Controls.OfType<Label>().Any(static l => l.Text.Contains("next launch")),
-				"the window must explain why the core is still there");
-		}
-
-		[TestMethod]
-		public void TickingABrokenPackageIsRefusedAndTheRowSnapsBack()
-		{
-			Config config = new();
-			using var form = MakeForm(config, [ Pkg("Broken", "/cores/b.zip", sha1: "bb", error: "no systemId") ]);
-			var list = ListOf(form);
-
-			list.Items[0].Checked = true;
-
-			Assert.IsFalse(list.Items[0].Checked, "there is nothing to enable — the package could not be read");
-			Assert.AreEqual(0, config.DisabledCorePackages.Count, "and refusing must not write a disabled entry either");
+			using var form = MakeForm([ Pkg("DevBuild", "/home/you/quickerNES/waterbox/bin") ]);
+			StringAssert.Contains(ListOf(form).Items[0].SubItems[3].Text, "(folder)");
+			Assert.AreEqual("-", ListOf(form).Items[0].SubItems[4].Text, "a directory has no hash to show");
 		}
 
 		[TestMethod]
 		public void RescanRefreshesTheRows()
 		{
-			Config config = new();
 			List<DiscoveredCorePackage> discovered = [ Pkg("First", "/cores/1.zip", sha1: "11") ];
 			var rescanned = 0;
 			using var form = Realise(new CorePackagesForm(
-				config,
-				() => CorePackageList.Build(discovered, [ ], [ ], config),
+				() => CorePackageList.Build(discovered, [ ], [ ]),
 				() => { rescanned++; discovered.Add(Pkg("Second", "/cores/2.zip", sha1: "22")); },
 				() => { },
 				[ "/tmp/Cores" ]));
@@ -148,23 +96,24 @@ namespace BizHawk.Tests.Client.EmuHawk
 		}
 
 		[TestMethod]
-		public void SelectionSurvivesARepopulate()
+		public void AddPackageRefreshesTheRowsToo()
 		{
-			Config config = new();
-			using var form = MakeForm(config, [ Pkg("A", "/cores/a.zip", sha1: "aa"), Pkg("B", "/cores/b.zip", sha1: "bb") ]);
-			var list = ListOf(form);
-			list.Items[1].Selected = true;
-			Assert.AreEqual("B", form.SelectedEntry.Name);
+			List<DiscoveredCorePackage> discovered = [ ];
+			using var form = Realise(new CorePackagesForm(
+				() => CorePackageList.Build(discovered, [ ], [ ]),
+				() => { },
+				() => discovered.Add(Pkg("Chosen", "/elsewhere/c.zip", sha1: "cc")),
+				[ "/tmp/Cores" ]));
 
-			list.Items[1].Checked = false; // triggers a repopulate
+			form.Controls.OfType<Button>().Single(static b => b.Text == "Add Package...").PerformClick();
 
-			Assert.AreEqual("B", form.SelectedEntry?.Name, "losing the selection on every click would make the detail line useless");
+			Assert.AreEqual(1, ListOf(form).Items.Count);
+			Assert.AreEqual("Chosen", ListOf(form).Items[0].Text);
 		}
 
 		[TestMethod]
-		public void TheDetailLineShowsThePathAndTheExtensionsItClaims()
+		public void SelectingARowShowsItsPathAndTheExtensionsItClaims()
 		{
-			Config config = new();
 			DiscoveredCorePackage pkg = new()
 			{
 				Name = "quickerNES",
@@ -173,7 +122,7 @@ namespace BizHawk.Tests.Client.EmuHawk
 				Systems = [ "NES" ],
 				Extensions = new Dictionary<string, string> { [".nes"] = "NES", [".fds"] = "NES" },
 			};
-			using var form = MakeForm(config, [ pkg ]);
+			using var form = MakeForm([ pkg ]);
 			ListOf(form).Items[0].Selected = true;
 
 			var detail = form.Controls.OfType<Label>().Single(static l => l.Text.Contains("/cores/q.zip"));
@@ -182,10 +131,33 @@ namespace BizHawk.Tests.Client.EmuHawk
 		}
 
 		[TestMethod]
+		public void SelectingABrokenRowShowsTheWholeReasonNotTheTruncatedColumn()
+		{
+			const string reason = "package \"quickerNES\" declares native libquickernes.so but it is missing";
+			using var form = MakeForm([ Pkg("quickerNES", "/cores/q.zip", sha1: "aa", error: reason) ]);
+			ListOf(form).Items[0].Selected = true;
+
+			Assert.IsTrue(
+				form.Controls.OfType<Label>().Any(l => l.Text.Contains(reason)),
+				"the Status column clips a long message, so the detail line has to carry it");
+		}
+
+		[TestMethod]
+		public void SelectionSurvivesARepopulate()
+		{
+			using var form = MakeForm([ Pkg("A", "/cores/a.zip", sha1: "aa"), Pkg("B", "/cores/b.zip", sha1: "bb") ]);
+			ListOf(form).Items[1].Selected = true;
+			Assert.AreEqual("B", form.SelectedEntry.Name);
+
+			form.Populate();
+
+			Assert.AreEqual("B", form.SelectedEntry?.Name, "losing the selection on a refresh would clear the detail line under the user");
+		}
+
+		[TestMethod]
 		public void AnEmptyCoresFolderShowsAnEmptyListRatherThanFailing()
 		{
-			Config config = new();
-			using var form = MakeForm(config, [ ]);
+			using var form = MakeForm([ ]);
 			Assert.AreEqual(0, ListOf(form).Items.Count);
 			Assert.AreEqual(0, form.Entries.Count);
 			Assert.IsNull(form.SelectedEntry);

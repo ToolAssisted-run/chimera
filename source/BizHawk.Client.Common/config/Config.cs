@@ -102,14 +102,6 @@ namespace BizHawk.Client.Common
 		/// scanned first, so this only ever adds.
 		/// </summary>
 		public List<string> CorePackagePaths { get; set; } = new();
-
-		/// <summary>
-		/// Identities of discovered packages the user does not want loaded: the
-		/// package SHA1, or the path for directory-form (dev) packages, which have no
-		/// hash. Keyed by identity rather than name so two builds of the same core can
-		/// sit in Cores/ with only one of them enabled.
-		/// </summary>
-		public List<string> DisabledCorePackages { get; set; } = new();
 		public bool PauseWhenMenuActivated { get; set; } = true;
 		public bool SaveWindowPosition { get; set; } = true;
 		public bool MainFormStayOnTop { get; set; }

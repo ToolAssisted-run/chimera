@@ -6,25 +6,15 @@ using System.Linq;
 
 namespace BizHawk.Client.Common
 {
-	/// <summary>What the user's core-package situation is, per package.</summary>
+	/// <summary>
+	/// What became of a discovered package. There are only two outcomes, because
+	/// there is no way to ask for a third: everything readable in a search
+	/// directory is loaded, and not loading one means taking it out of the folder.
+	/// </summary>
 	public enum CorePackageState
 	{
-		/// <summary>Loaded and in use this session.</summary>
+		/// <summary>Loaded and available to open roms with.</summary>
 		Loaded,
-
-		/// <summary>Enabled but not loaded yet — it will load next launch.</summary>
-		PendingLoad,
-
-		/// <summary>
-		/// Loaded this session, but switched off for the next. Packages cannot be
-		/// unloaded in-process (loading pins native modules, and adapter packages an
-		/// assembly), so this state exists and the UI must say so rather than pretend
-		/// the core went away.
-		/// </summary>
-		LoadedDisabled,
-
-		/// <summary>Switched off and not loaded.</summary>
-		Disabled,
 
 		/// <summary>Unreadable — listed so a broken package is visible instead of just absent.</summary>
 		Failed,
@@ -42,26 +32,18 @@ namespace BizHawk.Client.Common
 
 		public string Name => Package.Name;
 
-		/// <summary>True if the user has it switched on (regardless of whether it has loaded yet).</summary>
-		public bool Enabled => State is CorePackageState.Loaded or CorePackageState.PendingLoad;
-
-		/// <summary>True if a restart is needed for the current enabled/disabled choice to take effect.</summary>
-		public bool NeedsRestart => State is CorePackageState.PendingLoad or CorePackageState.LoadedDisabled;
-
 		public string StatusText => State switch
 		{
 			CorePackageState.Loaded => "loaded",
-			CorePackageState.PendingLoad => "loads on restart",
-			CorePackageState.LoadedDisabled => "loaded (off after restart)",
-			CorePackageState.Disabled => "disabled",
 			CorePackageState.Failed => $"error: {Error}",
 			_ => "?",
 		};
 	}
 
 	/// <summary>
-	/// Builds the core-package list the UI shows. Kept out of the form so the states
-	/// - which are the whole substance of that dialog - can be tested without one.
+	/// Builds the core-package list the UI shows. Kept out of the form so what the
+	/// user is told - which packages exist, which are in use, which are broken and
+	/// why - can be tested without one.
 	/// </summary>
 	public static class CorePackageList
 	{
@@ -74,10 +56,8 @@ namespace BizHawk.Client.Common
 		public static IReadOnlyList<CorePackageListEntry> Build(
 			IEnumerable<DiscoveredCorePackage> discovered,
 			IEnumerable<CoreRegistry.LoadedCorePackage> loaded,
-			IEnumerable<(DiscoveredCorePackage Package, string Error)> failures,
-			Config config)
+			IEnumerable<(DiscoveredCorePackage Package, string Error)> failures)
 		{
-			HashSet<string> loadedPaths = new(loaded.Select(static p => p.Path), StringComparer.OrdinalIgnoreCase);
 			Dictionary<string, string> errorByPath = new(StringComparer.OrdinalIgnoreCase);
 			foreach (var (pkg, error) in failures) errorByPath[pkg.Path] = error;
 
@@ -87,15 +67,11 @@ namespace BizHawk.Client.Common
 			{
 				if (!listedPaths.Add(pkg.Path)) continue;
 				var error = pkg.Error ?? (errorByPath.TryGetValue(pkg.Path, out var e) ? e : null);
-				var enabled = CorePackageDiscovery.IsEnabled(config, pkg);
-				var isLoaded = loadedPaths.Contains(pkg.Path);
 				entries.Add(new CorePackageListEntry
 				{
 					Package = pkg,
 					Error = error,
-					State = error is not null ? CorePackageState.Failed
-						: isLoaded ? (enabled ? CorePackageState.Loaded : CorePackageState.LoadedDisabled)
-						: (enabled ? CorePackageState.PendingLoad : CorePackageState.Disabled),
+					State = error is null ? CorePackageState.Loaded : CorePackageState.Failed,
 				});
 			}
 
@@ -111,7 +87,6 @@ namespace BizHawk.Client.Common
 						Path = pkg.Path,
 						Name = pkg.Name,
 						Sha1 = pkg.Sha1,
-						IsDirectoryForm = pkg.Sha1 is null,
 					},
 				});
 			}
