@@ -77,12 +77,6 @@ namespace BizHawk.Client.EmuHawk
 				case "Toggle Throttle":
 					ToggleUnthrottled();
 					break;
-				case "Soft Reset":
-					SoftReset();
-					break;
-				case "Hard Reset":
-					HardReset();
-					break;
 				case "Quick Load":
 					_ = LoadstateCurrentSlot();
 					break;
@@ -361,9 +355,6 @@ namespace BizHawk.Client.EmuHawk
 				case "ToolBox":
 					ToolBoxMenuItem_Click(this, EventArgs.Empty);
 					break;
-				case "Virtual Pad":
-					VirtualPadMenuItem_Click(this, EventArgs.Empty);
-					break;
 
 				// RAM Search
 				case "Do Search":
@@ -503,32 +494,6 @@ namespace BizHawk.Client.EmuHawk
 				case "Paste Insert":
 					if (!Tools.IsLoaded<TAStudio>()) return false;
 					Tools.TAStudio.PasteInsertExternal();
-					break;
-
-				// Analog
-				case "Y Up Small":
-					Tools.VirtualPad.BumpAnalogValue(null, Config.AnalogSmallChange);
-					break;
-				case "Y Up Large":
-					Tools.VirtualPad.BumpAnalogValue(null, Config.AnalogLargeChange);
-					break;
-				case "Y Down Small":
-					Tools.VirtualPad.BumpAnalogValue(null, -Config.AnalogSmallChange);
-					break;
-				case "Y Down Large":
-					Tools.VirtualPad.BumpAnalogValue(null, -Config.AnalogLargeChange);
-					break;
-				case "X Up Small":
-					Tools.VirtualPad.BumpAnalogValue(Config.AnalogSmallChange, null);
-					break;
-				case "X Up Large":
-					Tools.VirtualPad.BumpAnalogValue(Config.AnalogLargeChange, null);
-					break;
-				case "X Down Small":
-					Tools.VirtualPad.BumpAnalogValue(-Config.AnalogSmallChange, null);
-					break;
-				case "X Down Large":
-					Tools.VirtualPad.BumpAnalogValue(-Config.AnalogLargeChange, null);
 					break;
 
 			}

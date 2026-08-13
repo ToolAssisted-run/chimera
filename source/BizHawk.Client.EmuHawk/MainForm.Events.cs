@@ -466,20 +466,12 @@ namespace BizHawk.Client.EmuHawk
 			if (exitCode != null) _exitCode = exitCode.Value;
 		}
 
-		private void EmulationMenuItem_DropDownOpened(object sender, EventArgs e)
+		private void SystemMenuItem_DropDownOpened(object sender, EventArgs e)
 		{
 			PauseMenuItem.Checked = _didMenuPause ? _wasPaused : EmulatorPaused;
 
-			SoftResetMenuItem.Enabled = Emulator.ControllerDefinition.BoolButtons.Contains("Reset")
-				&& !MovieSession.Movie.IsPlaying();
-
-			HardResetMenuItem.Enabled = Emulator.ControllerDefinition.BoolButtons.Contains("Power")
-				&& !MovieSession.Movie.IsPlaying();
-
 			PauseMenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["Pause"];
 			RebootCoreMenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["Reboot Core"];
-			SoftResetMenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["Soft Reset"];
-			HardResetMenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["Hard Reset"];
 
 			RealTimeCounterMenuItem.Text = $"Est. {PlayMovie.MovieTimeLengthStr(Emulator.EstimatedRealTimeSincePowerOn())} since power-on";
 		}
@@ -498,16 +490,6 @@ namespace BizHawk.Client.EmuHawk
 		private void PowerMenuItem_Click(object sender, EventArgs e)
 		{
 			RebootCore();
-		}
-
-		private void SoftResetMenuItem_Click(object sender, EventArgs e)
-		{
-			SoftReset();
-		}
-
-		private void HardResetMenuItem_Click(object sender, EventArgs e)
-		{
-			HardReset();
 		}
 
 		private void ViewSubMenu_DropDownOpened(object sender, EventArgs e)
@@ -952,7 +934,6 @@ namespace BizHawk.Client.EmuHawk
 			LuaConsoleMenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["Lua Console"];
 			CheatsMenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["Cheats"];
 			TAStudioMenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["TAStudio"];
-			VirtualPadMenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["Virtual Pad"];
 
 			TAStudioMenuItem.Enabled = Tools.IsAvailable<TAStudio>();
 
@@ -961,18 +942,14 @@ namespace BizHawk.Client.EmuHawk
 			RamSearchMenuItem.Enabled = Tools.IsAvailable<RamSearch>();
 			RamWatchMenuItem.Enabled = Tools.IsAvailable<RamWatch>();
 
-			DebuggerMenuItem.Enabled = Tools.IsAvailable<GenericDebugger>();
 
 			// Core-managed tooling: available exactly when the loaded core backs the
 			// service (see ICoreSurfaces / ITraceable), so a core with nothing to show
 			// simply greys these out.
-			TraceLoggerMenuItem.Enabled = Tools.IsAvailable<TraceLogger>();
-			SurfaceViewerMenuItem.Enabled = Tools.IsAvailable<SurfaceViewer>();
 
 			BatchRunnerMenuItem.Visible = VersionInfo.DeveloperBuild;
 
 			MacroToolMenuItem.Enabled = MovieSession.Movie.IsActive() && Tools.IsAvailable<MacroInputTool>();
-			VirtualPadMenuItem.Enabled = Emulator.ControllerDefinition.Any();
 		}
 
 		private void ExternalToolMenuItem_DropDownOpening(object sender, EventArgs e)
@@ -1038,29 +1015,9 @@ namespace BizHawk.Client.EmuHawk
 			Tools.Load<HexEditor>();
 		}
 
-		private void DebuggerMenuItem_Click(object sender, EventArgs e)
-		{
-			Tools.Load<GenericDebugger>();
-		}
-
-		private void TraceLoggerMenuItem_Click(object sender, EventArgs e)
-		{
-			Tools.Load<TraceLogger>();
-		}
-
-		private void SurfaceViewerMenuItem_Click(object sender, EventArgs e)
-		{
-			Tools.Load<SurfaceViewer>();
-		}
-
 		private void MacroToolMenuItem_Click(object sender, EventArgs e)
 		{
 			Tools.Load<MacroInputTool>();
-		}
-
-		private void VirtualPadMenuItem_Click(object sender, EventArgs e)
-		{
-			Tools.Load<VirtualpadTool>();
 		}
 
 		private void CheatsMenuItem_Click(object sender, EventArgs e)

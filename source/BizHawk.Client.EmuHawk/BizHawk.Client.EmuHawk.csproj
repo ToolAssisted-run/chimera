@@ -461,26 +461,6 @@
 		<Compile Update="tools/TraceLogger.cs" SubType="Form" />
 		<Compile Update="tools/TraceLogger.Designer.cs" DependentUpon="TraceLogger.cs" />
 		<EmbeddedResource Update="tools/TraceLogger.resx" DependentUpon="TraceLogger.cs" />
-		<Compile Update="tools/VirtualPads/controls/components/AnalogStickPanel.cs" SubType="Component" />
-		<Compile Update="tools/VirtualPads/controls/VirtualPadAnalogButton.cs" SubType="UserControl" />
-		<Compile Update="tools/VirtualPads/controls/VirtualPadAnalogButton.Designer.cs" DependentUpon="VirtualPadAnalogButton.cs" />
-		<EmbeddedResource Update="tools/VirtualPads/controls/VirtualPadAnalogButton.resx" DependentUpon="VirtualPadAnalogButton.cs" />
-		<Compile Update="tools/VirtualPads/controls/VirtualPadAnalogStick.cs" SubType="UserControl" />
-		<Compile Update="tools/VirtualPads/controls/VirtualPadAnalogStick.Designer.cs" DependentUpon="VirtualPadAnalogStick.cs" />
-		<EmbeddedResource Update="tools/VirtualPads/controls/VirtualPadAnalogStick.resx" DependentUpon="VirtualPadAnalogStick.cs" />
-		<Compile Update="tools/VirtualPads/controls/VirtualPadButton.cs" SubType="Component" />
-		<Compile Update="tools/VirtualPads/controls/VirtualPadDiscManager.cs" SubType="UserControl" />
-		<Compile Update="tools/VirtualPads/controls/VirtualPadDiscManager.Designer.cs" DependentUpon="VirtualPadDiscManager.cs" />
-		<EmbeddedResource Update="tools/VirtualPads/controls/VirtualPadDiscManager.resx" DependentUpon="VirtualPadDiscManager.cs" />
-		<Compile Update="tools/VirtualPads/controls/VirtualPadTargetScreen.cs" SubType="UserControl" />
-		<Compile Update="tools/VirtualPads/controls/VirtualPadTargetScreen.Designer.cs" DependentUpon="VirtualPadTargetScreen.cs" />
-		<EmbeddedResource Update="tools/VirtualPads/controls/VirtualPadTargetScreen.resx" DependentUpon="VirtualPadTargetScreen.cs" />
-		<Compile Update="tools/VirtualPads/VirtualPad.cs" SubType="UserControl" />
-		<Compile Update="tools/VirtualPads/VirtualPad.Designer.cs" DependentUpon="VirtualPad.cs" />
-		<EmbeddedResource Update="tools/VirtualPads/VirtualPad.resx" DependentUpon="VirtualPad.cs" />
-		<Compile Update="tools/VirtualPads/VirtualpadsTool.cs" SubType="Form" />
-		<Compile Update="tools/VirtualPads/VirtualpadsTool.Designer.cs" DependentUpon="VirtualpadsTool.cs" />
-		<EmbeddedResource Update="tools/VirtualPads/VirtualpadsTool.resx" DependentUpon="VirtualpadsTool.cs" />
 		<Compile Update="tools/Watch/RamPoke.cs" SubType="Form" />
 		<Compile Update="tools/Watch/RamPoke.Designer.cs" DependentUpon="RamPoke.cs" />
 		<EmbeddedResource Update="tools/Watch/RamPoke.resx" DependentUpon="RamPoke.cs" />

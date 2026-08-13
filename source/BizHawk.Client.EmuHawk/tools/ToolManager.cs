@@ -861,8 +861,6 @@ namespace BizHawk.Client.EmuHawk
 
 		public HexEditor HexEditor => GetTool<HexEditor>();
 
-		public VirtualpadTool VirtualPad => GetTool<VirtualpadTool>();
-
 		public LuaConsole LuaConsole => GetTool<LuaConsole>();
 
 		public TAStudio TAStudio => GetTool<TAStudio>();

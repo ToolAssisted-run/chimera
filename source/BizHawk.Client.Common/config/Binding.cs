@@ -32,8 +32,6 @@ namespace BizHawk.Client.Common
 			Bind("General", "Fast Forward", "Tab");
 			Bind("General", "Turbo", "Shift+Tab");
 			Bind("General", "Toggle Throttle");
-			Bind("General", "Soft Reset");
-			Bind("General", "Hard Reset");
 			Bind("General", "Autofire");
 			Bind("General", "Autohold");
 			Bind("General", "Clear Autohold");
@@ -124,7 +122,6 @@ namespace BizHawk.Client.Common
 			Bind("Tools", "Cheats");
 			Bind("Tools", "TAStudio");
 			Bind("Tools", "ToolBox", "Shift+T");
-			Bind("Tools", "Virtual Pad");
 
 			Bind("RAM Search", "New Search");
 			Bind("RAM Search", "Do Search");
@@ -166,15 +163,6 @@ namespace BizHawk.Client.Common
 			Bind("TAStudio", "Analog Decr. by 10", "Shift+Down");
 			Bind("TAStudio", "Analog Maximum", "Right");
 			Bind("TAStudio", "Analog Minimum", "Left");
-
-			Bind("Analog", "Y Up Small", toolTip: "For Virtual Pad");
-			Bind("Analog", "Y Up Large", toolTip: "For Virtual Pad");
-			Bind("Analog", "Y Down Small", toolTip: "For Virtual Pad");
-			Bind("Analog", "Y Down Large", toolTip: "For Virtual Pad");
-			Bind("Analog", "X Up Small", toolTip: "For Virtual Pad");
-			Bind("Analog", "X Up Large", toolTip: "For Virtual Pad");
-			Bind("Analog", "X Down Small", toolTip: "For Virtual Pad");
-			Bind("Analog", "X Down Large", toolTip: "For Virtual Pad");
 
 			Bind("Tools", "Toggle All Cheats");
 			Bind("Tools", "Toggle Last Lua Script");

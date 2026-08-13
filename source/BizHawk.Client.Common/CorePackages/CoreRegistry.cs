@@ -77,8 +77,8 @@ namespace BizHawk.Client.Common
 		/// extensions, and control defaults. Loading is an explicit act — there is no
 		/// discovery. Throws with a user-showable message on any problem.
 		/// </summary>
-		/// <returns>the loaded package's manifest and the SHA1 of its file (null for directory-form packages)</returns>
-		public (CorePackageManifest Manifest, string/*?*/ PackageSha1) LoadCorePackage(string path)
+		/// <returns>the package's manifest, the SHA1 of its file (null for directory-form packages), and the factories it registered</returns>
+		public (CorePackageManifest Manifest, string/*?*/ PackageSha1, IReadOnlyList<ICoreFactory> Factories) LoadCorePackage(string path)
 		{
 			var (manifest, factories, packageDir, packageSha1) = CorePackageLoader.LoadPackage(path);
 			foreach (var factory in factories)
@@ -111,7 +111,7 @@ namespace BizHawk.Client.Common
 			var keybinds = PackageKeybinds.Read(packageDir);
 			// first package to name a controller wins; later duplicates are ignored
 			if (keybinds is not null) PackageControlDefaults.OverlayMissingFrom(keybinds);
-			return (manifest, packageSha1);
+			return (manifest, packageSha1, factories);
 		}
 
 		/// <summary>A package this session has loaded, in load order.</summary>

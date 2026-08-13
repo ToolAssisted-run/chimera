@@ -75,8 +75,8 @@ namespace BizHawk.Client.EmuHawk
 			Slot0StatusButton.Tag = SelectSlot0MenuItem.Tag = 10;
 
 			DumpStatusReportMenuItem.Click += DumpStatusButton_Click;
-			EmulationSubMenu.DropDownItems.InsertBefore(LoadedCoreNameMenuItem, insert: DumpStatusReportMenuItem);
-			EmulationSubMenu.DropDownItems.InsertBefore(LoadedCoreNameMenuItem, insert: RealTimeCounterMenuItem);
+			SystemSubMenu.DropDownItems.InsertBefore(LoadedCoreNameMenuItem, insert: DumpStatusReportMenuItem);
+			SystemSubMenu.DropDownItems.InsertBefore(LoadedCoreNameMenuItem, insert: RealTimeCounterMenuItem);
 
 			{
 				for (int i = 1; i <= EmuClientApi.WINDOW_SCALE_MAX; i++)
@@ -244,10 +244,8 @@ namespace BizHawk.Client.EmuHawk
 				= (/*TAStudio.ToolIcon.ToBitmap()*/Properties.Resources.TAStudio, "TAStudio");
 			(HexEditorMenuItem.Image, /*HexEditorMenuItem.Text*/_) = ToolManager.IconAndNameCache[typeof(HexEditor)]
 				= (/*HexEditor.ToolIcon.ToBitmap()*/Properties.Resources.Poke, "Hex Editor");
-			(DebuggerMenuItem.Image, /*DebuggerMenuItem.Text*/_) = ToolManager.IconAndNameCache[typeof(GenericDebugger)]
+			ToolManager.IconAndNameCache[typeof(GenericDebugger)]
 				= (/*GenericDebugger.ToolIcon.ToBitmap()*/Properties.Resources.Bug, "Debugger");
-			(VirtualPadMenuItem.Image, /*VirtualPadMenuItem.Text*/_) = ToolManager.IconAndNameCache[typeof(VirtualpadTool)]
-				= (/*VirtualpadTool.ToolIcon.ToBitmap()*/Properties.Resources.GameController, "Virtual Pads");
 			(CheatsMenuItem.Image, /*CheatsMenuItem.Text*/_) = ToolManager.IconAndNameCache[typeof(Cheats)]
 				= (/*Cheats.ToolIcon.ToBitmap()*/Properties.Resources.Cheat, "Cheats");
 			OnlineHelpMenuItem.Image = Properties.Resources.Help;
@@ -1002,15 +1000,8 @@ namespace BizHawk.Client.EmuHawk
 
 		public void ClearHolds()
 		{
-			if (Tools.Has<VirtualpadTool>())
-			{
-				Tools.VirtualPad.ClearVirtualPadHolds();
-			}
-			else
-			{
-				InputManager.StickyHoldController.ClearStickies();
-				InputManager.StickyAutofireController.ClearStickies();
-			}
+			InputManager.StickyHoldController.ClearStickies();
+			InputManager.StickyAutofireController.ClearStickies();
 		}
 
 		public void FlagNeedsReboot()
@@ -1780,28 +1771,6 @@ namespace BizHawk.Client.EmuHawk
 			settingsMenuItem.Click += GenericCoreSettingsMenuItem_Click;
 			GenericCoreSubMenu.DropDownItems.Add(settingsMenuItem);
 
-			// Which core runs this system. Usually one package claims a system and this is a single
-			// checked entry saying what is running; when two do, this is where you choose, and the
-			// choice becomes the default that system's roms open with.
-			var choices = CoreChoices.For(Emulator.SystemId, Emulator.Attributes().CoreName);
-			if (choices.Count is not 0)
-			{
-				ToolStripMenuItem coreMenuItem = new() { Text = "&Core" };
-				foreach (var choice in choices)
-				{
-					var coreName = choice.CoreName;
-					ToolStripMenuItem item = new() { Text = coreName, Checked = choice.IsCurrent };
-					item.Click += (_, _) =>
-					{
-						if (!CoreChoices.MakeDefault(Config, Emulator.SystemId, coreName)) return;
-						// the rom has to go through the loader again: the core IS the machine
-						if (!RebootCore()) AddOnScreenMessage($"{coreName} will be used the next time a rom loads");
-					};
-					coreMenuItem.DropDownItems.Add(item);
-				}
-				GenericCoreSubMenu.DropDownItems.Add(coreMenuItem);
-			}
-
 			var coreTools = CoreProvidedTools.Concat(SpecializedTools)
 				.Where(Tools.IsAvailable)
 				.OrderBy(static t => t.Name)
@@ -2207,8 +2176,16 @@ namespace BizHawk.Client.EmuHawk
 		{
 			try
 			{
-				var (manifest, packageSha1) = CoreRegistry.Instance.LoadCorePackage(path);
+				var (manifest, packageSha1, factories) = CoreRegistry.Instance.LoadCorePackage(path);
 				Config.LastCorePackagePath = path;
+				// Opening a core is how you choose one: every system this package claims will open
+				// its roms with it from now on. Startup discovery deliberately does NOT do this - it
+				// only makes packages available, so what is sitting in Cores/ can never silently
+				// reassign what you picked.
+				foreach (var factory in factories)
+				{
+					foreach (var sysID in factory.SystemIds) CoreChoices.MakeDefault(Config, sysID, factory.CoreName);
+				}
 				RebuildCoreSettingsMenus();
 				AddOnScreenMessage(packageSha1 is null
 					? $"Loaded core package: {manifest.Name} (directory form, unhashed)"
@@ -2399,28 +2376,6 @@ namespace BizHawk.Client.EmuHawk
 			}
 
 			AddOnScreenMessage($"Volume {Config.SoundVolume}");
-		}
-
-		private void SoftReset()
-		{
-			// is it enough to run this for one frame? maybe..
-			if (Emulator.ControllerDefinition.BoolButtons.Contains("Reset")
-				&& !MovieSession.Movie.IsPlaying())
-			{
-				InputManager.ClickyVirtualPadController.Click("Reset");
-				AddOnScreenMessage("Reset button pressed.");
-			}
-		}
-
-		private void HardReset()
-		{
-			// is it enough to run this for one frame? maybe..
-			if (Emulator.ControllerDefinition.BoolButtons.Contains("Power")
-				&& !MovieSession.Movie.IsPlaying())
-			{
-				InputManager.ClickyVirtualPadController.Click("Power");
-				AddOnScreenMessage("Power button pressed.");
-			}
 		}
 
 		private Color SlotForeColor(int slot)

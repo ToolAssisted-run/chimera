@@ -1012,3 +1012,26 @@ core.
 - Smaller: `CGBNotSupportedException` (a Game Boy Color error in a frontend with
   no Game Boy core), and 37 image resources plus 35 image files left orphaned by
   this and the previous passes.
+
+### The menus say what they mean (2026-08-13)
+
+- **Emulation → System.** The menu holds Pause, Reboot Core, the dump status and
+  what is loaded: that is the machine, not "emulation" as an activity.
+- **Soft Reset and Hard Reset are gone**, menu items and hotkeys both. They only
+  ever clicked a controller button named "Reset" or "Power" - buttons a package
+  declares like any other, and bindable in the controller config. A frontend
+  command that presses a button on your behalf is a leftover from when the
+  frontend knew what a console had.
+- **Emulator > Core is gone** (user, and rightly - I should not have built it).
+  A core is not a setting to pick from a list, it is the machine; you choose it by
+  opening its package. So File > Open Core now DOES choose: every system the
+  package claims will open its roms with the cores it brought. Startup discovery
+  deliberately does not, so what is sitting in `Cores/` can never silently
+  reassign what you opened. `CoreChoices` is down to `MakeDefault`.
+- **Tools lost Debugger, Trace Logger and Surface Viewer**: they are core-provided,
+  and the Emulator menu is where the running core's tools belong. Listing them
+  twice implied they were the frontend's.
+- **Virtual Pad is gone entirely.** Its schemas come from core factory assemblies
+  (BizHawk shipped one per console); the generic waterbox adapter has none, so the
+  window could only ever be empty. With it went the eight "Analog" hotkeys that
+  nudged values inside it, and `vpads_schemata` from Emulation.Common.

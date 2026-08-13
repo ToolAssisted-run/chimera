@@ -115,12 +115,10 @@ namespace BizHawk.Client.EmuHawk
 			this.ScreenshotCaptureOSDMenuItem1 = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
 			this.toolStripSeparator4 = new BizHawk.WinForms.Controls.ToolStripSeparatorEx();
 			this.ExitMenuItem = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
-			this.EmulationSubMenu = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
+			this.SystemSubMenu = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
 			this.PauseMenuItem = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
 			this.RebootCoreMenuItem = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
 			this.toolStripSeparator1 = new BizHawk.WinForms.Controls.ToolStripSeparatorEx();
-			this.SoftResetMenuItem = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
-			this.HardResetMenuItem = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
 			this.EmulatorMenuSeparator2 = new BizHawk.WinForms.Controls.ToolStripSeparatorEx();
 			this.LoadedCoreNameMenuItem = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
 			this.ViewSubMenu = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
@@ -196,11 +194,7 @@ namespace BizHawk.Client.EmuHawk
 			this.LuaConsoleMenuItem = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
 			this.TAStudioMenuItem = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
 			this.HexEditorMenuItem = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
-			this.DebuggerMenuItem = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
-			this.TraceLoggerMenuItem = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
-			this.SurfaceViewerMenuItem = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
 			this.MacroToolMenuItem = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
-			this.VirtualPadMenuItem = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
 			this.toolStripSeparator11 = new BizHawk.WinForms.Controls.ToolStripSeparatorEx();
 			this.CheatsMenuItem = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
 			this.toolStripSeparator29 = new BizHawk.WinForms.Controls.ToolStripSeparatorEx();
@@ -287,7 +281,7 @@ namespace BizHawk.Client.EmuHawk
 			// 
 			this.MainformMenu.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.FileSubMenu,
-            this.EmulationSubMenu,
+            this.SystemSubMenu,
             this.ViewSubMenu,
             this.ConfigSubMenu,
             this.ToolsSubMenu,
@@ -823,18 +817,16 @@ namespace BizHawk.Client.EmuHawk
 			this.ExitMenuItem.Text = "E&xit";
 			this.ExitMenuItem.Click += new System.EventHandler(this.ExitMenuItem_Click);
 			// 
-			// EmulationSubMenu
+			// SystemSubMenu
 			// 
-			this.EmulationSubMenu.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+			this.SystemSubMenu.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.PauseMenuItem,
             this.toolStripSeparator1,
             this.RebootCoreMenuItem,
-            this.SoftResetMenuItem,
-            this.HardResetMenuItem,
             this.EmulatorMenuSeparator2,
             this.LoadedCoreNameMenuItem});
-			this.EmulationSubMenu.Text = "&Emulation";
-			this.EmulationSubMenu.DropDownOpened += new System.EventHandler(this.EmulationMenuItem_DropDownOpened);
+			this.SystemSubMenu.Text = "&System";
+			this.SystemSubMenu.DropDownOpened += new System.EventHandler(this.SystemMenuItem_DropDownOpened);
 			// 
 			// PauseMenuItem
 			// 
@@ -845,16 +837,6 @@ namespace BizHawk.Client.EmuHawk
 			// 
 			this.RebootCoreMenuItem.Text = "&Reboot Core";
 			this.RebootCoreMenuItem.Click += new System.EventHandler(this.PowerMenuItem_Click);
-			// 
-			// SoftResetMenuItem
-			// 
-			this.SoftResetMenuItem.Text = "&Soft Reset";
-			this.SoftResetMenuItem.Click += new System.EventHandler(this.SoftResetMenuItem_Click);
-			// 
-			// HardResetMenuItem
-			// 
-			this.HardResetMenuItem.Text = "&Hard Reset";
-			this.HardResetMenuItem.Click += new System.EventHandler(this.HardResetMenuItem_Click);
 			// 
 			// LoadedCoreNameMenuItem
 			// 
@@ -1222,11 +1204,7 @@ namespace BizHawk.Client.EmuHawk
             this.LuaConsoleMenuItem,
             this.TAStudioMenuItem,
             this.HexEditorMenuItem,
-            this.DebuggerMenuItem,
-            this.TraceLoggerMenuItem,
-            this.SurfaceViewerMenuItem,
             this.MacroToolMenuItem,
-            this.VirtualPadMenuItem,
             this.toolStripSeparator11,
             this.CheatsMenuItem,
             this.toolStripSeparator29,
@@ -1267,30 +1245,10 @@ namespace BizHawk.Client.EmuHawk
 			// 
 			// 
 			// 
-			// DebuggerMenuItem
-			// 
-			this.DebuggerMenuItem.Text = "&Debugger";
-			this.DebuggerMenuItem.Click += new System.EventHandler(this.DebuggerMenuItem_Click);
-			//
-			// TraceLoggerMenuItem
-			//
-			this.TraceLoggerMenuItem.Text = "Trace &Logger";
-			this.TraceLoggerMenuItem.Click += new System.EventHandler(this.TraceLoggerMenuItem_Click);
-			//
-			// SurfaceViewerMenuItem
-			//
-			this.SurfaceViewerMenuItem.Text = "Surface &Viewer";
-			this.SurfaceViewerMenuItem.Click += new System.EventHandler(this.SurfaceViewerMenuItem_Click);
-			// 
 			// MacroToolMenuItem
 			// 
 			this.MacroToolMenuItem.Text = "&Macro Tool";
 			this.MacroToolMenuItem.Click += new System.EventHandler(this.MacroToolMenuItem_Click);
-			// 
-			// VirtualPadMenuItem
-			// 
-			this.VirtualPadMenuItem.Text = "Virtual Pad";
-			this.VirtualPadMenuItem.Click += new System.EventHandler(this.VirtualPadMenuItem_Click);
 			// 
 			// CheatsMenuItem
 			// 
@@ -1962,7 +1920,7 @@ namespace BizHawk.Client.EmuHawk
 		private BizHawk.WinForms.Controls.ToolStripMenuItemEx LoadState8MenuItem;
 		private BizHawk.WinForms.Controls.ToolStripMenuItemEx LoadState9MenuItem;
 		private BizHawk.WinForms.Controls.ToolStripMenuItemEx LoadState0MenuItem;
-		private BizHawk.WinForms.Controls.ToolStripMenuItemEx EmulationSubMenu;
+		private BizHawk.WinForms.Controls.ToolStripMenuItemEx SystemSubMenu;
 		private BizHawk.WinForms.Controls.ToolStripMenuItemEx ViewSubMenu;
 		private BizHawk.WinForms.Controls.ToolStripMenuItemEx ConfigSubMenu;
 		private BizHawk.WinForms.Controls.ToolStripMenuItemEx ToolsSubMenu;
@@ -1970,7 +1928,6 @@ namespace BizHawk.Client.EmuHawk
 		private BizHawk.WinForms.Controls.ToolStripMenuItemEx PauseMenuItem;
 		private BizHawk.WinForms.Controls.ToolStripSeparatorEx toolStripSeparator1;
 		private BizHawk.WinForms.Controls.ToolStripMenuItemEx RebootCoreMenuItem;
-		private BizHawk.WinForms.Controls.ToolStripMenuItemEx SoftResetMenuItem;
 		private BizHawk.WinForms.Controls.ToolStripMenuItemEx OnlineHelpMenuItem;
 		private BizHawk.WinForms.Controls.ToolStripMenuItemEx AboutMenuItem;
 		private BizHawk.WinForms.Controls.ToolStripMenuItemEx ControllersMenuItem;
@@ -2099,7 +2056,6 @@ namespace BizHawk.Client.EmuHawk
 		private BizHawk.WinForms.Controls.ToolStripMenuItemEx ForumsMenuItem;
 		private BizHawk.WinForms.Controls.ToolStripMenuItemEx ScreenshotClipboardMenuItem;
 		private BizHawk.WinForms.Controls.ToolStripMenuItemEx ScreenshotContextMenuItem;
-		private BizHawk.WinForms.Controls.ToolStripMenuItemEx HardResetMenuItem;
 		private BizHawk.WinForms.Controls.ToolStripSeparatorEx EmulatorMenuSeparator2;
 		private BizHawk.WinForms.Controls.ToolStripMenuItemEx LoadedCoreNameMenuItem;
 		private BizHawk.WinForms.Controls.ToolStripSeparatorEx toolStripSeparator19;
@@ -2109,7 +2065,6 @@ namespace BizHawk.Client.EmuHawk
 		private BizHawk.WinForms.Controls.StatusLabelEx RebootStatusBarIcon;
 		private BizHawk.WinForms.Controls.ToolStripMenuItemEx SaveMovieMenuItem;
 		private BizHawk.WinForms.Controls.ToolStripMenuItemEx SaveMovieContextMenuItem;
-		private BizHawk.WinForms.Controls.ToolStripMenuItemEx VirtualPadMenuItem;
 		private BizHawk.WinForms.Controls.ToolStripMenuItemEx AudioThrottleMenuItem;
 		private BizHawk.WinForms.Controls.ToolStripSeparatorEx toolStripSeparator27;
 		private BizHawk.WinForms.Controls.ToolStripMenuItemEx VsyncEnabledMenuItem;
@@ -2157,9 +2112,6 @@ namespace BizHawk.Client.EmuHawk
 		private BizHawk.WinForms.Controls.ToolStripMenuItemEx ScreenshotClientClipboardMenuItem;
 		private BizHawk.WinForms.Controls.StatusLabelEx LinkConnectStatusBarButton;
 		private BizHawk.WinForms.Controls.ToolStripMenuItemEx FeaturesMenuItem;
-		private BizHawk.WinForms.Controls.ToolStripMenuItemEx DebuggerMenuItem;
-		private BizHawk.WinForms.Controls.ToolStripMenuItemEx TraceLoggerMenuItem;
-		private BizHawk.WinForms.Controls.ToolStripMenuItemEx SurfaceViewerMenuItem;
 		private BizHawk.WinForms.Controls.ToolStripMenuItemEx SaveRAMSubMenu;
 		private BizHawk.WinForms.Controls.ToolStripMenuItemEx FlushSaveRAMMenuItem;
 		private BizHawk.WinForms.Controls.StatusLabelEx UpdateNotification;
