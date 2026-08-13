@@ -10,7 +10,7 @@ namespace BizHawk.Tests.Client.Common.CorePackages
 	/// <summary>
 	/// Two packages may claim the same system - a fast core and an accurate one - and then the user
 	/// has to be able to say which one a rom opens with. These cover what the Emulator > Core menu
-	/// is built from and what picking an entry records.
+	/// is built from and what picking an entry records as that system's default.
 	/// </summary>
 	[TestClass]
 	public class CoreChoicesTests
@@ -71,40 +71,40 @@ namespace BizHawk.Tests.Client.Common.CorePackages
 			=> Assert.AreEqual(1, CoreChoices.For(Factories("quickerNES", "quickerNES"), null).Count);
 
 		[TestMethod]
-		public void TheEffectiveCoreIsThePreferredOneWhenItStillExists()
+		public void TheEffectiveCoreIsTheDefaultOnlyWhileThatCoreExists()
 		{
-			// what Config > Preferred Cores puts the checkmark on, and what RomLoader would pick
+			// what the menu checkmarks, and what RomLoader would pick
 			Config config = new();
-			config.PreferredCores["NES"] = "somePackageTheUserRemoved";
+			config.DefaultCores["NES"] = "somePackageTheUserRemoved";
 			Assert.IsNull(CoreChoices.EffectiveCoreName(config, "NES"),
 				"a preference naming a core no package provides must not be reported as the one that would run");
 		}
 
 		[TestMethod]
-		public void PreferringACoreRecordsItAgainstTheSystem()
+		public void ChoosingACoreRecordsItAgainstTheSystem()
 		{
 			Config config = new();
-			Assert.IsTrue(CoreChoices.Prefer(config, "NES", "QuickerNesHawk"));
-			Assert.AreEqual("QuickerNesHawk", config.PreferredCores["NES"]);
+			Assert.IsTrue(CoreChoices.MakeDefault(config, "NES", "QuickerNesHawk"));
+			Assert.AreEqual("QuickerNesHawk", config.DefaultCores["NES"]);
 		}
 
 		[TestMethod]
-		public void PreferringTheCoreAlreadyChosenChangesNothing()
+		public void ChoosingTheCoreAlreadyRunningChangesNothing()
 		{
 			// the caller uses this to skip a reload, which would otherwise throw away the session
 			Config config = new();
-			config.PreferredCores["NES"] = "quickerNES";
-			Assert.IsFalse(CoreChoices.Prefer(config, "NES", "quickerNES"));
+			config.DefaultCores["NES"] = "quickerNES";
+			Assert.IsFalse(CoreChoices.MakeDefault(config, "NES", "quickerNES"));
 		}
 
 		[TestMethod]
 		public void EachSystemRemembersItsOwnCore()
 		{
 			Config config = new();
-			CoreChoices.Prefer(config, "NES", "QuickerNesHawk");
-			CoreChoices.Prefer(config, "SNES", "someSnesCore");
-			Assert.AreEqual("QuickerNesHawk", config.PreferredCores["NES"]);
-			Assert.AreEqual("someSnesCore", config.PreferredCores["SNES"]);
+			CoreChoices.MakeDefault(config, "NES", "QuickerNesHawk");
+			CoreChoices.MakeDefault(config, "SNES", "someSnesCore");
+			Assert.AreEqual("QuickerNesHawk", config.DefaultCores["NES"]);
+			Assert.AreEqual("someSnesCore", config.DefaultCores["SNES"]);
 		}
 	}
 }

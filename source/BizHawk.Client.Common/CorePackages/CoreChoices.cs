@@ -19,8 +19,9 @@ namespace BizHawk.Client.Common
 	/// Which cores a system can be run with. Nothing stops two packages from claiming the same
 	/// system - a faster core and a more accurate one, say - and when that happens the user has to
 	/// be able to say which one a rom opens with, or the answer is whatever happened to register
-	/// first. The choice is remembered per system in <see cref="Config.PreferredCores"/> and read
-	/// back by <c>RomLoader</c> on the next load.
+	/// first. What they pick becomes that system's default (<see cref="Config.DefaultCores"/>),
+	/// which <c>RomLoader</c> reads on the next load. Nothing writes an entry the user did not ask
+	/// for: a system with one core never appears there.
 	/// </summary>
 	public static class CoreChoices
 	{
@@ -33,13 +34,13 @@ namespace BizHawk.Client.Common
 				.ToList();
 
 		/// <summary>
-		/// The core a rom for <paramref name="systemId"/> would open with right now: the remembered
-		/// preference, or - when there is none - whichever core registered first, which is what
+		/// The core a rom for <paramref name="systemId"/> would open with right now: the system's
+		/// default if one was ever chosen, else whichever core registered first, which is what
 		/// <c>RomLoader</c> falls back to. Null if no core claims the system.
 		/// </summary>
 		public static string? EffectiveCoreName(Config config, string systemId)
 		{
-			if (config.PreferredCores.TryGetValue(systemId, out var preferred)
+			if (config.DefaultCores.TryGetValue(systemId, out var preferred)
 				&& CoreRegistry.Instance.GetFactories(systemId).Any(f => f.CoreName == preferred))
 			{
 				return preferred;
@@ -60,13 +61,13 @@ namespace BizHawk.Client.Common
 				.ToList();
 
 		/// <summary>
-		/// Remembers <paramref name="coreName"/> as the core for <paramref name="systemId"/>.
-		/// Returns false if that was already the choice, so the caller can skip the reload.
+		/// Makes <paramref name="coreName"/> the core <paramref name="systemId"/>'s roms open with.
+		/// Returns false if that was already the case, so the caller can skip the reload.
 		/// </summary>
-		public static bool Prefer(Config config, string systemId, string coreName)
+		public static bool MakeDefault(Config config, string systemId, string coreName)
 		{
-			if (config.PreferredCores.TryGetValue(systemId, out var existing) && existing == coreName) return false;
-			config.PreferredCores[systemId] = coreName;
+			if (config.DefaultCores.TryGetValue(systemId, out var existing) && existing == coreName) return false;
+			config.DefaultCores[systemId] = coreName;
 			return true;
 		}
 	}

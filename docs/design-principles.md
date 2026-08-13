@@ -888,17 +888,20 @@ of them a file the frontend can no longer fill in for a core it has never seen.
 Your own bindings live in your config, where they always did; the defaults live
 with the core that knows what the controller is.
 
-**A dead menu turned up while checking this.** Config > Preferred Cores had been
-sitting there since the CoreInventory removal with no handler and no contents - it
-was kept only as the anchor the Core Settings submenu is inserted after, so it
-rendered as an item that does nothing, claiming exactly the job the new Emulator >
-Core submenu had just taken. It is populated now: every system a loaded package can
-emulate, each with its cores and a checkmark on the one a rom would actually open
-with (`CoreChoices.EffectiveCoreName` - the remembered preference, or whichever
-core registered first, which is what RomLoader falls back to). The two menus answer
-the same question at different moments: Emulator > Core is about the machine
-running now and reboots it; Config > Preferred Cores is the only way to choose
-before the first rom is open.
+**And "Preferred Cores" went with it** (user, same day). Config > Preferred Cores
+had been a dead menu item since the CoreInventory removal - no handler, no
+contents, kept only as the anchor the Core Settings submenu is inserted after. I
+populated it; the user's call was to delete it instead, and the reasoning
+generalises past this menu: a per-system matrix of cores to prefer is a shape that
+only makes sense when the frontend ships every core it can name. Here a package
+either is installed or is not, and the question is never "which of the cores you
+bundle" but "this rom opens with which of the ones I installed".
+
+So the only thing left is that answer, renamed to what it is:
+`Config.DefaultCores` - the core a system's roms open with, written only when
+someone picks one in Emulator > Core, never pre-populated, and absent entirely for
+a system with one core. `RomLoader` reads it and otherwise takes whichever core
+registered first.
 
 They are DEFAULTS in the strict sense: they fill in for a controller the user's
 config has never seen (`InputManager.SyncControls`), and the controller config's

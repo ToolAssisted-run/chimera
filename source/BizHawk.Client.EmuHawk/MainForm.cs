@@ -109,8 +109,6 @@ namespace BizHawk.Client.EmuHawk
 			_ = FileSubMenu.DropDownItems.InsertAfter(OpenCoreMenuItem, insert: corePackagesMenuItem);
 
 			RebuildCoreSettingsMenus();
-			// keeps the checkmark honest if the preference changed elsewhere (Emulator > Core)
-			CoresSubMenu.DropDownOpened += (_, _) => RebuildPreferredCoresMenu();
 
 			// Hide Status bar icons and general StatusBar prep
 			MainStatusBar.Padding = new Padding(MainStatusBar.Padding.Left, MainStatusBar.Padding.Top, MainStatusBar.Padding.Left, MainStatusBar.Padding.Bottom); // Workaround to remove extra padding on right
@@ -1825,8 +1823,8 @@ namespace BizHawk.Client.EmuHawk
 			GenericCoreSubMenu.DropDownItems.Add(settingsMenuItem);
 
 			// Which core runs this system. Usually one package claims a system and this is a single
-			// checked entry saying what is running; when two do, it is the only way to choose - a rom
-			// otherwise opens with whichever package registered first.
+			// checked entry saying what is running; when two do, this is where you choose, and the
+			// choice becomes the default that system's roms open with.
 			var choices = CoreChoices.For(Emulator.SystemId, Emulator.Attributes().CoreName);
 			if (choices.Count is not 0)
 			{
@@ -1837,7 +1835,7 @@ namespace BizHawk.Client.EmuHawk
 					ToolStripMenuItem item = new() { Text = coreName, Checked = choice.IsCurrent };
 					item.Click += (_, _) =>
 					{
-						if (!CoreChoices.Prefer(Config, Emulator.SystemId, coreName)) return;
+						if (!CoreChoices.MakeDefault(Config, Emulator.SystemId, coreName)) return;
 						// the rom has to go through the loader again: the core IS the machine
 						if (!RebootCore()) AddOnScreenMessage($"{coreName} will be used the next time a rom loads");
 					};
@@ -2149,46 +2147,8 @@ namespace BizHawk.Client.EmuHawk
 		/// settings must be configurable BEFORE the first rom load, so this reruns on
 		/// every package load.
 		/// </summary>
-		/// <summary>
-		/// Config > Preferred Cores: which core opens a rom for each system a loaded package can
-		/// emulate. The Emulator > Core submenu answers the same question for the machine currently
-		/// running; this one answers it for the machines that are not, which is the only way to
-		/// choose before the first rom is open. Rebuilt on open, because packages can load later.
-		/// </summary>
-		private void RebuildPreferredCoresMenu()
-		{
-			CoresSubMenu.DropDownItems.Clear();
-			var systems = CoreChoices.SystemsWithCores();
-			if (systems.Count is 0)
-			{
-				CoresSubMenu.DropDownItems.Add(new ToolStripMenuItemEx { Enabled = false, Text = "(no cores loaded)" });
-				return;
-			}
-			foreach (var systemId in systems)
-			{
-				ToolStripMenuItemEx systemItem = new() { Text = systemId };
-				var effective = CoreChoices.EffectiveCoreName(Config, systemId);
-				foreach (var choice in CoreChoices.For(systemId, effective))
-				{
-					var coreName = choice.CoreName;
-					var sysID = systemId;
-					ToolStripMenuItem item = new() { Text = coreName, Checked = choice.IsCurrent };
-					item.Click += (_, _) =>
-					{
-						if (!CoreChoices.Prefer(Config, sysID, coreName)) return;
-						AddOnScreenMessage($"{coreName} will run {sysID} roms");
-						// only the running machine can be swapped in place; the rest take effect on load
-						if (Emulator.SystemId == sysID && !Emulator.IsNull()) RebootCore();
-					};
-					systemItem.DropDownItems.Add(item);
-				}
-				CoresSubMenu.DropDownItems.Add(systemItem);
-			}
-		}
-
 		private void RebuildCoreSettingsMenus()
 		{
-			RebuildPreferredCoresMenu();
 			if (_coreSettingsParentMenu is not null) ConfigSubMenu.DropDownItems.Remove(_coreSettingsParentMenu);
 			ToolStripMenuItemEx recentCoreSettingsSubmenu = new() { Text = "Recent" };
 			recentCoreSettingsSubmenu.DropDownItems.AddRange(CreateCoreSettingsSubmenus().ToArray());
@@ -2235,7 +2195,7 @@ namespace BizHawk.Client.EmuHawk
 				},
 				Text = "Core Settings",
 			};
-			_ = ConfigSubMenu.DropDownItems.InsertAfter(CoresSubMenu, insert: _coreSettingsParentMenu);
+			_ = ConfigSubMenu.DropDownItems.InsertAfter(KeyPrioritySubMenu, insert: _coreSettingsParentMenu);
 		}
 
 		/// <summary>packages found by the startup scan, kept so the Core Packages dialog opens without rescanning</summary>

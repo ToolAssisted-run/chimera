@@ -365,7 +365,13 @@ namespace BizHawk.Client.Common
 		public bool GbAsSgb { get; set; }
 		public string LibretroCore { get; set; }
 
-		public Dictionary<string, string> PreferredCores = new();
+		/// <summary>
+		/// The core a system's roms open with, keyed by system ID - remembered from the last time the
+		/// user chose one (Emulator > Core), and consulted by RomLoader when more than one loaded
+		/// package can run the file. Not a matrix of everything the frontend could do: it holds only
+		/// what someone actually picked, and a system with one core never appears here.
+		/// </summary>
+		public Dictionary<string, string> DefaultCores = new();
 
 		public bool DontTryOtherCores { get; set; }
 

@@ -381,7 +381,7 @@ namespace BizHawk.Client.Common
 			}
 			else
 			{
-				_ = _config.PreferredCores.TryGetValue(lp.Game.System, out var preferredCore);
+				_ = _config.DefaultCores.TryGetValue(lp.Game.System, out var preferredCore);
 				var dbForcedCoreName = lp.Game.ForcedCore;
 				factories = CoreRegistry.Instance.GetFactories(lp.Game.System)
 					.OrderBy(f =>

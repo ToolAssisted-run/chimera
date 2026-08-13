@@ -23,7 +23,7 @@ namespace BizHawk.Client.EmuHawk
 				if (result is null) return false;
 				if (result is false) CheatList.DisableAll();
 			}
-			var oldPreferredCores = new Dictionary<string, string>(Config.PreferredCores);
+			var oldDefaultCores = new Dictionary<string, string>(Config.DefaultCores);
 			try
 			{
 				if (newMovie) PrepopulateMovieHeaderValues(movie);
@@ -34,7 +34,7 @@ namespace BizHawk.Client.EmuHawk
 						systemId: Emulator.SystemId,
 						loadedRomHash: Game.Hash,
 						Config.PathEntries,
-						Config.PreferredCores);
+						Config.DefaultCores);
 				}
 				catch (MoviePlatformMismatchException ex)
 				{
@@ -62,7 +62,7 @@ namespace BizHawk.Client.EmuHawk
 			finally
 			{
 				MovieSession.AbortQueuedMovie();
-				Config.PreferredCores = oldPreferredCores;
+				Config.DefaultCores = oldDefaultCores;
 			}
 
 			SetMainformMovieInfo();

@@ -184,7 +184,6 @@ namespace BizHawk.Client.EmuHawk
 			this.BothHkAndControllerMenuItem = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
 			this.InputOverHkMenuItem = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
 			this.HkOverInputMenuItem = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
-			this.CoresSubMenu = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
 			this.toolStripSeparator10 = new BizHawk.WinForms.Controls.ToolStripSeparatorEx();
 			this.SaveConfigMenuItem = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
 			this.SaveConfigAsMenuItem = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
@@ -969,7 +968,6 @@ namespace BizHawk.Client.EmuHawk
             this.toolStripSeparator9,
             this.SpeedSkipSubMenu,
             this.KeyPrioritySubMenu,
-            this.CoresSubMenu,
             this.toolStripSeparator10,
             this.SaveConfigMenuItem,
             this.SaveConfigAsMenuItem,
@@ -1205,10 +1203,6 @@ namespace BizHawk.Client.EmuHawk
 			// 
 			this.HkOverInputMenuItem.Text = "Hotkeys override Input";
 			this.HkOverInputMenuItem.Click += new System.EventHandler(this.HkOverInputMenuItem_Click);
-			// 
-			// CoresSubMenu
-			// 
-			this.CoresSubMenu.Text = "Preferred Cores";
 			// 
 			// SaveConfigMenuItem
 			// 
@@ -2180,7 +2174,6 @@ namespace BizHawk.Client.EmuHawk
 		private BizHawk.WinForms.Controls.ToolStripSeparatorEx ShowMenuContextMenuSeparator;
 		private BizHawk.WinForms.Controls.ToolStripMenuItemEx StopAVContextMenuItem;
 		private BizHawk.WinForms.Controls.ToolStripMenuItemEx GenericCoreSubMenu;
-		private BizHawk.WinForms.Controls.ToolStripMenuItemEx CoresSubMenu;
 		private BizHawk.WinForms.Controls.ToolStripMenuItemEx BatchRunnerMenuItem;
 		private BizHawk.WinForms.Controls.ToolStripMenuItemEx DisplayConfigMenuItem;
 		private BizHawk.WinForms.Controls.ToolStripMenuItemEx extensionsToolStripMenuItem;
