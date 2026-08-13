@@ -43,10 +43,10 @@ namespace BizHawk.Client.Common
 			=> _bySystem.TryGetValue(systemId, out var list) ? list : [ ];
 
 		/// <summary>
-		/// Default input bindings provided by loaded packages (a package's optional
-		/// <c>defctrl.json</c>), keyed by controller definition name. The frontend
-		/// ships no bindings of its own; these fill in for controllers the user's
-		/// config has never seen.
+		/// Default input bindings provided by loaded packages (each package's optional
+		/// <see cref="PackageKeybinds.FileName"/>), keyed by controller definition
+		/// name. The frontend ships no bindings of its own; these fill in for
+		/// controllers the user's config has never seen.
 		/// </summary>
 		public DefaultControls PackageControlDefaults { get; } = new();
 
@@ -108,12 +108,9 @@ namespace BizHawk.Client.Common
 				}
 				_systemByExtension[extLower] = sysID;
 			}
-			var defctrlPath = Path.Combine(packageDir, "defctrl.json");
-			if (File.Exists(defctrlPath))
-			{
-				// first package to name a controller wins; later duplicates are ignored
-				PackageControlDefaults.OverlayMissingFrom(ConfigService.Load<DefaultControls>(defctrlPath));
-			}
+			var keybinds = PackageKeybinds.Read(packageDir);
+			// first package to name a controller wins; later duplicates are ignored
+			if (keybinds is not null) PackageControlDefaults.OverlayMissingFrom(keybinds);
 			return (manifest, packageSha1);
 		}
 

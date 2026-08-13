@@ -861,3 +861,34 @@ key and one settings blob. Whichever core is loaded reads the keys it knows and
 ignores the rest, so nothing breaks today, but two cores with a same-named
 setting of different meaning would collide. Keying by package SHA1 (the identity
 the reproduction contract already uses) is the fix when it matters.
+
+## Key bindings arrive with the core (2026-08-13)
+
+BizHawk ships one `defctrl.json` listing the default bindings for every console it
+knows about. That only works while the frontend knows every console; miniHawk's
+cores arrive from outside it, so a monolithic file here would either list consoles
+the frontend has no business knowing about, or be empty. It was empty: the
+mechanism to read package bindings existed, but the last packages that shipped any
+lost their files in the waterbox-only redesign, so a fresh install had no bindings
+for any core and no way to get them except binding everything by hand.
+
+**A package that declares a controller declares how it is played.** Each package
+ships `default_keybinds.json` beside its `waterbox.config` - the same shape as
+BizHawk's file, scoped to the controllers that package declares - and the values
+are transcribed from BizHawk's own defaults, so someone arriving from BizHawk
+finds the keys where they left them. The frontend ships none of its own.
+
+They are DEFAULTS in the strict sense: they fill in for a controller the user's
+config has never seen (`InputManager.SyncControls`), and the controller config's
+Defaults button falls back to them. A user's own bindings always win, and the
+first package to claim a controller name keeps it - so installing a second NES
+core cannot rebind the pad someone is already playing with.
+
+**A broken bindings file costs the bindings, not the core.** `PackageKeybinds.Read`
+reports and ignores unreadable JSON: an optional convenience file must never stop
+a core from loading.
+
+Gated at both ends: the synthetic witness starts EmuHawk from a config that has
+never heard of the synth controller and requires the package's bindings to be in
+the config it writes out (`K:box:keybinds`), and each core repo's frontend gate
+does the same for its own package.

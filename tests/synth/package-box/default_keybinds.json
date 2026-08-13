@@ -1,0 +1,27 @@
+{
+	"_comment": [
+		"Default bindings for the controller this package declares. miniHawk ships no bindings of its",
+		"own - a package that declares a controller says how it is played by default, and the frontend",
+		"uses that for a controller the user's config has never seen.",
+		"The synthetic core is a test fixture, so these exist mainly to keep the mechanism gated: the",
+		"witness asserts the frontend adopted them."
+	],
+	"AllTrollers": {
+		"Synth Controller": {
+			"P1 Up": "Up, J1 POV1U, X1 DpadUp",
+			"P1 Down": "Down, J1 POV1D, X1 DpadDown",
+			"P1 Left": "Left, J1 POV1L, X1 DpadLeft",
+			"P1 Right": "Right, J1 POV1R, X1 DpadRight",
+			"P1 A": "X, J1 B2, X1 A",
+			"P1 B": "Z, J1 B1, X1 X",
+			"P1 Select": "Space, J1 B9, X1 Back",
+			"P1 Start": "Enter, J1 B10, X1 Start"
+		}
+	},
+	"AllTrollersAutoFire": {
+		"Synth Controller": {
+			"P1 A": "S",
+			"P1 B": "A"
+		}
+	}
+}

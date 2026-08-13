@@ -47,6 +47,8 @@ rm -rf "$staging"
 mkdir -p "$staging"
 cp "$here/package-box/synth.wbx" "$staging/core.wbx"
 cp "$here/package-box/waterbox.config" "$staging"
+# the bindings the package declares for its controller (miniHawk ships none of its own)
+cp "$here/package-box/default_keybinds.json" "$staging"
 
 cores_dir="$minihawk_root/build/Cores"
 mkdir -p "$cores_dir"

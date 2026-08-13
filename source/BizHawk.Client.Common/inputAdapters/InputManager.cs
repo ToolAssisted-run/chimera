@@ -60,8 +60,8 @@ namespace BizHawk.Client.Common
 			var def = emulator.ControllerDefinition;
 			def.BuildMnemonicsCache(emulator.SystemId);
 
-			// core packages may ship default bindings for their controllers (a package
-			// defctrl.json); adopt them for controllers this config has never seen
+			// core packages may ship default bindings for the controllers they declare
+			// (default_keybinds.json); adopt them for controllers this config has never seen
 			var packageDefaults = CoreRegistry.Instance.PackageControlDefaults;
 			if (!config.AllTrollers.ContainsKey(def.Name) && packageDefaults.AllTrollers.TryGetValue(def.Name, out var defaultBinds))
 			{

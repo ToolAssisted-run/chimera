@@ -236,6 +236,36 @@ PY
 		else
 			report "D:box:autodiscovery" FAIL "loaded, but RAM differs from the golden"
 		fi
+
+		# --- keybinds ship with the package ---
+		# The frontend has no bindings of its own: a controller it has never seen is played however
+		# the package that declared it says (the package's default_keybinds.json). Start from a
+		# config that has never heard of this controller - which is what a fresh install is - and
+		# the config EmuHawk writes on exit must hold the package's bindings, or the core arrives
+		# unplayable.
+		kname=gridWalker.win
+		kcfg="$work/config.keybinds.ini"
+		python3 "$here/forget-controller.py" "$config" "$kcfg" "Synth Controller"
+		kjob="$work/job.keybinds.txt"
+		{
+			echo "movie=$here/movies/$kname.txt"
+			echo "outram=$work/keybinds.ram.bin"
+			echo "outvram=$work/keybinds.vram.bin"
+			echo "meta=$work/keybinds.meta.txt"
+			echo "mode=simple"
+		} > "$kjob"
+		rm -f "$work/keybinds.meta.txt"
+		( cd "$repo_root" && MINIHAWK_JOB="$kjob" timeout 300 mono "$emu_hawk" --headless \
+			"--config=$kcfg" "--lua=$here/synth-replay.lua" \
+			"$here/roms/${kname%%.*}.testrom" ) > "$work/keybinds.log" 2>&1
+		if [ ! -f "$work/keybinds.meta.txt" ] || ! grep -q "^status=OK" "$work/keybinds.meta.txt"; then
+			report "K:box:keybinds" FAIL "run failed (see work/keybinds.log)"
+		elif python3 "$here/check-keybinds.py" "$kcfg" \
+			"$here/package-box/default_keybinds.json" "Synth Controller" > "$work/keybinds.txt" 2>&1; then
+			report "K:box:keybinds" PASS "$(cat "$work/keybinds.txt")"
+		else
+			report "K:box:keybinds" FAIL "$(head -1 "$work/keybinds.txt")"
+		fi
 	fi
 fi
 
