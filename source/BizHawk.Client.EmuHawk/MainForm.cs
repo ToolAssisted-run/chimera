@@ -109,6 +109,8 @@ namespace BizHawk.Client.EmuHawk
 			_ = FileSubMenu.DropDownItems.InsertAfter(OpenCoreMenuItem, insert: corePackagesMenuItem);
 
 			RebuildCoreSettingsMenus();
+			// keeps the checkmark honest if the preference changed elsewhere (Emulator > Core)
+			CoresSubMenu.DropDownOpened += (_, _) => RebuildPreferredCoresMenu();
 
 			// Hide Status bar icons and general StatusBar prep
 			MainStatusBar.Padding = new Padding(MainStatusBar.Padding.Left, MainStatusBar.Padding.Top, MainStatusBar.Padding.Left, MainStatusBar.Padding.Bottom); // Workaround to remove extra padding on right
@@ -569,6 +571,8 @@ namespace BizHawk.Client.EmuHawk
 			// MainForm_Load would be far too late. (--core still wins: it is applied
 			// next, and a package already loaded from Cores/ is not loaded twice.)
 			LoadDiscoveredCorePackages();
+			// the menus built at construction time predate the packages
+			RebuildCoreSettingsMenus();
 
 			if (_argParser.cmdCorePackage != null && !LoadCorePackage(_argParser.cmdCorePackage))
 			{
@@ -2145,8 +2149,46 @@ namespace BizHawk.Client.EmuHawk
 		/// settings must be configurable BEFORE the first rom load, so this reruns on
 		/// every package load.
 		/// </summary>
+		/// <summary>
+		/// Config > Preferred Cores: which core opens a rom for each system a loaded package can
+		/// emulate. The Emulator > Core submenu answers the same question for the machine currently
+		/// running; this one answers it for the machines that are not, which is the only way to
+		/// choose before the first rom is open. Rebuilt on open, because packages can load later.
+		/// </summary>
+		private void RebuildPreferredCoresMenu()
+		{
+			CoresSubMenu.DropDownItems.Clear();
+			var systems = CoreChoices.SystemsWithCores();
+			if (systems.Count is 0)
+			{
+				CoresSubMenu.DropDownItems.Add(new ToolStripMenuItemEx { Enabled = false, Text = "(no cores loaded)" });
+				return;
+			}
+			foreach (var systemId in systems)
+			{
+				ToolStripMenuItemEx systemItem = new() { Text = systemId };
+				var effective = CoreChoices.EffectiveCoreName(Config, systemId);
+				foreach (var choice in CoreChoices.For(systemId, effective))
+				{
+					var coreName = choice.CoreName;
+					var sysID = systemId;
+					ToolStripMenuItem item = new() { Text = coreName, Checked = choice.IsCurrent };
+					item.Click += (_, _) =>
+					{
+						if (!CoreChoices.Prefer(Config, sysID, coreName)) return;
+						AddOnScreenMessage($"{coreName} will run {sysID} roms");
+						// only the running machine can be swapped in place; the rest take effect on load
+						if (Emulator.SystemId == sysID && !Emulator.IsNull()) RebootCore();
+					};
+					systemItem.DropDownItems.Add(item);
+				}
+				CoresSubMenu.DropDownItems.Add(systemItem);
+			}
+		}
+
 		private void RebuildCoreSettingsMenus()
 		{
+			RebuildPreferredCoresMenu();
 			if (_coreSettingsParentMenu is not null) ConfigSubMenu.DropDownItems.Remove(_coreSettingsParentMenu);
 			ToolStripMenuItemEx recentCoreSettingsSubmenu = new() { Text = "Recent" };
 			recentCoreSettingsSubmenu.DropDownItems.AddRange(CreateCoreSettingsSubmenus().ToArray());

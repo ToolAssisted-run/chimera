@@ -71,6 +71,16 @@ namespace BizHawk.Tests.Client.Common.CorePackages
 			=> Assert.AreEqual(1, CoreChoices.For(Factories("quickerNES", "quickerNES"), null).Count);
 
 		[TestMethod]
+		public void TheEffectiveCoreIsThePreferredOneWhenItStillExists()
+		{
+			// what Config > Preferred Cores puts the checkmark on, and what RomLoader would pick
+			Config config = new();
+			config.PreferredCores["NES"] = "somePackageTheUserRemoved";
+			Assert.IsNull(CoreChoices.EffectiveCoreName(config, "NES"),
+				"a preference naming a core no package provides must not be reported as the one that would run");
+		}
+
+		[TestMethod]
 		public void PreferringACoreRecordsItAgainstTheSystem()
 		{
 			Config config = new();

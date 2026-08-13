@@ -223,7 +223,9 @@ phase of unverified change.
   adopts package defaults for any controller the user's config has never seen. A
   user-saved defctrl.json next to the exe (written by the controller dialog's "save
   defaults") still wins over package defaults. The quickernes package ships the NES
-  Controller bindings. Natives KEPT deliberately: chd_capi (DiscSystem - disc story
+  Controller bindings. [Superseded 2026-08-13, see "Key bindings arrive with the
+  core": the packages lost their file in the waterbox-only redesign below, and the
+  exe-side defctrl.json - along with the dialog's Save Defaults - is now gone too.] Natives KEPT deliberately: chd_capi (DiscSystem - disc story
   still an open decision), cimgui/SDL2/OpenAL32/lua54/libzstd/libbizhash/e_sqlite3
   (frontend infrastructure). blip_buf was initially kept as contract-offered audio
   resampling, then REMOVED at user request (wrapper class, natives, C source dir,
@@ -877,6 +879,26 @@ ships `default_keybinds.json` beside its `waterbox.config` - the same shape as
 BizHawk's file, scoped to the controllers that package declares - and the values
 are transcribed from BizHawk's own defaults, so someone arriving from BizHawk
 finds the keys where they left them. The frontend ships none of its own.
+
+**And has nowhere to put any.** The exe-side `defctrl.json` went with it:
+`Config.ControlDefaultPath`, the seeding of a fresh config from that file, and the
+controller dialog's "Save Defaults" item are all gone. Keeping a second source of
+defaults would have meant two answers to "what are the defaults for this pad", one
+of them a file the frontend can no longer fill in for a core it has never seen.
+Your own bindings live in your config, where they always did; the defaults live
+with the core that knows what the controller is.
+
+**A dead menu turned up while checking this.** Config > Preferred Cores had been
+sitting there since the CoreInventory removal with no handler and no contents - it
+was kept only as the anchor the Core Settings submenu is inserted after, so it
+rendered as an item that does nothing, claiming exactly the job the new Emulator >
+Core submenu had just taken. It is populated now: every system a loaded package can
+emulate, each with its cores and a checkmark on the one a rom would actually open
+with (`CoreChoices.EffectiveCoreName` - the remembered preference, or whichever
+core registered first, which is what RomLoader falls back to). The two menus answer
+the same question at different moments: Emulator > Core is about the machine
+running now and reboots it; Config > Preferred Cores is the only way to choose
+before the first rom is open.
 
 They are DEFAULTS in the strict sense: they fill in for a controller the user's
 config has never seen (`InputManager.SyncControls`), and the controller config's

@@ -333,14 +333,6 @@ namespace BizHawk.Client.EmuHawk
 			ActOnControlCollection<FeedbacksBindPanel>(FeedbacksTab, c => c.Save(_config.AllTrollersFeedbacks[_emulator.ControllerDefinition.Name]));
 		}
 
-		private void SaveToDefaults(DefaultControls cd)
-		{
-			ActOnControlCollection<ControllerConfigPanel>(NormalControlsTab, c => c.Save(cd.AllTrollers[_emulator.ControllerDefinition.Name]));
-			ActOnControlCollection<ControllerConfigPanel>(AutofireControlsTab, c => c.Save(cd.AllTrollersAutoFire[_emulator.ControllerDefinition.Name]));
-			ActOnControlCollection<AnalogBindPanel>(AnalogControlsTab, c => c.Save(cd.AllTrollersAnalog[_emulator.ControllerDefinition.Name]));
-			ActOnControlCollection<FeedbacksBindPanel>(FeedbacksTab, c => c.Save(cd.AllTrollersFeedbacks[_emulator.ControllerDefinition.Name]));
-		}
-
 		private static void ActOnControlCollection<T>(Control c, Action<T> proc)
 			where T : Control
 		{
@@ -414,8 +406,9 @@ namespace BizHawk.Client.EmuHawk
 			// load panels directly from the default config.
 			// this means that the changes are NOT committed.  so "Cancel" works right and you
 			// still have to hit OK at the end.
-			// user-saved defaults (defctrl.json next to the exe) win; core-package defaults fill the gaps
-			var cd = ConfigService.Load<DefaultControls>(Config.ControlDefaultPath);
+			// The defaults are whatever the loaded core packages declare for their controllers - the
+			// frontend has none of its own. Copied, so editing the panels cannot rewrite them.
+			DefaultControls cd = new();
 			cd.OverlayMissingFrom(CoreRegistry.Instance.PackageControlDefaults);
 			LoadPanels(cd);
 
@@ -446,28 +439,6 @@ namespace BizHawk.Client.EmuHawk
 			}
 
 			tabControl1.ResumeLayout();
-		}
-
-		private void ButtonSaveDefaults_Click(object sender, EventArgs e)
-		{
-			// this doesn't work anymore, as it stomps out any defaults for buttons that aren't currently active on the console
-			// there are various ways to fix it, each with its own semantic problems
-			var result = this.ModalMessageBox2("OK to overwrite defaults for current control scheme?", "Save Defaults");
-			if (result)
-			{
-				var cd = ConfigService.Load<DefaultControls>(Config.ControlDefaultPath);
-				cd.AllTrollers[_emulator.ControllerDefinition.Name] = new Dictionary<string, string>();
-				cd.AllTrollersAutoFire[_emulator.ControllerDefinition.Name] = new Dictionary<string, string>();
-				cd.AllTrollersAnalog[_emulator.ControllerDefinition.Name] = new Dictionary<string, AnalogBind>();
-
-				SaveToDefaults(cd);
-
-				FileWriteResult saveResult = ConfigService.Save(Config.ControlDefaultPath, cd);
-				if (saveResult.IsError)
-				{
-					this.ErrorMessageBox(saveResult);
-				}
-			}
 		}
 
 		private void ClearWidgetAndChildren(Control c)

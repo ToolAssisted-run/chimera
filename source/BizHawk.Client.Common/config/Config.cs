@@ -15,22 +15,10 @@ namespace BizHawk.Client.Common
 {
 	public class Config
 	{
-		public static string ControlDefaultPath => Path.Combine(PathUtils.ExeDirectoryPath, "defctrl.json");
-
-		public Config()
-		{
-			if (AllTrollers.Count == 0
-				&& AllTrollersAutoFire.Count == 0
-				&& AllTrollersAnalog.Count == 0
-				&& AllTrollersFeedbacks.Count == 0)
-			{
-				var cd = ConfigService.Load<DefaultControls>(ControlDefaultPath);
-				AllTrollers = cd.AllTrollers;
-				AllTrollersAutoFire = cd.AllTrollersAutoFire;
-				AllTrollersAnalog = cd.AllTrollersAnalog;
-				AllTrollersFeedbacks = cd.AllTrollersFeedbacks;
-			}
-		}
+		// A fresh config starts with no bindings at all, deliberately. BizHawk seeded them here from a
+		// defctrl.json shipped next to the exe, listing every console it knew; miniHawk's cores come
+		// from outside the frontend, so the bindings come with them - InputManager.SyncControls takes
+		// a controller's defaults from the package that declared it, the first time it sees one.
 
 		public void ResolveDefaults()
 		{

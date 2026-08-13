@@ -24,6 +24,29 @@ namespace BizHawk.Client.Common
 	/// </summary>
 	public static class CoreChoices
 	{
+		/// <summary>Systems some loaded package can emulate, in a stable display order.</summary>
+		public static IReadOnlyList<string> SystemsWithCores()
+			=> CoreRegistry.Instance.AllFactories
+				.SelectMany(static f => f.SystemIds)
+				.Distinct()
+				.OrderBy(static id => id, System.StringComparer.OrdinalIgnoreCase)
+				.ToList();
+
+		/// <summary>
+		/// The core a rom for <paramref name="systemId"/> would open with right now: the remembered
+		/// preference, or - when there is none - whichever core registered first, which is what
+		/// <c>RomLoader</c> falls back to. Null if no core claims the system.
+		/// </summary>
+		public static string? EffectiveCoreName(Config config, string systemId)
+		{
+			if (config.PreferredCores.TryGetValue(systemId, out var preferred)
+				&& CoreRegistry.Instance.GetFactories(systemId).Any(f => f.CoreName == preferred))
+			{
+				return preferred;
+			}
+			return CoreRegistry.Instance.GetFactories(systemId).FirstOrDefault()?.CoreName;
+		}
+
 		/// <summary>Cores registered for <paramref name="systemId"/>, in a stable display order.</summary>
 		public static IReadOnlyList<CoreChoice> For(string systemId, string? currentCoreName)
 			=> For(CoreRegistry.Instance.GetFactories(systemId), currentCoreName);
