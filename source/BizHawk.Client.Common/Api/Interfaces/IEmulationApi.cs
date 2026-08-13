@@ -19,6 +19,12 @@ namespace BizHawk.Client.Common
 		void SetRegister(string register, int value);
 		long TotalExecutedCycles();
 		string GetSystemId();
+
+		/// <summary>
+		/// Which core is running. More than one package can claim a system, so a script (or a test)
+		/// that cares what it is talking to has to be able to ask.
+		/// </summary>
+		string GetCoreName();
 		bool IsLagged();
 		void SetIsLagged(bool value = true);
 		int LagCount();

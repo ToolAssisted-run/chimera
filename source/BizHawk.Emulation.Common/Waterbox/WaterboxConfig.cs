@@ -164,7 +164,13 @@ namespace BizHawk.Emulation.Common.Waterbox
 			public int Height { get; set; }
 			public int VirtualWidth { get; set; }
 			public int VirtualHeight { get; set; }
+			/// <summary>
+			/// Frame rate as a fraction. Only a fallback: a core that knows its own rate - because
+			/// the region is a user setting, say - exports <c>GetVsyncNumerator</c> and
+			/// <c>GetVsyncDenominator</c>, which the adapter asks after Init and prefers.
+			/// </summary>
 			public int VsyncNumerator { get; set; } = 60;
+
 			public int VsyncDenominator { get; set; } = 1;
 
 			/// <summary>Guest export returning a Width*Height BGRA (0xFFrrggbb) frame.</summary>
@@ -173,7 +179,13 @@ namespace BizHawk.Emulation.Common.Waterbox
 
 		public sealed class AudioConfig
 		{
+			/// <summary>
+			/// Samples per frame, per channel. A core that produces a varying number (any blip-style
+			/// resampler does) exports <c>GetAudioSampleCount</c> and this becomes the capacity: the
+			/// adapter takes what the core reports, clamped to this.
+			/// </summary>
 			public int SamplesPerFrame { get; set; }
+
 			public int Channels { get; set; } = 1;
 
 			/// <summary>Guest export returning SamplesPerFrame*Channels interleaved int16.</summary>

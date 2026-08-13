@@ -72,6 +72,11 @@ namespace BizHawk.Client.Common
 		public string GetSystemId()
 			=> APIs.Emulation.GetSystemId();
 
+		[LuaMethodExample("local stemuget = emu.getcorename( );")]
+		[LuaMethod("getcorename", "Returns the name of the core currently emulating the loaded rom. Several cores can claim the same system, so this is what a script should branch on rather than getsystemid")]
+		public string GetCoreName()
+			=> APIs.Emulation.GetCoreName();
+
 		[LuaMethodExample("if ( emu.islagged( ) ) then\r\n\tconsole.log( \"Returns whether or not the current frame is a lag frame\" );\r\nend;")]
 		[LuaMethod("islagged", "Returns whether or not the current frame is a lag frame")]
 		public bool IsLagged()

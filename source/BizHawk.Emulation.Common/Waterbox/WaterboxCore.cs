@@ -100,6 +100,9 @@ namespace BizHawk.Emulation.Common.Waterbox
 		private int _loadLen;
 
 		private readonly int _width, _height, _samplesPerFrame, _channels;
+		private IntFn _getAudioSampleCount; // optional: this frame's real sample count
+		private int _nsamp;                 // what the last frame actually produced
+		private int _vsyncNum, _vsyncDen;
 		private readonly int[] _videoBuff;
 		private readonly short[] _stereoBuff;
 		private readonly string[] _buttons;
@@ -188,6 +191,19 @@ namespace BizHawk.Emulation.Common.Waterbox
 
 			_getVideoBgra = Proc<GetPtrFn>(cfg.Video.GetBgra);
 			_getAudio = Proc<GetPtrFn>(cfg.Audio.Get);
+
+			// Optional: a core whose frame rate or sample count depends on something only it knows
+			// (a region setting, say) answers for them after Init, and waterbox.config's numbers are
+			// the fallback. The declared samplesPerFrame is then the buffer's capacity.
+			_getAudioSampleCount = TryProc<IntFn>("GetAudioSampleCount");
+			_vsyncNum = TryProc<IntFn>("GetVsyncNumerator")?.Invoke() ?? 0;
+			_vsyncDen = TryProc<IntFn>("GetVsyncDenominator")?.Invoke() ?? 0;
+			if (_vsyncNum <= 0 || _vsyncDen <= 0)
+			{
+				_vsyncNum = cfg.Video.VsyncNumerator;
+				_vsyncDen = cfg.Video.VsyncDenominator;
+			}
+
 			if (!string.IsNullOrEmpty(cfg.Lag?.InputWasRead))
 			{
 				_inputWasRead = Proc<IntFn>(cfg.Lag.InputWasRead);
@@ -438,8 +454,8 @@ namespace BizHawk.Emulation.Common.Waterbox
 		public int VirtualWidth => _cfg.Video.VirtualWidth;
 		public int VirtualHeight => _cfg.Video.VirtualHeight;
 		public int BackgroundColor => unchecked((int)0xFF000000);
-		public int VsyncNumerator => _cfg.Video.VsyncNumerator;
-		public int VsyncDenominator => _cfg.Video.VsyncDenominator;
+		public int VsyncNumerator => _vsyncNum;
+		public int VsyncDenominator => _vsyncDen;
 		public int[] GetVideoBuffer() => _videoBuff;
 
 		// ---------------- ISoundProvider ----------------
@@ -450,7 +466,7 @@ namespace BizHawk.Emulation.Common.Waterbox
 		public void GetSamplesSync(out short[] samples, out int nsamp)
 		{
 			samples = _stereoBuff;
-			nsamp = _samplesPerFrame;
+			nsamp = _nsamp;
 		}
 
 		public void DiscardSamples() { }
@@ -465,13 +481,18 @@ namespace BizHawk.Emulation.Common.Waterbox
 		private unsafe void DrainAudio()
 		{
 			var src = (short*)_getAudio();
+			// A core that reports its own count may produce a different number every frame (blip
+			// resamplers do); the declared samplesPerFrame is then the buffer we must not overrun.
+			_nsamp = _getAudioSampleCount?.Invoke() ?? _samplesPerFrame;
+			if (_nsamp < 0) _nsamp = 0;
+			if (_nsamp > _samplesPerFrame) _nsamp = _samplesPerFrame;
 			if (_channels == 2)
 			{
-				for (int i = 0; i < _samplesPerFrame * 2; i++) _stereoBuff[i] = src[i];
+				for (int i = 0; i < _nsamp * 2; i++) _stereoBuff[i] = src[i];
 			}
 			else
 			{
-				for (int i = 0; i < _samplesPerFrame; i++)
+				for (int i = 0; i < _nsamp; i++)
 				{
 					_stereoBuff[i * 2] = src[i];
 					_stereoBuff[i * 2 + 1] = src[i];

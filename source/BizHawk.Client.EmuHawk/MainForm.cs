@@ -1820,6 +1820,28 @@ namespace BizHawk.Client.EmuHawk
 			settingsMenuItem.Click += GenericCoreSettingsMenuItem_Click;
 			GenericCoreSubMenu.DropDownItems.Add(settingsMenuItem);
 
+			// Which core runs this system. Usually one package claims a system and this is a single
+			// checked entry saying what is running; when two do, it is the only way to choose - a rom
+			// otherwise opens with whichever package registered first.
+			var choices = CoreChoices.For(Emulator.SystemId, Emulator.Attributes().CoreName);
+			if (choices.Count is not 0)
+			{
+				ToolStripMenuItem coreMenuItem = new() { Text = "&Core" };
+				foreach (var choice in choices)
+				{
+					var coreName = choice.CoreName;
+					ToolStripMenuItem item = new() { Text = coreName, Checked = choice.IsCurrent };
+					item.Click += (_, _) =>
+					{
+						if (!CoreChoices.Prefer(Config, Emulator.SystemId, coreName)) return;
+						// the rom has to go through the loader again: the core IS the machine
+						if (!RebootCore()) AddOnScreenMessage($"{coreName} will be used the next time a rom loads");
+					};
+					coreMenuItem.DropDownItems.Add(item);
+				}
+				GenericCoreSubMenu.DropDownItems.Add(coreMenuItem);
+			}
+
 			var coreTools = CoreProvidedTools.Concat(SpecializedTools)
 				.Where(Tools.IsAvailable)
 				.OrderBy(static t => t.Name)

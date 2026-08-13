@@ -140,6 +140,9 @@ namespace BizHawk.Client.Common
 		public string GetSystemId()
 			=> _game!.System;
 
+		public string GetCoreName()
+			=> Emulator.Attributes().CoreName;
+
 		public bool IsLagged()
 		{
 			if (InputPollableCore != null) return InputPollableCore.IsLagFrame;

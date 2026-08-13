@@ -823,3 +823,41 @@ identical runs diverge.
 **Storage did not change.** Values are still a flat name -> value map in the
 config file and movie headers, so movies and configs written before this still
 load.
+
+## A second core for a system (2026-08-13)
+
+QuickerNesHawk - a C++ transliteration of BizHawk's NesHawk - joined quickerNES
+as a NES core package, and being the second package to claim a system turned up
+three gaps that one core per system had hidden.
+
+**Nothing could choose between them.** `--core` LOADS a package; it does not say
+which core a rom opens with. That was decided by `Config.PreferredCores`, which
+nothing in the UI ever wrote, so a `.nes` file opened with whichever package
+happened to register first - alphabetical accident. The Emulator menu now has a
+`Core` submenu listing every core registered for the running system, checked on
+the current one; picking another records the preference and reboots. With one
+core it is a single checked entry that answers "what am I running", which the
+status bar already said - but the menu is where a user goes to change it.
+
+**A script (or a gate) could not ask what it was talking to.** `emu.getsystemid()`
+answers "NES", which is now ambiguous. `emu.getcorename()` answers the question
+that matters. This is not a nicety: the first version of QuickerNesHawk's
+frontend gate silently measured *quickerNES* and passed, because both cores are
+accurate enough to agree on the test rom's RAM for 300 frames. A gate that cannot
+name its subject is not a gate.
+
+**A package may know its own frame rate.** NesHawk's region (NTSC/PAL/Dendy) is a
+user setting, and it changes both the frame rate and the samples per frame -
+neither of which a static `waterbox.config` can express. Two more optional guest
+exports resolve after `Init` and win over the config when present:
+`GetVsyncNumerator`/`GetVsyncDenominator`, and `GetAudioSampleCount`, which is
+also what a blip-style resampler needs (it does not produce the same count every
+frame). When a core exports the count, `audio.samplesPerFrame` becomes the buffer
+CAPACITY rather than the per-frame number.
+
+The wrinkle noted in the ABI section is now visible rather than theoretical:
+sync settings are keyed by adapter *type*, so both NES packages share one config
+key and one settings blob. Whichever core is loaded reads the keys it knows and
+ignores the rest, so nothing breaks today, but two cores with a same-named
+setting of different meaning would collide. Keying by package SHA1 (the identity
+the reproduction contract already uses) is the fix when it matters.
