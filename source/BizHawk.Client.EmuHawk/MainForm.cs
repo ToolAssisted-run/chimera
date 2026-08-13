@@ -128,12 +128,6 @@ namespace BizHawk.Client.EmuHawk
 			_linkCableOn = Properties.Resources.Connect16X16;
 			_linkCableOff = Properties.Resources.NoConnect16X16;
 			UpdateCoreStatusBarButton();
-			if (Config.FirstBoot)
-			{
-				ProfileFirstBootLabel.Visible = true;
-				AddOnScreenMessage("Click the blue silhouette below for onboarding", duration: 30);
-			}
-
 			HandleToggleLightAndLink();
 			SetStatusBar();
 			_stateSlots.Update(Emulator, MovieSession.Movie, SaveStatePrefix());
@@ -267,8 +261,6 @@ namespace BizHawk.Client.EmuHawk
 				= (/*CDL.ToolIcon.ToBitmap()*/Properties.Resources.CdLogger, "Code Data Logger");
 			(VirtualPadMenuItem.Image, /*VirtualPadMenuItem.Text*/_) = ToolManager.IconAndNameCache[typeof(VirtualpadTool)]
 				= (/*VirtualpadTool.ToolIcon.ToBitmap()*/Properties.Resources.GameController, "Virtual Pads");
-			(BasicBotMenuItem.Image, /*BasicBotMenuItem.Text*/_) = ToolManager.IconAndNameCache[typeof(BasicBot)]
-				= (/*BasicBot.ToolIcon.ToBitmap()*/Properties.Resources.BasicBotBit, "Basic Bot");
 			(CheatsMenuItem.Image, /*CheatsMenuItem.Text*/_) = ToolManager.IconAndNameCache[typeof(Cheats)]
 				= (/*Cheats.ToolIcon.ToBitmap()*/Properties.Resources.Cheat, "Cheats");
 			OnlineHelpMenuItem.Image = Properties.Resources.Help;
@@ -284,7 +276,6 @@ namespace BizHawk.Client.EmuHawk
 			LedLightStatusLabel.Image = Properties.Resources.LightOff;
 			KeyPriorityStatusLabel.Image = Properties.Resources.Both;
 			CoreNameStatusBarButton.Image = Properties.Resources.CorpHawkSmall;
-			ProfileFirstBootLabel.Image = Properties.Resources.Profile;
 			LinkConnectStatusBarButton.Image = Properties.Resources.Connect16X16;
 			OpenRomContextMenuItem.Image = Properties.Resources.OpenFile;
 			LoadLastRomContextMenuItem.Image = Properties.Resources.Recent;
@@ -1450,16 +1441,6 @@ namespace BizHawk.Client.EmuHawk
 			{
 				SetSpeedPercent(num);
 			}
-		}
-
-		public void Unthrottle()
-		{
-			Config.Unthrottled = true;
-		}
-
-		public void Throttle()
-		{
-			Config.Unthrottled = false;
 		}
 
 		private void ThrottleMessage()

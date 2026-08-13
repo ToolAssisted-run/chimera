@@ -51,9 +51,6 @@ namespace BizHawk.Client.Common
 		/// <param name="forceWindowResize">Override <see cref="Common.Config.ResizeWithFramebuffer"/></param>
 		void FrameBufferResized(bool forceWindowResize = false);
 
-		/// <remarks>only referenced from BasicBot</remarks>
-		bool LoadQuickSave(int slot, bool suppressOSD = false);
-
 		/// <remarks>referenced from MultiDiskBundler and RetroAchievements</remarks>
 		bool LoadRom(string path, LoadRomArgs args);
 
@@ -78,17 +75,11 @@ namespace BizHawk.Client.Common
 		/// <remarks>referenced by 3 or more tools</remarks>
 		bool StartNewMovie(IMovie movie, bool newMovie);
 
-		/// <remarks>only referenced from BasicBot</remarks>
-		void Throttle();
-
 		/// <remarks>only referenced from TAStudio</remarks>
 		void TogglePause();
 
 		/// <remarks>referenced by 3 or more tools</remarks>
 		void UnpauseEmulator();
-
-		/// <remarks>only referenced from BasicBot</remarks>
-		void Unthrottle();
 
 		/// <remarks>only referenced from LogWindow</remarks>
 		void UpdateDumpInfo(RomStatus? newStatus = null);

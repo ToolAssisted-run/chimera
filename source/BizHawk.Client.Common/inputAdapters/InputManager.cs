@@ -261,11 +261,6 @@ namespace BizHawk.Client.Common
 			ActiveController.OR_FromLogical(ClickyVirtualPadController);
 			AutoFireController.LatchFromPhysical(ControllerInputCoalescer);
 
-			if (config.N64UseCircularAnalogConstraint)
-			{
-				ActiveController.ApplyAxisConstraints("Natural Circle");
-			}
-
 			if (ClientControls["Autohold"] || ClientControls["Autofire"])
 			{
 				List<string> newPressedButtons = ActiveController.PressedButtons;

@@ -298,15 +298,6 @@
 		<EmbeddedResource Update="RetroAchievements/RAIntegrationDownloaderForm.resx" DependentUpon="RAIntegrationDownloaderForm.cs" />
 		<Compile Update="RetroAchievements/RCheevos.*.cs" DependentUpon="RCheevos.cs" />
 		<Compile Update="RetroAchievements/RetroAchievements.*.cs" DependentUpon="RetroAchievements.cs" />
-		<Compile Update="RomStatusPicker.cs" SubType="Form" />
-		<Compile Update="RomStatusPicker.Designer.cs" DependentUpon="RomStatusPicker.cs" />
-		<EmbeddedResource Update="RomStatusPicker.resx" DependentUpon="RomStatusPicker.cs" />
-		<Compile Update="tools/BasicBot/BasicBot.cs" SubType="Form" />
-		<Compile Update="tools/BasicBot/BasicBot.Designer.cs" DependentUpon="BasicBot.cs" />
-		<EmbeddedResource Update="tools/BasicBot/BasicBot.resx" DependentUpon="BasicBot.cs" />
-		<Compile Update="tools/BasicBot/BotControlsRow.cs" SubType="UserControl" />
-		<Compile Update="tools/BasicBot/BotControlsRow.Designer.cs" DependentUpon="BotControlsRow.cs" />
-		<EmbeddedResource Update="tools/BasicBot/BotControlsRow.resx" DependentUpon="BotControlsRow.cs" />
 		<Compile Update="tools/BatchRun.cs" SubType="Form" />
 		<Compile Update="tools/BatchRun.Designer.cs" DependentUpon="BatchRun.cs" />
 		<EmbeddedResource Update="tools/BatchRun.resx" DependentUpon="BatchRun.cs" />

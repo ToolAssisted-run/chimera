@@ -917,3 +917,36 @@ Gated at both ends: the synthetic witness starts EmuHawk from a config that has
 never heard of the synth controller and requires the package's bindings to be in
 the config it writes out (`K:box:keybinds`), and each core repo's frontend gate
 does the same for its own package.
+
+## Sweeping out what the bundle left behind (2026-08-13)
+
+With the cores outside the frontend, a lot of BizHawk's furniture had nothing
+behind it any more. Removed, on the user's instruction to take out anything no
+longer relevant:
+
+- **Basic Bot**, entirely. It is a brute-force input searcher, and searching is
+  jaffarPlus's job - that integration is the plan, not a second bot in here.
+  Its three `IMainFormForTools` members (`LoadQuickSave`, `Throttle`,
+  `Unthrottle`) went with it, each marked "only referenced from BasicBot", and
+  `MainForm.Throttle`/`Unthrottle` had no other caller either.
+- **Hotkeys for consoles this frontend cannot run**: the SNES, GB and NDS groups
+  (layer toggles, screen rotation) and the RetroAchievements group. None had a
+  handler - they were tabs in the Hotkeys dialog binding keys to nothing. The
+  dialog's hack to hide the RA tab went too.
+- **Config members nothing reads**: the ten RetroAchievements settings,
+  `GbAsSgb`, `LibretroCore`, `SelectedProfile` (and the `ClientProfile` enum),
+  `FirstBoot`, and `N64UseCircularAnalogConstraint` - a knob named for a console
+  that cannot exist here, gating an axis constraint no package can declare.
+  `TargetZoomFactors` lost its seed values for eight systems that are not here;
+  it still remembers what the user sets.
+- **The onboarding silhouette** in the status bar, which offered a setup wizard
+  that no longer exists and answered a click with "All done!".
+- **Dead UI**: an `A7800Hawk` menu item that was never even added to a menu, the
+  `RomStatusPicker` dialog nothing opened, and five image files no code named.
+
+Kept deliberately: the Code-Data Logger tool (it greys itself out for a core
+without the service, and a future guest ABI group could back it), the "None"
+placeholder in External Tools (an empty submenu never opens, so it cannot
+repopulate itself - the same trap Preferred Cores fell into), and
+`PreferredPlatformsForExtensions`, which the platform chooser still uses for
+ambiguous extensions.

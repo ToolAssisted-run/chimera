@@ -998,7 +998,6 @@ namespace BizHawk.Client.EmuHawk
 
 			BatchRunnerMenuItem.Visible = VersionInfo.DeveloperBuild;
 
-			BasicBotMenuItem.Enabled = Tools.IsAvailable<BasicBot>();
 			MacroToolMenuItem.Enabled = MovieSession.Movie.IsActive() && Tools.IsAvailable<MacroInputTool>();
 			VirtualPadMenuItem.Enabled = Emulator.ControllerDefinition.Any();
 		}
@@ -1094,11 +1093,6 @@ namespace BizHawk.Client.EmuHawk
 		private void VirtualPadMenuItem_Click(object sender, EventArgs e)
 		{
 			Tools.Load<VirtualpadTool>();
-		}
-
-		private void BasicBotMenuItem_Click(object sender, EventArgs e)
-		{
-			Tools.Load<BasicBot>();
 		}
 
 		private void CheatsMenuItem_Click(object sender, EventArgs e)
@@ -1430,14 +1424,6 @@ namespace BizHawk.Client.EmuHawk
 			{
 				Tools.Load<Cheats>();
 			}
-		}
-
-		private void ProfileFirstBootLabel_Click(object sender, EventArgs e)
-		{
-			Config.FirstBoot = false;
-			ProfileFirstBootLabel.Visible = false;
-			OSD.ClearRegularMessages();
-			AddOnScreenMessage("All done! Drag+drop a rom to start playing", duration: 10/*seconds*/);
 		}
 
 		private void LinkConnectStatusBarButton_Click(object sender, EventArgs e)

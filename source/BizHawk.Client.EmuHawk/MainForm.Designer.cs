@@ -203,7 +203,6 @@ namespace BizHawk.Client.EmuHawk
 			this.CodeDataLoggerMenuItem = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
 			this.MacroToolMenuItem = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
 			this.VirtualPadMenuItem = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
-			this.BasicBotMenuItem = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
 			this.toolStripSeparator11 = new BizHawk.WinForms.Controls.ToolStripSeparatorEx();
 			this.CheatsMenuItem = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
 			this.toolStripSeparator29 = new BizHawk.WinForms.Controls.ToolStripSeparatorEx();
@@ -217,7 +216,6 @@ namespace BizHawk.Client.EmuHawk
 			this.ForumsMenuItem = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
 			this.FeaturesMenuItem = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
 			this.AboutMenuItem = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
-			this.A7800HawkCoreMenuItem = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
 			this.MainStatusBar = new BizHawk.WinForms.Controls.StatusStripEx();
 			this.DumpStatusButton = new System.Windows.Forms.ToolStripDropDownButton();
 			this.EmuStatus = new BizHawk.WinForms.Controls.StatusLabelEx();
@@ -240,7 +238,6 @@ namespace BizHawk.Client.EmuHawk
 			this.CheatStatusButton = new BizHawk.WinForms.Controls.StatusLabelEx();
 			this.KeyPriorityStatusLabel = new BizHawk.WinForms.Controls.StatusLabelEx();
 			this.CoreNameStatusBarButton = new BizHawk.WinForms.Controls.StatusLabelEx();
-			this.ProfileFirstBootLabel = new BizHawk.WinForms.Controls.StatusLabelEx();
 			this.LinkConnectStatusBarButton = new BizHawk.WinForms.Controls.StatusLabelEx();
 			this.UpdateNotification = new BizHawk.WinForms.Controls.StatusLabelEx();
 			this.MainFormContextMenu = new System.Windows.Forms.ContextMenuStrip(this.components);
@@ -1240,7 +1237,6 @@ namespace BizHawk.Client.EmuHawk
             this.CodeDataLoggerMenuItem,
             this.MacroToolMenuItem,
             this.VirtualPadMenuItem,
-            this.BasicBotMenuItem,
             this.toolStripSeparator11,
             this.CheatsMenuItem,
             this.toolStripSeparator29,
@@ -1310,11 +1306,6 @@ namespace BizHawk.Client.EmuHawk
 			// 
 			this.VirtualPadMenuItem.Text = "Virtual Pad";
 			this.VirtualPadMenuItem.Click += new System.EventHandler(this.VirtualPadMenuItem_Click);
-			// 
-			// BasicBotMenuItem
-			// 
-			this.BasicBotMenuItem.Text = "Basic Bot";
-			this.BasicBotMenuItem.Click += new System.EventHandler(this.BasicBotMenuItem_Click);
 			// 
 			// CheatsMenuItem
 			// 
@@ -1540,10 +1531,6 @@ namespace BizHawk.Client.EmuHawk
 			this.AboutMenuItem.Text = "&About...";
 			this.AboutMenuItem.Click += new System.EventHandler(this.AboutMenuItem_Click);
 			// 
-			// A7800HawkCoreMenuItem
-			// 
-			this.A7800HawkCoreMenuItem.Text = "A7800Hawk";
-			// 
 			// MainStatusBar
 			// 
 			this.MainStatusBar.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
@@ -1568,7 +1555,6 @@ namespace BizHawk.Client.EmuHawk
             this.CheatStatusButton,
             this.KeyPriorityStatusLabel,
             this.CoreNameStatusBarButton,
-            this.ProfileFirstBootLabel,
             this.LinkConnectStatusBarButton,
             this.UpdateNotification});
 			this.MainStatusBar.Location = new System.Drawing.Point(0, 386);
@@ -1703,15 +1689,6 @@ namespace BizHawk.Client.EmuHawk
 			// CoreNameStatusBarButton
 			// 
 			this.CoreNameStatusBarButton.Text = "<core name>";
-			// 
-			// ProfileFirstBootLabel
-			// 
-			this.ProfileFirstBootLabel.AutoToolTip = true;
-			this.ProfileFirstBootLabel.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
-			this.ProfileFirstBootLabel.Text = "ProfileFirstBootLabel";
-			this.ProfileFirstBootLabel.ToolTipText = "Open the setup/onboarding wizard";
-			this.ProfileFirstBootLabel.Visible = false;
-			this.ProfileFirstBootLabel.Click += new System.EventHandler(this.ProfileFirstBootLabel_Click);
 			// 
 			// LinkConnectStatusBarButton
 			// 
@@ -2195,7 +2172,6 @@ namespace BizHawk.Client.EmuHawk
 		private BizHawk.WinForms.Controls.ToolStripMenuItemEx customizeToolStripMenuItem;
 		private BizHawk.WinForms.Controls.ToolStripSeparatorEx toolStripSeparator22;
 		private BizHawk.WinForms.Controls.ToolStripMenuItemEx SynclessRecordingMenuItem;
-		private BizHawk.WinForms.Controls.StatusLabelEx ProfileFirstBootLabel;
 		private BizHawk.WinForms.Controls.ToolStripMenuItemEx MovieEndSubMenu;
 		private BizHawk.WinForms.Controls.ToolStripMenuItemEx MovieEndFinishMenuItem;
 		private BizHawk.WinForms.Controls.ToolStripMenuItemEx MovieEndRecordMenuItem;
@@ -2224,7 +2200,6 @@ namespace BizHawk.Client.EmuHawk
 		private BizHawk.WinForms.Controls.ToolStripMenuItemEx Frameskip9MenuItem;
 		private BizHawk.WinForms.Controls.ToolStripMenuItemEx Frameskip8MenuItem;
 		private BizHawk.WinForms.Controls.ToolStripMenuItemEx Speed400MenuItem;
-		private BizHawk.WinForms.Controls.ToolStripMenuItemEx BasicBotMenuItem;
 		private BizHawk.WinForms.Controls.ToolStripMenuItemEx DisplayMessagesMenuItem;
 		private BizHawk.WinForms.Controls.ToolStripMenuItemEx ExternalToolMenuItem;
 		private BizHawk.WinForms.Controls.ToolStripMenuItemEx CodeDataLoggerMenuItem;
@@ -2234,7 +2209,6 @@ namespace BizHawk.Client.EmuHawk
 		private BizHawk.WinForms.Controls.ToolStripMenuItemEx LoadConfigFromMenuItem;
 		private BizHawk.WinForms.Controls.ToolStripMenuItemEx SaveMovieAsMenuItem;
 		private BizHawk.WinForms.Controls.ToolStripMenuItemEx SaveMovieAsContextMenuItem;
-		private BizHawk.WinForms.Controls.ToolStripMenuItemEx A7800HawkCoreMenuItem;
 		private BizHawk.WinForms.Controls.ToolStripSeparatorEx toolStripSeparator8;
 		private System.Windows.Forms.ToolStripMenuItem CaptureLuaMenuItem;
 		private ToolStripSeparatorEx toolStripSeparator24;

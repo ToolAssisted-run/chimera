@@ -167,19 +167,6 @@ namespace BizHawk.Client.Common
 			Bind("TAStudio", "Analog Maximum", "Right");
 			Bind("TAStudio", "Analog Minimum", "Left");
 
-			Bind("SNES", "Toggle BG 1");
-			Bind("SNES", "Toggle BG 2");
-			Bind("SNES", "Toggle BG 3");
-			Bind("SNES", "Toggle BG 4");
-			Bind("SNES", "Toggle OBJ 1");
-			Bind("SNES", "Toggle OBJ 2");
-			Bind("SNES", "Toggle OBJ 3");
-			Bind("SNES", "Toggle OBJ 4");
-
-			Bind("GB", "GB Toggle BG");
-			Bind("GB", "GB Toggle Obj");
-			Bind("GB", "GB Toggle Window");
-
 			Bind("Analog", "Y Up Small", toolTip: "For Virtual Pad");
 			Bind("Analog", "Y Up Large", toolTip: "For Virtual Pad");
 			Bind("Analog", "Y Down Small", toolTip: "For Virtual Pad");
@@ -191,20 +178,6 @@ namespace BizHawk.Client.Common
 
 			Bind("Tools", "Toggle All Cheats");
 			Bind("Tools", "Toggle Last Lua Script");
-
-			Bind("NDS", "Next Screen Layout");
-			Bind("NDS", "Previous Screen Layout");
-			Bind("NDS", "Screen Rotate");
-			Bind("NDS", "Swap Screens");
-
-			Bind("RAIntegration", "Open RA Overlay", "Escape");
-			Bind("RAIntegration", "RA Up", "Up");
-			Bind("RAIntegration", "RA Down", "Down");
-			Bind("RAIntegration", "RA Left", "Left");
-			Bind("RAIntegration", "RA Right", "Right");
-			Bind("RAIntegration", "RA Confirm", "X");
-			Bind("RAIntegration", "RA Cancel", "Z");
-			Bind("RAIntegration", "RA Quit", "Backspace");
 
 			AllHotkeys = dict;
 			Groupings = dict.Values.Select(static info => info.TabGroup).Distinct().ToList();

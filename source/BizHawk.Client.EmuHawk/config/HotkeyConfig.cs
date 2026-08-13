@@ -76,11 +76,6 @@ namespace BizHawk.Client.EmuHawk
 
 			foreach (var tab in HotkeyInfo.Groupings)
 			{
-				if (tab == "RAIntegration")
-				{
-					continue; // RetroAchievements is not part of miniHawk
-				}
-
 				var tb = new TabPage { Name = tab, Text = tab };
 				var bindings = HotkeyInfo.AllHotkeys.Where(kvp => kvp.Value.TabGroup == tab)
 					.OrderBy(static kvp => kvp.Value.Ordinal).ThenBy(static kvp => kvp.Value.DisplayName);

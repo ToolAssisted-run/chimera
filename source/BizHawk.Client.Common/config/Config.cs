@@ -60,17 +60,8 @@ namespace BizHawk.Client.Common
 
 		public bool StackOSDMessages { get; set; } = true;
 
-		private Dictionary<string, int> TargetZoomFactors { get; set; } = new()
-		{
-			[VSystemID.Raw.Doom] = 2,
-			[VSystemID.Raw.DOS] = 1,
-			[VSystemID.Raw.GB] = 3,
-			[VSystemID.Raw.GBA] = 3,
-			[VSystemID.Raw.GBC] = 3,
-			[VSystemID.Raw.Libretro] = 1,
-			[VSystemID.Raw.N64] = 1,
-			[VSystemID.Raw.WSWAN] = 3,
-		};
+		/// <summary>window scale per system, as the user last set it; a system nobody has resized gets 2</summary>
+		private Dictionary<string, int> TargetZoomFactors { get; set; } = new();
 
 		public int GetWindowScaleFor(string sysID)
 			=> TargetZoomFactors.GetValueOrPut(sysID, static _ => 2);
@@ -119,7 +110,6 @@ namespace BizHawk.Client.Common
 		public bool AviCaptureOsd { get; set; }
 		public bool AviCaptureLua { get; set; }
 		public bool ScreenshotCaptureOsd { get; set; }
-		public bool FirstBoot { get; set; } = true;
 		public bool UpdateAutoCheckEnabled { get; set; } = true;
 		public DateTime? UpdateLastCheckTimeUtc { get; set; }
 		public string UpdateLatestVersion { get; set; } = "";
@@ -146,11 +136,6 @@ namespace BizHawk.Client.Common
 		public int FlushSaveRamFrames { get; set; }
 
 		public bool TurboSeek { get; set; }
-
-		public ClientProfile SelectedProfile { get; set; } = ClientProfile.Unknown;
-
-		// TODO: make this not N64-specific, it doesn't need to be
-		public bool N64UseCircularAnalogConstraint { get; set; } = true;
 
 		// Run-Control settings
 		public int FrameProgressDelayMs { get; set; } = 500; // how long until a frame advance hold turns into a frame progress?
@@ -361,10 +346,6 @@ namespace BizHawk.Client.Common
 		public Dictionary<string, Dictionary<string, AnalogBind>> AllTrollersAnalog { get; set; } = new Dictionary<string, Dictionary<string, AnalogBind>>();
 		public Dictionary<string, Dictionary<string, FeedbackBind>> AllTrollersFeedbacks { get; set; } = new Dictionary<string, Dictionary<string, FeedbackBind>>();
 
-		/// <remarks>as this setting spans multiple cores and doesn't actually affect the behavior of any core, it hasn't been absorbed into the new system</remarks>
-		public bool GbAsSgb { get; set; }
-		public string LibretroCore { get; set; }
-
 		/// <summary>
 		/// The core a system's roms open with, keyed by system ID - remembered from the last time the
 		/// user chose one (Emulator > Core), and consulted by RomLoader when more than one loaded
@@ -404,18 +385,6 @@ namespace BizHawk.Client.Common
 		public Queue<string> RecentCores { get; set; } = new();
 
 		public Dictionary<string, string> TrustedExtTools { get; set; } = new();
-
-		// RetroAchievements settings
-		public bool SkipRATelemetryWarning { get; set; }
-		public string RAUsername { get; set; } = "";
-		public string RAToken { get; set; } = "";
-		public bool RACheevosActive { get; set; } = true;
-		public bool RALBoardsActive { get; set; }
-		public bool RARichPresenceActive { get; set; } = true;
-		public bool RAHardcoreMode { get; set; }
-		public bool RASoundEffects { get; set; } = true;
-		public bool RAAllowUnofficialCheevos { get; set; }
-		public bool RAAutostart { get; set; }
 
 		public bool AVWriterPad { get; set; } = false;
 

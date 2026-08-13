@@ -1,4 +1,4 @@
-using System.Drawing;
+﻿using System.Drawing;
 using System.IO;
 using System.Windows.Forms;
 
@@ -54,8 +54,6 @@ namespace BizHawk.Client.EmuHawk.Properties
 		internal static readonly Bitmap Avi = ReadEmbeddedBitmap("AVI");
 		internal static readonly Bitmap Back = ReadEmbeddedBitmap("Back");
 		internal static readonly Bitmap BackMore = ReadEmbeddedBitmap("BackMore");
-		internal static readonly Icon BasicBot = ReadEmbeddedIcon("basicbot");
-		internal static readonly Bitmap BasicBotBit = ReadEmbeddedBitmap("basicbotbit");
 		internal static readonly Bitmap Blank = ReadEmbeddedBitmap("Blank");
 		internal static readonly Lazy<Cursor> BlankCursor = new(static () => new(ReflectionCache.EmbeddedResourceStream("images.BlankCursor.cur")));
 		internal static readonly Bitmap BlueDown = ReadEmbeddedBitmap("BlueDown");
@@ -201,7 +199,6 @@ namespace BizHawk.Client.EmuHawk.Properties
 		internal static readonly Bitmap Unfreeze = ReadEmbeddedBitmap("Unfreeze");
 		internal static readonly Bitmap UpdateBranch = ReadEmbeddedBitmap("updateBranch");
 		internal static readonly Bitmap UpdateWithText = ReadEmbeddedBitmap("updateWithText");
-		internal static readonly Bitmap Profile = ReadEmbeddedBitmap("user_blue_small");
 		internal static readonly Icon ProfileIcon = ReadEmbeddedIcon("user_blue");
 		internal static readonly Bitmap Watch = ReadEmbeddedIconAsBitmap("watch");
 		internal static readonly Icon WatchIcon = ReadEmbeddedIcon("watch");
