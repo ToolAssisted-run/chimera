@@ -86,6 +86,18 @@ namespace BizHawk.Client.Common
 				Register(factory);
 				if (packageSha1 is not null) _packageSha1ByAssembly[factory.CoreType.Assembly] = packageSha1;
 			}
+			// the same package can arrive twice (found in Cores/ AND named with --core);
+			// registration itself is idempotent, but the session list must not double up
+			if (!IsPackageLoaded(path))
+			{
+				_loadedPackages.Add(new LoadedCorePackage
+				{
+					Path = path,
+					Name = manifest.Name ?? Path.GetFileNameWithoutExtension(path),
+					Sha1 = packageSha1,
+					CoreNames = factories.Select(static f => f.CoreName).ToList(),
+				});
+			}
 			foreach (var (ext, sysID) in manifest.Extensions)
 			{
 				var extLower = ext.ToLowerInvariant();
@@ -103,6 +115,53 @@ namespace BizHawk.Client.Common
 				PackageControlDefaults.OverlayMissingFrom(ConfigService.Load<DefaultControls>(defctrlPath));
 			}
 			return (manifest, packageSha1);
+		}
+
+		/// <summary>A package this session has loaded, in load order.</summary>
+		public sealed class LoadedCorePackage
+		{
+			public string Path { get; init; } = "";
+
+			public string Name { get; init; } = "";
+
+			public string? Sha1 { get; init; }
+
+			/// <summary>Names of the cores this package registered.</summary>
+			public IReadOnlyList<string> CoreNames { get; init; } = [ ];
+		}
+
+		private readonly List<LoadedCorePackage> _loadedPackages = new();
+
+		public IReadOnlyList<LoadedCorePackage> LoadedPackages => _loadedPackages;
+
+		/// <summary>True if this exact path has already been loaded this session.</summary>
+		public bool IsPackageLoaded(string path)
+			=> _loadedPackages.Exists(p => string.Equals(p.Path, path, StringComparison.OrdinalIgnoreCase));
+
+		/// <summary>
+		/// Loads every loadable package in <paramref name="packages"/> that is not
+		/// already loaded, and reports what went wrong for the ones that failed. A bad
+		/// package must not stop the others: discovery is automatic, so one broken zip
+		/// in Cores/ would otherwise take the whole frontend down with it.
+		/// </summary>
+		/// <returns>one entry per package that failed to load, with the reason</returns>
+		public IReadOnlyList<(DiscoveredCorePackage Package, string Error)> LoadDiscovered(IEnumerable<DiscoveredCorePackage> packages)
+		{
+			List<(DiscoveredCorePackage, string)> failures = new();
+			foreach (var pkg in packages)
+			{
+				if (pkg.Error is not null) { failures.Add((pkg, pkg.Error)); continue; }
+				if (IsPackageLoaded(pkg.Path)) continue;
+				try
+				{
+					_ = LoadCorePackage(pkg.Path);
+				}
+				catch (Exception ex)
+				{
+					failures.Add((pkg, ex.Message));
+				}
+			}
+			return failures;
 		}
 
 		public static CoreAttribute? AttributesFor(ICoreFactory factory)

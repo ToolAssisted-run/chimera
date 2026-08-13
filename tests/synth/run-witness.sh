@@ -208,6 +208,35 @@ PY
 			report "S:box:initFillByte" PASS "RAM diverged - user setting reached the guest"
 		fi
 	fi
+
+	# --- core discovery ---
+	# Same movie, but NO --core: the package must be found in build/Cores by the
+	# startup scan, and the rom must route to it by its declared extension. This is
+	# the path a user actually takes (drop a package in Cores/, open a rom), and it
+	# is easy to break by moving the scan later in startup than the rom load.
+	if [ "$record" -eq 0 ]; then
+		dname=gridWalker.win
+		djob="$work/job.discovery.txt"
+		{
+			echo "movie=$here/movies/$dname.txt"
+			echo "outram=$work/discovery.ram.bin"
+			echo "outvram=$work/discovery.vram.bin"
+			echo "meta=$work/discovery.meta.txt"
+			echo "mode=simple"
+		} > "$djob"
+		rm -f "$work/discovery.ram.bin" "$work/discovery.meta.txt"
+		cp "$config" "$work/config.discovery.ini"
+		( cd "$repo_root" && MINIHAWK_JOB="$djob" timeout 300 mono "$emu_hawk" --headless \
+			"--config=$work/config.discovery.ini" "--lua=$here/synth-replay.lua" \
+			"$here/roms/${dname%%.*}.testrom" ) > "$work/discovery.log" 2>&1
+		if [ ! -f "$work/discovery.meta.txt" ] || ! grep -q "^status=OK" "$work/discovery.meta.txt"; then
+			report "D:box:autodiscovery" FAIL "rom did not load without --core (see work/discovery.log)"
+		elif cmp -s "$work/discovery.ram.bin" "$golden_dir/$dname.ram.bin"; then
+			report "D:box:autodiscovery" PASS "package found in Cores/ and rom routed by extension"
+		else
+			report "D:box:autodiscovery" FAIL "loaded, but RAM differs from the golden"
+		fi
+	fi
 fi
 
 echo ""

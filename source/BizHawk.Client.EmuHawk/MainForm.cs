@@ -106,6 +106,10 @@ namespace BizHawk.Client.EmuHawk
 			ConfigSubMenu.DropDownOpened += (_, _) => superHawkThrottleMenuItem.Checked = Config.SuperHawkThrottle;
 #endif
 
+			ToolStripMenuItemEx corePackagesMenuItem = new() { Text = "Core &Packages..." };
+			corePackagesMenuItem.Click += (_, _) => OpenCorePackagesDialog();
+			_ = FileSubMenu.DropDownItems.InsertAfter(OpenCoreMenuItem, insert: corePackagesMenuItem);
+
 			RebuildCoreSettingsMenus();
 
 			_ = MainformMenu.Items.InsertAfter(ToolsSubMenu, insert: NullHawkVSysSubmenu);
@@ -563,6 +567,12 @@ namespace BizHawk.Client.EmuHawk
 			}
 
 			if (Config.MainFormStayOnTop) TopMost = true;
+
+			// Packages sitting in Cores/ load here, in the constructor, because the
+			// commandline rom load is a few lines below and needs a core to exist -
+			// MainForm_Load would be far too late. (--core still wins: it is applied
+			// next, and a package already loaded from Cores/ is not loaded twice.)
+			LoadDiscoveredCorePackages();
 
 			if (_argParser.cmdCorePackage != null && !LoadCorePackage(_argParser.cmdCorePackage))
 			{
@@ -2177,6 +2187,54 @@ namespace BizHawk.Client.EmuHawk
 			};
 			_ = ConfigSubMenu.DropDownItems.InsertAfter(CoresSubMenu, insert: _coreSettingsParentMenu);
 		}
+
+		/// <summary>packages found by the startup scan, kept so the Core Packages dialog opens without rescanning</summary>
+		private IReadOnlyList<DiscoveredCorePackage> _discoveredCorePackages = [ ];
+
+		private IReadOnlyList<(DiscoveredCorePackage Package, string Error)> _corePackageLoadFailures = [ ];
+
+		/// <summary>
+		/// Scans the core search directories and loads everything the user has not
+		/// switched off. Runs during construction, so it must not touch the UI: a
+		/// failure here is a console line plus an entry the Core Packages dialog
+		/// shows, never a modal that blocks startup.
+		/// </summary>
+		private void LoadDiscoveredCorePackages()
+		{
+			_discoveredCorePackages = CorePackageDiscovery.ScanFor(Config);
+			_corePackageLoadFailures = CoreRegistry.Instance.LoadDiscovered(
+				CorePackageDiscovery.NotDisabledIn(_discoveredCorePackages, Config));
+			foreach (var (pkg, error) in _corePackageLoadFailures)
+			{
+				Console.WriteLine($"core package not loaded: {pkg.Path}: {error}");
+			}
+		}
+
+		/// <summary>Rescans the search directories, loading anything newly present and enabled.</summary>
+		public void RescanCorePackages()
+		{
+			LoadDiscoveredCorePackages();
+			RebuildCoreSettingsMenus();
+		}
+
+		/// <summary>The core-package rows as the dialog shows them (also the unit under test for that dialog's logic).</summary>
+		public IReadOnlyList<CorePackageListEntry> BuildCorePackageList()
+			=> CorePackageList.Build(_discoveredCorePackages, CoreRegistry.Instance.LoadedPackages, _corePackageLoadFailures, Config);
+
+		private void OpenCorePackagesDialog()
+		{
+			using CorePackagesForm form = new(
+				Config,
+				BuildCorePackageList,
+				RescanCorePackages,
+				OpenCore,
+				CorePackageDiscovery.SearchPaths(Config));
+			this.ShowDialogAsChild(form);
+		}
+
+		public IReadOnlyList<DiscoveredCorePackage> DiscoveredCorePackages => _discoveredCorePackages;
+
+		public IReadOnlyList<(DiscoveredCorePackage Package, string Error)> CorePackageLoadFailures => _corePackageLoadFailures;
 
 		/// <summary>Loads and registers a core package (dir or zip). Returns false (after telling the user) on failure.</summary>
 		public bool LoadCorePackage(string path)

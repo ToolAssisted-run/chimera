@@ -736,3 +736,58 @@ adapter merges the user's sync settings over them and mounts the result as JSON
 for the guest to read during `Init`. They shape the machine, so changing one
 reboots the core. Note the known wrinkle: sync settings are keyed by adapter
 *type*, so every waterbox core currently shares one config key.
+
+## Core packages arrive by themselves (2026-08-13)
+
+Objective 1 said packages are "discovered from a `Cores/` directory"; until now
+they were not - a package had to be named on the commandline (`--core`) or picked
+from File > Open Core on every launch. `CorePackageDiscovery` closes that: at
+startup, `Cores/` beside the executable (plus anything in
+`Config.CorePackagePaths`) is scanned, and every package the user has not
+switched off is loaded.
+
+**Discovery reads, it does not load.** It opens a zip (or directory), reads
+`waterbox.config` or `minihawk-core.json` for a name, systems and extensions,
+and hashes the file - nothing more. That matters because loading is irreversible
+in-process: it pins native modules and, for adapter packages, an assembly. The
+frontend has to be able to *describe* a package it will never load - a disabled
+one, a broken one, one that duplicates another - and it can only do that if
+describing is cheap and separate.
+
+**The consequence the UI must not hide.** Since nothing can be unloaded,
+un-ticking a loaded package cannot take effect until the next launch. The state
+machine in `CorePackageList` names that case (`LoadedDisabled`) and the window
+says so, rather than pretending the core went away.
+
+**Identity, again.** A package's SHA1 is what enable/disable is keyed on, so the
+choice survives renaming and two builds of the same core can coexist with only
+one enabled. Directory-form (dev) packages have no file to hash, so they fall
+back to their path - the same compromise as everywhere else.
+
+**Ordering trap, found by testing.** The scan must run in the MainForm
+*constructor*, not `MainForm_Load`: the commandline rom load happens in the
+constructor, so a scan in Load is minutes too late in program terms and the user
+gets a platform-picker for a rom the frontend could have opened. The witness has
+a `D:box:autodiscovery` case (a rom load with no `--core`) so this cannot regress
+silently.
+
+## Testing the interface (2026-08-13)
+
+The frontend's windows are now split so that almost everything about them can be
+checked without a person:
+
+- **Logic** lives in `BizHawk.Client.Common` and is tested in
+  `BizHawk.Tests.Client.Common` - no display, no emulator, no core. The states a
+  window displays belong here, not in the window.
+- **Wiring** is tested in `BizHawk.Tests.Client.EmuHawk`, which constructs real
+  forms and drives them (tick a row, press a button) under Xvfb. Forms must be
+  shown for handles to exist, or selection and click handling silently do
+  nothing.
+- **Appearance** cannot be asserted, so it is rendered instead: `UiScreenshots`
+  writes PNGs when `MINIHAWK_UI_SHOTS` is set, CI uploads them every run, and a
+  person looks.
+
+`tests/ui/run-ui-tests.sh` runs all of it (`--shots` for the pictures). New tool
+windows should follow the same split: if a question about a window can be
+answered without looking at it, the answer belongs in a class that a test can
+call.

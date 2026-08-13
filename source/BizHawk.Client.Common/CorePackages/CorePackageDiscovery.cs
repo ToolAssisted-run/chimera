@@ -1,0 +1,285 @@
+#nullable enable
+
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.IO.Compression;
+using System.Linq;
+using System.Text;
+
+using BizHawk.Common.PathExtensions;
+using BizHawk.Emulation.Common.Waterbox;
+
+using Newtonsoft.Json;
+
+namespace BizHawk.Client.Common
+{
+	/// <summary>
+	/// What a scan found at one path: enough to list it, identify it, and decide
+	/// whether to load it — read WITHOUT loading anything. Loading a package is
+	/// irreversible in-process (it pins native modules and, for adapter packages,
+	/// an assembly), so discovery must be able to describe a package it will never
+	/// load: one the user disabled, one that is broken, one that duplicates another.
+	/// </summary>
+	public sealed class DiscoveredCorePackage
+	{
+		/// <summary>Absolute path of the zip (or directory, for dev packages).</summary>
+		public string Path { get; init; } = "";
+
+		public bool IsDirectoryForm { get; init; }
+
+		/// <summary>Display name, from waterbox.config's coreName or the manifest's name; falls back to the file name.</summary>
+		public string Name { get; init; } = "";
+
+		public IReadOnlyList<string> Systems { get; init; } = [ ];
+
+		/// <summary>Rom extension (leading dot, lowercase) -&gt; system id.</summary>
+		public IReadOnlyDictionary<string, string> Extensions { get; init; } = new Dictionary<string, string>();
+
+		/// <summary>
+		/// SHA1 of the package file — the package's ground-truth identity. Null for
+		/// directory-form packages, which have no file to hash.
+		/// </summary>
+		public string? Sha1 { get; init; }
+
+		/// <summary>Non-null if the package could not be read; it is listed but not loadable.</summary>
+		public string? Error { get; init; }
+
+		/// <summary>
+		/// Stable key for remembering per-package decisions (the disabled list). The
+		/// SHA1 where there is one, so moving or renaming a zip keeps its setting;
+		/// the path for directory-form packages, which have no identity.
+		/// </summary>
+		public string Key => Sha1 ?? Path;
+
+		public bool IsLoadable => Error is null;
+
+		/// <summary>
+		/// The identity abbreviated for display, or "-" for a directory-form package.
+		/// Does not assume a well-formed hash: this is display code, and a package
+		/// that reached it with a short or odd identity should still render.
+		/// </summary>
+		public string ShortSha1
+			=> Sha1 is null ? "-" : Sha1.Length <= 8 ? Sha1 : Sha1.Substring(0, 8);
+
+		public override string ToString()
+			=> $"{Name} [{ShortSha1}] {string.Join(",", Systems)}{(Error is null ? "" : $" ERROR: {Error}")}";
+	}
+
+	/// <summary>
+	/// Finds core packages in the search directories and reads their identity
+	/// without loading them. This is the discovery half of the charter's "cores
+	/// arrive as packages, discovered from a Cores/ directory"; <see cref="CoreRegistry"/>
+	/// does the loading.
+	/// </summary>
+	public static class CorePackageDiscovery
+	{
+		public const string DefaultDirName = "Cores";
+
+		/// <summary>The default search directory: <c>Cores/</c> beside the executable.</summary>
+		public static string DefaultSearchPath
+			=> System.IO.Path.Combine(PathUtils.ExeDirectoryPath, DefaultDirName);
+
+		/// <summary>
+		/// Scans <paramref name="searchPaths"/> (each a directory) for packages, in
+		/// order. A directory entry is a package if it holds a waterbox package or a
+		/// manifest; otherwise the scan does NOT recurse into it — packages live at
+		/// the top of a search directory, so an unrelated folder of roms costs nothing.
+		/// Missing search directories are skipped silently: an absent Cores/ is the
+		/// normal state of a fresh checkout, not an error.
+		/// </summary>
+		/// <returns>one entry per package found, name-sorted, duplicates (same identity) collapsed</returns>
+		public static IReadOnlyList<DiscoveredCorePackage> Scan(IEnumerable<string> searchPaths)
+		{
+			List<DiscoveredCorePackage> found = new();
+			HashSet<string> seenKeys = new(StringComparer.OrdinalIgnoreCase);
+			HashSet<string> seenDirs = new(StringComparer.OrdinalIgnoreCase);
+			foreach (var searchPath in searchPaths)
+			{
+				if (string.IsNullOrWhiteSpace(searchPath)) continue;
+				string fullSearchPath;
+				try
+				{
+					fullSearchPath = System.IO.Path.GetFullPath(searchPath);
+				}
+				catch (Exception)
+				{
+					continue; // unusable path string; not worth a diagnostic
+				}
+				if (!Directory.Exists(fullSearchPath) || !seenDirs.Add(fullSearchPath)) continue;
+
+				List<string> candidates = new();
+				try
+				{
+					candidates.AddRange(Directory.EnumerateFiles(fullSearchPath, "*.zip"));
+					candidates.AddRange(Directory.EnumerateDirectories(fullSearchPath));
+				}
+				catch (Exception ex)
+				{
+					// an unreadable search dir is worth saying out loud, once
+					found.Add(new DiscoveredCorePackage { Path = fullSearchPath, Name = System.IO.Path.GetFileName(fullSearchPath), Error = ex.Message });
+					continue;
+				}
+
+				foreach (var candidate in candidates.OrderBy(static p => p, StringComparer.OrdinalIgnoreCase))
+				{
+					var pkg = Peek(candidate);
+					if (pkg is null) continue; // not a package at all — silently ignored
+					if (!seenKeys.Add(pkg.Key)) continue; // same file reachable twice
+					found.Add(pkg);
+				}
+			}
+			return found.OrderBy(static p => p.Name, StringComparer.OrdinalIgnoreCase).ToList();
+		}
+
+		/// <summary>
+		/// The directories to scan, in order: the default <c>Cores/</c> beside the
+		/// executable, then any the user added. The default is not removable — a
+		/// package dropped into Cores/ must always be found, that being the whole
+		/// point of the directory.
+		/// </summary>
+		public static IReadOnlyList<string> SearchPaths(Config config)
+			=> new[] { DefaultSearchPath }.Concat(config.CorePackagePaths).ToList();
+
+		/// <summary>Scans the directories <paramref name="config"/> designates.</summary>
+		public static IReadOnlyList<DiscoveredCorePackage> ScanFor(Config config)
+			=> Scan(SearchPaths(config));
+
+		/// <summary>
+		/// The subset of <paramref name="packages"/> the user has not switched off.
+		/// Broken packages stay in the list — the caller reports them; dropping them
+		/// here would make a package that fails to parse indistinguishable from one
+		/// that is not there.
+		/// </summary>
+		public static IReadOnlyList<DiscoveredCorePackage> NotDisabledIn(IEnumerable<DiscoveredCorePackage> packages, Config config)
+		{
+			HashSet<string> disabled = new(config.DisabledCorePackages, StringComparer.OrdinalIgnoreCase);
+			return packages.Where(p => !disabled.Contains(p.Key)).ToList();
+		}
+
+		/// <summary>Records whether a discovered package should load at startup.</summary>
+		public static void SetEnabled(Config config, DiscoveredCorePackage package, bool enabled)
+		{
+			config.DisabledCorePackages.RemoveAll(k => string.Equals(k, package.Key, StringComparison.OrdinalIgnoreCase));
+			if (!enabled) config.DisabledCorePackages.Add(package.Key);
+		}
+
+		public static bool IsEnabled(Config config, DiscoveredCorePackage package)
+			=> !config.DisabledCorePackages.Exists(k => string.Equals(k, package.Key, StringComparison.OrdinalIgnoreCase));
+
+		/// <summary>
+		/// Reads one candidate path's identity. Returns null if it is not a core
+		/// package at all (an ordinary zip or folder); returns an entry with
+		/// <see cref="DiscoveredCorePackage.Error"/> set if it looks like one but
+		/// cannot be read — that distinction is what keeps a broken package visible
+		/// instead of silently missing.
+		/// </summary>
+		public static DiscoveredCorePackage? Peek(string path)
+		{
+			try
+			{
+				return Directory.Exists(path) ? PeekDirectory(path)
+					: path.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) && File.Exists(path) ? PeekZip(path)
+					: null;
+			}
+			catch (Exception ex)
+			{
+				return new DiscoveredCorePackage
+				{
+					Path = System.IO.Path.GetFullPath(path),
+					IsDirectoryForm = Directory.Exists(path),
+					Name = System.IO.Path.GetFileNameWithoutExtension(path),
+					Error = ex.Message,
+				};
+			}
+		}
+
+		private static DiscoveredCorePackage? PeekDirectory(string dir)
+		{
+			var full = System.IO.Path.GetFullPath(dir);
+			var fallbackName = System.IO.Path.GetFileName(full.TrimEnd(System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar));
+			if (WaterboxCoreFactory.IsWaterboxPackage(full))
+			{
+				return FromWaterboxConfig(full, isDir: true, sha1: null, fallbackName,
+					File.ReadAllText(System.IO.Path.Combine(full, WaterboxCoreFactory.ConfigFileName)));
+			}
+			var manifestPath = System.IO.Path.Combine(full, CorePackageManifest.FILE_NAME);
+			if (File.Exists(manifestPath))
+			{
+				return FromManifest(full, isDir: true, sha1: null, fallbackName, File.ReadAllText(manifestPath));
+			}
+			return null;
+		}
+
+		private static DiscoveredCorePackage? PeekZip(string zipPath)
+		{
+			var full = System.IO.Path.GetFullPath(zipPath);
+			var fallbackName = System.IO.Path.GetFileNameWithoutExtension(full);
+			using var zip = ZipFile.OpenRead(full);
+			// package files live at the zip root — that is what the extraction cache
+			// hands to the loader, so anything nested is not a package we can load
+			var wbxConfig = zip.GetEntry(WaterboxCoreFactory.ConfigFileName);
+			var isWaterbox = wbxConfig is not null && zip.GetEntry(WaterboxCoreFactory.WbxFileName) is not null;
+			var manifest = zip.GetEntry(CorePackageManifest.FILE_NAME);
+			if (!isWaterbox && manifest is null) return null;
+
+			// only now is the hash worth paying for: it is the identity of a thing we
+			// know to be a package
+			var sha1 = BizHawk.Common.SHA1Checksum.ComputeDigestHex(File.ReadAllBytes(full));
+			return isWaterbox
+				? FromWaterboxConfig(full, isDir: false, sha1, fallbackName, ReadEntry(wbxConfig!))
+				: FromManifest(full, isDir: false, sha1, fallbackName, ReadEntry(manifest!));
+		}
+
+		private static string ReadEntry(ZipArchiveEntry entry)
+		{
+			using var stream = entry.Open();
+			using StreamReader reader = new(stream, Encoding.UTF8);
+			return reader.ReadToEnd();
+		}
+
+		private static DiscoveredCorePackage FromWaterboxConfig(string path, bool isDir, string? sha1, string fallbackName, string json)
+		{
+			var cfg = WaterboxConfig.FromJson(json)
+				?? throw new InvalidOperationException($"{WaterboxCoreFactory.ConfigFileName} is empty or invalid");
+			if (string.IsNullOrEmpty(cfg.SystemId)) throw new InvalidOperationException($"{WaterboxCoreFactory.ConfigFileName} is missing systemId");
+			return new DiscoveredCorePackage
+			{
+				Path = path,
+				IsDirectoryForm = isDir,
+				Sha1 = sha1,
+				Name = string.IsNullOrWhiteSpace(cfg.CoreName) ? fallbackName : cfg.CoreName,
+				Systems = [ cfg.SystemId ],
+				Extensions = NormaliseExtensions(cfg.Extensions),
+			};
+		}
+
+		private static DiscoveredCorePackage FromManifest(string path, bool isDir, string? sha1, string fallbackName, string json)
+		{
+			var manifest = JsonConvert.DeserializeObject<CorePackageManifest>(json)
+				?? throw new InvalidOperationException($"{CorePackageManifest.FILE_NAME} deserialized to null");
+			if (manifest.FormatVersion is not CorePackageLoader.SUPPORTED_FORMAT_VERSION)
+			{
+				throw new NotSupportedException($"manifest formatVersion {manifest.FormatVersion}, this build supports {CorePackageLoader.SUPPORTED_FORMAT_VERSION}");
+			}
+			var extensions = NormaliseExtensions(manifest.Extensions);
+			return new DiscoveredCorePackage
+			{
+				Path = path,
+				IsDirectoryForm = isDir,
+				Sha1 = sha1,
+				Name = string.IsNullOrWhiteSpace(manifest.Name) ? fallbackName : manifest.Name!,
+				Systems = extensions.Values.Distinct().OrderBy(static s => s, StringComparer.Ordinal).ToList(),
+				Extensions = extensions,
+			};
+		}
+
+		private static Dictionary<string, string> NormaliseExtensions(IDictionary<string, string>? extensions)
+		{
+			Dictionary<string, string> result = new();
+			if (extensions is null) return result;
+			foreach (var (ext, sysID) in extensions) result[ext.ToLowerInvariant()] = sysID;
+			return result;
+		}
+	}
+}

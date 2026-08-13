@@ -1,0 +1,93 @@
+#!/bin/bash
+# Runs miniHawk's automated tests, including the ones that build real windows.
+#
+# There are two kinds and they are deliberately separate:
+#   - BizHawk.Tests.* : logic. No display, no emulator, no core. Everything a
+#     machine can decide about the frontend's behaviour should end up here.
+#   - BizHawk.Tests.Client.EmuHawk : windows. Constructs forms and drives them
+#     (tick a row, press a button) to check the wiring between the widgets and
+#     that logic. Needs an X display; on a headless box that is Xvfb.
+#
+# Neither kind can tell you a window LOOKS right. For that, --shots renders the
+# windows to PNGs under tests/ui/shots/ for a person to look at.
+#
+# Usage:
+#   ./run-ui-tests.sh              # every test project
+#   ./run-ui-tests.sh --shots      # ...and write screenshots to tests/ui/shots
+#   ./run-ui-tests.sh --only-ui    # just the window tests
+set -u
+
+shots=0
+only_ui=0
+while [ $# -gt 0 ]; do
+	case "$1" in
+		--shots) shots=1 ;;
+		--only-ui) only_ui=1 ;;
+		*) echo "unknown option: $1" >&2; exit 2 ;;
+	esac
+	shift
+done
+
+here="$(cd "$(dirname "$0")" && pwd)"
+repo_root="$(cd "$here/../.." && pwd)"
+tests_dir="$repo_root/build/tests"
+[ -d "$tests_dir" ] || { echo "no build/tests - run: dotnet build source/BizHawk.sln -c Release" >&2; exit 1; }
+
+export LD_LIBRARY_PATH="$repo_root/build/dll:$repo_root/build:${LD_LIBRARY_PATH:-}"
+export MONO_CRASH_NOFILE=1 MONO_WINFORMS_XIM_STYLE=disabled
+
+# A display for the window tests. If the caller already has one (a desktop, or a
+# CI step that started Xvfb), use it rather than starting a second.
+xvfb_pid=""
+cleanup() { [ -n "$xvfb_pid" ] && kill "$xvfb_pid" 2>/dev/null; }
+trap cleanup EXIT
+if [ -z "${DISPLAY:-}" ]; then
+	command -v Xvfb >/dev/null || { echo "Xvfb not found (apt install xvfb)" >&2; exit 1; }
+	for n in 80 81 82 83 84 85; do
+		if [ ! -e "/tmp/.X11-unix/X$n" ]; then
+			Xvfb ":$n" -screen 0 1280x1024x24 -nolisten tcp >/dev/null 2>&1 & xvfb_pid=$!
+			export DISPLAY=":$n"
+			break
+		fi
+	done
+	[ -n "${DISPLAY:-}" ] || { echo "could not find a free X display" >&2; exit 1; }
+	sleep 1
+fi
+
+if [ "$shots" -eq 1 ]; then
+	export MINIHAWK_UI_SHOTS="$here/shots"
+	rm -rf "$MINIHAWK_UI_SHOTS"
+fi
+
+if [ "$only_ui" -eq 1 ]; then
+	projects=(BizHawk.Tests.Client.EmuHawk)
+else
+	projects=(BizHawk.Tests.Common BizHawk.Tests.Emulation.Common BizHawk.Tests.Client.Common BizHawk.Tests.Client.EmuHawk)
+fi
+
+failed=0
+for project in "${projects[@]}"; do
+	exe="$tests_dir/$project.exe"
+	if [ ! -f "$exe" ]; then
+		printf "%-36s SKIP (not built)\n" "$project"
+		continue
+	fi
+	# mono's X11 backend chatters about xkb keysyms on a bare Xvfb; drop that noise
+	if out="$(cd "$tests_dir" && timeout 600 mono "$exe" 2>&1 | grep -vE 'xkbcomp|^> *Warning:|^Errors from xkbcomp')"; then
+		summary="$(printf '%s\n' "$out" | grep -E '^  (total|failed|succeeded|skipped):' | tr -s ' ' | paste -sd' ' -)"
+		printf "%-36s %s\n" "$project" "$summary"
+	else
+		printf "%-36s FAILED\n" "$project"
+		printf '%s\n' "$out" | tail -40
+		failed=$((failed + 1))
+	fi
+done
+
+if [ "$shots" -eq 1 ]; then
+	echo ""
+	echo "screenshots:"
+	ls -1 "$MINIHAWK_UI_SHOTS" 2>/dev/null | sed 's/^/  /' || echo "  (none written)"
+fi
+
+[ "$failed" -gt 0 ] && exit 1
+exit 0

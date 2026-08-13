@@ -100,6 +100,11 @@ jobs:
       - name: Build the waterboxed synth core package
         run: ./tests/synth/build-package.sh
 
+      - name: Unit tests (logic + windows)
+        # The window tests construct real forms, so they need the same Xvfb the
+        # witness uses; run-ui-tests.sh brings one up when DISPLAY is unset.
+        run: ./tests/ui/run-ui-tests.sh --shots
+
       - name: Witness - Levels A and B
         run: ./tests/synth/run-witness.sh
 
@@ -109,3 +114,13 @@ jobs:
         with:
           name: witness-full-work
           path: tests/synth/work/
+
+      - name: Upload UI screenshots
+        # Rendered every run, not just on failure: nothing here can tell whether a
+        # window LOOKS right, so the pictures are for a person to glance at.
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-screenshots
+          path: tests/ui/shots/
+          if-no-files-found: warn
