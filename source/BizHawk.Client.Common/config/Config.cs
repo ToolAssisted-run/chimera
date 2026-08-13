@@ -350,6 +350,13 @@ namespace BizHawk.Client.Common
 		/// </summary>
 		public Dictionary<string, string> DefaultCores = new();
 
+		/// <summary>
+		/// Where the user put each file a core package asked for, keyed
+		/// "&lt;core name&gt;/&lt;firmware id&gt;" (see <c>CoreFirmwareStore</c>). The frontend
+		/// has no idea what any of them are - the declarations come from the packages.
+		/// </summary>
+		public Dictionary<string, string> CoreFirmware = new();
+
 		public bool DontTryOtherCores { get; set; }
 
 		// ReSharper disable once UnusedMember.Global

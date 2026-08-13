@@ -406,6 +406,7 @@ namespace BizHawk.Client.Common
 						DeterministicEmulationRequested = Deterministic,
 						Settings = GetCoreSettings(factory.CoreType, factory.SettingsType),
 						SyncSettings = GetCoreSyncSettings(factory.CoreType, factory.SyncSettingsType),
+						FirmwareProvider = CoreFirmwareStore.ProviderFor(_config, factory.CoreName),
 					};
 					return factory.Create(ctx);
 				}
@@ -680,7 +681,12 @@ namespace BizHawk.Client.Common
 			while (ex.InnerException != null)
 				ex = ex.InnerException;
 
-			if (ex is NoAvailableCoreException)
+			if (ex is MissingFirmwareException)
+			{
+				// the user can fix this one, and the window that fixes it is named in the message
+				DoLoadErrorCallback(ex.Message, system);
+			}
+			else if (ex is NoAvailableCoreException)
 			{
 				// handle exceptions thrown by the new detected systems that BizHawk does not have cores for
 				DoLoadErrorCallback($"{ex.Message}\n\n{ex}", system);

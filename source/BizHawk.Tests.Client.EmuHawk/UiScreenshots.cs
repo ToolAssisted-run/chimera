@@ -98,6 +98,46 @@ namespace BizHawk.Tests.Client.EmuHawk
 		}
 
 		/// <summary>
+		/// The firmware window, over a package that wants two files and another that
+		/// wants one. The states are what a user actually hits - provided, never
+		/// provided, and the wrong file - so the picture shows whether they read
+		/// clearly enough to act on.
+		/// </summary>
+		[TestMethod]
+		public void FirmwareWindow()
+		{
+			if (ShotDir is null) { Assert.Inconclusive("set MINIHAWK_UI_SHOTS to write screenshots"); return; }
+
+			CoreFirmwareEntry Entry(string core, string id, string display, string description, CoreFirmwareState state, string path, bool required = true)
+				=> new()
+				{
+					CoreName = core,
+					Decl = new() { Id = id, Display = display, Description = description, Size = 8192, Required = required },
+					Path = path,
+					State = state,
+					Sha1 = state is CoreFirmwareState.Good ? "57FE1BDEE955BB48D357E463CCBF129496930B62" : null,
+				};
+
+			List<CoreFirmwareEntry> entries =
+			[
+				Entry("QuickerNesHawk", "bios", "Family Computer Disk System BIOS",
+					"The 8 KiB boot rom in the RAM adapter. Any disk image needs it; cartridges do not.",
+					CoreFirmwareState.Good, "/home/you/firmware/disksys.rom"),
+				Entry("QuickerNesHawk", "expansion", "Expansion audio rom",
+					"Optional. Without it the expansion channels are silent.",
+					CoreFirmwareState.Missing, null, required: false),
+				Entry("synth", "boot", "Boot rom",
+					"Runs before the cartridge does.",
+					CoreFirmwareState.WrongSize, "/home/you/firmware/oops.bin"),
+			];
+
+			using CoreFirmwareForm form = new(() => entries, (_, _) => { });
+			form.StartPosition = FormStartPosition.Manual;
+			form.Location = new Point(0, 0);
+			Shoot(form, "firmware");
+		}
+
+		/// <summary>
 		/// The core settings dialog, over the settings a real package declares. The
 		/// grid rows are synthesized from those declarations, so this is the only way
 		/// to see whether a core's own words come out legible.

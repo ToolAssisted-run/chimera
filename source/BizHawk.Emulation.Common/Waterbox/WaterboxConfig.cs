@@ -51,6 +51,13 @@ namespace BizHawk.Emulation.Common.Waterbox
 		public Dictionary<string, string> Extensions { get; set; }
 
 		/// <summary>
+		/// Files the core needs that it may not ship - a disk-system BIOS, say. Each is
+		/// mounted for the guest under its declared id, alongside the rom and the
+		/// settings; the guest opens it by that name during Init.
+		/// </summary>
+		public List<CoreFirmwareDecl> Firmware { get; set; }
+
+		/// <summary>
 		/// The user-tunable settings this core offers, declared by the package. The
 		/// frontend renders them from this and nothing else - it has no per-core
 		/// settings dialogs to render them with.

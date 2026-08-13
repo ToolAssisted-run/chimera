@@ -1767,9 +1767,31 @@ namespace BizHawk.Client.EmuHawk
 		{
 			GenericCoreSubMenu.DropDownItems.Clear();
 
-			var settingsMenuItem = new ToolStripMenuItem { Text = "&Settings" };
+			var coreRunning = Emulator.SystemId is not VSystemID.Raw.NULL;
+
+			var settingsMenuItem = new ToolStripMenuItem { Text = "&Settings", Enabled = coreRunning };
 			settingsMenuItem.Click += GenericCoreSettingsMenuItem_Click;
 			GenericCoreSubMenu.DropDownItems.Add(settingsMenuItem);
+
+			// Firmware is reachable with nothing loaded, unlike everything else here: a
+			// rom that needs a BIOS cannot be loaded until the BIOS has been provided, so
+			// an item that only appeared once a core was running would be unreachable
+			// exactly when it is needed.
+			var firmwareMenuItem = new ToolStripMenuItem
+			{
+				Text = "&Firmware...",
+				Enabled = CoreFirmwareStore.AnyExpected(CoreRegistry.Instance),
+			};
+			firmwareMenuItem.Click += (_, _) =>
+			{
+				using CoreFirmwareForm form = new(
+					() => CoreFirmwareStore.Enumerate(Config, CoreRegistry.Instance),
+					(entry, path) => CoreFirmwareStore.SetPath(Config, entry.CoreName, entry.Decl.Id, path));
+				form.ShowDialog(this);
+			};
+			GenericCoreSubMenu.DropDownItems.Add(firmwareMenuItem);
+
+			if (!coreRunning) return;
 
 			var coreTools = CoreProvidedTools.Concat(SpecializedTools)
 				.Where(Tools.IsAvailable)

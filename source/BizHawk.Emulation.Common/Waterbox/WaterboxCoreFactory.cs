@@ -11,7 +11,7 @@ namespace BizHawk.Emulation.Common.Waterbox
 	/// Constructed by CorePackageLoader when it sees a waterbox package - there is no
 	/// per-core managed assembly.
 	/// </summary>
-	public sealed class WaterboxCoreFactory : ICoreFactory, ICoreIdentity
+	public sealed class WaterboxCoreFactory : ICoreFactory, ICoreIdentity, ICoreFirmwareUser
 	{
 		public const string WbxFileName = "core.wbx";
 		public const string ConfigFileName = "waterbox.config";
@@ -42,6 +42,9 @@ namespace BizHawk.Emulation.Common.Waterbox
 
 		public IReadOnlyList<string> SystemIds => new[] { _cfg.SystemId };
 
+		/// <summary>The files this core expects the user to provide (see waterbox.config "firmware").</summary>
+		public IReadOnlyList<CoreFirmwareDecl> Firmware => _cfg.Firmware ?? (IReadOnlyList<CoreFirmwareDecl>) [ ];
+
 		public Type CoreType => typeof(WaterboxCore);
 
 		public Type SettingsType => typeof(WaterboxCoreSettings);
@@ -57,7 +60,34 @@ namespace BizHawk.Emulation.Common.Waterbox
 				_cfg,
 				_wbxPath,
 				ctx.SyncSettings as WaterboxCoreSyncSettings,
-				ctx.Settings as WaterboxCoreSettings);
+				ctx.Settings as WaterboxCoreSettings,
+				ResolveFirmware(ctx));
+		}
+
+		/// <summary>
+		/// Collects the files the user provided for this core's declarations. A missing
+		/// required file stops the load here, before the sandbox is built, so what the
+		/// user sees names the file rather than "Init failed".
+		/// </summary>
+		private Dictionary<string, byte[]> ResolveFirmware(CoreCreationContext ctx)
+		{
+			Dictionary<string, byte[]> resolved = new();
+			foreach (var decl in Firmware)
+			{
+				var bytes = ctx.FirmwareProvider?.Invoke(decl);
+				if (bytes is null)
+				{
+					if (decl.Required)
+					{
+						throw new MissingFirmwareException(
+							$"{CoreName} needs firmware that has not been provided: {decl.DisplayName}."
+								+ " Set it in Emulator > Firmware, then load the rom again.");
+					}
+					continue;
+				}
+				resolved[decl.Id] = bytes;
+			}
+			return resolved;
 		}
 	}
 }

@@ -47,7 +47,10 @@ namespace BizHawk.Client.EmuHawk
 		private void HandlePlatformMenus()
 		{
 			DisplayDefaultCoreMenu();
-			GenericCoreSubMenu.Enabled = Emulator.SystemId is not VSystemID.Raw.NULL;
+			// still reachable with no core running, but only if there is something inside
+			// worth opening it for - which, with nothing loaded, means firmware to provide
+			GenericCoreSubMenu.Enabled = Emulator.SystemId is not VSystemID.Raw.NULL
+				|| CoreFirmwareStore.AnyExpected(CoreRegistry.Instance);
 		}
 	}
 }

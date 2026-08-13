@@ -82,6 +82,12 @@ namespace BizHawk.Emulation.Common.Waterbox
 		private int _wbxPos;
 		private readonly byte[] _romBytes;
 		private int _romPos;
+
+		// The files the user provided for the package's firmware declarations, by id.
+		// Mounted like the rom is - the guest opens them by name during Init - and, like
+		// the rom, they are part of the machine rather than of its state.
+		private readonly IReadOnlyDictionary<string, byte[]> _firmware;
+		private readonly List<LibMiniBoxHost.ReadCallback> _firmwareReads = new();
 		private readonly byte[] _settingsBytes;
 		private int _settingsPos;
 		private WaterboxCoreSyncSettings _syncSettings;
@@ -109,10 +115,11 @@ namespace BizHawk.Emulation.Common.Waterbox
 		private readonly WaterboxConfig.AxisConfig[] _axes;
 		private readonly SetAxisFn _setAxis; // null iff the package declares no axes
 
-		public WaterboxCore(byte[] rom, WaterboxConfig cfg, string wbxPath, WaterboxCoreSyncSettings syncSettings, WaterboxCoreSettings settings = null)
+		public WaterboxCore(byte[] rom, WaterboxConfig cfg, string wbxPath, WaterboxCoreSyncSettings syncSettings, WaterboxCoreSettings settings = null, IReadOnlyDictionary<string, byte[]> firmware = null)
 		{
 			_cfg = cfg;
 			_romBytes = rom;
+			_firmware = firmware ?? new Dictionary<string, byte[]>();
 			_wbxBytes = File.ReadAllBytes(wbxPath);
 
 			// Effective settings = the package's waterbox.config defaults, overlaid
@@ -166,6 +173,18 @@ namespace BizHawk.Emulation.Common.Waterbox
 			// settings), so the guest ABI is uniform. Read-only, stable across states.
 			_host.wbx_mount_file(_obj, "settings", _settingsRead, UIntPtr.Zero, 0, ref r);
 			r.ThrowIfError();
+
+			// Whatever firmware the user provided, under the ids the package declared.
+			// The delegates are kept alive in a field: the host holds them as raw
+			// function pointers for the mount's lifetime, and a collected one is a crash.
+			foreach (var (id, bytes) in _firmware)
+			{
+				var pos = 0;
+				LibMiniBoxHost.ReadCallback read = (ud, data, size) => ReadInto(bytes, ref pos, data, size);
+				_firmwareReads.Add(read);
+				_host.wbx_mount_file(_obj, id, read, UIntPtr.Zero, 0, ref r);
+				r.ThrowIfError();
+			}
 
 			Activate();
 			var init = Proc<InitFn>("Init");

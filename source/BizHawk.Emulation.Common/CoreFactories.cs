@@ -55,6 +55,14 @@ namespace BizHawk.Emulation.Common
 
 		/// <summary>Sync settings previously returned from the core, of the factory's SyncSettingsType. May be null.</summary>
 		public object? SyncSettings { get; set; }
+
+		/// <summary>
+		/// Hands over the file the user provided for a firmware declaration, or null if
+		/// there is none (or it no longer reads). Set by the frontend, which is the only
+		/// part that knows where the user put it; a factory that needs firmware and finds
+		/// this null should fail the load with a message naming what is missing.
+		/// </summary>
+		public Func<CoreFirmwareDecl, byte[]?>? FirmwareProvider { get; set; }
 	}
 
 	/// <summary>

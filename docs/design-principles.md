@@ -1035,3 +1035,40 @@ core.
   (BizHawk shipped one per console); the generic waterbox adapter has none, so the
   window could only ever be empty. With it went the eight "Analog" hotkeys that
   nudged values inside it, and `vpads_schemata` from Emulation.Common.
+
+## Firmware is declared by the core, not known by the frontend (2026-08-13)
+
+The frontend deleted its firmware manager along with the rest of the bundle
+furniture: a table of every BIOS for every console, in a program that does not
+know what cores exist. But some machines genuinely need a file the core cannot
+ship - the Famicom Disk System's RAM adapter boots from an 8 KiB rom, and no disk
+image will run without it - so the channel came back the other way up, and the
+user decided its shape.
+
+- **The package declares what it wants.** `waterbox.config` gains a `firmware`
+  list: an id, a display name, a sentence about what breaks without it, the exact
+  size, and the SHA1s of the dumps known to be right. Nothing about this lives in
+  the frontend, which cannot name a single firmware file on its own.
+- **The user provides it once, and it is remembered** under `<core name>/<id>` -
+  keyed by core rather than by package hash, so rebuilding a package does not make
+  you find your BIOS again.
+- **`Emulator > Firmware`**, greyed out when no loaded package expects anything.
+  It is the one item in that menu reachable with nothing loaded, because a rom
+  that needs a BIOS cannot be loaded until the BIOS is there; opening it after the
+  fact would be a door that only unlocks from the inside.
+- **A wrong file is refused, an unknown one is not.** Wrong size means the wrong
+  file and the core never sees it. A right-sized file whose hash is not on the
+  list is used anyway and flagged: a good dump the declaration has never seen is
+  likelier than a frontend that should refuse to run.
+- **Missing means a sentence, not a stack trace.** `MissingFirmwareException` is
+  its own type for exactly this: it is the one load failure the user can fix, and
+  the message names the window that fixes it.
+- **Delivery is a mount.** The file is handed to the guest as another mounted
+  file, under the declared id, next to the rom and the settings - so the guest
+  reads it with the same call it reads the rom with, and nothing in the ABI is
+  special-cased for firmware.
+
+What is deliberately NOT here: any suggestion that the frontend knows what a
+firmware file means. It checks size and hash because the declaration told it what
+to check, and hands over bytes. Whether they are the right bytes for the machine
+is the core's business.
