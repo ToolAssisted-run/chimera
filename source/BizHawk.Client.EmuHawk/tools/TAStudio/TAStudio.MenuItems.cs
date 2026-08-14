@@ -31,13 +31,7 @@ namespace BizHawk.Client.EmuHawk
 
 		private void NewFromSubMenu_DropDownOpened(object sender, EventArgs e)
 		{
-			NewFromNowMenuItem.Enabled =
-				CurrentTasMovie.InputLogLength > 0
-				&& !CurrentTasMovie.StartsFromSaveRam;
-
-			NewFromCurrentSaveRamMenuItem.Enabled =
-				CurrentTasMovie.InputLogLength > 0
-				&& SaveRamEmulator != null;
+			NewFromNowMenuItem.Enabled = CurrentTasMovie.InputLogLength > 0;
 		}
 
 		private void StartNewProjectFromNowMenuItem_Click(object sender, EventArgs e)
@@ -46,23 +40,6 @@ namespace BizHawk.Client.EmuHawk
 			{
 				var result = CurrentTasMovie.ConvertToSavestateAnchoredMovie(
 					Emulator.Frame, StatableEmulator.CloneSavestate());
-				DisplayMessageIfFailed(() => result, "Failed to create movie.");
-
-				if (result.Value is ITasMovie newProject)
-				{
-					MainForm.PauseEmulator();
-					LoadMovie(newProject, true);
-				}
-			}
-		}
-
-		private void StartANewProjectFromSaveRamMenuItem_Click(object sender, EventArgs e)
-		{
-			if (AskSaveChanges())
-			{
-				var saveRam = SaveRamEmulator?.CloneSaveRam(clearDirty: false) ?? throw new Exception("No SaveRam");
-				GoToFrame(AnyRowsSelected ? FirstSelectedRowIndex : 0);
-				var result = CurrentTasMovie.ConvertToSaveRamAnchoredMovie(saveRam);
 				DisplayMessageIfFailed(() => result, "Failed to create movie.");
 
 				if (result.Value is ITasMovie newProject)
@@ -1046,15 +1023,9 @@ namespace BizHawk.Client.EmuHawk
 			var selectionIsSingleRow = GetSelection().CountIsExactly(1);
 			StartNewProjectFromNowMenuItem.Visible =
 				selectionIsSingleRow
-				&& IsRowSelected(Emulator.Frame)
-				&& !CurrentTasMovie.StartsFromSaveRam;
+				&& IsRowSelected(Emulator.Frame);
 
-			StartANewProjectFromSaveRamMenuItem.Visible =
-				selectionIsSingleRow
-				&& SaveRamEmulator != null
-				&& !CurrentTasMovie.StartsFromSavestate;
-
-			StartFromNowSeparator.Visible = StartNewProjectFromNowMenuItem.Visible || StartANewProjectFromSaveRamMenuItem.Visible;
+			StartFromNowSeparator.Visible = StartNewProjectFromNowMenuItem.Visible;
 			RemoveMarkersContextMenuItem.Enabled = CurrentTasMovie.Markers.Any(m => IsRowSelected(m.Frame)); // Disable the option to remove markers if no markers are selected (FCEUX does this).
 			CancelSeekContextMenuItem.Enabled = SeekingTo != -1;
 			BranchContextMenuItem.Visible = CurrentCell?.RowIndex == Emulator.Frame;

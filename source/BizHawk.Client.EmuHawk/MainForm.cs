@@ -1521,8 +1521,6 @@ namespace BizHawk.Client.EmuHawk
 		private readonly PresentationPanel _presentationPanel;
 
 		// countdown for saveram autoflushing
-		public int AutoFlushSaveRamIn { get; set; }
-		private bool AutoFlushSaveRamFailed;
 
 		private void SetStatusBar()
 		{
@@ -1635,94 +1633,6 @@ namespace BizHawk.Client.EmuHawk
 		// Better is to just keep the game and rom hashes as properties and then generate the rom info from this
 		private string _defaultRomDetails = "";
 
-		private void LoadSaveRam()
-		{
-			if (Emulator.HasSaveRam())
-			{
-				var saveRam = new FileInfo(Config.PathEntries.SaveRamAbsolutePath(Game, MovieSession.Movie));
-				var autoSaveRam = new FileInfo(Config.PathEntries.AutoSaveRamAbsolutePath(Game, MovieSession.Movie));
-
-				FileInfo saveramToLoad;
-				if (saveRam.Exists && (!autoSaveRam.Exists || autoSaveRam.LastWriteTimeUtc <= saveRam.LastWriteTimeUtc))
-				{
-					saveramToLoad = saveRam;
-				}
-				else if (autoSaveRam.Exists && !saveRam.Exists)
-				{
-					AddOnScreenMessage("SaveRAM missing! Loading autosaved SaveRAM instead.", 5);
-					saveramToLoad = autoSaveRam;
-				}
-				else if (saveRam.Exists && autoSaveRam.Exists)
-				{
-					bool result = ShowMessageBox2(
-						owner: this,
-						"The autosaved SaveRAM is more recent than the normal SaveRAM.\n" +
-						"This could happen due to a crash or because files were manually modified.\n" +
-						"Do you want to load the autosave instead of the older SaveRAM file?",
-						"Load autosaved SaveRAM?",
-						EMsgBoxIcon.Error);
-
-					saveramToLoad = result ? autoSaveRam : saveRam;
-				}
-				else
-				{
-					// no saveram to load
-					return;
-				}
-
-				try
-				{
-					if (Emulator.AsSaveRam().CloneSaveRam() is null)
-					{
-						// we have a SaveRAM file, but the current core does not have save ram.
-						// just skip loading the saveram file in that case
-						return;
-					}
-
-					// The file goes over whole, at the length it is on disk. BizHawk truncated or
-					// zero-padded it to the size the core reported, which turns "this save belongs
-					// to another game" into a corrupted save loaded without a word; whether a file
-					// fits the machine is the core's judgement, and it can refuse.
-					Emulator.AsSaveRam().StoreSaveRam(File.ReadAllBytes(saveramToLoad.FullName));
-				}
-				catch (IOException e)
-				{
-					AddOnScreenMessage("An error occurred while loading Sram");
-					Console.Error.WriteLine(e);
-				}
-				catch (Exception e)
-				{
-					// a core refusing the file is not a reason to refuse the game: say so, and boot
-					// the machine as it comes out of the box
-					AddOnScreenMessage("Save file not loaded: " + e.Message, 10);
-					Console.Error.WriteLine(e);
-				}
-			}
-		}
-
-		public FileWriteResult FlushSaveRAM(bool autosave = false)
-		{
-			if (Emulator.HasSaveRam())
-			{
-				string path;
-				if (autosave)
-				{
-					path = Config.PathEntries.AutoSaveRamAbsolutePath(Game, MovieSession.Movie);
-				}
-				else
-				{
-					path = Config.PathEntries.SaveRamAbsolutePath(Game, MovieSession.Movie);
-				}
-
-				var saveram = Emulator.AsSaveRam().CloneSaveRam();
-				if (saveram == null)
-					return new();
-				return FileWriter.Write(path, saveram, $"{path}.bak");
-			}
-
-			return new();
-		}
-
 		private void RewireSound()
 		{
 			if (_dumpProxy != null)
@@ -1793,6 +1703,16 @@ namespace BizHawk.Client.EmuHawk
 			GenericCoreSubMenu.DropDownItems.Add(firmwareMenuItem);
 
 			if (!coreRunning) return;
+
+			// What this machine keeps between sessions, in the core's own words - a cartridge's
+			// SRAM, a disk. It belongs to the core's menu because only the core has the concept:
+			// the frontend cannot name it, and most machines have nothing here at all.
+			var persistentItem = MakePersistentDataMenuItem();
+			if (persistentItem is not null)
+			{
+				GenericCoreSubMenu.DropDownItems.Add(new ToolStripSeparator());
+				GenericCoreSubMenu.DropDownItems.Add(persistentItem);
+			}
 
 			var coreTools = CoreProvidedTools.Concat(SpecializedTools)
 				.Where(Tools.IsAvailable)
@@ -2866,29 +2786,6 @@ namespace BizHawk.Client.EmuHawk
 
 				MovieSession.HandleFrameBefore();
 
-				if (Config.AutosaveSaveRAM)
-				{
-					AutoFlushSaveRamIn--;
-					if (AutoFlushSaveRamIn <= 0)
-					{
-						FileWriteResult result = FlushSaveRAM(true);
-						if (result.IsError)
-						{
-							// For autosave, allow one failure before bothering the user.
-							if (AutoFlushSaveRamFailed)
-							{
-								this.ErrorMessageBox(result, "Failed to flush saveram!");
-							}
-							AutoFlushSaveRamFailed = true;
-							AutoFlushSaveRamIn = Math.Min(600, Config.FlushSaveRamFrames);
-						}
-						else
-						{
-							AutoFlushSaveRamFailed = false;
-							AutoFlushSaveRamIn = Config.FlushSaveRamFrames;
-						}
-					}
-				}
 				// why not skip audio if the user doesn't want sound
 				bool renderSound = (Config.SoundEnabled && !IsTurboing)
 					|| _currAviWriter?.UsesAudio is true;
@@ -3468,7 +3365,7 @@ namespace BizHawk.Client.EmuHawk
 				// it is then up to the core itself to override its own local DeterministicEmulation setting
 				bool deterministic = args.Deterministic ?? MovieSession.NewMovieQueued;
 
-				var loader = new RomLoader(Config, this)
+				var loader = _lastRomLoader = new RomLoader(Config, this)
 				{
 					ChooseArchive = LoadArchiveChooser,
 					ChoosePlatform = romGame => args.ForcedSysID ?? ChoosePlatformForRom(romGame),
@@ -3591,8 +3488,7 @@ namespace BizHawk.Client.EmuHawk
 					// Don't load Save Ram if a movie is being loaded
 					if (!MovieSession.NewMovieQueued)
 					{
-						LoadSaveRam();
-						AutoFlushSaveRamIn = Config.FlushSaveRamFrames;
+						LoadBundleAttachments();
 					}
 
 					var previousRom = CurrentlyOpenRom;
@@ -3711,7 +3607,7 @@ namespace BizHawk.Client.EmuHawk
 		/// This method should only be called (outside of <see cref="LoadNullRom(bool)"/>) if the caller is about to load a new game with no user interaction between close and load.
 		/// </summary>
 		/// <returns>True if the game was closed. False if the user cancelled due to unsaved changes.</returns>
-		private bool CloseGame(bool clearSram = false)
+		private bool CloseGame()
 		{
 			CommitCoreSettingsToConfig(); // Must happen before stopping the movie, since it checks for active movie.
 
@@ -3730,36 +3626,7 @@ namespace BizHawk.Client.EmuHawk
 				if (saveMovieResult == TryAgainResult.Canceled) return false;
 			}
 
-			if (clearSram)
-			{
-				var path = Config.PathEntries.SaveRamAbsolutePath(Game, MovieSession.Movie);
-				if (File.Exists(path))
-				{
-					TryAgainResult clearResult = this.DoWithTryAgainBox(() => {
-						try
-						{
-							File.Delete(path);
-							AddOnScreenMessage("SRAM cleared.");
-							return new();
-						}
-						catch (Exception ex)
-						{
-							return new(FileWriteEnum.FailedToDeleteGeneric, new(path, ""), ex);
-						}
-					}, "Failed to clear SRAM.");
-					if (clearResult == TryAgainResult.Canceled)
-					{
-						return false;
-					}
-				}
-			}
-			else if (Emulator.HasSaveRam())
-			{
-				TryAgainResult flushResult = this.DoWithTryAgainBox(
-					() => FlushSaveRAM(),
-					"Failed flushing the game's Save RAM to your disk.");
-				if (flushResult == TryAgainResult.Canceled) return false;
-			}
+			if (!WriteBundleAttachmentsOnClose()) return false;
 
 			TryAgainResult stateSaveResult = this.DoWithTryAgainBox(AutoSaveStateIfConfigured, "Failed to auto-save state.");
 			if (stateSaveResult == TryAgainResult.Canceled) return false;
@@ -3795,12 +3662,11 @@ namespace BizHawk.Client.EmuHawk
 		/// <summary>
 		/// This closes the current ROM, closes tools that require emulator services, and sets things up for the user to interact with the client having no loaded ROM.
 		/// </summary>
-		/// <param name="clearSram">True if SRAM should be deleted instead of saved.</param>
-		public void LoadNullRom(bool clearSram = false)
+		public void LoadNullRom()
 		{
 			if (Tools.AskSave())
 			{
-				CloseGame(clearSram);
+				CloseGame();
 				Tools.Restart(Config, Emulator, Game);
 				DisplayManager.UpdateGlobals(Config, Emulator);
 				ExtToolManager.BuildToolStrip();

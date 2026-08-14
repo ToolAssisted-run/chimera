@@ -46,7 +46,7 @@ namespace BizHawk.Client.Common
 		void CloseEmulator(int? exitCode = null);
 
 		/// <remarks>only referenced from <see cref="EmuClientApi"/></remarks>
-		void LoadNullRom(bool clearSram = false);
+		void LoadNullRom();
 
 		/// <remarks>only referenced from <see cref="ClientLuaLibrary"/></remarks>
 
@@ -54,7 +54,6 @@ namespace BizHawk.Client.Common
 		void EnableRewind(bool enabled);
 
 		/// <remarks>only referenced from <see cref="EmuClientApi"/></remarks>
-		FileWriteResult FlushSaveRAM(bool autosave = false);
 
 		/// <remarks>only referenced from <see cref="EmuClientApi"/></remarks>
 		void FrameAdvance(bool discardApiHawkSurfaces = true);

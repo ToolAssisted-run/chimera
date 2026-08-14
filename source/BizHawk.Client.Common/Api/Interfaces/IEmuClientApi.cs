@@ -94,7 +94,6 @@ namespace BizHawk.Client.Common
 
 		void RebootCore();
 
-		void SaveRam();
 
 		/// <summary>
 		/// Save a state with specified name

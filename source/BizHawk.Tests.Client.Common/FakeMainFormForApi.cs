@@ -40,13 +40,12 @@ namespace BizHawk.Tests.Client.Common
 		public void ClickSpeedItem(int num) => throw new NotImplementedException();
 		public void CloseEmulator(int? exitCode = null) => throw new NotImplementedException();
 		public void EnableRewind(bool enabled) => throw new NotImplementedException();
-		public FileWriteResult FlushSaveRAM(bool autosave = false) => throw new NotImplementedException();
 		public void FrameAdvance(bool discardApiHawkSurfaces = true) => throw new NotImplementedException();
 		public void FrameBufferResized(bool forceWindowResize = false) => throw new NotImplementedException();
 		public void FrameSkipMessage() => throw new NotImplementedException();
 		public int GetApproxFramerate() => throw new NotImplementedException();
 		public bool LoadMovie(string filename, string? archive = null) => throw new NotImplementedException();
-		public void LoadNullRom(bool clearSram = false) => throw new NotImplementedException();
+		public void LoadNullRom() => throw new NotImplementedException();
 		public bool LoadQuickSave(int slot, bool suppressOSD = false) => throw new NotImplementedException();
 		public bool LoadRom(string path, LoadRomArgs args) => throw new NotImplementedException();
 		public bool LoadState(string path, string userFriendlyStateName, bool suppressOSD = false) => throw new NotImplementedException();

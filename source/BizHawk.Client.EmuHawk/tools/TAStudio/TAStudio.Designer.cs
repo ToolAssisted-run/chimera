@@ -36,7 +36,6 @@ namespace BizHawk.Client.EmuHawk
 			this.NewTASMenuItem = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
 			this.NewFromSubMenu = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
 			this.NewFromNowMenuItem = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
-			this.NewFromCurrentSaveRamMenuItem = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
 			this.OpenTASMenuItem = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
 			this.SaveTASMenuItem = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
 			this.SaveAsTASMenuItem = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
@@ -128,7 +127,6 @@ namespace BizHawk.Client.EmuHawk
 			this.BranchContextMenuItem = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
 			this.StartFromNowSeparator = new BizHawk.WinForms.Controls.ToolStripSeparatorEx();
 			this.StartNewProjectFromNowMenuItem = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
-			this.StartANewProjectFromSaveRamMenuItem = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
 			this.BookMarkControl = new BizHawk.Client.EmuHawk.BookmarksBranchesBox();
 			this.BranchesMarkersSplit = new System.Windows.Forms.SplitContainer();
 			this.MainVertialSplit = new System.Windows.Forms.SplitContainer();
@@ -191,8 +189,7 @@ namespace BizHawk.Client.EmuHawk
 			// NewFromSubMenu
 			// 
 			this.NewFromSubMenu.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
-            this.NewFromNowMenuItem,
-            this.NewFromCurrentSaveRamMenuItem});
+            this.NewFromNowMenuItem});
 			this.NewFromSubMenu.Text = "New From";
 			this.NewFromSubMenu.DropDownOpened += new System.EventHandler(this.NewFromSubMenu_DropDownOpened);
 			// 
@@ -201,10 +198,7 @@ namespace BizHawk.Client.EmuHawk
 			this.NewFromNowMenuItem.Text = "&Now";
 			this.NewFromNowMenuItem.Click += new System.EventHandler(this.StartNewProjectFromNowMenuItem_Click);
 			// 
-			// NewFromCurrentSaveRamMenuItem
 			// 
-			this.NewFromCurrentSaveRamMenuItem.Text = "&Current SaveRam";
-			this.NewFromCurrentSaveRamMenuItem.Click += new System.EventHandler(this.StartANewProjectFromSaveRamMenuItem_Click);
 			// 
 			// OpenTASMenuItem
 			// 
@@ -574,8 +568,7 @@ namespace BizHawk.Client.EmuHawk
             this.TruncateContextMenuItem,
             this.BranchContextMenuItem,
             this.StartFromNowSeparator,
-            this.StartNewProjectFromNowMenuItem,
-            this.StartANewProjectFromSaveRamMenuItem});
+            this.StartNewProjectFromNowMenuItem});
 			this.RightClickMenu.Name = "RightClickMenu";
 			this.RightClickMenu.Size = new System.Drawing.Size(253, 502);
 			this.RightClickMenu.Opened += new System.EventHandler(this.RightClickMenu_Opened);
@@ -684,10 +677,7 @@ namespace BizHawk.Client.EmuHawk
 			this.StartNewProjectFromNowMenuItem.Text = "Start a new project from Now";
 			this.StartNewProjectFromNowMenuItem.Click += new System.EventHandler(this.StartNewProjectFromNowMenuItem_Click);
 			// 
-			// StartANewProjectFromSaveRamMenuItem
 			// 
-			this.StartANewProjectFromSaveRamMenuItem.Text = "Start a new project from SaveRam";
-			this.StartANewProjectFromSaveRamMenuItem.Click += new System.EventHandler(this.StartANewProjectFromSaveRamMenuItem_Click);
 			// 
 			// BookMarkControl
 			// 
@@ -915,10 +905,8 @@ namespace BizHawk.Client.EmuHawk
 		private BizHawk.WinForms.Controls.ToolStripMenuItemEx BranchContextMenuItem;
 		private System.Windows.Forms.SplitContainer BranchesMarkersSplit;
 		private System.Windows.Forms.SplitContainer MainVertialSplit;
-		private BizHawk.WinForms.Controls.ToolStripMenuItemEx StartANewProjectFromSaveRamMenuItem;
 		private BizHawk.WinForms.Controls.ToolStripMenuItemEx NewFromSubMenu;
 		private BizHawk.WinForms.Controls.ToolStripMenuItemEx NewFromNowMenuItem;
-		private BizHawk.WinForms.Controls.ToolStripMenuItemEx NewFromCurrentSaveRamMenuItem;
 		private BizHawk.WinForms.Controls.ToolStripMenuItemEx SetMarkerWithTextContextMenuItem;
 		private BizHawk.WinForms.Controls.ToolStripMenuItemEx TASEditorManualOnlineMenuItem;
 		private BizHawk.WinForms.Controls.ToolStripMenuItemEx ForumThreadMenuItem;

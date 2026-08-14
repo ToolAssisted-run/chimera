@@ -35,7 +35,8 @@ namespace BizHawk.Client.Common
 			tas.StartsFromSavestate = old.StartsFromSavestate;
 			tas.TextSavestate = old.TextSavestate;
 			tas.BinarySavestate = old.BinarySavestate;
-			tas.SaveRam = old.SaveRam;
+			tas.BundleName = old.BundleName;
+			tas.BundleId = old.BundleId;
 
 			return tas;
 		}
@@ -69,7 +70,8 @@ namespace BizHawk.Client.Common
 
 			bk2.TextSavestate = old.TextSavestate;
 			bk2.BinarySavestate = old.BinarySavestate;
-			bk2.SaveRam = old.SaveRam;
+			bk2.BundleName = old.BundleName;
+			bk2.BundleId = old.BundleId;
 
 			return bk2;
 		}
@@ -116,37 +118,6 @@ namespace BizHawk.Client.Common
 				{
 					tas.Markers.Add(new TasMovieMarker(marker.Frame - frame, marker.Message));
 				}
-			}
-
-			FileWriteResult saveResult = tas.Save();
-			return saveResult.Convert(tas);
-		}
-
-		public static FileWriteResult<ITasMovie> ConvertToSaveRamAnchoredMovie(this ITasMovie old, byte[] saveRam)
-		{
-			string newFilename = ConvertFileNameToTasMovie(old.Filename);
-
-			var tas = (ITasMovie)old.Session.Get(newFilename);
-			tas.SaveRam = saveRam;
-
-			var entries = old.GetLogEntries();
-
-			tas.CopyVerificationLog(old.VerificationLog);
-			tas.CopyVerificationLog(entries);
-
-			foreach (var (k, v) in old.HeaderEntries) tas.HeaderEntries[k] = v;
-
-			tas.StartsFromSaveRam = true;
-			tas.SyncSettingsJson = old.SyncSettingsJson;
-
-			foreach (string comment in old.Comments)
-			{
-				tas.Comments.Add(comment);
-			}
-
-			foreach (Subtitle sub in old.Subtitles)
-			{
-				tas.Subtitles.Add(sub);
 			}
 
 			FileWriteResult saveResult = tas.Save();

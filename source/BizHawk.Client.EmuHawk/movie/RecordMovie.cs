@@ -16,9 +16,8 @@ namespace BizHawk.Client.EmuHawk
 	{
 		private const string START_FROM_POWERON = "Power-on (clean)";
 
-		private const string START_FROM_SAVERAM = "SaveRAM";
 
-		private const string START_FROM_SAVESTATE = "SaveRAM + savestate";
+		private const string START_FROM_SAVESTATE = "savestate";
 
 		private readonly IMainFormForTools _mainForm;
 		private readonly Config _config;
@@ -103,7 +102,6 @@ namespace BizHawk.Client.EmuHawk
 				MaxDropDownItems = 32,
 				Size = new(152, 21),
 			};
-			if (_emulator.HasSaveRam() && _emulator.AsSaveRam().CloneSaveRam(clearDirty: false) is not null) StartFromCombo.Items.Add(START_FROM_SAVERAM);
 			if (_emulator.HasSavestates()) StartFromCombo.Items.Add(START_FROM_SAVESTATE);
 
 			DefaultAuthorCheckBox = new()
@@ -238,12 +236,6 @@ namespace BizHawk.Client.EmuHawk
 						var v = _emulator.AsVideoProvider();
 						movieToRecord.SavestateFramebuffer = new BitmapBuffer(v.BufferWidth, v.BufferHeight, v.GetVideoBuffer());
 					}
-				}
-				else if (selectedStartFromValue is START_FROM_SAVERAM && _emulator.HasSaveRam())
-				{
-					var core = _emulator.AsSaveRam();
-					movieToRecord.StartsFromSaveRam = true;
-					movieToRecord.SaveRam = core.CloneSaveRam(clearDirty: false);
 				}
 
 				_mainForm.StartNewMovie(movieToRecord, true);

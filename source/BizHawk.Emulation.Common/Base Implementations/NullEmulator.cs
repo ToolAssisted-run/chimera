@@ -14,7 +14,7 @@ namespace BizHawk.Emulation.Common
 		typeof(IInputPollable),
 		typeof(IMemoryDomains),
 		typeof(IRegionable),
-		typeof(ISaveRam),
+		typeof(ICorePersistentData),
 		typeof(ISettable<,>),
 		typeof(ISoundProvider),
 		typeof(IStatable),

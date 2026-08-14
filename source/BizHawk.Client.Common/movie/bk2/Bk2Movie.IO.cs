@@ -113,10 +113,6 @@ namespace BizHawk.Client.Common
 						zstdCompress: false);
 				}
 			}
-			else if (StartsFromSaveRam)
-			{
-				bs.PutLump(BinaryStateLump.MovieSaveRam, (BinaryWriter bw) => bw.Write(SaveRam));
-			}
 		}
 
 		protected override void ClearBeforeLoad()
@@ -181,11 +177,6 @@ namespace BizHawk.Client.Common
 							SavestateFramebuffer = new BitmapBuffer(bmp.BufferWidth, bmp.BufferHeight, bmp.GetVideoBuffer());
 						}
 					});
-			}
-			else if (StartsFromSaveRam)
-			{
-				bl.GetLump(BinaryStateLump.MovieSaveRam, false,
-					br => SaveRam = br.ReadAllBytes());
 			}
 		}
 	}

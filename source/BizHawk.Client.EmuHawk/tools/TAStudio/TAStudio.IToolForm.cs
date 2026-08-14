@@ -14,9 +14,6 @@ namespace BizHawk.Client.EmuHawk
 		[RequiredService]
 		public IVideoProvider VideoProvider { get; private set; }
 
-		[OptionalService]
-		public ISaveRam SaveRamEmulator { get; private set; }
-
 		private bool _initializing; // If true, will bypass restart logic, this is necessary since loading projects causes a movie to load which causes a rom to reload causing dialogs to restart
 
 		private int _lastRefresh;

@@ -5,7 +5,6 @@ namespace BizHawk.Client.Common
 	public interface IMovieApi : IExternalApi
 	{
 		bool StartsFromSavestate();
-		bool StartsFromSaveram();
 		string Filename();
 		IReadOnlyDictionary<string, object> GetInput(int frame, int? controller = null);
 		string GetInputAsMnemonic(int frame);

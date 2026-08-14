@@ -47,10 +47,8 @@ namespace BizHawk.Client.Common
 			}
 			else
 			{
-				if (StartsFromSaveRam && emulator.HasSaveRam())
-				{
-					emulator.AsSaveRam().StoreSaveRam(SaveRam!);
-				}
+				// a run that starts from a save starts from a BUNDLE, which the rom loader
+				// has already composed into the machine before we get here
 				TasStateManager.Engage(emulator.AsStatable().CloneSavestate());
 			}
 

@@ -119,17 +119,14 @@ namespace BizHawk.Client.Common
 		/// <summary>
 		/// Makes a .bak file before any saveram-writing operation (could be extended to make timestamped backups)
 		/// </summary>
-		public bool BackupSaveram { get; set; } = true;
 
 		/// <summary>
 		/// Whether to make AutoSave files at periodic intervals
 		/// </summary>
-		public bool AutosaveSaveRAM { get; set; }
 
 		/// <summary>
 		/// Intervals at which to make AutoSave files
 		/// </summary>
-		public int FlushSaveRamFrames { get; set; }
 
 		public bool TurboSeek { get; set; }
 

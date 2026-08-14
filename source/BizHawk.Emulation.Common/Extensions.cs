@@ -85,14 +85,14 @@ namespace BizHawk.Emulation.Common
 			return core.ServiceProvider.GetService<IMemoryDomains>();
 		}
 
-		public static bool HasSaveRam(this IEmulator core)
+		public static bool HasPersistentData(this IEmulator core)
 		{
-			return core != null && core.ServiceProvider.HasService<ISaveRam>();
+			return core != null && core.ServiceProvider.HasService<ICorePersistentData>();
 		}
 
-		public static ISaveRam AsSaveRam(this IEmulator core)
+		public static ICorePersistentData AsPersistentData(this IEmulator core)
 		{
-			return core.ServiceProvider.GetService<ISaveRam>();
+			return core.ServiceProvider.GetService<ICorePersistentData>();
 		}
 
 		public static bool HasSavestates(this IEmulator core)

@@ -1073,6 +1073,44 @@ firmware file means. It checks size and hash because the declaration told it wha
 to check, and hands over bytes. Whether they are the right bytes for the machine
 is the core's business.
 
+## Persistent data and bundles (user-decided, 2026-08-14)
+
+"SaveRAM" is one console family's word, and miniHawk was full of it: a File menu,
+an autosave timer, a per-system save directory, a movie header flag, a lump
+inside every .bk2. All of it deleted - 362 references across 34 files - and
+replaced by two ideas that do not know what a cartridge is.
+
+**Persistent data.** A core says it keeps something, says what to CALL it
+("Cartridge SRAM", "Disk Contents") and what to file it under ("sram", "disk"),
+and hands over opaque bytes. The frontend repeats the core's words and moves the
+bytes. `ICorePersistentData`; guest ABI `GetPersistentSize` / `GetPersistent` /
+`GetPersistentBuffer` / `PutPersistent`, plus `GetPersistentName` and
+`GetPersistentId` so even the label comes from the core. Exposed in the core's
+OWN menu (Emulator > Cartridge SRAM > Write to File... / Write to Bundle /
+Compose Bundle...), because it is a fact about that machine and not a frontend
+feature.
+
+**Bundles.** A game that is more than one file: `game.bundle`, a small JSON
+CATALOGUE naming a rom and any attachments, each pinned by SHA1, all of them
+sitting in the same folder as the bundle. It holds no data of its own - it is a
+few hundred bytes, editing a save does not mean rebuilding anything, and the rom
+it names is still the rom you already had.
+
+- **Identity is over the parts, not the file**: a hash of the parts' hashes. So
+  renaming a bundle, or writing it out with different formatting, does not change
+  what a movie recorded - but changing a save does.
+- **Only files beside it.** No absolute paths, no `..`. A catalogue that reaches
+  elsewhere is a catalogue that only works on one machine.
+- **Attachments are addressed to a core** by name and by the id that core
+  declared, so a save for one core is never fed to another.
+- **This is how a movie starts from a save.** BizHawk's `StartsFromSaveRam` put a
+  copy of the save inside the .bk2, where it could not be inspected or shared;
+  the movie now cites `Bundle` and `BundleID`, and replay warns when the bundle
+  loaded is not the one recorded against. The blob-in-a-movie is gone.
+- **Loading is never implicit.** Nothing is looked for next to a rom; a bare rom
+  boots clean every time. A bundle IS the statement "this game starts with this
+  in it", and is also the standing instruction to write back to it on close.
+
 ## Save files: the core decides what a machine keeps (2026-08-14)
 
 A save file is not a memory domain the frontend copies out. Only the core knows

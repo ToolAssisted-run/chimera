@@ -386,11 +386,6 @@ namespace BizHawk.Client.Common
 		public void DisplayMessages(bool value)
 			=> APIs.EmuClient.DisplayMessages(value);
 
-		[LuaMethodExample("client.saveram( );")]
-		[LuaMethod("saveram", "flushes save ram to disk")]
-		public void SaveRam()
-			=> APIs.EmuClient.SaveRam();
-
 		[LuaMethodExample("client.sleep( 50 );")]
 		[LuaMethod("sleep", "sleeps for n milliseconds")]
 		public void Sleep(int millis)

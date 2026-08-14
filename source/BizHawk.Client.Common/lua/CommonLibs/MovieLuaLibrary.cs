@@ -17,11 +17,6 @@ namespace BizHawk.Client.Common
 		public bool StartsFromSavestate()
 			=> APIs.Movie.StartsFromSavestate();
 
-		[LuaMethodExample("if ( movie.startsfromsaveram( ) ) then\r\n\tconsole.log( \"Returns whether or not the movie is a saveram-anchored movie\" );\r\nend;")]
-		[LuaMethod("startsfromsaveram", "Returns whether or not the movie is a saveram-anchored movie")]
-		public bool StartsFromSaveram()
-			=> APIs.Movie.StartsFromSaveram();
-
 		[LuaMethodExample("local stmovfil = movie.filename( );")]
 		[LuaMethod("filename", "Returns the file name including path of the currently loaded movie")]
 		public string Filename()

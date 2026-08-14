@@ -556,9 +556,33 @@ namespace BizHawk.Client.Common
 			}
 		}
 
+		/// <summary>
+		/// The bundle the loaded game came from, or null when a bare rom was opened. What a
+		/// core keeps (see <see cref="ICorePersistentData"/>) travels in here, and a movie
+		/// recorded now cites it.
+		/// </summary>
+		public GameBundle LoadedBundle { get; private set; }
+
 		public bool LoadRom(string path, CoreComm nextComm, string forcedCoreName = null, int recursiveCount = 0)
 		{
 			if (path == null) return false;
+
+			// A bundle is a catalogue: it names the rom beside it, and what a core should
+			// start with. Resolve it to that rom and carry the bundle for the caller, so
+			// nothing downstream has to know bundles exist.
+			LoadedBundle = null;
+			if (GameBundle.IsBundlePath(path))
+			{
+				var bundle = GameBundle.Load(path);
+				LoadedBundle = bundle;
+				path = bundle.ResolveFile(bundle.Rom);
+				if (!File.Exists(path))
+				{
+					DoLoadErrorCallback($"{Path.GetFileName(path)} is missing from this bundle's folder", "");
+					return false;
+				}
+				_ = bundle.ReadFile(bundle.Rom); // hashes are checked before anything is loaded
+			}
 
 			if (recursiveCount > 1) // hack to stop recursive calls from endlessly rerunning if we can't load it
 			{

@@ -53,15 +53,6 @@
 			this.SingleInstanceModeCheckbox = new System.Windows.Forms.CheckBox();
 			this.tabPage3 = new System.Windows.Forms.TabPage();
 			this.NoMixedKeyPriorityCheckBox = new System.Windows.Forms.CheckBox();
-			this.groupBox2 = new System.Windows.Forms.GroupBox();
-			this.label10 = new BizHawk.WinForms.Controls.LocLabelEx();
-			this.label9 = new BizHawk.WinForms.Controls.LocLabelEx();
-			this.AutosaveSRAMtextBox = new System.Windows.Forms.NumericUpDown();
-			this.AutosaveSRAMradioButton1 = new System.Windows.Forms.RadioButton();
-			this.label8 = new BizHawk.WinForms.Controls.LocLabelEx();
-			this.AutosaveSRAMradioButton2 = new System.Windows.Forms.RadioButton();
-			this.AutosaveSRAMradioButton3 = new System.Windows.Forms.RadioButton();
-			this.AutosaveSRAMCheckbox = new System.Windows.Forms.CheckBox();
 			this.label6 = new BizHawk.WinForms.Controls.LocLabelEx();
 			this.cbSkipWaterboxIntegrityChecks = new System.Windows.Forms.CheckBox();
 			this.label5 = new BizHawk.WinForms.Controls.LocLabelEx();
@@ -70,14 +61,11 @@
 			this.label12 = new BizHawk.WinForms.Controls.LocLabelEx();
 			this.label13 = new BizHawk.WinForms.Controls.LocLabelEx();
 			this.FrameAdvSkipLagCheckbox = new System.Windows.Forms.CheckBox();
-			this.BackupSRamCheckbox = new System.Windows.Forms.CheckBox();
 			this.toolTip1 = new System.Windows.Forms.ToolTip(this.components);
 			this.tabControl1.SuspendLayout();
 			this.tabPage1.SuspendLayout();
 			this.groupBox1.SuspendLayout();
 			this.tabPage3.SuspendLayout();
-			this.groupBox2.SuspendLayout();
-			((System.ComponentModel.ISupportInitialize)(this.AutosaveSRAMtextBox)).BeginInit();
 			this.SuspendLayout();
 			// 
 			// OkBtn
@@ -309,8 +297,6 @@
 			// tabPage3
 			// 
 			this.tabPage3.Controls.Add(this.NoMixedKeyPriorityCheckBox);
-			this.tabPage3.Controls.Add(this.groupBox2);
-			this.tabPage3.Controls.Add(this.AutosaveSRAMCheckbox);
 			this.tabPage3.Controls.Add(this.label6);
 			this.tabPage3.Controls.Add(this.cbSkipWaterboxIntegrityChecks);
 			this.tabPage3.Controls.Add(this.label5);
@@ -319,7 +305,6 @@
 			this.tabPage3.Controls.Add(this.label12);
 			this.tabPage3.Controls.Add(this.label13);
 			this.tabPage3.Controls.Add(this.FrameAdvSkipLagCheckbox);
-			this.tabPage3.Controls.Add(this.BackupSRamCheckbox);
 			this.tabPage3.Location = new System.Drawing.Point(4, 22);
 			this.tabPage3.Name = "tabPage3";
 			this.tabPage3.Size = new System.Drawing.Size(392, 322);
@@ -336,106 +321,6 @@
 			this.NoMixedKeyPriorityCheckBox.TabIndex = 25;
 			this.NoMixedKeyPriorityCheckBox.Text = "Key Priority Toggle - Remove Mixed Key Priority Options";
 			this.NoMixedKeyPriorityCheckBox.UseVisualStyleBackColor = true;
-			// 
-			// groupBox2
-			// 
-			this.groupBox2.Controls.Add(this.label10);
-			this.groupBox2.Controls.Add(this.label9);
-			this.groupBox2.Controls.Add(this.AutosaveSRAMtextBox);
-			this.groupBox2.Controls.Add(this.AutosaveSRAMradioButton1);
-			this.groupBox2.Controls.Add(this.label8);
-			this.groupBox2.Controls.Add(this.AutosaveSRAMradioButton2);
-			this.groupBox2.Controls.Add(this.AutosaveSRAMradioButton3);
-			this.groupBox2.Location = new System.Drawing.Point(27, 32);
-			this.groupBox2.Margin = new System.Windows.Forms.Padding(0);
-			this.groupBox2.Name = "groupBox2";
-			this.groupBox2.Size = new System.Drawing.Size(265, 60);
-			this.groupBox2.TabIndex = 5;
-			this.groupBox2.TabStop = false;
-			this.groupBox2.Text = "AutoSaveRAM";
-			// 
-			// label10
-			// 
-			this.label10.Location = new System.Drawing.Point(9, 34);
-			this.label10.Name = "label10";
-			this.label10.Text = "every";
-			// 
-			// label9
-			// 
-			this.label9.Location = new System.Drawing.Point(6, 16);
-			this.label9.Name = "label9";
-			this.label9.Text = "Save SaveRAM to .AutoSaveRAM.SaveRAM";
-			// 
-			// AutosaveSRAMtextBox
-			// 
-			this.AutosaveSRAMtextBox.Location = new System.Drawing.Point(151, 33);
-			this.AutosaveSRAMtextBox.Maximum = new decimal(new int[] {
-            86400,
-            0,
-            0,
-            0});
-			this.AutosaveSRAMtextBox.Minimum = new decimal(new int[] {
-            1,
-            0,
-            0,
-            0});
-			this.AutosaveSRAMtextBox.Name = "AutosaveSRAMtextBox";
-			this.AutosaveSRAMtextBox.Size = new System.Drawing.Size(50, 20);
-			this.AutosaveSRAMtextBox.TabIndex = 5;
-			this.AutosaveSRAMtextBox.Value = new decimal(new int[] {
-            1,
-            0,
-            0,
-            0});
-			// 
-			// AutosaveSRAMradioButton1
-			// 
-			this.AutosaveSRAMradioButton1.AutoSize = true;
-			this.AutosaveSRAMradioButton1.Location = new System.Drawing.Point(48, 33);
-			this.AutosaveSRAMradioButton1.Name = "AutosaveSRAMradioButton1";
-			this.AutosaveSRAMradioButton1.Size = new System.Drawing.Size(36, 17);
-			this.AutosaveSRAMradioButton1.TabIndex = 2;
-			this.AutosaveSRAMradioButton1.TabStop = true;
-			this.AutosaveSRAMradioButton1.Text = "5s";
-			this.AutosaveSRAMradioButton1.UseVisualStyleBackColor = true;
-			// 
-			// label8
-			// 
-			this.label8.Location = new System.Drawing.Point(202, 35);
-			this.label8.Name = "label8";
-			this.label8.Text = "s";
-			// 
-			// AutosaveSRAMradioButton2
-			// 
-			this.AutosaveSRAMradioButton2.AutoSize = true;
-			this.AutosaveSRAMradioButton2.Location = new System.Drawing.Point(90, 34);
-			this.AutosaveSRAMradioButton2.Name = "AutosaveSRAMradioButton2";
-			this.AutosaveSRAMradioButton2.Size = new System.Drawing.Size(39, 17);
-			this.AutosaveSRAMradioButton2.TabIndex = 3;
-			this.AutosaveSRAMradioButton2.TabStop = true;
-			this.AutosaveSRAMradioButton2.Text = "5m";
-			this.AutosaveSRAMradioButton2.UseVisualStyleBackColor = true;
-			// 
-			// AutosaveSRAMradioButton3
-			// 
-			this.AutosaveSRAMradioButton3.AutoSize = true;
-			this.AutosaveSRAMradioButton3.Location = new System.Drawing.Point(131, 35);
-			this.AutosaveSRAMradioButton3.Name = "AutosaveSRAMradioButton3";
-			this.AutosaveSRAMradioButton3.Size = new System.Drawing.Size(14, 13);
-			this.AutosaveSRAMradioButton3.TabIndex = 4;
-			this.AutosaveSRAMradioButton3.TabStop = true;
-			this.AutosaveSRAMradioButton3.UseVisualStyleBackColor = true;
-			this.AutosaveSRAMradioButton3.CheckedChanged += new System.EventHandler(this.AutosaveSRAMRadioButton3_CheckedChanged);
-			// 
-			// AutosaveSRAMCheckbox
-			// 
-			this.AutosaveSRAMCheckbox.AutoSize = true;
-			this.AutosaveSRAMCheckbox.Location = new System.Drawing.Point(6, 35);
-			this.AutosaveSRAMCheckbox.Name = "AutosaveSRAMCheckbox";
-			this.AutosaveSRAMCheckbox.Size = new System.Drawing.Size(15, 14);
-			this.AutosaveSRAMCheckbox.TabIndex = 4;
-			this.AutosaveSRAMCheckbox.UseVisualStyleBackColor = true;
-			this.AutosaveSRAMCheckbox.CheckedChanged += new System.EventHandler(this.AutosaveSRAMCheckbox_CheckedChanged);
 			// 
 			// label6
 			// 
@@ -503,16 +388,6 @@
 			this.FrameAdvSkipLagCheckbox.Text = "Frame advance button skips non-input frames";
 			this.FrameAdvSkipLagCheckbox.UseVisualStyleBackColor = true;
 			// 
-			// BackupSRamCheckbox
-			// 
-			this.BackupSRamCheckbox.AutoSize = true;
-			this.BackupSRamCheckbox.Location = new System.Drawing.Point(6, 12);
-			this.BackupSRamCheckbox.Name = "BackupSRamCheckbox";
-			this.BackupSRamCheckbox.Size = new System.Drawing.Size(203, 17);
-			this.BackupSRamCheckbox.TabIndex = 3;
-			this.BackupSRamCheckbox.Text = "Backup SaveRAM to .SaveRAM.bak";
-			this.BackupSRamCheckbox.UseVisualStyleBackColor = true;
-			// 
 			// EmuHawkOptions
 			// 
 			this.AcceptButton = this.OkBtn;
@@ -535,9 +410,6 @@
 			this.groupBox1.PerformLayout();
 			this.tabPage3.ResumeLayout(false);
 			this.tabPage3.PerformLayout();
-			this.groupBox2.ResumeLayout(false);
-			this.groupBox2.PerformLayout();
-			((System.ComponentModel.ISupportInitialize)(this.AutosaveSRAMtextBox)).EndInit();
 			this.ResumeLayout(false);
 
 		}
@@ -550,7 +422,6 @@
 		private System.Windows.Forms.TabPage tabPage1;
 		private System.Windows.Forms.TabPage tabPage3;
 		private System.Windows.Forms.ToolTip toolTip1;
-		private System.Windows.Forms.CheckBox BackupSRamCheckbox;
 		private System.Windows.Forms.CheckBox FrameAdvSkipLagCheckbox;
 		private BizHawk.WinForms.Controls.LocLabelEx label12;
 		private BizHawk.WinForms.Controls.LocLabelEx label13;
@@ -559,15 +430,6 @@
 		private System.Windows.Forms.CheckBox cbMoviesOnDisk;
 		private BizHawk.WinForms.Controls.LocLabelEx label6;
 		private System.Windows.Forms.CheckBox cbSkipWaterboxIntegrityChecks;
-		private System.Windows.Forms.CheckBox AutosaveSRAMCheckbox;
-		private BizHawk.WinForms.Controls.LocLabelEx label8;
-		private System.Windows.Forms.RadioButton AutosaveSRAMradioButton3;
-		private System.Windows.Forms.RadioButton AutosaveSRAMradioButton2;
-		private System.Windows.Forms.RadioButton AutosaveSRAMradioButton1;
-		private System.Windows.Forms.GroupBox groupBox2;
-		private System.Windows.Forms.NumericUpDown AutosaveSRAMtextBox;
-		private BizHawk.WinForms.Controls.LocLabelEx label10;
-		private BizHawk.WinForms.Controls.LocLabelEx label9;
 		private System.Windows.Forms.CheckBox HandleAlternateKeyboardLayoutsCheckBox;
 		private System.Windows.Forms.CheckBox NeverAskSaveCheckbox;
 		private BizHawk.WinForms.Controls.LocLabelEx label2;

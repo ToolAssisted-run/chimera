@@ -51,26 +51,32 @@ namespace BizHawk.Client.Common
 			}
 		}
 
-		public bool StartsFromSaveRam
+		/// <summary>
+		/// The bundle this was recorded against, if any: a run that starts from a save
+		/// starts from a bundle, because that is what composes a rom with what a core
+		/// keeps. Name for a human, id for a machine.
+		/// </summary>
+		public string BundleName
 		{
-			// ReSharper disable SimplifyConditionalTernaryExpression
-			get => Header.TryGetValue(HeaderKeys.StartsFromSaveram, out var s) ? bool.Parse(s) : false;
-			// ReSharper restore SimplifyConditionalTernaryExpression
+			get => Header.TryGetValue(HeaderKeys.Bundle, out var s) ? s : "";
 			set
 			{
-				if (value)
-				{
-					if (!Header.ContainsKey(HeaderKeys.StartsFromSaveram))
-					{
-						Header.Add(HeaderKeys.StartsFromSaveram, "True");
-					}
-				}
-				else
-				{
-					Header.Remove(HeaderKeys.StartsFromSaveram);
-				}
+				if (string.IsNullOrWhiteSpace(value)) Header.Remove(HeaderKeys.Bundle);
+				else Header[HeaderKeys.Bundle] = value;
 			}
 		}
+
+		public string BundleId
+		{
+			get => Header.TryGetValue(HeaderKeys.BundleId, out var s) ? s : "";
+			set
+			{
+				if (string.IsNullOrWhiteSpace(value)) Header.Remove(HeaderKeys.BundleId);
+				else Header[HeaderKeys.BundleId] = value;
+			}
+		}
+
+		public bool StartsFromBundle => !string.IsNullOrWhiteSpace(BundleId) || !string.IsNullOrWhiteSpace(BundleName);
 
 		public override string GameName
 		{
@@ -183,6 +189,5 @@ namespace BizHawk.Client.Common
 		public string TextSavestate { get; set; }
 		public byte[] BinarySavestate { get; set; }
 		public BitmapBuffer SavestateFramebuffer { get; set; }
-		public byte[] SaveRam { get; set; }
 	}
 }

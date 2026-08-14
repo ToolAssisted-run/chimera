@@ -7,59 +7,18 @@ namespace BizHawk.Client.EmuHawk
 {
 	public partial class EmuHawkOptions : Form
 	{
-		private readonly Action _autoFlushSaveRamTimerBumpCallback;
-
 		private readonly Action _reinitHostKeybinds;
 
 		private readonly Config _config;
 
-		public EmuHawkOptions(Config config, Action autoFlushSaveRamTimerBumpCallback, Action reinitHostKeybinds)
+		public EmuHawkOptions(Config config, Action reinitHostKeybinds)
 		{
-			_autoFlushSaveRamTimerBumpCallback = autoFlushSaveRamTimerBumpCallback;
 			_reinitHostKeybinds = reinitHostKeybinds;
 			_config = config;
 			InitializeComponent();
 			cbEnableGCAdapterSupport.Text = OSTailoredCode.IsUnixHost
 				? "Enable Wii U/Switch GameCube Adapter Support (via libusb)"
 				: "Enable Wii U/Switch GameCube Adapter Support (via Zadig/WinUSB)";
-		}
-
-		public int AutosaveSaveRAMSeconds
-		{
-			get
-			{
-				if (AutosaveSRAMradioButton1.Checked)
-				{
-					return 5;
-				}
-
-				if (AutosaveSRAMradioButton2.Checked)
-				{
-					return 5 * 60;
-				}
-
-				return (int)AutosaveSRAMtextBox.Value;
-			}
-			set
-			{
-				switch (value)
-				{
-					case 5:
-						AutosaveSRAMradioButton1.Checked = true;
-						AutosaveSRAMtextBox.Enabled = false;
-						break;
-					case 5 * 60:
-						AutosaveSRAMradioButton2.Checked = true;
-						AutosaveSRAMtextBox.Enabled = false;
-						break;
-					default:
-						AutosaveSRAMradioButton3.Checked = true;
-						AutosaveSRAMtextBox.Enabled = true;
-						break;
-				}
-
-				AutosaveSRAMtextBox.Value = ((decimal) value).Clamp(AutosaveSRAMtextBox.Minimum, AutosaveSRAMtextBox.Maximum);
-			}
 		}
 
 		private void GuiOptions_Load(object sender, EventArgs e)
@@ -77,10 +36,6 @@ namespace BizHawk.Client.EmuHawk
 			SingleInstanceModeCheckbox.Checked = _config.SingleInstanceMode;
 			SingleInstanceModeCheckbox.Enabled = !OSTailoredCode.IsUnixHost;
 
-			BackupSRamCheckbox.Checked = _config.BackupSaveram;
-			AutosaveSRAMCheckbox.Checked = _config.AutosaveSaveRAM;
-			groupBox2.Enabled = AutosaveSRAMCheckbox.Checked;
-			AutosaveSaveRAMSeconds = _config.FlushSaveRamFrames / 60;
 			FrameAdvSkipLagCheckbox.Checked = _config.SkipLagFrame;
 			LuaDuringTurboCheckbox.Checked = _config.RunLuaDuringTurbo;
 			cbMoviesOnDisk.Checked = _config.Movies.MoviesOnDisk;
@@ -120,11 +75,6 @@ namespace BizHawk.Client.EmuHawk
 			_config.MergeLAndRModifierKeys = cbMergeLAndRModifierKeys.Checked;
 			_config.SingleInstanceMode = SingleInstanceModeCheckbox.Checked;
 
-			_config.BackupSaveram = BackupSRamCheckbox.Checked;
-			_config.AutosaveSaveRAM = AutosaveSRAMCheckbox.Checked;
-			_config.FlushSaveRamFrames = AutosaveSaveRAMSeconds * 60;
-			_autoFlushSaveRamTimerBumpCallback();
-
 			_config.SkipLagFrame = FrameAdvSkipLagCheckbox.Checked;
 			_config.RunLuaDuringTurbo = LuaDuringTurboCheckbox.Checked;
 			_config.Movies.MoviesOnDisk = cbMoviesOnDisk.Checked;
@@ -147,14 +97,5 @@ namespace BizHawk.Client.EmuHawk
 			AcceptBackgroundInputControllerOnlyCheckBox.Enabled = AcceptBackgroundInputCheckbox.Checked;
 		}
 
-		private void AutosaveSRAMCheckbox_CheckedChanged(object sender, EventArgs e)
-		{
-			groupBox2.Enabled = AutosaveSRAMCheckbox.Checked;
-		}
-
-		private void AutosaveSRAMRadioButton3_CheckedChanged(object sender, EventArgs e)
-		{
-			AutosaveSRAMtextBox.Enabled = AutosaveSRAMradioButton3.Checked;
-		}
 	}
 }

@@ -163,7 +163,6 @@ namespace BizHawk.Client.Common
 		public void RebootCore() => _mainForm.RebootCore();
 
 		// TODO: Change return type to FileWriteResult.
-		public void SaveRam() => _mainForm.FlushSaveRAM();
 
 		// TODO: Change return type to FileWriteResult.
 		// We may wish to change more than that, since we have a mostly-dupicate ISaveStateApi.Save, neither has documentation indicating what the differences are.

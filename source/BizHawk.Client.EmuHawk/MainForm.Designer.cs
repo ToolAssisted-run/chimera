@@ -72,8 +72,6 @@ namespace BizHawk.Client.EmuHawk
 			this.toolStripSeparator5 = new BizHawk.WinForms.Controls.ToolStripSeparatorEx();
 			this.SaveToCurrentSlotMenuItem = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
 			this.LoadCurrentSlotMenuItem = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
-			this.SaveRAMSubMenu = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
-			this.FlushSaveRAMMenuItem = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
 			this.toolStripMenuItem2 = new BizHawk.WinForms.Controls.ToolStripSeparatorEx();
 			this.MovieSubMenu = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
 			this.ReadonlyMenuItem = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
@@ -268,7 +266,6 @@ namespace BizHawk.Client.EmuHawk
 			this.toolStripMenuItem67 = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
 			this.ScreenshotContextMenuItem = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
 			this.CloseRomContextMenuItem = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
-			this.ClearSRAMContextMenuItem = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
 			this.ShowMenuContextMenuSeparator = new BizHawk.WinForms.Controls.ToolStripSeparatorEx();
 			this.ShowMenuContextMenuItem = new BizHawk.WinForms.Controls.ToolStripMenuItemEx();
 			this.timerMouseIdle = new System.Windows.Forms.Timer(this.components);
@@ -302,7 +299,6 @@ namespace BizHawk.Client.EmuHawk
             this.SaveStateSubMenu,
             this.LoadStateSubMenu,
             this.SaveSlotSubMenu,
-            this.SaveRAMSubMenu,
             this.toolStripMenuItem2,
             this.MovieSubMenu,
             this.AVSubMenu,
@@ -586,18 +582,6 @@ namespace BizHawk.Client.EmuHawk
 			// 
 			this.LoadCurrentSlotMenuItem.Text = "Load Current Slot";
 			this.LoadCurrentSlotMenuItem.Click += new System.EventHandler(this.LoadCurrentSlotMenuItem_Click);
-			// 
-			// SaveRAMSubMenu
-			// 
-			this.SaveRAMSubMenu.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
-            this.FlushSaveRAMMenuItem});
-			this.SaveRAMSubMenu.Text = "Save &RAM";
-			this.SaveRAMSubMenu.DropDownOpened += new System.EventHandler(this.SaveRamSubMenu_DropDownOpened);
-			// 
-			// FlushSaveRAMMenuItem
-			// 
-			this.FlushSaveRAMMenuItem.Text = "&Flush Save Ram";
-			this.FlushSaveRAMMenuItem.Click += new System.EventHandler(this.FlushSaveRAMMenuItem_Click);
 			// 
 			// MovieSubMenu
 			// 
@@ -1673,7 +1657,6 @@ namespace BizHawk.Client.EmuHawk
             this.ConfigContextMenuItem,
             this.ScreenshotContextMenuItem,
             this.CloseRomContextMenuItem,
-            this.ClearSRAMContextMenuItem,
             this.ShowMenuContextMenuSeparator,
             this.ShowMenuContextMenuItem});
 			this.MainFormContextMenu.Name = "contextMenuStrip1";
@@ -1849,10 +1832,7 @@ namespace BizHawk.Client.EmuHawk
 			this.CloseRomContextMenuItem.Text = "Close ROM";
 			this.CloseRomContextMenuItem.Click += new System.EventHandler(this.CloseRomMenuItem_Click);
 			// 
-			// ClearSRAMContextMenuItem
 			// 
-			this.ClearSRAMContextMenuItem.Text = "Close and Clear SRAM";
-			this.ClearSRAMContextMenuItem.Click += new System.EventHandler(this.ClearSramContextMenuItem_Click);
 			// 
 			// ShowMenuContextMenuItem
 			// 
@@ -2080,7 +2060,6 @@ namespace BizHawk.Client.EmuHawk
 		private BizHawk.WinForms.Controls.ToolStripSeparatorEx toolStripSeparator29;
 		private BizHawk.WinForms.Controls.ToolStripMenuItemEx ConfigContextMenuItem;
 		private BizHawk.WinForms.Controls.ToolStripMenuItemEx RewindOptionsMenuItem;
-		private BizHawk.WinForms.Controls.ToolStripMenuItemEx ClearSRAMContextMenuItem;
 		private BizHawk.WinForms.Controls.ToolStripSeparatorEx ShowMenuContextMenuSeparator;
 		private BizHawk.WinForms.Controls.ToolStripMenuItemEx StopAVContextMenuItem;
 		private BizHawk.WinForms.Controls.ToolStripMenuItemEx GenericCoreSubMenu;
@@ -2112,8 +2091,6 @@ namespace BizHawk.Client.EmuHawk
 		private BizHawk.WinForms.Controls.ToolStripMenuItemEx ScreenshotClientClipboardMenuItem;
 		private BizHawk.WinForms.Controls.StatusLabelEx LinkConnectStatusBarButton;
 		private BizHawk.WinForms.Controls.ToolStripMenuItemEx FeaturesMenuItem;
-		private BizHawk.WinForms.Controls.ToolStripMenuItemEx SaveRAMSubMenu;
-		private BizHawk.WinForms.Controls.ToolStripMenuItemEx FlushSaveRAMMenuItem;
 		private BizHawk.WinForms.Controls.StatusLabelEx UpdateNotification;
 		private BizHawk.WinForms.Controls.ToolStripMenuItemEx MacroToolMenuItem;
 		private System.Windows.Forms.Timer timerMouseIdle;

@@ -38,12 +38,6 @@ namespace BizHawk.Client.EmuHawk
 
 			CloseRomMenuItem.Enabled = !Emulator.IsNull();
 
-			var hasSaveRam = Emulator.HasSaveRam();
-			bool needBold = hasSaveRam && Emulator.AsSaveRam().SaveRamModified;
-
-			SaveRAMSubMenu.Enabled = hasSaveRam;
-			SaveRAMSubMenu.SetStyle(needBold ? FontStyle.Bold : FontStyle.Regular);
-
 			AVSubMenu.Enabled = Emulator.HasVideoProvider(); //TODO necessary?
 		}
 
@@ -140,11 +134,6 @@ namespace BizHawk.Client.EmuHawk
 			LoadCurrentSlotMenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["Quick Load"];
 			var slot = Config.SaveSlot;
 			for (var i = 1; i < slotMenuItems.Length; i++) slotMenuItems[i]!.Checked = slot == i;
-		}
-
-		private void SaveRamSubMenu_DropDownOpened(object sender, EventArgs e)
-		{
-			FlushSaveRAMMenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["Flush SaveRAM"];
 		}
 
 		private void MovieSubMenu_DropDownOpened(object sender, EventArgs e)
@@ -271,11 +260,6 @@ namespace BizHawk.Client.EmuHawk
 
 		private bool LoadstateCurrentSlot()
 			=> LoadQuickSave(Config.SaveSlot);
-
-		private void FlushSaveRAMMenuItem_Click(object sender, EventArgs e)
-		{
-			ShowMessageIfError(() => FlushSaveRAM(), "Failed to flush saveram!");
-		}
 
 		private void ReadonlyMenuItem_Click(object sender, EventArgs e)
 		{
@@ -753,19 +737,10 @@ namespace BizHawk.Client.EmuHawk
 			if (this.ShowDialogWithTempMute(form).IsOk()) AddOnScreenMessage("Rom Extension Preferences changed");
 		}
 
-		private void BumpAutoFlushSaveRamTimer()
-		{
-			if (AutoFlushSaveRamIn > Config.FlushSaveRamFrames)
-			{
-				AutoFlushSaveRamIn = Config.FlushSaveRamFrames;
-			}
-		}
-
 		private void CustomizeMenuItem_Click(object sender, EventArgs e)
 		{
 			using EmuHawkOptions form = new(
 				Config,
-				BumpAutoFlushSaveRamTimer,
 				() => ReinitHostKeybinds(includedHotkeys: true));
 			if (!this.ShowDialogWithTempMute(form).IsOk()) return;
 			AddOnScreenMessage("Custom configurations saved.");
@@ -1119,8 +1094,6 @@ namespace BizHawk.Client.EmuHawk
 
 			ConfigContextMenuItem.Visible = _inFullscreen;
 
-			ClearSRAMContextMenuItem.Visible = File.Exists(Config.PathEntries.SaveRamAbsolutePath(Game, MovieSession.Movie));
-
 			ContextSeparator_AfterROM.Visible = OpenRomContextMenuItem.Visible || LoadLastRomContextMenuItem.Visible;
 
 			LoadLastRomContextMenuItem.Enabled = !Config.RecentRoms.Empty;
@@ -1259,11 +1232,6 @@ namespace BizHawk.Client.EmuHawk
 			{
 				AddOnScreenMessage($"Save slot {slot} restored.");
 			}
-		}
-
-		private void ClearSramContextMenuItem_Click(object sender, EventArgs e)
-		{
-			LoadNullRom(clearSram: true);
 		}
 
 		private void ShowMenuContextMenuItem_Click(object sender, EventArgs e)

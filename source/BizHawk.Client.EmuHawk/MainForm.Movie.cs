@@ -77,6 +77,22 @@ namespace BizHawk.Client.EmuHawk
 				AddOnScreenMessage("Warning: Movie hash does not match the ROM", 5);
 			}
 
+			// the bundle: a movie recorded against one must be replayed against the same one,
+			// or the machine it starts on is not the machine it was recorded on
+			if (MovieSession.Movie.StartsFromBundle)
+			{
+				var loadedId = _openBundle?.ContentId;
+				if (loadedId is null)
+				{
+					AddOnScreenMessage($"Warning: this movie was recorded against bundle \"{MovieSession.Movie.BundleName}\"", 5);
+				}
+				else if (!string.IsNullOrEmpty(MovieSession.Movie.BundleId)
+					&& !loadedId.Equals(MovieSession.Movie.BundleId, StringComparison.OrdinalIgnoreCase))
+				{
+					AddOnScreenMessage("Warning: this bundle is not the one the movie was recorded against", 5);
+				}
+			}
+
 			// the analogous check for the core package: its SHA1 is its identity
 			if (!MovieSession.Movie.HeaderEntries.TryGetValue(HeaderKeys.CorePackageSha1, out var moviePackageSha1)
 				|| string.IsNullOrEmpty(moviePackageSha1))
@@ -180,6 +196,14 @@ namespace BizHawk.Client.EmuHawk
 			// the package's SHA1 is its ground-truth identity; (movie, core package) is the reproduction contract
 			var packageSha1 = CoreRegistry.Instance.GetPackageSha1ForCore(Emulator.GetType());
 			if (packageSha1 is not null) movie.HeaderEntries[HeaderKeys.CorePackageSha1] = packageSha1;
+
+			// ...and if the game came from a bundle, the bundle is part of that contract too: it
+			// is what says the machine started with a save in it, and which one
+			if (_openBundle is not null)
+			{
+				movie.BundleName = _openBundle.Name ?? System.IO.Path.GetFileNameWithoutExtension(_openBundle.Path);
+				movie.BundleId = _openBundle.ContentId ?? "";
+			}
 
 			var settable = GetSettingsAdapterForLoadedCoreUntyped();
 			if (settable.HasSyncSettings)

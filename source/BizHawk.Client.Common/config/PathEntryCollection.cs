@@ -20,12 +20,11 @@ namespace BizHawk.Client.Common
 		private static PathEntry CheatsEntryFor(string sysID)
 			=> new(sysID, "Cheats", Path.Combine(".", "Cheats"));
 
-		private static IEnumerable<PathEntry> CommonEntriesFor(string sysID, string basePath, bool omitSaveRAM = false)
+		private static IEnumerable<PathEntry> CommonEntriesFor(string sysID, string basePath)
 			=> [
 				BaseEntryFor(sysID, basePath),
 				ROMEntryFor(sysID),
 				SavestatesEntryFor(sysID),
-				..(omitSaveRAM ? [ ] : new[] { SaveRAMEntryFor(sysID) }),
 				ScreenshotsEntryFor(sysID),
 				CheatsEntryFor(sysID),
 			];
@@ -41,9 +40,6 @@ namespace BizHawk.Client.Common
 
 		private static PathEntry ROMEntryFor(string sysID, string path = ".")
 			=> new(sysID, "ROM", path);
-
-		private static PathEntry SaveRAMEntryFor(string sysID)
-			=> new(sysID, "Save RAM", Path.Combine(".", "SaveRAM"));
 
 		private static PathEntry SavestatesEntryFor(string sysID)
 			=> new(sysID, "Savestates", Path.Combine(".", "State"));
