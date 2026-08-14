@@ -26,12 +26,24 @@ namespace BizHawk.Tests.Client.Common.CorePackages
 			=> CorePackageList.Build(discovered, loaded, failures ?? [ ]);
 
 		[TestMethod]
-		public void AReadablePackageIsLoaded()
+		public void APackageInTheSessionIsLoaded()
 		{
 			var pkg = Pkg("quickerNES", "/cores/q.zip", sha1: "aa");
 			var entry = Build([ pkg ], [ Loaded("quickerNES", "/cores/q.zip", "aa") ])[0];
 			Assert.AreEqual(CorePackageState.Loaded, entry.State);
 			Assert.AreEqual("loaded", entry.StatusText);
+		}
+
+		/// <summary>
+		/// Being in a search directory is not being loaded: a package sits there until
+		/// someone opens it, which is the whole point of the Open Core window.
+		/// </summary>
+		[TestMethod]
+		public void AFoundButUnopenedPackageIsMerelyAvailable()
+		{
+			var entry = Build([ Pkg("quickerNES", "/cores/q.zip", sha1: "aa") ], [ ])[0];
+			Assert.AreEqual(CorePackageState.Available, entry.State);
+			Assert.AreEqual("available", entry.StatusText);
 		}
 
 		[TestMethod]

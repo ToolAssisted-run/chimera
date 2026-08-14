@@ -1138,3 +1138,26 @@ OUTLIVES the machine - and must never enter a savestate.
   autosave prompt, a flush on close, and per-system Save RAM paths. It was dead
   code for want of a core that had a save file; the work was the channel, not the
   window.
+
+## Opening a core is something you do (2026-08-14)
+
+Packages sitting in `Cores/` used to load themselves at startup. That made the
+folder the decision-maker, and it showed: with nothing open at all, the Emulator
+menu already had a Firmware item in it, because the descriptors were already
+loaded.
+
+- **`File > Open Core...` is the package list** (was "Core Packages..."), with an
+  Open button. Discovery scans the search directories and LISTS what it finds;
+  opening one is what loads it. Rows read *available*, *loaded* or an error - a
+  package that will not parse still appears, because "why is my core not here"
+  needs an answer that is not the console.
+- **The Emulator menu is empty until a core is loaded**, and disabled when empty.
+  Everything in it comes from a core: with a package open it holds that package's
+  Firmware (declared by the descriptor, so it is known before any rom); with a
+  machine running it also holds Settings, the core's tools, and what the machine
+  keeps.
+- **The command line still runs a rom in one step.** Naming a rom is an
+  instruction to run it, so if no `--core` was given and nothing is open, the
+  available packages are loaded to route it. Nothing like that happens in the
+  GUI, where the point is that the choice is yours and visible.
+

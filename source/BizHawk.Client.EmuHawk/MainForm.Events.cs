@@ -42,7 +42,7 @@ namespace BizHawk.Client.EmuHawk
 		}
 
 		private void OpenCoreMenuItem_Click(object sender, EventArgs e)
-			=> OpenCore();
+			=> OpenCoreDialog();
 
 		private void RecentRomMenuItem_DropDownOpened(object sender, EventArgs e)
 			=> RecentRomSubMenu.ReplaceDropDownItems(Config.RecentRoms.RecentMenu(this, LoadRomFromRecent, "ROM", romLoading: true));

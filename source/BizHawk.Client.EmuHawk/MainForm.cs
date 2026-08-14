@@ -100,10 +100,6 @@ namespace BizHawk.Client.EmuHawk
 			ConfigSubMenu.DropDownOpened += (_, _) => superHawkThrottleMenuItem.Checked = Config.SuperHawkThrottle;
 #endif
 
-			ToolStripMenuItemEx corePackagesMenuItem = new() { Text = "Core &Packages..." };
-			corePackagesMenuItem.Click += (_, _) => OpenCorePackagesDialog();
-			_ = FileSubMenu.DropDownItems.InsertAfter(OpenCoreMenuItem, insert: corePackagesMenuItem);
-
 			RebuildCoreSettingsMenus();
 
 			// Hide Status bar icons and general StatusBar prep
@@ -538,11 +534,10 @@ namespace BizHawk.Client.EmuHawk
 
 			if (Config.MainFormStayOnTop) TopMost = true;
 
-			// Packages sitting in Cores/ load here, in the constructor, because the
-			// commandline rom load is a few lines below and needs a core to exist -
-			// MainForm_Load would be far too late. (--core still wins: it is applied
-			// next, and a package already loaded from Cores/ is not loaded twice.)
-			LoadDiscoveredCorePackages();
+			// What is in Cores/ is only LISTED here - opening a core is something you do,
+			// like opening a rom (File > Open Core). The scan runs in the constructor
+			// because the commandline load a few lines below needs the list to exist.
+			ScanForCorePackages();
 			// the menus built at construction time predate the packages
 			RebuildCoreSettingsMenus();
 
@@ -553,6 +548,19 @@ namespace BizHawk.Client.EmuHawk
 
 			if (_argParser.cmdRom != null)
 			{
+				// Naming a rom on the commandline is an instruction to run it, so if no core
+				// was named with --core and none is open, the available ones are loaded to
+				// route it. Nothing like this happens in the GUI, where opening a core is a
+				// thing you do on purpose.
+				if (CoreRegistry.Instance.AllFactories.Count is 0)
+				{
+					foreach (var (pkg, error) in CoreRegistry.Instance.LoadDiscovered(_discoveredCorePackages))
+					{
+						Console.WriteLine($"core package not loaded: {pkg.Path}: {error}");
+					}
+					RebuildCoreSettingsMenus();
+				}
+
 				// Commandline should always override auto-load
 				var ioa = OpenAdvancedSerializer.ParseWithLegacy(_argParser.cmdRom);
 				_ = LoadRom(ioa.SimplePath, new LoadRomArgs(ioa));
@@ -1663,39 +1671,38 @@ namespace BizHawk.Client.EmuHawk
 		];
 
 		/// <summary>
-		/// Fills the "Emulator" menu: the running core's settings, then the tools that
-		/// core provides. The title is fixed (see <see cref="HandlePlatformMenus"/>);
-		/// only what is inside changes.
+		/// Fills the "Emulator" menu, which is EMPTY until a core is loaded: every item
+		/// in it comes from a core, so with none there is nothing to show and nothing to
+		/// grey out. Opening a package gives it what that package's descriptor declares
+		/// (its firmware needs); running a game adds what the machine itself has.
 		/// </summary>
 		private void DisplayDefaultCoreMenu()
 		{
 			GenericCoreSubMenu.DropDownItems.Clear();
 
-			var coreRunning = Emulator.SystemId is not VSystemID.Raw.NULL;
+			if (CoreRegistry.Instance.AllFactories.Count is 0) return; // no core loaded: nothing to say
 
-			var settingsMenuItem = new ToolStripMenuItem { Text = "&Settings", Enabled = coreRunning };
+			// What a loaded package says it needs. Known from the descriptor alone, which
+			// is why it is here before any rom is: a rom that needs a BIOS cannot be
+			// loaded until the BIOS is provided.
+			if (CoreFirmwareStore.AnyExpected(CoreRegistry.Instance))
+			{
+				ToolStripMenuItem firmwareMenuItem = new() { Text = "&Firmware..." };
+				firmwareMenuItem.Click += (_, _) =>
+				{
+					using CoreFirmwareForm form = new(
+						() => CoreFirmwareStore.Enumerate(Config, CoreRegistry.Instance),
+						(entry, path) => CoreFirmwareStore.SetPath(Config, entry.CoreName, entry.Decl.Id, path));
+					form.ShowDialog(this);
+				};
+				GenericCoreSubMenu.DropDownItems.Add(firmwareMenuItem);
+			}
+
+			if (Emulator.SystemId is VSystemID.Raw.NULL) return; // a core, but no machine running yet
+
+			var settingsMenuItem = new ToolStripMenuItem { Text = "&Settings" };
 			settingsMenuItem.Click += GenericCoreSettingsMenuItem_Click;
-			GenericCoreSubMenu.DropDownItems.Add(settingsMenuItem);
-
-			// Firmware is reachable with nothing loaded, unlike everything else here: a
-			// rom that needs a BIOS cannot be loaded until the BIOS has been provided, so
-			// an item that only appeared once a core was running would be unreachable
-			// exactly when it is needed.
-			var firmwareMenuItem = new ToolStripMenuItem
-			{
-				Text = "&Firmware...",
-				Enabled = CoreFirmwareStore.AnyExpected(CoreRegistry.Instance),
-			};
-			firmwareMenuItem.Click += (_, _) =>
-			{
-				using CoreFirmwareForm form = new(
-					() => CoreFirmwareStore.Enumerate(Config, CoreRegistry.Instance),
-					(entry, path) => CoreFirmwareStore.SetPath(Config, entry.CoreName, entry.Decl.Id, path));
-				form.ShowDialog(this);
-			};
-			GenericCoreSubMenu.DropDownItems.Add(firmwareMenuItem);
-
-			if (!coreRunning) return;
+			GenericCoreSubMenu.DropDownItems.Insert(0, settingsMenuItem);
 
 			// What this machine keeps between sessions, in the core's own words - a cartridge's
 			// SRAM, a disk. It belongs to the core's menu because only the core has the concept:
@@ -2067,39 +2074,50 @@ namespace BizHawk.Client.EmuHawk
 		private IReadOnlyList<(DiscoveredCorePackage Package, string Error)> _corePackageLoadFailures = [ ];
 
 		/// <summary>
-		/// Scans the core search directories and loads everything readable it finds.
-		/// Runs during construction, so it must not touch the UI: a failure here is a
-		/// console line plus an entry the Core Packages dialog shows, never a modal
-		/// that blocks startup.
+		/// Scans the core search directories for packages. It does NOT load them: what
+		/// is in a folder is a list of what is available, and a core becomes part of the
+		/// session because you opened it, exactly as a rom does. Runs during
+		/// construction, so it must not touch the UI.
 		/// </summary>
-		private void LoadDiscoveredCorePackages()
+		private void ScanForCorePackages()
 		{
 			_discoveredCorePackages = CorePackageDiscovery.ScanFor(Config);
-			_corePackageLoadFailures = CoreRegistry.Instance.LoadDiscovered(_discoveredCorePackages);
-			foreach (var (pkg, error) in _corePackageLoadFailures)
-			{
-				Console.WriteLine($"core package not loaded: {pkg.Path}: {error}");
-			}
 		}
 
-		/// <summary>Rescans the search directories, loading anything newly present and enabled.</summary>
+		/// <summary>Rescans the search directories for packages that were not there before.</summary>
 		public void RescanCorePackages()
 		{
-			LoadDiscoveredCorePackages();
+			ScanForCorePackages();
 			RebuildCoreSettingsMenus();
+		}
+
+		/// <summary>Loads a package the user picked out of the Open Core list.</summary>
+		private bool OpenDiscoveredCorePackage(DiscoveredCorePackage package)
+		{
+			if (package.Error is not null)
+			{
+				AddOnScreenMessage($"{package.Name}: {package.Error}", 8);
+				return false;
+			}
+			return LoadCorePackage(package.Path);
 		}
 
 		/// <summary>The core-package rows as the dialog shows them (also the unit under test for that dialog's logic).</summary>
 		public IReadOnlyList<CorePackageListEntry> BuildCorePackageList()
 			=> CorePackageList.Build(_discoveredCorePackages, CoreRegistry.Instance.LoadedPackages, _corePackageLoadFailures);
 
-		private void OpenCorePackagesDialog()
+		/// <summary>
+		/// The window that chooses the machine. Also the only place a package's failure
+		/// to load is visible, which is why it lists what it cannot open as well.
+		/// </summary>
+		private void OpenCoreDialog()
 		{
-			using CorePackagesForm form = new(
+			using OpenCoreForm form = new(
 				BuildCorePackageList,
 				RescanCorePackages,
-				OpenCore,
-				CorePackageDiscovery.SearchPaths(Config));
+				AddCorePackageFromDisk,
+				CorePackageDiscovery.SearchPaths(Config),
+				OpenDiscoveredCorePackage);
 			this.ShowDialogAsChild(form);
 		}
 
@@ -2139,7 +2157,8 @@ namespace BizHawk.Client.EmuHawk
 			}
 		}
 
-		private void OpenCore()
+		/// <summary>Loads a package from anywhere on disk, for one that is not in a search directory.</summary>
+		private void AddCorePackageFromDisk()
 		{
 			var result = this.ShowFileOpenDialog(
 				filter: CorePackageFSFilterSet,

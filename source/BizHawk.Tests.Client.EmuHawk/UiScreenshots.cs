@@ -69,7 +69,7 @@ namespace BizHawk.Tests.Client.EmuHawk
 		}
 
 		[TestMethod]
-		public void CorePackagesWindow()
+		public void OpenCoreWindow()
 		{
 			if (ShotDir is null) { Assert.Inconclusive("set MINIHAWK_UI_SHOTS to write screenshots"); return; }
 
@@ -86,15 +86,16 @@ namespace BizHawk.Tests.Client.EmuHawk
 				new() { Name = "synth", Path = synth.Path, Sha1 = synth.Sha1, CoreNames = [ "synth" ] },
 			];
 
-			using CorePackagesForm form = new(
+			using OpenCoreForm form = new(
 				() => CorePackageList.Build([ quicker, synth, dev, broken ], loaded, [ ]),
 				() => { },
 				() => { },
-				[ "/home/you/miniHawk/Cores" ]);
+				[ "/home/you/miniHawk/Cores" ],
+				_ => true);
 			form.StartPosition = FormStartPosition.Manual;
 			form.Location = new Point(0, 0);
 			ListOfFirst(form).Items[0].Selected = true;
-			Shoot(form, "core-packages");
+			Shoot(form, "open-core");
 		}
 
 		/// <summary>

@@ -10,7 +10,7 @@ namespace BizHawk.Tests.Client.EmuHawk
 {
 	/// <summary>
 	/// Drives the Firmware window over a fixed set of declarations. Same split as
-	/// <see cref="CorePackagesFormTests"/>: the verdicts are decided (and tested)
+	/// <see cref="OpenCoreFormTests"/>: the verdicts are decided (and tested)
 	/// in <c>CoreFirmwareStore</c>, so what is left here is that the window shows
 	/// them and that its two buttons reach the owner.
 	/// </summary>

@@ -20,7 +20,7 @@ namespace BizHawk.Client.EmuHawk
 	/// package what it wants, checks that what the user chose is the right size and
 	/// a known dump, and remembers where it is.
 	///
-	/// Like <see cref="CorePackagesForm"/> this window is deliberately thin: the
+	/// Like <see cref="OpenCoreForm"/> this window is deliberately thin: the
 	/// rows and their verdicts come from <see cref="CoreFirmwareStore"/>, which is
 	/// tested without a UI, and choosing a file is handed back to the owner.
 	/// </summary>

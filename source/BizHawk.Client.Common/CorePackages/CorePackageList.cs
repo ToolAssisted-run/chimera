@@ -7,13 +7,16 @@ using System.Linq;
 namespace BizHawk.Client.Common
 {
 	/// <summary>
-	/// What became of a discovered package. There are only two outcomes, because
-	/// there is no way to ask for a third: everything readable in a search
-	/// directory is loaded, and not loading one means taking it out of the folder.
+	/// Where a package stands in this session. Being in a search directory only makes
+	/// a package AVAILABLE - loading it is something the user does (Open Core), the
+	/// same way opening a rom is.
 	/// </summary>
 	public enum CorePackageState
 	{
-		/// <summary>Loaded and available to open roms with.</summary>
+		/// <summary>Found, readable, and not opened (yet).</summary>
+		Available,
+
+		/// <summary>Opened: its cores are registered, and roms can be loaded with them.</summary>
 		Loaded,
 
 		/// <summary>Unreadable — listed so a broken package is visible instead of just absent.</summary>
@@ -34,6 +37,7 @@ namespace BizHawk.Client.Common
 
 		public string StatusText => State switch
 		{
+			CorePackageState.Available => "available",
 			CorePackageState.Loaded => "loaded",
 			CorePackageState.Failed => $"error: {Error}",
 			_ => "?",
@@ -61,6 +65,8 @@ namespace BizHawk.Client.Common
 			Dictionary<string, string> errorByPath = new(StringComparer.OrdinalIgnoreCase);
 			foreach (var (pkg, error) in failures) errorByPath[pkg.Path] = error;
 
+			HashSet<string> loadedPaths = new(loaded.Select(static p => p.Path), StringComparer.OrdinalIgnoreCase);
+
 			List<CorePackageListEntry> entries = new();
 			HashSet<string> listedPaths = new(StringComparer.OrdinalIgnoreCase);
 			foreach (var pkg in discovered)
@@ -71,7 +77,9 @@ namespace BizHawk.Client.Common
 				{
 					Package = pkg,
 					Error = error,
-					State = error is null ? CorePackageState.Loaded : CorePackageState.Failed,
+					State = error is not null ? CorePackageState.Failed
+						: loadedPaths.Contains(pkg.Path) ? CorePackageState.Loaded
+						: CorePackageState.Available,
 				});
 			}
 

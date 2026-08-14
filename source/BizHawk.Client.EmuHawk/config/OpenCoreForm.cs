@@ -12,44 +12,52 @@ using BizHawk.Client.Common;
 namespace BizHawk.Client.EmuHawk
 {
 	/// <summary>
-	/// Lists the core packages this frontend found and what became of each one.
+	/// Where you choose the machine: the core packages this frontend can see, and
+	/// what became of each one. Picking one and pressing Open loads it.
 	///
-	/// It is a report, not a control panel: everything readable in a search
-	/// directory is loaded, so there is nothing here to switch. What the window is
-	/// for is answering "is my core actually being picked up, and if not, why not" —
-	/// which before this existed meant reading the console, if you had one.
+	/// Nothing here loads by itself. What sits in a search directory is a list of
+	/// what is AVAILABLE - a package becomes part of the session because you opened
+	/// it, in the same way a rom does. That is why this window is also the answer to
+	/// "is my core being picked up, and if not, why not": a package that will not
+	/// load says so in its row, instead of being missing for reasons only the
+	/// console knows.
 	///
 	/// The window is deliberately thin: the rows are computed by
 	/// <see cref="CorePackageList"/> and tested without a UI. What is left here is
-	/// rendering them and forwarding three buttons, which is the part that has to
-	/// be looked at rather than asserted.
+	/// rendering them and forwarding four buttons, which is the part that has to be
+	/// looked at rather than asserted.
 	/// </summary>
-	public sealed class CorePackagesForm : FormBase
+	public sealed class OpenCoreForm : FormBase
 	{
 		private readonly ListView _list;
 		private readonly Label _detail;
+		private readonly Button _openButton;
 		private readonly Func<IReadOnlyList<CorePackageListEntry>> _fetch;
 		private readonly Action _rescan;
 		private readonly Action _addPackage;
+		private readonly Func<DiscoveredCorePackage, bool> _open;
 		private readonly IReadOnlyList<string> _searchPaths;
 
 		private List<CorePackageListEntry> _entries = new();
 
-		protected override string WindowTitleStatic => "Core Packages";
+		protected override string WindowTitleStatic => "Open Core";
 
 		/// <param name="fetch">re-reads the current list (called on open and after every rescan)</param>
-		/// <param name="rescan">rescans the search directories and loads anything newly present</param>
+		/// <param name="rescan">rescans the search directories for packages newly present</param>
 		/// <param name="addPackage">prompts for a package anywhere on disk and loads it (the file dialog belongs to the owner, not here)</param>
-		public CorePackagesForm(
+		/// <param name="open">loads the chosen package; false if it would not load, in which case the window stays open showing why</param>
+		public OpenCoreForm(
 			Func<IReadOnlyList<CorePackageListEntry>> fetch,
 			Action rescan,
 			Action addPackage,
-			IReadOnlyList<string> searchPaths)
+			IReadOnlyList<string> searchPaths,
+			Func<DiscoveredCorePackage, bool> open)
 		{
 			_fetch = fetch;
 			_rescan = rescan;
 			_addPackage = addPackage;
 			_searchPaths = searchPaths;
+			_open = open;
 
 			SuspendLayout();
 			ClientSize = new(UIHelper.ScaleX(640), UIHelper.ScaleY(360));
@@ -61,7 +69,7 @@ namespace BizHawk.Client.EmuHawk
 			{
 				AutoSize = true,
 				Location = new(UIHelper.ScaleX(8), UIHelper.ScaleY(8)),
-				Text = $"Loaded at startup from: {string.Join("; ", searchPaths)}",
+				Text = $"Found in: {string.Join("; ", searchPaths)}",
 			};
 
 			_list = new ListView
@@ -80,6 +88,7 @@ namespace BizHawk.Client.EmuHawk
 			_list.Columns.Add("Package", UIHelper.ScaleX(130));
 			_list.Columns.Add("SHA1", UIHelper.ScaleX(70));
 			_list.SelectedIndexChanged += (_, _) => UpdateDetail();
+			_list.DoubleClick += (_, _) => Open();
 
 			_detail = new Label
 			{
@@ -89,14 +98,16 @@ namespace BizHawk.Client.EmuHawk
 				Size = new(UIHelper.ScaleX(624), UIHelper.ScaleY(16)),
 			};
 
-			Button addButton = MakeButton("Add Package...", 8, AddPackage);
-			Button folderButton = MakeButton("Open Cores Folder", 120, OpenCoresFolder);
-			Button rescanButton = MakeButton("Rescan", 260, Rescan);
+			_openButton = MakeButton("Open", 8, Open);
+			Button addButton = MakeButton("Add Package...", 70, AddPackage);
+			Button folderButton = MakeButton("Open Cores Folder", 182, OpenCoresFolder);
+			Button rescanButton = MakeButton("Rescan", 322, Rescan);
 			Button closeButton = MakeButton("Close", 552, Close);
 			closeButton.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
+			AcceptButton = _openButton;
 			CancelButton = closeButton;
 
-			Controls.AddRange([ header, _list, _detail, addButton, folderButton, rescanButton, closeButton ]);
+			Controls.AddRange([ header, _list, _detail, _openButton, addButton, folderButton, rescanButton, closeButton ]);
 			ResumeLayout();
 			Populate();
 		}
@@ -146,6 +157,8 @@ namespace BizHawk.Client.EmuHawk
 		private void UpdateDetail()
 		{
 			var entry = SelectedEntry;
+			_openButton.Enabled = entry is not null && entry.State is not CorePackageState.Failed;
+			_openButton.Text = entry?.State is CorePackageState.Loaded ? "Loaded" : "Open";
 			if (entry is null) { _detail.Text = ""; return; }
 			var pkg = entry.Package;
 			// the Status column truncates a long message; the selected row's full
@@ -154,6 +167,24 @@ namespace BizHawk.Client.EmuHawk
 				? $"  |  {entry.Error}"
 				: pkg.Extensions.Count is 0 ? "" : $"  |  {string.Join(" ", pkg.Extensions.Keys.OrderBy(static e => e))}";
 			_detail.Text = $"{pkg.Path}{tail}";
+		}
+
+		/// <summary>
+		/// Loads the selected package and closes, which is what "opening a core" means.
+		/// A package that is already loaded needs no opening, and one that would not
+		/// load leaves the window up with its reason on the row.
+		/// </summary>
+		private void Open()
+		{
+			var entry = SelectedEntry;
+			if (entry is null || entry.State is CorePackageState.Failed) return;
+			if (entry.State is not CorePackageState.Loaded && !_open(entry.Package))
+			{
+				Populate(); // the row now says why it did not load
+				return;
+			}
+			DialogResult = DialogResult.OK;
+			Close();
 		}
 
 		private void Rescan()

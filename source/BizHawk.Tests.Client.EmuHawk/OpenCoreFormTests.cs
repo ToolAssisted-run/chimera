@@ -8,8 +8,8 @@ using BizHawk.Client.EmuHawk;
 namespace BizHawk.Tests.Client.EmuHawk
 {
 	/// <summary>
-	/// Drives the Core Packages window without a person: build it over a known
-	/// list, press its buttons, and check that what it shows matches.
+	/// Drives the Open Core window without a person: build it over a known list,
+	/// press its buttons, and check that what it shows - and what it opens - matches.
 	///
 	/// What this can prove is behaviour - rows, contents, the effect of a click.
 	/// What it cannot prove is that the window looks right; that still needs eyes
@@ -17,7 +17,7 @@ namespace BizHawk.Tests.Client.EmuHawk
 	/// <see cref="CorePackageList"/> and this class only checks the wiring.
 	/// </summary>
 	[TestClass]
-	public class CorePackagesFormTests
+	public class OpenCoreFormTests
 	{
 		private static DiscoveredCorePackage Pkg(string name, string path, string sha1 = null, string error = null)
 			=> new() { Name = name, Path = path, Sha1 = sha1, Error = error, Systems = [ "NES" ] };
@@ -30,23 +30,25 @@ namespace BizHawk.Tests.Client.EmuHawk
 		/// selection state is not tracked and half of what this class checks would
 		/// silently do nothing. Xvfb gives us a display to show it on.
 		/// </summary>
-		private static CorePackagesForm Realise(CorePackagesForm form)
+		private static OpenCoreForm Realise(OpenCoreForm form)
 		{
 			form.Show();
 			return form;
 		}
 
 		/// <summary>a form over a fixed set of packages, none of them loaded</summary>
-		private static CorePackagesForm MakeForm(
+		private static OpenCoreForm MakeForm(
 			IReadOnlyList<DiscoveredCorePackage> discovered,
 			IReadOnlyList<CoreRegistry.LoadedCorePackage> loaded = null,
 			Action rescan = null,
-			Action addPackage = null)
-			=> Realise(new CorePackagesForm(
+			Action addPackage = null,
+			Func<DiscoveredCorePackage, bool> open = null)
+			=> Realise(new OpenCoreForm(
 				() => CorePackageList.Build(discovered, loaded ?? [ ], [ ]),
 				rescan ?? (() => { }),
 				addPackage ?? (() => { }),
-				[ "/tmp/Cores" ]));
+				[ "/tmp/Cores" ],
+				open ?? (_ => true)));
 
 		[TestMethod]
 		public void RowsShowEveryPackageWithItsStatus()
@@ -77,16 +79,71 @@ namespace BizHawk.Tests.Client.EmuHawk
 			Assert.AreEqual("-", ListOf(form).Items[0].SubItems[4].Text, "a directory has no hash to show");
 		}
 
+		/// <summary>Opening is what the window is for: the chosen package goes to the owner, and the window closes.</summary>
+		[TestMethod]
+		public void OpenLoadsTheSelectedPackageAndCloses()
+		{
+			List<DiscoveredCorePackage> opened = new();
+			using var form = MakeForm(
+				[ Pkg("quickerNES", "/cores/q.zip", sha1: "aa"), Pkg("synth", "/cores/s.zip", sha1: "bb") ],
+				open: pkg => { opened.Add(pkg); return true; });
+
+			ListOf(form).Items[1].Selected = true; // rows are alphabetical: quickerNES, synth
+			form.Controls.OfType<Button>().Single(static b => b.Text is "Open").PerformClick();
+
+			Assert.AreEqual(1, opened.Count);
+			Assert.AreEqual("/cores/s.zip", opened[0].Path);
+			Assert.AreEqual(DialogResult.OK, form.DialogResult);
+		}
+
+		/// <summary>A package that will not load leaves the window up, showing why.</summary>
+		[TestMethod]
+		public void APackageThatWillNotOpenKeepsTheWindowOpen()
+		{
+			using var form = MakeForm([ Pkg("quickerNES", "/cores/q.zip", sha1: "aa") ], open: _ => false);
+			ListOf(form).Items[0].Selected = true;
+			form.Controls.OfType<Button>().Single(static b => b.Text is "Open").PerformClick();
+			Assert.AreNotEqual(DialogResult.OK, form.DialogResult);
+		}
+
+		/// <summary>There is nothing to open for a package that could not even be read.</summary>
+		[TestMethod]
+		public void ABrokenPackageCannotBeOpened()
+		{
+			var opened = 0;
+			using var form = MakeForm(
+				[ Pkg("Broken", "/cores/b.zip", sha1: "bb", error: "waterbox.config is empty or invalid") ],
+				open: _ => { opened++; return true; });
+			ListOf(form).Items[0].Selected = true;
+			var button = form.Controls.OfType<Button>().Single(static b => b.Text is "Open");
+			Assert.IsFalse(button.Enabled);
+			button.PerformClick();
+			Assert.AreEqual(0, opened);
+		}
+
+		/// <summary>A package already in the session says so rather than offering to load it twice.</summary>
+		[TestMethod]
+		public void AnAlreadyLoadedPackageSaysSo()
+		{
+			var pkg = Pkg("quickerNES", "/cores/q.zip", sha1: "aa");
+			using var form = MakeForm(
+				[ pkg ],
+				loaded: [ new CoreRegistry.LoadedCorePackage { Name = "quickerNES", Path = "/cores/q.zip", Sha1 = "aa" } ]);
+			ListOf(form).Items[0].Selected = true;
+			Assert.AreEqual("Loaded", form.Controls.OfType<Button>().Single(static b => b.Text is "Loaded").Text);
+		}
+
 		[TestMethod]
 		public void RescanRefreshesTheRows()
 		{
 			List<DiscoveredCorePackage> discovered = [ Pkg("First", "/cores/1.zip", sha1: "11") ];
 			var rescanned = 0;
-			using var form = Realise(new CorePackagesForm(
+			using var form = Realise(new OpenCoreForm(
 				() => CorePackageList.Build(discovered, [ ], [ ]),
 				() => { rescanned++; discovered.Add(Pkg("Second", "/cores/2.zip", sha1: "22")); },
 				() => { },
-				[ "/tmp/Cores" ]));
+				[ "/tmp/Cores" ],
+				_ => true));
 			Assert.AreEqual(1, ListOf(form).Items.Count);
 
 			form.Controls.OfType<Button>().Single(static b => b.Text == "Rescan").PerformClick();
@@ -99,11 +156,12 @@ namespace BizHawk.Tests.Client.EmuHawk
 		public void AddPackageRefreshesTheRowsToo()
 		{
 			List<DiscoveredCorePackage> discovered = [ ];
-			using var form = Realise(new CorePackagesForm(
+			using var form = Realise(new OpenCoreForm(
 				() => CorePackageList.Build(discovered, [ ], [ ]),
 				() => { },
 				() => discovered.Add(Pkg("Chosen", "/elsewhere/c.zip", sha1: "cc")),
-				[ "/tmp/Cores" ]));
+				[ "/tmp/Cores" ],
+				_ => true));
 
 			form.Controls.OfType<Button>().Single(static b => b.Text == "Add Package...").PerformClick();
 
