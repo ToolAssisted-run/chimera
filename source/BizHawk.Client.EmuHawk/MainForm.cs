@@ -1613,11 +1613,6 @@ namespace BizHawk.Client.EmuHawk
 					RomStatus.NotInDatabase => (DUMP_KIND_UNRECOGNIZED, Properties.Resources.RetroQuestion, "Warning: Unknown ROM"),
 					/*RomStatus.Unknown or RomStatus.Bios*/_ => (DUMP_KIND_UNRECOGNIZED, Properties.Resources.Hack, "Warning: ROM of Unknown Character"),
 				};
-				if (_multiDiskMode)
-				{
-					icon = Properties.Resources.RetroQuestion;
-					tooltip = "Multi-disk bundler";
-				}
 			}
 			DumpStatusButton.Image = icon;
 			DumpStatusButton.ToolTipText = tooltip;
@@ -1626,8 +1621,6 @@ namespace BizHawk.Client.EmuHawk
 			DumpStatusReportMenuItem.Text = string.Format(FMT_STR_DUMP_STATUS_MENUITEM_LABEL, kind);
 			DumpStatusReportMenuItem.ToolTipText = tooltip;
 		}
-
-		private bool _multiDiskMode;
 
 		// Rom details as decided by MainForm, which shouldn't happen, the RomLoader or Core should be doing this
 		// Better is to just keep the game and rom hashes as properties and then generate the rom info from this
@@ -3437,37 +3430,6 @@ namespace BizHawk.Client.EmuHawk
 						while (Config.RecentCores.Count > 5) Config.RecentCores.Dequeue();
 					}
 					InputManager.SyncControls(Emulator, MovieSession, Config);
-					_multiDiskMode = false;
-
-					if (loader.XMLGameInfo is XmlGame xmlGame)
-					{
-						// this is a multi-disk bundler file
-						// determine the xml assets and create RomStatusDetails for all of them
-						using var xSw = new StringWriter();
-
-						for (int xg = 0; xg < xmlGame.Assets.Count; xg++)
-						{
-							var (_, filename, data) = xmlGame.Assets[xg];
-							// data length is 0 in the case of discs or 3DS roms
-							if (data.Length == 0)
-							{
-								xSw.WriteLine(Path.GetFileNameWithoutExtension(filename));
-								xSw.WriteLine("SHA1:N/A");
-								xSw.WriteLine("MD5:N/A");
-								xSw.WriteLine();
-							}
-							else
-							{
-								xSw.WriteLine(filename);
-								xSw.WriteLine(SHA1Checksum.ComputePrefixedHex(data));
-								xSw.WriteLine(MD5Checksum.ComputePrefixedHex(data));
-								xSw.WriteLine();
-							}
-						}
-
-						_defaultRomDetails = xSw.ToString();
-						_multiDiskMode = true;
-					}
 
 					var romDetails = Emulator.RomDetails();
 					if (string.IsNullOrWhiteSpace(romDetails) && loader.Rom != null)
@@ -3485,7 +3447,7 @@ namespace BizHawk.Client.EmuHawk
 						Console.WriteLine("Core reported BoardID: \"{0}\"", Emulator.AsBoardInfo().BoardName);
 					}
 
-					// Don't load Save Ram if a movie is being loaded
+					// a movie brings its own starting machine, so nothing is applied under it
 					if (!MovieSession.NewMovieQueued)
 					{
 						LoadBundleAttachments();

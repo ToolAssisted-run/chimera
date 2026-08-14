@@ -1090,7 +1090,7 @@ OWN menu (Emulator > Cartridge SRAM > Write to File... / Write to Bundle /
 Compose Bundle...), because it is a fact about that machine and not a frontend
 feature.
 
-**Bundles.** A game that is more than one file: `game.bundle`, a small JSON
+**Bundles.** A game that is more than one file: `game.gameBundle`, a small JSON
 CATALOGUE naming a rom and any attachments, each pinned by SHA1, all of them
 sitting in the same folder as the bundle. It holds no data of its own - it is a
 few hundred bytes, editing a save does not mean rebuilding anything, and the rom

@@ -35,7 +35,7 @@ namespace BizHawk.Tests.Client.Common.Bundles
 			return path;
 		}
 
-		private string WriteBundle(string json, string name = "game.bundle")
+		private string WriteBundle(string json, string name = "game.gameBundle")
 		{
 			var path = Path.Combine(_dir, name);
 			File.WriteAllText(path, json);
@@ -67,7 +67,7 @@ namespace BizHawk.Tests.Client.Common.Bundles
 		{
 			foreach (var bad in new[] { "/etc/passwd", "../outside.nes", "sub/../../outside.nes" })
 			{
-				var path = WriteBundle($$"""{ "bundle": 1, "rom": { "file": {{System.Text.Json.JsonSerializer.Serialize(bad)}} } }""", $"b{bad.GetHashCode()}.bundle");
+				var path = WriteBundle($$"""{ "bundle": 1, "rom": { "file": {{System.Text.Json.JsonSerializer.Serialize(bad)}} } }""", $"b{bad.GetHashCode()}.gameBundle");
 				Assert.ThrowsException<InvalidOperationException>(() => GameBundle.Load(path), $"should have refused {bad}");
 			}
 		}
@@ -106,19 +106,19 @@ namespace BizHawk.Tests.Client.Common.Bundles
 		{
 			var rom = Write("smb3.nes", "rom bytes");
 			var sram = Write("smb3.sram", "save bytes");
-			var composed = GameBundle.Compose(Path.Combine(_dir, "a.bundle"), rom, "QuickerNesHawk", "sram", sram, name: "one");
-			composed.Save(Path.Combine(_dir, "a.bundle"));
+			var composed = GameBundle.Compose(Path.Combine(_dir, "a.gameBundle"), rom, "QuickerNesHawk", "sram", sram, name: "one");
+			composed.Save(Path.Combine(_dir, "a.gameBundle"));
 
-			var reloaded = GameBundle.Load(Path.Combine(_dir, "a.bundle"));
+			var reloaded = GameBundle.Load(Path.Combine(_dir, "a.gameBundle"));
 			Assert.AreEqual(composed.ContentId, reloaded.ContentId);
 
 			// same parts, different name and different file name
-			var other = GameBundle.Compose(Path.Combine(_dir, "b.bundle"), rom, "QuickerNesHawk", "sram", sram, name: "two");
+			var other = GameBundle.Compose(Path.Combine(_dir, "b.gameBundle"), rom, "QuickerNesHawk", "sram", sram, name: "two");
 			Assert.AreEqual(composed.ContentId, other.ContentId);
 
 			// change what the save says, and it is a different bundle
 			File.WriteAllBytes(sram, Encoding.ASCII.GetBytes("other save"));
-			var changed = GameBundle.Compose(Path.Combine(_dir, "c.bundle"), rom, "QuickerNesHawk", "sram", sram);
+			var changed = GameBundle.Compose(Path.Combine(_dir, "c.gameBundle"), rom, "QuickerNesHawk", "sram", sram);
 			Assert.AreNotEqual(composed.ContentId, changed.ContentId);
 		}
 
@@ -127,7 +127,7 @@ namespace BizHawk.Tests.Client.Common.Bundles
 		{
 			var rom = Write("smb3.nes", "rom bytes");
 			var sram = Write("smb3.sram", "save bytes");
-			var bundlePath = Path.Combine(_dir, "a.bundle");
+			var bundlePath = Path.Combine(_dir, "a.gameBundle");
 			var bundle = GameBundle.Compose(bundlePath, rom, "QuickerNesHawk", "sram", sram);
 			var before = bundle.ContentId;
 
@@ -160,7 +160,7 @@ namespace BizHawk.Tests.Client.Common.Bundles
 		{
 			var ex = Assert.ThrowsException<InvalidOperationException>(
 				() => GameBundle.Load(WriteBundle("this is not json at all")));
-			StringAssert.Contains(ex.Message, "game.bundle");
+			StringAssert.Contains(ex.Message, "game.gameBundle");
 		}
 	}
 }

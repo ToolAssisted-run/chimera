@@ -97,8 +97,6 @@ namespace BizHawk.Client.Common
 		public GameInfo Game { get; private set; }
 		public RomGame Rom { get; private set; }
 		public string CanonicalFullPath { get; private set; }
-		public XmlGame XMLGameInfo = null;
-
 		public bool Deterministic { get; set; }
 
 		public class RomErrorArgs : EventArgs
@@ -336,38 +334,113 @@ namespace BizHawk.Client.Common
 			return true;
 		}
 
-		private void LoadM3U(string path, CoreComm nextComm, HawkFile file, string forcedCoreName, out IEmulator nextEmulator, out GameInfo game)
+		/// <summary>
+		/// The bundle the loaded game came from, or null when a bare rom was opened. What a
+		/// core keeps (see <see cref="ICorePersistentData"/>) travels in here, and a movie
+		/// recorded now cites it.
+		/// </summary>
+		public GameBundle LoadedBundle { get; private set; }
+
+		public bool LoadRom(string path, CoreComm nextComm, string forcedCoreName = null, int recursiveCount = 0)
 		{
-			M3U_File m3u;
-			using (var sr = new StreamReader(path))
-				m3u = M3U_File.Read(sr);
-			if (m3u.Entries.Count == 0)
-				throw new InvalidOperationException("Can't load an empty M3U");
-			m3u.Rebase(Path.GetDirectoryName(path));
+			if (path == null) return false;
 
-			var discs = m3u.Entries
-				.Select(e => e.Path)
-				.Where(p => Disc.IsValidExtension(Path.GetExtension(p)))
-				.Select(p => (p, d: DiscExtensions.CreateAnyType(p, str => DoLoadErrorCallback(str, "???", LoadErrorType.DiscError))))
-				.Where(a => a.d != null)
-				.Select(a => new DiscAsset
-				{
-					DiscData = a.d,
-					DiscType = new DiscIdentifier(a.d).DetectDiscType(),
-					DiscName = Path.GetFileNameWithoutExtension(a.p),
-				})
-				.ToList();
-			if (discs.Count == 0)
-				throw new InvalidOperationException("Couldn't load any contents of the M3U as discs");
-
-			game = MakeGameFromDisc(discs[0].DiscData, Path.GetExtension(m3u.Entries[0].Path), discs[0].DiscName);
-			var lp = new LoadParameters
+			// A bundle is a catalogue: it names the rom beside it, and what a core should
+			// start with. Resolve it to that rom and carry the bundle for the caller, so
+			// nothing downstream has to know bundles exist.
+			LoadedBundle = null;
+			if (GameBundle.IsBundlePath(path))
 			{
-				Comm = nextComm,
-				Game = game,
-				Discs = discs.Cast<object>().ToList(),
-			};
-			nextEmulator = MakeCoreFromRegistry(lp, forcedCoreName);
+				var bundle = GameBundle.Load(path);
+				LoadedBundle = bundle;
+				path = bundle.ResolveFile(bundle.Rom);
+				if (!File.Exists(path))
+				{
+					DoLoadErrorCallback($"{Path.GetFileName(path)} is missing from this bundle's folder", "");
+					return false;
+				}
+				_ = bundle.ReadFile(bundle.Rom); // hashes are checked before anything is loaded
+			}
+
+			if (recursiveCount > 1) // hack to stop recursive calls from endlessly rerunning if we can't load it
+			{
+				DoLoadErrorCallback("Failed multiple attempts to load ROM.", "");
+				return false;
+			}
+
+			using HawkFile file = new(path, allowArchives: true);
+			// make sure path is absolute
+			path = CanonicalFullPath = file.CanonicalFullPath;
+
+			if (!file.Exists) return false; // if the provided file doesn't even exist, give up!
+
+			IEmulator nextEmulator;
+			RomGame rom = null;
+			GameInfo game = null;
+
+			try
+			{
+				var cancel = false;
+
+				{
+					// do the archive binding we had to skip
+					if (!HandleArchiveBinding(file))
+					{
+						return false;
+					}
+
+					// extension checking
+					var ext = file.Extension;
+					switch (ext)
+					{
+						default:
+							if (Disc.IsValidExtension(ext))
+							{
+								if (file.IsArchive)
+									throw new InvalidOperationException("Can't load CD files from archives!");
+								if (!LoadDisc(path, nextComm, file, ext, forcedCoreName, out nextEmulator, out game))
+									return false;
+							}
+							else
+							{
+								LoadOther(
+									nextComm,
+									file,
+									ext: ext,
+									forcedCoreName: forcedCoreName,
+									out nextEmulator,
+									out rom,
+									out game,
+									out cancel);
+							}
+							break;
+					}
+				}
+
+				if (nextEmulator == null)
+				{
+					if (!cancel)
+					{
+						DoLoadErrorCallback("No core could load the rom.", null);
+					}
+
+					return false;
+				}
+
+				if (game is null) throw new Exception("RomLoader returned core but no GameInfo"); // shouldn't be null if `nextEmulator` isn't? just in case
+			}
+			catch (Exception ex)
+			{
+				var system = game?.System;
+
+				DispatchErrorMessage(ex, system: system, path: path);
+				return false;
+			}
+
+			Rom = rom;
+			LoadedEmulator = nextEmulator;
+			Game = game;
+			return true;
 		}
 
 		private IEmulator MakeCoreFromRegistry(LoadParameters lp, string forcedCoreName = null)
@@ -492,197 +565,6 @@ namespace BizHawk.Client.Common
 			return Disc.IsValidExtension(Path.GetExtension(path));
 		}
 
-		private bool LoadXML(
-			string path,
-			CoreComm nextComm,
-			HawkFile file,
-			string forcedCoreName,
-			out IEmulator nextEmulator,
-			out RomGame rom,
-			out GameInfo game,
-			out XmlGame xmlGame)
-		{
-			nextEmulator = null;
-			rom = null;
-			game = null;
-			try
-			{
-				xmlGame = XmlGame.Create(file); // if load fails, are we supposed to retry as a bsnes XML????????
-				game = xmlGame.GI;
-
-				var system = game.System;
-				var lp = new LoadParameters
-				{
-					Comm = nextComm,
-					Game = game,
-					Roms = xmlGame.Assets
-						.Where(pfd => !IsDiscForXML(pfd.Filename))
-						.Select(IRomAsset (pfd) => new RomAsset
-						{
-							RomData = pfd.FileData, // TODO: Do RomGame RomData conversions here
-							FileData = pfd.FileData,
-							Extension = Path.GetExtension(pfd.Filename),
-							RomPath = pfd.Path,
-							Game = new GameInfo
-							{
-								Name = Path.GetFileNameWithoutExtension(pfd.Filename),
-								Hash = SHA1Checksum.ComputeDigestHex(pfd.FileData),
-								Status = RomStatus.NotInDatabase,
-								NotInDatabase = true,
-							},
-						})
-						.ToList(),
-					Discs = xmlGame.Assets
-						.Where(pfd => IsDiscForXML(pfd.Path))
-						.Select(pfd => (p: pfd.Path, d: DiscExtensions.CreateAnyType(pfd.Path, str => DoLoadErrorCallback(str, system, LoadErrorType.DiscError))))
-						.Where(a => a.d != null)
-						.Select(object (a) => new DiscAsset
-						{
-							DiscData = a.d,
-							DiscType = new DiscIdentifier(a.d).DetectDiscType(),
-							DiscName = Path.GetFileNameWithoutExtension(a.p),
-						})
-						.ToList(),
-				};
-				nextEmulator = MakeCoreFromRegistry(lp, forcedCoreName);
-				return true;
-			}
-			catch (Exception ex)
-			{
-				var sysIDWas = game?.System ?? VSystemID.Raw.SNES;
-				xmlGame = null;
-				DoLoadErrorCallback(ex.ToString(), sysIDWas, LoadErrorType.Xml);
-				return false;
-			}
-		}
-
-		/// <summary>
-		/// The bundle the loaded game came from, or null when a bare rom was opened. What a
-		/// core keeps (see <see cref="ICorePersistentData"/>) travels in here, and a movie
-		/// recorded now cites it.
-		/// </summary>
-		public GameBundle LoadedBundle { get; private set; }
-
-		public bool LoadRom(string path, CoreComm nextComm, string forcedCoreName = null, int recursiveCount = 0)
-		{
-			if (path == null) return false;
-
-			// A bundle is a catalogue: it names the rom beside it, and what a core should
-			// start with. Resolve it to that rom and carry the bundle for the caller, so
-			// nothing downstream has to know bundles exist.
-			LoadedBundle = null;
-			if (GameBundle.IsBundlePath(path))
-			{
-				var bundle = GameBundle.Load(path);
-				LoadedBundle = bundle;
-				path = bundle.ResolveFile(bundle.Rom);
-				if (!File.Exists(path))
-				{
-					DoLoadErrorCallback($"{Path.GetFileName(path)} is missing from this bundle's folder", "");
-					return false;
-				}
-				_ = bundle.ReadFile(bundle.Rom); // hashes are checked before anything is loaded
-			}
-
-			if (recursiveCount > 1) // hack to stop recursive calls from endlessly rerunning if we can't load it
-			{
-				DoLoadErrorCallback("Failed multiple attempts to load ROM.", "");
-				return false;
-			}
-
-			using HawkFile file = new(path, allowArchives: true);
-			// make sure path is absolute
-			path = CanonicalFullPath = file.CanonicalFullPath;
-
-			if (!file.Exists) return false; // if the provided file doesn't even exist, give up!
-
-			IEmulator nextEmulator;
-			RomGame rom = null;
-			GameInfo game = null;
-
-			try
-			{
-				var cancel = false;
-
-				{
-					// do the archive binding we had to skip
-					if (!HandleArchiveBinding(file))
-					{
-						return false;
-					}
-
-					// extension checking
-					var ext = file.Extension;
-					switch (ext)
-					{
-						case ".m3u":
-							LoadM3U(path, nextComm, file, forcedCoreName, out nextEmulator, out game);
-							break;
-						case ".xml":
-							if (!LoadXML(
-								path,
-								nextComm,
-								file,
-								forcedCoreName,
-								out nextEmulator,
-								out rom,
-								out game,
-								out XMLGameInfo))
-							{
-								return false;
-							}
-							break;
-						default:
-							if (Disc.IsValidExtension(ext))
-							{
-								if (file.IsArchive)
-									throw new InvalidOperationException("Can't load CD files from archives!");
-								if (!LoadDisc(path, nextComm, file, ext, forcedCoreName, out nextEmulator, out game))
-									return false;
-							}
-							else
-							{
-								// must be called after LoadXML because of SNES hacks
-								LoadOther(
-									nextComm,
-									file,
-									ext: ext,
-									forcedCoreName: forcedCoreName,
-									out nextEmulator,
-									out rom,
-									out game,
-									out cancel);
-							}
-							break;
-					}
-				}
-
-				if (nextEmulator == null)
-				{
-					if (!cancel)
-					{
-						DoLoadErrorCallback("No core could load the rom.", null);
-					}
-
-					return false;
-				}
-
-				if (game is null) throw new Exception("RomLoader returned core but no GameInfo"); // shouldn't be null if `nextEmulator` isn't? just in case
-			}
-			catch (Exception ex)
-			{
-				var system = game?.System;
-
-				DispatchErrorMessage(ex, system: system, path: path);
-				return false;
-			}
-
-			Rom = rom;
-			LoadedEmulator = nextEmulator;
-			Game = game;
-			return true;
-		}
-
 		private void DispatchErrorMessage(Exception ex, string system, string path)
 		{
 			if (ex is AggregateException agg)
@@ -730,7 +612,7 @@ namespace BizHawk.Client.Common
 				combinedEntryDesc: "Everything",
 				FilesystemFilter.Archives,
 				new FilesystemFilter("Disc Images", FilesystemFilter.DiscExtensions),
-				new FilesystemFilter("Rom Bundles", new[] { "xml" }),
+				new FilesystemFilter("Game Bundles", new[] { GameBundle.Extension.TrimStart('.') }),
 				new FilesystemFilter("ROMs", CoreRegistry.Instance.KnownRomExtensions.Select(static e => e.TrimStart('.')).ToList(), addArchiveExts: true),
 				FilesystemFilter.EmuHawkSaveStates);
 	}

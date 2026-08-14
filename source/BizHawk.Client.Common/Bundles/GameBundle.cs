@@ -30,7 +30,7 @@ namespace BizHawk.Client.Common
 	/// </summary>
 	public sealed class GameBundle
 	{
-		public const string Extension = ".bundle";
+		public const string Extension = ".gameBundle";
 
 		/// <summary>Format version, so an older frontend can refuse a newer bundle rather than misread it.</summary>
 		[JsonProperty("bundle")]
