@@ -246,6 +246,7 @@ namespace BizHawk.Emulation.Common.Waterbox
 			// The optional tooling ABI (see WaterboxCore.Tooling.cs) - may append bus
 			// domains to the list, so it runs before the domains are published.
 			InitTooling((BasicServiceProvider)ServiceProvider, domains);
+			InitSaveRam((BasicServiceProvider)ServiceProvider);
 			((BasicServiceProvider)ServiceProvider).Register<IMemoryDomains>(new MemoryDomainList(domains));
 		}
 
@@ -413,6 +414,7 @@ namespace BizHawk.Emulation.Common.Waterbox
 		public bool FrameAdvance(IController controller, bool render, bool renderSound = true)
 		{
 			CheckDisposed();
+			_saveRamMaybeDirty = true; // see SaveRamModified: any frame may have written to the save
 			ulong input = 0;
 			for (int i = 0; i < _buttons.Length; i++)
 			{

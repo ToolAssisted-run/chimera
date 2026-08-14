@@ -1672,28 +1672,29 @@ namespace BizHawk.Client.EmuHawk
 
 				try
 				{
-					byte[] sram;
-
+					if (Emulator.AsSaveRam().CloneSaveRam() is null)
 					{
-						var oldRam = Emulator.AsSaveRam().CloneSaveRam();
-						if (oldRam is null)
-						{
-							// we have a SaveRAM file, but the current core does not have save ram.
-							// just skip loading the saveram file in that case
-							return;
-						}
-
-						// why do we silently truncate\pad here instead of warning\erroring?
-						sram = new byte[oldRam.Length];
-						using var fs = saveramToLoad.OpenRead();
-						_ = fs.Read(sram, 0, sram.Length);
+						// we have a SaveRAM file, but the current core does not have save ram.
+						// just skip loading the saveram file in that case
+						return;
 					}
 
-					Emulator.AsSaveRam().StoreSaveRam(sram);
+					// The file goes over whole, at the length it is on disk. BizHawk truncated or
+					// zero-padded it to the size the core reported, which turns "this save belongs
+					// to another game" into a corrupted save loaded without a word; whether a file
+					// fits the machine is the core's judgement, and it can refuse.
+					Emulator.AsSaveRam().StoreSaveRam(File.ReadAllBytes(saveramToLoad.FullName));
 				}
 				catch (IOException e)
 				{
 					AddOnScreenMessage("An error occurred while loading Sram");
+					Console.Error.WriteLine(e);
+				}
+				catch (Exception e)
+				{
+					// a core refusing the file is not a reason to refuse the game: say so, and boot
+					// the machine as it comes out of the box
+					AddOnScreenMessage("Save file not loaded: " + e.Message, 10);
 					Console.Error.WriteLine(e);
 				}
 			}

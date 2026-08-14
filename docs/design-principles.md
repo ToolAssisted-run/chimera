@@ -1072,3 +1072,31 @@ What is deliberately NOT here: any suggestion that the frontend knows what a
 firmware file means. It checks size and hash because the declaration told it what
 to check, and hands over bytes. Whether they are the right bytes for the machine
 is the core's business.
+
+## Save files: the core decides what a machine keeps (2026-08-14)
+
+A save file is not a memory domain the frontend copies out. Only the core knows
+what belongs in one: for a battery cart it is the WRAM verbatim, but for the
+Famicom Disk System it is the difference between the disk now and the disk as it
+was inserted - which exists nowhere as a block of memory, and has to be computed.
+
+So the ABI moves opaque bytes. Optional guest group: `GetSaveRamSize`,
+`GetSaveRam` (fill a guest-owned buffer, return it), `GetSaveRamBuffer(size)`
+and `PutSaveRam(length)`. The host reads and writes; it never interprets. The
+buffer is `ECL_INVISIBLE`, because a save file is not machine state - it is what
+OUTLIVES the machine - and must never enter a savestate.
+
+- **Size zero means no save**, and the adapter then unregisters `ISaveRam`, which
+  is what greys out File > Save RAM. The same core answers differently per rom:
+  a battery cart and a disk have a save, a plain cartridge does not.
+- **The core may refuse a file** (`PutSaveRam` returns 0) - wrong size, wrong
+  number of disk sides. BizHawk's frontend silently truncated or zero-padded the
+  file to the size the core reported, which turns "this save belongs to another
+  game" into a corrupted save loaded without a word. Here the file goes over
+  whole at the length it is on disk, and a refusal is an on-screen message with
+  the machine booting clean - a bad save is not a reason to refuse the game.
+- **Nothing new in the UI.** The frontend already had all of it: File > Save RAM
+  > Flush Save Ram (with a hotkey), autosave on a timer with the more-recent-
+  autosave prompt, a flush on close, and per-system Save RAM paths. It was dead
+  code for want of a core that had a save file; the work was the channel, not the
+  window.
