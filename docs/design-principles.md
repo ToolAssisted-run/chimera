@@ -1228,8 +1228,15 @@ is the ordinary case of someone building the core themselves.
 
 **Identity is relative to a toolchain**, and that is honest rather than
 unfortunate: the same sources through a different gcc are different code and
-could in principle emulate differently. The package records the compiler version
-in `build.txt` so the difference is legible instead of mysterious. Pinning a
-vendored toolchain would make builds identical across machines; that is a
-separate job, and until then "reproducible" means "given the same toolchain".
+could in principle emulate differently. Rather than pin a vendored toolchain, the
+package SAYS which one it used (user-decided): `build.json` records the source
+(origin, commit, dirty), the toolchain (gcc, libstdc++, binutils, musl, target),
+the OS it was built on, and the exact compile and link flags. A hash that differs
+is then a question with its answer inside the file.
+
+Everything in that record is a function of the INPUTS. No timestamps, no
+hostname, no absolute paths - the linkscript is written as a placeholder, because
+where a machine keeps the guest kit is not something a rebuilder needs. Anything
+time- or machine-dependent would make two builds of one commit differ, which is
+the property all of this exists to keep.
 
