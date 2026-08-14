@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using System.Drawing;
 using System.Drawing.Imaging;
@@ -113,10 +113,23 @@ namespace BizHawk.Tests.Client.EmuHawk
 				=> new()
 				{
 					CoreName = core,
-					Decl = new() { Id = id, Display = display, Description = description, Size = 8192, Required = required },
+					Decl = new()
+					{
+						Id = id,
+						Display = display,
+						Description = description,
+						Size = 8192,
+						Required = required,
+						Sha1 = [ "57FE1BDEE955BB48D357E463CCBF129496930B62", "E4E41472C454F928E53EB10E0509BF7D1146ECC1" ],
+					},
 					Path = path,
 					State = state,
-					Sha1 = state is CoreFirmwareState.Good ? "57FE1BDEE955BB48D357E463CCBF129496930B62" : null,
+					Sha1 = state switch
+					{
+						CoreFirmwareState.Good => "57FE1BDEE955BB48D357E463CCBF129496930B62",
+						CoreFirmwareState.Missing => null,
+						_ => "9C1D5A0B77E4F3128899AABBCCDDEEFF00112233",
+					},
 				};
 
 			List<CoreFirmwareEntry> entries =
@@ -129,6 +142,9 @@ namespace BizHawk.Tests.Client.EmuHawk
 					CoreFirmwareState.Missing, null, required: false),
 				Entry("synth", "boot", "Boot rom",
 					"Runs before the cartridge does.",
+					CoreFirmwareState.Unrecognised, "/home/you/firmware/boot-alt.rom"),
+				Entry("synth", "char", "Character generator",
+					"The font the machine draws text with.",
 					CoreFirmwareState.WrongSize, "/home/you/firmware/oops.bin"),
 			];
 

@@ -548,25 +548,25 @@ namespace BizHawk.Client.EmuHawk
 
 			if (_argParser.cmdRom != null)
 			{
-				// Naming a rom on the commandline is an instruction to run it, so if no core
-				// was named with --core and none is open, the available ones are loaded to
-				// route it. Nothing like this happens in the GUI, where opening a core is a
-				// thing you do on purpose.
+				// A rom needs a core, and choosing one is never implicit - not on the
+				// commandline either. --core says which; nothing else does.
 				if (CoreRegistry.Instance.AllFactories.Count is 0)
 				{
-					foreach (var (pkg, error) in CoreRegistry.Instance.LoadDiscovered(_discoveredCorePackages))
-					{
-						Console.WriteLine($"core package not loaded: {pkg.Path}: {error}");
-					}
-					RebuildCoreSettingsMenus();
+					ShowMessageBox(
+						owner: null,
+						$"No core is loaded, so {Path.GetFileName(_argParser.cmdRom)} cannot run."
+							+ "\n\nName one with --core=<package>, or open one with File > Open Core...",
+						"No core loaded");
 				}
-
-				// Commandline should always override auto-load
-				var ioa = OpenAdvancedSerializer.ParseWithLegacy(_argParser.cmdRom);
-				_ = LoadRom(ioa.SimplePath, new LoadRomArgs(ioa));
-				if (Game.IsNullInstance())
+				else
 				{
-					ShowMessageBox(owner: null, $"Failed to load {_argParser.cmdRom} specified on commandline");
+					// Commandline should always override auto-load
+					var ioa = OpenAdvancedSerializer.ParseWithLegacy(_argParser.cmdRom);
+					_ = LoadRom(ioa.SimplePath, new LoadRomArgs(ioa));
+					if (Game.IsNullInstance())
+					{
+						ShowMessageBox(owner: null, $"Failed to load {_argParser.cmdRom} specified on commandline");
+					}
 				}
 			}
 			else if (Config.RecentRoms.AutoLoad && !Config.RecentRoms.Empty

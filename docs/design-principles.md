@@ -1161,3 +1161,41 @@ loaded.
   available packages are loaded to route it. Nothing like that happens in the
   GUI, where the point is that the choice is yours and visible.
 
+## A refusal is a sentence, not a stack trace (2026-08-14)
+
+Opening an FDS image with no BIOS produced a dialog with an exception and a
+stack trace in it. Everything needed to say something useful existed - the core
+knew precisely what was wrong - but its words went to stdout and died there,
+because the only thing crossing the sandbox was "Init returned 0".
+
+- **The core explains itself.** Optional guest export `GetLoadError`: after a
+  failed Init the host reads the reason and shows it. The frontend cannot write
+  that sentence - it does not know what a disk image is - so it repeats the
+  core's.
+- **`CoreLoadException`** is the type for a failure the user can act on
+  (`MissingFirmwareException` now derives from it). RomLoader shows those as a
+  plain message. Anything else still gets its stack trace: that is a bug report,
+  not a configuration problem.
+- **The same rule for the frontend's own refusals**: "no loaded core can run a
+  NES game" now names the window that fixes it instead of arriving as an
+  InvalidOperationException.
+- **The command line is strict too** (user): naming a rom with no core open and
+  no `--core` says so and stops. Choosing a core is never implicit, on either
+  side of the GUI.
+
+## The firmware window shows both hashes (2026-08-14)
+
+What a person does in that window is compare what the core expects with what
+they have, so the window does that comparison for them and shows its working:
+
+- a **mark per row** - green tick (matches a dump the core names), amber warning
+  (right size, hash the core has never seen; used anyway), red cross (wrong size
+  or unreadable; refused), empty circle (nothing provided yet);
+- **Expected SHA1** and **Actual SHA1** columns, first eight characters - enough
+  to see a difference at a glance;
+- the **full hashes** for the selected row underneath, because eight characters
+  are enough to spot a mismatch but not enough to trust a match.
+
+The hash of a provided file is computed even when the file will be refused: "you
+gave me a 4KB file" is much less useful than showing what it actually is.
+

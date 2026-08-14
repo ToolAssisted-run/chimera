@@ -1,4 +1,4 @@
-#nullable enable
+﻿#nullable enable
 
 using System.Collections.Generic;
 using System.Drawing;
@@ -26,6 +26,9 @@ namespace BizHawk.Client.EmuHawk
 	/// </summary>
 	public sealed class CoreFirmwareForm : FormBase
 	{
+		/// <summary>0 satisfied, 1 usable but not a dump the core knows, 2 unusable, 3 nothing provided.</summary>
+		private static readonly ImageList _marks = BuildMarks();
+
 		private readonly ListView _list;
 		private readonly Label _detail;
 		private readonly Func<IReadOnlyList<CoreFirmwareEntry>> _fetch;
@@ -43,8 +46,8 @@ namespace BizHawk.Client.EmuHawk
 			_setPath = setPath;
 
 			SuspendLayout();
-			ClientSize = new(UIHelper.ScaleX(660), UIHelper.ScaleY(340));
-			MinimumSize = new(UIHelper.ScaleX(500), UIHelper.ScaleY(240));
+			ClientSize = new(UIHelper.ScaleX(760), UIHelper.ScaleY(360));
+			MinimumSize = new(UIHelper.ScaleX(560), UIHelper.ScaleY(260));
 			StartPosition = FormStartPosition.CenterParent;
 			ShowIcon = false;
 
@@ -62,13 +65,19 @@ namespace BizHawk.Client.EmuHawk
 				HideSelection = false,
 				Location = new(UIHelper.ScaleX(8), UIHelper.ScaleY(30)),
 				MultiSelect = false,
-				Size = new(UIHelper.ScaleX(644), UIHelper.ScaleY(230)),
+				Size = new(UIHelper.ScaleX(744), UIHelper.ScaleY(245)),
+				SmallImageList = _marks,
 				View = View.Details,
 			};
-			_list.Columns.Add("Core", UIHelper.ScaleX(130));
-			_list.Columns.Add("Firmware", UIHelper.ScaleX(200));
-			_list.Columns.Add("Status", UIHelper.ScaleX(180));
-			_list.Columns.Add("File", UIHelper.ScaleX(130));
+			// The mark is the whole answer at a glance: is this one satisfied, is it wrong,
+			// or has nobody given it anything yet. The hashes underneath are the evidence.
+			_list.Columns.Add("", UIHelper.ScaleX(26));
+			_list.Columns.Add("Core", UIHelper.ScaleX(115));
+			_list.Columns.Add("Firmware", UIHelper.ScaleX(175));
+			_list.Columns.Add("Expected SHA1", UIHelper.ScaleX(95));
+			_list.Columns.Add("Actual SHA1", UIHelper.ScaleX(95));
+			_list.Columns.Add("Status", UIHelper.ScaleX(140));
+			_list.Columns.Add("File", UIHelper.ScaleX(95));
 			_list.SelectedIndexChanged += (_, _) => UpdateDetail();
 			_list.DoubleClick += (_, _) => Browse();
 
@@ -76,13 +85,13 @@ namespace BizHawk.Client.EmuHawk
 			{
 				Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
 				AutoEllipsis = true,
-				Location = new(UIHelper.ScaleX(8), UIHelper.ScaleY(268)),
-				Size = new(UIHelper.ScaleX(644), UIHelper.ScaleY(32)),
+				Location = new(UIHelper.ScaleX(8), UIHelper.ScaleY(283)),
+				Size = new(UIHelper.ScaleX(744), UIHelper.ScaleY(46)),
 			};
 
 			Button setButton = MakeButton("Set File...", 8, Browse);
 			Button clearButton = MakeButton("Clear", 110, Clear);
-			Button closeButton = MakeButton("Close", 580, Close);
+			Button closeButton = MakeButton("Close", 680, Close);
 			closeButton.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
 			CancelButton = closeButton;
 
@@ -91,13 +100,65 @@ namespace BizHawk.Client.EmuHawk
 			Populate();
 		}
 
+		/// <summary>
+		/// The four marks, drawn rather than shipped as files: a tick, a warning triangle,
+		/// a cross, and an empty circle for "nobody has given this one anything".
+		/// </summary>
+		private static ImageList BuildMarks()
+		{
+			ImageList list = new() { ImageSize = new(16, 16), ColorDepth = ColorDepth.Depth32Bit };
+
+			Bitmap Draw(Action<Graphics> paint)
+			{
+				Bitmap bmp = new(16, 16);
+				using Graphics g = Graphics.FromImage(bmp);
+				g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+				paint(g);
+				return bmp;
+			}
+
+			list.Images.Add(Draw(g =>
+			{
+				using Pen pen = new(Color.FromArgb(0, 140, 0), 2.4f);
+				g.DrawLines(pen, new[] { new Point(3, 8), new Point(6, 12), new Point(13, 4) });
+			}));
+			list.Images.Add(Draw(g =>
+			{
+				using SolidBrush fill = new(Color.FromArgb(240, 173, 40));
+				g.FillPolygon(fill, new[] { new Point(8, 1), new Point(15, 14), new Point(1, 14) });
+				using SolidBrush ink = new(Color.FromArgb(60, 40, 0));
+				g.FillRectangle(ink, 7, 5, 2, 5);
+				g.FillRectangle(ink, 7, 11, 2, 2);
+			}));
+			list.Images.Add(Draw(g =>
+			{
+				using Pen pen = new(Color.FromArgb(190, 40, 40), 2.4f);
+				g.DrawLine(pen, 4, 4, 12, 12);
+				g.DrawLine(pen, 12, 4, 4, 12);
+			}));
+			list.Images.Add(Draw(g =>
+			{
+				using Pen pen = new(Color.FromArgb(150, 150, 150), 1.4f);
+				g.DrawEllipse(pen, 3, 3, 10, 10);
+			}));
+			return list;
+		}
+
+		private static int MarkFor(CoreFirmwareState state) => state switch
+		{
+			CoreFirmwareState.Good => 0,
+			CoreFirmwareState.Unrecognised => 1,
+			CoreFirmwareState.WrongSize or CoreFirmwareState.Unreadable => 2,
+			_ => 3,
+		};
+
 		private Button MakeButton(string text, int x, Action onClick)
 		{
 			Button b = new()
 			{
 				Anchor = AnchorStyles.Bottom | AnchorStyles.Left,
 				AutoSize = true,
-				Location = new(UIHelper.ScaleX(x), UIHelper.ScaleY(306)),
+				Location = new(UIHelper.ScaleX(x), UIHelper.ScaleY(330)),
 				Text = text,
 			};
 			b.Click += (_, _) => onClick();
@@ -114,8 +175,11 @@ namespace BizHawk.Client.EmuHawk
 			_list.Items.Clear();
 			foreach (var entry in _entries)
 			{
-				ListViewItem item = new(entry.CoreName);
+				ListViewItem item = new("", MarkFor(entry.State));
+				item.SubItems.Add(entry.CoreName);
 				item.SubItems.Add(entry.Decl.DisplayName);
+				item.SubItems.Add(entry.ExpectedSha1.Count is 0 ? "(any)" : CoreFirmwareEntry.Short(entry.ExpectedSha1[0]));
+				item.SubItems.Add(CoreFirmwareEntry.Short(entry.Sha1));
 				item.SubItems.Add(entry.StatusText);
 				item.SubItems.Add(entry.Path is null ? "" : Path.GetFileName(entry.Path));
 				item.ForeColor = entry.State switch
@@ -148,10 +212,17 @@ namespace BizHawk.Client.EmuHawk
 				_detail.Text = "No loaded core expects any firmware.";
 				return;
 			}
-			// what the file is comes from the core; where it is (and what it hashed to)
-			// is the part the user needs to see when a row is not what they expected
+			// The full hashes live here rather than in the columns: comparing them is the one
+			// thing a person actually does in this window, and eight characters is enough to
+			// spot a difference but not enough to be sure of a match.
 			var what = entry.Decl.Description ?? $"{entry.Decl.DisplayName}, {entry.Decl.Size} bytes";
-			_detail.Text = entry.Path is null ? what : $"{what}\n{entry.Path}{(entry.Sha1 is null ? "" : $"  |  SHA1 {entry.Sha1}")}";
+			var expected = entry.ExpectedSha1.Count is 0
+				? "expects any file of the right size"
+				: $"expects {string.Join("  or  ", entry.ExpectedSha1.Select(static h => h.ToUpperInvariant()))}";
+			var actual = entry.Sha1 is null
+				? (entry.Path is null ? "nothing provided yet" : $"{entry.Path} could not be read")
+				: $"yours is {entry.Sha1}";
+			_detail.Text = $"{what}\n{expected}\n{actual}";
 		}
 
 		private void Browse()

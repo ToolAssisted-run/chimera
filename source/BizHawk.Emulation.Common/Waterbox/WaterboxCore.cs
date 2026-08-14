@@ -190,7 +190,13 @@ namespace BizHawk.Emulation.Common.Waterbox
 			var init = Proc<InitFn>("Init");
 			if (init() != 1)
 			{
-				throw new InvalidOperationException($"{cfg.CoreName}: core.wbx Init failed (bad rom?)");
+				// A core that refuses a rom knows why - an untranslated mapper, a disk image
+				// with no BIOS - and is the only one who does. GetLoadError is optional, so a
+				// core that says nothing still fails, just less helpfully.
+				var reason = Marshal.PtrToStringAnsi(TryProc<GetPtrFn>("GetLoadError")?.Invoke() ?? IntPtr.Zero);
+				throw new CoreLoadException(string.IsNullOrWhiteSpace(reason)
+					? $"{cfg.CoreName} could not load this file."
+					: $"{cfg.CoreName}: {reason}");
 			}
 			Deactivate();
 			_host.wbx_seal(_obj, ref r); // freeze the post-init image as the savestate baseline

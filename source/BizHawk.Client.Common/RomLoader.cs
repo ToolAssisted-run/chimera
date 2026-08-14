@@ -463,7 +463,10 @@ namespace BizHawk.Client.Common
 						return 0;
 					})
 					.ToList();
-				if (factories.Count == 0) throw new InvalidOperationException("No core was found to try on the game");
+				if (factories.Count == 0)
+				{
+					throw new CoreLoadException($"No loaded core can run a {lp.Game.System} game. Open one with File > Open Core...");
+				}
 			}
 			var exceptions = new List<Exception>();
 			foreach (var factory in factories)
@@ -587,9 +590,9 @@ namespace BizHawk.Client.Common
 			while (ex.InnerException != null)
 				ex = ex.InnerException;
 
-			if (ex is MissingFirmwareException)
+			if (ex is CoreLoadException)
 			{
-				// the user can fix this one, and the window that fixes it is named in the message
+				// the user can fix this one, and what to do is in the message
 				DoLoadErrorCallback(ex.Message, system);
 			}
 			else if (ex is NoAvailableCoreException)

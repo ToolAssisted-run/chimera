@@ -42,8 +42,14 @@ namespace BizHawk.Client.Common
 
 		public CoreFirmwareState State { get; init; }
 
-		/// <summary>The file's SHA1 (uppercase hex), when it could be read.</summary>
+		/// <summary>The SHA1 of the file the user provided (uppercase hex), or null if there is none or it would not read.</summary>
 		public string? Sha1 { get; init; }
+
+		/// <summary>The SHA1s the core says are right, in declaration order. Empty when it pins none.</summary>
+		public IReadOnlyList<string> ExpectedSha1 => Decl.Sha1 ?? (IReadOnlyList<string>) [ ];
+
+		/// <summary>Short form for a column; the full value goes in the detail line.</summary>
+		public static string Short(string? sha1) => sha1 is null ? "" : sha1.ToUpperInvariant()[..8];
 
 		public string StatusText => State switch
 		{
@@ -110,11 +116,11 @@ namespace BizHawk.Client.Common
 			{
 				return new() { CoreName = coreName, Decl = decl, Path = path, State = CoreFirmwareState.Unreadable };
 			}
+			var sha1 = Sha1Of(bytes); // computed even for a file that will be refused: the user wants to see WHAT they pointed at
 			if (decl.Size != 0 && bytes.Length != decl.Size)
 			{
-				return new() { CoreName = coreName, Decl = decl, Path = path, State = CoreFirmwareState.WrongSize };
+				return new() { CoreName = coreName, Decl = decl, Path = path, Sha1 = sha1, State = CoreFirmwareState.WrongSize };
 			}
-			var sha1 = Sha1Of(bytes);
 			var known = decl.Sha1 is not null
 				&& decl.Sha1.Exists(h => string.Equals(h, sha1, StringComparison.OrdinalIgnoreCase));
 			return new()
