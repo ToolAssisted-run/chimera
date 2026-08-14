@@ -229,6 +229,7 @@ custom_target(
 # ---------------------------------------------------------------------------
 minibox_host = repo_root / 'extern/miniBox/source/host'
 minibox_host_src = files(
+  minibox_host / 'diag.c',
   minibox_host / 'sha256.c',
   minibox_host / 'memblock.c',
   minibox_host / 'tripguard.c',
