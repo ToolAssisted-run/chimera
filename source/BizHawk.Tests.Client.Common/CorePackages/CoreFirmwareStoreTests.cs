@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 
 using BizHawk.Client.Common;
 using BizHawk.Emulation.Common;
@@ -130,6 +131,51 @@ namespace BizHawk.Tests.Client.Common.CorePackages
 			File.Delete(good);
 			File.Delete(small);
 		}
+
+		/// <summary>
+		/// What a movie records about firmware: one canonical line per core, ordered, so a
+		/// replay reports a difference only when the machine really is different.
+		/// </summary>
+		[TestMethod]
+		public void TheRecordedFirmwareLineIsCanonical()
+		{
+			var bios = FileOf(8192);
+			var chars = FileOf(8192, seed: 7);
+			Config config = new();
+			CoreFirmwareStore.SetPath(config, "Core", "bios", bios);
+			CoreFirmwareStore.SetPath(config, "Core", "charset", chars);
+
+			var biosSha1 = CoreFirmwareStore.Sha1Of(File.ReadAllBytes(bios));
+			var charsSha1 = CoreFirmwareStore.Sha1Of(File.ReadAllBytes(chars));
+
+			// declared in one order, recorded in another: the line must not depend on it
+			var forwards = Record(config, "Core", Decl(), Decl2("charset"));
+			var backwards = Record(config, "Core", Decl2("charset"), Decl());
+			Assert.AreEqual($"bios={biosSha1} charset={charsSha1}", forwards);
+			Assert.AreEqual(forwards, backwards);
+
+			// another core's files are another core's business
+			Assert.AreEqual("", Record(config, "OtherCore", Decl()));
+
+			File.Delete(bios);
+			File.Delete(chars);
+		}
+
+		/// <summary>Nothing provided means nothing recorded, rather than an empty pair.</summary>
+		[TestMethod]
+		public void FirmwareThatWasNeverProvidedIsNotRecorded()
+			=> Assert.AreEqual("", Record(new Config(), "Core", Decl()));
+
+		private static CoreFirmwareDecl Decl2(string id)
+			=> new() { Id = id, Display = id, Size = 8192 };
+
+		/// <summary>Runs the record over a registry that declares exactly these files.</summary>
+		private static string Record(Config config, string coreName, params CoreFirmwareDecl[] decls)
+			=> string.Join(" ", decls
+				.OrderBy(static d => d.Id, StringComparer.Ordinal)
+				.Select(d => CoreFirmwareStore.Describe(config, coreName, d))
+				.Where(static e => e.Sha1 is not null)
+				.Select(static e => $"{e.Decl.Id}={e.Sha1}"));
 
 		/// <summary>Choices are remembered per core and id, so two cores wanting the same-named file do not collide.</summary>
 		[TestMethod]

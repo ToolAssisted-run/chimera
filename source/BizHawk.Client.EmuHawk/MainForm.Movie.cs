@@ -1,10 +1,12 @@
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Windows.Forms;
 
 using BizHawk.Client.Common;
 using BizHawk.Common;
 using BizHawk.Emulation.Common;
+using BizHawk.Emulation.Common.Waterbox;
 
 namespace BizHawk.Client.EmuHawk
 {
@@ -103,6 +105,17 @@ namespace BizHawk.Client.EmuHawk
 			if (!string.IsNullOrWhiteSpace(movieCoreVersion) && !versionsAgree)
 			{
 				AddOnScreenMessage($"Warning: movie was recorded on {MovieSession.Movie.Core} {movieCoreVersion}, this is {loadedCoreVersion}", 5);
+			}
+
+			// Firmware: a different BIOS is a different machine, so this is not a nicety.
+			if (MovieSession.Movie.HeaderEntries.TryGetValue(HeaderKeys.Firmware, out var movieFirmware)
+				&& !string.IsNullOrWhiteSpace(movieFirmware))
+			{
+				var nowFirmware = CoreFirmwareStore.RecordFor(Config, CoreRegistry.Instance, Emulator.Attributes().CoreName);
+				if (!movieFirmware.Equals(nowFirmware, StringComparison.OrdinalIgnoreCase))
+				{
+					AddOnScreenMessage("Warning: this movie was recorded with different firmware", 5);
+				}
 			}
 
 			if (!MovieSession.Movie.HeaderEntries.TryGetValue(HeaderKeys.CorePackageSha1, out var moviePackageSha1)
@@ -217,6 +230,18 @@ namespace BizHawk.Client.EmuHawk
 
 			var packageSha1 = CoreRegistry.Instance.GetPackageSha1ForCore(Emulator.GetType());
 			if (packageSha1 is not null) movie.HeaderEntries[HeaderKeys.CorePackageSha1] = packageSha1;
+
+			// The sandbox is meant to change no emulation, which is a claim worth being able
+			// to check rather than assert: record which build of it ran.
+			if (!string.IsNullOrWhiteSpace(WaterboxCore.HostBuildInfo))
+			{
+				movie.HeaderEntries[HeaderKeys.WaterboxHost] = WaterboxCore.HostBuildInfo;
+			}
+
+			// Firmware decides what the machine IS - a disk system with a different BIOS is a
+			// different machine - so a movie that does not record it is not reproducible.
+			var firmware = CoreFirmwareStore.RecordFor(Config, CoreRegistry.Instance, Emulator.Attributes().CoreName);
+			if (!string.IsNullOrWhiteSpace(firmware)) movie.HeaderEntries[HeaderKeys.Firmware] = firmware;
 
 			// ...and if the game came from a bundle, the bundle is part of that contract too: it
 			// is what says the machine started with a save in it, and which one

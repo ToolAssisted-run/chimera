@@ -243,12 +243,30 @@ minibox_host_src = files(
   minibox_host / 'calling_convention_adapters.c',
   minibox_host / (host_windows ? 'pal_win.c' : 'pal_linux.c'),
 )
+# Provenance compiled into the host, matching what miniBox's own build stamps: the
+# frontend shows it and a movie records it, so every binary in the emulation path can
+# say where it came from. Inputs only, never a timestamp.
+minibox_commit = run_command(
+  'git', '-C', repo_root / 'extern/miniBox', 'rev-parse', '--short=12', 'HEAD',
+  check: false).stdout().strip()
+if minibox_commit == ''
+  minibox_commit = 'unknown'
+endif
+minibox_build_os = run_command(
+  'sh', '-c', '. /etc/os-release 2>/dev/null && printf "%s %s" "$ID" "$VERSION_ID" || uname -s',
+  check: false).stdout().strip()
+
 shared_library(
   'miniboxhost',
   minibox_host_src,
   name_prefix: 'lib',  # libminiboxhost.{so,dll} on both targets (the adapter resolves this name)
   include_directories: include_directories('extern/miniBox/source/host'),
-  c_args: ['-fno-strict-aliasing'],
+  c_args: [
+    '-fno-strict-aliasing',
+    '-DMB_BUILD_COMMIT="' + minibox_commit + '"',
+    '-DMB_BUILD_COMPILER="' + meson.get_compiler('c').get_id() + ' ' + meson.get_compiler('c').version() + '"',
+    '-DMB_BUILD_OS="' + minibox_build_os + '"',
+  ],
   dependencies: [dl_dep, thread_dep],
   gnu_symbol_visibility: 'default',
   install: true,

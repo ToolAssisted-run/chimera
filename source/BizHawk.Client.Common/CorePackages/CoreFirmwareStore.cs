@@ -153,6 +153,18 @@ namespace BizHawk.Client.Common
 				}
 			};
 
+		/// <summary>
+		/// What firmware a core is running with, as "&lt;id&gt;=&lt;sha1&gt;" pairs in a fixed
+		/// order - the line a movie records. A different BIOS is a different machine, so a
+		/// movie that does not carry this is not reproducible; and it has to be canonical,
+		/// or replay would report a difference that is only an ordering.
+		/// </summary>
+		public static string RecordFor(Config config, CoreRegistry registry, string coreName)
+			=> string.Join(" ", Enumerate(config, registry)
+				.Where(e => string.Equals(e.CoreName, coreName, StringComparison.OrdinalIgnoreCase) && e.Sha1 is not null)
+				.OrderBy(static e => e.Decl.Id, StringComparer.Ordinal)
+				.Select(static e => $"{e.Decl.Id}={e.Sha1}"));
+
 		public static string Sha1Of(byte[] bytes)
 		{
 			using var sha1 = SHA1.Create();

@@ -62,6 +62,10 @@ namespace BizHawk.Emulation.Common.Waterbox
 		[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
 		public delegate int WriteCallback(UIntPtr userdata, IntPtr data, UIntPtr size);
 
+		/// <summary>JSON: what built this host library (commit, compiler, OS, target).</summary>
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract IntPtr wbx_build_info();
+
 		[BizImport(CallingConvention.Cdecl)]
 		public abstract void wbx_create_host(ref MemoryLayoutTemplate layout, string moduleName, ReadCallback cb, UIntPtr userdata, ref ReturnData ret);
 

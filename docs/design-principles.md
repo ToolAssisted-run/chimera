@@ -1240,3 +1240,33 @@ where a machine keeps the guest kit is not something a rebuilder needs. Anything
 time- or machine-dependent would make two builds of one commit differ, which is
 the property all of this exists to keep.
 
+## The whole pipeline accounts for itself (2026-08-14)
+
+A run is reproducible only if every binary in the path can say where it came
+from. Three could not, in different ways, and a movie recorded none of them.
+
+- **The core package** carries `build.json`: source (origin, commit, dirty),
+  toolchain (gcc, libstdc++, binutils, musl, target), the OS it was built on, and
+  the exact compile and link flags.
+- **The waterbox host** answers `wbx_build_info()` with its own commit, compiler,
+  OS and target - compiled in as defines, since two build systems compile those
+  sources. The sandbox is meant to change no emulation; that is a claim to be
+  checkable, not asserted.
+- **The frontend** already stamped its commit (`GIT <branch>#<hash>`), and now
+  says so on the console at startup, where a log keeps it.
+- **Firmware** is recorded per movie as `<id>=<sha1>` pairs in a canonical order.
+  A disk system with a different BIOS is a different machine, so a movie without
+  this was never reproducible; the ordering is fixed so replay reports a
+  difference only when the machine really differs.
+
+A movie header therefore carries: the frontend version, the core name, its
+version (the commit) and package SHA1, the waterbox host's build, the firmware
+hashes, and - when the game came from one - the bundle and its content id. Each
+mismatch reports itself in its own words, because "something differs" is not
+actionable and "your BIOS is not the one this was recorded with" is.
+
+The discipline that makes all of it hold: **everything recorded is a function of
+the inputs**. Not a timestamp, not a hostname, not a path. The moment provenance
+starts describing the moment rather than the ingredients, two builds of one
+commit stop matching and every hash in the chain becomes noise.
+

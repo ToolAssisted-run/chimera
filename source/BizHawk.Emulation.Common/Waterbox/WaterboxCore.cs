@@ -115,6 +115,12 @@ namespace BizHawk.Emulation.Common.Waterbox
 		private readonly WaterboxConfig.AxisConfig[] _axes;
 		private readonly SetAxisFn _setAxis; // null iff the package declares no axes
 
+		/// <summary>
+		/// What built the waterbox host this session is running on, as JSON. Static
+		/// because there is one host library per process, and it is asked once.
+		/// </summary>
+		public static string HostBuildInfo { get; private set; }
+
 		public WaterboxCore(byte[] rom, WaterboxConfig cfg, string wbxPath, WaterboxCoreSyncSettings syncSettings, WaterboxCoreSettings settings = null, IReadOnlyDictionary<string, byte[]> firmware = null)
 		{
 			_cfg = cfg;
@@ -151,6 +157,10 @@ namespace BizHawk.Emulation.Common.Waterbox
 			// The host itself is an ordinary library and speaks the host convention;
 			// the GUEST is always sysv64, so calls into it go through this.
 			_abi = new WaterboxAbiShim(resolver);
+
+			// The sandbox's own provenance, recorded once: a run is reproducible only if
+			// every binary in the path can say where it came from, and this is the last one.
+			HostBuildInfo ??= Marshal.PtrToStringAnsi(_host.wbx_build_info()) ?? "";
 
 			var mib = cfg.MemoryLayoutMiB;
 			var layout = new LibMiniBoxHost.MemoryLayoutTemplate

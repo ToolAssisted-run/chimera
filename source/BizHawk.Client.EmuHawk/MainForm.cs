@@ -541,6 +541,8 @@ namespace BizHawk.Client.EmuHawk
 			// the menus built at construction time predate the packages
 			RebuildCoreSettingsMenus();
 
+			Console.WriteLine($"miniHawk {VersionInfo.GetEmuVersion()}");
+
 			if (_argParser.cmdCorePackage != null && !LoadCorePackage(_argParser.cmdCorePackage))
 			{
 				ShowMessageBox(owner: null, $"Failed to load core package {_argParser.cmdCorePackage} specified on commandline");
