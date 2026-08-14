@@ -19,8 +19,22 @@ namespace BizHawk.Tests.Client.EmuHawk
 	[TestClass]
 	public class OpenCoreFormTests
 	{
-		private static DiscoveredCorePackage Pkg(string name, string path, string sha1 = null, string error = null)
-			=> new() { Name = name, Path = path, Sha1 = sha1, Error = error, Systems = [ "NES" ] };
+		private static DiscoveredCorePackage Pkg(string name, string path, string sha1 = null, string error = null, string version = "")
+			=> new() { Name = name, Path = path, Sha1 = sha1, Error = error, Systems = [ "NES" ], Version = version };
+
+		/// <summary>The version a package declares is what a movie will cite, so the window shows it.</summary>
+		[TestMethod]
+		public void TheVersionAPackageDeclaresIsShown()
+		{
+			using var form = MakeForm(
+			[
+				Pkg("published", "/cores/p.zip", sha1: "aa", version: "9f3c1d2e4b5a"),
+				Pkg("home-built", "/cores/h.zip", sha1: "bb", version: "9f3c1d2e4b5a-dirty+local"),
+			]);
+			Assert.AreEqual("home-built", ListOf(form).Items[0].Text);
+			Assert.AreEqual("9f3c1d2e4b5a-dirty+local", ListOf(form).Items[0].SubItems[2].Text);
+			Assert.AreEqual("9f3c1d2e4b5a", ListOf(form).Items[1].SubItems[2].Text);
+		}
 
 		private static ListView ListOf(Form form)
 			=> form.Controls.OfType<ListView>().Single();
@@ -65,18 +79,18 @@ namespace BizHawk.Tests.Client.EmuHawk
 			Assert.AreEqual("Broken", broken.Text);
 			Assert.AreEqual("quickerNES", quicker.Text);
 			Assert.AreEqual("NES", quicker.SubItems[1].Text);
-			Assert.AreEqual("loaded", quicker.SubItems[2].Text);
-			Assert.AreEqual("q.zip", quicker.SubItems[3].Text);
-			Assert.AreEqual("01234567", quicker.SubItems[4].Text, "the SHA1 column shows the identity prefix");
-			StringAssert.Contains(broken.SubItems[2].Text, "waterbox.config");
+			Assert.AreEqual("loaded", quicker.SubItems[3].Text);
+			Assert.AreEqual("q.zip", quicker.SubItems[4].Text);
+			Assert.AreEqual("01234567", quicker.SubItems[5].Text, "the SHA1 column shows the identity prefix");
+			StringAssert.Contains(broken.SubItems[3].Text, "waterbox.config");
 		}
 
 		[TestMethod]
 		public void ADirectoryPackageIsMarkedAsAFolder()
 		{
 			using var form = MakeForm([ Pkg("DevBuild", "/home/you/quickerNES/waterbox/bin") ]);
-			StringAssert.Contains(ListOf(form).Items[0].SubItems[3].Text, "(folder)");
-			Assert.AreEqual("-", ListOf(form).Items[0].SubItems[4].Text, "a directory has no hash to show");
+			StringAssert.Contains(ListOf(form).Items[0].SubItems[4].Text, "(folder)");
+			Assert.AreEqual("-", ListOf(form).Items[0].SubItems[5].Text, "a directory has no hash to show");
 		}
 
 		/// <summary>Opening is what the window is for: the chosen package goes to the owner, and the window closes.</summary>

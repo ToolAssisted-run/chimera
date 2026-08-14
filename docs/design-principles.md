@@ -1199,3 +1199,37 @@ they have, so the window does that comparison for them and shows its working:
 The hash of a provided file is computed even when the file will be refused: "you
 gave me a 4KB file" is much less useful than showing what it actually is.
 
+## What a package IS: reproducible bytes, versioned by a commit (2026-08-14)
+
+A package's SHA1 was the core's whole identity, and it changed on every rebuild -
+the zip stores mtimes, so the same sources produced a different "machine" every
+time. A movie recorded on Tuesday warned against Wednesday's rebuild of the same
+commit. Two changes, and they need each other.
+
+**Deterministic packaging.** Fixed timestamp (1980-01-01), fixed permissions,
+sorted entries, pinned compression level. The guest ELF was already reproducible;
+only the container was not. `build-package.sh` packs a second time and compares
+before it will publish, because this is exactly the kind of promise that rots
+without anyone noticing.
+
+**The commit is the version** (user-decided). The automated build that publishes
+an artifact passes `CORE_VERSION=<commit>`, which is stamped into the packaged
+`waterbox.config` - the repo's copy carries no version, since a file under
+version control has no business holding a number that changes with every commit.
+A package built by hand stamps `<commit>+local` (or `-dirty`), so it can never be
+mistaken for a published one, and CI publishes the zip only from a job whose
+gates passed.
+
+**Both, in a movie.** `CoreVersion` is the commit - meaningful, lookup-able, what
+a person acts on. `CorePackageSHA1` is the exact bytes - which BUILD of that
+commit ran. When the version matches but the hash does not, the frontend says so
+in those words ("same core version, but a different build of it"), because that
+is the ordinary case of someone building the core themselves.
+
+**Identity is relative to a toolchain**, and that is honest rather than
+unfortunate: the same sources through a different gcc are different code and
+could in principle emulate differently. The package records the compiler version
+in `build.txt` so the difference is legible instead of mysterious. Pinning a
+vendored toolchain would make builds identical across machines; that is a
+separate job, and until then "reproducible" means "given the same toolchain".
+

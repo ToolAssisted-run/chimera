@@ -209,11 +209,11 @@ PY
 		fi
 	fi
 
-	# --- core discovery ---
-	# Same movie, but NO --core: the package must be found in build/Cores by the
-	# startup scan, and the rom must route to it by its declared extension. This is
-	# the path a user actually takes (drop a package in Cores/, open a rom), and it
-	# is easy to break by moving the scan later in startup than the rom load.
+	# --- a core is never loaded implicitly ---
+	# Same movie, but NO --core. A package sitting in build/Cores is AVAILABLE, not
+	# loaded: opening a core is something the user does (File > Open Core), and the
+	# commandline says which one with --core. So this run must NOT produce a machine -
+	# if it does, something is loading cores behind the user's back again.
 	if [ "$record" -eq 0 ]; then
 		dname=gridWalker.win
 		djob="$work/job.discovery.txt"
@@ -229,12 +229,10 @@ PY
 		( cd "$repo_root" && MINIHAWK_JOB="$djob" timeout 300 mono "$emu_hawk" --headless \
 			"--config=$work/config.discovery.ini" "--lua=$here/synth-replay.lua" \
 			"$here/roms/${dname%%.*}.testrom" ) > "$work/discovery.log" 2>&1
-		if [ ! -f "$work/discovery.meta.txt" ] || ! grep -q "^status=OK" "$work/discovery.meta.txt"; then
-			report "D:box:autodiscovery" FAIL "rom did not load without --core (see work/discovery.log)"
-		elif cmp -s "$work/discovery.ram.bin" "$golden_dir/$dname.ram.bin"; then
-			report "D:box:autodiscovery" PASS "package found in Cores/ and rom routed by extension"
+		if [ -f "$work/discovery.meta.txt" ] && grep -q "^status=OK" "$work/discovery.meta.txt"; then
+			report "D:box:noImplicitCore" FAIL "the rom ran with no core opened and no --core"
 		else
-			report "D:box:autodiscovery" FAIL "loaded, but RAM differs from the golden"
+			report "D:box:noImplicitCore" PASS "a rom does not load without a core (see work/discovery.log)"
 		fi
 
 		# --- keybinds ship with the package ---
@@ -256,7 +254,7 @@ PY
 		} > "$kjob"
 		rm -f "$work/keybinds.meta.txt"
 		( cd "$repo_root" && MINIHAWK_JOB="$kjob" timeout 300 mono "$emu_hawk" --headless \
-			"--config=$kcfg" "--lua=$here/synth-replay.lua" \
+			"--config=$kcfg" "--core=$package" "--lua=$here/synth-replay.lua" \
 			"$here/roms/${kname%%.*}.testrom" ) > "$work/keybinds.log" 2>&1
 		if [ ! -f "$work/keybinds.meta.txt" ] || ! grep -q "^status=OK" "$work/keybinds.meta.txt"; then
 			report "K:box:keybinds" FAIL "run failed (see work/keybinds.log)"

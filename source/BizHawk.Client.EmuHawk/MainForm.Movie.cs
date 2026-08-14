@@ -93,7 +93,18 @@ namespace BizHawk.Client.EmuHawk
 				}
 			}
 
-			// the analogous check for the core package: its SHA1 is its identity
+			// The core: version first, because it is the one a person can act on ("get that
+			// commit"), then the package hash, which distinguishes two builds of that same
+			// commit - a different toolchain produces different bytes from identical sources.
+			MovieSession.Movie.HeaderEntries.TryGetValue(HeaderKeys.CoreVersion, out var movieCoreVersion);
+			var loadedCoreVersion = Emulator.CoreVersion();
+			var versionsAgree = !string.IsNullOrWhiteSpace(movieCoreVersion)
+				&& movieCoreVersion.Equals(loadedCoreVersion, StringComparison.OrdinalIgnoreCase);
+			if (!string.IsNullOrWhiteSpace(movieCoreVersion) && !versionsAgree)
+			{
+				AddOnScreenMessage($"Warning: movie was recorded on {MovieSession.Movie.Core} {movieCoreVersion}, this is {loadedCoreVersion}", 5);
+			}
+
 			if (!MovieSession.Movie.HeaderEntries.TryGetValue(HeaderKeys.CorePackageSha1, out var moviePackageSha1)
 				|| string.IsNullOrEmpty(moviePackageSha1))
 			{
@@ -103,7 +114,11 @@ namespace BizHawk.Client.EmuHawk
 				CoreRegistry.Instance.GetPackageSha1ForCore(Emulator.GetType()),
 				StringComparison.OrdinalIgnoreCase))
 			{
-				AddOnScreenMessage("Warning: Movie's core package hash does not match the loaded core package", 5);
+				// Same version, different bytes: almost always a package built somewhere else,
+				// which is worth saying plainly rather than as a bare hash mismatch.
+				AddOnScreenMessage(versionsAgree
+					? "Warning: same core version, but a different build of it (rebuilt, or a different toolchain)"
+					: "Warning: Movie's core package hash does not match the loaded core package", 5);
 			}
 
 			return !Emulator.IsNull();
@@ -193,7 +208,13 @@ namespace BizHawk.Client.EmuHawk
 			movie.Core = Emulator.Attributes().CoreName;
 			movie.SystemID = Emulator.SystemId; // TODO: I feel like setting this shouldn't be necessary, but it is currently
 
-			// the package's SHA1 is its ground-truth identity; (movie, core package) is the reproduction contract
+			// A core's version is the commit its published build was made from, which is what
+			// a movie can cite and a person can look up; the package's SHA1 says WHICH BUILD of
+			// that commit ran, since the same source built with a different toolchain is
+			// different bytes. Both, therefore: one is meaningful, the other is exact.
+			var coreVersion = Emulator.CoreVersion();
+			if (!string.IsNullOrWhiteSpace(coreVersion)) movie.HeaderEntries[HeaderKeys.CoreVersion] = coreVersion;
+
 			var packageSha1 = CoreRegistry.Instance.GetPackageSha1ForCore(Emulator.GetType());
 			if (packageSha1 is not null) movie.HeaderEntries[HeaderKeys.CorePackageSha1] = packageSha1;
 

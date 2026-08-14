@@ -28,7 +28,8 @@ namespace BizHawk.Client.Common
 		public const string ClockRate = "ClockRate";
 		public const string VsyncAttoseconds = "VsyncAttoseconds"; // used for Arcade due to it representing thousands of different systems with different vsync rates
 		public const string Core = "Core";
-		public const string CorePackageSha1 = "CorePackageSHA1"; // SHA1 of the core package file — the package's ground-truth identity
+		public const string CoreVersion = "CoreVersion"; // the core's authoritative version: the commit its published build was made from
+		public const string CorePackageSha1 = "CorePackageSHA1"; // SHA1 of the package file — the same version can be built twice, this says which build
 
 		private static FrozenSet<string> field;
 

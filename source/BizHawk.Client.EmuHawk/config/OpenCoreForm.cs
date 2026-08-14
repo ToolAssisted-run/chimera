@@ -82,9 +82,10 @@ namespace BizHawk.Client.EmuHawk
 				Size = new(UIHelper.ScaleX(624), UIHelper.ScaleY(250)),
 				View = View.Details,
 			};
-			_list.Columns.Add("Core", UIHelper.ScaleX(140));
-			_list.Columns.Add("System", UIHelper.ScaleX(60));
-			_list.Columns.Add("Status", UIHelper.ScaleX(210));
+			_list.Columns.Add("Core", UIHelper.ScaleX(130));
+			_list.Columns.Add("System", UIHelper.ScaleX(55));
+			_list.Columns.Add("Version", UIHelper.ScaleX(115));
+			_list.Columns.Add("Status", UIHelper.ScaleX(160));
 			_list.Columns.Add("Package", UIHelper.ScaleX(130));
 			_list.Columns.Add("SHA1", UIHelper.ScaleX(70));
 			_list.SelectedIndexChanged += (_, _) => UpdateDetail();
@@ -137,6 +138,7 @@ namespace BizHawk.Client.EmuHawk
 				var pkg = entry.Package;
 				ListViewItem item = new(pkg.Name);
 				item.SubItems.Add(string.Join(", ", pkg.Systems));
+				item.SubItems.Add(pkg.Version);
 				item.SubItems.Add(entry.StatusText);
 				item.SubItems.Add(pkg.IsDirectoryForm ? $"{Path.GetFileName(pkg.Path)} (folder)" : Path.GetFileName(pkg.Path));
 				item.SubItems.Add(pkg.ShortSha1);

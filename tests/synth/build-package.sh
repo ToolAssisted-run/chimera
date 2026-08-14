@@ -54,15 +54,48 @@ cores_dir="$minihawk_root/build/Cores"
 mkdir -p "$cores_dir"
 zip_path="$cores_dir/synth-box.zip"
 rm -f "$zip_path"
+# The package's SHA1 is the core's identity: it is what a movie records to say which
+# machine produced it. So the same sources must produce the same bytes - which an
+# ordinary zip does not, because it stores each file's mtime and mode. Entries are
+# written sorted, with a fixed timestamp, fixed permissions and a pinned compression
+# level; the guest ELF is already reproducible on its own.
 python3 - "$staging" "$zip_path" <<'PYEOF'
 import os, sys, zipfile
+
 staging, zip_path = sys.argv[1], sys.argv[2]
-with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as z:
-    for root, dirs, files in os.walk(staging):
-        dirs.sort()
-        for name in sorted(files):
-            full = os.path.join(root, name)
-            z.write(full, os.path.relpath(full, staging))
+
+# 1980-01-01 is the earliest a zip can express, and the point is that it never moves
+FIXED_DATE = (1980, 1, 1, 0, 0, 0)
+
+
+def write_package(path):
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED, compresslevel=6) as z:
+        for root, dirs, files in os.walk(staging):
+            dirs.sort()
+            for name in sorted(files):
+                full = os.path.join(root, name)
+                info = zipfile.ZipInfo(os.path.relpath(full, staging), date_time=FIXED_DATE)
+                info.compress_type = zipfile.ZIP_DEFLATED
+                info.create_system = 3  # unix, so the mode below is what is stored
+                info.external_attr = 0o644 << 16
+                with open(full, "rb") as f:
+                    z.writestr(info, f.read())
+
+
+write_package(zip_path)
+
+# A self-check, because "identical sources give an identical package" is a promise
+# that rots silently: pack a second time and compare.
+import hashlib
+import tempfile
+
+with tempfile.NamedTemporaryFile(suffix=".zip") as tmp:
+    write_package(tmp.name)
+    again = hashlib.sha1(open(tmp.name, "rb").read()).hexdigest()
+first = hashlib.sha1(open(zip_path, "rb").read()).hexdigest()
+if first != again:
+    sys.exit(f"packaging is not deterministic: {first} then {again}")
+print(f"package sha1 {first}")
 PYEOF
 # force re-extract on next load
 for cache in "$minihawk_root"/build/CoreCache/synth-box-*; do

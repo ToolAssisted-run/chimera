@@ -85,6 +85,13 @@ namespace BizHawk.Emulation.Common
 			return core.ServiceProvider.GetService<IMemoryDomains>();
 		}
 
+		/// <summary>
+		/// The core's own version - for a package, the commit its published build was made
+		/// from. Empty when the core does not say, which a movie then does not claim.
+		/// </summary>
+		public static string CoreVersion(this IEmulator core)
+			=> core.Attributes() is PortedCoreAttribute ported ? ported.PortedVersion : "";
+
 		public static bool HasPersistentData(this IEmulator core)
 		{
 			return core != null && core.ServiceProvider.HasService<ICorePersistentData>();

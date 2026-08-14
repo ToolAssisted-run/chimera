@@ -38,6 +38,13 @@ namespace BizHawk.Client.Common
 
 		public IReadOnlyList<string> Systems { get; init; } = [ ];
 
+		/// <summary>
+		/// What the package says its version is: for one published by the automated
+		/// build, the commit it was made from. A package built by hand says so ("+local"),
+		/// and one that says nothing is empty.
+		/// </summary>
+		public string Version { get; init; } = "";
+
 		/// <summary>Rom extension (leading dot, lowercase) -&gt; system id.</summary>
 		public IReadOnlyDictionary<string, string> Extensions { get; init; } = new Dictionary<string, string>();
 
@@ -230,6 +237,7 @@ namespace BizHawk.Client.Common
 				Path = path,
 				Sha1 = sha1,
 				Name = string.IsNullOrWhiteSpace(cfg.CoreName) ? fallbackName : cfg.CoreName,
+				Version = cfg.Version ?? "",
 				Systems = [ cfg.SystemId ],
 				Extensions = NormaliseExtensions(cfg.Extensions),
 			};
