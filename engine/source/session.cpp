@@ -69,8 +69,13 @@ struct SessionConfig
 	std::vector<std::string> buttons;
 	std::vector<AxisDecl> axes;
 	bool deterministic = false;
+	std::string defaultsJson; // JSON object: every declared setting at its default
 	std::string settingsJson; // the effective settings, serialized for the guest
 };
+
+/* effective settings = the declared defaults overlaid with the overrides -
+ * shared by open and by a live re-apply */
+bool composeSettings(const std::string &defaultsJson, const char *overrides, std::string &out, std::string &error);
 
 const char *strOf(const cJSON *obj, const char *key, const char *fallback = "")
 {
@@ -155,9 +160,9 @@ bool parseConfig(const char *json, uint64_t len, const char *overrides, SessionC
 	const cJSON *lag = cJSON_GetObjectItemCaseSensitive(root, "lag");
 	if (cJSON_IsObject(lag)) cfg.inputWasRead = strOf(lag, "inputWasRead");
 
-	/* effective settings: every declared setting at its default, overlaid
-	 * with the caller's overrides - what the C# EffectiveSettings built */
-	cJSON *effective = cJSON_CreateObject();
+	/* every declared setting at its default, kept for open AND for live
+	 * re-applies - what the C# EffectiveSettings started from */
+	cJSON *defaults = cJSON_CreateObject();
 	const cJSON *decls = cJSON_GetObjectItemCaseSensitive(root, "settings");
 	if (cJSON_IsArray(decls))
 	{
@@ -167,10 +172,22 @@ bool parseConfig(const char *json, uint64_t len, const char *overrides, SessionC
 			const cJSON *fallback = cJSON_GetObjectItemCaseSensitive(item, "default");
 			if (name != nullptr && fallback != nullptr)
 			{
-				cJSON_AddItemToObject(effective, name, cJSON_Duplicate(fallback, 1));
+				cJSON_AddItemToObject(defaults, name, cJSON_Duplicate(fallback, 1));
 			}
 		}
 	}
+	char *printed = cJSON_PrintUnformatted(defaults);
+	cfg.defaultsJson = printed != nullptr ? printed : "{}";
+	if (printed != nullptr) cJSON_free(printed);
+	cJSON_Delete(defaults);
+	cJSON_Delete(root);
+	return composeSettings(cfg.defaultsJson, overrides, cfg.settingsJson, error);
+}
+
+bool composeSettings(const std::string &defaultsJson, const char *overrides, std::string &out, std::string &error)
+{
+	cJSON *effective = cJSON_Parse(defaultsJson.c_str());
+	if (effective == nullptr) effective = cJSON_CreateObject();
 	if (overrides != nullptr && overrides[0] != '\0')
 	{
 		cJSON *over = cJSON_Parse(overrides);
@@ -178,10 +195,10 @@ bool parseConfig(const char *json, uint64_t len, const char *overrides, SessionC
 		{
 			cJSON_Delete(over);
 			cJSON_Delete(effective);
-			cJSON_Delete(root);
 			error = "settings overrides are not readable JSON";
 			return false;
 		}
+		const cJSON *item = nullptr;
 		cJSON_ArrayForEach(item, over)
 		{
 			cJSON *dup = cJSON_Duplicate(item, 1);
@@ -197,10 +214,9 @@ bool parseConfig(const char *json, uint64_t len, const char *overrides, SessionC
 		cJSON_Delete(over);
 	}
 	char *printed = cJSON_PrintUnformatted(effective);
-	cfg.settingsJson = printed != nullptr ? printed : "{}";
+	out = printed != nullptr ? printed : "{}";
 	if (printed != nullptr) cJSON_free(printed);
 	cJSON_Delete(effective);
-	cJSON_Delete(root);
 	return true;
 }
 
@@ -578,5 +594,48 @@ int64_t ce_session_domain_read(const ce_session *s, int32_t index, int64_t offse
 }
 
 const char *ce_session_last_error(ce_session *s) { return s->error.c_str(); }
+
+const char *ce_host_build_info(void)
+{
+	const char *error = nullptr;
+	const chimera::HostApi *host = chimera::hostApi(&error);
+	return host != nullptr ? host->wbx_build_info() : nullptr;
+}
+
+uint64_t ce_session_domain_ptr(const ce_session *s, int32_t index)
+{
+	return static_cast<uint64_t>(s->mdPtr(index));
+}
+
+int32_t ce_session_apply_settings(ce_session *s, const char *overrides_json)
+{
+	s->error.clear();
+	std::string err;
+	auto capacity = reinterpret_cast<int32_t (*)()>(s->proc("GetSettingsCapacity", 0, false, err));
+	auto buffer = reinterpret_cast<uintptr_t (*)()>(s->proc("GetSettingsBuffer", 0, false, err));
+	auto apply = reinterpret_cast<void (*)(int32_t)>(s->proc("PutSettings", 1, false, err));
+	if (capacity == nullptr || buffer == nullptr || apply == nullptr) return 1;
+
+	std::string json;
+	if (!composeSettings(s->cfg.defaultsJson, overrides_json, json, s->error)) return 2;
+	int32_t cap = capacity();
+	if (static_cast<int32_t>(json.size()) > cap)
+	{
+		s->error = s->cfg.coreName + ": settings JSON is " + std::to_string(json.size())
+			+ " bytes but the core's buffer holds " + std::to_string(cap);
+		return 2;
+	}
+	uintptr_t dest = buffer();
+	if (dest == 0) return 1;
+	std::memcpy(reinterpret_cast<void *>(dest), json.data(), json.size());
+	apply(static_cast<int32_t>(json.size()));
+	return 0;
+}
+
+uint64_t ce_session_guest_proc(ce_session *s, const char *name, int32_t arg_count)
+{
+	std::string err;
+	return static_cast<uint64_t>(s->proc(name, arg_count, false, err));
+}
 
 } // extern "C"

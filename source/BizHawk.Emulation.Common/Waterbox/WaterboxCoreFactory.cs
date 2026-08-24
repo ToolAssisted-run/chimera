@@ -17,11 +17,11 @@ namespace BizHawk.Emulation.Common.Waterbox
 		public const string ConfigFileName = "waterbox.config";
 
 		private readonly WaterboxConfig _cfg;
-		private readonly string _wbxPath;
+		private readonly string _packageDir;
 
 		public WaterboxCoreFactory(string packageDir)
 		{
-			_wbxPath = Path.Combine(packageDir, WbxFileName);
+			_packageDir = packageDir;
 			_cfg = WaterboxConfig.FromJson(File.ReadAllText(Path.Combine(packageDir, ConfigFileName)));
 			if (_cfg is null) throw new InvalidOperationException($"{ConfigFileName} is empty or invalid");
 			if (string.IsNullOrEmpty(_cfg.SystemId)) throw new InvalidOperationException($"{ConfigFileName} is missing systemId");
@@ -58,7 +58,7 @@ namespace BizHawk.Emulation.Common.Waterbox
 			return new WaterboxCore(
 				rom.FileData,
 				_cfg,
-				_wbxPath,
+				_packageDir,
 				ctx.SyncSettings as WaterboxCoreSyncSettings,
 				ctx.Settings as WaterboxCoreSettings,
 				ResolveFirmware(ctx));

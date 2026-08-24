@@ -163,8 +163,8 @@ namespace BizHawk.Emulation.Common.Waterbox
 					busSize,
 					MemoryDomain.Endian.Little,
 					// guarded: a domain can outlive the core in a tool that kept a reference
-					addr => _obj == IntPtr.Zero ? (byte)0 : (byte)peek(bus, (int)addr),
-					!writable ? null : (addr, val) => { if (_obj != IntPtr.Zero) poke(bus, (int)addr, val); },
+					addr => _session.Disposed ? (byte)0 : (byte)peek(bus, (int)addr),
+					!writable ? null : (addr, val) => { if (!_session.Disposed) poke(bus, (int)addr, val); },
 					1));
 			}
 		}

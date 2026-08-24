@@ -78,9 +78,15 @@ long-lived dual paths.
      `chimera-run` replays movies headlessly, and the witness gate's new
      Level E proves it byte-identical to the Level A goldens - no Mono, no
      Xvfb, no frontend.
-   - 5b second half: rewire the C# WaterboxCore onto ce_session (GUI keeps
-     rendering); tooling/persistent-data ABI groups; then the session grows
-     movie playback/record and the greenzone
+   - 5b **second half: WaterboxCore rewired onto ce_session** - DONE. The C#
+     adapter is now a thin frontend shell: the machine (host, mounts, Init,
+     frame loop, savestates, domains, live settings) is the engine's session,
+     the SAME one chimera-run drives - LibMiniBoxHost.cs and WaterboxAbiShim.cs
+     are deleted. The optional tooling/persistent-data groups still reach the
+     guest through the session's TRANSITIONAL guest-proc bridge
+     (ce_session_guest_proc) until they migrate as their own components.
+   - remaining in 5: tooling/persistent-data ABI groups into the session;
+     movie playback/record and the greenzone into the session
 6. Memory domains + tooling services
 7. Lua (real Lua replaces NLua; script API preserved)
 8. AV dumping

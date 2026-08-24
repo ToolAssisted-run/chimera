@@ -1,5 +1,6 @@
 #nullable enable
 
+using System.Collections.Generic;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -239,6 +240,105 @@ namespace BizHawk.Emulation.Common.Engine
 
 		[BizImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_package_last_error(IntPtr package);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_session_open(
+			string packagePath, byte[] rom, ulong romLen, string? settingsOverridesJson,
+			IntPtr[]? firmwareIds, IntPtr[]? firmwareData, ulong[]? firmwareLens, int firmwareCount,
+			ref IntPtr errorOut);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract void ce_session_free(IntPtr session);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_session_core_name(IntPtr session);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_session_system_id(IntPtr session);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract int ce_session_width(IntPtr session);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract int ce_session_height(IntPtr session);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract int ce_session_virtual_width(IntPtr session);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract int ce_session_virtual_height(IntPtr session);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract int ce_session_vsync_numerator(IntPtr session);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract int ce_session_vsync_denominator(IntPtr session);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract int ce_session_samples_per_frame(IntPtr session);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract int ce_session_channels(IntPtr session);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract int ce_session_deterministic(IntPtr session);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract long ce_session_button_count(IntPtr session);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_session_button_name(IntPtr session, long index);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract long ce_session_axis_count(IntPtr session);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_session_axis_name(IntPtr session, long index);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract void ce_session_set_axis(IntPtr session, int index, int value);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract int ce_session_frame_advance(IntPtr session, ulong buttons, int render);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_session_video(IntPtr session);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_session_audio(IntPtr session, ref int sampleCount);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_session_save_state(IntPtr session, ref ulong lenOut);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract int ce_session_load_state(IntPtr session, byte[] data, ulong len);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract int ce_session_domain_count(IntPtr session);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_session_domain_name(IntPtr session, int index);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract long ce_session_domain_size(IntPtr session, int index);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract int ce_session_domain_writable(IntPtr session, int index);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract ulong ce_session_domain_ptr(IntPtr session, int index);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_session_last_error(IntPtr session);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_host_build_info();
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract int ce_session_apply_settings(IntPtr session, string overridesJson);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract ulong ce_session_guest_proc(IntPtr session, string name, int argCount);
 	}
 
 	public static class ChimeraEngine
@@ -669,6 +769,150 @@ namespace BizHawk.Emulation.Common.Engine
 			var bytes = Entry(name);
 			return bytes is null ? null : Encoding.UTF8.GetString(bytes);
 		}
+	}
+
+	/// <summary>
+	/// A running waterboxed machine, held by the engine (see ce_session in
+	/// engine.h): the same machine chimera-run drives headlessly, wrapped for
+	/// the frontend's adapter. Frame data crosses as borrowed pointers the
+	/// caller copies out of before the next advance.
+	/// </summary>
+	public sealed class EngineSession : IDisposable
+	{
+		private IntPtr _session;
+
+		public IntPtr Handle => _session;
+
+		private EngineSession(IntPtr session) => _session = session;
+
+		/// <exception cref="InvalidOperationException">anything wrong with the package, the rom, or the core's own refusal</exception>
+		public static EngineSession Open(
+			string packagePath, byte[] rom, string? settingsOverridesJson,
+			IReadOnlyDictionary<string, byte[]>? firmware)
+		{
+			var count = firmware?.Count ?? 0;
+			var ids = new IntPtr[Math.Max(count, 1)];
+			var blobs = new IntPtr[Math.Max(count, 1)];
+			var lens = new ulong[Math.Max(count, 1)];
+			var allocated = new List<IntPtr>();
+			try
+			{
+				var i = 0;
+				foreach (var (id, bytes) in firmware ?? new Dictionary<string, byte[]>())
+				{
+					var idBytes = Encoding.UTF8.GetBytes(id + "\0");
+					ids[i] = Marshal.AllocHGlobal(idBytes.Length);
+					allocated.Add(ids[i]);
+					Marshal.Copy(idBytes, 0, ids[i], idBytes.Length);
+					blobs[i] = Marshal.AllocHGlobal(bytes.Length is 0 ? 1 : bytes.Length);
+					allocated.Add(blobs[i]);
+					if (bytes.Length is not 0) Marshal.Copy(bytes, 0, blobs[i], bytes.Length);
+					lens[i] = (ulong)bytes.LongLength;
+					i++;
+				}
+				var error = IntPtr.Zero;
+				var session = ChimeraEngine.Instance.ce_session_open(
+					packagePath, rom, (ulong)rom.LongLength, settingsOverridesJson,
+					ids, blobs, lens, count, ref error);
+				if (session == IntPtr.Zero)
+				{
+					throw new InvalidOperationException(ChimeraEngine.PtrToStringUtf8(error) ?? "the engine could not open a session");
+				}
+				return new(session);
+			}
+			finally
+			{
+				foreach (var p in allocated) Marshal.FreeHGlobal(p);
+			}
+		}
+
+		public void Dispose()
+		{
+			if (_session == IntPtr.Zero) return;
+			ChimeraEngine.Instance.ce_session_free(_session);
+			_session = IntPtr.Zero;
+		}
+
+		public bool Disposed => _session == IntPtr.Zero;
+
+		private static LibChimera E => ChimeraEngine.Instance;
+
+		public string CoreName => ChimeraEngine.PtrToStringUtf8(E.ce_session_core_name(_session)) ?? "";
+		public string SystemId => ChimeraEngine.PtrToStringUtf8(E.ce_session_system_id(_session)) ?? "";
+		public int Width => E.ce_session_width(_session);
+		public int Height => E.ce_session_height(_session);
+		public int VirtualWidth => E.ce_session_virtual_width(_session);
+		public int VirtualHeight => E.ce_session_virtual_height(_session);
+		public int VsyncNumerator => E.ce_session_vsync_numerator(_session);
+		public int VsyncDenominator => E.ce_session_vsync_denominator(_session);
+		public int SamplesPerFrame => E.ce_session_samples_per_frame(_session);
+		public bool Deterministic => E.ce_session_deterministic(_session) is not 0;
+
+		public void SetAxis(int index, int value) => E.ce_session_set_axis(_session, index, value);
+
+		/// <returns>true when the frame was a lag frame</returns>
+		public bool FrameAdvance(ulong buttons, bool render)
+			=> E.ce_session_frame_advance(_session, buttons, render ? 1 : 0) is not 0;
+
+		/// <summary>Borrowed: the last rendered frame, BGRA, Width*Height ints.</summary>
+		public IntPtr VideoBuffer => E.ce_session_video(_session);
+
+		/// <summary>Borrowed: the last frame's interleaved stereo s16 and its pair count.</summary>
+		public IntPtr AudioBuffer(out int sampleCount)
+		{
+			var n = 0;
+			var p = E.ce_session_audio(_session, ref n);
+			sampleCount = n;
+			return p;
+		}
+
+		/// <summary>Borrowed until the next save: the whole-machine state.</summary>
+		public IntPtr SaveState(out int length)
+		{
+			ulong len = 0;
+			var p = E.ce_session_save_state(_session, ref len);
+			if (p == IntPtr.Zero) throw new InvalidOperationException(LastError);
+			length = checked((int)len);
+			return p;
+		}
+
+		public void LoadState(byte[] data, int length)
+		{
+			if (E.ce_session_load_state(_session, data, (ulong)length) is not 0)
+			{
+				throw new InvalidOperationException(LastError);
+			}
+		}
+
+		public int DomainCount => E.ce_session_domain_count(_session);
+		public string DomainName(int index) => ChimeraEngine.PtrToStringUtf8(E.ce_session_domain_name(_session, index)) ?? $"Domain {index}";
+		public long DomainSize(int index) => E.ce_session_domain_size(_session, index);
+		public bool DomainWritable(int index) => E.ce_session_domain_writable(_session, index) is not 0;
+		public IntPtr DomainPtr(int index) => unchecked((IntPtr)(long)E.ce_session_domain_ptr(_session, index));
+
+		/// <returns>true when the running guest took the settings; false when it has no live-settings group (reboot instead)</returns>
+		/// <exception cref="InvalidOperationException">the guest has the group but the push failed</exception>
+		public bool ApplySettings(string overridesJson)
+			=> E.ce_session_apply_settings(_session, overridesJson) switch
+			{
+				0 => true,
+				1 => false,
+				_ => throw new InvalidOperationException(LastError),
+			};
+
+		/// <summary>
+		/// TRANSITIONAL: a bridged guest entry point for the optional ABI groups
+		/// (tooling, persistent data) that have not migrated into the session yet.
+		/// Zero when the guest does not export the name.
+		/// </summary>
+		public IntPtr GuestProc(string name, int argCount)
+			=> unchecked((IntPtr)(long)E.ce_session_guest_proc(_session, name, argCount));
+
+		private string LastError
+			=> ChimeraEngine.PtrToStringUtf8(E.ce_session_last_error(_session)) ?? "engine session error";
+
+		/// <summary>What built the waterbox host, as JSON; "" when the host is not loadable.</summary>
+		public static string HostBuildInfo => ChimeraEngine.PtrToStringUtf8(ChimeraEngine.Instance.ce_host_build_info()) ?? "";
 	}
 
 	/// <summary>The firmware verdict and the canonical movie line; declarations and files stay with the caller.</summary>

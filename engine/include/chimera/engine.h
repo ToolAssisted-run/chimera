@@ -441,6 +441,29 @@ int64_t ce_session_domain_read(const ce_session *s, int32_t index, int64_t offse
 /* "" when no error. Invalidated by the next call on the same session. */
 const char *ce_session_last_error(ce_session *s);
 
+/* What built the waterbox host this engine loads (its wbx_build_info JSON):
+ * the frontend shows it and movies record it. NULL when the host is not
+ * loadable. Static string, never invalidated. */
+const char *ce_host_build_info(void);
+
+/* The raw guest pointer behind a memory domain, for pointer-backed peek/poke
+ * (the hex editor's path). Stable for the session's lifetime - the guest is
+ * non-PIE - and 0 when the domain has no linear backing. */
+uint64_t ce_session_domain_ptr(const ce_session *s, int32_t index);
+
+/* Re-composes the effective settings (declared defaults overlaid with
+ * overrides_json) and hands them to the RUNNING guest through its live-
+ * settings exports. 0 = applied; 1 = the core has no live-settings group
+ * (the caller must reboot instead); 2 = error (see _last_error). */
+int32_t ce_session_apply_settings(ce_session *s, const char *overrides_json);
+
+/* TRANSITIONAL: a bridged guest entry point, callable with the host's
+ * convention, for the optional ABI groups the session does not model yet
+ * (tooling, persistent data). 0 when the guest does not export the name.
+ * These calls migrate into proper ce_session_* surface with their
+ * components; nothing new should grow on this. */
+uint64_t ce_session_guest_proc(ce_session *s, const char *name, int32_t arg_count);
+
 #ifdef __cplusplus
 }
 #endif
