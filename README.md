@@ -1,4 +1,9 @@
-# Chimera
+<p align="center">
+	<picture>
+		<source media="(prefers-color-scheme: dark)" srcset="docs/logo-dark.svg">
+		<img src="docs/logo.svg" alt="Chimera - a beast assembled from modular parts" width="420">
+	</picture>
+</p>
 
 **Chimera is a derivative fork of [BizHawk](https://github.com/TASEmulators/BizHawk).** The frontend, the TAS tooling, and the architecture it builds on are the original work of the BizHawk team, and all credit for them belongs to BizHawk's developers.
 
