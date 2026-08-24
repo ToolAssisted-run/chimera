@@ -1,13 +1,13 @@
 # The synthetic witness
 
-miniHawk's own, core-agnostic correctness apparatus (see "The synthetic
+Chimera's own, core-agnostic correctness apparatus (see "The synthetic
 witness" in [design-principles.md](../../docs/design-principles.md)). Three
 core flavors - native, pure C#, waterboxed - will implement the same tiny
 console, and for every test movie ALL of the memory space, video output, and
 audio output must match bit-exactly across the three.
 
 Everything here is a conformance-test fixture for the published core contract:
-nothing is part of BizHawk.sln, and nothing is quickerNES- or system-specific.
+nothing is part of Chimera.sln, and nothing is quickerNES- or system-specific.
 
 ## Running
 
@@ -41,7 +41,7 @@ nothing is part of BizHawk.sln, and nothing is quickerNES- or system-specific.
       video output / audio output), Level A native metrics incl. full
       per-frame video+audio stream hashes with a rerecord self-check, Level B
       through EmuHawk with RAM+VRAM byte-compare against the same goldens,
-      both modes. ~20 s wall clock - THE miniHawk smoke test (supersedes the
+      both modes. ~20 s wall clock - THE Chimera smoke test (supersedes the
       old quickerNES --quick subset).
 - [x] Pure-C# twin (flavor b): SynthMachine.cs, written from SPEC.md alone
       (no shared code with the native flavor), shipped as synth-sharp.zip -

@@ -7,7 +7,7 @@
 	<PropertyGroup>
 		<AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
 		<DebugType>embedded</DebugType>
-		<DefineConstants>$(DefineConstants);AVI_SUPPORT;BIZHAWKBUILD_SUPERHAWK</DefineConstants>
+		<DefineConstants>$(DefineConstants);AVI_SUPPORT;CHIMERABUILD_SUPERHAWK</DefineConstants>
 		<MeziantouPolyfill_AllowUnsafeBlocks>false</MeziantouPolyfill_AllowUnsafeBlocks>
 		<MeziantouPolyfill_ExcludedPolyfills>@(MeziantouPolyfill_DeferToPolySharp, '|')</MeziantouPolyfill_ExcludedPolyfills>
 		<NeutralLanguage>en-US</NeutralLanguage>
@@ -44,9 +44,9 @@
 	</PropertyGroup>
 	<ItemGroup>
 		<PackageReference Include="Meziantou.Polyfill" PrivateAssets="all" />
-		<ProjectReference Include="$(MSBuildThisFileDirectory)../extern/BizHawk.SrcGen.ReflectionCache/BizHawk.SrcGen.ReflectionCache.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" PrivateAssets="all" />
+		<ProjectReference Include="$(MSBuildThisFileDirectory)../extern/Chimera.SrcGen.ReflectionCache/Chimera.SrcGen.ReflectionCache.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" PrivateAssets="all" />
 		<CompilerVisibleProperty Include="MSBuildProjectName" />
-		<InternalsVisibleTo Include="$(MSBuildProjectName.Replace('BizHawk.', 'BizHawk.Tests.'))" />
+		<InternalsVisibleTo Include="$(MSBuildProjectName.Replace('Chimera.', 'Chimera.Tests.'))" />
 		<Using Include="System" />
 		<Using Include="System.Object" Alias="Lock" />
 	</ItemGroup>

@@ -1,0 +1,20 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<TargetFramework>net48</TargetFramework>
+	</PropertyGroup>
+	<Import Project="../MainSlnTest.props" />
+	<ItemGroup>
+		<ProjectReference Include="$(ProjectDir)../Chimera.Client.Common/Chimera.Client.Common.csproj" />
+		<ProjectReference Include="$(ProjectDir)../Chimera.Tests.Common/Chimera.Tests.Common.csproj" />
+		<PackageReference Include="System.Drawing.Common" />
+		
+		<EmbeddedResource Include="data/**/*" />
+		<None Include="$(ProjectDir)/Movie/macros/**/*">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</None>
+		<None Include="$(ProjectDir)../../build/dll/*e_sqlite3.*" CopyToOutputDirectory="PreserveNewest" />
+		<None Include="$(ProjectDir)/lua/scripts/**/*">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</None>
+	</ItemGroup>
+</Project>

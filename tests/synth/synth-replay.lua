@@ -1,7 +1,7 @@
 -- Level B of the synthetic witness: replay a synth movie through EmuHawk's
 -- frontend input pipeline and dump the final RAM and VRAM (framebuffer) domains.
 --
--- Job description is read from the file named by the MINIHAWK_JOB env var:
+-- Job description is read from the file named by the CHIMERA_JOB env var:
 --   movie=<path to movie txt ("|UDLRABST|" per frame)>
 --   outram=<path for the 4096-byte final RAM dump>
 --   outvram=<path for the 15360-byte final framebuffer dump>
@@ -28,8 +28,8 @@ local function finish(status, detail)
 	client.exit()
 end
 
-local jobPath = os.getenv("MINIHAWK_JOB")
-if jobPath == nil then error("MINIHAWK_JOB env var not set") end
+local jobPath = os.getenv("CHIMERA_JOB")
+if jobPath == nil then error("CHIMERA_JOB env var not set") end
 local job = {}
 for line in io.lines(jobPath) do
 	local k, v = line:match("^([^=]+)=(.*)$")

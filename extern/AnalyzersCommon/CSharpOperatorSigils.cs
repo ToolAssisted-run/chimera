@@ -1,4 +1,4 @@
-namespace BizHawk.Analyzers;
+namespace Chimera.Analyzers;
 
 public static class CSharpOperatorSigils
 {

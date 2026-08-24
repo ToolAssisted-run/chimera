@@ -1,0 +1,711 @@
+using System.Collections.Generic;
+using System.Drawing;
+using System.Linq;
+using System.Windows.Forms;
+using Chimera.Common;
+
+namespace Chimera.Client.EmuHawk
+{
+	public partial class InputRoll
+	{
+		private const int WM_SETREDRAW = 0x000B;
+
+		private int _suspendCount = 0;
+
+		public void SuspendDrawing()
+		{
+			_suspendCount++;
+			if (!OSTailoredCode.IsUnixHost)
+			{
+				WmImports.SendMessageW(Handle, WM_SETREDRAW, (IntPtr) 0, IntPtr.Zero);
+			}
+		}
+
+		public void ResumeDrawing()
+		{
+			_suspendCount--;
+			if (_suspendCount > 0) return;
+
+			if (!OSTailoredCode.IsUnixHost)
+			{
+				WmImports.SendMessageW(Handle, WM_SETREDRAW, (IntPtr) 1, IntPtr.Zero);
+				Refresh(); // per docs, an explicit redraw is required
+			}
+		}
+
+		protected override void OnPaint(PaintEventArgs e)
+		{
+			using (_renderer.LockGraphics(e.Graphics))
+			{
+				// White Background
+				_renderer.SetBrush(_backColor);
+				_renderer.SetSolidPen(_backColor);
+				_renderer.FillRectangle(e.ClipRectangle);
+
+				// Lag frame calculations
+				SetLagFramesArray();
+
+				List<RollColumn> visibleColumns;
+
+				if (HorizontalOrientation)
+				{
+					visibleColumns = VisibleColumns
+						.Where(c => c.Right + 1 - _vBar.Value > e.ClipRectangle.Top && c.Left - _vBar.Value < e.ClipRectangle.Bottom)
+						.ToList();
+				}
+				else
+				{
+					visibleColumns = _columns.VisibleColumns
+						// + 1: we want to include the right edge border
+						.Where(c => c.Right + 1 - _hBar.Value > e.ClipRectangle.Left && c.Left - _hBar.Value < e.ClipRectangle.Right)
+						.ToList();
+				}
+
+				var firstVisibleRow = Math.Max(FirstVisibleRow, 0);
+				var visibleRows = HorizontalOrientation
+					? e.ClipRectangle.Width / CellWidth
+					: e.ClipRectangle.Height / CellHeight;
+
+				var lastVisibleRow = LastVisibleRow;
+
+				int startIndex = _selectedItems.LowerBoundByRow(firstVisibleRow);
+				int endIndex = _selectedItems.LowerBoundByRow(lastVisibleRow + 1);
+				int length = endIndex - startIndex;
+				CellList selectedCells = length == _selectedItems.Count ? _selectedItems : _selectedItems.Slice(startIndex, length);
+
+				if (HorizontalOrientation || e.ClipRectangle.Y <= ColumnHeight)
+				{
+					DrawColumnBg(visibleColumns, e.ClipRectangle);
+					DrawColumnText(visibleColumns);
+				}
+
+				// Background
+				DrawBg(visibleColumns, e.ClipRectangle, firstVisibleRow, lastVisibleRow, selectedCells);
+
+				// Foreground
+				DrawData(visibleColumns, firstVisibleRow, lastVisibleRow, selectedCells);
+
+				DrawColumnDrag();
+				DrawCellDrag();
+			}
+		}
+
+		private void DrawString(string text, Rectangle rect)
+		{
+			if (!string.IsNullOrWhiteSpace(text))
+			{
+				_renderer.DrawString(text, rect);
+			}
+		}
+
+		protected override void OnPaintBackground(PaintEventArgs e)
+		{
+			// Do nothing, and this should never be called
+		}
+
+		private void DrawColumnDrag()
+		{
+			if (_columnDown is not { Width: > 0 }
+				|| !_columnDownMoved
+				|| !_currentX.HasValue
+				|| !_currentY.HasValue
+				|| !IsHoveringOnColumnCell)
+			{
+				return;
+			}
+
+			int columnWidth = _columnDown.ScaledWidth;
+			int columnHeight = CellHeight;
+			if (HorizontalOrientation)
+			{
+				columnWidth = MaxColumnWidth;
+				columnHeight = _columnDown.ScaledWidth;
+			}
+
+			int x1 = _currentX.Value - (columnWidth / 2);
+			int y1 = _currentY.Value - (columnHeight / 2);
+			int textOffsetY = CellHeightPadding;
+			if (HorizontalOrientation)
+			{
+				int textHeight = (int)_renderer.MeasureString(_columnDown.Text, Font).Height;
+				textOffsetY = (columnHeight - textHeight) / 2;
+			}
+
+			_renderer.SetSolidPen(_backColor);
+			_renderer.DrawRectangle(new Rectangle(x1, y1, columnWidth, columnHeight));
+			_renderer.PrepDrawString(Font, _foreColor);
+			_renderer.DrawString(_columnDown.Text, new Rectangle(x1 + CellWidthPadding, y1 + textOffsetY, columnWidth, columnHeight));
+		}
+
+		private void DrawCellDrag()
+		{
+			if (_draggingCell is { RowIndex: int targetRow, Column: { Width: > 0 } targetCol }
+				&& _currentX.HasValue
+				&& _currentY.HasValue)
+			{
+				var text = "";
+				int offsetX = 0;
+				int offsetY = 0;
+				QueryItemText?.Invoke(this, targetRow, targetCol, out text, ref offsetX, ref offsetY);
+
+				Color bgColor = _backColor;
+				QueryItemBkColor?.Invoke(this, targetRow, targetCol, ref bgColor);
+
+				int cellHeight;
+				int cellWidth;
+				if (HorizontalOrientation)
+				{
+					cellHeight = targetCol.ScaledWidth;
+					cellWidth = CellHeight;
+				}
+				else
+				{
+					cellHeight = CellHeight;
+					cellWidth = targetCol.ScaledWidth;
+				}
+				var x1 = _currentX.Value - cellWidth / 2;
+				int y1 = _currentY.Value - (cellHeight / 2);
+				var x2 = x1 + cellWidth - 1; // -1 for the border width
+				int y2 = y1 + cellHeight - 1;
+
+				_renderer.SetBrush(bgColor);
+				_renderer.FillRectangle(new Rectangle(x1, y1, x2 - x1, y2 - y1));
+
+				if (HorizontalOrientation)
+				{
+					_renderer.PrepDrawString(Font, _foreColor, rotate: targetCol.Rotatable);
+					_renderer.DrawString(text, new Rectangle(x2 - CellHeightPadding + offsetX - 1, y1 + CellWidthPadding + offsetY, x2 - x1, y2 - y1));
+				}
+				else
+				{
+					_renderer.PrepDrawString(Font, _foreColor);
+					_renderer.DrawString(text, new Rectangle(x1 + CellWidthPadding + offsetX, y1 + CellHeightPadding + offsetY - 1, x2 - x1, y2 - y1));
+				}
+			}
+		}
+
+		private void DrawColumnText(List<RollColumn> visibleColumns)
+		{
+			_renderer.PrepDrawString(Font, _foreColor);
+
+			for (int j = 0; j < visibleColumns.Count; j++)
+			{
+				var column = visibleColumns[j];
+				int x, y, w, h;
+
+				if (HorizontalOrientation)
+				{
+					var textSize = _renderer.MeasureString(column.Text, Font);
+					x = MaxColumnWidth - CellWidthPadding - (int)textSize.Width;
+					y = column.Left + ((column.ScaledWidth - (int)textSize.Height) / 2) - _vBar.Value;
+					w = MaxColumnWidth;
+					h = column.ScaledWidth;
+				}
+				else
+				{
+					x = 1 + column.Left + CellWidthPadding - _hBar.Value;
+					y = CellHeightPadding;
+					w = column.ScaledWidth;
+					h = ColumnHeight;
+				}
+
+				if (IsHoveringOnColumnCell && column == CurrentCell.Column)
+				{
+					_renderer.PrepDrawString(Font, SystemColors.HighlightText);
+					DrawString(column.Text, new Rectangle(x, y, w, h));
+					_renderer.PrepDrawString(Font, _foreColor);
+				}
+				else
+				{
+					DrawString(column.Text, new Rectangle(x, y, w, h));
+				}
+			}
+		}
+
+		private void DrawData(List<RollColumn> visibleColumns, int firstVisibleRow, int lastVisibleRow, CellList selectedCells)
+		{
+			if (QueryItemText == null)
+			{
+				return;
+			}
+			if (visibleColumns.Count is 0) return;
+
+			int startRow = firstVisibleRow;
+			int range = Math.Min(lastVisibleRow, RowCount - 1) - startRow + 1;
+
+			Cell currentCell = new();
+			Cell mouseCell = null;
+			if (ShowColumnTextOnHover && _draggingCell == null && !IsPaintDown)
+			{
+				mouseCell = CurrentCell;
+			}
+			if (HorizontalOrientation)
+			{
+				for (int j = 0; j < visibleColumns.Count; j++)
+				{
+					RollColumn col = visibleColumns[j];
+					int colHeight = col.ScaledWidth;
+
+					for (int i = 0, f = 0; f < range; i++, f++)
+					{
+						f += _lagFrames[i];
+
+						int baseX = RowsToPixels(i);
+						int baseY = col.Left - _vBar.Value;
+
+						Bitmap image = null;
+						int bitmapOffsetX = 0;
+						int bitmapOffsetY = 0;
+
+						QueryItemIcon?.Invoke(this, f + startRow, col, ref image, ref bitmapOffsetX, ref bitmapOffsetY);
+
+						if (image != null)
+						{
+							int x = baseX + CellWidthPadding + bitmapOffsetX;
+							int y = baseY + CellHeightPadding + bitmapOffsetY;
+							_renderer.DrawBitmap(image, new Point(x, y));
+						}
+
+						if (col.Rotatable) baseX += CellWidth;
+						int strOffsetX = 0;
+						int strOffsetY = 0;
+						QueryItemText(this, f + startRow, col, out var text, ref strOffsetX, ref strOffsetY);
+
+						Color? foreColor = QueryItemForeColor?.Invoke(this, f + startRow, col);
+						Font font = Font;
+						currentCell.Column = col;
+						currentCell.RowIndex = f + startRow;
+						if (foreColor == null && selectedCells.Contains(currentCell))
+						{
+							foreColor = SystemColors.HighlightText;
+						}
+						if (string.IsNullOrEmpty(text) && mouseCell == currentCell)
+						{
+							font = new Font(Font, FontStyle.Regular);
+							foreColor = SystemColors.GrayText;
+							text = col.Text;
+						}
+						_renderer.PrepDrawString(font, foreColor ?? _foreColor, rotate: col.Rotatable);
+
+						int textWidth = (int)_renderer.MeasureString(text, font).Width;
+						if (col.Rotatable)
+						{
+							// Center Text
+							int textX = Math.Max(((colHeight - textWidth) / 2), CellWidthPadding) + strOffsetX;
+							int textY = CellHeightPadding + strOffsetY;
+
+							DrawString(text, new Rectangle(baseX - textY, baseY + textX, 999, CellHeight));
+						}
+						else
+						{
+							// Center Text
+							int textX = Math.Max(((CellWidth - textWidth) / 2), CellHeightPadding) + strOffsetX;
+							int textY = CellWidthPadding + strOffsetY;
+
+							DrawString(text, new Rectangle(baseX + textX, baseY + textY, MaxColumnWidth, CellHeight));
+						}
+					}
+				}
+			}
+			else
+			{
+				int xPadding = CellWidthPadding + 1 - _hBar.Value;
+				for (int i = 0, f = 0; f < range; i++, f++) // Vertical
+				{
+					f += _lagFrames[i];
+					foreach (var column in visibleColumns)
+					{
+						int strOffsetX = 0;
+						int strOffsetY = 0;
+						Point point = new Point(column.Left + xPadding, RowsToPixels(i) + CellHeightPadding);
+
+						Bitmap image = null;
+						int bitmapOffsetX = 0;
+						int bitmapOffsetY = 0;
+
+						QueryItemIcon?.Invoke(this, f + startRow, column, ref image, ref bitmapOffsetX, ref bitmapOffsetY);
+
+						if (image != null)
+						{
+							_renderer.DrawBitmap(image, new Point(point.X + bitmapOffsetX, point.Y + bitmapOffsetY + CellHeightPadding));
+						}
+
+						QueryItemText(this, f + startRow, column, out var text, ref strOffsetX, ref strOffsetY);
+
+						Color? foreColor = QueryItemForeColor?.Invoke(this, f + startRow, column);
+						Font font = Font;
+						currentCell.Column = column;
+						currentCell.RowIndex = f + startRow;
+						if (foreColor == null && selectedCells.Contains(currentCell))
+						{
+							foreColor = SystemColors.HighlightText;
+						}
+						if (string.IsNullOrEmpty(text) && mouseCell == currentCell)
+						{
+							font = new Font(Font, FontStyle.Regular);
+							foreColor = SystemColors.GrayText;
+							text = column.Text;
+						}
+
+						_renderer.PrepDrawString(font, foreColor ?? _foreColor);
+						DrawString(text, new Rectangle(point.X + strOffsetX, point.Y + strOffsetY, column.ScaledWidth, ColumnHeight));
+					}
+				}
+			}
+		}
+
+		private void DrawColumnBg(List<RollColumn> visibleColumns, Rectangle rect)
+		{
+			_renderer.SetBrush(SystemColors.ControlLight);
+			_renderer.SetSolidPen(Color.Black);
+
+			if (HorizontalOrientation)
+			{
+				int rightEdge = MaxColumnWidth;
+				_renderer.FillRectangle(new Rectangle(0, 0, rightEdge + 1, rect.Bottom));
+
+				for (int j = 0; j < visibleColumns.Count; j++)
+				{
+					int y = visibleColumns[j].Left - _vBar.Value;
+					_renderer.Line(1, y, MaxColumnWidth, y);
+				}
+
+				if (visibleColumns.Count is not 0)
+				{
+					int y = visibleColumns[visibleColumns.Count - 1].Right;
+					_renderer.Line(1, y, rightEdge, y);
+				}
+
+				if (rect.Left <= 0) _renderer.Line(0, 0, 0, rect.Bottom);
+				_renderer.Line(rightEdge, 0, rightEdge, rect.Bottom);
+			}
+			else
+			{
+				int bottomEdge = RowsToPixels(0);
+
+				// Gray column box and black line underneath
+				_renderer.FillRectangle(new Rectangle(0, 0, rect.Right, bottomEdge + 1));
+				if (rect.Top <= 0) _renderer.Line(0, 0, rect.Right, 0);
+				_renderer.Line(0, bottomEdge, rect.Right, bottomEdge);
+
+				// Vertical black separators
+				foreach (var column in visibleColumns)
+				{
+					int pos = column.Left - _hBar.Value;
+					_renderer.Line(pos, 0, pos, bottomEdge);
+				}
+
+				// Draw right most line
+				if (visibleColumns.Count is not 0)
+				{
+					int right = visibleColumns[visibleColumns.Count - 1].Right - _hBar.Value;
+					if (right <= rect.Left + rect.Width)
+					{
+						_renderer.Line(right, 0, right, bottomEdge);
+					}
+				}
+			}
+
+			// Emphasis
+			foreach (var column in visibleColumns.Where(c => c.Emphasis))
+			{
+				_renderer.SetBrush(SystemColors.ActiveBorder);
+				if (HorizontalOrientation)
+				{
+					_renderer.FillRectangle(new Rectangle(1, column.Left + 1, MaxColumnWidth - 1, column.ScaledWidth - 1));
+				}
+				else
+				{
+					_renderer.FillRectangle(new Rectangle(column.Left + 1 - _hBar.Value, 1, column.ScaledWidth - 1, ColumnHeight - 1));
+				}
+			}
+
+			// If the user is hovering over a column
+			if (IsHoveringOnColumnCell)
+			{
+				if (HorizontalOrientation)
+				{
+					for (int i = 0; i < visibleColumns.Count; i++)
+					{
+						if (visibleColumns[i] != CurrentCell.Column)
+						{
+							continue;
+						}
+
+						int top = visibleColumns[i].Left - _vBar.Value;
+						int height = visibleColumns[i].ScaledWidth;
+
+						_renderer.SetBrush(CurrentCell.Column!.Emphasis
+							? SystemColors.Highlight.Add(0x00222222)
+							: SystemColors.Highlight);
+
+						_renderer.FillRectangle(new Rectangle(1, top + 1, MaxColumnWidth - 1, height - 1));
+					}
+				}
+				else
+				{
+					// TODO multiple selected columns
+					foreach (var column in visibleColumns)
+					{
+						if (column == CurrentCell.Column)
+						{
+							// Left of column is to the right of the viewable area or right of column is to the left of the viewable area
+							if (column.Left - _hBar.Value > Width || column.Right - _hBar.Value < 0)
+							{
+								continue;
+							}
+
+							int left = column.Left - _hBar.Value;
+							int width = column.Right - _hBar.Value - left;
+
+							_renderer.SetBrush(CurrentCell.Column!.Emphasis
+								? SystemColors.Highlight.Add(0x00550000)
+								: SystemColors.Highlight);
+
+							_renderer.FillRectangle(new Rectangle(left + 1, 1, width - 1, ColumnHeight - 1));
+						}
+					}
+				}
+			}
+		}
+
+		// TODO refactor this and DoBackGroundCallback functions.
+		// Draw Gridlines and background colors using QueryItemBkColor.
+		private void DrawBg(List<RollColumn> visibleColumns, Rectangle rect, int firstVisibleRow, int lastVisibleRow, CellList selectedCells)
+		{
+			if (QueryItemBkColor is not null || QueryRowBkColor is not null)
+			{
+				DoBackGroundCallback(visibleColumns, firstVisibleRow, lastVisibleRow);
+			}
+
+			if (GridLines)
+			{
+				_renderer.SetSolidPen(SystemColors.ControlLight);
+				if (HorizontalOrientation)
+				{
+					// Columns
+					for (int i = 1; i < lastVisibleRow - firstVisibleRow + 1; i++)
+					{
+						int x = RowsToPixels(i);
+						_renderer.Line(x, 1, x, rect.Bottom);
+					}
+
+					// Rows
+					int startX = RowsToPixels(0) + 1;
+					for (int i = 0; i < visibleColumns.Count; i++)
+					{
+						int y = visibleColumns[i].Left - _vBar.Value;
+						_renderer.Line(startX, y, rect.Right, y);
+					}
+
+					if (visibleColumns.Count is not 0)
+					{
+						int y = visibleColumns[visibleColumns.Count - 1].Right - _vBar.Value;
+						_renderer.Line(startX, y, rect.Right, y);
+					}
+				}
+				else
+				{
+					// Columns
+					int y = ColumnHeight + 1;
+					if (y <= rect.Bottom) // drawing a vertical line outside the clip rectangle is NOT safe; it'll draw a pixel at the bottom of the rect
+					{
+						foreach (var column in visibleColumns)
+						{
+							int x = column.Left - _hBar.Value;
+							_renderer.Line(x, y, x, rect.Bottom);
+						}
+
+						if (visibleColumns.Count is not 0)
+						{
+							int x = visibleColumns[visibleColumns.Count - 1].Right - _hBar.Value;
+							_renderer.Line(x, y, x, rect.Bottom);
+						}
+					}
+
+					// Rows
+					for (int i = 1; i < VisibleRows + 1; i++)
+					{
+						_renderer.Line(0, RowsToPixels(i), rect.Right + 1, RowsToPixels(i));
+					}
+				}
+			}
+
+			if (selectedCells.Count is not 0) DoSelectionBG(selectedCells);
+		}
+
+		private void DoSelectionBG(CellList selectedCells)
+		{
+			var visibleRows = FirstVisibleRow.RangeTo(LastVisibleRow);
+			int lastRow = -1;
+			var rowColor = _backColor;
+			foreach (Cell cell in selectedCells)
+			{
+				if (!cell.RowIndex.HasValue || !VisibleColumns.Contains(cell.Column))
+				{
+					continue;
+				}
+
+				Cell relativeCell = new Cell
+				{
+					RowIndex = cell.RowIndex - visibleRows.Start,
+					Column = cell.Column,
+				};
+				relativeCell.RowIndex -= CountLagFramesAbsolute(relativeCell.RowIndex.Value);
+
+				if (QueryRowBkColor != null && lastRow != cell.RowIndex.Value)
+				{
+					QueryRowBkColor(this, cell.RowIndex.Value, ref rowColor);
+					lastRow = cell.RowIndex.Value;
+				}
+
+				Color cellColor = rowColor;
+				QueryItemBkColor?.Invoke(this, cell.RowIndex.Value, cell.Column, ref cellColor);
+
+				// Alpha layering for cell before selection
+				float alpha = (float)cellColor.A / 255;
+				if (cellColor.A != 255 && cellColor.A != 0)
+				{
+					cellColor = Color.FromArgb(rowColor.R - (int)((rowColor.R - cellColor.R) * alpha),
+						rowColor.G - (int)((rowColor.G - cellColor.G) * alpha),
+						rowColor.B - (int)((rowColor.B - cellColor.B) * alpha));
+				}
+
+				// Alpha layering for selection
+				alpha = 0.33f;
+				cellColor = Color.FromArgb(cellColor.R - (int)((cellColor.R - SystemColors.Highlight.R) * alpha),
+					cellColor.G - (int)((cellColor.G - SystemColors.Highlight.G) * alpha),
+					cellColor.B - (int)((cellColor.B - SystemColors.Highlight.B) * alpha));
+				DrawCellBG(cellColor, relativeCell);
+			}
+		}
+
+		// Given a cell with RowIndex in between 0 and VisibleRows, it draws the background color specified. Do not call with absolute row indices.
+		private void DrawCellBG(Color color, Cell cell)
+		{
+			int x, y, w, h;
+
+			if (HorizontalOrientation)
+			{
+				x = RowsToPixels(cell.RowIndex.Value) + 1;
+				if (x < MaxColumnWidth)
+				{
+					return;
+				}
+
+				w = CellWidth - 1;
+				y = cell.Column!.Left - _vBar.Value + 1;
+				h = cell.Column.ScaledWidth - 1;
+			}
+			else
+			{
+				y = RowsToPixels(cell.RowIndex.Value) + 1; // We can't draw without row and column, so assume they exist and fail catastrophically if they don't
+				if (y < ColumnHeight)
+				{
+					return;
+				}
+
+				x = cell.Column!.Left - _hBar.Value + 1;
+				w = cell.Column.ScaledWidth - 1;
+				h = CellHeight - 1;
+			}
+
+			_renderer.SetBrush(color);
+			_renderer.FillRectangle(new Rectangle(x, y, w, h));
+		}
+
+		// Calls QueryItemBkColor callback for all visible cells and fills in the background of those cells.
+		private void DoBackGroundCallback(List<RollColumn> visibleColumns, int firstVisibleRow, int lastVisibleRow)
+		{
+			if (visibleColumns.Count is 0) return;
+
+			int startIndex = firstVisibleRow;
+			int range = Math.Min(lastVisibleRow, RowCount - 1) - startIndex + 1;
+
+			var currentCell = new Cell();
+			for (int i = 0, f = 0; f < range; i++, f++)
+			{
+				f += _lagFrames[i];
+				var rowColor = _backColor;
+				QueryRowBkColor?.Invoke(this, f + startIndex, ref rowColor);
+
+				foreach (var column in visibleColumns)
+				{
+					var itemColor = rowColor;
+					QueryItemBkColor?.Invoke(this, f + startIndex, column, ref itemColor);
+					if (itemColor.A is not (0 or 255))
+					{
+						float alpha = (float)itemColor.A / 255;
+						itemColor = Color.FromArgb(rowColor.R - (int)((rowColor.R - itemColor.R) * alpha),
+							rowColor.G - (int)((rowColor.G - itemColor.G) * alpha),
+							rowColor.B - (int)((rowColor.B - itemColor.B) * alpha));
+					}
+					if (itemColor != _backColor) // An easy optimization, don't draw unless the user specified something other than the default
+					{
+						currentCell.Column = column;
+						currentCell.RowIndex = i;
+						DrawCellBG(itemColor, currentCell);
+					}
+				}
+			}
+		}
+
+		private void InvalidateCell(Cell cell)
+		{
+			if (cell == null || cell.Column is not RollColumn col) return;
+
+			if (HorizontalOrientation)
+			{
+				int barValue = _hBar.Value / CellHeight * CellHeight;
+				if (cell.RowIndex.HasValue)
+				{
+					Invalidate(new Rectangle(
+						RowsToPixels(cell.RowIndex.Value) - barValue,
+						col.Left,
+						CellHeight,
+						this.Width)); // hover text may overflow the cell in horizontal mode
+				}
+				else
+				{
+					Invalidate(new Rectangle(0, col.Left, MaxColumnWidth, col.ScaledWidth));
+				}
+			}
+			else
+			{
+				int barValue = _vBar.Value / CellHeight * CellHeight;
+				if (cell.RowIndex.HasValue)
+				{
+					Invalidate(new Rectangle(
+						col.Left,
+						RowsToPixels(cell.RowIndex.Value) - barValue,
+						col.ScaledWidth,
+						CellHeight));
+				}
+				else
+				{
+					Invalidate(new Rectangle(col.Left, 0, col.ScaledWidth, ColumnHeight));
+				}
+			}
+		}
+
+		public void InvalidateRow(int index)
+		{
+			if (!IsPartiallyVisible(index)) return;
+
+			if (HorizontalOrientation)
+			{
+				int barValue = _hBar.Value / CellHeight * CellHeight;
+				int h = Math.Min(TotalColWidth, _drawHeight);
+				Invalidate(new Rectangle(RowsToPixels(index) - barValue, 0, CellHeight, h));
+			}
+			else
+			{
+				int barValue = _vBar.Value / CellHeight * CellHeight;
+				int w = VisibleColumns.Any()
+					? Math.Min(VisibleColumns.Max(c => c.Right) - _hBar.Value, Width)
+					: 0;
+				Invalidate(new Rectangle(0, RowsToPixels(index) - barValue, w, CellHeight));
+			}
+		}
+	}
+}

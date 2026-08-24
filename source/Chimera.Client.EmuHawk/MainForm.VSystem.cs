@@ -1,0 +1,55 @@
+using System.Collections.Generic;
+using System.Windows.Forms;
+
+using Chimera.Client.Common;
+using Chimera.Emulation.Common;
+using Chimera.WinForms.Controls;
+
+namespace Chimera.Client.EmuHawk
+{
+	public partial class MainForm
+	{
+		private enum VSystemCategory : int
+		{
+			Consoles = 0,
+			Handhelds = 1,
+			PCs = 2,
+			Other = 3,
+		}
+
+		private IReadOnlyCollection<ToolStripItem> CreateCoreSettingsSubmenus(bool includeDupes = false)
+		{
+			List<ToolStripItem> items = new();
+			foreach (var factory in CoreRegistry.Instance.AllFactories)
+			{
+				var coreName = factory.CoreName;
+				var settingsItem = new ToolStripMenuItemEx { Text = "Settings..." };
+				settingsItem.Click += (_, _) => GenericCoreConfig.DoDialogFor(
+					this,
+					GetSettingsAdapterFor(factory),
+					$"{coreName} Settings",
+					isMovieActive: MovieSession.Movie.IsActive());
+				var submenu = new ToolStripMenuItemEx { Tag = VSystemCategory.Consoles, Text = coreName };
+				submenu.DropDownItems.Add(settingsItem);
+				items.Add(submenu);
+			}
+			return items;
+		}
+
+		/// <summary>
+		/// Rebuilds the "Emulator" menu for whatever core is running.
+		///
+		/// The menu is named "Emulator", always, and never after the system: a
+		/// top-level menu whose title moves around as you load games is a menu the
+		/// user has to re-find every time. It stays in place and greys out when there
+		/// is nothing loaded; its CONTENTS are what varies by core.
+		/// </summary>
+		private void HandlePlatformMenus()
+		{
+			DisplayDefaultCoreMenu();
+			// the menu is exactly as useful as its contents: everything in it comes from a
+			// core, so it is dead until one is opened
+			GenericCoreSubMenu.Enabled = GenericCoreSubMenu.DropDownItems.Count is not 0;
+		}
+	}
+}

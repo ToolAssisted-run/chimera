@@ -1,9 +1,9 @@
 # BizHawk waterbox - architecture analysis (2026-08-11)
 
 Working-level analysis of the waterbox system in the BizHawk checkout at
-~/BizHawk (master, 4a16b5c7ee), made in preparation for miniHawk's flavor-(c)
+~/BizHawk (master, 4a16b5c7ee), made in preparation for Chimera's flavor-(c)
 synthetic core. Sources: waterbox/ (guest toolchain + Rust host),
-src/BizHawk.Emulation.Cores/Waterbox/ and src/BizHawk.BizInvoke (C# layer).
+src/Chimera.Emulation.Cores/Waterbox/ and src/Chimera.BizInvoke (C# layer).
 
 ## What the waterbox actually is
 
@@ -122,19 +122,19 @@ machine state is capturable and restorable byte-exactly. It has three layers.
   (real time throws under determinism); Nyma cores receive time as a
   FrameInfo field.
 
-## Assessment for miniHawk flavor (c)
+## Assessment for Chimera flavor (c)
 
 1. THE PACKAGE MODEL NEEDS NO FRONTEND CHANGES. Everything waterbox is
    reachable from inside a core package: the adapter DLL can carry the
    WaterboxHost/WaterboxCore equivalents, declare libwaterboxhost as a
-   package native, and ship the .wbx as package data. miniHawk's loader,
+   package native, and ship the .wbx as package data. Chimera's loader,
    contract, and BizInvoke usage require nothing new. Moreover the
    reproducibility pillar argues waterbox machinery SHOULD be package-side:
    the waterbox host version affects emulation determinism, so it belongs
    inside the (movie + package) reproduction contract, not in the frontend.
-   (BizHawk treats it as frontend infrastructure; miniHawk's principles
+   (BizHawk treats it as frontend infrastructure; Chimera's principles
    disagree, conveniently in the direction that costs us nothing.)
-2. Deleted machinery inventory: miniHawk removed WaterboxAdapter +
+2. Deleted machinery inventory: Chimera removed WaterboxAdapter +
    MsHostSysVGuest from BizInvoke (charter, fifth addendum). On Linux the
    guest ABI is native SysV so nothing is missing; Windows waterboxing would
    need that adapter back - restorable from the transitional fork, or

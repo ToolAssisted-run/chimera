@@ -24,7 +24,8 @@ thread_local std::string g_openError;
 
 constexpr const char *WBX_FILE = "core.wbx";
 constexpr const char *CONFIG_FILE = "waterbox.config";
-constexpr const char *MANIFEST_FILE = "minihawk-core.json";
+constexpr const char *MANIFEST_FILE = "chimera-core.json";
+constexpr const char *MANIFEST_FILE_LEGACY = "minihawk-core.json"; // packages built before the rename
 
 } // namespace
 
@@ -60,7 +61,11 @@ ce_package *ce_package_open(const char *path, const char **error_out)
 	{
 		auto join = [&](const char *name) { return std::string(path) + "/" + name; };
 		bool waterbox = chimera::fileExists(join(WBX_FILE).c_str()) && chimera::fileExists(join(CONFIG_FILE).c_str());
-		if (!waterbox && !chimera::fileExists(join(MANIFEST_FILE).c_str())) return nullptr;
+		if (!waterbox && !chimera::fileExists(join(MANIFEST_FILE).c_str())
+			&& !chimera::fileExists(join(MANIFEST_FILE_LEGACY).c_str()))
+		{
+			return nullptr;
+		}
 		auto *p = new ce_package();
 		p->dir = path;
 		p->isWaterbox = waterbox;
@@ -93,7 +98,7 @@ ce_package *ce_package_open(const char *path, const char **error_out)
 		p->entries.emplace(nameBuf, i); // root-relative names; first wins on the (never-seen) dup
 	}
 	bool waterbox = p->entries.count(WBX_FILE) != 0 && p->entries.count(CONFIG_FILE) != 0;
-	if (!waterbox && p->entries.count(MANIFEST_FILE) == 0)
+	if (!waterbox && p->entries.count(MANIFEST_FILE) == 0 && p->entries.count(MANIFEST_FILE_LEGACY) == 0)
 	{
 		delete p;
 		return nullptr; // an ordinary zip

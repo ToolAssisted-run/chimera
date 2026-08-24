@@ -1,0 +1,417 @@
+﻿using System.ComponentModel;
+using System.Diagnostics;
+using System.Drawing;
+using System.Linq;
+using System.Threading;
+
+using Chimera.Common;
+using Chimera.Emulation.Common;
+
+using NLua;
+
+// ReSharper disable StringLiteralTypo
+// ReSharper disable UnusedMember.Global
+namespace Chimera.Client.Common
+{
+	[Description("A library for manipulating the EmuHawk client UI")]
+	public sealed class ClientLuaLibrary : LuaLibraryBase, IRegisterFunctions
+	{
+		public Lazy<string> AllAPINames { get; set; }
+
+		public NLFAddCallback CreateAndRegisterNamedFunction { get; set; }
+
+		[OptionalService]
+		private IVideoProvider VideoProvider { get; set; }
+
+		public IMainFormForApi MainForm { get; set; }
+
+		public ClientLuaLibrary(ILuaLibraries luaLibsImpl, ApiContainer apiContainer, Action<string> logOutputCallback)
+			: base(luaLibsImpl, apiContainer, logOutputCallback) {}
+
+		public override string Name => "client";
+
+		[LuaMethodExample("client.exit( );")]
+		[LuaMethod("exit", "Closes the emulator")]
+		public void CloseEmulator()
+			=> APIs.EmuClient.CloseEmulator();
+
+		[LuaMethodExample("client.exitCode( 0 );")]
+		[LuaMethod("exitCode", "Closes the emulator and returns the provided code")]
+		public void CloseEmulatorWithCode(int exitCode)
+			=> APIs.EmuClient.CloseEmulator(exitCode);
+
+		[LuaMethodExample("local inclibor = client.borderheight( );")]
+		[LuaMethod("borderheight", "Gets the current height in pixels of the letter/pillarbox area (top side only) around the emu display surface, excluding the gameExtraPadding you've set. This function (the whole lot of them) should be renamed or refactored since the padding areas have got more complex.")]
+		public int BorderHeight()
+			=> APIs.EmuClient.BorderHeight();
+
+		[LuaMethodExample("local inclibor = client.borderwidth( );")]
+		[LuaMethod("borderwidth", "Gets the current width in pixels of the letter/pillarbox area (left side only) around the emu display surface, excluding the gameExtraPadding you've set. This function (the whole lot of them) should be renamed or refactored since the padding areas have got more complex.")]
+		public int BorderWidth()
+			=> APIs.EmuClient.BorderWidth();
+
+		[LuaMethodExample("local inclibuf = client.bufferheight( );")]
+		[LuaMethod("bufferheight", "Gets the visible height of the emu display surface (the core video output). This excludes the gameExtraPadding you've set.")]
+		public int BufferHeight()
+		{
+			return VideoProvider?.BufferHeight ?? NullVideo.Instance.BufferHeight; // TODO: consider exposing the video provider from mainform, so it can decide NullVideo is the correct substitute
+		}
+
+		[LuaMethodExample("local inclibuf = client.bufferwidth( );")]
+		[LuaMethod("bufferwidth", "Gets the visible width of the emu display surface (the core video output). This excludes the gameExtraPadding you've set.")]
+		public int BufferWidth()
+		{
+			return VideoProvider?.BufferWidth ?? NullVideo.Instance.BufferWidth;
+		}
+
+		[LuaMethodExample("client.clearautohold( );")]
+		[LuaMethod("clearautohold", "Clears all autohold keys")]
+		public void ClearAutohold()
+			=> APIs.EmuClient.ClearAutohold();
+
+		[LuaMethodExample("client.closerom( );")]
+		[LuaMethod("closerom", "Closes the loaded Rom")]
+		public void CloseRom()
+		{
+			if (_luaLibsImpl.ProhibitedApis.HasFlag(ApiGroup.BOOTING))
+			{
+				throw new InvalidOperationException("client.closerom() is not allowed during input/memory callbacks");
+			}
+
+			_luaLibsImpl.IsRebootingCore = true;
+			APIs.EmuClient.CloseRom();
+			_luaLibsImpl.IsRebootingCore = false;
+		}
+
+		[LuaMethodExample("client.enablerewind( true );")]
+		[LuaMethod("enablerewind", "Sets whether or not the rewind feature is enabled")]
+		public void EnableRewind(bool enabled)
+			=> APIs.EmuClient.EnableRewind(enabled);
+
+		[LuaMethodExample("client.frameskip( 8 );")]
+		[LuaMethod("frameskip", "Sets the frame skip value of the client UI (use 0 to disable)")]
+		public void FrameSkip(int numFrames)
+			=> APIs.EmuClient.FrameSkip(numFrames);
+
+		[LuaMethod("get_lua_engine", "returns the name of the Lua engine currently in use")]
+		public string GetLuaEngine()
+			=> "NLua+Lua";
+
+		[LuaMethodExample("local sounds_terrible = client.get_approx_framerate() < 55;")]
+		[LuaMethod("get_approx_framerate", "Gets the (host) framerate, approximated from frame durations.")]
+		public int GetApproxFramerate()
+			=> APIs.EmuClient.GetApproxFramerate();
+
+		[LuaMethodExample("local stconget = client.getluafunctionslist( );")]
+		[LuaMethod("getluafunctionslist", "returns a list of implemented functions")]
+		public string GetLuaFunctionsList()
+			=> AllAPINames.Value;
+
+		[LuaMethodExample("local incliget = client.gettargetscanlineintensity( );")]
+		[LuaMethod("gettargetscanlineintensity", "Gets the current scanline intensity setting, used for the scanline display filter")]
+		public int GetTargetScanlineIntensity()
+			=> APIs.EmuClient.GetTargetScanlineIntensity();
+
+		[LuaMethodExample("local incliget = client.getwindowsize( );")]
+		[LuaMethod("getwindowsize", "Gets the main window's size Possible values are 1, 2, 3, 4, 5, and 10")]
+		public int GetWindowSize()
+			=> APIs.EmuClient.GetWindowSize();
+
+		[LuaMethodExample("client.SetGameExtraPadding( 5, 10, 15, 20 );")]
+		[LuaMethod("SetGameExtraPadding", "Sets the extra padding added to the 'emu' surface so that you can draw HUD elements in predictable placements")]
+		public void SetGameExtraPadding(int left, int top, int right, int bottom)
+			=> APIs.EmuClient.SetGameExtraPadding(left, top, right, bottom);
+
+		[LuaMethodExample("client.SetSoundOn( true );")]
+		[LuaMethod("SetSoundOn", "Sets the state of the Sound On toggle")]
+		public void SetSoundOn(bool enable)
+			=> APIs.EmuClient.SetSoundOn(enable);
+
+		[LuaMethodExample("if ( client.GetSoundOn( ) ) then\r\n\tconsole.log( \"Gets the state of the Sound On toggle\" );\r\nend;")]
+		[LuaMethod("GetSoundOn", "Gets the state of the Sound On toggle")]
+		public bool GetSoundOn()
+			=> APIs.EmuClient.GetSoundOn();
+
+		[LuaMethodExample("client.SetClientExtraPadding( 5, 10, 15, 20 );")]
+		[LuaMethod("SetClientExtraPadding", "Sets the extra padding added to the 'native' surface so that you can draw HUD elements in predictable placements")]
+		public void SetClientExtraPadding(int left, int top, int right, int bottom)
+			=> APIs.EmuClient.SetClientExtraPadding(left, top, right, bottom);
+
+		[LuaMethodExample("if ( client.ispaused( ) ) then\r\n\tconsole.log( \"Returns true if emulator is paused, otherwise, false\" );\r\nend;")]
+		[LuaMethod("ispaused", "Returns true if emulator is paused, otherwise, false")]
+		public bool IsPaused()
+			=> APIs.EmuClient.IsPaused();
+
+		[LuaMethodExample("if ( client.client.isturbo( ) ) then\r\n\tconsole.log( \"Returns true if emulator is in turbo mode, otherwise, false\" );\r\nend;")]
+		[LuaMethod("isturbo", "Returns true if emulator is in turbo mode, otherwise, false")]
+		public bool IsTurbo()
+			=> APIs.EmuClient.IsTurbo();
+
+		[LuaMethodExample("if ( client.isseeking( ) ) then\r\n\tconsole.log( \"Returns true if emulator is seeking, otherwise, false\" );\r\nend;")]
+		[LuaMethod("isseeking", "Returns true if emulator is seeking, otherwise, false")]
+		public bool IsSeeking()
+			=> APIs.EmuClient.IsSeeking();
+
+#pragma warning disable MA0136 // multi-line string literals (passed to `[LuaMethodExample]`, which converts to host newlines)
+		[LuaMethodExample("""
+			local speed = read_lateral_speed();
+			if (client.is_rewinding()) then speed = -speed; end
+			gui.text(0, 100, tostring(speed));
+		""")]
+#pragma warning restore MA0136
+		[LuaMethod(
+			name: "is_rewinding",
+			description: "Returns true iff the frontend is rewinding.")]
+		public bool IsRewinding()
+			=> APIs.EmuClient.IsRewinding();
+
+		[LuaMethodExample("client.opencheats( );")]
+		[LuaMethod("opencheats", "opens the Cheats dialog")]
+		public void OpenCheats()
+			=> APIs.Tool.OpenCheats();
+
+		[LuaMethodExample("client.openhexeditor( );")]
+		[LuaMethod("openhexeditor", "opens the Hex Editor dialog")]
+		public void OpenHexEditor()
+			=> APIs.Tool.OpenHexEditor();
+
+		[LuaMethodExample("client.openramwatch( );")]
+		[LuaMethod("openramwatch", "opens the RAM Watch dialog")]
+		public void OpenRamWatch()
+			=> APIs.Tool.OpenRamWatch();
+
+		[LuaMethodExample("client.openramsearch( );")]
+		[LuaMethod("openramsearch", "opens the RAM Search dialog")]
+		public void OpenRamSearch()
+			=> APIs.Tool.OpenRamSearch();
+
+		[LuaMethodExample("client.openrom( \"C:\\rom.bin\" );")]
+		[LuaMethod("openrom", "Loads a ROM from the given path. Returns true if the ROM was successfully loaded, otherwise false.")]
+		public bool OpenRom(string path)
+		{
+			if (_luaLibsImpl.ProhibitedApis.HasFlag(ApiGroup.BOOTING))
+			{
+				throw new InvalidOperationException("client.openrom() is not allowed during input/memory callbacks");
+			}
+
+			_luaLibsImpl.IsRebootingCore = true;
+			var success = APIs.EmuClient.OpenRom(path);
+			_luaLibsImpl.IsRebootingCore = false;
+			return success;
+		}
+
+		[LuaMethodExample("client.opentasstudio( );")]
+		[LuaMethod("opentasstudio", "opens the TAStudio dialog")]
+		public void OpenTasStudio()
+			=> APIs.Tool.OpenTasStudio();
+
+		[LuaMethodExample("client.opentoolbox( );")]
+		[LuaMethod("opentoolbox", "opens the Toolbox Dialog")]
+		public void OpenToolBox()
+			=> APIs.Tool.OpenToolBox();
+
+		[LuaMethodExample("client.pause( );")]
+		[LuaMethod("pause", "Pauses the emulator")]
+		public void Pause()
+			=> APIs.EmuClient.Pause();
+
+		[LuaMethodExample("client.pause_av( );")]
+		[LuaMethod("pause_av", "If currently capturing Audio/Video, this will suspend the record. Frames will not be captured into the AV until client.unpause_av() is called")]
+		public void PauseAv()
+			=> APIs.EmuClient.PauseAv();
+
+		[LuaMethodExample("client.reboot_core( );")]
+		[LuaMethod("reboot_core", "Reboots the currently loaded core")]
+		public void RebootCore()
+		{
+			if (_luaLibsImpl.ProhibitedApis.HasFlag(ApiGroup.BOOTING))
+			{
+				throw new InvalidOperationException("client.reboot_core() is not allowed during input/memory callbacks");
+			}
+
+			_luaLibsImpl.IsRebootingCore = true;
+			APIs.EmuClient.RebootCore();
+			_luaLibsImpl.IsRebootingCore = false;
+		}
+
+		[LuaMethodExample("local incliscr = client.screenheight( );")]
+		[LuaMethod("screenheight", "Gets the current height in pixels of the emulator's drawing area")]
+		public int ScreenHeight()
+			=> APIs.EmuClient.ScreenHeight();
+
+		[LuaMethodExample("client.screenshot( \"C:\\\" );")]
+		[LuaMethod("screenshot", "if a parameter is passed it will function as the Screenshot As menu item of EmuHawk, else it will function as the Screenshot menu item")]
+		public void Screenshot(string path = null)
+			=> APIs.EmuClient.Screenshot(path);
+
+		[LuaMethodExample("client.screenshottoclipboard( );")]
+		[LuaMethod("screenshottoclipboard", "Performs the same function as EmuHawk's Screenshot To Clipboard menu item")]
+		public void ScreenshotToClipboard()
+			=> APIs.EmuClient.ScreenshotToClipboard();
+
+		[LuaMethodExample("client.settargetscanlineintensity( -1000 );")]
+		[LuaMethod("settargetscanlineintensity", "Sets the current scanline intensity setting, used for the scanline display filter")]
+		public void SetTargetScanlineIntensity(int val)
+			=> APIs.EmuClient.SetTargetScanlineIntensity(val);
+
+		[LuaMethodExample("client.setscreenshotosd( true );")]
+		[LuaMethod("setscreenshotosd", "Sets the screenshot Capture OSD property of the client")]
+		public void SetScreenshotOSD(bool value)
+			=> APIs.EmuClient.SetScreenshotOSD(value);
+
+		[LuaMethodExample("local incliscr = client.screenwidth( );")]
+		[LuaMethod("screenwidth", "Gets the current width in pixels of the emulator's drawing area")]
+		public int ScreenWidth()
+			=> APIs.EmuClient.ScreenWidth();
+
+		[LuaMethodExample("""
+			client.setwindowsize(2);
+		""")]
+		[LuaMethod(
+			name: "setwindowsize",
+			description: "Sets the MainForm scale (window size multiplier) for the system of the current rom."
+//				+ $" The size argument must be an integer between 1 and {EmuClientApi.WINDOW_SCALE_MAX}, inclusive.")]
+				+ $" The size argument must be an integer between 1 and 10, inclusive.")]
+		public void SetWindowSize(int size)
+			=> APIs.EmuClient.SetWindowSize(size);
+
+		[LuaMethodExample("client.show_future(function(frame) return frame == 1 end, 1)")]
+		[LuaMethod(
+			name: "show_future",
+			description: "Tell the client to display a frame from the future, instead of the current frame. " +
+				"The given lua function will be called before emulating each future frame. " +
+				"It can have 1 parameter, which is the number of frames into the future that have already been emulated. " +
+				"Return false to emulate another future frame. " +
+				"When the callback returns true, emulation will rewind to the real current frame and the just-run future frame will be displayed. " +
+				"Unregister the callback with event.unregister____ to disable future frame display. " +
+				"No more than `maxFrames` future frames will be emulated. Useful to avoid freezing " +
+				"the client UI in case of accidentally never returning true from the callback. " +
+				"Your timeout can be as low as 1 frame or as high as 32767 frames.")]
+		public string ShowFuture(LuaFunction luaf, long maxFrames, string name = null)
+		{
+			if (maxFrames is < 1 or > EmuClientApi.SHOW_FUTURE_MAX_USER_TIMEOUT)
+			{
+				Log($"Invalid number of future frames for timeout ({maxFrames}); number must be in 1..={EmuClientApi.SHOW_FUTURE_MAX_USER_TIMEOUT}.");
+				return EventsLuaLibrary.EMPTY_UUID_STR;
+			}
+
+			INamedLuaFunction nlf = CreateAndRegisterNamedFunction(luaf, NamedLuaFunction.EVENT_TYPE_FUTURE, prohibitedApis: ApiGroup.PROHIBITED_MID_FRAME, name: name);
+			ShowFutureCallback FutureCallback = (f) => nlf.Call(f) is [ bool r ] ? r : false;
+			APIs.EmuClient.ShowFuture(FutureCallback, (ushort) maxFrames);
+			nlf.OnRemove += () => APIs.EmuClient.ShowFuture(null, 0);
+			return nlf.GuidStr;
+		}
+
+		[LuaMethodExample("client.speedmode( 75 );")]
+		[LuaMethod("speedmode", "Sets the speed of the emulator (in terms of percent)")]
+		public void SpeedMode(int percent)
+			=> APIs.EmuClient.SpeedMode(percent);
+
+		[LuaMethodExample("local curSpeed = client.getconfig().SpeedPercent")]
+		[LuaMethod("getconfig", "gets the current config settings object")]
+		public object GetConfig()
+			=> ((EmulationApi) APIs.Emulation).ForbiddenConfigReference;
+
+		[LuaMethodExample("client.togglepause( );")]
+		[LuaMethod("togglepause", "Toggles the current pause state")]
+		public void TogglePause()
+			=> APIs.EmuClient.TogglePause();
+
+		[LuaMethodExample("local newY = client.transform_point( 32, 100 ).y;")]
+		[LuaMethod("transformPoint", "Transforms a point (x, y) in emulator space to a point in client space")]
+		public LuaTable TransformPoint(int x, int y) {
+			var transformed = APIs.EmuClient.TransformPoint(new Point(x, y));
+			var table = _th.CreateTable();
+			table["x"] = transformed.X;
+			table["y"] = transformed.Y;
+			return table;
+		}
+
+		[LuaMethodExample("client.unpause( );")]
+		[LuaMethod(
+			"unpause",
+			"Unpauses the emulator. Note that the user can pause again before the next frame,"
+				+ " either with the pause key or by releasing frame advance."
+				+ " If you want to force emulation to continue, put this and emu.yield (not frameadvance)"
+				+ " inside a loop that runs until the desired frame.")]
+		public void Unpause()
+			=> APIs.EmuClient.Unpause();
+
+		[LuaMethodExample("client.unpause_av( );")]
+		[LuaMethod("unpause_av", "If currently capturing Audio/Video this resumes capturing")]
+		public void UnpauseAv()
+			=> APIs.EmuClient.UnpauseAv();
+
+		[LuaMethodExample("local inclixpo = client.xpos( );")]
+		[LuaMethod("xpos", "Returns the x value of the screen position where the client currently sits")]
+		public int Xpos()
+			=> APIs.EmuClient.Xpos();
+
+		[LuaMethodExample("local incliypo = client.ypos( );")]
+		[LuaMethod("ypos", "Returns the y value of the screen position where the client currently sits")]
+		public int Ypos()
+			=> APIs.EmuClient.Ypos();
+
+		[LuaMethodExample("local incbhver = client.getversion( );")]
+		[LuaMethod("getversion", "Returns the current stable Chimera version")]
+		public static string GetVersion()
+		{
+			return VersionInfo.MainVersion;
+		}
+
+		[LuaMethodExample("local nlcliget = client.getavailabletools( );")]
+		[LuaMethod("getavailabletools", "Returns a list of the tools currently open")]
+		[return: LuaZeroIndexed]
+		public LuaTable GetAvailableTools()
+			=> _th.EnumerateToLuaTable(APIs.Tool.AvailableTools.Select(tool => tool.Name.ToLowerInvariant()), indexFrom: 0);
+
+		[LuaMethodExample("local nlcliget = client.gettool( \"Tool name\" );")]
+		[LuaMethod("gettool", "Returns an object that represents a tool of the given name (not case sensitive). If the tool is not open, it will be loaded if available. Use getavailabletools to get a list of names")]
+		public LuaTable GetTool(string name)
+		{
+			var selectedTool = APIs.Tool.GetTool(name);
+			return selectedTool == null ? null : _th.ObjectToTable(selectedTool);
+		}
+
+		[LuaMethodExample("local nlclicre = client.createinstance( \"objectname\" );")]
+		[LuaMethod("createinstance", "returns a default instance of the given type of object if it exists (not case sensitive). Note: This will only work on objects which have a parameterless constructor.  If no suitable type is found, or the type does not have a parameterless constructor, then nil is returned")]
+		public LuaTable CreateInstance(string name)
+		{
+			var instance = APIs.Tool.CreateInstance(name);
+			return instance == null ? null : _th.ObjectToTable(instance);
+		}
+
+		[LuaMethodExample("client.displaymessages( true );")]
+		[LuaMethod("displaymessages", "sets whether or not on screen messages will display")]
+		public void DisplayMessages(bool value)
+			=> APIs.EmuClient.DisplayMessages(value);
+
+		[LuaMethodExample("client.sleep( 50 );")]
+		[LuaMethod("sleep", "sleeps for n milliseconds")]
+		public void Sleep(int millis)
+		{
+			Thread.Sleep(millis);
+		}
+
+		[LuaMethodExample("client.exactsleep( 50 );")]
+		[LuaMethod("exactsleep", "sleeps exactly for n milliseconds")]
+		public void ExactSleep(int millis)
+		{
+			Stopwatch stopwatch = Stopwatch.StartNew();
+			while (millis - stopwatch.ElapsedMilliseconds > 100)
+			{
+				Thread.Sleep(50);
+			}
+			while (true)
+			{
+				if (stopwatch.ElapsedMilliseconds >= millis)
+				{
+					break;
+				}
+			}
+		}
+
+	}
+}
+
+

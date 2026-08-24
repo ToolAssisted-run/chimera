@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [minihawk]
+    branches: [chimera]
   pull_request:
   workflow_dispatch:
   schedule:
@@ -57,7 +57,7 @@ jobs:
 
   witness-full:
     # The full gate, including Level B: EmuHawk runs headless under Mono + Xvfb,
-    # loads the core.wbx package through miniHawk's built-in generic waterbox
+    # loads the core.wbx package through Chimera's built-in generic waterbox
     # adapter, replays the movies, and the RAM/VRAM dumps must be byte-identical
     # to the Level A goldens - in both simple and rerecord (per-frame
     # whole-machine savestate) modes.
@@ -95,7 +95,7 @@ jobs:
           meson install -C build/meson-linux
 
       - name: Build the managed solution
-        run: dotnet build source/BizHawk.sln -c Release /nodeReuse:false -p:UseSharedCompilation=false
+        run: dotnet build source/Chimera.sln -c Release /nodeReuse:false -p:UseSharedCompilation=false
 
       - name: Build the waterboxed synth core package
         run: ./tests/synth/build-package.sh

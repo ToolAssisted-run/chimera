@@ -1,16 +1,16 @@
-# miniHawk - Project Charter
+# Chimera - Project Charter
 
 A minimal, core-agnostic TAS frontend derived from BizHawk. Emulation cores are removed
 from the tree and loaded on-the-fly as external, self-contained packages just before ROM load.
 
 ## Objectives (testable)
 
-1. **Zero core code in the repo.** miniHawk builds and runs with no emulation core in the
+1. **Zero core code in the repo.** Chimera builds and runs with no emulation core in the
    solution. Cores arrive as single-file packages (`.zip`: manifest + managed adapter DLL +
    native DLL(s)), discovered from a `Cores/` directory and loaded at ROM-load time.
-2. **Published core contract.** The core-facing API (essentially `BizHawk.Emulation.Common`
-   + `BizHawk.BizInvoke`) becomes a versioned, published contract. A core package must be
-   buildable outside the miniHawk repo against that contract alone.
+2. **Published core contract.** The core-facing API (essentially `Chimera.Emulation.Common`
+   + `Chimera.BizInvoke`) becomes a versioned, published contract. A core package must be
+   buildable outside the Chimera repo against that contract alone.
 3. **Determinism witness.** The QuickerNES regression suite (31 test movies, vendored at
    `tests/suite/` from github.com/TASEmulators/quickerNES) must resync to
    success at every phase boundary, including after the core is evicted to an external
@@ -26,10 +26,10 @@ from the tree and loaded on-the-fly as external, self-contained packages just be
 
 ## Pillar: reproducibility belongs to the core, not the frontend
 
-miniHawk is NOT the keeper or enforcer of reproducibility - it REQUIRES it from
+Chimera is NOT the keeper or enforcer of reproducibility - it REQUIRES it from
 cores. A movie's reproduction contract is the pair (movie, core package): if the
 selected core package is exactly the same, the movie must reproduce regardless of
-miniHawk's version or the versions of any frontend library (SDL, Lua, zstd, cimgui,
+Chimera's version or the versions of any frontend library (SDL, Lua, zstd, cimgui,
 ...). Consequences: frontend native dependencies may be upgraded freely and are
 never pinned for determinism's sake (only for build reproducibility); no frontend
 feature may become something a movie depends on to sync; the witness harness proves
@@ -44,7 +44,7 @@ extraction cache is keyed by that SHA1, the hash is shown on load, recorded into
 movie headers as CorePackageSHA1, and compared on playback with a warning on
 mismatch - the exact analogue of the rom-hash check.
 
-Elaboration (same day): the pillar bites hardest at the interface points where miniHawk
+Elaboration (same day): the pillar bites hardest at the interface points where Chimera
 hands data to cores. Audit of those points and their standing:
 - ROM data: RomGame is format-agnostic - the core receives the file's exact bytes, no
   header detection/stripping/per-system preprocessing (done in P3.2, and now
@@ -54,10 +54,10 @@ hands data to cores. Audit of those points and their standing:
   those formats are deterministic by spec; the implementation must stay spec-exact and
   must never grow heuristics.
 - Movie input log: the mnemonic format is effectively FROZEN - its parsing is part of
-  the reproduction contract and must be spec-stable across miniHawk versions.
+  the reproduction contract and must be spec-stable across Chimera versions.
 - Sync settings: opaque JSON round-tripped to the core's types; the frontend must
   never interpret or migrate them.
-- DISC DATA IS THE OPEN VIOLATION: BizHawk.Emulation.DiscSystem parses CUE/CCD/CHD and
+- DISC DATA IS THE OPEN VIOLATION: Chimera.Emulation.DiscSystem parses CUE/CCD/CHD and
   synthesizes sector streams IN THE FRONTEND - a frontend version change could alter
   the byte stream a disc core sees, breaking the pillar. Resolution direction when the
   disc story is taken up: disc image interpretation must move core-side (each disc
@@ -68,7 +68,7 @@ hands data to cores. Audit of those points and their standing:
 
 ## Core flavors and their reproducibility profiles
 
-Three "flavors" of emulation core exist from miniHawk's perspective (user-stated,
+Three "flavors" of emulation core exist from Chimera's perspective (user-stated,
 2026-08-11):
 
 - **(a) Native cores** (e.g. QuickerNES): compiled per platform (Windows .dll /
@@ -101,8 +101,8 @@ open question for whenever a waterboxed core is wanted.
 **Side-effect freedom (non-waterboxed cores; user-stated, 2026-08-11).** For
 waterboxed cores the sandbox enforces isolation; flavors (a) and (b) must
 uphold it by discipline: a core must contain NO side effects. Like the
-reproducibility pillar, this rule CANNOT be enforced by miniHawk - it is the
-core developer's responsibility. miniHawk states the requirement in the
+reproducibility pillar, this rule CANNOT be enforced by Chimera - it is the
+core developer's responsibility. Chimera states the requirement in the
 contract documentation and trusts core packages to honor it; there is no
 sandbox, no auditing machinery, and none will be added for it. Concretely: no
 writing to the filesystem; no reading directly from the filesystem (ALL data -
@@ -129,7 +129,7 @@ now reads nothing from the filesystem at runtime.
   interfaces) against the published contract, bundled with its native core DLL(s).
   Not a C ABI, not libretro.
 - **Repo strategy:** trim this BizHawk checkout in place on a branch. Keep git history and
-  upstream diffability. Rename to miniHawk once stable.
+  upstream diffability. Rename to Chimera once stable.
 - **Reload model:** load-once per process (net48 cannot unload assemblies). Packages load
   lazily at ROM-load time; swapping a loaded core's version requires app restart.
 - **Witness core:** QuickNes (backed by the TASEmulators/quickerNES submodule) - single
@@ -156,14 +156,14 @@ phase of unverified change.
   and the reflection-attribute construction machinery are gone (per user decision, along
   with waterbox, the 6502 disassembler, and the trace logger - all recoverable from git
   history). In their place:
- - `ICoreFactory` + `CoreCreationContext` + `IRomAsset` in **BizHawk.Emulation.Common**
+ - `ICoreFactory` + `CoreCreationContext` + `IRomAsset` in **Chimera.Emulation.Common**
    - the published core contract. A core ships a factory: name, system IDs, core type
     (stable key for persisted settings), settings/sync-settings types, and `Create(ctx)`.
  - `CoreRegistry` (Client.Common) indexes factories by system; RomLoader's
     `MakeCoreFromRegistry` replaces the old inventory path (same preferred/forced-core
     and error semantics).
  - `CorePackageLoader` (Client.Common): at startup, `<exe>/Cores/` is scanned for
-    package directories or zips containing `minihawk-core.json` (formatVersion 1:
+    package directories or zips containing `chimera-core.json` (formatVersion 1:
     name, assembly, factoryTypes[]). Zips extract to `Cores/_cache/<name>` keyed by
     zip timestamp; the package dir is prepended to PATH for native DLL resolution;
     an AppDomain.AssemblyResolve hook serves package assemblies so persisted
@@ -172,11 +172,11 @@ phase of unverified change.
     replaces it with a real external package and deletes it).
   Witness at phase close: 26/26 simple AND 26/26 rerecord through the new loader.
 - **Phase 3 - Evict the witness. [DONE 2026-08-09]** The QuickNES adapter now lives in
-  `minihawk-cores/quickernes/` - NOT part of BizHawk.sln, built by `build-package.ps1`
+  `chimera-cores/quickernes/` - NOT part of Chimera.sln, built by `build-package.ps1`
   against the contract DLLs from `build/dll` exactly as an out-of-repo package would be,
-  and shipped as `build/Cores/quickernes.zip` (manifest + MiniHawk.QuickerNES.dll +
-  libquicknes natives). `BizHawk.Emulation.Cores` is deleted from the solution entirely:
-  **miniHawk contains zero core code**. Supporting changes: INESPPUViewable and the NES
+  and shipped as `build/Cores/quickernes.zip` (manifest + Chimera.QuickerNES.dll +
+  libquicknes natives). `Chimera.Emulation.Cores` is deleted from the solution entirely:
+  **Chimera contains zero core code**. Supporting changes: INESPPUViewable and the NES
   palette helpers moved into Emulation.Common (frontend PPU viewers stay core-agnostic);
   BootGod NES cart DB init moved into the package factory; virtual pad schemas are
   discovered from registered factory assemblies; per-core settings dialogs replaced by
@@ -184,12 +184,12 @@ phase of unverified change.
   revisit if missed); `emu.setrenderplanes` is a no-op pending a contract story; the
   Debug-only core-poking dev menu was deleted. Witness at phase close: 26/26 simple AND
   26/26 rerecord with the core loaded from the zip package.
-  Addendum (same day): per user principle - miniHawk must contain NOTHING core-specific
+  Addendum (same day): per user principle - Chimera must contain NOTHING core-specific
  - the Phase 3 compromises were purged too: INESPPUViewable and the NES palette code
   moved from Emulation.Common into the package; the NES PPU/nametable viewer tools, the
   NES menu, and the QuickNes icon were deleted from the frontend; NesCarts.xml moved
   from gamedb into the package zip (BootGod reads from the extracted package dir);
-  NES palette files moved to minihawk-cores/quickernes/palettes.
+  NES palette files moved to chimera-cores/quickernes/palettes.
   Second addendum (deeper cleanse, same day): gamedb is GONE entirely (all per-system
   hash DBs, the Database class, DB-entry generation service). ROM->system routing is now
   purely: (1) user extension preference, (2) the extension->system map that core-package
@@ -204,7 +204,7 @@ phase of unverified change.
   cheat-code decoders, and the game-DB button in the log window.
   Phase 3 sharp-edge, confirmed in the wild: persisted configs and movie sync-settings
   embed `"Type, AssemblyName"` - entries written before eviction name the deleted
-  `BizHawk.Emulation.Cores` assembly, and Newtonsoft's `$type` binder then throws
+  `Chimera.Emulation.Cores` assembly, and Newtonsoft's `$type` binder then throws
   (silently swallowed -> defaults, first caught as two sync-settings-dependent witness
   failures). Fix: the manifest's `supersedesAssemblies` list - the resolver serves the
   package assembly under its legacy names, keeping old configs AND pre-eviction movies
@@ -253,12 +253,12 @@ phase of unverified change.
   since they referenced gamedb/waterbox/defctrl anyway. blip_buf removed (see above).
   Eighteenth addendum (2026-08-11, user-directed - TOTAL QUICKERNES EVICTION):
   absolutely nothing from QuickerNES remains in this repository; anything
-  important moved to the quickerNES repo's minihawk/ dir. Concretely: the
+  important moved to the quickerNES repo's chimera/ dir. Concretely: the
   entire witness apparatus - vendored suite (reversing the earlier vendoring
   decision), Level A+B goldens, replay.lua, bootstrap.lua, both run-level-b
   drivers, hidden-run.ps1, native/dumper.cpp, tests/README - moved to
-  quickerNES minihawk/tests/ (drivers grew --minihawk-root/-MiniHawkRoot,
-  defaulting to a sibling miniHawk or BizHawk checkout); stale QuickNesConfig
+  quickerNES chimera/tests/ (drivers grew --chimera-root/-ChimeraRoot,
+  defaulting to a sibling Chimera or BizHawk checkout); stale QuickNesConfig
   Compile Update items purged from the EmuHawk csproj. The quickerNES witness
   remains the commit gate, run from its new home, until the synthetic witness
   (see "The synthetic witness" section) replaces it: three synthetic cores
@@ -270,7 +270,7 @@ phase of unverified change.
   synthetic-witness section status) and run-witness.sh became THE smoke test,
   retiring the short-lived --quick subset from the quickerNES drivers; the
   side-effect-freedom rule for non-waterboxed cores was stated (see the
-  core-flavors section; core-dev responsibility, not enforced by miniHawk)
+  core-flavors section; core-dev responsibility, not enforced by Chimera)
   and QuickerNES's NesCarts.xml read - its one violation - was reduced to a
   compiled-in PAL hash list in the adapter. Also fixed: `meson compile
   frontend` no longer blocks ~15 minutes on lingering msbuild node-reuse
@@ -300,9 +300,9 @@ phase of unverified change.
   (previously they could exit 0 after an invisible dialog). Both witness drivers
   pass --headless, and both gained --quick/-Quick: a six-test smoke subset (~1 min)
   for CI and dev loops - explicitly NOT a substitute for the full commit gate.
-  Layout/docs in the same round: MINIHAWK.md moved to docs/design-principles.md
+  Layout/docs in the same round: CHIMERA.md moved to docs/design-principles.md
   (references updated); LICENSE separates copyright (BizHawk team = inherited
-  code, Sergio Martin 2026 = miniHawk modifications and new work); accidentally
+  code, Sergio Martin 2026 = Chimera modifications and new work); accidentally
   committed build output purged (root libchd_capi.so and 490 files under
   extern/libchd-rs-capi/chd-build/, now gitignored); all prose files converted to
   pure ASCII after a committed double-encoding accident (em-dashes had become
@@ -339,12 +339,12 @@ phase of unverified change.
   (SDL2, lua54, zstd, cimgui, bizhash all mingw-built) byte-exact at 26/26 + 26/26,
   which is also the deferred-reproducibility pillar demonstrated empirically:
   an entirely different compiler family under the frontend, identical emulation.
-  Fourteenth addendum (2026-08-10, user-directed): BizHawk.sln, Common.props, and
+  Fourteenth addendum (2026-08-10, user-directed): Chimera.sln, Common.props, and
   Directory.Packages.props moved into source/ (sln project paths relativized;
   extern/ gained a thin Directory.Packages.props forwarding to source/'s, since NuGet
   discovers that file by walking up from each project). Root is now four directories
   (build/ extern/ source/ tests/) and five files (.gitignore .gitmodules LICENSE
-  MINIHAWK.md README.md). STATED DIRECTION (user): the entire build system - Windows
+  CHIMERA.md README.md). STATED DIRECTION (user): the entire build system - Windows
   and Linux targets - should eventually be mediated solely by MESON; the current
   msbuild-invokes-build-natives.ps1 arrangement is a transitional shim that meson
   will absorb (meson orchestrating the dotnet build and every native recipe).
@@ -366,7 +366,7 @@ phase of unverified change.
   the core package. Assets/ is GONE entirely: EmuHawkMono.sh moved into the EmuHawk
   project (copied to build/ by the PostBuild target), the LuaCATS API doc stubs were
   DELETED outright (pure editor documentation, annotation-only with error() guards,
-  never read by the frontend, and partially stale against miniHawk's actual API;
+  never read by the frontend, and partially stale against Chimera's actual API;
   recoverable from history or regenerable from the [LuaMethod] attributes if ever
   wanted), and the Assets/** copy glob was removed. Root is now
   build/ extern/ source/ tests/ + eight files.
@@ -377,16 +377,16 @@ phase of unverified change.
   Recent ROM stay DISABLED until a core is loaded - deliberately, so core (sync)
   settings can be configured BEFORE the first rom load (config-before-load principle).
   The Config > Core Settings menu rebuilds on every package load; zip caches now live
-  under <exe>/CoreCache. Layout changes in the same round: minihawk-cores/ deleted
+  under <exe>/CoreCache. Layout changes in the same round: chimera-cores/ deleted
   (author docs live in this charter + the quickerNES reference package);
-  minihawk-tests/ renamed tests/; ExternalProjects/ moved under source/; root purged
+  chimera-tests/ renamed tests/; ExternalProjects/ moved under source/; root purged
   to the minimum (removed: .github incl. all CI, .vscode, .config, .editorconfig,
   .global.editorconfig.ini, .stylecop.json + the Common.props StyleCop block,
   appveyor.yml, SECURITY.md, contributing.md [README gained a Contributing section],
   global.json, sln.DotSettings, .git-blame-ignore-revs, "Building Other
   Solutions.txt").
-  Eleventh addendum (2026-08-10, user-directed): miniHawk is a STANDALONE repository
-  (github.com/SergioMartin86/miniHawk) with a FRESH history - commit 0 is the
+  Eleventh addendum (2026-08-10, user-directed): Chimera is a STANDALONE repository
+  (github.com/SergioMartin86/Chimera) with a FRESH history - commit 0 is the
   post-separation state. The BizHawk ancestry (23,722 commits) is deliberately not
   carried; it remains available in the upstream BizHawk repository and in the
   transitional SergioMartin86/BizHawk fork, which is also the recovery source for
@@ -394,15 +394,15 @@ phase of unverified change.
   Phase 4). Future upstream ports are cherry-picked/rebased without shared ancestry.
   Tenth addendum (2026-08-10, user-directed - FULL SEPARATION): the QuickerNES adapter
   no longer lives in this repo at all. Everything quickerNES-specific
-  (minihawk-cores/quickernes/ and the quickernes.yml workflow) moved to the quickerNES
-  repository itself (github.com/SergioMartin86/quickerNES, branch minihawk-adapter,
-  `minihawk/` dir): managed adapter, native bizinterface + Makefile (now building from
+  (chimera-cores/quickernes/ and the quickernes.yml workflow) moved to the quickerNES
+  repository itself (github.com/SergioMartin86/quickerNES, branch chimera-adapter,
+  `chimera/` dir): managed adapter, native bizinterface + Makefile (now building from
   that repo's own sources), manifest, bundled data, prebuilt natives, build-package.ps1
-  (param -MiniHawkRoot, default sibling ../BizHawk checkout; installs quickernes.zip
-  into <MiniHawkRoot>/build/Cores), and a native-build CI workflow. The dev loop:
-  build miniHawk sln -> run ../quickerNES/minihawk/build-package.ps1 -> witness gate.
-  minihawk-cores/ here is reduced to the core-author guide README. The vendored witness
-  suite stays in minihawk-tests/suite/ (user decision: pinning the gate to what the
+  (param -ChimeraRoot, default sibling ../BizHawk checkout; installs quickernes.zip
+  into <ChimeraRoot>/build/Cores), and a native-build CI workflow. The dev loop:
+  build Chimera sln -> run ../quickerNES/chimera/build-package.ps1 -> witness gate.
+  chimera-cores/ here is reduced to the core-author guide README. The vendored witness
+  suite stays in chimera-tests/suite/ (user decision: pinning the gate to what the
   goldens were recorded against is a feature). Gate ran against the
   quickerNES-repo-built package: 26/26 simple + 26/26 rerecord.
   Ninth addendum (same day, user-directed): References/ deleted - no committed managed
@@ -424,8 +424,8 @@ phase of unverified change.
   build wrapper scripts (two already broken by the rename), upstream release stamping,
   the upstream changelog, arm64 prebuilt natives nothing shipped anymore, and the
   git-hooks commit-message linter together with the InstallGitHooks build target in
-  BizHawk.Common.csproj that installed it on every build (code-checking, per user
-  policy). Unix builds are plain `dotnet build BizHawk.sln` now.
+  Chimera.Common.csproj that installed it on every build (code-checking, per user
+  policy). Unix builds are plain `dotnet build Chimera.sln` now.
   Seventh addendum (same day, user-directed): standard folder nomenclature adopted - 
   `src/` is now `source/` (git mv, sln paths updated; likewise the package's `src/` ->
   `source/` and `native-src/` -> `native-source/`) and the build output dir `output/` is
@@ -434,12 +434,12 @@ phase of unverified change.
   entries were rewritten to the new names wholesale.
   Sixth addendum (same day, user-directed): ExternalToolProjects deleted entirely
   (incl. HelloWorld; the external-tools mechanism in the frontend stays), and the
-  `quicknes/` directory is GONE - miniHawk no longer carries the quickerNES submodule.
+  `quicknes/` directory is GONE - Chimera no longer carries the quickerNES submodule.
   Consequences handled: the witness test suite (.test/.sol/.state) is now VENDORED at
-  `minihawk-tests/suite/` (snapshot of upstream `tests/`; run-level-b.ps1 reads from
+  `chimera-tests/suite/` (snapshot of upstream `tests/`; run-level-b.ps1 reads from
   there, making the Level B gate fully self-contained modulo ROMs); the native build
   recipe (bizinterface.cpp + Makefile) moved into
-  `minihawk-cores/quickernes/native-source/` with a `QUICKERNES_ROOT` variable pointing
+  `chimera-cores/quickernes/native-source/` with a `QUICKERNES_ROOT` variable pointing
   at an external quickerNES clone; quickernes.yml clones upstream instead of using a
   submodule. The submodule working tree contained untracked files (controller.hpp and
   a vendored copy of the original blargg quickNES) - backed up to
@@ -448,15 +448,15 @@ phase of unverified change.
   Fifth addendum (same day, user-directed): ExternalProjects dead weight deleted - 
   FlatBuffers.GenOutput (no consumers), LibBizAbiAdapter + the WaterboxAdapter/
   MsHostSysVGuest code in BizInvoke (waterbox pile), TestromSuiteReportProcessor,
-  BizHawk.AnalyzersTests, and BizHawk.Analyzer itself (user: no code-checking needed;
-  References/BizHawk.Analyzer.dll + Common.props wiring removed). AnalyzersCommon KEPT:
+  Chimera.AnalyzersTests, and Chimera.Analyzer itself (user: no code-checking needed;
+  References/Chimera.Analyzer.dll + Common.props wiring removed). AnalyzersCommon KEPT:
   despite the name it's shared plumbing imported by the three source generators, which
   generate runtime-necessary code. ExternalToolProjects trimmed to HelloWorld + shared
   props/targets (DATParser/DBMan were gamedb tooling; AutoGenConfig/FakeTemporalAA were
   dev experiments) - the external-tools mechanism itself stays. Stale CI deleted
   (.gitlab-ci.yml, mame/waterbox/release workflows); ci.yml rewritten minimal
   (build sln + package); quickernes.yml and quicknes/make now install the native to
-  minihawk-cores/quickernes/natives. Still present, deliberately: ExternalProjects/SDL2
+  chimera-cores/quickernes/natives. Still present, deliberately: ExternalProjects/SDL2
   (81 MB of SDL+libusb submodules, only needed to rebuild SDL2.dll from source),
   iso-parser + libchd-rs-capi (fall with DiscSystem if the disc decision goes that way),
   NLua/LibBizHash/HawkQuantizer/SrcGens (sources of live References/Assets binaries).
@@ -473,7 +473,7 @@ phase of unverified change.
 ## THE WATERBOX-ONLY REDESIGN (user-decided, 2026-08-11)
 
 After full analysis of BizHawk's waterbox (docs/waterbox-analysis.md), a
-fundamental design change: miniHawk allows ONLY waterboxed cores, making
+fundamental design change: Chimera allows ONLY waterboxed cores, making
 every core reproducible and portable BY FORCE rather than by discipline.
 Decisions, all user-confirmed:
 
@@ -482,13 +482,13 @@ Decisions, all user-confirmed:
    packages; the taxonomy above remains as analysis, and the side-effect
    rule's "cannot be enforced" caveat inverts - the sandbox IS the
    enforcement.
-2. **The waterbox host lives in miniHawk**, compiled and shipped with
-   miniHawk's OS-dependent artifacts (meson dual-target, like every other
+2. **The waterbox host lives in Chimera**, compiled and shipped with
+   Chimera's OS-dependent artifacts (meson dual-target, like every other
    native). This amends the reproducibility pillar the same way the frozen
    movie-mnemonic format does: the WATERBOX MACHINE IS A FROZEN, VERSIONED
    SPECIFICATION - address layout, syscall semantics, the time constant,
    scheduling order, callback-slot mechanics, everything the guest can
-   observe - and miniHawk ships a spec-exact implementation. Movies record
+   observe - and Chimera ships a spec-exact implementation. Movies record
    the machine-spec version; the reproduction contract becomes
    (movie + core package + machine-spec version), where implementations of
    a given spec version are interchangeable by definition. The Synth
@@ -497,7 +497,7 @@ Decisions, all user-confirmed:
 3. **One generic adapter, no per-core managed code.** A core package is a
    single platform-neutral zip: manifest + core.wbx + data files
    (controller definitions, settings schemas, system ids, extensions -
-   all DATA, interpreted by miniHawk's one universal adapter over a
+   all DATA, interpreted by Chimera's one universal adapter over a
    standardized guest export ABI). Identical zip and identical package
    SHA1 on every OS; movies therefore carry the same CorePackageSHA1
    cross-platform. (BizHawk's Nyma layer - one data-driven adapter serving
@@ -505,11 +505,11 @@ Decisions, all user-confirmed:
 4. **Everything waterbox lives in ONE external repository: miniBox**
    (github.com/SergioMartin86/miniBox), consumed as a submodule at
    extern/miniBox like every other from-source dependency. It carries all
-   sides: the runtime (sandbox host - miniHawk's meson builds it into the
+   sides: the runtime (sandbox host - Chimera's meson builds it into the
    frontend's OS-dependent artifacts), the guest toolchain (the core-author
    kit: musl fork, emulibc, libco, libcxx sysroot, linkscript, common.mak),
    the managed host layer, and the waterbox's own conformance tests -
-   independently testable without miniHawk. Plan of record for the runtime:
+   independently testable without Chimera. Plan of record for the runtime:
    a C/C++ port replacing the imported Rust reference (drops the
    nightly-Rust requirement; validated differentially against it).
 
@@ -526,7 +526,7 @@ quickerNES suite until its core is migrated):
       (Level A golden generators - an even cleaner witness split);
   (iv) migrate quickerNES to a .wbx guest; re-gate the full suite;
   (v) retire the flavor-(a)/(b) loading paths (manifest v1, natives lists,
-      package-assembly resolution) from miniHawk.
+      package-assembly resolution) from Chimera.
 
 ## The synthetic witness (planned successor to the quickerNES gate)
 
@@ -570,7 +570,7 @@ checks final RAM plus FULL per-frame video and audio stream hashes against
 goldens, with a serialize-every-frame rerecord self-check; Level B replays
 the same movies through EmuHawk (Mono + Xvfb) and byte-compares the final
 RAM and VRAM domains against the same goldens, both modes. ~10 seconds wall
-clock, and it is THE miniHawk smoke test (user decision, same day): the
+clock, and it is THE Chimera smoke test (user decision, same day): the
 quickerNES --quick smoke subset is retired; quickerNES's suite is the full
 determinism gate only. Audio is Level A-verified only for now (the frontend
 has no scriptable audio tap - an acceptable gap while the frontend audio
@@ -609,7 +609,7 @@ GCC-buildable (no clang/nightly-Rust), and reproduces emulation exactly.
 Placement note: the synthetic cores are conformance-test fixtures for the
 published contract, not product cores - they live under `tests/` and are built
 by the test harness against `build/dll`, never as members of the solution. The
-"zero core code in the repo" objective refers to the product: miniHawk builds
+"zero core code in the repo" objective refers to the product: Chimera builds
 and ships with no core in the solution; a test fixture proving the contract
 works is test machinery, same as the witness drivers.
 
@@ -617,9 +617,9 @@ works is test machinery, same as the witness drivers.
 
 NOTE (2026-08-11): this section describes the quickerNES witness, which -
 together with the vendored suite, goldens, and drivers - now lives in the
-quickerNES repository (`minihawk/tests/`), per the rule that absolutely
+quickerNES repository (`chimera/tests/`), per the rule that absolutely
 nothing quickerNES-specific remains in this repository. It is still the
-commit gate (run it from there, `--minihawk-root` pointing here) until the
+commit gate (run it from there, `--chimera-root` pointing here) until the
 synthetic witness above replaces it. The section is kept as the harness's
 design record.
 
@@ -654,7 +654,7 @@ Witness-set exclusions found in Phase 0 (28 of 31 at Level A; 26 at Level B):
 - `arkanoid2.arkFamicomController`: local `Arkanoid II (Japan).nes` dump SHA1 does not
   match the test's expected dump - excluded until the matching dump is available.
 - `rcProAmII.race1` / `superOffroad.anyPercent`: upstream's quickNES-vs-quickerNES
-  comparison fails, but quickerNES itself runs and hashes fine - IN scope (miniHawk
+  comparison fails, but quickerNES itself runs and hashes fine - IN scope (Chimera
   Level A compares quickerNES hashes against stored goldens, not core-vs-core).
 - Note: the native tester build needs `-Wno-unused-but-set-variable` appended to
   `commonCompileArgs` under GCC 13+ (applied to the WSL build copy only, not the
@@ -664,7 +664,7 @@ Phase 0 discoveries about frame alignment (validated by per-frame RAM comparison
 - EmuHawk emulates exactly ONE frame during ROM load, before a `--lua` script's
   first line executes. A naive Lua replay is therefore one frame late relative to a
   power-on input sequence. `replay.lua` compensates with `client.reboot_core()` at
-  script start (verified `startframe=0` afterward). Remember this when miniHawk later
+  script start (verified `startframe=0` afterward). Remember this when Chimera later
   aligns `.bk2` movies with tester `.sol` sequences.
 - quickerNES `emulate_skip_frame` (rendering disabled, used by the native tester) was
   verified state-equivalent to `emulate_frame` - rendering on/off does not affect RAM.
@@ -673,7 +673,7 @@ Phase 0 discoveries about frame alignment (validated by per-frame RAM comparison
 - Lua `joypad.set` input passes through the SOCD (opposing-directions) filter
   (`UdlrControllerAdapter`), whose default `Priority` policy silently rewrites
   simultaneous L+R / U+D - which the TAS movies use heavily. The harness config sets
-  `OpposingDirPolicy: 2` (Allow). Note for miniHawk: `.bk2` movie *playback* bypasses
+  `OpposingDirPolicy: 2` (Allow). Note for Chimera: `.bk2` movie *playback* bypasses
   this filter (it taps the chain after the SOCD adapter); only Lua/user input is
   affected.
 - The native tester parses but IGNORES console Reset/Power flags during replay
@@ -681,7 +681,7 @@ Phase 0 discoveries about frame alignment (validated by per-frame RAM comparison
 - Lua `joypad.setanalog` axis sticky-holds never reach the output controller in this
   BizHawk build (axes die between `StickyHoldController` and the final controller);
   axes must be delivered via `joypad.setfrommnemonicstr`, which routes through
-  `ButtonOverrideAdapter` -> `Controller.Overrides()`. Worth revisiting when miniHawk
+  `ButtonOverrideAdapter` -> `Controller.Overrides()`. Worth revisiting when Chimera
   owns the input pipeline.
 - Phase 0 witness status: 26/26 Level B tests PASS byte-identical to native ground
   truth in BOTH modes (simple replay AND per-frame savestate rerecord); Level A
@@ -699,8 +699,8 @@ Phase 0 discoveries about frame alignment (validated by per-frame RAM comparison
 - `CoreInventory` already discovers cores via reflection (`[Core]` + `[CoreConstructor]`
   attributes) and its constructor already accepts arbitrary assembly type lists - the
   plugin inversion is small.
-- Only `BizHawk.Client.Common` references `Emulation.Cores` at the project level; the real
-  coupling is ~96 frontend files using concrete core types, mostly deletable for miniHawk.
+- Only `Chimera.Client.Common` references `Emulation.Cores` at the project level; the real
+  coupling is ~96 frontend files using concrete core types, mostly deletable for Chimera.
 - `GenericCoreConfig` (reflection-based settings UI) already exists; per-core config
   dialogs are not needed.
 - EmuHawk targets `net48`: no assembly unload, hence the load-once model.
@@ -711,7 +711,7 @@ Phase 0 discoveries about frame alignment (validated by per-frame RAM comparison
 
 The contract a core package implements. Everything below is the *whole* surface:
 a package is `core.wbx` + `waterbox.config`, and the one generic adapter in
-`BizHawk.Emulation.Common` drives it.
+`Chimera.Emulation.Common` drives it.
 
 **Required exports.** `Init()` (reads the mounted rom and the mounted
 `settings` JSON, returns 1 on success), `FrameAdvance(uint64 buttons)`, and the
@@ -749,7 +749,7 @@ startup, `Cores/` beside the executable (plus anything in
 loaded.
 
 **Discovery reads, it does not load.** It opens a zip (or directory), reads
-`waterbox.config` or `minihawk-core.json` for a name, systems and extensions,
+`waterbox.config` or `chimera-core.json` for a name, systems and extensions,
 and hashes the file - nothing more. That matters because loading is irreversible
 in-process: it pins native modules and, for adapter packages, an assembly. The
 frontend has to be able to *describe* a package it will never load - a broken
@@ -777,15 +777,15 @@ silently.
 The frontend's windows are now split so that almost everything about them can be
 checked without a person:
 
-- **Logic** lives in `BizHawk.Client.Common` and is tested in
-  `BizHawk.Tests.Client.Common` - no display, no emulator, no core. The states a
+- **Logic** lives in `Chimera.Client.Common` and is tested in
+  `Chimera.Tests.Client.Common` - no display, no emulator, no core. The states a
   window displays belong here, not in the window.
-- **Wiring** is tested in `BizHawk.Tests.Client.EmuHawk`, which constructs real
+- **Wiring** is tested in `Chimera.Tests.Client.EmuHawk`, which constructs real
   forms and drives them (tick a row, press a button) under Xvfb. Forms must be
   shown for handles to exist, or selection and click handling silently do
   nothing.
 - **Appearance** cannot be asserted, so it is rendered instead: `UiScreenshots`
-  writes PNGs when `MINIHAWK_UI_SHOTS` is set, CI uploads them every run, and a
+  writes PNGs when `CHIMERA_UI_SHOTS` is set, CI uploads them every run, and a
   person looks.
 
 `tests/ui/run-ui-tests.sh` runs all of it (`--shots` for the pictures). New tool
@@ -867,7 +867,7 @@ the reproduction contract already uses) is the fix when it matters.
 ## Key bindings arrive with the core (2026-08-13)
 
 BizHawk ships one `defctrl.json` listing the default bindings for every console it
-knows about. That only works while the frontend knows every console; miniHawk's
+knows about. That only works while the frontend knows every console; Chimera's
 cores arrive from outside it, so a monolithic file here would either list consoles
 the frontend has no business knowing about, or be empty. It was empty: the
 mechanism to read package bindings existed, but the last packages that shipped any
@@ -970,13 +970,13 @@ ambiguous extensions.
   interface, `RomLoader.LoadRom`'s `launchLibretroCore` parameter (whose one
   caller passed null), the file filter for picking a libretro `.so`/`.dll`, and
   the `Libretro` system ID. A libretro core is a foreign plugin ABI loaded from a
-  shared library; miniHawk's cores are waterbox packages with a sandbox and a
+  shared library; Chimera's cores are waterbox packages with a sandbox and a
   reproduction contract, which is the opposite trade, so there was never going to
   be a road back.
 - The **AVI writer** is now hidden on non-Windows rather than removed: it is
   Microsoft's AVIFIL32, so on Linux the only thing offering it achieved was a
   `DllNotFoundException` after the user picked a codec. It still works on Windows,
-  where miniHawk also runs.
+  where Chimera also runs.
 
 Checked and kept: the seven other video writers (all registered, all working - the
 per-codec dialogs are theirs, not leftovers), and the Cheats tool, which needs
@@ -1075,7 +1075,7 @@ is the core's business.
 
 ## Persistent data and bundles (user-decided, 2026-08-14)
 
-"SaveRAM" is one console family's word, and miniHawk was full of it: a File menu,
+"SaveRAM" is one console family's word, and Chimera was full of it: a File menu,
 an autosave timer, a per-system save directory, a movie header flag, a lump
 inside every .bk2. All of it deleted - 362 references across 34 files - and
 replaced by two ideas that do not know what a cartridge is.

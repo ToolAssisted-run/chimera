@@ -1,10 +1,10 @@
 #!/bin/sh
 # Builds the waterboxed Synth core package and the test roms, and installs the
-# package into <MiniHawkRoot>/build/Cores/.
+# package into <ChimeraRoot>/build/Cores/.
 #
-# miniHawk is WATERBOX-ONLY: the only shipped core package is the waterboxed
+# Chimera is WATERBOX-ONLY: the only shipped core package is the waterboxed
 # flavor. A package is just core.wbx (fixed name) + waterbox.config; it is loaded
-# by miniHawk's built-in generic WaterboxCore adapter through libminiboxhost,
+# by Chimera's built-in generic WaterboxCore adapter through libminiboxhost,
 # which ships with the frontend in build/dll (see the root meson.build). There is
 # no per-core managed assembly, manifest, or natives list.
 #
@@ -14,19 +14,19 @@
 # Prereq: the frontend has been built (build/dll has libminiboxhost + the contract
 # DLLs including the built-in WaterboxCore).
 #
-# Usage: ./build-package.sh [-c Configuration] [-r MiniHawkRoot]
+# Usage: ./build-package.sh [-c Configuration] [-r ChimeraRoot]
 set -eu
 here="$(cd "$(dirname "$0")" && pwd)"
 configuration=Release
-minihawk_root="$here/../.."
+chimera_root="$here/../.."
 while getopts "c:r:" opt; do
 	case "$opt" in
 		c) configuration="$OPTARG" ;;
-		r) minihawk_root="$OPTARG" ;;
+		r) chimera_root="$OPTARG" ;;
 		*) exit 2 ;;
 	esac
 done
-minihawk_root="$(cd "$minihawk_root" && pwd)"
+chimera_root="$(cd "$chimera_root" && pwd)"
 
 # test roms
 for src in "$here"/roms/*.sasm; do
@@ -35,7 +35,7 @@ done
 
 # build the miniBox host + guest toolchain (musl builds in the meson graph), then
 # the guest core.wbx.
-mb="$minihawk_root/extern/miniBox"
+mb="$chimera_root/extern/miniBox"
 mbuild="$mb/build/meson-linux"
 [ -f "$mbuild/build.ninja" ] || meson setup "$mbuild" "$mb"
 ninja -C "$mbuild"
@@ -47,10 +47,10 @@ rm -rf "$staging"
 mkdir -p "$staging"
 cp "$here/package-box/synth.wbx" "$staging/core.wbx"
 cp "$here/package-box/waterbox.config" "$staging"
-# the bindings the package declares for its controller (miniHawk ships none of its own)
+# the bindings the package declares for its controller (Chimera ships none of its own)
 cp "$here/package-box/default_keybinds.json" "$staging"
 
-cores_dir="$minihawk_root/build/Cores"
+cores_dir="$chimera_root/build/Cores"
 mkdir -p "$cores_dir"
 zip_path="$cores_dir/synth-box.zip"
 rm -f "$zip_path"
@@ -98,7 +98,7 @@ if first != again:
 print(f"package sha1 {first}")
 PYEOF
 # force re-extract on next load
-for cache in "$minihawk_root"/build/CoreCache/synth-box-*; do
+for cache in "$chimera_root"/build/CoreCache/synth-box-*; do
 	[ -d "$cache" ] && rm -rf "$cache" || true
 done
 echo "packaged -> $zip_path"

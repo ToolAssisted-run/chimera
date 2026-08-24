@@ -1,0 +1,259 @@
+using System.Drawing;
+using System.IO;
+using Chimera.Emulation.Common;
+
+namespace Chimera.Client.Common
+{
+	public sealed class EmuClientApi : IEmuClientApi
+	{
+		internal const ushort SHOW_FUTURE_MAX_USER_TIMEOUT = 0x7FFF; // arbitrary; see https://github.com/TASEmulators/BizHawk/pull/4598#discussion_r2760712788
+
+		public const int WINDOW_SCALE_MAX = 10;
+
+		private readonly Config _config;
+
+		private readonly IDialogController _dialogController;
+
+		private readonly DisplayManagerBase _displayManager;
+
+		private readonly IMainFormForApi _mainForm;
+
+		private readonly Action<string> _logCallback;
+
+		private readonly IEmulator Emulator;
+
+		private readonly IGameInfo Game;
+
+		private readonly IVideoProvider VideoProvider;
+
+		public event BeforeQuickLoadEventHandler BeforeQuickLoad;
+
+		public event BeforeQuickSaveEventHandler BeforeQuickSave;
+
+		public event EventHandler RomLoaded;
+
+		public event StateLoadedEventHandler StateLoaded;
+
+		public event StateSavedEventHandler StateSaved;
+
+		public EmuClientApi(
+			Config config,
+			IDialogController dialogController,
+			DisplayManagerBase displayManager,
+			IEmulator emulator,
+			IGameInfo game,
+			IMainFormForApi mainForm,
+			Action<string> logCallback)
+		{
+			_config = config;
+			_dialogController = dialogController;
+			_displayManager = displayManager;
+			Emulator = emulator;
+			Game = game;
+			_logCallback = logCallback;
+			_mainForm = mainForm;
+			VideoProvider = Emulator.AsVideoProviderOrDefault();
+
+			_mainForm.QuicksaveLoad += CallBeforeQuickLoad;
+			_mainForm.QuicksaveSave += CallBeforeQuickSave;
+			_mainForm.RomLoaded += CallRomLoaded;
+			_mainForm.SavestateLoaded += CallStateLoaded;
+			_mainForm.SavestateSaved += CallStateSaved;
+		}
+
+		public int BorderHeight() => _displayManager.TransformPoint(new Point(0, 0)).Y;
+
+		public int BorderWidth() => _displayManager.TransformPoint(new Point(0, 0)).X;
+
+		public int BufferHeight() => VideoProvider.BufferHeight;
+
+		public int BufferWidth() => VideoProvider.BufferWidth;
+
+#pragma warning disable MA0091 // passing through `sender` is intentional
+		private void CallBeforeQuickLoad(object sender, BeforeQuickLoadEventArgs args)
+			=> BeforeQuickLoad?.Invoke(sender, args);
+
+		private void CallBeforeQuickSave(object sender, BeforeQuickSaveEventArgs args)
+			=> BeforeQuickSave?.Invoke(sender, args);
+
+		private void CallRomLoaded(object sender, EventArgs args)
+			=> RomLoaded?.Invoke(sender, args);
+
+		private void CallStateLoaded(object sender, StateLoadedEventArgs args)
+			=> StateLoaded?.Invoke(sender, args);
+
+		private void CallStateSaved(object sender, StateSavedEventArgs args)
+			=> StateSaved?.Invoke(sender, args);
+#pragma warning restore MA0091
+
+		public void ClearAutohold() => _mainForm.ClearHolds();
+
+		public void CloseEmulator(int? exitCode = null) => _mainForm.CloseEmulator(exitCode);
+
+		public void CloseRom() => _mainForm.LoadNullRom();
+
+		public void DisplayMessages(bool value) => _config.DisplayMessages = value;
+
+		public void Dispose()
+		{
+			_mainForm.QuicksaveLoad -= CallBeforeQuickLoad;
+			_mainForm.QuicksaveSave -= CallBeforeQuickSave;
+			_mainForm.RomLoaded -= CallRomLoaded;
+			_mainForm.SavestateLoaded -= CallStateLoaded;
+			_mainForm.SavestateSaved -= CallStateSaved;
+		}
+
+		public void DoFrameAdvance()
+		{
+			_mainForm.FrameAdvance(discardApiHawkSurfaces: false); // we're rendering, so we don't want to discard
+			_mainForm.StepRunLoop_Throttle();
+			_mainForm.Render();
+		}
+
+		public void DoFrameAdvanceAndUnpause()
+		{
+			DoFrameAdvance();
+			Unpause();
+		}
+
+		public void EnableRewind(bool enabled) => _mainForm.EnableRewind(enabled);
+
+		public void FrameSkip(int numFrames)
+		{
+			if (numFrames < 0)
+			{
+				_logCallback("Invalid frame skip value");
+				return;
+			}
+
+			_config.FrameSkip = numFrames;
+			_mainForm.FrameSkipMessage();
+		}
+
+		public int GetApproxFramerate() => _mainForm.GetApproxFramerate();
+
+		public bool GetSoundOn() => _config.SoundEnabled;
+
+		public int GetTargetScanlineIntensity() => 0; // scanline display filter was removed with the rest of the shader machinery
+
+		public int GetWindowSize()
+			=> _config.GetWindowScaleFor(Emulator.SystemId);
+
+		public bool IsPaused() => _mainForm.EmulatorPaused;
+
+		public bool IsSeeking() => _mainForm.IsSeeking;
+
+		public bool IsTurbo() => _mainForm.IsTurboing;
+
+		public bool IsRewinding() => _mainForm.IsRewinding;
+
+		public bool LoadState(string name)
+			=> _mainForm.LoadState(
+				path: Path.Combine(_config.PathEntries.SaveStateAbsolutePath(Game.System), $"{name}.State"),
+				userFriendlyStateName: name,
+				suppressOSD: false);
+
+		public bool OpenRom(string path)
+			=> _mainForm.LoadRom(path, new LoadRomArgs(OpenAdvancedSerializer.ParseWithLegacy(path)));
+
+		public void Pause() => _mainForm.PauseEmulator();
+
+		public void PauseAv() => _mainForm.PauseAvi = true;
+
+		public void RebootCore() => _mainForm.RebootCore();
+
+		// TODO: Change return type to FileWriteResult.
+
+		// TODO: Change return type to FileWriteResult.
+		// We may wish to change more than that, since we have a mostly-dupicate ISaveStateApi.Save, neither has documentation indicating what the differences are.
+		public void SaveState(string name)
+		{
+			FileWriteResult result = _mainForm.SaveState(Path.Combine(_config.PathEntries.SaveStateAbsolutePath(Game.System), $"{name}.State"), name);
+			if (result.Exception != null && result.Exception is not UnlessUsingApiException)
+			{
+				throw result.Exception;
+			}
+		}
+
+		public int ScreenHeight() => _displayManager.GetPanelNativeSize().Height;
+
+		public void Screenshot(string path)
+		{
+			if (path == null) _mainForm.TakeScreenshot();
+			else _mainForm.TakeScreenshot(path);
+		}
+
+		public void ScreenshotToClipboard() => _mainForm.TakeScreenshotToClipboard();
+
+		public int ScreenWidth() => _displayManager.GetPanelNativeSize().Width;
+
+		public void SetClientExtraPadding(int left, int top, int right, int bottom)
+		{
+			_displayManager.ClientExtraPadding = (left, top, right, bottom);
+			_mainForm.FrameBufferResized();
+		}
+
+		public void SetGameExtraPadding(int left, int top, int right, int bottom)
+		{
+			_displayManager.GameExtraPadding = (left, top, right, bottom);
+			_mainForm.FrameBufferResized();
+		}
+
+		public void SetScreenshotOSD(bool value) => _config.ScreenshotCaptureOsd = value;
+
+		public void SetSoundOn(bool enable)
+		{
+			if (enable != _config.SoundEnabled) _mainForm.ToggleSound();
+		}
+
+		public void SetTargetScanlineIntensity(int val)
+			=> Console.WriteLine("SetTargetScanlineIntensity is a no-op: the scanline display filter was removed from Chimera");
+
+		public void SetWindowSize(int size)
+		{
+			if (size is >= 1 and <= WINDOW_SCALE_MAX)
+			{
+				_config.SetWindowScaleFor(Emulator.SystemId, size);
+				_mainForm.FrameBufferResized(forceWindowResize: true);
+				_dialogController.AddOnScreenMessage($"Window size set to {size}x");
+			}
+			else
+			{
+				_logCallback("Invalid window size");
+			}
+		}
+
+		public void ShowFuture(ShowFutureCallback/*?*/ preFrameCallback, ushort maxFrames)
+		{
+			if (preFrameCallback is not null)
+			{
+				if (maxFrames is 0) throw new ArgumentOutOfRangeException(paramName: nameof(maxFrames), maxFrames, message: "0 frames is not in the future. Did you mean to disable this by passing (null, 0)?");
+				if (maxFrames > SHOW_FUTURE_MAX_USER_TIMEOUT) throw new ArgumentOutOfRangeException(paramName: nameof(maxFrames), maxFrames, message: $"Invalid number of future frames for timeout; must be in 1..={SHOW_FUTURE_MAX_USER_TIMEOUT}.");
+				_mainForm.MaxFutureFrames = maxFrames;
+			}
+			else
+			{
+				_mainForm.MaxFutureFrames = 0;
+			}
+			_mainForm.PreFutureFrameCallback = preFrameCallback;
+		}
+
+		public void SpeedMode(int percent)
+		{
+			if (percent is > 0 and <= 6400) _mainForm.ClickSpeedItem(percent);
+			else _logCallback("Invalid speed value");
+		}
+
+		public void TogglePause() => _mainForm.TogglePause();
+
+		public Point TransformPoint(Point point) => _displayManager.TransformPoint(point);
+
+		public void Unpause() => _mainForm.UnpauseEmulator();
+
+		public void UnpauseAv() => _mainForm.PauseAvi = false;
+
+		public int Xpos() => _mainForm.DesktopLocation.X;
+
+		public int Ypos() => _mainForm.DesktopLocation.Y;
+	}
+}

@@ -1,4 +1,4 @@
-namespace BizHawk.Analyzers;
+namespace Chimera.Analyzers;
 
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;

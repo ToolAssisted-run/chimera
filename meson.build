@@ -1,4 +1,4 @@
-# miniHawk build — mediated by meson, from a Linux host, for BOTH targets.
+# Chimera build — mediated by meson, from a Linux host, for BOTH targets.
 #
 #   Linux artifacts (.so + the platform-neutral managed build):
 #     meson setup build/meson-linux --prefix "$(pwd)/build" --libdir dll
@@ -16,7 +16,7 @@
 # built per-target. Per the reproducibility pillar, none of this affects movie
 # determinism — that belongs to core packages.
 project(
-  'minihawk',
+  'chimera',
   ['c', 'cpp'],
   version: '0.1',
   default_options: ['buildtype=release', 'cpp_std=c++17'],
@@ -222,7 +222,7 @@ custom_target(
 
 # ---------------------------------------------------------------------------
 # libminiboxhost — the miniBox waterbox host (from the extern/miniBox submodule).
-# miniHawk is waterbox-only: this host loads every core's core.wbx, so it ships
+# Chimera is waterbox-only: this host loads every core's core.wbx, so it ships
 # with the frontend. It is self-contained C (no external deps, no guest
 # toolchain), so we compile it directly here rather than driving miniBox's own
 # meson build - the guest toolchain (musl) is a core-author kit, never built here.
@@ -367,7 +367,7 @@ if not meson.is_cross_build()
       # nodeReuse/shared-compilation off: lingering msbuild worker processes
       # otherwise hold the output pipe open ~15 minutes after the build ends,
       # and `meson compile frontend` blocks on them
-      command: [dotnet, 'build', repo_root / 'source/BizHawk.sln', '-c', 'Release', '/nodeReuse:false', '-p:UseSharedCompilation=false'],
+      command: [dotnet, 'build', repo_root / 'source/Chimera.sln', '-c', 'Release', '/nodeReuse:false', '-p:UseSharedCompilation=false'],
     )
   endif
 endif

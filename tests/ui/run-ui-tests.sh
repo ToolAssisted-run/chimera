@@ -1,10 +1,10 @@
 #!/bin/bash
-# Runs miniHawk's automated tests, including the ones that build real windows.
+# Runs Chimera's automated tests, including the ones that build real windows.
 #
 # There are two kinds and they are deliberately separate:
-#   - BizHawk.Tests.* : logic. No display, no emulator, no core. Everything a
+#   - Chimera.Tests.* : logic. No display, no emulator, no core. Everything a
 #     machine can decide about the frontend's behaviour should end up here.
-#   - BizHawk.Tests.Client.EmuHawk : windows. Constructs forms and drives them
+#   - Chimera.Tests.Client.EmuHawk : windows. Constructs forms and drives them
 #     (tick a row, press a button) to check the wiring between the widgets and
 #     that logic. Needs an X display; on a headless box that is Xvfb.
 #
@@ -31,7 +31,7 @@ done
 here="$(cd "$(dirname "$0")" && pwd)"
 repo_root="$(cd "$here/../.." && pwd)"
 tests_dir="$repo_root/build/tests"
-[ -d "$tests_dir" ] || { echo "no build/tests - run: dotnet build source/BizHawk.sln -c Release" >&2; exit 1; }
+[ -d "$tests_dir" ] || { echo "no build/tests - run: dotnet build source/Chimera.sln -c Release" >&2; exit 1; }
 
 export LD_LIBRARY_PATH="$repo_root/build/dll:$repo_root/build:${LD_LIBRARY_PATH:-}"
 export MONO_CRASH_NOFILE=1 MONO_WINFORMS_XIM_STYLE=disabled
@@ -55,14 +55,14 @@ if [ -z "${DISPLAY:-}" ]; then
 fi
 
 if [ "$shots" -eq 1 ]; then
-	export MINIHAWK_UI_SHOTS="$here/shots"
-	rm -rf "$MINIHAWK_UI_SHOTS"
+	export CHIMERA_UI_SHOTS="$here/shots"
+	rm -rf "$CHIMERA_UI_SHOTS"
 fi
 
 if [ "$only_ui" -eq 1 ]; then
-	projects=(BizHawk.Tests.Client.EmuHawk)
+	projects=(Chimera.Tests.Client.EmuHawk)
 else
-	projects=(BizHawk.Tests.Common BizHawk.Tests.Emulation.Common BizHawk.Tests.Client.Common BizHawk.Tests.Client.EmuHawk)
+	projects=(Chimera.Tests.Common Chimera.Tests.Emulation.Common Chimera.Tests.Client.Common Chimera.Tests.Client.EmuHawk)
 fi
 
 failed=0
@@ -86,7 +86,7 @@ done
 if [ "$shots" -eq 1 ]; then
 	echo ""
 	echo "screenshots:"
-	ls -1 "$MINIHAWK_UI_SHOTS" 2>/dev/null | sed 's/^/  /' || echo "  (none written)"
+	ls -1 "$CHIMERA_UI_SHOTS" 2>/dev/null | sed 's/^/  /' || echo "  (none written)"
 fi
 
 [ "$failed" -gt 0 ] && exit 1

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Writes a copy of a miniHawk config with every binding for one controller removed - the state a
+# Writes a copy of a Chimera config with every binding for one controller removed - the state a
 # fresh install is in, which is when a package's shipped bindings are supposed to fill in.
 #
 # Usage: forget-controller.py <source config> <output config> <controller name>

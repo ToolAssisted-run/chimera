@@ -1,6 +1,6 @@
 # The Synth machine - specification (v1)
 
-The synthetic witness console for miniHawk (see docs/design-principles.md,
+The synthetic witness console for Chimera (see docs/design-principles.md,
 "The synthetic witness"). The emulator is a stateful interpreter with the
 capacity of printing to screen and emitting audio; ALL game logic, video
 assets, and audio assets belong to the game, provided as a `.testrom` file.

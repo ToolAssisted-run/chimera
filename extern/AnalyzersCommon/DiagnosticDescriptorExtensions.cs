@@ -1,4 +1,4 @@
-namespace BizHawk.Analyzers;
+namespace Chimera.Analyzers;
 
 using DD = Microsoft.CodeAnalysis.DiagnosticDescriptor;
 using MI = System.Runtime.CompilerServices.MethodImplAttribute;

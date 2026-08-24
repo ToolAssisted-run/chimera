@@ -43,7 +43,7 @@ static std::vector<uint8_t> makeZip(bool waterbox, bool manifest)
 	if (manifest)
 	{
 		const char *m = "{ \"formatVersion\": 1, \"name\": \"adapter\" }";
-		mz_zip_writer_add_mem(&zip, "minihawk-core.json", m, std::strlen(m), MZ_BEST_SPEED);
+		mz_zip_writer_add_mem(&zip, "chimera-core.json", m, std::strlen(m), MZ_BEST_SPEED);
 	}
 	mz_zip_writer_add_mem(&zip, "build.json", "{}", 2, MZ_BEST_SPEED);
 	void *buf = nullptr;

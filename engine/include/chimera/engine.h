@@ -342,7 +342,7 @@ CE_API const char *ce_firmware_record_line(const char *pairs, uint64_t *len_out)
  *
  * A core package is a zip (or, for development, a directory) whose root holds
  * core.wbx + waterbox.config - the data-driven form the generic adapter runs -
- * or a minihawk-core.json manifest. The engine owns the container: what makes
+ * or a chimera-core.json manifest. The engine owns the container: what makes
  * a path a package, the package's identity (the SHA1 of its zip), and access
  * to its entries. What the entries MEAN stays with the caller for now; the
  * waterbox.config schema moves into the engine with the session.

@@ -10,7 +10,7 @@
 		<None Include="$(ProjectDir)../../build/dll/lua54.*" CopyToOutputDirectory="PreserveNewest" />
 		<None Include="$(ProjectDir)../../build/dll/libbizhash.*" CopyToOutputDirectory="PreserveNewest" />
 		<None Include="$(ProjectDir)../../build/dll/libzstd.*" CopyToOutputDirectory="PreserveNewest" />
-		<Using Include="BizHawk.Tests" />
+		<Using Include="Chimera.Tests" />
 		<Using Include="System.Diagnostics.CodeAnalysis" />
 	</ItemGroup>
 	<PropertyGroup>

@@ -1,13 +1,13 @@
-# miniHawk
+# Chimera
 
-**miniHawk is a derivative fork of [BizHawk](https://github.com/TASEmulators/BizHawk).**
+**Chimera is a derivative fork of [BizHawk](https://github.com/TASEmulators/BizHawk).**
 The frontend, the tooling, and the architecture it builds on are the original
 work of the BizHawk team, and all credit for them belongs to BizHawk's
 developers.
 
 ## What it is
 
-miniHawk is a minimal, **core-agnostic** frontend for creating tool-assisted
+Chimera is a minimal, **core-agnostic** frontend for creating tool-assisted
 speedruns (TAS). It keeps BizHawk's TAS toolchain and removes everything else - 
 most importantly, every emulation core. Cores are not compiled into the
 frontend: they are **external, self-contained packages** (a `.zip` with a
@@ -34,24 +34,24 @@ defaults, cart databases, and palettes all ship inside core packages.
 
 ## Approach
 
-- **Deferred reproducibility guarantee.** miniHawk is distributed both as
+- **Deferred reproducibility guarantee.** Chimera is distributed both as
   source and as precompiled releases, and the resulting binaries may differ - 
   between the two, and between builds on different systems. That is by design.
   The frontend is deliberately written to *tolerate variation in itself*:
-  nothing about a miniHawk build - its version, its compiler, the versions of
+  nothing about a Chimera build - its version, its compiler, the versions of
   its libraries - is allowed to matter for whether a movie reproduces. The
   guarantee of emulation reproducibility is instead deferred to each core: a
   movie's reproduction contract is the pair *(movie, core package)*, and given
-  the same core package it must sync on any miniHawk that can load it.
+  the same core package it must sync on any Chimera that can load it.
 - **Complete rebuildability.** This repository contains no precompiled
   objects, libraries, or cores - not one committed binary. Everything required
-  to produce a working miniHawk is present here, either directly or as pinned
+  to produce a working Chimera is present here, either directly or as pinned
   submodules, and every prerequisite (including all native libraries) is
   compiled from source as part of the ordinary build: the repository is
   self-complete. Users who would rather not build anything can download an
   official release, which ships the same components precompiled.
-- **A published core contract.** `BizHawk.Emulation.Common` (+
-  `BizHawk.Common`, `BizHawk.BizInvoke`) is the complete interface a core
+- **A published core contract.** `Chimera.Emulation.Common` (+
+  `Chimera.Common`, `Chimera.BizInvoke`) is the complete interface a core
   builds against, outside this repository. Building the solution produces the
   full core-author kit in `build/dll`, including the settings source
   generator. The package format is documented in [design-principles.md](docs/design-principles.md),
@@ -62,11 +62,11 @@ defaults, cart databases, and palettes all ship inside core packages.
   straight-replay and per-frame-savestate modes. Frame-exact reproducibility
   is the invariant that makes TAS work possible. The current gate is the
   quickerNES witness suite, which lives with the rest of the quickerNES
-  material in that repository's `minihawk/tests/`; a core-agnostic synthetic
+  material in that repository's `chimera/tests/`; a core-agnostic synthetic
   witness (in-repo) is planned to replace it - see the design doc.
 - **A reference core.** The first core package is
-  [quickerNES](https://github.com/SergioMartin86/quickerNES), whose `minihawk/`
-  directory contains the entire quickerNES<->miniHawk interface - this
+  [quickerNES](https://github.com/SergioMartin86/quickerNES), whose `chimera/`
+  directory contains the entire quickerNES<->Chimera interface - this
   repository contains zero emulator-specific code.
 
 The full engineering log - objectives, phase-by-phase procedure, and the sharp
@@ -105,7 +105,7 @@ via Visual Studio's clang-cl/CMake/Ninja and rustup) - but the Linux meson
 build is the one releases and CI use.
 
 To run on Windows: `build\EmuHawk.exe` (on Linux: `build/EmuHawkMono.sh`).
-Build a core package first (for quickerNES, run `minihawk/build-package.ps1` -
+Build a core package first (for quickerNES, run `chimera/build-package.ps1` -
 or `build-package.sh` on Linux - from a sibling quickerNES checkout; it
 installs `quickernes.zip` into `build/Cores/`), then `File > Open Core...`
 (or `--core=<path>`) followed by the ROM.
@@ -125,10 +125,10 @@ attribution they require.
 This project stands entirely on **BizHawk**, created and maintained by the
 BizHawk team ([TASEmulators/BizHawk](https://github.com/TASEmulators/BizHawk)) - 
 the frontend architecture, the TAS tools, the emulation service interfaces,
-and years of accumulated correctness are theirs. miniHawk is a subtraction
+and years of accumulated correctness are theirs. Chimera is a subtraction
 from their work, not an addition to it.
 
-miniHawk is provided under the MIT License, preserving the BizHawk team's
+Chimera is provided under the MIT License, preserving the BizHawk team's
 copyright - see [LICENSE](LICENSE), which also explains the licensing of the
 native libraries built from `extern/`, the vendored test suite, and why core
 packages carry their own licenses.

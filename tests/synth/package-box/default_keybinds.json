@@ -1,6 +1,6 @@
 {
 	"_comment": [
-		"Default bindings for the controller this package declares. miniHawk ships no bindings of its",
+		"Default bindings for the controller this package declares. Chimera ships no bindings of its",
 		"own - a package that declares a controller says how it is played by default, and the frontend",
 		"uses that for a controller the user's config has never seen.",
 		"The synthetic core is a test fixture, so these exist mainly to keep the mechanism gated: the",

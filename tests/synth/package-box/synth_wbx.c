@@ -83,7 +83,7 @@ ECL_EXPORT int      InputWasRead(void)   { return synth_input_was_read(g_synth);
 ECL_EXPORT uint32_t *GetVideoBgra(void)  { synth_get_video_bgra(g_synth, g_video); return g_video; }
 
 /* --- self-described memory domains (guest ABI v1) ---
- * The generic miniHawk adapter queries these AFTER Init, because a core's domain
+ * The generic Chimera adapter queries these AFTER Init, because a core's domain
  * sizes/count can depend on runtime settings (synth's are fixed, but the ABI is
  * uniform). Domain 0 is RAM (writable), domain 1 is VRAM (the palette-index
  * framebuffer, read-only). */

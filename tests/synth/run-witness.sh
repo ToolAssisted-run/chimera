@@ -1,7 +1,7 @@
 #!/bin/bash
-# The synthetic witness driver - miniHawk's own smoke/correctness test.
+# The synthetic witness driver - Chimera's own smoke/correctness test.
 #
-# miniHawk is waterbox-only. The shipped core is the waterboxed core.wbx; the
+# Chimera is waterbox-only. The shipped core is the waterboxed core.wbx; the
 # native C reference exists only to generate/verify the goldens (it is not a core).
 # Level A: native/synth-run (the reference) records goldens; the waterboxed
 #   core.wbx (via the miniBox host) must reproduce them byte-for-byte, in both
@@ -9,7 +9,7 @@
 # Level E (engine): chimera-run - the engine's headless session - replays the
 #   same movies with no frontend at all; its dumps must match the goldens too.
 # Level B (frontend): EmuHawk (Mono + Xvfb on Linux) loads the core.wbx package
-#   through miniHawk's built-in generic waterbox adapter and replays the same
+#   through Chimera's built-in generic waterbox adapter and replays the same
 #   movies; the final RAM and VRAM dumps must be byte-identical to the Level A
 #   goldens. Audio is Level A-verified only (no scriptable audio tap).
 #
@@ -204,7 +204,7 @@ if [ "$level" = "both" ] || [ "$level" = "b" ]; then
 			"--lua=$here/bootstrap-exit.lua" ) > "$work/bootstrap.log" 2>&1
 		[ -f "$config" ] || { echo "config bootstrap failed (see $work/bootstrap.log)" >&2; exit 1; }
 	fi
-	# miniHawk is waterbox-only: the frontend only accepts .wbx cores, so the box
+	# Chimera is waterbox-only: the frontend only accepts .wbx cores, so the box
 	# flavor is the ONLY Level-B core. native/sharp are Level-A equivalence
 	# references (proving synth.wbx matches the goldens), never frontend cores.
 	for flavor in box; do
@@ -225,7 +225,7 @@ if [ "$level" = "both" ] || [ "$level" = "b" ]; then
 				} > "$job"
 				rm -f "$work/$tag.ram.bin" "$work/$tag.vram.bin" "$work/$tag.meta.txt"
 				cp "$config" "$work/config.$tag.ini"
-				( cd "$repo_root" && MINIHAWK_JOB="$job" timeout 300 mono "$emu_hawk" --headless \
+				( cd "$repo_root" && CHIMERA_JOB="$job" timeout 300 mono "$emu_hawk" --headless \
 					"--config=$work/config.$tag.ini" "--core=$package" \
 					"--lua=$here/synth-replay.lua" "$rom" ) > "$work/$tag.log" 2>&1
 				if [ ! -f "$work/$tag.meta.txt" ] || ! grep -q "^status=OK" "$work/$tag.meta.txt"; then
@@ -256,6 +256,8 @@ if [ "$level" = "both" ] || [ "$level" = "b" ]; then
 		python3 - "$config" "$scfg" <<'PY'
 import json, sys
 cfg = json.load(open(sys.argv[1]))
+# deliberately the PRE-RENAME key: the frontend must keep honouring configs
+# written before BizHawk/miniHawk became Chimera
 cfg.setdefault("CoreSyncSettings", {})["BizHawk.Emulation.Common.Waterbox.WaterboxCore"] = {"Values": {"initFillByte": 171}}
 json.dump(cfg, open(sys.argv[2], "w"), indent=2)
 PY
@@ -268,7 +270,7 @@ PY
 			echo "mode=simple"
 		} > "$sjob"
 		rm -f "$work/settings.ram.bin" "$work/settings.meta.txt"
-		( cd "$repo_root" && MINIHAWK_JOB="$sjob" timeout 300 mono "$emu_hawk" --headless \
+		( cd "$repo_root" && CHIMERA_JOB="$sjob" timeout 300 mono "$emu_hawk" --headless \
 			"--config=$scfg" "--core=$repo_root/build/Cores/synth-box.zip" \
 			"--lua=$here/synth-replay.lua" "$srom" ) > "$work/settings.log" 2>&1
 		if [ ! -f "$work/settings.meta.txt" ] || ! grep -q "^status=OK" "$work/settings.meta.txt"; then
@@ -277,6 +279,48 @@ PY
 			report "S:box:initFillByte" FAIL "RAM identical to golden - setting did NOT reach the guest"
 		else
 			report "S:box:initFillByte" PASS "RAM diverged - user setting reached the guest"
+		fi
+	fi
+
+	# --- a real .bk2 through the real movie pipeline ---
+	# Everything above drives input by script; this composes an actual movie
+	# file from the win inputs and lets MovieSession play it. The engine parses
+	# the entries, the frontend latches them, and the dumps must match the same
+	# goldens - the movie pipeline is Level B's reason to exist.
+	if [ "$record" -eq 0 ]; then
+		mname=gridWalker.win
+		mrom="$here/roms/${mname%%.*}.testrom"
+		mbk2="$work/$mname.bk2"
+		python3 - "$here/movies/$mname.txt" "$mbk2" <<'PY'
+import sys, zipfile
+entries = [l.rstrip("\r\n") for l in open(sys.argv[1]) if l.startswith("|")]
+logkey = "#P1 Up|P1 Down|P1 Left|P1 Right|P1 A|P1 B|P1 Select|P1 Start|"
+with zipfile.ZipFile(sys.argv[2], "w", zipfile.ZIP_DEFLATED) as z:
+    z.writestr("BizState 1.0", "3\n")
+    z.writestr("Header.txt", "MovieVersion BizHawk v2.0\nPlatform Synth\nCore Synth\nrerecordCount 0\n\n")
+    z.writestr("Comments.txt", "\n")
+    z.writestr("Subtitles.txt", "\n")
+    z.writestr("SyncSettings.json", "\n")
+    z.writestr("Input Log.txt", "[Input]\nLogKey:" + logkey + "\n" + "\n".join(entries) + "\n[/Input]\n")
+PY
+		mjob="$work/job.movie.txt"
+		{
+			echo "outram=$work/movie.ram.bin"
+			echo "outvram=$work/movie.vram.bin"
+			echo "meta=$work/movie.meta.txt"
+		} > "$mjob"
+		rm -f "$work/movie.ram.bin" "$work/movie.vram.bin" "$work/movie.meta.txt"
+		cp "$config" "$work/config.movie.ini"
+		( cd "$repo_root" && CHIMERA_JOB="$mjob" timeout 300 mono "$emu_hawk" --headless \
+			"--config=$work/config.movie.ini" "--core=$repo_root/build/Cores/synth-box.zip" \
+			"--movie=$mbk2" "--lua=$here/synth-movie-dump.lua" "$mrom" ) > "$work/movie.log" 2>&1
+		if [ ! -f "$work/movie.meta.txt" ] || ! grep -q "^status=OK" "$work/movie.meta.txt"; then
+			report "M:box:$mname" FAIL "no OK meta (see work/movie.log)"
+		elif cmp -s "$work/movie.ram.bin" "$golden_dir/$mname.ram.bin" \
+			&& cmp -s "$work/movie.vram.bin" "$golden_dir/$mname.vram.bin"; then
+			report "M:box:$mname" PASS "MovieSession playback byte-identical to goldens"
+		else
+			report "M:box:$mname" FAIL "RAM or VRAM differs from goldens (see work/movie.log)"
 		fi
 	fi
 
@@ -297,7 +341,7 @@ PY
 		} > "$djob"
 		rm -f "$work/discovery.ram.bin" "$work/discovery.meta.txt"
 		cp "$config" "$work/config.discovery.ini"
-		( cd "$repo_root" && MINIHAWK_JOB="$djob" timeout 300 mono "$emu_hawk" --headless \
+		( cd "$repo_root" && CHIMERA_JOB="$djob" timeout 300 mono "$emu_hawk" --headless \
 			"--config=$work/config.discovery.ini" "--lua=$here/synth-replay.lua" \
 			"$here/roms/${dname%%.*}.testrom" ) > "$work/discovery.log" 2>&1
 		if [ -f "$work/discovery.meta.txt" ] && grep -q "^status=OK" "$work/discovery.meta.txt"; then
@@ -324,7 +368,7 @@ PY
 			echo "mode=simple"
 		} > "$kjob"
 		rm -f "$work/keybinds.meta.txt"
-		( cd "$repo_root" && MINIHAWK_JOB="$kjob" timeout 300 mono "$emu_hawk" --headless \
+		( cd "$repo_root" && CHIMERA_JOB="$kjob" timeout 300 mono "$emu_hawk" --headless \
 			"--config=$kcfg" "--core=$package" "--lua=$here/synth-replay.lua" \
 			"$here/roms/${kname%%.*}.testrom" ) > "$work/keybinds.log" 2>&1
 		if [ ! -f "$work/keybinds.meta.txt" ] || ! grep -q "^status=OK" "$work/keybinds.meta.txt"; then

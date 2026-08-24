@@ -1,15 +1,15 @@
 <Project>
 	<Import Project="TestProjects.props" />
-	<PropertyGroup Condition=" '$(BIZHAWKTEST_RUN_KNOWN_FAILURES)' == '' ">
+	<PropertyGroup Condition=" '$(CHIMERATEST_RUN_KNOWN_FAILURES)' == '' ">
 		<DefineConstants>$(DefineConstants);SKIP_KNOWN_FAILURES</DefineConstants>
 	</PropertyGroup>
-	<PropertyGroup Condition=" '$(BIZHAWKTEST_SAVE_IMAGES)' == '' OR '$(BIZHAWKTEST_SAVE_IMAGES)' == 'failures' ">
+	<PropertyGroup Condition=" '$(CHIMERATEST_SAVE_IMAGES)' == '' OR '$(CHIMERATEST_SAVE_IMAGES)' == 'failures' ">
 		<DefineConstants>$(DefineConstants);SAVE_IMAGES_ON_FAIL</DefineConstants>
 	</PropertyGroup>
-	<PropertyGroup Condition=" '$(BIZHAWKTEST_SAVE_IMAGES)' == 'all' ">
+	<PropertyGroup Condition=" '$(CHIMERATEST_SAVE_IMAGES)' == 'all' ">
 		<DefineConstants>$(DefineConstants);SAVE_IMAGES_ON_FAIL;SAVE_IMAGES_ON_PASS</DefineConstants>
 	</PropertyGroup>
-	<!-- BIZHAWKTEST_SAVE_IMAGES=none => no extra defines -->
+	<!-- CHIMERATEST_SAVE_IMAGES=none => no extra defines -->
 	<PropertyGroup Condition=" '$(OS)' != 'Windows_NT' ">
 		<MagickCopyNativeLinux>true</MagickCopyNativeLinux>
 	</PropertyGroup>

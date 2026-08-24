@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<TargetFramework>net48</TargetFramework>
+	</PropertyGroup>
+	<Import Project="../MainSlnTest.props" />
+	<ItemGroup>
+		<ProjectReference Include="$(ProjectDir)../Chimera.Emulation.Common/Chimera.Emulation.Common.csproj" />
+		<ProjectReference Include="$(ProjectDir)../Chimera.Tests.Common/Chimera.Tests.Common.csproj" />
+	</ItemGroup>
+</Project>

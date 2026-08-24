@@ -1,0 +1,21 @@
+﻿using System.Collections.Generic;
+
+namespace Chimera.Client.Common
+{
+	/// <summary>for querying or modifying virtual input</summary>
+	/// <seealso cref="IInputApi"/>
+	public interface IJoypadApi : IExternalApi
+	{
+		IReadOnlyDictionary<string, object> Get(int? controller = null);
+		IReadOnlyDictionary<string, object> GetWithMovie(int? controller = null);
+		IReadOnlyDictionary<string, object> GetImmediate(int? controller = null);
+		void SetFromMnemonicStr(string inputLogEntry);
+		void Set(IReadOnlyDictionary<string, bool> buttons, int? controller = null);
+		void Set(string button, bool? state = null, int? controller = null);
+		/// <summary>Overrides an analog control for the current frame, the way <c>Set</c> does for buttons.</summary>
+		void SetAxis(string control, int value, int? controller = null);
+
+		void SetAnalog(IReadOnlyDictionary<string, int?> controls, int? controller = null);
+		void SetAnalog(string control, int? value = null, int? controller = null);
+	}
+}
