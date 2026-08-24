@@ -1,7 +1,7 @@
 <p align="center">
 	<picture>
 		<source media="(prefers-color-scheme: dark)" srcset="docs/logo-dark.svg">
-		<img src="docs/logo.svg" alt="Chimera - a beast assembled from modular parts" width="420">
+		<img src="docs/logo.svg" alt="Chimera - a ring of pixel modules around a d-pad" width="420">
 	</picture>
 </p>
 
