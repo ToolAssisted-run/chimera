@@ -88,7 +88,7 @@
 			this.label4.Font = new System.Drawing.Font("Microsoft Sans Serif", 9.75F, System.Drawing.FontStyle.Italic, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
 			this.label4.Location = new System.Drawing.Point(207, 31);
 			this.label4.Name = "label4";
-			this.label4.Text = "\"A modular emulation frontend...\r\nfor productive people.\"";
+			this.label4.Text = "\"A modular emulation frontend\"";
 			// 
 			// CoreInfoPanel
 			// 
