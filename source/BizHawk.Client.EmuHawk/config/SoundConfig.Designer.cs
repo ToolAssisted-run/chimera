@@ -46,7 +46,6 @@
 			this.BufferSizeUnitsLabel = new BizHawk.WinForms.Controls.LocLabelEx();
 			this.grpOutputMethod = new System.Windows.Forms.GroupBox();
 			this.rbOutputMethodOpenAL = new System.Windows.Forms.RadioButton();
-			this.rbOutputMethodXAudio2 = new System.Windows.Forms.RadioButton();
 			this.cbMuteFrameAdvance = new System.Windows.Forms.CheckBox();
 			this.cbEnableMaster = new System.Windows.Forms.CheckBox();
 			this.label3 = new BizHawk.WinForms.Controls.LocLabelEx();
@@ -219,7 +218,6 @@
 			// grpOutputMethod
 			// 
 			this.grpOutputMethod.Controls.Add(this.rbOutputMethodOpenAL);
-			this.grpOutputMethod.Controls.Add(this.rbOutputMethodXAudio2);
 			this.grpOutputMethod.Location = new System.Drawing.Point(292, 12);
 			this.grpOutputMethod.Name = "grpOutputMethod";
 			this.grpOutputMethod.Size = new System.Drawing.Size(100, 73);
@@ -230,7 +228,7 @@
 			// rbOutputMethodOpenAL
 			// 
 			this.rbOutputMethodOpenAL.AutoSize = true;
-			this.rbOutputMethodOpenAL.Location = new System.Drawing.Point(6, 43);
+			this.rbOutputMethodOpenAL.Location = new System.Drawing.Point(6, 20);
 			this.rbOutputMethodOpenAL.Name = "rbOutputMethodOpenAL";
 			this.rbOutputMethodOpenAL.Size = new System.Drawing.Size(64, 17);
 			this.rbOutputMethodOpenAL.TabIndex = 2;
@@ -238,19 +236,7 @@
 			this.rbOutputMethodOpenAL.Text = "OpenAL";
 			this.rbOutputMethodOpenAL.UseVisualStyleBackColor = true;
 			this.rbOutputMethodOpenAL.CheckedChanged += new System.EventHandler(this.OutputMethodRadioButtons_CheckedChanged);
-			// 
-			// rbOutputMethodXAudio2
-			// 
-			this.rbOutputMethodXAudio2.AutoSize = true;
-			this.rbOutputMethodXAudio2.Location = new System.Drawing.Point(6, 20);
-			this.rbOutputMethodXAudio2.Name = "rbOutputMethodXAudio2";
-			this.rbOutputMethodXAudio2.Size = new System.Drawing.Size(65, 17);
-			this.rbOutputMethodXAudio2.TabIndex = 1;
-			this.rbOutputMethodXAudio2.TabStop = true;
-			this.rbOutputMethodXAudio2.Text = "XAudio2";
-			this.rbOutputMethodXAudio2.UseVisualStyleBackColor = true;
-			this.rbOutputMethodXAudio2.CheckedChanged += new System.EventHandler(this.OutputMethodRadioButtons_CheckedChanged);
-			// 
+			//
 			// cbMuteFrameAdvance
 			// 
 			this.cbMuteFrameAdvance.AutoSize = true;
@@ -332,7 +318,6 @@
 		private System.Windows.Forms.NumericUpDown BufferSizeNumeric;
 		private BizHawk.WinForms.Controls.LocLabelEx BufferSizeUnitsLabel;
 		private System.Windows.Forms.GroupBox grpOutputMethod;
-		private System.Windows.Forms.RadioButton rbOutputMethodXAudio2;
 		private System.Windows.Forms.RadioButton rbOutputMethodOpenAL;
 		private System.Windows.Forms.NumericUpDown nudRWFF;
 		private System.Windows.Forms.CheckBox cbEnableRWFF;

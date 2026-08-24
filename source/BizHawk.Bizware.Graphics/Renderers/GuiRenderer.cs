@@ -20,22 +20,8 @@ namespace BizHawk.Bizware.Graphics
 			_projection = new();
 			_modelView = new();
 
-			string psProgram, vsProgram;
-
-			// ReSharper disable once SwitchStatementHandlesSomeKnownEnumValuesWithDefault
-			switch (owner.DispMethodEnum)
-			{
-				case EDispMethod.D3D11:
-					vsProgram = DefaultVertexShader_d3d11;
-					psProgram = DefaultPixelShader_d3d11;
-					break;
-				case EDispMethod.OpenGL:
-					vsProgram = DefaultVertexShader_gl;
-					psProgram = DefaultPixelShader_gl;
-					break;
-				default:
-					throw new InvalidOperationException();
-			}
+			var vsProgram = DefaultVertexShader_gl;
+			var psProgram = DefaultPixelShader_gl;
 
 			var vertexLayoutItems = new PipelineCompileArgs.VertexLayoutItem[3];
 			vertexLayoutItems[0] = new("aPosition", 2, 0, AttribUsage.Position);
@@ -260,57 +246,6 @@ namespace BizHawk.Bizware.Graphics
 		private readonly IPipeline DefaultPipeline;
 
 		// shaders are hand-coded for each platform to make sure they stay as fast as possible
-
-		public const string DefaultVertexShader_d3d11 = @"
-//vertex shader uniforms
-float4x4 um44Modelview, um44Projection;
-float4 uModulateColor;
-
-struct VS_INPUT
-{
-	float2 aPosition : POSITION;
-	float2 aTexcoord : TEXCOORD0;
-	float4 aColor : TEXCOORD1;
-};
-
-struct VS_OUTPUT
-{
-	float4 vPosition : SV_POSITION;
-	float2 vTexcoord0 : TEXCOORD0;
-	float4 vCornerColor : COLOR0;
-};
-
-VS_OUTPUT vsmain(VS_INPUT src)
-{
-	VS_OUTPUT dst;
-	float4 temp = float4(src.aPosition,0,1);
-	dst.vPosition = mul(um44Projection,mul(um44Modelview,temp));
-	dst.vTexcoord0 = src.aTexcoord;
-	dst.vCornerColor = src.aColor * uModulateColor;
-	return dst;
-}
-";
-
-		public const string DefaultPixelShader_d3d11 = @"
-//pixel shader uniforms
-bool uSamplerEnable;
-Texture2D texture0;
-sampler uSampler0;
-
-struct PS_INPUT
-{
-	float4 vPosition : SV_POSITION;
-	float2 vTexcoord0 : TEXCOORD0;
-	float4 vCornerColor : COLOR0;
-};
-
-float4 psmain(PS_INPUT src) : SV_Target
-{
-	float4 temp = src.vCornerColor;
-	if(uSamplerEnable) temp *= texture0.Sample(uSampler0,src.vTexcoord0);
-	return temp;
-}
-";
 
 		public const string DefaultVertexShader_gl = @"
 //opengl 3.2

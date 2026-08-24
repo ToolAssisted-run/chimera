@@ -129,10 +129,6 @@ if [ "$level" = "both" ] || [ "$level" = "b" ]; then
 			"--lua=$here/bootstrap-exit.lua" ) > "$work/bootstrap.log" 2>&1
 		[ -f "$config" ] || { echo "config bootstrap failed (see $work/bootstrap.log)" >&2; exit 1; }
 	fi
-	# GDI+ display: OpenGL on the hidden display is Mesa llvmpipe software
-	# rendering (wasted cores); display method cannot affect emulation
-	sed -i 's/"DispMethod": [0-9]/"DispMethod": 1/' "$config"
-
 	# miniHawk is waterbox-only: the frontend only accepts .wbx cores, so the box
 	# flavor is the ONLY Level-B core. native/sharp are Level-A equivalence
 	# references (proving synth.wbx matches the goldens), never frontend cores.

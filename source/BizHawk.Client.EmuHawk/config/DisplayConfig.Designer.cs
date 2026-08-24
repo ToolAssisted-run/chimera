@@ -49,8 +49,6 @@
 			this.label3 = new BizHawk.WinForms.Controls.LocLabelEx();
 			this.txtCustomARWidth = new System.Windows.Forms.TextBox();
 			this.rbUseCustom = new System.Windows.Forms.RadioButton();
-			this.rbOpenGL = new System.Windows.Forms.RadioButton();
-			this.label5 = new BizHawk.WinForms.Controls.LocLabelEx();
 			this.tabControl1 = new System.Windows.Forms.TabControl();
 			this.tpAR = new System.Windows.Forms.TabPage();
 			this.groupBox6 = new System.Windows.Forms.GroupBox();
@@ -67,15 +65,6 @@
 			this.label11 = new BizHawk.WinForms.Controls.LocLabelEx();
 			this.label10 = new BizHawk.WinForms.Controls.LocLabelEx();
 			this.nudPrescale = new System.Windows.Forms.NumericUpDown();
-			this.tpDispMethod = new System.Windows.Forms.TabPage();
-			this.label6 = new BizHawk.WinForms.Controls.LocLabelEx();
-			this.groupBox3 = new System.Windows.Forms.GroupBox();
-			this.label13 = new BizHawk.WinForms.Controls.LocLabelEx();
-			this.cbAllowTearing = new System.Windows.Forms.CheckBox();
-			this.label8 = new BizHawk.WinForms.Controls.LocLabelEx();
-			this.rbD3D11 = new System.Windows.Forms.RadioButton();
-			this.label7 = new BizHawk.WinForms.Controls.LocLabelEx();
-			this.rbGDIPlus = new System.Windows.Forms.RadioButton();
 			this.tpMisc = new System.Windows.Forms.TabPage();
 			this.flpStaticWindowTitles = new BizHawk.WinForms.Controls.LocSzSingleColumnFLP();
 			this.cbStaticWindowTitles = new BizHawk.WinForms.Controls.CheckBoxEx();
@@ -111,8 +100,6 @@
 			this.tpAR.SuspendLayout();
 			this.groupBox6.SuspendLayout();
 			((System.ComponentModel.ISupportInitialize)(this.nudPrescale)).BeginInit();
-			this.tpDispMethod.SuspendLayout();
-			this.groupBox3.SuspendLayout();
 			this.tpMisc.SuspendLayout();
 			this.flpStaticWindowTitles.SuspendLayout();
 			this.groupBox5.SuspendLayout();
@@ -311,32 +298,12 @@
 			this.rbUseCustom.Text = "Use custom size:";
 			this.rbUseCustom.UseVisualStyleBackColor = true;
 			// 
-			// rbOpenGL
-			// 
-			this.rbOpenGL.AutoSize = true;
-			this.rbOpenGL.Checked = true;
-			this.rbOpenGL.Location = new System.Drawing.Point(6, 103);
-			this.rbOpenGL.Name = "rbOpenGL";
-			this.rbOpenGL.Size = new System.Drawing.Size(65, 17);
-			this.rbOpenGL.TabIndex = 3;
-			this.rbOpenGL.TabStop = true;
-			this.rbOpenGL.Text = "OpenGL";
-			this.rbOpenGL.UseVisualStyleBackColor = true;
-			// 
-			// label5
-			// 
-			this.label5.Location = new System.Drawing.Point(21, 123);
-			this.label5.Name = "label5";
-			this.label5.Text = " • May malfunction on some systems.\r\n • May have increased performance for OpenGL" +
-    "-based emulation cores.\r\n • May have reduced performance on some systems.\r\n";
-			// 
 			// tabControl1
 			// 
 			this.tabControl1.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
 			this.tabControl1.Controls.Add(this.tpAR);
-			this.tabControl1.Controls.Add(this.tpDispMethod);
 			this.tabControl1.Controls.Add(this.tpMisc);
 			this.tabControl1.Controls.Add(this.tabPage1);
 			this.tabControl1.Location = new System.Drawing.Point(12, 4);
@@ -493,96 +460,6 @@
             0,
             0,
             0});
-			// 
-			// tpDispMethod
-			// 
-			this.tpDispMethod.Controls.Add(this.label6);
-			this.tpDispMethod.Controls.Add(this.groupBox3);
-			this.tpDispMethod.Location = new System.Drawing.Point(4, 22);
-			this.tpDispMethod.Name = "tpDispMethod";
-			this.tpDispMethod.Size = new System.Drawing.Size(528, 291);
-			this.tpDispMethod.TabIndex = 2;
-			this.tpDispMethod.Text = "Display Method";
-			this.tpDispMethod.UseVisualStyleBackColor = true;
-			// 
-			// label6
-			// 
-			this.label6.Location = new System.Drawing.Point(3, 258);
-			this.label6.Name = "label6";
-			this.label6.Text = "Changes require restart of program to take effect.\r\n";
-			// 
-			// groupBox3
-			// 
-			this.groupBox3.Controls.Add(this.label13);
-			this.groupBox3.Controls.Add(this.cbAllowTearing);
-			this.groupBox3.Controls.Add(this.label8);
-			this.groupBox3.Controls.Add(this.rbD3D11);
-			this.groupBox3.Controls.Add(this.label7);
-			this.groupBox3.Controls.Add(this.rbGDIPlus);
-			this.groupBox3.Controls.Add(this.label5);
-			this.groupBox3.Controls.Add(this.rbOpenGL);
-			this.groupBox3.Location = new System.Drawing.Point(6, 5);
-			this.groupBox3.Name = "groupBox3";
-			this.groupBox3.Size = new System.Drawing.Size(415, 241);
-			this.groupBox3.TabIndex = 16;
-			this.groupBox3.TabStop = false;
-			// 
-			// label13
-			// 
-			this.label13.Location = new System.Drawing.Point(45, 60);
-			this.label13.Name = "label13";
-			this.label13.Text = "Allow Tearing: Allows fullscreen to tear when VSync is disabled.\nThis is required" +
-    " for variable frame rate (VFR) monitors to properly work.\nFast forward performan" +
-    "ce might decrease with tearing allowed.";
-			this.label13.Click += new System.EventHandler(this.Label13_Click);
-			this.label13.DoubleClick += new System.EventHandler(this.Label13_Click);
-			// 
-			// cbAllowTearing
-			// 
-			this.cbAllowTearing.AutoSize = true;
-			this.cbAllowTearing.Location = new System.Drawing.Point(28, 60);
-			this.cbAllowTearing.Name = "cbAllowTearing";
-			this.cbAllowTearing.Size = new System.Drawing.Size(15, 14);
-			this.cbAllowTearing.TabIndex = 21;
-			this.cbAllowTearing.UseVisualStyleBackColor = true;
-			// 
-			// label8
-			// 
-			this.label8.Location = new System.Drawing.Point(21, 30);
-			this.label8.Name = "label8";
-			this.label8.Text = " • Best compatibility\r\n • May have decreased performance for OpenGL-based cores (" +
-    "NDS, 3DS)\r\n";
-			// 
-			// rbD3D11
-			// 
-			this.rbD3D11.AutoSize = true;
-			this.rbD3D11.Checked = true;
-			this.rbD3D11.Location = new System.Drawing.Point(6, 10);
-			this.rbD3D11.Name = "rbD3D11";
-			this.rbD3D11.Size = new System.Drawing.Size(79, 17);
-			this.rbD3D11.TabIndex = 19;
-			this.rbD3D11.TabStop = true;
-			this.rbD3D11.Text = "Direct3D11";
-			this.rbD3D11.UseVisualStyleBackColor = true;
-			// 
-			// label7
-			// 
-			this.label7.Location = new System.Drawing.Point(21, 191);
-			this.label7.Name = "label7";
-			this.label7.Text = " • Slow; Mainly for compatibility purposes\r\n • Missing many features\r\n • Works be" +
-    "tter over Remote Desktop, etc.\r\n";
-			// 
-			// rbGDIPlus
-			// 
-			this.rbGDIPlus.AutoSize = true;
-			this.rbGDIPlus.Checked = true;
-			this.rbGDIPlus.Location = new System.Drawing.Point(6, 171);
-			this.rbGDIPlus.Name = "rbGDIPlus";
-			this.rbGDIPlus.Size = new System.Drawing.Size(50, 17);
-			this.rbGDIPlus.TabIndex = 17;
-			this.rbGDIPlus.TabStop = true;
-			this.rbGDIPlus.Text = "GDI+";
-			this.rbGDIPlus.UseVisualStyleBackColor = true;
 			// 
 			// tpMisc
 			// 
@@ -893,10 +770,6 @@
 			this.groupBox6.ResumeLayout(false);
 			this.groupBox6.PerformLayout();
 			((System.ComponentModel.ISupportInitialize)(this.nudPrescale)).EndInit();
-			this.tpDispMethod.ResumeLayout(false);
-			this.tpDispMethod.PerformLayout();
-			this.groupBox3.ResumeLayout(false);
-			this.groupBox3.PerformLayout();
 			this.tpMisc.ResumeLayout(false);
 			this.flpStaticWindowTitles.ResumeLayout(false);
 			this.flpStaticWindowTitles.PerformLayout();
@@ -931,18 +804,9 @@
 		private System.Windows.Forms.TextBox txtCustomARWidth;
 		private System.Windows.Forms.RadioButton rbUseCustom;
 		private BizHawk.WinForms.Controls.LocLabelEx label4;
-		private System.Windows.Forms.RadioButton rbOpenGL;
-		private BizHawk.WinForms.Controls.LocLabelEx label5;
 		private System.Windows.Forms.TabControl tabControl1;
 		private System.Windows.Forms.TabPage tpAR;
-		private System.Windows.Forms.TabPage tpDispMethod;
-		private BizHawk.WinForms.Controls.LocLabelEx label6;
-		private System.Windows.Forms.GroupBox groupBox3;
-		private BizHawk.WinForms.Controls.LocLabelEx label7;
-		private System.Windows.Forms.RadioButton rbGDIPlus;
 		private System.Windows.Forms.TabPage tpMisc;
-		private BizHawk.WinForms.Controls.LocLabelEx label8;
-		private System.Windows.Forms.RadioButton rbD3D11;
 		private System.Windows.Forms.TabPage tabPage1;
 		private System.Windows.Forms.CheckBox cbStatusBarWindowed;
 		private BizHawk.WinForms.Controls.LocLabelEx label9;
@@ -969,8 +833,6 @@
 		private BizHawk.WinForms.Controls.LocLabelEx label12;
 		private System.Windows.Forms.TextBox txtCustomARX;
 		private System.Windows.Forms.CheckBox cbAutoPrescale;
-		private BizHawk.WinForms.Controls.LocLabelEx label13;
-		private System.Windows.Forms.CheckBox cbAllowTearing;
 		private BizHawk.WinForms.Controls.LocLabelEx label1;
 		private System.Windows.Forms.CheckBox cbFullscreenHacks;
 		private System.Windows.Forms.Button btnDefaults;

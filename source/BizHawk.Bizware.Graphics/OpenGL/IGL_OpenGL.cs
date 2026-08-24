@@ -10,8 +10,6 @@ namespace BizHawk.Bizware.Graphics
 	/// </summary>
 	public class IGL_OpenGL : IGL
 	{
-		public EDispMethod DispMethodEnum => EDispMethod.OpenGL;
-
 		private readonly GL GL;
 
 		// rendering state

@@ -3,7 +3,7 @@
 	public enum ESoundOutputMethod
 	{
 		LegacyDirectSound, // kept here to handle old configs
-		XAudio2,
+		XAudio2, // kept here to handle old configs; output removed, maps to OpenAL
 		OpenAL,
 		Dummy,
 	}

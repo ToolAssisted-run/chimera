@@ -53,7 +53,6 @@ namespace BizHawk.Client.Common
 			IEmulator emulator,
 			InputManager inputManager,
 			IMovieSession movieSession,
-			EDispMethod dispMethod,
 			IGL gl,
 			IGuiRenderer renderer)
 		{

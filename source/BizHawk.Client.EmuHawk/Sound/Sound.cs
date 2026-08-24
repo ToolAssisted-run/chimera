@@ -39,27 +39,15 @@ namespace BizHawk.Client.EmuHawk
 			_outputProvider = new SoundOutputProvider(_getCoreVsyncRateCallback);
 			Config = config;
 
-			if (config.SoundOutputMethod == ESoundOutputMethod.LegacyDirectSound)
+			// old configs may name outputs that no longer exist; they all map to OpenAL, the one real output
+			if (config.SoundOutputMethod is ESoundOutputMethod.LegacyDirectSound or ESoundOutputMethod.XAudio2)
 			{
-				config.SoundOutputMethod = HostCapabilityDetector.HasXAudio2 ? ESoundOutputMethod.XAudio2 : ESoundOutputMethod.OpenAL;
+				config.SoundOutputMethod = ESoundOutputMethod.OpenAL;
 			}
 
-			if (OSTailoredCode.IsUnixHost)
-			{
-				// if XAudio is chosen, use OpenAL, otherwise comply with the user's choice
-				_outputDevice = config.SoundOutputMethod == ESoundOutputMethod.Dummy
-					? new DummySoundOutput(this)
-					: new OpenALSoundOutput(this, config.SoundDevice);
-			}
-			else
-			{
-				_outputDevice = config.SoundOutputMethod switch
-				{
-					ESoundOutputMethod.XAudio2 => new XAudio2SoundOutput(this, config.SoundDevice),
-					ESoundOutputMethod.OpenAL => new OpenALSoundOutput(this, config.SoundDevice),
-					_ => new DummySoundOutput(this),
-				};
-			}
+			_outputDevice = config.SoundOutputMethod == ESoundOutputMethod.Dummy
+				? new DummySoundOutput(this)
+				: new OpenALSoundOutput(this, config.SoundDevice);
 		}
 
 		/// <summary>

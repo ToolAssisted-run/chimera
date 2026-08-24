@@ -158,7 +158,6 @@ namespace BizHawk.Client.Common
 		/// <summary>
 		/// Allows non-vsync'd video to tear, this is needed for VFR monitors reportedly
 		/// </summary>
-		public bool DispAllowTearing { get; set; }
 
 		// Display options
 		public bool DisplayFps { get; set; }
@@ -190,7 +189,6 @@ namespace BizHawk.Client.Common
 
 		public int DispPrescale { get; set; } = 1;
 
-		public EDispMethod DispMethod { get; set; } = HostCapabilityDetector.HasD3D11 ? EDispMethod.D3D11 : EDispMethod.OpenGL;
 
 		public int DispChromeFrameWindowed { get; set; } = 2;
 		public bool DispChromeStatusBarWindowed { get; set; } = true;
@@ -223,7 +221,7 @@ namespace BizHawk.Client.Common
 		public bool ResizeWithFramebuffer { get; set; } = true;
 
 		// Sound options
-		public ESoundOutputMethod SoundOutputMethod { get; set; } = HostCapabilityDetector.HasXAudio2 ? ESoundOutputMethod.XAudio2 : ESoundOutputMethod.OpenAL;
+		public ESoundOutputMethod SoundOutputMethod { get; set; } = ESoundOutputMethod.OpenAL;
 
 		/// <value>iff <see langword="false"/>, cores may skip processing audio</value>
 		/// <seealso cref="SoundEnabledNormal"/>

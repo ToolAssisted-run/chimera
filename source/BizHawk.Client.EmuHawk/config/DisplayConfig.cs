@@ -42,8 +42,6 @@ namespace BizHawk.Client.EmuHawk
 
 		public IDialogController DialogController { get; }
 
-		public bool NeedReset { get; set; }
-
 		public DisplayConfig(Config config, IDialogController dialogController, IGL gl)
 		{
 			_config = config;
@@ -140,17 +138,11 @@ namespace BizHawk.Client.EmuHawk
 			cbAutoPrescale.Checked = _config.DispAutoPrescale;
 			cbScaleOSD.Checked = _config.ScaleOSDWithSystemScale;
 
-			cbAllowTearing.Checked = _config.DispAllowTearing;
-
 			if (_config.DispSpeedupFeatures == 2) rbDisplayFull.Checked = true;
 			if (_config.DispSpeedupFeatures == 1) rbDisplayMinimal.Checked = true;
 			if (_config.DispSpeedupFeatures == 0) rbDisplayAbsoluteZero.Checked = true;
 
 			cbStaticWindowTitles.Checked = _config.UseStaticWindowTitles;
-
-			rbOpenGL.Checked = _config.DispMethod == EDispMethod.OpenGL;
-			rbGDIPlus.Checked = _config.DispMethod == EDispMethod.GdiPlus;
-			rbD3D11.Checked = _config.DispMethod == EDispMethod.D3D11;
 
 			cbStatusBarWindowed.Checked = _config.DispChromeStatusBarWindowed;
 			cbCaptionWindowed.Checked = _config.DispChromeCaptionWindowed;
@@ -199,15 +191,6 @@ namespace BizHawk.Client.EmuHawk
 			txtCropBottom.Text = _config.DispCropBottom.ToString();
 
 			RefreshAspectRatioOptions();
-
-			if (!HostCapabilityDetector.HasD3D11)
-			{
-				rbD3D11.Enabled = false;
-				rbD3D11.AutoCheck = false;
-				cbAllowTearing.Enabled = false;
-				label13.Enabled = false;
-				label8.Enabled = false;
-			}
 		}
 
 		private void BtnOk_Click(object sender, EventArgs e)
@@ -224,8 +207,6 @@ namespace BizHawk.Client.EmuHawk
 			_config.DispFullscreenHacks = cbFullscreenHacks.Checked;
 			_config.DispAutoPrescale = cbAutoPrescale.Checked;
 			_config.ScaleOSDWithSystemScale = cbScaleOSD.Checked;
-
-			_config.DispAllowTearing = cbAllowTearing.Checked;
 
 			_config.DispChromeStatusBarWindowed = cbStatusBarWindowed.Checked;
 			_config.DispChromeCaptionWindowed = cbCaptionWindowed.Checked;
@@ -316,14 +297,6 @@ namespace BizHawk.Client.EmuHawk
 				_config.DispCustomUserAry = -1;
 			}
 
-			var oldDisplayMethod = _config.DispMethod;
-			if(rbOpenGL.Checked)
-				_config.DispMethod = EDispMethod.OpenGL;
-			if(rbGDIPlus.Checked)
-				_config.DispMethod = EDispMethod.GdiPlus;
-			if(rbD3D11.Checked)
-				_config.DispMethod = EDispMethod.D3D11;
-
 			if (int.TryParse(txtCropLeft.Text, out int dispCropLeft))
 			{
 				_config.DispCropLeft = dispCropLeft;
@@ -342,11 +315,6 @@ namespace BizHawk.Client.EmuHawk
 			if (int.TryParse(txtCropBottom.Text, out int dispCropBottom))
 			{
 				_config.DispCropBottom = dispCropBottom;
-			}
-
-			if (oldDisplayMethod != _config.DispMethod)
-			{
-				NeedReset = true;
 			}
 
 			DialogResult = DialogResult.OK;
@@ -406,9 +374,6 @@ namespace BizHawk.Client.EmuHawk
 		{
 			Util.OpenUrlExternal("https://tasvideos.org/Bizhawk/DisplayConfig");
 		}
-
-		private void Label13_Click(object sender, EventArgs e)
-			=> cbAllowTearing.Checked = !cbAllowTearing.Checked;
 
 		private void BtnDefaults_Click(object sender, EventArgs e)
 		{

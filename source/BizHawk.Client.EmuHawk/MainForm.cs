@@ -489,7 +489,7 @@ namespace BizHawk.Client.EmuHawk
 			InitControls();
 
 			var savedOutputMethod = Config.SoundOutputMethod;
-			if (savedOutputMethod is ESoundOutputMethod.Dummy) Config.SoundOutputMethod = HostCapabilityDetector.HasXAudio2 ? ESoundOutputMethod.XAudio2 : ESoundOutputMethod.OpenAL;
+			if (savedOutputMethod is ESoundOutputMethod.Dummy) Config.SoundOutputMethod = ESoundOutputMethod.OpenAL;
 			try
 			{
 				Sound = new Sound(Config, () => Emulator.VsyncRate());
@@ -1352,8 +1352,7 @@ namespace BizHawk.Client.EmuHawk
 				// At any rate, we can solve this by adding a 1px black border around the GL control
 				// Please note: It is important to do this before resizing things, otherwise momentarily a GL control without WS_BORDER will be at the magic dimensions and cause the flakeout
 				if (!OSTailoredCode.IsUnixHost
-					&& Config.DispFullscreenHacks
-					&& Config.DispMethod == EDispMethod.OpenGL)
+					&& Config.DispFullscreenHacks)
 				{
 					// ATTENTION: this causes the StatusBar to not work well, since the backcolor is now set to black instead of SystemColors.Control.
 					// It seems that some StatusBar elements composite with the backcolor.

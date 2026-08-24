@@ -689,7 +689,6 @@ namespace BizHawk.Client.EmuHawk
 		{
 			static IEnumerable<string> GetDeviceNamesCallback(ESoundOutputMethod outputMethod) => outputMethod switch
 			{
-				ESoundOutputMethod.XAudio2 => XAudio2SoundOutput.GetDeviceNames(),
 				ESoundOutputMethod.OpenAL => OpenALSoundOutput.GetDeviceNames(),
 				_ => [ ],
 			};
@@ -1150,10 +1149,6 @@ namespace BizHawk.Client.EmuHawk
 				FrameBufferResized();
 				SynchChrome();
 				UpdateWindowTitle();
-				if (window.NeedReset)
-				{
-					AddOnScreenMessage("Restart program for changed settings");
-				}
 			}
 		}
 

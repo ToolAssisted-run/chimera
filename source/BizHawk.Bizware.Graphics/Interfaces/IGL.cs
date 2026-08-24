@@ -4,16 +4,12 @@ using System.Numerics;
 namespace BizHawk.Bizware.Graphics
 {
 	/// <summary>
-	/// This is a wrapper over OpenGL and Direct3D11 to give a uniform interface
+	/// The interface to the display driver. OpenGL is the only implementation:
+	/// one driver, no multiplexing.
 	/// NOTE: THIS SHOULD NOT BE ASSUMED TO BE THREAD SAFE! Make a new IGL if you want to use it in a new thread. I hope that will work...
 	/// </summary>
 	public interface IGL : IDisposable
 	{
-		/// <summary>
-		/// Returns the display method represented by this IGL
-		/// </summary>
-		EDispMethod DispMethodEnum { get; }
-
 		/// <summary>
 		/// Returns the maximum size any dimension of a texture may have
 		/// This should be set on init, and therefore shouldn't need a graphics context active...

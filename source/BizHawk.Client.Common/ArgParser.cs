@@ -52,11 +52,6 @@ namespace BizHawk.Client.Common
 			Description = "path of a core package (dir or .zip with minihawk-core.json) to load before any rom",
 		};
 
-		private static readonly Option<bool> OptionGDIPlus = new("--gdi")
-		{
-			Description = "use the GDI+ display method rather than whatever preference is set in the config file",
-		};
-
 		private static readonly Option<bool> OptionHeadless = new("--headless")
 		{
 			Description = "unattended mode: any modal dialog is printed to the console and, if it would block for an answer, the process exits with code 64 instead of hanging",
@@ -158,7 +153,6 @@ namespace BizHawk.Client.Common
 			root.Add(/* --dump-name */ OptionAVDumpName);
 			root.Add(/* --dump-type */ OptionAVDumpType);
 			root.Add(/* --fullscreen */ OptionLaunchFullscreen);
-			root.Add(/* --gdi */ OptionGDIPlus);
 			root.Add(/* --headless */ OptionHeadless);
 			root.Add(/* --load-slot */ OptionLoadQuicksaveSlot);
 			root.Add(/* --load-state */ OptionLoadSavestateFilePath);
@@ -271,7 +265,6 @@ namespace BizHawk.Client.Common
 				autoCloseOnDump: result.GetValue(OptionAVDumpQuitWhenDone),
 				chromeless: result.GetValue(OptionLaunchChromeless),
 				startFullscreen: result.GetValue(OptionLaunchFullscreen),
-				gdiPlusRequested: result.GetValue(OptionGDIPlus),
 				luaScript: luaScript,
 				luaConsole: luaConsole,
 				socketAddress: socketAddress,

@@ -54,19 +54,14 @@ namespace BizHawk.Client.EmuHawk
 			IGL gl,
 			PresentationPanel presentationPanel,
 			Func<bool> getIsSecondaryThrottlingDisabled)
-				: base(config, emulator, inputManager, movieSession, gl.DispMethodEnum, gl, gl.CreateGuiRenderer())
+				: base(config, emulator, inputManager, movieSession, gl, gl.CreateGuiRenderer())
 		{
 			_presentationPanel = presentationPanel;
 			_getIsSecondaryThrottlingDisabled = getIsSecondaryThrottlingDisabled;
 		}
 
 		public override void ActivateOpenGLContext()
-		{
-			if (_gl.DispMethodEnum == EDispMethod.OpenGL)
-			{
-				_graphicsControl.Begin();
-			}
-		}
+			=> _graphicsControl.Begin();
 
 		protected override void ActivateGraphicsControlContext() => _graphicsControl.Begin();
 
@@ -99,7 +94,6 @@ namespace BizHawk.Client.EmuHawk
 				//for now, it's assumed that the presentation panel is the main window, but that may not always be true
 
 				// no cost currently to just always call this...
-				_graphicsControl.AllowTearing(GlobalConfig.DispAllowTearing);
 
 				//TODO - whats so hard about triple buffering anyway? just enable it always, and change api to SetVsync(enable,throttle)
 				//maybe even SetVsync(enable,throttlemethod) or just SetVsync(enable,throttle,advanced)

@@ -13,10 +13,7 @@
 		<PackageReference Include="System.Drawing.Common" PrivateAssets="all" />
 		<PackageReference Include="System.Drawing.Primitives" />
 		<PackageReference Include="Silk.NET.OpenGL" />
-		<PackageReference Include="Silk.NET.WGL.Extensions.NV" />
 		<PackageReference Include="ppy.SDL2-CS" ExcludeAssets="native;contentFiles" />
-		<PackageReference Include="Vortice.Direct3D11" />
-		<PackageReference Include="Vortice.D3DCompiler" />
 		<ProjectReference Include="$(ProjectDir)../BizHawk.Common/BizHawk.Common.csproj" />
 	</ItemGroup>
 </Project>

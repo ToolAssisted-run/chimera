@@ -2,7 +2,6 @@ using System.Collections.Generic;
 using System.Windows.Forms;
 
 using BizHawk.Client.Common;
-using BizHawk.Common;
 
 namespace BizHawk.Client.EmuHawk
 {
@@ -33,9 +32,6 @@ namespace BizHawk.Client.EmuHawk
 			cbEnableRWFF.Checked = _config.SoundEnabledRWFF;
 			cbMuteFrameAdvance.Checked = _config.MuteFrameAdvance;
 
-			rbOutputMethodXAudio2.Enabled = HostCapabilityDetector.HasXAudio2;
-
-			rbOutputMethodXAudio2.Checked = _config.SoundOutputMethod == ESoundOutputMethod.XAudio2;
 			rbOutputMethodOpenAL.Checked = _config.SoundOutputMethod == ESoundOutputMethod.OpenAL;
 			BufferSizeNumeric.Value = _config.SoundBufferSizeMs;
 			tbNormal.Value = _config.SoundVolume;
@@ -48,14 +44,7 @@ namespace BizHawk.Client.EmuHawk
 		}
 
 		private ESoundOutputMethod GetSelectedOutputMethod()
-		{
-			if (!OSTailoredCode.IsUnixHost)
-			{
-				if (rbOutputMethodXAudio2.Checked) return ESoundOutputMethod.XAudio2;
-			}
-			if (rbOutputMethodOpenAL.Checked) return ESoundOutputMethod.OpenAL;
-			return ESoundOutputMethod.Dummy;
-		}
+			=> rbOutputMethodOpenAL.Checked ? ESoundOutputMethod.OpenAL : ESoundOutputMethod.Dummy;
 
 		private void Ok_Click(object sender, EventArgs e)
 		{

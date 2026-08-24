@@ -244,7 +244,6 @@ namespace BizHawk.Client.EmuHawk
 				initialConfig = ConfigService.Load<Config>(configPath);
 			}
 			initialConfig.ResolveDefaults();
-			if (cliFlags.GDIPlusRequested) initialConfig.DispMethod = EDispMethod.GdiPlus;
 			// initialConfig should really be globalConfig as it's mutable
 
 			StringLogUtil.DefaultToDisk = initialConfig.Movies.MoviesOnDisk;
@@ -256,88 +255,37 @@ namespace BizHawk.Client.EmuHawk
 				SDL2.SDL.SDL_SetHintWithPriority(SDL2.SDL.SDL_HINT_NO_SIGNAL_HANDLERS, "1", SDL2.SDL.SDL_HintPriority.SDL_HINT_OVERRIDE);
 			}
 
-			var glInitCount = 0;
-
-			IGL TryInitIGL(EDispMethod dispMethod)
+			// OpenGL is the one display driver: no multiplexing, no fallbacks. A machine
+			// that cannot give us a 3.2 context gets a clear refusal, not a degraded mode.
+			IGL workingGL;
+			try
 			{
-				glInitCount++;
+				if (!IGL_OpenGL.Available) throw new InvalidOperationException("no OpenGL 3.2 context could be created");
 
-				(EDispMethod Method, string Name) ChooseFallback()
-					=> glInitCount switch
-					{
-						// try to fallback on the faster option on Windows
-						// if we're on a Unix platform, there's only 1 fallback here...
-						1 when OSTailoredCode.IsUnixHost => (EDispMethod.GdiPlus, "GDI+"),
-						1 or 2 when !OSTailoredCode.IsUnixHost => dispMethod == EDispMethod.D3D11
-							? (EDispMethod.OpenGL, "OpenGL")
-							: (EDispMethod.D3D11, "Direct3D11"),
-						_ => (EDispMethod.GdiPlus, "GDI+"),
-					};
-
-				IGL CheckRenderer(IGL gl)
+				// need to have a context active for checking the renderer, will be disposed afterwards
+				using (new SDL2OpenGLContext(3, 2, true))
 				{
-					try
-					{
-						using (gl.CreateGuiRenderer()) return gl;
-					}
-					catch (Exception ex)
-					{
-						var (method, name) = ChooseFallback();
-						var fallbackMsg = $"Initialization of Display Method failed; falling back to {name}";
-						if (HeadlessMode.Enabled) HeadlessMode.LogSuppressedWarning($"{fallbackMsg}\n{ex}");
-						else new ExceptionBox(new Exception(fallbackMsg, ex)).ShowDialog();
-						return TryInitIGL(initialConfig.DispMethod = method);
-					}
+					using var testOpenGL = new IGL_OpenGL();
+					testOpenGL.InitGLState();
+					using (testOpenGL.CreateGuiRenderer()) {}
 				}
 
-				switch (dispMethod)
-				{
-					case EDispMethod.D3D11:
-						if (OSTailoredCode.IsUnixHost)
-						{
-							// possibly sharing config w/ Windows, assume the user wants the not-slow method (but don't change the config)
-							return TryInitIGL(EDispMethod.OpenGL);
-						}
-						try
-						{
-							return CheckRenderer(new IGL_D3D11());
-						}
-						catch (Exception ex)
-						{
-							var (method, name) = ChooseFallback();
-							var d3dFallbackMsg = $"Initialization of Direct3D11 Display Method failed; falling back to {name}";
-							if (HeadlessMode.Enabled) HeadlessMode.LogSuppressedWarning($"{d3dFallbackMsg}\n{ex}");
-							else new ExceptionBox(new Exception(d3dFallbackMsg, ex)).ShowDialog();
-							return TryInitIGL(initialConfig.DispMethod = method);
-						}
-					case EDispMethod.OpenGL:
-						if (!IGL_OpenGL.Available)
-						{
-							// too old to use, need to fallback to something else
-							var (method, name) = ChooseFallback();
-							var glFallbackMsg = $"Initialization of OpenGL Display Method failed; falling back to {name}";
-							if (HeadlessMode.Enabled) HeadlessMode.LogSuppressedWarning(glFallbackMsg);
-							else new ExceptionBox(new Exception(glFallbackMsg)).ShowDialog();
-							return TryInitIGL(initialConfig.DispMethod = method);
-						}
-						// need to have a context active for checking renderer, will be disposed afterwards
-						using (new SDL2OpenGLContext(3, 2, true))
-						{
-							using var testOpenGL = new IGL_OpenGL();
-							testOpenGL.InitGLState();
-							_ = CheckRenderer(testOpenGL);
-						}
-
-						// don't return the same IGL, we don't want the test context to be part of this IGL
-						return new IGL_OpenGL();
-					default:
-					case EDispMethod.GdiPlus:
-						// if this fails, we're screwed
-						return new IGL_GDIPlus();
-				}
+				// don't return the same IGL, we don't want the test context to be part of this IGL
+				workingGL = new IGL_OpenGL();
 			}
-
-			var workingGL = TryInitIGL(initialConfig.DispMethod);
+			catch (Exception ex)
+			{
+				const string GL_FATAL_MSG = "This frontend requires OpenGL 3.2, and this machine's display driver did not provide it.\nUpdate or install a graphics driver with OpenGL 3.2 support.";
+				if (HeadlessMode.Enabled)
+				{
+					Console.Error.WriteLine($"{GL_FATAL_MSG}\n{ex}");
+				}
+				else
+				{
+					new ExceptionBox(new Exception(GL_FATAL_MSG, ex)).ShowDialog();
+				}
+				return -1;
+			}
 
 			Sound globalSound = null;
 
