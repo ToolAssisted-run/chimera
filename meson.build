@@ -1,4 +1,4 @@
-# Chimera build — mediated by meson, from a Linux host, for BOTH targets.
+# Chimera build: mediated by meson, from a Linux host, for BOTH targets.
 #
 #   Linux artifacts (.so + the platform-neutral managed build):
 #     meson setup build/meson-linux --prefix "$(pwd)/build" --libdir dll
@@ -14,7 +14,7 @@
 # The managed solution (dotnet build) is invoked from the native (Linux) dir only:
 # its IL output is platform-neutral and serves both targets. Native libraries are
 # built per-target. Per the reproducibility pillar, none of this affects movie
-# determinism — that belongs to core packages.
+# determinism; that belongs to core packages.
 project(
   'chimera',
   ['c', 'cpp'],
@@ -33,7 +33,7 @@ dl_dep = cc.find_library('dl', required: false)
 thread_dep = dependency('threads')
 
 # ---------------------------------------------------------------------------
-# libbizhash — hardware-accelerated hashing (in-repo sources)
+# libbizhash: hardware-accelerated hashing (in-repo sources)
 # ---------------------------------------------------------------------------
 bizhash_src = files(
   'extern/LibBizHash/bizinterface.c',
@@ -53,7 +53,7 @@ shared_library(
 )
 
 # ---------------------------------------------------------------------------
-# lua54 — the Lua 5.4 runtime (stock upstream sources, pinned submodule)
+# lua54: the Lua 5.4 runtime (stock upstream sources, pinned submodule)
 # ---------------------------------------------------------------------------
 lua_src = []
 foreach f : [
@@ -76,7 +76,7 @@ lua54 = shared_library(
 )
 
 # ---------------------------------------------------------------------------
-# e_sqlite3 — SQLite with the canonical SQLitePCLRaw configuration
+# e_sqlite3: SQLite with the canonical SQLitePCLRaw configuration
 # ---------------------------------------------------------------------------
 sqlite_args = [
   '-DSQLITE_ENABLE_COLUMN_METADATA', '-DSQLITE_ENABLE_FTS3_PARENTHESIS',
@@ -98,7 +98,7 @@ shared_library(
 )
 
 # ---------------------------------------------------------------------------
-# cimgui — Dear ImGui C bindings, pinned to ImGui.NET's binding version
+# cimgui: Dear ImGui C bindings, pinned to ImGui.NET's binding version
 # ---------------------------------------------------------------------------
 cimgui_args = ['-DIMGUI_DISABLE_OBSOLETE_FUNCTIONS=1']
 if host_windows
@@ -123,7 +123,7 @@ shared_library(
 )
 
 # ---------------------------------------------------------------------------
-# luasocket — socket/core + mime/core Lua modules (for user scripts)
+# luasocket: socket/core + mime/core Lua modules (for user scripts)
 # ---------------------------------------------------------------------------
 luasocket_common = [
   'luasocket', 'timeout', 'buffer', 'io', 'auxiliar', 'options', 'inet',
@@ -146,7 +146,7 @@ subdir('extern/meson/luasocket-socket')
 subdir('extern/meson/luasocket-mime')
 
 # ---------------------------------------------------------------------------
-# zstd — savestate compression; upstream's own meson build, nested
+# zstd: savestate compression; upstream's own meson build, nested
 # ---------------------------------------------------------------------------
 nested_tool = files('extern/meson/nested-build.sh')
 cross_arg = host_windows ? '--cross-file=' + repo_root / 'extern/meson/mingw-w64.ini' : ''
@@ -168,7 +168,7 @@ custom_target(
 )
 
 # ---------------------------------------------------------------------------
-# SDL2 + OpenAL Soft — cmake-driven, via the wrapper script
+# SDL2 + OpenAL Soft: cmake-driven, via the wrapper script
 # ---------------------------------------------------------------------------
 cmake_toolchain = host_windows ? repo_root / 'extern/meson/mingw-toolchain.cmake' : ''
 custom_target(
@@ -203,7 +203,7 @@ custom_target(
 )
 
 # ---------------------------------------------------------------------------
-# chd_capi — Rust, toolchain pinned by extern/libchd-rs-capi/rust-toolchain.toml
+# chd_capi: Rust, toolchain pinned by extern/libchd-rs-capi/rust-toolchain.toml
 # ---------------------------------------------------------------------------
 custom_target(
   'chd_capi',
@@ -221,7 +221,7 @@ custom_target(
 )
 
 # ---------------------------------------------------------------------------
-# libminiboxhost — the miniBox waterbox host (from the extern/miniBox submodule).
+# libminiboxhost: the miniBox waterbox host (from the extern/miniBox submodule).
 # Chimera is waterbox-only: this host loads every core's core.wbx, so it ships
 # with the frontend. It is self-contained C (no external deps, no guest
 # toolchain), so we compile it directly here rather than driving miniBox's own
@@ -274,7 +274,7 @@ shared_library(
 )
 
 # ---------------------------------------------------------------------------
-# libchimera — the engine. The functional side of the frontend, migrating out
+# libchimera: the engine. The functional side of the frontend, migrating out
 # of C# component by component (see docs/engine-migration.md). Its C ABI in
 # engine/include/chimera/engine.h is a frozen spec; the frontend BizInvokes it
 # the same way it does libminiboxhost.
@@ -357,7 +357,7 @@ if not meson.is_cross_build()
 endif
 
 # ---------------------------------------------------------------------------
-# The managed solution — one platform-neutral build, from the Linux dir only
+# The managed solution: one platform-neutral build, from the Linux dir only
 # ---------------------------------------------------------------------------
 if not meson.is_cross_build()
   dotnet = find_program('dotnet', required: false)

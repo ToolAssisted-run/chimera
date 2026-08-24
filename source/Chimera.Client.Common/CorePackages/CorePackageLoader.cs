@@ -95,12 +95,12 @@ namespace Chimera.Client.Common
 		/// Loads a single core package: either a directory containing
 		/// <see cref="CorePackageManifest.FILE_NAME"/>, or a zip of one (extracted to a
 		/// cache first). Loading is always an explicit act (File &gt; Open Core, or the
-		/// <c>--core</c> command-line option) — there is no directory scanning.
+		/// <c>--core</c> command-line option); there is no directory scanning.
 		/// </summary>
-		/// <exception cref="Exception">anything wrong with the package — callers surface the message</exception>
+		/// <exception cref="Exception">anything wrong with the package; callers surface the message</exception>
 		public static (CorePackageManifest Manifest, IReadOnlyList<ICoreFactory> Factories, string PackageDir, string/*?*/ PackageSha1) LoadPackage(string path)
 		{
-			// A package's ground-truth identity is the SHA1 of its file — name, version,
+			// A package's ground-truth identity is the SHA1 of its file; name, version,
 			// and platform are secondary metadata. Directory-form packages (a dev
 			// convenience) have no file to hash and therefore no identity.
 			string packageDir;

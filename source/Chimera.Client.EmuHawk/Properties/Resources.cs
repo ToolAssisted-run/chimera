@@ -44,8 +44,8 @@ namespace Chimera.Client.EmuHawk.Properties
 		internal static readonly Icon CommandWindow = ReadEmbeddedIcon("commandWindow");
 		internal static readonly Bitmap Connect16X16 = ReadEmbeddedBitmap("connect_16x16");
 		internal static readonly Bitmap CopyFolder = ReadEmbeddedBitmap("CopyFolderHS");
-		internal static readonly Bitmap CorpHawk = ReadEmbeddedBitmap("corphawk");
-		internal static readonly Bitmap CorpHawkSmall = ReadEmbeddedBitmap("CorpHawkSmall");
+		internal static readonly Bitmap Chimera = ReadEmbeddedBitmap("chimera");
+		internal static readonly Bitmap ChimeraSmall = ReadEmbeddedBitmap("ChimeraSmall");
 		internal static readonly Bitmap Cross = ReadEmbeddedBitmap("Cross");
 		internal static readonly Bitmap Cut = ReadEmbeddedBitmap("CutHS");
 		internal static readonly Bitmap Debugger = ReadEmbeddedBitmap("Debugger");

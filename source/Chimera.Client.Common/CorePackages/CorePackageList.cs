@@ -19,7 +19,7 @@ namespace Chimera.Client.Common
 		/// <summary>Opened: its cores are registered, and roms can be loaded with them.</summary>
 		Loaded,
 
-		/// <summary>Unreadable — listed so a broken package is visible instead of just absent.</summary>
+		/// <summary>Unreadable: listed so a broken package is visible instead of just absent.</summary>
 		Failed,
 	}
 

@@ -55,7 +55,7 @@ namespace Chimera.Client.Common
 		/// <summary>
 		/// The SHA1 of the package file that provides <paramref name="coreType"/> (any type
 		/// from the package's adapter assembly). A package's ground-truth identity is this
-		/// hash — name/version/platform are secondary. Null for directory-form (dev)
+		/// hash; name/version/platform are secondary. Null for directory-form (dev)
 		/// packages, which have no file to hash.
 		/// </summary>
 		public string/*?*/ GetPackageSha1ForCore(Type coreType)
@@ -74,7 +74,7 @@ namespace Chimera.Client.Common
 
 		/// <summary>
 		/// Loads a single core package (directory or zip) and registers its factories,
-		/// extensions, and control defaults. Loading is an explicit act — there is no
+		/// extensions, and control defaults. Loading is an explicit act; there is no
 		/// discovery. Throws with a user-showable message on any problem.
 		/// </summary>
 		/// <returns>the package's manifest, the SHA1 of its file (null for directory-form packages), and the factories it registered</returns>

@@ -10,7 +10,7 @@ namespace Chimera.Client.Common
 	/// <summary>
 	/// A rom file read into memory, with a generic <see cref="GameInfo"/> derived from it.
 	/// Chimera knows nothing about rom formats: no header detection, no per-system
-	/// preprocessing — cores receive the file as-is (any format knowledge belongs to the
+	/// preprocessing: cores receive the file as-is (any format knowledge belongs to the
 	/// core package). The identifying hash is of the whole file.
 	/// </summary>
 	public class RomGame

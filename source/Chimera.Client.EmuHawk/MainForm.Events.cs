@@ -1329,7 +1329,7 @@ namespace Chimera.Client.EmuHawk
 		{
 			Sound.StopSound();
 			var result = this.ModalMessageBox3(
-				$"Version {Config.UpdateLatestVersion} is now available. Would you like to open the BizHawk homepage?\r\n\r\nClick \"No\" to hide the update notification for this version.",
+				$"Version {Config.UpdateLatestVersion} is now available. Would you like to open the Chimera homepage?\r\n\r\nClick \"No\" to hide the update notification for this version.",
 				"New Version Available",
 				EMsgBoxIcon.Question);
 			Sound.StartSound();

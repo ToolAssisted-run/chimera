@@ -13,7 +13,7 @@ namespace Chimera.Client.EmuHawk
 		{
 			InitializeComponent();
 			Icon = Resources.Logo;
-			pictureBox1.Image = Resources.CorpHawk;
+			pictureBox1.Image = Resources.Chimera;
 			btnCopyHash.Image = Resources.Duplicate;
 			if (playNotHawkCallSFX is not null) Shown += (_, _) => playNotHawkCallSFX();
 		}
@@ -58,6 +58,6 @@ namespace Chimera.Client.EmuHawk
 			=> Clipboard.SetText(VersionInfo.GIT_HASH);
 
 		private void linkLabel3_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
-			=> Util.OpenUrlExternal(VersionInfo.BizHawkContributorsListURI);
+			=> Util.OpenUrlExternal(VersionInfo.CreditsListURI);
 	}
 }

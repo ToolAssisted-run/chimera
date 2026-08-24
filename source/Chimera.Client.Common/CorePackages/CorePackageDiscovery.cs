@@ -14,7 +14,7 @@ using Newtonsoft.Json;
 namespace Chimera.Client.Common
 {
 	/// <summary>
-	/// What a scan found at one path: enough to list it and identify it — read
+	/// What a scan found at one path: enough to list it and identify it: read
 	/// WITHOUT loading anything. Loading a package is irreversible in-process (it
 	/// pins native modules and, for adapter packages, an assembly), so discovery
 	/// must be able to describe a package it will never load: one that is broken,
@@ -48,7 +48,7 @@ namespace Chimera.Client.Common
 		public IReadOnlyDictionary<string, string> Extensions { get; init; } = new Dictionary<string, string>();
 
 		/// <summary>
-		/// SHA1 of the package file — the package's ground-truth identity. Null for
+		/// SHA1 of the package file: the package's ground-truth identity. Null for
 		/// directory-form packages, which have no file to hash.
 		/// </summary>
 		public string? Sha1 { get; init; }
@@ -94,7 +94,7 @@ namespace Chimera.Client.Common
 		/// <summary>
 		/// Scans <paramref name="searchPaths"/> (each a directory) for packages, in
 		/// order. A directory entry is a package if it holds a waterbox package or a
-		/// manifest; otherwise the scan does NOT recurse into it — packages live at
+		/// manifest; otherwise the scan does NOT recurse into it; packages live at
 		/// the top of a search directory, so an unrelated folder of roms costs nothing.
 		/// Missing search directories are skipped silently: an absent Cores/ is the
 		/// normal state of a fresh checkout, not an error.
@@ -135,7 +135,7 @@ namespace Chimera.Client.Common
 				foreach (var candidate in candidates.OrderBy(static p => p, StringComparer.OrdinalIgnoreCase))
 				{
 					var pkg = Peek(candidate);
-					if (pkg is null) continue; // not a package at all — silently ignored
+					if (pkg is null) continue; // not a package at all; silently ignored
 					if (!seenKeys.Add(pkg.Key)) continue; // same file reachable twice
 					found.Add(pkg);
 				}
@@ -145,7 +145,7 @@ namespace Chimera.Client.Common
 
 		/// <summary>
 		/// The directories to scan, in order: the default <c>Cores/</c> beside the
-		/// executable, then any the user added. The default is not removable — a
+		/// executable, then any the user added. The default is not removable: a
 		/// package dropped into Cores/ must always be found, that being the whole
 		/// point of the directory.
 		/// </summary>
@@ -160,7 +160,7 @@ namespace Chimera.Client.Common
 		/// Reads one candidate path's identity. Returns null if it is not a core
 		/// package at all (an ordinary zip or folder); returns an entry with
 		/// <see cref="DiscoveredCorePackage.Error"/> set if it looks like one but
-		/// cannot be read — that distinction is what keeps a broken package visible
+		/// cannot be read; that distinction is what keeps a broken package visible
 		/// instead of silently missing.
 		/// </summary>
 		public static DiscoveredCorePackage? Peek(string path)

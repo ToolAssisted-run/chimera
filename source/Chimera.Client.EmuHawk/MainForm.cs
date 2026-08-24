@@ -248,7 +248,7 @@ namespace Chimera.Client.EmuHawk
 			ForumsMenuItem.Image = Properties.Resources.TAStudio;
 			(FeaturesMenuItem.Image, /*FeaturesMenuItem.Text*/_) = ToolManager.IconAndNameCache[typeof(CoreFeatureAnalysis)]
 				= (/*CoreFeatureAnalysis.ToolIcon.ToBitmap()*/Properties.Resources.KitchenSink, "Core Features");
-			AboutMenuItem.Image = Properties.Resources.CorpHawkSmall;
+			AboutMenuItem.Image = Properties.Resources.ChimeraSmall;
 			DumpStatusButton.Image = Properties.Resources.Blank;
 			PlayRecordStatusButton.Image = Properties.Resources.Blank;
 			PauseStatusButton.Image = Properties.Resources.Blank;
@@ -256,7 +256,7 @@ namespace Chimera.Client.EmuHawk
 			AVStatusLabel.Image = Properties.Resources.Blank;
 			LedLightStatusLabel.Image = Properties.Resources.LightOff;
 			KeyPriorityStatusLabel.Image = Properties.Resources.Both;
-			CoreNameStatusBarButton.Image = Properties.Resources.CorpHawkSmall;
+			CoreNameStatusBarButton.Image = Properties.Resources.ChimeraSmall;
 			LinkConnectStatusBarButton.Image = Properties.Resources.Connect16X16;
 			OpenRomContextMenuItem.Image = Properties.Resources.OpenFile;
 			LoadLastRomContextMenuItem.Image = Properties.Resources.Recent;

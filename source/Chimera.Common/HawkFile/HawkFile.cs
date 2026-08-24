@@ -9,7 +9,7 @@ using Chimera.Common.StringExtensions;
 namespace Chimera.Common
 {
 	/// <summary>
-	/// This class can represent a variety of file-like objects—"regular" files on disk, archive members, SMB shares(?)—encapsulating them so any may be opened/read/closed like files on disk.<br/>
+	/// This class can represent a variety of file-like objects ("regular" files on disk, archive members, SMB shares(?)), encapsulating them so any may be opened/read/closed like files on disk.<br/>
 	/// When opening an archive, it won't always be clear automatically which member should actually be used.
 	/// Therefore, we define the concept of "binding": the <see cref="HawkFile"/> attaches itself to an archive member, which is the file that it will actually be using.<br/>
 	/// We also define a simple extension to the Unix path format using <c>'|'</c>: <c>/path/to/file.rom</c> is readable, but so is <c>/path/to/archive.zip|member.rom</c>.

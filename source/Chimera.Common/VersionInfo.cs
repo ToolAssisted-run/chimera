@@ -14,13 +14,14 @@ namespace Chimera.Common
 
 		public static readonly string ReleaseDate = "May 1st, 2026";
 
-		public static readonly string HomePage = "https://tasvideos.org/BizHawk";
+		public static readonly string HomePage = "https://github.com/ToolAssisted-run/chimera";
 
 		public static readonly bool DeveloperBuild = true;
 
 		public static readonly string? CustomBuildString;
 
-		public static readonly string BizHawkContributorsListURI = "https://github.com/TASEmulators/BizHawk/graphs/contributors";
+		/// <summary>Chimera's contributors, and through them BizHawk's: the About box links here.</summary>
+		public static readonly string CreditsListURI = "https://github.com/ToolAssisted-run/chimera/blob/main/Credits.md";
 
 		public static readonly string UserAgentEscaped;
 
@@ -57,7 +58,7 @@ namespace Chimera.Common
 			const string buildConfig = "Release";
 #endif
 			return DeveloperBuild
-				? $"Version {MainVersion} — dev build ({buildConfig}, {targetArch})"
+				? $"Version {MainVersion}, dev build ({buildConfig}, {targetArch})"
 				: $"Version {MainVersion} ({targetArch})";
 		}
 

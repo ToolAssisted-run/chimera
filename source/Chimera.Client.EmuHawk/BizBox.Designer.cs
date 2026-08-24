@@ -73,7 +73,7 @@
 			this.linkLabel1.Size = new System.Drawing.Size(102, 13);
 			this.linkLabel1.TabIndex = 2;
 			this.linkLabel1.TabStop = true;
-			this.linkLabel1.Text = "BizHawk Homepage";
+			this.linkLabel1.Text = "Chimera Homepage";
 			this.linkLabel1.LinkClicked += new System.Windows.Forms.LinkLabelLinkClickedEventHandler(this.linkLabel1_LinkClicked);
 			// 
 			// label3
@@ -81,14 +81,14 @@
 			this.label3.Font = new System.Drawing.Font("Microsoft Sans Serif", 12F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
 			this.label3.Location = new System.Drawing.Point(197, 10);
 			this.label3.Name = "label3";
-			this.label3.Text = "EmuHawk";
+			this.label3.Text = "Chimera";
 			// 
 			// label4
 			// 
 			this.label4.Font = new System.Drawing.Font("Microsoft Sans Serif", 9.75F, System.Drawing.FontStyle.Italic, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
 			this.label4.Location = new System.Drawing.Point(207, 31);
 			this.label4.Name = "label4";
-			this.label4.Text = "\"A multi-system emulator...\r\nfor productive people.\"";
+			this.label4.Text = "\"A modular emulation frontend...\r\nfor productive people.\"";
 			// 
 			// CoreInfoPanel
 			// 
@@ -140,7 +140,7 @@
 			this.linkLabel3.Size = new System.Drawing.Size(63, 13);
 			this.linkLabel3.TabIndex = 20;
 			this.linkLabel3.TabStop = true;
-			this.linkLabel3.Text = "Contributors";
+			this.linkLabel3.Text = "Credits";
 			this.linkLabel3.LinkClicked += new System.Windows.Forms.LinkLabelLinkClickedEventHandler(this.linkLabel3_LinkClicked);
 			// 
 			// DateLabel

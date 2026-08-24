@@ -27,7 +27,7 @@ namespace Chimera.Client.EmuHawk.CoreExtensions
 
 		public static Bitmap Icon(this IEmulator core)
 			=> core.Attributes() is not PortedCoreAttribute
-				? Properties.Resources.CorpHawkSmall
+				? Properties.Resources.ChimeraSmall
 				: null; // core-specific icons would have to come from the core package; not currently part of the contract
 
 		public static string GetSystemDisplayName(this IEmulator emulator) => emulator switch

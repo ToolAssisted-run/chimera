@@ -31,7 +31,7 @@ namespace Chimera.Client.Common
 		public const string WaterboxHost = "WaterboxHost"; // the sandbox the core ran inside, by its own build info
 		public const string Firmware = "Firmware"; // "<id>=<sha1>" per file the core was given; a BIOS changes what runs
 		public const string CoreVersion = "CoreVersion"; // the core's authoritative version: the commit its published build was made from
-		public const string CorePackageSha1 = "CorePackageSHA1"; // SHA1 of the package file — the same version can be built twice, this says which build
+		public const string CorePackageSha1 = "CorePackageSHA1"; // SHA1 of the package file; the same version can be built twice, this says which build
 
 		private static FrozenSet<string> field;
 
