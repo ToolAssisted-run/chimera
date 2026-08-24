@@ -457,12 +457,72 @@ uint64_t ce_session_domain_ptr(const ce_session *s, int32_t index);
  * (the caller must reboot instead); 2 = error (see _last_error). */
 int32_t ce_session_apply_settings(ce_session *s, const char *overrides_json);
 
-/* TRANSITIONAL: a bridged guest entry point, callable with the host's
- * convention, for the optional ABI groups the session does not model yet
- * (tooling, persistent data). 0 when the guest does not export the name.
- * These calls migrate into proper ce_session_* surface with their
- * components; nothing new should grow on this. */
-uint64_t ce_session_guest_proc(ce_session *s, const char *name, int32_t arg_count);
+/* ---- the optional guest ABI groups ----
+ *
+ * A core may export any subset of four independent tooling groups (surfaces,
+ * registers, buses, trace) plus the persistent-data channel. The session
+ * probes them once, post-Init (names and counts may depend on the rom and
+ * settings). An absent group answers with a zero count / zero flag, and the
+ * frontend simply does not offer the tool.
+ */
+
+/* surfaces: core-rendered viewer windows */
+int32_t ce_session_surface_count(const ce_session *s);
+const char *ce_session_surface_name(const ce_session *s, int32_t index);
+int32_t ce_session_surface_width(const ce_session *s, int32_t index);
+int32_t ce_session_surface_height(const ce_session *s, int32_t index);
+/* BGRA, width*height pixels. Borrowed; invalidated by the next render of the
+ * same surface. NULL when the guest gave nothing. */
+const uint32_t *ce_session_surface_render(ce_session *s, int32_t index);
+
+/* registers: the generic debugger's register box */
+int32_t ce_session_register_count(const ce_session *s);
+const char *ce_session_register_name(const ce_session *s, int32_t index);
+/* how many hex digits the debugger shows; 32 when the core does not say */
+int32_t ce_session_register_bits(const ce_session *s, int32_t index);
+int64_t ce_session_register_value(const ce_session *s, int32_t index);
+/* 0 = written; 1 = this core does not support writing registers */
+int32_t ce_session_register_set(ce_session *s, int32_t index, int64_t value);
+int32_t ce_session_has_executed_cycles(const ce_session *s);
+int64_t ce_session_executed_cycles(const ce_session *s);
+
+/* buses: address SPACES the guest resolves through its own mapper logic -
+ * peek/poke, never pointer-mapped */
+int32_t ce_session_bus_count(const ce_session *s);
+const char *ce_session_bus_name(const ce_session *s, int32_t index);
+int64_t ce_session_bus_size(const ce_session *s, int32_t index);
+int32_t ce_session_bus_writable(const ce_session *s, int32_t index);
+int32_t ce_session_bus_peek(const ce_session *s, int32_t index, int32_t addr);
+void ce_session_bus_poke(ce_session *s, int32_t index, int32_t addr, int32_t value);
+
+/* trace: the guest appends lines to a buffer of its own; drain it once per
+ * frame - a callback per instruction would cross the sandbox boundary
+ * millions of times a second */
+int32_t ce_session_trace_available(const ce_session *s);
+const char *ce_session_trace_header(const ce_session *s);
+/* The session REMEMBERS the desired flag: a savestate overwrites the guest's
+ * own tracing state, and load_state re-asserts this (and clears the restored
+ * buffer - its lines were traced before the load and would appear out of
+ * order). */
+void ce_session_trace_enable(ce_session *s, int32_t on);
+/* The lines the guest traced since the last drain, as consecutive
+ * NUL-terminated strings (line_count of them), cleared on the way out.
+ * overflow_out reports the guest's raw truncation flag for this window.
+ * Borrowed; invalidated by the next drain. */
+const uint8_t *ce_session_trace_drain(
+	ce_session *s, uint64_t *len_out, int32_t *line_count_out, int32_t *overflow_out);
+
+/* persistent data: what the machine keeps when switched off. Only the core
+ * knows what belongs in the file, so it serializes into a buffer it owns and
+ * the session moves bytes it does not interpret. */
+int32_t ce_session_persist_available(const ce_session *s); // exported AND nonempty for THIS rom
+const char *ce_session_persist_name(const ce_session *s);
+const char *ce_session_persist_id(const ce_session *s);
+/* Borrowed until the next call; NULL when the core has nothing right now. */
+const uint8_t *ce_session_persist_get(ce_session *s, uint64_t *len_out);
+/* 0 = accepted; 1 = the core refused it (the file does not belong to this
+ * game - loading half a save silently would be worse); 2 = no room. */
+int32_t ce_session_persist_put(ce_session *s, const uint8_t *data, uint64_t len);
 
 #ifdef __cplusplus
 }

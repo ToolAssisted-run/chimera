@@ -255,6 +255,46 @@ struct ce_session
 	std::vector<uint8_t> stateBuf;
 	std::string error;
 
+	// ---- the optional guest ABI groups, probed once post-Init ----
+	// surfaces
+	uintptr_t (*renderSurface)(int32_t) = nullptr;
+	std::vector<std::string> surfaceNames;
+	std::vector<int32_t> surfaceWidths, surfaceHeights;
+	std::vector<std::vector<uint32_t>> surfaceBufs;
+	// registers
+	int64_t (*regValue)(int32_t) = nullptr;
+	void (*regSet)(int32_t, int64_t) = nullptr;
+	int64_t (*executedCycles)() = nullptr;
+	std::vector<std::string> regNames;
+	std::vector<int32_t> regBits;
+	// buses
+	int32_t (*busPeek)(int32_t, int32_t) = nullptr;
+	void (*busPoke)(int32_t, int32_t, int32_t) = nullptr;
+	std::vector<std::string> busNames;
+	std::vector<int64_t> busSizes;
+	std::vector<bool> busWritables;
+	// trace
+	void (*traceSetEnabled)(int32_t) = nullptr;
+	int32_t (*traceLineCount)() = nullptr;
+	uintptr_t (*traceBuffer)() = nullptr;
+	int32_t (*traceOverflow)() = nullptr;
+	int32_t (*traceUsedBytes)() = nullptr;
+	void (*traceClear)() = nullptr;
+	std::string traceHeader = "Instructions";
+	bool traceDesired = false;
+	std::vector<uint8_t> traceOut;
+	// persistent data
+	int32_t (*persistSize)() = nullptr;
+	uintptr_t (*persistGet)() = nullptr;
+	uintptr_t (*persistBuffer)(int32_t) = nullptr;
+	int32_t (*persistPut)(int32_t) = nullptr;
+	bool persistAvailable = false;
+	std::string persistName = "Persistent Data";
+	std::string persistId = "data";
+	std::vector<uint8_t> persistOut;
+
+	void probeOptionalGroups();
+
 	bool activate(std::string &err)
 	{
 		if (active) return true;
@@ -290,6 +330,128 @@ struct ce_session
 		return bridged;
 	}
 };
+
+void ce_session::probeOptionalGroups()
+{
+	std::string err; // optional probes never fail the session
+	auto opt = [&](const char *name, int argCount) { return proc(name, argCount, false, err); };
+	auto cstr = [](uintptr_t p) { return p != 0 ? reinterpret_cast<const char *>(p) : nullptr; };
+
+	// surfaces: all five or nothing
+	{
+		auto count = reinterpret_cast<int32_t (*)()>(opt("GetSurfaceCount", 0));
+		auto name = reinterpret_cast<uintptr_t (*)(int32_t)>(opt("GetSurfaceName", 1));
+		auto width = reinterpret_cast<int32_t (*)(int32_t)>(opt("GetSurfaceWidth", 1));
+		auto height = reinterpret_cast<int32_t (*)(int32_t)>(opt("GetSurfaceHeight", 1));
+		auto render = reinterpret_cast<uintptr_t (*)(int32_t)>(opt("RenderSurface", 1));
+		if (count != nullptr && name != nullptr && width != nullptr && height != nullptr && render != nullptr)
+		{
+			int32_t n = count();
+			for (int32_t i = 0; i < n; i++)
+			{
+				const char *sn = cstr(name(i));
+				surfaceNames.emplace_back(sn != nullptr ? sn : ("Surface " + std::to_string(i)));
+				surfaceWidths.push_back(width(i));
+				surfaceHeights.push_back(height(i));
+				surfaceBufs.emplace_back(static_cast<size_t>(width(i)) * height(i), 0);
+			}
+			if (n > 0) renderSurface = render;
+		}
+	}
+
+	// registers: count/name/value required; bits, set and cycles optional
+	{
+		auto count = reinterpret_cast<int32_t (*)()>(opt("GetRegisterCount", 0));
+		auto name = reinterpret_cast<uintptr_t (*)(int32_t)>(opt("GetRegisterName", 1));
+		auto value = reinterpret_cast<int64_t (*)(int32_t)>(opt("GetRegisterValue", 1));
+		if (count != nullptr && name != nullptr && value != nullptr)
+		{
+			int32_t n = count();
+			if (n > 0)
+			{
+				/* width is per-register and only the core knows it; cores that
+				 * don't say get 32 bits, which only shapes the hex display */
+				auto bits = reinterpret_cast<int32_t (*)(int32_t)>(opt("GetRegisterBits", 1));
+				for (int32_t i = 0; i < n; i++)
+				{
+					const char *rn = cstr(name(i));
+					regNames.emplace_back(rn != nullptr ? rn : ("R" + std::to_string(i)));
+					int32_t b = bits != nullptr ? bits(i) : 32;
+					regBits.push_back(b > 0 && b <= 64 ? b : 32);
+				}
+				regValue = value;
+				regSet = reinterpret_cast<void (*)(int32_t, int64_t)>(opt("SetRegisterValue", 2));
+				executedCycles = reinterpret_cast<int64_t (*)()>(opt("GetExecutedCycles", 0));
+			}
+		}
+	}
+
+	// buses: count/name/peek required; poke, size and writability optional
+	{
+		auto count = reinterpret_cast<int32_t (*)()>(opt("GetBusCount", 0));
+		auto name = reinterpret_cast<uintptr_t (*)(int32_t)>(opt("GetBusName", 1));
+		auto peek = reinterpret_cast<int32_t (*)(int32_t, int32_t)>(opt("PeekBus", 2));
+		if (count != nullptr && name != nullptr && peek != nullptr)
+		{
+			auto poke = reinterpret_cast<void (*)(int32_t, int32_t, int32_t)>(opt("PokeBus", 3));
+			auto size = reinterpret_cast<int64_t (*)(int32_t)>(opt("GetBusSize", 1));
+			auto writable = reinterpret_cast<int32_t (*)(int32_t)>(opt("GetBusWritable", 1));
+			int32_t n = count();
+			for (int32_t i = 0; i < n; i++)
+			{
+				const char *bn = cstr(name(i));
+				busNames.emplace_back(bn != nullptr ? bn : ("Bus " + std::to_string(i)));
+				busSizes.push_back(size != nullptr ? size(i) : 0x10000); // 64K default: the common case
+				/* a core with a poke may still have read-only buses; claiming
+				 * writable there hands the hex editor a silently discarded edit */
+				busWritables.push_back(poke != nullptr && (writable != nullptr ? writable(i) : 1) != 0);
+			}
+			busPeek = peek;
+			busPoke = poke;
+		}
+	}
+
+	// trace: enable/lineCount/buffer required; the rest optional
+	{
+		auto setEnabled = reinterpret_cast<void (*)(int32_t)>(opt("TraceSetEnabled", 1));
+		auto lineCount = reinterpret_cast<int32_t (*)()>(opt("TraceGetLineCount", 0));
+		auto buffer = reinterpret_cast<uintptr_t (*)()>(opt("TraceGetBuffer", 0));
+		if (setEnabled != nullptr && lineCount != nullptr && buffer != nullptr)
+		{
+			traceLineCount = lineCount;
+			traceBuffer = buffer;
+			traceOverflow = reinterpret_cast<int32_t (*)()>(opt("TraceGetOverflow", 0));
+			traceUsedBytes = reinterpret_cast<int32_t (*)()>(opt("TraceGetUsedBytes", 0));
+			traceClear = reinterpret_cast<void (*)()>(opt("TraceClear", 0));
+			auto header = reinterpret_cast<uintptr_t (*)()>(opt("TraceGetHeader", 0));
+			const char *h = header != nullptr ? cstr(header()) : nullptr;
+			if (h != nullptr) traceHeader = h;
+			traceSetEnabled = setEnabled;
+			traceSetEnabled(0); // tracing costs the guest time; off until a sink asks
+		}
+	}
+
+	// persistent data: a core may export the group and still keep nothing for
+	// THIS rom (the same NES core runs battery carts, plain carts and disks)
+	{
+		persistSize = reinterpret_cast<int32_t (*)()>(opt("GetPersistentSize", 0));
+		persistGet = reinterpret_cast<uintptr_t (*)()>(opt("GetPersistent", 0));
+		persistBuffer = reinterpret_cast<uintptr_t (*)(int32_t)>(opt("GetPersistentBuffer", 1));
+		persistPut = reinterpret_cast<int32_t (*)(int32_t)>(opt("PutPersistent", 1));
+		persistAvailable = persistSize != nullptr && persistGet != nullptr && persistSize() != 0;
+		if (persistAvailable)
+		{
+			/* what the core calls it, and what a bundle files it under; both are
+			 * the core's vocabulary, and the frontend only ever repeats them */
+			auto name = reinterpret_cast<uintptr_t (*)()>(opt("GetPersistentName", 0));
+			auto id = reinterpret_cast<uintptr_t (*)()>(opt("GetPersistentId", 0));
+			const char *n = name != nullptr ? cstr(name()) : nullptr;
+			const char *i = id != nullptr ? cstr(id()) : nullptr;
+			if (n != nullptr) persistName = n;
+			if (i != nullptr) persistId = i;
+		}
+	}
+}
 
 extern "C" {
 
@@ -452,6 +614,7 @@ ce_session *ce_session_open(
 
 	s->videoBuf.assign(static_cast<size_t>(s->cfg.width) * s->cfg.height, 0);
 	s->audioBuf.assign(static_cast<size_t>(s->cfg.samplesPerFrame) * 2, 0);
+	s->probeOptionalGroups();
 	return s;
 }
 
@@ -568,6 +731,15 @@ int32_t ce_session_load_state(ce_session *s, const uint8_t *data, uint64_t len)
 		s->error = r.errorMessage;
 		return 1;
 	}
+	/* a savestate is guest memory, and the guest's "tracing on" flag is guest
+	 * memory too: re-assert the desired flag, and discard whatever lines the
+	 * restored buffer holds - they were traced before the load and would
+	 * appear out of order */
+	if (s->traceSetEnabled != nullptr)
+	{
+		s->traceSetEnabled(s->traceDesired ? 1 : 0);
+		if (s->traceClear != nullptr) s->traceClear();
+	}
 	return 0;
 }
 
@@ -632,10 +804,188 @@ int32_t ce_session_apply_settings(ce_session *s, const char *overrides_json)
 	return 0;
 }
 
-uint64_t ce_session_guest_proc(ce_session *s, const char *name, int32_t arg_count)
+int32_t ce_session_surface_count(const ce_session *s)
 {
-	std::string err;
-	return static_cast<uint64_t>(s->proc(name, arg_count, false, err));
+	return static_cast<int32_t>(s->surfaceNames.size());
+}
+
+const char *ce_session_surface_name(const ce_session *s, int32_t index)
+{
+	if (index < 0 || index >= static_cast<int32_t>(s->surfaceNames.size())) return nullptr;
+	return s->surfaceNames[static_cast<size_t>(index)].c_str();
+}
+
+int32_t ce_session_surface_width(const ce_session *s, int32_t index)
+{
+	return index >= 0 && index < static_cast<int32_t>(s->surfaceWidths.size()) ? s->surfaceWidths[static_cast<size_t>(index)] : 0;
+}
+
+int32_t ce_session_surface_height(const ce_session *s, int32_t index)
+{
+	return index >= 0 && index < static_cast<int32_t>(s->surfaceHeights.size()) ? s->surfaceHeights[static_cast<size_t>(index)] : 0;
+}
+
+const uint32_t *ce_session_surface_render(ce_session *s, int32_t index)
+{
+	if (s->renderSurface == nullptr || index < 0 || index >= static_cast<int32_t>(s->surfaceBufs.size())) return nullptr;
+	uintptr_t p = s->renderSurface(index);
+	if (p == 0) return nullptr;
+	auto &buf = s->surfaceBufs[static_cast<size_t>(index)];
+	std::memcpy(buf.data(), reinterpret_cast<const void *>(p), buf.size() * sizeof(uint32_t));
+	return buf.data();
+}
+
+int32_t ce_session_register_count(const ce_session *s)
+{
+	return static_cast<int32_t>(s->regNames.size());
+}
+
+const char *ce_session_register_name(const ce_session *s, int32_t index)
+{
+	if (index < 0 || index >= static_cast<int32_t>(s->regNames.size())) return nullptr;
+	return s->regNames[static_cast<size_t>(index)].c_str();
+}
+
+int32_t ce_session_register_bits(const ce_session *s, int32_t index)
+{
+	return index >= 0 && index < static_cast<int32_t>(s->regBits.size()) ? s->regBits[static_cast<size_t>(index)] : 32;
+}
+
+int64_t ce_session_register_value(const ce_session *s, int32_t index)
+{
+	return s->regValue != nullptr ? s->regValue(index) : 0;
+}
+
+int32_t ce_session_register_set(ce_session *s, int32_t index, int64_t value)
+{
+	if (s->regSet == nullptr) return 1;
+	s->regSet(index, value);
+	return 0;
+}
+
+int32_t ce_session_has_executed_cycles(const ce_session *s) { return s->executedCycles != nullptr ? 1 : 0; }
+
+int64_t ce_session_executed_cycles(const ce_session *s)
+{
+	return s->executedCycles != nullptr ? s->executedCycles() : 0;
+}
+
+int32_t ce_session_bus_count(const ce_session *s) { return static_cast<int32_t>(s->busNames.size()); }
+
+const char *ce_session_bus_name(const ce_session *s, int32_t index)
+{
+	if (index < 0 || index >= static_cast<int32_t>(s->busNames.size())) return nullptr;
+	return s->busNames[static_cast<size_t>(index)].c_str();
+}
+
+int64_t ce_session_bus_size(const ce_session *s, int32_t index)
+{
+	return index >= 0 && index < static_cast<int32_t>(s->busSizes.size()) ? s->busSizes[static_cast<size_t>(index)] : 0;
+}
+
+int32_t ce_session_bus_writable(const ce_session *s, int32_t index)
+{
+	return index >= 0 && index < static_cast<int32_t>(s->busWritables.size()) && s->busWritables[static_cast<size_t>(index)] ? 1 : 0;
+}
+
+int32_t ce_session_bus_peek(const ce_session *s, int32_t index, int32_t addr)
+{
+	return s->busPeek != nullptr ? s->busPeek(index, addr) : 0;
+}
+
+void ce_session_bus_poke(ce_session *s, int32_t index, int32_t addr, int32_t value)
+{
+	if (s->busPoke != nullptr && ce_session_bus_writable(s, index) != 0) s->busPoke(index, addr, value);
+}
+
+int32_t ce_session_trace_available(const ce_session *s) { return s->traceSetEnabled != nullptr ? 1 : 0; }
+
+const char *ce_session_trace_header(const ce_session *s) { return s->traceHeader.c_str(); }
+
+void ce_session_trace_enable(ce_session *s, int32_t on)
+{
+	s->traceDesired = on != 0;
+	if (s->traceSetEnabled != nullptr) s->traceSetEnabled(on != 0 ? 1 : 0);
+}
+
+const uint8_t *ce_session_trace_drain(
+	ce_session *s, uint64_t *len_out, int32_t *line_count_out, int32_t *overflow_out)
+{
+	s->traceOut.clear();
+	int32_t lines = 0;
+	if (s->traceLineCount != nullptr && s->traceBuffer != nullptr)
+	{
+		int32_t reported = s->traceLineCount();
+		if (reported > 0)
+		{
+			/* one bulk copy of the whole used region beats a call per line when
+			 * a frame can produce tens of thousands; cores that don't report the
+			 * byte count fall back to walking line by line */
+			int32_t used = s->traceUsedBytes != nullptr ? s->traceUsedBytes() : -1;
+			const auto *base = reinterpret_cast<const uint8_t *>(s->traceBuffer());
+			if (used > 0)
+			{
+				s->traceOut.assign(base, base + used);
+				for (int32_t i = 0; i < used; i++)
+				{
+					if (s->traceOut[static_cast<size_t>(i)] == 0) lines++;
+				}
+			}
+			else if (base != nullptr)
+			{
+				const uint8_t *p = base;
+				for (int32_t i = 0; i < reported; i++)
+				{
+					size_t n = std::strlen(reinterpret_cast<const char *>(p));
+					if (n == 0) break;
+					s->traceOut.insert(s->traceOut.end(), p, p + n + 1);
+					p += n + 1;
+					lines++;
+				}
+			}
+		}
+		int32_t overflow = s->traceOverflow != nullptr && s->traceOverflow() != 0 ? 1 : 0;
+		if (overflow_out != nullptr) *overflow_out = overflow;
+		if (s->traceClear != nullptr) s->traceClear();
+	}
+	else if (overflow_out != nullptr)
+	{
+		*overflow_out = 0;
+	}
+	if (len_out != nullptr) *len_out = s->traceOut.size();
+	if (line_count_out != nullptr) *line_count_out = lines;
+	return s->traceOut.data();
+}
+
+int32_t ce_session_persist_available(const ce_session *s) { return s->persistAvailable ? 1 : 0; }
+
+const char *ce_session_persist_name(const ce_session *s) { return s->persistName.c_str(); }
+
+const char *ce_session_persist_id(const ce_session *s) { return s->persistId.c_str(); }
+
+const uint8_t *ce_session_persist_get(ce_session *s, uint64_t *len_out)
+{
+	if (len_out != nullptr) *len_out = 0;
+	if (s->persistSize == nullptr || s->persistGet == nullptr) return nullptr;
+	int32_t size = s->persistSize();
+	if (size <= 0) return nullptr;
+	uintptr_t p = s->persistGet();
+	if (p == 0) return nullptr;
+	s->persistOut.assign(
+		reinterpret_cast<const uint8_t *>(p), reinterpret_cast<const uint8_t *>(p) + size);
+	if (len_out != nullptr) *len_out = s->persistOut.size();
+	return s->persistOut.data();
+}
+
+int32_t ce_session_persist_put(ce_session *s, const uint8_t *data, uint64_t len)
+{
+	if (s->persistBuffer == nullptr || s->persistPut == nullptr) return 1;
+	uintptr_t dest = s->persistBuffer(static_cast<int32_t>(len));
+	if (dest == 0) return 2; // no room
+	std::memcpy(reinterpret_cast<void *>(dest), data, static_cast<size_t>(len));
+	/* the core is the judge of whether the file fits the machine - a disk save
+	 * with the wrong number of sides, say - and says so by refusing it */
+	return s->persistPut(static_cast<int32_t>(len)) != 0 ? 0 : 1;
 }
 
 } // extern "C"

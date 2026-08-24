@@ -338,7 +338,85 @@ namespace BizHawk.Emulation.Common.Engine
 		public abstract int ce_session_apply_settings(IntPtr session, string overridesJson);
 
 		[BizImport(CallingConvention.Cdecl)]
-		public abstract ulong ce_session_guest_proc(IntPtr session, string name, int argCount);
+		public abstract int ce_session_surface_count(IntPtr session);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_session_surface_name(IntPtr session, int index);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract int ce_session_surface_width(IntPtr session, int index);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract int ce_session_surface_height(IntPtr session, int index);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_session_surface_render(IntPtr session, int index);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract int ce_session_register_count(IntPtr session);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_session_register_name(IntPtr session, int index);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract int ce_session_register_bits(IntPtr session, int index);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract long ce_session_register_value(IntPtr session, int index);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract int ce_session_register_set(IntPtr session, int index, long value);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract int ce_session_has_executed_cycles(IntPtr session);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract long ce_session_executed_cycles(IntPtr session);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract int ce_session_bus_count(IntPtr session);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_session_bus_name(IntPtr session, int index);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract long ce_session_bus_size(IntPtr session, int index);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract int ce_session_bus_writable(IntPtr session, int index);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract int ce_session_bus_peek(IntPtr session, int index, int addr);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract void ce_session_bus_poke(IntPtr session, int index, int addr, int value);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract int ce_session_trace_available(IntPtr session);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_session_trace_header(IntPtr session);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract void ce_session_trace_enable(IntPtr session, int on);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_session_trace_drain(IntPtr session, ref ulong lenOut, ref int lineCountOut, ref int overflowOut);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract int ce_session_persist_available(IntPtr session);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_session_persist_name(IntPtr session);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_session_persist_id(IntPtr session);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_session_persist_get(IntPtr session, ref ulong lenOut);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract int ce_session_persist_put(IntPtr session, byte[] data, ulong len);
 	}
 
 	public static class ChimeraEngine
@@ -900,13 +978,66 @@ namespace BizHawk.Emulation.Common.Engine
 				_ => throw new InvalidOperationException(LastError),
 			};
 
-		/// <summary>
-		/// TRANSITIONAL: a bridged guest entry point for the optional ABI groups
-		/// (tooling, persistent data) that have not migrated into the session yet.
-		/// Zero when the guest does not export the name.
-		/// </summary>
-		public IntPtr GuestProc(string name, int argCount)
-			=> unchecked((IntPtr)(long)E.ce_session_guest_proc(_session, name, argCount));
+		// ---- the optional guest ABI groups (zero count / false = absent) ----
+
+		public int SurfaceCount => E.ce_session_surface_count(_session);
+		public string SurfaceName(int index) => ChimeraEngine.PtrToStringUtf8(E.ce_session_surface_name(_session, index)) ?? $"Surface {index}";
+		public int SurfaceWidth(int index) => E.ce_session_surface_width(_session, index);
+		public int SurfaceHeight(int index) => E.ce_session_surface_height(_session, index);
+		/// <summary>Borrowed until the same surface renders again; IntPtr.Zero when the guest gave nothing.</summary>
+		public IntPtr RenderSurface(int index) => E.ce_session_surface_render(_session, index);
+
+		public int RegisterCount => E.ce_session_register_count(_session);
+		public string RegisterName(int index) => ChimeraEngine.PtrToStringUtf8(E.ce_session_register_name(_session, index)) ?? $"R{index}";
+		public int RegisterBits(int index) => E.ce_session_register_bits(_session, index);
+		public long RegisterValue(int index) => E.ce_session_register_value(_session, index);
+		/// <returns>false when this core does not support writing registers</returns>
+		public bool SetRegister(int index, long value) => E.ce_session_register_set(_session, index, value) is 0;
+		public bool HasExecutedCycles => E.ce_session_has_executed_cycles(_session) is not 0;
+		public long ExecutedCycles => E.ce_session_executed_cycles(_session);
+
+		public int BusCount => E.ce_session_bus_count(_session);
+		public string BusName(int index) => ChimeraEngine.PtrToStringUtf8(E.ce_session_bus_name(_session, index)) ?? $"Bus {index}";
+		public long BusSize(int index) => E.ce_session_bus_size(_session, index);
+		public bool BusWritable(int index) => E.ce_session_bus_writable(_session, index) is not 0;
+		public byte BusPeek(int index, int addr) => unchecked((byte)E.ce_session_bus_peek(_session, index, addr));
+		public void BusPoke(int index, int addr, byte value) => E.ce_session_bus_poke(_session, index, addr, value);
+
+		public bool TraceAvailable => E.ce_session_trace_available(_session) is not 0;
+		public string TraceHeader => ChimeraEngine.PtrToStringUtf8(E.ce_session_trace_header(_session)) ?? "Instructions";
+		/// <summary>The session remembers the flag and re-asserts it after a state load.</summary>
+		public void TraceEnable(bool on) => E.ce_session_trace_enable(_session, on ? 1 : 0);
+		/// <summary>The traced lines since the last drain (consecutive NUL-terminated strings), cleared on the way out.</summary>
+		public byte[] TraceDrain(out int lineCount, out bool overflowed)
+		{
+			ulong len = 0;
+			var lines = 0;
+			var overflow = 0;
+			var p = E.ce_session_trace_drain(_session, ref len, ref lines, ref overflow);
+			lineCount = lines;
+			overflowed = overflow is not 0;
+			if (len == 0) return [ ];
+			var ret = new byte[len];
+			Marshal.Copy(p, ret, 0, checked((int)len));
+			return ret;
+		}
+
+		public bool PersistAvailable => E.ce_session_persist_available(_session) is not 0;
+		public string PersistName => ChimeraEngine.PtrToStringUtf8(E.ce_session_persist_name(_session)) ?? "Persistent Data";
+		public string PersistId => ChimeraEngine.PtrToStringUtf8(E.ce_session_persist_id(_session)) ?? "data";
+		/// <returns>the core's serialized keep-data, or null when it has nothing right now</returns>
+		public byte[]? PersistGet()
+		{
+			ulong len = 0;
+			var p = E.ce_session_persist_get(_session, ref len);
+			if (p == IntPtr.Zero || len == 0) return null;
+			var ret = new byte[len];
+			Marshal.Copy(p, ret, 0, checked((int)len));
+			return ret;
+		}
+
+		/// <summary>0 = accepted; 1 = the core refused the file; 2 = no room for it.</summary>
+		public int PersistPut(byte[] data) => E.ce_session_persist_put(_session, data, (ulong)data.LongLength);
 
 		private string LastError
 			=> ChimeraEngine.PtrToStringUtf8(E.ce_session_last_error(_session)) ?? "engine session error";

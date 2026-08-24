@@ -17,8 +17,8 @@ namespace BizHawk.Emulation.Common.Waterbox
 	/// docs/engine-migration.md) - the same machine chimera-run drives headlessly
 	/// and the witness gate's Level E verifies. What remains here is the
 	/// frontend-facing half: IEmulator and friends, the settings objects, and the
-	/// optional tooling/persistent-data groups (still driven over the session's
-	/// transitional guest-proc bridge until they migrate in turn).
+	/// service surfaces the optional tooling/persistent-data groups back - the
+	/// groups themselves are probed and driven by the session.
 	/// </summary>
 	// The attribute names the ADAPTER, which is all a class-level attribute can do
 	// when one class serves every package. It is the fallback; the real identity
@@ -45,9 +45,6 @@ namespace BizHawk.Emulation.Common.Waterbox
 				author: cfg.Author ?? "",
 				portedVersion: cfg.Version ?? "",
 				portedUrl: cfg.Url ?? "");
-
-		[UnmanagedFunctionPointer(CallingConvention.Cdecl)] private delegate IntPtr GetPtrFn();
-		[UnmanagedFunctionPointer(CallingConvention.Cdecl)] private delegate int IntFn();
 
 		private readonly WaterboxConfig _cfg;
 		private readonly EngineSession _session;
@@ -109,20 +106,6 @@ namespace BizHawk.Emulation.Common.Waterbox
 			InitTooling((BasicServiceProvider)ServiceProvider, domains);
 			InitPersistentData((BasicServiceProvider)ServiceProvider);
 			((BasicServiceProvider)ServiceProvider).Register<IMemoryDomains>(new MemoryDomainList(domains));
-		}
-
-		private static int ArgCount<T>() where T : Delegate
-			=> typeof(T).GetMethod("Invoke")!.GetParameters().Length;
-
-		/// <summary>
-		/// An OPTIONAL guest export via the session's transitional bridge, for the
-		/// tooling groups that have not migrated into the engine yet. Null when the
-		/// core does not export it.
-		/// </summary>
-		private T TryProc<T>(string name) where T : Delegate
-		{
-			var addr = _session.GuestProc(name, ArgCount<T>());
-			return addr == IntPtr.Zero ? null : Marshal.GetDelegateForFunctionPointer<T>(addr);
 		}
 
 		// ---- settings ----
@@ -286,8 +269,9 @@ namespace BizHawk.Emulation.Common.Waterbox
 				if (n <= 0) throw new EndOfStreamException("truncated waterbox savestate");
 				got += n;
 			}
+			// (the engine re-asserts the tracing flag itself: a state load overwrites
+			// the guest memory it lives in)
 			_session.LoadState(_stateScratch, len);
-			RestoreTraceState(); // the guest's tracing flag lives in guest memory, which the state just overwrote
 
 			IsLagFrame = reader.ReadBoolean();
 			LagCount = reader.ReadInt32();

@@ -85,8 +85,16 @@ long-lived dual paths.
      are deleted. The optional tooling/persistent-data groups still reach the
      guest through the session's TRANSITIONAL guest-proc bridge
      (ce_session_guest_proc) until they migrate as their own components.
-   - remaining in 5: tooling/persistent-data ABI groups into the session;
-     movie playback/record and the greenzone into the session
+   - 5b **tooling + persistent data into the session** - DONE. The four
+     tooling groups (surfaces, registers, buses, trace) and the persistent-
+     data channel are probed and driven by the session
+     (`ce_session_surface_*`/`_register_*`/`_bus_*`/`_trace_*`/`_persist_*`);
+     the transitional guest-proc bridge is gone. The session owns the trace
+     flag and re-asserts it inside load_state (movie-correctness state
+     belongs to the engine). Known gap: the synth core exports none of the
+     optional groups, so the gate witnesses only the groups-absent path -
+     the groups-present path rides the 1:1 transliteration and real cores.
+   - remaining in 5: movie playback/record and the greenzone into the session
 6. Memory domains + tooling services
 7. Lua (real Lua replaces NLua; script API preserved)
 8. AV dumping
