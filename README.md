@@ -1,7 +1,16 @@
 <p align="center">
+	<a href="https://github.com/ToolAssisted-run/chimera/actions/workflows/ci.yml"><img src="https://github.com/ToolAssisted-run/chimera/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+</p>
+
+<p align="center">
 	<picture>
-		<source media="(prefers-color-scheme: dark)" srcset="docs/logo-dark.svg">
-		<img src="docs/logo.svg" alt="Chimera - a ring of pixel modules around a d-pad" width="420">
+		<source media="(prefers-color-scheme: dark)" srcset="docs/icon-dark.svg">
+		<img src="docs/icon.svg" alt="Chimera - four pixel modules around the beast's eye" width="140" align="middle">
+	</picture>
+	&nbsp;&nbsp;
+	<picture>
+		<source media="(prefers-color-scheme: dark)" srcset="docs/logotype-dark.svg">
+		<img src="docs/logotype.svg" alt="CHIMERA" width="330" align="middle">
 	</picture>
 </p>
 
