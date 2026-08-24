@@ -203,24 +203,6 @@ custom_target(
 )
 
 # ---------------------------------------------------------------------------
-# chd_capi: Rust, toolchain pinned by extern/libchd-rs-capi/rust-toolchain.toml
-# ---------------------------------------------------------------------------
-custom_target(
-  'chd_capi',
-  output: host_windows ? 'chd_capi.dll' : 'libchd_capi.so',
-  command: [
-    nested_tool, 'cargo',
-    repo_root / 'extern/libchd-rs-capi',
-    '@OUTDIR@' / 'chd-build',
-    '@OUTPUT@',
-    host_windows ? 'x86_64-pc-windows-gnu' : '',
-  ],
-  console: true,
-  install: true,
-  install_dir: 'dll',
-)
-
-# ---------------------------------------------------------------------------
 # libminiboxhost: the miniBox waterbox host (from the extern/miniBox submodule).
 # Chimera is waterbox-only: this host loads every core's core.wbx, so it ships
 # with the frontend. It is self-contained C (no external deps, no guest

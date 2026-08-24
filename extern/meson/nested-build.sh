@@ -3,7 +3,6 @@
 # single meson custom_target command:
 #   nested-build.sh meson <srcdir> <builddir> <output> <cross-arg|''> [extra -D args...]
 #   nested-build.sh cmake <srcdir> <builddir> <output> <toolchain|''> [extra -D args...]
-#   nested-build.sh cargo <cratedir> <builddir> <output> <rust-target|''>
 # <output> is the file meson expects this target to produce; the built library
 # is copied there.
 set -e
@@ -46,16 +45,6 @@ cmake)
 		# versioned .so (e.g. libopenal.so.1.24.3) or lib-prefixed variant
 		stem="$(basename "$out" | sed 's/\.[^.]*$//')"
 		lib="$(find "$bld" \( -name "$stem.so.*" -o -name "$stem.*" \) -type f | head -1)"
-	fi
-	;;
-cargo)
-	crate_name="$(basename "$out" | sed 's/^lib//; s/\.[^.]*$//')"
-	if [ -n "$aux" ]; then
-		(cd "$src" && CARGO_TARGET_DIR="$bld" cargo build --release --target "$aux")
-		lib="$(find "$bld/$aux/release" -maxdepth 1 \( -name "$crate_name.dll" -o -name "lib$crate_name.so" \) -type f | head -1)"
-	else
-		(cd "$src" && CARGO_TARGET_DIR="$bld" cargo build --release)
-		lib="$(find "$bld/release" -maxdepth 1 \( -name "$crate_name.dll" -o -name "lib$crate_name.so" \) -type f | head -1)"
 	fi
 	;;
 *)

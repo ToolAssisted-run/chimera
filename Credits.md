@@ -17,4 +17,4 @@ This repository's history begins at the point of separation from BizHawk; the fu
 
 ## Third-party libraries
 
-The native libraries built from `extern/` (SDL2, Lua, zstd, SQLite, OpenAL Soft, cimgui, luasocket, chd-rs, miniz, cJSON, and supporting projects) belong to their respective authors, under their respective licenses; see each project's license file, and [LICENSE](LICENSE) for how they relate to this repository.
+The native libraries built from `extern/` (SDL2, Lua, zstd, SQLite, OpenAL Soft, cimgui, luasocket, miniz, cJSON, and supporting projects) belong to their respective authors, under their respective licenses; see each project's license file, and [LICENSE](LICENSE) for how they relate to this repository.
