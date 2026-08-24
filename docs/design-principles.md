@@ -232,7 +232,7 @@ phase of unverified change.
   arm64 prebuilt): nothing in the tree used it, and a core that wants it (e.g. a
   future Gambatte package) should bundle its own copy.
   Sharp edge #2, caught by the witness harness itself: the original zip-extraction
-  cache (delete stale dir, extract, write stamp file) raced when 8 EmuHawk instances
+  cache (delete stale dir, extract, write stamp file) raced when 8 Chimera instances
   launched simultaneously against a cold cache - ZipFile.ExtractToDirectory threw
   "file already exists", and since extraction ran outside the per-package try/catch it
   reached the top-level exception dialog, which on the hidden desktop blocks invisibly
@@ -259,7 +259,7 @@ phase of unverified change.
   drivers, hidden-run.ps1, native/dumper.cpp, tests/README - moved to
   quickerNES chimera/tests/ (drivers grew --chimera-root/-ChimeraRoot,
   defaulting to a sibling Chimera or BizHawk checkout); stale QuickNesConfig
-  Compile Update items purged from the EmuHawk csproj. The quickerNES witness
+  Compile Update items purged from the Chimera csproj. The quickerNES witness
   remains the commit gate, run from its new home, until the synthetic witness
   (see "The synthetic witness" section) replaces it: three synthetic cores
   (one per flavor of the core taxonomy) sharing exact emulation logic, video,
@@ -280,7 +280,7 @@ phase of unverified change.
   Seventeenth addendum (2026-08-11, user-directed - LINUX GATE + HEADLESS + layout;
   the sixteenth - an exec-bit fix and charter note - was authored on the Windows box
   and is pending its push): the witness gate now runs on Linux. tests/run-level-b.sh
-  (+ bootstrap.lua) is a faithful port of run-level-b.ps1 - EmuHawk under Mono on a
+  (+ bootstrap.lua) is a faithful port of run-level-b.ps1 - Chimera under Mono on a
   private Xvfb display replacing the hidden Windows desktop, same job protocol and
   the same goldens. First-ever Mono run of this frontend; 26/26 simple + 26/26
   rerecord byte-identical to the Windows-recorded goldens - the reproducibility
@@ -363,7 +363,7 @@ phase of unverified change.
   Toolchain: VS2022's clang-cl/CMake/Ninja (probed by path, works on GitHub
   windows-latest runners unchanged). Per the reproducibility pillar, all version pins
   are for BUILD reproducibility only - never for movie determinism, which belongs to
-  the core package. Assets/ is GONE entirely: EmuHawkMono.sh moved into the EmuHawk
+  the core package. Assets/ is GONE entirely: ChimeraMono.sh moved into the Chimera
   project (copied to build/ by the PostBuild target), the LuaCATS API doc stubs were
   DELETED outright (pure editor documentation, annotation-only with error() guards,
   never read by the frontend, and partially stale against Chimera's actual API;
@@ -409,7 +409,7 @@ phase of unverified change.
   binaries remain. The source generators are ProjectReferences with
   OutputItemType=Analyzer; NLua/ISOParser/HawkQuantizer are plain ProjectReferences
   (built transitively, not sln members); SettingsUtil is built via a
-  ReferenceOutputAssembly=false reference from EmuHawk and copied into build/dll
+  ReferenceOutputAssembly=false reference from Chimera and copied into build/dll
   (ProvideCoreAuthorKit target) so the core-author kit is contract DLLs + settings
   generator in one directory - the quickernes package's Analyzer path points there.
   Sharp edge #3: solution builds UNSET Configuration/Platform for ProjectReferences
@@ -568,7 +568,7 @@ both OS natives); and run-witness.sh, the two-level driver: Level A replays
 the four goal movies (win / lose / video output / audio output) natively and
 checks final RAM plus FULL per-frame video and audio stream hashes against
 goldens, with a serialize-every-frame rerecord self-check; Level B replays
-the same movies through EmuHawk (Mono + Xvfb) and byte-compares the final
+the same movies through Chimera (Mono + Xvfb) and byte-compares the final
 RAM and VRAM domains against the same goldens, both modes. ~10 seconds wall
 clock, and it is THE Chimera smoke test (user decision, same day): the
 quickerNES --quick smoke subset is retired; quickerNES's suite is the full
@@ -633,7 +633,7 @@ is exactly the TAS-critical property.
 - **Level A - core payload guard.** Build and run the native quickerNES tester over all
   34 tests. Validates that the native DLL we package never drifts. Runs everything,
   including the two tests with initial `.state` files.
-- **Level B - full-stack witness (the real one).** Drive EmuHawk itself: load ROM, feed
+- **Level B - full-stack witness (the real one).** Drive Chimera itself: load ROM, feed
   the `.sol` inputs through the frontend input pipeline (Lua harness or generated `.bk2`
   movies), dump final 2KB RAM domain, byte-compare against golden dumps recorded from
   unmodified BizHawk in Phase 0. Also run a per-frame savestate save/load variant
@@ -661,14 +661,14 @@ Witness-set exclusions found in Phase 0 (28 of 31 at Level A; 26 at Level B):
   submodule).
 
 Phase 0 discoveries about frame alignment (validated by per-frame RAM comparison):
-- EmuHawk emulates exactly ONE frame during ROM load, before a `--lua` script's
+- Chimera emulates exactly ONE frame during ROM load, before a `--lua` script's
   first line executes. A naive Lua replay is therefore one frame late relative to a
   power-on input sequence. `replay.lua` compensates with `client.reboot_core()` at
   script start (verified `startframe=0` afterward). Remember this when Chimera later
   aligns `.bk2` movies with tester `.sol` sequences.
 - quickerNES `emulate_skip_frame` (rendering disabled, used by the native tester) was
   verified state-equivalent to `emulate_frame` - rendering on/off does not affect RAM.
-- EmuHawk power-on RAM state is byte-identical to the bare core's (no adapter-side
+- Chimera power-on RAM state is byte-identical to the bare core's (no adapter-side
   initialization differences).
 - Lua `joypad.set` input passes through the SOCD (opposing-directions) filter
   (`UdlrControllerAdapter`), whose default `Priority` policy silently rewrites
@@ -688,7 +688,7 @@ Phase 0 discoveries about frame alignment (validated by per-frame RAM comparison
   goldens recorded for 28/28.
 - Core finding for upstream quickerNES: a full-state savestate round-trip is NOT
   lossless for `gimmick` (Sunsoft FME-7) and `superOffroad` - the native core itself
-  perturbs state on deserialize+advance (EmuHawk mirrors it byte-exactly, so the
+  perturbs state on deserialize+advance (Chimera mirrors it byte-exactly, so the
   frontend is faithful; the incompleteness is in core serialization). Deterministic,
   so the witness remains sound, but worth an upstream look.
 - Core finding for upstream: pinned fork segfaults in `Core::serializeState` on
@@ -703,7 +703,7 @@ Phase 0 discoveries about frame alignment (validated by per-frame RAM comparison
   coupling is ~96 frontend files using concrete core types, mostly deletable for Chimera.
 - `GenericCoreConfig` (reflection-based settings UI) already exists; per-core config
   dialogs are not needed.
-- EmuHawk targets `net48`: no assembly unload, hence the load-once model.
+- Chimera targets `net48`: no assembly unload, hence the load-once model.
 - Determinism is sacred: anything touching emulation, input, or timing must preserve
   frame-exact reproducibility or movies desync.
 
@@ -780,7 +780,7 @@ checked without a person:
 - **Logic** lives in `Chimera.Client.Common` and is tested in
   `Chimera.Tests.Client.Common` - no display, no emulator, no core. The states a
   window displays belong here, not in the window.
-- **Wiring** is tested in `Chimera.Tests.Client.EmuHawk`, which constructs real
+- **Wiring** is tested in `Chimera.Tests.Client.GUI`, which constructs real
   forms and drives them (tick a row, press a button) under Xvfb. Forms must be
   shown for handles to exist, or selection and click handling silently do
   nothing.
@@ -913,7 +913,7 @@ core cannot rebind the pad someone is already playing with.
 reports and ignores unreadable JSON: an optional convenience file must never stop
 a core from loading.
 
-Gated at both ends: the synthetic witness starts EmuHawk from a config that has
+Gated at both ends: the synthetic witness starts Chimera from a config that has
 never heard of the synth controller and requires the package's bindings to be in
 the config it writes out (`K:box:keybinds`), and each core repo's frontend gate
 does the same for its own package.

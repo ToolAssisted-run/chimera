@@ -8,7 +8,7 @@ using Newtonsoft.Json.Linq;
 namespace Chimera.Tests.Client.Common.config
 {
 	/// <summary>
-	/// The project was renamed from BizHawk/miniHawk to Chimera, but a decade of
+	/// The project was renamed from BizHawk/Chimera to Chimera, but a decade of
 	/// configs and movies embed the old names - in "$type" annotations and in the
 	/// per-core settings keys. These pin the promise that all of them keep
 	/// loading, forever.

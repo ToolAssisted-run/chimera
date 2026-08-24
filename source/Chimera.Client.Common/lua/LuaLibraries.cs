@@ -72,8 +72,6 @@ namespace Chimera.Client.Common
 			foreach (var lib in ReflectionCache_Chi_Cli_Com.Types
 				.Where(static t => typeof(LuaLibraryBase).IsAssignableFrom(t) && t.IsSealed))
 			{
-				if (VersionInfo.DeveloperBuild
-					|| lib.GetCustomAttribute<LuaLibraryAttribute>(inherit: false)?.Released is not false)
 				{
 					if (!ServiceInjector.IsAvailable(serviceProvider, lib))
 					{

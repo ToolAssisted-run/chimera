@@ -137,7 +137,7 @@ namespace Chimera.Client.Common
 		private static RootCommand GetRootCommand()
 		{
 			RootCommand root = new($"{
-				(string.IsNullOrEmpty(VersionInfo.CustomBuildString) ? "EmuHawk" : VersionInfo.CustomBuildString)
+				(string.IsNullOrEmpty(VersionInfo.CustomBuildString) ? "Chimera" : VersionInfo.CustomBuildString)
 			}, a multi-system emulator frontend\n{VersionInfo.GetEmuVersion()}");
 			root.Add(ArgumentRomFilePath);
 			root.Options.RemoveAll(option => option is VersionOption); // we have our own version command
@@ -199,14 +199,14 @@ namespace Chimera.Client.Common
 			}
 			if (result.Action is not null)
 			{
-				// means e.g. `./EmuHawkMono.sh --help` was passed, run whatever behaviour it normally has
+				// means e.g. `./ChimeraMono.sh --help` was passed, run whatever behaviour it normally has
 				EnsureConsole();
 				return result.Invoke();
 			}
 			if (result.GetValue(OptionHeadless)) HeadlessMode.Enabled = true; // also set by a raw pre-parse scan in Program, for dialogs shown before this point
 			if (result.GetValue(OptionQueryAppVersion))
 			{
-				// means e.g. `./EmuHawkMono.sh --version` was passed, so print that and exit immediately
+				// means e.g. `./ChimeraMono.sh --version` was passed, so print that and exit immediately
 				EnsureConsole();
 				Console.WriteLine(VersionInfo.GetEmuVersion());
 				return 0;

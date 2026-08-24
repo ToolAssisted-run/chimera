@@ -8,7 +8,7 @@
 #   simple and per-frame whole-machine-savestate (rerecord) modes.
 # Level E (engine): chimera-run - the engine's headless session - replays the
 #   same movies with no frontend at all; its dumps must match the goldens too.
-# Level B (frontend): EmuHawk (Mono + Xvfb on Linux) loads the core.wbx package
+# Level B (frontend): Chimera (Mono + Xvfb on Linux) loads the core.wbx package
 #   through Chimera's built-in generic waterbox adapter and replays the same
 #   movies; the final RAM and VRAM dumps must be byte-identical to the Level A
 #   goldens. Audio is Level A-verified only (no scriptable audio tap).
@@ -16,8 +16,8 @@
 # Usage:
 #   ./run-witness.sh              # verify (all levels, both modes)
 #   ./run-witness.sh --record     # (re)record goldens from the current build
-#   ./run-witness.sh --level a    # native level only (no EmuHawk needed)
-#   ./run-witness.sh --level e    # engine level only (no EmuHawk needed)
+#   ./run-witness.sh --level a    # native level only (no Chimera needed)
+#   ./run-witness.sh --level e    # engine level only (no Chimera needed)
 set -u
 
 record=0
@@ -180,7 +180,7 @@ fi
 
 # ---------- Level B ----------
 if [ "$level" = "both" ] || [ "$level" = "b" ]; then
-	emu_hawk="$repo_root/build/EmuHawk.exe"
+	emu_exe="$repo_root/build/Chimera.exe"
 
 	export LD_LIBRARY_PATH="$repo_root/build/dll:$repo_root/build:/usr/lib/x86_64-linux-gnu"
 	export MONO_CRASH_NOFILE=1 MONO_WINFORMS_XIM_STYLE=disabled ALSOFT_DRIVERS=null
@@ -200,7 +200,7 @@ if [ "$level" = "both" ] || [ "$level" = "b" ]; then
 
 	config="$work/config.ini"
 	if [ ! -f "$config" ]; then
-		( cd "$repo_root" && timeout 120 mono "$emu_hawk" --headless "--config=$config" \
+		( cd "$repo_root" && timeout 120 mono "$emu_exe" --headless "--config=$config" \
 			"--lua=$here/bootstrap-exit.lua" ) > "$work/bootstrap.log" 2>&1
 		[ -f "$config" ] || { echo "config bootstrap failed (see $work/bootstrap.log)" >&2; exit 1; }
 	fi
@@ -225,7 +225,7 @@ if [ "$level" = "both" ] || [ "$level" = "b" ]; then
 				} > "$job"
 				rm -f "$work/$tag.ram.bin" "$work/$tag.vram.bin" "$work/$tag.meta.txt"
 				cp "$config" "$work/config.$tag.ini"
-				( cd "$repo_root" && CHIMERA_JOB="$job" timeout 300 mono "$emu_hawk" --headless \
+				( cd "$repo_root" && CHIMERA_JOB="$job" timeout 300 mono "$emu_exe" --headless \
 					"--config=$work/config.$tag.ini" "--core=$package" \
 					"--lua=$here/synth-replay.lua" "$rom" ) > "$work/$tag.log" 2>&1
 				if [ ! -f "$work/$tag.meta.txt" ] || ! grep -q "^status=OK" "$work/$tag.meta.txt"; then
@@ -257,7 +257,7 @@ if [ "$level" = "both" ] || [ "$level" = "b" ]; then
 import json, sys
 cfg = json.load(open(sys.argv[1]))
 # deliberately the PRE-RENAME key: the frontend must keep honouring configs
-# written before BizHawk/miniHawk became Chimera
+# written before BizHawk/Chimera became Chimera
 cfg.setdefault("CoreSyncSettings", {})["BizHawk.Emulation.Common.Waterbox.WaterboxCore"] = {"Values": {"initFillByte": 171}}
 json.dump(cfg, open(sys.argv[2], "w"), indent=2)
 PY
@@ -270,7 +270,7 @@ PY
 			echo "mode=simple"
 		} > "$sjob"
 		rm -f "$work/settings.ram.bin" "$work/settings.meta.txt"
-		( cd "$repo_root" && CHIMERA_JOB="$sjob" timeout 300 mono "$emu_hawk" --headless \
+		( cd "$repo_root" && CHIMERA_JOB="$sjob" timeout 300 mono "$emu_exe" --headless \
 			"--config=$scfg" "--core=$repo_root/build/Cores/synth-box.zip" \
 			"--lua=$here/synth-replay.lua" "$srom" ) > "$work/settings.log" 2>&1
 		if [ ! -f "$work/settings.meta.txt" ] || ! grep -q "^status=OK" "$work/settings.meta.txt"; then
@@ -311,7 +311,7 @@ PY
 		} > "$mjob"
 		rm -f "$work/movie.ram.bin" "$work/movie.vram.bin" "$work/movie.meta.txt"
 		cp "$config" "$work/config.movie.ini"
-		( cd "$repo_root" && CHIMERA_JOB="$mjob" timeout 300 mono "$emu_hawk" --headless \
+		( cd "$repo_root" && CHIMERA_JOB="$mjob" timeout 300 mono "$emu_exe" --headless \
 			"--config=$work/config.movie.ini" "--core=$repo_root/build/Cores/synth-box.zip" \
 			"--movie=$mbk2" "--lua=$here/synth-movie-dump.lua" "$mrom" ) > "$work/movie.log" 2>&1
 		if [ ! -f "$work/movie.meta.txt" ] || ! grep -q "^status=OK" "$work/movie.meta.txt"; then
@@ -341,7 +341,7 @@ PY
 		} > "$djob"
 		rm -f "$work/discovery.ram.bin" "$work/discovery.meta.txt"
 		cp "$config" "$work/config.discovery.ini"
-		( cd "$repo_root" && CHIMERA_JOB="$djob" timeout 300 mono "$emu_hawk" --headless \
+		( cd "$repo_root" && CHIMERA_JOB="$djob" timeout 300 mono "$emu_exe" --headless \
 			"--config=$work/config.discovery.ini" "--lua=$here/synth-replay.lua" \
 			"$here/roms/${dname%%.*}.testrom" ) > "$work/discovery.log" 2>&1
 		if [ -f "$work/discovery.meta.txt" ] && grep -q "^status=OK" "$work/discovery.meta.txt"; then
@@ -354,7 +354,7 @@ PY
 		# The frontend has no bindings of its own: a controller it has never seen is played however
 		# the package that declared it says (the package's default_keybinds.json). Start from a
 		# config that has never heard of this controller - which is what a fresh install is - and
-		# the config EmuHawk writes on exit must hold the package's bindings, or the core arrives
+		# the config Chimera writes on exit must hold the package's bindings, or the core arrives
 		# unplayable.
 		kname=gridWalker.win
 		kcfg="$work/config.keybinds.ini"
@@ -368,7 +368,7 @@ PY
 			echo "mode=simple"
 		} > "$kjob"
 		rm -f "$work/keybinds.meta.txt"
-		( cd "$repo_root" && CHIMERA_JOB="$kjob" timeout 300 mono "$emu_hawk" --headless \
+		( cd "$repo_root" && CHIMERA_JOB="$kjob" timeout 300 mono "$emu_exe" --headless \
 			"--config=$kcfg" "--core=$package" "--lua=$here/synth-replay.lua" \
 			"$here/roms/${kname%%.*}.testrom" ) > "$work/keybinds.log" 2>&1
 		if [ ! -f "$work/keybinds.meta.txt" ] || ! grep -q "^status=OK" "$work/keybinds.meta.txt"; then

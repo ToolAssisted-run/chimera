@@ -7,7 +7,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Chimera.Client.Common", "Ch
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Chimera.Common", "Chimera.Common\Chimera.Common.csproj", "{866F8D13-0678-4FF9-80A4-A3993FD4D8A3}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Chimera.Client.EmuHawk", "Chimera.Client.EmuHawk\Chimera.Client.EmuHawk.csproj", "{DD448B37-BA3F-4544-9754-5406E8094723}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Chimera.Client.GUI", "Chimera.Client.GUI\Chimera.Client.GUI.csproj", "{DD448B37-BA3F-4544-9754-5406E8094723}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Chimera.Emulation.DiscSystem", "Chimera.Emulation.DiscSystem\Chimera.Emulation.DiscSystem.csproj", "{F51946EA-827F-4D82-B841-1F2F6D060312}"
 EndProject
@@ -33,7 +33,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{74391239
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Chimera.Tests.Client.Common", "Chimera.Tests.Client.Common\Chimera.Tests.Client.Common.csproj", "{284E19E2-661D-4A7D-864A-AC2FC91E7C25}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Chimera.Tests.Client.EmuHawk", "Chimera.Tests.Client.EmuHawk\Chimera.Tests.Client.EmuHawk.csproj", "{5B7E0FA1-9C31-4A22-B7A0-2A8F1D6C4E30}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Chimera.Tests.Client.GUI", "Chimera.Tests.Client.GUI\Chimera.Tests.Client.GUI.csproj", "{5B7E0FA1-9C31-4A22-B7A0-2A8F1D6C4E30}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Chimera.Tests.Common", "Chimera.Tests.Common\Chimera.Tests.Common.csproj", "{39546396-C4D0-45D3-8C6A-D56D29B5BD72}"
 EndProject
@@ -124,6 +124,6 @@ Global
 		SolutionGuid = {9B9E4316-9185-412E-B951-A63355ACA956}
 	EndGlobalSection
 	GlobalSection(MonoDevelopProperties) = preSolution
-		StartupItem = Chimera.Client.EmuHawk\Chimera.Client.EmuHawk.csproj
+		StartupItem = Chimera.Client.GUI\Chimera.Client.GUI.csproj
 	EndGlobalSection
 EndGlobal

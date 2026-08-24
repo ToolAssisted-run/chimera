@@ -4,7 +4,7 @@
 # There are two kinds and they are deliberately separate:
 #   - Chimera.Tests.* : logic. No display, no emulator, no core. Everything a
 #     machine can decide about the frontend's behaviour should end up here.
-#   - Chimera.Tests.Client.EmuHawk : windows. Constructs forms and drives them
+#   - Chimera.Tests.Client.GUI : windows. Constructs forms and drives them
 #     (tick a row, press a button) to check the wiring between the widgets and
 #     that logic. Needs an X display; on a headless box that is Xvfb.
 #
@@ -60,9 +60,9 @@ if [ "$shots" -eq 1 ]; then
 fi
 
 if [ "$only_ui" -eq 1 ]; then
-	projects=(Chimera.Tests.Client.EmuHawk)
+	projects=(Chimera.Tests.Client.GUI)
 else
-	projects=(Chimera.Tests.Common Chimera.Tests.Emulation.Common Chimera.Tests.Client.Common Chimera.Tests.Client.EmuHawk)
+	projects=(Chimera.Tests.Common Chimera.Tests.Emulation.Common Chimera.Tests.Client.Common Chimera.Tests.Client.GUI)
 fi
 
 failed=0

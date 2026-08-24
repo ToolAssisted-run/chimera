@@ -6,17 +6,7 @@ namespace Chimera.Common
 {
 	public static partial class VersionInfo
 	{
-		/// <remarks>
-		/// Bump this immediately after release.
-		/// Only use '0'..'9' and '.' or it will fail to parse and the new version notification won't work.
-		/// </remarks>
-		public static readonly string MainVersion = "2.11.2";
-
-		public static readonly string ReleaseDate = "May 1st, 2026";
-
 		public static readonly string HomePage = "https://github.com/ToolAssisted-run/chimera";
-
-		public static readonly bool DeveloperBuild = true;
 
 		public static readonly string? CustomBuildString;
 
@@ -41,13 +31,18 @@ namespace Chimera.Common
 				}
 			}
 			UserAgentEscaped = $"{
-				(string.IsNullOrWhiteSpace(CustomBuildString) ? "EmuHawk" : CustomBuildString!.OnlyAlphanumeric())
-			}/{MainVersion}{(DeveloperBuild ? "-dev" : string.Empty)}";
+				(string.IsNullOrWhiteSpace(CustomBuildString) ? "Chimera" : CustomBuildString!.OnlyAlphanumeric())
+			}/{GIT_SHORTHASH}";
 		}
 
 		public static (string Label, string TargetURI) GetGitCommitLink()
-			=> ($"Commit :{GIT_BRANCH}@{GIT_SHORTHASH}", $"https://github.com/TASEmulators/BizHawk/commit/{GIT_HASH}");
+			=> ($"Commit {GIT_SHORTHASH} ({GIT_SHORTDATE})", $"https://github.com/ToolAssisted-run/chimera/commit/{GIT_HASH}");
 
+		/// <summary>
+		/// Chimera has no versions: a build is identified by its commit and that
+		/// commit's date (never a build wall-clock, which would break reproducible
+		/// builds).
+		/// </summary>
 		public static string GetFullVersionDetails()
 		{
 			//TODO prepare for AArch64/RISC-V
@@ -57,27 +52,11 @@ namespace Chimera.Common
 #else
 			const string buildConfig = "Release";
 #endif
-			return DeveloperBuild
-				? $"Version {MainVersion}, dev build ({buildConfig}, {targetArch})"
-				: $"Version {MainVersion} ({targetArch})";
+			return $"Commit {GIT_SHORTHASH} ({buildConfig}, {targetArch})";
 		}
 
 		public static string GetEmuVersion()
-			=> DeveloperBuild ? $"GIT {GIT_BRANCH}#{GIT_SHORTHASH}" : $"Version {MainVersion}"; // intentionally leaving '#' here to differentiate it from the "proper" one in `Help` > `About...` --yoshi
+			=> $"Commit {GIT_SHORTHASH}";
 
-		/// <summary>"2.5.1" => 0x02050100</summary>
-		public static uint VersionStrToInt(string s)
-		{
-			var a = s.Split('.');
-			var v = 0U;
-			var i = 0;
-			while (i < 4)
-			{
-				v <<= 8;
-				v += i < a.Length && byte.TryParse(a[i], out var b) ? b : 0U;
-				i++;
-			}
-			return v;
-		}
 	}
 }

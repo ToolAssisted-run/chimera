@@ -243,14 +243,14 @@ namespace Chimera.Common.NumberExtensions
 		/// <summary>2^-53</summary>
 		private const double ExtremelySmallNumber = 1.1102230246251565E-16;
 
-		/// <inheritdoc cref="HawkFloatEquality(float,float,float)"/>
-		public static bool HawkFloatEquality(this double d, double other, double ε = ExtremelySmallNumber) => Math.Abs(other - d) < ε;
+		/// <inheritdoc cref="ApproxFloatEquality(float,float,float)"/>
+		public static bool ApproxFloatEquality(this double d, double other, double ε = ExtremelySmallNumber) => Math.Abs(other - d) < ε;
 
 		/// <summary>2^-24</summary>
 		private const float ReallySmallNumber = 5.96046448E-08f;
 
 		/// <remarks>don't use this in cores without picking a suitable ε</remarks>
-		public static bool HawkFloatEquality(this float f, float other, float ε = ReallySmallNumber) => Math.Abs(other - f) < ε;
+		public static bool ApproxFloatEquality(this float f, float other, float ε = ReallySmallNumber) => Math.Abs(other - f) < ε;
 
 #pragma warning disable RCS1224 // don't want extension on nonspecific `float`/`uint`
 		/// <summary> Reinterprets the byte representation of <paramref name="value"/> as a float</summary>

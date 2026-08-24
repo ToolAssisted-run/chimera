@@ -144,13 +144,13 @@ namespace Chimera.Client.Common
 		public delegate void LoadErrorEventHandler(object sender, RomErrorArgs e);
 		public event LoadErrorEventHandler OnLoadError;
 
-		public Func<HawkFile, int?> ChooseArchive { get; set; }
+		public Func<ChimeraFile, int?> ChooseArchive { get; set; }
 
 		public Func<RomGame, string> ChoosePlatform { get; set; }
 
 		// in case we get sent back through the picker more than once, use the same choice the second time
 		private int? _previousChoice;
-		private int? HandleArchive(HawkFile file)
+		private int? HandleArchive(ChimeraFile file)
 		{
 			if (_previousChoice.HasValue)
 			{
@@ -179,7 +179,7 @@ namespace Chimera.Client.Common
 
 		public IOpenAdvanced OpenAdvanced { get; set; }
 
-		private bool HandleArchiveBinding(HawkFile file, bool showDialog = true)
+		private bool HandleArchiveBinding(ChimeraFile file, bool showDialog = true)
 		{
 			// try binding normal rom extensions first
 			if (!file.IsBound)
@@ -304,7 +304,7 @@ namespace Chimera.Client.Common
 				path,
 				str => DoLoadErrorCallback(message: str, systemId: "???"/*TODO we should NOT be doing this, even if it's just for error display*/, LoadErrorType.DiscError));
 
-		private bool LoadDisc(string path, CoreComm nextComm, HawkFile file, string ext, string forcedCoreName, out IEmulator nextEmulator, out GameInfo game)
+		private bool LoadDisc(string path, CoreComm nextComm, ChimeraFile file, string ext, string forcedCoreName, out IEmulator nextEmulator, out GameInfo game)
 		{
 			var disc = InstantiateDiscFor(path);
 			if (disc == null)
@@ -368,7 +368,7 @@ namespace Chimera.Client.Common
 				return false;
 			}
 
-			using HawkFile file = new(path, allowArchives: true);
+			using ChimeraFile file = new(path, allowArchives: true);
 			// make sure path is absolute
 			path = CanonicalFullPath = file.CanonicalFullPath;
 
@@ -496,7 +496,7 @@ namespace Chimera.Client.Common
 
 		private void LoadOther(
 			CoreComm nextComm,
-			HawkFile file,
+			ChimeraFile file,
 			string ext,
 			string forcedCoreName,
 			out IEmulator nextEmulator,
@@ -560,7 +560,7 @@ namespace Chimera.Client.Common
 
 		private static bool IsDiscForXML(string path)
 		{
-			if (HawkFile.PathContainsPipe(path))
+			if (ChimeraFile.PathContainsPipe(path))
 			{
 				return false;
 			}
@@ -617,6 +617,6 @@ namespace Chimera.Client.Common
 				new FilesystemFilter("Disc Images", FilesystemFilter.DiscExtensions),
 				new FilesystemFilter("Game Bundles", new[] { GameBundle.Extension.TrimStart('.') }),
 				new FilesystemFilter("ROMs", CoreRegistry.Instance.KnownRomExtensions.Select(static e => e.TrimStart('.')).ToList(), addArchiveExts: true),
-				FilesystemFilter.EmuHawkSaveStates);
+				FilesystemFilter.ChimeraSaveStates);
 	}
 }

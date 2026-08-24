@@ -1,4 +1,4 @@
--- Level B-movie of the synthetic witness: EmuHawk plays a real .bk2 through
+-- Level B-movie of the synthetic witness: Chimera plays a real .bk2 through
 -- the ACTUAL movie pipeline (MovieSession, not scripted joypad), and this
 -- script only advances frames and dumps RAM/VRAM once the movie's entries are
 -- exhausted. The dumps must match the same goldens every other level uses.

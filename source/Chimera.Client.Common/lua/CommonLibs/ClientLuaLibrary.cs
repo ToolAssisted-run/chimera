@@ -13,7 +13,7 @@ using NLua;
 // ReSharper disable UnusedMember.Global
 namespace Chimera.Client.Common
 {
-	[Description("A library for manipulating the EmuHawk client UI")]
+	[Description("A library for manipulating the Chimera client UI")]
 	public sealed class ClientLuaLibrary : LuaLibraryBase, IRegisterFunctions
 	{
 		public Lazy<string> AllAPINames { get; set; }
@@ -240,12 +240,12 @@ namespace Chimera.Client.Common
 			=> APIs.EmuClient.ScreenHeight();
 
 		[LuaMethodExample("client.screenshot( \"C:\\\" );")]
-		[LuaMethod("screenshot", "if a parameter is passed it will function as the Screenshot As menu item of EmuHawk, else it will function as the Screenshot menu item")]
+		[LuaMethod("screenshot", "if a parameter is passed it will function as the Screenshot As menu item of Chimera, else it will function as the Screenshot menu item")]
 		public void Screenshot(string path = null)
 			=> APIs.EmuClient.Screenshot(path);
 
 		[LuaMethodExample("client.screenshottoclipboard( );")]
-		[LuaMethod("screenshottoclipboard", "Performs the same function as EmuHawk's Screenshot To Clipboard menu item")]
+		[LuaMethod("screenshottoclipboard", "Performs the same function as Chimera's Screenshot To Clipboard menu item")]
 		public void ScreenshotToClipboard()
 			=> APIs.EmuClient.ScreenshotToClipboard();
 
@@ -353,10 +353,10 @@ namespace Chimera.Client.Common
 			=> APIs.EmuClient.Ypos();
 
 		[LuaMethodExample("local incbhver = client.getversion( );")]
-		[LuaMethod("getversion", "Returns the current stable Chimera version")]
+		[LuaMethod("getversion", "Returns the commit hash identifying this Chimera build")]
 		public static string GetVersion()
 		{
-			return VersionInfo.MainVersion;
+			return VersionInfo.GIT_SHORTHASH;
 		}
 
 		[LuaMethodExample("local nlcliget = client.getavailabletools( );")]

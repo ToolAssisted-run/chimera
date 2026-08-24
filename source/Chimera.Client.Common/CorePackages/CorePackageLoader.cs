@@ -125,7 +125,7 @@ namespace Chimera.Client.Common
 		private static string ExtractZipToCache(string zipPath, string packageSha1)
 		{
 			// The cache dir name embeds the zip's SHA1 (its identity), and extraction goes
-			// to a private temp dir followed by an atomic rename. Concurrent EmuHawk
+			// to a private temp dir followed by an atomic rename. Concurrent Chimera
 			// instances (or a stale cache from an older zip) therefore never conflict:
 			// whoever wins the rename provides the cache, losers just use it.
 			var packageName = Path.GetFileNameWithoutExtension(zipPath);

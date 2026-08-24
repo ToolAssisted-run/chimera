@@ -1,4 +1,4 @@
--- Level B of the synthetic witness: replay a synth movie through EmuHawk's
+-- Level B of the synthetic witness: replay a synth movie through Chimera's
 -- frontend input pipeline and dump the final RAM and VRAM (framebuffer) domains.
 --
 -- Job description is read from the file named by the CHIMERA_JOB env var:
@@ -51,7 +51,7 @@ do
 	f:close()
 end
 
--- clean power-on (EmuHawk emulates one frame during rom load)
+-- clean power-on (Chimera emulates one frame during rom load)
 if emu.framecount() > 0 then
 	client.reboot_core()
 	if emu.framecount() > 0 then emu.frameadvance() end

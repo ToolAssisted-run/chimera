@@ -74,7 +74,7 @@ namespace Chimera.Client.Common
 		private I2DRenderer Get2DRenderer(DisplaySurfaceID? surfaceID)
 		{
 			var nnID = surfaceID ?? _usingSurfaceID ?? throw new Exception();
-			return _displayManager.GetApiHawk2DRenderer(nnID);
+			return _displayManager.GetApi2DRenderer(nnID);
 		}
 
 		public void ToggleCompositingMode()
@@ -315,7 +315,7 @@ namespace Chimera.Client.Common
 		public void ClearImageCache()
 		{
 			_imageCache.Clear();
-			_displayManager?.ClearApiHawkTextureCache();
+			_displayManager?.ClearApiTextureCache();
 		}
 
 		public void DrawImageRegion(Image img, int source_x, int source_y, int source_width, int source_height, int dest_x, int dest_y, int? dest_width = null, int? dest_height = null, DisplaySurfaceID? surfaceID = null)

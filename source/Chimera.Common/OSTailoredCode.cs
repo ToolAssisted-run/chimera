@@ -81,7 +81,7 @@ namespace Chimera.Common
 			}
 			else if (rawWinVer == new Version(6, 2)) winVer = WindowsVersion._8;
 			else if (rawWinVer == new Version(6, 1)) winVer = WindowsVersion._7;
-			// in reality, EmuHawk will not run on these OSes, but here they are for posterity
+			// in reality, Chimera will not run on these OSes, but here they are for posterity
 			else if (rawWinVer == new Version(6, 0)) winVer = WindowsVersion.Vista;
 			else /*if (rawWinVer < new Version(6, 0))*/ winVer = WindowsVersion.XP;
 			return (winVer, null);

@@ -20,13 +20,13 @@ namespace Chimera.Client.Common
 		public GameInfo GameInfo { get; }
 		public string Extension { get; }
 
-		public RomGame(HawkFile file)
+		public RomGame(ChimeraFile file)
 			: this(file, null)
 		{
 		}
 
 		/// <exception cref="Exception"><paramref name="file"/> does not exist</exception>
-		public RomGame(HawkFile file, string patch)
+		public RomGame(ChimeraFile file, string patch)
 		{
 			if (!file.Exists)
 			{
@@ -53,7 +53,7 @@ namespace Chimera.Client.Common
 			};
 
 			if (patch is null) return;
-			using var patchFile = new HawkFile(patch);
+			using var patchFile = new ChimeraFile(patch);
 			patchFile.BindFirstOf(".ips");
 			if (!patchFile.IsBound) patchFile.BindFirstOf(".bps");
 			if (!patchFile.IsBound) return;

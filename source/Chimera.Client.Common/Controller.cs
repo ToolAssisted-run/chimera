@@ -48,7 +48,7 @@ namespace Chimera.Client.Common
 
 		private readonly Dictionary<string, FeedbackBind> _feedbackBindings = new Dictionary<string, FeedbackBind>();
 
-#if CHIMERABUILD_SUPERHAWK
+#if CHIMERABUILD_SUPERCHIMERA
 		public bool AnyInputHeld
 			=> _buttons.ContainsValue(true) || _axes.Any(kvp => kvp.Value != _axisRanges[kvp.Key].Neutral);
 #endif

@@ -7,7 +7,7 @@
 	<PropertyGroup>
 		<AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
 		<DebugType>embedded</DebugType>
-		<DefineConstants>$(DefineConstants);AVI_SUPPORT;CHIMERABUILD_SUPERHAWK</DefineConstants>
+		<DefineConstants>$(DefineConstants);AVI_SUPPORT;CHIMERABUILD_SUPERCHIMERA</DefineConstants>
 		<MeziantouPolyfill_AllowUnsafeBlocks>false</MeziantouPolyfill_AllowUnsafeBlocks>
 		<MeziantouPolyfill_ExcludedPolyfills>@(MeziantouPolyfill_DeferToPolySharp, '|')</MeziantouPolyfill_ExcludedPolyfills>
 		<NeutralLanguage>en-US</NeutralLanguage>

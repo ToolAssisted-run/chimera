@@ -3,7 +3,7 @@ using System.Windows.Forms;
 
 using Chimera.Common.NumberExtensions;
 
-namespace Chimera.Client.EmuHawk;
+namespace Chimera.Client.GUI;
 
 public class VirtualizedFlowLayoutPanel : FlowLayoutPanel
 {

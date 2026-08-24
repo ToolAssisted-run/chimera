@@ -13,7 +13,7 @@ nothing is part of Chimera.sln, and nothing is quickerNES- or system-specific.
 
 ```
 ./run-witness.sh              # both levels, both modes (~10 s)
-./run-witness.sh --level a    # native only (no EmuHawk/Xvfb needed, <1 s)
+./run-witness.sh --level a    # native only (no Chimera/Xvfb needed, <1 s)
 ./run-witness.sh --record     # (re)record goldens
 ```
 
@@ -34,13 +34,13 @@ nothing is part of Chimera.sln, and nothing is quickerNES- or system-specific.
 
 - [x] Machine spec v1
 - [x] Native core (libsynthcore) + assembler + gridWalker rom
-- [x] Native-flavor package; verified through EmuHawk on Mono end to end
+- [x] Native-flavor package; verified through Chimera on Mono end to end
       (rom routing via manifest extensions, factory creation, input pipeline,
       RAM domain, savestates, lag counting)
 - [x] Witness driver (`run-witness.sh`): four goal movies (win / lose /
       video output / audio output), Level A native metrics incl. full
       per-frame video+audio stream hashes with a rerecord self-check, Level B
-      through EmuHawk with RAM+VRAM byte-compare against the same goldens,
+      through Chimera with RAM+VRAM byte-compare against the same goldens,
       both modes. ~20 s wall clock - THE Chimera smoke test (supersedes the
       old quickerNES --quick subset).
 - [x] Pure-C# twin (flavor b): SynthMachine.cs, written from SPEC.md alone

@@ -23,7 +23,7 @@ namespace Chimera.Client.Common
 		public static bool IsCurrentTasVersion(string movieVersion)
 		{
 			var actual = ParseTasMovieVersion(movieVersion);
-			return actual.HawkFloatEquality(TasMovie.CurrentVersion);
+			return actual.ApproxFloatEquality(TasMovie.CurrentVersion);
 		}
 
 		internal static double ParseTasMovieVersion(string movieVersion)

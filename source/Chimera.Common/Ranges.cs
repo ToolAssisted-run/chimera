@@ -123,7 +123,7 @@ namespace Chimera.Common
 				yield return d;
 				d += step;
 			}
-			if (d.HawkFloatEquality(range.EndInclusive)) yield return d;
+			if (d.ApproxFloatEquality(range.EndInclusive)) yield return d;
 		}
 
 		/// <remarks>beware precision errors</remarks>
@@ -135,7 +135,7 @@ namespace Chimera.Common
 				yield return f;
 				f += step;
 			}
-			if (f.HawkFloatEquality(range.EndInclusive)) yield return f;
+			if (f.ApproxFloatEquality(range.EndInclusive)) yield return f;
 		}
 
 		public static IEnumerable<int> Enumerate(this Range<int> range)

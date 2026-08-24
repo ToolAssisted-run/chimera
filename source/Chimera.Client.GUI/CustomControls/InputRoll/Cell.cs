@@ -1,0 +1,151 @@
+﻿#nullable enable
+
+using System.Collections.Generic;
+
+using Chimera.Common;
+using Chimera.Common.CollectionExtensions;
+
+namespace Chimera.Client.GUI
+{
+	/// <summary>
+	/// Represents a single cell of the <see cref="InputRoll"/>
+	/// </summary>
+	public sealed class Cell : IComparable<Cell>, IEquatable<Cell>
+	{
+		public RollColumn? Column { get; internal set; } = null;
+
+		public int? RowIndex { get; internal set; } = null;
+
+		public Cell() { }
+
+		public Cell(Cell cell)
+		{
+			Column = cell.Column;
+			RowIndex = cell.RowIndex;
+		}
+
+		public int CompareTo(Cell other)
+			=> SortCell.Compare(this, other);
+
+		public bool Equals(Cell? other)
+			=> other is not null && Column?.Name == other.Column?.Name && RowIndex == other.RowIndex;
+
+		public override bool Equals(object? obj)
+			=> obj is Cell other && Equals(other);
+
+		public override int GetHashCode()
+		{
+			return Column!.GetHashCode() + RowIndex.GetHashCode();
+		}
+
+		public override string ToString()
+			=> $"Cell(r: {RowIndex?.ToString() ?? "null"}, c: \"{Column?.Name ?? "(no column)"}\")";
+
+		public static bool operator ==(Cell? a, Cell? b)
+			=> a is null ? b is null : a.Equals(b);
+
+		public static bool operator !=(Cell? a, Cell? b)
+			=> a is null ? b is not null : !a.Equals(b);
+	}
+
+	internal static class SortCell
+	{
+		public static int Compare(Cell? c1, Cell? c2)
+		{
+			if (c1 is null && c2 is null)
+			{
+				return 0;
+			}
+
+			if (c2 is null)
+			{
+				return 1;
+			}
+
+			if (c1 is null)
+			{
+				return -1;
+			}
+
+			if (c1.RowIndex is not null)
+			{
+				if (c2.RowIndex is not null)
+				{
+					int row = c1.RowIndex.Value.CompareTo(c2.RowIndex.Value);
+					return row == 0
+						? string.CompareOrdinal(c1.Column?.Name, c2.Column?.Name)
+						: row;
+				}
+
+				return 1;
+			}
+
+			if (c2.RowIndex is not null)
+			{
+				return -1;
+			}
+
+			return string.CompareOrdinal(c1.Column!.Name, c2.Column!.Name);
+		}
+	}
+
+	public sealed class CellList : SortedList<Cell>
+	{
+		private CellList(List<Cell> wrapped)
+			: base(wrapped) {}
+
+		public CellList() {}
+
+		public CellList(IEnumerable<Cell> collection)
+			: base(collection) {}
+
+		/// <remarks>restore the distinctness invariant from <see cref="System.Collections.Generic.SortedSet{T}"/>; though I don't think we actually rely on it anywhere --yoshi</remarks>
+		public override void Add(Cell item)
+		{
+			var i = _list.BinarySearch(item);
+			if (i >= 0)
+			{
+				//TODO We can end up adding cells that are already selected pretty easily, by combining Alt multi-selection with Shift range-selection.
+				System.Diagnostics.Debug.Assert(false, $"{nameof(CellList)}'s distinctness invariant was almost broken! CellList.Add({(item is null ? "null" : item.ToString())})");
+				return;
+			}
+			_list.Insert(~i, item);
+		}
+
+		public bool IncludesRow(int rowIndex)
+#if false
+			=> _list.Exists(cell => cell.RowIndex == rowIndex);
+#elif false
+		{
+			var i = _list.BinarySearch(new() { RowIndex = rowIndex, Column = null });
+			return i >= 0 || (~i < _list.Count && _list[~i].RowIndex == rowIndex);
+		}
+#else
+		{
+			var i = _list.LowerBoundBinarySearch(static c => c.RowIndex ?? -1, rowIndex);
+			return i >= 0 && _list[i].RowIndex == rowIndex;
+		}
+#endif
+
+		/// <summary>
+		/// Gets the lowest index where a cell has the given row, or if none exist then the index where such a cell would be inserted.
+		/// </summary>
+		public int LowerBoundByRow(int rowIndex)
+		{
+			int cellIndex = _list.LowerBoundBinarySearch(static c => c.RowIndex ?? -1, rowIndex - 1); // -1 to ensure we don't get an index in the middle of a group of cells on this row
+			cellIndex = Math.Max(cellIndex, 0);
+			while (cellIndex < _list.Count && _list[cellIndex].RowIndex < rowIndex) cellIndex++;
+			return cellIndex;
+		}
+
+
+		public new CellList Slice(int start, int length)
+			=> new(SliceImpl(start: start, length: length));
+	}
+
+	public static class CellExtensions
+	{
+		public static bool IsDataCell(this Cell? cell)
+			=> cell is { RowIndex: not null, Column: not null };
+	}
+}

@@ -56,14 +56,14 @@ jobs:
           path: tests/synth/work/
 
   witness-full:
-    # The full gate, including Level B: EmuHawk runs headless under Mono + Xvfb,
+    # The full gate, including Level B: Chimera runs headless under Mono + Xvfb,
     # loads the core.wbx package through Chimera's built-in generic waterbox
     # adapter, replays the movies, and the RAM/VRAM dumps must be byte-identical
     # to the Level A goldens - in both simple and rerecord (per-frame
     # whole-machine savestate) modes.
     #
     # This builds the entire frontend: every native dependency (SDL2, OpenAL,
-    # zstd, cimgui, lua, luasocket, sqlite3, chd) plus the .NET solution, so it
+    # zstd, cimgui, lua, luasocket, sqlite3) plus the .NET solution, so it
     # takes minutes rather than seconds. It still runs per push - the level A
     # job above gives fast feedback meanwhile - and on a daily schedule, which
     # catches environment drift (toolchain/runner image changes) with no commit.

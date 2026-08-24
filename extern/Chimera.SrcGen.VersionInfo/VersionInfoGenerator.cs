@@ -49,6 +49,7 @@ public class VersionInfoGenerator : IIncrementalGenerator
 		var rev = ExecuteGitWithArguments($"-C {projectDir} rev-list HEAD --count") ?? string.Empty;
 		var branch = ExecuteGitWithArguments($"-C {projectDir} rev-parse --abbrev-ref HEAD") ?? "master";
 		var hash = ExecuteGitWithArguments($"-C {projectDir} log -1 --format=\"%H\"") ?? "0000000000000000000000000000000000000000";
+		var commitDate = ExecuteGitWithArguments($"-C {projectDir} log -1 --format=\"%cs\"") ?? "unknown";
 
 		// Generated source code
 		string source = $@"namespace Chimera.Common
@@ -59,6 +60,7 @@ public class VersionInfoGenerator : IIncrementalGenerator
 		public const string GIT_BRANCH = ""{branch}"";
 		public const string GIT_HASH = ""{hash}"";
 		public const string GIT_SHORTHASH = ""{hash.Substring(startIndex: 0, length: 9)}"";
+		public const string GIT_SHORTDATE = ""{commitDate}"";
 	}}
 }}
 ";

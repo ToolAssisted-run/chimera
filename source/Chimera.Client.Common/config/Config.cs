@@ -106,10 +106,6 @@ namespace Chimera.Client.Common
 		public bool AviCaptureOsd { get; set; }
 		public bool AviCaptureLua { get; set; }
 		public bool ScreenshotCaptureOsd { get; set; }
-		public bool UpdateAutoCheckEnabled { get; set; } = true;
-		public DateTime? UpdateLastCheckTimeUtc { get; set; }
-		public string UpdateLatestVersion { get; set; } = "";
-		public string UpdateIgnoreVersion { get; set; } = "";
 		public bool SkipOutdatedOsCheck { get; set; }
 		public bool CaptureMouse { get; set; } = false;
 		public bool MainFormMouseCaptureForcesTopmost { get; set; } = false;
@@ -139,8 +135,8 @@ namespace Chimera.Client.Common
 		public bool Unthrottled { get; set; } = false;
 		public bool AutoMinimizeSkipping { get; set; } = true;
 		public bool VSyncThrottle { get; set; } = false;
-#if CHIMERABUILD_SUPERHAWK
-		public bool SuperHawkThrottle { get; set; } = false;
+#if CHIMERABUILD_SUPERCHIMERA
+		public bool SuperChimeraThrottle { get; set; } = false;
 #endif
 
 		public RewindConfig Rewind { get; set; } = new RewindConfig();
@@ -355,9 +351,6 @@ namespace Chimera.Client.Common
 		public bool DontTryOtherCores { get; set; }
 
 		// ReSharper disable once UnusedMember.Global
-		public string LastWrittenFrom { get; set; } = VersionInfo.MainVersion;
-
-		// ReSharper disable once UnusedMember.Global
 		public string LastWrittenFromDetailed { get; set; } = VersionInfo.GetEmuVersion();
 
 		public bool UseStaticWindowTitles { get; set; }
@@ -367,7 +360,7 @@ namespace Chimera.Client.Common
 		[JsonIgnore]
 		public string MainFormStaticWindowTitleOverrideEffective
 			=> string.IsNullOrWhiteSpace(MainFormStaticWindowTitleOverride)
-				? string.IsNullOrWhiteSpace(VersionInfo.CustomBuildString) ? "EmuHawk" : VersionInfo.CustomBuildString
+				? string.IsNullOrWhiteSpace(VersionInfo.CustomBuildString) ? "Chimera" : VersionInfo.CustomBuildString
 				: MainFormStaticWindowTitleOverride;
 
 		public List<string> ModifierKeys { get; set; } = new();
@@ -396,6 +389,6 @@ namespace Chimera.Client.Common
 
 		public int RelativeMouseSensitivity { get; set; } = 100;
 
-		public SnowyNullVideo.TriggerCriterion SnowyNullHawk { get; set; } = SnowyNullVideo.TriggerCriterion.WeekOfChristmas;
+		public SnowyNullVideo.TriggerCriterion SnowyNullCore { get; set; } = SnowyNullVideo.TriggerCriterion.WeekOfChristmas;
 	}
 }

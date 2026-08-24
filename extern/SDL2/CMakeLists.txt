@@ -98,7 +98,7 @@ set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 # Silence a warning when specifying INTERPROCEDURAL_OPTIMIZATION
 set(CMAKE_POLICY_DEFAULT_CMP0069 NEW)
 
-# Would be `libSDL2d.so` without this, but EmuHawk only knows the usual `libSDL.so` filename
+# Would be `libSDL2d.so` without this, but Chimera only knows the usual `libSDL.so` filename
 set(SDL_CMAKE_DEBUG_POSTFIX "" CACHE STRING "" FORCE)
 
 add_subdirectory(SDL)

@@ -6,7 +6,7 @@
 		<!-- Output path will contain the executable along with all its dependencies. We copy the executable up one directory up later on.
 			This allows us to have the executable dependencies automagically copied over to our dll folder while still keeping the executable in the output folder. -->
 		<OutputPath>$(MSBuildProjectDirectory)/../../build/dll/</OutputPath>
-		<Product>$(MSBuildProjectName.Substring($([MSBuild]::Add($(MSBuildProjectName.LastIndexOf('.')), 1))))</Product>
+		<Product>Chimera</Product>
 		<ExecFilesDest>$(MSBuildProjectDirectory)/../../build/</ExecFilesDest>
 		<!-- Setting TargetFileName does not change the AssemblyName (as setting TargetName would), but also does not change the output file name
 			for the executable on build (as one would expect). So we still need to rename the executable file below. Using this method has the advantage
@@ -44,10 +44,10 @@
 			<ExecConfigFilesFromExecProj Include="$(OutputPath)$(TargetFileName).*" /> <!-- include the .exe.config files -->
 		</ItemGroup>
 		<!-- Surely this can be done in one step, right? FIXME -->
-		<Move SourceFiles="@(ExecFilesFromExecProj)" DestinationFiles="@(ExecFilesFromExecProj->Replace('Chimera.Client.', ''))" />
-		<Move SourceFiles="@(ExecFilesFromExecProj->Replace('Chimera.Client.', ''))" DestinationFolder="$(ExecFilesDest)" />
+		<Move SourceFiles="@(ExecFilesFromExecProj)" DestinationFiles="@(ExecFilesFromExecProj->Replace('$(MSBuildProjectName)', '$(Product)'))" />
+		<Move SourceFiles="@(ExecFilesFromExecProj->Replace('$(MSBuildProjectName)', '$(Product)'))" DestinationFolder="$(ExecFilesDest)" />
 		<Move SourceFiles="@(ExecConfigFilesFromExecProj)" DestinationFolder="$(ExecFilesDest)" />
-		<Copy SourceFiles="$(MSBuildProjectDirectory)/EmuHawkMono.sh" DestinationFolder="$(ExecFilesDest)" SkipUnchangedFiles="true" Condition="Exists('$(MSBuildProjectDirectory)/EmuHawkMono.sh')" />
+		<Copy SourceFiles="$(MSBuildProjectDirectory)/ChimeraMono.sh" DestinationFolder="$(ExecFilesDest)" SkipUnchangedFiles="true" Condition="Exists('$(MSBuildProjectDirectory)/ChimeraMono.sh')" />
 		<MakeDir Directories="@(EmptyDirsToCreate)" />
 		<Touch Files="@(EmptyDirsToCreate->Combine('.keep'))" AlwaysCreate="true" />
 	</Target>

@@ -4,7 +4,7 @@ using System.Threading;
 
 namespace Chimera.Emulation.Common
 {
-	[Core("NullHawk", "")]
+	[Core("NullCore", "")]
 	[ServiceNotApplicable(
 		typeof(IVideoProvider),
 		typeof(IBoardInfo),

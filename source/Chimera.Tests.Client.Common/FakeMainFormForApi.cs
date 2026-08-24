@@ -40,7 +40,7 @@ namespace Chimera.Tests.Client.Common
 		public void ClickSpeedItem(int num) => throw new NotImplementedException();
 		public void CloseEmulator(int? exitCode = null) => throw new NotImplementedException();
 		public void EnableRewind(bool enabled) => throw new NotImplementedException();
-		public void FrameAdvance(bool discardApiHawkSurfaces = true) => throw new NotImplementedException();
+		public void FrameAdvance(bool discardApiSurfaces = true) => throw new NotImplementedException();
 		public void FrameBufferResized(bool forceWindowResize = false) => throw new NotImplementedException();
 		public void FrameSkipMessage() => throw new NotImplementedException();
 		public int GetApproxFramerate() => throw new NotImplementedException();

@@ -45,7 +45,7 @@ namespace Chimera.Client.Common
 		bool EnsureCoreIsAccurate();
 
 		/// <remarks>only referenced from TAStudio</remarks>
-		void FrameAdvance(bool discardApiHawkSurfaces = true);
+		void FrameAdvance(bool discardApiSurfaces = true);
 
 		/// <remarks>only referenced from LuaConsole</remarks>
 		/// <param name="forceWindowResize">Override <see cref="Common.Config.ResizeWithFramebuffer"/></param>

@@ -185,11 +185,11 @@ namespace Chimera.Common.PathExtensions
 		/// </remarks>
 		public static readonly string DataDirectoryPath;
 
-		/// <returns>absolute path of the dll dir (sibling of EmuHawk.exe)</returns>
+		/// <returns>absolute path of the dll dir (sibling of Chimera.exe)</returns>
 		/// <remarks>returned string omits trailing slash</remarks>
 		public static readonly string DllDirectoryPath;
 
-		/// <returns>absolute path of the parent dir of EmuHawk.exe, commonly referred to as <c>%exe%</c> though none of our code adds it to the environment</returns>
+		/// <returns>absolute path of the parent dir of Chimera.exe, commonly referred to as <c>%exe%</c> though none of our code adds it to the environment</returns>
 		/// <remarks>returned string omits trailing slash</remarks>
 		public static readonly string ExeDirectoryPath;
 

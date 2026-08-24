@@ -82,7 +82,7 @@ namespace Chimera.Client.Common
 			}
 
 			_imGuiResourceCache = new ImGuiResourceCache(_gl);
-			// `_apiHawkIDTo2DRenderer` is a new empty dict, members are lazily-initialised
+			// `_apiIDTo2DRenderer` is a new empty dict, members are lazily-initialised
 		}
 
 		public void UpdateGlobals(Config config, IEmulator emulator)
@@ -112,7 +112,7 @@ namespace Chimera.Client.Common
 
 			_videoTextureFrugalizer.Dispose();
 
-			foreach (var r in _apiHawkIDTo2DRenderer.Values)
+			foreach (var r in _apiIDTo2DRenderer.Values)
 			{
 				r.Dispose();
 			}
@@ -261,7 +261,7 @@ namespace Chimera.Client.Common
 			}
 
 			// add lua layer 'emu'
-			AppendApiHawkLayer(chain, DisplaySurfaceID.EmuCore);
+			AppendApiLayer(chain, DisplaySurfaceID.EmuCore);
 
 			if (includeUserFilters)
 			{
@@ -295,7 +295,7 @@ namespace Chimera.Client.Common
 			}
 
 			//add lua layer 'native'
-			AppendApiHawkLayer(chain, DisplaySurfaceID.Client);
+			AppendApiLayer(chain, DisplaySurfaceID.Client);
 
 			// and OSD goes on top of that
 			// TODO - things break if this isn't present (the final presentation filter gets messed up when used with prescaling)
@@ -305,11 +305,11 @@ namespace Chimera.Client.Common
 			return chain;
 		}
 
-		private void AppendApiHawkLayer(FilterProgram chain, DisplaySurfaceID surfaceID)
+		private void AppendApiLayer(FilterProgram chain, DisplaySurfaceID surfaceID)
 		{
-			var apiHawkRenderer = GetApiHawk2DRenderer(surfaceID);
-			var fApiHawkLayer = new ApiHawkLayer(apiHawkRenderer);
-			chain.AddFilter(fApiHawkLayer, surfaceID.GetName());
+			var apiRenderer = GetApi2DRenderer(surfaceID);
+			var fApiLayer = new ApiLayer(apiRenderer);
+			chain.AddFilter(fApiLayer, surfaceID.GetName());
 		}
 
 		protected abstract Point GraphicsControlPointToClient(Point p);
@@ -827,35 +827,35 @@ namespace Chimera.Client.Common
 		}
 
 		private readonly ImGuiResourceCache _imGuiResourceCache;
-		private readonly Dictionary<DisplaySurfaceID, I2DRenderer> _apiHawkIDTo2DRenderer = new();
+		private readonly Dictionary<DisplaySurfaceID, I2DRenderer> _apiIDTo2DRenderer = new();
 
 		/// <summary>
-		/// Gets an ApiHawk 2D renderer, suitable for drawing with Gui/lua apis and such
+		/// Gets an Api 2D renderer, suitable for drawing with Gui/lua apis and such
 		/// The size of this surface might change between different calls
 		/// Implicitly, if the size changes the surface will be cleared
 		/// </summary>
-		public I2DRenderer GetApiHawk2DRenderer(DisplaySurfaceID surfaceID)
+		public I2DRenderer GetApi2DRenderer(DisplaySurfaceID surfaceID)
 			=> surfaceID is DisplaySurfaceID.EmuCore or DisplaySurfaceID.Client
-				? _apiHawkIDTo2DRenderer.GetValueOrPut(surfaceID, _ => _gl.Create2DRenderer(_imGuiResourceCache))
+				? _apiIDTo2DRenderer.GetValueOrPut(surfaceID, _ => _gl.Create2DRenderer(_imGuiResourceCache))
 				: throw new ArgumentOutOfRangeException(paramName: nameof(surfaceID), surfaceID, message: "invalid surface ID");
 
-		public void ClearApiHawkSurfaces()
+		public void ClearApiSurfaces()
 		{
-			foreach (var renderer in _apiHawkIDTo2DRenderer.Values)
+			foreach (var renderer in _apiIDTo2DRenderer.Values)
 			{
 				renderer.Clear();
 			}
 		}
 
-		public void DiscardApiHawkSurfaces()
+		public void DiscardApiSurfaces()
 		{
-			foreach (var renderer in _apiHawkIDTo2DRenderer.Values)
+			foreach (var renderer in _apiIDTo2DRenderer.Values)
 			{
 				renderer.Discard();
 			}
 		}
 
-		public void ClearApiHawkTextureCache()
+		public void ClearApiTextureCache()
 			=> _imGuiResourceCache.ClearTextureCache();
 	}
 }

@@ -4,7 +4,7 @@ namespace Chimera.Emulation.DiscSystem.CUE
 
 	/// <summary>
 	/// Represents a Mode2 Form1 2048-byte sector
-	/// Only used by NRG, MDS, and CHD
+	/// Only used by NRG and MDS
 	/// </summary>
 	internal class SS_Mode2_Form1_2048 : SS_Base
 	{
@@ -34,7 +34,7 @@ namespace Chimera.Emulation.DiscSystem.CUE
 
 	/// <summary>
 	/// Represents a Mode2 Form1 2324-byte sector
-	/// Only used by MDS and CHD
+	/// Only used by MDS
 	/// </summary>
 	internal class SS_Mode2_Form2_2324 : SS_Base
 	{

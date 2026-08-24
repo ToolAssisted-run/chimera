@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Asserts that the bindings a core package ships became the frontend's defaults for its controller.
 #
-# Usage: check-keybinds.py <config written by EmuHawk> <package default_keybinds.json> <controller>
+# Usage: check-keybinds.py <config written by Chimera> <package default_keybinds.json> <controller>
 import json
 import sys
 

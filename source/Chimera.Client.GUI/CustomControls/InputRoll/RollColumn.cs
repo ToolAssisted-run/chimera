@@ -1,0 +1,77 @@
+﻿#nullable enable
+
+using Newtonsoft.Json;
+
+namespace Chimera.Client.GUI
+{
+	public class RollColumn
+	{
+		public int VerticalWidth { get; set; }
+		public int HorizontalHeight { get; set; }
+
+		[JsonIgnore]
+		public int Width
+		{
+			get => (owner?.HorizontalOrientation == true) ? HorizontalHeight : VerticalWidth;
+			set
+			{
+				if (owner?.HorizontalOrientation == true) HorizontalHeight = value;
+				else VerticalWidth = value;
+			}
+		}
+
+		[JsonIgnore]
+		public int ScaledWidth
+		{
+			get => UIHelper.ScaleX(Width);
+			set => Width = UIHelper.UnscaleX(value);
+		}
+
+		public int Left { get; set; }
+		public int Right { get; set; }
+
+		/// <remarks>TODO rename to <c>Key</c>?</remarks>
+		public string Name { get; }
+
+		/// <remarks>TODO rename to <c>Label</c>?</remarks>
+		public string Text { get; set; }
+
+		public bool Visible { get; set; } = true;
+
+		/// <summary>
+		/// Column will be drawn with an emphasized look, if true
+		/// </summary>
+		public bool Emphasis { get; set; }
+
+		/// <summary>
+		/// Column text will be drawn rotated if true
+		/// </summary>
+		public bool Rotatable { get; set; }
+
+		[JsonIgnore]
+		public InputRoll? owner;
+
+		[JsonConstructor]
+		private RollColumn(string name, string text, int verticalWidth, int horizontalHeight)
+		{
+			Name = name;
+			Text = text;
+			VerticalWidth = verticalWidth;
+			HorizontalHeight = horizontalHeight;
+		}
+
+		public RollColumn(string name, int widthUnscaled, string text)
+			: this(name, widthUnscaled, widthUnscaled, text) { }
+
+		public RollColumn(string name, int verticalWidth, int horizontalHeight, string text)
+		{
+			Name = name;
+			Text = text;
+			VerticalWidth = verticalWidth;
+			HorizontalHeight = horizontalHeight;
+			Width = VerticalWidth;
+		}
+
+		public RollColumn Clone() => (MemberwiseClone() as RollColumn)!;
+	}
+}

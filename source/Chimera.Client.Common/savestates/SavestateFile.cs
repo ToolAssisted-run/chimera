@@ -143,20 +143,6 @@ namespace Chimera.Client.Common
 			if (bl is null) return false;
 			var succeed = false;
 
-			if (!VersionInfo.DeveloperBuild)
-			{
-				bl.GetLump(BinaryStateLump.BizVersion, true, tr => succeed = tr.ReadLine() == VersionInfo.GetEmuVersion());
-				if (!succeed)
-				{
-					var result = dialogParent.ModalMessageBox2(
-						"This savestate was made with a different version, so it's unlikely to work.\nChoose OK to try loading it anyway.",
-						"Savestate version mismatch",
-						EMsgBoxIcon.Question,
-						useOKCancel: true);
-					if (!result) return false;
-				}
-			}
-
 			// next, check sync settings match
 			if (_settable.HasSyncSettings)
 			{

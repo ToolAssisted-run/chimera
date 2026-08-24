@@ -11,7 +11,7 @@ using SharpCompress.Archives;
 namespace Chimera.Client.Common
 {
 	/// <see cref="SharpCompressDearchivalMethod"/>
-	public sealed class SharpCompressArchiveFile : IHawkArchiveFile
+	public sealed class SharpCompressArchiveFile : IChimeraArchiveFile
 	{
 		private IArchive? _archive;
 
@@ -41,15 +41,15 @@ namespace Chimera.Client.Common
 			entryStream.CopyTo(stream);
 		}
 
-		public List<HawkArchiveFileItem>? Scan()
+		public List<ChimeraArchiveFileItem>? Scan()
 		{
 			var entries = EnumerateArchiveFiles().ToList();
-			List<HawkArchiveFileItem> outFiles = new();
+			List<ChimeraArchiveFileItem> outFiles = new();
 			for (var i = 0; i < entries.Count; i++)
 			{
 				var (entry, archiveIndex) = entries[i];
 				if (entry.Key is null) return null; // see https://github.com/adamhathcock/sharpcompress/issues/137
-				outFiles.Add(new HawkArchiveFileItem(entry.Key.Replace('\\', '/'), size: entry.Size, index: i, archiveIndex: archiveIndex));
+				outFiles.Add(new ChimeraArchiveFileItem(entry.Key.Replace('\\', '/'), size: entry.Size, index: i, archiveIndex: archiveIndex));
 			}
 			return outFiles;
 		}

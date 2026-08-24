@@ -419,9 +419,9 @@ namespace Chimera.Client.Common.RamSearchEngine
 			{
 				default:
 				case ComparisonOperator.Equal:
-					return watchList.Where(w => ReinterpretAsF32(GetValue(w)).HawkFloatEquality(ReinterpretAsF32(w.Previous)));
+					return watchList.Where(w => ReinterpretAsF32(GetValue(w)).ApproxFloatEquality(ReinterpretAsF32(w.Previous)));
 				case ComparisonOperator.NotEqual:
-					return watchList.Where(w => !ReinterpretAsF32(GetValue(w)).HawkFloatEquality(ReinterpretAsF32(w.Previous)));
+					return watchList.Where(w => !ReinterpretAsF32(GetValue(w)).ApproxFloatEquality(ReinterpretAsF32(w.Previous)));
 				case ComparisonOperator.GreaterThan:
 					return watchList.Where(w => ReinterpretAsF32(GetValue(w)) > ReinterpretAsF32(w.Previous));
 				case ComparisonOperator.GreaterThanEqual:
@@ -429,7 +429,7 @@ namespace Chimera.Client.Common.RamSearchEngine
 					{
 						var val = ReinterpretAsF32(GetValue(w));
 						var prev = ReinterpretAsF32(w.Previous);
-						return val > prev || val.HawkFloatEquality(prev);
+						return val > prev || val.ApproxFloatEquality(prev);
 					});
 				case ComparisonOperator.LessThan:
 					return watchList.Where(w => ReinterpretAsF32(GetValue(w)) < ReinterpretAsF32(w.Previous));
@@ -438,13 +438,13 @@ namespace Chimera.Client.Common.RamSearchEngine
 					{
 						var val = ReinterpretAsF32(GetValue(w));
 						var prev = ReinterpretAsF32(w.Previous);
-						return val < prev || val.HawkFloatEquality(prev);
+						return val < prev || val.ApproxFloatEquality(prev);
 					});
 				case ComparisonOperator.DifferentBy:
 					if (DifferentBy is not uint differentBy) throw new InvalidOperationException();
 					var differentByF = ReinterpretAsF32(differentBy);
 					return watchList.Where(w => Math.Abs(ReinterpretAsF32(GetValue(w)) - ReinterpretAsF32(w.Previous))
-						.HawkFloatEquality(differentByF));
+						.ApproxFloatEquality(differentByF));
 			}
 		}
 
@@ -479,16 +479,16 @@ namespace Chimera.Client.Common.RamSearchEngine
 			{
 				default:
 				case ComparisonOperator.Equal:
-					return watchList.Where(w => ReinterpretAsF32(GetValue(w)).HawkFloatEquality(compareValueF));
+					return watchList.Where(w => ReinterpretAsF32(GetValue(w)).ApproxFloatEquality(compareValueF));
 				case ComparisonOperator.NotEqual:
-					return watchList.Where(w => !ReinterpretAsF32(GetValue(w)).HawkFloatEquality(compareValueF));
+					return watchList.Where(w => !ReinterpretAsF32(GetValue(w)).ApproxFloatEquality(compareValueF));
 				case ComparisonOperator.GreaterThan:
 					return watchList.Where(w => ReinterpretAsF32(GetValue(w)) > compareValueF);
 				case ComparisonOperator.GreaterThanEqual:
 					return watchList.Where(w =>
 					{
 						var val = ReinterpretAsF32(GetValue(w));
-						return val > compareValueF || val.HawkFloatEquality(compareValueF);
+						return val > compareValueF || val.ApproxFloatEquality(compareValueF);
 					});
 				case ComparisonOperator.LessThan:
 					return watchList.Where(w => ReinterpretAsF32(GetValue(w)) < compareValueF);
@@ -496,13 +496,13 @@ namespace Chimera.Client.Common.RamSearchEngine
 					return watchList.Where(w =>
 					{
 						var val = ReinterpretAsF32(GetValue(w));
-						return val < compareValueF || val.HawkFloatEquality(compareValueF);
+						return val < compareValueF || val.ApproxFloatEquality(compareValueF);
 					});
 				case ComparisonOperator.DifferentBy:
 					if (DifferentBy is not uint differentBy) throw new InvalidOperationException();
 					var differentByF = ReinterpretAsF32(differentBy);
 					return watchList.Where(w => Math.Abs(ReinterpretAsF32(GetValue(w)) - compareValueF)
-						.HawkFloatEquality(differentByF));
+						.ApproxFloatEquality(differentByF));
 			}
 		}
 
@@ -600,16 +600,16 @@ namespace Chimera.Client.Common.RamSearchEngine
 			{
 				default:
 				case ComparisonOperator.Equal:
-					return watchList.Where(w => (ReinterpretAsF32(GetValue(w)) - ReinterpretAsF32(w.Previous)).HawkFloatEquality(compareValueF));
+					return watchList.Where(w => (ReinterpretAsF32(GetValue(w)) - ReinterpretAsF32(w.Previous)).ApproxFloatEquality(compareValueF));
 				case ComparisonOperator.NotEqual:
-					return watchList.Where(w => !(ReinterpretAsF32(GetValue(w)) - ReinterpretAsF32(w.Previous)).HawkFloatEquality(compareValueF));
+					return watchList.Where(w => !(ReinterpretAsF32(GetValue(w)) - ReinterpretAsF32(w.Previous)).ApproxFloatEquality(compareValueF));
 				case ComparisonOperator.GreaterThan:
 					return watchList.Where(w => ReinterpretAsF32(GetValue(w)) - ReinterpretAsF32(w.Previous) > compareValueF);
 				case ComparisonOperator.GreaterThanEqual:
 					return watchList.Where(w =>
 					{
 						var diff = ReinterpretAsF32(GetValue(w)) - ReinterpretAsF32(w.Previous);
-						return diff > compareValueF || diff.HawkFloatEquality(compareValueF);
+						return diff > compareValueF || diff.ApproxFloatEquality(compareValueF);
 					});
 				case ComparisonOperator.LessThan:
 					return watchList.Where(w => ReinterpretAsF32(GetValue(w)) - ReinterpretAsF32(w.Previous) < compareValueF);
@@ -617,13 +617,13 @@ namespace Chimera.Client.Common.RamSearchEngine
 					return watchList.Where(w =>
 					{
 						var diff = ReinterpretAsF32(GetValue(w)) - ReinterpretAsF32(w.Previous);
-						return diff < compareValueF || diff.HawkFloatEquality(compareValueF);
+						return diff < compareValueF || diff.ApproxFloatEquality(compareValueF);
 					});
 				case ComparisonOperator.DifferentBy:
 					if (DifferentBy is not uint differentBy) throw new InvalidOperationException();
 					var differentByF = ReinterpretAsF32(differentBy);
 					return watchList.Where(w => Math.Abs(ReinterpretAsF32(GetValue(w)) - ReinterpretAsF32(w.Previous) - compareValueF)
-						.HawkFloatEquality(differentByF));
+						.ApproxFloatEquality(differentByF));
 			}
 		}
 

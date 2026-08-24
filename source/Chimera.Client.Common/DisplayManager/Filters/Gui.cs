@@ -441,11 +441,11 @@ namespace Chimera.Client.Common.Filters
 		}
 	}
 
-	public class ApiHawkLayer : BaseFilter
+	public class ApiLayer : BaseFilter
 	{
 		private readonly I2DRenderer _renderer;
 
-		public ApiHawkLayer(I2DRenderer renderer)
+		public ApiLayer(I2DRenderer renderer)
 			=> _renderer = renderer;
 
 		public override void Initialize()

@@ -56,7 +56,7 @@ namespace Chimera.Client.Common
 		/// <remarks>only referenced from <see cref="EmuClientApi"/></remarks>
 
 		/// <remarks>only referenced from <see cref="EmuClientApi"/></remarks>
-		void FrameAdvance(bool discardApiHawkSurfaces = true);
+		void FrameAdvance(bool discardApiSurfaces = true);
 
 		/// <param name="forceWindowResize">Override <see cref="Common.Config.ResizeWithFramebuffer"/></param>
 		/// <remarks>only referenced from <see cref="EmuClientApi"/></remarks>

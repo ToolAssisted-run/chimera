@@ -65,7 +65,7 @@ namespace Chimera.Client.Common
 					tuple =>
 					{
 						var instance = tuple.Ctor.Invoke(tuple.CtorTypes.Select(t => avail[t]).ToArray());
-						if (!ServiceInjector.UpdateServices(serviceProvider, instance, mayCache: true)) throw new Exception("ApiHawk impl. has required service(s) that can't be fulfilled");
+						if (!ServiceInjector.UpdateServices(serviceProvider, instance, mayCache: true)) throw new Exception("Api impl. has required service(s) that can't be fulfilled");
 						return (IExternalApi) instance;
 					}));
 		}

@@ -39,7 +39,7 @@ namespace Chimera.Client.Common
 		{
 			if (Filename is null)
 			{
-				Console.WriteLine("MMF screenshot target not set; start EmuHawk with `--mmf=filename`");
+				Console.WriteLine("MMF screenshot target not set; start Chimera with `--mmf=filename`");
 				return 0;
 			}
 			return WriteToFile(Filename, _takeScreenshotCallback());
