@@ -6,15 +6,18 @@
 # Level A: native/synth-run (the reference) records goldens; the waterboxed
 #   core.wbx (via the miniBox host) must reproduce them byte-for-byte, in both
 #   simple and per-frame whole-machine-savestate (rerecord) modes.
+# Level E (engine): chimera-run - the engine's headless session - replays the
+#   same movies with no frontend at all; its dumps must match the goldens too.
 # Level B (frontend): EmuHawk (Mono + Xvfb on Linux) loads the core.wbx package
 #   through miniHawk's built-in generic waterbox adapter and replays the same
 #   movies; the final RAM and VRAM dumps must be byte-identical to the Level A
 #   goldens. Audio is Level A-verified only (no scriptable audio tap).
 #
 # Usage:
-#   ./run-witness.sh              # verify (both levels, both modes)
+#   ./run-witness.sh              # verify (all levels, both modes)
 #   ./run-witness.sh --record     # (re)record goldens from the current build
 #   ./run-witness.sh --level a    # native level only (no EmuHawk needed)
+#   ./run-witness.sh --level e    # engine level only (no EmuHawk needed)
 set -u
 
 record=0
@@ -101,6 +104,52 @@ if [ "$level" = "both" ] || [ "$level" = "a" ]; then
 			report "A:box:$name" SKIP "synth.wbx not built (run package-box/build-box.sh)"
 		fi
 	done
+fi
+
+# ---------- Level E ----------
+# The engine's own headless runner (chimera-run): the same package, host and
+# movies with NO frontend at all - no Mono, no display. Its dumps must match
+# the Level A goldens, in both modes, and the settings channel must reach the
+# guest. This is the migration's session (docs/engine-migration.md) proving
+# it IS the same machine.
+if [ "$level" = "both" ] || [ "$level" = "e" ]; then
+	chimera_run="$repo_root/build/meson-linux/chimera-run"
+	epkg="$repo_root/build/Cores/synth-box.zip"
+	if [ ! -x "$chimera_run" ]; then
+		report "E:engine" SKIP "chimera-run not built (meson compile -C build/meson-linux)"
+	elif [ ! -f "$epkg" ]; then
+		report "E:engine" SKIP "package not found: $epkg (run build-package.sh)"
+	elif [ "$record" -eq 1 ]; then
+		report "E:engine" PASS "(goldens recorded at level A)"
+	else
+		for movie in "$here"/movies/*.txt; do
+			ename="$(basename "$movie" .txt)"
+			erom="$here/roms/${ename%%.*}.testrom"
+			for emode in simple rerecord; do
+				eextra=""
+				[ "$emode" = "rerecord" ] && eextra="--rerecord"
+				etag="$ename.engine.$emode"
+				rm -f "$work/$etag.ram.bin" "$work/$etag.vram.bin" "$work/$etag.meta.txt"
+				"$chimera_run" "$epkg" "$erom" "$movie" $eextra 					--dump "RAM=$work/$etag.ram.bin" --dump "VRAM=$work/$etag.vram.bin" 					--meta "$work/$etag.meta.txt" > "$work/$etag.log" 2>&1
+				if [ ! -f "$work/$etag.meta.txt" ] || ! grep -q "^status=OK" "$work/$etag.meta.txt"; then
+					report "E:$ename:$emode" FAIL "no OK meta (see work/$etag.log)"
+				elif cmp -s "$work/$etag.ram.bin" "$golden_dir/$ename.ram.bin" 					&& cmp -s "$work/$etag.vram.bin" "$golden_dir/$ename.vram.bin"; then
+					report "E:$ename:$emode" PASS "RAM+VRAM byte-identical to level A goldens"
+				else
+					report "E:$ename:$emode" FAIL "RAM or VRAM differs from level A goldens"
+				fi
+			done
+		done
+		# the settings channel, natively: a non-default sync setting must diverge
+		"$chimera_run" "$epkg" "$here/roms/gridWalker.testrom" "$here/movies/gridWalker.win.txt" 			--settings '{"initFillByte":171}' --dump "RAM=$work/engine.settings.ram.bin" 			> "$work/engine.settings.log" 2>&1
+		if [ ! -f "$work/engine.settings.ram.bin" ]; then
+			report "E:settings" FAIL "run failed (see work/engine.settings.log)"
+		elif cmp -s "$work/engine.settings.ram.bin" "$golden_dir/gridWalker.win.ram.bin"; then
+			report "E:settings" FAIL "RAM identical to golden - setting did NOT reach the guest"
+		else
+			report "E:settings" PASS "RAM diverged - user setting reached the guest"
+		fi
+	fi
 fi
 
 # ---------- Level B ----------

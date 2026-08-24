@@ -69,8 +69,18 @@ long-lived dual paths.
      session needs anyway. A corrupt zip stays listable with its error; an
      ordinary zip stays quietly invisible. waterbox.config's MEANING still
      parses in C# and moves with 5b.
-   - 5b native session: transliterate WaterboxCore.cs onto libminiboxhost,
-     `chimera-run` gate binary, then rewire the C# adapter onto ce_session
+   - 5b **native session, first half** - DONE. `ce_session_*`: package +
+     waterbox.config (parsed engine-side) + rom + effective settings +
+     firmware in; frame advance (buttons/axes/video/audio/lag), whole-machine
+     save/load state, memory domains out. libminiboxhost is loaded from
+     beside the engine; on Windows guest calls bridge through the host's
+     departN trampolines (host_dyn.cpp, the WaterboxAbiShim transliterated).
+     `chimera-run` replays movies headlessly, and the witness gate's new
+     Level E proves it byte-identical to the Level A goldens - no Mono, no
+     Xvfb, no frontend.
+   - 5b second half: rewire the C# WaterboxCore onto ce_session (GUI keeps
+     rendering); tooling/persistent-data ABI groups; then the session grows
+     movie playback/record and the greenzone
 6. Memory domains + tooling services
 7. Lua (real Lua replaces NLua; script API preserved)
 8. AV dumping

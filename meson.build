@@ -291,6 +291,8 @@ engine_src = files(
   'engine/source/firmware.cpp',
   'engine/source/file_io.cpp',
   'engine/source/package.cpp',
+  'engine/source/host_dyn.cpp',
+  'engine/source/session.cpp',
   'extern/miniz/miniz.c',  # vendored (MIT): the zip half of the state container
   'extern/cjson/cJSON.c',  # vendored (MIT): bundle JSON
 )
@@ -321,6 +323,17 @@ shared_library(
   install: true,
   install_dir: 'dll',
 )
+executable(
+  'chimera-run',
+  ['engine/tools/chimera-run.cpp'] + engine_src,
+  include_directories: engine_inc,
+  cpp_args: engine_build_args,
+  c_args: engine_build_args,
+  dependencies: [dl_dep],
+  install: true,
+  install_dir: 'dll',  # beside libminiboxhost + libzstd, which it loads from its own directory
+)
+
 if not meson.is_cross_build()
   foreach engine_test : ['movie_log', 'movie_text', 'state_container', 'bundle', 'package']
     test(

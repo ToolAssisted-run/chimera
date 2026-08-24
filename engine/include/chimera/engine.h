@@ -359,6 +359,88 @@ const uint8_t *ce_package_entry(ce_package *p, const char *name, uint64_t *len_o
  * Invalidated by the next call on the same package. */
 const char *ce_package_last_error(ce_package *p);
 
+/* ---- the session ----
+ *
+ * A running waterboxed machine: a core package's guest, loaded through the
+ * miniBox host (libminiboxhost, found beside this library), configured by its
+ * own waterbox.config, fed a rom and settings, and driven a frame at a time.
+ * This is the same machine the C# WaterboxCore adapter runs - one machine,
+ * one behaviour, with or without a frontend.
+ *
+ * The engine composes the effective settings itself: every declared setting
+ * at its config default, overlaid with the caller's overrides JSON (the
+ * user's or the movie's sync settings). Buttons map to input bits by their
+ * position in the config's buttons array.
+ */
+
+typedef struct ce_session ce_session;
+
+/* rom_len 0 with rom NULL is allowed for coreless boots (none exist today).
+ * settings_overrides_json may be NULL for pure defaults. firmware arrives as
+ * ids and blobs, parallel arrays. NULL with *error_out set (static per-
+ * thread, valid until the thread's next failed open) on any failure - an
+ * unreadable package, a missing export, a core that refused the rom (its
+ * GetLoadError text is the message when it gives one). */
+ce_session *ce_session_open(
+	const char *package_path,
+	const uint8_t *rom, uint64_t rom_len,
+	const char *settings_overrides_json,
+	const char *const *firmware_ids, const uint8_t *const *firmware_data,
+	const uint64_t *firmware_lens, int32_t firmware_count,
+	const char **error_out);
+
+void ce_session_free(ce_session *s);
+
+/* config-derived facts (borrowed strings live as long as the session) */
+const char *ce_session_core_name(const ce_session *s);
+const char *ce_session_system_id(const ce_session *s);
+int32_t ce_session_width(const ce_session *s);
+int32_t ce_session_height(const ce_session *s);
+int32_t ce_session_virtual_width(const ce_session *s);
+int32_t ce_session_virtual_height(const ce_session *s);
+/* post-Init: the guest's own answer when it gives one, else the config's */
+int32_t ce_session_vsync_numerator(const ce_session *s);
+int32_t ce_session_vsync_denominator(const ce_session *s);
+int32_t ce_session_samples_per_frame(const ce_session *s);
+int32_t ce_session_channels(const ce_session *s);
+int32_t ce_session_deterministic(const ce_session *s);
+int64_t ce_session_button_count(const ce_session *s);
+const char *ce_session_button_name(const ce_session *s, int64_t index);
+int64_t ce_session_axis_count(const ce_session *s);
+const char *ce_session_axis_name(const ce_session *s, int64_t index);
+
+/* Axes are set per frame, before the advance they belong to. */
+void ce_session_set_axis(ce_session *s, int32_t index, int32_t value);
+
+/* One frame: buttons is the bitmask (bit i = the config's buttons[i]).
+ * render 0 skips the video copy. Returns nonzero when the frame was a lag
+ * frame (the guest never read input), per the config's lag export. */
+int32_t ce_session_frame_advance(ce_session *s, uint64_t buttons, int32_t render);
+
+/* The last rendered frame, BGRA, width*height pixels.
+ * Invalidated by the next rendered frame_advance. */
+const uint32_t *ce_session_video(const ce_session *s);
+
+/* The last frame's audio as interleaved stereo s16 (mono sources are
+ * doubled), and its sample-pair count. Invalidated by the next advance. */
+const int16_t *ce_session_audio(const ce_session *s, int32_t *sample_count);
+
+/* The guest's whole-machine state. The buffer is the session's, reused and
+ * invalidated by the next save. Load returns 0 on success. */
+const uint8_t *ce_session_save_state(ce_session *s, uint64_t *len_out);
+int32_t ce_session_load_state(ce_session *s, const uint8_t *data, uint64_t len);
+
+/* The guest's self-described memory domains. */
+int32_t ce_session_domain_count(const ce_session *s);
+const char *ce_session_domain_name(const ce_session *s, int32_t index);
+int64_t ce_session_domain_size(const ce_session *s, int32_t index);
+int32_t ce_session_domain_writable(const ce_session *s, int32_t index);
+/* Copies out [offset, offset+len); returns bytes copied (clamped at end). */
+int64_t ce_session_domain_read(const ce_session *s, int32_t index, int64_t offset, uint8_t *buf, int64_t len);
+
+/* "" when no error. Invalidated by the next call on the same session. */
+const char *ce_session_last_error(ce_session *s);
+
 #ifdef __cplusplus
 }
 #endif
