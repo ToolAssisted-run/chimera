@@ -46,7 +46,7 @@ namespace BizHawk.Client.Common
 			GameInfo = new GameInfo
 			{
 				Name = Path.GetFileNameWithoutExtension(file.Name).Replace('_', ' '),
-				Hash = SHA1Checksum.ComputeDigestHex(FileData),
+				Hash = BizHawk.Emulation.Common.Engine.ChimeraEngine.Sha1Hex(FileData),
 				System = null, // resolved by the frontend (core package extension map, user preference, or prompt)
 				Status = RomStatus.NotInDatabase,
 				NotInDatabase = true,

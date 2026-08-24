@@ -4,9 +4,9 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Security.Cryptography;
 
 using BizHawk.Emulation.Common;
+using BizHawk.Emulation.Common.Engine;
 
 namespace BizHawk.Client.Common
 {
@@ -117,20 +117,14 @@ namespace BizHawk.Client.Common
 				return new() { CoreName = coreName, Decl = decl, Path = path, State = CoreFirmwareState.Unreadable };
 			}
 			var sha1 = Sha1Of(bytes); // computed even for a file that will be refused: the user wants to see WHAT they pointed at
-			if (decl.Size != 0 && bytes.Length != decl.Size)
+			// the verdict is the engine's (see docs/engine-migration.md)
+			var state = EngineFirmware.Classify(decl.Size, decl.Sha1, bytes.Length, sha1) switch
 			{
-				return new() { CoreName = coreName, Decl = decl, Path = path, Sha1 = sha1, State = CoreFirmwareState.WrongSize };
-			}
-			var known = decl.Sha1 is not null
-				&& decl.Sha1.Exists(h => string.Equals(h, sha1, StringComparison.OrdinalIgnoreCase));
-			return new()
-			{
-				CoreName = coreName,
-				Decl = decl,
-				Path = path,
-				Sha1 = sha1,
-				State = known || decl.Sha1 is null or { Count: 0 } ? CoreFirmwareState.Good : CoreFirmwareState.Unrecognised,
+				EngineFirmware.Verdict.WrongSize => CoreFirmwareState.WrongSize,
+				EngineFirmware.Verdict.Unrecognised => CoreFirmwareState.Unrecognised,
+				_ => CoreFirmwareState.Good,
 			};
+			return new() { CoreName = coreName, Decl = decl, Path = path, Sha1 = sha1, State = state };
 		}
 
 		/// <summary>
@@ -160,15 +154,10 @@ namespace BizHawk.Client.Common
 		/// or replay would report a difference that is only an ordering.
 		/// </summary>
 		public static string RecordFor(Config config, CoreRegistry registry, string coreName)
-			=> string.Join(" ", Enumerate(config, registry)
+			=> EngineFirmware.RecordLine(Enumerate(config, registry)
 				.Where(e => string.Equals(e.CoreName, coreName, StringComparison.OrdinalIgnoreCase) && e.Sha1 is not null)
-				.OrderBy(static e => e.Decl.Id, StringComparer.Ordinal)
-				.Select(static e => $"{e.Decl.Id}={e.Sha1}"));
+				.Select(static e => (e.Decl.Id, e.Sha1!)));
 
-		public static string Sha1Of(byte[] bytes)
-		{
-			using var sha1 = SHA1.Create();
-			return BitConverter.ToString(sha1.ComputeHash(bytes)).Replace("-", "");
-		}
+		public static string Sha1Of(byte[] bytes) => ChimeraEngine.Sha1Hex(bytes);
 	}
 }

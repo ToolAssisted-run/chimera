@@ -3,45 +3,35 @@
 using System.IO;
 
 using BizHawk.Common;
+using BizHawk.Emulation.Common.Engine;
 
 namespace BizHawk.Client.Common
 {
+	/// <summary>
+	/// Writes the savestate/movie container. The engine renders the archive
+	/// (see docs/engine-migration.md); this class keeps what was always the C#'s
+	/// job - the callback-based lump API and the temp-file/backup dance around
+	/// the actual file. As before, a failed lump poisons the write and the error
+	/// surfaces at <see cref="CloseAndDispose"/>, not at the failing PutLump.
+	/// </summary>
 	public class ZipStateSaver : IDisposable
 	{
-		internal const string TOP_LEVEL_DIR_NAME = "BizState"; // savestates and movies all have the same structure, including the `BizState 1.0` file, so this seemed a fitting name
-
-		private readonly IZipWriter _zip;
+		private readonly EngineStateWriter _writer;
+		private FileWriter? _fs;
+		private Exception? _writeException;
 		private bool _isDisposed;
 
-		public bool AsTarbomb = /*!OSTailoredCode.IsUnixHost*/true;
-
-		private static void WriteZipVersion(Stream s)
+		private ZipStateSaver(EngineStateWriter writer, FileWriter fs)
 		{
-			using var sw = new StreamWriter(s);
-			sw.WriteLine("3"); // version 1.0.3
-		}
-
-		private static void WriteEmuVersion(Stream s)
-		{
-			using var sw = new StreamWriter(s);
-			sw.WriteLine(VersionInfo.GetEmuVersion());
-		}
-
-		private ZipStateSaver(FrameworkZipWriter zip)
-		{
-			_zip = zip;
-
-			// we put these in every zip, so we know where they came from
-			// a bit redundant for movie files given their headers, but w/e
-			PutLump(BinaryStateLump.ZipVersion, WriteZipVersion, false);
-			PutLump(BinaryStateLump.BizVersion, WriteEmuVersion, false);
+			_writer = writer;
+			_fs = fs;
 		}
 
 		public static FileWriteResult<ZipStateSaver> Create(string path, int compressionLevel)
 		{
-			FileWriteResult<FrameworkZipWriter> result = FrameworkZipWriter.Create(path, compressionLevel);
-			if (result.IsError) return new(result);
-			else return result.Convert(new ZipStateSaver(result.Value!));
+			FileWriteResult<FileWriter> fs = FileWriter.Create(path);
+			if (fs.IsError) return new(fs);
+			return fs.Convert(new ZipStateSaver(new(compressionLevel, VersionInfo.GetEmuVersion()), fs.Value!));
 		}
 
 		/// <summary>
@@ -51,7 +41,29 @@ namespace BizHawk.Client.Common
 		/// <param name="backupPath">If not null, renames the original file to this path.</param>
 		public FileWriteResult CloseAndDispose(string? backupPath = null)
 		{
-			FileWriteResult result = _zip.CloseAndDispose(backupPath);
+			if (_fs == null) throw new ObjectDisposedException("Cannot use disposed ZipStateSaver.");
+			FileWriteResult result;
+			if (_writeException == null)
+			{
+				try
+				{
+					var bytes = _writer.Finish();
+					_fs.Stream.Write(bytes, 0, bytes.Length);
+				}
+				catch (Exception ex)
+				{
+					_writeException = ex;
+				}
+			}
+			if (_writeException == null)
+			{
+				result = _fs.CloseAndDispose(backupPath);
+			}
+			else
+			{
+				result = new(FileWriteEnum.FailedDuringWrite, _fs.Paths, _writeException);
+				_fs.Abort();
+			}
 			Dispose();
 			return result;
 		}
@@ -62,20 +74,27 @@ namespace BizHawk.Client.Common
 		/// </summary>
 		public void Abort()
 		{
-			_zip.Abort();
+			if (_fs == null) throw new ObjectDisposedException("Cannot use disposed ZipStateSaver.");
+			_fs.Abort();
 			Dispose();
 		}
 
 		public void PutLump(BinaryStateLump lump, Action<Stream> callback, bool zstdCompress = true)
 		{
-			var filePath = AsTarbomb ? lump.FileName : $"{TOP_LEVEL_DIR_NAME}/{lump.FileName}";
-			if (zstdCompress)
+			if (_writeException != null) return;
+			try
 			{
-				_zip.WriteItem(filePath + ".zst", callback, zstdCompress: true);
+				using MemoryStream ms = new();
+				callback(ms);
+				if (!_writer.PutLump(lump.Name, lump.Ext, zstdCompress, ms.ToArray()))
+				{
+					throw new IOException($"engine could not add {lump.FileName}: {_writer.LastError}");
+				}
 			}
-			else
+			catch (Exception ex)
 			{
-				_zip.WriteItem(filePath, callback, zstdCompress: false);
+				_writeException = ex;
+				// the failure is reported at closing, as it always was
 			}
 		}
 
@@ -101,21 +120,12 @@ namespace BizHawk.Client.Common
 
 		public void Dispose()
 		{
-			Dispose(true);
+			if (_isDisposed) return;
+			_isDisposed = true;
+			_writer.Dispose();
+			_fs?.Dispose();
+			_fs = null;
 			GC.SuppressFinalize(this);
-		}
-
-		protected virtual void Dispose(bool disposing)
-		{
-			if (!_isDisposed)
-			{
-				_isDisposed = true;
-
-				if (disposing)
-				{
-					_zip.Dispose();
-				}
-			}
 		}
 	}
 }

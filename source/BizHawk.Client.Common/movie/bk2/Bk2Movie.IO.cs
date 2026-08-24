@@ -7,6 +7,7 @@ using System.Runtime.InteropServices;
 using BizHawk.Bizware.Graphics;
 using BizHawk.Common;
 using BizHawk.Common.IOExtensions;
+using BizHawk.Emulation.Common.Engine;
 using BizHawk.Common.StringExtensions;
 using BizHawk.Emulation.Common;
 
@@ -88,9 +89,28 @@ namespace BizHawk.Client.Common
 
 		protected void AddBk2Lumps(ZipStateSaver bs)
 		{
-			bs.PutLump(BinaryStateLump.Movieheader, tw => tw.WriteLine(Header.ToString()));
-			bs.PutLump(BinaryStateLump.Comments, tw => tw.WriteLine(CommentsString()));
-			bs.PutLump(BinaryStateLump.Subtitles, tw => tw.WriteLine(Subtitles.ToString()));
+			// the engine renders the text lumps (see docs/engine-migration.md); the
+			// closing blank line the old WriteLine(ToString()) pair produced is part
+			// of each serialization
+			bs.PutLump(BinaryStateLump.Movieheader, tw =>
+			{
+				using EngineMovieHeader header = new();
+				foreach (var (k, v) in Header) header.Set(k, v);
+				tw.Write(header.Serialize(crlf: tw.NewLine == "\r\n"));
+			});
+			bs.PutLump(BinaryStateLump.Comments, tw =>
+			{
+				using EngineTextLines lines = new();
+				foreach (var comment in Comments) lines.Add(comment);
+				tw.Write(lines.Serialize(crlf: tw.NewLine == "\r\n"));
+			});
+			bs.PutLump(BinaryStateLump.Subtitles, tw =>
+			{
+				Subtitles.Sort();
+				using EngineTextLines lines = new();
+				foreach (var subtitle in Subtitles) lines.Add(subtitle.ToString());
+				tw.Write(lines.Serialize(crlf: tw.NewLine == "\r\n"));
+			});
 			bs.PutLump(BinaryStateLump.SyncSettings, tw => tw.WriteLine(SyncSettingsJson));
 			bs.PutLump(BinaryStateLump.Input, WriteInputLog);
 

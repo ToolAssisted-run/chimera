@@ -174,18 +174,6 @@ namespace BizHawk.Client.Common
 			}
 		}
 
-		protected string CommentsString()
-		{
-			var sb = new StringBuilder();
-
-			foreach (var comment in Comments)
-			{
-				sb.AppendLine(comment);
-			}
-
-			return sb.ToString();
-		}
-
 		public string TextSavestate { get; set; }
 		public byte[] BinarySavestate { get; set; }
 		public BitmapBuffer SavestateFramebuffer { get; set; }

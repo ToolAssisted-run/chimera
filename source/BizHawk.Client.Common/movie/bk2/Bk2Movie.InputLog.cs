@@ -1,7 +1,7 @@
-﻿using System.Collections.Generic;
 using System.IO;
+
 using BizHawk.Common;
-using BizHawk.Common.StringExtensions;
+using BizHawk.Emulation.Common.Engine;
 
 namespace BizHawk.Client.Common
 {
@@ -12,16 +12,12 @@ namespace BizHawk.Client.Common
 
 		public void WriteInputLog(TextWriter writer)
 		{
-			writer.WriteLine("[Input]");
-			writer.Write("LogKey:");
-			writer.WriteLine(string.IsNullOrEmpty(LogKey) ? Bk2LogEntryGenerator.GenerateLogKey(Session.MovieController.Definition) : LogKey);
-
-			foreach (var record in Log)
-			{
-				writer.WriteLine(record);
-			}
-
-			writer.WriteLine("[/Input]");
+			// the engine renders the [Input] block (see docs/engine-migration.md);
+			// the EOL matches what TextWriter.WriteLine wrote here historically
+			using EngineMovieLog engineLog = new();
+			foreach (var record in Log) engineLog.Add(record);
+			engineLog.Key = string.IsNullOrEmpty(LogKey) ? Bk2LogEntryGenerator.GenerateLogKey(Session.MovieController.Definition) : LogKey;
+			writer.Write(engineLog.Serialize(crlf: writer.NewLine == "\r\n"));
 		}
 
 		public string GetInputLogEntry(int frame)
@@ -34,7 +30,6 @@ namespace BizHawk.Client.Common
 		public virtual bool ExtractInputLog(TextReader reader, out string errorMessage)
 		{
 			errorMessage = "";
-			int? stateFrame = null;
 
 			// We are in record mode so replace the movie log with the one from the savestate
 			if (Session.Settings.EnableBackupMovies && MakeBackup && Log.Count != 0)
@@ -43,39 +38,32 @@ namespace BizHawk.Client.Common
 				MakeBackup = false;
 			}
 
-			Log.Clear();
-			string line;
-			while ((line = reader.ReadLine()) != null)
+			using EngineMovieLog engineLog = new();
+			if (!engineLog.Parse(reader.ReadToEnd(), out errorMessage))
 			{
-				if (line.StartsWith('|'))
-				{
-					Log.Add(line);
-				}
-				else if (line.StartsWithOrdinal("Frame "))
-				{
-					var strs = line.Split(' ');
-					try
-					{
-						stateFrame = int.Parse(strs[1]);
-					}
-					catch
-					{
-						errorMessage = "Savestate Frame number failed to parse";
-						return false;
-					}
-				}
-				else if (line.StartsWithOrdinal("LogKey:"))
-				{
-					LogKey = line.Replace("LogKey:", "");
-				}
+				// unlike the parser this replaced, a failed parse leaves the movie as
+				// it was rather than half-loaded
+				return false;
 			}
 
-			if (!stateFrame.HasValue)
+			Log.Clear();
+			for (long i = 0; i < engineLog.Count; i++)
+			{
+				Log.Add(engineLog[i]);
+			}
+			if (engineLog.Key is not null)
+			{
+				LogKey = engineLog.Key;
+			}
+
+			// quirk, preserved: text with no "Frame N" line sets this message yet
+			// still succeeds, and the state frame is taken as 0
+			if (!engineLog.HasStateFrame)
 			{
 				errorMessage = "Savestate Frame number failed to parse";
 			}
 
-			var stateFramei = stateFrame ?? 0;
+			var stateFramei = engineLog.HasStateFrame ? engineLog.StateFrame : 0;
 
 			if (stateFramei.StrictlyBoundedBy(0.RangeTo(Log.Count)))
 			{
@@ -106,33 +94,19 @@ namespace BizHawk.Client.Common
 		{
 			// This function will compare the movie data to the savestate movie data to see if they match
 			errorMessage = "";
-			var newLog = new List<string>();
-			var stateFrame = 0;
-			string line;
-			while ((line = reader.ReadLine()) != null)
+
+			using EngineMovieLog newLog = new();
+			if (!newLog.Parse(reader.ReadToEnd(), out errorMessage))
 			{
-				if (line.StartsWith('|'))
-				{
-					newLog.Add(line);
-				}
-				else if (line.StartsWithOrdinal("Frame "))
-				{
-					var strs = line.Split(' ');
-					try
-					{
-						stateFrame = int.Parse(strs[1]);
-					}
-					catch
-					{
-						errorMessage = "Savestate Frame number failed to parse";
-						return false;
-					}
-				}
+				return false;
 			}
 
+			// quirk, preserved: an absent (or literal 0) frame number means the
+			// whole savestate input log
+			var stateFrame = newLog.HasStateFrame ? newLog.StateFrame : 0;
 			if (stateFrame == 0)
 			{
-				stateFrame = newLog.Count;  // In case the frame count failed to parse, revert to using the entire state input log
+				stateFrame = (int)newLog.Count;
 			}
 
 			if (stateFrame > newLog.Count)

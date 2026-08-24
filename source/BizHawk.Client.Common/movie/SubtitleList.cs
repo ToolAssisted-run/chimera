@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 
 using BizHawk.Common;
+using BizHawk.Emulation.Common.Engine;
 
 namespace BizHawk.Client.Common
 {
@@ -30,38 +31,18 @@ namespace BizHawk.Client.Common
 
 		public bool AddFromString(string subtitleStr)
 		{
-			if (!string.IsNullOrWhiteSpace(subtitleStr))
+			if (string.IsNullOrWhiteSpace(subtitleStr)) return false;
+			if (!EngineSubtitleLine.TryParse(subtitleStr, out var fields, out var message)) return false;
+			Add(new Subtitle
 			{
-				try
-				{
-					var subParts = subtitleStr.Split(' ');
-
-					// Unfortunately I made the file format space delaminated so this hack is necessary to get the message
-					var message = "";
-					for (var i = 6; i < subParts.Length; i++)
-					{
-						message += subParts[i] + ' ';
-					}
-
-					Add(new Subtitle
-					{
-						Frame = int.Parse(subParts[1]),
-						X = int.Parse(subParts[2]),
-						Y = int.Parse(subParts[3]),
-						Duration = int.Parse(subParts[4]),
-						Color = uint.Parse(subParts[5], NumberStyles.HexNumber),
-						Message = message.Trim(),
-					});
-
-					return true;
-				}
-				catch
-				{
-					return false;
-				}
-			}
-
-			return false;
+				Frame = fields.Frame,
+				X = fields.X,
+				Y = fields.Y,
+				Duration = fields.Duration,
+				Color = fields.Color,
+				Message = message,
+			});
+			return true;
 		}
 
 		public new void Sort()

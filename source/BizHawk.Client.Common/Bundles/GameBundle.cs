@@ -2,11 +2,8 @@
 
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Security.Cryptography;
-using System.Text;
 
-using Newtonsoft.Json;
+using BizHawk.Emulation.Common.Engine;
 
 namespace BizHawk.Client.Common
 {
@@ -15,9 +12,9 @@ namespace BizHawk.Client.Common
 	/// it - the cartridge's battery memory, the disk the game wrote on.
 	///
 	/// A bundle is a CATALOGUE, not a container. It names files that sit beside it and
-	/// pins each by SHA1; it never holds their bytes. So a bundle stays a few hundred
-	/// bytes, editing a save does not mean rebuilding anything, and the file you point
-	/// the emulator at is still the file you would have pointed it at.
+	/// pins each by SHA1; it never holds their bytes. The format, the naming rules and
+	/// the bundle's identity live in the engine (see docs/engine-migration.md); this
+	/// class is the frontend's living model of one, plus the filesystem around it.
 	///
 	/// The hashes are what make it worth citing: a movie that says "recorded against
 	/// bundle X" is only meaningful if X pins its parts by content. A hand-written
@@ -32,46 +29,33 @@ namespace BizHawk.Client.Common
 	{
 		public const string Extension = ".gameBundle";
 
-		/// <summary>Format version, so an older frontend can refuse a newer bundle rather than misread it.</summary>
-		[JsonProperty("bundle")]
-		public int FormatVersion { get; set; } = 1;
-
 		/// <summary>What to call this in the window title and recent list. Falls back to the rom's name.</summary>
-		[JsonProperty("name")]
 		public string? Name { get; set; }
 
-		[JsonProperty("rom")]
 		public BundlePart? Rom { get; set; }
 
-		[JsonProperty("attach")]
-		public List<BundleAttachment> Attach { get; set; } = new();
+		public List<BundleAttachment> Attach { get; } = new();
 
 		/// <summary>Where the bundle was read from; every file it names is relative to this directory.</summary>
-		[JsonIgnore]
 		public string? Directory { get; set; }
 
-		[JsonIgnore]
 		public string? Path { get; set; }
 
 		public class BundlePart
 		{
 			/// <summary>File name, relative to the bundle. Never absolute, never outside the bundle's folder.</summary>
-			[JsonProperty("file")]
 			public string File { get; set; } = "";
 
 			/// <summary>SHA1 of the file's bytes (uppercase hex), or null in a hand-written bundle that pins nothing.</summary>
-			[JsonProperty("sha1", NullValueHandling = NullValueHandling.Ignore)]
 			public string? Sha1 { get; set; }
 		}
 
 		public sealed class BundleAttachment : BundlePart
 		{
 			/// <summary>The core this belongs to, by the name movies record.</summary>
-			[JsonProperty("core")]
 			public string Core { get; set; } = "";
 
 			/// <summary>The id the core declared for its persistent data ("sram", "disk").</summary>
-			[JsonProperty("id")]
 			public string Id { get; set; } = "";
 		}
 
@@ -84,16 +68,8 @@ namespace BizHawk.Client.Common
 		{
 			get
 			{
-				if (Rom?.Sha1 is null) return null;
-				StringBuilder sb = new();
-				sb.Append("rom:").Append(Rom.Sha1.ToUpperInvariant()).Append('\n');
-				foreach (var a in Attach.OrderBy(static a => a.Core, StringComparer.Ordinal).ThenBy(static a => a.Id, StringComparer.Ordinal))
-				{
-					if (a.Sha1 is null) return null;
-					sb.Append(a.Core).Append(':').Append(a.Id).Append(':').Append(a.Sha1.ToUpperInvariant()).Append('\n');
-				}
-				using SHA1 sha1 = SHA1.Create();
-				return BitConverter.ToString(sha1.ComputeHash(Encoding.UTF8.GetBytes(sb.ToString()))).Replace("-", "");
+				using var engine = ToEngine();
+				return engine.ContentId;
 			}
 		}
 
@@ -103,22 +79,21 @@ namespace BizHawk.Client.Common
 		/// <exception cref="InvalidOperationException">the file is not a readable bundle</exception>
 		public static GameBundle Load(string path)
 		{
-			GameBundle? bundle;
-			try
+			// the engine refuses anything unacceptable: unreadable JSON, a newer
+			// format version, no rom, a part naming a path a bundle may not name
+			using var parsed = EngineBundle.Parse(File.ReadAllText(path), System.IO.Path.GetFileName(path));
+			GameBundle bundle = new()
 			{
-				bundle = JsonConvert.DeserializeObject<GameBundle>(File.ReadAllText(path));
-			}
-			catch (JsonException e)
+				Name = parsed.Name,
+				Rom = new() { File = parsed.RomFile, Sha1 = parsed.RomSha1 },
+				Path = path,
+				Directory = System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(path)),
+			};
+			for (long i = 0; i < parsed.AttachCount; i++)
 			{
-				throw new InvalidOperationException($"{System.IO.Path.GetFileName(path)} is not a readable bundle: {e.Message}");
+				var (core, id, file, sha1) = parsed.AttachAt(i);
+				bundle.Attach.Add(new() { Core = core, Id = id, File = file, Sha1 = sha1 });
 			}
-			if (bundle is null) throw new InvalidOperationException($"{System.IO.Path.GetFileName(path)} is empty");
-			if (bundle.FormatVersion > 1) throw new InvalidOperationException($"{System.IO.Path.GetFileName(path)} is a version {bundle.FormatVersion} bundle; this build understands version 1");
-			if (string.IsNullOrWhiteSpace(bundle.Rom?.File)) throw new InvalidOperationException($"{System.IO.Path.GetFileName(path)} names no rom");
-			bundle.Attach ??= new();
-			bundle.Path = path;
-			bundle.Directory = System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(path));
-			foreach (var part in bundle.AllParts()) _ = bundle.ResolveFile(part); // reject bad paths at load, not at use
 			return bundle;
 		}
 
@@ -126,7 +101,16 @@ namespace BizHawk.Client.Common
 		{
 			Path = path;
 			Directory = System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(path));
-			File.WriteAllText(path, JsonConvert.SerializeObject(this, Formatting.Indented));
+			using var engine = ToEngine();
+			File.WriteAllText(path, engine.Serialize());
+		}
+
+		private EngineBundle ToEngine()
+		{
+			EngineBundle engine = new() { Name = Name };
+			engine.SetRom(Rom?.File ?? "", Rom?.Sha1);
+			foreach (var a in Attach) engine.AddAttach(a.Core, a.Id, a.File, a.Sha1);
+			return engine;
 		}
 
 		public IEnumerable<BundlePart> AllParts()
@@ -143,19 +127,14 @@ namespace BizHawk.Client.Common
 		/// <exception cref="InvalidOperationException">the part names a path a bundle may not name</exception>
 		public string ResolveFile(BundlePart part)
 		{
-			var name = part.File;
-			if (string.IsNullOrWhiteSpace(name)) throw new InvalidOperationException("a bundle entry names no file");
-			if (System.IO.Path.IsPathRooted(name) || name.Contains(':'))
+			switch (EngineBundle.CheckPath(part.File))
 			{
-				throw new InvalidOperationException($"\"{name}\": a bundle may only name files beside it, not absolute paths");
+				case 0: break;
+				case 1: throw new InvalidOperationException("a bundle entry names no file");
+				case 2: throw new InvalidOperationException($"\"{part.File}\": a bundle may only name files beside it, not absolute paths");
+				default: throw new InvalidOperationException($"\"{part.File}\": a bundle may only name files beside it, not outside its own folder");
 			}
-			var full = System.IO.Path.GetFullPath(System.IO.Path.Combine(Directory ?? ".", name));
-			var root = System.IO.Path.GetFullPath(Directory ?? ".");
-			if (!full.StartsWith(root + System.IO.Path.DirectorySeparatorChar, StringComparison.Ordinal) && full != root)
-			{
-				throw new InvalidOperationException($"\"{name}\": a bundle may only name files beside it, not outside its own folder");
-			}
-			return full;
+			return System.IO.Path.GetFullPath(System.IO.Path.Combine(Directory ?? ".", part.File));
 		}
 
 		/// <summary>
@@ -190,11 +169,7 @@ namespace BizHawk.Client.Common
 			=> Attach.Find(a => string.Equals(a.Core, coreName, StringComparison.OrdinalIgnoreCase)
 				&& string.Equals(a.Id, id, StringComparison.OrdinalIgnoreCase));
 
-		public static string Sha1Of(byte[] data)
-		{
-			using SHA1 sha1 = SHA1.Create();
-			return BitConverter.ToString(sha1.ComputeHash(data)).Replace("-", "");
-		}
+		public static string Sha1Of(byte[] data) => ChimeraEngine.Sha1Hex(data);
 
 		/// <summary>
 		/// Builds a bundle for a rom and one core's persistent data, both already sitting

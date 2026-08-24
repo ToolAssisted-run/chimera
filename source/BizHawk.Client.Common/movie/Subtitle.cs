@@ -1,5 +1,7 @@
 ﻿using System.Text;
 
+using BizHawk.Emulation.Common.Engine;
+
 namespace BizHawk.Client.Common
 {
 	public class Subtitle
@@ -32,18 +34,14 @@ namespace BizHawk.Client.Common
 		public uint Color { get; set; }
 
 		public override string ToString()
-		{
-			var sb = new StringBuilder("subtitle ");
-			sb
-				.Append(Frame).Append(' ')
-				.Append(X).Append(' ')
-				.Append(Y).Append(' ')
-				.Append(Duration).Append(' ')
-				.Append($"{Color:X8}").Append(' ')
-				.Append(Message);
-
-			return sb.ToString();
-		}
+			=> EngineSubtitleLine.Format(new()
+			{
+				Frame = Frame,
+				X = X,
+				Y = Y,
+				Duration = Duration,
+				Color = Color,
+			}, Message ?? "");
 
 		public string ToSubRip(int index, double fps, bool addColorTag)
 		{

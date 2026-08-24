@@ -274,6 +274,70 @@ shared_library(
 )
 
 # ---------------------------------------------------------------------------
+# libchimera — the engine. The functional side of the frontend, migrating out
+# of C# component by component (see docs/engine-migration.md). Its C ABI in
+# engine/include/chimera/engine.h is a frozen spec; the frontend BizInvokes it
+# the same way it does libminiboxhost.
+# ---------------------------------------------------------------------------
+engine_inc = include_directories('engine/include')
+engine_src = files(
+  'engine/source/engine.cpp',
+  'engine/source/movie_log.cpp',
+  'engine/source/movie_text.cpp',
+  'engine/source/state_container.cpp',
+  'engine/source/zstd_dyn.cpp',
+  'engine/source/sha1.cpp',
+  'engine/source/bundle.cpp',
+  'engine/source/firmware.cpp',
+  'extern/miniz/miniz.c',  # vendored (MIT): the zip half of the state container
+  'extern/cjson/cJSON.c',  # vendored (MIT): bundle JSON
+)
+# Provenance: this repo's commit, since the engine lives in-tree. Inputs only.
+engine_commit = run_command(
+  'git', '-C', repo_root, 'rev-parse', '--short=12', 'HEAD',
+  check: false).stdout().strip()
+if engine_commit == ''
+  engine_commit = 'unknown'
+endif
+engine_build_args = [
+  '-DCE_BUILD_COMMIT="' + engine_commit + '"',
+  '-DCE_BUILD_COMPILER="' + meson.get_compiler('cpp').get_id() + ' ' + meson.get_compiler('cpp').version() + '"',
+  '-DCE_BUILD_OS="' + minibox_build_os + '"',
+  # miniz's zlib-name-compat macros (#define compress mz_compress) leak into
+  # everything that includes it; we use the mz_ names
+  '-DMINIZ_NO_ZLIB_COMPATIBLE_NAMES',
+]
+shared_library(
+  'chimera',
+  engine_src,
+  name_prefix: 'lib',  # libchimera.{so,dll} on both targets (the frontend resolves this name)
+  include_directories: engine_inc,
+  cpp_args: engine_build_args,
+  c_args: engine_build_args,
+  dependencies: [dl_dep],  # zstd_dyn loads libzstd from beside the library
+  gnu_symbol_visibility: 'default',
+  install: true,
+  install_dir: 'dll',
+)
+if not meson.is_cross_build()
+  foreach engine_test : ['movie_log', 'movie_text', 'state_container', 'bundle']
+    test(
+      'engine_' + engine_test,
+      executable(
+        'test_' + engine_test,
+        ['engine/tests/test_' + engine_test + '.cpp'] + engine_src,
+        include_directories: engine_inc,
+        cpp_args: engine_build_args + ['-UNDEBUG'],  # these tests ARE asserts
+        c_args: engine_build_args,
+        dependencies: [dl_dep],
+      ),
+      # (the state container test finds libzstd the way the shipped library
+      # does: beside its own binary, which in the build dir it is)
+    )
+  endforeach
+endif
+
+# ---------------------------------------------------------------------------
 # The managed solution — one platform-neutral build, from the Linux dir only
 # ---------------------------------------------------------------------------
 if not meson.is_cross_build()

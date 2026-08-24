@@ -3,6 +3,7 @@ using System.Globalization;
 using System.IO;
 
 using BizHawk.Emulation.Common;
+using BizHawk.Emulation.Common.Engine;
 
 namespace BizHawk.Client.Common
 {
@@ -172,44 +173,35 @@ namespace BizHawk.Client.Common
 
 		protected virtual void LoadFields(ZipStateLoader bl)
 		{
+			// the engine parses the text lumps (see docs/engine-migration.md)
 			bl.GetLump(BinaryStateLump.Movieheader, abort: true, tr =>
 			{
-				while (tr.ReadLine() is string line)
+				using EngineMovieHeader header = new();
+				header.Parse(tr.ReadToEnd());
+				for (long i = 0; i < header.Count; i++)
 				{
-					if (!string.IsNullOrWhiteSpace(line))
-					{
-						var pair = line.Split(new[] { ' ' }, 2, StringSplitOptions.RemoveEmptyEntries);
-
-						if (pair.Length > 1)
-						{
-							if (!Header.ContainsKey(pair[0]))
-							{
-								Header.Add(pair[0], pair[1]);
-							}
-						}
-					}
+					var (key, value) = header[i];
+					if (!Header.ContainsKey(key)) Header.Add(key, value);
 				}
 			});
 
 			bl.GetLump(BinaryStateLump.Comments, abort: false, tr =>
 			{
-				while (tr.ReadLine() is string line)
+				using EngineTextLines lines = new();
+				lines.Parse(tr.ReadToEnd());
+				for (long i = 0; i < lines.Count; i++)
 				{
-					if (!string.IsNullOrWhiteSpace(line))
-					{
-						Comments.Add(line);
-					}
+					Comments.Add(lines[i]);
 				}
 			});
 
 			bl.GetLump(BinaryStateLump.Subtitles, abort: false, tr =>
 			{
-				while (tr.ReadLine() is string line)
+				using EngineTextLines lines = new();
+				lines.Parse(tr.ReadToEnd());
+				for (long i = 0; i < lines.Count; i++)
 				{
-					if (!string.IsNullOrWhiteSpace(line))
-					{
-						Subtitles.AddFromString(line);
-					}
+					Subtitles.AddFromString(lines[i]);
 				}
 
 				Subtitles.Sort();

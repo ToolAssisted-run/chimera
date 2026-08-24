@@ -1,127 +1,53 @@
-using System.Collections.Generic;
 using System.IO;
-using System.IO.Compression;
-using System.Linq;
 
-using BizHawk.Common;
-using BizHawk.Common.StringExtensions;
+using BizHawk.Emulation.Common.Engine;
 
 namespace BizHawk.Client.Common
 {
+	/// <summary>
+	/// Reads the savestate/movie container. The engine parses the archive
+	/// (see docs/engine-migration.md) - the lump naming rules, the ".zst"
+	/// handling, the BizState version quirks and the old non-tarbomb layout all
+	/// live there now. Lump callbacks receive the DECOMPRESSED length; the only
+	/// caller that ever read it (the version lump's emptiness check) wanted
+	/// exactly that.
+	/// </summary>
 	public class ZipStateLoader : IDisposable
 	{
-		private ZipArchive _zip;
-		private Version _ver;
+		private EngineStateReader _reader;
 		private bool _isDisposed;
-		private Dictionary<string, ZipArchiveEntry> _entriesByName;
-		private readonly Zstd _zstd;
 
-		public int Version => _ver.Build;
+		public int Version => _reader.Version;
 
-		private ZipStateLoader()
+		private ZipStateLoader(EngineStateReader reader)
 		{
-			_zstd = new();
+			_reader = reader;
 		}
 
 		public void Dispose()
 		{
-			Dispose(true);
+			if (_isDisposed) return;
+			_isDisposed = true;
+			_reader.Dispose();
+			_reader = null;
 		}
 
-		protected virtual void Dispose(bool disposing)
-		{
-			if (!_isDisposed)
-			{
-				_isDisposed = true;
-				if (disposing)
-				{
-					_zip.Dispose();
-					_zstd.Dispose();
-				}
-			}
-		}
-
-		private void ReadZipVersion(Stream s, long length)
-		{
-			// the "BizState 1.0" tag contains an integer in it describing the sub version.
-			if (length == 0)
-			{
-				_ver = new Version(1, 0, 0); // except for the first release, which doesn't
-			}
-			else
-			{
-				var sr = new StreamReader(s);
-				_ver = new Version(1, 0, int.Parse(sr.ReadLine()));
-			}
-
-			Console.WriteLine("Read a zipstate of version {0}", _ver);
-		}
-
-		private void PopulateEntries()
-		{
-			_entriesByName = new Dictionary<string, ZipArchiveEntry>();
-			if (_zip.Entries.Count is 0) return;
-			var allFilePaths = _zip.Entries.Select(static entry => entry.FullName).ToArray();
-			string commonPrefix = new(allFilePaths.CommonPrefix());
-			if (commonPrefix is not ([ ] or [ .., '/' ] or [ .., '\\' ]))
-			{
-				// not sure what happened but it's not right
-				commonPrefix = string.Empty; // assume it's a tarbomb (no top-level dir)
-				// and try reading anyway
-			}
-			foreach (var z in _zip.Entries)
-			{
-				//TODO this would fail for `/BizState/a.b.c/file.txt`, though thankfully we control all the filenames and don't have any like that
-				var name = z.FullName.RemovePrefix(commonPrefix).SubstringBefore('.').Replace('\\', '/');
-
-				// .zst compression is optional, but loader needs to know if it was used
-				if (z.FullName.EndsWith(".zst")) name += ".zst";
-
-				if (_entriesByName.ContainsKey(name)) throw new Exception($"Duplicate file found in zip archive: {name}. Please delete one.");
-				_entriesByName.Add(name, z);
-			}
-		}
-
-		private static readonly byte[] Zipheader = { 0x50, 0x4b, 0x03, 0x04 };
 		public static ZipStateLoader LoadAndDetect(string filename, bool isMovieLoad = false)
 		{
-			var ret = new ZipStateLoader();
-
-			using (var fs = new FileStream(filename, FileMode.Open, FileAccess.Read))
-			{
-				byte[] data = new byte[4];
-				_ = fs.Read(data, offset: 0, count: data.Length); // if stream is too short, the next check will catch it
-				if (!data.SequenceEqual(Zipheader))
-				{
-					return null;
-				}
-			}
-
+			byte[] data;
 			try
 			{
-				ret._zip = new ZipArchive(new FileStream(filename, FileMode.Open, FileAccess.Read), ZipArchiveMode.Read);
-				ret.PopulateEntries();
-				if (isMovieLoad)
-				{
-					if (!ret.GetLump(BinaryStateLump.ZipVersion, false, ret.ReadZipVersion))
-					{
-						// movies before 1.0.2 did not include the BizState 1.0 file, don't strictly error in this case
-						ret._ver = new Version(1, 0, 0);
-						Console.WriteLine("Read a zipstate of version {0}", ret._ver);
-					}
-				}
-				else if (!ret.GetLump(BinaryStateLump.ZipVersion, false, ret.ReadZipVersion))
-				{
-					ret._zip.Dispose();
-					return null;
-				}
-
-				return ret;
+				data = File.ReadAllBytes(filename);
 			}
 			catch (IOException)
 			{
 				return null;
 			}
+
+			var reader = EngineStateReader.Open(data, isMovieLoad);
+			if (reader is null) return null;
+			Console.WriteLine("Read a zipstate of version 1.0.{0}", reader.Version);
+			return new(reader);
 		}
 
 		/// <param name="lump">lump to retrieve</param>
@@ -131,44 +57,18 @@ namespace BizHawk.Client.Common
 		/// <exception cref="Exception">stream not found and <paramref name="abort"/> is <see langword="true"/></exception>
 		public bool GetLump(BinaryStateLump lump, bool abort, Action<Stream, long> callback)
 		{
-			bool fileFound = _entriesByName.TryGetValue(lump.Name, out var e);
-			bool isZstdCompressed = false;
-			if (!fileFound)
+			var bytes = _reader.Lump(lump.Name, lump.Ext);
+			if (bytes is null)
 			{
-				isZstdCompressed = fileFound = _entriesByName.TryGetValue(lump.Name + ".zst", out e);
-			}
-
-			if (fileFound)
-			{
-				// In version 1.0.2, we did not use .zst to mark zstd compression (earlier versions had no zstd)
-				// These particular files/exensions were zstd compressed:
-				if (_ver == new Version(1, 0, 2)
-					&& (lump.Ext is "bin" or "bmp" || lump.Name is "Greenzone"))
+				if (abort)
 				{
-					isZstdCompressed = true;
+					throw new Exception($"Essential zip section not found: {lump.FileName}");
 				}
-
-				using var zs = e.Open();
-
-				if (isZstdCompressed)
-				{
-					using var z = _zstd.CreateZstdDecompressionStream(zs);
-					callback(z, e.Length);
-				}
-				else
-				{
-					callback(zs, e.Length);
-				}
-
-				return true;
+				return false;
 			}
-
-			if (abort)
-			{
-				throw new Exception($"Essential zip section not found: {lump.FileName}");
-			}
-
-			return false;
+			using MemoryStream ms = new(bytes, writable: false);
+			callback(ms, bytes.LongLength);
+			return true;
 		}
 
 		public bool GetLump(BinaryStateLump lump, bool abort, Action<BinaryReader> callback)
