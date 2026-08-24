@@ -172,7 +172,6 @@ namespace Chimera.Client.GUI
 			MovieEndRecordMenuItem.Checked = Config.Movies.MovieEndAction == MovieEndAction.Record;
 			MovieEndStopMenuItem.Checked = Config.Movies.MovieEndAction == MovieEndAction.Stop;
 			MovieEndPauseMenuItem.Checked = Config.Movies.MovieEndAction == MovieEndAction.Pause;
-			MovieEndPlaySoundMenuItem.Checked = Config.Movies.PlaySoundOnMovieEnd;
 		}
 
 		private void AVSubMenu_DropDownOpened(object sender, EventArgs e)
@@ -1020,8 +1019,7 @@ namespace Chimera.Client.GUI
 
 		private void AboutMenuItem_Click(object sender, EventArgs e)
 		{
-			var atten = Config.SoundEnabledNormal ? Config.SoundVolume / 100.0f : 0.0f;
-			using BizBox form = new(() => Sound.PlayWavFile(Properties.Resources.GetAboutSFX(), atten));
+			using BizBox form = new();
 			this.ShowDialogWithTempMute(form);
 		}
 
@@ -1397,9 +1395,6 @@ namespace Chimera.Client.GUI
 
 		private void FormDragDrop(object sender, DragEventArgs e)
 			=> PathsFromDragDrop = (string[]) e.Data.GetData(DataFormats.FileDrop);
-
-		private void MovieEndPlaySoundMenuItem_Click(object sender, EventArgs e)
-			=> Config.Movies.PlaySoundOnMovieEnd = !((ToolStripMenuItem) sender).Checked;
 	}
 }
 

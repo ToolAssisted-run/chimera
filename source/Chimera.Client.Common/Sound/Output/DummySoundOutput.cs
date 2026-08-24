@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.IO;
 
 namespace Chimera.Client.Common
@@ -75,10 +75,6 @@ namespace Chimera.Client.Common
 		{
 			if (sampleCount == 0) return;
 			_remainingSamples += sampleCount;
-		}
-
-		public void PlayWavFile(Stream wavFile, double volume)
-		{
 		}
 	}
 }

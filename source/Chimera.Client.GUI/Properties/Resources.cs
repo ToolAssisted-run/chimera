@@ -1,5 +1,4 @@
 ﻿using System.Drawing;
-using System.IO;
 using System.Windows.Forms;
 
 namespace Chimera.Client.GUI.Properties
@@ -148,8 +147,5 @@ namespace Chimera.Client.GUI.Properties
 		internal static readonly Bitmap YellowLeft = ReadEmbeddedBitmap("YellowLeft");
 		internal static readonly Bitmap YellowRight = ReadEmbeddedBitmap("YellowRight");
 		internal static readonly Bitmap YellowUp = ReadEmbeddedBitmap("YellowUp");
-
-		internal static Stream GetAboutSFX()
-			=> ReflectionCache.EmbeddedResourceStream("Resources.about-sfx.wav");
 	}
 }

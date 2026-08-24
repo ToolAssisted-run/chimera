@@ -6,7 +6,6 @@
 		bool EnableBackupMovies { get; }
 		int MovieCompressionLevel { get; }
 		bool VBAStyleMovieLoadState { get; }
-		bool PlaySoundOnMovieEnd { get; set; }
 		IStateManagerSettings DefaultTasStateManagerSettings { get; }
 	}
 
@@ -16,7 +15,6 @@
 		public bool EnableBackupMovies { get; set; } = true;
 		public int MovieCompressionLevel { get; set; } = 2;
 		public bool VBAStyleMovieLoadState { get; set; }
-		public bool PlaySoundOnMovieEnd { get; set; }
 
 		public IStateManagerSettings DefaultTasStateManagerSettings { get; set; } = new PagedStateManager.PagedSettings();
 	}

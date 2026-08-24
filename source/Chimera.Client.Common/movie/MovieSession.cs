@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 
@@ -23,7 +23,6 @@ namespace Chimera.Client.Common
 		private readonly Action _pauseCallback;
 		private readonly Action _modeChangedCallback;
 		private readonly EventHandler _changesChangedCallback;
-		private readonly Action _movieEndSound;
 
 		private IMovie _queuedMovie;
 
@@ -33,8 +32,7 @@ namespace Chimera.Client.Common
 			IDialogParent dialogParent,
 			Action pauseCallback,
 			Action modeChangedCallback,
-			EventHandler changesChangedCallback,
-			Action movieEndSound = null)
+			EventHandler changesChangedCallback)
 		{
 			Settings = settings;
 			BackupDirectory = backDirectory;
@@ -44,7 +42,6 @@ namespace Chimera.Client.Common
 			_modeChangedCallback = modeChangedCallback
 				?? throw new ArgumentNullException(paramName: nameof(modeChangedCallback));
 			_changesChangedCallback = changesChangedCallback;
-			_movieEndSound = movieEndSound;
 		}
 
 		public IMovieConfig Settings { get; }
@@ -410,9 +407,6 @@ namespace Chimera.Client.Common
 					Movie.FinishedMode();
 					break;
 			}
-
-			if (Settings.MovieEndAction is not MovieEndAction.Record && Settings.PlaySoundOnMovieEnd)
-				_movieEndSound?.Invoke();
 
 			_modeChangedCallback();
 		}

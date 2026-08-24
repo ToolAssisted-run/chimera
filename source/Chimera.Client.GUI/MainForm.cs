@@ -318,8 +318,7 @@ namespace Chimera.Client.GUI
 				this,
 				PauseEmulator,
 				SetMainformMovieInfo,
-				(_, _) => UpdateWindowTitle(),
-				() => Sound.PlayWavFile(Properties.Resources.GetAboutSFX(), Config.SoundVolume / 100f));
+				(_, _) => UpdateWindowTitle());
 
 			void MainForm_MouseClick(object sender, MouseEventArgs e)
 			{

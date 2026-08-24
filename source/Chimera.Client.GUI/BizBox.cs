@@ -9,13 +9,12 @@ namespace Chimera.Client.GUI
 {
 	public partial class BizBox : Form
 	{
-		public BizBox(Action/*?*/ playAboutSFX = null)
+		public BizBox()
 		{
 			InitializeComponent();
 			Icon = Resources.Logo;
 			pictureBox1.Image = Resources.Chimera;
 			btnCopyHash.Image = Resources.Duplicate;
-			if (playAboutSFX is not null) Shown += (_, _) => playAboutSFX();
 		}
 
 		private void linkLabel1_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)

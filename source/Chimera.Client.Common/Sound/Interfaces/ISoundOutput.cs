@@ -1,6 +1,4 @@
-using System.IO;
-
-namespace Chimera.Client.Common
+﻿namespace Chimera.Client.Common
 {
 	public interface ISoundOutput : IDisposable
 	{
@@ -10,6 +8,5 @@ namespace Chimera.Client.Common
 		int MaxSamplesDeficit { get; }
 		int CalculateSamplesNeeded();
 		void WriteSamples(short[] samples, int sampleOffset, int sampleCount);
-		void PlayWavFile(Stream wavFile, double volume);
 	}
 }

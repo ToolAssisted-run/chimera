@@ -1,5 +1,4 @@
-using System.Collections.Generic;
-using System.IO;
+﻿using System.Collections.Generic;
 using System.Linq;
 
 using Chimera.Client.Common;
@@ -46,9 +45,8 @@ namespace Chimera.Bizware.Audio
 		private bool _disposed;
 		private readonly IHostAudioManager _sound;
 		private AudioContext _context;
-		private uint _sourceID, _wavSourceID;
+		private uint _sourceID;
 		private BufferPool _bufferPool;
-		private uint _wavBufferID;
 		private int _currentSamplesQueued;
 		private short[] _tempSampleBuffer;
 		private unsafe Device* _device;
@@ -75,8 +73,6 @@ namespace Chimera.Bizware.Audio
 		public void Dispose()
 		{
 			if (_disposed) return;
-
-			StopWav();
 
 			_context.Dispose();
 			_context = null;
@@ -132,7 +128,6 @@ namespace Chimera.Bizware.Audio
 			}
 
 			StopSound();
-			StopWav();
 			_context.Dispose();
 
 			_context = new(device: null, _sound.SampleRate);
@@ -189,60 +184,6 @@ namespace Chimera.Bizware.Audio
 			{
 				_al.SourcePlay(_sourceID);
 			}
-		}
-
-		private void StopWav()
-		{
-			if (_wavSourceID != 0)
-			{
-				_al.SourceStop(_wavSourceID);
-				_al.DeleteSource(_wavSourceID);
-				_wavSourceID = 0;
-			}
-
-			if (_wavBufferID != 0)
-			{
-				_al.DeleteBuffer(_wavBufferID);
-				_wavBufferID = 0;
-			}
-		}
-
-		public void PlayWavFile(Stream wavFile, double volume)
-		{
-			using var wavStream = new SDL2WavStream(wavFile);
-			if (wavStream.Channels > 2)
-			{
-				throw new NotSupportedException("OpenAL does not support more than 2 channels");
-			}
-
-			var format = wavStream.Format switch
-			{
-				SDL2WavStream.AudioFormat.U8 => wavStream.Channels == 1 ? BufferFormat.Mono8 : BufferFormat.Stereo8,
-				SDL2WavStream.AudioFormat.S16LSB or SDL2WavStream.AudioFormat.S16MSB => wavStream.Channels == 1 ? BufferFormat.Mono16 : BufferFormat.Stereo16,
-				SDL2WavStream.AudioFormat.S32LSB => throw new NotSupportedException("OpenAL does not support s32 samples"),
-				SDL2WavStream.AudioFormat.F32LSB when _floatExt == null => throw new NotSupportedException("This OpenAL implementation does not support f32 samples"),
-				SDL2WavStream.AudioFormat.F32LSB => (BufferFormat)(wavStream.Channels == 1 ? FloatBufferFormat.Mono : FloatBufferFormat.Stereo),
-				_ => throw new InvalidOperationException(),
-			};
-
-			StopWav();
-			_wavSourceID = _al.GenSource();
-			_wavBufferID = _al.GenBuffer();
-
-			var tempBuffer = wavStream.ReadAllBytes();
-			if (wavStream.Format == SDL2WavStream.AudioFormat.S16MSB)
-			{
-				EndiannessUtils.MutatingByteSwap16(tempBuffer);
-			}
-
-			_al.BufferData(_wavBufferID, format, tempBuffer, wavStream.Frequency);
-			_al.SetSourceProperty(_wavSourceID, SourceFloat.Gain, (float)volume);
-			unsafe
-			{
-				var bid = _wavBufferID;
-				_al.SourceQueueBuffers(_wavSourceID, 1, &bid);
-			}
-			_al.SourcePlay(_wavSourceID);
 		}
 
 		private unsafe void UnqueueProcessedBuffers()

@@ -94,8 +94,6 @@ namespace Chimera.Client.GUI
 			this.MovieEndRecordMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.MovieEndStopMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.MovieEndPauseMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.toolStripSeparator32 = new System.Windows.Forms.ToolStripSeparator();
-			this.MovieEndPlaySoundMenuItem = new System.Windows.Forms.ToolStripMenuItem();
 			this.AVSubMenu = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.RecordAVMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.ConfigAndRecordAVMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
@@ -671,9 +669,7 @@ namespace Chimera.Client.GUI
             this.MovieEndFinishMenuItem,
             this.MovieEndRecordMenuItem,
             this.MovieEndStopMenuItem,
-            this.MovieEndPauseMenuItem,
-            this.toolStripSeparator32,
-            this.MovieEndPlaySoundMenuItem});
+            this.MovieEndPauseMenuItem});
 			this.MovieEndSubMenu.Text = "On Movie End";
 			this.MovieEndSubMenu.DropDownOpened += new System.EventHandler(this.MovieEndSubMenu_DropDownOpened);
 			// 
@@ -696,18 +692,6 @@ namespace Chimera.Client.GUI
 			// 
 			this.MovieEndPauseMenuItem.Text = "Pause";
 			this.MovieEndPauseMenuItem.Click += new System.EventHandler(this.MovieEndPauseMenuItem_Click);
-			// 
-			// toolStripSeparator32
-			// 
-			this.toolStripSeparator32.Name = "toolStripSeparator32";
-			this.toolStripSeparator32.Size = new System.Drawing.Size(177, 6);
-			// 
-			// MovieEndPlaySoundMenuItem
-			// 
-			this.MovieEndPlaySoundMenuItem.Name = "MovieEndPlaySoundMenuItem";
-			this.MovieEndPlaySoundMenuItem.Size = new System.Drawing.Size(180, 22);
-			this.MovieEndPlaySoundMenuItem.Text = "Play Sound";
-			this.MovieEndPlaySoundMenuItem.Click += new System.EventHandler(this.MovieEndPlaySoundMenuItem_Click);
 			// 
 			// AVSubMenu
 			// 
@@ -2093,7 +2077,5 @@ namespace Chimera.Client.GUI
 		private System.Windows.Forms.ToolStripSeparator toolStripSeparator25;
 		private ToolStripMenuItemEx DisableResizeWithFramebufferMenuItem;
 		private ToolStripSeparatorEx toolStripSeparator26;
-		private System.Windows.Forms.ToolStripSeparator toolStripSeparator32;
-		private System.Windows.Forms.ToolStripMenuItem MovieEndPlaySoundMenuItem;
 	}
 }

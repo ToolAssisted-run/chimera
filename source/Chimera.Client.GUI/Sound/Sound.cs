@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Threading;
 
 using Chimera.Bizware.Audio;
@@ -226,19 +226,6 @@ namespace Chimera.Client.GUI
 			}
 
 			_outputDevice.WriteSamples(samples, sampleOffset, sampleCount);
-		}
-
-		public void PlayWavFile(Stream wavFile, float atten)
-		{
-			if (!Config.SoundEnabled || atten <= 0) return;
-			try
-			{
-				_outputDevice.PlayWavFile(wavFile, Math.Min(atten, 1));
-			}
-			catch (Exception e)
-			{
-				Console.WriteLine(e);
-			}
 		}
 	}
 }
