@@ -246,8 +246,6 @@ namespace BizHawk.Client.EmuHawk
 			initialConfig.ResolveDefaults();
 			// initialConfig should really be globalConfig as it's mutable
 
-			StringLogUtil.DefaultToDisk = initialConfig.Movies.MoviesOnDisk;
-
 			// must be done VERY early, before any SDL_Init calls can be done
 			// if this isn't done, SIGINT/SIGTERM get swallowed by SDL
 			if (OSTailoredCode.IsUnixHost)

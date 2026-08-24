@@ -137,6 +137,35 @@ int main(void)
 		ce_movie_log_free(log);
 	}
 
+	{ // the editing ops TAStudio leans on: set, insert, remove_range, assign
+		ce_movie_log *log = parsed("|A|\n|B|\n|C|\n|D|\n");
+		ce_movie_log_set(log, 1, "|X|");
+		assert(std::strcmp(ce_movie_log_entry(log, 1), "|X|") == 0);
+		ce_movie_log_set(log, 99, "|nope|"); // out of range: ignored
+		assert(ce_movie_log_count(log) == 4);
+		ce_movie_log_insert(log, 0, "|first|");
+		ce_movie_log_insert(log, 5, "|last|"); // == count: append
+		assert(ce_movie_log_count(log) == 6);
+		assert(std::strcmp(ce_movie_log_entry(log, 0), "|first|") == 0);
+		assert(std::strcmp(ce_movie_log_entry(log, 5), "|last|") == 0);
+		ce_movie_log_remove_range(log, 1, 2); // drops |A|,|X|
+		assert(ce_movie_log_count(log) == 4);
+		assert(std::strcmp(ce_movie_log_entry(log, 1), "|C|") == 0);
+		ce_movie_log_remove_range(log, 2, 100); // clamped
+		assert(ce_movie_log_count(log) == 2);
+		ce_movie_log_truncate(log, 1);
+		assert(ce_movie_log_count(log) == 1);
+
+		ce_movie_log *copy = ce_movie_log_new();
+		ce_movie_log_set_key(log, "#K|");
+		ce_movie_log_assign(copy, log);
+		assert(ce_movie_log_count(copy) == 1);
+		assert(std::strcmp(ce_movie_log_key(copy), "#K|") == 0);
+		assert(ce_movie_log_divergent_point(copy, log) == -1);
+		ce_movie_log_free(copy);
+		ce_movie_log_free(log);
+	}
+
 	std::puts("test_movie_log: all ok");
 	return 0;
 }

@@ -1,46 +1,31 @@
 using System.Collections;
 using System.Collections.Generic;
-using System.IO;
 using System.Text;
 
-using BizHawk.Common;
+using BizHawk.Emulation.Common.Engine;
 
 namespace BizHawk.Client.Common
 {
 	public static class StringLogUtil
 	{
-		public static bool DefaultToDisk { get; set; }
-
-		public static IStringLog MakeStringLog()
-		{
-			if (DefaultToDisk)
-			{
-				return new StreamStringLog(true);
-			}
-
-			return new ListStringLog();
-		}
+		/// <summary>The one implementation: the log's storage is the engine's (see docs/engine-migration.md).</summary>
+		public static IStringLog MakeStringLog() => new EngineStringLog();
 
 		public static int? DivergentPoint(this IStringLog currentLog, IStringLog newLog)
 		{
-			int max = newLog.Count;
-			if (currentLog.Count < newLog.Count)
+			if (currentLog is EngineStringLog a && newLog is EngineStringLog b)
 			{
-				max = currentLog.Count;
+				var divergence = a.Engine.DivergentPoint(b.Engine);
+				return divergence is null ? null : checked((int)divergence.Value);
 			}
 
+			// a generic walk for mixed implementations, which nothing creates today
+			int max = Math.Min(currentLog.Count, newLog.Count);
 			for (int i = 0; i < max; i++)
 			{
-				if (newLog[i] != currentLog[i])
-				{
-					return i;
-				}
+				if (newLog[i] != currentLog[i]) return i;
 			}
-
-			if (newLog.Count != currentLog.Count)
-				return Math.Min(newLog.Count, currentLog.Count);
-
-			return null;
+			return newLog.Count != currentLog.Count ? max : null;
 		}
 
 		public static string ToInputLog(this IStringLog log)
@@ -70,180 +55,69 @@ namespace BizHawk.Client.Common
 		void CopyTo(int index, string[] array, int arrayIndex, int count);
 	}
 
-	internal class ListStringLog : List<string>, IStringLog
-	{
-		public IStringLog Clone()
-		{
-			var ret = new ListStringLog();
-			ret.AddRange(this);
-			return ret;
-		}
-
-		public void Dispose() { }
-	}
-
 	/// <summary>
-	/// A dumb IStringLog with storage on disk with no provision for recovering lost space, except upon Clear()
-	/// The purpose here is to avoid having too complicated buggy logic or a dependency on SQLite or such.
-	/// It should be faster than those alternatives, but wasteful of disk space.
-	/// It should also be easier to add new IList&lt;string&gt;-like methods than dealing with a database
+	/// An input log whose storage is the engine's <c>ce_movie_log</c> - the same
+	/// object the movie file I/O and (in time) the running session's movie use,
+	/// so there is exactly one copy of the data and one implementation of its
+	/// semantics. The list-shaped surface exists for the frontend's editors.
 	/// </summary>
-	internal class StreamStringLog : IStringLog
+	public sealed class EngineStringLog : IStringLog
 	{
-		private readonly Stream _stream;
-		private readonly List<long> _offsets = new List<long>();
-		private readonly BinaryWriter _bw;
-		private readonly BinaryReader _br;
-		private readonly bool _mDisk;
+		public EngineMovieLog Engine { get; } = new();
 
-		public StreamStringLog(bool disk)
-		{
-			_mDisk = disk;
-			if (disk)
-			{
-				var path = TempFileManager.GetTempFilename("movieOnDisk");
-				_stream = new FileStream(path, FileMode.Create, FileAccess.ReadWrite, FileShare.None, 4 * 1024, FileOptions.DeleteOnClose);
-			}
-			else
-			{
-				//but leave this in case we want to retain the option for more efficient management than the list of strings
-				throw new InvalidOperationException("Not supported anymore");
-			}
-
-			_bw = new BinaryWriter(_stream);
-			_br = new BinaryReader(_stream);
-		}
-
-		public IStringLog Clone()
-		{
-			var ret = new StreamStringLog(_mDisk); // doesn't necessarily make sense to copy the mDisk value, they could be designated for different targets...
-			for (int i = 0; i < Count; i++)
-			{
-				ret.Add(this[i]);
-			}
-
-			return ret;
-		}
-
-		public void Dispose()
-		{
-			_stream.Dispose();
-		}
-
-		public int Count => _offsets.Count;
-
-		public void Clear()
-		{
-			_stream.SetLength(0);
-			_offsets.Clear();
-		}
-
-		public void Add(string str)
-		{
-			_stream.Position = _stream.Length;
-			_offsets.Add(_stream.Position);
-			_bw.Write(str);
-			_bw.Flush();
-		}
-
-		public void RemoveAt(int index)
-		{
-			// no garbage collection in the disk file... oh well.
-			_offsets.RemoveAt(index);
-		}
+		public int Count => checked((int)Engine.Count);
 
 		public string this[int index]
 		{
-			get
-			{
-				_stream.Position = _offsets[index];
-				return _br.ReadString();
-			}
-
-			set
-			{
-				_stream.Position = _stream.Length;
-				_offsets[index] = _stream.Position;
-				_bw.Write(value);
-				_bw.Flush();
-			}
+			get => Engine[index];
+			set => Engine.Set(index, value);
 		}
 
-		public void Insert(int index, string val)
-		{
-			_stream.Position = _stream.Length;
-			_offsets.Insert(index, _stream.Position);
-			_bw.Write(val);
-			_bw.Flush();
-		}
-
-		public void InsertRange(int index, IEnumerable<string> collection)
-		{
-			foreach (var item in collection)
-			{
-				Insert(index++, item);
-			}
-		}
+		public void Add(string str) => Engine.Add(str);
 
 		public void AddRange(IEnumerable<string> collection)
 		{
-			foreach (var item in collection)
-			{
-				Add(item);
-			}
+			foreach (var item in collection) Engine.Add(item);
 		}
 
-		private class Enumerator : IEnumerator<string>
+		public void Insert(int index, string val) => Engine.Insert(index, val);
+
+		public void InsertRange(int index, IEnumerable<string> collection)
 		{
-			public StreamStringLog Log { get; set; }
-			private int _index = -1;
-
-			public string Current => Log[_index];
-			object IEnumerator.Current => Log[_index];
-
-			bool IEnumerator.MoveNext()
-			{
-				_index++;
-				if (_index >= Log.Count)
-				{
-					_index = Log.Count;
-					return false;
-				}
-
-				return true;
-			}
-
-			void IEnumerator.Reset() { _index = -1; }
-
-			public void Dispose() { }
+			foreach (var item in collection) Engine.Insert(index++, item);
 		}
 
-		IEnumerator<string> IEnumerable<string>.GetEnumerator()
-		{
-			return new Enumerator { Log = this };
-		}
+		public void RemoveAt(int index) => Engine.RemoveRange(index, 1);
 
-		IEnumerator IEnumerable.GetEnumerator()
-		{
-			return new Enumerator { Log = this };
-		}
+		public void RemoveRange(int index, int count) => Engine.RemoveRange(index, count);
 
-		public void RemoveRange(int index, int count)
+		public void Clear() => Engine.Clear();
+
+		public IStringLog Clone()
 		{
-			int end = index + count - 1;
-			for (int i = 0; i < count; i++)
-			{
-				RemoveAt(end);
-				end--;
-			}
+			EngineStringLog clone = new();
+			clone.Engine.AssignFrom(Engine);
+			return clone;
 		}
 
 		public void CopyTo(int index, string[] array, int arrayIndex, int count)
 		{
 			for (int i = 0; i < count; i++)
 			{
-				array[i + arrayIndex] = this[index + i];
+				array[arrayIndex + i] = Engine[index + i];
 			}
 		}
+
+		public IEnumerator<string> GetEnumerator()
+		{
+			for (long i = 0; i < Engine.Count; i++)
+			{
+				yield return Engine[i];
+			}
+		}
+
+		IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+
+		public void Dispose() => Engine.Dispose();
 	}
 }

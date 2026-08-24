@@ -49,6 +49,21 @@ namespace BizHawk.Emulation.Common.Engine
 		public abstract void ce_movie_log_clear(IntPtr log);
 
 		[BizImport(CallingConvention.Cdecl)]
+		public abstract void ce_movie_log_truncate(IntPtr log, long count);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract void ce_movie_log_set(IntPtr log, long index, string entry);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract void ce_movie_log_insert(IntPtr log, long index, string entry);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract void ce_movie_log_remove_range(IntPtr log, long index, long count);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract void ce_movie_log_assign(IntPtr dst, IntPtr src);
+
+		[BizImport(CallingConvention.Cdecl)]
 		public abstract int ce_movie_log_has_state_frame(IntPtr log);
 
 		[BizImport(CallingConvention.Cdecl)]
@@ -494,9 +509,22 @@ namespace BizHawk.Emulation.Common.Engine
 	{
 		private IntPtr _log;
 
+		/// <summary>For engine-to-engine operations (assign, divergence) and the session.</summary>
+		public IntPtr Handle => _log;
+
 		public EngineMovieLog() => _log = ChimeraEngine.Instance.ce_movie_log_new();
 
+		// the backstop for logs that are simply dropped (undo history, branches);
+		// freeing an unreferenced log is safe from any thread
+		~EngineMovieLog() => Free();
+
 		public void Dispose()
+		{
+			Free();
+			GC.SuppressFinalize(this);
+		}
+
+		private void Free()
 		{
 			if (_log == IntPtr.Zero) return;
 			ChimeraEngine.Instance.ce_movie_log_free(_log);
@@ -522,6 +550,26 @@ namespace BizHawk.Emulation.Common.Engine
 				?? throw new ArgumentOutOfRangeException(nameof(index));
 
 		public void Add(string entry) => ChimeraEngine.Instance.ce_movie_log_add(_log, entry);
+
+		public void Set(long index, string entry) => ChimeraEngine.Instance.ce_movie_log_set(_log, index, entry);
+
+		public void Insert(long index, string entry) => ChimeraEngine.Instance.ce_movie_log_insert(_log, index, entry);
+
+		public void RemoveRange(long index, long count) => ChimeraEngine.Instance.ce_movie_log_remove_range(_log, index, count);
+
+		public void Truncate(long count) => ChimeraEngine.Instance.ce_movie_log_truncate(_log, count);
+
+		public void Clear() => ChimeraEngine.Instance.ce_movie_log_clear(_log);
+
+		/// <summary>Replaces this log's entries and LogKey with another's, engine-side.</summary>
+		public void AssignFrom(EngineMovieLog source) => ChimeraEngine.Instance.ce_movie_log_assign(_log, source.Handle);
+
+		/// <summary>First frame where the logs differ; the shorter length when one is a prefix; null when identical.</summary>
+		public long? DivergentPoint(EngineMovieLog other)
+		{
+			var result = ChimeraEngine.Instance.ce_movie_log_divergent_point(_log, other.Handle);
+			return result < 0 ? null : result;
+		}
 
 		public bool HasStateFrame => ChimeraEngine.Instance.ce_movie_log_has_state_frame(_log) is not 0;
 

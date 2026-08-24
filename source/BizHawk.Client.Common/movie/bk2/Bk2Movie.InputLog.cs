@@ -10,12 +10,14 @@ namespace BizHawk.Client.Common
 		protected IStringLog Log { get; set; } = StringLogUtil.MakeStringLog();
 		public string LogKey { get; set; }
 
+		public virtual void Dispose() => Log.Dispose();
+
 		public void WriteInputLog(TextWriter writer)
 		{
-			// the engine renders the [Input] block (see docs/engine-migration.md);
-			// the EOL matches what TextWriter.WriteLine wrote here historically
-			using EngineMovieLog engineLog = new();
-			foreach (var record in Log) engineLog.Add(record);
+			// the engine renders the [Input] block straight from the log's own
+			// engine-side storage (see docs/engine-migration.md); the EOL matches
+			// what TextWriter.WriteLine wrote here historically
+			var engineLog = ((EngineStringLog)Log).Engine;
 			engineLog.Key = string.IsNullOrEmpty(LogKey) ? Bk2LogEntryGenerator.GenerateLogKey(Session.MovieController.Definition) : LogKey;
 			writer.Write(engineLog.Serialize(crlf: writer.NewLine == "\r\n"));
 		}
@@ -46,14 +48,18 @@ namespace BizHawk.Client.Common
 				return false;
 			}
 
-			Log.Clear();
-			for (long i = 0; i < engineLog.Count; i++)
+			// engine-to-engine: the parsed entries become the log's storage wholesale
+			var parsedKey = engineLog.Key;
+			var target = ((EngineStringLog)Log).Engine;
+			var previousKey = target.Key;
+			target.AssignFrom(engineLog);
+			if (parsedKey is not null)
 			{
-				Log.Add(engineLog[i]);
+				LogKey = parsedKey;
 			}
-			if (engineLog.Key is not null)
+			else
 			{
-				LogKey = engineLog.Key;
+				target.Key = previousKey; // assign copied the (absent) key; the movie keeps its own
 			}
 
 			// quirk, preserved: text with no "Frame N" line sets this message yet

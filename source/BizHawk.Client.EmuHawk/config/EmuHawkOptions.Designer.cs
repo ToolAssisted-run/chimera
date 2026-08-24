@@ -56,7 +56,6 @@
 			this.label6 = new BizHawk.WinForms.Controls.LocLabelEx();
 			this.cbSkipWaterboxIntegrityChecks = new System.Windows.Forms.CheckBox();
 			this.label5 = new BizHawk.WinForms.Controls.LocLabelEx();
-			this.cbMoviesOnDisk = new System.Windows.Forms.CheckBox();
 			this.LuaDuringTurboCheckbox = new System.Windows.Forms.CheckBox();
 			this.label12 = new BizHawk.WinForms.Controls.LocLabelEx();
 			this.label13 = new BizHawk.WinForms.Controls.LocLabelEx();
@@ -300,7 +299,6 @@
 			this.tabPage3.Controls.Add(this.label6);
 			this.tabPage3.Controls.Add(this.cbSkipWaterboxIntegrityChecks);
 			this.tabPage3.Controls.Add(this.label5);
-			this.tabPage3.Controls.Add(this.cbMoviesOnDisk);
 			this.tabPage3.Controls.Add(this.LuaDuringTurboCheckbox);
 			this.tabPage3.Controls.Add(this.label12);
 			this.tabPage3.Controls.Add(this.label13);
@@ -345,16 +343,6 @@
 			this.label5.Name = "label5";
 			this.label5.Text = "Will prevent many Out Of Memory crashes during long movies.\r\nYou must restart the" +
     " program after changing this.";
-			// 
-			// cbMoviesOnDisk
-			// 
-			this.cbMoviesOnDisk.AutoSize = true;
-			this.cbMoviesOnDisk.Location = new System.Drawing.Point(6, 174);
-			this.cbMoviesOnDisk.Name = "cbMoviesOnDisk";
-			this.cbMoviesOnDisk.Size = new System.Drawing.Size(259, 17);
-			this.cbMoviesOnDisk.TabIndex = 16;
-			this.cbMoviesOnDisk.Text = "Store movie working data on disk instead of RAM";
-			this.cbMoviesOnDisk.UseVisualStyleBackColor = true;
 			// 
 			// LuaDuringTurboCheckbox
 			// 
@@ -427,7 +415,6 @@
 		private BizHawk.WinForms.Controls.LocLabelEx label13;
 		private System.Windows.Forms.CheckBox LuaDuringTurboCheckbox;
 		private BizHawk.WinForms.Controls.LocLabelEx label5;
-		private System.Windows.Forms.CheckBox cbMoviesOnDisk;
 		private BizHawk.WinForms.Controls.LocLabelEx label6;
 		private System.Windows.Forms.CheckBox cbSkipWaterboxIntegrityChecks;
 		private System.Windows.Forms.CheckBox HandleAlternateKeyboardLayoutsCheckBox;

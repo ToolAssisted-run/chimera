@@ -109,8 +109,18 @@ long-lived dual paths.
      gate coverage yet (synth declares no axes; record wires up with the
      frontend); the C# MovieSession/TAStudio still run their own movie and
      Zwinder greenzone - rewiring them onto the session is next.
-   - remaining in 5: rewire C# MovieSession (and TAStudio's state history)
-     onto the session's movie + greenzone
+   - 5b **movie log storage unified** - DONE. IStringLog has ONE
+     implementation, EngineStringLog, a list-shaped view over the engine's
+     ce_movie_log (which grew set/insert/remove_range/assign for the
+     editors): every movie's log - bk2, tasproj, branches, the undo
+     history's snapshots - is engine-side data, and movie file I/O runs
+     engine-to-engine with no marshalling round trip. ListStringLog,
+     StreamStringLog and the MoviesOnDisk config option are deleted (the
+     disk-backed variant was a RAM-saving relic; engine storage is compact).
+   - remaining in 5: the session-driven frame loop - MovieSession's
+     latch/record path and TAStudio's state history onto ce_session's
+     movie + greenzone. This is one entangled surgery (the input chain,
+     LoadState-position sync, IStateManager) and comes as its own step.
 6. Memory domains + tooling services
 7. Lua (real Lua replaces NLua; script API preserved)
 8. AV dumping

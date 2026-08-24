@@ -38,7 +38,6 @@ namespace BizHawk.Client.EmuHawk
 
 			FrameAdvSkipLagCheckbox.Checked = _config.SkipLagFrame;
 			LuaDuringTurboCheckbox.Checked = _config.RunLuaDuringTurbo;
-			cbMoviesOnDisk.Checked = _config.Movies.MoviesOnDisk;
 			cbSkipWaterboxIntegrityChecks.Checked = _config.SkipWaterboxIntegrityChecks;
 			NoMixedKeyPriorityCheckBox.Checked = _config.NoMixedInputHokeyOverride;
 			cbEnableGCAdapterSupport.Checked = _config.GCAdapterSupportEnabled;
@@ -77,7 +76,6 @@ namespace BizHawk.Client.EmuHawk
 
 			_config.SkipLagFrame = FrameAdvSkipLagCheckbox.Checked;
 			_config.RunLuaDuringTurbo = LuaDuringTurboCheckbox.Checked;
-			_config.Movies.MoviesOnDisk = cbMoviesOnDisk.Checked;
 			_config.SkipWaterboxIntegrityChecks = cbSkipWaterboxIntegrityChecks.Checked;
 			_config.NoMixedInputHokeyOverride = NoMixedKeyPriorityCheckBox.Checked;
 			_config.GCAdapterSupportEnabled = cbEnableGCAdapterSupport.Checked;

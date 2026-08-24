@@ -148,6 +148,35 @@ void ce_movie_log_truncate(ce_movie_log *log, int64_t count)
 	}
 }
 
+void ce_movie_log_set(ce_movie_log *log, int64_t index, const char *entry)
+{
+	if (index < 0 || index >= static_cast<int64_t>(log->entries.size())) return;
+	log->entries[static_cast<size_t>(index)] = entry;
+}
+
+void ce_movie_log_insert(ce_movie_log *log, int64_t index, const char *entry)
+{
+	if (index < 0 || index > static_cast<int64_t>(log->entries.size())) return;
+	log->entries.insert(log->entries.begin() + static_cast<ptrdiff_t>(index), entry);
+}
+
+void ce_movie_log_remove_range(ce_movie_log *log, int64_t index, int64_t count)
+{
+	int64_t size = static_cast<int64_t>(log->entries.size());
+	if (index < 0) { count += index; index = 0; }
+	if (index >= size || count <= 0) return;
+	if (count > size - index) count = size - index;
+	log->entries.erase(
+		log->entries.begin() + static_cast<ptrdiff_t>(index),
+		log->entries.begin() + static_cast<ptrdiff_t>(index + count));
+}
+
+void ce_movie_log_assign(ce_movie_log *dst, const ce_movie_log *src)
+{
+	dst->entries = src->entries;
+	dst->logKey = src->logKey;
+}
+
 void ce_movie_log_clear(ce_movie_log *log)
 {
 	log->entries.clear();

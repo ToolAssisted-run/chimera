@@ -328,8 +328,9 @@ namespace BizHawk.Client.Common
 				|| Branches.Any(b => b.Frame == frame); // Branches should already be in the reserved list, but it doesn't hurt to check
 		}
 
-		public void Dispose()
+		public override void Dispose()
 		{
+			base.Dispose();
 			TasStateManager?.Dispose();
 			TasStateManager = null;
 		}

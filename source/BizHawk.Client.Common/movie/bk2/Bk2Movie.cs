@@ -3,7 +3,7 @@ using BizHawk.Emulation.Common;
 
 namespace BizHawk.Client.Common
 {
-	public partial class Bk2Movie : BasicMovieInfo, IMovie
+	public partial class Bk2Movie : BasicMovieInfo, IMovie, IDisposable
 	{
 		private IController _defaultValueController;
 		protected IController DefaultValueController

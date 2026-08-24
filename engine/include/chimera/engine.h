@@ -72,6 +72,14 @@ void ce_movie_log_add(ce_movie_log *log, const char *entry);
 void ce_movie_log_clear(ce_movie_log *log);
 /* Drops entries at and after count, keeping the first count. */
 void ce_movie_log_truncate(ce_movie_log *log, int64_t count);
+/* Out-of-range indices are ignored: the log's length never changes by set. */
+void ce_movie_log_set(ce_movie_log *log, int64_t index, const char *entry);
+/* index may equal the count (an append); beyond that is ignored. */
+void ce_movie_log_insert(ce_movie_log *log, int64_t index, const char *entry);
+/* Removes [index, index+count), clamped to the log's bounds. */
+void ce_movie_log_remove_range(ce_movie_log *log, int64_t index, int64_t count);
+/* Replaces dst's entries and LogKey with src's. */
+void ce_movie_log_assign(ce_movie_log *dst, const ce_movie_log *src);
 
 /* Nonzero when the parsed text carried a "Frame N" line. */
 int32_t ce_movie_log_has_state_frame(const ce_movie_log *log);
