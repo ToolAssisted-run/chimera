@@ -13,7 +13,9 @@
 
 #include "../../extern/cjson/cJSON.h"
 
+#include <algorithm>
 #include <cstring>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -293,7 +295,32 @@ struct ce_session
 	std::string persistId = "data";
 	std::vector<uint8_t> persistOut;
 
+	// ---- the session's movie ----
+	ce_movie_log *movie = nullptr;
+	int32_t movieMode = 0; // 0 none, 1 play, 2 record, 3 finished
+	int64_t frame = 0;
+	std::string mnemonics; // one char per button, for generated entries
+	// entry layout: the Bk2 order (groups by player, axes before buttons)
+	struct LayoutItem
+	{
+		bool isAxis;
+		int32_t index; // into cfg.buttons / cfg.axes
+	};
+	std::vector<LayoutItem> layout;
+	int32_t layoutGroups = 0;
+	std::vector<int32_t> layoutGroupStarts; // index into layout where each group begins
+
+	// ---- the greenzone ----
+	uint64_t gzBudget = 0;
+	uint64_t gzBytes = 0;
+	std::map<int64_t, std::vector<uint8_t>> gzStates;
+
 	void probeOptionalGroups();
+	void buildEntryLayout();
+	int32_t advanceCore(uint64_t buttons, int32_t render);
+	bool parseEntry(const char *entry, uint64_t &mask, std::vector<int32_t> &axesOut);
+	std::string generateEntry(uint64_t buttons, const int32_t *axes);
+	void greenzoneCapture();
 
 	bool activate(std::string &err)
 	{
@@ -450,6 +477,183 @@ void ce_session::probeOptionalGroups()
 			if (n != nullptr) persistName = n;
 			if (i != nullptr) persistId = i;
 		}
+	}
+}
+
+namespace {
+
+/* ControllerDefinition.PlayerNumber: "^P(\d+) " captures the player, else 0 */
+int32_t playerNumberOf(const std::string &name)
+{
+	if (name.size() < 3 || name[0] != 'P') return 0;
+	size_t i = 1;
+	int32_t value = 0;
+	while (i < name.size() && name[i] >= '0' && name[i] <= '9')
+	{
+		value = value * 10 + (name[i] - '0');
+		i++;
+	}
+	return i > 1 && i < name.size() && name[i] == ' ' ? value : 0;
+}
+
+/* int parse for an axis field: optional spaces (the padding), sign, digits */
+bool parseAxisValue(const char *begin, const char *end, int32_t &out)
+{
+	while (begin < end && *begin == ' ') begin++;
+	if (begin >= end) return false;
+	bool negative = false;
+	if (*begin == '+' || *begin == '-')
+	{
+		negative = *begin == '-';
+		if (++begin >= end) return false;
+	}
+	int64_t value = 0;
+	for (; begin < end; begin++)
+	{
+		if (*begin < '0' || *begin > '9') return false;
+		value = value * 10 + (*begin - '0');
+		if (value > 2147483648LL) return false;
+	}
+	out = static_cast<int32_t>(negative ? -value : value);
+	return true;
+}
+
+} // namespace
+
+/* The Bk2 entry order: controls grouped by player number (0 = console),
+ * axes before buttons within a group, both in declaration order - exactly
+ * what ControllerDefinition.GenOrderedControls produced. */
+void ce_session::buildEntryLayout()
+{
+	int32_t maxPlayer = 0;
+	for (const auto &a : cfg.axes) maxPlayer = std::max(maxPlayer, playerNumberOf(a.name));
+	for (const auto &b : cfg.buttons) maxPlayer = std::max(maxPlayer, playerNumberOf(b));
+	layoutGroups = maxPlayer + 1;
+	for (int32_t g = 0; g < layoutGroups; g++)
+	{
+		layoutGroupStarts.push_back(static_cast<int32_t>(layout.size()));
+		for (int32_t i = 0; i < static_cast<int32_t>(cfg.axes.size()); i++)
+		{
+			if (playerNumberOf(cfg.axes[static_cast<size_t>(i)].name) == g) layout.push_back({ true, i });
+		}
+		for (int32_t i = 0; i < static_cast<int32_t>(cfg.buttons.size()); i++)
+		{
+			if (playerNumberOf(cfg.buttons[static_cast<size_t>(i)]) == g) layout.push_back({ false, i });
+		}
+	}
+}
+
+/* Positional, '|'-tolerant - the exact Bk2Controller.SetFromMnemonic walk. */
+bool ce_session::parseEntry(const char *entry, uint64_t &mask, std::vector<int32_t> &axesOut)
+{
+	mask = 0;
+	axesOut.assign(cfg.axes.size(), 0);
+	for (size_t i = 0; i < cfg.axes.size(); i++) axesOut[i] = cfg.axes[i].neutral;
+	const char *p = entry;
+	for (const auto &item : layout)
+	{
+		while (*p == '|') p++;
+		if (*p == '\0') return false; // entry shorter than the controller
+		if (item.isAxis)
+		{
+			const char *comma = std::strchr(p, ',');
+			if (comma == nullptr) return false;
+			int32_t value;
+			if (!parseAxisValue(p, comma, value)) return false;
+			axesOut[static_cast<size_t>(item.index)] = value;
+			p = comma + 1;
+		}
+		else
+		{
+			if (*p != '.') mask |= 1ull << item.index;
+			p++;
+		}
+	}
+	return true;
+}
+
+std::string ce_session::generateEntry(uint64_t buttons, const int32_t *axes)
+{
+	std::string out;
+	out.push_back('|');
+	size_t next = 0;
+	for (int32_t g = 0; g < layoutGroups; g++)
+	{
+		size_t end = g + 1 < layoutGroups
+			? static_cast<size_t>(layoutGroupStarts[static_cast<size_t>(g) + 1])
+			: layout.size();
+		for (; next < end; next++)
+		{
+			const auto &item = layout[next];
+			if (item.isAxis)
+			{
+				int32_t value = axes != nullptr ? axes[item.index] : cfg.axes[static_cast<size_t>(item.index)].neutral;
+				std::string text = std::to_string(value);
+				while (text.size() < 5) text.insert(text.begin(), ' '); // PadLeft(5)
+				out.append(text).push_back(',');
+			}
+			else
+			{
+				char mnemonic = static_cast<size_t>(item.index) < mnemonics.size()
+					? mnemonics[static_cast<size_t>(item.index)]
+					: '!';
+				out.push_back((buttons & (1ull << item.index)) != 0 ? mnemonic : '.');
+			}
+		}
+		out.push_back('|');
+	}
+	return out;
+}
+
+int32_t ce_session::advanceCore(uint64_t buttons, int32_t render)
+{
+	frameAdvance(buttons);
+	if (render != 0)
+	{
+		std::memcpy(videoBuf.data(), reinterpret_cast<const void *>(getVideoBgra()),
+			videoBuf.size() * sizeof(uint32_t));
+	}
+	int32_t nsamp = getAudioSampleCount != nullptr ? getAudioSampleCount() : cfg.samplesPerFrame;
+	if (nsamp < 0) nsamp = 0;
+	if (nsamp > cfg.samplesPerFrame) nsamp = cfg.samplesPerFrame;
+	const auto *src = reinterpret_cast<const int16_t *>(getAudio());
+	if (cfg.channels == 2)
+	{
+		std::memcpy(audioBuf.data(), src, static_cast<size_t>(nsamp) * 2 * sizeof(int16_t));
+	}
+	else
+	{
+		for (int32_t i = 0; i < nsamp; i++)
+		{
+			audioBuf[static_cast<size_t>(i) * 2] = src[i];
+			audioBuf[static_cast<size_t>(i) * 2 + 1] = src[i];
+		}
+	}
+	sampleCount = nsamp;
+	frame++;
+	return inputWasRead != nullptr && inputWasRead() == 0 ? 1 : 0;
+}
+
+void ce_session::greenzoneCapture()
+{
+	if (gzBudget == 0) return;
+	std::vector<uint8_t> state;
+	chimera::WbxReturn r{};
+	host->wbx_save_state(obj, vectorWrite, reinterpret_cast<uintptr_t>(&state), &r);
+	if (!r.ok()) return; // a missed capture only costs a longer replay later
+	auto it = gzStates.find(frame);
+	if (it != gzStates.end()) gzBytes -= it->second.size();
+	gzBytes += state.size();
+	gzStates[frame] = std::move(state);
+	/* evict the earliest state above the anchor: the anchor keeps every frame
+	 * reachable, the recent tail keeps nearby seeks fast, and the thinned
+	 * middle merely replays longer */
+	while (gzBytes > gzBudget && gzStates.size() > 2)
+	{
+		auto victim = std::next(gzStates.begin());
+		if (victim->first == frame) break; // never evict what we just stored
+		gzBytes -= victim->second.size();
+		gzStates.erase(victim);
 	}
 }
 
@@ -615,12 +819,14 @@ ce_session *ce_session_open(
 	s->videoBuf.assign(static_cast<size_t>(s->cfg.width) * s->cfg.height, 0);
 	s->audioBuf.assign(static_cast<size_t>(s->cfg.samplesPerFrame) * 2, 0);
 	s->probeOptionalGroups();
+	s->buildEntryLayout();
 	return s;
 }
 
 void ce_session_free(ce_session *s)
 {
 	if (s == nullptr) return;
+	if (s->movie != nullptr) ce_movie_log_free(s->movie);
 	if (s->obj != nullptr)
 	{
 		std::string err;
@@ -986,6 +1192,193 @@ int32_t ce_session_persist_put(ce_session *s, const uint8_t *data, uint64_t len)
 	/* the core is the judge of whether the file fits the machine - a disk save
 	 * with the wrong number of sides, say - and says so by refusing it */
 	return s->persistPut(static_cast<int32_t>(len)) != 0 ? 0 : 1;
+}
+
+int32_t ce_session_movie_load(ce_session *s, const ce_movie_log *log)
+{
+	if (s->movie == nullptr) s->movie = ce_movie_log_new();
+	ce_movie_log_clear(s->movie);
+	int64_t n = ce_movie_log_count(log);
+	for (int64_t i = 0; i < n; i++) ce_movie_log_add(s->movie, ce_movie_log_entry(log, i));
+	const char *key = ce_movie_log_key(log);
+	ce_movie_log_set_key(s->movie, key);
+	s->movieMode = 1;
+	return 0;
+}
+
+void ce_session_movie_record(ce_session *s, const char *mnemonics)
+{
+	if (s->movie == nullptr) s->movie = ce_movie_log_new();
+	if (mnemonics != nullptr)
+	{
+		s->mnemonics = mnemonics;
+	}
+	else
+	{
+		/* neutral fallback: the button name's first character past any player
+		 * prefix - the frontend supplies its real per-system vocabulary */
+		s->mnemonics.clear();
+		for (const auto &b : s->cfg.buttons)
+		{
+			std::string bare = b;
+			if (playerNumberOf(bare) != 0) bare.erase(0, bare.find(' ') + 1);
+			s->mnemonics.push_back(bare.empty() ? '!' : bare[0]);
+		}
+	}
+	s->movieMode = 2;
+}
+
+int32_t ce_session_movie_mode(const ce_session *s) { return s->movieMode; }
+
+int64_t ce_session_movie_length(const ce_session *s)
+{
+	return s->movie != nullptr ? ce_movie_log_count(s->movie) : 0;
+}
+
+int64_t ce_session_frame(const ce_session *s) { return s->frame; }
+
+const ce_movie_log *ce_session_movie_log(const ce_session *s) { return s->movie; }
+
+int32_t ce_session_movie_advance(ce_session *s, uint64_t buttons, const int32_t *axes, int32_t render)
+{
+	s->error.clear();
+	if (s->movieMode == 0 || s->movie == nullptr)
+	{
+		s->error = "no movie is loaded";
+		return -1;
+	}
+
+	int32_t lag;
+	if (s->movieMode == 1 && s->frame < ce_movie_log_count(s->movie))
+	{
+		uint64_t mask = 0;
+		std::vector<int32_t> movieAxes;
+		const char *entry = ce_movie_log_entry(s->movie, s->frame);
+		if (!s->parseEntry(entry, mask, movieAxes))
+		{
+			s->error = std::string("unparseable movie entry at frame ") + std::to_string(s->frame);
+			return -1;
+		}
+		for (size_t i = 0; i < movieAxes.size(); i++)
+		{
+			if (s->setAxis != nullptr) s->setAxis(static_cast<int32_t>(i), movieAxes[i]);
+		}
+		lag = s->advanceCore(mask, render);
+	}
+	else
+	{
+		if (s->movieMode == 1) s->movieMode = 3; // the log ran out: input is the caller's again
+		if (s->movieMode == 2 && s->frame < ce_movie_log_count(s->movie))
+		{
+			/* recording over existing entries IS the rerecord: everything from
+			 * here on described a timeline that no longer happens */
+			ce_movie_log_truncate(s->movie, s->frame);
+		}
+		for (size_t i = 0; i < s->cfg.axes.size(); i++)
+		{
+			int32_t value = axes != nullptr ? axes[i] : s->cfg.axes[i].neutral;
+			if (s->setAxis != nullptr) s->setAxis(static_cast<int32_t>(i), value);
+		}
+		if (s->movieMode == 2)
+		{
+			std::string entry = s->generateEntry(buttons, axes);
+			ce_movie_log_add(s->movie, entry.c_str());
+		}
+		lag = s->advanceCore(buttons, render);
+	}
+	s->greenzoneCapture();
+	return lag;
+}
+
+void ce_session_greenzone_enable(ce_session *s, uint64_t budget_bytes)
+{
+	s->gzBudget = budget_bytes;
+	s->gzStates.clear();
+	s->gzBytes = 0;
+	if (budget_bytes != 0) s->greenzoneCapture(); // the anchor: the frame we stand on now
+}
+
+int64_t ce_session_greenzone_count(const ce_session *s)
+{
+	return static_cast<int64_t>(s->gzStates.size());
+}
+
+int64_t ce_session_greenzone_nearest(const ce_session *s, int64_t frame)
+{
+	auto it = s->gzStates.upper_bound(frame);
+	if (it == s->gzStates.begin()) return -1;
+	return std::prev(it)->first;
+}
+
+void ce_session_greenzone_invalidate(ce_session *s, int64_t after_frame)
+{
+	auto it = s->gzStates.upper_bound(after_frame);
+	while (it != s->gzStates.end())
+	{
+		s->gzBytes -= it->second.size();
+		it = s->gzStates.erase(it);
+	}
+}
+
+int32_t ce_session_seek(ce_session *s, int64_t frame)
+{
+	s->error.clear();
+	if (s->movieMode == 0 || s->movie == nullptr)
+	{
+		s->error = "seeking needs a movie";
+		return 1;
+	}
+	if (frame > ce_movie_log_count(s->movie))
+	{
+		s->error = "cannot seek past the movie's end";
+		return 1;
+	}
+
+	int64_t base = ce_session_greenzone_nearest(s, frame);
+	if (base >= 0 && (base > s->frame || s->frame > frame))
+	{
+		const auto &state = s->gzStates[base];
+		ByteStream stream{ state.data(), state.size() };
+		chimera::WbxReturn r{};
+		s->host->wbx_load_state(s->obj, streamRead, reinterpret_cast<uintptr_t>(&stream), &r);
+		if (!r.ok())
+		{
+			s->error = r.errorMessage;
+			return 1;
+		}
+		if (s->traceSetEnabled != nullptr)
+		{
+			s->traceSetEnabled(s->traceDesired ? 1 : 0);
+			if (s->traceClear != nullptr) s->traceClear();
+		}
+		s->frame = base;
+	}
+	else if (s->frame > frame)
+	{
+		s->error = "no stored state at or before the target frame";
+		return 1;
+	}
+
+	/* replay the log to the target - a seek is a replay, never a guess */
+	while (s->frame < frame)
+	{
+		uint64_t mask = 0;
+		std::vector<int32_t> movieAxes;
+		const char *entry = ce_movie_log_entry(s->movie, s->frame);
+		if (entry == nullptr || !s->parseEntry(entry, mask, movieAxes))
+		{
+			s->error = std::string("unparseable movie entry at frame ") + std::to_string(s->frame);
+			return 1;
+		}
+		for (size_t i = 0; i < movieAxes.size(); i++)
+		{
+			if (s->setAxis != nullptr) s->setAxis(static_cast<int32_t>(i), movieAxes[i]);
+		}
+		s->advanceCore(mask, 0);
+		s->greenzoneCapture();
+	}
+	if (s->movieMode == 3 && s->frame < ce_movie_log_count(s->movie)) s->movieMode = 1;
+	return 0;
 }
 
 } // extern "C"

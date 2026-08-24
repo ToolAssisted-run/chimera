@@ -94,7 +94,23 @@ long-lived dual paths.
      belongs to the engine). Known gap: the synth core exports none of the
      optional groups, so the gate witnesses only the groups-absent path -
      the groups-present path rides the 1:1 transliteration and real cores.
-   - remaining in 5: movie playback/record and the greenzone into the session
+   - 5b **movie + greenzone in the session** - DONE (engine side). The
+     session carries the movie itself: the input log lives in the engine,
+     entries are parsed and generated there (the Bk2 entry structure -
+     groups by player, axes before buttons, positional parse; mnemonic
+     CHARACTERS stay the frontend's per-system vocabulary, passed in as
+     data), the frame position is session state, play flips to finished at
+     the log's end, and recording over existing entries truncates (the
+     rerecord). The greenzone is a budget-bounded state history with an
+     always-kept anchor: seek = restore nearest + replay, invalidate drops
+     what an input edit falsified. chimera-run --seek and four new gate
+     checks (play to end, seek back, invalidate, replay - dumps must not
+     change) witness it. Gaps: axes and record-mode entry generation have no
+     gate coverage yet (synth declares no axes; record wires up with the
+     frontend); the C# MovieSession/TAStudio still run their own movie and
+     Zwinder greenzone - rewiring them onto the session is next.
+   - remaining in 5: rewire C# MovieSession (and TAStudio's state history)
+     onto the session's movie + greenzone
 6. Memory domains + tooling services
 7. Lua (real Lua replaces NLua; script API preserved)
 8. AV dumping

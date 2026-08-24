@@ -140,6 +140,21 @@ if [ "$level" = "both" ] || [ "$level" = "e" ]; then
 				fi
 			done
 		done
+		# the greenzone: play to the end, seek BACK mid-movie, invalidate (as an
+		# input edit would), replay to the end - the dumps must not change
+		for movie in "$here"/movies/*.txt; do
+			gname="$(basename "$movie" .txt)"
+			grom="$here/roms/${gname%%.*}.testrom"
+			gtag="$gname.engine.seek"
+			rm -f "$work/$gtag.ram.bin" "$work/$gtag.vram.bin"
+			"$chimera_run" "$epkg" "$grom" "$movie" --seek 10 				--dump "RAM=$work/$gtag.ram.bin" --dump "VRAM=$work/$gtag.vram.bin" 				> "$work/$gtag.log" 2>&1
+			if cmp -s "$work/$gtag.ram.bin" "$golden_dir/$gname.ram.bin" 				&& cmp -s "$work/$gtag.vram.bin" "$golden_dir/$gname.vram.bin"; then
+				report "E:$gname:seek" PASS "greenzone seek+replay byte-identical"
+			else
+				report "E:$gname:seek" FAIL "RAM or VRAM differs after seek (see work/$gtag.log)"
+			fi
+		done
+
 		# the settings channel, natively: a non-default sync setting must diverge
 		"$chimera_run" "$epkg" "$here/roms/gridWalker.testrom" "$here/movies/gridWalker.win.txt" 			--settings '{"initFillByte":171}' --dump "RAM=$work/engine.settings.ram.bin" 			> "$work/engine.settings.log" 2>&1
 		if [ ! -f "$work/engine.settings.ram.bin" ]; then

@@ -139,6 +139,15 @@ const char *ce_movie_log_entry(const ce_movie_log *log, int64_t index)
 
 void ce_movie_log_add(ce_movie_log *log, const char *entry) { log->entries.emplace_back(entry); }
 
+void ce_movie_log_truncate(ce_movie_log *log, int64_t count)
+{
+	if (count < 0) count = 0;
+	if (count < static_cast<int64_t>(log->entries.size()))
+	{
+		log->entries.resize(static_cast<size_t>(count));
+	}
+}
+
 void ce_movie_log_clear(ce_movie_log *log)
 {
 	log->entries.clear();
