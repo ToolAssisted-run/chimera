@@ -318,6 +318,47 @@ int32_t ce_firmware_state(
  * Borrowed per-thread buffer, valid until the next call on the thread. */
 const char *ce_firmware_record_line(const char *pairs, uint64_t *len_out);
 
+/* ---- core packages ----
+ *
+ * A core package is a zip (or, for development, a directory) whose root holds
+ * core.wbx + waterbox.config - the data-driven form the generic adapter runs -
+ * or a minihawk-core.json manifest. The engine owns the container: what makes
+ * a path a package, the package's identity (the SHA1 of its zip), and access
+ * to its entries. What the entries MEAN stays with the caller for now; the
+ * waterbox.config schema moves into the engine with the session.
+ *
+ * This is the engine's first filesystem read - packages are read-only inputs,
+ * and the coming native session has to open them without a frontend anyway.
+ */
+
+typedef struct ce_package ce_package;
+
+/* Returns NULL two ways, told apart by error_out: NULL error for a path that
+ * is simply not a core package (an unrelated zip or directory, a missing
+ * path), a message (static per-thread, valid until the thread's next failed
+ * open) for something that looks like a package but cannot be read. The zip
+ * is hashed only after it is known to be a package. */
+ce_package *ce_package_open(const char *path, const char **error_out);
+void ce_package_free(ce_package *p);
+
+/* The package's identity: SHA1 of the zip file, uppercase hex. NULL for the
+ * directory form, which has no file to hash. */
+const char *ce_package_sha1(const ce_package *p);
+
+/* Nonzero for the data-driven waterbox form (core.wbx + waterbox.config). */
+int32_t ce_package_is_waterbox(const ce_package *p);
+
+int32_t ce_package_has_entry(ce_package *p, const char *name);
+
+/* The entry's bytes (decompressed from the zip, or the file in the directory
+ * form). NULL when absent or unreadable (see _last_error to tell which;
+ * absent is ""). Invalidated by the next entry read on the same package. */
+const uint8_t *ce_package_entry(ce_package *p, const char *name, uint64_t *len_out);
+
+/* "" when the last entry miss was a plain absence.
+ * Invalidated by the next call on the same package. */
+const char *ce_package_last_error(ce_package *p);
+
 #ifdef __cplusplus
 }
 #endif

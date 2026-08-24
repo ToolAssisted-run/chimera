@@ -3,11 +3,10 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.IO.Compression;
 using System.Linq;
-using System.Text;
 
 using BizHawk.Common.PathExtensions;
+using BizHawk.Emulation.Common.Engine;
 using BizHawk.Emulation.Common.Waterbox;
 
 using Newtonsoft.Json;
@@ -168,9 +167,23 @@ namespace BizHawk.Client.Common
 		{
 			try
 			{
-				return Directory.Exists(path) ? PeekDirectory(path)
-					: path.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) && File.Exists(path) ? PeekZip(path)
-					: null;
+				// the container is the engine's (see docs/engine-migration.md): what
+				// counts as a package, its identity hash, its entries. Keep the old
+				// gate on what is even worth asking about.
+				if (!Directory.Exists(path)
+					&& !(path.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) && File.Exists(path)))
+				{
+					return null;
+				}
+				var full = System.IO.Path.GetFullPath(path);
+				using var package = EnginePackage.Open(full);
+				if (package is null) return null;
+				var fallbackName = Directory.Exists(path)
+					? System.IO.Path.GetFileName(full.TrimEnd(System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar))
+					: System.IO.Path.GetFileNameWithoutExtension(full);
+				return package.IsWaterbox
+					? FromWaterboxConfig(full, package.Sha1, fallbackName, package.EntryText(WaterboxCoreFactory.ConfigFileName)!)
+					: FromManifest(full, package.Sha1, fallbackName, package.EntryText(CorePackageManifest.FILE_NAME)!);
 			}
 			catch (Exception ex)
 			{
@@ -181,50 +194,6 @@ namespace BizHawk.Client.Common
 					Error = ex.Message,
 				};
 			}
-		}
-
-		private static DiscoveredCorePackage? PeekDirectory(string dir)
-		{
-			var full = System.IO.Path.GetFullPath(dir);
-			var fallbackName = System.IO.Path.GetFileName(full.TrimEnd(System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar));
-			if (WaterboxCoreFactory.IsWaterboxPackage(full))
-			{
-				return FromWaterboxConfig(full, sha1: null, fallbackName,
-					File.ReadAllText(System.IO.Path.Combine(full, WaterboxCoreFactory.ConfigFileName)));
-			}
-			var manifestPath = System.IO.Path.Combine(full, CorePackageManifest.FILE_NAME);
-			if (File.Exists(manifestPath))
-			{
-				return FromManifest(full, sha1: null, fallbackName, File.ReadAllText(manifestPath));
-			}
-			return null;
-		}
-
-		private static DiscoveredCorePackage? PeekZip(string zipPath)
-		{
-			var full = System.IO.Path.GetFullPath(zipPath);
-			var fallbackName = System.IO.Path.GetFileNameWithoutExtension(full);
-			using var zip = ZipFile.OpenRead(full);
-			// package files live at the zip root — that is what the extraction cache
-			// hands to the loader, so anything nested is not a package we can load
-			var wbxConfig = zip.GetEntry(WaterboxCoreFactory.ConfigFileName);
-			var isWaterbox = wbxConfig is not null && zip.GetEntry(WaterboxCoreFactory.WbxFileName) is not null;
-			var manifest = zip.GetEntry(CorePackageManifest.FILE_NAME);
-			if (!isWaterbox && manifest is null) return null;
-
-			// only now is the hash worth paying for: it is the identity of a thing we
-			// know to be a package
-			var sha1 = BizHawk.Common.SHA1Checksum.ComputeDigestHex(File.ReadAllBytes(full));
-			return isWaterbox
-				? FromWaterboxConfig(full, sha1, fallbackName, ReadEntry(wbxConfig!))
-				: FromManifest(full, sha1, fallbackName, ReadEntry(manifest!));
-		}
-
-		private static string ReadEntry(ZipArchiveEntry entry)
-		{
-			using var stream = entry.Open();
-			using StreamReader reader = new(stream, Encoding.UTF8);
-			return reader.ReadToEnd();
 		}
 
 		private static DiscoveredCorePackage FromWaterboxConfig(string path, string? sha1, string fallbackName, string json)

@@ -289,6 +289,8 @@ engine_src = files(
   'engine/source/sha1.cpp',
   'engine/source/bundle.cpp',
   'engine/source/firmware.cpp',
+  'engine/source/file_io.cpp',
+  'engine/source/package.cpp',
   'extern/miniz/miniz.c',  # vendored (MIT): the zip half of the state container
   'extern/cjson/cJSON.c',  # vendored (MIT): bundle JSON
 )
@@ -320,7 +322,7 @@ shared_library(
   install_dir: 'dll',
 )
 if not meson.is_cross_build()
-  foreach engine_test : ['movie_log', 'movie_text', 'state_container', 'bundle']
+  foreach engine_test : ['movie_log', 'movie_text', 'state_container', 'bundle', 'package']
     test(
       'engine_' + engine_test,
       executable(

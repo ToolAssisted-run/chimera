@@ -63,6 +63,14 @@ long-lived dual paths.
    object and delegates format concerns.
 5. Core/package loading + session (the frame loop; the witness gate moves onto the
    engine binary here, dropping Mono/Xvfb from Level B)
+   - 5a **package container** - DONE. `ce_package_*`: what makes a path a
+     package (zip or dev directory), its identity hash, entry access; the
+     engine's first (read-only) filesystem capability, which the native
+     session needs anyway. A corrupt zip stays listable with its error; an
+     ordinary zip stays quietly invisible. waterbox.config's MEANING still
+     parses in C# and moves with 5b.
+   - 5b native session: transliterate WaterboxCore.cs onto libminiboxhost,
+     `chimera-run` gate binary, then rewire the C# adapter onto ce_session
 6. Memory domains + tooling services
 7. Lua (real Lua replaces NLua; script API preserved)
 8. AV dumping

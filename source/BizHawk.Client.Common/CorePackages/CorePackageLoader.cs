@@ -111,7 +111,7 @@ namespace BizHawk.Client.Common
 			}
 			else if (File.Exists(path) && path.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
 			{
-				packageSha1 = BizHawk.Common.SHA1Checksum.ComputeDigestHex(File.ReadAllBytes(path));
+				packageSha1 = BizHawk.Emulation.Common.Engine.ChimeraEngine.Sha1Hex(File.ReadAllBytes(path));
 				packageDir = ExtractZipToCache(path, packageSha1);
 			}
 			else

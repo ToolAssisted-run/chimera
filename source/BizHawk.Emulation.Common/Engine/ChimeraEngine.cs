@@ -218,6 +218,27 @@ namespace BizHawk.Emulation.Common.Engine
 
 		[BizImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_firmware_record_line(string pairs, ref ulong lenOut);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_package_open(string path, ref IntPtr errorOut);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract void ce_package_free(IntPtr package);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_package_sha1(IntPtr package);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract int ce_package_is_waterbox(IntPtr package);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract int ce_package_has_entry(IntPtr package, string name);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_package_entry(IntPtr package, string name, ref ulong lenOut);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_package_last_error(IntPtr package);
 	}
 
 	public static class ChimeraEngine
@@ -587,6 +608,67 @@ namespace BizHawk.Emulation.Common.Engine
 
 		/// <summary>0 = fine; 1 = names no file; 2 = absolute path; 3 = escapes the bundle's folder.</summary>
 		public static int CheckPath(string file) => ChimeraEngine.Instance.ce_bundle_check_path(file);
+	}
+
+	/// <summary>
+	/// A core package's container, held by the engine: zip or directory form,
+	/// identity, entry access. What the entries mean stays with the caller until
+	/// the session migrates.
+	/// </summary>
+	public sealed class EnginePackage : IDisposable
+	{
+		private IntPtr _package;
+
+		private EnginePackage(IntPtr package) => _package = package;
+
+		/// <returns>null when the path is simply not a core package</returns>
+		/// <exception cref="InvalidOperationException">something that looks like a package but cannot be read</exception>
+		public static EnginePackage? Open(string path)
+		{
+			var error = IntPtr.Zero;
+			var package = ChimeraEngine.Instance.ce_package_open(path, ref error);
+			if (package != IntPtr.Zero) return new(package);
+			if (error != IntPtr.Zero) throw new InvalidOperationException(ChimeraEngine.PtrToStringUtf8(error));
+			return null;
+		}
+
+		public void Dispose()
+		{
+			if (_package == IntPtr.Zero) return;
+			ChimeraEngine.Instance.ce_package_free(_package);
+			_package = IntPtr.Zero;
+		}
+
+		/// <summary>SHA1 of the zip file (the package's identity); null for the directory form.</summary>
+		public string? Sha1 => ChimeraEngine.PtrToStringUtf8(ChimeraEngine.Instance.ce_package_sha1(_package));
+
+		/// <summary>True for the data-driven waterbox form (core.wbx + waterbox.config).</summary>
+		public bool IsWaterbox => ChimeraEngine.Instance.ce_package_is_waterbox(_package) is not 0;
+
+		public bool HasEntry(string name) => ChimeraEngine.Instance.ce_package_has_entry(_package, name) is not 0;
+
+		/// <returns>the entry's bytes, or null when absent</returns>
+		/// <exception cref="InvalidOperationException">the entry exists but cannot be read</exception>
+		public byte[]? Entry(string name)
+		{
+			ulong len = 0;
+			var p = ChimeraEngine.Instance.ce_package_entry(_package, name, ref len);
+			if (p == IntPtr.Zero)
+			{
+				var error = ChimeraEngine.PtrToStringUtf8(ChimeraEngine.Instance.ce_package_last_error(_package));
+				if (!string.IsNullOrEmpty(error)) throw new InvalidOperationException(error);
+				return null;
+			}
+			var ret = new byte[len];
+			Marshal.Copy(p, ret, 0, checked((int)len));
+			return ret;
+		}
+
+		public string? EntryText(string name)
+		{
+			var bytes = Entry(name);
+			return bytes is null ? null : Encoding.UTF8.GetString(bytes);
+		}
 	}
 
 	/// <summary>The firmware verdict and the canonical movie line; declarations and files stay with the caller.</summary>
