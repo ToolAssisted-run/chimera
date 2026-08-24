@@ -11,7 +11,7 @@ namespace BizHawk.Client.Common
 		/// <remarks>referenced by 3 or more tools</remarks>
 		string CurrentlyOpenRom { get; }
 
-		/// <remarks>referenced from HexEditor and RetroAchievements</remarks>
+		/// <remarks>referenced from HexEditor</remarks>
 		LoadRomArgs CurrentlyOpenRomArgs { get; }
 
 		/// <remarks>only referenced from TAStudio</remarks>
@@ -51,7 +51,7 @@ namespace BizHawk.Client.Common
 		/// <param name="forceWindowResize">Override <see cref="Common.Config.ResizeWithFramebuffer"/></param>
 		void FrameBufferResized(bool forceWindowResize = false);
 
-		/// <remarks>referenced from MultiDiskBundler and RetroAchievements</remarks>
+		/// <remarks>referenced from EmuClientApi</remarks>
 		bool LoadRom(string path, LoadRomArgs args);
 
 		/// <remarks>only referenced from BookmarksBranchesBox</remarks>

@@ -63,7 +63,7 @@ namespace BizHawk.Emulation.DiscSystem.CUE
 		SeekAudio,
 
 		/// <summary>
-		/// An encoded audio file which can't be seeked on the fly. It must be decoded to a temp buffer, or pre-discohawked
+		/// An encoded audio file which can't be seeked on the fly. It must be decoded to a temp buffer (or pre-converted to raw)
 		/// </summary>
 		DecodeAudio,
 	}
