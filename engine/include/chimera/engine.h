@@ -21,16 +21,26 @@
 extern "C" {
 #endif
 
+/* Windows: the engine's API is exported EXPLICITLY. Relying on mingw's
+ * export-everything default broke the moment a vendored library declared its
+ * own dllexports (cJSON did), which silently un-exported the entire ce_ ABI.
+ * Explicit beats implicit here, permanently. */
+#if defined(_WIN32) && defined(CHIMERA_BUILDING)
+#define CE_API __declspec(dllexport)
+#else
+#define CE_API
+#endif
+
 #define CE_ABI_VERSION 1u
 
 /* The ABI version this library was built as. A caller compiled against a
  * different major refuses to run rather than misbehave. */
-uint32_t ce_abi_version(void);
+CE_API uint32_t ce_abi_version(void);
 
 /* Build provenance as JSON, same convention as miniBox's mb_build_info():
  * a function of the inputs only, shown by the frontend and cited by movies.
  * Static string, never invalidated. */
-const char *ce_build_info(void);
+CE_API const char *ce_build_info(void);
 
 /* ---- movie input log ----
  *
@@ -45,8 +55,8 @@ const char *ce_build_info(void);
 
 typedef struct ce_movie_log ce_movie_log;
 
-ce_movie_log *ce_movie_log_new(void);
-void ce_movie_log_free(ce_movie_log *log);
+CE_API ce_movie_log *ce_movie_log_new(void);
+CE_API void ce_movie_log_free(ce_movie_log *log);
 
 /* Parses input-log text (an "Input Log.txt" lump, or the input block of a
  * savestate). Replaces the log's previous contents. Accepts LF, CRLF and CR
@@ -56,43 +66,43 @@ void ce_movie_log_free(ce_movie_log *log);
  * parse as a 32-bit integer is a hard error; a text with no "Frame" line at
  * all is NOT an error - the state frame is simply absent. A "LogKey:" line
  * takes effect even mid-log, last one wins. */
-int32_t ce_movie_log_parse(ce_movie_log *log, const char *text, uint64_t len);
+CE_API int32_t ce_movie_log_parse(ce_movie_log *log, const char *text, uint64_t len);
 
 /* The error text of the last failed call on this log, or "" if none.
  * Invalidated by the next call on the same log. */
-const char *ce_movie_log_last_error(ce_movie_log *log);
+CE_API const char *ce_movie_log_last_error(ce_movie_log *log);
 
-int64_t ce_movie_log_count(const ce_movie_log *log);
+CE_API int64_t ce_movie_log_count(const ce_movie_log *log);
 
 /* The entry for one frame, exactly as it appears in the file.
  * NULL when index is out of range. Invalidated by any mutating call. */
-const char *ce_movie_log_entry(const ce_movie_log *log, int64_t index);
+CE_API const char *ce_movie_log_entry(const ce_movie_log *log, int64_t index);
 
-void ce_movie_log_add(ce_movie_log *log, const char *entry);
-void ce_movie_log_clear(ce_movie_log *log);
+CE_API void ce_movie_log_add(ce_movie_log *log, const char *entry);
+CE_API void ce_movie_log_clear(ce_movie_log *log);
 /* Drops entries at and after count, keeping the first count. */
-void ce_movie_log_truncate(ce_movie_log *log, int64_t count);
+CE_API void ce_movie_log_truncate(ce_movie_log *log, int64_t count);
 /* Out-of-range indices are ignored: the log's length never changes by set. */
-void ce_movie_log_set(ce_movie_log *log, int64_t index, const char *entry);
+CE_API void ce_movie_log_set(ce_movie_log *log, int64_t index, const char *entry);
 /* index may equal the count (an append); beyond that is ignored. */
-void ce_movie_log_insert(ce_movie_log *log, int64_t index, const char *entry);
+CE_API void ce_movie_log_insert(ce_movie_log *log, int64_t index, const char *entry);
 /* Removes [index, index+count), clamped to the log's bounds. */
-void ce_movie_log_remove_range(ce_movie_log *log, int64_t index, int64_t count);
+CE_API void ce_movie_log_remove_range(ce_movie_log *log, int64_t index, int64_t count);
 /* Replaces dst's entries and LogKey with src's. */
-void ce_movie_log_assign(ce_movie_log *dst, const ce_movie_log *src);
+CE_API void ce_movie_log_assign(ce_movie_log *dst, const ce_movie_log *src);
 
 /* Nonzero when the parsed text carried a "Frame N" line. */
-int32_t ce_movie_log_has_state_frame(const ce_movie_log *log);
-int32_t ce_movie_log_state_frame(const ce_movie_log *log);
+CE_API int32_t ce_movie_log_has_state_frame(const ce_movie_log *log);
+CE_API int32_t ce_movie_log_state_frame(const ce_movie_log *log);
 
 /* The LogKey, or NULL when none was parsed or set.
  * Invalidated by ce_movie_log_parse and ce_movie_log_set_key. */
-const char *ce_movie_log_key(const ce_movie_log *log);
-void ce_movie_log_set_key(ce_movie_log *log, const char *key);
+CE_API const char *ce_movie_log_key(const ce_movie_log *log);
+CE_API void ce_movie_log_set_key(ce_movie_log *log, const char *key);
 
 /* First frame where the two logs differ; length of the shorter one when one
  * is a prefix of the other; -1 when identical. */
-int64_t ce_movie_log_divergent_point(const ce_movie_log *a, const ce_movie_log *b);
+CE_API int64_t ce_movie_log_divergent_point(const ce_movie_log *a, const ce_movie_log *b);
 
 /* Renders the whole [Input] block: header line, LogKey line, one line per
  * frame, terminator line. crlf selects the line end (the format is EOL-
@@ -100,7 +110,7 @@ int64_t ce_movie_log_divergent_point(const ce_movie_log *a, const ce_movie_log *
  * The LogKey line always appears; pass the generated fallback via _set_key
  * when the log has none. Returns the text and stores its byte length in
  * *len_out (may be NULL). Invalidated by any other call on the same log. */
-const char *ce_movie_log_serialize(ce_movie_log *log, int32_t crlf, uint64_t *len_out);
+CE_API const char *ce_movie_log_serialize(ce_movie_log *log, int32_t crlf, uint64_t *len_out);
 
 /* ---- movie header ----
  *
@@ -112,28 +122,28 @@ const char *ce_movie_log_serialize(ce_movie_log *log, int32_t crlf, uint64_t *le
 
 typedef struct ce_movie_header ce_movie_header;
 
-ce_movie_header *ce_movie_header_new(void);
-void ce_movie_header_free(ce_movie_header *header);
+CE_API ce_movie_header *ce_movie_header_new(void);
+CE_API void ce_movie_header_free(ce_movie_header *header);
 
 /* Replaces contents. Whitespace-only lines and lines with no value are
  * skipped; "Key  Value" parses with the separator run eaten, trailing
  * whitespace kept - the exact net48 Split(' ', 2, RemoveEmptyEntries) rules.
  * Never fails. */
-void ce_movie_header_parse(ce_movie_header *header, const char *text, uint64_t len);
+CE_API void ce_movie_header_parse(ce_movie_header *header, const char *text, uint64_t len);
 
-int64_t ce_movie_header_count(const ce_movie_header *header);
+CE_API int64_t ce_movie_header_count(const ce_movie_header *header);
 
 /* Borrowed; invalidated by parse/set/free. NULL when index is out of range. */
-const char *ce_movie_header_key_at(const ce_movie_header *header, int64_t index);
-const char *ce_movie_header_value_at(const ce_movie_header *header, int64_t index);
+CE_API const char *ce_movie_header_key_at(const ce_movie_header *header, int64_t index);
+CE_API const char *ce_movie_header_value_at(const ce_movie_header *header, int64_t index);
 
 /* Overwrites in place when the key exists, appends otherwise. */
-void ce_movie_header_set(ce_movie_header *header, const char *key, const char *value);
+CE_API void ce_movie_header_set(ce_movie_header *header, const char *key, const char *value);
 
 /* "Key Value" per line, then a closing blank line - the old writer wrapped
  * ToString() in WriteLine(), and that extra EOL is part of the format now.
  * Invalidated by any other call on the same header. */
-const char *ce_movie_header_serialize(ce_movie_header *header, int32_t crlf, uint64_t *len_out);
+CE_API const char *ce_movie_header_serialize(ce_movie_header *header, int32_t crlf, uint64_t *len_out);
 
 /* ---- plain line lumps (Comments.txt and friends) ----
  *
@@ -144,15 +154,15 @@ const char *ce_movie_header_serialize(ce_movie_header *header, int32_t crlf, uin
 
 typedef struct ce_text_lines ce_text_lines;
 
-ce_text_lines *ce_text_lines_new(void);
-void ce_text_lines_free(ce_text_lines *lines);
-void ce_text_lines_parse(ce_text_lines *lines, const char *text, uint64_t len);
-int64_t ce_text_lines_count(const ce_text_lines *lines);
+CE_API ce_text_lines *ce_text_lines_new(void);
+CE_API void ce_text_lines_free(ce_text_lines *lines);
+CE_API void ce_text_lines_parse(ce_text_lines *lines, const char *text, uint64_t len);
+CE_API int64_t ce_text_lines_count(const ce_text_lines *lines);
 /* Borrowed; invalidated by parse/add/free. NULL when out of range. */
-const char *ce_text_lines_at(const ce_text_lines *lines, int64_t index);
-void ce_text_lines_add(ce_text_lines *lines, const char *line);
+CE_API const char *ce_text_lines_at(const ce_text_lines *lines, int64_t index);
+CE_API void ce_text_lines_add(ce_text_lines *lines, const char *line);
 /* Invalidated by any other call on the same object. */
-const char *ce_text_lines_serialize(ce_text_lines *lines, int32_t crlf, uint64_t *len_out);
+CE_API const char *ce_text_lines_serialize(ce_text_lines *lines, int32_t crlf, uint64_t *len_out);
 
 /* ---- subtitle lines ----
  *
@@ -174,12 +184,12 @@ typedef struct ce_subtitle_fields
 /* Returns the message's byte length on success (message copied into
  * message_buf, NUL-terminated, when cap allows; a message can never be longer
  * than its line), or -1 when the line does not parse. */
-int64_t ce_subtitle_parse_line(
+CE_API int64_t ce_subtitle_parse_line(
 	const char *line, ce_subtitle_fields *fields, char *message_buf, uint64_t cap);
 
 /* Renders the line (no EOL). Returns its byte length; writes NUL-terminated
  * into buf when cap allows, so call with cap 0 to size first if needed. */
-int64_t ce_subtitle_format_line(
+CE_API int64_t ce_subtitle_format_line(
 	const ce_subtitle_fields *fields, const char *message, char *buf, uint64_t cap);
 
 /* ---- the savestate/movie container ----
@@ -202,22 +212,22 @@ typedef struct ce_state_writer ce_state_writer;
  * plain lumps and zstd level 2n+1 for zstd lumps - the mapping the C# writer
  * used. emu_version fills the BizVersion lump; both version lumps are written
  * here. */
-ce_state_writer *ce_state_writer_new(int32_t compression_level, const char *emu_version);
-void ce_state_writer_free(ce_state_writer *w);
+CE_API ce_state_writer *ce_state_writer_new(int32_t compression_level, const char *emu_version);
+CE_API void ce_state_writer_free(ce_state_writer *w);
 
 /* ext may be NULL for extensionless lumps ("GreenZone"). Returns 0 on
  * success; on failure see _last_error, and the writer is poisoned - finish
  * will fail too, matching the old writer's collect-errors-until-close. */
-int32_t ce_state_writer_put_lump(
+CE_API int32_t ce_state_writer_put_lump(
 	ce_state_writer *w, const char *name, const char *ext, int32_t zstd,
 	const uint8_t *data, uint64_t len);
 
 /* The finished archive. NULL on failure (see _last_error).
  * Valid until the writer is freed. */
-const uint8_t *ce_state_writer_finish(ce_state_writer *w, uint64_t *len_out);
+CE_API const uint8_t *ce_state_writer_finish(ce_state_writer *w, uint64_t *len_out);
 
 /* "" when no error. Invalidated by the next call on the same writer. */
-const char *ce_state_writer_last_error(ce_state_writer *w);
+CE_API const char *ce_state_writer_last_error(ce_state_writer *w);
 
 typedef struct ce_state_reader ce_state_reader;
 
@@ -228,30 +238,30 @@ typedef struct ce_state_reader ce_state_reader;
  * caller does not care; the message is a static buffer, valid until the next
  * failed open. is_movie relaxes the missing-version-lump case to version
  * 1.0.0, as movie loading always has. */
-ce_state_reader *ce_state_reader_open(
+CE_API ce_state_reader *ce_state_reader_open(
 	const uint8_t *data, uint64_t len, int32_t is_movie, const char **error_out);
-void ce_state_reader_free(ce_state_reader *r);
+CE_API void ce_state_reader_free(ce_state_reader *r);
 
 /* The sub version from the "BizState 1.0" lump (1.0.N). */
-int32_t ce_state_reader_version(const ce_state_reader *r);
+CE_API int32_t ce_state_reader_version(const ce_state_reader *r);
 
 /* The lump's bytes, zstd-decompressed when it was stored compressed - length
  * is the DECOMPRESSED length. NULL when absent or undecompressable (see
  * _last_error to tell which; absent is ""). ext participates only in the
  * version-1.0.2 quirk, where compression was inferred from the extension
  * instead of marked. Invalidated by the next lump read on the same reader. */
-const uint8_t *ce_state_reader_lump(
+CE_API const uint8_t *ce_state_reader_lump(
 	ce_state_reader *r, const char *name, const char *ext, uint64_t *len_out);
 
 /* "" when the last lump miss was a plain absence. Invalidated by the next
  * call on the same reader. */
-const char *ce_state_reader_last_error(ce_state_reader *r);
+CE_API const char *ce_state_reader_last_error(ce_state_reader *r);
 
 /* ---- identity hashing ----
  *
  * The hash the frontend identifies files by: roms, bundle parts, firmware.
  * Writes 40 uppercase hex characters plus a NUL into out41. */
-void ce_sha1_hex(const uint8_t *data, uint64_t len, char *out41);
+CE_API void ce_sha1_hex(const uint8_t *data, uint64_t len, char *out41);
 
 /* ---- game bundles ----
  *
@@ -270,42 +280,42 @@ typedef struct ce_bundle ce_bundle;
  * failed parse on the thread) when the text is not an acceptable bundle:
  * unreadable JSON, a newer format version, no rom, or a part whose file name
  * breaks the naming rules. file_label is used in the error text. */
-ce_bundle *ce_bundle_parse(
+CE_API ce_bundle *ce_bundle_parse(
 	const char *json, uint64_t len, const char *file_label, const char **error_out);
 
-ce_bundle *ce_bundle_new(void);
-void ce_bundle_free(ce_bundle *b);
+CE_API ce_bundle *ce_bundle_new(void);
+CE_API void ce_bundle_free(ce_bundle *b);
 
 /* Accessors return borrowed strings, invalidated by mutation or free;
  * NULL when the field is absent (an unpinned sha1, an unnamed bundle). */
-const char *ce_bundle_name(const ce_bundle *b);
-void ce_bundle_set_name(ce_bundle *b, const char *name);
-const char *ce_bundle_rom_file(const ce_bundle *b);
-const char *ce_bundle_rom_sha1(const ce_bundle *b);
-void ce_bundle_set_rom(ce_bundle *b, const char *file, const char *sha1);
-int64_t ce_bundle_attach_count(const ce_bundle *b);
-const char *ce_bundle_attach_core(const ce_bundle *b, int64_t index);
-const char *ce_bundle_attach_id(const ce_bundle *b, int64_t index);
-const char *ce_bundle_attach_file(const ce_bundle *b, int64_t index);
-const char *ce_bundle_attach_sha1(const ce_bundle *b, int64_t index);
-void ce_bundle_add_attach(ce_bundle *b, const char *core, const char *id, const char *file, const char *sha1);
+CE_API const char *ce_bundle_name(const ce_bundle *b);
+CE_API void ce_bundle_set_name(ce_bundle *b, const char *name);
+CE_API const char *ce_bundle_rom_file(const ce_bundle *b);
+CE_API const char *ce_bundle_rom_sha1(const ce_bundle *b);
+CE_API void ce_bundle_set_rom(ce_bundle *b, const char *file, const char *sha1);
+CE_API int64_t ce_bundle_attach_count(const ce_bundle *b);
+CE_API const char *ce_bundle_attach_core(const ce_bundle *b, int64_t index);
+CE_API const char *ce_bundle_attach_id(const ce_bundle *b, int64_t index);
+CE_API const char *ce_bundle_attach_file(const ce_bundle *b, int64_t index);
+CE_API const char *ce_bundle_attach_sha1(const ce_bundle *b, int64_t index);
+CE_API void ce_bundle_add_attach(ce_bundle *b, const char *core, const char *id, const char *file, const char *sha1);
 /* re-pin after rewriting an attachment's file */
-void ce_bundle_set_attach_sha1(ce_bundle *b, int64_t index, const char *sha1);
+CE_API void ce_bundle_set_attach_sha1(ce_bundle *b, int64_t index, const char *sha1);
 
 /* The bundle's identity: a hash over what its parts ARE (rom sha1, then each
  * attachment's core:id:sha1 ordered by core then id, ordinal), so renaming or
  * reformatting the bundle file changes nothing. NULL when any part is
  * unpinned. Borrowed; invalidated by mutation or another call. */
-const char *ce_bundle_content_id(ce_bundle *b);
+CE_API const char *ce_bundle_content_id(ce_bundle *b);
 
 /* Indented JSON, ready to write to disk. Invalidated by any other call. */
-const char *ce_bundle_serialize(ce_bundle *b, uint64_t *len_out);
+CE_API const char *ce_bundle_serialize(ce_bundle *b, uint64_t *len_out);
 
 /* The naming rule for one part's file field:
  * 0 = fine; 1 = names no file; 2 = absolute (or drive-qualified) path;
  * 3 = escapes the bundle's folder. Pure string logic, so every platform
  * agrees on what a bundle may say. */
-int32_t ce_bundle_check_path(const char *file);
+CE_API int32_t ce_bundle_check_path(const char *file);
 
 /* ---- firmware ----
  *
@@ -318,7 +328,7 @@ int32_t ce_bundle_check_path(const char *file);
  * declared_size 0 means the core pinned no size; expected_sha1s is a
  * newline-separated list of acceptable hashes (case-insensitive), "" when
  * the core pinned none - and pinning none means any dump is good. */
-int32_t ce_firmware_state(
+CE_API int32_t ce_firmware_state(
 	int64_t declared_size, const char *expected_sha1s,
 	int64_t actual_size, const char *actual_sha1);
 
@@ -326,7 +336,7 @@ int32_t ce_firmware_state(
  * newline-separated in any order, leave sorted by id (ordinal). A different
  * BIOS is a different machine; this line is why replays can say so.
  * Borrowed per-thread buffer, valid until the next call on the thread. */
-const char *ce_firmware_record_line(const char *pairs, uint64_t *len_out);
+CE_API const char *ce_firmware_record_line(const char *pairs, uint64_t *len_out);
 
 /* ---- core packages ----
  *
@@ -348,26 +358,26 @@ typedef struct ce_package ce_package;
  * path), a message (static per-thread, valid until the thread's next failed
  * open) for something that looks like a package but cannot be read. The zip
  * is hashed only after it is known to be a package. */
-ce_package *ce_package_open(const char *path, const char **error_out);
-void ce_package_free(ce_package *p);
+CE_API ce_package *ce_package_open(const char *path, const char **error_out);
+CE_API void ce_package_free(ce_package *p);
 
 /* The package's identity: SHA1 of the zip file, uppercase hex. NULL for the
  * directory form, which has no file to hash. */
-const char *ce_package_sha1(const ce_package *p);
+CE_API const char *ce_package_sha1(const ce_package *p);
 
 /* Nonzero for the data-driven waterbox form (core.wbx + waterbox.config). */
-int32_t ce_package_is_waterbox(const ce_package *p);
+CE_API int32_t ce_package_is_waterbox(const ce_package *p);
 
-int32_t ce_package_has_entry(ce_package *p, const char *name);
+CE_API int32_t ce_package_has_entry(ce_package *p, const char *name);
 
 /* The entry's bytes (decompressed from the zip, or the file in the directory
  * form). NULL when absent or unreadable (see _last_error to tell which;
  * absent is ""). Invalidated by the next entry read on the same package. */
-const uint8_t *ce_package_entry(ce_package *p, const char *name, uint64_t *len_out);
+CE_API const uint8_t *ce_package_entry(ce_package *p, const char *name, uint64_t *len_out);
 
 /* "" when the last entry miss was a plain absence.
  * Invalidated by the next call on the same package. */
-const char *ce_package_last_error(ce_package *p);
+CE_API const char *ce_package_last_error(ce_package *p);
 
 /* ---- the session ----
  *
@@ -391,7 +401,7 @@ typedef struct ce_session ce_session;
  * thread, valid until the thread's next failed open) on any failure - an
  * unreadable package, a missing export, a core that refused the rom (its
  * GetLoadError text is the message when it gives one). */
-ce_session *ce_session_open(
+CE_API ce_session *ce_session_open(
 	const char *package_path,
 	const uint8_t *rom, uint64_t rom_len,
 	const char *settings_overrides_json,
@@ -399,73 +409,73 @@ ce_session *ce_session_open(
 	const uint64_t *firmware_lens, int32_t firmware_count,
 	const char **error_out);
 
-void ce_session_free(ce_session *s);
+CE_API void ce_session_free(ce_session *s);
 
 /* config-derived facts (borrowed strings live as long as the session) */
-const char *ce_session_core_name(const ce_session *s);
-const char *ce_session_system_id(const ce_session *s);
-int32_t ce_session_width(const ce_session *s);
-int32_t ce_session_height(const ce_session *s);
-int32_t ce_session_virtual_width(const ce_session *s);
-int32_t ce_session_virtual_height(const ce_session *s);
+CE_API const char *ce_session_core_name(const ce_session *s);
+CE_API const char *ce_session_system_id(const ce_session *s);
+CE_API int32_t ce_session_width(const ce_session *s);
+CE_API int32_t ce_session_height(const ce_session *s);
+CE_API int32_t ce_session_virtual_width(const ce_session *s);
+CE_API int32_t ce_session_virtual_height(const ce_session *s);
 /* post-Init: the guest's own answer when it gives one, else the config's */
-int32_t ce_session_vsync_numerator(const ce_session *s);
-int32_t ce_session_vsync_denominator(const ce_session *s);
-int32_t ce_session_samples_per_frame(const ce_session *s);
-int32_t ce_session_channels(const ce_session *s);
-int32_t ce_session_deterministic(const ce_session *s);
-int64_t ce_session_button_count(const ce_session *s);
-const char *ce_session_button_name(const ce_session *s, int64_t index);
-int64_t ce_session_axis_count(const ce_session *s);
-const char *ce_session_axis_name(const ce_session *s, int64_t index);
+CE_API int32_t ce_session_vsync_numerator(const ce_session *s);
+CE_API int32_t ce_session_vsync_denominator(const ce_session *s);
+CE_API int32_t ce_session_samples_per_frame(const ce_session *s);
+CE_API int32_t ce_session_channels(const ce_session *s);
+CE_API int32_t ce_session_deterministic(const ce_session *s);
+CE_API int64_t ce_session_button_count(const ce_session *s);
+CE_API const char *ce_session_button_name(const ce_session *s, int64_t index);
+CE_API int64_t ce_session_axis_count(const ce_session *s);
+CE_API const char *ce_session_axis_name(const ce_session *s, int64_t index);
 
 /* Axes are set per frame, before the advance they belong to. */
-void ce_session_set_axis(ce_session *s, int32_t index, int32_t value);
+CE_API void ce_session_set_axis(ce_session *s, int32_t index, int32_t value);
 
 /* One frame: buttons is the bitmask (bit i = the config's buttons[i]).
  * render 0 skips the video copy. Returns nonzero when the frame was a lag
  * frame (the guest never read input), per the config's lag export. */
-int32_t ce_session_frame_advance(ce_session *s, uint64_t buttons, int32_t render);
+CE_API int32_t ce_session_frame_advance(ce_session *s, uint64_t buttons, int32_t render);
 
 /* The last rendered frame, BGRA, width*height pixels.
  * Invalidated by the next rendered frame_advance. */
-const uint32_t *ce_session_video(const ce_session *s);
+CE_API const uint32_t *ce_session_video(const ce_session *s);
 
 /* The last frame's audio as interleaved stereo s16 (mono sources are
  * doubled), and its sample-pair count. Invalidated by the next advance. */
-const int16_t *ce_session_audio(const ce_session *s, int32_t *sample_count);
+CE_API const int16_t *ce_session_audio(const ce_session *s, int32_t *sample_count);
 
 /* The guest's whole-machine state. The buffer is the session's, reused and
  * invalidated by the next save. Load returns 0 on success. */
-const uint8_t *ce_session_save_state(ce_session *s, uint64_t *len_out);
-int32_t ce_session_load_state(ce_session *s, const uint8_t *data, uint64_t len);
+CE_API const uint8_t *ce_session_save_state(ce_session *s, uint64_t *len_out);
+CE_API int32_t ce_session_load_state(ce_session *s, const uint8_t *data, uint64_t len);
 
 /* The guest's self-described memory domains. */
-int32_t ce_session_domain_count(const ce_session *s);
-const char *ce_session_domain_name(const ce_session *s, int32_t index);
-int64_t ce_session_domain_size(const ce_session *s, int32_t index);
-int32_t ce_session_domain_writable(const ce_session *s, int32_t index);
+CE_API int32_t ce_session_domain_count(const ce_session *s);
+CE_API const char *ce_session_domain_name(const ce_session *s, int32_t index);
+CE_API int64_t ce_session_domain_size(const ce_session *s, int32_t index);
+CE_API int32_t ce_session_domain_writable(const ce_session *s, int32_t index);
 /* Copies out [offset, offset+len); returns bytes copied (clamped at end). */
-int64_t ce_session_domain_read(const ce_session *s, int32_t index, int64_t offset, uint8_t *buf, int64_t len);
+CE_API int64_t ce_session_domain_read(const ce_session *s, int32_t index, int64_t offset, uint8_t *buf, int64_t len);
 
 /* "" when no error. Invalidated by the next call on the same session. */
-const char *ce_session_last_error(ce_session *s);
+CE_API const char *ce_session_last_error(ce_session *s);
 
 /* What built the waterbox host this engine loads (its wbx_build_info JSON):
  * the frontend shows it and movies record it. NULL when the host is not
  * loadable. Static string, never invalidated. */
-const char *ce_host_build_info(void);
+CE_API const char *ce_host_build_info(void);
 
 /* The raw guest pointer behind a memory domain, for pointer-backed peek/poke
  * (the hex editor's path). Stable for the session's lifetime - the guest is
  * non-PIE - and 0 when the domain has no linear backing. */
-uint64_t ce_session_domain_ptr(const ce_session *s, int32_t index);
+CE_API uint64_t ce_session_domain_ptr(const ce_session *s, int32_t index);
 
 /* Re-composes the effective settings (declared defaults overlaid with
  * overrides_json) and hands them to the RUNNING guest through its live-
  * settings exports. 0 = applied; 1 = the core has no live-settings group
  * (the caller must reboot instead); 2 = error (see _last_error). */
-int32_t ce_session_apply_settings(ce_session *s, const char *overrides_json);
+CE_API int32_t ce_session_apply_settings(ce_session *s, const char *overrides_json);
 
 /* ---- the optional guest ABI groups ----
  *
@@ -477,62 +487,62 @@ int32_t ce_session_apply_settings(ce_session *s, const char *overrides_json);
  */
 
 /* surfaces: core-rendered viewer windows */
-int32_t ce_session_surface_count(const ce_session *s);
-const char *ce_session_surface_name(const ce_session *s, int32_t index);
-int32_t ce_session_surface_width(const ce_session *s, int32_t index);
-int32_t ce_session_surface_height(const ce_session *s, int32_t index);
+CE_API int32_t ce_session_surface_count(const ce_session *s);
+CE_API const char *ce_session_surface_name(const ce_session *s, int32_t index);
+CE_API int32_t ce_session_surface_width(const ce_session *s, int32_t index);
+CE_API int32_t ce_session_surface_height(const ce_session *s, int32_t index);
 /* BGRA, width*height pixels. Borrowed; invalidated by the next render of the
  * same surface. NULL when the guest gave nothing. */
-const uint32_t *ce_session_surface_render(ce_session *s, int32_t index);
+CE_API const uint32_t *ce_session_surface_render(ce_session *s, int32_t index);
 
 /* registers: the generic debugger's register box */
-int32_t ce_session_register_count(const ce_session *s);
-const char *ce_session_register_name(const ce_session *s, int32_t index);
+CE_API int32_t ce_session_register_count(const ce_session *s);
+CE_API const char *ce_session_register_name(const ce_session *s, int32_t index);
 /* how many hex digits the debugger shows; 32 when the core does not say */
-int32_t ce_session_register_bits(const ce_session *s, int32_t index);
-int64_t ce_session_register_value(const ce_session *s, int32_t index);
+CE_API int32_t ce_session_register_bits(const ce_session *s, int32_t index);
+CE_API int64_t ce_session_register_value(const ce_session *s, int32_t index);
 /* 0 = written; 1 = this core does not support writing registers */
-int32_t ce_session_register_set(ce_session *s, int32_t index, int64_t value);
-int32_t ce_session_has_executed_cycles(const ce_session *s);
-int64_t ce_session_executed_cycles(const ce_session *s);
+CE_API int32_t ce_session_register_set(ce_session *s, int32_t index, int64_t value);
+CE_API int32_t ce_session_has_executed_cycles(const ce_session *s);
+CE_API int64_t ce_session_executed_cycles(const ce_session *s);
 
 /* buses: address SPACES the guest resolves through its own mapper logic -
  * peek/poke, never pointer-mapped */
-int32_t ce_session_bus_count(const ce_session *s);
-const char *ce_session_bus_name(const ce_session *s, int32_t index);
-int64_t ce_session_bus_size(const ce_session *s, int32_t index);
-int32_t ce_session_bus_writable(const ce_session *s, int32_t index);
-int32_t ce_session_bus_peek(const ce_session *s, int32_t index, int32_t addr);
-void ce_session_bus_poke(ce_session *s, int32_t index, int32_t addr, int32_t value);
+CE_API int32_t ce_session_bus_count(const ce_session *s);
+CE_API const char *ce_session_bus_name(const ce_session *s, int32_t index);
+CE_API int64_t ce_session_bus_size(const ce_session *s, int32_t index);
+CE_API int32_t ce_session_bus_writable(const ce_session *s, int32_t index);
+CE_API int32_t ce_session_bus_peek(const ce_session *s, int32_t index, int32_t addr);
+CE_API void ce_session_bus_poke(ce_session *s, int32_t index, int32_t addr, int32_t value);
 
 /* trace: the guest appends lines to a buffer of its own; drain it once per
  * frame - a callback per instruction would cross the sandbox boundary
  * millions of times a second */
-int32_t ce_session_trace_available(const ce_session *s);
-const char *ce_session_trace_header(const ce_session *s);
+CE_API int32_t ce_session_trace_available(const ce_session *s);
+CE_API const char *ce_session_trace_header(const ce_session *s);
 /* The session REMEMBERS the desired flag: a savestate overwrites the guest's
  * own tracing state, and load_state re-asserts this (and clears the restored
  * buffer - its lines were traced before the load and would appear out of
  * order). */
-void ce_session_trace_enable(ce_session *s, int32_t on);
+CE_API void ce_session_trace_enable(ce_session *s, int32_t on);
 /* The lines the guest traced since the last drain, as consecutive
  * NUL-terminated strings (line_count of them), cleared on the way out.
  * overflow_out reports the guest's raw truncation flag for this window.
  * Borrowed; invalidated by the next drain. */
-const uint8_t *ce_session_trace_drain(
+CE_API const uint8_t *ce_session_trace_drain(
 	ce_session *s, uint64_t *len_out, int32_t *line_count_out, int32_t *overflow_out);
 
 /* persistent data: what the machine keeps when switched off. Only the core
  * knows what belongs in the file, so it serializes into a buffer it owns and
  * the session moves bytes it does not interpret. */
-int32_t ce_session_persist_available(const ce_session *s); // exported AND nonempty for THIS rom
-const char *ce_session_persist_name(const ce_session *s);
-const char *ce_session_persist_id(const ce_session *s);
+CE_API int32_t ce_session_persist_available(const ce_session *s); // exported AND nonempty for THIS rom
+CE_API const char *ce_session_persist_name(const ce_session *s);
+CE_API const char *ce_session_persist_id(const ce_session *s);
 /* Borrowed until the next call; NULL when the core has nothing right now. */
-const uint8_t *ce_session_persist_get(ce_session *s, uint64_t *len_out);
+CE_API const uint8_t *ce_session_persist_get(ce_session *s, uint64_t *len_out);
 /* 0 = accepted; 1 = the core refused it (the file does not belong to this
  * game - loading half a save silently would be worse); 2 = no room. */
-int32_t ce_session_persist_put(ce_session *s, const uint8_t *data, uint64_t len);
+CE_API int32_t ce_session_persist_put(ce_session *s, const uint8_t *data, uint64_t len);
 
 /* ---- the session's movie ----
  *
@@ -548,25 +558,25 @@ int32_t ce_session_persist_put(ce_session *s, const uint8_t *data, uint64_t len)
 
 /* Copies a log's entries in and enters PLAY mode at the current frame
  * (normally 0, right after open). 0 on success. */
-int32_t ce_session_movie_load(ce_session *s, const ce_movie_log *log);
+CE_API int32_t ce_session_movie_load(ce_session *s, const ce_movie_log *log);
 
 /* Enters RECORD mode. mnemonics gives the character generated entries use
  * for each pressed button, one per button in config order (the frontend's
  * per-system vocabulary; pass NULL for a neutral fallback of the button
  * name's first character). Recording over existing entries truncates them:
  * recording at frame N drops entries >= N before appending - the rerecord. */
-void ce_session_movie_record(ce_session *s, const char *mnemonics);
+CE_API void ce_session_movie_record(ce_session *s, const char *mnemonics);
 
 /* 0 = no movie, 1 = play, 2 = record, 3 = finished (play ran past the end;
  * input is the caller's again, nothing is appended). */
-int32_t ce_session_movie_mode(const ce_session *s);
-int64_t ce_session_movie_length(const ce_session *s);
-int64_t ce_session_frame(const ce_session *s);
+CE_API int32_t ce_session_movie_mode(const ce_session *s);
+CE_API int64_t ce_session_movie_length(const ce_session *s);
+CE_API int64_t ce_session_frame(const ce_session *s);
 
 /* The session's own log, for saving through ce_movie_log_serialize.
  * Borrowed and READ-ONLY: mutate the movie through the session, never
  * through this. Invalidated when the session is freed. */
-const ce_movie_log *ce_session_movie_log(const ce_session *s);
+CE_API const ce_movie_log *ce_session_movie_log(const ce_session *s);
 
 /* One frame under the movie. In play mode the input comes from the log
  * (buttons/axes are ignored) until the log runs out, which flips the mode to
@@ -575,7 +585,7 @@ const ce_movie_log *ce_session_movie_log(const ce_session *s);
  * otherwise it carries ce_session_axis_count values in config order.
  * Returns like ce_session_frame_advance (nonzero = lag frame), or -1 on
  * error (no movie loaded, or an unparseable entry - see _last_error). */
-int32_t ce_session_movie_advance(ce_session *s, uint64_t buttons, const int32_t *axes, int32_t render);
+CE_API int32_t ce_session_movie_advance(ce_session *s, uint64_t buttons, const int32_t *axes, int32_t render);
 
 /* ---- the greenzone ----
  *
@@ -589,16 +599,16 @@ int32_t ce_session_movie_advance(ce_session *s, uint64_t buttons, const int32_t 
 
 /* Enables with a byte budget (captures the current frame immediately as the
  * anchor), or disables and drops everything with budget 0. */
-void ce_session_greenzone_enable(ce_session *s, uint64_t budget_bytes);
-int64_t ce_session_greenzone_count(const ce_session *s);
+CE_API void ce_session_greenzone_enable(ce_session *s, uint64_t budget_bytes);
+CE_API int64_t ce_session_greenzone_count(const ce_session *s);
 /* The nearest stored frame at or before frame; -1 when none is. */
-int64_t ce_session_greenzone_nearest(const ce_session *s, int64_t frame);
+CE_API int64_t ce_session_greenzone_nearest(const ce_session *s, int64_t frame);
 /* Drops stored states AFTER frame - an input edit at frame N makes every
  * later state a lie, while the state at N itself (inputs 0..N-1) still holds. */
-void ce_session_greenzone_invalidate(ce_session *s, int64_t after_frame);
+CE_API void ce_session_greenzone_invalidate(ce_session *s, int64_t after_frame);
 /* Restores the nearest stored state at or before frame, then replays the
  * movie to frame. Needs the movie's entries up to frame. 0 on success. */
-int32_t ce_session_seek(ce_session *s, int64_t frame);
+CE_API int32_t ce_session_seek(ce_session *s, int64_t frame);
 
 #ifdef __cplusplus
 }

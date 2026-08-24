@@ -115,6 +115,17 @@ fi
 if [ "$level" = "both" ] || [ "$level" = "e" ]; then
 	chimera_run="$repo_root/build/meson-linux/chimera-run"
 	epkg="$repo_root/build/Cores/synth-box.zip"
+	# the ABI must actually be exported - mingw once silently un-exported it
+	# when a vendored library declared its own dllexports
+	if [ -f "$repo_root/build/dll/libchimera.so" ] \
+		&& ! nm -D "$repo_root/build/dll/libchimera.so" 2>/dev/null | grep -q ' ce_abi_version$'; then
+		report "E:exports:linux" FAIL "libchimera.so does not export ce_abi_version"
+	fi
+	if [ -f "$repo_root/build/dll/libchimera.dll" ] \
+		&& ! objdump -p "$repo_root/build/dll/libchimera.dll" 2>/dev/null | grep -q 'ce_abi_version'; then
+		report "E:exports:windows" FAIL "libchimera.dll does not export ce_abi_version"
+	fi
+
 	if [ ! -x "$chimera_run" ]; then
 		report "E:engine" SKIP "chimera-run not built (meson compile -C build/meson-linux)"
 	elif [ ! -f "$epkg" ]; then

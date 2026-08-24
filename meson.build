@@ -310,6 +310,10 @@ engine_build_args = [
   # miniz's zlib-name-compat macros (#define compress mz_compress) leak into
   # everything that includes it; we use the mz_ names
   '-DMINIZ_NO_ZLIB_COMPATIBLE_NAMES',
+  # the ce_ ABI is exported explicitly (see engine.h); cJSON must not export
+  # its own symbols, which on mingw would also disable auto-exports
+  '-DCHIMERA_BUILDING',
+  '-DCJSON_HIDE_SYMBOLS',
 ]
 shared_library(
   'chimera',
