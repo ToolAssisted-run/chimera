@@ -284,6 +284,12 @@ namespace Chimera.Emulation.Common.Engine
 		public abstract IntPtr ce_session_video(IntPtr session);
 
 		[BizImport(CallingConvention.Cdecl)]
+		public abstract int ce_session_video_width(IntPtr session);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract int ce_session_video_height(IntPtr session);
+
+		[BizImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_session_audio(IntPtr session, ref int sampleCount);
 
 		[BizImport(CallingConvention.Cdecl)]
@@ -883,6 +889,9 @@ namespace Chimera.Emulation.Common.Engine
 
 		/// <summary>Borrowed: the last rendered frame, BGRA, Width*Height ints.</summary>
 		public IntPtr VideoBuffer => E.ce_session_video(_session);
+		/// <summary>The live frame size - a mode-changing machine (DOS) reports it per frame; others equal the config's.</summary>
+		public int VideoWidth => E.ce_session_video_width(_session);
+		public int VideoHeight => E.ce_session_video_height(_session);
 
 		/// <summary>Borrowed: the last frame's interleaved stereo s16 and its pair count.</summary>
 		public IntPtr AudioBuffer(out int sampleCount)

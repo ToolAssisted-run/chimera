@@ -374,9 +374,16 @@ CE_API void ce_session_set_button(ce_session *s, int32_t index, int32_t pressed)
  * read input), per the config's lag export. */
 CE_API int32_t ce_session_frame_advance(ce_session *s, uint64_t buttons, int32_t render);
 
-/* The last rendered frame, BGRA, width*height pixels.
+/* The last rendered frame, BGRA, video_width*video_height pixels.
  * Invalidated by the next rendered frame_advance. */
 CE_API const uint32_t *ce_session_video(const ce_session *s);
+
+/* The LIVE frame size: a machine that changes video modes (DOS) reports it
+ * per frame through optional GetVideoWidth/GetVideoHeight exports, clamped
+ * to the config's declared buffer. Without the exports these equal
+ * ce_session_width/height. Valid after the advance they belong to. */
+CE_API int32_t ce_session_video_width(const ce_session *s);
+CE_API int32_t ce_session_video_height(const ce_session *s);
 
 /* The last frame's audio as interleaved stereo s16 (mono sources are
  * doubled), and its sample-pair count. Invalidated by the next advance. */

@@ -255,6 +255,12 @@ struct ce_session
 	int32_t (*mdWritable)(int32_t) = nullptr;
 
 	int32_t vsyncNum = 0, vsyncDen = 0;
+	// dynamic video size: a DOS machine changes modes; the guest reports the
+	// live frame size (clamped to the config's buffer) through optional
+	// exports, and the config's width/height stay the buffer's capacity
+	int32_t (*getVideoWidth)() = nullptr;
+	int32_t (*getVideoHeight)() = nullptr;
+	int32_t vidW = 0, vidH = 0;
 	std::vector<uint32_t> videoBuf;
 	std::vector<int16_t> audioBuf;
 	int32_t sampleCount = 0;
@@ -313,6 +319,7 @@ struct ce_session
 
 	void probeOptionalGroups();
 	int32_t advanceCore(const uint8_t *buttons, int32_t render);
+	void copyVideo();
 	const uint8_t *computeEffective(uint64_t mask);
 	uint64_t sendButtons(const uint8_t *states);
 	void greenzoneCapture();
@@ -510,14 +517,30 @@ uint64_t ce_session::sendButtons(const uint8_t *states)
 	return mask;
 }
 
+void ce_session::copyVideo()
+{
+	if (getVideoWidth != nullptr && getVideoHeight != nullptr)
+	{
+		int32_t w = getVideoWidth(), h = getVideoHeight();
+		if (w > 0 && h > 0)
+		{
+			vidW = w < cfg.width ? w : cfg.width;
+			vidH = h < cfg.height ? h : cfg.height;
+		}
+	}
+	/* a machine that has not rendered yet answers null (DOS before its first
+	 * mode set); the buffer keeps its previous frame */
+	const void *src = reinterpret_cast<const void *>(getVideoBgra());
+	if (src != nullptr)
+	{
+		std::memcpy(videoBuf.data(), src, static_cast<size_t>(vidW) * vidH * sizeof(uint32_t));
+	}
+}
+
 int32_t ce_session::advanceCore(const uint8_t *buttons, int32_t render)
 {
 	frameAdvance(sendButtons(buttons));
-	if (render != 0)
-	{
-		std::memcpy(videoBuf.data(), reinterpret_cast<const void *>(getVideoBgra()),
-			videoBuf.size() * sizeof(uint32_t));
-	}
+	if (render != 0) copyVideo();
 	int32_t nsamp = getAudioSampleCount != nullptr ? getAudioSampleCount() : cfg.samplesPerFrame;
 	if (nsamp < 0) nsamp = 0;
 	if (nsamp > cfg.samplesPerFrame) nsamp = cfg.samplesPerFrame;
@@ -708,6 +731,10 @@ ce_session *ce_session_open(
 
 	/* optional exports: the guest's own answers override the config's */
 	s->getAudioSampleCount = reinterpret_cast<int32_t (*)()>(s->proc("GetAudioSampleCount", 0, false, err));
+	s->getVideoWidth = reinterpret_cast<int32_t (*)()>(s->proc("GetVideoWidth", 0, false, err));
+	s->getVideoHeight = reinterpret_cast<int32_t (*)()>(s->proc("GetVideoHeight", 0, false, err));
+	s->vidW = s->cfg.width;
+	s->vidH = s->cfg.height;
 	auto vsyncN = reinterpret_cast<int32_t (*)()>(s->proc("GetVsyncNumerator", 0, false, err));
 	auto vsyncD = reinterpret_cast<int32_t (*)()>(s->proc("GetVsyncDenominator", 0, false, err));
 	s->vsyncNum = vsyncN != nullptr ? vsyncN() : 0;
@@ -798,11 +825,7 @@ void ce_session_set_button(ce_session *s, int32_t index, int32_t pressed)
 int32_t ce_session_frame_advance(ce_session *s, uint64_t buttons, int32_t render)
 {
 	s->frameAdvance(s->sendButtons(s->computeEffective(buttons)));
-	if (render != 0)
-	{
-		std::memcpy(s->videoBuf.data(), reinterpret_cast<const void *>(s->getVideoBgra()),
-			s->videoBuf.size() * sizeof(uint32_t));
-	}
+	if (render != 0) s->copyVideo();
 	/* a core that reports its own count may produce a different number every
 	 * frame (blip resamplers do); the declared samplesPerFrame is the buffer
 	 * we must not overrun */
@@ -827,6 +850,9 @@ int32_t ce_session_frame_advance(ce_session *s, uint64_t buttons, int32_t render
 }
 
 const uint32_t *ce_session_video(const ce_session *s) { return s->videoBuf.data(); }
+
+int32_t ce_session_video_width(const ce_session *s) { return s->vidW; }
+int32_t ce_session_video_height(const ce_session *s) { return s->vidH; }
 
 const int16_t *ce_session_audio(const ce_session *s, int32_t *sample_count)
 {

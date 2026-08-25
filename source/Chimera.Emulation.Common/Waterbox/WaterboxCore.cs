@@ -194,7 +194,7 @@ namespace Chimera.Emulation.Common.Waterbox
 			Frame++;
 			if (IsLagFrame) LagCount++;
 
-			if (render) Marshal.Copy(_session.VideoBuffer, _videoBuff, 0, _width * _height);
+			if (render) Marshal.Copy(_session.VideoBuffer, _videoBuff, 0, _session.VideoWidth * _session.VideoHeight);
 			var audio = _session.AudioBuffer(out _nsamp);
 			Marshal.Copy(audio, _stereoBuff, 0, _nsamp * 2);
 			return true;
@@ -222,8 +222,10 @@ namespace Chimera.Emulation.Common.Waterbox
 
 		// ---------------- IVideoProvider ----------------
 
-		public int BufferWidth => _width;
-		public int BufferHeight => _height;
+		// The LIVE size: a mode-changing machine (DOS) reports it per frame,
+		// clamped by the engine to the config's buffer; others equal the config.
+		public int BufferWidth => _session.Disposed ? _width : _session.VideoWidth;
+		public int BufferHeight => _session.Disposed ? _height : _session.VideoHeight;
 		public int VirtualWidth => _cfg.Video.VirtualWidth;
 		public int VirtualHeight => _cfg.Video.VirtualHeight;
 		public int BackgroundColor => unchecked((int)0xFF000000);
