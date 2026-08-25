@@ -506,7 +506,7 @@ Decisions, all user-confirmed:
    cross-platform. (BizHawk's Nyma layer - one data-driven adapter serving
    every mednafen core - is the scale precedent.)
 4. **Everything waterbox lives in ONE external repository: miniBox**
-   (github.com/SergioMartin86/miniBox), consumed as a submodule at
+   (github.com/ToolAssisted-run/chimera-common-minibox), consumed as a submodule at
    extern/miniBox like every other from-source dependency. It carries all
    sides: the runtime (sandbox host - Chimera's meson builds it into the
    frontend's OS-dependent artifacts), the guest toolchain (the core-author
