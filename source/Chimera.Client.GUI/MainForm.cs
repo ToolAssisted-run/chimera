@@ -3542,6 +3542,23 @@ namespace Chimera.Client.GUI
 			UpdateCoreStatusBarButton();
 			UpdateDumpInfo();
 			SetMainformMovieInfo();
+			WarnAboutNonStandardFirmware();
+		}
+
+		/// <summary>
+		/// Say so when a core is running with firmware it does not recognise - a file the
+		/// user substituted, or a dump no declaration lists. Both are allowed and both are
+		/// recorded in movies, but they make a machine nobody can reproduce without that
+		/// exact file, which the user should hear about at load rather than discover when
+		/// someone else's replay desyncs.
+		/// </summary>
+		private void WarnAboutNonStandardFirmware()
+		{
+			if (Emulator.IsNull()) return;
+			foreach (var entry in CoreFirmwareStore.NonStandard(Config, CoreRegistry.Instance, Emulator.Attributes().CoreName))
+			{
+				AddOnScreenMessage(entry.WarningText, 5);
+			}
 		}
 
 		private void CommitCoreSettingsToConfig()

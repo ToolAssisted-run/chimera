@@ -110,7 +110,7 @@ int main(void)
 	}
 
 	{ // firmware verdicts
-		assert(ce_firmware_state(512, "AA\nBB", 100, "AA") == 0); // wrong size trumps all
+		assert(ce_firmware_state(512, "AA\nBB", 100, "AA") == 0); // size decides: a matching hash at the wrong size is still a substituted file
 		assert(ce_firmware_state(0, "AA\nBB", 100, "CC") == 1);   // unrecognised
 		assert(ce_firmware_state(0, "AA\nBB", 100, "bb") == 2);   // case-insensitive match
 		assert(ce_firmware_state(512, "", 512, "CC") == 2);       // nothing pinned: any dump is good

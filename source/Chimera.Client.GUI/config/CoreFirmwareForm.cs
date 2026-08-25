@@ -148,7 +148,8 @@ namespace Chimera.Client.GUI
 		{
 			CoreFirmwareState.Good => 0,
 			CoreFirmwareState.Unrecognised => 1,
-			CoreFirmwareState.WrongSize or CoreFirmwareState.Unreadable => 2,
+			CoreFirmwareState.Unreadable => 2,
+			CoreFirmwareState.Custom => 1,
 			_ => 3,
 		};
 
@@ -187,7 +188,8 @@ namespace Chimera.Client.GUI
 					CoreFirmwareState.Good => Color.DarkGreen,
 					CoreFirmwareState.Unrecognised => Color.DarkGoldenrod,
 					CoreFirmwareState.Missing when !entry.Decl.Required => SystemColors.GrayText,
-					CoreFirmwareState.Missing or CoreFirmwareState.Unreadable or CoreFirmwareState.WrongSize => Color.Firebrick,
+					CoreFirmwareState.Custom => Color.DarkGoldenrod,
+					CoreFirmwareState.Missing or CoreFirmwareState.Unreadable => Color.Firebrick,
 					_ => SystemColors.ControlText,
 				};
 				if (CoreFirmwareStore.KeyFor(entry.CoreName, entry.Decl.Id) == selectedKey) item.Selected = true;

@@ -61,13 +61,21 @@ namespace Chimera.Tests.Client.Common.CorePackages
 			Assert.IsFalse(entry.Usable);
 		}
 
+		/// <summary>
+		/// A file that is not the declared size is a substitution, not an error: replacing
+		/// a declared file (a custom system font, a modified BIOS) is a thing users do on
+		/// purpose. It is used, flagged as custom, and its hash is recorded like any other.
+		/// </summary>
 		[TestMethod]
-		public void WrongSizeIsRefused()
+		public void ASubstitutedFileIsUsedAndFlaggedCustom()
 		{
 			var path = FileOf(4096);
 			var entry = CoreFirmwareStore.Describe(WithPath("Core", "bios", path), "Core", Decl());
-			Assert.AreEqual(CoreFirmwareState.WrongSize, entry.State);
-			Assert.IsFalse(entry.Usable);
+			Assert.AreEqual(CoreFirmwareState.Custom, entry.State);
+			Assert.IsTrue(entry.Usable);
+			Assert.IsFalse(entry.IsStandard);
+			Assert.IsNotNull(entry.Sha1);
+			StringAssert.Contains(entry.WarningText, "custom");
 			File.Delete(path);
 		}
 
@@ -112,9 +120,13 @@ namespace Chimera.Tests.Client.Common.CorePackages
 			File.Delete(path);
 		}
 
-		/// <summary>The core gets bytes only when the file is usable - a wrong file must fail as "provide this", not as a crash inside the sandbox.</summary>
+		/// <summary>
+		/// The core gets whatever readable file the user chose, declared size or not - the
+		/// declaration says what the core expects, not what it will accept. Only "nothing
+		/// chosen" and "chosen but gone" hand over nothing.
+		/// </summary>
 		[TestMethod]
-		public void ProviderHandsOverOnlyUsableFiles()
+		public void ProviderHandsOverEveryReadableFile()
 		{
 			var good = FileOf(8192);
 			var small = FileOf(64);
@@ -122,11 +134,17 @@ namespace Chimera.Tests.Client.Common.CorePackages
 			var provider = CoreFirmwareStore.ProviderFor(WithPath("Core", "bios", good), "Core");
 			CollectionAssert.AreEqual(File.ReadAllBytes(good), provider(Decl()));
 
+			// a substituted file of another size still reaches the core
 			provider = CoreFirmwareStore.ProviderFor(WithPath("Core", "bios", small), "Core");
-			Assert.IsNull(provider(Decl()));
+			CollectionAssert.AreEqual(File.ReadAllBytes(small), provider(Decl()));
 
 			provider = CoreFirmwareStore.ProviderFor(new Config(), "Core");
 			Assert.IsNull(provider(Decl()));
+
+			var gone = FileOf(8192);
+			var config = WithPath("Core", "bios", gone);
+			File.Delete(gone);
+			Assert.IsNull(CoreFirmwareStore.ProviderFor(config, "Core")(Decl()));
 
 			File.Delete(good);
 			File.Delete(small);

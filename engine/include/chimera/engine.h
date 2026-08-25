@@ -324,7 +324,12 @@ CE_API int32_t ce_bundle_check_path(const char *file);
  * the verdict and the movie's canonical firmware line live here.
  */
 
-/* 0 = wrong size, 1 = unrecognised dump (usable), 2 = good.
+/* Classifies, it does not permit: 0 = not the declared size, 1 = right size
+ * but no listed hash matches, 2 = matches (or the core listed none). What the
+ * frontend does with a file is the frontend's policy - Chimera hands every
+ * readable file to the core and warns about anything that is not 2, since a
+ * substituted file (a custom system font, a modified BIOS) is a legitimate
+ * thing to run, and movies record its hash either way.
  * declared_size 0 means the core pinned no size; expected_sha1s is a
  * newline-separated list of acceptable hashes (case-insensitive), "" when
  * the core pinned none - and pinning none means any dump is good. */

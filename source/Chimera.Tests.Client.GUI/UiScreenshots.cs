@@ -145,7 +145,7 @@ namespace Chimera.Tests.Client.GUI
 					CoreFirmwareState.Unrecognised, "/home/you/firmware/boot-alt.rom"),
 				Entry("synth", "char", "Character generator",
 					"The font the machine draws text with.",
-					CoreFirmwareState.WrongSize, "/home/you/firmware/oops.bin"),
+					CoreFirmwareState.Custom, "/home/you/firmware/custom.bin"),
 			];
 
 			using CoreFirmwareForm form = new(() => entries, (_, _) => { });

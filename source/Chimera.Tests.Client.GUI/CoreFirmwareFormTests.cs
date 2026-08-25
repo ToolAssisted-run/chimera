@@ -89,10 +89,12 @@ namespace Chimera.Tests.Client.GUI
 		}
 
 		[TestMethod]
-		public void AWrongSizedFileSaysWhatWasExpected()
+		public void ACustomFileSaysWhatTheCoreExpected()
 		{
-			using var form = MakeForm([ Entry("Core", "bios", CoreFirmwareState.WrongSize, "/roms/wrong.rom") ]);
-			StringAssert.Contains(ListOf(form).Items[0].SubItems[COL_STATUS].Text, "8192");
+			using var form = MakeForm([ Entry("Core", "bios", CoreFirmwareState.Custom, "/roms/wrong.rom") ]);
+			var status = ListOf(form).Items[0].SubItems[COL_STATUS].Text;
+			StringAssert.Contains(status, "8192");
+			StringAssert.Contains(status, "used anyway", "a substituted file is used, and the row must not imply otherwise");
 		}
 
 		/// <summary>Clearing a row hands the owner a null path - the frontend's "forget this".</summary>
@@ -140,17 +142,22 @@ namespace Chimera.Tests.Client.GUI
 			Assert.AreEqual(3, list.Items[2].ImageIndex);
 		}
 
+		/// <summary>
+		/// A file that will be used but is not what the core knows (custom, unrecognised)
+		/// carries the caution mark; only a file that cannot be used at all gets the error
+		/// mark. The user has to be able to tell "running, but not standard" from "broken".
+		/// </summary>
 		[TestMethod]
-		public void AnUnusableFileIsMarkedDifferentlyFromOneMerelyUnrecognised()
+		public void ACustomFileIsMarkedCautionAndAnUnusableOneError()
 		{
 			using var form = MakeForm(
 			[
-				Entry("Core", "bios", CoreFirmwareState.WrongSize, "/f/small.rom", sha1: "AABBCCDDEE"),
+				Entry("Core", "bios", CoreFirmwareState.Custom, "/f/small.rom", sha1: "AABBCCDDEE"),
 				Entry("Core", "boot", CoreFirmwareState.Unreadable, "/f/gone.rom"),
 			]);
-			Assert.AreEqual(2, ListOf(form).Items[0].ImageIndex);
+			Assert.AreEqual(1, ListOf(form).Items[0].ImageIndex);
 			Assert.AreEqual(2, ListOf(form).Items[1].ImageIndex);
-			Assert.AreEqual("AABBCCDD", ListOf(form).Items[0].SubItems[COL_ACTUAL].Text, "a wrong file still shows what it hashed to");
+			Assert.AreEqual("AABBCCDD", ListOf(form).Items[0].SubItems[COL_ACTUAL].Text, "a custom file still shows what it hashed to");
 		}
 
 		/// <summary>A declaration that pins nothing says so rather than showing an empty column.</summary>

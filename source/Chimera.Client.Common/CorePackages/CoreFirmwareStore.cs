@@ -19,8 +19,12 @@ namespace Chimera.Client.Common
 		/// <summary>Chosen, but the file is gone or unreadable now.</summary>
 		Unreadable,
 
-		/// <summary>Readable, but not the size the core declared - almost certainly the wrong file.</summary>
-		WrongSize,
+		/// <summary>
+		/// Readable, but not the size the core declared. Either a deliberate replacement
+		/// (a custom font, a modified BIOS) or the wrong file picked by mistake - the
+		/// frontend cannot tell those apart, so it uses the file and says so.
+		/// </summary>
+		Custom,
 
 		/// <summary>Right size, but no known-good hash matches. Used anyway; a good dump may simply be one the core has never seen.</summary>
 		Unrecognised,
@@ -55,14 +59,37 @@ namespace Chimera.Client.Common
 		{
 			CoreFirmwareState.Missing => Decl.Required ? "not provided" : "not provided (optional)",
 			CoreFirmwareState.Unreadable => "file is gone",
-			CoreFirmwareState.WrongSize => $"wrong size (expected {Decl.Size} bytes)",
-			CoreFirmwareState.Unrecognised => "unrecognised dump - will be used anyway",
+			CoreFirmwareState.Custom => $"custom file, not the {Decl.Size} bytes the core expects - used anyway",
+			CoreFirmwareState.Unrecognised => "unrecognised dump - used anyway",
 			CoreFirmwareState.Good => "ok",
 			_ => "?",
 		};
 
-		/// <summary>True if this file is good enough to hand to the core.</summary>
-		public bool Usable => State is CoreFirmwareState.Unrecognised or CoreFirmwareState.Good;
+		/// <summary>
+		/// True if this file is handed to the core. Every readable file is: what a core
+		/// declares is what it EXPECTS, not what the user is allowed to supply, and
+		/// replacing a declared file is a legitimate thing to want (a custom system font,
+		/// a modified BIOS). The core runs sandboxed and validates its own inputs, so a
+		/// wrong file fails inside the machine rather than endangering the frontend, and
+		/// <see cref="IsStandard"/> is what warns the user before it gets that far.
+		/// </summary>
+		public bool Usable => State is CoreFirmwareState.Custom or CoreFirmwareState.Unrecognised or CoreFirmwareState.Good;
+
+		/// <summary>
+		/// True if this is a file the core says it knows. False for anything the user
+		/// substituted, or a dump no declaration lists - which still runs, but is worth
+		/// telling the user about, since it makes a machine nobody else can reproduce
+		/// without that same file.
+		/// </summary>
+		public bool IsStandard => State is CoreFirmwareState.Good;
+
+		/// <summary>One line naming what is non-standard about this file. Empty when there is nothing to say.</summary>
+		public string WarningText => State switch
+		{
+			CoreFirmwareState.Custom => $"{CoreName}: {Decl.DisplayName} is a custom file ({Short(Sha1)}), not what the core expects",
+			CoreFirmwareState.Unrecognised => $"{CoreName}: {Decl.DisplayName} is an unrecognised dump ({Short(Sha1)})",
+			_ => "",
+		};
 	}
 
 	/// <summary>
@@ -120,7 +147,7 @@ namespace Chimera.Client.Common
 			// the verdict is the engine's (see docs/engine-migration.md)
 			var state = EngineFirmware.Classify(decl.Size, decl.Sha1, bytes.Length, sha1) switch
 			{
-				EngineFirmware.Verdict.WrongSize => CoreFirmwareState.WrongSize,
+				EngineFirmware.Verdict.WrongSize => CoreFirmwareState.Custom,
 				EngineFirmware.Verdict.Unrecognised => CoreFirmwareState.Unrecognised,
 				_ => CoreFirmwareState.Good,
 			};
@@ -128,9 +155,10 @@ namespace Chimera.Client.Common
 		}
 
 		/// <summary>
-		/// The provider handed to a core at load: the file's bytes, or null when there is
-		/// nothing usable. A wrong-sized file counts as nothing - handing it over would
-		/// only turn a clear "provide this" into a mystery crash inside the sandbox.
+		/// The provider handed to a core at load: the file's bytes, or null when the user
+		/// pointed at nothing, or at a file that no longer reads. Anything readable goes
+		/// over, whatever its size or hash - see <see cref="CoreFirmwareEntry.Usable"/>
+		/// for why, and <see cref="NonStandard"/> for the warning that goes with it.
 		/// </summary>
 		public static Func<CoreFirmwareDecl, byte[]?> ProviderFor(Config config, string coreName)
 			=> decl =>
@@ -154,9 +182,28 @@ namespace Chimera.Client.Common
 		/// or replay would report a difference that is only an ordering.
 		/// </summary>
 		public static string RecordFor(Config config, CoreRegistry registry, string coreName)
-			=> EngineFirmware.RecordLine(Enumerate(config, registry)
-				.Where(e => string.Equals(e.CoreName, coreName, StringComparison.OrdinalIgnoreCase) && e.Sha1 is not null)
+			=> EngineFirmware.RecordLine(ForCore(config, registry, coreName)
+				// what the core was actually given, not merely what the user pointed at:
+				// a file the frontend never handed over did not shape this machine
+				.Where(static e => e.Usable && e.Sha1 is not null)
 				.Select(static e => (e.Decl.Id, e.Sha1!)));
+
+		/// <summary>Every declaration of one core, with its current state.</summary>
+		public static IReadOnlyList<CoreFirmwareEntry> ForCore(Config config, CoreRegistry registry, string coreName)
+			=> Enumerate(config, registry)
+				.Where(e => string.Equals(e.CoreName, coreName, StringComparison.OrdinalIgnoreCase))
+				.ToList();
+
+		/// <summary>
+		/// The files this core is running with that it does not recognise - a custom
+		/// replacement, or a dump no declaration lists. They shape the machine and are
+		/// recorded in movies like any firmware, so the user is told rather than left
+		/// to wonder why a movie will not sync elsewhere.
+		/// </summary>
+		public static IReadOnlyList<CoreFirmwareEntry> NonStandard(Config config, CoreRegistry registry, string coreName)
+			=> ForCore(config, registry, coreName)
+				.Where(static e => e.Usable && !e.IsStandard)
+				.ToList();
 
 		public static string Sha1Of(byte[] bytes) => ChimeraEngine.Sha1Hex(bytes);
 	}
