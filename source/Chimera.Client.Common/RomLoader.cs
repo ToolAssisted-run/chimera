@@ -7,18 +7,11 @@ using Chimera.Common;
 using Chimera.Common.IOExtensions;
 using Chimera.Common.StringExtensions;
 using Chimera.Emulation.Common;
-using Chimera.Emulation.DiscSystem;
 
 namespace Chimera.Client.Common
 {
 	public class RomLoader
 	{
-		private class DiscAsset
-		{
-			public Disc DiscData { get; set; }
-			public DiscType DiscType { get; set; }
-			public string DiscName { get; set; }
-		}
 		private class RomAsset : IRomAsset
 		{
 			public byte[] RomData { get; set; }
@@ -34,8 +27,6 @@ namespace Chimera.Client.Common
 			public GameInfo Game { get; set; }
 
 			public List<IRomAsset> Roms { get; set; } = new List<IRomAsset>();
-
-			public List<object> Discs { get; set; } = new List<object>();
 		}
 		private readonly Config _config;
 
@@ -54,7 +45,6 @@ namespace Chimera.Client.Common
 		{
 			Unknown,
 			Xml,
-			DiscError,
 		}
 
 		// helper methods for the settings events
@@ -214,126 +204,6 @@ namespace Chimera.Client.Common
 			return true;
 		}
 
-		private GameInfo MakeGameFromDisc(Disc disc, string ext, string name, bool fastFailUnsupportedSystems = true)
-		{
-			// TODO - use more sophisticated IDer
-			var discType = new DiscIdentifier(disc).DetectDiscType();
-			var discHasher = new DiscHasher(disc);
-			var discHash = discHasher.CalculateBizHash(discType);
-
-			var game = new GameInfo { Name = name, Hash = discHash };
-			void NoCoreForSystem(string sysID)
-			{
-				// no supported emulator core for these (yet)
-				game.System = sysID;
-				if (fastFailUnsupportedSystems) throw new NoAvailableCoreException(sysID);
-			}
-			switch (discType)
-			{
-				case DiscType.DOS:
-					game.System = VSystemID.Raw.DOS;
-					break;
-
-				case DiscType.SegaSaturn:
-					game.System = VSystemID.Raw.SAT;
-					break;
-				case DiscType.MegaCD:
-					game.System = VSystemID.Raw.GEN;
-					break;
-				case DiscType.Panasonic3DO:
-					game.System = VSystemID.Raw.Panasonic3DO;
-					break;
-				case DiscType.PCFX:
-					game.System = VSystemID.Raw.PCFX;
-					break;
-
-				case DiscType.TurboGECD:
-				case DiscType.TurboCD:
-					game.System = VSystemID.Raw.PCE;
-					break;
-
-				case DiscType.SonyPSP:
-					game.System = VSystemID.Raw.PSP;
-					break;
-
-				case DiscType.JaguarCD:
-					game.System = VSystemID.Raw.Jaguar;
-					break;
-
-				case DiscType.Amiga:
-					NoCoreForSystem(VSystemID.Raw.Amiga);
-					break;
-				case DiscType.CDi:
-					NoCoreForSystem(VSystemID.Raw.PhillipsCDi);
-					break;
-				case DiscType.Dreamcast:
-					NoCoreForSystem(VSystemID.Raw.Dreamcast);
-					break;
-				case DiscType.GameCube:
-					NoCoreForSystem(VSystemID.Raw.GameCube);
-					break;
-				case DiscType.NeoGeoCD:
-					NoCoreForSystem(VSystemID.Raw.NeoGeoCD);
-					break;
-				case DiscType.Playdia:
-					NoCoreForSystem(VSystemID.Raw.Playdia);
-					break;
-				case DiscType.SonyPS2:
-					NoCoreForSystem(VSystemID.Raw.PS2);
-					break;
-				case DiscType.Wii:
-					NoCoreForSystem(VSystemID.Raw.Wii);
-					break;
-
-				case DiscType.AudioDisc:
-				case DiscType.UnknownCDFS:
-				case DiscType.UnknownFormat:
-					game.System = _config.TryGetChosenSystemForFileExt(ext, out var sysID) ? sysID : VSystemID.Raw.NULL;
-					break;
-
-				default: //"for an unknown disc, default to psx instead of pce-cd, since that is far more likely to be what they are attempting to open" [5e07ab3ec3b8b8de9eae71b489b55d23a3909f55, year 2015]
-				case DiscType.SonyPSX:
-					game.System = VSystemID.Raw.PSX;
-					break;
-			}
-			return game;
-		}
-
-		private Disc/*?*/ InstantiateDiscFor(string path)
-			=> DiscExtensions.CreateAnyType(
-				path,
-				str => DoLoadErrorCallback(message: str, systemId: "???"/*TODO we should NOT be doing this, even if it's just for error display*/, LoadErrorType.DiscError));
-
-		private bool LoadDisc(string path, CoreComm nextComm, ChimeraFile file, string ext, string forcedCoreName, out IEmulator nextEmulator, out GameInfo game)
-		{
-			var disc = InstantiateDiscFor(path);
-			if (disc == null)
-			{
-				game = null;
-				nextEmulator = null;
-				return false;
-			}
-
-			game = MakeGameFromDisc(disc, ext, Path.GetFileNameWithoutExtension(file.Name));
-
-			var lp = new LoadParameters
-			{
-				Comm = nextComm,
-				Game = game,
-				Discs =
-					{
-						new DiscAsset
-						{
-							DiscData = disc,
-							DiscType = new DiscIdentifier(disc).DetectDiscType(),
-							DiscName = Path.GetFileNameWithoutExtension(path),
-						},
-					},
-			};
-			nextEmulator = MakeCoreFromRegistry(lp, forcedCoreName);
-			return true;
-		}
-
 		/// <summary>
 		/// The bundle the loaded game came from, or null when a bare rom was opened. What a
 		/// core keeps (see <see cref="ICorePersistentData"/>) travels in here, and a movie
@@ -389,32 +259,18 @@ namespace Chimera.Client.Common
 						return false;
 					}
 
-					// extension checking
-					var ext = file.Extension;
-					switch (ext)
-					{
-						default:
-							if (Disc.IsValidExtension(ext))
-							{
-								if (file.IsArchive)
-									throw new InvalidOperationException("Can't load CD files from archives!");
-								if (!LoadDisc(path, nextComm, file, ext, forcedCoreName, out nextEmulator, out game))
-									return false;
-							}
-							else
-							{
-								LoadOther(
-									nextComm,
-									file,
-									ext: ext,
-									forcedCoreName: forcedCoreName,
-									out nextEmulator,
-									out rom,
-									out game,
-									out cancel);
-							}
-							break;
-					}
+					// What a file's bytes mean is the core's business, never the frontend's:
+					// disc images included, the raw file goes to whichever core package
+					// declared the extension, and any format parsing happens in there.
+					LoadOther(
+						nextComm,
+						file,
+						ext: file.Extension,
+						forcedCoreName: forcedCoreName,
+						out nextEmulator,
+						out rom,
+						out game,
+						out cancel);
 				}
 
 				if (nextEmulator == null)
@@ -478,7 +334,6 @@ namespace Chimera.Client.Common
 						Comm = lp.Comm,
 						Game = lp.Game,
 						Roms = lp.Roms,
-						Discs = lp.Discs,
 						DeterministicEmulationRequested = Deterministic,
 						Settings = GetCoreSettings(factory.CoreType, factory.SettingsType),
 						SyncSettings = GetCoreSyncSettings(factory.CoreType, factory.SyncSettingsType),
@@ -558,16 +413,6 @@ namespace Chimera.Client.Common
 			nextEmulator = MakeCoreFromRegistry(lp, forcedCoreName);
 		}
 
-		private static bool IsDiscForXML(string path)
-		{
-			if (ChimeraFile.PathContainsPipe(path))
-			{
-				return false;
-			}
-
-			return Disc.IsValidExtension(Path.GetExtension(path));
-		}
-
 		private void DispatchErrorMessage(Exception ex, string system, string path)
 		{
 			if (ex is AggregateException agg)
@@ -614,7 +459,6 @@ namespace Chimera.Client.Common
 			=> new(
 				combinedEntryDesc: "Everything",
 				FilesystemFilter.Archives,
-				new FilesystemFilter("Disc Images", FilesystemFilter.DiscExtensions),
 				new FilesystemFilter("Game Bundles", new[] { GameBundle.Extension.TrimStart('.') }),
 				new FilesystemFilter("ROMs", CoreRegistry.Instance.KnownRomExtensions.Select(static e => e.TrimStart('.')).ToList(), addArchiveExts: true),
 				FilesystemFilter.ChimeraSaveStates);

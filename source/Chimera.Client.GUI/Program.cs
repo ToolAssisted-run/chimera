@@ -17,7 +17,6 @@ using Chimera.Common.StringExtensions;
 using Chimera.Client.Common;
 using Chimera.Client.GUI.CustomControls;
 using Chimera.Emulation.Common;
-using Chimera.Emulation.DiscSystem;
 using Chimera.WinForms.Controls;
 
 namespace Chimera.Client.GUI
@@ -139,7 +138,6 @@ namespace Chimera.Client.GUI
 					ReflectionCache_Chi_Cli_Com.AsmVersion,
 					ReflectionCache_Chi_Com.AsmVersion,
 					ReflectionCache_Chi_Emu_Com.AsmVersion,
-					ReflectionCache_Chi_Emu_Dis.AsmVersion,
 					ReflectionCache_Chi_Win_Con.AsmVersion,
 				}.Any(asmVer => asmVer != thisAsmVer))
 			{

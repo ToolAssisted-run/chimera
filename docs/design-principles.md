@@ -57,13 +57,16 @@ hands data to cores. Audit of those points and their standing:
   the reproduction contract and must be spec-stable across Chimera versions.
 - Sync settings: opaque JSON round-tripped to the core's types; the frontend must
   never interpret or migrate them.
-- DISC DATA IS THE OPEN VIOLATION: Chimera.Emulation.DiscSystem parses CUE/CCD/CHD and
-  synthesizes sector streams IN THE FRONTEND - a frontend version change could alter
-  the byte stream a disc core sees, breaking the pillar. Resolution direction when the
-  disc story is taken up: disc image interpretation must move core-side (each disc
-  core package bundles its own disc layer, versioned with the core); the contract
-  should hand over raw file paths/bytes only. Until then DiscSystem stays unused
-  (no disc cores exist).
+- Disc data [RESOLVED 2026-08-25]: Chimera.Emulation.DiscSystem is REMOVED. It parsed
+  CUE/CCD/etc and synthesized sector streams in the frontend, so a frontend version
+  change could alter the byte stream a disc core sees - and it silently claimed
+  extensions (.iso and friends) that core packages declare, feeding the factory a
+  disc object no waterbox core reads. Now disc images are roms like any other file:
+  the raw bytes go to whichever package declared the extension, and all format
+  interpretation happens core-side, versioned with the core (the PSP package parses
+  ISO/CSO/CHD in-guest). A future CD-based core package bundles its own disc layer;
+  the frontend's only disc job, if one ever appears, is gathering the files of a
+  multi-file set - never transforming bytes on the emulation path.
 - Firmware: database contents removed; anything a core needs ships inside its package.
 
 ## Core flavors and their reproducibility profiles

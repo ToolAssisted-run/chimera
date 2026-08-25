@@ -17,7 +17,6 @@
 		<ProjectReference Include="$(ProjectDir)../Chimera.Bizware.Graphics/Chimera.Bizware.Graphics.csproj" />
 		<ProjectReference Include="$(ProjectDir)../Chimera.Bizware.Input/Chimera.Bizware.Input.csproj" />
 		<ProjectReference Include="$(ProjectDir)../Chimera.Emulation.Common/Chimera.Emulation.Common.csproj" />
-		<ProjectReference Include="$(ProjectDir)../Chimera.Emulation.DiscSystem/Chimera.Emulation.DiscSystem.csproj" />
 		<EmbeddedResource Include="Resources/**/*" />
 	</ItemGroup>
 	<ItemGroup>

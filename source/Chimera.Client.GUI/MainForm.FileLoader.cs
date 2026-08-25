@@ -36,8 +36,6 @@ namespace Chimera.Client.GUI
 			}
 		}
 
-		private readonly string[] _nonArchive = { ".ISO", ".CUE", ".CCD", ".CDI", ".MDS", ".NRG" };
-
 		private void LoadCheats(string filename, string archive = null)
 		{
 			CheatList.Load(Emulator.AsMemoryDomains(), filename, false);
@@ -114,10 +112,7 @@ namespace Chimera.Client.GUI
 						}
 						else if (RomLoader.KnownRomExtensions.Contains(ext))
 						{
-							if (string.IsNullOrEmpty(archive) || !_nonArchive.Contains(ext))
-							{
-								sortedFiles[LoadOrdering.Rom].Add(fileInformation);
-							}
+							sortedFiles[LoadOrdering.Rom].Add(fileInformation);
 						}
 						else
 						{

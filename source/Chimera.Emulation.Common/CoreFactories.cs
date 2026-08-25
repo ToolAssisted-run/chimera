@@ -41,13 +41,6 @@ namespace Chimera.Emulation.Common
 		/// </summary>
 		public IReadOnlyList<IRomAsset> Roms { get; set; } = [ ];
 
-		/// <summary>
-		/// Disc assets for this load, if any. Weakly typed because disc types live in
-		/// Chimera.Emulation.DiscSystem which this assembly cannot reference; a disc-capable
-		/// core factory downcasts. TODO type this properly when the contract grows a disc story.
-		/// </summary>
-		public IReadOnlyList<object> Discs { get; set; } = [ ];
-
 		public bool DeterministicEmulationRequested { get; set; }
 
 		/// <summary>Settings previously returned from the core, of the factory's SettingsType. May be null.</summary>
