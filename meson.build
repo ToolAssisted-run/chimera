@@ -274,6 +274,7 @@ engine_src = files(
   'engine/source/file_io.cpp',
   'engine/source/package.cpp',
   'engine/source/host_dyn.cpp',
+  'engine/source/movie_entry.cpp',
   'engine/source/session.cpp',
   'extern/miniz/miniz.c',  # vendored (MIT): the zip half of the state container
   'extern/cjson/cJSON.c',  # vendored (MIT): bundle JSON
@@ -321,7 +322,7 @@ executable(
 )
 
 if not meson.is_cross_build()
-  foreach engine_test : ['movie_log', 'movie_text', 'state_container', 'bundle', 'package']
+  foreach engine_test : ['movie_log', 'movie_text', 'movie_entry', 'state_container', 'bundle', 'package']
     test(
       'engine_' + engine_test,
       executable(

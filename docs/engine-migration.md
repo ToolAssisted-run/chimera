@@ -105,10 +105,23 @@ long-lived dual paths.
      always-kept anchor: seek = restore nearest + replay, invalidate drops
      what an input edit falsified. chimera-run --seek and four new gate
      checks (play to end, seek back, invalidate, replay - dumps must not
-     change) witness it. Gaps: axes and record-mode entry generation have no
-     gate coverage yet (synth declares no axes; record wires up with the
-     frontend); the C# MovieSession/TAStudio still run their own movie and
-     Zwinder greenzone - rewiring them onto the session is next.
+     change) witness it. The C# MovieSession/TAStudio still run their own
+     movie and Zwinder greenzone - rewiring them onto the session is next.
+   - 5b **the entry format, witnessed** - DONE. The two gaps the step above
+     left are closed. The Bk2 entry layout moved out of the session into
+     `engine/source/movie_entry.{hpp,cpp}` as a pure function of a
+     controller's declaration, so `test_movie_entry` can exercise it against
+     controllers no core in the tree declares - AXES above all (padding,
+     sign, non-zero neutral, axes-before-buttons, multi-player grouping, the
+     round trip, and every refusal), plus the empty console group C# emits
+     and the hand-written movie fixtures omit. Record mode gained an
+     end-to-end witness: `chimera-run --record` drives RECORD with a movie as
+     an input source only, the session generates its own log, and the gate
+     checks both that the recording drove the machine to the goldens and that
+     replaying the file it wrote lands there too (`E:*:record`, four more
+     checks). One new ABI call carries it, `ce_session_movie_entry_decode` -
+     which the frontend needs anyway to display input once MovieSession
+     moves onto the session.
    - 5b **movie log storage unified** - DONE. IStringLog has ONE
      implementation, EngineStringLog, a list-shaped view over the engine's
      ce_movie_log (which grew set/insert/remove_range/assign for the

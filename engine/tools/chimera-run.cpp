@@ -7,7 +7,7 @@
  * the managed frontend produces.
  *
  *   chimera-run <package> <rom> <movie.txt>
- *       [--rerecord] [--seek <frame>] [--settings <json>]
+ *       [--rerecord] [--seek <frame>] [--record <out.txt>] [--settings <json>]
  *       [--dump <domain>=<path>]... [--meta <path>]
  *
  * --rerecord round-trips the whole machine through save/load state around
@@ -15,6 +15,11 @@
  * --seek plays the movie to its end, seeks BACK to the given frame through
  * the greenzone, and plays to the end again - and that must not change
  * anything either.
+ * --record drives RECORD mode instead of playback: the given movie is only an
+ * input source (each entry decoded to buttons/axes), the session generates the
+ * log itself, and it is written to <out.txt>. Feeding that file back in as an
+ * ordinary movie must reach the same machine - which is what witnesses record
+ * mode and entry generation, the paths playback never touches.
  */
 
 #include "chimera/engine.h"
@@ -69,12 +74,14 @@ int main(int argc, char **argv)
 	std::vector<std::pair<std::string, std::string>> dumps; // domain -> path
 	bool rerecord = false;
 	int64_t seekFrame = -1;
+	std::string recordPath;
 
 	for (int i = 1; i < argc; i++)
 	{
 		std::string arg = argv[i];
 		if (arg == "--rerecord") rerecord = true;
 		else if (arg == "--seek" && i + 1 < argc) seekFrame = std::atoll(argv[++i]);
+		else if (arg == "--record" && i + 1 < argc) recordPath = argv[++i];
 		else if (arg == "--settings" && i + 1 < argc) settings = argv[++i];
 		else if (arg == "--meta" && i + 1 < argc) metaPath = argv[++i];
 		else if (arg == "--dump" && i + 1 < argc)
@@ -91,7 +98,7 @@ int main(int argc, char **argv)
 	}
 	if (moviePath == nullptr)
 	{
-		std::fprintf(stderr, "usage: chimera-run <package> <rom> <movie.txt> [--rerecord] [--settings <json>] [--dump <domain>=<path>]... [--meta <path>]\n");
+		std::fprintf(stderr, "usage: chimera-run <package> <rom> <movie.txt> [--rerecord] [--seek <frame>] [--record <out.txt>] [--settings <json>] [--dump <domain>=<path>]... [--meta <path>]\n");
 		return 1;
 	}
 
@@ -117,6 +124,33 @@ int main(int argc, char **argv)
 	if (ce_session_movie_load(session, movie) != 0) return fail(metaPath, "could not load the movie into the session");
 	if (seekFrame >= 0) ce_session_greenzone_enable(session, 256ull << 20);
 
+	/* Record mode: decode the source movie's entries into machine input and
+	 * hand THAT to the session, which generates its own log. The source is an
+	 * input source only - none of its text reaches the recorded movie. */
+	std::vector<uint64_t> recButtons;
+	std::vector<std::vector<int32_t>> recAxes;
+	if (!recordPath.empty())
+	{
+		int64_t axisCount = ce_session_axis_count(session);
+		for (int64_t i = 0; i < frames; i++)
+		{
+			uint64_t buttons = 0;
+			std::vector<int32_t> axes(static_cast<size_t>(axisCount), 0);
+			if (ce_session_movie_entry_decode(
+					session, ce_movie_log_entry(movie, i), &buttons,
+					axisCount != 0 ? axes.data() : nullptr) != 0)
+			{
+				return fail(metaPath, "could not decode entry " + std::to_string(i));
+			}
+			recButtons.push_back(buttons);
+			recAxes.push_back(std::move(axes));
+		}
+		/* NULL mnemonics: the generated characters are the engine's fallback
+		 * rather than a frontend vocabulary. Parsing ignores the character, so
+		 * a replay of this file lands on the same machine either way. */
+		ce_session_movie_record(session, nullptr);
+	}
+
 	std::vector<uint8_t> state;
 	if (rerecord)
 	{
@@ -132,7 +166,11 @@ int main(int argc, char **argv)
 		{
 			return fail(metaPath, ce_session_last_error(session));
 		}
-		if (ce_session_movie_advance(session, 0, nullptr, 0) < 0)
+		const uint64_t buttons = recordPath.empty() ? 0 : recButtons[static_cast<size_t>(i)];
+		const int32_t *axes = recordPath.empty() || recAxes[static_cast<size_t>(i)].empty()
+			? nullptr
+			: recAxes[static_cast<size_t>(i)].data();
+		if (ce_session_movie_advance(session, buttons, axes, 0) < 0)
 		{
 			return fail(metaPath, ce_session_last_error(session));
 		}
@@ -156,6 +194,28 @@ int main(int argc, char **argv)
 		ce_session_greenzone_invalidate(session, seekFrame);
 		if (ce_session_seek(session, frames) != 0) return fail(metaPath, ce_session_last_error(session));
 		if (ce_session_frame(session) != frames) return fail(metaPath, "replay landed on the wrong frame");
+	}
+
+	if (!recordPath.empty())
+	{
+		/* the session's own log, one entry per line - the shape chimera-run
+		 * reads back in, so a recorded movie can simply be replayed */
+		const ce_movie_log *log = ce_session_movie_log(session);
+		std::string text;
+		for (int64_t i = 0; i < ce_movie_log_count(log); i++)
+		{
+			text += ce_movie_log_entry(log, i);
+			text += '\n';
+		}
+		if (!writeWholeFile(recordPath, reinterpret_cast<const uint8_t *>(text.data()), text.size()))
+		{
+			return fail(metaPath, "could not write " + recordPath);
+		}
+		if (ce_movie_log_count(log) != frames)
+		{
+			return fail(metaPath, "recorded " + std::to_string(ce_movie_log_count(log))
+				+ " entries for " + std::to_string(frames) + " frames");
+		}
 	}
 
 	for (const auto &dump : dumps)

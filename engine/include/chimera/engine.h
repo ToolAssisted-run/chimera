@@ -583,6 +583,16 @@ CE_API int64_t ce_session_frame(const ce_session *s);
  * through this. Invalidated when the session is freed. */
 CE_API const ce_movie_log *ce_session_movie_log(const ce_session *s);
 
+/* Decodes one entry against THIS session's controller: buttons_out gets the
+ * pressed-button mask (bit per button in config order), axes_out (may be null)
+ * gets ce_session_axis_count values in config order, each axis the entry does
+ * not carry left at its declared neutral. 0 on success, nonzero when the entry
+ * runs out before the controller does or an axis field will not parse.
+ * The inverse - generating an entry - is what record mode does; a caller that
+ * wants an entry drives the movie rather than formatting one itself. */
+CE_API int32_t ce_session_movie_entry_decode(
+	const ce_session *s, const char *entry, uint64_t *buttons_out, int32_t *axes_out);
+
 /* One frame under the movie. In play mode the input comes from the log
  * (buttons/axes are ignored) until the log runs out, which flips the mode to
  * finished; in record and finished modes the input is the caller's, and

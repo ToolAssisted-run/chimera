@@ -8,6 +8,8 @@
  */
 
 #include "chimera/engine.h"
+
+#include "movie_entry.hpp"
 #include "file_io.hpp"
 #include "host_dyn.hpp"
 
@@ -52,12 +54,6 @@ extern "C" int32_t vectorWrite(uintptr_t userdata, const void *src, uintptr_t si
 	return 0;
 }
 
-struct AxisDecl
-{
-	std::string name;
-	int32_t min = 0, max = 0, neutral = 0;
-};
-
 /* the slice of waterbox.config the machine itself needs */
 struct SessionConfig
 {
@@ -69,7 +65,7 @@ struct SessionConfig
 	int32_t samplesPerFrame = 0, channels = 1;
 	std::string inputName, inputWasRead;
 	std::vector<std::string> buttons;
-	std::vector<AxisDecl> axes;
+	std::vector<chimera::EntryAxis> axes;
 	bool deterministic = false;
 	std::string defaultsJson; // JSON object: every declared setting at its default
 	std::string settingsJson; // the effective settings, serialized for the guest
@@ -151,7 +147,7 @@ bool parseConfig(const char *json, uint64_t len, const char *overrides, SessionC
 	{
 		cJSON_ArrayForEach(item, axes)
 		{
-			AxisDecl axis;
+			chimera::EntryAxis axis;
 			axis.name = strOf(item, "name");
 			axis.min = intOf(item, "min");
 			axis.max = intOf(item, "max");
@@ -300,15 +296,7 @@ struct ce_session
 	int32_t movieMode = 0; // 0 none, 1 play, 2 record, 3 finished
 	int64_t frame = 0;
 	std::string mnemonics; // one char per button, for generated entries
-	// entry layout: the Bk2 order (groups by player, axes before buttons)
-	struct LayoutItem
-	{
-		bool isAxis;
-		int32_t index; // into cfg.buttons / cfg.axes
-	};
-	std::vector<LayoutItem> layout;
-	int32_t layoutGroups = 0;
-	std::vector<int32_t> layoutGroupStarts; // index into layout where each group begins
+	chimera::EntryLayout layout; // the Bk2 entry order (see movie_entry.hpp)
 
 	// ---- the greenzone ----
 	uint64_t gzBudget = 0;
@@ -316,10 +304,7 @@ struct ce_session
 	std::map<int64_t, std::vector<uint8_t>> gzStates;
 
 	void probeOptionalGroups();
-	void buildEntryLayout();
 	int32_t advanceCore(uint64_t buttons, int32_t render);
-	bool parseEntry(const char *entry, uint64_t &mask, std::vector<int32_t> &axesOut);
-	std::string generateEntry(uint64_t buttons, const int32_t *axes);
 	void greenzoneCapture();
 
 	bool activate(std::string &err)
@@ -480,130 +465,9 @@ void ce_session::probeOptionalGroups()
 	}
 }
 
-namespace {
 
-/* ControllerDefinition.PlayerNumber: "^P(\d+) " captures the player, else 0 */
-int32_t playerNumberOf(const std::string &name)
-{
-	if (name.size() < 3 || name[0] != 'P') return 0;
-	size_t i = 1;
-	int32_t value = 0;
-	while (i < name.size() && name[i] >= '0' && name[i] <= '9')
-	{
-		value = value * 10 + (name[i] - '0');
-		i++;
-	}
-	return i > 1 && i < name.size() && name[i] == ' ' ? value : 0;
-}
 
-/* int parse for an axis field: optional spaces (the padding), sign, digits */
-bool parseAxisValue(const char *begin, const char *end, int32_t &out)
-{
-	while (begin < end && *begin == ' ') begin++;
-	if (begin >= end) return false;
-	bool negative = false;
-	if (*begin == '+' || *begin == '-')
-	{
-		negative = *begin == '-';
-		if (++begin >= end) return false;
-	}
-	int64_t value = 0;
-	for (; begin < end; begin++)
-	{
-		if (*begin < '0' || *begin > '9') return false;
-		value = value * 10 + (*begin - '0');
-		if (value > 2147483648LL) return false;
-	}
-	out = static_cast<int32_t>(negative ? -value : value);
-	return true;
-}
 
-} // namespace
-
-/* The Bk2 entry order: controls grouped by player number (0 = console),
- * axes before buttons within a group, both in declaration order - exactly
- * what ControllerDefinition.GenOrderedControls produced. */
-void ce_session::buildEntryLayout()
-{
-	int32_t maxPlayer = 0;
-	for (const auto &a : cfg.axes) maxPlayer = std::max(maxPlayer, playerNumberOf(a.name));
-	for (const auto &b : cfg.buttons) maxPlayer = std::max(maxPlayer, playerNumberOf(b));
-	layoutGroups = maxPlayer + 1;
-	for (int32_t g = 0; g < layoutGroups; g++)
-	{
-		layoutGroupStarts.push_back(static_cast<int32_t>(layout.size()));
-		for (int32_t i = 0; i < static_cast<int32_t>(cfg.axes.size()); i++)
-		{
-			if (playerNumberOf(cfg.axes[static_cast<size_t>(i)].name) == g) layout.push_back({ true, i });
-		}
-		for (int32_t i = 0; i < static_cast<int32_t>(cfg.buttons.size()); i++)
-		{
-			if (playerNumberOf(cfg.buttons[static_cast<size_t>(i)]) == g) layout.push_back({ false, i });
-		}
-	}
-}
-
-/* Positional, '|'-tolerant - the exact Bk2Controller.SetFromMnemonic walk. */
-bool ce_session::parseEntry(const char *entry, uint64_t &mask, std::vector<int32_t> &axesOut)
-{
-	mask = 0;
-	axesOut.assign(cfg.axes.size(), 0);
-	for (size_t i = 0; i < cfg.axes.size(); i++) axesOut[i] = cfg.axes[i].neutral;
-	const char *p = entry;
-	for (const auto &item : layout)
-	{
-		while (*p == '|') p++;
-		if (*p == '\0') return false; // entry shorter than the controller
-		if (item.isAxis)
-		{
-			const char *comma = std::strchr(p, ',');
-			if (comma == nullptr) return false;
-			int32_t value;
-			if (!parseAxisValue(p, comma, value)) return false;
-			axesOut[static_cast<size_t>(item.index)] = value;
-			p = comma + 1;
-		}
-		else
-		{
-			if (*p != '.') mask |= 1ull << item.index;
-			p++;
-		}
-	}
-	return true;
-}
-
-std::string ce_session::generateEntry(uint64_t buttons, const int32_t *axes)
-{
-	std::string out;
-	out.push_back('|');
-	size_t next = 0;
-	for (int32_t g = 0; g < layoutGroups; g++)
-	{
-		size_t end = g + 1 < layoutGroups
-			? static_cast<size_t>(layoutGroupStarts[static_cast<size_t>(g) + 1])
-			: layout.size();
-		for (; next < end; next++)
-		{
-			const auto &item = layout[next];
-			if (item.isAxis)
-			{
-				int32_t value = axes != nullptr ? axes[item.index] : cfg.axes[static_cast<size_t>(item.index)].neutral;
-				std::string text = std::to_string(value);
-				while (text.size() < 5) text.insert(text.begin(), ' '); // PadLeft(5)
-				out.append(text).push_back(',');
-			}
-			else
-			{
-				char mnemonic = static_cast<size_t>(item.index) < mnemonics.size()
-					? mnemonics[static_cast<size_t>(item.index)]
-					: '!';
-				out.push_back((buttons & (1ull << item.index)) != 0 ? mnemonic : '.');
-			}
-		}
-		out.push_back('|');
-	}
-	return out;
-}
 
 int32_t ce_session::advanceCore(uint64_t buttons, int32_t render)
 {
@@ -819,7 +683,7 @@ ce_session *ce_session_open(
 	s->videoBuf.assign(static_cast<size_t>(s->cfg.width) * s->cfg.height, 0);
 	s->audioBuf.assign(static_cast<size_t>(s->cfg.samplesPerFrame) * 2, 0);
 	s->probeOptionalGroups();
-	s->buildEntryLayout();
+	s->layout.build(s->cfg.buttons, s->cfg.axes);
 	return s;
 }
 
@@ -1221,7 +1085,7 @@ void ce_session_movie_record(ce_session *s, const char *mnemonics)
 		for (const auto &b : s->cfg.buttons)
 		{
 			std::string bare = b;
-			if (playerNumberOf(bare) != 0) bare.erase(0, bare.find(' ') + 1);
+			if (chimera::playerNumberOf(bare) != 0) bare.erase(0, bare.find(' ') + 1);
 			s->mnemonics.push_back(bare.empty() ? '!' : bare[0]);
 		}
 	}
@@ -1239,6 +1103,21 @@ int64_t ce_session_frame(const ce_session *s) { return s->frame; }
 
 const ce_movie_log *ce_session_movie_log(const ce_session *s) { return s->movie; }
 
+int32_t ce_session_movie_entry_decode(
+	const ce_session *s, const char *entry, uint64_t *buttons_out, int32_t *axes_out)
+{
+	if (entry == nullptr) return -1;
+	uint64_t mask = 0;
+	std::vector<int32_t> values;
+	if (!s->layout.parse(entry, mask, values)) return -1;
+	if (buttons_out != nullptr) *buttons_out = mask;
+	if (axes_out != nullptr)
+	{
+		for (size_t i = 0; i < values.size(); i++) axes_out[i] = values[i];
+	}
+	return 0;
+}
+
 int32_t ce_session_movie_advance(ce_session *s, uint64_t buttons, const int32_t *axes, int32_t render)
 {
 	s->error.clear();
@@ -1254,7 +1133,7 @@ int32_t ce_session_movie_advance(ce_session *s, uint64_t buttons, const int32_t 
 		uint64_t mask = 0;
 		std::vector<int32_t> movieAxes;
 		const char *entry = ce_movie_log_entry(s->movie, s->frame);
-		if (!s->parseEntry(entry, mask, movieAxes))
+		if (!s->layout.parse(entry, mask, movieAxes))
 		{
 			s->error = std::string("unparseable movie entry at frame ") + std::to_string(s->frame);
 			return -1;
@@ -1281,7 +1160,7 @@ int32_t ce_session_movie_advance(ce_session *s, uint64_t buttons, const int32_t 
 		}
 		if (s->movieMode == 2)
 		{
-			std::string entry = s->generateEntry(buttons, axes);
+			std::string entry = s->layout.generate(buttons, axes, s->mnemonics);
 			ce_movie_log_add(s->movie, entry.c_str());
 		}
 		lag = s->advanceCore(buttons, render);
@@ -1365,7 +1244,7 @@ int32_t ce_session_seek(ce_session *s, int64_t frame)
 		uint64_t mask = 0;
 		std::vector<int32_t> movieAxes;
 		const char *entry = ce_movie_log_entry(s->movie, s->frame);
-		if (entry == nullptr || !s->parseEntry(entry, mask, movieAxes))
+		if (entry == nullptr || !s->layout.parse(entry, mask, movieAxes))
 		{
 			s->error = std::string("unparseable movie entry at frame ") + std::to_string(s->frame);
 			return 1;

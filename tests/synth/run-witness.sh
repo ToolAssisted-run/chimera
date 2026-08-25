@@ -166,6 +166,39 @@ if [ "$level" = "both" ] || [ "$level" = "e" ]; then
 			fi
 		done
 
+		# RECORD mode: playback never generates an entry, so the paths that turn
+		# machine input back into movie text have no other witness. Each movie is
+		# replayed as an INPUT SOURCE into a recording session, which writes its
+		# own log; that recording must drive the machine to the same goldens, and
+		# replaying the file it wrote must land there too - record and playback
+		# agreeing on the format is the whole point.
+		for movie in "$here"/movies/*.txt; do
+			rname="$(basename "$movie" .txt)"
+			rrom="$here/roms/${rname%%.*}.testrom"
+			rtag="$rname.engine.record"
+			rm -f "$work/$rtag.ram.bin" "$work/$rtag.vram.bin" "$work/$rtag.txt"
+			"$chimera_run" "$epkg" "$rrom" "$movie" --record "$work/$rtag.txt" \
+				--dump "RAM=$work/$rtag.ram.bin" --dump "VRAM=$work/$rtag.vram.bin" \
+				> "$work/$rtag.log" 2>&1
+			if [ ! -s "$work/$rtag.txt" ]; then
+				report "E:$rname:record" FAIL "no movie recorded (see work/$rtag.log)"
+			elif ! cmp -s "$work/$rtag.ram.bin" "$golden_dir/$rname.ram.bin" \
+				|| ! cmp -s "$work/$rtag.vram.bin" "$golden_dir/$rname.vram.bin"; then
+				report "E:$rname:record" FAIL "recording drove a different machine than playback"
+			else
+				rm -f "$work/$rtag.replay.ram.bin" "$work/$rtag.replay.vram.bin"
+				"$chimera_run" "$epkg" "$rrom" "$work/$rtag.txt" \
+					--dump "RAM=$work/$rtag.replay.ram.bin" --dump "VRAM=$work/$rtag.replay.vram.bin" \
+					> "$work/$rtag.replay.log" 2>&1
+				if cmp -s "$work/$rtag.replay.ram.bin" "$golden_dir/$rname.ram.bin" \
+					&& cmp -s "$work/$rtag.replay.vram.bin" "$golden_dir/$rname.vram.bin"; then
+					report "E:$rname:record" PASS "recorded log replays to the same goldens"
+				else
+					report "E:$rname:record" FAIL "the recorded movie replays to a different machine"
+				fi
+			fi
+		done
+
 		# the settings channel, natively: a non-default sync setting must diverge
 		"$chimera_run" "$epkg" "$here/roms/gridWalker.testrom" "$here/movies/gridWalker.win.txt" 			--settings '{"initFillByte":171}' --dump "RAM=$work/engine.settings.ram.bin" 			> "$work/engine.settings.log" 2>&1
 		if [ ! -f "$work/engine.settings.ram.bin" ]; then
