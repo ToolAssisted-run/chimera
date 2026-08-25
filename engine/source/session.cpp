@@ -240,6 +240,14 @@ struct ce_session
 	int32_t (*inputWasRead)() = nullptr;
 	int32_t (*getAudioSampleCount)() = nullptr;
 	void (*setAxis)(int32_t, int32_t) = nullptr;
+	// wide input: buttons past the packed mask's 64 (a DOS keyboard). The
+	// caller's ce_session_set_button values persist here like axes do;
+	// deltas cross into the guest through its SetButton export.
+	void (*setButton)(int32_t, int32_t) = nullptr;
+	std::vector<uint8_t> btnState;     // what ce_session_set_button set
+	std::vector<uint8_t> btnSent;      // what the guest last received
+	std::vector<uint8_t> btnEffective; // scratch: state OR packed mask
+	std::vector<uint8_t> movieButtons; // scratch: a parsed entry's buttons
 	int32_t (*mdCount)() = nullptr;
 	uintptr_t (*mdName)(int32_t) = nullptr;
 	uintptr_t (*mdPtr)(int32_t) = nullptr;
@@ -304,7 +312,9 @@ struct ce_session
 	std::map<int64_t, std::vector<uint8_t>> gzStates;
 
 	void probeOptionalGroups();
-	int32_t advanceCore(uint64_t buttons, int32_t render);
+	int32_t advanceCore(const uint8_t *buttons, int32_t render);
+	const uint8_t *computeEffective(uint64_t mask);
+	uint64_t sendButtons(const uint8_t *states);
 	void greenzoneCapture();
 
 	bool activate(std::string &err)
@@ -465,9 +475,44 @@ void ce_session::probeOptionalGroups()
 
 
 
-int32_t ce_session::advanceCore(uint64_t buttons, int32_t render)
+/* The effective button states this frame: what ce_session_set_button holds,
+ * OR'd with the packed mask's low 64 - callers use one path or the other, and
+ * the OR keeps either alone exact. */
+const uint8_t *ce_session::computeEffective(uint64_t mask)
 {
-	frameAdvance(buttons);
+	size_t n = btnEffective.size();
+	for (size_t i = 0; i < n; i++)
+	{
+		uint8_t v = btnState[i];
+		if (i < 64 && ((mask >> i) & 1ull) != 0) v = 1;
+		btnEffective[i] = v;
+	}
+	return btnEffective.data();
+}
+
+/* Delivers wide states to the guest (deltas through its SetButton export -
+ * only changes cross the boundary) and returns the packed mask for the low
+ * 64, which every FrameAdvance still receives. */
+uint64_t ce_session::sendButtons(const uint8_t *states)
+{
+	uint64_t mask = 0;
+	size_t n = btnSent.size();
+	for (size_t i = 0; i < n; i++)
+	{
+		uint8_t v = states != nullptr && states[i] != 0 ? 1 : 0;
+		if (i < 64 && v != 0) mask |= 1ull << i;
+		if (setButton != nullptr && v != btnSent[i])
+		{
+			setButton(static_cast<int32_t>(i), v);
+			btnSent[i] = v;
+		}
+	}
+	return mask;
+}
+
+int32_t ce_session::advanceCore(const uint8_t *buttons, int32_t render)
+{
+	frameAdvance(sendButtons(buttons));
 	if (render != 0)
 	{
 		std::memcpy(videoBuf.data(), reinterpret_cast<const void *>(getVideoBgra()),
@@ -646,6 +691,16 @@ ce_session *ce_session_open(
 			return abort(s->cfg.coreName + ": waterbox.config declares axes but core.wbx exports no SetAxis");
 		}
 	}
+	/* wide input: optional in general, REQUIRED past 64 buttons - without the
+	 * export the extra buttons could never reach the machine, and a controller
+	 * that silently drops keys is worse than one that refuses to load */
+	s->setButton = reinterpret_cast<void (*)(int32_t, int32_t)>(s->proc("SetButton", 2, false, err));
+	if (s->cfg.buttons.size() > 64 && s->setButton == nullptr)
+	{
+		return abort(s->cfg.coreName + ": waterbox.config declares "
+			+ std::to_string(s->cfg.buttons.size())
+			+ " buttons (more than the packed 64) but core.wbx exports no SetButton");
+	}
 	s->getVideoBgra = reinterpret_cast<uintptr_t (*)()>(s->proc(s->cfg.getBgra.c_str(), 0, true, err));
 	if (s->getVideoBgra == nullptr) return abort(std::move(err));
 	s->getAudio = reinterpret_cast<uintptr_t (*)()>(s->proc(s->cfg.getAudio.c_str(), 0, true, err));
@@ -678,6 +733,9 @@ ce_session *ce_session_open(
 
 	s->videoBuf.assign(static_cast<size_t>(s->cfg.width) * s->cfg.height, 0);
 	s->audioBuf.assign(static_cast<size_t>(s->cfg.samplesPerFrame) * 2, 0);
+	s->btnState.assign(s->cfg.buttons.size(), 0);
+	s->btnSent.assign(s->cfg.buttons.size(), 0); // a fresh guest holds nothing down
+	s->btnEffective.assign(s->cfg.buttons.size(), 0);
 	s->probeOptionalGroups();
 	s->layout.build(s->cfg.buttons, s->cfg.axes);
 	return s;
@@ -729,9 +787,17 @@ void ce_session_set_axis(ce_session *s, int32_t index, int32_t value)
 	if (s->setAxis != nullptr) s->setAxis(index, value);
 }
 
+void ce_session_set_button(ce_session *s, int32_t index, int32_t pressed)
+{
+	if (index >= 0 && static_cast<size_t>(index) < s->btnState.size())
+	{
+		s->btnState[static_cast<size_t>(index)] = pressed != 0 ? 1 : 0;
+	}
+}
+
 int32_t ce_session_frame_advance(ce_session *s, uint64_t buttons, int32_t render)
 {
-	s->frameAdvance(buttons);
+	s->frameAdvance(s->sendButtons(s->computeEffective(buttons)));
 	if (render != 0)
 	{
 		std::memcpy(s->videoBuf.data(), reinterpret_cast<const void *>(s->getVideoBgra()),
@@ -797,6 +863,12 @@ int32_t ce_session_load_state(ce_session *s, const uint8_t *data, uint64_t len)
 		s->error = r.errorMessage;
 		return 1;
 	}
+	/* a savestate is guest memory, and the guest's wide-input latches are
+	 * guest memory too: the load just rewrote what the guest believes is
+	 * held, so the delta tracker must forget its history and resend every
+	 * button's current state on the next advance */
+	std::fill(s->btnSent.begin(), s->btnSent.end(), uint8_t{ 0xFF });
+
 	/* a savestate is guest memory, and the guest's "tracing on" flag is guest
 	 * memory too: re-assert the desired flag, and discard whatever lines the
 	 * restored buffer holds - they were traced before the load and would
@@ -1151,10 +1223,36 @@ int32_t ce_session_movie_entry_decode(
 	const ce_session *s, const char *entry, uint64_t *buttons_out, int32_t *axes_out)
 {
 	if (entry == nullptr) return -1;
-	uint64_t mask = 0;
+	std::vector<uint8_t> states;
 	std::vector<int32_t> values;
-	if (!s->layout.parse(entry, mask, values)) return -1;
-	if (buttons_out != nullptr) *buttons_out = mask;
+	if (!s->layout.parse(entry, states, values)) return -1;
+	if (buttons_out != nullptr)
+	{
+		uint64_t mask = 0;
+		for (size_t i = 0; i < states.size() && i < 64; i++)
+		{
+			if (states[i] != 0) mask |= 1ull << i;
+		}
+		*buttons_out = mask;
+	}
+	if (axes_out != nullptr)
+	{
+		for (size_t i = 0; i < values.size(); i++) axes_out[i] = values[i];
+	}
+	return 0;
+}
+
+int32_t ce_session_movie_entry_decode_wide(
+	const ce_session *s, const char *entry, uint8_t *states_out, int32_t *axes_out)
+{
+	if (entry == nullptr) return -1;
+	std::vector<uint8_t> states;
+	std::vector<int32_t> values;
+	if (!s->layout.parse(entry, states, values)) return -1;
+	if (states_out != nullptr)
+	{
+		for (size_t i = 0; i < states.size(); i++) states_out[i] = states[i];
+	}
 	if (axes_out != nullptr)
 	{
 		for (size_t i = 0; i < values.size(); i++) axes_out[i] = values[i];
@@ -1174,10 +1272,9 @@ int32_t ce_session_movie_advance(ce_session *s, uint64_t buttons, const int32_t 
 	int32_t lag;
 	if (s->movieMode == 1 && s->frame < ce_movie_log_count(s->movie))
 	{
-		uint64_t mask = 0;
 		std::vector<int32_t> movieAxes;
 		const char *entry = ce_movie_log_entry(s->movie, s->frame);
-		if (!s->layout.parse(entry, mask, movieAxes))
+		if (!s->layout.parse(entry, s->movieButtons, movieAxes))
 		{
 			s->error = std::string("unparseable movie entry at frame ") + std::to_string(s->frame);
 			return -1;
@@ -1186,7 +1283,7 @@ int32_t ce_session_movie_advance(ce_session *s, uint64_t buttons, const int32_t 
 		{
 			if (s->setAxis != nullptr) s->setAxis(static_cast<int32_t>(i), movieAxes[i]);
 		}
-		lag = s->advanceCore(mask, render);
+		lag = s->advanceCore(s->movieButtons.data(), render);
 	}
 	else
 	{
@@ -1202,12 +1299,15 @@ int32_t ce_session_movie_advance(ce_session *s, uint64_t buttons, const int32_t 
 			int32_t value = axes != nullptr ? axes[i] : s->cfg.axes[i].neutral;
 			if (s->setAxis != nullptr) s->setAxis(static_cast<int32_t>(i), value);
 		}
+		/* the caller's input: the packed mask OR'd with the set_button states,
+		 * so a wide controller records exactly what the machine receives */
+		const uint8_t *effective = s->computeEffective(buttons);
 		if (s->movieMode == 2)
 		{
-			std::string entry = s->layout.generate(buttons, axes, s->mnemonics);
+			std::string entry = s->layout.generate(effective, axes, s->mnemonics);
 			ce_movie_log_add(s->movie, entry.c_str());
 		}
-		lag = s->advanceCore(buttons, render);
+		lag = s->advanceCore(effective, render);
 	}
 	s->greenzoneCapture();
 	return lag;
@@ -1274,6 +1374,9 @@ int32_t ce_session_seek(ce_session *s, int64_t frame)
 			s->traceSetEnabled(s->traceDesired ? 1 : 0);
 			if (s->traceClear != nullptr) s->traceClear();
 		}
+		/* same as ce_session_load_state: the restore rewrote the guest's
+		 * wide-input latches, so resend every button on the next advance */
+		std::fill(s->btnSent.begin(), s->btnSent.end(), uint8_t{ 0xFF });
 		s->frame = base;
 	}
 	else if (s->frame > frame)
@@ -1285,10 +1388,9 @@ int32_t ce_session_seek(ce_session *s, int64_t frame)
 	/* replay the log to the target - a seek is a replay, never a guess */
 	while (s->frame < frame)
 	{
-		uint64_t mask = 0;
 		std::vector<int32_t> movieAxes;
 		const char *entry = ce_movie_log_entry(s->movie, s->frame);
-		if (entry == nullptr || !s->layout.parse(entry, mask, movieAxes))
+		if (entry == nullptr || !s->layout.parse(entry, s->movieButtons, movieAxes))
 		{
 			s->error = std::string("unparseable movie entry at frame ") + std::to_string(s->frame);
 			return 1;
@@ -1297,7 +1399,7 @@ int32_t ce_session_seek(ce_session *s, int64_t frame)
 		{
 			if (s->setAxis != nullptr) s->setAxis(static_cast<int32_t>(i), movieAxes[i]);
 		}
-		s->advanceCore(mask, 0);
+		s->advanceCore(s->movieButtons.data(), 0);
 		s->greenzoneCapture();
 	}
 	if (s->movieMode == 3 && s->frame < ce_movie_log_count(s->movie)) s->movieMode = 1;

@@ -164,9 +164,22 @@ namespace Chimera.Emulation.Common.Waterbox
 		{
 			CheckDisposed();
 			ulong input = 0;
-			for (int i = 0; i < _buttons.Length; i++)
+			if (_buttons.Length > 64)
 			{
-				if (controller.IsPressed(_buttons[i])) input |= 1ul << i;
+				// A wide controller (a DOS keyboard): every button rides the
+				// engine's set_button channel; the engine delivers only changes
+				// to the guest. The packed mask stays zero - one path, exact.
+				for (int i = 0; i < _buttons.Length; i++)
+				{
+					_session.SetButton(i, controller.IsPressed(_buttons[i]));
+				}
+			}
+			else
+			{
+				for (int i = 0; i < _buttons.Length; i++)
+				{
+					if (controller.IsPressed(_buttons[i])) input |= 1ul << i;
+				}
 			}
 
 			// Analog values don't fit in the button mask, so they go over separately

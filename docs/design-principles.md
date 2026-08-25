@@ -1119,6 +1119,37 @@ or firmware. Cores whose save data is plain machine memory (NES SRAM) export
 nothing and need nothing. First tenant: PPSSPP's RAM memstick.
 
 
+## Wide input: a controller is as wide as it declares (2026-08-25)
+
+The packed uint64 button mask was an accident of the first cores, not a
+design: a DOS machine's keyboard is 101 keys before its mouse and joysticks
+exist. The movie format never had the limit - an entry carries one mnemonic
+column per declared button, any count - so only the transport was narrow, and
+the fix is additive:
+
+- The ENGINE keeps button state as a byte per declared button. The entry
+  layer (movie_entry) parses and generates wide; `1ull << index` is gone.
+- `ce_session_set_button(index, pressed)` mirrors set_axis: per frame, before
+  the advance, values persist until changed. The effective state at an
+  advance is the packed mask's low 64 OR'd with these - either path alone is
+  exact, and record mode writes the effective state, exactly what the
+  machine received.
+- The GUEST side stays core-agnostic: a wide core exports
+  `SetButton(index, state)` next to SetAxis, and the session delivers only
+  CHANGES across the boundary. A config declaring more than 64 buttons
+  refuses to open without the export - a controller that silently drops keys
+  is worse than one that refuses to load. Loadstate (and greenzone seeks)
+  reset the delta tracker to resend everything, because the guest's input
+  latches are guest memory and the restore just rewrote them - the same
+  lesson the trace flag taught.
+- The FRONTEND packs the low 64 exactly as before for narrow cores; a wide
+  core's adapter drives every button through set_button and passes mask 0.
+
+First tenant: chimera-core-dosbox-x. Witnessed by the widened
+test_movie_entry (a 101-button round trip across the 64 boundary) and by
+every existing gate staying green - the packed path's behaviour is pinned
+unchanged.
+
 ## Opening a core is something you do (2026-08-14)
 
 Packages sitting in `Cores/` used to load themselves at startup. That made the

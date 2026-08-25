@@ -55,6 +55,7 @@ void EntryLayout::build(const std::vector<std::string> &buttons, const std::vect
 	items_.clear();
 	groupStarts_.clear();
 	axes_ = axes;
+	buttonCount_ = buttons.size();
 
 	int32_t maxPlayer = 0;
 	for (const auto &a : axes) maxPlayer = std::max(maxPlayer, playerNumberOf(a.name));
@@ -74,9 +75,9 @@ void EntryLayout::build(const std::vector<std::string> &buttons, const std::vect
 	}
 }
 
-bool EntryLayout::parse(const char *entry, uint64_t &mask, std::vector<int32_t> &axesOut) const
+bool EntryLayout::parse(const char *entry, std::vector<uint8_t> &buttonsOut, std::vector<int32_t> &axesOut) const
 {
-	mask = 0;
+	buttonsOut.assign(buttonCount_, 0);
 	axesOut.assign(axes_.size(), 0);
 	for (size_t i = 0; i < axes_.size(); i++) axesOut[i] = axes_[i].neutral;
 	const char *p = entry;
@@ -95,14 +96,14 @@ bool EntryLayout::parse(const char *entry, uint64_t &mask, std::vector<int32_t> 
 		}
 		else
 		{
-			if (*p != '.') mask |= 1ull << item.index;
+			if (*p != '.') buttonsOut[static_cast<size_t>(item.index)] = 1;
 			p++;
 		}
 	}
 	return true;
 }
 
-std::string EntryLayout::generate(uint64_t buttons, const int32_t *axes, const std::string &mnemonics) const
+std::string EntryLayout::generate(const uint8_t *buttons, const int32_t *axes, const std::string &mnemonics) const
 {
 	std::string out;
 	out.push_back('|');
@@ -127,7 +128,8 @@ std::string EntryLayout::generate(uint64_t buttons, const int32_t *axes, const s
 				char mnemonic = static_cast<size_t>(item.index) < mnemonics.size()
 					? mnemonics[static_cast<size_t>(item.index)]
 					: '!';
-				out.push_back((buttons & (1ull << item.index)) != 0 ? mnemonic : '.');
+				bool pressed = buttons != nullptr && buttons[static_cast<size_t>(item.index)] != 0;
+				out.push_back(pressed ? mnemonic : '.');
 			}
 		}
 		out.push_back('|');

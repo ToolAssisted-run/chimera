@@ -9,6 +9,10 @@
  * paths end to end; here they are exercised directly - padding, sign,
  * neutral fill, the axes-before-buttons order, and the round trip.
  *
+ * WIDE controllers are witnessed here too: buttons are a byte per control
+ * with no 64 limit (a DOS keyboard is 101 keys), and the layout must keep
+ * every byte-exact behaviour at any width.
+ *
  * Plain asserts, run by `meson test -C build/meson-linux`.
  */
 
@@ -16,6 +20,7 @@
 
 #include <cassert>
 #include <cstdint>
+#include <cstdio>
 #include <string>
 #include <vector>
 
@@ -41,6 +46,25 @@ EntryAxis axis(const char *name, int32_t min, int32_t max, int32_t neutral)
 	return a;
 }
 
+/* the packed view of a parse result, for fixtures pinned as masks */
+uint64_t maskOf(const std::vector<uint8_t> &states)
+{
+	uint64_t mask = 0;
+	for (size_t i = 0; i < states.size() && i < 64; i++)
+	{
+		if (states[i] != 0) mask |= 1ull << i;
+	}
+	return mask;
+}
+
+/* the wide view of a mask, for driving generate with pinned inputs */
+std::vector<uint8_t> statesOf(uint64_t mask, size_t count)
+{
+	std::vector<uint8_t> s(count, 0);
+	for (size_t i = 0; i < count && i < 64; i++) s[i] = (mask >> i) & 1;
+	return s;
+}
+
 /* the synth witness controller */
 const std::vector<std::string> kSynthButtons = {
 	"P1 Up", "P1 Down", "P1 Left", "P1 Right", "P1 A", "P1 B", "P1 Select", "P1 Start",
@@ -63,15 +87,16 @@ int main(void)
 		EntryLayout l = layoutOf(kSynthButtons, {});
 		assert(l.groups() == 2); // console group (empty) + P1
 		assert(l.size() == 8);
+		assert(l.buttonCount() == 8);
 
-		uint64_t mask = 0;
+		std::vector<uint8_t> states;
 		std::vector<int32_t> axes;
-		assert(l.parse("|.U......|", mask, axes));
-		assert(mask == (1ull << 1)); // Down is button index 1
+		assert(l.parse("|.U......|", states, axes));
+		assert(maskOf(states) == (1ull << 1)); // Down is button index 1
 		assert(axes.empty());
 
-		assert(l.parse("|UDLRAB.S|", mask, axes));
-		assert(mask == 0xBFull); // everything but Select
+		assert(l.parse("|UDLRAB.S|", states, axes));
+		assert(maskOf(states) == 0xBFull); // everything but Select
 
 		// Generate is the inverse - but the CHARACTER comes from the frontend's
 		// mnemonic vocabulary, not from whatever the parsed entry happened to
@@ -79,17 +104,19 @@ int main(void)
 		// The leading empty group is the console group (no Reset/Power here);
 		// C#'s GenOrderedControls emits empty player groups too, and a movie
 		// written by either side must have the same separators.
-		assert(l.generate(1ull << 1, nullptr, "UDLRABsS") == "||.D......|");
+		auto down = statesOf(1ull << 1, l.buttonCount());
+		assert(l.generate(down.data(), nullptr, "UDLRABsS") == "||.D......|");
 	}
 
 	{ // a console group that is not empty: Reset/Power come first, in their own group
 		EntryLayout l = layoutOf({ "Reset", "Power", "P1 Up", "P1 Down" }, {});
 		assert(l.groups() == 2);
-		uint64_t mask = 0;
+		std::vector<uint8_t> states;
 		std::vector<int32_t> axes;
-		assert(l.parse("|r.|.D|", mask, axes));
-		assert(mask == ((1ull << 0) | (1ull << 3))); // Reset and P1 Down
-		assert(l.generate((1ull << 0) | (1ull << 3), nullptr, "rpUD") == "|r.|.D|");
+		assert(l.parse("|r.|.D|", states, axes));
+		assert(maskOf(states) == ((1ull << 0) | (1ull << 3))); // Reset and P1 Down
+		auto in = statesOf((1ull << 0) | (1ull << 3), l.buttonCount());
+		assert(l.generate(in.data(), nullptr, "rpUD") == "|r.|.D|");
 	}
 
 	{ // AXES: written before the buttons of their group, PadLeft(5) then a comma
@@ -98,35 +125,36 @@ int main(void)
 			{ axis("P1 Stick X", -128, 127, 0), axis("P1 Stick Y", -128, 127, 0) });
 		assert(l.size() == 4);
 
-		uint64_t mask = 0;
+		std::vector<uint8_t> states;
 		std::vector<int32_t> axes;
-		assert(l.parse("|    0,    0,..|", mask, axes));
-		assert(mask == 0);
+		assert(l.parse("|    0,    0,..|", states, axes));
+		assert(maskOf(states) == 0);
 		assert(axes.size() == 2 && axes[0] == 0 && axes[1] == 0);
 
-		assert(l.parse("|  127, -128,A.|", mask, axes));
-		assert(mask == 1ull);
+		assert(l.parse("|  127, -128,A.|", states, axes));
+		assert(maskOf(states) == 1ull);
 		assert(axes[0] == 127 && axes[1] == -128);
 
 		// an explicit + sign parses, as it did in C#
-		assert(l.parse("|  +42,   -7,..|", mask, axes));
+		assert(l.parse("|  +42,   -7,..|", states, axes));
 		assert(axes[0] == 42 && axes[1] == -7);
 
 		// generate pads to 5 and puts axes first
 		const int32_t values[2] = { 127, -128 };
-		assert(l.generate(1ull, values, "AB") == "||  127, -128,A.|");
+		auto a = statesOf(1ull, l.buttonCount());
+		assert(l.generate(a.data(), values, "AB") == "||  127, -128,A.|");
 
-		// a null axis pointer means every axis at its neutral
-		assert(l.generate(0, nullptr, "AB") == "||    0,    0,..|");
+		// null buttons and axes mean everything released, every axis neutral
+		assert(l.generate(nullptr, nullptr, "AB") == "||    0,    0,..|");
 	}
 
 	{ // a non-zero neutral is what an absent or unparsed axis falls back to
 		EntryLayout l = layoutOf({}, { axis("P1 Throttle", 0, 255, 128) });
+		std::vector<uint8_t> states;
 		std::vector<int32_t> axes;
-		uint64_t mask = 0;
-		assert(l.parse("|  200,|", mask, axes));
+		assert(l.parse("|  200,|", states, axes));
 		assert(axes[0] == 200);
-		assert(l.generate(0, nullptr, "") == "||  128,|");
+		assert(l.generate(nullptr, nullptr, "") == "||  128,|");
 	}
 
 	{ // several players: each group is axes-then-buttons, groups in player order
@@ -134,14 +162,15 @@ int main(void)
 			{ "Reset", "P1 A", "P2 A" },
 			{ axis("P2 Stick", -128, 127, 0), axis("P1 Stick", -128, 127, 0) });
 		assert(l.groups() == 3);
-		uint64_t mask = 0;
+		std::vector<uint8_t> states;
 		std::vector<int32_t> axes;
-		assert(l.parse("|r|   10,A|  -20,A|", mask, axes));
-		assert(mask == 0x7ull);         // all three buttons
-		assert(axes[1] == 10);          // P1 Stick, declared second
-		assert(axes[0] == -20);         // P2 Stick, declared first
+		assert(l.parse("|r|   10,A|  -20,A|", states, axes));
+		assert(maskOf(states) == 0x7ull); // all three buttons
+		assert(axes[1] == 10);            // P1 Stick, declared second
+		assert(axes[0] == -20);           // P2 Stick, declared first
 		const int32_t values[2] = { -20, 10 };
-		assert(l.generate(0x7ull, values, "rAA") == "|r|   10,A|  -20,A|");
+		auto in = statesOf(0x7ull, l.buttonCount());
+		assert(l.generate(in.data(), values, "rAA") == "|r|   10,A|  -20,A|");
 	}
 
 	{ // round trip: parse then generate reproduces the entry exactly
@@ -154,31 +183,63 @@ int main(void)
 		const char *entries[] = { "||    0,..|", "||  -99,AB|", "||  127,.B|" };
 		for (const char *entry : entries)
 		{
-			uint64_t mask = 0;
+			std::vector<uint8_t> states;
 			std::vector<int32_t> axes;
-			assert(l.parse(entry, mask, axes));
-			assert(l.generate(mask, axes.data(), "AB") == entry);
+			assert(l.parse(entry, states, axes));
+			assert(l.generate(states.data(), axes.data(), "AB") == entry);
 		}
 	}
 
 	{ // refusals: an entry that runs out, and an axis field that will not parse
 		EntryLayout l = layoutOf({ "P1 A", "P1 B" }, { axis("P1 Stick", -128, 127, 0) });
-		uint64_t mask = 0;
+		std::vector<uint8_t> states;
 		std::vector<int32_t> axes;
-		assert(!l.parse("|    0,A|", mask, axes));  // one button short
-		assert(!l.parse("|", mask, axes));
-		assert(!l.parse("|zzzzz,AB|", mask, axes)); // not a number
-		assert(!l.parse("|     ,AB|", mask, axes)); // blank axis field
-		assert(!l.parse("|    0AB|", mask, axes));  // no comma ending the axis
+		assert(!l.parse("|    0,A|", states, axes)); // one button short
+		assert(!l.parse("|", states, axes));
+		assert(!l.parse("|zzzzz,AB|", states, axes)); // not a number
+		assert(!l.parse("|     ,AB|", states, axes)); // blank axis field
+		assert(!l.parse("|    0AB|", states, axes));  // no comma ending the axis
 	}
 
 	{ // a button past the end of the mnemonic vocabulary is visibly wrong, not silent
 		EntryLayout l = layoutOf(kSynthButtons, {});
-		assert(l.generate(0xFFull, nullptr, "UD") == "||UD!!!!!!|");
+		auto all = statesOf(0xFFull, l.buttonCount());
+		assert(l.generate(all.data(), nullptr, "UD") == "||UD!!!!!!|");
 		// and the same entry still parses, since parse ignores the character
-		uint64_t mask = 0;
+		std::vector<uint8_t> states;
 		std::vector<int32_t> axes;
-		assert(l.parse("||UD!!!!!!|", mask, axes) && mask == 0xFFull);
+		assert(l.parse("||UD!!!!!!|", states, axes) && maskOf(states) == 0xFFull);
+	}
+
+	{ // WIDE: 101 buttons - a DOS keyboard's worth - far past any packed word.
+	  // Buttons 64 and above must parse, generate, and round-trip exactly like
+	  // the first 64; a movie column exists for every declared control.
+		std::vector<std::string> keys;
+		std::string mnemonics;
+		for (int i = 0; i < 101; i++)
+		{
+			keys.push_back("P1 Key" + std::to_string(i));
+			mnemonics.push_back(static_cast<char>('A' + (i % 26)));
+		}
+		EntryLayout l = layoutOf(keys, {});
+		assert(l.buttonCount() == 101);
+		assert(l.groups() == 2);
+
+		// press the first, one in the middle of the upper half, and the last
+		std::vector<uint8_t> in(101, 0);
+		in[0] = in[64] = in[77] = in[100] = 1;
+		std::string entry = l.generate(in.data(), nullptr, mnemonics);
+		assert(entry.size() == 2 + 101 + 1); // "||" + columns + "|"
+		assert(entry[2 + 0] == 'A');
+		assert(entry[2 + 64] == mnemonics[64]);
+		assert(entry[2 + 77] == mnemonics[77]);
+		assert(entry[2 + 100] == mnemonics[100]);
+		assert(entry[2 + 1] == '.' && entry[2 + 63] == '.' && entry[2 + 99] == '.');
+
+		std::vector<uint8_t> back;
+		std::vector<int32_t> axes;
+		assert(l.parse(entry.c_str(), back, axes));
+		assert(back == in); // byte-exact round trip across the 64 boundary
 	}
 
 	std::printf("test_movie_entry: ok\n");

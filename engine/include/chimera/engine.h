@@ -357,9 +357,21 @@ CE_API const char *ce_session_axis_name(const ce_session *s, int64_t index);
 /* Axes are set per frame, before the advance they belong to. */
 CE_API void ce_session_set_axis(ce_session *s, int32_t index, int32_t value);
 
-/* One frame: buttons is the bitmask (bit i = the config's buttons[i]).
- * render 0 skips the video copy. Returns nonzero when the frame was a lag
- * frame (the guest never read input), per the config's lag export. */
+/* WIDE INPUT: buttons past the packed mask's 64 (a DOS keyboard is 101 keys
+ * before the mouse and joysticks). Set like axes - per frame, before the
+ * advance; values persist until changed. The effective state of button i at
+ * an advance is this call's value OR'd with packed bit i (i < 64), so a
+ * caller uses whichever path fits and either alone is exact. The session
+ * delivers only CHANGES to the guest through its SetButton export; a config
+ * declaring more than 64 buttons refuses to open without that export.
+ * Movie entries have always carried arbitrary button counts - one mnemonic
+ * column per declared button - so recording and playback are unchanged. */
+CE_API void ce_session_set_button(ce_session *s, int32_t index, int32_t pressed);
+
+/* One frame: buttons is the bitmask (bit i = the config's buttons[i]);
+ * buttons beyond 63 ride ce_session_set_button. render 0 skips the video
+ * copy. Returns nonzero when the frame was a lag frame (the guest never
+ * read input), per the config's lag export. */
 CE_API int32_t ce_session_frame_advance(ce_session *s, uint64_t buttons, int32_t render);
 
 /* The last rendered frame, BGRA, width*height pixels.
@@ -521,10 +533,18 @@ CE_API const ce_movie_log *ce_session_movie_log(const ce_session *s);
 CE_API int32_t ce_session_movie_entry_decode(
 	const ce_session *s, const char *entry, uint64_t *buttons_out, int32_t *axes_out);
 
+/* The wide twin: states_out (may be null) gets ce_session_button_count
+ * bytes, 0/1 per button in config order - the form a controller wider than
+ * 64 buttons needs, and exact for any width. Same returns as above. */
+CE_API int32_t ce_session_movie_entry_decode_wide(
+	const ce_session *s, const char *entry, uint8_t *states_out, int32_t *axes_out);
+
 /* One frame under the movie. In play mode the input comes from the log
  * (buttons/axes are ignored) until the log runs out, which flips the mode to
- * finished; in record and finished modes the input is the caller's, and
- * record appends the generated entry. axes may be NULL for all-neutral;
+ * finished; in record and finished modes the input is the caller's - the
+ * packed mask OR'd with the ce_session_set_button states, so wide
+ * controllers record exactly what the machine receives - and record appends
+ * the generated entry. axes may be NULL for all-neutral;
  * otherwise it carries ce_session_axis_count values in config order.
  * Returns like ce_session_frame_advance (nonzero = lag frame), or -1 on
  * error (no movie loaded, or an unparseable entry - see _last_error). */

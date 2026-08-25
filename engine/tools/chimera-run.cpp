@@ -152,23 +152,27 @@ int main(int argc, char **argv)
 
 	/* Record mode: decode the source movie's entries into machine input and
 	 * hand THAT to the session, which generates its own log. The source is an
-	 * input source only - none of its text reaches the recorded movie. */
-	std::vector<uint64_t> recButtons;
+	 * input source only - none of its text reaches the recorded movie.
+	 * The WIDE decode + set_button path is used for every controller - exact
+	 * at any width, and identical to the packed path below 64 buttons. */
+	int64_t buttonCount = ce_session_button_count(session);
+	std::vector<std::vector<uint8_t>> recButtons;
 	std::vector<std::vector<int32_t>> recAxes;
 	if (!recordPath.empty())
 	{
 		int64_t axisCount = ce_session_axis_count(session);
 		for (int64_t i = 0; i < frames; i++)
 		{
-			uint64_t buttons = 0;
+			std::vector<uint8_t> states(static_cast<size_t>(buttonCount), 0);
 			std::vector<int32_t> axes(static_cast<size_t>(axisCount), 0);
-			if (ce_session_movie_entry_decode(
-					session, ce_movie_log_entry(movie, i), &buttons,
+			if (ce_session_movie_entry_decode_wide(
+					session, ce_movie_log_entry(movie, i),
+					buttonCount != 0 ? states.data() : nullptr,
 					axisCount != 0 ? axes.data() : nullptr) != 0)
 			{
 				return fail(metaPath, "could not decode entry " + std::to_string(i));
 			}
-			recButtons.push_back(buttons);
+			recButtons.push_back(std::move(states));
 			recAxes.push_back(std::move(axes));
 		}
 		/* NULL mnemonics: the generated characters are the engine's fallback
@@ -192,11 +196,18 @@ int main(int argc, char **argv)
 		{
 			return fail(metaPath, ce_session_last_error(session));
 		}
-		const uint64_t buttons = recordPath.empty() ? 0 : recButtons[static_cast<size_t>(i)];
+		if (!recordPath.empty())
+		{
+			const auto &states = recButtons[static_cast<size_t>(i)];
+			for (size_t b = 0; b < states.size(); b++)
+			{
+				ce_session_set_button(session, static_cast<int32_t>(b), states[b]);
+			}
+		}
 		const int32_t *axes = recordPath.empty() || recAxes[static_cast<size_t>(i)].empty()
 			? nullptr
 			: recAxes[static_cast<size_t>(i)].data();
-		if (ce_session_movie_advance(session, buttons, axes, 0) < 0)
+		if (ce_session_movie_advance(session, 0, axes, 0) < 0)
 		{
 			return fail(metaPath, ce_session_last_error(session));
 		}

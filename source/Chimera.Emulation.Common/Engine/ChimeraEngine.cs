@@ -383,6 +383,9 @@ namespace Chimera.Emulation.Common.Engine
 		public abstract IntPtr ce_session_trace_drain(IntPtr session, ref ulong lenOut, ref int lineCountOut, ref int overflowOut);
 
 		[BizImport(CallingConvention.Cdecl)]
+		public abstract void ce_session_set_button(IntPtr session, int index, int pressed);
+
+		[BizImport(CallingConvention.Cdecl)]
 		public abstract int ce_session_savedata_available(IntPtr session);
 
 		[BizImport(CallingConvention.Cdecl)]
@@ -967,6 +970,9 @@ namespace Chimera.Emulation.Common.Engine
 			Marshal.Copy(p, ret, 0, checked((int)len));
 			return ret;
 		}
+
+		/// <summary>Buttons past the packed mask's 64 (wide controllers): set per frame, before the advance; values persist until changed.</summary>
+		public void SetButton(int index, bool pressed) => E.ce_session_set_button(_session, index, pressed ? 1 : 0);
 
 		public bool SaveDataAvailable => E.ce_session_savedata_available(_session) is not 0;
 		/// <summary>Snapshots the guest's exportable files (the list is dynamic); names and sizes refer to this snapshot.</summary>

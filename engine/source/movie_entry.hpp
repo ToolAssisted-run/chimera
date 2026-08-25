@@ -37,17 +37,21 @@ public:
 
 	/* Positional and '|'-tolerant - the exact Bk2Controller.SetFromMnemonic
 	 * walk. false when the entry runs out before the controller does, or an
-	 * axis field will not parse. axesOut is sized to the axis count and
+	 * axis field will not parse. buttonsOut is sized to the button count
+	 * (one byte per button, 0/1, declaration order - a DOS keyboard is wider
+	 * than any packed word); axesOut is sized to the axis count and
 	 * pre-filled with each axis's neutral. */
-	bool parse(const char *entry, uint64_t &mask, std::vector<int32_t> &axesOut) const;
+	bool parse(const char *entry, std::vector<uint8_t> &buttonsOut, std::vector<int32_t> &axesOut) const;
 
 	/* mnemonics gives the character a pressed button generates, one per button
 	 * in declaration order; a button past the end of the string generates '!'.
-	 * axes may be null for all-neutral. */
-	std::string generate(uint64_t buttons, const int32_t *axes, const std::string &mnemonics) const;
+	 * buttons carries buttonCount() 0/1 states (null = all released); axes may
+	 * be null for all-neutral. */
+	std::string generate(const uint8_t *buttons, const int32_t *axes, const std::string &mnemonics) const;
 
 	int32_t groups() const { return groups_; }
 	size_t size() const { return items_.size(); }
+	size_t buttonCount() const { return buttonCount_; }
 
 private:
 	struct Item
@@ -59,6 +63,7 @@ private:
 	std::vector<int32_t> groupStarts_;
 	std::vector<EntryAxis> axes_;
 	int32_t groups_ = 0;
+	size_t buttonCount_ = 0;
 };
 
 } // namespace chimera
