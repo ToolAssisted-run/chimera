@@ -263,6 +263,21 @@ CE_API const char *ce_state_reader_last_error(ce_state_reader *r);
  * Writes 40 uppercase hex characters plus a NUL into out41. */
 CE_API void ce_sha1_hex(const uint8_t *data, uint64_t len, char *out41);
 
+/* ---- firmware ----
+ *
+ * Whether a provided file is the firmware a core asked for. declared_size 0
+ * means the core pinned no size; expected_sha1s is the core's accepted hash
+ * list, one per '\n'-separated line, empty for "anything". Returns 0 (wrong
+ * size, refused), 1 (unrecognised hash, used anyway) or 2 (a pinned match). */
+CE_API int32_t ce_firmware_state(
+	int64_t declared_size, const char *expected_sha1s,
+	int64_t actual_size, const char *actual_sha1);
+
+/* The canonical firmware line a movie records: "id=SHA1" pairs, one per
+ * '\n'-separated line in, sorted by id and space-joined out. Thread-local
+ * buffer, invalidated by the next call. */
+CE_API const char *ce_firmware_record_line(const char *pairs, uint64_t *len_out);
+
 /* ---- core packages ----
  *
  * A core package is a zip (or, for development, a directory) whose root holds
