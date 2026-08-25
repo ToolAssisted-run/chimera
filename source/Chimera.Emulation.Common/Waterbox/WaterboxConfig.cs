@@ -109,6 +109,7 @@ namespace Chimera.Emulation.Common.Waterbox
 			{
 				"bool" => typeof(bool),
 				"int" => typeof(int),
+				"float" => typeof(double),
 				_ => typeof(string),
 			};
 
@@ -123,6 +124,7 @@ namespace Chimera.Emulation.Common.Waterbox
 					{
 						bool => "bool",
 						sbyte or byte or short or ushort or int or uint or long or ulong => "int",
+						float or double or decimal => "float",
 						_ => "string",
 					};
 				}
@@ -152,6 +154,16 @@ namespace Chimera.Emulation.Common.Waterbox
 						if (Min is int min && n < min) n = min;
 						if (Max is int max && n > max) n = max;
 						return n;
+					}
+					case "float":
+					{
+						return value switch
+						{
+							null => 0.0,
+							double d => d,
+							float f => (double)f,
+							_ => double.TryParse(Convert.ToString(value, CultureInfo.InvariantCulture), NumberStyles.Float, CultureInfo.InvariantCulture, out var pd) ? pd : 0.0,
+						};
 					}
 					default:
 					{
