@@ -224,6 +224,7 @@ namespace Chimera.Emulation.Common.Engine
 		public abstract IntPtr ce_session_open(
 			string packagePath, byte[] rom, ulong romLen, string? settingsOverridesJson,
 			IntPtr[]? firmwareIds, IntPtr[]? firmwareData, ulong[]? firmwareLens, int firmwareCount,
+			IntPtr[]? extraNames, IntPtr[]? extraData, ulong[]? extraLens, int extraCount,
 			ref IntPtr errorOut);
 
 		[BizImport(CallingConvention.Cdecl)]
@@ -819,34 +820,59 @@ namespace Chimera.Emulation.Common.Engine
 		private EngineSession(IntPtr session) => _session = session;
 
 		/// <exception cref="InvalidOperationException">anything wrong with the package, the rom, or the core's own refusal</exception>
+		/// <remarks>extraFiles: a multi-file game's additional mounts (rom2..N,
+		/// support files, "savedata", "rom.name"), each ORDERED pair mounted
+		/// under its given name before the core boots.</remarks>
 		public static EngineSession Open(
 			string packagePath, byte[] rom, string? settingsOverridesJson,
-			IReadOnlyDictionary<string, byte[]>? firmware)
+			IReadOnlyDictionary<string, byte[]>? firmware,
+			IReadOnlyList<KeyValuePair<string, byte[]>>? extraFiles = null)
 		{
 			var count = firmware?.Count ?? 0;
 			var ids = new IntPtr[Math.Max(count, 1)];
 			var blobs = new IntPtr[Math.Max(count, 1)];
 			var lens = new ulong[Math.Max(count, 1)];
+			var extraCount = extraFiles?.Count ?? 0;
+			var extraNames = new IntPtr[Math.Max(extraCount, 1)];
+			var extraData = new IntPtr[Math.Max(extraCount, 1)];
+			var extraLens = new ulong[Math.Max(extraCount, 1)];
 			var allocated = new List<IntPtr>();
+			IntPtr AllocUtf8(string text)
+			{
+				var bytes = Encoding.UTF8.GetBytes(text + "\0");
+				var ptr = Marshal.AllocHGlobal(bytes.Length);
+				allocated.Add(ptr);
+				Marshal.Copy(bytes, 0, ptr, bytes.Length);
+				return ptr;
+			}
+			IntPtr AllocBlob(byte[] bytes)
+			{
+				var ptr = Marshal.AllocHGlobal(bytes.Length is 0 ? 1 : bytes.Length);
+				allocated.Add(ptr);
+				if (bytes.Length is not 0) Marshal.Copy(bytes, 0, ptr, bytes.Length);
+				return ptr;
+			}
 			try
 			{
 				var i = 0;
 				foreach (var (id, bytes) in firmware ?? new Dictionary<string, byte[]>())
 				{
-					var idBytes = Encoding.UTF8.GetBytes(id + "\0");
-					ids[i] = Marshal.AllocHGlobal(idBytes.Length);
-					allocated.Add(ids[i]);
-					Marshal.Copy(idBytes, 0, ids[i], idBytes.Length);
-					blobs[i] = Marshal.AllocHGlobal(bytes.Length is 0 ? 1 : bytes.Length);
-					allocated.Add(blobs[i]);
-					if (bytes.Length is not 0) Marshal.Copy(bytes, 0, blobs[i], bytes.Length);
+					ids[i] = AllocUtf8(id);
+					blobs[i] = AllocBlob(bytes);
 					lens[i] = (ulong)bytes.LongLength;
 					i++;
+				}
+				for (var e = 0; e < extraCount; e++)
+				{
+					extraNames[e] = AllocUtf8(extraFiles![e].Key);
+					extraData[e] = AllocBlob(extraFiles[e].Value);
+					extraLens[e] = (ulong)extraFiles[e].Value.LongLength;
 				}
 				var error = IntPtr.Zero;
 				var session = ChimeraEngine.Instance.ce_session_open(
 					packagePath, rom, (ulong)rom.LongLength, settingsOverridesJson,
-					ids, blobs, lens, count, ref error);
+					ids, blobs, lens, count,
+					extraNames, extraData, extraLens, extraCount, ref error);
 				if (session == IntPtr.Zero)
 				{
 					throw new InvalidOperationException(ChimeraEngine.PtrToStringUtf8(error) ?? "the engine could not open a session");

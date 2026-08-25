@@ -33,6 +33,15 @@ FILE *openRead(const char *utf8Path)
 #endif
 }
 
+FILE *openWrite(const char *utf8Path)
+{
+#if defined(_WIN32)
+	return _wfopen(widen(utf8Path).c_str(), L"wb");
+#else
+	return std::fopen(utf8Path, "wb");
+#endif
+}
+
 } // namespace
 
 bool readFile(const char *utf8Path, std::vector<uint8_t> &out)
@@ -48,6 +57,15 @@ bool readFile(const char *utf8Path, std::vector<uint8_t> &out)
 	}
 	bool ok = std::ferror(f) == 0;
 	std::fclose(f);
+	return ok;
+}
+
+bool writeFile(const char *utf8Path, const uint8_t *data, uint64_t len)
+{
+	FILE *f = openWrite(utf8Path);
+	if (f == nullptr) return false;
+	bool ok = len == 0 || std::fwrite(data, 1, len, f) == len;
+	if (std::fclose(f) != 0) ok = false;
 	return ok;
 }
 

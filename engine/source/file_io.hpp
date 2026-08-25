@@ -1,6 +1,6 @@
-/* file_io.hpp - the engine's minimal file reading.
+/* file_io.hpp - the engine's minimal file access.
  *
- * Read-only, whole-file, UTF-8 paths everywhere - on Windows that means
+ * Whole-file, UTF-8 paths everywhere - on Windows that means
  * converting to wide characters, since the ANSI fopen would mangle non-ASCII
  * paths the C# side (which is UTF-16 native) has no trouble with.
  */
@@ -17,6 +17,9 @@ namespace chimera {
 bool readFile(const char *utf8Path, std::vector<uint8_t> &out);
 
 bool fileExists(const char *utf8Path);
+
+/* whole-file write (multifile descriptors); false on any failure */
+bool writeFile(const char *utf8Path, const uint8_t *data, uint64_t len);
 
 bool isDirectory(const char *utf8Path);
 

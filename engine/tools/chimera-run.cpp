@@ -129,8 +129,77 @@ int main(int argc, char **argv)
 	}
 
 	std::vector<uint8_t> rom, movieText;
-	if (!readWholeFile(romPath, rom)) return fail(metaPath, std::string("could not read rom ") + romPath);
 	if (!readWholeFile(moviePath, movieText)) return fail(metaPath, std::string("could not read movie ") + moviePath);
+
+	/* A .chimeraMultiFile rom is a multi-file game: the first image mounts as
+	 * the rom (rom.name carrying its real name), further images as rom2..N,
+	 * support files and savedata under their fixed names - the exact mounts
+	 * the frontend makes. Everything hash-verified; refuse on any mismatch
+	 * (this tool has no user to ask). */
+	ce_multifile *multi = nullptr;
+	std::vector<const char *> extraNames;
+	std::vector<const uint8_t *> extraData;
+	std::vector<uint64_t> extraLens;
+	std::vector<std::string> extraNameStore;
+	std::string romPathStr = romPath;
+	if (romPathStr.size() > 17 &&
+		romPathStr.compare(romPathStr.size() - 17, 17, ".chimeraMultiFile") == 0)
+	{
+		const char *merr = nullptr;
+		multi = ce_multifile_open(romPath, &merr);
+		if (multi == nullptr) return fail(metaPath, merr != nullptr ? merr : "bad descriptor");
+		if (ce_multifile_ok(multi) == 0)
+		{
+			for (int32_t i = 0; i < ce_multifile_count(multi); i++)
+			{
+				if (ce_multifile_status(multi, i) != 0)
+					return fail(metaPath, std::string("multifile: '") + ce_multifile_name(multi, i)
+						+ (ce_multifile_status(multi, i) == 1 ? "' is missing" : "' does not match its recorded hash"));
+			}
+		}
+		int32_t primary = ce_multifile_image_index(multi, 0);
+		uint64_t len = 0;
+		const uint8_t *data = ce_multifile_data(multi, primary, &len);
+		rom.assign(data, data + len);
+		extraNameStore.push_back("rom.name");
+		extraNameStore.push_back(ce_multifile_name(multi, primary));
+		for (int32_t n = 1; n < ce_multifile_image_count(multi); n++)
+		{
+			extraNameStore.push_back("rom" + std::to_string(n + 1));
+		}
+		// mounts: rom.name first, then rom2..N, then the rest by name
+		size_t store = 0;
+		extraNames.push_back(extraNameStore[store++].c_str());
+		{
+			const std::string &nm = extraNameStore[store++];
+			extraData.push_back(reinterpret_cast<const uint8_t *>(nm.data()));
+			extraLens.push_back(nm.size());
+		}
+		for (int32_t n = 1; n < ce_multifile_image_count(multi); n++)
+		{
+			int32_t idx = ce_multifile_image_index(multi, n);
+			extraNames.push_back(extraNameStore[store++].c_str());
+			extraData.push_back(ce_multifile_data(multi, idx, &len));
+			extraLens.push_back(len);
+		}
+		for (int32_t i = 0; i < ce_multifile_count(multi); i++)
+		{
+			const char *role = ce_multifile_role(multi, i);
+			if (std::strcmp(role, "support") == 0)
+			{
+				extraNames.push_back(ce_multifile_name(multi, i));
+				extraData.push_back(ce_multifile_data(multi, i, &len));
+				extraLens.push_back(len);
+			}
+			else if (std::strcmp(role, "savedata") == 0)
+			{
+				extraNames.push_back("savedata");
+				extraData.push_back(ce_multifile_data(multi, i, &len));
+				extraLens.push_back(len);
+			}
+		}
+	}
+	else if (!readWholeFile(romPath, rom)) return fail(metaPath, std::string("could not read rom ") + romPath);
 
 	ce_movie_log *movie = ce_movie_log_new();
 	if (ce_movie_log_parse(movie, reinterpret_cast<const char *>(movieText.data()), movieText.size()) != 0)
@@ -140,7 +209,9 @@ int main(int argc, char **argv)
 
 	const char *error = nullptr;
 	ce_session *session = ce_session_open(
-		packagePath, rom.data(), rom.size(), settings, nullptr, nullptr, nullptr, 0, &error);
+		packagePath, rom.data(), rom.size(), settings, nullptr, nullptr, nullptr, 0,
+		extraNames.data(), extraData.data(), extraLens.data(),
+		static_cast<int32_t>(extraNames.size()), &error);
 	if (session == nullptr) return fail(metaPath, error != nullptr ? error : "session open failed");
 
 	int64_t frames = ce_movie_log_count(movie);

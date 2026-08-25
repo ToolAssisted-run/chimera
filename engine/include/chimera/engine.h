@@ -278,6 +278,67 @@ CE_API int32_t ce_firmware_state(
  * buffer, invalidated by the next call. */
 CE_API const char *ce_firmware_record_line(const char *pairs, uint64_t *len_out);
 
+/* ---- multi-file games ----
+ *
+ * A .chimeraMultiFile descriptor names the files a game is made of: bare
+ * names (every file lives in the descriptor's own folder), each with the
+ * SHA1 recorded at creation, in an order that matters (images load as rom,
+ * rom2..romN - which IS the disc/floppy swap order). Roles: "image" (an
+ * ordered, mountable, swappable item), "support" (present and hashed, but
+ * only referenced by another file - a cue's bin), "savedata" (at most one:
+ * a previously exported save, mounted under the fixed name "savedata" for
+ * the core to consume). The engine owns the format: parsing, the rules,
+ * hashing, the canonical movie line.
+ *
+ * ce_multifile_open enforces the STRUCTURAL rules (valid JSON, bare unique
+ * names, known roles, at least one image, at most one savedata, and cue
+ * closure: every file a listed cue references must itself be listed) and
+ * loads + hashes the files. A missing or hash-mismatched file does NOT fail
+ * the open: per-file status lets the caller refuse or knowingly proceed -
+ * the movie line always records what was ACTUALLY loaded. */
+typedef struct ce_multifile ce_multifile;
+
+/* NULL with *error_out (static per-thread) on structural failure. */
+CE_API ce_multifile *ce_multifile_open(const char *descriptor_path, const char **error_out);
+CE_API void ce_multifile_free(ce_multifile *m);
+
+CE_API int32_t ce_multifile_count(const ce_multifile *m);
+CE_API const char *ce_multifile_name(const ce_multifile *m, int32_t index);
+CE_API const char *ce_multifile_role(const ce_multifile *m, int32_t index);
+/* the descriptor's recorded hash (40 uppercase hex) */
+CE_API const char *ce_multifile_sha1(const ce_multifile *m, int32_t index);
+/* the hash of the bytes actually on disk; "" while the file is missing */
+CE_API const char *ce_multifile_actual_sha1(const ce_multifile *m, int32_t index);
+/* 0 = ok, 1 = missing, 2 = hash mismatch */
+CE_API int32_t ce_multifile_status(const ce_multifile *m, int32_t index);
+/* 1 when every file is present with a matching hash */
+CE_API int32_t ce_multifile_ok(const ce_multifile *m);
+/* the loaded bytes (NULL while missing); borrowed, live as long as m */
+CE_API const uint8_t *ce_multifile_data(const ce_multifile *m, int32_t index, uint64_t *len_out);
+
+CE_API int32_t ce_multifile_image_count(const ce_multifile *m);
+/* entry index of the nth image (0-based), -1 out of range */
+CE_API int32_t ce_multifile_image_index(const ce_multifile *m, int32_t nth);
+/* entry index of the savedata file, -1 when the descriptor has none */
+CE_API int32_t ce_multifile_savedata_index(const ce_multifile *m);
+
+/* The canonical movie line ("GameFiles" in a movie header): the entries in
+ * descriptor order as name=SHA1 (images) or name=SHA1:role (the rest),
+ * space-joined, with '%', '=', ':' and bytes outside 0x21..0x7E percent-
+ * encoded in names. The hashes are the ACTUAL ones - a movie records what
+ * was loaded, not what the descriptor claimed. NULL while any file is
+ * missing. Borrowed; invalidated by ce_multifile_free. */
+CE_API const char *ce_multifile_record_line(const ce_multifile *m, uint64_t *len_out);
+
+/* Creation: names (bare, in order) + parallel roles; the files must already
+ * sit in the descriptor's folder. Hashes them, enforces every structural
+ * rule (including cue closure), writes the descriptor JSON. 0 on success,
+ * nonzero with *error_out (static per-thread) otherwise. */
+CE_API int32_t ce_multifile_save(
+	const char *descriptor_path,
+	const char *const *names, const char *const *roles, int32_t count,
+	const char **error_out);
+
 /* ---- core packages ----
  *
  * A core package is a zip (or, for development, a directory) whose root holds
@@ -337,16 +398,21 @@ typedef struct ce_session ce_session;
 
 /* rom_len 0 with rom NULL is allowed for coreless boots (none exist today).
  * settings_overrides_json may be NULL for pure defaults. firmware arrives as
- * ids and blobs, parallel arrays. NULL with *error_out set (static per-
- * thread, valid until the thread's next failed open) on any failure - an
- * unreadable package, a missing export, a core that refused the rom (its
- * GetLoadError text is the message when it gives one). */
+ * ids and blobs, parallel arrays; extra files (a multi-file game's rom2..N,
+ * support files, savedata, and "rom.name" when the name is contract) the
+ * same way - each is mounted under its given name before the core boots.
+ * NULL with *error_out set (static per-thread, valid until the thread's
+ * next failed open) on any failure - an unreadable package, a missing
+ * export, a core that refused the rom (its GetLoadError text is the message
+ * when it gives one). */
 CE_API ce_session *ce_session_open(
 	const char *package_path,
 	const uint8_t *rom, uint64_t rom_len,
 	const char *settings_overrides_json,
 	const char *const *firmware_ids, const uint8_t *const *firmware_data,
 	const uint64_t *firmware_lens, int32_t firmware_count,
+	const char *const *extra_names, const uint8_t *const *extra_data,
+	const uint64_t *extra_lens, int32_t extra_count,
 	const char **error_out);
 
 CE_API void ce_session_free(ce_session *s);

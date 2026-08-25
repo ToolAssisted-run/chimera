@@ -231,6 +231,7 @@ struct ce_session
 	std::vector<uint8_t> wbxBytes, romBytes;
 	std::string settingsBytes;
 	std::vector<std::vector<uint8_t>> firmwareBytes;
+	std::vector<std::vector<uint8_t>> extraBytes;
 	std::vector<ByteStream> streams; // stable addresses: reserved up front
 
 	// guest entry points (already bridged to our convention)
@@ -593,6 +594,8 @@ ce_session *ce_session_open(
 	const char *settings_overrides_json,
 	const char *const *firmware_ids, const uint8_t *const *firmware_data,
 	const uint64_t *firmware_lens, int32_t firmware_count,
+	const char *const *extra_names, const uint8_t *const *extra_data,
+	const uint64_t *extra_lens, int32_t extra_count,
 	const char **error_out)
 {
 	auto fail = [&](std::string message) -> ce_session *
@@ -645,7 +648,7 @@ ce_session *ce_session_open(
 	s->settingsBytes = s->cfg.settingsJson;
 
 	// every mounted stream needs a stable address for the host's callback
-	s->streams.reserve(3 + static_cast<size_t>(firmware_count));
+	s->streams.reserve(3 + static_cast<size_t>(firmware_count) + static_cast<size_t>(extra_count));
 
 	chimera::WbxLayout layout{};
 	layout.sbrkSize = static_cast<uintptr_t>(s->cfg.layoutMiB[0] << 20);
@@ -675,6 +678,17 @@ ce_session *ce_session_open(
 		s->firmwareBytes.emplace_back(firmware_data[i], firmware_data[i] + firmware_lens[i]);
 		s->streams.push_back({ s->firmwareBytes.back().data(), s->firmwareBytes.back().size() });
 		host->wbx_mount_file(s->obj, firmware_ids[i], streamRead, reinterpret_cast<uintptr_t>(&s->streams.back()), 0, &r);
+		if (!r.ok()) return abort(r.errorMessage);
+	}
+
+	/* a multi-file game's additional mounts: rom2..romN, support files,
+	 * savedata, rom.name - the engine mounts names, the core gives them
+	 * meaning (the same division firmware uses) */
+	for (int32_t i = 0; i < extra_count; i++)
+	{
+		s->extraBytes.emplace_back(extra_data[i], extra_data[i] + extra_lens[i]);
+		s->streams.push_back({ s->extraBytes.back().data(), s->extraBytes.back().size() });
+		host->wbx_mount_file(s->obj, extra_names[i], streamRead, reinterpret_cast<uintptr_t>(&s->streams.back()), 0, &r);
 		if (!r.ok()) return abort(r.errorMessage);
 	}
 
