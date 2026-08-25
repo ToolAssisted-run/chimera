@@ -8,7 +8,7 @@
  *
  *   chimera-run <package> <rom> <movie.txt>
  *       [--rerecord] [--seek <frame>] [--record <out.txt>] [--settings <json>]
- *       [--dump <domain>=<path>]... [--meta <path>]
+ *       [--dump <domain>=<path>]... [--export-savedata <dir>] [--meta <path>]
  *
  * --rerecord round-trips the whole machine through save/load state around
  * every frame, which must not change anything - that is the point.
@@ -20,6 +20,8 @@
  * log itself, and it is written to <out.txt>. Feeding that file back in as an
  * ordinary movie must reach the same machine - which is what witnesses record
  * mode and entry generation, the paths playback never touches.
+ * --export-savedata writes the core's exported save-data tree under <dir>
+ * after the run (docs/save-data.md) - the gates diff it like a memory dump.
  */
 
 #include "chimera/engine.h"
@@ -28,6 +30,12 @@
 #include <cstring>
 #include <string>
 #include <vector>
+
+#ifdef _WIN32
+#include <direct.h>
+#else
+#include <sys/stat.h>
+#endif
 
 namespace {
 
@@ -53,6 +61,22 @@ bool writeWholeFile(const std::string &path, const uint8_t *data, size_t len)
 	return ok;
 }
 
+/* mkdir -p for a path's PARENT directories (the engine already refused any
+ * name with "..", so walking forward is safe) */
+void makeParentDirs(const std::string &path)
+{
+	for (size_t i = 1; i < path.size(); i++)
+	{
+		if (path[i] != '/') continue;
+		std::string dir = path.substr(0, i);
+#ifdef _WIN32
+		_mkdir(dir.c_str());
+#else
+		mkdir(dir.c_str(), 0777);
+#endif
+	}
+}
+
 int fail(const std::string &metaPath, const std::string &detail)
 {
 	if (!metaPath.empty())
@@ -75,6 +99,7 @@ int main(int argc, char **argv)
 	bool rerecord = false;
 	int64_t seekFrame = -1;
 	std::string recordPath;
+	std::string savedataDir;
 
 	for (int i = 1; i < argc; i++)
 	{
@@ -83,6 +108,7 @@ int main(int argc, char **argv)
 		else if (arg == "--seek" && i + 1 < argc) seekFrame = std::atoll(argv[++i]);
 		else if (arg == "--record" && i + 1 < argc) recordPath = argv[++i];
 		else if (arg == "--settings" && i + 1 < argc) settings = argv[++i];
+		else if (arg == "--export-savedata" && i + 1 < argc) savedataDir = argv[++i];
 		else if (arg == "--meta" && i + 1 < argc) metaPath = argv[++i];
 		else if (arg == "--dump" && i + 1 < argc)
 		{
@@ -98,7 +124,7 @@ int main(int argc, char **argv)
 	}
 	if (moviePath == nullptr)
 	{
-		std::fprintf(stderr, "usage: chimera-run <package> <rom> <movie.txt> [--rerecord] [--seek <frame>] [--record <out.txt>] [--settings <json>] [--dump <domain>=<path>]... [--meta <path>]\n");
+		std::fprintf(stderr, "usage: chimera-run <package> <rom> <movie.txt> [--rerecord] [--seek <frame>] [--record <out.txt>] [--settings <json>] [--dump <domain>=<path>]... [--export-savedata <dir>] [--meta <path>]\n");
 		return 1;
 	}
 
@@ -238,6 +264,35 @@ int main(int argc, char **argv)
 		{
 			return fail(metaPath, "could not write " + dump.second);
 		}
+	}
+
+	if (!savedataDir.empty())
+	{
+		if (ce_session_savedata_available(session) == 0)
+		{
+			return fail(metaPath, "this core exports no save data");
+		}
+		int32_t files = ce_session_savedata_count(session);
+		std::vector<uint8_t> chunk(1 << 20); // ranged reads: a big file streams
+		for (int32_t f = 0; f < files; f++)
+		{
+			std::string path = savedataDir + "/" + ce_session_savedata_name(session, f);
+			makeParentDirs(path);
+			FILE *out = std::fopen(path.c_str(), "wb");
+			if (out == nullptr) return fail(metaPath, "could not write " + path);
+			int64_t size = ce_session_savedata_size(session, f);
+			bool ok = true;
+			for (int64_t off = 0; off < size && ok;)
+			{
+				int64_t got = ce_session_savedata_read(session, f, off, chunk.data(), static_cast<int64_t>(chunk.size()));
+				if (got <= 0) { ok = false; break; }
+				ok = std::fwrite(chunk.data(), 1, static_cast<size_t>(got), out) == static_cast<size_t>(got);
+				off += got;
+			}
+			std::fclose(out);
+			if (!ok) return fail(metaPath, "could not write " + path);
+		}
+		std::printf("savedata=%d\n", files);
 	}
 
 	if (!metaPath.empty())

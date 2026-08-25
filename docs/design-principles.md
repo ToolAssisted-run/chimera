@@ -1101,6 +1101,23 @@ nothing is written beside it.** A machine's progress lives only in savestates,
 which are explicit and belong to the user. Nothing in the frontend knows what an
 SRAM is - and this time nothing knows what a save is at all.
 
+## Save data: the core keeps it, the user takes it out (user-decided, 2026-08-25)
+
+The third design, specified in full in docs/save-data.md. The short form: a
+core with save data keeps it INSIDE the guest machine (in-guest storage is
+savestate- and rewind-correct by construction, and the sealed baseline plus
+page-dirty tracking makes even a 2 GB disk image cost only its dirtied pages
+per state - the proven BizHawk/DOSBox recipe). Getting progress OUT is one
+user action: `Emulator > Export Save Data...`, enabled whenever the core
+exports the savedata group - the sixth optional guest ABI group
+(`GetSaveDataFileCount/Name/Size/Buffer`) - with no change detection and no
+automation; the frontend writes the core's own `(path, bytes)` enumeration as
+a zip without interpreting a byte. Getting it back IN is a game input: the
+exported files return through a multi-file game descriptor (a future design
+the user owns), mounted hash-bound and cited by the movie header like any rom
+or firmware. Cores whose save data is plain machine memory (NES SRAM) export
+nothing and need nothing. First tenant: PPSSPP's RAM memstick.
+
 
 ## Opening a core is something you do (2026-08-14)
 

@@ -271,6 +271,15 @@ struct ce_session
 	std::vector<std::string> busNames;
 	std::vector<int64_t> busSizes;
 	std::vector<bool> busWritables;
+	// savedata export (docs/save-data.md); a snapshot maps engine index ->
+	// guest index because entries with unclean paths are dropped here
+	int32_t (*sdCount)() = nullptr;
+	uintptr_t (*sdName)(int32_t) = nullptr;
+	int64_t (*sdSize)(int32_t) = nullptr;
+	uintptr_t (*sdBuffer)(int32_t) = nullptr;
+	std::vector<std::string> sdNames;
+	std::vector<int64_t> sdSizes;
+	std::vector<int32_t> sdGuestIndex;
 	// trace
 	void (*traceSetEnabled)(int32_t) = nullptr;
 	int32_t (*traceLineCount)() = nullptr;
@@ -431,6 +440,23 @@ void ce_session::probeOptionalGroups()
 			if (h != nullptr) traceHeader = h;
 			traceSetEnabled = setEnabled;
 			traceSetEnabled(0); // tracing costs the guest time; off until a sink asks
+		}
+	}
+
+	// savedata export: all four or nothing. Only the POINTERS are kept - the
+	// file list is dynamic (a game creates files while it runs), so it is
+	// snapshotted at export time, never here.
+	{
+		auto count = reinterpret_cast<int32_t (*)()>(opt("GetSaveDataFileCount", 0));
+		auto name = reinterpret_cast<uintptr_t (*)(int32_t)>(opt("GetSaveDataFileName", 1));
+		auto size = reinterpret_cast<int64_t (*)(int32_t)>(opt("GetSaveDataFileSize", 1));
+		auto buffer = reinterpret_cast<uintptr_t (*)(int32_t)>(opt("GetSaveDataFileBuffer", 1));
+		if (count != nullptr && name != nullptr && size != nullptr && buffer != nullptr)
+		{
+			sdCount = count;
+			sdName = name;
+			sdSize = size;
+			sdBuffer = buffer;
 		}
 	}
 }
@@ -936,6 +962,85 @@ int32_t ce_session_bus_peek(const ce_session *s, int32_t index, int32_t addr)
 void ce_session_bus_poke(ce_session *s, int32_t index, int32_t addr, int32_t value)
 {
 	if (s->busPoke != nullptr && ce_session_bus_writable(s, index) != 0) s->busPoke(index, addr, value);
+}
+
+// ---- savedata export (docs/save-data.md) ----
+
+namespace {
+
+/* relative and clean, or it does not leave the sandbox: no absolute paths,
+ * no backslashes, no "." or ".." components, no empty ones */
+bool savedataNameClean(const char *name)
+{
+	if (name == nullptr || name[0] == '\0' || name[0] == '/') return false;
+	const char *p = name;
+	while (*p != '\0')
+	{
+		const char *end = p;
+		while (*end != '\0' && *end != '/') { if (*end == '\\') return false; end++; }
+		size_t n = static_cast<size_t>(end - p);
+		if (n == 0) return false;                                   // "//" or trailing '/'
+		if (n == 1 && p[0] == '.') return false;
+		if (n == 2 && p[0] == '.' && p[1] == '.') return false;
+		p = *end == '/' ? end + 1 : end;
+	}
+	return true;
+}
+
+} // namespace
+
+int32_t ce_session_savedata_available(const ce_session *s) { return s->sdCount != nullptr ? 1 : 0; }
+
+int32_t ce_session_savedata_count(ce_session *s)
+{
+	s->sdNames.clear();
+	s->sdSizes.clear();
+	s->sdGuestIndex.clear();
+	if (s->sdCount == nullptr) return 0;
+	int32_t n = s->sdCount();
+	for (int32_t i = 0; i < n; i++)
+	{
+		const auto *name = reinterpret_cast<const char *>(s->sdName(i));
+		if (!savedataNameClean(name))
+		{
+			std::fprintf(stderr, "%s: savedata entry %d has an unclean path%s%s%s - dropped\n",
+				s->cfg.coreName.c_str(), i,
+				name != nullptr ? " (\"" : "", name != nullptr ? name : "", name != nullptr ? "\")" : "");
+			continue;
+		}
+		int64_t size = s->sdSize(i);
+		if (size < 0) size = 0;
+		s->sdNames.emplace_back(name);
+		s->sdSizes.push_back(size);
+		s->sdGuestIndex.push_back(i);
+	}
+	return static_cast<int32_t>(s->sdNames.size());
+}
+
+const char *ce_session_savedata_name(const ce_session *s, int32_t index)
+{
+	if (index < 0 || static_cast<size_t>(index) >= s->sdNames.size()) return nullptr;
+	return s->sdNames[static_cast<size_t>(index)].c_str();
+}
+
+int64_t ce_session_savedata_size(const ce_session *s, int32_t index)
+{
+	if (index < 0 || static_cast<size_t>(index) >= s->sdSizes.size()) return 0;
+	return s->sdSizes[static_cast<size_t>(index)];
+}
+
+int64_t ce_session_savedata_read(ce_session *s, int32_t index, int64_t offset, uint8_t *buf, int64_t len)
+{
+	if (index < 0 || static_cast<size_t>(index) >= s->sdGuestIndex.size()) return 0;
+	int64_t size = s->sdSizes[static_cast<size_t>(index)];
+	if (offset < 0 || offset >= size || len <= 0) return 0;
+	int64_t n = len < size - offset ? len : size - offset;
+	/* fetched per call rather than kept: the guest owns the allocation and a
+	 * snapshot only promises the file, not the address */
+	const auto *src = reinterpret_cast<const uint8_t *>(s->sdBuffer(s->sdGuestIndex[static_cast<size_t>(index)]));
+	if (src == nullptr) return 0;
+	std::memcpy(buf, src + offset, static_cast<size_t>(n));
+	return n;
 }
 
 int32_t ce_session_trace_available(const ce_session *s) { return s->traceSetEnabled != nullptr ? 1 : 0; }

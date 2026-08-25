@@ -1682,6 +1682,16 @@ namespace Chimera.Client.GUI
 			settingsMenuItem.Click += GenericCoreSettingsMenuItem_Click;
 			GenericCoreSubMenu.DropDownItems.Insert(0, settingsMenuItem);
 
+			// The way OUT for what this machine keeps (docs/save-data.md): present
+			// exactly when the core exports the savedata group, with no change
+			// detection - the user knows when their progress is worth exporting.
+			if (Emulator.ServiceProvider.HasService<ICoreSaveData>())
+			{
+				ToolStripMenuItem exportSaveDataMenuItem = new() { Text = "Export Save &Data..." };
+				exportSaveDataMenuItem.Click += (_, _) => ExportSaveData();
+				GenericCoreSubMenu.DropDownItems.Insert(1, exportSaveDataMenuItem);
+			}
+
 			var coreTools = CoreProvidedTools.Concat(SpecializedTools)
 				.Where(Tools.IsAvailable)
 				.OrderBy(static t => t.Name)
@@ -3540,6 +3550,77 @@ namespace Chimera.Client.GUI
 			foreach (var entry in CoreFirmwareStore.NonStandard(Config, CoreRegistry.Instance, Emulator.Attributes().CoreName))
 			{
 				AddOnScreenMessage(entry.WarningText, 5);
+			}
+		}
+
+		/// <summary>
+		/// Emulator > Export Save Data... - the one way OUT for the progress a core
+		/// keeps inside its machine (docs/save-data.md). The core enumerates
+		/// (relative path, bytes); one file saves under its own name, several become
+		/// a zip, and not a byte of it is interpreted here. Runs on the UI thread
+		/// between frames, so the machine is at a frame boundary by construction.
+		/// </summary>
+		private void ExportSaveData()
+		{
+			if (Emulator.ServiceProvider.GetService<ICoreSaveData>() is not ICoreSaveData saveData) return;
+
+			var files = saveData.SaveDataSnapshot();
+			if (files is 0)
+			{
+				ShowMessageBox(owner: null, "This machine holds no save data yet.", "Export Save Data");
+				return;
+			}
+
+			try
+			{
+				var chunk = new byte[1 << 20]; // ranged reads: a big file streams
+				if (files is 1)
+				{
+					var name = Path.GetFileName(saveData.SaveDataName(0));
+					var ext = Path.GetExtension(name).TrimStart('.');
+					var filterSet = ext.Length is 0
+						? new FilesystemFilterSet() // just the All Files entry
+						: new FilesystemFilterSet(new FilesystemFilter($"{ext} files", new[] { ext }));
+					var result = this.ShowFileSaveDialog(
+						filter: filterSet,
+						initDir: Config.PathEntries.RomAbsolutePath(Emulator.SystemId),
+						initFileName: name);
+					if (result is null) return;
+					using var fs = new FileStream(result, FileMode.Create, FileAccess.Write);
+					CopySaveDataFile(saveData, 0, chunk, fs);
+				}
+				else
+				{
+					var result = this.ShowFileSaveDialog(
+						filter: new(new FilesystemFilter("Zip Archives", new[] { "zip" })),
+						initDir: Config.PathEntries.RomAbsolutePath(Emulator.SystemId),
+						initFileName: $"{Game.FilesystemSafeName()} (save data).zip");
+					if (result is null) return;
+					using var fs = new FileStream(result, FileMode.Create, FileAccess.Write);
+					using var zip = new System.IO.Compression.ZipArchive(fs, System.IO.Compression.ZipArchiveMode.Create);
+					for (var i = 0; i < files; i++)
+					{
+						using var entry = zip.CreateEntry(saveData.SaveDataName(i)).Open();
+						CopySaveDataFile(saveData, i, chunk, entry);
+					}
+				}
+				AddOnScreenMessage($"Save data exported ({files} file{(files is 1 ? "" : "s")})");
+			}
+			catch (IOException ex)
+			{
+				ShowMessageBox(owner: null, $"Could not export save data: {ex.Message}", "Export Save Data");
+			}
+		}
+
+		private static void CopySaveDataFile(ICoreSaveData saveData, int index, byte[] chunk, Stream output)
+		{
+			var size = saveData.SaveDataSize(index);
+			for (var offset = 0L; offset < size;)
+			{
+				var got = saveData.SaveDataRead(index, offset, chunk);
+				if (got <= 0) throw new IOException($"the core stopped supplying {saveData.SaveDataName(index)} at byte {offset}");
+				output.Write(chunk, 0, got);
+				offset += got;
 			}
 		}
 

@@ -439,6 +439,26 @@ CE_API int32_t ce_session_bus_writable(const ce_session *s, int32_t index);
 CE_API int32_t ce_session_bus_peek(const ce_session *s, int32_t index, int32_t addr);
 CE_API void ce_session_bus_poke(ce_session *s, int32_t index, int32_t addr, int32_t value);
 
+/* savedata export: files the guest deems the user's progress (a memory
+ * card's contents, a disk image), enumerated at export time - the list is
+ * dynamic, a game creates files while it runs (docs/save-data.md). The
+ * frontend writes them out verbatim; nothing here interprets a byte. */
+
+/* nonzero when the core exports the savedata group */
+CE_API int32_t ce_session_savedata_available(const ce_session *s);
+/* Snapshots the guest's file list and returns its length; name and size
+ * below refer to this snapshot. Call at a frame boundary. Entries with a
+ * path that is not relative-and-clean (leading '/', "..", backslash) are
+ * dropped here, with a warning on stderr, rather than handed to a writer. */
+CE_API int32_t ce_session_savedata_count(ce_session *s);
+/* Borrowed; invalidated by the next snapshot. NULL when out of range. */
+CE_API const char *ce_session_savedata_name(const ce_session *s, int32_t index);
+CE_API int64_t ce_session_savedata_size(const ce_session *s, int32_t index);
+/* Copies out [offset, offset+len) of file index; returns bytes copied
+ * (clamped at the file's end). Ranged so a huge file streams in chunks and
+ * is never materialized whole. */
+CE_API int64_t ce_session_savedata_read(ce_session *s, int32_t index, int64_t offset, uint8_t *buf, int64_t len);
+
 /* trace: the guest appends lines to a buffer of its own; drain it once per
  * frame - a callback per instruction would cross the sandbox boundary
  * millions of times a second */

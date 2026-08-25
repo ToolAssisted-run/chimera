@@ -382,6 +382,21 @@ namespace Chimera.Emulation.Common.Engine
 		[BizImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_session_trace_drain(IntPtr session, ref ulong lenOut, ref int lineCountOut, ref int overflowOut);
 
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract int ce_session_savedata_available(IntPtr session);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract int ce_session_savedata_count(IntPtr session);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_session_savedata_name(IntPtr session, int index);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract long ce_session_savedata_size(IntPtr session, int index);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract long ce_session_savedata_read(IntPtr session, int index, long offset, byte[] buf, long len);
+
 
 
 
@@ -952,6 +967,15 @@ namespace Chimera.Emulation.Common.Engine
 			Marshal.Copy(p, ret, 0, checked((int)len));
 			return ret;
 		}
+
+		public bool SaveDataAvailable => E.ce_session_savedata_available(_session) is not 0;
+		/// <summary>Snapshots the guest's exportable files (the list is dynamic); names and sizes refer to this snapshot.</summary>
+		public int SaveDataSnapshot() => E.ce_session_savedata_count(_session);
+		public string SaveDataName(int index) => ChimeraEngine.PtrToStringUtf8(E.ce_session_savedata_name(_session, index)) ?? $"file{index}";
+		public long SaveDataSize(int index) => E.ce_session_savedata_size(_session, index);
+		/// <summary>Copies [offset, offset+buffer.Length) of file index into buffer; returns bytes copied (clamped at the file's end).</summary>
+		public int SaveDataRead(int index, long offset, byte[] buffer)
+			=> checked((int)E.ce_session_savedata_read(_session, index, offset, buffer, buffer.LongLength));
 
 		private string LastError
 			=> ChimeraEngine.PtrToStringUtf8(E.ce_session_last_error(_session)) ?? "engine session error";

@@ -15,13 +15,14 @@ namespace Chimera.Emulation.Common.Waterbox
 	/// <item>registers -> <see cref="IDebuggable"/> (the generic debugger's register box)</item>
 	/// <item>buses     -> extra <see cref="IMemoryDomains"/> entries (peek/poke address spaces)</item>
 	/// <item>trace     -> <see cref="ITraceable"/> (the trace logger)</item>
+	/// <item>savedata  -> <see cref="ICoreSaveData"/> (Emulator > Export Save Data...)</item>
 	/// </list>
 	///
 	/// Nothing here is core-specific: the frontend never learns what a nametable or
 	/// a 6502 is. Absent exports simply mean the tool is unavailable for that core,
 	/// which the service provider communicates by not registering the service.
 	/// </summary>
-	public sealed partial class WaterboxCore : IDebuggable, ITraceable, ICoreSurfaces
+	public sealed partial class WaterboxCore : IDebuggable, ITraceable, ICoreSurfaces, ICoreSaveData
 	{
 		private string[] _surfaceNames = [ ];
 		private int[][] _surfaceBuffs = [ ];
@@ -70,6 +71,7 @@ namespace Chimera.Emulation.Common.Waterbox
 			if (surfaces is 0) services.Unregister<ICoreSurfaces>();
 			if (_regNames.Length is 0) services.Unregister<IDebuggable>();
 			if (!_session.TraceAvailable) services.Unregister<ITraceable>();
+			if (!_session.SaveDataAvailable) services.Unregister<ICoreSaveData>();
 		}
 
 		// ---------------- ICoreSurfaces ----------------
@@ -134,6 +136,22 @@ namespace Chimera.Emulation.Common.Waterbox
 
 		public long TotalExecutedCycles
 			=> _session.HasExecutedCycles ? _session.ExecutedCycles : throw new NotImplementedException($"{_cfg.CoreName} does not report a cycle count");
+
+		// ---------------- ICoreSaveData ----------------
+		// Pure forwarding: the session snapshots the guest's dynamic file list
+		// and streams bytes out in ranged reads (docs/save-data.md).
+
+		public int SaveDataSnapshot()
+		{
+			CheckDisposed();
+			return _session.SaveDataSnapshot();
+		}
+
+		public string SaveDataName(int index) => _session.SaveDataName(index);
+
+		public long SaveDataSize(int index) => _session.SaveDataSize(index);
+
+		public int SaveDataRead(int index, long offset, byte[] buffer) => _session.SaveDataRead(index, offset, buffer);
 
 		// ---------------- ITraceable ----------------
 
