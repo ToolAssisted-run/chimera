@@ -1511,8 +1511,6 @@ namespace Chimera.Client.GUI
 
 		private readonly PresentationPanel _presentationPanel;
 
-		// countdown for saveram autoflushing
-
 		private void SetStatusBar()
 		{
 			if (!_inFullscreen)
@@ -1683,16 +1681,6 @@ namespace Chimera.Client.GUI
 			var settingsMenuItem = new ToolStripMenuItem { Text = "&Settings" };
 			settingsMenuItem.Click += GenericCoreSettingsMenuItem_Click;
 			GenericCoreSubMenu.DropDownItems.Insert(0, settingsMenuItem);
-
-			// What this machine keeps between sessions, in the core's own words - a cartridge's
-			// SRAM, a disk. It belongs to the core's menu because only the core has the concept:
-			// the frontend cannot name it, and most machines have nothing here at all.
-			var persistentItem = MakePersistentDataMenuItem();
-			if (persistentItem is not null)
-			{
-				GenericCoreSubMenu.DropDownItems.Add(new ToolStripSeparator());
-				GenericCoreSubMenu.DropDownItems.Add(persistentItem);
-			}
 
 			var coreTools = CoreProvidedTools.Concat(SpecializedTools)
 				.Where(Tools.IsAvailable)
@@ -3356,7 +3344,7 @@ namespace Chimera.Client.GUI
 				// it is then up to the core itself to override its own local DeterministicEmulation setting
 				bool deterministic = args.Deterministic ?? MovieSession.NewMovieQueued;
 
-				var loader = _lastRomLoader = new RomLoader(Config, this)
+				var loader = new RomLoader(Config, this)
 				{
 					ChooseArchive = LoadArchiveChooser,
 					ChoosePlatform = romGame => args.ForcedSysID ?? ChoosePlatformForRom(romGame),
@@ -3443,12 +3431,6 @@ namespace Chimera.Client.GUI
 					if (Emulator.HasBoardInfo())
 					{
 						Console.WriteLine("Core reported BoardID: \"{0}\"", Emulator.AsBoardInfo().BoardName);
-					}
-
-					// a movie brings its own starting machine, so nothing is applied under it
-					if (!MovieSession.NewMovieQueued)
-					{
-						LoadBundleAttachments();
 					}
 
 					var previousRom = CurrentlyOpenRom;
@@ -3602,8 +3584,6 @@ namespace Chimera.Client.GUI
 				TryAgainResult saveMovieResult = this.DoWithTryAgainBox(() => MovieSession.StopMovie(), "Failed to save movie.");
 				if (saveMovieResult == TryAgainResult.Canceled) return false;
 			}
-
-			if (!WriteBundleAttachmentsOnClose()) return false;
 
 			TryAgainResult stateSaveResult = this.DoWithTryAgainBox(AutoSaveStateIfConfigured, "Failed to auto-save state.");
 			if (stateSaveResult == TryAgainResult.Canceled) return false;

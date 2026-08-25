@@ -92,16 +92,6 @@ namespace Chimera.Emulation.Common
 		public static string CoreVersion(this IEmulator core)
 			=> core.Attributes() is PortedCoreAttribute ported ? ported.PortedVersion : "";
 
-		public static bool HasPersistentData(this IEmulator core)
-		{
-			return core != null && core.ServiceProvider.HasService<ICorePersistentData>();
-		}
-
-		public static ICorePersistentData AsPersistentData(this IEmulator core)
-		{
-			return core.ServiceProvider.GetService<ICorePersistentData>();
-		}
-
 		public static bool HasSavestates(this IEmulator core)
 		{
 			return core != null && core.ServiceProvider.HasService<IStatable>();

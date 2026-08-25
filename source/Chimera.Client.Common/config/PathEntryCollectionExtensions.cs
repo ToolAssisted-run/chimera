@@ -190,12 +190,6 @@ namespace Chimera.Client.Common
 			return collection.AbsolutePathFor(path, null);
 		}
 
-		public static string MultiDiskAbsolutePath(this PathEntryCollection collection)
-		{
-			var path = collection.ResolveToolsPath(collection[PathEntryCollection.GLOBAL, "Multi-Disk Bundles"].Path);
-			return collection.AbsolutePathFor(path, null);
-		}
-
 		public static string RomAbsolutePath(this PathEntryCollection collection, string systemId = null)
 		{
 			if (string.IsNullOrWhiteSpace(systemId))

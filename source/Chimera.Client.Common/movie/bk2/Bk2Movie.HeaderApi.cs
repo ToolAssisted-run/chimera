@@ -51,33 +51,6 @@ namespace Chimera.Client.Common
 			}
 		}
 
-		/// <summary>
-		/// The bundle this was recorded against, if any: a run that starts from a save
-		/// starts from a bundle, because that is what composes a rom with what a core
-		/// keeps. Name for a human, id for a machine.
-		/// </summary>
-		public string BundleName
-		{
-			get => Header.TryGetValue(HeaderKeys.Bundle, out var s) ? s : "";
-			set
-			{
-				if (string.IsNullOrWhiteSpace(value)) Header.Remove(HeaderKeys.Bundle);
-				else Header[HeaderKeys.Bundle] = value;
-			}
-		}
-
-		public string BundleId
-		{
-			get => Header.TryGetValue(HeaderKeys.BundleId, out var s) ? s : "";
-			set
-			{
-				if (string.IsNullOrWhiteSpace(value)) Header.Remove(HeaderKeys.BundleId);
-				else Header[HeaderKeys.BundleId] = value;
-			}
-		}
-
-		public bool StartsFromBundle => !string.IsNullOrWhiteSpace(BundleId) || !string.IsNullOrWhiteSpace(BundleName);
-
 		public override string GameName
 		{
 			set

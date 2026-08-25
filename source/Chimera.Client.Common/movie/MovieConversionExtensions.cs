@@ -35,8 +35,6 @@ namespace Chimera.Client.Common
 			tas.StartsFromSavestate = old.StartsFromSavestate;
 			tas.TextSavestate = old.TextSavestate;
 			tas.BinarySavestate = old.BinarySavestate;
-			tas.BundleName = old.BundleName;
-			tas.BundleId = old.BundleId;
 
 			return tas;
 		}
@@ -70,8 +68,6 @@ namespace Chimera.Client.Common
 
 			bk2.TextSavestate = old.TextSavestate;
 			bk2.BinarySavestate = old.BinarySavestate;
-			bk2.BundleName = old.BundleName;
-			bk2.BundleId = old.BundleId;
 
 			return bk2;
 		}

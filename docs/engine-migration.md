@@ -17,7 +17,7 @@ only for the WinForms GUI. Mono then carries windows and dialogs, not emulation.
 ## The boundary
 
 The engine owns exactly **what a headless movie run touches**: waterbox host
-management, core/package loading, firmware resolution, bundles, rom identification,
+management, core/package loading, firmware resolution, rom identification,
 input log, movie record/playback/rerecord, savestates, memory domains, AV dumping,
 Lua. The GUI keeps windows, rendering, input devices, and config presentation.
 
@@ -30,7 +30,7 @@ Rules, in the same spirit as the waterbox boundary:
    pointers are documented with their invalidation rule at the declaration.
 3. **The engine owns movie-correctness state.** The GUI cannot desync what it cannot
    reach.
-4. **Formats do not change.** Movies, bundles, packages, configs written before and
+4. **Formats do not change.** Movies, packages, configs written before and
    after a component moves are byte-compatible. Where the old code had a quirk, the
    engine reproduces the quirk and a comment names it.
 
@@ -54,13 +54,13 @@ long-lived dual paths.
    the format; C# keeps the temp-file/backup plumbing and hands buffers
    across. What a savestate CONTAINS (SavestateFile's lump set, the greenzone
    Zwinder ring) is session policy and moves with step 5.
-4. **Rom identification + bundles + firmware** - DONE. The engine owns SHA1
-   identity hashing (`ce_sha1_hex`), the .gameBundle format/naming rules/
-   ContentId (cJSON vendored in extern/cjson; strict JSON now - no comments or
-   trailing commas; the path rule is pure string logic so both platforms agree),
-   the firmware verdict, and the canonical "<id>=<sha1>" movie line. Config,
-   registry and the filesystem stay C#; GameBundle remains the UI's model
-   object and delegates format concerns.
+4. **Rom identification + firmware** - DONE. The engine owns SHA1 identity
+   hashing (`ce_sha1_hex`), the firmware verdict, and the canonical
+   "<id>=<sha1>" movie line. Config, registry and the filesystem stay C#.
+   (This step also moved the .gameBundle format, with cJSON vendored in
+   extern/cjson; bundles were removed wholesale on 2026-08-25 - see
+   design-principles, "Storing progress: cleared to the ground" - and cJSON
+   stays for waterbox.config.)
 5. Core/package loading + session (the frame loop; the witness gate moves onto the
    engine binary here, dropping Mono/Xvfb from Level B)
    - 5a **package container** - DONE. `ce_package_*`: what makes a path a
@@ -82,14 +82,14 @@ long-lived dual paths.
      adapter is now a thin frontend shell: the machine (host, mounts, Init,
      frame loop, savestates, domains, live settings) is the engine's session,
      the SAME one chimera-run drives - LibMiniBoxHost.cs and WaterboxAbiShim.cs
-     are deleted. The optional tooling/persistent-data groups still reach the
-     guest through the session's TRANSITIONAL guest-proc bridge
+     are deleted. The optional tooling groups still reach the guest through
+     the session's TRANSITIONAL guest-proc bridge
      (ce_session_guest_proc) until they migrate as their own components.
-   - 5b **tooling + persistent data into the session** - DONE. The four
-     tooling groups (surfaces, registers, buses, trace) and the persistent-
-     data channel are probed and driven by the session
-     (`ce_session_surface_*`/`_register_*`/`_bus_*`/`_trace_*`/`_persist_*`);
-     the transitional guest-proc bridge is gone. The session owns the trace
+   - 5b **tooling into the session** - DONE. The four tooling groups
+     (surfaces, registers, buses, trace) are probed and driven by the session
+     (`ce_session_surface_*`/`_register_*`/`_bus_*`/`_trace_*`); the
+     transitional guest-proc bridge is gone. (This step also moved the
+     persistent-data channel, removed wholesale on 2026-08-25.) The session owns the trace
      flag and re-asserts it inside load_state (movie-correctness state
      belongs to the engine). Known gap: the synth core exports none of the
      optional groups, so the gate witnesses only the groups-absent path -

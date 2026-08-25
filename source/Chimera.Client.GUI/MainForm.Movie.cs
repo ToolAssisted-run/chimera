@@ -79,22 +79,6 @@ namespace Chimera.Client.GUI
 				AddOnScreenMessage("Warning: Movie hash does not match the ROM", 5);
 			}
 
-			// the bundle: a movie recorded against one must be replayed against the same one,
-			// or the machine it starts on is not the machine it was recorded on
-			if (MovieSession.Movie.StartsFromBundle)
-			{
-				var loadedId = _openBundle?.ContentId;
-				if (loadedId is null)
-				{
-					AddOnScreenMessage($"Warning: this movie was recorded against bundle \"{MovieSession.Movie.BundleName}\"", 5);
-				}
-				else if (!string.IsNullOrEmpty(MovieSession.Movie.BundleId)
-					&& !loadedId.Equals(MovieSession.Movie.BundleId, StringComparison.OrdinalIgnoreCase))
-				{
-					AddOnScreenMessage("Warning: this bundle is not the one the movie was recorded against", 5);
-				}
-			}
-
 			// The core: version first, because it is the one a person can act on ("get that
 			// commit"), then the package hash, which distinguishes two builds of that same
 			// commit - a different toolchain produces different bytes from identical sources.
@@ -242,14 +226,6 @@ namespace Chimera.Client.GUI
 			// different machine - so a movie that does not record it is not reproducible.
 			var firmware = CoreFirmwareStore.RecordFor(Config, CoreRegistry.Instance, Emulator.Attributes().CoreName);
 			if (!string.IsNullOrWhiteSpace(firmware)) movie.HeaderEntries[HeaderKeys.Firmware] = firmware;
-
-			// ...and if the game came from a bundle, the bundle is part of that contract too: it
-			// is what says the machine started with a save in it, and which one
-			if (_openBundle is not null)
-			{
-				movie.BundleName = _openBundle.Name ?? System.IO.Path.GetFileNameWithoutExtension(_openBundle.Path);
-				movie.BundleId = _openBundle.ContentId ?? "";
-			}
 
 			var settable = GetSettingsAdapterForLoadedCoreUntyped();
 			if (settable.HasSyncSettings)

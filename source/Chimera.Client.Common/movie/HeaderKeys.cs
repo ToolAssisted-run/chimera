@@ -14,8 +14,6 @@ namespace Chimera.Client.Common
 		public const string Author = "Author";
 		public const string Rerecords = "rerecordCount";
 		public const string StartsFromSavestate = "StartsFromSavestate";
-		public const string Bundle = "Bundle"; // the bundle the run was recorded against, by name
-		public const string BundleId = "BundleID"; // ...and by content: hash over the parts' hashes
 		public const string SavestateBinaryBase64Blob = "SavestateBinaryBase64Blob"; // this string will not contain base64: ; it's implicit (this is to avoid another big string op to dice off the base64: substring)
 		public const string Sha1 = "SHA1"; // misleading name; either CRC32, MD5, or SHA1, hex-encoded, unprefixed
 		public const string Sha256 = "SHA256";

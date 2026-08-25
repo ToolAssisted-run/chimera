@@ -72,19 +72,8 @@ namespace Chimera.Client.Common
 		byte[] BinarySavestate { get; set; }
 		BitmapBuffer SavestateFramebuffer { get; set; }
 
-		// saveram anchor
-
 
 		bool StartsFromSavestate { get; set; }
-
-		/// <summary>The bundle the run was recorded against - see <see cref="BundleId"/> - or empty.</summary>
-		string BundleName { get; set; }
-
-		/// <summary>Identity of that bundle: a hash over its parts' hashes, so replay can check it.</summary>
-		string BundleId { get; set; }
-
-		/// <summary>True when this movie cites a bundle, which is how a run starts from a save.</summary>
-		bool StartsFromBundle { get; }
 
 
 		string LogKey { get; set; }

@@ -175,59 +175,23 @@ namespace Chimera.Emulation.Common.Engine
 		[BizImport(CallingConvention.Cdecl)]
 		public abstract void ce_sha1_hex(byte[] data, ulong len, byte[] out41);
 
-		[BizImport(CallingConvention.Cdecl)]
-		public abstract IntPtr ce_bundle_parse(byte[] json, ulong len, string fileLabel, ref IntPtr errorOut);
 
-		[BizImport(CallingConvention.Cdecl)]
-		public abstract IntPtr ce_bundle_new();
 
-		[BizImport(CallingConvention.Cdecl)]
-		public abstract void ce_bundle_free(IntPtr bundle);
 
-		[BizImport(CallingConvention.Cdecl)]
-		public abstract IntPtr ce_bundle_name(IntPtr bundle);
 
-		[BizImport(CallingConvention.Cdecl)]
-		public abstract void ce_bundle_set_name(IntPtr bundle, string? name);
 
-		[BizImport(CallingConvention.Cdecl)]
-		public abstract IntPtr ce_bundle_rom_file(IntPtr bundle);
 
-		[BizImport(CallingConvention.Cdecl)]
-		public abstract IntPtr ce_bundle_rom_sha1(IntPtr bundle);
 
-		[BizImport(CallingConvention.Cdecl)]
-		public abstract void ce_bundle_set_rom(IntPtr bundle, string file, string? sha1);
 
-		[BizImport(CallingConvention.Cdecl)]
-		public abstract long ce_bundle_attach_count(IntPtr bundle);
 
-		[BizImport(CallingConvention.Cdecl)]
-		public abstract IntPtr ce_bundle_attach_core(IntPtr bundle, long index);
 
-		[BizImport(CallingConvention.Cdecl)]
-		public abstract IntPtr ce_bundle_attach_id(IntPtr bundle, long index);
 
-		[BizImport(CallingConvention.Cdecl)]
-		public abstract IntPtr ce_bundle_attach_file(IntPtr bundle, long index);
 
-		[BizImport(CallingConvention.Cdecl)]
-		public abstract IntPtr ce_bundle_attach_sha1(IntPtr bundle, long index);
 
-		[BizImport(CallingConvention.Cdecl)]
-		public abstract void ce_bundle_add_attach(IntPtr bundle, string core, string id, string file, string? sha1);
 
-		[BizImport(CallingConvention.Cdecl)]
-		public abstract void ce_bundle_set_attach_sha1(IntPtr bundle, long index, string? sha1);
 
-		[BizImport(CallingConvention.Cdecl)]
-		public abstract IntPtr ce_bundle_content_id(IntPtr bundle);
 
-		[BizImport(CallingConvention.Cdecl)]
-		public abstract IntPtr ce_bundle_serialize(IntPtr bundle, ref ulong lenOut);
 
-		[BizImport(CallingConvention.Cdecl)]
-		public abstract int ce_bundle_check_path(string file);
 
 		[BizImport(CallingConvention.Cdecl)]
 		public abstract int ce_firmware_state(long declaredSize, string expectedSha1s, long actualSize, string actualSha1);
@@ -418,20 +382,10 @@ namespace Chimera.Emulation.Common.Engine
 		[BizImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_session_trace_drain(IntPtr session, ref ulong lenOut, ref int lineCountOut, ref int overflowOut);
 
-		[BizImport(CallingConvention.Cdecl)]
-		public abstract int ce_session_persist_available(IntPtr session);
 
-		[BizImport(CallingConvention.Cdecl)]
-		public abstract IntPtr ce_session_persist_name(IntPtr session);
 
-		[BizImport(CallingConvention.Cdecl)]
-		public abstract IntPtr ce_session_persist_id(IntPtr session);
 
-		[BizImport(CallingConvention.Cdecl)]
-		public abstract IntPtr ce_session_persist_get(IntPtr session, ref ulong lenOut);
 
-		[BizImport(CallingConvention.Cdecl)]
-		public abstract int ce_session_persist_put(IntPtr session, byte[] data, ulong len);
 	}
 
 	public static class ChimeraEngine
@@ -766,77 +720,6 @@ namespace Chimera.Emulation.Common.Engine
 	}
 
 	/// <summary>
-	/// A .gameBundle held by the engine, which owns the catalogue's format,
-	/// naming rules and identity. Used transiently: parse or fill, read out,
-	/// dispose - the frontend's own bundle object stays the living model.
-	/// </summary>
-	public sealed class EngineBundle : IDisposable
-	{
-		private IntPtr _bundle;
-
-		public EngineBundle() => _bundle = ChimeraEngine.Instance.ce_bundle_new();
-
-		private EngineBundle(IntPtr bundle) => _bundle = bundle;
-
-		/// <exception cref="InvalidOperationException">the text is not an acceptable bundle</exception>
-		public static EngineBundle Parse(string json, string fileLabel)
-		{
-			var bytes = Encoding.UTF8.GetBytes(json);
-			var error = IntPtr.Zero;
-			var bundle = ChimeraEngine.Instance.ce_bundle_parse(bytes, (ulong)bytes.LongLength, fileLabel, ref error);
-			if (bundle == IntPtr.Zero)
-			{
-				throw new InvalidOperationException(ChimeraEngine.PtrToStringUtf8(error) ?? $"{fileLabel} is not a readable bundle");
-			}
-			return new(bundle);
-		}
-
-		public void Dispose()
-		{
-			if (_bundle == IntPtr.Zero) return;
-			ChimeraEngine.Instance.ce_bundle_free(_bundle);
-			_bundle = IntPtr.Zero;
-		}
-
-		public string? Name
-		{
-			get => ChimeraEngine.PtrToStringUtf8(ChimeraEngine.Instance.ce_bundle_name(_bundle));
-			set => ChimeraEngine.Instance.ce_bundle_set_name(_bundle, value);
-		}
-
-		public string RomFile => ChimeraEngine.PtrToStringUtf8(ChimeraEngine.Instance.ce_bundle_rom_file(_bundle)) ?? "";
-
-		public string? RomSha1 => ChimeraEngine.PtrToStringUtf8(ChimeraEngine.Instance.ce_bundle_rom_sha1(_bundle));
-
-		public void SetRom(string file, string? sha1) => ChimeraEngine.Instance.ce_bundle_set_rom(_bundle, file, sha1);
-
-		public long AttachCount => ChimeraEngine.Instance.ce_bundle_attach_count(_bundle);
-
-		public (string Core, string Id, string File, string? Sha1) AttachAt(long index)
-			=> (ChimeraEngine.PtrToStringUtf8(ChimeraEngine.Instance.ce_bundle_attach_core(_bundle, index)) ?? "",
-				ChimeraEngine.PtrToStringUtf8(ChimeraEngine.Instance.ce_bundle_attach_id(_bundle, index)) ?? "",
-				ChimeraEngine.PtrToStringUtf8(ChimeraEngine.Instance.ce_bundle_attach_file(_bundle, index)) ?? "",
-				ChimeraEngine.PtrToStringUtf8(ChimeraEngine.Instance.ce_bundle_attach_sha1(_bundle, index)));
-
-		public void AddAttach(string core, string id, string file, string? sha1)
-			=> ChimeraEngine.Instance.ce_bundle_add_attach(_bundle, core, id, file, sha1);
-
-		/// <summary>The bundle's identity over its parts, or null when anything is unpinned.</summary>
-		public string? ContentId => ChimeraEngine.PtrToStringUtf8(ChimeraEngine.Instance.ce_bundle_content_id(_bundle));
-
-		/// <summary>Indented JSON, ready to write to disk.</summary>
-		public string Serialize()
-		{
-			ulong len = 0;
-			var p = ChimeraEngine.Instance.ce_bundle_serialize(_bundle, ref len);
-			return ChimeraEngine.PtrToStringUtf8(p, len);
-		}
-
-		/// <summary>0 = fine; 1 = names no file; 2 = absolute path; 3 = escapes the bundle's folder.</summary>
-		public static int CheckPath(string file) => ChimeraEngine.Instance.ce_bundle_check_path(file);
-	}
-
-	/// <summary>
 	/// A core package's container, held by the engine: zip or directory form,
 	/// identity, entry access. What the entries mean stays with the caller until
 	/// the session migrates.
@@ -1069,23 +952,6 @@ namespace Chimera.Emulation.Common.Engine
 			Marshal.Copy(p, ret, 0, checked((int)len));
 			return ret;
 		}
-
-		public bool PersistAvailable => E.ce_session_persist_available(_session) is not 0;
-		public string PersistName => ChimeraEngine.PtrToStringUtf8(E.ce_session_persist_name(_session)) ?? "Persistent Data";
-		public string PersistId => ChimeraEngine.PtrToStringUtf8(E.ce_session_persist_id(_session)) ?? "data";
-		/// <returns>the core's serialized keep-data, or null when it has nothing right now</returns>
-		public byte[]? PersistGet()
-		{
-			ulong len = 0;
-			var p = E.ce_session_persist_get(_session, ref len);
-			if (p == IntPtr.Zero || len == 0) return null;
-			var ret = new byte[len];
-			Marshal.Copy(p, ret, 0, checked((int)len));
-			return ret;
-		}
-
-		/// <summary>0 = accepted; 1 = the core refused the file; 2 = no room for it.</summary>
-		public int PersistPut(byte[] data) => E.ce_session_persist_put(_session, data, (ulong)data.LongLength);
 
 		private string LastError
 			=> ChimeraEngine.PtrToStringUtf8(E.ce_session_last_error(_session)) ?? "engine session error";

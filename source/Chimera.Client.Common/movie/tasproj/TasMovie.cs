@@ -47,8 +47,6 @@ namespace Chimera.Client.Common
 			}
 			else
 			{
-				// a run that starts from a save starts from a BUNDLE, which the rom loader
-				// has already composed into the machine before we get here
 				TasStateManager.Engage(emulator.AsStatable().CloneSavestate());
 			}
 

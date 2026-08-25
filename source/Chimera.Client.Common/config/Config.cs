@@ -113,10 +113,6 @@ namespace Chimera.Client.Common
 		public bool SkipSuperuserPrivsCheck { get; set; }
 
 		/// <summary>
-		/// Makes a .bak file before any saveram-writing operation (could be extended to make timestamped backups)
-		/// </summary>
-
-		/// <summary>
 		/// Whether to make AutoSave files at periodic intervals
 		/// </summary>
 

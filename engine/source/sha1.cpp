@@ -1,6 +1,10 @@
-/* sha1.cpp - FIPS 180-1 SHA1, straightforwardly. */
+/* sha1.cpp - FIPS 180-1 SHA1, straightforwardly. The ce_sha1_hex ABI entry
+ * lives here too: it is the identity hash the frontend uses everywhere, so it
+ * belongs with the hash, not with whichever caller happened to need it first. */
 
 #include "sha1.hpp"
+
+#include "chimera/engine.h"
 
 #include <cstring>
 
@@ -98,3 +102,10 @@ std::string sha1Hex(const uint8_t *data, uint64_t len)
 }
 
 } // namespace chimera
+
+extern "C" void ce_sha1_hex(const uint8_t *data, uint64_t len, char *out41)
+{
+	std::string hex = chimera::sha1Hex(data, len);
+	std::memcpy(out41, hex.data(), 40);
+	out41[40] = '\0';
+}

@@ -1076,71 +1076,31 @@ firmware file means. It checks size and hash because the declaration told it wha
 to check, and hands over bytes. Whether they are the right bytes for the machine
 is the core's business.
 
-## Persistent data and bundles (user-decided, 2026-08-14)
+## Storing progress: cleared to the ground (user-decided, 2026-08-25)
 
-"SaveRAM" is one console family's word, and Chimera was full of it: a File menu,
-an autosave timer, a per-system save directory, a movie header flag, a lump
-inside every .bk2. All of it deleted - 362 references across 34 files - and
-replaced by two ideas that do not know what a cartridge is.
+Two designs for "what a machine keeps" have now been removed, and the ground is
+deliberately bare while a third is designed.
 
-**Persistent data.** A core says it keeps something, says what to CALL it
-("Cartridge SRAM", "Disk Contents") and what to file it under ("sram", "disk"),
-and hands over opaque bytes. The frontend repeats the core's words and moves the
-bytes. `ICorePersistentData`; guest ABI `GetPersistentSize` / `GetPersistent` /
-`GetPersistentBuffer` / `PutPersistent`, plus `GetPersistentName` and
-`GetPersistentId` so even the label comes from the core. Exposed in the core's
-OWN menu (Emulator > Cartridge SRAM > Write to File... / Write to Bundle /
-Compose Bundle...), because it is a fact about that machine and not a frontend
-feature.
+The first was BizHawk's: a SaveRAM file per rom, an autosave timer, a per-system
+save directory, and `StartsFromSaveRam` putting a copy of the save inside the
+movie. It was replaced on 2026-08-14 by a core-declared persistent-data channel
+(`ICorePersistentData`, guest `GetPersistent*`/`PutPersistent`) plus `.gameBundle`
+catalogues that named a rom and its attachments, with a movie citing the bundle
+it was recorded against.
 
-**Bundles.** A game that is more than one file: `game.gameBundle`, a small JSON
-CATALOGUE naming a rom and any attachments, each pinned by SHA1, all of them
-sitting in the same folder as the bundle. It holds no data of its own - it is a
-few hundred bytes, editing a save does not mean rebuilding anything, and the rom
-it names is still the rom you already had.
+That second design is now gone too, at the user's decision: the frontend must not
+be the thing that decides when progress reaches the disc. Removed with it: the
+persistent-data channel and its guest ABI group, bundles (the format, the engine's
+`ce_bundle_*` ABI, the loader path, the compose/write-back UI), the automatic
+write-back on rom close, the `Bundle`/`BundleID` movie header keys, and the gates
+that witnessed them. The cores lost their `GetPersistent*` exports and the test
+runners their `--saveram-in`/`--saveram-out` flags.
 
-- **Identity is over the parts, not the file**: a hash of the parts' hashes. So
-  renaming a bundle, or writing it out with different formatting, does not change
-  what a movie recorded - but changing a save does.
-- **Only files beside it.** No absolute paths, no `..`. A catalogue that reaches
-  elsewhere is a catalogue that only works on one machine.
-- **Attachments are addressed to a core** by name and by the id that core
-  declared, so a save for one core is never fed to another.
-- **This is how a movie starts from a save.** BizHawk's `StartsFromSaveRam` put a
-  copy of the save inside the .bk2, where it could not be inspected or shared;
-  the movie now cites `Bundle` and `BundleID`, and replay warns when the bundle
-  loaded is not the one recorded against. The blob-in-a-movie is gone.
-- **Loading is never implicit.** Nothing is looked for next to a rom; a bare rom
-  boots clean every time. A bundle IS the statement "this game starts with this
-  in it", and is also the standing instruction to write back to it on close.
+What holds until the replacement lands: **a rom boots clean, every time, and
+nothing is written beside it.** A machine's progress lives only in savestates,
+which are explicit and belong to the user. Nothing in the frontend knows what an
+SRAM is - and this time nothing knows what a save is at all.
 
-## Save files: the core decides what a machine keeps (2026-08-14)
-
-A save file is not a memory domain the frontend copies out. Only the core knows
-what belongs in one: for a battery cart it is the WRAM verbatim, but for the
-Famicom Disk System it is the difference between the disk now and the disk as it
-was inserted - which exists nowhere as a block of memory, and has to be computed.
-
-So the ABI moves opaque bytes. Optional guest group: `GetSaveRamSize`,
-`GetSaveRam` (fill a guest-owned buffer, return it), `GetSaveRamBuffer(size)`
-and `PutSaveRam(length)`. The host reads and writes; it never interprets. The
-buffer is `ECL_INVISIBLE`, because a save file is not machine state - it is what
-OUTLIVES the machine - and must never enter a savestate.
-
-- **Size zero means no save**, and the adapter then unregisters `ISaveRam`, which
-  is what greys out File > Save RAM. The same core answers differently per rom:
-  a battery cart and a disk have a save, a plain cartridge does not.
-- **The core may refuse a file** (`PutSaveRam` returns 0) - wrong size, wrong
-  number of disk sides. BizHawk's frontend silently truncated or zero-padded the
-  file to the size the core reported, which turns "this save belongs to another
-  game" into a corrupted save loaded without a word. Here the file goes over
-  whole at the length it is on disk, and a refusal is an on-screen message with
-  the machine booting clean - a bad save is not a reason to refuse the game.
-- **Nothing new in the UI.** The frontend already had all of it: File > Save RAM
-  > Flush Save Ram (with a hotkey), autosave on a timer with the more-recent-
-  autosave prompt, a flush on close, and per-system Save RAM paths. It was dead
-  code for want of a core that had a save file; the work was the channel, not the
-  window.
 
 ## Opening a core is something you do (2026-08-14)
 

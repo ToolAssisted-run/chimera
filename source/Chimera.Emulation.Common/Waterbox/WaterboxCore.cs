@@ -17,8 +17,8 @@ namespace Chimera.Emulation.Common.Waterbox
 	/// docs/engine-migration.md) - the same machine chimera-run drives headlessly
 	/// and the witness gate's Level E verifies. What remains here is the
 	/// frontend-facing half: IEmulator and friends, the settings objects, and the
-	/// service surfaces the optional tooling/persistent-data groups back - the
-	/// groups themselves are probed and driven by the session.
+	/// service surfaces the optional tooling groups back - the groups themselves
+	/// are probed and driven by the session.
 	/// </summary>
 	// The attribute names the ADAPTER, which is all a class-level attribute can do
 	// when one class serves every package. It is the fallback; the real identity
@@ -104,7 +104,6 @@ namespace Chimera.Emulation.Common.Waterbox
 			// The optional tooling ABI (see WaterboxCore.Tooling.cs) - may append bus
 			// domains to the list, so it runs before the domains are published.
 			InitTooling((BasicServiceProvider)ServiceProvider, domains);
-			InitPersistentData((BasicServiceProvider)ServiceProvider);
 			((BasicServiceProvider)ServiceProvider).Register<IMemoryDomains>(new MemoryDomainList(domains));
 		}
 
@@ -164,7 +163,6 @@ namespace Chimera.Emulation.Common.Waterbox
 		public bool FrameAdvance(IController controller, bool render, bool renderSound = true)
 		{
 			CheckDisposed();
-			_persistMaybeDirty = true; // see PersistentDataModified: any frame may have written to the save
 			ulong input = 0;
 			for (int i = 0; i < _buttons.Length; i++)
 			{

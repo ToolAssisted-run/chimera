@@ -281,15 +281,6 @@ struct ce_session
 	std::string traceHeader = "Instructions";
 	bool traceDesired = false;
 	std::vector<uint8_t> traceOut;
-	// persistent data
-	int32_t (*persistSize)() = nullptr;
-	uintptr_t (*persistGet)() = nullptr;
-	uintptr_t (*persistBuffer)(int32_t) = nullptr;
-	int32_t (*persistPut)(int32_t) = nullptr;
-	bool persistAvailable = false;
-	std::string persistName = "Persistent Data";
-	std::string persistId = "data";
-	std::vector<uint8_t> persistOut;
 
 	// ---- the session's movie ----
 	ce_movie_log *movie = nullptr;
@@ -440,27 +431,6 @@ void ce_session::probeOptionalGroups()
 			if (h != nullptr) traceHeader = h;
 			traceSetEnabled = setEnabled;
 			traceSetEnabled(0); // tracing costs the guest time; off until a sink asks
-		}
-	}
-
-	// persistent data: a core may export the group and still keep nothing for
-	// THIS rom (the same NES core runs battery carts, plain carts and disks)
-	{
-		persistSize = reinterpret_cast<int32_t (*)()>(opt("GetPersistentSize", 0));
-		persistGet = reinterpret_cast<uintptr_t (*)()>(opt("GetPersistent", 0));
-		persistBuffer = reinterpret_cast<uintptr_t (*)(int32_t)>(opt("GetPersistentBuffer", 1));
-		persistPut = reinterpret_cast<int32_t (*)(int32_t)>(opt("PutPersistent", 1));
-		persistAvailable = persistSize != nullptr && persistGet != nullptr && persistSize() != 0;
-		if (persistAvailable)
-		{
-			/* what the core calls it, and what a bundle files it under; both are
-			 * the core's vocabulary, and the frontend only ever repeats them */
-			auto name = reinterpret_cast<uintptr_t (*)()>(opt("GetPersistentName", 0));
-			auto id = reinterpret_cast<uintptr_t (*)()>(opt("GetPersistentId", 0));
-			const char *n = name != nullptr ? cstr(name()) : nullptr;
-			const char *i = id != nullptr ? cstr(id()) : nullptr;
-			if (n != nullptr) persistName = n;
-			if (i != nullptr) persistId = i;
 		}
 	}
 }
@@ -1025,37 +995,6 @@ const uint8_t *ce_session_trace_drain(
 	if (len_out != nullptr) *len_out = s->traceOut.size();
 	if (line_count_out != nullptr) *line_count_out = lines;
 	return s->traceOut.data();
-}
-
-int32_t ce_session_persist_available(const ce_session *s) { return s->persistAvailable ? 1 : 0; }
-
-const char *ce_session_persist_name(const ce_session *s) { return s->persistName.c_str(); }
-
-const char *ce_session_persist_id(const ce_session *s) { return s->persistId.c_str(); }
-
-const uint8_t *ce_session_persist_get(ce_session *s, uint64_t *len_out)
-{
-	if (len_out != nullptr) *len_out = 0;
-	if (s->persistSize == nullptr || s->persistGet == nullptr) return nullptr;
-	int32_t size = s->persistSize();
-	if (size <= 0) return nullptr;
-	uintptr_t p = s->persistGet();
-	if (p == 0) return nullptr;
-	s->persistOut.assign(
-		reinterpret_cast<const uint8_t *>(p), reinterpret_cast<const uint8_t *>(p) + size);
-	if (len_out != nullptr) *len_out = s->persistOut.size();
-	return s->persistOut.data();
-}
-
-int32_t ce_session_persist_put(ce_session *s, const uint8_t *data, uint64_t len)
-{
-	if (s->persistBuffer == nullptr || s->persistPut == nullptr) return 1;
-	uintptr_t dest = s->persistBuffer(static_cast<int32_t>(len));
-	if (dest == 0) return 2; // no room
-	std::memcpy(reinterpret_cast<void *>(dest), data, static_cast<size_t>(len));
-	/* the core is the judge of whether the file fits the machine - a disk save
-	 * with the wrong number of sides, say - and says so by refusing it */
-	return s->persistPut(static_cast<int32_t>(len)) != 0 ? 0 : 1;
 }
 
 int32_t ce_session_movie_load(ce_session *s, const ce_movie_log *log)

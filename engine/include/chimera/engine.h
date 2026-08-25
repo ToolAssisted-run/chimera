@@ -259,89 +259,9 @@ CE_API const char *ce_state_reader_last_error(ce_state_reader *r);
 
 /* ---- identity hashing ----
  *
- * The hash the frontend identifies files by: roms, bundle parts, firmware.
+ * The hash the frontend identifies files by: roms, firmware.
  * Writes 40 uppercase hex characters plus a NUL into out41. */
 CE_API void ce_sha1_hex(const uint8_t *data, uint64_t len, char *out41);
-
-/* ---- game bundles ----
- *
- * A .gameBundle is a CATALOGUE: a small JSON file naming a rom and per-core
- * attachments sitting beside it, each optionally pinned by SHA1. The engine
- * owns the format, the naming rules, and the bundle's identity (ContentId);
- * the C# object model and the filesystem stay with the caller.
- *
- * One tightening against the old Newtonsoft parser: bundles are now strict
- * JSON - no comments, no trailing commas. Nothing we ever wrote used either.
- */
-
-typedef struct ce_bundle ce_bundle;
-
-/* NULL with *error_out set (static per-thread buffer, valid until the next
- * failed parse on the thread) when the text is not an acceptable bundle:
- * unreadable JSON, a newer format version, no rom, or a part whose file name
- * breaks the naming rules. file_label is used in the error text. */
-CE_API ce_bundle *ce_bundle_parse(
-	const char *json, uint64_t len, const char *file_label, const char **error_out);
-
-CE_API ce_bundle *ce_bundle_new(void);
-CE_API void ce_bundle_free(ce_bundle *b);
-
-/* Accessors return borrowed strings, invalidated by mutation or free;
- * NULL when the field is absent (an unpinned sha1, an unnamed bundle). */
-CE_API const char *ce_bundle_name(const ce_bundle *b);
-CE_API void ce_bundle_set_name(ce_bundle *b, const char *name);
-CE_API const char *ce_bundle_rom_file(const ce_bundle *b);
-CE_API const char *ce_bundle_rom_sha1(const ce_bundle *b);
-CE_API void ce_bundle_set_rom(ce_bundle *b, const char *file, const char *sha1);
-CE_API int64_t ce_bundle_attach_count(const ce_bundle *b);
-CE_API const char *ce_bundle_attach_core(const ce_bundle *b, int64_t index);
-CE_API const char *ce_bundle_attach_id(const ce_bundle *b, int64_t index);
-CE_API const char *ce_bundle_attach_file(const ce_bundle *b, int64_t index);
-CE_API const char *ce_bundle_attach_sha1(const ce_bundle *b, int64_t index);
-CE_API void ce_bundle_add_attach(ce_bundle *b, const char *core, const char *id, const char *file, const char *sha1);
-/* re-pin after rewriting an attachment's file */
-CE_API void ce_bundle_set_attach_sha1(ce_bundle *b, int64_t index, const char *sha1);
-
-/* The bundle's identity: a hash over what its parts ARE (rom sha1, then each
- * attachment's core:id:sha1 ordered by core then id, ordinal), so renaming or
- * reformatting the bundle file changes nothing. NULL when any part is
- * unpinned. Borrowed; invalidated by mutation or another call. */
-CE_API const char *ce_bundle_content_id(ce_bundle *b);
-
-/* Indented JSON, ready to write to disk. Invalidated by any other call. */
-CE_API const char *ce_bundle_serialize(ce_bundle *b, uint64_t *len_out);
-
-/* The naming rule for one part's file field:
- * 0 = fine; 1 = names no file; 2 = absolute (or drive-qualified) path;
- * 3 = escapes the bundle's folder. Pure string logic, so every platform
- * agrees on what a bundle may say. */
-CE_API int32_t ce_bundle_check_path(const char *file);
-
-/* ---- firmware ----
- *
- * The frontend's firmware knowledge is entirely "does this file match what
- * the core declared". The declaration and the file live with the caller;
- * the verdict and the movie's canonical firmware line live here.
- */
-
-/* Classifies, it does not permit: 0 = not the declared size, 1 = right size
- * but no listed hash matches, 2 = matches (or the core listed none). What the
- * frontend does with a file is the frontend's policy - Chimera hands every
- * readable file to the core and warns about anything that is not 2, since a
- * substituted file (a custom system font, a modified BIOS) is a legitimate
- * thing to run, and movies record its hash either way.
- * declared_size 0 means the core pinned no size; expected_sha1s is a
- * newline-separated list of acceptable hashes (case-insensitive), "" when
- * the core pinned none - and pinning none means any dump is good. */
-CE_API int32_t ce_firmware_state(
-	int64_t declared_size, const char *expected_sha1s,
-	int64_t actual_size, const char *actual_sha1);
-
-/* The canonical "<id>=<sha1> <id>=<sha1>" line a movie records: pairs arrive
- * newline-separated in any order, leave sorted by id (ordinal). A different
- * BIOS is a different machine; this line is why replays can say so.
- * Borrowed per-thread buffer, valid until the next call on the thread. */
-CE_API const char *ce_firmware_record_line(const char *pairs, uint64_t *len_out);
 
 /* ---- core packages ----
  *
@@ -485,8 +405,7 @@ CE_API int32_t ce_session_apply_settings(ce_session *s, const char *overrides_js
 /* ---- the optional guest ABI groups ----
  *
  * A core may export any subset of four independent tooling groups (surfaces,
- * registers, buses, trace) plus the persistent-data channel. The session
- * probes them once, post-Init (names and counts may depend on the rom and
+ * registers, buses, trace). The session probes them once, post-Init (names and counts may depend on the rom and
  * settings). An absent group answers with a zero count / zero flag, and the
  * frontend simply does not offer the tool.
  */
@@ -537,17 +456,6 @@ CE_API void ce_session_trace_enable(ce_session *s, int32_t on);
 CE_API const uint8_t *ce_session_trace_drain(
 	ce_session *s, uint64_t *len_out, int32_t *line_count_out, int32_t *overflow_out);
 
-/* persistent data: what the machine keeps when switched off. Only the core
- * knows what belongs in the file, so it serializes into a buffer it owns and
- * the session moves bytes it does not interpret. */
-CE_API int32_t ce_session_persist_available(const ce_session *s); // exported AND nonempty for THIS rom
-CE_API const char *ce_session_persist_name(const ce_session *s);
-CE_API const char *ce_session_persist_id(const ce_session *s);
-/* Borrowed until the next call; NULL when the core has nothing right now. */
-CE_API const uint8_t *ce_session_persist_get(ce_session *s, uint64_t *len_out);
-/* 0 = accepted; 1 = the core refused it (the file does not belong to this
- * game - loading half a save silently would be worse); 2 = no room. */
-CE_API int32_t ce_session_persist_put(ce_session *s, const uint8_t *data, uint64_t len);
 
 /* ---- the session's movie ----
  *

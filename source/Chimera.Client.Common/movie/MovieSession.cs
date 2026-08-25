@@ -226,8 +226,6 @@ namespace Chimera.Client.Common
 			_queuedMovie = null;
 
 			Movie.ProcessSavestate(Movie.Emulator);
-			// Nothing to apply for a run that starts from a save: what a core keeps arrives
-			// with the game, out of the bundle the movie cites.
 
 			if (recordMode)
 			{

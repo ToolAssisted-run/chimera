@@ -269,7 +269,6 @@ engine_src = files(
   'engine/source/state_container.cpp',
   'engine/source/zstd_dyn.cpp',
   'engine/source/sha1.cpp',
-  'engine/source/bundle.cpp',
   'engine/source/firmware.cpp',
   'engine/source/file_io.cpp',
   'engine/source/package.cpp',
@@ -322,7 +321,7 @@ executable(
 )
 
 if not meson.is_cross_build()
-  foreach engine_test : ['movie_log', 'movie_text', 'movie_entry', 'state_container', 'bundle', 'package']
+  foreach engine_test : ['movie_log', 'movie_text', 'movie_entry', 'state_container', 'package']
     test(
       'engine_' + engine_test,
       executable(
