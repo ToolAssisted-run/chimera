@@ -3677,7 +3677,7 @@ namespace Chimera.Client.GUI
 		public BitmapBuffer/*?*/ ReadScreenshotFromSavestate(int slot)
 		{
 			if (!Emulator.HasSavestates()) return null;
-			var path = $"{SaveStatePrefix()}.QuickSave{slot % 10}.State";
+			var path = $"{SaveStatePrefix()}.QuickSave{slot % 10}.{SaveSlotManager.StateExtension}";
 			return File.Exists(path) ? SavestateFile.GetFrameBufferFrom(path) : null;
 		}
 
@@ -3736,10 +3736,10 @@ namespace Chimera.Client.GUI
 
 			if (ToolControllingSavestates is { } tool) return tool.LoadQuickSave(slot);
 
-			var path = $"{SaveStatePrefix()}.{quickSlotName}.State";
+			var path = $"{SaveStatePrefix()}.{quickSlotName}.{SaveSlotManager.StateExtension}";
 			if (!File.Exists(path))
 			{
-				AddOnScreenMessage($"Unable to load {quickSlotName}.State");
+				AddOnScreenMessage($"Unable to load {quickSlotName}.{SaveSlotManager.StateExtension}");
 				return false;
 			}
 
@@ -3829,7 +3829,7 @@ namespace Chimera.Client.GUI
 				return new();
 			}
 
-			var path = $"{SaveStatePrefix()}.{quickSlotName}.State";
+			var path = $"{SaveStatePrefix()}.{quickSlotName}.{SaveSlotManager.StateExtension}";
 			var ret = SaveStateInternal(path, quickSlotName, suppressOSD, true);
 			UpdateStatusSlots();
 			return ret;
@@ -3870,10 +3870,10 @@ namespace Chimera.Client.GUI
 			new FileInfo(path).Directory?.Create();
 
 			var shouldSaveResult = this.ShowFileSaveDialog(
-				fileExt: "State",
+				fileExt: SaveSlotManager.StateExtension,
 				filter: ChimeraSaveStatesFSFilterSet,
 				initDir: path,
-				initFileName: $"{SaveStatePrefix()}.QuickSave0.State");
+				initFileName: $"{SaveStatePrefix()}.QuickSave0.{SaveSlotManager.StateExtension}");
 			if (shouldSaveResult is not null)
 			{
 				ShowMessageIfError(

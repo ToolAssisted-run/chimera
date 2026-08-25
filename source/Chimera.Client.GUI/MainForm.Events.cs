@@ -1199,7 +1199,7 @@ namespace Chimera.Client.GUI
 		private void UndoSavestateContextMenuItem_Click(object sender, EventArgs e)
 		{
 			var slot = Config.SaveSlot;
-			FileWriteResult swapResult = _stateSlots.SwapBackupSavestate(MovieSession.Movie, $"{SaveStatePrefix()}.QuickSave{slot % 10}.State", slot);
+			FileWriteResult swapResult = _stateSlots.SwapBackupSavestate(MovieSession.Movie, $"{SaveStatePrefix()}.QuickSave{slot % 10}.{SaveSlotManager.StateExtension}", slot);
 			if (swapResult.IsError)
 			{
 				this.ErrorMessageBox(swapResult, "Failed to swap state files.");

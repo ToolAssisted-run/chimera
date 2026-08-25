@@ -7,6 +7,9 @@ namespace Chimera.Client.Common
 {
 	public class SaveSlotManager
 	{
+		/// <summary>The savestate file extension, without the dot.</summary>
+		public const string StateExtension = "chimeraState";
+
 		private readonly bool[] _slots = new bool[10];
 		private readonly bool[] _redo = new bool[10];
 
@@ -30,7 +33,7 @@ namespace Chimera.Client.Common
 				}
 				else
 				{
-					var file = new FileInfo($"{saveStatePrefix}.QuickSave{i % 10}.State");
+					var file = new FileInfo($"{saveStatePrefix}.QuickSave{i % 10}.{StateExtension}");
 					file.Directory?.Create();
 					_slots[i - 1] = file.Exists;
 				}

@@ -8,9 +8,9 @@ namespace Chimera.Tests.Client.Common.Movie
 		[TestMethod]
 		[DataRow(null, null)]
 		[DataRow("", "")]
-		[DataRow("C:\\Temp\\TestMovie.tas", "C:\\Temp\\TestMovie.tasproj")]
-		[DataRow("C:\\Temp\\TestMovie.tasproj.tas", "C:\\Temp\\TestMovie.tasproj.tasproj")]
-		[DataRow("C:\\Temp\\TestMovie.tasproj", "C:\\Temp\\TestMovie.tasproj")]
+		[DataRow("C:\\Temp\\TestMovie.chimeraMovie", "C:\\Temp\\TestMovie.chimeraProject")]
+		[DataRow("C:\\Temp\\TestMovie.chimeraProject.chimeraMovie", "C:\\Temp\\TestMovie.chimeraProject.chimeraProject")]
+		[DataRow("C:\\Temp\\TestMovie.chimeraProject", "C:\\Temp\\TestMovie.chimeraProject")]
 		public void ConvertFileNameToTasMovie(string original, string expected)
 		{
 			PlatformTestUtils.OnlyRunOnWindows();

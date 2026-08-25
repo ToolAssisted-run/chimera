@@ -282,7 +282,7 @@ PY
 		fi
 	fi
 
-	# --- a real .bk2 through the real movie pipeline ---
+	# --- a real .chimeraMovie through the real movie pipeline ---
 	# Everything above drives input by script; this composes an actual movie
 	# file from the win inputs and lets MovieSession play it. The engine parses
 	# the entries, the frontend latches them, and the dumps must match the same
@@ -290,7 +290,7 @@ PY
 	if [ "$record" -eq 0 ]; then
 		mname=gridWalker.win
 		mrom="$here/roms/${mname%%.*}.testrom"
-		mbk2="$work/$mname.bk2"
+		mbk2="$work/$mname.chimeraMovie"
 		python3 - "$here/movies/$mname.txt" "$mbk2" <<'PY'
 import sys, zipfile
 entries = [l.rstrip("\r\n") for l in open(sys.argv[1]) if l.startswith("|")]

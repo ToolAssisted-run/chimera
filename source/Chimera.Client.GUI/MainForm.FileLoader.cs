@@ -96,7 +96,7 @@ namespace Chimera.Client.GUI
 					case ".LUASES":
 						sortedFiles[LoadOrdering.LuaSession].Add(fileInformation);
 						break;
-					case ".STATE":
+					case ".CHIMERASTATE":
 						sortedFiles[LoadOrdering.State].Add(fileInformation);
 						break;
 					case ".CHT":

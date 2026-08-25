@@ -225,7 +225,7 @@ namespace Chimera.Client.GUI
 			// 
 			// SaveBk2BackupMenuItem
 			// 
-			this.SaveBk2BackupMenuItem.Text = "Save Bk2 Backup";
+			this.SaveBk2BackupMenuItem.Text = "Save Movie Backup";
 			this.SaveBk2BackupMenuItem.Click += new System.EventHandler(this.SaveBk2BackupMenuItem_Click);
 			// 
 			// RecentSubMenu
@@ -254,7 +254,7 @@ namespace Chimera.Client.GUI
 			// 
 			// ToBk2MenuItem
 			// 
-			this.ToBk2MenuItem.Text = "&Export to Bk2";
+			this.ToBk2MenuItem.Text = "&Export to .chimeraMovie";
 			this.ToBk2MenuItem.Click += new System.EventHandler(this.ToBk2MenuItem_Click);
 			// 
 			// EditSubMenu

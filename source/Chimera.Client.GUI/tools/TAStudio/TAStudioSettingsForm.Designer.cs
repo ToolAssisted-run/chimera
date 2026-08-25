@@ -324,7 +324,7 @@
 			this.BackupOnSaveCheckbox.Size = new System.Drawing.Size(226, 17);
 			this.BackupOnSaveCheckbox.TabIndex = 204;
 			this.BackupOnSaveCheckbox.Text = "When manually saving, also save .backup";
-			this.toolTip1.SetToolTip(this.BackupOnSaveCheckbox, "Save a backup .tasproj after each manual file save.");
+			this.toolTip1.SetToolTip(this.BackupOnSaveCheckbox, "Save a backup .chimeraProject after each manual file save.");
 			this.BackupOnSaveCheckbox.UseVisualStyleBackColor = true;
 			// 
 			// AutosaveBackupCheckbox
@@ -346,7 +346,7 @@
 			this.AutosaveBk2Checkbox.Size = new System.Drawing.Size(89, 17);
 			this.AutosaveBk2Checkbox.TabIndex = 202;
 			this.AutosaveBk2Checkbox.Text = "Save as .tas";
-			this.toolTip1.SetToolTip(this.AutosaveBk2Checkbox, "Autosave will export the movie to a .tas file instead of saving a .tasproj file.");
+			this.toolTip1.SetToolTip(this.AutosaveBk2Checkbox, "Autosave will export the movie to a .chimeraMovie file instead of saving a .chimeraProject file.");
 			this.AutosaveBk2Checkbox.UseVisualStyleBackColor = true;
 			// 
 			// label5

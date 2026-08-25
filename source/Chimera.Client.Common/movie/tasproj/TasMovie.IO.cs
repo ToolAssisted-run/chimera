@@ -72,7 +72,7 @@ namespace Chimera.Client.Common
 			}
 			else
 			{
-				Session.PopupMessage("The current .tasproj is not compatible with this version of Chimera! .tasproj features failed to load.");
+				Session.PopupMessage("The current .chimeraProject is not compatible with this version of Chimera! Project features failed to load.");
 				Markers.Add(0, StartsFromSavestate ? "Savestate" : "Power on");
 			}
 

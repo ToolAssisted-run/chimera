@@ -51,7 +51,7 @@ namespace Chimera.Client.Common
 		/// Chimera's movie extension. The format is unchanged from the one
 		/// BizHawk writes; only the name differs, and the type names still say Bk2.
 		/// </remarks>
-		public const string Extension = "tas";
+		public const string Extension = "chimeraMovie";
 
 		public event EventHandler ChangesChanged;
 

@@ -214,7 +214,7 @@ namespace Chimera.Client.GUI
 
 			if (fileInfo is not null)
 			{
-				MessageStatusLabel.Text = "Exporting to .tas...";
+				MessageStatusLabel.Text = "Exporting to .chimeraMovie...";
 				MessageStatusLabel.Owner.Update();
 
 				Cursor = Cursors.WaitCursor;
@@ -227,7 +227,7 @@ namespace Chimera.Client.GUI
 				while (saveResult.IsError)
 				{
 					DialogResult d = MessageBox.Show(
-						$"Failed to save .tas. {saveResult.UserFriendlyErrorMessage()}\nTry again?",
+						$"Failed to save .chimeraMovie. {saveResult.UserFriendlyErrorMessage()}\nTry again?",
 						"Error",
 						MessageBoxButtons.YesNo);
 					if (d == DialogResult.Yes) saveResult = bk2.Save();
@@ -237,7 +237,7 @@ namespace Chimera.Client.GUI
 			}
 			else
 			{
-				MessageStatusLabel.Text = "bk2 export cancelled.";
+				MessageStatusLabel.Text = "Movie export cancelled.";
 			}
 
 			if (Settings.AutosaveInterval > 0)
