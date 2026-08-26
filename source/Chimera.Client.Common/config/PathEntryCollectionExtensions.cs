@@ -142,6 +142,17 @@ namespace Chimera.Client.Common
 			return isAbsolute ? path : PathUtils.ExeDirectoryPath;
 		}
 
+		/// <summary>
+		/// The folder inspected for firmware matches before the user is ever
+		/// asked (docs/project.md): drop dumps here once, satisfy wizards forever.
+		/// </summary>
+		public static string FirmwareAbsolutePath(this PathEntryCollection collection)
+		{
+			var entry = collection[PathEntryCollection.GLOBAL, "Firmware"];
+			var path = entry?.Path ?? Path.Combine(".", "Firmware");
+			return collection.AbsolutePathFor(path, null);
+		}
+
 		public static string MovieAbsolutePath(this PathEntryCollection collection)
 		{
 			var path = collection[PathEntryCollection.GLOBAL, "Movies"].Path;

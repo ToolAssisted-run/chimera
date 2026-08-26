@@ -97,9 +97,32 @@ settings:
 The engine evaluates (ce_firmware_evaluate), everywhere the question is
 asked: the wizard's last page, and the core factory at load time - a
 required file the user never provided stops the load with its name.
-The project records the provided files as pins ("firmware": [{"id",
+
+Each requirement lists its CANDIDATES openly - the known-good dumps
+that satisfy it, declared as {"sha1", "name", "label"} (the bare
+"sha1" list remains valid as anonymous candidates). The SHA1 is the
+identity; the name is only a hint of what the file is usually called.
+A file satisfies a requirement exactly when its hash matches a listed
+candidate, whatever the file is named.
+
+The wizard's firmware page inspects the Firmware folder (a path entry)
+FIRST, so a dump dropped there once satisfies wizards forever: every
+plausible file is hashed and matched, the satisfied requirement and
+the exact candidate it matched get their checkmarks, several matching
+files are all listed and selectable, and a per-item Select File button
+covers what the folder could not - allowed even when something was
+already found. A REQUIRED entry accepts only a listed candidate; an
+optional one also takes a custom dump, recorded as unrecognised. The
+project cannot be created until every required entry is satisfied.
+
+The project records the chosen files as pins ("firmware": [{"id",
 "sha1"}]), actual hashes as always; the frontend remembers paths
-per-user in its config, never in the project.
+per-user in its config, never in the project. REOPENING is stricter
+than creation: each pin must be matched exactly, by hash, from the
+Firmware folder or the remembered paths - whichever file matches is
+what the session mounts - and a pin nothing satisfies takes a severe
+are-you-sure (different firmware is a different machine: expect
+desync) to get past.
 
 The declaration lives in a static file generated at core build time and
 shipped in the core package - the same pattern as `waterbox.config` for

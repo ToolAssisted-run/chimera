@@ -77,7 +77,12 @@ namespace Chimera.Client.GUI
 				{
 					using OpenFileDialog dialog = new() { Title = title };
 					return dialog.ShowDialog(this) is DialogResult.OK ? dialog.FileName : null;
-				});
+				},
+				firmwareSearchDirs: [ Config.PathEntries.FirmwareAbsolutePath() ],
+				rememberedFirmwarePath: (coreName, id) =>
+					Config.CoreFirmware.TryGetValue(CoreFirmwareStore.KeyFor(coreName, id), out var remembered)
+						? remembered
+						: null);
 			if (wizard.ShowDialog(this) is not DialogResult.OK) return null;
 
 			// remember where the firmware lives, keyed the way the resolver reads
@@ -143,6 +148,12 @@ namespace Chimera.Client.GUI
 				return false;
 			}
 
+			if (!VerifyFirmwarePins(project))
+			{
+				project.Dispose();
+				return false;
+			}
+
 			_openProject?.Dispose();
 			_openProject = project;
 
@@ -168,6 +179,66 @@ namespace Chimera.Client.GUI
 			if (Visible) Tools.Load<TAStudio>();
 			else Shown += (_, _) => Tools.Load<TAStudio>();
 			return true;
+		}
+
+		/// <summary>
+		/// The project's firmware pins, honored exactly: for each pinned file,
+		/// a file with THAT hash must be on hand (the Firmware folder and the
+		/// remembered paths are searched; whichever matches is what the session
+		/// mounts). A pin nothing satisfies is a different machine, so it takes
+		/// a severe are-you-sure to proceed (docs/project.md).
+		/// </summary>
+		private bool VerifyFirmwarePins(EngineProject project)
+		{
+			List<(string Id, string Sha1)> pins = new();
+			try
+			{
+				foreach (var pin in Newtonsoft.Json.Linq.JArray.Parse(project.FirmwareJson))
+				{
+					var id = pin.Value<string>("id");
+					var sha1 = pin.Value<string>("sha1");
+					if (id is not null && sha1 is not null) pins.Add((id, sha1));
+				}
+			}
+			catch (Newtonsoft.Json.JsonException)
+			{
+				return true; // no usable pins is no constraint
+			}
+			if (pins.Count is 0) return true;
+
+			var coreName = project.CoreName;
+			var index = FirmwareLocator.BuildIndex(
+				[ Config.PathEntries.FirmwareAbsolutePath() ],
+				pins.Select(pin => Config.CoreFirmware.TryGetValue(
+						CoreFirmwareStore.KeyFor(coreName, pin.Id), out var remembered)
+					? remembered
+					: null)
+					.Where(static path => path is not null)!);
+
+			List<string> unsatisfied = new();
+			foreach (var (id, sha1) in pins)
+			{
+				var exact = index.FirstOrDefault(f => f.Sha1.Equals(sha1, StringComparison.OrdinalIgnoreCase));
+				if (exact is not null)
+				{
+					// the session mounts THIS file, exactly what the project names
+					Config.CoreFirmware[CoreFirmwareStore.KeyFor(coreName, id)] = exact.Path;
+				}
+				else
+				{
+					unsatisfied.Add($"{id} = {sha1}");
+				}
+			}
+			if (unsatisfied.Count is 0) return true;
+
+			return this.ModalMessageBox2(
+				caption: "The project's firmware is not on hand",
+				icon: EMsgBoxIcon.Warning,
+				text: "This project was made with firmware that could not be found by hash:"
+					+ $"\n\n{string.Join("\n", unsatisfied)}\n\n"
+					+ "Running with DIFFERENT firmware is a DIFFERENT MACHINE: the movie"
+					+ " will very likely DESYNC, and anything recorded will not reproduce"
+					+ " the original work. Are you sure you want to open it anyway?");
 		}
 
 		/// <summary>
