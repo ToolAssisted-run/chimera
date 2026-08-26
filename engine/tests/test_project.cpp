@@ -86,6 +86,11 @@ int main(int argc, char **argv)
 		ce_project_branch_add(p, "risky route", 400, "2026-08-26 21:00:00", "|..|\n", 5);
 		ce_project_branch_marker_add(p, 0, 350, "the setup", 1);
 		ce_project_subtitle_add(p, "subtitle 100 10 10 300 FFFFFFFF hello");
+		ce_project_header_set(p, "Author", "sergio");
+		ce_project_header_set(p, "Platform", "DOS");
+		ce_project_header_set(p, "Platform", "DOSBox");
+		ce_project_header_set(p, "Doomed", "yes");
+		ce_project_header_set(p, "Doomed", nullptr);
 
 		assert(ce_project_validate(p, SLOTS_DECL, std::strlen(SLOTS_DECL), &err) == 0);
 		assert(ce_project_save(p, path.c_str(), &err) == 0);
@@ -119,6 +124,10 @@ int main(int argc, char **argv)
 		assert(std::strcmp(ce_project_branch_marker_text(p, 0, 0), "the setup") == 0);
 		assert(ce_project_subtitle_count(p) == 1);
 		assert(std::strcmp(ce_project_subtitle_at(p, 0), "subtitle 100 10 10 300 FFFFFFFF hello") == 0);
+		assert(ce_project_header_count(p) == 2);
+		assert(std::strcmp(ce_project_header_key_at(p, 0), "Author") == 0);
+		assert(std::strcmp(ce_project_header_get(p, "Platform"), "DOSBox") == 0);
+		assert(ce_project_header_get(p, "Doomed") == nullptr);
 
 		assert(ce_project_file_count(p) == 4);
 		assert(ce_project_file_status(p, 0) == 1);

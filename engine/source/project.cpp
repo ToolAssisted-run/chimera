@@ -95,6 +95,9 @@ struct ce_project
 	std::vector<Marker> markers;
 	std::vector<Branch> branches;
 	std::vector<std::string> subtitles; // verbatim subtitle lines, in order
+	// movie metadata this format does not first-class (Author, emulator
+	// version, platform facts): ordered key/value pairs, carried verbatim
+	std::vector<std::pair<std::string, std::string>> headers;
 
 	// borrowed-buffer returns
 	std::string settingsOut, firmwareOut, slotsOut;
@@ -150,7 +153,8 @@ ce_project *ce_project_open(const char *path, const char **error_out)
 	/* the format is strict: a key this build does not know is an error, not
 	 * something to drop silently on the next save */
 	static const char *known[] = { "title", "description", "core", "rerecords",
-		"files", "settings", "firmware", "input", "markers", "branches", "subtitles" };
+		"files", "settings", "firmware", "input", "markers", "branches", "subtitles",
+		"headers" };
 	for (cJSON *item = root->child; item != nullptr; item = item->next)
 	{
 		bool ok = false;
@@ -333,6 +337,15 @@ ce_project *ce_project_open(const char *path, const char **error_out)
 			p->subtitles.push_back(item->valuestring);
 		}
 	}
+	if ((j = cJSON_GetObjectItemCaseSensitive(root, "headers")) != nullptr)
+	{
+		if (!cJSON_IsObject(j)) return rejectP("\"headers\" is not an object");
+		for (cJSON *item = j->child; item != nullptr; item = item->next)
+		{
+			if (!cJSON_IsString(item)) return rejectP("every header value is a string");
+			p->headers.emplace_back(item->string != nullptr ? item->string : "", item->valuestring);
+		}
+	}
 
 	cJSON_Delete(root);
 	return p;
@@ -420,6 +433,14 @@ int32_t ce_project_save(ce_project *p, const char *path, const char **error_out)
 		for (const std::string &s : p->subtitles)
 		{
 			cJSON_AddItemToArray(subs, cJSON_CreateString(s.c_str()));
+		}
+	}
+	if (!p->headers.empty())
+	{
+		cJSON *hdrs = cJSON_AddObjectToObject(root, "headers");
+		for (const auto &kv : p->headers)
+		{
+			cJSON_AddStringToObject(hdrs, kv.first.c_str(), kv.second.c_str());
 		}
 	}
 
@@ -641,6 +662,49 @@ int32_t ce_project_branch_marker_keep_state(const ce_project *p, int32_t branch,
 {
 	if (index < 0 || index >= ce_project_branch_marker_count(p, branch)) return 1;
 	return p->branches[branch].markers[index].keepState ? 1 : 0;
+}
+
+/* ---- the headers map: ordered, verbatim ---- */
+
+int32_t ce_project_header_count(const ce_project *p)
+{
+	return static_cast<int32_t>(p->headers.size());
+}
+
+const char *ce_project_header_key_at(const ce_project *p, int32_t index)
+{
+	if (index < 0 || index >= ce_project_header_count(p)) return nullptr;
+	return p->headers[index].first.c_str();
+}
+
+const char *ce_project_header_value_at(const ce_project *p, int32_t index)
+{
+	if (index < 0 || index >= ce_project_header_count(p)) return nullptr;
+	return p->headers[index].second.c_str();
+}
+
+const char *ce_project_header_get(const ce_project *p, const char *key)
+{
+	if (key == nullptr) return nullptr;
+	for (const auto &kv : p->headers)
+	{
+		if (kv.first == key) return kv.second.c_str();
+	}
+	return nullptr;
+}
+
+/* value NULL removes the key; a new key appends, keeping order */
+void ce_project_header_set(ce_project *p, const char *key, const char *value)
+{
+	if (key == nullptr) return;
+	for (size_t i = 0; i < p->headers.size(); i++)
+	{
+		if (p->headers[i].first != key) continue;
+		if (value == nullptr) p->headers.erase(p->headers.begin() + static_cast<long>(i));
+		else p->headers[i].second = value;
+		return;
+	}
+	if (value != nullptr) p->headers.emplace_back(key, value);
 }
 
 /* ---- subtitles: verbatim lines, in order ---- */

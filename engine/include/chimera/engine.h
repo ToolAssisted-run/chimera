@@ -429,6 +429,15 @@ CE_API const char *ce_project_branch_marker_text(const ce_project *p, int32_t br
 CE_API int32_t ce_project_branch_marker_keep_state(const ce_project *p, int32_t branch, int32_t index);
 CE_API void ce_project_branch_marker_add(ce_project *p, int32_t branch, int64_t frame, const char *text, int32_t keep_state);
 
+/* The headers map: movie metadata the format does not first-class (Author,
+ * emulator version, platform facts) as ordered verbatim key/value pairs.
+ * set with a NULL value removes; a new key appends. */
+CE_API int32_t ce_project_header_count(const ce_project *p);
+CE_API const char *ce_project_header_key_at(const ce_project *p, int32_t index);
+CE_API const char *ce_project_header_value_at(const ce_project *p, int32_t index);
+CE_API const char *ce_project_header_get(const ce_project *p, const char *key);
+CE_API void ce_project_header_set(ce_project *p, const char *key, const char *value);
+
 /* subtitles: verbatim display lines, in order */
 CE_API int32_t ce_project_subtitle_count(const ce_project *p);
 CE_API const char *ce_project_subtitle_at(const ce_project *p, int32_t index);
