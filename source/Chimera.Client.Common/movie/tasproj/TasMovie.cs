@@ -8,7 +8,7 @@ using Chimera.Emulation.Common;
 
 namespace Chimera.Client.Common
 {
-	internal sealed partial class TasMovie : Bk2Movie, ITasMovie
+	internal sealed partial class TasMovie : MovieBase, ITasMovie
 	{
 		public new const string Extension = "chimeraProject";
 		private IInputPollable _inputPollable;
@@ -149,7 +149,7 @@ namespace Chimera.Client.Common
 		{
 			if (_displayCache.Frame != frame || Log.Count == 1)
 			{
-				_displayCache.Controller ??= new Bk2Controller(Session.MovieController.Definition, LogKey);
+				_displayCache.Controller ??= new MovieController(Session.MovieController.Definition, LogKey);
 				_displayCache.Controller.SetFromMnemonic(Log[frame]);
 				_displayCache.Frame = frame;
 			}

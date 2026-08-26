@@ -4,7 +4,7 @@ using Chimera.Bizware.Graphics;
 
 namespace Chimera.Client.Common
 {
-	public partial class Bk2Movie
+	public partial class MovieBase
 	{
 		private string _syncSettingsJson = "";
 

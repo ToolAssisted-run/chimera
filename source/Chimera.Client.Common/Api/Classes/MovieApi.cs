@@ -48,7 +48,7 @@ namespace Chimera.Client.Common
 				return string.Empty;
 			}
 
-			return Bk2LogEntryGenerator.GenerateLogEntry(_movieSession.Movie.GetInputState(frame));
+			return LogEntryGenerator.GenerateLogEntry(_movieSession.Movie.GetInputState(frame));
 		}
 
 		// TODO: Change return type to FileWriteResult

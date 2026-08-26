@@ -104,7 +104,7 @@ namespace Chimera.Tests.Client.Common.Movie
 			ITasMovie movie = TasMovieTests.MakeMovie(5);
 			movie.SetBoolState(2, "A", true);
 			movie.SetBoolState(3, "B", true);
-			if (useMultitrack) Bk2MovieTests.SetSingleActiveInput(movie, "B");
+			if (useMultitrack) MovieBaseTests.SetSingleActiveInput(movie, "B");
 
 			ValidateActionCanUndoAndRedo(movie, () =>
 			{
@@ -120,7 +120,7 @@ namespace Chimera.Tests.Client.Common.Movie
 			ITasMovie movie = TasMovieTests.MakeMovie(5);
 			movie.SetBoolState(2, "A", true);
 			movie.SetBoolState(4, "B", true);
-			if (useMultitrack) Bk2MovieTests.SetSingleActiveInput(movie, "B");
+			if (useMultitrack) MovieBaseTests.SetSingleActiveInput(movie, "B");
 
 			ValidateActionCanUndoAndRedo(movie, () =>
 			{
@@ -136,7 +136,7 @@ namespace Chimera.Tests.Client.Common.Movie
 			ITasMovie movie = TasMovieTests.MakeMovie(10);
 			movie.SetBoolState(2, "A", true);
 			movie.SetBoolState(4, "B", true);
-			if (useMultitrack) Bk2MovieTests.SetSingleActiveInput(movie, "B");
+			if (useMultitrack) MovieBaseTests.SetSingleActiveInput(movie, "B");
 
 			// both overloads
 			ValidateActionCanUndoAndRedo(movie, () =>
@@ -159,7 +159,7 @@ namespace Chimera.Tests.Client.Common.Movie
 			ITasMovie movie = TasMovieTests.MakeMovie(5);
 			movie.SetBoolState(2, "A", true);
 			movie.SetBoolState(3, "B", true);
-			if (useMultitrack) Bk2MovieTests.SetSingleActiveInput(movie, "B");
+			if (useMultitrack) MovieBaseTests.SetSingleActiveInput(movie, "B");
 
 			ValidateActionCanUndoAndRedo(movie, () =>
 			{
@@ -199,11 +199,11 @@ namespace Chimera.Tests.Client.Common.Movie
 		public void RecordFrameAtEnd(bool useMultitrack)
 		{
 			ITasMovie movie = TasMovieTests.MakeMovie(5);
-			if (useMultitrack) Bk2MovieTests.SetSingleActiveInput(movie, "A");
+			if (useMultitrack) MovieBaseTests.SetSingleActiveInput(movie, "A");
 
 			ValidateActionCanUndoAndRedo(movie, () =>
 			{
-				Bk2Controller controller = new Bk2Controller(movie.Emulator.ControllerDefinition);
+				MovieController controller = new MovieController(movie.Emulator.ControllerDefinition);
 				controller.SetBool("A", true);
 				movie.RecordFrame(5, controller);
 			});
@@ -215,11 +215,11 @@ namespace Chimera.Tests.Client.Common.Movie
 		public void RecordFrameInMiddle(bool useMultitrack)
 		{
 			ITasMovie movie = TasMovieTests.MakeMovie(5);
-			if (useMultitrack) Bk2MovieTests.SetSingleActiveInput(movie, "A");
+			if (useMultitrack) MovieBaseTests.SetSingleActiveInput(movie, "A");
 
 			ValidateActionCanUndoAndRedo(movie, () =>
 			{
-				Bk2Controller controller = new Bk2Controller(movie.Emulator.ControllerDefinition);
+				MovieController controller = new MovieController(movie.Emulator.ControllerDefinition);
 				controller.SetBool("A", true);
 				movie.RecordFrame(2, controller);
 			});
@@ -232,7 +232,7 @@ namespace Chimera.Tests.Client.Common.Movie
 
 			ValidateActionCanUndoAndRedo(movie, () =>
 			{
-				Bk2Controller controller = new Bk2Controller(movie.Emulator.ControllerDefinition);
+				MovieController controller = new MovieController(movie.Emulator.ControllerDefinition);
 				controller.SetBool("A", true);
 				movie.RecordFrame(0, controller);
 			});
@@ -301,9 +301,9 @@ namespace Chimera.Tests.Client.Common.Movie
 			movie.Markers.Add(9, "");
 			movie.BindMarkersToInput = true;
 
-			Bk2Controller controllerA = new Bk2Controller(movie.Emulator.ControllerDefinition);
+			MovieController controllerA = new MovieController(movie.Emulator.ControllerDefinition);
 			controllerA.SetBool("A", true);
-			string entryA = Bk2LogEntryGenerator.GenerateLogEntry(controllerA);
+			string entryA = LogEntryGenerator.GenerateLogEntry(controllerA);
 
 			int beginIndex = 0;
 			TasMovieTests.TestAllOperations(movie,
@@ -445,7 +445,7 @@ namespace Chimera.Tests.Client.Common.Movie
 			ITasMovie movie = TasMovieTests.MakeMovie(5);
 			movie.Markers.Add(3, "a");
 
-			Bk2Controller controllerA = new Bk2Controller(movie.Emulator.ControllerDefinition);
+			MovieController controllerA = new MovieController(movie.Emulator.ControllerDefinition);
 			controllerA.SetBool("A", true);
 
 			movie.BindMarkersToInput = true;

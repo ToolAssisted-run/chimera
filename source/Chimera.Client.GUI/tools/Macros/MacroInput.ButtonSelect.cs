@@ -48,7 +48,7 @@ namespace Chimera.Client.GUI
 			s.Refresh();
 
 			// Update the selected zone's key
-			string key = Bk2LogEntryGenerator.GenerateLogKey(MovieSession.MovieController.Definition);
+			string key = LogEntryGenerator.GenerateLogKey(MovieSession.MovieController.Definition);
 			key = key.Replace("#", "");
 
 			foreach (var box in _buttonBoxes)

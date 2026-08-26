@@ -55,8 +55,8 @@ namespace Chimera.Tests.Client.Common.Movie
 			{
 				DefaultTasStateManagerSettings = new FakeStateManagerSettings(),
 			};
-			StickySource = new Bk2Controller(emulator.ControllerDefinition);
-			MovieController = new Bk2Controller(emulator.ControllerDefinition);
+			StickySource = new MovieController(emulator.ControllerDefinition);
+			MovieController = new MovieController(emulator.ControllerDefinition);
 		}
 
 		public void AbortQueuedMovie() => throw new NotImplementedException();

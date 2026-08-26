@@ -4,13 +4,13 @@ using Chimera.Emulation.Common;
 namespace Chimera.Tests.Client.Common.Movie
 {
 	[TestClass]
-	public class Bk2MovieTests
+	public class MovieBaseTests
 	{
-		internal static Bk2Movie MakeMovie(int numberOfFrames)
+		internal static MovieBase MakeMovie(int numberOfFrames)
 		{
 			FakeEmulator emu = new FakeEmulator();
 			FakeMovieSession session = new(emu);
-			Bk2Movie movie = new TasMovie(session, "/fake/path.chimeraProject");
+			MovieBase movie = new TasMovie(session, "/fake/path.chimeraProject");
 			session.Movie = movie;
 
 			movie.Attach(emu);
@@ -31,7 +31,7 @@ namespace Chimera.Tests.Client.Common.Movie
 		public void GetInputReturnsDifferentInstances()
 		{
 			// arrange
-			Bk2Movie movie = MakeMovie(2);
+			MovieBase movie = MakeMovie(2);
 			IMovieController controller = movie.Session.MovieController;
 			controller.SetBool("A", true);
 			movie.PokeFrame(0, controller);
@@ -50,7 +50,7 @@ namespace Chimera.Tests.Client.Common.Movie
 		public void MultitrackRecordFrame()
 		{
 			// arrange
-			Bk2Movie movie = MakeMovie(2);
+			MovieBase movie = MakeMovie(2);
 			SetSingleActiveInput(movie, "A");
 			IMovieController controller = movie.Session.MovieController;
 			controller.SetBool("A", true);
@@ -68,7 +68,7 @@ namespace Chimera.Tests.Client.Common.Movie
 		public void MultitrackPokeFrame()
 		{
 			// arrange
-			Bk2Movie movie = MakeMovie(2);
+			MovieBase movie = MakeMovie(2);
 			SetSingleActiveInput(movie, "A");
 			IMovieController controller = movie.Session.MovieController;
 			controller.SetBool("A", true);
@@ -86,7 +86,7 @@ namespace Chimera.Tests.Client.Common.Movie
 		public void MultitrackAppendFrame()
 		{
 			// arrange
-			Bk2Movie movie = MakeMovie(2);
+			MovieBase movie = MakeMovie(2);
 			SetSingleActiveInput(movie, "A");
 			IMovieController controller = movie.Session.MovieController;
 			controller.SetBool("A", true);
@@ -104,7 +104,7 @@ namespace Chimera.Tests.Client.Common.Movie
 		public void MultitrackTruncateFrameWithoutLengthChange()
 		{
 			// arrange
-			Bk2Movie movie = MakeMovie(2);
+			MovieBase movie = MakeMovie(2);
 			IMovieController controller = movie.Session.MovieController;
 			controller.SetBool("A", true);
 			controller.SetBool("B", true);
@@ -125,7 +125,7 @@ namespace Chimera.Tests.Client.Common.Movie
 		public void MultitrackTruncateFrameWithLengthChange()
 		{
 			// arrange
-			Bk2Movie movie = MakeMovie(2);
+			MovieBase movie = MakeMovie(2);
 			SetSingleActiveInput(movie, "A");
 
 			// act

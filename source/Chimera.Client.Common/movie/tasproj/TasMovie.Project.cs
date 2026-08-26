@@ -104,7 +104,7 @@ namespace Chimera.Client.Common
 			// the input lump, exactly the [Input] block a movie file carries
 			var engineLog = ((EngineStringLog)Log).Engine;
 			engineLog.Key = string.IsNullOrEmpty(LogKey)
-				? Bk2LogEntryGenerator.GenerateLogKey(Session.MovieController.Definition)
+				? LogEntryGenerator.GenerateLogKey(Session.MovieController.Definition)
 				: LogKey;
 			p.LogText = engineLog.Serialize(crlf: false);
 

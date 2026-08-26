@@ -1229,7 +1229,7 @@ namespace Chimera.Client.GUI
 				{
 					if (axisSpec.HasValue)
 					{
-						string mnemonic = Bk2MnemonicLookup.LookupAxis(name, MovieSession.Movie.SystemID);
+						string mnemonic = MnemonicLookup.LookupAxis(name, MovieSession.Movie.SystemID);
 						yield return (name, mnemonic, axisSpec.Value.MaxCharacters);
 					}
 					else

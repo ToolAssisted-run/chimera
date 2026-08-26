@@ -5,7 +5,7 @@ using Chimera.Common.StringExtensions;
 
 namespace Chimera.Emulation.Common
 {
-	public static class Bk2MnemonicLookup
+	public static class MnemonicLookup
 	{
 		private const string PFX_RETROPAD = "RetroPad ";
 
@@ -1061,9 +1061,9 @@ namespace Chimera.Emulation.Common
 			},
 		};
 
-		static Bk2MnemonicLookup()
+		static MnemonicLookup()
 		{
-			const string ERR_FMT_STR = $"{nameof(Bk2MnemonicLookup)}.{{1}}[\"{{0}}\"] must not be '.' as that indicates unpressed buttons";
+			const string ERR_FMT_STR = $"{nameof(MnemonicLookup)}.{{1}}[\"{{0}}\"] must not be '.' as that indicates unpressed buttons";
 			foreach (var (k, v) in BaseMnemonicLookupTable)
 			{
 				Debug.Assert(v is not '.', ERR_FMT_STR, k, nameof(BaseMnemonicLookupTable));

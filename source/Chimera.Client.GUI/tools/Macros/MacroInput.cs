@@ -15,7 +15,7 @@ namespace Chimera.Client.GUI
 		[RequiredService]
 		private IEmulator Emulator { get; set; }
 
-		public static readonly FilesystemFilterSet MacrosFSFilterSet = new FilesystemFilterSet(new FilesystemFilter("Movie Macros", new[] { "bk2m" }));
+		public static readonly FilesystemFilterSet MacrosFSFilterSet = new FilesystemFilterSet(new FilesystemFilter("Movie Macros", new[] { "chimeraMacro" }));
 
 		public static Icon ToolIcon
 			=> Properties.Resources.TAStudioIcon;

@@ -25,13 +25,13 @@ namespace Chimera.Client.Common
 		public MovieZone(IMovie movie, int start, int length)
 			: this(movie)
 		{
-			_inputKey = CleanInputKey(Bk2LogEntryGenerator.GenerateLogKey(_movieDefinition));
+			_inputKey = CleanInputKey(LogEntryGenerator.GenerateLogKey(_movieDefinition));
 			_log = new string[length];
 
 			// Get a IController that only contains buttons in key.
 			InitController();
 
-			string movieKey = CleanInputKey(Bk2LogEntryGenerator.GenerateLogKey(_controller.Definition));
+			string movieKey = CleanInputKey(LogEntryGenerator.GenerateLogKey(_controller.Definition));
 			if (_inputKey == movieKey)
 			{
 				for (int i = 0; i < length; i++)
@@ -44,7 +44,7 @@ namespace Chimera.Client.Common
 				for (int i = 0; i < length; i++)
 				{
 					_controller.SetFrom(movie.GetInputState(i + start));
-					_log[i] = Bk2LogEntryGenerator.GenerateLogEntry(_controller);
+					_log[i] = LogEntryGenerator.GenerateLogEntry(_controller);
 				}
 			}
 		}
@@ -71,7 +71,7 @@ namespace Chimera.Client.Common
 				}
 			}
 
-			_controller = new Bk2Controller(d.MakeImmutable());
+			_controller = new MovieController(d.MakeImmutable());
 			d.BuildMnemonicsCache(_sysId);
 		}
 
@@ -92,13 +92,13 @@ namespace Chimera.Client.Common
 			IMovieController oldController = _controller;
 			InitController();
 
-			IMovieController temp = new Bk2Controller(_movieDefinition);
+			IMovieController temp = new MovieController(_movieDefinition);
 			for (int i = 0; i < Length; i++)
 			{
 				oldController.SetFromMnemonic(_log[i]);
 				LatchFromSourceButtons(temp, oldController);
 				_controller.SetFrom(temp);
-				_log[i] = Bk2LogEntryGenerator.GenerateLogEntry(_controller);
+				_log[i] = LogEntryGenerator.GenerateLogEntry(_controller);
 			}
 		}
 
@@ -137,7 +137,7 @@ namespace Chimera.Client.Common
 				{
 					int frame = i + start;
 					_controller.SetFromMnemonic(_log[i]);
-					IMovieController frameState = movie.GetInputState(frame) ?? new Bk2Controller(_movieDefinition);
+					IMovieController frameState = movie.GetInputState(frame) ?? new MovieController(_movieDefinition);
 					ORLatchFromSource(frameState, _controller);
 					movie.PokeFrame(frame, frameState);
 				}
@@ -149,7 +149,7 @@ namespace Chimera.Client.Common
 				{
 					int frame = i + start;
 					_controller.SetFromMnemonic(_log[i]);
-					IMovieController frameState = movie.GetInputState(frame) ?? new Bk2Controller(_movieDefinition);
+					IMovieController frameState = movie.GetInputState(frame) ?? new MovieController(_movieDefinition);
 					LatchFromSourceButtons(frameState, _controller);
 					movie.PokeFrame(frame, frameState);
 				}
@@ -190,7 +190,7 @@ namespace Chimera.Client.Common
 			// If the LogKey contains buttons/controls not accepted by the emulator,
 			// tell the user and display the macro's controller name and player count
 			macro._inputKey = readText[0];
-			string key = CleanInputKey(Bk2LogEntryGenerator.GenerateLogKey(macro._movieDefinition));
+			string key = CleanInputKey(LogEntryGenerator.GenerateLogKey(macro._movieDefinition));
 			string[] emuKeys = key.Split('|');
 			string[] macroKeys = macro._inputKey.Split('|');
 			foreach (var macroKey in macroKeys)

@@ -20,10 +20,10 @@
 		<EmbeddedResource Include="Resources/**/*" />
 	</ItemGroup>
 	<ItemGroup>
-		<Compile Update="movie/bk2/Bk2Movie.HeaderApi.cs" DependentUpon="Bk2Movie.cs" />
-		<Compile Update="movie/bk2/Bk2Movie.InputLog.cs" DependentUpon="Bk2Movie.cs" />
-		<Compile Update="movie/bk2/Bk2Movie.IO.cs" DependentUpon="Bk2Movie.cs" />
-		<Compile Update="movie/bk2/Bk2Movie.ModeApi.cs" DependentUpon="Bk2Movie.cs" />
+		<Compile Update="movie/base/MovieBase.HeaderApi.cs" DependentUpon="MovieBase.cs" />
+		<Compile Update="movie/base/MovieBase.InputLog.cs" DependentUpon="MovieBase.cs" />
+		<Compile Update="movie/base/MovieBase.IO.cs" DependentUpon="MovieBase.cs" />
+		<Compile Update="movie/base/MovieBase.ModeApi.cs" DependentUpon="MovieBase.cs" />
 		<Compile Update="movie/tasproj/TasMovie.Editing.cs" DependentUpon="TasMovie.cs" />
 		<Compile Update="movie/tasproj/TasMovie.IO.cs" DependentUpon="TasMovie.cs" />
 	</ItemGroup>

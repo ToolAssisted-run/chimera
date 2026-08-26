@@ -3,7 +3,7 @@
 namespace Chimera.Client.Common
 {
 	/// <remarks>the Header.txt lump itself is parsed and rendered by the engine</remarks>
-	public class Bk2Header : Dictionary<string, string>
+	public class MovieHeader : Dictionary<string, string>
 	{
 		public new string this[string key]
 		{

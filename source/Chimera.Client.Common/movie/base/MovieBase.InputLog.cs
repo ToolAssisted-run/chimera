@@ -5,7 +5,7 @@ using Chimera.Emulation.Common.Engine;
 
 namespace Chimera.Client.Common
 {
-	public partial class Bk2Movie
+	public partial class MovieBase
 	{
 		protected IStringLog Log { get; set; } = StringLogUtil.MakeStringLog();
 		public string LogKey { get; set; }
@@ -18,7 +18,7 @@ namespace Chimera.Client.Common
 			// engine-side storage (see docs/engine-migration.md); the EOL matches
 			// what TextWriter.WriteLine wrote here historically
 			var engineLog = ((EngineStringLog)Log).Engine;
-			engineLog.Key = string.IsNullOrEmpty(LogKey) ? Bk2LogEntryGenerator.GenerateLogKey(Session.MovieController.Definition) : LogKey;
+			engineLog.Key = string.IsNullOrEmpty(LogKey) ? LogEntryGenerator.GenerateLogKey(Session.MovieController.Definition) : LogKey;
 			writer.Write(engineLog.Serialize(crlf: writer.NewLine == "\r\n"));
 		}
 
@@ -26,7 +26,7 @@ namespace Chimera.Client.Common
 		{
 			return frame < FrameCount && frame >= 0
 				? Log[frame]
-				: Bk2LogEntryGenerator.EmptyEntry(Session.MovieController);
+				: LogEntryGenerator.EmptyEntry(Session.MovieController);
 		}
 
 		public virtual bool ExtractInputLog(TextReader reader, out string errorMessage)

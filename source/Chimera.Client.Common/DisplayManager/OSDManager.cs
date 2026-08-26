@@ -192,7 +192,7 @@ namespace Chimera.Client.Common
 
 		private static string MakeStringFor(IController controller)
 		{
-			return Bk2InputDisplayGenerator.Generate(controller);
+			return InputDisplayGenerator.Generate(controller);
 		}
 
 		private string MakeIntersectImmediatePrevious()

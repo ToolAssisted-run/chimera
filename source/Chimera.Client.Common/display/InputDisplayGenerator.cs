@@ -6,9 +6,9 @@ namespace Chimera.Client.Common
 {
 	/// <summary>
 	/// Generates a display friendly version of the input log entry
-	/// using .bk2 mnemonics as the basis for display
+	/// using movie-log mnemonics as the basis for display
 	/// </summary>
-	public static class Bk2InputDisplayGenerator
+	public static class InputDisplayGenerator
 	{
 		public static string Generate(IController source)
 		{

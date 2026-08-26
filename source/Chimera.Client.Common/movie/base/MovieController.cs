@@ -5,19 +5,19 @@ using Chimera.Emulation.Common;
 
 namespace Chimera.Client.Common
 {
-	internal class Bk2Controller : IMovieController
+	internal class MovieController : IMovieController
 	{
 		private readonly Dictionary<string, int> _myAxisControls = new();
 
 		private readonly Dictionary<string, bool> _myBoolButtons = new();
 
-		public Bk2Controller(ControllerDefinition definition, string logKey) : this(definition)
+		public MovieController(ControllerDefinition definition, string logKey) : this(definition)
 		{
 			if (!string.IsNullOrEmpty(logKey))
-				Definition = new Bk2ControllerDefinition(definition, logKey);
+				Definition = new MovieControllerDefinition(definition, logKey);
 		}
 
-		public Bk2Controller(ControllerDefinition definition)
+		public MovieController(ControllerDefinition definition)
 		{
 			Definition = definition;
 			foreach ((string axisName, AxisSpec range) in definition.Axes)
@@ -93,11 +93,11 @@ namespace Chimera.Client.Common
 			_myAxisControls[buttonName] = value;
 		}
 
-		private class Bk2ControllerDefinition : ControllerDefinition
+		private class MovieControllerDefinition : ControllerDefinition
 		{
 			private readonly IReadOnlyList<IReadOnlyList<(string, AxisSpec?)>> _controlsFromLogKey;
 
-			public Bk2ControllerDefinition(ControllerDefinition sourceDefinition, string logKey)
+			public MovieControllerDefinition(ControllerDefinition sourceDefinition, string logKey)
 				: base(sourceDefinition)
 			{
 				var groups = logKey.Split('#');

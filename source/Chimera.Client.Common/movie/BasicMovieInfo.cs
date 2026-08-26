@@ -12,7 +12,7 @@ namespace Chimera.Client.Common
 		private string _filename;
 		private bool IsPal => Header[HeaderKeys.Pal] == "1";
 
-		protected readonly Bk2Header Header = new();
+		protected readonly MovieHeader Header = new();
 
 		public BasicMovieInfo(string filename)
 		{

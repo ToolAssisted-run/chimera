@@ -301,7 +301,7 @@ namespace Chimera.Client.GUI
 					}
 
 					_tasClipboard.Add(new TasClipboardEntry(index, input));
-					var logEntry = Bk2LogEntryGenerator.GenerateLogEntry(input);
+					var logEntry = LogEntryGenerator.GenerateLogEntry(input);
 					sb.AppendLine(Settings.CopyIncludesFrameNo ? $"{FrameToStringPadded(index)} {logEntry}" : logEntry);
 				}
 
@@ -366,7 +366,7 @@ namespace Chimera.Client.GUI
 					}
 
 					_tasClipboard.Add(new TasClipboardEntry(index, input));
-					sb.AppendLine(Bk2LogEntryGenerator.GenerateLogEntry(input));
+					sb.AppendLine(LogEntryGenerator.GenerateLogEntry(input));
 				}
 
 				Clipboard.SetDataObject(sb.ToString());

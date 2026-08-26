@@ -70,7 +70,7 @@ namespace Chimera.Client.Common
 
 		public void PokeFrame(int frame, string source)
 		{
-			Bk2Controller controller = new(Session.MovieController.Definition, LogKey);
+			MovieController controller = new(Session.MovieController.Definition, LogKey);
 			controller.SetFromMnemonic(source);
 			PokeFrame(frame, controller);
 		}
@@ -203,7 +203,7 @@ namespace Chimera.Client.Common
 			{
 				int count = inputLogCopy.Count;
 				// add empty frames at the end
-				Log.AddRange(Enumerable.Repeat(Bk2LogEntryGenerator.EmptyEntry(Session.MovieController), count));
+				Log.AddRange(Enumerable.Repeat(LogEntryGenerator.EmptyEntry(Session.MovieController), count));
 				// shift inputs to future frames
 				_inputMoveCache.Clear();
 				for (int i = Log.Count - 1; i >= frame + count; i--)
@@ -211,7 +211,7 @@ namespace Chimera.Client.Common
 					MoveFrame(readFrom: i - count, writeTo: i);
 				}
 				// write the new inputs
-				Bk2Controller controller = new(Session.MovieController.Definition, LogKey);
+				MovieController controller = new(Session.MovieController.Definition, LogKey);
 				for (int i = 0; i < count; i++)
 				{
 					controller.SetFromMnemonic(inputLogCopy[i]);
@@ -230,7 +230,7 @@ namespace Chimera.Client.Common
 
 			foreach (var input in inputStates)
 			{
-				inputLog.Add(Bk2LogEntryGenerator.GenerateLogEntry(input));
+				inputLog.Add(LogEntryGenerator.GenerateLogEntry(input));
 			}
 
 			InsertInput(frame, inputLog); // Sets the ChangeLog
@@ -254,7 +254,7 @@ namespace Chimera.Client.Common
 				IController controller = states[i];
 				if (ActiveControllerInputs != null)
 					controller = new MultitrackAdapter(controller, GetInputState(frame + i), ActiveControllerInputs);
-				Log[frame + i] = Bk2LogEntryGenerator.GenerateLogEntry(controller);
+				Log[frame + i] = LogEntryGenerator.GenerateLogEntry(controller);
 			}
 			int firstChangedFrame = ChangeLog.SetGeneralRedo();
 
@@ -272,12 +272,12 @@ namespace Chimera.Client.Common
 
 			if (ActiveControllerInputs == null)
 			{
-				Log.InsertRange(frame, Enumerable.Repeat(Bk2LogEntryGenerator.EmptyEntry(Session.MovieController), count));
+				Log.InsertRange(frame, Enumerable.Repeat(LogEntryGenerator.EmptyEntry(Session.MovieController), count));
 			}
 			else
 			{
 				// add empty frames at the end
-				Log.AddRange(Enumerable.Repeat(Bk2LogEntryGenerator.EmptyEntry(Session.MovieController), count));
+				Log.AddRange(Enumerable.Repeat(LogEntryGenerator.EmptyEntry(Session.MovieController), count));
 				// shift inputs to future frames
 				_inputMoveCache.Clear();
 				for (int i = Log.Count - 1; i >= frame + count; i--)
@@ -299,7 +299,7 @@ namespace Chimera.Client.Common
 		{
 			int oldLength = InputLogLength;
 
-			string inputs = Bk2LogEntryGenerator.GenerateLogEntry(Session.StickySource);
+			string inputs = LogEntryGenerator.GenerateLogEntry(Session.StickySource);
 			for (int i = 0; i < numFrames; i++)
 			{
 				Log.Add(inputs);
@@ -320,7 +320,7 @@ namespace Chimera.Client.Common
 			var adapter = GetInputState(frame);
 			adapter.SetBool(buttonName, !adapter.IsPressed(buttonName));
 
-			Log[frame] = Bk2LogEntryGenerator.GenerateLogEntry(adapter);
+			Log[frame] = LogEntryGenerator.GenerateLogEntry(adapter);
 			ChangeLog.AddBoolToggle(frame, buttonName, !adapter.IsPressed(buttonName));
 
 			if (endBatch) ChangeLog.EndBatch();
@@ -345,7 +345,7 @@ namespace Chimera.Client.Common
 			if (old != val)
 			{
 				adapter.SetBool(buttonName, val);
-				Log[frame] = Bk2LogEntryGenerator.GenerateLogEntry(adapter);
+				Log[frame] = LogEntryGenerator.GenerateLogEntry(adapter);
 				ChangeLog.AddBoolToggle(frame, buttonName, old);
 			}
 
@@ -372,7 +372,7 @@ namespace Chimera.Client.Common
 				bool old = adapter.IsPressed(buttonName);
 				adapter.SetBool(buttonName, val);
 
-				Log[frame + i] = Bk2LogEntryGenerator.GenerateLogEntry(adapter);
+				Log[frame + i] = LogEntryGenerator.GenerateLogEntry(adapter);
 
 				if (firstChangedFrame == -1 && old != val)
 				{
@@ -403,7 +403,7 @@ namespace Chimera.Client.Common
 			if (old != val)
 			{
 				adapter.SetAxis(buttonName, val);
-				Log[frame] = Bk2LogEntryGenerator.GenerateLogEntry(adapter);
+				Log[frame] = LogEntryGenerator.GenerateLogEntry(adapter);
 				ChangeLog.AddAxisChange(frame, buttonName, old, val);
 			}
 
@@ -430,7 +430,7 @@ namespace Chimera.Client.Common
 				var old = adapter.AxisValue(buttonName);
 				adapter.SetAxis(buttonName, val);
 
-				Log[frame + i] = Bk2LogEntryGenerator.GenerateLogEntry(adapter);
+				Log[frame + i] = LogEntryGenerator.GenerateLogEntry(adapter);
 
 				if (firstChangedFrame == -1 && old != val)
 				{

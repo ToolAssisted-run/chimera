@@ -36,7 +36,7 @@ namespace Chimera.Emulation.Common
 		private Dictionary<string, char>? _mnemonicsCache;
 
 		/// <summary>
-		/// A mapping between buttons names and their Bk2 mnemonics.
+		/// A mapping between buttons names and their movie-log mnemonics.
 		/// (it's only relevant for buttons, not axes)
 		/// </summary>
 		public IReadOnlyDictionary<string, char>? MnemonicsCache => _mnemonicsCache;
@@ -51,7 +51,7 @@ namespace Chimera.Emulation.Common
 
 			_mnemonicsCache ??= BoolButtons.ToDictionary(
 				static buttonName => buttonName,
-				buttonName => Bk2MnemonicLookup.Lookup(buttonName, sysID));
+				buttonName => MnemonicLookup.Lookup(buttonName, sysID));
 		}
 
 		public ControllerDefinition(string name)

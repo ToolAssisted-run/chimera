@@ -3,7 +3,7 @@ using Chimera.Emulation.Common;
 
 namespace Chimera.Client.Common
 {
-	public abstract partial class Bk2Movie : BasicMovieInfo, IMovie, IDisposable
+	public abstract partial class MovieBase : BasicMovieInfo, IMovie, IDisposable
 	{
 		private IController _defaultValueController;
 		protected IController DefaultValueController
@@ -11,12 +11,12 @@ namespace Chimera.Client.Common
 			get
 			{
 				// LogKey isn't available at construction time, so we have to create this instance when it is accessed.
-				_defaultValueController ??= new Bk2Controller(Session.MovieController.Definition, LogKey);
+				_defaultValueController ??= new MovieController(Session.MovieController.Definition, LogKey);
 				return _defaultValueController;
 			}
 		}
 
-		public Bk2Movie(IMovieSession session, string filename) : base(filename)
+		public MovieBase(IMovieSession session, string filename) : base(filename)
 		{
 			Session = session;
 			Header[HeaderKeys.MovieVersion] = "BizHawk v2.0.0";
@@ -46,11 +46,6 @@ namespace Chimera.Client.Common
 		protected bool MakeBackup { get; set; } = true;
 
 		public abstract string PreferredExtension { get; }
-
-		/// <remarks>
-		/// Chimera's movie extension. The format is unchanged from the one
-		/// BizHawk writes; only the name differs, and the type names still say Bk2.
-		/// </remarks>
 
 		public event EventHandler ChangesChanged;
 
@@ -87,10 +82,10 @@ namespace Chimera.Client.Common
 		{
 			if (ActiveControllerInputs != null)
 			{
-				source = new MultitrackAdapter(source, new Bk2Controller(Session.MovieController.Definition, LogKey), ActiveControllerInputs);
+				source = new MultitrackAdapter(source, new MovieController(Session.MovieController.Definition, LogKey), ActiveControllerInputs);
 			}
 
-			Log.Add(Bk2LogEntryGenerator.GenerateLogEntry(source));
+			Log.Add(LogEntryGenerator.GenerateLogEntry(source));
 			Changes = true;
 		}
 
@@ -115,7 +110,7 @@ namespace Chimera.Client.Common
 				{
 					for (int i = frame; i < Log.Count; i++)
 						PokeFrameCore(i, DefaultValueController);
-					string defaultEntry = Bk2LogEntryGenerator.EmptyEntry(DefaultValueController);
+					string defaultEntry = LogEntryGenerator.EmptyEntry(DefaultValueController);
 					int firstDefault = Log.Count;
 					while (firstDefault > frame && Log[firstDefault - 1] == defaultEntry)
 						firstDefault--;
@@ -131,8 +126,8 @@ namespace Chimera.Client.Common
 		{
 			if (frame < FrameCount && frame >= -1)
 			{
-				Bk2Controller controller = new(Session.MovieController.Definition, LogKey);
-				controller.SetFromMnemonic(frame >= 0 ? Log[frame] : Bk2LogEntryGenerator.EmptyEntry(controller));
+				MovieController controller = new(Session.MovieController.Definition, LogKey);
+				controller.SetFromMnemonic(frame >= 0 ? Log[frame] : LogEntryGenerator.EmptyEntry(controller));
 				return controller;
 			}
 
@@ -153,7 +148,7 @@ namespace Chimera.Client.Common
 				source = new MultitrackAdapter(source, GetInputState(frame) ?? DefaultValueController, ActiveControllerInputs);
 			}
 
-			SetFrameAt(frame, Bk2LogEntryGenerator.GenerateLogEntry(source));
+			SetFrameAt(frame, LogEntryGenerator.GenerateLogEntry(source));
 			Changes = true;
 		}
 

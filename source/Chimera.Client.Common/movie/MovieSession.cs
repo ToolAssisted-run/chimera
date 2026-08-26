@@ -64,13 +64,13 @@ namespace Chimera.Client.Common
 		public IInputAdapter MovieOut { get; } = new CopyControllerAdapter();
 		public IController StickySource { get; set; }
 
-		public IMovieController MovieController { get; private set; } = new Bk2Controller(NullController.Instance.Definition);
+		public IMovieController MovieController { get; private set; } = new MovieController(NullController.Instance.Definition);
 
 		public IMovieController GenerateMovieController(ControllerDefinition definition = null, string logKey = null)
 		{
 			// TODO: should this fallback to Movie.LogKey?
 			// this function is kinda weird
-			return new Bk2Controller(definition ?? MovieController.Definition, logKey);
+			return new MovieController(definition ?? MovieController.Definition, logKey);
 		}
 
 		public void HandleFrameBefore()
@@ -219,7 +219,7 @@ namespace Chimera.Client.Common
 
 		public void RunQueuedMovie(bool recordMode, IEmulator emulator)
 		{
-			MovieController = new Bk2Controller(emulator.ControllerDefinition, _queuedMovie.LogKey);
+			MovieController = new MovieController(emulator.ControllerDefinition, _queuedMovie.LogKey);
 
 			Movie = _queuedMovie;
 			Movie.Attach(emulator);

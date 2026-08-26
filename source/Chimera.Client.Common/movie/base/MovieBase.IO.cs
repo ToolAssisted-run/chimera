@@ -9,7 +9,7 @@ using Chimera.Emulation.Common;
 
 namespace Chimera.Client.Common
 {
-	public partial class Bk2Movie
+	public partial class MovieBase
 	{
 		public FileWriteResult Save()
 		{

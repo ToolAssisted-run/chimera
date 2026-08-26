@@ -21,11 +21,11 @@ namespace Chimera.Tests.Client.Common.Movie
 
 		public static void TestAllOperations(ITasMovie movie, Action PreOperation, Action PostOperation)
 		{
-			Bk2Controller controllerEmpty = new Bk2Controller(movie.Emulator.ControllerDefinition);
-			string entryEmpty = Bk2LogEntryGenerator.GenerateLogEntry(controllerEmpty);
-			Bk2Controller controllerA = new Bk2Controller(movie.Emulator.ControllerDefinition);
+			MovieController controllerEmpty = new MovieController(movie.Emulator.ControllerDefinition);
+			string entryEmpty = LogEntryGenerator.GenerateLogEntry(controllerEmpty);
+			MovieController controllerA = new MovieController(movie.Emulator.ControllerDefinition);
 			controllerA.SetBool("A", true);
-			string entryA = Bk2LogEntryGenerator.GenerateLogEntry(controllerA);
+			string entryA = LogEntryGenerator.GenerateLogEntry(controllerA);
 
 			// Make sure all operations actually do something.
 			movie.SetBoolState(3, "A", true);
@@ -119,7 +119,7 @@ namespace Chimera.Tests.Client.Common.Movie
 			controller.SetBool("A", true);
 			controller.SetBool("B", true);
 			movie.PokeFrame(0, controller);
-			Bk2MovieTests.SetSingleActiveInput(movie, "A");
+			MovieBaseTests.SetSingleActiveInput(movie, "A");
 
 			// act
 			movie.ClearFrame(0);
@@ -138,7 +138,7 @@ namespace Chimera.Tests.Client.Common.Movie
 			controller.SetBool("A", true);
 			controller.SetBool("B", true);
 			movie.PokeFrame(0, controller);
-			Bk2MovieTests.SetSingleActiveInput(movie, "A");
+			MovieBaseTests.SetSingleActiveInput(movie, "A");
 
 			// act
 			movie.RemoveFrame(0);
@@ -158,7 +158,7 @@ namespace Chimera.Tests.Client.Common.Movie
 			controller.SetBool("A", true);
 			controller.SetBool("B", true);
 			movie.PokeFrame(0, controller);
-			Bk2MovieTests.SetSingleActiveInput(movie, "A");
+			MovieBaseTests.SetSingleActiveInput(movie, "A");
 
 			// act
 			movie.RemoveFrames(0, 1);
@@ -174,7 +174,7 @@ namespace Chimera.Tests.Client.Common.Movie
 		{
 			// arrange
 			ITasMovie movie = MakeMovie(2);
-			Bk2MovieTests.SetSingleActiveInput(movie, "A");
+			MovieBaseTests.SetSingleActiveInput(movie, "A");
 			IMovieController controller = movie.Session.MovieController;
 			controller.SetBool("A", true);
 			controller.SetBool("B", true);
@@ -193,13 +193,13 @@ namespace Chimera.Tests.Client.Common.Movie
 		{
 			// arrange
 			ITasMovie movie = MakeMovie(2);
-			Bk2MovieTests.SetSingleActiveInput(movie, "A");
+			MovieBaseTests.SetSingleActiveInput(movie, "A");
 			IMovieController controller = movie.Session.MovieController;
 			controller.SetBool("A", true);
 			controller.SetBool("B", true);
 
 			// act
-			movie.InsertInput(0, Enumerable.Repeat(Bk2LogEntryGenerator.GenerateLogEntry(controller), 1));
+			movie.InsertInput(0, Enumerable.Repeat(LogEntryGenerator.GenerateLogEntry(controller), 1));
 
 			// assert
 			Assert.IsTrue(movie.GetInputState(0).IsPressed("A"));
@@ -212,13 +212,13 @@ namespace Chimera.Tests.Client.Common.Movie
 		{
 			// arrange
 			ITasMovie movie = MakeMovie(2);
-			Bk2MovieTests.SetSingleActiveInput(movie, "A");
+			MovieBaseTests.SetSingleActiveInput(movie, "A");
 			IMovieController controller = movie.Session.MovieController;
 			controller.SetBool("A", true);
 			controller.SetBool("B", true);
 
 			// act
-			movie.InsertInput(0, Bk2LogEntryGenerator.GenerateLogEntry(controller));
+			movie.InsertInput(0, LogEntryGenerator.GenerateLogEntry(controller));
 
 			// assert
 			Assert.IsTrue(movie.GetInputState(0).IsPressed("A"));
@@ -235,7 +235,7 @@ namespace Chimera.Tests.Client.Common.Movie
 			controller.SetBool("A", true);
 			controller.SetBool("B", true);
 			movie.PokeFrame(0, controller);
-			Bk2MovieTests.SetSingleActiveInput(movie, "A");
+			MovieBaseTests.SetSingleActiveInput(movie, "A");
 
 			// act
 			movie.InsertEmptyFrame(0);
@@ -251,7 +251,7 @@ namespace Chimera.Tests.Client.Common.Movie
 		{
 			// arrange
 			ITasMovie movie = MakeMovie(2);
-			Bk2MovieTests.SetSingleActiveInput(movie, "A");
+			MovieBaseTests.SetSingleActiveInput(movie, "A");
 			IMovieController controller = movie.Session.MovieController;
 			controller.SetBool("A", true);
 			controller.SetBool("B", true);

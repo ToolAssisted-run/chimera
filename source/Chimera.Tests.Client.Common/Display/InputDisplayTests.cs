@@ -28,7 +28,7 @@ namespace Chimera.Tests.Client.Common.Display
 		public void Generate_BoolPressed_GeneratesMnemonic()
 		{
 			_boolController["A"] = true;
-			var actual = Bk2InputDisplayGenerator.Generate(_boolController);
+			var actual = InputDisplayGenerator.Generate(_boolController);
 			Assert.AreEqual("A", actual);
 		}
 
@@ -36,7 +36,7 @@ namespace Chimera.Tests.Client.Common.Display
 		public void Generate_BoolUnPressed_GeneratesSpace()
 		{
 			_boolController["A"] = false;
-			var actual = Bk2InputDisplayGenerator.Generate(_boolController);
+			var actual = InputDisplayGenerator.Generate(_boolController);
 			Assert.AreEqual(" ", actual);
 		}
 
@@ -45,17 +45,17 @@ namespace Chimera.Tests.Client.Common.Display
 		{
 			_axisController.AcceptNewAxis("StickX", 0);
 			_axisController.AcceptNewAxis("StickY", 0);
-			var actual = Bk2InputDisplayGenerator.Generate(_axisController);
+			var actual = InputDisplayGenerator.Generate(_axisController);
 			Assert.AreEqual("    0,    0,", actual);
 		}
 
 		[TestMethod]
 		public void Generate_MidRangeDisplaysEmpty()
 		{
-			var actual = Bk2InputDisplayGenerator.Generate(_axisController);
+			var actual = InputDisplayGenerator.Generate(_axisController);
 			Assert.AreEqual("            ", actual);
 			_axisController.AcceptNewAxis("StickX", MidValue);
-			actual = Bk2InputDisplayGenerator.Generate(_axisController);
+			actual = InputDisplayGenerator.Generate(_axisController);
 			Assert.AreEqual("            ", actual);
 		}
 #pragma warning restore BHI1600
