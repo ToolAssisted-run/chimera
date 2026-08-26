@@ -1,0 +1,229 @@
+name: Release
+
+# What users download, built only from what the gates passed.
+#
+# Two kinds of build, deliberately:
+#
+#   dev      a ROLLING prerelease, replaced on every green push to main. One
+#            link that is always the newest; the assets carry the short commit
+#            in their names, so a downloaded file still says what it is.
+#   nightly  an IMMUTABLE dated prerelease, once a day and only when main moved.
+#            The point is not freshness (dev has that) but CITABILITY: after dev
+#            has moved twelve times, "it broke in Tuesday's build" is still a
+#            thing someone can download. The last 14 are kept.
+#
+# Nothing is published that did not pass CI. The release job is triggered by the
+# CI workflow FINISHING SUCCESSFULLY, and builds that same commit.
+
+on:
+  workflow_run:
+    workflows: [ CI ]
+    types: [ completed ]
+    branches: [ main ]
+  schedule:
+    # 05:00 UTC, an hour after CI's own nightly, so it releases a gated commit
+    - cron: '0 5 * * *'
+  workflow_dispatch:
+    inputs:
+      kind:
+        description: 'dev (rolling) or nightly (dated)'
+        required: true
+        default: dev
+        type: choice
+        options: [ dev, nightly ]
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  bundle:
+    # A push-triggered run only publishes when CI was green. A scheduled or
+    # manual run has no CI run attached and is gated by the commit's own status
+    # check below.
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    name: bundle (windows + linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - name: What is being released
+        id: what
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+            sha="${{ github.event.workflow_run.head_sha }}"
+            kind=dev
+          else
+            sha="${{ github.sha }}"
+            kind="${{ github.event.inputs.kind || 'nightly' }}"
+          fi
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "kind=$kind" >> "$GITHUB_OUTPUT"
+          echo "short=$(echo "$sha" | cut -c1-8)" >> "$GITHUB_OUTPUT"
+          echo "date=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.what.outputs.sha }}
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Has main moved since the last nightly?
+        id: moved
+        if: github.event_name == 'schedule'
+        run: |
+          # a nightly of an unchanged commit is a second copy of yesterday's
+          last=$(git tag -l 'nightly-*' --sort=-creatordate | head -1)
+          if [ -n "$last" ] && [ "$(git rev-list -n1 "$last")" = "$(git rev-parse HEAD)" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "main has not moved since $last; nothing to release"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Was this commit gated?
+        if: github.event_name == 'schedule' && steps.moved.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # the scheduled build publishes only a commit CI has passed
+          conclusion=$(gh run list --workflow CI --branch main --limit 20 \
+            --json headSha,conclusion --jq \
+            "[.[] | select(.headSha == \"$(git rev-parse HEAD)\")] | first | .conclusion")
+          if [ "$conclusion" != "success" ]; then
+            echo "CI has not passed for $(git rev-parse --short HEAD) (conclusion: ${conclusion:-none})" >&2
+            exit 1
+          fi
+
+      - name: Install build dependencies
+        if: steps.moved.outputs.skip != 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            meson ninja-build build-essential cmake pkg-config python3 \
+            mingw-w64 \
+            libgl1-mesa-dev libx11-dev libxext-dev libasound2-dev
+
+      - name: Set up .NET
+        if: steps.moved.outputs.skip != 'true'
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0'
+
+      - name: Cache the core guest builds
+        if: steps.moved.outputs.skip != 'true'
+        uses: actions/cache@v4
+        with:
+          # keyed on the exact core commits and the guest kit they build
+          # against: bump one core, rebuild one core
+          path: |
+            extern/cores/*/build
+            extern/cores/*/waterbox/obj-guest
+            extern/cores/*/waterbox/bin
+          key: cores-${{ hashFiles('.gitmodules') }}-${{ hashFiles('.git/modules/*/HEAD') }}-${{ runner.os }}
+
+      - name: Build the Linux bundle
+        if: steps.moved.outputs.skip != 'true'
+        run: ./tools/build-bundle.sh --platform linux --out build/bundle-linux
+
+      - name: Build the Windows bundle
+        if: steps.moved.outputs.skip != 'true'
+        # the managed assemblies and the core packages are already built; only
+        # the natives differ between the two
+        run: ./tools/build-bundle.sh --platform windows --out build/bundle-windows
+
+      - name: Pack
+        id: pack
+        if: steps.moved.outputs.skip != 'true'
+        run: |
+          short="${{ steps.what.outputs.short }}"
+          mkdir -p build/release
+          ( cd build/bundle-windows && zip -qr "../release/chimera-win-x64-$short.zip" . )
+          ( cd build/bundle-linux && tar czf "../release/chimera-linux-x64-$short.tar.gz" . )
+          cp build/bundle-windows/LICENSES.md build/release/LICENSES.md
+          cp build/bundle-windows/BUILD.txt build/release/BUILD.txt
+          ls -la build/release
+
+      - name: Release notes
+        id: notes
+        if: steps.moved.outputs.skip != 'true'
+        run: |
+          short="${{ steps.what.outputs.short }}"
+          {
+            echo "Built from \`$short\` - $(git log -1 --format=%s)"
+            echo
+            echo "| what | file |"
+            echo "| --- | --- |"
+            echo "| Windows x64 | \`chimera-win-x64-$short.zip\` |"
+            echo "| Linux x64 | \`chimera-linux-x64-$short.tar.gz\` |"
+            echo
+            echo "Both carry the frontend, its natives and every core package."
+            echo "\`BUILD.txt\` names the exact commit of each, and \`LICENSES.md\`"
+            echo "states the terms of the whole bundle."
+            echo
+            echo "**This bundle is NON-COMMERCIAL**: it includes cores (Genesis Plus GX,"
+            echo "Opera, Snes9x) whose licences forbid commercial use, and that binds the"
+            echo "whole distribution. See LICENSES.md."
+            echo
+            echo "Windows will warn that the executable is unsigned and from an unknown"
+            echo "publisher; it is not signed, and there is no way around that warning"
+            echo "short of buying a certificate."
+            echo
+            echo "### Cores in this build"
+            echo
+            echo '```'
+            git submodule status extern/cores/* | sed 's/^ //'
+            echo '```'
+          } > build/release/NOTES.md
+
+      - name: Publish the rolling dev release
+        if: steps.moved.outputs.skip != 'true' && steps.what.outputs.kind == 'dev'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # one tag, moved: the link in the README is always the newest build
+          git tag -f dev "${{ steps.what.outputs.sha }}"
+          git push -f origin dev
+          if gh release view dev >/dev/null 2>&1; then
+            gh release edit dev --target "${{ steps.what.outputs.sha }}" \
+              --title "Development build ${{ steps.what.outputs.short }}" \
+              --notes-file build/release/NOTES.md --prerelease
+            # assets carry the commit in their names, so clear the old ones
+            for asset in $(gh release view dev --json assets --jq '.assets[].name'); do
+              gh release delete-asset dev "$asset" --yes
+            done
+          else
+            gh release create dev --target "${{ steps.what.outputs.sha }}" \
+              --title "Development build ${{ steps.what.outputs.short }}" \
+              --notes-file build/release/NOTES.md --prerelease
+          fi
+          gh release upload dev build/release/chimera-*.zip build/release/chimera-*.tar.gz \
+            build/release/LICENSES.md build/release/BUILD.txt --clobber
+
+      - name: Publish the nightly
+        if: steps.moved.outputs.skip != 'true' && steps.what.outputs.kind == 'nightly'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="nightly-${{ steps.what.outputs.date }}"
+          gh release view "$tag" >/dev/null 2>&1 && { echo "$tag already exists"; exit 0; }
+          gh release create "$tag" --target "${{ steps.what.outputs.sha }}" \
+            --title "Nightly ${{ steps.what.outputs.date }} (${{ steps.what.outputs.short }})" \
+            --notes-file build/release/NOTES.md --prerelease
+          gh release upload "$tag" build/release/chimera-*.zip build/release/chimera-*.tar.gz \
+            build/release/LICENSES.md build/release/BUILD.txt --clobber
+
+      - name: Keep the last 14 nightlies
+        if: steps.moved.outputs.skip != 'true' && steps.what.outputs.kind == 'nightly'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # old enough to be gone, recent enough that a bug report from last
+          # week still names something downloadable
+          for tag in $(gh release list --limit 100 --json tagName --jq '.[].tagName' \
+                        | grep '^nightly-' | sort -r | tail -n +15); do
+            echo "pruning $tag"
+            gh release delete "$tag" --yes --cleanup-tag
+          done

@@ -1,5 +1,7 @@
 <p align="center">
 	<a href="https://github.com/ToolAssisted-run/chimera/actions/workflows/ci.yml"><img src="https://github.com/ToolAssisted-run/chimera/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+	<a href="https://github.com/ToolAssisted-run/chimera/releases/tag/dev"><img src="https://img.shields.io/github/v/release/ToolAssisted-run/chimera?include_prereleases&sort=date&label=download&color=2DB3A6" alt="Latest development build"></a>
+	<a href="https://github.com/ToolAssisted-run/chimera/releases"><img src="https://img.shields.io/github/downloads/ToolAssisted-run/chimera/total?label=downloads&color=8A63E8" alt="Downloads"></a>
 </p>
 
 <p align="center">
@@ -15,6 +17,22 @@
 </p>
 
 Chimera is a minimal frontend for creating tool-assisted speedruns (TAS). It keeps BizHawk's TAS toolchain (movies, savestates, TAStudio, RAM tools, Lua) and removes everything else, most importantly every emulation core.
+
+## Getting a build
+
+The **download** badge above is the current development build: a Windows x64
+zip and a Linux x64 tarball, each carrying the frontend, its native libraries
+and every core package, rebuilt on every change to `main` that passes the gates.
+Nothing is published that did not pass them.
+
+That link always points at the newest build. When you need one that will still
+be there next week - to cite in a bug report, or to go back to - take a dated
+[nightly](https://github.com/ToolAssisted-run/chimera/releases) instead: those
+are immutable, and the last fortnight is kept.
+
+Every bundle contains `BUILD.txt`, naming the exact commit of the frontend and
+of every core in it, and `LICENSES.md`, stating the terms of the whole thing.
+**Those terms are non-commercial**, because some of the cores' are.
 
 ## Goals
 

@@ -34,3 +34,38 @@
 [submodule "extern/miniBox"]
 	url = https://github.com/ToolAssisted-run/chimera-common-minibox.git
 	path = extern/miniBox
+[submodule "quickernes"]
+	path = extern/cores/quickernes
+	url = https://github.com/ToolAssisted-run/chimera-core-quickernes.git
+	branch = minihawk-adapter
+	ignore = dirty
+[submodule "neshawk"]
+	path = extern/cores/neshawk
+	url = https://github.com/ToolAssisted-run/chimera-core-neshawk.git
+	branch = minihawk-adapter
+	ignore = dirty
+[submodule "ppsspp"]
+	path = extern/cores/ppsspp
+	url = https://github.com/ToolAssisted-run/chimera-core-ppsspp.git
+	branch = main
+	ignore = dirty
+[submodule "dosbox-x"]
+	path = extern/cores/dosbox-x
+	url = https://github.com/ToolAssisted-run/chimera-core-dosbox-x.git
+	branch = main
+	ignore = dirty
+[submodule "gpgx"]
+	path = extern/cores/gpgx
+	url = https://github.com/ToolAssisted-run/chimera-core-gpgx.git
+	branch = main
+	ignore = dirty
+[submodule "opera"]
+	path = extern/cores/opera
+	url = https://github.com/ToolAssisted-run/chimera-core-opera.git
+	branch = main
+	ignore = dirty
+[submodule "snes9x"]
+	path = extern/cores/snes9x
+	url = https://github.com/ToolAssisted-run/chimera-core-snes9x.git
+	branch = main
+	ignore = dirty
