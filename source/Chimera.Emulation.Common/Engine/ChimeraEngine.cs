@@ -335,6 +335,21 @@ namespace Chimera.Emulation.Common.Engine
 		public abstract void ce_project_branch_marker_add(IntPtr project, int branch, long frame, string text, int keepState);
 
 		[BizImport(CallingConvention.Cdecl)]
+		public abstract int ce_project_header_count(IntPtr project);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_project_header_key_at(IntPtr project, int index);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_project_header_value_at(IntPtr project, int index);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_project_header_get(IntPtr project, string key);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract void ce_project_header_set(IntPtr project, string key, string? value);
+
+		[BizImport(CallingConvention.Cdecl)]
 		public abstract int ce_project_subtitle_count(IntPtr project);
 
 		[BizImport(CallingConvention.Cdecl)]
@@ -1151,6 +1166,20 @@ namespace Chimera.Emulation.Common.Engine
 			=> ChimeraEngine.Instance.ce_project_branch_marker_keep_state(_project, branch, index) is not 0;
 		public void BranchMarkerAdd(int branch, long frame, string text, bool keepState = true)
 			=> ChimeraEngine.Instance.ce_project_branch_marker_add(_project, branch, frame, text, keepState ? 1 : 0);
+
+		public int HeaderCount => ChimeraEngine.Instance.ce_project_header_count(_project);
+		public string HeaderKeyAt(int index)
+			=> ChimeraEngine.PtrToStringUtf8(ChimeraEngine.Instance.ce_project_header_key_at(_project, index)) ?? "";
+		public string HeaderValueAt(int index)
+			=> ChimeraEngine.PtrToStringUtf8(ChimeraEngine.Instance.ce_project_header_value_at(_project, index)) ?? "";
+		public string? HeaderGet(string key)
+			=> ChimeraEngine.PtrToStringUtf8(ChimeraEngine.Instance.ce_project_header_get(_project, key));
+		/// <summary>value null removes the key; a new key appends, keeping order</summary>
+		public void HeaderSet(string key, string? value) => ChimeraEngine.Instance.ce_project_header_set(_project, key, value);
+		public void HeadersClear()
+		{
+			while (HeaderCount > 0) HeaderSet(HeaderKeyAt(HeaderCount - 1), null);
+		}
 
 		public int SubtitleCount => ChimeraEngine.Instance.ce_project_subtitle_count(_project);
 		public string SubtitleAt(int index)

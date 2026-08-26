@@ -144,6 +144,14 @@ namespace Chimera.Client.Common
 				return false;
 			}
 
+			// The JSON .chimeraProject (docs/project.md) is TAStudio's native
+			// format now; the zip forms remain for .chimeraMovie and legacy
+			// tasprojs. One byte tells them apart: a zip can never start '{'.
+			if (LooksLikeProjectJson(Filename))
+			{
+				return LoadProjectFormat();
+			}
+
 			try
 			{
 				using var bl = ZipStateLoader.LoadAndDetect(Filename, true);
@@ -163,6 +171,21 @@ namespace Chimera.Client.Common
 				throw new Exception("Archive appears to be corrupt. Make a backup, then try to repair it with e.g. 7-Zip.", e);
 			}
 		}
+
+		private static bool LooksLikeProjectJson(string path)
+		{
+			using var fs = File.OpenRead(path);
+			int b;
+			while ((b = fs.ReadByte()) is not -1)
+			{
+				if (b is ' ' or '\t' or '\r' or '\n') continue;
+				return b is '{';
+			}
+			return false;
+		}
+
+		/// <summary>Only the TAS movie understands the project format; anything else refuses.</summary>
+		protected virtual bool LoadProjectFormat() => false;
 
 		protected virtual void ClearBeforeLoad()
 		{
