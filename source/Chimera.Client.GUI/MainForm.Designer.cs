@@ -21,8 +21,9 @@ namespace Chimera.Client.GUI
 			this.MainformMenu = new Chimera.WinForms.Controls.MenuStripEx();
 			this.FileSubMenu = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.OpenCoreMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.OpenRomMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.RecentRomSubMenu = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
+			this.NewProjectMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
+			this.OpenProjectMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
+			this.RecentProjectSubMenu = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.toolStripSeparator3 = new Chimera.WinForms.Controls.ToolStripSeparatorEx();
 			this.CloseRomMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.toolStripMenuItem1 = new Chimera.WinForms.Controls.ToolStripSeparatorEx();
@@ -226,8 +227,6 @@ namespace Chimera.Client.GUI
 			this.CoreNameStatusBarButton = new Chimera.WinForms.Controls.StatusLabelEx();
 			this.LinkConnectStatusBarButton = new Chimera.WinForms.Controls.StatusLabelEx();
 			this.MainFormContextMenu = new System.Windows.Forms.ContextMenuStrip(this.components);
-			this.OpenRomContextMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.LoadLastRomContextMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.StopAVContextMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.ContextSeparator_AfterROM = new Chimera.WinForms.Controls.ToolStripSeparatorEx();
 			this.RecordMovieContextMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
@@ -286,9 +285,10 @@ namespace Chimera.Client.GUI
 			// FileSubMenu
 			// 
 			this.FileSubMenu.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.NewProjectMenuItem,
+            this.OpenProjectMenuItem,
+            this.RecentProjectSubMenu,
             this.OpenCoreMenuItem,
-            this.OpenRomMenuItem,
-            this.RecentRomSubMenu,
             this.CloseRomMenuItem,
             this.toolStripMenuItem1,
             this.SaveStateSubMenu,
@@ -308,17 +308,22 @@ namespace Chimera.Client.GUI
 			this.OpenCoreMenuItem.Text = "Open &Core...";
 			this.OpenCoreMenuItem.Click += new System.EventHandler(this.OpenCoreMenuItem_Click);
 			//
-			// OpenRomMenuItem
+			// NewProjectMenuItem
 			//
-			this.OpenRomMenuItem.Text = "&Open ROM...";
-			this.OpenRomMenuItem.Click += new System.EventHandler(this.OpenRomMenuItem_Click);
+			this.NewProjectMenuItem.Text = "&New Chimera Project...";
+			this.NewProjectMenuItem.Click += new System.EventHandler(this.NewProjectMenuItem_Click);
+			//
+			// OpenProjectMenuItem
+			//
+			this.OpenProjectMenuItem.Text = "&Open Project...";
+			this.OpenProjectMenuItem.Click += new System.EventHandler(this.OpenProjectMenuItem_Click);
 			// 
-			// RecentRomSubMenu
+			// RecentProjectSubMenu
 			// 
-			this.RecentRomSubMenu.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+			this.RecentProjectSubMenu.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.toolStripSeparator3});
-			this.RecentRomSubMenu.Text = "&Recent ROM";
-			this.RecentRomSubMenu.DropDownOpened += new System.EventHandler(this.RecentRomMenuItem_DropDownOpened);
+			this.RecentProjectSubMenu.Text = "&Recent Projects";
+			this.RecentProjectSubMenu.DropDownOpened += new System.EventHandler(this.RecentProjectSubMenu_DropDownOpened);
 			// 
 			// 
 			// 
@@ -1594,8 +1599,6 @@ namespace Chimera.Client.GUI
 			// MainFormContextMenu
 			// 
 			this.MainFormContextMenu.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
-            this.OpenRomContextMenuItem,
-            this.LoadLastRomContextMenuItem,
             this.StopAVContextMenuItem,
             this.ContextSeparator_AfterROM,
             this.RecordMovieContextMenuItem,
@@ -1622,16 +1625,6 @@ namespace Chimera.Client.GUI
 			this.MainFormContextMenu.Size = new System.Drawing.Size(217, 490);
 			this.MainFormContextMenu.Closing += new System.Windows.Forms.ToolStripDropDownClosingEventHandler(this.MainFormContextMenu_Closing);
 			this.MainFormContextMenu.Opening += new System.ComponentModel.CancelEventHandler(this.MainFormContextMenu_Opening);
-			// 
-			// OpenRomContextMenuItem
-			// 
-			this.OpenRomContextMenuItem.Text = "Open Rom";
-			this.OpenRomContextMenuItem.Click += new System.EventHandler(this.OpenRomMenuItem_Click);
-			// 
-			// LoadLastRomContextMenuItem
-			// 
-			this.LoadLastRomContextMenuItem.Text = "Load Last ROM";
-			this.LoadLastRomContextMenuItem.Click += new System.EventHandler(this.LoadLastRomContextMenuItem_Click);
 			// 
 			// StopAVContextMenuItem
 			// 
@@ -1833,7 +1826,8 @@ namespace Chimera.Client.GUI
 
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx FileSubMenu;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx OpenCoreMenuItem;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx OpenRomMenuItem;
+		private Chimera.WinForms.Controls.ToolStripMenuItemEx NewProjectMenuItem;
+		private Chimera.WinForms.Controls.ToolStripMenuItemEx OpenProjectMenuItem;
 		private Chimera.WinForms.Controls.ToolStripSeparatorEx toolStripMenuItem1;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx ExitMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx SaveStateSubMenu;
@@ -1881,7 +1875,7 @@ namespace Chimera.Client.GUI
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx DisplayInputMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx DisplayLagCounterMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx LuaConsoleMenuItem;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx RecentRomSubMenu;
+		private Chimera.WinForms.Controls.ToolStripMenuItemEx RecentProjectSubMenu;
 		private Chimera.WinForms.Controls.ToolStripSeparatorEx toolStripSeparator3;
 		private Chimera.WinForms.Controls.ToolStripSeparatorEx toolStripSeparator4;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx SaveSlotSubMenu;
@@ -1949,8 +1943,6 @@ namespace Chimera.Client.GUI
 		private Chimera.WinForms.Controls.ToolStripSeparatorEx toolStripMenuItem4;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx DisplayStatusBarMenuItem;
 		private System.Windows.Forms.ContextMenuStrip MainFormContextMenu;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx OpenRomContextMenuItem;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx LoadLastRomContextMenuItem;
 		private Chimera.WinForms.Controls.ToolStripSeparatorEx ContextSeparator_AfterROM;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx RecordMovieContextMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx PlayMovieContextMenuItem;

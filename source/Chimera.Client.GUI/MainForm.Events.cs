@@ -30,11 +30,7 @@ namespace Chimera.Client.GUI
 				SaveSlotSubMenu.Enabled =
 				Emulator.HasSavestates();
 
-			OpenRomMenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["Open ROM"];
 			CloseRomMenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["Close ROM"];
-
-			// roms can't load before a core does (and core settings should be configurable first)
-			OpenRomMenuItem.Enabled = RecentRomSubMenu.Enabled = CoreRegistry.Instance.AllFactories.Count is not 0;
 
 			CloseRomMenuItem.Enabled = !Emulator.IsNull();
 
@@ -44,8 +40,14 @@ namespace Chimera.Client.GUI
 		private void OpenCoreMenuItem_Click(object sender, EventArgs e)
 			=> OpenCoreDialog();
 
-		private void RecentRomMenuItem_DropDownOpened(object sender, EventArgs e)
-			=> RecentRomSubMenu.ReplaceDropDownItems(Config.RecentRoms.RecentMenu(this, LoadRomFromRecent, "ROM", romLoading: true));
+		private void NewProjectMenuItem_Click(object sender, EventArgs e)
+			=> NewProjectDialog();
+
+		private void OpenProjectMenuItem_Click(object sender, EventArgs e)
+			=> OpenProjectDialog();
+
+		private void RecentProjectSubMenu_DropDownOpened(object sender, EventArgs e)
+			=> RecentProjectSubMenu.ReplaceDropDownItems(Config.RecentProjects.RecentMenu(this, path => LoadProject(path), "Project", noAutoload: true));
 
 		private bool HasSlot(int slot) => _stateSlots.HasSlot(Emulator, MovieSession.Movie, slot, SaveStatePrefix());
 
@@ -201,11 +203,6 @@ namespace Chimera.Client.GUI
 			ScreenshotMenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["Screenshot"];
 			ScreenshotClipboardMenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["Screen Raw to Clipboard"];
 			ScreenshotClientClipboardMenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["Screen Client to Clipboard"];
-		}
-
-		private void OpenRomMenuItem_Click(object sender, EventArgs e)
-		{
-			OpenRom();
 		}
 
 		private void CloseRomMenuItem_Click(object sender, EventArgs e)
@@ -1027,7 +1024,6 @@ namespace Chimera.Client.GUI
 		{
 			MaybePauseFromMenuOpened();
 
-			OpenRomContextMenuItem.Visible = Emulator.IsNull() || _inFullscreen;
 
 			bool showMenuVisible = _inFullscreen || !MainMenuStrip.Visible; // need to always be able to restore this as an emergency measure
 
@@ -1042,7 +1038,6 @@ namespace Chimera.Client.GUI
 				ShowMenuContextMenuSeparator.Visible =
 				showMenuVisible;
 
-			LoadLastRomContextMenuItem.Visible = Emulator.IsNull();
 
 			StopAVContextMenuItem.Visible = _currAviWriter != null;
 
@@ -1074,9 +1069,8 @@ namespace Chimera.Client.GUI
 
 			ConfigContextMenuItem.Visible = _inFullscreen;
 
-			ContextSeparator_AfterROM.Visible = OpenRomContextMenuItem.Visible || LoadLastRomContextMenuItem.Visible;
+			ContextSeparator_AfterROM.Visible = false;
 
-			LoadLastRomContextMenuItem.Enabled = !Config.RecentRoms.Empty;
 			LoadLastMovieContextMenuItem.Enabled = !Config.RecentMovies.Empty;
 
 			if (movieIsActive)
@@ -1131,14 +1125,6 @@ namespace Chimera.Client.GUI
 				SynchChrome();
 				UpdateWindowTitle();
 			}
-		}
-
-		private void LoadLastRomContextMenuItem_Click(object sender, EventArgs e)
-			=> LoadMostRecentROM();
-
-		private void LoadMostRecentROM()
-		{
-			LoadRomFromRecent(Config.RecentRoms.MostRecent);
 		}
 
 		private void LoadLastMovieContextMenuItem_Click(object sender, EventArgs e)

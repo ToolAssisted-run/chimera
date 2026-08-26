@@ -183,8 +183,6 @@ namespace Chimera.Client.GUI
 
 		private void SetImages()
 		{
-			OpenRomMenuItem.Image = Properties.Resources.OpenFile;
-			RecentRomSubMenu.Image = Properties.Resources.Recent;
 			CloseRomMenuItem.Image = Properties.Resources.Close;
 			PreviousSlotMenuItem.Image = Properties.Resources.MoveLeft;
 			NextSlotMenuItem.Image = Properties.Resources.MoveRight;
@@ -241,8 +239,6 @@ namespace Chimera.Client.GUI
 			KeyPriorityStatusLabel.Image = Properties.Resources.Both;
 			CoreNameStatusBarButton.Image = Properties.Resources.ChimeraSmall;
 			LinkConnectStatusBarButton.Image = Properties.Resources.Connect16X16;
-			OpenRomContextMenuItem.Image = Properties.Resources.OpenFile;
-			LoadLastRomContextMenuItem.Image = Properties.Resources.Recent;
 			StopAVContextMenuItem.Image = Properties.Resources.Stop;
 			RecordMovieContextMenuItem.Image = Properties.Resources.Record;
 			PlayMovieContextMenuItem.Image = Properties.Resources.Play;
@@ -553,11 +549,8 @@ namespace Chimera.Client.GUI
 					}
 				}
 			}
-			else if (Config.RecentRoms.AutoLoad && !Config.RecentRoms.Empty
-				&& CoreRegistry.Instance.AllFactories.Count is not 0) // roms can't load before a core does
-			{
-				LoadMostRecentROM();
-			}
+			// no rom autoload: the GUI's entry point is a project (docs/project.md);
+			// the start screen offers New/Open/recents once the window is up
 
 			Config.VideoWriterAudioSyncEffective = _argParser.audiosync ?? Config.VideoWriterAudioSync;
 			_autoDumpLength = _argParser._autoDumpLength;
@@ -661,6 +654,16 @@ namespace Chimera.Client.GUI
 				if (_argParser.luaScript != null)
 				{
 					Tools.LuaConsole.LoadFromCommandLine(_argParser.luaScript.MakeAbsolute());
+				}
+				// the front door: with nothing loaded and nothing scripted, the only
+				// way forward is a project (docs/project.md). Headless runs and
+				// commandline-driven sessions never see it.
+				if (!HeadlessMode.Enabled
+					&& _argParser.luaScript is null && !_argParser.luaConsole
+					&& _argParser.cmdRom is null && _argParser.cmdMovie is null
+					&& Emulator.IsNull())
+				{
+					ShowStartScreen();
 				}
 			};
 
@@ -3361,6 +3364,11 @@ namespace Chimera.Client.GUI
 					Deterministic = deterministic,
 					OpenAdvanced = args.OpenAdvanced,
 				};
+				if (path.EndsWith(".chimeraProject", StringComparison.OrdinalIgnoreCase))
+				{
+					// the resolved project drives the mounts; reboots come this way too
+					loader.Project = _openProject;
+				}
 
 				loader.OnLoadError += ShowLoadError;
 				loader.OnLoadSettings += CoreSettings;

@@ -35,6 +35,20 @@ namespace Chimera.Client.Common
 
 		public string CacheFilename => Filename + ".cache";
 
+		/// <summary>
+		/// Adopts the frontend's RESOLVED instance (files located and hashed for
+		/// this session) in place of the one this movie opened itself, so a save
+		/// records the ACTUAL hashes - a knowing override included. The frontend
+		/// keeps the same instance for mounts; nothing disposes it until the next
+		/// project replaces it.
+		/// </summary>
+		public void UseResolvedProject(EngineProject project)
+		{
+			if (ReferenceEquals(_project, project)) return;
+			_project?.Dispose();
+			_project = project;
+		}
+
 		// header keys the project format first-classes; the rest ride the
 		// project's ordered headers map verbatim
 		private static bool IsFirstClassHeaderKey(string key)

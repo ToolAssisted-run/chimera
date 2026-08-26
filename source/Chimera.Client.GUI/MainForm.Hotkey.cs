@@ -100,14 +100,8 @@ namespace Chimera.Client.GUI
 				case "Full Screen":
 					ToggleFullscreen();
 					break;
-				case "Open ROM":
-					OpenRom();
-					break;
 				case "Close ROM":
 					LoadNullRom();
-					break;
-				case "Load Last ROM":
-					LoadMostRecentROM();
 					break;
 				case "Display FPS":
 					ToggleFps();

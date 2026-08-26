@@ -68,6 +68,9 @@ namespace Chimera.Client.Common
 		public int DispFinalFilter { get; set; } = 0; // None
 		public RecentFiles RecentRoms { get; set; } = new RecentFiles(10);
 
+		/// <summary>the projects the start screen and File menu offer, most recent first</summary>
+		public RecentFiles RecentProjects { get; set; } = new RecentFiles(10);
+
 		/// <summary>last core package loaded via File &gt; Open Core (used to seed the file prompt)</summary>
 		public string LastCorePackagePath { get; set; } = "";
 

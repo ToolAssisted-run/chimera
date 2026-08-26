@@ -17,6 +17,12 @@ namespace Chimera.Client.Common
 		ITasBranchCollection Branches { get; }
 		TasLagLog LagLog { get; }
 		IStringLog VerificationLog { get; }
+
+		/// <summary>
+		/// Adopts the frontend's RESOLVED engine project as this movie's backing
+		/// store, so saves record what actually ran (docs/project.md).
+		/// </summary>
+		void UseResolvedProject(Chimera.Emulation.Common.Engine.EngineProject project);
 		int LastEditedFrame { get; }
 		bool LastEditWasRecording { get; }
 
