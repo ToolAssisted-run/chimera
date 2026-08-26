@@ -92,6 +92,28 @@ namespace Chimera.Tests.Client.GUI
 		}
 
 		[TestMethod]
+		public void WizardFileFormAdapts()
+		{
+			if (ShotDir is null) { Assert.Inconclusive("set CHIMERA_UI_SHOTS to write screenshots"); return; }
+			using var form = MakeWizard();
+			// mutually exclusive slots: the picked disk greys the cartridge
+			form.UseDeclaration(ProjectSlotDeclaration.Parse("""
+				{
+				  "slots": [
+				    { "id": "cart", "title": "Cartridge", "min": 1, "max": 1, "formats": ["nes"],
+				      "help": "An iNES cartridge image.",
+				      "exposedWhen": { "not": { "slot": "fds" } } },
+				    { "id": "fds", "title": "Famicom disk", "min": 1, "max": 1, "formats": ["fds"],
+				      "help": "A Famicom Disk System image - makes the FDS BIOS a firmware requirement.",
+				      "exposedWhen": { "not": { "slot": "cart" } } }
+				  ]
+				}
+				"""));
+			form.AddFileToSlot("fds", "/home/you/games/zelda no densetsu.fds");
+			Shoot(form, "wizard-2-files-adapts");
+		}
+
+		[TestMethod]
 		public void WizardSettingsStep()
 		{
 			if (ShotDir is null) { Assert.Inconclusive("set CHIMERA_UI_SHOTS to write screenshots"); return; }
