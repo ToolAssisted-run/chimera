@@ -33,20 +33,6 @@ namespace Chimera.Client.GUI
 			VersionLabel.Text = VersionInfo.GetFullVersionDetails();
 			DateLabel.Text = VersionInfo.GIT_SHORTDATE;
 			(linkLabel2.Text, linkLabel2.Tag) = VersionInfo.GetGitCommitLink();
-
-			CoreInfoPanel.SuspendLayout();
-			foreach (var coreAttr in CoreRegistry.Instance.AllFactories
-				.Select(static f => CoreRegistry.AttributesFor(f))
-				.Where(static attr => attr is not null)
-				.OrderBy(static attr => attr.Released)
-				.ThenByDescending(static attr => attr.CoreName, StringComparer.OrdinalIgnoreCase))
-			{
-				CoreInfoPanel.Controls.Add(new BizBoxInfoControl(coreAttr)
-				{
-					Dock = DockStyle.Top,
-				});
-			}
-			CoreInfoPanel.ResumeLayout();
 		}
 
 		private void linkLabel2_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)

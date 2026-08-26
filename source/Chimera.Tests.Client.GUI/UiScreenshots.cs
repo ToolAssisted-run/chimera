@@ -48,6 +48,21 @@ namespace Chimera.Tests.Client.GUI
 		}
 
 		/// <summary>
+		/// The About window: it says what this build is, and nothing else. Worth a
+		/// picture because it is all layout - nothing in it is driven by state.
+		/// </summary>
+		[TestMethod]
+		public void AboutWindow()
+		{
+			if (ShotDir is null) { Assert.Inconclusive("set CHIMERA_UI_SHOTS to write screenshots"); return; }
+
+			using BizBox form = new();
+			form.StartPosition = FormStartPosition.Manual;
+			form.Location = new Point(0, 0);
+			Shoot(form, "about");
+		}
+
+		/// <summary>
 		/// The firmware window, over a package that wants two files and another that
 		/// wants one. The states are what a user actually hits - provided, never
 		/// provided, and the wrong file - so the picture shows whether they read

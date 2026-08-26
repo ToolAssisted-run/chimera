@@ -33,7 +33,6 @@
 			this.linkLabel1 = new System.Windows.Forms.LinkLabel();
 			this.label3 = new Chimera.WinForms.Controls.LocLabelEx();
 			this.label4 = new Chimera.WinForms.Controls.LocLabelEx();
-			this.CoreInfoPanel = new System.Windows.Forms.Panel();
 			this.VersionLabel = new Chimera.WinForms.Controls.LocLabelEx();
 			this.btnCopyHash = new System.Windows.Forms.Button();
 			this.linkLabel2 = new System.Windows.Forms.LinkLabel();
@@ -47,7 +46,7 @@
 			// 
 			this.OK.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
 			this.OK.DialogResult = System.Windows.Forms.DialogResult.Cancel;
-			this.OK.Location = new System.Drawing.Point(361, 504);
+			this.OK.Location = new System.Drawing.Point(361, 195);
 			this.OK.Name = "OK";
 			this.OK.Size = new System.Drawing.Size(75, 23);
 			this.OK.TabIndex = 0;
@@ -68,7 +67,7 @@
 			// 
 			this.linkLabel1.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
 			this.linkLabel1.AutoSize = true;
-			this.linkLabel1.Location = new System.Drawing.Point(245, 509);
+			this.linkLabel1.Location = new System.Drawing.Point(245, 200);
 			this.linkLabel1.Name = "linkLabel1";
 			this.linkLabel1.Size = new System.Drawing.Size(102, 13);
 			this.linkLabel1.TabIndex = 2;
@@ -90,18 +89,6 @@
 			this.label4.Name = "label4";
 			this.label4.Text = "\"A modular emulation frontend\"";
 			// 
-			// CoreInfoPanel
-			// 
-			this.CoreInfoPanel.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
-            | System.Windows.Forms.AnchorStyles.Left) 
-            | System.Windows.Forms.AnchorStyles.Right)));
-			this.CoreInfoPanel.AutoScroll = true;
-			this.CoreInfoPanel.BorderStyle = System.Windows.Forms.BorderStyle.Fixed3D;
-			this.CoreInfoPanel.Location = new System.Drawing.Point(12, 197);
-			this.CoreInfoPanel.Name = "CoreInfoPanel";
-			this.CoreInfoPanel.Size = new System.Drawing.Size(423, 259);
-			this.CoreInfoPanel.TabIndex = 14;
-			// 
 			// VersionLabel
 			// 
 			this.VersionLabel.Location = new System.Drawing.Point(198, 75);
@@ -113,7 +100,7 @@
 			this.btnCopyHash.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
 			this.btnCopyHash.AutoSize = true;
 			this.btnCopyHash.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink;
-			this.btnCopyHash.Location = new System.Drawing.Point(12, 505);
+			this.btnCopyHash.Location = new System.Drawing.Point(12, 196);
 			this.btnCopyHash.Name = "btnCopyHash";
 			this.btnCopyHash.Size = new System.Drawing.Size(22, 22);
 			this.btnCopyHash.TabIndex = 18;
@@ -124,7 +111,7 @@
 			// 
 			this.linkLabel2.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
 			this.linkLabel2.AutoSize = true;
-			this.linkLabel2.Location = new System.Drawing.Point(40, 509);
+			this.linkLabel2.Location = new System.Drawing.Point(40, 200);
 			this.linkLabel2.Name = "linkLabel2";
 			this.linkLabel2.Size = new System.Drawing.Size(100, 13);
 			this.linkLabel2.TabIndex = 19;
@@ -168,20 +155,19 @@
 			this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
 			this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
 			this.CancelButton = this.OK;
-			this.ClientSize = new System.Drawing.Size(448, 536);
+			this.ClientSize = new System.Drawing.Size(448, 230);
 			this.Controls.Add(this.DateLabel);
 			this.Controls.Add(this.linkLabelBizHawk);
 			this.Controls.Add(this.linkLabel3);
 			this.Controls.Add(this.linkLabel2);
 			this.Controls.Add(this.btnCopyHash);
-			this.Controls.Add(this.CoreInfoPanel);
 			this.Controls.Add(this.VersionLabel);
 			this.Controls.Add(this.label4);
 			this.Controls.Add(this.label3);
 			this.Controls.Add(this.linkLabel1);
 			this.Controls.Add(this.pictureBox1);
 			this.Controls.Add(this.OK);
-			this.MinimumSize = new System.Drawing.Size(453, 253);
+			this.MinimumSize = new System.Drawing.Size(453, 240);
 			this.Name = "BizBox";
 			this.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
 			this.Text = "About Chimera";
@@ -199,7 +185,6 @@
 		private System.Windows.Forms.LinkLabel linkLabel1;
 		private Chimera.WinForms.Controls.LocLabelEx label3;
 		private Chimera.WinForms.Controls.LocLabelEx label4;
-		private System.Windows.Forms.Panel CoreInfoPanel;
 		//private System.Windows.Forms.TextBox textBox1;
 		private Chimera.WinForms.Controls.LocLabelEx VersionLabel;
 		private System.Windows.Forms.Button btnCopyHash;

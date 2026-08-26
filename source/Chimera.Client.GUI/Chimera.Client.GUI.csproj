@@ -67,9 +67,6 @@
 		<Compile Update="BizBox.cs" SubType="Form" />
 		<Compile Update="BizBox.Designer.cs" DependentUpon="BizBox.cs" />
 		<EmbeddedResource Update="BizBox.resx" DependentUpon="BizBox.cs" />
-		<Compile Update="BizBoxInfoControl.cs" SubType="UserControl" />
-		<Compile Update="BizBoxInfoControl.Designer.cs" DependentUpon="BizBoxInfoControl.cs" />
-		<EmbeddedResource Update="BizBoxInfoControl.resx" DependentUpon="BizBoxInfoControl.cs" />
 		<Compile Update="config/A7800/A7800ControllerSettings.cs" SubType="Form" />
 		<Compile Update="config/A7800/A7800ControllerSettings.Designer.cs" DependentUpon="A7800ControllerSettings.cs" />
 		<EmbeddedResource Update="config/A7800/A7800ControllerSettings.resx" DependentUpon="A7800ControllerSettings.cs" />
