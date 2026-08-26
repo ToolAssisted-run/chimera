@@ -357,6 +357,58 @@ PY
 		fi
 	fi
 
+	# --- the project entry point: ONE boot, project settings honored ---
+	# Chimera's whole point vs the BizHawk lineage: opening a project must
+	# init the core EXACTLY ONCE (rom load, TAStudio open and tasproj load
+	# each cost a full boot there), and the boot must run with the
+	# project's OWN sync settings - not a config default. One leg pins
+	# both: a project carrying initFillByte=171 plays the win movie; the
+	# final RAM must DIVERGE from the golden (the setting reached the
+	# guest through the project path) and the log must show exactly one
+	# "[waterbox] booting" line.
+	if [ "$record" -eq 0 ]; then
+		pname=gridWalker.win
+		prom="$here/roms/${pname%%.*}.testrom"
+		pdir="$work/project-leg"
+		rm -rf "$pdir" && mkdir -p "$pdir"
+		cp "$prom" "$pdir/gridWalker.testrom"
+		python3 - "$here/movies/$pname.txt" "$pdir/gridWalker.testrom" "$pdir/$pname.chimeraProject" <<'PY'
+import hashlib, json, sys
+entries = [l.rstrip("\r\n") for l in open(sys.argv[1]) if l.startswith("|")]
+logkey = "#P1 Up|P1 Down|P1 Left|P1 Right|P1 A|P1 B|P1 Select|P1 Start|"
+sha1 = hashlib.sha1(open(sys.argv[2], "rb").read()).hexdigest().upper()
+json.dump({
+    "title": "gridWalker.win",
+    "core": {"name": "Synth", "version": "", "sha1": ""},
+    "headers": {"MovieVersion": "BizHawk v2.0 Tasproj v1.1", "Platform": "Synth"},
+    "files": [{"name": "gridWalker.testrom", "sha1": sha1, "slot": "rom"}],
+    "settings": {"initFillByte": 171},
+    "input": "[Input]\nLogKey:" + logkey + "\n" + "\n".join(entries) + "\n[/Input]\n",
+}, open(sys.argv[3], "w"))
+PY
+		pjob="$work/job.project.txt"
+		{
+			echo "outram=$work/project.ram.bin"
+			echo "outvram=$work/project.vram.bin"
+			echo "meta=$work/project.meta.txt"
+		} > "$pjob"
+		rm -f "$work/project.ram.bin" "$work/project.vram.bin" "$work/project.meta.txt"
+		cp "$config" "$work/config.project.ini"
+		( cd "$repo_root" && CHIMERA_JOB="$pjob" timeout 300 mono "$emu_exe" --headless \
+			"--config=$work/config.project.ini" "--core=$repo_root/build/Cores/synth-box.zip" \
+			"--project=$pdir/$pname.chimeraProject" "--lua=$here/synth-movie-dump.lua" ) > "$work/project.log" 2>&1
+		boots="$(grep -c "\[waterbox\] booting" "$work/project.log" || true)"
+		if [ ! -f "$work/project.meta.txt" ] || ! grep -q "^status=OK" "$work/project.meta.txt"; then
+			report "P:box:$pname" FAIL "no OK meta (see work/project.log)"
+		elif [ "$boots" != "1" ]; then
+			report "P:box:$pname" FAIL "core booted $boots times; a project open boots EXACTLY once"
+		elif cmp -s "$work/project.ram.bin" "$golden_dir/$pname.ram.bin"; then
+			report "P:box:$pname" FAIL "RAM matches the default golden - the project's initFillByte never reached the guest"
+		else
+			report "P:box:$pname" PASS "one boot, project sync settings live in the guest"
+		fi
+	fi
+
 	# --- a core is never loaded implicitly ---
 	# Same movie, but NO --core. A package sitting in build/Cores is AVAILABLE, not
 	# loaded: opening a core is something the user does (File > Open Core), and the

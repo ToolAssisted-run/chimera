@@ -780,6 +780,12 @@ namespace Chimera.Client.GUI
 			project.Title = _title.Text.Trim();
 			project.Description = _description.Text.Replace("\r\n", "\n");
 			project.SetCore(core.Name, core.Version ?? "", core.Sha1 ?? "");
+			// the platform, stamped at creation: reopening forces the pinned core
+			// through the movie queue, and that check wants to know the system
+			if (core.Systems.FirstOrDefault() is { Length: not 0 } system)
+			{
+				project.HeaderSet("Platform", system);
+			}
 
 			try
 			{

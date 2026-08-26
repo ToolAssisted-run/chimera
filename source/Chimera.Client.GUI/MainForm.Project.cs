@@ -4,7 +4,9 @@ using System.Linq;
 using System.Windows.Forms;
 
 using Chimera.Client.Common;
+using Chimera.Emulation.Common;
 using Chimera.Emulation.Common.Engine;
+using Chimera.Emulation.Common.Waterbox;
 
 namespace Chimera.Client.GUI
 {
@@ -157,27 +159,74 @@ namespace Chimera.Client.GUI
 			_openProject?.Dispose();
 			_openProject = project;
 
-			if (!LoadRom(path, new LoadRomArgs(new OpenAdvanced_OpenRom(path))))
+			// THE MACHINE BOOTS EXACTLY ONCE. The movie (which IS the project) is
+			// queued BEFORE the rom load, so the one boot already runs with the
+			// project's core and sync settings - never a throwaway config-settings
+			// boot followed by a reboot (the BizHawk triple-init lineage: rom
+			// load, TAStudio open, tasproj load - each a full core init).
+			if (MovieSession.Get(path, loadMovie: true) is not ITasMovie tasMovie)
 			{
 				return false;
 			}
+			// the movie adopts the RESOLVED project, so its saves record what
+			// actually ran (an overridden hash included), and the manifest and
+			// wizard fields pass through untouched
+			tasMovie.UseResolvedProject(project);
+			var isFresh = tasMovie.InputLogLength is 0;
 
-			var movie = MovieSession.Get(path, loadMovie: true);
-			if (movie is ITasMovie tasMovie)
+			var oldDefaultCores = new Dictionary<string, string>(Config.DefaultCores);
+			try
 			{
-				// the movie adopts the RESOLVED project, so its saves record what
-				// actually ran (an overridden hash included), and the manifest and
-				// wizard fields pass through untouched
-				tasMovie.UseResolvedProject(project);
-				var isFresh = movie.InputLogLength is 0;
-				if (!StartNewMovie(movie, isFresh)) return false;
+				// the movie's own identity makes the legacy platform/hash checks
+				// vacuous on purpose: the resolution dialog and the core pin
+				// already vetted everything, with better dialogs
+				MovieSession.QueueNewMovie(
+					tasMovie,
+					systemId: tasMovie.SystemID,
+					loadedRomHash: tasMovie.Hash ?? "",
+					Config.PathEntries,
+					Config.DefaultCores);
+
+				if (!LoadRom(path, new LoadRomArgs(new OpenAdvanced_OpenRom(path))))
+				{
+					return false;
+				}
+
+				MovieSession.RunQueuedMovie(isFresh, Emulator);
 			}
+			finally
+			{
+				MovieSession.AbortQueuedMovie();
+				Config.DefaultCores = oldDefaultCores;
+			}
+
+			if (isFresh)
+			{
+				// the wizard recorded the core, settings and firmware; what only a
+				// RUNNING machine knows is filled in here, on the one boot - and
+				// nothing the project already says is overwritten
+				if (string.IsNullOrEmpty(tasMovie.SystemID)) tasMovie.SystemID = Emulator.SystemId;
+				if (!string.IsNullOrWhiteSpace(WaterboxCore.HostBuildInfo))
+				{
+					tasMovie.HeaderEntries[HeaderKeys.WaterboxHost] = WaterboxCore.HostBuildInfo;
+				}
+				PopulateWithDefaultHeaderValues(tasMovie);
+				tasMovie.ClearChanges();
+			}
+
+			SetMainformMovieInfo();
+			WarnOnMovieVsLoadedCore();
 
 			Config.RecentProjects.Add(path);
 			// a project IS a TAStudio session; from the commandline the window is
-			// not up yet, so the landing waits for it
-			if (Visible) Tools.Load<TAStudio>();
-			else Shown += (_, _) => Tools.Load<TAStudio>();
+			// not up yet, so the landing waits for it. Headless runs have nobody
+			// to operate TAStudio (which opens PAUSED at the session frame) -
+			// they just play the project (gates, dumps).
+			if (!HeadlessMode.Enabled)
+			{
+				if (Visible) Tools.Load<TAStudio>();
+				else Shown += (_, _) => Tools.Load<TAStudio>();
+			}
 			return true;
 		}
 

@@ -218,6 +218,17 @@ version+hash): refuse by default with a clear pinned-vs-installed message,
 with a knowing override - and the project then records what actually ran,
 mirroring the file-hash posture.
 
+Opening boots the machine EXACTLY ONCE. The movie (which is the project)
+is queued before the rom load, so the single boot already runs with the
+project's core and its recorded sync settings - never a throwaway boot
+on config settings followed by a reboot, and never a re-init when
+TAStudio engages (the BizHawk lineage cost three full core inits: rom
+load, TAStudio open, tasproj load - seconds each on a machine with a
+2GB hard disk image). The witness gate's P leg counts the boots and
+checks a project-recorded setting is live in the guest. Headless runs
+skip the TAStudio landing (it opens paused, and nobody is there to
+operate it): they just play the project.
+
 ## Architecture decisions
 
 - **Serializer in the engine**: `ce_project_*` in libchimera reads,

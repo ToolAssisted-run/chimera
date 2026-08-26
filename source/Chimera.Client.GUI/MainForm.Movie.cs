@@ -69,6 +69,19 @@ namespace Chimera.Client.GUI
 
 			SetMainformMovieInfo();
 
+			WarnOnMovieVsLoadedCore();
+
+			return !Emulator.IsNull();
+		}
+
+		/// <summary>
+		/// The active movie held against the machine that actually booted: rom
+		/// hash, core version, package build, firmware. Warnings only - the hard
+		/// refusals (core pin, file hashes, firmware pins) happened before the
+		/// boot, with better dialogs.
+		/// </summary>
+		internal void WarnOnMovieVsLoadedCore()
+		{
 			// turns out this was too late for .tasproj autoloading and restoring playback position (loads savestate but wasn't checking game match)
 			if (string.IsNullOrEmpty(MovieSession.Movie.Hash))
 			{
@@ -117,8 +130,6 @@ namespace Chimera.Client.GUI
 					? "Warning: same core version, but a different build of it (rebuilt, or a different toolchain)"
 					: "Warning: Movie's core package hash does not match the loaded core package", 5);
 			}
-
-			return !Emulator.IsNull();
 		}
 
 		public void SetMainformMovieInfo()

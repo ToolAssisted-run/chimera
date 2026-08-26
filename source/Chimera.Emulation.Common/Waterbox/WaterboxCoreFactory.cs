@@ -55,6 +55,9 @@ namespace Chimera.Emulation.Common.Waterbox
 		{
 			var rom = ctx.Roms.FirstOrDefault()
 				?? throw new InvalidOperationException($"{CoreName} needs a rom to load");
+			// one line per boot, greppable: a project open must produce exactly
+			// one of these (the witness gate counts them)
+			Console.WriteLine($"[waterbox] booting {CoreName}");
 			return new WaterboxCore(
 				rom.FileData,
 				_cfg,

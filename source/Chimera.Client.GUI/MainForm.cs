@@ -2064,9 +2064,12 @@ namespace Chimera.Client.GUI
 		{
 			if (MovieSession.NewMovieQueued)
 			{
-				if (!string.IsNullOrWhiteSpace(MovieSession.QueuedSyncSettings))
+				// a movie's sync settings are the project's flat map wrapped as
+				// {"Values":{...}} - the $type-encapsulated encoding died with
+				// the legacy movie formats
+				if (MovieSyncSettings.Decode(MovieSession.QueuedSyncSettings) is { } queued)
 				{
-					e.Settings = ConfigService.LoadWithType(MovieSession.QueuedSyncSettings);
+					e.Settings = queued;
 				}
 				else
 				{
@@ -3201,7 +3204,10 @@ namespace Chimera.Client.GUI
 
 				var forcedCoreName = MovieSession.QueuedCoreName;
 
-				if (forcedCoreName is not null)
+				// a movie that does not know its platform cannot have that
+				// checked; the core name still forces the choice (projects made
+				// before Platform was stamped at creation)
+				if (forcedCoreName is not null && !string.IsNullOrEmpty(MovieSession.QueuedSysID))
 				{
 					var availCores = CoreRegistry.Instance.GetFactories(MovieSession.QueuedSysID);
 					if (!availCores.Any(f => f.CoreName == forcedCoreName))

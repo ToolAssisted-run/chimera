@@ -365,7 +365,10 @@ namespace Chimera.Client.Common
 				},
 				DeterministicEmulationRequested = Deterministic,
 				Settings = GetCoreSettings(factory.CoreType, factory.SettingsType),
-				SyncSettings = GetCoreSyncSettings(factory.CoreType, factory.SyncSettingsType),
+				// everything sync-relevant lives in the project: its recorded
+				// settings drive the boot directly, never a config lookup
+				SyncSettings = MovieSyncSettings.Decode(p.SettingsJson)
+					?? GetCoreSyncSettings(factory.CoreType, factory.SyncSettingsType),
 				FirmwareProvider = CoreFirmwareStore.ProviderFor(_config, factory.CoreName),
 				ExtraFiles = extras,
 			};
