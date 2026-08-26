@@ -1,10 +1,13 @@
 /* test_firmware.cpp - the firmware decision tree, pinned.
  *
- * Everything can affect whether firmware is needed and which file satisfies
- * it: the core itself, the game files chosen, the sync settings. The core
- * declares that logic as conditions; this pins the evaluation - slot
- * presence, slot extension, setting values, the combinators, the legacy
- * required flag, and the malformed-condition rule (asks for nothing).
+ * Everything can affect whether firmware is needed: the core itself, the
+ * game files chosen, the sync settings. The decisions nail each requirement
+ * to ONE exact file or to nothing - variants of one id are separate entries
+ * with disjoint conditions (a sync setting picks between them), and
+ * optional firmware does not exist. This pins the evaluation: slot
+ * presence, slot extension, setting values, the combinators, entry indices
+ * for same-id variants, and the malformed-condition rule (asks for
+ * nothing).
  */
 
 #include "chimera/engine.h"
@@ -27,54 +30,52 @@ static std::string eval(const char *decl, const char *slots, const char *setting
 
 int main(void)
 {
-	// the motivating cases, straight from the design discussion:
-
-	// a Famicom Disk System game needs the bios; a plain cartridge does not
+	// a Famicom Disk System game needs the bios; a plain cartridge needs
+	// NOTHING - not even a mention
 	const char *fds =
-		"[{\"id\":\"disksys.rom\",\"requiredWhen\":{\"slot\":\"fds\"}}]";
-	assert(eval(fds, "{\"fds\":[\"game.fds\"]}", "{}")
-		== "[{\"id\":\"disksys.rom\",\"state\":\"required\"}]");
+		"[{\"id\":\"bios\",\"requiredWhen\":{\"slot\":\"rom\",\"extension\":\"fds\"}}]";
+	assert(eval(fds, "{\"rom\":[\"game.fds\"]}", "{}")
+		== "[{\"id\":\"bios\",\"index\":0}]");
 	assert(eval(fds, "{\"rom\":[\"game.nes\"]}", "{}") == "[]");
 
-	// a CD game needs the CD bios; a cartridge in the same core does not
+	// the Sega CD bios, nailed to ONE file by a sync setting: same id, one
+	// entry per dump, the setting picks - the index says which entry applies
 	const char *segacd =
-		"[{\"id\":\"bios_cd\",\"requiredWhen\":{\"any\":[{\"slot\":\"cd\",\"extension\":\"cue\"},{\"slot\":\"cd\",\"extension\":\"iso\"}]}}]";
-	assert(eval(segacd, "{\"cd\":[\"sonic cd.cue\"]}", "{}")
-		== "[{\"id\":\"bios_cd\",\"state\":\"required\"}]");
-	assert(eval(segacd, "{\"cart\":[\"sonic.md\"]}", "{}") == "[]");
-	assert(eval(segacd, "{\"cd\":[\"notes.txt\"]}", "{}") == "[]");
+		"[{\"id\":\"bios_cd\",\"requiredWhen\":{\"all\":[{\"slot\":\"cd\"},{\"setting\":\"cdBios\",\"is\":\"usa_1.10\"}]}},"
+		"{\"id\":\"bios_cd\",\"requiredWhen\":{\"all\":[{\"slot\":\"cd\"},{\"setting\":\"cdBios\",\"is\":\"jpn_1.00\"}]}}]";
+	assert(eval(segacd, "{\"cd\":[\"sonic cd.cue\"]}", "{\"cdBios\":\"usa_1.10\"}")
+		== "[{\"id\":\"bios_cd\",\"index\":0}]");
+	assert(eval(segacd, "{\"cd\":[\"sonic cd.cue\"]}", "{\"cdBios\":\"jpn_1.00\"}")
+		== "[{\"id\":\"bios_cd\",\"index\":1}]");
+	assert(eval(segacd, "{\"cart\":[\"sonic.md\"]}", "{\"cdBios\":\"usa_1.10\"}") == "[]");
 
-	// a region setting selects between region bioses
-	const char *region =
-		"[{\"id\":\"bios_jp\",\"requiredWhen\":{\"setting\":\"region\",\"is\":\"jp\"}},"
-		"{\"id\":\"bios_us\",\"requiredWhen\":{\"setting\":\"region\",\"in\":[\"us\",\"eu\"]}}]";
-	assert(eval(region, "{}", "{\"region\":\"jp\"}")
-		== "[{\"id\":\"bios_jp\",\"state\":\"required\"}]");
-	assert(eval(region, "{}", "{\"region\":\"eu\"}")
-		== "[{\"id\":\"bios_us\",\"state\":\"required\"}]");
-	assert(eval(region, "{}", "{}") == "[]");
-
-	// a setting flips a bundled freebie into a real-bios requirement
+	// the no-optional rule in person: a font-source setting either needs no
+	// firmware at all (the free font) or exactly one file (the real one)
 	const char *fonts =
-		"[{\"id\":\"ltn0.pgf\",\"requiredWhen\":{\"all\":[{\"setting\":\"fontSource\",\"is\":\"sony\"},{\"not\":{\"setting\":\"language\",\"is\":0}}]}}]";
-	assert(eval(fonts, "{}", "{\"fontSource\":\"sony\",\"language\":1}")
-		== "[{\"id\":\"ltn0.pgf\",\"state\":\"required\"}]");
-	assert(eval(fonts, "{}", "{\"fontSource\":\"free\",\"language\":1}") == "[]");
-	assert(eval(fonts, "{}", "{\"fontSource\":\"sony\",\"language\":0}") == "[]");
+		"[{\"id\":\"ltn0.pgf\",\"requiredWhen\":{\"setting\":\"fontSource\",\"is\":\"sony\"}}]";
+	assert(eval(fonts, "{}", "{\"fontSource\":\"sony\"}")
+		== "[{\"id\":\"ltn0.pgf\",\"index\":0}]");
+	assert(eval(fonts, "{}", "{\"fontSource\":\"bundled\"}") == "[]");
 
-	// number and bool settings compare by their own type
+	// an entry without a condition always applies (a core that cannot start
+	// without its bios, regardless of anything else)
+	const char *always = "[{\"id\":\"boot\"}]";
+	assert(eval(always, "{}", "{}") == "[{\"id\":\"boot\",\"index\":0}]");
+
+	// extension and membership conditions
+	const char *byExt =
+		"[{\"id\":\"cdrom_fw\",\"requiredWhen\":{\"any\":[{\"slot\":\"cd\",\"extension\":\"cue\"},{\"slot\":\"cd\",\"extension\":\"iso\"}]}},"
+		"{\"id\":\"region_fw\",\"requiredWhen\":{\"setting\":\"region\",\"in\":[\"us\",\"eu\"]}}]";
+	assert(eval(byExt, "{\"cd\":[\"disc.iso\"]}", "{\"region\":\"jp\"}")
+		== "[{\"id\":\"cdrom_fw\",\"index\":0}]");
+	assert(eval(byExt, "{\"cd\":[\"notes.txt\"]}", "{\"region\":\"eu\"}")
+		== "[{\"id\":\"region_fw\",\"index\":1}]");
+
+	// number and bool settings compare by their own type; not-combinator
 	const char *typed =
-		"[{\"id\":\"a\",\"requiredWhen\":{\"setting\":\"n\",\"is\":3}},"
-		"{\"id\":\"b\",\"requiredWhen\":{\"setting\":\"f\",\"is\":true}}]";
-	assert(eval(typed, "{}", "{\"n\":3,\"f\":true}")
-		== "[{\"id\":\"a\",\"state\":\"required\"},{\"id\":\"b\",\"state\":\"required\"}]");
-	assert(eval(typed, "{}", "{\"n\":\"3\",\"f\":1}") == "[]");
-
-	// no condition: the legacy flag decides between required and optional
-	const char *legacy =
-		"[{\"id\":\"always\",\"required\":true},{\"id\":\"maybe\",\"required\":false},{\"id\":\"also-maybe\"}]";
-	assert(eval(legacy, "{}", "{}")
-		== "[{\"id\":\"always\",\"state\":\"required\"},{\"id\":\"maybe\",\"state\":\"optional\"},{\"id\":\"also-maybe\",\"state\":\"optional\"}]");
+		"[{\"id\":\"a\",\"requiredWhen\":{\"all\":[{\"setting\":\"n\",\"is\":3},{\"not\":{\"setting\":\"f\",\"is\":false}}]}}]";
+	assert(eval(typed, "{}", "{\"n\":3,\"f\":true}") == "[{\"id\":\"a\",\"index\":0}]");
+	assert(eval(typed, "{}", "{\"n\":\"3\",\"f\":true}") == "[]");
 
 	// a malformed condition asks for nothing rather than for everything
 	const char *broken =

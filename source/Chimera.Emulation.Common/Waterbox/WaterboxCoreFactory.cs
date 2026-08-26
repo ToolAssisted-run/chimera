@@ -93,21 +93,15 @@ namespace Chimera.Emulation.Common.Waterbox
 				_cfg.RawFirmwareJson, slotsJson, Newtonsoft.Json.JsonConvert.SerializeObject(effective));
 
 			Dictionary<string, byte[]> resolved = new();
-			foreach (var (id, required) in applicable)
+			foreach (var (id, index) in applicable)
 			{
-				var decl = Firmware.FirstOrDefault(d => d.Id == id);
+				var decl = index >= 0 && index < Firmware.Count ? Firmware[index] : null;
+				if (decl is null || decl.Id != id) decl = Firmware.FirstOrDefault(d => d.Id == id);
 				if (decl is null) continue;
-				var bytes = ctx.FirmwareProvider?.Invoke(decl);
-				if (bytes is null)
-				{
-					if (required)
-					{
-						throw new MissingFirmwareException(
-							$"{CoreName} needs firmware that has not been provided: {decl.DisplayName}."
-								+ " Set it in Emulator > Firmware, then load the rom again.");
-					}
-					continue;
-				}
+				var bytes = ctx.FirmwareProvider?.Invoke(decl)
+					?? throw new MissingFirmwareException(
+						$"{CoreName} needs firmware that has not been provided: {decl.DisplayName}."
+							+ " Open the project again and satisfy its firmware page.");
 				resolved[decl.Id] = bytes;
 			}
 			return resolved;

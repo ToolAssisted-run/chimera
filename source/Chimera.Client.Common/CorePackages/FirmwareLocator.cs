@@ -25,13 +25,16 @@ namespace Chimera.Client.Common
 			public long Length { get; init; }
 		}
 
-		/// <summary>a file that satisfies a requirement, and which candidate it matched</summary>
-		public sealed class Match
-		{
-			public string Path { get; init; } = "";
-			public string Sha1 { get; init; } = "";
-			public int CandidateIndex { get; init; }
-		}
+		/// <summary>
+		/// The file that satisfies the requirement, if the index holds one: hash
+		/// equals the entry's - the name plays no part. The decisions upstream
+		/// nailed the requirement to one exact file, so there is nothing to
+		/// choose between; duplicate copies are the same bytes, first one wins.
+		/// </summary>
+		public static IndexedFile? FindFor(CoreFirmwareDecl decl, IReadOnlyList<IndexedFile> index)
+			=> string.IsNullOrEmpty(decl.Sha1)
+				? null
+				: index.FirstOrDefault(f => f.Sha1.Equals(decl.Sha1, StringComparison.OrdinalIgnoreCase));
 
 		/// <summary>files this large or larger are never firmware; hashing them would only hurt</summary>
 		public const long MaxBytes = 64 * 1024 * 1024;
@@ -89,24 +92,5 @@ namespace Chimera.Client.Common
 			return index;
 		}
 
-		/// <summary>
-		/// Every indexed file that satisfies the requirement: hash equals one of
-		/// the candidates' - the name plays no part.
-		/// </summary>
-		public static IReadOnlyList<Match> MatchesFor(CoreFirmwareDecl decl, IReadOnlyList<IndexedFile> index)
-		{
-			List<Match> matches = new();
-			var candidates = decl.AllCandidates;
-			foreach (var file in index)
-			{
-				for (var i = 0; i < candidates.Count; i++)
-				{
-					if (!file.Sha1.Equals(candidates[i].Sha1, StringComparison.OrdinalIgnoreCase)) continue;
-					matches.Add(new() { Path = file.Path, Sha1 = file.Sha1, CandidateIndex = i });
-					break;
-				}
-			}
-			return matches;
-		}
 	}
 }

@@ -98,22 +98,24 @@ The engine evaluates (ce_firmware_evaluate), everywhere the question is
 asked: the wizard's last page, and the core factory at load time - a
 required file the user never provided stops the load with its name.
 
-Each requirement lists its CANDIDATES openly - the known-good dumps
-that satisfy it, declared as {"sha1", "name", "label"} (the bare
-"sha1" list remains valid as anonymous candidates). The SHA1 is the
-identity; the name is only a hint of what the file is usually called.
-A file satisfies a requirement exactly when its hash matches a listed
-candidate, whatever the file is named.
+The decisions nail each requirement to ONE exact file, or to nothing.
+There is no optional firmware and nothing to choose between: variants
+of one file are separate declaration entries sharing an id, with
+disjoint conditions a sync setting selects between ("FDS BIOS to Use:
+Nintendo", "System Fonts: sony") - a choice that needs no firmware
+simply produces no requirement ("System Fonts: bundled"). An entry
+names its one dump openly: {"sha1", "name", "label"} - the SHA1 is the
+identity, the name only a hint of what the file is usually called. An
+entry may omit the hash only for a file no one can pin (a dump only
+the user can own); the chosen file's actual hash is recorded.
 
 The wizard's firmware page inspects the Firmware folder (a path entry)
 FIRST, so a dump dropped there once satisfies wizards forever: every
-plausible file is hashed and matched, the satisfied requirement and
-the exact candidate it matched get their checkmarks, several matching
-files are all listed and selectable, and a per-item Select File button
+plausible file is hashed and matched, and a satisfied requirement
+shows its checkmark and the file in use. A per-item Select File button
 covers what the folder could not - allowed even when something was
-already found. A REQUIRED entry accepts only a listed candidate; an
-optional one also takes a custom dump, recorded as unrecognised. The
-project cannot be created until every required entry is satisfied.
+found - and only the exact file satisfies. Create stays DISABLED until
+every requirement is satisfied.
 
 The project records the chosen files as pins ("firmware": [{"id",
 "sha1"}]), actual hashes as always; the frontend remembers paths

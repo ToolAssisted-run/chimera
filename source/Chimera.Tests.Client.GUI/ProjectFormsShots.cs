@@ -117,12 +117,8 @@ namespace Chimera.Tests.Client.GUI
 			{
 				using var form = MakeWizard();
 				var (cfg, index) = MakeFirmwareFixture(dir);
-				form.UseFirmwareNeeds(cfg,
-				[
-					("bios_cd", true),
-					("disksys.rom", true),
-					("ltn0.pgf", false),
-				], index);
+				// the decisions selected the US bios (entry 0) and a Famicom disk
+				form.UseFirmwareNeeds(cfg, [ ("bios_cd", 0), ("bios", 2) ], index);
 				Shoot(form, "wizard-4-firmware");
 			}
 			finally
@@ -133,8 +129,8 @@ namespace Chimera.Tests.Client.GUI
 
 		internal static (WaterboxConfig Cfg, IReadOnlyList<FirmwareLocator.IndexedFile> Index) MakeFirmwareFixture(string dir)
 		{
-			// two dumps sit in the "Firmware folder": one satisfies the US CD
-			// bios candidate, one satisfies nothing
+			// the Firmware folder holds the US CD bios under a foreign name, and
+			// one file that is no firmware at all
 			File.WriteAllText(Path.Combine(dir, "my_us_bios.bin"), "US CD BIOS BYTES");
 			File.WriteAllText(Path.Combine(dir, "random.bin"), "NOT FIRMWARE");
 			var usSha1 = Chimera.Emulation.Common.Engine.ChimeraEngine.Sha1Hex(
@@ -145,23 +141,12 @@ namespace Chimera.Tests.Client.GUI
 				System.Text.Encoding.ASCII.GetBytes("FDS BIOS BYTES"));
 			WaterboxConfig cfg = new()
 			{
+				// one id, one entry per dump - a sync setting picks which applies
 				Firmware =
 				[
-					new()
-					{
-						Id = "bios_cd", Display = "Sega CD BIOS",
-						Candidates =
-						[
-							new() { Sha1 = usSha1, Name = "bios_CD_U.bin", Label = "US v1.10" },
-							new() { Sha1 = jpSha1, Name = "bios_CD_J.bin", Label = "JP v1.00" },
-						],
-					},
-					new()
-					{
-						Id = "disksys.rom", Display = "Famicom Disk System BIOS",
-						Candidates = [ new() { Sha1 = fdsSha1, Name = "disksys.rom", Label = "Nintendo" } ],
-					},
-					new() { Id = "ltn0.pgf", Display = "System Font ltn0" },
+					new() { Id = "bios_cd", Display = "Sega CD BIOS", Label = "US v1.10", Name = "bios_CD_U.bin", Sha1 = usSha1 },
+					new() { Id = "bios_cd", Display = "Sega CD BIOS", Label = "JP v1.00", Name = "bios_CD_J.bin", Sha1 = jpSha1 },
+					new() { Id = "bios", Display = "Famicom Disk System BIOS", Label = "Nintendo FDS", Name = "disksys.rom", Sha1 = fdsSha1 },
 				],
 			};
 			var index = FirmwareLocator.BuildIndex([ dir ]);

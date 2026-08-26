@@ -7,10 +7,10 @@ using Chimera.Client.GUI;
 namespace Chimera.Tests.Client.GUI
 {
 	/// <summary>
-	/// The firmware page's rules: the hash is the identity (a file's name plays
-	/// no part), the folder answers before the user, a required entry accepts
-	/// only a listed candidate, an optional one also takes a custom dump, and
-	/// nothing creates until every required entry is satisfied.
+	/// The firmware page's rules: each requirement is ONE exact file (the hash
+	/// is the identity, a file's name plays no part), the folder answers before
+	/// the user, only that exact file satisfies, and nothing creates until
+	/// every requirement is satisfied. Optional firmware does not exist.
 	/// </summary>
 	[TestClass]
 	public class WizardFirmwareTests
@@ -37,69 +37,65 @@ namespace Chimera.Tests.Client.GUI
 		}
 
 		[TestMethod]
-		public void TheFolderSatisfiesByHashAndTheExactCandidateIsKnown()
+		public void TheFolderSatisfiesByHashUnderAnyName()
 		{
 			using var form = MakeForm(out var dir);
 			var (cfg, index) = ProjectFormsShots.MakeFirmwareFixture(dir);
-			form.UseFirmwareNeeds(cfg, [ ("bios_cd", true) ], index);
+			form.UseFirmwareNeeds(cfg, [ ("bios_cd", 0) ], index);
 
 			Assert.IsTrue(form.FirmwareSatisfied("bios_cd"), "the folder's dump satisfies by hash");
-			var chosen = form.ChosenFirmware("bios_cd");
-			Assert.AreEqual(0, chosen.Candidate, "and the US candidate is the one it matched");
-			StringAssert.Contains(chosen.Path, "my_us_bios.bin", "the file name was only a hint - a different name satisfied");
+			StringAssert.Contains(form.ChosenFirmwarePath("bios_cd"),
+				"my_us_bios.bin", "the file name was only a hint - a foreign name satisfied");
 		}
 
 		[TestMethod]
-		public void ARequiredEntryRefusesANonCandidateFile()
+		public void OnlyTheExactFileSatisfies()
 		{
 			using var form = MakeForm(out var dir);
 			var (cfg, _) = ProjectFormsShots.MakeFirmwareFixture(dir);
-			form.UseFirmwareNeeds(cfg, [ ("disksys.rom", true) ], [ ]);
+			form.UseFirmwareNeeds(cfg, [ ("bios", 2) ], [ ]);
 
-			Assert.IsFalse(form.FirmwareSatisfied("disksys.rom"));
-			form.ProvideFirmware("disksys.rom", Path.Combine(dir, "random.bin"));
-			Assert.IsFalse(form.FirmwareSatisfied("disksys.rom"), "a hash matching no candidate satisfies nothing");
+			Assert.IsFalse(form.FirmwareSatisfied("bios"));
+			form.ProvideFirmware("bios", Path.Combine(dir, "random.bin"));
+			Assert.IsFalse(form.FirmwareSatisfied("bios"), "the wrong bytes satisfy nothing, whatever they are named");
 
 			var good = Path.Combine(dir, "differently named.bios");
 			File.WriteAllText(good, "FDS BIOS BYTES");
-			form.ProvideFirmware("disksys.rom", good);
-			Assert.IsTrue(form.FirmwareSatisfied("disksys.rom"), "the right bytes under any name satisfy");
+			form.ProvideFirmware("bios", good);
+			Assert.IsTrue(form.FirmwareSatisfied("bios"), "the exact bytes under any name satisfy");
 		}
 
 		[TestMethod]
-		public void CreateIsDisabledUntilEveryRequiredEntryIsSatisfied()
+		public void TheVariantIsPickedUpstreamAndEachNailsOneFile()
+		{
+			// the same id, two entries - the sync setting decided which one
+			// applies before this page ever rendered; only THAT dump satisfies
+			using var form = MakeForm(out var dir);
+			var (cfg, index) = ProjectFormsShots.MakeFirmwareFixture(dir);
+
+			form.UseFirmwareNeeds(cfg, [ ("bios_cd", 1) ], index); // the JP entry
+			Assert.IsFalse(form.FirmwareSatisfied("bios_cd"),
+				"the folder's US dump does not satisfy the JP requirement");
+
+			var jp = Path.Combine(dir, "whatever.bin");
+			File.WriteAllText(jp, "JP CD BIOS BYTES");
+			form.ProvideFirmware("bios_cd", jp);
+			Assert.IsTrue(form.FirmwareSatisfied("bios_cd"));
+		}
+
+		[TestMethod]
+		public void CreateIsDisabledUntilEveryRequirementIsSatisfied()
 		{
 			using var form = MakeForm(out var dir);
 			var (cfg, index) = ProjectFormsShots.MakeFirmwareFixture(dir);
-			form.UseFirmwareNeeds(cfg, [ ("bios_cd", true), ("disksys.rom", true) ], index);
+			form.UseFirmwareNeeds(cfg, [ ("bios_cd", 0), ("bios", 2) ], index);
 
-			Assert.IsFalse(form.CreateEnabled, "the FDS bios is required and unsatisfied");
+			Assert.IsFalse(form.CreateEnabled, "the FDS bios is not on hand");
 
 			var good = Path.Combine(dir, "whatever.bin");
 			File.WriteAllText(good, "FDS BIOS BYTES");
-			form.ProvideFirmware("disksys.rom", good);
-			Assert.IsTrue(form.CreateEnabled, "every required entry satisfied - Create returns");
-		}
-
-		[TestMethod]
-		public void AnOptionalEntryTakesACustomDumpAndAFoundOneCanBeOverridden()
-		{
-			using var form = MakeForm(out var dir);
-			var (cfg, index) = ProjectFormsShots.MakeFirmwareFixture(dir);
-			form.UseFirmwareNeeds(cfg, [ ("bios_cd", true), ("ltn0.pgf", false) ], index);
-
-			// optional: a custom (unrecognised) dump is allowed and recorded
-			form.ProvideFirmware("ltn0.pgf", Path.Combine(dir, "random.bin"));
-			var font = form.ChosenFirmware("ltn0.pgf");
-			Assert.IsNotNull(font.Path);
-			Assert.AreEqual(-1, font.Candidate, "custom: no candidate matched, used anyway");
-			Assert.IsFalse(form.FirmwareSatisfied("ltn0.pgf"), "custom never counts as candidate-satisfied");
-
-			// found firmware can still be replaced by another matching file
-			var jp = Path.Combine(dir, "some_other_dump.bin");
-			File.WriteAllText(jp, "JP CD BIOS BYTES");
-			form.ProvideFirmware("bios_cd", jp);
-			Assert.AreEqual(1, form.ChosenFirmware("bios_cd").Candidate, "now the JP candidate is the satisfied one");
+			form.ProvideFirmware("bios", good);
+			Assert.IsTrue(form.CreateEnabled, "every requirement satisfied - Create returns");
 		}
 	}
 }

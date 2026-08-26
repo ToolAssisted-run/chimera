@@ -15,21 +15,6 @@ namespace Chimera.Emulation.Common
 	/// one, since it does not know what cores exist. All it does is ask for what a
 	/// loaded package says it wants, check the file matches, and hand it over.
 	/// </summary>
-	/// <summary>One known-good dump: hash is identity, name is only a hint.</summary>
-	public sealed class FirmwareCandidate
-	{
-		public string Sha1 { get; set; } = "";
-
-		/// <summary>the file name this dump usually goes by - a hint, never a requirement</summary>
-		public string? Name { get; set; }
-
-		/// <summary>which release this is ("US v1.10", "6.61 official")</summary>
-		public string? Label { get; set; }
-
-		public string DisplayText
-			=> string.Join("  ", new[] { Label, Name, Sha1 }.Where(static s => !string.IsNullOrEmpty(s)));
-	}
-
 	public sealed class CoreFirmwareDecl
 	{
 		/// <summary>
@@ -53,30 +38,13 @@ namespace Chimera.Emulation.Common
 		/// rather than rejected, because a good dump this list has never seen is more
 		/// likely than a frontend that should refuse to run.
 		/// </summary>
-		public List<string>? Sha1 { get; set; }
+		public string? Sha1 { get; set; }
 
-		/// <summary>
-		/// The known-good dumps that satisfy this requirement, listed openly:
-		/// the SHA1 is the identity, the name only a hint of what the file is
-		/// usually called, the label which release it is. When absent, the bare
-		/// <see cref="Sha1"/> list is the candidates, anonymously.
-		/// </summary>
-		public List<FirmwareCandidate>? Candidates { get; set; }
+		/// <summary>the file name this dump usually goes by - a hint, never a requirement</summary>
+		public string? Name { get; set; }
 
-		/// <summary>the unified candidate view: Candidates, else Sha1 as anonymous entries</summary>
-		public IReadOnlyList<FirmwareCandidate> AllCandidates
-			=> Candidates is { Count: not 0 }
-				? Candidates
-				: (Sha1 ?? [ ]).ConvertAll(static hash => new FirmwareCandidate { Sha1 = hash });
-
-		/// <summary>every accepted hash, for the engine's size-and-hash verdict</summary>
-		public IEnumerable<string> AcceptedSha1s()
-		{
-			foreach (var candidate in AllCandidates)
-			{
-				if (!string.IsNullOrEmpty(candidate.Sha1)) yield return candidate.Sha1;
-			}
-		}
+		/// <summary>which release this is ("US v1.10", "6.61 official") - shown beside the name</summary>
+		public string? Label { get; set; }
 
 		/// <summary>
 		/// False for a file the core can start without (an optional expansion rom, say).

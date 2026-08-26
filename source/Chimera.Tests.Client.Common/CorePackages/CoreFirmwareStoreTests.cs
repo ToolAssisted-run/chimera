@@ -22,7 +22,7 @@ namespace Chimera.Tests.Client.Common.CorePackages
 				Id = "bios",
 				Display = "FDS BIOS",
 				Size = size,
-				Sha1 = sha1.Length is 0 ? null : new List<string>(sha1),
+				Sha1 = sha1.Length is 0 ? null : sha1[0],
 			};
 
 		/// <summary>A file of <paramref name="size"/> deterministic bytes, deleted with the test run.</summary>
@@ -93,9 +93,10 @@ namespace Chimera.Tests.Client.Common.CorePackages
 		[TestMethod]
 		public void MatchingHashIsGood()
 		{
+			// one requirement, ONE exact file: the decisions upstream picked it
 			var path = FileOf(8192);
 			var sha1 = CoreFirmwareStore.Sha1Of(File.ReadAllBytes(path));
-			var entry = CoreFirmwareStore.Describe(WithPath("Core", "bios", path), "Core", Decl(8192, "0123456789ABCDEF0123456789ABCDEF01234567", sha1));
+			var entry = CoreFirmwareStore.Describe(WithPath("Core", "bios", path), "Core", Decl(8192, sha1));
 			Assert.AreEqual(CoreFirmwareState.Good, entry.State);
 			Assert.AreEqual(sha1, entry.Sha1);
 			File.Delete(path);

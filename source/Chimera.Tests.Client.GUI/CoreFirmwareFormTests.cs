@@ -34,7 +34,7 @@ namespace Chimera.Tests.Client.GUI
 					Display = id is "bios" ? "FDS BIOS" : id,
 					Size = 8192,
 					Required = required,
-					Sha1 = expected.Length is 0 ? null : new List<string>(expected),
+					Sha1 = expected.Length is 0 ? null : expected[0],
 				},
 				Path = path,
 				Sha1 = sha1,

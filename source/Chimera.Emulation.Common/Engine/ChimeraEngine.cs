@@ -1521,12 +1521,13 @@ namespace Chimera.Emulation.Common.Engine
 		}
 
 		/// <summary>
-		/// The firmware decision tree (docs/project.md): which declared files
-		/// the project's decisions call for, and whether each is required or
-		/// optional. Takes the package's raw "firmware" array, the slot map,
-		/// and the EFFECTIVE (defaults-overlaid) settings.
+		/// The firmware decision tree (docs/project.md): which declared entries
+		/// the project's decisions call for - every one REQUIRED, each nailed to
+		/// one exact file (the index says which declaration entry, so same-id
+		/// variants resolve). Takes the package's raw "firmware" array, the slot
+		/// map, and the EFFECTIVE (defaults-overlaid) settings.
 		/// </summary>
-		public static System.Collections.Generic.IReadOnlyList<(string Id, bool Required)> Evaluate(
+		public static System.Collections.Generic.IReadOnlyList<(string Id, int Index)> Evaluate(
 			string declJson, string slotsJson, string settingsJson)
 		{
 			var decl = Encoding.UTF8.GetBytes(declJson ?? "[]");
@@ -1539,12 +1540,12 @@ namespace Chimera.Emulation.Common.Engine
 				settings, (ulong)settings.LongLength,
 				ref len);
 			var text = ChimeraEngine.PtrToStringUtf8(result, len);
-			System.Collections.Generic.List<(string, bool)> outList = new();
+			System.Collections.Generic.List<(string, int)> outList = new();
 			foreach (var item in Newtonsoft.Json.Linq.JArray.Parse(text))
 			{
 				var id = item.Value<string>("id");
 				if (id is null) continue;
-				outList.Add((id, item.Value<string>("state") is "required"));
+				outList.Add((id, item.Value<int?>("index") ?? -1));
 			}
 			return outList;
 		}

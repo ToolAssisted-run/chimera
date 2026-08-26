@@ -50,7 +50,7 @@ namespace Chimera.Client.Common
 		public string? Sha1 { get; init; }
 
 		/// <summary>The SHA1s the core says are right, in declaration order. Empty when it pins none.</summary>
-		public IReadOnlyList<string> ExpectedSha1 => Decl.AcceptedSha1s().ToList();
+		public IReadOnlyList<string> ExpectedSha1 => string.IsNullOrEmpty(Decl.Sha1) ? [ ] : [ Decl.Sha1 ];
 
 		/// <summary>Short form for a column; the full value goes in the detail line.</summary>
 		public static string Short(string? sha1) => sha1 is null ? "" : sha1.ToUpperInvariant()[..8];
@@ -145,7 +145,7 @@ namespace Chimera.Client.Common
 			}
 			var sha1 = Sha1Of(bytes); // computed even for a file that will be refused: the user wants to see WHAT they pointed at
 			// the verdict is the engine's (see docs/engine-migration.md)
-			var state = EngineFirmware.Classify(decl.Size, decl.AcceptedSha1s(), bytes.Length, sha1) switch
+			var state = EngineFirmware.Classify(decl.Size, string.IsNullOrEmpty(decl.Sha1) ? [ ] : [ decl.Sha1 ], bytes.Length, sha1) switch
 			{
 				EngineFirmware.Verdict.WrongSize => CoreFirmwareState.Custom,
 				EngineFirmware.Verdict.Unrecognised => CoreFirmwareState.Unrecognised,

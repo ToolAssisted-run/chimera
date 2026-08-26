@@ -214,26 +214,20 @@ const char *ce_firmware_evaluate(
 	cJSON *out = cJSON_CreateArray();
 	if (cJSON_IsArray(decl))
 	{
-		for (const cJSON *entry = decl->child; entry != nullptr; entry = entry->next)
+		int32_t index = 0;
+		for (const cJSON *entry = decl->child; entry != nullptr; entry = entry->next, index++)
 		{
 			const cJSON *id = cJSON_GetObjectItemCaseSensitive(entry, "id");
 			if (!cJSON_IsString(id)) continue;
+			/* every applying entry is REQUIRED: the decisions nail each
+			 * requirement to one exact file or to nothing - variants are
+			 * separate entries (same id, disjoint conditions) selected by a
+			 * sync setting, and optional firmware does not exist */
 			const cJSON *when = cJSON_GetObjectItemCaseSensitive(entry, "requiredWhen");
-			const char *state;
-			if (when != nullptr)
-			{
-				/* conditional: needed when the decisions say so, absent otherwise */
-				if (!evalCondition(when, slots, settings)) continue;
-				state = "required";
-			}
-			else
-			{
-				const cJSON *required = cJSON_GetObjectItemCaseSensitive(entry, "required");
-				state = cJSON_IsTrue(required) ? "required" : "optional";
-			}
+			if (when != nullptr && !evalCondition(when, slots, settings)) continue;
 			cJSON *item = cJSON_CreateObject();
 			cJSON_AddStringToObject(item, "id", id->valuestring);
-			cJSON_AddStringToObject(item, "state", state);
+			cJSON_AddNumberToObject(item, "index", index);
 			cJSON_AddItemToArray(out, item);
 		}
 	}

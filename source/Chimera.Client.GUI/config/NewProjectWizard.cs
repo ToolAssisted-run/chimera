@@ -50,15 +50,14 @@ namespace Chimera.Client.GUI
 		private WaterboxCoreSyncSettings? _syncSettings;
 		private WaterboxConfig? _cfg;
 
-		// page 4, computed from every earlier decision (docs/project.md): each
-		// requirement lists its candidates openly; SHA1 is the identity, names
-		// are hints; the firmware folder answers first, the user only when it
-		// cannot
+		// page 4, computed from every earlier decision (docs/project.md): the
+		// decisions nail each requirement to ONE exact file or to nothing -
+		// the hash is the identity, the name only a hint, and the Firmware
+		// folder answers before the user does
 		private readonly Func<string, string?> _pickFirmwareFile;
 		private readonly IReadOnlyList<string> _firmwareSearchDirs;
 		private readonly Func<string, string, string?> _rememberedFirmwarePath;
-		private readonly TreeView _firmwareTree;
-		private readonly Button _firmwareUseButton;
+		private readonly ListView _firmwareList;
 		private readonly Button _firmwareSetButton;
 		private readonly Button _firmwareClearButton;
 		private List<FirmwareNeed> _firmwareNeeds = new();
@@ -67,15 +66,11 @@ namespace Chimera.Client.GUI
 		private sealed class FirmwareNeed
 		{
 			public string Id = "";
-			public bool Required;
 			public CoreFirmwareDecl? Decl;
-			public IReadOnlyList<FirmwareLocator.Match> Found = [ ];
-			public string? ChosenPath;
-			public string? ChosenSha1;
-			public int ChosenCandidate = -1; // -1 = nothing chosen, or a custom (non-candidate) file
+			public string? ChosenPath; // for a pinned entry, set only when the hash matched exactly
+			public string? ChosenSha1; // the actual hash - equals the pin, or names an unpinned choice
 
-			public bool Satisfied => ChosenPath is not null && ChosenCandidate >= 0;
-			public bool HasCustom => ChosenPath is not null && ChosenCandidate < 0;
+			public bool Satisfied => ChosenPath is not null;
 		}
 
 		private readonly Button _backButton;
@@ -184,25 +179,29 @@ namespace Chimera.Client.GUI
 
 			// ---- page 4: firmware, decided by everything chosen above ------------
 			var p4 = _pages[3];
-			p4.Controls.Add(MakeLabel("The firmware these decisions call for. Each requirement lists the dumps that\nsatisfy it - the hash is the identity, the file name only a hint. The Firmware\nfolder was searched already; set a file yourself where nothing was found.", 8, 8));
-			_firmwareTree = new TreeView
+			p4.Controls.Add(MakeLabel("The firmware these decisions call for - each requirement is one exact file,\nnamed by hash (the file name is only a hint). The Firmware folder was\nsearched already; select a file yourself where nothing was found.", 8, 8));
+			_firmwareList = new ListView
 			{
 				Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
 				FullRowSelect = true,
 				HideSelection = false,
 				Location = Pt(8, 56),
-				ShowNodeToolTips = true,
+				MultiSelect = false,
+				ShowItemToolTips = true,
 				Size = new(UIHelper.ScaleX(544), UIHelper.ScaleY(282)),
+				View = View.Details,
 			};
-			_firmwareTree.AfterSelect += (_, _) => UpdateFirmwareButtons();
-			_firmwareTree.NodeMouseDoubleClick += (_, _) => UseSelectedFirmware();
-			_firmwareUseButton = new Button { AutoSize = true, Location = Pt(8, 344), Text = "Use Selected" };
-			_firmwareUseButton.Click += (_, _) => UseSelectedFirmware();
-			_firmwareSetButton = new Button { AutoSize = true, Location = Pt(110, 344), Text = "Select File..." };
+			_firmwareList.Columns.Add("Firmware", UIHelper.ScaleX(150));
+			_firmwareList.Columns.Add("Expected file", UIHelper.ScaleX(120));
+			_firmwareList.Columns.Add("SHA1", UIHelper.ScaleX(110));
+			_firmwareList.Columns.Add("Status", UIHelper.ScaleX(160));
+			_firmwareList.SelectedIndexChanged += (_, _) => UpdateFirmwareButtons();
+			_firmwareList.DoubleClick += (_, _) => SetFirmwareFile();
+			_firmwareSetButton = new Button { AutoSize = true, Location = Pt(8, 344), Text = "Select File..." };
 			_firmwareSetButton.Click += (_, _) => SetFirmwareFile();
-			_firmwareClearButton = new Button { AutoSize = true, Location = Pt(212, 344), Text = "Clear" };
+			_firmwareClearButton = new Button { AutoSize = true, Location = Pt(110, 344), Text = "Clear" };
 			_firmwareClearButton.Click += (_, _) => ClearFirmwareFile();
-			p4.Controls.AddRange([ _firmwareTree, _firmwareUseButton, _firmwareSetButton, _firmwareClearButton ]);
+			p4.Controls.AddRange([ _firmwareList, _firmwareSetButton, _firmwareClearButton ]);
 
 			// ---- chrome ----------------------------------------------------------
 			_status = new Label
@@ -449,13 +448,13 @@ namespace Chimera.Client.GUI
 		/// <summary>Renders given firmware needs directly - the test and screenshot door.</summary>
 		internal void UseFirmwareNeeds(
 			WaterboxConfig cfg,
-			IReadOnlyList<(string Id, bool Required)> needed,
+			IReadOnlyList<(string Id, int Index)> needed,
 			IReadOnlyList<FirmwareLocator.IndexedFile>? index = null)
 		{
 			_cfg = cfg;
 			_firmwareIndex = index ?? [ ];
 			BuildFirmwareNeeds(needed);
-			RenderFirmwareTree();
+			RenderFirmwareRows();
 			ShowPage(3);
 		}
 
@@ -493,147 +492,91 @@ namespace Chimera.Client.GUI
 				.Select(static path => path!);
 			_firmwareIndex = FirmwareLocator.BuildIndex(_firmwareSearchDirs, remembered);
 			BuildFirmwareNeeds(needed);
-			RenderFirmwareTree();
+			RenderFirmwareRows();
 		}
 
-		private void BuildFirmwareNeeds(IReadOnlyList<(string Id, bool Required)> needed)
+		private void BuildFirmwareNeeds(IReadOnlyList<(string Id, int Index)> needed)
 		{
+			var decls = _cfg?.Firmware ?? [ ];
 			_firmwareNeeds = needed.Select(entry =>
 			{
 				FirmwareNeed need = new()
 				{
 					Id = entry.Id,
-					Required = entry.Required,
-					Decl = DeclFor(entry.Id),
+					Decl = entry.Index >= 0 && entry.Index < decls.Count && decls[entry.Index].Id == entry.Id
+						? decls[entry.Index]
+						: decls.FirstOrDefault(d => d.Id == entry.Id),
 				};
-				need.Found = need.Decl is null ? [ ] : FirmwareLocator.MatchesFor(need.Decl, _firmwareIndex);
-				// auto-satisfy from what was found; a remembered file wins over
-				// a folder hit so yesterday's choice stays today's
-				var remembered = _rememberedFirmwarePath(ChosenCoreName ?? "", entry.Id);
-				var auto = need.Found.FirstOrDefault(m => m.Path == remembered) ?? need.Found.FirstOrDefault();
-				if (auto is not null)
+				// the requirement is one exact file; the folder either holds it
+				// (any name) or the user is asked
+				if (need.Decl is not null
+					&& FirmwareLocator.FindFor(need.Decl, _firmwareIndex) is { } found)
 				{
-					need.ChosenPath = auto.Path;
-					need.ChosenSha1 = auto.Sha1;
-					need.ChosenCandidate = auto.CandidateIndex;
+					need.ChosenPath = found.Path;
+					need.ChosenSha1 = found.Sha1;
 				}
 				return need;
 			}).ToList();
 		}
 
-		private CoreFirmwareDecl? DeclFor(string id)
-			=> (_cfg?.Firmware ?? [ ]).FirstOrDefault(d => d.Id == id);
-
 		private const string CHECK = "\u2714 ";
 
-		private void RenderFirmwareTree()
+		private void RenderFirmwareRows()
 		{
-			_firmwareTree.BeginUpdate();
-			_firmwareTree.Nodes.Clear();
-			for (var n = 0; n < _firmwareNeeds.Count; n++)
+			var selected = _firmwareList.SelectedIndices.Count is 0 ? -1 : _firmwareList.SelectedIndices[0];
+			_firmwareList.BeginUpdate();
+			_firmwareList.Items.Clear();
+			foreach (var need in _firmwareNeeds)
 			{
-				var need = _firmwareNeeds[n];
 				var title = need.Decl?.DisplayName ?? need.Id;
-				var suffix = need.Required ? "required" : "optional";
-				TreeNode reqNode = new(
-					need.Satisfied ? $"{CHECK}{title}  ({suffix} - satisfied)"
-					: need.HasCustom ? $"{title}  ({suffix} - custom dump, unrecognised)"
-					: $"{title}  ({suffix} - not satisfied)")
+				if (!string.IsNullOrEmpty(need.Decl?.Label)) title += $"  ({need.Decl!.Label})";
+				ListViewItem item = new(need.Satisfied ? CHECK + title : title)
 				{
-					Tag = ValueTuple.Create(n, -1, (string)null),
 					ToolTipText = need.Decl?.Description ?? "",
-					ForeColor = need.Satisfied ? System.Drawing.Color.DarkGreen
-						: need.Required ? System.Drawing.Color.Firebrick
-						: System.Drawing.SystemColors.ControlText,
+					ForeColor = need.Satisfied ? System.Drawing.Color.DarkGreen : System.Drawing.Color.Firebrick,
 				};
-
-				var candidates = need.Decl?.AllCandidates ?? [ ];
-				for (var c = 0; c < candidates.Count; c++)
-				{
-					var inUse = need.ChosenCandidate == c;
-					var matches = need.Found.Where(m => m.CandidateIndex == c).ToList();
-					var text = candidates[c].DisplayText;
-					if (inUse) text = $"{CHECK}{text}  -  in use: {Path.GetFileName(need.ChosenPath)}";
-					else if (matches.Count is not 0) text += $"  -  found: {string.Join(", ", matches.Select(static m => Path.GetFileName(m.Path)))}";
-					TreeNode candNode = new(text)
-					{
-						Tag = ValueTuple.Create(n, c, matches.FirstOrDefault()?.Path),
-						ForeColor = inUse ? System.Drawing.Color.DarkGreen : System.Drawing.SystemColors.ControlText,
-					};
-					// several files can satisfy one requirement; each is selectable
-					foreach (var match in matches)
-					{
-						var active = inUse && match.Path == need.ChosenPath;
-						candNode.Nodes.Add(new TreeNode(
-							(active ? CHECK : "") + match.Path)
-						{
-							Tag = ValueTuple.Create(n, c, match.Path),
-							ForeColor = active ? System.Drawing.Color.DarkGreen : System.Drawing.SystemColors.ControlText,
-						});
-					}
-					reqNode.Nodes.Add(candNode);
-				}
-				if (need.HasCustom)
-				{
-					reqNode.Nodes.Add(new TreeNode($"custom: {need.ChosenPath}  {need.ChosenSha1}")
-					{
-						Tag = ValueTuple.Create(n, -1, need.ChosenPath),
-					});
-				}
-				reqNode.Expand();
-				_firmwareTree.Nodes.Add(reqNode);
+				item.SubItems.Add(need.Decl?.Name ?? "");
+				item.SubItems.Add(string.IsNullOrEmpty(need.Decl?.Sha1) ? "(your own dump)" : need.Decl!.Sha1);
+				item.SubItems.Add(need.Satisfied
+					? $"{CHECK}found: {Path.GetFileName(need.ChosenPath)}"
+					: "not found");
+				_firmwareList.Items.Add(item);
 			}
 			if (_firmwareNeeds.Count is 0)
 			{
-				_firmwareTree.Nodes.Add(new TreeNode("(these decisions need no firmware)"));
+				_firmwareList.Items.Add(new ListViewItem("(these decisions need no firmware)"));
 			}
-			_firmwareTree.EndUpdate();
+			if (selected >= 0 && selected < _firmwareList.Items.Count) _firmwareList.Items[selected].Selected = true;
+			_firmwareList.EndUpdate();
 			UpdateFirmwareButtons();
 			UpdateCreateEnabled();
 		}
 
-		private (FirmwareNeed Need, int Candidate, string? Path)? SelectedFirmware()
+		private FirmwareNeed? SelectedFirmwareNeed()
 		{
-			if (_firmwareTree.SelectedNode?.Tag is not ValueTuple<int, int, string> tag) return null;
-			var (n, c, path) = tag;
-			if (n < 0 || n >= _firmwareNeeds.Count) return null;
-			return (_firmwareNeeds[n], c, path);
+			var index = _firmwareList.SelectedIndices.Count is 0 ? -1 : _firmwareList.SelectedIndices[0];
+			return index >= 0 && index < _firmwareNeeds.Count ? _firmwareNeeds[index] : null;
 		}
 
 		private void UpdateFirmwareButtons()
 		{
-			var selected = SelectedFirmware();
-			_firmwareSetButton.Enabled = selected is not null;
-			_firmwareUseButton.Enabled = selected is { Path: not null } sel
-				&& !(sel.Need.ChosenPath == sel.Path);
-			_firmwareClearButton.Enabled = selected is { } s && s.Need.ChosenPath is not null;
-		}
-
-		/// <summary>Activates the found file (or candidate's file) the tree has selected.</summary>
-		private void UseSelectedFirmware()
-		{
-			if (SelectedFirmware() is not { Path: not null } sel) return;
-			var match = sel.Need.Found.FirstOrDefault(m => m.Path == sel.Path);
-			if (match is null) return;
-			sel.Need.ChosenPath = match.Path;
-			sel.Need.ChosenSha1 = match.Sha1;
-			sel.Need.ChosenCandidate = match.CandidateIndex;
-			RenderFirmwareTree();
+			var need = SelectedFirmwareNeed();
+			_firmwareSetButton.Enabled = need is not null;
+			_firmwareClearButton.Enabled = need?.ChosenPath is not null;
 		}
 
 		private void SetFirmwareFile()
 		{
-			if (SelectedFirmware() is not { } sel) return;
-			var path = _pickFirmwareFile($"Locate {sel.Need.Decl?.DisplayName ?? sel.Need.Id}");
+			if (SelectedFirmwareNeed() is not { } need) return;
+			var path = _pickFirmwareFile($"Locate {need.Decl?.DisplayName ?? need.Id}");
 			if (path is null) return;
-			ProvideFirmware(sel.Need.Id, path);
+			ProvideFirmware(need.Id, path);
 		}
 
 		/// <summary>
-		/// Points one firmware id at a file the user chose - allowed even when
-		/// something was already found. The hash decides everything: a required
-		/// entry only accepts a listed candidate; an optional one also takes a
-		/// custom dump, recorded as such.
+		/// Points one requirement at a file the user chose - allowed even when
+		/// the folder already found one. The hash decides: the requirement names
+		/// ONE exact file, and only that file satisfies it.
 		/// </summary>
 		public void ProvideFirmware(string id, string path)
 		{
@@ -650,43 +593,39 @@ namespace Chimera.Client.GUI
 				return;
 			}
 			var sha1 = Chimera.Emulation.Common.Engine.ChimeraEngine.Sha1Hex(bytes);
-			var candidates = need.Decl?.AllCandidates ?? [ ];
-			var matched = -1;
-			for (var c = 0; c < candidates.Count; c++)
+			// a pinned entry names ONE exact file; an unpinned one (no declared
+			// hash - a file only the user can own, like a console's own font
+			// region nothing ships) takes what is chosen and records its hash
+			if (!string.IsNullOrEmpty(need.Decl?.Sha1)
+				&& !sha1.Equals(need.Decl!.Sha1, StringComparison.OrdinalIgnoreCase))
 			{
-				if (sha1.Equals(candidates[c].Sha1, StringComparison.OrdinalIgnoreCase)) { matched = c; break; }
-			}
-			if (matched < 0 && need.Required)
-			{
-				_status.Text = $"{System.IO.Path.GetFileName(path)} matches none of the listed dumps for {need.Decl?.DisplayName ?? id} (hash {sha1})";
+				_status.Text = $"{System.IO.Path.GetFileName(path)} is not this file: its hash is {sha1},"
+					+ $" the requirement is {need.Decl!.Sha1}";
 				return;
 			}
 			need.ChosenPath = System.IO.Path.GetFullPath(path);
 			need.ChosenSha1 = sha1;
-			need.ChosenCandidate = matched;
 			_status.Text = "";
-			RenderFirmwareTree();
+			RenderFirmwareRows();
 		}
 
 		private void ClearFirmwareFile()
 		{
-			if (SelectedFirmware() is not { } sel) return;
-			sel.Need.ChosenPath = null;
-			sel.Need.ChosenSha1 = null;
-			sel.Need.ChosenCandidate = -1;
-			RenderFirmwareTree();
+			if (SelectedFirmwareNeed() is not { } need) return;
+			need.ChosenPath = null;
+			RenderFirmwareRows();
 		}
 
 		private string? MissingRequiredFirmware()
 		{
 			foreach (var need in _firmwareNeeds)
 			{
-				if (need.Required && !need.Satisfied) return need.Decl?.DisplayName ?? need.Id;
+				if (!need.Satisfied) return need.Decl?.DisplayName ?? need.Id;
 			}
 			return null;
 		}
 
-		/// <summary>What the user ended up with, for the owner to remember paths per core (Config.CoreFirmware).</summary>
+		/// <summary>What was found or chosen, for the owner to remember paths per core (Config.CoreFirmware).</summary>
 		public IReadOnlyDictionary<string, string> ProvidedFirmwarePaths
 			=> _firmwareNeeds.Where(static n => n.ChosenPath is not null)
 				.ToDictionary(static n => n.Id, static n => n.ChosenPath!);
@@ -695,11 +634,8 @@ namespace Chimera.Client.GUI
 		public bool FirmwareSatisfied(string id)
 			=> _firmwareNeeds.FirstOrDefault(n => n.Id == id)?.Satisfied is true;
 
-		public (string? Path, string? Sha1, int Candidate) ChosenFirmware(string id)
-		{
-			var need = _firmwareNeeds.FirstOrDefault(n => n.Id == id);
-			return (need?.ChosenPath, need?.ChosenSha1, need?.ChosenCandidate ?? -1);
-		}
+		public string? ChosenFirmwarePath(string id)
+			=> _firmwareNeeds.FirstOrDefault(n => n.Id == id)?.ChosenPath;
 
 		// ---- creation -------------------------------------------------------------
 
@@ -737,7 +673,7 @@ namespace Chimera.Client.GUI
 				Newtonsoft.Json.Linq.JArray pins = new();
 				foreach (var need in _firmwareNeeds)
 				{
-					if (need.ChosenSha1 is null) continue;
+					if (!need.Satisfied || need.ChosenSha1 is null) continue;
 					pins.Add(new Newtonsoft.Json.Linq.JObject { ["id"] = need.Id, ["sha1"] = need.ChosenSha1 });
 				}
 				if (pins.Count is not 0) project.SetFirmwareJson(pins.ToString(Newtonsoft.Json.Formatting.None));

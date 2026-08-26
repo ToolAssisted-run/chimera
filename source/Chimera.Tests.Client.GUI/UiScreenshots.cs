@@ -120,7 +120,7 @@ namespace Chimera.Tests.Client.GUI
 						Description = description,
 						Size = 8192,
 						Required = required,
-						Sha1 = [ "57FE1BDEE955BB48D357E463CCBF129496930B62", "E4E41472C454F928E53EB10E0509BF7D1146ECC1" ],
+						Sha1 = "57FE1BDEE955BB48D357E463CCBF129496930B62",
 					},
 					Path = path,
 					State = state,

@@ -287,11 +287,13 @@ CE_API const char *ce_firmware_record_line(const char *pairs, uint64_t *len_out)
  *   {"setting": name, "is": v}      the setting has that value
  *   {"setting": name, "in": [v..]}  ...one of those values
  *   {"all": [c..]} {"any": [c..]} {"not": c}
- * A conditional entry is required when its condition holds and absent
- * otherwise; an unconditional one keeps its "required" flag (false =
- * optional). Malformed conditions evaluate false. Returns a JSON array
- * [{"id":..,"state":"required"|"optional"}] in declaration order
- * (thread-local; invalidated by the next call). */
+ * Every applying entry is REQUIRED - the decisions nail each requirement
+ * to one exact file or to nothing; variants of one id are separate
+ * entries with disjoint conditions (a sync setting picks between them),
+ * and optional firmware does not exist. An entry without a condition
+ * always applies. Malformed conditions evaluate false. Returns a JSON
+ * array [{"id":..,"index":n}] in declaration order, n being the
+ * position in decl_json (thread-local; invalidated by the next call). */
 CE_API const char *ce_firmware_evaluate(
 	const char *decl_json, uint64_t decl_len,
 	const char *slots_json, uint64_t slots_len,
