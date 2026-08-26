@@ -411,10 +411,16 @@ namespace Chimera.Emulation.Common.Engine
 		public abstract int ce_project_file_status(IntPtr project, int index);
 
 		[BizImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_project_file_source_path(IntPtr project, int index);
+
+		[BizImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_project_file_data(IntPtr project, int index, ref ulong lenOut);
 
 		[BizImport(CallingConvention.Cdecl)]
 		public abstract int ce_project_file_resolve(IntPtr project, int index, string path, ref IntPtr errorOut);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract void ce_project_file_unresolve(IntPtr project, int index);
 
 		[BizImport(CallingConvention.Cdecl)]
 		public abstract int ce_project_resolve_dir(IntPtr project, string dir);
@@ -1248,6 +1254,14 @@ namespace Chimera.Emulation.Common.Engine
 		/// <summary>0 = resolved and matching, 1 = unresolved, 2 = resolved but mismatched.</summary>
 		public int FileStatus(int index) => ChimeraEngine.Instance.ce_project_file_status(_project, index);
 
+		/// <summary>
+		/// Where this file's bytes were read from in THIS run, or "" if not yet read.
+		/// In memory only: the project never carries a path, so remembering one is
+		/// the frontend's business (see <c>ProjectLocalPaths</c>).
+		/// </summary>
+		public string FileSourcePath(int index)
+			=> ChimeraEngine.PtrToStringUtf8(ChimeraEngine.Instance.ce_project_file_source_path(_project, index)) ?? "";
+
 		/// <returns>the resolved bytes, or null while unresolved</returns>
 		public byte[]? FileData(int index)
 		{
@@ -1269,6 +1283,9 @@ namespace Chimera.Emulation.Common.Engine
 				throw new InvalidOperationException(ChimeraEngine.PtrToStringUtf8(error) ?? "unresolvable");
 			}
 		}
+
+		/// <summary>Puts a file back to unresolved: no bytes, no hash, no source path.</summary>
+		public void FileUnresolve(int index) => ChimeraEngine.Instance.ce_project_file_unresolve(_project, index);
 
 		/// <summary>Tries every unresolved file by canonical name in a directory; returns how many resolved.</summary>
 		public int ResolveDir(string dir) => ChimeraEngine.Instance.ce_project_resolve_dir(_project, dir);

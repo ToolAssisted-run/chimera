@@ -152,6 +152,11 @@ namespace Chimera.Client.Common
 			if (!isBackup)
 			{
 				WriteCacheFile(Path.ChangeExtension(fn, "chimeraGreenZone"));
+				// and where this machine keeps the project's files, in a sibling of
+				// its own: the project itself stays distributable, carrying names and
+				// hashes and no paths at all (docs/project.md). Merged over whatever
+				// is already there, so firmware locations recorded at load survive.
+				ProjectLocalPaths.Read(fn).Save(fn, p);
 				Changes = false;
 			}
 			return new FileWriteResult();

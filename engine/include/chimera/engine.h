@@ -520,6 +520,11 @@ CE_API const char *ce_project_file_sha1(const ce_project *p, int32_t index);
 CE_API const char *ce_project_file_actual_sha1(const ce_project *p, int32_t index);
 /* 0 = resolved and matching, 1 = unresolved, 2 = resolved but mismatched */
 CE_API int32_t ce_project_file_status(const ce_project *p, int32_t index);
+/* Where this file's bytes were read from in THIS run, or "" if not yet read.
+ * In memory only - NEVER written to the project, which is distributable and
+ * has no business carrying one machine's paths. A frontend that wants to
+ * remember locations keeps its own sidecar and reads them from here. */
+CE_API const char *ce_project_file_source_path(const ce_project *p, int32_t index);
 /* the resolved bytes (NULL while unresolved); borrowed, live as long as p */
 CE_API const uint8_t *ce_project_file_data(const ce_project *p, int32_t index, uint64_t *len_out);
 
@@ -528,6 +533,12 @@ CE_API const uint8_t *ce_project_file_data(const ce_project *p, int32_t index, u
  * may differ from the canonical one. 0 on success (even a mismatch - that
  * is a status, not an error); nonzero with *error_out when unreadable. */
 CE_API int32_t ce_project_file_resolve(ce_project *p, int32_t index, const char *path, const char **error_out);
+
+/* Puts a file back to unresolved, dropping the bytes, the actual hash and the
+ * source path. For a caller that resolved speculatively (a remembered location
+ * that turned out to hold something else) and wants the file asked about
+ * rather than mounted. */
+CE_API void ce_project_file_unresolve(ce_project *p, int32_t index);
 /* Tries to resolve every unresolved file by its canonical name inside dir
  * (the "files beside the project" convenience). Returns how many resolved. */
 CE_API int32_t ce_project_resolve_dir(ce_project *p, const char *dir);

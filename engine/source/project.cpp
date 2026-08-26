@@ -37,6 +37,10 @@ struct FileEntry
 	std::string sha1;       // recorded (40 uppercase hex)
 	std::string actualSha1; // "" while unresolved
 	int32_t status = 1;     // 0 resolved+match, 1 unresolved, 2 mismatch
+	/* Where these bytes were read from, on THIS machine, in THIS run. Never
+	 * serialized: the project is distributable and a path is not. It exists so
+	 * a frontend can remember locations in a sidecar of its own. */
+	std::string sourcePath;
 	std::vector<uint8_t> data;
 };
 
@@ -775,6 +779,7 @@ int32_t ce_project_file_add(ce_project *p, const char *name, const char *slot, c
 	hashInto(e.data, e.actualSha1);
 	e.sha1 = e.actualSha1;
 	e.status = 0;
+	e.sourcePath = source_path;
 	std::string folder = folderOf(source_path);
 	std::string cueName = e.name;
 	bool isCue = hasCueSuffix(e.name);
@@ -812,6 +817,7 @@ int32_t ce_project_file_add(ce_project *p, const char *name, const char *slot, c
 		hashInto(s.data, s.actualSha1);
 		s.sha1 = s.actualSha1;
 		s.status = 0;
+		s.sourcePath = folder + ref;
 		p->files.push_back(std::move(s));
 	}
 	return 0;
@@ -858,6 +864,12 @@ int32_t ce_project_file_status(const ce_project *p, int32_t index)
 	return p->files[index].status;
 }
 
+const char *ce_project_file_source_path(const ce_project *p, int32_t index)
+{
+	if (index < 0 || index >= ce_project_file_count(p)) return nullptr;
+	return p->files[index].sourcePath.c_str();
+}
+
 const uint8_t *ce_project_file_data(const ce_project *p, int32_t index, uint64_t *len_out)
 {
 	if (len_out != nullptr) *len_out = 0;
@@ -884,7 +896,19 @@ int32_t ce_project_file_resolve(ce_project *p, int32_t index, const char *path, 
 	e.data = std::move(data);
 	hashInto(e.data, e.actualSha1);
 	e.status = e.actualSha1 == e.sha1 ? 0 : 2;
+	e.sourcePath = path;
 	return 0;
+}
+
+void ce_project_file_unresolve(ce_project *p, int32_t index)
+{
+	if (index < 0 || index >= ce_project_file_count(p)) return;
+	FileEntry &e = p->files[index];
+	e.data.clear();
+	e.data.shrink_to_fit();
+	e.actualSha1.clear();
+	e.sourcePath.clear();
+	e.status = 1;
 }
 
 int32_t ce_project_resolve_dir(ce_project *p, const char *dir)
@@ -897,10 +921,12 @@ int32_t ce_project_resolve_dir(ce_project *p, const char *dir)
 	{
 		if (e.status != 1) continue;
 		std::vector<uint8_t> data;
-		if (!chimera::readFile((base + e.name).c_str(), data)) continue;
+		const std::string path = base + e.name;
+		if (!chimera::readFile(path.c_str(), data)) continue;
 		e.data = std::move(data);
 		hashInto(e.data, e.actualSha1);
 		e.status = e.actualSha1 == e.sha1 ? 0 : 2;
+		e.sourcePath = path;
 		resolved++;
 	}
 	return resolved;

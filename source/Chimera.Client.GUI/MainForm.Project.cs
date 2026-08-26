@@ -134,8 +134,12 @@ namespace Chimera.Client.GUI
 				return false;
 			}
 
-			// resolution: beside the project first, then the user's say per file
+			// resolution: beside the project first, then where this machine last
+			// found them (the .chimeraLocal sidecar - a hint, never authority: it
+			// resolves nothing whose bytes do not match), then the user's say per file
 			project.ResolveDir(Path.GetDirectoryName(Path.GetFullPath(path)));
+			var local = ProjectLocalPaths.Read(path);
+			local.ApplyTo(project);
 			if (!project.FilesOk)
 			{
 				using ProjectResolutionForm dialog = new(project, locateFile: title =>
@@ -150,7 +154,9 @@ namespace Chimera.Client.GUI
 				}
 			}
 
-			return BootProject(project, path, saved: true);
+			// the firmware the project pins is looked for where this machine last
+			// had it, as well as in the Firmware folder
+			return BootProject(project, path, saved: true, local);
 		}
 
 		/// <summary>
@@ -167,15 +173,16 @@ namespace Chimera.Client.GUI
 		/// machine up EXACTLY ONCE with the project's own core and settings,
 		/// with the project queued as the movie it IS.
 		/// </summary>
-		private bool BootProject(EngineProject project, string path, bool saved)
+		private bool BootProject(EngineProject project, string path, bool saved, ProjectLocalPaths local = null)
 		{
+			local ??= new ProjectLocalPaths();
 			if (!EnsureProjectCore(project))
 			{
 				project.Dispose();
 				return false;
 			}
 
-			if (!VerifyFirmwarePins(project))
+			if (!VerifyFirmwarePins(project, local))
 			{
 				project.Dispose();
 				return false;
@@ -257,8 +264,13 @@ namespace Chimera.Client.GUI
 			SetMainformMovieInfo();
 			WarnOnMovieVsLoadedCore();
 
-			// only a project that HAS a file can be recent
-			if (saved) Config.RecentProjects.Add(path);
+			// only a project that HAS a file can be recent, and only one that has a
+			// file has somewhere to keep the note of where its files were found
+			if (saved)
+			{
+				Config.RecentProjects.Add(path);
+				local.Save(path, project);
+			}
 			// a project IS a TAStudio session; from the commandline the window is
 			// not up yet, so the landing waits for it. Headless runs have nobody
 			// to operate TAStudio (which opens PAUSED at the session frame) -
@@ -281,12 +293,13 @@ namespace Chimera.Client.GUI
 
 		/// <summary>
 		/// The project's firmware pins, honored exactly: for each pinned file,
-		/// a file with THAT hash must be on hand (the Firmware folder and the
-		/// remembered paths are searched; whichever matches is what the session
-		/// mounts). A pin nothing satisfies is a different machine, so it takes
-		/// a severe are-you-sure to proceed (docs/project.md).
+		/// a file with THAT hash must be on hand (the Firmware folder, the paths
+		/// remembered for this core, and the ones this project's own sidecar
+		/// remembers are searched; whichever matches is what the session mounts).
+		/// A pin nothing satisfies is a different machine, so it takes a severe
+		/// are-you-sure to proceed (docs/project.md).
 		/// </summary>
-		private bool VerifyFirmwarePins(EngineProject project)
+		private bool VerifyFirmwarePins(EngineProject project, ProjectLocalPaths local)
 		{
 			List<(string Id, string Sha1)> pins = new();
 			try
@@ -307,10 +320,13 @@ namespace Chimera.Client.GUI
 			var coreName = project.CoreName;
 			var index = FirmwareLocator.BuildIndex(
 				[ Config.PathEntries.FirmwareAbsolutePath() ],
-				pins.Select(pin => Config.CoreFirmware.TryGetValue(
-						CoreFirmwareStore.KeyFor(coreName, pin.Id), out var remembered)
-					? remembered
-					: null)
+				pins.SelectMany(pin => new[]
+					{
+						Config.CoreFirmware.TryGetValue(CoreFirmwareStore.KeyFor(coreName, pin.Id), out var remembered)
+							? remembered
+							: null,
+						local.Firmware.TryGetValue(pin.Id, out var beside) ? beside : null,
+					})
 					.Where(static path => path is not null)!);
 
 			List<string> unsatisfied = new();
@@ -319,8 +335,11 @@ namespace Chimera.Client.GUI
 				var exact = index.FirstOrDefault(f => f.Sha1.Equals(sha1, StringComparison.OrdinalIgnoreCase));
 				if (exact is not null)
 				{
-					// the session mounts THIS file, exactly what the project names
+					// the session mounts THIS file, exactly what the project names -
+					// and where it was is worth remembering, for this core and for
+					// this project
 					Config.CoreFirmware[CoreFirmwareStore.KeyFor(coreName, id)] = exact.Path;
+					local.RememberFirmware(id, exact.Path);
 				}
 				else
 				{

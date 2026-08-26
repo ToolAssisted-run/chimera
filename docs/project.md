@@ -210,12 +210,33 @@ longer sync; that is the user's informed call). Non-structural changes
 
 ## Opening
 
-Opening a project first shows a file-resolution dialog: the user provides
-the location of every required file for this session (locations are
-per-session, wherever the files happen to live). As each file is provided
-its SHA1 is checked and divergence is warned about immediately, in the
-dialog. A differing file NAME on disk is fine - the project's recorded
-name is the canonical label and mount name, the hash is the identity.
+Opening a project resolves its files in three steps, and only asks for
+what is left: beside the project file first, then where THIS machine last
+found them, then the file-resolution dialog. As each file is provided its
+SHA1 is checked and divergence is warned about immediately, in the dialog.
+A differing file NAME on disk is fine - the project's recorded name is the
+canonical label and mount name, the hash is the identity.
+
+### The local sidecar: `<project>.chimeraLocal`
+
+The project carries names and hashes and never a path, because it is meant
+to be handed to someone else and a path is true of one machine only. But
+the machine that made it knows where those files are, and asking it again
+every time you open your own work is friction for nothing.
+
+So the paths live in a sibling with the same name and a different
+extension, written whenever the project is saved and whenever one is
+opened: `{"files": {"<name>": "<path>"}, "firmware": {"<id>": "<path>"}}`.
+It is never distributed, and never authority - a HINT. Every path it
+offers is checked: the file must still be there and still hash to what the
+project records, and a path that now holds something else is put back to
+unresolved so the dialog asks rather than mounting the wrong bytes
+quietly. Deleting it costs nothing but the asking. A machine that has no
+sidecar behaves exactly as before.
+
+The engine keeps each file's source path in memory (`ce_project_file_source_path`)
+so a frontend can write one, and never serializes it: the distributable
+file stays free of paths by construction, not by convention.
 
 Core pin mismatch (installed package differs from the pinned
 version+hash): refuse by default with a clear pinned-vs-installed message,
