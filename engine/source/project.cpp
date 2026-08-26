@@ -15,10 +15,12 @@
 
 #include "file_io.hpp"
 #include "manifest_util.hpp"
+#include "conditions.hpp"
 
 #include "../../extern/cjson/cJSON.h"
 
 #include <cstring>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -969,7 +971,45 @@ int32_t ce_project_validate(const ce_project *p, const char *slots_json, uint64_
 		}
 	}
 
-	/* cardinality per declared slot */
+	/* a slot may be gated by the OTHER slots' contents (exposedWhen, the
+	 * same condition language as firmware): files sitting in a slot the
+	 * manifest itself makes unavailable are structurally invalid - a
+	 * Famicom disk rules out a cartridge and vice versa. Exposure is
+	 * decided FIRST because an unexposed slot's minimum does not bind:
+	 * "cart min 1 unless fds" and "fds min 1 unless cart" together mean
+	 * exactly one of either. */
+	std::set<std::string> unexposed;
+	{
+		cJSON *slotMap = cJSON_CreateObject();
+		for (const FileEntry &e : p->files)
+		{
+			if (e.slot == "support") continue;
+			cJSON *arr = cJSON_GetObjectItemCaseSensitive(slotMap, e.slot.c_str());
+			if (arr == nullptr) arr = cJSON_AddArrayToObject(slotMap, e.slot.c_str());
+			cJSON_AddItemToArray(arr, cJSON_CreateString(e.name.c_str()));
+		}
+		for (cJSON *item = slots->child; item != nullptr; item = item->next)
+		{
+			cJSON *id = cJSON_GetObjectItemCaseSensitive(item, "id");
+			cJSON *when = cJSON_GetObjectItemCaseSensitive(item, "exposedWhen");
+			if (!cJSON_IsString(id) || when == nullptr) continue;
+			if (ceEvalCondition(when, slotMap, nullptr)) continue;
+			unexposed.insert(id->valuestring);
+			for (const FileEntry &e : p->files)
+			{
+				if (e.slot != id->valuestring) continue;
+				std::string bad = e.name;
+				std::string slotName = id->valuestring;
+				cJSON_Delete(slotMap);
+				return failV("file '" + bad + "' sits in slot '" + slotName
+					+ "', which these files make unavailable");
+			}
+		}
+		cJSON_Delete(slotMap);
+	}
+
+	/* cardinality per declared slot; an unexposed slot's minimum does not
+	 * bind (it cannot be filled) */
 	for (const Decl &d : decls)
 	{
 		int32_t count = 0;
@@ -977,7 +1017,7 @@ int32_t ce_project_validate(const ce_project *p, const char *slots_json, uint64_
 		{
 			if (e.slot == d.id) count++;
 		}
-		if (count < d.min)
+		if (count < d.min && unexposed.find(d.id) == unexposed.end())
 		{
 			return failV("slot '" + d.id + "' needs at least " + std::to_string(d.min) +
 				" file(s), " + std::to_string(count) + " given");

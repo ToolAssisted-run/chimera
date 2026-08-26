@@ -214,6 +214,12 @@ namespace Chimera.Emulation.Common.Engine
 			ref ulong lenOut);
 
 		[BizImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_slots_evaluate(
+			byte[] declJson, ulong declLen,
+			byte[] slotsJson, ulong slotsLen,
+			ref ulong lenOut);
+
+		[BizImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_package_open(string path, ref IntPtr errorOut);
 
 		[BizImport(CallingConvention.Cdecl)]
@@ -1586,6 +1592,31 @@ namespace Chimera.Emulation.Common.Engine
 				var name = item.Value<string>("name");
 				if (name is null) continue;
 				outList.Add((name, item.Value<int?>("index") ?? -1));
+			}
+			return outList;
+		}
+	}
+
+	/// <summary>
+	/// The decision tree over the SLOTS themselves (docs/project.md): filling
+	/// one slot can make another unavailable until it is unloaded - a Famicom
+	/// disk rules out a cartridge and vice versa.
+	/// </summary>
+	public static class EngineSlotsGate
+	{
+		/// <returns>the exposed slot ids, declaration order</returns>
+		public static System.Collections.Generic.IReadOnlyList<string> Evaluate(string declJson, string slotsJson)
+		{
+			var decl = Encoding.UTF8.GetBytes(declJson ?? "{}");
+			var slots = Encoding.UTF8.GetBytes(slotsJson ?? "{}");
+			ulong len = 0;
+			var result = ChimeraEngine.Instance.ce_slots_evaluate(
+				decl, (ulong)decl.LongLength, slots, (ulong)slots.LongLength, ref len);
+			var text = ChimeraEngine.PtrToStringUtf8(result, len);
+			System.Collections.Generic.List<string> outList = new();
+			foreach (var item in Newtonsoft.Json.Linq.JArray.Parse(text))
+			{
+				if (item.Type is Newtonsoft.Json.Linq.JTokenType.String) outList.Add(item.ToObject<string>()!);
 			}
 			return outList;
 		}

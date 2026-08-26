@@ -122,6 +122,23 @@ int main(void)
 	assert(evalSettings(variants, "{\"cart\":[\"x.md\"]}", "{}")
 		== "[{\"name\":\"soundChip\",\"index\":1}]");
 
+	// ---- and the SLOTS themselves: filling one can rule out another ----
+
+	auto evalSlots = [](const char *decl, const char *slots)
+	{
+		uint64_t len = 0;
+		const char *out = ce_slots_evaluate(decl, std::strlen(decl), slots, std::strlen(slots), &len);
+		return std::string(out, len);
+	};
+
+	const char *exclusive =
+		"{\"slots\":["
+		"{\"id\":\"cart\",\"exposedWhen\":{\"not\":{\"slot\":\"fds\"}}},"
+		"{\"id\":\"fds\",\"exposedWhen\":{\"not\":{\"slot\":\"cart\"}}}]}";
+	assert(evalSlots(exclusive, "{}") == "[\"cart\",\"fds\"]");
+	assert(evalSlots(exclusive, "{\"fds\":[\"zelda.fds\"]}") == "[\"fds\"]");
+	assert(evalSlots(exclusive, "{\"cart\":[\"smb.nes\"]}") == "[\"cart\"]");
+
 	std::printf("firmware: all assertions passed\n");
 	return 0;
 }

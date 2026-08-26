@@ -43,6 +43,7 @@ namespace Chimera.Client.GUI
 		private ProjectSlotDeclaration? _declaration;
 		private string? _declarationCore;
 		private readonly Dictionary<string, ListBox> _slotLists = new();
+		private readonly Dictionary<string, GroupBox> _slotGroups = new();
 		private readonly ToolTip _tips = new();
 
 		// page 3
@@ -361,6 +362,7 @@ namespace Chimera.Client.GUI
 		{
 			_slotsHost.Controls.Clear();
 			_slotLists.Clear();
+			_slotGroups.Clear();
 			var y = 0;
 			foreach (var slot in _declaration!.Slots)
 			{
@@ -395,13 +397,43 @@ namespace Chimera.Client.GUI
 				remove.Click += (_, _) =>
 				{
 					if (list.SelectedIndex >= 0) list.Items.RemoveAt(list.SelectedIndex);
+					RefreshSlotAvailability();
 				};
 				group.Controls.AddRange([ help, list, add, remove ]);
 				_slotsHost.Controls.Add(group);
 				_slotLists[slot.Id] = list;
+				_slotGroups[slot.Id] = group;
+				group.Tag = group.Text;
 				y += 102;
 			}
+			RefreshSlotAvailability();
 		}
+
+		/// <summary>
+		/// The slots themselves join the decision tree: a slot's exposedWhen is
+		/// evaluated over the CURRENT picks, so filling one slot can make
+		/// another unavailable until it is unloaded (a Famicom disk rules out
+		/// a cartridge and vice versa). Greyed, never hidden - the person sees
+		/// what the machine could also take and why it cannot right now.
+		/// </summary>
+		private void RefreshSlotAvailability()
+		{
+			if (_declaration is null) return;
+			var exposed = EngineSlotsGate.Evaluate(_declaration.RawJson, CurrentSlotsJson());
+			foreach (var slot in _declaration.Slots)
+			{
+				if (!_slotGroups.TryGetValue(slot.Id, out var group)) continue;
+				var available = exposed.Contains(slot.Id);
+				group.Enabled = available;
+				group.Text = available
+					? (string)group.Tag!
+					: $"{(string)group.Tag!} - unavailable with the current files";
+			}
+		}
+
+		/// <summary>Whether a slot currently accepts files, for tests.</summary>
+		public bool SlotAvailable(string slotId)
+			=> _slotGroups.TryGetValue(slotId, out var group) && group.Enabled;
 
 		/// <summary>One picked file, kept as its canonical (bare) name plus where it is now.</summary>
 		private sealed record PickedFile(string Name, string Path)
@@ -413,10 +445,25 @@ namespace Chimera.Client.GUI
 		public void AddFileToSlot(string slotId, string path)
 		{
 			if (!_slotLists.TryGetValue(slotId, out var list)) return;
+			if (_slotGroups.TryGetValue(slotId, out var g) && !g.Enabled) return;
 			var name = Path.GetFileName(path);
 			if (list.Items.OfType<PickedFile>().Any(f => f.Name == name)) return;
 			list.Items.Add(new PickedFile(name, path));
+			RefreshSlotAvailability();
 		}
+
+		/// <summary>The remove button's behaviour, for tests: drop one picked file by canonical name.</summary>
+		public void RemoveFileFromSlot(string slotId, string name)
+		{
+			if (!_slotLists.TryGetValue(slotId, out var list)) return;
+			var found = list.Items.OfType<PickedFile>().FirstOrDefault(f => f.Name == name);
+			if (found is null) return;
+			list.Items.Remove(found);
+			RefreshSlotAvailability();
+		}
+
+		/// <summary>What still blocks the file page, for tests (null = nothing).</summary>
+		public string? FilesComplaint() => CardinalityComplaint();
 
 		/// <summary>The canonical names in one slot, in order, for tests.</summary>
 		public string[] SlotFileNames(string slotId)
@@ -430,7 +477,7 @@ namespace Chimera.Client.GUI
 			foreach (var slot in _declaration!.Slots)
 			{
 				var count = _slotLists[slot.Id].Items.Count;
-				if (count < slot.Min) return $"{slot.Title}: needs {slot.CardinalityText}, has {count}";
+				if (count < slot.Min && SlotAvailable(slot.Id)) return $"{slot.Title}: needs {slot.CardinalityText}, has {count}";
 				if (slot.Max >= 0 && count > slot.Max) return $"{slot.Title}: takes {slot.CardinalityText}, has {count}";
 			}
 			foreach (var group in _declaration.AtLeastOneOf)

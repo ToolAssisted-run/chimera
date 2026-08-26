@@ -58,7 +58,12 @@ circled question-mark tooltip explaining what is expected there and in
 what format. The form's content is fully decided, populated and formatted
 by each core; Chimera only provides the interface and the execution. Files
 are hashed as they are added, and order within a category is the swap
-order. Then the sync settings - themselves GATED by the files just chosen: a
+order. The form ADAPTS within the step: a slot may carry "exposedWhen"
+over the current picks, so providing a Famicom disk greys the cartridge
+slot until the disk is unloaded and vice versa - greyed, never hidden,
+so the person still sees what the machine could also take. An
+unavailable slot's minimum does not bind, which is how two mutually
+exclusive min-1 slots together say "exactly one of either". Then the sync settings - themselves GATED by the files just chosen: a
 declaration entry may carry "exposedWhen" (the same condition language
 as firmware), so a Game Gear cart exposes its sound chip where a
 Genesis cart exposes its own, a Famicom disk exposes the FDS BIOS
@@ -173,6 +178,13 @@ to build the form, and by `ce_project_*` to validate a manifest:
   floppy or a hard disk - the user's slot choice resolves what
   sniffing had to guess).
 - `help`: the circled-question-mark tooltip text.
+- `exposedWhen` (optional): the condition language above, evaluated over
+  the CURRENT slot map (settings do not take part - the files come
+  first in the wizard). The form re-evaluates after every add and
+  remove, greying slots the condition rules out; `ce_project_validate`
+  enforces the same rule (a file in an unexposed slot is a structural
+  error), and exposure is decided before cardinality so an unexposed
+  slot's `min` does not bind.
 - `atLeastOneOf` (optional): groups of slot ids; across each group at
   least one file must be present, for requirements no single slot's
   `min` can express ("some bootable medium").

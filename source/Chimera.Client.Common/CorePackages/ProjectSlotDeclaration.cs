@@ -16,6 +16,9 @@ namespace Chimera.Client.Common
 	/// </summary>
 	public sealed class ProjectSlotDeclaration
 	{
+		/// <summary>the declaration exactly as the package wrote it, for the engine's slot gate</summary>
+		public string RawJson { get; private init; } = "{}";
+
 		public sealed class Slot
 		{
 			public string Id { get; init; } = "";
@@ -76,7 +79,7 @@ namespace Chimera.Client.Common
 						if (ids.Count is not 0) groups.Add(ids);
 					}
 				}
-				return new() { Slots = parsed, AtLeastOneOf = groups };
+				return new() { Slots = parsed, AtLeastOneOf = groups, RawJson = json! };
 			}
 			catch (Newtonsoft.Json.JsonException)
 			{

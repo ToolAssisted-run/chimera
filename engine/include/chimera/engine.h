@@ -314,6 +314,19 @@ CE_API const char *ce_settings_evaluate(
 	const char *settings_json, uint64_t settings_len,
 	uint64_t *len_out);
 
+/* And gating the SLOTS themselves, within the file form (docs/project.md):
+ * a slot in file_slots.json may carry "exposedWhen" over the CURRENT slot
+ * map, so filling one slot can make another unavailable (a Famicom disk
+ * rules out a cartridge and vice versa) until it is unloaded. decl_json is
+ * the whole file_slots.json. Returns the exposed slot ids as a JSON array
+ * of strings, declaration order (thread-local; invalidated by the next
+ * call). ce_project_validate enforces the same rule: files in an unexposed
+ * slot are structurally invalid. */
+CE_API const char *ce_slots_evaluate(
+	const char *decl_json, uint64_t decl_len,
+	const char *slots_json, uint64_t slots_len,
+	uint64_t *len_out);
+
 /* ---- multi-file games ----
  *
  * A .chimeraMultiFile descriptor names the files a game is made of: bare

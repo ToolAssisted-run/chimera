@@ -206,6 +206,27 @@ int main(int argc, char **argv)
 		// a min is enforced
 		const char *needOne = "{\"slots\":[{\"id\":\"rom\",\"min\":1,\"max\":1}]}";
 		assert(ce_project_validate(p, needOne, std::strlen(needOne), &err) != 0);
+		// mutually exclusive slots: files in a slot the manifest itself makes
+		// unavailable are structurally invalid
+		const char *exclusive =
+			"{\"slots\":["
+			"{\"id\":\"cart\",\"formats\":[\"iso\"],\"exposedWhen\":{\"not\":{\"slot\":\"fdsx\"}}},"
+			"{\"id\":\"fdsx\",\"formats\":[\"hdd\"],\"exposedWhen\":{\"not\":{\"slot\":\"cart\"}}}]}";
+		assert(ce_project_file_add(p, "disc2.iso", "cart", (g_dir + "/disc2.iso").c_str(), &err) == 0);
+		assert(ce_project_validate(p, exclusive, std::strlen(exclusive), &err) == 0);
+		assert(ce_project_file_add(p, "save.hdd", "fdsx", (g_dir + "/save.hdd").c_str(), &err) == 0);
+		assert(ce_project_validate(p, exclusive, std::strlen(exclusive), &err) != 0);
+		assert(std::strstr(err, "unavailable") != nullptr);
+		ce_project_file_remove(p, 1);
+		assert(ce_project_validate(p, exclusive, std::strlen(exclusive), &err) == 0);
+		// an unexposed slot's minimum does not bind: "cart min 1 unless
+		// fdsx" plus "fdsx min 1 unless cart" means exactly one of either
+		const char *eitherOne =
+			"{\"slots\":["
+			"{\"id\":\"cart\",\"min\":1,\"max\":1,\"formats\":[\"iso\"],\"exposedWhen\":{\"not\":{\"slot\":\"fdsx\"}}},"
+			"{\"id\":\"fdsx\",\"min\":1,\"max\":1,\"formats\":[\"hdd\"],\"exposedWhen\":{\"not\":{\"slot\":\"cart\"}}}]}";
+		assert(ce_project_validate(p, eitherOne, std::strlen(eitherOne), &err) == 0);
+		ce_project_file_remove(p, 0);
 		ce_project_free(p);
 	}
 

@@ -270,6 +270,7 @@ engine_src = files(
   'engine/source/zstd_dyn.cpp',
   'engine/source/sha1.cpp',
   'engine/source/firmware.cpp',
+  'engine/source/conditions.cpp',
   'engine/source/multifile.cpp',
   'engine/source/manifest_util.cpp',
   'engine/source/project.cpp',
