@@ -58,7 +58,16 @@ circled question-mark tooltip explaining what is expected there and in
 what format. The form's content is fully decided, populated and formatted
 by each core; Chimera only provides the interface and the execution. Files
 are hashed as they are added, and order within a category is the swap
-order. Then the sync settings, and LAST, the firmware - last because everything
+order. Then the sync settings - themselves GATED by the files just chosen: a
+declaration entry may carry "exposedWhen" (the same condition language
+as firmware), so a Game Gear cart exposes its sound chip where a
+Genesis cart exposes its own, a Famicom disk exposes the FDS BIOS
+choice where a cartridge shows nothing, and a setting may gate further
+settings (re-evaluated live as values change). Same-name variants are
+separate entries with disjoint conditions, exactly like firmware. The
+project records every EXPOSED sync setting explicitly at its effective
+value - the settings section is exactly the knobs the decisions
+offered, nothing else. And LAST, the firmware - last because everything
 before it has a say: the core itself may need a file regardless of
 anything else, the chosen game files may trigger a need (a Famicom disk
 needs the FDS bios where a cartridge does not; a CD image needs the CD

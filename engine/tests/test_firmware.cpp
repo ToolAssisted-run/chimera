@@ -83,6 +83,45 @@ int main(void)
 	assert(eval(broken, "{\"any\":[\"thing.bin\"]}", "{\"any\":1}") == "[]");
 	assert(eval("not json at all", "{}", "{}") == "[]");
 
+	// ---- the same tree gates SYNC SETTINGS ----
+
+	auto evalSettings = [](const char *decl, const char *slots, const char *settings)
+	{
+		uint64_t len = 0;
+		const char *out = ce_settings_evaluate(
+			decl, std::strlen(decl), slots, std::strlen(slots),
+			settings, std::strlen(settings), &len);
+		return std::string(out, len);
+	};
+
+	// a Game Gear cart exposes its sound chip, a Genesis cart its own; the
+	// always-exposed region knob survives either way
+	const char *gpgx =
+		"[{\"name\":\"region\"},"
+		"{\"name\":\"ggSoundChip\",\"exposedWhen\":{\"slot\":\"cart\",\"extension\":\"gg\"}},"
+		"{\"name\":\"mdSoundChip\",\"exposedWhen\":{\"slot\":\"cart\",\"extension\":\"md\"}}]";
+	assert(evalSettings(gpgx, "{\"cart\":[\"sonic.gg\"]}", "{}")
+		== "[{\"name\":\"region\",\"index\":0},{\"name\":\"ggSoundChip\",\"index\":1}]");
+	assert(evalSettings(gpgx, "{\"cart\":[\"sonic.md\"]}", "{}")
+		== "[{\"name\":\"region\",\"index\":0},{\"name\":\"mdSoundChip\",\"index\":2}]");
+
+	// a setting can gate a further setting (cascade re-evaluated by the form)
+	const char *cascade =
+		"[{\"name\":\"expansion\"},"
+		"{\"name\":\"expansionRam\",\"exposedWhen\":{\"setting\":\"expansion\",\"is\":true}}]";
+	assert(evalSettings(cascade, "{}", "{\"expansion\":true}")
+		== "[{\"name\":\"expansion\",\"index\":0},{\"name\":\"expansionRam\",\"index\":1}]");
+	assert(evalSettings(cascade, "{}", "{\"expansion\":false}")
+		== "[{\"name\":\"expansion\",\"index\":0}]");
+
+	// same-name variants: which entry applies (and so which options/default)
+	// follows the files, exactly like the firmware variants
+	const char *variants =
+		"[{\"name\":\"soundChip\",\"exposedWhen\":{\"slot\":\"cart\",\"extension\":\"gg\"}},"
+		"{\"name\":\"soundChip\",\"exposedWhen\":{\"slot\":\"cart\",\"extension\":\"md\"}}]";
+	assert(evalSettings(variants, "{\"cart\":[\"x.md\"]}", "{}")
+		== "[{\"name\":\"soundChip\",\"index\":1}]");
+
 	std::printf("firmware: all assertions passed\n");
 	return 0;
 }

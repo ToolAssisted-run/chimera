@@ -207,6 +207,13 @@ namespace Chimera.Emulation.Common.Engine
 			ref ulong lenOut);
 
 		[BizImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_settings_evaluate(
+			byte[] declJson, ulong declLen,
+			byte[] slotsJson, ulong slotsLen,
+			byte[] settingsJson, ulong settingsLen,
+			ref ulong lenOut);
+
+		[BizImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_package_open(string path, ref IntPtr errorOut);
 
 		[BizImport(CallingConvention.Cdecl)]
@@ -1546,6 +1553,39 @@ namespace Chimera.Emulation.Common.Engine
 				var id = item.Value<string>("id");
 				if (id is null) continue;
 				outList.Add((id, item.Value<int?>("index") ?? -1));
+			}
+			return outList;
+		}
+	}
+
+	/// <summary>
+	/// The decision tree over SYNC SETTINGS (docs/project.md): the game files
+	/// chosen decide which settings are exposed at all, and settings may gate
+	/// further settings. Same rules as the firmware tree: entries without a
+	/// condition always apply; same-name variants are separate entries with
+	/// disjoint conditions, the index picking which declaration governs.
+	/// </summary>
+	public static class EngineSettingsGate
+	{
+		public static System.Collections.Generic.IReadOnlyList<(string Name, int Index)> Evaluate(
+			string declJson, string slotsJson, string settingsJson)
+		{
+			var decl = Encoding.UTF8.GetBytes(declJson ?? "[]");
+			var slots = Encoding.UTF8.GetBytes(slotsJson ?? "{}");
+			var settings = Encoding.UTF8.GetBytes(settingsJson ?? "{}");
+			ulong len = 0;
+			var result = ChimeraEngine.Instance.ce_settings_evaluate(
+				decl, (ulong)decl.LongLength,
+				slots, (ulong)slots.LongLength,
+				settings, (ulong)settings.LongLength,
+				ref len);
+			var text = ChimeraEngine.PtrToStringUtf8(result, len);
+			System.Collections.Generic.List<(string, int)> outList = new();
+			foreach (var item in Newtonsoft.Json.Linq.JArray.Parse(text))
+			{
+				var name = item.Value<string>("name");
+				if (name is null) continue;
+				outList.Add((name, item.Value<int?>("index") ?? -1));
 			}
 			return outList;
 		}

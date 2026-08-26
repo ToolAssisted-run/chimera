@@ -251,6 +251,13 @@ namespace Chimera.Emulation.Common.Waterbox
 		[JsonIgnore]
 		public string RawFirmwareJson { get; private set; } = "[]";
 
+		/// <summary>
+		/// The "settings" array exactly as the package wrote it, for the engine's
+		/// exposure gate (ce_settings_evaluate) - conditions and all.
+		/// </summary>
+		[JsonIgnore]
+		public string RawSettingsJson { get; private set; } = "[]";
+
 		public static WaterboxConfig FromJson(string json)
 		{
 			var cfg = JsonConvert.DeserializeObject<WaterboxConfig>(json);
@@ -258,8 +265,9 @@ namespace Chimera.Emulation.Common.Waterbox
 			{
 				try
 				{
-					var fw = Newtonsoft.Json.Linq.JObject.Parse(json)["firmware"];
-					if (fw is Newtonsoft.Json.Linq.JArray arr) cfg.RawFirmwareJson = arr.ToString(Formatting.None);
+					var root = Newtonsoft.Json.Linq.JObject.Parse(json);
+					if (root["firmware"] is Newtonsoft.Json.Linq.JArray fw) cfg.RawFirmwareJson = fw.ToString(Formatting.None);
+					if (root["settings"] is Newtonsoft.Json.Linq.JArray st) cfg.RawSettingsJson = st.ToString(Formatting.None);
 				}
 				catch (JsonException)
 				{

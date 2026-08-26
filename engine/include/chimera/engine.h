@@ -300,6 +300,20 @@ CE_API const char *ce_firmware_evaluate(
 	const char *settings_json, uint64_t settings_len,
 	uint64_t *len_out);
 
+/* The same decision tree, gating SYNC SETTINGS (docs/project.md): the game
+ * files chosen decide which settings are exposed at all (a Game Gear cart
+ * exposes its sound chip, a Genesis cart its own), and settings may gate
+ * further settings. decl_json is the package's "settings" array; an entry
+ * may carry "exposedWhen" with the same condition language. An entry
+ * without a condition is always exposed; variants of one name are separate
+ * entries with disjoint conditions. Returns [{"name":..,"index":n}] in
+ * declaration order (thread-local; invalidated by the next call). */
+CE_API const char *ce_settings_evaluate(
+	const char *decl_json, uint64_t decl_len,
+	const char *slots_json, uint64_t slots_len,
+	const char *settings_json, uint64_t settings_len,
+	uint64_t *len_out);
+
 /* ---- multi-file games ----
  *
  * A .chimeraMultiFile descriptor names the files a game is made of: bare

@@ -175,6 +175,7 @@ namespace Chimera.Client.GUI
 				ToolbarVisible = false,
 				PropertySort = PropertySort.Alphabetical,
 			};
+			_settingsGrid.PropertyValueChanged += (_, _) => RefreshExposedSettings();
 			p3.Controls.Add(_settingsGrid);
 
 			// ---- page 4: firmware, decided by everything chosen above ------------
@@ -327,6 +328,27 @@ namespace Chimera.Client.GUI
 			ShowPage(1);
 		}
 
+		/// <summary>Runs the real exposure gate over a given config - the test door.</summary>
+		internal void UseSettingsFrom(WaterboxConfig cfg)
+		{
+			_cfg = cfg;
+			_syncSettings = new WaterboxCoreSyncSettings();
+			RefreshExposedSettings();
+			_settingsGrid.SelectedObject = _syncSettings;
+			ShowPage(2);
+		}
+
+		/// <summary>the exposed sync settings, in order, for tests</summary>
+		public string[] ExposedSettingNames
+			=> (_syncSettings?.Declarations ?? [ ]).Select(static d => d.Name).ToArray();
+
+		/// <summary>sets a value as the grid would, re-running the gate - for tests</summary>
+		internal void SetSettingValue(string name, object value)
+		{
+			_syncSettings!.Values[name] = value;
+			RefreshExposedSettings();
+		}
+
 		/// <summary>Renders given sync-setting declarations directly - the test and screenshot door.</summary>
 		internal void UseSyncSettingsDecls(IReadOnlyList<WaterboxConfig.SettingDecl> declarations)
 		{
@@ -433,8 +455,8 @@ namespace Chimera.Client.GUI
 				using var pkg = EnginePackage.Open(core.Path);
 				var cfg = WaterboxConfig.FromJson(pkg?.EntryText(WaterboxCoreFactory.ConfigFileName) ?? "");
 				_cfg = cfg;
-				var declarations = (cfg?.Settings ?? [ ]).Where(static d => d.Sync).ToList();
-				_syncSettings = new WaterboxCoreSyncSettings { Declarations = declarations };
+				_syncSettings = new WaterboxCoreSyncSettings();
+				RefreshExposedSettings();
 				_settingsGrid.SelectedObject = _syncSettings;
 				return true;
 			}
@@ -443,6 +465,36 @@ namespace Chimera.Client.GUI
 				_status.Text = ex.Message;
 				return false;
 			}
+		}
+
+		/// <summary>
+		/// The settings the DECISIONS expose (docs/project.md): the chosen files
+		/// gate which sync settings exist at all (a Game Gear cart exposes its
+		/// sound chip, a Genesis cart its own), and a setting may gate further
+		/// settings - so the set is re-evaluated when a value changes.
+		/// </summary>
+		private void RefreshExposedSettings()
+		{
+			if (_cfg is null || _syncSettings is null) return;
+			var effective = WaterboxCore.EffectiveSettingsFor(_cfg, null, _syncSettings);
+			var exposed = Chimera.Emulation.Common.Engine.EngineSettingsGate.Evaluate(
+				_cfg.RawSettingsJson,
+				CurrentSlotsJson(),
+				Newtonsoft.Json.JsonConvert.SerializeObject(effective));
+			var all = _cfg.Settings ?? [ ];
+			var declarations = exposed
+				.Where(entry => entry.Index >= 0 && entry.Index < all.Count && all[entry.Index].Name == entry.Name)
+				.Select(entry => all[entry.Index])
+				.Where(static d => d.Sync)
+				.ToList();
+			var current = _syncSettings.Declarations;
+			if (current is not null && current.Count == declarations.Count
+				&& current.Zip(declarations, static (a, b) => ReferenceEquals(a, b)).All(static same => same))
+			{
+				return; // the exposed set did not change
+			}
+			_syncSettings.Declarations = declarations;
+			_settingsGrid.Refresh();
 		}
 
 		/// <summary>Renders given firmware needs directly - the test and screenshot door.</summary>
@@ -664,9 +716,20 @@ namespace Chimera.Client.GUI
 				return;
 			}
 
-			if (_syncSettings?.Values is { Count: not 0 } values)
+			// the project records every EXPOSED sync setting explicitly, at its
+			// effective value: the settings section is exactly the knobs these
+			// decisions offered, nothing else
+			if (_syncSettings?.Declarations is { Count: not 0 } exposedDecls)
 			{
-				project.SetSettingsJson(Newtonsoft.Json.JsonConvert.SerializeObject(values));
+				Dictionary<string, object> recorded = new();
+				foreach (var decl in exposedDecls)
+				{
+					recorded[decl.Name] = _syncSettings.Values is not null
+						&& _syncSettings.Values.TryGetValue(decl.Name, out var value)
+							? value
+							: decl.DefaultValue;
+				}
+				project.SetSettingsJson(Newtonsoft.Json.JsonConvert.SerializeObject(recorded));
 			}
 
 			{

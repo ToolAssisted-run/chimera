@@ -244,4 +244,51 @@ const char *ce_firmware_evaluate(
 	return g_evaluated.c_str();
 }
 
+const char *ce_settings_evaluate(
+	const char *decl_json, uint64_t decl_len,
+	const char *slots_json, uint64_t slots_len,
+	const char *settings_json, uint64_t settings_len,
+	uint64_t *len_out)
+{
+	if (len_out != nullptr) *len_out = 0;
+
+	cJSON *decl = decl_json != nullptr
+		? cJSON_ParseWithLength(decl_json, static_cast<size_t>(decl_len)) : nullptr;
+	cJSON *slots = slots_json != nullptr
+		? cJSON_ParseWithLength(slots_json, static_cast<size_t>(slots_len)) : nullptr;
+	cJSON *settings = settings_json != nullptr
+		? cJSON_ParseWithLength(settings_json, static_cast<size_t>(settings_len)) : nullptr;
+
+	cJSON *out = cJSON_CreateArray();
+	if (cJSON_IsArray(decl))
+	{
+		int32_t index = 0;
+		for (const cJSON *entry = decl->child; entry != nullptr; entry = entry->next, index++)
+		{
+			const cJSON *name = cJSON_GetObjectItemCaseSensitive(entry, "name");
+			if (!cJSON_IsString(name)) continue;
+			/* same rules as the firmware tree: an entry without a condition is
+			 * always exposed; variants of one name are separate entries with
+			 * disjoint conditions, the index says which applies */
+			const cJSON *when = cJSON_GetObjectItemCaseSensitive(entry, "exposedWhen");
+			if (when != nullptr && !evalCondition(when, slots, settings)) continue;
+			cJSON *item = cJSON_CreateObject();
+			cJSON_AddStringToObject(item, "name", name->valuestring);
+			cJSON_AddNumberToObject(item, "index", index);
+			cJSON_AddItemToArray(out, item);
+		}
+	}
+
+	char *text = cJSON_PrintUnformatted(out);
+	g_evaluated = text != nullptr ? text : "[]";
+	if (text != nullptr) cJSON_free(text);
+	cJSON_Delete(out);
+	cJSON_Delete(decl);
+	cJSON_Delete(slots);
+	cJSON_Delete(settings);
+
+	if (len_out != nullptr) *len_out = g_evaluated.size();
+	return g_evaluated.c_str();
+}
+
 } // extern "C"
