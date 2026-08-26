@@ -626,7 +626,8 @@ ce_session *ce_session_open(
 	s->host = host;
 	auto abort = [&](std::string message) -> ce_session *
 	{
-		ce_package_free(pkg);
+		if (pkg != nullptr) ce_package_free(pkg);
+		pkg = nullptr;
 		ce_session_free(s);
 		return fail(std::move(message));
 	};
@@ -643,6 +644,7 @@ ce_session *ce_session_open(
 	if (entry == nullptr) return abort("package has no core.wbx");
 	s->wbxBytes.assign(entry, entry + len);
 	ce_package_free(pkg);
+	pkg = nullptr; /* a later abort() must not free it again */
 
 	if (rom != nullptr && rom_len != 0) s->romBytes.assign(rom, rom + rom_len);
 	s->settingsBytes = s->cfg.settingsJson;
