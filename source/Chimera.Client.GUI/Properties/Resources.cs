@@ -32,7 +32,6 @@ namespace Chimera.Client.GUI.Properties
 		internal static readonly Bitmap Both = ReadEmbeddedBitmap("Both");
 		internal static readonly Icon BugIcon = ReadEmbeddedIcon("Bug");
 		internal static readonly Bitmap Bug = ReadEmbeddedBitmap("Bug");
-		internal static readonly Bitmap C64Symbol = ReadEmbeddedBitmap("C64Symbol");
 		internal static readonly Bitmap Camera = ReadEmbeddedBitmap("camera");
 		internal static readonly Bitmap Cheat = ReadEmbeddedBitmap("Freeze");
 		internal static readonly Icon CheatIcon = ReadEmbeddedIcon("Freeze");

@@ -13,6 +13,10 @@ What it writes, into source/Chimera.Client.GUI/images:
   RetroQuestion.png             a plain question mark (unrecognised rom)
   commandWindow.ico             a console window (the log window's icon; the
                                 art it replaces carried BizHawk's hawk)
+  HomeBrew.png                  a beaker (the homebrew rom status). The art it
+                                replaces was a cauldron from the CC-BY
+                                FatCow Farm-Fresh set - licensed, not game
+                                art, but this way the icon is ours
 
 The eye is drawn from the same 8x8 cell grid as images/chimera.png, so the
 mark stays the mark and only the palette changes. Everything else is drawn
@@ -175,6 +179,48 @@ def draw_console(size):
     return img.resize((size, size), Image.LANCZOS)
 
 
+def draw_beaker(size):
+    """A flask with something brewing in it: a rom somebody made themselves.
+
+    Kept to a silhouette - at 16px a glass outline turns to mush, so the
+    shape carries it and the contents supply the colour.
+    """
+    S = 256
+    img = Image.new("RGBA", (S, S), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+
+    glass = (222, 230, 240, 255)
+    edge = (58, 68, 84, 255)
+    brew = TEAL + (255,)
+    bubble = AMBER + (255,)
+
+    neck_l, neck_r, neck_top, shoulder = 96, 160, 44, 116
+    base_l, base_r, base_y = 34, 222, 214
+    flask = [(neck_l, neck_top), (neck_r, neck_top), (neck_r, shoulder),
+             (base_r, base_y), (base_l, base_y), (neck_l, shoulder)]
+
+    d.polygon(flask, fill=glass, outline=edge)
+    for i in range(len(flask)):
+        d.line([flask[i], flask[(i + 1) % len(flask)]], fill=edge, width=14)
+    # the lip, so the neck does not read as a stem
+    d.line([(neck_l - 16, neck_top + 4), (neck_r + 16, neck_top + 4)], fill=edge, width=16)
+
+    # the brew: a level line, then everything below it
+    level = 150
+    d.polygon([(neck_l + 6 + (level - shoulder) * 0.0, level),
+               (neck_r - 6, level),
+               (base_r - 12, base_y - 10), (base_l + 12, base_y - 10)], fill=brew)
+    span = (base_r - base_l) * (level - shoulder) / (base_y - shoulder) / 2
+    d.polygon([(128 - span - 20, level), (128 + span + 20, level),
+               (base_r - 12, base_y - 10), (base_l + 12, base_y - 10)], fill=brew)
+
+    # one bubble inside it - a second one outside the glass just reads as a
+    # stray pixel once this is 16 across
+    d.ellipse([114, 112, 146, 144], fill=bubble)
+
+    return img.resize((size, size), Image.LANCZOS)
+
+
 def save_ico(img, path, sizes=(16, 32, 48, 64)):
     img.save(path, format="ICO", sizes=[(s, s) for s in sizes])
 
@@ -202,16 +248,20 @@ def main():
     question = draw_question(16)
     question.save(os.path.join(out, "RetroQuestion.png"))
 
+    homebrew = draw_beaker(16)
+    homebrew.save(os.path.join(out, "HomeBrew.png"))
+
     console = draw_console(32)
     save_ico(draw_console(64), os.path.join(out, "commandWindow.ico"),
              sizes=(16, 24, 32, 48, 64))
 
     print("wrote TAStudio.png/.ico, Freeze.png/.ico, Unfreeze.png,"
-          " RetroQuestion.png, commandWindow.ico")
+          " RetroQuestion.png, commandWindow.ico, HomeBrew.png")
 
     if args.preview:
         tiles = [("TAStudio", tas), ("Freeze", freeze), ("Unfreeze", unfreeze),
-                 ("RetroQuestion", question), ("commandWindow", console)]
+                 ("RetroQuestion", question), ("commandWindow", console),
+                 ("HomeBrew", homebrew)]
         tw = 96
         sheet = Image.new("RGBA", (len(tiles) * tw, tw + 30), (32, 32, 32, 255))
         d = ImageDraw.Draw(sheet)
