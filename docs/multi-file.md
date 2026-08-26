@@ -1,5 +1,11 @@
 # Multi-file games: the .chimeraMultiFile descriptor
 
+> **2026-08-26**: superseded as a GUI-facing format by the Chimera project
+> (docs/project.md), which folds this manifest in as its file section. The
+> `ce_multifile_*` engine code is the backbone of that section, and
+> headless descriptors remain in use by chimera-run and the gates. The
+> frontend TODOs below are cancelled in favour of the project work.
+
 A game made of several files - multiple floppies or discs, a cue and its
 bin, previously exported save data - is named by one descriptor file, and
 every byte it brings to the machine is hashed. BizHawk's multi-disk bundler

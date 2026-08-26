@@ -11,6 +11,7 @@
 #include "chimera/engine.h"
 
 #include "file_io.hpp"
+#include "manifest_util.hpp"
 #include "sha1.hpp"
 
 #include "../../extern/cjson/cJSON.h"
@@ -21,6 +22,8 @@
 #include <vector>
 
 namespace {
+
+using namespace chimera::manifest;
 
 thread_local std::string g_error;
 
@@ -37,107 +40,6 @@ struct Entry
 bool validRole(const std::string &r)
 {
 	return r == "image" || r == "support" || r == "savedata";
-}
-
-/* bare means bare: no separators, no traversal, nothing empty */
-bool bareName(const std::string &n)
-{
-	if (n.empty()) return false;
-	if (n == "." || n == "..") return false;
-	return n.find('/') == std::string::npos && n.find('\\') == std::string::npos;
-}
-
-std::string upperHex(std::string s)
-{
-	for (char &c : s)
-	{
-		if (c >= 'a' && c <= 'z') c = static_cast<char>(c - 'a' + 'A');
-	}
-	return s;
-}
-
-bool validSha1(const std::string &s)
-{
-	if (s.size() != 40) return false;
-	for (char c : s)
-	{
-		if (!((c >= '0' && c <= '9') || (c >= 'A' && c <= 'F'))) return false;
-	}
-	return true;
-}
-
-std::string folderOf(const std::string &path)
-{
-	size_t cut = path.find_last_of("/\\");
-	return cut == std::string::npos ? std::string() : path.substr(0, cut + 1);
-}
-
-/* The file names a cue sheet references: FILE "name" TYPE lines (quotes
- * optional). The cue decides - a listed cue whose references are not listed
- * would let unhashed bytes reach the machine. */
-std::vector<std::string> cueReferences(const std::vector<uint8_t> &bytes)
-{
-	std::vector<std::string> out;
-	std::string text(reinterpret_cast<const char *>(bytes.data()), bytes.size());
-	size_t pos = 0;
-	while (pos < text.size())
-	{
-		size_t eol = text.find('\n', pos);
-		if (eol == std::string::npos) eol = text.size();
-		std::string line = text.substr(pos, eol - pos);
-		pos = eol + 1;
-
-		size_t at = 0;
-		while (at < line.size() && (line[at] == ' ' || line[at] == '\t' || line[at] == '\r')) at++;
-		if (line.compare(at, 4, "FILE") != 0) continue;
-		at += 4;
-		while (at < line.size() && (line[at] == ' ' || line[at] == '\t')) at++;
-		std::string name;
-		if (at < line.size() && line[at] == '"')
-		{
-			size_t close = line.find('"', at + 1);
-			if (close == std::string::npos) continue;
-			name = line.substr(at + 1, close - at - 1);
-		}
-		else
-		{
-			size_t end = at;
-			while (end < line.size() && line[end] != ' ' && line[end] != '\t' && line[end] != '\r') end++;
-			name = line.substr(at, end - at);
-		}
-		if (!name.empty()) out.push_back(name);
-	}
-	return out;
-}
-
-bool hasCueSuffix(const std::string &name)
-{
-	if (name.size() < 4) return false;
-	std::string tail = name.substr(name.size() - 4);
-	for (char &c : tail)
-	{
-		if (c >= 'A' && c <= 'Z') c = static_cast<char>(c - 'A' + 'a');
-	}
-	return tail == ".cue";
-}
-
-/* the movie line's name encoding: '%', '=', ':' and anything outside
- * 0x21..0x7E become %XX, so names with spaces survive a space-joined line */
-std::string encodeName(const std::string &name)
-{
-	static const char hex[] = "0123456789ABCDEF";
-	std::string out;
-	for (unsigned char c : name)
-	{
-		if (c < 0x21 || c > 0x7E || c == '%' || c == '=' || c == ':')
-		{
-			out += '%';
-			out += hex[c >> 4];
-			out += hex[c & 0xF];
-		}
-		else out += static_cast<char>(c);
-	}
-	return out;
 }
 
 /* Structural validation shared by open and save: rules that make a
@@ -197,13 +99,6 @@ bool checkCueClosure(const std::vector<Entry> &entries, std::string &err)
 		}
 	}
 	return true;
-}
-
-void hashInto(const std::vector<uint8_t> &bytes, std::string &out)
-{
-	char hex[41];
-	ce_sha1_hex(bytes.data(), bytes.size(), hex);
-	out = hex;
 }
 
 } // namespace

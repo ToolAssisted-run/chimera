@@ -9,6 +9,18 @@
  *   chimera-run <package> <rom> <movie.txt>
  *       [--rerecord] [--seek <frame>] [--record <out.txt>] [--settings <json>]
  *       [--dump <domain>=<path>]... [--export-savedata <dir>] [--meta <path>]
+ *   chimera-run --project <p.chimeraProject> <package>
+ *       [--files <dir>]... [--allow-core-mismatch] [the same run flags]
+ *
+ * --project runs a .chimeraProject (docs/project.md): the input log and the
+ * sync settings come from the project, files resolve from the project's own
+ * folder plus any --files dirs, and every hash must match (this tool has no
+ * user to knowingly override). The package must match the project's core
+ * pin unless --allow-core-mismatch says otherwise; when the package ships
+ * file_slots.json, the manifest is validated against it. Mounts: the slot
+ * map as "slots", every file under its canonical name, and (transitionally,
+ * while cores learn slots) the first file of the first slot as rom/rom.name
+ * with that slot's remaining files as rom2..N.
  *
  * --rerecord round-trips the whole machine through save/load state around
  * every frame, which must not change anything - that is the point.
@@ -100,6 +112,9 @@ int main(int argc, char **argv)
 	int64_t seekFrame = -1;
 	std::string recordPath;
 	std::string savedataDir;
+	std::string projectPath;
+	std::vector<std::string> fileDirs;
+	bool allowCoreMismatch = false;
 
 	for (int i = 1; i < argc; i++)
 	{
@@ -110,6 +125,9 @@ int main(int argc, char **argv)
 		else if (arg == "--settings" && i + 1 < argc) settings = argv[++i];
 		else if (arg == "--export-savedata" && i + 1 < argc) savedataDir = argv[++i];
 		else if (arg == "--meta" && i + 1 < argc) metaPath = argv[++i];
+		else if (arg == "--project" && i + 1 < argc) projectPath = argv[++i];
+		else if (arg == "--files" && i + 1 < argc) fileDirs.push_back(argv[++i]);
+		else if (arg == "--allow-core-mismatch") allowCoreMismatch = true;
 		else if (arg == "--dump" && i + 1 < argc)
 		{
 			std::string spec = argv[++i];
@@ -118,18 +136,24 @@ int main(int argc, char **argv)
 			dumps.emplace_back(spec.substr(0, eq), spec.substr(eq + 1));
 		}
 		else if (packagePath == nullptr) packagePath = argv[i];
-		else if (romPath == nullptr) romPath = argv[i];
-		else if (moviePath == nullptr) moviePath = argv[i];
+		else if (projectPath.empty() && romPath == nullptr) romPath = argv[i];
+		else if (projectPath.empty() && moviePath == nullptr) moviePath = argv[i];
 		else return fail(metaPath, "unexpected argument: " + arg);
 	}
-	if (moviePath == nullptr)
+	bool projectMode = !projectPath.empty();
+	if (projectMode ? packagePath == nullptr : moviePath == nullptr)
 	{
-		std::fprintf(stderr, "usage: chimera-run <package> <rom> <movie.txt> [--rerecord] [--seek <frame>] [--record <out.txt>] [--settings <json>] [--dump <domain>=<path>]... [--export-savedata <dir>] [--meta <path>]\n");
+		std::fprintf(stderr, "usage: chimera-run <package> <rom> <movie.txt> [--rerecord] [--seek <frame>] [--record <out.txt>] [--settings <json>] [--dump <domain>=<path>]... [--export-savedata <dir>] [--meta <path>]\n"
+			"       chimera-run --project <p.chimeraProject> <package> [--files <dir>]... [--allow-core-mismatch] [the same run flags]\n");
 		return 1;
+	}
+	if (projectMode && settings != nullptr)
+	{
+		return fail(metaPath, "--settings and --project do not mix: the project IS the settings");
 	}
 
 	std::vector<uint8_t> rom, movieText;
-	if (!readWholeFile(moviePath, movieText)) return fail(metaPath, std::string("could not read movie ") + moviePath);
+	if (!projectMode && !readWholeFile(moviePath, movieText)) return fail(metaPath, std::string("could not read movie ") + moviePath);
 
 	/* A .chimeraMultiFile rom is a multi-file game: the first image mounts as
 	 * the rom (rom.name carrying its real name), further images as rom2..N,
@@ -137,11 +161,110 @@ int main(int argc, char **argv)
 	 * the frontend makes. Everything hash-verified; refuse on any mismatch
 	 * (this tool has no user to ask). */
 	ce_multifile *multi = nullptr;
+	ce_project *project = nullptr;
 	std::vector<const char *> extraNames;
 	std::vector<const uint8_t *> extraData;
 	std::vector<uint64_t> extraLens;
 	std::vector<std::string> extraNameStore;
-	std::string romPathStr = romPath;
+	std::string settingsStore, slotsStore;
+	if (projectMode)
+	{
+		const char *perr = nullptr;
+		project = ce_project_open(projectPath.c_str(), &perr);
+		if (project == nullptr) return fail(metaPath, perr != nullptr ? perr : "bad project");
+
+		/* resolution: the project's own folder first (the convenience), then
+		 * every --files dir; whatever is still missing or mismatched fails -
+		 * this tool has no user to knowingly override */
+		size_t cut = projectPath.find_last_of("/\\");
+		std::string projFolder = cut == std::string::npos ? std::string(".") : projectPath.substr(0, cut);
+		ce_project_resolve_dir(project, projFolder.c_str());
+		for (const std::string &dir : fileDirs) ce_project_resolve_dir(project, dir.c_str());
+		if (ce_project_files_ok(project) == 0)
+		{
+			for (int32_t i = 0; i < ce_project_file_count(project); i++)
+			{
+				if (ce_project_file_status(project, i) != 0)
+					return fail(metaPath, std::string("project: '") + ce_project_file_name(project, i)
+						+ (ce_project_file_status(project, i) == 1
+							? "' was not found in the project's folder or any --files dir"
+							: "' does not match its recorded hash"));
+			}
+		}
+
+		/* the core pin, against the actual package; and the manifest against
+		 * the package's slot declaration when it ships one */
+		const char *kerr = nullptr;
+		ce_package *pkg = ce_package_open(packagePath, &kerr);
+		if (pkg != nullptr)
+		{
+			const char *pin = ce_project_core_sha1(project);
+			const char *actual = ce_package_sha1(pkg);
+			if (pin[0] != '\0' && actual != nullptr && std::strcmp(pin, actual) != 0 && !allowCoreMismatch)
+			{
+				std::string detail = std::string("the package is not the project's pinned core (pinned ")
+					+ pin + ", given " + actual + "); --allow-core-mismatch to run anyway";
+				ce_package_free(pkg);
+				return fail(metaPath, detail);
+			}
+			uint64_t declLen = 0;
+			const uint8_t *decl = ce_package_entry(pkg, "file_slots.json", &declLen);
+			if (decl != nullptr &&
+				ce_project_validate(project, reinterpret_cast<const char *>(decl), declLen, &perr) != 0)
+			{
+				std::string detail = perr != nullptr ? perr : "the manifest does not fit the core's slots";
+				ce_package_free(pkg);
+				return fail(metaPath, detail);
+			}
+			ce_package_free(pkg);
+		}
+
+		uint64_t len = 0;
+		settingsStore = ce_project_settings_text(project, &len);
+		settings = settingsStore.c_str();
+		const char *lump = ce_project_log_text(project, &len);
+		movieText.assign(reinterpret_cast<const uint8_t *>(lump),
+			reinterpret_cast<const uint8_t *>(lump) + len);
+
+		/* mounts: the slot map, every file under its canonical name, and the
+		 * transitional rom/rom.name/rom2..N view of the first slot */
+		slotsStore = ce_project_slots_text(project, &len);
+		extraNames.push_back("slots");
+		extraData.push_back(reinterpret_cast<const uint8_t *>(slotsStore.data()));
+		extraLens.push_back(slotsStore.size());
+		int32_t primary = -1;
+		for (int32_t i = 0; i < ce_project_file_count(project); i++)
+		{
+			extraNames.push_back(ce_project_file_name(project, i));
+			const uint8_t *data = ce_project_file_data(project, i, &len);
+			extraData.push_back(data);
+			extraLens.push_back(len);
+			if (primary < 0 && std::strcmp(ce_project_file_slot(project, i), "support") != 0) primary = i;
+		}
+		if (primary >= 0)
+		{
+			/* pointers into extraNameStore go out as they are made, so the
+			 * vector must never reallocate: reserve the worst case */
+			extraNameStore.reserve(static_cast<size_t>(ce_project_file_count(project)) + 1);
+			const uint8_t *data = ce_project_file_data(project, primary, &len);
+			rom.assign(data, data + len);
+			extraNameStore.push_back(ce_project_file_name(project, primary));
+			extraNames.push_back("rom.name");
+			extraData.push_back(reinterpret_cast<const uint8_t *>(extraNameStore.back().data()));
+			extraLens.push_back(extraNameStore.back().size());
+			int n = 2;
+			std::string primarySlot = ce_project_file_slot(project, primary);
+			for (int32_t i = primary + 1; i < ce_project_file_count(project); i++)
+			{
+				if (primarySlot != ce_project_file_slot(project, i)) continue;
+				extraNameStore.push_back("rom" + std::to_string(n++));
+				extraNames.push_back(extraNameStore.back().c_str());
+				extraData.push_back(ce_project_file_data(project, i, &len));
+				extraLens.push_back(len);
+			}
+		}
+	}
+	std::string romPathStr = projectMode ? std::string() : romPath;
 	if (romPathStr.size() > 17 &&
 		romPathStr.compare(romPathStr.size() - 17, 17, ".chimeraMultiFile") == 0)
 	{
@@ -199,7 +322,7 @@ int main(int argc, char **argv)
 			}
 		}
 	}
-	else if (!readWholeFile(romPath, rom)) return fail(metaPath, std::string("could not read rom ") + romPath);
+	else if (!projectMode && !readWholeFile(romPath, rom)) return fail(metaPath, std::string("could not read rom ") + romPath);
 
 	ce_movie_log *movie = ce_movie_log_new();
 	if (ce_movie_log_parse(movie, reinterpret_cast<const char *>(movieText.data()), movieText.size()) != 0)
@@ -385,5 +508,7 @@ int main(int argc, char **argv)
 	std::printf("frames=%lld\n", static_cast<long long>(frames));
 	ce_movie_log_free(movie);
 	ce_session_free(session);
+	if (multi != nullptr) ce_multifile_free(multi);
+	if (project != nullptr) ce_project_free(project);
 	return 0;
 }

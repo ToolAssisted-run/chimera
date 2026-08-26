@@ -339,6 +339,125 @@ CE_API int32_t ce_multifile_save(
 	const char *const *names, const char *const *roles, int32_t count,
 	const char **error_out);
 
+/* ---- the project ----
+ *
+ * A .chimeraProject is chimera's entry point and its movie in one file: a
+ * JSON document holding everything required to reproduce the work except
+ * the data bytes, which are named by SHA1 (docs/project.md). Identity
+ * (title, description), the pinned core (name, version, package SHA1), the
+ * file manifest (bare canonical names + SHA1 + the core-defined slot each
+ * file fills, order within a slot = swap order), firmware pins, the sync
+ * settings, and the TAS work itself: input log, markers, branches.
+ *
+ * No paths are ever stored. Files are resolved per session - the caller
+ * says where each one is (ce_project_file_resolve / ce_project_resolve_dir)
+ * and the engine hashes what it finds; a file whose on-disk NAME differs is
+ * fine, the canonical name is the label and the hash is the identity.
+ * Saving records the ACTUAL hash of every resolved file, so a knowing
+ * override leaves a truthful record.
+ *
+ * ce_project_open enforces the structural rules (valid JSON, known keys,
+ * bare unique names, well-formed hashes and slot ids) and leaves every file
+ * unresolved. ce_project_validate checks the manifest against a core's
+ * file_slots.json declaration: known slots, cardinality, formats, and the
+ * declaration's atLeastOneOf groups. */
+typedef struct ce_project ce_project;
+
+/* a fresh, empty project (for the creation wizard) */
+CE_API ce_project *ce_project_new(void);
+/* NULL with *error_out (static per-thread) on structural failure */
+CE_API ce_project *ce_project_open(const char *path, const char **error_out);
+/* 0 on success; resolved files are written with their ACTUAL hash */
+CE_API int32_t ce_project_save(ce_project *p, const char *path, const char **error_out);
+CE_API void ce_project_free(ce_project *p);
+
+CE_API const char *ce_project_title(const ce_project *p);
+CE_API void ce_project_set_title(ce_project *p, const char *title);
+CE_API const char *ce_project_description(const ce_project *p);
+CE_API void ce_project_set_description(ce_project *p, const char *description);
+
+/* the pinned core: package name, version, package zip SHA1 */
+CE_API const char *ce_project_core_name(const ce_project *p);
+CE_API const char *ce_project_core_version(const ce_project *p);
+CE_API const char *ce_project_core_sha1(const ce_project *p);
+CE_API void ce_project_set_core(ce_project *p, const char *name, const char *version, const char *sha1);
+
+CE_API uint64_t ce_project_rerecords(const ce_project *p);
+CE_API void ce_project_set_rerecords(ce_project *p, uint64_t count);
+
+/* The sync settings, as the JSON object the session's settings channel
+ * takes. Borrowed; invalidated by the next settings call on p. The setter
+ * rejects anything that does not parse as a JSON object. */
+CE_API const char *ce_project_settings_text(ce_project *p, uint64_t *len_out);
+CE_API int32_t ce_project_set_settings_text(ce_project *p, const char *json, const char **error_out);
+
+/* The firmware pins, as a JSON array carried verbatim (the firmware
+ * channel's record: id + SHA1 entries). Borrowed as above; the setter
+ * rejects anything that does not parse as a JSON array. */
+CE_API const char *ce_project_firmware_text(ce_project *p, uint64_t *len_out);
+CE_API int32_t ce_project_set_firmware_text(ce_project *p, const char *json, const char **error_out);
+
+/* The input log lump, exactly what ce_movie_log_parse/_serialize exchange
+ * (LogKey line + entries). "" for a project with no frames yet. */
+CE_API const char *ce_project_log_text(const ce_project *p, uint64_t *len_out);
+CE_API void ce_project_set_log_text(ce_project *p, const char *text, uint64_t len);
+
+/* markers, kept sorted by frame */
+CE_API int32_t ce_project_marker_count(const ce_project *p);
+CE_API int64_t ce_project_marker_frame(const ce_project *p, int32_t index);
+CE_API const char *ce_project_marker_text(const ce_project *p, int32_t index);
+CE_API void ce_project_marker_add(ce_project *p, int64_t frame, const char *text);
+CE_API void ce_project_marker_remove(ce_project *p, int32_t index);
+
+/* branches: a named alternative input log at a frame, in creation order */
+CE_API int32_t ce_project_branch_count(const ce_project *p);
+CE_API const char *ce_project_branch_name(const ce_project *p, int32_t index);
+CE_API int64_t ce_project_branch_frame(const ce_project *p, int32_t index);
+CE_API const char *ce_project_branch_log_text(const ce_project *p, int32_t index, uint64_t *len_out);
+CE_API void ce_project_branch_add(ce_project *p, const char *name, int64_t frame, const char *log_text, uint64_t len);
+CE_API void ce_project_branch_remove(ce_project *p, int32_t index);
+
+/* Adds a file: canonical (bare) name, the slot it fills, and where its
+ * bytes are RIGHT NOW - read and hashed immediately, so the entry is born
+ * resolved. A .cue's referenced files are auto-added from the cue's own
+ * folder with the reserved slot "support" (closure at creation). 0 on
+ * success; nonzero with *error_out (static per-thread) otherwise. */
+CE_API int32_t ce_project_file_add(ce_project *p, const char *name, const char *slot, const char *source_path, const char **error_out);
+CE_API void ce_project_file_remove(ce_project *p, int32_t index);
+
+CE_API int32_t ce_project_file_count(const ce_project *p);
+CE_API const char *ce_project_file_name(const ce_project *p, int32_t index);
+CE_API const char *ce_project_file_slot(const ce_project *p, int32_t index);
+/* the recorded hash (40 uppercase hex) */
+CE_API const char *ce_project_file_sha1(const ce_project *p, int32_t index);
+/* the hash of the resolved bytes; "" while unresolved */
+CE_API const char *ce_project_file_actual_sha1(const ce_project *p, int32_t index);
+/* 0 = resolved and matching, 1 = unresolved, 2 = resolved but mismatched */
+CE_API int32_t ce_project_file_status(const ce_project *p, int32_t index);
+/* the resolved bytes (NULL while unresolved); borrowed, live as long as p */
+CE_API const uint8_t *ce_project_file_data(const ce_project *p, int32_t index, uint64_t *len_out);
+
+/* Resolves one file from a caller-provided location (the per-session
+ * resolution dialog): reads, hashes, sets status 0 or 2. The on-disk name
+ * may differ from the canonical one. 0 on success (even a mismatch - that
+ * is a status, not an error); nonzero with *error_out when unreadable. */
+CE_API int32_t ce_project_file_resolve(ce_project *p, int32_t index, const char *path, const char **error_out);
+/* Tries to resolve every unresolved file by its canonical name inside dir
+ * (the "files beside the project" convenience). Returns how many resolved. */
+CE_API int32_t ce_project_resolve_dir(ce_project *p, const char *dir);
+/* 1 when every file is resolved with a matching hash */
+CE_API int32_t ce_project_files_ok(const ce_project *p);
+
+/* The manifest checked against a core's file_slots.json declaration (slot
+ * ids, cardinality, formats, atLeastOneOf groups; "support" is exempt).
+ * 0 when it conforms; nonzero with *error_out otherwise. */
+CE_API int32_t ce_project_validate(const ce_project *p, const char *slots_json, uint64_t slots_len, const char **error_out);
+
+/* The slot map the session mounts as "slots": a JSON object of slot id ->
+ * canonical names in manifest order, "support" excluded. Borrowed;
+ * invalidated by the next call on p. */
+CE_API const char *ce_project_slots_text(ce_project *p, uint64_t *len_out);
+
 /* ---- core packages ----
  *
  * A core package is a zip (or, for development, a directory) whose root holds
