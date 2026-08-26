@@ -540,6 +540,11 @@ namespace Chimera.Client.GUI
 			// no rom autoload: the GUI's entry point is a project (docs/project.md);
 			// the start screen offers New/Open/recents once the window is up
 
+			if (_argParser.cmdProject != null && !LoadProject(_argParser.cmdProject))
+			{
+				ShowMessageBox(owner: null, $"Failed to open project {_argParser.cmdProject} specified on commandline");
+			}
+
 			Config.VideoWriterAudioSyncEffective = _argParser.audiosync ?? Config.VideoWriterAudioSync;
 			_autoDumpLength = _argParser._autoDumpLength;
 			if (_argParser.cmdMovie != null)
@@ -649,6 +654,7 @@ namespace Chimera.Client.GUI
 				if (!HeadlessMode.Enabled
 					&& _argParser.luaScript is null && !_argParser.luaConsole
 					&& _argParser.cmdRom is null && _argParser.cmdMovie is null
+					&& _argParser.cmdProject is null
 					&& Emulator.IsNull())
 				{
 					ShowStartScreen();

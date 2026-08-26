@@ -15,6 +15,8 @@ namespace Chimera.Client.Common
 
 		public readonly string? cmdMovie;
 
+		public readonly string? cmdProject;
+
 		public readonly string? cmdDumpType;
 
 		public readonly HashSet<int>? _currAviWriterFrameList;
@@ -57,6 +59,7 @@ namespace Chimera.Client.Common
 			string? cmdLoadState,
 			string? cmdConfigFile,
 			string? cmdMovie,
+			string? cmdProject,
 			string? cmdDumpType,
 			HashSet<int>? currAviWriterFrameList,
 			int autoDumpLength,
@@ -80,6 +83,7 @@ namespace Chimera.Client.Common
 			this.cmdLoadState = cmdLoadState;
 			this.cmdConfigFile = cmdConfigFile;
 			this.cmdMovie = cmdMovie;
+			this.cmdProject = cmdProject;
 			this.cmdDumpType = cmdDumpType;
 			_currAviWriterFrameList = currAviWriterFrameList;
 			_autoDumpLength = autoDumpLength;

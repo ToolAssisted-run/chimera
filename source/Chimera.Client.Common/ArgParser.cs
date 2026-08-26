@@ -96,6 +96,11 @@ namespace Chimera.Client.Common
 			Description = "path; input movie which should be loaded on launch",
 		};
 
+		private static readonly Option<string?> OptionProjectFilePath = new("--project")
+		{
+			Description = "path; chimera project to open on launch (docs/project.md)",
+		};
+
 		private static readonly Option<string?> OptionOpenExternalTool = new("--open-ext-tool-dll")
 		{
 			Description = "the first ext. tool from ExternalToolManager.ToolStripMenu which satisfies both of these will be opened: 1) available (no load errors, correct system/rom, etc.) and 2) dll path matches given string; or dll filename matches given string with or without `.dll`",
@@ -160,6 +165,7 @@ namespace Chimera.Client.Common
 			root.Add(/* --luaconsole */ OptionOpenLuaConsole);
 			root.Add(/* --mmf */ OptionMMFPath);
 			root.Add(/* --movie */ OptionMovieFilePath);
+			root.Add(/* --project */ OptionProjectFilePath);
 			root.Add(/* --open-ext-tool-dll */ OptionOpenExternalTool);
 			root.Add(/* --socket-ip */ OptionSocketServerIP);
 			root.Add(/* --socket-port */ OptionSocketServerPort);
@@ -258,6 +264,7 @@ namespace Chimera.Client.Common
 				cmdLoadState: result.GetValue(OptionLoadSavestateFilePath),
 				cmdConfigFile: result.GetValue(OptionConfigFilePath),
 				cmdMovie: result.GetValue(OptionMovieFilePath),
+				cmdProject: result.GetValue(OptionProjectFilePath),
 				cmdDumpType: result.GetValue(OptionAVDumpType),
 				currAviWriterFrameList: currAviWriterFrameList,
 				autoDumpLength: autoDumpLength ?? 0,

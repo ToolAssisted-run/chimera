@@ -146,7 +146,10 @@ namespace Chimera.Client.GUI
 			}
 
 			Config.RecentProjects.Add(path);
-			Tools.Load<TAStudio>();
+			// a project IS a TAStudio session; from the commandline the window is
+			// not up yet, so the landing waits for it
+			if (Visible) Tools.Load<TAStudio>();
+			else Shown += (_, _) => Tools.Load<TAStudio>();
 			return true;
 		}
 
