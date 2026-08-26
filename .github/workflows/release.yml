@@ -112,17 +112,24 @@ jobs:
         with:
           dotnet-version: '8.0'
 
+      - name: What the cores are pinned at
+        id: pins
+        if: steps.moved.outputs.skip != 'true'
+        run: |
+          # the cache key is the exact core commits plus the guest kit they
+          # build against: bump one core, rebuild one core
+          git submodule status extern/cores/* extern/miniBox > core-pins.txt
+          cat core-pins.txt
+
       - name: Cache the core guest builds
         if: steps.moved.outputs.skip != 'true'
         uses: actions/cache@v4
         with:
-          # keyed on the exact core commits and the guest kit they build
-          # against: bump one core, rebuild one core
           path: |
             extern/cores/*/build
             extern/cores/*/waterbox/obj-guest
             extern/cores/*/waterbox/bin
-          key: cores-${{ hashFiles('.gitmodules') }}-${{ hashFiles('.git/modules/*/HEAD') }}-${{ runner.os }}
+          key: cores-${{ hashFiles('core-pins.txt') }}-${{ runner.os }}
 
       - name: Build the Linux bundle
         if: steps.moved.outputs.skip != 'true'
@@ -130,9 +137,10 @@ jobs:
 
       - name: Build the Windows bundle
         if: steps.moved.outputs.skip != 'true'
-        # the managed assemblies and the core packages are already built; only
-        # the natives differ between the two
-        run: ./tools/build-bundle.sh --platform windows --out build/bundle-windows
+        # only the natives differ between the two: the managed assemblies are IL
+        # and every core.wbx is OS-independent, so both bundles ship the same
+        # packages byte for byte
+        run: ./tools/build-bundle.sh --platform windows --out build/bundle-windows --skip-cores
 
       - name: Pack
         id: pack

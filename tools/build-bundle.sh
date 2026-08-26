@@ -7,21 +7,29 @@
 # are submodules (extern/cores/*), so the commit says which core builds went in,
 # and every package stamps its own provenance into build.json.
 #
-# Usage: tools/build-bundle.sh --platform windows|linux --out <dir> [--skip-natives]
+# Usage: tools/build-bundle.sh --platform windows|linux --out <dir>
+#                              [--skip-natives] [--skip-cores]
 #
 #   --skip-natives   the natives and the managed solution are already built
-#                    (a second platform from the same checkout, or a rebuild)
+#                    (a rebuild of the same platform)
+#   --skip-cores     take the core packages already in build/Cores rather than
+#                    rebuilding them. A core.wbx is OS-independent - the host
+#                    maps and runs it - so the second platform of a release
+#                    ships the SAME packages, byte for byte, and rebuilding
+#                    them would only risk them differing.
 set -eu
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
 platform=""
 out=""
 skip_natives=0
+skip_cores=0
 while [ $# -gt 0 ]; do
 	case "$1" in
 		--platform) platform="$2"; shift 2 ;;
 		--out) out="$2"; shift 2 ;;
 		--skip-natives) skip_natives=1; shift ;;
+		--skip-cores) skip_cores=1; shift ;;
 		*) echo "unknown option: $1" >&2; exit 2 ;;
 	esac
 done
@@ -80,6 +88,13 @@ fi
 # ---- the cores, from the pinned submodules ----------------------------------
 build_core() { # <submodule name> <package zip name>...
 	name="$1"; shift
+	if [ "$skip_cores" -eq 1 ]; then
+		for zip in "$@"; do
+			[ -f "$root/build/Cores/$zip" ] || { echo "  --skip-cores, but build/Cores/$zip is not there" >&2; return 1; }
+			cp "$root/build/Cores/$zip" "$out/Cores/"
+		done
+		return 0
+	fi
 	dir="$root/extern/cores/$name"
 	if [ ! -f "$dir/waterbox/build-package.sh" ]; then
 		echo "  core submodule '$name' is not checked out; run: git submodule update --init --recursive extern/cores/$name" >&2
