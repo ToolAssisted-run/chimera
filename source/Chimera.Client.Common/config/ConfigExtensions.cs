@@ -84,19 +84,6 @@ namespace Chimera.Client.Common
 			}
 		}
 
-		/// <param name="fileExt">file extension, including the leading period and in lowercase</param>
-		/// <remarks><paramref name="systemID"/> will be <see langword="null"/> if returned value is <see langword="false"/></remarks>
-		public static bool TryGetChosenSystemForFileExt(this Config config, string fileExt, out string systemID)
-		{
-			var b = config.PreferredPlatformsForExtensions.TryGetValue(fileExt, out var v);
-			if (b && !string.IsNullOrEmpty(v))
-			{
-				systemID = v;
-				return true;
-			}
-			systemID = null;
-			return false;
-		}
 		/// <summary>The key this core's settings were filed under before the Chimera rename.</summary>
 		private static string LegacyKeyOf(Type coreType)
 			=> "BizHawk." + coreType.ToString().Substring("Chimera.".Length);

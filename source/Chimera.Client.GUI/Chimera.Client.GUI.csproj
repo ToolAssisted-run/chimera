@@ -112,12 +112,6 @@
 		<Compile Update="config/GuiOptions.cs" SubType="Form" />
 		<Compile Update="config/GuiOptions.Designer.cs" DependentUpon="GuiOptions.cs" />
 		<EmbeddedResource Update="config/GuiOptions.resx" DependentUpon="GuiOptions.cs" />
-		<Compile Update="config/FileExtensionPreferences.cs" SubType="Form" />
-		<Compile Update="config/FileExtensionPreferences.Designer.cs" DependentUpon="FileExtensionPreferences.cs" />
-		<EmbeddedResource Update="config/FileExtensionPreferences.resx" DependentUpon="FileExtensionPreferences.cs" />
-		<Compile Update="config/FileExtensionPreferencesPicker.cs" SubType="UserControl" />
-		<Compile Update="config/FileExtensionPreferencesPicker.Designer.cs" DependentUpon="FileExtensionPreferencesPicker.cs" />
-		<EmbeddedResource Update="config/FileExtensionPreferencesPicker.resx" DependentUpon="FileExtensionPreferencesPicker.cs" />
 		<Compile Update="config/FirmwareConfig.cs" SubType="Form" />
 		<Compile Update="config/FirmwareConfig.Designer.cs" DependentUpon="FirmwareConfig.cs" />
 		<EmbeddedResource Update="config/FirmwareConfig.resx" DependentUpon="FirmwareConfig.cs" />
@@ -291,12 +285,6 @@
 		<Compile Update="tools/BatchRun.cs" SubType="Form" />
 		<Compile Update="tools/BatchRun.Designer.cs" DependentUpon="BatchRun.cs" />
 		<EmbeddedResource Update="tools/BatchRun.resx" DependentUpon="BatchRun.cs" />
-		<Compile Update="tools/Cheats/CheatEdit.cs" SubType="UserControl" />
-		<Compile Update="tools/Cheats/CheatEdit.Designer.cs" DependentUpon="CheatEdit.cs" />
-		<EmbeddedResource Update="tools/Cheats/CheatEdit.resx" DependentUpon="CheatEdit.cs" />
-		<Compile Update="tools/Cheats/Cheats.cs" SubType="Form" />
-		<Compile Update="tools/Cheats/Cheats.Designer.cs" DependentUpon="Cheats.cs" />
-		<EmbeddedResource Update="tools/Cheats/Cheats.resx" DependentUpon="Cheats.cs" />
 		<Compile Update="tools/Debugger/AddBreakpointDialog.cs" SubType="Form" />
 		<Compile Update="tools/Debugger/AddBreakpointDialog.Designer.cs" DependentUpon="AddBreakpointDialog.cs" />
 		<EmbeddedResource Update="tools/Debugger/AddBreakpointDialog.resx" DependentUpon="AddBreakpointDialog.cs" />
@@ -444,9 +432,6 @@
 		<Compile Update="tools/TI83/TI83KeyPad.cs" SubType="Form" />
 		<Compile Update="tools/TI83/TI83KeyPad.Designer.cs" DependentUpon="TI83KeyPad.cs" />
 		<EmbeddedResource Update="tools/TI83/TI83KeyPad.resx" DependentUpon="TI83KeyPad.cs" />
-		<Compile Update="tools/ToolBox.cs" SubType="Form" />
-		<Compile Update="tools/ToolBox.Designer.cs" DependentUpon="ToolBox.cs" />
-		<EmbeddedResource Update="tools/ToolBox.resx" DependentUpon="ToolBox.cs" SubType="Designer" />
 		<Compile Update="tools/ToolFormBase.cs" SubType="Form" />
 		<Compile Update="tools/TraceLogger.cs" SubType="Form" />
 		<Compile Update="tools/TraceLogger.Designer.cs" DependentUpon="TraceLogger.cs" />

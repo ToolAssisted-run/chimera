@@ -76,7 +76,6 @@ namespace Chimera.Client.Common
 		void UnpauseEmulator();
 
 		/// <remarks>only referenced from LogWindow</remarks>
-		void UpdateDumpInfo(RomStatus? newStatus = null);
 
 		/// <remarks>only referenced from TAStudio</remarks>
 		void UpdateWindowTitle();

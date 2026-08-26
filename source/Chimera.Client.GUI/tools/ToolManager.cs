@@ -28,7 +28,6 @@ namespace Chimera.Client.GUI
 		private readonly MainForm _owner;
 		private Config _config;
 		private readonly DisplayManager _displayManager;
-		private readonly ExternalToolManager _extToolManager;
 		private readonly InputManager _inputManager;
 
 		private IExternalApiProvider _apiProvider = null;
@@ -38,7 +37,7 @@ namespace Chimera.Client.GUI
 		private IGameInfo _game;
 
 		// TODO: merge ToolHelper code where logical
-		// For instance, add an IToolForm property called UsesCheats, so that a UpdateCheatRelatedTools() method can update all tools of this type
+		// For instance, add an IToolForm property called UsesCheats, so that a UpdateFreezeRelatedTools() method can update all tools of this type
 		// Also a UsesRam, and similar method
 		private readonly List<IToolForm> _tools = new List<IToolForm>();
 
@@ -49,7 +48,6 @@ namespace Chimera.Client.GUI
 			MainForm owner,
 			Config config,
 			DisplayManager displayManager,
-			ExternalToolManager extToolManager,
 			InputManager inputManager,
 			IEmulator emulator,
 			IMovieSession movieSession,
@@ -58,7 +56,6 @@ namespace Chimera.Client.GUI
 			_owner = owner;
 			_config = config;
 			_displayManager = displayManager;
-			_extToolManager = extToolManager;
 			_inputManager = inputManager;
 			_emulator = emulator;
 			_movieSession = movieSession;
@@ -101,7 +98,7 @@ namespace Chimera.Client.GUI
 			if (form is LuaConsole luaConsole) luaConsole.MainFormForApi = _owner;
 		}
 
-		public T Load<T>(bool focus = true, string toolPath = "")
+		public T Load<T>(bool focus = true)
 			where T : class, IToolForm
 		{
 			if (!IsAvailable<T>()) return null;
@@ -123,11 +120,10 @@ namespace Chimera.Client.GUI
 				_tools.Remove(existingTool);
 			}
 
-			if (CreateInstance<T>(toolPath) is not T newTool) return null;
+			if (CreateInstance<T>() is not T newTool) return null;
 
 			if (newTool is Form form) form.Owner = _owner;
 			if (!ServiceInjector.UpdateServices(_emulator.ServiceProvider, newTool)) return null; //TODO pass `true` for `mayCache` when from Chimera assembly
-			if (newTool is IExternalToolForm && !ApiInjector.UpdateApis(GetOrInitApiProvider, newTool)) return null;
 			SetBaseProperties(newTool);
 			var toolTypeName = typeof(T).FullName!;
 			// auto settings
@@ -139,50 +135,6 @@ namespace Chimera.Client.GUI
 			if (HasCustomConfig(newTool))
 			{
 				InstallCustomConfig(newTool, _config.CustomToolSettings.GetValueOrPutNew(toolTypeName));
-			}
-
-			newTool.Restart();
-			newTool.Show();
-			return newTool;
-		}
-
-		/// <summary>Loads the external tool's entry form.</summary>
-		public IExternalToolForm LoadExternalToolForm(string toolPath, string customFormTypeName, bool focus = true, bool skipExtToolWarning = false)
-		{
-			var existingTool = _tools.OfType<IExternalToolForm>().FirstOrDefault(t => t.GetType().Assembly.Location == toolPath);
-			if (existingTool != null)
-			{
-				if (existingTool.IsActive)
-				{
-					if (focus)
-					{
-						existingTool.Show();
-						existingTool.Focus();
-					}
-					return existingTool;
-				}
-
-				_tools.Remove(existingTool);
-			}
-
-			var newTool = (IExternalToolForm) CreateInstance(typeof(IExternalToolForm), toolPath, customFormTypeName, skipExtToolWarning: skipExtToolWarning);
-			if (newTool == null) return null;
-			if (newTool is Form form) form.Owner = _owner;
-			if (!ServiceInjector.UpdateServices(_emulator.ServiceProvider, newTool)
-				|| !ApiInjector.UpdateApis(GetOrInitApiProvider, newTool))
-			{
-				return null;
-			}
-			SetBaseProperties(newTool);
-			// auto settings
-			if (newTool is IToolFormAutoConfig autoConfigTool)
-			{
-				AttachSettingHooks(autoConfigTool, _config.CommonToolSettings.GetValueOrPutNew(customFormTypeName));
-			}
-			// custom settings
-			if (HasCustomConfig(newTool))
-			{
-				InstallCustomConfig(newTool, _config.CustomToolSettings.GetValueOrPutNew(customFormTypeName));
 			}
 
 			newTool.Restart();
@@ -574,14 +526,6 @@ namespace Chimera.Client.GUI
 			}
 		}
 
-		public void GeneralUpdateActiveExtTools()
-		{
-			foreach (var tool in _tools.ToArray())
-			{
-				if (tool is IExternalToolForm { IsActive: true }) tool.UpdateValues(ToolFormUpdateType.General);
-			}
-		}
-
 		public void Restart(Config config, IEmulator emulator, IGameInfo game)
 		{
 			_config = config;
@@ -594,15 +538,13 @@ namespace Chimera.Client.GUI
 			foreach (var tool in _tools.ToArray()) // copy because a tool may open another
 			{
 				SetBaseProperties(tool);
-				if (ServiceInjector.UpdateServices(_emulator.ServiceProvider, tool)
-					&& (tool is not IExternalToolForm || ApiInjector.UpdateApis(GetOrInitApiProvider, tool)))
+				if (ServiceInjector.UpdateServices(_emulator.ServiceProvider, tool))
 				{
 					if (tool.IsActive) tool.Restart();
 				}
 				else
 				{
 					unavailable.Add(tool);
-					if (tool is IExternalToolForm) ApiInjector.ClearApis(tool);
 				}
 			}
 
@@ -674,72 +616,16 @@ namespace Chimera.Client.GUI
 			}
 		}
 
-		/// <summary>
-		/// Create a new instance of an IToolForm and return it
-		/// </summary>
-		/// <typeparam name="T">Type of tool you want to create</typeparam>
-		/// <param name="dllPath">Path .dll for an external tool</param>
-		/// <returns>New instance of an IToolForm</returns>
-		private IToolForm CreateInstance<T>(string dllPath)
+		/// <summary>Creates a new instance of an IToolForm and returns it.</summary>
+		private IToolForm CreateInstance<T>()
 			where T : IToolForm
+			=> CreateInstance(typeof(T));
+
+		/// <summary>Creates a new instance of an IToolForm and returns it.</summary>
+		private IToolForm CreateInstance(Type toolType)
 		{
-			return CreateInstance(typeof(T), dllPath);
-		}
-
-		/// <summary>
-		/// Create a new instance of an IToolForm and return it
-		/// </summary>
-		/// <param name="toolType">Type of tool you want to create</param>
-		/// <param name="dllPath">Path dll for an external tool</param>
-		/// <param name="toolTypeName">For external tools, <see cref="Type.FullName"/> of the entry form's type (<paramref name="toolType"/> will be <see cref="IExternalToolForm"/>)</param>
-		/// <returns>New instance of an IToolForm</returns>
-		private IToolForm CreateInstance(Type toolType, string dllPath, string toolTypeName = null, bool skipExtToolWarning = false)
-		{
-			IToolForm tool;
-
-			// Specific case for custom tools
-			// TODO: Use AppDomain in order to be able to unload the assembly
-			// Hard stuff as we need a proxy object that inherit from MarshalByRefObject.
-			if (toolType == typeof(IExternalToolForm))
-			{
-				if (!skipExtToolWarning)
-				{
-					if (!_owner.ShowMessageBox2(
-						caption: "Confirm loading",
-						icon: EMsgBoxIcon.Question,
-						text: "Trust this external tool to run on your device?"
-							+ "\nIf you're not 100% sure of what the tool will do, choose \"No\"."))
-					{
-						return null;
-					}
-				}
-
-				try
-				{
-					tool = Activator.CreateInstanceFrom(dllPath, toolTypeName ?? "Chimera.Client.GUI.CustomMainForm").Unwrap() as IExternalToolForm;
-					if (tool == null)
-					{
-						_owner.ShowMessageBox($"It seems that the object CustomMainForm does not implement {nameof(IExternalToolForm)}. Please review the code.", "No, no, no. Wrong Way !", EMsgBoxIcon.Warning);
-						return null;
-					}
-				}
-				catch (MissingMethodException)
-				{
-					_owner.ShowMessageBox("It seems that the object CustomMainForm does not have a public default constructor. Please review the code.", "No, no, no. Wrong Way !", EMsgBoxIcon.Warning);
-					return null;
-				}
-				catch (TypeLoadException)
-				{
-					_owner.ShowMessageBox("It seems that the object CustomMainForm does not exists. Please review the code.", "No, no, no. Wrong Way !", EMsgBoxIcon.Warning);
-					return null;
-				}
-			}
-			else
-			{
-				tool = (IToolForm)Activator.CreateInstance(toolType);
-			}
+			var tool = (IToolForm) Activator.CreateInstance(toolType);
 			CaptureIconAndName(tool, toolType);
-			// Add to our list of tools
 			_tools.Add(tool);
 			return tool;
 		}
@@ -816,12 +702,7 @@ namespace Chimera.Client.GUI
 		public bool IsAvailable(Type tool)
 		{
 			if (!ServiceInjector.IsAvailable(_emulator.ServiceProvider, tool)) return false;
-			if (typeof(IExternalToolForm).IsAssignableFrom(tool)
-				&& !ApiInjector.IsAvailable(GetOrInitApiProvider, tool))
-			{
-				return false;
-			}
-			if (!PossibleToolTypeNames.Contains(tool.AssemblyQualifiedName) && !_extToolManager.PossibleExtToolTypeNames.Contains(tool.AssemblyQualifiedName)) return false; // not a tool
+			if (!PossibleToolTypeNames.Contains(tool.AssemblyQualifiedName)) return false; // not a tool
 
 			ToolAttribute attr = tool.GetCustomAttributes(false).OfType<ToolAttribute>().SingleOrDefault();
 			if (attr == null)
@@ -888,14 +769,8 @@ namespace Chimera.Client.GUI
 			}
 		}
 
-		public string GenerateDefaultCheatFilename()
-		{
-			var path = _config.PathEntries.CheatsAbsolutePath(_game.System);
-			new FileInfo(path).Directory?.Create();
-			return Path.Combine(path, $"{_game.FilesystemSafeName()}.cht");
-		}
-
-		public void UpdateCheatRelatedTools(object sender, CheatCollection.CheatListEventArgs e)
+		/// <summary>The frozen-address list changed, so everything that shows frozen addresses is stale.</summary>
+		public void UpdateFreezeRelatedTools(object sender, CheatCollection.CheatListEventArgs e)
 		{
 			if (!_emulator.HasMemoryDomains())
 			{
@@ -905,7 +780,6 @@ namespace Chimera.Client.GUI
 			UpdateValues<RamWatch>();
 			UpdateValues<RamSearch>();
 			UpdateValues<HexEditor>();
-			UpdateValues<Cheats>();
 
 			_owner.UpdateCheatStatus();
 		}

@@ -10,10 +10,9 @@ namespace Chimera.Client.Common
 		/// Loads the tool dialog T (T must implement <see cref="IToolForm"/>) , if it does not exist it will be created, if it is already open, it will be focused
 		/// </summary>
 		/// <param name="focus">Define if the tool form has to get the focus or not (Default is true)</param>
-		/// <param name="toolPath">Path to the .dll of the external tool</param>
 		/// <typeparam name="T">Type of tool you want to load</typeparam>
 		/// <returns>An instantiated <see cref="IToolForm"/></returns>
-		T Load<T>(bool focus = true, string toolPath = "")
+		T Load<T>(bool focus = true)
 			where T : class, IToolForm;
 
 		/// <summary>

@@ -9,10 +9,9 @@ using Chimera.Emulation.Common;
 namespace Chimera.Tests.Client.GUI
 {
 	/// <summary>
-	/// Drives the Firmware window over a fixed set of declarations. Same split as
-	/// <see cref="OpenCoreFormTests"/>: the verdicts are decided (and tested)
-	/// in <c>CoreFirmwareStore</c>, so what is left here is that the window shows
-	/// them and that its two buttons reach the owner.
+	/// Drives the Firmware window over a fixed set of declarations. The verdicts
+	/// are decided (and tested) in <c>CoreFirmwareStore</c>, so what is left here
+	/// is that the window shows them and that its two buttons reach the owner.
 	/// </summary>
 	[TestClass]
 	public class CoreFirmwareFormTests

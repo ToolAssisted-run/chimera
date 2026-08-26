@@ -1,67 +1,33 @@
 using System.Collections;
 using System.Collections.Generic;
-using System.Globalization;
-using System.IO;
 using System.Linq;
-using System.Text;
 
-using Chimera.Common;
 using Chimera.Emulation.Common;
 
 namespace Chimera.Client.Common
 {
+	/// <summary>
+	/// The frozen addresses of the running machine: a value held at an address for
+	/// as long as the freeze is on. It belongs to the session, not to a file - a
+	/// freeze is something you set while looking at RAM (RAM Watch, RAM Search, the
+	/// Hex Editor), and it lasts as long as the machine it was set on.
+	/// </summary>
 	public class CheatCollection : ICollection<Cheat>
 	{
-		private const string NameColumn = "NamesColumn";
-		private const string AddressColumn = "AddressColumn";
-		private const string ValueColumn = "ValueColumn";
-		private const string CompareColumn = "CompareColumn";
-		private const string OnColumn = "OnColumn";
-		private const string DomainColumn = "DomainColumn";
-		private const string SizeColumn = "SizeColumn";
-		private const string EndianColumn = "EndianColumn";
-		private const string TypeColumn = "DisplayTypeColumn";
-		private const string ComparisonType = "ComparisonTypeColumn";
-
 		private readonly IDialogParent _dialogParent;
 
-		private readonly ICheatConfig _config;
-		private List<Cheat> _cheatList = new List<Cheat>();
-		private string _defaultFileName = "";
-		private bool _changes;
+		private readonly List<Cheat> _cheatList = new();
 
-		public CheatCollection(IDialogParent dialogParent, ICheatConfig config)
-		{
-			_dialogParent = dialogParent;
-			_config = config;
-		}
+		public CheatCollection(IDialogParent dialogParent)
+			=> _dialogParent = dialogParent;
 
 		public delegate void CheatListEventHandler(object sender, CheatListEventArgs e);
 		public event CheatListEventHandler Changed;
 
 		public int Count => _cheatList.Count;
 
-		public int CheatCount => _cheatList.Count(c => !c.IsSeparator);
-
-		public int ActiveCount => _cheatList.Count(c => c.Enabled);
-
 		public bool AnyActive
 			=> _cheatList.Exists(static c => c.Enabled);
-
-		public bool Changes
-		{
-			get => _changes;
-			set
-			{
-				_changes = value;
-				if (value)
-				{
-					CheatChanged(Cheat.Separator); // Pass a dummy, no cheat invoked this change
-				}
-			}
-		}
-
-		public string CurrentFileName { get; private set; } = "";
 
 		public bool IsReadOnly => false;
 
@@ -77,24 +43,6 @@ namespace Chimera.Client.Common
 		public void Pulse()
 		{
 			_cheatList.ForEach(cheat => cheat.Pulse());
-		}
-
-		/// <summary>
-		/// Looks for a .cht file that matches the ROM loaded based on the default filename for a given ROM
-		/// </summary>
-		public bool AttemptToLoadCheatFile(IMemoryDomains domains)
-		{
-			var file = new FileInfo(_defaultFileName);
-			return file.Exists && Load(domains, file.FullName, false);
-		}
-
-		public void NewList(string defaultFileName)
-		{
-			_defaultFileName = defaultFileName;
-
-			_cheatList.Clear();
-			CurrentFileName = "";
-			Changes = false;
 		}
 
 		/// <exception cref="ArgumentNullException"><paramref name="cheat"/> is null</exception>
@@ -117,7 +65,7 @@ namespace Chimera.Client.Common
 				_cheatList.Add(cheat);
 			}
 
-			Changes = true;
+			Touched();
 		}
 
 		public void AddRange(IEnumerable<Cheat> cheats)
@@ -125,50 +73,16 @@ namespace Chimera.Client.Common
 			var toAdd = cheats.Where(c => !_cheatList.Contains(c)).ToList();
 			if (toAdd.Count is 0) return;
 			const int WARN_WHEN_ADDING_MORE_THAN = 200;
-			if (toAdd.Count > WARN_WHEN_ADDING_MORE_THAN && !_dialogParent.ModalMessageBox2($"Adding {toAdd.Count} freezes/cheats at once is probably a bad idea. Do it anyway?")) return;
+			if (toAdd.Count > WARN_WHEN_ADDING_MORE_THAN && !_dialogParent.ModalMessageBox2($"Freezing {toAdd.Count} addresses at once is probably a bad idea. Do it anyway?")) return;
 			_cheatList.AddRange(toAdd);
-			Changes = true;
-		}
-
-		public void Insert(int index, Cheat cheat)
-		{
-			cheat.Changed += CheatChanged;
-			if (_cheatList.Exists(c => c.Domain == cheat.Domain && c.Address == cheat.Address))
-			{
-				_cheatList.First(c => c.Domain == cheat.Domain && c.Address == cheat.Address).Enable();
-			}
-			else
-			{
-				_cheatList.Insert(index, cheat);
-			}
-
-			Changes = true;
-		}
-
-		public bool Exchange(Cheat oldCheat, Cheat newCheat)
-		{
-			int index = _cheatList.IndexOf(oldCheat);
-			if (index == -1)
-			{
-				return false;
-			}
-
-			_cheatList[index] = newCheat;
-			Changes = true;
-
-			return true;
+			Touched();
 		}
 
 		public bool Remove(Cheat cheat)
 		{
-			var result = _cheatList.Remove(cheat);
-			if (result)
-			{
-				Changes = true;
-				return true;
-			}
-
-			return false;
+			if (!_cheatList.Remove(cheat)) return false;
+			Touched();
+			return true;
 		}
 
 		public bool Contains(Cheat cheat)
@@ -186,217 +100,34 @@ namespace Chimera.Client.Common
 				_cheatList.Remove(cheat);
 			}
 
-			Changes = true;
+			Touched();
 		}
 
 		public void RemoveRange(IEnumerable<Watch> watches)
 		{
 			_cheatList.RemoveAll(cheat => watches.Any(w => w == cheat));
-			Changes = true;
+			Touched();
 		}
 
 		public void Clear()
 		{
 			_cheatList.Clear();
-			Changes = true;
+			Touched();
 		}
 
 		public void DisableAll()
 		{
 			_cheatList.ForEach(c => c.Disable(false));
-			Changes = true;
+			Touched();
 		}
 
 		public bool IsActive(MemoryDomain domain, long address)
 			=> _cheatList.Exists(cheat => !cheat.IsSeparator && cheat.Enabled && cheat.Domain == domain && cheat.Contains(address));
 
-		public FileWriteResult SaveOnClose()
-		{
-			if (_config.AutoSaveOnClose)
-			{
-				if (Changes && _cheatList.Count is not 0)
-				{
-					if (string.IsNullOrWhiteSpace(CurrentFileName))
-					{
-						CurrentFileName = _defaultFileName;
-					}
-
-					return SaveFile(CurrentFileName);
-				}
-				else if (_cheatList.Count is 0 && !string.IsNullOrWhiteSpace(CurrentFileName))
-				{
-					try
-					{
-						File.Delete(CurrentFileName);
-					}
-					catch (Exception ex)
-					{
-						return new(FileWriteEnum.FailedToDeleteGeneric, new(CurrentFileName, ""), ex);
-					}
-					_config.Recent.Remove(CurrentFileName);
-					return new();
-				}
-			}
-
-			return new();
-		}
-
-		public FileWriteResult Save()
-		{
-			if (string.IsNullOrWhiteSpace(CurrentFileName))
-			{
-				CurrentFileName = _defaultFileName;
-			}
-
-			return SaveFile(CurrentFileName);
-		}
-
-		public FileWriteResult SaveFile(string path)
-		{
-			var sb = new StringBuilder();
-
-			foreach (var cheat in _cheatList)
-			{
-				if (cheat.IsSeparator)
-				{
-					sb.AppendLine("----");
-				}
-				else
-				{
-					// Set to hex for saving
-					var tempCheatType = cheat.Type;
-
-					cheat.SetType(WatchDisplayType.Hex);
-
-					sb
-						.Append(cheat.AddressStr).Append('\t')
-						.Append(cheat.ValueStr).Append('\t')
-						.Append(cheat.Compare is null ? "N" : cheat.CompareStr).Append('\t')
-						.Append(cheat.Domain != null ? cheat.Domain.Name : "").Append('\t')
-						.Append(cheat.Enabled ? '1' : '0').Append('\t')
-						.Append(cheat.Name).Append('\t')
-						.Append(cheat.SizeAsChar).Append('\t')
-						.Append(cheat.TypeAsChar).Append('\t')
-						.Append(cheat.BigEndian is true ? '1' : '0').Append('\t')
-						.Append(cheat.ComparisonType).Append('\t')
-						.AppendLine();
-
-					cheat.SetType(tempCheatType);
-				}
-			}
-			FileWriteResult result = FileWriter.Write(path, (fs) =>
-			{
-				StreamWriter sw = new(fs);
-				sw.Write(sb.ToString());
-				sw.Flush();
-			});
-			if (!result.IsError)
-			{
-				CurrentFileName = path;
-				_config.Recent.Add(CurrentFileName);
-				Changes = false;
-			}
-			return result;
-		}
-
-		public bool Load(IMemoryDomains domains, string path, bool append)
-		{
-			var file = new FileInfo(path);
-			if (!file.Exists)
-			{
-				return false;
-			}
-
-			if (!append)
-			{
-				CurrentFileName = path;
-			}
-
-			using var sr = file.OpenText();
-
-			if (!append)
-			{
-				Clear();
-			}
-
-			string s;
-			while ((s = sr.ReadLine()) != null)
-			{
-				try
-				{
-					if (s == "----")
-					{
-						_cheatList.Add(Cheat.Separator);
-					}
-					else
-					{
-						int? compare;
-						var size = WatchSize.Byte;
-						var type = WatchDisplayType.Hex;
-						var bigEndian = false;
-						var comparisonType = Cheat.CompareType.None;
-
-						if (s.Length < 6)
-						{
-							continue;
-						}
-
-						var vals = s.Split('\t');
-						var address = int.Parse(vals[0], NumberStyles.HexNumber);
-						var value = int.Parse(vals[1], NumberStyles.HexNumber);
-
-						if (vals[2] == "N")
-						{
-							compare = null;
-						}
-						else
-						{
-							compare = int.Parse(vals[2], NumberStyles.HexNumber);
-						}
-
-						var domain = domains[vals[3]];
-						var enabled = vals[4] == "1";
-						var name = vals[5];
-
-						// For backwards compatibility, don't assume these values exist
-						if (vals.Length > 6)
-						{
-							size = Watch.SizeFromChar(vals[6][0]);
-							type = Watch.DisplayTypeFromChar(vals[7][0]);
-							bigEndian = vals[8] == "1";
-						}
-
-						// For backwards compatibility, don't assume these values exist
-						if (vals.Length > 9)
-						{
-							if (!Enum.TryParse(vals[9], out comparisonType))
-							{
-								continue; // Not sure if this is the best answer, could just resort to ==
-							}
-						}
-
-						var watch = Watch.GenerateWatch(
-							domain,
-							address,
-							size,
-							type,
-							bigEndian,
-							name);
-
-						Add(new Cheat(watch, value, compare, !_config.DisableOnLoad && enabled, comparisonType));
-					}
-				}
-				catch
-				{
-					// Ignore and continue
-				}
-			}
-
-			_config.Recent.Add(CurrentFileName);
-			Changes = false;
-			return true;
-		}
-
+		/// <summary>
+		/// Re-points the freezes at the domains of the machine that is now running,
+		/// dropping any whose domain that machine does not have.
+		/// </summary>
 		public void UpdateDomains(IMemoryDomains domains)
 		{
 			for (int i = _cheatList.Count - 1; i >= 0; i--)
@@ -412,38 +143,17 @@ namespace Chimera.Client.Common
 				else
 				{
 					_cheatList.RemoveAt(i);
-					Changes = true;
+					Touched();
 				}
 			}
 		}
 
-		private static readonly RigidMultiPredicateSort<Cheat> ColumnSorts
-			= new RigidMultiPredicateSort<Cheat>(new Dictionary<string, Func<Cheat, IComparable>>
-			{
-				[NameColumn] = c => c.Name,
-				[AddressColumn] = c => c.Address ?? 0L,
-				[ValueColumn] = c => c.Value ?? 0,
-				[CompareColumn] = c => c.Compare ?? 0,
-				[OnColumn] = c => c.Enabled,
-				[DomainColumn] = c => c.Domain.Name,
-				[SizeColumn] = c => (int) c.Size,
-				[EndianColumn] = c => c.BigEndian,
-				[TypeColumn] = c => c.Type,
-				[ComparisonType] = c => c.ComparisonType,
-			});
-
-		public void Sort(string column, bool reverse) => _cheatList = ColumnSorts.AppliedTo(_cheatList, column, firstIsDesc: reverse);
-
-		public void SetDefaultFileName(string defaultFileName)
-		{
-			_defaultFileName = defaultFileName;
-		}
+		/// <summary>The list changed, so everything showing frozen addresses is stale.</summary>
+		private void Touched()
+			=> CheatChanged(Cheat.Separator); // a dummy: no single cheat invoked this change
 
 		private void CheatChanged(object sender)
-		{
-			Changed?.Invoke(this, new CheatListEventArgs(sender as Cheat));
-			_changes = true;
-		}
+			=> Changed?.Invoke(this, new CheatListEventArgs(sender as Cheat));
 
 		public class CheatListEventArgs : EventArgs
 		{

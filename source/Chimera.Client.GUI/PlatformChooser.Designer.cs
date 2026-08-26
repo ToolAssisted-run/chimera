@@ -38,8 +38,6 @@
 			this.ExtensionLabel = new Chimera.WinForms.Controls.LocLabelEx();
 			this.RomSizeLabel = new Chimera.WinForms.Controls.LocLabelEx();
 			this.label6 = new Chimera.WinForms.Controls.LocLabelEx();
-			this.AlwaysCheckbox = new System.Windows.Forms.CheckBox();
-			this.label4 = new Chimera.WinForms.Controls.LocLabelEx();
 			this.label5 = new Chimera.WinForms.Controls.LocLabelEx();
 			this.HashBox = new System.Windows.Forms.TextBox();
 			this.SuspendLayout();
@@ -134,23 +132,7 @@
 			this.label6.Name = "label6";
 			this.label6.Text = "Size:";
 			// 
-			// AlwaysCheckbox
 			// 
-			this.AlwaysCheckbox.AutoSize = true;
-			this.AlwaysCheckbox.Location = new System.Drawing.Point(300, 396);
-			this.AlwaysCheckbox.Name = "AlwaysCheckbox";
-			this.AlwaysCheckbox.Size = new System.Drawing.Size(138, 17);
-			this.AlwaysCheckbox.TabIndex = 13;
-			this.AlwaysCheckbox.Text = "Always use this platform";
-			this.AlwaysCheckbox.UseVisualStyleBackColor = true;
-			// 
-			// label4
-			// 
-			this.label4.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
-			this.label4.Location = new System.Drawing.Point(300, 416);
-			this.label4.Name = "label4";
-			this.label4.Text = "for this extension";
-			this.label4.Click += new System.EventHandler(this.label4_Click);
 			// 
 			// label5
 			// 
@@ -175,8 +157,6 @@
 			this.ClientSize = new System.Drawing.Size(438, 483);
 			this.Controls.Add(this.HashBox);
 			this.Controls.Add(this.label5);
-			this.Controls.Add(this.label4);
-			this.Controls.Add(this.AlwaysCheckbox);
 			this.Controls.Add(this.RomSizeLabel);
 			this.Controls.Add(this.label6);
 			this.Controls.Add(this.ExtensionLabel);
@@ -210,8 +190,6 @@
         private Chimera.WinForms.Controls.LocLabelEx ExtensionLabel;
         private Chimera.WinForms.Controls.LocLabelEx RomSizeLabel;
         private Chimera.WinForms.Controls.LocLabelEx label6;
-		private System.Windows.Forms.CheckBox AlwaysCheckbox;
-		private Chimera.WinForms.Controls.LocLabelEx label4;
 		private Chimera.WinForms.Controls.LocLabelEx label5;
 		private System.Windows.Forms.TextBox HashBox;
 	}

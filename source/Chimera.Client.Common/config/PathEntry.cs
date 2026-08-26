@@ -44,7 +44,6 @@ namespace Chimera.Client.Common
 				"Savestates" => 0x20,
 				"Save RAM" => 0x21,
 				"Screenshots" => 0x22,
-				"Cheats" => 0x23,
 
 				// some cores
 				"Palettes" => 0x30,

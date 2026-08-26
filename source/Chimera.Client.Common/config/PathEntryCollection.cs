@@ -17,16 +17,12 @@ namespace Chimera.Client.Common
 		private static PathEntry BaseEntryFor(string sysID, string path)
 			=> new(sysID, "Base", path);
 
-		private static PathEntry CheatsEntryFor(string sysID)
-			=> new(sysID, "Cheats", Path.Combine(".", "Cheats"));
-
 		private static IEnumerable<PathEntry> CommonEntriesFor(string sysID, string basePath)
 			=> [
 				BaseEntryFor(sysID, basePath),
 				ROMEntryFor(sysID),
 				SavestatesEntryFor(sysID),
 				ScreenshotsEntryFor(sysID),
-				CheatsEntryFor(sysID),
 			];
 
 		public static string GetDisplayNameFor(string sysID)
@@ -114,7 +110,6 @@ namespace Chimera.Client.Common
 				new(GLOBAL, "Watch (.wch)", Path.Combine(".", ".")),
 				new(GLOBAL, "Debug Logs", Path.Combine(".", "")),
 				new(GLOBAL, "Macros", Path.Combine(".", "Movies", "Macros")),
-				new(GLOBAL, "External Tools", Path.Combine(".", "ExternalTools")),
 				new(GLOBAL, "Temp Files", ""),
 			},
 		}.SelectMany(a => a).ToArray());

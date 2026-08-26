@@ -197,26 +197,17 @@ namespace Chimera.Client.GUI
 						Tools.LuaConsole.ToggleLastLuaScript();
 					}
 					break;
-				case "Cheats":
-					CheatsMenuItem_Click(this, EventArgs.Empty);
-					break;
-				case "Toggle All Cheats":
-					var cheats = CheatList.Where(static c => !c.IsSeparator).ToList();
-					if (cheats.Count is 0) break;
-					var firstWasEnabled = cheats[0].Enabled;
-					var kind = cheats.TrueForAll(c => c.Enabled == firstWasEnabled)
+				case "Toggle All Freezes":
+					var frozen = CheatList.Where(static c => !c.IsSeparator).ToList();
+					if (frozen.Count is 0) break;
+					var firstWasEnabled = frozen[0].Enabled;
+					var kind = frozen.TrueForAll(c => c.Enabled == firstWasEnabled)
 						? firstWasEnabled
 							? "off"
 							: "on"
 						: "mixed";
-					foreach (var x in cheats) x.Toggle();
-					AddOnScreenMessage($"Cheats toggled ({kind})");
-					break;
-				case "TAStudio":
-					TAStudioMenuItem_Click(null, EventArgs.Empty);
-					break;
-				case "ToolBox":
-					ToolBoxMenuItem_Click(this, EventArgs.Empty);
+					foreach (var x in frozen) x.Toggle();
+					AddOnScreenMessage($"Freezes toggled ({kind})");
 					break;
 
 				// RAM Search

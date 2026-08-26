@@ -42,7 +42,7 @@ meson compile -C build/meson-linux frontend   # the managed solution (dotnet)
 
 Linux requirements: meson, ninja, cmake, gcc, mingw-w64, and Microsoft's own .NET SDK binary (`curl -sSL https://dot.net/v1/dotnet-install.sh | bash -s -- --channel 8.0`); distro-built SDKs omit the WindowsDesktop targets the net48/WinForms frontend needs.
 
-To run: `build\Chimera.exe` on Windows, `build/ChimeraMono.sh` on Linux. Build a core package first (for quickerNES, run its `chimera/build-package.sh` from a sibling checkout; it installs `quickernes.zip` into `build/Cores/`), then `File > Open Core...` (or `--core=<path>`) followed by the ROM.
+To run: `build\Chimera.exe` on Windows, `build/ChimeraMono.sh` on Linux. Build a core package first (for quickerNES, run its `chimera/build-package.sh` from a sibling checkout; it installs `quickernes.zip` into `build/Cores/`), then `File > New Project...` and pick that core. A plain rom with no project is `--core=<path> <rom>` from the commandline.
 
 The witness gate runs with `tests/synth/run-witness.sh`. The engineering log (objectives, procedure, and the sharp edges found along the way) is in [docs/design-principles.md](docs/design-principles.md); the engine migration is chronicled in [docs/engine-migration.md](docs/engine-migration.md).
 

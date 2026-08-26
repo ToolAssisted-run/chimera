@@ -46,7 +46,6 @@ namespace Chimera.Tests.Client.Common.config
 		private static readonly IReadOnlyDictionary<Type, string> KnownGoodFromChimera = new Dictionary<Type, string>
 		{
 			[typeof(AnalogBind)] = @"{""Value"":""X1 LeftThumbX Axis"",""Mult"":0.8,""Deadzone"":0.1,""ButtonBindPositive"":""Right"",""ButtonBindNegative"":""Left""}",
-			[typeof(CheatConfig)] = $@"{{""DisableOnLoad"":false,""LoadFileByGame"":true,""AutoSaveOnClose"":true,""Recent"":{RECENT_SER}}}",
 			[typeof(FeedbackBind)] = @"{""Channels"":""Left+Right"",""GamepadPrefix"":""X1 "",""Prescale"":1.0}",
 			[typeof(MessagePosition)] = @"{""X"":0,""Y"":0,""Anchor"":0}",
 			[typeof(MovieConfig)] = $@"{{""MovieEndAction"":3,""EnableBackupMovies"":true,""MovieCompressionLevel"":2,""VBAStyleMovieLoadState"":false,""DefaultTasStateManagerSettings"":{PAGED_SER_WITH_TYPE}}}",

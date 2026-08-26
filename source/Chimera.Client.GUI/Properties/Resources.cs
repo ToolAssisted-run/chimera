@@ -61,9 +61,7 @@ namespace Chimera.Client.GUI.Properties
 		internal static readonly Icon GameControllerIcon = ReadEmbeddedIcon("GameController");
 		internal static readonly Bitmap GameController = ReadEmbeddedBitmap("GameController");
 		internal static readonly Bitmap GreenCheck = ReadEmbeddedBitmap("GreenCheck");
-		internal static readonly Bitmap Hack = ReadEmbeddedBitmap("Hack");
 		internal static readonly Bitmap Help = ReadEmbeddedBitmap("Help");
-		internal static readonly Bitmap HomeBrew = ReadEmbeddedBitmap("HomeBrew");
 		internal static readonly Icon HotKeysIcon = ReadEmbeddedIcon("HotKeys");
 		internal static readonly Bitmap HotKeys = ReadEmbeddedBitmap("HotKeys");
 		internal static readonly Bitmap InsertSeparator = ReadEmbeddedBitmap("InsertSeparator");
@@ -109,7 +107,6 @@ namespace Chimera.Client.GUI.Properties
 		internal static readonly Bitmap Redo = ReadEmbeddedBitmap("redo");
 		internal static readonly Bitmap Refresh = ReadEmbeddedBitmap("Refresh");
 		internal static readonly Bitmap Restart = ReadEmbeddedBitmap("restart");
-		internal static readonly Bitmap RetroQuestion = ReadEmbeddedBitmap("RetroQuestion");
 		internal static readonly Bitmap RewindRecord = ReadEmbeddedBitmap("RewindRecord");
 		internal static readonly Bitmap Save = ReadEmbeddedBitmap("Save");
 		internal static readonly Bitmap SaveAs = ReadEmbeddedBitmap("SaveAs");
@@ -128,9 +125,6 @@ namespace Chimera.Client.GUI.Properties
 		internal static readonly Bitmap TAStudio = ReadEmbeddedBitmap("TAStudio");
 		internal static readonly Bitmap TextDoc = ReadEmbeddedBitmap("textdoc");
 		internal static readonly Icon TextDocIcon = ReadEmbeddedIcon("textdoc");
-		internal static readonly Icon ToolBoxIcon = ReadEmbeddedIcon("ToolBox");
-		internal static readonly Bitmap ToolBox = ReadEmbeddedBitmap("ToolBox");
-		internal static readonly Bitmap Translation = ReadEmbeddedBitmap("Translation");
 		internal static readonly Bitmap Triangle = ReadEmbeddedBitmap("Triangle");
 		internal static readonly Bitmap TruncateFromFile = ReadEmbeddedBitmap("TruncateFromFile");
 		internal static readonly Bitmap TvIcon = ReadEmbeddedBitmap("tvIcon");

@@ -160,11 +160,6 @@ namespace Chimera.Client.Common
 		public bool IsRewinding()
 			=> APIs.EmuClient.IsRewinding();
 
-		[LuaMethodExample("client.opencheats( );")]
-		[LuaMethod("opencheats", "opens the Cheats dialog")]
-		public void OpenCheats()
-			=> APIs.Tool.OpenCheats();
-
 		[LuaMethodExample("client.openhexeditor( );")]
 		[LuaMethod("openhexeditor", "opens the Hex Editor dialog")]
 		public void OpenHexEditor()
@@ -199,11 +194,6 @@ namespace Chimera.Client.Common
 		[LuaMethod("opentasstudio", "opens the TAStudio dialog")]
 		public void OpenTasStudio()
 			=> APIs.Tool.OpenTasStudio();
-
-		[LuaMethodExample("client.opentoolbox( );")]
-		[LuaMethod("opentoolbox", "opens the Toolbox Dialog")]
-		public void OpenToolBox()
-			=> APIs.Tool.OpenToolBox();
 
 		[LuaMethodExample("client.pause( );")]
 		[LuaMethod("pause", "Pauses the emulator")]

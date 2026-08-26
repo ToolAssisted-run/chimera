@@ -27,20 +27,6 @@ namespace Chimera.Client.Common
 			PathEntries.RefreshTempPath();
 		}
 
-		/// <summary>
-		/// Used to determine the system a rom is classified as (and thus which core to use) for the times when our romloading autodetect magic can't determine a system.
-		/// Keys are file extensions, include the leading period in each, and use lowercase;
-		/// values are system IDs, use <see cref="string.Empty"/> for unset (though <see langword="null"/> should also work, omitting will remove from UI).
-		/// </summary>
-		public Dictionary<string, string> PreferredPlatformsForExtensions { get; set; } = new Dictionary<string, string>
-		{
-			[".bin"] = "",
-			[".cue"] = "",
-			[".img"] = "",
-			[".iso"] = "",
-			[".rom"] = "",
-		};
-
 		public PathEntryCollection PathEntries { get; set; } = new PathEntryCollection();
 
 		// General Client Settings
@@ -131,10 +117,6 @@ namespace Chimera.Client.Common
 		public bool Unthrottled { get; set; } = false;
 		public bool AutoMinimizeSkipping { get; set; } = true;
 		public bool VSyncThrottle { get; set; } = false;
-#if CHIMERABUILD_SUPERCHIMERA
-		public bool SuperChimeraThrottle { get; set; } = false;
-#endif
-
 
 
 		public MovieConfig Movies { get; set; } = new MovieConfig();
@@ -299,7 +281,6 @@ namespace Chimera.Client.Common
 		public Dictionary<string, ToolDialogSettings> CommonToolSettings { get; set; } = new Dictionary<string, ToolDialogSettings>();
 		public Dictionary<string, Dictionary<string, object>> CustomToolSettings { get; set; } = new Dictionary<string, Dictionary<string, object>>();
 
-		public CheatConfig Cheats { get; set; } = new CheatConfig();
 
 		// Macro Tool
 		public RecentFiles RecentMacros { get; set; } = new RecentFiles(8);
@@ -368,7 +349,6 @@ namespace Chimera.Client.Common
 
 		public Queue<string> RecentCores { get; set; } = new();
 
-		public Dictionary<string, string> TrustedExtTools { get; set; } = new();
 
 		public bool AVWriterPad { get; set; } = false;
 

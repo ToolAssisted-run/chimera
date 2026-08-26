@@ -82,9 +82,7 @@ namespace Chimera.Client.Common
 			Bind("Tools", "Hex Editor");
 			Bind("Tools", "Trace Logger");
 			Bind("Tools", "Lua Console");
-			Bind("Tools", "Cheats");
 			Bind("Tools", "TAStudio");
-			Bind("Tools", "ToolBox", "Shift+T");
 
 			Bind("RAM Search", "New Search");
 			Bind("RAM Search", "Do Search");
@@ -127,7 +125,7 @@ namespace Chimera.Client.Common
 			Bind("TAStudio", "Analog Maximum", "Right");
 			Bind("TAStudio", "Analog Minimum", "Left");
 
-			Bind("Tools", "Toggle All Cheats");
+			Bind("Tools", "Toggle All Freezes");
 			Bind("Tools", "Toggle Last Lua Script");
 
 			AllHotkeys = dict;

@@ -1553,7 +1553,7 @@ namespace Chimera.Client.GUI
 				}
 			}
 
-			Tools.UpdateCheatRelatedTools(null, new(null));
+			Tools.UpdateFreezeRelatedTools(null, new(null));
 			MemoryViewerBox.Refresh();
 		}
 

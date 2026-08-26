@@ -10,7 +10,6 @@ namespace Chimera.Client.Common
 
 		IToolForm GetTool(string name);
 
-		void OpenCheats();
 
 		void OpenHexEditor();
 
@@ -20,7 +19,6 @@ namespace Chimera.Client.Common
 
 		void OpenTasStudio();
 
-		void OpenToolBox();
 	}
 }
 

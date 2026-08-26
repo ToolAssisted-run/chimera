@@ -195,12 +195,6 @@ namespace Chimera.Client.Common
 			return collection.AbsolutePathFor(path, null);
 		}
 
-		public static string ExternalToolsAbsolutePath(this PathEntryCollection collection)
-		{
-			var path = collection[PathEntryCollection.GLOBAL, "External Tools"].Path;
-			return collection.AbsolutePathFor(path, null);
-		}
-
 		public static string RomAbsolutePath(this PathEntryCollection collection, string systemId = null)
 		{
 			if (string.IsNullOrWhiteSpace(systemId))
@@ -228,14 +222,6 @@ namespace Chimera.Client.Common
 			}
 
 			return collection.AbsolutePathFor(path.Path, systemId);
-		}
-
-		public static string CheatsAbsolutePath(this PathEntryCollection collection, string systemId)
-		{
-			var pathEntry = collection[systemId, "Cheats"]
-				?? collection[systemId, "Base"];
-
-			return collection.AbsolutePathFor(pathEntry.Path,systemId);
 		}
 
 		public static string SaveStateAbsolutePath(this PathEntryCollection collection, string systemId)

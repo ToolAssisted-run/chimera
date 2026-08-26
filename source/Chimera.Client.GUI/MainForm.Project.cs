@@ -308,7 +308,7 @@ namespace Chimera.Client.GUI
 					ShowMessageBox(
 						owner: null,
 						$"This project runs on \"{coreName}\", and no such core package is installed."
-							+ "\n\nPut its package in the Cores folder (File > Open Core... shows where), then open the project again.",
+							+ "\n\nPut its package in the Cores folder, then open the project again.",
 						"The project's core is not installed");
 					return false;
 				}

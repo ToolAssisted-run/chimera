@@ -44,8 +44,6 @@ namespace Chimera.Client.Common
 
 		public readonly bool? audiosync;
 
-		public readonly string? openExtToolDll;
-
 		public readonly string? cmdRom;
 
 		public readonly string? cmdCorePackage;
@@ -67,7 +65,6 @@ namespace Chimera.Client.Common
 			string? mmfFilename,
 			(string? UrlGet, string? UrlPost)? httpAddresses,
 			bool? audiosync,
-			string? openExtToolDll,
 			ProtocolType socketProtocol,
 			IReadOnlyList<(string Key, string Value)>? userdataUnparsedPairs,
 			string? cmdRom,
@@ -89,7 +86,6 @@ namespace Chimera.Client.Common
 			MMFFilename = mmfFilename;
 			HTTPAddresses = httpAddresses;
 			this.audiosync = audiosync;
-			this.openExtToolDll = openExtToolDll;
 			SocketProtocol = socketProtocol;
 			UserdataUnparsedPairs = userdataUnparsedPairs;
 			this.cmdRom = cmdRom;

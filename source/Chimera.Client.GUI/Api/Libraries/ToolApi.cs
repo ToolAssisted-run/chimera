@@ -27,7 +27,6 @@ namespace Chimera.Client.GUI
 			return found != null ? Activator.CreateInstance(found) : null;
 		}
 
-		public void OpenCheats() => _toolLoader.Load<Cheats>();
 
 		public void OpenHexEditor() => _toolLoader.Load<HexEditor>();
 
@@ -37,7 +36,6 @@ namespace Chimera.Client.GUI
 
 		public void OpenTasStudio() => _toolLoader.Load<TAStudio>();
 
-		public void OpenToolBox() => _toolLoader.Load<ToolBox>();
 	}
 }
 

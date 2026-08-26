@@ -94,11 +94,6 @@ namespace Chimera.Client.Common
 			Description = "path; chimera project to open on launch (docs/project.md)",
 		};
 
-		private static readonly Option<string?> OptionOpenExternalTool = new("--open-ext-tool-dll")
-		{
-			Description = "the first ext. tool from ExternalToolManager.ToolStripMenu which satisfies both of these will be opened: 1) available (no load errors, correct system/rom, etc.) and 2) dll path matches given string; or dll filename matches given string with or without `.dll`",
-		};
-
 		private static readonly Option<bool> OptionOpenLuaConsole = new("--luaconsole")
 		{
 			Description = "open the Lua Console, even if not loading a script",
@@ -156,7 +151,6 @@ namespace Chimera.Client.Common
 			root.Add(/* --mmf */ OptionMMFPath);
 			root.Add(/* --movie */ OptionMovieFilePath);
 			root.Add(/* --project */ OptionProjectFilePath);
-			root.Add(/* --open-ext-tool-dll */ OptionOpenExternalTool);
 			root.Add(/* --socket-ip */ OptionSocketServerIP);
 			root.Add(/* --socket-port */ OptionSocketServerPort);
 			root.Add(/* --socket-udp */ OptionSocketServerUseUDP);
@@ -266,7 +260,6 @@ namespace Chimera.Client.Common
 				mmfFilename: result.GetValue(OptionMMFPath),
 				httpAddresses: httpAddresses,
 				audiosync: audiosync,
-				openExtToolDll: result.GetValue(OptionOpenExternalTool),
 				socketProtocol: result.GetValue(OptionSocketServerUseUDP) ? ProtocolType.Udp : ProtocolType.Tcp,
 				userdataUnparsedPairs: userdataUnparsedPairs,
 				cmdRom: result.GetValue(ArgumentRomFilePath),

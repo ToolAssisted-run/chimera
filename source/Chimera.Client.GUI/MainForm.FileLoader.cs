@@ -36,12 +36,6 @@ namespace Chimera.Client.GUI
 			}
 		}
 
-		private void LoadCheats(string filename, string archive = null)
-		{
-			CheatList.Load(Emulator.AsMemoryDomains(), filename, false);
-			Tools.Load<Cheats>();
-		}
-
 		private void LoadLuaFile(string filename, string archive = null)
 		{
 			OpenLuaConsole();
@@ -219,9 +213,6 @@ namespace Chimera.Client.GUI
 								break;
 							case LoadOrdering.LuaScript:
 								LoadLuaFile(filename, fileInformation.ArchiveName);
-								break;
-							case LoadOrdering.Cheat:
-								LoadCheats(filename, fileInformation.ArchiveName);
 								break;
 							case LoadOrdering.MovieFile:
 								// I don't really like this hack, but for now, we only want to load one movie file.

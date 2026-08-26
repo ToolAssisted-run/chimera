@@ -47,57 +47,6 @@ namespace Chimera.Tests.Client.GUI
 			bmp.Save(Path.Combine(dir, $"{name}.png"), ImageFormat.Png);
 		}
 
-		private static DiscoveredCorePackage Pkg(
-			string name,
-			string path,
-			string sha1,
-			string system = "NES",
-			string error = null,
-			params string[] extensions)
-		{
-			Dictionary<string, string> exts = new();
-			foreach (var ext in extensions) exts[ext] = system;
-			return new DiscoveredCorePackage
-			{
-				Name = name,
-				Path = path,
-				Sha1 = sha1,
-				Systems = [ system ],
-				Extensions = exts,
-				Error = error,
-			};
-		}
-
-		[TestMethod]
-		public void OpenCoreWindow()
-		{
-			if (ShotDir is null) { Assert.Inconclusive("set CHIMERA_UI_SHOTS to write screenshots"); return; }
-
-			// a plausible Cores/ folder: two working packages, a dev build sitting there
-			// as a directory, and one that will not parse
-			var quicker = Pkg("quickerNES", "/home/you/Chimera/Cores/quickernes.zip", "3f2a91c47b0e5d8a1122334455667788990aabbc", "NES", null, ".nes", ".fds");
-			var synth = Pkg("synth", "/home/you/Chimera/Cores/synth-box.zip", "c1d2e3f405162738495a6b7c8d9e0f1122334455", "SYNTH", null, ".synth");
-			var dev = Pkg("quickerNES-dev", "/home/you/quickerNES/waterbox/bin", null, "NES", null, ".nes");
-			var broken = Pkg("mystery.zip", "/home/you/Chimera/Cores/mystery.zip", "aabbccddeeff00112233445566778899aabbccdd", "?", "waterbox.config is missing systemId");
-
-			List<CoreRegistry.LoadedCorePackage> loaded =
-			[
-				new() { Name = "quickerNES", Path = quicker.Path, Sha1 = quicker.Sha1, CoreNames = [ "quickerNES" ] },
-				new() { Name = "synth", Path = synth.Path, Sha1 = synth.Sha1, CoreNames = [ "synth" ] },
-			];
-
-			using OpenCoreForm form = new(
-				() => CorePackageList.Build([ quicker, synth, dev, broken ], loaded, [ ]),
-				() => { },
-				() => { },
-				[ "/home/you/Chimera/Cores" ],
-				_ => true);
-			form.StartPosition = FormStartPosition.Manual;
-			form.Location = new Point(0, 0);
-			ListOfFirst(form).Items[0].Selected = true;
-			Shoot(form, "open-core");
-		}
-
 		/// <summary>
 		/// The firmware window, over a package that wants two files and another that
 		/// wants one. The states are what a user actually hits - provided, never

@@ -158,15 +158,6 @@ namespace Chimera.Client.Common
 			{
 				file.BindSoleItemOf(CoreRegistry.Instance.KnownRomExtensions.ToList());
 			}
-			// ...including unrecognised extensions that the user has set a platform for
-			if (!file.IsBound)
-			{
-				var exts = _config.PreferredPlatformsForExtensions.Where(static kvp => !string.IsNullOrEmpty(kvp.Value))
-					.Select(static kvp => kvp.Key)
-					.ToList();
-				if (exts.Count is not 0) file.BindSoleItemOf(exts);
-			}
-
 			// if we have an archive and need to bind something, then pop the dialog
 			if (file.IsArchive && !file.IsBound)
 			{
@@ -427,12 +418,7 @@ namespace Chimera.Client.Common
 
 			if (string.IsNullOrEmpty(rom.GameInfo.System))
 			{
-				// Has the user picked a preference for this extension?
-				if (_config.TryGetChosenSystemForFileExt(rom.Extension.ToLowerInvariant(), out var systemID))
-				{
-					rom.GameInfo.System = systemID;
-				}
-				else if (CoreRegistry.Instance.TryGetSystemForExtension(rom.Extension, out var declaredSysID))
+				if (CoreRegistry.Instance.TryGetSystemForExtension(rom.Extension, out var declaredSysID))
 				{
 					// a loaded core package declared this extension
 					rom.GameInfo.System = declaredSysID;

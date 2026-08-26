@@ -27,13 +27,13 @@ namespace Chimera.Client.GUI
 		{
 			CloseRomMenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["Close ROM"];
 
-			CloseRomMenuItem.Enabled = !Emulator.IsNull();
+			// there is one thing to close, and it is the project
+			CloseRomMenuItem.Enabled = _openProject is not null;
 
+			// nothing is running, so there is nothing to shoot or record
+			ScreenshotSubMenu.Enabled = !Emulator.IsNull();
 			AVSubMenu.Enabled = Emulator.HasVideoProvider(); //TODO necessary?
 		}
-
-		private void OpenCoreMenuItem_Click(object sender, EventArgs e)
-			=> OpenCoreDialog();
 
 		private void NewProjectMenuItem_Click(object sender, EventArgs e)
 			=> NewProjectDialog();
@@ -434,12 +434,6 @@ namespace Chimera.Client.GUI
 			if (this.ShowDialogWithTempMute(form).IsOk()) AddOnScreenMessage("Autofire settings saved");
 		}
 
-		private void FileExtensionsMenuItem_Click(object sender, EventArgs e)
-		{
-			using var form = new FileExtensionPreferences(Config.PreferredPlatformsForExtensions);
-			if (this.ShowDialogWithTempMute(form).IsOk()) AddOnScreenMessage("Rom Extension Preferences changed");
-		}
-
 		private void CustomizeMenuItem_Click(object sender, EventArgs e)
 		{
 			using GuiOptions form = new(
@@ -605,17 +599,10 @@ namespace Chimera.Client.GUI
 
 		private void ToolsSubMenu_DropDownOpened(object sender, EventArgs e)
 		{
-			ToolBoxMenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["ToolBox"];
 			RamWatchMenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["RAM Watch"];
 			RamSearchMenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["RAM Search"];
 			HexEditorMenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["Hex Editor"];
 			LuaConsoleMenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["Lua Console"];
-			CheatsMenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["Cheats"];
-			TAStudioMenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["TAStudio"];
-
-			TAStudioMenuItem.Enabled = Tools.IsAvailable<TAStudio>();
-
-			CheatsMenuItem.Enabled = Tools.IsAvailable<Cheats>();
 			HexEditorMenuItem.Enabled = Tools.IsAvailable<HexEditor>();
 			RamSearchMenuItem.Enabled = Tools.IsAvailable<RamSearch>();
 			RamWatchMenuItem.Enabled = Tools.IsAvailable<RamWatch>();
@@ -626,36 +613,6 @@ namespace Chimera.Client.GUI
 			// simply greys these out.
 
 			MacroToolMenuItem.Enabled = MovieSession.Movie.IsActive() && Tools.IsAvailable<MacroInputTool>();
-		}
-
-		private void ExternalToolMenuItem_DropDownOpening(object sender, EventArgs e)
-		{
-			ExternalToolMenuItem.ReplaceDropDownItems(items: ExtToolManager.ToolStripItems.ToArray());
-			if (ExternalToolMenuItem.DropDownItems.Count == 0)
-			{
-				ExternalToolMenuItem.DropDownItems.Add(new ToolStripMenuItemEx { Enabled = false, Text = "(none)" });
-			}
-			if (Config.TrustedExtTools.Count is 0) return;
-
-			ExternalToolMenuItem.DropDownItems.Add(new ToolStripSeparatorEx());
-			ToolStripMenuItemEx forgetTrustedItem = new() { Text = "Forget Trusted Tools" };
-			forgetTrustedItem.Click += (_, _) =>
-			{
-				if (this.ModalMessageBox2(
-					caption: "Forget trusted ext. tools?",
-					text: "This will cause the warning about running third-party code to show again for all the ext. tools you've previously loaded.\n" +
-						"(If a tool has been loaded this session, the warning may not appear until Chimera is restarted.)",
-					useOKCancel: true))
-				{
-					Config.TrustedExtTools.Clear();
-				}
-			};
-			ExternalToolMenuItem.DropDownItems.Add(forgetTrustedItem);
-		}
-
-		private void ToolBoxMenuItem_Click(object sender, EventArgs e)
-		{
-			Tools.Load<ToolBox>();
 		}
 
 		private void RamWatchMenuItem_Click(object sender, EventArgs e)
@@ -670,22 +627,6 @@ namespace Chimera.Client.GUI
 			OpenLuaConsole();
 		}
 
-		private void TAStudioMenuItem_Click(object sender, EventArgs e)
-		{
-			if (!Emulator.CanPollInput())
-			{
-				ShowMessageBox(owner: null, "Current core does not support input polling. TAStudio can't be used.");
-				return;
-			}
-			const int DONT_PROMPT_BEFORE_FRAME = 2 * 60 * 60; // 2 min @ 60 fps
-			if (MovieSession.Movie.NotActive() && Emulator.Frame > DONT_PROMPT_BEFORE_FRAME // if playing casually (not recording) AND played for enough frames (prompting always would be annoying)...
-				&& !this.ModalMessageBox2("This will reload the rom without saving. Launch TAStudio anyway?", "Confirmation")) // ...AND user responds "No" to "Open TAStudio?", then cancel
-			{
-				return;
-			}
-			Tools.Load<TAStudio>();
-		}
-
 		private void HexEditorMenuItem_Click(object sender, EventArgs e)
 		{
 			Tools.Load<HexEditor>();
@@ -694,11 +635,6 @@ namespace Chimera.Client.GUI
 		private void MacroToolMenuItem_Click(object sender, EventArgs e)
 		{
 			Tools.Load<MacroInputTool>();
-		}
-
-		private void CheatsMenuItem_Click(object sender, EventArgs e)
-		{
-			Tools.Load<Cheats>();
 		}
 
 		private void BatchRunnerMenuItem_Click(object sender, EventArgs e)
@@ -853,21 +789,6 @@ namespace Chimera.Client.GUI
 			FrameBufferResized();
 		}
 
-		private void DumpStatusButton_Click(object sender, EventArgs e)
-		{
-			string details = Emulator.RomDetails();
-			if (string.IsNullOrWhiteSpace(details))
-			{
-				details = _defaultRomDetails;
-			}
-
-			if (!string.IsNullOrEmpty(details))
-			{
-				Tools.Load<LogWindow>();
-				((LogWindow) Tools.Get<LogWindow>()).ShowReport("Dump Status Report", details);
-			}
-		}
-
 		private readonly ScreenshotForm _screenshotTooltip = new();
 
 		private void KeyPriorityStatusLabel_Click(object sender, EventArgs e)
@@ -879,14 +800,6 @@ namespace Chimera.Client.GUI
 				_ => Config.InputPriority.INPUT,
 			};
 			UpdateKeyPriorityIcon();
-		}
-
-		private void FreezeStatus_Click(object sender, EventArgs e)
-		{
-			if (CheatStatusButton.Visible)
-			{
-				Tools.Load<Cheats>();
-			}
 		}
 
 		private void LinkConnectStatusBarButton_Click(object sender, EventArgs e)
@@ -943,11 +856,6 @@ namespace Chimera.Client.GUI
 			if (Config.RecentWatches.AutoLoad)
 			{
 				Tools.LoadRamWatch(!Config.DisplayRamWatch);
-			}
-
-			if (Config.Cheats.Recent.AutoLoad)
-			{
-				Tools.Load<Cheats>();
 			}
 
 			Tools.AutoLoad();

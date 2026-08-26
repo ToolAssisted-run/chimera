@@ -37,15 +37,7 @@ namespace Chimera.Client.GUI
 	public partial class MainForm : FormBase, IDialogParent,
 		IMainFormForApi, IMainFormForTools
 	{
-		private const string FMT_STR_DUMP_STATUS_MENUITEM_LABEL = "Dump Status Report{0}...";
-
 		private readonly ToolStripMenuItemEx DOSSubMenu = new() { Text = "&DOS" };
-
-		private readonly ToolStripMenuItemEx DumpStatusReportMenuItem = new()
-		{
-			Enabled = false,
-			Text = string.Format(FMT_STR_DUMP_STATUS_MENUITEM_LABEL, string.Empty),
-		};
 
 		private readonly ToolStripMenuItemEx RealTimeCounterMenuItem = new() { Enabled = false, Text = "00:00.0" };
 
@@ -55,8 +47,6 @@ namespace Chimera.Client.GUI
 		{
 			UpdateWindowTitle();
 
-			DumpStatusReportMenuItem.Click += DumpStatusButton_Click;
-			SystemSubMenu.DropDownItems.InsertBefore(LoadedCoreNameMenuItem, insert: DumpStatusReportMenuItem);
 			SystemSubMenu.DropDownItems.InsertBefore(LoadedCoreNameMenuItem, insert: RealTimeCounterMenuItem);
 
 			{
@@ -74,13 +64,6 @@ namespace Chimera.Client.GUI
 				}
 			}
 
-#if CHIMERABUILD_SUPERCHIMERA
-			ToolStripMenuItemEx superChimeraThrottleMenuItem = new() { Text = "SUPER·CHIMERA" };
-			superChimeraThrottleMenuItem.Click += (_, _) => Config.SuperChimeraThrottle = !Config.SuperChimeraThrottle;
-			_ = SpeedSkipSubMenu.DropDownItems.InsertBefore(MinimizeSkippingMenuItem, insert: superChimeraThrottleMenuItem);
-			ConfigSubMenu.DropDownOpened += (_, _) => superChimeraThrottleMenuItem.Checked = Config.SuperChimeraThrottle;
-#endif
-
 
 			// Hide Status bar icons and general StatusBar prep
 			MainStatusBar.Padding = new Padding(MainStatusBar.Padding.Left, MainStatusBar.Padding.Top, MainStatusBar.Padding.Left, MainStatusBar.Padding.Bottom); // Workaround to remove extra padding on right
@@ -89,7 +72,7 @@ namespace Chimera.Client.GUI
 
 			AVStatusLabel.Visible = false;
 			SetPauseStatusBarIcon();
-			Tools.UpdateCheatRelatedTools(null, new(null));
+			Tools.UpdateFreezeRelatedTools(null, new(null));
 			RebootStatusBarIcon.Visible = false;
 			_statusBarDiskLightOnImage = Properties.Resources.LightOn;
 			_statusBarDiskLightOffImage = Properties.Resources.LightOff;
@@ -107,19 +90,6 @@ namespace Chimera.Client.GUI
 				// workaround for https://github.com/mono/mono/issues/12644
 				MainFormContextMenu.Items.Insert(0, new ToolStripMenuItemEx { Text = "(Dismiss Menu)" }); // don't even need to attach any behaviour, since clicking anything will dismiss the menu first
 				MainFormContextMenu.Items.Insert(1, new ToolStripSeparatorEx());
-			}
-
-			// open requested ext. tool
-			var requestedExtToolDll = _argParser.openExtToolDll;
-			if (requestedExtToolDll != null)
-			{
-				var found = ExtToolManager.ToolStripItems.Where(static item => item.Enabled)
-					.Select(static item => (ExternalToolManager.MenuItemInfo) item.Tag)
-					.FirstOrNull(info => info.AsmFilename == requestedExtToolDll
-						|| Path.GetFileName(info.AsmFilename) == requestedExtToolDll
-						|| Path.GetFileNameWithoutExtension(info.AsmFilename) == requestedExtToolDll);
-				if (found is not null) found.Value.TryLoad();
-				else Console.WriteLine($"requested ext. tool dll {requestedExtToolDll} could not be loaded");
 			}
 
 		}
@@ -163,25 +133,20 @@ namespace Chimera.Client.GUI
 			AutofireMenuItem.Image = Properties.Resources.Lightning;
 			SaveConfigMenuItem.Image = Properties.Resources.Save;
 			LoadConfigMenuItem.Image = Properties.Resources.LoadConfig;
-			(ToolBoxMenuItem.Image, /*ToolBoxMenuItem.Text*/_) = ToolManager.IconAndNameCache[typeof(ToolBox)]
-				= (/*ToolBox.ToolIcon.ToBitmap()*/Properties.Resources.ToolBox, "Tool Box");
 			(RamWatchMenuItem.Image, /*RamWatchMenuItem.Text*/_) = ToolManager.IconAndNameCache[typeof(RamWatch)]
 				= (/*RamWatch.ToolIcon.ToBitmap()*/Properties.Resources.Watch, "RAM Watch");
 			(RamSearchMenuItem.Image, /*RamSearchMenuItem.Text*/_) = ToolManager.IconAndNameCache[typeof(RamSearch)]
 				= (/*RamSearch.ToolIcon.ToBitmap()*/Properties.Resources.Search, "RAM Search");
 			(LuaConsoleMenuItem.Image, /*LuaConsoleMenuItem.Text*/_) = ToolManager.IconAndNameCache[typeof(LuaConsole)]
 				= (/*LuaConsole.ToolIcon.ToBitmap()*/Properties.Resources.TextDoc, "Lua Console");
-			(TAStudioMenuItem.Image, /*TAStudioMenuItem.Text*/_) = ToolManager.IconAndNameCache[typeof(TAStudio)]
+			ToolManager.IconAndNameCache[typeof(TAStudio)]
 				= (/*TAStudio.ToolIcon.ToBitmap()*/Properties.Resources.TAStudio, "TAStudio");
 			(HexEditorMenuItem.Image, /*HexEditorMenuItem.Text*/_) = ToolManager.IconAndNameCache[typeof(HexEditor)]
 				= (/*HexEditor.ToolIcon.ToBitmap()*/Properties.Resources.Poke, "Hex Editor");
 			ToolManager.IconAndNameCache[typeof(GenericDebugger)]
 				= (/*GenericDebugger.ToolIcon.ToBitmap()*/Properties.Resources.Bug, "Debugger");
-			(CheatsMenuItem.Image, /*CheatsMenuItem.Text*/_) = ToolManager.IconAndNameCache[typeof(Cheats)]
-				= (/*Cheats.ToolIcon.ToBitmap()*/Properties.Resources.Cheat, "Cheats");
 			OnlineHelpMenuItem.Image = Properties.Resources.Help;
 			AboutMenuItem.Image = Properties.Resources.ChimeraSmall;
-			DumpStatusButton.Image = Properties.Resources.Blank;
 			PlayRecordStatusButton.Image = Properties.Resources.Blank;
 			PauseStatusButton.Image = Properties.Resources.Blank;
 			RebootStatusBarIcon.Image = Properties.Resources.Reboot;
@@ -325,14 +290,7 @@ namespace Chimera.Client.GUI
 					: null
 			);
 
-			ExtToolManager = new(
-				Config,
-				() => (Emulator.SystemId, Game.Hash),
-				(toolPath, customFormTypeName, skipExtToolWarning) => Tools!.LoadExternalToolForm(
-					toolPath: toolPath,
-					customFormTypeName: customFormTypeName,
-					skipExtToolWarning: skipExtToolWarning) is not null);
-			Tools = new ToolManager(this, Config, DisplayManager, ExtToolManager, InputManager, Emulator, MovieSession, Game);
+			Tools = new ToolManager(this, Config, DisplayManager, InputManager, Emulator, MovieSession, Game);
 
 			// TODO GL - move these event handlers somewhere less obnoxious line in the On* overrides
 			Load += (o, e) =>
@@ -405,7 +363,6 @@ namespace Chimera.Client.GUI
 					ControllerConfig => AllowInput.All,
 					HotkeyConfig => AllowInput.All,
 					LuaWinform { BlocksInputWhenFocused: false } => AllowInput.All,
-					IExternalToolForm => AllowInput.None,
 					_ => Config.AcceptBackgroundInput ? AllowInput.OnlyController : AllowInput.None,
 				}
 			);
@@ -433,8 +390,8 @@ namespace Chimera.Client.GUI
 
 			Sound.StartSound();
 			InputManager.SyncControls(Emulator, MovieSession, Config);
-			CheatList = new CheatCollection(this, Config.Cheats);
-			CheatList.Changed += Tools.UpdateCheatRelatedTools;
+			CheatList = new CheatCollection(this);
+			CheatList.Changed += Tools.UpdateFreezeRelatedTools;
 			RewireSound();
 
 			if (Config.SaveWindowPosition)
@@ -790,9 +747,6 @@ namespace Chimera.Client.GUI
 				{
 					Tools.LuaConsole.ResumeScripts(false);
 				}
-				// ext. tools don't yield per se, so just send them a GeneralUpdate
-				Tools.GeneralUpdateActiveExtTools();
-
 				StepRunLoop_Core();
 				if (serviceHost) Render();
 				StepRunLoop_Throttle();
@@ -964,8 +918,6 @@ namespace Chimera.Client.GUI
 		private readonly Func<string> _getConfigPath;
 
 		private readonly IGL GL;
-
-		internal readonly ExternalToolManager ExtToolManager;
 
 		private readonly ToolManager Tools;
 
@@ -1341,7 +1293,7 @@ namespace Chimera.Client.GUI
 		{
 			if (CheatList.AnyActive)
 			{
-				CheatStatusButton.ToolTipText = "Cheats are currently active";
+				CheatStatusButton.ToolTipText = "Addresses are currently frozen";
 				CheatStatusButton.Image = Properties.Resources.Cheat;
 				CheatStatusButton.Visible = true;
 			}
@@ -1472,39 +1424,6 @@ namespace Chimera.Client.GUI
 		{
 			Tools.UpdateToolsAfter();
 			HandleToggleLightAndLink();
-		}
-
-		public void UpdateDumpInfo(RomStatus? newStatus = null)
-		{
-			const string DUMP_KIND_BAD = " (bad dump)";
-			const string DUMP_KIND_GOOD = " (good dump)";
-			const string DUMP_KIND_HACK = " (hack/homebrew)";
-			const string DUMP_KIND_UNRECOGNIZED = " (unrecognized)";
-			var kind = string.Empty;
-			var icon = Properties.Resources.Blank;
-			var tooltip = string.Empty;
-			if (!Game.IsNullInstance() && !Emulator.IsNull())
-			{
-				if (newStatus is null) newStatus = Game.Status;
-				else Game.Status = newStatus.Value;
-				(kind, icon, tooltip) = newStatus switch
-				{
-					RomStatus.GoodDump => (DUMP_KIND_GOOD, Properties.Resources.GreenCheck, "Verified good dump"),
-					RomStatus.BadDump => (DUMP_KIND_BAD, Properties.Resources.ExclamationRed, "Warning: Bad ROM Dump"),
-					RomStatus.Homebrew => (DUMP_KIND_HACK, Properties.Resources.HomeBrew, "Homebrew ROM"),
-					RomStatus.TranslatedRom => (DUMP_KIND_HACK, Properties.Resources.Translation, "Translated ROM"),
-					RomStatus.Hack => (DUMP_KIND_HACK, Properties.Resources.Hack, "Hacked ROM"),
-					RomStatus.Overdump => (DUMP_KIND_BAD, Properties.Resources.ExclamationRed, "Warning: Overdump"),
-					RomStatus.NotInDatabase => (DUMP_KIND_UNRECOGNIZED, Properties.Resources.RetroQuestion, "Warning: Unknown ROM"),
-					/*RomStatus.Unknown or RomStatus.Bios*/_ => (DUMP_KIND_UNRECOGNIZED, Properties.Resources.Hack, "Warning: ROM of Unknown Character"),
-				};
-			}
-			DumpStatusButton.Image = icon;
-			DumpStatusButton.ToolTipText = tooltip;
-			DumpStatusReportMenuItem.Enabled = kind.Length is not 0;
-			DumpStatusReportMenuItem.Image = icon;
-			DumpStatusReportMenuItem.Text = string.Format(FMT_STR_DUMP_STATUS_MENUITEM_LABEL, kind);
-			DumpStatusReportMenuItem.ToolTipText = tooltip;
 		}
 
 		// Rom details as decided by MainForm, which shouldn't happen, the RomLoader or Core should be doing this
@@ -1884,42 +1803,6 @@ namespace Chimera.Client.GUI
 			_discoveredCorePackages = CorePackageDiscovery.ScanFor(Config);
 		}
 
-		/// <summary>Rescans the search directories for packages that were not there before.</summary>
-		public void RescanCorePackages()
-		{
-			ScanForCorePackages();
-		}
-
-		/// <summary>Loads a package the user picked out of the Open Core list.</summary>
-		private bool OpenDiscoveredCorePackage(DiscoveredCorePackage package)
-		{
-			if (package.Error is not null)
-			{
-				AddOnScreenMessage($"{package.Name}: {package.Error}", 8);
-				return false;
-			}
-			return LoadCorePackage(package.Path);
-		}
-
-		/// <summary>The core-package rows as the dialog shows them (also the unit under test for that dialog's logic).</summary>
-		public IReadOnlyList<CorePackageListEntry> BuildCorePackageList()
-			=> CorePackageList.Build(_discoveredCorePackages, CoreRegistry.Instance.LoadedPackages, _corePackageLoadFailures);
-
-		/// <summary>
-		/// The window that chooses the machine. Also the only place a package's failure
-		/// to load is visible, which is why it lists what it cannot open as well.
-		/// </summary>
-		private void OpenCoreDialog()
-		{
-			using OpenCoreForm form = new(
-				BuildCorePackageList,
-				RescanCorePackages,
-				AddCorePackageFromDisk,
-				CorePackageDiscovery.SearchPaths(Config),
-				OpenDiscoveredCorePackage);
-			this.ShowDialogAsChild(form);
-		}
-
 		public IReadOnlyList<DiscoveredCorePackage> DiscoveredCorePackages => _discoveredCorePackages;
 
 		public IReadOnlyList<(DiscoveredCorePackage Package, string Error)> CorePackageLoadFailures => _corePackageLoadFailures;
@@ -1955,23 +1838,11 @@ namespace Chimera.Client.GUI
 			}
 		}
 
-		/// <summary>Loads a package from anywhere on disk, for one that is not in a search directory.</summary>
-		private void AddCorePackageFromDisk()
-		{
-			var result = this.ShowFileOpenDialog(
-				filter: CorePackageFSFilterSet,
-				initDir: string.IsNullOrWhiteSpace(Config.LastCorePackagePath)
-					? PathUtils.ExeDirectoryPath
-					: Path.GetDirectoryName(Config.LastCorePackagePath));
-			if (result is null) return;
-			_ = LoadCorePackage(new FileInfo(result).FullName);
-		}
-
 		private void OpenRom()
 		{
 			if (CoreRegistry.Instance.AllFactories.Count is 0)
 			{
-				AddOnScreenMessage("Load a core first (File > Open Core...)");
+				AddOnScreenMessage("There is no core to run this with; start a project first.");
 				return;
 			}
 			var result = this.ShowFileOpenDialog(
@@ -2350,7 +2221,6 @@ namespace Chimera.Client.GUI
 			InitControls(); // rebind hotkeys
 			InputManager.SyncControls(Emulator, MovieSession, Config);
 			Tools.Restart(Config, Emulator, Game);
-			ExtToolManager.Restart(Config);
 			Sound.Config = Config;
 			DisplayManager.UpdateGlobals(Config, Emulator);
 			AddOnScreenMessage($"Config file loaded: {iniPath}");
@@ -2431,11 +2301,7 @@ namespace Chimera.Client.GUI
 
 			_runloopFrameAdvance = frameAdvance;
 
-#if CHIMERABUILD_SUPERCHIMERA
-			if (!EmulatorPaused && (!Config.SuperChimeraThrottle || InputManager.ClientControls.AnyInputHeld))
-#else
 			if (!EmulatorPaused)
-#endif
 			{
 				runFrame = true;
 			}
@@ -3004,7 +2870,7 @@ namespace Chimera.Client.GUI
 
 		private string ChoosePlatformForRom(RomGame rom)
 		{
-			using var platformChooser = new PlatformChooser(Config)
+			using var platformChooser = new PlatformChooser()
 			{
 				RomGame = rom,
 			};
@@ -3172,27 +3038,15 @@ namespace Chimera.Client.GUI
 
 					Tools.Restart(Config, Emulator, Game);
 
-					if (previousRom != CurrentlyOpenRom)
+					// freezes belong to the machine that is running, and a different
+					// machine has different addresses
+					if (previousRom == CurrentlyOpenRom && Emulator.HasMemoryDomains())
 					{
-						CheatList.NewList(Tools.GenerateDefaultCheatFilename());
-						if (Config.Cheats.LoadFileByGame && Emulator.HasMemoryDomains())
-						{
-							if (CheatList.AttemptToLoadCheatFile(Emulator.AsMemoryDomains()))
-							{
-								AddOnScreenMessage("Cheats file loaded");
-							}
-						}
+						CheatList.UpdateDomains(Emulator.AsMemoryDomains());
 					}
 					else
 					{
-						if (Emulator.HasMemoryDomains())
-						{
-							CheatList.UpdateDomains(Emulator.AsMemoryDomains());
-						}
-						else
-						{
-							CheatList.NewList(Tools.GenerateDefaultCheatFilename());
-						}
+						CheatList.Clear();
 					}
 
 					OnRomChanged();
@@ -3200,8 +3054,7 @@ namespace Chimera.Client.GUI
 					DisplayManager.Blank();
 
 					RewireSound();
-					Tools.UpdateCheatRelatedTools(null, new(null));
-					ExtToolManager.BuildToolStrip();
+					Tools.UpdateFreezeRelatedTools(null, new(null));
 
 					RomLoaded?.Invoke(this, EventArgs.Empty);
 
@@ -3218,8 +3071,7 @@ namespace Chimera.Client.GUI
 					Tools.Restart(Config, Emulator, Game);
 					DisplayManager.UpdateGlobals(Config, Emulator);
 					DisplayManager.Blank();
-					ExtToolManager.BuildToolStrip();
-					CheatList.NewList("");
+					CheatList.Clear();
 					OnRomChanged();
 					return false;
 				}
@@ -3247,7 +3099,6 @@ namespace Chimera.Client.GUI
 			UpdateWindowTitle();
 			HandlePlatformMenus();
 			UpdateCoreStatusBarButton();
-			UpdateDumpInfo();
 			SetMainformMovieInfo();
 			WarnAboutNonStandardFirmware();
 		}
@@ -3365,10 +3216,6 @@ namespace Chimera.Client.GUI
 			{
 				return false;
 			}
-			// There is a cheats tool, but cheats can be active while the "cheats tool" is not. And have auto-save option.
-			TryAgainResult cheatSaveResult = this.DoWithTryAgainBox(CheatList.SaveOnClose, "Failed to save cheats.");
-			if (cheatSaveResult == TryAgainResult.Canceled) return false;
-
 			// If TAStudio is open, we already asked about saving the movie.
 			if (!Tools.IsLoaded<TAStudio>())
 			{
@@ -3403,11 +3250,10 @@ namespace Chimera.Client.GUI
 				CloseGame();
 				Tools.Restart(Config, Emulator, Game);
 				DisplayManager.UpdateGlobals(Config, Emulator);
-				ExtToolManager.BuildToolStrip();
 				PauseOnFrame = null;
 				CurrentlyOpenRom = null;
 				CurrentlyOpenRomArgs = null;
-				CheatList.NewList("");
+				CheatList.Clear();
 				OnRomChanged();
 			}
 		}

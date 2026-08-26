@@ -2,20 +2,15 @@ using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
 
-using Chimera.Emulation.Common;
 using Chimera.Client.Common;
+using Chimera.Emulation.Common;
 
 namespace Chimera.Client.GUI
 {
 	public partial class PlatformChooser : Form
 	{
-		private readonly Config _config;
-
-		public PlatformChooser(Config config)
-		{
-			_config = config;
-			InitializeComponent();
-		}
+		public PlatformChooser()
+			=> InitializeComponent();
 
 		public RomGame RomGame { get; set; }
 		public string PlatformChoice { get; set; }
@@ -60,16 +55,7 @@ namespace Chimera.Client.GUI
 		private void OkBtn_Click(object sender, EventArgs e)
 		{
 			PlatformChoice = SelectedRadio != null ? SelectedRadio.Text : "";
-
-			if (AlwaysCheckbox.Checked)
-			{
-				_config.PreferredPlatformsForExtensions[RomGame.Extension.ToLowerInvariant()] = PlatformChoice;
-			}
-
 			Close();
 		}
-
-		private void label4_Click(object sender, EventArgs e)
-			=> AlwaysCheckbox.Checked = !AlwaysCheckbox.Checked;
 	}
 }
