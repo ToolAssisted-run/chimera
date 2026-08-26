@@ -156,7 +156,8 @@ namespace Chimera.Client.GUI
 			var shouldSaveResult = DialogController.DoWithTempMute(() => this.ModalMessageBox3(
 				caption: "Closing with Unsaved Changes",
 				icon: EMsgBoxIcon.Question,
-				text: $"Save {WindowTitleStatic} project?"));
+				// the thing being saved is the PROJECT, whatever window you closed
+				text: "Save Chimera Project?"));
 			if (shouldSaveResult == true)
 			{
 				TryAgainResult saveResult = this.DoWithTryAgainBox(() => SaveTas(), "Failed to save movie.");

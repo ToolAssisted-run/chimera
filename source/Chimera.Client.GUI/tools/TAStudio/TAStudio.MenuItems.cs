@@ -821,7 +821,7 @@ namespace Chimera.Client.GUI
 				Enabled = false,
 				Text = "Change Peripherals...",
 				ToolTipText = "Changing peripherals/players is done in the core's sync settings (if the core supports different peripherals)."
-					+ "\nAs these can't be changed in the middle of a movie, you'll have to close TAStudio, change the settings, and create a new TAStudio project.",
+					+ "\nAs these can't be changed in the middle of a movie, you'll have to close the project, change the settings, and create a new one.",
 			});
 		}
 

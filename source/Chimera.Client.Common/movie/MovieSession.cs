@@ -188,7 +188,7 @@ namespace Chimera.Client.Common
 			{
 				var result = _dialogParent.ModalMessageBox2(
 					caption: "Discard GreenZone?",
-					text: $"The TAStudio project {movie.Filename.MakeRelativeTo(pathEntries.MovieAbsolutePath())} appears to be for a different game than the one that's loaded.\n"
+					text: $"The project {movie.Filename.MakeRelativeTo(pathEntries.MovieAbsolutePath())} appears to be for a different game than the one that's loaded.\n"
 						+ "Choose \"No\" to continue anyway, which may lead to an invalid savestate being loaded.\n"
 						+ "Choose \"Yes\" to discard the GreenZone (savestate history). This is safer, and at worst you'll only need to watch through the whole movie.");
 				//TODO add abort option
