@@ -58,8 +58,48 @@ circled question-mark tooltip explaining what is expected there and in
 what format. The form's content is fully decided, populated and formatted
 by each core; Chimera only provides the interface and the execution. Files
 are hashed as they are added, and order within a category is the swap
-order. Then firmware and sync settings, and on create, TAStudio opens at
-frame 0.
+order. Then the sync settings, and LAST, the firmware - last because everything
+before it has a say: the core itself may need a file regardless of
+anything else, the chosen game files may trigger a need (a Famicom disk
+needs the FDS bios where a cartridge does not; a CD image needs the CD
+bios where a cart does not), and the sync settings may too (a region
+choice selects between region bioses; a font-source choice turns a
+bundled freebie into a real-BIOS requirement). The core dictates that
+logic entirely, as a decision tree in its waterbox.config "firmware"
+declaration; the wizard only renders the result and collects the files.
+On create, TAStudio opens at frame 0.
+
+### The firmware decision tree
+
+A firmware entry in waterbox.config may carry "requiredWhen", a
+condition over the slot map and the EFFECTIVE (defaults-overlaid)
+settings:
+
+```json
+{ "id": "bios_cd_us", "display": "Sega CD BIOS (US)",
+  "requiredWhen": { "all": [
+    { "slot": "cd" },
+    { "setting": "region", "is": "us" }
+  ] } }
+```
+
+- `{"slot": id}`: the slot holds at least one file;
+  `{"slot": id, "extension": "cue"}`: ...a file with that extension.
+- `{"setting": name, "is": v}`: the setting has that value (compared by
+  its declared type); `{"setting": name, "in": [v...]}`: one of those.
+- `{"all": [...]}`, `{"any": [...]}`, `{"not": {...}}` combine freely.
+- A conditional entry is required when its condition holds and absent
+  otherwise; an entry without a condition keeps its legacy "required"
+  flag (false = shown as optional). A malformed condition evaluates
+  false - a core that misdeclares asks for nothing, never for
+  everything.
+
+The engine evaluates (ce_firmware_evaluate), everywhere the question is
+asked: the wizard's last page, and the core factory at load time - a
+required file the user never provided stops the load with its name.
+The project records the provided files as pins ("firmware": [{"id",
+"sha1"}]), actual hashes as always; the frontend remembers paths
+per-user in its config, never in the project.
 
 The declaration lives in a static file generated at core build time and
 shipped in the core package - the same pattern as `waterbox.config` for

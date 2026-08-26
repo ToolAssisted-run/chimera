@@ -278,6 +278,26 @@ CE_API int32_t ce_firmware_state(
  * buffer, invalidated by the next call. */
 CE_API const char *ce_firmware_record_line(const char *pairs, uint64_t *len_out);
 
+/* The firmware decision tree (docs/project.md): which of a core's declared
+ * firmware files the project's decisions call for. decl_json is the
+ * package's "firmware" array, where an entry may carry "requiredWhen" - a
+ * condition over the slot map and the EFFECTIVE settings:
+ *   {"slot": id}                    the slot holds at least one file
+ *   {"slot": id, "extension": e}    ...a file with that extension
+ *   {"setting": name, "is": v}      the setting has that value
+ *   {"setting": name, "in": [v..]}  ...one of those values
+ *   {"all": [c..]} {"any": [c..]} {"not": c}
+ * A conditional entry is required when its condition holds and absent
+ * otherwise; an unconditional one keeps its "required" flag (false =
+ * optional). Malformed conditions evaluate false. Returns a JSON array
+ * [{"id":..,"state":"required"|"optional"}] in declaration order
+ * (thread-local; invalidated by the next call). */
+CE_API const char *ce_firmware_evaluate(
+	const char *decl_json, uint64_t decl_len,
+	const char *slots_json, uint64_t slots_len,
+	const char *settings_json, uint64_t settings_len,
+	uint64_t *len_out);
+
 /* ---- multi-file games ----
  *
  * A .chimeraMultiFile descriptor names the files a game is made of: bare

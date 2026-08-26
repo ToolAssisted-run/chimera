@@ -8,6 +8,7 @@ using System.Windows.Forms;
 
 using Chimera.Client.Common;
 using Chimera.Emulation.Common.Engine;
+using Chimera.Emulation.Common;
 using Chimera.Emulation.Common.Waterbox;
 
 namespace Chimera.Client.GUI
@@ -28,7 +29,7 @@ namespace Chimera.Client.GUI
 		private readonly Func<string?> _pickSavePath;
 		private readonly Func<ProjectSlotDeclaration.Slot, string[]> _pickFiles;
 
-		private readonly Panel[] _pages = new Panel[3];
+		private readonly Panel[] _pages = new Panel[4];
 		private int _page;
 
 		// page 1
@@ -47,6 +48,16 @@ namespace Chimera.Client.GUI
 		// page 3
 		private readonly PropertyGrid _settingsGrid;
 		private WaterboxCoreSyncSettings? _syncSettings;
+		private WaterboxConfig? _cfg;
+
+		// page 4, computed from every earlier decision (docs/project.md)
+		private readonly Func<string, string?> _pickFirmwareFile;
+		private readonly ListView _firmwareList;
+		private readonly Button _firmwareSetButton;
+		private readonly Button _firmwareClearButton;
+		private List<(string Id, bool Required)> _firmwareNeeded = new();
+		private readonly Dictionary<string, string> _firmwarePaths = new();
+		private readonly Dictionary<string, string> _firmwareHashes = new();
 
 		private readonly Button _backButton;
 		private readonly Button _nextButton;
@@ -55,13 +66,18 @@ namespace Chimera.Client.GUI
 		/// <summary>set when Create succeeded: the path of the written project</summary>
 		public string? CreatedProjectPath { get; private set; }
 
+		/// <summary>the chosen core's name, for the owner's firmware bookkeeping</summary>
+		public string? ChosenCoreName => ChosenCore?.Name;
+
 		protected override string WindowTitleStatic => "New Chimera Project";
 
 		public NewProjectWizard(
 			IReadOnlyList<DiscoveredCorePackage> cores,
 			Func<string?> pickSavePath,
-			Func<ProjectSlotDeclaration.Slot, string[]> pickFiles)
+			Func<ProjectSlotDeclaration.Slot, string[]> pickFiles,
+			Func<string, string?>? pickFirmwareFile = null)
 		{
+			_pickFirmwareFile = pickFirmwareFile ?? (static _ => null);
 			_cores = cores.Where(static c => c.Error is null).ToList();
 			_pickSavePath = pickSavePath;
 			_pickFiles = pickFiles;
@@ -143,6 +159,30 @@ namespace Chimera.Client.GUI
 			};
 			p3.Controls.Add(_settingsGrid);
 
+			// ---- page 4: firmware, decided by everything chosen above ------------
+			var p4 = _pages[3];
+			p4.Controls.Add(MakeLabel("The firmware these decisions call for - the core, the files and the settings\nall have a say (the core declares the logic; this page only renders it).", 8, 8));
+			_firmwareList = new ListView
+			{
+				Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
+				FullRowSelect = true,
+				HideSelection = false,
+				Location = Pt(8, 48),
+				MultiSelect = false,
+				Size = new(UIHelper.ScaleX(544), UIHelper.ScaleY(290)),
+				View = View.Details,
+			};
+			_firmwareList.Columns.Add("Firmware", UIHelper.ScaleX(190));
+			_firmwareList.Columns.Add("Needed", UIHelper.ScaleX(70));
+			_firmwareList.Columns.Add("Status", UIHelper.ScaleX(270));
+			_firmwareList.SelectedIndexChanged += (_, _) => UpdateFirmwareButtons();
+			_firmwareList.DoubleClick += (_, _) => SetFirmwareFile();
+			_firmwareSetButton = new Button { AutoSize = true, Location = Pt(8, 344), Text = "Set File..." };
+			_firmwareSetButton.Click += (_, _) => SetFirmwareFile();
+			_firmwareClearButton = new Button { AutoSize = true, Location = Pt(90, 344), Text = "Clear" };
+			_firmwareClearButton.Click += (_, _) => ClearFirmwareFile();
+			p4.Controls.AddRange([ _firmwareList, _firmwareSetButton, _firmwareClearButton ]);
+
 			// ---- chrome ----------------------------------------------------------
 			_status = new Label
 			{
@@ -209,7 +249,13 @@ namespace Chimera.Client.GUI
 					if (!BuildSettingsPage()) return;
 					ShowPage(2);
 					break;
+				case 2:
+					BuildFirmwarePage();
+					ShowPage(3);
+					break;
 				default:
+					var missing = MissingRequiredFirmware();
+					if (missing is not null) { _status.Text = $"{missing} is required and not provided"; return; }
 					Create();
 					break;
 			}
@@ -358,6 +404,7 @@ namespace Chimera.Client.GUI
 			{
 				using var pkg = EnginePackage.Open(core.Path);
 				var cfg = WaterboxConfig.FromJson(pkg?.EntryText(WaterboxCoreFactory.ConfigFileName) ?? "");
+				_cfg = cfg;
 				var declarations = (cfg?.Settings ?? [ ]).Where(static d => d.Sync).ToList();
 				_syncSettings = new WaterboxCoreSyncSettings { Declarations = declarations };
 				_settingsGrid.SelectedObject = _syncSettings;
@@ -369,6 +416,153 @@ namespace Chimera.Client.GUI
 				return false;
 			}
 		}
+
+		/// <summary>Renders given firmware needs directly - the test and screenshot door.</summary>
+		internal void UseFirmwareNeeds(WaterboxConfig cfg, IReadOnlyList<(string Id, bool Required)> needed)
+		{
+			_cfg = cfg;
+			_firmwareNeeded = needed.ToList();
+			RenderFirmwareRows();
+			ShowPage(3);
+		}
+
+		// ---- firmware: the last word, decided by everything before it ------------
+
+		/// <summary>The slot map exactly as the session will mount it, from the form's current picks.</summary>
+		private string CurrentSlotsJson()
+		{
+			Newtonsoft.Json.Linq.JObject slots = new();
+			if (_declaration is null) return slots.ToString(Newtonsoft.Json.Formatting.None);
+			foreach (var slot in _declaration.Slots)
+			{
+				if (!_slotLists.TryGetValue(slot.Id, out var list) || list.Items.Count is 0) continue;
+				Newtonsoft.Json.Linq.JArray names = new();
+				foreach (var file in list.Items.OfType<PickedFile>()) names.Add(file.Name);
+				slots[slot.Id] = names;
+			}
+			return slots.ToString(Newtonsoft.Json.Formatting.None);
+		}
+
+		private void BuildFirmwarePage()
+		{
+			var effective = WaterboxCore.EffectiveSettingsFor(
+				_cfg ?? new WaterboxConfig(), null, _syncSettings);
+			_firmwareNeeded = Chimera.Emulation.Common.Engine.EngineFirmware.Evaluate(
+					_cfg?.RawFirmwareJson ?? "[]",
+					CurrentSlotsJson(),
+					Newtonsoft.Json.JsonConvert.SerializeObject(effective))
+				.ToList();
+			RenderFirmwareRows();
+		}
+
+		private CoreFirmwareDecl? DeclFor(string id)
+			=> (_cfg?.Firmware ?? [ ]).FirstOrDefault(d => d.Id == id);
+
+		private void RenderFirmwareRows()
+		{
+			var selected = _firmwareList.SelectedIndices.Count is 0 ? -1 : _firmwareList.SelectedIndices[0];
+			_firmwareList.BeginUpdate();
+			_firmwareList.Items.Clear();
+			foreach (var (id, required) in _firmwareNeeded)
+			{
+				var decl = DeclFor(id);
+				ListViewItem item = new(decl?.DisplayName ?? id);
+				item.SubItems.Add(required ? "required" : "optional");
+				item.SubItems.Add(FirmwareStatusText(id, decl));
+				if (required && !_firmwarePaths.ContainsKey(id)) item.ForeColor = System.Drawing.Color.Firebrick;
+				_firmwareList.Items.Add(item);
+			}
+			if (_firmwareNeeded.Count is 0)
+			{
+				_firmwareList.Items.Add(new ListViewItem("(these decisions need no firmware)"));
+			}
+			if (selected >= 0 && selected < _firmwareList.Items.Count) _firmwareList.Items[selected].Selected = true;
+			_firmwareList.EndUpdate();
+			UpdateFirmwareButtons();
+		}
+
+		private string FirmwareStatusText(string id, CoreFirmwareDecl? decl)
+		{
+			if (!_firmwarePaths.TryGetValue(id, out var path)) return "not provided";
+			if (!_firmwareHashes.TryGetValue(id, out var sha1)) return "not provided";
+			var verdict = Chimera.Emulation.Common.Engine.EngineFirmware.Classify(
+				decl?.Size ?? 0, decl?.Sha1 ?? [ ], new System.IO.FileInfo(path).Length, sha1);
+			return verdict switch
+			{
+				Chimera.Emulation.Common.Engine.EngineFirmware.Verdict.Good => $"ok ({System.IO.Path.GetFileName(path)})",
+				Chimera.Emulation.Common.Engine.EngineFirmware.Verdict.Unrecognised => $"unrecognised dump, used anyway ({System.IO.Path.GetFileName(path)})",
+				_ => $"WRONG SIZE, refused ({System.IO.Path.GetFileName(path)})",
+			};
+		}
+
+		private void UpdateFirmwareButtons()
+		{
+			var index = _firmwareList.SelectedIndices.Count is 0 ? -1 : _firmwareList.SelectedIndices[0];
+			var valid = index >= 0 && index < _firmwareNeeded.Count;
+			_firmwareSetButton.Enabled = valid;
+			_firmwareClearButton.Enabled = valid && _firmwarePaths.ContainsKey(_firmwareNeeded[index].Id);
+		}
+
+		private void SetFirmwareFile()
+		{
+			var index = _firmwareList.SelectedIndices.Count is 0 ? -1 : _firmwareList.SelectedIndices[0];
+			if (index < 0 || index >= _firmwareNeeded.Count) return;
+			var id = _firmwareNeeded[index].Id;
+			var decl = DeclFor(id);
+			var path = _pickFirmwareFile($"Locate {decl?.DisplayName ?? id}");
+			if (path is null) return;
+			ProvideFirmware(id, path);
+		}
+
+		/// <summary>Points one firmware id at a file; public in behaviour so tests can drive it.</summary>
+		public void ProvideFirmware(string id, string path)
+		{
+			try
+			{
+				var bytes = System.IO.File.ReadAllBytes(path);
+				var decl = DeclFor(id);
+				var sha1 = Chimera.Emulation.Common.Engine.ChimeraEngine.Sha1Hex(bytes);
+				if (Chimera.Emulation.Common.Engine.EngineFirmware.Classify(
+						decl?.Size ?? 0, decl?.Sha1 ?? [ ], bytes.LongLength, sha1)
+					is Chimera.Emulation.Common.Engine.EngineFirmware.Verdict.WrongSize)
+				{
+					_status.Text = $"{System.IO.Path.GetFileName(path)} is the wrong size for {decl?.DisplayName ?? id}";
+					return;
+				}
+				_firmwarePaths[id] = path;
+				_firmwareHashes[id] = sha1;
+			}
+			catch (System.IO.IOException ex)
+			{
+				_status.Text = ex.Message;
+				return;
+			}
+			RenderFirmwareRows();
+		}
+
+		private void ClearFirmwareFile()
+		{
+			var index = _firmwareList.SelectedIndices.Count is 0 ? -1 : _firmwareList.SelectedIndices[0];
+			if (index < 0 || index >= _firmwareNeeded.Count) return;
+			_firmwarePaths.Remove(_firmwareNeeded[index].Id);
+			_firmwareHashes.Remove(_firmwareNeeded[index].Id);
+			RenderFirmwareRows();
+		}
+
+		private string? MissingRequiredFirmware()
+		{
+			foreach (var (id, required) in _firmwareNeeded)
+			{
+				if (required && !_firmwarePaths.ContainsKey(id)) return DeclFor(id)?.DisplayName ?? id;
+			}
+			return null;
+		}
+
+		/// <summary>What the user provided, for the owner to remember paths per core (Config.CoreFirmware).</summary>
+		public IReadOnlyDictionary<string, string> ProvidedFirmwarePaths => _firmwarePaths;
+
+		/// <summary>The evaluated needs, for tests.</summary>
+		public IReadOnlyList<(string Id, bool Required)> FirmwareNeeded => _firmwareNeeded;
 
 		// ---- creation -------------------------------------------------------------
 
@@ -400,6 +594,17 @@ namespace Chimera.Client.GUI
 			if (_syncSettings?.Values is { Count: not 0 } values)
 			{
 				project.SetSettingsJson(Newtonsoft.Json.JsonConvert.SerializeObject(values));
+			}
+
+			if (_firmwareHashes.Count is not 0)
+			{
+				Newtonsoft.Json.Linq.JArray pins = new();
+				foreach (var (id, _) in _firmwareNeeded)
+				{
+					if (!_firmwareHashes.TryGetValue(id, out var sha1)) continue;
+					pins.Add(new Newtonsoft.Json.Linq.JObject { ["id"] = id, ["sha1"] = sha1 });
+				}
+				project.SetFirmwareJson(pins.ToString(Newtonsoft.Json.Formatting.None));
 			}
 
 			string? declarationJson = null;

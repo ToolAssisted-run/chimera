@@ -72,8 +72,25 @@ namespace Chimera.Client.GUI
 							: "All files (*.*)|*.*",
 					};
 					return dialog.ShowDialog(this) is DialogResult.OK ? dialog.FileNames : [ ];
+				},
+				pickFirmwareFile: title =>
+				{
+					using OpenFileDialog dialog = new() { Title = title };
+					return dialog.ShowDialog(this) is DialogResult.OK ? dialog.FileName : null;
 				});
-			return wizard.ShowDialog(this) is DialogResult.OK ? wizard.CreatedProjectPath : null;
+			if (wizard.ShowDialog(this) is not DialogResult.OK) return null;
+
+			// remember where the firmware lives, keyed the way the resolver reads
+			// it back at load (Config.CoreFirmware)
+			var coreName = wizard.ChosenCoreName;
+			if (coreName is not null)
+			{
+				foreach (var (id, path) in wizard.ProvidedFirmwarePaths)
+				{
+					Config.CoreFirmware[CoreFirmwareStore.KeyFor(coreName, id)] = path;
+				}
+			}
+			return wizard.CreatedProjectPath;
 		}
 
 		private string PickProjectToOpen()

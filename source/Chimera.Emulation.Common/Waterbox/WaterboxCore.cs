@@ -126,6 +126,23 @@ namespace Chimera.Emulation.Common.Waterbox
 			return effective;
 		}
 
+		/// <summary>
+		/// The same merge, callable before a core exists - the firmware decision
+		/// tree evaluates against EFFECTIVE settings, and the factory (and the
+		/// wizard) need them without booting anything.
+		/// </summary>
+		public static Dictionary<string, object> EffectiveSettingsFor(
+			WaterboxConfig cfg, WaterboxCoreSettings settings, WaterboxCoreSyncSettings syncSettings)
+		{
+			var decls = cfg.Settings ?? (IReadOnlyList<WaterboxConfig.SettingDecl>) [ ];
+			var effective = new Dictionary<string, object>();
+			foreach (var decl in decls) effective[decl.Name] = decl.DefaultValue;
+			foreach (var kv in settings?.Values ?? new())
+				if (effective.ContainsKey(kv.Key) || decls.All(d => d.Name != kv.Key)) effective[kv.Key] = kv.Value;
+			foreach (var kv in syncSettings?.Values ?? new()) effective[kv.Key] = kv.Value;
+			return effective;
+		}
+
 		private IReadOnlyList<WaterboxConfig.SettingDecl> Decls
 			=> _cfg.Settings ?? [ ];
 

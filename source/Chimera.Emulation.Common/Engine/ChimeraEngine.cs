@@ -200,6 +200,13 @@ namespace Chimera.Emulation.Common.Engine
 		public abstract IntPtr ce_firmware_record_line(string pairs, ref ulong lenOut);
 
 		[BizImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_firmware_evaluate(
+			byte[] declJson, ulong declLen,
+			byte[] slotsJson, ulong slotsLen,
+			byte[] settingsJson, ulong settingsLen,
+			ref ulong lenOut);
+
+		[BizImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_package_open(string path, ref IntPtr errorOut);
 
 		[BizImport(CallingConvention.Cdecl)]
@@ -1511,6 +1518,35 @@ namespace Chimera.Emulation.Common.Engine
 			var packed = string.Join("\n", System.Linq.Enumerable.Select(pairs, static p => $"{p.Id}={p.Sha1}"));
 			var result = ChimeraEngine.Instance.ce_firmware_record_line(packed, ref len);
 			return ChimeraEngine.PtrToStringUtf8(result, len);
+		}
+
+		/// <summary>
+		/// The firmware decision tree (docs/project.md): which declared files
+		/// the project's decisions call for, and whether each is required or
+		/// optional. Takes the package's raw "firmware" array, the slot map,
+		/// and the EFFECTIVE (defaults-overlaid) settings.
+		/// </summary>
+		public static System.Collections.Generic.IReadOnlyList<(string Id, bool Required)> Evaluate(
+			string declJson, string slotsJson, string settingsJson)
+		{
+			var decl = Encoding.UTF8.GetBytes(declJson ?? "[]");
+			var slots = Encoding.UTF8.GetBytes(slotsJson ?? "{}");
+			var settings = Encoding.UTF8.GetBytes(settingsJson ?? "{}");
+			ulong len = 0;
+			var result = ChimeraEngine.Instance.ce_firmware_evaluate(
+				decl, (ulong)decl.LongLength,
+				slots, (ulong)slots.LongLength,
+				settings, (ulong)settings.LongLength,
+				ref len);
+			var text = ChimeraEngine.PtrToStringUtf8(result, len);
+			System.Collections.Generic.List<(string, bool)> outList = new();
+			foreach (var item in Newtonsoft.Json.Linq.JArray.Parse(text))
+			{
+				var id = item.Value<string>("id");
+				if (id is null) continue;
+				outList.Add((id, item.Value<string>("state") is "required"));
+			}
+			return outList;
 		}
 	}
 

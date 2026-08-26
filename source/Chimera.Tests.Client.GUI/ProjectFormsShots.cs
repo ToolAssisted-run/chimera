@@ -4,7 +4,9 @@ using System.Windows.Forms;
 
 using Chimera.Client.Common;
 using Chimera.Client.GUI;
+using Chimera.Emulation.Common;
 using Chimera.Emulation.Common.Engine;
+using Chimera.Emulation.Common.Waterbox;
 using Chimera.Emulation.Common.Waterbox;
 
 namespace Chimera.Tests.Client.GUI
@@ -103,6 +105,40 @@ namespace Chimera.Tests.Client.GUI
 				new WaterboxConfig.SettingDecl { Name = "mouseSensitivity", Display = "Mouse Sensitivity", Type = "float", Default = 3.0, Description = "Multiplier on relative mouse movement.", Sync = true },
 			]);
 			Shoot(form, "wizard-3-settings");
+		}
+
+		[TestMethod]
+		public void WizardFirmwareStep()
+		{
+			if (ShotDir is null) { Assert.Inconclusive("set CHIMERA_UI_SHOTS to write screenshots"); return; }
+			var dir = Path.Combine(Path.GetTempPath(), $"chimera-shot-fw-{System.Diagnostics.Process.GetCurrentProcess().Id}");
+			Directory.CreateDirectory(dir);
+			try
+			{
+				File.WriteAllBytes(Path.Combine(dir, "bios_cd_us.bin"), new byte[16]);
+				using var form = MakeWizard();
+				var cfg = new WaterboxConfig
+				{
+					Firmware =
+					[
+						new() { Id = "bios_cd_us", Display = "Sega CD BIOS (US)", Size = 16 },
+						new() { Id = "disksys.rom", Display = "Famicom Disk System BIOS", Size = 8192 },
+						new() { Id = "ltn0.pgf", Display = "System Font ltn0 (Latin sans-serif regular)" },
+					],
+				};
+				form.UseFirmwareNeeds(cfg,
+				[
+					("bios_cd_us", true),
+					("disksys.rom", true),
+					("ltn0.pgf", false),
+				]);
+				form.ProvideFirmware("bios_cd_us", Path.Combine(dir, "bios_cd_us.bin"));
+				Shoot(form, "wizard-4-firmware");
+			}
+			finally
+			{
+				Directory.Delete(dir, recursive: true);
+			}
 		}
 
 		private static NewProjectWizard MakeWizard()

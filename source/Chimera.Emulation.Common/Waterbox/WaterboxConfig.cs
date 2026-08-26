@@ -243,7 +243,30 @@ namespace Chimera.Emulation.Common.Waterbox
 			public string InputWasRead { get; set; }
 		}
 
+		/// <summary>
+		/// The "firmware" array exactly as the package wrote it, for the engine's
+		/// decision tree (ce_firmware_evaluate) - conditions and all, no round
+		/// trip through the typed declarations.
+		/// </summary>
+		[JsonIgnore]
+		public string RawFirmwareJson { get; private set; } = "[]";
+
 		public static WaterboxConfig FromJson(string json)
-			=> JsonConvert.DeserializeObject<WaterboxConfig>(json);
+		{
+			var cfg = JsonConvert.DeserializeObject<WaterboxConfig>(json);
+			if (cfg is not null)
+			{
+				try
+				{
+					var fw = Newtonsoft.Json.Linq.JObject.Parse(json)["firmware"];
+					if (fw is Newtonsoft.Json.Linq.JArray arr) cfg.RawFirmwareJson = arr.ToString(Formatting.None);
+				}
+				catch (JsonException)
+				{
+					// the typed parse above already decided the config is usable
+				}
+			}
+			return cfg;
+		}
 	}
 }

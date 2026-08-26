@@ -66,19 +66,41 @@ namespace Chimera.Emulation.Common.Waterbox
 		}
 
 		/// <summary>
-		/// Collects the files the user provided for this core's declarations. A missing
-		/// required file stops the load here, before the sandbox is built, so what the
-		/// user sees names the file rather than "Init failed".
+		/// Collects the files the user provided for this core's declarations,
+		/// asking only for what the DECISIONS call for: the engine's firmware
+		/// decision tree evaluates the declaration against the slot map and the
+		/// effective settings (docs/project.md). A missing required file stops
+		/// the load here, before the sandbox is built, so what the user sees
+		/// names the file rather than "Init failed".
 		/// </summary>
 		private Dictionary<string, byte[]> ResolveFirmware(CoreCreationContext ctx)
 		{
-			Dictionary<string, byte[]> resolved = new();
-			foreach (var decl in Firmware)
+			var slotsJson = "{}";
+			if (ctx.ExtraFiles is not null)
 			{
+				foreach (var extra in ctx.ExtraFiles)
+				{
+					if (extra.Key is "slots")
+					{
+						slotsJson = System.Text.Encoding.UTF8.GetString(extra.Value);
+						break;
+					}
+				}
+			}
+			var effective = WaterboxCore.EffectiveSettingsFor(
+				_cfg, ctx.Settings as WaterboxCoreSettings, ctx.SyncSettings as WaterboxCoreSyncSettings);
+			var applicable = Engine.EngineFirmware.Evaluate(
+				_cfg.RawFirmwareJson, slotsJson, Newtonsoft.Json.JsonConvert.SerializeObject(effective));
+
+			Dictionary<string, byte[]> resolved = new();
+			foreach (var (id, required) in applicable)
+			{
+				var decl = Firmware.FirstOrDefault(d => d.Id == id);
+				if (decl is null) continue;
 				var bytes = ctx.FirmwareProvider?.Invoke(decl);
 				if (bytes is null)
 				{
-					if (decl.Required)
+					if (required)
 					{
 						throw new MissingFirmwareException(
 							$"{CoreName} needs firmware that has not been provided: {decl.DisplayName}."
