@@ -55,28 +55,11 @@ namespace Chimera.Tests.Client.GUI
 			""";
 
 		[TestMethod]
-		public void StartScreen()
-		{
-			if (ShotDir is null) { Assert.Inconclusive("set CHIMERA_UI_SHOTS to write screenshots"); return; }
-			using StartScreenForm form = new(
-				[
-					"/home/you/tas/alleycat/alleycat.chimeraProject",
-					"/home/you/tas/keen4/keen4-any.chimeraProject",
-					"/home/you/tas/gone/moved-away.chimeraProject",
-				],
-				newProject: static () => null,
-				openProject: static () => null);
-			form.StartPosition = FormStartPosition.Manual;
-			form.Location = new(0, 0);
-			Shoot(form, "start-screen");
-		}
-
-		[TestMethod]
-		public void WizardIdentityStep()
+		public void WizardCoreStep()
 		{
 			if (ShotDir is null) { Assert.Inconclusive("set CHIMERA_UI_SHOTS to write screenshots"); return; }
 			using var form = MakeWizard();
-			Shoot(form, "wizard-1-identity");
+			Shoot(form, "wizard-1-core");
 		}
 
 		[TestMethod]
@@ -206,7 +189,7 @@ namespace Chimera.Tests.Client.GUI
 					Version = "0eebbf6d4e5f",
 				},
 			];
-			NewProjectWizard form = new(cores, static () => null, static _ => [ ]);
+			NewProjectWizard form = new(cores, static _ => [ ]);
 			form.StartPosition = FormStartPosition.Manual;
 			form.Location = new(0, 0);
 			form.Show();

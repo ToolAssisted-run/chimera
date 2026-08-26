@@ -10,6 +10,18 @@ namespace Chimera.Client.Common
 		public static string TasMovieExtension => TasMovie.Extension;
 
 		/// <summary>
+		/// The name a project carries before it has one of its own. A movie
+		/// filed under this is UNWRITTEN: saving it asks where it goes instead
+		/// of writing here, which is what lets a new project start with no
+		/// question about files at all.
+		/// </summary>
+		public const string UnsavedProjectName = "default";
+
+		/// <summary>The unwritten project's stand-in path, under the movies directory.</summary>
+		public static string UnsavedProjectPath(PathEntryCollection paths)
+			=> System.IO.Path.Combine(paths.MovieAbsolutePath(), $"{UnsavedProjectName}.{TasMovie.Extension}");
+
+		/// <summary>
 		/// Gets a list of extensions for all <see cref="IMovie"/> implementations
 		/// </summary>
 		public static IEnumerable<string> MovieExtensions => new[] { TasMovie.Extension };

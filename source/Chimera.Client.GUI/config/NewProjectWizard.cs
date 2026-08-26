@@ -16,28 +16,27 @@ namespace Chimera.Client.GUI
 {
 	/// <summary>
 	/// Where a chimera project is born: everything defined at once, up front
-	/// (docs/project.md). Step one names the project and picks the core; step
-	/// two is the core-informed file form - the slots, cardinalities, formats
-	/// and tooltips all come from the chosen package's file_slots.json, this
-	/// window only renders and enforces; step three is the settings. On
-	/// Create, every file is hashed where it stands, the manifest is validated
-	/// by the engine against the core's own declaration, and the project file
-	/// is written.
+	/// (docs/project.md). Step one is the core and nothing else - the first
+	/// question is which machine, because every question after it belongs to
+	/// that machine. Step two is the core-informed file form - the slots,
+	/// cardinalities, formats and tooltips all come from the chosen package's
+	/// file_slots.json, this window only renders and enforces; step three is
+	/// the settings; step four the firmware those choices call for. On Create,
+	/// every file is hashed where it stands and the manifest is validated by
+	/// the engine against the core's own declaration - and the project stays
+	/// IN MEMORY. Nothing is written until the work is saved, so starting a
+	/// project costs no decision about where a file goes.
 	/// </summary>
 	public sealed class NewProjectWizard : FormBase
 	{
 		private readonly IReadOnlyList<DiscoveredCorePackage> _cores;
-		private readonly Func<string?> _pickSavePath;
 		private readonly Func<ProjectSlotDeclaration.Slot, string[]> _pickFiles;
 
 		private readonly Panel[] _pages = new Panel[4];
 		private int _page;
 
 		// page 1
-		private readonly TextBox _projectPath;
-		private readonly TextBox _title;
 		private readonly ComboBox _core;
-		private readonly TextBox _description;
 
 		// page 2, rebuilt when the chosen core changes
 		private readonly Panel _slotsHost;
@@ -79,8 +78,12 @@ namespace Chimera.Client.GUI
 		private readonly Button _nextButton;
 		private readonly Label _status;
 
-		/// <summary>set when Create succeeded: the path of the written project</summary>
-		public string? CreatedProjectPath { get; private set; }
+		/// <summary>
+		/// Set when Create succeeded: the project, in memory and unwritten. The
+		/// caller owns it from that moment (it boots the machine from it, and
+		/// disposes it when the next project replaces it).
+		/// </summary>
+		public EngineProject? CreatedProject { get; private set; }
 
 		/// <summary>the chosen core's name, for the owner's firmware bookkeeping</summary>
 		public string? ChosenCoreName => ChosenCore?.Name;
@@ -89,7 +92,6 @@ namespace Chimera.Client.GUI
 
 		public NewProjectWizard(
 			IReadOnlyList<DiscoveredCorePackage> cores,
-			Func<string?> pickSavePath,
 			Func<ProjectSlotDeclaration.Slot, string[]> pickFiles,
 			Func<string, string?>? pickFirmwareFile = null,
 			IReadOnlyList<string>? firmwareSearchDirs = null,
@@ -99,7 +101,6 @@ namespace Chimera.Client.GUI
 			_firmwareSearchDirs = firmwareSearchDirs ?? [ ];
 			_rememberedFirmwarePath = rememberedFirmwarePath ?? (static (_, _) => null);
 			_cores = cores.Where(static c => c.Error is null).ToList();
-			_pickSavePath = pickSavePath;
 			_pickFiles = pickFiles;
 
 			SuspendLayout();
@@ -120,39 +121,17 @@ namespace Chimera.Client.GUI
 				Controls.Add(_pages[i]);
 			}
 
-			// ---- page 1: identity ------------------------------------------------
+			// ---- page 1: the machine ---------------------------------------------
 			var p1 = _pages[0];
-			p1.Controls.Add(MakeLabel("A project holds everything the work needs: the core, the files, the settings,\nand the TAS itself. Everything is defined here, once.", 8, 8));
-			p1.Controls.Add(MakeLabel("Project file:", 8, 56));
-			_projectPath = new TextBox { Location = Pt(110, 52), Width = UIHelper.ScaleX(360) };
-			Button browse = new() { Text = "Browse...", Location = Pt(476, 50), AutoSize = true };
-			browse.Click += (_, _) =>
-			{
-				var chosen = _pickSavePath();
-				if (chosen is not null) _projectPath.Text = chosen;
-			};
-			p1.Controls.Add(_projectPath);
-			p1.Controls.Add(browse);
-			p1.Controls.Add(MakeLabel("Title:", 8, 88));
-			_title = new TextBox { Location = Pt(110, 84), Width = UIHelper.ScaleX(360) };
-			p1.Controls.Add(_title);
-			p1.Controls.Add(MakeLabel("Emulation core:", 8, 120));
-			_core = new ComboBox { Location = Pt(110, 116), Width = UIHelper.ScaleX(360), DropDownStyle = ComboBoxStyle.DropDownList };
+			p1.Controls.Add(MakeLabel("A project holds everything the work needs: the core, the files, the settings,\nand the TAS itself. Everything is defined here, once.\n\nStart with the machine - every question after this one belongs to it.", 8, 8));
+			p1.Controls.Add(MakeLabel("Emulation core:", 8, 104));
+			_core = new ComboBox { Location = Pt(110, 100), Width = UIHelper.ScaleX(360), DropDownStyle = ComboBoxStyle.DropDownList };
 			foreach (var core in _cores)
 			{
 				_core.Items.Add($"{core.Name}  ({string.Join(", ", core.Systems)}{(string.IsNullOrEmpty(core.Version) ? "" : $", {core.Version}")})");
 			}
 			if (_core.Items.Count is not 0) _core.SelectedIndex = 0;
 			p1.Controls.Add(_core);
-			p1.Controls.Add(MakeLabel("Description:", 8, 152));
-			_description = new TextBox
-			{
-				Location = Pt(110, 148),
-				Size = new(UIHelper.ScaleX(360), UIHelper.ScaleY(180)),
-				Multiline = true,
-				ScrollBars = ScrollBars.Vertical,
-			};
-			p1.Controls.Add(_description);
 
 			// ---- page 2: the core-informed file form -----------------------------
 			var p2 = _pages[1];
@@ -268,8 +247,6 @@ namespace Chimera.Client.GUI
 			switch (_page)
 			{
 				case 0:
-					if (string.IsNullOrWhiteSpace(_projectPath.Text)) { _status.Text = "pick where the project file goes"; return; }
-					if (string.IsNullOrWhiteSpace(_title.Text)) { _status.Text = "give the project a title"; return; }
 					if (ChosenCore is null) { _status.Text = "pick a core (none are installed?)"; return; }
 					if (!BuildSlotForm()) return;
 					ShowPage(1);
@@ -775,9 +752,10 @@ namespace Chimera.Client.GUI
 		private void Create()
 		{
 			var core = ChosenCore!;
-			using var project = EngineProject.New();
-			project.Title = _title.Text.Trim();
-			project.Description = _description.Text.Replace("\r\n", "\n");
+			// NOT disposed here on success: the caller takes ownership of the
+			// finished project and boots the machine from it. On any failure
+			// below we dispose it ourselves and stay on the page.
+			var project = EngineProject.New();
 			project.SetCore(core.Name, core.Version ?? "", core.Sha1 ?? "");
 			// the platform, stamped at creation: reopening forces the pinned core
 			// through the movie queue, and that check wants to know the system
@@ -799,6 +777,7 @@ namespace Chimera.Client.GUI
 			catch (InvalidOperationException ex)
 			{
 				_status.Text = ex.Message;
+				project.Dispose();
 				ShowPage(1);
 				return;
 			}
@@ -841,23 +820,14 @@ namespace Chimera.Client.GUI
 			if (declarationJson is not null && project.Validate(declarationJson) is { } refusal)
 			{
 				_status.Text = refusal;
+				project.Dispose();
 				ShowPage(1);
 				return;
 			}
 
-			var path = _projectPath.Text;
-			if (!path.EndsWith(".chimeraProject", StringComparison.OrdinalIgnoreCase)) path += ".chimeraProject";
-			try
-			{
-				project.Save(path);
-			}
-			catch (InvalidOperationException ex)
-			{
-				_status.Text = ex.Message;
-				return;
-			}
-
-			CreatedProjectPath = path;
+			// nothing is written: the project lives in memory until the work is
+			// saved, which is also when the user is asked where it goes
+			CreatedProject = project;
 			DialogResult = DialogResult.OK;
 			Close();
 		}

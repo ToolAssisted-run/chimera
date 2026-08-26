@@ -325,7 +325,14 @@ namespace Chimera.Client.Common
 
 			game = new GameInfo
 			{
-				Name = p.Title.Length is not 0 ? p.Title : Path.GetFileNameWithoutExtension(path),
+				// what to call this: the project's own title if it has one, else
+				// the game file's name - which beats the project file's, because
+				// an unwritten project's stand-in path says nothing about the game
+				Name = p.Title.Length is not 0
+					? p.Title
+					: (Path.GetFileNameWithoutExtension(p.FileName(primary)) is { Length: not 0 } fileName
+						? fileName
+						: Path.GetFileNameWithoutExtension(path)),
 				Hash = p.FileActualSha1(primary),
 				System = factory.SystemIds[0],
 			};

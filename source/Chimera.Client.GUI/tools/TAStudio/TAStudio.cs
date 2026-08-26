@@ -827,15 +827,11 @@ namespace Chimera.Client.GUI
 			WantsToControlRewind = false;
 		}
 
-		private const string DefaultTasProjectName = "default";
-
-		// Used when starting a new project
+		// The stand-in name an unwritten project carries (MovieService owns it,
+		// because the frontend hands new projects the same one): a movie filed
+		// under it saves by ASKING where it goes.
 		private string DefaultTasProjName()
-		{
-			return Path.Combine(
-				Config.PathEntries.MovieAbsolutePath(),
-				$"{DefaultTasProjectName}.{MovieService.TasMovieExtension}");
-		}
+			=> MovieService.UnsavedProjectPath(Config.PathEntries);
 
 		// Used for things like SaveFile dialogs to suggest a name to the user
 		private string SuggestedTasProjName()

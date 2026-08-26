@@ -17,29 +17,10 @@ namespace Chimera.Client.GUI
 		// (reboots go through it again). Replaced on the next LoadProject.
 		private EngineProject _openProject;
 
-		/// <summary>
-		/// The front door: New / Open / recents, modal over the empty main
-		/// window. Closing it leaves the empty window up - File > Open Project
-		/// still works - because quitting is the user's call, not this form's.
-		/// </summary>
-		private void ShowStartScreen()
-		{
-			List<string> recents = new();
-			foreach (var recent in Config.RecentProjects) recents.Add(recent);
-			using StartScreenForm screen = new(
-				recents,
-				newProject: RunNewProjectWizard,
-				openProject: PickProjectToOpen);
-			if (screen.ShowDialog(this) is DialogResult.OK && screen.ChosenProjectPath is not null)
-			{
-				LoadProject(screen.ChosenProjectPath);
-			}
-		}
-
 		private void NewProjectDialog()
 		{
 			var created = RunNewProjectWizard();
-			if (created is not null) LoadProject(created);
+			if (created is not null) LoadNewProject(created);
 		}
 
 		private void OpenProjectDialog()
@@ -48,21 +29,12 @@ namespace Chimera.Client.GUI
 			if (chosen is not null) LoadProject(chosen);
 		}
 
-		/// <returns>the created project's path, or null when cancelled</returns>
-		private string RunNewProjectWizard()
+		/// <returns>the created project, in memory and unwritten, or null when cancelled</returns>
+		private EngineProject RunNewProjectWizard()
 		{
 			ScanForCorePackages();
 			using NewProjectWizard wizard = new(
 				_discoveredCorePackages,
-				pickSavePath: () =>
-				{
-					using SaveFileDialog dialog = new()
-					{
-						Filter = new FilesystemFilterSet(FilesystemFilter.TAStudioProjects).ToString(),
-						Title = "Where the project file goes (its files may live anywhere)",
-					};
-					return dialog.ShowDialog(this) is DialogResult.OK ? dialog.FileName : null;
-				},
 				pickFiles: slot =>
 				{
 					using OpenFileDialog dialog = new()
@@ -97,7 +69,7 @@ namespace Chimera.Client.GUI
 					Config.CoreFirmware[CoreFirmwareStore.KeyFor(coreName, id)] = path;
 				}
 			}
-			return wizard.CreatedProjectPath;
+			return wizard.CreatedProject;
 		}
 
 		private string PickProjectToOpen()
@@ -144,6 +116,25 @@ namespace Chimera.Client.GUI
 				}
 			}
 
+			return BootProject(project, path, saved: true);
+		}
+
+		/// <summary>
+		/// Starts a project that has never been written: the wizard just built
+		/// it in memory, so there is no file to resolve against and nothing to
+		/// remember in recents. The movie carries TAStudio's default name,
+		/// which is what makes the first save ask where it goes.
+		/// </summary>
+		public bool LoadNewProject(EngineProject project)
+			=> BootProject(project, MovieService.UnsavedProjectPath(Config.PathEntries), saved: false);
+
+		/// <summary>
+		/// The one boot: check the core pin and the firmware, then bring the
+		/// machine up EXACTLY ONCE with the project's own core and settings,
+		/// with the project queued as the movie it IS.
+		/// </summary>
+		private bool BootProject(EngineProject project, string path, bool saved)
+		{
 			if (!EnsureProjectCore(project))
 			{
 				project.Dispose();
@@ -164,7 +155,7 @@ namespace Chimera.Client.GUI
 			// project's core and sync settings - never a throwaway config-settings
 			// boot followed by a reboot (the BizHawk triple-init lineage: rom
 			// load, TAStudio open, tasproj load - each a full core init).
-			if (MovieSession.Get(path, loadMovie: true) is not ITasMovie tasMovie)
+			if (MovieSession.Get(path, loadMovie: saved) is not ITasMovie tasMovie)
 			{
 				return false;
 			}
@@ -217,7 +208,8 @@ namespace Chimera.Client.GUI
 			SetMainformMovieInfo();
 			WarnOnMovieVsLoadedCore();
 
-			Config.RecentProjects.Add(path);
+			// only a project that HAS a file can be recent
+			if (saved) Config.RecentProjects.Add(path);
 			// a project IS a TAStudio session; from the commandline the window is
 			// not up yet, so the landing waits for it. Headless runs have nobody
 			// to operate TAStudio (which opens PAUSED at the session frame) -

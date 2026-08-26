@@ -46,7 +46,7 @@ namespace Chimera.Tests.Client.GUI
 
 		private static NewProjectWizard MakeForm(string cartName)
 		{
-			NewProjectWizard form = new([ ], static () => null, static _ => [ ]);
+			NewProjectWizard form = new([ ], static _ => [ ]);
 			form.Show();
 			form.UseDeclaration(ProjectSlotDeclaration.Parse(Declaration));
 			form.AddFileToSlot("cart", $"/games/{cartName}");

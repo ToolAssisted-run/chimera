@@ -31,7 +31,7 @@ namespace Chimera.Tests.Client.GUI
 		{
 			dir = Path.Combine(_dir, Path.GetRandomFileName());
 			Directory.CreateDirectory(dir);
-			NewProjectWizard form = new([ ], static () => null, static _ => [ ]);
+			NewProjectWizard form = new([ ], static _ => [ ]);
 			form.Show();
 			return form;
 		}

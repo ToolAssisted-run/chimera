@@ -584,17 +584,10 @@ namespace Chimera.Client.GUI
 				{
 					Tools.LuaConsole.LoadFromCommandLine(_argParser.luaScript.MakeAbsolute());
 				}
-				// the front door: with nothing loaded and nothing scripted, the only
-				// way forward is a project (docs/project.md). Headless runs and
-				// commandline-driven sessions never see it.
-				if (!HeadlessMode.Enabled
-					&& _argParser.luaScript is null && !_argParser.luaConsole
-					&& _argParser.cmdRom is null && _argParser.cmdMovie is null
-					&& _argParser.cmdProject is null
-					&& Emulator.IsNull())
-				{
-					ShowStartScreen();
-				}
+				// nothing is asked at startup: the window comes up empty and the
+				// File menu is the way in (New Project, Open Project, and the
+				// recents submenu). Being greeted by a dialog before any work
+				// exists is friction, not a front door.
 			};
 
 			SetStatusBar();
