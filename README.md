@@ -14,8 +14,6 @@
 	</picture>
 </p>
 
-**Chimera is a derivative fork of [BizHawk](https://github.com/TASEmulators/BizHawk).** The frontend, the TAS tooling, and the architecture it builds on are the original work of the BizHawk team, and all credit for them belongs to BizHawk's developers.
-
 Chimera is a minimal frontend for creating tool-assisted speedruns (TAS). It keeps BizHawk's TAS toolchain (movies, savestates, TAStudio, RAM tools, Lua) and removes everything else, most importantly every emulation core.
 
 ## Goals
@@ -54,6 +52,6 @@ Pull requests are welcome: from people, from people working with AI assistants, 
 
 ## Credits and license
 
-This project stands entirely on **BizHawk**, created and maintained by the BizHawk team ([TASEmulators/BizHawk](https://github.com/TASEmulators/BizHawk)); the frontend architecture, the TAS tools, the emulation service interfaces, and years of accumulated correctness are theirs.
+**Chimera is a derivative fork of [BizHawk](https://github.com/TASEmulators/BizHawk).** The frontend, the TAS tooling, and the architecture it builds on are the original work of the BizHawk team, and all credit for them belongs to BizHawk's developers.
 
 Chimera is provided under the MIT License, preserving the BizHawk team's copyright; see [LICENSE](LICENSE), which also covers the native libraries built from `extern/`, the vendored test suite, and why core packages carry their own licenses.
