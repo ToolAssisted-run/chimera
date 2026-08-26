@@ -87,6 +87,37 @@ logic entirely, as a decision tree in its waterbox.config "firmware"
 declaration; the wizard only renders the result and collects the files.
 On create, TAStudio opens at frame 0.
 
+### One core, several machines
+
+A package need not be one machine. Genesis Plus GX is a Mega Drive, a Master
+System, a Game Gear and an SG-1000 - the same `core.wbx` with different
+hardware selected - so its `waterbox.config` declares a `machines` array and
+names the setting that picks between them (`machineSetting`). Each machine
+carries what makes it a different machine: the system id the movie records,
+the controller it has, the picture it draws, and the rom extensions that
+belong to it. What they share - the binary, the guest heap, the audio rate -
+stays at the top level, and a package with no `machines` is one machine
+exactly as before.
+
+The choice belongs with the core, on step one, because everything after it
+depends on it: the files it takes (a Sega CD drive is not a Master System's),
+the settings it has, the values those settings may take (a Mega Drive port
+takes a mouse, an Activator and a Team Player; a Master System port takes a
+pad or nothing - a machine may narrow a setting with `settingOverrides`), and
+the firmware it wants. Because the machine IS a setting, the project pins it
+and the movie cites it like every other structural choice, and the condition
+language already understood it: `{"setting": "systemHardware", "is": "sms"}`
+gates slots, settings and firmware alike.
+
+Loading a plain rom with no project has no pin, so the extension decides: the
+package's machines claim their own extensions, and a `.sms` opened with this
+package is a Master System.
+
+The alternative - one package per machine - was tried and is worse. It ships
+copies of one binary, and since a package registers its core by name, four
+packages all called "Genesis Plus GX" meant three were silently dropped when
+all four were installed.
+
 ### The firmware decision tree
 
 A firmware entry in waterbox.config may carry "requiredWhen", a

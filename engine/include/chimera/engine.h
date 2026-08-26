@@ -325,6 +325,7 @@ CE_API const char *ce_settings_evaluate(
 CE_API const char *ce_slots_evaluate(
 	const char *decl_json, uint64_t decl_len,
 	const char *slots_json, uint64_t slots_len,
+	const char *settings_json, uint64_t settings_len,
 	uint64_t *len_out);
 
 /* The files a cue sheet references (its FILE lines, quoted or bare), as a

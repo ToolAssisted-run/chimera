@@ -38,10 +38,23 @@ namespace Chimera.Client.GUI
 		// page 1
 		private readonly ComboBox _core;
 
+		/// <summary>
+		/// Which machine, for a package that is several. Genesis Plus GX is one core
+		/// that is a Mega Drive, a Master System, a Game Gear or an SG-1000, and the
+		/// choice belongs here beside the core: everything after it - the files it
+		/// takes, the settings it has, the firmware it wants - depends on it.
+		/// </summary>
+		private readonly ComboBox _machine;
+
+		private readonly Label _machineLabel;
+
 		// page 2, rebuilt when the chosen core changes
 		private readonly Panel _slotsHost;
 		private ProjectSlotDeclaration? _declaration;
 		private string? _declarationCore;
+
+		/// <summary>the package whose declaration <see cref="_cfg"/> holds</summary>
+		private string? _cfgCore;
 		private readonly Dictionary<string, ListBox> _slotLists = new();
 		private readonly Dictionary<string, GroupBox> _slotGroups = new();
 		private readonly ToolTip _tips = new();
@@ -136,8 +149,21 @@ namespace Chimera.Client.GUI
 			{
 				_core.Items.Add($"{core.Name}  ({string.Join(", ", core.Systems)}{(string.IsNullOrEmpty(core.Version) ? "" : $", {core.Version}")})");
 			}
-			if (_core.Items.Count is not 0) _core.SelectedIndex = 0;
 			p1.Controls.Add(_core);
+
+			_machineLabel = MakeLabel("Machine:", 8, 84);
+			_machine = new ComboBox
+			{
+				Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
+				DropDownStyle = ComboBoxStyle.DropDownList,
+				Location = Pt(110, 80),
+				Width = UIHelper.ScaleX(442),
+			};
+			_machine.SelectedIndexChanged += (_, _) => PinMachine();
+			p1.Controls.AddRange([ _machineLabel, _machine ]);
+			_core.SelectedIndexChanged += (_, _) => LoadChosenPackage();
+			if (_core.Items.Count is not 0) _core.SelectedIndex = 0;
+			LoadChosenPackage();
 
 			// ---- page 2: the core-informed file form -----------------------------
 			var p2 = _pages[1];
@@ -250,6 +276,62 @@ namespace Chimera.Client.GUI
 		private DiscoveredCorePackage? ChosenCore
 			=> _core.SelectedIndex is >= 0 and var i && i < _cores.Count ? _cores[i] : null;
 
+		/// <summary>
+		/// Reads the chosen package's declaration and offers its machines. Done as
+		/// soon as a core is picked, because the machine is part of picking it: a
+		/// package that is one machine simply has nothing to offer here.
+		/// </summary>
+		private void LoadChosenPackage()
+		{
+			var core = ChosenCore;
+			if (core is null || _cfgCore == core.Path) return;
+			_cfgCore = core.Path;
+			_cfg = null;
+			_settings = new WaterboxCoreSettings();
+			try
+			{
+				using var pkg = EnginePackage.Open(core.Path);
+				_cfg = WaterboxConfig.FromJson(pkg?.EntryText(WaterboxCoreFactory.ConfigFileName) ?? "");
+			}
+			catch (InvalidOperationException)
+			{
+				// an unreadable package complains when the user tries to go on
+			}
+			_machine.Items.Clear();
+			var machines = _cfg?.Machines;
+			if (machines is { Count: > 0 })
+			{
+				foreach (var machine in machines) _machine.Items.Add(machine.DisplayName);
+				_machine.SelectedIndex = 0;
+			}
+			var several = _machine.Items.Count > 1;
+			_machine.Visible = several;
+			_machineLabel.Visible = several;
+			PinMachine();
+		}
+
+		/// <summary>
+		/// Writes the chosen machine into the settings, where it is a setting like
+		/// any other - so the project records it, the movie cites it, and the file
+		/// and firmware gates can ask which machine this is.
+		/// </summary>
+		private void PinMachine()
+		{
+			if (_cfg?.HasMachines is not true || _settings is null) return;
+			var index = Math.Max(0, Math.Min(_cfg.Machines.Count - 1, _machine.SelectedIndex));
+			var machine = _cfg.Machines[index];
+			_settings.Values[_cfg.MachineSetting] = machine.When is { Count: > 0 } ? machine.When[0] : machine.Id;
+			// the machine decides which files the project takes, so a form built for
+			// another machine is stale
+			_declarationCore = null;
+		}
+
+		/// <summary>The machine chosen on page one, for tests.</summary>
+		public string? ChosenMachine
+			=> _cfg?.HasMachines is true && _machine.SelectedIndex >= 0
+				? _cfg.Machines[_machine.SelectedIndex].Id
+				: null;
+
 		private void ShowPage(int page)
 		{
 			_page = Math.Max(0, Math.Min(_pages.Length - 1, page));
@@ -339,6 +421,7 @@ namespace Chimera.Client.GUI
 		{
 			var core = ChosenCore!;
 			if (_declarationCore == core.Path && _declaration is not null) return true;
+
 
 			string? declarationJson = null;
 			try
@@ -460,7 +543,13 @@ namespace Chimera.Client.GUI
 		private void RefreshSlotAvailability()
 		{
 			if (_declaration is null) return;
-			var exposed = EngineSlotsGate.Evaluate(_declaration.RawJson, CurrentSlotsJson());
+			// the settings go in because the MACHINE is one: a package that is
+			// several machines has slots only some of them have
+			var exposed = EngineSlotsGate.Evaluate(
+				_declaration.RawJson,
+				CurrentSlotsJson(),
+				Newtonsoft.Json.JsonConvert.SerializeObject(
+					_cfg is null ? new System.Collections.Generic.Dictionary<string, object>() : WaterboxCore.EffectiveSettingsFor(_cfg, _settings)));
 			foreach (var slot in _declaration.Slots)
 			{
 				if (!_slotGroups.TryGetValue(slot.Id, out var group)) continue;
@@ -571,22 +660,17 @@ namespace Chimera.Client.GUI
 
 		private bool BuildSettingsPage()
 		{
-			var core = ChosenCore!;
-			try
+			// the package was read when its core was chosen (the machine is picked
+			// there, and everything since has depended on it)
+			if (_cfg is null)
 			{
-				using var pkg = EnginePackage.Open(core.Path);
-				var cfg = WaterboxConfig.FromJson(pkg?.EntryText(WaterboxCoreFactory.ConfigFileName) ?? "");
-				_cfg = cfg;
-				_settings = new WaterboxCoreSettings();
-				RefreshExposedSettings();
-				_settingsGrid.SelectedObject = _settings;
-				return true;
-			}
-			catch (InvalidOperationException ex)
-			{
-				_status.Text = ex.Message;
+				_status.Text = $"{ChosenCore?.Name} has no usable {WaterboxCoreFactory.ConfigFileName} in its package";
 				return false;
 			}
+			_settings ??= new WaterboxCoreSettings();
+			RefreshExposedSettings();
+			_settingsGrid.SelectedObject = _settings;
+			return true;
 		}
 
 		/// <summary>
@@ -603,7 +687,10 @@ namespace Chimera.Client.GUI
 				_cfg.RawSettingsJson,
 				CurrentSlotsJson(),
 				Newtonsoft.Json.JsonConvert.SerializeObject(effective));
-			var all = _cfg.Settings ?? [ ];
+			// as the CHOSEN MACHINE has them: a package that is several machines
+			// narrows some settings per machine (a Master System port takes a pad
+			// or nothing, where a Mega Drive port takes six devices)
+			var all = _cfg.SettingsFor(_cfg.MachineFor(effective));
 			var declarations = exposed
 				.Where(entry => entry.Index >= 0 && entry.Index < all.Count && all[entry.Index].Name == entry.Name)
 				.Select(entry => all[entry.Index])
@@ -820,9 +907,15 @@ namespace Chimera.Client.GUI
 			// below we dispose it ourselves and stay on the page.
 			var project = EngineProject.New();
 			project.SetCore(core.Name, core.Version ?? "", core.Sha1 ?? "");
-			// the platform, stamped at creation: reopening forces the pinned core
-			// through the movie queue, and that check wants to know the system
-			if (core.Systems.FirstOrDefault() is { Length: not 0 } system)
+			// The platform, stamped at creation: reopening forces the pinned core
+			// through the movie queue, and that check wants to know the system. A
+			// package that is several machines says which one through its settings,
+			// which the user has just chosen.
+			var system = (_cfg is not null && _settings is not null
+					? _cfg.MachineFor(WaterboxCore.EffectiveSettingsFor(_cfg, _settings))?.Id
+					: null)
+				?? core.Systems.FirstOrDefault();
+			if (system is { Length: not 0 })
 			{
 				project.HeaderSet("Platform", system);
 			}

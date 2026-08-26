@@ -200,15 +200,19 @@ namespace Chimera.Client.Common
 		{
 			var cfg = WaterboxConfig.FromJson(json)
 				?? throw new InvalidOperationException($"{WaterboxCoreFactory.ConfigFileName} is empty or invalid");
-			if (string.IsNullOrEmpty(cfg.SystemId)) throw new InvalidOperationException($"{WaterboxCoreFactory.ConfigFileName} is missing systemId");
+			var systems = cfg.SystemIds;
+			if (systems.Count is 0)
+			{
+				throw new InvalidOperationException($"{WaterboxCoreFactory.ConfigFileName} names no machine (systemId, or machines)");
+			}
 			return new DiscoveredCorePackage
 			{
 				Path = path,
 				Sha1 = sha1,
 				Name = string.IsNullOrWhiteSpace(cfg.CoreName) ? fallbackName : cfg.CoreName,
 				Version = cfg.Version ?? "",
-				Systems = [ cfg.SystemId ],
-				Extensions = NormaliseExtensions(cfg.Extensions),
+				Systems = systems,
+				Extensions = NormaliseExtensions(cfg.AllExtensions),
 			};
 		}
 

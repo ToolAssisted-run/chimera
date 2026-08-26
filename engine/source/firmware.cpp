@@ -183,6 +183,7 @@ const char *ce_settings_evaluate(
 const char *ce_slots_evaluate(
 	const char *decl_json, uint64_t decl_len,
 	const char *slots_json, uint64_t slots_len,
+	const char *settings_json, uint64_t settings_len,
 	uint64_t *len_out)
 {
 	if (len_out != nullptr) *len_out = 0;
@@ -191,6 +192,11 @@ const char *ce_slots_evaluate(
 		? cJSON_ParseWithLength(decl_json, static_cast<size_t>(decl_len)) : nullptr;
 	cJSON *slots = slots_json != nullptr
 		? cJSON_ParseWithLength(slots_json, static_cast<size_t>(slots_len)) : nullptr;
+	/* Settings gate slots too: a core that is several machines has slots only
+	 * some of them have (a Sega CD drive is not a Master System's), and which
+	 * machine a session is, is a setting like any other. */
+	cJSON *settings = settings_json != nullptr
+		? cJSON_ParseWithLength(settings_json, static_cast<size_t>(settings_len)) : nullptr;
 	cJSON *slotArray = cJSON_GetObjectItemCaseSensitive(decl, "slots");
 
 	cJSON *out = cJSON_CreateArray();
@@ -201,7 +207,7 @@ const char *ce_slots_evaluate(
 			const cJSON *id = cJSON_GetObjectItemCaseSensitive(entry, "id");
 			if (!cJSON_IsString(id)) continue;
 			const cJSON *when = cJSON_GetObjectItemCaseSensitive(entry, "exposedWhen");
-			if (when != nullptr && !ceEvalCondition(when, slots, nullptr)) continue;
+			if (when != nullptr && !ceEvalCondition(when, slots, settings)) continue;
 			cJSON_AddItemToArray(out, cJSON_CreateString(id->valuestring));
 		}
 	}
@@ -212,6 +218,7 @@ const char *ce_slots_evaluate(
 	cJSON_Delete(out);
 	cJSON_Delete(decl);
 	cJSON_Delete(slots);
+	cJSON_Delete(settings);
 
 	if (len_out != nullptr) *len_out = g_evaluated.size();
 	return g_evaluated.c_str();

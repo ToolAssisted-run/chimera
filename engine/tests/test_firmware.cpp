@@ -127,7 +127,7 @@ int main(void)
 	auto evalSlots = [](const char *decl, const char *slots)
 	{
 		uint64_t len = 0;
-		const char *out = ce_slots_evaluate(decl, std::strlen(decl), slots, std::strlen(slots), &len);
+		const char *out = ce_slots_evaluate(decl, std::strlen(decl), slots, std::strlen(slots), "{}", 2, &len);
 		return std::string(out, len);
 	};
 

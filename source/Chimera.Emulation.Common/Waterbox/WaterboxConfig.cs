@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 
 using Newtonsoft.Json;
 
@@ -20,6 +21,10 @@ namespace Chimera.Emulation.Common.Waterbox
 	{
 		public string CoreName { get; set; }
 
+		/// <summary>
+		/// The machine this package is, when it is only one. A package that declares
+		/// <see cref="Machines"/> leaves this empty and names the machine there.
+		/// </summary>
 		public string SystemId { get; set; }
 
 		/// <summary>Who wrote the core. Shown wherever the frontend introduces it.</summary>
@@ -44,6 +49,169 @@ namespace Chimera.Emulation.Common.Waterbox
 		public AudioConfig Audio { get; set; }
 
 		public InputConfig Input { get; set; }
+
+		/// <summary>
+		/// The machines one core.wbx can be. Genesis Plus GX is a Mega Drive, a Master
+		/// System, a Game Gear and an SG-1000 - the same binary, four machines - and a
+		/// package that shipped one machine each would be four copies of the same core
+		/// whose only difference is a controller and a name.
+		///
+		/// What they share stays at the top level: the binary, the guest heap, the
+		/// audio rate, the video BUFFER. What makes them different machines is here:
+		/// the system they are, the controller they have, the picture they draw, and
+		/// the file extensions that belong to them.
+		///
+		/// Which one a session is comes from a setting - <see cref="MachineSetting"/> -
+		/// so the machine is pinned in the project and recorded in the movie like every
+		/// other structural choice, rather than being a property of which zip you
+		/// happened to install.
+		/// </summary>
+		public List<MachineConfig> Machines { get; set; }
+
+		/// <summary>
+		/// The setting whose value picks the machine. Required when <see cref="Machines"/>
+		/// is declared, and it must be one of the package's own settings.
+		/// </summary>
+		public string MachineSetting { get; set; }
+
+		/// <summary>True when this package describes more than one machine.</summary>
+		public bool HasMachines => Machines is { Count: > 0 };
+
+		/// <summary>Every system this package can be, in declaration order.</summary>
+		public IReadOnlyList<string> SystemIds
+			=> HasMachines
+				? Machines.Select(static m => m.Id).Where(static id => !string.IsNullOrEmpty(id)).ToList()
+				: string.IsNullOrEmpty(SystemId) ? [ ] : new[] { SystemId };
+
+		/// <summary>Rom extension -&gt; system, over the whole package (every machine's).</summary>
+		public Dictionary<string, string> AllExtensions
+		{
+			get
+			{
+				Dictionary<string, string> all = new();
+				foreach (var (ext, sysID) in Extensions ?? new()) all[ext] = sysID;
+				foreach (var machine in Machines ?? new())
+				{
+					foreach (var (ext, sysID) in machine.Extensions ?? new()) all[ext] = sysID;
+				}
+				return all;
+			}
+		}
+
+		/// <summary>
+		/// The machine a session with these settings is. Null for a single-machine
+		/// package. A value naming no machine falls back to the first one declared,
+		/// so a package can never end up with no machine at all.
+		/// </summary>
+		public MachineConfig MachineFor(IReadOnlyDictionary<string, object> effectiveSettings)
+		{
+			if (!HasMachines) return null;
+			if (!string.IsNullOrEmpty(MachineSetting)
+				&& effectiveSettings is not null
+				&& effectiveSettings.TryGetValue(MachineSetting, out var value))
+			{
+				var chosen = value?.ToString() ?? "";
+				var match = Machines.Find(m => m.Selects(chosen));
+				if (match is not null) return match;
+			}
+			return Machines[0];
+		}
+
+		/// <summary>What a machine changes about one of the package's settings.</summary>
+		public sealed class SettingOverride
+		{
+			public List<string> Options { get; set; }
+
+			public object Default { get; set; }
+		}
+
+		/// <summary>
+		/// The package's settings as this machine has them: same names, same
+		/// meanings, with whatever the machine narrows applied.
+		/// </summary>
+		public IReadOnlyList<SettingDecl> SettingsFor(MachineConfig machine)
+		{
+			var decls = Settings ?? new List<SettingDecl>();
+			if (machine?.SettingOverrides is not { Count: > 0 }) return decls;
+			// the SAME instances every time for a given machine: callers compare
+			// declaration lists by reference to tell whether anything changed
+			if (_narrowed.TryGetValue(machine.Id ?? "", out var cached)) return cached;
+
+			List<SettingDecl> narrowed = new(decls.Count);
+			foreach (var decl in decls)
+			{
+				if (!machine.SettingOverrides.TryGetValue(decl.Name ?? "", out var over) || over is null)
+				{
+					narrowed.Add(decl);
+					continue;
+				}
+				narrowed.Add(new SettingDecl
+				{
+					Name = decl.Name,
+					Display = decl.Display,
+					Description = decl.Description,
+					Type = decl.Type,
+					Options = over.Options ?? decl.Options,
+					Default = over.Default ?? decl.Default,
+					Min = decl.Min,
+					Max = decl.Max,
+				});
+			}
+			_narrowed[machine.Id ?? ""] = narrowed;
+			return narrowed;
+		}
+
+		private readonly Dictionary<string, IReadOnlyList<SettingDecl>> _narrowed = new();
+
+		/// <summary>The machine that IS this system, or null.</summary>
+		public MachineConfig MachineForSystem(string systemId)
+			=> HasMachines && !string.IsNullOrEmpty(systemId)
+				? Machines.Find(m => string.Equals(m.Id, systemId, StringComparison.OrdinalIgnoreCase))
+				: null;
+
+		/// <summary>
+		/// One machine a package can be. Everything here overrides the top level for a
+		/// session that is this machine; everything absent is shared.
+		/// </summary>
+		public sealed class MachineConfig
+		{
+			/// <summary>The system this machine is (the movie's platform).</summary>
+			public string Id { get; set; }
+
+			/// <summary>What to call it in front of a user. Falls back to the id.</summary>
+			public string Label { get; set; }
+
+			/// <summary>Values of the package's machine setting that mean this machine.</summary>
+			public List<string> When { get; set; }
+
+			/// <summary>The controller this machine has.</summary>
+			public InputConfig Input { get; set; }
+
+			/// <summary>The picture it draws, when it differs from the package default.</summary>
+			public int? VirtualWidth { get; set; }
+
+			public int? VirtualHeight { get; set; }
+
+			/// <summary>Rom extensions that belong to this machine.</summary>
+			public Dictionary<string, string> Extensions { get; set; }
+
+			/// <summary>
+			/// Settings this machine narrows: a Mega Drive port takes a mouse, an
+			/// Activator and a Team Player, and a Master System port takes a pad or
+			/// nothing. Same setting, same name in the guest, fewer legal values -
+			/// so the machine says which, rather than the user being offered a
+			/// controller the machine cannot have.
+			/// </summary>
+			public Dictionary<string, SettingOverride> SettingOverrides { get; set; }
+
+			public string DisplayName => string.IsNullOrWhiteSpace(Label) ? Id : Label;
+
+			/// <summary>True when a machine-setting value names this machine.</summary>
+			public bool Selects(string settingValue)
+				=> When is { Count: > 0 }
+					? When.Exists(v => string.Equals(v, settingValue, StringComparison.OrdinalIgnoreCase))
+					: string.Equals(Id, settingValue, StringComparison.OrdinalIgnoreCase);
+		}
 
 		public LagConfig Lag { get; set; }
 

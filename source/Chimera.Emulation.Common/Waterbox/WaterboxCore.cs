@@ -47,6 +47,10 @@ namespace Chimera.Emulation.Common.Waterbox
 				portedUrl: cfg.Url ?? "");
 
 		private readonly WaterboxConfig _cfg;
+
+		/// <summary>the machine this session is, for a package that can be several</summary>
+		private readonly WaterboxConfig.MachineConfig _machine;
+
 		private readonly EngineSession _session;
 		private WaterboxCoreSettings _settings;
 
@@ -68,13 +72,18 @@ namespace Chimera.Emulation.Common.Waterbox
 		{
 			_cfg = cfg;
 			_settings = settings?.Clone() ?? new WaterboxCoreSettings();
+			// WHICH MACHINE this session is, settled before anything is built: the
+			// controller, the picture and the system id all come from it, and a
+			// package that is only ever one machine has none and uses the top level.
+			_machine = cfg.MachineFor(EffectiveSettingsFor(cfg, _settings));
+			var input = _machine?.Input ?? cfg.Input;
 			_width = cfg.Video.Width;
 			_height = cfg.Video.Height;
 			_samplesPerFrame = cfg.Audio.SamplesPerFrame;
 			_videoBuff = new int[_width * _height];
 			_stereoBuff = new short[_samplesPerFrame * 2];
-			_buttons = cfg.Input.Buttons.ToArray();
-			_axes = cfg.Input.Axes?.ToArray() ?? [ ];
+			_buttons = input.Buttons.ToArray();
+			_axes = input.Axes?.ToArray() ?? [ ];
 
 			ServiceProvider = new BasicServiceProvider(this);
 
@@ -128,15 +137,27 @@ namespace Chimera.Emulation.Common.Waterbox
 		public static Dictionary<string, object> EffectiveSettingsFor(
 			WaterboxConfig cfg, WaterboxCoreSettings settings)
 		{
-			var decls = cfg.Settings ?? (IReadOnlyList<WaterboxConfig.SettingDecl>) [ ];
+			// Two passes, because a package of machines has settings whose defaults
+			// and legal values depend on WHICH machine - and which machine is itself
+			// a setting. So: settle the machine from the package's own defaults and
+			// the user's values, then take the rest as that machine has them.
+			var effective = Defaults(cfg.Settings, settings);
+			if (!cfg.HasMachines) return effective;
+			return Defaults(cfg.SettingsFor(cfg.MachineFor(effective)), settings);
+		}
+
+		private static Dictionary<string, object> Defaults(
+			IReadOnlyList<WaterboxConfig.SettingDecl> decls, WaterboxCoreSettings settings)
+		{
 			var effective = new Dictionary<string, object>();
-			foreach (var decl in decls) effective[decl.Name] = decl.DefaultValue;
+			foreach (var decl in decls ?? (IReadOnlyList<WaterboxConfig.SettingDecl>) [ ]) effective[decl.Name] = decl.DefaultValue;
 			foreach (var kv in settings?.Values ?? new()) effective[kv.Key] = kv.Value;
 			return effective;
 		}
 
+		/// <summary>The settings as the machine this session is has them.</summary>
 		private IReadOnlyList<WaterboxConfig.SettingDecl> Decls
-			=> _cfg.Settings ?? [ ];
+			=> _cfg.SettingsFor(_machine);
 
 
 		// Delivered as a flat JSON object, e.g. {"initFillByte":171}. The guest
@@ -151,7 +172,7 @@ namespace Chimera.Emulation.Common.Waterbox
 
 		private ControllerDefinition MakeControllerDefinition()
 		{
-			var def = new ControllerDefinition(_cfg.Input.Name ?? "Waterbox Controller");
+			var def = new ControllerDefinition((_machine?.Input ?? _cfg.Input).Name ?? "Waterbox Controller");
 			foreach (var button in _buttons)
 			{
 				def.BoolButtons.Add(button);
@@ -205,7 +226,7 @@ namespace Chimera.Emulation.Common.Waterbox
 
 		public int Frame { get; private set; }
 
-		public string SystemId => _cfg.SystemId;
+		public string SystemId => _machine?.Id ?? _cfg.SystemId;
 
 		public bool DeterministicEmulation => _cfg.Deterministic;
 
@@ -229,8 +250,8 @@ namespace Chimera.Emulation.Common.Waterbox
 		// clamped by the engine to the config's buffer; others equal the config.
 		public int BufferWidth => _session.Disposed ? _width : _session.VideoWidth;
 		public int BufferHeight => _session.Disposed ? _height : _session.VideoHeight;
-		public int VirtualWidth => _cfg.Video.VirtualWidth;
-		public int VirtualHeight => _cfg.Video.VirtualHeight;
+		public int VirtualWidth => _machine?.VirtualWidth ?? _cfg.Video.VirtualWidth;
+		public int VirtualHeight => _machine?.VirtualHeight ?? _cfg.Video.VirtualHeight;
 		public int BackgroundColor => unchecked((int)0xFF000000);
 		public int VsyncNumerator => _session.VsyncNumerator;
 		public int VsyncDenominator => _session.VsyncDenominator;

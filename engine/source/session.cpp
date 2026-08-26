@@ -87,6 +87,51 @@ int32_t intOf(const cJSON *obj, const char *key, int32_t fallback = 0)
 	return cJSON_IsNumber(item) ? item->valueint : fallback;
 }
 
+/* WHICH MACHINE this session is, for a package that is several (one core.wbx
+ * that is a Mega Drive, a Master System, a Game Gear and an SG-1000). The
+ * choice is a setting like any other, so it is already in the overrides or in
+ * the package's own defaults; what it selects is the machine's system id,
+ * controller and picture. A package that is one machine has no machines array
+ * and this answers nullptr. */
+const cJSON *chooseMachine(const cJSON *root, const char *overrides)
+{
+	const cJSON *machines = cJSON_GetObjectItemCaseSensitive(root, "machines");
+	if (!cJSON_IsArray(machines) || machines->child == nullptr) return nullptr;
+
+	const char *settingName = strOf(root, "machineSetting", nullptr);
+	std::string chosen;
+	if (settingName != nullptr)
+	{
+		/* the package's default first, then whatever the caller pinned */
+		const cJSON *decls = cJSON_GetObjectItemCaseSensitive(root, "settings");
+		const cJSON *decl = nullptr;
+		cJSON_ArrayForEach(decl, decls)
+		{
+			if (std::string(strOf(decl, "name")) != settingName) continue;
+			chosen = strOf(decl, "default");
+			break;
+		}
+		cJSON *over = overrides != nullptr && overrides[0] != '\0' ? cJSON_Parse(overrides) : nullptr;
+		const cJSON *pinned = cJSON_GetObjectItemCaseSensitive(over, settingName);
+		if (cJSON_IsString(pinned)) chosen = pinned->valuestring;
+		cJSON_Delete(over);
+	}
+
+	const cJSON *machine = nullptr;
+	cJSON_ArrayForEach(machine, machines)
+	{
+		const cJSON *when = cJSON_GetObjectItemCaseSensitive(machine, "when");
+		const cJSON *value = nullptr;
+		cJSON_ArrayForEach(value, when)
+		{
+			if (cJSON_IsString(value) && chosen == value->valuestring) return machine;
+		}
+		if (!cJSON_IsArray(when) && std::string(strOf(machine, "id")) == chosen) return machine;
+	}
+	/* a value naming no machine is the first one: a session always has a machine */
+	return machines->child;
+}
+
 bool parseConfig(const char *json, uint64_t len, const char *overrides, SessionConfig &cfg, std::string &error)
 {
 	cJSON *root = cJSON_ParseWithLength(json, static_cast<size_t>(len));
@@ -96,8 +141,9 @@ bool parseConfig(const char *json, uint64_t len, const char *overrides, SessionC
 		error = "waterbox.config is not readable JSON";
 		return false;
 	}
+	const cJSON *machine = chooseMachine(root, overrides);
 	cfg.coreName = strOf(root, "coreName", "Waterbox");
-	cfg.systemId = strOf(root, "systemId");
+	cfg.systemId = machine != nullptr ? strOf(machine, "id") : strOf(root, "systemId");
 	cfg.romFile = strOf(root, "romFile", "rom");
 	cfg.deterministic = cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(root, "deterministic"));
 
@@ -115,7 +161,10 @@ bool parseConfig(const char *json, uint64_t len, const char *overrides, SessionC
 
 	const cJSON *video = cJSON_GetObjectItemCaseSensitive(root, "video");
 	const cJSON *audio = cJSON_GetObjectItemCaseSensitive(root, "audio");
-	const cJSON *input = cJSON_GetObjectItemCaseSensitive(root, "input");
+	/* the controller is the machine's, and the picture may be too */
+	const cJSON *input = machine != nullptr
+		? cJSON_GetObjectItemCaseSensitive(machine, "input")
+		: cJSON_GetObjectItemCaseSensitive(root, "input");
 	if (!cJSON_IsObject(video) || !cJSON_IsObject(audio) || !cJSON_IsObject(input))
 	{
 		cJSON_Delete(root);
@@ -126,6 +175,11 @@ bool parseConfig(const char *json, uint64_t len, const char *overrides, SessionC
 	cfg.height = intOf(video, "height");
 	cfg.virtualWidth = intOf(video, "virtualWidth", cfg.width);
 	cfg.virtualHeight = intOf(video, "virtualHeight", cfg.height);
+	if (machine != nullptr)
+	{
+		cfg.virtualWidth = intOf(machine, "virtualWidth", cfg.virtualWidth);
+		cfg.virtualHeight = intOf(machine, "virtualHeight", cfg.virtualHeight);
+	}
 	cfg.vsyncNum = intOf(video, "vsyncNumerator");
 	cfg.vsyncDen = intOf(video, "vsyncDenominator");
 	cfg.getBgra = strOf(video, "getBgra", "GetVideoBgra");

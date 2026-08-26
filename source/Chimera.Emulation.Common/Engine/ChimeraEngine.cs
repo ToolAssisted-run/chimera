@@ -217,6 +217,7 @@ namespace Chimera.Emulation.Common.Engine
 		public abstract IntPtr ce_slots_evaluate(
 			byte[] declJson, ulong declLen,
 			byte[] slotsJson, ulong slotsLen,
+			byte[] settingsJson, ulong settingsLen,
 			ref ulong lenOut);
 
 		[BizImport(CallingConvention.Cdecl)]
@@ -1626,14 +1627,20 @@ namespace Chimera.Emulation.Common.Engine
 	/// </summary>
 	public static class EngineSlotsGate
 	{
+		/// <param name="settingsJson">
+		/// the effective settings, because a slot can belong to one machine of a
+		/// package that is several (a Sega CD drive is not a Master System's)
+		/// </param>
 		/// <returns>the exposed slot ids, declaration order</returns>
-		public static System.Collections.Generic.IReadOnlyList<string> Evaluate(string declJson, string slotsJson)
+		public static System.Collections.Generic.IReadOnlyList<string> Evaluate(string declJson, string slotsJson, string settingsJson = "{}")
 		{
 			var decl = Encoding.UTF8.GetBytes(declJson ?? "{}");
 			var slots = Encoding.UTF8.GetBytes(slotsJson ?? "{}");
+			var settings = Encoding.UTF8.GetBytes(settingsJson ?? "{}");
 			ulong len = 0;
 			var result = ChimeraEngine.Instance.ce_slots_evaluate(
-				decl, (ulong)decl.LongLength, slots, (ulong)slots.LongLength, ref len);
+				decl, (ulong)decl.LongLength, slots, (ulong)slots.LongLength,
+				settings, (ulong)settings.LongLength, ref len);
 			var text = ChimeraEngine.PtrToStringUtf8(result, len);
 			System.Collections.Generic.List<string> outList = new();
 			foreach (var item in Newtonsoft.Json.Linq.JArray.Parse(text))
