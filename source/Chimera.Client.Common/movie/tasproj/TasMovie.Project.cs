@@ -20,8 +20,8 @@ namespace Chimera.Client.Common
 		// the project file; everything regenerable (greenzone, lag log,
 		// branch states and screenshots, session position, column layout)
 		// lives in a cache sibling that may be lost at the price of
-		// recomputation only. The zip tasproj remains loadable as legacy and
-		// upgrades to this format on its next save.
+		// recomputation only. There is no other project format: legacy zip
+		// tasprojs (and imported movies of any provenance) are not read.
 
 		private EngineProject _project;
 
@@ -75,7 +75,7 @@ namespace Chimera.Client.Common
 			}
 			p.SetCore(Header[HeaderKeys.Core], Header[HeaderKeys.CoreVersion], Header[HeaderKeys.CorePackageSha1]);
 			p.Rerecords = Rerecords;
-			p.SetSettingsJson(string.IsNullOrWhiteSpace(SyncSettingsJson) ? "{}" : SyncSettingsJson);
+			p.SetSettingsJson(FlattenSyncSettings(SyncSettingsJson));
 			p.Description = string.Join("\n", Comments);
 
 			p.SubtitlesClear();
@@ -135,6 +135,44 @@ namespace Chimera.Client.Common
 				Changes = false;
 			}
 			return new FileWriteResult();
+		}
+
+		/// <summary>
+		/// The project stores the flat name-to-value map the engine's settings
+		/// channel takes (and chimera-run passes straight through); the movie
+		/// machinery stores the settings OBJECT ({"Values":{...}} for a waterbox
+		/// core). These two translate at the boundary.
+		/// </summary>
+		internal static string FlattenSyncSettings(string syncSettingsJson)
+		{
+			if (string.IsNullOrWhiteSpace(syncSettingsJson)) return "{}";
+			try
+			{
+				var root = Newtonsoft.Json.Linq.JObject.Parse(syncSettingsJson);
+				if (root.Count is 1 && root["Values"] is Newtonsoft.Json.Linq.JObject values)
+				{
+					return values.ToString(Formatting.None);
+				}
+				return root.ToString(Formatting.None);
+			}
+			catch (JsonException)
+			{
+				return "{}";
+			}
+		}
+
+		internal static string WrapSyncSettings(string flatJson)
+		{
+			try
+			{
+				var values = Newtonsoft.Json.Linq.JObject.Parse(
+					string.IsNullOrWhiteSpace(flatJson) ? "{}" : flatJson);
+				return new Newtonsoft.Json.Linq.JObject { ["Values"] = values }.ToString(Formatting.None);
+			}
+			catch (JsonException)
+			{
+				return "{\"Values\":{}}";
+			}
 		}
 
 		private static string JoinLogLines(IStringLog log)
@@ -279,7 +317,7 @@ namespace Chimera.Client.Common
 			}
 			Subtitles.Sort();
 
-			SyncSettingsJson = p.SettingsJson;
+			SyncSettingsJson = WrapSyncSettings(p.SettingsJson);
 
 			var logText = p.LogText;
 			if (logText.Length is not 0)

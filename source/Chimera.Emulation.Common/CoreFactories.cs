@@ -56,6 +56,12 @@ namespace Chimera.Emulation.Common
 		/// this null should fail the load with a message naming what is missing.
 		/// </summary>
 		public Func<CoreFirmwareDecl, byte[]?>? FirmwareProvider { get; set; }
+
+		/// <summary>
+		/// Extra files mounted into the session before boot, in order (a chimera
+		/// project's slot map plus its files by canonical name - docs/project.md).
+		/// </summary>
+		public IReadOnlyList<KeyValuePair<string, byte[]>>? ExtraFiles { get; set; }
 	}
 
 	/// <summary>

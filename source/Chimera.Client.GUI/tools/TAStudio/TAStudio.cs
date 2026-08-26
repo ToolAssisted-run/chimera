@@ -97,7 +97,6 @@ namespace Chimera.Client.GUI
 				FollowCursorAlwaysScroll = false;
 				FollowCursorScrollMethod = "near";
 				AutosaveInterval = 120000;
-				AutosaveAsBk2 = false;
 				AutosaveAsBackupFile = false;
 				BackupPerFileSave = false;
 				EditInvisibleColumns = true;
@@ -123,7 +122,6 @@ namespace Chimera.Client.GUI
 			public bool FollowCursorAlwaysScroll { get; set; }
 			public string FollowCursorScrollMethod { get; set; }
 			public uint AutosaveInterval { get; set; }
-			public bool AutosaveAsBk2 { get; set; }
 			public bool AutosaveAsBackupFile { get; set; }
 			public bool BackupPerFileSave { get; set; }
 			public bool OldControlSchemeForBranches { get; set; }
@@ -291,40 +289,8 @@ namespace Chimera.Client.GUI
 				MainForm.EnsureCoreIsAccurate();
 			}
 
-			// Start Scenario 1: A regular movie is active
-			if (MovieSession.Movie.IsActive() && MovieSession.Movie is not ITasMovie)
-			{
-				var changesString = "Would you like to save the current movie before closing it?";
-				if (MovieSession.Movie.Changes)
-				{
-					changesString = "The current movie has unsaved changes. Would you like to save before closing it?";
-				}
-				var shouldSaveResult = DialogController.ShowMessageBox3(
-					"TAStudio will create a new project file from the current movie.\n\n" + changesString,
-					"Convert movie",
-					EMsgBoxIcon.Question);
-				if (shouldSaveResult == true)
-				{
-					FileWriteResult saveResult = MovieSession.Movie.Save();
-					if (saveResult.IsError)
-					{
-						DisplayMessageIfFailed(() => saveResult, "Failed to save movie.");
-						return false;
-					}
-				}
-				else if (shouldSaveResult == null)
-				{
-					return false;
-				}
-
-				var tasMovie = MovieSession.Movie.ToTasMovie();
-				// No need to save new movie, as there are no changes.
-				// User will save future changes if they want (potentially via auto-save).
-				success = LoadMovie(tasMovie);
-			}
-
-			// Start Scenario 2: A tasproj is already active
-			else if (MovieSession.Movie.IsActive() && MovieSession.Movie is ITasMovie)
+			// Start Scenario 1: the active project (chimera knows no other kind of movie)
+			if (MovieSession.Movie.IsActive() && MovieSession.Movie is ITasMovie)
 			{
 				success = LoadMovie(CurrentTasMovie, gotoFrame: Emulator.Frame);
 				if (!success)
@@ -383,29 +349,9 @@ namespace Chimera.Client.GUI
 				return;
 			}
 
-			FileWriteResult saveResult;
-			if (Settings.AutosaveAsBackupFile)
-			{
-				if (Settings.AutosaveAsBk2)
-				{
-					saveResult = SaveTas(saveAsBk2: true, saveBackup: true);
-				}
-				else
-				{
-					saveResult = SaveTas(saveBackup: true);
-				}
-			}
-			else
-			{
-				if (Settings.AutosaveAsBk2)
-				{
-					saveResult = SaveTas(saveAsBk2: true);
-				}
-				else
-				{
-					saveResult = SaveTas();
-				}
-			}
+			FileWriteResult saveResult = Settings.AutosaveAsBackupFile
+				? SaveTas(saveBackup: true)
+				: SaveTas();
 
 			if (saveResult.IsError && _lastAutoSaveSuccess)
 			{
@@ -814,9 +760,8 @@ namespace Chimera.Client.GUI
 			if (File.Exists(path))
 			{
 				var movie = MovieSession.Get(path, loadMovie: true);
-				if (movie != null)
+				if (movie is ITasMovie tasMovie)
 				{
-					var tasMovie = movie as ITasMovie ?? movie.ToTasMovie();
 					movieLoadSucceeded = LoadMovie(tasMovie);
 				}
 			}
@@ -914,7 +859,7 @@ namespace Chimera.Client.GUI
 			}
 		}
 
-		private FileWriteResult SaveTas(bool saveAsBk2 = false, bool saveBackup = false)
+		private FileWriteResult SaveTas(bool saveBackup = false)
 		{
 			if (string.IsNullOrEmpty(CurrentTasMovie.Filename) || CurrentTasMovie.Filename == DefaultTasProjName())
 			{
@@ -929,11 +874,6 @@ namespace Chimera.Client.GUI
 			Cursor = Cursors.WaitCursor;
 
 			IMovie movieToSave = CurrentTasMovie;
-			if (saveAsBk2)
-			{
-				movieToSave = CurrentTasMovie.ToBk2();
-				movieToSave.Attach(Emulator);
-			}
 
 			FileWriteResult result;
 			if (saveBackup)
@@ -944,7 +884,7 @@ namespace Chimera.Client.GUI
 			if (!result.IsError)
 			{
 				MessageStatusLabel.Text = saveBackup
-					? $"Backup .{(saveAsBk2 ? MovieService.StandardMovieExtension : MovieService.TasMovieExtension)} saved to \"Movie backups\" path."
+					? $"Backup .{MovieService.TasMovieExtension} saved to \"Movie backups\" path."
 					: "File saved.";
 			}
 			else

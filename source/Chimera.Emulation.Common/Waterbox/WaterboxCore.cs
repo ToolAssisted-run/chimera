@@ -65,7 +65,7 @@ namespace Chimera.Emulation.Common.Waterbox
 		/// </summary>
 		public static string HostBuildInfo => EngineSession.HostBuildInfo;
 
-		public WaterboxCore(byte[] rom, WaterboxConfig cfg, string packageDir, WaterboxCoreSyncSettings syncSettings, WaterboxCoreSettings settings = null, IReadOnlyDictionary<string, byte[]> firmware = null)
+		public WaterboxCore(byte[] rom, WaterboxConfig cfg, string packageDir, WaterboxCoreSyncSettings syncSettings, WaterboxCoreSettings settings = null, IReadOnlyDictionary<string, byte[]> firmware = null, IReadOnlyList<KeyValuePair<string, byte[]>> extraFiles = null)
 		{
 			_cfg = cfg;
 			_syncSettings = syncSettings?.Clone() ?? new WaterboxCoreSyncSettings();
@@ -84,7 +84,7 @@ namespace Chimera.Emulation.Common.Waterbox
 			// core's own words (GetLoadError), which the engine already collected.
 			try
 			{
-				_session = EngineSession.Open(packageDir, rom, SerializeSettings(EffectiveSettings()), firmware);
+				_session = EngineSession.Open(packageDir, rom, SerializeSettings(EffectiveSettings()), firmware, extraFiles);
 			}
 			catch (InvalidOperationException ex)
 			{

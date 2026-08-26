@@ -73,7 +73,6 @@ namespace Chimera.Client.GUI
 
 			// autosave
 			AutosaveBackupCheckbox.Checked = _settings.GeneralClientSettings.AutosaveAsBackupFile;
-			AutosaveBk2Checkbox.Checked = _settings.GeneralClientSettings.AutosaveAsBk2;
 			AutosaveIntervalNum.Value = _settings.GeneralClientSettings.AutosaveInterval / 1000;
 			BackupOnSaveCheckbox.Checked = _settings.GeneralClientSettings.BackupPerFileSave;
 
@@ -486,7 +485,6 @@ namespace Chimera.Client.GUI
 			_settings.MovieSettings.HorizontalOrientation = RotateCheckbox.Checked;
 
 			_settings.GeneralClientSettings.AutosaveAsBackupFile = AutosaveBackupCheckbox.Checked;
-			_settings.GeneralClientSettings.AutosaveAsBk2 = AutosaveBk2Checkbox.Checked;
 			_settings.GeneralClientSettings.AutosaveInterval = (uint)AutosaveIntervalNum.Value * 1000;
 			_settings.GeneralClientSettings.BackupPerFileSave = BackupOnSaveCheckbox.Checked;
 

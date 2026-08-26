@@ -61,7 +61,8 @@ namespace Chimera.Emulation.Common.Waterbox
 				_packageDir,
 				ctx.SyncSettings as WaterboxCoreSyncSettings,
 				ctx.Settings as WaterboxCoreSettings,
-				ResolveFirmware(ctx));
+				ResolveFirmware(ctx),
+				ctx.ExtraFiles);
 		}
 
 		/// <summary>

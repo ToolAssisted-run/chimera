@@ -47,7 +47,6 @@
 			this.label11 = new System.Windows.Forms.Label();
 			this.BackupOnSaveCheckbox = new System.Windows.Forms.CheckBox();
 			this.AutosaveBackupCheckbox = new System.Windows.Forms.CheckBox();
-			this.AutosaveBk2Checkbox = new System.Windows.Forms.CheckBox();
 			this.label5 = new System.Windows.Forms.Label();
 			this.label4 = new System.Windows.Forms.Label();
 			this.AutosaveIntervalNum = new System.Windows.Forms.NumericUpDown();
@@ -295,7 +294,6 @@
 			this.tabPage5.Controls.Add(this.label11);
 			this.tabPage5.Controls.Add(this.BackupOnSaveCheckbox);
 			this.tabPage5.Controls.Add(this.AutosaveBackupCheckbox);
-			this.tabPage5.Controls.Add(this.AutosaveBk2Checkbox);
 			this.tabPage5.Controls.Add(this.label5);
 			this.tabPage5.Controls.Add(this.label4);
 			this.tabPage5.Controls.Add(this.AutosaveIntervalNum);
@@ -337,17 +335,6 @@
 			this.AutosaveBackupCheckbox.Text = "Save as .backup (no greenzone)";
 			this.toolTip1.SetToolTip(this.AutosaveBackupCheckbox, resources.GetString("AutosaveBackupCheckbox.ToolTip"));
 			this.AutosaveBackupCheckbox.UseVisualStyleBackColor = true;
-			// 
-			// AutosaveBk2Checkbox
-			// 
-			this.AutosaveBk2Checkbox.AutoSize = true;
-			this.AutosaveBk2Checkbox.Location = new System.Drawing.Point(6, 56);
-			this.AutosaveBk2Checkbox.Name = "AutosaveBk2Checkbox";
-			this.AutosaveBk2Checkbox.Size = new System.Drawing.Size(89, 17);
-			this.AutosaveBk2Checkbox.TabIndex = 202;
-			this.AutosaveBk2Checkbox.Text = "Save as .tas";
-			this.toolTip1.SetToolTip(this.AutosaveBk2Checkbox, "Autosave will export the movie to a .chimeraMovie file instead of saving a .chimeraProject file.");
-			this.AutosaveBk2Checkbox.UseVisualStyleBackColor = true;
 			// 
 			// label5
 			// 
@@ -1138,7 +1125,6 @@
 		private System.Windows.Forms.RadioButton PatternAutoFireRadioButton;
 		private System.Windows.Forms.CheckBox BackupOnSaveCheckbox;
 		private System.Windows.Forms.CheckBox AutosaveBackupCheckbox;
-		private System.Windows.Forms.CheckBox AutosaveBk2Checkbox;
 		private System.Windows.Forms.Label label5;
 		private System.Windows.Forms.Label label4;
 		private System.Windows.Forms.NumericUpDown AutosaveIntervalNum;

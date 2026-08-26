@@ -34,13 +34,10 @@ namespace Chimera.Client.GUI
 			this.TASMenu = new Chimera.WinForms.Controls.MenuStripEx();
 			this.FileSubMenu = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.NewTASMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.NewFromSubMenu = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.NewFromNowMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.OpenTASMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.SaveTASMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.SaveAsTASMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.SaveBackupMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.SaveBk2BackupMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.RecentSubMenu = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.toolStripSeparator3 = new Chimera.WinForms.Controls.ToolStripSeparatorEx();
 			this.toolStripSeparator1 = new Chimera.WinForms.Controls.ToolStripSeparatorEx();
@@ -49,7 +46,6 @@ namespace Chimera.Client.GUI
 			this.recentMacrosToolStripMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.toolStripSeparator22 = new Chimera.WinForms.Controls.ToolStripSeparatorEx();
 			this.toolStripSeparator20 = new Chimera.WinForms.Controls.ToolStripSeparatorEx();
-			this.ToBk2MenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.EditSubMenu = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.UndoMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.RedoMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
@@ -124,8 +120,6 @@ namespace Chimera.Client.GUI
 			this.toolStripSeparator18 = new Chimera.WinForms.Controls.ToolStripSeparatorEx();
 			this.TruncateContextMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.BranchContextMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.StartFromNowSeparator = new Chimera.WinForms.Controls.ToolStripSeparatorEx();
-			this.StartNewProjectFromNowMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.BookMarkControl = new Chimera.Client.GUI.BookmarksBranchesBox();
 			this.BranchesMarkersSplit = new System.Windows.Forms.SplitContainer();
 			this.MainVertialSplit = new System.Windows.Forms.SplitContainer();
@@ -164,19 +158,16 @@ namespace Chimera.Client.GUI
 			// 
 			this.FileSubMenu.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.NewTASMenuItem,
-            this.NewFromSubMenu,
             this.OpenTASMenuItem,
             this.SaveTASMenuItem,
             this.SaveAsTASMenuItem,
             this.SaveBackupMenuItem,
-            this.SaveBk2BackupMenuItem,
             this.RecentSubMenu,
             this.toolStripSeparator1,
             this.saveSelectionToMacroToolStripMenuItem,
             this.placeMacroAtSelectionToolStripMenuItem,
             this.recentMacrosToolStripMenuItem,
-            this.toolStripSeparator20,
-            this.ToBk2MenuItem});
+            this.toolStripSeparator20});
 			this.FileSubMenu.Text = "&File";
 			this.FileSubMenu.DropDownOpened += new System.EventHandler(this.FileSubMenu_DropDownOpened);
 			// 
@@ -184,18 +175,6 @@ namespace Chimera.Client.GUI
 			// 
 			this.NewTASMenuItem.Text = "&New";
 			this.NewTASMenuItem.Click += new System.EventHandler(this.NewTasMenuItem_Click);
-			// 
-			// NewFromSubMenu
-			// 
-			this.NewFromSubMenu.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
-            this.NewFromNowMenuItem});
-			this.NewFromSubMenu.Text = "New From";
-			this.NewFromSubMenu.DropDownOpened += new System.EventHandler(this.NewFromSubMenu_DropDownOpened);
-			// 
-			// NewFromNowMenuItem
-			// 
-			this.NewFromNowMenuItem.Text = "&Now";
-			this.NewFromNowMenuItem.Click += new System.EventHandler(this.StartNewProjectFromNowMenuItem_Click);
 			// 
 			// 
 			// 
@@ -223,11 +202,6 @@ namespace Chimera.Client.GUI
 			this.SaveBackupMenuItem.Text = "Save Backup";
 			this.SaveBackupMenuItem.Click += new System.EventHandler(this.SaveBackupMenuItem_Click);
 			// 
-			// SaveBk2BackupMenuItem
-			// 
-			this.SaveBk2BackupMenuItem.Text = "Save Movie Backup";
-			this.SaveBk2BackupMenuItem.Click += new System.EventHandler(this.SaveBk2BackupMenuItem_Click);
-			// 
 			// RecentSubMenu
 			// 
 			this.RecentSubMenu.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
@@ -251,11 +225,6 @@ namespace Chimera.Client.GUI
             this.toolStripSeparator22});
 			this.recentMacrosToolStripMenuItem.Text = "Recent Macros";
 			this.recentMacrosToolStripMenuItem.DropDownOpened += new System.EventHandler(this.RecentMacrosMenuItem_DropDownOpened);
-			// 
-			// ToBk2MenuItem
-			// 
-			this.ToBk2MenuItem.Text = "&Export to .chimeraMovie";
-			this.ToBk2MenuItem.Click += new System.EventHandler(this.ToBk2MenuItem_Click);
 			// 
 			// EditSubMenu
 			// 
@@ -559,9 +528,7 @@ namespace Chimera.Client.GUI
             this.CloneXTimesContextMenuItem,
             this.toolStripSeparator18,
             this.TruncateContextMenuItem,
-            this.BranchContextMenuItem,
-            this.StartFromNowSeparator,
-            this.StartNewProjectFromNowMenuItem});
+            this.BranchContextMenuItem});
 			this.RightClickMenu.Name = "RightClickMenu";
 			this.RightClickMenu.Size = new System.Drawing.Size(253, 502);
 			this.RightClickMenu.Opened += new System.EventHandler(this.RightClickMenu_Opened);
@@ -664,11 +631,6 @@ namespace Chimera.Client.GUI
 			// 
 			this.BranchContextMenuItem.Text = "&Branch";
 			this.BranchContextMenuItem.Click += new System.EventHandler(this.BranchContextMenuItem_Click);
-			// 
-			// StartNewProjectFromNowMenuItem
-			// 
-			this.StartNewProjectFromNowMenuItem.Text = "Start a new project from Now";
-			this.StartNewProjectFromNowMenuItem.Click += new System.EventHandler(this.StartNewProjectFromNowMenuItem_Click);
 			// 
 			// 
 			// 
@@ -878,8 +840,6 @@ namespace Chimera.Client.GUI
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx ColumnsSubMenu;
 		private Chimera.WinForms.Controls.ToolStripSeparatorEx toolStripSeparator19;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx CancelSeekContextMenuItem;
-		private Chimera.WinForms.Controls.ToolStripSeparatorEx StartFromNowSeparator;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx StartNewProjectFromNowMenuItem;
 		private System.Windows.Forms.ToolStripProgressBar ProgressBar;
 		private System.Windows.Forms.ToolStripStatusLabel toolStripStatusLabel2;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx copyToolStripMenuItem;
@@ -891,19 +851,15 @@ namespace Chimera.Client.GUI
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx saveSelectionToMacroToolStripMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx placeMacroAtSelectionToolStripMenuItem;
 		private Chimera.WinForms.Controls.ToolStripSeparatorEx toolStripSeparator20;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx ToBk2MenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx recentMacrosToolStripMenuItem;
 		private Chimera.WinForms.Controls.ToolStripSeparatorEx toolStripSeparator22;
 		private BookmarksBranchesBox BookMarkControl;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx BranchContextMenuItem;
 		private System.Windows.Forms.SplitContainer BranchesMarkersSplit;
 		private System.Windows.Forms.SplitContainer MainVertialSplit;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx NewFromSubMenu;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx NewFromNowMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx SetMarkerWithTextContextMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx TASEditorManualOnlineMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx SaveBackupMenuItem;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx SaveBk2BackupMenuItem;
 		private System.Windows.Forms.ToolTip toolTip1;
 		private System.Windows.Forms.ToolStripMenuItem TAStudioSettingsToolStripMenuItem;
 		private System.Windows.Forms.ContextMenuStrip ColumnRightClickMenu;

@@ -16,38 +16,15 @@ namespace Chimera.Client.GUI
 	public partial class TAStudio
 	{
 		private static readonly FilesystemFilterSet MoviesFSFilterSet = new(
-			new FilesystemFilter("All Available Files", MovieService.MovieExtensions.Reverse().ToArray()),
-			FilesystemFilter.TAStudioProjects,
-			FilesystemFilter.BizHawkMovies);
+			FilesystemFilter.TAStudioProjects);
 
 		private void FileSubMenu_DropDownOpened(object sender, EventArgs e)
 		{
-			SaveBackupMenuItem.Enabled = SaveBk2BackupMenuItem.Enabled = !string.IsNullOrWhiteSpace(CurrentTasMovie.Filename) && CurrentTasMovie.Filename != DefaultTasProjName();
+			SaveBackupMenuItem.Enabled = !string.IsNullOrWhiteSpace(CurrentTasMovie.Filename) && CurrentTasMovie.Filename != DefaultTasProjName();
 			saveSelectionToMacroToolStripMenuItem.Enabled =
 				placeMacroAtSelectionToolStripMenuItem.Enabled =
 				recentMacrosToolStripMenuItem.Enabled =
 				AnyRowsSelected;
-		}
-
-		private void NewFromSubMenu_DropDownOpened(object sender, EventArgs e)
-		{
-			NewFromNowMenuItem.Enabled = CurrentTasMovie.InputLogLength > 0;
-		}
-
-		private void StartNewProjectFromNowMenuItem_Click(object sender, EventArgs e)
-		{
-			if (AskSaveChanges())
-			{
-				var result = CurrentTasMovie.ConvertToSavestateAnchoredMovie(
-					Emulator.Frame, StatableEmulator.CloneSavestate());
-				DisplayMessageIfFailed(() => result, "Failed to create movie.");
-
-				if (result.Value is ITasMovie newProject)
-				{
-					MainForm.PauseEmulator();
-					LoadMovie(newProject, true);
-				}
-			}
 		}
 
 		private void RecentSubMenu_DropDownOpened(object sender, EventArgs e)
@@ -123,11 +100,6 @@ namespace Chimera.Client.GUI
 			DisplayMessageIfFailed(() => SaveTas(saveBackup: true), "Failed to save backup.");
 		}
 
-		private void SaveBk2BackupMenuItem_Click(object sender, EventArgs e)
-		{
-			DisplayMessageIfFailed(() => SaveTas(saveAsBk2: true, saveBackup: true), "Failed to save backup.");
-		}
-
 		private void SaveSelectionToMacroMenuItem_Click(object sender, EventArgs e)
 		{
 			if (!AnyRowsSelected)
@@ -193,58 +165,6 @@ namespace Chimera.Client.GUI
 
 		private void RecentMacrosMenuItem_DropDownOpened(object sender, EventArgs e)
 			=> recentMacrosToolStripMenuItem.ReplaceDropDownItems(Config!.RecentMacros.RecentMenu(this, DummyLoadMacro, "Macro", noAutoload: true));
-
-		private void ToBk2MenuItem_Click(object sender, EventArgs e)
-		{
-			_autosaveTimer.Stop();
-
-			if (Emulator.HasCycleTiming() && !CurrentTasMovie.IsAtEnd())
-			{
-				DialogController.ShowMessageBox("This core requires emulation to be on the last frame when writing the movie, otherwise movie length will appear incorrect.", "Warning", EMsgBoxIcon.Warning);
-			}
-
-			string filename = CurrentTasMovie.Filename;
-			if (string.IsNullOrWhiteSpace(filename) || filename == DefaultTasProjName())
-			{
-				filename = SuggestedTasProjName();
-			}
-
-			filename = Path.ChangeExtension(filename, Bk2Movie.Extension);
-			var fileInfo = SaveFileDialog(currentFile: filename, path: Config!.PathEntries.MovieAbsolutePath(), new FilesystemFilterSet(FilesystemFilter.BizHawkMovies), this);
-
-			if (fileInfo is not null)
-			{
-				MessageStatusLabel.Text = "Exporting to .chimeraMovie...";
-				MessageStatusLabel.Owner.Update();
-
-				Cursor = Cursors.WaitCursor;
-				var bk2 = CurrentTasMovie.ToBk2();
-				bk2.Filename = fileInfo.FullName;
-				bk2.Attach(Emulator); // required to be able to save the cycle count for ICycleTiming emulators
-				FileWriteResult saveResult = bk2.Save();
-				Cursor = Cursors.Default;
-
-				while (saveResult.IsError)
-				{
-					DialogResult d = MessageBox.Show(
-						$"Failed to save .chimeraMovie. {saveResult.UserFriendlyErrorMessage()}\nTry again?",
-						"Error",
-						MessageBoxButtons.YesNo);
-					if (d == DialogResult.Yes) saveResult = bk2.Save();
-					else break;
-				}
-				if (!saveResult.IsError) MessageStatusLabel.Text = $"{bk2.Name} exported.";
-			}
-			else
-			{
-				MessageStatusLabel.Text = "Movie export cancelled.";
-			}
-
-			if (Settings.AutosaveInterval > 0)
-			{
-				_autosaveTimer.Start();
-			}
-		}
 
 		private void EditSubMenu_DropDownClosed(object sender, EventArgs e)
 		{
@@ -1020,12 +940,6 @@ namespace Chimera.Client.GUI
 				pasteInsertToolStripMenuItem.Enabled =
 					AnyRowsSelected && Clipboard.ContainsText();
 
-			var selectionIsSingleRow = GetSelection().CountIsExactly(1);
-			StartNewProjectFromNowMenuItem.Visible =
-				selectionIsSingleRow
-				&& IsRowSelected(Emulator.Frame);
-
-			StartFromNowSeparator.Visible = StartNewProjectFromNowMenuItem.Visible;
 			RemoveMarkersContextMenuItem.Enabled = CurrentTasMovie.Markers.Any(m => IsRowSelected(m.Frame)); // Disable the option to remove markers if no markers are selected (FCEUX does this).
 			CancelSeekContextMenuItem.Enabled = SeekingTo != -1;
 			BranchContextMenuItem.Visible = CurrentCell?.RowIndex == Emulator.Frame;

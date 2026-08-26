@@ -204,6 +204,13 @@ namespace Chimera.Client.Common
 			return true;
 		}
 
+		/// <summary>
+		/// The resolved project when the caller is opening a .chimeraProject: every
+		/// file already located and hash-checked (or knowingly overridden) by the
+		/// resolution dialog. The loader only builds the mounts from it.
+		/// </summary>
+		public Emulation.Common.Engine.EngineProject Project { get; set; }
+
 		public bool LoadRom(string path, CoreComm nextComm, string forcedCoreName = null, int recursiveCount = 0)
 		{
 			if (path == null) return false;
@@ -212,6 +219,25 @@ namespace Chimera.Client.Common
 			{
 				DoLoadErrorCallback("Failed multiple attempts to load ROM.", "");
 				return false;
+			}
+
+			if (Project is not null && path.EndsWith(".chimeraProject", StringComparison.OrdinalIgnoreCase))
+			{
+				try
+				{
+					LoadProjectGame(path, nextComm, out var projectEmulator, out var projectGame);
+					if (projectEmulator is null) return false;
+					CanonicalFullPath = Path.GetFullPath(path);
+					Rom = null;
+					LoadedEmulator = projectEmulator;
+					Game = projectGame;
+					return true;
+				}
+				catch (Exception ex)
+				{
+					DispatchErrorMessage(ex, system: null, path: path);
+					return false;
+				}
 			}
 
 			using ChimeraFile file = new(path, allowArchives: true);
@@ -273,6 +299,77 @@ namespace Chimera.Client.Common
 			LoadedEmulator = nextEmulator;
 			Game = game;
 			return true;
+		}
+
+		/// <summary>
+		/// A project's machine: the pinned core, the project's own sync settings
+		/// (queued by the movie the project IS), and the manifest's mounts - the
+		/// slot map as "slots", every file under its canonical name, and the
+		/// transitional rom/rom.name/rom2..N view of the first slot, exactly the
+		/// mounts chimera-run makes (docs/project.md).
+		/// </summary>
+		private void LoadProjectGame(string path, CoreComm nextComm, out IEmulator nextEmulator, out GameInfo game)
+		{
+			var p = Project;
+			var primary = -1;
+			for (var i = 0; i < p.FileCount; i++)
+			{
+				if (p.FileSlot(i) is not "support") { primary = i; break; }
+			}
+			if (primary < 0) throw new CoreLoadException("the project lists no game file");
+			var primaryBytes = p.FileData(primary)
+				?? throw new CoreLoadException($"'{p.FileName(primary)}' has not been resolved");
+
+			var factory = CoreRegistry.Instance.AllFactories.FirstOrDefault(f => f.CoreName == p.CoreName)
+				?? throw new CoreLoadException($"the project's core '{p.CoreName}' is not loaded");
+
+			List<KeyValuePair<string, byte[]>> extras = new()
+			{
+				new("slots", System.Text.Encoding.UTF8.GetBytes(p.SlotsJson)),
+			};
+			for (var i = 0; i < p.FileCount; i++)
+			{
+				extras.Add(new(p.FileName(i), p.FileData(i)
+					?? throw new CoreLoadException($"'{p.FileName(i)}' has not been resolved")));
+			}
+			extras.Add(new("rom.name", System.Text.Encoding.UTF8.GetBytes(p.FileName(primary))));
+			var primarySlot = p.FileSlot(primary);
+			var n = 2;
+			for (var i = primary + 1; i < p.FileCount; i++)
+			{
+				if (p.FileSlot(i) != primarySlot) continue;
+				extras.Add(new($"rom{n++}", p.FileData(i)));
+			}
+
+			game = new GameInfo
+			{
+				Name = p.Title.Length is not 0 ? p.Title : Path.GetFileNameWithoutExtension(path),
+				Hash = p.FileActualSha1(primary),
+				System = factory.SystemIds[0],
+			};
+
+			var ctx = new CoreCreationContext
+			{
+				Comm = nextComm,
+				Game = game,
+				Roms = new List<IRomAsset>
+				{
+					new RomAsset
+					{
+						RomData = primaryBytes,
+						FileData = primaryBytes,
+						Extension = Path.GetExtension(p.FileName(primary)),
+						RomPath = path,
+						Game = game,
+					},
+				},
+				DeterministicEmulationRequested = Deterministic,
+				Settings = GetCoreSettings(factory.CoreType, factory.SettingsType),
+				SyncSettings = GetCoreSyncSettings(factory.CoreType, factory.SyncSettingsType),
+				FirmwareProvider = CoreFirmwareStore.ProviderFor(_config, factory.CoreName),
+				ExtraFiles = extras,
+			};
+			nextEmulator = factory.Create(ctx);
 		}
 
 		private IEmulator MakeCoreFromRegistry(LoadParameters lp, string forcedCoreName = null)
