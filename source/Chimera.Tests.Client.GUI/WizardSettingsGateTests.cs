@@ -76,5 +76,56 @@ namespace Chimera.Tests.Client.GUI
 			form.SetSettingValue("expansion", false);
 			CollectionAssert.DoesNotContain(form.ExposedSettingNames, "expansionRam");
 		}
+
+		private static WaterboxConfig MakeCfgWithFirmware()
+			=> WaterboxConfig.FromJson("""
+				{
+				  "coreName": "GPGX-shaped",
+				  "systemId": "GEN",
+				  "video": { "width": 320, "height": 224 },
+				  "audio": { "samplesPerFrame": 1024 },
+				  "input": { "buttons": [] },
+				  "settings": [
+				    { "name": "loadBios", "type": "bool", "default": false }
+				  ],
+				  "firmware": [
+				    { "id": "mdBios", "display": "TMSS boot rom",
+				      "requiredWhen": { "setting": "loadBios", "is": true } }
+				  ]
+				}
+				""");
+
+		[TestMethod]
+		public void AMachineThatNeedsNoFirmwareIsNotAskedAboutFirmware()
+		{
+			// the settings step is the last one, so its button offers to create
+			using var form = MakeForm("sonic.md");
+			Assert.AreEqual("Create", form.NextButtonText,
+				"nothing declares firmware: the settings step ends the wizard");
+		}
+
+		[TestMethod]
+		public void TheFirmwareStepAppearsOnlyWhileSomethingNeedsIt()
+		{
+			NewProjectWizard form = new([ ], static _ => [ ]);
+			using (form)
+			{
+				form.Show();
+				form.UseDeclaration(ProjectSlotDeclaration.Parse(Declaration));
+				form.AddFileToSlot("cart", "/games/sonic.md");
+				form.UseSettingsFrom(MakeCfgWithFirmware());
+
+				Assert.AreEqual("Create", form.NextButtonText,
+					"the bios is not asked for while loadBios is off");
+
+				form.SetSettingValue("loadBios", true);
+				Assert.AreEqual("Next >", form.NextButtonText,
+					"turning the bios on adds the step that asks for it");
+
+				form.SetSettingValue("loadBios", false);
+				Assert.AreEqual("Create", form.NextButtonText,
+					"and turning it off takes the step away again");
+			}
+		}
 	}
 }

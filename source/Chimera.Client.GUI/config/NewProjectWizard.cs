@@ -123,9 +123,15 @@ namespace Chimera.Client.GUI
 
 			// ---- page 1: the machine ---------------------------------------------
 			var p1 = _pages[0];
-			p1.Controls.Add(MakeLabel("A project holds everything the work needs: the core, the files, the settings,\nand the TAS itself. Everything is defined here, once.\n\nStart with the machine - every question after this one belongs to it.", 8, 8));
-			p1.Controls.Add(MakeLabel("Emulation core:", 8, 104));
-			_core = new ComboBox { Location = Pt(110, 100), Width = UIHelper.ScaleX(360), DropDownStyle = ComboBoxStyle.DropDownList };
+			p1.Controls.Add(MakeHeading("Please select the emulation core."));
+			p1.Controls.Add(MakeLabel("Emulation core:", 8, 52));
+			_core = new ComboBox
+			{
+				Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
+				DropDownStyle = ComboBoxStyle.DropDownList,
+				Location = Pt(110, 48),
+				Width = UIHelper.ScaleX(442),
+			};
 			foreach (var core in _cores)
 			{
 				_core.Items.Add($"{core.Name}  ({string.Join(", ", core.Systems)}{(string.IsNullOrEmpty(core.Version) ? "" : $", {core.Version}")})");
@@ -135,7 +141,7 @@ namespace Chimera.Client.GUI
 
 			// ---- page 2: the core-informed file form -----------------------------
 			var p2 = _pages[1];
-			p2.Controls.Add(MakeLabel("The files this machine takes, as the core declares them. Order within a\ncategory is the swap order.", 8, 8));
+			p2.Controls.Add(MakeHeading("Please provide the game ROMs and other persistent data."));
 			_slotsHost = new Panel
 			{
 				Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
@@ -147,7 +153,7 @@ namespace Chimera.Client.GUI
 
 			// ---- page 3: settings ------------------------------------------------
 			var p3 = _pages[2];
-			p3.Controls.Add(MakeLabel("The settings this machine starts with. Every setting shapes the machine, so\nthe project records them; a structural change later restarts from frame 0.", 8, 8));
+			p3.Controls.Add(MakeHeading("Please specify the emulation configuration settings."));
 			_settingsGrid = new PropertyGrid
 			{
 				Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
@@ -156,12 +162,16 @@ namespace Chimera.Client.GUI
 				ToolbarVisible = false,
 				PropertySort = PropertySort.Alphabetical,
 			};
-			_settingsGrid.PropertyValueChanged += (_, _) => RefreshExposedSettings();
+			_settingsGrid.PropertyValueChanged += (_, _) =>
+			{
+				RefreshExposedSettings();
+				UpdateNavLabels();
+			};
 			p3.Controls.Add(_settingsGrid);
 
 			// ---- page 4: firmware, decided by everything chosen above ------------
 			var p4 = _pages[3];
-			p4.Controls.Add(MakeLabel("The firmware these decisions call for - each requirement is one exact file,\nnamed by hash (the file name is only a hint). The Firmware folder was\nsearched already; select a file yourself where nothing was found.", 8, 8));
+			p4.Controls.Add(MakeHeading("Please indicate where to find the required firmware files."));
 			_firmwareList = new ListView
 			{
 				Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
@@ -209,6 +219,21 @@ namespace Chimera.Client.GUI
 		private static Label MakeLabel(string text, int x, int y)
 			=> new() { AutoSize = true, Location = Pt(x, y), Text = text };
 
+		/// <summary>
+		/// A step's one question, across the full width of the window. Not
+		/// auto-sized and never hand-wrapped: the text stops where the window
+		/// stops, and follows it when it is resized.
+		/// </summary>
+		private static Label MakeHeading(string text)
+			=> new()
+			{
+				Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
+				AutoSize = false,
+				Location = Pt(8, 10),
+				Size = new(UIHelper.ScaleX(544), UIHelper.ScaleY(20)),
+				Text = text,
+			};
+
 		private Button MakeNavButton(string text, int x, Action onClick)
 		{
 			Button b = new()
@@ -230,8 +255,37 @@ namespace Chimera.Client.GUI
 			_page = Math.Max(0, Math.Min(_pages.Length - 1, page));
 			for (var i = 0; i < _pages.Length; i++) _pages[i].Visible = i == _page;
 			_backButton.Enabled = _page > 0;
-			_nextButton.Text = _page == _pages.Length - 1 ? "Create" : "Next >";
 			_status.Text = "";
+			UpdateNavLabels();
+		}
+
+		/// <summary>
+		/// A machine that needs no firmware is not asked about firmware: the
+		/// settings step is then the last one, and its button says Create.
+		/// Whether it is depends on the current files and settings, so this is
+		/// re-asked whenever either changes.
+		/// </summary>
+		private bool IsLastPage(int page)
+			=> page == _pages.Length - 1 || (page == 2 && !AnyFirmwareRequired());
+
+		/// <summary>
+		/// Which firmware the decisions so far call for - the cheap half of the
+		/// firmware step (the engine's decision tree only; no folder is indexed
+		/// and nothing is hashed).
+		/// </summary>
+		private bool AnyFirmwareRequired()
+		{
+			if (_cfg?.RawFirmwareJson is not { Length: not 0 } declJson) return false;
+			var effective = WaterboxCore.EffectiveSettingsFor(_cfg, _settings);
+			return Chimera.Emulation.Common.Engine.EngineFirmware.Evaluate(
+				declJson,
+				CurrentSlotsJson(),
+				Newtonsoft.Json.JsonConvert.SerializeObject(effective)).Count is not 0;
+		}
+
+		private void UpdateNavLabels()
+		{
+			_nextButton.Text = IsLastPage(_page) ? "Create" : "Next >";
 			UpdateCreateEnabled();
 		}
 
@@ -241,6 +295,9 @@ namespace Chimera.Client.GUI
 
 		/// <summary>whether Create is currently available, for tests</summary>
 		public bool CreateEnabled => _nextButton.Enabled;
+
+		/// <summary>what the forward button offers right now - "Next &gt;" or "Create", for tests</summary>
+		public string NextButtonText => _nextButton.Text;
 
 		private void Advance()
 		{
@@ -258,6 +315,12 @@ namespace Chimera.Client.GUI
 					ShowPage(2);
 					break;
 				case 2:
+					if (!AnyFirmwareRequired())
+					{
+						// nothing to ask for: the settings step was the last one
+						Create();
+						break;
+					}
 					BuildFirmwarePage();
 					ShowPage(3);
 					break;
@@ -324,8 +387,11 @@ namespace Chimera.Client.GUI
 		/// <summary>sets a value as the grid would, re-running the gate - for tests</summary>
 		internal void SetSettingValue(string name, object value)
 		{
+			// exactly what the grid does when a value is edited, so the test
+			// door cannot drift from the real path
 			_settings!.Values[name] = value;
 			RefreshExposedSettings();
+			UpdateNavLabels();
 		}
 
 		/// <summary>Renders given sync-setting declarations directly - the test and screenshot door.</summary>
@@ -351,21 +417,18 @@ namespace Chimera.Client.GUI
 					Size = new(UIHelper.ScaleX(520), UIHelper.ScaleY(96)),
 					Text = $"{slot.Title}  ({slot.CardinalityText}{(slot.Formats.Count is 0 ? "" : $"; {string.Join(", ", slot.Formats.Select(static f => "." + f))}")})",
 				};
-				Label help = new()
-				{
-					AutoSize = true,
-					Font = new Font(Font, FontStyle.Bold),
-					Location = Pt(6, 20),
-					Text = "(?)",
-				};
-				_tips.SetToolTip(help, slot.Help.Length is 0 ? "the core did not explain this slot" : slot.Help);
+				// the core's own explanation of the slot, on hover - the row IS
+				// the affordance, so there is no glyph to wonder about
+				var help = slot.Help.Length is 0 ? "the core did not explain this slot" : slot.Help;
+				_tips.SetToolTip(group, help);
 				ListBox list = new()
 				{
 					Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
 					IntegralHeight = false,
-					Location = Pt(30, 18),
-					Size = new(UIHelper.ScaleX(380), UIHelper.ScaleY(70)),
+					Location = Pt(8, 18),
+					Size = new(UIHelper.ScaleX(402), UIHelper.ScaleY(70)),
 				};
+				_tips.SetToolTip(list, help);
 				Button add = new() { AutoSize = true, Location = Pt(416, 18), Text = "Add..." };
 				add.Click += (_, _) =>
 				{
@@ -377,7 +440,7 @@ namespace Chimera.Client.GUI
 					if (list.SelectedIndex >= 0) list.Items.RemoveAt(list.SelectedIndex);
 					RefreshSlotAvailability();
 				};
-				group.Controls.AddRange([ help, list, add, remove ]);
+				group.Controls.AddRange([ list, add, remove ]);
 				_slotsHost.Controls.Add(group);
 				_slotLists[slot.Id] = list;
 				_slotGroups[slot.Id] = group;
