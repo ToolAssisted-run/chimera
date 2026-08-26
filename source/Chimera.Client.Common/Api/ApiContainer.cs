@@ -38,8 +38,6 @@ namespace Chimera.Client.Common
 		public IMovieApi Movie
 			=> Get<IMovieApi>();
 
-		public ISaveStateApi SaveState
-			=> Get<ISaveStateApi>();
 
 		public ISQLiteApi SQLite
 			=> Get<ISQLiteApi>();

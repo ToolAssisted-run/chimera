@@ -25,11 +25,6 @@ namespace Chimera.Client.GUI
 
 		private void FileSubMenu_DropDownOpened(object sender, EventArgs e)
 		{
-			SaveStateSubMenu.Enabled =
-				LoadStateSubMenu.Enabled =
-				SaveSlotSubMenu.Enabled =
-				Emulator.HasSavestates();
-
 			CloseRomMenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["Close ROM"];
 
 			CloseRomMenuItem.Enabled = !Emulator.IsNull();
@@ -48,95 +43,6 @@ namespace Chimera.Client.GUI
 
 		private void RecentProjectSubMenu_DropDownOpened(object sender, EventArgs e)
 			=> RecentProjectSubMenu.ReplaceDropDownItems(Config.RecentProjects.RecentMenu(this, path => LoadProject(path), "Project", noAutoload: true));
-
-		private bool HasSlot(int slot) => _stateSlots.HasSlot(Emulator, MovieSession.Movie, slot, SaveStatePrefix());
-
-		private void SaveStateSubMenu_DropDownOpened(object sender, EventArgs e)
-		{
-			void SetSlotFont(ToolStripMenuItemEx menu, int slot) => menu.SetStyle(
-				HasSlot(slot) ? (FontStyle.Italic | FontStyle.Bold) : FontStyle.Regular);
-
-			SetSlotFont(SaveState1MenuItem, 1);
-			SetSlotFont(SaveState2MenuItem, 2);
-			SetSlotFont(SaveState3MenuItem, 3);
-			SetSlotFont(SaveState4MenuItem, 4);
-			SetSlotFont(SaveState5MenuItem, 5);
-			SetSlotFont(SaveState6MenuItem, 6);
-			SetSlotFont(SaveState7MenuItem, 7);
-			SetSlotFont(SaveState8MenuItem, 8);
-			SetSlotFont(SaveState9MenuItem, 9);
-			SetSlotFont(SaveState0MenuItem, 10);
-
-			AutosaveLastSlotMenuItem.Checked = Config.AutoSaveLastSaveSlot;
-
-			SaveState1MenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["Save State 1"];
-			SaveState2MenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["Save State 2"];
-			SaveState3MenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["Save State 3"];
-			SaveState4MenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["Save State 4"];
-			SaveState5MenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["Save State 5"];
-			SaveState6MenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["Save State 6"];
-			SaveState7MenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["Save State 7"];
-			SaveState8MenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["Save State 8"];
-			SaveState9MenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["Save State 9"];
-			SaveState0MenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["Save State 10"];
-			SaveNamedStateMenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["Save Named State"];
-		}
-
-		private void LoadStateSubMenu_DropDownOpened(object sender, EventArgs e)
-		{
-			LoadState1MenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["Load State 1"];
-			LoadState2MenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["Load State 2"];
-			LoadState3MenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["Load State 3"];
-			LoadState4MenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["Load State 4"];
-			LoadState5MenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["Load State 5"];
-			LoadState6MenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["Load State 6"];
-			LoadState7MenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["Load State 7"];
-			LoadState8MenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["Load State 8"];
-			LoadState9MenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["Load State 9"];
-			LoadState0MenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["Load State 10"];
-			LoadNamedStateMenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["Load Named State"];
-
-			AutoloadLastSlotMenuItem.Checked = Config.AutoLoadLastSaveSlot;
-
-			LoadState1MenuItem.Enabled = HasSlot(1);
-			LoadState2MenuItem.Enabled = HasSlot(2);
-			LoadState3MenuItem.Enabled = HasSlot(3);
-			LoadState4MenuItem.Enabled = HasSlot(4);
-			LoadState5MenuItem.Enabled = HasSlot(5);
-			LoadState6MenuItem.Enabled = HasSlot(6);
-			LoadState7MenuItem.Enabled = HasSlot(7);
-			LoadState8MenuItem.Enabled = HasSlot(8);
-			LoadState9MenuItem.Enabled = HasSlot(9);
-			LoadState0MenuItem.Enabled = HasSlot(10);
-		}
-
-		private void SaveSlotSubMenu_DropDownOpened(object sender, EventArgs e)
-		{
-			var slotMenuItems = new ToolStripMenuItem/*?*/[]
-			{
-				null,
-				SelectSlot1MenuItem,
-				SelectSlot2MenuItem,
-				SelectSlot3MenuItem,
-				SelectSlot4MenuItem,
-				SelectSlot5MenuItem,
-				SelectSlot6MenuItem,
-				SelectSlot7MenuItem,
-				SelectSlot8MenuItem,
-				SelectSlot9MenuItem,
-				SelectSlot0MenuItem,
-			};
-			for (var i = 1; i < slotMenuItems.Length; i++)
-			{
-				slotMenuItems[i]!.ShortcutKeyDisplayString = Config.HotkeyBindings[$"Select State {i}"];
-			}
-			PreviousSlotMenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["Previous Slot"];
-			NextSlotMenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["Next Slot"];
-			SaveToCurrentSlotMenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["Quick Save"];
-			LoadCurrentSlotMenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["Quick Load"];
-			var slot = Config.SaveSlot;
-			for (var i = 1; i < slotMenuItems.Length; i++) slotMenuItems[i]!.Checked = slot == i;
-		}
 
 		private void AVSubMenu_DropDownOpened(object sender, EventArgs e)
 		{
@@ -173,51 +79,6 @@ namespace Chimera.Client.GUI
 			LoadNullRom();
 			Console.WriteLine($"Closing rom clicked DONE Frame: {Emulator.Frame} Emulator: {Emulator.GetType().Name}");
 		}
-
-		private void QuickSavestateMenuItem_Click(object sender, EventArgs e)
-			=> SaveQuickSaveAndShowError(int.Parse(((ToolStripMenuItem) sender).Text));
-
-		private void SaveNamedStateMenuItem_Click(object sender, EventArgs e) => SaveStateAs();
-
-		private void QuickLoadstateMenuItem_Click(object sender, EventArgs e)
-			=> LoadQuickSave(int.Parse(((ToolStripMenuItem) sender).Text));
-
-		private void LoadNamedStateMenuItem_Click(object sender, EventArgs e) => LoadStateAs();
-
-		private void AutoloadLastSlotMenuItem_Click(object sender, EventArgs e)
-			=> Config.AutoLoadLastSaveSlot = !Config.AutoLoadLastSaveSlot;
-
-		private void AutosaveLastSlotMenuItem_Click(object sender, EventArgs e)
-			=> Config.AutoSaveLastSaveSlot = !Config.AutoSaveLastSaveSlot;
-
-		private void SelectSlotMenuItems_Click(object sender, EventArgs e)
-		{
-			Config.SaveSlot = (int) ((ToolStripItem) sender).Tag;
-			UpdateStatusSlots();
-			SaveSlotSelectedMessage();
-		}
-
-		private void PreviousSlotMenuItem_Click(object sender, EventArgs e)
-		{
-			PreviousSlot();
-		}
-
-		private void NextSlotMenuItem_Click(object sender, EventArgs e)
-		{
-			NextSlot();
-		}
-
-		private void SaveToCurrentSlotMenuItem_Click(object sender, EventArgs e)
-			=> SavestateCurrentSlot();
-
-		private void SavestateCurrentSlot()
-			=> SaveQuickSaveAndShowError(Config.SaveSlot);
-
-		private void LoadCurrentSlotMenuItem_Click(object sender, EventArgs e)
-			=> LoadstateCurrentSlot();
-
-		private bool LoadstateCurrentSlot()
-			=> LoadQuickSave(Config.SaveSlot);
 
 		private void ConfigAndRecordAVMenuItem_Click(object sender, EventArgs e)
 		{
@@ -429,7 +290,6 @@ namespace Chimera.Client.GUI
 		private void ConfigSubMenu_DropDownOpened(object sender, EventArgs e)
 		{
 			ControllersMenuItem.Enabled = Emulator.ControllerDefinition.Any();
-			RewindOptionsMenuItem.Enabled = Emulator.HasSavestates();
 		}
 
 		private void FrameSkipMenuItem_DropDownOpened(object sender, EventArgs e)
@@ -572,18 +432,6 @@ namespace Chimera.Client.GUI
 		{
 			using var form = new AutofireConfig(Config, InputManager.AutoFireController, InputManager.StickyAutofireController);
 			if (this.ShowDialogWithTempMute(form).IsOk()) AddOnScreenMessage("Autofire settings saved");
-		}
-
-		private void RewindOptionsMenuItem_Click(object sender, EventArgs e)
-		{
-			if (!Emulator.HasSavestates()) return;
-			using RewindConfig form = new(
-				Config,
-				PlatformFrameRates.GetFrameRate(Emulator.SystemId, Emulator.HasRegions() && Emulator.AsRegionable().Region is DisplayType.PAL), // why isn't there a helper for this
-				Emulator.AsStatable(),
-				CreateRewinder,
-				() => this.Rewinder);
-			if (this.ShowDialogWithTempMute(form).IsOk()) AddOnScreenMessage("Rewind and State settings saved");
 		}
 
 		private void FileExtensionsMenuItem_Click(object sender, EventArgs e)
@@ -905,7 +753,6 @@ namespace Chimera.Client.GUI
 				ContextSeparator_AfterUndo.Visible =
 				ScreenshotContextMenuItem.Visible =
 				CloseRomContextMenuItem.Visible =
-				UndoSavestateContextMenuItem.Visible =
 				!Emulator.IsNull();
 
 			RestartMovieContextMenuItem.Visible =
@@ -941,27 +788,6 @@ namespace Chimera.Client.GUI
 				}
 			}
 
-			var quicksaveSlot = Config.SaveSlot;
-			if (File.Exists($"{SaveStatePrefix()}.QuickSave{quicksaveSlot % 10}.State.bak"))
-			{
-				UndoSavestateContextMenuItem.Enabled = true;
-				if (_stateSlots.IsRedo(MovieSession.Movie, quicksaveSlot))
-				{
-					UndoSavestateContextMenuItem.Text = $"Redo Save to slot {quicksaveSlot}";
-					UndoSavestateContextMenuItem.Image = Properties.Resources.Redo;
-				}
-				else
-				{
-					UndoSavestateContextMenuItem.Text = $"Undo Save to slot {quicksaveSlot}";
-					UndoSavestateContextMenuItem.Image = Properties.Resources.Undo;
-				}
-			}
-			else
-			{
-				UndoSavestateContextMenuItem.Enabled = false;
-				UndoSavestateContextMenuItem.Text = "Undo Savestate";
-				UndoSavestateContextMenuItem.Image = Properties.Resources.Undo;
-			}
 
 			ShowMenuContextMenuItem.Text = MainMenuStrip.Visible ? "Hide Menu" : "Show Menu";
 		}
@@ -1031,20 +857,6 @@ namespace Chimera.Client.GUI
 			this.ShowDialogWithTempMute(form);
 		}
 
-		private void UndoSavestateContextMenuItem_Click(object sender, EventArgs e)
-		{
-			var slot = Config.SaveSlot;
-			FileWriteResult swapResult = _stateSlots.SwapBackupSavestate(MovieSession.Movie, $"{SaveStatePrefix()}.QuickSave{slot % 10}.{SaveSlotManager.StateExtension}", slot);
-			if (swapResult.IsError)
-			{
-				this.ErrorMessageBox(swapResult, "Failed to swap state files.");
-			}
-			else
-			{
-				AddOnScreenMessage($"Save slot {slot} restored.");
-			}
-		}
-
 		private void ShowMenuContextMenuItem_Click(object sender, EventArgs e)
 		{
 			MainMenuStrip.Visible = !MainMenuStrip.Visible;
@@ -1067,49 +879,6 @@ namespace Chimera.Client.GUI
 		}
 
 		private readonly ScreenshotForm _screenshotTooltip = new();
-
-		private void SlotStatusButtons_MouseEnter(object/*?*/ sender, EventArgs e)
-		{
-			var slot = (int) ((ToolStripItem) sender).Tag;
-			if (!(HasSlot(slot) && ReadScreenshotFromSavestate(slot: slot) is {} bb))
-			{
-				_screenshotTooltip.FadeOut();
-				return;
-			}
-			var width = bb.Width;
-			var height = bb.Height;
-			var location = PointToScreen(MainStatusBar.Location);
-			location.Offset(((e as MouseEventArgs)?.X ?? 50) - width/2, -height);
-			_screenshotTooltip.UpdateValues(
-				bb,
-				captionText: string.Empty,
-				location,
-				width: width,
-				height: height,
-				Graphics.FromHwnd(Handle).MeasureString);
-			_screenshotTooltip.FadeIn();
-		}
-
-		private void SlotStatusButtons_MouseLeave(object/*?*/ sender, EventArgs e)
-			=> _screenshotTooltip.FadeOut();
-
-		private void SlotStatusButtons_MouseUp(object sender, MouseEventArgs e)
-		{
-			var slot = 10;
-			if (sender == Slot1StatusButton) slot = 1;
-			if (sender == Slot2StatusButton) slot = 2;
-			if (sender == Slot3StatusButton) slot = 3;
-			if (sender == Slot4StatusButton) slot = 4;
-			if (sender == Slot5StatusButton) slot = 5;
-			if (sender == Slot6StatusButton) slot = 6;
-			if (sender == Slot7StatusButton) slot = 7;
-			if (sender == Slot8StatusButton) slot = 8;
-			if (sender == Slot9StatusButton) slot = 9;
-			if (sender == Slot0StatusButton) slot = 10;
-
-			if (e.Button is MouseButtons.Right) SaveQuickSaveAndShowError(slot);
-			else if (e.Button is MouseButtons.Left && HasSlot(slot)) _ = LoadQuickSave(slot);
-		}
 
 		private void KeyPriorityStatusLabel_Click(object sender, EventArgs e)
 		{

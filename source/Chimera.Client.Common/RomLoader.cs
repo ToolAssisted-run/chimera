@@ -532,7 +532,6 @@ namespace Chimera.Client.Common
 			=> new(
 				combinedEntryDesc: "Everything",
 				FilesystemFilter.Archives,
-				new FilesystemFilter("ROMs", CoreRegistry.Instance.KnownRomExtensions.Select(static e => e.TrimStart('.')).ToList(), addArchiveExts: true),
-				FilesystemFilter.ChimeraSaveStates);
+				new FilesystemFilter("ROMs", CoreRegistry.Instance.KnownRomExtensions.Select(static e => e.TrimStart('.')).ToList(), addArchiveExts: true));
 	}
 }

@@ -143,7 +143,6 @@ namespace Chimera.Client.GUI
 			}
 
 			UpdateWindowTitle();
-			UpdateStatusSlots();
 		}
 
 		public void StopMovie(bool saveChanges = true)

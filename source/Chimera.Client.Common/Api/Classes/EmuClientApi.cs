@@ -26,15 +26,7 @@ namespace Chimera.Client.Common
 
 		private readonly IVideoProvider VideoProvider;
 
-		public event BeforeQuickLoadEventHandler BeforeQuickLoad;
-
-		public event BeforeQuickSaveEventHandler BeforeQuickSave;
-
 		public event EventHandler RomLoaded;
-
-		public event StateLoadedEventHandler StateLoaded;
-
-		public event StateSavedEventHandler StateSaved;
 
 		public EmuClientApi(
 			Config config,
@@ -54,11 +46,7 @@ namespace Chimera.Client.Common
 			_mainForm = mainForm;
 			VideoProvider = Emulator.AsVideoProviderOrDefault();
 
-			_mainForm.QuicksaveLoad += CallBeforeQuickLoad;
-			_mainForm.QuicksaveSave += CallBeforeQuickSave;
 			_mainForm.RomLoaded += CallRomLoaded;
-			_mainForm.SavestateLoaded += CallStateLoaded;
-			_mainForm.SavestateSaved += CallStateSaved;
 		}
 
 		public int BorderHeight() => _displayManager.TransformPoint(new Point(0, 0)).Y;
@@ -69,21 +57,8 @@ namespace Chimera.Client.Common
 
 		public int BufferWidth() => VideoProvider.BufferWidth;
 
-#pragma warning disable MA0091 // passing through `sender` is intentional
-		private void CallBeforeQuickLoad(object sender, BeforeQuickLoadEventArgs args)
-			=> BeforeQuickLoad?.Invoke(sender, args);
-
-		private void CallBeforeQuickSave(object sender, BeforeQuickSaveEventArgs args)
-			=> BeforeQuickSave?.Invoke(sender, args);
-
 		private void CallRomLoaded(object sender, EventArgs args)
 			=> RomLoaded?.Invoke(sender, args);
-
-		private void CallStateLoaded(object sender, StateLoadedEventArgs args)
-			=> StateLoaded?.Invoke(sender, args);
-
-		private void CallStateSaved(object sender, StateSavedEventArgs args)
-			=> StateSaved?.Invoke(sender, args);
 #pragma warning restore MA0091
 
 		public void ClearAutohold() => _mainForm.ClearHolds();
@@ -96,11 +71,7 @@ namespace Chimera.Client.Common
 
 		public void Dispose()
 		{
-			_mainForm.QuicksaveLoad -= CallBeforeQuickLoad;
-			_mainForm.QuicksaveSave -= CallBeforeQuickSave;
 			_mainForm.RomLoaded -= CallRomLoaded;
-			_mainForm.SavestateLoaded -= CallStateLoaded;
-			_mainForm.SavestateSaved -= CallStateSaved;
 		}
 
 		public void DoFrameAdvance()
@@ -115,8 +86,6 @@ namespace Chimera.Client.Common
 			DoFrameAdvance();
 			Unpause();
 		}
-
-		public void EnableRewind(bool enabled) => _mainForm.EnableRewind(enabled);
 
 		public void FrameSkip(int numFrames)
 		{
@@ -147,12 +116,6 @@ namespace Chimera.Client.Common
 
 		public bool IsRewinding() => _mainForm.IsRewinding;
 
-		public bool LoadState(string name)
-			=> _mainForm.LoadState(
-				path: Path.Combine(_config.PathEntries.SaveStateAbsolutePath(Game.System), $"{name}.State"),
-				userFriendlyStateName: name,
-				suppressOSD: false);
-
 		public bool OpenRom(string path)
 			=> _mainForm.LoadRom(path, new LoadRomArgs(OpenAdvancedSerializer.ParseWithLegacy(path)));
 
@@ -163,17 +126,6 @@ namespace Chimera.Client.Common
 		public void RebootCore() => _mainForm.RebootCore();
 
 		// TODO: Change return type to FileWriteResult.
-
-		// TODO: Change return type to FileWriteResult.
-		// We may wish to change more than that, since we have a mostly-dupicate ISaveStateApi.Save, neither has documentation indicating what the differences are.
-		public void SaveState(string name)
-		{
-			FileWriteResult result = _mainForm.SaveState(Path.Combine(_config.PathEntries.SaveStateAbsolutePath(Game.System), $"{name}.State"), name);
-			if (result.Exception != null && result.Exception is not UnlessUsingApiException)
-			{
-				throw result.Exception;
-			}
-		}
 
 		public int ScreenHeight() => _displayManager.GetPanelNativeSize().Height;
 

@@ -51,9 +51,6 @@ namespace Chimera.Client.Common
 		/// <remarks>only referenced from <see cref="ClientLuaLibrary"/></remarks>
 
 		/// <remarks>only referenced from <see cref="EmuClientApi"/></remarks>
-		void EnableRewind(bool enabled);
-
-		/// <remarks>only referenced from <see cref="EmuClientApi"/></remarks>
 
 		/// <remarks>only referenced from <see cref="EmuClientApi"/></remarks>
 		void FrameAdvance(bool discardApiSurfaces = true);
@@ -76,14 +73,8 @@ namespace Chimera.Client.Common
 		/// <remarks>only referenced from <see cref="MovieApi"/></remarks>
 		bool LoadMovie(string filename, string archive = null);
 
-		/// <remarks>only referenced from <see cref="SaveStateApi"/></remarks>
-		bool LoadQuickSave(int slot, bool suppressOSD = false);
-
 		/// <remarks>only referenced from <see cref="EmuClientApi"/></remarks>
 		bool LoadRom(string path, LoadRomArgs args);
-
-		/// <remarks>referenced from <see cref="EmuClientApi"/> and <see cref="SaveStateApi"/></remarks>
-		bool LoadState(string path, string userFriendlyStateName, bool suppressOSD = false);
 
 		/// <remarks>only referenced from <see cref="EmuClientApi"/></remarks>
 		void PauseEmulator();
@@ -96,18 +87,6 @@ namespace Chimera.Client.Common
 
 		/// <remarks>only referenced from <see cref="MovieApi"/></remarks>
 		bool RestartMovie();
-
-		FileWriteResult SaveQuickSave(int slot, bool suppressOSD = false);
-
-		/// <summary>
-		/// Creates a savestate and writes it to a file.
-		/// </summary>
-		/// <param name="path">The path of the file to write.</param>
-		/// <param name="userFriendlyStateName">The name to use for the state on the client's on-screen display.</param>
-		/// <param name="suppressOSD">If true, the client will not show a success message.</param>
-		/// <returns>Returns a value indicating if there was an error and (if there was) why.</returns>
-		/// <remarks>referenced from <see cref="EmuClientApi"/> and <see cref="SaveStateApi"/></remarks>
-		FileWriteResult SaveState(string path, string userFriendlyStateName, bool suppressOSD = false);
 
 		/// <remarks>only referenced from <see cref="EmuClientApi"/></remarks>
 		void StepRunLoop_Throttle();
@@ -134,18 +113,6 @@ namespace Chimera.Client.Common
 		void UnpauseEmulator();
 
 		/// <remarks>only referenced from <see cref="EmuClientApi"/></remarks>
-		event BeforeQuickLoadEventHandler QuicksaveLoad;
-
-		/// <remarks>only referenced from <see cref="EmuClientApi"/></remarks>
-		event BeforeQuickSaveEventHandler QuicksaveSave;
-
-		/// <remarks>only referenced from <see cref="EmuClientApi"/></remarks>
 		event EventHandler RomLoaded;
-
-		/// <remarks>only referenced from <see cref="EmuClientApi"/></remarks>
-		event StateLoadedEventHandler SavestateLoaded;
-
-		/// <remarks>only referenced from <see cref="EmuClientApi"/></remarks>
-		event StateSavedEventHandler SavestateSaved;
 	}
 }

@@ -72,9 +72,6 @@ namespace Chimera.Client.GUI
 		private bool LoadRom(string filename, string archive = null)
 			=> LoadRom(filename, new LoadRomArgs(new OpenAdvanced_OpenRom(filename)));
 
-		private bool LoadStateFile(string filename, string archive = null)
-			=> LoadState(path: filename, userFriendlyStateName: Path.GetFileName(filename));
-
 		private void LoadWatch(string filename, string archive = null)
 		{
 			Tools.LoadRamWatch(true);
@@ -213,9 +210,6 @@ namespace Chimera.Client.GUI
 						{
 							case LoadOrdering.Rom:
 								_ = LoadRom(filename, fileInformation.ArchiveName);
-								break;
-							case LoadOrdering.State:
-								_ = LoadStateFile(filename, fileInformation.ArchiveName);
 								break;
 							case LoadOrdering.Watch:
 								LoadWatch(filename, fileInformation.ArchiveName);

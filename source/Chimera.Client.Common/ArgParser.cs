@@ -77,13 +77,6 @@ namespace Chimera.Client.Common
 			Description = "launch in fullscreen",
 		};
 
-		private static readonly Option<int?> OptionLoadQuicksaveSlot = new("--load-slot")
-		{
-			Description = "int; quicksave slot which should be loaded on launch",
-		};
-
-		private static readonly Option<string?> OptionLoadSavestateFilePath = new("--load-state"); // desc added in static ctor
-
 		private static readonly Option<string?> OptionLuaFilePath = new("--lua"); // desc added in static ctor
 
 		private static readonly Option<string?> OptionMMFPath = new("--mmf")
@@ -132,7 +125,6 @@ namespace Chimera.Client.Common
 			OptionAVDumpFrameList.Description = $"comma-separated list of integers, indices of frames which should be included in the A/V dump (encoding); implies `{OptionAVDumpEndAtFrame.Name}=<end>` where `<end>` is the highest frame listed";
 			OptionAVDumpName.Description = $"ignored unless `{OptionAVDumpType.Name}` also passed";
 			OptionAVDumpType.Description = $"ignored unless `{OptionAVDumpName.Name}` also passed";
-			OptionLoadSavestateFilePath.Description = $"path; savestate which should be loaded on launch; this takes precedence over `{OptionLoadQuicksaveSlot.Name}`";
 			OptionLuaFilePath.Description = $"path; Lua script or Console session to load; implies `{OptionOpenLuaConsole.Name}`";
 			OptionSocketServerIP.Description = $"string; IP address for Unix socket IPC (Lua `comm.socket*`); must be paired with `{OptionSocketServerPort.Name}`";
 			OptionSocketServerPort.Description = $"int; port for Unix socket IPC (Lua `comm.socket*`); must be paired with `{OptionSocketServerIP.Name}`";
@@ -159,8 +151,6 @@ namespace Chimera.Client.Common
 			root.Add(/* --dump-type */ OptionAVDumpType);
 			root.Add(/* --fullscreen */ OptionLaunchFullscreen);
 			root.Add(/* --headless */ OptionHeadless);
-			root.Add(/* --load-slot */ OptionLoadQuicksaveSlot);
-			root.Add(/* --load-state */ OptionLoadSavestateFilePath);
 			root.Add(/* --lua */ OptionLuaFilePath);
 			root.Add(/* --luaconsole */ OptionOpenLuaConsole);
 			root.Add(/* --mmf */ OptionMMFPath);
@@ -260,8 +250,6 @@ namespace Chimera.Client.Common
 			}
 
 			parsed = new(
-				cmdLoadSlot: result.GetValue(OptionLoadQuicksaveSlot),
-				cmdLoadState: result.GetValue(OptionLoadSavestateFilePath),
 				cmdConfigFile: result.GetValue(OptionConfigFilePath),
 				cmdMovie: result.GetValue(OptionMovieFilePath),
 				cmdProject: result.GetValue(OptionProjectFilePath),

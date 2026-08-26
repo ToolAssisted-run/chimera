@@ -110,12 +110,6 @@ namespace Chimera.Client.Common
 			Log($"Error: {Emulator.Attributes().CoreName} does not yet implement input polling callbacks");
 		}
 
-		[LuaMethodExample("local steveonl = event.onloadstate(\r\n\tfunction()\r\n\tconsole.log( \"Fires after a state is loaded. Receives a lua function name, and registers it to the event immediately following a successful savestate event\" );\r\nend\", \"Frame name\" );")]
-		[LuaMethod("onloadstate", "Fires after a state is loaded. Your callback can have 1 parameter, which will be the name of the loaded state.")]
-		public string OnLoadState(LuaFunction luaf, string name = null)
-			=> CreateAndRegisterNamedFunction(luaf, NamedLuaFunction.EVENT_TYPE_LOADSTATE, name: name)
-				.GuidStr;
-
 		[LuaDeprecatedMethod]
 		[LuaMethod("onmemoryexecute", "Fires immediately before the given address is executed by the core. Your callback can have 3 parameters {{(addr, val, flags)}}. {{val}} is the value to be executed (or {{0}} always, if this feature is only partially implemented).")]
 		public string OnMemoryExecute(
@@ -295,12 +289,6 @@ namespace Chimera.Client.Common
 			LogMemoryCallbacksNotImplemented(isWildcard: address is null);
 			return EMPTY_UUID_STR;
 		}
-
-		[LuaMethodExample("local steveons = event.onsavestate(\r\n\tfunction()\r\n\t\tconsole.log( \"Fires after a state is saved\" );\r\n\tend\r\n\t, \"Frame name\" );")]
-		[LuaMethod("onsavestate", "Fires after a state is saved. Your callback can have 1 parameter, which will be the name of the saved state.")]
-		public string OnSaveState(LuaFunction luaf, string name = null)
-			=> CreateAndRegisterNamedFunction(luaf, NamedLuaFunction.EVENT_TYPE_SAVESTATE, name: name)
-				.GuidStr;
 
 		[LuaMethodExample("local steveone = event.onexit(\r\n\tfunction()\r\n\t\tconsole.log( \"Fires after the calling script has stopped\" );\r\n\tend\r\n\t, \"Frame name\" );")]
 		[LuaMethod("onexit", "Fires after the calling script has stopped")]

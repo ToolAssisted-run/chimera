@@ -45,8 +45,6 @@ namespace Chimera.Client.Common
 
 		public static readonly FilesystemFilter Archives = new FilesystemFilter("Archives", ArchiveExtensions);
 
-		public static readonly FilesystemFilter ChimeraSaveStates = new FilesystemFilter("Save States", new[] { SaveSlotManager.StateExtension });
-
 		public static readonly FilesystemFilter LuaScripts = new FilesystemFilter("Lua Scripts", new[] { "lua" });
 
 		public static readonly FilesystemFilter PNGs = new FilesystemFilter("PNG Files", new[] { "png" });

@@ -214,28 +214,6 @@ namespace Chimera.Client.Common
 
 		public bool FrameAdvanceRequested { get; private set; }
 
-		public void CallSaveStateEvent(string name)
-		{
-			foreach (LuaFile file in ScriptList)
-			{
-				foreach (var func in file.Functions.Where(static l => l.Event == NamedLuaFunction.EVENT_TYPE_SAVESTATE).ToList())
-				{
-					func.Call(name);
-				}
-			}
-		}
-
-		public void CallLoadStateEvent(string name)
-		{
-			foreach (LuaFile file in ScriptList)
-			{
-				foreach (var func in file.Functions.Where(static l => l.Event == NamedLuaFunction.EVENT_TYPE_LOADSTATE).ToList())
-				{
-					func.Call(name);
-				}
-			}
-		}
-
 		public void CallFrameBeforeEvent()
 		{
 			if (IsUpdateSupressed) return;

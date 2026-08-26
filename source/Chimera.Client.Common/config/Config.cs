@@ -101,9 +101,6 @@ namespace Chimera.Client.Common
 		public int AutofireOn { get; set; } = 1;
 		public int AutofireOff { get; set; } = 1;
 		public bool AutofireLagFrames { get; set; } = true;
-		public int SaveSlot { get; set; } // currently selected savestate slot
-		public bool AutoLoadLastSaveSlot { get; set; }
-		public bool AutoSaveLastSaveSlot { get; set; }
 		public bool SkipLagFrame { get; set; }
 		public bool SuppressAskSave { get; set; }
 		public bool AviCaptureOsd { get; set; }
@@ -138,9 +135,7 @@ namespace Chimera.Client.Common
 		public bool SuperChimeraThrottle { get; set; } = false;
 #endif
 
-		public RewindConfig Rewind { get; set; } = new RewindConfig();
 
-		public SaveStateConfig Savestates { get; set; } = new SaveStateConfig();
 
 		public MovieConfig Movies { get; set; } = new MovieConfig();
 

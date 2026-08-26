@@ -318,7 +318,6 @@ namespace Chimera.Client.GUI
 			}
 
 			MainForm.AddOnScreenMessage("TAStudio engaged");
-			MainForm.DisableRewind();
 			MovieSession.ReadOnly = true;
 			SetSplicer();
 
@@ -826,7 +825,6 @@ namespace Chimera.Client.GUI
 			MainForm.PauseOnFrame = null;
 			MainForm.AddOnScreenMessage("TAStudio disengaged");
 			WantsToControlRewind = false;
-			MainForm.EnableRewind(true);
 		}
 
 		private const string DefaultTasProjectName = "default";

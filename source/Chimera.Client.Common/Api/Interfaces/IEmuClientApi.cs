@@ -5,31 +5,9 @@ namespace Chimera.Client.Common
 	public interface IEmuClientApi : IDisposable, IExternalApi
 	{
 		/// <summary>
-		/// Occurs before a quickload is done (just after user has pressed the shortcut button
-		/// or has click on the item menu)
-		/// </summary>
-		event BeforeQuickLoadEventHandler BeforeQuickLoad;
-
-		/// <summary>
-		/// Occurs before a quicksave is done (just after user has pressed the shortcut button
-		/// or has click on the item menu)
-		/// </summary>
-		event BeforeQuickSaveEventHandler BeforeQuickSave;
-
-		/// <summary>
 		/// Occurs when a ROM is successfully loaded
 		/// </summary>
 		event EventHandler RomLoaded;
-
-		/// <summary>
-		/// Occurs when a savestate is successfully loaded
-		/// </summary>
-		event StateLoadedEventHandler StateLoaded;
-
-		/// <summary>
-		/// Occurs when a savestate is successfully saved
-		/// </summary>
-		event StateSavedEventHandler StateSaved;
 
 		int BorderHeight();
 
@@ -58,8 +36,6 @@ namespace Chimera.Client.Common
 		/// </summary>
 		void DoFrameAdvanceAndUnpause();
 
-		void EnableRewind(bool enabled);
-
 		void FrameSkip(int numFrames);
 
 		/// <returns>the (host) framerate, approximated from frame durations</returns>
@@ -79,13 +55,6 @@ namespace Chimera.Client.Common
 
 		bool IsRewinding();
 
-		/// <summary>
-		/// Load a savestate specified by its name
-		/// </summary>
-		/// <param name="name">Savestate friendly name</param>
-		/// <returns><see langword="true"/> iff succeeded</returns>
-		bool LoadState(string name);
-
 		bool OpenRom(string path);
 
 		void Pause();
@@ -94,12 +63,6 @@ namespace Chimera.Client.Common
 
 		void RebootCore();
 
-
-		/// <summary>
-		/// Save a state with specified name
-		/// </summary>
-		/// <param name="name">Savestate friendly name</param>
-		void SaveState(string name);
 
 		int ScreenHeight();
 

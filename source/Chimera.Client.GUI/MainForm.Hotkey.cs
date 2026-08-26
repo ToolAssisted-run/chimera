@@ -8,19 +8,6 @@ namespace Chimera.Client.GUI
 	{
 		private bool CheckHotkey(string trigger)
 		{
-			void SelectAndSaveToSlot(int slot)
-			{
-				SaveQuickSaveAndShowError(slot);
-				Config.SaveSlot = slot;
-				UpdateStatusSlots();
-			}
-			void SelectAndLoadFromSlot(int slot)
-			{
-				_ = LoadQuickSave(slot);
-				Config.SaveSlot = slot;
-				UpdateStatusSlots();
-			}
-
 			// avoid conflict with regular hotkeys
 			if (Tools.IsLoaded<TAStudio>() && Tools.TAStudio.AxisEditingMode)
 			{
@@ -76,12 +63,6 @@ namespace Chimera.Client.GUI
 					break;
 				case "Toggle Throttle":
 					ToggleUnthrottled();
-					break;
-				case "Quick Load":
-					_ = LoadstateCurrentSlot();
-					break;
-				case "Quick Save":
-					SavestateCurrentSlot();
 					break;
 				case "Clear Autohold":
 					ClearAutohold();
@@ -181,110 +162,7 @@ namespace Chimera.Client.GUI
 					ToggleStayOnTop();
 					break;
 
-				// Save States
-				case "Save State 1":
-					SelectAndSaveToSlot(1);
-					break;
-				case "Save State 2":
-					SelectAndSaveToSlot(2);
-					break;
-				case "Save State 3":
-					SelectAndSaveToSlot(3);
-					break;
-				case "Save State 4":
-					SelectAndSaveToSlot(4);
-					break;
-				case "Save State 5":
-					SelectAndSaveToSlot(5);
-					break;
-				case "Save State 6":
-					SelectAndSaveToSlot(6);
-					break;
-				case "Save State 7":
-					SelectAndSaveToSlot(7);
-					break;
-				case "Save State 8":
-					SelectAndSaveToSlot(8);
-					break;
-				case "Save State 9":
-					SelectAndSaveToSlot(9);
-					break;
-				case "Save State 10":
-					SelectAndSaveToSlot(10);
-					break;
-				case "Load State 1":
-					SelectAndLoadFromSlot(1);
-					break;
-				case "Load State 2":
-					SelectAndLoadFromSlot(2);
-					break;
-				case "Load State 3":
-					SelectAndLoadFromSlot(3);
-					break;
-				case "Load State 4":
-					SelectAndLoadFromSlot(4);
-					break;
-				case "Load State 5":
-					SelectAndLoadFromSlot(5);
-					break;
-				case "Load State 6":
-					SelectAndLoadFromSlot(6);
-					break;
-				case "Load State 7":
-					SelectAndLoadFromSlot(7);
-					break;
-				case "Load State 8":
-					SelectAndLoadFromSlot(8);
-					break;
-				case "Load State 9":
-					SelectAndLoadFromSlot(9);
-					break;
-				case "Load State 10":
-					SelectAndLoadFromSlot(10);
-					break;
 
-				case "Select State 1":
-					SelectSlot(1);
-					break;
-				case "Select State 2":
-					SelectSlot(2);
-					break;
-				case "Select State 3":
-					SelectSlot(3);
-					break;
-				case "Select State 4":
-					SelectSlot(4);
-					break;
-				case "Select State 5":
-					SelectSlot(5);
-					break;
-				case "Select State 6":
-					SelectSlot(6);
-					break;
-				case "Select State 7":
-					SelectSlot(7);
-					break;
-				case "Select State 8":
-					SelectSlot(8);
-					break;
-				case "Select State 9":
-					SelectSlot(9);
-					break;
-				case "Select State 10":
-					SelectSlot(10);
-					break;
-				case "Save Named State":
-					SaveStateAs();
-					break;
-				case "Load Named State":
-					_ = LoadStateAs();
-					break;
-				case "Previous Slot":
-					PreviousSlot();
-					break;
-				case "Next Slot":
-					NextSlot();
-					break;
 
 				// Movie
 				case "Toggle read-only":

@@ -83,11 +83,6 @@ namespace Chimera.Client.Common
 			_luaLibsImpl.IsRebootingCore = false;
 		}
 
-		[LuaMethodExample("client.enablerewind( true );")]
-		[LuaMethod("enablerewind", "Sets whether or not the rewind feature is enabled")]
-		public void EnableRewind(bool enabled)
-			=> APIs.EmuClient.EnableRewind(enabled);
-
 		[LuaMethodExample("client.frameskip( 8 );")]
 		[LuaMethod("frameskip", "Sets the frame skip value of the client UI (use 0 to disable)")]
 		public void FrameSkip(int numFrames)

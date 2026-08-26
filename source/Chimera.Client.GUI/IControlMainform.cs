@@ -5,28 +5,6 @@
 		bool WantsToControlReboot { get; }
 		void RebootCore();
 
-		bool WantsToControlSavestates { get; }
-
-		void SaveState();
-
-		bool LoadState();
-
-		void SaveStateAs();
-
-		bool LoadStateAs();
-
-		void SaveQuickSave(int slot);
-
-		bool LoadQuickSave(int slot);
-
-		/// <summary>
-		/// Overrides the select slot method
-		/// </summary>
-		/// <returns>Returns whether the function is handled.
-		/// If false, the mainform should continue with its logic</returns>
-		bool SelectSlot(int slot);
-		bool PreviousSlot();
-		bool NextSlot();
 
 		bool WantsToControlReadOnly { get; }
 

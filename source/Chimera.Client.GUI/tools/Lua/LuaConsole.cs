@@ -594,12 +594,6 @@ namespace Chimera.Client.GUI
 			return result;
 		}
 
-		public void CallStateLoadCallbacks(string userFriendlyStateName)
-			=> LuaImp.CallLoadStateEvent(userFriendlyStateName);
-
-		public void CallStateSaveCallbacks(string userFriendlyStateName)
-			=> LuaImp.CallSaveStateEvent(userFriendlyStateName);
-
 		protected override void UpdateBefore()
 		{
 			if (LuaImp.IsUpdateSupressed)

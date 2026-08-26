@@ -39,8 +39,6 @@ namespace Chimera.Client.GUI
 	{
 		private const string FMT_STR_DUMP_STATUS_MENUITEM_LABEL = "Dump Status Report{0}...";
 
-		private static readonly FilesystemFilterSet ChimeraSaveStatesFSFilterSet = new(FilesystemFilter.ChimeraSaveStates);
-
 		private readonly ToolStripMenuItemEx DOSSubMenu = new() { Text = "&DOS" };
 
 		private readonly ToolStripMenuItemEx DumpStatusReportMenuItem = new()
@@ -53,26 +51,9 @@ namespace Chimera.Client.GUI
 
 		private readonly StatusLabelEx StatusBarMuteIndicator = new();
 
-		private readonly StatusLabelEx StatusBarRewindIndicator = new()
-		{
-			Image = Properties.Resources.RewindRecord,
-			ToolTipText = "Rewinder is capturing states",
-		};
-
 		private void MainForm_Load(object sender, EventArgs e)
 		{
 			UpdateWindowTitle();
-
-			Slot1StatusButton.Tag = SelectSlot1MenuItem.Tag = 1;
-			Slot2StatusButton.Tag = SelectSlot2MenuItem.Tag = 2;
-			Slot3StatusButton.Tag = SelectSlot3MenuItem.Tag = 3;
-			Slot4StatusButton.Tag = SelectSlot4MenuItem.Tag = 4;
-			Slot5StatusButton.Tag = SelectSlot5MenuItem.Tag = 5;
-			Slot6StatusButton.Tag = SelectSlot6MenuItem.Tag = 6;
-			Slot7StatusButton.Tag = SelectSlot7MenuItem.Tag = 7;
-			Slot8StatusButton.Tag = SelectSlot8MenuItem.Tag = 8;
-			Slot9StatusButton.Tag = SelectSlot9MenuItem.Tag = 9;
-			Slot0StatusButton.Tag = SelectSlot0MenuItem.Tag = 10;
 
 			DumpStatusReportMenuItem.Click += DumpStatusButton_Click;
 			SystemSubMenu.DropDownItems.InsertBefore(LoadedCoreNameMenuItem, insert: DumpStatusReportMenuItem);
@@ -106,9 +87,6 @@ namespace Chimera.Client.GUI
 			MainStatusBar.Padding = new Padding(MainStatusBar.Padding.Left, MainStatusBar.Padding.Top, MainStatusBar.Padding.Left, MainStatusBar.Padding.Bottom); // Workaround to remove extra padding on right
 			PlayRecordStatusButton.Visible = false;
 
-			StatusBarRewindIndicator.Click += RewindOptionsMenuItem_Click;
-			MainStatusBar.Items.InsertAfter(PlayRecordStatusButton, insert: StatusBarRewindIndicator);
-			UpdateStatusBarRewindIndicator();
 
 			AVStatusLabel.Visible = false;
 			SetPauseStatusBarIcon();
@@ -121,20 +99,6 @@ namespace Chimera.Client.GUI
 			UpdateCoreStatusBarButton();
 			HandleToggleLightAndLink();
 			SetStatusBar();
-			_stateSlots.Update(Emulator, MovieSession.Movie, SaveStatePrefix());
-
-			var quickslotButtons = new[]
-			{
-				Slot1StatusButton, Slot2StatusButton, Slot3StatusButton, Slot4StatusButton, Slot5StatusButton,
-				Slot6StatusButton, Slot7StatusButton, Slot8StatusButton, Slot9StatusButton, Slot0StatusButton,
-			};
-			for (var i = 0; i < quickslotButtons.Length; i++)
-			{
-				ref var button = ref quickslotButtons[i];
-				button.MouseEnter += SlotStatusButtons_MouseEnter;
-				button.MouseLeave += SlotStatusButtons_MouseLeave;
-			}
-
 			StatusBarMuteIndicator.Click += (_, _) => ToggleSound();
 			MainStatusBar.Items.InsertBefore(KeyPriorityStatusLabel, insert: StatusBarMuteIndicator);
 			UpdateStatusBarMuteIndicator();
@@ -184,8 +148,6 @@ namespace Chimera.Client.GUI
 		private void SetImages()
 		{
 			CloseRomMenuItem.Image = Properties.Resources.Close;
-			PreviousSlotMenuItem.Image = Properties.Resources.MoveLeft;
-			NextSlotMenuItem.Image = Properties.Resources.MoveRight;
 			RecordAVMenuItem.Image = Properties.Resources.Record;
 			ConfigAndRecordAVMenuItem.Image = Properties.Resources.Avi;
 			StopAVMenuItem.Image = Properties.Resources.Stop;
@@ -200,7 +162,6 @@ namespace Chimera.Client.GUI
 			PathsMenuItem.Image = Properties.Resources.CopyFolder;
 			MessagesMenuItem.Image = Properties.Resources.MessageConfig;
 			AutofireMenuItem.Image = Properties.Resources.Lightning;
-			RewindOptionsMenuItem.Image = Properties.Resources.Previous;
 			SaveConfigMenuItem.Image = Properties.Resources.Save;
 			LoadConfigMenuItem.Image = Properties.Resources.LoadConfig;
 			(ToolBoxMenuItem.Image, /*ToolBoxMenuItem.Text*/_) = ToolManager.IconAndNameCache[typeof(ToolBox)]
@@ -236,7 +197,6 @@ namespace Chimera.Client.GUI
 			StopNoSaveContextMenuItem.Image = Properties.Resources.Stop;
 			SaveMovieContextMenuItem.Image = Properties.Resources.SaveAs;
 			SaveMovieAsContextMenuItem.Image = Properties.Resources.SaveAs;
-			UndoSavestateContextMenuItem.Image = Properties.Resources.Undo;
 			toolStripMenuItem6.Image = Properties.Resources.GameController;
 			toolStripMenuItem7.Image = Properties.Resources.HotKeys;
 			toolStripMenuItem8.Image = Properties.Resources.TvIcon;
@@ -244,7 +204,6 @@ namespace Chimera.Client.GUI
 			toolStripMenuItem10.Image = Properties.Resources.CopyFolder;
 			toolStripMenuItem12.Image = Properties.Resources.MessageConfig;
 			toolStripMenuItem13.Image = Properties.Resources.Lightning;
-			toolStripMenuItem14.Image = Properties.Resources.Previous;
 			toolStripMenuItem66.Image = Properties.Resources.Save;
 			toolStripMenuItem67.Image = Properties.Resources.LoadConfig;
 			ScreenshotContextMenuItem.Image = Properties.Resources.Camera;
@@ -340,7 +299,6 @@ namespace Chimera.Client.GUI
 			_throttle = new Throttle();
 			Emulator = new NullEmulator();
 
-			UpdateStatusSlots();
 			UpdateKeyPriorityIcon();
 
 			// TODO GL - a lot of disorganized wiring-up here
@@ -604,24 +562,6 @@ namespace Chimera.Client.GUI
 			if (_argParser.startFullscreen || Config.StartFullscreen)
 			{
 				_needsFullscreenOnLoad = true;
-			}
-
-			if (!Game.IsNullInstance())
-			{
-				if (_argParser.cmdLoadState != null)
-				{
-					_ = LoadState(
-						path: _argParser.cmdLoadState,
-						userFriendlyStateName: Path.GetFileName(_argParser.cmdLoadState));
-				}
-				else if (_argParser.cmdLoadSlot != null)
-				{
-					_ = LoadQuickSave(_argParser.cmdLoadSlot.Value);
-				}
-				else if (Config.AutoLoadLastSaveSlot)
-				{
-					_ = LoadstateCurrentSlot();
-				}
 			}
 
 			if (_argParser.UserdataUnparsedPairs is {} pairs) foreach (var (k, v) in pairs)
@@ -1014,15 +954,7 @@ namespace Chimera.Client.GUI
 			}
 		}
 
-		public event BeforeQuickLoadEventHandler QuicksaveLoad;
-
-		public event BeforeQuickSaveEventHandler QuicksaveSave;
-
 		public event EventHandler RomLoaded;
-
-		public event StateLoadedEventHandler SavestateLoaded;
-
-		public event StateSavedEventHandler SavestateSaved;
 
 		public ShowFutureCallback/*?*/ PreFutureFrameCallback { get; set; }
 
@@ -1049,7 +981,6 @@ namespace Chimera.Client.GUI
 
 		private readonly ToolManager Tools;
 
-		private IControlMainform ToolControllingSavestates => Tools.FirstOrNull<IControlMainform>(tool => tool.WantsToControlSavestates);
 		private IControlMainform ToolControllingRewind => Tools.FirstOrNull<IControlMainform>(tool => tool.WantsToControlRewind);
 		private IControlMainform ToolControllingReboot => Tools.FirstOrNull<IControlMainform>(tool => tool.WantsToControlReboot);
 		private IControlMainform ToolControllingStopMovie => Tools.FirstOrNull<IControlMainform>(tool => tool.WantsToControlStopMovie);
@@ -1079,22 +1010,6 @@ namespace Chimera.Client.GUI
 		public CheatCollection CheatList { get; }
 
 		public (HttpCommunication HTTP, MemoryMappedFiles MMF, SocketServer Sockets) NetworkingHelpers { get; }
-
-		public IRewinder Rewinder { get; private set; }
-
-		public void CreateRewinder()
-		{
-			if (ToolControllingRewind is not null) return;
-
-			Rewinder?.Dispose();
-			Rewinder = Emulator.HasSavestates() && Config.Rewind.Enabled && (!Emulator.AsStatable().AvoidRewind || Config.Rewind.AllowSlowStates)
-				? Config.Rewind.UseDelta
-					? new ZeldaWinder(Emulator.AsStatable(), Config.Rewind)
-					: new Zwinder(Emulator.AsStatable(), Config.Rewind)
-				: null;
-			UpdateStatusBarRewindIndicator();
-			AddOnScreenMessage(Rewinder?.Active == true ? "Rewind started" : "Rewind disabled");
-		}
 
 		protected override void OnActivated(EventArgs e)
 		{
@@ -1451,7 +1366,6 @@ namespace Chimera.Client.GUI
 		}
 
 		private Size _lastVideoSize = new Size(-1, -1), _lastVirtualSize = new Size(-1, -1);
-		private readonly SaveSlotManager _stateSlots = new SaveSlotManager();
 
 		// AVI/WAV state
 		private IVideoWriter _currAviWriter;
@@ -1790,18 +1704,12 @@ namespace Chimera.Client.GUI
 			// skips outputting the audio. There's also a third way which is when no throttle
 			// method is selected, but the clock throttle determines that by itself and
 			// everything appears normal here.
-			var rewind = Rewinder?.Active == true && (InputManager.ClientControls["Rewind"] || PressRewind);
 			var fastForward = IsFastForwarding;
 			var turbo = IsTurboing;
 
 			int speedPercent = fastForward ? Config.SpeedPercentAlternate : Config.SpeedPercent;
 
-			if (rewind)
-			{
-				speedPercent = Math.Max(speedPercent / Rewinder.RewindFrequency, 5);
-			}
-
-			DisableSecondaryThrottling = Config.Unthrottled || turbo || fastForward || rewind;
+			DisableSecondaryThrottling = Config.Unthrottled || turbo || fastForward;
 
 			// realtime throttle is never going to be so exact that using a double here is wrong
 			_throttle.SetCoreFps(Emulator.VsyncRate());
@@ -1809,7 +1717,7 @@ namespace Chimera.Client.GUI
 			_throttle.signal_unthrottle = Config.Unthrottled || turbo;
 
 			// zero 26-mar-2016 - vsync and vsync throttle here both is odd, but see comments elsewhere about triple buffering
-			_throttle.signal_overrideSecondaryThrottle = (fastForward || rewind) && (Config.SoundThrottle || Config.VSyncThrottle || Config.VSync);
+			_throttle.signal_overrideSecondaryThrottle = fastForward && (Config.SoundThrottle || Config.VSyncThrottle || Config.VSync);
 			_throttle.SetSpeedPercent(speedPercent);
 		}
 
@@ -1920,14 +1828,6 @@ namespace Chimera.Client.GUI
 			var ret = new BitmapBuffer(_currentVideoProvider.BufferWidth, _currentVideoProvider.BufferHeight, _currentVideoProvider.GetVideoBufferCopy());
 			ret.DiscardAlpha();
 			return ret;
-		}
-
-		private void SaveSlotSelectedMessage()
-		{
-			int slot = Config.SaveSlot;
-			string emptyPart = HasSlot(slot) ? "" : " (empty)";
-			string message = $"Slot {slot}{emptyPart} selected.";
-			AddOnScreenMessage(message);
 		}
 
 		/*internal*/public void Render()
@@ -2307,62 +2207,6 @@ namespace Chimera.Client.GUI
 			AddOnScreenMessage($"Volume {Config.SoundVolume}");
 		}
 
-		private Color SlotForeColor(int slot)
-		{
-			return HasSlot(slot)
-				? Config.SaveSlot == slot
-					? SystemColors.HighlightText
-					: SystemColors.WindowText
-				: SystemColors.GrayText;
-		}
-
-		private Color SlotBackColor(int slot)
-		{
-			return  Config.SaveSlot == slot
-				? SystemColors.Highlight
-				: SystemColors.Control;
-		}
-
-		public void UpdateStatusSlots()
-		{
-			_stateSlots.Update(Emulator, MovieSession.Movie, SaveStatePrefix());
-
-			Slot1StatusButton.ForeColor = SlotForeColor(1);
-			Slot2StatusButton.ForeColor = SlotForeColor(2);
-			Slot3StatusButton.ForeColor = SlotForeColor(3);
-			Slot4StatusButton.ForeColor = SlotForeColor(4);
-			Slot5StatusButton.ForeColor = SlotForeColor(5);
-			Slot6StatusButton.ForeColor = SlotForeColor(6);
-			Slot7StatusButton.ForeColor = SlotForeColor(7);
-			Slot8StatusButton.ForeColor = SlotForeColor(8);
-			Slot9StatusButton.ForeColor = SlotForeColor(9);
-			Slot0StatusButton.ForeColor = SlotForeColor(10);
-
-			Slot1StatusButton.BackColor = SlotBackColor(1);
-			Slot2StatusButton.BackColor = SlotBackColor(2);
-			Slot3StatusButton.BackColor = SlotBackColor(3);
-			Slot4StatusButton.BackColor = SlotBackColor(4);
-			Slot5StatusButton.BackColor = SlotBackColor(5);
-			Slot6StatusButton.BackColor = SlotBackColor(6);
-			Slot7StatusButton.BackColor = SlotBackColor(7);
-			Slot8StatusButton.BackColor = SlotBackColor(8);
-			Slot9StatusButton.BackColor = SlotBackColor(9);
-			Slot0StatusButton.BackColor = SlotBackColor(10);
-
-			SaveSlotsStatusLabel.Visible =
-				Slot1StatusButton.Visible =
-				Slot2StatusButton.Visible =
-				Slot3StatusButton.Visible =
-				Slot4StatusButton.Visible =
-				Slot5StatusButton.Visible =
-				Slot6StatusButton.Visible =
-				Slot7StatusButton.Visible =
-				Slot8StatusButton.Visible =
-				Slot9StatusButton.Visible =
-				Slot0StatusButton.Visible =
-					Emulator.HasSavestates();
-		}
-
 		public BitmapBuffer CaptureOSD()
 		{
 			var bb = DisplayManager.RenderOffscreen(_currentVideoProvider, true);
@@ -2506,9 +2350,6 @@ namespace Chimera.Client.GUI
 			=> (StatusBarMuteIndicator.Image, StatusBarMuteIndicator.ToolTipText) = Config.SoundEnabled
 				? (Properties.Resources.Audio, $"Core is producing audio, live playback at {(Config.SoundEnabledNormal ? Config.SoundVolume : 0)}% volume")
 				: (Properties.Resources.AudioMuted, "Core is not producing audio");
-
-		private void UpdateStatusBarRewindIndicator()
-			=> StatusBarRewindIndicator.Visible = Rewinder?.Active is true;
 
 		private void UpdateKeyPriorityIcon()
 		{
@@ -3257,21 +3098,6 @@ namespace Chimera.Client.GUI
 			return null;
 		}
 
-		public string SaveStatePrefix()
-		{
-			var name = Game.FilesystemSafeName();
-			name += $".{Emulator.Attributes().CoreName}";
-
-			if (MovieSession.Movie.IsActive())
-			{
-				name += $".{Path.GetFileNameWithoutExtension(MovieSession.Movie.Filename)}";
-			}
-
-			var pathEntry = Config.PathEntries.SaveStateAbsolutePath(Game.System);
-
-			return Path.Combine(pathEntry, name);
-		}
-
 		private void ShowLoadError(object sender, RomLoader.RomErrorArgs e)
 		{
 			string title = "load error";
@@ -3477,15 +3303,9 @@ namespace Chimera.Client.GUI
 					OnRomChanged();
 					DisplayManager.UpdateGlobals(Config, Emulator);
 					DisplayManager.Blank();
-					CreateRewinder();
 
 					RewireSound();
 					Tools.UpdateCheatRelatedTools(null, new(null));
-					if (!MovieSession.NewMovieQueued && Config.AutoLoadLastSaveSlot && HasSlot(Config.SaveSlot))
-					{
-						_ = LoadstateCurrentSlot();
-					}
-
 					ExtToolManager.BuildToolStrip();
 
 					RomLoaded?.Invoke(this, EventArgs.Empty);
@@ -3531,8 +3351,6 @@ namespace Chimera.Client.GUI
 			OSD.Fps = "0 fps";
 			UpdateWindowTitle();
 			HandlePlatformMenus();
-			_stateSlots.ClearRedoList();
-			UpdateStatusSlots();
 			UpdateCoreStatusBarButton();
 			UpdateDumpInfo();
 			SetMainformMovieInfo();
@@ -3668,12 +3486,8 @@ namespace Chimera.Client.GUI
 				if (saveMovieResult == TryAgainResult.Canceled) return false;
 			}
 
-			TryAgainResult stateSaveResult = this.DoWithTryAgainBox(AutoSaveStateIfConfigured, "Failed to auto-save state.");
-			if (stateSaveResult == TryAgainResult.Canceled) return false;
-
 			StopAv();
 
-			DisableRewind();
 
 			Emulator.Dispose();
 
@@ -3687,16 +3501,6 @@ namespace Chimera.Client.GUI
 			RebootStatusBarIcon.Visible = false;
 
 			return true;
-		}
-
-		private FileWriteResult AutoSaveStateIfConfigured()
-		{
-			if (Config.AutoSaveLastSaveSlot && Emulator.HasSavestates())
-			{
-				return SaveQuickSave(Config.SaveSlot);
-			}
-
-			return new();
 		}
 
 		/// <summary>
@@ -3718,318 +3522,14 @@ namespace Chimera.Client.GUI
 			}
 		}
 
-		public void EnableRewind(bool enabled)
-		{
-			if (!Emulator.HasSavestates())
-			{
-				return;
-			}
-
-			if (Rewinder == null)
-			{
-				CreateRewinder();
-			}
-
-			// CreateRewinder doesn't necessarily create an instance of rewinder, still need to check null
-			if (Rewinder != null)
-			{
-				if (enabled)
-				{
-					Rewinder.Resume();
-				}
-				else
-				{
-					Rewinder.Suspend();
-				}
-
-				AddOnScreenMessage($"Rewind {(enabled ? "enabled" : "suspended")}");
-			}
-			UpdateStatusBarRewindIndicator();
-		}
-
-		public void DisableRewind()
-		{
-			Rewinder?.Dispose();
-			Rewinder = null;
-			UpdateStatusBarRewindIndicator();
-		}
-
-		public BitmapBuffer/*?*/ ReadScreenshotFromSavestate(int slot)
-		{
-			if (!Emulator.HasSavestates()) return null;
-			var path = $"{SaveStatePrefix()}.QuickSave{slot % 10}.{SaveSlotManager.StateExtension}";
-			return File.Exists(path) ? SavestateFile.GetFrameBufferFrom(path) : null;
-		}
-
-		public bool LoadState(string path, string userFriendlyStateName, bool suppressOSD = false) // Move to client.common
-		{
-			if (!Emulator.HasSavestates()) return false;
-			if (ToolControllingSavestates is { } tool) return tool.LoadState();
-
-			if (!new SavestateFile(Emulator, MovieSession, MovieSession.UserBag).Load(path, this))
-			{
-				AddOnScreenMessage("Loadstate error!");
-				return false;
-			}
-
-			OSD.ClearGuiText();
-			if (SavestateLoaded is not null)
-			{
-				StateLoadedEventArgs args = new(userFriendlyStateName);
-				SavestateLoaded(this, args);
-			}
-
-			if (Tools.Has<LuaConsole>()) Tools.LuaConsole.CallStateLoadCallbacks(userFriendlyStateName);
-
-			SetMainformMovieInfo();
-			UpdateToolsAfter();
-			UpdateToolsLoadstate();
-			InputManager.AutoFireController.ClearStarts();
-
-			//we don't want to analyze how to intermix movies, rewinding, and states
-			//so purge rewind history when loading a state while doing a movie
-			if (ToolControllingRewind is null && MovieSession.Movie.IsActive())
-			{
-				Rewinder?.Clear();
-			}
-
-			if (!suppressOSD)
-			{
-				AddOnScreenMessage($"Loaded state: {userFriendlyStateName}");
-			}
-			return true;
-		}
-
-		public bool LoadQuickSave(int slot, bool suppressOSD = false)
-		{
-			if (!Emulator.HasSavestates()) return false;
-
-			var quickSlotName = $"QuickSave{slot % 10}";
-			var handled = false;
-			if (QuicksaveLoad is not null)
-			{
-				BeforeQuickLoadEventArgs args = new(quickSlotName);
-				QuicksaveLoad(this, args);
-				handled = args.Handled;
-			}
-			if (handled) return true; // not sure
-
-			if (ToolControllingSavestates is { } tool) return tool.LoadQuickSave(slot);
-
-			var path = $"{SaveStatePrefix()}.{quickSlotName}.{SaveSlotManager.StateExtension}";
-			if (!File.Exists(path))
-			{
-				AddOnScreenMessage($"Unable to load {quickSlotName}.{SaveSlotManager.StateExtension}");
-				return false;
-			}
-
-			return LoadState(path: path, userFriendlyStateName: quickSlotName, suppressOSD: suppressOSD);
-		}
-
-		private FileWriteResult SaveStateInternal(string path, string userFriendlyStateName, bool suppressOSD, bool makeBackup)
-		{
-			if (!Emulator.HasSavestates())
-			{
-				return new(FileWriteEnum.Aborted, new("", ""), new UnlessUsingApiException("The current emulator does not support savestates."));
-			}
-
-			if (ToolControllingSavestates is { } tool)
-			{
-				tool.SaveState();
-				// assume success by the tool: state was created, but not as a file. So no path.
-				return new();
-			}
-
-			if (MovieSession.Movie.IsActive() && Emulator.Frame > MovieSession.Movie.FrameCount)
-			{
-				const string errmsg = "Cannot savestate after movie end!";
-				AddOnScreenMessage(errmsg);
-				// Failed to create state due to limitations of our movie handling code.
-				return new(FileWriteEnum.Aborted, new("", ""), new UnlessUsingApiException(errmsg));
-			}
-
-			FileWriteResult result = new SavestateFile(Emulator, MovieSession, MovieSession.UserBag)
-				.Create(path, Config.Savestates, makeBackup);
-			if (result.IsError)
-			{
-				AddOnScreenMessage($"Unable to save state {path}");
-			}
-			else
-			{
-				if (SavestateSaved is not null)
-				{
-					StateSavedEventArgs args = new(userFriendlyStateName);
-					SavestateSaved(this, args);
-				}
-
-				if (Tools.Has<LuaConsole>())
-				{
-					Tools.LuaConsole.CallStateSaveCallbacks(userFriendlyStateName);
-				}
-
-				if (!suppressOSD)
-				{
-					AddOnScreenMessage($"Saved state: {userFriendlyStateName}");
-				}
-			}
-
-			return result;
-		}
-
-		public FileWriteResult SaveState(string path, string userFriendlyStateName, bool suppressOSD = false)
-		{
-			return SaveStateInternal(path, userFriendlyStateName, suppressOSD, false);
-		}
-
-		public FileWriteResult SaveQuickSave(int slot, bool suppressOSD = false)
-		{
-			if (!Emulator.HasSavestates())
-			{
-				return new(FileWriteEnum.Aborted, new("", ""), new UnlessUsingApiException("The current emulator does not support savestates."));
-			}
-
-			var quickSlotName = $"QuickSave{slot % 10}";
-			var handled = false;
-			if (QuicksaveSave is not null)
-			{
-				BeforeQuickSaveEventArgs args = new(quickSlotName);
-				QuicksaveSave(this, args);
-				handled = args.Handled;
-			}
-			if (handled)
-			{
-				// I suppose this is a success? But we have no path.
-				return new();
-			}
-
-			if (ToolControllingSavestates is { } tool)
-			{
-				tool.SaveQuickSave(slot);
-				// assume success by the tool: state was created, but not as a file. So no path.
-				return new();
-			}
-
-			var path = $"{SaveStatePrefix()}.{quickSlotName}.{SaveSlotManager.StateExtension}";
-			var ret = SaveStateInternal(path, quickSlotName, suppressOSD, true);
-			UpdateStatusSlots();
-			return ret;
-		}
-
-		/// <summary>
-		/// Runs <see cref="SaveQuickSave(int, bool)"/> and displays a pop up message if there was an error.
-		/// </summary>
-		private void SaveQuickSaveAndShowError(int slot)
-		{
-			ShowMessageIfError(() => SaveQuickSave(slot), "Quick save failed.");
-		}
-
 		public bool EnsureCoreIsAccurate()
 			=> true; // single-core build: no more-accurate alternative to offer
-
-		private void SaveStateAs()
-		{
-			if (!Emulator.HasSavestates())
-			{
-				return;
-			}
-
-			// allow named state export for tastudio, since it's safe, unlike loading one
-			// todo: make it not save laglog in that case
-			if (Tools.IsLoaded<TAStudio>())
-			{
-				Tools.TAStudio.NamedStatePending = true;
-			}
-
-			if (ToolControllingSavestates is { } tool)
-			{
-				tool.SaveStateAs();
-				return;
-			}
-
-			var path = Config.PathEntries.SaveStateAbsolutePath(Game.System);
-			new FileInfo(path).Directory?.Create();
-
-			var shouldSaveResult = this.ShowFileSaveDialog(
-				fileExt: SaveSlotManager.StateExtension,
-				filter: ChimeraSaveStatesFSFilterSet,
-				initDir: path,
-				initFileName: $"{SaveStatePrefix()}.QuickSave0.{SaveSlotManager.StateExtension}");
-			if (shouldSaveResult is not null)
-			{
-				ShowMessageIfError(
-					() => SaveState(path: shouldSaveResult, userFriendlyStateName: shouldSaveResult),
-					"Unable to save state.");
-			}
-
-			if (Tools.IsLoaded<TAStudio>())
-			{
-				Tools.TAStudio.NamedStatePending = false;
-			}
-		}
-
-		private bool LoadStateAs()
-		{
-			if (!Emulator.HasSavestates()) return false;
-			if (ToolControllingSavestates is { } tool) return tool.LoadStateAs();
-
-			var result = this.ShowFileOpenDialog(
-				discardCWDChange: true,
-				filter: ChimeraSaveStatesFSFilterSet,
-				initDir: Config.PathEntries.SaveStateAbsolutePath(Game.System));
-			if (result is null || !File.Exists(result)) return false;
-			return LoadState(path: result, userFriendlyStateName: Path.GetFileName(result));
-		}
-
-		private void SelectSlot(int slot)
-		{
-			if (!Emulator.HasSavestates()) return;
-			if (ToolControllingSavestates is { } tool)
-			{
-				bool handled = tool.SelectSlot(slot);
-				if (handled) return;
-			}
-			Config.SaveSlot = slot;
-			SaveSlotSelectedMessage();
-			UpdateStatusSlots();
-		}
-
-		private void PreviousSlot()
-		{
-			if (!Emulator.HasSavestates()) return;
-			if (ToolControllingSavestates is { } tool)
-			{
-				bool handled = tool.PreviousSlot();
-				if (handled) return;
-			}
-			Config.SaveSlot--;
-			if (Config.SaveSlot < 1) Config.SaveSlot = 10;
-			SaveSlotSelectedMessage();
-			UpdateStatusSlots();
-		}
-
-		private void NextSlot()
-		{
-			if (!Emulator.HasSavestates()) return;
-			if (ToolControllingSavestates is { } tool)
-			{
-				bool handled = tool.NextSlot();
-				if (handled) return;
-			}
-			Config.SaveSlot++;
-			if (Config.SaveSlot > 10) Config.SaveSlot = 1;
-			SaveSlotSelectedMessage();
-			UpdateStatusSlots();
-		}
 
 		private void CaptureRewind(bool suppressCaptureRewind)
 		{
 			if (ToolControllingRewind is { } tool)
 			{
 				tool.CaptureRewind();
-			}
-			else if (!suppressCaptureRewind && Rewinder?.Active == true)
-			{
-				Rewinder.Capture(Emulator.Frame);
 			}
 		}
 
@@ -4088,50 +3588,7 @@ namespace Chimera.Client.GUI
 				return isRewinding;
 			}
 
-			if (Rewinder?.Active == true && (InputManager.ClientControls["Rewind"] || PressRewind))
-			{
-				if (EmulatorPaused)
-				{
-					if (_frameRewindTimestamp == 0)
-					{
-						isRewinding = true;
-						_frameRewindTimestamp = currentTimestamp;
-					}
-					else
-					{
-						double timestampDeltaMs = (double)(currentTimestamp - _frameRewindTimestamp) / Stopwatch.Frequency * 1000.0;
-						isRewinding = timestampDeltaMs >= Config.FrameProgressDelayMs;
-					}
-				}
-				else
-				{
-					isRewinding = true;
-				}
-
-				if (isRewinding)
-				{
-					// Try to avoid the previous frame:  We want to frame advance right after rewinding so we can give a useful
-					// framebuffer.
-					var frameToAvoid = Emulator.Frame - 1;
-					runFrame = Rewinder.Rewind(frameToAvoid);
-					if (Emulator.Frame == frameToAvoid)
-					{
-						// The rewinder was unable to satisfy our request.  Prefer showing a stale framebuffer to
-						// advancing in a way that essentially no-ops the entire rewind.
-						runFrame = false;
-					}
-
-					if (runFrame && MovieSession.Movie.IsRecording())
-					{
-						MovieSession.Movie.SwitchToPlay();
-						returnToRecording = true;
-					}
-				}
-			}
-			else
-			{
-				_frameRewindTimestamp = 0;
-			}
+			_frameRewindTimestamp = 0;
 
 			return isRewinding;
 		}

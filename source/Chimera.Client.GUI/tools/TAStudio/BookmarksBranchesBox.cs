@@ -179,7 +179,6 @@ namespace Chimera.Client.GUI
 			Select(Branches.Current, true);
 			BranchView.Refresh();
 			Tastudio.RefreshDialog();
-			MainForm.UpdateStatusSlots();
 		}
 
 		public TasBranch SelectedBranch
@@ -363,7 +362,6 @@ namespace Chimera.Client.GUI
 
 			BranchView.RowCount = Branches.Count;
 			Tastudio.RefreshDialog(refreshBranches: false);
-			MainForm.UpdateStatusSlots();
 		}
 
 		private void UndoBranchToolStripMenuItem_Click(object sender, EventArgs e)

@@ -7,10 +7,6 @@ namespace Chimera.Client.Common
 {
 	public readonly struct ParsedCLIFlags
 	{
-		public readonly int? cmdLoadSlot;
-
-		public readonly string? cmdLoadState;
-
 		public readonly string? cmdConfigFile;
 
 		public readonly string? cmdMovie;
@@ -55,8 +51,6 @@ namespace Chimera.Client.Common
 		public readonly string? cmdCorePackage;
 
 		public ParsedCLIFlags(
-			int? cmdLoadSlot,
-			string? cmdLoadState,
 			string? cmdConfigFile,
 			string? cmdMovie,
 			string? cmdProject,
@@ -79,8 +73,6 @@ namespace Chimera.Client.Common
 			string? cmdRom,
 			string? cmdCorePackage)
 		{
-			this.cmdLoadSlot = cmdLoadSlot;
-			this.cmdLoadState = cmdLoadState;
 			this.cmdConfigFile = cmdConfigFile;
 			this.cmdMovie = cmdMovie;
 			this.cmdProject = cmdProject;

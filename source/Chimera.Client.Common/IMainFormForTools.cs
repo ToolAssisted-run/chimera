@@ -36,12 +36,6 @@ namespace Chimera.Client.Common
 		BitmapBuffer CaptureOSD();
 
 		/// <remarks>only referenced from TAStudio</remarks>
-		void DisableRewind();
-
-		/// <remarks>only referenced from TAStudio</remarks>
-		void EnableRewind(bool enabled);
-
-		/// <remarks>only referenced from TAStudio</remarks>
 		bool EnsureCoreIsAccurate();
 
 		/// <remarks>only referenced from TAStudio</remarks>
@@ -83,9 +77,6 @@ namespace Chimera.Client.Common
 
 		/// <remarks>only referenced from LogWindow</remarks>
 		void UpdateDumpInfo(RomStatus? newStatus = null);
-
-		/// <remarks>only referenced from BookmarksBranchesBox</remarks>
-		void UpdateStatusSlots();
 
 		/// <remarks>only referenced from TAStudio</remarks>
 		void UpdateWindowTitle();

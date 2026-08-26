@@ -27,52 +27,11 @@ namespace Chimera.Client.GUI
 			this.toolStripSeparator3 = new Chimera.WinForms.Controls.ToolStripSeparatorEx();
 			this.CloseRomMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.toolStripMenuItem1 = new Chimera.WinForms.Controls.ToolStripSeparatorEx();
-			this.SaveStateSubMenu = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.SaveState1MenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.SaveState2MenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.SaveState3MenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.SaveState4MenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.SaveState5MenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.SaveState6MenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.SaveState7MenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.SaveState8MenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.SaveState9MenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.SaveState0MenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.toolStripSeparator6 = new Chimera.WinForms.Controls.ToolStripSeparatorEx();
-			this.SaveNamedStateMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.toolStripSeparator24 = new Chimera.WinForms.Controls.ToolStripSeparatorEx();
-			this.AutosaveLastSlotMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.LoadStateSubMenu = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.LoadState1MenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.LoadState2MenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.LoadState3MenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.LoadState4MenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.LoadState5MenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.LoadState6MenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.LoadState7MenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.LoadState8MenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.LoadState9MenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.LoadState0MenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.toolStripSeparator7 = new Chimera.WinForms.Controls.ToolStripSeparatorEx();
-			this.LoadNamedStateMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.toolStripSeparator21 = new Chimera.WinForms.Controls.ToolStripSeparatorEx();
-			this.AutoloadLastSlotMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.SaveSlotSubMenu = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.SelectSlot1MenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.SelectSlot2MenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.SelectSlot3MenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.SelectSlot4MenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.SelectSlot5MenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.SelectSlot6MenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.SelectSlot7MenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.SelectSlot8MenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.SelectSlot9MenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.SelectSlot0MenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.PreviousSlotMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.NextSlotMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.toolStripSeparator5 = new Chimera.WinForms.Controls.ToolStripSeparatorEx();
-			this.SaveToCurrentSlotMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.LoadCurrentSlotMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.toolStripMenuItem2 = new Chimera.WinForms.Controls.ToolStripSeparatorEx();
 			this.AVSubMenu = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.RecordAVMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
@@ -122,7 +81,6 @@ namespace Chimera.Client.GUI
 			this.PathsMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.MessagesMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.AutofireMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.RewindOptionsMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.extensionsToolStripMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.ClientOptionsMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.toolStripSeparator9 = new Chimera.WinForms.Controls.ToolStripSeparatorEx();
@@ -190,17 +148,6 @@ namespace Chimera.Client.GUI
 			this.RebootStatusBarIcon = new Chimera.WinForms.Controls.StatusLabelEx();
 			this.AVStatusLabel = new Chimera.WinForms.Controls.StatusLabelEx();
 			this.LedLightStatusLabel = new Chimera.WinForms.Controls.StatusLabelEx();
-			this.SaveSlotsStatusLabel = new Chimera.WinForms.Controls.StatusLabelEx();
-			this.Slot1StatusButton = new Chimera.WinForms.Controls.StatusLabelEx();
-			this.Slot2StatusButton = new Chimera.WinForms.Controls.StatusLabelEx();
-			this.Slot3StatusButton = new Chimera.WinForms.Controls.StatusLabelEx();
-			this.Slot4StatusButton = new Chimera.WinForms.Controls.StatusLabelEx();
-			this.Slot5StatusButton = new Chimera.WinForms.Controls.StatusLabelEx();
-			this.Slot6StatusButton = new Chimera.WinForms.Controls.StatusLabelEx();
-			this.Slot7StatusButton = new Chimera.WinForms.Controls.StatusLabelEx();
-			this.Slot8StatusButton = new Chimera.WinForms.Controls.StatusLabelEx();
-			this.Slot9StatusButton = new Chimera.WinForms.Controls.StatusLabelEx();
-			this.Slot0StatusButton = new Chimera.WinForms.Controls.StatusLabelEx();
 			this.CheatStatusButton = new Chimera.WinForms.Controls.StatusLabelEx();
 			this.KeyPriorityStatusLabel = new Chimera.WinForms.Controls.StatusLabelEx();
 			this.CoreNameStatusBarButton = new Chimera.WinForms.Controls.StatusLabelEx();
@@ -218,7 +165,6 @@ namespace Chimera.Client.GUI
 			this.SaveMovieContextMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.SaveMovieAsContextMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.ContextSeparator_AfterMovie = new Chimera.WinForms.Controls.ToolStripSeparatorEx();
-			this.UndoSavestateContextMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.ContextSeparator_AfterUndo = new Chimera.WinForms.Controls.ToolStripSeparatorEx();
 			this.ConfigContextMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.toolStripMenuItem6 = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
@@ -228,7 +174,6 @@ namespace Chimera.Client.GUI
 			this.toolStripMenuItem10 = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.toolStripMenuItem12 = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.toolStripMenuItem13 = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.toolStripMenuItem14 = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.toolStripMenuItem15 = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.customizeToolStripMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.toolStripSeparator30 = new Chimera.WinForms.Controls.ToolStripSeparatorEx();
@@ -267,9 +212,6 @@ namespace Chimera.Client.GUI
             this.OpenCoreMenuItem,
             this.CloseRomMenuItem,
             this.toolStripMenuItem1,
-            this.SaveStateSubMenu,
-            this.LoadStateSubMenu,
-            this.SaveSlotSubMenu,
             this.toolStripMenuItem2,
             this.AVSubMenu,
             this.ScreenshotSubMenu,
@@ -309,254 +251,126 @@ namespace Chimera.Client.GUI
 			// 
 			// SaveStateSubMenu
 			// 
-			this.SaveStateSubMenu.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
-            this.SaveState1MenuItem,
-            this.SaveState2MenuItem,
-            this.SaveState3MenuItem,
-            this.SaveState4MenuItem,
-            this.SaveState5MenuItem,
-            this.SaveState6MenuItem,
-            this.SaveState7MenuItem,
-            this.SaveState8MenuItem,
-            this.SaveState9MenuItem,
-            this.SaveState0MenuItem,
-            this.toolStripSeparator6,
-            this.SaveNamedStateMenuItem,
-            this.toolStripSeparator24,
-            this.AutosaveLastSlotMenuItem});
-			this.SaveStateSubMenu.Text = "&Save State";
-			this.SaveStateSubMenu.DropDownOpened += new System.EventHandler(this.SaveStateSubMenu_DropDownOpened);
 			// 
 			// SaveState1MenuItem
 			// 
-			this.SaveState1MenuItem.Text = "1";
-			this.SaveState1MenuItem.Click += new System.EventHandler(this.QuickSavestateMenuItem_Click);
 			// 
 			// SaveState2MenuItem
 			// 
-			this.SaveState2MenuItem.Text = "2";
-			this.SaveState2MenuItem.Click += new System.EventHandler(this.QuickSavestateMenuItem_Click);
 			// 
 			// SaveState3MenuItem
 			// 
-			this.SaveState3MenuItem.Text = "3";
-			this.SaveState3MenuItem.Click += new System.EventHandler(this.QuickSavestateMenuItem_Click);
 			// 
 			// SaveState4MenuItem
 			// 
-			this.SaveState4MenuItem.Text = "4";
-			this.SaveState4MenuItem.Click += new System.EventHandler(this.QuickSavestateMenuItem_Click);
 			// 
 			// SaveState5MenuItem
 			// 
-			this.SaveState5MenuItem.Text = "5";
-			this.SaveState5MenuItem.Click += new System.EventHandler(this.QuickSavestateMenuItem_Click);
 			// 
 			// SaveState6MenuItem
 			// 
-			this.SaveState6MenuItem.Text = "6";
-			this.SaveState6MenuItem.Click += new System.EventHandler(this.QuickSavestateMenuItem_Click);
 			// 
 			// SaveState7MenuItem
 			// 
-			this.SaveState7MenuItem.Text = "7";
-			this.SaveState7MenuItem.Click += new System.EventHandler(this.QuickSavestateMenuItem_Click);
 			// 
 			// SaveState8MenuItem
 			// 
-			this.SaveState8MenuItem.Text = "8";
-			this.SaveState8MenuItem.Click += new System.EventHandler(this.QuickSavestateMenuItem_Click);
 			// 
 			// SaveState9MenuItem
 			// 
-			this.SaveState9MenuItem.Text = "9";
-			this.SaveState9MenuItem.Click += new System.EventHandler(this.QuickSavestateMenuItem_Click);
 			// 
 			// SaveState0MenuItem
 			// 
-			this.SaveState0MenuItem.Text = "10";
-			this.SaveState0MenuItem.Click += new System.EventHandler(this.QuickSavestateMenuItem_Click);
 			// 
 			// SaveNamedStateMenuItem
 			// 
-			this.SaveNamedStateMenuItem.Text = "Save Named State...";
-			this.SaveNamedStateMenuItem.Click += new System.EventHandler(this.SaveNamedStateMenuItem_Click);
 			// 
 			// AutosaveLastSlotMenuItem
 			// 
-			this.AutosaveLastSlotMenuItem.Text = "Autosave Last Slot";
-			this.AutosaveLastSlotMenuItem.Click += new System.EventHandler(this.AutosaveLastSlotMenuItem_Click);
 			// 
 			// LoadStateSubMenu
 			// 
-			this.LoadStateSubMenu.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
-            this.LoadState1MenuItem,
-            this.LoadState2MenuItem,
-            this.LoadState3MenuItem,
-            this.LoadState4MenuItem,
-            this.LoadState5MenuItem,
-            this.LoadState6MenuItem,
-            this.LoadState7MenuItem,
-            this.LoadState8MenuItem,
-            this.LoadState9MenuItem,
-            this.LoadState0MenuItem,
-            this.toolStripSeparator7,
-            this.LoadNamedStateMenuItem,
-            this.toolStripSeparator21,
-            this.AutoloadLastSlotMenuItem});
-			this.LoadStateSubMenu.Text = "&Load State";
-			this.LoadStateSubMenu.DropDownOpened += new System.EventHandler(this.LoadStateSubMenu_DropDownOpened);
 			// 
 			// LoadState1MenuItem
 			// 
-			this.LoadState1MenuItem.Text = "1";
-			this.LoadState1MenuItem.Click += new System.EventHandler(this.QuickLoadstateMenuItem_Click);
 			// 
 			// LoadState2MenuItem
 			// 
-			this.LoadState2MenuItem.Text = "2";
-			this.LoadState2MenuItem.Click += new System.EventHandler(this.QuickLoadstateMenuItem_Click);
 			// 
 			// LoadState3MenuItem
 			// 
-			this.LoadState3MenuItem.Text = "3";
-			this.LoadState3MenuItem.Click += new System.EventHandler(this.QuickLoadstateMenuItem_Click);
 			// 
 			// LoadState4MenuItem
 			// 
-			this.LoadState4MenuItem.Text = "4";
-			this.LoadState4MenuItem.Click += new System.EventHandler(this.QuickLoadstateMenuItem_Click);
 			// 
 			// LoadState5MenuItem
 			// 
-			this.LoadState5MenuItem.Text = "5";
-			this.LoadState5MenuItem.Click += new System.EventHandler(this.QuickLoadstateMenuItem_Click);
 			// 
 			// LoadState6MenuItem
 			// 
-			this.LoadState6MenuItem.Text = "6";
-			this.LoadState6MenuItem.Click += new System.EventHandler(this.QuickLoadstateMenuItem_Click);
 			// 
 			// LoadState7MenuItem
 			// 
-			this.LoadState7MenuItem.Text = "7";
-			this.LoadState7MenuItem.Click += new System.EventHandler(this.QuickLoadstateMenuItem_Click);
 			// 
 			// LoadState8MenuItem
 			// 
-			this.LoadState8MenuItem.Text = "8";
-			this.LoadState8MenuItem.Click += new System.EventHandler(this.QuickLoadstateMenuItem_Click);
 			// 
 			// LoadState9MenuItem
 			// 
-			this.LoadState9MenuItem.Text = "9";
-			this.LoadState9MenuItem.Click += new System.EventHandler(this.QuickLoadstateMenuItem_Click);
 			// 
 			// LoadState0MenuItem
 			// 
-			this.LoadState0MenuItem.Text = "10";
-			this.LoadState0MenuItem.Click += new System.EventHandler(this.QuickLoadstateMenuItem_Click);
 			// 
 			// LoadNamedStateMenuItem
 			// 
-			this.LoadNamedStateMenuItem.Text = "Load Named State...";
-			this.LoadNamedStateMenuItem.Click += new System.EventHandler(this.LoadNamedStateMenuItem_Click);
 			// 
 			// AutoloadLastSlotMenuItem
 			// 
-			this.AutoloadLastSlotMenuItem.Text = "Autoload Last Slot";
-			this.AutoloadLastSlotMenuItem.Click += new System.EventHandler(this.AutoloadLastSlotMenuItem_Click);
 			// 
 			// SaveSlotSubMenu
 			// 
-			this.SaveSlotSubMenu.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
-            this.SelectSlot1MenuItem,
-            this.SelectSlot2MenuItem,
-            this.SelectSlot3MenuItem,
-            this.SelectSlot4MenuItem,
-            this.SelectSlot5MenuItem,
-            this.SelectSlot6MenuItem,
-            this.SelectSlot7MenuItem,
-            this.SelectSlot8MenuItem,
-            this.SelectSlot9MenuItem,
-            this.SelectSlot0MenuItem,
-            this.PreviousSlotMenuItem,
-            this.NextSlotMenuItem,
-            this.toolStripSeparator5,
-            this.SaveToCurrentSlotMenuItem,
-            this.LoadCurrentSlotMenuItem});
-			this.SaveSlotSubMenu.Text = "Save S&lot";
-			this.SaveSlotSubMenu.DropDownOpened += new System.EventHandler(this.SaveSlotSubMenu_DropDownOpened);
 			// 
 			// SelectSlot1MenuItem
 			// 
-			this.SelectSlot1MenuItem.Text = "Select Slot 1";
-			this.SelectSlot1MenuItem.Click += new System.EventHandler(this.SelectSlotMenuItems_Click);
 			// 
 			// SelectSlot2MenuItem
 			// 
-			this.SelectSlot2MenuItem.Text = "Select Slot 2";
-			this.SelectSlot2MenuItem.Click += new System.EventHandler(this.SelectSlotMenuItems_Click);
 			// 
 			// SelectSlot3MenuItem
 			// 
-			this.SelectSlot3MenuItem.Text = "Select Slot 3";
-			this.SelectSlot3MenuItem.Click += new System.EventHandler(this.SelectSlotMenuItems_Click);
 			// 
 			// SelectSlot4MenuItem
 			// 
-			this.SelectSlot4MenuItem.Text = "Select Slot 4";
-			this.SelectSlot4MenuItem.Click += new System.EventHandler(this.SelectSlotMenuItems_Click);
 			// 
 			// SelectSlot5MenuItem
 			// 
-			this.SelectSlot5MenuItem.Text = "Select Slot 5";
-			this.SelectSlot5MenuItem.Click += new System.EventHandler(this.SelectSlotMenuItems_Click);
 			// 
 			// SelectSlot6MenuItem
 			// 
-			this.SelectSlot6MenuItem.Text = "Select Slot 6";
-			this.SelectSlot6MenuItem.Click += new System.EventHandler(this.SelectSlotMenuItems_Click);
 			// 
 			// SelectSlot7MenuItem
 			// 
-			this.SelectSlot7MenuItem.Text = "Select Slot 7";
-			this.SelectSlot7MenuItem.Click += new System.EventHandler(this.SelectSlotMenuItems_Click);
 			// 
 			// SelectSlot8MenuItem
 			// 
-			this.SelectSlot8MenuItem.Text = "Select Slot 8";
-			this.SelectSlot8MenuItem.Click += new System.EventHandler(this.SelectSlotMenuItems_Click);
 			// 
 			// SelectSlot9MenuItem
 			// 
-			this.SelectSlot9MenuItem.Text = "Select Slot 9";
-			this.SelectSlot9MenuItem.Click += new System.EventHandler(this.SelectSlotMenuItems_Click);
 			// 
 			// SelectSlot0MenuItem
 			// 
-			this.SelectSlot0MenuItem.Text = "Select Slot 10";
-			this.SelectSlot0MenuItem.Click += new System.EventHandler(this.SelectSlotMenuItems_Click);
 			// 
 			// PreviousSlotMenuItem
 			// 
-			this.PreviousSlotMenuItem.Text = "Previous Slot";
-			this.PreviousSlotMenuItem.Click += new System.EventHandler(this.PreviousSlotMenuItem_Click);
 			// 
 			// NextSlotMenuItem
 			// 
-			this.NextSlotMenuItem.Text = "Next Slot";
-			this.NextSlotMenuItem.Click += new System.EventHandler(this.NextSlotMenuItem_Click);
 			// 
 			// SaveToCurrentSlotMenuItem
 			// 
-			this.SaveToCurrentSlotMenuItem.Text = "Save to Current Slot";
-			this.SaveToCurrentSlotMenuItem.Click += new System.EventHandler(this.SaveToCurrentSlotMenuItem_Click);
 			// 
 			// LoadCurrentSlotMenuItem
 			// 
-			this.LoadCurrentSlotMenuItem.Text = "Load Current Slot";
-			this.LoadCurrentSlotMenuItem.Click += new System.EventHandler(this.LoadCurrentSlotMenuItem_Click);
 			// 
 			// MovieSubMenu
 			// 
@@ -822,7 +636,6 @@ namespace Chimera.Client.GUI
             this.PathsMenuItem,
             this.MessagesMenuItem,
             this.AutofireMenuItem,
-            this.RewindOptionsMenuItem,
             this.extensionsToolStripMenuItem,
             this.ClientOptionsMenuItem,
             this.toolStripSeparator9,
@@ -871,10 +684,7 @@ namespace Chimera.Client.GUI
 			this.AutofireMenuItem.Text = "&Autofire...";
 			this.AutofireMenuItem.Click += new System.EventHandler(this.AutofireMenuItem_Click);
 			// 
-			// RewindOptionsMenuItem
 			// 
-			this.RewindOptionsMenuItem.Text = "&Rewind && States...";
-			this.RewindOptionsMenuItem.Click += new System.EventHandler(this.RewindOptionsMenuItem_Click);
 			// 
 			// extensionsToolStripMenuItem
 			// 
@@ -1356,17 +1166,6 @@ namespace Chimera.Client.GUI
             this.RebootStatusBarIcon,
             this.AVStatusLabel,
             this.LedLightStatusLabel,
-            this.SaveSlotsStatusLabel,
-            this.Slot1StatusButton,
-            this.Slot2StatusButton,
-            this.Slot3StatusButton,
-            this.Slot4StatusButton,
-            this.Slot5StatusButton,
-            this.Slot6StatusButton,
-            this.Slot7StatusButton,
-            this.Slot8StatusButton,
-            this.Slot9StatusButton,
-            this.Slot0StatusButton,
             this.CheatStatusButton,
             this.KeyPriorityStatusLabel,
             this.CoreNameStatusBarButton,
@@ -1426,68 +1225,36 @@ namespace Chimera.Client.GUI
 			// 
 			// SaveSlotsStatusLabel
 			// 
-			this.SaveSlotsStatusLabel.BackColor = System.Drawing.SystemColors.Control;
-			this.SaveSlotsStatusLabel.Text = "Save slots";
 			// 
 			// Slot1StatusButton
 			// 
-			this.Slot1StatusButton.Text = "1";
-			this.Slot1StatusButton.ToolTipText = "Save slot 1";
-			this.Slot1StatusButton.MouseUp += new System.Windows.Forms.MouseEventHandler(this.SlotStatusButtons_MouseUp);
 			// 
 			// Slot2StatusButton
 			// 
-			this.Slot2StatusButton.Text = "2";
-			this.Slot2StatusButton.ToolTipText = "Save slot 2";
-			this.Slot2StatusButton.MouseUp += new System.Windows.Forms.MouseEventHandler(this.SlotStatusButtons_MouseUp);
 			// 
 			// Slot3StatusButton
 			// 
-			this.Slot3StatusButton.Text = "3";
-			this.Slot3StatusButton.ToolTipText = "Save slot 3";
-			this.Slot3StatusButton.MouseUp += new System.Windows.Forms.MouseEventHandler(this.SlotStatusButtons_MouseUp);
 			// 
 			// Slot4StatusButton
 			// 
-			this.Slot4StatusButton.Text = "4";
-			this.Slot4StatusButton.ToolTipText = "Save slot 4";
-			this.Slot4StatusButton.MouseUp += new System.Windows.Forms.MouseEventHandler(this.SlotStatusButtons_MouseUp);
 			// 
 			// Slot5StatusButton
 			// 
-			this.Slot5StatusButton.Text = "5";
-			this.Slot5StatusButton.ToolTipText = "Save slot 5";
-			this.Slot5StatusButton.MouseUp += new System.Windows.Forms.MouseEventHandler(this.SlotStatusButtons_MouseUp);
 			// 
 			// Slot6StatusButton
 			// 
-			this.Slot6StatusButton.Text = "6";
-			this.Slot6StatusButton.ToolTipText = "Save slot 6";
-			this.Slot6StatusButton.MouseUp += new System.Windows.Forms.MouseEventHandler(this.SlotStatusButtons_MouseUp);
 			// 
 			// Slot7StatusButton
 			// 
-			this.Slot7StatusButton.Text = "7";
-			this.Slot7StatusButton.ToolTipText = "Save slot 7";
-			this.Slot7StatusButton.MouseUp += new System.Windows.Forms.MouseEventHandler(this.SlotStatusButtons_MouseUp);
 			// 
 			// Slot8StatusButton
 			// 
-			this.Slot8StatusButton.Text = "8";
-			this.Slot8StatusButton.ToolTipText = "Save slot 8";
-			this.Slot8StatusButton.MouseUp += new System.Windows.Forms.MouseEventHandler(this.SlotStatusButtons_MouseUp);
 			// 
 			// Slot9StatusButton
 			// 
-			this.Slot9StatusButton.Text = "9";
-			this.Slot9StatusButton.ToolTipText = "Save slot 9";
-			this.Slot9StatusButton.MouseUp += new System.Windows.Forms.MouseEventHandler(this.SlotStatusButtons_MouseUp);
 			// 
 			// Slot0StatusButton
 			// 
-			this.Slot0StatusButton.Text = "0";
-			this.Slot0StatusButton.ToolTipText = "Save slot 10";
-			this.Slot0StatusButton.MouseUp += new System.Windows.Forms.MouseEventHandler(this.SlotStatusButtons_MouseUp);
 			// 
 			// CheatStatusButton
 			// 
@@ -1526,7 +1293,6 @@ namespace Chimera.Client.GUI
             this.SaveMovieContextMenuItem,
             this.SaveMovieAsContextMenuItem,
             this.ContextSeparator_AfterMovie,
-            this.UndoSavestateContextMenuItem,
             this.ContextSeparator_AfterUndo,
             this.ConfigContextMenuItem,
             this.ScreenshotContextMenuItem,
@@ -1593,8 +1359,6 @@ namespace Chimera.Client.GUI
 			// 
 			// UndoSavestateContextMenuItem
 			// 
-			this.UndoSavestateContextMenuItem.Text = "Undo Savestate";
-			this.UndoSavestateContextMenuItem.Click += new System.EventHandler(this.UndoSavestateContextMenuItem_Click);
 			// 
 			// ConfigContextMenuItem
 			// 
@@ -1606,7 +1370,6 @@ namespace Chimera.Client.GUI
             this.toolStripMenuItem10,
             this.toolStripMenuItem12,
             this.toolStripMenuItem13,
-            this.toolStripMenuItem14,
             this.toolStripMenuItem15,
             this.customizeToolStripMenuItem,
             this.toolStripSeparator30,
@@ -1649,10 +1412,7 @@ namespace Chimera.Client.GUI
 			this.toolStripMenuItem13.Text = "&Autofire...";
 			this.toolStripMenuItem13.Click += new System.EventHandler(this.AutofireMenuItem_Click);
 			// 
-			// toolStripMenuItem14
 			// 
-			this.toolStripMenuItem14.Text = "&Rewind...";
-			this.toolStripMenuItem14.Click += new System.EventHandler(this.RewindOptionsMenuItem_Click);
 			// 
 			// toolStripMenuItem15
 			// 
@@ -1730,29 +1490,7 @@ namespace Chimera.Client.GUI
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx OpenProjectMenuItem;
 		private Chimera.WinForms.Controls.ToolStripSeparatorEx toolStripMenuItem1;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx ExitMenuItem;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx SaveStateSubMenu;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx SaveState1MenuItem;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx SaveState2MenuItem;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx SaveState3MenuItem;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx SaveState4MenuItem;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx SaveState5MenuItem;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx SaveState6MenuItem;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx SaveState7MenuItem;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx SaveState8MenuItem;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx SaveState9MenuItem;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx SaveState0MenuItem;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx LoadStateSubMenu;
 		private Chimera.WinForms.Controls.ToolStripSeparatorEx toolStripMenuItem2;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx LoadState1MenuItem;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx LoadState2MenuItem;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx LoadState3MenuItem;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx LoadState4MenuItem;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx LoadState5MenuItem;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx LoadState6MenuItem;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx LoadState7MenuItem;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx LoadState8MenuItem;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx LoadState9MenuItem;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx LoadState0MenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx SystemSubMenu;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx ViewSubMenu;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx ConfigSubMenu;
@@ -1778,27 +1516,10 @@ namespace Chimera.Client.GUI
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx RecentProjectSubMenu;
 		private Chimera.WinForms.Controls.ToolStripSeparatorEx toolStripSeparator3;
 		private Chimera.WinForms.Controls.ToolStripSeparatorEx toolStripSeparator4;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx SaveSlotSubMenu;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx SelectSlot1MenuItem;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx SelectSlot2MenuItem;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx SelectSlot3MenuItem;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx SelectSlot4MenuItem;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx SelectSlot5MenuItem;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx SelectSlot6MenuItem;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx SelectSlot7MenuItem;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx SelectSlot8MenuItem;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx SelectSlot9MenuItem;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx SelectSlot0MenuItem;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx PreviousSlotMenuItem;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx NextSlotMenuItem;
 		private Chimera.WinForms.Controls.ToolStripSeparatorEx toolStripSeparator5;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx SaveToCurrentSlotMenuItem;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx LoadCurrentSlotMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx CloseRomMenuItem;
 		private Chimera.WinForms.Controls.ToolStripSeparatorEx toolStripSeparator6;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx SaveNamedStateMenuItem;
 		private Chimera.WinForms.Controls.ToolStripSeparatorEx toolStripSeparator7;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx LoadNamedStateMenuItem;
 		private Chimera.WinForms.Controls.ToolStripSeparatorEx toolStripSeparator9;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx SoundMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx SpeedSkipSubMenu;
@@ -1836,7 +1557,6 @@ namespace Chimera.Client.GUI
 		private Chimera.WinForms.Controls.ToolStripSeparatorEx ContextSeparator_AfterROM;
 		private Chimera.WinForms.Controls.ToolStripSeparatorEx ContextSeparator_AfterMovie;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx AddSubtitleContextMenuItem;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx UndoSavestateContextMenuItem;
 		private Chimera.WinForms.Controls.ToolStripSeparatorEx ContextSeparator_AfterUndo;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx CloseRomContextMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx BackupMovieContextMenuItem;
@@ -1846,17 +1566,6 @@ namespace Chimera.Client.GUI
 		private System.Windows.Forms.ToolStripDropDownButton DumpStatusButton;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx ViewSubtitlesContextMenuItem;
 		private MenuStripEx MainformMenu;
-		private Chimera.WinForms.Controls.StatusLabelEx SaveSlotsStatusLabel;
-		private Chimera.WinForms.Controls.StatusLabelEx Slot1StatusButton;
-		private Chimera.WinForms.Controls.StatusLabelEx Slot2StatusButton;
-		private Chimera.WinForms.Controls.StatusLabelEx Slot3StatusButton;
-		private Chimera.WinForms.Controls.StatusLabelEx Slot4StatusButton;
-		private Chimera.WinForms.Controls.StatusLabelEx Slot5StatusButton;
-		private Chimera.WinForms.Controls.StatusLabelEx Slot6StatusButton;
-		private Chimera.WinForms.Controls.StatusLabelEx Slot7StatusButton;
-		private Chimera.WinForms.Controls.StatusLabelEx Slot8StatusButton;
-		private Chimera.WinForms.Controls.StatusLabelEx Slot9StatusButton;
-		private Chimera.WinForms.Controls.StatusLabelEx Slot0StatusButton;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx ViewCommentsContextMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx DisplayLogWindowMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx DisplaySubtitlesMenuItem;
@@ -1867,7 +1576,6 @@ namespace Chimera.Client.GUI
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx RestartMovieContextMenuItem;
 		private Chimera.WinForms.Controls.StatusLabelEx CheatStatusButton;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx AutofireMenuItem;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx AutoloadLastSlotMenuItem;
 		private Chimera.WinForms.Controls.ToolStripSeparatorEx toolStripSeparator21;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx ShowMenuContextMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx ScreenshotClipboardMenuItem;
@@ -1892,7 +1600,6 @@ namespace Chimera.Client.GUI
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx StopNoSaveContextMenuItem;
 		private Chimera.WinForms.Controls.ToolStripSeparatorEx toolStripSeparator29;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx ConfigContextMenuItem;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx RewindOptionsMenuItem;
 		private Chimera.WinForms.Controls.ToolStripSeparatorEx ShowMenuContextMenuSeparator;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx StopAVContextMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx GenericCoreSubMenu;
@@ -1907,7 +1614,6 @@ namespace Chimera.Client.GUI
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx toolStripMenuItem10;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx toolStripMenuItem12;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx toolStripMenuItem13;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx toolStripMenuItem14;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx toolStripMenuItem15;
 		private Chimera.WinForms.Controls.ToolStripSeparatorEx toolStripSeparator30;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx toolStripMenuItem66;
@@ -1942,7 +1648,6 @@ namespace Chimera.Client.GUI
 		private Chimera.WinForms.Controls.ToolStripSeparatorEx toolStripSeparator8;
 		private System.Windows.Forms.ToolStripMenuItem CaptureLuaMenuItem;
 		private ToolStripSeparatorEx toolStripSeparator24;
-		private ToolStripMenuItemEx AutosaveLastSlotMenuItem;
 		private ToolStripMenuItemEx DisableResizeWithFramebufferMenuItem;
 		private ToolStripSeparatorEx toolStripSeparator26;
 	}
