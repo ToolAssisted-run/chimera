@@ -290,7 +290,10 @@ namespace Chimera.Emulation.Common.Engine
 		public abstract IntPtr ce_project_marker_text(IntPtr project, int index);
 
 		[BizImport(CallingConvention.Cdecl)]
-		public abstract void ce_project_marker_add(IntPtr project, long frame, string text);
+		public abstract int ce_project_marker_keep_state(IntPtr project, int index);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract int ce_project_marker_add(IntPtr project, long frame, string text, int keepState);
 
 		[BizImport(CallingConvention.Cdecl)]
 		public abstract void ce_project_marker_remove(IntPtr project, int index);
@@ -305,13 +308,43 @@ namespace Chimera.Emulation.Common.Engine
 		public abstract long ce_project_branch_frame(IntPtr project, int index);
 
 		[BizImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_project_branch_time(IntPtr project, int index);
+
+		[BizImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_project_branch_log_text(IntPtr project, int index, ref ulong lenOut);
 
 		[BizImport(CallingConvention.Cdecl)]
-		public abstract void ce_project_branch_add(IntPtr project, string name, long frame, byte[] logText, ulong len);
+		public abstract void ce_project_branch_add(IntPtr project, string name, long frame, string time, byte[] logText, ulong len);
 
 		[BizImport(CallingConvention.Cdecl)]
 		public abstract void ce_project_branch_remove(IntPtr project, int index);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract int ce_project_branch_marker_count(IntPtr project, int branch);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract long ce_project_branch_marker_frame(IntPtr project, int branch, int index);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_project_branch_marker_text(IntPtr project, int branch, int index);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract int ce_project_branch_marker_keep_state(IntPtr project, int branch, int index);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract void ce_project_branch_marker_add(IntPtr project, int branch, long frame, string text, int keepState);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract int ce_project_subtitle_count(IntPtr project);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_project_subtitle_at(IntPtr project, int index);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract void ce_project_subtitle_add(IntPtr project, string line);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract void ce_project_subtitle_remove(IntPtr project, int index);
 
 		[BizImport(CallingConvention.Cdecl)]
 		public abstract int ce_project_file_add(IntPtr project, string name, string slot, string sourcePath, ref IntPtr errorOut);
@@ -1083,7 +1116,9 @@ namespace Chimera.Emulation.Common.Engine
 		public long MarkerFrame(int index) => ChimeraEngine.Instance.ce_project_marker_frame(_project, index);
 		public string MarkerText(int index)
 			=> ChimeraEngine.PtrToStringUtf8(ChimeraEngine.Instance.ce_project_marker_text(_project, index)) ?? "";
-		public void MarkerAdd(long frame, string text) => ChimeraEngine.Instance.ce_project_marker_add(_project, frame, text);
+		public bool MarkerKeepState(int index) => ChimeraEngine.Instance.ce_project_marker_keep_state(_project, index) is not 0;
+		public int MarkerAdd(long frame, string text, bool keepState = true)
+			=> ChimeraEngine.Instance.ce_project_marker_add(_project, frame, text, keepState ? 1 : 0);
 		public void MarkerRemove(int index) => ChimeraEngine.Instance.ce_project_marker_remove(_project, index);
 		public void MarkersClear()
 		{
@@ -1094,18 +1129,38 @@ namespace Chimera.Emulation.Common.Engine
 		public string BranchName(int index)
 			=> ChimeraEngine.PtrToStringUtf8(ChimeraEngine.Instance.ce_project_branch_name(_project, index)) ?? "";
 		public long BranchFrame(int index) => ChimeraEngine.Instance.ce_project_branch_frame(_project, index);
+		public string BranchTime(int index)
+			=> ChimeraEngine.PtrToStringUtf8(ChimeraEngine.Instance.ce_project_branch_time(_project, index)) ?? "";
 		public string BranchLogText(int index)
 		{
 			ulong len = 0;
 			var p = ChimeraEngine.Instance.ce_project_branch_log_text(_project, index, ref len);
 			return p == IntPtr.Zero ? "" : ChimeraEngine.PtrToStringUtf8(p, len);
 		}
-		public void BranchAdd(string name, long frame, string logText)
+		public void BranchAdd(string name, long frame, string time, string logText)
 		{
 			var bytes = Encoding.UTF8.GetBytes(logText ?? "");
-			ChimeraEngine.Instance.ce_project_branch_add(_project, name, frame, bytes, (ulong)bytes.LongLength);
+			ChimeraEngine.Instance.ce_project_branch_add(_project, name, frame, time ?? "", bytes, (ulong)bytes.LongLength);
 		}
 		public void BranchRemove(int index) => ChimeraEngine.Instance.ce_project_branch_remove(_project, index);
+		public int BranchMarkerCount(int branch) => ChimeraEngine.Instance.ce_project_branch_marker_count(_project, branch);
+		public long BranchMarkerFrame(int branch, int index) => ChimeraEngine.Instance.ce_project_branch_marker_frame(_project, branch, index);
+		public string BranchMarkerText(int branch, int index)
+			=> ChimeraEngine.PtrToStringUtf8(ChimeraEngine.Instance.ce_project_branch_marker_text(_project, branch, index)) ?? "";
+		public bool BranchMarkerKeepState(int branch, int index)
+			=> ChimeraEngine.Instance.ce_project_branch_marker_keep_state(_project, branch, index) is not 0;
+		public void BranchMarkerAdd(int branch, long frame, string text, bool keepState = true)
+			=> ChimeraEngine.Instance.ce_project_branch_marker_add(_project, branch, frame, text, keepState ? 1 : 0);
+
+		public int SubtitleCount => ChimeraEngine.Instance.ce_project_subtitle_count(_project);
+		public string SubtitleAt(int index)
+			=> ChimeraEngine.PtrToStringUtf8(ChimeraEngine.Instance.ce_project_subtitle_at(_project, index)) ?? "";
+		public void SubtitleAdd(string line) => ChimeraEngine.Instance.ce_project_subtitle_add(_project, line);
+		public void SubtitleRemove(int index) => ChimeraEngine.Instance.ce_project_subtitle_remove(_project, index);
+		public void SubtitlesClear()
+		{
+			while (SubtitleCount > 0) SubtitleRemove(SubtitleCount - 1);
+		}
 		public void BranchesClear()
 		{
 			while (BranchCount > 0) BranchRemove(BranchCount - 1);

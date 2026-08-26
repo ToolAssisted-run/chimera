@@ -402,20 +402,38 @@ CE_API int32_t ce_project_set_firmware_text(ce_project *p, const char *json, con
 CE_API const char *ce_project_log_text(const ce_project *p, uint64_t *len_out);
 CE_API void ce_project_set_log_text(ce_project *p, const char *text, uint64_t len);
 
-/* markers, kept sorted by frame */
+/* Markers, kept sorted by frame. keep_state is the user's keep-a-state-here
+ * choice (default true; serialized only when false). Add returns the index
+ * the marker landed at. */
 CE_API int32_t ce_project_marker_count(const ce_project *p);
 CE_API int64_t ce_project_marker_frame(const ce_project *p, int32_t index);
 CE_API const char *ce_project_marker_text(const ce_project *p, int32_t index);
-CE_API void ce_project_marker_add(ce_project *p, int64_t frame, const char *text);
+CE_API int32_t ce_project_marker_keep_state(const ce_project *p, int32_t index);
+CE_API int32_t ce_project_marker_add(ce_project *p, int64_t frame, const char *text, int32_t keep_state);
 CE_API void ce_project_marker_remove(ce_project *p, int32_t index);
 
-/* branches: a named alternative input log at a frame, in creation order */
+/* Branches: a named alternative input log at a frame, in creation order,
+ * with an optional timestamp text (carried verbatim) and its own markers -
+ * a branch is work, so everything about it except the regenerable state
+ * lives in the project. */
 CE_API int32_t ce_project_branch_count(const ce_project *p);
 CE_API const char *ce_project_branch_name(const ce_project *p, int32_t index);
 CE_API int64_t ce_project_branch_frame(const ce_project *p, int32_t index);
+CE_API const char *ce_project_branch_time(const ce_project *p, int32_t index);
 CE_API const char *ce_project_branch_log_text(const ce_project *p, int32_t index, uint64_t *len_out);
-CE_API void ce_project_branch_add(ce_project *p, const char *name, int64_t frame, const char *log_text, uint64_t len);
+CE_API void ce_project_branch_add(ce_project *p, const char *name, int64_t frame, const char *time, const char *log_text, uint64_t len);
 CE_API void ce_project_branch_remove(ce_project *p, int32_t index);
+CE_API int32_t ce_project_branch_marker_count(const ce_project *p, int32_t branch);
+CE_API int64_t ce_project_branch_marker_frame(const ce_project *p, int32_t branch, int32_t index);
+CE_API const char *ce_project_branch_marker_text(const ce_project *p, int32_t branch, int32_t index);
+CE_API int32_t ce_project_branch_marker_keep_state(const ce_project *p, int32_t branch, int32_t index);
+CE_API void ce_project_branch_marker_add(ce_project *p, int32_t branch, int64_t frame, const char *text, int32_t keep_state);
+
+/* subtitles: verbatim display lines, in order */
+CE_API int32_t ce_project_subtitle_count(const ce_project *p);
+CE_API const char *ce_project_subtitle_at(const ce_project *p, int32_t index);
+CE_API void ce_project_subtitle_add(ce_project *p, const char *line);
+CE_API void ce_project_subtitle_remove(ce_project *p, int32_t index);
 
 /* Adds a file: canonical (bare) name, the slot it fills, and where its
  * bytes are RIGHT NOW - read and hashed immediately, so the entry is born

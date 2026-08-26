@@ -74,14 +74,18 @@ int main(int argc, char **argv)
 		assert(ce_project_files_ok(p) == 1);
 
 		// markers keep frame order regardless of insertion order
-		ce_project_marker_add(p, 500, "lap two");
-		ce_project_marker_add(p, 10, "power on");
-		ce_project_marker_add(p, 500, "lap two again");
+		ce_project_marker_add(p, 500, "lap two", 1);
+		ce_project_marker_add(p, 10, "power on", 0);
+		ce_project_marker_add(p, 500, "lap two again", 1);
 		assert(ce_project_marker_count(p) == 3);
 		assert(ce_project_marker_frame(p, 0) == 10);
 		assert(std::strcmp(ce_project_marker_text(p, 1), "lap two") == 0);
+		assert(ce_project_marker_keep_state(p, 0) == 0);
+		assert(ce_project_marker_keep_state(p, 1) == 1);
 
-		ce_project_branch_add(p, "risky route", 400, "|..|\n", 5);
+		ce_project_branch_add(p, "risky route", 400, "2026-08-26 21:00:00", "|..|\n", 5);
+		ce_project_branch_marker_add(p, 0, 350, "the setup", 1);
+		ce_project_subtitle_add(p, "subtitle 100 10 10 300 FFFFFFFF hello");
 
 		assert(ce_project_validate(p, SLOTS_DECL, std::strlen(SLOTS_DECL), &err) == 0);
 		assert(ce_project_save(p, path.c_str(), &err) == 0);
@@ -107,8 +111,14 @@ int main(int argc, char **argv)
 		assert(ce_project_branch_count(p) == 1);
 		assert(std::strcmp(ce_project_branch_name(p, 0), "risky route") == 0);
 		assert(ce_project_branch_frame(p, 0) == 400);
+		assert(std::strcmp(ce_project_branch_time(p, 0), "2026-08-26 21:00:00") == 0);
 		const char *branchLog = ce_project_branch_log_text(p, 0, &len);
 		assert(std::string(branchLog, len) == "|..|\n");
+		assert(ce_project_branch_marker_count(p, 0) == 1);
+		assert(ce_project_branch_marker_frame(p, 0, 0) == 350);
+		assert(std::strcmp(ce_project_branch_marker_text(p, 0, 0), "the setup") == 0);
+		assert(ce_project_subtitle_count(p) == 1);
+		assert(std::strcmp(ce_project_subtitle_at(p, 0), "subtitle 100 10 10 300 FFFFFFFF hello") == 0);
 
 		assert(ce_project_file_count(p) == 4);
 		assert(ce_project_file_status(p, 0) == 1);

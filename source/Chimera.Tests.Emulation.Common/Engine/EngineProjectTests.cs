@@ -41,7 +41,9 @@ namespace Chimera.Tests.Emulation.Common.Engine
 				p.FileAdd("game.img", "floppy", Path.Combine(_dir, "game.img"));
 				p.MarkerAdd(500, "later");
 				p.MarkerAdd(10, "power on");
-				p.BranchAdd("risky", 400, "|U|\n");
+				p.BranchAdd("risky", 400, "2026-08-26 21:00:00", "|U|\n");
+				p.BranchMarkerAdd(0, 350, "the setup");
+				p.SubtitleAdd("subtitle 100 10 10 300 FFFFFFFF hello");
 				p.Save(path);
 			}
 
@@ -61,7 +63,13 @@ namespace Chimera.Tests.Emulation.Common.Engine
 				Assert.AreEqual(1, p.BranchCount);
 				Assert.AreEqual("risky", p.BranchName(0));
 				Assert.AreEqual(400L, p.BranchFrame(0));
+				Assert.AreEqual("2026-08-26 21:00:00", p.BranchTime(0));
 				Assert.AreEqual("|U|\n", p.BranchLogText(0));
+				Assert.AreEqual(1, p.BranchMarkerCount(0));
+				Assert.AreEqual(350L, p.BranchMarkerFrame(0, 0));
+				Assert.AreEqual("the setup", p.BranchMarkerText(0, 0));
+				Assert.AreEqual(1, p.SubtitleCount);
+				Assert.AreEqual("subtitle 100 10 10 300 FFFFFFFF hello", p.SubtitleAt(0));
 
 				// files come back unresolved, then resolve by folder
 				Assert.AreEqual(1, p.FileCount);

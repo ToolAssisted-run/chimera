@@ -42,13 +42,16 @@ struct Marker
 {
 	int64_t frame = 0;
 	std::string text;
+	bool keepState = true; // the user's keep-a-state-here choice; serialized only when false
 };
 
 struct Branch
 {
 	std::string name;
 	int64_t frame = 0;
+	std::string time; // carried verbatim (the frontend's timestamp text); "" = none
 	std::string log;
+	std::vector<Marker> markers;
 };
 
 const char *fail(std::string message, const char **error_out)
@@ -91,6 +94,7 @@ struct ce_project
 	std::vector<FileEntry> files;
 	std::vector<Marker> markers;
 	std::vector<Branch> branches;
+	std::vector<std::string> subtitles; // verbatim subtitle lines, in order
 
 	// borrowed-buffer returns
 	std::string settingsOut, firmwareOut, slotsOut;
@@ -146,7 +150,7 @@ ce_project *ce_project_open(const char *path, const char **error_out)
 	/* the format is strict: a key this build does not know is an error, not
 	 * something to drop silently on the next save */
 	static const char *known[] = { "title", "description", "core", "rerecords",
-		"files", "settings", "firmware", "input", "markers", "branches" };
+		"files", "settings", "firmware", "input", "markers", "branches", "subtitles" };
 	for (cJSON *item = root->child; item != nullptr; item = item->next)
 	{
 		bool ok = false;
@@ -248,6 +252,7 @@ ce_project *ce_project_open(const char *path, const char **error_out)
 		{
 			cJSON *frame = cJSON_GetObjectItemCaseSensitive(item, "frame");
 			cJSON *text = cJSON_GetObjectItemCaseSensitive(item, "text");
+			cJSON *keep = cJSON_GetObjectItemCaseSensitive(item, "keepState");
 			if (!cJSON_IsNumber(frame) || !cJSON_IsString(text))
 			{
 				return rejectP("every marker needs number \"frame\" and string \"text\"");
@@ -255,6 +260,11 @@ ce_project *ce_project_open(const char *path, const char **error_out)
 			Marker m;
 			m.frame = static_cast<int64_t>(frame->valuedouble);
 			m.text = text->valuestring;
+			if (keep != nullptr)
+			{
+				if (!cJSON_IsBool(keep)) return rejectP("a marker's \"keepState\" is not a boolean");
+				m.keepState = cJSON_IsTrue(keep);
+			}
 			p->markers.push_back(std::move(m));
 		}
 		/* kept sorted by frame; a hand-edited file gets the order restored
@@ -279,6 +289,8 @@ ce_project *ce_project_open(const char *path, const char **error_out)
 			cJSON *name = cJSON_GetObjectItemCaseSensitive(item, "name");
 			cJSON *frame = cJSON_GetObjectItemCaseSensitive(item, "frame");
 			cJSON *input = cJSON_GetObjectItemCaseSensitive(item, "input");
+			cJSON *time = cJSON_GetObjectItemCaseSensitive(item, "time");
+			cJSON *markers = cJSON_GetObjectItemCaseSensitive(item, "markers");
 			if (!cJSON_IsString(name) || !cJSON_IsNumber(frame) || !cJSON_IsString(input))
 			{
 				return rejectP("every branch needs string \"name\", number \"frame\" and string \"input\"");
@@ -287,7 +299,38 @@ ce_project *ce_project_open(const char *path, const char **error_out)
 			b.name = name->valuestring;
 			b.frame = static_cast<int64_t>(frame->valuedouble);
 			b.log = input->valuestring;
+			if (time != nullptr)
+			{
+				if (!cJSON_IsString(time)) return rejectP("a branch's \"time\" is not a string");
+				b.time = time->valuestring;
+			}
+			if (markers != nullptr)
+			{
+				if (!cJSON_IsArray(markers)) return rejectP("a branch's \"markers\" is not an array");
+				for (cJSON *m = markers->child; m != nullptr; m = m->next)
+				{
+					cJSON *mFrame = cJSON_GetObjectItemCaseSensitive(m, "frame");
+					cJSON *mText = cJSON_GetObjectItemCaseSensitive(m, "text");
+					if (!cJSON_IsNumber(mFrame) || !cJSON_IsString(mText))
+					{
+						return rejectP("every branch marker needs number \"frame\" and string \"text\"");
+					}
+					Marker mk;
+					mk.frame = static_cast<int64_t>(mFrame->valuedouble);
+					mk.text = mText->valuestring;
+					b.markers.push_back(std::move(mk));
+				}
+			}
 			p->branches.push_back(std::move(b));
+		}
+	}
+	if ((j = cJSON_GetObjectItemCaseSensitive(root, "subtitles")) != nullptr)
+	{
+		if (!cJSON_IsArray(j)) return rejectP("\"subtitles\" is not an array");
+		for (cJSON *item = j->child; item != nullptr; item = item->next)
+		{
+			if (!cJSON_IsString(item)) return rejectP("every subtitle is a string");
+			p->subtitles.push_back(item->valuestring);
 		}
 	}
 
@@ -347,6 +390,7 @@ int32_t ce_project_save(ce_project *p, const char *path, const char **error_out)
 		cJSON *item = cJSON_CreateObject();
 		cJSON_AddNumberToObject(item, "frame", static_cast<double>(m.frame));
 		cJSON_AddStringToObject(item, "text", m.text.c_str());
+		if (!m.keepState) cJSON_AddBoolToObject(item, "keepState", 0);
 		cJSON_AddItemToArray(markers, item);
 	}
 	cJSON *branches = cJSON_AddArrayToObject(root, "branches");
@@ -355,8 +399,28 @@ int32_t ce_project_save(ce_project *p, const char *path, const char **error_out)
 		cJSON *item = cJSON_CreateObject();
 		cJSON_AddStringToObject(item, "name", b.name.c_str());
 		cJSON_AddNumberToObject(item, "frame", static_cast<double>(b.frame));
+		if (!b.time.empty()) cJSON_AddStringToObject(item, "time", b.time.c_str());
 		cJSON_AddStringToObject(item, "input", b.log.c_str());
+		if (!b.markers.empty())
+		{
+			cJSON *bm = cJSON_AddArrayToObject(item, "markers");
+			for (const Marker &m : b.markers)
+			{
+				cJSON *mi = cJSON_CreateObject();
+				cJSON_AddNumberToObject(mi, "frame", static_cast<double>(m.frame));
+				cJSON_AddStringToObject(mi, "text", m.text.c_str());
+				cJSON_AddItemToArray(bm, mi);
+			}
+		}
 		cJSON_AddItemToArray(branches, item);
+	}
+	if (!p->subtitles.empty())
+	{
+		cJSON *subs = cJSON_AddArrayToObject(root, "subtitles");
+		for (const std::string &s : p->subtitles)
+		{
+			cJSON_AddItemToArray(subs, cJSON_CreateString(s.c_str()));
+		}
 	}
 
 	char *text = cJSON_Print(root);
@@ -472,14 +536,22 @@ const char *ce_project_marker_text(const ce_project *p, int32_t index)
 	return p->markers[index].text.c_str();
 }
 
-void ce_project_marker_add(ce_project *p, int64_t frame, const char *text)
+int32_t ce_project_marker_add(ce_project *p, int64_t frame, const char *text, int32_t keep_state)
 {
 	Marker m;
 	m.frame = frame;
 	m.text = text != nullptr ? text : "";
+	m.keepState = keep_state != 0;
 	size_t at = p->markers.size();
 	while (at > 0 && p->markers[at - 1].frame > frame) at--;
 	p->markers.insert(p->markers.begin() + at, std::move(m));
+	return static_cast<int32_t>(at);
+}
+
+int32_t ce_project_marker_keep_state(const ce_project *p, int32_t index)
+{
+	if (index < 0 || index >= ce_project_marker_count(p)) return 1;
+	return p->markers[index].keepState ? 1 : 0;
 }
 
 void ce_project_marker_remove(ce_project *p, int32_t index)
@@ -515,11 +587,18 @@ const char *ce_project_branch_log_text(const ce_project *p, int32_t index, uint6
 	return p->branches[index].log.c_str();
 }
 
-void ce_project_branch_add(ce_project *p, const char *name, int64_t frame, const char *log_text, uint64_t len)
+const char *ce_project_branch_time(const ce_project *p, int32_t index)
+{
+	if (index < 0 || index >= ce_project_branch_count(p)) return nullptr;
+	return p->branches[index].time.c_str();
+}
+
+void ce_project_branch_add(ce_project *p, const char *name, int64_t frame, const char *time, const char *log_text, uint64_t len)
 {
 	Branch b;
 	b.name = name != nullptr ? name : "";
 	b.frame = frame;
+	b.time = time != nullptr ? time : "";
 	if (log_text != nullptr) b.log.assign(log_text, static_cast<size_t>(len));
 	p->branches.push_back(std::move(b));
 }
@@ -528,6 +607,64 @@ void ce_project_branch_remove(ce_project *p, int32_t index)
 {
 	if (index < 0 || index >= ce_project_branch_count(p)) return;
 	p->branches.erase(p->branches.begin() + index);
+}
+
+int32_t ce_project_branch_marker_count(const ce_project *p, int32_t branch)
+{
+	if (branch < 0 || branch >= ce_project_branch_count(p)) return 0;
+	return static_cast<int32_t>(p->branches[branch].markers.size());
+}
+
+int64_t ce_project_branch_marker_frame(const ce_project *p, int32_t branch, int32_t index)
+{
+	if (index < 0 || index >= ce_project_branch_marker_count(p, branch)) return -1;
+	return p->branches[branch].markers[index].frame;
+}
+
+const char *ce_project_branch_marker_text(const ce_project *p, int32_t branch, int32_t index)
+{
+	if (index < 0 || index >= ce_project_branch_marker_count(p, branch)) return nullptr;
+	return p->branches[branch].markers[index].text.c_str();
+}
+
+void ce_project_branch_marker_add(ce_project *p, int32_t branch, int64_t frame, const char *text, int32_t keep_state)
+{
+	if (branch < 0 || branch >= ce_project_branch_count(p)) return;
+	Marker m;
+	m.frame = frame;
+	m.text = text != nullptr ? text : "";
+	m.keepState = keep_state != 0;
+	p->branches[branch].markers.push_back(std::move(m));
+}
+
+int32_t ce_project_branch_marker_keep_state(const ce_project *p, int32_t branch, int32_t index)
+{
+	if (index < 0 || index >= ce_project_branch_marker_count(p, branch)) return 1;
+	return p->branches[branch].markers[index].keepState ? 1 : 0;
+}
+
+/* ---- subtitles: verbatim lines, in order ---- */
+
+int32_t ce_project_subtitle_count(const ce_project *p)
+{
+	return static_cast<int32_t>(p->subtitles.size());
+}
+
+const char *ce_project_subtitle_at(const ce_project *p, int32_t index)
+{
+	if (index < 0 || index >= ce_project_subtitle_count(p)) return nullptr;
+	return p->subtitles[index].c_str();
+}
+
+void ce_project_subtitle_add(ce_project *p, const char *line)
+{
+	p->subtitles.push_back(line != nullptr ? line : "");
+}
+
+void ce_project_subtitle_remove(ce_project *p, int32_t index)
+{
+	if (index < 0 || index >= ce_project_subtitle_count(p)) return;
+	p->subtitles.erase(p->subtitles.begin() + index);
 }
 
 /* ---- files ---- */
