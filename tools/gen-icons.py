@@ -222,7 +222,43 @@ def draw_beaker(size):
 
 
 def save_ico(img, path, sizes=(16, 32, 48, 64)):
-    img.save(path, format="ICO", sizes=[(s, s) for s in sizes])
+    """Writes an .ico whose entries are classic DIBs.
+
+    Not Image.save(format="ICO"): Pillow writes PNG-compressed entries, and
+    Mono's System.Drawing.Icon - which is what runs the Linux build - only
+    understands the BMP kind. It does not fail politely either; it reads the
+    PNG header as a DIB header and dies on a nonsense length, taking the
+    whole app down at startup before any window exists.
+    """
+    import struct
+
+    images = []
+    for s in sizes:
+        im = img.resize((s, s), Image.LANCZOS).convert("RGBA")
+        px = im.load()
+        xor = bytearray()
+        for y in range(s - 1, -1, -1):  # DIBs are bottom-up
+            for x in range(s):
+                r, g, b, a = px[x, y]
+                xor += bytes((b, g, r, a))
+        # the AND mask is unused for 32-bit entries but the format wants it,
+        # one bit per pixel, each row padded to four bytes
+        row = ((s + 31) // 32) * 4
+        and_mask = bytes(row * s)
+        header = struct.pack("<IiiHHIIiiII", 40, s, s * 2, 1, 32, 0,
+                             len(xor) + len(and_mask), 0, 0, 0, 0)
+        images.append((s, header + bytes(xor) + and_mask))
+
+    offset = 6 + 16 * len(images)
+    out = bytearray(struct.pack("<HHH", 0, 1, len(images)))
+    for s, blob in images:
+        out += struct.pack("<BBBBHHII", s if s < 256 else 0, s if s < 256 else 0,
+                           0, 0, 1, 32, len(blob), offset)
+        offset += len(blob)
+    for _, blob in images:
+        out += blob
+    with open(path, "wb") as f:
+        f.write(bytes(out))
 
 
 def main():
