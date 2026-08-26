@@ -108,13 +108,15 @@ to build the form, and by `ce_project_*` to validate a manifest:
 
 ## Editing
 
-Anything in a project can be changed after it is opened. A **structural**
-change - one that affects sync: sync settings, the file manifest, the
-core - first asks: "this will erase the greenzone and possibly desync
-your current inputs, are you sure?". On yes: the greenzone is cleared,
-the core restarts, and the frame selector returns to frame 0. The input
-log is kept (it may no longer sync; that is the user's informed call).
-Non-structural changes (title, description, markers, ...) apply freely.
+Anything in a project can be changed after it is opened, with one
+exception: the core. The core selection is fixed at creation - a
+different core means a new project. A **structural** change - one that
+affects sync: sync settings, the file manifest - first asks: "this will
+erase the greenzone and possibly desync your current inputs, are you
+sure?". On yes: the greenzone is cleared, the core restarts, and the
+frame selector returns to frame 0. The input log is kept (it may no
+longer sync; that is the user's informed call). Non-structural changes
+(title, description, markers, ...) apply freely.
 
 ## Opening
 
@@ -145,8 +147,15 @@ mirroring the file-hash posture.
 ## Status
 
 - Decided: everything above.
-- TODO: ce_project_* (schema + serialization), the per-core slot
-  declaration file + its generators, start screen + creation wizard +
-  resolution dialog, TAStudio-as-application restructuring, removal of
-  the casual paths, chimera-run project support, per-core gate legs
-  against projects.
+- DONE: file_slots.json in all four core packages; ce_project_* in the
+  engine (open/save/resolve/validate/slots map) with test_project;
+  chimera-run --project (resolution, core pin, declaration validation,
+  transitional rom mounts); cores consume the "slots" mount through the
+  guest kit's waterbox_slots.h - DOSBox-X mounts mixed media (floppies +
+  CDs + hard disk + conf, gated: the slots leg, 12/12), PPSSPP boots the
+  disc slot, both NES cores read the rom slot.
+- TODO: the frontend (start screen, creation wizard rendering
+  file_slots.json, resolution dialog, TAStudio-as-application, removal
+  of the casual paths); PPSSPP memstick-zip import and NES SRAM import
+  as future savedata-consuming slots; retiring the transitional
+  rom/rom.name/rom2..N mounts once nothing legacy needs them.
