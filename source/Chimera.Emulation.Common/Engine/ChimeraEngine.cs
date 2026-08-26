@@ -221,6 +221,141 @@ namespace Chimera.Emulation.Common.Engine
 		public abstract IntPtr ce_package_last_error(IntPtr package);
 
 		[BizImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_project_new();
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_project_open(string path, ref IntPtr errorOut);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract int ce_project_save(IntPtr project, string path, ref IntPtr errorOut);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract void ce_project_free(IntPtr project);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_project_title(IntPtr project);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract void ce_project_set_title(IntPtr project, string title);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_project_description(IntPtr project);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract void ce_project_set_description(IntPtr project, string description);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_project_core_name(IntPtr project);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_project_core_version(IntPtr project);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_project_core_sha1(IntPtr project);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract void ce_project_set_core(IntPtr project, string name, string version, string sha1);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract ulong ce_project_rerecords(IntPtr project);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract void ce_project_set_rerecords(IntPtr project, ulong count);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_project_settings_text(IntPtr project, ref ulong lenOut);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract int ce_project_set_settings_text(IntPtr project, string json, ref IntPtr errorOut);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_project_firmware_text(IntPtr project, ref ulong lenOut);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract int ce_project_set_firmware_text(IntPtr project, string json, ref IntPtr errorOut);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_project_log_text(IntPtr project, ref ulong lenOut);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract void ce_project_set_log_text(IntPtr project, byte[] text, ulong len);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract int ce_project_marker_count(IntPtr project);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract long ce_project_marker_frame(IntPtr project, int index);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_project_marker_text(IntPtr project, int index);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract void ce_project_marker_add(IntPtr project, long frame, string text);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract void ce_project_marker_remove(IntPtr project, int index);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract int ce_project_branch_count(IntPtr project);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_project_branch_name(IntPtr project, int index);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract long ce_project_branch_frame(IntPtr project, int index);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_project_branch_log_text(IntPtr project, int index, ref ulong lenOut);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract void ce_project_branch_add(IntPtr project, string name, long frame, byte[] logText, ulong len);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract void ce_project_branch_remove(IntPtr project, int index);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract int ce_project_file_add(IntPtr project, string name, string slot, string sourcePath, ref IntPtr errorOut);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract void ce_project_file_remove(IntPtr project, int index);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract int ce_project_file_count(IntPtr project);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_project_file_name(IntPtr project, int index);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_project_file_slot(IntPtr project, int index);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_project_file_sha1(IntPtr project, int index);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_project_file_actual_sha1(IntPtr project, int index);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract int ce_project_file_status(IntPtr project, int index);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_project_file_data(IntPtr project, int index, ref ulong lenOut);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract int ce_project_file_resolve(IntPtr project, int index, string path, ref IntPtr errorOut);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract int ce_project_resolve_dir(IntPtr project, string dir);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract int ce_project_files_ok(IntPtr project);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract int ce_project_validate(IntPtr project, byte[] slotsJson, ulong slotsLen, ref IntPtr errorOut);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_project_slots_text(IntPtr project, ref ulong lenOut);
+
+		[BizImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_session_open(
 			string packagePath, byte[] rom, ulong romLen, string? settingsOverridesJson,
 			IntPtr[]? firmwareIds, IntPtr[]? firmwareData, ulong[]? firmwareLens, int firmwareCount,
@@ -802,6 +937,254 @@ namespace Chimera.Emulation.Common.Engine
 		{
 			var bytes = Entry(name);
 			return bytes is null ? null : Encoding.UTF8.GetString(bytes);
+		}
+	}
+
+	/// <summary>
+	/// A .chimeraProject, held by the engine (see ce_project in engine.h):
+	/// chimera's entry point and its movie in one file. The engine owns the
+	/// format - the rules, hashing, per-session file resolution, validation
+	/// against a core's file_slots.json - and this wrapper only makes it
+	/// idiomatic. Files carry a status: 0 resolved and matching, 1 unresolved,
+	/// 2 resolved but mismatched (docs/project.md).
+	/// </summary>
+	public sealed class EngineProject : IDisposable
+	{
+		private IntPtr _project;
+
+		private EngineProject(IntPtr project) => _project = project;
+
+		/// <summary>The internal handle's liveness backstop, like EngineMovieLog's.</summary>
+		~EngineProject() => Free();
+
+		public static EngineProject New() => new(ChimeraEngine.Instance.ce_project_new());
+
+		/// <exception cref="InvalidOperationException">a structurally invalid or unreadable project</exception>
+		public static EngineProject Open(string path)
+		{
+			var error = IntPtr.Zero;
+			var project = ChimeraEngine.Instance.ce_project_open(path, ref error);
+			if (project == IntPtr.Zero)
+			{
+				throw new InvalidOperationException(
+					ChimeraEngine.PtrToStringUtf8(error) ?? "the project could not be opened");
+			}
+			return new(project);
+		}
+
+		public void Dispose()
+		{
+			Free();
+			GC.SuppressFinalize(this);
+		}
+
+		private void Free()
+		{
+			if (_project == IntPtr.Zero) return;
+			ChimeraEngine.Instance.ce_project_free(_project);
+			_project = IntPtr.Zero;
+		}
+
+		/// <exception cref="InvalidOperationException">the save was refused (cue closure, unwritable path)</exception>
+		public void Save(string path)
+		{
+			var error = IntPtr.Zero;
+			if (ChimeraEngine.Instance.ce_project_save(_project, path, ref error) is not 0)
+			{
+				throw new InvalidOperationException(
+					ChimeraEngine.PtrToStringUtf8(error) ?? "the project could not be saved");
+			}
+		}
+
+		public string Title
+		{
+			get => ChimeraEngine.PtrToStringUtf8(ChimeraEngine.Instance.ce_project_title(_project)) ?? "";
+			set => ChimeraEngine.Instance.ce_project_set_title(_project, value);
+		}
+
+		public string Description
+		{
+			get => ChimeraEngine.PtrToStringUtf8(ChimeraEngine.Instance.ce_project_description(_project)) ?? "";
+			set => ChimeraEngine.Instance.ce_project_set_description(_project, value);
+		}
+
+		public string CoreName => ChimeraEngine.PtrToStringUtf8(ChimeraEngine.Instance.ce_project_core_name(_project)) ?? "";
+		public string CoreVersion => ChimeraEngine.PtrToStringUtf8(ChimeraEngine.Instance.ce_project_core_version(_project)) ?? "";
+		public string CoreSha1 => ChimeraEngine.PtrToStringUtf8(ChimeraEngine.Instance.ce_project_core_sha1(_project)) ?? "";
+
+		public void SetCore(string name, string version, string sha1)
+			=> ChimeraEngine.Instance.ce_project_set_core(_project, name, version, sha1);
+
+		public ulong Rerecords
+		{
+			get => ChimeraEngine.Instance.ce_project_rerecords(_project);
+			set => ChimeraEngine.Instance.ce_project_set_rerecords(_project, value);
+		}
+
+		/// <summary>The sync settings as the JSON object the session's settings channel takes.</summary>
+		public string SettingsJson
+		{
+			get
+			{
+				ulong len = 0;
+				var p = ChimeraEngine.Instance.ce_project_settings_text(_project, ref len);
+				return ChimeraEngine.PtrToStringUtf8(p, len);
+			}
+		}
+
+		/// <exception cref="InvalidOperationException">not a JSON object</exception>
+		public void SetSettingsJson(string json)
+		{
+			var error = IntPtr.Zero;
+			if (ChimeraEngine.Instance.ce_project_set_settings_text(_project, json, ref error) is not 0)
+			{
+				throw new InvalidOperationException(ChimeraEngine.PtrToStringUtf8(error) ?? "bad settings");
+			}
+		}
+
+		/// <summary>The firmware pins, a JSON array carried verbatim.</summary>
+		public string FirmwareJson
+		{
+			get
+			{
+				ulong len = 0;
+				var p = ChimeraEngine.Instance.ce_project_firmware_text(_project, ref len);
+				return ChimeraEngine.PtrToStringUtf8(p, len);
+			}
+		}
+
+		/// <exception cref="InvalidOperationException">not a JSON array</exception>
+		public void SetFirmwareJson(string json)
+		{
+			var error = IntPtr.Zero;
+			if (ChimeraEngine.Instance.ce_project_set_firmware_text(_project, json, ref error) is not 0)
+			{
+				throw new InvalidOperationException(ChimeraEngine.PtrToStringUtf8(error) ?? "bad firmware");
+			}
+		}
+
+		/// <summary>The input-log lump, exactly what EngineMovieLog parses and serializes.</summary>
+		public string LogText
+		{
+			get
+			{
+				ulong len = 0;
+				var p = ChimeraEngine.Instance.ce_project_log_text(_project, ref len);
+				return ChimeraEngine.PtrToStringUtf8(p, len);
+			}
+			set
+			{
+				var bytes = Encoding.UTF8.GetBytes(value ?? "");
+				ChimeraEngine.Instance.ce_project_set_log_text(_project, bytes, (ulong)bytes.LongLength);
+			}
+		}
+
+		public int MarkerCount => ChimeraEngine.Instance.ce_project_marker_count(_project);
+		public long MarkerFrame(int index) => ChimeraEngine.Instance.ce_project_marker_frame(_project, index);
+		public string MarkerText(int index)
+			=> ChimeraEngine.PtrToStringUtf8(ChimeraEngine.Instance.ce_project_marker_text(_project, index)) ?? "";
+		public void MarkerAdd(long frame, string text) => ChimeraEngine.Instance.ce_project_marker_add(_project, frame, text);
+		public void MarkerRemove(int index) => ChimeraEngine.Instance.ce_project_marker_remove(_project, index);
+		public void MarkersClear()
+		{
+			while (MarkerCount > 0) MarkerRemove(MarkerCount - 1);
+		}
+
+		public int BranchCount => ChimeraEngine.Instance.ce_project_branch_count(_project);
+		public string BranchName(int index)
+			=> ChimeraEngine.PtrToStringUtf8(ChimeraEngine.Instance.ce_project_branch_name(_project, index)) ?? "";
+		public long BranchFrame(int index) => ChimeraEngine.Instance.ce_project_branch_frame(_project, index);
+		public string BranchLogText(int index)
+		{
+			ulong len = 0;
+			var p = ChimeraEngine.Instance.ce_project_branch_log_text(_project, index, ref len);
+			return p == IntPtr.Zero ? "" : ChimeraEngine.PtrToStringUtf8(p, len);
+		}
+		public void BranchAdd(string name, long frame, string logText)
+		{
+			var bytes = Encoding.UTF8.GetBytes(logText ?? "");
+			ChimeraEngine.Instance.ce_project_branch_add(_project, name, frame, bytes, (ulong)bytes.LongLength);
+		}
+		public void BranchRemove(int index) => ChimeraEngine.Instance.ce_project_branch_remove(_project, index);
+		public void BranchesClear()
+		{
+			while (BranchCount > 0) BranchRemove(BranchCount - 1);
+		}
+
+		/// <summary>
+		/// Adds a file: canonical bare name, the slot it fills, and where its bytes
+		/// are right now (hashed immediately; a cue auto-adds its referenced files).
+		/// </summary>
+		/// <exception cref="InvalidOperationException">refused, with the engine's reason</exception>
+		public void FileAdd(string name, string slot, string sourcePath)
+		{
+			var error = IntPtr.Zero;
+			if (ChimeraEngine.Instance.ce_project_file_add(_project, name, slot, sourcePath, ref error) is not 0)
+			{
+				throw new InvalidOperationException(ChimeraEngine.PtrToStringUtf8(error) ?? "file refused");
+			}
+		}
+
+		public void FileRemove(int index) => ChimeraEngine.Instance.ce_project_file_remove(_project, index);
+		public int FileCount => ChimeraEngine.Instance.ce_project_file_count(_project);
+		public string FileName(int index)
+			=> ChimeraEngine.PtrToStringUtf8(ChimeraEngine.Instance.ce_project_file_name(_project, index)) ?? "";
+		public string FileSlot(int index)
+			=> ChimeraEngine.PtrToStringUtf8(ChimeraEngine.Instance.ce_project_file_slot(_project, index)) ?? "";
+		public string FileSha1(int index)
+			=> ChimeraEngine.PtrToStringUtf8(ChimeraEngine.Instance.ce_project_file_sha1(_project, index)) ?? "";
+		public string FileActualSha1(int index)
+			=> ChimeraEngine.PtrToStringUtf8(ChimeraEngine.Instance.ce_project_file_actual_sha1(_project, index)) ?? "";
+
+		/// <summary>0 = resolved and matching, 1 = unresolved, 2 = resolved but mismatched.</summary>
+		public int FileStatus(int index) => ChimeraEngine.Instance.ce_project_file_status(_project, index);
+
+		/// <returns>the resolved bytes, or null while unresolved</returns>
+		public byte[]? FileData(int index)
+		{
+			ulong len = 0;
+			var p = ChimeraEngine.Instance.ce_project_file_data(_project, index, ref len);
+			if (p == IntPtr.Zero) return null;
+			var ret = new byte[len];
+			Marshal.Copy(p, ret, 0, checked((int)len));
+			return ret;
+		}
+
+		/// <summary>Resolves one file from a caller-provided location; a hash mismatch is a status, not an error.</summary>
+		/// <exception cref="InvalidOperationException">the path is unreadable</exception>
+		public void FileResolve(int index, string path)
+		{
+			var error = IntPtr.Zero;
+			if (ChimeraEngine.Instance.ce_project_file_resolve(_project, index, path, ref error) is not 0)
+			{
+				throw new InvalidOperationException(ChimeraEngine.PtrToStringUtf8(error) ?? "unresolvable");
+			}
+		}
+
+		/// <summary>Tries every unresolved file by canonical name in a directory; returns how many resolved.</summary>
+		public int ResolveDir(string dir) => ChimeraEngine.Instance.ce_project_resolve_dir(_project, dir);
+
+		/// <summary>True when every file is resolved with a matching hash.</summary>
+		public bool FilesOk => ChimeraEngine.Instance.ce_project_files_ok(_project) is not 0;
+
+		/// <summary>The manifest against a core's file_slots.json declaration; null when it conforms, else the reason.</summary>
+		public string? Validate(string slotsJson)
+		{
+			var bytes = Encoding.UTF8.GetBytes(slotsJson);
+			var error = IntPtr.Zero;
+			if (ChimeraEngine.Instance.ce_project_validate(_project, bytes, (ulong)bytes.LongLength, ref error) is 0) return null;
+			return ChimeraEngine.PtrToStringUtf8(error) ?? "the manifest does not fit the core's slots";
+		}
+
+		/// <summary>The slot map the session mounts as "slots" (support excluded).</summary>
+		public string SlotsJson
+		{
+			get
+			{
+				ulong len = 0;
+				var p = ChimeraEngine.Instance.ce_project_slots_text(_project, ref len);
+				return ChimeraEngine.PtrToStringUtf8(p, len);
+			}
 		}
 	}
 
