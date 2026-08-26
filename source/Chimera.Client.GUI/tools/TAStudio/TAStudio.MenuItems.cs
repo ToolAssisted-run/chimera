@@ -57,19 +57,6 @@ namespace Chimera.Client.GUI
 			{
 				return LoadFileWithFallback(filename);
 			}
-			if (filename.EndsWithOrdinal(MovieService.StandardMovieExtension))
-			{
-				if (!DialogController.ShowMessageBox2(
-					caption: "Convert movie",
-					icon: EMsgBoxIcon.Question,
-					text: "This is a regular movie, a new project must be created from it to use in TAStudio\nProceed?",
-					useOKCancel: true))
-				{
-					return false;
-				}
-
-				return LoadFileWithFallback(filename);
-			}
 			DialogController.ShowMessageBox(
 				caption: "Movie load error",
 				icon: EMsgBoxIcon.Error,

@@ -208,7 +208,7 @@ namespace Chimera.Client.Common
 	public static class MovieExtensions
 	{
 		public static FilesystemFilterSet GetFSFilterSet(this IMovie/*?*/ movie)
-			=> new(new FilesystemFilter("Movie Files", new[] { movie?.PreferredExtension ?? MovieService.StandardMovieExtension }));
+			=> new(new FilesystemFilter("Movie Files", new[] { movie?.PreferredExtension ?? MovieService.TasMovieExtension }));
 
 		public static bool IsActive(this IMovie movie) => movie != null && movie.Mode != MovieMode.Inactive;
 		public static bool NotActive(this IMovie movie) => movie == null || movie.Mode == MovieMode.Inactive;

@@ -186,15 +186,6 @@ namespace Chimera.Client.GUI
 			CloseRomMenuItem.Image = Properties.Resources.Close;
 			PreviousSlotMenuItem.Image = Properties.Resources.MoveLeft;
 			NextSlotMenuItem.Image = Properties.Resources.MoveRight;
-			ReadonlyMenuItem.Image = Properties.Resources.ReadOnly;
-			RecentMovieSubMenu.Image = Properties.Resources.Recent;
-			RecordMovieMenuItem.Image = Properties.Resources.Record;
-			PlayMovieMenuItem.Image = Properties.Resources.Play;
-			StopMovieMenuItem.Image = Properties.Resources.Stop;
-			PlayFromBeginningMenuItem.Image = Properties.Resources.Restart;
-			SaveMovieMenuItem.Image = Properties.Resources.SaveAs;
-			SaveMovieAsMenuItem.Image = Properties.Resources.SaveAs;
-			StopMovieWithoutSavingMenuItem.Image = Properties.Resources.Stop;
 			RecordAVMenuItem.Image = Properties.Resources.Record;
 			ConfigAndRecordAVMenuItem.Image = Properties.Resources.Avi;
 			StopAVMenuItem.Image = Properties.Resources.Stop;
@@ -240,11 +231,8 @@ namespace Chimera.Client.GUI
 			CoreNameStatusBarButton.Image = Properties.Resources.ChimeraSmall;
 			LinkConnectStatusBarButton.Image = Properties.Resources.Connect16X16;
 			StopAVContextMenuItem.Image = Properties.Resources.Stop;
-			RecordMovieContextMenuItem.Image = Properties.Resources.Record;
-			PlayMovieContextMenuItem.Image = Properties.Resources.Play;
 			RestartMovieContextMenuItem.Image = Properties.Resources.Restart;
 			StopMovieContextMenuItem.Image = Properties.Resources.Stop;
-			LoadLastMovieContextMenuItem.Image = Properties.Resources.Recent;
 			StopNoSaveContextMenuItem.Image = Properties.Resources.Stop;
 			SaveMovieContextMenuItem.Image = Properties.Resources.SaveAs;
 			SaveMovieAsContextMenuItem.Image = Properties.Resources.SaveAs;

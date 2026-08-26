@@ -315,26 +315,26 @@ PY
 		fi
 	fi
 
-	# --- a real .chimeraMovie through the real movie pipeline ---
-	# Everything above drives input by script; this composes an actual movie
-	# file from the win inputs and lets MovieSession play it. The engine parses
-	# the entries, the frontend latches them, and the dumps must match the same
-	# goldens - the movie pipeline is Level B's reason to exist.
+	# --- a real .chimeraProject through the real movie pipeline ---
+	# Everything above drives input by script; this composes an actual project
+	# file from the win inputs and lets MovieSession play it (the project IS
+	# the movie, docs/project.md). The engine parses the entries, the frontend
+	# latches them, and the dumps must match the same goldens - the movie
+	# pipeline is Level B's reason to exist.
 	if [ "$record" -eq 0 ]; then
 		mname=gridWalker.win
 		mrom="$here/roms/${mname%%.*}.testrom"
-		mbk2="$work/$mname.chimeraMovie"
+		mbk2="$work/$mname.chimeraProject"
 		python3 - "$here/movies/$mname.txt" "$mbk2" <<'PY'
-import sys, zipfile
+import json, sys
 entries = [l.rstrip("\r\n") for l in open(sys.argv[1]) if l.startswith("|")]
 logkey = "#P1 Up|P1 Down|P1 Left|P1 Right|P1 A|P1 B|P1 Select|P1 Start|"
-with zipfile.ZipFile(sys.argv[2], "w", zipfile.ZIP_DEFLATED) as z:
-    z.writestr("BizState 1.0", "3\n")
-    z.writestr("Header.txt", "MovieVersion BizHawk v2.0\nPlatform Synth\nCore Synth\nrerecordCount 0\n\n")
-    z.writestr("Comments.txt", "\n")
-    z.writestr("Subtitles.txt", "\n")
-    z.writestr("SyncSettings.json", "\n")
-    z.writestr("Input Log.txt", "[Input]\nLogKey:" + logkey + "\n" + "\n".join(entries) + "\n[/Input]\n")
+json.dump({
+    "title": "gridWalker.win",
+    "core": {"name": "Synth", "version": "", "sha1": ""},
+    "headers": {"MovieVersion": "BizHawk v2.0 Tasproj v1.1", "Platform": "Synth"},
+    "input": "[Input]\nLogKey:" + logkey + "\n" + "\n".join(entries) + "\n[/Input]\n",
+}, open(sys.argv[2], "w"))
 PY
 		mjob="$work/job.movie.txt"
 		{

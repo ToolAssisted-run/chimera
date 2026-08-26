@@ -33,7 +33,11 @@ namespace Chimera.Client.Common
 		/// </summary>
 		public EngineProject Project => _project ??= EngineProject.New();
 
-		public string CacheFilename => Filename + ".cache";
+		/// <summary>
+		/// The greenzone sibling: everything regenerable, beside the project.
+		/// Present = loaded; absent = a clean slate (docs/project.md).
+		/// </summary>
+		public string GreenZoneFilename => Path.ChangeExtension(Filename, "chimeraGreenZone");
 
 		/// <summary>
 		/// Adopts the frontend's RESOLVED instance (files located and hashed for
@@ -55,16 +59,8 @@ namespace Chimera.Client.Common
 			=> key is HeaderKeys.GameName or HeaderKeys.Rerecords
 				or HeaderKeys.Core or HeaderKeys.CoreVersion or HeaderKeys.CorePackageSha1;
 
-		private static bool HasProjectExtension(string path)
-			=> path.EndsWith("." + Extension, StringComparison.OrdinalIgnoreCase);
-
 		protected override FileWriteResult Write(string fn, bool isBackup = false)
 		{
-			if (!HasProjectExtension(fn))
-			{
-				return base.Write(fn, isBackup);
-			}
-
 			if (StartsFromSavestate)
 			{
 				// an anchored movie's savestate is sync data with no project home
@@ -145,7 +141,7 @@ namespace Chimera.Client.Common
 
 			if (!isBackup)
 			{
-				WriteCacheFile(fn + ".cache");
+				WriteCacheFile(Path.ChangeExtension(fn, "chimeraGreenZone"));
 				Changes = false;
 			}
 			return new FileWriteResult();
@@ -315,6 +311,10 @@ namespace Chimera.Client.Common
 			{
 				Header[p.HeaderKeyAt(i)] = p.HeaderValueAt(i);
 			}
+			if (StartsFromSavestate)
+			{
+				throw new InvalidOperationException("savestate-anchored projects are not supported (docs/project.md)");
+			}
 			if (p.CoreName.Length is not 0) Header[HeaderKeys.Core] = p.CoreName;
 			if (p.CoreVersion.Length is not 0) Header[HeaderKeys.CoreVersion] = p.CoreVersion;
 			if (p.CoreSha1.Length is not 0) Header[HeaderKeys.CorePackageSha1] = p.CoreSha1;
@@ -400,7 +400,7 @@ namespace Chimera.Client.Common
 			ZipStateLoader bl = null;
 			try
 			{
-				if (File.Exists(CacheFilename)) bl = ZipStateLoader.LoadAndDetect(CacheFilename, true);
+				if (File.Exists(GreenZoneFilename)) bl = ZipStateLoader.LoadAndDetect(GreenZoneFilename, true);
 			}
 			catch
 			{

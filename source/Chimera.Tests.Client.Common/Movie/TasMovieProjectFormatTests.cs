@@ -88,8 +88,8 @@ namespace Chimera.Tests.Client.Common.Movie
 			{
 				Assert.AreEqual('{', (char)fs.ReadByte());
 			}
-			Assert.IsTrue(File.Exists(path + ".cache"),
-				$"cache missing; dir has: {string.Join(",", Directory.GetFiles(_dir).Select(Path.GetFileName))}");
+			Assert.IsTrue(File.Exists(Path.ChangeExtension(path, "chimeraGreenZone")),
+				$"greenzone missing; dir has: {string.Join(",", Directory.GetFiles(_dir).Select(Path.GetFileName))}");
 
 			var loaded = LoadFresh(path);
 			Assert.AreEqual(6, loaded.InputLogLength);
@@ -124,7 +124,7 @@ namespace Chimera.Tests.Client.Common.Movie
 			var path = Path.Combine(_dir, "nocache.chimeraProject");
 			var movie = MakeWorkedMovie(path);
 			Assert.IsFalse(movie.Save().IsError);
-			File.Delete(path + ".cache");
+			File.Delete(Path.ChangeExtension(path, "chimeraGreenZone"));
 
 			var loaded = LoadFresh(path);
 			Assert.AreEqual(6, loaded.InputLogLength, "the input log is work, not cache");

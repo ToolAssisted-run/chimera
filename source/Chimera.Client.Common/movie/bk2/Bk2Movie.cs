@@ -3,7 +3,7 @@ using Chimera.Emulation.Common;
 
 namespace Chimera.Client.Common
 {
-	public partial class Bk2Movie : BasicMovieInfo, IMovie, IDisposable
+	public abstract partial class Bk2Movie : BasicMovieInfo, IMovie, IDisposable
 	{
 		private IController _defaultValueController;
 		protected IController DefaultValueController
@@ -45,13 +45,12 @@ namespace Chimera.Client.Common
 
 		protected bool MakeBackup { get; set; } = true;
 
-		public virtual string PreferredExtension => Extension;
+		public abstract string PreferredExtension { get; }
 
 		/// <remarks>
 		/// Chimera's movie extension. The format is unchanged from the one
 		/// BizHawk writes; only the name differs, and the type names still say Bk2.
 		/// </remarks>
-		public const string Extension = "chimeraMovie";
 
 		public event EventHandler ChangesChanged;
 
@@ -115,7 +114,7 @@ namespace Chimera.Client.Common
 				if (ActiveControllerInputs != null)
 				{
 					for (int i = frame; i < Log.Count; i++)
-						PokeFrame(i, DefaultValueController);
+						PokeFrameCore(i, DefaultValueController);
 					string defaultEntry = Bk2LogEntryGenerator.EmptyEntry(DefaultValueController);
 					int firstDefault = Log.Count;
 					while (firstDefault > frame && Log[firstDefault - 1] == defaultEntry)
@@ -140,7 +139,14 @@ namespace Chimera.Client.Common
 			return null;
 		}
 
-		public virtual void PokeFrame(int frame, IController source)
+		public virtual void PokeFrame(int frame, IController source) => PokeFrameCore(frame, source);
+
+		/// <summary>
+		/// The poke itself, bypassing subclass bookkeeping - Truncate's multitrack
+		/// loop uses this, because a virtual PokeFrame would re-enter the TAS
+		/// movie's change log per frame and corrupt the surrounding undo batch.
+		/// </summary>
+		protected void PokeFrameCore(int frame, IController source)
 		{
 			if (ActiveControllerInputs != null)
 			{

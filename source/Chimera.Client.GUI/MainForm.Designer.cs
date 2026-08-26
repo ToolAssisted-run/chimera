@@ -74,27 +74,6 @@ namespace Chimera.Client.GUI
 			this.SaveToCurrentSlotMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.LoadCurrentSlotMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.toolStripMenuItem2 = new Chimera.WinForms.Controls.ToolStripSeparatorEx();
-			this.MovieSubMenu = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.ReadonlyMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.toolStripSeparator15 = new Chimera.WinForms.Controls.ToolStripSeparatorEx();
-			this.RecentMovieSubMenu = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.toolStripSeparator16 = new Chimera.WinForms.Controls.ToolStripSeparatorEx();
-			this.RecordMovieMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.PlayMovieMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.StopMovieMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.PlayFromBeginningMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.SaveMovieMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.SaveMovieAsMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.StopMovieWithoutSavingMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.toolStripSeparator25 = new System.Windows.Forms.ToolStripSeparator();
-			this.toolStripSeparator14 = new Chimera.WinForms.Controls.ToolStripSeparatorEx();
-			this.AutomaticallyBackupMoviesMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.FullMovieLoadstatesMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.MovieEndSubMenu = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.MovieEndFinishMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.MovieEndRecordMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.MovieEndStopMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.MovieEndPauseMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.AVSubMenu = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.RecordAVMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.ConfigAndRecordAVMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
@@ -229,11 +208,8 @@ namespace Chimera.Client.GUI
 			this.MainFormContextMenu = new System.Windows.Forms.ContextMenuStrip(this.components);
 			this.StopAVContextMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.ContextSeparator_AfterROM = new Chimera.WinForms.Controls.ToolStripSeparatorEx();
-			this.RecordMovieContextMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.PlayMovieContextMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.RestartMovieContextMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.StopMovieContextMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.LoadLastMovieContextMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.BackupMovieContextMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.StopNoSaveContextMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.ViewSubtitlesContextMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
@@ -295,7 +271,6 @@ namespace Chimera.Client.GUI
             this.LoadStateSubMenu,
             this.SaveSlotSubMenu,
             this.toolStripMenuItem2,
-            this.MovieSubMenu,
             this.AVSubMenu,
             this.ScreenshotSubMenu,
             this.toolStripSeparator4,
@@ -585,118 +560,58 @@ namespace Chimera.Client.GUI
 			// 
 			// MovieSubMenu
 			// 
-			this.MovieSubMenu.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
-            this.ReadonlyMenuItem,
-            this.toolStripSeparator15,
-            this.RecentMovieSubMenu,
-            this.RecordMovieMenuItem,
-            this.PlayMovieMenuItem,
-            this.StopMovieMenuItem,
-            this.PlayFromBeginningMenuItem,
-            this.SaveMovieMenuItem,
-            this.SaveMovieAsMenuItem,
-            this.StopMovieWithoutSavingMenuItem,
-            this.toolStripSeparator25,
-            this.toolStripSeparator14,
-            this.AutomaticallyBackupMoviesMenuItem,
-            this.FullMovieLoadstatesMenuItem,
-            this.MovieEndSubMenu});
-			this.MovieSubMenu.Text = "&Movie";
-			this.MovieSubMenu.DropDownOpened += new System.EventHandler(this.MovieSubMenu_DropDownOpened);
 			// 
 			// ReadonlyMenuItem
 			// 
-			this.ReadonlyMenuItem.Text = "Read-only";
-			this.ReadonlyMenuItem.Click += new System.EventHandler(this.ReadonlyMenuItem_Click);
 			// 
 			// RecentMovieSubMenu
 			// 
-			this.RecentMovieSubMenu.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
-            this.toolStripSeparator16});
-			this.RecentMovieSubMenu.Text = "Recent";
-			this.RecentMovieSubMenu.DropDownOpened += new System.EventHandler(this.RecentMovieSubMenu_DropDownOpened);
 			// 
 			// RecordMovieMenuItem
 			// 
-			this.RecordMovieMenuItem.Text = "&Record Movie...";
-			this.RecordMovieMenuItem.Click += new System.EventHandler(this.RecordMovieMenuItem_Click);
 			// 
 			// PlayMovieMenuItem
 			// 
-			this.PlayMovieMenuItem.Text = "&Play Movie...";
-			this.PlayMovieMenuItem.Click += new System.EventHandler(this.PlayMovieMenuItem_Click);
 			// 
 			// StopMovieMenuItem
 			// 
-			this.StopMovieMenuItem.Text = "Stop Movie";
-			this.StopMovieMenuItem.Click += new System.EventHandler(this.StopMovieMenuItem_Click);
 			// 
 			// PlayFromBeginningMenuItem
 			// 
-			this.PlayFromBeginningMenuItem.Text = "Play from Beginning";
-			this.PlayFromBeginningMenuItem.Click += new System.EventHandler(this.PlayFromBeginningMenuItem_Click);
 			// 
 			// SaveMovieMenuItem
 			// 
-			this.SaveMovieMenuItem.Text = "&Save Movie";
-			this.SaveMovieMenuItem.Click += new System.EventHandler(this.SaveMovieMenuItem_Click);
 			// 
 			// SaveMovieAsMenuItem
 			// 
-			this.SaveMovieAsMenuItem.Text = "Save Movie As...";
-			this.SaveMovieAsMenuItem.Click += new System.EventHandler(this.SaveMovieAsMenuItem_Click);
 			// 
 			// StopMovieWithoutSavingMenuItem
 			// 
-			this.StopMovieWithoutSavingMenuItem.Text = "Stop Movie without Saving";
-			this.StopMovieWithoutSavingMenuItem.Click += new System.EventHandler(this.StopMovieWithoutSavingMenuItem_Click);
 			// 
 			// toolStripSeparator25
 			// 
-			this.toolStripSeparator25.Name = "toolStripSeparator25";
-			this.toolStripSeparator25.Size = new System.Drawing.Size(228, 6);
 			// 
 			// 
 			// 
 			// AutomaticallyBackupMoviesMenuItem
 			// 
-			this.AutomaticallyBackupMoviesMenuItem.Text = "Automatically Backup Movies";
-			this.AutomaticallyBackupMoviesMenuItem.Click += new System.EventHandler(this.AutomaticMovieBackupMenuItem_Click);
 			// 
 			// FullMovieLoadstatesMenuItem
 			// 
-			this.FullMovieLoadstatesMenuItem.Text = "Full Movie Loadstates";
-			this.FullMovieLoadstatesMenuItem.Click += new System.EventHandler(this.FullMovieLoadstatesMenuItem_Click);
 			// 
 			// MovieEndSubMenu
 			// 
-			this.MovieEndSubMenu.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
-            this.MovieEndFinishMenuItem,
-            this.MovieEndRecordMenuItem,
-            this.MovieEndStopMenuItem,
-            this.MovieEndPauseMenuItem});
-			this.MovieEndSubMenu.Text = "On Movie End";
-			this.MovieEndSubMenu.DropDownOpened += new System.EventHandler(this.MovieEndSubMenu_DropDownOpened);
 			// 
 			// MovieEndFinishMenuItem
 			// 
-			this.MovieEndFinishMenuItem.Text = "Switch to Finished";
-			this.MovieEndFinishMenuItem.Click += new System.EventHandler(this.MovieEndFinishMenuItem_Click);
 			// 
 			// MovieEndRecordMenuItem
 			// 
-			this.MovieEndRecordMenuItem.Text = "Switch to Record";
-			this.MovieEndRecordMenuItem.Click += new System.EventHandler(this.MovieEndRecordMenuItem_Click);
 			// 
 			// MovieEndStopMenuItem
 			// 
-			this.MovieEndStopMenuItem.Text = "Stop";
-			this.MovieEndStopMenuItem.Click += new System.EventHandler(this.MovieEndStopMenuItem_Click);
 			// 
-			// MovieEndPauseMenuItem
 			// 
-			this.MovieEndPauseMenuItem.Text = "Pause";
-			this.MovieEndPauseMenuItem.Click += new System.EventHandler(this.MovieEndPauseMenuItem_Click);
 			// 
 			// AVSubMenu
 			// 
@@ -1601,11 +1516,8 @@ namespace Chimera.Client.GUI
 			this.MainFormContextMenu.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.StopAVContextMenuItem,
             this.ContextSeparator_AfterROM,
-            this.RecordMovieContextMenuItem,
-            this.PlayMovieContextMenuItem,
             this.RestartMovieContextMenuItem,
             this.StopMovieContextMenuItem,
-            this.LoadLastMovieContextMenuItem,
             this.BackupMovieContextMenuItem,
             this.StopNoSaveContextMenuItem,
             this.ViewSubtitlesContextMenuItem,
@@ -1633,28 +1545,19 @@ namespace Chimera.Client.GUI
 			// 
 			// RecordMovieContextMenuItem
 			// 
-			this.RecordMovieContextMenuItem.Text = "Record Movie";
-			this.RecordMovieContextMenuItem.Click += new System.EventHandler(this.RecordMovieMenuItem_Click);
 			// 
 			// PlayMovieContextMenuItem
 			// 
-			this.PlayMovieContextMenuItem.Text = "Play Movie";
-			this.PlayMovieContextMenuItem.Click += new System.EventHandler(this.PlayMovieMenuItem_Click);
 			// 
 			// RestartMovieContextMenuItem
 			// 
 			this.RestartMovieContextMenuItem.Text = "Restart Movie";
-			this.RestartMovieContextMenuItem.Click += new System.EventHandler(this.PlayFromBeginningMenuItem_Click);
 			// 
 			// StopMovieContextMenuItem
 			// 
 			this.StopMovieContextMenuItem.Text = "Stop Movie";
-			this.StopMovieContextMenuItem.Click += new System.EventHandler(this.StopMovieMenuItem_Click);
 			// 
-			// LoadLastMovieContextMenuItem
 			// 
-			this.LoadLastMovieContextMenuItem.Text = "Load Last Movie";
-			this.LoadLastMovieContextMenuItem.Click += new System.EventHandler(this.LoadLastMovieContextMenuItem_Click);
 			// 
 			// BackupMovieContextMenuItem
 			// 
@@ -1664,7 +1567,6 @@ namespace Chimera.Client.GUI
 			// StopNoSaveContextMenuItem
 			// 
 			this.StopNoSaveContextMenuItem.Text = "Stop Movie without Saving";
-			this.StopNoSaveContextMenuItem.Click += new System.EventHandler(this.StopMovieWithoutSavingMenuItem_Click);
 			// 
 			// ViewSubtitlesContextMenuItem
 			// 
@@ -1684,12 +1586,10 @@ namespace Chimera.Client.GUI
 			// SaveMovieContextMenuItem
 			// 
 			this.SaveMovieContextMenuItem.Text = "Save Movie";
-			this.SaveMovieContextMenuItem.Click += new System.EventHandler(this.SaveMovieMenuItem_Click);
 			// 
 			// SaveMovieAsContextMenuItem
 			// 
 			this.SaveMovieAsContextMenuItem.Text = "Save Movie As...";
-			this.SaveMovieAsContextMenuItem.Click += new System.EventHandler(this.SaveMovieAsMenuItem_Click);
 			// 
 			// UndoSavestateContextMenuItem
 			// 
@@ -1899,12 +1799,6 @@ namespace Chimera.Client.GUI
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx SaveNamedStateMenuItem;
 		private Chimera.WinForms.Controls.ToolStripSeparatorEx toolStripSeparator7;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx LoadNamedStateMenuItem;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx MovieSubMenu;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx RecentMovieSubMenu;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx RecordMovieMenuItem;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx PlayMovieMenuItem;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx StopMovieMenuItem;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx PlayFromBeginningMenuItem;
 		private Chimera.WinForms.Controls.ToolStripSeparatorEx toolStripSeparator9;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx SoundMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx SpeedSkipSubMenu;
@@ -1931,10 +1825,6 @@ namespace Chimera.Client.GUI
 		private Chimera.WinForms.Controls.StatusLabelEx EmuStatus;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx MessagesMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx PathsMenuItem;
-		private Chimera.WinForms.Controls.ToolStripSeparatorEx toolStripSeparator14;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx ReadonlyMenuItem;
-		private Chimera.WinForms.Controls.ToolStripSeparatorEx toolStripSeparator15;
-		private Chimera.WinForms.Controls.ToolStripSeparatorEx toolStripSeparator16;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx DisplayRerecordCountMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx ScreenshotSubMenu;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx ScreenshotMenuItem;
@@ -1944,16 +1834,12 @@ namespace Chimera.Client.GUI
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx DisplayStatusBarMenuItem;
 		private System.Windows.Forms.ContextMenuStrip MainFormContextMenu;
 		private Chimera.WinForms.Controls.ToolStripSeparatorEx ContextSeparator_AfterROM;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx RecordMovieContextMenuItem;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx PlayMovieContextMenuItem;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx LoadLastMovieContextMenuItem;
 		private Chimera.WinForms.Controls.ToolStripSeparatorEx ContextSeparator_AfterMovie;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx AddSubtitleContextMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx UndoSavestateContextMenuItem;
 		private Chimera.WinForms.Controls.ToolStripSeparatorEx ContextSeparator_AfterUndo;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx CloseRomContextMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx BackupMovieContextMenuItem;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx AutomaticallyBackupMoviesMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx StopMovieContextMenuItem;
 		private System.Windows.Forms.ToolStripDropDownButton PauseStatusButton;
 		private System.Windows.Forms.ToolStripDropDownButton PlayRecordStatusButton;
@@ -1993,7 +1879,6 @@ namespace Chimera.Client.GUI
 		private Chimera.WinForms.Controls.ToolStripSeparatorEx toolStripSeparator20;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx ScreenshotCaptureOSDMenuItem1;
 		private Chimera.WinForms.Controls.StatusLabelEx RebootStatusBarIcon;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx SaveMovieMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx SaveMovieContextMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx AudioThrottleMenuItem;
 		private Chimera.WinForms.Controls.ToolStripSeparatorEx toolStripSeparator27;
@@ -2004,9 +1889,7 @@ namespace Chimera.Client.GUI
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx InputOverHkMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx HkOverInputMenuItem;
 		private Chimera.WinForms.Controls.StatusLabelEx KeyPriorityStatusLabel;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx FullMovieLoadstatesMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx StopNoSaveContextMenuItem;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx StopMovieWithoutSavingMenuItem;
 		private Chimera.WinForms.Controls.ToolStripSeparatorEx toolStripSeparator29;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx ConfigContextMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx RewindOptionsMenuItem;
@@ -2033,11 +1916,6 @@ namespace Chimera.Client.GUI
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx customizeToolStripMenuItem;
 		private Chimera.WinForms.Controls.ToolStripSeparatorEx toolStripSeparator22;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx SynclessRecordingMenuItem;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx MovieEndSubMenu;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx MovieEndFinishMenuItem;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx MovieEndRecordMenuItem;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx MovieEndStopMenuItem;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx MovieEndPauseMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx ScreenshotClientClipboardMenuItem;
 		private Chimera.WinForms.Controls.StatusLabelEx LinkConnectStatusBarButton;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx MacroToolMenuItem;
@@ -2060,13 +1938,11 @@ namespace Chimera.Client.GUI
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx RecordAVMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx SaveConfigAsMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx LoadConfigFromMenuItem;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx SaveMovieAsMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx SaveMovieAsContextMenuItem;
 		private Chimera.WinForms.Controls.ToolStripSeparatorEx toolStripSeparator8;
 		private System.Windows.Forms.ToolStripMenuItem CaptureLuaMenuItem;
 		private ToolStripSeparatorEx toolStripSeparator24;
 		private ToolStripMenuItemEx AutosaveLastSlotMenuItem;
-		private System.Windows.Forms.ToolStripSeparator toolStripSeparator25;
 		private ToolStripMenuItemEx DisableResizeWithFramebufferMenuItem;
 		private ToolStripSeparatorEx toolStripSeparator26;
 	}

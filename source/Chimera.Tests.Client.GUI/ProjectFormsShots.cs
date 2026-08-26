@@ -5,6 +5,7 @@ using System.Windows.Forms;
 using Chimera.Client.Common;
 using Chimera.Client.GUI;
 using Chimera.Emulation.Common.Engine;
+using Chimera.Emulation.Common.Waterbox;
 
 namespace Chimera.Tests.Client.GUI
 {
@@ -86,6 +87,22 @@ namespace Chimera.Tests.Client.GUI
 			form.AddFileToSlot("floppy", "/home/you/games/alleycat/disk2.img");
 			form.AddFileToSlot("cdrom", "/home/you/games/alleycat/bonus.iso");
 			Shoot(form, "wizard-2-files");
+		}
+
+		[TestMethod]
+		public void WizardSettingsStep()
+		{
+			if (ShotDir is null) { Assert.Inconclusive("set CHIMERA_UI_SHOTS to write screenshots"); return; }
+			using var form = MakeWizard();
+			form.UseSyncSettingsDecls(
+			[
+				new WaterboxConfig.SettingDecl { Name = "machinePreset", Display = "Machine Preset", Type = "enum", Default = "1993_ibm_ps2_53_slc2_486", Options = [ "1993_ibm_ps2_53_slc2_486", "1983_ibm_xt5160" ], Description = "The hardware preset the machine boots as.", Sync = true },
+				new WaterboxConfig.SettingDecl { Name = "cpuCycles", Display = "CPU Cycles", Type = "int", Default = -1, Description = "Fixed CPU cycles per millisecond; -1 uses the preset's value.", Sync = true },
+				new WaterboxConfig.SettingDecl { Name = "memsizeMB", Display = "Memory (MB)", Type = "int", Default = -1, Description = "Installed RAM; -1 uses the preset's value.", Sync = true },
+				new WaterboxConfig.SettingDecl { Name = "joystick1Enabled", Display = "Joystick 1", Type = "bool", Default = true, Description = "A joystick plugged into game port 1.", Sync = true },
+				new WaterboxConfig.SettingDecl { Name = "mouseSensitivity", Display = "Mouse Sensitivity", Type = "float", Default = 3.0, Description = "Multiplier on relative mouse movement.", Sync = true },
+			]);
+			Shoot(form, "wizard-3-settings");
 		}
 
 		private static NewProjectWizard MakeWizard()

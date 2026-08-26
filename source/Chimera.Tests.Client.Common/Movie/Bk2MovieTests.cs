@@ -10,7 +10,7 @@ namespace Chimera.Tests.Client.Common.Movie
 		{
 			FakeEmulator emu = new FakeEmulator();
 			FakeMovieSession session = new(emu);
-			Bk2Movie movie = new(session, "/fake/path");
+			Bk2Movie movie = new TasMovie(session, "/fake/path.chimeraProject");
 			session.Movie = movie;
 
 			movie.Attach(emu);

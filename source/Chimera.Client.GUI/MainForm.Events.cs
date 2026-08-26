@@ -138,44 +138,6 @@ namespace Chimera.Client.GUI
 			for (var i = 1; i < slotMenuItems.Length; i++) slotMenuItems[i]!.Checked = slot == i;
 		}
 
-		private void MovieSubMenu_DropDownOpened(object sender, EventArgs e)
-		{
-			StopMovieWithoutSavingMenuItem.Enabled = MovieSession.Movie.IsActive() && MovieSession.Movie.Changes;
-			StopMovieMenuItem.Enabled
-				= SaveMovieMenuItem.Enabled
-				= SaveMovieAsMenuItem.Enabled
-				= MovieSession.Movie.IsActive();
-
-			ReadonlyMenuItem.Checked = MovieSession.ReadOnly;
-			AutomaticallyBackupMoviesMenuItem.Checked = Config.Movies.EnableBackupMovies;
-			FullMovieLoadstatesMenuItem.Checked = Config.Movies.VBAStyleMovieLoadState;
-
-			ReadonlyMenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["Toggle read-only"];
-			RecordMovieMenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["Record Movie"];
-			PlayMovieMenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["Play Movie"];
-			StopMovieMenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["Stop Movie"];
-			PlayFromBeginningMenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["Play from beginning"];
-			SaveMovieMenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["Save Movie"];
-
-			PlayMovieMenuItem.Enabled
-				= RecordMovieMenuItem.Enabled
-				= RecentMovieSubMenu.Enabled
-					= !Emulator.IsNull() && !Tools.IsLoaded<TAStudio>();
-
-			PlayFromBeginningMenuItem.Enabled = MovieSession.Movie.IsActive() && !Tools.IsLoaded<TAStudio>();
-		}
-
-		private void RecentMovieSubMenu_DropDownOpened(object sender, EventArgs e)
-			=> RecentMovieSubMenu.ReplaceDropDownItems(Config.RecentMovies.RecentMenu(this, LoadMoviesFromRecent, "Movie"));
-
-		private void MovieEndSubMenu_DropDownOpened(object sender, EventArgs e)
-		{
-			MovieEndFinishMenuItem.Checked = Config.Movies.MovieEndAction == MovieEndAction.Finish;
-			MovieEndRecordMenuItem.Checked = Config.Movies.MovieEndAction == MovieEndAction.Record;
-			MovieEndStopMenuItem.Checked = Config.Movies.MovieEndAction == MovieEndAction.Stop;
-			MovieEndPauseMenuItem.Checked = Config.Movies.MovieEndAction == MovieEndAction.Pause;
-		}
-
 		private void AVSubMenu_DropDownOpened(object sender, EventArgs e)
 		{
 			ConfigAndRecordAVMenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["Record A/V"];
@@ -256,113 +218,6 @@ namespace Chimera.Client.GUI
 
 		private bool LoadstateCurrentSlot()
 			=> LoadQuickSave(Config.SaveSlot);
-
-		private void ReadonlyMenuItem_Click(object sender, EventArgs e)
-		{
-			ToggleReadOnly();
-		}
-
-		private void RecordMovieMenuItem_Click(object sender, EventArgs e)
-		{
-			if (Game.IsNullInstance()) return;
-			if (!Emulator.Attributes().Released)
-			{
-				var result = this.ModalMessageBox2(
-					"Thanks for using Chimera!  The emulation core you have selected "
-						+ "is currently BETA-status.  We appreciate your help in testing BizHawk. "
-						+ "You can record a movie on this core if you'd like to, but expect to "
-						+ "encounter bugs and sync problems.  Continue?",
-					"Chimera");
-
-				if (!result)
-				{
-					return;
-				}
-			}
-
-			// Nag user to user a more accurate core, but let them continue anyway
-			EnsureCoreIsAccurate();
-
-			using var form = new RecordMovie(this, Config, Game, Emulator, MovieSession);
-			this.ShowDialogWithTempMute(form);
-		}
-
-		private void PlayMovieMenuItem_Click(object sender, EventArgs e)
-		{
-			using var form = new PlayMovie(this, Config, Game, Emulator, MovieSession);
-			this.ShowDialogWithTempMute(form);
-		}
-
-		private void StopMovieMenuItem_Click(object sender, EventArgs e)
-		{
-			StopMovie();
-		}
-
-		private void PlayFromBeginningMenuItem_Click(object sender, EventArgs e)
-			=> _ = RestartMovie();
-
-		private void SaveMovieMenuItem_Click(object sender, EventArgs e)
-		{
-			SaveMovie();
-		}
-
-		private void SaveMovieAsMenuItem_Click(object sender, EventArgs e)
-		{
-			var filename = MovieSession.Movie.Filename;
-			if (string.IsNullOrWhiteSpace(filename))
-			{
-				filename = Game.FilesystemSafeName();
-			}
-
-			var file = ToolFormBase.SaveFileDialog(
-				currentFile: filename,
-				path: Config.PathEntries.MovieAbsolutePath(),
-				MovieSession.Movie.GetFSFilterSet(),
-				this);
-
-			if (file != null)
-			{
-				MovieSession.Movie.Filename = file.FullName;
-				Config.RecentMovies.Add(MovieSession.Movie.Filename);
-				SaveMovie();
-			}
-		}
-
-		private void StopMovieWithoutSavingMenuItem_Click(object sender, EventArgs e)
-		{
-			if (Config.Movies.EnableBackupMovies)
-			{
-				MovieSession.Movie.SaveBackup();
-			}
-
-			StopMovie(saveChanges: false);
-		}
-
-		private void AutomaticMovieBackupMenuItem_Click(object sender, EventArgs e)
-			=> Config.Movies.EnableBackupMovies = !Config.Movies.EnableBackupMovies;
-
-		private void FullMovieLoadstatesMenuItem_Click(object sender, EventArgs e)
-			=> Config.Movies.VBAStyleMovieLoadState = !Config.Movies.VBAStyleMovieLoadState;
-
-		private void MovieEndFinishMenuItem_Click(object sender, EventArgs e)
-		{
-			Config.Movies.MovieEndAction = MovieEndAction.Finish;
-		}
-
-		private void MovieEndRecordMenuItem_Click(object sender, EventArgs e)
-		{
-			Config.Movies.MovieEndAction = MovieEndAction.Record;
-		}
-
-		private void MovieEndStopMenuItem_Click(object sender, EventArgs e)
-		{
-			Config.Movies.MovieEndAction = MovieEndAction.Stop;
-		}
-
-		private void MovieEndPauseMenuItem_Click(object sender, EventArgs e)
-		{
-			Config.Movies.MovieEndAction = MovieEndAction.Pause;
-		}
 
 		private void ConfigAndRecordAVMenuItem_Click(object sender, EventArgs e)
 		{
@@ -453,8 +308,13 @@ namespace Chimera.Client.GUI
 			PauseMenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["Pause"];
 			RebootCoreMenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["Reboot Core"];
 
-			RealTimeCounterMenuItem.Text = $"Est. {PlayMovie.MovieTimeLengthStr(Emulator.EstimatedRealTimeSincePowerOn())} since power-on";
+			RealTimeCounterMenuItem.Text = $"Est. {MovieTimeLengthStr(Emulator.EstimatedRealTimeSincePowerOn())} since power-on";
 		}
+
+		private static string MovieTimeLengthStr(TimeSpan movieLength)
+			=> movieLength.ToString(
+				movieLength.Days == 0 ? @"hh\:mm\:ss\.fff" : @"dd\:hh\:mm\:ss\.fff",
+				System.Globalization.DateTimeFormatInfo.InvariantInfo);
 
 		private void PauseMenuItem_Click(object sender, EventArgs e)
 		{
@@ -1048,11 +908,6 @@ namespace Chimera.Client.GUI
 				UndoSavestateContextMenuItem.Visible =
 				!Emulator.IsNull();
 
-			RecordMovieContextMenuItem.Visible =
-				PlayMovieContextMenuItem.Visible =
-				LoadLastMovieContextMenuItem.Visible =
-				!Emulator.IsNull() && !movieIsActive;
-
 			RestartMovieContextMenuItem.Visible =
 				StopMovieContextMenuItem.Visible =
 				ViewSubtitlesContextMenuItem.Visible =
@@ -1071,7 +926,6 @@ namespace Chimera.Client.GUI
 
 			ContextSeparator_AfterROM.Visible = false;
 
-			LoadLastMovieContextMenuItem.Enabled = !Config.RecentMovies.Empty;
 
 			if (movieIsActive)
 			{
@@ -1125,11 +979,6 @@ namespace Chimera.Client.GUI
 				SynchChrome();
 				UpdateWindowTitle();
 			}
-		}
-
-		private void LoadLastMovieContextMenuItem_Click(object sender, EventArgs e)
-		{
-			LoadMoviesFromRecent(Config.RecentMovies.MostRecent);
 		}
 
 		private void BackupMovieContextMenuItem_Click(object sender, EventArgs e)

@@ -144,32 +144,15 @@ namespace Chimera.Client.Common
 				return false;
 			}
 
-			// The JSON .chimeraProject (docs/project.md) is TAStudio's native
-			// format now; the zip forms remain for .chimeraMovie and legacy
-			// tasprojs. One byte tells them apart: a zip can never start '{'.
-			if (LooksLikeProjectJson(Filename))
+			// the JSON project (docs/project.md) is the only movie-bearing file
+			// chimera reads; anything else - a zip movie of any provenance
+			// included - is refused with its reason
+			if (!LooksLikeProjectJson(Filename))
 			{
-				return LoadProjectFormat();
+				throw new InvalidOperationException(
+					"this is not a chimera project; chimera reads no other movie format (docs/project.md)");
 			}
-
-			try
-			{
-				using var bl = ZipStateLoader.LoadAndDetect(Filename, true);
-				if (bl is null) return false;
-				ClearBeforeLoad();
-				LoadFields(bl);
-				if (FrameCount == 0)
-				{
-					// only iterate the input log if it hasn't been loaded already
-					LoadFramecount(bl);
-				}
-
-				return true;
-			}
-			catch (InvalidDataException e) when (e.StackTrace.Contains("ZipArchive.ReadEndOfCentralDirectory"))
-			{
-				throw new Exception("Archive appears to be corrupt. Make a backup, then try to repair it with e.g. 7-Zip.", e);
-			}
+			return LoadProjectFormat();
 		}
 
 		private static bool LooksLikeProjectJson(string path)
@@ -192,53 +175,6 @@ namespace Chimera.Client.Common
 			Header.Clear();
 			Subtitles.Clear();
 			Comments.Clear();
-		}
-
-		protected virtual void LoadFields(ZipStateLoader bl)
-		{
-			// the engine parses the text lumps (see docs/engine-migration.md)
-			bl.GetLump(BinaryStateLump.Movieheader, abort: true, tr =>
-			{
-				using EngineMovieHeader header = new();
-				header.Parse(tr.ReadToEnd());
-				for (long i = 0; i < header.Count; i++)
-				{
-					var (key, value) = header[i];
-					if (!Header.ContainsKey(key)) Header.Add(key, value);
-				}
-			});
-
-			bl.GetLump(BinaryStateLump.Comments, abort: false, tr =>
-			{
-				using EngineTextLines lines = new();
-				lines.Parse(tr.ReadToEnd());
-				for (long i = 0; i < lines.Count; i++)
-				{
-					Comments.Add(lines[i]);
-				}
-			});
-
-			bl.GetLump(BinaryStateLump.Subtitles, abort: false, tr =>
-			{
-				using EngineTextLines lines = new();
-				lines.Parse(tr.ReadToEnd());
-				for (long i = 0; i < lines.Count; i++)
-				{
-					Subtitles.AddFromString(lines[i]);
-				}
-
-				Subtitles.Sort();
-			});
-		}
-
-		private void LoadFramecount(ZipStateLoader bl)
-		{
-			bl.GetLump(BinaryStateLump.Input, abort: true, tr =>
-			{
-				// just skim through the input log and count input lines
-				// FIXME: this is potentially expensive and shouldn't be necessary for something as simple as frame count
-				while (tr.ReadLine() is string line) if (line.StartsWith('|')) FrameCount++;
-			});
 		}
 	}
 }

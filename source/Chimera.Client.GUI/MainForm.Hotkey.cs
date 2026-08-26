@@ -290,12 +290,6 @@ namespace Chimera.Client.GUI
 				case "Toggle read-only":
 					ToggleReadOnly();
 					break;
-				case "Play Movie":
-					PlayMovieMenuItem_Click(null, EventArgs.Empty);
-					break;
-				case "Record Movie":
-					RecordMovieMenuItem_Click(null, EventArgs.Empty);
-					break;
 				case "Stop Movie":
 					StopMovie();
 					break;

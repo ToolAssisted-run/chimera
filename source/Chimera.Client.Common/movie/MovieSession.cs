@@ -294,10 +294,9 @@ namespace Chimera.Client.Common
 
 		public IMovie Get(string path, bool loadMovie)
 		{
-			// TODO: change IMovies to take ChimeraFiles only and not path
-			IMovie movie = Path.GetExtension(path)?.EndsWithOrdinal(TasMovie.Extension) is true
-				? new TasMovie(this, path)
-				: new Bk2Movie(this, path);
+			// there is exactly one movie-bearing artifact: the project (docs/project.md)
+			if (Path.GetExtension(path)?.EndsWithOrdinal(TasMovie.Extension) is not true) return null;
+			IMovie movie = new TasMovie(this, path);
 
 			if (loadMovie)
 			{

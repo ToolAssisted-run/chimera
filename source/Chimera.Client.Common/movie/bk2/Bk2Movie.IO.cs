@@ -2,12 +2,8 @@
 
 using System.Globalization;
 using System.IO;
-using System.Runtime.InteropServices;
 
-using Chimera.Bizware.Graphics;
 using Chimera.Common;
-using Chimera.Common.IOExtensions;
-using Chimera.Emulation.Common.Engine;
 using Chimera.Common.StringExtensions;
 using Chimera.Emulation.Common;
 
@@ -33,39 +29,9 @@ namespace Chimera.Client.Common
 			return Write(backupName, isBackup: true);
 		}
 
-		protected virtual FileWriteResult Write(string fn, bool isBackup = false)
-		{
-			SetCycleValues();
-			// EmulatorVersion used to store the unchanging original emulator version.
-			if (!Header.ContainsKey(HeaderKeys.OriginalEmulatorVersion))
-			{
-				Header[HeaderKeys.OriginalEmulatorVersion] = Header[HeaderKeys.EmulatorVersion];
-			}
-			Header[HeaderKeys.EmulatorVersion] = VersionInfo.GetEmuVersion();
-			Directory.CreateDirectory(Path.GetDirectoryName(fn)!);
-
-			var createResult = ZipStateSaver.Create(fn, Session.Settings.MovieCompressionLevel);
-			if (createResult.IsError) return createResult;
-
-			ZipStateSaver saver = createResult.Value!;
-			try
-			{
-				AddLumps(saver, isBackup);
-			}
-			catch (Exception ex)
-			{
-				saver.Abort();
-				return new(FileWriteEnum.FailedDuringWrite, createResult.Paths, ex);
-			}
-
-			FileWriteResult result = saver.CloseAndDispose();
-			if (!isBackup && !result.IsError)
-			{
-				Changes = false;
-			}
-
-			return result;
-		}
+		// The project (docs/project.md) is the only on-disk movie form; the
+		// subclass that IS the project writes it. There is no zip movie.
+		protected abstract FileWriteResult Write(string fn, bool isBackup = false);
 
 		public void SetCycleValues() //TODO IEmulator should not be an instance prop of movies, it should be passed in to every call (i.e. from MovieService) --yoshi
 		{
@@ -82,122 +48,11 @@ namespace Chimera.Client.Common
 			}
 		}
 
-		protected virtual void AddLumps(ZipStateSaver bs, bool isBackup = false)
-		{
-			AddBk2Lumps(bs);
-		}
-
-		protected void AddBk2Lumps(ZipStateSaver bs)
-		{
-			// the engine renders the text lumps (see docs/engine-migration.md); the
-			// closing blank line the old WriteLine(ToString()) pair produced is part
-			// of each serialization
-			bs.PutLump(BinaryStateLump.Movieheader, tw =>
-			{
-				using EngineMovieHeader header = new();
-				foreach (var (k, v) in Header) header.Set(k, v);
-				tw.Write(header.Serialize(crlf: tw.NewLine == "\r\n"));
-			});
-			bs.PutLump(BinaryStateLump.Comments, tw =>
-			{
-				using EngineTextLines lines = new();
-				foreach (var comment in Comments) lines.Add(comment);
-				tw.Write(lines.Serialize(crlf: tw.NewLine == "\r\n"));
-			});
-			bs.PutLump(BinaryStateLump.Subtitles, tw =>
-			{
-				Subtitles.Sort();
-				using EngineTextLines lines = new();
-				foreach (var subtitle in Subtitles) lines.Add(subtitle.ToString());
-				tw.Write(lines.Serialize(crlf: tw.NewLine == "\r\n"));
-			});
-			bs.PutLump(BinaryStateLump.SyncSettings, tw => tw.WriteLine(SyncSettingsJson));
-			bs.PutLump(BinaryStateLump.Input, WriteInputLog);
-
-			if (StartsFromSavestate)
-			{
-				if (TextSavestate != null)
-				{
-					bs.PutLump(BinaryStateLump.CorestateText, (TextWriter tw) => tw.Write(TextSavestate));
-				}
-				else
-				{
-					bs.PutLump(BinaryStateLump.Corestate, (BinaryWriter bw) => bw.Write(BinarySavestate));
-				}
-
-				if (SavestateFramebuffer != null)
-				{
-					bs.PutLump(
-						BinaryStateLump.Framebuffer,
-						s => QuickBmpFile.Save(new BitmapBufferVideoProvider(SavestateFramebuffer), s, SavestateFramebuffer.Width, SavestateFramebuffer.Height),
-						zstdCompress: false);
-				}
-			}
-		}
-
 		protected override void ClearBeforeLoad()
 		{
 			base.ClearBeforeLoad();
-			ClearBk2Fields();
-		}
-
-		private void ClearBk2Fields()
-		{
 			Log.Clear();
 			_syncSettingsJson = "";
-			TextSavestate = null;
-			BinarySavestate = null;
-		}
-
-		protected override void LoadFields(ZipStateLoader bl)
-		{
-			base.LoadFields(bl);
-			LoadBk2Fields(bl);
-		}
-
-		private void LoadBk2Fields(ZipStateLoader bl)
-		{
-			bl.GetLump(BinaryStateLump.Input, abort: true, tr =>
-			{
-				IsCountingRerecords = false;
-				ExtractInputLog(tr, out _);
-				IsCountingRerecords = true;
-			});
-
-			bl.GetLump(BinaryStateLump.SyncSettings, abort: false, tr =>
-			{
-				string? line;
-				while ((line = tr.ReadLine()) != null)
-				{
-					if (!string.IsNullOrWhiteSpace(line))
-					{
-						_syncSettingsJson = line;
-						break;
-					}
-				}
-			});
-
-			if (StartsFromSavestate)
-			{
-				bl.GetCoreState(
-					br => BinarySavestate = br.ReadAllBytes(),
-					tr => TextSavestate = tr.ReadToEnd());
-				bl.GetLump(BinaryStateLump.Framebuffer, false,
-					br =>
-					{
-						if (bl.Version < 3)
-						{
-							var fb = MemoryMarshal.Cast<byte, int>(br.ReadAllBytes());
-							// width and height are unknown, so just use dummy values
-							SavestateFramebuffer = new BitmapBuffer(fb.Length / 4, 1, fb.ToArray());
-						}
-						else
-						{
-							QuickBmpFile.LoadAuto(br.BaseStream, out var bmp);
-							SavestateFramebuffer = new BitmapBuffer(bmp.BufferWidth, bmp.BufferHeight, bmp.GetVideoBuffer());
-						}
-					});
-			}
 		}
 	}
 }

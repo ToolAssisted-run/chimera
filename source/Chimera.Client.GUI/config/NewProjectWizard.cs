@@ -253,6 +253,14 @@ namespace Chimera.Client.GUI
 			ShowPage(1);
 		}
 
+		/// <summary>Renders given sync-setting declarations directly - the test and screenshot door.</summary>
+		internal void UseSyncSettingsDecls(IReadOnlyList<WaterboxConfig.SettingDecl> declarations)
+		{
+			_syncSettings = new WaterboxCoreSyncSettings { Declarations = declarations };
+			_settingsGrid.SelectedObject = _syncSettings;
+			ShowPage(2);
+		}
+
 		private void RenderSlotForm()
 		{
 			_slotsHost.Controls.Clear();
