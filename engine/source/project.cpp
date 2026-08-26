@@ -735,6 +735,26 @@ void ce_project_subtitle_remove(ce_project *p, int32_t index)
 
 /* ---- files ---- */
 
+const char *ce_cue_references(const char *cue_bytes, uint64_t cue_len, uint64_t *len_out)
+{
+	static thread_local std::string g_cueRefs;
+	cJSON *arr = cJSON_CreateArray();
+	if (cue_bytes != nullptr && cue_len > 0)
+	{
+		std::vector<uint8_t> bytes(cue_bytes, cue_bytes + cue_len);
+		for (const std::string &ref : cueReferences(bytes))
+		{
+			cJSON_AddItemToArray(arr, cJSON_CreateString(ref.c_str()));
+		}
+	}
+	char *printed = cJSON_PrintUnformatted(arr);
+	g_cueRefs = printed != nullptr ? printed : "[]";
+	cJSON_free(printed);
+	cJSON_Delete(arr);
+	if (len_out != nullptr) *len_out = g_cueRefs.size();
+	return g_cueRefs.c_str();
+}
+
 int32_t ce_project_file_add(ce_project *p, const char *name, const char *slot, const char *source_path, const char **error_out)
 {
 	if (error_out != nullptr) *error_out = nullptr;

@@ -220,6 +220,11 @@ namespace Chimera.Emulation.Common.Engine
 			ref ulong lenOut);
 
 		[BizImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_cue_references(
+			byte[] cueBytes, ulong cueLen,
+			ref ulong lenOut);
+
+		[BizImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_package_open(string path, ref IntPtr errorOut);
 
 		[BizImport(CallingConvention.Cdecl)]
@@ -1612,6 +1617,28 @@ namespace Chimera.Emulation.Common.Engine
 			ulong len = 0;
 			var result = ChimeraEngine.Instance.ce_slots_evaluate(
 				decl, (ulong)decl.LongLength, slots, (ulong)slots.LongLength, ref len);
+			var text = ChimeraEngine.PtrToStringUtf8(result, len);
+			System.Collections.Generic.List<string> outList = new();
+			foreach (var item in Newtonsoft.Json.Linq.JArray.Parse(text))
+			{
+				if (item.Type is Newtonsoft.Json.Linq.JTokenType.String) outList.Add(item.ToObject<string>()!);
+			}
+			return outList;
+		}
+	}
+
+	/// <summary>
+	/// The files a cue sheet references, in cue order - what the project will
+	/// pull in beside the cue as support files. Lets a form show
+	/// "disc.cue (+ N tracks)" and complain at pick time.
+	/// </summary>
+	public static class EngineCue
+	{
+		public static System.Collections.Generic.IReadOnlyList<string> References(byte[] cueBytes)
+		{
+			ulong len = 0;
+			var result = ChimeraEngine.Instance.ce_cue_references(
+				cueBytes ?? [ ], (ulong)(cueBytes?.LongLength ?? 0), ref len);
 			var text = ChimeraEngine.PtrToStringUtf8(result, len);
 			System.Collections.Generic.List<string> outList = new();
 			foreach (var item in Newtonsoft.Json.Linq.JArray.Parse(text))

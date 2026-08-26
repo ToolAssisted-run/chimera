@@ -83,12 +83,26 @@ namespace Chimera.Tests.Client.GUI
 		public void WizardFileForm()
 		{
 			if (ShotDir is null) { Assert.Inconclusive("set CHIMERA_UI_SHOTS to write screenshots"); return; }
-			using var form = MakeWizard();
-			form.UseDeclaration(ProjectSlotDeclaration.Parse(DosboxDeclaration));
-			form.AddFileToSlot("floppy", "/home/you/games/alleycat/disk1.img");
-			form.AddFileToSlot("floppy", "/home/you/games/alleycat/disk2.img");
-			form.AddFileToSlot("cdrom", "/home/you/games/alleycat/bonus.iso");
-			Shoot(form, "wizard-2-files");
+			var dir = Path.Combine(Path.GetTempPath(), $"chimera-shot-files-{System.Diagnostics.Process.GetCurrentProcess().Id}");
+			Directory.CreateDirectory(dir);
+			try
+			{
+				// a real cue with real tracks, so the row shows them riding along
+				File.WriteAllText(Path.Combine(dir, "bonus.cue"),
+					"FILE \"bonus (track 1).bin\" BINARY\n  TRACK 01 MODE1/2352\nFILE \"bonus (track 2).bin\" BINARY\n  TRACK 02 AUDIO\n");
+				File.WriteAllText(Path.Combine(dir, "bonus (track 1).bin"), "data track");
+				File.WriteAllText(Path.Combine(dir, "bonus (track 2).bin"), "audio track");
+				using var form = MakeWizard();
+				form.UseDeclaration(ProjectSlotDeclaration.Parse(DosboxDeclaration));
+				form.AddFileToSlot("floppy", "/home/you/games/alleycat/disk1.img");
+				form.AddFileToSlot("floppy", "/home/you/games/alleycat/disk2.img");
+				form.AddFileToSlot("cdrom", Path.Combine(dir, "bonus.cue"));
+				Shoot(form, "wizard-2-files");
+			}
+			finally
+			{
+				Directory.Delete(dir, recursive: true);
+			}
 		}
 
 		[TestMethod]

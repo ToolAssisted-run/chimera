@@ -300,6 +300,17 @@ int main(int argc, char **argv)
 		ce_project_free(p);
 	}
 
+	// the cue parser, exported: what a form shows as "(+ N tracks)"
+	{
+		const char *cue =
+			"FILE \"track01.bin\" BINARY\n  TRACK 01 MODE1/2352\nFILE track02.bin BINARY\n";
+		uint64_t len = 0;
+		const char *refs = ce_cue_references(cue, std::strlen(cue), &len);
+		assert(std::string(refs, len) == "[\"track01.bin\",\"track02.bin\"]");
+		refs = ce_cue_references("not a cue at all", 16, &len);
+		assert(std::string(refs, len) == "[]");
+	}
+
 	std::printf("project: all assertions passed\n");
 	return 0;
 }

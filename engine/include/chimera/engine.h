@@ -327,6 +327,16 @@ CE_API const char *ce_slots_evaluate(
 	const char *slots_json, uint64_t slots_len,
 	uint64_t *len_out);
 
+/* The files a cue sheet references (its FILE lines, quoted or bare), as a
+ * JSON array of names in cue order - what ce_project_file_add will pull in
+ * beside the cue as "support" files. Lets a form show "disc.cue (+ N
+ * tracks)" and complain about a missing track at pick time rather than at
+ * create time. Returns thread-local storage, invalidated by the next
+ * call; not-a-cue or empty input returns []. */
+CE_API const char *ce_cue_references(
+	const char *cue_bytes, uint64_t cue_len,
+	uint64_t *len_out);
+
 /* ---- multi-file games ----
  *
  * A .chimeraMultiFile descriptor names the files a game is made of: bare

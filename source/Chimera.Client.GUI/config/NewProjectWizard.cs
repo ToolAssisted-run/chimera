@@ -1,5 +1,6 @@
 #nullable enable
 
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -435,10 +436,16 @@ namespace Chimera.Client.GUI
 		public bool SlotAvailable(string slotId)
 			=> _slotGroups.TryGetValue(slotId, out var group) && group.Enabled;
 
-		/// <summary>One picked file, kept as its canonical (bare) name plus where it is now.</summary>
-		private sealed record PickedFile(string Name, string Path)
+		/// <summary>
+		/// One picked file, kept as its canonical (bare) name plus where it is
+		/// now. A cue sheet counts as ONE pick: its referenced track files ride
+		/// along automatically at creation (the engine adds them as support
+		/// files, from the cue's own folder), so the row says how many.
+		/// </summary>
+		private sealed record PickedFile(string Name, string Path, int TrackCount = 0)
 		{
-			public override string ToString() => Name;
+			public override string ToString()
+				=> TrackCount is 0 ? Name : $"{Name}  (+ {TrackCount} track file{(TrackCount is 1 ? "" : "s")})";
 		}
 
 		/// <summary>Adds a file to a slot's list; public in behaviour so tests can drive the form without a picker.</summary>
@@ -448,7 +455,26 @@ namespace Chimera.Client.GUI
 			if (_slotGroups.TryGetValue(slotId, out var g) && !g.Enabled) return;
 			var name = Path.GetFileName(path);
 			if (list.Items.OfType<PickedFile>().Any(f => f.Name == name)) return;
-			list.Items.Add(new PickedFile(name, path));
+
+			// a cue sheet is one pick, but its track files must be next to it -
+			// the same all-or-nothing rule the engine applies at creation,
+			// raised here so the complaint lands at pick time
+			var tracks = 0;
+			if (name.EndsWith(".cue", StringComparison.OrdinalIgnoreCase) && File.Exists(path))
+			{
+				var refs = EngineCue.References(File.ReadAllBytes(path));
+				var folder = Path.GetDirectoryName(path) ?? "";
+				var missing = refs.Where(r => !File.Exists(Path.Combine(folder, r))).ToList();
+				if (missing.Count is not 0)
+				{
+					_status.Text = $"{name} references {missing[0]}, which is not next to it - a cue's files are added together";
+					return;
+				}
+				tracks = refs.Count;
+			}
+
+			list.Items.Add(new PickedFile(name, path, tracks));
+			_status.Text = "";
 			RefreshSlotAvailability();
 		}
 
@@ -464,6 +490,15 @@ namespace Chimera.Client.GUI
 
 		/// <summary>What still blocks the file page, for tests (null = nothing).</summary>
 		public string? FilesComplaint() => CardinalityComplaint();
+
+		/// <summary>The rows as the list shows them (cue rows carry their track count), for tests.</summary>
+		public string[] SlotRowTexts(string slotId)
+			=> _slotLists.TryGetValue(slotId, out var list)
+				? list.Items.OfType<PickedFile>().Select(static f => f.ToString()).ToArray()
+				: [ ];
+
+		/// <summary>The page's live complaint line, for tests.</summary>
+		public string StatusText => _status.Text;
 
 		/// <summary>The canonical names in one slot, in order, for tests.</summary>
 		public string[] SlotFileNames(string slotId)
