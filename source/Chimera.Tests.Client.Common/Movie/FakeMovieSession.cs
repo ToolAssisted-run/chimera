@@ -16,7 +16,7 @@ namespace Chimera.Tests.Client.Common.Movie
 
 		public bool NewMovieQueued => throw new NotImplementedException();
 
-		public string QueuedSyncSettings => throw new NotImplementedException();
+		public string QueuedSettings => throw new NotImplementedException();
 
 		public string QueuedCoreName => throw new NotImplementedException();
 

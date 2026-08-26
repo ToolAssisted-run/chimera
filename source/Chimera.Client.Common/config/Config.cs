@@ -295,7 +295,6 @@ namespace Chimera.Client.Common
 
 		// Emulation core settings
 		internal Dictionary<string, JToken> CoreSettings { get; set; } = new Dictionary<string, JToken>();
-		internal Dictionary<string, JToken> CoreSyncSettings { get; set; } = new Dictionary<string, JToken>();
 
 		public Dictionary<string, ToolDialogSettings> CommonToolSettings { get; set; } = new Dictionary<string, ToolDialogSettings>();
 		public Dictionary<string, Dictionary<string, object>> CustomToolSettings { get; set; } = new Dictionary<string, Dictionary<string, object>>();

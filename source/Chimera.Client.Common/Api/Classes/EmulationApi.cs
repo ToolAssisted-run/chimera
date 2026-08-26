@@ -191,9 +191,7 @@ namespace Chimera.Client.Common
 				: new(
 					Emulator,
 					mayPutCoreSettings: static () => true,
-					handlePutCoreSettings: static _ => { },
-					mayPutCoreSyncSettings: static () => false,
-					handlePutCoreSyncSettings: static _ => { });
+					handlePutCoreSettings: static _ => { });
 
 		public object? GetSettings()
 		{

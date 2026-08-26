@@ -707,16 +707,6 @@ namespace Chimera.Client.GUI
 			this.ShowDialogWithTempMute(form);
 		}
 
-		private DialogResult OpenGenericCoreConfigFor<T>(string title)
-			where T : IEmulator
-			=> GenericCoreConfig.DoDialogFor(this, GetSettingsAdapterFor<T>(), title, isMovieActive: MovieSession.Movie.IsActive());
-
-		private void OpenGenericCoreConfig()
-			=> GenericCoreConfig.DoDialog(Emulator, this, isMovieActive: MovieSession.Movie.IsActive());
-
-		private void GenericCoreSettingsMenuItem_Click(object sender, EventArgs e)
-			=> OpenGenericCoreConfig();
-
 		private void OnlineHelpMenuItem_Click(object sender, EventArgs e)
 		{
 			Util.OpenUrlExternal("https://toolassisted.run");

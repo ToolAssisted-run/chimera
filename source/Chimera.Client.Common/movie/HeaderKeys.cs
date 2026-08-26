@@ -21,7 +21,6 @@ namespace Chimera.Client.Common
 		public const string Crc32 = "CRC32";
 		public const string Pal = "PAL";
 		public const string BoardName = "BoardName";
-		public const string SyncSettings = "SyncSettings";
 		public const string CycleCount = "CycleCount";
 		public const string ClockRate = "ClockRate";
 		public const string VsyncAttoseconds = "VsyncAttoseconds"; // used for Arcade due to it representing thousands of different systems with different vsync rates

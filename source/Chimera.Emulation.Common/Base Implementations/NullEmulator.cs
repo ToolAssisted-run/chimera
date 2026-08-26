@@ -14,7 +14,7 @@ namespace Chimera.Emulation.Common
 		typeof(IInputPollable),
 		typeof(IMemoryDomains),
 		typeof(IRegionable),
-		typeof(ISettable<,>),
+		typeof(ISettable<>),
 		typeof(ISoundProvider),
 		typeof(IStatable),
 		typeof(ITraceable)

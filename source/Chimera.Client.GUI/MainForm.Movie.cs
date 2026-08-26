@@ -238,9 +238,11 @@ namespace Chimera.Client.GUI
 			if (!string.IsNullOrWhiteSpace(firmware)) movie.HeaderEntries[HeaderKeys.Firmware] = firmware;
 
 			var settable = GetSettingsAdapterForLoadedCoreUntyped();
-			if (settable.HasSyncSettings)
+			if (settable.HasSettings)
 			{
-				movie.SyncSettingsJson = ConfigService.SaveWithType(settable.GetSyncSettings());
+				// the movie carries the flat settings map wrapped as {"Values":{...}},
+				// which is exactly how a settings object serializes
+				movie.SettingsJson = Newtonsoft.Json.JsonConvert.SerializeObject(settable.GetSettings());
 			}
 		}
 

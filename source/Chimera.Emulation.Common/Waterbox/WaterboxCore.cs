@@ -29,7 +29,7 @@ namespace Chimera.Emulation.Common.Waterbox
 		portedVersion: "1.0.0",
 		portedUrl: "https://github.com/SergioMartin86/miniBox")]
 	public sealed partial class WaterboxCore : IEmulator, IVideoProvider, ISoundProvider, IStatable, IInputPollable,
-		ICoreIdentity, ISettable<WaterboxCoreSettings, WaterboxCoreSyncSettings>
+		ICoreIdentity, ISettable<WaterboxCoreSettings>
 	{
 		/// <summary>
 		/// The identity of the PACKAGE this instance is running - what the status bar,
@@ -48,7 +48,6 @@ namespace Chimera.Emulation.Common.Waterbox
 
 		private readonly WaterboxConfig _cfg;
 		private readonly EngineSession _session;
-		private WaterboxCoreSyncSettings _syncSettings;
 		private WaterboxCoreSettings _settings;
 
 		private readonly int _width, _height, _samplesPerFrame;
@@ -65,10 +64,9 @@ namespace Chimera.Emulation.Common.Waterbox
 		/// </summary>
 		public static string HostBuildInfo => EngineSession.HostBuildInfo;
 
-		public WaterboxCore(byte[] rom, WaterboxConfig cfg, string packageDir, WaterboxCoreSyncSettings syncSettings, WaterboxCoreSettings settings = null, IReadOnlyDictionary<string, byte[]> firmware = null, IReadOnlyList<KeyValuePair<string, byte[]>> extraFiles = null)
+		public WaterboxCore(byte[] rom, WaterboxConfig cfg, string packageDir, WaterboxCoreSettings settings = null, IReadOnlyDictionary<string, byte[]> firmware = null, IReadOnlyList<KeyValuePair<string, byte[]>> extraFiles = null)
 		{
 			_cfg = cfg;
-			_syncSettings = syncSettings?.Clone() ?? new WaterboxCoreSyncSettings();
 			_settings = settings?.Clone() ?? new WaterboxCoreSettings();
 			_width = cfg.Video.Width;
 			_height = cfg.Video.Height;
@@ -111,18 +109,14 @@ namespace Chimera.Emulation.Common.Waterbox
 
 		/// <summary>
 		/// What the guest is told: every declared setting, at the package's default
-		/// unless the user (or a movie) overrode it. Both kinds go in the same object -
-		/// the guest reads the keys it knows and the sync/non-sync split is a question
-		/// about movies and reboots, which is the frontend's business, not the core's.
-		/// (The engine overlays this onto the declared defaults again, harmlessly:
-		/// the merge is idempotent.)
+		/// unless the user (or the project) overrode it. (The engine overlays this
+		/// onto the declared defaults again, harmlessly: the merge is idempotent.)
 		/// </summary>
 		private Dictionary<string, object> EffectiveSettings()
 		{
 			var effective = new Dictionary<string, object>();
 			foreach (var decl in Decls) effective[decl.Name] = decl.DefaultValue;
-			foreach (var kv in _settings.Values ?? new()) if (effective.ContainsKey(kv.Key) || Decl(kv.Key) is null) effective[kv.Key] = kv.Value;
-			foreach (var kv in _syncSettings.Values ?? new()) effective[kv.Key] = kv.Value;
+			foreach (var kv in _settings.Values ?? new()) effective[kv.Key] = kv.Value;
 			return effective;
 		}
 
@@ -132,26 +126,18 @@ namespace Chimera.Emulation.Common.Waterbox
 		/// wizard) need them without booting anything.
 		/// </summary>
 		public static Dictionary<string, object> EffectiveSettingsFor(
-			WaterboxConfig cfg, WaterboxCoreSettings settings, WaterboxCoreSyncSettings syncSettings)
+			WaterboxConfig cfg, WaterboxCoreSettings settings)
 		{
 			var decls = cfg.Settings ?? (IReadOnlyList<WaterboxConfig.SettingDecl>) [ ];
 			var effective = new Dictionary<string, object>();
 			foreach (var decl in decls) effective[decl.Name] = decl.DefaultValue;
-			foreach (var kv in settings?.Values ?? new())
-				if (effective.ContainsKey(kv.Key) || decls.All(d => d.Name != kv.Key)) effective[kv.Key] = kv.Value;
-			foreach (var kv in syncSettings?.Values ?? new()) effective[kv.Key] = kv.Value;
+			foreach (var kv in settings?.Values ?? new()) effective[kv.Key] = kv.Value;
 			return effective;
 		}
 
 		private IReadOnlyList<WaterboxConfig.SettingDecl> Decls
 			=> _cfg.Settings ?? [ ];
 
-		private WaterboxConfig.SettingDecl Decl(string name)
-			=> Decls.FirstOrDefault(d => d.Name == name);
-
-		/// <summary>The declarations for one half of the split, handed to the settings object so the grid can draw them.</summary>
-		private IReadOnlyList<WaterboxConfig.SettingDecl> DeclsFor(bool sync)
-			=> Decls.Where(d => d.Sync == sync).ToList();
 
 		// Delivered as a flat JSON object, e.g. {"initFillByte":171}. The guest
 		// parses it with a small JSON reader (jsmn for C cores, nlohmann for C++).
@@ -309,23 +295,14 @@ namespace Chimera.Emulation.Common.Waterbox
 		}
 
 		// ---------------- ISettable ----------------
-		// The package declares which of its settings are sync. Sync ones shape the
-		// machine, are mounted for Init, are recorded in movies, and need a reboot to
-		// change. Non-sync ones are pushed to the running guest if it exports the
-		// live-settings entry points, and otherwise also need a reboot - a setting
-		// that silently failed to apply would be worse than a reboot.
+		// One kind of setting only: all of them shape the machine, are mounted
+		// for Init, are recorded in the project, and changing one is a
+		// STRUCTURAL change - it needs a reboot.
 
 		public WaterboxCoreSettings GetSettings()
 		{
 			var s = _settings.Clone();
-			s.Declarations = DeclsFor(sync: false);
-			return s;
-		}
-
-		public WaterboxCoreSyncSettings GetSyncSettings()
-		{
-			var s = _syncSettings.Clone();
-			s.Declarations = DeclsFor(sync: true);
+			s.Declarations = Decls;
 			return s;
 		}
 
@@ -334,17 +311,6 @@ namespace Chimera.Emulation.Common.Waterbox
 			var incoming = o?.Clone() ?? new WaterboxCoreSettings();
 			var changed = !_settings.ValuesEqual(incoming);
 			_settings = incoming;
-			if (!changed) return PutSettingsDirtyBits.None;
-			return _session.ApplySettings(SerializeSettings(EffectiveSettings()))
-				? PutSettingsDirtyBits.None
-				: PutSettingsDirtyBits.RebootCore;
-		}
-
-		public PutSettingsDirtyBits PutSyncSettings(WaterboxCoreSyncSettings o)
-		{
-			var incoming = o?.Clone() ?? new WaterboxCoreSyncSettings();
-			var changed = !_syncSettings.ValuesEqual(incoming);
-			_syncSettings = incoming;
 			return changed ? PutSettingsDirtyBits.RebootCore : PutSettingsDirtyBits.None;
 		}
 

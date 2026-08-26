@@ -6,57 +6,40 @@ using System.Reflection;
 namespace Chimera.Emulation.Common
 {
 	/// <summary>
-	/// This service provides mechanism for the client to set sync and non-sync related settings to the core
-	/// Settings are settings that can change during the lifetime of the core and do not affect potential movie sync
-	/// Sync Settings do not change during the lifetime of the core and affect movie sync
-	/// If available, Sync settings are stored in movie files and automatically applied when the movie is loaded
-	/// If this service is available the client can provide UI for the user to manage these settings
+	/// This service lets the client hand a core its settings. There is exactly
+	/// ONE kind: settings shape the emulated machine, so every one of them is
+	/// sync-sensitive, recorded in the project, and delivered before the core
+	/// boots. (The BizHawk lineage split "settings" from "sync settings"; that
+	/// distinction never earned its complexity and does not exist here.)
 	/// </summary>
-	/// <typeparam name="TSettings">The Type of the object that represent regular settings (settings that can be changed during the lifespan of a core instance</typeparam>
-	/// <typeparam name="TSync">The Type of the object that represents sync settings (settings that can not change during the lifespan of the core and are required for movie sync</typeparam>
-	public interface ISettable<TSettings, TSync> : IEmulatorService
+	/// <typeparam name="TSettings">The type of the object that represents the core's settings</typeparam>
+	public interface ISettable<TSettings> : IEmulatorService
 		where TSettings : class, new()
-		where TSync : class, new()
 	{
-		// in addition to these methods, it's expected that the constructor or Load() method
-		// will take a Settings and SyncSettings object to set the initial state of the core
-		// (if those are null, default settings are to be used)
+		// in addition to these methods, it's expected that the constructor or
+		// Load() method will take a settings object to set the initial state of
+		// the core (if null, default settings are to be used)
 
 		/// <summary>
-		/// get the current core settings, excepting movie settings.  should be a clone of the active in-core object.
-		/// VERY IMPORTANT: changes to the object returned by this function SHOULD NOT have any effect on emulation
+		/// get the current core settings. should be a clone of the active in-core
+		/// object - changes to the returned object MUST NOT affect emulation
 		/// (unless the object is later passed to PutSettings)
 		/// </summary>
 		/// <returns>a JSON serializable object</returns>
 		TSettings GetSettings();
 
 		/// <summary>
-		/// get the current core settings that affect movie sync.  these go in movie 2.0 files, so don't make the JSON too extravagant, please
-		/// should be a clone of the active in-core object.
-		/// VERY IMPORTANT: changes to the object returned by this function MUST NOT have any effect on emulation
-		/// (unless the object is later passed to PutSyncSettings)
-		/// </summary>
-		/// <returns>a JSON serializable object</returns>
-		TSync GetSyncSettings();
-
-		/// <summary>
-		/// change the core settings, excepting movie settings
+		/// changes the core settings. Settings shape the machine, so THIS SHOULD
+		/// NEVER BE CALLED WHILE A MOVIE IS ACTIVE except through the structural
+		/// change flow (which clears the greenzone and reboots).
 		/// </summary>
 		/// <param name="o">an object of the same type as the return for GetSettings</param>
-		/// <returns>true if a core reboot will be required to make the changes effective</returns>
+		/// <returns>flags for what the change requires (e.g. a core reboot)</returns>
 		PutSettingsDirtyBits PutSettings(TSettings o);
-
-		/// <summary>
-		/// changes the movie-sync relevant settings.  THIS SHOULD NEVER BE CALLED WHILE RECORDING
-		/// if it is called while recording, the core need not guarantee continued determinism
-		/// </summary>
-		/// <param name="o">an object of the same type as the return for GetSyncSettings</param>
-		/// <returns>true if a core reboot will be required to make the changes effective</returns>
-		PutSettingsDirtyBits PutSyncSettings(TSync o);
 	}
 
 	/// <summary>
-	/// Place this attribute for TSettings and TSync classes which use System.ComponentModel.DefaultValue
+	/// Place this attribute for TSettings classes which use System.ComponentModel.DefaultValue
 	/// Classes with this attribute will have a Chimera.Common.SettingsUtil.SetDefaultValues(T) function generated
 	/// </summary>
 	[AttributeUsage(AttributeTargets.Class)]
@@ -78,17 +61,10 @@ namespace Chimera.Emulation.Common
 	{
 		bool HasSettings { get; }
 
-		bool HasSyncSettings { get; }
-
-		/// <exception cref="InvalidOperationException">does not have non-sync settings</exception>
+		/// <exception cref="InvalidOperationException">does not have settings</exception>
 		object GetSettings();
 
-		/// <exception cref="InvalidOperationException">does not have sync settings</exception>
-		object GetSyncSettings();
-
 		void PutCoreSettings(object s);
-
-		void PutCoreSyncSettings(object ss);
 	}
 
 	/// <summary>
@@ -98,49 +74,31 @@ namespace Chimera.Emulation.Common
 	{
 		private readonly Action<PutSettingsDirtyBits> _handlePutCoreSettings;
 
-		private readonly Action<PutSettingsDirtyBits> _handlePutCoreSyncSettings;
-
 		private readonly Func<bool> _mayPutCoreSettings;
-
-		private readonly Func<bool> _mayPutCoreSyncSettings;
 
 		public SettingsAdapter(
 			IEmulator emulator,
 			Func<bool> mayPutCoreSettings,
-			Action<PutSettingsDirtyBits> handlePutCoreSettings,
-			Func<bool> mayPutCoreSyncSettings,
-			Action<PutSettingsDirtyBits> handlePutCoreSyncSettings)
+			Action<PutSettingsDirtyBits> handlePutCoreSettings)
 		{
 			_handlePutCoreSettings = handlePutCoreSettings;
-			_handlePutCoreSyncSettings = handlePutCoreSyncSettings;
 			_mayPutCoreSettings = mayPutCoreSettings;
-			_mayPutCoreSyncSettings = mayPutCoreSyncSettings;
 
 			var settableType = emulator.ServiceProvider.AvailableServices
-				.SingleOrDefault(t => t.IsGenericType && t.GetGenericTypeDefinition() == typeof(ISettable<,>));
+				.SingleOrDefault(t => t.IsGenericType && t.GetGenericTypeDefinition() == typeof(ISettable<>));
 			if (settableType == null)
 			{
 				HasSettings = false;
-				HasSyncSettings = false;
 			}
 			else
 			{
-				var tt = settableType.GetGenericArguments();
-				var settingType = tt[0];
-				var syncType = tt[1];
-				HasSettings = settingType != typeof(object); // object is used for a placeholder where an emu doesn't have both s and ss
-				HasSyncSettings = syncType != typeof(object);
+				var settingType = settableType.GetGenericArguments()[0];
+				HasSettings = settingType != typeof(object); // object is used as a placeholder where an emu has none
 
 				if (HasSettings)
 				{
 					_gets = settableType.GetMethod("GetSettings");
 					_puts = settableType.GetMethod("PutSettings");
-				}
-
-				if (HasSyncSettings)
-				{
-					_getss = settableType.GetMethod("GetSyncSettings");
-					_putss = settableType.GetMethod("PutSyncSettings");
 				}
 
 				_settable = emulator.ServiceProvider.GetService(settableType);
@@ -150,15 +108,12 @@ namespace Chimera.Emulation.Common
 		private readonly object _settable;
 
 		public bool HasSettings { get; }
-		public bool HasSyncSettings { get; }
 
 		private readonly object[] _tempObject = new object[1];
 		private static readonly object[] Empty = Array.Empty<object>();
 
 		private readonly MethodInfo _gets;
 		private readonly MethodInfo _puts;
-		private readonly MethodInfo _getss;
-		private readonly MethodInfo _putss;
 
 		public object GetSettings()
 		{
@@ -170,36 +125,15 @@ namespace Chimera.Emulation.Common
 			return _gets.Invoke(_settable, Empty);
 		}
 
-		public object GetSyncSettings()
-		{
-			if (!HasSyncSettings)
-			{
-				throw new InvalidOperationException();
-			}
-
-			return _getss.Invoke(_settable, Empty);
-		}
-
 		public void PutCoreSettings(object s)
 		{
 			if (HasSettings && _mayPutCoreSettings()) _handlePutCoreSettings(DoPutSettings(s));
-		}
-
-		public void PutCoreSyncSettings(object ss)
-		{
-			if (HasSyncSettings && _mayPutCoreSyncSettings()) _handlePutCoreSyncSettings(DoPutSyncSettings(ss));
 		}
 
 		private PutSettingsDirtyBits DoPutSettings(object o)
 		{
 			_tempObject[0] = o;
 			return (PutSettingsDirtyBits)_puts.Invoke(_settable, _tempObject);
-		}
-
-		private PutSettingsDirtyBits DoPutSyncSettings(object o)
-		{
-			_tempObject[0] = o;
-			return (PutSettingsDirtyBits)_putss.Invoke(_settable, _tempObject);
 		}
 	}
 }

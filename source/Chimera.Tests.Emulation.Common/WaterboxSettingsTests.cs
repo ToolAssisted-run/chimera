@@ -73,7 +73,7 @@ namespace Chimera.Tests.Emulation.Common
 		[TestMethod]
 		public void EachDeclarationBecomesOneGridRow()
 		{
-			WaterboxCoreSyncSettings settings = new()
+			WaterboxCoreSettings settings = new()
 			{
 				Declarations = [ Enum("port1", "gamepad", "none", "gamepad"), Int("spriteLimit", 8) ],
 			};
@@ -89,19 +89,19 @@ namespace Chimera.Tests.Emulation.Common
 			var decl = Enum("port1", "gamepad", "none", "gamepad");
 			decl.Display = "Left Port Peripheral";
 			decl.Description = "What is plugged into controller port 1.";
-			var prop = TypeDescriptor.GetProperties(new WaterboxCoreSyncSettings { Declarations = [ decl ] })[0];
+			var prop = TypeDescriptor.GetProperties(new WaterboxCoreSettings { Declarations = [ decl ] })[0];
 			Assert.AreEqual("Left Port Peripheral", prop.DisplayName);
 			Assert.AreEqual("What is plugged into controller port 1.", prop.Description);
 		}
 
 		[TestMethod]
 		public void TheDisplayNameFallsBackToTheKey()
-			=> Assert.AreEqual("port1", TypeDescriptor.GetProperties(new WaterboxCoreSyncSettings { Declarations = [ Enum("port1", "none", "none") ] })[0].DisplayName);
+			=> Assert.AreEqual("port1", TypeDescriptor.GetProperties(new WaterboxCoreSettings { Declarations = [ Enum("port1", "none", "none") ] })[0].DisplayName);
 
 		[TestMethod]
 		public void AnEnumRowOffersExactlyTheDeclaredOptions()
 		{
-			var prop = TypeDescriptor.GetProperties(new WaterboxCoreSyncSettings
+			var prop = TypeDescriptor.GetProperties(new WaterboxCoreSettings
 			{
 				Declarations = [ Enum("port1", "gamepad", "none", "gamepad", "fourScore") ],
 			})[0];
@@ -115,7 +115,7 @@ namespace Chimera.Tests.Emulation.Common
 		[TestMethod]
 		public void AnUnsetRowReadsAsTheCoresDefault()
 		{
-			WaterboxCoreSyncSettings settings = new() { Declarations = [ Int("spriteLimit", 8) ] };
+			WaterboxCoreSettings settings = new() { Declarations = [ Int("spriteLimit", 8) ] };
 			var prop = TypeDescriptor.GetProperties(settings)[0];
 			Assert.AreEqual(8, prop.GetValue(settings));
 			Assert.IsFalse(prop.ShouldSerializeValue(settings), "unchanged from the package default, so the grid must not bold it");
@@ -125,7 +125,7 @@ namespace Chimera.Tests.Emulation.Common
 		public void EditingARowWritesThroughToTheValuesBag()
 		{
 			// the bag is what gets serialized into the config file and movie headers
-			WaterboxCoreSyncSettings settings = new() { Declarations = [ Int("spriteLimit", 8, min: 0, max: 64) ] };
+			WaterboxCoreSettings settings = new() { Declarations = [ Int("spriteLimit", 8, min: 0, max: 64) ] };
 			var prop = TypeDescriptor.GetProperties(settings)[0];
 			prop.SetValue(settings, 64);
 			Assert.AreEqual(64, settings.Values["spriteLimit"]);
@@ -147,8 +147,8 @@ namespace Chimera.Tests.Emulation.Common
 		{
 			// one side has been through a JSON round-trip, the other has not; a
 			// spurious difference here would reboot the core for no reason
-			WaterboxCoreSyncSettings a = new() { Values = { ["spriteLimit"] = 8 } };
-			WaterboxCoreSyncSettings b = new() { Values = { ["spriteLimit"] = 8L } };
+			WaterboxCoreSettings a = new() { Values = { ["spriteLimit"] = 8 } };
+			WaterboxCoreSettings b = new() { Values = { ["spriteLimit"] = 8L } };
 			Assert.IsTrue(a.ValuesEqual(b));
 
 			b.Values["spriteLimit"] = 64;
@@ -158,7 +158,7 @@ namespace Chimera.Tests.Emulation.Common
 		[TestMethod]
 		public void CloneDoesNotShareTheValuesBag()
 		{
-			WaterboxCoreSyncSettings original = new() { Values = { ["port1"] = "gamepad" } };
+			WaterboxCoreSettings original = new() { Values = { ["port1"] = "gamepad" } };
 			var clone = original.Clone();
 			clone.Values["port1"] = "fourScore";
 			Assert.AreEqual("gamepad", original.Values["port1"], "the dialog edits a clone; the core must not see it until OK");

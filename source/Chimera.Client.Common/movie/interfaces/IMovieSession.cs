@@ -18,7 +18,7 @@ namespace Chimera.Client.Common
 		/// <summary>
 		/// Gets the sync settings from a queued movie, if a movie is queued
 		/// </summary>
-		string QueuedSyncSettings { get; }
+		string QueuedSettings { get; }
 
 		/// <value>The Core header of the queued movie iff one is queued, else <see langword="null"/></value>
 		string QueuedCoreName { get; }

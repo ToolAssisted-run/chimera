@@ -41,7 +41,7 @@ namespace Chimera.Tests.Client.Common.Movie
 			movie.HeaderEntries[HeaderKeys.CorePackageSha1] = new string('B', 40);
 			movie.HeaderEntries[HeaderKeys.GameName] = "sprilo";
 			movie.Rerecords = 77;
-			movie.SyncSettingsJson = """{"region":"ntsc"}""";
+			movie.SettingsJson = """{"region":"ntsc"}""";
 			movie.Comments.Add("first comment");
 			movie.Comments.Add("second comment");
 			movie.Subtitles.AddFromString("subtitle 2 10 10 120 FFFFFFFF hi there");
@@ -100,7 +100,7 @@ namespace Chimera.Tests.Client.Common.Movie
 			Assert.AreEqual(new string('B', 40), loaded.HeaderEntries[HeaderKeys.CorePackageSha1]);
 			Assert.AreEqual("sprilo", loaded.HeaderEntries[HeaderKeys.GameName]);
 			Assert.AreEqual(77UL, loaded.Rerecords);
-			StringAssert.Contains(loaded.SyncSettingsJson, "\"region\":\"ntsc\"");
+			StringAssert.Contains(loaded.SettingsJson, "\"region\":\"ntsc\"");
 			CollectionAssert.AreEqual(new[] { "first comment", "second comment" }, loaded.Comments.ToArray());
 			Assert.AreEqual(1, loaded.Subtitles.Count);
 

@@ -28,8 +28,6 @@ namespace Chimera.Client.Common
 		public static BinaryStateLump Comments { get; private set; }
 		[Name("Subtitles", "txt")]
 		public static BinaryStateLump Subtitles { get; private set; }
-		[Name("SyncSettings", "json")]
-		public static BinaryStateLump SyncSettings { get; private set; }
 
 		// TasMovie
 		[Name("LagLog", "json")]

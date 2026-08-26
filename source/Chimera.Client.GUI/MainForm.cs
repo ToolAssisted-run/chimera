@@ -81,7 +81,6 @@ namespace Chimera.Client.GUI
 			ConfigSubMenu.DropDownOpened += (_, _) => superChimeraThrottleMenuItem.Checked = Config.SuperChimeraThrottle;
 #endif
 
-			RebuildCoreSettingsMenus();
 
 			// Hide Status bar icons and general StatusBar prep
 			MainStatusBar.Padding = new Padding(MainStatusBar.Padding.Left, MainStatusBar.Padding.Top, MainStatusBar.Padding.Left, MainStatusBar.Padding.Bottom); // Workaround to remove extra padding on right
@@ -463,7 +462,6 @@ namespace Chimera.Client.GUI
 			// because the commandline load a few lines below needs the list to exist.
 			ScanForCorePackages();
 			// the menus built at construction time predate the packages
-			RebuildCoreSettingsMenus();
 
 			Console.WriteLine($"Chimera {VersionInfo.GetEmuVersion()}");
 
@@ -507,7 +505,6 @@ namespace Chimera.Client.GUI
 			_autoDumpLength = _argParser._autoDumpLength;
 			if (_argParser.cmdMovie != null)
 			{
-				_suppressSyncSettingsWarning = true; // We don't want to be nagged if we are attempting to automate
 				if (Game.IsNullInstance())
 				{
 					OpenRom();
@@ -530,8 +527,7 @@ namespace Chimera.Client.GUI
 						StartNewMovie(movie, false);
 						Config.RecentMovies.Add(_argParser.cmdMovie);
 
-						_suppressSyncSettingsWarning = false;
-					}
+						}
 					else
 					{
 						ShowMessageBox(owner: null, $"Failed to load movie {_argParser.cmdMovie} specified on commandline");
@@ -680,7 +676,6 @@ namespace Chimera.Client.GUI
 			Input.Instance.ControlInputFocus(this, HostInputType.Mouse, false);
 		}
 
-		private readonly bool _suppressSyncSettingsWarning;
 
 		public override bool BlocksInputWhenFocused { get; } = false;
 
@@ -1589,10 +1584,6 @@ namespace Chimera.Client.GUI
 
 			if (Emulator.SystemId is VSystemID.Raw.NULL) return; // a core, but no machine running yet
 
-			var settingsMenuItem = new ToolStripMenuItem { Text = "&Settings" };
-			settingsMenuItem.Click += GenericCoreSettingsMenuItem_Click;
-			GenericCoreSubMenu.DropDownItems.Insert(0, settingsMenuItem);
-
 			// The way OUT for what this machine keeps (docs/save-data.md): present
 			// exactly when the core exports the savedata group, with no change
 			// detection - the user knows when their progress is worth exporting.
@@ -1600,7 +1591,7 @@ namespace Chimera.Client.GUI
 			{
 				ToolStripMenuItem exportSaveDataMenuItem = new() { Text = "Export Save &Data..." };
 				exportSaveDataMenuItem.Click += (_, _) => ExportSaveData();
-				GenericCoreSubMenu.DropDownItems.Insert(1, exportSaveDataMenuItem);
+				GenericCoreSubMenu.DropDownItems.Insert(0, exportSaveDataMenuItem);
 			}
 
 			var coreTools = CoreProvidedTools.Concat(SpecializedTools)
@@ -1884,65 +1875,6 @@ namespace Chimera.Client.GUI
 		public static readonly FilesystemFilterSet CorePackageFSFilterSet = new(
 			new FilesystemFilter("Chimera Core Package", extensions: [ "zip" ]));
 
-		private ToolStripMenuItemEx _coreSettingsParentMenu;
-
-		/// <summary>
-		/// (Re)builds the Config &gt; Core Settings menu tree from the currently loaded
-		/// packages. Cores load explicitly at any time (File &gt; Open Core), and their
-		/// settings must be configurable BEFORE the first rom load, so this reruns on
-		/// every package load.
-		/// </summary>
-		private void RebuildCoreSettingsMenus()
-		{
-			if (_coreSettingsParentMenu is not null) ConfigSubMenu.DropDownItems.Remove(_coreSettingsParentMenu);
-			ToolStripMenuItemEx recentCoreSettingsSubmenu = new() { Text = "Recent" };
-			recentCoreSettingsSubmenu.DropDownItems.AddRange(CreateCoreSettingsSubmenus().ToArray());
-			ToolStripMenuItemEx noRecentsItem = new() { Enabled = false, Text = "(N/A)" };
-			recentCoreSettingsSubmenu.DropDownItems.Add(noRecentsItem);
-			recentCoreSettingsSubmenu.DropDownOpening += (_, _) =>
-			{
-				foreach (ToolStripItem submenu in recentCoreSettingsSubmenu.DropDownItems) submenu.Visible = Config.RecentCores.Contains(submenu.Text);
-				noRecentsItem.Visible = Config.RecentCores.Count is 0;
-			};
-			ToolStripMenuItemEx consolesCoreSettingsSubmenu = new() { Text = "For Consoles" };
-			ToolStripMenuItemEx handheldsCoreSettingsSubmenu = new() { Text = "For Handhelds" };
-			ToolStripMenuItemEx pcsCoreSettingsSubmenu = new() { Text = "For Computers" };
-			ToolStripMenuItemEx otherCoreSettingsSubmenu = new() { Text = "Other" };
-			foreach (var submenu in CreateCoreSettingsSubmenus(includeDupes: true).OrderBy(submenu => submenu.Text))
-			{
-				var parentMenu = (VSystemCategory) submenu.Tag switch
-				{
-					VSystemCategory.Consoles => consolesCoreSettingsSubmenu,
-					VSystemCategory.Handhelds => handheldsCoreSettingsSubmenu,
-					VSystemCategory.PCs => pcsCoreSettingsSubmenu,
-					_ => otherCoreSettingsSubmenu,
-				};
-				parentMenu.DropDownItems.Add(submenu);
-			}
-			foreach (var submenu in new[] { consolesCoreSettingsSubmenu, handheldsCoreSettingsSubmenu, pcsCoreSettingsSubmenu, otherCoreSettingsSubmenu })
-			{
-				if (submenu.DropDownItems.Count is 0)
-				{
-					submenu.DropDownItems.Add(new ToolStripMenuItemEx { Text = "(none)" });
-					submenu.Enabled = false;
-				}
-			}
-			_coreSettingsParentMenu = new ToolStripMenuItemEx
-			{
-				DropDownItems =
-				{
-					recentCoreSettingsSubmenu,
-					new ToolStripSeparatorEx { AutoSize = true },
-					consolesCoreSettingsSubmenu,
-					handheldsCoreSettingsSubmenu,
-					pcsCoreSettingsSubmenu,
-					otherCoreSettingsSubmenu,
-				},
-				Text = "Core Settings",
-			};
-			_ = ConfigSubMenu.DropDownItems.InsertAfter(KeyPrioritySubMenu, insert: _coreSettingsParentMenu);
-		}
-
 		/// <summary>packages found by the startup scan, kept so the Core Packages dialog opens without rescanning</summary>
 		private IReadOnlyList<DiscoveredCorePackage> _discoveredCorePackages = [ ];
 
@@ -1963,7 +1895,6 @@ namespace Chimera.Client.GUI
 		public void RescanCorePackages()
 		{
 			ScanForCorePackages();
-			RebuildCoreSettingsMenus();
 		}
 
 		/// <summary>Loads a package the user picked out of the Open Core list.</summary>
@@ -2015,8 +1946,7 @@ namespace Chimera.Client.GUI
 				{
 					foreach (var sysID in factory.SystemIds) CoreChoices.MakeDefault(Config, sysID, factory.CoreName);
 				}
-				RebuildCoreSettingsMenus();
-				AddOnScreenMessage(packageSha1 is null
+					AddOnScreenMessage(packageSha1 is null
 					? $"Loaded core package: {manifest.Name} (directory form, unhashed)"
 					: $"Loaded core package: {manifest.Name} [{packageSha1.Substring(0, 8)}]");
 				return true;
@@ -2060,41 +1990,13 @@ namespace Chimera.Client.GUI
 			_ = LoadRom(filePath, new LoadRomArgs(new OpenAdvanced_OpenRom(filePath)));
 		}
 
-		private void CoreSyncSettings(object sender, RomLoader.SettingsLoadArgs e)
-		{
-			if (MovieSession.NewMovieQueued)
-			{
-				// a movie's sync settings are the project's flat map wrapped as
-				// {"Values":{...}} - the $type-encapsulated encoding died with
-				// the legacy movie formats
-				if (MovieSyncSettings.Decode(MovieSession.QueuedSyncSettings) is { } queued)
-				{
-					e.Settings = queued;
-				}
-				else
-				{
-					e.Settings = Config.GetCoreSyncSettings(e.Core, e.SettingsType);
-
-					// Only show this nag if the core actually has sync settings, not all cores do
-					if (e.Settings != null && !_suppressSyncSettingsWarning)
-					{
-						ShowMessageBox(
-							owner: null,
-							"No sync settings found, using currently configured settings for this core.",
-							"No sync settings found",
-							EMsgBoxIcon.Warning);
-					}
-				}
-			}
-			else
-			{
-				e.Settings = Config.GetCoreSyncSettings(e.Core, e.SettingsType);
-			}
-		}
-
 		private void CoreSettings(object sender, RomLoader.SettingsLoadArgs e)
 		{
-			e.Settings = Config.GetCoreSettings(e.Core, e.SettingsType);
+			// a queued movie's settings are the project's flat map wrapped as
+			// {"Values":{...}}; without a movie, the user's config store serves
+			e.Settings = MovieSession.NewMovieQueued && MovieSettings.Decode(MovieSession.QueuedSettings) is { } queued
+				? queued
+				: Config.GetCoreSettings(e.Core, e.SettingsType);
 		}
 
 		private void HandlePutCoreSettings(PutSettingsDirtyBits dirty)
@@ -2103,19 +2005,14 @@ namespace Chimera.Client.GUI
 			if (dirty.HasFlag(PutSettingsDirtyBits.ScreenLayoutChanged)) FrameBufferResized();
 		}
 
-		private bool MayPutCoreSyncSettings()
+		private bool MayPutCoreSettings()
 		{
 			if (MovieSession.Movie.IsActive())
 			{
-				AddOnScreenMessage("Attempt to change sync-relevant settings while recording BLOCKED.");
+				AddOnScreenMessage("Attempt to change settings while a movie is active BLOCKED (settings are structural).");
 				return false;
 			}
 			return true;
-		}
-
-		private void HandlePutCoreSyncSettings(PutSettingsDirtyBits dirty)
-		{
-			if (dirty.HasFlag(PutSettingsDirtyBits.RebootCore)) FlagNeedsReboot();
 		}
 
 		public ISettingsAdapter GetSettingsAdapterFor<T>()
@@ -2137,7 +2034,7 @@ namespace Chimera.Client.GUI
 		}
 
 		public SettingsAdapter GetSettingsAdapterForLoadedCoreUntyped()
-			=> new(Emulator, static () => true, HandlePutCoreSettings, MayPutCoreSyncSettings, HandlePutCoreSyncSettings);
+			=> new(Emulator, MayPutCoreSettings, HandlePutCoreSettings);
 
 		private FileWriteResult SaveConfig(string path = "")
 		{
@@ -3176,7 +3073,7 @@ namespace Chimera.Client.GUI
 			try
 			{
 				// movies should require deterministic emulation in ALL cases
-				// if the core is managing its own DE through SyncSettings a 'deterministic' bool can be passed into the core's constructor
+				// if the core is managing its own DE through settings a 'deterministic' bool can be passed into the core's constructor
 				// it is then up to the core itself to override its own local DeterministicEmulation setting
 				bool deterministic = args.Deterministic ?? MovieSession.NewMovieQueued;
 
@@ -3195,7 +3092,6 @@ namespace Chimera.Client.GUI
 
 				loader.OnLoadError += ShowLoadError;
 				loader.OnLoadSettings += CoreSettings;
-				loader.OnLoadSyncSettings += CoreSyncSettings;
 
 				var nextComm = CreateCoreComm();
 
@@ -3456,15 +3352,10 @@ namespace Chimera.Client.GUI
 			var t = Emulator.GetType();
 			var settable = GetSettingsAdapterForLoadedCoreUntyped();
 
-			if (settable.HasSettings)
+			// don't trample config with loaded-from-movie settings
+			if (settable.HasSettings && MovieSession.Movie.NotActive())
 			{
 				Config.PutCoreSettings(settable.GetSettings(), t);
-			}
-
-			if (settable.HasSyncSettings && MovieSession.Movie.NotActive())
-			{
-				// don't trample config with loaded-from-movie settings
-				Config.PutCoreSyncSettings(settable.GetSyncSettings(), t);
 			}
 		}
 

@@ -162,29 +162,16 @@ namespace Chimera.Emulation.Common.Waterbox
 	}
 
 	/// <summary>
-	/// Settings that do not shape the emulated machine (presentation and the like).
-	/// Not recorded in movies, and changing one does not invalidate a run.
+	/// THE settings: every one shapes the machine, so all of them are part of
+	/// the project's reproduction contract - merged over the package's declared
+	/// defaults, delivered to the guest before Init, and recorded in the
+	/// project. (There is no second, "non-sync" kind.)
 	/// </summary>
 	public sealed class WaterboxCoreSettings : WaterboxSettingsBase
 	{
 		public WaterboxCoreSettings Clone()
 		{
 			WaterboxCoreSettings clone = new();
-			CopyTo(clone);
-			return clone;
-		}
-	}
-
-	/// <summary>
-	/// Settings that shape the machine, so they are part of a movie's reproduction
-	/// contract: merged over the package's declared defaults, delivered to the guest
-	/// before Init, and recorded in movie headers.
-	/// </summary>
-	public sealed class WaterboxCoreSyncSettings : WaterboxSettingsBase
-	{
-		public WaterboxCoreSyncSettings Clone()
-		{
-			WaterboxCoreSyncSettings clone = new();
 			CopyTo(clone);
 			return clone;
 		}

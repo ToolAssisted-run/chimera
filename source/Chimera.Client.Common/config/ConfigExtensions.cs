@@ -73,43 +73,6 @@ namespace Chimera.Client.Common
 			}
 		}
 
-		/// <summary>
-		/// Returns the core syncsettings for a core
-		/// </summary>
-		/// <returns>null if no settings were saved, or there was an error deserializing</returns>
-		public static object GetCoreSyncSettings(this Config config, Type coreType, Type syncSettingsType)
-		{
-			_ = TryGetWithLegacyKey(config.CoreSyncSettings, coreType, out var j);
-			return Deserialize(j, syncSettingsType);
-		}
-
-		/// <summary>
-		/// Returns the core syncsettings for a core
-		/// </summary>
-		/// <returns>null if no settings were saved, or there was an error deserializing</returns>
-		public static TSync GetCoreSyncSettings<TCore, TSync>(this Config config)
-			where TCore : IEmulator
-		{
-			return (TSync)config.GetCoreSyncSettings(typeof(TCore), typeof(TSync));
-		}
-
-		/// <summary>
-		/// saves the core syncsettings for a core
-		/// </summary>
-		/// <param name="o">null to remove settings for that core instead</param>
-		public static void PutCoreSyncSettings(this Config config, object o, Type coreType)
-		{
-			if (o != null)
-			{
-				config.CoreSyncSettings.Remove(LegacyKeyOf(coreType)); // migrate pre-rename entries forward
-				config.CoreSyncSettings[coreType.ToString()] = Serialize(o);
-			}
-			else
-			{
-				config.CoreSyncSettings.Remove(coreType.ToString());
-			}
-		}
-
 		public static void ReplaceKeysInBindings(this Config config, IReadOnlyDictionary<string, string> replMap)
 		{
 			string ReplMulti(string multiBind)

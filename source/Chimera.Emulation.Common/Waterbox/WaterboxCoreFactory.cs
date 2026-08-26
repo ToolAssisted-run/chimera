@@ -49,7 +49,6 @@ namespace Chimera.Emulation.Common.Waterbox
 
 		public Type SettingsType => typeof(WaterboxCoreSettings);
 
-		public Type SyncSettingsType => typeof(WaterboxCoreSyncSettings);
 
 		public IEmulator Create(CoreCreationContext ctx)
 		{
@@ -62,7 +61,6 @@ namespace Chimera.Emulation.Common.Waterbox
 				rom.FileData,
 				_cfg,
 				_packageDir,
-				ctx.SyncSettings as WaterboxCoreSyncSettings,
 				ctx.Settings as WaterboxCoreSettings,
 				ResolveFirmware(ctx),
 				ctx.ExtraFiles);
@@ -91,7 +89,7 @@ namespace Chimera.Emulation.Common.Waterbox
 				}
 			}
 			var effective = WaterboxCore.EffectiveSettingsFor(
-				_cfg, ctx.Settings as WaterboxCoreSettings, ctx.SyncSettings as WaterboxCoreSyncSettings);
+				_cfg, ctx.Settings as WaterboxCoreSettings);
 			var applicable = Engine.EngineFirmware.Evaluate(
 				_cfg.RawFirmwareJson, slotsJson, Newtonsoft.Json.JsonConvert.SerializeObject(effective));
 

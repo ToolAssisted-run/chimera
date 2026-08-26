@@ -32,13 +32,13 @@ namespace Chimera.Tests.Client.GUI
 				  "audio": { "samplesPerFrame": 1024 },
 				  "input": { "buttons": [] },
 				  "settings": [
-				    { "name": "region", "type": "enum", "options": ["us", "jp", "eu"], "default": "us", "sync": true },
-				    { "name": "ggSoundChip", "type": "enum", "options": ["stock", "enhanced"], "default": "stock", "sync": true,
+				    { "name": "region", "type": "enum", "options": ["us", "jp", "eu"], "default": "us" },
+				    { "name": "ggSoundChip", "type": "enum", "options": ["stock", "enhanced"], "default": "stock",
 				      "exposedWhen": { "slot": "cart", "extension": "gg" } },
-				    { "name": "mdSoundChip", "type": "enum", "options": ["ym2612", "ym3438"], "default": "ym2612", "sync": true,
+				    { "name": "mdSoundChip", "type": "enum", "options": ["ym2612", "ym3438"], "default": "ym2612",
 				      "exposedWhen": { "slot": "cart", "extension": "md" } },
-				    { "name": "expansion", "type": "bool", "default": false, "sync": true },
-				    { "name": "expansionRam", "type": "int", "default": 64, "sync": true,
+				    { "name": "expansion", "type": "bool", "default": false },
+				    { "name": "expansionRam", "type": "int", "default": 64,
 				      "exposedWhen": { "setting": "expansion", "is": true } }
 				  ]
 				}

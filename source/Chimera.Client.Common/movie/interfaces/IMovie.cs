@@ -65,7 +65,7 @@ namespace Chimera.Client.Common
 		/// <summary>
 		/// Gets or sets the Sync Settings from the Core
 		/// </summary>
-		string SyncSettingsJson { get; set; }
+		string SettingsJson { get; set; }
 
 		// savestate anchor.
 		string TextSavestate { get; set; }

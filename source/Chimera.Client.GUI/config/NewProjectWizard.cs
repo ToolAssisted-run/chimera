@@ -19,7 +19,7 @@ namespace Chimera.Client.GUI
 	/// (docs/project.md). Step one names the project and picks the core; step
 	/// two is the core-informed file form - the slots, cardinalities, formats
 	/// and tooltips all come from the chosen package's file_slots.json, this
-	/// window only renders and enforces; step three is the sync settings. On
+	/// window only renders and enforces; step three is the settings. On
 	/// Create, every file is hashed where it stands, the manifest is validated
 	/// by the engine against the core's own declaration, and the project file
 	/// is written.
@@ -49,7 +49,7 @@ namespace Chimera.Client.GUI
 
 		// page 3
 		private readonly PropertyGrid _settingsGrid;
-		private WaterboxCoreSyncSettings? _syncSettings;
+		private WaterboxCoreSettings? _settings;
 		private WaterboxConfig? _cfg;
 
 		// page 4, computed from every earlier decision (docs/project.md): the
@@ -166,9 +166,9 @@ namespace Chimera.Client.GUI
 			};
 			p2.Controls.Add(_slotsHost);
 
-			// ---- page 3: sync settings -------------------------------------------
+			// ---- page 3: settings ------------------------------------------------
 			var p3 = _pages[2];
-			p3.Controls.Add(MakeLabel("The sync settings this machine starts with. They shape the machine, so the\nproject records them; a structural change later restarts from frame 0.", 8, 8));
+			p3.Controls.Add(MakeLabel("The settings this machine starts with. Every setting shapes the machine, so\nthe project records them; a structural change later restarts from frame 0.", 8, 8));
 			_settingsGrid = new PropertyGrid
 			{
 				Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
@@ -334,28 +334,28 @@ namespace Chimera.Client.GUI
 		internal void UseSettingsFrom(WaterboxConfig cfg)
 		{
 			_cfg = cfg;
-			_syncSettings = new WaterboxCoreSyncSettings();
+			_settings = new WaterboxCoreSettings();
 			RefreshExposedSettings();
-			_settingsGrid.SelectedObject = _syncSettings;
+			_settingsGrid.SelectedObject = _settings;
 			ShowPage(2);
 		}
 
-		/// <summary>the exposed sync settings, in order, for tests</summary>
+		/// <summary>the exposed settings, in order, for tests</summary>
 		public string[] ExposedSettingNames
-			=> (_syncSettings?.Declarations ?? [ ]).Select(static d => d.Name).ToArray();
+			=> (_settings?.Declarations ?? [ ]).Select(static d => d.Name).ToArray();
 
 		/// <summary>sets a value as the grid would, re-running the gate - for tests</summary>
 		internal void SetSettingValue(string name, object value)
 		{
-			_syncSettings!.Values[name] = value;
+			_settings!.Values[name] = value;
 			RefreshExposedSettings();
 		}
 
 		/// <summary>Renders given sync-setting declarations directly - the test and screenshot door.</summary>
-		internal void UseSyncSettingsDecls(IReadOnlyList<WaterboxConfig.SettingDecl> declarations)
+		internal void UseSettingsDecls(IReadOnlyList<WaterboxConfig.SettingDecl> declarations)
 		{
-			_syncSettings = new WaterboxCoreSyncSettings { Declarations = declarations };
-			_settingsGrid.SelectedObject = _syncSettings;
+			_settings = new WaterboxCoreSettings { Declarations = declarations };
+			_settingsGrid.SelectedObject = _settings;
 			ShowPage(2);
 		}
 
@@ -527,7 +527,7 @@ namespace Chimera.Client.GUI
 			return null;
 		}
 
-		// ---- sync settings --------------------------------------------------------
+		// ---- settings -------------------------------------------------------------
 
 		private bool BuildSettingsPage()
 		{
@@ -537,9 +537,9 @@ namespace Chimera.Client.GUI
 				using var pkg = EnginePackage.Open(core.Path);
 				var cfg = WaterboxConfig.FromJson(pkg?.EntryText(WaterboxCoreFactory.ConfigFileName) ?? "");
 				_cfg = cfg;
-				_syncSettings = new WaterboxCoreSyncSettings();
+				_settings = new WaterboxCoreSettings();
 				RefreshExposedSettings();
-				_settingsGrid.SelectedObject = _syncSettings;
+				_settingsGrid.SelectedObject = _settings;
 				return true;
 			}
 			catch (InvalidOperationException ex)
@@ -551,14 +551,14 @@ namespace Chimera.Client.GUI
 
 		/// <summary>
 		/// The settings the DECISIONS expose (docs/project.md): the chosen files
-		/// gate which sync settings exist at all (a Game Gear cart exposes its
+		/// gate which settings exist at all (a Game Gear cart exposes its
 		/// sound chip, a Genesis cart its own), and a setting may gate further
 		/// settings - so the set is re-evaluated when a value changes.
 		/// </summary>
 		private void RefreshExposedSettings()
 		{
-			if (_cfg is null || _syncSettings is null) return;
-			var effective = WaterboxCore.EffectiveSettingsFor(_cfg, null, _syncSettings);
+			if (_cfg is null || _settings is null) return;
+			var effective = WaterboxCore.EffectiveSettingsFor(_cfg, _settings);
 			var exposed = Chimera.Emulation.Common.Engine.EngineSettingsGate.Evaluate(
 				_cfg.RawSettingsJson,
 				CurrentSlotsJson(),
@@ -567,15 +567,14 @@ namespace Chimera.Client.GUI
 			var declarations = exposed
 				.Where(entry => entry.Index >= 0 && entry.Index < all.Count && all[entry.Index].Name == entry.Name)
 				.Select(entry => all[entry.Index])
-				.Where(static d => d.Sync)
 				.ToList();
-			var current = _syncSettings.Declarations;
+			var current = _settings.Declarations;
 			if (current is not null && current.Count == declarations.Count
 				&& current.Zip(declarations, static (a, b) => ReferenceEquals(a, b)).All(static same => same))
 			{
 				return; // the exposed set did not change
 			}
-			_syncSettings.Declarations = declarations;
+			_settings.Declarations = declarations;
 			_settingsGrid.Refresh();
 		}
 
@@ -612,7 +611,7 @@ namespace Chimera.Client.GUI
 		private void BuildFirmwarePage()
 		{
 			var effective = WaterboxCore.EffectiveSettingsFor(
-				_cfg ?? new WaterboxConfig(), null, _syncSettings);
+				_cfg ?? new WaterboxConfig(), _settings);
 			var needed = Chimera.Emulation.Common.Engine.EngineFirmware.Evaluate(
 				_cfg?.RawFirmwareJson ?? "[]",
 				CurrentSlotsJson(),
@@ -807,13 +806,13 @@ namespace Chimera.Client.GUI
 			// the project records every EXPOSED sync setting explicitly, at its
 			// effective value: the settings section is exactly the knobs these
 			// decisions offered, nothing else
-			if (_syncSettings?.Declarations is { Count: not 0 } exposedDecls)
+			if (_settings?.Declarations is { Count: not 0 } exposedDecls)
 			{
 				Dictionary<string, object> recorded = new();
 				foreach (var decl in exposedDecls)
 				{
-					recorded[decl.Name] = _syncSettings.Values is not null
-						&& _syncSettings.Values.TryGetValue(decl.Name, out var value)
+					recorded[decl.Name] = _settings.Values is not null
+						&& _settings.Values.TryGetValue(decl.Name, out var value)
 							? value
 							: decl.DefaultValue;
 				}

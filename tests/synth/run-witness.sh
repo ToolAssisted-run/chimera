@@ -291,7 +291,7 @@ import json, sys
 cfg = json.load(open(sys.argv[1]))
 # deliberately the PRE-RENAME key: the frontend must keep honouring configs
 # written before BizHawk/Chimera became Chimera
-cfg.setdefault("CoreSyncSettings", {})["BizHawk.Emulation.Common.Waterbox.WaterboxCore"] = {"Values": {"initFillByte": 171}}
+cfg.setdefault("CoreSettings", {})["BizHawk.Emulation.Common.Waterbox.WaterboxCore"] = {"Values": {"initFillByte": 171}}
 json.dump(cfg, open(sys.argv[2], "w"), indent=2)
 PY
 		sjob="$work/job.settings.txt"
@@ -405,7 +405,7 @@ PY
 		elif cmp -s "$work/project.ram.bin" "$golden_dir/$pname.ram.bin"; then
 			report "P:box:$pname" FAIL "RAM matches the default golden - the project's initFillByte never reached the guest"
 		else
-			report "P:box:$pname" PASS "one boot, project sync settings live in the guest"
+			report "P:box:$pname" PASS "one boot, project settings live in the guest"
 		fi
 	fi
 

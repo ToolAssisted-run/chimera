@@ -20,9 +20,9 @@ namespace Chimera.Tests.Client.Common.config
 		public void ALegacyDollarTypeStillDeserializes()
 		{
 			// exactly what a pre-rename movie's SyncSettings.json carried
-			const string LEGACY = @"{""$type"":""BizHawk.Emulation.Common.Waterbox.WaterboxCoreSyncSettings, BizHawk.Emulation.Common"",""Values"":{""initFillByte"":171}}";
+			const string LEGACY = @"{""$type"":""BizHawk.Emulation.Common.Waterbox.WaterboxCoreSettings, BizHawk.Emulation.Common"",""Values"":{""initFillByte"":171}}";
 			var restored = JToken.Parse(LEGACY).ToObject<object>(ConfigService.Serializer);
-			var settings = restored as WaterboxCoreSyncSettings;
+			var settings = restored as WaterboxCoreSettings;
 			Assert.IsNotNull(settings, $"legacy $type deserialized to {restored?.GetType().FullName ?? "null"}");
 			Assert.AreEqual(171L, Convert.ToInt64(settings.Values["initFillByte"]));
 		}
@@ -32,17 +32,17 @@ namespace Chimera.Tests.Client.Common.config
 		{
 			Config config = new();
 			// a pre-rename config remembered sync settings under the old type name
-			config.CoreSyncSettings["BizHawk.Emulation.Common.Waterbox.WaterboxCore"] =
-				JToken.FromObject(new WaterboxCoreSyncSettings { Values = new Dictionary<string, object> { ["initFillByte"] = 42 } }, ConfigService.Serializer);
+			config.CoreSettings["BizHawk.Emulation.Common.Waterbox.WaterboxCore"] =
+				JToken.FromObject(new WaterboxCoreSettings { Values = new Dictionary<string, object> { ["initFillByte"] = 42 } }, ConfigService.Serializer);
 
-			var restored = (WaterboxCoreSyncSettings)config.GetCoreSyncSettings(typeof(WaterboxCore), typeof(WaterboxCoreSyncSettings));
+			var restored = (WaterboxCoreSettings)config.GetCoreSettings(typeof(WaterboxCore), typeof(WaterboxCoreSettings));
 			Assert.IsNotNull(restored, "settings filed under the legacy key were not found");
 			Assert.AreEqual(42L, Convert.ToInt64(restored.Values["initFillByte"]));
 
 			// writing them back migrates the entry to the new key
-			config.PutCoreSyncSettings(restored, typeof(WaterboxCore));
-			Assert.IsFalse(config.CoreSyncSettings.ContainsKey("BizHawk.Emulation.Common.Waterbox.WaterboxCore"), "legacy key should be migrated away on write");
-			Assert.IsTrue(config.CoreSyncSettings.ContainsKey(typeof(WaterboxCore).ToString()));
+			config.PutCoreSettings(restored, typeof(WaterboxCore));
+			Assert.IsFalse(config.CoreSettings.ContainsKey("BizHawk.Emulation.Common.Waterbox.WaterboxCore"), "legacy key should be migrated away on write");
+			Assert.IsTrue(config.CoreSettings.ContainsKey(typeof(WaterboxCore).ToString()));
 		}
 	}
 }

@@ -51,7 +51,7 @@ namespace Chimera.Client.Common
 		public IMovie Movie { get; private set; }
 		public bool ReadOnly { get; set; } = true;
 		public bool NewMovieQueued => _queuedMovie != null;
-		public string QueuedSyncSettings => _queuedMovie.SyncSettingsJson;
+		public string QueuedSettings => _queuedMovie.SettingsJson;
 
 		public string QueuedCoreName => _queuedMovie?.Core;
 

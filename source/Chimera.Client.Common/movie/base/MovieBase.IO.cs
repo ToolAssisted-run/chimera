@@ -52,7 +52,7 @@ namespace Chimera.Client.Common
 		{
 			base.ClearBeforeLoad();
 			Log.Clear();
-			_syncSettingsJson = "";
+			_settingsJson = "";
 		}
 	}
 }

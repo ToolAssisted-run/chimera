@@ -85,7 +85,7 @@ namespace Chimera.Client.Common
 			}
 			p.SetCore(Header[HeaderKeys.Core], Header[HeaderKeys.CoreVersion], Header[HeaderKeys.CorePackageSha1]);
 			p.Rerecords = Rerecords;
-			p.SetSettingsJson(FlattenSyncSettings(SyncSettingsJson));
+			p.SetSettingsJson(FlattenSettings(SettingsJson));
 			p.Description = string.Join("\n", Comments);
 
 			p.SubtitlesClear();
@@ -153,7 +153,7 @@ namespace Chimera.Client.Common
 		/// machinery stores the settings OBJECT ({"Values":{...}} for a waterbox
 		/// core). These two translate at the boundary.
 		/// </summary>
-		internal static string FlattenSyncSettings(string syncSettingsJson)
+		internal static string FlattenSettings(string syncSettingsJson)
 		{
 			if (string.IsNullOrWhiteSpace(syncSettingsJson)) return "{}";
 			try
@@ -171,7 +171,7 @@ namespace Chimera.Client.Common
 			}
 		}
 
-		internal static string WrapSyncSettings(string flatJson)
+		internal static string WrapSettings(string flatJson)
 		{
 			try
 			{
@@ -331,7 +331,7 @@ namespace Chimera.Client.Common
 			}
 			Subtitles.Sort();
 
-			SyncSettingsJson = WrapSyncSettings(p.SettingsJson);
+			SettingsJson = WrapSettings(p.SettingsJson);
 
 			var logText = p.LogText;
 			if (logText.Length is not 0)

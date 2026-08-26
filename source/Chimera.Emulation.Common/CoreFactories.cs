@@ -46,8 +46,6 @@ namespace Chimera.Emulation.Common
 		/// <summary>Settings previously returned from the core, of the factory's SettingsType. May be null.</summary>
 		public object? Settings { get; set; }
 
-		/// <summary>Sync settings previously returned from the core, of the factory's SyncSettingsType. May be null.</summary>
-		public object? SyncSettings { get; set; }
 
 		/// <summary>
 		/// Hands over the file the user provided for a firmware declaration, or null if
@@ -85,7 +83,6 @@ namespace Chimera.Emulation.Common
 
 		Type SettingsType { get; }
 
-		Type SyncSettingsType { get; }
 
 		IEmulator Create(CoreCreationContext ctx);
 	}

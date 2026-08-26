@@ -6,17 +6,17 @@ namespace Chimera.Client.Common
 {
 	public partial class MovieBase
 	{
-		private string _syncSettingsJson = "";
+		private string _settingsJson = "";
 
-		public string SyncSettingsJson
+		public string SettingsJson
 		{
-			get => _syncSettingsJson;
+			get => _settingsJson;
 			set
 			{
-				if (_syncSettingsJson != value)
+				if (_settingsJson != value)
 				{
 					Changes = true;
-					_syncSettingsJson = value;
+					_settingsJson = value;
 				}
 			}
 		}

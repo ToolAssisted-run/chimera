@@ -11,7 +11,7 @@ The GUI opens on a start screen - New Chimera Project, Open Project, recent
 projects - and nothing else. Creating or opening a project leads directly
 into TAStudio; TAStudio is no longer a tool among others, it is the
 application. The casual paths are fully removed: no Load ROM menu, no
-runtime Emulator > Core picker, no live sync-settings dialogs. Core
+runtime Emulator > Core picker, no live settings dialogs. Core
 development and debugging needs are covered headlessly by chimera-run,
 which learns to take a project file.
 
@@ -31,7 +31,11 @@ themselves, which are named by their SHA1:
   concept; the engine's `ce_multifile_*` code evolves into this section,
   and headless descriptors remain available during the transition.
 - **Firmware**: resolved at creation, pinned by hash.
-- **Sync settings**: defined once, in the creation wizard.
+- **Settings**: defined once, in the creation wizard. There is ONE kind
+  of setting: every setting shapes the machine, so all of them are part
+  of the reproduction contract. (The BizHawk lineage's "settings"
+  vs "non-settings" split does not exist here; a knob that cannot
+  desync a run is not worth declaring.)
 - **The TAS work itself**: input log, markers, branches. The project IS
   the movie; publishing a finished TAS means handing over the project
   file, and anyone holding files matching the SHA1s can reproduce
@@ -63,7 +67,7 @@ over the current picks, so providing a Famicom disk greys the cartridge
 slot until the disk is unloaded and vice versa - greyed, never hidden,
 so the person still sees what the machine could also take. An
 unavailable slot's minimum does not bind, which is how two mutually
-exclusive min-1 slots together say "exactly one of either". Then the sync settings - themselves GATED by the files just chosen: a
+exclusive min-1 slots together say "exactly one of either". Then the settings - themselves GATED by the files just chosen: a
 declaration entry may carry "exposedWhen" (the same condition language
 as firmware), so a Game Gear cart exposes its sound chip where a
 Genesis cart exposes its own, a Famicom disk exposes the FDS BIOS
@@ -76,7 +80,7 @@ offered, nothing else. And LAST, the firmware - last because everything
 before it has a say: the core itself may need a file regardless of
 anything else, the chosen game files may trigger a need (a Famicom disk
 needs the FDS bios where a cartridge does not; a CD image needs the CD
-bios where a cart does not), and the sync settings may too (a region
+bios where a cart does not), and the settings may too (a region
 choice selects between region bioses; a font-source choice turns a
 bundled freebie into a real-BIOS requirement). The core dictates that
 logic entirely, as a decision tree in its waterbox.config "firmware"
@@ -115,7 +119,7 @@ required file the user never provided stops the load with its name.
 The decisions nail each requirement to ONE exact file, or to nothing.
 There is no optional firmware and nothing to choose between: variants
 of one file are separate declaration entries sharing an id, with
-disjoint conditions a sync setting selects between ("FDS BIOS to Use:
+disjoint conditions a setting selects between ("FDS BIOS to Use:
 Nintendo", "System Fonts: sony") - a choice that needs no firmware
 simply produces no requirement ("System Fonts: bundled"). An entry
 names its one dump openly: {"sha1", "name", "label"} - the SHA1 is the
@@ -197,7 +201,7 @@ to build the form, and by `ce_project_*` to validate a manifest:
 Anything in a project can be changed after it is opened, with one
 exception: the core. The core selection is fixed at creation - a
 different core means a new project. A **structural** change - one that
-affects sync: sync settings, the file manifest - first asks: "this will
+affects sync: settings, the file manifest - first asks: "this will
 erase the greenzone and possibly desync your current inputs, are you
 sure?". On yes: the greenzone is cleared, the core restarts, and the
 frame selector returns to frame 0. The input log is kept (it may no
@@ -220,7 +224,7 @@ mirroring the file-hash posture.
 
 Opening boots the machine EXACTLY ONCE. The movie (which is the project)
 is queued before the rom load, so the single boot already runs with the
-project's core and its recorded sync settings - never a throwaway boot
+project's core and its recorded settings - never a throwaway boot
 on config settings followed by a reboot, and never a re-init when
 TAStudio engages (the BizHawk lineage cost three full core inits: rom
 load, TAStudio open, tasproj load - seconds each on a machine with a

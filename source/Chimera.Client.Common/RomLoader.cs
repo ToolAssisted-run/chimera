@@ -54,12 +54,6 @@ namespace Chimera.Client.Common
 			return (TSetting)GetCoreSettings(typeof(TCore), typeof(TSetting));
 		}
 
-		private TSync GetCoreSyncSettings<TCore, TSync>()
-			where TCore : IEmulator
-		{
-			return (TSync)GetCoreSyncSettings(typeof(TCore), typeof(TSync));
-		}
-
 		private object GetCoreSettings(Type t, Type settingsType)
 		{
 			var e = new SettingsLoadArgs(t, settingsType);
@@ -68,17 +62,6 @@ namespace Chimera.Client.Common
 			OnLoadSettings(this, e);
 			if (e.Settings != null && e.Settings.GetType() != settingsType)
 				throw new InvalidOperationException($"Frontend did not provide the requested settings type: Expected {settingsType}, got {e.Settings.GetType()}");
-			return e.Settings;
-		}
-
-		private object GetCoreSyncSettings(Type t, Type syncSettingsType)
-		{
-			var e = new SettingsLoadArgs(t, syncSettingsType);
-			if (OnLoadSyncSettings == null)
-				throw new InvalidOperationException("Frontend failed to provide a sync settings getter");
-			OnLoadSyncSettings(this, e);
-			if (e.Settings != null && e.Settings.GetType() != syncSettingsType)
-				throw new InvalidOperationException($"Frontend did not provide the requested sync settings type: Expected {syncSettingsType}, got {e.Settings.GetType()}");
 			return e.Settings;
 		}
 
@@ -129,7 +112,6 @@ namespace Chimera.Client.Common
 
 		public delegate void SettingsLoadEventHandler(object sender, SettingsLoadArgs e);
 		public event SettingsLoadEventHandler OnLoadSettings;
-		public event SettingsLoadEventHandler OnLoadSyncSettings;
 
 		public delegate void LoadErrorEventHandler(object sender, RomErrorArgs e);
 		public event LoadErrorEventHandler OnLoadError;
@@ -364,11 +346,10 @@ namespace Chimera.Client.Common
 					},
 				},
 				DeterministicEmulationRequested = Deterministic,
-				Settings = GetCoreSettings(factory.CoreType, factory.SettingsType),
 				// everything sync-relevant lives in the project: its recorded
 				// settings drive the boot directly, never a config lookup
-				SyncSettings = MovieSyncSettings.Decode(p.SettingsJson)
-					?? GetCoreSyncSettings(factory.CoreType, factory.SyncSettingsType),
+				Settings = MovieSettings.Decode(p.SettingsJson)
+					?? GetCoreSettings(factory.CoreType, factory.SettingsType),
 				FirmwareProvider = CoreFirmwareStore.ProviderFor(_config, factory.CoreName),
 				ExtraFiles = extras,
 			};
@@ -412,7 +393,6 @@ namespace Chimera.Client.Common
 						Roms = lp.Roms,
 						DeterministicEmulationRequested = Deterministic,
 						Settings = GetCoreSettings(factory.CoreType, factory.SettingsType),
-						SyncSettings = GetCoreSyncSettings(factory.CoreType, factory.SyncSettingsType),
 						FirmwareProvider = CoreFirmwareStore.ProviderFor(_config, factory.CoreName),
 					};
 					return factory.Create(ctx);

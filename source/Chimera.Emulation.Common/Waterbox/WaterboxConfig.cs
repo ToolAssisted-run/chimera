@@ -91,12 +91,6 @@ namespace Chimera.Emulation.Common.Waterbox
 
 			public int? Max { get; set; }
 
-			/// <summary>
-			/// True if the setting shapes the emulated machine, so it is part of a
-			/// movie's reproduction contract: recorded in movie headers, and changing it
-			/// reboots the core. False for settings that only affect presentation.
-			/// </summary>
-			public bool Sync { get; set; }
 
 			public string DisplayName => string.IsNullOrWhiteSpace(Display) ? Name : Display;
 

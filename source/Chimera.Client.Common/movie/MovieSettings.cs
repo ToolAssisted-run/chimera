@@ -10,15 +10,15 @@ using Newtonsoft.Json.Linq;
 namespace Chimera.Client.Common
 {
 	/// <summary>
-	/// A movie's sync settings ARE the project's flat settings map, carried as
-	/// {"Values":{...}} (TasMovie.WrapSyncSettings). This turns that text back
+	/// A movie's settings ARE the project's flat settings map, carried as
+	/// {"Values":{...}} (TasMovie.WrapSettings). This turns that text back
 	/// into the one settings object every core takes. The old $type-encapsulated
 	/// encoding died with the legacy movie formats; nothing decodes it any more.
 	/// </summary>
-	public static class MovieSyncSettings
+	public static class MovieSettings
 	{
 		/// <returns>null when the text holds no usable settings</returns>
-		public static WaterboxCoreSyncSettings? Decode(string? json)
+		public static WaterboxCoreSettings? Decode(string? json)
 		{
 			if (string.IsNullOrWhiteSpace(json)) return null;
 			try
@@ -31,7 +31,7 @@ namespace Chimera.Client.Common
 				{
 					if (prop.Value is JValue { Value: { } v }) map[prop.Name] = v;
 				}
-				return new WaterboxCoreSyncSettings { Values = map };
+				return new WaterboxCoreSettings { Values = map };
 			}
 			catch (JsonException)
 			{
