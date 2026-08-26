@@ -162,5 +162,41 @@ namespace Chimera.Tests.Client.Common.Movie
 			Assert.AreEqual("the wizard's description", reloaded.Description);
 			StringAssert.Contains(reloaded.LogText, "|", "and the input log is in the project now");
 		}
+
+		/// <summary>
+		/// A project made by the wizard pins its core; the movie that starts from it
+		/// has no headers at all yet. Saving must not read that silence as "no core"
+		/// and unpin the project - a project nothing can run, which is what the
+		/// frontend then says when you reopen it.
+		/// </summary>
+		[TestMethod]
+		public void SavingAMovieThatIsSilentAboutTheCoreKeepsThePin()
+		{
+			var path = Path.Combine(_dir, "pinned.chimeraProject");
+			using (var p = Chimera.Emulation.Common.Engine.EngineProject.New())
+			{
+				p.SetCore("quickernes", "abc123+local", new string('B', 40));
+				p.Save(path);
+			}
+
+			FakeEmulator emu = new();
+			FakeMovieSession session = new(emu);
+			TasMovie movie = new(session, path);
+			session.Movie = movie;
+			Assert.IsTrue(movie.Load(), "the project should load");
+			movie.Attach(emu);
+
+			// the movie says nothing about the core, the way a brand new one does
+			movie.HeaderEntries.Remove(HeaderKeys.Core);
+			movie.HeaderEntries.Remove(HeaderKeys.CoreVersion);
+			movie.HeaderEntries.Remove(HeaderKeys.CorePackageSha1);
+			movie.InsertEmptyFrame(0, 2);
+			Assert.IsFalse(movie.Save().IsError);
+
+			using var reloaded = Chimera.Emulation.Common.Engine.EngineProject.Open(path);
+			Assert.AreEqual("quickernes", reloaded.CoreName, "the core pin was lost on save");
+			Assert.AreEqual("abc123+local", reloaded.CoreVersion);
+			Assert.AreEqual(new string('B', 40), reloaded.CoreSha1);
+		}
 	}
 }

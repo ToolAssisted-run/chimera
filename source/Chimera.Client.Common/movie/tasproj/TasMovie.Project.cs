@@ -59,6 +59,10 @@ namespace Chimera.Client.Common
 			=> key is HeaderKeys.GameName or HeaderKeys.Rerecords
 				or HeaderKeys.Core or HeaderKeys.CoreVersion or HeaderKeys.CorePackageSha1;
 
+		/// <summary>the header's value when it has one, and what the project already says when it does not</summary>
+		private static string Keep(string headerValue, string pinned)
+			=> string.IsNullOrWhiteSpace(headerValue) ? pinned : headerValue;
+
 		protected override FileWriteResult Write(string fn, bool isBackup = false)
 		{
 			if (StartsFromSavestate)
@@ -83,7 +87,13 @@ namespace Chimera.Client.Common
 			{
 				p.Title = Header[HeaderKeys.GameName];
 			}
-			p.SetCore(Header[HeaderKeys.Core], Header[HeaderKeys.CoreVersion], Header[HeaderKeys.CorePackageSha1]);
+			// the pin is the project's, and a movie header that does not carry it is
+			// silent rather than empty: writing "" here would unpin the core and leave
+			// a project nothing can run
+			p.SetCore(
+				Keep(Header[HeaderKeys.Core], p.CoreName),
+				Keep(Header[HeaderKeys.CoreVersion], p.CoreVersion),
+				Keep(Header[HeaderKeys.CorePackageSha1], p.CoreSha1));
 			p.Rerecords = Rerecords;
 			p.SetSettingsJson(FlattenSettings(SettingsJson));
 			p.Description = string.Join("\n", Comments);

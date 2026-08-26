@@ -38,6 +38,13 @@ namespace Chimera.Client.Common
 		/// <remarks>only referenced from TAStudio</remarks>
 		bool EnsureCoreIsAccurate();
 
+		/// <summary>
+		/// Ends the session once the caller's own close has finished: a project and
+		/// its TAStudio are one thing, so closing that window closes the project.
+		/// </summary>
+		/// <remarks>only referenced from TAStudio</remarks>
+		void QueueProjectClose();
+
 		/// <remarks>only referenced from TAStudio</remarks>
 		void FrameAdvance(bool discardApiSurfaces = true);
 

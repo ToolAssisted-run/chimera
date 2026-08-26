@@ -74,11 +74,7 @@ namespace Chimera.Client.GUI
 		}
 
 		private void CloseRomMenuItem_Click(object sender, EventArgs e)
-		{
-			Console.WriteLine($"Closing rom clicked Frame: {Emulator.Frame} Emulator: {Emulator.GetType().Name}");
-			LoadNullRom();
-			Console.WriteLine($"Closing rom clicked DONE Frame: {Emulator.Frame} Emulator: {Emulator.GetType().Name}");
-		}
+			=> CloseProject();
 
 		private void ConfigAndRecordAVMenuItem_Click(object sender, EventArgs e)
 		{

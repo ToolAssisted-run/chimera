@@ -17,6 +17,40 @@ namespace Chimera.Client.GUI
 		// (reboots go through it again). Replaced on the next LoadProject.
 		private EngineProject _openProject;
 
+		/// <summary>guards the two ways a project ends from chasing each other</summary>
+		private bool _closingProject;
+
+		/// <summary>
+		/// A project and TAStudio are one thing: the window IS the session, so one is
+		/// open exactly when the other is. This is the single place that ends both,
+		/// whichever of them was closed first.
+		/// </summary>
+		public void CloseProject()
+		{
+			if (_closingProject) return;
+			_closingProject = true;
+			try
+			{
+				if (Tools.IsLoaded<TAStudio>()) Tools.Close<TAStudio>();
+				LoadNullRom();
+			}
+			finally
+			{
+				_closingProject = false;
+			}
+		}
+
+		/// <summary>
+		/// The same, but after the caller's own close has finished: TAStudio asks this
+		/// from inside its FormClosing, where the window it is about to take down is
+		/// still standing.
+		/// </summary>
+		public void QueueProjectClose()
+			=> BeginInvoke((Action) (() =>
+			{
+				if (!Emulator.IsNull()) CloseProject();
+			}));
+
 		private void NewProjectDialog()
 		{
 			var created = RunNewProjectWizard();
@@ -163,6 +197,21 @@ namespace Chimera.Client.GUI
 			// actually ran (an overridden hash included), and the manifest and
 			// wizard fields pass through untouched
 			tasMovie.UseResolvedProject(project);
+
+			// The core is the project's, and the queue is about to ask the movie
+			// which core it wants: a movie with no answer takes the "no core in the
+			// movie file, using the default" path, which is for movies that predate
+			// projects. A NEW project's movie has no headers at all yet, so the pin
+			// is copied across here - before the queue, and before the boot.
+			if (string.IsNullOrWhiteSpace(tasMovie.Core) && project.CoreName.Length is not 0)
+			{
+				tasMovie.Core = project.CoreName;
+			}
+			// (HeaderEntries is an IDictionary here, so a missing key THROWS rather
+			// than reading empty - a fresh project's movie has no keys at all)
+			PinIfSilent(tasMovie, HeaderKeys.CoreVersion, project.CoreVersion);
+			PinIfSilent(tasMovie, HeaderKeys.CorePackageSha1, project.CoreSha1);
+
 			var isFresh = tasMovie.InputLogLength is 0;
 
 			var oldDefaultCores = new Dictionary<string, string>(Config.DefaultCores);
@@ -220,6 +269,14 @@ namespace Chimera.Client.GUI
 				else Shown += (_, _) => Tools.Load<TAStudio>();
 			}
 			return true;
+		}
+
+		/// <summary>Writes what the project pins into a movie header that does not carry it.</summary>
+		private static void PinIfSilent(ITasMovie movie, string key, string pinned)
+		{
+			if (pinned.Length is 0) return;
+			if (movie.HeaderEntries.TryGetValue(key, out var existing) && !string.IsNullOrWhiteSpace(existing)) return;
+			movie.HeaderEntries[key] = pinned;
 		}
 
 		/// <summary>

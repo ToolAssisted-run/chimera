@@ -1061,6 +1061,9 @@ namespace Chimera.Client.GUI
 				WantsToControlStopMovie = false;
 				TastudioStopMovie();
 				Disengage();
+				// this window IS the project's session: it does not outlive it, and
+				// the project does not outlive the window
+				MainForm.QueueProjectClose();
 			}
 			else
 			{

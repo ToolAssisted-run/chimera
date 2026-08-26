@@ -28,13 +28,19 @@ namespace Chimera.Client.GUI
 		private void HandlePlatformMenus()
 		{
 			DisplayDefaultCoreMenu();
-			// everything in it comes from a core, and the only way to a core is a
-			// project: with none there is nothing to show, so it does not appear
-			GenericCoreSubMenu.Visible = GenericCoreSubMenu.DropDownItems.Count is not 0;
+			// Everything in either menu is about a machine: the Emulator menu holds
+			// what a core brought, and System pauses and reboots it. With none
+			// running - before the first project, and after one is closed - neither
+			// has anything to say, so neither appears. (A loaded package still
+			// declaring firmware is not a reason to show a menu: there is nothing
+			// for that firmware to be part of yet.)
+			var running = !Emulator.IsNull();
+			GenericCoreSubMenu.Visible = running && GenericCoreSubMenu.DropDownItems.Count is not 0;
+			SystemSubMenu.Visible = running;
 
-			// the same goes for "System": pause, reboot and the core's name are all
-			// about a machine that is running
-			SystemSubMenu.Visible = !Emulator.IsNull();
+			// every icon down there reports on the running machine: what is playing,
+			// whether it is paused, what is frozen, which core it is
+			MainStatusBar.Visible = running;
 		}
 	}
 }

@@ -993,18 +993,21 @@ namespace Chimera.Client.GUI
 
 		public void PauseEmulator()
 		{
+			if (Emulator.IsNull()) return; // nothing is running to pause
 			EmulatorPaused = true;
 			SetPauseStatusBarIcon();
 		}
 
 		public void UnpauseEmulator()
 		{
+			if (Emulator.IsNull()) return;
 			EmulatorPaused = false;
 			SetPauseStatusBarIcon();
 		}
 
 		public void TogglePause()
 		{
+			if (Emulator.IsNull()) return;
 			EmulatorPaused = !EmulatorPaused;
 			SetPauseStatusBarIcon();
 		}
@@ -3259,6 +3262,8 @@ namespace Chimera.Client.GUI
 				CurrentlyOpenRom = null;
 				CurrentlyOpenRomArgs = null;
 				CheatList.Clear();
+				_openProject?.Dispose();
+				_openProject = null;
 				OnRomChanged();
 			}
 		}
