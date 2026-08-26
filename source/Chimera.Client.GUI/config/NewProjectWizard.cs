@@ -251,7 +251,15 @@ namespace Chimera.Client.GUI
 			_backButton.Enabled = _page > 0;
 			_nextButton.Text = _page == _pages.Length - 1 ? "Create" : "Next >";
 			_status.Text = "";
+			UpdateCreateEnabled();
 		}
+
+		/// <summary>Create is not an error message: it is simply unavailable until every required firmware is satisfied.</summary>
+		private void UpdateCreateEnabled()
+			=> _nextButton.Enabled = _page != _pages.Length - 1 || MissingRequiredFirmware() is null;
+
+		/// <summary>whether Create is currently available, for tests</summary>
+		public bool CreateEnabled => _nextButton.Enabled;
 
 		private void Advance()
 		{
@@ -581,6 +589,7 @@ namespace Chimera.Client.GUI
 			}
 			_firmwareTree.EndUpdate();
 			UpdateFirmwareButtons();
+			UpdateCreateEnabled();
 		}
 
 		private (FirmwareNeed Need, int Candidate, string? Path)? SelectedFirmware()

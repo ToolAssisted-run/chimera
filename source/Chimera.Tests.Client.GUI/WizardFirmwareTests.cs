@@ -67,6 +67,21 @@ namespace Chimera.Tests.Client.GUI
 		}
 
 		[TestMethod]
+		public void CreateIsDisabledUntilEveryRequiredEntryIsSatisfied()
+		{
+			using var form = MakeForm(out var dir);
+			var (cfg, index) = ProjectFormsShots.MakeFirmwareFixture(dir);
+			form.UseFirmwareNeeds(cfg, [ ("bios_cd", true), ("disksys.rom", true) ], index);
+
+			Assert.IsFalse(form.CreateEnabled, "the FDS bios is required and unsatisfied");
+
+			var good = Path.Combine(dir, "whatever.bin");
+			File.WriteAllText(good, "FDS BIOS BYTES");
+			form.ProvideFirmware("disksys.rom", good);
+			Assert.IsTrue(form.CreateEnabled, "every required entry satisfied - Create returns");
+		}
+
+		[TestMethod]
 		public void AnOptionalEntryTakesACustomDumpAndAFoundOneCanBeOverridden()
 		{
 			using var form = MakeForm(out var dir);
