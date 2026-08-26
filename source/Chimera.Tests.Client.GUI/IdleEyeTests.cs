@@ -60,6 +60,8 @@ namespace Chimera.Tests.Client.GUI
 			var narrowest = int.MaxValue;
 			var leftmost = int.MaxValue;
 			var rightmost = 0;
+			var frameLeft = new HashSet<int>();
+			var frameRight = new HashSet<int>();
 			for (var i = 0; i < 4000; i++)
 			{
 				var frame = eye.GetVideoBuffer();
@@ -72,9 +74,36 @@ namespace Chimera.Tests.Client.GUI
 					if (centre < leftmost) leftmost = centre;
 					if (centre > rightmost) rightmost = centre;
 				}
+				var (edgeL, edgeR) = Edges(frame);
+				frameLeft.Add(edgeL);
+				frameRight.Add(edgeR);
 			}
 			Assert.IsTrue(narrowest < open / 2, $"the eye never blinked (it was {narrowest}..{open} rows tall)");
-			Assert.IsTrue(rightmost - leftmost > 8, $"the eye never looked aside (its pupil stayed within {rightmost - leftmost}px)");
+			Assert.IsTrue(rightmost - leftmost > 8, $"the eye never looked aside (its eye stayed within {rightmost - leftmost}px)");
+
+			// the WHOLE oval moves, not just the pupil inside it: the mark's outer
+			// slabs must not have shifted with it
+			Assert.AreEqual(1, frameLeft.Count, $"the mark's left edge moved with the eye ({string.Join(",", frameLeft)})");
+			Assert.AreEqual(1, frameRight.Count, $"the mark's right edge moved with the eye ({string.Join(",", frameRight)})");
+		}
+
+		/// <summary>the outermost lit columns of the mark: its frame, which never moves</summary>
+		private static (int Left, int Right) Edges(int[] frame)
+		{
+			const int W = 480;
+			var left = -1;
+			var right = -1;
+			for (var x = 0; x < W; x++)
+			{
+				for (var y = 0; y < frame.Length / W; y++)
+				{
+					if ((frame[(y * W) + x] & 0xFF) is 0) continue;
+					if (left < 0) left = x;
+					right = x;
+					break;
+				}
+			}
+			return (left, right);
 		}
 
 		/// <summary>rows of the mark that are lit, and the x of the brightest run on the middle row</summary>

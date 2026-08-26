@@ -24,28 +24,34 @@ namespace Chimera.Client.GUI
 		private const float MarkScale = 0.62f;
 
 		/// <summary>
-		/// The pupil in the source art: the dark bar down the middle. It is the one
-		/// part that moves on its own, and it has the iris column's width to move in.
+		/// The eye within the mark, in the source art: the central oval and the dark
+		/// pupil inside it. It is what moves - as one piece, the way an eye moves -
+		/// and the four slabs around it are the face it moves in. These bounds sit in
+		/// the gap between the oval and those slabs, so the box holds the oval and
+		/// nothing else.
 		/// </summary>
-		private const float PupilLeft = 0.45f;
+		private const float EyeLeft = 62f / 160f;
 
-		private const float PupilRight = 0.55f;
+		private const float EyeRight = 98f / 160f;
 
-		private const float PupilTop = 0.38f;
+		private const float EyeTop = 41f / 160f;
 
-		private const float PupilBottom = 0.62f;
+		private const float EyeBottom = 118f / 160f;
 
-		/// <summary>how far the pupil may slide, in source pixels, before it leaves its column</summary>
-		private const float MaxGaze = 9f;
+		/// <summary>below this the art is pupil rather than iris</summary>
+		private const float PupilDarkerThan = 0.35f;
+
+		/// <summary>how far the oval may slide, in source pixels, before it crowds the slabs</summary>
+		private const float MaxGaze = 12f;
 
 		private readonly int[] _buffer = new int[Width * Height];
 
 		private readonly Random _rng = new(Seed: 0x0E7E); // "eye"
 
-		/// <summary>the mark without its pupil, and the pupil alone: source intensity, 0..1</summary>
-		private float[] _body;
+		/// <summary>the mark without its eye, and the eye alone: source intensity, 0..1</summary>
+		private float[] _still;
 
-		private float[] _pupil;
+		private float[] _eye;
 
 		private int _srcSize;
 
@@ -227,7 +233,7 @@ namespace Chimera.Client.GUI
 						var dy = y + ((s + 0.5f) / rows);
 						var sy = ((dy - midline) / _lid) + (mark / 2f);
 						sy *= scale;
-						value += Sample(_body, sx, sy) + Sample(_pupil, sx - gaze, sy);
+						value += Sample(_still, sx, sy) + Sample(_eye, sx - gaze, sy);
 					}
 					value /= rows;
 					if (value <= 0.004f) continue;
@@ -259,19 +265,19 @@ namespace Chimera.Client.GUI
 			=> x < 0 || y < 0 || x >= _srcSize || y >= _srcSize ? 0f : mask[(y * _srcSize) + x];
 
 		/// <summary>
-		/// Reads the mark once and splits it in two: the pupil, which moves, and
-		/// everything else, which does not. Colour is dropped here - the idle screen
-		/// is monochrome on purpose, so the mark reads as an absence of light rather
-		/// than as a logo someone left on the screen.
+		/// Reads the mark once and splits it in two: the eye - the central oval with
+		/// its pupil - which moves, and everything else, which does not. Colour is
+		/// dropped here: the idle screen is monochrome on purpose, so the mark reads
+		/// as an absence of light rather than as a logo someone left on the screen.
 		/// </summary>
 		private void Load()
 		{
-			if (_body is not null) return;
+			if (_still is not null) return;
 
 			var art = Properties.Resources.Chimera;
 			_srcSize = Math.Min(art.Width, art.Height);
-			_body = new float[_srcSize * _srcSize];
-			_pupil = new float[_srcSize * _srcSize];
+			_still = new float[_srcSize * _srcSize];
+			_eye = new float[_srcSize * _srcSize];
 
 			var data = art.LockBits(
 				new Rectangle(0, 0, _srcSize, _srcSize),
@@ -294,20 +300,22 @@ namespace Chimera.Client.GUI
 
 						// keep some of the art's own shading, so the blocks do not
 						// flatten into one silhouette
+						var lum = (r + g + b) / 3f;
+						// keep some of the art's own shading, so the blocks do not
+						// flatten into one silhouette
+						var shaded = a * (0.40f + (0.45f * lum));
 						var u = x / (float) _srcSize;
-						if (u is >= PupilLeft and <= PupilRight && v is >= PupilTop and <= PupilBottom)
+						if (u is >= EyeLeft and <= EyeRight && v is >= EyeTop and <= EyeBottom)
 						{
 							// the pupil is the darkest part of the art, and dark cannot
 							// be seen against black: on the idle screen it is the
-							// BRIGHTEST part, so that the one thing which moves is the
-							// one thing you can see move
-							_pupil[(y * _srcSize) + x] = a * 0.8f;
+							// BRIGHTEST part, so the oval does not slide about as a
+							// hollow ring
+							_eye[(y * _srcSize) + x] = lum < PupilDarkerThan ? a * 0.8f : shaded;
 						}
 						else
 						{
-							// keep some of the art's own shading, so the blocks do not
-							// flatten into one silhouette
-							_body[(y * _srcSize) + x] = a * (0.40f + (0.45f * ((r + g + b) / 3f)));
+							_still[(y * _srcSize) + x] = shaded;
 						}
 					}
 				}
