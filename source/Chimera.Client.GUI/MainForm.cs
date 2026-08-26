@@ -906,6 +906,9 @@ namespace Chimera.Client.GUI
 
 		private IVideoProvider _currentVideoProvider = NullVideo.Instance;
 
+		/// <summary>What an idle Chimera looks at you with while no project is open.</summary>
+		private readonly IdleEyeVideo _idleEye = new();
+
 		private ISoundProvider _currentSoundProvider = new NullSound(44100 / 60); // Reasonable default until we have a core instance
 
 		/// <remarks>don't use this, use <see cref="Config"/></remarks>
@@ -1741,7 +1744,14 @@ namespace Chimera.Client.GUI
 				return;
 			}
 
-			var video = _currentVideoProvider;
+			// nothing is loaded, so there is nothing to show but the eye
+			var snowing = Emulator is NullEmulator && (Config.SnowyNullCore switch
+			{
+				SnowyNullVideo.TriggerCriterion.Always => true,
+				SnowyNullVideo.TriggerCriterion.WeekOfChristmas => DateTime.Now.DayOfYear is >= 354/*Dec. 20*/ and <= 360/*Dec. 26*/,
+				_ => false,
+			});
+			var video = Emulator is NullEmulator && !snowing ? _idleEye : _currentVideoProvider;
 			Size currVideoSize = new Size(video.BufferWidth, video.BufferHeight);
 			Size currVirtualSize = new Size(video.VirtualWidth, video.VirtualHeight);
 
@@ -1771,12 +1781,7 @@ namespace Chimera.Client.GUI
 			}
 			else
 			{
-				DisplayManager.UpdateSource(video, useSnow: Emulator is NullEmulator && (Config.SnowyNullCore switch
-				{
-					SnowyNullVideo.TriggerCriterion.Always => true,
-					SnowyNullVideo.TriggerCriterion.WeekOfChristmas => DateTime.Now.DayOfYear is >= 354/*Dec. 20*/ and <= 360/*Dec. 26*/,
-					_ => false,
-				}));
+				DisplayManager.UpdateSource(video, useSnow: snowing);
 			}
 		}
 
