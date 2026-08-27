@@ -112,6 +112,7 @@ namespace Chimera.Client.GUI
 				DenoteMarkersWithBGColor = true;
 
 				Palette = TAStudioPalette.Default;
+				MoveWithMainWindow = true;
 			}
 
 			public RecentFiles RecentTas { get; set; }
@@ -138,6 +139,14 @@ namespace Chimera.Client.GUI
 			public bool AutoadjustInput { get; set; } // Currently unsupported due to being broken
 			public TAStudioPalette Palette { get; set; }
 			public int MaxUndoSteps { get; set; } = 1000;
+
+			/// <summary>
+			/// Whether this window and the main window move as one. They are two
+			/// halves of a session, so dragging either normally takes both; hold
+			/// SHIFT while dragging to move one alone, which is also how the
+			/// offset between them is changed.
+			/// </summary>
+			public bool MoveWithMainWindow { get; set; }
 			public int RewindStep { get; set; } = 1;
 			public int RewindStepFast { get; set; } = 4;
 			public bool ScrollSync { get; set; } = true;
@@ -239,8 +248,132 @@ namespace Chimera.Client.GUI
 
 			RefreshDialog();
 			PlaceBesideMainWindow();
+			LinkWindowMovement();
 			_initialized = true;
 		}
+
+		// ---- the pair moves as one ------------------------------------------------
+
+		/// <summary>guards the two Move handlers from answering each other</summary>
+		private bool _movingPair;
+
+		/// <summary>where each window was when we last looked, to take a delta from</summary>
+		private Point _lastMine, _lastMain;
+
+		private Form MainWindow => MainForm as Form;
+
+		/// <summary>
+		/// Makes this window and the main window move together: drag either and
+		/// the other keeps its place beside it.
+		///
+		/// They are two halves of one session - a project is open exactly when
+		/// TAStudio is - and on a desktop they are read as one thing, so dragging
+		/// the emulator out from under its input log is almost never what someone
+		/// meant. Holding SHIFT moves one alone, which is how the offset between
+		/// them is set in the first place.
+		/// </summary>
+		private void LinkWindowMovement()
+		{
+			var main = MainWindow;
+			if (main is null) return;
+
+			_lastMine = Location;
+			_lastMain = main.Location;
+			_lastMainRight = main.Right;
+			Move += FollowFromTastudio;
+			main.Move += FollowFromMainWindow;
+			main.SizeChanged += FollowMainWindowResize;
+			FormClosed += (_, _) =>
+			{
+				Move -= FollowFromTastudio;
+				main.Move -= FollowFromMainWindow;
+				main.SizeChanged -= FollowMainWindowResize;
+			};
+		}
+
+		/// <summary>the main window's right edge when we last looked, to tell whether we were docked to it</summary>
+		private int _lastMainRight;
+
+		/// <summary>
+		/// The main window resizes itself to whatever machine booted - a PSP is
+		/// not a NES - and a window that grew rightwards would then be sitting on
+		/// top of this one. If we were against its right edge, we stay against
+		/// it; if the user had moved us somewhere of their own, we stay there.
+		/// </summary>
+		private void FollowMainWindowResize(object sender, EventArgs e)
+		{
+			var main = MainWindow;
+			if (main is null) return;
+			var wasDocked = Math.Abs(Left - _lastMainRight) <= UIHelper.ScaleX(12);
+			_lastMainRight = main.Right;
+			if (!wasDocked || !ShouldMovePair(main)) return;
+
+			_movingPair = true;
+			try
+			{
+				PlaceBesideMainWindow();
+				_lastMine = Location;
+				_lastMain = main.Location;
+			}
+			finally
+			{
+				_movingPair = false;
+			}
+		}
+
+		private void FollowFromTastudio(object sender, EventArgs e)
+		{
+			var main = MainWindow;
+			if (main is null) return;
+			var delta = new Size(Location.X - _lastMine.X, Location.Y - _lastMine.Y);
+			_lastMine = Location;
+			if (!ShouldMovePair(main)) { _lastMain = main.Location; return; }
+
+			_movingPair = true;
+			try
+			{
+				main.Location += delta;
+				_lastMain = main.Location;
+			}
+			finally
+			{
+				_movingPair = false;
+			}
+		}
+
+		private void FollowFromMainWindow(object sender, EventArgs e)
+		{
+			var main = MainWindow;
+			if (main is null) return;
+			var delta = new Size(main.Location.X - _lastMain.X, main.Location.Y - _lastMain.Y);
+			_lastMain = main.Location;
+			if (!ShouldMovePair(main)) { _lastMine = Location; return; }
+
+			_movingPair = true;
+			try
+			{
+				Location += delta;
+				_lastMine = Location;
+			}
+			finally
+			{
+				_movingPair = false;
+			}
+		}
+
+		/// <summary>
+		/// A move is followed unless it was one WE made (or the pair would chase
+		/// each other), the user asked for one window alone with shift, the
+		/// feature is off, or either window is minimised or maximised - where a
+		/// position is not something the user is choosing.
+		/// </summary>
+		private bool ShouldMovePair(Form main)
+			=> !_movingPair
+				&& _initialized
+				&& Settings.MoveWithMainWindow
+				&& (Control.ModifierKeys & Keys.Shift) is 0
+				&& WindowState is FormWindowState.Normal
+				&& main.WindowState is FormWindowState.Normal;
 
 		/// <summary>
 		/// Opens at the main window's right shoulder, tops aligned.

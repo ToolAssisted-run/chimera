@@ -947,6 +947,12 @@ namespace Chimera.Client.GUI
 			Util.OpenUrlExternal("http://www.fceux.com/web/help/taseditor/");
 		}
 
+		private void SettingsSubMenu_DropDownOpened(object sender, EventArgs e)
+			=> MoveWithMainWindowMenuItem.Checked = Settings.MoveWithMainWindow;
+
+		private void MoveWithMainWindowMenuItem_Click(object sender, EventArgs e)
+			=> Settings.MoveWithMainWindow = !Settings.MoveWithMainWindow;
+
 		private void TAStudioSettingsToolStripMenuItem_Click(object sender, EventArgs e)
 		{
 			TAStudioSettingsForm settingsForm = new(new()

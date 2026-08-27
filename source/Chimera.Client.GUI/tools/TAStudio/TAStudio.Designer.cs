@@ -81,6 +81,7 @@ namespace Chimera.Client.GUI
 			this.SubtitlesMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.SettingsSubMenu = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.TAStudioSettingsToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+			this.MoveWithMainWindowMenuItem = new System.Windows.Forms.ToolStripMenuItem();
 			this.ColumnsSubMenu = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.toolStripSeparator19 = new Chimera.WinForms.Controls.ToolStripSeparatorEx();
 			this.HelpSubMenu = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
@@ -411,8 +412,18 @@ namespace Chimera.Client.GUI
 			// SettingsSubMenu
 			// 
 			this.SettingsSubMenu.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.MoveWithMainWindowMenuItem,
             this.TAStudioSettingsToolStripMenuItem});
 			this.SettingsSubMenu.Text = "&Settings";
+			this.SettingsSubMenu.DropDownOpened += new System.EventHandler(this.SettingsSubMenu_DropDownOpened);
+			// 
+			// MoveWithMainWindowMenuItem
+			// 
+			this.MoveWithMainWindowMenuItem.Name = "MoveWithMainWindowMenuItem";
+			this.MoveWithMainWindowMenuItem.Size = new System.Drawing.Size(156, 22);
+			this.MoveWithMainWindowMenuItem.Text = "&Move with the main window";
+			this.MoveWithMainWindowMenuItem.ToolTipText = "Drag either window and the other keeps its place beside it. Hold Shift while dragging to move one alone.";
+			this.MoveWithMainWindowMenuItem.Click += new System.EventHandler(this.MoveWithMainWindowMenuItem_Click);
 			// 
 			// TAStudioSettingsToolStripMenuItem
 			// 
@@ -861,6 +872,7 @@ namespace Chimera.Client.GUI
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx TASEditorManualOnlineMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx SaveBackupMenuItem;
 		private System.Windows.Forms.ToolTip toolTip1;
+		private System.Windows.Forms.ToolStripMenuItem MoveWithMainWindowMenuItem;
 		private System.Windows.Forms.ToolStripMenuItem TAStudioSettingsToolStripMenuItem;
 		private System.Windows.Forms.ContextMenuStrip ColumnRightClickMenu;
 		private System.Windows.Forms.ToolStripMenuItem AutoHoldContextMenuItem;
