@@ -25,6 +25,9 @@ namespace Chimera.Client.GUI
 			this.RecentProjectSubMenu = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.toolStripSeparator3 = new Chimera.WinForms.Controls.ToolStripSeparatorEx();
 			this.CloseRomMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
+			this.SaveProjectMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
+			this.SaveProjectAsMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
+			this.SaveProjectBackupMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.toolStripMenuItem1 = new Chimera.WinForms.Controls.ToolStripSeparatorEx();
 			this.toolStripSeparator6 = new Chimera.WinForms.Controls.ToolStripSeparatorEx();
 			this.toolStripSeparator24 = new Chimera.WinForms.Controls.ToolStripSeparatorEx();
@@ -197,6 +200,9 @@ namespace Chimera.Client.GUI
             this.NewProjectMenuItem,
             this.OpenProjectMenuItem,
             this.RecentProjectSubMenu,
+            this.SaveProjectMenuItem,
+            this.SaveProjectAsMenuItem,
+            this.SaveProjectBackupMenuItem,
             this.CloseRomMenuItem,
             this.toolStripMenuItem1,
             this.AVSubMenu,
@@ -222,6 +228,24 @@ namespace Chimera.Client.GUI
             this.toolStripSeparator3});
 			this.RecentProjectSubMenu.Text = "&Recent Projects";
 			this.RecentProjectSubMenu.DropDownOpened += new System.EventHandler(this.RecentProjectSubMenu_DropDownOpened);
+			// 
+			// CloseRomMenuItem
+			// 
+			this.SaveProjectMenuItem.ShortcutKeys = ((System.Windows.Forms.Keys)((System.Windows.Forms.Keys.Control | System.Windows.Forms.Keys.S)));
+			this.SaveProjectMenuItem.Text = "&Save Project";
+			this.SaveProjectMenuItem.Click += new System.EventHandler(this.SaveProjectMenuItem_Click);
+			// 
+			// SaveProjectAsMenuItem
+			// 
+			this.SaveProjectAsMenuItem.ShortcutKeys = ((System.Windows.Forms.Keys)(((System.Windows.Forms.Keys.Control | System.Windows.Forms.Keys.Shift) 
+            | System.Windows.Forms.Keys.S)));
+			this.SaveProjectAsMenuItem.Text = "Save Project &As...";
+			this.SaveProjectAsMenuItem.Click += new System.EventHandler(this.SaveProjectAsMenuItem_Click);
+			// 
+			// SaveProjectBackupMenuItem
+			// 
+			this.SaveProjectBackupMenuItem.Text = "Save Project &Backup";
+			this.SaveProjectBackupMenuItem.Click += new System.EventHandler(this.SaveProjectBackupMenuItem_Click);
 			// 
 			// CloseRomMenuItem
 			// 
@@ -1185,6 +1209,9 @@ namespace Chimera.Client.GUI
 		private Chimera.WinForms.Controls.ToolStripSeparatorEx toolStripSeparator3;
 		private Chimera.WinForms.Controls.ToolStripSeparatorEx toolStripSeparator4;
 		private Chimera.WinForms.Controls.ToolStripSeparatorEx toolStripSeparator5;
+		private Chimera.WinForms.Controls.ToolStripMenuItemEx SaveProjectMenuItem;
+		private Chimera.WinForms.Controls.ToolStripMenuItemEx SaveProjectAsMenuItem;
+		private Chimera.WinForms.Controls.ToolStripMenuItemEx SaveProjectBackupMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx CloseRomMenuItem;
 		private Chimera.WinForms.Controls.ToolStripSeparatorEx toolStripSeparator6;
 		private Chimera.WinForms.Controls.ToolStripSeparatorEx toolStripSeparator7;

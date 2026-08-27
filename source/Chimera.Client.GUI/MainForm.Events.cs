@@ -30,6 +30,15 @@ namespace Chimera.Client.GUI
 			// there is one thing to close, and it is the project
 			CloseRomMenuItem.Enabled = _openProject is not null;
 
+			// SAVING IS THE PROJECT'S, and TAStudio is the window it is edited in:
+			// a project is open exactly when TAStudio is, so these ask it. Save is
+			// offered only when there is something to save; a backup only once the
+			// project has a file to make a backup OF.
+			var tastudio = Tools.IsLoaded<TAStudio>() ? Tools.TAStudio : null;
+			SaveProjectMenuItem.Enabled = tastudio?.HasUnsavedChanges is true;
+			SaveProjectAsMenuItem.Enabled = tastudio is not null;
+			SaveProjectBackupMenuItem.Enabled = tastudio?.CanSaveBackup is true;
+
 			// nothing is running, so there is nothing to shoot or record
 			ScreenshotSubMenu.Enabled = !Emulator.IsNull();
 			AVSubMenu.Enabled = Emulator.HasVideoProvider(); //TODO necessary?
@@ -71,6 +80,21 @@ namespace Chimera.Client.GUI
 			ScreenshotMenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["Screenshot"];
 			ScreenshotClipboardMenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["Screen Raw to Clipboard"];
 			ScreenshotClientClipboardMenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["Screen Client to Clipboard"];
+		}
+
+		private void SaveProjectMenuItem_Click(object sender, EventArgs e)
+		{
+			if (Tools.IsLoaded<TAStudio>()) Tools.TAStudio.SaveProject();
+		}
+
+		private void SaveProjectAsMenuItem_Click(object sender, EventArgs e)
+		{
+			if (Tools.IsLoaded<TAStudio>()) Tools.TAStudio.SaveProjectAs();
+		}
+
+		private void SaveProjectBackupMenuItem_Click(object sender, EventArgs e)
+		{
+			if (Tools.IsLoaded<TAStudio>()) Tools.TAStudio.SaveProjectBackup();
 		}
 
 		private void CloseRomMenuItem_Click(object sender, EventArgs e)

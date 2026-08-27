@@ -18,35 +18,6 @@ namespace Chimera.Client.GUI
 		private static readonly FilesystemFilterSet MoviesFSFilterSet = new(
 			FilesystemFilter.TAStudioProjects);
 
-		private void FileSubMenu_DropDownOpened(object sender, EventArgs e)
-		{
-			SaveBackupMenuItem.Enabled = !string.IsNullOrWhiteSpace(CurrentTasMovie.Filename) && CurrentTasMovie.Filename != DefaultTasProjName();
-			saveSelectionToMacroToolStripMenuItem.Enabled =
-				placeMacroAtSelectionToolStripMenuItem.Enabled =
-				recentMacrosToolStripMenuItem.Enabled =
-				AnyRowsSelected;
-		}
-
-		private void RecentSubMenu_DropDownOpened(object sender, EventArgs e)
-			=> RecentSubMenu.ReplaceDropDownItems(Settings.RecentTas.RecentMenu(this, DummyLoadProject, "Project"));
-
-		private void NewTasMenuItem_Click(object sender, EventArgs e) => StartNewTasMovie();
-
-		private void OpenTasMenuItem_Click(object sender, EventArgs e)
-		{
-			if (!AskSaveChanges()) return;
-			var filename = CurrentTasMovie.Filename;
-			if (string.IsNullOrWhiteSpace(filename) || filename == DefaultTasProjName())
-			{
-				filename = "";
-			}
-			var result = this.ShowFileOpenDialog(
-				filter: MoviesFSFilterSet,
-				initDir: Config!.PathEntries.MovieAbsolutePath(),
-				initFileName: filename);
-			if (result is not null) LoadMovieFile(result, askToSave: false);
-		}
-
 		/// <summary>
 		/// Load the movie with the given filename within TAStudio.
 		/// </summary>
@@ -64,28 +35,41 @@ namespace Chimera.Client.GUI
 			return false;
 		}
 
-		private void SaveTasMenuItem_Click(object sender, EventArgs e)
+		// ---- saving: the menu items live on the MAIN window ----------------------
+		// What is being saved is the PROJECT, and the project is the main window's
+		// (File > Save Project). These are what those items call.
+
+		/// <summary>Whether there is anything to save - the Save Project item's condition.</summary>
+		public bool HasUnsavedChanges => CurrentTasMovie?.Changes is true;
+
+		/// <summary>
+		/// Whether a backup means anything yet: a project that has never been
+		/// written has nothing to back up but its own default name.
+		/// </summary>
+		public bool CanSaveBackup
+			=> !string.IsNullOrWhiteSpace(CurrentTasMovie?.Filename)
+				&& CurrentTasMovie.Filename != DefaultTasProjName();
+
+		public void SaveProject()
 		{
-			DisplayMessageIfFailed(() => SaveTas(), "Failed to save movie.");
+			DisplayMessageIfFailed(() => SaveTas(), "Failed to save the project.");
 			if (Settings.BackupPerFileSave)
 			{
 				DisplayMessageIfFailed(() => SaveTas(saveBackup: true), "Failed to save backup.");
 			}
 		}
 
-		private void SaveAsTasMenuItem_Click(object sender, EventArgs e)
+		public void SaveProjectAs()
 		{
-			DisplayMessageIfFailed(() => SaveAsTas(), "Failed to save movie.");
+			DisplayMessageIfFailed(() => SaveAsTas(), "Failed to save the project.");
 			if (Settings.BackupPerFileSave)
 			{
 				DisplayMessageIfFailed(() => SaveTas(saveBackup: true), "Failed to save backup.");
 			}
 		}
 
-		private void SaveBackupMenuItem_Click(object sender, EventArgs e)
-		{
-			DisplayMessageIfFailed(() => SaveTas(saveBackup: true), "Failed to save backup.");
-		}
+		public void SaveProjectBackup()
+			=> DisplayMessageIfFailed(() => SaveTas(saveBackup: true), "Failed to save backup.");
 
 		private void SaveSelectionToMacroMenuItem_Click(object sender, EventArgs e)
 		{
@@ -167,6 +151,13 @@ namespace Chimera.Client.GUI
 
 		private void EditSubMenu_DropDownOpened(object sender, EventArgs e)
 		{
+			// the macro items work on the selection too (they moved here when
+			// TAStudio's File menu went to the main window)
+			saveSelectionToMacroToolStripMenuItem.Enabled =
+				placeMacroAtSelectionToolStripMenuItem.Enabled =
+				recentMacrosToolStripMenuItem.Enabled =
+				AnyRowsSelected;
+
 			DeselectMenuItem.Enabled =
 				SelectBetweenMarkersMenuItem.Enabled =
 				CopyMenuItem.Enabled =

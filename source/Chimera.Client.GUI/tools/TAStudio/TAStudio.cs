@@ -204,7 +204,6 @@ namespace Chimera.Client.GUI
 			_tasViewPanel.Controls.Add(_tasViewHBar);
 			_tasViewPanel.Controls.Add(_tasViewVBar);
 
-			RecentSubMenu.Image = Resources.Recent;
 			recentMacrosToolStripMenuItem.Image = Resources.Recent;
 			TASEditorManualOnlineMenuItem.Image = Resources.Help;
 			Icon = ToolIcon;
@@ -1279,6 +1278,20 @@ namespace Chimera.Client.GUI
 		protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
 		{
 			if (keyData is Keys.Tab or (Keys.Shift | Keys.Tab) or Keys.Space) return true;
+
+			// Saving lives on the main window's File menu now, and a menu shortcut
+			// only fires for the window that owns it - so the keys have to be
+			// answered here as well, or Ctrl+S would do nothing in the window where
+			// the work is actually done.
+			switch (keyData)
+			{
+				case Keys.Control | Keys.S:
+					if (HasUnsavedChanges) SaveProject();
+					return true;
+				case Keys.Control | Keys.Shift | Keys.S:
+					SaveProjectAs();
+					return true;
+			}
 			return base.ProcessCmdKey(ref msg, keyData);
 		}
 

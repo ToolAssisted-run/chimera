@@ -32,20 +32,12 @@ namespace Chimera.Client.GUI
 		{
 			this.components = new System.ComponentModel.Container();
 			this.TASMenu = new Chimera.WinForms.Controls.MenuStripEx();
-			this.FileSubMenu = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.NewTASMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.OpenTASMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.SaveTASMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.SaveAsTASMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.SaveBackupMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.RecentSubMenu = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.toolStripSeparator3 = new Chimera.WinForms.Controls.ToolStripSeparatorEx();
 			this.toolStripSeparator1 = new Chimera.WinForms.Controls.ToolStripSeparatorEx();
 			this.saveSelectionToMacroToolStripMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.placeMacroAtSelectionToolStripMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.recentMacrosToolStripMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.toolStripSeparator22 = new Chimera.WinForms.Controls.ToolStripSeparatorEx();
-			this.toolStripSeparator20 = new Chimera.WinForms.Controls.ToolStripSeparatorEx();
 			this.EditSubMenu = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.UndoMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.RedoMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
@@ -147,68 +139,12 @@ namespace Chimera.Client.GUI
 			// TASMenu
 			// 
 			this.TASMenu.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
-            this.FileSubMenu,
             this.EditSubMenu,
             this.MetaSubMenu,
             this.SettingsSubMenu,
             this.ColumnsSubMenu,
             this.HelpSubMenu});
 			this.TASMenu.TabIndex = 0;
-			// 
-			// FileSubMenu
-			// 
-			this.FileSubMenu.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
-            this.NewTASMenuItem,
-            this.OpenTASMenuItem,
-            this.SaveTASMenuItem,
-            this.SaveAsTASMenuItem,
-            this.SaveBackupMenuItem,
-            this.RecentSubMenu,
-            this.toolStripSeparator1,
-            this.saveSelectionToMacroToolStripMenuItem,
-            this.placeMacroAtSelectionToolStripMenuItem,
-            this.recentMacrosToolStripMenuItem,
-            this.toolStripSeparator20});
-			this.FileSubMenu.Text = "&File";
-			this.FileSubMenu.DropDownOpened += new System.EventHandler(this.FileSubMenu_DropDownOpened);
-			// 
-			// NewTASMenuItem
-			// 
-			this.NewTASMenuItem.Text = "&New";
-			this.NewTASMenuItem.Click += new System.EventHandler(this.NewTasMenuItem_Click);
-			// 
-			// 
-			// 
-			// OpenTASMenuItem
-			// 
-			this.OpenTASMenuItem.ShortcutKeys = ((System.Windows.Forms.Keys)((System.Windows.Forms.Keys.Control | System.Windows.Forms.Keys.O)));
-			this.OpenTASMenuItem.Text = "&Open";
-			this.OpenTASMenuItem.Click += new System.EventHandler(this.OpenTasMenuItem_Click);
-			// 
-			// SaveTASMenuItem
-			// 
-			this.SaveTASMenuItem.ShortcutKeys = ((System.Windows.Forms.Keys)((System.Windows.Forms.Keys.Control | System.Windows.Forms.Keys.S)));
-			this.SaveTASMenuItem.Text = "&Save";
-			this.SaveTASMenuItem.Click += new System.EventHandler(this.SaveTasMenuItem_Click);
-			// 
-			// SaveAsTASMenuItem
-			// 
-			this.SaveAsTASMenuItem.ShortcutKeys = ((System.Windows.Forms.Keys)(((System.Windows.Forms.Keys.Control | System.Windows.Forms.Keys.Shift) 
-            | System.Windows.Forms.Keys.S)));
-			this.SaveAsTASMenuItem.Text = "Save As";
-			this.SaveAsTASMenuItem.Click += new System.EventHandler(this.SaveAsTasMenuItem_Click);
-			// 
-			// SaveBackupMenuItem
-			// 
-			this.SaveBackupMenuItem.Text = "Save Backup";
-			this.SaveBackupMenuItem.Click += new System.EventHandler(this.SaveBackupMenuItem_Click);
-			// 
-			// RecentSubMenu
-			// 
-			this.RecentSubMenu.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
-            this.toolStripSeparator3});
-			this.RecentSubMenu.Text = "Recent";
-			this.RecentSubMenu.DropDownOpened += new System.EventHandler(this.RecentSubMenu_DropDownOpened);
 			// 
 			// saveSelectionToMacroToolStripMenuItem
 			// 
@@ -257,7 +193,11 @@ namespace Chimera.Client.GUI
             this.TruncateMenuItem,
             this.ClearGreenzoneMenuItem,
             this.GreenzoneICheckSeparator,
-            this.StateHistoryIntegrityCheckMenuItem});
+            this.StateHistoryIntegrityCheckMenuItem,
+            this.toolStripSeparator1,
+            this.saveSelectionToMacroToolStripMenuItem,
+            this.placeMacroAtSelectionToolStripMenuItem,
+            this.recentMacrosToolStripMenuItem});
 			this.EditSubMenu.Text = "&Edit";
 			this.EditSubMenu.DropDownClosed += new System.EventHandler(this.EditSubMenu_DropDownClosed);
 			this.EditSubMenu.DropDownOpened += new System.EventHandler(this.EditSubMenu_DropDownOpened);
@@ -781,14 +721,8 @@ namespace Chimera.Client.GUI
 		#endregion
 
 		private MenuStripEx TASMenu;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx FileSubMenu;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx NewTASMenuItem;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx OpenTASMenuItem;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx SaveTASMenuItem;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx SaveAsTASMenuItem;
 		private Chimera.WinForms.Controls.ToolStripSeparatorEx toolStripSeparator1;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx EditSubMenu;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx RecentSubMenu;
 		private Chimera.WinForms.Controls.ToolStripSeparatorEx toolStripSeparator3;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx InsertFrameMenuItem;
 		private Chimera.WinForms.Controls.ToolStripSeparatorEx toolStripSeparator7;
@@ -861,7 +795,6 @@ namespace Chimera.Client.GUI
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx showUndoHistoryToolStripMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx saveSelectionToMacroToolStripMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx placeMacroAtSelectionToolStripMenuItem;
-		private Chimera.WinForms.Controls.ToolStripSeparatorEx toolStripSeparator20;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx recentMacrosToolStripMenuItem;
 		private Chimera.WinForms.Controls.ToolStripSeparatorEx toolStripSeparator22;
 		private BookmarksBranchesBox BookMarkControl;
@@ -870,7 +803,6 @@ namespace Chimera.Client.GUI
 		private System.Windows.Forms.SplitContainer MainVertialSplit;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx SetMarkerWithTextContextMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx TASEditorManualOnlineMenuItem;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx SaveBackupMenuItem;
 		private System.Windows.Forms.ToolTip toolTip1;
 		private System.Windows.Forms.ToolStripMenuItem MoveWithMainWindowMenuItem;
 		private System.Windows.Forms.ToolStripMenuItem TAStudioSettingsToolStripMenuItem;
