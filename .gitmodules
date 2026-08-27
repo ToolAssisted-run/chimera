@@ -69,3 +69,8 @@
 	url = https://github.com/ToolAssisted-run/chimera-core-snes9x.git
 	branch = main
 	ignore = dirty
+[submodule "stella"]
+	path = extern/cores/stella
+	url = https://github.com/ToolAssisted-run/chimera-core-stella.git
+	branch = main
+	ignore = dirty

@@ -114,6 +114,7 @@ build_core dosbox-x dosbox-x.zip
 build_core gpgx gpgx.zip
 build_core opera opera.zip
 build_core snes9x snes9x.zip
+build_core stella stella.zip
 
 say "licences"
 # What the bundle as a whole may be used for, computed from what its packages
