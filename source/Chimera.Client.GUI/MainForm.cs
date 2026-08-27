@@ -1793,7 +1793,7 @@ namespace Chimera.Client.GUI
 			new FilesystemFilter("Config File", extensions: [ "ini" ]));
 
 		public static readonly FilesystemFilterSet CorePackageFSFilterSet = new(
-			new FilesystemFilter("Chimera Core Package", extensions: [ "zip" ]));
+			new FilesystemFilter("Chimera Core Package", extensions: [ "chimeraCore", "zip" ]));
 
 		/// <summary>packages found by the startup scan, kept so the Core Packages dialog opens without rescanning</summary>
 		private IReadOnlyList<DiscoveredCorePackage> _discoveredCorePackages = [ ];

@@ -70,7 +70,7 @@ namespace Chimera.Tests.Client.Common.CorePackages
 		[TestMethod]
 		public void FindsWaterboxZip()
 		{
-			_ = MakeWaterboxZip("quickernes.zip", "quickerNES");
+			_ = MakeWaterboxZip("quickernes.chimeraCore", "quickerNES");
 			var found = CorePackageDiscovery.Scan([ _root ]);
 			Assert.AreEqual(1, found.Count);
 			Assert.AreEqual("quickerNES", found[0].Name);
@@ -97,7 +97,7 @@ namespace Chimera.Tests.Client.Common.CorePackages
 		public void FindsManifestPackageAndDerivesItsSystems()
 		{
 			_ = MakeZip(
-				"adapter.zip",
+				"adapter.chimeraCore",
 				("chimera-core.json", @"{ ""formatVersion"": 1, ""name"": ""AdapterCore"", ""assembly"": ""Adapter.dll"", ""extensions"": { "".AAA"": ""SYSA"", "".bbb"": ""SYSB"" } }"));
 			var found = CorePackageDiscovery.Scan([ _root ]);
 			Assert.AreEqual(1, found.Count);
@@ -110,6 +110,10 @@ namespace Chimera.Tests.Client.Common.CorePackages
 		public void IgnoresThingsThatAreNotPackages()
 		{
 			_ = MakeZip("some-roms.zip", ("mario.nes", "not a core"));
+			// a real package under the WRONG extension is not scanned either: the
+			// extension is what a scan goes by, so Cores/ never has to be opened zip
+			// by zip to find out what is in it
+			_ = MakeZip("mislabelled.zip", ("core.wbx", "stub"), ("waterbox.config", WaterboxConfigJson("Hidden", "NES", ".nes")));
 			_ = MakeDir("savestates", ("slot1.state", "not a core"));
 			File.WriteAllText(Path.Combine(_root, "readme.txt"), "hello");
 			Assert.AreEqual(0, CorePackageDiscovery.Scan([ _root ]).Count);
@@ -119,8 +123,8 @@ namespace Chimera.Tests.Client.Common.CorePackages
 		public void ListsBrokenPackagesWithTheirErrorRatherThanHidingThem()
 		{
 			// looks like a package (it has the marker files) but cannot be understood
-			_ = MakeZip("broken.zip", ("core.wbx", "stub"), ("waterbox.config", "{ this is not json"));
-			_ = MakeZip("future.zip", ("chimera-core.json", @"{ ""formatVersion"": 99, ""name"": ""FromTheFuture"" }"));
+			_ = MakeZip("broken.chimeraCore", ("core.wbx", "stub"), ("waterbox.config", "{ this is not json"));
+			_ = MakeZip("future.chimeraCore", ("chimera-core.json", @"{ ""formatVersion"": 99, ""name"": ""FromTheFuture"" }"));
 			var found = CorePackageDiscovery.Scan([ _root ]).OrderBy(static p => p.Name).ToList();
 			Assert.AreEqual(2, found.Count);
 			Assert.IsTrue(found.All(static p => p.Error is not null), "both are unreadable and must say so");
@@ -131,7 +135,7 @@ namespace Chimera.Tests.Client.Common.CorePackages
 		[TestMethod]
 		public void MissingSystemIdIsAnErrorNotACrash()
 		{
-			_ = MakeZip("nosys.zip", ("core.wbx", "stub"), ("waterbox.config", @"{ ""coreName"": ""Nameless"" }"));
+			_ = MakeZip("nosys.chimeraCore", ("core.wbx", "stub"), ("waterbox.config", @"{ ""coreName"": ""Nameless"" }"));
 			var found = CorePackageDiscovery.Scan([ _root ]);
 			Assert.AreEqual(1, found.Count);
 			StringAssert.Contains(found[0].Error, "systemId");
@@ -148,7 +152,7 @@ namespace Chimera.Tests.Client.Common.CorePackages
 		[TestMethod]
 		public void SameSearchDirectoryTwiceYieldsOneEntry()
 		{
-			_ = MakeWaterboxZip("core.zip", "OnlyOnce");
+			_ = MakeWaterboxZip("core.chimeraCore", "OnlyOnce");
 			Assert.AreEqual(1, CorePackageDiscovery.Scan([ _root, _root, _root + Path.DirectorySeparatorChar ]).Count);
 		}
 
@@ -157,9 +161,9 @@ namespace Chimera.Tests.Client.Common.CorePackages
 		{
 			var dirA = MakeDir("a");
 			var dirB = MakeDir("b");
-			var zip = MakeWaterboxZip("core.zip", "Twin");
-			File.Copy(zip, Path.Combine(dirA, "core.zip"));
-			File.Copy(zip, Path.Combine(dirB, "renamed.zip"));
+			var zip = MakeWaterboxZip("core.chimeraCore", "Twin");
+			File.Copy(zip, Path.Combine(dirA, "core.chimeraCore"));
+			File.Copy(zip, Path.Combine(dirB, "renamed.chimeraCore"));
 			File.Delete(zip);
 			var found = CorePackageDiscovery.Scan([ dirA, dirB ]);
 			Assert.AreEqual(1, found.Count, "same bytes = same package, whatever it is called or wherever it sits");
@@ -169,9 +173,9 @@ namespace Chimera.Tests.Client.Common.CorePackages
 		[TestMethod]
 		public void ResultsAreNameSorted()
 		{
-			_ = MakeWaterboxZip("z.zip", "Alpha");
-			_ = MakeWaterboxZip("a.zip", "Zulu");
-			_ = MakeWaterboxZip("m.zip", "mike");
+			_ = MakeWaterboxZip("z.chimeraCore", "Alpha");
+			_ = MakeWaterboxZip("a.chimeraCore", "Zulu");
+			_ = MakeWaterboxZip("m.chimeraCore", "mike");
 			CollectionAssert.AreEqual(
 				new[] { "Alpha", "mike", "Zulu" },
 				CorePackageDiscovery.Scan([ _root ]).Select(static p => p.Name).ToList());

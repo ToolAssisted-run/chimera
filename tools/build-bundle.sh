@@ -86,7 +86,7 @@ else
 fi
 
 # ---- the cores, from the pinned submodules ----------------------------------
-build_core() { # <submodule name> <package zip name>...
+build_core() { # <submodule name> <package file name>...
 	name="$1"; shift
 	if [ "$skip_cores" -eq 1 ]; then
 		for zip in "$@"; do
@@ -107,14 +107,14 @@ build_core() { # <submodule name> <package zip name>...
 	done
 }
 
-build_core quickernes quickernes.zip
-build_core neshawk quickerneshawk.zip
-build_core ppsspp ppsspp.zip
-build_core dosbox-x dosbox-x.zip
-build_core gpgx gpgx.zip
-build_core opera opera.zip
-build_core snes9x snes9x.zip
-build_core stella stella.zip
+build_core quickernes quickernes.chimeraCore
+build_core neshawk quickerneshawk.chimeraCore
+build_core ppsspp ppsspp.chimeraCore
+build_core dosbox-x dosbox-x.chimeraCore
+build_core gpgx gpgx.chimeraCore
+build_core opera opera.chimeraCore
+build_core snes9x snes9x.chimeraCore
+build_core stella stella.chimeraCore
 
 say "licences"
 # What the bundle as a whole may be used for, computed from what its packages
@@ -135,17 +135,17 @@ say "build stamp"
 	printf "\nguest kit:\n"
 	git -C "$root" submodule status extern/tools/chimera-common-minibox 2>/dev/null | sed 's/^/  /'
 	printf "\nfiles (sha1):\n"
-	( cd "$out" && sha1sum Chimera.exe Cores/*.zip 2>/dev/null | sed 's/^/  /' )
+	( cd "$out" && sha1sum Chimera.exe Cores/*.chimeraCore 2>/dev/null | sed 's/^/  /' )
 } > "$out/BUILD.txt"
 cat "$out/BUILD.txt"
 
 say "verifying"
 # A truncated dll is indistinguishable from a bug until you check.
 bad=0
-for f in "$out/Chimera.exe" "$out"/dll/* "$out"/Cores/*.zip; do
+for f in "$out/Chimera.exe" "$out"/dll/* "$out"/Cores/*.chimeraCore; do
 	[ -s "$f" ] || { echo "EMPTY: $f" >&2; bad=1; }
 done
-for z in "$out"/Cores/*.zip; do
+for z in "$out"/Cores/*.chimeraCore; do
 	python3 -c "import sys,zipfile; zipfile.ZipFile(sys.argv[1]).testzip()" "$z" || { echo "CORRUPT: $z" >&2; bad=1; }
 done
 [ -s "$out/LICENSES.md" ] || { echo "MISSING: LICENSES.md" >&2; bad=1; }

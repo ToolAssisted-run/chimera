@@ -28,7 +28,7 @@ nothing is part of Chimera.sln, and nothing is quickerNES- or system-specific.
 - `package/` - the managed adapter + manifest for the native flavor;
   `build-package.sh` builds natives (Linux .so always, Windows .dll when
   mingw-w64 is present), assembles the roms, builds the adapter against
-  `build/dll`, and installs `build/Cores/synth-native.zip`.
+  `build/dll`, and installs `build/Cores/synth-native.chimeraCore`.
 
 ## Status
 
@@ -44,7 +44,7 @@ nothing is part of Chimera.sln, and nothing is quickerNES- or system-specific.
       both modes. ~20 s wall clock - THE Chimera smoke test (supersedes the
       old quickerNES --quick subset).
 - [x] Pure-C# twin (flavor b): SynthMachine.cs, written from SPEC.md alone
-      (no shared code with the native flavor), shipped as synth-sharp.zip -
+      (no shared code with the native flavor), shipped as synth-sharp.chimeraCore -
       a manifest with an EMPTY natives list; nothing loaded at runtime. Its
       Level A tester (synth-run-sharp, under Mono) and its frontend package
       both verify against the NATIVE-recorded goldens: bit-identical RAM,

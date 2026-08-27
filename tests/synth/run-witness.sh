@@ -114,7 +114,7 @@ fi
 # it IS the same machine.
 if [ "$level" = "both" ] || [ "$level" = "e" ]; then
 	chimera_run="$repo_root/build/meson-linux/chimera-run"
-	epkg="$repo_root/build/Cores/synth-box.zip"
+	epkg="$repo_root/build/Cores/synth-box.chimeraCore"
 	# the ABI must actually be exported - mingw once silently un-exported it
 	# when a vendored library declared its own dllexports
 	if [ -f "$repo_root/build/dll/libchimera.so" ] \
@@ -241,7 +241,7 @@ if [ "$level" = "both" ] || [ "$level" = "b" ]; then
 	# flavor is the ONLY Level-B core. native/sharp are Level-A equivalence
 	# references (proving synth.wbx matches the goldens), never frontend cores.
 	for flavor in box; do
-		package="$repo_root/build/Cores/synth-$flavor.zip"
+		package="$repo_root/build/Cores/synth-$flavor.chimeraCore"
 		[ -f "$package" ] || { echo "package not found: $package (run build-package.sh)" >&2; exit 1; }
 		for movie in "$here"/movies/*.txt; do
 			name="$(basename "$movie" .txt)"
@@ -304,7 +304,7 @@ PY
 		} > "$sjob"
 		rm -f "$work/settings.ram.bin" "$work/settings.meta.txt"
 		( cd "$repo_root" && CHIMERA_JOB="$sjob" timeout 300 mono "$emu_exe" --headless \
-			"--config=$scfg" "--core=$repo_root/build/Cores/synth-box.zip" \
+			"--config=$scfg" "--core=$repo_root/build/Cores/synth-box.chimeraCore" \
 			"--lua=$here/synth-replay.lua" "$srom" ) > "$work/settings.log" 2>&1
 		if [ ! -f "$work/settings.meta.txt" ] || ! grep -q "^status=OK" "$work/settings.meta.txt"; then
 			report "S:box:initFillByte" FAIL "no OK meta (see work/settings.log)"
@@ -345,7 +345,7 @@ PY
 		rm -f "$work/movie.ram.bin" "$work/movie.vram.bin" "$work/movie.meta.txt"
 		cp "$config" "$work/config.movie.ini"
 		( cd "$repo_root" && CHIMERA_JOB="$mjob" timeout 300 mono "$emu_exe" --headless \
-			"--config=$work/config.movie.ini" "--core=$repo_root/build/Cores/synth-box.zip" \
+			"--config=$work/config.movie.ini" "--core=$repo_root/build/Cores/synth-box.chimeraCore" \
 			"--movie=$mbk2" "--lua=$here/synth-movie-dump.lua" "$mrom" ) > "$work/movie.log" 2>&1
 		if [ ! -f "$work/movie.meta.txt" ] || ! grep -q "^status=OK" "$work/movie.meta.txt"; then
 			report "M:box:$mname" FAIL "no OK meta (see work/movie.log)"
@@ -395,7 +395,7 @@ PY
 		rm -f "$work/project.ram.bin" "$work/project.vram.bin" "$work/project.meta.txt"
 		cp "$config" "$work/config.project.ini"
 		( cd "$repo_root" && CHIMERA_JOB="$pjob" timeout 300 mono "$emu_exe" --headless \
-			"--config=$work/config.project.ini" "--core=$repo_root/build/Cores/synth-box.zip" \
+			"--config=$work/config.project.ini" "--core=$repo_root/build/Cores/synth-box.chimeraCore" \
 			"--project=$pdir/$pname.chimeraProject" "--lua=$here/synth-movie-dump.lua" ) > "$work/project.log" 2>&1
 		boots="$(grep -c "\[waterbox\] booting" "$work/project.log" || true)"
 		if [ ! -f "$work/project.meta.txt" ] || ! grep -q "^status=OK" "$work/project.meta.txt"; then

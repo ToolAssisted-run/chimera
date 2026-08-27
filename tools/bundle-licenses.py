@@ -59,7 +59,7 @@ def main():
     packages = []
     undeclared = []
     for name in sorted(os.listdir(cores_dir)) if os.path.isdir(cores_dir) else []:
-        if not name.endswith(".zip"):
+        if not name.endswith(".chimeraCore"):
             continue
         index, texts = read_package_licences(os.path.join(cores_dir, name))
         pkg = os.path.splitext(name)[0]

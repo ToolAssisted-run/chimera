@@ -6,7 +6,7 @@ from the tree and loaded on-the-fly as external, self-contained packages just be
 ## Objectives (testable)
 
 1. **Zero core code in the repo.** Chimera builds and runs with no emulation core in the
-   solution. Cores arrive as single-file packages (`.zip`: manifest + managed adapter DLL +
+   solution. Cores arrive as single-file packages (`.chimeraCore`, a zip: manifest + managed adapter DLL +
    native DLL(s)), discovered from a `Cores/` directory and loaded at ROM-load time.
 2. **Published core contract.** The core-facing API (essentially `Chimera.Emulation.Common`
    + `Chimera.BizInvoke`) becomes a versioned, published contract. A core package must be
@@ -177,7 +177,7 @@ phase of unverified change.
 - **Phase 3 - Evict the witness. [DONE 2026-08-09]** The QuickNES adapter now lives in
   `chimera-cores/quickernes/` - NOT part of Chimera.sln, built by `build-package.ps1`
   against the contract DLLs from `build/dll` exactly as an out-of-repo package would be,
-  and shipped as `build/Cores/quickernes.zip` (manifest + Chimera.QuickerNES.dll +
+  and shipped as `build/Cores/quickernes.chimeraCore` (manifest + Chimera.QuickerNES.dll +
   libquicknes natives). `Chimera.Emulation.Cores` is deleted from the solution entirely:
   **Chimera contains zero core code**. Supporting changes: INESPPUViewable and the NES
   palette helpers moved into Emulation.Common (frontend PPU viewers stay core-agnostic);
@@ -401,7 +401,7 @@ phase of unverified change.
   repository itself (github.com/SergioMartin86/quickerNES, branch chimera-adapter,
   `chimera/` dir): managed adapter, native bizinterface + Makefile (now building from
   that repo's own sources), manifest, bundled data, prebuilt natives, build-package.ps1
-  (param -ChimeraRoot, default sibling ../BizHawk checkout; installs quickernes.zip
+  (param -ChimeraRoot, default sibling ../BizHawk checkout; installs quickernes.chimeraCore
   into <ChimeraRoot>/build/Cores), and a native-build CI workflow. The dev loop:
   build Chimera sln -> run ../quickerNES/chimera/build-package.ps1 -> witness gate.
   chimera-cores/ here is reduced to the core-author guide README. The vendored witness
@@ -581,7 +581,7 @@ path stays core-agnostic).
 
 Flavor (b) LANDED (same day): SynthMachine.cs is a from-spec pure-C#
 reimplementation sharing no code with the native flavor, shipped as
-synth-sharp.zip - a package whose manifest declares an empty natives list;
+synth-sharp.chimeraCore - a package whose manifest declares an empty natives list;
 nothing is loaded at runtime, upholding side-effect freedom trivially. The
 C# core integration story turned out to already exist: the contract and
 package loader handle a natives-free package unchanged. Cross-flavor

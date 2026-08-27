@@ -22,7 +22,7 @@ namespace Chimera.Client.Common
 	/// </summary>
 	public sealed class DiscoveredCorePackage
 	{
-		/// <summary>Absolute path of the zip (or directory, for dev packages).</summary>
+		/// <summary>Absolute path of the package file (or directory, for dev packages).</summary>
 		public string Path { get; init; } = "";
 
 		/// <summary>
@@ -87,6 +87,29 @@ namespace Chimera.Client.Common
 	{
 		public const string DefaultDirName = "Cores";
 
+		/// <summary>
+		/// What a core package is called. The container is a zip, but the extension
+		/// says what the file IS rather than how it is compressed: a Chimera core,
+		/// not an archive of unknown contents that happens to hold one. A scan of
+		/// Cores/ therefore never has to open an unrelated zip to find out.
+		/// </summary>
+		public const string Extension = ".chimeraCore";
+
+		/// <summary>
+		/// Packages were once plain <c>.zip</c>, and one downloaded then (or from the
+		/// permanent core archive, whose older assets carry that name) is the SAME
+		/// package: identity is the SHA1 of the bytes, which a rename does not touch.
+		/// So a zip still LOADS when something points at one; only discovery is
+		/// narrow, because scanning every zip in a directory is what the extension
+		/// exists to avoid.
+		/// </summary>
+		public const string LegacyExtension = ".zip";
+
+		/// <summary>Whether <paramref name="path"/> names a package file this can open.</summary>
+		public static bool IsPackageFile(string path)
+			=> path.EndsWith(Extension, StringComparison.OrdinalIgnoreCase)
+				|| path.EndsWith(LegacyExtension, StringComparison.OrdinalIgnoreCase);
+
 		/// <summary>The default search directory: <c>Cores/</c> beside the executable.</summary>
 		public static string DefaultSearchPath
 			=> System.IO.Path.Combine(PathUtils.ExeDirectoryPath, DefaultDirName);
@@ -122,7 +145,7 @@ namespace Chimera.Client.Common
 				List<string> candidates = new();
 				try
 				{
-					candidates.AddRange(Directory.EnumerateFiles(fullSearchPath, "*.zip"));
+					candidates.AddRange(Directory.EnumerateFiles(fullSearchPath, "*" + Extension));
 					candidates.AddRange(Directory.EnumerateDirectories(fullSearchPath));
 				}
 				catch (Exception ex)
@@ -170,8 +193,7 @@ namespace Chimera.Client.Common
 				// the container is the engine's (see docs/engine-migration.md): what
 				// counts as a package, its identity hash, its entries. Keep the old
 				// gate on what is even worth asking about.
-				if (!Directory.Exists(path)
-					&& !(path.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) && File.Exists(path)))
+				if (!Directory.Exists(path) && !(IsPackageFile(path) && File.Exists(path)))
 				{
 					return null;
 				}

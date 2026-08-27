@@ -109,14 +109,14 @@ namespace Chimera.Client.Common
 			{
 				packageDir = path;
 			}
-			else if (File.Exists(path) && path.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+			else if (File.Exists(path) && CorePackageDiscovery.IsPackageFile(path))
 			{
 				packageSha1 = Chimera.Emulation.Common.Engine.ChimeraEngine.Sha1Hex(File.ReadAllBytes(path));
 				packageDir = ExtractZipToCache(path, packageSha1);
 			}
 			else
 			{
-				throw new FileNotFoundException($"no core package at {path} (expecting a directory or .zip containing {CorePackageManifest.FILE_NAME})", path);
+				throw new FileNotFoundException($"no core package at {path} (expecting a directory or a {CorePackageDiscovery.Extension} containing {CorePackageManifest.FILE_NAME})", path);
 			}
 			var (manifest, factories) = LoadPackageDir(packageDir);
 			return (manifest, factories.ToList(), packageDir, packageSha1);

@@ -178,13 +178,13 @@ namespace Chimera.Tests.Client.GUI
 			[
 				new()
 				{
-					Name = "dosbox-x", Path = "/home/you/Chimera/Cores/dosbox-x.zip",
+					Name = "dosbox-x", Path = "/home/you/Chimera/Cores/dosbox-x.chimeraCore",
 					Sha1 = "9803F96728C7B454E5B9797E1A0CDEF6C2E19A4B", Systems = [ "DOS" ],
 					Version = "8750be5a1c2d",
 				},
 				new()
 				{
-					Name = "quickernes", Path = "/home/you/Chimera/Cores/quickernes.zip",
+					Name = "quickernes", Path = "/home/you/Chimera/Cores/quickernes.chimeraCore",
 					Sha1 = "3F2A91C47B0E5D8A1122334455667788990AABBC", Systems = [ "NES" ],
 					Version = "0eebbf6d4e5f",
 				},

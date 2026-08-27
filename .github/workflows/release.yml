@@ -230,12 +230,12 @@ jobs:
           # build whose bundle has long since been replaced.
           gh release view cores >/dev/null 2>&1 || \
             gh release create cores --title "Core package archive" --prerelease --notes \
-              "Every distinct core package Chimera has published, named <core>-<sha1>.zip. A movie cites the SHA1 of the package that recorded it; this is where that package stays."
+              "Every distinct core package Chimera has published, named <core>-<sha1>.chimeraCore. A movie cites the SHA1 of the package that recorded it; this is where that package stays. Assets named <core>-<sha1>.zip are the same format under the older name."
           existing=$(gh release view cores --json assets --jq '.assets[].name')
-          for zip in build/bundle-windows/Cores/*.zip; do
-            base=$(basename "$zip" .zip)
+          for zip in build/bundle-windows/Cores/*.chimeraCore; do
+            base=$(basename "$zip" .chimeraCore)
             sha=$(sha1sum "$zip" | cut -c1-12)
-            asset="$base-$sha.zip"
+            asset="$base-$sha.chimeraCore"
             if printf '%s\n' "$existing" | grep -qx "$asset"; then
               echo "already archived: $asset"
               continue

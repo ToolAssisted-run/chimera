@@ -52,7 +52,7 @@ cp "$here/package-box/default_keybinds.json" "$staging"
 
 cores_dir="$chimera_root/build/Cores"
 mkdir -p "$cores_dir"
-zip_path="$cores_dir/synth-box.zip"
+zip_path="$cores_dir/synth-box.chimeraCore"
 rm -f "$zip_path"
 # The package's SHA1 is the core's identity: it is what a movie records to say which
 # machine produced it. So the same sources must produce the same bytes - which an

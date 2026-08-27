@@ -28,8 +28,8 @@ namespace Chimera.Tests.Client.Common.CorePackages
 		[TestMethod]
 		public void APackageInTheSessionIsLoaded()
 		{
-			var pkg = Pkg("quickerNES", "/cores/q.zip", sha1: "aa");
-			var entry = Build([ pkg ], [ Loaded("quickerNES", "/cores/q.zip", "aa") ])[0];
+			var pkg = Pkg("quickerNES", "/cores/q.chimeraCore", sha1: "aa");
+			var entry = Build([ pkg ], [ Loaded("quickerNES", "/cores/q.chimeraCore", "aa") ])[0];
 			Assert.AreEqual(CorePackageState.Loaded, entry.State);
 			Assert.AreEqual("loaded", entry.StatusText);
 		}
@@ -41,7 +41,7 @@ namespace Chimera.Tests.Client.Common.CorePackages
 		[TestMethod]
 		public void AFoundButUnopenedPackageIsMerelyAvailable()
 		{
-			var entry = Build([ Pkg("quickerNES", "/cores/q.zip", sha1: "aa") ], [ ])[0];
+			var entry = Build([ Pkg("quickerNES", "/cores/q.chimeraCore", sha1: "aa") ], [ ])[0];
 			Assert.AreEqual(CorePackageState.Available, entry.State);
 			Assert.AreEqual("available", entry.StatusText);
 		}
@@ -50,7 +50,7 @@ namespace Chimera.Tests.Client.Common.CorePackages
 		public void UnreadablePackagesAreListedAsFailedRatherThanOmitted()
 		{
 			// silently missing would be indistinguishable from "you forgot to copy it"
-			var entry = Build([ Pkg("Broken", "/cores/b.zip", sha1: "dd", error: "waterbox.config is empty or invalid") ], [ ])[0];
+			var entry = Build([ Pkg("Broken", "/cores/b.chimeraCore", sha1: "dd", error: "waterbox.config is empty or invalid") ], [ ])[0];
 			Assert.AreEqual(CorePackageState.Failed, entry.State);
 			StringAssert.Contains(entry.StatusText, "waterbox.config");
 		}
@@ -59,7 +59,7 @@ namespace Chimera.Tests.Client.Common.CorePackages
 		public void APackageThatFailedWhileLoadingIsFailedToo()
 		{
 			// discovery read it fine; the load blew up afterwards (a missing native, say)
-			var pkg = Pkg("Fine On Paper", "/cores/f.zip", sha1: "ee");
+			var pkg = Pkg("Fine On Paper", "/cores/f.chimeraCore", sha1: "ee");
 			var entry = Build([ pkg ], [ ], failures: [ (pkg, "declares native libfoo.so but it is missing") ])[0];
 			Assert.AreEqual(CorePackageState.Failed, entry.State);
 			StringAssert.Contains(entry.StatusText, "libfoo.so");
@@ -71,12 +71,12 @@ namespace Chimera.Tests.Client.Common.CorePackages
 			// File > Open Core, or --core on the commandline: not in Cores/, but very
 			// much part of this session
 			var entries = Build(
-				[ Pkg("InCores", "/cores/a.zip", sha1: "aa") ],
-				[ Loaded("InCores", "/cores/a.zip", "aa"), Loaded("Elsewhere", "/home/user/dev/build.zip", "ff") ]);
+				[ Pkg("InCores", "/cores/a.chimeraCore", sha1: "aa") ],
+				[ Loaded("InCores", "/cores/a.chimeraCore", "aa"), Loaded("Elsewhere", "/home/user/dev/build.chimeraCore", "ff") ]);
 			Assert.AreEqual(2, entries.Count);
 			var stray = entries.Single(static e => e.Name == "Elsewhere");
 			Assert.AreEqual(CorePackageState.Loaded, stray.State);
-			Assert.AreEqual("/home/user/dev/build.zip", stray.Package.Path);
+			Assert.AreEqual("/home/user/dev/build.chimeraCore", stray.Package.Path);
 		}
 
 		[TestMethod]
@@ -91,8 +91,8 @@ namespace Chimera.Tests.Client.Common.CorePackages
 		public void EntriesAreNameSortedAndUnique()
 		{
 			var entries = Build(
-				[ Pkg("Zulu", "/c/z.zip", sha1: "1"), Pkg("alpha", "/c/a.zip", sha1: "2") ],
-				[ Loaded("Zulu", "/c/z.zip", "1") ]); // already listed by discovery; must not double up
+				[ Pkg("Zulu", "/c/z.chimeraCore", sha1: "1"), Pkg("alpha", "/c/a.chimeraCore", sha1: "2") ],
+				[ Loaded("Zulu", "/c/z.chimeraCore", "1") ]); // already listed by discovery; must not double up
 			CollectionAssert.AreEqual(new[] { "alpha", "Zulu" }, entries.Select(static e => e.Name).ToList());
 		}
 	}
