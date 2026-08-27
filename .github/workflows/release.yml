@@ -198,17 +198,25 @@ jobs:
             gh release edit dev --target "${{ steps.what.outputs.sha }}" \
               --title "Development build ${{ steps.what.outputs.short }}" \
               --notes-file build/release/NOTES.md --prerelease
-            # assets carry the commit in their names, so clear the old ones
-            for asset in $(gh release view dev --json assets --jq '.assets[].name'); do
-              gh release delete-asset dev "$asset" --yes
-            done
           else
             gh release create dev --target "${{ steps.what.outputs.sha }}" \
               --title "Development build ${{ steps.what.outputs.short }}" \
               --notes-file build/release/NOTES.md --prerelease
           fi
+
+          # UPLOAD FIRST, THEN PRUNE. The assets carry the commit in their
+          # names, so the new ones never collide with the old - and if this job
+          # dies halfway, the release still has a complete set of SOMETHING.
+          # Deleting first would leave the download link empty for as long as it
+          # took to fail.
           gh release upload dev build/release/chimera-*.zip build/release/chimera-*.tar.gz \
             build/release/LICENSES.md build/release/BUILD.txt --clobber
+          for asset in $(gh release view dev --json assets --jq '.assets[].name'); do
+            case "$asset" in
+              *"${{ steps.what.outputs.short }}"*|LICENSES.md|BUILD.txt) ;;
+              *) echo "removing stale asset $asset"; gh release delete-asset dev "$asset" --yes ;;
+            esac
+          done
 
       - name: Publish the nightly
         if: steps.moved.outputs.skip != 'true' && steps.what.outputs.kind == 'nightly'
