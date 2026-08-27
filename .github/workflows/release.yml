@@ -194,32 +194,24 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # one tag, moved: the link in the README is always the newest build
-          git tag -f dev "${{ steps.what.outputs.sha }}"
-          git push -f origin dev
-          if gh release view dev >/dev/null 2>&1; then
-            gh release edit dev --target "${{ steps.what.outputs.sha }}" \
-              --title "Development build ${{ steps.what.outputs.short }}" \
-              --notes-file build/release/NOTES.md --prerelease
-          else
-            gh release create dev --target "${{ steps.what.outputs.sha }}" \
-              --title "Development build ${{ steps.what.outputs.short }}" \
-              --notes-file build/release/NOTES.md --prerelease
-          fi
+          # ONE TAG, MOVED - through the API, never `git push`. A workflow's
+          # token may not create or update workflow FILES, and pushing a tag at
+          # a commit whose .github/workflows differ from the default branch's
+          # counts as exactly that: the first release of this pipeline died on
+          # "refusing to allow a GitHub App to create or update workflow" while
+          # publishing a commit main had already moved past. Deleting the
+          # release with its tag and recreating it at the built commit goes
+          # through the releases API, which has no such restriction, and keeps
+          # the tag honest about which build the assets came from.
+          gh release delete dev --yes --cleanup-tag 2>/dev/null || true
+          gh release create dev --target "${{ steps.what.outputs.sha }}" \
+            --title "Development build ${{ steps.what.outputs.short }}" \
+            --notes-file build/release/NOTES.md --prerelease
 
-          # UPLOAD FIRST, THEN PRUNE. The assets carry the commit in their
-          # names, so the new ones never collide with the old - and if this job
-          # dies halfway, the release still has a complete set of SOMETHING.
-          # Deleting first would leave the download link empty for as long as it
-          # took to fail.
+          # straight away, so the window in which /releases/tag/dev has nothing
+          # to download is as short as an upload
           gh release upload dev build/release/chimera-*.zip build/release/chimera-*.tar.gz \
             build/release/LICENSES.md build/release/BUILD.txt --clobber
-          for asset in $(gh release view dev --json assets --jq '.assets[].name'); do
-            case "$asset" in
-              *"${{ steps.what.outputs.short }}"*|LICENSES.md|BUILD.txt) ;;
-              *) echo "removing stale asset $asset"; gh release delete-asset dev "$asset" --yes ;;
-            esac
-          done
 
       - name: Archive every distinct core package, forever
         if: steps.moved.outputs.skip != 'true'
