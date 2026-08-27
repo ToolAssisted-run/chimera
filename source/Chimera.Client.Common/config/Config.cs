@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
+using System.Linq;
 
 using Chimera.Bizware.Graphics;
 using Chimera.Common;
@@ -25,7 +26,29 @@ namespace Chimera.Client.Common
 			PathEntries.ResolveWithDefaults();
 			HotkeyInfo.ResolveWithDefaults(HotkeyBindings);
 			PathEntries.RefreshTempPath();
+			UnfloatToolsOnce();
 		}
+
+		/// <summary>
+		/// Tools used to float free of the main window by default, and every
+		/// config written before that changed carries the old value per tool - so
+		/// changing the default alone would leave anyone who had opened a tool
+		/// with the old behaviour forever. This flips those saved values once,
+		/// and records that it did, so a later deliberate choice stands.
+		/// </summary>
+		private void UnfloatToolsOnce()
+		{
+			if (ToolsUnfloated) return;
+			ToolsUnfloated = true;
+			foreach (var settings in CommonToolSettings.Values) settings.FloatingWindow = false;
+			foreach (var perTool in CustomToolSettings.Values)
+			{
+				foreach (var settings in perTool.Values.OfType<ToolDialogSettings>()) settings.FloatingWindow = false;
+			}
+		}
+
+		/// <summary>Whether the one-time unfloat above has run (see <see cref="UnfloatToolsOnce"/>).</summary>
+		public bool ToolsUnfloated { get; set; }
 
 		public PathEntryCollection PathEntries { get; set; } = new PathEntryCollection();
 

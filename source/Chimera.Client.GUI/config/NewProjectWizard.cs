@@ -230,9 +230,21 @@ namespace Chimera.Client.GUI
 				Location = Pt(8, 386),
 				Size = new(UIHelper.ScaleX(360), UIHelper.ScaleY(16)),
 			};
-			_backButton = MakeNavButton("< Back", 370, () => ShowPage(_page - 1));
-			_nextButton = MakeNavButton("Next >", 442, Advance);
-			Button cancel = MakeNavButton("Cancel", 506, () => { DialogResult = DialogResult.Cancel; Close(); });
+			_backButton = MakeNavButton("< Back", () => ShowPage(_page - 1));
+			_nextButton = MakeNavButton("Next >", Advance);
+			Button cancel = MakeNavButton("Cancel", () => { DialogResult = DialogResult.Cancel; Close(); });
+			// laid out from the RIGHT EDGE inward, with the same margin the page
+			// content has on the left: hand-placed x positions plus an auto-sized
+			// button had Cancel hanging over the window's edge
+			var margin = UIHelper.ScaleX(8);
+			var gap = UIHelper.ScaleX(6);
+			var right = ClientSize.Width - margin;
+			foreach (var button in new[] { cancel, _nextButton, _backButton })
+			{
+				right -= button.Width;
+				button.Location = new Point(right, UIHelper.ScaleY(382));
+				right -= gap;
+			}
 			AcceptButton = _nextButton;
 			CancelButton = cancel;
 			Controls.AddRange([ _status, _backButton, _nextButton, cancel ]);
@@ -260,13 +272,19 @@ namespace Chimera.Client.GUI
 				Text = text,
 			};
 
-		private Button MakeNavButton(string text, int x, Action onClick)
+		/// <summary>
+		/// One of the three navigation buttons. A FIXED size, because they are
+		/// laid out from the window's right edge and an auto-sized button's width
+		/// is not known until it has been laid out - which is how Cancel ended up
+		/// past the edge of the window.
+		/// </summary>
+		private Button MakeNavButton(string text, Action onClick)
 		{
 			Button b = new()
 			{
 				Anchor = AnchorStyles.Bottom | AnchorStyles.Right,
-				AutoSize = true,
-				Location = Pt(x, 382),
+				AutoSize = false,
+				Size = new(UIHelper.ScaleX(76), UIHelper.ScaleY(24)),
 				Text = text,
 			};
 			b.Click += (_, _) => onClick();

@@ -238,7 +238,35 @@ namespace Chimera.Client.GUI
 			HandleHotkeyUpdate();
 
 			RefreshDialog();
+			PlaceBesideMainWindow();
 			_initialized = true;
+		}
+
+		/// <summary>
+		/// Opens at the main window's right shoulder, tops aligned.
+		///
+		/// TAStudio is the project's window - one is open exactly when the other
+		/// is - so the pair should land as a pair rather than TAStudio appearing
+		/// centred on top of the screen it is meant to sit beside. A saved
+		/// position would put it back wherever it was last dragged, which for a
+		/// window that is only ever opened with its main window is the wrong
+		/// memory to keep; it is placed on every open.
+		///
+		/// If there is no room to the right (a narrow screen, or a main window
+		/// against the right edge), it goes as far right as the screen allows
+		/// rather than off it.
+		/// </summary>
+		private void PlaceBesideMainWindow()
+		{
+			if (MainForm is not Form main || main.WindowState is not FormWindowState.Normal) return;
+
+			var screen = Screen.FromControl(main).WorkingArea;
+			var x = main.Right;
+			if (x + Width > screen.Right) x = Math.Max(screen.Left, screen.Right - Width);
+			var y = Math.Max(screen.Top, Math.Min(main.Top, screen.Bottom - Height));
+
+			StartPosition = FormStartPosition.Manual;
+			Location = new Point(x, y);
 		}
 
 		public override void HandleHotkeyUpdate()

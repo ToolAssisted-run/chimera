@@ -14,7 +14,11 @@ namespace Chimera.Client.Common
 		public ToolDialogSettings()
 		{
 			SaveWindowPosition = true;
-			FloatingWindow = true;
+			// A tool belongs to the window that opened it: it stays in front of the
+			// main window and goes away with it, rather than floating loose among
+			// everything else on the desktop. Anyone who wants it loose can turn
+			// this on per tool (its Settings > Float from Parent).
+			FloatingWindow = false;
 		}
 
 		public void RestoreDefaults()
@@ -22,7 +26,7 @@ namespace Chimera.Client.Common
 			_wndx = null;
 			_wndy = null;
 			SaveWindowPosition = true;
-			FloatingWindow = true;
+			FloatingWindow = false;
 			TopMost = false;
 			AutoLoad = false;
 			Width = null;
