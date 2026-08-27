@@ -26,9 +26,17 @@ and every core package, rebuilt on every change to `main` that passes the gates.
 Nothing is published that did not pass them.
 
 That link always points at the newest build. When you need one that will still
-be there next week - to cite in a bug report, or to go back to - take a dated
-[nightly](https://github.com/ToolAssisted-run/chimera/releases) instead: those
-are immutable, and the last fortnight is kept.
+be there later - to cite in a bug report, or to replay a run years from now -
+take a dated [nightly](https://github.com/ToolAssisted-run/chimera/releases)
+instead: those are immutable and **kept forever**. A movie is only reproducible
+if the build that recorded it still exists, so nothing is ever deleted.
+
+Every distinct core package is kept forever too, in the
+[`cores`](https://github.com/ToolAssisted-run/chimera/releases/tag/cores)
+release, named by its own SHA1. A movie cites the SHA1 of the package that
+recorded it - what a replay has to match is the core, not the frontend around
+it - so whatever a movie names stays downloadable even if it was recorded on a
+development build that has since been replaced.
 
 Every bundle contains `BUILD.txt`, naming the exact commit of the frontend and
 of every core in it, and `LICENSES.md`, stating the terms of the whole thing.

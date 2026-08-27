@@ -8,9 +8,12 @@ name: Release
 #            link that is always the newest; the assets carry the short commit
 #            in their names, so a downloaded file still says what it is.
 #   nightly  an IMMUTABLE dated prerelease, once a day and only when main moved.
-#            The point is not freshness (dev has that) but CITABILITY: after dev
-#            has moved twelve times, "it broke in Tuesday's build" is still a
-#            thing someone can download. The last 14 are kept.
+#            The point is not freshness (dev has that) but PERMANENCE. A movie
+#            cites the build that recorded it, and someone replaying that run in
+#            five years needs THAT build - not a rebuild, because a package's
+#            identity is a function of its toolchain, so the same sources
+#            through a later gcc are different bytes and a different hash.
+#            Nightlies are therefore NEVER deleted. They are the archive.
 #
 # Nothing is published that did not pass CI. The release job is triggered by the
 # CI workflow FINISHING SUCCESSFULLY, and builds that same commit.
@@ -218,6 +221,38 @@ jobs:
             esac
           done
 
+      - name: Archive every distinct core package, forever
+        if: steps.moved.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # A movie cites the SHA1 of the CORE PACKAGE that recorded it, and
+          # what a replay must match is that package: sync is the core, its
+          # settings and its firmware, not the frontend built around them. Core
+          # packages also change rarely - only when a core's submodule is bumped
+          # - and are small (five of the seven are about a megabyte).
+          #
+          # So every DISTINCT package is kept forever under one tag, named by
+          # its own hash. Whatever CorePackageSha1 a movie names, years later,
+          # is still downloadable - even if it was recorded on a rolling dev
+          # build whose bundle has long since been replaced.
+          gh release view cores >/dev/null 2>&1 || \
+            gh release create cores --title "Core package archive" --prerelease --notes \
+              "Every distinct core package Chimera has published, named <core>-<sha1>.zip. A movie cites the SHA1 of the package that recorded it; this is where that package stays."
+          existing=$(gh release view cores --json assets --jq '.assets[].name')
+          for zip in build/bundle-windows/Cores/*.zip; do
+            base=$(basename "$zip" .zip)
+            sha=$(sha1sum "$zip" | cut -c1-12)
+            asset="$base-$sha.zip"
+            if printf '%s\n' "$existing" | grep -qx "$asset"; then
+              echo "already archived: $asset"
+              continue
+            fi
+            cp "$zip" "build/release/$asset"
+            gh release upload cores "build/release/$asset"
+            echo "archived $asset"
+          done
+
       - name: Publish the nightly
         if: steps.moved.outputs.skip != 'true' && steps.what.outputs.kind == 'nightly'
         env:
@@ -230,16 +265,3 @@ jobs:
             --notes-file build/release/NOTES.md --prerelease
           gh release upload "$tag" build/release/chimera-*.zip build/release/chimera-*.tar.gz \
             build/release/LICENSES.md build/release/BUILD.txt --clobber
-
-      - name: Keep the last 14 nightlies
-        if: steps.moved.outputs.skip != 'true' && steps.what.outputs.kind == 'nightly'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          # old enough to be gone, recent enough that a bug report from last
-          # week still names something downloadable
-          for tag in $(gh release list --limit 100 --json tagName --jq '.[].tagName' \
-                        | grep '^nightly-' | sort -r | tail -n +15); do
-            echo "pruning $tag"
-            gh release delete "$tag" --yes --cleanup-tag
-          done
