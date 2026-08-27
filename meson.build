@@ -203,13 +203,13 @@ custom_target(
 )
 
 # ---------------------------------------------------------------------------
-# libminiboxhost: the miniBox waterbox host (from the extern/miniBox submodule).
+# libminiboxhost: the miniBox waterbox host (from the extern/chimera-common-minibox submodule).
 # Chimera is waterbox-only: this host loads every core's core.wbx, so it ships
 # with the frontend. It is self-contained C (no external deps, no guest
 # toolchain), so we compile it directly here rather than driving miniBox's own
 # meson build - the guest toolchain (musl) is a core-author kit, never built here.
 # ---------------------------------------------------------------------------
-minibox_host = repo_root / 'extern/miniBox/source/host'
+minibox_host = repo_root / 'extern/chimera-common-minibox/source/host'
 minibox_host_src = files(
   minibox_host / 'diag.c',
   minibox_host / 'sha256.c',
@@ -229,7 +229,7 @@ minibox_host_src = files(
 # frontend shows it and a movie records it, so every binary in the emulation path can
 # say where it came from. Inputs only, never a timestamp.
 minibox_commit = run_command(
-  'git', '-C', repo_root / 'extern/miniBox', 'rev-parse', '--short=12', 'HEAD',
+  'git', '-C', repo_root / 'extern/chimera-common-minibox', 'rev-parse', '--short=12', 'HEAD',
   check: false).stdout().strip()
 if minibox_commit == ''
   minibox_commit = 'unknown'
@@ -242,7 +242,7 @@ shared_library(
   'miniboxhost',
   minibox_host_src,
   name_prefix: 'lib',  # libminiboxhost.{so,dll} on both targets (the adapter resolves this name)
-  include_directories: include_directories('extern/miniBox/source/host'),
+  include_directories: include_directories('extern/chimera-common-minibox/source/host'),
   c_args: [
     '-fno-strict-aliasing',
     '-DMB_BUILD_COMMIT="' + minibox_commit + '"',

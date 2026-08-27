@@ -1,14 +1,14 @@
 #!/bin/sh
 # Builds synth.wbx (the waterboxed flavor (c) Synth core) and synth-run-box (its
-# Level A tester) using the miniBox toolchain + host from extern/miniBox.
+# Level A tester) using the miniBox toolchain + host from extern/chimera-common-minibox.
 #
 # Prereq: build miniBox once. musl (the guest toolchain) and the host both build
 # in the meson graph, so a single setup+compile is enough:
-#   meson setup extern/miniBox/build/meson-linux
-#   ninja -C extern/miniBox/build/meson-linux
+#   meson setup extern/chimera-common-minibox/build/meson-linux
+#   ninja -C extern/chimera-common-minibox/build/meson-linux
 set -eu
 here="$(cd "$(dirname "$0")" && pwd)"
-mb="$(cd "$here/../../../extern/miniBox" && pwd)"
+mb="$(cd "$here/../../../extern/chimera-common-minibox" && pwd)"
 mbuild="$mb/build/meson-linux"
 
 # musl-gcc is installed to the build root; emulibc.o and the host are meson outputs.

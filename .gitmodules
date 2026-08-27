@@ -31,18 +31,18 @@
 	path = extern/sqlite3
 	url = https://github.com/ericsink/cb.git
 	ignore = untracked
-[submodule "extern/miniBox"]
+[submodule "extern/chimera-common-minibox"]
 	url = https://github.com/ToolAssisted-run/chimera-common-minibox.git
-	path = extern/miniBox
+	path = extern/chimera-common-minibox
 [submodule "quickernes"]
 	path = extern/cores/quickernes
 	url = https://github.com/ToolAssisted-run/chimera-core-quickernes.git
-	branch = minihawk-adapter
+	branch = main
 	ignore = dirty
 [submodule "neshawk"]
 	path = extern/cores/neshawk
 	url = https://github.com/ToolAssisted-run/chimera-core-neshawk.git
-	branch = minihawk-adapter
+	branch = main
 	ignore = dirty
 [submodule "ppsspp"]
 	path = extern/cores/ppsspp

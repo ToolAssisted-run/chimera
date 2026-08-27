@@ -507,7 +507,7 @@ Decisions, all user-confirmed:
    every mednafen core - is the scale precedent.)
 4. **Everything waterbox lives in ONE external repository: miniBox**
    (github.com/ToolAssisted-run/chimera-common-minibox), consumed as a submodule at
-   extern/miniBox like every other from-source dependency. It carries all
+   extern/chimera-common-minibox like every other from-source dependency. It carries all
    sides: the runtime (sandbox host - Chimera's meson builds it into the
    frontend's OS-dependent artifacts), the guest toolchain (the core-author
    kit: musl fork, emulibc, libco, libcxx sysroot, linkscript, common.mak),
@@ -594,7 +594,7 @@ re-record.
 
 Flavor (c) LANDED (2026-08-11): synth.wbx is the SAME synthcore.c
 compiled for the miniBox waterbox sandbox (see the miniBox repository at
-extern/miniBox - a from-scratch C/C++ port of BizHawk's waterbox host,
+extern/chimera-common-minibox - a from-scratch C/C++ port of BizHawk's waterbox host,
 GCC-built guest toolchain, machine spec, all meson) and wrapped in the
 waterbox ABI (tests/synth/package-box/). Its whole machine state lives in
 guest memory, so the waterbox host savestates it AUTOMATICALLY - no

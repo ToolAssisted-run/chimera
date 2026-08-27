@@ -44,7 +44,7 @@ say() { printf "\n== %s\n" "$1"; }
 # Every core package builds its guest against a miniBox guest kit; default it to
 # the submodule the frontend itself is built against, or a stale sibling clone
 # silently produces a core.wbx built against a different ABI.
-export MINIBOX_DIR="${MINIBOX_DIR:-$root/extern/miniBox}"
+export MINIBOX_DIR="${MINIBOX_DIR:-$root/extern/chimera-common-minibox}"
 
 native_dir="$root/build/meson-$platform"
 if [ "$skip_natives" -eq 0 ]; then
@@ -132,7 +132,7 @@ say "build stamp"
 	printf "\ncores (submodule commits):\n"
 	git -C "$root" submodule status extern/cores/* 2>/dev/null | sed 's/^/  /'
 	printf "\nguest kit:\n"
-	git -C "$root" submodule status extern/miniBox 2>/dev/null | sed 's/^/  /'
+	git -C "$root" submodule status extern/chimera-common-minibox 2>/dev/null | sed 's/^/  /'
 	printf "\nfiles (sha1):\n"
 	( cd "$out" && sha1sum Chimera.exe Cores/*.zip 2>/dev/null | sed 's/^/  /' )
 } > "$out/BUILD.txt"
