@@ -17,7 +17,7 @@
 #include "manifest_util.hpp"
 #include "conditions.hpp"
 
-#include "../../extern/cjson/cJSON.h"
+#include "../../extern/tools/cjson/cJSON.h"
 
 #include <cstring>
 #include <set>

@@ -7,7 +7,7 @@
 #
 #   Windows artifacts (.dll, cross-built via mingw-w64):
 #     meson setup build/meson-windows --prefix "$(pwd)/build" --libdir dll \
-#         --cross-file extern/meson/mingw-w64.ini
+#         --cross-file extern/tools/meson/mingw-w64.ini
 #     meson compile -C build/meson-windows
 #     meson install -C build/meson-windows
 #
@@ -36,17 +36,17 @@ thread_dep = dependency('threads')
 # libbizhash: hardware-accelerated hashing (in-repo sources)
 # ---------------------------------------------------------------------------
 bizhash_src = files(
-  'extern/LibBizHash/bizinterface.c',
-  'extern/LibBizHash/common/x86_features.c',
-  'extern/LibBizHash/crc32/crc32_braid.c',
-  'extern/LibBizHash/crc32/crc32_fold_pclmulqdq.c',
-  'extern/LibBizHash/crc32/crc32_fold_vpclmulqdq.c',
-  'extern/LibBizHash/sha1/sha1_sha.c',
+  'extern/tools/LibBizHash/bizinterface.c',
+  'extern/tools/LibBizHash/common/x86_features.c',
+  'extern/tools/LibBizHash/crc32/crc32_braid.c',
+  'extern/tools/LibBizHash/crc32/crc32_fold_pclmulqdq.c',
+  'extern/tools/LibBizHash/crc32/crc32_fold_vpclmulqdq.c',
+  'extern/tools/LibBizHash/sha1/sha1_sha.c',
 )
 shared_library(
   'bizhash',
   bizhash_src,
-  include_directories: include_directories('extern/LibBizHash/common'),
+  include_directories: include_directories('extern/tools/LibBizHash/common'),
   gnu_symbol_visibility: 'hidden',
   install: true,
   install_dir: 'dll',
@@ -63,7 +63,7 @@ foreach f : [
   'lstate', 'lstring', 'lstrlib', 'ltable', 'ltablib', 'ltm', 'lundump',
   'lutf8lib', 'lvm', 'lzio',
 ]
-  lua_src += files('extern/lua' / f + '.c')
+  lua_src += files('extern/tools/lua' / f + '.c')
 endforeach
 lua54 = shared_library(
   'lua54',
@@ -89,7 +89,7 @@ if host_windows
 endif
 shared_library(
   'e_sqlite3',
-  files('extern/sqlite3/sqlite3/sqlite3.c'),
+  files('extern/tools/sqlite3/sqlite3/sqlite3.c'),
   name_prefix: host_windows ? '' : 'lib',
   c_args: sqlite_args,
   dependencies: [m_dep, dl_dep, thread_dep],
@@ -109,12 +109,12 @@ endif
 shared_library(
   'cimgui',
   files(
-    'extern/cimgui/cimgui.cpp',
-    'extern/cimgui/imgui/imgui.cpp',
-    'extern/cimgui/imgui/imgui_demo.cpp',
-    'extern/cimgui/imgui/imgui_draw.cpp',
-    'extern/cimgui/imgui/imgui_tables.cpp',
-    'extern/cimgui/imgui/imgui_widgets.cpp',
+    'extern/tools/cimgui/cimgui.cpp',
+    'extern/tools/cimgui/imgui/imgui.cpp',
+    'extern/tools/cimgui/imgui/imgui_demo.cpp',
+    'extern/tools/cimgui/imgui/imgui_draw.cpp',
+    'extern/tools/cimgui/imgui/imgui_tables.cpp',
+    'extern/tools/cimgui/imgui/imgui_widgets.cpp',
   ),
   name_prefix: host_windows ? '' : 'lib',
   cpp_args: cimgui_args,
@@ -131,7 +131,7 @@ luasocket_common = [
 ]
 luasocket_src = []
 foreach f : luasocket_common + [host_windows ? 'wsocket' : 'usocket']
-  luasocket_src += files('extern/luasocket/src' / f + '.c')
+  luasocket_src += files('extern/tools/luasocket/src' / f + '.c')
 endforeach
 luasocket_args = []
 luasocket_deps = []
@@ -140,23 +140,23 @@ if host_windows
   luasocket_deps += cc.find_library('ws2_32')
 endif
 # both modules must be named "core" on disk; meson target names and per-dir
-# outputs are unique, so each builds in its own subdir (extern/meson/luasocket-*)
-lua_inc = include_directories('extern/lua')
-subdir('extern/meson/luasocket-socket')
-subdir('extern/meson/luasocket-mime')
+# outputs are unique, so each builds in its own subdir (extern/tools/meson/luasocket-*)
+lua_inc = include_directories('extern/tools/lua')
+subdir('extern/tools/meson/luasocket-socket')
+subdir('extern/tools/meson/luasocket-mime')
 
 # ---------------------------------------------------------------------------
 # zstd: savestate compression; upstream's own meson build, nested
 # ---------------------------------------------------------------------------
-nested_tool = files('extern/meson/nested-build.sh')
-cross_arg = host_windows ? '--cross-file=' + repo_root / 'extern/meson/mingw-w64.ini' : ''
+nested_tool = files('extern/tools/meson/nested-build.sh')
+cross_arg = host_windows ? '--cross-file=' + repo_root / 'extern/tools/meson/mingw-w64.ini' : ''
 zstd_out = host_windows ? 'libzstd.dll' : 'libzstd.so'
 custom_target(
   'zstd',
   output: zstd_out,
   command: [
     nested_tool, 'meson',
-    repo_root / 'extern/zstd/build/meson',
+    repo_root / 'extern/tools/zstd/build/meson',
     '@OUTDIR@' / 'zstd-build',
     '@OUTPUT@',
     cross_arg,
@@ -170,13 +170,13 @@ custom_target(
 # ---------------------------------------------------------------------------
 # SDL2 + OpenAL Soft: cmake-driven, via the wrapper script
 # ---------------------------------------------------------------------------
-cmake_toolchain = host_windows ? repo_root / 'extern/meson/mingw-toolchain.cmake' : ''
+cmake_toolchain = host_windows ? repo_root / 'extern/tools/meson/mingw-toolchain.cmake' : ''
 custom_target(
   'sdl2',
   output: host_windows ? 'SDL2.dll' : 'libSDL2.so',
   command: [
     nested_tool, 'cmake',
-    repo_root / 'extern/SDL2',
+    repo_root / 'extern/tools/SDL2',
     '@OUTDIR@' / 'sdl2-build',
     '@OUTPUT@',
     cmake_toolchain,
@@ -190,7 +190,7 @@ custom_target(
   output: host_windows ? 'OpenAL32.dll' : 'libopenal.so',
   command: [
     nested_tool, 'cmake',
-    repo_root / 'extern/openal-soft',
+    repo_root / 'extern/tools/openal-soft',
     '@OUTDIR@' / 'openal-build',
     '@OUTPUT@',
     cmake_toolchain,
@@ -203,13 +203,13 @@ custom_target(
 )
 
 # ---------------------------------------------------------------------------
-# libminiboxhost: the miniBox waterbox host (from the extern/chimera-common-minibox submodule).
+# libminiboxhost: the miniBox waterbox host (from the extern/tools/chimera-common-minibox submodule).
 # Chimera is waterbox-only: this host loads every core's core.wbx, so it ships
 # with the frontend. It is self-contained C (no external deps, no guest
 # toolchain), so we compile it directly here rather than driving miniBox's own
 # meson build - the guest toolchain (musl) is a core-author kit, never built here.
 # ---------------------------------------------------------------------------
-minibox_host = repo_root / 'extern/chimera-common-minibox/source/host'
+minibox_host = repo_root / 'extern/tools/chimera-common-minibox/source/host'
 minibox_host_src = files(
   minibox_host / 'diag.c',
   minibox_host / 'sha256.c',
@@ -229,7 +229,7 @@ minibox_host_src = files(
 # frontend shows it and a movie records it, so every binary in the emulation path can
 # say where it came from. Inputs only, never a timestamp.
 minibox_commit = run_command(
-  'git', '-C', repo_root / 'extern/chimera-common-minibox', 'rev-parse', '--short=12', 'HEAD',
+  'git', '-C', repo_root / 'extern/tools/chimera-common-minibox', 'rev-parse', '--short=12', 'HEAD',
   check: false).stdout().strip()
 if minibox_commit == ''
   minibox_commit = 'unknown'
@@ -242,7 +242,7 @@ shared_library(
   'miniboxhost',
   minibox_host_src,
   name_prefix: 'lib',  # libminiboxhost.{so,dll} on both targets (the adapter resolves this name)
-  include_directories: include_directories('extern/chimera-common-minibox/source/host'),
+  include_directories: include_directories('extern/tools/chimera-common-minibox/source/host'),
   c_args: [
     '-fno-strict-aliasing',
     '-DMB_BUILD_COMMIT="' + minibox_commit + '"',
@@ -279,8 +279,8 @@ engine_src = files(
   'engine/source/host_dyn.cpp',
   'engine/source/movie_entry.cpp',
   'engine/source/session.cpp',
-  'extern/miniz/miniz.c',  # vendored (MIT): the zip half of the state container
-  'extern/cjson/cJSON.c',  # vendored (MIT): bundle JSON
+  'extern/tools/miniz/miniz.c',  # vendored (MIT): the zip half of the state container
+  'extern/tools/cjson/cJSON.c',  # vendored (MIT): bundle JSON
 )
 # Provenance: this repo's commit, since the engine lives in-tree. Inputs only.
 engine_commit = run_command(

@@ -13,7 +13,7 @@
 #include "file_io.hpp"
 #include "host_dyn.hpp"
 
-#include "../../extern/cjson/cJSON.h"
+#include "../../extern/tools/cjson/cJSON.h"
 
 #include <algorithm>
 #include <cstring>

@@ -60,7 +60,7 @@ The canonical build is Linux-hosted and meson-mediated, and produces the artifac
 
 ```
 meson setup build/meson-linux   --prefix "$(pwd)/build" --libdir dll
-meson setup build/meson-windows --prefix "$(pwd)/build" --libdir dll --cross-file extern/meson/mingw-w64.ini
+meson setup build/meson-windows --prefix "$(pwd)/build" --libdir dll --cross-file extern/tools/meson/mingw-w64.ini
 meson compile -C build/meson-linux && meson install -C build/meson-linux
 meson compile -C build/meson-windows && meson install -C build/meson-windows
 meson compile -C build/meson-linux frontend   # the managed solution (dotnet)

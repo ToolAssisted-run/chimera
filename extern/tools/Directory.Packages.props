@@ -2,5 +2,5 @@
 	<!-- NuGet discovers Directory.Packages.props by walking up from each project;
 		the single authoritative version table lives in source/, this just forwards
 		to it for the managed projects under extern/. -->
-	<Import Project="../source/Directory.Packages.props" />
+	<Import Project="../../source/Directory.Packages.props" />
 </Project>

@@ -12,7 +12,7 @@
 #include "chimera/engine.h"
 #include "zstd_dyn.hpp"
 
-#include "../../extern/miniz/miniz.h"
+#include "../../extern/tools/miniz/miniz.h"
 
 #include <cstring>
 #include <map>

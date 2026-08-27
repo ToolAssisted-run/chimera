@@ -1,39 +1,39 @@
 [submodule "ExternalProjects/SDL2/SDL"]
-	path = extern/SDL2/SDL
+	path = extern/tools/SDL2/SDL
 	url = https://github.com/libsdl-org/SDL.git
 	branch = SDL2
 	ignore = untracked
 [submodule "ExternalProjects/SDL2/libusb"]
-	path = extern/SDL2/libusb
+	path = extern/tools/SDL2/libusb
 	url = https://github.com/libusb/libusb.git
 	ignore = untracked
-[submodule "extern/lua"]
-	path = extern/lua
+[submodule "extern/tools/lua"]
+	path = extern/tools/lua
 	url = https://github.com/lua/lua.git
 	ignore = untracked
-[submodule "extern/zstd"]
-	path = extern/zstd
+[submodule "extern/tools/zstd"]
+	path = extern/tools/zstd
 	url = https://github.com/facebook/zstd.git
 	ignore = untracked
-[submodule "extern/cimgui"]
-	path = extern/cimgui
+[submodule "extern/tools/cimgui"]
+	path = extern/tools/cimgui
 	url = https://github.com/cimgui/cimgui.git
 	ignore = untracked
-[submodule "extern/openal-soft"]
-	path = extern/openal-soft
+[submodule "extern/tools/openal-soft"]
+	path = extern/tools/openal-soft
 	url = https://github.com/kcat/openal-soft.git
 	ignore = untracked
-[submodule "extern/luasocket"]
-	path = extern/luasocket
+[submodule "extern/tools/luasocket"]
+	path = extern/tools/luasocket
 	url = https://github.com/lunarmodules/luasocket.git
 	ignore = untracked
-[submodule "extern/sqlite3"]
-	path = extern/sqlite3
+[submodule "extern/tools/sqlite3"]
+	path = extern/tools/sqlite3
 	url = https://github.com/ericsink/cb.git
 	ignore = untracked
-[submodule "extern/chimera-common-minibox"]
+[submodule "extern/tools/chimera-common-minibox"]
 	url = https://github.com/ToolAssisted-run/chimera-common-minibox.git
-	path = extern/chimera-common-minibox
+	path = extern/tools/chimera-common-minibox
 [submodule "quickernes"]
 	path = extern/cores/quickernes
 	url = https://github.com/ToolAssisted-run/chimera-core-quickernes.git

@@ -121,7 +121,7 @@ jobs:
         run: |
           # the cache key is the exact core commits plus the guest kit they
           # build against: bump one core, rebuild one core
-          git submodule status extern/cores/* extern/chimera-common-minibox > core-pins.txt
+          git submodule status extern/cores/* extern/tools/chimera-common-minibox > core-pins.txt
           cat core-pins.txt
 
       - name: Cache the core guest builds
