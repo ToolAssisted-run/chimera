@@ -458,10 +458,14 @@ ENCPY
 			( cd "$repo_root" && CHIMERA_JOB="$ejob" timeout 300 mono "$emu_exe" --headless \
 				"--config=$work/config.encode.ini" "--core=$repo_root/build/Cores/synth-box.chimeraCore" \
 				"--project=$edir/$ename.chimeraProject" "--lua=$here/synth-encode.lua" ) > "$work/encode.log" 2>&1
+			# counted with the ffmpeg this build ships rather than a system
+			# ffprobe: the gate must not depend on a tool the machine happens to
+			# have, and a CI runner does not have one. The progress line ffmpeg
+			# writes while decoding to nowhere ends with the frame it reached.
 			ecount=""
 			if [ -s "$evideo" ]; then
-				ecount="$(ffprobe -v error -select_streams v:0 -count_frames \
-					-show_entries stream=nb_read_frames -of csv=p=0 "$evideo" 2>/dev/null | tr -d "\r\n,")"
+				ecount="$("$repo_root/build/dll/ffmpeg" -hide_banner -nostdin -i "$evideo" -f null - 2>&1 \
+					| tr "\r" "\n" | sed -n "s/^frame= *\([0-9][0-9]*\).*/\1/p" | tail -1)"
 			fi
 			ebefore="$(sed -n "s/^before=//p" "$work/encode.meta.txt" 2>/dev/null)"
 			eafter="$(sed -n "s/^after=//p" "$work/encode.meta.txt" 2>/dev/null)"

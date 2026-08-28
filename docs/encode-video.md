@@ -90,9 +90,10 @@ while client.encodingvideo() do emu.frameadvance() end
 
 That is what `tests/synth/run-witness.sh` uses to prove the whole path on every
 run: it encodes a stretch of a real project with the synthetic core and checks
-with `ffprobe` that the file holds exactly the frames that were asked for, both
-ends included, and that the emulator was handed back on the frame it was
-borrowed from.
+that the file holds exactly the frames that were asked for, both ends included,
+and that the emulator was handed back on the frame it was borrowed from. It
+counts them with the ffmpeg the build ships, not a system ffprobe: a gate must
+not depend on a tool the machine happens to have, and a CI runner has none.
 
 The command line's `--dump-type` / `--dump-name` / `--dump-length` still exist
 and still work; that is a different thing, for a build machine dumping a run
