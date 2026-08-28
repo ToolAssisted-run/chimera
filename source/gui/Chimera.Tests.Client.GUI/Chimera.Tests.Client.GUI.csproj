@@ -25,9 +25,9 @@
 	-->
 	<Target Name="CopyFrontendForProbing" AfterTargets="Build">
 		<Copy
-			SourceFiles="$(ProjectDir)../../build/Chimera.exe"
+			SourceFiles="$(ProjectDir)../../../build/Chimera.exe"
 			DestinationFiles="$(OutputPath)Chimera.Client.GUI.exe"
 			SkipUnchangedFiles="true"
-			Condition="Exists('$(ProjectDir)../../build/Chimera.exe')" />
+			Condition="Exists('$(ProjectDir)../../../build/Chimera.exe')" />
 	</Target>
 </Project>

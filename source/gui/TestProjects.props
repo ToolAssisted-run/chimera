@@ -2,7 +2,7 @@
 	<Import Project="MainSlnCommon.props" />
 	<PropertyGroup>
 		<EnableMSTestRunner>true</EnableMSTestRunner>
-		<OutputPath>$(ProjectDir)../../build/tests</OutputPath>
+		<OutputPath>$(ProjectDir)../../../build/tests</OutputPath>
 		<OutputType>Exe</OutputType>
 	</PropertyGroup>
 	<PropertyGroup Condition=" '$(TestProjTargetFrameworkOverride)' != '' AND '$(TargetFramework)' == 'net48' ">

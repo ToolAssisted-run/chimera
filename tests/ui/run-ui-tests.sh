@@ -31,7 +31,7 @@ done
 here="$(cd "$(dirname "$0")" && pwd)"
 repo_root="$(cd "$here/../.." && pwd)"
 tests_dir="$repo_root/build/tests"
-[ -d "$tests_dir" ] || { echo "no build/tests - run: dotnet build source/Chimera.sln -c Release" >&2; exit 1; }
+[ -d "$tests_dir" ] || { echo "no build/tests - run: dotnet build source/gui/Chimera.sln -c Release" >&2; exit 1; }
 
 export LD_LIBRARY_PATH="$repo_root/build/dll:$repo_root/build:${LD_LIBRARY_PATH:-}"
 export MONO_CRASH_NOFILE=1 MONO_WINFORMS_XIM_STYLE=disabled

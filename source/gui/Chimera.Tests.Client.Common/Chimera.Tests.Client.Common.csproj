@@ -12,7 +12,7 @@
 		<None Include="$(ProjectDir)/Movie/macros/**/*">
 			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
 		</None>
-		<None Include="$(ProjectDir)../../build/dll/*e_sqlite3.*" CopyToOutputDirectory="PreserveNewest" />
+		<None Include="$(ProjectDir)../../../build/dll/*e_sqlite3.*" CopyToOutputDirectory="PreserveNewest" />
 		<None Include="$(ProjectDir)/lua/scripts/**/*">
 			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
 		</None>

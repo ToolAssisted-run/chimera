@@ -23,7 +23,7 @@ Lua. The GUI keeps windows, rendering, input devices, and config presentation.
 
 Rules, in the same spirit as the waterbox boundary:
 
-1. **The ABI is a frozen spec.** Flat C ABI in `engine/include/chimera/engine.h`,
+1. **The ABI is a frozen spec.** Flat C ABI in `source/engine/include/chimera/engine.h`,
    prefix `ce_`, versioned by `CE_ABI_VERSION` / `ce_abi_version()`. Additive changes
    only; anything else bumps the version and the C# side checks it at load.
 2. **Bulk data crosses as buffers.** Never a call per byte/cell/frame. Borrowed
@@ -37,7 +37,7 @@ Rules, in the same spirit as the waterbox boundary:
 ## The method (per component)
 
 Move one component at a time, smallest verifiable seam first. For each: implement in
-`engine/` with meson-run C++ tests carrying byte-exact fixtures; wire the C# call
+`source/engine/` with meson-run C++ tests carrying byte-exact fixtures; wire the C# call
 sites through the ABI (BizInvoke, same pattern as libminiboxhost); keep a C# parity
 test comparing engine behaviour against the legacy behaviour where the witness gate
 does not reach; witness gate + full test suite green before the next component starts.
@@ -109,7 +109,7 @@ long-lived dual paths.
      movie and Zwinder greenzone - rewiring them onto the session is next.
    - 5b **the entry format, witnessed** - DONE. The two gaps the step above
      left are closed. The Bk2 entry layout moved out of the session into
-     `engine/source/movie_entry.{hpp,cpp}` as a pure function of a
+     `source/engine/source/movie_entry.{hpp,cpp}` as a pure function of a
      controller's declaration, so `test_movie_entry` can exercise it against
      controllers no core in the tree declares - AXES above all (padding,
      sign, non-zero neutral, axes-before-buttons, multi-player grouping, the

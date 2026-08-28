@@ -261,24 +261,24 @@ shared_library(
 # engine/include/chimera/engine.h is a frozen spec; the frontend BizInvokes it
 # the same way it does libminiboxhost.
 # ---------------------------------------------------------------------------
-engine_inc = include_directories('engine/include')
+engine_inc = include_directories('source/engine/include')
 engine_src = files(
-  'engine/source/engine.cpp',
-  'engine/source/movie_log.cpp',
-  'engine/source/movie_text.cpp',
-  'engine/source/state_container.cpp',
-  'engine/source/zstd_dyn.cpp',
-  'engine/source/sha1.cpp',
-  'engine/source/firmware.cpp',
-  'engine/source/conditions.cpp',
-  'engine/source/multifile.cpp',
-  'engine/source/manifest_util.cpp',
-  'engine/source/project.cpp',
-  'engine/source/file_io.cpp',
-  'engine/source/package.cpp',
-  'engine/source/host_dyn.cpp',
-  'engine/source/movie_entry.cpp',
-  'engine/source/session.cpp',
+  'source/engine/source/engine.cpp',
+  'source/engine/source/movie_log.cpp',
+  'source/engine/source/movie_text.cpp',
+  'source/engine/source/state_container.cpp',
+  'source/engine/source/zstd_dyn.cpp',
+  'source/engine/source/sha1.cpp',
+  'source/engine/source/firmware.cpp',
+  'source/engine/source/conditions.cpp',
+  'source/engine/source/multifile.cpp',
+  'source/engine/source/manifest_util.cpp',
+  'source/engine/source/project.cpp',
+  'source/engine/source/file_io.cpp',
+  'source/engine/source/package.cpp',
+  'source/engine/source/host_dyn.cpp',
+  'source/engine/source/movie_entry.cpp',
+  'source/engine/source/session.cpp',
   'extern/tools/miniz/miniz.c',  # vendored (MIT): the zip half of the state container
   'extern/tools/cjson/cJSON.c',  # vendored (MIT): bundle JSON
 )
@@ -315,7 +315,7 @@ shared_library(
 )
 executable(
   'chimera-run',
-  ['engine/tools/chimera-run.cpp'] + engine_src,
+  ['source/engine/tools/chimera-run.cpp'] + engine_src,
   include_directories: engine_inc,
   cpp_args: engine_build_args,
   c_args: engine_build_args,
@@ -330,7 +330,7 @@ if not meson.is_cross_build()
       'engine_' + engine_test,
       executable(
         'test_' + engine_test,
-        ['engine/tests/test_' + engine_test + '.cpp'] + engine_src,
+        ['source/engine/tests/test_' + engine_test + '.cpp'] + engine_src,
         include_directories: engine_inc,
         cpp_args: engine_build_args + ['-UNDEBUG'],  # these tests ARE asserts
         c_args: engine_build_args,

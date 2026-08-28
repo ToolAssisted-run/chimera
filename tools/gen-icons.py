@@ -5,7 +5,7 @@ ice flowers, the question block).
 
     python3 tools/gen-icons.py [--preview <file.png>]
 
-What it writes, into source/Chimera.Client.GUI/images:
+What it writes, into source/gui/Chimera.Client.GUI/images:
 
   TAStudio.png / TAStudio.ico   the Chimera eye in TAStudio's own colours
   Freeze.png   / Freeze.ico     a snowflake (freeze an address; also cheats)
@@ -30,7 +30,7 @@ import sys
 from PIL import Image, ImageDraw
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-IMAGES = os.path.join(HERE, "..", "source", "Chimera.Client.GUI", "images")
+IMAGES = os.path.join(HERE, "..", "source", "gui", "Chimera.Client.GUI", "images")
 
 # the brand palette, read off images/chimera.png
 TEAL = (45, 179, 166)

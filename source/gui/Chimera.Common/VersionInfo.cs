@@ -11,7 +11,7 @@ namespace Chimera.Common
 		public static readonly string? CustomBuildString;
 
 		/// <summary>Chimera's contributors, and through them BizHawk's: the About box links here.</summary>
-		public static readonly string CreditsListURI = "https://github.com/ToolAssisted-run/chimera/blob/main/Credits.md";
+		public static readonly string CreditsListURI = "https://github.com/ToolAssisted-run/chimera/blob/main/CREDITS.md";
 
 		public static readonly string UserAgentEscaped;
 

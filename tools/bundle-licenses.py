@@ -80,7 +80,7 @@ def main():
 
     # the frontend's own terms, copied in beside the cores
     if chimera_root:
-        for filename in ("LICENSE", "Credits.md"):
+        for filename in ("LICENSE", "CREDITS.md"):
             src = os.path.join(chimera_root, filename)
             if os.path.exists(src):
                 with open(src, "rb") as f:
@@ -117,7 +117,7 @@ def main():
     lines.append("")
     lines.append("Chimera itself is a derivative fork of BizHawk; its terms are in")
     lines.append("`licenses/chimera-LICENSE` and the people behind it in")
-    lines.append("`licenses/chimera-Credits.md`. The native libraries it links (SDL2, OpenAL")
+    lines.append("`licenses/chimera-CREDITS.md`. The native libraries it links (SDL2, OpenAL")
     lines.append("Soft, Lua, zstd, SQLite, cimgui, luasocket and others) remain their authors'")
     lines.append("under their own licences.")
     lines.append("")

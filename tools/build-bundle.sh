@@ -63,7 +63,7 @@ if [ "$skip_natives" -eq 0 ]; then
 	[ "$platform" = "linux" ] && meson install -C "$native_dir"
 
 	say "managed solution"
-	dotnet build "$root/source/Chimera.sln" -c Release /nodeReuse:false -p:UseSharedCompilation=false -v q --nologo
+	dotnet build "$root/source/gui/Chimera.sln" -c Release /nodeReuse:false -p:UseSharedCompilation=false -v q --nologo
 fi
 
 say "staging into $out"
