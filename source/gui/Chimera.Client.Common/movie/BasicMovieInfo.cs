@@ -66,6 +66,18 @@ namespace Chimera.Client.Common
 		{
 			get
 			{
+				// what the machine that recorded this actually ran at. Anything
+				// below is a guess; this is the answer, and a movie written by any
+				// recent build carries it.
+				if (Header.TryGetValue(HeaderKeys.VsyncNumerator, out var numStr)
+					&& Header.TryGetValue(HeaderKeys.VsyncDenominator, out var denStr)
+					&& double.TryParse(numStr, NumberStyles.Integer, CultureInfo.InvariantCulture, out var num)
+					&& double.TryParse(denStr, NumberStyles.Integer, CultureInfo.InvariantCulture, out var den)
+					&& den > 0)
+				{
+					return num / den;
+				}
+
 				if (SystemID == VSystemID.Raw.Arcade && Header.TryGetValue(HeaderKeys.VsyncAttoseconds, out var vsyncAttoStr))
 				{
 					const decimal attosInSec = 1_000_000_000_000_000_000.0M;

@@ -24,6 +24,20 @@ namespace Chimera.Client.Common
 		public const string CycleCount = "CycleCount";
 		public const string ClockRate = "ClockRate";
 		public const string VsyncAttoseconds = "VsyncAttoseconds"; // used for Arcade due to it representing thousands of different systems with different vsync rates
+
+		// The rate the machine actually ran at, as the core reports it. Chimera
+		// keeps no per-system rate table - the exact rate is the core's, and a
+		// core is a package this frontend knows nothing about - so a movie that
+		// did not write it down cannot be turned into a duration by anything
+		// except the core that recorded it.
+		public const string VsyncNumerator = "VsyncNumerator";
+		public const string VsyncDenominator = "VsyncDenominator";
+
+		// The last frame anything is pressed on. Derived from the input log, and
+		// written on every save because it changes with the log: a reader that
+		// wants where the run's input stops should not have to know what a
+		// neutral entry looks like for this core's controller.
+		public const string LastInputFrame = "LastInputFrame";
 		public const string Core = "Core";
 		public const string WaterboxHost = "WaterboxHost"; // the sandbox the core ran inside, by its own build info
 		public const string Firmware = "Firmware"; // "<id>=<sha1>" per file the core was given; a BIOS changes what runs

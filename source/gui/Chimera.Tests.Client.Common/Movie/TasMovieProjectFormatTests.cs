@@ -77,6 +77,44 @@ namespace Chimera.Tests.Client.Common.Movie
 		}
 
 		[TestMethod]
+		public void ItWritesDownWhereTheRunsInputStops()
+		{
+			// so a reader does not have to know what a neutral entry looks like for
+			// this core's controller in order to find the end of the run
+			var path = Path.Combine(_dir, "last-input.chimeraProject");
+			var movie = MakeWorkedMovie(path);   // presses A on frame 3 of 6
+			movie.Save();
+
+			var reloaded = LoadFresh(path);
+			Assert.AreEqual("3", reloaded.HeaderEntries[HeaderKeys.LastInputFrame]);
+			Assert.AreEqual(3, reloaded.LastNonEmptyInputFrame, "and it agrees with the log it was derived from");
+
+			// it follows the log rather than being stamped once
+			reloaded.SetBoolState(5, "A", true);
+			reloaded.Save();
+			Assert.AreEqual("5", LoadFresh(path).HeaderEntries[HeaderKeys.LastInputFrame]);
+		}
+
+		[TestMethod]
+		public void ARecordedRateIsWhatTheMovieIsTimedBy()
+		{
+			// Chimera keeps no per-system rate table - the fallback is a flat
+			// 60/50 - so a movie that did not write its rate down cannot be turned
+			// into a duration by anything but the core that recorded it.
+			var path = Path.Combine(_dir, "vsync.chimeraProject");
+			var movie = MakeWorkedMovie(path);
+			movie.Save();
+			Assert.IsTrue(LoadFresh(path).HeaderEntries.ContainsKey(HeaderKeys.VsyncNumerator),
+				"a save writes down what the attached machine runs at");
+
+			// and the recorded rate is what a duration is computed from
+			movie.HeaderEntries[HeaderKeys.VsyncNumerator] = "39375000";
+			movie.HeaderEntries[HeaderKeys.VsyncDenominator] = "655171";
+			Assert.AreEqual(60.0988, movie.FrameRate, 0.0001,
+				"an NES runs at 60.0988, which no 60/50 guess would have said");
+		}
+
+		[TestMethod]
 		public void TheRunsOwnMarkersAreNotWrittenAndDoNotAccumulate()
 		{
 			// They are derived on load - writing them down would let them go stale,

@@ -7,6 +7,7 @@ using Newtonsoft.Json;
 using Chimera.Bizware.Graphics;
 using Chimera.Common;
 using Chimera.Common.IOExtensions;
+using Chimera.Emulation.Common;
 using Chimera.Emulation.Common.Engine;
 
 namespace Chimera.Client.Common
@@ -103,6 +104,24 @@ namespace Chimera.Client.Common
 			foreach (var subtitle in Subtitles)
 			{
 				p.SubtitleAdd(subtitle.ToString());
+			}
+
+			// Two facts about the run that only the running machine knows, written
+			// at save rather than at record so that a project made before either
+			// existed gains them the first time it is saved.
+			//
+			// Where the input stops, so a reader does not have to know what a
+			// neutral entry looks like for this core's controller...
+			Header[HeaderKeys.LastInputFrame] = LastNonEmptyInputFrame.ToString(CultureInfo.InvariantCulture);
+			// ...and the rate the machine runs at. Chimera keeps no per-system rate
+			// table - the exact rate is the core's - so without this a movie is a
+			// frame count nothing outside that core can turn into a duration.
+			if (IsAttached())
+			{
+				Header[HeaderKeys.VsyncNumerator] =
+					Emulator.VsyncNumerator().ToString(CultureInfo.InvariantCulture);
+				Header[HeaderKeys.VsyncDenominator] =
+					Emulator.VsyncDenominator().ToString(CultureInfo.InvariantCulture);
 			}
 
 			p.HeadersClear();
