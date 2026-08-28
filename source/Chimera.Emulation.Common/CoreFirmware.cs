@@ -63,5 +63,17 @@ namespace Chimera.Emulation.Common
 	public interface ICoreFirmwareUser
 	{
 		IReadOnlyList<CoreFirmwareDecl> Firmware { get; }
+
+		/// <summary>
+		/// The declarations the last load actually used, which is not the same as
+		/// the ones it declares: a package may declare a hundred BIOS dumps and use
+		/// exactly the one the project chose. Empty before anything has loaded.
+		///
+		/// It matters because the difference is visible. Judging a file against a
+		/// declaration it was never meant to satisfy calls a perfectly good BIOS
+		/// unrecognised ninety-nine times, and a movie that recorded every
+		/// declaration would claim a machine that was never built.
+		/// </summary>
+		IReadOnlyList<CoreFirmwareDecl> FirmwareInUse { get; }
 	}
 }

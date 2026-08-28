@@ -257,13 +257,18 @@ namespace Chimera.Client.Common
 		}
 
 		/// <summary>
-		/// Permanent markers first when several share a frame, so the run's own
-		/// story reads start, last input, end.
+		/// Where several markers share a frame, the run's own come first and in the
+		/// order the run happens: run start, then last input, then run end. That is
+		/// the order they are declared in, so the enum does the deciding.
 		/// </summary>
 		private void SortByFrame()
 			=> Sort(static (m1, m2) => m1.Frame != m2.Frame
 				? m1.Frame.CompareTo(m2.Frame)
-				: ((int)m2.Permanence).CompareTo((int)m1.Permanence));
+				: Rank(m1).CompareTo(Rank(m2)));
+
+		/// <summary>Permanents in run order, then everything a person placed.</summary>
+		private static int Rank(TasMovieMarker marker)
+			=> marker.IsPermanent ? (int)marker.Permanence : int.MaxValue;
 
 		/// <summary>The run's own marker of this kind, if it has been worked out yet.</summary>
 		public TasMovieMarker Permanent(MarkerPermanence kind)

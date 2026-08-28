@@ -364,11 +364,6 @@ namespace Chimera.Client.Common
 					WantsState = p.MarkerKeepState(i),
 				}, skipHistory: true);
 			}
-			if (!Markers.Any(m => m.Frame is 0))
-			{
-				Markers.Add(new TasMovieMarker(0, "Power on"), skipHistory: true);
-			}
-
 			// the run's own markers are never written to the file, so they are
 			// worked out again here - which is the only way they can be trusted
 			RefreshLastNonEmptyInput(0);

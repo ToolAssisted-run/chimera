@@ -182,7 +182,7 @@ namespace Chimera.Client.Common
 		/// or replay would report a difference that is only an ordering.
 		/// </summary>
 		public static string RecordFor(Config config, CoreRegistry registry, string coreName)
-			=> EngineFirmware.RecordLine(ForCore(config, registry, coreName)
+			=> EngineFirmware.RecordLine(InUse(config, registry, coreName)
 				// what the core was actually given, not merely what the user pointed at:
 				// a file the frontend never handed over did not shape this machine
 				.Where(static e => e.Usable && e.Sha1 is not null)
@@ -195,13 +195,46 @@ namespace Chimera.Client.Common
 				.ToList();
 
 		/// <summary>
+		/// What the loaded machine is actually running on: the declarations the load
+		/// called for, not every one the package lists.
+		///
+		/// A package may declare a hundred BIOS dumps and use the one the project
+		/// chose. Judging the chosen file against the other ninety-nine calls a
+		/// perfectly good dump unrecognised, once per declaration, which is what
+		/// this exists to stop. A package whose declarations are unconditional gets
+		/// the same answer either way.
+		/// </summary>
+		public static IReadOnlyList<CoreFirmwareEntry> InUse(Config config, CoreRegistry registry, string coreName)
+		{
+			var user = registry.AllFactories
+				.OfType<ICoreFirmwareUser>()
+				.FirstOrDefault(u => string.Equals(((ICoreFactory) u).CoreName, coreName, StringComparison.OrdinalIgnoreCase));
+			if (user is null) return [ ];
+			return InUse(config, coreName, user.Firmware, user.FirmwareInUse);
+		}
+
+		/// <summary>
+		/// The same decision without a registry, so it can be tested: what a load
+		/// actually used, or - before anything has loaded, when nothing is in use
+		/// yet - everything the package declares.
+		/// </summary>
+		public static IReadOnlyList<CoreFirmwareEntry> InUse(
+			Config config,
+			string coreName,
+			IReadOnlyList<CoreFirmwareDecl> declared,
+			IReadOnlyList<CoreFirmwareDecl> inUse)
+			=> (inUse.Count is 0 ? declared : inUse)
+				.Select(decl => Describe(config, coreName, decl))
+				.ToList();
+
+		/// <summary>
 		/// The files this core is running with that it does not recognise - a custom
 		/// replacement, or a dump no declaration lists. They shape the machine and are
 		/// recorded in movies like any firmware, so the user is told rather than left
 		/// to wonder why a movie will not sync elsewhere.
 		/// </summary>
 		public static IReadOnlyList<CoreFirmwareEntry> NonStandard(Config config, CoreRegistry registry, string coreName)
-			=> ForCore(config, registry, coreName)
+			=> InUse(config, registry, coreName)
 				.Where(static e => e.Usable && !e.IsStandard)
 				.ToList();
 

@@ -56,11 +56,7 @@ namespace Chimera.Client.Common
 		public override bool StartsFromSavestate
 		{
 			get => base.StartsFromSavestate;
-			set
-			{
-				Markers.Add(new TasMovieMarker(0, value ? "Savestate" : "Power on"), skipHistory: true);
-				base.StartsFromSavestate = value;
-			}
+			set => base.StartsFromSavestate = value;
 		}
 
 		public IStringLog VerificationLog { get; } = StringLogUtil.MakeStringLog(); // For movies that do not begin with power-on, this is the input required to get into the initial state
@@ -107,7 +103,6 @@ namespace Chimera.Client.Common
 		public override void StartNewRecording()
 		{
 			ClearTasprojExtras();
-			Markers.Add(new TasMovieMarker(0, StartsFromSavestate ? "Savestate" : "Power on"), skipHistory: true);
 			RefreshLastNonEmptyInput(0);
 			Markers.RefreshPermanent();
 			ClearChanges();

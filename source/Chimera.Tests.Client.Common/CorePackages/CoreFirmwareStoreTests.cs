@@ -43,6 +43,30 @@ namespace Chimera.Tests.Client.Common.CorePackages
 		}
 
 		[TestMethod]
+		public void OnlyTheDeclarationsALoadUsedAreJudged()
+		{
+			// A package may declare a hundred BIOS dumps and use the one the project
+			// chose. Judging the chosen file against the other ninety-nine called a
+			// perfectly good dump unrecognised, once per declaration, on every load.
+			var path = FileOf(8192, seed: 7);
+			var sha1 = CoreFirmwareStore.Sha1Of(File.ReadAllBytes(path));
+			var config = WithPath("PCSX2", "bios", path);
+
+			var chosen = Decl(8192, sha1);
+			List<CoreFirmwareDecl> declared = [ chosen ];
+			for (var i = 0; i < 20; i++) declared.Add(Decl(8192, new string('A', 40)));
+
+			var all = CoreFirmwareStore.InUse(config, "PCSX2", declared, [ ]);
+			Assert.AreEqual(20, all.Count(static e => !e.IsStandard),
+				"every declaration it did not use disagrees with the file, as it must");
+
+			var used = CoreFirmwareStore.InUse(config, "PCSX2", declared, [ chosen ]);
+			Assert.AreEqual(1, used.Count);
+			Assert.IsTrue(used[0].IsStandard, "the one the load actually used is the right file");
+			Assert.AreEqual("", used[0].WarningText, "so there is nothing to warn about");
+		}
+
+		[TestMethod]
 		public void NothingProvidedIsMissing()
 		{
 			var entry = CoreFirmwareStore.Describe(new Config(), "QuickerNesHawk", Decl());

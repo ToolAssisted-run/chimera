@@ -11,8 +11,6 @@ namespace Chimera.Client.GUI
 {
 	public partial class MarkerControl : UserControl, IDialogParent
 	{
-		private static string SAVESTATE_COL_NAME = "Savestate";
-
 		public TAStudio Tastudio { get; set; }
 		public TasMovieMarkerList Markers => Tastudio.CurrentTasMovie.Markers;
 
@@ -40,7 +38,6 @@ namespace Chimera.Client.GUI
 			SetupColumns();
 			MarkerView.QueryItemBkColor += MarkerView_QueryItemBkColor;
 			MarkerView.QueryItemText += MarkerView_QueryItemText;
-			MarkerView.QueryItemForeColor += MarkerView_QueryItemForeColor;
 		}
 
 		public void UpdateHotkeyTooltips(Config config)
@@ -54,8 +51,7 @@ namespace Chimera.Client.GUI
 		{
 			MarkerView.AllColumns.Clear();
 			MarkerView.AllColumns.Add(new(name: "FrameColumn", widthUnscaled: 52, text: "Frame"));
-			MarkerView.AllColumns.Add(new(name: SAVESTATE_COL_NAME, widthUnscaled: 24, text: "State"));
-			MarkerView.AllColumns.Add(new(name: "LabelColumn", widthUnscaled: 125, text: string.Empty));
+			MarkerView.AllColumns.Add(new(name: "LabelColumn", widthUnscaled: 149, text: "Name"));
 		}
 
 		public InputRoll MarkerInputRoll => MarkerView;
@@ -116,33 +112,8 @@ namespace Chimera.Client.GUI
 			{
 				text = marker.Message;
 			}
-			else if (column.Name == SAVESTATE_COL_NAME)
-			{
-				if (marker.WantsState)
-				{
-					bool hasState = marker.Frame == 0 || Tastudio.CurrentTasMovie.TasStateManager.HasState(marker.Frame - 1);
-					text = hasState ? "✔" : "-";
-				}
-				else
-				{
-					text = "x";
-				}
-			}
 		}
 
-		private Color? MarkerView_QueryItemForeColor(InputRoll sender, int index, RollColumn column)
-		{
-			if (column.Name == SAVESTATE_COL_NAME)
-			{
-				TasMovieMarker marker = Markers[index];
-				if (!marker.WantsState)
-				{
-					return Color.OrangeRed;
-				}
-			}
-
-			return null;
-		}
 
 		private void MarkerContextMenu_Opening(object sender, CancelEventArgs e)
 		{
@@ -333,23 +304,5 @@ namespace Chimera.Client.GUI
 			if (MarkerView.AnyRowsSelected) Tastudio.GoToFrame(FirstSelectedMarker.Frame);
 		}
 
-		private void MarkerView_MouseDown(object sender, MouseEventArgs e)
-		{
-			Cell cell = MarkerView.CurrentCell;
-			if (cell == null || cell.RowIndex < 0 || cell.RowIndex >= Markers.Count) return;
-			if (cell.Column?.Name != SAVESTATE_COL_NAME) return;
-
-			TasMovieMarker marker = Markers[cell.RowIndex.Value];
-			marker.WantsState = !marker.WantsState;
-			if (!marker.WantsState)
-			{
-				Tastudio.CurrentTasMovie.TasStateManager.Unreserve(marker.Frame - 1);
-			}
-			else if (Tastudio.Emulator.Frame == marker.Frame - 1)
-			{
-				Tastudio.CurrentTasMovie.TasStateManager.Capture(marker.Frame - 1, Tastudio.Emulator.AsStatable());
-			}
-			Tastudio.RefreshDialog();
-		}
 	}
 }

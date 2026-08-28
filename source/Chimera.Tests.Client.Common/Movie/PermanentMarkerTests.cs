@@ -104,6 +104,25 @@ namespace Chimera.Tests.Client.Common.Movie
 		}
 
 		[TestMethod]
+		public void SharingAFrameTheyStillReadInRunOrder()
+		{
+			var movie = MakeMovie(1);   // one frame: all three land on frame zero
+			CollectionAssert.AreEqual(
+				new[] { MarkerPermanence.RunStart, MarkerPermanence.LastInput, MarkerPermanence.RunEnd },
+				movie.Markers.Where(static m => m.IsPermanent).Select(static m => m.Permanence).ToArray(),
+				"a run starts, then stops pressing, then ends - in that order, whatever frame they are on");
+		}
+
+		[TestMethod]
+		public void AUserMarkerOnTheirFrameComesAfterThem()
+		{
+			var movie = MakeMovie(1);
+			movie.Markers.Add(0, "mine");
+			Assert.IsTrue(movie.Markers[0].IsPermanent, "the run's own come first on a shared frame");
+			Assert.AreEqual("mine", movie.Markers.Last().Message);
+		}
+
+		[TestMethod]
 		public void TheyCannotBeRemoved()
 		{
 			var movie = MakeMovie(10);

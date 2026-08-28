@@ -68,6 +68,9 @@ namespace Chimera.Emulation.Common.Waterbox
 		/// <summary>The files this core expects the user to provide (see waterbox.config "firmware").</summary>
 		public IReadOnlyList<CoreFirmwareDecl> Firmware => _cfg.Firmware ?? (IReadOnlyList<CoreFirmwareDecl>) [ ];
 
+		/// <summary>Of those, the ones the decisions actually called for at the last load.</summary>
+		public IReadOnlyList<CoreFirmwareDecl> FirmwareInUse { get; private set; } = [ ];
+
 		public Type CoreType => typeof(WaterboxCore);
 
 		public Type SettingsType => typeof(WaterboxCoreSettings);
@@ -148,11 +151,14 @@ namespace Chimera.Emulation.Common.Waterbox
 				_cfg.RawFirmwareJson, slotsJson, Newtonsoft.Json.JsonConvert.SerializeObject(effective));
 
 			Dictionary<string, byte[]> resolved = new();
+			List<CoreFirmwareDecl> used = new();
+			FirmwareInUse = used;
 			foreach (var (id, index) in applicable)
 			{
 				var decl = index >= 0 && index < Firmware.Count ? Firmware[index] : null;
 				if (decl is null || decl.Id != id) decl = Firmware.FirstOrDefault(d => d.Id == id);
 				if (decl is null) continue;
+				used.Add(decl);
 				var bytes = ctx.FirmwareProvider?.Invoke(decl)
 					?? throw new MissingFirmwareException(
 						$"{CoreName} needs firmware that has not been provided: {decl.DisplayName}."

@@ -60,6 +60,18 @@ namespace Chimera.Tests.Client.GUI
 		}
 
 		[TestMethod]
+		public void ItSpellsOutWhatEachRendererActuallyIs()
+		{
+			using var form = MakeForm(CfgWithRenderers());
+			CollectionAssert.AreEqual(new[] { "Software (Native)", "Software (OpenGL)" }, form.RendererLabels,
+				"both draw on the CPU; the difference is which path through the core");
+
+			using var one = MakeForm(CfgWithoutRenderers());
+			CollectionAssert.AreEqual(new[] { "Software (Native)" }, one.RendererLabels,
+				"a core that names no renderer still says what it does");
+		}
+
+		[TestMethod]
 		public void ItStartsOnTheRendererTheCoreDeclaredAsItsDefault()
 		{
 			using var form = MakeForm(CfgWithRenderers());

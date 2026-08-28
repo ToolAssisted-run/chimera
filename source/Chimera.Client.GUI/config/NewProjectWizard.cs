@@ -155,7 +155,7 @@ namespace Chimera.Client.GUI
 			};
 			foreach (var core in _cores)
 			{
-				_core.Items.Add($"{core.Name}  ({string.Join(", ", core.Systems)}{(string.IsNullOrEmpty(core.Version) ? "" : $", {core.Version}")})");
+				_core.Items.Add($"{core.Name}  ({SystemNames.Of(core.Systems)}{(string.IsNullOrEmpty(core.Version) ? "" : $", {core.Version}")})");
 			}
 			p1.Controls.Add(_core);
 
@@ -246,9 +246,11 @@ namespace Chimera.Client.GUI
 			p4.Controls.AddRange([ _firmwareList, _firmwareSetButton, _firmwareClearButton ]);
 
 			// ---- chrome ----------------------------------------------------------
+			// Width is set below, once the buttons have been placed: a fixed one
+			// reached under the leftmost of them and painted over it.
 			_status = new Label
 			{
-				Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
+				Anchor = AnchorStyles.Bottom | AnchorStyles.Left,
 				AutoEllipsis = true,
 				ForeColor = Color.Firebrick,
 				Location = Pt(8, 386),
@@ -269,9 +271,14 @@ namespace Chimera.Client.GUI
 				button.Location = new Point(right, UIHelper.ScaleY(382));
 				right -= gap;
 			}
+			// what is left of the row once the buttons have taken their share
+			_status.Width = Math.Max(UIHelper.ScaleX(80), right - margin);
+
 			AcceptButton = _nextButton;
 			CancelButton = cancel;
-			Controls.AddRange([ _status, _backButton, _nextButton, cancel ]);
+			// buttons first, so they sit in front of the status label rather than
+			// under it - it is the one thing on this row that can grow
+			Controls.AddRange([ _backButton, _nextButton, cancel, _status ]);
 			ResumeLayout();
 			ShowPage(0);
 		}
@@ -357,6 +364,28 @@ namespace Chimera.Client.GUI
 		private const string RendererSetting = "renderer";
 
 		/// <summary>
+		/// One entry in the renderer dropdown: the name the CORE knows it by, shown
+		/// as what it actually is. Both of these draw on the CPU - one is the core's
+		/// own rasteriser, the other is the core's OpenGL path over a software
+		/// OpenGL compiled into the sandbox - and a person choosing between them is
+		/// owed that much. The value is what the project records; renaming what is
+		/// on screen must never rename what is in the file.
+		/// </summary>
+		private sealed class RendererChoice
+		{
+			internal RendererChoice(string value) => Value = value;
+
+			internal string Value { get; }
+
+			public override string ToString() => Value switch
+			{
+				"software" or "default" => "Software (Native)",
+				"opengl" => "Software (OpenGL)",
+				_ => Value,
+			};
+		}
+
+		/// <summary>
 		/// Offers the chosen core's renderers. A core that declares none draws one
 		/// way, so there is one entry and nothing to choose; a core that declares
 		/// them starts on the one it declared as its default, which is the faster of
@@ -373,16 +402,16 @@ namespace Chimera.Client.GUI
 			_renderer.Items.Clear();
 			if (options is { Count: > 0 })
 			{
-				foreach (var option in options) _renderer.Items.Add(option);
+				foreach (var option in options) _renderer.Items.Add(new RendererChoice(option));
 			}
 			else
 			{
 				// nothing declared: the core has one renderer and does not name it
-				_renderer.Items.Add("default");
+				_renderer.Items.Add(new RendererChoice("default"));
 			}
 
 			var wanted = decl?.DefaultValue as string;
-			var index = wanted is null ? -1 : _renderer.Items.IndexOf(wanted);
+			var index = wanted is null ? -1 : Array.IndexOf(RendererOptions, wanted);
 			_renderer.SelectedIndex = index >= 0 ? index : 0;
 
 			// one renderer is not a choice, and a disabled box still says what it is
@@ -408,7 +437,7 @@ namespace Chimera.Client.GUI
 		private void PinRenderer()
 		{
 			if (_settings is null || RendererDecl() is null) return;
-			if (_renderer.SelectedItem is string chosen) _settings.Values[RendererSetting] = chosen;
+			if (_renderer.SelectedItem is RendererChoice chosen) _settings.Values[RendererSetting] = chosen.Value;
 		}
 
 		/// <summary>
@@ -578,10 +607,14 @@ namespace Chimera.Client.GUI
 
 		/// <summary>the renderers offered on page one, in order, for tests</summary>
 		public string[] RendererOptions
-			=> _renderer.Items.Cast<object>().Select(static item => (string)item).ToArray();
+			=> _renderer.Items.Cast<RendererChoice>().Select(static item => item.Value).ToArray();
+
+		/// <summary>how those renderers are spelled in the dropdown, for tests</summary>
+		public string[] RendererLabels
+			=> _renderer.Items.Cast<RendererChoice>().Select(static item => item.ToString()).ToArray();
 
 		/// <summary>the renderer chosen on page one, for tests</summary>
-		public string? ChosenRenderer => _renderer.SelectedItem as string;
+		public string? ChosenRenderer => (_renderer.SelectedItem as RendererChoice)?.Value;
 
 		/// <summary>whether the renderer is a choice at all, for tests</summary>
 		public bool RendererIsAChoice => _renderer.Enabled;
@@ -593,7 +626,7 @@ namespace Chimera.Client.GUI
 		/// <summary>picks a renderer as the dropdown would - for tests</summary>
 		internal void SetRenderer(string name)
 		{
-			var index = _renderer.Items.IndexOf(name);
+			var index = Array.IndexOf(RendererOptions, name);
 			if (index >= 0) _renderer.SelectedIndex = index;
 		}
 
@@ -916,8 +949,6 @@ namespace Chimera.Client.GUI
 			}).ToList();
 		}
 
-		private const string CHECK = "\u2714 ";
-
 		private void RenderFirmwareRows()
 		{
 			var selected = _firmwareList.SelectedIndices.Count is 0 ? -1 : _firmwareList.SelectedIndices[0];
@@ -927,7 +958,10 @@ namespace Chimera.Client.GUI
 			{
 				var title = need.Decl?.DisplayName ?? need.Id;
 				if (!string.IsNullOrEmpty(need.Decl?.Label)) title += $"  ({need.Decl!.Label})";
-				ListViewItem item = new(need.Satisfied ? CHECK + title : title)
+				// no tick glyph: it renders badly at this size on every platform, and
+				// prefixing only the satisfied rows left the column ragged. Green
+				// against red says the same thing and says it in line.
+				ListViewItem item = new(title)
 				{
 					ToolTipText = need.Decl?.Description ?? "",
 					ForeColor = need.Satisfied ? System.Drawing.Color.DarkGreen : System.Drawing.Color.Firebrick,
@@ -935,7 +969,7 @@ namespace Chimera.Client.GUI
 				item.SubItems.Add(need.Decl?.Name ?? "");
 				item.SubItems.Add(string.IsNullOrEmpty(need.Decl?.Sha1) ? "(your own dump)" : need.Decl!.Sha1);
 				item.SubItems.Add(need.Satisfied
-					? $"{CHECK}found: {Path.GetFileName(need.ChosenPath)}"
+					? $"found: {Path.GetFileName(need.ChosenPath)}"
 					: "not found");
 				_firmwareList.Items.Add(item);
 			}

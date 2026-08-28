@@ -289,7 +289,7 @@ namespace Chimera.Client.Common
 		public int JmdCompression { get; set; } = 3;
 		public int JmdThreads { get; set; } = 3;
 		public string FFmpegFormat { get; set; } = "";
-		public string FFmpegCustomCommand { get; set; } = "-c:a foo -c:v bar -f baz";
+		public string FFmpegCustomCommand { get; set; } = "-c:v libx264 -c:a aac -pix_fmt yuv420p -f mp4";
 		public string AviCodecToken { get; set; } = "";
 		public int GifWriterFrameskip { get; set; } = 3;
 		public int GifWriterDelay { get; set; } = -1;

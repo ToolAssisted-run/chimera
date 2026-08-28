@@ -96,14 +96,23 @@ namespace Chimera.Tests.Client.GUI
 		}
 
 		[TestMethod]
+		public void ItOpensOnACommandThatMakesAFilePeopleCanPlay()
+		{
+			using Harness h = new();
+			Assert.AreEqual(EncodeVideoForm.DefaultCommand, h.Form.FFmpegCommand);
+			StringAssert.Contains(h.Form.FFmpegCommand, "libx264");
+			StringAssert.Contains(h.Form.FFmpegCommand, "yuv420p");
+		}
+
+		[TestMethod]
 		public void TheCommandDecidesTheExtension()
 		{
 			using Harness h = new();
-			h.Form.Choose(format: "Matroska Lossless");
+			h.Form.Choose(command: "-c:a pcm_s16le -c:v ffv1 -f matroska");
 			StringAssert.EndsWith(h.Form.OutputPath, ".mkv",
 				"the container the command names is the one the file should say it is");
 
-			h.Form.Choose(format: "WebM");
+			h.Form.Choose(command: "-c:a libvorbis -c:v libvpx -f webm");
 			StringAssert.EndsWith(h.Form.OutputPath, ".webm");
 		}
 
@@ -111,7 +120,7 @@ namespace Chimera.Tests.Client.GUI
 		public void WhatItAsksForIsWhatWasFilledIn()
 		{
 			using Harness h = new();
-			h.Form.Choose(from: "120  the door", to: "900  Last input", output: "/tmp/mine.mp4", format: "MP4");
+			h.Form.Choose(from: "120  the door", to: "900  Last input", output: "/tmp/mine.mp4");
 			h.Form.StartEncode();
 
 			var request = h.Started.Single();
