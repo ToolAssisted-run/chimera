@@ -211,9 +211,8 @@ namespace Chimera.Client.GUI
 		{
 			if (!FFmpegService.QueryServiceAvailable())
 			{
-				using var form = new FFmpegDownloaderForm();
-				_dialogParent.ShowDialogWithTempMute(form);
-				if (!FFmpegService.QueryServiceAvailable()) return null;
+				_dialogParent.DialogController.ShowMessageBox(FFmpegService.MissingMessage);
+				return null;
 			}
 			return FFmpegWriterForm.DoFFmpegWriterDlg(_dialogParent.AsWinFormsHandle(), config);
 		}

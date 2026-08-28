@@ -11,6 +11,13 @@ namespace Chimera.Client.Common
 		bool ReadOnly { get; set; }
 
 		/// <summary>
+		/// While set, playing a frame leaves the movie exactly as it was: no
+		/// greenzone state kept, no lag written down. Encoding a video drives the
+		/// run this way, because it reproduces a movie rather than authoring one.
+		/// </summary>
+		bool SuppressStateCapture { get; set; }
+
+		/// <summary>
 		/// Gets a value indicating whether or not a new movie is queued for loading
 		/// </summary>
 		bool NewMovieQueued { get; }

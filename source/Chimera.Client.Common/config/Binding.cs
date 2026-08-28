@@ -48,8 +48,7 @@ namespace Chimera.Client.Common
 			Bind("General", "Toggle Menu");
 			Bind("General", "Volume Up");
 			Bind("General", "Volume Down");
-			Bind("General", "Record A/V");
-			Bind("General", "Stop A/V");
+			Bind("General", "Encode Video");
 			Bind("General", "Larger Window", "Alt+Up");
 			Bind("General", "Smaller Window", "Alt+Down");
 			Bind("General", "Increase Speed", "Equals");

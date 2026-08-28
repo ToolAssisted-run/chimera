@@ -117,9 +117,7 @@ namespace Chimera.Client.GUI
 		private void SetImages()
 		{
 			CloseRomMenuItem.Image = Properties.Resources.Close;
-			RecordAVMenuItem.Image = Properties.Resources.Record;
-			ConfigAndRecordAVMenuItem.Image = Properties.Resources.Avi;
-			StopAVMenuItem.Image = Properties.Resources.Stop;
+			EncodeVideoMenuItem.Image = Properties.Resources.Avi;
 			ScreenshotMenuItem.Image = Properties.Resources.Camera;
 			PauseMenuItem.Image = Properties.Resources.Pause;
 			RebootCoreMenuItem.Image = Properties.Resources.Reboot;
@@ -155,7 +153,6 @@ namespace Chimera.Client.GUI
 			KeyPriorityStatusLabel.Image = Properties.Resources.Both;
 			CoreNameStatusBarButton.Image = Properties.Resources.ChimeraSmall;
 			LinkConnectStatusBarButton.Image = Properties.Resources.Connect16X16;
-			StopAVContextMenuItem.Image = Properties.Resources.Stop;
 			RestartMovieContextMenuItem.Image = Properties.Resources.Restart;
 			StopMovieContextMenuItem.Image = Properties.Resources.Stop;
 			StopNoSaveContextMenuItem.Image = Properties.Resources.Stop;
@@ -253,12 +250,6 @@ namespace Chimera.Client.GUI
 			SetImages();
 #if !DEBUG
 #endif
-#if AVI_SUPPORT
-			SynclessRecordingMenuItem.Click += (_, _) => new SynclessRecordingTools(Config, Game, this).Run();
-#else
-			SynclessRecordingMenuItem.Enabled = false;
-#endif
-
 			Game = GameInfo.NullInstance;
 			_throttle = new Throttle();
 			Emulator = new NullEmulator();
@@ -852,7 +843,10 @@ namespace Chimera.Client.GUI
 
 		public bool IsSeeking => PauseOnFrame.HasValue;
 		private bool IsTurboSeeking => PauseOnFrame.HasValue && Config.TurboSeek;
-		public bool IsTurboing => InputManager.ClientControls["Turbo"] || IsTurboSeeking;
+
+		// An encode runs as fast as the machine will go, and gets turbo's cheap tool
+		// updates for the same reason a turbo seek does: nobody is watching it.
+		public bool IsTurboing => InputManager.ClientControls["Turbo"] || IsTurboSeeking || IsEncodingVideo;
 		public bool IsFastForwarding => InputManager.ClientControls["Fast Forward"] || IsTurboing;
 		public bool IsRewinding { get; private set; }
 
@@ -2314,6 +2308,13 @@ namespace Chimera.Client.GUI
 				runFrame = true;
 			}
 
+			// An encode owns the emulator until it is finished: it runs a frame every
+			// iteration whatever else the client would rather do with them.
+			if (EncodeWantsFrame)
+			{
+				runFrame = true;
+			}
+
 			bool isRewinding = Rewind(ref runFrame, currentTimestamp, out var returnToRecording);
 			IsRewinding = isRewinding;
 			_runloopFrameProgress |= isRewinding;
@@ -2321,7 +2322,7 @@ namespace Chimera.Client.GUI
 			float atten = 0;
 
 			// BlockFrameAdvance (true when input it being editted in TAStudio) supercedes all other frame advance conditions
-			if ((runFrame || force) && !BlockFrameAdvance)
+			if ((runFrame || force) && (!BlockFrameAdvance || EncodeWantsFrame))
 			{
 				var isFastForwarding = IsFastForwarding;
 				var isFastForwardingOrRewinding = isFastForwarding || isRewinding || Config.Unthrottled;
@@ -2391,7 +2392,9 @@ namespace Chimera.Client.GUI
 				bool render = !_throttle.skipNextFrame || _currAviWriter?.UsesVideo is true || atTurboSeekEnd;
 				bool newFrame = Emulator.FrameAdvance(InputManager.ControllerOutput, render, renderSound);
 
-				MovieSession.HandleFrameAfter(ToolBypassingMovieEndAction is not null);
+				// an encode reaching the end of the movie is the encode finishing, not
+				// the movie ending on the person - so it bypasses the end action too
+				MovieSession.HandleFrameAfter(ToolBypassingMovieEndAction is not null || IsEncodingVideo);
 
 				if (returnToRecording)
 				{
@@ -2469,6 +2472,9 @@ namespace Chimera.Client.GUI
 				{
 					AvFrameAdvance();
 				}
+
+				// after the dump, so a counted frame is one that reached the file
+				EncodeAfterFrame();
 			}
 			else if (isRewinding)
 			{
@@ -2529,69 +2535,33 @@ namespace Chimera.Client.GUI
 		}
 
 		/// <summary>
-		/// start AVI recording, unattended
+		/// Starts the command line's dump (--dump-type, --dump-name, --dump-length):
+		/// a video written by a run that nobody is watching, for a build machine or
+		/// a script. A person encoding a video does it in Encode Video instead,
+		/// which is why nothing here asks anything.
 		/// </summary>
 		/// <param name="videoWriterName">match the short name of an <see cref="IVideoWriter"/></param>
 		/// <param name="filename">filename to save to</param>
 		private void RecordAv(string videoWriterName, string filename)
 		{
-			RecordAvBase(videoWriterName, filename, true);
-		}
-
-		/// <summary>
-		/// start AV recording, asking user for filename and options
-		/// </summary>
-		private void RecordAv()
-		{
-			RecordAvBase(null, null, false);
-		}
-
-		/// <summary>
-		/// start AV recording
-		/// </summary>
-		private void RecordAvBase(string videoWriterName, string filename, bool unattended)
-		{
 			if (_currAviWriter != null) return;
 
 			if (Game.IsNullInstance()) throw new InvalidOperationException("how is an A/V recording starting with no game loaded? please report this including as much detail as possible");
-
-			// select IVideoWriter to use
-			IVideoWriter aw;
 
 			if (string.IsNullOrEmpty(videoWriterName) && !string.IsNullOrEmpty(Config.VideoWriter))
 			{
 				videoWriterName = Config.VideoWriter;
 			}
 
-			if (unattended && !string.IsNullOrEmpty(videoWriterName))
-			{
-				aw = VideoWriterInventory.GetVideoWriter(videoWriterName, this);
-			}
-			else
-			{
-				aw = VideoWriterChooserForm.DoVideoWriterChooserDlg(
-					VideoWriterInventory.GetAllWriters(),
-					this,
-					Emulator,
-					Config);
-			}
-
+			IVideoWriter aw = VideoWriterInventory.GetVideoWriter(videoWriterName, this);
 			if (aw == null)
 			{
-				AddOnScreenMessage(
-					unattended ? $"Couldn't start video writer \"{videoWriterName}\"" : "A/V capture canceled.");
-
+				AddOnScreenMessage($"Couldn't start video writer \"{videoWriterName}\"");
 				return;
 			}
 
 			try
 			{
-#if AVI_SUPPORT
-				bool usingAvi = aw is AviWriter; // SO GROSS!
-#else
-				const bool usingAvi = false;
-#endif
-
 				aw = Config.VideoWriterAudioSyncEffective ? new VideoStretcher(aw) : new AudioStretcher(aw);
 				aw.SetMovieParameters(Emulator.VsyncNumerator(), Emulator.VsyncDenominator());
 				(IVideoProvider output, Action dispose) = GetCaptureProvider();
@@ -2600,70 +2570,8 @@ namespace Chimera.Client.GUI
 
 				aw.SetAudioParameters(44100, 2, 16);
 
-				// select codec token
-				// do this before save dialog because ffmpeg won't know what extension it wants until it's been configured
-				if (unattended && !string.IsNullOrEmpty(filename))
-				{
-					aw.SetDefaultVideoCodecToken(Config);
-				}
-				else
-				{
-					// THIS IS REALLY SLOPPY!
-					// PLEASE REDO ME TO NOT CARE WHICH AVWRITER IS USED!
-					if (usingAvi && !string.IsNullOrEmpty(Config.AviCodecToken))
-					{
-						aw.SetDefaultVideoCodecToken(Config);
-					}
-
-					var token = aw.AcquireVideoCodecToken(Config);
-					if (token == null)
-					{
-						AddOnScreenMessage("A/V capture canceled.");
-						aw.Dispose();
-						return;
-					}
-
-					aw.SetVideoCodecToken(token);
-				}
-
-				// select file to save to
-				if (unattended && !string.IsNullOrEmpty(filename))
-				{
-					aw.OpenFile(filename);
-				}
-				else
-				{
-					string ext = aw.DesiredExtension();
-					string pathForOpenFile;
-
-					// handle directories first
-					if (ext == "<directory>")
-					{
-						using var fbd = new FolderBrowserEx();
-						if (this.ShowDialogWithTempMute(fbd) is DialogResult.Cancel)
-						{
-							aw.Dispose();
-							return;
-						}
-
-						pathForOpenFile = fbd.SelectedPath;
-					}
-					else
-					{
-						var result = this.ShowFileSaveDialog(
-							filter: new(new FilesystemFilter(ext, new[] { ext })),
-							initDir: Config.PathEntries.AvAbsolutePath(),
-							initFileName: $"{(MovieSession.Movie.IsActive() ? Path.GetFileNameWithoutExtension(MovieSession.Movie.Filename) : Game.FilesystemSafeName())}.{ext}");
-						if (result is null)
-						{
-							aw.Dispose();
-							return;
-						}
-						pathForOpenFile = result;
-					}
-
-					aw.OpenFile(pathForOpenFile);
-				}
+				aw.SetDefaultVideoCodecToken(Config);
+				aw.OpenFile(filename);
 
 				// commit the avi writing last, in case there were any errors earlier
 				_currAviWriter = aw;
@@ -2679,6 +2587,16 @@ namespace Chimera.Client.GUI
 				throw;
 			}
 
+			ConfigureAvSound();
+		}
+
+		/// <summary>
+		/// Points the sound at the writer that has just been opened. Shared with the
+		/// Encode Video dialog, which opens its writer without any of the dialogs
+		/// above but needs the audio wired up in exactly the same way.
+		/// </summary>
+		private void ConfigureAvSound()
+		{
 			if (Config.VideoWriterAudioSyncEffective)
 			{
 				_currentSoundProvider.SetSyncMode(SyncSoundMode.Sync);

@@ -41,7 +41,9 @@ namespace Chimera.Client.GUI
 
 			// nothing is running, so there is nothing to shoot or record
 			ScreenshotSubMenu.Enabled = !Emulator.IsNull();
-			AVSubMenu.Enabled = Emulator.HasVideoProvider(); //TODO necessary?
+
+			// a video is an encode of a run, so it needs a run and a picture
+			EncodeVideoMenuItem.Enabled = Emulator.HasVideoProvider() && MovieSession.Movie.IsActive();
 		}
 
 		private void NewProjectMenuItem_Click(object sender, EventArgs e)
@@ -52,27 +54,6 @@ namespace Chimera.Client.GUI
 
 		private void RecentProjectSubMenu_DropDownOpened(object sender, EventArgs e)
 			=> RecentProjectSubMenu.ReplaceDropDownItems(Config.RecentProjects.RecentMenu(this, path => LoadProject(path), "Project", noAutoload: true));
-
-		private void AVSubMenu_DropDownOpened(object sender, EventArgs e)
-		{
-			ConfigAndRecordAVMenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["Record A/V"];
-			StopAVMenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["Stop A/V"];
-			CaptureOSDMenuItem.Checked = Config.AviCaptureOsd;
-			CaptureLuaMenuItem.Checked = Config.AviCaptureLua || Config.AviCaptureOsd; // or with osd is for better compatibility with old config files
-
-			RecordAVMenuItem.Enabled = !string.IsNullOrEmpty(Config.VideoWriter) && _currAviWriter == null;
-
-			if (_currAviWriter == null)
-			{
-				ConfigAndRecordAVMenuItem.Enabled = true;
-				StopAVMenuItem.Enabled = false;
-			}
-			else
-			{
-				ConfigAndRecordAVMenuItem.Enabled = false;
-				StopAVMenuItem.Enabled = true;
-			}
-		}
 
 		private void ScreenshotSubMenu_DropDownOpening(object sender, EventArgs e)
 		{
@@ -100,41 +81,8 @@ namespace Chimera.Client.GUI
 		private void CloseRomMenuItem_Click(object sender, EventArgs e)
 			=> CloseProject();
 
-		private void ConfigAndRecordAVMenuItem_Click(object sender, EventArgs e)
-		{
-			if (OSTailoredCode.IsUnixHost)
-			{
-				using MsgBox dialog = new("Most of these options will cause crashes on Linux.", "A/V instability warning", MessageBoxIcon.Warning);
-				this.ShowDialogWithTempMute(dialog);
-			}
-			RecordAv();
-		}
-
-		private void RecordAVMenuItem_Click(object sender, EventArgs e)
-		{
-			RecordAv(null, null); // force unattended, but allow traditional setup
-		}
-
-		private void StopAVMenuItem_Click(object sender, EventArgs e)
-		{
-			StopAv();
-		}
-
-		private void CaptureOSDMenuItem_Click(object sender, EventArgs e)
-		{
-			bool c = ((ToolStripMenuItem)sender).Checked;
-			Config.AviCaptureOsd = c;
-			if (c) // Logic to capture OSD w/o Lua does not currently exist, so disallow that.
-				Config.AviCaptureLua = true;
-		}
-
-		private void CaptureLuaMenuItem_Click(object sender, EventArgs e)
-		{
-			bool c = ((ToolStripMenuItem)sender).Checked;
-			Config.AviCaptureLua = c;
-			if (!c) // Logic to capture OSD w/o Lua does not currently exist, so disallow that.
-				Config.AviCaptureOsd = false;
-		}
+		private void EncodeVideoMenuItem_Click(object sender, EventArgs e)
+			=> EncodeVideoDialog();
 
 		private void ScreenshotMenuItem_Click(object sender, EventArgs e)
 		{
@@ -693,7 +641,6 @@ namespace Chimera.Client.GUI
 				showMenuVisible;
 
 
-			StopAVContextMenuItem.Visible = _currAviWriter != null;
 
 			ContextSeparator_AfterMovie.Visible =
 				ContextSeparator_AfterUndo.Visible =

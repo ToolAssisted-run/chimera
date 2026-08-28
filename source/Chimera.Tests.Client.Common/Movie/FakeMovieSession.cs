@@ -13,6 +13,7 @@ namespace Chimera.Tests.Client.Common.Movie
 		public IMovie? Movie { get; set; }
 
 		public bool ReadOnly { get => false; set { } }
+		public bool SuppressStateCapture { get; set; }
 
 		public bool NewMovieQueued => throw new NotImplementedException();
 

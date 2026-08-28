@@ -15,6 +15,9 @@ namespace Chimera.Client.Common
 		/// <remarks>only referenced from <see cref="EmuClientApi"/></remarks>
 		bool EmulatorPaused { get; }
 
+		/// <remarks>only referenced from <see cref="ClientLuaLibrary"/></remarks>
+		bool IsEncodingVideo { get; }
+
 		/// <remarks>only referenced from <see cref="EmuClientApi"/></remarks>
 		bool IsSeeking { get; }
 
@@ -35,6 +38,14 @@ namespace Chimera.Client.Common
 
 		/// <remarks>only referenced from <see cref="EmuClientApi"/></remarks>
 		public ShowFutureCallback/*?*/ PreFutureFrameCallback { get; set; }
+
+		/// <summary>
+		/// Starts an encode without the dialog, for a script or a test: the same job
+		/// Encode Video runs, asked for in one line. Returns null when it began, or
+		/// why it did not.
+		/// </summary>
+		/// <remarks>only referenced from <see cref="ClientLuaLibrary"/></remarks>
+		string BeginVideoEncode(string path, int fromFrame, int toFrame, string ffmpegCommand);
 
 		/// <remarks>only referenced from <see cref="EmuClientApi"/></remarks>
 		void ClearHolds();

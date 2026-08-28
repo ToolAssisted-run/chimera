@@ -34,14 +34,7 @@ namespace Chimera.Client.GUI
 			this.toolStripSeparator7 = new Chimera.WinForms.Controls.ToolStripSeparatorEx();
 			this.toolStripSeparator21 = new Chimera.WinForms.Controls.ToolStripSeparatorEx();
 			this.toolStripSeparator5 = new Chimera.WinForms.Controls.ToolStripSeparatorEx();
-			this.AVSubMenu = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.RecordAVMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.ConfigAndRecordAVMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.StopAVMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.toolStripSeparator19 = new Chimera.WinForms.Controls.ToolStripSeparatorEx();
-			this.CaptureOSDMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.CaptureLuaMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-			this.SynclessRecordingMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
+			this.EncodeVideoMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.ScreenshotSubMenu = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.ScreenshotMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.ScreenshotAsMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
@@ -145,7 +138,6 @@ namespace Chimera.Client.GUI
 			this.CoreNameStatusBarButton = new Chimera.WinForms.Controls.StatusLabelEx();
 			this.LinkConnectStatusBarButton = new Chimera.WinForms.Controls.StatusLabelEx();
 			this.MainFormContextMenu = new System.Windows.Forms.ContextMenuStrip(this.components);
-			this.StopAVContextMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.ContextSeparator_AfterROM = new Chimera.WinForms.Controls.ToolStripSeparatorEx();
 			this.RestartMovieContextMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.StopMovieContextMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
@@ -205,7 +197,7 @@ namespace Chimera.Client.GUI
             this.SaveProjectBackupMenuItem,
             this.CloseRomMenuItem,
             this.toolStripMenuItem1,
-            this.AVSubMenu,
+            this.EncodeVideoMenuItem,
             this.ScreenshotSubMenu,
             this.toolStripSeparator4,
             this.ExitMenuItem});
@@ -370,49 +362,8 @@ namespace Chimera.Client.GUI
 			// 
 			// AVSubMenu
 			// 
-			this.AVSubMenu.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
-            this.RecordAVMenuItem,
-            this.ConfigAndRecordAVMenuItem,
-            this.StopAVMenuItem,
-            this.toolStripSeparator19,
-            this.CaptureOSDMenuItem,
-            this.CaptureLuaMenuItem,
-            this.SynclessRecordingMenuItem});
-			this.AVSubMenu.Text = "&A/V Writer";
-			this.AVSubMenu.DropDownOpened += new System.EventHandler(this.AVSubMenu_DropDownOpened);
-			// 
-			// RecordAVMenuItem
-			// 
-			this.RecordAVMenuItem.Text = "&Record A/V";
-			this.RecordAVMenuItem.Click += new System.EventHandler(this.RecordAVMenuItem_Click);
-			// 
-			// ConfigAndRecordAVMenuItem
-			// 
-			this.ConfigAndRecordAVMenuItem.Text = "Config and Record A/V...";
-			this.ConfigAndRecordAVMenuItem.Click += new System.EventHandler(this.ConfigAndRecordAVMenuItem_Click);
-			// 
-			// StopAVMenuItem
-			// 
-			this.StopAVMenuItem.Text = "&Stop A/V Writer";
-			this.StopAVMenuItem.Click += new System.EventHandler(this.StopAVMenuItem_Click);
-			// 
-			// CaptureOSDMenuItem
-			// 
-			this.CaptureOSDMenuItem.CheckOnClick = true;
-			this.CaptureOSDMenuItem.Text = "Capture OSD";
-			this.CaptureOSDMenuItem.Click += new System.EventHandler(this.CaptureOSDMenuItem_Click);
-			// 
-			// CaptureLuaMenuItem
-			// 
-			this.CaptureLuaMenuItem.CheckOnClick = true;
-			this.CaptureLuaMenuItem.Name = "CaptureLuaMenuItem";
-			this.CaptureLuaMenuItem.Size = new System.Drawing.Size(205, 22);
-			this.CaptureLuaMenuItem.Text = "Capture Lua";
-			this.CaptureLuaMenuItem.Click += new System.EventHandler(this.CaptureLuaMenuItem_Click);
-			// 
-			// SynclessRecordingMenuItem
-			// 
-			this.SynclessRecordingMenuItem.Text = "S&yncless Recording Tools";
+			this.EncodeVideoMenuItem.Text = "&Encode Video...";
+			this.EncodeVideoMenuItem.Click += new System.EventHandler(this.EncodeVideoMenuItem_Click);
 			// 
 			// ScreenshotSubMenu
 			// 
@@ -989,7 +940,6 @@ namespace Chimera.Client.GUI
 			// MainFormContextMenu
 			// 
 			this.MainFormContextMenu.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
-            this.StopAVContextMenuItem,
             this.ContextSeparator_AfterROM,
             this.RestartMovieContextMenuItem,
             this.StopMovieContextMenuItem,
@@ -1011,11 +961,6 @@ namespace Chimera.Client.GUI
 			this.MainFormContextMenu.Size = new System.Drawing.Size(217, 490);
 			this.MainFormContextMenu.Closing += new System.Windows.Forms.ToolStripDropDownClosingEventHandler(this.MainFormContextMenu_Closing);
 			this.MainFormContextMenu.Opening += new System.ComponentModel.CancelEventHandler(this.MainFormContextMenu_Opening);
-			// 
-			// StopAVContextMenuItem
-			// 
-			this.StopAVContextMenuItem.Text = "Stop A/V Writer";
-			this.StopAVContextMenuItem.Click += new System.EventHandler(this.StopAVMenuItem_Click);
 			// 
 			// RecordMovieContextMenuItem
 			// 
@@ -1258,9 +1203,7 @@ namespace Chimera.Client.GUI
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx ViewCommentsContextMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx DisplayLogWindowMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx DisplaySubtitlesMenuItem;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx AVSubMenu;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx ConfigAndRecordAVMenuItem;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx StopAVMenuItem;
+		private Chimera.WinForms.Controls.ToolStripMenuItemEx EncodeVideoMenuItem;
 		private Chimera.WinForms.Controls.StatusLabelEx AVStatusLabel;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx RestartMovieContextMenuItem;
 		private Chimera.WinForms.Controls.StatusLabelEx CheatStatusButton;
@@ -1271,8 +1214,6 @@ namespace Chimera.Client.GUI
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx ScreenshotContextMenuItem;
 		private Chimera.WinForms.Controls.ToolStripSeparatorEx EmulatorMenuSeparator2;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx LoadedCoreNameMenuItem;
-		private Chimera.WinForms.Controls.ToolStripSeparatorEx toolStripSeparator19;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx CaptureOSDMenuItem;
 		private Chimera.WinForms.Controls.ToolStripSeparatorEx toolStripSeparator20;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx ScreenshotCaptureOSDMenuItem1;
 		private Chimera.WinForms.Controls.StatusLabelEx RebootStatusBarIcon;
@@ -1290,7 +1231,6 @@ namespace Chimera.Client.GUI
 		private Chimera.WinForms.Controls.ToolStripSeparatorEx toolStripSeparator29;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx ConfigContextMenuItem;
 		private Chimera.WinForms.Controls.ToolStripSeparatorEx ShowMenuContextMenuSeparator;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx StopAVContextMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx GenericCoreSubMenu;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx BatchRunnerMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx DisplayConfigMenuItem;
@@ -1308,7 +1248,6 @@ namespace Chimera.Client.GUI
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx ClientOptionsMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx customizeToolStripMenuItem;
 		private Chimera.WinForms.Controls.ToolStripSeparatorEx toolStripSeparator22;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx SynclessRecordingMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx ScreenshotClientClipboardMenuItem;
 		private Chimera.WinForms.Controls.StatusLabelEx LinkConnectStatusBarButton;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx MacroToolMenuItem;
@@ -1326,12 +1265,10 @@ namespace Chimera.Client.GUI
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx Frameskip8MenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx Speed400MenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx DisplayMessagesMenuItem;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx RecordAVMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx SaveConfigAsMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx LoadConfigFromMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx SaveMovieAsContextMenuItem;
 		private Chimera.WinForms.Controls.ToolStripSeparatorEx toolStripSeparator8;
-		private System.Windows.Forms.ToolStripMenuItem CaptureLuaMenuItem;
 		private ToolStripSeparatorEx toolStripSeparator24;
 		private ToolStripMenuItemEx DisableResizeWithFramebufferMenuItem;
 		private ToolStripSeparatorEx toolStripSeparator26;

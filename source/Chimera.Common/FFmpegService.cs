@@ -13,22 +13,18 @@ namespace Chimera.Common
 {
 	public static class FFmpegService
 	{
-		private const string BIN_HOST_URI_LINUX_X64 = "https://github.com/TASEmulators/ffmpeg-binaries/raw/master/ffmpeg-4.4.1-static-linux-x64.7z";
-
-		private const string BIN_HOST_URI_WIN_X64 = "https://github.com/TASEmulators/ffmpeg-binaries/raw/master/ffmpeg-4.4.1-static-windows-x64.7z";
-
-		private const string BIN_SHA256_LINUX_X64 = "3EA58083710F63BF920B16C7D5D24AE081E7D731F57A656FED11AF0410D4EB48";
-
-		private const string BIN_SHA256_WIN_X64 = "8436760AF8F81C95EFF92D854A7684E6D3CEDB872888420359FC45C8EB2664AC";
-
-		private const string VERSION = "ffmpeg version 4.4.1";
-
-		public static string DownloadSHA256Checksum
-			=> OSTailoredCode.IsUnixHost ? BIN_SHA256_LINUX_X64 : BIN_SHA256_WIN_X64;
-
+		/// <summary>
+		/// ffmpeg ships in the bundle, beside the other native neighbours
+		/// (tools/fetch-ffmpeg.sh puts it there). Chimera used to name a version, a
+		/// URL and a checksum and ask the person to go and fetch it the first time
+		/// they wanted a video; there is nothing to ask any more, and nothing to
+		/// pin, because the build and the binary arrive together.
+		/// </summary>
 		public static string FFmpegPath => Path.Combine(PathUtils.DataDirectoryPath, "dll", OSTailoredCode.IsUnixHost ? "ffmpeg" : "ffmpeg.exe");
 
-		public static readonly string Url = OSTailoredCode.IsUnixHost ? BIN_HOST_URI_LINUX_X64 : BIN_HOST_URI_WIN_X64;
+		/// <summary>What to say when it is not there, which now means a broken install.</summary>
+		public static string MissingMessage
+			=> $"ffmpeg is missing from this build of Chimera. It should be at {FFmpegPath}.";
 
 		public class AudioQueryResult
 		{
@@ -50,13 +46,15 @@ namespace Chimera.Common
 		}
 
 		/// <summary>
-		/// queries whether this service is available. if ffmpeg is broken or missing, then you can handle it gracefully
+		/// Whether the shipped ffmpeg is there and runs. No version is demanded:
+		/// the one that answers is the one this build shipped with, and a person
+		/// who has put their own there in its place has said what they want.
 		/// </summary>
 		public static bool QueryServiceAvailable()
 		{
 			try
 			{
-				return Run("-version").Text.Contains(VERSION);
+				return File.Exists(FFmpegPath) && Run("-version").Text.ContainsOrdinal("ffmpeg version");
 			}
 			catch
 			{

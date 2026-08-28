@@ -50,6 +50,17 @@ namespace Chimera.Client.Common
 
 		public IMovie Movie { get; private set; }
 		public bool ReadOnly { get; set; } = true;
+
+		/// <summary>
+		/// While this is set, playing a frame leaves the movie exactly as it was:
+		/// no greenzone state is kept and no lag is written down.
+		///
+		/// Encoding a video drives the run this way. It reproduces a movie rather
+		/// than authoring one, and a reproduction that rewrote the greenzone would
+		/// spend a run's worth of memory on states nobody asked for and leave the
+		/// project changed by the act of looking at it.
+		/// </summary>
+		public bool SuppressStateCapture { get; set; }
 		public bool NewMovieQueued => _queuedMovie != null;
 		public string QueuedSettings => _queuedMovie.SettingsJson;
 
@@ -104,7 +115,7 @@ namespace Chimera.Client.Common
 
 		public void HandleFrameAfter(bool ignoreMovieEndAction)
 		{
-			if (Movie is ITasMovie tasMovie)
+			if (Movie is ITasMovie tasMovie && !SuppressStateCapture)
 			{
 				tasMovie.GreenzoneCurrentFrame();
 			}

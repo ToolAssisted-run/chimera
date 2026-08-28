@@ -114,11 +114,8 @@ namespace Chimera.Client.GUI
 				case "Exit Program":
 					ScheduleShutdown();
 					break;
-				case "Record A/V":
-					RecordAv();
-					break;
-				case "Stop A/V":
-					StopAv();
+				case "Encode Video":
+					EncodeVideoDialog();
 					break;
 				case "Larger Window":
 					IncreaseWindowSize();

@@ -76,6 +76,21 @@ namespace Chimera.Client.GUI
 			}
 
 			/// <summary>
+			/// A preset made of nothing but a command line, for the Encode Video
+			/// dialog: there the command IS the choice, typed or picked, and the
+			/// container it names decides the extension the same way as ever.
+			/// </summary>
+			public static FormatPreset CustomPreset(string commandline)
+				=> new("[Custom]", "Written in the Encode Video dialog.", commandline, true, "avi");
+
+			/// <summary>
+			/// The canned commands the Encode Video dialog offers, without the
+			/// custom entry - there, every command is editable anyway.
+			/// </summary>
+			public static FormatPreset[] GetCannedPresets()
+				=> GetPresets("").Where(static p => !p.Custom).ToArray();
+
+			/// <summary>
 			/// get the default format preset (from config files)
 			/// </summary>
 			public static FormatPreset GetDefaultPreset(Config config)

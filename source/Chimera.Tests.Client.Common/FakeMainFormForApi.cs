@@ -16,6 +16,11 @@ namespace Chimera.Tests.Client.Common
 
 		public bool InvisibleEmulation { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
 
+		public bool IsEncodingVideo => throw new NotImplementedException();
+
+		public string BeginVideoEncode(string path, int fromFrame, int toFrame, string ffmpegCommand)
+			=> throw new NotImplementedException();
+
 		public bool IsSeeking => throw new NotImplementedException();
 
 		public bool IsTurboing => throw new NotImplementedException();

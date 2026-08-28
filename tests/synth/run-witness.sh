@@ -409,6 +409,76 @@ PY
 		fi
 	fi
 
+	# --- a run becomes a video ---
+	# Encode Video, end to end: part of a real run reproduced into a real file
+	# through the real writer. The checks are the ones that used to be a person's
+	# job when this was three separate commands - is the file there, does it hold
+	# EXACTLY the frames that were asked for (both ends included), and was the
+	# emulator put back where it was found.
+	if [ "$record" -eq 0 ]; then
+		ename=gridWalker.win
+		erom="$here/roms/${ename%%.*}.testrom"
+		edir="$work/encode-leg"
+		rm -rf "$edir" && mkdir -p "$edir"
+		cp "$erom" "$edir/gridWalker.testrom"
+		python3 - "$here/movies/$ename.txt" "$edir/gridWalker.testrom" "$edir/$ename.chimeraProject" <<'ENCPY'
+import hashlib, json, sys
+entries = [l.rstrip("\r\n") for l in open(sys.argv[1]) if l.startswith("|")]
+logkey = "#P1 Up|P1 Down|P1 Left|P1 Right|P1 A|P1 B|P1 Select|P1 Start|"
+sha1 = hashlib.sha1(open(sys.argv[2], "rb").read()).hexdigest().upper()
+json.dump({
+    "title": "gridWalker.win",
+    "core": {"name": "Synth", "version": "", "sha1": ""},
+    "headers": {"MovieVersion": "BizHawk v2.0 Tasproj v1.1", "Platform": "Synth"},
+    "files": [{"name": "gridWalker.testrom", "sha1": sha1, "slot": "rom"}],
+    "input": "[Input]\nLogKey:" + logkey + "\n" + "\n".join(entries) + "\n[/Input]\n",
+}, open(sys.argv[3], "w"))
+ENCPY
+		evideo="$work/encode.mkv"
+		efrom=10
+		eto=49
+		eframes=$((eto - efrom + 1))
+		ejob="$work/job.encode.txt"
+		{
+			echo "out=$evideo"
+			echo "meta=$work/encode.meta.txt"
+			echo "from=$efrom"
+			echo "to=$eto"
+			# lossless, so a frame that came out wrong cannot be blamed on a codec
+			echo "command=-c:a pcm_s16le -c:v ffv1 -pix_fmt bgr0 -level 1 -g 1 -f matroska"
+		} > "$ejob"
+		rm -f "$evideo" "$work/encode.meta.txt"
+		cp "$config" "$work/config.encode.ini"
+
+		# ffmpeg is part of a build now, not something a person is asked to fetch
+		# the first time they want a video - so the gate builds it in too.
+		if ! "$repo_root/tools/fetch-ffmpeg.sh" linux "$repo_root/build/dll" > "$work/ffmpeg.log" 2>&1; then
+			report "V:box:encode" FAIL "no ffmpeg to encode with (see work/ffmpeg.log)"
+		else
+			( cd "$repo_root" && CHIMERA_JOB="$ejob" timeout 300 mono "$emu_exe" --headless \
+				"--config=$work/config.encode.ini" "--core=$repo_root/build/Cores/synth-box.chimeraCore" \
+				"--project=$edir/$ename.chimeraProject" "--lua=$here/synth-encode.lua" ) > "$work/encode.log" 2>&1
+			ecount=""
+			if [ -s "$evideo" ]; then
+				ecount="$(ffprobe -v error -select_streams v:0 -count_frames \
+					-show_entries stream=nb_read_frames -of csv=p=0 "$evideo" 2>/dev/null | tr -d "\r\n,")"
+			fi
+			ebefore="$(sed -n "s/^before=//p" "$work/encode.meta.txt" 2>/dev/null)"
+			eafter="$(sed -n "s/^after=//p" "$work/encode.meta.txt" 2>/dev/null)"
+			if [ ! -f "$work/encode.meta.txt" ] || ! grep -q "^status=OK" "$work/encode.meta.txt"; then
+				report "V:box:encode" FAIL "$(sed -n "s/^detail=//p" "$work/encode.meta.txt" 2>/dev/null || echo "run failed") (see work/encode.log)"
+			elif [ ! -s "$evideo" ]; then
+				report "V:box:encode" FAIL "no video was written (see work/encode.log)"
+			elif [ "$ecount" != "$eframes" ]; then
+				report "V:box:encode" FAIL "video holds ${ecount:-?} frames, asked for $eframes ($efrom to $eto inclusive)"
+			elif [ "$ebefore" != "$eafter" ]; then
+				report "V:box:encode" FAIL "emulator was left on frame $eafter, not the $ebefore it was borrowed from"
+			else
+				report "V:box:encode" PASS "$eframes frames written, emulator handed back on frame $eafter"
+			fi
+		fi
+	fi
+
 	# --- a core is never loaded implicitly ---
 	# Same movie, but NO --core. A package sitting in build/Cores is AVAILABLE, not
 	# loaded: opening a core is something the user does (File > Open Core), and the

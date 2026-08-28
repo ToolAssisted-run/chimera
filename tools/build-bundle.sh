@@ -85,6 +85,11 @@ else
 	cp "$root/build/ChimeraMono.sh" "$out/" 2>/dev/null || true
 fi
 
+# ffmpeg is part of the bundle, not something the frontend asks a person to go
+# and find the first time they encode a video.
+say "ffmpeg"
+"$root/tools/fetch-ffmpeg.sh" "$platform" "$out/dll"
+
 # ---- the cores, from the pinned submodules ----------------------------------
 build_core() { # <submodule name> <package file name>...
 	name="$1"; shift

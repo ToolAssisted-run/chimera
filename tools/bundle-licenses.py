@@ -121,6 +121,21 @@ def main():
     lines.append("Soft, Lua, zstd, SQLite, cimgui, luasocket and others) remain their authors'")
     lines.append("under their own licences.")
     lines.append("")
+    # A shipped GPL program has to be named and pointed at its source, and it is
+    # not one of the cores, so it gets said here rather than nowhere.
+    ffmpeg_licence = os.path.join(bundle, "dll", "ffmpeg-LICENSE.txt")
+    if os.path.exists(ffmpeg_licence):
+        with open(ffmpeg_licence) as f:
+            version = f.readline().strip()
+        lines.append("## ffmpeg")
+        lines.append("")
+        lines.append(f"Encoding video runs `{version}`, shipped in `dll/` beside Chimera rather")
+        lines.append("than downloaded the first time somebody wants a video. It is a separate")
+        lines.append("GPL program: Chimera starts it and writes frames down a pipe, and does not")
+        lines.append("link any part of it. The release it came from, the exact source commit it")
+        lines.append("was built from and its own licence are in `dll/ffmpeg-LICENSE.txt`.")
+        lines.append("")
+
     lines.append("## The cores")
     lines.append("")
     for pkg, index in packages:

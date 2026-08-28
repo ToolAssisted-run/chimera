@@ -195,6 +195,16 @@ namespace Chimera.Client.Common
 		public void OpenTasStudio()
 			=> APIs.Tool.OpenTasStudio();
 
+		[LuaMethodExample("""local err = client.encodevideo( "/tmp/run.mp4", 0, 1799, "-c:a aac -c:v libx264 -f mp4" );""")]
+		[LuaMethod("encodevideo", "Encodes frames fromFrame to toFrame of the loaded movie into a video file, the same way the Encode Video window does. Returns nil when it started, or a message saying why it did not. The encode runs while you advance frames; client.encodingvideo() says whether it is still going.")]
+		public string EncodeVideo(string path, int fromFrame, int toFrame, string ffmpegCommand)
+			=> MainForm.BeginVideoEncode(path, fromFrame, toFrame, ffmpegCommand);
+
+		[LuaMethodExample("while client.encodingvideo( ) do emu.frameadvance( ); end")]
+		[LuaMethod("encodingvideo", "Whether a video is still being encoded")]
+		public bool EncodingVideo()
+			=> MainForm.IsEncodingVideo;
+
 		[LuaMethodExample("client.pause( );")]
 		[LuaMethod("pause", "Pauses the emulator")]
 		public void Pause()
