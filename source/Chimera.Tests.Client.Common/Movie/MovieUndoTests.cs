@@ -1,10 +1,20 @@
-﻿using Chimera.Client.Common;
+﻿using System.Linq;
+
+using Chimera.Client.Common;
 
 namespace Chimera.Tests.Client.Common.Movie
 {
 	[TestClass]
 	public class MovieUndoTests
 	{
+		/// <summary>
+		/// The markers the USER placed. Every movie also carries the run's own
+		/// three - start, last input, end - which are not what these tests are
+		/// about and which would otherwise shift every index here.
+		/// </summary>
+		private static System.Collections.Generic.List<TasMovieMarker> UserMarkers(ITasMovie movie)
+			=> movie.Markers.Where(static m => !m.IsPermanent).ToList();
+
 		// Our test looks for the first actually different frame and compares with the value returned by Undo.
 		// Some operations (e.g. RemoveFrames) don't check for which frames were actually edited. (Should they? Would that give bad performance?)
 		// So we should ensure the first frame we touch is actually changed.
@@ -248,10 +258,10 @@ namespace Chimera.Tests.Client.Common.Movie
 			movie.InsertEmptyFrame(2);
 
 			movie.ChangeLog.Undo();
-			Assert.AreEqual(3, movie.Markers[0].Frame);
+			Assert.AreEqual(3, UserMarkers(movie)[0].Frame);
 
 			movie.ChangeLog.Redo();
-			Assert.AreEqual(4, movie.Markers[0].Frame);
+			Assert.AreEqual(4, UserMarkers(movie)[0].Frame);
 		}
 
 		[TestMethod]
@@ -263,12 +273,12 @@ namespace Chimera.Tests.Client.Common.Movie
 			movie.RemoveFrame(3);
 
 			movie.ChangeLog.Undo();
-			Assert.AreEqual(1, movie.Markers.Count);
-			Assert.AreEqual(3, movie.Markers[0].Frame);
-			Assert.AreEqual("a", movie.Markers[0].Message);
+			Assert.AreEqual(1, UserMarkers(movie).Count);
+			Assert.AreEqual(3, UserMarkers(movie)[0].Frame);
+			Assert.AreEqual("a", UserMarkers(movie)[0].Message);
 
 			movie.ChangeLog.Redo();
-			Assert.AreEqual(0, movie.Markers.Count);
+			Assert.AreEqual(0, UserMarkers(movie).Count);
 		}
 
 		[TestMethod]
@@ -281,14 +291,14 @@ namespace Chimera.Tests.Client.Common.Movie
 			movie.SetBoolState(10, "A", true);
 
 			movie.ChangeLog.Undo();
-			Assert.AreEqual(2, movie.Markers.Count);
-			Assert.AreEqual(5, movie.Markers[0].Frame);
-			Assert.AreEqual(8, movie.Markers[1].Frame);
+			Assert.AreEqual(2, UserMarkers(movie).Count);
+			Assert.AreEqual(5, UserMarkers(movie)[0].Frame);
+			Assert.AreEqual(8, UserMarkers(movie)[1].Frame);
 
 			movie.ChangeLog.Redo();
-			Assert.AreEqual(2, movie.Markers.Count);
-			Assert.AreEqual(5, movie.Markers[0].Frame);
-			Assert.AreEqual(8, movie.Markers[1].Frame);
+			Assert.AreEqual(2, UserMarkers(movie).Count);
+			Assert.AreEqual(5, UserMarkers(movie)[0].Frame);
+			Assert.AreEqual(8, UserMarkers(movie)[1].Frame);
 		}
 #pragma warning restore BHI1600
 
@@ -411,11 +421,11 @@ namespace Chimera.Tests.Client.Common.Movie
 			movie.BindMarkersToInput = false;
 
 			movie.ChangeLog.Undo();
-			Assert.AreEqual(3, movie.Markers[0].Frame);
+			Assert.AreEqual(3, UserMarkers(movie)[0].Frame);
 			Assert.IsFalse(movie.BindMarkersToInput);
 
 			movie.ChangeLog.Redo();
-			Assert.AreEqual(4, movie.Markers[0].Frame);
+			Assert.AreEqual(4, UserMarkers(movie)[0].Frame);
 			Assert.IsFalse(movie.BindMarkersToInput);
 		}
 
@@ -430,11 +440,11 @@ namespace Chimera.Tests.Client.Common.Movie
 			movie.BindMarkersToInput = false;
 
 			movie.ChangeLog.Undo();
-			Assert.AreEqual(3, movie.Markers[0].Frame);
+			Assert.AreEqual(3, UserMarkers(movie)[0].Frame);
 			Assert.IsFalse(movie.BindMarkersToInput);
 
 			movie.ChangeLog.Redo();
-			Assert.AreEqual(2, movie.Markers[0].Frame);
+			Assert.AreEqual(2, UserMarkers(movie)[0].Frame);
 			Assert.IsFalse(movie.BindMarkersToInput);
 		}
 
@@ -455,12 +465,12 @@ namespace Chimera.Tests.Client.Common.Movie
 
 			movie.ChangeLog.Undo();
 			movie.ChangeLog.Undo();
-			Assert.AreEqual(3, movie.Markers[0].Frame);
+			Assert.AreEqual(3, UserMarkers(movie)[0].Frame);
 			Assert.IsFalse(movie.BindMarkersToInput);
 
 			movie.ChangeLog.Redo();
 			movie.ChangeLog.Redo();
-			Assert.AreEqual(3, movie.Markers[0].Frame);
+			Assert.AreEqual(3, UserMarkers(movie)[0].Frame);
 			Assert.IsFalse(movie.BindMarkersToInput);
 		}
 #pragma warning restore BHI1600

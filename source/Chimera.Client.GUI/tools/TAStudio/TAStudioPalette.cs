@@ -21,6 +21,10 @@ namespace Chimera.Client.GUI
 			lagZone_InputLog_Stated: Color.FromArgb(0xF0, 0xD0, 0xD2),
 			lagZone_InputLog_Invalidated: Color.FromArgb(0xF7, 0xE5, 0xE5),
 			marker_FrameCol: Color.FromArgb(0xF7, 0xFF, 0xC9),
+			// the run's own three markers, told apart from the user's at a glance:
+			// a colder, deeper tint than the marker yellow, because they are not
+			// something anyone placed and not something anyone can move
+			permanentMarker_FrameCol: Color.FromArgb(0xC9, 0xE4, 0xFF),
 			analogEdit_Col: Color.FromArgb(0x90, 0x90, 0x70)); // SuuperW: When editing an analog value, it will be a gray color.
 
 //		public readonly Color CurrentFrame_FrameCol;
@@ -47,6 +51,9 @@ namespace Chimera.Client.GUI
 
 		public readonly Color Marker_FrameCol;
 
+		/// <summary>The frame column for the run's own markers: start, last input, end.</summary>
+		public readonly Color PermanentMarker_FrameCol;
+
 		public readonly Color AnalogEdit_Col;
 
 		public TAStudioPalette(
@@ -61,6 +68,7 @@ namespace Chimera.Client.GUI
 			Color lagZone_InputLog_Stated,
 			Color lagZone_InputLog_Invalidated,
 			Color marker_FrameCol,
+			Color permanentMarker_FrameCol,
 			Color analogEdit_Col)
 		{
 //			CurrentFrame_FrameCol = currentFrame_FrameCol;
@@ -75,6 +83,7 @@ namespace Chimera.Client.GUI
 			LagZone_InputLog_Stated = lagZone_InputLog_Stated;
 			LagZone_InputLog_Invalidated = lagZone_InputLog_Invalidated;
 			Marker_FrameCol = marker_FrameCol;
+			PermanentMarker_FrameCol = permanentMarker_FrameCol;
 			AnalogEdit_Col = analogEdit_Col;
 		}
 	}

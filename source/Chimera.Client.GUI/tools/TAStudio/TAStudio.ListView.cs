@@ -483,7 +483,11 @@ namespace Chimera.Client.GUI
 			{
 				if (Emulator.Frame != index && Settings.DenoteMarkersWithBGColor && CurrentTasMovie.Markers.IsMarker(index))
 				{
-					color = Palette.Marker_FrameCol;
+					// the run's own markers - start, last input, end - are not the
+					// user's and do not look like the user's
+					color = CurrentTasMovie.Markers.Any(m => m.Frame == index && m.IsPermanent)
+						? Palette.PermanentMarker_FrameCol
+						: Palette.Marker_FrameCol;
 				}
 				else
 				{
@@ -1293,7 +1297,10 @@ namespace Chimera.Client.GUI
 
 		private void SetMarker(int frame)
 		{
-			TasMovieMarker/*?*/ existingMarker = CurrentTasMovie.Markers.FirstOrDefault(m => m.Frame == frame);
+			// a permanent marker is not the user's to rename, so a frame carrying only
+			// one is still a frame the user may put their own marker on
+			TasMovieMarker/*?*/ existingMarker
+				= CurrentTasMovie.Markers.FirstOrDefault(m => m.Frame == frame && !m.IsPermanent);
 
 			if (existingMarker != null)
 			{
@@ -1307,7 +1314,8 @@ namespace Chimera.Client.GUI
 
 		public void RemoveMarker()
 		{
-			TasMovieMarker/*?*/ existingMarker = CurrentTasMovie.Markers.FirstOrDefault(m => m.Frame == Emulator.Frame);
+			TasMovieMarker/*?*/ existingMarker
+				= CurrentTasMovie.Markers.FirstOrDefault(m => m.Frame == Emulator.Frame && !m.IsPermanent);
 			if (existingMarker == null) return;
 
 			CurrentTasMovie.Markers.Remove(existingMarker);

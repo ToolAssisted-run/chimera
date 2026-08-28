@@ -369,6 +369,11 @@ namespace Chimera.Client.Common
 				Markers.Add(new TasMovieMarker(0, "Power on"), skipHistory: true);
 			}
 
+			// the run's own markers are never written to the file, so they are
+			// worked out again here - which is the only way they can be trusted
+			RefreshLastNonEmptyInput(0);
+			Markers.RefreshPermanent();
+
 			Branches.Clear();
 			for (var i = 0; i < p.BranchCount; i++)
 			{

@@ -25,6 +25,7 @@ namespace Chimera.Client.GUI
 				colours["lagZone_InputLog_Stated"] = fromPalette.LagZone_InputLog_Stated;
 				colours["lagZone_InputLog_Invalidated"] = fromPalette.LagZone_InputLog_Invalidated;
 				colours["marker_FrameCol"] = fromPalette.Marker_FrameCol;
+				colours["permanentMarker_FrameCol"] = fromPalette.PermanentMarker_FrameCol;
 				colours["analogEdit_Col"] = fromPalette.AnalogEdit_Col;
 			}
 			Init(initPalette);
@@ -56,6 +57,7 @@ namespace Chimera.Client.GUI
 					Row("lagZone_InputLog_Stated", "Savestate (Lag)"),
 					Row("lagZone_InputLog_Invalidated", "Invalidated (Lag)"),
 					Row("marker_FrameCol", "Marker"),
+					Row("permanentMarker_FrameCol", "Marker (run start / last input / end)"),
 					Row("analogEdit_Col", "Analog Edit Mode"),
 				},
 			};
@@ -76,6 +78,7 @@ namespace Chimera.Client.GUI
 					lagZone_InputLog_Stated: colours["lagZone_InputLog_Stated"],
 					lagZone_InputLog_Invalidated: colours["lagZone_InputLog_Invalidated"],
 					marker_FrameCol: colours["marker_FrameCol"],
+					permanentMarker_FrameCol: colours["permanentMarker_FrameCol"],
 					analogEdit_Col: colours["analogEdit_Col"]));
 				Close();
 			};

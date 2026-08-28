@@ -14,6 +14,13 @@ namespace Chimera.Client.Common
 		ITasMovieRecord this[int index] { get; }
 		ITasSession TasSession { get; }
 		TasMovieMarkerList Markers { get; }
+
+		/// <summary>
+		/// The last frame with anything pressed on it, or zero when nothing is
+		/// pressed anywhere. "Empty" is the same emptiness Truncate uses: the log
+		/// entry a default controller generates.
+		/// </summary>
+		int LastNonEmptyInputFrame { get; }
 		ITasBranchCollection Branches { get; }
 		TasLagLog LagLog { get; }
 		IStringLog VerificationLog { get; }

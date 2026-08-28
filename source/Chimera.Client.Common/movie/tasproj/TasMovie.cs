@@ -108,9 +108,58 @@ namespace Chimera.Client.Common
 		{
 			ClearTasprojExtras();
 			Markers.Add(new TasMovieMarker(0, StartsFromSavestate ? "Savestate" : "Power on"), skipHistory: true);
+			RefreshLastNonEmptyInput(0);
+			Markers.RefreshPermanent();
 			ClearChanges();
 
 			base.StartNewRecording();
+		}
+
+		/// <summary>
+		/// The last frame with anything pressed on it, or zero when nothing is
+		/// pressed anywhere. Emptiness is the same emptiness Truncate uses - the
+		/// log entry a DEFAULT controller generates - so the two agree about where
+		/// a run's input really stops.
+		/// </summary>
+		public int LastNonEmptyInputFrame => _lastNonEmptyInput;
+
+		private int _lastNonEmptyInput;
+
+		/// <summary>
+		/// Works the answer out again after an edit at <paramref name="frame"/>,
+		/// knowing that nothing before that frame has changed.
+		///
+		/// It matters that this is cheap: recording calls it once per frame, and a
+		/// run recorded past its last press would otherwise re-read a longer and
+		/// longer log every frame. So the walk back from the end stops at the edit,
+		/// which during recording is a step or two; and it only ever falls through
+		/// to reading the whole log when the edit lands at or before the frame the
+		/// answer was sitting on, which is the one case where that answer can have
+		/// been erased.
+		/// </summary>
+		private void RefreshLastNonEmptyInput(int frame)
+		{
+			if (Log.Count == 0)
+			{
+				_lastNonEmptyInput = 0;
+				return;
+			}
+
+			int floor = _lastNonEmptyInput < frame ? frame : 0;
+			string empty = LogEntryGenerator.EmptyEntry(
+				DefaultValueController ?? Session.MovieController);
+			for (int i = Log.Count - 1; i >= floor; i--)
+			{
+				if (Log[i] != empty)
+				{
+					_lastNonEmptyInput = i;
+					return;
+				}
+			}
+
+			// nothing pressed from the edit onwards: what stands is whatever was
+			// found before it, which the untouched frames still say is true
+			if (floor == 0) _lastNonEmptyInput = 0;
 		}
 
 		// Removes lag log and greenzone after this frame
@@ -131,6 +180,12 @@ namespace Chimera.Client.Common
 			{
 				Rerecords++;
 			}
+
+			// The run's own markers follow the movie. This is the one place every
+			// editing path passes through - input, inserts, deletes, truncation -
+			// so putting it here is what keeps them from ever being stale.
+			RefreshLastNonEmptyInput(frame);
+			Markers.RefreshPermanent();
 
 			GreenzoneInvalidated?.Invoke(frame);
 			LastEditWasRecording = false; // We can set it here; it's only used in the GreenzoneInvalidated action.

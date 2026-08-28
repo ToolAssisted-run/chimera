@@ -70,7 +70,12 @@ namespace Chimera.Client.GUI
 			var marker = Markers[index];
 			var prev = Markers.PreviousOrCurrent(Tastudio.Emulator.Frame);
 
-			if (ReferenceEquals(marker, prev))
+			if (marker.IsPermanent)
+			{
+				// told apart from the user's own at a glance, here as in the frame column
+				color = Tastudio.Palette.PermanentMarker_FrameCol;
+			}
+			else if (ReferenceEquals(marker, prev))
 			{
 				// feos: taseditor doesn't have it, so we're free to set arbitrary color scheme. and I prefer consistency
 				color = Tastudio.Palette.CurrentFrame_InputLog;
@@ -141,10 +146,14 @@ namespace Chimera.Client.GUI
 
 		private void MarkerContextMenu_Opening(object sender, CancelEventArgs e)
 		{
+			// the run's own markers - start, last input, end - are the movie
+			// speaking; there is nothing here to rename, move or delete
+			bool editable = MarkerInputRoll.AnyRowsSelected
+				&& MarkerView.FirstSelectedRowIndex is not 0
+				&& FirstSelectedMarker?.IsPermanent is not true;
 			EditMarkerToolStripMenuItem.Enabled =
 				EditMarkerFrameToolStripMenuItem.Enabled =
-				RemoveMarkerToolStripMenuItem.Enabled =
-					MarkerInputRoll.AnyRowsSelected && MarkerView.FirstSelectedRowIndex is not 0;
+				RemoveMarkerToolStripMenuItem.Enabled = editable;
 
 			JumpToMarkerToolStripMenuItem.Enabled =
 				ScrollToMarkerToolStripMenuItem.Enabled =
@@ -188,7 +197,10 @@ namespace Chimera.Client.GUI
 		private void RemoveMarkerToolStripMenuItem_Click(object sender, EventArgs e)
 		{
 			if (!MarkerView.AnyRowsSelected) return;
-			foreach (var i in MarkerView.SelectedRows.Select(index => Markers[index]).ToList()) Markers.Remove(i);
+			foreach (var i in MarkerView.SelectedRows.Select(index => Markers[index]).Where(static m => !m.IsPermanent).ToList())
+			{
+				Markers.Remove(i);
+			}
 			MarkerView.RowCount = Markers.Count;
 		}
 
@@ -243,6 +255,7 @@ namespace Chimera.Client.GUI
 
 		public void EditMarkerPopUp(TasMovieMarker marker)
 		{
+			if (marker.IsPermanent) return;
 			var markerFrame = marker.Frame;
 			var i = new InputPrompt
 			{
@@ -262,6 +275,7 @@ namespace Chimera.Client.GUI
 
 		public void EditMarkerFramePopUp(TasMovieMarker marker)
 		{
+			if (marker.IsPermanent) return;
 			var markerFrame = marker.Frame;
 			var i = new InputPrompt
 			{
