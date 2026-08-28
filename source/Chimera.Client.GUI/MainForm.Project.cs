@@ -98,6 +98,12 @@ namespace Chimera.Client.GUI
 					Config.CoreFirmware.TryGetValue(CoreFirmwareStore.KeyFor(coreName, id), out var remembered)
 						? remembered
 						: null);
+			// A project that is already open opens the wizard already answered. This
+			// is how a project is reconfigured: changing a sync setting changes the
+			// machine, so there is no editing one in place - what made that
+			// unbearable was answering every question again to change one of them.
+			if (_openProject is not null) wizard.SeedFrom(_openProject);
+
 			if (wizard.ShowDialog(this) is not DialogResult.OK) return null;
 
 			// remember where the firmware lives, keyed the way the resolver reads

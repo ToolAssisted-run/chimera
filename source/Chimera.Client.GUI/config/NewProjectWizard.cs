@@ -390,6 +390,86 @@ namespace Chimera.Client.GUI
 			RefreshRendererChoices();
 		}
 
+		/// <summary>
+		/// Opens the wizard already filled in from a project: its core, its machine,
+		/// its settings and the files it is running on.
+		///
+		/// This IS how a project is reconfigured. Changing a sync setting changes the
+		/// machine, so there is no editing a project in place that would not amount
+		/// to building another one - and what made that unbearable was re-answering
+		/// every question to change one of them. Answer them once; come back and
+		/// change the one.
+		///
+		/// The files are seeded from where THIS run found them, which is the only
+		/// place a path exists: a project carries names and hashes and no paths at
+		/// all. A file the run never resolved is skipped rather than guessed at.
+		/// </summary>
+		public void SeedFrom(EngineProject project)
+		{
+			var index = _cores.ToList().FindIndex(c =>
+				string.Equals(c.Name, project.CoreName, StringComparison.OrdinalIgnoreCase));
+			if (index < 0) return;   // the project's core is not installed; leave the wizard blank
+			_core.SelectedIndex = index;
+			LoadChosenPackage();
+
+			SeedSettings(project.SettingsJson);
+
+			// the slot form has to exist before anything can be put in it
+			if (!BuildSlotForm()) return;
+			for (var i = 0; i < project.FileCount; i++)
+			{
+				var path = project.FileSourcePath(i);
+				if (!string.IsNullOrEmpty(path) && File.Exists(path)) AddFileToSlot(project.FileSlot(i), path);
+			}
+
+			// and the files can decide settings in their turn
+			RefreshExposedSettings();
+			_settingsGrid.SelectedObject = _settings;
+		}
+
+		/// <summary>
+		/// Puts a project's saved values into the settings object, then lets the
+		/// machine and renderer pickers read themselves back out of it - they are
+		/// settings like any other, and this is where they were recorded.
+		/// </summary>
+		private void SeedSettings(string flatJson)
+		{
+			_settings ??= new WaterboxCoreSettings();
+			if (!string.IsNullOrWhiteSpace(flatJson))
+			{
+				try
+				{
+					var values = Newtonsoft.Json.Linq.JObject.Parse(flatJson);
+					foreach (var pair in values)
+					{
+						if (pair.Value is Newtonsoft.Json.Linq.JValue v && v.Value is not null)
+						{
+							_settings.Values[pair.Key] = v.Value;
+						}
+					}
+				}
+				catch (Newtonsoft.Json.JsonException)
+				{
+					// a project whose settings will not parse gets the defaults
+				}
+			}
+
+			if (_cfg?.HasMachines is true)
+			{
+				var effective = WaterboxCore.EffectiveSettingsFor(_cfg, _settings);
+				var machine = _cfg.MachineFor(effective);
+				var at = machine is null ? -1 : _cfg.Machines.IndexOf(machine);
+				if (at >= 0) _machine.SelectedIndex = at;
+			}
+			// read before the pickers are refreshed: refreshing them selects the
+			// core's default and writes THAT back over what the project said
+			var renderer = _settings.Values.TryGetValue(RendererSetting, out var chosen) ? chosen?.ToString() : null;
+
+			PinMachine();
+			RefreshRendererChoices();
+			if (renderer is not null) SetRenderer(renderer);
+		}
+
 		/// <summary>The setting that names the renderers, if this core has one.</summary>
 		private const string RendererSetting = "renderer";
 
@@ -731,6 +811,18 @@ namespace Chimera.Client.GUI
 		}
 
 		/// <summary>
+		/// The settings as the decision trees should read them: the package's
+		/// defaults and per-machine narrowing applied over what has been chosen.
+		/// Without a package there is nothing to apply, but the chosen values are
+		/// still the truth - answering with an empty map instead would make every
+		/// condition that names a setting quietly false.
+		/// </summary>
+		private System.Collections.Generic.Dictionary<string, object> EffectiveSettings()
+			=> _cfg is not null
+				? WaterboxCore.EffectiveSettingsFor(_cfg, _settings)
+				: new(_settings?.Values ?? new System.Collections.Generic.Dictionary<string, object>());
+
+		/// <summary>
 		/// The slots themselves join the decision tree: a slot's exposedWhen is
 		/// evaluated over the CURRENT picks, so filling one slot can make
 		/// another unavailable until it is unloaded (a Famicom disk rules out
@@ -745,8 +837,7 @@ namespace Chimera.Client.GUI
 			var exposed = EngineSlotsGate.Evaluate(
 				_declaration.RawJson,
 				CurrentSlotsJson(),
-				Newtonsoft.Json.JsonConvert.SerializeObject(
-					_cfg is null ? new System.Collections.Generic.Dictionary<string, object>() : WaterboxCore.EffectiveSettingsFor(_cfg, _settings)));
+				Newtonsoft.Json.JsonConvert.SerializeObject(EffectiveSettings()));
 			foreach (var slot in _declaration.Slots)
 			{
 				if (!_slotGroups.TryGetValue(slot.Id, out var group)) continue;
