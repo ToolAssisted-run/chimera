@@ -122,6 +122,24 @@ namespace Chimera.Tests.Client.Common.Movie
 			Assert.AreEqual("mine", movie.Markers.Last().Message);
 		}
 
+		/// <summary>
+		/// Zero is two answers: a run that presses nothing, and a run that presses
+		/// only on its first frame. The marker wants that - both belong on frame
+		/// zero - but anything COUNTING frames from it should know, because the
+		/// LastInputFrame header a movie carries has the same shape and readers
+		/// outside Chimera use it to state a run's length.
+		/// </summary>
+		[TestMethod]
+		public void FrameZeroIsBothNoInputAndInputOnTheFirstFrame()
+		{
+			var noInput = MakeMovie(10);
+			Assert.AreEqual(0, noInput.LastNonEmptyInputFrame, "nothing pressed anywhere");
+
+			var pressedOnFrameZero = MakeMovie(10);
+			pressedOnFrameZero.SetBoolState(0, "A", true);
+			Assert.AreEqual(0, pressedOnFrameZero.LastNonEmptyInputFrame, "pressed on frame zero only");
+		}
+
 		[TestMethod]
 		public void TheyCannotBeRemoved()
 		{
