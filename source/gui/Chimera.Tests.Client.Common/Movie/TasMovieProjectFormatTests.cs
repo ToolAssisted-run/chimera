@@ -77,6 +77,32 @@ namespace Chimera.Tests.Client.Common.Movie
 		}
 
 		[TestMethod]
+		public void TheRunsOwnMarkersAreNotWrittenAndDoNotAccumulate()
+		{
+			// They are derived on load - writing them down would let them go stale,
+			// and reading them back as ordinary markers would breed three more of
+			// them on every save.
+			var path = Path.Combine(_dir, "permanent-markers.chimeraProject");
+			MakeWorkedMovie(path).Save();
+
+			var reloaded = LoadFresh(path);
+			Assert.AreEqual(3, reloaded.Markers.Count(static m => m.IsPermanent),
+				"exactly the three the run derives");
+			CollectionAssert.AreEqual(
+				new[] { "the jump" },
+				reloaded.Markers.Where(static m => !m.IsPermanent).Select(static m => m.Message).ToArray(),
+				"and nothing of theirs left behind as somebody's own marker");
+
+			// and again, because accumulation only shows on the second pass
+			var twice = Path.Combine(_dir, "permanent-markers-twice.chimeraProject");
+			reloaded.Filename = twice;
+			reloaded.Save();
+			var third = LoadFresh(twice);
+			Assert.AreEqual(1, third.Markers.Count(static m => !m.IsPermanent),
+				"a second round trip adds none either");
+		}
+
+		[TestMethod]
 		public void TheWorkRoundTripsThroughTheProjectAlone()
 		{
 			var path = Path.Combine(_dir, "roundtrip.chimeraProject");

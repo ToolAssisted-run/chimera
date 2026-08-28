@@ -121,6 +121,11 @@ namespace Chimera.Client.Common
 			p.MarkersClear();
 			foreach (var marker in Markers)
 			{
+				// the run's own three are derived from the movie and worked out
+				// again on load: writing them would let them go stale, and reading
+				// them back would leave three of somebody else's markers behind
+				// every time the project was saved
+				if (marker.IsPermanent) continue;
 				p.MarkerAdd(marker.Frame, marker.Message ?? "", marker.WantsState);
 			}
 
