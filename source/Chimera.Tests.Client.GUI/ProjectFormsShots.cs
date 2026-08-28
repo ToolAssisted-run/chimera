@@ -7,7 +7,6 @@ using Chimera.Client.GUI;
 using Chimera.Emulation.Common;
 using Chimera.Emulation.Common.Engine;
 using Chimera.Emulation.Common.Waterbox;
-using Chimera.Emulation.Common.Waterbox;
 
 namespace Chimera.Tests.Client.GUI
 {
@@ -60,6 +59,30 @@ namespace Chimera.Tests.Client.GUI
 			if (ShotDir is null) { Assert.Inconclusive("set CHIMERA_UI_SHOTS to write screenshots"); return; }
 			using var form = MakeWizard();
 			Shoot(form, "wizard-1-core");
+		}
+
+		/// <summary>
+		/// The same page for a core that draws two ways: the renderer is a choice,
+		/// and it starts on the one the core declared - the faster of the two.
+		/// </summary>
+		[TestMethod]
+		public void WizardCoreStepWithRenderers()
+		{
+			if (ShotDir is null) { Assert.Inconclusive("set CHIMERA_UI_SHOTS to write screenshots"); return; }
+			using var form = MakeWizard();
+			form.UseRenderersFrom(WaterboxConfig.FromJson("""
+				{
+				  "coreName": "flycast",
+				  "systemId": "DC",
+				  "video": { "width": 640, "height": 480 },
+				  "audio": { "samplesPerFrame": 1024 },
+				  "input": { "buttons": [] },
+				  "settings": [
+				    { "name": "renderer", "type": "enum", "options": ["software", "opengl"], "default": "software" }
+				  ]
+				}
+				"""));
+			Shoot(form, "wizard-1-core-renderers");
 		}
 
 		[TestMethod]

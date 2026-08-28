@@ -48,6 +48,14 @@ namespace Chimera.Client.GUI
 
 		private readonly Label _machineLabel;
 
+		/// <summary>
+		/// Which renderer draws, for a core that offers a choice. It sits beside the
+		/// core rather than among the settings because it is not a property of the
+		/// machine: the same machine, drawn twice. A core with one renderer shows it
+		/// greyed, so the question is always answered in the same place.
+		/// </summary>
+		private readonly ComboBox _renderer;
+
 		// page 2, rebuilt when the chosen core changes
 		private readonly Panel _slotsHost;
 		private ProjectSlotDeclaration? _declaration;
@@ -151,15 +159,31 @@ namespace Chimera.Client.GUI
 			}
 			p1.Controls.Add(_core);
 
-			_machineLabel = MakeLabel("Machine:", 8, 84);
-			_machine = new ComboBox
+			p1.Controls.Add(MakeLabel("Renderer:", 8, 84));
+			_renderer = new ComboBox
 			{
 				Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
 				DropDownStyle = ComboBoxStyle.DropDownList,
 				Location = Pt(110, 80),
 				Width = UIHelper.ScaleX(442),
 			};
-			_machine.SelectedIndexChanged += (_, _) => PinMachine();
+			_renderer.SelectedIndexChanged += (_, _) => PinRenderer();
+			p1.Controls.Add(_renderer);
+
+			_machineLabel = MakeLabel("Machine:", 8, 116);
+			_machine = new ComboBox
+			{
+				Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
+				DropDownStyle = ComboBoxStyle.DropDownList,
+				Location = Pt(110, 112),
+				Width = UIHelper.ScaleX(442),
+			};
+			_machine.SelectedIndexChanged += (_, _) =>
+			{
+				PinMachine();
+				// a package that is several machines may offer different renderers
+				RefreshRendererChoices();
+			};
 			p1.Controls.AddRange([ _machineLabel, _machine ]);
 			_core.SelectedIndexChanged += (_, _) => LoadChosenPackage();
 			if (_core.Items.Count is not 0) _core.SelectedIndex = 0;
@@ -326,6 +350,65 @@ namespace Chimera.Client.GUI
 			_machine.Visible = several;
 			_machineLabel.Visible = several;
 			PinMachine();
+			RefreshRendererChoices();
+		}
+
+		/// <summary>The setting that names the renderers, if this core has one.</summary>
+		private const string RendererSetting = "renderer";
+
+		/// <summary>
+		/// Offers the chosen core's renderers. A core that declares none draws one
+		/// way, so there is one entry and nothing to choose; a core that declares
+		/// them starts on the one it declared as its default, which is the faster of
+		/// the two everywhere this exists so far.
+		///
+		/// Read through the CHOSEN MACHINE, because a package that is several
+		/// machines may narrow a setting per machine.
+		/// </summary>
+		private void RefreshRendererChoices()
+		{
+			var decl = RendererDecl();
+			var options = decl?.Options;
+
+			_renderer.Items.Clear();
+			if (options is { Count: > 0 })
+			{
+				foreach (var option in options) _renderer.Items.Add(option);
+			}
+			else
+			{
+				// nothing declared: the core has one renderer and does not name it
+				_renderer.Items.Add("default");
+			}
+
+			var wanted = decl?.DefaultValue as string;
+			var index = wanted is null ? -1 : _renderer.Items.IndexOf(wanted);
+			_renderer.SelectedIndex = index >= 0 ? index : 0;
+
+			// one renderer is not a choice, and a disabled box still says what it is
+			_renderer.Enabled = _renderer.Items.Count > 1;
+			PinRenderer();
+		}
+
+		private WaterboxConfig.SettingDecl? RendererDecl()
+		{
+			if (_cfg is null) return null;
+			var effective = _settings is null
+				? new Dictionary<string, object>()
+				: WaterboxCore.EffectiveSettingsFor(_cfg, _settings);
+			return _cfg.SettingsFor(_cfg.MachineFor(effective))
+				.FirstOrDefault(static decl => decl.Name == RendererSetting);
+		}
+
+		/// <summary>
+		/// Writes the chosen renderer into the settings, where it is a setting like
+		/// any other - so the project records it and the movie cites it. A core that
+		/// declares no renderer has nothing to write.
+		/// </summary>
+		private void PinRenderer()
+		{
+			if (_settings is null || RendererDecl() is null) return;
+			if (_renderer.SelectedItem is string chosen) _settings.Values[RendererSetting] = chosen;
 		}
 
 		/// <summary>
@@ -476,9 +559,42 @@ namespace Chimera.Client.GUI
 		{
 			_cfg = cfg;
 			_settings = new WaterboxCoreSettings();
+			RefreshRendererChoices();   // as choosing the core does
 			RefreshExposedSettings();
 			_settingsGrid.SelectedObject = _settings;
 			ShowPage(2);
+		}
+
+		/// <summary>
+		/// Offers a given core's renderers without leaving page one - the test and
+		/// screenshot door for the dropdown beside the core.
+		/// </summary>
+		internal void UseRenderersFrom(WaterboxConfig cfg)
+		{
+			_cfg = cfg;
+			_settings = new WaterboxCoreSettings();
+			RefreshRendererChoices();
+		}
+
+		/// <summary>the renderers offered on page one, in order, for tests</summary>
+		public string[] RendererOptions
+			=> _renderer.Items.Cast<object>().Select(static item => (string)item).ToArray();
+
+		/// <summary>the renderer chosen on page one, for tests</summary>
+		public string? ChosenRenderer => _renderer.SelectedItem as string;
+
+		/// <summary>whether the renderer is a choice at all, for tests</summary>
+		public bool RendererIsAChoice => _renderer.Enabled;
+
+		/// <summary>what the project would record for a setting - for tests</summary>
+		public object? SettingValue(string name)
+			=> _settings?.Values is not null && _settings.Values.TryGetValue(name, out var value) ? value : null;
+
+		/// <summary>picks a renderer as the dropdown would - for tests</summary>
+		internal void SetRenderer(string name)
+		{
+			var index = _renderer.Items.IndexOf(name);
+			if (index >= 0) _renderer.SelectedIndex = index;
 		}
 
 		/// <summary>the exposed settings, in order, for tests</summary>
