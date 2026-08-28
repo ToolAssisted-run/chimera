@@ -479,6 +479,58 @@ ENCPY
 		fi
 	fi
 
+	# --- a second project, over a running one ---
+	# The shape that used to throw: booting over a live session ran the old
+	# machine's close inside the new one's load, where it took the movie the load
+	# had just queued. A session has to end before the next one begins, and the
+	# machine left behind has to be the SECOND project's.
+	if [ "$record" -eq 0 ]; then
+		rdir="$work/reopen-leg"
+		rm -rf "$rdir" && mkdir -p "$rdir"
+		make_project() { # <movie name> <project path>
+			cp "$here/roms/${1%%.*}.testrom" "$rdir/${1%%.*}.testrom"
+			python3 - "$here/movies/$1.txt" "$rdir/${1%%.*}.testrom" "$2" <<'REOPENPY'
+import hashlib, json, sys
+entries = [l.rstrip("\r\n") for l in open(sys.argv[1]) if l.startswith("|")]
+logkey = "#P1 Up|P1 Down|P1 Left|P1 Right|P1 A|P1 B|P1 Select|P1 Start|"
+sha1 = hashlib.sha1(open(sys.argv[2], "rb").read()).hexdigest().upper()
+json.dump({
+    "title": sys.argv[1],
+    "core": {"name": "Synth", "version": "", "sha1": ""},
+    "headers": {"MovieVersion": "BizHawk v2.0 Tasproj v1.1", "Platform": "Synth"},
+    "files": [{"name": sys.argv[2].split("/")[-1], "sha1": sha1, "slot": "rom"}],
+    "input": "[Input]\nLogKey:" + logkey + "\n" + "\n".join(entries) + "\n[/Input]\n",
+}, open(sys.argv[3], "w"))
+REOPENPY
+		}
+		make_project gridWalker.win "$rdir/first.chimeraProject"
+		make_project gridWalker.lose "$rdir/second.chimeraProject"
+		firstlen="$(grep -c '^|' "$here/movies/gridWalker.win.txt")"
+		secondlen="$(grep -c '^|' "$here/movies/gridWalker.lose.txt")"
+
+		rjob="$work/job.reopen.txt"
+		{
+			echo "second=$rdir/second.chimeraProject"
+			echo "meta=$work/reopen.meta.txt"
+		} > "$rjob"
+		rm -f "$work/reopen.meta.txt" "$work/reopen.ram.bin"
+		cp "$config" "$work/config.reopen.ini"
+		( cd "$repo_root" && CHIMERA_JOB="$rjob" timeout 300 mono "$emu_exe" --headless \
+			"--config=$work/config.reopen.ini" "--core=$repo_root/build/Cores/synth-box.chimeraCore" \
+			"--project=$rdir/first.chimeraProject" "--lua=$here/synth-reopen.lua" ) > "$work/reopen.log" 2>&1
+		got_first="$(sed -n 's/^firstlength=//p' "$work/reopen.meta.txt" 2>/dev/null)"
+		got_second="$(sed -n 's/^secondlength=//p' "$work/reopen.meta.txt" 2>/dev/null)"
+		if [ ! -f "$work/reopen.meta.txt" ] || ! grep -q "^status=OK" "$work/reopen.meta.txt"; then
+			report "R:box:reopen" FAIL "$(sed -n 's/^detail=//p' "$work/reopen.meta.txt" 2>/dev/null || echo "run failed") (see work/reopen.log)"
+		elif [ "$got_first" != "$firstlen" ]; then
+			report "R:box:reopen" FAIL "the first project was $got_first frames, not $firstlen"
+		elif [ "$got_second" != "$secondlen" ]; then
+			report "R:box:reopen" FAIL "after reopening, the movie is $got_second frames; the second project is $secondlen"
+		else
+			report "R:box:reopen" PASS "a project opened over a running one, and the second is what is loaded"
+		fi
+	fi
+
 	# --- a core is never loaded implicitly ---
 	# Same movie, but NO --core. A package sitting in build/Cores is AVAILABLE, not
 	# loaded: opening a core is something the user does (File > Open Core), and the

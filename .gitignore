@@ -39,7 +39,8 @@ UpgradeLog.htm
 
 /packages
 
-launchSettings.jsonminibox-diag.log
+launchSettings.json
+minibox-diag.log
 
 # scratch left by the engine test binaries when run from a checkout root
 # (test_project and friends write their fixtures into the working directory)

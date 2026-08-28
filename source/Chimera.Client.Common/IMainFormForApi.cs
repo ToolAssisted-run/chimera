@@ -47,6 +47,13 @@ namespace Chimera.Client.Common
 		/// <remarks>only referenced from <see cref="ClientLuaLibrary"/></remarks>
 		string BeginVideoEncode(string path, int fromFrame, int toFrame, string ffmpegCommand);
 
+		/// <summary>
+		/// Opens a .chimeraProject, ending whatever session is running first. The
+		/// same thing File &gt; Open Project does.
+		/// </summary>
+		/// <remarks>only referenced from <see cref="ClientLuaLibrary"/></remarks>
+		bool OpenProject(string path);
+
 		/// <remarks>only referenced from <see cref="EmuClientApi"/></remarks>
 		void ClearHolds();
 

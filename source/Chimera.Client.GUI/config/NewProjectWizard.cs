@@ -8,6 +8,7 @@ using System.Linq;
 using System.Windows.Forms;
 
 using Chimera.Client.Common;
+using Chimera.Common;
 using Chimera.Emulation.Common.Engine;
 using Chimera.Emulation.Common;
 using Chimera.Emulation.Common.Waterbox;
@@ -185,6 +186,7 @@ namespace Chimera.Client.GUI
 				RefreshRendererChoices();
 			};
 			p1.Controls.AddRange([ _machineLabel, _machine ]);
+			p1.Controls.Add(MakeIssuesNotice());
 			_core.SelectedIndexChanged += (_, _) => LoadChosenPackage();
 			if (_core.Items.Count is not 0) _core.SelectedIndex = 0;
 			LoadChosenPackage();
@@ -281,6 +283,34 @@ namespace Chimera.Client.GUI
 			Controls.AddRange([ _backButton, _nextButton, cancel, _status ]);
 			ResumeLayout();
 			ShowPage(0);
+		}
+
+		private const string IssuesUrl = "https://github.com/ToolAssisted-run/chimera/issues";
+
+		/// <summary>
+		/// Where to say something when Chimera gets it wrong. It sits on the first
+		/// page because that is the page everyone sees, and it says the URL rather
+		/// than hiding it behind a word, so it can be read off a screenshot.
+		/// </summary>
+		private static LinkLabel MakeIssuesNotice()
+		{
+			const string text = "Chimera is still under heavy development. Please submit bugs, crashes,"
+				+ " graphical glitches, performance issues, and feature requests here:\n"
+				+ IssuesUrl;
+			LinkLabel notice = new()
+			{
+				Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
+				AutoSize = false,
+				ForeColor = SystemColors.GrayText,
+				LinkBehavior = LinkBehavior.HoverUnderline,
+				Location = Pt(8, 316),
+				Size = new(UIHelper.ScaleX(544), UIHelper.ScaleY(56)),
+				Text = text,
+			};
+			notice.Links.Clear();
+			notice.Links.Add(text.IndexOf(IssuesUrl, StringComparison.Ordinal), IssuesUrl.Length, IssuesUrl);
+			notice.LinkClicked += static (_, e) => Util.OpenUrlExternal((string) e.Link.LinkData);
+			return notice;
 		}
 
 		private static Point Pt(int x, int y) => new(UIHelper.ScaleX(x), UIHelper.ScaleY(y));

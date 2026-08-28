@@ -21,6 +21,13 @@ namespace Chimera.Client.GUI
 		private bool _closingProject;
 
 		/// <summary>
+		/// Set for the window between a project queueing its movie and running it.
+		/// Inside it the rom load restarts the tools, and TAStudio's restart would
+		/// otherwise start a movie of its own and take the queued one with it.
+		/// </summary>
+		private bool _bootingProject;
+
+		/// <summary>
 		/// A project and TAStudio are one thing: the window IS the session, so one is
 		/// open exactly when the other is. This is the single place that ends both,
 		/// whichever of them was closed first.
@@ -159,6 +166,9 @@ namespace Chimera.Client.GUI
 			return BootProject(project, path, saved: true, local);
 		}
 
+		/// <summary>The same, for a script (client.openproject).</summary>
+		public bool OpenProject(string path) => LoadProject(path);
+
 		/// <summary>
 		/// Starts a project that has never been written: the wizard just built
 		/// it in memory, so there is no file to resolve against and nothing to
@@ -182,10 +192,23 @@ namespace Chimera.Client.GUI
 				return false;
 			}
 
-			if (!VerifyFirmwarePins(project, local))
+			// A project and TAStudio are one session, and the next one begins only
+			// once this one has ended. Booting over a live session left the old
+			// machine's close running inside the new one's load, where it consumed
+			// the movie the load had just queued and the boot fell over on it.
+			//
+			// It happens here rather than at the menu item: everything above can
+			// still refuse, and a project that cannot boot must not take down the
+			// one that is running. Everything below is committed.
+			if (!Emulator.IsNull())
 			{
-				project.Dispose();
-				return false;
+				CloseProject();
+				if (!Emulator.IsNull())
+				{
+					// the close asked about unsaved work and was told no
+					project.Dispose();
+					return false;
+				}
 			}
 
 			_openProject?.Dispose();
@@ -222,6 +245,7 @@ namespace Chimera.Client.GUI
 			var isFresh = tasMovie.InputLogLength is 0;
 
 			var oldDefaultCores = new Dictionary<string, string>(Config.DefaultCores);
+			_bootingProject = true;
 			try
 			{
 				// the movie's own identity makes the legacy platform/hash checks
@@ -243,6 +267,7 @@ namespace Chimera.Client.GUI
 			}
 			finally
 			{
+				_bootingProject = false;
 				MovieSession.AbortQueuedMovie();
 				Config.DefaultCores = oldDefaultCores;
 			}

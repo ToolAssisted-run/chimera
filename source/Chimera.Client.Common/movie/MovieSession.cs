@@ -230,6 +230,17 @@ namespace Chimera.Client.Common
 
 		public void RunQueuedMovie(bool recordMode, IEmulator emulator)
 		{
+			// Nothing queued means something ran between the queue and here and took
+			// it - a close, or another movie starting - and the caller is about to
+			// believe it has a session it does not. Say which, rather than throwing a
+			// null reference from the middle of the next line.
+			if (_queuedMovie is null)
+			{
+				throw new InvalidOperationException(
+					"no movie is queued: something ended or replaced it between queueing and running."
+						+ " A project must be closed before the next one is booted.");
+			}
+
 			MovieController = new MovieController(emulator.ControllerDefinition, _queuedMovie.LogKey);
 
 			Movie = _queuedMovie;

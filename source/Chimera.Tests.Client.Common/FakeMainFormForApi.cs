@@ -21,6 +21,8 @@ namespace Chimera.Tests.Client.Common
 		public string BeginVideoEncode(string path, int fromFrame, int toFrame, string ffmpegCommand)
 			=> throw new NotImplementedException();
 
+		public bool OpenProject(string path) => throw new NotImplementedException();
+
 		public bool IsSeeking => throw new NotImplementedException();
 
 		public bool IsTurboing => throw new NotImplementedException();

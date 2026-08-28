@@ -228,7 +228,13 @@ namespace Chimera.Client.GUI
 					return;
 				}
 
-				runningScripts = LuaImp.ScriptList.Where(lf => lf.Enabled).ToList();
+				// Not the REPL. It is a LuaFile whose path is the Lua FOLDER rather
+				// than any script, so re-enabling it reads a directory as source and
+				// throws - which is what happened on the second restart of a session,
+				// as when a project is opened while a script is running.
+				runningScripts = LuaImp.ScriptList
+					.Where(lf => lf.Enabled && !ReferenceEquals(lf, _nonFile))
+					.ToList();
 
 				// we don't use runningScripts here as the other scripts need to be stopped too
 				foreach (var file in LuaImp.ScriptList)

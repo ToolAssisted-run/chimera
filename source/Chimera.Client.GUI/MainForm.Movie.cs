@@ -16,6 +16,13 @@ namespace Chimera.Client.GUI
 		{
 			if (movie is null) throw new ArgumentNullException(paramName: nameof(movie));
 
+			// A project boot has already queued the movie it IS and is inside the one
+			// rom load; the tool restart that load performs reaches TAStudio, which
+			// would start a movie of its own here and consume the queued one out from
+			// under the boot that queued it. The boot engages TAStudio itself when it
+			// has finished, against the movie it actually loaded.
+			if (_bootingProject) return false;
+
 			if (CheatList.AnyActive)
 			{
 				var result = this.ModalMessageBox3(

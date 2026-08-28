@@ -195,6 +195,29 @@ namespace Chimera.Client.Common
 		public void OpenTasStudio()
 			=> APIs.Tool.OpenTasStudio();
 
+		[LuaMethodExample("client.openproject( \"/tmp/run.chimeraProject\" );")]
+		[LuaMethod("openproject", "Opens a Chimera project, closing whichever one is open first. Returns true if it opened.")]
+		public bool OpenProject(string path)
+		{
+			if (_luaLibsImpl.ProhibitedApis.HasFlag(ApiGroup.BOOTING))
+			{
+				throw new InvalidOperationException("client.openproject() is not allowed during input/memory callbacks");
+			}
+
+			// Same as openrom: opening a project boots a machine, and a boot restarts
+			// the lua console. Saying so first makes it re-inject its dependencies
+			// rather than close the lua state this script is still running on.
+			_luaLibsImpl.IsRebootingCore = true;
+			try
+			{
+				return MainForm.OpenProject(path);
+			}
+			finally
+			{
+				_luaLibsImpl.IsRebootingCore = false;
+			}
+		}
+
 		[LuaMethodExample("""local err = client.encodevideo( "/tmp/run.mp4", 0, 1799, "-c:a aac -c:v libx264 -f mp4" );""")]
 		[LuaMethod("encodevideo", "Encodes frames fromFrame to toFrame of the loaded movie into a video file, the same way the Encode Video window does. Returns nil when it started, or a message saying why it did not. The encode runs while you advance frames; client.encodingvideo() says whether it is still going.")]
 		public string EncodeVideo(string path, int fromFrame, int toFrame, string ffmpegCommand)
