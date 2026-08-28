@@ -32,15 +32,16 @@ The officially maintained cores currently offered for Chimera are:
 | Master System | [Genesis Plus GX](https://github.com/ToolAssisted-run/chimera-core-gpgx) |
 | Game Gear | [Genesis Plus GX](https://github.com/ToolAssisted-run/chimera-core-gpgx) |
 | SG-1000 | [Genesis Plus GX](https://github.com/ToolAssisted-run/chimera-core-gpgx) |
-| Dreamcast | Flycast \* |
-| PlayStation 2 | PCSX2 \* |
+| Dreamcast | [Flycast](https://github.com/ToolAssisted-run/chimera-core-flycast) \* |
+| PlayStation 2 | [PCSX2](https://github.com/ToolAssisted-run/chimera-core-pcsx2) \* |
 | PlayStation Portable | [PPSSPP](https://github.com/ToolAssisted-run/chimera-core-ppsspp) |
 | 3DO Interactive Multiplayer | [Opera](https://github.com/ToolAssisted-run/chimera-core-opera) |
 | Atari 2600 | [Stella](https://github.com/ToolAssisted-run/chimera-core-stella) |
 | MS-DOS | [DOSBox-X](https://github.com/ToolAssisted-run/chimera-core-dosbox-x) |
 | Windows 3.1 / 95 / 98 | [DOSBox-X](https://github.com/ToolAssisted-run/chimera-core-dosbox-x) |
 
-\* Not published yet, and not in the builds below.
+\* Not yet in the builds below: these two are not submodules of this repository
+yet, so `tools/build-bundle.sh` does not assemble them.
 
 ## Getting a build
 
