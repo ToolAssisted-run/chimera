@@ -85,6 +85,15 @@ namespace Chimera.Tests.Client.GUI
 		}
 
 		[TestMethod]
+		public void ItIsNotAskedAgainAmongTheSettings()
+		{
+			using var form = MakeForm(CfgWithRenderers());
+			CollectionAssert.Contains(form.ExposedSettingNames, "region");
+			CollectionAssert.DoesNotContain(form.ExposedSettingNames, "renderer",
+				"it is chosen beside the core, so the settings page does not ask again");
+		}
+
+		[TestMethod]
 		public void ACoreWithNoRendererSettingRecordsNothingForIt()
 		{
 			using var form = MakeForm(CfgWithoutRenderers());

@@ -828,6 +828,9 @@ namespace Chimera.Client.GUI
 			var declarations = exposed
 				.Where(entry => entry.Index >= 0 && entry.Index < all.Count && all[entry.Index].Name == entry.Name)
 				.Select(entry => all[entry.Index])
+				// ...except the renderer, which is asked beside the core on page one
+				// and would only be asked twice here
+				.Where(static decl => decl.Name != RendererSetting)
 				.ToList();
 			var current = _settings.Declarations;
 			if (current is not null && current.Count == declarations.Count
@@ -1075,17 +1078,26 @@ namespace Chimera.Client.GUI
 			// the project records every EXPOSED sync setting explicitly, at its
 			// effective value: the settings section is exactly the knobs these
 			// decisions offered, nothing else
-			if (_settings?.Declarations is { Count: not 0 } exposedDecls)
 			{
 				Dictionary<string, object> recorded = new();
-				foreach (var decl in exposedDecls)
+				foreach (var decl in _settings?.Declarations ?? [ ])
 				{
-					recorded[decl.Name] = _settings.Values is not null
+					recorded[decl.Name] = _settings!.Values is not null
 						&& _settings.Values.TryGetValue(decl.Name, out var value)
 							? value
 							: decl.DefaultValue;
 				}
-				project.SetSettingsJson(Newtonsoft.Json.JsonConvert.SerializeObject(recorded));
+				// the renderer is not in that list - it is chosen on page one - but it
+				// is a setting like any other and the project records it the same way
+				if (RendererDecl() is { } rendererDecl)
+				{
+					recorded[rendererDecl.Name] = _settings?.Values is not null
+						&& _settings.Values.TryGetValue(rendererDecl.Name, out var chosen)
+							? chosen
+							: rendererDecl.DefaultValue;
+				}
+				if (recorded.Count is not 0)
+					project.SetSettingsJson(Newtonsoft.Json.JsonConvert.SerializeObject(recorded));
 			}
 
 			{
