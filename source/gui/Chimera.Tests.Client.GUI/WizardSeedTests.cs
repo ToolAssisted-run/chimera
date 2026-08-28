@@ -97,7 +97,7 @@ namespace Chimera.Tests.Client.GUI
 			project.FileAdd("seeded.nes", "rom", rom);
 
 			using var form = MakeForm(package);
-			form.SeedFrom(project);
+			form.SeedFrom(ProjectAnswers.Of(project));
 
 			Assert.AreEqual("pal", form.SettingValue("region"), "the setting the project was running on");
 			Assert.AreEqual("opengl", form.ChosenRenderer, "and the renderer it was drawn with");
@@ -115,10 +115,35 @@ namespace Chimera.Tests.Client.GUI
 			project.SetSettingsJson("""{"region":"pal"}""");
 
 			using var form = MakeForm(package);
-			form.SeedFrom(project);
+			form.SeedFrom(ProjectAnswers.Of(project));
 
 			Assert.AreNotEqual("pal", form.SettingValue("region"),
 				"nothing is filled in from a project this build cannot open");
+		}
+
+		[TestMethod]
+		public void TheAnswersOutliveTheProjectTheyCameFrom()
+		{
+			// closing a project is not a decision to start the next one from
+			// nothing, and the project itself is disposed when it is replaced - so
+			// what the wizard opens on is a copy taken while it was still open
+			var package = MakePackage();
+			var rom = MakeRom("outlives.nes");
+
+			ProjectAnswers answers;
+			using (var project = EngineProject.New())
+			{
+				project.SetCore("seedbox", "", "");
+				project.SetSettingsJson("""{"region":"pal"}""");
+				project.FileAdd("outlives.nes", "rom", rom);
+				answers = ProjectAnswers.Of(project);
+			}
+
+			using var form = MakeForm(package);
+			form.SeedFrom(answers);
+
+			Assert.AreEqual("pal", form.SettingValue("region"));
+			CollectionAssert.Contains(form.SlotFileNames("rom"), "outlives.nes");
 		}
 
 		[TestMethod]
@@ -133,7 +158,7 @@ namespace Chimera.Tests.Client.GUI
 			File.Delete(rom);
 
 			using var form = MakeForm(package);
-			form.SeedFrom(project);
+			form.SeedFrom(ProjectAnswers.Of(project));
 
 			Assert.AreEqual(0, form.SlotFileNames("rom").Length,
 				"a project carries names and hashes, not paths; a file this run cannot find is not guessed at");

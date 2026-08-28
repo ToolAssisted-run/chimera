@@ -17,6 +17,17 @@ namespace Chimera.Client.GUI
 		// (reboots go through it again). Replaced on the next LoadProject.
 		private EngineProject _openProject;
 
+		/// <summary>
+		/// The answers the last project was built from, kept so the wizard opens on
+		/// them next time. It survives the project being closed, because closing one
+		/// is not a decision to start the next from nothing - most often it is the
+		/// step before changing one setting and going again.
+		///
+		/// A copy rather than the project: the open one gets disposed when it is
+		/// replaced, and this has to outlive that.
+		/// </summary>
+		private ProjectAnswers _lastAnswers;
+
 		/// <summary>guards the two ways a project ends from chasing each other</summary>
 		private bool _closingProject;
 
@@ -44,19 +55,39 @@ namespace Chimera.Client.GUI
 			finally
 			{
 				_closingProject = false;
+				// after the close, so a request TAStudio queued on the way out
+				// belongs to the session that has just ended rather than to this one
+				_projectSession++;
 			}
 		}
+
+		/// <summary>
+		/// Which session is open, counted rather than named. Only ever compared for
+		/// equality: what a deferred close needs to know is whether the session it
+		/// was asked about is still the one that is open.
+		/// </summary>
+		private int _projectSession;
 
 		/// <summary>
 		/// The same, but after the caller's own close has finished: TAStudio asks this
 		/// from inside its FormClosing, where the window it is about to take down is
 		/// still standing.
+		///
+		/// It is deferred, so by the time it runs the session that asked may be long
+		/// gone - starting a project closes the open one first, and that close takes
+		/// TAStudio down, and TAStudio asks for this on its way out. Running it then
+		/// would close the project that had just replaced it. So the request carries
+		/// the session it was made for, and is dropped if that is not still the one.
 		/// </summary>
 		public void QueueProjectClose()
-			=> BeginInvoke((Action) (() =>
+		{
+			var session = _projectSession;
+			BeginInvoke((Action) (() =>
 			{
+				if (session != _projectSession) return;
 				if (!Emulator.IsNull()) CloseProject();
 			}));
+		}
 
 		private void NewProjectDialog()
 		{
@@ -98,11 +129,13 @@ namespace Chimera.Client.GUI
 					Config.CoreFirmware.TryGetValue(CoreFirmwareStore.KeyFor(coreName, id), out var remembered)
 						? remembered
 						: null);
-			// A project that is already open opens the wizard already answered. This
-			// is how a project is reconfigured: changing a sync setting changes the
-			// machine, so there is no editing one in place - what made that
-			// unbearable was answering every question again to change one of them.
-			if (_openProject is not null) wizard.SeedFrom(_openProject);
+			// The wizard opens on the last project's answers - the open one, or the
+			// last one there was. This is how a project is reconfigured: changing a
+			// sync setting changes the machine, so there is no editing one in place,
+			// and what made that unbearable was answering every question again to
+			// change one of them.
+			var answers = _openProject is not null ? ProjectAnswers.Of(_openProject) : _lastAnswers;
+			if (answers is not null) wizard.SeedFrom(answers);
 
 			if (wizard.ShowDialog(this) is not DialogResult.OK) return null;
 
@@ -291,6 +324,11 @@ namespace Chimera.Client.GUI
 				PopulateWithDefaultHeaderValues(tasMovie);
 				tasMovie.ClearChanges();
 			}
+
+			// what this project was built from, for the next wizard to open on -
+			// taken here rather than at the wizard, so opening a project remembers
+			// its answers as much as making one does
+			_lastAnswers = ProjectAnswers.Of(project);
 
 			SetMainformMovieInfo();
 			WarnOnMovieVsLoadedCore();

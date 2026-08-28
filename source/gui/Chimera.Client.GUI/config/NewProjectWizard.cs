@@ -398,26 +398,25 @@ namespace Chimera.Client.GUI
 		/// every question to change one of them. Answer them once; come back and
 		/// change the one.
 		///
-		/// The files are seeded from where THIS run found them, which is the only
-		/// place a path exists: a project carries names and hashes and no paths at
-		/// all. A file the run never resolved is skipped rather than guessed at.
+		/// The files are seeded from where a run found them, which is the only place
+		/// a path exists: a project carries names and hashes and no paths at all. A
+		/// file that is no longer there is skipped rather than guessed at.
 		/// </summary>
-		public void SeedFrom(EngineProject project)
+		public void SeedFrom(ProjectAnswers answers)
 		{
 			var index = _cores.ToList().FindIndex(c =>
-				string.Equals(c.Name, project.CoreName, StringComparison.OrdinalIgnoreCase));
-			if (index < 0) return;   // the project's core is not installed; leave the wizard blank
+				string.Equals(c.Name, answers.CoreName, StringComparison.OrdinalIgnoreCase));
+			if (index < 0) return;   // that core is not installed; leave the wizard blank
 			_core.SelectedIndex = index;
 			LoadChosenPackage();
 
-			SeedSettings(project.SettingsJson);
+			SeedSettings(answers.SettingsJson);
 
 			// the slot form has to exist before anything can be put in it
 			if (!BuildSlotForm()) return;
-			for (var i = 0; i < project.FileCount; i++)
+			foreach (var (slot, path) in answers.Files)
 			{
-				var path = project.FileSourcePath(i);
-				if (!string.IsNullOrEmpty(path) && File.Exists(path)) AddFileToSlot(project.FileSlot(i), path);
+				if (File.Exists(path)) AddFileToSlot(slot, path);
 			}
 
 			// and the files can decide settings in their turn

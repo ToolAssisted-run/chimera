@@ -74,4 +74,11 @@ if not movie.isloaded() then
 end
 meta.secondLength = movie.length()
 
+-- What this CANNOT see: the old session's close is deferred (TAStudio asks for
+-- it on its way out), so it lands after the new project has booted. Watching
+-- for that would mean turning the crank a few more frames, and a script's
+-- coroutine is never resumed once it has opened a project - it would hang here
+-- rather than report. MainForm._projectSession is what stops that close from
+-- landing on the wrong session.
+
 finish("OK", "")
