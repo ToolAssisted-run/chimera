@@ -46,9 +46,13 @@ Consequences a core author must respect:
   this design kills.
 
 Cores whose persistent state is plain machine memory (NES SRAM and the like)
-need none of this: their save data is already machine state, already rewinds,
-and is already reachable through savestates. They simply do not export the
-group, and the menu item does not appear.
+need none of this MACHINERY: their save data is already machine state, already
+rewinds, and is already reachable through savestates. They still export the
+group, though - user-decided 2026-08-28, revising the original "they simply do
+not". Reproduction was never the question: without an export there is no way to
+take a saved game off a cart, and without the import slot below no project can
+start from one. What such a core exports is the memory itself (a NES cart's
+battery WRAM), and what it refuses is a save for a machine that keeps none.
 
 ## The guest ABI group: savedata export
 
@@ -127,16 +131,39 @@ core-managed service). On click:
 The frontend never parses a byte of it. There is no import UI here and none
 is planned: files go back in as game inputs.
 
-## Taking it back in (the input side; NOT YET BUILT)
+## Taking it back in (BUILT, 2026-08-28)
 
-The exported files return as part of a multi-file game descriptor: each file
-is mounted read-only and hash-bound like any input, the movie header cites
-every hash, and the core seeds its writable tree from the mounts it
-recognizes during Init. That makes a movie's starting save data reproducible
-the way its rom and firmware already are - by hash, with no copy inside the
-movie and no frontend policy. The descriptor format is a separate design the
-user owns; nothing in the export side depends on its shape, because the
-names exported today are the names a descriptor will mount tomorrow.
+The descriptor this section anticipated is the project's slot declaration
+(docs/project.md), so the input side is one more slot. Every core that keeps
+save data declares:
+
+```json
+{ "id": "savedata", "title": "Save data", "min": 0, "max": 1,
+  "formats": ["sav"], "help": "..." }
+```
+
+and seeds from it **during Init, before seal**, so the contents land in the
+sealed baseline and a savestate carries only what the game wrote since. Each
+file is mounted read-only and hash-bound like any input and the movie header
+cites it, so a movie's starting save data is reproducible the way its rom and
+firmware are.
+
+Three rules, learned building the first six:
+
+- **Names are identity.** A project mounts a file under its recorded name, so
+  a core seeds by opening the name it EXPORTS. Export and import are the same
+  list read in two directions, and a round trip is the test.
+- **Refuse what will not be read.** A core that is handed save data it does
+  not recognize - a name it never opens, a cart with no battery, a file the
+  wrong size - fails the load and says why. A project carrying someone's
+  progress that is silently ignored is worse than one that will not start.
+- **Several files, or a tree, become a zip**, because that is what the export
+  writes. PPSSPP unpacks one onto its memory stick; libzip reads it from
+  MEMORY, since its file source wants fcntl and a sandbox does not answer.
+
+Built for: PCSX2 (memcard1.ps2, memcard2.ps2, bios.nvm), Flycast (vmu_A1.bin,
+vmu_A2.bin), Opera (NVRAM.ram), PPSSPP (the stick, as a zip), quickerNES and
+QuickerNesHawk (battery.sav, and disk.sav on an FDS).
 
 ## Tenants
 
