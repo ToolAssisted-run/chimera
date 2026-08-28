@@ -353,7 +353,7 @@ if not meson.is_cross_build()
       # nodeReuse/shared-compilation off: lingering msbuild worker processes
       # otherwise hold the output pipe open ~15 minutes after the build ends,
       # and `meson compile frontend` blocks on them
-      command: [dotnet, 'build', repo_root / 'source/Chimera.sln', '-c', 'Release', '/nodeReuse:false', '-p:UseSharedCompilation=false'],
+      command: [dotnet, 'build', repo_root / 'source/gui/Chimera.sln', '-c', 'Release', '/nodeReuse:false', '-p:UseSharedCompilation=false'],
     )
   endif
 endif
