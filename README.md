@@ -18,6 +18,16 @@
 
 Chimera is a minimal frontend for creating tool-assisted speedruns (TAS).
 
+## Goals
+
+- **Modularity.** The frontend contains no emulation core and no system-specific knowledge. Cores are external, self-contained packages (`.chimeraCore`), each maintained in its own repository under its own license, loaded explicitly like a ROM.
+
+- **Performance.** All functional machinery (the sandbox host, movies, savestates, file formats, the running machine itself) lives in `libchimera`, a native C++ engine the GUI calls into.
+
+- **Stronger reproducibility guarantees.** A movie's reproduction contract is the pair *(movie, core package)*: nothing about a Chimera build (compiler, libraries, OS) is allowed to affect whether a movie syncs. Movies record the exact core version, package hash, firmware hashes, and host provenance.
+
+Chimera is not designed for casual play. For that, use the original emulators directly, or a multi-emulation frontend such as RetroArch.
+
 ## Supported systems
 
 The officially maintained cores currently offered for Chimera are:
@@ -32,16 +42,13 @@ The officially maintained cores currently offered for Chimera are:
 | Master System | [Genesis Plus GX](https://github.com/ToolAssisted-run/chimera-core-gpgx) |
 | Game Gear | [Genesis Plus GX](https://github.com/ToolAssisted-run/chimera-core-gpgx) |
 | SG-1000 | [Genesis Plus GX](https://github.com/ToolAssisted-run/chimera-core-gpgx) |
-| Dreamcast | [Flycast](https://github.com/ToolAssisted-run/chimera-core-flycast) \* |
-| PlayStation 2 | [PCSX2](https://github.com/ToolAssisted-run/chimera-core-pcsx2) \* |
+| Dreamcast | [Flycast](https://github.com/ToolAssisted-run/chimera-core-flycast) |
+| PlayStation 2 | [PCSX2](https://github.com/ToolAssisted-run/chimera-core-pcsx2) |
 | PlayStation Portable | [PPSSPP](https://github.com/ToolAssisted-run/chimera-core-ppsspp) |
 | 3DO Interactive Multiplayer | [Opera](https://github.com/ToolAssisted-run/chimera-core-opera) |
 | Atari 2600 | [Stella](https://github.com/ToolAssisted-run/chimera-core-stella) |
 | MS-DOS | [DOSBox-X](https://github.com/ToolAssisted-run/chimera-core-dosbox-x) |
 | Windows 3.1 / 95 / 98 | [DOSBox-X](https://github.com/ToolAssisted-run/chimera-core-dosbox-x) |
-
-\* Not yet in the builds below: these two are not submodules of this repository
-yet, so `tools/build-bundle.sh` does not assemble them.
 
 ## Getting a build
 
@@ -59,18 +66,6 @@ replay has to match is the core rather than the frontend around it.
 Every bundle carries `BUILD.txt`, naming the exact commit of the frontend and of
 every core in it, and `LICENSES.md`, stating the terms of the whole thing.
 **Those terms are non-commercial**, because some of the cores' licences are.
-
-## Goals
-
-These are the reasons Chimera exists as its own project rather than a BizHawk configuration:
-
-- **Modularity.** The frontend contains no emulation core and no system-specific knowledge. Cores are external, self-contained packages (`.chimeraCore`), each maintained in its own repository under its own license, loaded explicitly like a ROM.
-
-- **Performance.** All functional machinery (the sandbox host, movies, savestates, file formats, the running machine itself) lives in `libchimera`, a native C++ engine the GUI calls into.
-
-- **Stronger reproducibility guarantees.** A movie's reproduction contract is the pair *(movie, core package)*: nothing about a Chimera build (compiler, libraries, OS) is allowed to affect whether a movie syncs. Movies record the exact core version, package hash, firmware hashes, and host provenance.
-
-Chimera is not designed for casual play. For that, use the original emulators directly, or a multi-emulation frontend such as RetroArch.
 
 ## Building
 
@@ -106,6 +101,6 @@ Pull requests are welcome, from people and from people working with AI assistant
 
 ## Credits and license
 
-**Chimera is a derivative fork of [BizHawk](https://github.com/TASEmulators/BizHawk).** The frontend, the TAS tooling, and the architecture it builds on are the original work of the BizHawk team, and all credit for them belongs to BizHawk's developers.
+**Chimera is a derivative fork of [BizHawk](https://github.com/TASEmulators/BizHawk).** most of the frontend, TAS tooling, and the architecture it builds on are the original work of the BizHawk team, and all credit for them belongs to BizHawk's developers.
 
 Chimera is provided under the MIT License, preserving the BizHawk team's copyright; see [LICENSE](LICENSE), which also covers the native libraries built from `extern/`, the vendored test suite, and why core packages carry their own licenses. The people behind Chimera itself are in [CREDITS.md](CREDITS.md).

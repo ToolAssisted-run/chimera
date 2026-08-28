@@ -74,3 +74,13 @@
 	url = https://github.com/ToolAssisted-run/chimera-core-stella.git
 	branch = main
 	ignore = dirty
+[submodule "extern/cores/flycast"]
+	path = extern/cores/flycast
+	url = https://github.com/ToolAssisted-run/chimera-core-flycast.git
+	branch = main
+	ignore = dirty
+[submodule "extern/cores/pcsx2"]
+	path = extern/cores/pcsx2
+	url = https://github.com/ToolAssisted-run/chimera-core-pcsx2.git
+	branch = main
+	ignore = dirty

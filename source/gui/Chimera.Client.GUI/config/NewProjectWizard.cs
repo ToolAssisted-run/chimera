@@ -294,9 +294,7 @@ namespace Chimera.Client.GUI
 		/// </summary>
 		private static LinkLabel MakeIssuesNotice()
 		{
-			const string text = "Chimera is still under heavy development. Please submit bugs, crashes,"
-				+ " graphical glitches, performance issues, and feature requests here:\n"
-				+ IssuesUrl;
+			const string text = "Please submit any issues and feature requests here:\n" + IssuesUrl;
 			LinkLabel notice = new()
 			{
 				Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
