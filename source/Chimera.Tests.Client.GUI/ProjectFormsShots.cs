@@ -169,6 +169,49 @@ namespace Chimera.Tests.Client.GUI
 			}
 		}
 
+		/// <summary>
+		/// The PS2 shape: one entry per known bios dump, all under one id, each
+		/// nailed to a value of the Boot ROM setting - so the page names the one
+		/// file this project wants, and its SHA1.
+		/// </summary>
+		[TestMethod]
+		public void WizardFirmwareStepOneExactDump()
+		{
+			if (ShotDir is null) { Assert.Inconclusive("set CHIMERA_UI_SHOTS to write screenshots"); return; }
+			using var form = MakeWizard();
+			var cfg = WaterboxConfig.FromJson("""
+				{
+				  "coreName": "PCSX2",
+				  "systemId": "PS2",
+				  "video": { "width": 640, "height": 448 },
+				  "audio": { "samplesPerFrame": 1024 },
+				  "input": { "buttons": [] },
+				  "settings": [
+				    { "name": "bios", "display": "Boot ROM", "type": "enum",
+				      "options": ["ps2-0160e-20011004", "ps2-0230a-20080220"],
+				      "default": "ps2-0230a-20080220" }
+				  ],
+				  "firmware": [
+				    { "id": "bios.bin", "display": "PlayStation 2 BIOS",
+				      "size": 4194304, "name": "ps2-0160e-20011004.bin",
+				      "sha1": "8361D615CC895962E0F0838489337574DBDC9173",
+				      "label": "Europe v1.60 (2001-10-04)",
+				      "description": "The console's own bios, 4MB, dumped from a PlayStation 2 you own.",
+				      "requiredWhen": { "setting": "bios", "is": "ps2-0160e-20011004" } },
+				    { "id": "bios.bin", "display": "PlayStation 2 BIOS",
+				      "size": 4194304, "name": "ps2-0230a-20080220.bin",
+				      "sha1": "F9229FE159D0353B9F0632F3FDC66819C9030458",
+				      "label": "USA v2.30 (2008-02-20)",
+				      "description": "The console's own bios, 4MB, dumped from a PlayStation 2 you own.",
+				      "requiredWhen": { "setting": "bios", "is": "ps2-0230a-20080220" } }
+				  ]
+				}
+				""");
+			// the Boot ROM setting chose the USA v2.30 dump: entry 1, and only it
+			form.UseFirmwareNeeds(cfg, [ ("bios.bin", 1) ], [ ]);
+			Shoot(form, "wizard-4-firmware-one-dump");
+		}
+
 		internal static (WaterboxConfig Cfg, IReadOnlyList<FirmwareLocator.IndexedFile> Index) MakeFirmwareFixture(string dir)
 		{
 			// the Firmware folder holds the US CD bios under a foreign name, and
