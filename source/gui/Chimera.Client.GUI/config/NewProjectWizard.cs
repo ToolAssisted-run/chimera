@@ -294,15 +294,15 @@ namespace Chimera.Client.GUI
 		/// </summary>
 		private static LinkLabel MakeIssuesNotice()
 		{
-			const string text = "Please submit any issues and feature requests here:\n" + IssuesUrl;
+			const string text = "Please submit any issues and feature requests here: " + IssuesUrl;
 			LinkLabel notice = new()
 			{
 				Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
 				AutoSize = false,
 				ForeColor = SystemColors.GrayText,
 				LinkBehavior = LinkBehavior.HoverUnderline,
-				Location = Pt(8, 316),
-				Size = new(UIHelper.ScaleX(544), UIHelper.ScaleY(56)),
+				Location = Pt(8, 352),
+				Size = new(UIHelper.ScaleX(544), UIHelper.ScaleY(20)),
 				Text = text,
 			};
 			notice.Links.Clear();
@@ -472,11 +472,12 @@ namespace Chimera.Client.GUI
 
 		/// <summary>
 		/// One entry in the renderer dropdown: the name the CORE knows it by, shown
-		/// as what it actually is. Both of these draw on the CPU - one is the core's
-		/// own rasteriser, the other is the core's OpenGL path over a software
-		/// OpenGL compiled into the sandbox - and a person choosing between them is
-		/// owed that much. The value is what the project records; renaming what is
-		/// on screen must never rename what is in the file.
+		/// as what it actually is. The distinction a person is owed here is where
+		/// the drawing happens - the core's own rasteriser and its OpenGL path over
+		/// a software OpenGL both run on the CPU inside the sandbox and are
+		/// deterministic; the hardware one leaves the sandbox for a GPU and is not.
+		/// The value is what the project records; renaming what is on screen must
+		/// never rename what is in the file.
 		/// </summary>
 		private sealed class RendererChoice
 		{
@@ -488,6 +489,7 @@ namespace Chimera.Client.GUI
 			{
 				"software" or "default" => "Software (Native)",
 				"opengl" => "Software (OpenGL)",
+				"opengl-hw" => "Hardware (OpenGL)",
 				_ => Value,
 			};
 		}

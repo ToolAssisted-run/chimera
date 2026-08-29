@@ -115,6 +115,7 @@ int main(int argc, char **argv)
 	std::string projectPath;
 	std::vector<std::string> fileDirs;
 	bool allowCoreMismatch = false;
+	bool wantGpu = false;
 
 	for (int i = 1; i < argc; i++)
 	{
@@ -128,6 +129,7 @@ int main(int argc, char **argv)
 		else if (arg == "--project" && i + 1 < argc) projectPath = argv[++i];
 		else if (arg == "--files" && i + 1 < argc) fileDirs.push_back(argv[++i]);
 		else if (arg == "--allow-core-mismatch") allowCoreMismatch = true;
+		else if (arg == "--gpu") wantGpu = true;
 		else if (arg == "--dump" && i + 1 < argc)
 		{
 			std::string spec = argv[++i];
@@ -143,7 +145,7 @@ int main(int argc, char **argv)
 	bool projectMode = !projectPath.empty();
 	if (projectMode ? packagePath == nullptr : moviePath == nullptr)
 	{
-		std::fprintf(stderr, "usage: chimera-run <package> <rom> <movie.txt> [--rerecord] [--seek <frame>] [--record <out.txt>] [--settings <json>] [--dump <domain>=<path>]... [--export-savedata <dir>] [--meta <path>]\n"
+		std::fprintf(stderr, "usage: chimera-run <package> <rom> <movie.txt> [--rerecord] [--seek <frame>] [--record <out.txt>] [--settings <json>] [--dump <domain>=<path>]... [--export-savedata <dir>] [--meta <path>] [--gpu]\n"
 			"       chimera-run --project <p.chimeraProject> <package> [--files <dir>]... [--allow-core-mismatch] [the same run flags]\n");
 		return 1;
 	}
@@ -330,6 +332,11 @@ int main(int argc, char **argv)
 		return fail(metaPath, std::string("movie: ") + ce_movie_log_last_error(movie));
 	}
 
+	/* --gpu is the same ask the frontend makes for a renderer named *-hw:
+	 * an offer, not a promise. Without a bridge in this build, without a
+	 * driver, or with a core that has no GL renderer, the software path
+	 * draws and ce_session_deterministic still says 1. */
+	ce_gl_request(wantGpu ? 1 : 0);
 	const char *error = nullptr;
 	ce_session *session = ce_session_open(
 		packagePath, rom.data(), rom.size(), settings, nullptr, nullptr, nullptr, 0,

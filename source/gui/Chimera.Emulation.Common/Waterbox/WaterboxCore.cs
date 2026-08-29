@@ -91,7 +91,10 @@ namespace Chimera.Emulation.Common.Waterbox
 			// core's own words (GetLoadError), which the engine already collected.
 			try
 			{
-				_session = EngineSession.Open(packageDir, rom, SerializeSettings(EffectiveSettings()), firmware, extraFiles);
+				var effective = EffectiveSettings();
+				_session = EngineSession.Open(
+					packageDir, rom, SerializeSettings(effective), firmware, extraFiles,
+					wantGpu: WantsGpu(effective));
 			}
 			catch (InvalidOperationException ex)
 			{
@@ -115,6 +118,18 @@ namespace Chimera.Emulation.Common.Waterbox
 		}
 
 		// ---- settings ----
+
+		/// <summary>
+		/// Whether these settings ask for a renderer that draws on the machine's
+		/// own GPU. The convention is the suffix, not a list: a core names its
+		/// hardware renderers "<c>something-hw</c>", and every core that grows one
+		/// is understood here without this file changing. A core with no renderer
+		/// setting never asks, which is most of them.
+		/// </summary>
+		internal static bool WantsGpu(IReadOnlyDictionary<string, object> effective)
+			=> effective.TryGetValue("renderer", out var r)
+				&& r?.ToString() is string name
+				&& name.EndsWith("-hw", StringComparison.Ordinal);
 
 		/// <summary>
 		/// What the guest is told: every declared setting, at the package's default

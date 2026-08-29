@@ -485,6 +485,12 @@ namespace Chimera.Emulation.Common.Engine
 		public abstract IntPtr ce_gl_description();
 
 		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract void ce_gl_request(int want);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract int ce_gl_available();
+
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract long ce_session_button_count(IntPtr session);
 
 		[ChimeraImport(CallingConvention.Cdecl)]
@@ -1339,10 +1345,17 @@ namespace Chimera.Emulation.Common.Engine
 		/// <remarks>extraFiles: a multi-file game's additional mounts (rom2..N,
 		/// support files, "savedata", "rom.name"), each ORDERED pair mounted
 		/// under its given name before the core boots.</remarks>
+		/// <param name="wantGpu">
+		/// The project asked for a renderer that draws on the machine's own GPU.
+		/// It is only ever an ASK: a build without the bridge, a driver that will
+		/// not give a context, or a core with no GL renderer all end in the
+		/// software path, and <see cref="GpuDrew"/> is what says which happened.
+		/// </param>
 		public static EngineSession Open(
 			string packagePath, byte[] rom, string? settingsOverridesJson,
 			IReadOnlyDictionary<string, byte[]>? firmware,
-			IReadOnlyList<KeyValuePair<string, byte[]>>? extraFiles = null)
+			IReadOnlyList<KeyValuePair<string, byte[]>>? extraFiles = null,
+			bool wantGpu = false)
 		{
 			var count = firmware?.Count ?? 0;
 			var ids = new IntPtr[Math.Max(count, 1)];
@@ -1384,6 +1397,8 @@ namespace Chimera.Emulation.Common.Engine
 					extraData[e] = AllocBlob(extraFiles[e].Value);
 					extraLens[e] = (ulong)extraFiles[e].Value.LongLength;
 				}
+				// a global switch, not a per-session one, so it is set every time
+				ChimeraEngine.Instance.ce_gl_request(wantGpu ? 1 : 0);
 				var error = IntPtr.Zero;
 				var session = ChimeraEngine.Instance.ce_session_open(
 					packagePath, rom, (ulong)rom.LongLength, settingsOverridesJson,

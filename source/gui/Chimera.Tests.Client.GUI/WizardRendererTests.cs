@@ -24,7 +24,7 @@ namespace Chimera.Tests.Client.GUI
 				  "input": { "buttons": [] },
 				  "settings": [
 				    { "name": "region", "type": "enum", "options": ["usa", "japan"], "default": "usa" },
-				    { "name": "renderer", "type": "enum", "options": ["software", "opengl"], "default": "software" }
+				    { "name": "renderer", "type": "enum", "options": ["software", "opengl", "opengl-hw"], "default": "software" }
 				  ]
 				}
 				""");
@@ -55,16 +55,16 @@ namespace Chimera.Tests.Client.GUI
 		public void ACoreThatOffersRenderersOffersThemInDeclarationOrder()
 		{
 			using var form = MakeForm(CfgWithRenderers());
-			CollectionAssert.AreEqual(new[] { "software", "opengl" }, form.RendererOptions);
-			Assert.IsTrue(form.RendererIsAChoice, "two renderers is a choice");
+			CollectionAssert.AreEqual(new[] { "software", "opengl", "opengl-hw" }, form.RendererOptions);
+			Assert.IsTrue(form.RendererIsAChoice, "more than one renderer is a choice");
 		}
 
 		[TestMethod]
 		public void ItSpellsOutWhatEachRendererActuallyIs()
 		{
 			using var form = MakeForm(CfgWithRenderers());
-			CollectionAssert.AreEqual(new[] { "Software (Native)", "Software (OpenGL)" }, form.RendererLabels,
-				"both draw on the CPU; the difference is which path through the core");
+			CollectionAssert.AreEqual(new[] { "Software (Native)", "Software (OpenGL)", "Hardware (OpenGL)" }, form.RendererLabels,
+				"the first two draw on the CPU; the third leaves the sandbox for a GPU");
 
 			using var one = MakeForm(CfgWithoutRenderers());
 			CollectionAssert.AreEqual(new[] { "Software (Native)" }, one.RendererLabels,
