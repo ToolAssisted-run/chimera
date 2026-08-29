@@ -402,6 +402,56 @@ namespace Chimera.Client.GUI
 		/// a path exists: a project carries names and hashes and no paths at all. A
 		/// file that is no longer there is skipped rather than guessed at.
 		/// </summary>
+		/// <summary>
+		/// Opens on a file somebody dropped: the core that claims its extension,
+		/// and the file already in the slot that takes that kind of file.
+		///
+		/// The guess is the packages' own, not a table kept here. Every package
+		/// declares the rom extensions it handles, so "which core is this .gg for"
+		/// is a question the installed cores have already answered - and a core
+		/// installed tomorrow answers it without this file changing. When two
+		/// claim the same extension the first is chosen and the picker is left
+		/// alone: a guess is a starting point, and the core box is right there.
+		/// </summary>
+		/// <returns>false when no installed core claims the extension</returns>
+		public bool StartFrom(string path)
+		{
+			var index = GuessCoreIndexFor(path);
+			if (index < 0) return false;
+
+			_core.SelectedIndex = index;
+			LoadChosenPackage();
+			if (!BuildSlotForm()) return false;
+
+			AddFileToSlot(SlotForFile(path), path);
+			RefreshExposedSettings();
+			_settingsGrid.SelectedObject = _settings;
+			return true;
+		}
+
+		/// <summary>Which installed package says it handles this file, or -1.</summary>
+		public int GuessCoreIndexFor(string path)
+		{
+			var extension = Path.GetExtension(path);
+			if (string.IsNullOrEmpty(extension)) return -1;
+			return _cores.ToList().FindIndex(c => c.Extensions.ContainsKey(extension.ToLowerInvariant()));
+		}
+
+		/// <summary>
+		/// Which slot a dropped file belongs in: the first that declares its
+		/// extension, and otherwise the first slot there is. A package lists the
+		/// formats each slot takes, so a disc lands in the disc slot rather than
+		/// in whatever happens to be at the top of the form.
+		/// </summary>
+		public string SlotForFile(string path)
+		{
+			var extension = Path.GetExtension(path).TrimStart('.').ToLowerInvariant();
+			var slots = _declaration!.Slots;
+			var match = slots.FirstOrDefault(slot =>
+				slot.Formats.Any(f => string.Equals(f, extension, StringComparison.OrdinalIgnoreCase)));
+			return (match ?? slots[0]).Id;
+		}
+
 		public void SeedFrom(ProjectAnswers answers)
 		{
 			var index = _cores.ToList().FindIndex(c =>
@@ -788,6 +838,21 @@ namespace Chimera.Client.GUI
 					Size = new(UIHelper.ScaleX(402), UIHelper.ScaleY(70)),
 				};
 				_tips.SetToolTip(list, help);
+
+				// A file arrives here the same way it arrives anywhere else on a
+				// desktop: dragged onto the thing it belongs to. The list IS the
+				// target, so what a person drops on it lands in that slot and no
+				// other - which is the whole reason not to make the window one
+				// big drop zone that has to guess.
+				list.AllowDrop = true;
+				list.DragEnter += (_, e) => e.Effect = DroppedPaths(e).Length is 0
+					? DragDropEffects.None
+					: DragDropEffects.Copy;
+				list.DragDrop += (_, e) =>
+				{
+					foreach (var path in DroppedPaths(e)) AddFileToSlot(slot.Id, path);
+				};
+
 				Button add = new() { AutoSize = true, Location = Pt(416, 18), Text = "Add..." };
 				add.Click += (_, _) =>
 				{
@@ -864,6 +929,17 @@ namespace Chimera.Client.GUI
 				=> TrackCount is 0 ? Name : $"{Name}  (+ {TrackCount} track file{(TrackCount is 1 ? "" : "s")})";
 		}
 
+		/// <summary>
+		/// The files in a drag, if it is carrying any. Directories are dropped
+		/// silently: a slot takes files, and expanding a folder into one would be
+		/// a different decision made on the person's behalf.
+		/// </summary>
+		private static string[] DroppedPaths(DragEventArgs e)
+			=> e.Data?.GetDataPresent(DataFormats.FileDrop) is true
+				&& e.Data.GetData(DataFormats.FileDrop) is string[] paths
+					? paths.Where(File.Exists).ToArray()
+					: [ ];
+
 		/// <summary>Adds a file to a slot's list; public in behaviour so tests can drive the form without a picker.</summary>
 		public void AddFileToSlot(string slotId, string path)
 		{
@@ -890,7 +966,18 @@ namespace Chimera.Client.GUI
 			}
 
 			list.Items.Add(new PickedFile(name, path, tracks));
-			_status.Text = "";
+
+			// A slot that names its formats has still not been given a rule: the
+			// picker offers "All files" too, and a person who renamed something
+			// knows better than this form does. So an unexpected extension is
+			// SAID rather than refused - the complaint a mis-drop would otherwise
+			// become is an engine error at Create, long after the mistake.
+			var slot = _declaration?.Slots.FirstOrDefault(s => s.Id == slotId);
+			var extension = Path.GetExtension(name).TrimStart('.');
+			_status.Text = slot is { Formats.Count: > 0 }
+				&& !slot.Formats.Any(f => string.Equals(f, extension, StringComparison.OrdinalIgnoreCase))
+					? $"{name} is not one of the {string.Join(", ", slot.Formats.Select(static f => "." + f))} this slot expects"
+					: "";
 			RefreshSlotAvailability();
 		}
 
@@ -903,6 +990,10 @@ namespace Chimera.Client.GUI
 			list.Items.Remove(found);
 			RefreshSlotAvailability();
 		}
+
+		/// <summary>Whether a slot's list takes dropped files, for tests.</summary>
+		public bool SlotAcceptsDrops(string slotId)
+			=> _slotLists.TryGetValue(slotId, out var list) && list.AllowDrop;
 
 		/// <summary>What still blocks the file page, for tests (null = nothing).</summary>
 		public string? FilesComplaint() => CardinalityComplaint();

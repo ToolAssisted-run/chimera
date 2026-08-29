@@ -203,7 +203,10 @@ namespace Chimera.Client.GUI
 						switch (value)
 						{
 							case LoadOrdering.Rom:
-								_ = LoadRom(filename, fileInformation.ArchiveName);
+								// A rom is not a thing that runs here: a project is
+								// (docs/project.md). Dropping one opens the wizard on
+								// it rather than booting a machine nobody described.
+								NewProjectFromFile(filename);
 								break;
 							case LoadOrdering.Watch:
 								LoadWatch(filename, fileInformation.ArchiveName);

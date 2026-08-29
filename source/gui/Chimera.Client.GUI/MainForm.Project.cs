@@ -95,6 +95,22 @@ namespace Chimera.Client.GUI
 			if (created is not null) LoadNewProject(created);
 		}
 
+		/// <summary>
+		/// A file was dropped on the window. In Chimera a file on its own is not a
+		/// thing that runs - a project is (docs/project.md) - so this opens the
+		/// wizard with that file already picked and the core that claims its
+		/// extension already chosen, and the person answers the rest.
+		///
+		/// A file no installed core claims still opens the wizard, blank: they may
+		/// have dropped it on purpose and know which core it is for, and a window
+		/// that appears is a better answer than one that silently does not.
+		/// </summary>
+		public void NewProjectFromFile(string path)
+		{
+			var created = RunNewProjectWizard(startFrom: path);
+			if (created is not null) LoadNewProject(created);
+		}
+
 		private void OpenProjectDialog()
 		{
 			var chosen = PickProjectToOpen();
@@ -102,7 +118,7 @@ namespace Chimera.Client.GUI
 		}
 
 		/// <returns>the created project, in memory and unwritten, or null when cancelled</returns>
-		private EngineProject RunNewProjectWizard()
+		private EngineProject RunNewProjectWizard(string startFrom = null)
 		{
 			ScanForCorePackages();
 			using NewProjectWizard wizard = new(
@@ -135,7 +151,22 @@ namespace Chimera.Client.GUI
 			// and what made that unbearable was answering every question again to
 			// change one of them.
 			var answers = _openProject is not null ? ProjectAnswers.Of(_openProject) : _lastAnswers;
-			if (answers is not null) wizard.SeedFrom(answers);
+
+			// A dropped file decides the core, so the last project's answers are
+			// only worth restoring when they were for the SAME core - otherwise
+			// they would put another machine's files and settings behind this one.
+			if (startFrom is not null)
+			{
+				var guess = wizard.GuessCoreIndexFor(startFrom);
+				var sameCore = guess >= 0 && answers is not null
+					&& string.Equals(_discoveredCorePackages[guess].Name, answers.CoreName, StringComparison.OrdinalIgnoreCase);
+				if (sameCore) wizard.SeedFrom(answers);
+				wizard.StartFrom(startFrom);
+			}
+			else if (answers is not null)
+			{
+				wizard.SeedFrom(answers);
+			}
 
 			if (wizard.ShowDialog(this) is not DialogResult.OK) return null;
 
