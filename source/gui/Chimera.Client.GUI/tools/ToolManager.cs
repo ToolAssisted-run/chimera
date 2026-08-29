@@ -201,8 +201,11 @@ namespace Chimera.Client.GUI
 						else if (submenu.Text.Contains("File")) AddCloseButton(submenu, form);
 					}
 
+					// A Window menu is all one kind of thing, so what is appended
+					// needs no rule drawn across it. A Settings menu is the tool's
+					// own settings and then its window's, which does.
 					dest = window ?? settingsMenu;
-					if (dest is not null && dest.Count > 0) dest.Add(new ToolStripSeparator());
+					if (window is null && settingsMenu is { Count: > 0 }) settingsMenu.Add(new ToolStripSeparator());
 
 					if (dest == null)
 					{
