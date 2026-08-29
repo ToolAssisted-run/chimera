@@ -279,6 +279,7 @@ engine_src = files(
   'source/engine/source/host_dyn.cpp',
   'source/engine/source/movie_entry.cpp',
   'source/engine/source/session.cpp',
+  'source/engine/source/gl_bridge.cpp',
   'extern/tools/miniz/miniz.c',  # vendored (MIT): the zip half of the state container
   'extern/tools/cjson/cJSON.c',  # vendored (MIT): bundle JSON
 )
@@ -301,25 +302,57 @@ engine_build_args = [
   '-DCHIMERA_BUILDING',
   '-DCJSON_HIDE_SYMBOLS',
 ]
+
+# The GPU bridge (docs/gpu-bridge.md): a real GL context in the engine, so a
+# sandboxed core's renderer can drive a GPU instead of a software rasteriser.
+# Opt in - it is the one part of the engine that depends on the machine it runs
+# on, and a core drawn this way is no longer deterministic.
+gl_bridge = get_option('gl_bridge')
+gl_bridge_src = []
+gl_bridge_deps = []
+if gl_bridge
+  # Both halves of the bridge are generated from miniBox's master list, which
+  # is where the numbering lives so that every core and this host agree.
+  gl_bridge_gen = custom_target('ce-gl-bridge',
+    output: ['gl-bridge-host.inc', 'gl-bridge-ops.h', 'gl-bridge-guest.cpp'],
+    command: [find_program('python3'),
+      repo_root / 'extern/tools/chimera-common-minibox/source/gl/gen-gl-bridge.py',
+      repo_root / 'extern/tools/glad/include/glad/gl.h',
+      repo_root / 'extern/tools/chimera-common-minibox/source/gl/gl-entry-points.txt',
+      '@OUTDIR@'])
+
+  gl_bridge_src = [gl_bridge_gen[0], files('extern/tools/glad/src/gl.c')]
+  engine_build_args += ['-DCE_GL_BRIDGE',
+    '-I' + repo_root / 'extern/tools/glad/include',
+    '-I' + repo_root / 'extern/tools/chimera-common-minibox/source/gl',
+    '-I' + meson.current_build_dir()]
+
+  if host_windows
+    gl_bridge_src += files('extern/tools/glad/src/wgl.c')
+    gl_bridge_deps = [meson.get_compiler('cpp').find_library('opengl32', required: true)]
+  else
+    gl_bridge_deps = [meson.get_compiler('cpp').find_library('EGL', required: true)]
+  endif
+endif
 shared_library(
   'chimera',
-  engine_src,
+  engine_src + gl_bridge_src,
   name_prefix: 'lib',  # libchimera.{so,dll} on both targets (the frontend resolves this name)
   include_directories: engine_inc,
   cpp_args: engine_build_args,
   c_args: engine_build_args,
-  dependencies: [dl_dep],  # zstd_dyn loads libzstd from beside the library
+  dependencies: [dl_dep] + gl_bridge_deps,  # zstd_dyn loads libzstd from beside the library
   gnu_symbol_visibility: 'default',
   install: true,
   install_dir: 'dll',
 )
 executable(
   'chimera-run',
-  ['source/engine/tools/chimera-run.cpp'] + engine_src,
+  ['source/engine/tools/chimera-run.cpp'] + engine_src + gl_bridge_src,
   include_directories: engine_inc,
   cpp_args: engine_build_args,
   c_args: engine_build_args,
-  dependencies: [dl_dep],
+  dependencies: [dl_dep] + gl_bridge_deps,
   install: true,
   install_dir: 'dll',  # beside libminiboxhost + libzstd, which it loads from its own directory
 )
@@ -330,11 +363,11 @@ if not meson.is_cross_build()
       'engine_' + engine_test,
       executable(
         'test_' + engine_test,
-        ['source/engine/tests/test_' + engine_test + '.cpp'] + engine_src,
+        ['source/engine/tests/test_' + engine_test + '.cpp'] + engine_src + gl_bridge_src,
         include_directories: engine_inc,
         cpp_args: engine_build_args + ['-UNDEBUG'],  # these tests ARE asserts
         c_args: engine_build_args,
-        dependencies: [dl_dep],
+        dependencies: [dl_dep] + gl_bridge_deps,
       ),
       # (the state container test finds libzstd the way the shipped library
       # does: beside its own binary, which in the build dir it is)

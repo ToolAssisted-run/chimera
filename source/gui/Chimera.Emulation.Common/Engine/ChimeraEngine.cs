@@ -479,6 +479,12 @@ namespace Chimera.Emulation.Common.Engine
 		public abstract int ce_session_deterministic(IntPtr session);
 
 		[BizImport(CallingConvention.Cdecl)]
+		public abstract int ce_session_gpu_drew(IntPtr session);
+
+		[BizImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_gl_description();
+
+		[BizImport(CallingConvention.Cdecl)]
 		public abstract long ce_session_button_count(IntPtr session);
 
 		[BizImport(CallingConvention.Cdecl)]
@@ -1416,6 +1422,18 @@ namespace Chimera.Emulation.Common.Engine
 		public int VsyncDenominator => E.ce_session_vsync_denominator(_session);
 		public int SamplesPerFrame => E.ce_session_samples_per_frame(_session);
 		public bool Deterministic => E.ce_session_deterministic(_session) is not 0;
+
+		/// <summary>
+		/// Whether a GPU outside the sandbox drew this session's pictures. A
+		/// movie records it, because a run made this way carries no promise that
+		/// it replays on another machine and a desync elsewhere should be
+		/// explicable rather than mysterious.
+		/// </summary>
+		public bool GpuDrew => E.ce_session_gpu_drew(_session) is not 0;
+
+		/// <summary>What the driver calls itself, or empty when none drew.</summary>
+		public string GpuDescription
+			=> GpuDrew ? (ChimeraEngine.PtrToStringUtf8(E.ce_gl_description()) ?? "") : "";
 
 		public void SetAxis(int index, int value) => E.ce_session_set_axis(_session, index, value);
 

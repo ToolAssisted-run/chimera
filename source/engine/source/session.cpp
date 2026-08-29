@@ -274,12 +274,21 @@ bool composeSettings(const std::string &defaultsJson, const char *overrides, std
 
 } // namespace
 
+/* source/engine/source/gl_bridge.cpp - present in every build; a build without
+ * CE_GL_BRIDGE answers that it has no context and nothing here happens. */
+extern "C" int32_t ce_gl_start(char *error_out, int32_t error_len);
+extern "C" const char *ce_gl_description(void);
+extern "C" int32_t ce_gl_requested(void);
+extern "C" uintptr_t ce_gl_dispatch(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t);
+
 struct ce_session
 {
 	SessionConfig cfg;
 	const chimera::HostApi *host = nullptr;
 	void *obj = nullptr;
 	bool active = false;
+	/* a GPU outside the sandbox drew this session's pictures */
+	bool gpuDrew = false;
 
 	// the mounted byte sources must outlive the mounts
 	std::vector<uint8_t> wbxBytes, romBytes;
@@ -751,6 +760,49 @@ ce_session *ce_session_open(
 	std::string err;
 	if (!s->activate(err)) return abort(std::move(err));
 
+	/* The GPU bridge, before Init because Init is where a core picks its
+	 * renderer. Three things have to be true and any of them may not be: the
+	 * caller asked (ce_gl_request), this build has a bridge and a driver that
+	 * will give it a context, and the core knows what to do with one. When any
+	 * fails the core draws the way it draws without a GPU, which is the
+	 * deterministic way, and the session simply does not claim otherwise.
+	 */
+	if (ce_gl_requested() != 0)
+	{
+		std::string ignored;
+		auto setBridge = reinterpret_cast<void (*)(uint64_t)>(
+			s->proc("SetGpuBridge", 1, false, ignored));
+		char glerr[256] = "";
+		if (setBridge == nullptr)
+		{
+			/* not a failure: most cores have no GL renderer at all */
+		}
+		else if (ce_gl_start(glerr, (int32_t)sizeof glerr) == 0)
+		{
+			fprintf(stderr, "chimera gl: no context (%s); drawing in software\n", glerr);
+		}
+		else
+		{
+			chimera::WbxReturn r;
+			host->wbx_get_callback_addr(s->obj, reinterpret_cast<void *>(&ce_gl_dispatch), 0, &r);
+			if (!r.ok() || r.data == 0)
+			{
+				fprintf(stderr, "chimera gl: the sandbox would not take the callback\n");
+			}
+			else
+			{
+				setBridge(static_cast<uint64_t>(r.data));
+				/* The core decides whether it took it - an older core, or one
+				 * built against a longer entry-point list, declines - and it
+				 * says so through the renderer it then reports using. What is
+				 * certain here is that a GPU was offered and a context exists;
+				 * the session records that, and the movie says a GPU drew. */
+				s->gpuDrew = true;
+				fprintf(stderr, "chimera gl: %s\n", ce_gl_description());
+			}
+		}
+	}
+
 	auto init = reinterpret_cast<int32_t (*)()>(s->proc("Init", 0, true, err));
 	if (init == nullptr) return abort(std::move(err));
 	if (init() != 1)
@@ -862,7 +914,17 @@ int32_t ce_session_vsync_numerator(const ce_session *s) { return s->vsyncNum; }
 int32_t ce_session_vsync_denominator(const ce_session *s) { return s->vsyncDen; }
 int32_t ce_session_samples_per_frame(const ce_session *s) { return s->cfg.samplesPerFrame; }
 int32_t ce_session_channels(const ce_session *s) { return s->cfg.channels; }
-int32_t ce_session_deterministic(const ce_session *s) { return s->cfg.deterministic ? 1 : 0; }
+/* A machine a GPU drew is not the deterministic one, whatever its config says:
+ * the GPU is outside the sandbox, outside the savestate, and different on every
+ * machine it runs on. */
+int32_t ce_session_deterministic(const ce_session *s)
+{
+	return (s->cfg.deterministic && !s->gpuDrew) ? 1 : 0;
+}
+
+/* Whether a GPU outside the sandbox drew this session's pictures. A movie
+ * records it, so a replay that desyncs elsewhere can be understood. */
+int32_t ce_session_gpu_drew(const ce_session *s) { return s->gpuDrew ? 1 : 0; }
 int64_t ce_session_button_count(const ce_session *s) { return static_cast<int64_t>(s->cfg.buttons.size()); }
 
 const char *ce_session_button_name(const ce_session *s, int64_t index)

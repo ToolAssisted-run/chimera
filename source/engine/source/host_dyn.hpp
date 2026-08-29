@@ -42,6 +42,10 @@ struct HostApi
 	void (*wbx_activate_host)(void *obj, WbxReturn *ret);
 	void (*wbx_deactivate_host)(void *obj, WbxReturn *ret);
 	void (*wbx_get_proc_addr)(void *obj, const char *name, WbxReturn *ret);
+	/* Registers a host callback the guest can call, answering with its
+	 * guest-visible address. The callback must be sysv64 on every host (miniBox
+	 * calls that MB_GUEST_ABI); the GPU bridge is the only user. */
+	void (*wbx_get_callback_addr)(void *obj, void *callback, uintptr_t slot, WbxReturn *ret);
 	void (*wbx_seal)(void *obj, WbxReturn *ret);
 	void (*wbx_mount_file)(void *obj, const char *name, WbxReadCb cb, uintptr_t userdata, uint8_t writable, WbxReturn *ret);
 	void (*wbx_save_state)(void *obj, WbxWriteCb cb, uintptr_t userdata, WbxReturn *ret);

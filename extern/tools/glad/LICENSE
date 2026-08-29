@@ -1,0 +1,21 @@
+glad 2.0.5 - an OpenGL/EGL/WGL loader, generated rather than written.
+
+The generator and its output are distributed under:
+
+    SPDX-License-Identifier: (WTFPL OR CC0-1.0) AND Apache-2.0
+
+which is the line every generated file carries at its top. The Apache-2.0 part
+covers the Khronos specification data the generator reads; the loader code
+itself is public domain under either WTFPL or CC0, at your option.
+
+Upstream: https://github.com/Dav1dde/glad
+
+WHY IT IS HERE. Chimera reaches OpenGL from C# for its own display. This copy
+is for the engine's GPU bridge (docs/gpu-bridge.md), which answers a sandboxed
+core's GL calls on a real context and therefore needs the entry points in C.
+On Windows that is not a convenience: opengl32.dll exports OpenGL 1.1 and
+nothing else, so everything a modern renderer calls has to be fetched at
+runtime through wglGetProcAddress, and a loader is the only way to have it.
+
+This is the same generated copy PCSX2 vendors, so the two sides of the bridge
+agree about types and entry points by construction.

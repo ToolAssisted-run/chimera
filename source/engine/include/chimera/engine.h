@@ -647,6 +647,39 @@ CE_API int32_t ce_session_vsync_denominator(const ce_session *s);
 CE_API int32_t ce_session_samples_per_frame(const ce_session *s);
 CE_API int32_t ce_session_channels(const ce_session *s);
 CE_API int32_t ce_session_deterministic(const ce_session *s);
+
+/* Whether a GPU OUTSIDE the sandbox drew this session's pictures.
+ *
+ * A core can be given a real OpenGL context: its renderer runs in the sandbox
+ * as always, but its GL calls are answered on the host's device. That is much
+ * faster than a software rasteriser and it is not deterministic - the GPU is
+ * outside the savestate and different on every machine - so a session that had
+ * one reports 0 from ce_session_deterministic whatever its config said, and a
+ * movie recorded on it must record that a GPU drew. Without that a replay
+ * elsewhere desyncs with nothing to explain it.
+ *
+ * It is only ever true when the caller asked (ce_gl_request), this build has a
+ * bridge, a driver gave it a context, and the core knew what to do with one. */
+CE_API int32_t ce_session_gpu_drew(const ce_session *s);
+
+/* ---------------------------------------------------------------------------
+ * The GPU bridge itself. One context per process, because there is only ever
+ * one machine running; sessions borrow it.
+ */
+
+/* Ask for hardware acceleration on the sessions opened after this call. Asking
+ * is not having: see ce_session_gpu_drew for what actually happened. */
+CE_API void ce_gl_request(int32_t want);
+CE_API int32_t ce_gl_requested(void);
+
+/* Whether a context exists now. Null-safe, cheap, false in a build without the
+ * bridge compiled in. */
+CE_API int32_t ce_gl_available(void);
+
+/* What the driver calls itself ("4.6 (Core Profile) Mesa ... on ..."), for a
+ * movie header and for saying which GPU a recording was made on. Empty when
+ * there is none. */
+CE_API const char *ce_gl_description(void);
 CE_API int64_t ce_session_button_count(const ce_session *s);
 CE_API const char *ce_session_button_name(const ce_session *s, int64_t index);
 CE_API int64_t ce_session_axis_count(const ce_session *s);

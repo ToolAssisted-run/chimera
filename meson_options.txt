@@ -1,0 +1,2 @@
+option('gl_bridge', type: 'boolean', value: false,
+  description: 'Build the GPU bridge into the engine: a real OpenGL context that answers a sandboxed core\'s GL calls, so a renderer can drive hardware instead of a software rasteriser. A core drawn this way is NOT deterministic - the GPU is outside the sandbox and the savestate, and differs between machines - so a movie recorded on it records that a GPU drew. Off by default; see docs/gpu-bridge.md.')

@@ -28,7 +28,7 @@ namespace Chimera.Emulation.Common.Waterbox
 		author: "miniBox",
 		portedVersion: "1.0.0",
 		portedUrl: "https://github.com/SergioMartin86/miniBox")]
-	public sealed partial class WaterboxCore : IEmulator, IVideoProvider, ISoundProvider, IStatable, IInputPollable,
+	public sealed partial class WaterboxCore : IEmulator, IVideoProvider, ISoundProvider, IStatable, IInputPollable, IGpuRendered,
 		ICoreIdentity, ISettable<WaterboxCoreSettings>
 	{
 		/// <summary>
@@ -228,7 +228,18 @@ namespace Chimera.Emulation.Common.Waterbox
 
 		public string SystemId => _machine?.Id ?? _cfg.SystemId;
 
-		public bool DeterministicEmulation => _cfg.Deterministic;
+		/// <summary>
+		/// A machine a GPU drew is not deterministic whatever its config says, so
+		/// the SESSION is asked rather than the config: it knows whether a bridge
+		/// was actually offered and taken.
+		/// </summary>
+		public bool DeterministicEmulation => _cfg.Deterministic && _session.Deterministic;
+
+		/// <summary>
+		/// Whether a GPU outside the sandbox drew, and what it calls itself.
+		/// Empty when none did, which is every ordinary run.
+		/// </summary>
+		public string GpuRenderer => _session.GpuDescription;
 
 		public void ResetCounters()
 		{

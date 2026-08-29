@@ -116,6 +116,15 @@ namespace Chimera.Client.Common
 			// ...and the rate the machine runs at. Chimera keeps no per-system rate
 			// table - the exact rate is the core's - so without this a movie is a
 			// frame count nothing outside that core can turn into a duration.
+			// ...and whether a GPU drew. A run made on one carries no promise that
+			// it replays anywhere - the GPU is outside the sandbox, outside the
+			// savestate and different on every machine - so it is written down,
+			// and a replay that desyncs elsewhere can be understood.
+			if (Emulator is IGpuRendered gpu && !string.IsNullOrEmpty(gpu.GpuRenderer))
+			{
+				Header[HeaderKeys.GpuRenderer] = gpu.GpuRenderer;
+			}
+
 			if (IsAttached())
 			{
 				Header[HeaderKeys.VsyncNumerator] =

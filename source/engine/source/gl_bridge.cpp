@@ -1,0 +1,370 @@
+/* The engine's side of the GPU bridge: a real GL context, and the dispatcher a
+ * sandboxed core reaches it through.
+ *
+ * A core that wants a GPU cannot have one. It runs in a sandbox with no
+ * syscalls, no libraries and no driver, and the only thing it may call out to
+ * is one callback the host registers with miniBox - six integers in, one out.
+ * So its renderer's GL calls arrive here as (opcode, pointer to an argument
+ * block in GUEST memory), and this answers them on a context the engine owns.
+ * The guest's memory is this process's memory, so the arguments - and the
+ * vertex data and textures they point at - are read in place, uncopied. That
+ * is what makes it affordable.
+ *
+ * The opcodes are miniBox's (extern/tools/chimera-common-minibox/source/gl),
+ * shared by every core and this host, and the list is append-only so a core
+ * built against an older copy still means what it meant. A guest asks how long
+ * our list is and declines us if we are behind it.
+ *
+ * TRAFFIC IS ONE-WAY. The guest may hand us pointers into its memory; we may
+ * never hand back a pointer into ours, because the sandbox stops the guest
+ * reading it - and is right to. Anything GL returns by pointer is copied into a
+ * buffer the guest supplied.
+ *
+ * WHAT THIS COSTS. The GPU is outside the sandbox: outside the savestate,
+ * outside the determinism the rest of a core is built on, and different on
+ * every machine. A session drawn this way says so (ce_session_deterministic
+ * turns 0) and a movie recorded on it carries a header saying a GPU drew, so
+ * that a replay that desyncs somewhere else can be understood rather than
+ * merely suffered.
+ */
+#include "chimera/engine.h"
+
+#include <cstdio>   /* snprintf: both flavours report why there is no context */
+
+#ifdef CE_GL_BRIDGE
+
+#include <glad/gl.h>
+
+#include "gl-bridge.h"
+#include "gl-bridge-ops.h"
+
+#include <cstdio>
+#include <cstring>
+
+#ifdef _WIN32
+#include <windows.h>
+#include <glad/wgl.h>
+#else
+#include <EGL/egl.h>
+#include <EGL/eglext.h>
+#ifndef EGL_PLATFORM_SURFACELESS_MESA
+#define EGL_PLATFORM_SURFACELESS_MESA 0x31DD
+#endif
+#endif
+
+namespace
+{
+
+int g_version;
+bool g_ready;
+char g_description[256];
+
+/* ---------------------------------------------------------------------------
+ * Windows: a context from a window nobody sees. WGL has no headless path and a
+ * pixel format has to come from somewhere, so it comes from a window that is
+ * created, never shown, and never pumped.
+ */
+#ifdef _WIN32
+
+HWND s_window;
+HDC s_dc;
+HGLRC s_context;
+HMODULE s_opengl32;
+
+GLADapiproc loader(const char *name)
+{
+	/* wglGetProcAddress answers for the modern entry points and returns null -
+	 * or one of several unhelpful small integers - for the 1.1 ones, which live
+	 * in opengl32.dll itself. Every GL loader on Windows carries this same
+	 * small piece of ugliness; here it is, once. */
+	PROC p = wglGetProcAddress(name);
+	if (p == nullptr || p == (PROC)1 || p == (PROC)2 || p == (PROC)3 || p == (PROC)-1)
+		p = GetProcAddress(s_opengl32, name);
+	return (GLADapiproc)p;
+}
+
+bool create_context(char *err, int errlen)
+{
+	WNDCLASSA wc;
+	memset(&wc, 0, sizeof wc);
+	wc.lpfnWndProc = DefWindowProcA;
+	wc.hInstance = GetModuleHandleA(nullptr);
+	wc.lpszClassName = "ChimeraGpuBridge";
+	RegisterClassA(&wc);
+
+	s_window = CreateWindowExA(0, "ChimeraGpuBridge", "", WS_OVERLAPPEDWINDOW,
+		0, 0, 64, 64, nullptr, nullptr, wc.hInstance, nullptr);
+	if (s_window == nullptr)
+	{
+		snprintf(err, errlen, "could not make a window to take a pixel format from");
+		return false;
+	}
+
+	s_dc = GetDC(s_window);
+	PIXELFORMATDESCRIPTOR pfd;
+	memset(&pfd, 0, sizeof pfd);
+	pfd.nSize = sizeof pfd;
+	pfd.nVersion = 1;
+	pfd.dwFlags = PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER;
+	pfd.iPixelType = PFD_TYPE_RGBA;
+	pfd.cColorBits = 32;
+	pfd.cDepthBits = 24;
+	pfd.cStencilBits = 8;
+
+	int format = ChoosePixelFormat(s_dc, &pfd);
+	if (format == 0 || !SetPixelFormat(s_dc, format, &pfd))
+	{
+		snprintf(err, errlen, "no pixel format this driver will draw into");
+		return false;
+	}
+
+	s_context = wglCreateContext(s_dc);
+	if (s_context == nullptr || !wglMakeCurrent(s_dc, s_context))
+	{
+		snprintf(err, errlen, "the driver would not make a context current");
+		return false;
+	}
+
+	s_opengl32 = LoadLibraryA("opengl32.dll");
+	return s_opengl32 != nullptr;
+}
+
+void destroy_context()
+{
+	if (s_context) { wglMakeCurrent(nullptr, nullptr); wglDeleteContext(s_context); s_context = nullptr; }
+	if (s_dc) { ReleaseDC(s_window, s_dc); s_dc = nullptr; }
+	if (s_window) { DestroyWindow(s_window); s_window = nullptr; }
+}
+
+#else
+
+/* ---------------------------------------------------------------------------
+ * Linux: EGL's surfaceless platform, which Mesa provides with or without a GPU.
+ * A context with NO surface has no framebuffer 0, which is fine here - a core's
+ * renderer draws into framebuffers of its own and the frame is read back from
+ * those, never from the default one.
+ */
+EGLDisplay s_display = EGL_NO_DISPLAY;
+EGLContext s_context = EGL_NO_CONTEXT;
+
+GLADapiproc loader(const char *name)
+{
+	return (GLADapiproc)eglGetProcAddress(name);
+}
+
+bool create_context(char *err, int errlen)
+{
+	auto getPlatformDisplay = (PFNEGLGETPLATFORMDISPLAYEXTPROC)
+		eglGetProcAddress("eglGetPlatformDisplayEXT");
+	if (getPlatformDisplay != nullptr)
+		s_display = getPlatformDisplay(EGL_PLATFORM_SURFACELESS_MESA, EGL_DEFAULT_DISPLAY, nullptr);
+	if (s_display == EGL_NO_DISPLAY)
+		s_display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
+	if (s_display == EGL_NO_DISPLAY)
+	{
+		snprintf(err, errlen, "no EGL display");
+		return false;
+	}
+
+	if (!eglInitialize(s_display, nullptr, nullptr))
+	{
+		snprintf(err, errlen, "EGL would not initialise");
+		return false;
+	}
+
+	if (!eglBindAPI(EGL_OPENGL_API))
+	{
+		snprintf(err, errlen, "this EGL has no desktop OpenGL");
+		return false;
+	}
+
+	static const EGLint configAttribs[] = {
+		EGL_SURFACE_TYPE, EGL_PBUFFER_BIT,
+		EGL_RENDERABLE_TYPE, EGL_OPENGL_BIT,
+		EGL_NONE
+	};
+	EGLConfig config;
+	EGLint configCount = 0;
+	if (!eglChooseConfig(s_display, configAttribs, &config, 1, &configCount) || configCount == 0)
+	{
+		snprintf(err, errlen, "no EGL config offers desktop OpenGL");
+		return false;
+	}
+
+	static const EGLint contextAttribs[] = {
+		EGL_CONTEXT_MAJOR_VERSION, 3,
+		EGL_CONTEXT_MINOR_VERSION, 3,
+		EGL_NONE
+	};
+	s_context = eglCreateContext(s_display, config, EGL_NO_CONTEXT, contextAttribs);
+	if (s_context == EGL_NO_CONTEXT)
+	{
+		snprintf(err, errlen, "the driver would not make an OpenGL 3.3 context");
+		return false;
+	}
+
+	if (!eglMakeCurrent(s_display, EGL_NO_SURFACE, EGL_NO_SURFACE, s_context))
+	{
+		snprintf(err, errlen, "the driver would not make the context current");
+		return false;
+	}
+
+	return true;
+}
+
+void destroy_context()
+{
+	if (s_display != EGL_NO_DISPLAY)
+	{
+		eglMakeCurrent(s_display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
+		if (s_context != EGL_NO_CONTEXT) eglDestroyContext(s_display, s_context);
+		eglTerminate(s_display);
+		s_display = EGL_NO_DISPLAY;
+		s_context = EGL_NO_CONTEXT;
+	}
+}
+
+#endif
+
+} // namespace
+
+/* ---------------------------------------------------------------------------
+ * The dispatcher.
+ *
+ * Entered FROM GUEST CODE, so it must be sysv64 on every host - miniBox's
+ * MB_GUEST_ABI says the same thing from the other side. On Windows that is not
+ * cosmetic: a win64 callee spills its shadow space over the caller's stack.
+ */
+#if defined(_WIN32) && defined(__GNUC__)
+#define BRIDGE_ABI __attribute__((sysv_abi))
+#else
+#define BRIDGE_ABI
+#endif
+
+extern "C" uintptr_t BRIDGE_ABI ce_gl_dispatch(uintptr_t op, uintptr_t a, uintptr_t b,
+                                               uintptr_t c, uintptr_t d, uintptr_t e)
+{
+	(void)d; (void)e;
+
+	switch (op)
+	{
+		case GL_OP_LIST_LENGTH:
+			/* How many entry points this host knows. The guest compares it with
+			 * what it was built against and declines us if we are behind; the
+			 * list being append-only is what makes that check sufficient. */
+			return CHIMERA_GL_OP_LIST_LENGTH;
+
+		case GL_OP_VERSION:
+		{
+			/* Never hand a host pointer back: the guest cannot read our memory
+			 * and the sandbox is right to stop it. Copied into its buffer. */
+			auto *args = reinterpret_cast<GlVersionArgs *>(a);
+			if (!args->out || args->size == 0) return 0;
+			snprintf(reinterpret_cast<char *>(args->out), args->size, "%s", g_description);
+			return 1;
+		}
+
+		/* the generated cases: one per GL entry point in the master list */
+#include "gl-bridge-host.inc"
+
+		default:
+			/* A core asking for something this host has never heard of is a
+			 * mismatch the handshake should have caught. Say so rather than
+			 * returning a plausible zero. */
+			fprintf(stderr, "chimera gl: opcode %llu has no case\n", (unsigned long long)op);
+			return 0;
+	}
+}
+
+/* Whether the CALLER wants hardware acceleration. Asked by the session before
+ * it offers a core a bridge, and set by the frontend from the project. It is a
+ * process-wide switch because the context is: one GL context, made once, shared
+ * by whatever session is open, because there is only ever one.
+ *
+ * Separate from ce_gl_available on purpose. Wanting it and having it are
+ * different facts, and a person who asked for a GPU and did not get one is owed
+ * a different answer from one who never asked. */
+static int32_t g_requested;
+
+extern "C" void ce_gl_request(int32_t want) { g_requested = want ? 1 : 0; }
+extern "C" int32_t ce_gl_requested(void) { return g_requested; }
+
+extern "C" int32_t ce_gl_available(void)
+{
+	return g_ready ? 1 : 0;
+}
+
+extern "C" const char *ce_gl_description(void)
+{
+	return g_ready ? g_description : "";
+}
+
+extern "C" int32_t ce_gl_start(char *error_out, int32_t error_len)
+{
+	if (g_ready) return 1;
+
+	char err[192] = "";
+	if (!create_context(err, (int)sizeof err))
+	{
+		destroy_context();
+		if (error_out && error_len > 0) snprintf(error_out, error_len, "%s", err);
+		return 0;
+	}
+
+	g_version = gladLoadGL(loader);
+	if (g_version == 0)
+	{
+		destroy_context();
+		if (error_out && error_len > 0)
+			snprintf(error_out, error_len, "the driver's entry points would not load");
+		return 0;
+	}
+
+	const char *renderer = reinterpret_cast<const char *>(glGetString(GL_RENDERER));
+	const char *version = reinterpret_cast<const char *>(glGetString(GL_VERSION));
+	snprintf(g_description, sizeof g_description, "%s on %s",
+		version ? version : "?", renderer ? renderer : "?");
+
+	/* A driver offering only the old fixed-function pipeline cannot run any of
+	 * these renderers, and saying so here is kinder than a null call in the
+	 * middle of a shader compile. */
+	if (GLAD_VERSION_MAJOR(g_version) < 3)
+	{
+		destroy_context();
+		if (error_out && error_len > 0)
+			snprintf(error_out, error_len, "the driver offers OpenGL %d.%d, and this needs 3.3",
+				GLAD_VERSION_MAJOR(g_version), GLAD_VERSION_MINOR(g_version));
+		return 0;
+	}
+
+	g_ready = true;
+	return 1;
+}
+
+extern "C" void ce_gl_stop(void)
+{
+	if (!g_ready) return;
+	destroy_context();
+	g_ready = false;
+	g_description[0] = 0;
+}
+
+#else /* !CE_GL_BRIDGE - a build without a GPU bridge answers honestly */
+
+static int32_t g_requested;
+extern "C" void ce_gl_request(int32_t want) { g_requested = want ? 1 : 0; }
+/* A build with no bridge can still be ASKED; it simply never delivers, and the
+ * session says so once rather than the caller guessing. */
+extern "C" int32_t ce_gl_requested(void) { return g_requested; }
+extern "C" int32_t ce_gl_available(void) { return 0; }
+extern "C" const char *ce_gl_description(void) { return ""; }
+extern "C" uintptr_t ce_gl_dispatch(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t) { return 0; }
+extern "C" int32_t ce_gl_start(char *error_out, int32_t error_len)
+{
+	if (error_out && error_len > 0)
+		snprintf(error_out, error_len, "this build has no GPU bridge");
+	return 0;
+}
+extern "C" void ce_gl_stop(void) {}
+
+#endif

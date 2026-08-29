@@ -115,6 +115,18 @@ namespace Chimera.Tests.Client.Common.Movie
 		}
 
 		[TestMethod]
+		public void AMovieSaysWhenAGpuDrewIt()
+		{
+			// A GPU is outside the sandbox and outside the savestate, so a run made
+			// on one carries no promise that it replays. Writing that down is what
+			// lets a desync somewhere else be understood rather than mysterious.
+			var path = Path.Combine(_dir, "no-gpu.chimeraProject");
+			MakeWorkedMovie(path).Save();
+			Assert.IsFalse(LoadFresh(path).HeaderEntries.ContainsKey(HeaderKeys.GpuRenderer),
+				"an ordinary run says nothing, because nothing happened");
+		}
+
+		[TestMethod]
 		public void TheRunsOwnMarkersAreNotWrittenAndDoNotAccumulate()
 		{
 			// They are derived on load - writing them down would let them go stale,

@@ -38,6 +38,13 @@ namespace Chimera.Client.Common
 		// wants where the run's input stops should not have to know what a
 		// neutral entry looks like for this core's controller.
 		public const string LastInputFrame = "LastInputFrame";
+
+		// A GPU outside the sandbox drew this run's pictures - much faster than
+		// the software rasteriser and NOT deterministic: the GPU is outside the
+		// savestate and differs between machines. Recorded so that a replay
+		// which desyncs somewhere else can be understood rather than merely
+		// suffered. The value is what the driver called itself.
+		public const string GpuRenderer = "GpuRenderer";
 		public const string Core = "Core";
 		public const string WaterboxHost = "WaterboxHost"; // the sandbox the core ran inside, by its own build info
 		public const string Firmware = "Firmware"; // "<id>=<sha1>" per file the core was given; a BIOS changes what runs
