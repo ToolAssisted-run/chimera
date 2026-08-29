@@ -92,6 +92,16 @@ namespace Chimera.Client.Common
 
 			Bind("TAStudio", "Add Branch", "Alt+Insert");
 			Bind("TAStudio", "Delete Branch", "Alt+Delete");
+
+			// Numbered branch slots: F1..F10 go back to one, Shift+F1..F10 put
+			// the run into one. A TAS spends its life bouncing between a handful
+			// of attempts, and reaching for the mouse to do it is the difference
+			// between trying something and not bothering.
+			for (int slot = 1; slot <= 10; slot++)
+			{
+				Bind("TAStudio", $"Save Branch {slot}", $"Shift+F{slot}");
+				Bind("TAStudio", $"Load Branch {slot}", $"F{slot}");
+			}
 			Bind("TAStudio", "Show Cursor");
 			Bind("TAStudio", "Select Current Frame");
 			Bind("TAStudio", "Seek To Selected Frame");

@@ -242,6 +242,30 @@ namespace Chimera.Client.GUI
 					if (!Tools.IsLoaded<TAStudio>()) return false;
 					Tools.TAStudio.RemoveBranchExternal();
 					break;
+				// The numbered branch slots. One case each rather than a parsed
+				// suffix, because the dispatch below is a plain switch on the
+				// binding's name and a special case that reads its digits back
+				// out would be the only one of its kind here.
+				case "Save Branch 1": return SaveBranchSlot(0);
+				case "Save Branch 2": return SaveBranchSlot(1);
+				case "Save Branch 3": return SaveBranchSlot(2);
+				case "Save Branch 4": return SaveBranchSlot(3);
+				case "Save Branch 5": return SaveBranchSlot(4);
+				case "Save Branch 6": return SaveBranchSlot(5);
+				case "Save Branch 7": return SaveBranchSlot(6);
+				case "Save Branch 8": return SaveBranchSlot(7);
+				case "Save Branch 9": return SaveBranchSlot(8);
+				case "Save Branch 10": return SaveBranchSlot(9);
+				case "Load Branch 1": return LoadBranchSlot(0);
+				case "Load Branch 2": return LoadBranchSlot(1);
+				case "Load Branch 3": return LoadBranchSlot(2);
+				case "Load Branch 4": return LoadBranchSlot(3);
+				case "Load Branch 5": return LoadBranchSlot(4);
+				case "Load Branch 6": return LoadBranchSlot(5);
+				case "Load Branch 7": return LoadBranchSlot(6);
+				case "Load Branch 8": return LoadBranchSlot(7);
+				case "Load Branch 9": return LoadBranchSlot(8);
+				case "Load Branch 10": return LoadBranchSlot(9);
 				case "Show Cursor":
 					if (!Tools.IsLoaded<TAStudio>()) return false;
 					Tools.TAStudio.SetVisibleFrame();
@@ -349,6 +373,26 @@ namespace Chimera.Client.GUI
 
 			}
 
+			return true;
+		}
+
+		/// <summary>
+		/// Put the run into numbered branch slot <paramref name="slot"/>, making
+		/// the branch if it is not there. Returns false when TAStudio is not
+		/// open, which lets the key through to whatever else wants it.
+		/// </summary>
+		private bool SaveBranchSlot(int slot)
+		{
+			if (!Tools.IsLoaded<TAStudio>()) return false;
+			Tools.TAStudio.SaveBranchByIndex(slot);
+			return true;
+		}
+
+		/// <summary>Go back to numbered branch slot <paramref name="slot"/>.</summary>
+		private bool LoadBranchSlot(int slot)
+		{
+			if (!Tools.IsLoaded<TAStudio>()) return false;
+			Tools.TAStudio.LoadBranchByIndex(slot);
 			return true;
 		}
 	}

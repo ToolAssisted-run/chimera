@@ -1150,6 +1150,14 @@ namespace Chimera.Client.GUI
 		}
 
 		public void AddBranchExternal() => BookMarkControl.AddBranchExternal();
+
+		/// <summary>
+		/// Put the run as it stands into branch <paramref name="index"/>, making
+		/// that branch if it is not there yet. This is the numbered-slot half of
+		/// the branch hotkeys - Shift+F1..F10 - and it deliberately overwrites:
+		/// a slot is a place you keep coming back to, not a list you append to.
+		/// </summary>
+		public void SaveBranchByIndex(int index) => BookMarkControl.UpdateBranchExternal(index);
 		public void RemoveBranchExternal() => BookMarkControl.RemoveBranchExternal();
 
 		private void UpdateTools()
