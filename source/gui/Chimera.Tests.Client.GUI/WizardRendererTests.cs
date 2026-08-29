@@ -72,6 +72,32 @@ namespace Chimera.Tests.Client.GUI
 		}
 
 		[TestMethod]
+		public void ChoosingHardwareSaysWhatItCosts()
+		{
+			using var form = MakeForm(CfgWithRenderers());
+			Assert.AreEqual("", form.RendererCaveatText,
+				"a software renderer has nothing to be careful about");
+
+			form.SetRenderer("opengl-hw");
+			StringAssert.Contains(form.RendererCaveatText, "desync",
+				"the cost is said where the choice is made");
+			StringAssert.Contains(form.RendererCaveatText, "greenzone",
+				"and so is what to do about it");
+
+			form.SetRenderer("software");
+			Assert.AreEqual("", form.RendererCaveatText, "and it goes away again");
+		}
+
+		[TestMethod]
+		public void OnlyTheHardwareOnesCarryTheWarning()
+		{
+			Assert.IsTrue(NewProjectWizard.IsHardware("opengl-hw"));
+			Assert.IsFalse(NewProjectWizard.IsHardware("opengl"));
+			Assert.IsFalse(NewProjectWizard.IsHardware("software"));
+			Assert.IsFalse(NewProjectWizard.IsHardware(null));
+		}
+
+		[TestMethod]
 		public void ItStartsOnTheRendererTheCoreDeclaredAsItsDefault()
 		{
 			using var form = MakeForm(CfgWithRenderers());

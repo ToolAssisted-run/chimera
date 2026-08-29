@@ -312,7 +312,7 @@ namespace Chimera.Client.GUI
 			// 
 			// ClearGreenzoneMenuItem
 			// 
-			this.ClearGreenzoneMenuItem.Text = "&Clear Savestate History";
+			this.ClearGreenzoneMenuItem.Text = "&Clear Greenzone";
 			this.ClearGreenzoneMenuItem.Click += new System.EventHandler(this.ClearGreenzoneMenuItem_Click);
 			// 
 			// StateHistoryIntegrityCheckMenuItem

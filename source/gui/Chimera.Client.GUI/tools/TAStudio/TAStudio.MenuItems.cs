@@ -500,9 +500,22 @@ namespace Chimera.Client.GUI
 			MarkerControl.UpdateMarkerCount();
 		}
 
+		/// <summary>
+		/// Throws away every savestate the run has accumulated and goes back to
+		/// frame 0, which is the only way to make the machine prove itself: from
+		/// there the movie replays from nothing, and a desync has nowhere to hide
+		/// behind a state that was saved before it happened.
+		///
+		/// That matters most on a hardware renderer, where the picture comes from
+		/// a GPU outside the savestate and sync is a thing to check rather than
+		/// assume - which is what the New Project window says when one is chosen.
+		/// Frame 0's state survives the clear (it is reserved), so this is a load
+		/// rather than a reboot.
+		/// </summary>
 		private void ClearGreenzoneMenuItem_Click(object sender, EventArgs e)
 		{
 			CurrentTasMovie.TasStateManager.Clear();
+			GoToFrame(0);
 			RefreshDialog();
 		}
 

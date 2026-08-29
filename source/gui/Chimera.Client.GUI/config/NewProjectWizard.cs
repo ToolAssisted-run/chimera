@@ -57,6 +57,9 @@ namespace Chimera.Client.GUI
 		/// </summary>
 		private readonly ComboBox _renderer;
 
+		/// <summary>what a hardware renderer costs, shown only when one is chosen</summary>
+		private readonly Label _rendererCaveat;
+
 		// page 2, rebuilt when the chosen core changes
 		private readonly Panel _slotsHost;
 		private ProjectSlotDeclaration? _declaration;
@@ -168,15 +171,33 @@ namespace Chimera.Client.GUI
 				Location = Pt(110, 80),
 				Width = UIHelper.ScaleX(442),
 			};
-			_renderer.SelectedIndexChanged += (_, _) => PinRenderer();
+			_renderer.SelectedIndexChanged += (_, _) =>
+			{
+				PinRenderer();
+				ShowRendererCaveat();
+			};
 			p1.Controls.Add(_renderer);
 
-			_machineLabel = MakeLabel("Machine:", 8, 116);
+			// What a hardware renderer costs, where the choice is made. The space
+			// is reserved whether or not the text is showing, so choosing between
+			// renderers does not make the form jump around underneath the hand
+			// that is choosing.
+			_rendererCaveat = new Label
+			{
+				Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
+				AutoSize = false,
+				ForeColor = SystemColors.GrayText,
+				Location = Pt(110, 106),
+				Size = new(UIHelper.ScaleX(442), UIHelper.ScaleY(46)),
+			};
+			p1.Controls.Add(_rendererCaveat);
+
+			_machineLabel = MakeLabel("Machine:", 8, 160);
 			_machine = new ComboBox
 			{
 				Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
 				DropDownStyle = ComboBoxStyle.DropDownList,
-				Location = Pt(110, 112),
+				Location = Pt(110, 156),
 				Width = UIHelper.ScaleX(442),
 			};
 			_machine.SelectedIndexChanged += (_, _) =>
@@ -576,7 +597,33 @@ namespace Chimera.Client.GUI
 			// one renderer is not a choice, and a disabled box still says what it is
 			_renderer.Enabled = _renderer.Items.Count > 1;
 			PinRenderer();
+			ShowRendererCaveat();
 		}
+
+		/// <summary>
+		/// What a hardware renderer costs, said where the choice is made rather
+		/// than in a manual nobody opens. Only for the hardware ones: a person who
+		/// picked a software renderer has nothing to be careful about, and a
+		/// warning that is always on screen is a warning nobody reads.
+		/// </summary>
+		internal const string HardwareRendererCaveat =
+			"Hardware renderers are much faster, but carry a slightly higher chance of desync. "
+			+ "Check now and then that your movie still syncs: clear its greenzone in TAStudio and replay it from the start. "
+			+ "If you need a guarantee, choose a software renderer.";
+
+		private void ShowRendererCaveat()
+			=> _rendererCaveat.Text = IsHardware(ChosenRenderer) ? HardwareRendererCaveat : "";
+
+		/// <summary>
+		/// Whether a renderer's value names one that draws on the machine's own
+		/// GPU. The suffix is the convention every core shares (see WaterboxCore),
+		/// so this window understands a core it has never heard of.
+		/// </summary>
+		internal static bool IsHardware(string? renderer)
+			=> renderer is not null && renderer.EndsWith("-hw", StringComparison.Ordinal);
+
+		/// <summary>The caveat as it stands, for tests ("" when none is showing).</summary>
+		public string RendererCaveatText => _rendererCaveat.Text;
 
 		private WaterboxConfig.SettingDecl? RendererDecl()
 		{
