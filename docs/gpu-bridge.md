@@ -76,13 +76,33 @@ Two things have to be true, and either may not be:
    Windows.
 
 When either fails the core draws the way it draws without a GPU - the
-deterministic way - and the session simply does not claim otherwise. A line on
-standard error says which happened:
+deterministic way - and the session simply does not claim otherwise. A run that
+did get one says so on screen when it starts ("GPU: <driver> - this run is not
+deterministic"), which is the only place a person can see WHICH driver drew.
+There is a line on standard error either way:
 
     chimera gl: 4.5 (Core Profile) Mesa 25.2.8 on llvmpipe    <- a context
     chimera gl: no context (...); drawing in software         <- no context
 
 `chimera-run --gpu` makes the same ask from the command line.
+
+## The context is borrowed, never kept
+
+"Current context" is one slot per thread, and the frontend draws its own
+picture - the emulated screen, the OSD, everything - through that same slot.
+The bridge takes it at the first GL call of a frame and gives back exactly what
+was there when the frame ends (`ce_gl_release`, called by the engine after each
+frame advance, after Init, and after a savestate load).
+
+Keeping it is not merely rude, it is invisible. Chimera binds its context
+through SDL, and `SDL_GL_MakeCurrent` short-circuits on SDL's own cache when it
+believes its context is already current - which it does, because
+`DisplayManager` deliberately never releases it ("workaround for slow context
+switching on intel GPUs"). A raw `wglMakeCurrent` behind SDL's back therefore
+makes the frontend go on drawing into the bridge's hidden 64x64 window for the
+rest of the session. The symptom is a pitch black screen with working sound and
+no OSD, and it is what Windows did the first time this ran against a real
+display.
 
 ## What is not proven
 

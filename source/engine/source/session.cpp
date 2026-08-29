@@ -279,6 +279,7 @@ bool composeSettings(const std::string &defaultsJson, const char *overrides, std
 extern "C" int32_t ce_gl_start(char *error_out, int32_t error_len);
 extern "C" const char *ce_gl_description(void);
 extern "C" int32_t ce_gl_requested(void);
+extern "C" void ce_gl_release(void);
 extern "C" uintptr_t ce_gl_dispatch(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t);
 
 struct ce_session
@@ -805,7 +806,11 @@ ce_session *ce_session_open(
 
 	auto init = reinterpret_cast<int32_t (*)()>(s->proc("Init", 0, true, err));
 	if (init == nullptr) return abort(std::move(err));
-	if (init() != 1)
+	const int32_t initResult = init();
+	/* Init is where a renderer makes its context and compiles its shaders, so
+	 * it is also where the bridge first borrows the caller's GL slot. */
+	ce_gl_release();
+	if (initResult != 1)
 	{
 		/* the core knows why it refused - GetLoadError is optional, so a core
 		 * that says nothing still fails, just less helpfully */
@@ -978,6 +983,9 @@ int32_t ce_session_frame_advance(ce_session *s, uint64_t buttons, int32_t render
 		}
 	}
 	s->sampleCount = nsamp;
+	/* The frame is over and the caller draws next: whatever GL context the
+	 * bridge borrowed goes back before it does. */
+	ce_gl_release();
 	return s->inputWasRead != nullptr && s->inputWasRead() == 0 ? 1 : 0;
 }
 
@@ -1016,6 +1024,7 @@ int32_t ce_session_load_state(ce_session *s, const uint8_t *data, uint64_t len)
 	ByteStream stream{ data, len };
 	chimera::WbxReturn r{};
 	s->host->wbx_load_state(s->obj, streamRead, reinterpret_cast<uintptr_t>(&stream), &r); // see save re: no bracket
+	ce_gl_release(); /* a restore can run guest code, and guest code can draw */
 	if (!r.ok())
 	{
 		s->error = r.errorMessage;

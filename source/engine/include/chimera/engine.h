@@ -680,6 +680,16 @@ CE_API int32_t ce_gl_available(void);
  * movie header and for saying which GPU a recording was made on. Empty when
  * there is none. */
 CE_API const char *ce_gl_description(void);
+
+/* Give the current-context slot back to whoever had it.
+ *
+ * "Current context" is one slot per thread and the frontend draws its own
+ * picture through it, so the bridge borrows it for the duration of a guest
+ * call and returns it here. The engine calls this itself at every point where
+ * a core stops running and the caller gets control back; a caller that runs
+ * guest code by some other route can call it too. Harmless with no bridge, no
+ * context, or nothing borrowed. */
+CE_API void ce_gl_release(void);
 CE_API int64_t ce_session_button_count(const ce_session *s);
 CE_API const char *ce_session_button_name(const ce_session *s, int64_t index);
 CE_API int64_t ce_session_axis_count(const ce_session *s);

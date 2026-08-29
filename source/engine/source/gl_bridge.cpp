@@ -20,6 +20,16 @@
  * reading it - and is right to. Anything GL returns by pointer is copied into a
  * buffer the guest supplied.
  *
+ * THE CONTEXT IS BORROWED, NEVER KEPT. "Current context" is one slot per
+ * thread, and the frontend draws its own picture through it. Holding ours
+ * across a return would take that slot away - and worse, take it away
+ * INVISIBLY: a frontend that binds its context through SDL is short-circuited
+ * by SDL's own cache ("already current") and never rebinds, so it goes on
+ * drawing into a hidden 64x64 window forever. That is a black screen with
+ * working sound, and it is what happened on Windows the first time this ran
+ * against a real display. So: borrow at the first call of a frame, put back
+ * exactly what was there when the frame ends (ce_gl_release).
+ *
  * WHAT THIS COSTS. The GPU is outside the sandbox: outside the savestate,
  * outside the determinism the rest of a core is built on, and different on
  * every machine. A session drawn this way says so (ce_session_deterministic
@@ -136,6 +146,26 @@ void destroy_context()
 	if (s_window) { DestroyWindow(s_window); s_window = nullptr; }
 }
 
+/* Whose context was current before we took the slot. Null is a legitimate
+ * answer and must be restored as faithfully as any other. */
+HGLRC s_lentContext;
+HDC s_lentDC;
+
+void save_current()
+{
+	s_lentContext = wglGetCurrentContext();
+	s_lentDC = wglGetCurrentDC();
+}
+
+void bind_ours() { wglMakeCurrent(s_dc, s_context); }
+
+void return_current()
+{
+	wglMakeCurrent(s_lentDC, s_lentContext);
+	s_lentContext = nullptr;
+	s_lentDC = nullptr;
+}
+
 #else
 
 /* ---------------------------------------------------------------------------
@@ -224,6 +254,38 @@ void destroy_context()
 	}
 }
 
+/* Whose context was current before we took the slot. A frontend drawing
+ * through GLX rather than EGL is invisible to eglGetCurrentContext, and there
+ * is no way to put a GLX context back from here - so what it gets back is an
+ * unbound slot, which is what it would have had if it had released its own. */
+EGLContext s_lentContext = EGL_NO_CONTEXT;
+EGLSurface s_lentDraw = EGL_NO_SURFACE;
+EGLSurface s_lentRead = EGL_NO_SURFACE;
+EGLDisplay s_lentDisplay = EGL_NO_DISPLAY;
+
+void save_current()
+{
+	s_lentContext = eglGetCurrentContext();
+	s_lentDraw = eglGetCurrentSurface(EGL_DRAW);
+	s_lentRead = eglGetCurrentSurface(EGL_READ);
+	s_lentDisplay = eglGetCurrentDisplay();
+}
+
+void bind_ours()
+{
+	eglMakeCurrent(s_display, EGL_NO_SURFACE, EGL_NO_SURFACE, s_context);
+}
+
+void return_current()
+{
+	if (s_lentDisplay != EGL_NO_DISPLAY)
+		eglMakeCurrent(s_lentDisplay, s_lentDraw, s_lentRead, s_lentContext);
+	else
+		eglMakeCurrent(s_display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
+	s_lentContext = EGL_NO_CONTEXT;
+	s_lentDisplay = EGL_NO_DISPLAY;
+}
+
 #endif
 
 } // namespace
@@ -241,10 +303,31 @@ void destroy_context()
 #define BRIDGE_ABI
 #endif
 
+/* Set between borrow_current and return_current. Reading the driver's own idea
+ * of the current context is a thread-local load and cheap, but this is on the
+ * path of every single GL call a renderer makes, so it is a bool. */
+static bool g_borrowed;
+
+extern "C" void ce_gl_release(void)
+{
+	if (!g_borrowed) return;
+	return_current();
+	g_borrowed = false;
+}
+
 extern "C" uintptr_t BRIDGE_ABI ce_gl_dispatch(uintptr_t op, uintptr_t a, uintptr_t b,
                                                uintptr_t c, uintptr_t d, uintptr_t e)
 {
 	(void)d; (void)e;
+
+	/* The first GL call of a frame takes the context; ce_gl_release gives it
+	 * back when the frame is over. Two calls per frame, not two per GL call. */
+	if (!g_borrowed && g_ready)
+	{
+		save_current();
+		bind_ours();
+		g_borrowed = true;
+	}
 
 	switch (op)
 	{
@@ -303,10 +386,16 @@ extern "C" int32_t ce_gl_start(char *error_out, int32_t error_len)
 {
 	if (g_ready) return 1;
 
+	/* Making a context makes it current, and this runs while the frontend is
+	 * on screen with a context of its own. Remember what it had, hand it back
+	 * on every path out of here. */
+	save_current();
+
 	char err[192] = "";
 	if (!create_context(err, (int)sizeof err))
 	{
 		destroy_context();
+		return_current();
 		if (error_out && error_len > 0) snprintf(error_out, error_len, "%s", err);
 		return 0;
 	}
@@ -315,6 +404,7 @@ extern "C" int32_t ce_gl_start(char *error_out, int32_t error_len)
 	if (g_version == 0)
 	{
 		destroy_context();
+		return_current();
 		if (error_out && error_len > 0)
 			snprintf(error_out, error_len, "the driver's entry points would not load");
 		return 0;
@@ -331,6 +421,7 @@ extern "C" int32_t ce_gl_start(char *error_out, int32_t error_len)
 	if (GLAD_VERSION_MAJOR(g_version) < 3)
 	{
 		destroy_context();
+		return_current();
 		if (error_out && error_len > 0)
 			snprintf(error_out, error_len, "the driver offers OpenGL %d.%d, and this needs 3.3",
 				GLAD_VERSION_MAJOR(g_version), GLAD_VERSION_MINOR(g_version));
@@ -338,12 +429,14 @@ extern "C" int32_t ce_gl_start(char *error_out, int32_t error_len)
 	}
 
 	g_ready = true;
+	return_current();
 	return 1;
 }
 
 extern "C" void ce_gl_stop(void)
 {
 	if (!g_ready) return;
+	ce_gl_release();
 	destroy_context();
 	g_ready = false;
 	g_description[0] = 0;
@@ -358,6 +451,7 @@ extern "C" void ce_gl_request(int32_t want) { g_requested = want ? 1 : 0; }
 extern "C" int32_t ce_gl_requested(void) { return g_requested; }
 extern "C" int32_t ce_gl_available(void) { return 0; }
 extern "C" const char *ce_gl_description(void) { return ""; }
+extern "C" void ce_gl_release(void) { }
 extern "C" uintptr_t ce_gl_dispatch(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t) { return 0; }
 extern "C" int32_t ce_gl_start(char *error_out, int32_t error_len)
 {

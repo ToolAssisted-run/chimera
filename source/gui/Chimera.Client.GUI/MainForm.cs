@@ -3027,6 +3027,24 @@ namespace Chimera.Client.GUI
 			UpdateCoreStatusBarButton();
 			SetMainformMovieInfo();
 			WarnAboutNonStandardFirmware();
+			SayWhenAGpuIsDrawing();
+		}
+
+		/// <summary>
+		/// Say so, on screen, when the machine's pictures are coming from a GPU.
+		/// A project that asked for a hardware renderer may not have got one -
+		/// a build without the bridge, a driver that would not give a context,
+		/// a core that declined it - and the difference decides whether this
+		/// run's movie replays anywhere else. It is also the only place a
+		/// person can see WHICH driver drew, which is what the movie records.
+		/// </summary>
+		private void SayWhenAGpuIsDrawing()
+		{
+			if (Emulator.IsNull()) return;
+			if (Emulator is IGpuRendered { GpuRenderer: { Length: > 0 } driver })
+			{
+				AddOnScreenMessage($"GPU: {driver} - this run is not deterministic", 5);
+			}
 		}
 
 		/// <summary>
