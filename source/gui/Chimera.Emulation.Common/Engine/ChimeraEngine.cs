@@ -5,125 +5,125 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 
-using Chimera.BizInvoke;
+using Chimera.NativeInvoke;
 using Chimera.Common;
 
 namespace Chimera.Emulation.Common.Engine
 {
 	/// <summary>
-	/// BizInvoke surface of libchimera - the engine (engine/include/chimera/engine.h),
+	/// NativeInvoke surface of libchimera - the engine (engine/include/chimera/engine.h),
 	/// which ships beside libminiboxhost in build/dll. The functional side of the
 	/// frontend migrates into it component by component; see docs/engine-migration.md.
 	/// </summary>
 	public abstract class LibChimera
 	{
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract uint ce_abi_version();
 
 		/// <summary>JSON: what built this engine (commit, compiler, OS, target).</summary>
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_build_info();
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_movie_log_new();
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract void ce_movie_log_free(IntPtr log);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_movie_log_parse(IntPtr log, byte[] text, ulong len);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_movie_log_last_error(IntPtr log);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract long ce_movie_log_count(IntPtr log);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_movie_log_entry(IntPtr log, long index);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract void ce_movie_log_add(IntPtr log, string entry);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract void ce_movie_log_clear(IntPtr log);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract void ce_movie_log_truncate(IntPtr log, long count);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract void ce_movie_log_set(IntPtr log, long index, string entry);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract void ce_movie_log_insert(IntPtr log, long index, string entry);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract void ce_movie_log_remove_range(IntPtr log, long index, long count);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract void ce_movie_log_assign(IntPtr dst, IntPtr src);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_movie_log_has_state_frame(IntPtr log);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_movie_log_state_frame(IntPtr log);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_movie_log_key(IntPtr log);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract void ce_movie_log_set_key(IntPtr log, string? key);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract long ce_movie_log_divergent_point(IntPtr a, IntPtr b);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_movie_log_serialize(IntPtr log, int crlf, ref ulong lenOut);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_movie_header_new();
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract void ce_movie_header_free(IntPtr header);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract void ce_movie_header_parse(IntPtr header, byte[] text, ulong len);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract long ce_movie_header_count(IntPtr header);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_movie_header_key_at(IntPtr header, long index);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_movie_header_value_at(IntPtr header, long index);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract void ce_movie_header_set(IntPtr header, string key, string value);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_movie_header_serialize(IntPtr header, int crlf, ref ulong lenOut);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_text_lines_new();
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract void ce_text_lines_free(IntPtr lines);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract void ce_text_lines_parse(IntPtr lines, byte[] text, ulong len);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract long ce_text_lines_count(IntPtr lines);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_text_lines_at(IntPtr lines, long index);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract void ce_text_lines_add(IntPtr lines, string line);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_text_lines_serialize(IntPtr lines, int crlf, ref ulong lenOut);
 
 		[StructLayout(LayoutKind.Sequential)]
@@ -136,43 +136,43 @@ namespace Chimera.Emulation.Common.Engine
 			public uint Color;
 		}
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract long ce_subtitle_parse_line(string line, ref CeSubtitleFields fields, byte[] messageBuf, ulong cap);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract long ce_subtitle_format_line(ref CeSubtitleFields fields, string message, byte[] buf, ulong cap);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_state_writer_new(int compressionLevel, string emuVersion);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract void ce_state_writer_free(IntPtr writer);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_state_writer_put_lump(IntPtr writer, string name, string ext, int zstd, byte[] data, ulong len);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_state_writer_finish(IntPtr writer, ref ulong lenOut);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_state_writer_last_error(IntPtr writer);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_state_reader_open(byte[] data, ulong len, int isMovie, ref IntPtr errorOut);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract void ce_state_reader_free(IntPtr reader);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_state_reader_version(IntPtr reader);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_state_reader_lump(IntPtr reader, string name, string ext, ref ulong lenOut);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_state_reader_last_error(IntPtr reader);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract void ce_sha1_hex(byte[] data, ulong len, byte[] out41);
 
 
@@ -193,439 +193,439 @@ namespace Chimera.Emulation.Common.Engine
 
 
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_firmware_state(long declaredSize, string expectedSha1s, long actualSize, string actualSha1);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_firmware_record_line(string pairs, ref ulong lenOut);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_firmware_evaluate(
 			byte[] declJson, ulong declLen,
 			byte[] slotsJson, ulong slotsLen,
 			byte[] settingsJson, ulong settingsLen,
 			ref ulong lenOut);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_settings_evaluate(
 			byte[] declJson, ulong declLen,
 			byte[] slotsJson, ulong slotsLen,
 			byte[] settingsJson, ulong settingsLen,
 			ref ulong lenOut);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_slots_evaluate(
 			byte[] declJson, ulong declLen,
 			byte[] slotsJson, ulong slotsLen,
 			byte[] settingsJson, ulong settingsLen,
 			ref ulong lenOut);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_cue_references(
 			byte[] cueBytes, ulong cueLen,
 			ref ulong lenOut);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_package_open(string path, ref IntPtr errorOut);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract void ce_package_free(IntPtr package);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_package_sha1(IntPtr package);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_package_is_waterbox(IntPtr package);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_package_has_entry(IntPtr package, string name);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_package_entry(IntPtr package, string name, ref ulong lenOut);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_package_last_error(IntPtr package);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_project_new();
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_project_open(string path, ref IntPtr errorOut);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_project_save(IntPtr project, string path, ref IntPtr errorOut);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract void ce_project_free(IntPtr project);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_project_title(IntPtr project);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract void ce_project_set_title(IntPtr project, string title);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_project_description(IntPtr project);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract void ce_project_set_description(IntPtr project, string description);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_project_core_name(IntPtr project);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_project_core_version(IntPtr project);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_project_core_sha1(IntPtr project);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract void ce_project_set_core(IntPtr project, string name, string version, string sha1);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract ulong ce_project_rerecords(IntPtr project);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract void ce_project_set_rerecords(IntPtr project, ulong count);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_project_settings_text(IntPtr project, ref ulong lenOut);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_project_set_settings_text(IntPtr project, string json, ref IntPtr errorOut);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_project_firmware_text(IntPtr project, ref ulong lenOut);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_project_set_firmware_text(IntPtr project, string json, ref IntPtr errorOut);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_project_log_text(IntPtr project, ref ulong lenOut);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract void ce_project_set_log_text(IntPtr project, byte[] text, ulong len);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_project_marker_count(IntPtr project);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract long ce_project_marker_frame(IntPtr project, int index);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_project_marker_text(IntPtr project, int index);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_project_marker_keep_state(IntPtr project, int index);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_project_marker_add(IntPtr project, long frame, string text, int keepState);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract void ce_project_marker_remove(IntPtr project, int index);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_project_branch_count(IntPtr project);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_project_branch_name(IntPtr project, int index);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract long ce_project_branch_frame(IntPtr project, int index);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_project_branch_time(IntPtr project, int index);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_project_branch_log_text(IntPtr project, int index, ref ulong lenOut);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract void ce_project_branch_add(IntPtr project, string name, long frame, string time, byte[] logText, ulong len);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract void ce_project_branch_remove(IntPtr project, int index);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_project_branch_marker_count(IntPtr project, int branch);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract long ce_project_branch_marker_frame(IntPtr project, int branch, int index);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_project_branch_marker_text(IntPtr project, int branch, int index);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_project_branch_marker_keep_state(IntPtr project, int branch, int index);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract void ce_project_branch_marker_add(IntPtr project, int branch, long frame, string text, int keepState);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_project_header_count(IntPtr project);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_project_header_key_at(IntPtr project, int index);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_project_header_value_at(IntPtr project, int index);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_project_header_get(IntPtr project, string key);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract void ce_project_header_set(IntPtr project, string key, string? value);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_project_subtitle_count(IntPtr project);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_project_subtitle_at(IntPtr project, int index);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract void ce_project_subtitle_add(IntPtr project, string line);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract void ce_project_subtitle_remove(IntPtr project, int index);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_project_file_add(IntPtr project, string name, string slot, string sourcePath, ref IntPtr errorOut);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract void ce_project_file_remove(IntPtr project, int index);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_project_file_count(IntPtr project);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_project_file_name(IntPtr project, int index);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_project_file_slot(IntPtr project, int index);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_project_file_sha1(IntPtr project, int index);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_project_file_actual_sha1(IntPtr project, int index);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_project_file_status(IntPtr project, int index);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_project_file_source_path(IntPtr project, int index);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_project_file_data(IntPtr project, int index, ref ulong lenOut);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_project_file_resolve(IntPtr project, int index, string path, ref IntPtr errorOut);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract void ce_project_file_unresolve(IntPtr project, int index);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_project_resolve_dir(IntPtr project, string dir);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_project_files_ok(IntPtr project);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_project_validate(IntPtr project, byte[] slotsJson, ulong slotsLen, ref IntPtr errorOut);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_project_slots_text(IntPtr project, ref ulong lenOut);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_session_open(
 			string packagePath, byte[] rom, ulong romLen, string? settingsOverridesJson,
 			IntPtr[]? firmwareIds, IntPtr[]? firmwareData, ulong[]? firmwareLens, int firmwareCount,
 			IntPtr[]? extraNames, IntPtr[]? extraData, ulong[]? extraLens, int extraCount,
 			ref IntPtr errorOut);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract void ce_session_free(IntPtr session);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_session_core_name(IntPtr session);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_session_system_id(IntPtr session);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_session_width(IntPtr session);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_session_height(IntPtr session);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_session_virtual_width(IntPtr session);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_session_virtual_height(IntPtr session);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_session_vsync_numerator(IntPtr session);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_session_vsync_denominator(IntPtr session);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_session_samples_per_frame(IntPtr session);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_session_channels(IntPtr session);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_session_deterministic(IntPtr session);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_session_gpu_drew(IntPtr session);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_gl_description();
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract long ce_session_button_count(IntPtr session);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_session_button_name(IntPtr session, long index);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract long ce_session_axis_count(IntPtr session);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_session_axis_name(IntPtr session, long index);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract void ce_session_set_axis(IntPtr session, int index, int value);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_session_frame_advance(IntPtr session, ulong buttons, int render);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_session_video(IntPtr session);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_session_video_width(IntPtr session);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_session_video_height(IntPtr session);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_session_audio(IntPtr session, ref int sampleCount);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_session_save_state(IntPtr session, ref ulong lenOut);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_session_load_state(IntPtr session, byte[] data, ulong len);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_session_domain_count(IntPtr session);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_session_domain_name(IntPtr session, int index);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract long ce_session_domain_size(IntPtr session, int index);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_session_domain_writable(IntPtr session, int index);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract ulong ce_session_domain_ptr(IntPtr session, int index);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_session_last_error(IntPtr session);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_host_build_info();
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_session_apply_settings(IntPtr session, string overridesJson);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_session_surface_count(IntPtr session);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_session_surface_name(IntPtr session, int index);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_session_surface_width(IntPtr session, int index);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_session_surface_height(IntPtr session, int index);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_session_surface_render(IntPtr session, int index);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_session_register_count(IntPtr session);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_session_register_name(IntPtr session, int index);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_session_register_bits(IntPtr session, int index);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract long ce_session_register_value(IntPtr session, int index);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_session_register_set(IntPtr session, int index, long value);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_session_has_executed_cycles(IntPtr session);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract long ce_session_executed_cycles(IntPtr session);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_session_bus_count(IntPtr session);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_session_bus_name(IntPtr session, int index);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract long ce_session_bus_size(IntPtr session, int index);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_session_bus_writable(IntPtr session, int index);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_session_bus_peek(IntPtr session, int index, int addr);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract void ce_session_bus_poke(IntPtr session, int index, int addr, int value);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_session_trace_available(IntPtr session);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_session_trace_header(IntPtr session);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract void ce_session_trace_enable(IntPtr session, int on);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_session_trace_drain(IntPtr session, ref ulong lenOut, ref int lineCountOut, ref int overflowOut);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract void ce_session_set_button(IntPtr session, int index, int pressed);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_session_savedata_available(IntPtr session);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_session_savedata_count(IntPtr session);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_session_savedata_name(IntPtr session, int index);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract long ce_session_savedata_size(IntPtr session, int index);
 
-		[BizImport(CallingConvention.Cdecl)]
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract long ce_session_savedata_read(IntPtr session, int index, long offset, byte[] buf, long len);
 
 
@@ -657,7 +657,7 @@ namespace Chimera.Emulation.Common.Engine
 				if (found is null) throw;
 				resolver = new(found, hasLimitedLifetime: false);
 			}
-			var lib = BizInvoker.GetInvoker<LibChimera>(resolver, CallingConventionAdapters.Native);
+			var lib = ChimeraInvoker.GetInvoker<LibChimera>(resolver, CallingConventionAdapters.Native);
 			var abi = lib.ce_abi_version();
 			if (abi != 1)
 			{
@@ -944,7 +944,7 @@ namespace Chimera.Emulation.Common.Engine
 			_reader = IntPtr.Zero;
 		}
 
-		/// <summary>The sub-version from the "BizState 1.0" lump (1.0.N).</summary>
+		/// <summary>The sub-version from the "ChimeraState 1.0" lump (1.0.N).</summary>
 		public int Version => ChimeraEngine.Instance.ce_state_reader_version(_reader);
 
 		/// <returns>the decompressed lump, or null when absent</returns>

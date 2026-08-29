@@ -115,8 +115,8 @@ ce_state_writer *ce_state_writer_new(int32_t compression_level, const char *emu_
 	/* every archive says what it is and what wrote it, uncompressed - the
 	 * trailing newline matches the old StreamWriter.WriteLine */
 	std::string version = std::string(emu_version != nullptr ? emu_version : "") + "\n";
-	ce_state_writer_put_lump(w, "BizState 1", "0", 0, reinterpret_cast<const uint8_t *>("3\n"), 2);
-	ce_state_writer_put_lump(w, "BizVersion", "txt", 0,
+	ce_state_writer_put_lump(w, "ChimeraState 1", "0", 0, reinterpret_cast<const uint8_t *>("3\n"), 2);
+	ce_state_writer_put_lump(w, "ChimeraVersion", "txt", 0,
 		reinterpret_cast<const uint8_t *>(version.data()), version.size());
 	return w;
 }
@@ -234,7 +234,7 @@ std::string commonDirPrefix(const std::vector<std::string> &paths)
 bool readVersion(ce_state_reader *r)
 {
 	uint64_t len = 0;
-	const uint8_t *text = ce_state_reader_lump(r, "BizState 1", "0", &len);
+	const uint8_t *text = ce_state_reader_lump(r, "ChimeraState 1", "0", &len);
 	if (text == nullptr) return false;
 	if (len == 0)
 	{

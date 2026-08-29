@@ -4,7 +4,7 @@ using System.Drawing.Imaging;
 using System.Text;
 
 using Chimera.Emulation.Common;
-using Chimera.Bizware.Graphics;
+using Chimera.Display;
 using Chimera.Client.Common;
 using Chimera.Common.PathExtensions;
 

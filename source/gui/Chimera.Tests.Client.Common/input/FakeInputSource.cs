@@ -23,7 +23,7 @@ namespace Chimera.Tests.Client.Common.input
 			{
 				EventType = InputEventType.Press,
 				LogicalButton = new(keyboardButton, modifiers, () => _modifierKeys),
-				Source = Bizware.Input.HostInputType.Keyboard,
+				Source = Chimera.Input.HostInputType.Keyboard,
 			});
 		}
 
@@ -33,7 +33,7 @@ namespace Chimera.Tests.Client.Common.input
 			{
 				EventType = InputEventType.Release,
 				LogicalButton = new(keyboardButton, modifiers, () => _modifierKeys),
-				Source = Bizware.Input.HostInputType.Keyboard,
+				Source = Chimera.Input.HostInputType.Keyboard,
 			});
 		}
 	}

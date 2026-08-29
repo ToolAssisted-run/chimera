@@ -1,0 +1,5 @@
+LIBRARY libchimerahash
+EXPORTS
+	ChimeraCalcCrcFunc
+	ChimeraSupportsShaInstructions
+	ChimeraCalcSha1

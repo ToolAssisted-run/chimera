@@ -7,7 +7,7 @@ using System.Drawing.Text;
 using System.IO;
 using System.Linq;
 
-using Chimera.Bizware.Graphics;
+using Chimera.Display;
 using Chimera.Common.CollectionExtensions;
 using Chimera.Common.StringExtensions;
 using Chimera.Emulation.Common;

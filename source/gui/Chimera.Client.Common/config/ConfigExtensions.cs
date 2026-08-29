@@ -42,7 +42,7 @@ namespace Chimera.Client.Common
 		/// <returns>null if no settings were saved, or there was an error deserializing</returns>
 		public static object GetCoreSettings(this Config config, Type coreType, Type settingsType)
 		{
-			_ = TryGetWithLegacyKey(config.CoreSettings, coreType, out var j);
+			_ = config.CoreSettings.TryGetValue(coreType.ToString(), out var j);
 			return Deserialize(j, settingsType);
 		}
 
@@ -64,7 +64,6 @@ namespace Chimera.Client.Common
 		{
 			if (o != null)
 			{
-				config.CoreSettings.Remove(LegacyKeyOf(coreType)); // migrate pre-rename entries forward
 				config.CoreSettings[coreType.ToString()] = Serialize(o);
 			}
 			else
@@ -83,14 +82,5 @@ namespace Chimera.Client.Common
 				foreach (var k in bindCollection.Keys.ToArray()) bindCollection[k] = bindCollection[k].ToDictionary(static kvp => kvp.Key, kvp => ReplMulti(kvp.Value));
 			}
 		}
-
-		/// <summary>The key this core's settings were filed under before the Chimera rename.</summary>
-		private static string LegacyKeyOf(Type coreType)
-			=> "BizHawk." + coreType.ToString().Substring("Chimera.".Length);
-
-		/// <summary>Settings saved before the rename answer under their legacy key.</summary>
-		private static bool TryGetWithLegacyKey(Dictionary<string, JToken> dict, Type coreType, out JToken j)
-			=> dict.TryGetValue(coreType.ToString(), out j) || dict.TryGetValue(LegacyKeyOf(coreType), out j);
-
 	}
 }

@@ -15,27 +15,6 @@ namespace Chimera.Client.Common
 	{
 		internal static readonly JsonSerializer Serializer;
 
-		/// <summary>
-		/// Configs and movies written before the Chimera rename carry embedded
-		/// "$type" names like "BizHawk.Client.Common.X, BizHawk.Client.Common".
-		/// Renaming the code must not orphan a decade of files: legacy names are
-		/// rewritten to their new homes at bind time, forever.
-		/// </summary>
-		private sealed class LegacyNameBinder : Newtonsoft.Json.Serialization.DefaultSerializationBinder
-		{
-			private static string Rewrite(string name)
-			{
-				if (name == null) return null;
-				if (name.StartsWith("BizHawk.", StringComparison.Ordinal)) name = "Chimera." + name.Substring("BizHawk.".Length);
-				if (name.StartsWith("Chimera.Client.EmuHawk", StringComparison.Ordinal)) name = "Chimera.Client.GUI" + name.Substring("Chimera.Client.EmuHawk".Length);
-				if (name == "EmuHawk") name = "Chimera.Client.GUI"; // the frontend assembly's pre-rename name
-				return name;
-			}
-
-			public override Type BindToType(string assemblyName, string typeName)
-				=> base.BindToType(Rewrite(assemblyName), Rewrite(typeName));
-		}
-
 		static ConfigService()
 		{
 			Serializer = new JsonSerializer
@@ -43,8 +22,6 @@ namespace Chimera.Client.Common
 				MissingMemberHandling = MissingMemberHandling.Ignore,
 				TypeNameHandling = TypeNameHandling.Auto,
 				ConstructorHandling = ConstructorHandling.Default,
-				SerializationBinder = new LegacyNameBinder(),
-
 				// because of the peculiar setup of Binding.cs and PathEntry.cs
 				ObjectCreationHandling = ObjectCreationHandling.Replace,
 

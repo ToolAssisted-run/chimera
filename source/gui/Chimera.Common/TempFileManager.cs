@@ -9,7 +9,7 @@ using Chimera.Common.PathExtensions;
 namespace Chimera.Common
 {
 	/// <summary>
-	/// Starts a thread which cleans any filenames in %temp% beginning with bizhawk.bizdelete.
+	/// Starts a thread which cleans any filenames in %temp% beginning with bizhawk.chimeradelete.
 	/// Files shouldn't be named that unless they're safe to delete, but notably, they may still be in use. That won't hurt this component.
 	/// When they're no longer in use, this component will then be able to delete them.
 	/// </summary>
@@ -41,7 +41,7 @@ namespace Chimera.Common
 				throw new InvalidOperationException();
 			}
 
-			filename = $"bizdelete-{filename.Remove(0, 4)}";
+			filename = $"chimeradelete-{filename.Remove(0, 4)}";
 			return Path.Combine(dir, filename);
 		}
 
@@ -82,7 +82,7 @@ namespace Chimera.Common
 					FileInfo[] fis;
 					try
 					{
-						fis = di.GetFiles("bizdelete-*");
+						fis = di.GetFiles("chimeradelete-*");
 					}
 					catch
 					{

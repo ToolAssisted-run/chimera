@@ -14,8 +14,8 @@
 		<PackageReference Include="SQLitePCLRaw.provider.e_sqlite3" />
 		<PackageReference Include="System.Drawing.Common" PrivateAssets="all" />
 		<PackageReference Include="System.CommandLine" />
-		<ProjectReference Include="$(ProjectDir)../Chimera.Bizware.Graphics/Chimera.Bizware.Graphics.csproj" />
-		<ProjectReference Include="$(ProjectDir)../Chimera.Bizware.Input/Chimera.Bizware.Input.csproj" />
+		<ProjectReference Include="$(ProjectDir)../Chimera.Display/Chimera.Display.csproj" />
+		<ProjectReference Include="$(ProjectDir)../Chimera.Input/Chimera.Input.csproj" />
 		<ProjectReference Include="$(ProjectDir)../Chimera.Emulation.Common/Chimera.Emulation.Common.csproj" />
 		<EmbeddedResource Include="Resources/**/*" />
 	</ItemGroup>

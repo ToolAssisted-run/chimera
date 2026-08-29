@@ -216,11 +216,11 @@ namespace Chimera.Common.PathExtensions
 			}
 			if (OSTailoredCode.IsUnixHost)
 			{
-				var dirPath = ReadPathFromEnvVar("CHIMERA_HOME") ?? ReadPathFromEnvVar("BIZHAWK_HOME") ?? AppContext.BaseDirectory;
+				var dirPath = ReadPathFromEnvVar("CHIMERA_HOME") ?? AppContext.BaseDirectory;
 				ExeDirectoryPath = string.IsNullOrEmpty(dirPath) || dirPath == "/" ? string.Empty : dirPath;
 				DllDirectoryPath = Path.Combine(ExeDirectoryPath.Length is 0 ? "/" : ExeDirectoryPath, "dll");
-				// yes, this is a lot of extra code to make sure BizHawk can run in `/` on Unix, but I've made up for it by caching these for the program lifecycle --yoshi
-				DataDirectoryPath = ReadPathFromEnvVar("CHIMERA_DATA_HOME") ?? ReadPathFromEnvVar("BIZHAWK_DATA_HOME") ?? ExeDirectoryPath;
+				// yes, this is a lot of extra code to make sure Chimera can run in `/` on Unix, but I've made up for it by caching these for the program lifecycle --yoshi
+				DataDirectoryPath = ReadPathFromEnvVar("CHIMERA_DATA_HOME") ?? ExeDirectoryPath;
 			}
 			else
 			{

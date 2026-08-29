@@ -21,7 +21,7 @@ namespace Chimera.Client.Common
 		{
 			Branches = new TasBranchCollection(this);
 			ChangeLog = new TasMovieChangeLog(this);
-			Header[HeaderKeys.MovieVersion] = $"BizHawk v2.0 Tasproj v{CurrentVersion.ToString(CultureInfo.InvariantCulture)}";
+			Header[HeaderKeys.MovieVersion] = $"Chimera Tasproj v{CurrentVersion.ToString(CultureInfo.InvariantCulture)}";
 			Markers = new TasMovieMarkerList(this);
 			Markers.CollectionChanged += Markers_CollectionChanged;
 		}

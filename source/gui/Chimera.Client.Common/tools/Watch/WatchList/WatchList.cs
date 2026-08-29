@@ -380,7 +380,7 @@ namespace Chimera.Client.Common
 				return false;
 			}
 
-			var isBizHawkWatch = true; // Hack to support .wch files from other emulators
+			var isOurWatchFormat = true; // Hack to support .wch files from other emulators
 			using var sr = file.OpenText();
 			string line;
 
@@ -395,11 +395,11 @@ namespace Chimera.Client.Common
 				// Any properly formatted line couldn't possibly be this short anyway, this also takes care of any garbage lines that might be in a file
 				if (line.Length < 5)
 				{
-					isBizHawkWatch = false;
+					isOurWatchFormat = false;
 					continue;
 				}
 
-				if (line.StartsWithOrdinal("Domain")) isBizHawkWatch = true;
+				if (line.StartsWithOrdinal("Domain")) isOurWatchFormat = true;
 				// is there a step missing here? --yoshi
 				if (line.StartsWithOrdinal("SystemID")) continue;
 
@@ -408,7 +408,7 @@ namespace Chimera.Client.Common
 				if (numColumns == 5)
 				{
 					// If 5, then this is a post 1.0.5 .wch file
-					if (isBizHawkWatch)
+					if (isOurWatchFormat)
 					{
 						// Do nothing here
 					}
@@ -458,7 +458,7 @@ namespace Chimera.Client.Common
 
 				var bigEndian = startIndex != 0;
 
-				if (isBizHawkWatch)
+				if (isOurWatchFormat)
 				{
 					startIndex = line.IndexOf('\t') + 1;
 					line = line.Substring(startIndex: startIndex); // Domain

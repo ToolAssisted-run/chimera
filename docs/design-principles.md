@@ -9,7 +9,7 @@ from the tree and loaded on-the-fly as external, self-contained packages just be
    solution. Cores arrive as single-file packages (`.chimeraCore`, a zip: manifest + managed adapter DLL +
    native DLL(s)), discovered from a `Cores/` directory and loaded at ROM-load time.
 2. **Published core contract.** The core-facing API (essentially `Chimera.Emulation.Common`
-   + `Chimera.BizInvoke`) becomes a versioned, published contract. A core package must be
+   + `Chimera.NativeInvoke`) becomes a versioned, published contract. A core package must be
    buildable outside the Chimera repo against that contract alone.
 3. **Determinism witness.** The QuickerNES regression suite (31 test movies, vendored at
    `tests/suite/` from github.com/TASEmulators/quickerNES) must resync to
@@ -152,7 +152,7 @@ phase of unverified change.
   menus except NES). Core asset payloads, core submodules, and native core source trees
   removed (Assets/dll: 90 -> 28 files, all frontend infra + libquicknes). Kept: Waterbox
   host + waterbox/ native tree (OPEN DECISION pending), quicknes/, SDL2 + rcheevos +
-  chd/bizhash/zstd/blip_buf natives (still referenced by frontend/DiscSystem), gamedb.
+  chd/chimerahash/zstd/blip_buf natives (still referenced by frontend/DiscSystem), gamedb.
   Witness at phase close: 26/26 simple AND 26/26 rerecord, byte-identical goldens,
   after a from-clean rebuild.
 - **Phase 2 - Publish the contract. [DONE 2026-08-09]** `CoreInventory`, `CoreNames`,
@@ -229,7 +229,7 @@ phase of unverified change.
   Controller bindings. [Superseded 2026-08-13, see "Key bindings arrive with the
   core": the packages lost their file in the waterbox-only redesign below, and the
   exe-side defctrl.json - along with the dialog's Save Defaults - is now gone too.] Natives KEPT deliberately: chd_capi (DiscSystem - disc story
-  still an open decision), cimgui/SDL2/OpenAL32/lua54/libzstd/libbizhash/e_sqlite3
+  still an open decision), cimgui/SDL2/OpenAL32/lua54/libzstd/libchimerahash/e_sqlite3
   (frontend infrastructure). blip_buf was initially kept as contract-offered audio
   resampling, then REMOVED at user request (wrapper class, natives, C source dir,
   arm64 prebuilt): nothing in the tree used it, and a core that wants it (e.g. a
@@ -247,9 +247,9 @@ phase of unverified change.
   retro-shader feature removed (RetroShaderChain/Preset/Pass, RetroShader, hq2x/
   scanlines/bicubic/user chains, TargetDisplayFilter + TargetScanlineFilterIntensity +
   DispUserFilterPath config, the Scaling Filter UI group, the Bicubic final-filter
-  option [legacy setting falls back to bilinear], the Bizware.Test shader demo app;
+  option [legacy setting falls back to bilinear], the Chimeraware.Test shader demo app;
   client.get/settargetscanlineintensity are warning no-ops now). The built-in
-  hand-coded presentation shaders in Bizware.Graphics remain - they ARE the display
+  hand-coded presentation shaders in Chimeraware.Graphics remain - they ARE the display
   pipeline. DiscoHawk removed entirely (app project, DiscoHawkLogic, sln entry, docs),
   taking the stale upstream release packaging with it: Package.sh, the packaging bats,
   and the whole nix ecosystem (default.nix, Dist/*.nix, docs, CI workflow) - dead
@@ -318,7 +318,7 @@ phase of unverified change.
   'frontend', Linux dir only), natives built per-target - native gcc for .so, and
   mingw-w64 cross (static gcc runtime, so no libgcc/winpthread dlls) for .dll via
   extern/tools/meson/mingw-w64.ini + mingw-toolchain.cmake. Root meson.build: direct
-  shared_library targets for bizhash/lua54/e_sqlite3/cimgui/luasocket (luasocket's
+  shared_library targets for chimerahash/lua54/e_sqlite3/cimgui/luasocket (luasocket's
   two same-named "core" modules live in extern/tools/meson/luasocket-*/ subdirs), nested
   upstream builds via extern/tools/meson/nested-build.sh for zstd (its own meson), SDL2 +
   openal (cmake + toolchain file), chd_capi (cargo, --target x86_64-pc-windows-gnu
@@ -339,7 +339,7 @@ phase of unverified change.
   returned ERROR_BAD_EXE_FORMAT and the witness went 0/26 - nested-build.sh now
   matches exact/version-infixed names and excludes .a/.d/.def. Witness after fix:
   the Windows gate ran against the Linux-cross-built dlls - the frontend stack
-  (SDL2, lua54, zstd, cimgui, bizhash all mingw-built) byte-exact at 26/26 + 26/26,
+  (SDL2, lua54, zstd, cimgui, chimerahash all mingw-built) byte-exact at 26/26 + 26/26,
   which is also the deferred-reproducibility pillar demonstrated empirically:
   an entirely different compiler family under the frontend, identical emulation.
   Fourteenth addendum (2026-08-10, user-directed): Chimera.sln, Common.props, and
@@ -355,7 +355,7 @@ phase of unverified change.
   moved to extern/ at the repo root, and ALL prebuilt native libraries are gone from the
   tree. extern/tools/build-natives.ps1, run automatically by the solution build
   (BuildNativeDeps target, incremental by timestamp), builds every native dependency
-  from source into build/dll: libbizhash + SDL2 (in-repo recipes; clang-cl - bizhash's
+  from source into build/dll: libchimerahash + SDL2 (in-repo recipes; clang-cl - chimerahash's
   gcc target-attributes need it, and a .def now provides the exports ELF visibility
   used to), and six NEW pinned submodules under extern/ with new recipes - lua v5.4.8
   (stock, LUA_BUILD_AS_DLL), zstd v1.5.7 (cmake -> libzstd.dll), cimgui 1.90.6 (pinned
@@ -399,7 +399,7 @@ phase of unverified change.
   no longer lives in this repo at all. Everything quickerNES-specific
   (chimera-cores/quickernes/ and the quickernes.yml workflow) moved to the quickerNES
   repository itself (github.com/SergioMartin86/quickerNES, branch chimera-adapter,
-  `chimera/` dir): managed adapter, native bizinterface + Makefile (now building from
+  `chimera/` dir): managed adapter, native chimerainterface + Makefile (now building from
   that repo's own sources), manifest, bundled data, prebuilt natives, build-package.ps1
   (param -ChimeraRoot, default sibling ../BizHawk checkout; installs quickernes.chimeraCore
   into <ChimeraRoot>/build/Cores), and a native-build CI workflow. The dev loop:
@@ -441,7 +441,7 @@ phase of unverified change.
   Consequences handled: the witness test suite (.test/.sol/.state) is now VENDORED at
   `chimera-tests/suite/` (snapshot of upstream `tests/`; run-level-b.ps1 reads from
   there, making the Level B gate fully self-contained modulo ROMs); the native build
-  recipe (bizinterface.cpp + Makefile) moved into
+  recipe (chimerainterface.cpp + Makefile) moved into
   `chimera-cores/quickernes/native-source/` with a `QUICKERNES_ROOT` variable pointing
   at an external quickerNES clone; quickernes.yml clones upstream instead of using a
   submodule. The submodule working tree contained untracked files (controller.hpp and
@@ -450,7 +450,7 @@ phase of unverified change.
   submodule.* entries for long-deleted submodules were purged from local .git/config.
   Fifth addendum (same day, user-directed): ExternalProjects dead weight deleted - 
   FlatBuffers.GenOutput (no consumers), LibBizAbiAdapter + the WaterboxAdapter/
-  MsHostSysVGuest code in BizInvoke (waterbox pile), TestromSuiteReportProcessor,
+  MsHostSysVGuest code in NativeInvoke (waterbox pile), TestromSuiteReportProcessor,
   Chimera.AnalyzersTests, and Chimera.Analyzer itself (user: no code-checking needed;
   References/Chimera.Analyzer.dll + Common.props wiring removed). AnalyzersCommon KEPT:
   despite the name it's shared plumbing imported by the three source generators, which
@@ -462,7 +462,7 @@ phase of unverified change.
   chimera-cores/quickernes/natives. Still present, deliberately: ExternalProjects/SDL2
   (81 MB of SDL+libusb submodules, only needed to rebuild SDL2.dll from source),
   iso-parser + libchd-rs-capi (fall with DiscSystem if the disc decision goes that way),
-  NLua/LibBizHash/HawkQuantizer/SrcGens (sources of live References/Assets binaries).
+  NLua/LibChimeraHash/HawkQuantizer/SrcGens (sources of live References/Assets binaries).
   Also in this round: ExternalProjects/librcheevos (build project + rcheevos submodule)
   removed; stale waterbox/llvm-project gitlink dropped from the index; legacy example/dev
   Lua scripts deleted (ButtonCount, Input_Display, JoypadIntersection, MovieClock,
@@ -641,7 +641,7 @@ is exactly the TAS-critical property.
   movies), dump final 2KB RAM domain, byte-compare against golden dumps recorded from
   unmodified BizHawk in Phase 0. Also run a per-frame savestate save/load variant
   (mirroring `Rerecord` cycle type) to exercise the frontend statable path.
-  `bizinterface.cpp` already supports the Arkanoid paddle types the arkanoid tests need.
+  `chimerainterface.cpp` already supports the Arkanoid paddle types the arkanoid tests need.
 
 Level B sharp edges, to resolve in Phase 0: input-string -> BizHawk controller mapping
 must be validated button-by-button; the two initial-`.state` tests (microMachines,

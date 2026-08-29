@@ -38,7 +38,7 @@ Rules, in the same spirit as the waterbox boundary:
 
 Move one component at a time, smallest verifiable seam first. For each: implement in
 `source/engine/` with meson-run C++ tests carrying byte-exact fixtures; wire the C# call
-sites through the ABI (BizInvoke, same pattern as libminiboxhost); keep a C# parity
+sites through the ABI (NativeInvoke, same pattern as libminiboxhost); keep a C# parity
 test comparing engine behaviour against the legacy behaviour where the witness gate
 does not reach; witness gate + full test suite green before the next component starts.
 The C# implementation is deleted in the same change that wires its replacement - no

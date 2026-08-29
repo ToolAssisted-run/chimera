@@ -4,7 +4,7 @@ using System.Drawing;
 using System.Linq;
 using System.Numerics;
 
-using Chimera.Bizware.Graphics;
+using Chimera.Display;
 
 namespace Chimera.Client.Common.Filters
 {

@@ -7,7 +7,7 @@ namespace Chimera.Client.Common
 	/// <summary>
 	/// Reads the savestate/movie container. The engine parses the archive
 	/// (see docs/engine-migration.md) - the lump naming rules, the ".zst"
-	/// handling, the BizState version quirks and the old non-tarbomb layout all
+	/// handling, the state version quirks and the old non-tarbomb layout all
 	/// live there now. Lump callbacks receive the DECOMPRESSED length; the only
 	/// caller that ever read it (the version lump's emptiness check) wanted
 	/// exactly that.

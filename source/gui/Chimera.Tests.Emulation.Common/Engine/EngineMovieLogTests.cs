@@ -5,7 +5,7 @@ namespace Chimera.Tests.Emulation.Common.Engine
 	/// <summary>
 	/// The engine's own tests (engine/tests/) pin the format byte for byte; these
 	/// pin the OTHER half of the pilot: that the ABI actually works through
-	/// BizInvoke and Mono's marshalling, and that the managed wrapper preserves
+	/// NativeInvoke and Mono's marshalling, and that the managed wrapper preserves
 	/// the C# parser's observable behaviour (quirks included).
 	/// </summary>
 	[TestClass]

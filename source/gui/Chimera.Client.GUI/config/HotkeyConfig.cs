@@ -3,7 +3,7 @@ using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
 
-using Chimera.Bizware.Input;
+using Chimera.Input;
 using Chimera.Client.Common;
 using Chimera.Common.CollectionExtensions;
 using Chimera.Common.StringExtensions;

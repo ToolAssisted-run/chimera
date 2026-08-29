@@ -8,7 +8,7 @@ using System.IO;
 using System.Numerics;
 using System.Runtime.InteropServices;
 
-using Chimera.Bizware.Graphics;
+using Chimera.Display;
 using Chimera.Client.Common.Filters;
 using Chimera.Common.CollectionExtensions;
 using Chimera.Common.PathExtensions;

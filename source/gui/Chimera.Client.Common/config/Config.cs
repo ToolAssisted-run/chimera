@@ -3,7 +3,7 @@ using System.Drawing;
 using System.IO;
 using System.Linq;
 
-using Chimera.Bizware.Graphics;
+using Chimera.Display;
 using Chimera.Common;
 using Chimera.Common.CollectionExtensions;
 using Chimera.Common.PathExtensions;

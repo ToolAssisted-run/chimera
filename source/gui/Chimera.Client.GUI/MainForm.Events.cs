@@ -5,7 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Windows.Forms;
 
-using Chimera.Bizware.Audio;
+using Chimera.Audio;
 using Chimera.Client.Common;
 using Chimera.Client.GUI.CoreExtensions;
 using Chimera.Client.GUI.CustomControls;
@@ -618,7 +618,7 @@ namespace Chimera.Client.GUI
 
 		private void AboutMenuItem_Click(object sender, EventArgs e)
 		{
-			using BizBox form = new();
+			using AboutBox form = new();
 			this.ShowDialogWithTempMute(form);
 		}
 

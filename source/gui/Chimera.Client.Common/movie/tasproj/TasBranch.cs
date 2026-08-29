@@ -4,7 +4,7 @@ using System.Linq;
 
 using Newtonsoft.Json;
 
-using Chimera.Bizware.Graphics;
+using Chimera.Display;
 using Chimera.Common.IOExtensions;
 
 namespace Chimera.Client.Common

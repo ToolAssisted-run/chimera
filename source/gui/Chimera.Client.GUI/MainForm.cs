@@ -14,8 +14,8 @@ using System.Security.AccessControl;
 using System.Security.Principal;
 using System.IO.Pipes;
 
-using Chimera.Bizware.Graphics;
-using Chimera.Bizware.Input;
+using Chimera.Display;
+using Chimera.Input;
 
 using Chimera.Common;
 using Chimera.Common.BufferExtensions;

@@ -7,10 +7,10 @@ namespace Chimera.Client.Common
 {
 	public class BinaryStateLump
 	{
-		[Name("BizState 1", "0")]
+		[Name("ChimeraState 1", "0")]
 		public static BinaryStateLump ZipVersion { get; private set; }
-		[Name("BizVersion", "txt")]
-		public static BinaryStateLump BizVersion { get; private set; }
+		[Name("ChimeraVersion", "txt")]
+		public static BinaryStateLump ChimeraVersion { get; private set; }
 		[Name("Core", "bin")]
 		public static BinaryStateLump Corestate { get; private set; }
 		[Name("Framebuffer", "bmp")]

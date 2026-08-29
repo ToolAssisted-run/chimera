@@ -196,13 +196,13 @@ CE_API int64_t ce_subtitle_format_line(
  *
  * Savestates and movies share one file shape: a zip of named lumps, each
  * optionally zstd-compressed (marked by a ".zst" suffix and stored, not
- * deflated), with a "BizState 1.0" version lump. The engine owns the FORMAT;
+ * deflated), with a "ChimeraState 1.0" version lump. The engine owns the FORMAT;
  * file I/O stays with the caller - a writer produces the finished archive as
  * one buffer, a reader takes one.
  *
  * Lumps are addressed as the C# always did: by base name, meaning the entry's
  * path up to its first '.' ("Input Log.txt" is "Input Log" - and the version
- * lump "BizState 1.0" is "BizState 1"). zstd needs libzstd beside this
+ * lump "ChimeraState 1.0" is "ChimeraState 1"). zstd needs libzstd beside this
  * library; it is loaded on first use and its absence is a put/get error.
  */
 
@@ -210,7 +210,7 @@ typedef struct ce_state_writer ce_state_writer;
 
 /* compression_level is the config's 0-9: 0 stores, otherwise deflate for
  * plain lumps and zstd level 2n+1 for zstd lumps - the mapping the C# writer
- * used. emu_version fills the BizVersion lump; both version lumps are written
+ * used. emu_version fills the ChimeraVersion lump; both version lumps are written
  * here. */
 CE_API ce_state_writer *ce_state_writer_new(int32_t compression_level, const char *emu_version);
 CE_API void ce_state_writer_free(ce_state_writer *w);
@@ -242,7 +242,7 @@ CE_API ce_state_reader *ce_state_reader_open(
 	const uint8_t *data, uint64_t len, int32_t is_movie, const char **error_out);
 CE_API void ce_state_reader_free(ce_state_reader *r);
 
-/* The sub version from the "BizState 1.0" lump (1.0.N). */
+/* The sub version from the "ChimeraState 1.0" lump (1.0.N). */
 CE_API int32_t ce_state_reader_version(const ce_state_reader *r);
 
 /* The lump's bytes, zstd-decompressed when it was stored compressed - length

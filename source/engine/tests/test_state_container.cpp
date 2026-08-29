@@ -25,7 +25,7 @@ int main(void)
 		for (int32_t level : { 0, 1, 5, 9 })
 		{
 			ce_state_writer *w = ce_state_writer_new(level, "2.11 (chimera test)");
-			auto header = bytes("MovieVersion BizHawk v2.0\n\n");
+			auto header = bytes("MovieVersion Chimera v1.0.0\n\n");
 			auto core = std::vector<uint8_t>(100000, 0xA5);
 			core[77] = 3; // not purely repetitive
 			assert(ce_state_writer_put_lump(w, "Header", "txt", 0, header.data(), header.size()) == 0);
@@ -48,7 +48,7 @@ int main(void)
 			assert(lump != nullptr && len == core.size() && std::memcmp(lump, core.data(), len) == 0);
 			lump = ce_state_reader_lump(r, "GreenZone", nullptr, &len);
 			assert(lump != nullptr && len == 512);
-			lump = ce_state_reader_lump(r, "BizVersion", "txt", &len);
+			lump = ce_state_reader_lump(r, "ChimeraVersion", "txt", &len);
 			assert(lump != nullptr && std::string(lump, lump + len) == "2.11 (chimera test)\n");
 			assert(ce_state_reader_lump(r, "Absent", "bin", &len) == nullptr);
 			assert(ce_state_reader_last_error(r)[0] == '\0'); // absent, not broken

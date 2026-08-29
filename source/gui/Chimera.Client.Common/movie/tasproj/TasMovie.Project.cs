@@ -4,7 +4,7 @@ using System.Linq;
 
 using Newtonsoft.Json;
 
-using Chimera.Bizware.Graphics;
+using Chimera.Display;
 using Chimera.Common;
 using Chimera.Common.IOExtensions;
 using Chimera.Emulation.Common;
@@ -354,7 +354,7 @@ namespace Chimera.Client.Common
 			var p = _project;
 
 			// the ctor's defaults, then the stored header metadata over them
-			Header[HeaderKeys.MovieVersion] = $"BizHawk v2.0 Tasproj v{CurrentVersion.ToString(CultureInfo.InvariantCulture)}";
+			Header[HeaderKeys.MovieVersion] = $"Chimera Tasproj v{CurrentVersion.ToString(CultureInfo.InvariantCulture)}";
 			for (var i = 0; i < p.HeaderCount; i++)
 			{
 				Header[p.HeaderKeyAt(i)] = p.HeaderValueAt(i);

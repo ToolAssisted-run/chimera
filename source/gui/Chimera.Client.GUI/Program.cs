@@ -6,11 +6,11 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
-using Chimera.BizInvoke;
-using Chimera.Bizware.Audio;
-using Chimera.Bizware.Graphics;
-using Chimera.Bizware.Graphics.Controls;
-using Chimera.Bizware.Input;
+using Chimera.NativeInvoke;
+using Chimera.Audio;
+using Chimera.Display;
+using Chimera.Display.Controls;
+using Chimera.Input;
 using Chimera.Common;
 using Chimera.Common.PathExtensions;
 using Chimera.Common.StringExtensions;
@@ -105,23 +105,6 @@ namespace Chimera.Client.GUI
 		[System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
 		private static int SubMain(string[] args)
 		{
-			// Assemblies were named BizHawk.* before the Chimera rename; anything
-			// that asks for one by its old name (an external tool built against the
-			// old ABI, a reflective load from an old file) gets the renamed one.
-			AppDomain.CurrentDomain.AssemblyResolve += static (_, resolveArgs) =>
-			{
-				var wanted = new System.Reflection.AssemblyName(resolveArgs.Name).Name;
-				if (wanted is "EmuHawk" or "BizHawk.Client.EmuHawk" or "Chimera.Client.EmuHawk") return typeof(Program).Assembly;
-				if (wanted?.StartsWith("BizHawk.", StringComparison.Ordinal) is not true) return null;
-				var renamed = "Chimera." + wanted.Substring("BizHawk.".Length);
-				if (renamed.StartsWith("Chimera.Client.EmuHawk", StringComparison.Ordinal)) renamed = "Chimera.Client.GUI" + renamed.Substring("Chimera.Client.EmuHawk".Length);
-				foreach (var assy in AppDomain.CurrentDomain.GetAssemblies())
-				{
-					if (assy.GetName().Name == renamed) return assy;
-				}
-				return null;
-			};
-
 			// raw scan, not ArgParser: several dialogs below can fire before arguments are parsed
 			if (Array.IndexOf(args, "--headless") >= 0) HeadlessMode.Enabled = true;
 
@@ -130,18 +113,18 @@ namespace Chimera.Client.GUI
 			var thisAsmVer = ReflectionCache.AsmVersion;
 			if (new[]
 				{
-					ReflectionCache_Chi_Biz.AsmVersion,
-					ReflectionCache_Chi_Biz_Aud.AsmVersion,
-					ReflectionCache_Chi_Biz_Gra.AsmVersion,
-					ReflectionCache_Chi_Biz_Gra_Con.AsmVersion,
-					ReflectionCache_Chi_Biz_Inp.AsmVersion,
+					ReflectionCache_Chi_Nat.AsmVersion,
+					ReflectionCache_Chi_Aud.AsmVersion,
+					ReflectionCache_Chi_Dis.AsmVersion,
+					ReflectionCache_Chi_Dis_Con.AsmVersion,
+					ReflectionCache_Chi_Inp.AsmVersion,
 					ReflectionCache_Chi_Cli_Com.AsmVersion,
 					ReflectionCache_Chi_Com.AsmVersion,
 					ReflectionCache_Chi_Emu_Com.AsmVersion,
 					ReflectionCache_Chi_Win_Con.AsmVersion,
 				}.Any(asmVer => asmVer != thisAsmVer))
 			{
-				const string MISMATCH_MSG = "One or more of the BizHawk.* assemblies have the wrong version!\n(Did you attempt to update by overwriting an existing install?)";
+				const string MISMATCH_MSG = "One or more of the Chimera.* assemblies have the wrong version!\n(Did you attempt to update by overwriting an existing install?)";
 				if (HeadlessMode.Enabled)
 				{
 					Console.Error.WriteLine(MISMATCH_MSG);

@@ -33,20 +33,20 @@ dl_dep = cc.find_library('dl', required: false)
 thread_dep = dependency('threads')
 
 # ---------------------------------------------------------------------------
-# libbizhash: hardware-accelerated hashing (in-repo sources)
+# libchimerahash: hardware-accelerated hashing (in-repo sources)
 # ---------------------------------------------------------------------------
-bizhash_src = files(
-  'extern/tools/LibBizHash/bizinterface.c',
-  'extern/tools/LibBizHash/common/x86_features.c',
-  'extern/tools/LibBizHash/crc32/crc32_braid.c',
-  'extern/tools/LibBizHash/crc32/crc32_fold_pclmulqdq.c',
-  'extern/tools/LibBizHash/crc32/crc32_fold_vpclmulqdq.c',
-  'extern/tools/LibBizHash/sha1/sha1_sha.c',
+chimerahash_src = files(
+  'extern/tools/LibChimeraHash/chimerainterface.c',
+  'extern/tools/LibChimeraHash/common/x86_features.c',
+  'extern/tools/LibChimeraHash/crc32/crc32_braid.c',
+  'extern/tools/LibChimeraHash/crc32/crc32_fold_pclmulqdq.c',
+  'extern/tools/LibChimeraHash/crc32/crc32_fold_vpclmulqdq.c',
+  'extern/tools/LibChimeraHash/sha1/sha1_sha.c',
 )
 shared_library(
-  'bizhash',
-  bizhash_src,
-  include_directories: include_directories('extern/tools/LibBizHash/common'),
+  'chimerahash',
+  chimerahash_src,
+  include_directories: include_directories('extern/tools/LibChimeraHash/common'),
   gnu_symbol_visibility: 'hidden',
   install: true,
   install_dir: 'dll',
@@ -258,7 +258,7 @@ shared_library(
 # ---------------------------------------------------------------------------
 # libchimera: the engine. The functional side of the frontend, migrating out
 # of C# component by component (see docs/engine-migration.md). Its C ABI in
-# engine/include/chimera/engine.h is a frozen spec; the frontend BizInvokes it
+# engine/include/chimera/engine.h is a frozen spec; the frontend NativeInvokes it
 # the same way it does libminiboxhost.
 # ---------------------------------------------------------------------------
 engine_inc = include_directories('source/engine/include')

@@ -1,8 +1,8 @@
 using System.Diagnostics;
 using System.Drawing;
 
-using Chimera.Bizware.Graphics;
-using Chimera.Bizware.Graphics.Controls;
+using Chimera.Display;
+using Chimera.Display.Controls;
 using Chimera.Client.Common;
 using Chimera.Common;
 using Chimera.Emulation.Common;

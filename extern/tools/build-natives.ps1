@@ -2,14 +2,14 @@
 # Invoked as part of the main solution build (BuildNativeDeps target in
 # source/MainSlnExecutable.props); can also be run by hand.
 #
-#   .\build-natives.ps1 -OutDir <repo>\build\dll [-Libs bizhash,sdl2] [-Force]
+#   .\build-natives.ps1 -OutDir <repo>\build\dll [-Libs chimerahash,sdl2] [-Force]
 #
 # Each library is skipped when its output is newer than all of its sources
 # (so incremental solution builds stay fast). Requires Visual Studio 2022 with
 # the C++ workload including clang-cl, CMake, and Ninja components.
 param(
     [Parameter(Mandatory = $true)] [string]$OutDir,
-    [string[]]$Libs = @("bizhash", "sdl2", "lua54", "zstd", "cimgui", "openal", "sqlite3", "chdcapi", "luasocket"),
+    [string[]]$Libs = @("chimerahash", "sdl2", "lua54", "zstd", "cimgui", "openal", "sqlite3", "chdcapi", "luasocket"),
     [switch]$Force
 )
 # native tools (cmake, clang) write progress/warnings to stderr; success is judged
@@ -59,28 +59,28 @@ function Test-Fresh([string]$output, [string[]]$sourceDirs, [string[]]$sourceFil
     return $outTime -gt $newest
 }
 
-# --- libbizhash: hardware-accelerated hashing (CRC32 PCLMULQDQ + SHA1-NI) ---
+# --- libchimerahash: hardware-accelerated hashing (CRC32 PCLMULQDQ + SHA1-NI) ---
 # clang-cl (not cl) because the sources use gcc function-target attributes.
-function Build-BizHash {
-    $src = Join-Path $here "LibBizHash"
-    $out = Join-Path $OutDir "libbizhash.dll"
-    if (Test-Fresh $out @($src) @()) { "libbizhash: up to date"; return }
-    "libbizhash: building..."
+function Build-ChimeraHash {
+    $src = Join-Path $here "LibChimeraHash"
+    $out = Join-Path $OutDir "libchimerahash.dll"
+    if (Test-Fresh $out @($src) @()) { "libchimerahash: up to date"; return }
+    "libchimerahash: building..."
     $files = @(Get-ChildItem "$src\common\*.c") + @(Get-ChildItem "$src\crc32\*.c") + @(Get-ChildItem "$src\sha1\*.c") + @(Get-Item "$src\bizinterface.c")
     $objDir = Join-Path $src "obj"
     New-Item -ItemType Directory -Force $objDir | Out-Null
     & clang-cl /nologo /O2 /MD /LD ("/I" + (Join-Path $src "common")) `
         ($files | ForEach-Object FullName) `
         /Fo"$objDir\" /Fe"$out" `
-        /link /DEF:"$src\libbizhash.def" | Out-Host
-    if ($LASTEXITCODE -ne 0) { throw "libbizhash build failed" }
+        /link /DEF:"$src\libchimerahash.def" | Out-Host
+    if ($LASTEXITCODE -ne 0) { throw "libchimerahash build failed" }
     # keep only the dll in the output dir
-    Remove-Item (Join-Path $OutDir "libbizhash.lib"), (Join-Path $OutDir "libbizhash.exp") -ErrorAction SilentlyContinue
-    "libbizhash: ok"
+    Remove-Item (Join-Path $OutDir "libchimerahash.lib"), (Join-Path $OutDir "libchimerahash.exp") -ErrorAction SilentlyContinue
+    "libchimerahash: ok"
 }
 
 # --- SDL2: input + OpenGL context + software 2D renderer ---
-# Built from the SDL submodule via the wrapper CMakeLists (BizHawk's subsystem
+# Built from the SDL submodule via the wrapper CMakeLists (the subsystem
 # configuration); its POST_BUILD step copies SDL2.dll next to the other dlls.
 function Build-SDL2 {
     $src = Join-Path $here "SDL2"
@@ -243,7 +243,7 @@ function Build-LuaSocket {
 
 foreach ($lib in $Libs) {
     switch ($lib) {
-        "bizhash"   { Build-BizHash }
+        "chimerahash"   { Build-ChimeraHash }
         "sdl2"      { Build-SDL2 }
         "lua54"     { Build-Lua54 }
         "zstd"      { Build-Zstd }

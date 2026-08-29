@@ -1,7 +1,7 @@
 using System.Drawing;
 using System.Windows.Forms;
 
-using Chimera.Bizware.Graphics;
+using Chimera.Display;
 
 namespace Chimera.Client.GUI
 {

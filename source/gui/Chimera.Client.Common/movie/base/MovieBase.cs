@@ -19,7 +19,7 @@ namespace Chimera.Client.Common
 		public MovieBase(IMovieSession session, string filename) : base(filename)
 		{
 			Session = session;
-			Header[HeaderKeys.MovieVersion] = "BizHawk v2.0.0";
+			Header[HeaderKeys.MovieVersion] = "Chimera v1.0.0";
 		}
 
 		public virtual void Attach(IEmulator emulator)

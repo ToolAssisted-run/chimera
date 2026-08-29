@@ -20,12 +20,12 @@ int main(void)
 {
 	{ // a real header, as the frontend writes it (with the closing blank line)
 		const char *lump =
-			"MovieVersion BizHawk v2.0\nAuthor jaffar\nPlatform NES\nCore QuickerNesHawk\n\n";
+			"MovieVersion Chimera v1.0.0\nAuthor jaffar\nPlatform NES\nCore QuickerNesHawk\n\n";
 		ce_movie_header *h = ce_movie_header_new();
 		ce_movie_header_parse(h, lump, std::strlen(lump));
 		assert(ce_movie_header_count(h) == 4);
 		assert(std::strcmp(ce_movie_header_key_at(h, 0), "MovieVersion") == 0);
-		assert(std::strcmp(ce_movie_header_value_at(h, 0), "BizHawk v2.0") == 0);
+		assert(std::strcmp(ce_movie_header_value_at(h, 0), "Chimera v1.0.0") == 0);
 		assert(std::strcmp(ce_movie_header_key_at(h, 3), "Core") == 0);
 		assert(ce_movie_header_key_at(h, 4) == nullptr);
 		assert(serialized(h, 0) == lump); // round trip

@@ -39,9 +39,9 @@ namespace Chimera.Tests.Client.Common.Savestates
 				var bytes = Encoding.UTF8.GetBytes(text);
 				s.Write(bytes, 0, bytes.Length);
 			}
-			PutText("BizState 1.0", "3\n");
-			PutText("BizVersion.txt", "2.10 (legacy)\n");
-			PutText("Header.txt", "MovieVersion BizHawk v2.0\n\n");
+			PutText("ChimeraState 1.0", "3\n");
+			PutText("ChimeraVersion.txt", "2.10 (legacy)\n");
+			PutText("Header.txt", "MovieVersion Chimera Tasproj v1.1\n\n");
 
 			// zstd lump the old way: stored entry, STREAMING compression (frames
 			// with no content size in the header - the engine must cope)
@@ -83,7 +83,7 @@ namespace Chimera.Tests.Client.Common.Savestates
 			var coreState = SomeCoreState();
 			try
 			{
-				WriteLegacyArchive(path, coreState, topDir: "BizState/");
+				WriteLegacyArchive(path, coreState, topDir: "ChimeraState/");
 				using var loader = ZipStateLoader.LoadAndDetect(path);
 				Assert.IsNotNull(loader, "pre-tarbomb layout must keep loading");
 				Assert.AreEqual(3, loader.Version);
@@ -105,13 +105,13 @@ namespace Chimera.Tests.Client.Common.Savestates
 				var create = ZipStateSaver.Create(path, compressionLevel: 5);
 				Assert.IsFalse(create.IsError);
 				var saver = create.Value!;
-				saver.PutLump(BinaryStateLump.Movieheader, (TextWriter tw) => tw.Write("MovieVersion BizHawk v2.0\n\n"));
+				saver.PutLump(BinaryStateLump.Movieheader, (TextWriter tw) => tw.Write("MovieVersion Chimera Tasproj v1.1\n\n"));
 				saver.PutLump(BinaryStateLump.Corestate, (BinaryWriter bw) => bw.Write(coreState));
 				Assert.IsFalse(saver.CloseAndDispose().IsError);
 
 				using var zip = new ZipArchive(new FileStream(path, FileMode.Open, FileAccess.Read), ZipArchiveMode.Read);
 				var names = zip.Entries.Select(static e => e.FullName).ToList();
-				CollectionAssert.Contains(names, "BizState 1.0", $"actual entries: {string.Join("|", names)}");
+				CollectionAssert.Contains(names, "ChimeraState 1.0", $"actual entries: {string.Join("|", names)}");
 				CollectionAssert.Contains(names, "Header.txt");
 				CollectionAssert.Contains(names, "Core.bin.zst");
 

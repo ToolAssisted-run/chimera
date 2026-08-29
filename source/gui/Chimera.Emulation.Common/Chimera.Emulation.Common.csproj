@@ -10,6 +10,6 @@
 		<PackageReference Include="System.Collections.Immutable" />
 		<PackageReference Include="Newtonsoft.Json" />
 		<PackageReference Include="ppy.SDL2-CS" ExcludeAssets="native;contentFiles" />
-		<ProjectReference Include="$(ProjectDir)../Chimera.BizInvoke/Chimera.BizInvoke.csproj" />
+		<ProjectReference Include="$(ProjectDir)../Chimera.NativeInvoke/Chimera.NativeInvoke.csproj" />
 	</ItemGroup>
 </Project>

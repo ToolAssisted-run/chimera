@@ -1,5 +1,0 @@
-LIBRARY libbizhash
-EXPORTS
-	BizCalcCrcFunc
-	BizSupportsShaInstructions
-	BizCalcSha1

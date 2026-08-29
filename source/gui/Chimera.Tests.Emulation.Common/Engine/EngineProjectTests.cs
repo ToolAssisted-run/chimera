@@ -7,7 +7,7 @@ namespace Chimera.Tests.Emulation.Common.Engine
 	/// <summary>
 	/// The .chimeraProject through the managed wrapper - the marshalling half of
 	/// what engine/tests/test_project.cpp pins in full. The rules live in the
-	/// engine; these prove the ABI carries them intact through BizInvoke.
+	/// engine; these prove the ABI carries them intact through NativeInvoke.
 	/// </summary>
 	[TestClass]
 	public class EngineProjectTests

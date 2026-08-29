@@ -8,7 +8,7 @@
 	<ItemGroup>
 		<ProjectReference Include="$(ProjectDir)../../../extern/tools/NLua/NLua.csproj" />
 		<None Include="$(ProjectDir)../../../build/dll/lua54.*" CopyToOutputDirectory="PreserveNewest" />
-		<None Include="$(ProjectDir)../../../build/dll/libbizhash.*" CopyToOutputDirectory="PreserveNewest" />
+		<None Include="$(ProjectDir)../../../build/dll/libchimerahash.*" CopyToOutputDirectory="PreserveNewest" />
 		<None Include="$(ProjectDir)../../../build/dll/libzstd.*" CopyToOutputDirectory="PreserveNewest" />
 		<Using Include="Chimera.Tests" />
 		<Using Include="System.Diagnostics.CodeAnalysis" />

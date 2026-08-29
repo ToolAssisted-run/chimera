@@ -3,7 +3,7 @@
 Working-level analysis of the waterbox system in the BizHawk checkout at
 ~/BizHawk (master, 4a16b5c7ee), made in preparation for Chimera's flavor-(c)
 synthetic core. Sources: waterbox/ (guest toolchain + Rust host),
-src/Chimera.Emulation.Cores/Waterbox/ and src/Chimera.BizInvoke (C# layer).
+src/Chimera.Emulation.Cores/Waterbox/ and src/Chimera.NativeInvoke (C# layer).
 
 ## What the waterbox actually is
 
@@ -92,14 +92,14 @@ machine state is capturable and restorable byte-exactly. It has three layers.
   (guest->host->guest) via an alt stack pair. On Windows, unwind info is
   registered so SEH can cross the stack switch.
 
-## Layer 3: the C# integration (src/.../Waterbox + BizInvoke)
+## Layer 3: the C# integration (src/.../Waterbox + NativeInvoke)
 
-- WaterboxHostNative: BizInvoke declarations of the ~17 wbx_* C-ABI
+- WaterboxHostNative: NativeInvoke declarations of the ~17 wbx_* C-ABI
   functions (create/destroy/activate/deactivate, get_proc_addr[_raw],
   get_callin_addr, get_callback_addr(slot), seal, mount/unmount_file,
   save/load_state, page introspection).
 - WaterboxHost: thin managed wrapper; implements IImportResolver (so
-  BizInvoker.GetInvoker<LibXxx> resolves guest exports like a DLL),
+  ChimeraInvoker.GetInvoker<LibXxx> resolves guest exports like a DLL),
   IMonitor (Enter/Exit = activate/deactivate; every touch of guest memory
   is inside using(_exe.EnterExit())), IStatable (streams wbx state),
   ICallbackAdjuster (slot registration).
@@ -117,7 +117,7 @@ machine state is capturable and restorable byte-exactly. It has three layers.
         // exactly one PRIMARY; ptrs are guest addresses -> memory domains
     ECL_EXPORT void SetInputCallback(cb);
   plus a per-core Init export. Lifecycle: ctor(WaterboxOptions with the five
-  heap sizes) -> BizInvoker over guest exports -> mount rom files -> Init ->
+  heap sizes) -> ChimeraInvoker over guest exports -> mount rom files -> Init ->
   GetMemoryAreas -> Seal -> frames. RTC is frontend-side and frame-derived
   (real time throws under determinism); Nyma cores receive time as a
   FrameInfo field.
@@ -128,14 +128,14 @@ machine state is capturable and restorable byte-exactly. It has three layers.
    reachable from inside a core package: the adapter DLL can carry the
    WaterboxHost/WaterboxCore equivalents, declare libwaterboxhost as a
    package native, and ship the .wbx as package data. Chimera's loader,
-   contract, and BizInvoke usage require nothing new. Moreover the
+   contract, and NativeInvoke usage require nothing new. Moreover the
    reproducibility pillar argues waterbox machinery SHOULD be package-side:
    the waterbox host version affects emulation determinism, so it belongs
    inside the (movie + package) reproduction contract, not in the frontend.
    (BizHawk treats it as frontend infrastructure; Chimera's principles
    disagree, conveniently in the direction that costs us nothing.)
 2. Deleted machinery inventory: Chimera removed WaterboxAdapter +
-   MsHostSysVGuest from BizInvoke (charter, fifth addendum). On Linux the
+   MsHostSysVGuest from NativeInvoke (charter, fifth addendum). On Linux the
    guest ABI is native SysV so nothing is missing; Windows waterboxing would
    need that adapter back - restorable from the transitional fork, or
    carried inside the package's adapter assembly.

@@ -34,7 +34,7 @@ namespace Chimera.Common
 			// Set SHA1 start state
 			var state = stackalloc uint[] { 0x67452301, 0xEFCDAB89, 0x98BADCFE, 0x10325476, 0xC3D2E1F0 };
 			// This will use dedicated SHA instructions, which perform 4x faster than a generic implementation
-			LibBizHash.BizCalcSha1((IntPtr) state, buffer, buffer.Length);
+			LibChimeraHash.ChimeraCalcSha1((IntPtr) state, buffer, buffer.Length);
 			// The copy seems wasteful, but pinning the state down actually has a bigger performance impact
 			var ret = new byte[20];
 			Marshal.Copy((IntPtr) state, ret, 0, 20);
@@ -56,7 +56,7 @@ namespace Chimera.Common
 			}
 		}
 
-		private static readonly bool UseUnmanagedImpl = RuntimeInformation.ProcessArchitecture == Architecture.X64 && LibBizHash.BizSupportsShaInstructions();
+		private static readonly bool UseUnmanagedImpl = RuntimeInformation.ProcessArchitecture == Architecture.X64 && LibChimeraHash.ChimeraSupportsShaInstructions();
 
 		public static byte[] Compute(byte[] data)
 			=> UseUnmanagedImpl

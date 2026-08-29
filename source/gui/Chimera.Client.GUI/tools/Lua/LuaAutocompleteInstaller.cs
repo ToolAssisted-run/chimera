@@ -21,25 +21,25 @@ namespace Chimera.Client.GUI
 			};
 		}
 
-		public bool IsBizLuaRegistered(TextEditors editor)
+		public bool IsChimeraLuaRegistered(TextEditors editor)
 		{
 			return editor switch
 			{
-				TextEditors.Sublime2 => IsBizLuaSublimeInstalled(),
-				TextEditors.NotePad => IsBizLuaNotepadInstalled(),
+				TextEditors.Sublime2 => IsChimeraLuaSublimeInstalled(),
+				TextEditors.NotePad => IsChimeraLuaNotepadInstalled(),
 				_ => false,
 			};
 		}
 
-		public void InstallBizLua(TextEditors editor, LuaDocumentation docs)
+		public void InstallChimeraLua(TextEditors editor, LuaDocumentation docs)
 		{
 			switch (editor)
 			{
 				case TextEditors.Sublime2:
-					InstallBizLuaToSublime2(docs);
+					InstallChimeraLuaToSublime2(docs);
 					break;
 				case TextEditors.NotePad:
-					InstallBizLuaToNotepad(docs);
+					InstallChimeraLuaToNotepad(docs);
 					break;
 			}
 		}
@@ -63,7 +63,7 @@ namespace Chimera.Client.GUI
 		private readonly string SublimeLuaPath = @"Sublime Text 2\Packages\Lua";
 		private readonly string SublimeCompletionsFilename = "bizhawk.lua.sublime-completions";
 
-		private bool IsBizLuaSublimeInstalled()
+		private bool IsChimeraLuaSublimeInstalled()
 		{
 			var bizCompletions = Path.Combine(AppDataFolder, SublimeLuaPath, SublimeCompletionsFilename);
 			return File.Exists(bizCompletions);
@@ -72,13 +72,13 @@ namespace Chimera.Client.GUI
 		private readonly string NotepadPath = "TODO";
 		private readonly string NotepadAutoCompleteFileName = "TODO";
 
-		private bool IsBizLuaNotepadInstalled()
+		private bool IsChimeraLuaNotepadInstalled()
 		{
 			var bizCompletions = Path.Combine(AppDataFolder, NotepadPath, NotepadAutoCompleteFileName);
 			return File.Exists(bizCompletions);
 		}
 
-		private void InstallBizLuaToSublime2(LuaDocumentation docs)
+		private void InstallChimeraLuaToSublime2(LuaDocumentation docs)
 		{
 			var bizCompletions = Path.Combine(AppDataFolder, SublimeLuaPath, SublimeCompletionsFilename);
 
@@ -86,7 +86,7 @@ namespace Chimera.Client.GUI
 			File.WriteAllText(bizCompletions, text);
 		}
 
-		private void InstallBizLuaToNotepad(LuaDocumentation docs)
+		private void InstallChimeraLuaToNotepad(LuaDocumentation docs)
 		{
 			var bizAutocomplete = Path.Combine(AppDataFolder, NotepadPath, NotepadAutoCompleteFileName);
 

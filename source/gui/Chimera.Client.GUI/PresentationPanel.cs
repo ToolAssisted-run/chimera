@@ -2,8 +2,8 @@ using System.Drawing;
 using System.Windows.Forms;
 
 using Chimera.Client.Common;
-using Chimera.Bizware.Graphics;
-using Chimera.Bizware.Graphics.Controls;
+using Chimera.Display;
+using Chimera.Display.Controls;
 
 namespace Chimera.Client.GUI
 {

@@ -1,6 +1,6 @@
 ﻿using System.Text;
 
-using Chimera.Bizware.Graphics;
+using Chimera.Display;
 
 namespace Chimera.Client.Common
 {

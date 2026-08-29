@@ -56,7 +56,7 @@ namespace Chimera.Tests.Client.GUI
 		{
 			if (ShotDir is null) { Assert.Inconclusive("set CHIMERA_UI_SHOTS to write screenshots"); return; }
 
-			using BizBox form = new();
+			using AboutBox form = new();
 			form.StartPosition = FormStartPosition.Manual;
 			form.Location = new Point(0, 0);
 			Shoot(form, "about");

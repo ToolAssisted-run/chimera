@@ -1,6 +1,6 @@
 ﻿cmake_minimum_required(VERSION 3.13 FATAL_ERROR)
 
-project(SDL2-BizHawk C CXX)
+project(SDL2-Chimera C CXX)
 
 # We only use a few subsystems, don't need to build the entire thing
 # Note that the defaults will be "enable if supported"
@@ -84,8 +84,8 @@ if(WIN32)
 	set(HAVE_LIBUSB ON)
 endif()
 
-# Mark this as a BizHawk build
-set(SDL_VENDOR_INFO "BizHawk" CACHE STRING "" FORCE)
+# Mark this as a Chimera build
+set(SDL_VENDOR_INFO "Chimera" CACHE STRING "" FORCE)
 
 # We only want a shared library
 set(SDL_SHARED ON)

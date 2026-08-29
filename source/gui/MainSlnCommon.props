@@ -13,7 +13,7 @@
 		<NeutralLanguage>en-US</NeutralLanguage>
 		<NoWarn>$(NoWarn);CS1573</NoWarn>
 		<ProduceReferenceAssembly>true</ProduceReferenceAssembly> <!-- extra assemblies in obj containing only API surface, used to quickly check for changed projects -->
-		<Product>BizHawk</Product>
+		<Product>Chimera</Product>
 		<ResolveAssemblyWarnOrErrorOnTargetArchitectureMismatch>None</ResolveAssemblyWarnOrErrorOnTargetArchitectureMismatch>
 		<SatelliteResourceLanguages>en-US</SatelliteResourceLanguages>
 	</PropertyGroup>

@@ -1180,7 +1180,7 @@ namespace Chimera.Client.GUI
 
 			if (_luaAutoInstaller.IsInstalled(LuaAutocompleteInstaller.TextEditors.Sublime2))
 			{
-				if (_luaAutoInstaller.IsBizLuaRegistered(LuaAutocompleteInstaller.TextEditors.Sublime2))
+				if (_luaAutoInstaller.IsChimeraLuaRegistered(LuaAutocompleteInstaller.TextEditors.Sublime2))
 				{
 					RegisterSublimeText2MenuItem.Text = "Sublime Text 2 (installed)";
 					RegisterSublimeText2MenuItem.SetStyle(FontStyle.Regular);
@@ -1202,7 +1202,7 @@ namespace Chimera.Client.GUI
 
 			if (_luaAutoInstaller.IsInstalled(LuaAutocompleteInstaller.TextEditors.NotePad))
 			{
-				if (_luaAutoInstaller.IsBizLuaRegistered(LuaAutocompleteInstaller.TextEditors.NotePad))
+				if (_luaAutoInstaller.IsChimeraLuaRegistered(LuaAutocompleteInstaller.TextEditors.NotePad))
 				{
 					RegisterNotePadMenuItem.Text = "Notepad++ (installed)";
 					RegisterNotePadMenuItem.SetStyle(FontStyle.Regular);
@@ -1225,12 +1225,12 @@ namespace Chimera.Client.GUI
 
 		private void RegisterSublimeText2MenuItem_Click(object sender, EventArgs e)
 		{
-			_luaAutoInstaller.InstallBizLua(LuaAutocompleteInstaller.TextEditors.Sublime2, LuaImp.Docs);
+			_luaAutoInstaller.InstallChimeraLua(LuaAutocompleteInstaller.TextEditors.Sublime2, LuaImp.Docs);
 		}
 
 		private void RegisterNotePadMenuItem_Click(object sender, EventArgs e)
 		{
-			_luaAutoInstaller.InstallBizLua(LuaAutocompleteInstaller.TextEditors.NotePad, LuaImp.Docs);
+			_luaAutoInstaller.InstallChimeraLua(LuaAutocompleteInstaller.TextEditors.NotePad, LuaImp.Docs);
 		}
 
 		private void FunctionsListMenuItem_Click(object sender, EventArgs e)

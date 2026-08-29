@@ -1,7 +1,7 @@
 using System.IO;
 using System.Drawing.Imaging;
 
-using Chimera.Bizware.Graphics;
+using Chimera.Display;
 using Chimera.Client.Common;
 using Chimera.Common.PathExtensions;
 using Chimera.Common.StringExtensions;

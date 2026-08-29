@@ -1,4 +1,4 @@
-using Chimera.Bizware.Graphics;
+using Chimera.Display;
 using Chimera.Emulation.Common;
 
 namespace Chimera.Client.Common

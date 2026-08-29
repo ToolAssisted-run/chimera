@@ -24,8 +24,8 @@
 		<ProjectReference Include="$(ProjectDir)../../../extern/tools/NLua/NLua.csproj" />
 	</ItemGroup>
 	<ItemGroup>
-		<ProjectReference Include="$(ProjectDir)../Chimera.Bizware.Audio/Chimera.Bizware.Audio.csproj" />
-		<ProjectReference Include="$(ProjectDir)../Chimera.Bizware.Graphics.Controls/Chimera.Bizware.Graphics.Controls.csproj" />
+		<ProjectReference Include="$(ProjectDir)../Chimera.Audio/Chimera.Audio.csproj" />
+		<ProjectReference Include="$(ProjectDir)../Chimera.Display.Controls/Chimera.Display.Controls.csproj" />
 		<ProjectReference Include="$(ProjectDir)../Chimera.WinForms.Controls/Chimera.WinForms.Controls.csproj" />
 		<Compile Remove="Properties/Settings.Designer.cs" />
 		<Content Include="images/logo.ico" />
@@ -64,9 +64,9 @@
 		<Compile Update="AVOut/VideoWriterChooserForm.cs" SubType="Form" />
 		<Compile Update="AVOut/VideoWriterChooserForm.Designer.cs" DependentUpon="VideoWriterChooserForm.cs" />
 		<EmbeddedResource Update="AVOut/VideoWriterChooserForm.resx" DependentUpon="VideoWriterChooserForm.cs" />
-		<Compile Update="BizBox.cs" SubType="Form" />
-		<Compile Update="BizBox.Designer.cs" DependentUpon="BizBox.cs" />
-		<EmbeddedResource Update="BizBox.resx" DependentUpon="BizBox.cs" />
+		<Compile Update="AboutBox.cs" SubType="Form" />
+		<Compile Update="AboutBox.Designer.cs" DependentUpon="AboutBox.cs" />
+		<EmbeddedResource Update="AboutBox.resx" DependentUpon="AboutBox.cs" />
 		<Compile Update="config/A7800/A7800ControllerSettings.cs" SubType="Form" />
 		<Compile Update="config/A7800/A7800ControllerSettings.Designer.cs" DependentUpon="A7800ControllerSettings.cs" />
 		<EmbeddedResource Update="config/A7800/A7800ControllerSettings.resx" DependentUpon="A7800ControllerSettings.cs" />

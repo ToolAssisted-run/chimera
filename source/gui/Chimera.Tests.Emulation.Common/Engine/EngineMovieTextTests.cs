@@ -12,7 +12,7 @@ namespace Chimera.Tests.Emulation.Common.Engine
 		[TestMethod]
 		public void AHeaderRoundTripsWithItsQuirks()
 		{
-			const string lump = "MovieVersion BizHawk v2.0\nAuthor jaffar\nCore QuickerNesHawk\n\n";
+			const string lump = "MovieVersion Chimera v1.0.0\nAuthor jaffar\nCore QuickerNesHawk\n\n";
 			using EngineMovieHeader header = new();
 			header.Parse(lump);
 			Assert.AreEqual(3L, header.Count);

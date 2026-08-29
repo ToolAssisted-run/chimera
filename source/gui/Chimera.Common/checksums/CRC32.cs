@@ -12,7 +12,7 @@ namespace Chimera.Common
 		/// Delegate to unmanaged code that actually does the calculation.
 		/// This may be hardware accelerated, if the CPU supports such.
 		/// </summary>
-		private static readonly LibBizHash.CalcCRC _calcCRC;
+		private static readonly LibChimeraHash.CalcCRC _calcCRC;
 
 		private static readonly uint[] COMBINER_INIT_STATE;
 
@@ -23,7 +23,7 @@ namespace Chimera.Common
 			// for Add (CRC32 computation):
 			if (RuntimeInformation.ProcessArchitecture == Architecture.X64)
 			{
-				_calcCRC = Marshal.GetDelegateForFunctionPointer<LibBizHash.CalcCRC>(LibBizHash.BizCalcCrcFunc());
+				_calcCRC = Marshal.GetDelegateForFunctionPointer<LibChimeraHash.CalcCRC>(LibChimeraHash.ChimeraCalcCrcFunc());
 			}
 			else
 			{

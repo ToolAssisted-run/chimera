@@ -181,8 +181,8 @@ namespace Chimera.Emulation.Common
 			string id = br.ReadString();
 			SubType = id switch
 			{
-				"CHIMERA-CDL-1" or "BIZHAWK-CDL-1" => "PCE", // pre-rename files keep loading
-				"CHIMERA-CDL-2" or "BIZHAWK-CDL-2" => br.ReadString().TrimEnd(' '),
+				"CHIMERA-CDL-1" => "PCE",
+				"CHIMERA-CDL-2" => br.ReadString().TrimEnd(' '),
 				_ => throw new InvalidOperationException("File is not a Chimera CDL file!"),
 			};
 			int count = br.ReadInt32();

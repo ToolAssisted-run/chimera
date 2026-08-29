@@ -289,9 +289,8 @@ if [ "$level" = "both" ] || [ "$level" = "b" ]; then
 		python3 - "$config" "$scfg" <<'PY'
 import json, sys
 cfg = json.load(open(sys.argv[1]))
-# deliberately the PRE-RENAME key: the frontend must keep honouring configs
-# written before BizHawk/Chimera became Chimera
-cfg.setdefault("CoreSettings", {})["BizHawk.Emulation.Common.Waterbox.WaterboxCore"] = {"Values": {"initFillByte": 171}}
+# the core's own settings key, spelled exactly as the UI writes it
+cfg.setdefault("CoreSettings", {})["Chimera.Emulation.Common.Waterbox.WaterboxCore"] = {"Values": {"initFillByte": 171}}
 json.dump(cfg, open(sys.argv[2], "w"), indent=2)
 PY
 		sjob="$work/job.settings.txt"
@@ -332,7 +331,7 @@ logkey = "#P1 Up|P1 Down|P1 Left|P1 Right|P1 A|P1 B|P1 Select|P1 Start|"
 json.dump({
     "title": "gridWalker.win",
     "core": {"name": "Synth", "version": "", "sha1": ""},
-    "headers": {"MovieVersion": "BizHawk v2.0 Tasproj v1.1", "Platform": "Synth"},
+    "headers": {"MovieVersion": "Chimera Tasproj v1.1", "Platform": "Synth"},
     "input": "[Input]\nLogKey:" + logkey + "\n" + "\n".join(entries) + "\n[/Input]\n",
 }, open(sys.argv[2], "w"))
 PY
@@ -358,7 +357,7 @@ PY
 	fi
 
 	# --- the project entry point: ONE boot, project settings honored ---
-	# Chimera's whole point vs the BizHawk lineage: opening a project must
+	# Chimera's whole point vs its lineage: opening a project must
 	# init the core EXACTLY ONCE (rom load, TAStudio open and tasproj load
 	# each cost a full boot there), and the boot must run with the
 	# project's OWN sync settings - not a config default. One leg pins
@@ -380,7 +379,7 @@ sha1 = hashlib.sha1(open(sys.argv[2], "rb").read()).hexdigest().upper()
 json.dump({
     "title": "gridWalker.win",
     "core": {"name": "Synth", "version": "", "sha1": ""},
-    "headers": {"MovieVersion": "BizHawk v2.0 Tasproj v1.1", "Platform": "Synth"},
+    "headers": {"MovieVersion": "Chimera Tasproj v1.1", "Platform": "Synth"},
     "files": [{"name": "gridWalker.testrom", "sha1": sha1, "slot": "rom"}],
     "settings": {"initFillByte": 171},
     "input": "[Input]\nLogKey:" + logkey + "\n" + "\n".join(entries) + "\n[/Input]\n",
@@ -429,7 +428,7 @@ sha1 = hashlib.sha1(open(sys.argv[2], "rb").read()).hexdigest().upper()
 json.dump({
     "title": "gridWalker.win",
     "core": {"name": "Synth", "version": "", "sha1": ""},
-    "headers": {"MovieVersion": "BizHawk v2.0 Tasproj v1.1", "Platform": "Synth"},
+    "headers": {"MovieVersion": "Chimera Tasproj v1.1", "Platform": "Synth"},
     "files": [{"name": "gridWalker.testrom", "sha1": sha1, "slot": "rom"}],
     "input": "[Input]\nLogKey:" + logkey + "\n" + "\n".join(entries) + "\n[/Input]\n",
 }, open(sys.argv[3], "w"))
@@ -501,7 +500,7 @@ sha1 = hashlib.sha1(open(sys.argv[2], "rb").read()).hexdigest().upper()
 json.dump({
     "title": sys.argv[1],
     "core": {"name": "Synth", "version": "", "sha1": ""},
-    "headers": {"MovieVersion": "BizHawk v2.0 Tasproj v1.1", "Platform": "Synth"},
+    "headers": {"MovieVersion": "Chimera Tasproj v1.1", "Platform": "Synth"},
     "files": [{"name": sys.argv[2].split("/")[-1], "sha1": sha1, "slot": "rom"}],
     "input": "[Input]\nLogKey:" + logkey + "\n" + "\n".join(entries) + "\n[/Input]\n",
 }, open(sys.argv[3], "w"))

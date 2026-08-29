@@ -182,7 +182,7 @@ namespace Chimera.Client.Common
 				// useful debugging:
 				// Console.WriteLine(ie);
 
-				if (ie.Source == Bizware.Input.HostInputType.Ignored)
+				if (ie.Source == Chimera.Input.HostInputType.Ignored)
 				{
 					processSpecialInput(ie, false);
 					continue;

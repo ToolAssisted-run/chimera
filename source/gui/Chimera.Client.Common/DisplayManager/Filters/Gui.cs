@@ -1,7 +1,7 @@
 ﻿using System.Drawing;
 using System.Numerics;
 
-using Chimera.Bizware.Graphics;
+using Chimera.Display;
 using Chimera.Emulation.Common;
 
 namespace Chimera.Client.Common.Filters

@@ -1,7 +1,7 @@
 ﻿using System.IO;
 using System.Threading;
 
-using Chimera.Bizware.Audio;
+using Chimera.Audio;
 using Chimera.Emulation.Common;
 using Chimera.Client.Common;
 using Chimera.Common;

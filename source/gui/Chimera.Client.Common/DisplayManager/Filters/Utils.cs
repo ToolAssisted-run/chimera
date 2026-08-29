@@ -1,6 +1,6 @@
 using System.Drawing;
 
-using Chimera.Bizware.Graphics;
+using Chimera.Display;
 
 namespace Chimera.Client.Common.Filters
 {
