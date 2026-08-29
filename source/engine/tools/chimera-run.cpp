@@ -34,12 +34,29 @@
  * mode and entry generation, the paths playback never touches.
  * --export-savedata writes the core's exported save-data tree under <dir>
  * after the run (docs/save-data.md) - the gates diff it like a memory dump.
+ * --firmware <id>=<path> mounts a firmware file under the id the core declares
+ * (a PS2 bios, a disk-system rom). Repeatable. A project names the ids it needs
+ * and the SHA1 it expects; this tool has no user to ask, so it mounts what it
+ * is given and the engine checks the hash.
+ * --save-state <frame>=<path> writes the whole machine after that frame;
+ * --state <path> starts from one instead of from power-on, and --frames <n>
+ * stops after n. The three together are for looking at a picture: a state saved
+ * near the end of a long movie makes "what does this frame look like" a
+ * one-second question instead of a five-minute one. The movie's read position
+ * still starts at 0, so the INPUT after a loaded state is the movie's first
+ * entries rather than the ones that belong there - fine for a rendering
+ * question, wrong for anything about the machine.
+ * --screenshot <frame>=<path> writes one frame's picture as a TGA. Repeatable.
+ * The run is otherwise undrawn (turbo), so only the frames asked for cost
+ * anything to draw - which is what makes "show me frame 1910 of this movie" a
+ * cheap question to ask of a two-hour run.
  */
 
 #include "chimera/engine.h"
 
 #include <cstdio>
 #include <cstring>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -71,6 +88,27 @@ bool writeWholeFile(const std::string &path, const uint8_t *data, size_t len)
 	bool ok = len == 0 || std::fwrite(data, 1, len, f) == len;
 	std::fclose(f);
 	return ok;
+}
+
+/* One frame as an uncompressed 32-bit TGA. The engine hands over BGRA, which is
+ * exactly what a TGA stores, so the rows only have to be written bottom-up. */
+bool writeTga(const std::string &path, const uint32_t *bgra, int32_t w, int32_t h)
+{
+    if (bgra == nullptr || w <= 0 || h <= 0) return false;
+    std::vector<uint8_t> out(18 + static_cast<size_t>(w) * h * 4, 0);
+    out[2] = 2;  /* uncompressed true-colour */
+    out[12] = static_cast<uint8_t>(w & 0xFF);
+    out[13] = static_cast<uint8_t>((w >> 8) & 0xFF);
+    out[14] = static_cast<uint8_t>(h & 0xFF);
+    out[15] = static_cast<uint8_t>((h >> 8) & 0xFF);
+    out[16] = 32;
+    out[17] = 8;  /* 8 bits of alpha, top-left origin cleared: rows go bottom-up */
+    for (int32_t y = 0; y < h; y++)
+    {
+        std::memcpy(out.data() + 18 + static_cast<size_t>(y) * w * 4,
+            bgra + static_cast<size_t>(h - 1 - y) * w, static_cast<size_t>(w) * 4);
+    }
+    return writeWholeFile(path, out.data(), out.size());
 }
 
 /* mkdir -p for a path's PARENT directories (the engine already refused any
@@ -108,6 +146,11 @@ int main(int argc, char **argv)
 	const char *settings = nullptr;
 	std::string metaPath;
 	std::vector<std::pair<std::string, std::string>> dumps; // domain -> path
+	std::map<int64_t, std::string> shots; // frame -> TGA path
+	std::vector<std::pair<std::string, std::string>> firmwareArgs; // id -> path
+	std::map<int64_t, std::string> stateOuts; // frame -> state path
+	std::string stateIn;
+	int64_t frameLimit = -1;
 	bool rerecord = false;
 	int64_t seekFrame = -1;
 	std::string recordPath;
@@ -130,6 +173,29 @@ int main(int argc, char **argv)
 		else if (arg == "--files" && i + 1 < argc) fileDirs.push_back(argv[++i]);
 		else if (arg == "--allow-core-mismatch") allowCoreMismatch = true;
 		else if (arg == "--gpu") wantGpu = true;
+		else if (arg == "--firmware" && i + 1 < argc)
+		{
+			std::string spec = argv[++i];
+			auto eq = spec.find('=');
+			if (eq == std::string::npos) return fail(metaPath, "--firmware wants <id>=<path>");
+			firmwareArgs.emplace_back(spec.substr(0, eq), spec.substr(eq + 1));
+		}
+		else if (arg == "--save-state" && i + 1 < argc)
+		{
+			std::string spec = argv[++i];
+			auto eq = spec.find('=');
+			if (eq == std::string::npos) return fail(metaPath, "--save-state wants <frame>=<path>");
+			stateOuts[std::atoll(spec.substr(0, eq).c_str())] = spec.substr(eq + 1);
+		}
+		else if (arg == "--state" && i + 1 < argc) stateIn = argv[++i];
+		else if (arg == "--frames" && i + 1 < argc) frameLimit = std::atoll(argv[++i]);
+		else if (arg == "--screenshot" && i + 1 < argc)
+		{
+			std::string spec = argv[++i];
+			auto eq = spec.find('=');
+			if (eq == std::string::npos) return fail(metaPath, "--screenshot wants <frame>=<path>");
+			shots[std::atoll(spec.substr(0, eq).c_str())] = spec.substr(eq + 1);
+		}
 		else if (arg == "--dump" && i + 1 < argc)
 		{
 			std::string spec = argv[++i];
@@ -145,7 +211,7 @@ int main(int argc, char **argv)
 	bool projectMode = !projectPath.empty();
 	if (projectMode ? packagePath == nullptr : moviePath == nullptr)
 	{
-		std::fprintf(stderr, "usage: chimera-run <package> <rom> <movie.txt> [--rerecord] [--seek <frame>] [--record <out.txt>] [--settings <json>] [--dump <domain>=<path>]... [--export-savedata <dir>] [--meta <path>] [--gpu]\n"
+		std::fprintf(stderr, "usage: chimera-run <package> <rom> <movie.txt> [--rerecord] [--seek <frame>] [--record <out.txt>] [--settings <json>] [--dump <domain>=<path>]... [--firmware <id>=<path>]... [--state <path>] [--frames <n>] [--save-state <frame>=<path>]... [--screenshot <frame>=<path>]... [--export-savedata <dir>] [--meta <path>] [--gpu]\n"
 			"       chimera-run --project <p.chimeraProject> <package> [--files <dir>]... [--allow-core-mismatch] [the same run flags]\n");
 		return 1;
 	}
@@ -344,10 +410,27 @@ int main(int argc, char **argv)
 	 * driver, or with a core that has no GL renderer, the software path
 	 * draws and ce_session_deterministic still says 1. */
 	ce_gl_request(wantGpu ? 1 : 0);
+
+	/* firmware, read whole: a bios is small and the engine wants the bytes */
+	std::vector<std::vector<uint8_t>> fwBytes(firmwareArgs.size());
+	std::vector<const char *> fwIds;
+	std::vector<const uint8_t *> fwData;
+	std::vector<uint64_t> fwLens;
+	for (size_t i = 0; i < firmwareArgs.size(); i++)
+	{
+		if (!readWholeFile(firmwareArgs[i].second.c_str(), fwBytes[i]))
+		{
+			return fail(metaPath, "could not read firmware " + firmwareArgs[i].second);
+		}
+		fwIds.push_back(firmwareArgs[i].first.c_str());
+		fwData.push_back(fwBytes[i].data());
+		fwLens.push_back(fwBytes[i].size());
+	}
+
 	const char *error = nullptr;
 	ce_session *session = ce_session_open(
 		packagePath, rom.data(), rom.size(), romPathStore.empty() ? nullptr : romPathStore.c_str(),
-		settings, nullptr, nullptr, nullptr, 0,
+		settings, fwIds.data(), fwData.data(), fwLens.data(), static_cast<int32_t>(fwIds.size()),
 		extraNames.data(), extraData.data(), extraLens.data(), extraPaths.data(),
 		static_cast<int32_t>(extraNames.size()), &error);
 	if (session == nullptr) return fail(metaPath, error != nullptr ? error : "session open failed");
@@ -390,6 +473,20 @@ int main(int argc, char **argv)
 		ce_session_movie_record(session, nullptr);
 	}
 
+	/* --state: begin from a machine somebody saved earlier. The movie's read
+	 * position is NOT wound forward with it (see the header comment): this is
+	 * for looking at pictures, not for replaying a run. */
+	if (!stateIn.empty())
+	{
+		std::vector<uint8_t> saved;
+		if (!readWholeFile(stateIn.c_str(), saved)) return fail(metaPath, "could not read state " + stateIn);
+		if (ce_session_load_state(session, saved.data(), saved.size()) != 0)
+		{
+			return fail(metaPath, ce_session_last_error(session));
+		}
+	}
+	if (frameLimit >= 0 && frameLimit < frames) frames = frameLimit;
+
 	std::vector<uint8_t> state;
 	if (rerecord)
 	{
@@ -416,9 +513,27 @@ int main(int argc, char **argv)
 		const int32_t *axes = recordPath.empty() || recAxes[static_cast<size_t>(i)].empty()
 			? nullptr
 			: recAxes[static_cast<size_t>(i)].data();
-		if (ce_session_movie_advance(session, 0, axes, 0) < 0)
+		auto shot = shots.find(i);
+		if (ce_session_movie_advance(session, 0, axes, shot != shots.end() ? 1 : 0) < 0)
 		{
 			return fail(metaPath, ce_session_last_error(session));
+		}
+		if (shot != shots.end()
+			&& !writeTga(shot->second, ce_session_video(session),
+				ce_session_video_width(session), ce_session_video_height(session)))
+		{
+			return fail(metaPath, "could not write " + shot->second);
+		}
+		auto st = stateOuts.find(i);
+		if (st != stateOuts.end())
+		{
+			uint64_t len = 0;
+			const uint8_t *p = ce_session_save_state(session, &len);
+			if (p == nullptr) return fail(metaPath, ce_session_last_error(session));
+			if (!writeWholeFile(st->second, p, static_cast<size_t>(len)))
+			{
+				return fail(metaPath, "could not write " + st->second);
+			}
 		}
 		if (rerecord)
 		{
