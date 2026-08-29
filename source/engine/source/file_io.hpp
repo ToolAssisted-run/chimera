@@ -37,8 +37,6 @@ private:
 	void *_f = nullptr;   /* FILE*, kept opaque so the header stays clean */
 };
 
-/* The file's size in bytes, or false if it cannot be measured. */
-bool fileSize(const char *utf8Path, uint64_t *out);
 
 bool fileExists(const char *utf8Path);
 
