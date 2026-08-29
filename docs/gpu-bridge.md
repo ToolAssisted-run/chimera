@@ -51,17 +51,31 @@ software rasteriser, the softpipe and the bridge. Only the picture differs -
 which is exactly what a desync would be made of if a game ever read its own
 rendered pixels back, and that case is untested.
 
-Measured through the frontend, 900 frames of a PS2 disc, on a machine with no
-GPU at all (llvmpipe - so this is CPU against CPU, and a real driver should do
-better):
+Measured through the frontend, on a machine with no GPU at all (llvmpipe - so
+this is CPU against CPU, and a real driver should do better):
 
-| renderer | time |
-|---|---|
-| `software` - PCSX2's own rasteriser | 37s |
-| `opengl` - Mesa softpipe inside the sandbox | 62s |
-| `opengl-hw` - through the bridge | 36s |
+| core | own rasteriser | softpipe in-guest | bridged |
+|---|---|---|---|
+| PCSX2, 900 frames of a disc | 37s | 62s | **36s** |
+| Flycast, 400 frames of a disc | 26s | 47s | **16s** |
 
-EE RAM was byte-identical between the first and the last.
+The machine's memory was byte-identical across all of them - EE RAM for PCSX2,
+System RAM for Flycast.
+
+## Which cores have it
+
+| core | hardware renderer | why |
+|---|---|---|
+| PCSX2 | `opengl-hw` | its GL renderer already ran in the sandbox |
+| Flycast | `opengl-hw` | the same |
+| everything else | no | see below |
+
+A core can only be bridged if its own OpenGL renderer already runs inside the
+sandbox - the bridge answers GL calls, it does not create them. PPSSPP, for
+instance, compiles only its SOFTWARE GPU backend (`GPU/Software`); its GLES
+backend is 9,000 lines that have never been built here and expect a separate
+render thread, which a sandbox does not have. Giving PPSSPP a hardware option
+means porting that backend first, and that is a port, not a wiring job.
 
 ## Turning it on
 
