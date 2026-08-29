@@ -2392,7 +2392,19 @@ namespace Chimera.Client.GUI
 					atten = 0;
 				}
 
-				bool render = !_throttle.skipNextFrame || _currAviWriter?.UsesVideo is true || atTurboSeekEnd;
+				// A frame nobody will look at does not have to be drawn, and a core
+				// that knows how to stop drawing (SetRenderingEnabled) makes that
+				// a real saving rather than a skipped memcpy - most of a frame, on
+				// a console with a 3D chip in it.
+				//
+				// A turbo SEEK has a destination and draws it (atTurboSeekEnd);
+				// the frames on the way are nobody's business, so none of them are
+				// drawn. A held Turbo key is a different thing - the person is
+				// watching to see where they are, and the throttle's one-in-four is
+				// what they are watching.
+				bool render = (!_throttle.skipNextFrame && !(IsTurboSeeking && !atTurboSeekEnd))
+					|| _currAviWriter?.UsesVideo is true
+					|| atTurboSeekEnd;
 				bool newFrame = Emulator.FrameAdvance(InputManager.ControllerOutput, render, renderSound);
 
 				// an encode reaching the end of the movie is the encode finishing, not

@@ -78,9 +78,23 @@ ECL_EXPORT uint8_t *GetFramebuffer(void) { return (uint8_t *)synth_get_framebuff
 ECL_EXPORT int16_t *GetAudio(void)       { return (int16_t *)synth_get_audio(g_synth); }
 ECL_EXPORT int      InputWasRead(void)   { return synth_input_was_read(g_synth); }
 
+/* Turbo (optional guest ABI group): the host says nobody will look at the next
+ * frames. The synth machine's picture IS its VRAM domain, which the witness
+ * hashes, so the DRAWING is machine state and is never skipped; what this core
+ * can skip is the palette resolution below, which exists only for the display.
+ * Exporting it at all is deliberate: it puts the engine's turbo path - the
+ * delta send, and the re-send after a state load - under every witness run. */
+ECL_INVISIBLE static int g_render = 1;
+
+ECL_EXPORT void SetRenderingEnabled(int on) { g_render = on != 0; }
+
 /* Palette-resolved presentation for the frontend's IVideoProvider (the raw
  * palette-index framebuffer is what the witness hashes; this is display only). */
-ECL_EXPORT uint32_t *GetVideoBgra(void)  { synth_get_video_bgra(g_synth, g_video); return g_video; }
+ECL_EXPORT uint32_t *GetVideoBgra(void)
+{
+	if (g_render) synth_get_video_bgra(g_synth, g_video);
+	return g_video;
+}
 
 /* --- self-described memory domains (guest ABI v1) ---
  * The generic Chimera adapter queries these AFTER Init, because a core's domain

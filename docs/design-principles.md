@@ -726,6 +726,10 @@ console with peripherals actually needs.
 (`GetMemoryDomain{Count,Name,Ptr,Size,Writable}`), never declared statically:
 their count and size depend on the cartridge and on user settings.
 
+**Turbo.** `SetRenderingEnabled(int on)`, optional: while off the core produces
+no picture and is otherwise exactly the machine it would have been. See "Turbo:
+a frame nobody looks at does not have to be drawn" below.
+
 **Analog controls.** `waterbox.config`'s `input.axes` declares them; the adapter
 pushes each value with `SetAxis(index, value)` immediately before the frame it
 belongs to. A package that declares axes must export it.
@@ -1281,3 +1285,92 @@ the inputs**. Not a timestamp, not a hostname, not a path. The moment provenance
 starts describing the moment rather than the ingredients, two builds of one
 commit stop matching and every hash in the chain becomes noise.
 
+
+## Turbo: a frame nobody looks at does not have to be drawn (user-asked, 2026-08-29)
+
+Fast-forwarding to the interesting part of a run spends most of its time drawing
+pictures that go past faster than a person can see. The frontend already asked
+for those frames with `render: false`, but that only skipped the memcpy out of
+the sandbox - the core drew every one of them anyway. Turbo is the other half:
+an optional guest export, `SetRenderingEnabled(int on)`, that tells the core
+itself to stop.
+
+**The contract is one sentence: while off, the core produces no picture and is
+otherwise exactly the machine it would have been.** Nothing else is allowed to
+change - not a byte of memory, not a sample of audio, not the lag count. A turbo
+that got this wrong would corrupt a TAS silently, which is the one failure this
+project cannot ship.
+
+**Every core's gate proves it, the same way.** `run-gate.sh` grew a turbo leg:
+run the frames twice, once drawing them all and once with drawing off for the
+first half and back on for the second, then compare everything except the
+whole-run video hash - memory domains, audio, lag count, and *the pictures of
+that second half*. That last part is what makes it a real test rather than a
+formality: a core whose skip disturbed the machine would still be caught by a
+different picture even when every byte of RAM agreed.
+
+Two cores need a one-frame settle window before that comparison starts, and both
+earn it by measurement rather than assertion. A PS2 field is woven with the
+field before it, so the first frame drawn after a gap has nothing to weave with;
+DOSBox-X redraws a row only when it differs from the last row it drew, so the
+frame that resumes is the one that rebuilds the surface. Both converge on the
+very next frame, and both runs skip the same one, so nothing else is excused.
+
+**What can be skipped is decided per core, by where the picture stops being the
+machine's business.** The answer is different every time and the gate is what
+settles it:
+
+| core | what turbo skips | share of a frame |
+|---|---|---|
+| DOSBox-X | the copy out of the finished surface | 33% |
+| snes9x | `IPPU.RenderThisFrame`, upstream's own, which still ORs the sprite range/time-over flags into `PPU.RangeTimeOver` | 24% |
+| stella | `TIA::renderPixel` and the line clone. The collision latches are updated elsewhere; the frame-layout detector still gets its colours, because that IS the machine | 14% |
+| quickerNES | the PPU's pixel output (upstream's own render-off path, which keeps sprite-zero hit exact through a mini offscreen buffer) | 8% |
+| NesHawk | the pixel pipeline, which is the only thing that writes `xbuf`; the sprite-zero hit is decided elsewhere | 8% |
+| gpgx | `remap_line` - the VDP's output step. Everything the 68000 notices (sprite overflow and collision, the pattern cache, the sprite parse) happens before it | 6% |
+| opera | the VDLP's scanline renderer - the 3DO's display processor, which only reads what the cel engine already wrote into VRAM | 5% |
+| PPSSPP | the framebuffer readback and its conversion, and nothing else | 3% |
+| PCSX2 | the display stage - the PCRTC merge and the deinterlace. Under the OpenGL renderer that is also where the per-frame readback lives | 0% (software renderer) |
+| flycast | the whole rasterisation, refsw and OpenGL alike. A render-to-TEXTURE pass is never skipped: that one is written back into video memory and the game reads it | not measurable here |
+
+The last column is the share of a frame that turned out to be drawing, measured
+by running each core's own gate content twice with half the frames undrawn. It
+is not a promise about any particular game: flycast's rasteriser runs only when
+a program submits a display list, and the gate's test programs submit one, so
+that row waits for a real disc. PCSX2's zero is the software renderer, where the
+display stage is a reference into GS local memory; the hardware renderer, where
+that stage is GL work and a readback, is unmeasured on a box with no GPU.
+
+**The 3D consoles gain the least, and the reason is worth stating.** A PSP or a
+PS2 draws into memory the game can read back - VRAM is a memory domain, the
+texture cache samples from it, the CPU can DMA out of it. So on those machines
+the drawing IS the machine, and skipping it is not a fast-forward but a
+different emulation. What turbo can take there is the display stage on top. The
+Dreamcast is the exception in the other direction: Flycast's rasteriser writes
+nothing back into video memory unless the pass is a render-to-texture, so the
+whole of it can go. DOSBox-X was tried the deep way too - upstream has its own
+`render.disablerender` switch - and the gate refused it: conventional memory and
+physical RAM both moved, because the RENDER layer is wired into the VGA's event
+scheduling. That is a measurement, and it is why DOS gets the thin cut.
+
+**Where the flag lives matters.** It is the frontend's policy for the moment,
+not part of the machine, so it goes in `ECL_INVISIBLE` memory - the same rule
+the live-settings buffer follows, and for the same reason: a state saved while
+fast-forwarding must not put the machine back into turbo when it is loaded to be
+looked at. Where a core has its own knob inside the savestate (NesHawk's PPU,
+snes9x's `IPPU`, PPSSPP's driver), the frame re-asserts it from the invisible
+flag rather than trusting what a loaded state left behind, and the engine
+forgets what it last sent after every state load.
+
+**The engine sends deltas.** `ce_session_frame_advance`'s `render` argument now
+reaches the core, but only when it changes - the seek path advances thousands of
+frames and one pointless guest call each would be the wrong kind of thrift.
+`chimera-run` has always replayed movies with `render: 0`, so the witness gate
+now runs every Level E movie with drawing switched off end to end and still
+matches the goldens byte for byte.
+
+**In the frontend, a seek draws only its destination.** Held Turbo keeps the
+throttle's one-in-four frames, because the person is watching to see where they
+are. A turbo SEEK has a destination and draws it; the frames on the way are
+nobody's business, so none of them are drawn - which is where the whole feature
+was aimed.

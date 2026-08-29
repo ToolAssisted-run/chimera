@@ -732,9 +732,17 @@ CE_API void ce_session_set_axis(ce_session *s, int32_t index, int32_t value);
 CE_API void ce_session_set_button(ce_session *s, int32_t index, int32_t pressed);
 
 /* One frame: buttons is the bitmask (bit i = the config's buttons[i]);
- * buttons beyond 63 ride ce_session_set_button. render 0 skips the video
- * copy. Returns nonzero when the frame was a lag frame (the guest never
- * read input), per the config's lag export. */
+ * buttons beyond 63 ride ce_session_set_button. Returns nonzero when the frame
+ * was a lag frame (the guest never read input), per the config's lag export.
+ *
+ * render 0 skips the video copy, and - for a core that exports
+ * SetRenderingEnabled - tells the core itself to stop drawing. That is turbo:
+ * the frame still happens, the machine is still exactly the machine it would
+ * have been, and only the picture is not produced. On a console with a 3D chip
+ * the picture is most of the frame's cost, so a seek that would have taken a
+ * minute takes a few seconds. The video buffer keeps the last frame that was
+ * drawn, so a caller that wants a picture at the end of a fast run asks for the
+ * last frame with render 1. */
 CE_API int32_t ce_session_frame_advance(ce_session *s, uint64_t buttons, int32_t render);
 
 /* The last rendered frame, BGRA, video_width*video_height pixels.

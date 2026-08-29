@@ -359,6 +359,11 @@ struct ce_session
 	std::vector<std::string> sdNames;
 	std::vector<int64_t> sdSizes;
 	std::vector<int32_t> sdGuestIndex;
+	// turbo: the core is told to stop drawing, and the machine must not
+	// notice. -1 means "the guest has not been told anything yet", which is
+	// also what a state load leaves behind (see ce_session_load_state).
+	void (*setRendering)(int32_t) = nullptr;
+	int32_t renderingSent = -1;
 	// trace
 	void (*traceSetEnabled)(int32_t) = nullptr;
 	int32_t (*traceLineCount)() = nullptr;
@@ -384,6 +389,7 @@ struct ce_session
 
 	void probeOptionalGroups();
 	int32_t advanceCore(const uint8_t *buttons, int32_t render);
+	void wantRendering(int32_t on);
 	void copyVideo();
 	const uint8_t *computeEffective(uint64_t mask);
 	uint64_t sendButtons(const uint8_t *states);
@@ -525,6 +531,11 @@ void ce_session::probeOptionalGroups()
 		}
 	}
 
+	// turbo: one export, and a core either has it or draws every frame. The
+	// guest is told nothing here - the first advance sends whatever it wants,
+	// and until then the core's own default (drawing) stands.
+	setRendering = reinterpret_cast<void (*)(int32_t)>(opt("SetRenderingEnabled", 1));
+
 	// savedata export: all four or nothing. Only the POINTERS are kept - the
 	// file list is dynamic (a game creates files while it runs), so it is
 	// snapshotted at export time, never here.
@@ -602,8 +613,25 @@ void ce_session::copyVideo()
 	}
 }
 
+/* Turbo. A frame nobody is going to look at does not need to be drawn, and for
+ * a machine with a 3D chip in it the drawing is most of the frame. The core is
+ * asked to stop producing a picture; it must go on being exactly the machine it
+ * would have been, which is the whole contract and what each core's gate
+ * checks. Cores without the export simply draw, and the caller pays.
+ *
+ * The state is a delta: telling a core the same thing every frame would be one
+ * pointless guest call per frame on the seek path, which is the path this
+ * exists for. */
+void ce_session::wantRendering(int32_t on)
+{
+	if (setRendering == nullptr || renderingSent == on) return;
+	setRendering(on);
+	renderingSent = on;
+}
+
 int32_t ce_session::advanceCore(const uint8_t *buttons, int32_t render)
 {
+	wantRendering(render != 0 ? 1 : 0);
 	frameAdvance(sendButtons(buttons));
 	if (render != 0) copyVideo();
 	int32_t nsamp = getAudioSampleCount != nullptr ? getAudioSampleCount() : cfg.samplesPerFrame;
@@ -979,6 +1007,7 @@ void ce_session_set_button(ce_session *s, int32_t index, int32_t pressed)
 
 int32_t ce_session_frame_advance(ce_session *s, uint64_t buttons, int32_t render)
 {
+	s->wantRendering(render != 0 ? 1 : 0);
 	s->frameAdvance(s->sendButtons(s->computeEffective(buttons)));
 	if (render != 0) s->copyVideo();
 	/* a core that reports its own count may produce a different number every
@@ -1053,6 +1082,10 @@ int32_t ce_session_load_state(ce_session *s, const uint8_t *data, uint64_t len)
 	 * held, so the delta tracker must forget its history and resend every
 	 * button's current state on the next advance */
 	std::fill(s->btnSent.begin(), s->btnSent.end(), uint8_t{ 0xFF });
+	/* the turbo flag is host policy rather than machine state and belongs in
+	 * memory the state does not cover - but a core that kept it in ordinary
+	 * memory would have just had it rewritten, so forget what we told it */
+	s->renderingSent = -1;
 
 	/* a savestate is guest memory, and the guest's "tracing on" flag is guest
 	 * memory too: re-assert the desired flag, and discard whatever lines the
@@ -1562,6 +1595,7 @@ int32_t ce_session_seek(ce_session *s, int64_t frame)
 		/* same as ce_session_load_state: the restore rewrote the guest's
 		 * wide-input latches, so resend every button on the next advance */
 		std::fill(s->btnSent.begin(), s->btnSent.end(), uint8_t{ 0xFF });
+		s->renderingSent = -1; // see ce_session_load_state
 		s->frame = base;
 	}
 	else if (s->frame > frame)
