@@ -55,6 +55,15 @@ namespace Chimera.Client.GUI
 		public readonly TimeSpan? Remaining;
 		public readonly string? Message;
 
+		/// <summary>
+		/// The loudest sample in each channel of the frame just written, as a
+		/// fraction of full scale. The speakers are muted during an encode, so
+		/// these are the only sign that sound is going into the file.
+		/// </summary>
+		public readonly double PeakLeft;
+
+		public readonly double PeakRight;
+
 		public VideoEncodeProgress(
 			VideoEncodePhase phase,
 			int framesDone,
@@ -62,7 +71,9 @@ namespace Chimera.Client.GUI
 			int currentFrame,
 			double framesPerSecond,
 			TimeSpan? remaining,
-			string? message)
+			string? message,
+			double peakLeft = 0,
+			double peakRight = 0)
 		{
 			Phase = phase;
 			FramesDone = framesDone;
@@ -71,6 +82,8 @@ namespace Chimera.Client.GUI
 			FramesPerSecond = framesPerSecond;
 			Remaining = remaining;
 			Message = message;
+			PeakLeft = peakLeft;
+			PeakRight = peakRight;
 		}
 	}
 
@@ -152,6 +165,30 @@ namespace Chimera.Client.GUI
 			_fps = 0;
 		}
 
+		/// <summary>
+		/// The samples that just went into the file, so the dialog can show that
+		/// there is sound in it. Interleaved stereo, 16 bit, as the writer takes
+		/// them; an odd tail is ignored rather than read past.
+		/// </summary>
+		internal void NoteAudio(short[] samples, int sampleCount)
+		{
+			int left = 0, right = 0;
+			var pairs = Math.Min(sampleCount, samples.Length / 2);
+			for (var i = 0; i < pairs; i++)
+			{
+				var l = Math.Abs((int)samples[i * 2]);
+				var r = Math.Abs((int)samples[(i * 2) + 1]);
+				if (l > left) left = l;
+				if (r > right) right = r;
+			}
+
+			// short.MinValue has no positive counterpart, so the scale is 32768
+			_peakLeft = left / 32768.0;
+			_peakRight = right / 32768.0;
+		}
+
+		private double _peakLeft, _peakRight;
+
 		/// <summary>One more frame is in the file.</summary>
 		internal void CountFrame()
 		{
@@ -187,7 +224,7 @@ namespace Chimera.Client.GUI
 				remaining = TimeSpan.FromSeconds(Math.Max(0, total - FramesDone) / fps);
 			}
 
-			return new(Phase, FramesDone, total, currentFrame, fps, remaining, Message);
+			return new(Phase, FramesDone, total, currentFrame, fps, remaining, Message, _peakLeft, _peakRight);
 		}
 	}
 }

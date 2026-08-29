@@ -1315,6 +1315,9 @@ namespace Chimera.Client.GUI
 
 		private SimpleSyncSoundProvider _dumpProxy; // an audio proxy used for dumping
 
+		/// <summary>zeroes handed to the sound card while Encode Video is running</summary>
+		private short[] _encodeSilence = [ ];
+
 		private bool _windowClosedAndSafeToExitProcess;
 		private int _exitCode;
 		private bool _exitRequestPending;
@@ -2748,7 +2751,23 @@ namespace Chimera.Client.GUI
 						((AudioStretcher) _currAviWriter).DumpAV(output, _aviSoundInputAsync, out samp, out nsamp);
 					}
 
-					_dumpProxy.PutSamples(samp, nsamp);
+					if (_encode is not null)
+					{
+						// Encode Video plays the run as fast as the machine will
+						// go, and sound at that speed is noise - so the speakers
+						// stay silent while a file is written. The samples above
+						// have already gone INTO the file; what is muted is only
+						// the copy that would have reached the sound card. The
+						// dialog's level meters read them instead, which is the
+						// only sign left that there is audio in the video.
+						_encode.NoteAudio(samp, nsamp);
+						if (_encodeSilence.Length < samp.Length) _encodeSilence = new short[samp.Length];
+						_dumpProxy.PutSamples(_encodeSilence, nsamp);
+					}
+					else
+					{
+						_dumpProxy.PutSamples(samp, nsamp);
+					}
 				}
 				catch (Exception e)
 				{

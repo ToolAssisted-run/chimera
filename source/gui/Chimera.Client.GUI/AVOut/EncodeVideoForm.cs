@@ -8,6 +8,7 @@ using System.Linq;
 using System.Windows.Forms;
 
 using Chimera.Client.Common;
+using Chimera.Common;
 
 namespace Chimera.Client.GUI
 {
@@ -51,10 +52,15 @@ namespace Chimera.Client.GUI
 		private readonly CheckBox _captureLua;
 		private readonly ProgressBar _progress;
 		private readonly Label _status;
+		private readonly AudioLevelMeter _levels;
 		private readonly Button _start;
 		private readonly Button _stop;
+		private readonly Button _openVideo;
 		private readonly Button _close;
 		private readonly Timer _tick;
+
+		/// <summary>the file the last finished encode wrote, for Open Video</summary>
+		private string? _written;
 
 		/// <summary>
 		/// What fills the file when nobody has said otherwise: h264 and aac in an
@@ -86,8 +92,8 @@ namespace Chimera.Client.GUI
 			Config = config;
 
 			SuspendLayout();
-			ClientSize = new(UIHelper.ScaleX(580), UIHelper.ScaleY(320));
-			MinimumSize = new(UIHelper.ScaleX(520), UIHelper.ScaleY(320));
+			ClientSize = new(UIHelper.ScaleX(580), UIHelper.ScaleY(364));
+			MinimumSize = new(UIHelper.ScaleX(520), UIHelper.ScaleY(364));
 			StartPosition = FormStartPosition.CenterParent;
 			ShowIcon = false;
 			MaximizeBox = false;
@@ -234,11 +240,35 @@ namespace Chimera.Client.GUI
 			};
 			Controls.Add(_status);
 
-			// ---- the three things you can do -------------------------------------
+			// ---- what is going into it -------------------------------------------
+			// The speakers are muted while a video is written (MainForm.Encode),
+			// so without these there is no way to tell a silent encode from a
+			// working one until the file is finished and played.
+			Controls.Add(MakeLabel("Audio:", 8, 274));
+			_levels = new AudioLevelMeter
+			{
+				Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
+				BackColor = SystemColors.ControlDarkDark,
+				Location = Pt(56, 270),
+				Size = new(UIHelper.ScaleX(516), UIHelper.ScaleY(26)),
+			};
+			Controls.Add(_levels);
+
+			// ---- the four things you can do --------------------------------------
+			_openVideo = new Button
+			{
+				Anchor = AnchorStyles.Bottom | AnchorStyles.Left,
+				Enabled = false,
+				Location = Pt(8, 324),
+				Size = new(UIHelper.ScaleX(96), UIHelper.ScaleY(26)),
+				Text = "Open Video",
+			};
+			_openVideo.Click += (_, _) => OpenWrittenVideo();
+			Controls.Add(_openVideo);
 			_start = new Button
 			{
 				Anchor = AnchorStyles.Bottom | AnchorStyles.Right,
-				Location = Pt(320, 280),
+				Location = Pt(320, 324),
 				Size = new(UIHelper.ScaleX(96), UIHelper.ScaleY(26)),
 				Text = "Start Encode",
 			};
@@ -248,7 +278,7 @@ namespace Chimera.Client.GUI
 			{
 				Anchor = AnchorStyles.Bottom | AnchorStyles.Right,
 				Enabled = false,
-				Location = Pt(424, 280),
+				Location = Pt(424, 324),
 				Size = new(UIHelper.ScaleX(70), UIHelper.ScaleY(26)),
 				Text = "Stop",
 			};
@@ -257,7 +287,7 @@ namespace Chimera.Client.GUI
 			_close = new Button
 			{
 				Anchor = AnchorStyles.Bottom | AnchorStyles.Right,
-				Location = Pt(502, 280),
+				Location = Pt(502, 324),
 				Size = new(UIHelper.ScaleX(70), UIHelper.ScaleY(26)),
 				Text = "Close",
 			};
@@ -267,7 +297,7 @@ namespace Chimera.Client.GUI
 			ResumeLayout();
 
 			_tick = new Timer { Interval = 200 };
-			_tick.Tick += (_, _) => ShowProgress(_poll());
+			_tick.Tick += (_, _) => Poll();
 
 			FillMarkers();
 			FillFromConfig(config);
@@ -293,6 +323,12 @@ namespace Chimera.Client.GUI
 
 		public bool StopEnabled => _stop.Enabled;
 
+		/// <summary>Whether there is a finished video to open.</summary>
+		public bool OpenVideoEnabled => _openVideo.Enabled;
+
+		/// <summary>Where the level meters stand, 0 to 1 on their own dB scale.</summary>
+		public (double Left, double Right) AudioLevels => (_levels.LeftFraction, _levels.RightFraction);
+
 		public string StatusText => _status.Text;
 
 		/// <summary>Fills in the dialog as if a person had, for tests and for callers.</summary>
@@ -306,6 +342,14 @@ namespace Chimera.Client.GUI
 
 		/// <summary>Presses Start Encode.</summary>
 		public void StartEncode() => Start();
+
+		/// <summary>
+		/// Reads the encode's progress once and redraws, which is what the window's
+		/// own timer does 5 times a second. Public so a caller that knows something
+		/// changed does not have to wait for the tick, and so a test can advance the
+		/// window without one.
+		/// </summary>
+		public void Poll() => ShowProgress(_poll());
 
 		// ---- filling it in --------------------------------------------------------
 
@@ -435,6 +479,14 @@ namespace Chimera.Client.GUI
 
 			RememberChoices();
 			_running = true;
+
+			// A new encode makes the previous file the WRONG one to open, and the
+			// new one does not exist yet: there is nothing to open until this
+			// finishes, and the button says so.
+			_written = null;
+			_openVideo.Enabled = false;
+			_levels.Reset();
+
 			SetInputsEnabled(false);
 			_tick.Start();
 			ShowProgress(_poll());
@@ -492,13 +544,48 @@ namespace Chimera.Client.GUI
 				_ => progress.Message ?? "",
 			};
 
+			if (progress.Phase is VideoEncodePhase.Encoding)
+			{
+				_levels.SetLevels(progress.PeakLeft, progress.PeakRight);
+			}
+
 			if (_running && progress.Phase is not (VideoEncodePhase.Seeking or VideoEncodePhase.Encoding))
 			{
 				_running = false;
 				_tick.Stop();
 				SetInputsEnabled(true);
 				ShowRange();
+				_levels.Reset();
+
+				// A stopped encode counts as finished: the file was closed and
+				// holds the frames that got written, and watching them is how a
+				// person decides whether to stop there. A FAILED one may have
+				// written nothing, so there is nothing to offer.
+				if (progress.Phase is VideoEncodePhase.Done or VideoEncodePhase.Stopped)
+				{
+					_written = _output.Text.Trim();
+					_openVideo.Enabled = _written.Length is not 0 && File.Exists(_written);
+				}
 			}
+		}
+
+		/// <summary>
+		/// Hands the finished file to whatever plays videos on this machine. If it
+		/// has been moved or deleted since, say so here rather than letting the
+		/// system fail silently somewhere the person is not looking.
+		/// </summary>
+		private void OpenWrittenVideo()
+		{
+			if (_written is null) return;
+			if (!File.Exists(_written))
+			{
+				_status.Text = $"{Path.GetFileName(_written)} is no longer there.";
+				_status.ForeColor = Color.Firebrick;
+				_openVideo.Enabled = false;
+				return;
+			}
+
+			Util.OpenUrlExternal(_written);
 		}
 
 		private static string Describe(TimeSpan span)

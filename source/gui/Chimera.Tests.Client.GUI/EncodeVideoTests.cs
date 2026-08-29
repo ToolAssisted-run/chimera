@@ -173,6 +173,137 @@ namespace Chimera.Tests.Client.GUI
 			h.Dispose();
 		}
 
+		// ---- the finished file, and the sound going into it ----------------------
+
+		private static string TempVideo()
+		{
+			var path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"chimera-encode-{Guid.NewGuid():N}.mp4");
+			System.IO.File.WriteAllBytes(path, new byte[] { 0 });
+			return path;
+		}
+
+		[TestMethod]
+		public void ThereIsNothingToOpenBeforeAnythingIsWritten()
+		{
+			using Harness h = new();
+			Assert.IsFalse(h.Form.OpenVideoEnabled, "no encode has finished, so there is no video");
+		}
+
+		[TestMethod]
+		public void AFinishedEncodeCanBeWatched()
+		{
+			var path = TempVideo();
+			try
+			{
+				using Harness h = new();
+				h.Form.Choose(output: path);
+				h.Form.StartEncode();
+				Assert.IsFalse(h.Form.OpenVideoEnabled, "not while it is still being written");
+
+				h.Progress = new(VideoEncodePhase.Done, 1000, 1000, 1000, 60, null, "Wrote 1000 frames.");
+				h.Form.Poll();
+				Assert.IsTrue(h.Form.OpenVideoEnabled, "the file is closed and there is something to watch");
+			}
+			finally
+			{
+				System.IO.File.Delete(path);
+			}
+		}
+
+		[TestMethod]
+		public void AnEncodeStoppedEarlyStillLeavesSomethingToWatch()
+		{
+			var path = TempVideo();
+			try
+			{
+				using Harness h = new();
+				h.Form.Choose(output: path);
+				h.Form.StartEncode();
+				h.Progress = new(VideoEncodePhase.Stopped, 40, 1000, 40, 60, null, "Stopped after 40 frames.");
+				h.Form.Poll();
+
+				Assert.IsTrue(h.Form.OpenVideoEnabled,
+					"what was written was written, and watching it is how you decide whether to stop there");
+			}
+			finally
+			{
+				System.IO.File.Delete(path);
+			}
+		}
+
+		[TestMethod]
+		public void AnEncodeThatFailedOffersNothing()
+		{
+			var path = TempVideo();
+			try
+			{
+				using Harness h = new();
+				h.Form.Choose(output: path);
+				h.Form.StartEncode();
+				h.Progress = new(VideoEncodePhase.Failed, 0, 1000, 0, 0, null, "ffmpeg would not start.");
+				h.Form.Poll();
+
+				Assert.IsFalse(h.Form.OpenVideoEnabled, "there may be no file at all, and there is certainly no video");
+			}
+			finally
+			{
+				System.IO.File.Delete(path);
+			}
+		}
+
+		[TestMethod]
+		public void AVideoThatWasNeverWrittenIsNotOffered()
+		{
+			using Harness h = new();
+			h.Form.Choose(output: System.IO.Path.Combine(System.IO.Path.GetTempPath(), "chimera-never-written.mp4"));
+			h.Form.StartEncode();
+			h.Progress = new(VideoEncodePhase.Done, 1000, 1000, 1000, 60, null, null);
+			h.Form.Poll();
+
+			Assert.IsFalse(h.Form.OpenVideoEnabled, "the phase says done and the file says otherwise");
+		}
+
+		[TestMethod]
+		public void StartingAgainTakesTheFinishedVideoAway()
+		{
+			var path = TempVideo();
+			try
+			{
+				using Harness h = new();
+				h.Form.Choose(output: path);
+				h.Form.StartEncode();
+				h.Progress = new(VideoEncodePhase.Done, 1000, 1000, 1000, 60, null, null);
+				h.Form.Poll();
+				Assert.IsTrue(h.Form.OpenVideoEnabled);
+
+				h.Form.StartEncode();
+				Assert.IsFalse(h.Form.OpenVideoEnabled,
+					"the old file is the wrong one now and the new one does not exist yet");
+			}
+			finally
+			{
+				System.IO.File.Delete(path);
+			}
+		}
+
+		[TestMethod]
+		public void TheMetersFollowTheSoundGoingIntoTheFile()
+		{
+			using Harness h = new();
+			h.Form.StartEncode();
+			Assert.AreEqual(0.0, h.Form.AudioLevels.Left, "silence to begin with");
+
+			h.Progress = new(VideoEncodePhase.Encoding, 10, 1000, 10, 60, null, null, 1.0, 0.5);
+			h.Form.Poll();
+			Assert.AreEqual(1.0, h.Form.AudioLevels.Left, 0.001, "full scale fills the bar");
+			Assert.IsTrue(h.Form.AudioLevels.Right is > 0.85 and < 1.0,
+				"half amplitude is 6dB down, which is most of the way up a dB scale");
+
+			h.Progress = new(VideoEncodePhase.Encoding, 20, 1000, 20, 60, null, null, 0.0, 0.0);
+			h.Form.Poll();
+			Assert.AreEqual(0.0, h.Form.AudioLevels.Left, "and silence reads as silence");
+		}
+
 		/// <summary>A picture of the window, for eyes. Set CHIMERA_UI_SHOTS to get one.</summary>
 		[TestMethod]
 		public void PictureIt()
