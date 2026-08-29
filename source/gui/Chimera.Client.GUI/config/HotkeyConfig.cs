@@ -76,7 +76,14 @@ namespace Chimera.Client.GUI
 
 			foreach (var tab in HotkeyInfo.Groupings)
 			{
-				var tb = new TabPage { Name = tab, Text = tab };
+				/* AutoScroll, because a tab can hold more bindings than the page
+				   is wide. The layout below fills a column, then starts another
+				   250px to the right; TAStudio was already three columns wide in
+				   a 751px page, and the numbered branch slots made it four - so
+				   the last column existed, could be tabbed into, and could not be
+				   seen or clicked. A scroll bar is what a page of controls that
+				   outgrew its window is supposed to do. */
+				var tb = new TabPage { Name = tab, Text = tab, AutoScroll = true };
 				var bindings = HotkeyInfo.AllHotkeys.Where(kvp => kvp.Value.TabGroup == tab)
 					.OrderBy(static kvp => kvp.Value.Ordinal).ThenBy(static kvp => kvp.Value.DisplayName);
 				int x = UIHelper.ScaleX(6);
