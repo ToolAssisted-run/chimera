@@ -290,20 +290,24 @@ namespace Chimera.Client.Common
 				if (p.FileSlot(i) is not "support") { primary = i; break; }
 			}
 			if (primary < 0) throw new CoreLoadException("the project lists no game file");
-			var primaryBytes = p.FileData(primary)
-				?? throw new CoreLoadException($"'{p.FileName(primary)}' has not been resolved");
+			// A project's files are mounted from WHERE THEY LIE. Nothing here reads
+			// one: a PS2 disc is over four gigabytes and a byte[] cannot reach two,
+			// so loading them was both wasteful and, past that size, impossible.
+			string PathOf(int i) => p.FileSourcePath(i) is { Length: > 0 } where
+				? where
+				: throw new CoreLoadException($"'{p.FileName(i)}' has not been resolved");
+			var primaryPath = PathOf(primary);
 
 			var factory = CoreRegistry.Instance.AllFactories.FirstOrDefault(f => f.CoreName == p.CoreName)
 				?? throw new CoreLoadException($"the project's core '{p.CoreName}' is not loaded");
 
-			List<KeyValuePair<string, byte[]>> extras = new()
+			List<CoreFile> extras = new()
 			{
 				new("slots", System.Text.Encoding.UTF8.GetBytes(p.SlotsJson)),
 			};
 			for (var i = 0; i < p.FileCount; i++)
 			{
-				extras.Add(new(p.FileName(i), p.FileData(i)
-					?? throw new CoreLoadException($"'{p.FileName(i)}' has not been resolved")));
+				extras.Add(new(p.FileName(i), PathOf(i)));
 			}
 			extras.Add(new("rom.name", System.Text.Encoding.UTF8.GetBytes(p.FileName(primary))));
 			var primarySlot = p.FileSlot(primary);
@@ -311,7 +315,7 @@ namespace Chimera.Client.Common
 			for (var i = primary + 1; i < p.FileCount; i++)
 			{
 				if (p.FileSlot(i) != primarySlot) continue;
-				extras.Add(new($"rom{n++}", p.FileData(i)));
+				extras.Add(new($"rom{n++}", PathOf(i)));
 			}
 
 			game = new GameInfo
@@ -336,10 +340,13 @@ namespace Chimera.Client.Common
 				{
 					new RomAsset
 					{
-						RomData = primaryBytes,
-						FileData = primaryBytes,
+						// no bytes: the file is mounted from RomPath, which is
+						// where the project resolved it to, not the project's own
+						// path (a project is not a game file)
+						RomData = null,
+						FileData = null,
 						Extension = Path.GetExtension(p.FileName(primary)),
-						RomPath = path,
+						RomPath = primaryPath,
 						Game = game,
 					},
 				},

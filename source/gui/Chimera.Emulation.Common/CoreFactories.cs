@@ -59,7 +59,40 @@ namespace Chimera.Emulation.Common
 		/// Extra files mounted into the session before boot, in order (a chimera
 		/// project's slot map plus its files by canonical name - docs/project.md).
 		/// </summary>
-		public IReadOnlyList<KeyValuePair<string, byte[]>>? ExtraFiles { get; set; }
+		public IReadOnlyList<CoreFile>? ExtraFiles { get; set; }
+	}
+
+	/// <summary>
+	/// One file a machine is given, named as the core will look for it.
+	///
+	/// It is either BYTES the frontend made - a slot map, a name, a settings
+	/// blob - or a PATH to something already on disk. The distinction is not a
+	/// preference: a file given as a path is never read into memory at all, and
+	/// a PS2 disc image is over four gigabytes, which no byte[] can hold. What
+	/// the machine sees is identical either way.
+	/// </summary>
+	public sealed class CoreFile
+	{
+		public CoreFile(string name, byte[] data)
+		{
+			Name = name;
+			Data = data;
+		}
+
+		public CoreFile(string name, string path)
+		{
+			Name = name;
+			Path = path;
+		}
+
+		/// <summary>the name the core opens it by</summary>
+		public string Name { get; }
+
+		/// <summary>the bytes, when the frontend made them; null when this is a path</summary>
+		public byte[]? Data { get; }
+
+		/// <summary>where it lies, when it is a real file; null when these are bytes</summary>
+		public string? Path { get; }
 	}
 
 	/// <summary>

@@ -167,6 +167,9 @@ int main(int argc, char **argv)
 	std::vector<const char *> extraNames;
 	std::vector<const uint8_t *> extraData;
 	std::vector<uint64_t> extraLens;
+	/* per extra: a path to read it from, or null to use the bytes above */
+	std::vector<const char *> extraPaths;
+	std::string romPathStore;
 	std::vector<std::string> extraNameStore;
 	std::string settingsStore, slotsStore;
 	if (projectMode)
@@ -234,13 +237,16 @@ int main(int argc, char **argv)
 		extraNames.push_back("slots");
 		extraData.push_back(reinterpret_cast<const uint8_t *>(slotsStore.data()));
 		extraLens.push_back(slotsStore.size());
+		extraPaths.push_back(nullptr);
 		int32_t primary = -1;
 		for (int32_t i = 0; i < ce_project_file_count(project); i++)
 		{
+			/* Where it lies, not what it holds: the engine mounts the file
+			 * from disk and the guest reads it as it goes. */
 			extraNames.push_back(ce_project_file_name(project, i));
-			const uint8_t *data = ce_project_file_data(project, i, &len);
-			extraData.push_back(data);
-			extraLens.push_back(len);
+			extraData.push_back(nullptr);
+			extraLens.push_back(0);
+			extraPaths.push_back(ce_project_file_source_path(project, i));
 			if (primary < 0 && std::strcmp(ce_project_file_slot(project, i), "support") != 0) primary = i;
 		}
 		if (primary >= 0)
@@ -248,12 +254,12 @@ int main(int argc, char **argv)
 			/* pointers into extraNameStore go out as they are made, so the
 			 * vector must never reallocate: reserve the worst case */
 			extraNameStore.reserve(static_cast<size_t>(ce_project_file_count(project)) + 1);
-			const uint8_t *data = ce_project_file_data(project, primary, &len);
-			rom.assign(data, data + len);
+			romPathStore = ce_project_file_source_path(project, primary);
 			extraNameStore.push_back(ce_project_file_name(project, primary));
 			extraNames.push_back("rom.name");
 			extraData.push_back(reinterpret_cast<const uint8_t *>(extraNameStore.back().data()));
 			extraLens.push_back(extraNameStore.back().size());
+			extraPaths.push_back(nullptr);
 			int n = 2;
 			std::string primarySlot = ce_project_file_slot(project, primary);
 			for (int32_t i = primary + 1; i < ce_project_file_count(project); i++)
@@ -261,8 +267,9 @@ int main(int argc, char **argv)
 				if (primarySlot != ce_project_file_slot(project, i)) continue;
 				extraNameStore.push_back("rom" + std::to_string(n++));
 				extraNames.push_back(extraNameStore.back().c_str());
-				extraData.push_back(ce_project_file_data(project, i, &len));
-				extraLens.push_back(len);
+				extraData.push_back(nullptr);
+				extraLens.push_back(0);
+				extraPaths.push_back(ce_project_file_source_path(project, i));
 			}
 		}
 	}
@@ -339,8 +346,9 @@ int main(int argc, char **argv)
 	ce_gl_request(wantGpu ? 1 : 0);
 	const char *error = nullptr;
 	ce_session *session = ce_session_open(
-		packagePath, rom.data(), rom.size(), settings, nullptr, nullptr, nullptr, 0,
-		extraNames.data(), extraData.data(), extraLens.data(),
+		packagePath, rom.data(), rom.size(), romPathStore.empty() ? nullptr : romPathStore.c_str(),
+		settings, nullptr, nullptr, nullptr, 0,
+		extraNames.data(), extraData.data(), extraLens.data(), extraPaths.data(),
 		static_cast<int32_t>(extraNames.size()), &error);
 	if (session == nullptr) return fail(metaPath, error != nullptr ? error : "session open failed");
 

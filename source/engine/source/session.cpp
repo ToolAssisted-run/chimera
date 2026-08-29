@@ -654,12 +654,12 @@ extern "C" {
 
 ce_session *ce_session_open(
 	const char *package_path,
-	const uint8_t *rom, uint64_t rom_len,
+	const uint8_t *rom, uint64_t rom_len, const char *rom_path,
 	const char *settings_overrides_json,
 	const char *const *firmware_ids, const uint8_t *const *firmware_data,
 	const uint64_t *firmware_lens, int32_t firmware_count,
 	const char *const *extra_names, const uint8_t *const *extra_data,
-	const uint64_t *extra_lens, int32_t extra_count,
+	const uint64_t *extra_lens, const char *const *extra_paths, int32_t extra_count,
 	const char **error_out)
 {
 	auto fail = [&](std::string message) -> ce_session *
@@ -710,7 +710,8 @@ ce_session *ce_session_open(
 	ce_package_free(pkg);
 	pkg = nullptr; /* a later abort() must not free it again */
 
-	if (rom != nullptr && rom_len != 0) s->romBytes.assign(rom, rom + rom_len);
+	const bool romFromDisk = rom_path != nullptr && rom_path[0] != '\0';
+	if (!romFromDisk && rom != nullptr && rom_len != 0) s->romBytes.assign(rom, rom + rom_len);
 	s->settingsBytes = s->cfg.settingsJson;
 
 	// every mounted stream needs a stable address for the host's callback
@@ -729,9 +730,18 @@ ce_session *ce_session_open(
 	if (!r.ok()) return abort(r.errorMessage);
 	s->obj = reinterpret_cast<void *>(r.data);
 
-	s->streams.push_back({ s->romBytes.data(), s->romBytes.size() });
-	host->wbx_mount_file(s->obj, s->cfg.romFile.c_str(), streamRead, reinterpret_cast<uintptr_t>(&s->streams.back()), 0, &r);
-	if (!r.ok()) return abort(r.errorMessage);
+	/* The game itself, which is the one most likely to be enormous: mounted
+	 * from where it lies when the caller said where that is. */
+	if (romFromDisk)
+	{
+		host->wbx_mount_file_path(s->obj, s->cfg.romFile.c_str(), rom_path, &r);
+	}
+	else
+	{
+		s->streams.push_back({ s->romBytes.data(), s->romBytes.size() });
+		host->wbx_mount_file(s->obj, s->cfg.romFile.c_str(), streamRead, reinterpret_cast<uintptr_t>(&s->streams.back()), 0, &r);
+	}
+	if (!r.ok()) return abort(std::string("mounting ") + s->cfg.romFile + ": " + r.errorMessage);
 
 	/* the settings channel: always mounted (empty object when the core has no
 	 * settings), so the guest ABI is uniform */
@@ -752,10 +762,18 @@ ce_session *ce_session_open(
 	 * meaning (the same division firmware uses) */
 	for (int32_t i = 0; i < extra_count; i++)
 	{
-		s->extraBytes.emplace_back(extra_data[i], extra_data[i] + extra_lens[i]);
-		s->streams.push_back({ s->extraBytes.back().data(), s->extraBytes.back().size() });
-		host->wbx_mount_file(s->obj, extra_names[i], streamRead, reinterpret_cast<uintptr_t>(&s->streams.back()), 0, &r);
-		if (!r.ok()) return abort(r.errorMessage);
+		const char *path = extra_paths != nullptr ? extra_paths[i] : nullptr;
+		if (path != nullptr && path[0] != '\0')
+		{
+			host->wbx_mount_file_path(s->obj, extra_names[i], path, &r);
+		}
+		else
+		{
+			s->extraBytes.emplace_back(extra_data[i], extra_data[i] + extra_lens[i]);
+			s->streams.push_back({ s->extraBytes.back().data(), s->extraBytes.back().size() });
+			host->wbx_mount_file(s->obj, extra_names[i], streamRead, reinterpret_cast<uintptr_t>(&s->streams.back()), 0, &r);
+		}
+		if (!r.ok()) return abort(std::string("mounting ") + extra_names[i] + ": " + r.errorMessage);
 	}
 
 	std::string err;

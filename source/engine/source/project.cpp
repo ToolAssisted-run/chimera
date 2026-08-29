@@ -16,6 +16,7 @@
 #include "file_io.hpp"
 #include "manifest_util.hpp"
 #include "conditions.hpp"
+#include "sha1.hpp"
 
 #include "../../extern/tools/cjson/cJSON.h"
 
@@ -41,8 +42,23 @@ struct FileEntry
 	 * serialized: the project is distributable and a path is not. It exists so
 	 * a frontend can remember locations in a sidecar of its own. */
 	std::string sourcePath;
-	std::vector<uint8_t> data;
+	/* NOT the bytes. A project's files are read where they lie, when the
+	 * machine asks for them (see ce_session_open's file_paths): a PS2 disc is
+	 * over four gigabytes and holding one here would be four gigabytes nothing
+	 * needed, on the way to a sandbox that reads it from the disk anyway. What
+	 * a project knows about a file is its name, its hash and where it is. */
+	uint64_t size = 0;
 };
+
+/* A cue is a few hundred bytes of text naming its tracks, so it IS read - the
+ * point of not holding files is the big ones. Empty when it will not read,
+ * which the callers all treat as "no references". */
+std::vector<uint8_t> readSmall(const std::string &path)
+{
+	std::vector<uint8_t> out;
+	if (!path.empty()) chimera::readFile(path.c_str(), out);
+	return out;
+}
 
 struct Marker
 {
@@ -366,7 +382,7 @@ int32_t ce_project_save(ce_project *p, const char *path, const char **error_out)
 	for (const FileEntry &e : p->files)
 	{
 		if (!hasCueSuffix(e.name) || e.status == 1) continue;
-		for (const std::string &ref : cueReferences(e.data))
+		for (const std::string &ref : cueReferences(readSmall(e.sourcePath)))
 		{
 			bool listed = false;
 			for (const FileEntry &other : p->files)
@@ -771,19 +787,18 @@ int32_t ce_project_file_add(ce_project *p, const char *name, const char *slot, c
 	{
 		if (prior.name == e.name) return failInt("file '" + e.name + "' is already listed", error_out);
 	}
-	if (source_path == nullptr || !chimera::readFile(source_path, e.data))
+	if (source_path == nullptr || !chimera::sha1HexOfFile(source_path, &e.size, e.actualSha1))
 	{
 		return failInt("cannot read '" + e.name + "' from " +
 			(source_path != nullptr ? source_path : "(null)"), error_out);
 	}
-	hashInto(e.data, e.actualSha1);
 	e.sha1 = e.actualSha1;
 	e.status = 0;
 	e.sourcePath = source_path;
 	std::string folder = folderOf(source_path);
 	std::string cueName = e.name;
 	bool isCue = hasCueSuffix(e.name);
-	std::vector<std::string> refs = isCue ? cueReferences(e.data) : std::vector<std::string>();
+	std::vector<std::string> refs = isCue ? cueReferences(readSmall(source_path)) : std::vector<std::string>();
 	size_t before = p->files.size();
 	p->files.push_back(std::move(e));
 
@@ -810,11 +825,10 @@ int32_t ce_project_file_add(ce_project *p, const char *name, const char *slot, c
 		FileEntry s;
 		s.name = ref;
 		s.slot = "support";
-		if (!chimera::readFile((folder + ref).c_str(), s.data))
+		if (!chimera::sha1HexOfFile((folder + ref).c_str(), &s.size, s.actualSha1))
 		{
 			return failCue("'" + cueName + "' references '" + ref + "', which is not next to it - a cue's files are added together");
 		}
-		hashInto(s.data, s.actualSha1);
 		s.sha1 = s.actualSha1;
 		s.status = 0;
 		s.sourcePath = folder + ref;
@@ -870,14 +884,11 @@ const char *ce_project_file_source_path(const ce_project *p, int32_t index)
 	return p->files[index].sourcePath.c_str();
 }
 
-const uint8_t *ce_project_file_data(const ce_project *p, int32_t index, uint64_t *len_out)
+uint64_t ce_project_file_size(const ce_project *p, int32_t index)
 {
-	if (len_out != nullptr) *len_out = 0;
-	if (index < 0 || index >= ce_project_file_count(p)) return nullptr;
+	if (index < 0 || index >= ce_project_file_count(p)) return 0;
 	const FileEntry &e = p->files[index];
-	if (e.status == 1) return nullptr;
-	if (len_out != nullptr) *len_out = e.data.size();
-	return e.data.data();
+	return e.status == 1 ? 0 : e.size;
 }
 
 int32_t ce_project_file_resolve(ce_project *p, int32_t index, const char *path, const char **error_out)
@@ -888,13 +899,10 @@ int32_t ce_project_file_resolve(ce_project *p, int32_t index, const char *path, 
 		return failInt("no such file entry", error_out);
 	}
 	FileEntry &e = p->files[index];
-	std::vector<uint8_t> data;
-	if (path == nullptr || !chimera::readFile(path, data))
+	if (path == nullptr || !chimera::sha1HexOfFile(path, &e.size, e.actualSha1))
 	{
 		return failInt("cannot read '" + e.name + "' from " + (path != nullptr ? path : "(null)"), error_out);
 	}
-	e.data = std::move(data);
-	hashInto(e.data, e.actualSha1);
 	e.status = e.actualSha1 == e.sha1 ? 0 : 2;
 	e.sourcePath = path;
 	return 0;
@@ -904,8 +912,7 @@ void ce_project_file_unresolve(ce_project *p, int32_t index)
 {
 	if (index < 0 || index >= ce_project_file_count(p)) return;
 	FileEntry &e = p->files[index];
-	e.data.clear();
-	e.data.shrink_to_fit();
+	e.size = 0;
 	e.actualSha1.clear();
 	e.sourcePath.clear();
 	e.status = 1;
@@ -920,11 +927,8 @@ int32_t ce_project_resolve_dir(ce_project *p, const char *dir)
 	for (FileEntry &e : p->files)
 	{
 		if (e.status != 1) continue;
-		std::vector<uint8_t> data;
 		const std::string path = base + e.name;
-		if (!chimera::readFile(path.c_str(), data)) continue;
-		e.data = std::move(data);
-		hashInto(e.data, e.actualSha1);
+		if (!chimera::sha1HexOfFile(path.c_str(), &e.size, e.actualSha1)) continue;
 		e.status = e.actualSha1 == e.sha1 ? 0 : 2;
 		e.sourcePath = path;
 		resolved++;

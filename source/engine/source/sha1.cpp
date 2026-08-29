@@ -7,6 +7,9 @@
 #include "chimera/engine.h"
 
 #include <cstring>
+#include <vector>
+
+#include "file_io.hpp"
 
 namespace chimera {
 
@@ -84,6 +87,40 @@ struct Sha1
 };
 
 } // namespace
+
+/* The same digest, without the file in memory.
+ *
+ * A disc image is gigabytes and its hash is 40 characters; reading it whole to
+ * produce them is a copy nothing needed. Returns false only when the file will
+ * not open or will not read - a caller cannot tell a wrong hash from a missing
+ * one by looking at the string, so it is told. */
+bool sha1HexOfFile(const char *utf8Path, uint64_t *lenOut, std::string &out)
+{
+	FileReader reader;
+	if (!reader.open(utf8Path)) return false;
+	Sha1 sha;
+	std::vector<uint8_t> chunk(1 << 20);
+	uint64_t total = 0;
+	for (;;)
+	{
+		uint64_t got = reader.read(chunk.data(), chunk.size());
+		if (got == 0) break;
+		sha.update(chunk.data(), got);
+		total += got;
+	}
+	if (!reader.ok()) return false;
+	uint8_t digest[20];
+	sha.finish(digest);
+	static const char *hex = "0123456789ABCDEF";
+	out.assign(40, '0');
+	for (int i = 0; i < 20; i++)
+	{
+		out[i * 2] = hex[digest[i] >> 4];
+		out[i * 2 + 1] = hex[digest[i] & 0xF];
+	}
+	if (lenOut != nullptr) *lenOut = total;
+	return true;
+}
 
 std::string sha1Hex(const uint8_t *data, uint64_t len)
 {

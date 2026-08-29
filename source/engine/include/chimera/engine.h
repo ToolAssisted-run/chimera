@@ -526,8 +526,14 @@ CE_API int32_t ce_project_file_status(const ce_project *p, int32_t index);
  * has no business carrying one machine's paths. A frontend that wants to
  * remember locations keeps its own sidecar and reads them from here. */
 CE_API const char *ce_project_file_source_path(const ce_project *p, int32_t index);
-/* the resolved bytes (NULL while unresolved); borrowed, live as long as p */
-CE_API const uint8_t *ce_project_file_data(const ce_project *p, int32_t index, uint64_t *len_out);
+/* How many bytes the resolved file holds, or 0 while unresolved.
+ *
+ * There is deliberately no call for the BYTES. A project's files stay where
+ * they are and are read when the machine asks for them (ce_session_open's
+ * file_paths): a PS2 disc is over four gigabytes, and every copy of one
+ * between the disk and the guest is four gigabytes nothing needed. What a
+ * project knows about a file is its name, its hash, its size and its path. */
+CE_API uint64_t ce_project_file_size(const ce_project *p, int32_t index);
 
 /* Resolves one file from a caller-provided location (the per-session
  * resolution dialog): reads, hashes, sets status 0 or 2. The on-disk name
@@ -622,14 +628,30 @@ typedef struct ce_session ce_session;
  * next failed open) on any failure - an unreadable package, a missing
  * export, a core that refused the rom (its GetLoadError text is the message
  * when it gives one). */
+/* Opens a machine.
+ *
+ * A file reaches the guest one of two ways, and the choice is per file. Give
+ * BYTES (rom/rom_len, extra_data/extra_lens) for something the caller made or
+ * already holds - a settings blob, a slot map, a name. Give a PATH (rom_path,
+ * extra_paths[i], either may be NULL for "use the bytes") for something that
+ * exists on disk, and it is never read into memory at all: the guest's reads
+ * go to the file as it makes them.
+ *
+ * That is not a tuning knob. A PS2 disc image is over four gigabytes and a
+ * .NET byte[] cannot hold two, so bytes are not merely wasteful for a disc,
+ * they are impossible. The bytes a guest sees are identical either way, a
+ * read-only file has nothing a savestate must carry, and the machine cannot
+ * tell the difference - so the only rule is that a file must not change while
+ * a session has it open. Firmware stays bytes: it is small, and a frontend
+ * resolves it from its own store rather than from a path the project knows. */
 CE_API ce_session *ce_session_open(
 	const char *package_path,
-	const uint8_t *rom, uint64_t rom_len,
+	const uint8_t *rom, uint64_t rom_len, const char *rom_path,
 	const char *settings_overrides_json,
 	const char *const *firmware_ids, const uint8_t *const *firmware_data,
 	const uint64_t *firmware_lens, int32_t firmware_count,
 	const char *const *extra_names, const uint8_t *const *extra_data,
-	const uint64_t *extra_lens, int32_t extra_count,
+	const uint64_t *extra_lens, const char *const *extra_paths, int32_t extra_count,
 	const char **error_out);
 
 CE_API void ce_session_free(ce_session *s);

@@ -12,6 +12,7 @@
 
 #include <cassert>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <string>
 
@@ -23,6 +24,19 @@ static void writeFile(const std::string &name, const std::string &content)
 	assert(f != nullptr);
 	std::fwrite(content.data(), 1, content.size(), f);
 	std::fclose(f);
+}
+
+/* A file bigger than a 32-bit length, made sparse so it costs no disk: the
+ * point is the SIZE arithmetic, not the bytes. Returns false when the
+ * filesystem will not make one, which is not a failure of the project. */
+static bool writeSparse(const std::string &name, uint64_t size)
+{
+	FILE *f = std::fopen((g_dir + "/" + name).c_str(), "wb");
+	if (f == nullptr) return false;
+	bool ok = fseeko(f, static_cast<off_t>(size) - 1, SEEK_SET) == 0
+		&& std::fputc(0, f) != EOF;
+	std::fclose(f);
+	return ok;
 }
 
 static std::string sha1Of(const std::string &content)
@@ -131,15 +145,18 @@ int main(int argc, char **argv)
 
 		assert(ce_project_file_count(p) == 4);
 		assert(ce_project_file_status(p, 0) == 1);
-		assert(ce_project_file_data(p, 0, nullptr) == nullptr);
+		assert(ce_project_file_size(p, 0) == 0);            // unresolved: nothing known yet
+		assert(ce_project_file_source_path(p, 0)[0] == '\0');
 		assert(ce_project_files_ok(p) == 0);
 		assert(std::strcmp(ce_project_file_sha1(p, 2), sha1Of("second disc bytes").c_str()) == 0);
 
 		// resolution by folder: the "files beside the project" convenience
 		assert(ce_project_resolve_dir(p, g_dir.c_str()) == 4);
 		assert(ce_project_files_ok(p) == 1);
-		const uint8_t *data = ce_project_file_data(p, 2, &len);
-		assert(data != nullptr && len == std::strlen("second disc bytes"));
+		// a resolved file says how big it is and WHERE it is; the bytes stay on
+		// the disk until a machine asks for them
+		assert(ce_project_file_size(p, 2) == std::strlen("second disc bytes"));
+		assert(std::string(ce_project_file_source_path(p, 2)) == g_dir + "/disc2.iso");
 
 		// the slot map the session mounts: manifest order, support excluded
 		const char *slots = ce_project_slots_text(p, &len);
@@ -309,6 +326,36 @@ int main(int argc, char **argv)
 		assert(std::string(refs, len) == "[\"track01.bin\",\"track02.bin\"]");
 		refs = ce_cue_references("not a cue at all", 16, &len);
 		assert(std::string(refs, len) == "[]");
+	}
+
+	// A file no byte[] could hold, and no 32-bit length could count.
+	//
+	// This is the whole reason a project keeps paths rather than bytes: a PS2
+	// disc is over four gigabytes. What is checked is that the size survives
+	// intact (a truncation to 32 bits would show here and nowhere else) and
+	// that adding it costs nothing but the hash - the file is sparse, so a
+	// build that read it whole would have to find 5GB of memory to do it.
+	//
+	// OPT-IN, because it hashes five gigabytes and takes half a minute, and
+	// this gate runs on every build: CHIMERA_BIG_FILE_TEST=1 to include it.
+	if (std::getenv("CHIMERA_BIG_FILE_TEST") != nullptr)
+	{
+		const uint64_t huge = 5ULL << 30;
+		if (writeSparse("huge.iso", huge))
+		{
+			ce_project *p = ce_project_new();
+			const char *err = nullptr;
+			assert(ce_project_file_add(p, "huge.iso", "disc", (g_dir + "/huge.iso").c_str(), &err) == 0);
+			assert(ce_project_file_size(p, 0) == huge);
+			assert(ce_project_file_status(p, 0) == 0);
+			assert(std::string(ce_project_file_source_path(p, 0)) == g_dir + "/huge.iso");
+			ce_project_free(p);
+			std::remove((g_dir + "/huge.iso").c_str());
+		}
+		else
+		{
+			std::printf("project: skipped the 5GB entry (no sparse file here)\n");
+		}
 	}
 
 	std::printf("project: all assertions passed\n");

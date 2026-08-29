@@ -76,11 +76,14 @@ namespace Chimera.Tests.Emulation.Common.Engine
 				Assert.AreEqual("game.img", p.FileName(0));
 				Assert.AreEqual("floppy", p.FileSlot(0));
 				Assert.AreEqual(1, p.FileStatus(0));
-				Assert.IsNull(p.FileData(0));
+				Assert.AreEqual(0UL, p.FileSize(0), "nothing is known about a file until it is resolved");
+				Assert.AreEqual("", p.FileSourcePath(0));
 				Assert.IsFalse(p.FilesOk);
 				Assert.AreEqual(1, p.ResolveDir(_dir));
 				Assert.IsTrue(p.FilesOk);
-				Assert.AreEqual("floppy bytes".Length, p.FileData(0)!.Length);
+				// resolved means "we know where it is and how big", not "we read it"
+				Assert.AreEqual((ulong)"floppy bytes".Length, p.FileSize(0));
+				StringAssert.EndsWith(p.FileSourcePath(0), "game.img");
 				StringAssert.Contains(p.SlotsJson, "\"floppy\":[\"game.img\"]");
 			}
 		}

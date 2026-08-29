@@ -68,7 +68,13 @@ namespace Chimera.Emulation.Common.Waterbox
 		/// </summary>
 		public static string HostBuildInfo => EngineSession.HostBuildInfo;
 
-		public WaterboxCore(byte[] rom, WaterboxConfig cfg, string packageDir, WaterboxCoreSettings settings = null, IReadOnlyDictionary<string, byte[]> firmware = null, IReadOnlyList<KeyValuePair<string, byte[]>> extraFiles = null)
+		/// <param name="rom">the game's bytes, or null when <paramref name="romPath"/> is given</param>
+		/// <param name="romPath">
+		/// Where the game lies, for the usual case of a file on disk: the engine
+		/// mounts it and the machine reads it from there, so nothing is loaded.
+		/// A disc image is routinely bigger than a byte[] can be.
+		/// </param>
+		public WaterboxCore(byte[] rom, string romPath, WaterboxConfig cfg, string packageDir, WaterboxCoreSettings settings = null, IReadOnlyDictionary<string, byte[]> firmware = null, IReadOnlyList<CoreFile> extraFiles = null)
 		{
 			_cfg = cfg;
 			_settings = settings?.Clone() ?? new WaterboxCoreSettings();
@@ -93,7 +99,7 @@ namespace Chimera.Emulation.Common.Waterbox
 			{
 				var effective = EffectiveSettings();
 				_session = EngineSession.Open(
-					packageDir, rom, SerializeSettings(effective), firmware, extraFiles,
+					packageDir, rom, romPath, SerializeSettings(effective), firmware, extraFiles,
 					wantGpu: WantsGpu(effective));
 			}
 			catch (InvalidOperationException ex)

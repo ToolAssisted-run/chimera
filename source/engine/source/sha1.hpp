@@ -12,6 +12,11 @@ namespace chimera {
 /* 40 uppercase hex characters. */
 std::string sha1Hex(const uint8_t *data, uint64_t len);
 
+/* The same digest taken by reading the file, without holding it: for a disc
+ * image, the difference between four gigabytes and none. lenOut, when given,
+ * receives the length that was hashed. */
+bool sha1HexOfFile(const char *utf8Path, uint64_t *lenOut, std::string &out);
+
 } // namespace chimera
 
 #endif

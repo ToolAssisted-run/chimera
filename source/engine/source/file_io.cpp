@@ -44,6 +44,48 @@ FILE *openWrite(const char *utf8Path)
 
 } // namespace
 
+FileReader::~FileReader() { close(); }
+
+bool FileReader::open(const char *utf8Path)
+{
+	close();
+	_f = openRead(utf8Path);
+	return _f != nullptr;
+}
+
+uint64_t FileReader::read(uint8_t *dst, uint64_t max)
+{
+	if (_f == nullptr) return 0;
+	return std::fread(dst, 1, static_cast<size_t>(max), static_cast<FILE *>(_f));
+}
+
+bool FileReader::ok() const
+{
+	return _f != nullptr && std::ferror(static_cast<FILE *>(_f)) == 0;
+}
+
+void FileReader::close()
+{
+	if (_f != nullptr) { std::fclose(static_cast<FILE *>(_f)); _f = nullptr; }
+}
+
+bool fileSize(const char *utf8Path, uint64_t *out)
+{
+	FILE *f = openRead(utf8Path);
+	if (f == nullptr) return false;
+#if defined(_WIN32)
+	bool ok = _fseeki64(f, 0, SEEK_END) == 0;
+	long long end = ok ? _ftelli64(f) : -1;
+#else
+	bool ok = std::fseek(f, 0, SEEK_END) == 0;
+	long long end = ok ? std::ftell(f) : -1;
+#endif
+	std::fclose(f);
+	if (!ok || end < 0) return false;
+	if (out != nullptr) *out = static_cast<uint64_t>(end);
+	return true;
+}
+
 bool readFile(const char *utf8Path, std::vector<uint8_t> &out)
 {
 	FILE *f = openRead(utf8Path);

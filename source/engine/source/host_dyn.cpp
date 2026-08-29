@@ -94,6 +94,7 @@ void loadOnce()
 		&& bind(g_api.wbx_get_callback_addr, "wbx_get_callback_addr")
 		&& bind(g_api.wbx_seal, "wbx_seal")
 		&& bind(g_api.wbx_mount_file, "wbx_mount_file")
+		&& bind(g_api.wbx_mount_file_path, "wbx_mount_file_path")
 		&& bind(g_api.wbx_save_state, "wbx_save_state")
 		&& bind(g_api.wbx_load_state, "wbx_load_state");
 	if (!g_ok) g_error = "libminiboxhost is missing expected wbx_ symbols";

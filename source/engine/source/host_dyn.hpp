@@ -48,6 +48,8 @@ struct HostApi
 	void (*wbx_get_callback_addr)(void *obj, void *callback, uintptr_t slot, WbxReturn *ret);
 	void (*wbx_seal)(void *obj, WbxReturn *ret);
 	void (*wbx_mount_file)(void *obj, const char *name, WbxReadCb cb, uintptr_t userdata, uint8_t writable, WbxReturn *ret);
+	/* read-only, read from the host's disk as the guest asks - no copy */
+	void (*wbx_mount_file_path)(void *obj, const char *name, const char *host_path, WbxReturn *ret);
 	void (*wbx_save_state)(void *obj, WbxWriteCb cb, uintptr_t userdata, WbxReturn *ret);
 	void (*wbx_load_state)(void *obj, WbxReadCb cb, uintptr_t userdata, WbxReturn *ret);
 };

@@ -85,7 +85,10 @@ namespace Chimera.Emulation.Common.Waterbox
 			// one of these (the witness gate counts them)
 			Console.WriteLine($"[waterbox] booting {CoreName}");
 			return new WaterboxCore(
-				rom.FileData,
+				// a file on disk is mounted from there; only a rom the frontend
+				// made (or pulled out of an archive) arrives as bytes
+				rom.RomPath is { Length: > 0 } path && File.Exists(path) ? null : rom.FileData,
+				rom.RomPath,
 				_cfg,
 				_packageDir,
 				settings,
@@ -138,9 +141,10 @@ namespace Chimera.Emulation.Common.Waterbox
 			{
 				foreach (var extra in ctx.ExtraFiles)
 				{
-					if (extra.Key is "slots")
+					// the slot map is one the frontend made, so it has bytes
+					if (extra.Name is "slots" && extra.Data is not null)
 					{
-						slotsJson = System.Text.Encoding.UTF8.GetString(extra.Value);
+						slotsJson = System.Text.Encoding.UTF8.GetString(extra.Data);
 						break;
 					}
 				}

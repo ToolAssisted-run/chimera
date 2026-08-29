@@ -16,6 +16,30 @@ namespace chimera {
 /* false when the file cannot be opened or read; out is only valid on true. */
 bool readFile(const char *utf8Path, std::vector<uint8_t> &out);
 
+/* A file read a piece at a time, for the ones too big to want whole: a PS2
+ * disc image is over four gigabytes, and nothing the engine does with one
+ * needs it in memory. Same UTF-8 path handling as the whole-file calls. */
+class FileReader
+{
+public:
+	FileReader() = default;
+	~FileReader();
+	FileReader(const FileReader &) = delete;
+	FileReader &operator=(const FileReader &) = delete;
+
+	bool open(const char *utf8Path);
+	/* bytes read, 0 at end of file (or on error - ask ok()) */
+	uint64_t read(uint8_t *dst, uint64_t max);
+	bool ok() const;
+	void close();
+
+private:
+	void *_f = nullptr;   /* FILE*, kept opaque so the header stays clean */
+};
+
+/* The file's size in bytes, or false if it cannot be measured. */
+bool fileSize(const char *utf8Path, uint64_t *out);
+
 bool fileExists(const char *utf8Path);
 
 /* whole-file write (multifile descriptors); false on any failure */

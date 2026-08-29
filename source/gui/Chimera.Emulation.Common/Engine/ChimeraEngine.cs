@@ -415,7 +415,7 @@ namespace Chimera.Emulation.Common.Engine
 		public abstract IntPtr ce_project_file_source_path(IntPtr project, int index);
 
 		[ChimeraImport(CallingConvention.Cdecl)]
-		public abstract IntPtr ce_project_file_data(IntPtr project, int index, ref ulong lenOut);
+		public abstract ulong ce_project_file_size(IntPtr project, int index);
 
 		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_project_file_resolve(IntPtr project, int index, string path, ref IntPtr errorOut);
@@ -437,9 +437,9 @@ namespace Chimera.Emulation.Common.Engine
 
 		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_session_open(
-			string packagePath, byte[] rom, ulong romLen, string? settingsOverridesJson,
+			string packagePath, byte[]? rom, ulong romLen, string? romPath, string? settingsOverridesJson,
 			IntPtr[]? firmwareIds, IntPtr[]? firmwareData, ulong[]? firmwareLens, int firmwareCount,
-			IntPtr[]? extraNames, IntPtr[]? extraData, ulong[]? extraLens, int extraCount,
+			IntPtr[]? extraNames, IntPtr[]? extraData, ulong[]? extraLens, IntPtr[]? extraPaths, int extraCount,
 			ref IntPtr errorOut);
 
 		[ChimeraImport(CallingConvention.Cdecl)]
@@ -1275,16 +1275,16 @@ namespace Chimera.Emulation.Common.Engine
 		public string FileSourcePath(int index)
 			=> ChimeraEngine.PtrToStringUtf8(ChimeraEngine.Instance.ce_project_file_source_path(_project, index)) ?? "";
 
-		/// <returns>the resolved bytes, or null while unresolved</returns>
-		public byte[]? FileData(int index)
-		{
-			ulong len = 0;
-			var p = ChimeraEngine.Instance.ce_project_file_data(_project, index, ref len);
-			if (p == IntPtr.Zero) return null;
-			var ret = new byte[len];
-			Marshal.Copy(p, ret, 0, checked((int)len));
-			return ret;
-		}
+		/// <summary>
+		/// How many bytes the resolved file holds, or 0 while unresolved.
+		///
+		/// There is deliberately no way to ask for the BYTES. A project's files
+		/// stay where they are and the machine reads them from there: a PS2 disc
+		/// is over four gigabytes, which is more than a byte[] can hold at all,
+		/// and every copy on the way to the sandbox was a copy of that.
+		/// </summary>
+		public ulong FileSize(int index)
+			=> ChimeraEngine.Instance.ce_project_file_size(_project, index);
 
 		/// <summary>Resolves one file from a caller-provided location; a hash mismatch is a status, not an error.</summary>
 		/// <exception cref="InvalidOperationException">the path is unreadable</exception>
@@ -1351,10 +1351,17 @@ namespace Chimera.Emulation.Common.Engine
 		/// not give a context, or a core with no GL renderer all end in the
 		/// software path, and <see cref="GpuDrew"/> is what says which happened.
 		/// </param>
+		/// <param name="rom">the game's bytes, or null when <paramref name="romPath"/> says where it is</param>
+		/// <param name="romPath">
+		/// Where the game lies. Given one, the engine mounts the file and the
+		/// machine reads it from the disk as it goes - nothing is loaded. That is
+		/// the only way a PS2 disc can be opened at all: over four gigabytes, and
+		/// a byte[] tops out below two.
+		/// </param>
 		public static EngineSession Open(
-			string packagePath, byte[] rom, string? settingsOverridesJson,
+			string packagePath, byte[]? rom, string? romPath, string? settingsOverridesJson,
 			IReadOnlyDictionary<string, byte[]>? firmware,
-			IReadOnlyList<KeyValuePair<string, byte[]>>? extraFiles = null,
+			IReadOnlyList<CoreFile>? extraFiles = null,
 			bool wantGpu = false)
 		{
 			var count = firmware?.Count ?? 0;
@@ -1365,6 +1372,7 @@ namespace Chimera.Emulation.Common.Engine
 			var extraNames = new IntPtr[Math.Max(extraCount, 1)];
 			var extraData = new IntPtr[Math.Max(extraCount, 1)];
 			var extraLens = new ulong[Math.Max(extraCount, 1)];
+			var extraPaths = new IntPtr[Math.Max(extraCount, 1)];
 			var allocated = new List<IntPtr>();
 			IntPtr AllocUtf8(string text)
 			{
@@ -1393,17 +1401,20 @@ namespace Chimera.Emulation.Common.Engine
 				}
 				for (var e = 0; e < extraCount; e++)
 				{
-					extraNames[e] = AllocUtf8(extraFiles![e].Key);
-					extraData[e] = AllocBlob(extraFiles[e].Value);
-					extraLens[e] = (ulong)extraFiles[e].Value.LongLength;
+					var file = extraFiles![e];
+					extraNames[e] = AllocUtf8(file.Name);
+					// a path wins: the bytes were never read, and there are none
+					extraPaths[e] = file.Path is null ? IntPtr.Zero : AllocUtf8(file.Path);
+					extraData[e] = AllocBlob(file.Data ?? [ ]);
+					extraLens[e] = (ulong)(file.Data?.LongLength ?? 0);
 				}
 				// a global switch, not a per-session one, so it is set every time
 				ChimeraEngine.Instance.ce_gl_request(wantGpu ? 1 : 0);
 				var error = IntPtr.Zero;
 				var session = ChimeraEngine.Instance.ce_session_open(
-					packagePath, rom, (ulong)rom.LongLength, settingsOverridesJson,
+					packagePath, rom, (ulong)(rom?.LongLength ?? 0), romPath, settingsOverridesJson,
 					ids, blobs, lens, count,
-					extraNames, extraData, extraLens, extraCount, ref error);
+					extraNames, extraData, extraLens, extraPaths, extraCount, ref error);
 				if (session == IntPtr.Zero)
 				{
 					throw new InvalidOperationException(ChimeraEngine.PtrToStringUtf8(error) ?? "the engine could not open a session");
