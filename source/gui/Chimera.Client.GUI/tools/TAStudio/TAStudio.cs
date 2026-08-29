@@ -257,7 +257,7 @@ namespace Chimera.Client.GUI
 		private bool _movingPair;
 
 		/// <summary>where each window was when we last looked, to take a delta from</summary>
-		private Point _lastMine, _lastMain;
+		private Point _lastMain;
 
 		private Form MainWindow => MainForm as Form;
 
@@ -276,15 +276,12 @@ namespace Chimera.Client.GUI
 			var main = MainWindow;
 			if (main is null) return;
 
-			_lastMine = Location;
 			_lastMain = main.Location;
 			_lastMainRight = main.Right;
-			Move += FollowFromTastudio;
 			main.Move += FollowFromMainWindow;
 			main.SizeChanged += FollowMainWindowResize;
 			FormClosed += (_, _) =>
 			{
-				Move -= FollowFromTastudio;
 				main.Move -= FollowFromMainWindow;
 				main.SizeChanged -= FollowMainWindowResize;
 			};
@@ -311,27 +308,6 @@ namespace Chimera.Client.GUI
 			try
 			{
 				PlaceBesideMainWindow();
-				_lastMine = Location;
-				_lastMain = main.Location;
-			}
-			finally
-			{
-				_movingPair = false;
-			}
-		}
-
-		private void FollowFromTastudio(object sender, EventArgs e)
-		{
-			var main = MainWindow;
-			if (main is null) return;
-			var delta = new Size(Location.X - _lastMine.X, Location.Y - _lastMine.Y);
-			_lastMine = Location;
-			if (!ShouldMovePair(main)) { _lastMain = main.Location; return; }
-
-			_movingPair = true;
-			try
-			{
-				main.Location += delta;
 				_lastMain = main.Location;
 			}
 			finally
@@ -346,13 +322,12 @@ namespace Chimera.Client.GUI
 			if (main is null) return;
 			var delta = new Size(main.Location.X - _lastMain.X, main.Location.Y - _lastMain.Y);
 			_lastMain = main.Location;
-			if (!ShouldMovePair(main)) { _lastMine = Location; return; }
+			if (!ShouldMovePair(main)) return;
 
 			_movingPair = true;
 			try
 			{
 				Location += delta;
-				_lastMine = Location;
 			}
 			finally
 			{
@@ -361,10 +336,16 @@ namespace Chimera.Client.GUI
 		}
 
 		/// <summary>
-		/// A move is followed unless it was one WE made (or the pair would chase
-		/// each other), the user asked for one window alone with shift, the
-		/// feature is off, or either window is minimised or maximised - where a
-		/// position is not something the user is choosing.
+		/// The main window's move is followed unless it was one WE made, the user
+		/// asked for one window alone with shift, the feature is off, or either
+		/// window is minimised or maximised - where a position is not something
+		/// the user is choosing.
+		///
+		/// It follows in ONE direction only. Dragging the main window brings
+		/// TAStudio along, because the main window is the thing being put
+		/// somewhere and TAStudio is its shoulder. Dragging TAStudio moves
+		/// TAStudio: that is somebody arranging the pair, and dragging the main
+		/// window out from under them would be the opposite of what they asked.
 		/// </summary>
 		private bool ShouldMovePair(Form main)
 			=> !_movingPair

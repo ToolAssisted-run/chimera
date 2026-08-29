@@ -362,7 +362,7 @@ namespace Chimera.Client.GUI
 			this.MoveWithMainWindowMenuItem.Name = "MoveWithMainWindowMenuItem";
 			this.MoveWithMainWindowMenuItem.Size = new System.Drawing.Size(156, 22);
 			this.MoveWithMainWindowMenuItem.Text = "&Move with the main window";
-			this.MoveWithMainWindowMenuItem.ToolTipText = "Drag either window and the other keeps its place beside it. Hold Shift while dragging to move one alone.";
+			this.MoveWithMainWindowMenuItem.ToolTipText = "Drag the main window and this one comes along, keeping its place beside it. Drag this one and it moves alone. Hold Shift to move the main window without this one.";
 			this.MoveWithMainWindowMenuItem.Click += new System.EventHandler(this.MoveWithMainWindowMenuItem_Click);
 			// 
 			// TAStudioSettingsToolStripMenuItem
