@@ -825,7 +825,6 @@ namespace Chimera.Client.GUI
 				Tools.LoadRamWatch(!Config.DisplayRamWatch);
 			}
 
-			Tools.AutoLoad();
 			HandlePlatformMenus();
 		}
 

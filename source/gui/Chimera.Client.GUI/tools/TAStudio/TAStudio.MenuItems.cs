@@ -933,12 +933,7 @@ namespace Chimera.Client.GUI
 			BookMarkControl.Branch();
 		}
 
-		private void TASEditorManualOnlineMenuItem_Click(object sender, EventArgs e)
-		{
-			Util.OpenUrlExternal("http://www.fceux.com/web/help/taseditor/");
-		}
-
-		private void SettingsSubMenu_DropDownOpened(object sender, EventArgs e)
+		private void WindowSubMenu_DropDownOpened(object sender, EventArgs e)
 			=> MoveWithMainWindowMenuItem.Checked = Settings.MoveWithMainWindow;
 
 		private void MoveWithMainWindowMenuItem_Click(object sender, EventArgs e)

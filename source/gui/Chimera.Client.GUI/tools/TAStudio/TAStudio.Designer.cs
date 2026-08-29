@@ -76,11 +76,7 @@ namespace Chimera.Client.GUI
 			this.MoveWithMainWindowMenuItem = new System.Windows.Forms.ToolStripMenuItem();
 			this.ColumnsSubMenu = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.toolStripSeparator19 = new Chimera.WinForms.Controls.ToolStripSeparatorEx();
-			this.HelpSubMenu = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.TASEditorManualOnlineMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.aboutToolStripMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
-			this.toolStripSeparator10 = new Chimera.WinForms.Controls.ToolStripSeparatorEx();
-			this.EnableTooltipsMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
+			this.WindowSubMenu = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.TasStatusStrip = new Chimera.WinForms.Controls.StatusStripEx();
 			this.MessageStatusLabel = new System.Windows.Forms.ToolStripStatusLabel();
 			this.ProgressBar = new System.Windows.Forms.ToolStripProgressBar();
@@ -143,7 +139,7 @@ namespace Chimera.Client.GUI
             this.MetaSubMenu,
             this.SettingsSubMenu,
             this.ColumnsSubMenu,
-            this.HelpSubMenu});
+            this.WindowSubMenu});
 			this.TASMenu.TabIndex = 0;
 			// 
 			// saveSelectionToMacroToolStripMenuItem
@@ -352,16 +348,14 @@ namespace Chimera.Client.GUI
 			// SettingsSubMenu
 			// 
 			this.SettingsSubMenu.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
-            this.MoveWithMainWindowMenuItem,
             this.TAStudioSettingsToolStripMenuItem});
 			this.SettingsSubMenu.Text = "&Settings";
-			this.SettingsSubMenu.DropDownOpened += new System.EventHandler(this.SettingsSubMenu_DropDownOpened);
 			// 
 			// MoveWithMainWindowMenuItem
 			// 
 			this.MoveWithMainWindowMenuItem.Name = "MoveWithMainWindowMenuItem";
 			this.MoveWithMainWindowMenuItem.Size = new System.Drawing.Size(156, 22);
-			this.MoveWithMainWindowMenuItem.Text = "&Move with the main window";
+			this.MoveWithMainWindowMenuItem.Text = "&Move with Main Window";
 			this.MoveWithMainWindowMenuItem.ToolTipText = "Drag the main window and this one comes along, keeping its place beside it. Drag this one and it moves alone. Hold Shift to move the main window without this one.";
 			this.MoveWithMainWindowMenuItem.Click += new System.EventHandler(this.MoveWithMainWindowMenuItem_Click);
 			// 
@@ -376,29 +370,16 @@ namespace Chimera.Client.GUI
 			// 
 			this.ColumnsSubMenu.Text = "&Columns";
 			// 
-			// HelpSubMenu
+			// WindowSubMenu
 			// 
-			this.HelpSubMenu.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
-            this.TASEditorManualOnlineMenuItem,
-            this.aboutToolStripMenuItem,
-            this.toolStripSeparator10,
-            this.EnableTooltipsMenuItem});
-			this.HelpSubMenu.Text = "&Help";
-			// 
-			// TASEditorManualOnlineMenuItem
-			// 
-			this.TASEditorManualOnlineMenuItem.Text = "TAS Editor Manual Online...";
-			this.TASEditorManualOnlineMenuItem.Click += new System.EventHandler(this.TASEditorManualOnlineMenuItem_Click);
-			// 
-			// aboutToolStripMenuItem
-			// 
-			this.aboutToolStripMenuItem.Enabled = false;
-			this.aboutToolStripMenuItem.Text = "&About";
-			// 
-			// EnableTooltipsMenuItem
-			// 
-			this.EnableTooltipsMenuItem.Enabled = false;
-			this.EnableTooltipsMenuItem.Text = "&Enable Tooltips";
+			// Where this window is put and how it behaves. The rest of its items -
+			// Save Window Position, Stay on Top, Float From Main Window, Restore
+			// Defaults - are appended by ToolManager, which puts them in a Window
+			// menu when a tool has one.
+			this.WindowSubMenu.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.MoveWithMainWindowMenuItem});
+			this.WindowSubMenu.Text = "&Window";
+			this.WindowSubMenu.DropDownOpened += new System.EventHandler(this.WindowSubMenu_DropDownOpened);
 			// 
 			// TasStatusStrip
 			// 
@@ -748,10 +729,7 @@ namespace Chimera.Client.GUI
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx ReselectClipboardMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx GoToFrameMenuItem;
 		private Chimera.WinForms.Controls.ToolStripSeparatorEx toolStripSeparator6;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx HelpSubMenu;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx EnableTooltipsMenuItem;
-		private Chimera.WinForms.Controls.ToolStripSeparatorEx toolStripSeparator10;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx aboutToolStripMenuItem;
+		private Chimera.WinForms.Controls.ToolStripMenuItemEx WindowSubMenu;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx SettingsSubMenu;
 		private StatusStripEx TasStatusStrip;
 		private System.Windows.Forms.ToolStripStatusLabel MessageStatusLabel;
@@ -802,7 +780,6 @@ namespace Chimera.Client.GUI
 		private System.Windows.Forms.SplitContainer BranchesMarkersSplit;
 		private System.Windows.Forms.SplitContainer MainVertialSplit;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx SetMarkerWithTextContextMenuItem;
-		private Chimera.WinForms.Controls.ToolStripMenuItemEx TASEditorManualOnlineMenuItem;
 		private System.Windows.Forms.ToolTip toolTip1;
 		private System.Windows.Forms.ToolStripMenuItem MoveWithMainWindowMenuItem;
 		private System.Windows.Forms.ToolStripMenuItem TAStudioSettingsToolStripMenuItem;

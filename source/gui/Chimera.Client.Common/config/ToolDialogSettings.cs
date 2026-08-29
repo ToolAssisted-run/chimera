@@ -28,7 +28,6 @@ namespace Chimera.Client.Common
 			SaveWindowPosition = true;
 			FloatingWindow = false;
 			TopMost = false;
-			AutoLoad = false;
 			Width = null;
 			Height = null;
 		}
@@ -81,7 +80,6 @@ namespace Chimera.Client.Common
 		public bool SaveWindowPosition { get; set; }
 		public bool TopMost { get; set; }
 		public bool FloatingWindow { get; set; }
-		public bool AutoLoad { get; set; }
 
 		[JsonIgnore]
 		public bool UseWindowPosition => SaveWindowPosition && Wndx.HasValue

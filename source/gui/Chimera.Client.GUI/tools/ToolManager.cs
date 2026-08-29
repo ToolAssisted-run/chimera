@@ -142,36 +142,6 @@ namespace Chimera.Client.GUI
 			return newTool;
 		}
 
-		public void AutoLoad()
-		{
-			var genericSettings = _config.CommonToolSettings
-				.Where(kvp => kvp.Value.AutoLoad)
-				.Select(kvp => kvp.Key);
-
-			var customSettings = _config.CustomToolSettings
-				.Where(list => list.Value.Any(kvp => kvp.Value is ToolDialogSettings settings && settings.AutoLoad))
-				.Select(kvp => kvp.Key);
-
-			var typeNames = genericSettings.Concat(customSettings);
-
-			foreach (var typename in typeNames)
-			{
-				// this type resolution might not be sufficient.  more investigation is needed
-				Type t = Type.GetType(typename);
-				if (t == null)
-				{
-					Console.WriteLine("BENIGN: Couldn't find type {0}", typename);
-				}
-				else
-				{
-					if (!IsLoaded(t))
-					{
-						Load(t, false);
-					}
-				}
-			}
-		}
-
 		private void RefreshSettings(Form form, ToolStripItemCollection menu, ToolDialogSettings settings, int idx)
 		{
 			((ToolStripMenuItem)menu[idx + 0]).Checked = settings.SaveWindowPosition;
@@ -188,7 +158,6 @@ namespace Chimera.Client.GUI
 				form.TopMost = settings.TopMost;
 			}
 			((ToolStripMenuItem)menu[idx + 2]).Checked = settings.FloatingWindow;
-			((ToolStripMenuItem)menu[idx + 3]).Checked = settings.AutoLoad;
 
 			// do we need to do this OnShown() as well?
 			form.Owner = settings.FloatingWindow ? null : _owner;
@@ -221,18 +190,19 @@ namespace Chimera.Client.GUI
 			{
 				if (c is MenuStrip ms)
 				{
+					// where the window options go: a tool with a Window menu says so
+					// by having one, and they belong there rather than under
+					// Settings, which is about the tool rather than its window
+					ToolStripItemCollection window = null, settingsMenu = null;
 					foreach (ToolStripMenuItem submenu in ms.Items)
 					{
-						if (submenu.Text.Contains("Settings"))
-						{
-							dest = submenu.DropDownItems;
-							dest.Add(new ToolStripSeparator());
-						}
-						else if (submenu.Text.Contains("File"))
-						{
-							AddCloseButton(submenu, form);
-						}
+						if (submenu.Text.Contains("Window")) window = submenu.DropDownItems;
+						else if (submenu.Text.Contains("Settings")) settingsMenu = submenu.DropDownItems;
+						else if (submenu.Text.Contains("File")) AddCloseButton(submenu, form);
 					}
+
+					dest = window ?? settingsMenu;
+					if (dest is not null && dest.Count > 0) dest.Add(new ToolStripSeparator());
 
 					if (dest == null)
 					{
@@ -254,8 +224,7 @@ namespace Chimera.Client.GUI
 
 			dest.Add("Save Window &Position");
 			dest.Add("Stay on &Top");
-			dest.Add("&Float from Parent");
-			dest.Add("&Autoload with Chimera");
+			dest.Add("&Float From Main Window");
 			dest.Add("Restore &Defaults");
 
 			RefreshSettings(form, dest, settings, idx);
@@ -316,12 +285,6 @@ namespace Chimera.Client.GUI
 				form.Owner = val ? null : _owner;
 			};
 			dest[idx + 3].Click += (o, e) =>
-			{
-				bool val = !((ToolStripMenuItem)o).Checked;
-				settings.AutoLoad = val;
-				((ToolStripMenuItem)o).Checked = val;
-			};
-			dest[idx + 4].Click += (o, e) =>
 			{
 				settings.RestoreDefaults();
 				RefreshSettings(form, dest, settings, idx);

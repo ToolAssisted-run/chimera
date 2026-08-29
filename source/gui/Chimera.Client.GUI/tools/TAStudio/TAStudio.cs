@@ -205,7 +205,6 @@ namespace Chimera.Client.GUI
 			_tasViewPanel.Controls.Add(_tasViewVBar);
 
 			recentMacrosToolStripMenuItem.Image = Resources.Recent;
-			TASEditorManualOnlineMenuItem.Image = Resources.Help;
 			Icon = ToolIcon;
 
 			_defaultMainSplitDistance = MainVertialSplit.SplitterDistance;
