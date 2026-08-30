@@ -29,7 +29,7 @@ namespace Chimera.Emulation.Common.Waterbox
 		portedVersion: "1.0.0",
 		portedUrl: "https://github.com/SergioMartin86/miniBox")]
 	public sealed partial class WaterboxCore : IEmulator, IVideoProvider, ISoundProvider, IStatable, IInputPollable, IGpuRendered,
-		ICoreIdentity, ISettable<WaterboxCoreSettings>
+		ICoreIdentity, ISettable<WaterboxCoreSettings>, IDriveLights
 	{
 		/// <summary>
 		/// The identity of the PACKAGE this instance is running - what the status bar,
@@ -131,6 +131,14 @@ namespace Chimera.Emulation.Common.Waterbox
 				domains.Add(new MemoryDomainIntPtr(
 					_session.DomainName(i), MemoryDomain.Endian.Little,
 					_session.DomainPtr(i), _session.DomainSize(i), _session.DomainWritable(i), 1));
+			}
+
+			// The drive lights, if this machine has any media to light one for.
+			// Registered rather than always present: the status bar shows a light
+			// per drive a core reports, and a core that reports none gets none.
+			if (_session.DriveCount > 0)
+			{
+				((BasicServiceProvider)ServiceProvider).Register<IDriveLights>(this);
 			}
 
 			// The optional tooling ABI (see WaterboxCore.Tooling.cs) - may append bus
@@ -270,6 +278,16 @@ namespace Chimera.Emulation.Common.Waterbox
 			Marshal.Copy(audio, _stereoBuff, 0, _nsamp * 2);
 			return true;
 		}
+
+		// ---- drive lights ----
+		// Asked of the session every frame: what is being reported is "was this
+		// drive touched during the frame just run", which is not something to
+		// cache.
+		public int DriveLightCount => _session.DriveCount;
+
+		public string DriveLightName(int index) => _session.DriveName(index);
+
+		public bool DriveLightOn(int index) => _session.DriveLight(index);
 
 		public int Frame { get; private set; }
 

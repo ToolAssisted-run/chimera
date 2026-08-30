@@ -1358,6 +1358,28 @@ namespace Chimera.Client.GUI
 		private int _autoDumpLength;
 
 		// Resources
+		/// <summary>
+		/// The second and later drive lights. The first is the Designer's own
+		/// label, which keeps its place in the status bar; these are inserted
+		/// after it the first time a machine turns out to have that many drives,
+		/// and hidden rather than destroyed when one does not.
+		/// </summary>
+		private readonly List<StatusLabelEx> _extraDriveLights = [ ];
+
+		private StatusLabelEx DriveLightLabel(int index)
+		{
+			if (index is 0) return LedLightStatusLabel;
+			while (_extraDriveLights.Count < index)
+			{
+				var made = new StatusLabelEx { Visible = false };
+				_extraDriveLights.Add(made);
+				MainStatusBar.Items.Insert(
+					MainStatusBar.Items.IndexOf(LedLightStatusLabel) + _extraDriveLights.Count,
+					made);
+			}
+			return _extraDriveLights[index - 1];
+		}
+
 		private Bitmap _statusBarDiskLightOnImage;
 		private Bitmap _statusBarDiskLightOffImage;
 		private Bitmap _linkCableOn;
@@ -2091,8 +2113,31 @@ namespace Chimera.Client.GUI
 		{
 			if (!MainStatusBar.Visible) return;
 
-			if (Emulator.HasDriveLight() && Emulator.AsDriveLight() is { DriveLightEnabled: true } diskLEDCore)
+			// ONE LIGHT PER DRIVE. A DOS machine can have a disc and a hard disk at
+			// the same time, and they are different facts: a single light meaning
+			// "something was read" says almost nothing while a game streams from
+			// CD. The first light is the Designer's label and the rest are made as
+			// they are needed, so a machine with no media adds nothing to the bar.
+			if (Emulator.ServiceProvider.GetService<IDriveLights>() is { DriveLightCount: > 0 } lights)
 			{
+				for (int i = 0; i < lights.DriveLightCount; i++)
+				{
+					var label = DriveLightLabel(i);
+					label.Image = lights.DriveLightOn(i)
+						? _statusBarDiskLightOnImage
+						: _statusBarDiskLightOffImage;
+					label.ToolTipText = lights.DriveLightName(i);
+					label.Visible = true;
+				}
+				for (int i = lights.DriveLightCount; i < _extraDriveLights.Count + 1; i++)
+				{
+					DriveLightLabel(i).Visible = false;
+				}
+			}
+			else if (Emulator.HasDriveLight() && Emulator.AsDriveLight() is { DriveLightEnabled: true } diskLEDCore)
+			{
+				// the single-light service, for a core that reports one drive and
+				// says nothing about which
 				LedLightStatusLabel.Image = diskLEDCore.DriveLightOn ? _statusBarDiskLightOnImage : _statusBarDiskLightOffImage;
 				LedLightStatusLabel.ToolTipText = Emulator.AsDriveLight().DriveLightIconDescription;
 				LedLightStatusLabel.Visible = true;
@@ -2100,6 +2145,7 @@ namespace Chimera.Client.GUI
 			else
 			{
 				LedLightStatusLabel.Visible = false;
+				foreach (var extra in _extraDriveLights) extra.Visible = false;
 			}
 
 			if (Emulator.UsesLinkCable())

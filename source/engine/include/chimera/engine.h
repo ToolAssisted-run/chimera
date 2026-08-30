@@ -730,6 +730,15 @@ CE_API const char *ce_session_axis_name(const ce_session *s, int64_t index);
  * order are the declaration's, so ce_session_set_button and every core's own
  * wire enum are untouched by any of this. A core that exports neither answer
  * has all of its controls, which is what every core had before this existed. */
+/* Drive lights: one per medium the machine has (a disc, a hard disk), lit on
+ * any frame that drive was read or written. A core that exports none has none,
+ * and the count is zero - which is what a machine with no removable media
+ * should show, rather than an icon that never lights. Names are settled at
+ * load; the light is asked every frame. */
+CE_API int32_t ce_session_drive_count(const ce_session *s);
+CE_API const char *ce_session_drive_name(const ce_session *s, int32_t index);
+CE_API int32_t ce_session_drive_light(const ce_session *s, int32_t index);
+
 CE_API int32_t ce_session_button_active(const ce_session *s, int64_t index);
 CE_API int32_t ce_session_axis_active(const ce_session *s, int64_t index);
 

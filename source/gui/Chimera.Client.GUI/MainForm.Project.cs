@@ -85,7 +85,12 @@ namespace Chimera.Client.GUI
 			BeginInvoke((Action) (() =>
 			{
 				if (session != _projectSession) return;
-				if (!Emulator.IsNull()) CloseProject();
+				// Not "is there still a machine": the PROJECT is what is being
+				// let go of, and it can outlive the machine. A queued close that
+				// arrives once the emulator has already gone still has a project
+				// to release, and leaving it held is a file kept open for a
+				// session that ended.
+				if (_openProject is not null || !Emulator.IsNull()) CloseProject();
 			}));
 		}
 

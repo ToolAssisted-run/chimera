@@ -503,6 +503,15 @@ namespace Chimera.Emulation.Common.Engine
 		public abstract IntPtr ce_session_axis_name(IntPtr session, long index);
 
 		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract int ce_session_drive_count(IntPtr session);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_session_drive_name(IntPtr session, int index);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract int ce_session_drive_light(IntPtr session, int index);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_session_button_active(IntPtr session, long index);
 
 		[ChimeraImport(CallingConvention.Cdecl)]
@@ -1476,6 +1485,18 @@ namespace Chimera.Emulation.Common.Engine
 		/// knows. An inactive control is not in the controller and not a column.
 		/// Indices are the declaration's either way, so the wire is unaffected.
 		/// </summary>
+		/// <summary>
+		/// One drive light per medium the machine has - a disc, a hard disk -
+		/// lit on any frame that drive was read or written. Zero when the core
+		/// has no removable media, which is most of them.
+		/// </summary>
+		public int DriveCount => E.ce_session_drive_count(_session);
+
+		public string DriveName(int index)
+			=> ChimeraEngine.PtrToStringUtf8(E.ce_session_drive_name(_session, index)) ?? "Drive";
+
+		public bool DriveLight(int index) => E.ce_session_drive_light(_session, index) is not 0;
+
 		public bool ButtonActive(int index) => E.ce_session_button_active(_session, index) is not 0;
 
 		public bool AxisActive(int index) => E.ce_session_axis_active(_session, index) is not 0;

@@ -323,6 +323,13 @@ struct ce_session
 	 *
 	 * A core that exports neither answer has every declared control, which is
 	 * what every core did before this existed. */
+	/* Drive lights: one per medium the machine actually has, lit on any frame
+	 * that drive was read or written. Optional, and all three or none. */
+	int32_t (*driveCount)() = nullptr;
+	uintptr_t (*driveName)(int32_t) = nullptr;
+	int32_t (*driveLight)(int32_t) = nullptr;
+	std::vector<std::string> driveNames;
+
 	int32_t (*isButtonActive)(int32_t) = nullptr;
 	int32_t (*isAxisActive)(int32_t) = nullptr;
 	std::vector<uint8_t> buttonActive;
@@ -481,6 +488,26 @@ void ce_session::probeOptionalGroups()
 	/* which declared controls this machine has (see buttonActive). Each is
 	 * optional on its own: a core whose ports change only its buttons need not
 	 * answer for its axes. */
+	/* the drive lights, all three or none: a count with no way to read a light
+	 * is a status bar with dead icons on it */
+	{
+		auto count = reinterpret_cast<int32_t (*)()>(opt("GetDriveCount", 0));
+		auto name = reinterpret_cast<uintptr_t (*)(int32_t)>(opt("GetDriveName", 1));
+		auto light = reinterpret_cast<int32_t (*)(int32_t)>(opt("GetDriveLight", 1));
+		if (count != nullptr && name != nullptr && light != nullptr)
+		{
+			driveCount = count;
+			driveName = name;
+			driveLight = light;
+			const int32_t n = count();
+			for (int32_t i = 0; i < n; i++)
+			{
+				const char *nm = cstr(name(i));
+				driveNames.push_back(nm != nullptr ? nm : "Drive");
+			}
+		}
+	}
+
 	isButtonActive = reinterpret_cast<int32_t (*)(int32_t)>(opt("IsButtonActive", 1));
 	isAxisActive = reinterpret_cast<int32_t (*)(int32_t)>(opt("IsAxisActive", 1));
 
@@ -1059,6 +1086,26 @@ const char *ce_session_button_name(const ce_session *s, int64_t index)
  * that is not active is not in the frontend's controller, not a column in
  * TAStudio, and not a character in a movie entry - but its index on the wire
  * never moves, so nothing else has to care. */
+/* The drive lights. Names are settled at load - a machine does not grow a
+ * drive - and the light itself is asked every frame. */
+int32_t ce_session_drive_count(const ce_session *s)
+{
+	return static_cast<int32_t>(s->driveNames.size());
+}
+
+const char *ce_session_drive_name(const ce_session *s, int32_t index)
+{
+	if (index < 0 || static_cast<size_t>(index) >= s->driveNames.size()) return nullptr;
+	return s->driveNames[static_cast<size_t>(index)].c_str();
+}
+
+int32_t ce_session_drive_light(const ce_session *s, int32_t index)
+{
+	if (s->driveLight == nullptr || index < 0
+		|| static_cast<size_t>(index) >= s->driveNames.size()) return 0;
+	return s->driveLight(index) != 0 ? 1 : 0;
+}
+
 int32_t ce_session_button_active(const ce_session *s, int64_t index)
 {
 	if (index < 0 || index >= static_cast<int64_t>(s->buttonActive.size())) return 0;

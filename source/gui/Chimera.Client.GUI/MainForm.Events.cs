@@ -27,8 +27,12 @@ namespace Chimera.Client.GUI
 		{
 			CloseRomMenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["Close ROM"];
 
-			// there is one thing to close, and it is the project
-			CloseRomMenuItem.Enabled = _openProject is not null;
+			// There is one thing to close, and it is the project - which is open
+			// exactly when TAStudio is (see CloseProject). Asked of the WINDOW as
+			// well as of the field: closing TAStudio closes the project, so an
+			// item still lit after that window has gone offers to close something
+			// that is not there, and clicking it did nothing except go grey.
+			CloseRomMenuItem.Enabled = _openProject is not null && Tools.IsLoaded<TAStudio>();
 
 			// SAVING IS THE PROJECT'S, and TAStudio is the window it is edited in:
 			// a project is open exactly when TAStudio is, so these ask it. Save is
