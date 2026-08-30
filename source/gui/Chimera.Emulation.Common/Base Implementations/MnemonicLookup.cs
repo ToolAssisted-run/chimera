@@ -286,6 +286,39 @@ namespace Chimera.Emulation.Common
 				["L2"] = '[',
 				["R2"] = ']',
 				["Analog"] = 'A',   // otherwise '!', which names nothing
+
+				// The two PHYSICAL ports also take the instruments, so one
+				// player's controls are the union of a DualShock 2, a Negcon, a
+				// guitar and a Pop'n controller - thirty-seven characters that
+				// have to differ from each other. The pad's own sixteen are
+				// spoken for above and by the base table, which leaves these.
+				["Negcon A"] = 'a',
+				["Negcon B"] = 'b',
+				["Negcon I"] = 'i',
+				["Negcon II"] = 'j',
+
+				["Strum Up"] = '^',
+				["Strum Down"] = 'v',
+				// the frets by colour initial, where the initial was free:
+				// r and R are the pad's shoulders, b is the Negcon's
+				["Fret Green"] = 'g',
+				["Fret Red"] = 'e',
+				["Fret Yellow"] = 'y',
+				["Fret Blue"] = 'u',
+				["Fret Orange"] = 'o',
+
+				// Pop'n Music's nine, numbered the way they sit on the
+				// controller: white, yellow, green, blue, RED in the middle,
+				// then blue, green, yellow, white back out again
+				["Pop White Left"] = '1',
+				["Pop Yellow Left"] = '2',
+				["Pop Green Left"] = '3',
+				["Pop Blue Left"] = '4',
+				["Pop Red"] = '5',
+				["Pop Blue Right"] = '6',
+				["Pop Green Right"] = '7',
+				["Pop Yellow Right"] = '8',
+				["Pop White Right"] = '9',
 			},
 
 			[VSystemID.Raw.NES] = new()
@@ -1106,6 +1139,22 @@ namespace Chimera.Emulation.Common
 			{
 				["L-Stick X"] = "LSX",
 				["L-Stick Y"] = "LSY",
+			},
+
+			// Eight slots of four axes, and the two physical ports four more
+			// for the instruments. "Tilt" and "Twist" both abbreviate to T, so
+			// the whole set is named rather than half of it. No player prefix -
+			// the input roll keeps each slot in its own group.
+			[VSystemID.Raw.PS2] = new()
+			{
+				["Left Stick X"] = "LSX",
+				["Left Stick Y"] = "LSY",
+				["Right Stick X"] = "RSX",
+				["Right Stick Y"] = "RSY",
+				["Dial"] = "Dial",     // the Jogcon's
+				["Twist"] = "Twst",    // the Negcon's
+				["Whammy"] = "Whmy",   // the guitar's
+				["Tilt"] = "Tilt",
 			},
 
 			// Eleven axes per port, four ports: forty-four columns, and the
