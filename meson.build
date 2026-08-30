@@ -358,7 +358,7 @@ executable(
 )
 
 if not meson.is_cross_build()
-  foreach engine_test : ['movie_log', 'movie_text', 'movie_entry', 'state_container', 'package', 'multifile', 'project', 'firmware']
+  foreach engine_test : ['sha1', 'movie_log', 'movie_text', 'movie_entry', 'state_container', 'package', 'multifile', 'project', 'firmware']
     test(
       'engine_' + engine_test,
       executable(

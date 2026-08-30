@@ -117,3 +117,22 @@ bool isDirectory(const char *utf8Path)
 }
 
 } // namespace chimera
+
+namespace chimera {
+
+/* Size and mtime, with the same UTF-8 path handling as everything else here. */
+bool fileStamp(const char *utf8Path, uint64_t *sizeOut, int64_t *mtimeOut)
+{
+#ifdef _WIN32
+	struct _stat64 st;
+	if (_wstat64(widen(utf8Path).c_str(), &st) != 0) return false;
+#else
+	struct stat st;
+	if (stat(utf8Path, &st) != 0) return false;
+#endif
+	if (sizeOut != nullptr) *sizeOut = (uint64_t)st.st_size;
+	if (mtimeOut != nullptr) *mtimeOut = (int64_t)st.st_mtime;
+	return true;
+}
+
+} // namespace chimera

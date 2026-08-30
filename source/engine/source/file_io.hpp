@@ -40,6 +40,10 @@ private:
 
 bool fileExists(const char *utf8Path);
 
+/* A file's size and last-modified time, for deciding whether a remembered
+ * answer about it still applies. false when the file cannot be stat'd. */
+bool fileStamp(const char *utf8Path, uint64_t *sizeOut, int64_t *mtimeOut);
+
 /* whole-file write (multifile descriptors); false on any failure */
 bool writeFile(const char *utf8Path, const uint8_t *data, uint64_t len);
 

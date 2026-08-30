@@ -17,6 +17,10 @@ std::string sha1Hex(const uint8_t *data, uint64_t len);
  * receives the length that was hashed. */
 bool sha1HexOfFile(const char *utf8Path, uint64_t *lenOut, std::string &out);
 
+/* Test hook: force the portable transform, so the same bytes can be hashed both
+ * ways and compared. The two paths agreeing is not something to assume. */
+void sha1ForceSoftwareForTests(bool on);
+
 } // namespace chimera
 
 #endif
