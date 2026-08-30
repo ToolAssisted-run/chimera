@@ -23,14 +23,22 @@ namespace Chimera.Tests.Client.Common.Movie
 		}
 
 #pragma warning disable BHI1600 //TODO disambiguate assert calls
+		/// <summary>
+		/// A name no table knows is abbreviated rather than refused. It used to
+		/// come out as '!', which heads a TAStudio column with a character that
+		/// names nothing; the last word of the name at least points at what was
+		/// pressed. Whole controllers came out that way - all sixty of the 3DO's
+		/// peripherals, the Super Scope's buttons, a keypad key with a typo in
+		/// its table entry.
+		/// </summary>
 		[TestMethod]
-		public void GenerateLogEntry_ExclamationForUnknownButtons()
+		public void GenerateLogEntry_UnknownButtonsAreAbbreviated()
 		{
 			SimpleController controller = new(new ControllerDefinition("Dummy Gamepad") { BoolButtons = { "Unknown Button" } }.MakeImmutable());
 			controller.Definition.BuildMnemonicsCache(VSystemID.Raw.NES);
 			controller["Unknown Button"] = true;
 			var actual = LogEntryGenerator.GenerateLogEntry(controller);
-			Assert.AreEqual("|!|", actual);
+			Assert.AreEqual("|B|", actual);
 		}
 
 		[TestMethod]

@@ -1374,3 +1374,61 @@ throttle's one-in-four frames, because the person is watching to see where they
 are. A turbo SEEK has a destination and draws it; the frames on the way are
 nobody's business, so none of them are drawn - which is where the whole feature
 was aimed.
+
+## A button is where it says it is, and something on the machine says so (user-asked, 2026-08-30)
+
+Two reports said PlayStation 2 buttons landed in the wrong places: pressing
+Circle gave Triangle, pressing L1 gave R1. That is the kind of claim nothing in
+the gates could answer, because every layer between a TAStudio column and the
+emulated pad is keyed by the SAME NAMES. A swap in one of them looks correct
+from both ends, and the two flavours agree with each other whatever they do.
+
+**So ask the machine.** `tests/own/padtest.elf` is a PlayStation 2 controller
+tester (by jbit, free to distribute) that draws every button of a DualShock 2
+with the pressure the console is reading. Hold the button the package declares
+as "Circle" and exactly one readout may move: the circle. The new `pad:mapping`
+gate leg does that for all sixteen, and all sixteen were already right - through
+the core, and again through a project and the engine's own movie decode. The
+wire was never wrong.
+
+**What WAS wrong was the label.** TAStudio heads each column with the control's
+MNEMONIC - the single character a movie log is written with - and the base table
+gives L2 the 'L' it gives Left, and R2 the 'R' it gives Right. Two pairs of PS2
+columns read identically, and a person clicking one of them has no way to know
+which. The Analog button had no entry at all and came out as '!'. PS2 now
+overrides those three, and a test holds every shipped controller to the rule
+that no two of its controls may share a mnemonic - which is a property of the
+movie format as much as of the window, since an ambiguous log cannot be read by
+eye either.
+
+Changing a mnemonic changes the character a NEW log is written with. Old logs
+still load: an entry is decoded by position and any character but '.' means
+pressed, so nothing recorded stops replaying.
+
+**The honest remainder.** Circle-gives-Triangle was not reproduced, here or
+anywhere. What was found is real and in the same neighbourhood, and it is not
+proof that it was the whole of what someone saw.
+
+## A PlayStation 2 runs programs, not only discs (user-asked, 2026-08-30)
+
+PCSX2 has always been able to start from an executable - it is how homebrew and
+every test program in the world ships - and this core could not, because it
+handed every file it was given to the disc path. It now looks at the file: an
+ELF is run directly with an empty tray (upstream's `elf_override`, which also
+forces the fast boot it needs), anything else is a disc image.
+
+**By the first four bytes, not the extension.** Upstream decides on the ".elf"
+suffix, which is right for a file picker and wrong here: a project names its
+files whatever their author called them and the slot map carries that name into
+the guest verbatim. What makes a file a program is that it is an ELF.
+
+**An .irx is refused, and says why.** IOP modules are ELF files too, so the
+magic alone would boot one as if it were an EE program and watch it fail
+strangely. They carry Sony's own `e_type` of 0xFF80, which makes them
+recognisable in the header, and the refusal says what an .irx is for instead of
+reporting a crash.
+
+One sharp edge paid for on the way: the sandbox's file system is flat, so
+`hostRoot` is always empty, and upstream's `host:` resolver leaves the path
+empty when it is - which made the machine unable to read the very ELF it had
+just been told to boot. In a flat file system a name IS its path.

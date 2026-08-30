@@ -48,7 +48,14 @@ namespace Chimera.Emulation.Common
 				return key.StartsWith('.') ? 'p' : key[0];
 			}
 
-			return '!';
+			// A name no table knows. '!' used to be the answer, which heads a
+			// TAStudio column with a character that names nothing and tells a
+			// person only that something is wrong somewhere. The last word is a
+			// better guess than that - "Stick Fire" is an F, "FDS Insert 2" is a
+			// 2 - and it is a guess: a controller whose columns must be told
+			// apart belongs in the table above, and the mnemonic test says so.
+			var lastWord = key.Substring(key.LastIndexOf(' ') + 1);
+			return lastWord.Length is 0 ? '?' : lastWord[0];
 		}
 
 		public static string LookupAxis(string button, string systemId)
@@ -70,7 +77,33 @@ namespace Chimera.Emulation.Common
 				return s1;
 			}
 
-			return button;
+			// the WHOLE name, not the stripped key: the tables are shared between
+			// players on purpose, but a header is not, and a 3DO with two sticks
+			// wants P1SH and P2SH rather than SH twice
+			return Abbreviate(button);
+		}
+
+		/// <summary>
+		/// A short header for an axis no table names: the initials of its words,
+		/// with anything already short kept whole. "Left Stick X" becomes LSX,
+		/// "P1 Gun Screen X" becomes P1GSX, "Left Trigger" becomes LT.
+		/// </summary>
+		/// <remarks>
+		/// The full name used to be the answer, and an axis column is as wide as
+		/// its header: four sticks of "Right Stick X" made the input roll wider
+		/// than the screen before a single button column was reached. A name
+		/// that deserves better than its initials belongs in the table.
+		/// </remarks>
+		private static string Abbreviate(string name)
+		{
+			var sb = new System.Text.StringBuilder(6);
+			foreach (var word in name.Split(' ', '-', '_'))
+			{
+				if (word.Length is 0) continue;
+				// "P1", "X", "Y", "L", "R" say everything they have to say
+				sb.Append(word.Length <= 2 ? word : word.Substring(0, 1));
+			}
+			return sb.Length is 0 ? name : sb.ToString();
 		}
 
 		private static readonly Dictionary<string, char> BaseMnemonicLookupTable = new Dictionary<string, char>
@@ -207,11 +240,44 @@ namespace Chimera.Emulation.Common
 				["Prev Disc"] = '<',
 			},
 
+			/* A DualShock 2 has six shoulder/stick buttons and a d-pad, and the
+			   base table gives L2/R2 the same letters as Left/Right. TAStudio
+			   heads each column with its MNEMONIC, so two pairs of PS2 columns
+			   read identically and there is no way to tell which one you are
+			   clicking - reported as buttons landing in the wrong places, which
+			   they never did: the wire is exact (the pad gate holds it to a real
+			   PlayStation 2 controller tester), it was the LABEL that was
+			   ambiguous. Brackets pair with the angles L3/R3 already use.
+
+			   Changing a mnemonic changes the character a new log is written
+			   with. Old logs still load: an entry is decoded by POSITION and any
+			   character but '.' means pressed, so nothing that was recorded
+			   stops replaying. */
+			[VSystemID.Raw.A26] = new()
+			{
+				// the console's own switches. Without these the difficulty
+				// toggles fall back to their last word and collide with each
+				// other, and the right one collides with Reset besides.
+				["Toggle Left Difficulty"] = 'x',
+				["Toggle Right Difficulty"] = 'y',
+				["Toggle TV Type"] = 'V',
+			},
+
+
+			[VSystemID.Raw.PS2] = new()
+			{
+				["L2"] = '[',
+				["R2"] = ']',
+				["Analog"] = 'A',   // otherwise '!', which names nothing
+			},
+
 			[VSystemID.Raw.NES] = new()
 			{
 				["FDS Eject"] = 'E',
 				["FDS Insert 0"] = '0',
 				["FDS Insert 1"] = '1',
+				["FDS Insert 2"] = '2',   // a disk has up to four sides
+				["FDS Insert 3"] = '3',
 				["Insert Coin P1"] = 'c',
 				["Insert Coin P2"] = 'C',
 				["Service Switch"] = 'w',
@@ -235,6 +301,17 @@ namespace Chimera.Emulation.Common
 			},
 			[VSystemID.Raw.SNES] = new()
 			{
+				// the Super Scope and the Justifier: two light guns whose
+				// buttons the base table has never heard of
+				["Scope Trigger"] = 'T',
+				["Scope Cursor"] = 'C',
+				["Scope Turbo"] = 'u',
+				["Scope Pause"] = 'P',
+				["Scope Offscreen"] = 'O',
+				["Justifier Trigger"] = 't',
+				["Justifier Start"] = 'S',
+				["Justifier Offscreen"] = 'o',
+
 				["Cursor"] = 'c',
 				["Turbo"] = 't',
 				["Toggle Multitap"] = 't',
@@ -968,7 +1045,7 @@ namespace Chimera.Emulation.Common
 				["KeyPadDivide"] = '/',
 				["KeyPadMultiply"] = '*',
 				["KeyPadMinus"] = '-',
-				["keyPadPlus"] = '+',
+				["KeyPadPlus"] = '+',   // was keyPadPlus, which no key is called, so it came out '!'
 				["KeyPadEnter"] = 'e',
 				["KeyPadPeriod"] = 'p',
 			},
@@ -996,6 +1073,15 @@ namespace Chimera.Emulation.Common
 
 		private static readonly Dictionary<string, Dictionary<string, string>> AxisSystemOverrides = new Dictionary<string, Dictionary<string, string>>
 		{
+			// A PSP has one player, so the "P1 " its core declares is noise in a
+			// column two characters wide. The lookup has already stripped it by
+			// the time this table is consulted.
+			[VSystemID.Raw.PSP] = new()
+			{
+				["L-Stick X"] = "LSX",
+				["L-Stick Y"] = "LSY",
+			},
+
 			[VSystemID.Raw.Panasonic3DO] = new()
 			{
 				["Flight Stick Horizontal Axis"] = "fsX",
