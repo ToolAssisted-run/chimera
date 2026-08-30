@@ -125,20 +125,24 @@ namespace Chimera.Tests.Client.Common
 		/// their columns in separate groups. Two players sharing an 'A' is the
 		/// design; one player owning two 'L's is the bug.
 		///
-		/// Held only over controllers small enough for it to be achievable. A DOS
-		/// keyboard has 123 keys and there are not 123 characters worth reading;
-		/// the ones a person actually TASes with are checked, which is the claim
-		/// that can be made honestly.
+		/// Held only over controllers small enough for it to be achievable, and
+		/// measured PER PLAYER rather than over the whole wire: a Dreamcast
+		/// declares four ports of twenty, which is eighty buttons and still a
+		/// gamepad. A DOS keyboard has 123 keys on ONE player and there are not
+		/// 123 characters worth reading; the ones a person actually TASes with
+		/// are checked, which is the claim that can be made honestly.
 		/// </summary>
 		[TestMethod]
 		public void NoTwoControlsOfOnePlayerShareAMnemonic()
 		{
 			const int GAMEPAD_SIZED = 40;
 			var complaints = new List<string>();
-			foreach (var c in RequireControllers().Where(c => c.Buttons.Count <= GAMEPAD_SIZED))
+			foreach (var c in RequireControllers())
 			{
 				foreach (var group in c.Buttons.GroupBy(PlayerOf))
 				{
+					if (group.Count() > GAMEPAD_SIZED) continue;
+
 					var byChar = new Dictionary<char, string>();
 					foreach (var button in group)
 					{

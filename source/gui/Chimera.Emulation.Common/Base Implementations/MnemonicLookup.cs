@@ -221,6 +221,23 @@ namespace Chimera.Emulation.Common
 
 		private static readonly Dictionary<string, Dictionary<string, char>> SystemOverrides = new Dictionary<string, Dictionary<string, char>>
 		{
+			// A Dreamcast port takes more than a gamepad, so one player's
+			// controls are the union of a controller, a twin stick, a
+			// PantherDC, a mouse and a light gun. Six of them would otherwise
+			// take a character the d-pad already has: the "D" BUTTON against
+			// Down, the second d-pad against the first, and Reload against
+			// Right. Held per player, which is what these have to be unique
+			// within - the four ports are separate groups in the input roll.
+			["DC"] = new()
+			{
+				["D"] = 'd',            // the fourth face button, not Down
+				["Up2"] = '^',          // the twin stick's second d-pad
+				["Down2"] = 'v',
+				["Left2"] = '<',
+				["Right2"] = '>',
+				["Reload"] = 'e',       // the light gun's, not Right
+				["Mouse Middle"] = 'c', // the base table knows Left and Right
+			},
 			[VSystemID.Raw.Panasonic3DO] = new()
 			{
 				["LT"] = 'l',
@@ -302,12 +319,21 @@ namespace Chimera.Emulation.Common
 			[VSystemID.Raw.SNES] = new()
 			{
 				// the Super Scope and the Justifier: two light guns whose
-				// buttons the base table has never heard of
+				// buttons the base table has never heard of.
+				//
+				// These are declared WITHOUT a player prefix, so they share a
+				// group with Power and Reset and have to be unique against them
+				// too: Scope Pause was 'P' against Power, and Mouse Right took
+				// the base table's 'r' against Reset. Two columns a person
+				// cannot tell apart, hidden for as long as the uniqueness check
+				// skipped this controller for being 108 buttons wide.
 				["Scope Trigger"] = 'T',
 				["Scope Cursor"] = 'C',
 				["Scope Turbo"] = 'u',
-				["Scope Pause"] = 'P',
+				["Scope Pause"] = 'p',
 				["Scope Offscreen"] = 'O',
+				["Mouse Left"] = 'L',
+				["Mouse Right"] = 'R',
 				["Justifier Trigger"] = 't',
 				["Justifier Start"] = 'S',
 				["Justifier Offscreen"] = 'o',
@@ -1080,6 +1106,26 @@ namespace Chimera.Emulation.Common
 			{
 				["L-Stick X"] = "LSX",
 				["L-Stick Y"] = "LSY",
+			},
+
+			// Eleven axes per port, four ports: forty-four columns, and the
+			// abbreviator would head some of them "P1MW" and let others fall
+			// through to the shared table's "mX". Named here so one player's
+			// eleven read as a set. The player prefix is not needed - the input
+			// roll keeps each port in its own group.
+			["DC"] = new()
+			{
+				["Stick X"] = "SX",
+				["Stick Y"] = "SY",
+				["Left Trigger"] = "LT",
+				["Right Trigger"] = "RT",
+				["Stick 2 X"] = "S2X",
+				["Stick 2 Y"] = "S2Y",
+				["Mouse X"] = "MX",
+				["Mouse Y"] = "MY",
+				["Mouse Wheel"] = "MW",
+				["Gun X"] = "GX",
+				["Gun Y"] = "GY",
 			},
 
 			[VSystemID.Raw.Panasonic3DO] = new()
