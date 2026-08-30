@@ -242,6 +242,61 @@ int main(void)
 		assert(back == in); // byte-exact round trip across the 64 boundary
 	}
 
+	{ // A MACHINE HAS ONLY SOME OF ITS DECLARED CONTROLS.
+		//
+		// A package declares the union of every peripheral its ports can hold,
+		// because the declaration is static; the running core says which of
+		// them exist. An entry carries those and no others - but every INDEX
+		// stays the declaration's, so what a core reads off its own wire is
+		// untouched by any of it.
+		const std::vector<std::string> declared = {
+			"P1 A", "P1 B", "P2 A", "P2 B", "P3 A", "P3 B",
+		};
+		const std::vector<EntryAxis> declaredAxes = {
+			axis("P1 Paddle", 0, 160, 80), axis("P3 Paddle", 0, 160, 80),
+		};
+		const std::string mnemonics = "ABABAB";
+
+		{ // nothing said: every declared control, which is what a core that
+		  // does not answer the question gets
+			EntryLayout l;
+			l.build(declared, declaredAxes);
+			assert(l.groups() == 4);
+			assert(l.size() == 8);
+		}
+
+		// port two empty and no paddle anywhere: P2 vanishes, and so does the
+		// player-three GROUP once its axis goes with it
+		const std::vector<uint8_t> activeButtons = { 1, 1, 0, 0, 1, 1 };
+		const std::vector<uint8_t> activeAxes = { 0, 0 };
+		EntryLayout l;
+		l.build(declared, declaredAxes, &activeButtons, &activeAxes);
+		assert(l.groups() == 4);   // console, P1, P2 (empty), P3
+		assert(l.size() == 4);
+		assert(l.buttonCount() == declared.size()); // the WIRE is unchanged
+
+		// P1 A and P3 B, which are declared indices 0 and 5
+		std::vector<uint8_t> in(declared.size(), 0);
+		in[0] = in[5] = 1;
+		const std::string entry = l.generate(in.data(), nullptr, mnemonics);
+		// the console group and player two's are both EMPTY and both still
+		// written: a group is a place in the entry, and one that vanished
+		// would shift every column after it
+		assert(entry == "||A.||.B|");
+
+		std::vector<uint8_t> back;
+		std::vector<int32_t> axes;
+		assert(l.parse(entry.c_str(), back, axes));
+		assert(back.size() == declared.size());
+		assert(back == in);                       // at the DECLARED positions
+		assert(axes.size() == declaredAxes.size());
+		assert(axes[0] == 80 && axes[1] == 80);   // an absent axis reads neutral
+
+		// and an entry written for the full controller is no longer this
+		// machine's: it has columns this machine has no controls for
+		assert(!l.parse("||AB|AB|AB|", back, axes) || back != in);
+	}
+
 	std::printf("test_movie_entry: ok\n");
 	return 0;
 }

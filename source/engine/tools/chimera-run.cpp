@@ -440,6 +440,17 @@ int main(int argc, char **argv)
 	/* the movie is the SESSION's from here: the engine parses entries, tracks
 	 * the frame position, and (with --seek) keeps the greenzone */
 	if (ce_session_movie_load(session, movie) != 0) return fail(metaPath, "could not load the movie into the session");
+
+	/* --frames shortens a run. While RECORDING it may also lengthen one: the
+	 * source movie is an input source there and not the timeline, so a run can
+	 * outlast it and the tail is idle input. That is what makes "record N
+	 * frames of nothing" expressible, which is the only way to ask a core what
+	 * its entries LOOK like before owning a movie of the right shape.
+	 *
+	 * Settled HERE, before the record block below decodes that many entries -
+	 * a limit applied after it would leave the decoded input shorter than the
+	 * run. */
+	if (frameLimit >= 0 && (frameLimit < frames || !recordPath.empty())) frames = frameLimit;
 	if (seekFrame >= 0) ce_session_greenzone_enable(session, 256ull << 20);
 
 	/* Record mode: decode the source movie's entries into machine input and
@@ -453,11 +464,15 @@ int main(int argc, char **argv)
 	if (!recordPath.empty())
 	{
 		int64_t axisCount = ce_session_axis_count(session);
+		const int64_t sourceFrames = ce_movie_log_count(movie);
 		for (int64_t i = 0; i < frames; i++)
 		{
 			std::vector<uint8_t> states(static_cast<size_t>(buttonCount), 0);
 			std::vector<int32_t> axes(static_cast<size_t>(axisCount), 0);
-			if (ce_session_movie_entry_decode_wide(
+			/* past the source movie's end the input is idle, which is what the
+			 * two vectors already hold. A run may outlast its input source
+			 * while recording (see --frames above); it may not read past it. */
+			if (i < sourceFrames && ce_session_movie_entry_decode_wide(
 					session, ce_movie_log_entry(movie, i),
 					buttonCount != 0 ? states.data() : nullptr,
 					axisCount != 0 ? axes.data() : nullptr) != 0)
@@ -485,7 +500,6 @@ int main(int argc, char **argv)
 			return fail(metaPath, ce_session_last_error(session));
 		}
 	}
-	if (frameLimit >= 0 && frameLimit < frames) frames = frameLimit;
 
 	std::vector<uint8_t> state;
 	if (rerecord)

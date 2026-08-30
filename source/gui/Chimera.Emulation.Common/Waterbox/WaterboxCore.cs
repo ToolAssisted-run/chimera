@@ -60,6 +60,10 @@ namespace Chimera.Emulation.Common.Waterbox
 		private readonly short[] _stereoBuff;
 		private readonly string[] _buttons;
 		private readonly WaterboxConfig.AxisConfig[] _axes;
+		// parallel to the two above: which of the declared controls this machine
+		// has, answered by the core once the ports are settled
+		private readonly bool[] _buttonActive;
+		private readonly bool[] _axisActive;
 		private byte[] _stateScratch = [ ];
 
 		/// <summary>
@@ -106,6 +110,18 @@ namespace Chimera.Emulation.Common.Waterbox
 			{
 				throw new CoreLoadException(ex.Message);
 			}
+
+			// WHICH OF THE DECLARED CONTROLS THIS MACHINE HAS. A package declares
+			// the union of every peripheral its ports can hold, because the
+			// declaration is static and cannot know what a project plugged in; the
+			// core read the port settings and built the machine, so it is asked.
+			// An inactive control is not in the controller, not a TAStudio column
+			// and not a character in a movie entry - but the arrays here stay the
+			// DECLARATION's, because an index on the wire must never move.
+			_buttonActive = new bool[_buttons.Length];
+			for (int i = 0; i < _buttons.Length; i++) _buttonActive[i] = _session.ButtonActive(i);
+			_axisActive = new bool[_axes.Length];
+			for (int i = 0; i < _axes.Length; i++) _axisActive[i] = _session.AxisActive(i);
 
 			// Memory domains are self-described by the guest at runtime (size/count
 			// can depend on settings); pointer-backed straight into guest memory.
@@ -194,12 +210,17 @@ namespace Chimera.Emulation.Common.Waterbox
 		private ControllerDefinition MakeControllerDefinition()
 		{
 			var def = new ControllerDefinition((_machine?.Input ?? _cfg.Input).Name ?? "Waterbox Controller");
-			foreach (var button in _buttons)
+			// only the controls this machine HAS: a Four Score's players 3 and 4,
+			// or an Arkanoid's paddle, are declared by every NES package and exist
+			// only when a project plugged one in
+			for (int i = 0; i < _buttons.Length; i++)
 			{
-				def.BoolButtons.Add(button);
+				if (_buttonActive[i]) def.BoolButtons.Add(_buttons[i]);
 			}
-			foreach (var axis in _axes)
+			for (int i = 0; i < _axes.Length; i++)
 			{
+				if (!_axisActive[i]) continue;
+				var axis = _axes[i];
 				def.Axes.Add(axis.Name, new AxisSpec(axis.Min.RangeTo(axis.Max), axis.Neutral));
 			}
 			return def.MakeImmutable();
@@ -216,14 +237,17 @@ namespace Chimera.Emulation.Common.Waterbox
 				// to the guest. The packed mask stays zero - one path, exact.
 				for (int i = 0; i < _buttons.Length; i++)
 				{
-					_session.SetButton(i, controller.IsPressed(_buttons[i]));
+					_session.SetButton(i, _buttonActive[i] && controller.IsPressed(_buttons[i]));
 				}
 			}
 			else
 			{
 				for (int i = 0; i < _buttons.Length; i++)
 				{
-					if (controller.IsPressed(_buttons[i])) input |= 1ul << i;
+					// a control the machine does not have is never asked about:
+					// it is not in the definition, so the controller has no
+					// answer for it
+					if (_buttonActive[i] && controller.IsPressed(_buttons[i])) input |= 1ul << i;
 				}
 			}
 
@@ -231,7 +255,9 @@ namespace Chimera.Emulation.Common.Waterbox
 			// just before the frame they belong to.
 			for (int i = 0; i < _axes.Length; i++)
 			{
-				_session.SetAxis(i, controller.AxisValue(_axes[i].Name));
+				_session.SetAxis(i, _axisActive[i]
+					? controller.AxisValue(_axes[i].Name)
+					: _axes[i].Neutral);
 			}
 
 			IsLagFrame = _session.FrameAdvance(input, render);

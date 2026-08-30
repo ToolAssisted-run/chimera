@@ -50,27 +50,44 @@ int32_t playerNumberOf(const std::string &name)
 	return i > 1 && i < name.size() && name[i] == ' ' ? value : 0;
 }
 
-void EntryLayout::build(const std::vector<std::string> &buttons, const std::vector<EntryAxis> &axes)
+void EntryLayout::build(const std::vector<std::string> &buttons, const std::vector<EntryAxis> &axes,
+	const std::vector<uint8_t> *activeButtons, const std::vector<uint8_t> *activeAxes)
 {
+	auto buttonLive = [&](size_t i) {
+		return activeButtons == nullptr || i >= activeButtons->size() || (*activeButtons)[i] != 0;
+	};
+	auto axisLive = [&](size_t i) {
+		return activeAxes == nullptr || i >= activeAxes->size() || (*activeAxes)[i] != 0;
+	};
+
 	items_.clear();
 	groupStarts_.clear();
 	axes_ = axes;
 	buttonCount_ = buttons.size();
 
+	/* The group count follows the controls that EXIST. A machine with nothing
+	 * in port two has no player-two group, and an entry with an empty group in
+	 * it would be a group a person could put nothing in. */
 	int32_t maxPlayer = 0;
-	for (const auto &a : axes) maxPlayer = std::max(maxPlayer, playerNumberOf(a.name));
-	for (const auto &b : buttons) maxPlayer = std::max(maxPlayer, playerNumberOf(b));
+	for (size_t i = 0; i < axes.size(); i++)
+		if (axisLive(i)) maxPlayer = std::max(maxPlayer, playerNumberOf(axes[i].name));
+	for (size_t i = 0; i < buttons.size(); i++)
+		if (buttonLive(i)) maxPlayer = std::max(maxPlayer, playerNumberOf(buttons[i]));
 	groups_ = maxPlayer + 1;
 	for (int32_t g = 0; g < groups_; g++)
 	{
 		groupStarts_.push_back(static_cast<int32_t>(items_.size()));
 		for (int32_t i = 0; i < static_cast<int32_t>(axes.size()); i++)
 		{
-			if (playerNumberOf(axes[static_cast<size_t>(i)].name) == g) items_.push_back({ true, i });
+			if (axisLive(static_cast<size_t>(i))
+				&& playerNumberOf(axes[static_cast<size_t>(i)].name) == g)
+				items_.push_back({ true, i });
 		}
 		for (int32_t i = 0; i < static_cast<int32_t>(buttons.size()); i++)
 		{
-			if (playerNumberOf(buttons[static_cast<size_t>(i)]) == g) items_.push_back({ false, i });
+			if (buttonLive(static_cast<size_t>(i))
+				&& playerNumberOf(buttons[static_cast<size_t>(i)]) == g)
+				items_.push_back({ false, i });
 		}
 	}
 }

@@ -503,6 +503,12 @@ namespace Chimera.Emulation.Common.Engine
 		public abstract IntPtr ce_session_axis_name(IntPtr session, long index);
 
 		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract int ce_session_button_active(IntPtr session, long index);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract int ce_session_axis_active(IntPtr session, long index);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract void ce_session_set_axis(IntPtr session, int index, int value);
 
 		[ChimeraImport(CallingConvention.Cdecl)]
@@ -1462,6 +1468,17 @@ namespace Chimera.Emulation.Common.Engine
 			=> GpuDrew ? (ChimeraEngine.PtrToStringUtf8(E.ce_gl_description()) ?? "") : "";
 
 		public void SetAxis(int index, int value) => E.ce_session_set_axis(_session, index, value);
+
+		/// <summary>
+		/// Whether a declared control is one THIS machine has. waterbox.config
+		/// declares the union of every peripheral a package's ports can hold;
+		/// the project decides what is plugged in, and only the running core
+		/// knows. An inactive control is not in the controller and not a column.
+		/// Indices are the declaration's either way, so the wire is unaffected.
+		/// </summary>
+		public bool ButtonActive(int index) => E.ce_session_button_active(_session, index) is not 0;
+
+		public bool AxisActive(int index) => E.ce_session_axis_active(_session, index) is not 0;
 
 		/// <returns>true when the frame was a lag frame</returns>
 		public bool FrameAdvance(ulong buttons, bool render)

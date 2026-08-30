@@ -313,6 +313,21 @@ struct ce_session
 	std::vector<uint8_t> btnSent;      // what the guest last received
 	std::vector<uint8_t> btnEffective; // scratch: state OR packed mask
 	std::vector<uint8_t> movieButtons; // scratch: a parsed entry's buttons
+	/* WHICH DECLARED CONTROLS THIS MACHINE ACTUALLY HAS.
+	 *
+	 * waterbox.config declares the union of every peripheral a package's ports
+	 * can hold, because it is a static declaration and cannot know what a
+	 * project plugged in. The running core can: it read the port settings
+	 * itself and built the machine from them, so it is the one place the answer
+	 * is not a duplicate of somebody else's logic.
+	 *
+	 * A core that exports neither answer has every declared control, which is
+	 * what every core did before this existed. */
+	int32_t (*isButtonActive)(int32_t) = nullptr;
+	int32_t (*isAxisActive)(int32_t) = nullptr;
+	std::vector<uint8_t> buttonActive;
+	std::vector<uint8_t> axisActive;
+	void buildControlActivity();
 	int32_t (*mdCount)() = nullptr;
 	uintptr_t (*mdName)(int32_t) = nullptr;
 	uintptr_t (*mdPtr)(int32_t) = nullptr;
@@ -431,11 +446,37 @@ struct ce_session
 	}
 };
 
+/* Asked once, after Init - which is the only moment it can be asked, because
+ * before Init the core has not read its settings and after the first frame the
+ * answer must not change: a controller that grew a button mid-movie is not a
+ * machine anything can replay. */
+void ce_session::buildControlActivity()
+{
+	buttonActive.assign(cfg.buttons.size(), 1);
+	axisActive.assign(cfg.axes.size(), 1);
+	if (isButtonActive != nullptr)
+	{
+		for (size_t i = 0; i < buttonActive.size(); i++)
+			buttonActive[i] = isButtonActive(static_cast<int32_t>(i)) != 0 ? 1 : 0;
+	}
+	if (isAxisActive != nullptr)
+	{
+		for (size_t i = 0; i < axisActive.size(); i++)
+			axisActive[i] = isAxisActive(static_cast<int32_t>(i)) != 0 ? 1 : 0;
+	}
+}
+
 void ce_session::probeOptionalGroups()
 {
 	std::string err; // optional probes never fail the session
 	auto opt = [&](const char *name, int argCount) { return proc(name, argCount, false, err); };
 	auto cstr = [](uintptr_t p) { return p != 0 ? reinterpret_cast<const char *>(p) : nullptr; };
+
+	/* which declared controls this machine has (see buttonActive). Each is
+	 * optional on its own: a core whose ports change only its buttons need not
+	 * answer for its axes. */
+	isButtonActive = reinterpret_cast<int32_t (*)(int32_t)>(opt("IsButtonActive", 1));
+	isAxisActive = reinterpret_cast<int32_t (*)(int32_t)>(opt("IsAxisActive", 1));
 
 	// surfaces: all five or nothing
 	{
@@ -948,7 +989,8 @@ ce_session *ce_session_open(
 	s->btnSent.assign(s->cfg.buttons.size(), 0); // a fresh guest holds nothing down
 	s->btnEffective.assign(s->cfg.buttons.size(), 0);
 	s->probeOptionalGroups();
-	s->layout.build(s->cfg.buttons, s->cfg.axes);
+	s->buildControlActivity();
+	s->layout.build(s->cfg.buttons, s->cfg.axes, &s->buttonActive, &s->axisActive);
 	return s;
 }
 
@@ -995,7 +1037,25 @@ const char *ce_session_button_name(const ce_session *s, int64_t index)
 	return s->cfg.buttons[static_cast<size_t>(index)].c_str();
 }
 
+/* Whether a declared control is one this machine HAS. A package declares the
+ * union of every peripheral its ports can hold; the project decides which of
+ * them are plugged in, and the core is the only thing that knows. A control
+ * that is not active is not in the frontend's controller, not a column in
+ * TAStudio, and not a character in a movie entry - but its index on the wire
+ * never moves, so nothing else has to care. */
+int32_t ce_session_button_active(const ce_session *s, int64_t index)
+{
+	if (index < 0 || index >= static_cast<int64_t>(s->buttonActive.size())) return 0;
+	return s->buttonActive[static_cast<size_t>(index)];
+}
+
 int64_t ce_session_axis_count(const ce_session *s) { return static_cast<int64_t>(s->cfg.axes.size()); }
+
+int32_t ce_session_axis_active(const ce_session *s, int64_t index)
+{
+	if (index < 0 || index >= static_cast<int64_t>(s->axisActive.size())) return 0;
+	return s->axisActive[static_cast<size_t>(index)];
+}
 
 const char *ce_session_axis_name(const ce_session *s, int64_t index)
 {

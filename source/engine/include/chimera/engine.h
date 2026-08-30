@@ -717,6 +717,22 @@ CE_API const char *ce_session_button_name(const ce_session *s, int64_t index);
 CE_API int64_t ce_session_axis_count(const ce_session *s);
 CE_API const char *ce_session_axis_name(const ce_session *s, int64_t index);
 
+/* Whether a declared control is one THIS machine has.
+ *
+ * waterbox.config declares the union of every peripheral a package's ports can
+ * hold - it is a static declaration and cannot know what a project plugged in.
+ * The running core can, because it read the port settings and built the machine
+ * from them, so it is asked (its optional IsButtonActive/IsAxisActive exports)
+ * once, after Init.
+ *
+ * An inactive control is absent from the frontend's controller, from TAStudio's
+ * columns and from a movie entry. Its INDEX never moves: the count and the
+ * order are the declaration's, so ce_session_set_button and every core's own
+ * wire enum are untouched by any of this. A core that exports neither answer
+ * has all of its controls, which is what every core had before this existed. */
+CE_API int32_t ce_session_button_active(const ce_session *s, int64_t index);
+CE_API int32_t ce_session_axis_active(const ce_session *s, int64_t index);
+
 /* Axes are set per frame, before the advance they belong to. */
 CE_API void ce_session_set_axis(ce_session *s, int32_t index, int32_t value);
 

@@ -33,7 +33,20 @@ int32_t playerNumberOf(const std::string &name);
 class EntryLayout
 {
 public:
-	void build(const std::vector<std::string> &buttons, const std::vector<EntryAxis> &axes);
+	/* activeButtons/activeAxes, when given, are one byte per DECLARED control:
+	 * zero for a control this machine does not have. A package declares the
+	 * union of every peripheral its ports can hold, because the declaration is
+	 * static; which of them exist is a question only the running core can
+	 * answer, and the answer changes what a movie entry looks like. An entry
+	 * carries the controls the machine HAS and no others.
+	 *
+	 * Item indices stay pointers into the full declared arrays, so everything
+	 * downstream still reads and writes at the declared position - only the
+	 * text gets shorter. Null means "all of them", which is what a core that
+	 * does not answer the question gets. */
+	void build(const std::vector<std::string> &buttons, const std::vector<EntryAxis> &axes,
+		const std::vector<uint8_t> *activeButtons = nullptr,
+		const std::vector<uint8_t> *activeAxes = nullptr);
 
 	/* Positional and '|'-tolerant - the exact Bk2Controller.SetFromMnemonic
 	 * walk. false when the entry runs out before the controller does, or an
