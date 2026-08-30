@@ -371,6 +371,12 @@ struct ce_session
 	uintptr_t (*sdName)(int32_t) = nullptr;
 	int64_t (*sdSize)(int32_t) = nullptr;
 	uintptr_t (*sdBuffer)(int32_t) = nullptr;
+	/* The streaming half of the save-data channel, for a file too big to be
+	 * addressable all at once - a DOS hard disk that does not live in guest
+	 * memory. The guest serves a window into a scratch buffer of its own; the
+	 * file's name and size are unchanged, so what comes out is the same file. */
+	int64_t (*sdRead)(int32_t, int64_t, int64_t) = nullptr;
+	uintptr_t (*sdScratch)() = nullptr;
 	std::vector<std::string> sdNames;
 	std::vector<int64_t> sdSizes;
 	std::vector<int32_t> sdGuestIndex;
@@ -591,6 +597,16 @@ void ce_session::probeOptionalGroups()
 			sdName = name;
 			sdSize = size;
 			sdBuffer = buffer;
+		}
+		/* ...and the streaming pair, which replaces the pointer when a core has
+		 * one. Both or neither: a reader that could ask for a window but not
+		 * find it would silently export nothing. */
+		auto read = reinterpret_cast<int64_t (*)(int32_t, int64_t, int64_t)>(opt("ReadSaveDataFile", 3));
+		auto scratch = reinterpret_cast<uintptr_t (*)()>(opt("GetSaveDataScratch", 0));
+		if (read != nullptr && scratch != nullptr)
+		{
+			sdRead = read;
+			sdScratch = scratch;
 		}
 	}
 }
@@ -1396,9 +1412,29 @@ int64_t ce_session_savedata_read(ce_session *s, int32_t index, int64_t offset, u
 	int64_t size = s->sdSizes[static_cast<size_t>(index)];
 	if (offset < 0 || offset >= size || len <= 0) return 0;
 	int64_t n = len < size - offset ? len : size - offset;
+	const int32_t guest = s->sdGuestIndex[static_cast<size_t>(index)];
+
+	/* A file the guest cannot hand over whole is served a window at a time. It
+	 * is the same file - same name, same size, same bytes - and this loop is
+	 * the only thing that knows the difference. */
+	if (s->sdRead != nullptr)
+	{
+		int64_t done = 0;
+		while (done < n)
+		{
+			const int64_t got = s->sdRead(guest, offset + done, n - done);
+			if (got <= 0) break;
+			const auto *win = reinterpret_cast<const uint8_t *>(s->sdScratch());
+			if (win == nullptr) break;
+			std::memcpy(buf + done, win, static_cast<size_t>(got));
+			done += got;
+		}
+		return done;
+	}
+
 	/* fetched per call rather than kept: the guest owns the allocation and a
 	 * snapshot only promises the file, not the address */
-	const auto *src = reinterpret_cast<const uint8_t *>(s->sdBuffer(s->sdGuestIndex[static_cast<size_t>(index)]));
+	const auto *src = reinterpret_cast<const uint8_t *>(s->sdBuffer(guest));
 	if (src == nullptr) return 0;
 	std::memcpy(buf, src + offset, static_cast<size_t>(n));
 	return n;

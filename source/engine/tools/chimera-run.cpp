@@ -397,7 +397,17 @@ int main(int argc, char **argv)
 			}
 		}
 	}
-	else if (!projectMode && !readWholeFile(romPath, rom)) return fail(metaPath, std::string("could not read rom ") + romPath);
+	else if (!projectMode)
+	{
+		/* THE PATH, not the bytes. The engine mounts a rom from where it lies
+		 * when it is told where that is, and reads it lazily from there; hand
+		 * it a byte array instead and the file is copied three times over -
+		 * once here, once into the session, once into the guest's file system -
+		 * before the machine has read a sector of it. A 2 GB DOS hard disk cost
+		 * 8.3 GB that way, which is the frontend's own behaviour nowhere: it
+		 * has always passed the path. */
+		romPathStore = romPath;
+	}
 
 	ce_movie_log *movie = ce_movie_log_new();
 	if (ce_movie_log_parse(movie, reinterpret_cast<const char *>(movieText.data()), movieText.size()) != 0)
