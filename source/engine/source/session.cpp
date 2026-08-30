@@ -595,6 +595,20 @@ uint64_t ce_session::sendButtons(const uint8_t *states)
 
 void ce_session::copyVideo()
 {
+	/* THE FRAME FIRST, THEN ITS SIZE. A core settles what it is about to hand
+	 * over while it hands it over - Flycast asks its renderer for the finished
+	 * picture inside GetVideoBgra, and only then knows whether the machine is
+	 * in a 640x480 mode or a 320x240 one. Asking the size first reads the
+	 * PREVIOUS frame's, which is a stride away from the data that follows: the
+	 * 240p Test Suite came out as two half-width copies of itself, because a
+	 * 320-wide picture was copied 640 wide.
+	 *
+	 * Both gate runners have always done it in this order, which is the order
+	 * the cores were written against; this was the odd one out.
+	 *
+	 * A machine that has not rendered yet answers null (DOS before its first
+	 * mode set); the buffer keeps its previous frame. */
+	const void *src = reinterpret_cast<const void *>(getVideoBgra());
 	if (getVideoWidth != nullptr && getVideoHeight != nullptr)
 	{
 		int32_t w = getVideoWidth(), h = getVideoHeight();
@@ -604,9 +618,6 @@ void ce_session::copyVideo()
 			vidH = h < cfg.height ? h : cfg.height;
 		}
 	}
-	/* a machine that has not rendered yet answers null (DOS before its first
-	 * mode set); the buffer keeps its previous frame */
-	const void *src = reinterpret_cast<const void *>(getVideoBgra());
 	if (src != nullptr)
 	{
 		std::memcpy(videoBuf.data(), src, static_cast<size_t>(vidW) * vidH * sizeof(uint32_t));
