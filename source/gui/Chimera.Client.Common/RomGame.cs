@@ -36,17 +36,37 @@ namespace Chimera.Client.Common
 			Extension = file.Extension.ToUpperInvariant();
 
 			var stream = file.GetStream();
-			int fileLength = (int)stream.Length;
-			FileData = new byte[fileLength];
-			stream.Position = 0;
-			var bytesRead = stream.Read(FileData, offset: 0, count: fileLength);
-			Debug.Assert(bytesRead == fileLength, "failed to read whole rom stream");
-			RomData = FileData;
+			long longLength = stream.Length;
+
+			string hash;
+			// A disc-sized file never becomes a byte array: the waterbox
+			// adapter mounts it from where it lies (RomPath), and a 2GB+
+			// image would overflow the array anyway. Only the identity
+			// hash needs the bytes, and it can stream.
+			const long StreamHashThreshold = 512L * 1024 * 1024;
+			if (longLength > StreamHashThreshold)
+			{
+				stream.Position = 0;
+				using var sha1 = System.Security.Cryptography.SHA1.Create();
+				var digest = sha1.ComputeHash(stream);
+				hash = string.Concat(Array.ConvertAll(digest, b => b.ToString("X2")));
+				FileData = RomData = Array.Empty<byte>();
+			}
+			else
+			{
+				int fileLength = (int)longLength;
+				FileData = new byte[fileLength];
+				stream.Position = 0;
+				var bytesRead = stream.Read(FileData, offset: 0, count: fileLength);
+				Debug.Assert(bytesRead == fileLength, "failed to read whole rom stream");
+				RomData = FileData;
+				hash = Chimera.Emulation.Common.Engine.ChimeraEngine.Sha1Hex(FileData);
+			}
 
 			GameInfo = new GameInfo
 			{
 				Name = Path.GetFileNameWithoutExtension(file.Name).Replace('_', ' '),
-				Hash = Chimera.Emulation.Common.Engine.ChimeraEngine.Sha1Hex(FileData),
+				Hash = hash,
 				System = null, // resolved by the frontend (core package extension map, user preference, or prompt)
 				Status = RomStatus.NotInDatabase,
 				NotInDatabase = true,

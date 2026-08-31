@@ -64,6 +64,7 @@ namespace Chimera.Client.Common
 			["VB"] = "Virtual Boy",
 			["VEC"] = "Vectrex",
 			["WSWAN"] = "WonderSwan",
+			["XBOX"] = "Xbox",
 			["ZXSpectrum"] = "ZX Spectrum",
 		};
 

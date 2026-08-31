@@ -163,10 +163,17 @@ namespace Chimera.Emulation.Common.Waterbox
 				if (decl is null || decl.Id != id) decl = Firmware.FirstOrDefault(d => d.Id == id);
 				if (decl is null) continue;
 				used.Add(decl);
-				var bytes = ctx.FirmwareProvider?.Invoke(decl)
-					?? throw new MissingFirmwareException(
+				var bytes = ctx.FirmwareProvider?.Invoke(decl);
+				if (bytes is null)
+				{
+					// A declaration may say the core can start without it
+					// (an optional identity file, an expansion rom); absent
+					// simply means not mounted, and the core carries on.
+					if (!decl.Required) continue;
+					throw new MissingFirmwareException(
 						$"{CoreName} needs firmware that has not been provided: {decl.DisplayName}."
 							+ " Open the project again and satisfy its firmware page.");
+				}
 				resolved[decl.Id] = bytes;
 			}
 			return resolved;
