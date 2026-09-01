@@ -161,10 +161,16 @@ bool parseConfig(const char *json, uint64_t len, const char *overrides, SessionC
 
 	const cJSON *video = cJSON_GetObjectItemCaseSensitive(root, "video");
 	const cJSON *audio = cJSON_GetObjectItemCaseSensitive(root, "audio");
-	/* the controller is the machine's, and the picture may be too */
+	/* the controller is the machine's, and the picture may be too; a machine
+	 * that declares none shares the package's (dolphin's GameCube and Wii
+	 * are one pad) */
 	const cJSON *input = machine != nullptr
 		? cJSON_GetObjectItemCaseSensitive(machine, "input")
-		: cJSON_GetObjectItemCaseSensitive(root, "input");
+		: nullptr;
+	if (!cJSON_IsObject(input))
+	{
+		input = cJSON_GetObjectItemCaseSensitive(root, "input");
+	}
 	if (!cJSON_IsObject(video) || !cJSON_IsObject(audio) || !cJSON_IsObject(input))
 	{
 		cJSON_Delete(root);

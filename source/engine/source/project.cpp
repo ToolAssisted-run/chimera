@@ -1043,7 +1043,10 @@ int32_t ce_project_validate(const ce_project *p, const char *slots_json, uint64_
 			cJSON *id = cJSON_GetObjectItemCaseSensitive(item, "id");
 			cJSON *when = cJSON_GetObjectItemCaseSensitive(item, "exposedWhen");
 			if (!cJSON_IsString(id) || when == nullptr) continue;
-			if (ceEvalCondition(when, slotMap, nullptr)) continue;
+			/* the project's own settings: a slot gated on the machine setting
+			 * (gpgx's per-machine cartridges) is exposed by what the project
+			 * records, not evaluated blind */
+			if (ceEvalCondition(when, slotMap, p->settings)) continue;
 			unexposed.insert(id->valuestring);
 			for (const FileEntry &e : p->files)
 			{
