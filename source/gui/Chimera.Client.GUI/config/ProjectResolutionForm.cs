@@ -4,6 +4,7 @@ using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
 
+using Chimera.Client.Common;
 using Chimera.Emulation.Common.Engine;
 
 namespace Chimera.Client.GUI
@@ -20,6 +21,7 @@ namespace Chimera.Client.GUI
 	{
 		private readonly EngineProject _project;
 		private readonly Func<string, string?> _locateFile;
+		private readonly Func<string?>? _locateFolder;
 		private readonly ListView _list;
 		private readonly Label _detail;
 		private readonly Button _openButton;
@@ -29,10 +31,12 @@ namespace Chimera.Client.GUI
 
 		/// <param name="project">opened and auto-resolved by the caller; this form finishes the job</param>
 		/// <param name="locateFile">shows a file picker titled for one file; the dialog belongs to the owner</param>
-		public ProjectResolutionForm(EngineProject project, Func<string, string?> locateFile)
+		/// <param name="locateFolder">shows a folder picker for Scan Folder; null hides the button</param>
+		public ProjectResolutionForm(EngineProject project, Func<string, string?> locateFile, Func<string?>? locateFolder = null)
 		{
 			_project = project;
 			_locateFile = locateFile;
+			_locateFolder = locateFolder;
 
 			SuspendLayout();
 			ClientSize = new(UIHelper.ScaleX(560), UIHelper.ScaleY(320));
@@ -72,6 +76,8 @@ namespace Chimera.Client.GUI
 			};
 
 			_locateButton = MakeButton("Locate...", 8, Locate);
+			Button scanButton = MakeButton("Scan Folder...", 92, ScanFolder);
+			scanButton.Visible = _locateFolder is not null;
 			_openButton = MakeButton("Open", 380, Confirm);
 			_openButton.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
 			Button cancelButton = MakeButton("Cancel", 472, () => { DialogResult = DialogResult.Cancel; Close(); });
@@ -79,7 +85,7 @@ namespace Chimera.Client.GUI
 			AcceptButton = _openButton;
 			CancelButton = cancelButton;
 
-			Controls.AddRange([ header, _list, _detail, _locateButton, _openButton, cancelButton ]);
+			Controls.AddRange([ header, _list, _detail, _locateButton, scanButton, _openButton, cancelButton ]);
 			ResumeLayout();
 			Populate();
 		}
@@ -181,6 +187,32 @@ namespace Chimera.Client.GUI
 				MessageBox.Show(this, ex.Message, "Cannot read that file", MessageBoxButtons.OK, MessageBoxIcon.Error);
 			}
 			Populate();
+		}
+
+		/// <summary>
+		/// "It is all somewhere in here": scans a folder (subfolders included)
+		/// and resolves whatever matches by hash - the identity, any file name -
+		/// or, failing that, by the recorded name, whose verdict shows in the
+		/// row like any Locate would.
+		/// </summary>
+		public void ScanFolder()
+		{
+			var folder = _locateFolder?.Invoke();
+			if (folder is null) return;
+			int resolved;
+			UseWaitCursor = true;
+			try
+			{
+				resolved = ProjectFolderScan.Resolve(_project, folder);
+			}
+			finally
+			{
+				UseWaitCursor = false;
+			}
+			Populate();
+			_detail.Text = resolved is 0
+				? "the scan found nothing new"
+				: $"the scan resolved {resolved} file{(resolved is 1 ? "" : "s")}";
 		}
 
 		private void Confirm()

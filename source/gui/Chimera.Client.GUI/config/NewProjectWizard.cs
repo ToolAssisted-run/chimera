@@ -86,6 +86,7 @@ namespace Chimera.Client.GUI
 		private readonly ListView _firmwareList;
 		private readonly Button _firmwareSetButton;
 		private readonly Button _firmwareClearButton;
+		private readonly Func<string?>? _pickFirmwareFolder;
 		private List<FirmwareNeed> _firmwareNeeds = new();
 		private IReadOnlyList<FirmwareLocator.IndexedFile> _firmwareIndex = [ ];
 
@@ -125,10 +126,12 @@ namespace Chimera.Client.GUI
 			Func<ProjectSlotDeclaration.Slot, string[]> pickFiles,
 			Func<string, string?>? pickFirmwareFile = null,
 			IReadOnlyList<string>? firmwareSearchDirs = null,
+			Func<string?>? pickFirmwareFolder = null,
 			Func<string, string, string?>? rememberedFirmwarePath = null)
 		{
 			_pickFirmwareFile = pickFirmwareFile ?? (static _ => null);
 			_firmwareSearchDirs = firmwareSearchDirs ?? [ ];
+			_pickFirmwareFolder = pickFirmwareFolder;
 			_rememberedFirmwarePath = rememberedFirmwarePath ?? (static (_, _) => null);
 			_cores = cores.Where(static c => c.Error is null).ToList();
 			_pickFiles = pickFiles;
@@ -271,7 +274,10 @@ namespace Chimera.Client.GUI
 			_firmwareSetButton.Click += (_, _) => SetFirmwareFile();
 			_firmwareClearButton = new Button { AutoSize = true, Location = Pt(110, 344), Text = "Clear" };
 			_firmwareClearButton.Click += (_, _) => ClearFirmwareFile();
-			p4.Controls.AddRange([ _firmwareList, _firmwareSetButton, _firmwareClearButton ]);
+			Button firmwareScanButton = new() { AutoSize = true, Location = Pt(178, 344), Text = "Scan Folder..." };
+			firmwareScanButton.Click += (_, _) => ScanFirmwareFolder();
+			firmwareScanButton.Visible = pickFirmwareFolder is not null;
+			p4.Controls.AddRange([ _firmwareList, _firmwareSetButton, _firmwareClearButton, firmwareScanButton ]);
 
 			// ---- chrome ----------------------------------------------------------
 			// Width is set below, once the buttons have been placed: a fixed one
@@ -1300,6 +1306,63 @@ namespace Chimera.Client.GUI
 			need.ChosenPath = System.IO.Path.GetFullPath(path);
 			need.ChosenSha1 = sha1;
 			_status.Text = "";
+			RenderFirmwareRows();
+		}
+
+		/// <summary>
+		/// "My files are somewhere in here": scans a folder (subfolders
+		/// included) and fills every requirement it can. A hash-pinned
+		/// requirement takes only its exact file, any name; an unpinned one
+		/// takes the file bearing its declared name, hashed and recorded like
+		/// any hand-picked choice. What the user already chose is left alone.
+		/// </summary>
+		private void ScanFirmwareFolder()
+		{
+			var folder = _pickFirmwareFolder?.Invoke();
+			if (folder is null) return;
+			UseWaitCursor = true;
+			try
+			{
+				var found = Chimera.Client.Common.ProjectFolderScan
+					.Enumerate(folder)
+					.Take(Chimera.Client.Common.ProjectFolderScan.MaxFiles)
+					.ToList();
+				// one hashed index answers every pinned requirement
+				var index = FirmwareLocator.BuildIndex([ ], found);
+				_firmwareIndex = _firmwareIndex.Concat(index).ToList();
+				var filled = 0;
+				foreach (var need in _firmwareNeeds)
+				{
+					if (need.ChosenPath is not null || need.Decl is null) continue;
+					if (!string.IsNullOrEmpty(need.Decl.Sha1))
+					{
+						if (FirmwareLocator.FindFor(need.Decl, index) is { } match)
+						{
+							need.ChosenPath = match.Path;
+							need.ChosenSha1 = match.Sha1;
+							filled++;
+						}
+						continue;
+					}
+					// unpinned: the declared file name is the only lead - and it
+					// also reaches files too large for the hash index (a disk
+					// image). ProvideFirmware hashes and records it properly.
+					var name = need.Decl.Name;
+					if (string.IsNullOrEmpty(name)) continue;
+					var named = found.FirstOrDefault(f =>
+						System.IO.Path.GetFileName(f).Equals(name, StringComparison.OrdinalIgnoreCase));
+					if (named is null) continue;
+					ProvideFirmware(need.Id, named);
+					if (need.ChosenPath is not null) filled++;
+				}
+				_status.Text = filled is 0
+					? $"scanned {found.Count} files; nothing new matched"
+					: $"scanned {found.Count} files; {filled} requirement{(filled is 1 ? "" : "s")} resolved";
+			}
+			finally
+			{
+				UseWaitCursor = false;
+			}
 			RenderFirmwareRows();
 		}
 

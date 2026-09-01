@@ -146,6 +146,14 @@ namespace Chimera.Client.GUI
 					return dialog.ShowDialog(this) is DialogResult.OK ? dialog.FileName : null;
 				},
 				firmwareSearchDirs: [ Config.PathEntries.FirmwareAbsolutePath() ],
+				pickFirmwareFolder: () =>
+				{
+					using FolderBrowserDialog picker = new()
+					{
+						Description = "Scan a folder for firmware files",
+					};
+					return picker.ShowDialog(this) is DialogResult.OK ? picker.SelectedPath : null;
+				},
 				rememberedFirmwarePath: (coreName, id) =>
 					Config.CoreFirmware.TryGetValue(CoreFirmwareStore.KeyFor(coreName, id), out var remembered)
 						? remembered
@@ -228,6 +236,14 @@ namespace Chimera.Client.GUI
 				{
 					using OpenFileDialog picker = new() { Title = title };
 					return picker.ShowDialog(this) is DialogResult.OK ? picker.FileName : null;
+				},
+				locateFolder: () =>
+				{
+					using FolderBrowserDialog picker = new()
+					{
+						Description = "Scan a folder for the project's files",
+					};
+					return picker.ShowDialog(this) is DialogResult.OK ? picker.SelectedPath : null;
 				});
 				if (dialog.ShowDialog(this) is not DialogResult.OK)
 				{
