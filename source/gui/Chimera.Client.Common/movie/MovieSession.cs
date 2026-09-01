@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 
@@ -316,8 +317,13 @@ namespace Chimera.Client.Common
 
 		public IMovie Get(string path, bool loadMovie)
 		{
-			// there is exactly one movie-bearing artifact: the project (docs/project.md)
-			if (Path.GetExtension(path)?.EndsWithOrdinal(TasMovie.Extension) is not true) return null;
+			// there is exactly one movie-bearing artifact: the project (docs/project.md).
+			// Case-insensitively: a filesystem that preserves case still hands
+			// back whatever case the file arrived with, and a downloaded
+			// project is as likely to be .chimeraproject as .chimeraProject.
+			// This was the ONE case-sensitive check on the open-project path,
+			// and it made the whole flow end in silence (issue #21).
+			if (Path.GetExtension(path)?.EndsWith(TasMovie.Extension, StringComparison.OrdinalIgnoreCase) is not true) return null;
 			IMovie movie = new TasMovie(this, path);
 
 			if (loadMovie)

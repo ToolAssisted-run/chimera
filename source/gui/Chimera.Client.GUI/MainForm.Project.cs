@@ -296,6 +296,13 @@ namespace Chimera.Client.GUI
 			// load, TAStudio open, tasproj load - each a full core init).
 			if (MovieSession.Get(path, loadMovie: saved) is not ITasMovie tasMovie)
 			{
+				// Never end in silence: everything above showed a dialog when it
+				// refused, and a user who just answered the resolution dialog is
+				// owed more than nothing happening (issue #21 was exactly this).
+				ShowMessageBox(
+					owner: null,
+					$"'{Path.GetFileName(path)}' could not be read as a project.",
+					"Cannot open the project");
 				return false;
 			}
 			// the movie adopts the RESOLVED project, so its saves record what

@@ -238,6 +238,16 @@ namespace Chimera.Emulation.Common
 				["Reload"] = 'e',       // the light gun's, not Right
 				["Mouse Middle"] = 'c', // the base table knows Left and Right
 			},
+
+			/* The Duke: A B X Y read from the base table; these are the names
+			 * whose first letters collide with them or with each other. */
+			["XBOX"] = new()
+			{
+				["Back"] = 's',          // the pad's select, not another B
+				["Black"] = 'k',         // blacK; White reads W on its own
+				["LStick Click"] = 'l',
+				["RStick Click"] = 'r',
+			},
 			[VSystemID.Raw.Panasonic3DO] = new()
 			{
 				["LT"] = 'l',
