@@ -96,7 +96,12 @@ namespace Chimera.Client.GUI
 			public string? ChosenPath; // for a pinned entry, set only when the hash matched exactly
 			public string? ChosenSha1; // the actual hash - equals the pin, or names an unpinned choice
 
-			public bool Satisfied => ChosenPath is not null;
+			/// <summary>
+			/// A file was chosen - or the core said it can start without one
+			/// (Required false), in which case absent is a fine answer and
+			/// the wizard must not stand in the way.
+			/// </summary>
+			public bool Satisfied => ChosenPath is not null || Decl?.Required == false;
 		}
 
 		private readonly Button _backButton;
@@ -1226,9 +1231,9 @@ namespace Chimera.Client.GUI
 				};
 				item.SubItems.Add(need.Decl?.Name ?? "");
 				item.SubItems.Add(string.IsNullOrEmpty(need.Decl?.Sha1) ? "(your own dump)" : need.Decl!.Sha1);
-				item.SubItems.Add(need.Satisfied
+				item.SubItems.Add(need.ChosenPath is not null
 					? $"found: {Path.GetFileName(need.ChosenPath)}"
-					: "not found");
+					: need.Satisfied ? "optional - core default used" : "not found");
 				_firmwareList.Items.Add(item);
 			}
 			if (_firmwareNeeds.Count is 0)
