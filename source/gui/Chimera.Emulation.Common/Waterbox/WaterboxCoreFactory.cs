@@ -40,7 +40,13 @@ namespace Chimera.Emulation.Common.Waterbox
 				foreach (var machine in _cfg.Machines)
 				{
 					if (string.IsNullOrEmpty(machine.Id)) throw new InvalidOperationException($"{ConfigFileName}: a machine has no id");
-					if (machine.Input?.Buttons is null) throw new InvalidOperationException($"{ConfigFileName}: machine \"{machine.Id}\" has no controller");
+					// a machine without its own controller uses the package's -
+					// dolphin's GameCube and Wii share one pad - so only a machine
+					// with NO controller anywhere is a broken declaration
+					if (machine.Input?.Buttons is null && _cfg.Input?.Buttons is null)
+					{
+						throw new InvalidOperationException($"{ConfigFileName}: machine \"{machine.Id}\" has no controller, and the package declares none to fall back on");
+					}
 				}
 			}
 			else if (string.IsNullOrEmpty(_cfg.SystemId))

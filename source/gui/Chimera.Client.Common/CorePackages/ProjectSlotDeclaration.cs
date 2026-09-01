@@ -1,4 +1,4 @@
-#nullable enable
+﻿#nullable enable
 
 using System.Collections.Generic;
 using System.Linq;
@@ -28,6 +28,16 @@ namespace Chimera.Client.Common
 			public int Max { get; init; } = -1;
 			public IReadOnlyList<string> Formats { get; init; } = [ ];
 			public string Help { get; init; } = "";
+
+			/// <summary>
+			/// True when the slot's exposedWhen condition reads only SETTINGS
+			/// (directly or through combinators) - the machine decides it, and
+			/// the answer cannot change while files are being picked. A wizard
+			/// may hide such a slot outright; one gated by other slots' contents
+			/// must stay visible (greyed), because unloading a file brings it
+			/// back. False also when there is no condition at all.
+			/// </summary>
+			public bool SettingGatedOnly { get; init; }
 
 			public string CardinalityText => (Min, Max) switch
 			{
@@ -67,6 +77,7 @@ namespace Chimera.Client.Common
 							? formats.Values<string>().OfType<string>().ToList()
 							: [ ],
 						Help = item.Value<string>("help") ?? "",
+						SettingGatedOnly = item["exposedWhen"] is JToken when && ReadsOnlySettings(when),
 					});
 				}
 				if (parsed.Count is 0) return null;
@@ -85,6 +96,24 @@ namespace Chimera.Client.Common
 			{
 				return null;
 			}
+		}
+
+		/// <summary>
+		/// Whether a condition tree (the language of docs/project.md) contains
+		/// only setting tests: combinators may nest, but no {"slot": ...} leaf.
+		/// </summary>
+		private static bool ReadsOnlySettings(JToken condition)
+		{
+			if (condition is not JObject obj) return false;
+			if (obj["slot"] is not null) return false;
+			if (obj["setting"] is not null) return true;
+			foreach (var key in new[] { "all", "any" })
+			{
+				if (obj[key] is JArray children)
+					return children.All(static c => c is JObject && ReadsOnlySettings(c));
+			}
+			if (obj["not"] is JObject sub) return ReadsOnlySettings(sub);
+			return false;
 		}
 
 		/// <summary>The wizard's file-picker filter for one slot ("*.img;*.ima"), or null for any file.</summary>

@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 
 using Chimera.Client.Common;
 using Chimera.Client.GUI;
@@ -91,6 +91,44 @@ namespace Chimera.Tests.Client.GUI
 
 			CollectionAssert.AreEqual(new[] { "cart_gg" }, offered,
 				"a Game Gear takes .gg, which is the whole of what its slot declares");
+		}
+
+		[TestMethod]
+		public void AnotherMachinesSlotIsNotEvenShown()
+		{
+			// not greyed: absent. A Game Gear form that lists a Mega Drive
+			// cartridge row explains nothing a person can act on.
+			using var form = MakeForm("gg");
+			foreach (var slot in EverySlot)
+			{
+				Assert.AreEqual(slot == "cart_gg", form.SlotRendered(slot),
+					$"a gg machine should render cart_gg alone, but {slot} disagreed");
+			}
+		}
+
+		[TestMethod]
+		public void ASlotGatedByFilesStaysVisible()
+		{
+			// the famicom shape: a disk rules out a cartridge and vice versa.
+			// Both are exposed while nothing is picked - and both must stay ON
+			// THE FORM afterwards, because unloading brings the other back.
+			const string declaration = """
+				{
+				  "slots": [
+				    { "id": "cart", "title": "Cartridge", "min": 0, "max": 1, "formats": ["nes"],
+				      "exposedWhen": { "not": { "slot": "disk" } } },
+				    { "id": "disk", "title": "Disk", "min": 0, "max": 1, "formats": ["fds"],
+				      "exposedWhen": { "not": { "slot": "cart" } } }
+				  ]
+				}
+				""";
+			NewProjectWizard form = new([ ], static _ => [ ]);
+			using var _ = form;
+			form.Show();
+			form.UseSettingsDecls([ ]);
+			form.UseDeclaration(ProjectSlotDeclaration.Parse(declaration));
+			Assert.IsTrue(form.SlotRendered("cart"), "the cartridge row belongs on the form");
+			Assert.IsTrue(form.SlotRendered("disk"), "the disk row belongs on the form");
 		}
 	}
 }
