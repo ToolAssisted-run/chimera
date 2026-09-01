@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Diagnostics;
 
 using Chimera.Common.StringExtensions;
@@ -241,6 +241,12 @@ namespace Chimera.Emulation.Common
 
 			/* The Duke: A B X Y read from the base table; these are the names
 			 * whose first letters collide with them or with each other. */
+			["GC"] = new()
+			{
+				// the triggers, lowercase; Left and Right keep the uppercase pair
+				["L"] = 'l',
+				["R"] = 'r',
+			},
 			["XBOX"] = new()
 			{
 				["Back"] = 's',          // the pad's select, not another B

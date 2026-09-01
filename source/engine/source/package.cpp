@@ -14,6 +14,8 @@
 #include "../../extern/tools/miniz/miniz.h"
 
 #include <cstring>
+#include <algorithm>
+#include <filesystem>
 #include <map>
 #include <string>
 #include <vector>
@@ -36,6 +38,8 @@ struct ce_package
 	mz_zip_archive zip{};
 	bool zipOpen = false;
 	std::map<std::string, mz_uint> entries;
+	std::vector<std::string> assetNames;
+	bool assetsBuilt = false;
 	std::string sha1;
 
 	// directory form
@@ -115,6 +119,51 @@ void ce_package_free(ce_package *p) { delete p; }
 const char *ce_package_sha1(const ce_package *p) { return p->sha1.empty() ? nullptr : p->sha1.c_str(); }
 
 int32_t ce_package_is_waterbox(const ce_package *p) { return p->isWaterbox ? 1 : 0; }
+
+/* The package's core-owned asset files: every entry under "assets/". The
+ * names are cached on first ask; bytes come through ce_package_entry like
+ * any other entry. */
+static void buildAssetList(ce_package *p)
+{
+	if (p->assetsBuilt) return;
+	p->assetsBuilt = true;
+	if (!p->dir.empty())
+	{
+		std::error_code ec;
+		std::filesystem::path base = std::filesystem::path(p->dir) / "assets";
+		if (std::filesystem::is_directory(base, ec))
+		{
+			for (auto it = std::filesystem::recursive_directory_iterator(base, ec);
+			     !ec && it != std::filesystem::recursive_directory_iterator(); it.increment(ec))
+			{
+				if (!it->is_regular_file(ec)) continue;
+				std::error_code rec;
+				std::string rel = std::filesystem::relative(it->path(), std::filesystem::path(p->dir), rec).generic_string();
+				if (!rec) p->assetNames.push_back(std::move(rel));
+			}
+		}
+	}
+	else
+	{
+		for (const auto &e : p->entries)
+			if (e.first.rfind("assets/", 0) == 0 && e.first.back() != '/')
+				p->assetNames.push_back(e.first);
+	}
+	std::sort(p->assetNames.begin(), p->assetNames.end());
+}
+
+int32_t ce_package_asset_count(ce_package *p)
+{
+	buildAssetList(p);
+	return static_cast<int32_t>(p->assetNames.size());
+}
+
+const char *ce_package_asset_name(ce_package *p, int32_t i)
+{
+	buildAssetList(p);
+	if (i < 0 || static_cast<size_t>(i) >= p->assetNames.size()) return nullptr;
+	return p->assetNames[static_cast<size_t>(i)].c_str();
+}
 
 int32_t ce_package_has_entry(ce_package *p, const char *name)
 {

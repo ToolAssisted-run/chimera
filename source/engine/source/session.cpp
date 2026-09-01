@@ -292,9 +292,10 @@ struct ce_session
 	bool gpuDrew = false;
 
 	// the mounted byte sources must outlive the mounts
-	std::vector<uint8_t> wbxBytes, romBytes;
+	std::vector<uint8_t> wbxBytes, romBytes, romNameBytes;
 	std::string settingsBytes;
 	std::vector<std::vector<uint8_t>> firmwareBytes;
+	std::vector<std::pair<std::string, std::vector<uint8_t>>> assetFiles;
 	std::vector<std::vector<uint8_t>> extraBytes;
 	std::vector<ByteStream> streams; // stable addresses: reserved up front
 
@@ -830,6 +831,18 @@ ce_session *ce_session_open(
 	entry = ce_package_entry(pkg, "core.wbx", &len);
 	if (entry == nullptr) return abort("package has no core.wbx");
 	s->wbxBytes.assign(entry, entry + len);
+	/* core-owned assets travel in the package and are mounted below with the
+	 * "assets" prefix dropped: assets/sys/... becomes /sys/... in the guest */
+	const int32_t asset_count = ce_package_asset_count(pkg);
+	s->assetFiles.reserve(static_cast<size_t>(asset_count));
+	for (int32_t i = 0; i < asset_count; i++)
+	{
+		const char *aname = ce_package_asset_name(pkg, i);
+		if (aname == nullptr) continue;
+		const uint8_t *abytes = ce_package_entry(pkg, aname, &len);
+		if (abytes == nullptr) return abort(std::string("package asset unreadable: ") + aname);
+		s->assetFiles.emplace_back(std::string(aname).substr(6), std::vector<uint8_t>(abytes, abytes + len));
+	}
 	ce_package_free(pkg);
 	pkg = nullptr; /* a later abort() must not free it again */
 
@@ -838,7 +851,8 @@ ce_session *ce_session_open(
 	s->settingsBytes = s->cfg.settingsJson;
 
 	// every mounted stream needs a stable address for the host's callback
-	s->streams.reserve(3 + static_cast<size_t>(firmware_count) + static_cast<size_t>(extra_count));
+	s->streams.reserve(5 + static_cast<size_t>(firmware_count) + static_cast<size_t>(extra_count)
+	                   + s->assetFiles.size());
 
 	chimera::WbxLayout layout{};
 	layout.sbrkSize = static_cast<uintptr_t>(s->cfg.layoutMiB[0] << 20);
@@ -866,6 +880,60 @@ ce_session *ce_session_open(
 	}
 	if (!r.ok()) return abort(std::string("mounting ") + s->cfg.romFile + ": " + r.errorMessage);
 
+	/* The same bytes under the file's real name too, the way a project mounts
+	 * its slot files: an extension-driven core (a GameCube .dol vs .iso) can
+	 * then boot the name instead of guessing from the fixed mount. */
+	if (rom_path != nullptr && rom_path[0] != '\0')
+	{
+		const char *base = strrchr(rom_path, '/');
+#ifdef _WIN32
+		const char *bs = strrchr(rom_path, '\\');
+		if (bs != nullptr && (base == nullptr || bs > base)) base = bs;
+#endif
+		base = base != nullptr ? base + 1 : rom_path;
+		std::string alias = std::string("/") + base;
+		if (alias != s->cfg.romFile)
+		{
+			if (romFromDisk)
+			{
+				host->wbx_mount_file_path(s->obj, alias.c_str(), rom_path, &r);
+			}
+			else
+			{
+				s->streams.push_back({ s->romBytes.data(), s->romBytes.size() });
+				host->wbx_mount_file(s->obj, alias.c_str(), streamRead, reinterpret_cast<uintptr_t>(&s->streams.back()), 0, &r);
+			}
+			if (!r.ok()) return abort(std::string("mounting ") + alias + ": " + r.errorMessage);
+		}
+	}
+
+	/* a directly-opened rom has a name too: when no caller-provided extra
+	 * carries "rom.name", derive it from the path so extension-driven cores
+	 * can tell what they were handed (the transitional rom/rom.name view,
+	 * docs/project.md) */
+	{
+		bool haveName = false;
+		for (int32_t i = 0; i < extra_count; i++)
+			if (extra_names != nullptr && extra_names[i] != nullptr && strcmp(extra_names[i], "rom.name") == 0)
+			{
+				haveName = true;
+				break;
+			}
+		if (!haveName && rom_path != nullptr && rom_path[0] != '\0')
+		{
+			const char *base = strrchr(rom_path, '/');
+#ifdef _WIN32
+			const char *bs = strrchr(rom_path, '\\');
+			if (bs != nullptr && (base == nullptr || bs > base)) base = bs;
+#endif
+			base = base != nullptr ? base + 1 : rom_path;
+			s->romNameBytes.assign(base, base + strlen(base));
+			s->streams.push_back({ s->romNameBytes.data(), s->romNameBytes.size() });
+			host->wbx_mount_file(s->obj, "rom.name", streamRead, reinterpret_cast<uintptr_t>(&s->streams.back()), 0, &r);
+			if (!r.ok()) return abort(std::string("mounting rom.name: ") + r.errorMessage);
+		}
+	}
+
 	/* the settings channel: always mounted (empty object when the core has no
 	 * settings), so the guest ABI is uniform */
 	s->streams.push_back({ reinterpret_cast<const uint8_t *>(s->settingsBytes.data()), s->settingsBytes.size() });
@@ -878,6 +946,13 @@ ce_session *ce_session_open(
 		s->streams.push_back({ s->firmwareBytes.back().data(), s->firmwareBytes.back().size() });
 		host->wbx_mount_file(s->obj, firmware_ids[i], streamRead, reinterpret_cast<uintptr_t>(&s->streams.back()), 0, &r);
 		if (!r.ok()) return abort(r.errorMessage);
+	}
+
+	for (const auto &asset : s->assetFiles)
+	{
+		s->streams.push_back({ asset.second.data(), asset.second.size() });
+		host->wbx_mount_file(s->obj, asset.first.c_str(), streamRead, reinterpret_cast<uintptr_t>(&s->streams.back()), 0, &r);
+		if (!r.ok()) return abort(std::string("mounting asset ") + asset.first + ": " + r.errorMessage);
 	}
 
 	/* a multi-file game's additional mounts: rom2..romN, support files,

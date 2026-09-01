@@ -594,6 +594,13 @@ CE_API int32_t ce_package_is_waterbox(const ce_package *p);
 
 CE_API int32_t ce_package_has_entry(ce_package *p, const char *name);
 
+/* Core-owned asset files: every entry under "assets/", sorted. A waterbox
+ * session mounts each one at its path with the "assets" prefix dropped, so
+ * a package carrying assets/sys/GC/font.bin gives its guest /sys/GC/font.bin.
+ * The names stay valid until the package is freed. */
+CE_API int32_t ce_package_asset_count(ce_package *p);
+CE_API const char *ce_package_asset_name(ce_package *p, int32_t i);
+
 /* The entry's bytes (decompressed from the zip, or the file in the directory
  * form). NULL when absent or unreadable (see _last_error to tell which;
  * absent is ""). Invalidated by the next entry read on the same package. */
