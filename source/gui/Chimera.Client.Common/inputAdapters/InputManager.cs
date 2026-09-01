@@ -60,22 +60,30 @@ namespace Chimera.Client.Common
 			var def = emulator.ControllerDefinition;
 			def.BuildMnemonicsCache(emulator.SystemId);
 
-			// core packages may ship default bindings for the controllers they declare
-			// (default_keybinds.json); adopt them for controllers this config has never seen
+			// Core packages may ship default bindings for the controllers they declare
+			// (default_keybinds.json); adopt them for controllers this config has never
+			// seen. A controller the config names but binds NOTHING for counts as never
+			// seen: a session from before the package carried bindings leaves that
+			// empty section behind, and it must not shadow the defaults forever. Any
+			// actual user binding wins, as always.
 			var packageDefaults = CoreRegistry.Instance.PackageControlDefaults;
-			if (!config.AllTrollers.ContainsKey(def.Name) && packageDefaults.AllTrollers.TryGetValue(def.Name, out var defaultBinds))
+			if (!(config.AllTrollers.TryGetValue(def.Name, out var seenBinds) && seenBinds.Count is not 0)
+				&& packageDefaults.AllTrollers.TryGetValue(def.Name, out var defaultBinds))
 			{
 				config.AllTrollers[def.Name] = new Dictionary<string, string>(defaultBinds);
 			}
-			if (!config.AllTrollersAutoFire.ContainsKey(def.Name) && packageDefaults.AllTrollersAutoFire.TryGetValue(def.Name, out var defaultAFBinds))
+			if (!(config.AllTrollersAutoFire.TryGetValue(def.Name, out var seenAF) && seenAF.Count is not 0)
+				&& packageDefaults.AllTrollersAutoFire.TryGetValue(def.Name, out var defaultAFBinds))
 			{
 				config.AllTrollersAutoFire[def.Name] = new Dictionary<string, string>(defaultAFBinds);
 			}
-			if (!config.AllTrollersAnalog.ContainsKey(def.Name) && packageDefaults.AllTrollersAnalog.TryGetValue(def.Name, out var defaultAnalogBinds))
+			if (!(config.AllTrollersAnalog.TryGetValue(def.Name, out var seenAnalog) && seenAnalog.Count is not 0)
+				&& packageDefaults.AllTrollersAnalog.TryGetValue(def.Name, out var defaultAnalogBinds))
 			{
 				config.AllTrollersAnalog[def.Name] = new Dictionary<string, AnalogBind>(defaultAnalogBinds);
 			}
-			if (!config.AllTrollersFeedbacks.ContainsKey(def.Name) && packageDefaults.AllTrollersFeedbacks.TryGetValue(def.Name, out var defaultFeedbackBinds))
+			if (!(config.AllTrollersFeedbacks.TryGetValue(def.Name, out var seenFB) && seenFB.Count is not 0)
+				&& packageDefaults.AllTrollersFeedbacks.TryGetValue(def.Name, out var defaultFeedbackBinds))
 			{
 				config.AllTrollersFeedbacks[def.Name] = new Dictionary<string, FeedbackBind>(defaultFeedbackBinds);
 			}
