@@ -83,16 +83,23 @@ namespace Chimera.Emulation.Common.Waterbox
 				? Machines.Select(static m => m.Id).Where(static id => !string.IsNullOrEmpty(id)).ToList()
 				: string.IsNullOrEmpty(SystemId) ? [ ] : new[] { SystemId };
 
-		/// <summary>Rom extension -&gt; system, over the whole package (every machine's).</summary>
+		/// <summary>
+		/// Rom extension -&gt; system, over the whole package (every machine's).
+		/// When two machines claim the same extension - dolphin's GameCube and
+		/// Wii both boot .iso - the FIRST declaration wins, so a directly-opened
+		/// file routes to the machine declared first (the package's default). An
+		/// image of the other machine is then refused with a message naming the
+		/// wizard, where the choice is explicit.
+		/// </summary>
 		public Dictionary<string, string> AllExtensions
 		{
 			get
 			{
 				Dictionary<string, string> all = new();
-				foreach (var (ext, sysID) in Extensions ?? new()) all[ext] = sysID;
+				foreach (var (ext, sysID) in Extensions ?? new()) if (!all.ContainsKey(ext)) all[ext] = sysID;
 				foreach (var machine in Machines ?? new())
 				{
-					foreach (var (ext, sysID) in machine.Extensions ?? new()) all[ext] = sysID;
+					foreach (var (ext, sysID) in machine.Extensions ?? new()) if (!all.ContainsKey(ext)) all[ext] = sysID;
 				}
 				return all;
 			}
