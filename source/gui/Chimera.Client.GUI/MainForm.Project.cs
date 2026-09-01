@@ -250,6 +250,12 @@ namespace Chimera.Client.GUI
 					project.Dispose();
 					return false;
 				}
+				// The user just did real work in that dialog; it outlives any
+				// failure below (a missing core, missing firmware - the boot can
+				// still refuse for its own reasons). The sidecar is a hint the
+				// next load verifies by hash, so recording it early risks
+				// nothing, and losing it meant answering every row again.
+				local.Save(path, project);
 			}
 
 			// the firmware the project pins is looked for where this machine last
