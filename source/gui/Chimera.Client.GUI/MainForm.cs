@@ -1773,6 +1773,17 @@ namespace Chimera.Client.GUI
 				SnowyNullVideo.TriggerCriterion.WeekOfChristmas => DateTime.Now.DayOfYear is >= 354/*Dec. 20*/ and <= 360/*Dec. 26*/,
 				_ => false,
 			});
+			if (Emulator is NullEmulator && !snowing)
+			{
+				// the idle eye watches the pointer: its horizontal place over the
+				// display, pegged when it wanders off
+				var panel = _presentationPanel.Control;
+				if (panel.Width > 0)
+				{
+					var mouseX = panel.PointToClient(Control.MousePosition).X;
+					_idleEye.LookAt(((mouseX / (float) panel.Width) * 2f) - 1f);
+				}
+			}
 			var video = Emulator is NullEmulator && !snowing ? _idleEye : _currentVideoProvider;
 			Size currVideoSize = new Size(video.BufferWidth, video.BufferHeight);
 			Size currVirtualSize = new Size(video.VirtualWidth, video.VirtualHeight);

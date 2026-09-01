@@ -61,9 +61,8 @@ namespace Chimera.Client.GUI
 		/// <summary>-1 is hard left, +1 is hard right</summary>
 		private float _gaze;
 
-		private float _gazeFrom;
-
-		private float _gazeTo;
+		/// <summary>where the eye was last told to look; it eases there on its own</summary>
+		private float _gazeTarget;
 
 		/// <summary>frames until the next thing the eye decides to do</summary>
 		private int _wait = 120;
@@ -83,9 +82,16 @@ namespace Chimera.Client.GUI
 			Waiting,
 			Closing,
 			Opening,
-			Glancing,
-			Returning,
 		}
+
+		/// <summary>
+		/// Tells the eye where to look, -1 hard left to +1 hard right. The caller
+		/// reports the pointer; the eye does the moving - a quick slide that
+		/// settles, the way a glance lands. Off-screen positions just peg the
+		/// gaze, which is what an eye watching someone leave the room does.
+		/// </summary>
+		public void LookAt(float gaze)
+			=> _gazeTarget = Math.Max(-1f, Math.Min(1f, gaze));
 
 		public int VirtualWidth => Width;
 
@@ -122,18 +128,16 @@ namespace Chimera.Client.GUI
 		private void Animate()
 		{
 			_frame++;
+			// the pupil follows wherever it was last pointed, easing in so the
+			// glance lands rather than teleports; once settled it snaps, the
+			// redraw key stops changing, and the idle screen goes back to free
+			var d = _gazeTarget - _gaze;
+			_gaze = Math.Abs(d) < 0.004f ? _gazeTarget : _gaze + (d * 0.18f);
 			switch (_doing)
 			{
 				case Act.Waiting:
 					if (--_wait > 0) break;
-					// a blink is the common thing to do; a glance is the interesting one
-					if (_rng.Next(100) < 62) Begin(Act.Closing, _rng.Next(3, 6));
-					else
-					{
-						_gazeFrom = _gaze;
-						_gazeTo = _rng.Next(2) is 0 ? -1f : 1f;
-						Begin(Act.Glancing, _rng.Next(10, 16));
-					}
+					Begin(Act.Closing, _rng.Next(3, 6));
 					break;
 				case Act.Closing:
 					_lid = 1f - Ease();
@@ -147,30 +151,6 @@ namespace Chimera.Client.GUI
 						// blinks sometimes come in pairs, the way real ones do
 						if (_rng.Next(100) < 22) Begin(Act.Closing, _rng.Next(3, 6));
 						else Wait();
-					}
-					break;
-				case Act.Glancing:
-					_gaze = _gazeFrom + ((_gazeTo - _gazeFrom) * Ease());
-					if (Done())
-					{
-						_gaze = _gazeTo;
-						_gazeFrom = _gaze;
-						Begin(Act.Returning, _rng.Next(60, 200)); // hold the look, then come back
-					}
-					break;
-				case Act.Returning:
-					// the first part of this is the hold: the eye keeps looking, then
-					// slides back
-					var slide = _stepsTotal / 3;
-					if (_step >= _stepsTotal - slide)
-					{
-						var t = (float) (_step - (_stepsTotal - slide)) / slide;
-						_gaze = _gazeFrom * (1f - Smooth(t));
-					}
-					if (Done())
-					{
-						_gaze = 0f;
-						Wait();
 					}
 					break;
 			}

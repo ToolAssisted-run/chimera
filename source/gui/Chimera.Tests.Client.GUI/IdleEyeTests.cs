@@ -48,12 +48,14 @@ namespace Chimera.Tests.Client.GUI
 		}
 
 		/// <summary>
-		/// Over a few thousand frames it must both blink (the whole mark shrinks
-		/// towards its midline) and glance (only the pupil moves). Without this the
-		/// screen is a static logo, which is the thing it is not supposed to be.
+		/// Over a few thousand frames it must blink on its own, and its pupil must
+		/// follow where it is told to look - the pointer, in the real window. The
+		/// gaze is driven here the way the mouse drives it: told a side, left to
+		/// ease there itself. Without this the screen is a static logo, which is
+		/// the thing it is not supposed to be.
 		/// </summary>
 		[TestMethod]
-		public void TheEyeBlinksAndLooksAround()
+		public void TheEyeBlinksAndFollowsThePointer()
 		{
 			IdleEyeVideo eye = new();
 			var open = 0;
@@ -64,6 +66,9 @@ namespace Chimera.Tests.Client.GUI
 			var frameRight = new HashSet<int>();
 			for (var i = 0; i < 4000; i++)
 			{
+				// a pointer crossing the window: left half of the run on one side,
+				// right half on the other
+				eye.LookAt(i < 2000 ? -1f : 1f);
 				var frame = eye.GetVideoBuffer();
 				var (rows, centre) = Measure(frame);
 				if (rows is 0) continue;
@@ -79,7 +84,7 @@ namespace Chimera.Tests.Client.GUI
 				frameRight.Add(edgeR);
 			}
 			Assert.IsTrue(narrowest < open / 2, $"the eye never blinked (it was {narrowest}..{open} rows tall)");
-			Assert.IsTrue(rightmost - leftmost > 8, $"the eye never looked aside (its eye stayed within {rightmost - leftmost}px)");
+			Assert.IsTrue(rightmost - leftmost > 8, $"the eye never followed the pointer (its eye stayed within {rightmost - leftmost}px)");
 
 			// the WHOLE oval moves, not just the pupil inside it: the mark's outer
 			// slabs must not have shifted with it
