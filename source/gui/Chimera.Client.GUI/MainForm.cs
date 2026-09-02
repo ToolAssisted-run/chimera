@@ -767,11 +767,16 @@ namespace Chimera.Client.GUI
 		protected override void Dispose(bool disposing)
 		{
 			// NOTE: this gets called twice sometimes. once by using() in Program.cs and once from winforms internals when the form is closed...
-			DisplayManager?.Dispose();
-			DisplayManager = null;
-
 			if (disposing)
 			{
+				// Managed, so only on a real Dispose: from the finalizer (an
+				// Environment.Exit, which is how a headless refusal ends) the GL
+				// control is already gone, and making its context current again
+				// threw ObjectDisposedException out of the finalizer thread - a
+				// "FATAL UNHANDLED EXCEPTION" and exit code 255 in place of the
+				// refusal's own.
+				DisplayManager?.Dispose();
+				DisplayManager = null;
 				components?.Dispose();
 				_presentationPanel?.Dispose();
 				SingleInstanceDispose();

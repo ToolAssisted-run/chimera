@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Windows.Forms;
@@ -284,6 +284,19 @@ namespace Chimera.Client.GUI
 		{
 			local ??= new ProjectLocalPaths();
 			if (!EnsureProjectCore(project))
+			{
+				project.Dispose();
+				return false;
+			}
+
+			// The firmware the project pins is looked for by hash - in the Firmware
+			// folder, where this core last had it, and where this project's own
+			// sidecar remembers it - and whatever matches is what the load below
+			// mounts. Without this the load knows only what a wizard once chose,
+			// so a project opened on a machine that never ran the wizard for this
+			// core refused with "firmware not provided" while the dump sat in the
+			// Firmware folder (issue #27).
+			if (!VerifyFirmwarePins(project, local))
 			{
 				project.Dispose();
 				return false;

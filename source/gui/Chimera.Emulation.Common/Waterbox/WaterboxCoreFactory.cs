@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 
@@ -178,7 +178,8 @@ namespace Chimera.Emulation.Common.Waterbox
 					if (!decl.Required) continue;
 					throw new MissingFirmwareException(
 						$"{CoreName} needs firmware that has not been provided: {decl.DisplayName}."
-							+ " Open the project again and satisfy its firmware page.");
+							+ " Put the file in the Firmware folder and open the project again"
+							+ " (a new project's wizard can also point at it).");
 				}
 				resolved[decl.Id] = bytes;
 			}
