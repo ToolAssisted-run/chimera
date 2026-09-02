@@ -106,10 +106,11 @@ namespace NLua.Native
 				return new[] { "lua54.dll" };
 			}
 
-			// Linux is tricky as we want to use the system lua library
-			// but old (but not yet EOL) distros may not have lua 5.4
-			// we can safely use lua 5.3 for our purposes, hope the
-			// user's distro provides at least lua 5.3!
+			// Chimera ships its own Lua 5.4 as liblua54.so in dll/, which every launcher
+			// and test runner puts first on LD_LIBRARY_PATH - the same pinned runtime
+			// Windows gets as lua54.dll. It is tried first so a bundle never depends on
+			// which Lua (if any) the distro happens to carry; the distro names stay as
+			// fallbacks for a checkout run some other way.
 			if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) ||
 #pragma warning disable CA1862 // suggests `string.Contains(string, StringComparison)` even though that's not available with this target
 #pragma warning disable RCS1155 // ditto
@@ -119,6 +120,7 @@ namespace NLua.Native
 			{
 				return new[]
 				{
+					"liblua54.so",
 					"liblua.so.5.4", "liblua-5.4.so", "liblua5.4.so", "liblua5.4.so.0", "liblua5.4.so.5.4",
 					"liblua.so.5.3", "liblua-5.3.so", "liblua5.3.so", "liblua5.3.so.0", "liblua5.3.so.5.3",
 				};

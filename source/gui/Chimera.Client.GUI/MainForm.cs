@@ -1237,9 +1237,8 @@ namespace Chimera.Client.GUI
 			{
 				ShowMessageBox(
 					owner: null,
-					text: "Native Lua dynamic library was unable to be loaded. " + (OSTailoredCode.IsUnixHost
-						? "Make sure Lua is installed with your package manager."
-						: "This library is provided in the dll/ folder, try redownloading Chimera to fix this error."),
+					text: "Native Lua dynamic library was unable to be loaded. "
+						+ "This library is provided in the dll/ folder, try redownloading Chimera to fix this error.",
 					caption: "Lua Load Error",
 					EMsgBoxIcon.Error);
 				return;
