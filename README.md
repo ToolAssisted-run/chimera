@@ -37,6 +37,8 @@ The officially maintained cores currently offered for Chimera are:
 | Nintendo Entertainment System | [quickerNES](https://github.com/ToolAssisted-run/chimera-core-quickernes) |
 | Nintendo Entertainment System | [QuickerNesHawk](https://github.com/ToolAssisted-run/chimera-core-neshawk) |
 | Super Nintendo | [Snes9x](https://github.com/ToolAssisted-run/chimera-core-snes9x) |
+| GameCube | [Dolphin](https://github.com/ToolAssisted-run/chimera-core-dolphin) |
+| Wii | [Dolphin](https://github.com/ToolAssisted-run/chimera-core-dolphin) |
 | Mega Drive / Genesis | [Genesis Plus GX](https://github.com/ToolAssisted-run/chimera-core-gpgx) |
 | Sega CD / Mega CD | [Genesis Plus GX](https://github.com/ToolAssisted-run/chimera-core-gpgx) |
 | Master System | [Genesis Plus GX](https://github.com/ToolAssisted-run/chimera-core-gpgx) |
@@ -45,6 +47,7 @@ The officially maintained cores currently offered for Chimera are:
 | Dreamcast | [Flycast](https://github.com/ToolAssisted-run/chimera-core-flycast) |
 | PlayStation 2 | [PCSX2](https://github.com/ToolAssisted-run/chimera-core-pcsx2) |
 | PlayStation Portable | [PPSSPP](https://github.com/ToolAssisted-run/chimera-core-ppsspp) |
+| Xbox | [xemu](https://github.com/ToolAssisted-run/chimera-core-xemu) |
 | 3DO Interactive Multiplayer | [Opera](https://github.com/ToolAssisted-run/chimera-core-opera) |
 | Atari 2600 | [Stella](https://github.com/ToolAssisted-run/chimera-core-stella) |
 | MS-DOS | [DOSBox-X](https://github.com/ToolAssisted-run/chimera-core-dosbox-x) |
