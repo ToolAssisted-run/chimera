@@ -48,7 +48,7 @@ namespace Chimera.Tests.Client.Common.Movie
 			}
 		}
 
-		public string BackupDirectory { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
+		public string BackupDirectory { get; set; } = "";
 
 		public FakeMovieSession(IEmulator emulator)
 		{

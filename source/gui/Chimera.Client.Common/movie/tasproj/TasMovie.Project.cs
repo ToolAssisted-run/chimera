@@ -243,9 +243,16 @@ namespace Chimera.Client.Common
 
 			try
 			{
+				// The folder first: a backup goes to the "Movie backups" path, which
+				// a fresh install does not have, and the engine writes files, not
+				// folders - so Save Backup failed until somebody made Movies/backup
+				// by hand (issue #19). A Save As lands in a folder the dialog showed,
+				// but the same line costs nothing there.
+				var folder = Path.GetDirectoryName(Path.GetFullPath(fn));
+				if (!string.IsNullOrEmpty(folder)) Directory.CreateDirectory(folder);
 				p.Save(fn);
 			}
-			catch (InvalidOperationException ex)
+			catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException)
 			{
 				return new FileWriteResult(FileWriteEnum.FailedDuringWrite, new(fn, ""), ex);
 			}

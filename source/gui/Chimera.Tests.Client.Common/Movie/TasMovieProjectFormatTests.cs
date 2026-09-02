@@ -248,6 +248,28 @@ namespace Chimera.Tests.Client.Common.Movie
 			Assert.AreNotEqual(TasMovie.MachineIdentityOf(a), TasMovie.MachineIdentityOf(b), "a value that differs is a different machine");
 		}
 
+		/// <summary>
+		/// A backup goes to the "Movie backups" folder, which a fresh install does
+		/// not have; the save makes it rather than fail (issue #19).
+		/// </summary>
+		[TestMethod]
+		public void ABackupMakesTheFolderItGoesTo()
+		{
+			var path = Path.Combine(_dir, "backedup.chimeraProject");
+			var movie = MakeWorkedMovie(path);
+			var backups = Path.Combine(_dir, "backups", "nested");
+			((FakeMovieSession) movie.Session).BackupDirectory = backups;
+			Assert.IsFalse(Directory.Exists(backups));
+
+			var result = movie.SaveBackup();
+			Assert.IsFalse(result.IsError, result.Exception?.Message);
+			Assert.IsTrue(Directory.Exists(backups), "the folder was made");
+			var written = Directory.GetFiles(backups, "*.chimeraProject");
+			Assert.AreEqual(1, written.Length, "one backup project in it");
+			StringAssert.StartsWith(Path.GetFileName(written[0]), "backedup.");
+			Assert.AreEqual(0, Directory.GetFiles(backups, "*.chimeraGreenZone").Length, "a backup carries no cache");
+		}
+
 		[TestMethod]
 		public void ALostCacheCostsRecomputationNeverWork()
 		{
