@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
@@ -34,6 +34,8 @@ namespace Chimera.Tests.Client.GUI
 			internal int Cancels;
 			internal VideoEncodeProgress Progress = new(VideoEncodePhase.Idle, 0, 0, 0, 0, null, null);
 			internal string Refusal;
+			internal readonly List<string> AskedToOverwrite = new();
+			internal bool Overwrite = true;
 			internal readonly EncodeVideoForm Form;
 
 			internal Harness(IReadOnlyList<TasMovieMarker> markers = null, Config config = null)
@@ -52,7 +54,8 @@ namespace Chimera.Tests.Client.GUI
 					},
 					() => Cancels++,
 					() => Progress,
-					current => current);
+					current => current,
+					path => { AskedToOverwrite.Add(path); return Overwrite; });
 				Form.Show();
 			}
 
@@ -261,6 +264,42 @@ namespace Chimera.Tests.Client.GUI
 			h.Form.Poll();
 
 			Assert.IsFalse(h.Form.OpenVideoEnabled, "the phase says done and the file says otherwise");
+		}
+
+		[TestMethod]
+		public void AVideoAlreadyThereIsNotReplacedWithoutAsking()
+		{
+			var path = TempVideo();
+			try
+			{
+				using Harness h = new();
+				h.Form.Choose(output: path);
+				h.Overwrite = false;
+				h.Form.StartEncode();
+
+				CollectionAssert.AreEqual(new[] { path }, h.AskedToOverwrite, "the existing file is asked about, by name");
+				Assert.AreEqual(0, h.Started.Count, "and a no means nothing was written");
+				StringAssert.Contains(h.Form.StatusText, "was kept");
+				Assert.IsTrue(h.Form.StartEnabled, "another name can be tried");
+
+				h.Overwrite = true;
+				h.Form.StartEncode();
+				Assert.AreEqual(1, h.Started.Count, "a yes goes ahead");
+			}
+			finally
+			{
+				System.IO.File.Delete(path);
+			}
+		}
+
+		[TestMethod]
+		public void ANameNobodyHasUsedIsNotAskedAbout()
+		{
+			using Harness h = new();
+			h.Form.Choose(output: "/tmp/never-written-" + System.Guid.NewGuid() + ".mp4");
+			h.Form.StartEncode();
+			Assert.AreEqual(0, h.AskedToOverwrite.Count, "there is nothing to protect");
+			Assert.AreEqual(1, h.Started.Count);
 		}
 
 		[TestMethod]

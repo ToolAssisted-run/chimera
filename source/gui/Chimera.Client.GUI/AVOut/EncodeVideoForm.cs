@@ -1,4 +1,4 @@
-#nullable enable
+﻿#nullable enable
 
 using System;
 using System.Collections.Generic;
@@ -59,6 +59,9 @@ namespace Chimera.Client.GUI
 		private readonly Button _close;
 		private readonly Timer _tick;
 
+		/// <summary>asked before a file already at the output name is replaced; null asks with a message box</summary>
+		private readonly Func<string, bool> _confirmOverwrite;
+
 		/// <summary>the file the last finished encode wrote, for Open Video</summary>
 		private string? _written;
 
@@ -81,7 +84,8 @@ namespace Chimera.Client.GUI
 			Func<VideoEncodeRequest, string?> begin,
 			Action cancel,
 			Func<VideoEncodeProgress> poll,
-			Func<string, string?> pickOutputFile)
+			Func<string, string?> pickOutputFile,
+			Func<string, bool>? confirmOverwrite = null)
 		{
 			_markers = markers;
 			_currentOutputSize = currentOutputSize;
@@ -89,6 +93,12 @@ namespace Chimera.Client.GUI
 			_cancel = cancel;
 			_poll = poll;
 			_pickOutputFile = pickOutputFile;
+			_confirmOverwrite = confirmOverwrite ?? (path => MessageBox.Show(
+				this,
+				$"{Path.GetFileName(path)} already exists. Replace it with this encode?",
+				"Replace the video?",
+				MessageBoxButtons.YesNo,
+				MessageBoxIcon.Warning) is DialogResult.Yes);
 			Config = config;
 
 			SuspendLayout();
@@ -469,6 +479,18 @@ namespace Chimera.Client.GUI
 			if (_running) return;
 
 			var request = BuildRequest();
+			// A video already at that name is somebody's work - the window opens
+			// on the same suggested name every time, and trying another size over
+			// the run you just made replaced it with no word said (issue #28).
+			// Browse asks through its save dialog; Start asks here, so the answer
+			// does not depend on which way the name was typed.
+			if (File.Exists(request.OutputPath) && !_confirmOverwrite(request.OutputPath))
+			{
+				_status.Text = $"{Path.GetFileName(request.OutputPath)} was kept; pick another name to encode.";
+				_status.ForeColor = Color.Firebrick;
+				return;
+			}
+
 			var error = _begin(request);
 			if (error is not null)
 			{

@@ -1,4 +1,4 @@
-#nullable enable
+﻿#nullable enable
 
 using System;
 using System.Drawing;
@@ -81,7 +81,11 @@ namespace Chimera.Client.GUI
 				current => this.ShowFileSaveDialog(
 					filter: FilesystemFilterSet.Screenshots,
 					initDir: Path.GetDirectoryName(current) ?? Config.PathEntries.AvAbsolutePath(),
-					initFileName: Path.GetFileName(current)));
+					initFileName: Path.GetFileName(current)),
+				confirmOverwrite: path => this.ModalMessageBox2(
+					caption: "Replace the video?",
+					icon: EMsgBoxIcon.Warning,
+					text: $"{Path.GetFileName(path)} already exists. Replace it with this encode?"));
 			_encodeDialog.Show(this);
 		}
 

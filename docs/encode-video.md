@@ -1,4 +1,4 @@
-# Encoding a video
+﻿# Encoding a video
 
 A video is an encode of a run. In Chimera it is one act, in one window, and it
 is over when the window closes.
@@ -34,7 +34,10 @@ wrongly was a file that looked plausible and was not what you asked for.
 
 Start Encode winds the run to the first marker, reproduces it as fast as the
 machine will go, writes each frame out, closes the file, and puts the emulator
-back on the frame you were on. The window shows how far along it is, how many
+back on the frame you were on. A video already at that name is not replaced
+without asking: the window opens on the same suggested name every time, and
+trying another size over the run you just made used to overwrite it with no
+word said. The window shows how far along it is, how many
 frames a second it is managing and roughly how much longer it will take. Stop
 ends it early and leaves a playable file of what got written. Closing the window
 stops it too: nothing keeps running behind the dialog.
