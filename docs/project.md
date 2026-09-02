@@ -46,7 +46,11 @@ Not in the project:
 - **Paths.** Never stored. Only names and SHA1s.
 - **Greenzone / cached states.** A sibling cache file next to the project;
   if present it is loaded, otherwise the session starts from a clean
-  state-memory slate. Losing it costs recomputation, never work.
+  state-memory slate. Losing it costs recomputation, never work. It records
+  which machine made its states (core build, settings, firmware pins, file
+  hashes) and is used only when the project still describes that machine:
+  a savestate is the memory of one exact machine, and the sandbox checks
+  only the core binary when it loads one.
 - **Per-user preferences.** Keybinds, window layout, hotkeys stay in user
   config; the project holds only what affects sync and reproduction.
 

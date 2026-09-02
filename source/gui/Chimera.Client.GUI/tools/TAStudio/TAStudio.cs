@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.Linq;
@@ -744,6 +744,7 @@ namespace Chimera.Client.GUI
 
 			_engaged = true;
 			Settings.RecentTas.Add(CurrentTasMovie.Filename); // only add if it did load
+			if (CurrentTasMovie.DroppedCacheNote is { } droppedCache) MainForm.AddOnScreenMessage(droppedCache);
 
 			if (startsFromSavestate)
 			{
@@ -1436,6 +1437,14 @@ namespace Chimera.Client.GUI
 			if (Settings.OldControlSchemeForBranches && !TasPlaybackBox.RecordingMode)
 			{
 				GoToFrame(branch.Frame);
+				return;
+			}
+
+			// a branch is its input and its state; the state is cache, and a cache
+			// that was lost or set aside leaves the branch with nothing to jump to
+			if (branch.CoreData is null)
+			{
+				MainForm.AddOnScreenMessage("This branch has no saved state beside the project; it cannot be loaded.");
 				return;
 			}
 

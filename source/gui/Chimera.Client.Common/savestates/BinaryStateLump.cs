@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 
@@ -46,6 +46,8 @@ namespace Chimera.Client.Common
 		public static BinaryStateLump UserData { get; private set; }
 		[Name("Session", "json")]
 		public static BinaryStateLump Session { get; private set; }
+		[Name("Machine", "txt")]
+		public static BinaryStateLump Machine { get; private set; }
 
 		// branch stuff
 		[Name("Branches/CoreData", "bin")]

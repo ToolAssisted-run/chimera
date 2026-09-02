@@ -1,6 +1,7 @@
 ﻿using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Text;
 
 using Newtonsoft.Json;
 
@@ -39,6 +40,67 @@ namespace Chimera.Client.Common
 		/// Present = loaded; absent = a clean slate (docs/project.md).
 		/// </summary>
 		public string GreenZoneFilename => Path.ChangeExtension(Filename, "chimeraGreenZone");
+
+		public string DroppedCacheNote { get; private set; }
+
+		/// <summary>
+		/// What the cached states are states OF: the core build, the settings, the
+		/// firmware pins and the game files, hashed into one line. A savestate is
+		/// the memory of one exact machine, and the sandbox checks only that the
+		/// core is the same binary - not what it was configured with or given to
+		/// read - so a cache left beside a project whose machine has since changed
+		/// (a hand-edited setting, a project saved over another's name, the
+		/// settings a bug once wrote as "{}") loaded states into a machine they
+		/// were not made by, and that machine fell over (issue #26). The cache
+		/// carries this line, and is used only when it still says the same.
+		/// </summary>
+		internal static string MachineIdentityOf(EngineProject p)
+		{
+			StringBuilder sb = new();
+			sb.Append("core=").Append(p.CoreSha1.ToUpperInvariant()).Append('\n');
+			sb.Append("settings=").Append(CanonicalJson(p.SettingsJson)).Append('\n');
+			sb.Append("firmware=").Append(CanonicalJson(p.FirmwareJson)).Append('\n');
+			for (var i = 0; i < p.FileCount; i++)
+			{
+				// the hash is the file's identity; its name on disk is not
+				sb.Append("file=").Append(p.FileSlot(i)).Append(':').Append(p.FileSha1(i).ToUpperInvariant()).Append('\n');
+			}
+			return ChimeraEngine.Sha1Hex(Encoding.UTF8.GetBytes(sb.ToString()));
+		}
+
+		/// <summary>Object keys sorted, no whitespace: the same settings in any order are the same machine.</summary>
+		private static string CanonicalJson(string json)
+		{
+			if (string.IsNullOrWhiteSpace(json)) return "";
+			try
+			{
+				return Canonical(Newtonsoft.Json.Linq.JToken.Parse(json)).ToString(Formatting.None);
+			}
+			catch (JsonException)
+			{
+				return json.Trim();
+			}
+		}
+
+		private static Newtonsoft.Json.Linq.JToken Canonical(Newtonsoft.Json.Linq.JToken token)
+		{
+			switch (token)
+			{
+				case Newtonsoft.Json.Linq.JObject obj:
+					Newtonsoft.Json.Linq.JObject sorted = new();
+					foreach (var prop in obj.Properties().OrderBy(static prop => prop.Name, StringComparer.Ordinal))
+					{
+						sorted[prop.Name] = Canonical(prop.Value);
+					}
+					return sorted;
+				case Newtonsoft.Json.Linq.JArray arr:
+					Newtonsoft.Json.Linq.JArray items = new();
+					foreach (var item in arr) items.Add(Canonical(item));
+					return items;
+				default:
+					return token;
+			}
+		}
 
 		/// <summary>
 		/// Adopts the frontend's RESOLVED instance (files located and hashed for
@@ -277,6 +339,8 @@ namespace Chimera.Client.Common
 					settingsToSave,
 					new JsonSerializerSettings() { TypeNameHandling = TypeNameHandling.Objects });
 				bs.PutLump(BinaryStateLump.StateHistorySettings, tw => tw.WriteLine(settings));
+				// which machine these states belong to - checked before any is loaded
+				bs.PutLump(BinaryStateLump.Machine, tw => tw.WriteLine(MachineIdentityOf(Project)));
 				bs.PutLump(BinaryStateLump.LagLog, tw => LagLog.Save(tw), zstdCompress: true);
 				if (ClientSettingsForSave != null)
 				{
@@ -451,6 +515,7 @@ namespace Chimera.Client.Common
 		/// </summary>
 		private void LoadCacheFile()
 		{
+			DroppedCacheNote = null;
 			ZipStateLoader bl = null;
 			try
 			{
@@ -459,6 +524,26 @@ namespace Chimera.Client.Common
 			catch
 			{
 				bl = null;
+			}
+
+			// The states in it are states of ONE machine; the sandbox will load
+			// them into any machine running the same binary and only complain on
+			// stderr, so the check has to be here, before a single one is used.
+			// A cache from another machine is a clean slate, like a lost one:
+			// recomputation, never work (docs/project.md).
+			if (bl is not null)
+			{
+				string recorded = null;
+				bl.GetLump(BinaryStateLump.Machine, abort: false, tr => recorded = tr.ReadLine()?.Trim());
+				var current = MachineIdentityOf(Project);
+				if (recorded is null || !string.Equals(recorded, current, StringComparison.OrdinalIgnoreCase))
+				{
+					DroppedCacheNote = recorded is null
+						? "The cached states beside this project do not say which machine made them, so they were not used: the greenzone starts empty."
+						: "The cached states beside this project were made by a machine with other settings, files or core, so they were not used: the greenzone starts empty.";
+					bl.Dispose();
+					bl = null;
+				}
 			}
 
 			if (bl is null)

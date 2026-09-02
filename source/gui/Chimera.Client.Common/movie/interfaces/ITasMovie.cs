@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using Chimera.Emulation.Common;
 
 namespace Chimera.Client.Common
@@ -9,6 +9,12 @@ namespace Chimera.Client.Common
 
 		IMovieChangeLog ChangeLog { get; }
 		IStateManager TasStateManager { get; set; }
+
+		/// <summary>
+		/// Why the cache beside the project was set aside on load, or null when it
+		/// was used (or there was none). One sentence, for the person opening it.
+		/// </summary>
+		string DroppedCacheNote { get; }
 		Func<string> ClientSettingsForSave { get; set; }
 		string LoadedClientSettings { get; }
 		ITasMovieRecord this[int index] { get; }

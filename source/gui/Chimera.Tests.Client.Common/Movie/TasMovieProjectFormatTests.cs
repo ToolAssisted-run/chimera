@@ -194,6 +194,60 @@ namespace Chimera.Tests.Client.Common.Movie
 			CollectionAssert.AreEqual(new byte[] { 1, 2, 3, 4 }, branch.CoreData, "the state came from the cache");
 		}
 
+		/// <summary>
+		/// A savestate is the memory of one exact machine, and the sandbox only
+		/// checks the core binary when it loads one. The cache says which machine
+		/// made its states, and a project whose machine has since changed - a
+		/// setting edited, a file swapped, another core build - gets a clean slate
+		/// from it rather than states that will fall over (issue #26).
+		/// </summary>
+		[TestMethod]
+		public void ACacheMadeByAnotherMachineIsSetAside()
+		{
+			var path = Path.Combine(_dir, "othermachine.chimeraProject");
+			var movie = MakeWorkedMovie(path);
+			Assert.IsFalse(movie.Save().IsError);
+
+			var same = LoadFresh(path);
+			Assert.IsNull(same.DroppedCacheNote, "the same machine uses its cache");
+			CollectionAssert.AreEqual(new byte[] { 1, 2, 3, 4 }, same.Branches[0].CoreData);
+
+			// the project's settings change underneath the cache
+			using (var p = Chimera.Emulation.Common.Engine.EngineProject.Open(path))
+			{
+				p.SetSettingsJson("""{"region":"pal"}""");
+				p.Save(path);
+			}
+			var other = LoadFresh(path);
+			Assert.IsNotNull(other.DroppedCacheNote, "another machine's states are not loaded");
+			StringAssert.Contains(other.DroppedCacheNote, "other settings");
+			Assert.AreEqual(6, other.InputLogLength, "the work is untouched");
+			Assert.AreEqual(1, other.Branches.Count);
+			Assert.IsNull(other.Branches[0].CoreData, "the branch keeps its input and loses its state");
+			Assert.IsNotNull(other.TasStateManager, "and there is a greenzone to start filling");
+
+			// saving from the new machine writes a cache that is its own
+			other.InsertEmptyFrame(0, 1);
+			Assert.IsFalse(other.Save().IsError);
+			var again = LoadFresh(path);
+			Assert.IsNull(again.DroppedCacheNote, "the cache the new machine wrote is used");
+		}
+
+		[TestMethod]
+		public void TheMachineLineDoesNotCareAboutKeyOrderOrCase()
+		{
+			using var a = Chimera.Emulation.Common.Engine.EngineProject.New();
+			using var b = Chimera.Emulation.Common.Engine.EngineProject.New();
+			a.SetCore("core", "v", "abcdef");
+			b.SetCore("core", "v", "ABCDEF");
+			a.SetSettingsJson("""{"x":1,"y":{"q":true,"p":false}}""");
+			b.SetSettingsJson("""{"y":{"p":false,"q":true},"x":1}""");
+			Assert.AreEqual(TasMovie.MachineIdentityOf(a), TasMovie.MachineIdentityOf(b));
+
+			b.SetSettingsJson("""{"y":{"p":true,"q":true},"x":1}""");
+			Assert.AreNotEqual(TasMovie.MachineIdentityOf(a), TasMovie.MachineIdentityOf(b), "a value that differs is a different machine");
+		}
+
 		[TestMethod]
 		public void ALostCacheCostsRecomputationNeverWork()
 		{
