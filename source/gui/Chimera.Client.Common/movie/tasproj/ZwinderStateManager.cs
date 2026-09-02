@@ -38,6 +38,12 @@ namespace Chimera.Client.Common
 
 		public void Engage(byte[] frameZeroState)
 		{
+			// The frame-zero state is the first time anyone knows how big this
+			// system's states are, which is what the auto policy scales by. The
+			// buffers are empty at this point, so swapping them is free.
+			var resolved = Settings.ResolveAuto(frameZeroState.Length);
+			if (!ReferenceEquals(resolved, Settings)) UpdateSettings(resolved, false);
+
 			if (!_reserved.ContainsKey(0))
 			{
 				_reserved.Add(0, frameZeroState);

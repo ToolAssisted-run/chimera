@@ -50,8 +50,12 @@ namespace Chimera.Client.Common
 
 			// Ideally the default would be based on actual available RAM.
 			// But, auto-save is on by default so having more would make that potentially very annoying.
+			[DisplayName("Auto Memory Limit")]
+			[Description("Size the state pool to this machine and this system when a movie loads: a quarter of the RAM that is actually free (never less than 1GB, never more than 8GB), and no more than the states can use - a small system stops reserving space it cannot fill, a big one gets what the machine can spare. When off, 'Memory Limit (MB)' is used as-is.")]
+			public bool AutoMemoryLimit { get; set; } = true;
+
 			[DisplayName("Memory Limit (MB)")]
-			[Description("The amount of RAM to use for savestates. Bigger values gives more states but makes saving take longer.")]
+			[Description("The amount of RAM to use for savestates when 'Auto Memory Limit' is off. Bigger values gives more states but makes saving take longer.")]
 			[Range(1, 32768)]
 			public int TotalMemoryLimitMB { get; set; } = 1024;
 
@@ -90,6 +94,7 @@ namespace Chimera.Client.Common
 			public PagedSettings() { }
 			public PagedSettings(PagedSettings other)
 			{
+				AutoMemoryLimit = other.AutoMemoryLimit;
 				TotalMemoryLimitMB = other.TotalMemoryLimitMB;
 				NewToMidRatio = other.NewToMidRatio;
 
@@ -115,7 +120,7 @@ namespace Chimera.Client.Common
 
 		private const int PAGE_SIZE = 4096;
 		private const int PAGE_DATA_SIZE = PAGE_SIZE - 4; // PAGE_SIZE minus metadata
-		private readonly MemoryBlock _buffer;
+		private MemoryBlock _buffer;
 		private int _firstFree;
 
 		private enum StateGroup
@@ -294,11 +299,50 @@ namespace Chimera.Client.Common
 		public PagedStateManager(PagedSettings settings, Func<int, bool> reserveCallback)
 		{
 			Settings = settings;
-			int pageCount = settings.TotalMemoryLimitMB * 1024 / 4;
-			_buffer = new MemoryBlock((ulong)pageCount * PAGE_SIZE);
-			_buffer.Protect(_buffer.Start, _buffer.Size, MemoryBlock.Protection.RW);
-
 			_reserveCallback = reserveCallback;
+			// The pool is allocated at Engage, not here: the frame-zero state's
+			// size is what an auto limit scales by, and committing a gigabyte
+			// before knowing whether the system needs a tenth of it helps nobody.
+		}
+
+		/// <summary>
+		/// Allocates the page pool once, sized for this machine and (when the
+		/// limit is automatic) this system's states. If the machine refuses the
+		/// allocation the pool halves until it fits: a smaller pool is a sparser
+		/// history, where the refusal would have been a crash.
+		/// </summary>
+		private void EnsureAllocated(long stateSizeHint)
+		{
+			if (_buffer != null) return;
+
+			// Auto applies to BIG states only: a small system's states already fit
+			// thousands deep in the configured limit, and that limit keeps meaning
+			// exactly what it says for them.
+			int limitMB = Settings.AutoMemoryLimit && stateSizeHint >= StateBudget.BigStateBytes
+				? StateBudget.PoolMB(stateSizeHint, targetStates: 4096, floorMB: 1024, ceilingMB: 8192)
+				: Settings.TotalMemoryLimitMB;
+
+			int pageCount = limitMB * 1024 / 4;
+			while (true)
+			{
+				try
+				{
+					_buffer = new MemoryBlock((ulong)pageCount * PAGE_SIZE);
+					_buffer.Protect(_buffer.Start, _buffer.Size, MemoryBlock.Protection.RW);
+					break;
+				}
+				catch (Exception) when (pageCount > 64 * 1024 / 4)
+				{
+					// the machine said no; ask for half. The history gets sparser,
+					// the session keeps going.
+					pageCount /= 2;
+					Console.WriteLine($"TAStudio state pool: allocation refused, retrying at {pageCount * 4 / 1024}MB");
+				}
+			}
+			if (Settings.AutoMemoryLimit && stateSizeHint > 0)
+			{
+				Console.WriteLine($"TAStudio state pool: auto limit {pageCount * 4 / 1024}MB for {stateSizeHint / 1024}KB states");
+			}
 
 			// Set up the pages. This is a single link list.
 			// The links go like this:
@@ -436,6 +480,9 @@ namespace Chimera.Client.Common
 
 		private void InternalCapture(int frame, IStatable source, StateGroup destinationGroup)
 		{
+			// engaged managers arrive here allocated; a stray early capture
+			// falls back to the manual limit rather than dereferencing nothing
+			EnsureAllocated(0);
 			if (_firstFree == -1) _firstFree = FreePage(frame);
 			StateInfo newState = new StateInfo()
 			{
@@ -551,9 +598,13 @@ namespace Chimera.Client.Common
 
 		public void Clear() => InvalidateAfter(0);
 
-		public void Dispose() => _buffer.Dispose();
+		public void Dispose() => _buffer?.Dispose();
 
-		public void Engage(byte[] frameZeroState) => InternalCapture(0, new StatableArray(frameZeroState), StateGroup.Old);
+		public void Engage(byte[] frameZeroState)
+		{
+			EnsureAllocated(frameZeroState.Length);
+			InternalCapture(0, new StatableArray(frameZeroState), StateGroup.Old);
+		}
 
 		public KeyValuePair<int, Stream> GetStateClosestToFrame(int frame)
 		{
@@ -614,7 +665,9 @@ namespace Chimera.Client.Common
 
 		public IStateManager UpdateSettings(IStateManagerSettings settings, bool keepOldStates = false)
 		{
-			if (settings is not PagedSettings pSettings || pSettings.TotalMemoryLimitMB != this.Settings.TotalMemoryLimitMB)
+			if (settings is not PagedSettings pSettings
+				|| pSettings.TotalMemoryLimitMB != this.Settings.TotalMemoryLimitMB
+				|| pSettings.AutoMemoryLimit != this.Settings.AutoMemoryLimit)
 			{
 				IStateManager newManager = settings.CreateManager(_reserveCallback);
 				newManager.Engage(GetStateClosestToFrame(0).Value.ReadAllBytes());

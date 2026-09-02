@@ -24,14 +24,28 @@ namespace Chimera.Client.Common
 			if (settings.TargetFrameLength < 1) throw new ArgumentException(message: nameof(IRewindSettings.TargetFrameLength) + " of provided settings is invalid", paramName: nameof(settings));
 
 			Size = 1L << (int)Math.Floor(Math.Log(targetSize, 2));
-			_sizeMask = Size - 1;
 			_backingStoreType = settings.BackingStore;
 			switch (settings.BackingStore)
 			{
 				case IRewindSettings.BackingStoreType.Memory:
 				{
-					var buffer = new MemoryBlock((ulong)Size);
-					buffer.Protect(buffer.Start, buffer.Size, MemoryBlock.Protection.RW);
+					MemoryBlock buffer = null;
+					while (true)
+					{
+						try
+						{
+							buffer = new MemoryBlock((ulong)Size);
+							buffer.Protect(buffer.Start, buffer.Size, MemoryBlock.Protection.RW);
+							break;
+						}
+						catch (Exception) when (Size > 16L * 1024 * 1024)
+						{
+							// the machine said no; a half-size ring is a sparser
+							// history, where the refusal would have been a crash
+							Size /= 2;
+							Console.WriteLine($"ZwinderBuffer: allocation refused, retrying at {Size / (1024 * 1024)}MB");
+						}
+					}
 					_disposables.Add(buffer);
 					_backingStore = new MemoryViewStream(true, true, (long)buffer.Start, (long)buffer.Size);
 					_disposables.Add(_backingStore);
@@ -49,6 +63,7 @@ namespace Chimera.Client.Common
 				default:
 					throw new ArgumentException(message: $"Unsupported {nameof(IRewindSettings.BackingStore)} type for ZwinderBuffer in provided settings.", paramName: nameof(settings));
 			}
+			_sizeMask = Size - 1;
 			if (settings.UseFixedRewindInterval)
 			{
 				_fixedRewindInterval = true;

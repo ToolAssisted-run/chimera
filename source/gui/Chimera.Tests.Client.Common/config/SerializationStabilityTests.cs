@@ -16,9 +16,9 @@ namespace Chimera.Tests.Client.Common.config
 
 		private const string RECENT_SER = @"{""recentlist"":[],""MAX_RECENT_FILES"":8,""AutoLoad"":false,""Frozen"":false}";
 
-		private const string ZWINDER_SER = @"{""CurrentUseCompression"":false,""CurrentBufferSize"":256,""CurrentTargetFrameLength"":500,""CurrentStoreType"":0,""RecentUseCompression"":false,""RecentBufferSize"":128,""RecentTargetFrameLength"":2000,""RecentStoreType"":0,""GapsUseCompression"":false,""GapsBufferSize"":64,""GapsTargetFrameLength"":125,""GapsStoreType"":0,""AncientStateInterval"":5000,""AncientStoreType"":0}";
+		private const string ZWINDER_SER = @"{""AutoSize"":true,""CurrentUseCompression"":false,""CurrentBufferSize"":256,""CurrentTargetFrameLength"":500,""CurrentStoreType"":0,""RecentUseCompression"":false,""RecentBufferSize"":128,""RecentTargetFrameLength"":2000,""RecentStoreType"":0,""GapsUseCompression"":false,""GapsBufferSize"":64,""GapsTargetFrameLength"":125,""GapsStoreType"":0,""AncientStateInterval"":5000,""AncientStoreType"":0}";
 
-		private const string PAGED_SER_BASE = @"""TotalMemoryLimitMB"":1024,""FramesBetweenNewStates"":4,""FramesBetweenMidStates"":20,""FramesBetweenOldStates"":400,""NewToMidRatio"":2.0,""FramesBetweenSavedStates"":100,""ForceSaveMarkerStates"":false}";
+		private const string PAGED_SER_BASE = @"""AutoMemoryLimit"":true,""TotalMemoryLimitMB"":1024,""FramesBetweenNewStates"":4,""FramesBetweenMidStates"":20,""FramesBetweenOldStates"":400,""NewToMidRatio"":2.0,""FramesBetweenSavedStates"":100,""ForceSaveMarkerStates"":false}";
 		private const string PAGED_SER_WITH_TYPE = @"{""$type"":""Chimera.Client.Common.PagedStateManager+PagedSettings, Chimera.Client.Common""," + PAGED_SER_BASE;
 		private const string PAGED_SER = "{" + PAGED_SER_BASE;
 

@@ -14,6 +14,7 @@ namespace Chimera.Client.Common
 
 		public ZwinderStateManagerSettings(ZwinderStateManagerSettings settings)
 		{
+			AutoSize = settings.AutoSize;
 			CurrentUseCompression = settings.CurrentUseCompression;
 			CurrentBufferSize = settings.CurrentBufferSize;
 			CurrentTargetFrameLength = settings.CurrentTargetFrameLength;
@@ -31,6 +32,37 @@ namespace Chimera.Client.Common
 
 			AncientStateInterval = settings.AncientStateInterval;
 			AncientStoreType = settings.AncientStoreType;
+		}
+
+		[DisplayName("Auto-Size Buffers")]
+		[Description("Size the buffers to this machine and this system when a movie loads. A system with big states (4MB and up - GameCube, PS2, Xbox) gets buffers scaled to a quarter of the RAM that is actually free, compression turned on, and the colder tiers kept on disk where they cost no RAM at all. A system with small states keeps the sizes configured below. When off, everything below is used exactly as written.")]
+		public bool AutoSize { get; set; } = true;
+
+		/// <summary>
+		/// Applies the auto-size policy for a system whose states are
+		/// <paramref name="stateSizeBytes"/> big. Small-state systems come back
+		/// unchanged: the hand-set sizes below already hold thousands of their
+		/// states. Big-state systems get sizes counted in STATES (a buffer's
+		/// worth is how far back it reaches, and that is states, not megabytes),
+		/// capped by what this machine can spare right now, with the hot buffer
+		/// in memory and the colder tiers on disk, all compressed.
+		/// </summary>
+		public ZwinderStateManagerSettings ResolveAuto(long stateSizeBytes)
+		{
+			if (!AutoSize || stateSizeBytes < StateBudget.BigStateBytes) return this;
+			var resolved = new ZwinderStateManagerSettings(this);
+			var budget = StateBudget.BudgetMB();
+			resolved.CurrentUseCompression = true;
+			resolved.CurrentStoreType = IRewindSettings.BackingStoreType.Memory;
+			resolved.CurrentBufferSize = StateBudget.PoolMB(stateSizeBytes, targetStates: 256, floorMB: 256, ceilingMB: budget / 2);
+			resolved.RecentUseCompression = true;
+			resolved.RecentStoreType = IRewindSettings.BackingStoreType.TempFile;
+			resolved.RecentBufferSize = StateBudget.PoolMB(stateSizeBytes, targetStates: 128, floorMB: 128, ceilingMB: 4096);
+			resolved.GapsUseCompression = true;
+			resolved.GapsStoreType = IRewindSettings.BackingStoreType.TempFile;
+			resolved.GapsBufferSize = StateBudget.PoolMB(stateSizeBytes, targetStates: 64, floorMB: 64, ceilingMB: 2048);
+			resolved.AncientStoreType = IRewindSettings.BackingStoreType.TempFile;
+			return resolved;
 		}
 
 		/// <summary>
