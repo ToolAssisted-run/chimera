@@ -123,6 +123,7 @@ build_core stella stella.chimeraCore
 build_core flycast flycast.chimeraCore
 build_core pcsx2 pcsx2.chimeraCore
 build_core xemu xemu.chimeraCore
+build_core dolphin dolphin.chimeraCore
 
 say "licences"
 # What the bundle as a whole may be used for, computed from what its packages
