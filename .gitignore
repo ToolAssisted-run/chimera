@@ -51,3 +51,6 @@ mono_crash.*.json
 /*.iso
 /*.hdd
 /disc*.bin
+
+# game data for local testing - never shipped, never committed
+/roms/
