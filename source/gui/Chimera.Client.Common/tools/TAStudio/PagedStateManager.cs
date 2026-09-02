@@ -58,6 +58,12 @@ namespace Chimera.Client.Common
 			[Description("Keep the old anchor states - the ones spread across the whole movie that never decay - in compressed temp files instead of the memory pool. They are read only when navigating far back, a disk read there is invisible next to re-emulating the gap, and every page they would have held goes to the states you are actually working with. Applies to systems with big states (4MB and up); small states stay in the pool either way.")]
 			public bool OldStatesOnDisk { get; set; } = true;
 
+			[DisplayName("Old States Disk Limit (MB)")]
+			[Description("How much disk the old anchor states may take, compressed, before the spine thins itself: when the limit is crossed, every other unreserved anchor is evicted and the anchor spacing doubles, so the whole movie stays covered at half the density instead of the disk filling. Frame zero and reserved states (markers, branches) always survive.")]
+			[Range(256, 262144)]
+			[TypeConverter(typeof(ConstrainedIntConverter))]
+			public int OldStatesDiskLimitMB { get; set; } = 8192;
+
 			[DisplayName("Memory Limit (MB)")]
 			[Description("The amount of RAM to use for savestates when 'Auto Memory Limit' is off. Bigger values gives more states but makes saving take longer.")]
 			[Range(1, 32768)]
@@ -100,6 +106,7 @@ namespace Chimera.Client.Common
 			{
 				AutoMemoryLimit = other.AutoMemoryLimit;
 				OldStatesOnDisk = other.OldStatesOnDisk;
+				OldStatesDiskLimitMB = other.OldStatesDiskLimitMB;
 				TotalMemoryLimitMB = other.TotalMemoryLimitMB;
 				NewToMidRatio = other.NewToMidRatio;
 
@@ -180,6 +187,12 @@ namespace Chimera.Client.Common
 		// _states with FirstPage = -1 - the sorted-set logic neither knows nor
 		// cares where the bytes are.
 		private readonly TempFileStateDictionary _oldOnDisk = new();
+		private readonly Dictionary<int, long> _oldDiskSize = new();
+		private long _oldDiskBytes;
+		// Doubles each time the disk cache thins: ShouldKeepForOld measures gaps
+		// against FramesBetweenOldStates * this, so the spine STAYS at its wider
+		// spacing instead of refilling the gaps and thinning again forever.
+		private int _oldSpacingMultiplier = 1;
 		private readonly Chimera.Common.Zstd _zstd = new();
 
 		private bool _bufferIsFull = false;
@@ -376,6 +389,9 @@ namespace Chimera.Client.Common
 			_firstFree = 0;
 		}
 
+		/// <summary>the anchor spacing as the disk budget has widened it</summary>
+		private int OldSpacing => Settings.FramesBetweenOldStates * _oldSpacingMultiplier;
+
 		/// <summary>a state worth keeping as old, whose bytes should live on disk rather than in the pool</summary>
 		private bool ShouldDiskOld(StateInfo state)
 			=> Settings.OldStatesOnDisk && state.Size >= StateBudget.BigStateBytes;
@@ -387,18 +403,76 @@ namespace Chimera.Client.Common
 		/// </summary>
 		private void MoveOldToDisk(StateInfo state)
 		{
+			var compressed = new MemoryStream();
 			using (var pooled = new PagedStream(state, this, true))
+			using (var compressor = _zstd.CreateZstdCompressionStream(compressed, 1))
 			{
-				var compressed = new MemoryStream();
-				using (var compressor = _zstd.CreateZstdCompressionStream(compressed, 1))
-				{
-					pooled.CopyTo(compressor);
-				}
+				pooled.CopyTo(compressor);
+			}
+
+			// Over budget? Thin the spine first: half the anchors go, the
+			// spacing doubles, and the whole movie stays covered - sparser,
+			// the way the RAM side degrades, instead of the disk filling.
+			long limitBytes = (long)Settings.OldStatesDiskLimitMB * 1024 * 1024;
+			if (_oldDiskBytes + compressed.Length > limitBytes) ThinOldOnDisk();
+
+			// Still over after thinning, and nobody reserved this frame? Then
+			// this anchor is the one that goes: the survivors already cover the
+			// gap at the widened spacing. Reserved states are written anyway -
+			// a marker's state must not vanish - so the overshoot is bounded by
+			// what the user explicitly asked to keep.
+			if (_oldDiskBytes + compressed.Length > limitBytes && !_reserveCallback(state.Frame))
+			{
+				_states.Remove(state);
+				return;
+			}
+
+			try
+			{
 				compressed.Position = 0;
 				_oldOnDisk.SetState(state.Frame, compressed);
 			}
+			catch (IOException)
+			{
+				// the DISK said no (full, most likely): degrade exactly like the
+				// budget - thin, then retry once, then let the anchor go
+				ThinOldOnDisk();
+				try
+				{
+					compressed.Position = 0;
+					_oldOnDisk.SetState(state.Frame, compressed);
+				}
+				catch (IOException)
+				{
+					Console.WriteLine("TAStudio old-state cache: disk write failed twice; dropping the anchor");
+					_states.Remove(state);
+					return;
+				}
+			}
+			_oldDiskBytes += compressed.Length;
+			_oldDiskSize[state.Frame] = compressed.Length;
 			_states.Remove(state);
 			_states.Add(new StateInfo { Frame = state.Frame, FirstPage = -1, LastPage = -1, Size = state.Size });
+		}
+
+		/// <summary>
+		/// Evicts every other unreserved disk anchor and doubles the spacing the
+		/// spine maintains from here on. Frame zero and reserved frames always
+		/// survive; coverage of the whole movie is kept, at half the density.
+		/// </summary>
+		private void ThinOldOnDisk()
+		{
+			List<StateInfo> victims = new();
+			bool keep = true;
+			foreach (StateInfo state in _states)
+			{
+				if (state.FirstPage >= 0 || state.Frame == 0 || _reserveCallback(state.Frame)) continue;
+				keep = !keep;
+				if (!keep) victims.Add(state);
+			}
+			foreach (StateInfo victim in victims) RemoveState(victim);
+			if (_oldSpacingMultiplier < 1 << 20) _oldSpacingMultiplier *= 2;
+			Console.WriteLine($"TAStudio old-state cache: thinned to {_oldDiskBytes / (1024 * 1024)}MB, anchor spacing now {OldSpacing} frames");
 		}
 
 		/// <summary>the way back: the whole state, decompressed, as a stream with a Length</summary>
@@ -428,11 +502,11 @@ namespace Chimera.Client.Common
 				return false;
 			}
 
-			StateInfo nextState = _states.GetViewBetween(new(frame + 1), new(frame + Settings.FramesBetweenOldStates)).Min;
+			StateInfo nextState = _states.GetViewBetween(new(frame + 1), new(frame + OldSpacing)).Min;
 			if (nextState.Frame == 0) return true;
-			StateInfo previousState = _states.GetViewBetween(new(frame - Settings.FramesBetweenOldStates), new(frame - 1)).Max;
+			StateInfo previousState = _states.GetViewBetween(new(frame - OldSpacing), new(frame - 1)).Max;
 
-			return nextState.Frame - previousState.Frame > Settings.FramesBetweenOldStates;
+			return nextState.Frame - previousState.Frame > OldSpacing;
 		}
 
 		/// <summary>
@@ -462,6 +536,15 @@ namespace Chimera.Client.Common
 						if (pooledSeen == 2) { stateToKick = candidate; break; }
 					}
 					if (pooledSeen < 2) throw new Exception("Unable to capture a single state. This probably means your Memory Limit setting is too low.");
+					// A big old anchor still has somewhere better to go than
+					// oblivion: the disk cache. This also closes a hole older
+					// than the cache - the last-resort kick used to throw away
+					// even RESERVED states when the pool was all-old.
+					if (ShouldDiskOld(stateToKick))
+					{
+						MoveOldToDisk(stateToKick);
+						return stateToKick.FirstPage;
+					}
 					_states.Remove(stateToKick);
 					return stateToKick.FirstPage;
 				}
@@ -620,7 +703,7 @@ namespace Chimera.Client.Common
 				// Special case: If the buffer is entirely full of old states, we don't attempt to capture into new.
 				if (_bufferIsFull && _midStates.Count == 0 && _newStates.Count < 2)
 				{
-					min = frame - Settings.FramesBetweenOldStates;
+					min = frame - OldSpacing;
 					// Now, a quirk: Once we get here ("full of old states") for the first time, there should actually be one new state. Because our last capture went into new, recategorized a new to old, and deleted another new.
 					// In this case, we kinda want to ignore that new state.
 					if (_newStates.Count == 1)
@@ -631,7 +714,7 @@ namespace Chimera.Client.Common
 					if (min <= max) newestOlderState = _states.GetViewBetween(new(min), new(max)).Max.Frame;
 					else newestOlderState = 0;
 
-					if (frame - newestOlderState >= Settings.FramesBetweenOldStates)
+					if (frame - newestOlderState >= OldSpacing)
 						group = StateGroup.Old;
 				}
 				else
@@ -701,6 +784,11 @@ namespace Chimera.Client.Common
 				// the bytes live on disk; there are no pages to hand back
 				_states.Remove(state);
 				_oldOnDisk.Remove(state.Frame);
+				if (_oldDiskSize.TryGetValue(state.Frame, out long bytes))
+				{
+					_oldDiskBytes -= bytes;
+					_oldDiskSize.Remove(state.Frame);
+				}
 				return;
 			}
 
