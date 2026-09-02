@@ -122,6 +122,7 @@ build_core snes9x snes9x.chimeraCore
 build_core stella stella.chimeraCore
 build_core flycast flycast.chimeraCore
 build_core pcsx2 pcsx2.chimeraCore
+build_core xemu xemu.chimeraCore
 
 say "licences"
 # What the bundle as a whole may be used for, computed from what its packages

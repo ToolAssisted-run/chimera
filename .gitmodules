@@ -88,3 +88,7 @@
 	path = extern/cores/xemu
 	url = https://github.com/ToolAssisted-run/chimera-core-xemu.git
 	branch = main
+[submodule "extern/cores/dolphin"]
+	path = extern/cores/dolphin
+	url = https://github.com/ToolAssisted-run/chimera-core-dolphin.git
+	branch = main
