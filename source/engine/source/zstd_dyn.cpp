@@ -39,6 +39,14 @@ void *openBesideUs(const char *name)
 	}
 	return LoadLibraryA(name);
 #else
+	/* RTLD_DEEPBIND: the library's own symbols win over the process's global
+	 * ones when IT looks a symbol up. Mesa links the distro's libzstd, and SDL
+	 * loads Mesa with RTLD_GLOBAL, so by the time a savestate is written the
+	 * process already holds a libzstd of another version in its global scope.
+	 * Without this flag the bundled libzstd's internal calls (ZSTD_compress to
+	 * ZSTD_createCCtx, ZSTD_freeCCtx...) resolved to THAT one, a context made
+	 * by one version was torn down by the other, and the first big greenzone
+	 * write died in free() - a DOSBox-X project's save, a PS2 project's exit. */
 	Dl_info info;
 	if (dladdr(reinterpret_cast<void *>(&openBesideUs), &info) != 0 && info.dli_fname != nullptr)
 	{
@@ -47,10 +55,10 @@ void *openBesideUs(const char *name)
 		if (slash != std::string::npos)
 		{
 			std::string full = dir.substr(0, slash + 1) + name;
-			if (void *h = dlopen(full.c_str(), RTLD_NOW | RTLD_LOCAL)) return h;
+			if (void *h = dlopen(full.c_str(), RTLD_NOW | RTLD_LOCAL | RTLD_DEEPBIND)) return h;
 		}
 	}
-	return dlopen(name, RTLD_NOW | RTLD_LOCAL);
+	return dlopen(name, RTLD_NOW | RTLD_LOCAL | RTLD_DEEPBIND);
 #endif
 }
 
