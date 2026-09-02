@@ -660,6 +660,64 @@ namespace Chimera.Tests.Client.Common.Movie
 			Assert.IsTrue(loadingManager.HasState(2));
 		}
 
+		[TestMethod]
+		public void BigOldStatesRoundTripThroughTheDiskCache()
+		{
+			// Big (5MB) states and a pool that holds only a few: demotion to
+			// "old" is forced, and old big states live in compressed temp
+			// files. Whatever GetStateClosestToFrame hands back must carry the
+			// exact bytes that went in, wherever they lived in between.
+			const int stateSize = 5 * 1024 * 1024;
+			StateSource ss = new() { PaddingData = new byte[stateSize - 4] };
+			PagedStateManager.PagedSettings settings = new()
+			{
+				AutoMemoryLimit = false,
+				OldStatesOnDisk = true,
+				TotalMemoryLimitMB = 16,
+				FramesBetweenNewStates = 1,
+				FramesBetweenMidStates = 2,
+				FramesBetweenOldStates = 4,
+			};
+			using PagedStateManager manager = new(settings, static _ => false);
+			ss.Frame = 0;
+			manager.Engage(ss.CloneSavestate());
+			for (int i = 1; i <= 30; i++)
+			{
+				ss.Frame = i;
+				manager.Capture(i, ss);
+			}
+
+			// far-back anchors survived a pool that only holds three states...
+			KeyValuePair<int, Stream> anchor = manager.GetStateClosestToFrame(6);
+			Assert.IsTrue(anchor.Key > 0, "an old anchor state should exist behind the pool's reach");
+			// ...and the state's own contents say which frame it truly is
+			Assert.AreEqual(anchor.Key, StateSource.GetFrameNumberInState(anchor.Value),
+				"the disk round-trip must hand back the bytes that went in");
+
+			// and the same holds across every state the manager still claims
+			for (int frame = 30; frame > 0; frame = manager.GetStateClosestToFrame(frame).Key - 1)
+			{
+				KeyValuePair<int, Stream> state = manager.GetStateClosestToFrame(frame);
+				Assert.AreEqual(state.Key, StateSource.GetFrameNumberInState(state.Value));
+				if (state.Key == 0) break;
+			}
+		}
+
+		[TestMethod]
+		public void SmallStatesNeverTouchTheDisk()
+		{
+			// the same shape with tiny states: the pool serves everything, and
+			// no temp files are made (proven indirectly - behavior identical to
+			// the pre-disk manager, which every other test in this file pins)
+			IStatable ss = CreateStateSource(8);
+			PagedStateManager.PagedSettings settings = MakeDefaultSettings();
+			settings.OldStatesOnDisk = true;
+			using PagedStateManager manager = new(settings, static _ => false);
+			manager.Engage(ss.CloneSavestate());
+			for (int i = 1; i <= 200; i++) manager.Capture(i, ss);
+			Assert.IsTrue(manager.HasState(0), "the pool still anchors frame zero");
+		}
+
 		private class StateSource : IStatable
 		{
 			public int Frame { get; set; }

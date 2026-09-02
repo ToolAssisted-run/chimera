@@ -54,6 +54,10 @@ namespace Chimera.Client.Common
 			[Description("Size the state pool to this machine and this system when a movie loads: a quarter of the RAM that is actually free (never less than 1GB, never more than 8GB), and no more than the states can use - a small system stops reserving space it cannot fill, a big one gets what the machine can spare. When off, 'Memory Limit (MB)' is used as-is.")]
 			public bool AutoMemoryLimit { get; set; } = true;
 
+			[DisplayName("Old States On Disk")]
+			[Description("Keep the old anchor states - the ones spread across the whole movie that never decay - in compressed temp files instead of the memory pool. They are read only when navigating far back, a disk read there is invisible next to re-emulating the gap, and every page they would have held goes to the states you are actually working with. Applies to systems with big states (4MB and up); small states stay in the pool either way.")]
+			public bool OldStatesOnDisk { get; set; } = true;
+
 			[DisplayName("Memory Limit (MB)")]
 			[Description("The amount of RAM to use for savestates when 'Auto Memory Limit' is off. Bigger values gives more states but makes saving take longer.")]
 			[Range(1, 32768)]
@@ -95,6 +99,7 @@ namespace Chimera.Client.Common
 			public PagedSettings(PagedSettings other)
 			{
 				AutoMemoryLimit = other.AutoMemoryLimit;
+				OldStatesOnDisk = other.OldStatesOnDisk;
 				TotalMemoryLimitMB = other.TotalMemoryLimitMB;
 				NewToMidRatio = other.NewToMidRatio;
 
@@ -147,7 +152,9 @@ namespace Chimera.Client.Common
 
 			public Stream MakeReadStream(PagedStateManager manager)
 			{
-				return new PagedStream(this, manager, true);
+				return FirstPage < 0
+					? manager.ReadOldFromDisk(Frame)
+					: new PagedStream(this, manager, true);
 			}
 		}
 		/* Our collection of states needs to perform well in all of these tasks:
@@ -167,6 +174,13 @@ namespace Chimera.Client.Common
 		private readonly SortedSet<StateInfo> _newStates = new();
 
 		private readonly Func<int, bool> _reserveCallback;
+
+		// Old anchor states, moved out of the page pool: zstd-compressed, one
+		// temp file each, keyed by frame. A state living here is marked in
+		// _states with FirstPage = -1 - the sorted-set logic neither knows nor
+		// cares where the bytes are.
+		private readonly TempFileStateDictionary _oldOnDisk = new();
+		private readonly Chimera.Common.Zstd _zstd = new();
 
 		private bool _bufferIsFull = false;
 		private int _newPagesUsed = 0;
@@ -362,6 +376,43 @@ namespace Chimera.Client.Common
 			_firstFree = 0;
 		}
 
+		/// <summary>a state worth keeping as old, whose bytes should live on disk rather than in the pool</summary>
+		private bool ShouldDiskOld(StateInfo state)
+			=> Settings.OldStatesOnDisk && state.Size >= StateBudget.BigStateBytes;
+
+		/// <summary>
+		/// Moves a state's bytes out of the page pool into a compressed temp
+		/// file, leaving a FirstPage = -1 marker in its place. The caller owns
+		/// the freed page chain (the same one a plain kick would have returned).
+		/// </summary>
+		private void MoveOldToDisk(StateInfo state)
+		{
+			using (var pooled = new PagedStream(state, this, true))
+			{
+				var compressed = new MemoryStream();
+				using (var compressor = _zstd.CreateZstdCompressionStream(compressed, 1))
+				{
+					pooled.CopyTo(compressor);
+				}
+				compressed.Position = 0;
+				_oldOnDisk.SetState(state.Frame, compressed);
+			}
+			_states.Remove(state);
+			_states.Add(new StateInfo { Frame = state.Frame, FirstPage = -1, LastPage = -1, Size = state.Size });
+		}
+
+		/// <summary>the way back: the whole state, decompressed, as a stream with a Length</summary>
+		private Stream ReadOldFromDisk(int frame)
+		{
+			var plain = new MemoryStream();
+			using (var decompressor = _zstd.CreateZstdDecompressionStream(new MemoryStream(_oldOnDisk[frame])))
+			{
+				decompressor.CopyTo(plain);
+			}
+			plain.Position = 0;
+			return plain;
+		}
+
 		/// <summary>
 		/// Will removing the state on this frame leave us with a gap larger than <see cref="PagedSettings.FramesBetweenOldStates"/>?
 		/// </summary>
@@ -399,12 +450,18 @@ namespace Chimera.Client.Common
 				// A very special case: We have no mid or new states.
 				if (_newStates.Count == 0 && _midStates.Count == 0)
 				{
-					if (_states.Count < 2) throw new Exception("Unable to capture a single state. This probably means your Memory Limit setting is too low.");
-					// Avoiding the performance issues of GetViewBetween, when we have no idea what frame the second state is on.
-					var enumerator = _states.GetEnumerator();
-					enumerator.MoveNext();
-					enumerator.MoveNext();
-					StateInfo stateToKick = enumerator.Current;
+					// The second POOLED state: disk states hold no pages, and the
+					// earliest pooled state is spared the way the original spared
+					// the earliest state.
+					StateInfo stateToKick = default;
+					int pooledSeen = 0;
+					foreach (StateInfo candidate in _states)
+					{
+						if (candidate.FirstPage < 0) continue;
+						pooledSeen++;
+						if (pooledSeen == 2) { stateToKick = candidate; break; }
+					}
+					if (pooledSeen < 2) throw new Exception("Unable to capture a single state. This probably means your Memory Limit setting is too low.");
 					_states.Remove(stateToKick);
 					return stateToKick.FirstPage;
 				}
@@ -429,7 +486,14 @@ namespace Chimera.Client.Common
 					}
 					else if (_reserveCallback(stateToKick.Frame))
 					{
-						// Recategorize as old. Nothing to do here.
+						// Recategorize as old - and a big state's bytes go to
+						// disk, its pages answering the very request that got
+						// it demoted.
+						if (ShouldDiskOld(stateToKick))
+						{
+							MoveOldToDisk(stateToKick);
+							return stateToKick.FirstPage;
+						}
 					}
 					else
 					{
@@ -472,6 +536,11 @@ namespace Chimera.Client.Common
 					if (!recategorizeAsOld)
 					{
 						_states.Remove(stateToKick);
+						return stateToKick.FirstPage;
+					}
+					if (ShouldDiskOld(stateToKick))
+					{
+						MoveOldToDisk(stateToKick);
 						return stateToKick.FirstPage;
 					}
 				}
@@ -598,7 +667,12 @@ namespace Chimera.Client.Common
 
 		public void Clear() => InvalidateAfter(0);
 
-		public void Dispose() => _buffer?.Dispose();
+		public void Dispose()
+		{
+			_buffer?.Dispose();
+			_oldOnDisk.Dispose();
+			_zstd.Dispose();
+		}
 
 		public void Engage(byte[] frameZeroState)
 		{
@@ -621,6 +695,14 @@ namespace Chimera.Client.Common
 		private void RemoveState(StateInfo state)
 		{
 			Debug.Assert(_states.Contains(state), "Do not attempt to remove a non-existent state.");
+
+			if (state.FirstPage < 0)
+			{
+				// the bytes live on disk; there are no pages to hand back
+				_states.Remove(state);
+				_oldOnDisk.Remove(state.Frame);
+				return;
+			}
 
 			ulong position = _buffer.Start + ((ulong)state.LastPage * PAGE_SIZE);
 			Marshal.WriteInt32((IntPtr)position, _firstFree);
@@ -667,7 +749,8 @@ namespace Chimera.Client.Common
 		{
 			if (settings is not PagedSettings pSettings
 				|| pSettings.TotalMemoryLimitMB != this.Settings.TotalMemoryLimitMB
-				|| pSettings.AutoMemoryLimit != this.Settings.AutoMemoryLimit)
+				|| pSettings.AutoMemoryLimit != this.Settings.AutoMemoryLimit
+				|| pSettings.OldStatesOnDisk != this.Settings.OldStatesOnDisk)
 			{
 				IStateManager newManager = settings.CreateManager(_reserveCallback);
 				newManager.Engage(GetStateClosestToFrame(0).Value.ReadAllBytes());
