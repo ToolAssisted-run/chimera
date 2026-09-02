@@ -52,6 +52,7 @@ namespace Chimera.Emulation.Common
 			public const string PhillipsCDi = "PhillipsCDi";
 			public const string Playdia = "Playdia";
 			public const string PS2 = "PS2";
+			public const string PS3 = "PS3";
 			public const string PSP = "PSP";
 			public const string PSX = "PSX";
 			public const string SAT = "SAT";

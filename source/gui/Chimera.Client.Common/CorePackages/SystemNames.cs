@@ -51,6 +51,7 @@ namespace Chimera.Client.Common
 			["PCECD"] = "PC Engine CD",
 			["PCFX"] = "PC-FX",
 			["PS2"] = "PlayStation 2",
+			["PS3"] = "PlayStation 3",
 			["PSP"] = "PlayStation Portable",
 			["PSX"] = "PlayStation",
 			["SAT"] = "Sega Saturn",

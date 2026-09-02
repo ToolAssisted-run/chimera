@@ -297,6 +297,14 @@ namespace Chimera.Emulation.Common
 			},
 
 
+			[VSystemID.Raw.PS3] = new()
+			{
+				// a DualShock 3: the PS2 pad's shoulders read the same way,
+				// and the PS button is the Home key
+				["L2"] = '[',
+				["R2"] = ']',
+				["PS"] = 'H',
+			},
 			[VSystemID.Raw.PS2] = new()
 			{
 				["L2"] = '[',
