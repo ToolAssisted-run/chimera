@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Linq;
 
 using Chimera.Client.Common;
@@ -273,6 +273,48 @@ namespace Chimera.Tests.Client.Common.Movie
 			Assert.AreEqual("quickernes", reloaded.CoreName, "the core pin was lost on save");
 			Assert.AreEqual("abc123+local", reloaded.CoreVersion);
 			Assert.AreEqual(new string('B', 40), reloaded.CoreSha1);
+		}
+
+		/// <summary>
+		/// The wizard records every exposed setting at its chosen value, and the
+		/// movie that starts from that project has no settings text of its own -
+		/// the project boot fills headers, never settings. Saving must keep the
+		/// project's answers rather than write the movie's silence over them as
+		/// "{}", which put every setting back to its default on reopen (issue #29).
+		/// </summary>
+		[TestMethod]
+		public void SavingAMovieThatIsSilentAboutSettingsKeepsTheWizardsAnswers()
+		{
+			var path = Path.Combine(_dir, "fresh-settings.chimeraProject");
+			var project = Chimera.Emulation.Common.Engine.EngineProject.New();
+			project.SetCore("pcsx2-shaped", "abc123+local", new string('C', 40));
+			project.SetSettingsJson("""{"fast_boot":false,"memcard1":false,"renderer":"software"}""");
+
+			// the fresh shape: a movie for a project that has never been written -
+			// nothing to load, the resolved project handed over, headers filled
+			// from the machine, settings never mentioned
+			FakeEmulator emu = new();
+			FakeMovieSession session = new(emu);
+			TasMovie movie = new(session, path);
+			session.Movie = movie;
+			movie.Attach(emu);
+			movie.UseResolvedProject(project);
+			movie.HeaderEntries[HeaderKeys.Core] = "pcsx2-shaped";
+			Assert.AreEqual("", movie.SettingsJson, "the fresh movie says nothing about settings");
+			movie.InsertEmptyFrame(0, 2);
+			Assert.IsFalse(movie.Save().IsError);
+
+			using var reloaded = Chimera.Emulation.Common.Engine.EngineProject.Open(path);
+			StringAssert.Contains(reloaded.SettingsJson, "\"fast_boot\":false", "the wizard's answer was lost on save");
+			StringAssert.Contains(reloaded.SettingsJson, "\"memcard1\":false");
+			StringAssert.Contains(reloaded.SettingsJson, "\"renderer\":\"software\"");
+
+			// and a movie that DOES carry settings still has the last word
+			var loaded = LoadFresh(path);
+			loaded.SettingsJson = """{"Values":{"fast_boot":true}}""";
+			Assert.IsFalse(loaded.Save().IsError);
+			using var overwritten = Chimera.Emulation.Common.Engine.EngineProject.Open(path);
+			StringAssert.Contains(overwritten.SettingsJson, "\"fast_boot\":true");
 		}
 	}
 }

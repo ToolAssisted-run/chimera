@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.IO;
 using System.Linq;
 
@@ -96,7 +96,13 @@ namespace Chimera.Client.Common
 				Keep(Header[HeaderKeys.CoreVersion], p.CoreVersion),
 				Keep(Header[HeaderKeys.CorePackageSha1], p.CoreSha1));
 			p.Rerecords = Rerecords;
-			p.SetSettingsJson(FlattenSettings(SettingsJson));
+			// The settings are the movie's when it has them, and the project's
+			// own when it is silent - the same rule as the core pin above. A
+			// movie that starts from a wizard-made project has no settings text
+			// of its own (the project boot fills headers, not settings), and
+			// flattening that silence wrote "{}" over the wizard's answers: the
+			// reopened machine ran on every default, and desynced (issue #29).
+			if (!string.IsNullOrWhiteSpace(SettingsJson)) p.SetSettingsJson(FlattenSettings(SettingsJson));
 			p.Description = string.Join("\n", Comments);
 
 			p.SubtitlesClear();
