@@ -112,6 +112,7 @@ struct ce_project
 	uint64_t rerecords = 0;
 	cJSON *settings = nullptr; // always an object
 	cJSON *firmware = nullptr; // always an array
+	cJSON *coreCache = nullptr; // always an array: {name, sha1} per compiled object
 	std::string log;           // the ce_movie_log lump (LogKey + entries)
 	std::vector<FileEntry> files;
 	std::vector<Marker> markers;
@@ -122,17 +123,19 @@ struct ce_project
 	std::vector<std::pair<std::string, std::string>> headers;
 
 	// borrowed-buffer returns
-	std::string settingsOut, firmwareOut, slotsOut;
+	std::string settingsOut, firmwareOut, coreCacheOut, slotsOut;
 
 	ce_project()
 	{
 		settings = cJSON_CreateObject();
 		firmware = cJSON_CreateArray();
+		coreCache = cJSON_CreateArray();
 	}
 	~ce_project()
 	{
 		cJSON_Delete(settings);
 		cJSON_Delete(firmware);
+		cJSON_Delete(coreCache);
 	}
 };
 
@@ -175,7 +178,7 @@ ce_project *ce_project_open(const char *path, const char **error_out)
 	/* the format is strict: a key this build does not know is an error, not
 	 * something to drop silently on the next save */
 	static const char *known[] = { "title", "description", "core", "rerecords",
-		"files", "settings", "firmware", "input", "markers", "branches", "subtitles",
+		"files", "settings", "firmware", "coreCache", "input", "markers", "branches", "subtitles",
 		"headers" };
 	for (cJSON *item = root->child; item != nullptr; item = item->next)
 	{
@@ -265,6 +268,12 @@ ce_project *ce_project_open(const char *path, const char **error_out)
 		if (!cJSON_IsArray(j)) return rejectP("\"firmware\" is not an array");
 		cJSON_Delete(p->firmware);
 		p->firmware = cJSON_Duplicate(j, 1);
+	}
+	if ((j = cJSON_GetObjectItemCaseSensitive(root, "coreCache")) != nullptr)
+	{
+		if (!cJSON_IsArray(j)) return rejectP("\"coreCache\" is not an array");
+		cJSON_Delete(p->coreCache);
+		p->coreCache = cJSON_Duplicate(j, 1);
 	}
 	if ((j = cJSON_GetObjectItemCaseSensitive(root, "input")) != nullptr)
 	{
@@ -418,6 +427,10 @@ int32_t ce_project_save(ce_project *p, const char *path, const char **error_out)
 	}
 	cJSON_AddItemToObject(root, "settings", cJSON_Duplicate(p->settings, 1));
 	cJSON_AddItemToObject(root, "firmware", cJSON_Duplicate(p->firmware, 1));
+	/* What the core compiled for this game, by name and hash: regenerable from
+	 * the same inputs, recorded so a later run can be told it is running the
+	 * same compiled code (docs/compile-cache.md). */
+	cJSON_AddItemToObject(root, "coreCache", cJSON_Duplicate(p->coreCache, 1));
 	cJSON_AddStringToObject(root, "input", p->log.c_str());
 	cJSON *markers = cJSON_AddArrayToObject(root, "markers");
 	for (const Marker &m : p->markers)
@@ -522,6 +535,29 @@ int32_t ce_project_set_settings_text(ce_project *p, const char *json, const char
 	}
 	cJSON_Delete(p->settings);
 	p->settings = parsed;
+	return 0;
+}
+
+const char *ce_project_core_cache_text(ce_project *p, uint64_t *len_out)
+{
+	char *text = cJSON_PrintUnformatted(p->coreCache);
+	p->coreCacheOut = text != nullptr ? text : "[]";
+	if (text != nullptr) cJSON_free(text);
+	if (len_out != nullptr) *len_out = p->coreCacheOut.size();
+	return p->coreCacheOut.c_str();
+}
+
+int32_t ce_project_set_core_cache_text(ce_project *p, const char *json, const char **error_out)
+{
+	if (error_out != nullptr) *error_out = nullptr;
+	cJSON *parsed = cJSON_Parse(json != nullptr ? json : "");
+	if (parsed == nullptr || !cJSON_IsArray(parsed))
+	{
+		cJSON_Delete(parsed);
+		return failInt("coreCache must be a JSON array", error_out);
+	}
+	cJSON_Delete(p->coreCache);
+	p->coreCache = parsed;
 	return 0;
 }
 

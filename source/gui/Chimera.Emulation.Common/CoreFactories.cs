@@ -120,3 +120,19 @@ namespace Chimera.Emulation.Common
 		IEmulator Create(CoreCreationContext ctx);
 	}
 }
+
+namespace Chimera.Emulation.Common
+{
+	/// <summary>
+	/// A core opened as a precompile session (see WaterboxCore.PrecompileRequest):
+	/// it boots, compiles its share of the machine's code into the compile
+	/// cache, and reports when it is done. Never machine state.
+	/// </summary>
+	public interface ICorePrecompile : IEmulatorService
+	{
+		bool PrecompileDone { get; }
+		(uint Done, uint Total) PrecompileProgress { get; }
+		ulong CacheStored { get; }
+		ulong CacheFetched { get; }
+	}
+}

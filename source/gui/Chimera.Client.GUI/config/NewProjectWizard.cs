@@ -33,7 +33,7 @@ namespace Chimera.Client.GUI
 		private readonly IReadOnlyList<DiscoveredCorePackage> _cores;
 		private readonly Func<ProjectSlotDeclaration.Slot, string[]> _pickFiles;
 
-		private readonly Panel[] _pages = new Panel[4];
+		private readonly Panel[] _pages = new Panel[5];
 		private int _page;
 
 		// page 1
@@ -48,6 +48,26 @@ namespace Chimera.Client.GUI
 		private readonly ComboBox _machine;
 
 		private readonly Label _machineLabel;
+
+		// page 5: what the core must compile for this game before it can run it
+		/// <summary>the config a precompile session must run with, so it sees the same paths</summary>
+		private readonly string? _configPath;
+
+		private ListView _precompileList;
+		private Button _precompileButton;
+		private Label _precompileStatus;
+		private ProgressBar _precompileBar;
+		private CoreCacheManifest _precompileManifest;
+		private bool _precompiling;
+
+		/// <summary>the game's modules, and how many the sessions have finished</summary>
+		private uint _precompileExpected, _precompileDone;
+
+		/// <summary>Cancel was pressed while the sessions were running</summary>
+		private bool _precompileCancelled;
+
+		/// <summary>and the window is to close once they have stopped</summary>
+		private bool _closeAfterPrecompile;
 
 		/// <summary>
 		/// Which renderer draws, for a core that offers a choice. It sits beside the
@@ -127,8 +147,10 @@ namespace Chimera.Client.GUI
 			Func<string, string?>? pickFirmwareFile = null,
 			IReadOnlyList<string>? firmwareSearchDirs = null,
 			Func<string?>? pickFirmwareFolder = null,
-			Func<string, string, string?>? rememberedFirmwarePath = null)
+			Func<string, string, string?>? rememberedFirmwarePath = null,
+			string? configPath = null)
 		{
+			_configPath = configPath;
 			_pickFirmwareFile = pickFirmwareFile ?? (static _ => null);
 			_firmwareSearchDirs = firmwareSearchDirs ?? [ ];
 			_pickFirmwareFolder = pickFirmwareFolder;
@@ -281,6 +303,53 @@ namespace Chimera.Client.GUI
 			firmwareScanButton.Visible = pickFirmwareFolder is not null;
 			p4.Controls.AddRange([ _firmwareList, _firmwareSetButton, _firmwareClearButton, firmwareScanButton ]);
 
+			// ---- page 5: the code the core compiles for this game -----------------
+			var p5 = _pages[4];
+			p5.Controls.Add(MakeHeading("This game's code must be recompiled before it can be played."));
+			p5.Controls.Add(new Label
+			{
+				AutoSize = false,
+				Location = Pt(8, 52),
+				Size = new(UIHelper.ScaleX(544), UIHelper.ScaleY(44)),
+				Text = "This core translates the console's code into your machine's before running it. "
+					+ "Doing it once now, in parallel, is what makes the game fast enough to work on; "
+					+ "otherwise every session pays for it again. It can take several minutes. The result "
+					+ "depends only on the game and this core, so it is the same on every machine and is "
+					+ "not part of the run.",
+			});
+			_precompileList = new ListView
+			{
+				Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
+				FullRowSelect = true,
+				HideSelection = false,
+				Location = Pt(8, 100),
+				MultiSelect = false,
+				ShowItemToolTips = true,
+				Size = new(UIHelper.ScaleX(544), UIHelper.ScaleY(216)),
+				View = View.Details,
+			};
+			_precompileList.Columns.Add("Compiled Module", UIHelper.ScaleX(300));
+			_precompileList.Columns.Add("SHA1", UIHelper.ScaleX(180));
+			_precompileList.Columns.Add("State", UIHelper.ScaleX(72));
+			_precompileBar = new ProgressBar
+			{
+				Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
+				Location = Pt(8, 322),
+				Maximum = 1,
+				Size = new(UIHelper.ScaleX(544), UIHelper.ScaleY(14)),
+				Visible = false,
+			};
+			_precompileButton = new Button { AutoSize = true, Location = Pt(8, 344), Text = "Compile" };
+			_precompileButton.Click += (_, _) => RunPrecompile();
+			_precompileStatus = new Label
+			{
+				Anchor = AnchorStyles.Bottom | AnchorStyles.Left,
+				AutoEllipsis = true,
+				Location = Pt(96, 349),
+				Size = new(UIHelper.ScaleX(456), UIHelper.ScaleY(16)),
+			};
+			p5.Controls.AddRange([ _precompileList, _precompileBar, _precompileButton, _precompileStatus ]);
+
 			// ---- chrome ----------------------------------------------------------
 			// Width is set below, once the buttons have been placed: a fixed one
 			// reached under the leftmost of them and painted over it.
@@ -292,9 +361,9 @@ namespace Chimera.Client.GUI
 				Location = Pt(8, 386),
 				Size = new(UIHelper.ScaleX(360), UIHelper.ScaleY(16)),
 			};
-			_backButton = MakeNavButton("< Back", () => ShowPage(_page - 1));
+			_backButton = MakeNavButton("< Back", GoBack);
 			_nextButton = MakeNavButton("Next >", Advance);
-			Button cancel = MakeNavButton("Cancel", () => { DialogResult = DialogResult.Cancel; Close(); });
+			Button cancel = MakeNavButton("Cancel", CancelPressed);
 			// laid out from the RIGHT EDGE inward, with the same margin the page
 			// content has on the left: hand-placed x positions plus an auto-sized
 			// button had Cancel hanging over the window's edge
@@ -685,6 +754,51 @@ namespace Chimera.Client.GUI
 				? _cfg.Machines[_machine.SelectedIndex].Id
 				: null;
 
+		/// <summary>
+		/// Cancel while a compile is running stops it: the sessions are killed and
+		/// the window closes once they have. Closing the window does the same,
+		/// because a window that has gone is not waiting for anything either - and
+		/// neither can happen the direct way, since the compile is pumping
+		/// messages from inside a click handler and nothing may unwind under it.
+		/// </summary>
+		private void CancelPressed()
+		{
+			if (_precompiling)
+			{
+				_precompileCancelled = true;
+				_closeAfterPrecompile = true;
+				_precompileStatus.Text = "Stopping...";
+				return;
+			}
+			DialogResult = DialogResult.Cancel;
+			Close();
+		}
+
+		protected override void OnFormClosing(FormClosingEventArgs e)
+		{
+			if (_precompiling)
+			{
+				_precompileCancelled = true;
+				_closeAfterPrecompile = true;
+				_precompileStatus.Text = "Stopping...";
+				e.Cancel = true;
+				return;
+			}
+			base.OnFormClosing(e);
+		}
+
+		/// <summary>Back walks over the steps that did not apply on the way here.</summary>
+		private void GoBack()
+		{
+			for (var i = _page - 1; i >= 0; i--)
+			{
+				if (!PageApplies(i)) continue;
+				ShowPage(i);
+				return;
+			}
+			ShowPage(0);
+		}
+
 		private void ShowPage(int page)
 		{
 			_page = Math.Max(0, Math.Min(_pages.Length - 1, page));
@@ -695,13 +809,37 @@ namespace Chimera.Client.GUI
 		}
 
 		/// <summary>
-		/// A machine that needs no firmware is not asked about firmware: the
-		/// settings step is then the last one, and its button says Create.
-		/// Whether it is depends on the current files and settings, so this is
-		/// re-asked whenever either changes.
+		/// Whether a step applies at all. A machine that needs no firmware is not
+		/// asked about firmware; a core that compiles nothing has nothing to
+		/// compile. Both depend on the choices made so far, so this is re-asked
+		/// whenever they change.
 		/// </summary>
-		private bool IsLastPage(int page)
-			=> page == _pages.Length - 1 || (page == 2 && !AnyFirmwareRequired());
+		private bool PageApplies(int page) => page switch
+		{
+			3 => AnyFirmwareRequired(),
+			4 => PrecompileApplies(),
+			_ => true,
+		};
+
+		/// <summary>The next step that applies after this one, or -1 when this is the last.</summary>
+		private int NextApplicablePage(int page)
+		{
+			for (var i = page + 1; i < _pages.Length; i++)
+			{
+				if (PageApplies(i)) return i;
+			}
+			return -1;
+		}
+
+		private bool IsLastPage(int page) => NextApplicablePage(page) < 0;
+
+		/// <summary>
+		/// Whether this core compiles the game's code before running it
+		/// (docs/compile-cache.md). Needs a core that says so and a game to
+		/// compile: a project whose files are not settled yet has neither.
+		/// </summary>
+		private bool PrecompileApplies()
+			=> _cfg?.Precompile is true && PrecompileRomPath() is not null;
 
 		/// <summary>
 		/// Which firmware the decisions so far call for - the cheap half of the
@@ -724,9 +862,18 @@ namespace Chimera.Client.GUI
 			UpdateCreateEnabled();
 		}
 
-		/// <summary>Create is not an error message: it is simply unavailable until every required firmware is satisfied.</summary>
+		/// <summary>
+		/// Create is not an error message: it is simply unavailable until the last
+		/// step is answered - every required firmware provided, and every module
+		/// this core must compile for the game compiled.
+		/// </summary>
 		private void UpdateCreateEnabled()
-			=> _nextButton.Enabled = _page != _pages.Length - 1 || MissingRequiredFirmware() is null;
+		{
+			if (_precompiling) { _nextButton.Enabled = false; return; }
+			if (!IsLastPage(_page)) { _nextButton.Enabled = true; return; }
+			_nextButton.Enabled = (_page != 3 || MissingRequiredFirmware() is null)
+				&& (_page != 4 || PrecompileSatisfied());
+		}
 
 		/// <summary>whether Create is currently available, for tests</summary>
 		public bool CreateEnabled => _nextButton.Enabled;
@@ -750,21 +897,242 @@ namespace Chimera.Client.GUI
 					ShowPage(2);
 					break;
 				case 2:
-					if (!AnyFirmwareRequired())
+				case 3:
+				default:
+					if (_page == 3)
 					{
-						// nothing to ask for: the settings step was the last one
+						var missing = MissingRequiredFirmware();
+						if (missing is not null) { _status.Text = $"{missing} is required and not provided"; return; }
+					}
+					if (_page == 4)
+					{
+						if (!PrecompileSatisfied()) { _status.Text = "Compile this game's code first."; return; }
 						Create();
 						break;
 					}
-					BuildFirmwarePage();
-					ShowPage(3);
-					break;
-				default:
-					var missing = MissingRequiredFirmware();
-					if (missing is not null) { _status.Text = $"{missing} is required and not provided"; return; }
-					Create();
+					var next = NextApplicablePage(_page);
+					if (next < 0) { Create(); break; }
+					if (next == 3) BuildFirmwarePage();
+					if (next == 4) BuildPrecompilePage();
+					ShowPage(next);
 					break;
 			}
+		}
+
+		// ---- the code this core compiles for this game ---------------------------
+
+		/// <summary>
+		/// The game a precompile session would compile: the first file of the
+		/// first slot, which is the one a core boots. A slot list that is empty
+		/// means there is nothing to compile yet.
+		/// </summary>
+		/// <summary>a game named directly, for the tests and the screenshots</summary>
+		private string? _precompileRomOverride;
+
+		private string? PrecompileRomPath()
+		{
+			if (_precompileRomOverride is not null) return _precompileRomOverride;
+			foreach (var slot in _declaration?.Slots ?? [ ])
+			{
+				if (!_slotLists.TryGetValue(slot.Id, out var list)) continue;
+				if (list.Items.OfType<PickedFile>().FirstOrDefault() is { } file) return file.Path;
+			}
+			return null;
+		}
+
+		private string? _romSha1Path, _romSha1;
+
+		private string? PrecompileRomSha1()
+		{
+			var path = PrecompileRomPath();
+			if (path is null || !File.Exists(path)) return null;
+			if (_romSha1Path == path && _romSha1 is not null) return _romSha1;
+			using var stream = File.OpenRead(path);
+			using var sha1 = System.Security.Cryptography.SHA1.Create();
+			_romSha1 = BitConverter.ToString(sha1.ComputeHash(stream)).Replace("-", "");
+			_romSha1Path = path;
+			return _romSha1;
+		}
+
+		private string? PrecompileCacheDir()
+			=> _cfg is null ? null : WaterboxCore.CoreCacheDirectoryFor(_cfg);
+
+		/// <summary>Every module this game needs is compiled and unchanged.</summary>
+		private bool PrecompileSatisfied()
+			=> _precompileManifest is { Files.Count: not 0 } manifest && manifest.Satisfied(PrecompileCacheDir());
+
+		/// <summary>whether Create is available on the compile step, for tests</summary>
+		public bool PrecompileReady => PrecompileSatisfied();
+
+		/// <summary>what the compile step lists right now, for tests: name, hash, present</summary>
+		public IReadOnlyList<(string Name, string Sha1, bool Present)> PrecompileEntries
+			=> _precompileList.Items.Cast<ListViewItem>()
+				.Select(i => (i.SubItems[0].Text, i.SubItems[1].Text, i.ForeColor == Color.ForestGreen))
+				.ToList();
+
+		private void BuildPrecompilePage()
+		{
+			_precompileManifest = CoreCacheManifest.Load(PrecompileCacheDir(), PrecompileRomSha1());
+			RefreshPrecompileList();
+		}
+
+		private void RefreshPrecompileList()
+		{
+			var dir = PrecompileCacheDir();
+			_precompileList.BeginUpdate();
+			_precompileList.Items.Clear();
+			foreach (var file in _precompileManifest?.Files ?? [ ])
+			{
+				var present = string.Equals(CoreCacheManifest.HashOf(dir, file.Name), file.Sha1, StringComparison.OrdinalIgnoreCase);
+				AddPrecompileRow(file.Name, file.Sha1, present);
+			}
+			_precompileList.EndUpdate();
+			UpdatePrecompileStatus();
+		}
+
+		/// <summary>
+		/// One module: green when its object is on disk and still what it was.
+		/// The name shown is the module's, not the whole path - the path is the
+		/// core's business and is in the tooltip for anyone who wants it.
+		/// </summary>
+		private void AddPrecompileRow(string name, string sha1, bool present)
+		{
+			ListViewItem item = new(name) { ForeColor = present ? Color.ForestGreen : Color.Firebrick, ToolTipText = name };
+			item.SubItems.Add(sha1);
+			item.SubItems.Add(present ? "Compiled" : "Missing");
+			_precompileList.Items.Add(item);
+		}
+
+		/// <summary>
+		/// The bar fills with the modules compiled, out of what this game needed
+		/// last time. A game nobody has compiled yet has no total to fill
+		/// against, and the bar says "working" rather than pretending to know.
+		/// </summary>
+		private void UpdatePrecompileBar()
+		{
+			if (_precompileExpected is 0)
+			{
+				_precompileBar.Style = ProgressBarStyle.Marquee;
+				return;
+			}
+			_precompileBar.Style = ProgressBarStyle.Blocks;
+			_precompileBar.Maximum = (int)Math.Max(1, _precompileExpected);
+			_precompileBar.Value = Math.Min(_precompileList.Items.Count, _precompileBar.Maximum);
+		}
+
+		private void UpdatePrecompileStatus()
+		{
+			var total = _precompileList.Items.Count;
+			var green = _precompileList.Items.Cast<ListViewItem>().Count(i => i.ForeColor == Color.ForestGreen);
+			// While it runs, a row exists only once its module is compiled, so the
+			// total cannot come from the list - it comes from the sessions, and
+			// only once they have looked at the game. Until then there is nothing
+			// honest to count, and saying so beats a number that means nothing.
+			_precompileStatus.Text = _precompiling
+				? _precompileExpected is not 0
+					? $"Compiling {green} of {_precompileExpected} modules..."
+					: green is 0
+						? "Calculating..."
+						: $"Compiling... {green} modules compiled"
+				: total is 0
+					? "This game has not been compiled yet."
+					: green == total
+						? $"All {total} modules compiled."
+						: $"{total - green} of {total} modules are missing.";
+			_precompileStatus.ForeColor = !_precompiling && total is not 0 && green == total ? Color.ForestGreen : SystemColors.ControlText;
+			// Compile is offered exactly when there is compiling left to do
+			_precompileButton.Enabled = !_precompiling && !PrecompileSatisfied();
+			UpdateCreateEnabled();
+		}
+
+		/// <summary>
+		/// Compiles the game, in as many sessions as the machine can use. The list
+		/// fills as the objects land, so the wait shows what it is doing rather
+		/// than a bar with no content.
+		/// </summary>
+		private void RunPrecompile()
+		{
+			var romPath = PrecompileRomPath();
+			if (romPath is null || ChosenCore is null) return;
+
+			_precompiling = true;
+			_precompileCancelled = false;
+			// what this game needed last time, when it was compiled before
+			_precompileExpected = (uint)(_precompileManifest?.Files.Count ?? 0);
+			_precompileDone = 0;
+			_precompileBar.Visible = true;
+			_precompileBar.Value = 0;
+			// nothing behind this step may be changed while it runs: the sessions
+			// are compiling for the game and the settings as they stand
+			_backButton.Enabled = false;
+			_precompileList.Items.Clear();
+			UpdatePrecompileStatus();
+			// the click handler owns the thread from here, so what it has just
+			// said must be painted before it does anything slow - and hashing a
+			// disc image is slow
+			_precompileStatus.Refresh();
+			_precompileButton.Refresh();
+			Application.DoEvents();
+
+			var romSha1 = PrecompileRomSha1();
+			var dir = PrecompileCacheDir();
+			if (romSha1 is null || dir is null)
+			{
+				_precompiling = false;
+				_precompileBar.Visible = false;
+				_backButton.Enabled = _page > 0;
+				UpdatePrecompileStatus();
+				return;
+			}
+
+			var seen = new HashSet<string>(StringComparer.Ordinal);
+			void Entry(PrecompileOrchestrator.Entry entry)
+			{
+				// arrives on a worker's reader thread; the list is the UI's
+				BeginInvoke(new Action(() =>
+				{
+					if (!seen.Add(entry.Name)) return;
+					AddPrecompileRow(entry.Name, entry.Sha1, present: true);
+					UpdatePrecompileBar();
+					UpdatePrecompileStatus();
+				}));
+			}
+			// The sessions cannot tell how many modules this game has until they
+			// have compiled them: most objects come from the executable and what
+			// it loads, which every session walks and each compiles a share of.
+			// So the only honest total is one a previous compile left behind.
+			void Progress(uint modulesDone, uint modulesTotal)
+			{
+			}
+
+			var manifest = PrecompileOrchestrator.Run(
+				ChosenCore.Path, _configPath, romPath, romSha1, dir, Entry, Progress, cancelled: PumpAndCheckCancel);
+
+			_precompiling = false;
+			_precompileBar.Visible = false;
+			_backButton.Enabled = _page > 0;
+			if (manifest is not null) _precompileManifest = manifest;
+			RefreshPrecompileList();
+			if (_closeAfterPrecompile)
+			{
+				// the window was asked to go while the sessions were running; they
+				// have stopped, so now it can
+				DialogResult = DialogResult.Cancel;
+				Close();
+				return;
+			}
+			if (manifest is null) _status.Text = "The compile was stopped; this game is not compiled.";
+		}
+
+		/// <summary>
+		/// Keeps the window alive while the sessions work - without this the list
+		/// never paints and the window is a grey rectangle - and reports whether
+		/// the person asked to stop while it was pumping.
+		/// </summary>
+		private bool PumpAndCheckCancel()
+		{
+			Application.DoEvents();
+			return _precompileCancelled || IsDisposed;
 		}
 
 		// ---- the core-informed form ----------------------------------------------
@@ -815,6 +1183,20 @@ namespace Chimera.Client.GUI
 			RefreshExposedSettings();
 			_settingsGrid.SelectedObject = _settings;
 			ShowPage(2);
+		}
+
+		/// <summary>
+		/// Shows the compile step for a core and a game, without walking the pages
+		/// before it - the test and screenshot door for the step.
+		/// </summary>
+		internal void UsePrecompileFrom(WaterboxConfig cfg, string cacheRoot, string romPath)
+		{
+			_cfg = cfg;
+			_settings ??= new WaterboxCoreSettings();
+			WaterboxCore.CoreCacheRoot = cacheRoot;
+			_precompileRomOverride = romPath;
+			BuildPrecompilePage();
+			ShowPage(4);
 		}
 
 		/// <summary>
@@ -1537,6 +1919,20 @@ namespace Chimera.Client.GUI
 					pins.Add(new Newtonsoft.Json.Linq.JObject { ["id"] = need.Id, ["sha1"] = need.ChosenSha1 });
 				}
 				if (pins.Count is not 0) project.SetFirmwareJson(pins.ToString(Newtonsoft.Json.Formatting.None));
+			}
+
+			// What the core compiled for this game, by name and hash. The files
+			// themselves are not in the project - they regenerate from the same
+			// game and package - but the list is, so that opening this project
+			// later can say whether it is running the same compiled code.
+			if (_precompileManifest is { Files.Count: not 0 })
+			{
+				Newtonsoft.Json.Linq.JArray cache = new();
+				foreach (var file in _precompileManifest.Files)
+				{
+					cache.Add(new Newtonsoft.Json.Linq.JObject { ["name"] = file.Name, ["sha1"] = file.Sha1 });
+				}
+				project.SetCoreCacheJson(cache.ToString(Newtonsoft.Json.Formatting.None));
 			}
 
 			string? declarationJson = null;

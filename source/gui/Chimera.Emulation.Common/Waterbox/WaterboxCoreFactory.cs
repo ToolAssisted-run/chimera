@@ -65,6 +65,10 @@ namespace Chimera.Emulation.Common.Waterbox
 		/// <summary>The package's identity, so lists of available cores name the core rather than the adapter.</summary>
 		public CoreAttribute CoreIdentity => WaterboxCore.IdentityOf(_cfg);
 
+		public WaterboxConfig Config => _cfg;
+		public string PackageDir => _packageDir;
+
+
 		/// <summary>Rom-extension -&gt; systemId map from waterbox.config, over every machine.</summary>
 		public Dictionary<string, string> Extensions => _cfg.AllExtensions;
 

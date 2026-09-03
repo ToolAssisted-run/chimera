@@ -157,7 +157,10 @@ namespace Chimera.Client.GUI
 				rememberedFirmwarePath: (coreName, id) =>
 					Config.CoreFirmware.TryGetValue(CoreFirmwareStore.KeyFor(coreName, id), out var remembered)
 						? remembered
-						: null);
+						: null,
+				// a precompile session is this frontend again: it must read the
+				// same config, or it would look for its cache somewhere else
+				configPath: _getConfigPath());
 			// The wizard opens on the last project's answers - the open one, or the
 			// last one there was. This is how a project is reconfigured: changing a
 			// sync setting changes the machine, so there is no editing one in place,

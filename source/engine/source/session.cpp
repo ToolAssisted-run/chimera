@@ -8,6 +8,7 @@
  */
 
 #include "chimera/engine.h"
+#include <cstdlib>
 
 #include "movie_entry.hpp"
 #include "file_io.hpp"
@@ -283,6 +284,17 @@ bool composeSettings(const std::string &defaultsJson, const char *overrides, std
 /* source/engine/source/gl_bridge.cpp - present in every build; a build without
  * CE_GL_BRIDGE answers that it has no context and nothing here happens. */
 extern "C" int32_t ce_gl_start(char *error_out, int32_t error_len);
+extern "C" uintptr_t ce_cache_dispatch(uintptr_t op, uintptr_t a, uintptr_t b, uintptr_t c, uintptr_t d, uintptr_t e);
+
+/* precompile sessions: asked for before open, like the GPU */
+static int32_t s_precompileIndex = 0, s_precompileCount = 0, s_precompileFirmware = 1;
+
+extern "C" void ce_precompile_request(int32_t index, int32_t count, int32_t firmware_too)
+{
+	s_precompileIndex = index;
+	s_precompileCount = count;
+	s_precompileFirmware = firmware_too;
+}
 extern "C" const char *ce_gl_description(void);
 extern "C" int32_t ce_gl_requested(void);
 extern "C" void ce_gl_release(void);
@@ -296,6 +308,10 @@ struct ce_session
 	bool active = false;
 	/* a GPU outside the sandbox drew this session's pictures */
 	bool gpuDrew = false;
+	/* the compile cache and precompile sessions (optional exports) */
+	bool precompile = false;
+	uintptr_t fnCacheStored = 0, fnCacheFetched = 0;
+	uintptr_t fnPrecompileDone = 0, fnPrecompileDoneCount = 0, fnPrecompileTotal = 0;
 
 	// the mounted byte sources must outlive the mounts
 	std::vector<uint8_t> wbxBytes, romBytes, romNameBytes;
@@ -352,6 +368,21 @@ struct ce_session
 	// dynamic video size: a DOS machine changes modes; the guest reports the
 	// live frame size (clamped to the config's buffer) through optional
 	// exports, and the config's width/height stay the buffer's capacity
+	/* CHIMERA_TRACE=<n>: every n frames, the machine's own numbers on stderr.
+	 * The per-core diagnostic runners print a line of exactly this shape, so a
+	 * machine that misbehaves under the frontend and behaves under the runner
+	 * can be diffed on one machine instead of guessed at from two. Everything
+	 * here is an optional export; a core that answers nothing prints dashes. */
+	int32_t traceEvery = 0;
+	int64_t traceFrame = 0, traceLag = 0, traceTtySeen = 0;
+	int32_t (*traceThreads)() = nullptr;
+	int32_t (*traceRunning)() = nullptr;
+	uint64_t (*traceDigest)() = nullptr;
+	uint64_t (*traceTimeNs)() = nullptr;
+	uintptr_t (*traceTty)() = nullptr;
+	int64_t (*traceTtySize)() = nullptr;
+	void trace(int32_t lag, int32_t render);
+
 	int32_t (*getVideoWidth)() = nullptr;
 	int32_t (*getVideoHeight)() = nullptr;
 	int32_t vidW = 0, vidH = 0;
@@ -495,6 +526,13 @@ void ce_session::probeOptionalGroups()
 	/* which declared controls this machine has (see buttonActive). Each is
 	 * optional on its own: a core whose ports change only its buttons need not
 	 * answer for its axes. */
+	/* the compile cache's counters and the precompile session's progress */
+	fnCacheStored = opt("GetCacheStored", 0);
+	fnCacheFetched = opt("GetCacheFetched", 0);
+	fnPrecompileDone = opt("IsPrecompileDone", 0);
+	fnPrecompileDoneCount = opt("GetPrecompileDone", 0);
+	fnPrecompileTotal = opt("GetPrecompileTotal", 0);
+
 	/* the drive lights, all three or none: a count with no way to read a light
 	 * is a status bar with dead icons on it */
 	{
@@ -715,6 +753,54 @@ void ce_session::copyVideo()
 	}
 }
 
+/* One line per traceEvery frames, on stderr, cheap enough to leave in a
+ * release build because it costs nothing until the variable is set. The video
+ * checksum is what tells a black picture apart from a missing one: a machine
+ * drawing a dark scene still moves it. */
+void ce_session::trace(int32_t lag, int32_t render)
+{
+	traceFrame++;
+	if (lag != 0) traceLag++;
+	if (traceEvery <= 0) return;
+	if (traceTty != nullptr && traceTtySize != nullptr)
+	{
+		const int64_t n = traceTtySize();
+		const auto *text = reinterpret_cast<const uint8_t *>(traceTty());
+		if (text != nullptr && n > traceTtySeen)
+		{
+			fwrite(text + traceTtySeen, 1, static_cast<size_t>(n - traceTtySeen), stderr);
+			traceTtySeen = n;
+		}
+		else if (n < traceTtySeen)
+		{
+			traceTtySeen = n; // a state load rewound the machine's own log
+		}
+	}
+	if ((traceFrame % traceEvery) != 0) return;
+	uint64_t vsum = 0;
+	uint64_t vlit = 0;
+	if (render != 0)
+	{
+		const size_t px = static_cast<size_t>(vidW) * static_cast<size_t>(vidH);
+		for (size_t i = 0; i < px && i < videoBuf.size(); i++)
+		{
+			const uint32_t p = videoBuf[i];
+			vsum = vsum * 131 + p;
+			if ((p & 0x00FFFFFFu) != 0) vlit++;
+		}
+	}
+	fprintf(stderr,
+		"[trace] frame %lld lag %lld threads %d running %d time %llums digest %016llx "
+		"video %dx%d sum %016llx lit %llu audio %d\n",
+		(long long)traceFrame, (long long)traceLag,
+		traceThreads != nullptr ? traceThreads() : -1,
+		traceRunning != nullptr ? traceRunning() : -1,
+		(unsigned long long)(traceTimeNs != nullptr ? traceTimeNs() / 1000000ull : 0ull),
+		(unsigned long long)(traceDigest != nullptr ? traceDigest() : 0ull),
+		vidW, vidH, (unsigned long long)vsum, (unsigned long long)vlit, sampleCount);
+	fflush(stderr);
+}
+
 /* Turbo. A frame nobody is going to look at does not need to be drawn, and for
  * a machine with a 3D chip in it the drawing is most of the frame. The core is
  * asked to stop producing a picture; it must go on being exactly the machine it
@@ -754,7 +840,9 @@ int32_t ce_session::advanceCore(const uint8_t *buttons, int32_t render)
 	}
 	sampleCount = nsamp;
 	frame++;
-	return inputWasRead != nullptr && inputWasRead() == 0 ? 1 : 0;
+	const int32_t lag = inputWasRead != nullptr && inputWasRead() == 0 ? 1 : 0;
+	trace(lag, render);
+	return lag;
 }
 
 void ce_session::greenzoneCapture()
@@ -990,7 +1078,16 @@ ce_session *ce_session_open(
 	 * fails the core draws the way it draws without a GPU, which is the
 	 * deterministic way, and the session simply does not claim otherwise.
 	 */
-	if (ce_gl_requested() != 0)
+	/* CHIMERA_NO_GPU=1 refuses the bridge for this run whatever the project
+	 * asked for. A core drawn by a GPU and a core drawn by nobody fail in
+	 * different ways, and telling them apart on a machine that is not here is
+	 * otherwise a rebuild away. */
+	const char *noGpu = getenv("CHIMERA_NO_GPU");
+	if (noGpu != nullptr && noGpu[0] != '\0' && noGpu[0] != '0')
+	{
+		fprintf(stderr, "chimera gl: refused by CHIMERA_NO_GPU\n");
+	}
+	else if (ce_gl_requested() != 0)
 	{
 		std::string ignored;
 		auto setBridge = reinterpret_cast<void (*)(uint64_t)>(
@@ -1024,6 +1121,36 @@ ce_session *ce_session_open(
 				fprintf(stderr, "chimera gl: %s\n", ce_gl_description());
 			}
 		}
+	}
+
+	/* The compile cache, before Init because Init is where a core first asks
+	 * for compiled objects. A core without the export keeps nothing. */
+	if (ce_cache_dir_get()[0] != 0)
+	{
+		std::string ignored;
+		auto setCache = reinterpret_cast<void (*)(uint64_t)>(s->proc("SetCacheBridge", 1, false, ignored));
+		if (setCache != nullptr)
+		{
+			chimera::WbxReturn r;
+			host->wbx_get_callback_addr(s->obj, reinterpret_cast<void *>(&ce_cache_dispatch), 1, &r);
+			if (!r.ok() || r.data == 0)
+				fprintf(stderr, "chimera cache: the sandbox would not take the callback\n");
+			else
+				setCache(static_cast<uint64_t>(r.data));
+		}
+	}
+
+	/* A precompile session: the core boots, compiles its share and stops. */
+	if (s_precompileCount > 0)
+	{
+		std::string ignored;
+		auto setPre = reinterpret_cast<void (*)(int32_t, int32_t, int32_t)>(s->proc("SetPrecompile", 3, false, ignored));
+		if (setPre == nullptr)
+		{
+			return abort(std::string(s->cfg.coreName) + ": this core has no precompile session");
+		}
+		setPre(s_precompileIndex, s_precompileCount, s_precompileFirmware);
+		s->precompile = true;
 	}
 
 	auto init = reinterpret_cast<int32_t (*)()>(s->proc("Init", 0, true, err));
@@ -1099,6 +1226,22 @@ ce_session *ce_session_open(
 		if (s->inputWasRead == nullptr) return abort(std::move(err));
 	}
 
+	/* the trace's optional exports, resolved only when someone asked for it */
+	if (const char *traceEnv = getenv("CHIMERA_TRACE"))
+	{
+		s->traceEvery = atoi(traceEnv);
+		if (s->traceEvery <= 0) s->traceEvery = 100;
+		s->traceThreads = reinterpret_cast<int32_t (*)()>(s->proc("GetThreadCount", 0, false, err));
+		s->traceRunning = reinterpret_cast<int32_t (*)()>(s->proc("IsRunning", 0, false, err));
+		s->traceDigest = reinterpret_cast<uint64_t (*)()>(s->proc("GetMainMemoryDigest", 0, false, err));
+		s->traceTimeNs = reinterpret_cast<uint64_t (*)()>(s->proc("GetMachineTimeNs", 0, false, err));
+		s->traceTty = reinterpret_cast<uintptr_t (*)()>(s->proc("GetTty", 0, false, err));
+		s->traceTtySize = reinterpret_cast<int64_t (*)()>(s->proc("GetTtySize", 0, false, err));
+		err.clear(); // every one of them is allowed to be absent
+		fprintf(stderr, "[trace] every %d frames\n", s->traceEvery);
+		fflush(stderr);
+	}
+
 	/* memory domains are self-described post-Init (size can depend on settings) */
 	s->mdCount = reinterpret_cast<int32_t (*)()>(s->proc("GetMemoryDomainCount", 0, true, err));
 	s->mdName = reinterpret_cast<uintptr_t (*)(int32_t)>(s->proc("GetMemoryDomainName", 1, true, err));
@@ -1120,6 +1263,11 @@ ce_session *ce_session_open(
 
 void ce_session_free(ce_session *s)
 {
+	if (s != nullptr && ce_cache_dir_get()[0] != 0 && (s->fnCacheStored != 0 || s->fnCacheFetched != 0))
+	{
+		fprintf(stderr, "chimera cache: %llu stored, %llu fetched\n",
+			(unsigned long long)ce_session_cache_stored(s), (unsigned long long)ce_session_cache_fetched(s));
+	}
 	if (s == nullptr) return;
 	if (s->movie != nullptr) ce_movie_log_free(s->movie);
 	if (s->obj != nullptr)
@@ -1248,7 +1396,9 @@ int32_t ce_session_frame_advance(ce_session *s, uint64_t buttons, int32_t render
 	/* The frame is over and the caller draws next: whatever GL context the
 	 * bridge borrowed goes back before it does. */
 	ce_gl_release();
-	return s->inputWasRead != nullptr && s->inputWasRead() == 0 ? 1 : 0;
+	const int32_t lag = s->inputWasRead != nullptr && s->inputWasRead() == 0 ? 1 : 0;
+	s->trace(lag, render);
+	return lag;
 }
 
 const uint32_t *ce_session_video(const ce_session *s) { return s->videoBuf.data(); }
@@ -1861,3 +2011,44 @@ int32_t ce_session_seek(ce_session *s, int64_t frame)
 }
 
 } // extern "C"
+
+/* ---- the compile cache and precompile sessions -------------------------- */
+
+extern "C" uint64_t ce_session_cache_stored(const ce_session *s)
+{
+	if (s == nullptr || s->fnCacheStored == 0) return 0;
+	return reinterpret_cast<uint64_t (*)()>(s->fnCacheStored)();
+}
+
+extern "C" uint64_t ce_session_cache_fetched(const ce_session *s)
+{
+	if (s == nullptr || s->fnCacheFetched == 0) return 0;
+	return reinterpret_cast<uint64_t (*)()>(s->fnCacheFetched)();
+}
+
+extern "C" int32_t ce_session_precompile_done(const ce_session *s)
+{
+	if (s == nullptr || !s->precompile || s->fnPrecompileDone == 0) return -1;
+	return reinterpret_cast<int32_t (*)()>(s->fnPrecompileDone)() ? 1 : 0;
+}
+
+extern "C" int32_t ce_session_precompile_progress(const ce_session *s, uint32_t *done_out, uint32_t *total_out)
+{
+	if (s == nullptr || !s->precompile || s->fnPrecompileDoneCount == 0 || s->fnPrecompileTotal == 0) return -1;
+	const uint32_t done = reinterpret_cast<uint32_t (*)()>(s->fnPrecompileDoneCount)();
+	const uint32_t total = reinterpret_cast<uint32_t (*)()>(s->fnPrecompileTotal)();
+	if (done_out) *done_out = done;
+	if (total_out) *total_out = total;
+	/* Said here, on the same stream the object lines use: whoever started this
+	 * session is watching it, and a caller's own writes may sit in a buffer
+	 * this one does not control. */
+	static uint32_t lastDone = UINT32_MAX, lastTotal = UINT32_MAX;
+	if (done != lastDone || total != lastTotal)
+	{
+		lastDone = done;
+		lastTotal = total;
+		printf("Precompiled %u/%u modules\n", done, total);
+		fflush(stdout);
+	}
+	return 0;
+}

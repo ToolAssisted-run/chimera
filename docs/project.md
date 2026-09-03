@@ -31,6 +31,11 @@ themselves, which are named by their SHA1:
   concept; the engine's `ce_multifile_*` code evolves into this section,
   and headless descriptors remain available during the transition.
 - **Firmware**: resolved at creation, pinned by hash.
+- **Compiled code**: for a core that translates the machine's code before
+  running it, the list of objects it compiled for this game - names and
+  SHA1s, never the files, which regenerate from the game and the package
+  (docs/compile-cache.md). The wizard will not create a project until they
+  all exist.
 - **Settings**: defined once, in the creation wizard. There is ONE kind
   of setting: every setting shapes the machine, so all of them are part
   of the reproduction contract. (The BizHawk lineage's "settings"

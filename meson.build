@@ -264,6 +264,7 @@ shared_library(
 engine_inc = include_directories('source/engine/include')
 engine_src = files(
   'source/engine/source/engine.cpp',
+  'source/engine/source/cache_bridge.cpp',
   'source/engine/source/movie_log.cpp',
   'source/engine/source/movie_text.cpp',
   'source/engine/source/state_container.cpp',
@@ -291,6 +292,7 @@ if engine_commit == ''
   engine_commit = 'unknown'
 endif
 engine_build_args = [
+  '-I' + repo_root / 'extern/tools/chimera-common-minibox/source/cache',
   '-DCE_BUILD_COMMIT="' + engine_commit + '"',
   '-DCE_BUILD_COMPILER="' + meson.get_compiler('cpp').get_id() + ' ' + meson.get_compiler('cpp').version() + '"',
   '-DCE_BUILD_OS="' + minibox_build_os + '"',

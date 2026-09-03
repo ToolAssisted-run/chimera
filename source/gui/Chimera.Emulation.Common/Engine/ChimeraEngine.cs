@@ -301,6 +301,12 @@ namespace Chimera.Emulation.Common.Engine
 		public abstract int ce_project_set_firmware_text(IntPtr project, string json, ref IntPtr errorOut);
 
 		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_project_core_cache_text(IntPtr project, ref ulong lenOut);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract int ce_project_set_core_cache_text(IntPtr project, string json, ref IntPtr errorOut);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_project_log_text(IntPtr project, ref ulong lenOut);
 
 		[ChimeraImport(CallingConvention.Cdecl)]
@@ -486,6 +492,26 @@ namespace Chimera.Emulation.Common.Engine
 
 		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract void ce_gl_request(int want);
+
+		// the compile cache and precompile sessions (docs: a core's compiled
+		// objects, kept on the host; never machine state)
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract void ce_cache_dir([MarshalAs(UnmanagedType.LPUTF8Str)] string dir);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract void ce_precompile_request(int index, int count, int firmwareToo);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract ulong ce_session_cache_stored(IntPtr session);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract ulong ce_session_cache_fetched(IntPtr session);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract int ce_session_precompile_done(IntPtr session);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract int ce_session_precompile_progress(IntPtr session, out uint done, out uint total);
 
 		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_gl_available();
@@ -1160,6 +1186,31 @@ namespace Chimera.Emulation.Common.Engine
 			}
 		}
 
+		/// <summary>
+		/// What the core compiled for this game: [{name, sha1}], one per object
+		/// (docs/compile-cache.md). Not the files, which regenerate; the list, so
+		/// that opening the project later can check it is the same compiled code.
+		/// </summary>
+		public string CoreCacheJson
+		{
+			get
+			{
+				ulong len = 0;
+				var p = ChimeraEngine.Instance.ce_project_core_cache_text(_project, ref len);
+				return ChimeraEngine.PtrToStringUtf8(p, len);
+			}
+		}
+
+		/// <exception cref="InvalidOperationException">not a JSON array</exception>
+		public void SetCoreCacheJson(string json)
+		{
+			var error = IntPtr.Zero;
+			if (ChimeraEngine.Instance.ce_project_set_core_cache_text(_project, json, ref error) is not 0)
+			{
+				throw new InvalidOperationException(ChimeraEngine.PtrToStringUtf8(error) ?? "bad coreCache");
+			}
+		}
+
 		/// <exception cref="InvalidOperationException">not a JSON array</exception>
 		public void SetFirmwareJson(string json)
 		{
@@ -1348,6 +1399,12 @@ namespace Chimera.Emulation.Common.Engine
 	/// the frontend's adapter. Frame data crosses as borrowed pointers the
 	/// caller copies out of before the next advance.
 	/// </summary>
+	/// <summary>
+	/// A precompile session: worker Index of Count; FirmwareToo sweeps the
+	/// firmware's libraries as well as the game's directories.
+	/// </summary>
+	public sealed record PrecompileRequest(int Index, int Count, bool FirmwareToo);
+
 	public sealed class EngineSession : IDisposable
 	{
 		private IntPtr _session;
@@ -1377,7 +1434,9 @@ namespace Chimera.Emulation.Common.Engine
 			string packagePath, byte[]? rom, string? romPath, string? settingsOverridesJson,
 			IReadOnlyDictionary<string, byte[]>? firmware,
 			IReadOnlyList<CoreFile>? extraFiles = null,
-			bool wantGpu = false)
+			bool wantGpu = false,
+			string cacheDir = null,
+			PrecompileRequest precompile = null)
 		{
 			var count = firmware?.Count ?? 0;
 			var ids = new IntPtr[Math.Max(count, 1)];
@@ -1425,6 +1484,10 @@ namespace Chimera.Emulation.Common.Engine
 				}
 				// a global switch, not a per-session one, so it is set every time
 				ChimeraEngine.Instance.ce_gl_request(wantGpu ? 1 : 0);
+				// the compile cache directory for this core and package (empty:
+				// none), and whether this session precompiles instead of running
+				ChimeraEngine.Instance.ce_cache_dir(cacheDir ?? "");
+				ChimeraEngine.Instance.ce_precompile_request(precompile?.Index ?? 0, precompile?.Count ?? 0, precompile?.FirmwareToo == true ? 1 : 0);
 				var error = IntPtr.Zero;
 				var session = ChimeraEngine.Instance.ce_session_open(
 					packagePath, rom, (ulong)(rom?.LongLength ?? 0), romPath, settingsOverridesJson,
@@ -1502,6 +1565,25 @@ namespace Chimera.Emulation.Common.Engine
 		public bool AxisActive(int index) => E.ce_session_axis_active(_session, index) is not 0;
 
 		/// <returns>true when the frame was a lag frame</returns>
+		/// <summary>Objects this session's core stored into the compile cache.</summary>
+		public ulong CacheStored => ChimeraEngine.Instance.ce_session_cache_stored(_session);
+
+		/// <summary>Objects this session's core fetched from the compile cache.</summary>
+		public ulong CacheFetched => ChimeraEngine.Instance.ce_session_cache_fetched(_session);
+
+		/// <summary>For a precompile session: whether the core has finished compiling its share.</summary>
+		public bool PrecompileDone => ChimeraEngine.Instance.ce_session_precompile_done(_session) == 1;
+
+		/// <summary>For a precompile session: module parts done and in total, for a progress bar.</summary>
+		public (uint Done, uint Total) PrecompileProgress
+		{
+			get
+			{
+				if (ChimeraEngine.Instance.ce_session_precompile_progress(_session, out var done, out var total) != 0) return (0, 0);
+				return (done, total);
+			}
+		}
+
 		public bool FrameAdvance(ulong buttons, bool render)
 			=> E.ce_session_frame_advance(_session, buttons, render ? 1 : 0) is not 0;
 

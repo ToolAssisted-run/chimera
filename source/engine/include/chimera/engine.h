@@ -454,6 +454,11 @@ CE_API int32_t ce_project_set_settings_text(ce_project *p, const char *json, con
 /* The firmware pins, as a JSON array carried verbatim (the firmware
  * channel's record: id + SHA1 entries). Borrowed as above; the setter
  * rejects anything that does not parse as a JSON array. */
+/* What the core compiled for this game: a JSON array of {name, sha1}, one per
+ * cached object (docs/compile-cache.md). Regenerable from the same rom and
+ * package, recorded so a later open can check it is the same compiled code. */
+CE_API const char *ce_project_core_cache_text(ce_project *p, uint64_t *len_out);
+CE_API int32_t ce_project_set_core_cache_text(ce_project *p, const char *json, const char **error_out);
 CE_API const char *ce_project_firmware_text(ce_project *p, uint64_t *len_out);
 CE_API int32_t ce_project_set_firmware_text(ce_project *p, const char *json, const char **error_out);
 
@@ -719,6 +724,38 @@ CE_API const char *ce_gl_description(void);
  * guest code by some other route can call it too. Harmless with no bridge, no
  * context, or nothing borrowed. */
 CE_API void ce_gl_release(void);
+
+/* ---------------------------------------------------------------------------
+ * The compile cache. A core that recompiles its machine's code keeps the
+ * compiled objects between sessions in a directory the host owns: an object
+ * is a pure function of the module, the core package and the target CPU, so a
+ * warm run is a cold run minus the compile, and nothing about determinism,
+ * movies or projects depends on whether the cache was warm. The contract is
+ * miniBox's source/cache/cache-bridge.h; a core that keeps such files exports
+ * SetCacheBridge and receives the dispatcher before Init.
+ */
+/* The directory for the sessions opened after this call (NULL: none). The
+ * caller names it by core and package identity; the engine creates it and
+ * keeps whatever the core names under it, relative paths only. */
+CE_API void ce_cache_dir(const char *dir);
+CE_API const char *ce_cache_dir_get(void);
+/* Objects stored into and fetched from the cache by this session's core. */
+CE_API uint64_t ce_session_cache_stored(const ce_session *s);
+CE_API uint64_t ce_session_cache_fetched(const ce_session *s);
+
+/* ---------------------------------------------------------------------------
+ * Precompile sessions. A core that can fill its compile cache without running
+ * exports SetPrecompile(index, count, firmware_too): the session boots, never
+ * runs, compiles every module part whose name hashes to its index (so several
+ * sessions side by side, in separate processes, each compile a share), and
+ * reports when it is done. The caller pumps ce_session_frame_advance until
+ * ce_session_precompile_done and reads the progress for its bar.
+ */
+/* Sessions opened after this call are precompile sessions (count 0: off). */
+CE_API void ce_precompile_request(int32_t index, int32_t count, int32_t firmware_too);
+/* -1 when this session is no precompile session or the core has none. */
+CE_API int32_t ce_session_precompile_done(const ce_session *s);
+CE_API int32_t ce_session_precompile_progress(const ce_session *s, uint32_t *done_out, uint32_t *total_out);
 CE_API int64_t ce_session_button_count(const ce_session *s);
 CE_API const char *ce_session_button_name(const ce_session *s, int64_t index);
 CE_API int64_t ce_session_axis_count(const ce_session *s);

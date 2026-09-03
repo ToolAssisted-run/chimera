@@ -41,6 +41,12 @@ namespace Chimera.Emulation.Common.Waterbox
 
 		public bool Deterministic { get; set; } = true;
 
+		/// <summary>
+		/// The core can fill its compile cache without running (it exports
+		/// SetPrecompile): the frontend precompiles a rom before its first boot.
+		/// </summary>
+		public bool Precompile { get; set; }
+
 		/// <summary>Guest heap sizes in MiB, in order: sbrk, sealed, invis, plain, mmap.</summary>
 		public uint[] MemoryLayoutMiB { get; set; }
 

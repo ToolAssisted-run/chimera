@@ -28,7 +28,7 @@ namespace Chimera.Emulation.Common.Waterbox
 		author: "miniBox",
 		portedVersion: "1.0.0",
 		portedUrl: "https://github.com/SergioMartin86/miniBox")]
-	public sealed partial class WaterboxCore : IEmulator, IVideoProvider, ISoundProvider, IStatable, IInputPollable, IGpuRendered,
+	public sealed partial class WaterboxCore : IEmulator, IVideoProvider, ISoundProvider, IStatable, IInputPollable, IGpuRendered, ICorePrecompile,
 		ICoreIdentity, ISettable<WaterboxCoreSettings>, IDriveLights
 	{
 		/// <summary>
@@ -86,6 +86,30 @@ namespace Chimera.Emulation.Common.Waterbox
 		/// mounts it and the machine reads it from there, so nothing is loaded.
 		/// A disc image is routinely bigger than a byte[] can be.
 		/// </param>
+		/// <summary>
+		/// The root under which every core keeps the code it compiled for a game
+		/// (the frontend sets it from its paths); empty means none. A core's own
+		/// directory is named by core and package version below it.
+		/// </summary>
+		public static string CoreCacheRoot { get; set; } = "";
+
+		/// <summary>The precompile session the next core opens as (null: a normal run).</summary>
+		public static PrecompileRequest PrecompileRequest { get; set; }
+
+		/// <summary>
+		/// One directory per core and package version: a different build of the
+		/// package generates different code, so it must not read the old one's.
+		/// </summary>
+		public static string CoreCacheDirectoryFor(string cacheRoot, string coreName, string coreVersion)
+		{
+			if (string.IsNullOrEmpty(cacheRoot)) return null;
+			static string Safe(string s) => string.Concat((s ?? "").Select(c => char.IsLetterOrDigit(c) || c is '-' or '_' or '.' ? c : '_'));
+			return Path.Combine(cacheRoot, Safe(coreName), Safe(string.IsNullOrEmpty(coreVersion) ? "dev" : coreVersion));
+		}
+
+		public static string CoreCacheDirectoryFor(WaterboxConfig cfg)
+			=> cfg.Precompile ? CoreCacheDirectoryFor(CoreCacheRoot, cfg.CoreName, cfg.Version) : null;
+
 		public WaterboxCore(byte[] rom, string romPath, WaterboxConfig cfg, string packageDir, WaterboxCoreSettings settings = null, IReadOnlyDictionary<string, byte[]> firmware = null, IReadOnlyList<CoreFile> extraFiles = null)
 		{
 			_cfg = cfg;
@@ -121,7 +145,9 @@ namespace Chimera.Emulation.Common.Waterbox
 				var effective = EffectiveSettings();
 				_session = EngineSession.Open(
 					packageDir, rom, romPath, SerializeSettings(effective), firmware, extraFiles,
-					wantGpu: WantsGpu(effective));
+					wantGpu: WantsGpu(effective),
+					cacheDir: CoreCacheDirectoryFor(cfg),
+					precompile: PrecompileRequest);
 			}
 			catch (InvalidOperationException ex)
 			{
@@ -328,6 +354,12 @@ namespace Chimera.Emulation.Common.Waterbox
 		/// Empty when none did, which is every ordinary run.
 		/// </summary>
 		public string GpuRenderer => _session.GpuDescription;
+
+		// ICorePrecompile: only meaningful when the core was opened as a precompile session
+		public bool PrecompileDone => _session.PrecompileDone;
+		public (uint Done, uint Total) PrecompileProgress => _session.PrecompileProgress;
+		public ulong CacheStored => _session.CacheStored;
+		public ulong CacheFetched => _session.CacheFetched;
 
 		public void ResetCounters()
 		{

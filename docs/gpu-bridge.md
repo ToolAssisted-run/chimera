@@ -118,11 +118,36 @@ rest of the session. The symptom is a pitch black screen with working sound and
 no OSD, and it is what Windows did the first time this ran against a real
 display.
 
+## Telling the two failures apart
+
+A core drawn by a GPU and a core drawn by nobody fail differently, and on a
+machine that is not here the difference is otherwise a rebuild away. Two
+environment variables answer it without one:
+
+- `CHIMERA_NO_GPU=1` refuses the bridge for the run whatever the project asked
+  for. The engine says `chimera gl: refused by CHIMERA_NO_GPU`, the core draws
+  in software or not at all, and everything else about the machine is
+  unchanged.
+- `CHIMERA_TRACE=<n>` prints the machine's own numbers on stderr every n
+  frames: cumulative lag, thread count, whether it is running, machine time,
+  the main-memory digest, the frame size, a checksum of the picture the engine
+  received and how many pixels of it were not black. The per-core diagnostic
+  runners print a line of the same shape, so a machine that misbehaves under
+  the frontend and behaves under the runner can be diffed on one machine
+  instead of guessed at from two. It also forwards whatever the machine wrote
+  to its own TTY.
+
+A black picture with a moving digest and a checksum that changes is a picture
+lost above the engine; a black picture with a still digest is a machine that
+stopped.
+
 ## What is not proven
 
 - **Hardware.** Every measurement so far is on a machine with no GPU, against
   llvmpipe; a real driver should do better, and nobody has checked.
-- **Windows.** The host half builds against WGL and has never been run.
+- **Windows.** The host half builds against WGL and makes a real context on a
+  real driver (`4.6.0 NVIDIA 581.42`, GTX 1060, 2026-09-02); no frame drawn
+  through it has been seen on a screen there yet.
 - **Readback.** A game that reads rendered pixels into machine state would feed
   GPU output into the savestate, and that is where a desync stops being a
   possibility and becomes a certainty.

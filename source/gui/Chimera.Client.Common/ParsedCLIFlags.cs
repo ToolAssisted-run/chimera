@@ -48,6 +48,9 @@ namespace Chimera.Client.Common
 
 		public readonly string? cmdCorePackage;
 
+		/// <summary>"INDEX/COUNT[/game]": run as a precompile session (docs: the compile cache), then exit</summary>
+		public readonly string? cmdPrecompile;
+
 		public ParsedCLIFlags(
 			string? cmdConfigFile,
 			string? cmdMovie,
@@ -68,7 +71,8 @@ namespace Chimera.Client.Common
 			ProtocolType socketProtocol,
 			IReadOnlyList<(string Key, string Value)>? userdataUnparsedPairs,
 			string? cmdRom,
-			string? cmdCorePackage)
+			string? cmdCorePackage,
+			string? cmdPrecompile = null)
 		{
 			this.cmdConfigFile = cmdConfigFile;
 			this.cmdMovie = cmdMovie;
@@ -90,6 +94,7 @@ namespace Chimera.Client.Common
 			UserdataUnparsedPairs = userdataUnparsedPairs;
 			this.cmdRom = cmdRom;
 			this.cmdCorePackage = cmdCorePackage;
+			this.cmdPrecompile = cmdPrecompile;
 		}
 	}
 }

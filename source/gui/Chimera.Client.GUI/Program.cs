@@ -106,7 +106,7 @@ namespace Chimera.Client.GUI
 		private static int SubMain(string[] args)
 		{
 			// raw scan, not ArgParser: several dialogs below can fire before arguments are parsed
-			if (Array.IndexOf(args, "--headless") >= 0) HeadlessMode.Enabled = true;
+			if (Array.IndexOf(args, "--headless") >= 0 || Array.Exists(args, a => a.StartsWith("--precompile", StringComparison.Ordinal))) HeadlessMode.Enabled = true;
 
 			// this check has to be done VERY early.  i stepped through a debug build with wrong .dll versions purposely used,
 			// and there was a TypeLoadException before the first line of SubMain was reached (some static ColorType init?)

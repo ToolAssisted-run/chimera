@@ -25,6 +25,7 @@ using Chimera.Common.StringExtensions;
 using Chimera.Client.Common;
 
 using Chimera.Emulation.Common;
+using Chimera.Emulation.Common.Waterbox;
 
 using Chimera.Client.GUI.ToolExtensions;
 using Chimera.Client.GUI.CoreExtensions;
@@ -408,6 +409,23 @@ namespace Chimera.Client.GUI
 			// What is in Cores/ is only LISTED here - opening a core is something you do,
 			// like opening a rom (File > Open Core). The scan runs in the constructor
 			// because the commandline load a few lines below needs the list to exist.
+			// The compile cache (docs: a core's compiled objects, kept between
+			// sessions under the Compile Cache path). A precompile session is this
+			// same frontend as a child process; it installs no hook of its own.
+			WaterboxCore.CoreCacheRoot = Config.PathEntries.CoreCacheAbsolutePath();
+			if (_argParser.cmdPrecompile is { } precompileSpec)
+			{
+				var parts = precompileSpec.Split('/');
+				var preIndex = -1;
+				var preCount = 0;
+				if (parts.Length >= 2) { int.TryParse(parts[0], out preIndex); int.TryParse(parts[1], out preCount); }
+				if (preIndex < 0 || preCount < 1 || preIndex >= preCount)
+				{
+					Console.Error.WriteLine($"bad --precompile {precompileSpec} (want INDEX/COUNT[/game])");
+					Environment.Exit(2);
+				}
+				WaterboxCore.PrecompileRequest = new(preIndex, preCount, FirmwareToo: !parts.Skip(2).Contains("game"));
+			}
 			ScanForCorePackages();
 			// the menus built at construction time predate the packages
 
@@ -438,6 +456,35 @@ namespace Chimera.Client.GUI
 					if (Game.IsNullInstance())
 					{
 						ShowMessageBox(owner: null, $"Failed to load {_argParser.cmdRom} specified on commandline");
+					}
+					else if (WaterboxCore.PrecompileRequest is { } request)
+					{
+						// a precompile session: pump the core until it has compiled
+						// its share, one progress line per change, then leave
+						if (!Emulator.ServiceProvider.HasService<ICorePrecompile>())
+						{
+							Console.Error.WriteLine($"{Emulator.Attributes().CoreName} has no precompile session");
+							Environment.Exit(3);
+						}
+						var pre = Emulator.AsPrecompile();
+						// A redirected stdout is block-buffered, and a progress line
+						// held until the process exits is not progress: whoever
+						// started this session is watching for these.
+						Console.SetOut(new StreamWriter(Console.OpenStandardOutput()) { AutoFlush = true });
+						Console.Error.WriteLine($"precompile session {request.Index} of {request.Count}: cache {WaterboxCore.CoreCacheRoot}");
+						uint lastDone = uint.MaxValue;
+						while (!pre.PrecompileDone)
+						{
+							Emulator.FrameAdvance(InputManager.ControllerOutput, false, false);
+							var (done, total) = pre.PrecompileProgress;
+							if (done != lastDone) { Console.WriteLine($"Precompiled {done}/{total} modules"); lastDone = done; }
+						}
+						var (fdone, ftotal) = pre.PrecompileProgress;
+						Console.WriteLine($"Precompiled {fdone}/{ftotal} modules");
+						Console.WriteLine($"precompile session {request.Index} of {request.Count}: {pre.CacheStored} objects stored, {pre.CacheFetched} fetched");
+						// leave the way a script does: the run loop closes the window
+						// and the process exits with its code, nothing torn down early
+						_exitRequestPending = true;
 					}
 				}
 			}
@@ -1523,6 +1570,21 @@ namespace Chimera.Client.GUI
 				GenericCoreSubMenu.DropDownItems.Add(firmwareMenuItem);
 			}
 
+			// What this core has compiled for games so far (docs/compile-cache.md).
+			// Emptying it is the only action: filling it belongs to the wizard,
+			// where a project is not created until its game is compiled.
+			if (CoreRegistry.Instance.AllFactories.OfType<WaterboxCoreFactory>().FirstOrDefault(f => f.Config.Precompile) is { } precompiling
+				&& WaterboxCore.CoreCacheDirectoryFor(precompiling.Config) is { } cacheDir)
+			{
+				var mb = PrecompileOrchestrator.CacheBytes(cacheDir) / (1024.0 * 1024.0);
+				ToolStripMenuItem clearCacheMenuItem = new() { Text = $"&Clear Compiled Code ({mb:F0} MB)" };
+				clearCacheMenuItem.Click += (_, _) =>
+				{
+					if (ShowMessageBox2(owner: this, "Delete the code this core compiled for your games? Each project's game must be compiled again before it opens.", "Clear Compiled Code", EMsgBoxIcon.Question))
+						PrecompileOrchestrator.Clear(cacheDir);
+				};
+				GenericCoreSubMenu.DropDownItems.Add(clearCacheMenuItem);
+			}
 			if (Emulator.SystemId is VSystemID.Raw.NULL) return; // a core, but no machine running yet
 
 			// The way OUT for what this machine keeps (docs/save-data.md): present
