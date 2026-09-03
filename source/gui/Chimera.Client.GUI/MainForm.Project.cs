@@ -291,6 +291,17 @@ namespace Chimera.Client.GUI
 				project.Dispose();
 				return false;
 			}
+			// The firmware the project pins is looked up by hash, and the paths
+			// found are what the boot below mounts (Config.CoreFirmware). Without
+			// this the boot mounted only what this machine happened to remember,
+			// and a PS3 project whose config had not been saved since the wizard
+			// booted its disc with no system software at all: a machine that runs,
+			// polls nothing and draws nothing, with no word about why.
+			if (!VerifyFirmwarePins(project, local))
+			{
+				project.Dispose();
+				return false;
+			}
 
 			// The firmware the project pins is looked for by hash - in the Firmware
 			// folder, where this core last had it, and where this project's own

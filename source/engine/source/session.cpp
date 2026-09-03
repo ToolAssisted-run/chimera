@@ -1238,7 +1238,12 @@ ce_session *ce_session_open(
 		s->traceTty = reinterpret_cast<uintptr_t (*)()>(s->proc("GetTty", 0, false, err));
 		s->traceTtySize = reinterpret_cast<int64_t (*)()>(s->proc("GetTtySize", 0, false, err));
 		err.clear(); // every one of them is allowed to be absent
-		fprintf(stderr, "[trace] every %d frames\n", s->traceEvery);
+		fprintf(stderr, "[trace] every %d frames; %d firmware file(s)", s->traceEvery, firmware_count);
+		for (int32_t i = 0; i < firmware_count; i++)
+		{
+			fprintf(stderr, " %s=%llu", firmware_ids[i], (unsigned long long)firmware_lens[i]);
+		}
+		fprintf(stderr, "; rom %s\n", rom_path != nullptr ? rom_path : "(bytes)");
 		fflush(stderr);
 	}
 
@@ -1427,6 +1432,11 @@ const uint8_t *ce_session_save_state(ce_session *s, uint64_t *len_out)
 		return nullptr;
 	}
 	if (len_out != nullptr) *len_out = s->stateBuf.size();
+	if (s->traceEvery > 0)
+	{
+		fprintf(stderr, "[trace] save state: %zu bytes at frame %lld\n", s->stateBuf.size(), (long long)s->traceFrame);
+		fflush(stderr);
+	}
 	return s->stateBuf.data();
 }
 
@@ -1437,6 +1447,15 @@ int32_t ce_session_load_state(ce_session *s, const uint8_t *data, uint64_t len)
 	chimera::WbxReturn r{};
 	s->host->wbx_load_state(s->obj, streamRead, reinterpret_cast<uintptr_t>(&stream), &r); // see save re: no bracket
 	ce_gl_release(); /* a restore can run guest code, and guest code can draw */
+	if (s->traceEvery > 0)
+	{
+		fprintf(stderr, "[trace] load state: %llu bytes, %s, machine now: threads %d running %d digest %016llx\n",
+			(unsigned long long)len, r.ok() ? "ok" : r.errorMessage,
+			s->traceThreads != nullptr ? s->traceThreads() : -1,
+			s->traceRunning != nullptr ? s->traceRunning() : -1,
+			(unsigned long long)(s->traceDigest != nullptr ? s->traceDigest() : 0ull));
+		fflush(stderr);
+	}
 	if (!r.ok())
 	{
 		s->error = r.errorMessage;

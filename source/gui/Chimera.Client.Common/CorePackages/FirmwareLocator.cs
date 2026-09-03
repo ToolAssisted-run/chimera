@@ -36,8 +36,15 @@ namespace Chimera.Client.Common
 				? null
 				: index.FirstOrDefault(f => f.Sha1.Equals(decl.Sha1, StringComparison.OrdinalIgnoreCase));
 
-		/// <summary>files this large or larger are never firmware; hashing them would only hurt</summary>
-		public const long MaxBytes = 64 * 1024 * 1024;
+		/// <summary>
+		/// Files this large or larger are never firmware; hashing them would only
+		/// hurt. The bar was 64 MiB, which is smaller than a PlayStation 3 system
+		/// software update (206 MB): no PS3 project could ever find its firmware
+		/// in the Firmware folder, nor by the path it remembered, since that
+		/// goes through the same index. A gigabyte is above every firmware a
+		/// core declares and below any disc image.
+		/// </summary>
+		public const long MaxBytes = 1024L * 1024 * 1024;
 
 		/// <summary>
 		/// Hashes every plausible file in the given directories (and any extra

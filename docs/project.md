@@ -182,7 +182,14 @@ than creation: each pin must be matched exactly, by hash, from the
 Firmware folder or the remembered paths - whichever file matches is
 what the session mounts - and a pin nothing satisfies takes a severe
 are-you-sure (different firmware is a different machine: expect
-desync) to get past.
+desync) to get past. "Plausible" is by size alone, and the bar is a
+gigabyte: a PS3 system software update is 206 MB and is firmware, and
+the bar it replaced (64 MiB) let no PS3 project ever find its own,
+while a disc image is bigger still. That check is also the one that
+does the mounting: for a while it existed but nothing called it, so a
+project whose config remembered no path booted its disc with no system
+software and no word about it - a machine that ran, polled nothing and
+drew nothing (2026-09-03).
 
 The declaration lives in a static file generated at core build time and
 shipped in the core package - the same pattern as `waterbox.config` for
