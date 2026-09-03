@@ -96,7 +96,11 @@ namespace Chimera.Client.GUI
 				ScrollSpeed = 6;
 				FollowCursorAlwaysScroll = false;
 				FollowCursorScrollMethod = "near";
-				AutosaveInterval = 120000;
+				// Thirty minutes. Two was the lineage's, and an autosave writes the
+				// whole project and its greenzone - seconds of pause on a PS2 or a
+				// DOS machine - so it should not come around before there is a
+				// stretch of work worth keeping (issue #34).
+				AutosaveInterval = 1800000;
 				AutosaveAsBackupFile = false;
 				BackupPerFileSave = false;
 				EditInvisibleColumns = true;
