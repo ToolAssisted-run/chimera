@@ -40,6 +40,7 @@
 #include "chimera/engine.h"
 
 #include <cstdio>   /* snprintf: both flavours report why there is no context */
+#include <cstdlib>
 
 #ifdef CE_GL_BRIDGE
 
@@ -315,6 +316,9 @@ extern "C" void ce_gl_release(void)
 	g_borrowed = false;
 }
 
+static uintptr_t ce_gl_dispatch_one(uintptr_t op, uintptr_t a, uintptr_t b,
+                                    uintptr_t c, uintptr_t d, uintptr_t e);
+
 extern "C" uintptr_t BRIDGE_ABI ce_gl_dispatch(uintptr_t op, uintptr_t a, uintptr_t b,
                                                uintptr_t c, uintptr_t d, uintptr_t e)
 {
@@ -327,7 +331,33 @@ extern "C" uintptr_t BRIDGE_ABI ce_gl_dispatch(uintptr_t op, uintptr_t a, uintpt
 		save_current();
 		bind_ours();
 		g_borrowed = true;
+		if (getenv("CHIMERA_GL_TRACE"))
+			fprintf(stderr, "[ce-gl] borrowed the context (GL_VERSION now %s)\n",
+				glGetString(GL_VERSION) ? (const char *)glGetString(GL_VERSION) : "(null)");
 	}
+	/* CHIMERA_GL_CHECK asks the driver, after every crossing, whether that call
+	 * upset it. Nothing else can: a core's renderer sees only what this hands
+	 * back, so a GL error raised out here is invisible to it and to the user -
+	 * the frame simply comes out empty, with nothing anywhere saying why. That
+	 * is how a whole class of bridge bugs hides, and this is how they are
+	 * found. Off unless asked for; a getenv per call is nothing beside a GL
+	 * call. */
+	if (getenv("CHIMERA_GL_CHECK"))
+	{
+		while (glGetError() != GL_NO_ERROR) { }
+		const uintptr_t rv = ce_gl_dispatch_one(op, a, b, c, d, e);
+		const GLenum err = glGetError();
+		if (err != GL_NO_ERROR)
+			fprintf(stderr, "[ce-gl!] op=%lu raised %#x\n", (unsigned long)op, (unsigned)err);
+		return rv;
+	}
+	return ce_gl_dispatch_one(op, a, b, c, d, e);
+}
+
+static uintptr_t ce_gl_dispatch_one(uintptr_t op, uintptr_t a, uintptr_t b,
+                                    uintptr_t c, uintptr_t d, uintptr_t e)
+{
+	(void)d; (void)e;
 
 	switch (op)
 	{

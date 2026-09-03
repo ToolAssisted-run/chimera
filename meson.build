@@ -321,7 +321,13 @@ if gl_bridge
       repo_root / 'extern/tools/chimera-common-minibox/source/gl/gen-gl-bridge.py',
       repo_root / 'extern/tools/glad/include/glad/gl.h',
       repo_root / 'extern/tools/chimera-common-minibox/source/gl/gl-entry-points.txt',
-      '@OUTDIR@'])
+      '@OUTDIR@'],
+    # the list and the generator are inputs: without saying so, appending an
+    # entry point leaves the host still answering the old numbering
+    depend_files: [
+      files('extern/tools/chimera-common-minibox/source/gl/gl-entry-points.txt'),
+      files('extern/tools/chimera-common-minibox/source/gl/gen-gl-bridge.py'),
+    ])
 
   gl_bridge_src = [gl_bridge_gen[0], files('extern/tools/glad/src/gl.c')]
   engine_build_args += ['-DCE_GL_BRIDGE',
