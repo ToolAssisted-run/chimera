@@ -97,5 +97,34 @@ namespace Chimera.Tests.Client.GUI
 			form.ProvideFirmware("bios", good);
 			Assert.IsTrue(form.CreateEnabled, "every requirement satisfied - Create returns");
 		}
-	}
+	
+		[TestMethod]
+		public void OptionalFirmwareDoesNotExistSoADiscMustAskForThePup()
+		{
+			// RPCS3 declared the PUP "required": false, meaning "homebrew boots
+			// without it". The engine has no such idea - firmware.cpp: "every
+			// applying entry is REQUIRED ... and optional firmware does not
+			// exist" - so the key was ignored, while the WIZARD honoured it and
+			// let a disc project through with no PUP chosen. The config then got
+			// no entry and every precompile session was refused at boot, silently.
+			// "only discs need this" is spelt requiredWhen, as every other core
+			// spells it.
+			const string decl = """
+				[ { "id": "PS3UPDAT.PUP", "name": "PS3UPDAT.PUP",
+				    "requiredWhen": { "slot": "game", "extension": "iso" } } ]
+				""";
+			string Slots(string file) =>
+				Newtonsoft.Json.JsonConvert.SerializeObject(
+					new Dictionary<string, string[]> { [ "game" ] = [ file ] });
+
+			var forDisc = Chimera.Emulation.Common.Engine.EngineFirmware.Evaluate(
+				decl, Slots("gta.iso"), "{}");
+			Assert.AreEqual(1, forDisc.Count, "a disc needs the system software");
+			Assert.AreEqual("PS3UPDAT.PUP", forDisc[0].Id);
+
+			var forHomebrew = Chimera.Emulation.Common.Engine.EngineFirmware.Evaluate(
+				decl, Slots("hello.elf"), "{}");
+			Assert.AreEqual(0, forHomebrew.Count, "homebrew boots without it");
+		}
+}
 }
