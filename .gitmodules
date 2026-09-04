@@ -92,3 +92,9 @@
 	path = extern/cores/dolphin
 	url = https://github.com/ToolAssisted-run/chimera-core-dolphin.git
 	branch = main
+[submodule "extern/cores/rpcs3"]
+	path = extern/cores/rpcs3
+	url = https://github.com/ToolAssisted-run/chimera-core-rpcs3.git
+[submodule "extern/cores/ruffle"]
+	path = extern/cores/ruffle
+	url = https://github.com/ToolAssisted-run/chimera-core-ruffle.git
