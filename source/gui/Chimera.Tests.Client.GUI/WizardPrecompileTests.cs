@@ -199,5 +199,53 @@ namespace Chimera.Tests.Client.GUI
 				Directory.Delete(dir, recursive: true);
 			}
 		}
+	
+	[TestMethod]
+	public void APathWithSpacesSurvivesTheTripToTheChild()
+	{
+		// The precompile bug: every session died at once on a game whose folder
+		// had a space. Quote() escaped EVERY backslash, so C:\my games\x.iso
+		// reached the child as C:\\my games\\x.iso, which does not exist.
+		// CommandLineToArgvW treats a backslash as special ONLY before a quote.
+		var quote = typeof(SelfProcess).GetMethod("Quote",
+			System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+		Assert.IsNotNull(quote, "Quote must exist to be tested");
+		string Q(string a) => (string)quote.Invoke(null, [ a ]);
+
+		Assert.AreEqual("\"C:\\my games\\x.iso\"", Q("C:\\my games\\x.iso"),
+			"separators inside a quoted path must not be doubled");
+		Assert.AreEqual("C:\\plain\\x.iso", Q("C:\\plain\\x.iso"),
+			"a path with no space needs no quoting at all");
+		Assert.AreEqual("\"--config=C:\\a b\\c.ini\"", Q("--config=C:\\a b\\c.ini"),
+			"a --flag=value pair quotes as one argument");
+		// a trailing run must double, or the closing quote stops being a delimiter
+		Assert.AreEqual("\"C:\\a b\\\\\"", Q("C:\\a b\\"),
+			"a trailing backslash run doubles so the quote still closes");
 	}
+
+	[TestMethod]
+	public void ASessionsRefusalIsCarriedBackToThePerson()
+	{
+		// The PS3 bug: RPCS3 declares PS3UPDAT.PUP "required": false, so the
+		// wizard's firmware page counted the need satisfied with no path, wrote
+		// nothing to the config, and every session was then refused at boot. The
+		// parent said so on Console.Error - which on Windows, from a GUI-subsystem
+		// process, goes nowhere. The person saw "the compile was stopped" and no
+		// reason anywhere. A refusal has to survive the trip back.
+		var line = typeof(PrecompileOrchestrator).GetNestedType("RefusalLine",
+			System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+		var rx = (System.Text.RegularExpressions.Regex)typeof(PrecompileOrchestrator)
+			.GetField("RefusalLine", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)
+			.GetValue(null);
+		var refusal = "[headless] text: RPCS3: a PS3 disc needs the system software (PS3UPDAT.PUP), and none was provided";
+		var m = rx.Match(refusal);
+		Assert.IsTrue(m.Success, "the modal a headless session could not show is what says why");
+		Assert.AreEqual(
+			"RPCS3: a PS3 disc needs the system software (PS3UPDAT.PUP), and none was provided",
+			m.Groups[1].Value);
+		// and the lines that are not refusals must not be mistaken for one
+		Assert.IsFalse(rx.IsMatch("[headless] caption: PS3 load error"));
+		Assert.IsFalse(rx.IsMatch("Precompiled 3/8 modules"));
+	}
+}
 }

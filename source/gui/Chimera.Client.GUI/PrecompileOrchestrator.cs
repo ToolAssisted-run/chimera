@@ -32,6 +32,19 @@ namespace Chimera.Client.GUI
 		private static readonly Regex ProgressLine = new(@"^Precompiled (\d+)/(\d+) modules", RegexOptions.Compiled);
 
 		/// <summary>
+		/// What a session said as it refused the job. A precompile session is a
+		/// headless frontend, so the thing that stopped it is a modal it could not
+		/// show: "[headless] text: ..." is that modal's words. Without this the
+		/// wizard can only say the compile stopped - and on Windows the parent is a
+		/// GUI-subsystem process whose Console.Error goes nowhere, so the reason
+		/// was invisible in every log.
+		/// </summary>
+		private static readonly Regex RefusalLine = new(@"^\[headless\] text: (.+)$", RegexOptions.Compiled);
+
+		/// <summary>Why the last Run returned null, in the words of whatever refused it; null when it succeeded.</summary>
+		public static string LastFailure { get; private set; }
+
+		/// <summary>
 		/// How many sessions run side by side. A session compiling a big game
 		/// peaks at several gigabytes - it holds a machine's address space and a
 		/// compiler at once - so this is bounded by memory as well as by cores:
@@ -142,16 +155,30 @@ namespace Chimera.Client.GUI
 			string packagePath, string configPath, string romPath, string romSha1, string cacheDir,
 			Action<Entry> onEntry, Action<uint, uint> onProgress, Func<bool> cancelled)
 		{
-			if (string.IsNullOrEmpty(romPath) || !File.Exists(romPath) || cacheDir is null) return null;
+			LastFailure = null;
+			if (string.IsNullOrEmpty(romPath) || !File.Exists(romPath) || cacheDir is null)
+			{
+				LastFailure = "there is no game file to compile";
+				return null;
+			}
 
 			var n = Workers;
 			var done = new uint[n];
 			var total = new uint[n];
 			var found = new Dictionary<string, string>(StringComparer.Ordinal);
 			var processes = new List<Process>();
+			string failure = null;
+			LastFailure = null;
 
 			void Line(int index, string line)
 			{
+				var refusal = RefusalLine.Match(line);
+				if (refusal.Success)
+				{
+					// first one wins: the others are the same modal in the other sessions
+					lock (found) { failure ??= refusal.Groups[1].Value; }
+					return;
+				}
 				var m = CacheLine.Match(line);
 				if (m.Success)
 				{
@@ -207,6 +234,7 @@ namespace Chimera.Client.GUI
 			if (died is not 0)
 			{
 				Console.Error.WriteLine($"precompile: {died} of {processes.Count} sessions failed");
+				LastFailure = failure ?? $"{died} of {processes.Count} sessions failed without saying why";
 				return null;
 			}
 
@@ -220,7 +248,11 @@ namespace Chimera.Client.GUI
 					.Select(kv => new CoreCacheFile { Name = kv.Key, Sha1 = kv.Value })
 					.ToList(),
 			};
-			if (manifest.Files.Count is 0) return null;
+			if (manifest.Files.Count is 0)
+			{
+				LastFailure = failure ?? "the sessions compiled nothing for this game";
+				return null;
+			}
 			manifest.Save(cacheDir, romSha1);
 			return manifest;
 		}
@@ -229,8 +261,46 @@ namespace Chimera.Client.GUI
 	/// <summary>Launches this same frontend as a child process (headless), streaming its output lines.</summary>
 	public static class SelfProcess
 	{
+		/// <summary>
+		/// One argument, quoted the way Windows will parse it back.
+		/// 
+		/// A backslash is ONLY special before a quote: CommandLineToArgvW reads
+		/// 2n of them plus a quote as n backslashes and a delimiter, 2n+1 as n
+		/// backslashes and a literal quote, and leaves any other run alone. So
+		/// escaping every backslash - which is what this did - doubles every
+		/// separator in a path, and "C:\games\x.iso" reaches the child as
+		/// "C:\\games\\x.iso", which does not exist. It only bit paths that
+		/// needed quoting in the first place, i.e. ones containing a space,
+		/// which is why it survived: the precompile sessions all failed at once
+		/// on a game whose folder had one.
+		/// </summary>
 		private static string Quote(string a)
-			=> a.Length > 0 && a.IndexOfAny([ ' ', '"', '\t' ]) < 0 ? a : "\"" + a.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"";
+		{
+			if (a.Length > 0 && a.IndexOfAny([ ' ', '"', '\t' ]) < 0) return a;
+			var sb = new System.Text.StringBuilder(a.Length + 8);
+			sb.Append('"');
+			for (var i = 0; i < a.Length; i++)
+			{
+				var slashes = 0;
+				while (i < a.Length && a[i] == '\\') { slashes++; i++; }
+				if (i == a.Length)
+				{
+					// run at the end: doubled, so the closing quote stays a delimiter
+					sb.Append('\\', slashes * 2);
+					break;
+				}
+				if (a[i] == '"')
+				{
+					sb.Append('\\', slashes * 2 + 1).Append('"');
+				}
+				else
+				{
+					sb.Append('\\', slashes).Append(a[i]);
+				}
+			}
+			sb.Append('"');
+			return sb.ToString();
+		}
 
 		public static Process Start(IEnumerable<string> args, Action<string> onLine)
 		{

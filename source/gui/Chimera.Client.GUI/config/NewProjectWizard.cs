@@ -1139,7 +1139,17 @@ namespace Chimera.Client.GUI
 				Close();
 				return;
 			}
-			if (manifest is null) _status.Text = "The compile was stopped; this game is not compiled.";
+			if (manifest is null)
+			{
+				// Say WHY. The sessions are headless frontends, so a refusal is a
+				// modal they could not show - most often firmware this core calls
+				// optional but this GAME needs. Without the reason the person is
+				// told only that nothing happened, and on Windows the parent has no
+				// console for the detail to go to either.
+				_status.Text = PrecompileOrchestrator.LastFailure is { Length: not 0 } why
+					? $"The compile stopped: {why}"
+					: "The compile was stopped; this game is not compiled.";
+			}
 		}
 
 		/// <summary>
