@@ -268,6 +268,9 @@ namespace Chimera.Client.Common
 			ActiveController.LatchFromPhysical(ControllerInputCoalescer);
 			ActiveController.OR_FromLogical(ClickyVirtualPadController);
 			AutoFireController.LatchFromPhysical(ControllerInputCoalescer);
+			// everything that reads this frame has read it, so releases held back
+			// for a press that arrived inside it can now land
+			ControllerInputCoalescer.EndFrame();
 
 			if (ClientControls["Autohold"] || ClientControls["Autofire"])
 			{
