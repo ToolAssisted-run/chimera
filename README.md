@@ -47,11 +47,13 @@ The officially maintained cores currently offered for Chimera are:
 | Dreamcast | [Flycast](https://github.com/ToolAssisted-run/chimera-core-flycast) |
 | PlayStation 2 | [PCSX2](https://github.com/ToolAssisted-run/chimera-core-pcsx2) |
 | PlayStation Portable | [PPSSPP](https://github.com/ToolAssisted-run/chimera-core-ppsspp) |
+| PlayStation 3 | [RPCS3](https://github.com/ToolAssisted-run/chimera-core-rpcs3) |
 | Xbox | [xemu](https://github.com/ToolAssisted-run/chimera-core-xemu) |
 | 3DO Interactive Multiplayer | [Opera](https://github.com/ToolAssisted-run/chimera-core-opera) |
 | Atari 2600 | [Stella](https://github.com/ToolAssisted-run/chimera-core-stella) |
 | MS-DOS | [DOSBox-X](https://github.com/ToolAssisted-run/chimera-core-dosbox-x) |
 | Windows 3.1 / 95 / 98 | [DOSBox-X](https://github.com/ToolAssisted-run/chimera-core-dosbox-x) |
+| Flash | [Ruffle](https://github.com/ToolAssisted-run/chimera-core-ruffle) |
 
 ## Getting a build
 
