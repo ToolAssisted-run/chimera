@@ -103,6 +103,16 @@ namespace Chimera.Client.GUI
 		private readonly Func<string, string?> _pickFirmwareFile;
 		private readonly IReadOnlyList<string> _firmwareSearchDirs;
 		private readonly Func<string, string, string?> _rememberedFirmwarePath;
+
+		/// <summary>
+		/// Write the firmware chosen HERE into the config, and save it, before the
+		/// precompile sessions start. They are separate processes: they read the
+		/// config from DISK, and their only firmware source is what it remembers
+		/// (CoreFirmwareStore.ProviderFor). The owner remembers these paths too,
+		/// but only after this wizard returns - which is after the sessions have
+		/// already run and failed to find any.
+		/// </summary>
+		private readonly Action<string, IReadOnlyDictionary<string, string>> _rememberFirmwareNow;
 		private readonly ListView _firmwareList;
 		private readonly Button _firmwareSetButton;
 		private readonly Button _firmwareClearButton;
@@ -148,6 +158,7 @@ namespace Chimera.Client.GUI
 			IReadOnlyList<string>? firmwareSearchDirs = null,
 			Func<string?>? pickFirmwareFolder = null,
 			Func<string, string, string?>? rememberedFirmwarePath = null,
+			Action<string, IReadOnlyDictionary<string, string>>? rememberFirmwareNow = null,
 			string? configPath = null)
 		{
 			_configPath = configPath;
@@ -155,6 +166,7 @@ namespace Chimera.Client.GUI
 			_firmwareSearchDirs = firmwareSearchDirs ?? [ ];
 			_pickFirmwareFolder = pickFirmwareFolder;
 			_rememberedFirmwarePath = rememberedFirmwarePath ?? (static (_, _) => null);
+			_rememberFirmwareNow = rememberFirmwareNow ?? (static (_, _) => { });
 			_cores = cores.Where(static c => c.Error is null).ToList();
 			_pickFiles = pickFiles;
 
@@ -1105,6 +1117,12 @@ namespace Chimera.Client.GUI
 			{
 			}
 
+			// The sessions are child processes reading the config off disk, so
+			// whatever firmware was chosen on the firmware page has to BE there
+			// before they start. Without this a core that needs firmware compiles
+			// nothing: the session boots, is refused for want of it, and exits.
+			_rememberFirmwareNow(ChosenCore.Name, ProvidedFirmwarePaths);
+
 			var manifest = PrecompileOrchestrator.Run(
 				ChosenCore.Path, _configPath, romPath, romSha1, dir, Entry, Progress, cancelled: PumpAndCheckCancel);
 
@@ -1189,6 +1207,14 @@ namespace Chimera.Client.GUI
 		/// Shows the compile step for a core and a game, without walking the pages
 		/// before it - the test and screenshot door for the step.
 		/// </summary>
+		/// <summary>
+		/// Starts the compile the way the button does - the test door for the
+		/// ORDER the sessions depend on: the firmware they will need has to be in
+		/// the config before they are spawned, because they are separate processes
+		/// that read it off disk.
+		/// </summary>
+		internal void RunPrecompileForTest() => RunPrecompile();
+
 		internal void UsePrecompileFrom(WaterboxConfig cfg, string cacheRoot, string romPath)
 		{
 			_cfg = cfg;

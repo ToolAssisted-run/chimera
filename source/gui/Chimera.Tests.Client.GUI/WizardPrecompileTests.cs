@@ -95,6 +95,41 @@ namespace Chimera.Tests.Client.GUI
 			}
 		}
 
+		/// <summary>
+		/// The sessions are CHILD PROCESSES: they read the config off disk, and
+		/// what it remembers is their only source of firmware. So whatever the
+		/// firmware page settled has to be written there BEFORE they start - the
+		/// owner remembering it after this wizard returns is too late, and a core
+		/// that needs firmware then compiles nothing at all, which is what a PS3
+		/// project did.
+		/// </summary>
+		[TestMethod]
+		public void TheFirmwareIsRememberedBeforeTheSessionsStart()
+		{
+			var dir = TempDir();
+			try
+			{
+				// a core has to be CHOSEN for a compile to start at all: the
+				// sessions are spawned for a package, and RunPrecompile leaves
+				// immediately without one
+				var pkg = new DiscoveredCorePackage { Path = Path.Combine(dir, "fake.chimeraCore"), Name = "compiles" };
+				var order = new List<string>();
+				using NewProjectWizard form = new(
+					[ pkg ],
+					static _ => [ ],
+					rememberFirmwareNow: (_, _) => order.Add("remembered"));
+				form.Show();
+				form.UsePrecompileFrom(CfgThatCompiles(), dir, MakeRom(dir));
+				form.RunPrecompileForTest();
+				CollectionAssert.Contains(order, "remembered",
+					"the firmware must reach the config before a session is spawned");
+			}
+			finally
+			{
+				Directory.Delete(dir, recursive: true);
+			}
+		}
+
 		[TestMethod]
 		public void AGameNotCompiledYetCannotBeCreated()
 		{

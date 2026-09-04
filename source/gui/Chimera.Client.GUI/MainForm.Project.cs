@@ -158,6 +158,21 @@ namespace Chimera.Client.GUI
 					Config.CoreFirmware.TryGetValue(CoreFirmwareStore.KeyFor(coreName, id), out var remembered)
 						? remembered
 						: null,
+				// The precompile sessions run BEFORE this wizard returns, and they
+				// are separate processes: they read the config off disk and take
+				// their firmware from what it remembers. Remembering these paths
+				// only afterwards (a few lines below, with the rest of the wizard's
+				// answers) is too late - a core that needs firmware would be
+				// refused at boot and compile nothing.
+				rememberFirmwareNow: (coreName, provided) =>
+				{
+					if (provided.Count is 0) return;
+					foreach (var (id, path) in provided)
+					{
+						Config.CoreFirmware[CoreFirmwareStore.KeyFor(coreName, id)] = path;
+					}
+					SaveConfig();
+				},
 				// a precompile session is this frontend again: it must read the
 				// same config, or it would look for its cache somewhere else
 				configPath: _getConfigPath());
