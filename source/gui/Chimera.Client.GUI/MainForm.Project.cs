@@ -202,14 +202,18 @@ namespace Chimera.Client.GUI
 			if (wizard.ShowDialog(this) is not DialogResult.OK) return null;
 
 			// remember where the firmware lives, keyed the way the resolver reads
-			// it back at load (Config.CoreFirmware)
+			// it back at load (Config.CoreFirmware) - and WRITE IT DOWN. Held in
+			// memory it lasted until the next clean exit, so a session that ended
+			// any other way left a project whose firmware nothing on the machine
+			// could name, and opening it asked for all of it again (issue #40).
 			var coreName = wizard.ChosenCoreName;
-			if (coreName is not null)
+			if (coreName is not null && wizard.ProvidedFirmwarePaths.Count is not 0)
 			{
 				foreach (var (id, path) in wizard.ProvidedFirmwarePaths)
 				{
 					Config.CoreFirmware[CoreFirmwareStore.KeyFor(coreName, id)] = path;
 				}
+				SaveConfig();
 			}
 			return wizard.CreatedProject;
 		}
@@ -301,30 +305,26 @@ namespace Chimera.Client.GUI
 		private bool BootProject(EngineProject project, string path, bool saved, ProjectLocalPaths local = null)
 		{
 			local ??= new ProjectLocalPaths();
+			// where the LAST project's firmware was found is not this one's answer
+			ProjectLocalPaths.ForgetSessionFirmware();
 			if (!EnsureProjectCore(project))
 			{
 				project.Dispose();
 				return false;
 			}
-			// The firmware the project pins is looked up by hash, and the paths
-			// found are what the boot below mounts (Config.CoreFirmware). Without
-			// this the boot mounted only what this machine happened to remember,
-			// and a PS3 project whose config had not been saved since the wizard
-			// booted its disc with no system software at all: a machine that runs,
-			// polls nothing and draws nothing, with no word about why.
-			if (!VerifyFirmwarePins(project, local))
-			{
-				project.Dispose();
-				return false;
-			}
-
 			// The firmware the project pins is looked for by hash - in the Firmware
 			// folder, where this core last had it, and where this project's own
-			// sidecar remembers it - and whatever matches is what the load below
-			// mounts. Without this the load knows only what a wizard once chose,
-			// so a project opened on a machine that never ran the wizard for this
-			// core refused with "firmware not provided" while the dump sat in the
-			// Firmware folder (issue #27).
+			// sidecar remembers it - and whatever matches is what the boot below
+			// mounts (Config.CoreFirmware). Without this the boot knew only what a
+			// wizard once chose, so a project opened on a machine that never ran
+			// the wizard for this core refused with "firmware not provided" while
+			// the dump sat in the Firmware folder (issue #27), and a PS3 project
+			// whose config had not been saved since the wizard booted its disc
+			// with no system software at all: a machine that runs, polls nothing
+			// and draws nothing, with no word about why.
+			//
+			// ONCE. It ran twice, which asked the same severe question twice of
+			// anyone whose firmware it could not find.
 			if (!VerifyFirmwarePins(project, local))
 			{
 				project.Dispose();

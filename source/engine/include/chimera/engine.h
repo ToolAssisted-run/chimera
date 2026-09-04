@@ -263,6 +263,14 @@ CE_API const char *ce_state_reader_last_error(ce_state_reader *r);
  * Writes 40 uppercase hex characters plus a NUL into out41. */
 CE_API void ce_sha1_hex(const uint8_t *data, uint64_t len, char *out41);
 
+/* The same hash of a file, taken by reading it rather than by holding it: a
+ * firmware may be a disk image, and one that does not fit in memory still has
+ * an identity. Writes 40 uppercase hex characters plus a NUL into out41, and
+ * the length hashed into lenOut when it is given. Answers repeat calls from a
+ * cache keyed by path, size and mtime, so hashing the same file twice in a
+ * session costs one read. Returns 1 when the file was read, 0 when it was not. */
+CE_API int ce_sha1_file(const char *utf8Path, char *out41, uint64_t *lenOut);
+
 /* ---- firmware ----
  *
  * Whether a provided file is the firmware a core asked for. declared_size 0

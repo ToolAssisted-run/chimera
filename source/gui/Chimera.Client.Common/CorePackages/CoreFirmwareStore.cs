@@ -129,9 +129,54 @@ namespace Chimera.Client.Common
 		public static bool AnyExpected(CoreRegistry registry)
 			=> registry.AllFactories.OfType<ICoreFirmwareUser>().Any(static u => u.Firmware.Count != 0);
 
+		/// <summary>
+		/// What the Firmware folder can answer for a declaration nothing else
+		/// has: the file with the hash it pins, or - when it pins none, as an
+		/// Xbox disk image or a console's own identity dump cannot - the file
+		/// bearing the name the core says it goes by.
+		///
+		/// Until this, "put the file in the Firmware folder and open the project
+		/// again" was advice the frontend did not take: only the wizard and a
+		/// project's own hash pins ever looked in that folder, so a saved project
+		/// whose remembered path had moved refused with the file sitting exactly
+		/// where the message asked for it (issue #40).
+		/// </summary>
+		private static string? InFirmwareFolder(Config config, CoreFirmwareDecl decl)
+		{
+			string dir;
+			try
+			{
+				dir = config.PathEntries.FirmwareAbsolutePath();
+			}
+			catch (Exception ex) when (ex is IOException or ArgumentException)
+			{
+				return null;
+			}
+			if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir)) return null;
+			if (string.IsNullOrEmpty(decl.Sha1))
+			{
+				// nothing to ask by but the name, and a name is compared the way
+				// the platform that wrote it would: a dump called Complex_4627.bin
+				// is the file a core declares as complex_4627.bin
+				if (string.IsNullOrEmpty(decl.Name)) return null;
+				try
+				{
+					return Directory.EnumerateFiles(dir, "*", SearchOption.TopDirectoryOnly)
+						.FirstOrDefault(f => Path.GetFileName(f).Equals(decl.Name, StringComparison.OrdinalIgnoreCase));
+				}
+				catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+				{
+					return null;
+				}
+			}
+			return FirmwareLocator.FindFor(decl, FirmwareLocator.BuildIndex([ dir ]))?.Path;
+		}
+
 		public static CoreFirmwareEntry Describe(Config config, string coreName, CoreFirmwareDecl decl)
 		{
 			var path = GetPath(config, coreName, decl.Id);
+			// a choice that has moved is no longer an answer; the folder may hold one
+			if (path is null || !File.Exists(path)) path = InFirmwareFolder(config, decl) ?? path;
 			if (path is null) return new() { CoreName = coreName, Decl = decl, State = CoreFirmwareState.Missing };
 
 			byte[] bytes;

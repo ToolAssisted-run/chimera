@@ -98,6 +98,42 @@ namespace Chimera.Tests.Client.GUI
 			Assert.IsTrue(form.CreateEnabled, "every requirement satisfied - Create returns");
 		}
 	
+		/// <summary>
+		/// xemu declares four files and pins a hash to none of them: an Xbox
+		/// disk image and a console's own dumps are not files two people share.
+		/// The page found firmware by hash and by nothing else, so all four read
+		/// "not found" with the files sitting in the Firmware folder under
+		/// exactly the names the page was showing, and every xemu project asked
+		/// for all four by hand (issue #38).
+		/// </summary>
+		[TestMethod]
+		public void ADeclarationThatPinsNoHashIsFoundByItsDeclaredName()
+		{
+			using var form = MakeForm(out var dir);
+			File.WriteAllText(Path.Combine(dir, "Mcpx_1.0.bin"), "the secret 512");
+			File.WriteAllText(Path.Combine(dir, "some other file.bin"), "not firmware");
+			var index = FirmwareLocator.BuildIndex([ dir ]);
+
+			var cfg = Chimera.Emulation.Common.Waterbox.WaterboxConfig.FromJson("""
+				{
+				  "coreName": "xemu", "systemId": "XBOX",
+				  "video": { "width": 640, "height": 480 },
+				  "audio": { "samplesPerFrame": 800 },
+				  "input": { "buttons": [] },
+				  "firmware": [
+				    { "id": "mcpx", "display": "MCPX Boot ROM", "size": 512, "name": "mcpx_1.0.bin" },
+				    { "id": "hdd", "display": "Hard Disk Image", "name": "xbox_hdd.qcow2" }
+				  ]
+				}
+				""");
+			form.UseFirmwareNeeds(cfg, [ ("mcpx", 0), ("hdd", 1) ], index);
+
+			Assert.IsTrue(form.FirmwareSatisfied("mcpx"), "the declared name found it, case and all");
+			StringAssert.Contains(form.ChosenFirmwarePath("mcpx"), "Mcpx_1.0.bin");
+			Assert.IsFalse(form.FirmwareSatisfied("hdd"), "and one that is not there is still not there");
+			Assert.IsFalse(form.CreateEnabled);
+		}
+
 		[TestMethod]
 		public void OptionalFirmwareDoesNotExistSoADiscMustAskForThePup()
 		{

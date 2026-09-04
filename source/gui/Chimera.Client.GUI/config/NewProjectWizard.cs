@@ -1691,13 +1691,29 @@ namespace Chimera.Client.GUI
 						? decls[entry.Index]
 						: decls.FirstOrDefault(d => d.Id == entry.Id),
 				};
-				// the requirement is one exact file; the folder either holds it
-				// (any name) or the user is asked
-				if (need.Decl is not null
-					&& FirmwareLocator.FindFor(need.Decl, _firmwareIndex) is { } found)
+				// A requirement that pins a hash is one exact file: the folder
+				// either holds it (under any name) or the user is asked.
+				//
+				// One that pins none - an Xbox disk image, a console's own
+				// identity dump, files no two people have the same copy of - can
+				// only be recognised by the name the core declares, or by where
+				// this machine last had it. Without that every xemu project asked
+				// for all four by hand, with the files sitting in the Firmware
+				// folder under exactly the names the page was showing (issue #38).
+				if (need.Decl is not null)
 				{
-					need.ChosenPath = found.Path;
-					need.ChosenSha1 = found.Sha1;
+					var found = FirmwareLocator.FindEither(need.Decl, _firmwareIndex);
+					if (found is null && string.IsNullOrEmpty(need.Decl.Sha1)
+						&& _rememberedFirmwarePath(ChosenCoreName ?? "", need.Id) is { } last)
+					{
+						found = _firmwareIndex.FirstOrDefault(f =>
+							f.Path.Equals(System.IO.Path.GetFullPath(last), StringComparison.OrdinalIgnoreCase));
+					}
+					if (found is not null)
+					{
+						need.ChosenPath = found.Path;
+						need.ChosenSha1 = found.Sha1;
+					}
 				}
 				return need;
 			}).ToList();

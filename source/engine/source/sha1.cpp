@@ -331,3 +331,12 @@ extern "C" void ce_sha1_hex(const uint8_t *data, uint64_t len, char *out41)
 	std::memcpy(out41, hex.data(), 40);
 	out41[40] = '\0';
 }
+
+extern "C" int ce_sha1_file(const char *utf8Path, char *out41, uint64_t *lenOut)
+{
+	std::string hex;
+	if (!chimera::sha1HexOfFile(utf8Path, lenOut, hex)) return 0;
+	std::memcpy(out41, hex.data(), 40);
+	out41[40] = '\0';
+	return 1;
+}

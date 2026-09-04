@@ -124,5 +124,44 @@ namespace Chimera.Tests.Client.Common
 			Assert.AreEqual(Path.GetFullPath(biosPath), reread.Firmware["panafz1"]);
 			Assert.IsTrue(reread.Files.ContainsKey("game.nes"), "and the files it already knew about survived");
 		}
+
+		/// <summary>
+		/// A project the wizard has just made has no file yet, so the boot's
+		/// firmware lookups have no sidecar to go in - and the config that also
+		/// held them is not forever: replace it, or move the dumps, and a saved
+		/// project will not open with its own firmware still on the machine that
+		/// made it (issue #40). The first save is the first chance to write them
+		/// down, and it takes it.
+		/// </summary>
+		[TestMethod]
+		public void WhatTheBootFoundReachesTheFirstSidecarTheProjectGets()
+		{
+			ProjectLocalPaths.ForgetSessionFirmware();
+			var (projectPath, _) = MakeProject("carried");
+			var biosPath = Path.Combine(_dir, "mcpx_1.0.bin");
+			File.WriteAllText(biosPath, "boot rom bytes");
+
+			// the boot: a project with no file of its own, so this instance is
+			// thrown away without ever being written
+			new ProjectLocalPaths().RememberFirmware("mcpx", biosPath);
+
+			// the save, later, of a sidecar that has never heard of any of it
+			using (var p = EngineProject.Open(projectPath))
+			{
+				ProjectLocalPaths.Read(projectPath).Save(projectPath, p);
+			}
+
+			Assert.AreEqual(Path.GetFullPath(biosPath), ProjectLocalPaths.Read(projectPath).Firmware["mcpx"]);
+
+			// and the next project starts from nothing: these are this project's
+			// answers, not a running tally of every core the session has touched
+			ProjectLocalPaths.ForgetSessionFirmware();
+			var (other, _) = MakeProject("another");
+			using (var p = EngineProject.Open(other))
+			{
+				ProjectLocalPaths.Read(other).Save(other, p);
+			}
+			Assert.AreEqual(0, ProjectLocalPaths.Read(other).Firmware.Count);
+		}
 	}
 }

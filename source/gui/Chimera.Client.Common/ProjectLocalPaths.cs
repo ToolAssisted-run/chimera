@@ -75,10 +75,34 @@ namespace Chimera.Client.Common
 			}
 		}
 
+		/// <summary>
+		/// Where THIS session found the open project's firmware, by id.
+		///
+		/// A project that has never been written has no sidecar to write into:
+		/// the wizard's choices and the boot's lookups live only in the config,
+		/// and a config that is replaced (a fresh install copied over an old one)
+		/// or a file that is moved takes them with it - which is a saved project
+		/// that will not open, with its firmware still on the machine that made
+		/// it (issue #40). The first save is the first chance to write them
+		/// beside the project, so the boot leaves them here and every save merges
+		/// them in. They are hints and nothing more: the next load checks each
+		/// one by hash before it mounts anything, so an entry left over from a
+		/// project that is no longer open costs the asking and no more.
+		/// </summary>
+		private static readonly Dictionary<string, string> SessionFirmware = new();
+
+		/// <summary>Forgotten when another project boots, so a sidecar records this project's answers.</summary>
+		public static void ForgetSessionFirmware()
+		{
+			lock (SessionFirmware) SessionFirmware.Clear();
+		}
+
 		public void RememberFirmware(string id, string path)
 		{
 			if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(path)) return;
-			_firmware[id] = Path.GetFullPath(path);
+			var full = Path.GetFullPath(path);
+			_firmware[id] = full;
+			lock (SessionFirmware) SessionFirmware[id] = full;
 		}
 
 		/// <summary>
@@ -130,6 +154,15 @@ namespace Chimera.Client.Common
 				var source = project.FileSourcePath(i);
 				if (source.Length is 0) continue;
 				_files[project.FileName(i)] = Path.GetFullPath(source);
+			}
+			// what the session found, for a project whose sidecar this is the
+			// first of; anything this instance was told itself wins
+			lock (SessionFirmware)
+			{
+				foreach (var (id, source) in SessionFirmware)
+				{
+					if (!_firmware.ContainsKey(id)) _firmware[id] = source;
+				}
 			}
 			if (_files.Count is 0 && _firmware.Count is 0) return;
 

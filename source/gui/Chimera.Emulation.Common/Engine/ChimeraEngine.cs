@@ -175,6 +175,9 @@ namespace Chimera.Emulation.Common.Engine
 		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract void ce_sha1_hex(byte[] data, ulong len, byte[] out41);
 
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract int ce_sha1_file(string utf8Path, byte[] out41, ref ulong lenOut);
+
 
 
 
@@ -732,6 +735,19 @@ namespace Chimera.Emulation.Common.Engine
 			var buf = new byte[41];
 			Instance.ce_sha1_hex(data, (ulong)data.LongLength, buf);
 			return Encoding.ASCII.GetString(buf, 0, 40);
+		}
+
+		/// <summary>
+		/// The same hash of a file, taken by reading it rather than by holding
+		/// it: firmware can be a disk image, and one that does not fit in memory
+		/// still has an identity. Null when the file cannot be read.
+		/// </summary>
+		public static (string Sha1, long Length)? Sha1OfFile(string path)
+		{
+			var buf = new byte[41];
+			ulong len = 0;
+			if (Instance.ce_sha1_file(path, buf, ref len) is 0) return null;
+			return (Encoding.ASCII.GetString(buf, 0, 40), (long)len);
 		}
 
 		public static unsafe string? PtrToStringUtf8(IntPtr p)

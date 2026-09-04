@@ -16,7 +16,11 @@
 
 #include "../source/sha1.hpp"
 
+#include "chimera/engine.h"
+
 #include <cassert>
+#include <cstdio>
+#include <cstdlib>
 #include <cstdint>
 #include <cstdio>
 #include <string>
@@ -87,6 +91,39 @@ int main(void)
 		// that is not: the staging block and the bulk path have to agree about
 		// where they left off
 		assert(hashWith(true, big, 1000) == hashWith(false, big, 1000));
+	}
+
+	{ // the file hash is the same hash. A firmware may be a disk image - bigger
+	  // than the frontend can hold - so its identity has to come from reading
+	  // it, and the two ways of taking it must not disagree about one byte.
+		std::vector<uint8_t> big(3 << 20);
+		uint32_t x = 987654321u;
+		for (size_t i = 0; i < big.size(); i++)
+		{
+			x = x * 1664525u + 1013904223u;
+			big[i] = static_cast<uint8_t>(x >> 24);
+		}
+		const std::string path = "test_sha1_file.bin"; // the test's own working directory
+		FILE *f = std::fopen(path.c_str(), "wb");
+		assert(f != nullptr);
+		assert(std::fwrite(big.data(), 1, big.size(), f) == big.size());
+		std::fclose(f);
+
+		char hex[41] = { 0 };
+		uint64_t len = 0;
+		assert(ce_sha1_file(path.c_str(), hex, &len) == 1);
+		assert(len == big.size());
+		assert(std::string(hex) == chimera::sha1Hex(big.data(), big.size()));
+
+		// and again, which the cache answers - the same digest, not a stale one
+		char hex2[41] = { 0 };
+		assert(ce_sha1_file(path.c_str(), hex2, nullptr) == 1);
+		assert(std::string(hex2) == std::string(hex));
+
+		std::remove(path.c_str());
+		// a file that is not there is not an identity: it says so rather than
+		// handing back a digest of nothing
+		assert(ce_sha1_file(path.c_str(), hex, &len) == 0);
 	}
 
 	std::printf("test_sha1: ok\n");

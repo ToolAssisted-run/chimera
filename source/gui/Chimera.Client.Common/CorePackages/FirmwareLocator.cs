@@ -37,14 +37,39 @@ namespace Chimera.Client.Common
 				: index.FirstOrDefault(f => f.Sha1.Equals(decl.Sha1, StringComparison.OrdinalIgnoreCase));
 
 		/// <summary>
-		/// Files this large or larger are never firmware; hashing them would only
-		/// hurt. The bar was 64 MiB, which is smaller than a PlayStation 3 system
-		/// software update (206 MB): no PS3 project could ever find its firmware
-		/// in the Firmware folder, nor by the path it remembered, since that
-		/// goes through the same index. A gigabyte is above every firmware a
-		/// core declares and below any disc image.
+		/// The file that answers a requirement that pins no hash - a dump only
+		/// the user can own, a disk image every console writes differently - by
+		/// the name the core says it goes by. A name is a weak identity, which is
+		/// why it is only ever asked for when there is no hash to ask by; what
+		/// the file turns out to be is recorded from its bytes, not from this.
 		/// </summary>
-		public const long MaxBytes = 1024L * 1024 * 1024;
+		public static IndexedFile? FindNamed(CoreFirmwareDecl decl, IReadOnlyList<IndexedFile> index)
+			=> string.IsNullOrEmpty(decl.Name)
+				? null
+				: index.FirstOrDefault(f =>
+					Path.GetFileName(f.Path).Equals(decl.Name, StringComparison.OrdinalIgnoreCase));
+
+		/// <summary>
+		/// Whichever of the two answers this requirement: the hash when it pins
+		/// one, the declared name when it does not.
+		/// </summary>
+		public static IndexedFile? FindEither(CoreFirmwareDecl decl, IReadOnlyList<IndexedFile> index)
+			=> string.IsNullOrEmpty(decl.Sha1) ? FindNamed(decl, index) : FindFor(decl, index);
+
+		/// <summary>
+		/// Files this large or larger are never firmware, because the frontend
+		/// could not hand one to a core if it were: firmware crosses into the
+		/// sandbox as bytes, and a byte array stops here.
+		///
+		/// The bar was a size, and every size chosen was wrong about some real
+		/// machine. 64 MiB was smaller than a PlayStation 3 system software
+		/// update (206 MB); a gigabyte, chosen to be "above every firmware and
+		/// below any disc image", was smaller than the Xbox hard disk image xemu
+		/// declares - so a project made with one could never find it again, and
+		/// said so as a hash mismatch, which is not what was wrong (issue #38).
+		/// The only honest bar is what can actually be mounted.
+		/// </summary>
+		public const long MaxBytes = int.MaxValue;
 
 		/// <summary>
 		/// Hashes every plausible file in the given directories (and any extra
@@ -80,12 +105,14 @@ namespace Chimera.Client.Common
 				{
 					var info = new FileInfo(full);
 					if (!info.Exists || info.Length is 0 or >= MaxBytes) continue;
-					var bytes = File.ReadAllBytes(full);
+					// read through rather than held: a disk image is firmware too,
+					// and the engine answers a repeat with the hash it already took
+					if (ChimeraEngine.Sha1OfFile(full) is not { } hashed) continue;
 					index.Add(new()
 					{
 						Path = full,
-						Sha1 = ChimeraEngine.Sha1Hex(bytes),
-						Length = bytes.LongLength,
+						Sha1 = hashed.Sha1,
+						Length = hashed.Length,
 					});
 				}
 				catch (IOException)

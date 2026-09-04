@@ -220,6 +220,113 @@ namespace Chimera.Tests.Client.Common.CorePackages
 				.Where(static e => e.Sha1 is not null)
 				.Select(static e => $"{e.Decl.Id}={e.Sha1}"));
 
+		/// <summary>
+		/// A config whose Firmware folder is a directory of the test's own. The
+		/// entry is REPLACED rather than edited: a fresh PathEntryCollection is a
+		/// shallow copy of one shared list of defaults, so setting a path on one
+		/// sets it on every config the process makes afterwards - which these
+		/// tests, run in parallel, would then take turns losing.
+		/// </summary>
+		private static Config WithFirmwareFolder(string dir)
+		{
+			Config config = new();
+			config.PathEntries.Paths.RemoveAll(static p =>
+				p.System == PathEntryCollection.GLOBAL && p.Type == "Firmware");
+			config.PathEntries.Paths.Add(new(PathEntryCollection.GLOBAL, "Firmware", dir));
+			return config;
+		}
+
+		private static string MakeFolder()
+		{
+			var dir = Path.Combine(Path.GetTempPath(), $"chimera-fwdir-{Path.GetRandomFileName()}");
+			Directory.CreateDirectory(dir);
+			return dir;
+		}
+
+		/// <summary>
+		/// "Put the file in the Firmware folder and open the project again" is
+		/// what a core's refusal says, and until issue #40 nothing in the load
+		/// path did that: only the wizard and a project's own hash pins looked
+		/// there, so a saved project whose remembered path had moved refused with
+		/// the file sitting exactly where the message asked for it.
+		/// </summary>
+		[TestMethod]
+		public void TheFirmwareFolderAnswersWhenNothingWasEverChosen()
+		{
+			var dir = MakeFolder();
+			try
+			{
+				var bytes = new byte[8192];
+				for (var i = 0; i < bytes.Length; i++) bytes[i] = (byte) i;
+				var sha1 = CoreFirmwareStore.Sha1Of(bytes);
+				File.WriteAllBytes(Path.Combine(dir, "some_dump.rom"), bytes);
+
+				// pinned: the hash finds it whatever it is called
+				var entry = CoreFirmwareStore.Describe(WithFirmwareFolder(dir), "Core", Decl(8192, sha1));
+				Assert.AreEqual(CoreFirmwareState.Good, entry.State);
+				Assert.IsTrue(entry.Usable, "the folder answered for a choice nobody ever made");
+			}
+			finally
+			{
+				Directory.Delete(dir, recursive: true);
+			}
+		}
+
+		/// <summary>
+		/// A declaration that pins no hash - an Xbox disk image, a console's own
+		/// identity dump, files no two people have the same copy of - can only be
+		/// recognised by the name the core declares, and a dump called
+		/// Complex_4627.bin is the file declared as complex_4627.bin.
+		/// </summary>
+		[TestMethod]
+		public void AnUnpinnedDeclarationIsFoundByItsDeclaredName()
+		{
+			var dir = MakeFolder();
+			try
+			{
+				File.WriteAllBytes(Path.Combine(dir, "Complex_4627.bin"), new byte[8192]);
+				CoreFirmwareDecl decl = new() { Id = "bios", Display = "Flash ROM", Name = "complex_4627.bin" };
+
+				var entry = CoreFirmwareStore.Describe(WithFirmwareFolder(dir), "xemu", decl);
+				Assert.IsTrue(entry.Usable, "the declared name found it");
+				StringAssert.Contains(entry.Path, "Complex_4627.bin");
+			}
+			finally
+			{
+				Directory.Delete(dir, recursive: true);
+			}
+		}
+
+		/// <summary>
+		/// The user moved their dumps into the Firmware folder, which is what the
+		/// refusal told them to do: the path the config remembers is stale, and
+		/// the folder is the answer rather than "not provided".
+		/// </summary>
+		[TestMethod]
+		public void AChoiceThatMovedIsFoundWhereTheMessageSaidToPutIt()
+		{
+			var dir = MakeFolder();
+			try
+			{
+				var bytes = new byte[512];
+				for (var i = 0; i < bytes.Length; i++) bytes[i] = (byte) (i * 7);
+				var sha1 = CoreFirmwareStore.Sha1Of(bytes);
+				var gone = Path.Combine(dir, "elsewhere", "mcpx_1.0.bin");
+				var config = WithFirmwareFolder(dir);
+				CoreFirmwareStore.SetPath(config, "xemu", "mcpx", gone); // never written
+				File.WriteAllBytes(Path.Combine(dir, "mcpx_1.0.bin"), bytes);
+
+				var entry = CoreFirmwareStore.Describe(config, "xemu",
+					new() { Id = "mcpx", Display = "MCPX Boot ROM", Size = 512, Name = "mcpx_1.0.bin" });
+				Assert.IsTrue(entry.Usable);
+				Assert.AreEqual(sha1, entry.Sha1);
+			}
+			finally
+			{
+				Directory.Delete(dir, recursive: true);
+			}
+		}
+
 		/// <summary>Choices are remembered per core and id, so two cores wanting the same-named file do not collide.</summary>
 		[TestMethod]
 		public void PathsAreKeyedByCoreAndId()
