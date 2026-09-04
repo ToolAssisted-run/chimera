@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -58,6 +58,14 @@ namespace Chimera.Emulation.Common.Waterbox
 		private int _nsamp; // what the last frame actually produced
 		private readonly int[] _videoBuff;
 		private readonly short[] _stereoBuff;
+
+		// A core that mixes at a rate other than the 44100 the sound path assumes is
+		// resampled here, once per frame, on its way to whoever asks for samples -
+		// the sound output and the encoder alike. Presentation only: the guest's
+		// bytes, which the gates hash, are untouched.
+		private readonly SDLResampler _resampler;
+		private short[] _resampled = [ ];
+		private int _resampledCount;
 		private readonly string[] _buttons;
 		private readonly WaterboxConfig.AxisConfig[] _axes;
 		// parallel to the two above: which of the declared controls this machine
@@ -92,6 +100,15 @@ namespace Chimera.Emulation.Common.Waterbox
 			_samplesPerFrame = cfg.Audio.SamplesPerFrame;
 			_videoBuff = new int[_width * _height];
 			_stereoBuff = new short[_samplesPerFrame * 2];
+			if (cfg.Audio.Rate is > 0 and not 44100)
+			{
+				_resampler = new SDLResampler(cfg.Audio.Rate, 44100, (buf, n) =>
+				{
+					if (_resampled.Length < n * 2) _resampled = new short[n * 2];
+					Buffer.BlockCopy(buf, 0, _resampled, 0, n * 2 * sizeof(short));
+					_resampledCount = n;
+				});
+			}
 			_buttons = input.Buttons.ToArray();
 			_axes = input.Axes?.ToArray() ?? [ ];
 
@@ -276,6 +293,12 @@ namespace Chimera.Emulation.Common.Waterbox
 			if (render) Marshal.Copy(_session.VideoBuffer, _videoBuff, 0, _session.VideoWidth * _session.VideoHeight);
 			var audio = _session.AudioBuffer(out _nsamp);
 			Marshal.Copy(audio, _stereoBuff, 0, _nsamp * 2);
+			if (_resampler is not null)
+			{
+				_resampledCount = 0;
+				if (_nsamp > 0) _resampler.EnqueueSamples(_stereoBuff, _nsamp);
+				_resampler.Flush();
+			}
 			return true;
 		}
 
@@ -313,7 +336,11 @@ namespace Chimera.Emulation.Common.Waterbox
 			IsLagFrame = false;
 		}
 
-		public void Dispose() => _session.Dispose();
+		public void Dispose()
+		{
+			_resampler?.Dispose();
+			_session.Dispose();
+		}
 
 		private void CheckDisposed()
 		{
@@ -340,6 +367,12 @@ namespace Chimera.Emulation.Common.Waterbox
 
 		public void GetSamplesSync(out short[] samples, out int nsamp)
 		{
+			if (_resampler is not null)
+			{
+				samples = _resampled;
+				nsamp = _resampledCount;
+				return;
+			}
 			samples = _stereoBuff;
 			nsamp = _nsamp;
 		}

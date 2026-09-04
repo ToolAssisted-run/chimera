@@ -864,6 +864,15 @@ also what a blip-style resampler needs (it does not produce the same count every
 frame). When a core exports the count, `audio.samplesPerFrame` becomes the buffer
 CAPACITY rather than the per-frame number.
 
+**A package says what rate it mixes at** (2026-09-04). The frontend's sound path
+is built around 44100 Hz and the lineage's cores all produced it, so nothing ever
+asked. A PS2's SPU2, a GameCube's DSP and an Xbox's APU mix at 48 kHz, and played
+as 44.1 they came out a semitone and a half low with their audio outrunning the
+video of every encode (issue #37). `audio.rate` declares the rate (44100 when
+absent) and the adapter resamples to 44100 once per frame, on the way to the
+sound output and the encoder alike. Presentation only: the guest's bytes, which
+the gates hash, are what they were.
+
 The wrinkle noted in the ABI section is now visible rather than theoretical:
 sync settings are keyed by adapter *type*, so both NES packages share one config
 key and one settings blob. Whichever core is loaded reads the keys it knows and

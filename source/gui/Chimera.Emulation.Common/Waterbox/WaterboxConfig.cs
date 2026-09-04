@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 
@@ -375,6 +375,17 @@ namespace Chimera.Emulation.Common.Waterbox
 			public int SamplesPerFrame { get; set; }
 
 			public int Channels { get; set; } = 1;
+
+			/// <summary>
+			/// The rate the core mixes at, in Hz. The frontend's sound path is built
+			/// around 44100 and the adapter resamples anything else to it; a package
+			/// that says nothing is taken to produce 44100, which is what the
+			/// lineage's cores did. A 48 kHz chip (a PS2's SPU2, a GameCube's DSP,
+			/// an Xbox's APU) that did not say so was played as if it were 44.1 kHz:
+			/// a semitone and a half low, and its audio outrunning its video in
+			/// every encode (issue #37).
+			/// </summary>
+			public int Rate { get; set; } = 44100;
 
 			/// <summary>Guest export returning SamplesPerFrame*Channels interleaved int16.</summary>
 			public string Get { get; set; }
