@@ -159,6 +159,14 @@ namespace Chimera.Emulation.Common.Waterbox
 					}
 				}
 			}
+			// A rom opened directly - no project, so no slot map - still fills a
+			// slot: it is the game. Without saying so, every firmware condition
+			// written over the slots reads false and the firmware is silently not
+			// asked for, which is how a PS3 disc reached the machine with no system
+			// software and refused itself. A precompile session loads exactly this
+			// way, so this is the path its firmware depends on.
+			if (slotsJson is "{}") slotsJson = SlotsFromRom(ctx);
+
 			var effective = WaterboxCore.EffectiveSettingsFor(
 				_cfg, ctx.Settings as WaterboxCoreSettings);
 			var applicable = Engine.EngineFirmware.Evaluate(
@@ -188,6 +196,39 @@ namespace Chimera.Emulation.Common.Waterbox
 				resolved[decl.Id] = bytes;
 			}
 			return resolved;
+		}
+
+		/// <summary>
+		/// The slot map a directly-opened rom implies: its file in the package's
+		/// first required slot, which is the one the wizard calls the game. Only
+		/// the name is needed - conditions test the slot and its extension.
+		/// </summary>
+		private string SlotsFromRom(CoreCreationContext ctx)
+		{
+			var path = ctx.Roms is { Count: > 0 } roms ? roms[0]?.RomPath : null;
+			if (string.IsNullOrEmpty(path)) return "{}";
+			string primary;
+			try
+			{
+				var declJson = File.ReadAllText(Path.Combine(_packageDir, "file_slots.json"));
+				var decl = Newtonsoft.Json.Linq.JObject.Parse(declJson);
+				var slots = decl["slots"] as Newtonsoft.Json.Linq.JArray;
+				if (slots is null || slots.Count is 0) return "{}";
+				// the game slot is the first that must be filled; failing that, the first
+				var chosen = slots.FirstOrDefault(sl => (int?)sl["min"] >= 1) ?? slots[0];
+				primary = (string)chosen["id"];
+				if (string.IsNullOrEmpty(primary)) return "{}";
+			}
+			catch (Exception)
+			{
+				// no declaration, or an unreadable one: say nothing rather than guess
+				return "{}";
+			}
+			Newtonsoft.Json.Linq.JObject map = new()
+			{
+				[ primary ] = new Newtonsoft.Json.Linq.JArray(Path.GetFileName(path)),
+			};
+			return map.ToString(Newtonsoft.Json.Formatting.None);
 		}
 	}
 }

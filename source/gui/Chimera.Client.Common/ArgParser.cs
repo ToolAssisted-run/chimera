@@ -56,6 +56,19 @@ namespace Chimera.Client.Common
 		{
 			Description = "INDEX/COUNT[/game]; run as precompile session INDEX of COUNT for the rom (fills the compile cache, prints 'Precompiled D/T modules'), then exit; implies --headless",
 		};
+		/// <summary>
+		/// Firmware for THIS run, said outright. A precompile session is a child
+		/// process, and telling it through the config file means the parent has to
+		/// have written the file first - which it cannot always do: the wizard only
+		/// knows the paths a person chose, and a core may call a firmware optional
+		/// that the game in hand cannot boot without. So the sessions are told.
+		/// </summary>
+		private static readonly Option<string[]> OptionFirmware = new("--firmware")
+		{
+			Description = "<id>=<path>; use this file as the firmware the core declares under <id>, ahead of anything remembered in the config. May be repeated",
+			AllowMultipleArgumentsPerToken = false,
+		};
+
 		private static readonly Option<bool> OptionHeadless = new("--headless")
 		{
 			Description = "unattended mode: any modal dialog is printed to the console and, if it would block for an answer, the process exits with code 64 instead of hanging",
@@ -144,6 +157,7 @@ namespace Chimera.Client.Common
 			root.Add(/* --config */ OptionConfigFilePath);
 			root.Add(/* --core */ OptionCorePackagePath);
 			root.Add(/* --precompile */ OptionPrecompile);
+			root.Add(/* --firmware */ OptionFirmware);
 			root.Add(/* --dump-close */ OptionAVDumpQuitWhenDone);
 			root.Add(/* --dump-frames */ OptionAVDumpFrameList);
 			root.Add(/* --dump-length */ OptionAVDumpEndAtFrame);
@@ -269,7 +283,8 @@ namespace Chimera.Client.Common
 				userdataUnparsedPairs: userdataUnparsedPairs,
 				cmdRom: result.GetValue(ArgumentRomFilePath),
 				cmdCorePackage: result.GetValue(OptionCorePackagePath),
-				cmdPrecompile: result.GetValue(OptionPrecompile)
+				cmdPrecompile: result.GetValue(OptionPrecompile),
+				cmdFirmware: result.GetValue(OptionFirmware)
 			);
 			return null;
 		}

@@ -160,9 +160,49 @@ namespace Chimera.Client.Common
 		/// over, whatever its size or hash - see <see cref="CoreFirmwareEntry.Usable"/>
 		/// for why, and <see cref="NonStandard"/> for the warning that goes with it.
 		/// </summary>
+		/// <summary>
+		/// Firmware named on the command line, by id: what THIS run must use,
+		/// ahead of anything the config remembers. A precompile session is a child
+		/// process, and it cannot be told through the config - the parent would
+		/// have to have written the file first, and the wizard may hold a path
+		/// that was never written there (a core can call a firmware optional that
+		/// the game in hand cannot boot without). So it is told outright, and the
+		/// answer lives for the process, which is exactly one run.
+		/// </summary>
+		public static IReadOnlyDictionary<string, string> CommandLineFirmware { get; set; }
+			= new Dictionary<string, string>(StringComparer.Ordinal);
+
+		/// <summary>Parses "&lt;id&gt;=&lt;path&gt;" pairs; a pair without an "=" is skipped.</summary>
+		public static IReadOnlyDictionary<string, string> ParseFirmwareArgs(IEnumerable<string> pairs)
+		{
+			var map = new Dictionary<string, string>(StringComparer.Ordinal);
+			foreach (var pair in pairs ?? [ ])
+			{
+				if (string.IsNullOrWhiteSpace(pair)) continue;
+				var eq = pair.IndexOf('=');
+				if (eq <= 0 || eq == pair.Length - 1) continue;
+				map[pair[..eq]] = pair[(eq + 1)..];
+			}
+			return map;
+		}
+
 		public static Func<CoreFirmwareDecl, byte[]?> ProviderFor(Config config, string coreName)
 			=> decl =>
 			{
+				// said on the command line: use it, and say so if it cannot be read
+				// rather than quietly falling back to a different machine
+				if (decl is not null && CommandLineFirmware.TryGetValue(decl.Id, out var named))
+				{
+					try
+					{
+						return File.ReadAllBytes(named);
+					}
+					catch (IOException e)
+					{
+						Console.Error.WriteLine($"firmware {decl.Id}: cannot read {named}: {e.Message}");
+						return null;
+					}
+				}
 				var entry = Describe(config, coreName, decl);
 				if (!entry.Usable || entry.Path is null) return null;
 				try

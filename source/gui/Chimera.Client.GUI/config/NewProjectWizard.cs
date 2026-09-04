@@ -1013,6 +1013,12 @@ namespace Chimera.Client.GUI
 			item.SubItems.Add(sha1);
 			item.SubItems.Add(present ? "Compiled" : "Missing");
 			_precompileList.Items.Add(item);
+			// follow the work: a compile puts these there one at a time over
+			// minutes, and a list that stays at the top shows the same first
+			// screenful throughout, looking stalled while it is anything but.
+			// Inside a BeginUpdate this costs nothing and leaves the finished
+			// list where the newest row is.
+			item.EnsureVisible();
 		}
 
 		/// <summary>
@@ -1124,7 +1130,8 @@ namespace Chimera.Client.GUI
 			_rememberFirmwareNow(ChosenCore.Name, ProvidedFirmwarePaths);
 
 			var manifest = PrecompileOrchestrator.Run(
-				ChosenCore.Path, _configPath, romPath, romSha1, dir, Entry, Progress, cancelled: PumpAndCheckCancel);
+				ChosenCore.Path, _configPath, romPath, romSha1, dir, Entry, Progress, cancelled: PumpAndCheckCancel,
+				firmware: ProvidedFirmwarePaths);
 
 			_precompiling = false;
 			_precompileBar.Visible = false;

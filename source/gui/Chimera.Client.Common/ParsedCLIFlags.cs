@@ -51,6 +51,9 @@ namespace Chimera.Client.Common
 		/// <summary>"INDEX/COUNT[/game]": run as a precompile session (docs: the compile cache), then exit</summary>
 		public readonly string? cmdPrecompile;
 
+		/// <summary>"&lt;id&gt;=&lt;path&gt;" pairs: firmware for this run, ahead of the config</summary>
+		public readonly string[]? cmdFirmware;
+
 		public ParsedCLIFlags(
 			string? cmdConfigFile,
 			string? cmdMovie,
@@ -72,7 +75,8 @@ namespace Chimera.Client.Common
 			IReadOnlyList<(string Key, string Value)>? userdataUnparsedPairs,
 			string? cmdRom,
 			string? cmdCorePackage,
-			string? cmdPrecompile = null)
+			string? cmdPrecompile,
+			string[]? cmdFirmware = null)
 		{
 			this.cmdConfigFile = cmdConfigFile;
 			this.cmdMovie = cmdMovie;
@@ -95,6 +99,7 @@ namespace Chimera.Client.Common
 			this.cmdRom = cmdRom;
 			this.cmdCorePackage = cmdCorePackage;
 			this.cmdPrecompile = cmdPrecompile;
+			this.cmdFirmware = cmdFirmware;
 		}
 	}
 }

@@ -217,6 +217,11 @@ namespace Chimera.Client.GUI
 			typeof(Form).GetField(OSTailoredCode.IsUnixHost ? "default_icon" : "defaultIcon", BindingFlags.NonPublic | BindingFlags.Static)!
 				.SetValue(null, Properties.Resources.Logo);
 
+			// before any rom is loaded: firmware named on the command line is what
+			// this run uses, whatever the config remembers
+			CoreFirmwareStore.CommandLineFirmware =
+				CoreFirmwareStore.ParseFirmwareArgs(cliFlags.cmdFirmware);
+
 			var configPath = cliFlags.cmdConfigFile ?? Path.Combine(PathUtils.ExeDirectoryPath, "config.ini");
 
 			Config initialConfig;

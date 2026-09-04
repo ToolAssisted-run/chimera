@@ -153,7 +153,8 @@ namespace Chimera.Client.GUI
 		/// </summary>
 		public static CoreCacheManifest Run(
 			string packagePath, string configPath, string romPath, string romSha1, string cacheDir,
-			Action<Entry> onEntry, Action<uint, uint> onProgress, Func<bool> cancelled)
+			Action<Entry> onEntry, Action<uint, uint> onProgress, Func<bool> cancelled,
+			IReadOnlyDictionary<string, string> firmware = null)
 		{
 			LastFailure = null;
 			if (string.IsNullOrEmpty(romPath) || !File.Exists(romPath) || cacheDir is null)
@@ -206,6 +207,15 @@ namespace Chimera.Client.GUI
 				if (!string.IsNullOrEmpty(configPath)) args.Add($"--config={configPath}");
 				args.Add($"--core={packagePath}");
 				args.Add($"--precompile={i}/{n}");
+				// Say the firmware outright. Going through the config means the
+				// parent must have written it there first, and the wizard can hold
+				// a path that never gets written - a core may call a firmware
+				// optional that this GAME cannot boot without. A session refused at
+				// boot compiles nothing.
+				foreach (var (id, path) in firmware ?? new Dictionary<string, string>())
+				{
+					args.Add($"--firmware={id}={path}");
+				}
 				args.Add(romPath);
 				var index = i;
 				var p = SelfProcess.Start(args, line => Line(index, line));
