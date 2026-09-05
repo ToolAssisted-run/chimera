@@ -243,22 +243,32 @@ namespace Chimera.Client.GUI
 		public bool LoadProject(string path)
 		{
 			EngineProject project;
-			try
+			ProjectLocalPaths local;
+			// The window says what the wait is for: a project's discs are hashed
+			// on the way in, and a PlayStation 2's is four gigabytes. It closes
+			// before the resolution dialog can ask, and the boot opens its own.
+			using (var progress = ProgressDialog.Begin(this, "Opening project"))
 			{
-				project = EngineProject.Open(path);
-			}
-			catch (InvalidOperationException ex)
-			{
-				ShowMessageBox(owner: null, ex.Message, "Cannot open the project");
-				return false;
-			}
+				progress.Step("reading the project");
+				try
+				{
+					project = EngineProject.Open(path);
+				}
+				catch (InvalidOperationException ex)
+				{
+					progress.Dispose();
+					ShowMessageBox(owner: null, ex.Message, "Cannot open the project");
+					return false;
+				}
 
-			// resolution: beside the project first, then where this machine last
-			// found them (the .chimeraLocal sidecar - a hint, never authority: it
-			// resolves nothing whose bytes do not match), then the user's say per file
-			project.ResolveDir(Path.GetDirectoryName(Path.GetFullPath(path)));
-			var local = ProjectLocalPaths.Read(path);
-			local.ApplyTo(project);
+				// resolution: beside the project first, then where this machine last
+				// found them (the .chimeraLocal sidecar - a hint, never authority: it
+				// resolves nothing whose bytes do not match), then the user's say per file
+				progress.Step("finding the project's files");
+				project.ResolveDir(Path.GetDirectoryName(Path.GetFullPath(path)));
+				local = ProjectLocalPaths.Read(path);
+				local.ApplyTo(project);
+			}
 			if (!project.FilesOk)
 			{
 				using ProjectResolutionForm dialog = new(project, locateFile: title =>
@@ -360,6 +370,11 @@ namespace Chimera.Client.GUI
 			_openProject?.Dispose();
 			_openProject = project;
 
+			// Everything that can still ask has asked; from here the wait is work,
+			// and the window says which: the movie, the machine, the greenzone.
+			using var progress = ProgressDialog.Begin(this, saved ? "Opening project" : "Creating project");
+			progress.Step("reading the project's movie");
+
 			// THE MACHINE BOOTS EXACTLY ONCE. The movie (which IS the project) is
 			// queued BEFORE the rom load, so the one boot already runs with the
 			// project's core and sync settings - never a throwaway config-settings
@@ -411,11 +426,13 @@ namespace Chimera.Client.GUI
 					Config.PathEntries,
 					Config.DefaultCores);
 
+				progress.Step("booting the machine");
 				if (!LoadRom(path, new LoadRomArgs(new OpenAdvanced_OpenRom(path))))
 				{
 					return false;
 				}
 
+				progress.Step("starting the movie");
 				MovieSession.RunQueuedMovie(isFresh, Emulator);
 			}
 			finally
@@ -458,6 +475,8 @@ namespace Chimera.Client.GUI
 			// not up yet, so the landing waits for it. Headless runs have nobody
 			// to operate TAStudio (which opens PAUSED at the session frame) -
 			// they just play the project (gates, dumps).
+			progress.Step("opening TAStudio");
+			progress.Dispose();
 			if (!HeadlessMode.Enabled)
 			{
 				if (Visible) Tools.Load<TAStudio>();

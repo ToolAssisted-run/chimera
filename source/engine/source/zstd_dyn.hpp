@@ -24,6 +24,12 @@ struct ZstdApi
 	struct Buffer { const void *ptr; size_t size; size_t pos; };
 	struct OutBuffer { void *ptr; size_t size; size_t pos; };
 	size_t (*decompressStream)(void *zds, OutBuffer *output, Buffer *input);
+	/* streaming compression, so a big lump can say how far it is */
+	void *(*createCStream)(void);
+	size_t (*initCStream)(void *zcs, int level);
+	size_t (*freeCStream)(void *zcs);
+	/* ZSTD_compressStream2: endOp 0 continue, 2 end */
+	size_t (*compressStream2)(void *zcs, OutBuffer *output, Buffer *input, int endOp);
 };
 
 /* The loaded API, or nullptr with *error set to why. Loads once, then cached. */

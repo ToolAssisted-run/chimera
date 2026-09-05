@@ -1312,6 +1312,25 @@ starts describing the moment rather than the ingredients, two builds of one
 commit stop matching and every hash in the chain becomes noise.
 
 
+## A long wait says what it is waiting for (user-asked, 2026-09-05)
+
+Opening, creating and saving a project could take a long time with nothing on
+screen - a PlayStation 3 boot fetching its compiled code, a four-gigabyte disc
+being hashed, a greenzone of hundreds of megabytes going through zstd - and a
+frozen window is a window a person kills. The work stays on the UI thread, as
+it must (the emulator and the engine are not shared across threads), so the
+answer is not a worker but a report: the engine gains one progress sink
+(`ce_progress_set`), and its slow calls report into it as they go - hashing a
+file says the file's name and bytes of its length, the state container says
+bytes compressed or read, a boot says its stage, the cache bridge counts the
+objects it fetches. The frontend's own steps report into the same stream
+(`EngineProgress`), and a small `ProgressDialog` listens while it is up, draws
+a bar when the stage has a length and a clock when it does not, pumps the
+message loop from those reports, and disables its owner so a click during the
+wait cannot start a second operation inside the first. The engine test hashes a
+nine-megabyte file with a sink installed and checks the last report reaches the
+end, and that nothing is heard when no sink is set.
+
 ## Turbo: a frame nobody looks at does not have to be drawn (user-asked, 2026-08-29)
 
 Fast-forwarding to the interesting part of a run spends most of its time drawing

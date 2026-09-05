@@ -1030,10 +1030,15 @@ namespace Chimera.Client.GUI
 			IMovie movieToSave = CurrentTasMovie;
 
 			FileWriteResult result;
-			if (saveBackup)
-				result = movieToSave.SaveBackup();
-			else
-				result = movieToSave.Save();
+			// the greenzone is the wait: hundreds of megabytes of states through
+			// zstd, and the window shows them going
+			using (ProgressDialog.Begin(this, saveBackup ? "Saving backup" : "Saving project"))
+			{
+				if (saveBackup)
+					result = movieToSave.SaveBackup();
+				else
+					result = movieToSave.Save();
+			}
 
 			if (!result.IsError)
 			{

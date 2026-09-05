@@ -3,6 +3,7 @@
  * belongs with the hash, not with whichever caller happened to need it first. */
 
 #include "sha1.hpp"
+#include "progress.hpp"
 
 #include "chimera/engine.h"
 
@@ -279,13 +280,33 @@ bool sha1HexOfFile(const char *utf8Path, uint64_t *lenOut, std::string &out)
 	Sha1 sha;
 	std::vector<uint8_t> chunk(1 << 20);
 	uint64_t total = 0;
+	/* the stage names the file: a project with three discs hashes them one
+	 * after another, and a person wants to know which one this is */
+	std::string stage = "hashing ";
+	{
+		const char *slash = utf8Path;
+		for (const char *c = utf8Path; *c != '\0'; c++)
+		{
+			if (*c == '/' || *c == '\\') slash = c + 1;
+		}
+		stage += slash;
+	}
+	const uint64_t expected = stamped ? key.size : 0;
+	uint64_t sinceReport = 0;
 	for (;;)
 	{
 		uint64_t got = reader.read(chunk.data(), chunk.size());
 		if (got == 0) break;
 		sha.update(chunk.data(), got);
 		total += got;
+		sinceReport += got;
+		if (sinceReport >= (4u << 20))
+		{
+			sinceReport = 0;
+			progress(stage.c_str(), total, expected);
+		}
 	}
+	if (expected != 0) progress(stage.c_str(), total, expected);
 	if (!reader.ok()) return false;
 	uint8_t digest[20];
 	sha.finish(digest);

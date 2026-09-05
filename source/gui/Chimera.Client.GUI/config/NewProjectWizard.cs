@@ -1920,6 +1920,10 @@ namespace Chimera.Client.GUI
 			// NOT disposed here on success: the caller takes ownership of the
 			// finished project and boots the machine from it. On any failure
 			// below we dispose it ourselves and stay on the page.
+			// Create hashes every file the project takes - a disc image is
+			// gigabytes - so the wait says which file it is on
+			using var progress = ProgressDialog.Begin(this, "Creating project");
+			progress.Step("hashing the project's files");
 			var project = EngineProject.New();
 			project.SetCore(core.Name, core.Version ?? "", core.Sha1 ?? "");
 			// The platform, stamped at creation: reopening forces the pinned core

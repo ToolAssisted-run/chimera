@@ -245,6 +245,7 @@ namespace Chimera.Client.Common
 				}
 			}
 
+			EngineProgress.Report("writing the project");
 			try
 			{
 				// The folder first: a backup goes to the "Movie backups" path, which
@@ -263,6 +264,7 @@ namespace Chimera.Client.Common
 
 			if (!isBackup)
 			{
+				EngineProgress.Report("writing the greenzone");
 				WriteCacheFile(Path.ChangeExtension(fn, "chimeraGreenZone"));
 				// and where this machine keeps the project's files, in a sibling of
 				// its own: the project itself stays distributable, carrying names and
@@ -475,6 +477,7 @@ namespace Chimera.Client.Common
 		protected override bool LoadProjectFormat()
 		{
 			_project?.Dispose();
+			EngineProgress.Report("reading the project");
 			_project = EngineProject.Open(Filename); // structural errors surface with the engine's reason
 
 			ClearBeforeLoad();
@@ -511,6 +514,7 @@ namespace Chimera.Client.Common
 			var logText = p.LogText;
 			if (logText.Length is not 0)
 			{
+				EngineProgress.Report("reading the input log");
 				IsCountingRerecords = false;
 				MakeBackup = false;
 				ExtractInputLog(new StringReader(logText), out _);
@@ -558,6 +562,7 @@ namespace Chimera.Client.Common
 				Branches.Add(b);
 			}
 
+			EngineProgress.Report("reading the greenzone");
 			LoadCacheFile();
 
 			ChangeLog.Clear();

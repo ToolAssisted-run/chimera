@@ -1,4 +1,4 @@
-#nullable enable
+﻿#nullable enable
 
 using System.Collections.Generic;
 using System.IO;
@@ -496,6 +496,10 @@ namespace Chimera.Emulation.Common.Engine
 		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract void ce_gl_request(int want);
 
+		/// <summary>the progress sink (see <see cref="EngineProgress"/>); fn is a Cdecl (stage, done, total, user) function pointer, or zero to stop</summary>
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract void ce_progress_set(IntPtr fn, IntPtr user);
+
 		// the compile cache and precompile sessions (docs: a core's compiled
 		// objects, kept on the host; never machine state)
 		[ChimeraImport(CallingConvention.Cdecl)]
@@ -713,6 +717,7 @@ namespace Chimera.Emulation.Common.Engine
 			{
 				throw new InvalidOperationException($"{LibName} speaks engine ABI v{abi}; this frontend speaks v1");
 			}
+			EngineProgress.Install(lib);
 			return lib;
 		}
 
@@ -1877,5 +1882,40 @@ namespace Chimera.Emulation.Common.Engine
 			var n = ChimeraEngine.Instance.ce_subtitle_format_line(ref f, message, buf, (ulong)buf.LongLength);
 			return Encoding.UTF8.GetString(buf, 0, (int)n);
 		}
+	}
+
+	/// <summary>
+	/// How far along a slow thing is, from wherever it is being done - the engine
+	/// hashing a disc image, compressing a greenzone, fetching a boot's compiled
+	/// code, or a frontend step around those. One event, one shape: a stage in
+	/// words, and done over total, where a total of zero means the end is not
+	/// known. A progress window subscribes while it is up; nobody subscribed
+	/// costs a null check. Raised on the thread doing the work, which for the
+	/// engine is the caller's own, so a handler may pump the message loop and
+	/// must not call back into the engine.
+	/// </summary>
+	public static class EngineProgress
+	{
+		[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+		private delegate void NativeFn(IntPtr stage, ulong done, ulong total, IntPtr user);
+
+		// kept alive for as long as the engine may call it, which is forever
+		private static readonly NativeFn _native = OnNative;
+		private static IntPtr _nativePtr;
+
+		public static event Action<string, ulong, ulong>? Reported;
+
+		internal static void Install(LibChimera lib)
+		{
+			if (_nativePtr == IntPtr.Zero) _nativePtr = Marshal.GetFunctionPointerForDelegate(_native);
+			lib.ce_progress_set(_nativePtr, IntPtr.Zero);
+		}
+
+		private static void OnNative(IntPtr stage, ulong done, ulong total, IntPtr user)
+			=> Reported?.Invoke(ChimeraEngine.PtrToStringUtf8(stage) ?? "", done, total);
+
+		/// <summary>A step the frontend itself is taking, in the same stream as the engine's.</summary>
+		public static void Report(string stage, ulong done = 0, ulong total = 0)
+			=> Reported?.Invoke(stage, done, total);
 	}
 }

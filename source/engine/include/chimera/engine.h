@@ -257,6 +257,17 @@ CE_API const uint8_t *ce_state_reader_lump(
  * call on the same reader. */
 CE_API const char *ce_state_reader_last_error(ce_state_reader *r);
 
+/* ---- progress ----
+ *
+ * How far along a slow call is, for a frontend that shows a bar. The engine
+ * reports as it works: hashing a file (bytes of its length), compressing or
+ * reading a state lump (bytes), a boot's stages (no total), the compiled
+ * objects a boot fetches (a count, no total). The callback runs on the thread
+ * doing the work - the caller's own - so a frontend may pump its message loop
+ * from it; it must not call back into the engine. Pass a null fn to stop. */
+typedef void (*ce_progress_fn)(const char *stage, uint64_t done, uint64_t total, void *user);
+CE_API void ce_progress_set(ce_progress_fn fn, void *user);
+
 /* ---- identity hashing ----
  *
  * The hash the frontend identifies files by: roms, firmware.

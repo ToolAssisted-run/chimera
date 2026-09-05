@@ -38,8 +38,60 @@ std::string hashWith(bool software, const std::vector<uint8_t> &data, size_t len
 
 } // namespace
 
+namespace {
+
+uint64_t g_lastDone = 0, g_lastTotal = 0;
+int g_reports = 0;
+void onProgress(const char *stage, uint64_t done, uint64_t total, void *)
+{
+	assert(stage != nullptr);
+	g_lastDone = done;
+	g_lastTotal = total;
+	g_reports++;
+}
+
+void testProgressOfAFileHash()
+{
+	/* a file bigger than the 4 MiB report interval, hashed with a sink installed:
+	 * the sink hears at least one report on the way and the last says done ==
+	 * total == the file's length; with no sink, nothing is heard */
+	const char *path = "progress-probe.bin";
+	{
+		FILE *f = fopen(path, "wb");
+		assert(f != nullptr);
+		std::vector<uint8_t> block(1 << 20, 0x5A);
+		for (int i = 0; i < 9; i++) assert(fwrite(block.data(), 1, block.size(), f) == block.size());
+		fclose(f);
+	}
+	char hex[41];
+	uint64_t len = 0;
+	ce_progress_set(&onProgress, nullptr);
+	assert(ce_sha1_file(path, hex, &len) == 1);
+	assert(len == 9u << 20);
+	assert(g_reports >= 2);
+	assert(g_lastDone == len && g_lastTotal == len);
+	ce_progress_set(nullptr, nullptr);
+	g_reports = 0;
+	/* the answer for a file already hashed comes from the cache, so rewrite it
+	 * to make the hash run again with nobody listening */
+	remove(path);
+	{
+		FILE *f = fopen(path, "wb");
+		std::vector<uint8_t> block(1 << 20, 0x3C);
+		for (int i = 0; i < 5; i++) assert(fwrite(block.data(), 1, block.size(), f) == block.size());
+		fclose(f);
+	}
+	assert(ce_sha1_file(path, hex, &len) == 1);
+	assert(g_reports == 0);
+	remove(path);
+	printf("progress: a file hash reports its way to the end\n");
+}
+
+} // namespace
+
 int main(void)
 {
+	testProgressOfAFileHash();
 	{ // the known answers, so that "they agree" cannot mean "both are wrong"
 		const std::string empty = chimera::sha1Hex(nullptr, 0);
 		assert(empty == "DA39A3EE5E6B4B0D3255BFEF95601890AFD80709");

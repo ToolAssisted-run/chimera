@@ -5,6 +5,7 @@
 // refused. A store writes beside and renames, so a reader never sees half.
 #include "chimera/engine.h"
 #include "cache-bridge.h"
+#include "progress.hpp"
 #include "sha1.hpp"
 
 #include <cstdint>
@@ -103,6 +104,7 @@ static __attribute__((noinline)) uintptr_t dispatch_impl(uintptr_t op, uintptr_t
 			fseek(f, 0, SEEK_SET);
 			if (fread(reinterpret_cast<void *>(static_cast<uintptr_t>(args->dst)), 1, static_cast<size_t>(size), f) != static_cast<size_t>(size)) { fclose(f); return 0; }
 			s_fetched++;
+			chimera::progress("loading compiled code", s_fetched, 0);
 			/* one line per object, for whoever is watching this process fill a
 			 * cache (the wizard's precompile step reads exactly these) */
 			printf("[cache] fetched %s %s\n", rel.c_str(),
@@ -143,6 +145,7 @@ static __attribute__((noinline)) uintptr_t dispatch_impl(uintptr_t op, uintptr_t
 #endif
 		if (rename(tmp.c_str(), full.c_str()) != 0) { remove(tmp.c_str()); return 0; }
 		s_stored++;
+		chimera::progress("keeping compiled code", s_stored, 0);
 		printf("[cache] stored %s %s\n", rel.c_str(),
 			chimera::sha1Hex(reinterpret_cast<const uint8_t *>(static_cast<uintptr_t>(args->data)), args->size).c_str());
 		fflush(stdout);

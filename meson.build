@@ -270,6 +270,7 @@ engine_src = files(
   'source/engine/source/state_container.cpp',
   'source/engine/source/zstd_dyn.cpp',
   'source/engine/source/sha1.cpp',
+  'source/engine/source/progress.cpp',
   'source/engine/source/firmware.cpp',
   'source/engine/source/conditions.cpp',
   'source/engine/source/multifile.cpp',

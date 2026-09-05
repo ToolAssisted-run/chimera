@@ -13,6 +13,7 @@
 #include "movie_entry.hpp"
 #include "file_io.hpp"
 #include "host_dyn.hpp"
+#include "progress.hpp"
 
 #include "../../extern/tools/cjson/cJSON.h"
 
@@ -893,6 +894,7 @@ ce_session *ce_session_open(
 	if (host == nullptr) return fail(hostError);
 
 	const char *pkgError = nullptr;
+	chimera::progress("reading the core package", 0, 0);
 	ce_package *pkg = ce_package_open(package_path, &pkgError);
 	if (pkg == nullptr)
 	{
@@ -961,6 +963,7 @@ ce_session *ce_session_open(
 	if (!r.ok()) return abort(r.errorMessage);
 	s->obj = reinterpret_cast<void *>(r.data);
 
+	chimera::progress("mounting the game", 0, 0);
 	/* The game itself, which is the one most likely to be enormous: mounted
 	 * from where it lies when the caller said where that is. */
 	if (romFromDisk)
@@ -1153,6 +1156,7 @@ ce_session *ce_session_open(
 		s->precompile = true;
 	}
 
+	chimera::progress("starting the machine", 0, 0);
 	auto init = reinterpret_cast<int32_t (*)()>(s->proc("Init", 0, true, err));
 	if (init == nullptr) return abort(std::move(err));
 	const int32_t initResult = init();
@@ -1176,6 +1180,7 @@ ce_session *ce_session_open(
 	}
 
 	if (!s->deactivate(err)) return abort(std::move(err));
+	chimera::progress("sealing the machine", 0, 0);
 	host->wbx_seal(s->obj, &r); // freeze the post-init image as the savestate baseline
 	if (!r.ok()) return abort(r.errorMessage);
 	if (!s->activate(err)) return abort(std::move(err));

@@ -11,6 +11,9 @@
 
 #include "chimera/engine.h"
 #include "zstd_dyn.hpp"
+#include "progress.hpp"
+
+#include <algorithm>
 
 #include "../../extern/tools/miniz/miniz.h"
 
@@ -65,6 +68,7 @@ bool zstdDecompress(const uint8_t *data, size_t len, std::vector<uint8_t> &out, 
 	chimera::ZstdApi::Buffer input{ data, len, 0 };
 	uint8_t chunk[1 << 16];
 	bool ok = true;
+	size_t reportedAt = 0;
 	for (;;)
 	{
 		chimera::ZstdApi::OutBuffer output{ chunk, sizeof chunk, 0 };
@@ -76,6 +80,11 @@ bool zstdDecompress(const uint8_t *data, size_t len, std::vector<uint8_t> &out, 
 			break;
 		}
 		out.insert(out.end(), chunk, chunk + output.pos);
+		if (input.pos - reportedAt >= (4u << 20))
+		{
+			reportedAt = input.pos;
+			chimera::progress("reading the greenzone", input.pos, input.size);
+		}
 		if (rc == 0 && input.pos >= input.size) break;
 		if (output.pos == 0 && input.pos >= input.size)
 		{
@@ -147,13 +156,61 @@ int32_t ce_state_writer_put_lump(
 		}
 		std::vector<uint8_t> compressed(api->compressBound(static_cast<size_t>(len)));
 		/* the 0-9 config level maps onto zstd as 2n+1, as it always did */
-		size_t written = api->compress(
-			compressed.data(), compressed.size(), data, static_cast<size_t>(len),
-			w->compressionLevel * 2 + 1);
-		if (api->isError(written) != 0)
+		const int level = w->compressionLevel * 2 + 1;
+		size_t written;
+		if (len >= (8u << 20) && api->createCStream != nullptr && api->compressStream2 != nullptr && chimera::progressWanted())
 		{
-			w->error = "zstd: compression failed for " + path;
-			return 1;
+			/* A greenzone is hundreds of megabytes, and one call that says
+			 * nothing for ten seconds is a frozen window. Streamed in blocks,
+			 * the same bytes go in and a frame comes out, and each block says
+			 * how far along it is. */
+			void *zcs = api->createCStream();
+			if (zcs == nullptr)
+			{
+				w->error = "zstd: could not create a compression stream";
+				return 1;
+			}
+			api->initCStream(zcs, level);
+			const std::string stage = "compressing " + std::string(name);
+			chimera::ZstdApi::Buffer input{ data, static_cast<size_t>(len), 0 };
+			chimera::ZstdApi::OutBuffer output{ compressed.data(), compressed.size(), 0 };
+			bool failed = false;
+			while (input.pos < input.size)
+			{
+				const size_t blockEnd = std::min(input.size, input.pos + (size_t)(4u << 20));
+				chimera::ZstdApi::Buffer block{ data, blockEnd, input.pos };
+				const size_t rc = api->compressStream2(zcs, &output, &block, 0);
+				input.pos = block.pos;
+				if (api->isError(rc) != 0) { failed = true; break; }
+				chimera::progress(stage.c_str(), input.pos, input.size);
+			}
+			if (!failed)
+			{
+				chimera::ZstdApi::Buffer empty{ data, static_cast<size_t>(len), static_cast<size_t>(len) };
+				for (;;)
+				{
+					const size_t remaining = api->compressStream2(zcs, &output, &empty, 2);
+					if (api->isError(remaining) != 0) { failed = true; break; }
+					if (remaining == 0) break;
+				}
+			}
+			api->freeCStream(zcs);
+			if (failed)
+			{
+				w->error = "zstd: compression failed for " + path;
+				return 1;
+			}
+			written = output.pos;
+		}
+		else
+		{
+			written = api->compress(
+				compressed.data(), compressed.size(), data, static_cast<size_t>(len), level);
+			if (api->isError(written) != 0)
+			{
+				w->error = "zstd: compression failed for " + path;
+				return 1;
+			}
 		}
 		/* compressed lumps are STORED - deflating zstd is a timesink */
 		path += ".zst";
