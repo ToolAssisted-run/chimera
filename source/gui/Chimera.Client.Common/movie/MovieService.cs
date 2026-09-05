@@ -44,9 +44,12 @@ namespace Chimera.Client.Common
 				return 1.0F;
 			}
 
+			// the header reads "Chimera Project File vN.N"; the version is whatever
+			// follows the format name. (It read "Chimera Tasproj vN.N" through
+			// the BizHawk lineage - renamed 2026-09-05, no longer accepted.)
 			var split = movieVersion
 				.ToLowerInvariant()
-				.Split(new[] {"tasproj"}, StringSplitOptions.RemoveEmptyEntries);
+				.Split(new[] {"project file"}, StringSplitOptions.RemoveEmptyEntries);
 
 			if (split.Length == 1)
 			{
@@ -62,7 +65,7 @@ namespace Chimera.Client.Common
 				return parsedWithPeriod;
 			}
 
-			// Accept .tasproj files written from <= 2.5 where the host culture settings used ','
+			// Accept version numbers written where the host culture used ',' for the decimal point
 			if (double.TryParse(versionStr.Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedWithComma))
 			{
 				return parsedWithComma;

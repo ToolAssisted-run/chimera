@@ -11,8 +11,8 @@ namespace Chimera.Tests.Client.Common.Movie
 		[DataRow(" ", 1.0)]
 		[DataRow("NonsenseString", 1.0)]
 		[DataRow("Chimera v1.0.0", 1.0)]
-		[DataRow("Chimera Tasproj v1.0", 1.0)]
-		[DataRow("Chimera Tasproj v1.1", TasMovie.CurrentVersion)]
+		[DataRow("Chimera Project File v1.0", 1.0)]
+		[DataRow("Chimera Project File v1.1", TasMovie.CurrentVersion)]
 		public void ParseTasMovieVersion(string movieVersion, double expected)
 		{
 			var actual = MovieService.ParseTasMovieVersion(movieVersion);

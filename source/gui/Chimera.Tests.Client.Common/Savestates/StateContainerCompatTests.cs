@@ -41,7 +41,7 @@ namespace Chimera.Tests.Client.Common.Savestates
 			}
 			PutText("ChimeraState 1.0", "3\n");
 			PutText("ChimeraVersion.txt", "2.10 (legacy)\n");
-			PutText("Header.txt", "MovieVersion Chimera Tasproj v1.1\n\n");
+			PutText("Header.txt", "MovieVersion Chimera Project File v1.1\n\n");
 
 			// zstd lump the old way: stored entry, STREAMING compression (frames
 			// with no content size in the header - the engine must cope)
@@ -105,7 +105,7 @@ namespace Chimera.Tests.Client.Common.Savestates
 				var create = ZipStateSaver.Create(path, compressionLevel: 5);
 				Assert.IsFalse(create.IsError);
 				var saver = create.Value!;
-				saver.PutLump(BinaryStateLump.Movieheader, (TextWriter tw) => tw.Write("MovieVersion Chimera Tasproj v1.1\n\n"));
+				saver.PutLump(BinaryStateLump.Movieheader, (TextWriter tw) => tw.Write("MovieVersion Chimera Project File v1.1\n\n"));
 				saver.PutLump(BinaryStateLump.Corestate, (BinaryWriter bw) => bw.Write(coreState));
 				Assert.IsFalse(saver.CloseAndDispose().IsError);
 

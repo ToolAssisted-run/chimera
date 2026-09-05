@@ -331,7 +331,7 @@ logkey = "#P1 Up|P1 Down|P1 Left|P1 Right|P1 A|P1 B|P1 Select|P1 Start|"
 json.dump({
     "title": "gridWalker.win",
     "core": {"name": "Synth", "version": "", "sha1": ""},
-    "headers": {"MovieVersion": "Chimera Tasproj v1.1", "Platform": "Synth"},
+    "headers": {"MovieVersion": "Chimera Project File v1.1", "Platform": "Synth"},
     "input": "[Input]\nLogKey:" + logkey + "\n" + "\n".join(entries) + "\n[/Input]\n",
 }, open(sys.argv[2], "w"))
 PY
@@ -379,7 +379,7 @@ sha1 = hashlib.sha1(open(sys.argv[2], "rb").read()).hexdigest().upper()
 json.dump({
     "title": "gridWalker.win",
     "core": {"name": "Synth", "version": "", "sha1": ""},
-    "headers": {"MovieVersion": "Chimera Tasproj v1.1", "Platform": "Synth"},
+    "headers": {"MovieVersion": "Chimera Project File v1.1", "Platform": "Synth"},
     "files": [{"name": "gridWalker.testrom", "sha1": sha1, "slot": "rom"}],
     "settings": {"initFillByte": 171},
     "input": "[Input]\nLogKey:" + logkey + "\n" + "\n".join(entries) + "\n[/Input]\n",
@@ -428,7 +428,7 @@ sha1 = hashlib.sha1(open(sys.argv[2], "rb").read()).hexdigest().upper()
 json.dump({
     "title": "gridWalker.win",
     "core": {"name": "Synth", "version": "", "sha1": ""},
-    "headers": {"MovieVersion": "Chimera Tasproj v1.1", "Platform": "Synth"},
+    "headers": {"MovieVersion": "Chimera Project File v1.1", "Platform": "Synth"},
     "files": [{"name": "gridWalker.testrom", "sha1": sha1, "slot": "rom"}],
     "input": "[Input]\nLogKey:" + logkey + "\n" + "\n".join(entries) + "\n[/Input]\n",
 }, open(sys.argv[3], "w"))
@@ -500,7 +500,7 @@ sha1 = hashlib.sha1(open(sys.argv[2], "rb").read()).hexdigest().upper()
 json.dump({
     "title": sys.argv[1],
     "core": {"name": "Synth", "version": "", "sha1": ""},
-    "headers": {"MovieVersion": "Chimera Tasproj v1.1", "Platform": "Synth"},
+    "headers": {"MovieVersion": "Chimera Project File v1.1", "Platform": "Synth"},
     "files": [{"name": sys.argv[2].split("/")[-1], "sha1": sha1, "slot": "rom"}],
     "input": "[Input]\nLogKey:" + logkey + "\n" + "\n".join(entries) + "\n[/Input]\n",
 }, open(sys.argv[3], "w"))

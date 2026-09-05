@@ -484,7 +484,7 @@ namespace Chimera.Client.Common
 			var p = _project;
 
 			// the ctor's defaults, then the stored header metadata over them
-			Header[HeaderKeys.MovieVersion] = $"Chimera Tasproj v{CurrentVersion.ToString(CultureInfo.InvariantCulture)}";
+			Header[HeaderKeys.MovieVersion] = $"Chimera Project File v{CurrentVersion.ToString(CultureInfo.InvariantCulture)}";
 			for (var i = 0; i < p.HeaderCount; i++)
 			{
 				Header[p.HeaderKeyAt(i)] = p.HeaderValueAt(i);
