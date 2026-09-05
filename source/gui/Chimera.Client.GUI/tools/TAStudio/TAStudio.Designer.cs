@@ -589,6 +589,7 @@ namespace Chimera.Client.GUI
 			this.BranchesMarkersSplit.Panel1.Controls.Add(this.BookMarkControl);
 			this.BranchesMarkersSplit.Panel1.Controls.Add(this.TasPlaybackBox);
 			this.BranchesMarkersSplit.Panel1MinSize = 200;
+			this.BranchesMarkersSplit.Panel2MinSize = 90;
 			// 
 			// BranchesMarkersSplit.Panel2
 			// 
@@ -610,6 +611,7 @@ namespace Chimera.Client.GUI
 			// MainVertialSplit.Panel2
 			// 
 			this.MainVertialSplit.Panel2.Controls.Add(this.BranchesMarkersSplit);
+			this.MainVertialSplit.Panel2MinSize = 160;
 			this.MainVertialSplit.Size = new System.Drawing.Size(507, 528);
 			this.MainVertialSplit.SplitterDistance = 295;
 			this.MainVertialSplit.TabIndex = 10;

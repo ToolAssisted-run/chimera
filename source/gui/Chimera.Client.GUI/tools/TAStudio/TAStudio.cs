@@ -138,6 +138,25 @@ namespace Chimera.Client.GUI
 			public bool EditInvisibleColumns { get; set; }
 			public int MainVerticalSplitDistance { get; set; }
 			public int BranchMarkerSplitDistance { get; set; }
+
+			/// <summary>
+			/// The sidebar's width, which is what a person actually chose - the
+			/// splitter DISTANCE above is the roll's width, and the roll is the
+			/// panel that grows with the window. Saved from a maximised window,
+			/// that distance was the width of a maximised roll, and restored into
+			/// a normal-sized window it left the sidebar its 25-pixel minimum,
+			/// which no amount of maximising afterwards undid because the sidebar
+			/// is the fixed panel (issue #15). Zero means never saved; the
+			/// distance is then used, as before.
+			/// </summary>
+			public int SidebarWidth { get; set; }
+
+			/// <summary>
+			/// Where the branches end and the markers begin, as a share of the
+			/// sidebar's height - the same fix for the same reason, since the
+			/// sidebar's height follows the window's. Zero means never saved.
+			/// </summary>
+			public double BranchMarkerSplitRatio { get; set; }
 			public bool BindMarkersToInput { get; set; }
 			public bool CopyIncludesFrameNo { get; set; }
 			public bool AutoadjustInput { get; set; } // Currently unsupported due to being broken
@@ -226,9 +245,7 @@ namespace Chimera.Client.GUI
 
 		private void Tastudio_Load(object sender, EventArgs e)
 		{
-			MainVertialSplit.SetDistanceOrDefault(
-				Settings.MainVerticalSplitDistance,
-				_defaultMainSplitDistance);
+			RestoreMainSplit();
 			_activeInputRoll = MakeInputRoll(); // first because stuff in Engage assumes we have at least one
 
 			if (!Engage())
@@ -242,9 +259,7 @@ namespace Chimera.Client.GUI
 			_autosaveTimer.Tick += AutosaveTimerEventProcessor;
 			ScheduleAutoSave(Settings.AutosaveInterval);
 
-			BranchesMarkersSplit.SetDistanceOrDefault(
-				Settings.BranchMarkerSplitDistance,
-				_defaultBranchMarkerSplitDistance);
+			RestoreBranchMarkerSplit();
 
 			HandleHotkeyUpdate();
 
@@ -1341,15 +1356,56 @@ namespace Chimera.Client.GUI
 			return false;
 		}
 
+		// ---- the two splitters, remembered as what was chosen rather than where it landed ----
+		//
+		// SplitterMoved fires for a drag and for a window that was resized under
+		// the splitter alike, so what it records must not depend on the window's
+		// size at the time: the sidebar's width (the sidebar being the fixed
+		// panel, that is what a drag sets), and the branches/markers boundary as
+		// a share of the sidebar's height. Nothing is recorded until the window
+		// has finished loading, so restoring a value does not re-record it.
+
+		private static int Clamp(int value, int min, int max) => Math.Max(min, Math.Min(max, value));
+
+		private void RestoreMainSplit()
+		{
+			var width = MainVertialSplit.Width;
+			var max = width - MainVertialSplit.Panel2MinSize - MainVertialSplit.SplitterWidth;
+			if (Settings.SidebarWidth > 0 && max > MainVertialSplit.Panel1MinSize)
+			{
+				MainVertialSplit.SplitterDistance = Clamp(width - Settings.SidebarWidth - MainVertialSplit.SplitterWidth, MainVertialSplit.Panel1MinSize, max);
+				return;
+			}
+			MainVertialSplit.SetDistanceOrDefault(Settings.MainVerticalSplitDistance, _defaultMainSplitDistance);
+		}
+
+		private void RestoreBranchMarkerSplit()
+		{
+			var height = BranchesMarkersSplit.Height;
+			var max = height - BranchesMarkersSplit.Panel2MinSize - BranchesMarkersSplit.SplitterWidth;
+			if (Settings.BranchMarkerSplitRatio > 0 && max > BranchesMarkersSplit.Panel1MinSize)
+			{
+				BranchesMarkersSplit.SplitterDistance = Clamp((int)Math.Round(Settings.BranchMarkerSplitRatio * height), BranchesMarkersSplit.Panel1MinSize, max);
+				return;
+			}
+			BranchesMarkersSplit.SetDistanceOrDefault(Settings.BranchMarkerSplitDistance, _defaultBranchMarkerSplitDistance);
+		}
+
 		private void MainVerticalSplit_SplitterMoved(object sender, SplitterEventArgs e)
 		{
-			Settings.MainVerticalSplitDistance = MainVertialSplit.SplitterDistance;
+			if (_initialized)
+			{
+				Settings.MainVerticalSplitDistance = MainVertialSplit.SplitterDistance;
+				Settings.SidebarWidth = Math.Max(MainVertialSplit.Panel2MinSize, MainVertialSplit.Width - MainVertialSplit.SplitterDistance - MainVertialSplit.SplitterWidth);
+			}
 			if (_inputRolls.Count != 0) RepositionRolls(); // this event gets called while loading
 		}
 
 		private void BranchesMarkersSplit_SplitterMoved(object sender, SplitterEventArgs e)
 		{
+			if (!_initialized || BranchesMarkersSplit.Height <= 0) return;
 			Settings.BranchMarkerSplitDistance = BranchesMarkersSplit.SplitterDistance;
+			Settings.BranchMarkerSplitRatio = (double)BranchesMarkersSplit.SplitterDistance / BranchesMarkersSplit.Height;
 		}
 
 		private void TasView_CellDropped(object sender, InputRoll.CellEventArgs e)
