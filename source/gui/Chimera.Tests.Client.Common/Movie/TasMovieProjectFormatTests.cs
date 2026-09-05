@@ -25,9 +25,9 @@ namespace Chimera.Tests.Client.Common.Movie
 		[ClassCleanup]
 		public static void RemovePlayground() => Directory.Delete(_dir, recursive: true);
 
-		private static TasMovie MakeWorkedMovie(string path, string gpuRenderer = "")
+		private static TasMovie MakeWorkedMovie(string path, string gpuRenderer = "", bool statesSurvive = false)
 		{
-			FakeEmulator emu = new() { GpuRenderer = gpuRenderer };
+			FakeEmulator emu = new() { GpuRenderer = gpuRenderer, GpuStatesSurviveTheContext = statesSurvive };
 			FakeMovieSession session = new(emu);
 			TasMovie movie = new(session, path);
 			session.Movie = movie;
@@ -229,6 +229,26 @@ namespace Chimera.Tests.Client.Common.Movie
 			Assert.IsNull(plainLoaded.DroppedCacheNote);
 			CollectionAssert.AreEqual(new byte[] { 1, 2, 3, 4 }, plainLoaded.Branches[0].CoreData,
 				"the state came from the cache, as it always has");
+		}
+
+		/// <summary>
+		/// ...unless the core says its renderer builds its objects again when
+		/// the context it drew on is gone. Then the states are as good as any
+		/// other core's, and the project keeps them.
+		/// </summary>
+		[TestMethod]
+		public void ARendererThatRebuildsKeepsItsStates()
+		{
+			var path = Path.Combine(_dir, "rebuilds.chimeraProject");
+			var movie = MakeWorkedMovie(path, gpuRenderer: "4.5 Mesa on llvmpipe", statesSurvive: true);
+			Assert.IsFalse(movie.Save().IsError);
+
+			var loaded = LoadFresh(path);
+			Assert.IsNull(loaded.DroppedCacheNote, "nothing was dropped");
+			CollectionAssert.AreEqual(new byte[] { 1, 2, 3, 4 }, loaded.Branches[0].CoreData,
+				"the branch kept the machine behind it");
+			Assert.AreEqual("1", loaded.HeaderEntries[HeaderKeys.GpuStatesSurvive],
+				"and the project says why, for a session with no core to ask");
 		}
 
 		/// <summary>

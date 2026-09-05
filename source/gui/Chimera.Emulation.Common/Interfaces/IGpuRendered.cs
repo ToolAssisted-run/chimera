@@ -17,5 +17,20 @@ namespace Chimera.Emulation.Common
 		/// could have used a GPU and was not given one.
 		/// </summary>
 		string GpuRenderer { get; }
+
+		/// <summary>
+		/// Whether a savestate this core makes can be loaded into a session
+		/// with a DIFFERENT GL context - a later run of the frontend, most of
+		/// the time.
+		///
+		/// It is false by default and for a reason: a renderer holds its GL
+		/// objects by the names a driver handed out, those names live in guest
+		/// memory, and a state carries them into a session where they name
+		/// nothing. The driver refuses every call using one and says so to
+		/// nobody, so the machine runs and draws nothing. A core answers true
+		/// only when its renderer NOTICES that the context is not the one its
+		/// objects came from and builds them again.
+		/// </summary>
+		bool GpuStatesSurviveTheContext { get; }
 	}
 }

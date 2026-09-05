@@ -191,6 +191,10 @@ namespace Chimera.Client.Common
 			if (Emulator is IGpuRendered gpu && !string.IsNullOrEmpty(gpu.GpuRenderer))
 			{
 				Header[HeaderKeys.GpuRenderer] = gpu.GpuRenderer;
+				// ...and whether the states beside this project can be opened
+				// again in another session, which is a question about the core
+				// and has to be answered while there is a core to ask
+				if (gpu.GpuStatesSurviveTheContext) Header[HeaderKeys.GpuStatesSurvive] = "1";
 			}
 
 			if (IsAttached())
@@ -340,7 +344,8 @@ namespace Chimera.Client.Common
 		/// is what an empty greenzone has always meant.
 		/// </summary>
 		private bool DrawnByGpu
-			=> Emulator is IGpuRendered { GpuRenderer: { Length: > 0 } };
+			=> Emulator is IGpuRendered { GpuRenderer: { Length: > 0 } } gpu
+				&& !gpu.GpuStatesSurviveTheContext;
 
 		/// <summary>
 		/// The same question asked of the cache rather than of the machine, and
@@ -351,7 +356,9 @@ namespace Chimera.Client.Common
 		/// </summary>
 		private bool StatesMadeByGpu
 			=> HeaderEntries.TryGetValue(HeaderKeys.GpuRenderer, out var driver)
-				&& !string.IsNullOrWhiteSpace(driver);
+				&& !string.IsNullOrWhiteSpace(driver)
+				&& !(HeaderEntries.TryGetValue(HeaderKeys.GpuStatesSurvive, out var survives)
+					&& survives.Trim() == "1");
 
 		/// <summary>
 		/// The regenerable bulk, beside the project: greenzone, lag log, session

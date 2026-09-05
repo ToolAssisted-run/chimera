@@ -369,6 +369,20 @@ namespace Chimera.Emulation.Common.Waterbox
 
 			/// <summary>Guest export returning a Width*Height BGRA (0xFFrrggbb) frame.</summary>
 			public string GetBgra { get; set; }
+
+			/// <summary>
+			/// Whether this core's savestates survive a change of GL context -
+			/// which is what opening a project in a later session is.
+			///
+			/// A bridged renderer holds its GL objects by the names a driver
+			/// handed out, and those names live in guest memory, so a state
+			/// carries them into a session where they name nothing. A core
+			/// declares this only when its renderer NOTICES that (the bridge's
+			/// context id, kept beside the objects) and builds them again. The
+			/// frontend keeps a project's cached states for a core that says
+			/// yes, and drops them for one that does not.
+			/// </summary>
+			public bool GpuStatesSurviveTheContext { get; set; }
 		}
 
 		public sealed class AudioConfig

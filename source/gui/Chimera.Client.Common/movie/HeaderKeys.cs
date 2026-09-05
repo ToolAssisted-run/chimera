@@ -45,6 +45,14 @@ namespace Chimera.Client.Common
 		// which desyncs somewhere else can be understood rather than merely
 		// suffered. The value is what the driver called itself.
 		public const string GpuRenderer = "GpuRenderer";
+
+		/// <summary>
+		/// "1" when the core that made this can load its own states into a
+		/// session with another GL context (see IGpuRendered). Written only
+		/// alongside GpuRenderer, and read when a project's cached states are
+		/// opened - by which time there is no core to ask.
+		/// </summary>
+		public const string GpuStatesSurvive = "GpuStatesSurvive";
 		public const string Core = "Core";
 		public const string WaterboxHost = "WaterboxHost"; // the sandbox the core ran inside, by its own build info
 		public const string Firmware = "Firmware"; // "<id>=<sha1>" per file the core was given; a BIOS changes what runs

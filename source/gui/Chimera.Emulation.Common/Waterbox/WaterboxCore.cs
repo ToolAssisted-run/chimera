@@ -355,6 +355,12 @@ namespace Chimera.Emulation.Common.Waterbox
 		/// </summary>
 		public string GpuRenderer => _session.GpuDescription;
 
+		/// <summary>
+		/// Whether this core's renderer rebuilds after the context it drew on
+		/// is gone - declared in waterbox.config, and false unless it says so.
+		/// </summary>
+		public bool GpuStatesSurviveTheContext => _cfg.Video?.GpuStatesSurviveTheContext is true;
+
 		// ICorePrecompile: only meaningful when the core was opened as a precompile session
 		public bool PrecompileDone => _session.PrecompileDone;
 		public (uint Done, uint Total) PrecompileProgress => _session.PrecompileProgress;

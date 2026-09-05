@@ -174,13 +174,47 @@ loaded into a fresh process:
 36 GL errors a frame against 1.2 in the same run without the load, and every
 failing call one that names an object.
 
-So a state a GPU drew is **session-local**. The frontend enforces it where the
-states are kept: a project whose header names a driver (`GpuRenderer`) writes
-no states into its `.chimeraGreenZone` and uses none from an older one, and
-says so when it opens. Rewind, branches and everything else within a session
-are untouched - the objects are still there. Reopening a project replays
-instead, which is what an empty greenzone has always meant.
+### Noticing, and building them again
 
-The fix that would make such a state loadable is for the renderer to rebuild
-its objects after a load - a context-loss path, core by core - and nothing here
-has one yet.
+A renderer can be told which context its calls are landing on: `GL_OP_CONTEXT_ID`
+answers with an identity minted when the context is made (0 means "cannot tell" -
+no bridge, or a host older than the question, and a guest must read that as
+"assume nothing moved"). A renderer that stores that number beside its objects
+can see, at the top of any frame, that the ground has moved - and rebuild.
+
+RPCS3 does. Its `on_init_thread` and `on_exit` were split into the half that
+belongs to the CONTEXT (every GL object) and the half that belongs to the
+MACHINE (`rsx::thread::on_exit` sets the thread's exit flag, and must never run
+mid-game); the FIFO loop compares the two ids, and on a difference tears the
+context's half down, builds it again and marks the whole pipeline dirty. The
+objects come back from emulated memory, which is where they came from the first
+time: the surface cache reads its render targets out of RSX memory, the texture
+cache re-uploads, the program cache recompiles.
+
+One upstream bug had to go first. `gl::glsl::shader::remove()` did not clear
+`m_is_compiled`, and `compile()` returns early when it is set ("another thread
+compiled this already") - so a shader object destroyed and made again linked
+UNCOMPILED, and every uniform lookup on the resulting program failed forever.
+Nobody upstream re-creates a shader in one process. A renderer rebuilding after
+context loss does, twice, for the two overlay passes.
+
+Measured on the same disc, a state saved at frame 150 and loaded in a fresh
+process: the picture returns (1280x720, 20322 lit pixels, against `lit 0`
+forever); GL errors are 137 in the rebuild frame and 3 a frame after it, which
+is the rate an ordinary run has anyway.
+
+### What the frontend does with that
+
+A core declares `video.gpuStatesSurviveTheContext` when its renderer does this,
+and a project records it (`GpuStatesSurvive`) so that the answer is there when
+the cached states are opened - by which time there is no core to ask. For a core
+that says yes, the greenzone is kept like any other core's. For one that does
+not, the states are session-local: the project writes none into its
+`.chimeraGreenZone` and uses none from an older one, branch states included, and
+says so when it opens. Rewind and branches within a session are untouched either
+way - the objects are still there - and a project that loses its cache replays,
+which is what an empty greenzone has always meant.
+
+RPCS3 says yes. PCSX2, Flycast, xemu, Dolphin and Ruffle do not yet: the same
+split would work for the two that have an `on_exit`/`on_init` pair of this
+shape, and Ruffle needs it a layer lower, inside wgpu.

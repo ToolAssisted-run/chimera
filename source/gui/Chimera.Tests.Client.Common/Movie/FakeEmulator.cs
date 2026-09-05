@@ -11,6 +11,9 @@ namespace Chimera.Tests.Client.Common.Movie
 		/// <summary>Empty for a machine nobody's GPU drew, which is the default.</summary>
 		public string GpuRenderer { get; set; } = "";
 
+		/// <summary>False, as for a renderer that does not rebuild after a context change.</summary>
+		public bool GpuStatesSurviveTheContext { get; set; }
+
 		private BasicServiceProvider _serviceProvider;
 		public IEmulatorServiceProvider ServiceProvider => _serviceProvider;
 

@@ -41,6 +41,7 @@
 
 #include <cstdio>   /* snprintf: both flavours report why there is no context */
 #include <cstdlib>
+#include <ctime>    /* one ingredient of a context's identity */
 
 #ifdef CE_GL_BRIDGE
 
@@ -68,6 +69,8 @@ namespace
 
 int g_version;
 bool g_ready;
+/* Which context is current - see GL_OP_CONTEXT_ID. Zero until one is made. */
+uint64_t g_context_id;
 char g_description[256];
 
 /* ---------------------------------------------------------------------------
@@ -367,6 +370,15 @@ static uintptr_t ce_gl_dispatch_one(uintptr_t op, uintptr_t a, uintptr_t b,
 			 * list being append-only is what makes that check sufficient. */
 			return CHIMERA_GL_OP_LIST_LENGTH;
 
+		case GL_OP_CONTEXT_ID:
+			/* Which context these calls are landing on. A renderer keeps its
+			 * GL objects by the names this context handed out, and those names
+			 * live in guest memory - so they survive a savestate into a session
+			 * where they name nothing, and every call using one is refused
+			 * without the guest ever hearing about it. Storing this number
+			 * beside them is how a renderer can tell, and rebuild. */
+			return g_context_id;
+
 		case GL_OP_VERSION:
 		{
 			/* Never hand a host pointer back: the guest cannot read our memory
@@ -459,6 +471,17 @@ extern "C" int32_t ce_gl_start(char *error_out, int32_t error_len)
 	}
 
 	g_ready = true;
+	/* An identity for THIS context, and no other. It need only differ - the
+	 * guest compares it for equality and nothing else - so it is taken from
+	 * where this process happens to sit in memory (which the loader decides
+	 * anew every run), the clock, and a count of the contexts made here. */
+	{
+		static uint64_t made;
+		g_context_id = (static_cast<uint64_t>(reinterpret_cast<uintptr_t>(&g_context_id)) << 16)
+			^ (static_cast<uint64_t>(time(nullptr)) << 8)
+			^ (++made);
+		if (g_context_id == 0) g_context_id = 1; /* 0 means "cannot tell" */
+	}
 	return_current();
 	return 1;
 }
@@ -469,6 +492,7 @@ extern "C" void ce_gl_stop(void)
 	ce_gl_release();
 	destroy_context();
 	g_ready = false;
+	g_context_id = 0;
 	g_description[0] = 0;
 }
 
