@@ -477,6 +477,15 @@ namespace Chimera.Client.GUI
 			}
 
 			MainForm.AddOnScreenMessage("TAStudio engaged");
+			if (!Emulator.DeterministicEmulation)
+			{
+				// The greenzone is savestates, and a savestate does not capture the
+				// GPU: on a hardware renderer the machine cannot be fully restored,
+				// so seeking and rewind are unreliable and an edit can crash the
+				// core (issue #43). The boot's transient "not deterministic" notice
+				// does not say what that means for TAStudio, so say it here.
+				MainForm.AddOnScreenMessage("This machine is NOT deterministic (hardware renderer): the greenzone and seeking are unreliable and editing may crash. Use a software renderer for reliable TASing.", 12);
+			}
 			MovieSession.ReadOnly = true;
 			SetSplicer();
 

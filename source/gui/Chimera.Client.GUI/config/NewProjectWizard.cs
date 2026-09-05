@@ -714,9 +714,11 @@ namespace Chimera.Client.GUI
 		/// warning that is always on screen is a warning nobody reads.
 		/// </summary>
 		internal const string HardwareRendererCaveat =
-			"Hardware renderers are much faster, but carry a slightly higher chance of desync. "
-			+ "Check now and then that your movie still syncs: clear its greenzone in TAStudio and replay it from the start. "
-			+ "If you need a guarantee, choose a software renderer.";
+			"Hardware renderers draw on your PC's GPU. They are fast, but NOT deterministic: the GPU is outside "
+			+ "the savestate, so the greenzone cannot fully restore the machine. That means a higher chance of desync, "
+			+ "seeking and rewind that can misbehave, a movie that may not reproduce on another PC, and editing that "
+			+ "can even crash the emulator. Choose a software renderer for any TAS you mean to keep. To check a hardware "
+			+ "run anyway, clear its greenzone in TAStudio and replay it from the start.";
 
 		private void ShowRendererCaveat()
 			=> _rendererCaveat.Text = IsHardware(ChosenRenderer) ? HardwareRendererCaveat : "";
