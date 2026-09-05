@@ -320,11 +320,50 @@ namespace Chimera.Client.Common
 		}
 
 		/// <summary>
+		/// True when a GPU drew this machine, which decides whether its states
+		/// can outlive the session.
+		///
+		/// A bridged core's renderer keeps its OpenGL objects - textures,
+		/// programs, vertex arrays - by the NAMES a driver gave it, and those
+		/// names live in guest memory, so a savestate carries them faithfully
+		/// into a session where they mean nothing: the context that owned them
+		/// is gone, every call naming one is refused by the driver, and the
+		/// core is never told (a GL error raised out at the bridge is invisible
+		/// to the guest). The machine runs on perfectly - threads alive, memory
+		/// changing - and draws NOTHING, which is what a PS3 project reopened
+		/// after a few hundred frames did: a black screen, and then a crash
+		/// (issue: "saving a project and then reloading it").
+		///
+		/// So a state a GPU drew is good for the session that made it and no
+		/// other. Rewind and branches work as they always did; what does not
+		/// cross a restart is written down here and recomputed by replay, which
+		/// is what an empty greenzone has always meant.
+		/// </summary>
+		private bool DrawnByGpu
+			=> Emulator is IGpuRendered { GpuRenderer: { Length: > 0 } };
+
+		/// <summary>
+		/// The same question asked of the cache rather than of the machine, and
+		/// it has to be: a project is READ before its core is booted, so there is
+		/// no emulator to ask when the cache is opened. What there is, is what
+		/// the project's last save wrote down - the driver that drew it - which
+		/// is exactly the session those states belonged to.
+		/// </summary>
+		private bool StatesMadeByGpu
+			=> HeaderEntries.TryGetValue(HeaderKeys.GpuRenderer, out var driver)
+				&& !string.IsNullOrWhiteSpace(driver);
+
+		/// <summary>
 		/// The regenerable bulk, beside the project: greenzone, lag log, session
 		/// position, column layout, verification log, branch states and
 		/// screenshots (joined to the project's branches by order). A failed
 		/// cache write never fails the save - the cache is the one file whose
 		/// loss costs recomputation only.
+		///
+		/// The states themselves are left out for a machine a GPU drew (see
+		/// <see cref="DrawnByGpu"/>): they could only be loaded back into a
+		/// machine that cannot draw, and for a PlayStation 3 each one is the
+		/// better part of a gigabyte.
 		/// </summary>
 		private void WriteCacheFile(string path)
 		{
@@ -364,7 +403,7 @@ namespace Chimera.Client.Common
 				// memory FIRST, and a manager that cannot serialize costs a cold
 				// greenzone on the next load, nothing more
 				byte[] history = null;
-				if (TasStateManager is not null)
+				if (TasStateManager is not null && !DrawnByGpu)
 				{
 					try
 					{
@@ -389,7 +428,11 @@ namespace Chimera.Client.Common
 				var ncoreframebuffer = new IndexedStateLump(BinaryStateLump.BranchCoreFrameBuffer);
 				foreach (var b in Branches)
 				{
-					if (b.CoreData is not null)
+					// the branch's picture and its metadata are worth keeping; the
+					// machine behind it is not, for the same reason the greenzone
+					// is not (see DrawnByGpu). Skipped for ALL branches or none:
+					// these lumps are joined to the branches by order.
+					if (b.CoreData is not null && !DrawnByGpu)
 					{
 						bs.PutLump(ncore, (Stream s) => s.Write(b.CoreData, 0, b.CoreData.Length));
 					}
@@ -598,7 +641,13 @@ namespace Chimera.Client.Common
 				var ncoreframebuffer = new IndexedStateLump(BinaryStateLump.BranchCoreFrameBuffer);
 				foreach (var b in Branches)
 				{
-					bl.GetLump(ncore, abort: false, (Stream s, long _) => b.CoreData = s.ReadAllBytes());
+					// a state a GPU drew belongs to the session that drew it; an
+					// older cache may still hold one, and loading it would put a
+					// machine that cannot draw on the screen (see DrawnByGpu)
+					if (!StatesMadeByGpu)
+					{
+						bl.GetLump(ncore, abort: false, (Stream s, long _) => b.CoreData = s.ReadAllBytes());
+					}
 					bl.GetLump(nframebuffer, abort: false, (Stream s, long _) =>
 					{
 						QuickBmpFile.LoadAuto(s, out var vp);
@@ -629,7 +678,7 @@ namespace Chimera.Client.Common
 
 				TasStateManager?.Dispose();
 				TasStateManager = null;
-				var hasHistory = bl.GetLump(BinaryStateLump.StateHistory, abort: false, br =>
+				var hasHistory = !StatesMadeByGpu && bl.GetLump(BinaryStateLump.StateHistory, abort: false, br =>
 				{
 					try
 					{
@@ -642,6 +691,16 @@ namespace Chimera.Client.Common
 						TasStateManager = null;
 					}
 				});
+				// Said when there is work to say it about: a project with frames in
+				// it opens with an empty greenzone on a machine a GPU draws, and a
+				// person who is not told simply sees their cached states gone.
+				if (StatesMadeByGpu && DroppedCacheNote is null && InputLogLength > 0)
+				{
+					DroppedCacheNote =
+						"This machine is drawn by a GPU, and what it draws lives outside the machine: a state"
+						+ " it made is good only in the session that made it. The greenzone therefore starts"
+						+ " empty and fills again as the movie plays.";
+				}
 				if (!hasHistory || TasStateManager is null)
 				{
 					try

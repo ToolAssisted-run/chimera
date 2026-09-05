@@ -151,3 +151,36 @@ stopped.
 - **Readback.** A game that reads rendered pixels into machine state would feed
   GPU output into the savestate, and that is where a desync stops being a
   possibility and becomes a certainty.
+
+## A state is good in the session that made it, and no other
+
+The renderer keeps its OpenGL objects - textures, programs, vertex arrays,
+framebuffers - by the NAMES the driver handed it, and those names live in guest
+memory. A savestate carries them faithfully, which is exactly the problem: load
+one into a later session and every name refers to an object in a context that
+no longer exists. The driver refuses each call (`GL_INVALID_VALUE`,
+`GL_INVALID_OPERATION`) and the guest is never told, because a GL error raised
+out here is invisible to it. The machine runs on - threads alive, memory
+changing, audio playing - and draws nothing.
+
+That is what reopening a saved PlayStation 3 project did: a black screen, and
+then a crash. Measured on GTA San Andreas, one state saved at frame 150 and
+loaded into a fresh process:
+
+    [trace] frame 9 ... digest 0a684eb5... video 1920x1080 sum 0 lit 0
+    [ce-gl!] op=649 raised 0x501   (glProgramUniform4f)
+    [ce-gl!] op=115 raised 0x502   (glBindVertexArray)
+
+36 GL errors a frame against 1.2 in the same run without the load, and every
+failing call one that names an object.
+
+So a state a GPU drew is **session-local**. The frontend enforces it where the
+states are kept: a project whose header names a driver (`GpuRenderer`) writes
+no states into its `.chimeraGreenZone` and uses none from an older one, and
+says so when it opens. Rewind, branches and everything else within a session
+are untouched - the objects are still there. Reopening a project replays
+instead, which is what an empty greenzone has always meant.
+
+The fix that would make such a state loadable is for the renderer to rebuild
+its objects after a load - a context-loss path, core by core - and nothing here
+has one yet.

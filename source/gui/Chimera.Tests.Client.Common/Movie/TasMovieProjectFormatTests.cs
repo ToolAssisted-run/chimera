@@ -25,9 +25,9 @@ namespace Chimera.Tests.Client.Common.Movie
 		[ClassCleanup]
 		public static void RemovePlayground() => Directory.Delete(_dir, recursive: true);
 
-		private static TasMovie MakeWorkedMovie(string path)
+		private static TasMovie MakeWorkedMovie(string path, string gpuRenderer = "")
 		{
-			FakeEmulator emu = new();
+			FakeEmulator emu = new() { GpuRenderer = gpuRenderer };
 			FakeMovieSession session = new(emu);
 			TasMovie movie = new(session, path);
 			session.Movie = movie;
@@ -192,6 +192,43 @@ namespace Chimera.Tests.Client.Common.Movie
 			Assert.AreEqual(2, branch.InputLog.Count);
 			Assert.AreEqual("setup", branch.Markers.Single().Message);
 			CollectionAssert.AreEqual(new byte[] { 1, 2, 3, 4 }, branch.CoreData, "the state came from the cache");
+		}
+
+		/// <summary>
+		/// A machine a GPU drew keeps its states for the session that drew them.
+		///
+		/// The renderer holds its OpenGL objects by the names a driver handed
+		/// out, those names live in guest memory, and a savestate carries them
+		/// into a session where they mean nothing: the driver refuses every call
+		/// naming one, the core is never told, and what comes out is a machine
+		/// that runs and draws nothing - a black screen, then a crash. So the
+		/// cache carries no states from such a machine, and any older cache's
+		/// are not used.
+		/// </summary>
+		[TestMethod]
+		public void StatesAGpuDrewDoNotOutliveTheirSession()
+		{
+			var path = Path.Combine(_dir, "gpudrawn.chimeraProject");
+			var movie = MakeWorkedMovie(path, gpuRenderer: "4.5 (Core Profile) Mesa on llvmpipe");
+			Assert.IsFalse(movie.Save().IsError);
+
+			var loaded = LoadFresh(path);
+			Assert.AreEqual(6, loaded.InputLogLength, "the work itself is untouched");
+			Assert.AreEqual(1, loaded.Branches.Count);
+			Assert.AreEqual("risky route", loaded.Branches[0].UserText, "and so is what a branch IS");
+			Assert.IsNull(loaded.Branches[0].CoreData, "the branch keeps its input and loses its state");
+			Assert.IsNotNull(loaded.TasStateManager, "there is an empty greenzone to start filling");
+			Assert.IsNotNull(loaded.DroppedCacheNote, "and the person is told why it is empty");
+			StringAssert.Contains(loaded.DroppedCacheNote, "GPU");
+
+			// the same project on a machine no GPU drew keeps its states, which is
+			// what every deterministic core does and must go on doing
+			var plain = Path.Combine(_dir, "cpudrawn.chimeraProject");
+			Assert.IsFalse(MakeWorkedMovie(plain).Save().IsError);
+			var plainLoaded = LoadFresh(plain);
+			Assert.IsNull(plainLoaded.DroppedCacheNote);
+			CollectionAssert.AreEqual(new byte[] { 1, 2, 3, 4 }, plainLoaded.Branches[0].CoreData,
+				"the state came from the cache, as it always has");
 		}
 
 		/// <summary>

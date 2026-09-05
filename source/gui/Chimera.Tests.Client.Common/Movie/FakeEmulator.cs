@@ -6,8 +6,11 @@ using Chimera.Emulation.Common;
 namespace Chimera.Tests.Client.Common.Movie
 {
 	[Core("Fake", "Author", false, false)]
-	internal class FakeEmulator : IEmulator, IStatable, IInputPollable
+	internal class FakeEmulator : IEmulator, IStatable, IInputPollable, IGpuRendered
 	{
+		/// <summary>Empty for a machine nobody's GPU drew, which is the default.</summary>
+		public string GpuRenderer { get; set; } = "";
+
 		private BasicServiceProvider _serviceProvider;
 		public IEmulatorServiceProvider ServiceProvider => _serviceProvider;
 
