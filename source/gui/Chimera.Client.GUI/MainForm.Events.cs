@@ -409,7 +409,8 @@ namespace Chimera.Client.GUI
 		/// <summary>
 		/// Config > Firmware: every installed core surveyed for what it needs, just
 		/// in time - nothing about a core is kept once the window closes, and a
-		/// core that is gone takes its rows and its remembered paths with it.
+		/// core that is gone takes its rows with it (its chosen paths stay in the
+		/// config for when it is put back).
 		/// </summary>
 		private void FirmwareMenuItem_Click(object sender, EventArgs e)
 		{

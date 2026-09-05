@@ -18,8 +18,9 @@ namespace Chimera.Client.GUI
 	/// Cores folder when the window opens (<see cref="FirmwareSurvey"/>) and go away
 	/// with it; the frontend has no list of firmware of its own and cannot, since it
 	/// does not know what cores exist. Delete a core package and its rows are gone
-	/// on the next open, along with the paths remembered for it. What the person
-	/// points at is remembered where it lives, never copied: firmware can be a
+	/// on the next open; what was chosen for it stays in the config for the day it
+	/// is put back. What the person points at is remembered where it lives, never
+	/// copied: firmware can be a
 	/// PlayStation 3 update or an Xbox disk image, and a second copy is a second
 	/// thing to drift.
 	///

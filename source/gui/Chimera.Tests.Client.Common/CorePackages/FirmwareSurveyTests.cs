@@ -12,8 +12,8 @@ namespace Chimera.Tests.Client.Common
 	/// <summary>
 	/// The Config > Firmware survey: every installed core's declarations, answered
 	/// from the Firmware folder and from what a person chose, and nothing kept
-	/// between two surveys - a core that is gone takes its rows and its remembered
-	/// paths with it (issue #30).
+	/// between two surveys - a core that is gone takes its rows with it, while
+	/// what was chosen for it waits in the config for its return (issue #30).
 	/// </summary>
 	[TestClass]
 	public class FirmwareSurveyTests
@@ -143,7 +143,7 @@ namespace Chimera.Tests.Client.Common
 		}
 
 		[TestMethod]
-		public void ARemovedCoreTakesItsRowsAndItsMemoryWithIt()
+		public void ARemovedCoreTakesItsRowsButNotItsMemory()
 		{
 			var dump = FileOf(_firmware, "disksys.rom", 8192, seed: 5);
 			var decl = Pinned("bios", "Nintendo FDS", 8192, CoreFirmwareStore.Sha1Of(File.ReadAllBytes(dump)));
@@ -161,8 +161,12 @@ namespace Chimera.Tests.Client.Common
 			var after = Survey(config, new[] { Package("PCSX2") }, declared, _firmware);
 			Assert.AreEqual(1, after.Count, "its rows are gone");
 			Assert.AreEqual("PCSX2", after[0].CoreName);
-			Assert.AreEqual(1, config.CoreFirmware.Count, "and so is what was remembered for it");
-			Assert.IsTrue(config.CoreFirmware.ContainsKey("PCSX2/bios.bin"));
+			Assert.AreEqual(3, config.CoreFirmware.Count, "what was chosen for it is kept, for the day it is put back");
+
+			// and put back
+			var back = Survey(config, new[] { Package("QuickerNesHawk"), Package("PCSX2") }, declared, _firmware);
+			Assert.AreEqual(CoreFirmwareState.Good, back.Single(static g => g.CoreName == "QuickerNesHawk").Rows[0].State,
+				"its dump is found again without anyone pointing at it");
 		}
 
 		[TestMethod]

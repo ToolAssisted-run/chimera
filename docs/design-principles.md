@@ -1087,9 +1087,10 @@ user decided its shape.
   opens, lists one row per declaration entry grouped by core - PCSX2's
   seventy-three bios releases are seventy-three rows, collapsed to the ones on
   hand - and answers each from the Firmware folder and from every path a person
-  ever chose, by hash. Nothing is kept: the rows go with the window, a deleted
-  package is gone on the next open, and its remembered paths are pruned with it
-  (the frontend keeps no list of firmware, and cannot). A chosen file is
+  ever chose, by hash. Nothing is kept: the rows go with the window and a
+  deleted package is gone on the next open (the frontend keeps no list of
+  firmware, and cannot). What a person chose for it stays in config.ini, keyed
+  by the core's name, for the day the package is put back. A chosen file is
   remembered where it lives, under `<core>/<id>#<sha1>` so several releases of
   one id can all be known, and never copied - firmware can be a PlayStation 3
   update or an Xbox disk image, and a second copy is a second thing to drift.

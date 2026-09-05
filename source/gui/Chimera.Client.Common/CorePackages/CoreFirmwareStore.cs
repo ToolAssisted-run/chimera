@@ -145,20 +145,11 @@ namespace Chimera.Client.Common
 				.Distinct(StringComparer.OrdinalIgnoreCase)
 				.ToList();
 
-		/// <summary>
-		/// Forgets every path remembered for a core that is no longer installed.
-		/// The frontend keeps no list of firmware of its own: what it remembers is
-		/// what a person pointed at, for a core that was there to ask - and once
-		/// the core is gone, so is the reason to remember.
-		/// </summary>
-		/// <returns>how many keys were dropped</returns>
-		public static int Prune(Config config, IEnumerable<string> installedCoreNames)
-		{
-			HashSet<string> installed = new(installedCoreNames, StringComparer.OrdinalIgnoreCase);
-			var stale = config.CoreFirmware.Keys.Where(key => !installed.Contains(CoreOf(key))).ToList();
-			foreach (var key in stale) config.CoreFirmware.Remove(key);
-			return stale.Count;
-		}
+		// What is remembered for a core is kept whether or not the core is
+		// installed right now: a package that is removed and put back finds its
+		// dumps where they were, and a person is never made to point at a
+		// PlayStation 3 update twice. Only the SURVEY forgets an absent core -
+		// its rows come from the packages present - never the config.
 
 		private static string CoreOf(string key)
 		{

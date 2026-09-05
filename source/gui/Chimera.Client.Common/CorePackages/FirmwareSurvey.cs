@@ -96,8 +96,8 @@ namespace Chimera.Client.Common
 	/// Just in time, and nothing kept: the rows are built from the packages present
 	/// when asked and go away with the window. The frontend has no list of firmware
 	/// of its own; it cannot, since it does not know what cores exist. Delete a core
-	/// package and its rows are gone on the next survey, along with the paths that
-	/// were remembered for it (<see cref="CoreFirmwareStore.Prune"/>).
+	/// package and its rows are gone on the next survey. What the person chose for
+	/// it stays in the config, keyed by the core's name, for the day it is put back.
 	/// </summary>
 	public static class FirmwareSurvey
 	{
@@ -138,7 +138,7 @@ namespace Chimera.Client.Common
 				string.IsNullOrEmpty(firmwareFolder) ? [ ] : [ firmwareFolder! ],
 				coreNames.SelectMany(core => CoreFirmwareStore.RememberedPaths(config, core)));
 
-		/// <param name="config">where chosen paths are remembered; pruned of cores not in <paramref name="packages"/> first</param>
+		/// <param name="config">where chosen paths are remembered, for these packages and for any that are not installed today</param>
 		/// <param name="packages">the packages present right now</param>
 		/// <param name="declarationsOf">what a package declares - the real reader, or a test's</param>
 		/// <param name="firmwareFolder">the Firmware folder, for saying "found there" rather than "chosen"</param>
@@ -151,7 +151,6 @@ namespace Chimera.Client.Common
 			IReadOnlyList<FirmwareLocator.IndexedFile> index)
 		{
 			var present = packages.Where(static p => p.Error is null).ToList();
-			CoreFirmwareStore.Prune(config, present.Select(static p => p.Name));
 
 			List<FirmwareSurveyGroup> groups = new();
 			foreach (var package in present.OrderBy(static p => p.Name, StringComparer.OrdinalIgnoreCase))
