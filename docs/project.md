@@ -170,7 +170,10 @@ the user can own); the chosen file's actual hash is recorded.
 The wizard's firmware page inspects the Firmware folder (a path entry)
 FIRST, so a dump dropped there once satisfies wizards forever: every
 plausible file is hashed and matched, and a satisfied requirement
-shows its checkmark and the file in use. A per-item Select File button
+shows its checkmark and the file in use. Config > Firmware is the same
+question asked of every installed core at once, before any project: it
+surveys the packages present, says what the folder already answers, and
+takes a file for the rest - remembered where it lives, never copied. A per-item Select File button
 covers what the folder could not - allowed even when something was
 found - and only the exact file satisfies. Create stays DISABLED until
 every requirement is satisfied.

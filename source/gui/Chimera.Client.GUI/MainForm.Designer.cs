@@ -73,6 +73,7 @@ namespace Chimera.Client.GUI
 			this.DisplayConfigMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.SoundMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.PathsMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
+			this.FirmwareMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.MessagesMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.AutofireMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.ClientOptionsMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
@@ -526,6 +527,7 @@ namespace Chimera.Client.GUI
             this.DisplayConfigMenuItem,
             this.SoundMenuItem,
             this.PathsMenuItem,
+            this.FirmwareMenuItem,
             this.MessagesMenuItem,
             this.AutofireMenuItem,
             this.ClientOptionsMenuItem,
@@ -564,6 +566,11 @@ namespace Chimera.Client.GUI
 			// 
 			this.PathsMenuItem.Text = "Paths...";
 			this.PathsMenuItem.Click += new System.EventHandler(this.PathsMenuItem_Click);
+			// 
+			// FirmwareMenuItem
+			// 
+			this.FirmwareMenuItem.Text = "Firmware...";
+			this.FirmwareMenuItem.Click += new System.EventHandler(this.FirmwareMenuItem_Click);
 			// 
 			// MessagesMenuItem
 			// 
@@ -1182,6 +1189,7 @@ namespace Chimera.Client.GUI
 		private Chimera.WinForms.Controls.StatusLabelEx EmuStatus;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx MessagesMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx PathsMenuItem;
+		private Chimera.WinForms.Controls.ToolStripMenuItemEx FirmwareMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx DisplayRerecordCountMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx ScreenshotSubMenu;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx ScreenshotMenuItem;

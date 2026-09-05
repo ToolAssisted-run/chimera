@@ -406,6 +406,54 @@ namespace Chimera.Client.GUI
 			if (this.ShowDialogWithTempMute(form).IsOk()) AddOnScreenMessage("Path settings saved");
 		}
 
+		/// <summary>
+		/// Config > Firmware: every installed core surveyed for what it needs, just
+		/// in time - nothing about a core is kept once the window closes, and a
+		/// core that is gone takes its rows and its remembered paths with it.
+		/// </summary>
+		private void FirmwareMenuItem_Click(object sender, EventArgs e)
+		{
+			var firmwareFolder = Config.PathEntries.FirmwareAbsolutePath();
+			IReadOnlyList<FirmwareSurveyGroup> Survey()
+			{
+				var packages = CorePackageDiscovery.ScanFor(Config);
+				var index = FirmwareSurvey.BuildIndex(Config, firmwareFolder, packages.Select(static p => p.Name));
+				return FirmwareSurvey.Build(Config, packages, p => FirmwareSurvey.DeclarationsOf(p.Path), firmwareFolder, index);
+			}
+			using FirmwareSurveyForm form = new(
+				Survey,
+				(row, path) => CoreFirmwareStore.Remember(Config, row.CoreName, row.Decl, path),
+				pickFile: title =>
+				{
+					using OpenFileDialog picker = new() { Title = title, Filter = "All Files|*.*" };
+					return picker.ShowDialog(this) is DialogResult.OK ? picker.FileName : null;
+				},
+				pickFolder: () =>
+				{
+					using FolderBrowserDialog picker = new() { Description = "Scan a folder for firmware files" };
+					return picker.ShowDialog(this) is DialogResult.OK ? picker.SelectedPath : null;
+				},
+				scanFolder: folder =>
+				{
+					// every pinned declaration of every installed core, answered by hash
+					// from the folder and its subfolders; what is found is remembered
+					// where it lies
+					var packages = CorePackageDiscovery.ScanFor(Config);
+					var scanned = FirmwareLocator.BuildIndex([ ], ProjectFolderScan.Enumerate(folder).Take(ProjectFolderScan.MaxFiles));
+					foreach (var package in packages.Where(static p => p.Error is null))
+					{
+						foreach (var decl in FirmwareSurvey.DeclarationsOf(package.Path).Decls)
+						{
+							if (FirmwareLocator.FindEither(decl, scanned) is { } found)
+							{
+								CoreFirmwareStore.Remember(Config, package.Name, decl, found.Path);
+							}
+						}
+					}
+				});
+			this.ShowDialogWithTempMute(form);
+		}
+
 		private void SoundMenuItem_Click(object sender, EventArgs e)
 		{
 			static IEnumerable<string> GetDeviceNamesCallback(ESoundOutputMethod outputMethod) => outputMethod switch

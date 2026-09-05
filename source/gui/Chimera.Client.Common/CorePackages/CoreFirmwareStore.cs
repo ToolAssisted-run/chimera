@@ -106,6 +106,66 @@ namespace Chimera.Client.Common
 		/// <summary>The config key a choice is remembered under. Keyed by core name, not by package hash: rebuilding a core package must not make the user find their BIOS again.</summary>
 		public static string KeyFor(string coreName, string id) => $"{coreName}/{id}";
 
+		/// <summary>
+		/// The key one particular dump is remembered under. A core may declare one
+		/// id many times - PCSX2 lists seventy-three releases of its bios under
+		/// "bios.bin" - and a person may own several; the plain key can only say
+		/// which one is in use. A pinned declaration's file is remembered under its
+		/// hash as well, so the wizard, an opening project and the firmware survey
+		/// can all find every dump a person ever pointed at. An unpinned
+		/// declaration has no hash to remember by and keeps the plain key.
+		/// </summary>
+		public static string KeyFor(string coreName, CoreFirmwareDecl decl)
+			=> string.IsNullOrEmpty(decl.Sha1) ? KeyFor(coreName, decl.Id) : $"{coreName}/{decl.Id}#{decl.Sha1.ToUpperInvariant()}";
+
+		/// <summary>The remembered path for THIS declaration: its own dump's first, then whatever is in use for its id.</summary>
+		public static string? GetPath(Config config, string coreName, CoreFirmwareDecl decl)
+		{
+			if (!string.IsNullOrEmpty(decl.Sha1)
+				&& config.CoreFirmware.TryGetValue(KeyFor(coreName, decl), out var own) && !string.IsNullOrWhiteSpace(own))
+			{
+				return own;
+			}
+			return GetPath(config, coreName, decl.Id);
+		}
+
+		/// <summary>Remembers (or, for null, forgets) the file chosen for one declaration, under its own dump's key.</summary>
+		public static void Remember(Config config, string coreName, CoreFirmwareDecl decl, string? path)
+		{
+			var key = KeyFor(coreName, decl);
+			if (string.IsNullOrWhiteSpace(path)) config.CoreFirmware.Remove(key);
+			else config.CoreFirmware[key] = path!;
+		}
+
+		/// <summary>Every path remembered for a core, whichever key it sits under. Hints, all of them: hashed before they are believed.</summary>
+		public static IReadOnlyList<string> RememberedPaths(Config config, string coreName)
+			=> config.CoreFirmware
+				.Where(kv => CoreOf(kv.Key).Equals(coreName, StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(kv.Value))
+				.Select(static kv => kv.Value)
+				.Distinct(StringComparer.OrdinalIgnoreCase)
+				.ToList();
+
+		/// <summary>
+		/// Forgets every path remembered for a core that is no longer installed.
+		/// The frontend keeps no list of firmware of its own: what it remembers is
+		/// what a person pointed at, for a core that was there to ask - and once
+		/// the core is gone, so is the reason to remember.
+		/// </summary>
+		/// <returns>how many keys were dropped</returns>
+		public static int Prune(Config config, IEnumerable<string> installedCoreNames)
+		{
+			HashSet<string> installed = new(installedCoreNames, StringComparer.OrdinalIgnoreCase);
+			var stale = config.CoreFirmware.Keys.Where(key => !installed.Contains(CoreOf(key))).ToList();
+			foreach (var key in stale) config.CoreFirmware.Remove(key);
+			return stale.Count;
+		}
+
+		private static string CoreOf(string key)
+		{
+			var slash = key.IndexOf('/');
+			return slash < 0 ? key : key[..slash];
+		}
+
 		public static string? GetPath(Config config, string coreName, string id)
 			=> config.CoreFirmware.TryGetValue(KeyFor(coreName, id), out var path) && !string.IsNullOrWhiteSpace(path)
 				? path
@@ -173,10 +233,21 @@ namespace Chimera.Client.Common
 		}
 
 		public static CoreFirmwareEntry Describe(Config config, string coreName, CoreFirmwareDecl decl)
+			=> Describe(config, coreName, decl, null);
+
+		/// <summary>
+		/// The same, answering the Firmware folder from an index the caller built
+		/// once: a survey of seventy-three declarations must not hash the folder
+		/// seventy-three times.
+		/// </summary>
+		public static CoreFirmwareEntry Describe(Config config, string coreName, CoreFirmwareDecl decl, IReadOnlyList<FirmwareLocator.IndexedFile>? index)
 		{
-			var path = GetPath(config, coreName, decl.Id);
+			var path = GetPath(config, coreName, decl);
 			// a choice that has moved is no longer an answer; the folder may hold one
-			if (path is null || !File.Exists(path)) path = InFirmwareFolder(config, decl) ?? path;
+			if (path is null || !File.Exists(path))
+			{
+				path = (index is null ? InFirmwareFolder(config, decl) : FirmwareLocator.FindEither(decl, index)?.Path) ?? path;
+			}
 			if (path is null) return new() { CoreName = coreName, Decl = decl, State = CoreFirmwareState.Missing };
 
 			byte[] bytes;

@@ -154,6 +154,7 @@ namespace Chimera.Client.GUI
 					};
 					return picker.ShowDialog(this) is DialogResult.OK ? picker.SelectedPath : null;
 				},
+				rememberedFirmwarePaths: coreName => CoreFirmwareStore.RememberedPaths(Config, coreName),
 				rememberedFirmwarePath: (coreName, id) =>
 					Config.CoreFirmware.TryGetValue(CoreFirmwareStore.KeyFor(coreName, id), out var remembered)
 						? remembered
@@ -212,6 +213,12 @@ namespace Chimera.Client.GUI
 				foreach (var (id, path) in wizard.ProvidedFirmwarePaths)
 				{
 					Config.CoreFirmware[CoreFirmwareStore.KeyFor(coreName, id)] = path;
+				}
+				// and under each dump's own key, so Config > Firmware and the next
+				// project that wants this release find it without asking
+				foreach (var (decl, path) in wizard.ProvidedFirmwareDumps)
+				{
+					CoreFirmwareStore.Remember(Config, coreName, decl, path);
 				}
 				SaveConfig();
 			}
@@ -494,15 +501,13 @@ namespace Chimera.Client.GUI
 			if (pins.Count is 0) return true;
 
 			var coreName = project.CoreName;
+			// the Firmware folder, every dump ever remembered for this core (Config >
+			// Firmware, earlier projects), and where this project's own sidecar
+			// last had them - all hashed, none believed on its name
 			var index = FirmwareLocator.BuildIndex(
 				[ Config.PathEntries.FirmwareAbsolutePath() ],
-				pins.SelectMany(pin => new[]
-					{
-						Config.CoreFirmware.TryGetValue(CoreFirmwareStore.KeyFor(coreName, pin.Id), out var remembered)
-							? remembered
-							: null,
-						local.Firmware.TryGetValue(pin.Id, out var beside) ? beside : null,
-					})
+				CoreFirmwareStore.RememberedPaths(Config, coreName)
+					.Concat(pins.Select(pin => local.Firmware.TryGetValue(pin.Id, out var beside) ? beside : null))
 					.Where(static path => path is not null)!);
 
 			List<string> unsatisfied = new();
@@ -515,6 +520,7 @@ namespace Chimera.Client.GUI
 					// and where it was is worth remembering, for this core and for
 					// this project
 					Config.CoreFirmware[CoreFirmwareStore.KeyFor(coreName, id)] = exact.Path;
+					CoreFirmwareStore.Remember(Config, coreName, new Chimera.Emulation.Common.CoreFirmwareDecl { Id = id, Sha1 = sha1 }, exact.Path);
 					local.RememberFirmware(id, exact.Path);
 				}
 				else
@@ -531,7 +537,8 @@ namespace Chimera.Client.GUI
 					+ $"\n\n{string.Join("\n", unsatisfied)}\n\n"
 					+ "Running with DIFFERENT firmware is a DIFFERENT MACHINE: the movie"
 					+ " will very likely DESYNC, and anything recorded will not reproduce"
-					+ " the original work. Are you sure you want to open it anyway?");
+					+ " the original work. Config > Firmware shows what this core needs and"
+					+ " where to point it. Are you sure you want to open it anyway?");
 		}
 
 		/// <summary>

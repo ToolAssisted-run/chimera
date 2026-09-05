@@ -105,6 +105,13 @@ namespace Chimera.Client.GUI
 		private readonly Func<string, string, string?> _rememberedFirmwarePath;
 
 		/// <summary>
+		/// Every path remembered for a core, whichever dump it was for: a person may
+		/// own several releases of one bios, chosen in Config > Firmware or in an
+		/// earlier project, and the page finds them by hash wherever they lie.
+		/// </summary>
+		private readonly Func<string, IReadOnlyList<string>> _rememberedFirmwarePaths;
+
+		/// <summary>
 		/// Write the firmware chosen HERE into the config, and save it, before the
 		/// precompile sessions start. They are separate processes: they read the
 		/// config from DISK, and their only firmware source is what it remembers
@@ -159,8 +166,10 @@ namespace Chimera.Client.GUI
 			Func<string?>? pickFirmwareFolder = null,
 			Func<string, string, string?>? rememberedFirmwarePath = null,
 			Action<string, IReadOnlyDictionary<string, string>>? rememberFirmwareNow = null,
-			string? configPath = null)
+			string? configPath = null,
+			Func<string, IReadOnlyList<string>>? rememberedFirmwarePaths = null)
 		{
+			_rememberedFirmwarePaths = rememberedFirmwarePaths ?? (static _ => [ ]);
 			_configPath = configPath;
 			_pickFirmwareFile = pickFirmwareFile ?? (static _ => null);
 			_firmwareSearchDirs = firmwareSearchDirs ?? [ ];
@@ -1669,11 +1678,13 @@ namespace Chimera.Client.GUI
 				Newtonsoft.Json.JsonConvert.SerializeObject(effective));
 
 			// the Firmware folder answers first, plus anything remembered from
-			// earlier sessions - the user is only asked for what neither has
+			// earlier sessions - every dump ever chosen for this core, not only
+			// the one in use per id - and the user is only asked for what neither has
 			var remembered = needed
 				.Select(need => _rememberedFirmwarePath(ChosenCoreName ?? "", need.Id))
 				.Where(static path => path is not null)
-				.Select(static path => path!);
+				.Select(static path => path!)
+				.Concat(_rememberedFirmwarePaths(ChosenCoreName ?? ""));
 			_firmwareIndex = FirmwareLocator.BuildIndex(_firmwareSearchDirs, remembered);
 			BuildFirmwareNeeds(needed);
 			RenderFirmwareRows();
@@ -1887,6 +1898,12 @@ namespace Chimera.Client.GUI
 		public IReadOnlyDictionary<string, string> ProvidedFirmwarePaths
 			=> _firmwareNeeds.Where(static n => n.ChosenPath is not null)
 				.ToDictionary(static n => n.Id, static n => n.ChosenPath!);
+
+		/// <summary>The same, by declaration: what to remember under each dump's own key, so the survey and later projects find it.</summary>
+		public IReadOnlyList<(Chimera.Emulation.Common.CoreFirmwareDecl Decl, string Path)> ProvidedFirmwareDumps
+			=> _firmwareNeeds.Where(static n => n.ChosenPath is not null && n.Decl is not null)
+				.Select(static n => (n.Decl!, n.ChosenPath!))
+				.ToList();
 
 		/// <summary>the requirement states, for tests</summary>
 		public bool FirmwareSatisfied(string id)

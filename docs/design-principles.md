@@ -1079,6 +1079,22 @@ user decided its shape.
 - **Missing means a sentence, not a stack trace.** `MissingFirmwareException` is
   its own type for exactly this: it is the one load failure the user can fix, and
   the message names the window that fixes it.
+- **Config > Firmware surveys every installed core** (2026-09-05, issue #30). Until
+  it, firmware was only ever asked about from inside: the Emulator menu's window
+  needs a loaded package, the wizard asks per project, and a downloaded project
+  that wanted a bios could only say "put it in the Firmware folder". The survey
+  reads each package's `waterbox.config` in the Cores folder when the window
+  opens, lists one row per declaration entry grouped by core - PCSX2's
+  seventy-three bios releases are seventy-three rows, collapsed to the ones on
+  hand - and answers each from the Firmware folder and from every path a person
+  ever chose, by hash. Nothing is kept: the rows go with the window, a deleted
+  package is gone on the next open, and its remembered paths are pruned with it
+  (the frontend keeps no list of firmware, and cannot). A chosen file is
+  remembered where it lives, under `<core>/<id>#<sha1>` so several releases of
+  one id can all be known, and never copied - firmware can be a PlayStation 3
+  update or an Xbox disk image, and a second copy is a second thing to drift.
+  The wizard and Open Project index every remembered dump of the core, so a
+  file located in the survey satisfies them wherever it sits.
 - **Delivery is a mount.** The file is handed to the guest as another mounted
   file, under the declared id, next to the rom and the settings - so the guest
   reads it with the same call it reads the rom with, and nothing in the ABI is

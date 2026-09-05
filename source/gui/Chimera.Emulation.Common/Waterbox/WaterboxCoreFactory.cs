@@ -190,8 +190,8 @@ namespace Chimera.Emulation.Common.Waterbox
 					if (!decl.Required) continue;
 					throw new MissingFirmwareException(
 						$"{CoreName} needs firmware that has not been provided: {decl.DisplayName}."
-							+ " Put the file in the Firmware folder and open the project again"
-							+ " (a new project's wizard can also point at it).");
+							+ " Put the file in the Firmware folder, or point at it in Config > Firmware,"
+							+ " and open the project again.");
 				}
 				resolved[decl.Id] = bytes;
 			}
