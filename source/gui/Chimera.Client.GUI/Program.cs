@@ -254,31 +254,44 @@ namespace Chimera.Client.GUI
 			// OpenGL is the one display driver: no multiplexing, no fallbacks. A machine
 			// that cannot give us a 3.2 context gets a clear refusal, not a degraded mode.
 			IGL workingGL;
+			// Which step gave up, and what the driver said: everything in here used
+			// to surface as one sentence about OpenGL 3.2, whether the driver had
+			// refused a context, answered with a lower version, or compiled the GUI
+			// shaders badly - and the probe's own findings went to standard error,
+			// which a Windows user never sees (issue #39).
+			var glStep = "probing the display driver";
 			try
 			{
-				if (!IGL_OpenGL.Available) throw new InvalidOperationException("no OpenGL 3.2 context could be created");
+				if (!IGL_OpenGL.Available) throw new InvalidOperationException(OpenGLVersion.LastProbe);
 
 				// need to have a context active for checking the renderer, will be disposed afterwards
+				glStep = "creating a 3.2 core context";
 				using (new SDL2OpenGLContext(3, 2, true))
 				{
+					glStep = "setting up the GL state";
 					using var testOpenGL = new IGL_OpenGL();
 					testOpenGL.InitGLState();
+					glStep = "building the GUI renderer";
 					using (testOpenGL.CreateGuiRenderer()) {}
 				}
 
 				// don't return the same IGL, we don't want the test context to be part of this IGL
+				glStep = "creating the display's own context";
 				workingGL = new IGL_OpenGL();
 			}
 			catch (Exception ex)
 			{
-				const string GL_FATAL_MSG = "This frontend requires OpenGL 3.2, and this machine's display driver did not provide it.\nUpdate or install a graphics driver with OpenGL 3.2 support.";
+				var glFatalMsg = "This frontend requires OpenGL 3.2, and this machine's display driver did not provide it."
+					+ "\nUpdate or install a graphics driver with OpenGL 3.2 support."
+					+ $"\n\nIt failed while {glStep}: {ex.Message}"
+					+ $"\nThe probe found: {OpenGLVersion.LastProbe}";
 				if (HeadlessMode.Enabled)
 				{
-					Console.Error.WriteLine($"{GL_FATAL_MSG}\n{ex}");
+					Console.Error.WriteLine($"{glFatalMsg}\n{ex}");
 				}
 				else
 				{
-					new ExceptionBox(new Exception(GL_FATAL_MSG, ex)).ShowDialog();
+					new ExceptionBox(new Exception(glFatalMsg, ex)).ShowDialog();
 				}
 				return -1;
 			}
