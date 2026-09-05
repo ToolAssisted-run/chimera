@@ -714,11 +714,10 @@ namespace Chimera.Client.GUI
 		/// warning that is always on screen is a warning nobody reads.
 		/// </summary>
 		internal const string HardwareRendererCaveat =
-			"Hardware renderers draw on your PC's GPU. They are fast, but NOT deterministic: the GPU is outside "
-			+ "the savestate, so the greenzone cannot fully restore the machine. That means a higher chance of desync, "
-			+ "seeking and rewind that can misbehave, a movie that may not reproduce on another PC, and editing that "
-			+ "can even crash the emulator. Choose a software renderer for any TAS you mean to keep. To check a hardware "
-			+ "run anyway, clear its greenzone in TAStudio and replay it from the start.";
+			"Hardware renderers draw on your PC's GPU, which is fast. The picture is drawn outside the savestate, so "
+			+ "a movie made this way may not reproduce on another PC or driver - a desync there is expected. Your own "
+			+ "run continues normally: its greenzone loads and picks up where you left off. Choose a software renderer "
+			+ "for a movie you need to reproduce somewhere else.";
 
 		private void ShowRendererCaveat()
 			=> _rendererCaveat.Text = IsHardware(ChosenRenderer) ? HardwareRendererCaveat : "";
