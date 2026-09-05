@@ -89,7 +89,7 @@ namespace Chimera.Client.GUI
 		/// </summary>
 		internal void WarnOnMovieVsLoadedCore()
 		{
-			// turns out this was too late for .tasproj autoloading and restoring playback position (loads savestate but wasn't checking game match)
+			// turns out this was too late for .chimeraProject autoloading and restoring playback position (loads savestate but wasn't checking game match)
 			if (string.IsNullOrEmpty(MovieSession.Movie.Hash))
 			{
 				AddOnScreenMessage("Movie is missing hash, skipping hash check");

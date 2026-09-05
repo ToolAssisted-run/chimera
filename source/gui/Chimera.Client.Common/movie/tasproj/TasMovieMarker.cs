@@ -11,7 +11,7 @@ namespace Chimera.Client.Common
 	/// <summary>
 	/// The three markers a run always has, whether or not anyone placed them.
 	/// They are derived from the movie rather than authored, so they cannot be
-	/// moved, renamed or removed, and they are never written to the .tasproj -
+	/// moved, renamed or removed, and they are never written to the .chimeraProject -
 	/// on load they are worked out again, which is the only way they can be
 	/// trusted to still be true.
 	/// </summary>
