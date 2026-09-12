@@ -107,10 +107,37 @@ namespace Chimera.Tests.Client.Common.Movie
 		/// </summary>
 		public bool Save(string path, string machineId)
 		{
+			SavesInLine++;
+			LastSavePath = path;
+			LastSaveMachineId = machineId;
 			File.WriteAllLines(path, new[] { machineId }
 				.Concat(_states.Select(static f => f.ToString())).ToArray());
 			return true;
 		}
+
+		/// <summary>
+		/// Which save a caller asked for, and with what. The engine's writer is
+		/// not here, so a queued save happens at once - what is worth pinning is
+		/// that a project save asks for the QUEUED one, because waiting for the
+		/// history is the freeze that backgrounding it removes.
+		/// </summary>
+		public int SavesInLine { get; private set; }
+
+		public int SavesQueued { get; private set; }
+
+		public string LastSavePath { get; private set; }
+
+		public string LastSaveMachineId { get; private set; }
+
+		public bool SaveLater(string path, string machineId)
+		{
+			SavesQueued++;
+			return Save(path, machineId);
+		}
+
+		public bool SavePending => false;
+
+		public bool SaveWait() => true;
 
 		public bool Load(string path, string machineId)
 		{

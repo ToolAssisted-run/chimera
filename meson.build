@@ -282,6 +282,7 @@ engine_src = files(
   'source/engine/source/movie_entry.cpp',
   'source/engine/source/session.cpp',
   'source/engine/source/state_history.cpp',
+  'source/engine/source/work_thread.cpp',
   'source/engine/source/media_maker.cpp',
   'source/engine/source/media_iso.cpp',
   'source/engine/source/media_fat12.cpp',
@@ -371,6 +372,19 @@ executable(
 )
 
 if not meson.is_cross_build()
+  # Not a test: what a captured frame costs when the budget is full and
+  # stretches are going to disk, in line and on the writer. Built with the
+  # tests because it needs the engine; run by tests/perf/run-spillbench.sh.
+  executable(
+    'spillbench',
+    ['tests/perf/spillbench.cpp'] + engine_src + gl_bridge_src,
+    include_directories: engine_inc,
+    cpp_args: engine_build_args,
+    c_args: engine_build_args,
+    dependencies: [dl_dep] + gl_bridge_deps,
+    build_by_default: false,
+  )
+
   foreach engine_test : ['sha1', 'movie_log', 'movie_text', 'movie_entry', 'state_container', 'package', 'multifile', 'project', 'firmware', 'state_history', 'media']
     test(
       'engine_' + engine_test,

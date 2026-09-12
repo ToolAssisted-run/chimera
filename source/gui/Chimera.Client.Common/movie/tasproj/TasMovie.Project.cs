@@ -298,7 +298,15 @@ namespace Chimera.Client.Common
 				// made them (docs/gpu-bridge.md), so it writes none - and removes
 				// any an earlier session left, which would otherwise be loaded
 				// into a machine that cannot draw.
-				if (States is not null && !DrawnByGpu) States.Save(StateHistoryFilename, MachineIdentityOf(p));
+				// Queued, not waited for. This is the longest thing a save does -
+				// the history is written against budgets of four gigabytes in
+				// memory and ten on disk, which measured ten seconds to a Linux
+				// disk and over a minute to NTFS - and none of it needs the
+				// machine, so the run carries on while it is written. What lands
+				// in the file is the history as it stands right here; frames
+				// captured afterwards belong to the next save. The barrier is at
+				// Dispose, where the project is let go of.
+				if (States is not null && !DrawnByGpu) States.SaveLater(StateHistoryFilename, MachineIdentityOf(p));
 				else TryDelete(StateHistoryFilename);
 				// and where this machine keeps the project's files, in a sibling of
 				// its own: the project itself stays distributable, carrying names and

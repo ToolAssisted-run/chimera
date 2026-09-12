@@ -1230,8 +1230,12 @@ against:
    `saveTo`, `configure` and `clear` block until pending work is finished or
    cancelled. A seek that raced a pending spill would read a file that is not
    written yet.
-3. **The budget counts what is pending.** Bytes queued for the helper are bytes
-   held; `m_bytes` must include them, or the budget is a number about the past.
+3. **The queue is bounded instead.** Bytes handed to the writer are released
+   from the budget at once (rule 6), so the bound on what the history holds
+   while a write is in flight is the QUEUE: half the memory budget, never less
+   than four megabytes nor more than sixty-four. Unbounded, a run measured 29
+   MB of writes in flight - memory the budget could not see, and a file full of
+   ranges that were dead before they were written.
 4. **A frame is never lost to a busy helper.** If the queue is full or the
    helper has failed, the work happens in line, exactly as it does today. The
    thread is an optimisation and must be droppable.
@@ -1259,12 +1263,12 @@ garbage rather than into a hazard.
 
 | phase | what moves | worth | risk |
 |---|---|---|---|
-| 0 | writing the history at project save and autosave | seconds to a minute, unprompted every 30 minutes - see below | low: a queue and a barrier |
-| 1 | spill, settle and compaction I/O | 7 to 57 ms hitches, several per frame once the budget is full | low: no guest memory, no miniBox change |
-| 2 | coarsening and composition | 0.16 to 0.72 ms/frame, and the 8 MB cap can go - a denser history for the same memory | low: inside StateHistory |
-| 3 | copy-on-write anchors | 40 to 700 ms once every 600 frames, and the stride damage above | this is where miniBox's single-thread assumption has to be faced |
+| 0 **BUILT** | writing the history at project save and autosave | a save of a 122 MB history: 51 ms in line, 0.0 ms to return | low: a queue and a barrier |
+| 1 **BUILT** | spill and settle I/O (compaction stayed on the loop) | 1.7x to 12x the 99th percentile of a captured frame, 1.0x to 7.2x the worst | low: no guest memory, no miniBox change |
+| 2 | coarsening and composition | 0.16 to 0.72 ms/frame, and the 8 MB cap can go - a denser history for the same memory | low inside StateHistory, but it costs the step-for-step identity of phases 0 and 1: a merge lands a frame late, so the history holds different frames threaded than in line. Left undone for that reason, not for difficulty |
+| 3 **BUILT** | copy-on-write anchors | 6x to 15.7x less on the emulation thread: 521 ms becomes 33 on a gigabyte machine | this is where miniBox's single-thread assumption was faced |
 | 4 | deferred delta store | 0.3 to 1.4 ms/frame on heavy machines, nothing on light ones | same mechanism as 3, paid every frame |
-| 5 | zstd the cold deltas on the helper | depth rather than speed: zstd-1 runs about 700 MB/s in and 2.4 GB/s out | low, and it is a budget decision as much as a speed one |
+| 5 **BUILT** | zstd what reaches the disk, on the writer; the disk budget counts compressed bytes (user-decided, 2026-09-13) | speed, space and depth: a PS2 history 2.5 GB on disk becomes 79.9 MB, a cold restore of a spilled anchor 103 ms becomes 59, and a 1024 MB budget that kept two raw anchors keeps everything | low; disk evictions now follow the writer's reports, so threaded and in line may drop from disk at different moments |
 | 6 | a rolling composed prefix behind the playhead, on a thread of its own | the backwards step: ~280 links walked becomes one composed apply plus a short tail | low, and uniquely so - it is the one phase nothing waits for |
 
 Phases 0 to 2 are worth doing whether or not 3 ever is, and they are where the
@@ -1273,6 +1277,11 @@ the only one whose freeze is measured in seconds. Phase 3 is the large prize
 inside the capture path, and the real decision. Phase 6 is deliberately last:
 it is the only speculative one, and phase 3 may leave it with nothing to do -
 see its section below.
+
+What was actually built, and what each phase measured once it existed, is under
+"What was built, and what it measured" further down. Phase 2 is the one that
+was reconsidered rather than deferred for time: it cannot keep the property
+that makes the others verifiable.
 
 These are phases of work, not threads. Which roles run where, how many of each,
 and the two classes they fall into is its own question, answered in "How many
@@ -1337,14 +1346,13 @@ wrong in only one way - by being absent:
 3. **Never waited on.** If it is not ready, the walk happens as it does today.
    Nothing blocks on it, ever.
 
-**But do phase 3 first, and then measure again.** If copy-on-write anchors make
-a whole-machine snapshot cost about 3 ms of the emulation thread instead of 40
-to 700, then `anchorSpacing` can fall from 600 to 60 and EVERY backwards seek
-walks at most 60 links - deterministically, with no speculation, no
-invalidation rules and no second code path that can disagree with the first.
-That is a better trade than guessing right thirty frames at a time, and it may
-leave this phase with nothing worth doing. Speculation is the last resort here,
-not the first reach.
+**But do phase 3 first, and then measure again.** That was the instruction, and
+it was followed: phase 3 exists, the measurement was taken on a PlayStation 2,
+and the answer is under "What cheap anchors did to the backwards step" below.
+The short of it is that denser anchors more than halved the backwards step and
+then hit a floor made entirely of loading one whole machine - so a rolling
+prefix would be shortening the part that is already cheap. Read that before
+building any of this.
 
 ### How many threads, and which (user-asked, 2026-09-12)
 
@@ -1435,17 +1443,29 @@ order, on the one thread that is allowed to change things.
    point per frame and at barriers. So every change to the structure still
    happens in loop order, and "what the user did" and "what a helper finished"
    are ordered against each other by the same thread that orders frames.
-5. **Every piece of work carries a generation.** Anything that makes a
-   timeline untrue - `invalidateAfter`, `clear`, `configure`, `loadFrom`, a
-   branch load - bumps a counter. A completion whose generation is stale is
-   DROPPED: its bytes are freed, its file range abandoned. Interference thus
-   turns in-flight work into garbage automatically, which is exactly what it
-   should turn into.
-6. **A spill is not a spill until its completion is applied.** The segment
-   keeps its memory copy while the write is in flight; `spilled` is set, and
-   the memory released, only when the loop applies the writer's completion. A
-   restore that arrives mid-write therefore reads memory and never asks the
-   file for bytes that are not there yet. There is no window to get wrong.
+5. **Work nobody wants any more is cancelled, not finished.** A stretch
+   dropped while its write is still queued clears a flag the job holds, and
+   the job writes nothing: those bytes will never be read, and writing them is
+   megabytes of I/O into a range that then looks like dead room and brings on
+   a compaction that copies every live byte for nothing. (Built as a flag per
+   write rather than the generation counter the design first imagined, because
+   a write is the only thing that outlives the decision to make it.)
+6. **A spill settles its metadata at once; only the write is late.** Built
+   the other way round from the sketch above, and for a reason worth keeping:
+   if the segment held its memory copy until the write landed, the budget
+   would be met later than it is asked to be, and eviction - which is driven
+   by that byte count - would make different decisions threaded than in line.
+   So the stretch is marked spilled, its range reserved and its memory
+   released immediately, exactly as before, and the rule that pays for it is
+   that anything READING the file waits for the writer first, and only for the
+   range it needs (`m_writtenThrough`). A write that fails is undone when it
+   is reported. That is what makes the step-for-step comparison in the
+   differential test possible at all. One half of it was later given up on
+   purpose: once spilled bodies were compressed and the disk budget was made to
+   count what the file really holds (user-decided, 2026-09-13), a stretch
+   weighs on the DISK only from its report - so disk evictions follow the
+   writer's timing, while everything decided with memory still comes out the
+   same. See "Phase 5" below.
 7. **The file is append-only while anything can read it.** Settling a spilled
    stretch writes the new version at a NEW offset and flips the metadata on
    completion; the old range is freed afterwards. Nothing is ever rewritten
@@ -1562,6 +1582,381 @@ paying for zstd. The `movie` phase in the loop trace is 0.22 ms and is mostly
 the greenzone capture itself, which is where this design came in. The piano
 roll cannot leave the UI thread at all, and is already served on a clock rather
 than per frame.
+
+### What was built, and what it measured (2026-09-12)
+
+Phases 0, 1 and 3 exist. Phase 2 was deliberately left, and phases 4 to 6 are
+untouched. Everything below was measured on this workstation, and every number
+is reproducible with the benches named beside it.
+
+#### Phase 1: the writer
+
+`spill()` settles every piece of metadata the moment it is asked for - the
+stretch is marked spilled, its range in the file is reserved, its bytes are
+handed to the writer - so the budget's arithmetic and every decision that
+follows from it are what they always were. Only the write is late.
+
+The rule that costs is the other side of that: **anything that READS the file
+waits for the writer first**, and only for the range it is about to read
+(`m_writtenThrough`). Restores, saves, settling and compaction all do; a
+capture does not, and a capture is what a frame has to be quick for. A write
+that fails is undone when it is reported - the stretch gets its bytes back and
+stops being spilled - which leaves the history exactly where a synchronous
+spill returning false left it.
+
+`tests/perf/run-spillbench.sh`, best of two interleaved passes:
+
+| machine / frames / budget | mean | 99th | worst frame |
+|---|---|---|---|
+| 8 MB, 512 KB/frame, 128 MB, 2000 frames | 1.1x | 3.7x | 1.2x |
+| 32 MB, 1 MB/frame, 256 MB, 1500 frames | 1.2x | 1.7x | 1.0x |
+| 32 MB, 2 MB/frame, 8 MB | 1.4x | 2.1x | 4.9x |
+| 16 MB, 4 MB/frame, 6 MB | 1.5x | 5.2x | 7.2x |
+| 8 MB, 512 KB/frame, 4 MB (budget < one state) | 1.1x | 12.0x | 1.6x |
+| 64 MB, 256 KB/frame, 16 MB (anchor-bound) | 1.3x | 2.1x | 1.4x |
+
+#### Phase 0: the project save
+
+`saveToLater` copies the metadata now - so the file describes the history as it
+stood when the save was asked for - and streams the bodies on the writer. The
+bodies are shared and immutable, so what the run does next cannot touch them;
+spilled stretches are read from the spill file by the same thread that writes
+it, in queue order.
+
+A save of a 122 MB history measured **51 ms in line against 0.0 ms to return**,
+and the metadata snapshot stays under a millisecond at four thousand frames,
+because it is proportional to the number of links rather than to the bytes. The
+barrier is `WaterboxCore.Dispose`, not the movie's - see the defects below.
+
+#### Phase 3: the copy-on-write anchor
+
+miniBox grew `mb_block_state_plan`: it writes everything except the page data
+into the caller's buffer, holds the pages the data will come from, and hands
+back a list. `mb_block_plan_fill` copies a range of them on any thread;
+`mb_block_plan_capture` is the fault handler's half, copying a page the guest
+is about to write before the write lands; `mb_block_plan_finish` copies
+whatever is left and lifts the holds. Whoever gets to a page first wins it with
+one atomic exchange - there is no lock in this at all, which matters because
+one of the two racers is a signal handler.
+
+What made it worth building is that holding pages is cheap where copying them
+is not (`tests/perf/protbench.c`, measured): 256 MB held read-only costs
+**0.76 ms in one call** and 1.08 ms in megabyte runs, against 40 to 180 ms to
+copy it - and `refresh_range` already coalesces runs.
+
+`tests/perf/run-planbench.sh`, the cost ON the emulation thread:
+
+| machine / dirty / pages written while it filled | old | new | |
+|---|---|---|---|
+| 256 MB / 128 MB / none | 84.7 ms | 9.6 ms | **8.9x** |
+| 64 MB / 32 MB / 500 | 21.3 ms | 3.6 ms | **6.0x** |
+| 256 MB / 128 MB / 1000 | 120.8 ms | 9.3 ms | **12.9x** |
+| 1 GB / 512 MB / 2000 | 521.1 ms | 33.2 ms | **15.7x** |
+
+and on a real PlayStation 2 (232 MB state, `chimera-run`, anchor every twenty
+frames) **113 to 129 ms became 12 to 17** - but only after the buffer it writes
+into stopped being zeroed first; see below.
+
+and in every case the planned state is byte for byte the state the old path
+would have written, which the bench checks and returns non-zero if it is not.
+
+What the guest pays for it: one fault per page it writes during the drain that
+the copier has not reached yet, measured at about 17 microseconds each while
+the copier is saturating memory bandwidth. A thousand such pages over a drain
+of ninety milliseconds is a few milliseconds a frame, against a sixty
+millisecond freeze that is gone.
+
+**One page cannot be held: a guest stack on Windows.** A fault delivered on the
+stack's own page has nowhere to build its exception frame and the machine dies
+where it stands rather than faulting (miniBox 9f1c533, and the ares crash that
+found it). Those pages are copied at plan time instead - a few hundred against
+tens of thousands - which is why `plan_can_hold` exists.
+
+#### And then on a real console, where it did nothing at all
+
+planbench said a 256 MB anchor costs 9.6 ms on the emulation thread instead of
+84.7. A PlayStation 2 booting Gran Turismo 4 through `chimera-run`, with its
+232 MB state and an anchor every twenty frames, said something else:
+
+	ANCHOR 232683218 bytes planned, 56337 pages to fill, 140.9 ms here
+	ANCHOR 232785618 bytes planned, 56362 pages to fill, 117.1 ms here
+
+against 113 to 129 ms for the same anchors written in line. The whole design,
+measured on a real machine, was worth nothing.
+
+The trace was then split in two, which took two minutes and answered it:
+
+	140.9 ms here (buffer 129.5, plan 11.3)
+
+**The plan was doing exactly what the bench promised - eleven milliseconds for a
+232 MB machine - and `std::vector::resize` was spending a hundred and thirty
+zeroing the buffer it was about to be written over.** A vector value-initialises
+what it grows into; at this scale that is a memset of a quarter of a gigabyte
+plus the first-touch faults for every page of it, all on the thread that runs
+the emulator, to prepare memory whose every byte is about to be overwritten.
+
+So a body is now allocated by an allocator whose `construct` does nothing
+(`StateHistory::Bytes`). Whoever fills the bytes pays for touching them, and for
+a planned anchor that is the drainer. The same PlayStation 2 anchor:
+
+	ANCHOR 232933074 bytes planned, 56398 pages to fill, 12.2 ms here (buffer 2.5, plan 9.6)
+
+**113 to 129 ms became 12 to 17**, which is the number phase 3 was built for,
+and the EE RAM after a three hundred frame run with a seek back through the
+greenzone is byte-identical whether the helpers are on or off.
+
+Two things are worth keeping from that. A synthetic bench measured the
+mechanism correctly and the SYSTEM not at all, because the allocation it did
+once in a loop of its own was the whole cost in the real path. And the tool that
+found it was one extra number in a trace line - the same lesson as the gate that
+swallowed its stderr, arriving from the other end.
+
+#### What cheap anchors did to the backwards step, and what they did not
+
+The design said phase 3 might delete phase 6: an anchor that costs 12 ms
+instead of 120 can be taken every sixty frames instead of every six hundred, and
+then every backwards seek walks a short chain by construction - no speculation,
+no cache, no second code path that can disagree with the first. Measured on the
+PlayStation 2, seeking back two hundred frames:
+
+| anchor every | budget | what the seek cost |
+|---|---|---|
+| 600 frames (the default) | 512 MB | **91 ms** - anchor 0 (1.8 MB) plus **75 deltas, 62 ms of it** |
+| 120 frames | 512 MB | 81 ms - the anchor read back from disk, plus 20 deltas |
+| 60 frames | 2 GB | **39 ms** - anchor 183 (221.2 MB) **34 ms**, plus 6 deltas, 5 ms |
+| 20 frames | 2 GB | 40 ms - anchor 190 (221.2 MB) 35 ms, plus 5 deltas, 5 ms |
+
+So the prediction holds, and it has a floor. Taking anchors five times more
+often more than halves the backwards step, 91 ms to 39 - and then stops dead,
+because what is left is not the walk at all. **It is loading one whole machine:
+34 of the 39 ms.** Going from sixty frames to twenty buys one millisecond.
+
+That changes the answer to phase 6 rather than confirming it. A rolling composed
+prefix shortens the DELTA WALK, and on a machine of this size the delta walk was
+already five milliseconds of thirty-nine. The speculation would be buying the
+part that is already cheap. What it cannot touch is the anchor load, and nothing
+that starts from an anchor can.
+
+Two things follow. `m_anchorSpacing` at 600 is now a number chosen when an
+anchor cost what an anchor used to cost, and on a heavy core it should come down
+a long way - at the price the bands have always charged, which is that an anchor
+is the biggest thing the budget holds, so denser anchors mean fewer frames kept.
+That trade is per-core arithmetic (a PlayStation 2's anchor is 221 MB, a Game
+Boy's is under a megabyte) and it wants measuring per core rather than a new
+constant guessed here.
+
+And the only thing that could reach below that floor is not a cache: it is
+going BACKWARDS from where the machine already is, which is what reverse deltas
+were, and they were removed for costing a page copy in the fault handler on
+every frame. That handler now copies pages for a planned anchor already. Whether
+the same machinery makes reverse deltas cheap enough to bring back for the near
+band alone is a real question, and a different one - it belongs to whoever picks
+this up next, with a measurement rather than an opinion.
+
+#### Phase 5: what reaches the disk is compressed
+
+Measured before it was built, on real machine states at zstd level 1:
+
+| state | raw | compressed | ratio | compress | decompress |
+|---|---|---|---|---|---|
+| PlayStation 2, Gran Turismo 4 | 232.9 MB | 9.95 MB | 23.4x | 3.2 GB/s | 6.1 GB/s |
+| DOSBox-X | 9.3 MB | 253 KB | 36.7x | 4.3 GB/s | 9.5 GB/s |
+| ares, NES | 2.1 MB | 17.7 KB | 117.6x | 8.8 GB/s | 12.0 GB/s |
+| Genesis Plus GX | 822 KB | 37.9 KB | 21.7x | 3.3 GB/s | 6.6 GB/s |
+| Snes9x | 500 KB | 64.1 KB | 7.8x | 2.5 GB/s | 3.6 GB/s |
+
+A machine is mostly memory nobody has written, and what has been written is
+mostly repetitive; seven to a hundred and eighteen times smaller, at speeds a
+disk cannot match. (`tests/perf/spillbench` prints a ratio too, and it is
+meaningless - its fake machine writes single-byte slices, which compress to
+nothing. The ratios above are the real ones.)
+
+**How it is built, and the one thing it had to keep.** The writer compresses
+each body as it serialises it - never holding a second copy of a whole machine
+- and appends the frame wherever the file really ends. Everything the history
+DECIDES with stays logical: a spill still reserves the uncompressed length at
+once, and what is live, what is dead, when to compact and what the disk budget
+drops are all computed from those numbers, exactly as before. A size nobody
+knows until the compressor has run could not have come out the same threaded as
+in line, and that sameness is what the differential test exists to hold. Where
+the bytes really landed - `physAt`, `physLength`, `packed` - arrives with the
+writer's report, and only readers look at it. Appending rather than writing at
+the reserved offset matters on Windows: a compressed body written in place would
+leave a hole the size of the difference after every stretch, and NTFS fills
+holes with zeros. Every reader (a restore, a save, settling) goes through
+`SpillBodyReader`, which hands back the raw layout from either a zstd frame or a
+raw extent without holding the decompressed body whole; a saved history is
+always the raw layout, whatever the spill file holds. Settling now writes its
+result on the writer too, where it used to write a whole machine on the
+emulation thread once per settled stretch.
+
+**What it measured.** A PlayStation 2 seek back to frame 198, landing on a
+stretch whose 221 MB anchor has been spilled (anchor 183 plus 5 deltas):
+
+| bodies | page cache | the restore | the spill file on disk |
+|---|---|---|---|
+| raw | warm | 66 ms | 2,747.5 MB |
+| compressed | warm | 54 ms | 79.8 MB |
+| raw | cold | **103 ms** | 2,509.2 MB |
+| compressed | cold | **59 ms** | 79.9 MB |
+
+The EE RAM after the run is byte-identical in all four. The file is 31 times
+smaller for the same logical history, and a cold restore is 1.75 times faster on
+this disk, which reads at 1.4 GB/s. On the Windows install's NTFS, measured at
+176 MB/s, a cold read of that anchor raw would be about 1.3 s against about 57
+ms of compressed read plus 36 of decompression - an estimate from the measured
+throughput, not a measurement of the restore.
+
+**The measurement had two traps in it, and both would have flattered the old
+path.** The first attempt seeked back to frame 60 and landed on anchor 0, the
+1.8 MB boot state: it measured a delta walk, not a machine read off a disk. And
+a stretch spilled a moment ago sits in the page cache, so a "disk" read of it is
+a memcpy, and compression can only ADD its decompression time there - there is
+no dropping the cache system-wide without root. `CHIMERA_SPILL_COLD=1` makes the
+writer flush each body and evict its own file's pages (`posix_fadvise`, which
+needs no privilege), and that is what the cold rows are. `CHIMERA_SPILL_RAW=1`
+writes bodies uncompressed, for the A against the B.
+
+**And then it bought depth, because the owner of the budget chose it
+(user-decided, 2026-09-13).** As first built, the disk budget still counted
+logical bytes, so the same setting kept the same stretches in a thirty-first of
+the space. The choice put to the user was to count what the file really weighs,
+at the price of the disk half of the history's decisions following the writer's
+timing; the answer was to count compressed bytes.
+
+So a stretch now costs the disk nothing when it is reserved and costs what the
+writer really wrote when the writer reports it; forgetting or settling a
+stretch gives back what it really weighed; compaction judges the file by its
+real length (`m_fileBytes`). The budget is held once a frame, after that frame's
+reports have been applied, and again whenever a flush lands more - and between
+frames the file may run ahead of the budget by what is still being written,
+which the writer's queue bounds. `diskBytes()` now reports what is really on
+the disk, which is also what the cache manager is shown.
+
+The same PlayStation 2, a 1024 MB disk budget (512 MB live), a seek back to
+frame 130:
+
+| bodies | what is live on disk at the end | the seek back |
+|---|---|---|
+| raw | 528.2 MB, the budget full, stretches dropped all run | not in the history any more: replayed |
+| compressed | 79.7 MB, nothing ever dropped | **from disk: anchor 124 plus 2 deltas, 49 ms** |
+
+with the EE RAM identical, and a writer that was handed 4.8 GB of bodies and
+wrote 135 MB of them. That is the depth: the raw run's budget was spent on two
+anchors at a time and threw the rest away, and the compressed run never came
+near it.
+
+**What it cost, said plainly.** The step-for-step sameness of threaded and in
+line now covers what the history DECIDES with memory - which frames are kept,
+what is held, what is coarsened, what is spilled - but no longer what the disk
+budget drops, because a stretch starts to weigh on the disk when its report
+lands and that moment is the writer's. Both modes drop correctly; they can drop
+at different moments. The differential test says exactly that: it runs without
+a disk budget, compares the history step by step, and compares what the disk
+holds once, after a flush, where the same stretches compress to the same bytes
+either way. The disk budget's own correctness - every frame still offered comes
+back exact, the first stretch is never dropped, the file is held to the number
+given - stays the fuzz's and the disk-budget test's to prove, and both pass.
+
+It was tested the way everything else here was: `test_state_history` with
+bodies compressed, raw and in line, and twenty repeats compressed; the six real
+cores through `chimera-run`, every seek back restoring from compressed bodies,
+byte-identical; the synthetic witness, 48 ok; fifteen more repeats each with
+the helpers off and with bodies raw; the UI suite, none failed; the three
+frontend soaks, clean. And on real Windows, where the writer loads a different
+libzstd from beside a different library: NES, Atari 2600 and Genesis through a
+cross-built `chimera-run.exe`, plain against seek against seek in line,
+identical - with the trace checked rather than assumed, because a missing DLL
+would have written every body raw and passed anyway. It reported 37 planned
+anchors, a restore read back from disk, and a writer handed 29.5 MB that wrote
+342 KB.
+
+#### The stride tuner stopped listening to anchors
+
+Found while measuring rather than while looking, and true before any of this
+was built. `tuneStride` fed every capture into one exponential mean, anchors
+included - and an anchor costs what the MACHINE is where a delta costs what the
+frame did. One 121 ms anchor in a stream of 2 ms captures dragged the mean far
+enough past `kCostShare` to treble the near band's stride, which then recovered
+one step per thirty captures. A significant share of every heavy run was being
+stored sparsely because of a cost that had nothing to do with the frames being
+stored - and thinning the near band cannot make an anchor cheaper anyway,
+because anchors happen on `anchorSpacing` rather than on the stride.
+
+So an anchor now only resets the clock the next delta measures against. On the
+PlayStation 2 run above the near band thins once, for deltas that really are
+expensive on that machine, and then comes back to keeping every frame.
+
+#### The four defects the testing found
+
+None of these would have been caught by a green unit suite, and each is the
+reason the bar was set where it was.
+
+1. **A reader and the writer shared one FILE, and a FILE is one position.**
+   Even with glibc locking every call, and even reading a range nobody was
+   writing, the loop seeking to offset 0 and the writer seeking to the end
+   interleaved - and the loop's read came back from the end. It surfaced as
+   **restores returning somebody else's frames, seven runs in twenty**. The
+   file is now open twice: the writer owns one handle, the loop owns the other,
+   and separate handles are separate positions.
+2. **The save barrier called into a freed session.** A four-thousand-frame soak
+   survived every seek and died on the way out: a movie is disposed when a
+   project closes, and by then the emulator it borrowed may be gone. The
+   barrier belongs to the session (`WaterboxCore.Dispose`), which is the thing
+   that knows it is alive.
+3. **A barrier taken before deciding not to act.** `compactSpill` drained and
+   then decided not to compact, so every spill waited for its own write within
+   a frame or two of queuing it: a 1.8x win became a 2.4x LOSS the moment the
+   file had a budget. The cheap question comes first now, and the wait only for
+   an answer of yes.
+4. **Compaction judging a file that had not been written yet.** With writes in
+   flight the counts describe a file that does not exist - ranges reserved and
+   not written, and stretches dropped before their write landed - and it
+   compacted at every opportunity instead of every third one, copying every
+   live byte each time. A busy writer now defers the question to a quieter
+   frame, and past three times the live set compacts anyway, because the
+   promise about the file's size is a promise.
+
+Two more things came out of the same work: a queued write whose stretch is
+dropped before it lands is **cancelled** rather than written, and the writer is
+not allowed to fall further behind than half the memory budget (four megabytes
+to sixty-four), because an unbounded queue is memory the budget cannot see.
+
+#### What it was tested against
+
+- `test_state_history` **40 runs threaded and 25 in line, no failures** - the
+  repetition is the point, since the FILE-position bug failed seven in twenty.
+- A differential block in that suite runs the same 400-operation sequence
+  threaded and in line and compares what a caller can see after every step -
+  count, bytes held, bytes on disk, and the exact set of frames offered - and
+  they are identical, which is the claim phase 1 makes.
+- miniBox's own suite, 8 of 8, including a new `test_plan`: a planned state
+  equals a written one; writes during a plan do not change it; a THREAD filling
+  while the guest writes the same pages, eight rounds, is identical; a planned
+  state loads; and an epoch across a plan still describes what the frame did.
+- The synthetic witness, **48 ok, 0 failed**, which is the frontend and the
+  engine both driving a real core through a real greenzone.
+- Six real cores through `chimera-run`, each played to the end, then played
+  again with a seek back through a greenzone small enough to spill, then again
+  with the helpers off: **NES (two games), Atari 2600, Genesis, SNES and a
+  disk-backed DOS machine all come back byte-identical in all three**. ares and
+  Ruffle expose no memory domains to compare, and their savestates are not
+  byte-reproducible between two identical plain runs, so they were checked for
+  liveness only - they run clean under a spilling greenzone either way.
+- Three frontend soaks: six thousand frames of play with a jump back every
+  thirty-five, six thousand in RECORD mode with a jump back every twenty-five,
+  and four thousand with the greenzone thrown away every eight hundred. All
+  exit clean.
+- The UI suite, 727 tests, none failed.
+- **And all of it again on real Windows**, which is where the fault handler is a
+  vectored exception handler and where a guest stack may not be held at all.
+  miniBox's suite cross-built and run through interop, `test_plan` included:
+  106 checks, all passed. Then three real cores - NES, Atari 2600 and Genesis -
+  driven by a cross-built `chimera-run.exe` from a staged directory of its own:
+  plain, seek back through a spilling greenzone, and seek with the helpers off,
+  byte-identical in all three. The trace was checked rather than assumed: 37
+  planned anchors and none written in line, so the path under test is the path
+  that ran.
 
 ### What must be proved before any of it lands (user-decided, 2026-09-12)
 

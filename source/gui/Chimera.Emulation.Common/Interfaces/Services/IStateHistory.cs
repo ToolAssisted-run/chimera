@@ -73,6 +73,27 @@ namespace Chimera.Emulation.Common
 		/// </summary>
 		bool Save(string path, string machineId);
 
+		/// <summary>
+		/// The same save, queued on the engine's writer rather than waited for.
+		///
+		/// Writing the history is the longest thing a project save does - up to
+		/// fourteen gigabytes under the default budgets, and TAStudio fires one
+		/// every thirty minutes without being asked - and none of it needs the
+		/// machine. What the file describes is the history as it stands at this
+		/// call; the run carries on while it is written.
+		/// </summary>
+		bool SaveLater(string path, string machineId);
+
+		/// <summary>Whether a queued save is still being written.</summary>
+		bool SavePending { get; }
+
+		/// <summary>
+		/// Waits for a queued save. True when it worked, and when there was
+		/// nothing queued. This is the barrier, and it belongs wherever the
+		/// project is let go of: the file has to be whole by then.
+		/// </summary>
+		bool SaveWait();
+
 		bool Load(string path, string machineId);
 
 		/// <summary>

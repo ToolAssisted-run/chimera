@@ -2535,3 +2535,109 @@ take them. The lever that reaches those is granularity - a 2 MB huge page
 faults once where 512 pages fault 512 times - at the cost of deltas 512 times
 coarser, which is the trade this whole design was built to escape. It is a
 different project, and mixing the two would be a good way to lose both.
+
+## The greenzone got its threads, and the machine kept its core (2026-09-12)
+
+The design above is now three quarters built, and what it measured is worth
+recording beside what it predicted, because one prediction was wrong in an
+instructive way and four defects turned up that only the bar the user set could
+have found.
+
+**What exists.** The project save and the spill writes happen on a writer
+thread; an anchor is taken as a plan, its pages held read-only by miniBox and
+copied on a drainer thread while the machine runs on. Coarsening is still on
+the loop and is now deliberately staying there (below). Everything is droppable
+- `CHIMERA_HELPERS=0`, or a thread that will not start, and the whole of it
+happens in line exactly as before, which is the reference the threaded path is
+tested against rather than a fallback nobody exercises.
+
+**What it bought.** On the emulation thread, an anchor of a 256 MB machine fell
+from 84.7 ms to 9.6, and of a gigabyte machine from 521 ms to 33 - eight to
+fifteen times less - with the resulting state byte for byte the state the old
+path would have written. A captured frame's 99th percentile improved 1.7x to
+12x depending on the shape of the machine, and its worst frame up to 7.2x. A
+project save of a 122 MB history went from 51 ms of freeze to returning at
+once. The prediction that the steady-state MEAN would barely move was right: it
+moved 1.1x to 1.5x, and anybody doing this for throughput would still have the
+wrong reason.
+
+**The measurement that made phase 3 possible** was not about copying at all. A
+copy-on-write anchor has to hold every page it is about to copy, and if that
+cost what the copy costs the idea is dead; it does not, because mprotect works
+on RANGES. Holding 256 MB read-only measured 0.76 ms in one call and 1.08 ms in
+megabyte runs, against 40 to 180 ms to copy it. One micro-bench, five minutes,
+and it decided the whole design.
+
+**The prediction that was wrong.** The design said a spill should not count as
+spilled until its write landed, so that a reader could never want bytes that
+were not there. Built that way, the budget would be met later than it is asked
+to be - and eviction is driven by that byte count, so the history would hold
+different frames threaded than in line. It is the other way round: the metadata
+settles at once, exactly as before, and what pays for it is that every READER
+of the file waits for the writer, and only for the range it needs. That is what
+makes a step-for-step comparison between the two modes possible, and that
+comparison is now a test.
+
+**Phase 2 is not deferred, it is declined.** Moving coarsening off the loop
+costs that same property - a merge that lands a frame late leaves a landing the
+synchronous path had already merged away - and it buys 0.16 to 0.72 ms a frame
+of a cost that is not what anybody feels. Trading the one property that makes a
+threaded design checkable for a fraction of a millisecond is a bad trade, and
+saying so is more useful than leaving it on a list.
+
+**The measurement that nearly ended it, and the one line that saved it.** On a
+synthetic block the copy-on-write anchor did what it promised. On a real
+PlayStation 2 - a 232 MB state, anchors every twenty frames - it did nothing at
+all: 117 to 141 ms on the emulation thread against 113 to 129 for the old path.
+Splitting the trace line in two said why in two minutes. The plan cost eleven
+milliseconds, exactly as the bench said; `std::vector::resize` was spending a
+hundred and thirty zeroing the quarter-gigabyte buffer it was about to be
+written over. A body is now allocated by an allocator whose `construct` does
+nothing, so whoever fills the bytes pays for touching them - for an anchor, the
+drainer - and the same machine's anchor costs 12 to 17 ms. The lesson is not
+about allocators: a bench can measure a mechanism perfectly and the system not
+at all, because the thing it does once outside its loop is the thing that costs.
+
+And it is the same lesson twice in one day, from opposite ends. The rpcs3 crash
+above was found by printing the bytes at the faulting instruction instead of
+just its address; this was found by printing the buffer's time beside the
+plan's. Both had been one missing number away the whole time, and in both cases
+the missing number cost a day before it cost two minutes. What transfers is not
+the fix, it is that an instrument which reports the thing you are working on
+and nothing beside it will confirm whatever you already believe.
+
+**What reaches the disk is compressed, and the decisions did not notice.** Real
+machine states compress seven to a hundred and eighteen times at zstd level 1 -
+a PlayStation 2 anchor from 232.9 MB to 9.95 MB - so the writer compresses each
+spilled body as it writes it. The design constraint was the same one as
+everywhere else in this work: the history decides with LOGICAL sizes, reserved
+at once, and only the readers learn where the compressed bytes physically
+landed. The same PS2 history then weighed 79.9 MB on disk instead of 2.5 GB,
+and a cold restore of a spilled anchor fell from 103 ms to 59. As first built it
+bought no depth, because the disk budget still counted logical bytes; counting
+physical ones would make disk eviction follow the writer's timing, and that
+trade was put to the user rather than made. The answer was to count compressed
+bytes (user-decided, 2026-09-13), and with the same 1024 MB budget a PS2 run
+that had been throwing away all but two anchors kept everything it ever spilled
+in 79.7 MB, and served a seek back from disk that the raw run had to replay.
+What it cost is written down beside it: threaded and in line still decide the
+same frames step for step, but may drop from disk at different moments, so the
+differential test now compares the disk once, after a flush. The measurement that found this
+had to be taken twice, because the first one landed on the tiny boot anchor and
+read a page cache rather than a disk, and both mistakes flattered the old path.
+
+**Four defects, and what each says.** A reader and the writer shared one FILE
+handle, and a FILE is one position: the loop seeking to the oldest stretch and
+the writer seeking to the end interleaved, and restores came back with somebody
+else's frames seven runs in twenty. Two handles fixed it, and the lesson is
+that "different ranges" is not the same as "different files". The save barrier
+called into a session that was already freed, which a four-thousand-frame soak
+found by surviving every seek and dying on the way out - a barrier belongs to
+the thing that knows it is still alive. And twice a barrier was taken before
+deciding whether it was needed, or a decision was made on numbers describing a
+file that had not been written yet: both turned a win into a loss, and neither
+was visible as anything but a slower run.
+
+Every one of those four came from repetition and from real cores, not from a
+green suite: the FILE-position bug passed thirteen runs in twenty. That is the
+whole argument for the bar.

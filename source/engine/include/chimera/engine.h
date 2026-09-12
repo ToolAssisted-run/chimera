@@ -1213,6 +1213,24 @@ CE_API int32_t ce_session_seek(ce_session *s, int64_t frame);
 CE_API int32_t ce_session_history_save(ce_session *s, const char *path, const char *machine_id);
 CE_API int32_t ce_session_history_load(ce_session *s, const char *path, const char *machine_id);
 
+/* The same save, queued rather than waited for.
+ *
+ * Writing a history is the longest thing a project save does - up to fourteen
+ * gigabytes under the default budgets, which measured ten seconds to a Linux
+ * disk and over a minute to NTFS - and it has nothing to do with the machine:
+ * it is bytes going to a file. So it goes to the history's writer, and the run
+ * carries on. The file describes the history as it stands at THIS call, not as
+ * it ends up; frames captured while it is written belong to the next save.
+ *
+ * _later returns 0 when it was queued (and does it in line, returning the same,
+ * when helpers are off). _pending says whether it is still being written.
+ * _wait blocks until it is done and returns 0 when it worked - including when
+ * there was nothing queued, which is not a failure. Closing a project is where
+ * the wait belongs: the files must be whole before they are let go. */
+CE_API int32_t ce_session_history_save_later(ce_session *s, const char *path, const char *machine_id);
+CE_API int32_t ce_session_history_save_pending(ce_session *s);
+CE_API int32_t ce_session_history_save_wait(ce_session *s);
+
 #ifdef __cplusplus
 }
 #endif

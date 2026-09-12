@@ -1339,6 +1339,10 @@ void ce_session_free(ce_session *s)
 	if (s->movie != nullptr) ce_movie_log_free(s->movie);
 	if (s->obj != nullptr)
 	{
+		/* An anchor may still be being filled, and it is filled from the
+		 * machine that is about to go. Finishing costs what is left of one
+		 * copy; not finishing is a thread reading a freed mapping. */
+		s->history.configure(nullptr, nullptr, 0);
 		std::string err;
 		s->deactivate(err); // tearing down anyway
 		chimera::WbxReturn r{};
@@ -2141,6 +2145,41 @@ int32_t ce_session_history_save(ce_session *s, const char *path, const char *mac
 {
 	s->error.clear();
 	return s->history.saveTo(path, historyId(s, machine_id).c_str(), s->error) ? 0 : 1;
+}
+
+/* The same save, queued on the history's writer.
+ *
+ * A project save writes the whole history - up to fourteen gigabytes under the
+ * default budgets - and it does it on the thread that runs the machine, which
+ * is a freeze measured in seconds and fired every thirty minutes by TAStudio's
+ * autosave. The file describes the history as it stands at THIS call; the run
+ * carries on while it is written.
+ *
+ * 0 means it was queued (or, with helpers off, written). The answer comes from
+ * ce_session_history_save_wait, which is what closing a project must call. */
+int32_t ce_session_history_save_later(ce_session *s, const char *path, const char *machine_id)
+{
+	s->error.clear();
+	return s->history.saveToLater(path, historyId(s, machine_id).c_str(), s->error) ? 0 : 1;
+}
+
+/* Whether a queued save is still being written. */
+int32_t ce_session_history_save_pending(ce_session *s)
+{
+	return s->history.savePending() ? 1 : 0;
+}
+
+/* Waits for a queued save. 0 when it worked - and when there was nothing to
+ * wait for, which is not a failure: a caller that saved in line has nothing
+ * queued and nothing to hear about. */
+int32_t ce_session_history_save_wait(ce_session *s)
+{
+	s->error.clear();
+	std::string why;
+	const bool ok = s->history.saveWait(why);
+	if (ok || why.empty()) return 0;
+	s->error = why;
+	return 1;
 }
 
 int32_t ce_session_history_load(ce_session *s, const char *path, const char *machine_id)

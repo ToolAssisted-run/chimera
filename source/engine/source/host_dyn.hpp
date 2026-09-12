@@ -81,6 +81,22 @@ struct HostApi
 	 * is the same either way. */
 	void (*wbx_compose_delta_mem)(const uint8_t *a, uintptr_t aLen, const uint8_t *b, uintptr_t bLen,
 		WbxWriteCb out, uintptr_t outUserdata, WbxReturn *ret);
+
+	/* ---- a whole machine, taken while it runs ----
+	 *
+	 * Taking a state is 95 to 98% memcpy, and the copy does not need the
+	 * machine to stand still - only the bytes. These hold the pages a state
+	 * will carry, let anybody fill them, and lift the holds at the end; a guest
+	 * write to a page nobody has copied yet is copied by the fault handler
+	 * before the write lands. `size` first, then a buffer of exactly that, then
+	 * `plan`; `fill` on any thread; `finish` on the thread that runs the
+	 * machine. Optional as a set: a host without them takes states the old way,
+	 * which is correct and slower. */
+	void (*wbx_state_size)(void *obj, WbxReturn *ret);
+	void (*wbx_state_plan)(void *obj, uint8_t *dest, uint64_t size, WbxReturn *ret);
+	void (*wbx_state_pages)(void *obj, WbxReturn *ret);
+	void (*wbx_state_fill)(void *obj, uint64_t from, uint64_t to, WbxReturn *ret);
+	void (*wbx_state_finish)(void *obj, WbxReturn *ret);
 };
 
 /* The loaded host, or nullptr with *error set. Loads once, then cached. */

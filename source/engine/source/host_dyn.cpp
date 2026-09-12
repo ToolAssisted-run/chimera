@@ -121,6 +121,22 @@ void loadOnce()
 	if (!g_ok || !bind(g_api.wbx_compose_delta, "wbx_compose_delta")) g_api.wbx_compose_delta = nullptr;
 	/* and the in-memory form of it, which an older host does not have */
 	if (!g_ok || !bind(g_api.wbx_compose_delta_mem, "wbx_compose_delta_mem")) g_api.wbx_compose_delta_mem = nullptr;
+
+	/* Taking a state while the machine runs: all five or none. A host with
+	 * half of them could hold pages it has no way to release. */
+	if (!g_ok
+		|| !(bind(g_api.wbx_state_size, "wbx_state_size")
+			&& bind(g_api.wbx_state_plan, "wbx_state_plan")
+			&& bind(g_api.wbx_state_pages, "wbx_state_pages")
+			&& bind(g_api.wbx_state_fill, "wbx_state_fill")
+			&& bind(g_api.wbx_state_finish, "wbx_state_finish")))
+	{
+		g_api.wbx_state_size = nullptr;
+		g_api.wbx_state_plan = nullptr;
+		g_api.wbx_state_pages = nullptr;
+		g_api.wbx_state_fill = nullptr;
+		g_api.wbx_state_finish = nullptr;
+	}
 }
 
 } // namespace

@@ -452,6 +452,12 @@ namespace Chimera.Client.Common
 		public override void Dispose()
 		{
 			base.Dispose();
+			// A queued save is waited for by the SESSION, in WaterboxCore.Dispose
+			// and in the engine's own teardown - not here. By the time a movie is
+			// disposed the emulator it borrowed may already be gone, and calling
+			// into a freed session is a crash rather than a barrier: a 4000-frame
+			// soak survived every seek and died on the way out doing exactly that.
+			//
 			// not disposed: the history belongs to the emulator, which outlives
 			// the movie and is disposed by whoever made it
 			States = null;

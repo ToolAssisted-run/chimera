@@ -649,6 +649,15 @@ namespace Chimera.Emulation.Common.Engine
 		public abstract int ce_session_history_load(IntPtr session, string path, string machineId);
 
 		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract int ce_session_history_save_later(IntPtr session, string path, string machineId);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract int ce_session_history_save_pending(IntPtr session);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract int ce_session_history_save_wait(IntPtr session);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_session_domain_count(IntPtr session);
 
 		[ChimeraImport(CallingConvention.Cdecl)]
@@ -1850,6 +1859,28 @@ namespace Chimera.Emulation.Common.Engine
 
 		public bool HistoryLoad(string path, string machineId)
 			=> E.ce_session_history_load(_session, path, machineId ?? "") is 0;
+
+		/// <summary>
+		/// The same save, queued on the engine's writer instead of waited for.
+		///
+		/// Writing the history is the longest thing a project save does - up to
+		/// fourteen gigabytes under the default budgets - and it was happening on
+		/// the thread that runs the machine, every thirty minutes, because that is
+		/// how often TAStudio autosaves. The file describes the history as it
+		/// stands at this call; the run carries on while it is written.
+		/// </summary>
+		public bool HistorySaveLater(string path, string machineId)
+			=> E.ce_session_history_save_later(_session, path, machineId ?? "") is 0;
+
+		/// <summary>Whether a queued history save is still being written.</summary>
+		public bool HistorySavePending => E.ce_session_history_save_pending(_session) is not 0;
+
+		/// <summary>
+		/// Waits for a queued history save. True when it worked, and when there was
+		/// nothing queued - closing a project is where this belongs, because the
+		/// file has to be whole before the project is let go.
+		/// </summary>
+		public bool HistorySaveWait() => E.ce_session_history_save_wait(_session) is 0;
 
 		public int DomainCount => E.ce_session_domain_count(_session);
 		public string DomainName(int index) => ChimeraEngine.PtrToStringUtf8(E.ce_session_domain_name(_session, index)) ?? $"Domain {index}";

@@ -377,6 +377,13 @@ namespace Chimera.Emulation.Common.Waterbox
 
 		public void Dispose()
 		{
+			// A history save may still be being written (IStateHistory.SaveLater),
+			// and the file has to be whole before the session that is writing it
+			// goes. Here rather than in the movie's Dispose: the movie may outlive
+			// or predecease the emulator, and only the session knows it is alive.
+			// The engine's own teardown drains the writer as well - this is the
+			// one that can still report a failure.
+			if (!_session.Disposed) _session.HistorySaveWait();
 			_resampler?.Dispose();
 			_session.Dispose();
 		}
@@ -497,6 +504,23 @@ namespace Chimera.Emulation.Common.Waterbox
 		public void InvalidateAfter(int afterFrame) => _session.GreenzoneInvalidate(afterFrame);
 
 		public bool Save(string path, string machineId) => _session.HistorySave(path, machineId);
+
+		/// <summary>
+		/// The same save, queued on the engine's writer.
+		///
+		/// The history is the longest part of a project save - up to fourteen
+		/// gigabytes under the default budgets - and waiting for it stops the
+		/// machine. What is written describes the history as it stands at this
+		/// call; the run carries on. <see cref="SaveWait"/> is the barrier, and
+		/// it belongs where the project is let go of.
+		/// </summary>
+		public bool SaveLater(string path, string machineId) => _session.HistorySaveLater(path, machineId);
+
+		/// <summary>Whether a queued save is still being written.</summary>
+		public bool SavePending => _session.HistorySavePending;
+
+		/// <summary>Waits for a queued save; true when it worked or there was none.</summary>
+		public bool SaveWait() => _session.HistorySaveWait();
 
 		public bool Load(string path, string machineId)
 		{

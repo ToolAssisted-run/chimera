@@ -568,8 +568,11 @@ int main(void)
 		/* and the FILE is held too, not just the count of what is live in it -
 		 * dropping the oldest without reclaiming the room it held would be a
 		 * limit on paper only */
+		h.flushWrites();
 		const uint64_t onDisk = std::filesystem::file_size(spillFileIn("work-history-disk"));
 		assert(onDisk <= kDisk);   /* the number given, on the number `ls` shows */
+		/* and the budget counts the FILE: what is live in it is part of it */
+		assert(h.diskBytes() <= onDisk);
 
 		/* what is left still works: the newest frames are reachable, which is
 		 * the half of the run the oldest was dropped to protect */
@@ -587,6 +590,7 @@ int main(void)
 		for (int64_t f = 1; f <= 400; f++) { u.beforeAdvance(); advance(f); u.capture(f); }
 		/* the same run with no limit keeps everything it ever spilled, which is
 		 * the behaviour this budget exists to bound */
+		u.flushWrites();
 		fprintf(stderr, "  [disk budget] bounded %llu, unbounded %llu\n",
 			(unsigned long long)h.diskBytes(), (unsigned long long)u.diskBytes());
 		assert(u.diskBytes() > h.diskBytes());
@@ -621,7 +625,11 @@ int main(void)
 			truth.push_back(at);
 		}
 
-		/* it really did spill, or this proves only that nothing broke */
+		/* it really did spill, or this proves only that nothing broke. The
+		 * FILE is asked rather than the history, so the writer has to have
+		 * caught up first - it is allowed to lag, and everything that needs
+		 * the bytes waits for them on its own. */
+		h.flushWrites();
 		assert(!spillFileIn("work-history-spill").empty());
 		assert(h.bytes() <= 512);
 		assert(std::filesystem::file_size(spillFileIn("work-history-spill")) > 512);
@@ -695,7 +703,11 @@ int main(void)
 		run("work-history-settle-control", 1, dense, truthD);
 
 		/* the far band - everything older than near + mid - offers fewer frames
-		 * once settled, and the file is lighter for it */
+		 * once settled, and the file is lighter for it. "The file" is what has
+		 * been written: the disk count is taken when the writer reports, so both
+		 * wait for their writers before they are weighed against each other. */
+		settled.flushWrites();
+		dense.flushWrites();
 		int64_t offeredS = 0, offeredD = 0;
 		for (int64_t f = 8; f < 160 - 2 - 6 - 8; f++)
 		{
@@ -902,6 +914,7 @@ int main(void)
 			advance(f);
 			h.capture(f);
 		}
+		h.flushWrites();
 		assert(h.diskBytes() > 0);
 		assert(!spillFileIn("work-history-again").empty());
 
@@ -1100,6 +1113,307 @@ int main(void)
 		std::filesystem::remove("work-history-fuzz.err");
 		std::filesystem::remove_all("work-history-fuzz");
 		std::filesystem::remove_all("work-history-fuzz-b");
+	}
+
+
+	{ // The same run, threaded and in line, compared step by step.
+	  //
+	  // The fuzz above asks whether the history is RIGHT. This asks the
+	  // question a helper thread raises: is it the SAME? The claim the design
+	  // makes is not "close enough" but identical - a spill settles all of its
+	  // metadata the moment it is queued, so the budget's arithmetic and every
+	  // decision that follows from it are what they always were, and the only
+	  // thing that happens later is the write itself. Where that claim breaks,
+	  // the two signatures diverge at the operation that broke it.
+	  //
+	  // The signature is what a caller can see: how many frames are offered,
+	  // what is held in memory, what is on disk, and which frames answer.
+		const chimera::HostApi api = fakeHost();
+		auto signatureOf = [](chimera::StateHistory &x, int64_t upTo) {
+			/* Not the disk bytes. The disk budget counts what the file really
+			 * holds (user-decided, 2026-09-13), which is known when the writer
+			 * reports - and a report lands whenever the writer gets there, so
+			 * the disk count moves at different moments threaded and in line.
+			 * What is compared step by step is what the history DECIDED; what
+			 * the disk ends up holding is compared once, after a flush. */
+			std::string sig = std::to_string(x.count()) + "/" + std::to_string(x.bytes()) + ":";
+			for (int64_t f = 0; f <= upTo; f++)
+			{
+				if (x.nearest(f) == f) sig += std::to_string(f) + ",";
+			}
+			return sig;
+		};
+
+		int spilledIn[2] = { 0, 0 }, queuedWrites = 0;
+		for (int seed = 0; seed < 8; seed++)
+		{
+			std::string signature[2];
+			for (int pass = 0; pass < 2; pass++)
+			{
+				const bool threaded = pass == 0;
+				const char *dir = threaded ? "work-history-diff-t" : "work-history-diff-s";
+				std::filesystem::remove_all(dir);
+				std::filesystem::create_directories(dir);
+
+				uint64_t rng = 0x27BB2EE687B0B0FDull * static_cast<uint64_t>(seed + 1);
+				auto rnd = [&]() { rng ^= rng << 13; rng ^= rng >> 7; rng ^= rng << 17; return static_cast<uint32_t>(rng >> 11); };
+				g_machine = Machine{};
+
+				chimera::StateHistory h;
+				const uint64_t budget = 200 + (rnd() % 500);
+				const int64_t near = 1 + rnd() % 4, mid = 2 + rnd() % 8, midStride = 1 + rnd() % 3,
+					farStride = 1 + rnd() % 16, spacing = 2 + rnd() % 10;
+				h.configure(&api, nullptr, budget);
+				h.helpers(threaded);
+				h.bands(near, mid, midStride, farStride, spacing);
+				h.spillTo(dir);
+				/* No disk budget here, on purpose: dropping from disk follows the
+				 * writer's reports now, so the two modes would drop at different
+				 * moments and hold different frames - correctly, and not the same.
+				 * The disk budget's correctness is the fuzz above's to prove. The
+				 * random draw stays, so the rest of the sequence is unchanged. */
+				(void)(2048 + rnd() % 8192);
+
+				int64_t frame = 0, newest = 0;
+				bool sawDisk = false, sawWrites = false;
+				h.capture(0);
+				std::string sig;
+				/* Where somebody works: near the playhead, not uniformly over the
+				 * run. A uniform edit point walks the run back towards zero
+				 * faster than frames push it forward, and then nothing is ever
+				 * big enough to spill - which would compare two histories that
+				 * never touched the writer at all. */
+				auto somewhereRecent = [&]() {
+					const int64_t back = static_cast<int64_t>(rnd() % 12);
+					return h.nearest(newest > back ? newest - back : 0);
+				};
+				for (int op = 0; op < 400; op++)
+				{
+					switch (rnd() % 24)
+					{
+					case 0:
+					case 1:
+					case 2:
+					{ // a seek back, which is where a pending write is met
+						const int64_t f = somewhereRecent();
+						if (f < 0) break;
+						assert(h.restore(f, error));
+						frame = f;
+						break;
+					}
+					case 3:
+					{ // an edit: everything after this frame stops being true
+						const int64_t f = somewhereRecent();
+						if (f < 0) break;
+						assert(h.restore(f, error));
+						frame = f;
+						h.invalidateAfter(f);
+						newest = f;
+						break;
+					}
+					case 4:
+						h.pin(static_cast<int64_t>(rnd() % static_cast<uint32_t>(newest + 1)), rnd() % 2 == 0);
+						break;
+					case 5:
+						(void)(rnd() % 2 ? 0 : 1024 + rnd() % 16384);   /* see above */
+						break;
+					default:
+					{ // a frame
+						h.beforeAdvance();
+						frame++;
+						advance(frame);
+						if (frame > newest) newest = frame;
+						const uint8_t note[2] = { static_cast<uint8_t>(frame & 0xFF), 0x5A };
+						h.capture(frame, note, sizeof note);
+						break;
+					}
+					}
+					sig += signatureOf(h, newest) + "|";
+					if (h.diskBytes() != 0 || h.writesInFlight() != 0) sawDisk = true;
+					/* that the writer wrote at all. Catching a write still IN FLIGHT
+					 * used to be the sign, and a capture now applies what the writer
+					 * reported before it returns - so a quick writer is never caught
+					 * mid-write, and with helpers off it never could be */
+					if (h.costs().spilledRaw != 0) sawWrites = true;
+				}
+				/* a run that never spilled would compare two histories that
+				 * never used the writer, and prove nothing about it. Asked after
+				 * the writer has caught up: a pass whose only spills came in its
+				 * last few operations has written them and not yet said so, and
+				 * that pass used the writer as much as any other. The same flush
+				 * happens in both passes, and moves no frame. */
+				h.flushWrites();
+				if (h.costs().spilledRaw != 0) sawWrites = true;
+				if (h.diskBytes() != 0) sawDisk = true;
+				if (sawDisk) spilledIn[pass]++;
+				if (threaded && sawWrites) queuedWrites++;
+				/* and what a save sees, which is the other reader of the file */
+				assert(h.saveTo(kPath, "fake", error));
+				sig += signatureOf(h, newest);
+				/* and what the disk holds, once everything has landed: the same
+				 * stretches compress to the same bytes either way */
+				h.flushWrites();
+				sig += " disk " + std::to_string(h.diskBytes());
+				signature[pass] = std::move(sig);
+
+				std::filesystem::remove_all(dir);
+			}
+			if (signature[0] != signature[1])
+			{
+				/* say WHERE, not just that: the first difference is the decision
+				 * the threading changed, and its neighbourhood names the op */
+				size_t at = 0;
+				while (at < signature[0].size() && at < signature[1].size()
+					&& signature[0][at] == signature[1][at]) at++;
+				const size_t from = at > 120 ? at - 120 : 0;
+				std::fprintf(stderr, "seed %d: threaded and in line diverged at %zu\n"
+					"  threaded: ...%s\n  in line:  ...%s\n",
+					seed, at, signature[0].substr(from, 240).c_str(),
+					signature[1].substr(from, 240).c_str());
+				std::fflush(stderr);
+				assert(false);
+			}
+		}
+		/* A run that never spilled would be comparing two histories that never
+		 * used the writer, which would prove nothing about it. Not every random
+		 * budget forces one, so the bar is most of them - and the threaded pass
+		 * must have had writes actually in flight, or the comparison is between
+		 * two synchronous paths. */
+		assert(spilledIn[0] >= 6 && spilledIn[1] >= 6);
+		assert(spilledIn[0] == spilledIn[1]);
+		assert(queuedWrites >= 6);
+		std::filesystem::remove_all("work-history-diff-t");
+		std::filesystem::remove_all("work-history-diff-s");
+	}
+
+	{ // Every offset in the spill file is one the reservation chose.
+	  //
+	  // A spill reserves its range before its bytes are written, so the length
+	  // reserved and the length written have to agree exactly: one byte short
+	  // and the next stretch lands on this one's tail, which nothing notices
+	  // until a restore comes back as somebody else's frames. So: a budget too
+	  // small to hold the run, everything driven onto disk, and then every
+	  // frame the history still offers read back off it and compared.
+		const chimera::HostApi api = fakeHost();
+		g_machine = Machine{};
+		std::filesystem::remove_all("work-history-reserve");
+		std::filesystem::create_directories("work-history-reserve");
+		chimera::StateHistory h;
+		h.configure(&api, nullptr, 512);      /* smaller than the run: it must spill */
+		h.bands(2, 4, 1, 2, 6);
+		h.spillTo("work-history-reserve");
+
+		std::vector<std::array<uint8_t, Machine::kCells>> truth(1);
+		std::memcpy(truth[0].data(), g_machine.cell, Machine::kCells);
+		h.capture(0);
+		for (int64_t f = 1; f <= 60; f++)
+		{
+			h.beforeAdvance();
+			advance(f);
+			std::array<uint8_t, Machine::kCells> at{};
+			std::memcpy(at.data(), g_machine.cell, Machine::kCells);
+			truth.push_back(at);
+			h.capture(f);
+		}
+		h.flushWrites();
+		assert(h.diskBytes() > 0);   /* if nothing spilled this proves nothing */
+		int read = 0;
+		for (int64_t f = 0; f <= 60; f++)
+		{
+			if (h.nearest(f) != f) continue;
+			assert(h.restore(f, error));
+			assert(std::memcmp(g_machine.cell, truth[static_cast<size_t>(f)].data(), Machine::kCells) == 0);
+			read++;
+		}
+		assert(read > 4);
+		std::filesystem::remove_all("work-history-reserve");
+	}
+
+
+	{ // A save on the writer writes the same file as a save in line.
+	  //
+	  // This is the one with seconds on it: the budgets a project is saved
+	  // against are four gigabytes in memory and ten on disk, so a save can be
+	  // fourteen gigabytes on the thread that runs the machine - and TAStudio
+	  // fires one every thirty minutes without being asked. Moving it is only
+	  // allowed if the bytes are the same bytes, so that is what is compared,
+	  // including the part that has to be read back out of the spill file.
+		const chimera::HostApi api = fakeHost();
+		g_machine = Machine{};
+		std::filesystem::remove_all("work-history-save");
+		std::filesystem::create_directories("work-history-save");
+
+		chimera::StateHistory h;
+		h.configure(&api, nullptr, 700);      /* small enough that stretches go to disk */
+		h.bands(2, 6, 1, 3, 5);
+		h.spillTo("work-history-save");
+
+		std::vector<std::array<uint8_t, Machine::kCells>> truth(1);
+		std::memcpy(truth[0].data(), g_machine.cell, Machine::kCells);
+		h.capture(0);
+		for (int64_t f = 1; f <= 90; f++)
+		{
+			h.beforeAdvance();
+			advance(f);
+			std::array<uint8_t, Machine::kCells> at{};
+			std::memcpy(at.data(), g_machine.cell, Machine::kCells);
+			truth.push_back(at);
+			const uint8_t note[2] = { static_cast<uint8_t>(f & 0xFF), 0x5A };
+			h.capture(f, note, sizeof note);
+		}
+		h.flushWrites();
+		assert(h.diskBytes() > 0);   /* the spilled half is the interesting half */
+
+		/* in line first, for the answer to compare against */
+		assert(h.saveTo("work-history-save/in-line.bin", "fake", error));
+
+		/* then queued, and it must not have finished by the time we are back */
+		assert(h.saveToLater("work-history-save/queued.bin", "fake", error));
+		const bool sawPending = h.savePending();
+		assert(h.saveWait(error));
+		assert(!h.savePending());
+
+		auto slurp = [](const char *path) {
+			std::ifstream in(path, std::ios::binary);
+			return std::string((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+		};
+		const std::string inLine = slurp("work-history-save/in-line.bin");
+		const std::string queued = slurp("work-history-save/queued.bin");
+		assert(!inLine.empty());
+		assert(inLine == queued);
+
+		/* and what comes back out of it is the run, frame for frame */
+		chimera::StateHistory back;
+		back.configure(&api, nullptr, 1u << 20);
+		assert(back.loadFrom("work-history-save/queued.bin", "fake", error));
+		int checked = 0;
+		for (int64_t f = 0; f <= 90; f++)
+		{
+			if (back.nearest(f) != f) continue;
+			assert(back.restore(f, error));
+			assert(std::memcmp(g_machine.cell, truth[static_cast<size_t>(f)].data(), Machine::kCells) == 0);
+			checked++;
+		}
+		assert(checked > 8);
+
+		/* The run carries on while a save is in flight, and what the file says
+		 * is the history as it was ASKED about - not as it ended up. Frames
+		 * captured after the request are somebody else's business. */
+		assert(h.saveToLater("work-history-save/during.bin", "fake", error));
+		for (int64_t f = 91; f <= 140; f++)
+		{
+			h.beforeAdvance();
+			advance(f);
+			h.capture(f);
+		}
+		assert(h.saveWait(error));
+		chimera::StateHistory during;
+		during.configure(&api, nullptr, 1u << 20);
+		assert(during.loadFrom("work-history-save/during.bin", "fake", error));
+		assert(during.nearest(INT64_MAX) <= 90);
+
+		(void)sawPending;   /* a fast enough writer may have finished already */
+		std::filesystem::remove_all("work-history-save");
 	}
 
 	/* the spill file belongs to the history and goes with it */
