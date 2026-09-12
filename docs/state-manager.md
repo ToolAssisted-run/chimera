@@ -1080,3 +1080,522 @@ that had already been handed a stale page: a symptom of this, several steps
 downstream. miniBox now prints the guest return
 addresses on a refusal that large, and a core package ships `core.wbx`
 unstripped, so `addr2line` names the caller.
+
+## What a second thread could take, and what it could never (user-asked, 2026-09-12)
+
+Nothing is built yet. This is the design and the arithmetic behind it, written
+before the code so that the case can be argued with rather than discovered
+afterwards.
+
+The machine runs on one core on purpose: a movie that replays is a machine
+whose every step is the same step, and parallelism inside emulation is how that
+promise is lost. The greenzone is not the machine. It is a cache of where the
+machine has been, and the history already treats it as one - `tuneStride`
+changes what is kept from what the clock says, so what a greenzone holds has
+been a function of wall time since the day it was tuned. Nothing a movie
+depends on is in here. That is what makes the question askable at all.
+
+### The measurement that decides it
+
+The question is not "can this be moved" but "how much of it is worth moving",
+and that is a ratio: how much of a capture is miniBox walking its page tables -
+which happens where the machine is and can happen nowhere else - and how much
+is memcpy into a buffer, which cares about no order and no lock.
+
+`tests/perf/storebench.c` times both halves over the same work, once with a
+sink that only counts and once with the sink StateHistory has. Best of three,
+this workstation, milliseconds:
+
+| arena / dirty | what is taken | walk | walk+store | the copy |
+|---|---|---|---|---|
+| 64 MB / 8 MB | anchor, 8.0 MB | 0.02 | 0.66 | 0.64 (97%) |
+| 256 MB / 32 MB | anchor, 32.1 MB | 0.14 | 4.48 | 4.34 (97%) |
+| 2 GB / 256 MB | anchor, 257 MB | 2.07 | 41.4 | **39.4 (95%)** |
+| 2 GB / 1 GB | anchor, 1025 MB | 2.44 | 153.5 | **151.0 (98%)** |
+| 8 GB / 1 GB | anchor, 1028 MB | 8.23 | 162.6 | **154.3 (95%)** |
+| 2 GB, 64 pages/frame | delta, 256 KB | 0.00 | 0.07 | 0.06 |
+| 2 GB, 256 pages/frame | delta, 1.0 MB | 0.04 | 0.36 | 0.32 |
+| 2 GB, 1024 pages/frame | delta, 4.0 MB | 0.07 | 1.43 | 1.36 |
+
+The first pass over a cold arena costs three to four times the warm figure -
+the 257 MB anchor was 118 to 182 ms before the caches and the page tables were
+warm - so an anchor in a real session is somewhere between the two, and the
+honest range for a machine of that size is **40 to 180 ms**.
+
+Set that beside what a frame costs to capture at all (`epochbench`, same box,
+2 GB arena):
+
+| pages written/frame | open (mprotect) | guest faults | delta walk | delta copy |
+|---|---|---|---|---|
+| 64 | 0.15 | 0.26 | 0.03 | 0.06 |
+| 256 | 0.45 | 1.05 | 0.04 | 0.32 |
+| 1024 | 1.94 | 4.55 | 0.07 | 1.36 |
+
+**Only the last column can move.** `epoch_begin` must finish before the frame
+runs, because an epoch that opens late does not describe the frame; and the
+faults are not work done ON the emulation thread, they ARE the emulation thread
+- the guest's own stores, trapped. At 256 pages a frame that is 0.32 ms of
+1.86, about a sixth, and the design log's real-run figures - the history is 5%
+of an N64 run and 11% of a Game Boy one - put the offloadable share of a whole
+session at **one to three per cent**.
+
+So the first finding is a negative one, and it is the important one: threading
+the steady-state per-frame capture is not worth a thread. Anybody proposing
+this for throughput has the wrong reason.
+
+### The prize is the stalls
+
+What a person notices is not a percentage, it is a freeze. There are three, and
+they are all on the capture path:
+
+- **The anchor.** 40 to 180 ms on a 257 MB machine, 150 to 700 ms on a
+  gigabyte one, every `m_anchorSpacing` frames - that is once every ten
+  seconds. On a PS2, Xbox or PS3 core it is several frames to half a second of
+  nothing, on a clock.
+- **The spill.** `evict()` is `while (m_bytes > m_budget)`, and every turn of
+  it can be an `fwrite` plus `fflush` of a whole stretch, with `evictDisk()`
+  and possibly `compactSpill()` - which rewrites the file's live suffix -
+  behind it. A 10 MB stretch measured 7.2 ms to ext4 and **56.9 ms to NTFS**.
+  Once the budget is full, which is the steady state of any long session, that
+  lands on arbitrary frames, several times over on some of them.
+- **Coarsening.** 0.16 to 0.72 ms a frame with the 8 MB merge cap, and 11 to 34
+  without it. The cap is there precisely because this is on the critical path,
+  and it costs density: at 70% overlap it leaves 18 merges of 400 undone.
+
+All three are bytes moving between buffers and files. None of them touches the
+machine.
+
+### Anchors thin the greenzone as well as stalling it
+
+Found while measuring, and true today regardless of any thread.
+
+`tuneStride` feeds every capture into one exponential mean and moves the near
+band's stride when capture passes `kCostShare` of wall time. Anchors go into
+that mean with everything else. Work it through with a machine at 2 ms a
+capture on a 10 ms frame, and one 121 ms anchor: the capture mean goes to about
+7.9 ms and the wall mean to about 16, so the share reads 0.49 against a ceiling
+of 0.15, and `want = stride * (share / kCostShare)` asks for three times the
+stride. The near band drops from every frame to one in three, and recovers one
+step per thirty captures - about ninety frames - by which time the next anchor
+is a sixth of the way closer.
+
+So on a heavy core a significant fraction of all frames are captured at a
+degraded stride because of a cost that has nothing to do with the frames being
+captured. The fix is cheap and independent of everything else here: measure
+anchors separately from deltas, and tune the stride on the deltas, which are
+the thing the stride actually controls.
+
+### Why this is less exotic than it sounds
+
+Two pieces of the mechanism already exist, in the fault path, on both operating
+systems:
+
+- **The mirror.** miniBox keeps an always-RW second mapping of the whole arena
+  (`mirror_addr`). Host-side reads go through it so that they never trip dirty
+  detection. A helper thread reading guest memory through the mirror is doing
+  exactly what every host-side read already does.
+- **Copy-on-write pages.** `mb_page_maybe_snapshot()` copies a page into a slot
+  from a page-sized pool (`snap_alloc`) inside the handler, before a write is
+  let through. It exists to hold the sealed baseline; the machinery is the
+  machinery.
+
+A copy-on-write ANCHOR is those two facts put together:
+
+1. At anchor time, walk the dirty set and record it - 2 to 8 ms, the `walk`
+   column above - and mark those pages read-only. `epoch_begin` already pays
+   for a re-protection of the same shape every frame.
+2. Hand the page list to the helper, which reads through the mirror and fills
+   the anchor buffer at its own pace.
+3. When the guest writes one of those pages, the fault handler copies that page
+   into the anchor's slot before letting the write through, and marks it done.
+   The handler already does a page copy on this path for the baseline.
+4. The anchor is complete when the helper and the handler between them have
+   covered the list.
+
+The emulation thread's share becomes the walk - 2 to 8 ms instead of 40 to 700
+- plus one extra 4 KB copy for each page the guest happens to write while the
+drain runs. At 256 pages a frame and a drain of a few frames that is under a
+megabyte of extra copying, against a stall measured in hundreds of
+milliseconds.
+
+### The contract
+
+Whatever is built, these must hold, and each is a thing a test can be written
+against:
+
+1. **The helper never writes guest memory.** It reads through the mirror. Every
+   mutation of the machine - `load_state`, `delta_apply` - stays on the
+   emulation thread.
+2. **Every reader of the history drains first.** `restore`, `invalidateAfter`,
+   `saveTo`, `configure` and `clear` block until pending work is finished or
+   cancelled. A seek that raced a pending spill would read a file that is not
+   written yet.
+3. **The budget counts what is pending.** Bytes queued for the helper are bytes
+   held; `m_bytes` must include them, or the budget is a number about the past.
+4. **A frame is never lost to a busy helper.** If the queue is full or the
+   helper has failed, the work happens in line, exactly as it does today. The
+   thread is an optimisation and must be droppable.
+5. **Tests can make it synchronous.** The differential fuzzers
+   (`test_state_history.cpp`, miniBox's `test_fuzz.c`) are the reason the
+   history is trusted, and they stay deterministic only if a drain-now mode
+   makes the helper a function call. That mode is not a test-only path - it is
+   what a headless run and a gate use as well.
+6. **Nothing about the movie depends on when the helper runs.** The greenzone is
+   a cache; it is allowed to hold different frames on different machines, and
+   already does.
+7. **Work that nobody is waiting for may be killed where it stands.** Anything
+   speculative - the prefetch of phase 6, the compression of phase 5 - is
+   cancelled by an edit, a seek or memory pressure, and never holds a lock that
+   owed work needs. The two classes and their rules are below.
+
+These six say what the helpers may do. What happens when somebody steps back,
+edits, switches a branch and does it again immediately - which is not an edge
+case but the work itself - is the subject of "Concurrency by construction"
+below, and the short version is that the loop owns everything, the helpers own
+only the buffer in their hands, and interference turns work in flight into
+garbage rather than into a hazard.
+
+### The order, and what each is worth
+
+| phase | what moves | worth | risk |
+|---|---|---|---|
+| 0 | writing the history at project save and autosave | seconds to a minute, unprompted every 30 minutes - see below | low: a queue and a barrier |
+| 1 | spill, settle and compaction I/O | 7 to 57 ms hitches, several per frame once the budget is full | low: no guest memory, no miniBox change |
+| 2 | coarsening and composition | 0.16 to 0.72 ms/frame, and the 8 MB cap can go - a denser history for the same memory | low: inside StateHistory |
+| 3 | copy-on-write anchors | 40 to 700 ms once every 600 frames, and the stride damage above | this is where miniBox's single-thread assumption has to be faced |
+| 4 | deferred delta store | 0.3 to 1.4 ms/frame on heavy machines, nothing on light ones | same mechanism as 3, paid every frame |
+| 5 | zstd the cold deltas on the helper | depth rather than speed: zstd-1 runs about 700 MB/s in and 2.4 GB/s out | low, and it is a budget decision as much as a speed one |
+| 6 | a rolling composed prefix behind the playhead, on a thread of its own | the backwards step: ~280 links walked becomes one composed apply plus a short tail | low, and uniquely so - it is the one phase nothing waits for |
+
+Phases 0 to 2 are worth doing whether or not 3 ever is, and they are where the
+felt improvement per unit of risk is highest - phase 0 most of all, since it is
+the only one whose freeze is measured in seconds. Phase 3 is the large prize
+inside the capture path, and the real decision. Phase 6 is deliberately last:
+it is the only speculative one, and phase 3 may leave it with nothing to do -
+see its section below.
+
+These are phases of work, not threads. Which roles run where, how many of each,
+and the two classes they fall into is its own question, answered in "How many
+threads, and which".
+
+### What no thread can take
+
+The `open` and `faults` columns - 1.5 ms of the 1.86 at 256 pages a frame,
+about eighty per cent - are not offloadable in any design. They are one
+`mprotect` per run of pages written last frame, and the guest's own stores
+trapping. The lever that reaches them is not concurrency but GRANULARITY: a 2
+MB huge page faults once where 512 pages fault 512 times, at the cost of deltas
+512 times coarser and a history that costs what the machine could be again.
+That is a different project with a different trade, and it should not be
+confused with this one.
+
+### How it gets proved
+
+`run-storebench.sh` and `run-epochbench.sh` before and after, on the same box,
+for the numbers; `CHIMERA_HISTORY_TRACE=1` and `CHIMERA_LOOP_TRACE=1` on a real
+core, where the claim is about a hitch rather than a mean - so a per-frame
+MAXIMUM, not an average, because the worst frame is the whole point. And the
+two fuzz harnesses run in drain-now mode AND threaded against the same model: a
+helper that produces a different history from the synchronous path is a bug,
+and that is the property worth fuzzing hardest.
+
+### Phase 6 in detail: the rolling prefix, which is allowed to be wrong (user-asked, 2026-09-12)
+
+Stepping BACKWARDS is the gesture a TAS is made of, and it is the expensive
+one. A restore walks from its segment's anchor, `m_anchorSpacing` is 600, and
+inside a segment the near band keeps every frame and the mid band one in three
+- so a step back late in a segment walks about 280 links. Measured on a real
+core, 34 links cost 3 ms (N64, after the 2026-09-10 round), so 280 is 20 to 30
+ms there and more on a heavy machine. For one frame backwards.
+
+The proposal was a thread that rebuilds the states within about 30 frames of
+the playhead, newest first, cached and entirely discardable. The instinct is
+right and the framing - discardable, never load-bearing - is the correct one.
+The shape wants changing in one respect: **a state is a whole machine**. Thirty
+of them on a mid-weight core is 7.7 GB of cache to save 25 ms, and on a Game
+Boy it is effort spent on a machine whose entire state is smaller than this
+paragraph's table would be.
+
+The cheap shape with the same payoff is a **rolling composed prefix plus the
+raw tail**. The helper keeps ONE composed delta covering the anchor up to
+(playhead - N, default 30), and the newest N frames stay as the history has
+them. A restore into that window is then: load the anchor, apply one composed
+delta, apply at most N small ones. Tens of megabytes instead of gigabytes, and
+the primitive already exists - `composePair` and `mb_block_delta_compose_mem`
+are coarsening, pointed backwards.
+
+It obeys three rules, all of which come from the cache being allowed to be
+wrong in only one way - by being absent:
+
+1. **Derived, never invented.** The prefix is built from the history's own
+   bytes with the history's own primitives. A cache that builds a state a
+   different way from the walk is a machine that never existed, which is the
+   failure this file fears most and the one that surfaces seventy frames later
+   somewhere unrelated.
+2. **Dropped by any edit.** `invalidateAfter` throws it away. That is trivially
+   correct because it is keyed by frame.
+3. **Never waited on.** If it is not ready, the walk happens as it does today.
+   Nothing blocks on it, ever.
+
+**But do phase 3 first, and then measure again.** If copy-on-write anchors make
+a whole-machine snapshot cost about 3 ms of the emulation thread instead of 40
+to 700, then `anchorSpacing` can fall from 600 to 60 and EVERY backwards seek
+walks at most 60 links - deterministically, with no speculation, no
+invalidation rules and no second code path that can disagree with the first.
+That is a better trade than guessing right thirty frames at a time, and it may
+leave this phase with nothing worth doing. Speculation is the last resort here,
+not the first reach.
+
+### How many threads, and which (user-asked, 2026-09-12)
+
+"A helper thread" was shorthand. The work divides by what it touches and by
+whether anything waits for it, and those two questions give different answers
+for different phases, so the right shape is a small set of named roles rather
+than one queue with everything in it.
+
+| role | what it does | who waits for it | how many |
+|---|---|---|---|
+| writer | spill, settle, compaction, streaming a project save | a barrier, at save and at close | one - the spill file is an append-ordered queue and a second writer would interleave into it |
+| drainer | the copy half of a capture: anchor pages and deferred deltas, read through the mirror | the next capture, at the latest | a small pool: copying 257 MB is memory-bandwidth bound, and one thread gets a fraction of what the bus offers |
+| tidier | coarsening, composing, settling metadata | nothing directly; the budget notices | one - it mutates the history's own structure |
+| prefetcher | the rolling prefix of phase 6 | NOBODY, by construction | one, independent, cancellable at any moment |
+| compressor | zstd of cold deltas (phase 5) | nothing; a delta is readable either way | a pool, bounded by spare cores |
+
+The division that matters is not the count but the two CLASSES:
+
+- **Owed work** - writer, drainer, tidier. The history has already promised it:
+  bytes are counted against the budget, a restore must see it, a save must
+  contain it. A barrier waits for these, and they may not be abandoned, only
+  finished or rolled back.
+- **Speculative work** - prefetcher, compressor. Nobody has promised anything.
+  Any edit, any seek, any memory pressure cancels them where they stand, and
+  the only correct response to "it was not ready" is to do the thing the old
+  way.
+
+Four rules keep the two classes from poisoning each other, and each is a thing
+a test can be written against:
+
+1. **The emulation thread is never starved.** Helpers are bounded by what the
+   machine can spare - the count comes from spare cores, never from a constant
+   - and they run at a lower priority. A core that is itself saturating the
+   machine (rpcs3 on a four-core laptop) must end up with no helpers at all
+   rather than with contention, and that is a measurement, not an assumption.
+2. **No speculative thread ever holds a lock that owed work needs.** The
+   prefetcher works from a snapshot of what it needs, publishes its result with
+   one atomic swap, and is killed rather than waited for.
+3. **The fault handler takes no lock.** It runs on the emulation thread, inside
+   a signal handler on Linux and a vectored exception handler on Windows;
+   claiming a page from the drainer is a per-page atomic and nothing else. A
+   mutex there would put the machine behind a helper, which is the exact
+   inversion this whole design exists to avoid.
+4. **Every role is droppable.** With the helpers disabled - by configuration,
+   by a failed thread start, or by a test - everything happens in line, exactly
+   as it does today. That is what makes the threaded path verifiable: the
+   synchronous path is the reference implementation, and the fuzzers run both
+   against the same model.
+
+### Concurrency by construction: what the user can do to it (user-asked, 2026-09-12)
+
+The worry is the right one, and it is the reason this design is written before
+the code. Somebody stepping back, jumping forward, scrubbing the piano roll,
+editing an input, switching a branch and doing it again ten times a second is
+not an edge case - it is what TAS work IS. So the model has to be one where
+interference cannot produce an unstable state, rather than one where it does
+not happen to.
+
+The answer is not a bigger lock. It is that **only one thread owns anything,
+and the helpers never own, they convert**: bytes in, bytes out. Everything
+below follows from that.
+
+**There is no user thread.** The run loop calls `Application.DoEvents()`
+itself, so a click, a hotkey, a piano-roll drag and a menu action are all
+dispatched ON the loop thread, between frames. A user action is therefore
+already serialised with captures and restores, and always has been. Nothing in
+this design introduces a second thread that can act on the user's behalf. That
+is the single most important fact about the whole model: the actions arrive in
+order, on the one thread that is allowed to change things.
+
+#### The eleven rules
+
+1. **One owner.** The loop thread alone mutates the machine, `m_segments`,
+   `m_bytes`, the pin set and the spill metadata. No helper touches any of
+   them. There is consequently no lock on the history at all, and no lock for
+   a user action to wait behind.
+2. **Helpers convert bytes to bytes.** A helper is handed an immutable buffer
+   and a destination, and hands back a buffer or a file range. It cannot walk
+   the history, cannot ask what frame is newest, cannot free anything.
+3. **Bodies are immutable and reference-counted.** A link's bytes become
+   `shared_ptr<const vector<uint8_t>>`. A helper holding one cannot have it
+   freed underneath by a coarsening, an eviction or an edit; the structure
+   drops its reference and the bytes go when the last holder does. This one
+   change removes the entire use-after-free class that an edit-during-work
+   would otherwise create.
+4. **Completions are applied by the loop, never by the helper.** A finished
+   piece of work goes on a completion queue; the loop drains that queue at one
+   point per frame and at barriers. So every change to the structure still
+   happens in loop order, and "what the user did" and "what a helper finished"
+   are ordered against each other by the same thread that orders frames.
+5. **Every piece of work carries a generation.** Anything that makes a
+   timeline untrue - `invalidateAfter`, `clear`, `configure`, `loadFrom`, a
+   branch load - bumps a counter. A completion whose generation is stale is
+   DROPPED: its bytes are freed, its file range abandoned. Interference thus
+   turns in-flight work into garbage automatically, which is exactly what it
+   should turn into.
+6. **A spill is not a spill until its completion is applied.** The segment
+   keeps its memory copy while the write is in flight; `spilled` is set, and
+   the memory released, only when the loop applies the writer's completion. A
+   restore that arrives mid-write therefore reads memory and never asks the
+   file for bytes that are not there yet. There is no window to get wrong.
+7. **The file is append-only while anything can read it.** Settling a spilled
+   stretch writes the new version at a NEW offset and flips the metadata on
+   completion; the old range is freed afterwards. Nothing is ever rewritten
+   under a reader.
+8. **Compaction is the one exclusive act, and it copies rather than moves.**
+   Moving the live suffix to the front changes every offset, so it is done into
+   a second file which the loop flips to when it is complete; readers use the
+   old file until then. Where there is no room for both, compaction is skipped
+   and the budget is met by dropping - which is what already happens when
+   spilling fails.
+9. **A barrier is "help finish", not "wait".** When the loop needs work that is
+   in flight - a restore before a pending capture drain, a save, a close - it
+   joins in using the same per-item claim the helpers use. The worst case is
+   therefore one thread doing the work, which is today's behaviour, and the
+   worst case for a user action is the speed of the code that exists now.
+10. **The fault handler takes no lock.** It runs on the loop thread inside a
+    signal handler on Linux and a vectored exception handler on Windows.
+    Claiming a page from a drainer is a single compare-and-swap per page:
+    whoever wins copies it, and the loser goes on. There is no waiting, no
+    ordering requirement, and no path by which the machine can end up behind a
+    helper.
+11. **Speculation is published atomically or thrown away.** The prefetcher
+    works from references it already holds, publishes with one atomic swap of a
+    pointer plus its generation, and is cancelled - never joined - by any edit,
+    seek or memory pressure. A stale prefix is ignored and freed. Nothing ever
+    depends on it existing.
+
+#### What each thing the user can do actually does
+
+| the user does | what happens to work in flight |
+|---|---|
+| steps back one frame, or seeks anywhere | pending capture drains are helped to completion (bounded, and the loop joins in), the prefetch is cancelled, the machine is restored, the prefetch restarts behind the new playhead |
+| edits an input | generation bumps; every completion after that frame is dropped and its bytes freed; queued spill writes for dropped stretches are abandoned and the file truncated back by the writer, in queue order |
+| switches a branch | a state load plus a different input log: generation bumps, everything speculative dies, the prefix is rebuilt from the new timeline |
+| scrubs the piano roll for ten seconds | a seek per position, each cancelling the last prefetch before it started - which costs nothing, because a cancelled speculation has by definition produced nothing anybody wanted |
+| saves the project | the writer takes a metadata snapshot and streams bodies; the loop continues; closing the project is the barrier that must finish |
+| runs out of memory | the drainer's pending bytes are counted in `m_bytes`, so the budget sees them; speculation is cancelled first, owed work is finished, and only then does `halveBudget` do what it does today |
+
+#### Why this cannot deadlock
+
+No helper ever acquires a lock the loop holds, because helpers hold no lock on
+history state at all - they own their input buffer and their output buffer, and
+communicate through single-producer/single-consumer queues and atomics. The
+loop acquires nothing from a helper except at a barrier, and a barrier is
+bounded by work that is already in progress, which the loop is allowed to do
+itself. A deadlock needs a cycle; there is no second edge to make one from.
+
+#### How it gets proved rather than asserted
+
+The differential fuzzers are the reason this part of Chimera is trusted, and
+they extend to exactly this question. The same random sequence of actions -
+capture, seek, step back, edit, branch, save, budget squeeze - runs twice: once
+with the helpers off, where everything happens in line, and once with them on
+and with completions delivered at randomised points relative to those actions.
+The resulting history must be identical, and so must the machine's bytes after
+a restore to every frame the history offers. A helper that produces a different
+history from the synchronous path is a bug, and the synchronous path is the
+reference implementation by construction.
+
+Two properties get their own tests because they are the ones that would fail
+silently: that `m_bytes` returns to exactly what it was after a cancelled
+generation (the accounting bug that wrapped the budget past zero is the
+precedent), and that the spill file contains no range that no segment claims
+after a storm of edits (the leak a dropped completion would cause).
+
+### What else is on the critical path, once you look past the capture
+
+The question was asked of the greenzone, but the same helper answers two more,
+and the first of them is the largest stall in the application.
+
+**Saving the project writes the whole history, on the thread that runs the
+machine.** `TasMovie.Project.cs` calls `States.Save(...)` inline, and the
+default budgets are 4 GB in memory and 10 GB on disk, so a save can stream
+FOURTEEN gigabytes before the window moves again. At the rates measured for
+spilling - 1.4 GB/s to ext4, 176 MB/s to NTFS - that is about ten seconds on a
+good Linux disk and over a minute on the Windows install. And it is not only
+asked for: TAStudio's autosave timer fires it every thirty minutes by default,
+unprompted, on the UI thread.
+
+Nothing about that write needs the machine. The history's metadata - what
+frames exist, what is spilled where - is small and could be snapshotted in
+microseconds, leaving the helper to stream bodies while the run continues; the
+only true barrier is closing the project, where the save must finish before the
+files go. The one thing to get right is what an edit does to a save already in
+flight, and the history already has the answer in `invalidateAfter`: a save
+that has been overtaken by an edit is abandoned and taken again, because a
+history file that describes a timeline that no longer happens is worse than no
+file. That is the same rule the spill file lives by.
+
+This is worth doing FIRST, before anything in the capture path: the mechanism
+is a queue and a barrier, it touches no guest memory, it needs nothing from
+miniBox, and the freeze it removes is measured in seconds rather than
+milliseconds.
+
+**The GPU is a stall, and a thread is the wrong tool for it.** On a core with a
+hardware renderer, the guest blocks waiting on the GPU - the bridge is already
+instrumented for exactly this (`CHIMERA_GL_PROFILE`, `CHIMERA_GL_WHY` for what
+the guest was doing when it blocked, `CHIMERA_GL_GPUTIME` for whether the GPU
+is genuinely busy or the pipeline is being drained for nothing). It is
+tempting to answer that with a render thread, and that would be a mistake to
+reach for first: a GL context belongs to a thread, the guest is waiting for a
+RESULT rather than for the work, and a machine whose picture is on the GPU has
+a savestate problem already (docs/gpu-bridge.md). The fixes that reach this are
+pipelining - a readback that lands a frame later through a pixel buffer, fewer
+fences - and they are a different piece of work. Measure with the three
+switches above before anything is built.
+
+**And what turned out not to be there.** The render path has no CPU pixel work
+to move: scaling and filtering are the GPU's. Video encoding is already off the
+loop - `AviWriter` has had a worker thread and a queue since BizHawk, and
+`FFmpegWriter` writes down a pipe to another process. Branch states are stored
+uncompressed on purpose (`zstdCompress: false`), so no interactive path is
+paying for zstd. The `movie` phase in the loop trace is 0.22 ms and is mostly
+the greenzone capture itself, which is where this design came in. The piano
+roll cannot leave the UI thread at all, and is already served on a clock rather
+than per frame.
+
+### What must be proved before any of it lands (user-decided, 2026-09-12)
+
+None of this is committed or pushed on a green unit suite. The history is the
+one part of Chimera whose failures are silent, arrive late and land somewhere
+else - the `munmap` delta bug above surfaced seventy frames after the seek that
+caused it, in a `std::map` insert - and a helper thread is exactly the kind of
+change that turns a rare wrong byte into an unreproducible one. So the bar is
+the user's, and it is a bar of evidence rather than of green ticks:
+
+- **Stress.** Long runs, not the few hundred frames a unit test affords: the
+  budget full, the spill file compacting, stretches settling, all at once and
+  for long enough that the steady state is the thing being tested rather than
+  the warm-up.
+- **Backwards.** Seeking back, repeatedly and at every distance - inside the
+  near band, into the mid band, into a spilled stretch on disk, and to frame
+  zero - because a restore that races pending work is the failure this design
+  most invites.
+- **Back and forth with changing inputs.** Re-recording: seek back, change an
+  input, run forward, seek back further, change another. That is the sequence
+  that found the last three history bugs, and it is the one that makes
+  `invalidateAfter` race everything the helper is holding.
+- **Cores with disk-backed files.** HDD dumps and save data, where the machine
+  is not only its arena.
+- **Every core.** All of them, not the two that are easy to drive, because the
+  cost profile that decides whether a thread helps at all is per-core: a Game
+  Boy's whole state is smaller than one page of this document's tables.
+- **Different situations.** Playback, recording, turbo, a seek in progress, a
+  project being saved, an encode running, the budget being hit mid-seek.
+
+And the performance claim must be MEASURED, before and after, on the same box:
+`run-storebench.sh` and `run-epochbench.sh` for the machinery, and a real core
+under `CHIMERA_LOOP_TRACE=1` for the frame, reported as a per-frame maximum
+rather than a mean. A change that improves the average and keeps the hitch has
+not done the thing it was built to do.
+
+Only then does any of it become a commit.

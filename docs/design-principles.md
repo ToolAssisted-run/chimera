@@ -2422,3 +2422,116 @@ bytes and registers, not just its address (miniBox 5436126). The byte at the
 faulting rip was a nop, which is impossible for a write fault, and that single
 impossibility is what said the code had been modified underneath. A day of
 debugging bought that line; it now prints on both platforms.
+
+## The greenzone may use a second core; the machine never will (user-decided, 2026-09-12)
+
+Asked for directly: emulation is single-core on purpose and must stay that way,
+but state management - deltas, anchors, coarsening, spilling, prefetching - is
+demanding work on the critical path that a helper thread could take. Is it
+worth it?
+
+The full arithmetic and the design are in docs/state-manager.md, "What a second
+thread could take, and what it could never". What belongs here is the boundary
+and the three findings that decide it.
+
+**The boundary.** The machine runs on one core because a movie that replays is
+a machine whose every step is the same step. The greenzone is not the machine -
+it is a cache of where the machine has been, and it has been allowed to differ
+between machines since the day it was tuned: `tuneStride` decides what to keep
+from what the clock says. So a helper thread here cannot change a movie, and
+the rule that keeps it that way is one line - the helper reads guest memory
+through miniBox's always-RW mirror and never writes it. Every mutation of the
+machine stays on the emulation thread.
+
+**The first finding is negative, and it is the one that matters.** A capture is
+about a sixth copy and five sixths page-table work: one `mprotect` per run of
+pages written last frame, and the guest's own stores trapping. The second is
+not work done ON the emulation thread, it IS the emulation thread. Measured
+with a new bench (`tests/perf/storebench.c`), a 1 MB delta at 256 pages a frame
+is 0.04 ms of walk and 0.32 ms of copy, inside a captured frame costing 1.86.
+Against the real-run figures already in this log - the history is 5% of an N64
+run, 11% of a Game Boy one - the offloadable share of a whole session is one to
+three per cent. **Threading the steady-state capture for throughput is not
+worth a thread, and anybody who proposes it for that reason has the wrong
+reason.**
+
+**The second finding is that the prize is the stalls, not the mean.** An anchor
+is a whole machine copied at once: 40 to 180 ms on a 257 MB machine and 150 to
+700 ms on a gigabyte one, and it happens every 600 frames - once every ten
+seconds - forever. A spill is an `fwrite` plus `fflush` of a whole stretch, 7 ms
+to ext4 and 57 ms to NTFS, and `evict()` is a loop that can do several in one
+frame once the budget is full. Coarsening is 0.16 to 0.72 ms a frame and is
+capped at 8 MB of input precisely because it is on the critical path. What a
+person notices is a freeze, and all three of these are bytes moving between
+buffers and files while the machine waits for no reason.
+
+**The third finding came out of measuring rather than of the question.**
+Anchors do not only stall, they thin the greenzone: `tuneStride` averages every
+capture together, so one 121 ms anchor drags the mean far enough over
+`kCostShare` to treble the near band's stride, which then recovers one step per
+thirty captures. A significant share of frames on a heavy core are captured
+sparsely because of a cost that has nothing to do with those frames. That is
+fixable on its own - tune the stride on deltas, measure anchors apart - and is
+worth doing whether or not any of the rest is.
+
+The decision is to build it in that order: the I/O first (no guest memory, no
+miniBox change), then coarsening, and only then the copy-on-write anchor, which
+is where miniBox's deliberate single-threadedness - "a plain array + no lock is
+sufficient", says tripguard.c - has to be faced honestly. The anchor is the
+large prize and the real decision; the first two phases are worth having on
+their own terms.
+
+And it is threadS, not a thread (user-decided, 2026-09-12). The work divides by
+what it touches and by whether anything waits for it, which is the distinction
+that actually matters: **owed work** - the writer, the capture drainer, the
+tidier - has already been promised, is counted against the budget, and a
+barrier waits for it; **speculative work** - the prefetch that keeps a composed
+prefix behind the playhead, the compression of cold deltas - is promised to
+nobody and is killed where it stands by any edit, seek or memory pressure. A
+speculative thread that can make owed work wait has stopped being speculative,
+so it works from a snapshot, publishes with one atomic swap, and is cancelled
+rather than joined. The drainer is the one role that wants a POOL rather than a
+thread, because copying a quarter of a gigabyte is bound by the memory bus and
+one thread does not saturate it. Everything is bounded by what the machine can
+spare and every role is droppable: with the helpers off, the work happens in
+line exactly as it does today, which is what makes the threaded path
+verifiable at all - the synchronous path is the reference implementation.
+
+The concurrency rule is the part that had to be designed rather than coded
+into existence (user-asked, 2026-09-12). Somebody stepping back, jumping,
+scrubbing, editing an input and switching a branch several times a second is
+what TAS work IS, so the model must be one in which interference cannot make an
+unstable state rather than one in which it happens not to. Three facts carry
+it. There is no user thread - the run loop calls DoEvents itself, so every
+click and hotkey is dispatched on the loop thread, between frames, in order.
+Only the loop owns anything: the machine, the segments, the byte count, the
+spill metadata. And helpers do not own, they CONVERT - handed an immutable
+buffer, they hand back a buffer or a file range, and the loop applies the
+result at one point per frame.
+
+What follows from those is that there is no lock on the history to wait behind,
+no cycle to deadlock in, and no window where a reader can want bytes that a
+writer has not finished: a spill is not a spill until its completion is
+applied, so the memory copy stays until the file is good. Link bodies become
+reference-counted and immutable, which deletes the use-after-free that an edit
+during a helper's work would otherwise be. Every piece of work carries a
+generation, and anything that makes a timeline untrue bumps it, so interference
+turns work in flight into garbage automatically. And a barrier is "help
+finish", not "wait" - the loop joins the work rather than blocking on it, so
+the worst case a user action can meet is the speed of the code that exists
+today.
+
+None of it lands on a green unit suite. The user set the bar and it is written
+down beside the design: long stress runs with the budget full, seeking
+backwards at every distance, re-recording back and forth with changed inputs,
+cores whose machine includes disk-backed files, every core rather than the two
+that are easy to drive, and the performance claim measured before and after as
+a per-frame MAXIMUM rather than a mean. A history bug is silent, late and lands
+somewhere else; a threaded one would be all three and unreproducible as well.
+
+One thing is deliberately not on the list. The page faults and the
+re-protection are eighty per cent of a captured frame and no thread can ever
+take them. The lever that reaches those is granularity - a 2 MB huge page
+faults once where 512 pages fault 512 times - at the cost of deltas 512 times
+coarser, which is the trade this whole design was built to escape. It is a
+different project, and mixing the two would be a good way to lose both.
