@@ -56,7 +56,19 @@ while IFS='|' read -r id repo; do
 	if [ "$kind" = dev ]; then
 		tag=$(gh release list --repo "$repo" --limit 30 --json tagName --jq '.[].tagName' 2>/dev/null | grep -x dev || true)
 	else
-		tag=$(gh release list --repo "$repo" --limit 30 --json tagName --jq '.[].tagName' 2>/dev/null | grep '^nightly-' | sort -r | head -1 || true)
+		# The newest nightly that actually HOLDS a package. A publish can die
+		# between creating the release and uploading into it, and an empty
+		# newest nightly used to fail this whole script - so one core's bad
+		# morning on GitHub's API failed the frontend's CI (2026-09-13, flycast
+		# and ares). The one before it is still that core's latest real build.
+		tag=""
+		for t in $(gh release list --repo "$repo" --limit 30 --json tagName --jq '.[].tagName' 2>/dev/null | grep '^nightly-' | sort -r || true); do
+			if gh release view "$t" --repo "$repo" --json assets --jq '.assets[].name' 2>/dev/null | grep -q "^$id-.*\.chimeraCore$"; then
+				tag="$t"
+				break
+			fi
+			echo "$id: $t has no package, using an older nightly" >&2
+		done
 	fi
 	if [ -z "$tag" ]; then
 		skipped="$skipped $id"

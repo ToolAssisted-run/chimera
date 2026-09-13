@@ -68,10 +68,17 @@ jobs:
       - name: Has main moved since the last nightly?
         id: moved
         if: steps.what.outputs.kind == 'nightly'
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          # a nightly of an unchanged commit is a second copy of yesterday's
+          # a nightly of an unchanged commit is a second copy of yesterday's -
+          # but only a nightly that HOLDS a package counts. A publish that died
+          # between creating the release and uploading into it leaves a tag at
+          # this very commit, and counting that tag made every rerun skip the
+          # repair it was run for (2026-09-13, flycast and ares).
           last=$(git tag -l 'nightly-*' --sort=-creatordate | head -1)
-          if [ -n "$last" ] && [ "$(git rev-list -n1 "$last")" = "$(git rev-parse HEAD)" ]; then
+          if [ -n "$last" ] && [ "$(git rev-list -n1 "$last")" = "$(git rev-parse HEAD)" ] \
+             && gh release view "$last" --json assets --jq '.assets[].name' 2>/dev/null | grep -q '\.chimeraCore$'; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
             echo "main has not moved since $last; nothing to publish"
           else

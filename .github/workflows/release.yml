@@ -87,10 +87,16 @@ jobs:
       - name: Has main moved since the last nightly?
         id: moved
         if: github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          # a nightly of an unchanged commit is a second copy of yesterday's
+          # a nightly of an unchanged commit is a second copy of yesterday's -
+          # but only a nightly that HOLDS its bundles counts: a publish that died
+          # between create and upload leaves a tag at this very commit, and
+          # counting it would make every later run skip the repair
           last=$(git tag -l 'nightly-*' --sort=-creatordate | head -1)
-          if [ -n "$last" ] && [ "$(git rev-list -n1 "$last")" = "$(git rev-parse HEAD)" ]; then
+          if [ -n "$last" ] && [ "$(git rev-list -n1 "$last")" = "$(git rev-parse HEAD)" ] \
+             && gh release view "$last" --json assets --jq '.assets[].name' 2>/dev/null | grep -q '^chimera-.*\.zip$'; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
             echo "main has not moved since $last; nothing to release"
           else
@@ -198,14 +204,19 @@ jobs:
           # release with its tag and recreating it at the built commit goes
           # through the releases API, which has no such restriction, and keeps
           # the tag honest about which build the assets came from.
+          #
+          # Every call is retried and the release is ENSURED, not created: the
+          # API answers 5xx now and then, and on 2026-09-13 a 500 on this create
+          # cost the day's dev build. A create whose answer was lost may still
+          # have happened, so it looks before it tries again.
+          source tools/release-retry.sh
           gh release delete dev --yes --cleanup-tag 2>/dev/null || true
-          gh release create dev --target "${{ steps.what.outputs.sha }}" \
-            --title "Development build ${{ steps.what.outputs.short }}" \
-            --notes-file build/release/NOTES.md --prerelease
+          ensure_release dev "${{ steps.what.outputs.sha }}" \
+            "Development build ${{ steps.what.outputs.short }}" build/release/NOTES.md
 
           # straight away, so the window in which /releases/tag/dev has nothing
           # to download is as short as an upload
-          gh release upload dev build/release/chimera-*.zip build/release/chimera-*.tar.gz \
+          retry gh release upload dev build/release/chimera-*.zip build/release/chimera-*.tar.gz \
             build/release/LICENSES.md build/release/BUILD.txt --clobber
 
       - name: Publish the nightly
@@ -213,10 +224,15 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          source tools/release-retry.sh
           tag="nightly-${{ steps.what.outputs.date }}"
-          gh release view "$tag" >/dev/null 2>&1 && { echo "$tag already exists"; exit 0; }
-          gh release create "$tag" --target "${{ steps.what.outputs.sha }}" \
-            --title "Nightly ${{ steps.what.outputs.date }} (${{ steps.what.outputs.short }})" \
-            --notes-file build/release/NOTES.md --prerelease
-          gh release upload "$tag" build/release/chimera-*.zip build/release/chimera-*.tar.gz \
+          # A nightly that holds its bundles is never republished; one that
+          # exists EMPTY is a publish that died between create and upload, and
+          # finishing it is the only way it becomes what its name says.
+          if gh release view "$tag" --json assets --jq '.assets[].name' 2>/dev/null | grep -q '^chimera-.*\.zip$'; then
+            echo "$tag already exists"; exit 0
+          fi
+          ensure_release "$tag" "${{ steps.what.outputs.sha }}" \
+            "Nightly ${{ steps.what.outputs.date }} (${{ steps.what.outputs.short }})" build/release/NOTES.md
+          retry gh release upload "$tag" build/release/chimera-*.zip build/release/chimera-*.tar.gz \
             build/release/LICENSES.md build/release/BUILD.txt --clobber

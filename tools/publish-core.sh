@@ -110,6 +110,33 @@ if [ "$dry" -eq 1 ]; then
 	exit 0
 fi
 
+# GitHub's API answers 5xx now and then, and a publish is two calls - create the
+# release, then upload into it - so one bad answer between them used to leave a
+# release with nothing in it. That is worse than no release: the nightly rule
+# below then refused to touch it again, and every consumer that picks "the
+# newest nightly" found an empty one (2026-09-13: flycast got a 500 on the
+# upload, ares a 502 on a create that had in fact succeeded, and the frontend's
+# CI could not download either). So every call is retried, and a release is
+# ENSURED rather than created: a create whose answer was lost may still have
+# happened, which is why it looks before it tries again.
+retry() {
+	local n
+	for n in 1 2 3 4; do
+		"$@" && return 0
+		[ "$n" -lt 4 ] && { echo "retrying in $((n * 15))s: $1 $2 $3" >&2; sleep $((n * 15)); }
+	done
+	return 1
+}
+ensure_release() { # <tag> <title>
+	local n
+	for n in 1 2 3 4; do
+		gh release view "$1" >/dev/null 2>&1 && return 0
+		gh release create "$1" --target "$sha" --prerelease --title "$2" --notes-file "$notes" && return 0
+		[ "$n" -lt 4 ] && { echo "retrying in $((n * 15))s: release $1" >&2; sleep $((n * 15)); }
+	done
+	return 1
+}
+
 if [ "$kind" = dev ]; then
 	# ONE TAG, MOVED - through the releases API, never `git push`. A workflow's
 	# token may not create or update workflow FILES, and pushing a tag at a
@@ -117,17 +144,19 @@ if [ "$kind" = dev ]; then
 	# exactly that. Deleting the release with its tag and recreating it goes
 	# through the API, which has no such restriction.
 	gh release delete dev --yes --cleanup-tag 2>/dev/null || true
-	gh release create dev --target "$sha" --prerelease \
-		--title "Development build ${version:0:8}" --notes-file "$notes"
-	gh release upload dev "$staging/$asset" --clobber
+	ensure_release dev "Development build ${version:0:8}"
+	retry gh release upload dev "$staging/$asset" --clobber
 else
 	tag="nightly-$date"
-	if gh release view "$tag" >/dev/null 2>&1; then
+	# A nightly that already carries a package of this core is never
+	# republished: somebody's movie may name it. One that exists with NO package
+	# is a publish that died half way, and finishing it is the only way it ever
+	# becomes what its name promises.
+	if gh release view "$tag" --json assets --jq '.assets[].name' 2>/dev/null | grep -q "^$core_id-.*\.chimeraCore$"; then
 		echo "$tag already exists; a nightly is never republished"
 		exit 0
 	fi
-	gh release create "$tag" --target "$sha" --prerelease \
-		--title "Nightly $date" --notes-file "$notes"
-	gh release upload "$tag" "$staging/$asset"
+	ensure_release "$tag" "Nightly $date"
+	retry gh release upload "$tag" "$staging/$asset" --clobber
 fi
 echo "published $asset"
