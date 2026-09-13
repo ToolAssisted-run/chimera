@@ -2706,3 +2706,62 @@ which forces the core by name - found "more than one matching element". A
 system is listed once now, in the package and again in the registry. Both were
 found only by running the gesture on real roms of two different cores: the first
 fix made the NES pass and the Genesis still fail.
+
+## A shadow a frame behind is not always a frame behind (issue #64, 2026-09-13)
+
+Reported from outside: ares crashed on Windows running NES games, with faults at
+addresses like `0x3`, `0xf5` and the start of the `ares::Famicom::cpu` object -
+jumps into data. None of it reproduced from a plain run, a savestate round trip
+every frame, thirty minutes of play, pressed Reset buttons, the frontend itself,
+the reporter's own nightly, or rebooting the core in one process. What did was
+the user's suggestion: rewind many times, at irregular patterns. A seeded Lua
+stress script - record, seek back one frame or a hundred or to the start, seek
+forward, throw the greenzone away, resume - found it on Windows only, identically
+on the reporter's build and the current one: in nine seeks as ares throwing
+`Thread::Enter()::ThreadNotFound`, and after some 1470 seeks in the reporter's
+exact shape, an execute fault at `rip=0x2` and a read through `r15=0x3` inside
+`ares::Famicom::CPU::step` with `rcx` holding `&ares::Famicom::cpu`. Both are a
+coroutine's stack from one moment beside a heap from another.
+
+The cause was in miniBox. A Windows stack cannot report its own writes (the
+kernel pushes the exception record onto that very stack), so a stack page is
+tracked by COMPARING it with a shadow. The shadow was rewritten only when a delta
+was saved, and the reasoning that this was safe - "a stale shadow is a frame
+behind; carrying a page too many is waste, never wrong" - fails whenever the
+stale bytes happen to EQUAL the new ones, which determinism makes common. Two
+paths were measured, each with a test that fails on the Windows build without
+the fix: a load or a delta apply (seek back, replay, and the stack is rewritten
+into exactly the old timeline's bytes), and a frame captured as an anchor rather
+than a delta (the shadow still describes the frame before it). The first fix
+covered only the first path; seed 31 then survived 3000 steps and seed 57 still
+died at ~1470 seeks. The rule that closed both is the one hot pages already had:
+when an epoch opens, every stack page's shadow is what it holds, so the
+comparison at the end of the frame is its end against its start whatever
+happened in between (miniBox, `stack_shadows_describe_now`). Seeds 31, 57, 73
+and 91 then each survived 3000 irregular actions on Windows - 1992, 2121, 1989
+and 2033 seeks.
+
+Three things worth keeping. An argument of the form "the stale value can only
+make us do extra work" has to survive the case where the stale value EQUALS the
+new one, and a deterministic machine is exactly where that case is common. A
+harness that does one kind of thing at a time - a single seek, a round trip
+every frame, a long plain run - passes a bug that needs a SEQUENCE: clear, go to
+zero, go to zero again, replay, come back, step back eight frames. And a fix that
+makes the known reproduction pass is not finished until a different seed has run
+past where the old one died; the first version of this one looked complete for
+an hour.
+
+The fault report changed with it, because the crash that proved the fix partial
+printed `code:` and nothing more: reading instruction bytes at `rip=0x2` from
+inside the handler was a second fault. It now prints every general-purpose
+register first and reads code only where it is readable.
+
+The stress found more on the way, none of them this and all still open: after
+seventeen to thirty-four core reboots in one process on Windows the sandbox
+cannot create its memory block again ("failed to create memory block"); TAStudio
+cannot open a movie whose log key names controls the machine does not currently
+have (`MnemonicMap`, `KeyNotFoundException` - a project recorded with a second
+controller and reopened without it); a project's game record takes the package's
+FIRST system (`RomLoader`, `factory.SystemIds[0]`), so an ares NES project says
+N64 wherever that is read; and headless mode waits forever on the prompt to
+locate a project's missing file instead of exiting 64.
