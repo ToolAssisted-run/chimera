@@ -368,6 +368,12 @@ namespace Chimera.Client.Common
 				ExtraFiles = extras,
 			};
 			nextEmulator = factory.Create(ctx);
+			// The game record was made before the core existed, from the package's
+			// FIRST system - which for a core with many machines is not the one the
+			// project boots: an ares NES project said N64 to anything reading the
+			// game's system (scripts, tools, the movie's platform). The core knows
+			// which machine it became, so that is what the record says.
+			if (!string.IsNullOrEmpty(nextEmulator.SystemId)) game.System = nextEmulator.SystemId;
 		}
 
 		private IEmulator MakeCoreFromRegistry(LoadParameters lp, string forcedCoreName = null)
