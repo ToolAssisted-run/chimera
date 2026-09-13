@@ -437,11 +437,17 @@ was never triggered rather than anything a particular driver does.
 
 A core declares `video.gpuStatesSurviveTheContext` when its renderer does this,
 and a project records it (`GpuStatesSurvive`) so that the answer is there when
-the cached states are opened - by which time there is no core to ask. For a core
-that says yes, the greenzone is kept like any other core's. For one that does
-not, the states are session-local: the project writes none into its greenzone
-and uses none from an older one, branch states included, and says so when it
-opens. Rewind and branches within a session are untouched either
+the cached states are opened - by which time there is no core to ask. Since
+2026-09-13 the declaration is recorded but NOT honored: a machine a GPU drew
+keeps its states for its own session whatever it declares. The project writes
+none into its greenzone and uses none from an older one, branch states
+included, and says so when it opens. What changed it: a Ruffle greenzone saved
+by one process and restored twenty-one frames deep in the next crashed inside
+the NVIDIA driver (0xc0000409), reproducibly - a path the old
+drop-everything-ahead capture had kept anyone from reaching (see
+docs/design-principles.md, "A GPU core's word that its states survive is not
+taken"). The in-process reopen below still works; it is the cross-process
+restore that is unproven. Rewind and branches within a session are untouched either
 way - the objects are still there - and a project that loses its cache replays,
 which is what an empty greenzone has always meant.
 

@@ -13,6 +13,10 @@ namespace Chimera.Tests.Client.Common.Movie
 	/// and the cache sibling carries only what may be lost (docs/project.md).
 	/// </summary>
 	[TestClass]
+	// Every test here points CHIMERA_DATA_HOME - one variable for the whole process - at its own folder,
+	// and the assembly runs tests side by side, so two of them wrote into one another's cache
+	// ("Sharing violation on ... history.bin", a greenzone found missing) about once in six runs.
+	[DoNotParallelize]
 	public class TasMovieProjectFormatTests
 	{
 		private const string PalSettings = "{\"region\":\"pal\"}";
@@ -273,23 +277,25 @@ namespace Chimera.Tests.Client.Common.Movie
 		}
 
 		/// <summary>
-		/// ...unless the core says its renderer builds its objects again when
-		/// the context it drew on is gone. Then the states are as good as any
-		/// other core's, and the project keeps them.
+		/// ...and a core that SAYS its renderer builds its objects again when the context it drew on is
+		/// gone is not taken at its word. Ruffle says so, and a New Star Soccer greenzone saved by one
+		/// process and restored twenty-one frames deep in the next died inside the NVIDIA driver on the
+		/// first frame after (2026-09-13). The claim is still written down - it is what the core said -
+		/// but the states go the way every GPU-drawn machine's do.
 		/// </summary>
 		[TestMethod]
-		public void ARendererThatRebuildsKeepsItsStates()
+		public void EvenARendererThatSaysItRebuildsStartsCold()
 		{
 			var path = Path.Combine(_dir, "rebuilds.chimeraProject");
 			var movie = MakeWorkedMovie(path, gpuRenderer: "4.5 Mesa on llvmpipe", statesSurvive: true);
 			Assert.IsFalse(movie.Save().IsError);
 
 			var loaded = LoadFresh(path);
-			Assert.IsNull(loaded.DroppedCacheNote, "nothing was dropped");
-			CollectionAssert.AreEqual(new byte[] { 1, 2, 3, 4 }, loaded.Branches[0].CoreData,
-				"the branch kept the machine behind it");
+			Assert.AreEqual(6, loaded.InputLogLength, "the work itself is untouched");
+			Assert.IsNull(loaded.Branches[0].CoreData, "the branch keeps its input and loses its state");
+			Assert.IsNotNull(loaded.DroppedCacheNote, "and the person is told why the greenzone is empty");
 			Assert.AreEqual("1", loaded.HeaderEntries[HeaderKeys.GpuStatesSurvive],
-				"and the project says why, for a session with no core to ask");
+				"what the core declared is still on record");
 		}
 
 		/// <summary>

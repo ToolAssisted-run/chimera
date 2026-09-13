@@ -2919,3 +2919,29 @@ first (and so chosen), a project pinned to the original booted once, played its
 movie to an OK dump, and never asked; the same project pinned to a build that is
 not installed stopped at the prompt (exit 64). The chosen build in the config
 was the copy, untouched by the project's own load.
+
+## A GPU core's word that its states survive is not taken (2026-09-13)
+
+Reopening nss102 (Ruffle, `opengl-hw`) crashed Chimera inside the NVIDIA OpenGL
+driver - `nvoglv64.dll`, 0xc0000409, a fast-fail - after a long load and a black
+screen. It reproduced headless on the same GTX 1060 from a copy of the project
+and its saved greenzone, at the same fault offset, on the first frames after
+restoring frame 21 from the history the previous session saved. The build from
+before today's replay change ran the same steps to frame 300.
+
+The difference was not a bug introduced but one uncovered. Ruffle declares
+`video.gpuStatesSurviveTheContext`, so its greenzone was saved and loaded across
+sessions - but until a replay stopped discarding the frames ahead, the first
+capture of every session threw away everything loaded after frame 0, so a Ruffle
+state from another process was never actually run. Keeping the greenzone
+(user-decided, the same day) made the frontend restore one, and the renderer's
+objects did not come back with it: the state's own GL audit saw nothing
+orphaned, and the driver still aborted the process.
+
+So the claim is no longer taken on trust: a machine a GPU drew keeps its states
+for its own session, whatever the core declares, exactly as GPU cores without
+the claim always have. Rewind, branches and the greenzone within a session are
+unchanged; across a restart they are recomputed by replay. The declaration is
+still written into the project, because it is what the core said. Making it
+true is Ruffle's to do, and a core that proves it - a restored state drawn to
+the right picture in a fresh process - can have it honored again.

@@ -399,10 +399,19 @@ namespace Chimera.Client.Common
 		/// other. Rewind and branches work as they always did; what does not
 		/// cross a restart is written down here and recomputed by replay, which
 		/// is what an empty greenzone has always meant.
+		///
+		/// A core may declare that its states DO survive a new context
+		/// (<c>video.gpuStatesSurviveTheContext</c>), and that is no longer taken on
+		/// trust. Ruffle declares it, and on the GTX 1060 a New Star Soccer greenzone
+		/// saved by one process and restored twenty-one frames deep in the next died
+		/// inside the NVIDIA driver (0xc0000409, nvoglv64.dll) on the first frame
+		/// after - reproducibly, headless, 2026-09-13. It had never been exercised:
+		/// until a replay stopped discarding the greenzone ahead, the first capture of
+		/// every session threw away all but frame 0 of what was loaded. So a machine a
+		/// GPU drew keeps its states for its own session, whatever it declares.
 		/// </summary>
 		private bool DrawnByGpu
-			=> Emulator is IGpuRendered { GpuRenderer: { Length: > 0 } } gpu
-				&& !gpu.GpuStatesSurviveTheContext;
+			=> Emulator is IGpuRendered { GpuRenderer: { Length: > 0 } };
 
 		/// <summary>
 		/// The same question asked of the cache rather than of the machine, and
@@ -413,9 +422,7 @@ namespace Chimera.Client.Common
 		/// </summary>
 		private bool StatesMadeByGpu
 			=> HeaderEntries.TryGetValue(HeaderKeys.GpuRenderer, out var driver)
-				&& !string.IsNullOrWhiteSpace(driver)
-				&& !(HeaderEntries.TryGetValue(HeaderKeys.GpuStatesSurvive, out var survives)
-					&& survives.Trim() == "1");
+				&& !string.IsNullOrWhiteSpace(driver);
 
 		/// <summary>
 		/// The regenerable bulk, beside the project: greenzone, lag log, session
