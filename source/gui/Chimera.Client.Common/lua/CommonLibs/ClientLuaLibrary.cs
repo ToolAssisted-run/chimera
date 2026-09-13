@@ -193,7 +193,27 @@ namespace Chimera.Client.Common
 		[LuaMethodExample("client.opentasstudio( );")]
 		[LuaMethod("opentasstudio", "opens the TAStudio dialog")]
 		public void OpenTasStudio()
-			=> APIs.Tool.OpenTasStudio();
+		{
+			if (_luaLibsImpl.ProhibitedApis.HasFlag(ApiGroup.BOOTING))
+			{
+				throw new InvalidOperationException("client.opentasstudio() is not allowed during input/memory callbacks");
+			}
+
+			// Same as openproject: with no project open, engaging TAStudio starts a
+			// new one, and starting a movie reboots the core, which restarts the lua
+			// console. Unwarned, that closed the lua state this script was still
+			// running on, and the call returned into freed memory - a crash on the
+			// first line after it, on any bare rom.
+			_luaLibsImpl.IsRebootingCore = true;
+			try
+			{
+				APIs.Tool.OpenTasStudio();
+			}
+			finally
+			{
+				_luaLibsImpl.IsRebootingCore = false;
+			}
+		}
 
 		[LuaMethodExample("client.openproject( \"/tmp/run.chimeraProject\" );")]
 		[LuaMethod("openproject", "Opens a Chimera project, closing whichever one is open first. Returns true if it opened.")]

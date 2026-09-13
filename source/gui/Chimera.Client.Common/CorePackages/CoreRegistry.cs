@@ -69,7 +69,9 @@ namespace Chimera.Client.Common
 				return;
 			}
 			_all.Add(factory);
-			foreach (var sysID in factory.SystemIds) _bySystem.GetValueOrPutNew(sysID).Add(factory);
+			// once per system whatever the factory reports: a core listed twice under
+			// one system makes every lookup of it by name ambiguous
+			foreach (var sysID in factory.SystemIds.Distinct()) _bySystem.GetValueOrPutNew(sysID).Add(factory);
 		}
 
 		/// <summary>

@@ -90,10 +90,15 @@ namespace Chimera.Emulation.Common.Waterbox
 		/// <summary>True when this package describes more than one machine.</summary>
 		public bool HasMachines => Machines is { Count: > 0 };
 
-		/// <summary>Every system this package can be, in declaration order.</summary>
+		/// <summary>
+		/// Every system this package can be, in declaration order, each once. Two
+		/// machines may be the same system - gpgx's Genesis and Mega CD are both GEN -
+		/// and listing it twice put the one core in that system's list twice, so a
+		/// reboot that forces the core by name found "more than one" of it.
+		/// </summary>
 		public IReadOnlyList<string> SystemIds
 			=> HasMachines
-				? Machines.Select(static m => m.Id).Where(static id => !string.IsNullOrEmpty(id)).ToList()
+				? Machines.Select(static m => m.Id).Where(static id => !string.IsNullOrEmpty(id)).Distinct().ToList()
 				: string.IsNullOrEmpty(SystemId) ? [ ] : new[] { SystemId };
 
 		/// <summary>

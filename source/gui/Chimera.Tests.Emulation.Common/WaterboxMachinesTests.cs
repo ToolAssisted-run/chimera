@@ -57,6 +57,21 @@ namespace Chimera.Tests.Emulation.Common
 			return s;
 		}
 
+		/// <summary>
+		/// Two machines can be one system - the real gpgx declares its Mega Drive and
+		/// its Mega CD both as GEN - and the system is still one system. Listed
+		/// twice, the registry put the core under GEN twice, and a reboot forcing
+		/// the core by name (TAStudio starting a project on a bare rom) failed with
+		/// "Sequence contains more than one matching element".
+		/// </summary>
+		[TestMethod]
+		public void TwoMachinesOfOneSystemListTheSystemOnce()
+		{
+			var cfg = WaterboxConfig.FromJson(TwoMachines.Replace("\"id\": \"SMS\"", "\"id\": \"GEN\""));
+			CollectionAssert.AreEqual(new[] { "GEN" }, cfg.SystemIds.ToArray());
+			CollectionAssert.AreEqual(new[] { "GEN", "SMS" }, Cfg.SystemIds.ToArray());
+		}
+
 		[TestMethod]
 		public void ThePackageIsEveryMachineItDeclares()
 		{

@@ -2685,3 +2685,24 @@ and those cores went back to one anchor per run. The PlayStation 2 went from
 A positive spacing from a caller is still obeyed exactly. What transfers is the
 floor: a rule derived from cost ratios needs an absolute threshold too, or it
 optimises a cost nobody was paying.
+
+## Opening TAStudio from a script freed the script (2026-09-13)
+
+`client.opentasstudio()` on a bare rom crashed in `--headless`, on main, for
+everybody. With no project open TAStudio starts one, starting a movie reboots the
+core, and a reboot restarts the Lua console - which closed the Lua state the
+calling script was still running on. The call returned into freed memory, and
+the fault was a write through `L->top` holding the bytes of the string
+"DrawFini": a Lua method name, sitting where the state used to be. The other
+calls that can reboot (`openrom`, `openproject`, `reboot_core`) already told the
+console first, so it re-injected its dependencies instead of closing the state;
+`opentasstudio` never did, because opening a window was not supposed to boot
+anything.
+
+Fixing it exposed a second failure on the same gesture, on Genesis only. gpgx
+declares its Mega Drive and its Mega CD both as the GEN system, the package
+listed GEN twice, the registry put the core under GEN twice, and the reboot -
+which forces the core by name - found "more than one matching element". A
+system is listed once now, in the package and again in the registry. Both were
+found only by running the gesture on real roms of two different cores: the first
+fix made the NES pass and the Genesis still fail.
