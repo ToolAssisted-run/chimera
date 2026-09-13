@@ -284,6 +284,22 @@ namespace Chimera.Client.GUI
 				ProjectCache.Remember(project.Id, ProjectCache.FactsOf(project, path));
 				local.ApplyTo(project);
 			}
+			if (!project.FilesOk && HeadlessMode.Enabled)
+			{
+				// Nobody can answer the resolution form here. It used to open anyway -
+				// invisibly, holding the process at ~1 s of CPU for as long as anyone
+				// cared to wait - so an unattended run of a project whose game was not
+				// beside it looked exactly like a hang. Say which files, and stop.
+				var missing = new List<string>();
+				for (var i = 0; i < project.FileCount; i++)
+				{
+					if (string.IsNullOrEmpty(project.FileSourcePath(i))) missing.Add(project.FileName(i));
+				}
+				project.Dispose();
+				HeadlessMode.FatalDialog("Cannot open the project",
+					$"these files were not found beside it or where this machine last had them: {string.Join(", ", missing)}");
+				return false;
+			}
 			if (!project.FilesOk)
 			{
 				using ProjectResolutionForm dialog = new(project, locateFile: title =>

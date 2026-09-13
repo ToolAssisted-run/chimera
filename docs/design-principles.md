@@ -2756,12 +2756,20 @@ printed `code:` and nothing more: reading instruction bytes at `rip=0x2` from
 inside the handler was a second fault. It now prints every general-purpose
 register first and reads code only where it is readable.
 
-The stress found more on the way, none of them this and all still open: after
-seventeen to thirty-four core reboots in one process on Windows the sandbox
-cannot create its memory block again ("failed to create memory block"); TAStudio
-cannot open a movie whose log key names controls the machine does not currently
-have (`MnemonicMap`, `KeyNotFoundException` - a project recorded with a second
-controller and reopened without it); a project's game record takes the package's
-FIRST system (`RomLoader`, `factory.SystemIds[0]`), so an ares NES project says
-N64 wherever that is read; and headless mode waits forever on the prompt to
-locate a project's missing file instead of exiting 64.
+The stress found four more on the way, none of them this, each fixed after it.
+After seventeen to thirty-four core reboots in one process on Windows the sandbox
+could not create its memory block again ("failed to create memory block"): a
+freed block released its mirror - a view of the block's section - with
+VirtualFree, which cannot release a view and failed silently, so every reboot
+leaked a whole arena; it is now unmapped as a view, and the reboot-heavy stress
+survives 156 reboots. TAStudio could not open a movie whose log key names
+controls the machine does not currently have (`MnemonicMap`,
+`KeyNotFoundException` - a project recorded with a second controller and
+reopened without it): `ControllerDefinition.MnemonicFor` answers from the cache
+and falls back to the system's lookup for a name the machine lacks, and every
+reader of the cache goes through it. A project's game record took the package's
+FIRST system (`RomLoader`, `factory.SystemIds[0]`), so an ares NES project said
+N64 wherever that was read; it now takes the system the created emulator reports.
+And headless mode waited forever on the prompt to locate a project's missing
+file; it now names the missing files and exits 64, like every other dialog a
+headless run cannot answer.
