@@ -373,6 +373,17 @@ namespace Chimera.Client.Common
 				}
 			}
 
+			// A log that is shorter or longer than ours disagrees from where one of
+			// them ends, even when every entry both have matches. The history no
+			// longer drops what is ahead of a frame it replays, so it has to be told.
+			// Only against a log that is there: a project being opened reads its
+			// own log through here, into a movie that has none yet, and that is not
+			// a divergence - it is the greenzone it saved being given back.
+			if (!timelineBranchFrame.HasValue && Log is { Count: > 0 } && newLog.Count != Log.Count)
+			{
+				timelineBranchFrame = Math.Min(newLog.Count, Log.Count);
+			}
+
 			Log.Clear();
 			Log.AddRange(newLog);
 

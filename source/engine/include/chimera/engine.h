@@ -1125,7 +1125,12 @@ CE_API void ce_session_greenzone_bands(ce_session *s, int64_t near_frames, int64
  * since a delta is what changed since a moment and the moment has to be marked
  * first; a capture with no epoch open is simply a whole state, which is correct
  * and merely dearer. _capture stores the frame just reached - the caller says
- * which, because it is the caller counting. _restore puts the machine on a
+ * which, because it is the caller counting. A frame the history already
+ * reaches past is a replay: nothing is stored and nothing is dropped, so going
+ * back and playing the same input forward keeps what is ahead. A caller that
+ * CHANGES the timeline - an edit, recording over an entry, input that is not
+ * the movie's - says so with ce_session_greenzone_invalidate before the frame
+ * is played (user-decided, 2026-09-13). _restore puts the machine on a
  * stored frame, one ce_session_greenzone_nearest offered, and replaying from
  * there is then the caller's business.
  *

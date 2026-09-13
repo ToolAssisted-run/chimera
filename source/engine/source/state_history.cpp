@@ -1146,12 +1146,22 @@ void StateHistory::captureOnce(int64_t frame, const uint8_t *note, size_t noteLe
 	 * test_an_epoch_across_a_plan), so the fill goes on while frames are captured.
 	 * What does need the bytes waits for them itself: the next anchor, a
 	 * restore, a spill or a drop of THAT stretch, a save, a clear. */
+	/* A frame the history already reaches past is a REPLAY, and a replay changes
+	 * nothing (user-decided, 2026-09-13). It used to be taken as a re-record:
+	 * everything after it was dropped before it was stored, so going back and
+	 * playing forward over the same input threw the greenzone ahead away, and
+	 * the way back to the end was emulated frame by frame - 3000 frames in 99 s
+	 * on nss102. What changes the timeline says so itself, with invalidateAfter:
+	 * every TAStudio edit, recording over an entry, input that is not the
+	 * movie's. So nothing is stored and nothing is dropped, and the epoch is let
+	 * go - the next frame's delta is measured from where the machine stands
+	 * then, which is the history's own last frame by the time it matters. */
+	if (!m_segments.empty() && frame <= m_segments.back().lastFrame())
+	{
+		m_epochOpen = false;
+		return;
+	}
 	m_newest = frame;
-
-	/* A capture describes the frame we now stand on. Anything at or after it is
-	 * a timeline that no longer happens - which is what recording over an
-	 * existing entry means - so it goes before this is stored. */
-	invalidateAfter(frame - 1);
 
 	Bytes bytes;
 	ByteSink sink{ &bytes };

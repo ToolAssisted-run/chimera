@@ -1868,6 +1868,23 @@ const uint8_t *ce_session_trace_drain(
 int32_t ce_session_movie_load(ce_session *s, const ce_movie_log *log)
 {
 	if (s->movie == nullptr) s->movie = ce_movie_log_new();
+	/* What the history holds past the first entry the two logs disagree on
+	 * describes the old movie. A capture used to find that out on the way
+	 * through, by dropping everything ahead of every frame it stored; it no
+	 * longer does (a replay keeps what is ahead), so the new log says so here.
+	 * A log that merely goes on further agrees everywhere the old one reached,
+	 * and what was played past the old end was the caller's input, not this. */
+	{
+		const int64_t was = ce_movie_log_count(s->movie);
+		const int64_t now = ce_movie_log_count(log);
+		int64_t agree = 0;
+		while (agree < was && agree < now
+			&& std::strcmp(ce_movie_log_entry(s->movie, agree), ce_movie_log_entry(log, agree)) == 0)
+		{
+			agree++;
+		}
+		s->history.invalidateAfter(agree);
+	}
 	ce_movie_log_clear(s->movie);
 	int64_t n = ce_movie_log_count(log);
 	for (int64_t i = 0; i < n; i++) ce_movie_log_add(s->movie, ce_movie_log_entry(log, i));
@@ -1989,6 +2006,10 @@ int32_t ce_session_movie_advance(ce_session *s, uint64_t buttons, const int32_t 
 			 * here on described a timeline that no longer happens */
 			ce_movie_log_truncate(s->movie, s->frame);
 		}
+		/* Input that is not the log's changes what follows, so the history says
+		 * so here. A capture no longer does it for us: a frame it has already
+		 * gone past is a replay, and a replay keeps what is ahead. */
+		s->history.invalidateAfter(s->frame);
 		for (size_t i = 0; i < s->cfg.axes.size(); i++)
 		{
 			int32_t value = axes != nullptr ? axes[i] : s->cfg.axes[i].neutral;

@@ -373,6 +373,16 @@ coarser as it goes. Coarsening is driven by distance and not by the budget, so
 it is incremental and bounded: each captured frame pushes a couple of points
 across a boundary and pays for those, rather than a stall when the budget fills.
 
+Only NEW frames are captured into the near band. Going back and playing the same
+input forward is a replay, and a replay changes nothing (user-decided,
+2026-09-13): a capture of a frame the history already reaches past stores
+nothing and drops nothing, so what is ahead is still there to jump back to.
+What changes the timeline - an edit, recording over an entry, input that is not
+the movie's, a different log - calls `invalidateAfter` itself before the frame
+is played. Until 2026-09-13 every capture dropped everything after it, and on a
+Ruffle project returning 3000 frames to the end after a look back was 99 s of
+emulation (docs/design-principles.md, "A replay changes nothing").
+
 The budget then decides only what happens to the far band, and what happens is
 that it goes to disk, oldest first, into the project's cache directory. That is
 the right thing to spill precisely because it is far: large, rarely touched, and

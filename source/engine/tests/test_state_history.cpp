@@ -760,6 +760,9 @@ int main(void)
 		/* frame 8 closes the first stretch, which a 512 byte budget has spilled */
 		assert(h.nearest(8) == 8);
 		assert(h.restore(8, error));
+		/* an edit says so: a capture of a frame the history already reaches past
+		 * is a replay, and keeps what is ahead */
+		h.invalidateAfter(8);
 		h.beforeAdvance();
 		g_machine.cell[3] ^= 0x5C;   /* the edit */
 		advance(9);
@@ -1079,8 +1082,18 @@ int main(void)
 					h.beforeAdvance();
 					frame++;
 					advance(frame);
-					if (static_cast<int64_t>(truth.size()) <= frame) truth.resize(static_cast<size_t>(frame) + 1);
-					std::memcpy(truth[static_cast<size_t>(frame)].data(), g_machine.cell, Machine::kCells);
+					if (frame < static_cast<int64_t>(truth.size()))
+					{
+						/* a frame the run already has: the same input replayed, which
+						 * reproduces that timeline - an edit's change included, the
+						 * way the movie's log would - and changes nothing */
+						std::memcpy(g_machine.cell, truth[static_cast<size_t>(frame)].data(), Machine::kCells);
+					}
+					else
+					{
+						truth.resize(static_cast<size_t>(frame) + 1);
+						std::memcpy(truth[static_cast<size_t>(frame)].data(), g_machine.cell, Machine::kCells);
+					}
 					const uint8_t note[2] = { static_cast<uint8_t>(frame & 0xFF), 0x5A };
 					h.capture(frame, note, sizeof note);
 					break;
@@ -1550,6 +1563,99 @@ int main(void)
 		}
 		assert(restored > 8);
 		std::filesystem::remove_all("work-history-saving");
+	}
+
+	{ // Going back and playing forward over the same input keeps what is ahead.
+	  //
+	  // A capture used to drop every stored frame after the one it stored, so a
+	  // seek back followed by play threw the greenzone ahead away, and the way
+	  // back to the end was emulated frame by frame - 3000 frames in 99 s on
+	  // nss102. A replay changes nothing (user-decided, 2026-09-13); what
+	  // changes the timeline calls invalidateAfter itself.
+		const chimera::HostApi api = fakeHost();
+		for (int pass = 0; pass < 2; pass++)
+		{
+			const bool threaded = pass == 0;
+			g_machine = Machine{};
+			const char *dir = threaded ? "work-history-replay-t" : "work-history-replay-s";
+			std::filesystem::remove_all(dir);
+			std::filesystem::create_directories(dir);
+			chimera::StateHistory h;
+			h.helpers(threaded);
+			h.configure(&api, nullptr, 900);   /* small enough that the far end spills */
+			h.bands(4, 8, 2, 4, 6);
+			h.spillTo(dir);
+			std::vector<std::array<uint8_t, Machine::kCells>> truth(1);
+			std::memcpy(truth[0].data(), g_machine.cell, Machine::kCells);
+			h.capture(0);
+			for (int64_t f = 1; f <= 120; f++)
+			{
+				h.beforeAdvance();
+				advance(f);
+				std::array<uint8_t, Machine::kCells> at{};
+				std::memcpy(at.data(), g_machine.cell, Machine::kCells);
+				truth.push_back(at);
+				h.capture(f);
+			}
+			h.flushWrites();
+			const int64_t end = h.nearest(INT64_MAX);
+			assert(end > 100);
+			std::vector<int64_t> held;
+			for (int64_t f = 0; f <= 120; f++)
+			{
+				if (h.nearest(f) == f) held.push_back(f);
+			}
+
+			/* back, from several places, and the same input played forward */
+			for (int64_t back : { end - 3, int64_t(90), int64_t(40) })
+			{
+				const int64_t from = h.nearest(back);
+				assert(from >= 0);
+				assert(h.restore(from, error));
+				for (int64_t f = from + 1; f <= back + 10 && f <= 120; f++)
+				{
+					h.beforeAdvance();
+					advance(f);
+					assert(std::memcmp(g_machine.cell, truth[static_cast<size_t>(f)].data(), Machine::kCells) == 0);
+					h.capture(f);
+				}
+				assert(h.nearest(INT64_MAX) == end);
+			}
+			h.flushWrites();
+			for (int64_t f : held)
+			{
+				assert(h.nearest(f) == f);
+				assert(h.restore(f, error));
+				assert(std::memcmp(g_machine.cell, truth[static_cast<size_t>(f)].data(), Machine::kCells) == 0);
+			}
+
+			/* and playing on from the end after all that still extends it exactly */
+			assert(h.restore(end, error));
+			for (int64_t f = end + 1; f <= 120 + 30; f++)
+			{
+				h.beforeAdvance();
+				advance(f);
+				std::array<uint8_t, Machine::kCells> at{};
+				std::memcpy(at.data(), g_machine.cell, Machine::kCells);
+				if (f >= static_cast<int64_t>(truth.size())) truth.push_back(at);
+				h.capture(f);
+			}
+			int checkedAhead = 0;
+			for (int64_t f = end + 1; f <= 150; f++)
+			{
+				if (h.nearest(f) != f) continue;
+				assert(h.restore(f, error));
+				assert(std::memcmp(g_machine.cell, truth[static_cast<size_t>(f)].data(), Machine::kCells) == 0);
+				checkedAhead++;
+			}
+			assert(checkedAhead > 0);
+
+			/* an edit, which says so, still drops what is ahead of it */
+			assert(h.restore(h.nearest(60), error));
+			h.invalidateAfter(60);
+			assert(h.nearest(INT64_MAX) <= 60);
+			std::filesystem::remove_all(dir);
+		}
 	}
 
 	{ // A saved history is compressed, and it comes back exactly as it went.

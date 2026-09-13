@@ -2809,3 +2809,42 @@ input throws away the greenzone ahead, and returning to the end replays all of
 it - 300 frames in 10 s, 1000 in 31 s, 3000 in 99 s. Every TAStudio edit already
 invalidates explicitly; the engine's own record path relies on the capture
 doing it. Whether a replay may keep what is ahead is the user's decision.
+
+## A replay changes nothing (user-decided, 2026-09-13)
+
+The rule the user set: a non-modifying replay does not affect the greenzone.
+
+It did. Every capture dropped every stored frame after it (`captureOnce` called
+`invalidateAfter(frame - 1)`), on the reasoning that a capture describes the
+frame we stand on and anything after it is a timeline that no longer happens.
+That is true of recording over an entry and false of playing one back. On
+nss102 a seek back followed by play threw the greenzone ahead away, and the way
+back to the end was emulated frame by frame: 300 frames in 10 s, 1000 in 31 s,
+3000 in 99 s - the "stall" a user sees on every click forward after looking
+back, and longer the further back they looked.
+
+Now a capture of a frame the history already reaches past stores nothing and
+drops nothing, and lets the epoch go so the next delta is measured from where
+the machine stands. What changes the timeline says so itself, before the frame
+is played:
+
+- every TAStudio edit, recording included, already did (`TasMovie.InvalidateAfter`);
+- a branch loads through the same call, at the point where the logs diverge;
+- loading a savestate into a project now also counts a log that is merely
+  longer or shorter as diverging where the shorter one ends;
+- the engine's own movie (`ce_session_movie_advance`) invalidates after the
+  current frame whenever the input is not the log's - recording, or past the
+  log's end - and `ce_session_movie_load` invalidates after the first entry
+  the old and new logs disagree on.
+
+What a replay does not do is fill in what the bands thinned: the history is
+append-only, so frames the far band gave up stay given up until the playhead
+passes the end again. Making a branch mid-history no longer stores its frame
+either - and no longer drops everything after it, which is what that capture
+used to do. A branch carries its own state, so nothing reaches for it.
+
+Measured on nss102 on Windows with the change, the same script as before: back
+1, 2, 5, 10, 30, 100, 300, 1000 and 3000 frames and return to the end each time.
+Every return took a second or less and at most 17 frames of emulation - the
+stride back to the stored frame before the end - where the returns from 300,
+1000 and 3000 frames back had taken 10, 31 and 99 s.
