@@ -372,6 +372,13 @@ namespace Chimera.Client.Common
 		public Dictionary<string, string> DefaultCores = new();
 
 		/// <summary>
+		/// The build a core runs with when several builds of it are installed, keyed by core name, valued by
+		/// package SHA1 - what the user opened with File &gt; Open Core or installed in the core manager.
+		/// A project ignores it whenever the build it pins is installed (<c>CoreChoices.PickBuild</c>).
+		/// </summary>
+		public Dictionary<string, string> DefaultCoreBuilds = new();
+
+		/// <summary>
 		/// Where the user put each file a core package asked for, keyed
 		/// "&lt;core name&gt;/&lt;firmware id&gt;" (see <c>CoreFirmwareStore</c>). The frontend
 		/// has no idea what any of them are - the declarations come from the packages.

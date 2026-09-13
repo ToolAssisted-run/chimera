@@ -304,7 +304,7 @@ namespace Chimera.Client.Common
 				: throw new CoreLoadException($"'{p.FileName(i)}' has not been resolved");
 			var primaryPath = haveGame ? PathOf(primary) : "";
 
-			var factory = CoreRegistry.Instance.AllFactories.FirstOrDefault(f => f.CoreName == p.CoreName)
+			var factory = CoreRegistry.Instance.FactoryFor(p.CoreName, p.CoreSha1)
 				?? throw new CoreLoadException($"the project's core '{p.CoreName}' is not loaded");
 
 			List<CoreFile> extras = new()
@@ -368,6 +368,7 @@ namespace Chimera.Client.Common
 				ExtraFiles = extras,
 			};
 			nextEmulator = factory.Create(ctx);
+			CoreRegistry.Instance.NoteCreated(nextEmulator, factory);
 			// The game record was made before the core existed, from the package's
 			// FIRST system - which for a core with many machines is not the one the
 			// project boots: an ares NES project said N64 to anything reading the
@@ -381,7 +382,8 @@ namespace Chimera.Client.Common
 			IReadOnlyList<ICoreFactory> factories;
 			if (forcedCoreName != null)
 			{
-				var singleFactory = CoreRegistry.Instance.GetFactories(lp.Game.System).SingleOrDefault(f => f.CoreName == forcedCoreName);
+				// the chosen build of that core, else the newest installed: several builds may be registered
+				var singleFactory = CoreRegistry.Instance.FactoryFor(forcedCoreName, pinnedSha1: null) is { } built && built.SystemIds.Contains(lp.Game.System) ? built : null;
 				factories = singleFactory != null ? [ singleFactory ] : [ ];
 			}
 			else
@@ -389,6 +391,10 @@ namespace Chimera.Client.Common
 				_ = _config.DefaultCores.TryGetValue(lp.Game.System, out var preferredCore);
 				var dbForcedCoreName = lp.Game.ForcedCore;
 				factories = CoreRegistry.Instance.GetFactories(lp.Game.System)
+					// one build per core: the chosen one, else the newest installed
+					.Select(static f => f.CoreName).Distinct()
+					.Select(static name => CoreRegistry.Instance.FactoryFor(name, pinnedSha1: null))
+					.Where(f => f is not null && f.SystemIds.Contains(lp.Game.System))
 					.OrderBy(f =>
 					{
 						if (f.CoreName == preferredCore) return -2;
@@ -415,7 +421,9 @@ namespace Chimera.Client.Common
 						Settings = GetCoreSettings(factory.CoreType, factory.SettingsType),
 						FirmwareProvider = CoreFirmwareStore.ProviderFor(_config, factory.CoreName),
 					};
-					return factory.Create(ctx);
+					var created = factory.Create(ctx);
+					CoreRegistry.Instance.NoteCreated(created, factory);
+					return created;
 				}
 				catch (Exception e) when (!_config.DontTryOtherCores && e is not InternalCoreException)
 				{

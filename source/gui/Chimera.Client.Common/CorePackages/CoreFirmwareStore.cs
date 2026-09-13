@@ -174,6 +174,9 @@ namespace Chimera.Client.Common
 			=> registry.AllFactories
 				.OfType<ICoreFirmwareUser>()
 				.SelectMany(user => user.Firmware.Select(decl => Describe(config, ((ICoreFactory) user).CoreName, decl)))
+				// two builds of one core loaded side by side declare the same files once
+				.GroupBy(static e => KeyFor(e.CoreName, e.Decl), StringComparer.OrdinalIgnoreCase)
+				.Select(static g => g.First())
 				.ToList();
 
 		/// <summary>True if any loaded package expects firmware at all (the firmware window is pointless otherwise).</summary>
@@ -328,8 +331,8 @@ namespace Chimera.Client.Common
 		/// movie that does not carry this is not reproducible; and it has to be canonical,
 		/// or replay would report a difference that is only an ordering.
 		/// </summary>
-		public static string RecordFor(Config config, CoreRegistry registry, string coreName)
-			=> EngineFirmware.RecordLine(InUse(config, registry, coreName)
+		public static string RecordFor(Config config, CoreRegistry registry, string coreName, string? runningSha1 = null)
+			=> EngineFirmware.RecordLine(InUse(config, registry, coreName, runningSha1)
 				// what the core was actually given, not merely what the user pointed at:
 				// a file the frontend never handed over did not shape this machine
 				.Where(static e => e.Usable && e.Sha1 is not null)
@@ -351,11 +354,11 @@ namespace Chimera.Client.Common
 		/// this exists to stop. A package whose declarations are unconditional gets
 		/// the same answer either way.
 		/// </summary>
-		public static IReadOnlyList<CoreFirmwareEntry> InUse(Config config, CoreRegistry registry, string coreName)
+		public static IReadOnlyList<CoreFirmwareEntry> InUse(Config config, CoreRegistry registry, string coreName, string? runningSha1 = null)
 		{
-			var user = registry.AllFactories
-				.OfType<ICoreFirmwareUser>()
-				.FirstOrDefault(u => string.Equals(((ICoreFactory) u).CoreName, coreName, StringComparison.OrdinalIgnoreCase));
+			// with several builds of the core registered, the one running (or the one that would run)
+			var named = registry.AllFactories.FirstOrDefault(f => string.Equals(f.CoreName, coreName, StringComparison.OrdinalIgnoreCase));
+			var user = named is null ? null : registry.FactoryFor(named.CoreName, runningSha1) as ICoreFirmwareUser;
 			if (user is null) return [ ];
 			return InUse(config, coreName, user.Firmware, user.FirmwareInUse);
 		}
@@ -380,8 +383,8 @@ namespace Chimera.Client.Common
 		/// recorded in movies like any firmware, so the user is told rather than left
 		/// to wonder why a movie will not sync elsewhere.
 		/// </summary>
-		public static IReadOnlyList<CoreFirmwareEntry> NonStandard(Config config, CoreRegistry registry, string coreName)
-			=> InUse(config, registry, coreName)
+		public static IReadOnlyList<CoreFirmwareEntry> NonStandard(Config config, CoreRegistry registry, string coreName, string? runningSha1 = null)
+			=> InUse(config, registry, coreName, runningSha1)
 				.Where(static e => e.Usable && !e.IsStandard)
 				.ToList();
 

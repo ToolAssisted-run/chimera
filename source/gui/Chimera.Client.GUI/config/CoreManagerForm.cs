@@ -34,6 +34,9 @@ namespace Chimera.Client.GUI
 		private readonly Func<IReadOnlyList<DiscoveredCorePackage>> _scan;
 		private readonly CoreFeed _feed;
 		private readonly CoreInstaller _installer;
+
+		/// <summary>Told about each package installed here: installing a build is choosing it (<see cref="CoreChoices.MakeDefaultBuild"/>).</summary>
+		private readonly Action<DiscoveredCorePackage>? _installed;
 		private readonly Action<RosterCore>? _rememberExternal;
 		private readonly Action<RosterCore>? _forgetExternal;
 		private readonly Func<string?>? _askForUrl;
@@ -95,12 +98,14 @@ namespace Chimera.Client.GUI
 			Action<RosterCore>? rememberExternal = null,
 			Action<RosterCore>? forgetExternal = null,
 			Func<string?>? askForUrl = null,
-			Action? changed = null)
+			Action? changed = null,
+			Action<DiscoveredCorePackage>? installed = null)
 		{
 			_roster = roster;
 			_scan = scan;
 			_feed = feed;
 			_installer = installer;
+			_installed = installed;
 			_rememberExternal = rememberExternal;
 			_forgetExternal = forgetExternal;
 			_askForUrl = askForUrl;
@@ -656,6 +661,7 @@ namespace Chimera.Client.GUI
 					? $"Downloading {core.Name} {release.ShortVersion}: {done * 100 / total}%"
 					: $"Downloading {core.Name} {release.ShortVersion}: {done / 1024} KB"),
 				cancel).ConfigureAwait(true);
+			if (result.Ok && result.Package is { } package) _installed?.Invoke(package);
 			Reload();
 			_changed?.Invoke();
 			Say(result.Ok

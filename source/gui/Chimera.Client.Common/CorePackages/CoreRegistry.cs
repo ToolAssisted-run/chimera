@@ -4,9 +4,11 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 
 using Chimera.Common.CollectionExtensions;
 using Chimera.Emulation.Common;
+using Chimera.Emulation.Common.Waterbox;
 
 namespace Chimera.Client.Common
 {
@@ -50,25 +52,90 @@ namespace Chimera.Client.Common
 		/// </summary>
 		public DefaultControls PackageControlDefaults { get; } = new();
 
-		private readonly Dictionary<Assembly, string> _packageSha1ByAssembly = new();
+		/// <summary>
+		/// The package each registered factory came from. Per FACTORY, not per adapter assembly: every
+		/// miniBox package is served by the same adapter type, so a map by assembly answered one hash for
+		/// all of them - whichever package registered last.
+		/// </summary>
+		private readonly Dictionary<ICoreFactory, (string? Sha1, string Path)> _packageOf = new();
+
+		/// <summary>Which factory made each live emulator, so "which build is running" has an exact answer.</summary>
+		private readonly ConditionalWeakTable<IEmulator, ICoreFactory> _madeBy = new();
 
 		/// <summary>
-		/// The SHA1 of the package file that provides <paramref name="coreType"/> (any type
-		/// from the package's adapter assembly). A package's ground-truth identity is this
-		/// hash; name/version/platform are secondary. Null for directory-form (dev)
-		/// packages, which have no file to hash.
+		/// The build the user chose for a core (<see cref="Config.DefaultCoreBuilds"/>), asked when several
+		/// builds are registered and no project pins one. Set once by the frontend, which owns the config.
 		/// </summary>
-		public string/*?*/ GetPackageSha1ForCore(Type coreType)
-			=> _packageSha1ByAssembly.TryGetValue(coreType.Assembly, out var sha1) ? sha1 : null;
+		public Func<string, string?>? ChosenBuildOf { get; set; }
 
-		public void Register(ICoreFactory factory)
+		/// <summary>
+		/// The SHA1 of the package file <paramref name="factory"/> came from - a package's ground-truth
+		/// identity; name/version/platform are secondary. Null for directory-form (dev) packages, which
+		/// have no file to hash, and for a factory registered by hand.
+		/// </summary>
+		public string? PackageSha1Of(ICoreFactory factory)
+			=> _packageOf.TryGetValue(factory, out var package) ? package.Sha1 : null;
+
+		/// <summary>The SHA1 of the package whose factory made <paramref name="emulator"/>, when known.</summary>
+		public string? PackageSha1Of(IEmulator? emulator)
+			=> emulator is not null && _madeBy.TryGetValue(emulator, out var factory) ? PackageSha1Of(factory) : null;
+
+		/// <summary>Remembers that <paramref name="factory"/> made <paramref name="emulator"/> (see <see cref="PackageSha1Of(IEmulator)"/>).</summary>
+		public void NoteCreated(IEmulator? emulator, ICoreFactory factory)
 		{
-			if (_all.Exists(f => f.CoreName == factory.CoreName))
+			if (emulator is null) return;
+			_madeBy.Remove(emulator);
+			_madeBy.Add(emulator, factory);
+		}
+
+		/// <summary>
+		/// The registered build of <paramref name="coreName"/> to run: the one <paramref name="pinnedSha1"/>
+		/// names when it is registered, else the chosen build, else the most recently installed
+		/// (<see cref="CoreChoices.PickBuild"/>). Null when no build of that core is registered.
+		/// </summary>
+		public ICoreFactory? FactoryFor(string coreName, string? pinnedSha1)
+			=> CoreChoices.PickBuild(
+				_all.Where(f => f.CoreName == coreName),
+				PackageSha1Of,
+				InstalledAt,
+				pinnedSha1,
+				ChosenBuildOf?.Invoke(coreName));
+
+		private DateTime InstalledAt(ICoreFactory factory)
+		{
+			if (!_packageOf.TryGetValue(factory, out var package) || package.Path.Length is 0) return DateTime.MinValue;
+			try
 			{
-				Console.WriteLine($"CoreRegistry: ignoring duplicate registration of core \"{factory.CoreName}\"");
-				return;
+				return File.Exists(package.Path) ? File.GetLastWriteTimeUtc(package.Path) : Directory.GetLastWriteTimeUtc(package.Path);
+			}
+			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+			{
+				return DateTime.MinValue;
+			}
+		}
+
+		public void Register(ICoreFactory factory) => Register(factory, sha1: null, path: "");
+
+		private void Register(ICoreFactory factory, string? sha1, string path)
+		{
+			foreach (var existing in _all.Where(f => f.CoreName == factory.CoreName))
+			{
+				// Two BUILDS of one core may be installed side by side and both run, as long as they
+				// are not the same bytes (issue #63): a project pins one, and another build is another
+				// machine. Only miniBox packages, though - an adapter package is a .NET assembly, and a
+				// second assembly of the same identity would quietly be the first one's types.
+				var other = PackageSha1Of(existing);
+				var anotherBuild = factory is WaterboxCoreFactory && existing is WaterboxCoreFactory
+					&& sha1 is not null && other is not null
+					&& !string.Equals(sha1, other, StringComparison.OrdinalIgnoreCase);
+				if (!anotherBuild)
+				{
+					Console.WriteLine($"CoreRegistry: ignoring duplicate registration of core \"{factory.CoreName}\"");
+					return;
+				}
 			}
 			_all.Add(factory);
+			_packageOf[factory] = (sha1, path);
 			// once per system whatever the factory reports: a core listed twice under
 			// one system makes every lookup of it by name ambiguous
 			foreach (var sysID in factory.SystemIds.Distinct()) _bySystem.GetValueOrPutNew(sysID).Add(factory);
@@ -85,8 +152,7 @@ namespace Chimera.Client.Common
 			var (manifest, factories, packageDir, packageSha1) = CorePackageLoader.LoadPackage(path);
 			foreach (var factory in factories)
 			{
-				Register(factory);
-				if (packageSha1 is not null) _packageSha1ByAssembly[factory.CoreType.Assembly] = packageSha1;
+				Register(factory, packageSha1, path);
 			}
 			// the same package can arrive twice (found in Cores/ AND named with --core);
 			// registration itself is idempotent, but the session list must not double up

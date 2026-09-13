@@ -115,7 +115,7 @@ namespace Chimera.Client.GUI
 			if (MovieSession.Movie.HeaderEntries.TryGetValue(HeaderKeys.Firmware, out var movieFirmware)
 				&& !string.IsNullOrWhiteSpace(movieFirmware))
 			{
-				var nowFirmware = CoreFirmwareStore.RecordFor(Config, CoreRegistry.Instance, Emulator.Attributes().CoreName);
+				var nowFirmware = CoreFirmwareStore.RecordFor(Config, CoreRegistry.Instance, Emulator.Attributes().CoreName, CoreRegistry.Instance.PackageSha1Of(Emulator));
 				if (!movieFirmware.Equals(nowFirmware, StringComparison.OrdinalIgnoreCase))
 				{
 					AddOnScreenMessage("Warning: this movie was recorded with different firmware", 5);
@@ -128,7 +128,7 @@ namespace Chimera.Client.GUI
 				AddOnScreenMessage("Movie has no core package hash, skipping core package check");
 			}
 			else if (!moviePackageSha1.Equals(
-				CoreRegistry.Instance.GetPackageSha1ForCore(Emulator.GetType()),
+				CoreRegistry.Instance.PackageSha1Of(Emulator),
 				StringComparison.OrdinalIgnoreCase))
 			{
 				// Same version, different bytes: almost always a package built somewhere else,
@@ -229,7 +229,7 @@ namespace Chimera.Client.GUI
 			var coreVersion = Emulator.CoreVersion();
 			if (!string.IsNullOrWhiteSpace(coreVersion)) movie.HeaderEntries[HeaderKeys.CoreVersion] = coreVersion;
 
-			var packageSha1 = CoreRegistry.Instance.GetPackageSha1ForCore(Emulator.GetType());
+			var packageSha1 = CoreRegistry.Instance.PackageSha1Of(Emulator);
 			if (packageSha1 is not null) movie.HeaderEntries[HeaderKeys.CorePackageSha1] = packageSha1;
 
 			// The sandbox is meant to change no emulation, which is a claim worth being able
@@ -241,7 +241,7 @@ namespace Chimera.Client.GUI
 
 			// Firmware decides what the machine IS - a disk system with a different BIOS is a
 			// different machine - so a movie that does not record it is not reproducible.
-			var firmware = CoreFirmwareStore.RecordFor(Config, CoreRegistry.Instance, Emulator.Attributes().CoreName);
+			var firmware = CoreFirmwareStore.RecordFor(Config, CoreRegistry.Instance, Emulator.Attributes().CoreName, CoreRegistry.Instance.PackageSha1Of(Emulator));
 			if (!string.IsNullOrWhiteSpace(firmware)) movie.HeaderEntries[HeaderKeys.Firmware] = firmware;
 
 			var settable = GetSettingsAdapterForLoadedCoreUntyped();

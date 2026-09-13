@@ -208,12 +208,16 @@ namespace Chimera.Client.GUI
 				Location = Pt(110, 48),
 				Width = UIHelper.ScaleX(442),
 			};
+			// two builds of one core can be installed side by side (issue #63), and the version
+			// alone does not tell them apart when both are local builds of one commit
+			var sharedNames = _cores.GroupBy(static c => c.Name).Where(static g => g.Count() > 1).Select(static g => g.Key).ToList();
 			foreach (var core in _cores)
 			{
 				// the version at commit length, not the build script's full bookkeeping:
 				// this is a picker, and "12d65377b7d3-dirty+local" says nothing here
 				// that "12d65377 local" does not
-				_core.Items.Add($"{core.Name}  ({SystemNames.Of(core.Systems)}{(core.ShortVersion.Length is 0 ? "" : $", {core.ShortVersion}")})");
+				var build = sharedNames.Contains(core.Name) && core.Sha1 is { Length: >= 8 } ? $"  [package {core.Sha1.Substring(0, 8)}]" : "";
+				_core.Items.Add($"{core.Name}  ({SystemNames.Of(core.Systems)}{(core.ShortVersion.Length is 0 ? "" : $", {core.ShortVersion}")}){build}");
 			}
 			p1.Controls.Add(_core);
 

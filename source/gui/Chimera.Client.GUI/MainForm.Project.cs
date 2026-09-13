@@ -605,28 +605,43 @@ namespace Chimera.Client.GUI
 				return false;
 			}
 
-			if (CoreRegistry.Instance.AllFactories.All(f => f.CoreName != coreName))
+			// The build the project pins, whenever it is installed - beside other builds of the same core
+			// if need be, rather than whichever build this session happened to load first (issue #63).
+			var pin = project.CoreSha1;
+			var pinRegistered = pin.Length is not 0 && CoreRegistry.Instance.AllFactories.Any(f => f.CoreName == coreName
+				&& string.Equals(CoreRegistry.Instance.PackageSha1Of(f), pin, StringComparison.OrdinalIgnoreCase));
+			if (!pinRegistered)
 			{
 				ScanForCorePackages();
-				var candidate =
-					_discoveredCorePackages.FirstOrDefault(pkg => pkg.Error is null && pkg.Sha1 is not null
-						&& pkg.Sha1.Equals(project.CoreSha1, StringComparison.OrdinalIgnoreCase))
-					?? _discoveredCorePackages.FirstOrDefault(pkg => pkg.Error is null && pkg.Name == coreName);
-				if (candidate is null)
+				var usable = _discoveredCorePackages.Where(static pkg => pkg.Error is null).ToList();
+				var pinned = pin.Length is 0 ? null
+					: usable.FirstOrDefault(pkg => pkg.Sha1 is not null && pkg.Sha1.Equals(pin, StringComparison.OrdinalIgnoreCase));
+				if (pinned is not null)
 				{
-					ShowMessageBox(
-						owner: null,
-						$"This project runs on \"{coreName}\", and no such core package is installed."
-							+ "\n\nPut its package in the Cores folder, then open the project again.",
-						"The project's core is not installed");
-					return false;
+					// loading a project's core is not choosing it for bare roms
+					if (!LoadCorePackage(pinned.Path, chooseBuild: false)) return false;
 				}
-				if (!LoadCorePackage(candidate.Path)) return false;
+				else if (CoreRegistry.Instance.AllFactories.All(f => f.CoreName != coreName))
+				{
+					_ = Config.DefaultCoreBuilds.TryGetValue(coreName, out var chosen);
+					var candidate = CoreChoices.PickBuild(usable.Where(pkg => pkg.Name == coreName),
+						static pkg => pkg.Sha1, InstalledAt, pinnedSha1: null, chosen);
+					if (candidate is null)
+					{
+						ShowMessageBox(
+							owner: null,
+							$"This project runs on \"{coreName}\", and no such core package is installed."
+								+ "\n\nPut its package in the Cores folder, then open the project again.",
+							"The project's core is not installed");
+						return false;
+					}
+					if (!LoadCorePackage(candidate.Path, chooseBuild: false)) return false;
+				}
 			}
 
-			var pin = project.CoreSha1;
-			var actual = CoreRegistry.Instance.LoadedPackages
-				.FirstOrDefault(pkg => pkg.CoreNames.Contains(coreName))?.Sha1;
+			var actual = CoreRegistry.Instance.FactoryFor(coreName, pin) is { } running
+				? CoreRegistry.Instance.PackageSha1Of(running)
+				: null;
 			if (pin.Length is not 0 && actual is not null && !pin.Equals(actual, StringComparison.OrdinalIgnoreCase))
 			{
 				return this.ModalMessageBox2(
@@ -637,6 +652,19 @@ namespace Chimera.Client.GUI
 						+ "\n\nRun on the installed build anyway? The project will record what actually ran.");
 			}
 			return true;
+		}
+
+		/// <summary>When a package landed on this machine: "newest installed" is the newest file, not the newest version string.</summary>
+		private static DateTime InstalledAt(DiscoveredCorePackage pkg)
+		{
+			try
+			{
+				return File.Exists(pkg.Path) ? File.GetLastWriteTimeUtc(pkg.Path) : Directory.GetLastWriteTimeUtc(pkg.Path);
+			}
+			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+			{
+				return DateTime.MinValue;
+			}
 		}
 	}
 }

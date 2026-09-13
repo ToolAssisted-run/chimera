@@ -307,8 +307,13 @@ The engine keeps each file's source path in memory (`ce_project_file_source_path
 so a frontend can write one, and never serializes it: the distributable
 file stays free of paths by construction, not by convention.
 
-Core pin mismatch (installed package differs from the pinned
-version+hash): refuse by default with a clear pinned-vs-installed message,
+The pinned build runs whenever it is installed, beside any other builds of the
+same core (issue #63): several builds of one core can be loaded in a session as
+long as their packages are different bytes, and a project is never booted on
+whichever of them happened to load first.
+
+Core pin mismatch (the pinned build is not installed, and another build of the
+core is): refuse by default with a clear pinned-vs-installed message,
 with a knowing override - and the project then records what actually ran,
 mirroring the file-hash posture.
 

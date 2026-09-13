@@ -2884,3 +2884,38 @@ Still open: with two builds of one core installed, the registry keeps whichever
 registered first, so a project cannot choose the build it pins without the other
 being removed. The prompt says the builds differ; it cannot yet offer the right
 one.
+
+## Several builds of one core, and the one a project pins (user-decided, 2026-09-13)
+
+Issue #63's still-open half, as the user put it: several versions of a core may be
+installed and selectable, as long as they are not the exact same package. The
+registry used to keep one factory per core name and silently drop the next, so
+a project pinned to an older xemu opened on whichever xemu this session had
+loaded first - and its saved states were refused.
+
+A core package is now registered beside another of the same name whenever the
+two are different bytes, and a project boots the exact build it pins whenever
+that build is installed, loading it next to the others if need be. Which build
+runs otherwise is one rule, `CoreChoices.PickBuild`, used by every place that
+turns a core name into a machine - project boot, the cache's machine identity,
+a bare rom, a movie's forced core, the firmware in use: the pinned build if it
+is there, else the one the user chose, else the most recently installed. The
+user decided the middle term: opening a package with File > Open Core, or
+installing a version in the core manager, is choosing it
+(`Config.DefaultCoreBuilds`); a project loading the build it pins is not, and
+records nothing. The "not the project's core build" prompt now only appears
+when the pinned build is genuinely not installed.
+
+Two smaller truths came with it. "Which package made this emulator" was
+answered per adapter ASSEMBLY, and every miniBox package shares one, so it
+named whichever package registered last; the registry now remembers the
+factory behind each emulator, and the movie header and firmware record read
+that. And an adapter package - a .NET assembly rather than a miniBox guest -
+still cannot be loaded twice, because a second assembly of the same identity
+would silently be the first one's types; those stay one build per name.
+
+Proved end to end headless: with a byte-different copy of the synth core loaded
+first (and so chosen), a project pinned to the original booted once, played its
+movie to an OK dump, and never asked; the same project pinned to a build that is
+not installed stopped at the prompt (exit 64). The chosen build in the config
+was the copy, untouched by the project's own load.

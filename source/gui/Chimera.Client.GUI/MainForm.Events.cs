@@ -624,7 +624,12 @@ namespace Chimera.Client.GUI
 				// a core that has just landed must be usable in this session: discovery
 				// is separate from loading precisely so a package can appear without a
 				// restart, and the menus read from the scan
-				changed: ScanForCorePackages);
+				changed: ScanForCorePackages,
+				// installing a build of a core is choosing it, when several are installed
+				installed: package =>
+				{
+					if (package.Sha1 is not null) CoreChoices.MakeDefaultBuild(Config, package.Name, package.Sha1);
+				});
 			this.ShowDialogWithTempMute(form);
 			ScanForCorePackages();
 		}

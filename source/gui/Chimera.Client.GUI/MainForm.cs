@@ -468,6 +468,8 @@ namespace Chimera.Client.GUI
 
 			Console.WriteLine($"Chimera {VersionInfo.GetEmuVersion()}");
 
+			// several builds of one core may be registered; the config says which one was chosen
+			CoreRegistry.Instance.ChosenBuildOf = name => Config.DefaultCoreBuilds.TryGetValue(name, out var sha1) ? sha1 : null;
 			if (_argParser.cmdCorePackage != null && !LoadCorePackage(_argParser.cmdCorePackage))
 			{
 				ShowMessageBox(owner: null, $"Failed to load core package {_argParser.cmdCorePackage} specified on commandline");
@@ -2008,7 +2010,7 @@ namespace Chimera.Client.GUI
 		public IReadOnlyList<(DiscoveredCorePackage Package, string Error)> CorePackageLoadFailures => _corePackageLoadFailures;
 
 		/// <summary>Loads and registers a core package (dir or zip). Returns false (after telling the user) on failure.</summary>
-		public bool LoadCorePackage(string path)
+		public bool LoadCorePackage(string path, bool chooseBuild = true)
 		{
 			try
 			{
@@ -2021,6 +2023,9 @@ namespace Chimera.Client.GUI
 				foreach (var factory in factories)
 				{
 					foreach (var sysID in factory.SystemIds) CoreChoices.MakeDefault(Config, sysID, factory.CoreName);
+					// and which BUILD of it, when several are installed - unless this is a project
+					// loading the build it pins, which is not a choice anybody made
+					if (chooseBuild && packageSha1 is not null) CoreChoices.MakeDefaultBuild(Config, factory.CoreName, packageSha1);
 				}
 					AddOnScreenMessage(packageSha1 is null
 					? $"Loaded core package: {manifest.Name} (directory form, unhashed)"
@@ -3339,7 +3344,7 @@ namespace Chimera.Client.GUI
 		private void WarnAboutNonStandardFirmware()
 		{
 			if (Emulator.IsNull()) return;
-			foreach (var entry in CoreFirmwareStore.NonStandard(Config, CoreRegistry.Instance, Emulator.Attributes().CoreName))
+			foreach (var entry in CoreFirmwareStore.NonStandard(Config, CoreRegistry.Instance, Emulator.Attributes().CoreName, CoreRegistry.Instance.PackageSha1Of(Emulator)))
 			{
 				AddOnScreenMessage(entry.WarningText, 5);
 			}

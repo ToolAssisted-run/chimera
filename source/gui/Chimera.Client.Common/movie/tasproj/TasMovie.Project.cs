@@ -90,8 +90,10 @@ namespace Chimera.Client.Common
 			// installed - still pins the old hash until it is saved, and a cache
 			// checked against the pin was taken for this machine's: its branch
 			// states reached the sandbox, which refused them (issue #63).
-			var running = CoreRegistry.Instance.LoadedPackages
-				.FirstOrDefault(pkg => pkg.CoreNames.Contains(p.CoreName))?.Sha1;
+			// Resolved exactly as the boot resolves it (CoreRegistry.FactoryFor), so with several builds
+			// installed this names the one that will run.
+			var runningFactory = CoreRegistry.Instance.FactoryFor(p.CoreName, p.CoreSha1);
+			var running = runningFactory is null ? null : CoreRegistry.Instance.PackageSha1Of(runningFactory);
 			sb.Append("core=").Append((running ?? p.CoreSha1).ToUpperInvariant()).Append('\n');
 			sb.Append("settings=").Append(CanonicalJson(p.SettingsJson)).Append('\n');
 			sb.Append("firmware=").Append(CanonicalJson(p.FirmwareJson)).Append('\n');

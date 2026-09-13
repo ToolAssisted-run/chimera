@@ -254,6 +254,15 @@ recorded on it, so throwing it away to save a few megabytes would be throwing
 away the run. Versions go only when the user removes them, one at a time, and
 the manager says which movies in the recent list would lose their core.
 
+Installed side by side, they also RUN side by side: any number of builds of one
+core can be loaded in a session as long as their packages are different bytes
+(issue #63). A project boots the exact build it pins whenever that build is in
+the store; otherwise - a bare rom, a movie without a pin, a pin nobody has - the
+build that runs is the one last installed here or opened with File > Open Core,
+and failing that the most recently installed (`CoreChoices.PickBuild`,
+`Config.DefaultCoreBuilds`). Adapter packages (.NET assemblies rather than
+miniBox guests) are the exception: one build of each per session.
+
 The version string comes from a git tag, so it is sanitised down to name-safe
 characters before it becomes a file name. That is only a NAME - the package's
 identity is still the SHA1 of its bytes, which is what discovery, the extract
