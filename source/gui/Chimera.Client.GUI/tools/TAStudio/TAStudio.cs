@@ -1552,7 +1552,27 @@ namespace Chimera.Client.GUI
 			_suspendEditLogic = true;
 			CurrentTasMovie.LoadBranch(branch);
 			_suspendEditLogic = false;
-			LoadBranchState(branch, CurrentTasMovie.Branches.IndexOf(branch));
+			try
+			{
+				LoadBranchState(branch, CurrentTasMovie.Branches.IndexOf(branch));
+			}
+			catch (InvalidOperationException ex)
+			{
+				// The sandbox refuses a state another machine made - a different
+				// build of the core, most often, which is what an autosaved xemu
+				// project reopened beside a second xemu version met (issue #63). The
+				// branch's input is already loaded, and the state is only a way to
+				// reach its frame faster; the history reaches it by replay instead.
+				// The refused state is let go so it is not offered again.
+				branch.CoreData = null;
+				MainForm.AddOnScreenMessage("This branch's saved state was made by a different machine; replaying to its frame instead.");
+				MessageStatusLabel.Text = $"Branch state refused ({ex.Message}): replaying to frame {branch.Frame}.";
+				var from = PriorStateForFramebuffer(branch.Frame);
+				if (from >= 0) LoadStateAt(from);
+				GoToFrame(branch.Frame);
+				RefreshDialog();
+				return;
+			}
 
 			CurrentTasMovie.States.Capture(Emulator.Frame);
 			QuickBmpFile.Copy(new BitmapBufferVideoProvider(branch.CoreFrameBuffer), VideoProvider);

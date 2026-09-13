@@ -84,7 +84,15 @@ namespace Chimera.Client.Common
 		internal static string MachineIdentityOf(EngineProject p)
 		{
 			StringBuilder sb = new();
-			sb.Append("core=").Append(p.CoreSha1.ToUpperInvariant()).Append('\n');
+			// The build that RUNS, when it is known. A project opened on another
+			// build of its core - accepted at the "not the project's core build"
+			// prompt, or simply the version that registered first when two are
+			// installed - still pins the old hash until it is saved, and a cache
+			// checked against the pin was taken for this machine's: its branch
+			// states reached the sandbox, which refused them (issue #63).
+			var running = CoreRegistry.Instance.LoadedPackages
+				.FirstOrDefault(pkg => pkg.CoreNames.Contains(p.CoreName))?.Sha1;
+			sb.Append("core=").Append((running ?? p.CoreSha1).ToUpperInvariant()).Append('\n');
 			sb.Append("settings=").Append(CanonicalJson(p.SettingsJson)).Append('\n');
 			sb.Append("firmware=").Append(CanonicalJson(p.FirmwareJson)).Append('\n');
 			for (var i = 0; i < p.FileCount; i++)

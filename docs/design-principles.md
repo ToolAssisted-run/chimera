@@ -2848,3 +2848,39 @@ Measured on nss102 on Windows with the change, the same script as before: back
 Every return took a second or less and at most 17 frames of emulation - the
 stride back to the stored frame before the end - where the returns from 300,
 1000 and 3000 frames back had taken 10, 31 and 99 s.
+
+## Two versions of a core are one core to its firmware (issue #60, 2026-09-13)
+
+Installing a second xemu beside the first listed its firmware twice in Config >
+Firmware, with nothing to tell the two sets apart. The survey made one group per
+package found on disk. Firmware is remembered by core name, never by package, so
+the two groups were always the same files - the second was only noise. The
+survey now makes one group per core: every declaration any installed version
+makes, once each by id and dump, so a firmware only the newer version asks for
+is still asked for. That is the reporter's own preference - more firmware
+rather than fewer - and it needs no version shown, because nothing about a
+chosen file depends on which version asked.
+
+## A cache is checked against the build that runs (issue #63, 2026-09-13)
+
+An autosaved xemu project, reopened, could not load its branches: every attempt
+threw "memory block load failed", and miniBox's diagnostics said "this state was
+made by another machine". The cache beside a project (greenzone, branch states)
+is only used when the machine identity it records matches the project's - and
+that identity took the core's hash from the project's PIN. A project opened on
+another build of its core - accepted at the "not the project's core build"
+prompt, or simply the version that registered first when two are installed,
+which is what the same reporter had (issue #60) - still pinned the old hash
+until saved, so the old build's cache passed the check and its branch states
+reached a sandbox that rightly refused them.
+
+The identity now names the build that runs when it is known, so a cache made by
+another build is set aside with the note every other mismatch gets, and the
+greenzone starts empty. And a branch whose state is refused anyway no longer
+throws out of TAStudio: its input is already loaded, so the refused state is let
+go and the branch's frame is reached by replay, with a message saying why.
+
+Still open: with two builds of one core installed, the registry keeps whichever
+registered first, so a project cannot choose the build it pins without the other
+being removed. The prompt says the builds differ; it cannot yet offer the right
+one.
