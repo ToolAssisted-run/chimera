@@ -73,6 +73,7 @@
 
 #include "chimera/engine.h"
 
+#include <chrono>
 #include <cstdio>
 #include <cstring>
 #include <map>
@@ -575,9 +576,15 @@ int main(int argc, char **argv)
 	/* A history kept from a previous run, which is the thing a reopened project
 	 * lives on. The machine id is this tool's own convention; a frontend passes
 	 * whatever it knows about cores, settings and files. */
-	if (!historyIn.empty() && ce_session_history_load(session, historyIn.c_str(), "chimera-run") != 0)
+	if (!historyIn.empty())
 	{
-		return fail(metaPath, std::string("history: ") + ce_session_last_error(session));
+		const auto t0 = std::chrono::steady_clock::now();
+		if (ce_session_history_load(session, historyIn.c_str(), "chimera-run") != 0)
+		{
+			return fail(metaPath, std::string("history: ") + ce_session_last_error(session));
+		}
+		std::fprintf(stderr, "chimera-run: history loaded in %.1f ms\n",
+			std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count());
 	}
 
 	/* Record mode: decode the source movie's entries into machine input and
@@ -917,9 +924,15 @@ int main(int argc, char **argv)
 		}
 	}
 
-	if (!historyOut.empty() && ce_session_history_save(session, historyOut.c_str(), "chimera-run") != 0)
+	if (!historyOut.empty())
 	{
-		return fail(metaPath, std::string("history: ") + ce_session_last_error(session));
+		const auto t0 = std::chrono::steady_clock::now();
+		if (ce_session_history_save(session, historyOut.c_str(), "chimera-run") != 0)
+		{
+			return fail(metaPath, std::string("history: ") + ce_session_last_error(session));
+		}
+		std::fprintf(stderr, "chimera-run: history saved in %.1f ms\n",
+			std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count());
 	}
 
 	if (!metaPath.empty())

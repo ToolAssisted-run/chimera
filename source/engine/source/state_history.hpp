@@ -120,7 +120,10 @@ public:
 	 * thing that can be done to a stored delta without a machine.
 	 *
 	 * `anchorSpacing` is the one that decides what a seek costs, since a
-	 * restore walks the links of one anchor's stretch and no further. */
+	 * restore walks the links of one anchor's stretch and no further. Positive,
+	 * it is the spacing, exactly. Negative, it is the most a stretch may span,
+	 * and the history closes one sooner once its deltas weigh as much as its
+	 * anchor - see hasRoom. That is the default, capped at 600. */
 	void bands(int64_t nearFrames, int64_t midFrames, int64_t midStride,
 	           int64_t farStride, int64_t anchorSpacing);
 
@@ -190,6 +193,8 @@ public:
 	 * NOT the number of stored objects, because a frame reached by walking
 	 * deltas is as reachable as one with a state of its own. */
 	int64_t count() const;
+	/* how many stretches, each one anchor - what the spacing decided */
+	int64_t anchors() const { return static_cast<int64_t>(m_segments.size()); }
 
 	/* The greatest frame at or before `frame` that can be produced, or -1. */
 	int64_t nearest(int64_t frame) const;
@@ -409,6 +414,8 @@ private:
 		bool packed = false;
 
 		int64_t lastFrame() const { return links.empty() ? anchorFrame : links.back().endFrame; }
+		/* what walking every link costs in bytes, next to what loading the anchor does */
+		uint64_t linkBytes() const { return bytes - anchor.size(); }
 
 		/* The greatest frame this segment can produce at or before `f`, or -1.
 		 * Not the same as being inside the segment: with strides above one,
@@ -421,6 +428,13 @@ private:
 	};
 
 	bool deltasAvailable() const;
+	/* Whether the newest stretch takes another delta, or the next capture is an anchor. */
+	bool hasRoom(const Segment &seg) const;
+public:
+	/* The least a stretch's links must weigh before their weight may close it
+	 * (see hasRoom). 64 MB unless a test needs a machine small enough to see it. */
+	void anchorWalkFloor(uint64_t bytes) { m_anchorWalkFloor = bytes; }
+private:
 	bool composeAvailable() const;
 	void evict();
 
@@ -527,7 +541,8 @@ private:
 	/* A spilled stretch into a saved history: the body, link by link, only
 	 * as far as the stretch still answers (an edit may have truncated it).
 	 * Static, and handed the spill file, because the writer does this too. */
-	static bool copySpilledBody(std::FILE *spill, std::FILE *out, const Segment &seg);
+	static bool copySpilledBody(std::FILE *spill, const std::function<bool(const void *, size_t)> &put,
+		const Segment &seg);
 	/* The whole of writing a history file, with nothing of `this` in it. */
 	static bool writeHistoryFile(std::FILE *spill, const char *path, const std::string &id,
 		const std::vector<Segment> &segments, std::string &error);
@@ -608,7 +623,9 @@ private:
 	int64_t m_farStride = 1200;        /* and beyond that, one in 20 s - which,
 	                                    * being wider than a segment, collapses
 	                                    * an old segment to its anchor */
-	int64_t m_anchorSpacing = 600;     /* a new anchor every 10 s */
+	int64_t m_anchorSpacing = 600;     /* a new anchor every 10 s at the most */
+	bool m_anchorByBytes = true;       /* and sooner when the links outweigh it */
+	uint64_t m_anchorWalkFloor = 64ull << 20;   /* - and are worth the trouble */
 
 
 	std::set<int64_t> m_pinned;
@@ -654,6 +671,10 @@ private:
 	void finishPlan();
 
 	bool m_planPending = false;
+
+	/* how long the drainer took to fill the last plan, in microseconds, for the trace */
+
+	std::atomic<int64_t> m_fillMicros{ 0 };
 	int64_t m_planFrame = -1;          /* the anchor being filled */
 	WorkThread m_drainer{ "history drainer" };
 

@@ -1267,7 +1267,7 @@ garbage rather than into a hazard.
 | 1 **BUILT** | spill and settle I/O (compaction stayed on the loop) | 1.7x to 12x the 99th percentile of a captured frame, 1.0x to 7.2x the worst | low: no guest memory, no miniBox change |
 | 2 | coarsening and composition | 0.16 to 0.72 ms/frame, and the 8 MB cap can go - a denser history for the same memory | low inside StateHistory, but it costs the step-for-step identity of phases 0 and 1: a merge lands a frame late, so the history holds different frames threaded than in line. Left undone for that reason, not for difficulty |
 | 3 **BUILT** | copy-on-write anchors | 6x to 15.7x less on the emulation thread: 521 ms becomes 33 on a gigabyte machine | this is where miniBox's single-thread assumption was faced |
-| 4 | deferred delta store | 0.3 to 1.4 ms/frame on heavy machines, nothing on light ones | same mechanism as 3, paid every frame |
+| 4 **MEASURED, NOT BUILT** | deferred delta store | measured on a PS2: the delta costs this thread 3.6 ms mean, 6.9 at the 90th percentile - but the pages it copies are the pages the guest writes again next frame, so holding them for a helper turns a memcpy into a fault plus the same memcpy (see "The frame after an anchor") | same mechanism as 3, paid every frame, on exactly the pages it cannot win on |
 | 5 **BUILT** | zstd what reaches the disk, on the writer; the disk budget counts compressed bytes (user-decided, 2026-09-13) | speed, space and depth: a PS2 history 2.5 GB on disk becomes 79.9 MB, a cold restore of a spilled anchor 103 ms becomes 59, and a 1024 MB budget that kept two raw anchors keeps everything | low; disk evictions now follow the writer's reports, so threaded and in line may drop from disk at different moments |
 | 6 | a rolling composed prefix behind the playhead, on a thread of its own | the backwards step: ~280 links walked becomes one composed apply plus a short tail | low, and uniquely so - it is the one phase nothing waits for |
 
@@ -1705,6 +1705,67 @@ a planned anchor that is the drainer. The same PlayStation 2 anchor:
 and the EE RAM after a three hundred frame run with a seek back through the
 greenzone is byte-identical whether the helpers are on or off.
 
+**That number was only half true, and the other half was found the next day
+(2026-09-13).** It measured the frame the anchor was taken on. Every capture
+began by finishing any plan still being filled - "one plan at a time" - so the
+FRAME AFTER each anchor waited for the drainer, and the drainer took 141 to 153
+ms to fill 220 MB. Traced once the wait was given a line of its own:
+
+	plan of frame 31: filled in 152.5 ms on the drainer; this thread WAITED 102.56 ms
+	plan of frame 106: filled in 143.4 ms on the drainer; this thread WAITED 124.65 ms
+	plan of frame 215: filled in 145.2 ms on the drainer; this thread WAITED 145.26 ms
+
+So most of what planning took off the emulation thread came back one frame
+later. Nothing needed it: a delta does not read the anchor, composing reads only
+the anchor's length (fixed when it is planned), and the sandbox serves an epoch
+and a plan on the same pages by design (`test_an_epoch_across_a_plan`). The wait
+now happens only where the bytes are really needed - the next anchor, a restore,
+a spill or a drop of that stretch, a save, a clear - and dropping the stretch
+being filled waits too, because the drainer is writing into its buffer. Same
+run: every wait 0.00 ms, anchors 13 to 14 ms, 300 frames in 11.5 s instead of
+12.8 (10.0 s with no history at all), the EE RAM identical at three seeks, and
+six cores byte-identical plain, seeking and seeking in line. The fill itself is
+slow for a memcpy because the buffer is new: the kernel zero-fills each of its
+fifty-six thousand pages on first touch, which is the cost the no-init
+allocator moved OFF this thread rather than removed.
+
+#### The frame after an anchor, and what a second drainer and phase 4 would buy (2026-09-13)
+
+With the wait gone, the two ideas left on the list for this path - more threads
+filling a plan, and deferring a delta's copy the way an anchor's is deferred
+(phase 4) - were measured on the same PlayStation 2 run before either was kept.
+
+**A drainer pool was built, measured, and taken out again.** The sandbox claims
+every page of a plan with an atomic exchange, so several threads filling
+disjoint slices of one plan cannot copy a page twice, and splitting the fill was
+twenty lines. It did make the fill faster - the drainer's slice went from about
+145 ms alone to 78 with two threads and 31 to 39 with four, the kernel's
+first-touch faults scaling across threads - and the EE RAM stayed identical at
+three seeks. And it bought nothing anyone could feel: 300 frames took **11.5 s
+with one, two and four threads alike**, anchors stayed 12 to 17 ms, and nothing
+waited on any of them. Once the loop stopped waiting for the fill, the fill's
+length is a window in which a guest write to an uncopied page is copied by the
+fault handler - and that window was not where the frame's time was. WorkThread
+says it is not a thread pool, deliberately; this is the measurement that says
+the deliberate choice costs nothing.
+
+**Phase 4 is not built, and the measurement says why.** What a captured delta
+costs this thread, per delta past boot, split three ways:
+
+| | mean | median | 90th | worst |
+|---|---|---|---|---|
+| the sandbox writing the delta out | 3.6 ms | 2.9 | 6.9 | 10.7 |
+| coarsening | 0.04 ms | 0.00 | 0.01 | 4.1 |
+| the budget | 0.00 ms | 0.00 | 0.00 | 0.00 |
+
+So the delta write is the whole of it, and phase 4 would move exactly that to a
+helper by holding the pages copy-on-write. But the pages a delta copies are the
+pages the guest wrote THIS frame, which are overwhelmingly the pages it writes
+again NEXT frame - that is what made them hot - so holding them turns a memcpy on
+this thread into a fault on this thread followed by the same memcpy. An anchor
+wins by deferring because most of a machine is not written in the next hundred
+milliseconds; a delta is, by construction, the part that is.
+
 Two things are worth keeping from that. A synthetic bench measured the
 mechanism correctly and the SYSTEM not at all, because the allocation it did
 once in a loop of its own was the whole cost in the real path. And the tool that
@@ -1753,6 +1814,87 @@ the same machinery makes reverse deltas cheap enough to bring back for the near
 band alone is a real question, and a different one - it belongs to whoever picks
 this up next, with a measurement rather than an opinion.
 
+**It was picked up, and measured (2026-09-13): not bringing them back.** A
+reverse delta needs every page a frame writes as it was BEFORE the write. A hot
+page has that already - its shadow is the page as the epoch opened - so the
+question was how much of a frame's writing lands on hot pages. On the
+PlayStation 2 (`MB_TRACE_DELTA=1`, 300 frames of Gran Turismo 4, 121 deltas):
+
+| | pages a delta | of them hot | pre-images the fault handler would copy |
+|---|---|---|---|
+| every delta | 1,283 | 22% | median 454 pages, 90th percentile 1,305, worst 43,122 (168 MB) |
+| the last 60, past boot | 852 | 35% | 556 pages, **2.2 MB a frame** |
+
+So two thirds of what a frame writes lands on pages that are held, not hot, and
+every one of those would be copied inside the fault handler again - the exact
+cost the removal took away, a little under half of it, with a burst of 168 MB
+in one frame that a fixed pool would have to survive. On top of it the near band
+carries a second delta for every frame it keeps, so the same budget keeps about
+half as many frames there. And what it would buy is smaller than it looks,
+because this machine's near band is not keeping every frame to begin with:
+capture is already 38% of the run, the stride tuner has the near band keeping
+one frame in three, and a step back to a skipped frame replays whatever
+reverse deltas saved. Adding cost to capture makes the tuner thin the band
+further, which is more replay. The planned anchor already took the floor that
+mattered (an anchor on this thread 113 ms to 17), anchors every sixty frames
+took the walk to five milliseconds, and the rest is one anchor load. Reverse
+deltas stay out; the number that would change the answer is a core where most
+written pages are hot, and none measured so far is one.
+
+#### The spacing picks itself (2026-09-13)
+
+`m_anchorSpacing` was a constant, 600, chosen when an anchor cost what an
+anchor used to cost, and the section above says it should come down a long way
+on a heavy core and not at all on a light one - which is per-core arithmetic,
+and a table of cores is exactly the kind of thing that is wrong the day a core
+changes. So the history does the arithmetic itself, from what it is holding.
+
+A restore loads one anchor and walks the links after it, and both cost roughly
+what their bytes cost to put back. So a stretch is closed once walking it would
+cost as much as loading its anchor: its links weigh what the anchor weighs. A
+seek then costs at most about two anchor loads, on any machine, and nobody had
+to measure that machine first. `hasRoom` decides it, on the emulation thread and
+from logical bytes, so threaded and in line close stretches on the same frames.
+
+Weight alone was wrong about light machines, and the first run said so: a NES,
+an Atari 2600, a Genesis and a SNES all closed a stretch every thirty-one frames,
+because their anchors are small enough that thirty frames of four-kilobyte pages
+outweigh them - and a seek there was already a millisecond, so that bought
+nothing and spent the budget on anchors that cannot be coarsened. So there are
+two floors. The links must also weigh `m_anchorWalkFloor`, 64 MB - about twenty
+milliseconds of walking on the PlayStation 2 - before their weight counts; and a
+stretch spans at least thirty frames, so a machine whose every frame rewrites
+most of it does not become a history of anchors. With the floors, those four
+cores went back to one anchor for the whole run (the NES, the 2600 and DOS took
+one or two more, at the four-megabyte budget the oracle squeezes them into),
+and all six were byte-identical plain, seeking, and seeking in line.
+
+The PlayStation 2, 300 frames, 4 GB in memory and 10 GB on disk:
+
+| seek back to | fixed, every 600 | weighed (anchors landed at 31, 106, 215) |
+|---|---|---|
+| 100 | 99 ms - anchor 0 + 60 deltas | **63 ms** - anchor 31 + 33 deltas |
+| 200 | 103 ms - anchor 0 + 86 deltas | **44 ms** - anchor 173 + 8 deltas |
+| 290 | 135 ms - anchor 0 + 155 deltas | **53 ms** - anchor 215 + 37 deltas |
+| held in memory at the end | 603 - 861 MB | 1,025 - 1,520 MB |
+
+The EE RAM is identical across all nine runs. The price is the one the bands
+have always charged, said plainly: the anchors are the biggest things the
+budget holds, so the same budget keeps fewer frames in memory - here about 650
+MB more for three anchors. That is why the floor is a weight rather than a
+frame count: a machine only pays for denser anchors when its seeks were slow
+enough to be worth it, and the far band's anchors go to disk compressed, where
+one is about ten megabytes.
+
+The caller keeps both choices. `bands(..., anchorSpacing)` with a positive
+spacing is that spacing exactly, as before; a negative one is a ceiling with the
+weighing on, which is also the default with a ceiling of 600. The tests pin
+both: a fixed spacing yields one stretch, a ceiling of 50 yields stretches of
+51, the weighed rule on a tiny machine closes stretches at the frame floor, a
+ceiling below the frame floor still wins, the real walk floor leaves a light
+machine one stretch, and every frame the weighed stretches offer restores
+exact. The two fuzzers now draw a weighed spacing for half their seeds.
+
 #### Phase 5: what reaches the disk is compressed
 
 Measured before it was built, on real machine states at zstd level 1:
@@ -1786,7 +1928,7 @@ leave a hole the size of the difference after every stretch, and NTFS fills
 holes with zeros. Every reader (a restore, a save, settling) goes through
 `SpillBodyReader`, which hands back the raw layout from either a zstd frame or a
 raw extent without holding the decompressed body whole; a saved history is
-always the raw layout, whatever the spill file holds. Settling now writes its
+compressed on its own terms (below), whatever the spill file holds. Settling now writes its
 result on the writer too, where it used to write a whole machine on the
 emulation thread once per settled stretch.
 
@@ -1870,6 +2012,44 @@ identical - with the trace checked rather than assumed, because a missing DLL
 would have written every body raw and passed anyway. It reported 37 planned
 anchors, a restore read back from disk, and a writer handed 29.5 MB that wrote
 342 KB.
+
+#### A saved history is compressed too
+
+A project's saved history is the greenzone written out, so it is made of the
+same mostly-unwritten machines the spill file is, and it had stayed raw.
+`ChimeraHistory4` is the magic, written as it is, followed by exactly
+`ChimeraHistory3`'s layout as one zstd stream at level 1. Nothing else about
+the format changed, and that is deliberate: the writer streams the same records
+through the compressor that it used to stream to the file, a spilled stretch is
+copied out of the spill file through `SpillBodyReader` into the same stream, and
+the loader reads the records through a `SpillBodyReader` over the rest of the
+file, raw for 3 and compressed for 4. So nothing of a history is held twice to
+save or load it, which is the promise the persistence code exists to keep, and
+a length the file could not hold is still refused as damage before anything is
+allocated for it (bounded, when compressed, by the densest block zstd can
+write). 3 is still read, and still written when there is no libzstd or
+`CHIMERA_HISTORY_RAW=1` asks for it; 1 and 2 stay superseded.
+
+The PlayStation 2 again: 300 frames, 512 MB in memory and the rest spilled, so
+the save copies stretches out of the spill file as well as serialising the ones
+still in memory.
+
+| saved history | on disk | the save | the load |
+|---|---|---|---|
+| raw (`ChimeraHistory3`) | 1,845.5 MB | 881 ms | 954 ms |
+| compressed (`ChimeraHistory4`) | **60.0 MB** | **685 ms** | 1,202 ms |
+
+Thirty-one times smaller, and the save is FASTER, because level 1 compresses
+faster than this disk writes. The load is a quarter slower here, and that is the
+flattering case for raw: the file had just been written and was read back out
+of the page cache. A cold read of 1.8 GB off the Windows install's NTFS, at the
+176 MB/s measured there, is ten seconds before a byte is decompressed. Both
+reopened histories served a seek back to frame 144 from the loaded stretches,
+and the EE RAM after all four runs - saved raw, saved compressed, reopened from
+each - is byte-identical. `test_state_history` gained a round trip that
+restores every offered frame from a compressed file and checks every note,
+checks which magic was written, and refuses a compressed file cut in half; it
+passes compressed, raw and with the helpers off.
 
 #### The stride tuner stopped listening to anchors
 

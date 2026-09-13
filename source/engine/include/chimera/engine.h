@@ -1106,7 +1106,11 @@ CE_API int64_t ce_session_greenzone_count(const ce_session *s);
  * anchor_spacing is the one that decides what a seek costs: a restore walks the
  * links of one anchor's stretch and no further, so it trades memory for
  * latency directly. A far_stride wider than it collapses old stretches to their
- * anchors, which is usually what is wanted.
+ * anchors, which is usually what is wanted. Positive, it is the spacing
+ * exactly. Negative, its magnitude is the widest a stretch may be, and a
+ * stretch closes sooner once its links weigh as much as its anchor - which
+ * picks the spacing per core by what a seek would cost. That is the default,
+ * capped at 600 frames.
  *
  * The defaults suit 60 frames a second on a core nobody has measured. What they
  * cost on a heavy one, and how to pick better, is docs/state-manager.md. */

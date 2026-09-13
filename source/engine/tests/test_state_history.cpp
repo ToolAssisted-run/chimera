@@ -972,7 +972,7 @@ int main(void)
 			chimera::StateHistory h;
 			const uint64_t budget = 200 + rnd() % 1500;
 			const int64_t near = 1 + rnd() % 4, mid = 2 + rnd() % 8, midStride = 1 + rnd() % 3,
-				farStride = 1 + rnd() % 16, spacing = 2 + rnd() % 10;
+				farStride = 1 + rnd() % 16, spacing = seed % 2 ? -(2 + static_cast<int64_t>(rnd() % 60)) : 2 + static_cast<int64_t>(rnd() % 10);
 			h.configure(&api, nullptr, budget);
 			h.bands(near, mid, midStride, farStride, spacing);
 			if (rnd() % 4 != 0) h.spillTo("work-history-fuzz");
@@ -1162,7 +1162,7 @@ int main(void)
 				chimera::StateHistory h;
 				const uint64_t budget = 200 + (rnd() % 500);
 				const int64_t near = 1 + rnd() % 4, mid = 2 + rnd() % 8, midStride = 1 + rnd() % 3,
-					farStride = 1 + rnd() % 16, spacing = 2 + rnd() % 10;
+					farStride = 1 + rnd() % 16, spacing = seed % 2 ? -(2 + static_cast<int64_t>(rnd() % 60)) : 2 + static_cast<int64_t>(rnd() % 10);
 				h.configure(&api, nullptr, budget);
 				h.helpers(threaded);
 				h.bands(near, mid, midStride, farStride, spacing);
@@ -1414,6 +1414,151 @@ int main(void)
 
 		(void)sawPending;   /* a fast enough writer may have finished already */
 		std::filesystem::remove_all("work-history-save");
+	}
+
+	{ // A saved history is compressed, and it comes back exactly as it went.
+	  //
+	  // A project's history is a machine's worth of mostly unwritten memory per
+	  // anchor, so it is saved as one zstd stream behind a magic of its own
+	  // (ChimeraHistory4). The raw layout one version back is still read - the
+	  // hand-built files above are all ChimeraHistory3 - and this is the half
+	  // that proves the new one is a history rather than just a smaller file.
+		const chimera::HostApi api = fakeHost();
+		g_machine = Machine{};
+		chimera::StateHistory h;
+		h.configure(&api, nullptr, 1u << 20);
+		h.bands(2, 6, 1, 3, 8);
+		std::vector<std::array<uint8_t, Machine::kCells>> truth(1);
+		std::memcpy(truth[0].data(), g_machine.cell, Machine::kCells);
+		h.capture(0);
+		for (int64_t f = 1; f <= 60; f++)
+		{
+			h.beforeAdvance();
+			advance(f);
+			std::array<uint8_t, Machine::kCells> at{};
+			std::memcpy(at.data(), g_machine.cell, Machine::kCells);
+			truth.push_back(at);
+			const uint8_t note[2] = { static_cast<uint8_t>(f & 0xFF), 0x3C };
+			h.capture(f, note, sizeof note);
+		}
+		assert(h.saveTo("work-history-v4.bin", "fake", error));
+		{
+			std::ifstream in("work-history-v4.bin", std::ios::binary);
+			char magic[15] = {};
+			in.read(magic, sizeof magic);
+			const std::string m(magic, sizeof magic);
+			const bool rawAsked = getenv("CHIMERA_HISTORY_RAW") != nullptr && getenv("CHIMERA_HISTORY_RAW")[0] == '1';
+			assert(m == (rawAsked ? "ChimeraHistory3" : "ChimeraHistory4"));
+		}
+		chimera::StateHistory back;
+		back.configure(&api, nullptr, 1u << 20);
+		assert(back.loadFrom("work-history-v4.bin", "fake", error));
+		int checked = 0;
+		for (int64_t f = 0; f <= 60; f++)
+		{
+			if (h.nearest(f) != f) continue;
+			assert(back.nearest(f) == f);
+			assert(back.restore(f, error));
+			assert(std::memcmp(g_machine.cell, truth[static_cast<size_t>(f)].data(), Machine::kCells) == 0);
+			size_t len = 0;
+			const uint8_t *note = back.noteFor(f, len);
+			if (f != 0) assert(note != nullptr && len == 2 && note[1] == 0x3C);
+			checked++;
+		}
+		assert(checked > 8);
+
+		/* and a compressed file cut short is damage, refused, not a crash */
+		{
+			std::ifstream in("work-history-v4.bin", std::ios::binary);
+			std::string all((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+			all.resize(all.size() / 2);
+			std::ofstream out("work-history-v4-cut.bin", std::ios::binary);
+			out.write(all.data(), static_cast<std::streamsize>(all.size()));
+		}
+		chimera::StateHistory cut;
+		cut.configure(&api, nullptr, 1u << 20);
+		assert(!cut.loadFrom("work-history-v4-cut.bin", "fake", error));
+		assert(cut.count() == 0);
+		std::remove("work-history-v4.bin");
+		std::remove("work-history-v4-cut.bin");
+	}
+
+	{ // The anchor spacing, chosen by weight.
+	  //
+	  // A positive spacing is exact: one stretch for as long as it allows. A
+	  // negative one is a ceiling, and a stretch closes sooner once its links
+	  // weigh as much as its anchor AND as much as the walk floor - never before
+	  // thirty frames, and never later than the ceiling. This machine's anchor is
+	  // 64 bytes and a frame's delta 10, so weight alone would close a stretch
+	  // every seven frames; the frame floor is what holds it to thirty. With the
+	  // walk floor left at its 64 MB, a machine this light never closes one early
+	  // at all, which is the point of it. And whichever way the stretches were
+	  // cut, every frame they offer comes back exact.
+		const chimera::HostApi api = fakeHost();
+		auto run = [&](int64_t spacing, chimera::StateHistory &h,
+			std::vector<std::array<uint8_t, Machine::kCells>> &truth, uint64_t walkFloor = 1) {
+			g_machine = Machine{};
+			h.configure(&api, nullptr, 1u << 20);
+			h.anchorWalkFloor(walkFloor);
+			h.bands(1000, 1000, 1, 1, spacing);   /* every frame kept, nothing coarsened */
+			truth.assign(1, {});
+			std::memcpy(truth[0].data(), g_machine.cell, Machine::kCells);
+			h.capture(0);
+			for (int64_t f = 1; f <= 200; f++)
+			{
+				h.beforeAdvance();
+				advance(f);
+				std::array<uint8_t, Machine::kCells> at{};
+				std::memcpy(at.data(), g_machine.cell, Machine::kCells);
+				truth.push_back(at);
+				h.capture(f);
+			}
+		};
+		std::vector<std::array<uint8_t, Machine::kCells>> truth;
+
+		chimera::StateHistory fixed;
+		run(1000, fixed, truth);
+		assert(fixed.anchors() == 1);
+
+		chimera::StateHistory capped;
+		run(50, capped, truth);
+		assert(capped.anchors() == 4);   /* 0, 51, 102, 153 */
+
+		chimera::StateHistory weighed;
+		run(-1000, weighed, truth);
+		/* 200 frames at a stretch of 31 (the floor, then the frame that closes it) */
+		assert(weighed.anchors() >= 6 && weighed.anchors() <= 7);
+		for (int64_t f = 0; f <= 200; f++)
+		{
+			assert(weighed.nearest(f) == f);
+			assert(weighed.restore(f, error));
+			assert(std::memcmp(g_machine.cell, truth[static_cast<size_t>(f)].data(), Machine::kCells) == 0);
+		}
+
+		/* a ceiling below the floor is still the ceiling */
+		chimera::StateHistory tight;
+		run(-10, tight, truth);
+		assert(tight.anchors() >= 18 && tight.anchors() <= 19);
+
+		/* a light machine under the real walk floor keeps its whole ceiling */
+		chimera::StateHistory light;
+		run(-1000, light, truth, 64ull << 20);
+		assert(light.anchors() == 1);
+
+		/* and the default is weighed */
+		chimera::StateHistory byDefault;
+		g_machine = Machine{};
+		byDefault.configure(&api, nullptr, 1u << 20);
+		byDefault.anchorWalkFloor(1);
+		byDefault.bands(1000, 1000, 1, 1, 0);
+		byDefault.capture(0);
+		for (int64_t f = 1; f <= 200; f++)
+		{
+			byDefault.beforeAdvance();
+			advance(f);
+			byDefault.capture(f);
+		}
+		assert(byDefault.anchors() == weighed.anchors());
 	}
 
 	/* the spill file belongs to the history and goes with it */

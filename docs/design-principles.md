@@ -2598,6 +2598,13 @@ drainer - and the same machine's anchor costs 12 to 17 ms. The lesson is not
 about allocators: a bench can measure a mechanism perfectly and the system not
 at all, because the thing it does once outside its loop is the thing that costs.
 
+That figure was itself half the story (2026-09-13). It was the frame the anchor
+was taken on; the frame AFTER it waited 103 to 145 ms for the drainer, because
+every capture began by finishing the plan, whether it needed the anchor's bytes
+or not. A trace line for the wait found it, and the wait now happens only where
+the bytes are read. The same lesson a third time: the number measured was the
+one the trace printed, and the cost had moved to a line nobody had written yet.
+
 And it is the same lesson twice in one day, from opposite ends. The rpcs3 crash
 above was found by printing the bytes at the faulting instruction instead of
 just its address; this was found by printing the buffer's time beside the
@@ -2641,3 +2648,40 @@ was visible as anything but a slower run.
 Every one of those four came from repetition and from real cores, not from a
 green suite: the FILE-position bug passed thirteen runs in twenty. That is the
 whole argument for the bar.
+
+## The open ideas, measured rather than argued (2026-09-13)
+
+Three ideas were left over when the greenzone got its threads, and each one was
+settled by a run on a real machine rather than by how good it sounded.
+
+**A saved history is compressed, because the spill file already proved it.** A
+project's history is the greenzone written out, made of the same mostly-empty
+machines, and it had stayed raw. `ChimeraHistory4` is the magic followed by
+exactly the old layout as one zstd stream - nothing else about the format moved,
+so nothing is held twice to save or load it and the old version is still read.
+A PlayStation 2 history went from 1,845 MB to 60 MB, and the save got faster, not
+slower, because level 1 compresses faster than the disk writes.
+
+**Reverse deltas stay out, and the reason is where the work would happen.** They
+were removed once for costing a page copy in the fault handler on every frame,
+and the question was whether hot pages - which already keep the page as the
+frame found it - had made that copy free. They had not: on the PlayStation 2 two
+thirds of what a frame writes lands on pages that are not hot, 2.2 MB a frame
+past boot and 168 MB in the worst one. That copy cannot move to a helper. The
+bytes it needs exist only until the guest's write goes through, so it is paid on
+the machine's own thread or not at all - and a design whose whole premise is that
+the machine's thread only runs the machine does not buy a faster gesture with
+it. The number that would reopen this is a core where most written pages are hot.
+
+**The anchor spacing is chosen by what a seek would cost, not by a table of
+cores.** A stretch closes once its links weigh as much as its anchor, so a seek
+costs about two anchor loads on any machine. The first version was wrong about
+light machines in a way only a real run could show: a NES, a Genesis and a SNES
+all took an anchor every thirty-one frames, because their anchors are smaller
+than thirty frames of pages, and there a seek was already a millisecond. So the
+weight only counts past 64 MB of links - about twenty milliseconds of walking -
+and those cores went back to one anchor per run. The PlayStation 2 went from
+99 / 103 / 135 ms seeks to 63 / 44 / 53, for about 650 MB more held in memory.
+A positive spacing from a caller is still obeyed exactly. What transfers is the
+floor: a rule derived from cost ratios needs an absolute threshold too, or it
+optimises a cost nobody was paying.
