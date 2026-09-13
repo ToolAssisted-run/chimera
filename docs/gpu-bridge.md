@@ -550,3 +550,29 @@ something draws before anything binds one again. That is the thing to look at
 first in `chimera-core-dolphin`; the fix belongs there and not here, since the
 engine's side of the contract - mint an id per session, answer `GL_OP_CONTEXT_ID`
 with it - is doing exactly what the other four cores rebuild on.
+
+## The flight recorder (2026-09-13)
+
+A driver that finds its own state corrupt fast-fails: the process ends inside
+the GL call, and no trace switch, handler or flush runs after it. The crash
+that made the rule above (nvoglv64.dll, 0xc0000409, restoring a Ruffle state in
+a new process) was read from the Windows event log - a module and an offset,
+and nothing about what the renderer had just asked the driver to do.
+
+So the bridge keeps a flight recorder, always on: a fixed ring of the last 8192
+crossings in libchimera's memory (`ce_gl_flight_recorder` hands out its address
+and size). Each GL call writes its opcode BEFORE the driver is called, so a
+crash inside a call leaves that call newest. Markers share the ring: a frame
+taking the context and giving it back (with the calls it made), a state loaded
+(with the frame it went to), a session taking the bridge (a fresh context id),
+the context destroyed. It costs two stores and an increment a call, nothing
+beside a crossing, and it is written unsynchronised - a restore on another
+thread can tear one entry. It is always on because the crash that needs it is
+never the run somebody switched a trace on for.
+
+Nothing in Chimera reads it. The frontend puts its address in the crash block
+(docs/project.md, "Crash notes"); the crash module, running in WerFault.exe,
+reads the ring out of the dead process and writes the last calls into the note,
+oldest first, repeats folded (`glUniform4fv x37`), named from miniBox's master
+list - generated into the module at build time, so the numbering is the
+bridge's. `test_gl_flight` holds the layout to what the module reads.

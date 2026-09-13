@@ -389,6 +389,9 @@ movie header, set when a project boots) - and writes:
   to the dump that follows it.
 - the minidump: threads, modules and the memory the stacks reference; enough to
   open in WinDbg.
+- in the note, when a GPU drew: the last calls that crossed the GPU bridge,
+  named, oldest first, with where frames took and gave back the context and
+  where a state was loaded (docs/gpu-bridge.md, "The flight recorder").
 
 The module claims nothing; Windows still records the crash as it always does.
 Registry values naming a `chimera_crash.dll` that no longer exists (a moved or

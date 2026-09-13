@@ -643,6 +643,8 @@ namespace Chimera.Client.GUI
 			_recovery = ProjectRecovery.Begin(tasMovie, project.Id, path);
 			// what a crash note says this session was (docs/project.md, "Crash notes")
 			CrashCapture.DescribeSession(DescribeForCrashNote(tasMovie, path));
+			// and where the GPU bridge keeps its last calls, for a crash inside the driver
+			CrashCapture.NoteGlRecorder(Chimera.Emulation.Common.Engine.ChimeraEngine.Instance.ce_gl_flight_recorder(out var glRecorderBytes), glRecorderBytes);
 
 			progress.Step("opening TAStudio");
 			progress.Dispose();

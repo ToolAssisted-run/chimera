@@ -825,6 +825,14 @@ CE_API const char *ce_gl_description(void);
  * context, or nothing borrowed. */
 CE_API void ce_gl_release(void);
 
+/* The bridge's flight recorder: the last calls that crossed, an opcode each,
+ * with markers where a frame took and gave back the context, a state was
+ * loaded and a session took the bridge. A fixed block in this library's
+ * memory, written as calls cross, so a crash module reading the dead process
+ * finds what the driver was doing (docs/gpu-bridge.md, "The flight recorder").
+ * Null and 0 bytes in a build without the bridge. */
+CE_API void *ce_gl_flight_recorder(uint32_t *bytes);
+
 /* ---------------------------------------------------------------------------
  * The compile cache. A core that recompiles its machine's code keeps the
  * compiled objects between sessions in a directory the host owns: an object

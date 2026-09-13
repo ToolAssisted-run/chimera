@@ -567,6 +567,55 @@ static void auditDelete(int kind, GLuint name)
 	if (!lives.empty() && lives.back().died < 0) lives.back().died = g_auditFrame;
 }
 
+/* ---------------------------------------------------------------------------
+ * The flight recorder: the last calls that crossed, kept where a crash can
+ * still read them (docs/gpu-bridge.md, "The flight recorder").
+ *
+ * A driver that finds its state corrupt fast-fails, and nothing in this process
+ * runs after that - not a trace flush, not a handler. What the crash module in
+ * WerFault.exe CAN do is read this process's memory. So every crossing writes
+ * its opcode into a fixed ring here BEFORE the driver is called (a crash inside
+ * the call leaves that call newest), with markers where a frame took and gave
+ * back the context, where a state was loaded and where a session took the
+ * bridge. Two stores and an increment a call, against a crossing that already
+ * costs tens of nanoseconds; always on, because the crash that needs it is
+ * never the run that had a trace switched on.
+ *
+ * Written unsynchronised: a restore on another thread can tear one entry, and
+ * a torn entry in a crash note is a price worth not taking a lock per call. The
+ * layout is read by source/crash/chimera_crash.c.
+ */
+enum : uint32_t
+{
+	kFlightBorrowed = 0xFFFFFF01,    /* the first call of a frame took the context */
+	kFlightReleased = 0xFFFFFF02,    /* the frame gave it back; detail: the calls it made */
+	kFlightStateLoaded = 0xFFFFFF03, /* a savestate was restored; detail: the frame restored to */
+	kFlightSession = 0xFFFFFF04,     /* a session took the bridge (a fresh context id) */
+	kFlightStopped = 0xFFFFFF05,     /* the context was destroyed */
+};
+enum { kFlightCapacity = 8192 }; /* a power of two */
+struct FlightEntry
+{
+	uint32_t op;
+	uint32_t detail;
+};
+struct FlightRecorder
+{
+	uint32_t magic;    /* "CEGL" */
+	uint32_t capacity;
+	uint64_t written;  /* entries ever written; the newest is at (written - 1) % capacity */
+	FlightEntry entries[kFlightCapacity];
+};
+static FlightRecorder g_flight = { 0x4C474543u, kFlightCapacity, 0, {} };
+
+static inline void flightNote(uint32_t op, uint32_t detail)
+{
+	FlightEntry &entry = g_flight.entries[g_flight.written & (kFlightCapacity - 1)];
+	entry.op = op;
+	entry.detail = detail;
+	g_flight.written++;
+}
+
 extern "C" void ce_gl_audit_frame(int64_t frame)
 {
 	if (glAudit()) g_auditFrame = frame;
@@ -584,6 +633,7 @@ extern "C" void ce_gl_audit_frame(int64_t frame)
  */
 extern "C" void ce_gl_state_loaded(int64_t to)
 {
+	flightNote(kFlightStateLoaded, (uint32_t)to);
 	if (!glAudit()) return;
 	uint64_t dead = 0, reused = 0, held = 0, leaked = 0;
 	for (int k = 0; k < kAuditKinds; k++)
@@ -663,6 +713,7 @@ static void gpuTimeFrameEnd(void);
 extern "C" void ce_gl_release(void)
 {
 	if (!g_borrowed) return;
+	flightNote(kFlightReleased, (uint32_t)(g_calls - g_callsAtFrame));
 	gpuTimeFrameEnd();
 	return_current();
 	g_borrowed = false;
@@ -797,6 +848,7 @@ extern "C" uintptr_t BRIDGE_ABI ce_gl_dispatch(uintptr_t op, uintptr_t a, uintpt
 {
 	(void)d; (void)e;
 	g_calls++;
+	flightNote((uint32_t)op, 0);
 
 	/* The first GL call of a frame takes the context; ce_gl_release gives it
 	 * back when the frame is over. Two calls per frame, not two per GL call. */
@@ -805,6 +857,7 @@ extern "C" uintptr_t BRIDGE_ABI ce_gl_dispatch(uintptr_t op, uintptr_t a, uintpt
 		save_current();
 		bind_ours();
 		g_borrowed = true;
+		flightNote(kFlightBorrowed, 0);
 		gpuTimeFrameBegin();
 		if (glTrace())
 			fprintf(stderr, "[ce-gl] borrowed the context (GL_VERSION now %s)\n",
@@ -1048,6 +1101,12 @@ extern "C" const char *ce_gl_description(void)
 	return g_ready ? g_description : "";
 }
 
+extern "C" void *ce_gl_flight_recorder(uint32_t *bytes)
+{
+	if (bytes) *bytes = (uint32_t)sizeof g_flight;
+	return &g_flight;
+}
+
 /* Mint a fresh id. It need only DIFFER from any other - the guest compares it
  * for equality and nothing else - so it is taken from where this process sits
  * in memory (the loader decides that anew every run), the clock, and a
@@ -1060,6 +1119,7 @@ static void mint_context_id()
 		^ (static_cast<uint64_t>(time(nullptr)) << 8)
 		^ (++made);
 	if (g_context_id == 0) g_context_id = 1; /* 0 means "cannot tell" */
+	flightNote(kFlightSession, 0);
 }
 
 extern "C" int32_t ce_gl_start(char *error_out, int32_t error_len)
@@ -1137,6 +1197,7 @@ extern "C" void ce_gl_stop(void)
 {
 	if (!g_ready) return;
 	ce_gl_release();
+	flightNote(kFlightStopped, 0);
 	destroy_context();
 	g_ready = false;
 	g_context_id = 0;
@@ -1152,6 +1213,7 @@ extern "C" void ce_gl_request(int32_t want) { g_requested = want ? 1 : 0; }
 extern "C" int32_t ce_gl_requested(void) { return g_requested; }
 extern "C" int32_t ce_gl_available(void) { return 0; }
 extern "C" const char *ce_gl_description(void) { return ""; }
+extern "C" void *ce_gl_flight_recorder(uint32_t *bytes) { if (bytes) *bytes = 0; return nullptr; }
 extern "C" void ce_gl_release(void) { }
 extern "C" void ce_gl_audit_frame(int64_t) { }
 extern "C" void ce_gl_state_loaded(int64_t) { }

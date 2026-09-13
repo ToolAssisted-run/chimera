@@ -129,11 +129,15 @@ namespace Chimera.Tests.Client.Common
 		[TestMethod]
 		public void TheBlockIsLaidOutAsTheModuleReadsIt()
 		{
-			// source/crash/chimera_crash.c: magic, version, folder[520] (UTF-16), frame, session length, session
+			// source/crash/chimera_crash.c: magic, version, folder[520] (UTF-16), frame,
+			// GL recorder address and size, session length, session
+			Assert.AreEqual(2u, CrashCapture.Version);
 			Assert.AreEqual(1048, CrashCapture.FrameOffset);
-			Assert.AreEqual(1056, CrashCapture.SessionLengthOffset);
-			Assert.AreEqual(1060, CrashCapture.SessionOffset);
-			Assert.AreEqual(17440, CrashCapture.BlockSize);
+			Assert.AreEqual(1056, CrashCapture.GlRecorderOffset);
+			Assert.AreEqual(1064, CrashCapture.GlRecorderBytesOffset);
+			Assert.AreEqual(1068, CrashCapture.SessionLengthOffset);
+			Assert.AreEqual(1072, CrashCapture.SessionOffset);
+			Assert.AreEqual(17452, CrashCapture.BlockSize);
 		}
 
 		[TestMethod]
@@ -143,6 +147,7 @@ namespace Chimera.Tests.Client.Common
 			Assert.IsNotNull(CrashCapture.Arm(_dir));
 			Assert.IsFalse(CrashCapture.Armed);
 			CrashCapture.NoteFrame(5);
+			CrashCapture.NoteGlRecorder(new IntPtr(0x1000), 64);
 			CrashCapture.DescribeSession("nothing to write to, and nothing thrown");
 		}
 

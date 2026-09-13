@@ -520,6 +520,10 @@ namespace Chimera.Emulation.Common.Engine
 		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_gl_description();
 
+		/// <summary>the GPU bridge's flight recorder, for the crash module to read out of a dead process (docs/gpu-bridge.md)</summary>
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_gl_flight_recorder(out uint bytes);
+
 		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract void ce_gl_request(int want);
 

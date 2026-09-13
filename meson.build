@@ -57,9 +57,14 @@ shared_library(
 # runs inside WerFault.exe, never in Chimera - see source/crash/chimera_crash.c)
 # ---------------------------------------------------------------------------
 if host_windows
+  # the GL calls in a note are named from the same master list the bridge numbers by
+  chimera_crash_gl_names = custom_target('chimera-crash-gl-names',
+    output: 'gl_names.h',
+    command: [find_program('python3'), files('source/crash/gen-gl-names.py'),
+      files('extern/chimera-common-minibox/source/gl/gl-entry-points.txt'), '@OUTPUT@'])
   shared_library(
     'chimera_crash',
-    'source/crash/chimera_crash.c',
+    ['source/crash/chimera_crash.c', chimera_crash_gl_names],
     name_prefix: '',
     dependencies: [cc.find_library('dbghelp'), cc.find_library('psapi')],
     install: true,
@@ -400,7 +405,7 @@ if not meson.is_cross_build()
     build_by_default: false,
   )
 
-  foreach engine_test : ['sha1', 'movie_log', 'movie_text', 'movie_entry', 'state_container', 'package', 'multifile', 'project', 'firmware', 'state_history', 'media']
+  foreach engine_test : ['sha1', 'movie_log', 'movie_text', 'movie_entry', 'state_container', 'package', 'multifile', 'project', 'firmware', 'state_history', 'media', 'gl_flight']
     test(
       'engine_' + engine_test,
       executable(

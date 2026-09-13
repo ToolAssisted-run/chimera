@@ -24,6 +24,8 @@
 #include <string.h>
 #include <wchar.h>
 
+#include "gl_names.h"
+
 /* What WER hands a runtime exception helper module. Declared here: mingw-w64's
  * werapi.h does not compile on its own, and this prefix is all this module reads. */
 typedef struct _WER_RUNTIME_EXCEPTION_INFORMATION {
@@ -37,9 +39,10 @@ typedef struct _WER_RUNTIME_EXCEPTION_INFORMATION {
 	DWORD dwReserved;
 } WER_RUNTIME_EXCEPTION_INFORMATION, *PWER_RUNTIME_EXCEPTION_INFORMATION;
 
-/* The context block, laid out exactly as CrashCapture.cs writes it. */
+/* The context block, laid out exactly as CrashCapture.cs writes it (version 2 adds
+ * the GL flight recorder; the module and the frontend ship in one bundle). */
 #define CONTEXT_MAGIC 0x52434843u /* "CHCR" */
-#define CONTEXT_VERSION 1u
+#define CONTEXT_VERSION 2u
 #define FOLDER_CHARS 520
 #define SESSION_CAPACITY 16380
 #pragma pack(push, 1)
@@ -48,9 +51,30 @@ typedef struct {
 	UINT32 version;
 	WCHAR folder[FOLDER_CHARS];
 	INT64 frame;
+	UINT64 glRecorder;      /* the engine's ce_gl_flight_recorder, or 0 */
+	UINT32 glRecorderBytes;
 	UINT32 sessionLength;
 } context_header;
 #pragma pack(pop)
+
+/* The GPU bridge's flight recorder, laid out as source/engine/source/gl_bridge.cpp
+ * keeps it: a header, then a ring of (opcode, detail). */
+#define FLIGHT_MAGIC 0x4C474543u /* "CEGL" */
+#define FLIGHT_LINES 400
+typedef struct {
+	UINT32 magic;
+	UINT32 capacity;
+	UINT64 written;
+} flight_header;
+typedef struct {
+	UINT32 op;
+	UINT32 detail;
+} flight_entry;
+typedef struct {
+	UINT32 op;
+	UINT32 detail;
+	UINT32 count;
+} flight_line;
 
 static const char *fast_fail_name(ULONG_PTR code)
 {
@@ -97,6 +121,69 @@ static void describe_module(HANDLE process, DWORD64 address, wchar_t *name, DWOR
 			return;
 		}
 	}
+}
+
+static void write_gl_entry(FILE *f, const flight_line *line)
+{
+	char name[96];
+	switch (line->op) {
+	case 0xFFFFFF01: snprintf(name, sizeof name, "-- a frame takes the context"); break;
+	case 0xFFFFFF02: snprintf(name, sizeof name, "-- the frame gives it back (%lu calls)", (unsigned long)line->detail); break;
+	case 0xFFFFFF03: snprintf(name, sizeof name, "-- a state is loaded (frame %lu)", (unsigned long)line->detail); break;
+	case 0xFFFFFF04: snprintf(name, sizeof name, "-- a session takes the bridge (a fresh context id)"); break;
+	case 0xFFFFFF05: snprintf(name, sizeof name, "-- the context is destroyed"); break;
+	default:
+		if (line->op >= GL_NAMES_FIRST_OPCODE && line->op - GL_NAMES_FIRST_OPCODE < GL_NAMES_COUNT)
+			snprintf(name, sizeof name, "%s", gl_names[line->op - GL_NAMES_FIRST_OPCODE]);
+		else
+			snprintf(name, sizeof name, "bridge op %lu", (unsigned long)line->op);
+	}
+	if (line->count > 1) fprintf(f, "  %s x%lu\n", name, (unsigned long)line->count);
+	else fprintf(f, "  %s\n", name);
+}
+
+/* The last calls that crossed the GPU bridge, oldest first, repeats folded. The
+ * entry is written before the driver is called, so a crash inside a GL call
+ * leaves that call last. */
+static void write_gl_calls(FILE *f, HANDLE process, UINT64 address, UINT32 bytes)
+{
+	if (address == 0 || bytes < sizeof(flight_header)) return;
+	flight_header header;
+	SIZE_T got = 0;
+	if (!ReadProcessMemory(process, (LPCVOID)(ULONG_PTR)address, &header, sizeof header, &got) || got != sizeof header) return;
+	if (header.magic != FLIGHT_MAGIC || header.capacity == 0 || (header.capacity & (header.capacity - 1)) != 0
+		|| sizeof header + (UINT64)header.capacity * sizeof(flight_entry) > bytes) return;
+	if (header.written == 0) {
+		fprintf(f, "\ngl: nothing crossed the GPU bridge this run\n");
+		return;
+	}
+	const HANDLE heap = GetProcessHeap();
+	flight_entry *entries = (flight_entry *)HeapAlloc(heap, 0, header.capacity * sizeof(flight_entry));
+	flight_line *lines = (flight_line *)HeapAlloc(heap, 0, header.capacity * sizeof(flight_line));
+	if (entries && lines
+		&& ReadProcessMemory(process, (LPCVOID)(ULONG_PTR)(address + sizeof header), entries, header.capacity * sizeof(flight_entry), &got)
+		&& got == header.capacity * sizeof(flight_entry)) {
+		const UINT64 kept = header.written < header.capacity ? header.written : header.capacity;
+		UINT32 count = 0;
+		for (UINT64 i = header.written - kept; i < header.written; i++) {
+			const flight_entry *entry = &entries[i & (header.capacity - 1)];
+			if (count > 0 && lines[count - 1].op == entry->op && lines[count - 1].detail == entry->detail) {
+				lines[count - 1].count++;
+				continue;
+			}
+			lines[count].op = entry->op;
+			lines[count].detail = entry->detail;
+			lines[count].count = 1;
+			count++;
+		}
+		const UINT32 first = count > FLIGHT_LINES ? count - FLIGHT_LINES : 0;
+		fprintf(f, "\ngl (the last %llu of %llu crossings of the GPU bridge, oldest first; the newest is last):\n",
+			(unsigned long long)kept, (unsigned long long)header.written);
+		for (UINT32 i = first; i < count; i++) write_gl_entry(f, &lines[i]);
+		fflush(f);
+	}
+	if (entries) HeapFree(heap, 0, entries);
+	if (lines) HeapFree(heap, 0, lines);
 }
 
 static void write_stack(FILE *f, HANDLE process, HANDLE thread, CONTEXT ctx)
@@ -209,6 +296,7 @@ __declspec(dllexport) HRESULT WINAPI OutOfProcessExceptionEventCallback(PVOID co
 			fflush(f);
 		}
 		write_stack(f, info->hProcess, info->hThread, info->context);
+		write_gl_calls(f, info->hProcess, header.glRecorder, header.glRecorderBytes);
 	}
 
 	HANDLE dump = CreateFileW(dumpPath, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);

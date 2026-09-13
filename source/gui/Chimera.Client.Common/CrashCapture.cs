@@ -36,10 +36,12 @@ namespace Chimera.Client.Common
 
 		// The block, laid out exactly as source/crash/chimera_crash.c reads it.
 		internal const uint Magic = 0x52434843; // "CHCR"
-		internal const uint Version = 1;
+		internal const uint Version = 2;
 		internal const int FolderChars = 520;
 		internal const int FrameOffset = 8 + FolderChars * 2;
-		internal const int SessionLengthOffset = FrameOffset + 8;
+		internal const int GlRecorderOffset = FrameOffset + 8;
+		internal const int GlRecorderBytesOffset = GlRecorderOffset + 8;
+		internal const int SessionLengthOffset = GlRecorderBytesOffset + 4;
 		internal const int SessionOffset = SessionLengthOffset + 4;
 		internal const int SessionCapacity = 16380;
 		internal const int BlockSize = SessionOffset + SessionCapacity;
@@ -123,6 +125,19 @@ namespace Chimera.Client.Common
 		public static void NoteFrame(long frame)
 		{
 			if (_block != IntPtr.Zero) Marshal.WriteInt64(_block, FrameOffset, frame);
+		}
+
+		/// <summary>
+		/// Where the GPU bridge keeps its flight recorder (the engine's
+		/// ce_gl_flight_recorder): the crash module reads the last GL calls out of
+		/// it. A fixed block in libchimera, so noting it once is enough.
+		/// </summary>
+		public static void NoteGlRecorder(IntPtr address, uint bytes)
+		{
+			if (_block == IntPtr.Zero) return;
+			Marshal.WriteInt32(_block, GlRecorderBytesOffset, 0);
+			Marshal.WriteInt64(_block, GlRecorderOffset, address.ToInt64());
+			Marshal.WriteInt32(_block, GlRecorderBytesOffset, address == IntPtr.Zero ? 0 : unchecked((int)bytes));
 		}
 
 		/// <summary>

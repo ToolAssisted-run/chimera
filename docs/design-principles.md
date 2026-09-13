@@ -3070,3 +3070,10 @@ note, never the start.
 A note is matched to a recovery folder by process id AND time (ids are reused),
 and the reopen prompt says what ended the session. The minidumps are for a
 debugger, not for a person; the one line in the prompt is for the person.
+
+The first question a driver crash raises is what the renderer had just asked of
+it, and a stack inside nvoglv64.dll without symbols does not say. So the GPU
+bridge keeps a flight recorder (docs/gpu-bridge.md, "The flight recorder") and
+the note carries its last calls: always on, because the crash that needs it is
+never the run somebody switched a trace on for, and read from outside, because
+nothing inside runs after a fast fail.
