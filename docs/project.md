@@ -365,6 +365,43 @@ opens unsaved; saving writes it to the project) or the project as last saved
 not ask; they report the copy's path. A folder left where an earlier build kept
 it (`Projects/<id>/recovery`) is moved to the new root the first time.
 
+## Crash notes
+
+Recovery keeps the work; a crash note says why it was needed. A crash that no
+handler sees - a graphics driver that fast-fails, an access violation nothing
+catches - still leaves `<data>/Crashes/<time> pid<id>.txt` and a minidump
+(`.dmp`) beside it, on Windows.
+
+Nothing in the dying process writes them. At start Chimera registers
+`dll/chimera_crash.dll` with Windows Error Reporting
+(`WerRegisterRuntimeExceptionModule`; the per-user registry list
+`HKCU\Software\Microsoft\Windows\Windows Error Reporting\RuntimeExceptionHelperModules`
+allows it, so no administrator is needed). When the process dies, WER loads that
+module into WerFault.exe and hands it the dead process. The module reads a
+block Chimera keeps in its own memory - the folder to write to, the frame (set
+every loop), and a few lines about the session (the project, the machine and the
+movie header, set when a project boots) - and writes:
+
+- the note: time, process id, exception code and kind (a fast fail's own code
+  too), the address and the module and offset it is in, the frame, the session
+  lines, and the faulting thread's stack, symbolized as far as the modules'
+  exports allow. Each line is flushed as it is written, so a note is never lost
+  to the dump that follows it.
+- the minidump: threads, modules and the memory the stacks reference; enough to
+  open in WinDbg.
+
+The module claims nothing; Windows still records the crash as it always does.
+Registry values naming a `chimera_crash.dll` that no longer exists (a moved or
+deleted install) are removed at start, and only the newest 20 notes are kept.
+
+Opening a project whose recovery folder outlived its process looks for the note
+that process left (the same process id, written after it started) and says what
+ended it - "a fast fail in nvoglv64.dll+0x108eb9d (the NVIDIA graphics driver)
+at frame 21" - and where the note is.
+
+Linux has no equivalent here: the journal still keeps the work, and the kernel's
+core dump settings decide what else is kept.
+
 ## Architecture decisions
 
 - **Serializer in the engine**: `ce_project_*` in libchimera reads,

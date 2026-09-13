@@ -58,6 +58,7 @@ namespace Chimera.Client.GUI
 				// thrown away), so there is nothing left to recover.
 				_recovery?.End(clean: true);
 				_recovery = null;
+				CrashCapture.DescribeSession("no project open");
 			}
 			finally
 			{
@@ -426,16 +427,23 @@ namespace Chimera.Client.GUI
 			// the copy holds the work now, and the next session starts its own
 			ProjectRecovery.Discard(leftover);
 
+			// what ended that session, when Windows let the crash module say (docs/project.md, "Crash notes")
+			var crash = leftover is { ProcessId: not 0, ProcessStartedUtc: { } started }
+				? CrashCapture.NoteFor(leftover.ProcessId, started)
+				: null;
+
 			if (HeadlessMode.Enabled)
 			{
 				Console.Error.WriteLine($"[recovery] unsaved work from {leftover.LastWorkUtc.ToLocalTime():yyyy-MM-dd HH:mm:ss}"
-					+ $" was rebuilt into {copy}; opening the project as it was last saved");
+					+ $" was rebuilt into {copy}; opening the project as it was last saved"
+					+ (crash is null ? "" : $"; that session was ended by {crash.Summary} ({crash.Path})"));
 				return false;
 			}
 			var open = this.ModalMessageBox2(
 				caption: "Recover unsaved work?",
 				icon: EMsgBoxIcon.Question,
 				text: "Chimera did not close normally the last time this project was open."
+					+ (crash is null ? "" : $" It was ended by {crash.Summary}; what Windows recorded is in:\n{crash.Path}")
 					+ $"\n\nThe work in progress up to {leftover.LastWorkUtc.ToLocalTime():HH:mm:ss} - every input entered, and"
 					+ $" the markers and branches as of the last few seconds - has been kept as:\n{copy}"
 					+ "\n\nOpen that work now? It opens unsaved, and saving writes it to this project."
@@ -633,6 +641,8 @@ namespace Chimera.Client.GUI
 			// the next open of this project offers it back (docs/project.md, "Recovery").
 			_recovery?.End(clean: false);
 			_recovery = ProjectRecovery.Begin(tasMovie, project.Id, path);
+			// what a crash note says this session was (docs/project.md, "Crash notes")
+			CrashCapture.DescribeSession(DescribeForCrashNote(tasMovie, path));
 
 			progress.Step("opening TAStudio");
 			progress.Dispose();
@@ -642,6 +652,21 @@ namespace Chimera.Client.GUI
 				else Shown += (_, _) => Tools.Load<TAStudio>();
 			}
 			return true;
+		}
+
+		/// <summary>
+		/// The lines a crash note carries about the open project: where it is, the
+		/// machine, and the movie header - the core, its build and the GPU driver that
+		/// drew it are all written there, which is what a crash is first asked about.
+		/// </summary>
+		private string DescribeForCrashNote(ITasMovie movie, string path)
+		{
+			var lines = new System.Collections.Generic.List<string> { $"project={path}", $"system={Emulator.SystemId}" };
+			foreach (var entry in movie.HeaderEntries)
+			{
+				if (entry.Value is { Length: > 0 and < 240 } && entry.Value.IndexOf('\n') < 0) lines.Add($"{entry.Key}={entry.Value}");
+			}
+			return string.Join("\n", lines);
 		}
 
 		/// <summary>Writes what the project pins into a movie header that does not carry it.</summary>

@@ -3035,3 +3035,38 @@ moved on first use.
 
 One slip worth a line: a hand-typed separator went into the source as a raw
 control character, six times over. It compiled and ran; it is now an escape.
+
+## A crash no handler sees still says what it was (user-decided, 2026-09-13)
+
+The crash that started the recovery work was a graphics driver's fast fail:
+`__fastfail` ends the process without running one exception handler, one
+finally or one managed event. The work survives that (the journal), but nothing
+said why it had been needed - the Windows event log named a module and an
+offset, and the minidump `LocalDumps` happens to be set to keep was found by
+chance, outside anything Chimera knows about.
+
+What was ruled out: a handler in the process (never runs, and would be code in a
+process that has just declared itself corrupt), and a watcher process attached
+as a debugger (it would see every first-chance fault, and miniBox takes page
+faults by design - a debugger in the loop makes the sandbox crawl).
+
+What runs is Windows Error Reporting, in its own process, and WER has a place
+for exactly this: a runtime exception helper module, registered by the process
+(`WerRegisterRuntimeExceptionModule`) and allowed by a per-user registry value,
+so no administrator. It is loaded into WerFault.exe with a handle to the dead
+process. Proven on the test box before anything was built on it: a C crasher
+that fast-fails (`int 0x29`) and one that dereferences null both left a note
+and a minidump, and the stack walk resolved through WerFault's own dbghelp.
+
+So `chimera_crash.dll` (source/crash, built by meson for Windows only) writes a
+note and a minidump into `<data>/Crashes`. It reads a fixed block in Chimera's
+memory - the folder, the frame, lines about the session - through the process
+handle, clamps everything it reads, and claims nothing, so Windows' own record
+of the crash is unchanged. The note is plain text and flushed as it goes, so a
+dump that fails or stalls cannot take the note with it. The block is never
+freed: it is read after the process is gone. Registration failing costs the
+note, never the start.
+
+A note is matched to a recovery folder by process id AND time (ids are reused),
+and the reopen prompt says what ended the session. The minidumps are for a
+debugger, not for a person; the one line in the prompt is for the person.

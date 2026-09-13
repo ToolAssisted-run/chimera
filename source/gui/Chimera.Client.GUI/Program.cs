@@ -246,6 +246,14 @@ namespace Chimera.Client.GUI
 				}
 			}
 
+			// A crash that no handler sees - a graphics driver's fast fail - still leaves a
+			// note saying what failed and where, written from outside the process by Windows
+			// Error Reporting (docs/project.md, "Crash notes").
+			if (!OSTailoredCode.IsUnixHost && CrashCapture.Arm(Path.Combine(AppContext.BaseDirectory, "dll")) is { } crashNotesOff)
+			{
+				Console.Error.WriteLine($"[crash] no crash notes this session: {crashNotesOff}");
+			}
+
 			TempFileManager.Start();
 
 			ChimeraFile.DearchivalMethod = SharpCompressDearchivalMethod.Instance;

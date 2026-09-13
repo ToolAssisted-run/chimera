@@ -780,6 +780,8 @@ namespace Chimera.Client.GUI
 				if (serviceHost) LoopTrace.Served();
 				// the open project's work, kept recoverable (rate-limited inside)
 				if (serviceHost) _recovery?.Tick();
+				// the frame a crash note names; one write, whatever the loop is doing
+				CrashCapture.NoteFrame(Emulator.Frame);
 
 				long loopStarted = LoopTrace.Enabled ? Stopwatch.GetTimestamp() : 0;
 				if (serviceHost) Input.Instance.Update();

@@ -53,6 +53,21 @@ shared_library(
 )
 
 # ---------------------------------------------------------------------------
+# chimera_crash: the crash note a Windows fast-fail cannot stop (in-repo source;
+# runs inside WerFault.exe, never in Chimera - see source/crash/chimera_crash.c)
+# ---------------------------------------------------------------------------
+if host_windows
+  shared_library(
+    'chimera_crash',
+    'source/crash/chimera_crash.c',
+    name_prefix: '',
+    dependencies: [cc.find_library('dbghelp'), cc.find_library('psapi')],
+    install: true,
+    install_dir: 'dll',
+  )
+endif
+
+# ---------------------------------------------------------------------------
 # lua54: the Lua 5.4 runtime (stock upstream sources, pinned submodule)
 # ---------------------------------------------------------------------------
 lua_src = []

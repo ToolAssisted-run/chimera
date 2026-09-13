@@ -424,6 +424,12 @@ namespace Chimera.Client.Common
 			/// <summary>The newest moment the files describe.</summary>
 			public DateTime LastWorkUtc { get; init; }
 
+			/// <summary>The process that wrote the folder, which is how a crash note is matched to it; 0 when unknown.</summary>
+			public int ProcessId { get; init; }
+
+			/// <summary>When that process started: a process id alone is reused.</summary>
+			public DateTime? ProcessStartedUtc { get; init; }
+
 			internal string? Snapshot { get; init; }
 
 			internal string? Journal { get; init; }
@@ -467,6 +473,8 @@ namespace Chimera.Client.Common
 				Directory = dir,
 				ProjectPath = session?.ProjectPath ?? "",
 				LastWorkUtc = last,
+				ProcessId = session?.ProcessId ?? 0,
+				ProcessStartedUtc = session is { ProcessStartedUtcTicks: > 0 } ? new DateTime(session.ProcessStartedUtcTicks, DateTimeKind.Utc) : null,
 				Snapshot = snapshot,
 				Journal = journal,
 			};
