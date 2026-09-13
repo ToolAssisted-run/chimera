@@ -24,6 +24,31 @@ namespace Chimera.Tests.Client.Common.Movie
 
 #pragma warning disable BHI1600 //TODO disambiguate assert calls
 		/// <summary>
+		/// A movie's log key can name controls the running machine does not have:
+		/// a project recorded with a second controller, reopened with that port
+		/// empty. The movie's definition takes its columns from the key, but the
+		/// mnemonic cache came from the machine's definition, so looking a
+		/// pressed P2 button up in it threw - and TAStudio, which asks for every
+		/// column's mnemonic when it opens, could not open the movie at all
+		/// (KeyNotFoundException in MnemonicMap).
+		/// </summary>
+		[TestMethod]
+		public void LogKeyControlsTheMachineLacksDoNotThrow()
+		{
+			var machine = new ControllerDefinition("NES Controller") { BoolButtons = { "P1 A", "P1 B" } }.MakeImmutable();
+			machine.BuildMnemonicsCache(VSystemID.Raw.NES);
+
+			var movie = new MovieController(machine, "#P1 A|P1 B|#P2 A|P2 B|");
+			movie.SetFromMnemonic("|A.|AB|");
+
+			Assert.AreEqual("|A.|AB|", LogEntryGenerator.GenerateLogEntry(movie));
+			Assert.AreEqual('A', movie.Definition.MnemonicFor("P2 A"));
+			Assert.AreEqual('B', movie.Definition.MnemonicFor("P2 B"));
+			// the display string asks the same question
+			_ = InputDisplayGenerator.Generate(movie);
+		}
+
+		/// <summary>
 		/// A name no table knows is abbreviated rather than refused. It used to
 		/// come out as '!', which heads a TAStudio column with a character that
 		/// names nothing; the last word of the name at least points at what was

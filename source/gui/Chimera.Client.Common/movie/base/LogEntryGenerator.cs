@@ -59,7 +59,7 @@ namespace Chimera.Client.Common
 					else
 					{
 						sb.Append(!createEmpty && source.IsPressed(buttonName)
-							? source.Definition.MnemonicsCache[buttonName]
+							? source.Definition.MnemonicFor(buttonName)
 							: '.');
 					}
 				}

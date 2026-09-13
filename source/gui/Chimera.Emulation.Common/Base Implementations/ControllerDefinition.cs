@@ -35,6 +35,9 @@ namespace Chimera.Emulation.Common
 
 		private Dictionary<string, char>? _mnemonicsCache;
 
+		/// <summary>The system the cache was built for, so a control outside it can still be looked up.</summary>
+		private string? _mnemonicsSysId;
+
 		/// <summary>
 		/// A mapping between buttons names and their movie-log mnemonics.
 		/// (it's only relevant for buttons, not axes)
@@ -49,10 +52,25 @@ namespace Chimera.Emulation.Common
 			if (_mutable)
 				throw new InvalidOperationException($"this {nameof(ControllerDefinition)} has not yet been built and sealed; can't build mnemonics cache");
 
+			_mnemonicsSysId ??= sysID;
 			_mnemonicsCache ??= BoolButtons.ToDictionary(
 				static buttonName => buttonName,
 				buttonName => MnemonicLookup.Lookup(buttonName, sysID));
 		}
+
+		/// <summary>
+		/// The mnemonic for a button, including one this definition's cache does
+		/// not hold. A movie's definition takes its columns from the movie's log
+		/// key, and a log key can name controls the running machine does not have
+		/// - a project recorded with a second controller, reopened with that port
+		/// empty. Indexing the cache with such a name threw, and TAStudio could not
+		/// open the movie at all (KeyNotFoundException in MnemonicMap). Such a
+		/// control is looked up the same way the cache was built instead.
+		/// </summary>
+		public char MnemonicFor(string buttonName)
+			=> _mnemonicsCache is not null && _mnemonicsCache.TryGetValue(buttonName, out var c)
+				? c
+				: MnemonicLookup.Lookup(buttonName, _mnemonicsSysId ?? string.Empty);
 
 		public ControllerDefinition(string name)
 			=> Name = name;
@@ -65,6 +83,7 @@ namespace Chimera.Emulation.Common
 			HapticsChannels.AddRange(copyFrom.HapticsChannels);
 			CategoryLabels = copyFrom.CategoryLabels;
 			_mnemonicsCache = copyFrom._mnemonicsCache;
+			_mnemonicsSysId = copyFrom._mnemonicsSysId;
 			MakeImmutable();
 		}
 

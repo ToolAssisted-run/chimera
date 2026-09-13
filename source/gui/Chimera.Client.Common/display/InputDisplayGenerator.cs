@@ -36,7 +36,7 @@ namespace Chimera.Client.Common
 				else
 				{
 					sb.Append(source.IsPressed(buttonName)
-						? source.Definition.MnemonicsCache[buttonName]
+						? source.Definition.MnemonicFor(buttonName)
 						: ' ');
 				}
 			}

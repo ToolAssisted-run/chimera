@@ -1495,7 +1495,7 @@ namespace Chimera.Client.GUI
 					}
 					else
 					{
-						yield return (name, MovieSession.MovieController.Definition.MnemonicsCache[name].ToString(), 1);
+						yield return (name, MovieSession.MovieController.Definition.MnemonicFor(name).ToString(), 1);
 					}
 				}
 			}

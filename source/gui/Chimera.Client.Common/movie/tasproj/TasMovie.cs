@@ -259,7 +259,7 @@ namespace Chimera.Client.Common
 			if (adapter.Definition.BoolButtons.Contains(buttonName))
 			{
 				return adapter.IsPressed(buttonName)
-					? adapter.Definition.MnemonicsCache![buttonName].ToString()
+					? adapter.Definition.MnemonicFor(buttonName).ToString()
 					: "";
 			}
 
