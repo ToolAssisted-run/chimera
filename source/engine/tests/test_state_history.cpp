@@ -1416,6 +1416,142 @@ int main(void)
 		std::filesystem::remove_all("work-history-save");
 	}
 
+	{ // A save asked for while a spill is still being written is a whole save.
+	  //
+	  // A stretch handed to the writer does not know where its bytes will land
+	  // until the write reports back, and the save's snapshot is taken the moment
+	  // it is asked for. On a machine that spills every second or two - Ruffle,
+	  // hundreds of megabytes a stretch - that is most saves.
+		const chimera::HostApi api = fakeHost();
+		int attempts = 0, failed = 0, checked = 0, wrong = 0;
+		for (int round = 0; round < 20; round++)
+		{
+			g_machine = Machine{};
+			std::vector<std::array<uint8_t, Machine::kCells>> truth(1);
+			std::memcpy(truth[0].data(), g_machine.cell, Machine::kCells);
+			std::filesystem::remove_all("work-history-inflight");
+			std::filesystem::create_directories("work-history-inflight");
+			chimera::StateHistory h;
+			h.helpers(true);
+			h.configure(&api, nullptr, 700);
+			h.bands(2, 6, 1, 3, 5);
+			h.spillTo("work-history-inflight");
+			h.capture(0);
+			for (int64_t f = 1; f <= 90; f++)
+			{
+				h.beforeAdvance();
+				advance(f);
+				std::array<uint8_t, Machine::kCells> at{};
+				std::memcpy(at.data(), g_machine.cell, Machine::kCells);
+				truth.push_back(at);
+				h.capture(f);
+				if (f < 40 || h.writesInFlight() == 0) continue;
+				/* a spill this thread has not heard back about: ask for the save now */
+				attempts++;
+				assert(h.saveToLater("work-history-inflight/h.bin", "fake", error));
+				std::string why;
+				if (!h.saveWait(why))
+				{
+					failed++;
+					if (failed == 1) std::fprintf(stderr, "in-flight save failed: %s\n", why.c_str());
+					break;
+				}
+				/* and what it wrote is the run, frame for frame */
+				chimera::StateHistory back;
+				back.configure(&api, nullptr, 1u << 20);
+				if (!back.loadFrom("work-history-inflight/h.bin", "fake", why)) { wrong++; break; }
+				for (int64_t k = 0; k <= f; k++)
+				{
+					if (back.nearest(k) != k) continue;
+					checked++;
+					if (!back.restore(k, why)
+						|| std::memcmp(g_machine.cell, truth[static_cast<size_t>(k)].data(), Machine::kCells) != 0)
+					{
+						if (wrong == 0) std::fprintf(stderr, "in-flight save: frame %lld came back wrong\n", (long long)k);
+						wrong++;
+					}
+				}
+				break;
+			}
+		}
+		std::fprintf(stderr, "saves asked for mid-spill: %d, failed: %d, frames checked: %d, wrong: %d\n",
+			attempts, failed, checked, wrong);
+		assert(attempts > 0);
+		assert(failed == 0);
+		assert(checked > 0);
+		assert(wrong == 0);
+		std::filesystem::remove_all("work-history-inflight");
+	}
+
+	{ // Nothing is spilled behind a save that is being written.
+	  //
+	  // The save is one job on the writer, as big as the history. A spill queued
+	  // behind it lands when the save does, and the spill after that - finding
+	  // the queue over its cap - waited for both on the thread that runs the
+	  // machine: a 42 second frame on nss102. While a save is pending the budget
+	  // is kept by thinning instead, and that is neither a failure nor a wait.
+		const chimera::HostApi api = fakeHost();
+		g_machine = Machine{};
+		std::filesystem::remove_all("work-history-saving");
+		std::filesystem::create_directories("work-history-saving");
+		chimera::StateHistory h;
+		h.helpers(true);
+		h.configure(&api, nullptr, 700);
+		h.bands(2, 6, 1, 3, 5);
+		h.spillTo("work-history-saving");
+		std::vector<std::array<uint8_t, Machine::kCells>> truth(1);
+		std::memcpy(truth[0].data(), g_machine.cell, Machine::kCells);
+		h.capture(0);
+		int64_t f = 1;
+		auto play = [&](int64_t until) {
+			for (; f <= until; f++)
+			{
+				h.beforeAdvance();
+				advance(f);
+				std::array<uint8_t, Machine::kCells> at{};
+				std::memcpy(at.data(), g_machine.cell, Machine::kCells);
+				truth.push_back(at);
+				h.capture(f);
+			}
+		};
+		play(60);
+		h.flushWrites();
+		assert(h.diskBytes() > 0);
+
+		int watched = 0;
+		for (int round = 0; round < 10; round++)
+		{
+			assert(h.saveToLater("work-history-saving/h.bin", "fake", error));
+			for (int k = 0; k < 20; k++)
+			{
+				const bool before = h.savePending();
+				const uint64_t queued = h.writesInFlight();
+				play(f);
+				/* pending on both sides means pending throughout: it only ever clears */
+				if (before && h.savePending())
+				{
+					watched++;
+					assert(h.writesInFlight() <= queued);
+				}
+			}
+			assert(h.saveWait(error));
+		}
+		assert(!h.spillFailed());
+		std::fprintf(stderr, "captures watched while a save was pending: %d\n", watched);
+
+		/* and the thinned history is still the run wherever it answers */
+		int restored = 0;
+		for (int64_t k = 0; k < f; k++)
+		{
+			if (h.nearest(k) != k) continue;
+			assert(h.restore(k, error));
+			assert(std::memcmp(g_machine.cell, truth[static_cast<size_t>(k)].data(), Machine::kCells) == 0);
+			restored++;
+		}
+		assert(restored > 8);
+		std::filesystem::remove_all("work-history-saving");
+	}
+
 	{ // A saved history is compressed, and it comes back exactly as it went.
 	  //
 	  // A project's history is a machine's worth of mostly unwritten memory per

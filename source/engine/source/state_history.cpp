@@ -568,6 +568,9 @@ void StateHistory::evictDisk()
 bool StateHistory::compactSpill()
 {
 	if (m_spill == nullptr) return false;
+	/* A compaction waits for the writer, and while a save is being written that
+	 * is the whole save. Asked again at the next drop, when it is not. */
+	if (savePending()) return false;
 	/* The cheap question first, and the wait only for an answer of yes.
 	 *
 	 * This is called after every drop and the answer is usually no - the dead
@@ -593,6 +596,13 @@ bool StateHistory::compactSpill()
 		if (m_spillLive != 0 && dead < m_spillLive) return false;
 	}
 
+	const double tCompact0 = nowSeconds();
+	if (historyTrace())
+	{
+		fprintf(stderr, "[history] compaction starts: %llu live of %llu in the file\n",
+			(unsigned long long)m_spillLive, (unsigned long long)m_fileBytes);
+		fflush(stderr);
+	}
 	drainWriter();   /* it reads every live range, and then replaces the file */
 	if (m_spill == nullptr) return false;
 	bool anySpilled = false;
@@ -684,6 +694,11 @@ bool StateHistory::compactSpill()
 	m_fileBytes = physAt;
 	m_writtenThrough = at;   /* every live byte was just copied, here, in full */
 	m_costs.compactions++;
+	if (historyTrace())
+	{
+		fprintf(stderr, "[history] compaction done in %.0f ms on this thread\n", (nowSeconds() - tCompact0) * 1000);
+		fflush(stderr);
+	}
 	if (historyTrace())
 	{
 		fprintf(stderr, "[history] compacted the spill file to %llu bytes\n",
@@ -1759,7 +1774,14 @@ void StateHistory::drainWriter()
 		const double t0 = nowSeconds();
 		m_costs.waits++;
 		m_writer.drain();
-		m_costs.waitSeconds += nowSeconds() - t0;
+		const double waited = nowSeconds() - t0;
+		m_costs.waitSeconds += waited;
+		if (historyTrace() && waited >= 0.1)
+		{
+			fprintf(stderr, "[history] waited %.0f ms for the writer (%llu queued)\n",
+				waited * 1000, (unsigned long long)m_writeQueued);
+			fflush(stderr);
+		}
 	}
 	applyWrites();
 }
@@ -2053,7 +2075,16 @@ void StateHistory::evict()
 		 * the history is where that trade is obviously right. The newest is
 		 * never spilled - it is where the work is. */
 		bool moved = false;
-		for (size_t i = 0; i + 1 < m_segments.size(); i++)
+		/* Not while a save is being written. The save is one job on the writer,
+		 * and it is the size of the whole history - 4.35 GB of nss102, 46 s to
+		 * NTFS - so a spill queued behind it is a write that lands when the save
+		 * does, and the NEXT spill, finding the queue over its cap, waits for
+		 * both on this thread: a 42 s frame, measured. For that long the budget
+		 * is kept by thinning instead, which is what a history with nowhere to
+		 * spill has always done; the run carries on, which is what saving in the
+		 * background promised. Not a failure, so not reported as one. */
+		const bool saving = savePending();
+		for (size_t i = 0; !saving && i + 1 < m_segments.size(); i++)
 		{
 			if (m_segments[i].spilled) continue;
 			if (spill(m_segments[i]))

@@ -1555,6 +1555,14 @@ that has been overtaken by an edit is abandoned and taken again, because a
 history file that describes a timeline that no longer happens is worse than no
 file. That is the same rule the spill file lives by.
 
+What that missed (2026-09-13): a background save is one job on the writer, as
+big as the history, and anything on the machine's thread that waits for the
+writer waits for the save. A spill over the write queue's cap does exactly
+that - a 42.4 s frame on a Ruffle project whose history saved as 4.35 GB. So
+while a save is pending the history neither spills nor compacts, and keeps its
+memory budget by thinning (docs/design-principles.md, "A save in the background
+still stopped the run").
+
 This is worth doing FIRST, before anything in the capture path: the mechanism
 is a queue and a barrier, it touches no guest memory, it needs nothing from
 miniBox, and the freeze it removes is measured in seconds rather than

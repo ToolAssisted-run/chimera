@@ -2773,3 +2773,39 @@ N64 wherever that was read; it now takes the system the created emulator reports
 And headless mode waited forever on the prompt to locate a project's missing
 file; it now names the missing files and exits 64, like every other dialog a
 headless run cannot answer.
+
+## A save in the background still stopped the run (nss102, 2026-09-13)
+
+A Ruffle project of 8039 frames froze "for about ten seconds, every so often,
+worse as the movie grew". Saving a project already happens off the machine's
+thread: the history is snapshotted and written as one job on the history writer
+(`saveToLater`). Measured headless on Windows with the writer's waits traced,
+the save wrote 4.35 GB in 46 s - and the frame about five seconds after it
+started took 42.4 s. That frame spilled: a Ruffle stretch is about 300 MB, the
+writer's queue is capped at 64 MB, and a spill over the cap waits for the
+writer to catch up - which, with a save in the queue, is the whole save. The
+autosave fires every thirty minutes, and the history it writes grows with the
+run until the budgets are full, which is the "worse as the movie grew".
+
+While a save is pending the history now neither spills nor compacts (both would
+wait for the writer); the memory budget is kept by thinning, which is what a
+history with nowhere to spill has always done, and a refused spill is not
+reported as a full disk. The same run on Windows with the fix: the save still
+wrote its 4.35 GB, no frame took a second or more, the slowest after the save
+took 0.29 s - an ordinary spill frame - and the 7000 frames finished in 238 s
+rather than 287. A test asks the same question without a disk: 200 captures
+made while a save is pending, none of which may queue a write; it fails without
+the fix.
+
+The general lesson is the one the helper threads were built on and this broke
+quietly: moving a job off the critical path is only half of it. Anything that
+WAITS for that helper - a queue cap, a drain before a read - puts the job back
+on the path, and the biggest job the helper ever gets decides how long.
+
+The same measurement found the other half of the report, which is not fixed:
+a capture drops every stored frame after it (`captureOnce` calls
+`invalidateAfter(frame - 1)`), so going back and playing forward over unchanged
+input throws away the greenzone ahead, and returning to the end replays all of
+it - 300 frames in 10 s, 1000 in 31 s, 3000 in 99 s. Every TAStudio edit already
+invalidates explicitly; the engine's own record path relies on the capture
+doing it. Whether a replay may keep what is ahead is the user's decision.
