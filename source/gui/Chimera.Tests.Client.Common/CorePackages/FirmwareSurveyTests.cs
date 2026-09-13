@@ -66,6 +66,35 @@ namespace Chimera.Tests.Client.Common
 		}
 
 		[TestMethod]
+		public void TwoVersionsOfACoreAreOneGroup()
+		{
+			// Issue #60: a second version of xemu installed beside the first listed
+			// its firmware a second time, with nothing to tell the two apart.
+			var older = new DiscoveredCorePackage { Name = "xemu", Path = "/cores/xemu-old.chimeraCore", Sha1 = new string('A', 40) };
+			var newer = new DiscoveredCorePackage { Name = "xemu", Path = "/cores/xemu-new.chimeraCore", Sha1 = new string('B', 40) };
+			var other = Package("ares");
+			var bios = Pinned("bios", "retail", 1024, new string('1', 40));
+			var eeprom = Unpinned("eeprom", "eeprom.bin", 256);
+			var hdd = Unpinned("hdd", "hdd.img", 2048);   /* only the newer version asks for it */
+			var declared = new Dictionary<string, (IReadOnlyList<CoreFirmwareDecl>, JArray)>
+			{
+				[older.Path] = (new[] { bios, eeprom }, new JArray()),
+				[newer.Path] = (new[] { bios, eeprom, hdd }, new JArray()),
+				[other.Path] = (new[] { Unpinned("psx", "scph.bin", 512) }, new JArray()),
+			};
+			var packages = new[] { older, other, newer };
+			var config = new Config();
+			var groups = FirmwareSurvey.Build(config, packages,
+				p => declared[p.Path],
+				_firmware, FirmwareSurvey.BuildIndex(config, _firmware, packages.Select(static p => p.Name)));
+
+			Assert.AreEqual(2, groups.Count, "one group per core, however many versions are installed");
+			var xemu = groups.Single(static g => g.CoreName == "xemu");
+			CollectionAssert.AreEqual(new[] { "bios", "eeprom", "hdd" }, xemu.Rows.Select(static r => r.Decl.Id).ToArray(),
+				"every declaration any version makes, once each");
+		}
+
+		[TestMethod]
 		public void TheFolderAnswersByHashAndByName()
 		{
 			var dump = FileOf(_firmware, "whatever-it-was-called.bin", 4096, seed: 3);

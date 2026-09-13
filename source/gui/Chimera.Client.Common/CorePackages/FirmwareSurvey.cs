@@ -153,28 +153,42 @@ namespace Chimera.Client.Common
 			var present = packages.Where(static p => p.Error is null).ToList();
 
 			List<FirmwareSurveyGroup> groups = new();
-			foreach (var package in present.OrderBy(static p => p.Name, StringComparer.OrdinalIgnoreCase))
+			// One group per CORE, not per package: two versions of a core installed
+			// side by side are one core to the person pointing at its BIOS, and the
+			// chosen files are remembered by core name already, so a group per
+			// package listed the same firmware twice with nothing to tell the two
+			// apart (issue #60). The group is every declaration any of its versions
+			// makes, once each - a firmware one version added is still asked for.
+			foreach (var sameCore in present
+				.GroupBy(static p => p.Name, StringComparer.OrdinalIgnoreCase)
+				.OrderBy(static g => g.Key, StringComparer.OrdinalIgnoreCase))
 			{
-				var (decls, raw) = declarationsOf(package);
+				var first = sameCore.First();
 				List<FirmwareSurveyRow> rows = new();
-				for (var i = 0; i < decls.Count; i++)
+				HashSet<string> seen = new(StringComparer.OrdinalIgnoreCase);
+				foreach (var package in sameCore)
 				{
-					var decl = decls[i];
-					var entry = CoreFirmwareStore.Describe(config, package.Name, decl, index);
-					rows.Add(new FirmwareSurveyRow
+					var (decls, raw) = declarationsOf(package);
+					for (var i = 0; i < decls.Count; i++)
 					{
-						CoreName = package.Name,
-						Decl = decl,
-						Path = entry.Path,
-						Sha1 = entry.Sha1,
-						State = entry.State,
-						Where = entry.Path is null ? FirmwareWhere.Nowhere
-							: IsUnder(firmwareFolder, entry.Path) ? FirmwareWhere.FirmwareFolder
-							: FirmwareWhere.Chosen,
-						Condition = i < raw.Count && raw[i] is JObject o && o["requiredWhen"] is { } when ? ConditionText(when) : "",
-					});
+						var decl = decls[i];
+						if (!seen.Add($"{decl.Id}#{decl.Sha1}")) continue;
+						var entry = CoreFirmwareStore.Describe(config, first.Name, decl, index);
+						rows.Add(new FirmwareSurveyRow
+						{
+							CoreName = first.Name,
+							Decl = decl,
+							Path = entry.Path,
+							Sha1 = entry.Sha1,
+							State = entry.State,
+							Where = entry.Path is null ? FirmwareWhere.Nowhere
+								: IsUnder(firmwareFolder, entry.Path) ? FirmwareWhere.FirmwareFolder
+								: FirmwareWhere.Chosen,
+							Condition = i < raw.Count && raw[i] is JObject o && o["requiredWhen"] is { } when ? ConditionText(when) : "",
+						});
+					}
 				}
-				groups.Add(new FirmwareSurveyGroup { CoreName = package.Name, PackagePath = package.Path, Rows = rows });
+				groups.Add(new FirmwareSurveyGroup { CoreName = first.Name, PackagePath = first.Path, Rows = rows });
 			}
 			return groups;
 		}
