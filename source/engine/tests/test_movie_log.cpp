@@ -308,6 +308,78 @@ int main(void)
 		ce_movie_log_free(kept);
 	}
 
+	{ // The frontend's records - markers, branches - ride the same journal, with the same guarantees:
+	  // written into the image of every rewrite, flushed as they are appended, replayed in order.
+		const char *path = "work-movie-journal-notes.txt";
+		std::remove(path);
+		std::remove("work-movie-journal-notes.txt.new");
+		auto noteIs = [](ce_movie_log *l, int64_t i, const char *text) {
+			const char *n = ce_movie_log_journal_note_at(l, i);
+			return n != nullptr && std::strcmp(n, text) == 0;
+		};
+		auto replay = [&]() {
+			ce_movie_log *back = ce_movie_log_new();
+			assert(ce_movie_log_journal_replay(back, path) > 0);
+			return back;
+		};
+		ce_movie_log *log = parsed("[Input]\nLogKey:#P1 A|\n|.|\n[/Input]\n");
+		assert(ce_movie_log_journal_open_with(log, path, "M []\n\nO []") == 0);
+		ce_movie_log_journal_note(log, "M [[2,true,\"jump\"]]");
+		ce_movie_log_add(log, "|A|");
+		ce_movie_log_journal_note(log, "B {\"id\":\"b1\"}");
+		ce_movie_log_journal_note(log, "O [\"b1\"]");
+		{
+			ce_movie_log *back = replay();
+			assert(ce_movie_log_count(back) == 2);
+			assert(ce_movie_log_journal_note_count(back) == 5);
+			assert(noteIs(back, 0, "M []"));
+			assert(noteIs(back, 1, "O []"));
+			assert(noteIs(back, 2, "M [[2,true,\"jump\"]]"));
+			assert(noteIs(back, 3, "B {\"id\":\"b1\"}"));
+			assert(noteIs(back, 4, "O [\"b1\"]"));
+			assert(ce_movie_log_journal_note_at(back, 5) == nullptr);
+			assert(ce_movie_log_journal_note_at(back, -1) == nullptr);
+			ce_movie_log_free(back);
+		}
+
+		// a record cannot hold a line end: it is written with spaces rather than split in two
+		ce_movie_log_journal_note(log, "M [\n]");
+		{
+			ce_movie_log *back = replay();
+			assert(ce_movie_log_journal_note_count(back) == 6);
+			assert(noteIs(back, 5, "M [ ]"));
+			ce_movie_log_free(back);
+		}
+
+		// a rewrite holds the frontend's new image and nothing older
+		assert(ce_movie_log_journal_open_with(log, path, "M [[2,true,\"jump\"]]\nO [\"b1\"]\n") == 0);
+		{
+			ce_movie_log *back = replay();
+			assert(ce_movie_log_count(back) == 2);
+			assert(ce_movie_log_journal_note_count(back) == 2);
+			assert(noteIs(back, 1, "O [\"b1\"]"));
+			ce_movie_log_free(back);
+		}
+
+		// a record the crash cut short is not replayed
+		{
+			std::FILE *f = std::fopen(path, "ab");
+			std::fputs("X M [[9", f);
+			std::fclose(f);
+			ce_movie_log *back = replay();
+			assert(ce_movie_log_journal_note_count(back) == 2);
+			ce_movie_log_free(back);
+		}
+
+		// a log that is not journaling takes records nowhere, and nothing breaks
+		ce_movie_log *plain = ce_movie_log_new();
+		ce_movie_log_journal_note(plain, "M []");
+		assert(ce_movie_log_journal_note_count(plain) == 0);
+		ce_movie_log_free(plain);
+		ce_movie_log_journal_close(log, 1);
+		ce_movie_log_free(log);
+	}
+
 	std::puts("test_movie_log: all ok");
 	return 0;
 }

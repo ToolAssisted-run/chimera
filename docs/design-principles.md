@@ -3000,3 +3000,38 @@ unchanged; across a restart they are recomputed by replay. The declaration is
 still written into the project, because it is what the core said. Making it
 true is Ruffle's to do, and a core that proves it - a restored state drawn to
 the right picture in a fresh process - can have it honored again.
+
+## Markers and branches are journaled too, and unsaved work is locked (user-decided, 2026-09-13)
+
+Two follow-ups the user set for recovery. First, the markers and branches are
+journaled as they change, like the inputs, instead of reaching the disk only in
+the snapshot every few seconds. Second, the journal is a cache manager object,
+locked by default.
+
+The journal stays one file and stays the engine's. The engine carries the
+frontend's own records without interpreting them: an image of every marker and
+branch goes into the same fresh file as the input log whenever the journal is
+rewritten, so no crash can separate them, and each later change is appended
+with the same flush and the same once-a-second sync as an input. Three records
+say everything: `M` the markers a person placed (the run's own are derived),
+`B` one branch whole, keyed by its Uuid, and `O` the branch order - the list IS
+those ids, so a removal needs no record of its own. A branch's input log is in
+its record, but only when that branch changes. Changes are found by comparing
+cheap signatures on every pass of the main loop rather than by events, because
+a marker's message and a branch's text are plain properties anybody can set.
+Recovery replays the inputs, then takes the markers, branches and order the
+records end on; a journal with no such records leaves the base project's.
+
+Making it a cache entry uncovered a real hole. The recovery folder lived inside
+the project's cache, and a project's cache entry is the whole folder - so the
+auto-clean, which takes unlocked greenzones oldest first, or anyone removing a
+greenzone by hand, would have deleted unrecovered work with it. Recovery now has
+its own root, `<data>/Recovery/<id>`, and its own kind (`CacheKind.Recovery`,
+"Unsaved work"). The lock book already started every kind but greenzones locked;
+unsaved work joins them for the opposite reason from the small caches - it is
+the one entry whose loss is work rather than time. It is in use while any
+session that owns it is running, and a folder where an earlier build left it is
+moved on first use.
+
+One slip worth a line: a hand-typed separator went into the source as a raw
+control character, six times over. It compiled and ran; it is now an escape.

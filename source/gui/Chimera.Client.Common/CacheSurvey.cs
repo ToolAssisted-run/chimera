@@ -21,6 +21,14 @@ namespace Chimera.Client.Common
 
 		/// <summary>What each core's repository last said it had published.</summary>
 		CoreVersions,
+
+		/// <summary>
+		/// The journal of an open project's work, or what a crashed session left of it (ProjectRecovery):
+		/// inputs, markers and branches that may never have been saved. The one kind whose loss is work
+		/// rather than time, so it starts locked, and it lives apart from the project's cache so removing a
+		/// greenzone can never take it.
+		/// </summary>
+		Recovery,
 	}
 
 	/// <summary>One thing on disk that can be thrown away.</summary>
@@ -98,13 +106,14 @@ namespace Chimera.Client.Common
 			? "The project this belongs to is not where it was last seen."
 			: "";
 
-		/// <summary>What is actually lost by deleting it. Never work; always time.</summary>
+		/// <summary>What is actually lost by deleting it: time, for everything but unsaved work.</summary>
 		public string Cost => Kind switch
 		{
 			CacheKind.Project => "The run replays instead of resuming, and its files are asked for once more.",
 			CacheKind.CorePackage => "The package is unzipped again the next time it is loaded.",
 			CacheKind.CompiledCode => "The game's code is translated again, which is minutes on a first boot.",
 			CacheKind.CoreVersions => "The Core Manager asks each repository again instead of showing what it saw last.",
+			CacheKind.Recovery => "Unsaved work - inputs, markers and branches a session never saved. Removing it loses that work for good.",
 			_ => "",
 		};
 	}
@@ -282,6 +291,28 @@ namespace Chimera.Client.Common
 					LastUsed = project.LastUsed,
 					InUse = inUse,
 					Locked = CacheLocks.IsLocked(locks, CacheKind.Project, project.Path),
+				});
+			}
+
+			// Unsaved work: the open project's journal, and whatever a crashed session left. Its own
+			// kind and its own root, so a lock can hold it by default and removing a greenzone cannot
+			// reach it; in use while any session that owns it is running.
+			foreach (var (dir, label, projectPath, live) in ProjectRecovery.Entries())
+			{
+				var id = System.IO.Path.GetFileName(dir);
+				var open = openProjectId is { Length: > 0 }
+					&& string.Equals(System.IO.Path.GetFileName(ProjectCache.DirectoryFor(openProjectId)), id, StringComparison.OrdinalIgnoreCase);
+				items.Add(new CacheItem
+				{
+					Kind = CacheKind.Recovery,
+					Label = label,
+					Detail = id,
+					Path = dir,
+					ProjectPath = projectPath,
+					Bytes = SizeOf(dir),
+					LastUsed = TouchedAt(dir),
+					InUse = open || live,
+					Locked = CacheLocks.IsLocked(locks, CacheKind.Recovery, dir),
 				});
 			}
 
@@ -541,6 +572,7 @@ namespace Chimera.Client.Common
 			CacheKind.CorePackage => "Unpacked core",
 			CacheKind.CompiledCode => "Compiled code",
 			CacheKind.CoreVersions => "Core versions",
+			CacheKind.Recovery => "Unsaved work",
 			_ => kind.ToString(),
 		};
 

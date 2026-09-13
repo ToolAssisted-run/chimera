@@ -334,24 +334,36 @@ The work in a project survives any end of the process - a GPU driver that
 fast-fails, a kill, a power cut - because none of it waits for a crash to be
 saved (docs/design-principles.md, "A crash takes nothing that was entered").
 
-While a project is open, beside its cache (`<data>/Projects/<id>/recovery/`):
+While a project is open, its recovery folder is `<data>/Recovery/<id>/` - its
+own root, never inside the project's cache, so removing a greenzone cannot take
+it:
 
-- `inputs.journal` - the engine journals the movie's input log
-  (`ce_movie_log_journal_open`): the whole log first, then one line per change,
-  flushed to the OS as it happens and synced at most once a second.
-- `snapshot.chimeraProject` - the whole project as it stands (markers,
-  branches, settings; never the greenzone), rewritten every few seconds while
-  there is unsaved work, and at once when an error is caught.
-- `session.json` - the process that owns the folder, so a project open in
-  another running Chimera is never mistaken for a crash.
+- `work.journal` - one journal for all of the work. The engine writes the
+  movie's input log into it (`ce_movie_log_journal_open_with`), and the frontend
+  writes its markers and branches in the same fresh file; then every change is
+  appended as it happens - an input by the engine, a marker or branch by the
+  frontend (`ce_movie_log_journal_note`: `M` the markers, `B` one branch whole,
+  `O` the branch order) - flushed to the OS at once and synced at most once a
+  second. It is rewritten only when it has grown well past its last image.
+- `snapshot.chimeraProject` - the rest of the project as it stands (settings,
+  headers; never the greenzone), rewritten every few seconds while there is
+  unsaved work, and at once when an error is caught.
+- `session.json` - the process that owns the folder and the project's title, so
+  a project open in another running Chimera is never mistaken for a crash.
 
-Closing the project removes the folder. Opening a project whose folder outlived
-its process rebuilds the work first: the newer of the snapshot and the saved
-file, with the journal's inputs, written to the backups folder as
-`<name>.recovered <time>.chimeraProject`. The person is then asked whether to
-open that work in place of the file's (it opens unsaved; saving writes it to the
-project) or the project as last saved (the copy stays). A recovered copy never
-overwrites a project. Headless runs do not ask; they report the copy's path.
+The folder is a cache entry of its own ("Unsaved work" in the cache manager),
+locked by default: the auto-clean never takes it, it is in use while its
+session runs, and removing it by hand is a person's decision. Closing the
+project removes it.
+
+Opening a project whose folder outlived its process rebuilds the work first: the
+newer of the snapshot and the saved file, with the journal's inputs, markers and
+branches, written to the backups folder as `<name>.recovered <time>.chimeraProject`.
+The person is then asked whether to open that work in place of the file's (it
+opens unsaved; saving writes it to the project) or the project as last saved
+(the copy stays). A recovered copy never overwrites a project. Headless runs do
+not ask; they report the copy's path. A folder left where an earlier build kept
+it (`Projects/<id>/recovery`) is moved to the new root the first time.
 
 ## Architecture decisions
 

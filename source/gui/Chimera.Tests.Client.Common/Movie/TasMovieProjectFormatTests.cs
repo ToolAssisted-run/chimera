@@ -299,6 +299,42 @@ namespace Chimera.Tests.Client.Common.Movie
 		}
 
 		/// <summary>
+		/// An open session journals its markers and branches as they change, not when it saves: a marker
+		/// renamed, a marker added and a branch renamed after the last save all come back from the journal
+		/// alone - the snapshot is thrown away before the rebuild, so nothing else could have carried them.
+		/// </summary>
+		[TestMethod]
+		public void TheOpenSessionJournalsMarkersAndBranchesAsTheyChange()
+		{
+			var path = Path.Combine(_dir, "journaled.chimeraProject");
+			var movie = MakeWorkedMovie(path);
+			Assert.IsFalse(movie.Save().IsError);
+			var recovery = ProjectRecovery.Begin(movie, movie.Project.Id, path);
+			Assert.IsNotNull(recovery);
+
+			movie.Markers.Single(static m => m.Message == "the jump").Message = "the long jump";
+			movie.Markers.Add(new TasMovieMarker(5, "the landing"), skipHistory: true);
+			movie.Branches[0].UserText = "safer route";
+			recovery.Tick();
+
+			// the crash: nothing closes, the session's process is gone, and the snapshot is not trusted here
+			var dir = ProjectRecovery.DirectoryFor(movie.Project.Id);
+			ProjectRecovery.WriteSession(dir, new ProjectRecovery.SessionRecord { ProcessId = int.MaxValue, ProcessStartedUtcTicks = 1, ProjectPath = path });
+			File.Delete(Path.Combine(dir, "snapshot.chimeraProject"));
+
+			var leftover = ProjectRecovery.FindUnfinished(movie.Project.Id);
+			Assert.IsNotNull(leftover);
+			var copy = ProjectRecovery.BuildRecoveredCopy(leftover, path, Path.Combine(_dir, "Backups"));
+			using var recovered = Chimera.Emulation.Common.Engine.EngineProject.Open(copy);
+			var messages = Enumerable.Range(0, recovered.MarkerCount).Select(recovered.MarkerText).ToArray();
+			CollectionAssert.Contains(messages, "the long jump");
+			CollectionAssert.Contains(messages, "the landing");
+			Assert.AreEqual("safer route", recovered.BranchName(0));
+			recovery.End(clean: true);
+			Assert.IsFalse(Directory.Exists(dir), "and a clean end leaves nothing behind");
+		}
+
+		/// <summary>
 		/// A savestate is the memory of one exact machine, and the sandbox only
 		/// checks the core binary when it loads one. The cache says which machine
 		/// made its states, and a project whose machine has since changed - a

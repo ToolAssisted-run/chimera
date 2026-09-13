@@ -268,6 +268,47 @@ namespace Chimera.Tests.Client.Common
 			Assert.IsFalse(CacheLocks.IsLocked(CacheKind.Project, item.Path));
 		}
 
+		/// <summary>
+		/// Unsaved work is a cache entry of its own - the one whose loss is work, not time - so it starts
+		/// locked, the auto-clean cannot take it, it is in use while its project is open, and removing that
+		/// project's greenzone leaves it where it is. Removing it by hand is still a person's decision.
+		/// </summary>
+		/// <remarks>Serialised: the lock book is one file every test in the process shares.</remarks>
+		[TestMethod]
+		[DoNotParallelize]
+		public void UnsavedWorkIsALockedEntryOfItsOwn()
+		{
+			const string id = "00000000000000cc";
+			var dir = ProjectRecovery.DirectoryFor(id);
+			Fill(dir, "work.journal", 1024);
+			ProjectRecovery.WriteSession(dir, new ProjectRecovery.SessionRecord
+			{
+				ProcessId = int.MaxValue,
+				ProcessStartedUtcTicks = 1,
+				ProjectPath = Path.Combine(_dir, "lost.chimeraProject"),
+				Title = "The lost run",
+			});
+
+			var work = CacheSurvey.Take(null, null).Single(i => i.Kind is CacheKind.Recovery && i.Detail is id);
+			Assert.AreEqual("The lost run", work.Label);
+			Assert.IsTrue(work.Locked, "unsaved work starts locked");
+			Assert.IsFalse(work.InUse);
+			Assert.AreEqual(0, CacheSurvey.WhatWouldGo(new[] { work }, limitBytes: 0).Count, "the auto-clean cannot reach it");
+			StringAssert.Contains(work.Cost, "loses");
+
+			var open = CacheSurvey.Take(null, null, openProjectId: id).Single(i => i.Kind is CacheKind.Recovery && i.Detail is id);
+			Assert.IsTrue(open.InUse, "the open project's journal cannot be pulled out from under it");
+
+			ProjectCache.Ensure(id);
+			Fill(ProjectCache.DirectoryFor(id), "history.bin", 2048);
+			var greenzone = CacheSurvey.Take(null, null).Single(i => i.Kind is CacheKind.Project && i.Detail is id);
+			Assert.IsNull(CacheSurvey.Remove(greenzone));
+			Assert.IsTrue(Directory.Exists(dir), "removing the greenzone never takes the unsaved work");
+
+			Assert.IsNull(CacheSurvey.Remove(work), "but removing the work itself, by hand, is allowed");
+			Assert.IsFalse(Directory.Exists(dir));
+		}
+
 		private static CacheItem Aged(string path, long bytes, int daysAgo, bool locked = false, bool inUse = false)
 			=> new()
 			{

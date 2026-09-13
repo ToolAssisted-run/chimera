@@ -10,7 +10,7 @@ makes a window with a Remove button in it safe to offer at all, and it is what
 decides membership: a thing belongs here only if the worst outcome of deleting
 it is waiting.
 
-So the window lists four kinds:
+So the window lists five kinds, and the fifth is the one exception below:
 
 * **Project** - a run's state history (the greenzone) and where this machine
   last found the project's files. Losing it means the run replays instead of
@@ -21,13 +21,25 @@ So the window lists four kinds:
   (`docs/compile-cache.md`). Losing it means minutes on the next first boot.
 * **Core versions** - what each core repository last said it had published.
   Losing it means the Core Manager asks again.
+* **Unsaved work** - a project's recovery journal (docs/project.md,
+  "Recovery"): the open session's inputs, markers and branches as they change,
+  or what a crashed session left of them. Losing it loses that work.
 
 And it lists nothing else. Installed cores are the Core Manager's, because a
 movie needs the exact build that recorded it; projects, roms and firmware are
 not caches at all. A window that mixed those in would be a window where the
 rule stops being true, and then no row in it is safe.
 
-The one exception the window enforces itself: **what is open cannot be
+**Unsaved work breaks the rule on purpose** (user-decided, 2026-09-13). It is
+listed because a crash leaves it on disk, and the window is where somebody
+looks to see what Chimera is keeping and to throw it away once it is dealt
+with. What keeps the window safe with it in: it starts **locked**, so the
+auto-clean and the limit never take it; it is **in use** - not removable - while
+the session that owns it runs; its row says removing it loses work; and removing
+it is a deliberate press like any other. It lives under its own root rather than
+inside the project's cache, so removing a greenzone can never take it with it.
+
+The other exception the window enforces itself: **what is open cannot be
 removed**. Pulling a greenzone out from under a running session costs work, not
 time, so the tick is refused rather than the removal being attempted.
 
@@ -43,6 +55,7 @@ Everything the window lists is under the user's data directory -
 | `UnpackedCores/<name>-<sha1>/` | a `.chimeraCore` unzipped so it can be loaded |
 | `CompiledCode/<core>/<version>/` | what cores compiled for a game |
 | `Cores/.feed-cache/` | what each core repository last said it published |
+| `Recovery/<id>/` | unsaved work: one project's recovery journal, snapshot and session |
 | `cache-locks.json` | which entries the auto-clean may not take |
 
 **Nothing cached goes in the install directory.** A Chimera bundle is a zip
@@ -176,6 +189,7 @@ The defaults follow which way round the mistake would matter:
 | Unpacked core | locked | small; evicting it frees nothing and stalls the next boot |
 | Compiled code | locked | same |
 | Core versions | locked | same |
+| Unsaved work | locked | the opposite reason: losing it loses work, not time |
 
 So the limit falls where the room actually goes, and the furniture stays put
 unless somebody says otherwise.

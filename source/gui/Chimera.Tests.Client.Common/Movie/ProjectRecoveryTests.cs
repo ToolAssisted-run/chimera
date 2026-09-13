@@ -171,6 +171,37 @@ namespace Chimera.Tests.Client.Common.Movie
 		}
 
 		[TestMethod]
+		public void MarkersAndBranchesComeBackFromTheJournal()
+		{
+			// the project as last saved has none; everything below is work the journal alone holds
+			var projectPath = SaveProject("markers and branches");
+			var dir = RecoveryDirOf(projectPath);
+			CrashedSession(dir, projectPath);
+			var log = new EngineMovieLog();
+			Assert.IsTrue(log.Parse(SavedLog, out _));
+			Assert.IsTrue(log.JournalTo(Path.Combine(dir, "work.journal"), "M []\nO []\n"));
+			log.JournalNote("""M [[1,false,"the jump"],[5,true,"caf\u00e9"]]""");
+			log.JournalNote("""B {"id":"a","text":"route A","frame":1,"time":"2026-09-13T20:00:00.0000000Z","log":"|..|\n|A.|\n","markers":[[0,true,"start"]]}""");
+			log.JournalNote("""B {"id":"b","text":"route B","frame":2,"time":"2026-09-13T20:01:00.0000000Z","log":"|.B|\n","markers":[]}""");
+			log.JournalNote("""O ["b","a"]""");
+			// and an edit afterwards, which is the one that counts
+			log.JournalNote("""B {"id":"a","text":"route A, renamed","frame":1,"time":"2026-09-13T20:00:00.0000000Z","log":"|..|\n|A.|\n","markers":[[0,true,"start"]]}""");
+			log.Dispose();
+
+			var copy = ProjectRecovery.BuildRecoveredCopy(ProjectRecovery.FindUnfinishedIn(dir)!, projectPath, Path.Combine(_dir, "Backups"));
+			using var recovered = EngineProject.Open(copy);
+			Assert.AreEqual(2, recovered.MarkerCount);
+			Assert.AreEqual(1, recovered.MarkerFrame(0));
+			Assert.AreEqual(5, recovered.MarkerFrame(1));
+			Assert.AreEqual(2, recovered.BranchCount, "the order record says which branches exist");
+			Assert.AreEqual("route B", recovered.BranchName(0), "and in which order");
+			Assert.AreEqual("route A, renamed", recovered.BranchName(1), "the last record of a branch is the branch");
+			Assert.AreEqual("|..|\n|A.|\n", recovered.BranchLogText(1));
+			Assert.AreEqual(1, recovered.BranchMarkerCount(1));
+			StringAssert.Contains(recovered.LogText, "|..|", "and the inputs came back with them");
+		}
+
+		[TestMethod]
 		public void AFolderWithNothingInItOffersNothing()
 		{
 			var projectPath = SaveProject("nothing to recover");

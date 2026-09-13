@@ -26,7 +26,9 @@ namespace Chimera.Client.Common
 	/// code, the version index - starts locked: it is small enough that evicting
 	/// it frees nothing worth having, and losing it stalls the next boot for no
 	/// gain. So the limit falls where the room actually goes, and the little
-	/// things stay put unless somebody says otherwise.
+	/// things stay put unless somebody says otherwise. Unsaved work (a project's
+	/// recovery journal) starts locked for the opposite reason: it is the one
+	/// entry whose loss is work rather than time.
 	///
 	/// Kept beside the caches rather than inside them, and keyed by location: a
 	/// core package directory is unzipped from a package and must stay exactly

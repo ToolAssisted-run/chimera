@@ -94,6 +94,18 @@ namespace Chimera.Emulation.Common.Engine
 		public abstract long ce_movie_log_journal_replay(IntPtr log, string path);
 
 		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract int ce_movie_log_journal_open_with(IntPtr log, string path, string? frontendImage);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract void ce_movie_log_journal_note(IntPtr log, string record);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract long ce_movie_log_journal_note_count(IntPtr log);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_movie_log_journal_note_at(IntPtr log, long index);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_movie_header_new();
 
 		[ChimeraImport(CallingConvention.Cdecl)]
@@ -987,7 +999,29 @@ namespace Chimera.Emulation.Common.Engine
 		/// whole log there (ce_movie_log_journal_open). Calling it again rewrites the image and continues,
 		/// which is how the journal is kept short. False when the file could not be written.
 		/// </summary>
-		public bool JournalTo(string path) => ChimeraEngine.Instance.ce_movie_log_journal_open(_log, path) is 0;
+		public bool JournalTo(string path, string? frontendImage = null)
+			=> ChimeraEngine.Instance.ce_movie_log_journal_open_with(_log, path, frontendImage) is 0;
+
+		/// <summary>
+		/// Appends one of the frontend's own records (its markers, its branches) to the journal, flushed and
+		/// synced exactly like an input change. Nothing happens when the log is not journaling.
+		/// </summary>
+		public void JournalNote(string record) => ChimeraEngine.Instance.ce_movie_log_journal_note(_log, record);
+
+		/// <summary>The frontend's records the last replay into this log found, in the order they were written.</summary>
+		public IReadOnlyList<string> JournalNotes
+		{
+			get
+			{
+				var count = ChimeraEngine.Instance.ce_movie_log_journal_note_count(_log);
+				List<string> notes = new((int)Math.Min(count, int.MaxValue));
+				for (long i = 0; i < count; i++)
+				{
+					notes.Add(ChimeraEngine.PtrToStringUtf8(ChimeraEngine.Instance.ce_movie_log_journal_note_at(_log, i)) ?? "");
+				}
+				return notes;
+			}
+		}
 
 		/// <summary>Stops journaling; <paramref name="remove"/> also deletes the journal (a session that ended cleanly).</summary>
 		public void JournalClose(bool remove) => ChimeraEngine.Instance.ce_movie_log_journal_close(_log, remove ? 1 : 0);

@@ -136,6 +136,18 @@ CE_API void ce_movie_log_journal_close(ce_movie_log *log, int32_t remove);
 CE_API int32_t ce_movie_log_journaling(const ce_movie_log *log);
 CE_API int64_t ce_movie_log_journal_replay(ce_movie_log *log, const char *path);
 
+/* The frontend's own records ride the same journal - its markers and branches, which the engine
+ * carries without interpreting. _journal_open_with is _journal_open with the frontend's whole image
+ * (newline-separated records) written into the same fresh file right after the log's, so no rewrite
+ * can separate them. _journal_note appends one record, flushed and synced exactly like an input
+ * change (a record cannot hold a line end; one that does is written with spaces). A replay keeps the
+ * records it found, in the order they were written, readable through _note_count and _note_at
+ * (NULL out of range; invalidated by the next replay into the same log). */
+CE_API int32_t ce_movie_log_journal_open_with(ce_movie_log *log, const char *path, const char *frontend_image);
+CE_API void ce_movie_log_journal_note(ce_movie_log *log, const char *record);
+CE_API int64_t ce_movie_log_journal_note_count(const ce_movie_log *log);
+CE_API const char *ce_movie_log_journal_note_at(const ce_movie_log *log, int64_t index);
+
 /* ---- movie header ----
  *
  * The Header.txt lump: "Key Value" per line. Parsing keeps the FIRST

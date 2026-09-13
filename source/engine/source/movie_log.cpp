@@ -92,6 +92,9 @@ struct ce_movie_log : MovieLog
 	std::FILE *journal = nullptr;
 	std::string journalPath;
 	std::chrono::steady_clock::time_point journalSynced{};
+	/* The frontend's own records a replay found ("X ..." lines), in order: its markers and branches,
+	 * which the engine carries and does not interpret. */
+	std::vector<std::string> journalNotes;
 
 	ce_movie_log() = default;
 	ce_movie_log(const ce_movie_log &) = delete;
@@ -207,7 +210,7 @@ ce_movie_log *ce_movie_log_new(void) { return new ce_movie_log(); }
 
 void ce_movie_log_free(ce_movie_log *log) { delete log; }
 
-int32_t ce_movie_log_journal_open(ce_movie_log *log, const char *path)
+int32_t ce_movie_log_journal_open_with(ce_movie_log *log, const char *path, const char *frontend)
 {
 	if (log == nullptr || path == nullptr || path[0] == '\0') return 1;
 	const std::string target = path;
@@ -218,7 +221,21 @@ int32_t ce_movie_log_journal_open(ce_movie_log *log, const char *path)
 	 * that rebuilds everything. */
 	std::FILE *f = std::fopen(fresh.c_str(), "wb");
 	if (f == nullptr) return 1;
-	const std::string image = imageOf(log, true);
+	std::string image = imageOf(log, true);
+	/* The frontend's own image - every marker, every branch - goes into the same fresh file, so a
+	 * crash in the middle of a rewrite can never leave the inputs without them. */
+	if (frontend != nullptr)
+	{
+		const char *p = frontend;
+		while (*p != '\0')
+		{
+			const char *eol = std::strchr(p, '\n');
+			const size_t n = eol != nullptr ? static_cast<size_t>(eol - p) : std::strlen(p);
+			if (n != 0) image.append("X ").append(oneLine(std::string(p, n).c_str())).append("\n");
+			p += n;
+			if (*p == '\n') p++;
+		}
+	}
 	const bool written = std::fwrite(image.data(), 1, image.size(), f) == image.size() && std::fflush(f) == 0;
 	if (written) syncFile(f);
 	std::fclose(f);
@@ -250,6 +267,11 @@ int32_t ce_movie_log_journal_open(ce_movie_log *log, const char *path)
 	return 0;
 }
 
+int32_t ce_movie_log_journal_open(ce_movie_log *log, const char *path)
+{
+	return ce_movie_log_journal_open_with(log, path, nullptr);
+}
+
 void ce_movie_log_journal_close(ce_movie_log *log, int32_t remove)
 {
 	if (log == nullptr) return;
@@ -273,6 +295,23 @@ int32_t ce_movie_log_journaling(const ce_movie_log *log)
 	return log != nullptr && log->journal != nullptr ? 1 : 0;
 }
 
+void ce_movie_log_journal_note(ce_movie_log *log, const char *record)
+{
+	if (log == nullptr || log->journal == nullptr || record == nullptr) return;
+	journalAppend(log, "X " + oneLine(record) + "\n");
+}
+
+int64_t ce_movie_log_journal_note_count(const ce_movie_log *log)
+{
+	return log != nullptr ? static_cast<int64_t>(log->journalNotes.size()) : 0;
+}
+
+const char *ce_movie_log_journal_note_at(const ce_movie_log *log, int64_t index)
+{
+	if (log == nullptr || index < 0 || index >= static_cast<int64_t>(log->journalNotes.size())) return nullptr;
+	return log->journalNotes[static_cast<size_t>(index)].c_str();
+}
+
 int64_t ce_movie_log_journal_replay(ce_movie_log *log, const char *path)
 {
 	if (log == nullptr || path == nullptr) return -1;
@@ -293,6 +332,7 @@ int64_t ce_movie_log_journal_replay(ce_movie_log *log, const char *path)
 	log->entries.clear();
 	log->logKey.reset();
 	log->stateFrame.reset();
+	log->journalNotes.clear();
 	int64_t applied = 0;
 	size_t pos = magicLen + 1;
 	while (pos < text.size())
@@ -342,6 +382,9 @@ int64_t ce_movie_log_journal_replay(ce_movie_log *log, const char *path)
 				log->entries.erase(log->entries.begin() + static_cast<ptrdiff_t>(a),
 					log->entries.begin() + static_cast<ptrdiff_t>(a + b));
 			}
+			break;
+		case 'X':
+			log->journalNotes.push_back(rest());
 			break;
 		default:
 			ok = false;
