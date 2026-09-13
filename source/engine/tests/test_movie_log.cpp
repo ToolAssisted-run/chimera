@@ -166,6 +166,148 @@ int main(void)
 		ce_movie_log_free(log);
 	}
 
+	{ // The input journal: every change survives the process, and a journal alone
+	  // rebuilds the log. Whatever kills the process - a GPU driver fast-failing, a
+	  // kill, a power cut - the inputs entered up to that moment are on disk.
+		const char *path = "work-movie-journal.txt";
+		const char *fresh = "work-movie-journal.txt.new";
+		std::remove(path);
+		std::remove(fresh);
+		auto same = [](ce_movie_log *a, ce_movie_log *b) {
+			if (ce_movie_log_count(a) != ce_movie_log_count(b)) return false;
+			for (int64_t i = 0; i < ce_movie_log_count(a); i++)
+			{
+				if (std::strcmp(ce_movie_log_entry(a, i), ce_movie_log_entry(b, i)) != 0) return false;
+			}
+			const char *ka = ce_movie_log_key(a), *kb = ce_movie_log_key(b);
+			return (ka == nullptr) == (kb == nullptr) && (ka == nullptr || std::strcmp(ka, kb) == 0);
+		};
+		auto replayed = [&](const char *from, int64_t *records = nullptr) {
+			ce_movie_log *back = ce_movie_log_new();
+			const int64_t n = ce_movie_log_journal_replay(back, from);
+			if (records != nullptr) *records = n;
+			return back;
+		};
+
+		ce_movie_log *log = parsed("[Input]\nLogKey:#P1 A|\n|.|\n|A|\n[/Input]\n");
+		assert(!ce_movie_log_journaling(log));
+		assert(ce_movie_log_journal_open(log, path) == 0);
+		assert(ce_movie_log_journaling(log));
+
+		// every kind of change, each on disk the moment it returns
+		ce_movie_log_add(log, "|A|");
+		ce_movie_log_set(log, 0, "|B|");
+		ce_movie_log_insert(log, 1, "|C|");
+		ce_movie_log_remove_range(log, 2, 1);
+		ce_movie_log_add(log, "|D|");
+		ce_movie_log_truncate(log, 3);
+		ce_movie_log_set_key(log, "#P1 B|");
+		ce_movie_log_insert(log, 3, "|E|");     // an insert at the end is an append
+		ce_movie_log_remove_range(log, -1, 2);  // clamped: removes entry 0
+		ce_movie_log_set(log, 99, "|nope|");    // out of range: no change, nothing journaled
+		ce_movie_log_insert(log, 99, "|nope|");
+		{
+			int64_t records = 0;
+			ce_movie_log *back = replayed(path, &records);
+			assert(records > 0);
+			assert(same(back, log));
+			ce_movie_log_free(back);
+		}
+
+		// a record the crash cut short - no line end - is not replayed
+		{
+			std::FILE *f = std::fopen(path, "ab");
+			std::fputs("A |torn", f);
+			std::fclose(f);
+			ce_movie_log *back = replayed(path);
+			assert(same(back, log));
+			ce_movie_log_free(back);
+		}
+
+		// reopening rewrites the image (how the journal is kept short) and loses nothing
+		assert(ce_movie_log_journal_open(log, path) == 0);
+		ce_movie_log_add(log, "|F|");
+		{
+			ce_movie_log *back = replayed(path);
+			assert(same(back, log));
+			ce_movie_log_free(back);
+		}
+
+		// a parse and an assign replace the whole log, and the journal says so
+		assert(ce_movie_log_parse(log, "[Input]\nLogKey:#X|\n|1|\n|2|\n[/Input]\n", 34) == 0);
+		{
+			ce_movie_log *back = replayed(path);
+			assert(same(back, log));
+			ce_movie_log_free(back);
+		}
+		ce_movie_log *other = parsed("[Input]\nLogKey:#Y|\n|9|\n[/Input]\n");
+		ce_movie_log_assign(log, other);
+		ce_movie_log_clear(other);
+		ce_movie_log_add(log, "|10|");
+		{
+			ce_movie_log *back = replayed(path);
+			assert(same(back, log));
+			assert(ce_movie_log_count(back) == 2);
+			ce_movie_log_free(back);
+		}
+		ce_movie_log_free(other);
+
+		// a clear is a change like any other
+		ce_movie_log_clear(log);
+		ce_movie_log_add(log, "|after clear|");
+		{
+			ce_movie_log *back = replayed(path);
+			assert(same(back, log));
+			assert(ce_movie_log_key(back) == nullptr);
+			ce_movie_log_free(back);
+		}
+
+		// the crash itself: the log is gone without a close, and the file is not
+		ce_movie_log *kept = ce_movie_log_new();
+		ce_movie_log_assign(kept, log);
+		ce_movie_log_free(log);
+		{
+			ce_movie_log *back = replayed(path);
+			assert(same(back, kept));
+			ce_movie_log_free(back);
+		}
+
+		// a journal caught between its rewrite and its rename is read from the fresh file
+		std::rename(path, fresh);
+		{
+			ce_movie_log *back = replayed(path);
+			assert(same(back, kept));
+			ce_movie_log_free(back);
+		}
+		std::remove(fresh);
+
+		// nothing to rebuild from, or something that is not a journal
+		{
+			int64_t records = 0;
+			ce_movie_log *back = replayed(path, &records);
+			assert(records == -1);
+			assert(std::strlen(ce_movie_log_last_error(back)) > 0);
+			ce_movie_log_free(back);
+			std::FILE *f = std::fopen(path, "wb");
+			std::fputs("[Input]\n|1|\n", f);
+			std::fclose(f);
+			back = replayed(path, &records);
+			assert(records == -1);
+			ce_movie_log_free(back);
+		}
+
+		// a session that ended cleanly leaves nothing behind
+		ce_movie_log *clean = parsed("[Input]\nLogKey:#P1 A|\n|.|\n[/Input]\n");
+		assert(ce_movie_log_journal_open(clean, path) == 0);
+		ce_movie_log_add(clean, "|A|");
+		ce_movie_log_journal_close(clean, 1);
+		assert(!ce_movie_log_journaling(clean));
+		assert(std::fopen(path, "rb") == nullptr);
+		ce_movie_log_add(clean, "|not journaled|");   // closed: changes go nowhere, and nothing breaks
+		ce_movie_log_free(clean);
+		ce_movie_log_free(kept);
+	}
+
 	std::puts("test_movie_log: all ok");
 	return 0;
 }

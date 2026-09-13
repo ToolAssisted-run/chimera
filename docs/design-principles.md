@@ -2920,6 +2920,61 @@ movie to an OK dump, and never asked; the same project pinned to a build that is
 not installed stopped at the prompt (exit 64). The chosen build in the config
 was the copy, untouched by the project's own load.
 
+## A crash takes nothing that was entered (user-decided, 2026-09-13)
+
+The user asked for crashes not to be fatal, and above all for the work in
+progress - the inputs - never to be lost, even when a crash cannot be survived.
+
+The crash that prompted it could not have been caught. nss102 died inside the
+NVIDIA OpenGL driver with 0xc0000409, a fast-fail: Windows ends the process on
+the spot and runs no handler, managed or native. A design that saves the work
+"on the way down" saves nothing in exactly the crashes that matter most, and a
+killed process or a power cut is no kinder. So the inputs never wait for a
+crash: they are on disk before anything can go wrong.
+
+The input log is the engine's (`ce_movie_log`), so the engine journals it. A
+journal opened on a log first writes the whole log, then appends one line per
+change - add, set, insert, remove, truncate, clear, key, or a whole image for a
+parse or an assign - and hands each line to the operating system with a flush
+the moment it is made, syncing to the disk at most once a second. Bytes the OS
+holds outlive the process whatever kills it; a power cut costs at most that
+second. The journal alone rebuilds the log; a line the crash cut short is not
+replayed; rewriting the journal goes through a fresh file and a rename, so a
+crash mid-rewrite still leaves a whole one.
+
+The frontend keeps the rest (`ProjectRecovery`, per project, beside its cache):
+a session file naming the process, a snapshot of the whole project - markers,
+branches, settings, written through the backup path, so no greenzone and no
+change to what counts as saved - rewritten every few seconds while there is
+unsaved work, and the journal restarted with each snapshot to keep it short.
+A branch load replaces the movie's log object, and the journal follows it.
+Closing the project removes it all.
+
+Opening a project whose recovery files outlived the process that wrote them
+(the process is gone, or is another process with that id) rebuilds the work
+before anything else happens: the newer of the snapshot and the saved project
+file is the base, the journal's inputs replace its log, and the result is
+written into the backups folder as `<name>.recovered <time>.chimeraProject` -
+never over the project. Then it asks: yes swaps that content in, unsaved, and a
+save writes it to the project; no opens the project as last saved and the copy
+stays. A headless run never asks; it says where the copy is.
+
+What can be caught is survived. An error on the UI thread, or in a frame step
+(the core, the movie, a tool), keeps the work (a snapshot on the spot), pauses
+emulation and says so - with the work's state in the message - and the session
+goes on; a burst of them is told a few times and then only on the status line,
+so recovering cannot become an endless run of dialogs. An error on another
+thread ends the process whatever a handler does, so that handler only keeps the
+work. Headless runs still fail loudly, so a gate cannot pass by swallowing one.
+
+Not done, on purpose: no native last-chance handler writes anything. Code that
+runs inside a process whose memory may be corrupt is the least trustworthy code
+there is, and there is nothing left for it to save - the inputs are already on
+disk. One trap met on the way: a static field of type `MainForm` on `Program`
+made every start fail, because a field's type is loaded with its class, which
+is before Chimera's assembly resolver is installed; the handlers hold framework
+delegates instead.
+
 ## A GPU core's word that its states survive is not taken (2026-09-13)
 
 Reopening nss102 (Ruffle, `opengl-hw`) crashed Chimera inside the NVIDIA OpenGL

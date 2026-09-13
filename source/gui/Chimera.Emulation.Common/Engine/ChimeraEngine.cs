@@ -82,6 +82,18 @@ namespace Chimera.Emulation.Common.Engine
 		public abstract IntPtr ce_movie_log_serialize(IntPtr log, int crlf, ref ulong lenOut);
 
 		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract int ce_movie_log_journal_open(IntPtr log, string path);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract void ce_movie_log_journal_close(IntPtr log, int remove);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract int ce_movie_log_journaling(IntPtr log);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract long ce_movie_log_journal_replay(IntPtr log, string path);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_movie_header_new();
 
 		[ChimeraImport(CallingConvention.Cdecl)]
@@ -968,6 +980,33 @@ namespace Chimera.Emulation.Common.Engine
 		{
 			get => ChimeraEngine.PtrToStringUtf8(ChimeraEngine.Instance.ce_movie_log_key(_log));
 			set => ChimeraEngine.Instance.ce_movie_log_set_key(_log, value);
+		}
+
+		/// <summary>
+		/// Journals every change of this log to <paramref name="path"/> from now on, after writing the
+		/// whole log there (ce_movie_log_journal_open). Calling it again rewrites the image and continues,
+		/// which is how the journal is kept short. False when the file could not be written.
+		/// </summary>
+		public bool JournalTo(string path) => ChimeraEngine.Instance.ce_movie_log_journal_open(_log, path) is 0;
+
+		/// <summary>Stops journaling; <paramref name="remove"/> also deletes the journal (a session that ended cleanly).</summary>
+		public void JournalClose(bool remove) => ChimeraEngine.Instance.ce_movie_log_journal_close(_log, remove ? 1 : 0);
+
+		/// <summary>Whether changes are being journaled right now (a journal that could not be written stops).</summary>
+		public bool Journaling => ChimeraEngine.Instance.ce_movie_log_journaling(_log) is not 0;
+
+		/// <summary>
+		/// A log rebuilt from a journal file - everything entered up to the moment the process ended -
+		/// or null with the reason when there is no journal to rebuild from.
+		/// </summary>
+		public static EngineMovieLog? FromJournal(string path, out string error)
+		{
+			EngineMovieLog log = new();
+			var records = ChimeraEngine.Instance.ce_movie_log_journal_replay(log._log, path);
+			error = ChimeraEngine.PtrToStringUtf8(ChimeraEngine.Instance.ce_movie_log_last_error(log._log)) ?? "";
+			if (records >= 0) return log;
+			log.Dispose();
+			return null;
 		}
 
 		/// <summary>The whole [Input] block, ready to write into a movie file.</summary>

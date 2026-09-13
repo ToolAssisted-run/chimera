@@ -778,6 +778,8 @@ namespace Chimera.Client.GUI
 				}
 				_seekQuiet = IsSeeking && !serviceHost;
 				if (serviceHost) LoopTrace.Served();
+				// the open project's work, kept recoverable (rate-limited inside)
+				if (serviceHost) _recovery?.Tick();
 
 				long loopStarted = LoopTrace.Enabled ? Stopwatch.GetTimestamp() : 0;
 				if (serviceHost) Input.Instance.Update();
@@ -854,7 +856,18 @@ namespace Chimera.Client.GUI
 				}
 				LoopTrace.Add(LoopTrace.Top, loopStarted);
 				long phaseStarted = LoopTrace.Enabled ? Stopwatch.GetTimestamp() : 0;
-				StepRunLoop_Core();
+				try
+				{
+					StepRunLoop_Core();
+				}
+				catch (Exception ex) when (!Debugger.IsAttached)
+				{
+					// A frame that throws - the core, the movie, a tool - pauses the session instead of
+					// ending it. Headless runs still fail, loudly, once the work is kept.
+					KeepWorkSafe();
+					if (HeadlessMode.Enabled) throw;
+					RecoverFromError(ex, "Emulation stopped on an error");
+				}
 				LoopTrace.Add(LoopTrace.Core, phaseStarted);
 				phaseStarted = LoopTrace.Enabled ? Stopwatch.GetTimestamp() : 0;
 				if (serviceHost) Render();

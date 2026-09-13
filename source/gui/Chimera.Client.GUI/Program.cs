@@ -101,12 +101,66 @@ namespace Chimera.Client.GUI
 		private static int Main(string[] args)
 			=> SubMain(args);
 
+		// What the crash handlers call on the window, once there is one. Delegates of framework types
+		// and not a MainForm field: a static field's TYPE is loaded with Program itself, which is before
+		// the resolver that finds Chimera's own assemblies is in place - a MainForm field made every
+		// start fail with a TypeLoadException.
+		private static Action _keepWorkSafe;
+
+		private static Action<Exception, string> _recoverFromError;
+
+		private static void OnUiThreadException(object sender, System.Threading.ThreadExceptionEventArgs e)
+		{
+			try
+			{
+				_keepWorkSafe?.Invoke();
+			}
+			catch (Exception)
+			{
+				// keeping the work is best effort here; the journal already holds every input
+			}
+			if (IsHeadless())
+			{
+				// nobody can answer a dialog, and an unattended run that swallowed an error would pass
+				Console.Error.WriteLine($"[headless] fatal exception: {e.Exception}");
+				Environment.Exit(1);
+			}
+			_recoverFromError?.Invoke(e.Exception, "Chimera hit an error");
+		}
+
+		private static void OnUnhandledException(object sender, UnhandledExceptionEventArgs e)
+		{
+			Console.Error.WriteLine($"fatal exception: {e.ExceptionObject}");
+			try
+			{
+				_keepWorkSafe?.Invoke();
+			}
+			catch (Exception)
+			{
+				// the process is ending either way; every input is already on disk
+			}
+		}
+
+		[System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+		private static bool IsHeadless() => HeadlessMode.Enabled;
+
 		// NoInlining should keep this code from getting jammed into Main() which would create dependencies on types which havent been setup by the resolver yet... or something like that
 		[System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
 		private static int SubMain(string[] args)
 		{
 			// raw scan, not ArgParser: several dialogs below can fire before arguments are parsed
 			if (Array.IndexOf(args, "--headless") >= 0 || Array.Exists(args, a => a.StartsWith("--precompile", StringComparison.Ordinal))) HeadlessMode.Enabled = true;
+
+			// An error that can be caught must not be what ends a session (docs/project.md,
+			// "Recovery"). On the UI thread it is survived: the work is snapshotted, emulation
+			// pauses and the person is told. On any other thread the runtime ends the process
+			// whatever a handler does, so the handler keeps the work and lets it go - and the
+			// inputs themselves never depended on either, being journaled as they are entered.
+			if (!Debugger.IsAttached)
+			{
+				Application.ThreadException += OnUiThreadException;
+				AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
+			}
 
 			// this check has to be done VERY early.  i stepped through a debug build with wrong .dll versions purposely used,
 			// and there was a TypeLoadException before the first line of SubMain was reached (some static ColorType init?)
@@ -366,6 +420,8 @@ namespace Chimera.Client.GUI
 					// ReSharper disable once AccessToDisposedClosure
 					mf.Config = initialConfig;
 				};
+				_keepWorkSafe = mf.KeepWorkSafe;
+				_recoverFromError = mf.RecoverFromError;
 				mf.Show();
 				try
 				{
@@ -375,6 +431,15 @@ namespace Chimera.Client.GUI
 				}
 				catch (Exception e) when (movieSession.Movie.IsActive() && !Debugger.IsAttached)
 				{
+					// kept before anything is asked: whatever the answer below, the work survives
+					try
+					{
+						mf.KeepWorkSafe();
+					}
+					catch (Exception)
+					{
+						// best effort; every input is already journaled
+					}
 					if (HeadlessMode.Enabled)
 					{
 						Console.Error.WriteLine($"[headless] fatal exception (movie active, not saving): {e}");

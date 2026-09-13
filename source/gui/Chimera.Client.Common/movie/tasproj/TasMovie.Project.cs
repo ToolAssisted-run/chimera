@@ -163,6 +163,18 @@ namespace Chimera.Client.Common
 		private static string Keep(string headerValue, string pinned)
 			=> string.IsNullOrWhiteSpace(headerValue) ? pinned : headerValue;
 
+		/// <summary>
+		/// The project as it stands, written to <paramref name="path"/> for <see cref="ProjectRecovery"/>:
+		/// exactly what a backup writes, so no greenzone and no change to what counts as saved.
+		/// </summary>
+		internal FileWriteResult WriteRecoverySnapshot(string path) => Write(path, isBackup: true);
+
+		/// <summary>Raised when the input log is replaced by another object (a branch load), so a journal can follow it.</summary>
+		public event Action InputLogReplaced;
+
+		/// <summary>The movie holds work the project file does not: it was opened from recovered work.</summary>
+		public void MarkRecovered() => Changes = true;
+
 		protected override FileWriteResult Write(string fn, bool isBackup = false)
 		{
 			if (StartsFromSavestate)

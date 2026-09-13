@@ -54,6 +54,10 @@ namespace Chimera.Client.GUI
 			{
 				if (Tools.IsLoaded<TAStudio>()) Tools.Close<TAStudio>();
 				LoadNullRom();
+				// The close is done and whatever was to be saved was saved (or knowingly
+				// thrown away), so there is nothing left to recover.
+				_recovery?.End(clean: true);
+				_recovery = null;
 			}
 			finally
 			{
@@ -258,23 +262,24 @@ namespace Chimera.Client.GUI
 		{
 			EngineProject project;
 			ProjectLocalPaths local;
+			try
+			{
+				project = EngineProject.Open(path);
+			}
+			catch (InvalidOperationException ex)
+			{
+				ShowMessageBox(owner: null, ex.Message, "Cannot open the project");
+				return false;
+			}
+			// Work a crash left behind comes back before anything else happens: the
+			// recovered content replaces the file's, so resolution, the boot and every
+			// later save see it - and it stays unsaved until somebody saves it.
+			var recovered = OfferRecovery(ref project, path);
 			// The window says what the wait is for: a project's discs are hashed
 			// on the way in, and a PlayStation 2's is four gigabytes. It closes
 			// before the resolution dialog can ask, and the boot opens its own.
 			using (var progress = ProgressDialog.Begin(this, "Opening project"))
 			{
-				progress.Step("reading the project");
-				try
-				{
-					project = EngineProject.Open(path);
-				}
-				catch (InvalidOperationException ex)
-				{
-					progress.Dispose();
-					ShowMessageBox(owner: null, ex.Message, "Cannot open the project");
-					return false;
-				}
-
 				// resolution: beside the project first, then where this machine last
 				// found them (the .chimeraLocal sidecar - a hint, never authority: it
 				// resolves nothing whose bytes do not match), then the user's say per file
@@ -330,7 +335,124 @@ namespace Chimera.Client.GUI
 
 			// the firmware the project pins is looked for where this machine last
 			// had it, as well as in the Firmware folder
-			return BootProject(project, path, saved: true, local);
+			if (!BootProject(project, path, saved: true, local)) return false;
+			if (recovered && MovieSession.Movie is ITasMovie recoveredMovie) recoveredMovie.MarkRecovered();
+			return true;
+		}
+
+		/// <summary>The recovery session of the open project (<see cref="ProjectRecovery"/>); null when none is open.</summary>
+		private ProjectRecovery _recovery;
+
+		/// <summary>
+		/// Writes the open project's recovery snapshot now (<see cref="ProjectRecovery.SaveNow"/>). For the crash
+		/// handlers: whatever happens next, the work as it stands at this moment is kept.
+		/// </summary>
+		public void KeepWorkSafe() => _recovery?.SaveNow();
+
+		private int _errorsShown;
+
+		private DateTime _errorsSince = DateTime.MinValue;
+
+		/// <summary>
+		/// What an error that was caught becomes: emulation pauses, the person is told, and the session goes
+		/// on - they can keep editing, save, or reboot the core. A burst of errors (a frame that throws every
+		/// time it is tried, a control that throws on every paint) is told about a few times and then only
+		/// on the status line, so recovering cannot itself become an endless run of dialogs.
+		/// </summary>
+		public void RecoverFromError(Exception error, string what)
+		{
+			try
+			{
+				PauseEmulator();
+			}
+			catch (Exception)
+			{
+				// pausing is part of recovering, not a reason to stop
+			}
+			var now = DateTime.UtcNow;
+			if (now - _errorsSince > TimeSpan.FromSeconds(30))
+			{
+				_errorsSince = now;
+				_errorsShown = 0;
+			}
+			var kept = _recovery is null
+				? "No project is open, so there was no unsaved work to keep."
+				: "Your work is safe: every input is on disk as it is entered, and the rest of the project was kept just now.";
+			if (++_errorsShown > 3)
+			{
+				AddOnScreenMessage($"{what}: {error.GetType().Name}: {error.Message} (paused)");
+				return;
+			}
+			Console.Error.WriteLine($"{what}: {error}");
+			using ExceptionBox box = new($"{what}, and emulation is paused. {kept}"
+				+ " You can keep working, save, or reboot the core."
+				+ $"\n\n{error}");
+			box.ShowDialog(this);
+		}
+
+		/// <summary>
+		/// Offers the work a crashed session left for <paramref name="project"/>. The work is always rebuilt
+		/// into its own file in the backups folder first, so whatever is answered nothing is lost; answering
+		/// yes swaps that content in for the project file's. True when it was swapped in.
+		/// </summary>
+		private bool OfferRecovery(ref EngineProject project, string path)
+		{
+			ProjectRecovery.Leftover leftover;
+			try
+			{
+				leftover = ProjectRecovery.FindUnfinished(project.Id);
+			}
+			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+			{
+				Console.Error.WriteLine($"[recovery] {ex.Message}");
+				return false;
+			}
+			if (leftover is null) return false;
+
+			string copy;
+			try
+			{
+				copy = ProjectRecovery.BuildRecoveredCopy(leftover, path, MovieSession.BackupDirectory);
+			}
+			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+			{
+				// kept where they are: nothing is thrown away that could not be rebuilt
+				var why = $"Chimera did not close normally the last time this project was open, but its unsaved work"
+					+ $" could not be rebuilt ({ex.Message}). The recovery files are kept in:\n{leftover.Directory}";
+				if (HeadlessMode.Enabled) Console.Error.WriteLine($"[recovery] {why}");
+				else ShowMessageBox(owner: null, why, "Unsaved work");
+				return false;
+			}
+			// the copy holds the work now, and the next session starts its own
+			ProjectRecovery.Discard(leftover);
+
+			if (HeadlessMode.Enabled)
+			{
+				Console.Error.WriteLine($"[recovery] unsaved work from {leftover.LastWorkUtc.ToLocalTime():yyyy-MM-dd HH:mm:ss}"
+					+ $" was rebuilt into {copy}; opening the project as it was last saved");
+				return false;
+			}
+			var open = this.ModalMessageBox2(
+				caption: "Recover unsaved work?",
+				icon: EMsgBoxIcon.Question,
+				text: "Chimera did not close normally the last time this project was open."
+					+ $"\n\nThe work in progress up to {leftover.LastWorkUtc.ToLocalTime():HH:mm:ss} - every input entered, and"
+					+ $" the markers and branches as of the last few seconds - has been kept as:\n{copy}"
+					+ "\n\nOpen that work now? It opens unsaved, and saving writes it to this project."
+					+ "\n\nNo opens the project as it was last saved; the recovered copy stays where it is.");
+			if (!open) return false;
+			try
+			{
+				var recoveredProject = EngineProject.Open(copy);
+				project.Dispose();
+				project = recoveredProject;
+				return true;
+			}
+			catch (InvalidOperationException ex)
+			{
+				ShowMessageBox(owner: null, $"The recovered work could not be opened ({ex.Message}); it is kept as:\n{copy}", "Unsaved work");
+				return false;
+			}
 		}
 
 		/// <summary>The same, for a script (client.openproject).</summary>
@@ -506,6 +628,12 @@ namespace Chimera.Client.GUI
 			// not up yet, so the landing waits for it. Headless runs have nobody
 			// to operate TAStudio (which opens PAUSED at the session frame) -
 			// they just play the project (gates, dumps).
+			// From here every input entered is journaled as it happens, and the rest of
+			// the work is snapshotted while it is unsaved: whatever ends this process,
+			// the next open of this project offers it back (docs/project.md, "Recovery").
+			_recovery?.End(clean: false);
+			_recovery = ProjectRecovery.Begin(tasMovie, project.Id, path);
+
 			progress.Step("opening TAStudio");
 			progress.Dispose();
 			if (!HeadlessMode.Enabled)

@@ -432,6 +432,7 @@ namespace Chimera.Client.Common
 
 			Log?.Dispose();
 			Log = branch.InputLog.Clone();
+			InputLogReplaced?.Invoke();
 
 			if (BindMarkersToInput) // pretty critical not to erase them
 			{

@@ -1127,6 +1127,10 @@ namespace Chimera.Client.GUI
 
 		protected override void OnClosed(EventArgs e)
 		{
+			// The close went ahead, so every question about unsaved work has been answered:
+			// what a crash would have kept is either saved or knowingly let go.
+			_recovery?.End(clean: true);
+			_recovery = null;
 			_windowClosedAndSafeToExitProcess = true;
 			base.OnClosed(e);
 		}

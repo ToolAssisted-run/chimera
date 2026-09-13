@@ -328,6 +328,31 @@ checks a project-recorded setting is live in the guest. Headless runs
 skip the TAStudio landing (it opens paused, and nobody is there to
 operate it): they just play the project.
 
+## Recovery
+
+The work in a project survives any end of the process - a GPU driver that
+fast-fails, a kill, a power cut - because none of it waits for a crash to be
+saved (docs/design-principles.md, "A crash takes nothing that was entered").
+
+While a project is open, beside its cache (`<data>/Projects/<id>/recovery/`):
+
+- `inputs.journal` - the engine journals the movie's input log
+  (`ce_movie_log_journal_open`): the whole log first, then one line per change,
+  flushed to the OS as it happens and synced at most once a second.
+- `snapshot.chimeraProject` - the whole project as it stands (markers,
+  branches, settings; never the greenzone), rewritten every few seconds while
+  there is unsaved work, and at once when an error is caught.
+- `session.json` - the process that owns the folder, so a project open in
+  another running Chimera is never mistaken for a crash.
+
+Closing the project removes the folder. Opening a project whose folder outlived
+its process rebuilds the work first: the newer of the snapshot and the saved
+file, with the journal's inputs, written to the backups folder as
+`<name>.recovered <time>.chimeraProject`. The person is then asked whether to
+open that work in place of the file's (it opens unsaved; saving writes it to the
+project) or the project as last saved (the copy stays). A recovered copy never
+overwrites a project. Headless runs do not ask; they report the copy's path.
+
 ## Architecture decisions
 
 - **Serializer in the engine**: `ce_project_*` in libchimera reads,

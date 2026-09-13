@@ -112,6 +112,30 @@ CE_API int64_t ce_movie_log_divergent_point(const ce_movie_log *a, const ce_movi
  * *len_out (may be NULL). Invalidated by any other call on the same log. */
 CE_API const char *ce_movie_log_serialize(ce_movie_log *log, int32_t crlf, uint64_t *len_out);
 
+/* The input journal: what somebody entered survives any end of the process.
+ *
+ * _journal_open writes the whole log to `path` (through a fresh file that then
+ * replaces it, so a crash mid-rewrite still leaves a whole journal) and from
+ * then on appends every change to this log as one line, flushed to the OS the
+ * moment it happens and synced to the disk at most once a second. Opening again
+ * rewrites the image and continues; that is how the journal is kept short.
+ * Returns 0 on success.
+ *
+ * _journal_close stops appending; with `remove` nonzero it also deletes the
+ * journal (a session that ended cleanly has nothing to recover). Freeing the
+ * log closes the journal but keeps the file.
+ *
+ * _journal_replay rebuilds `log` from a journal file (or from its ".new"
+ * sibling when the journal itself is missing). A last line with no line end -
+ * a record the crash cut short - is not replayed, and replay stops at the first
+ * record it cannot read. Returns the number of records applied, or -1 when the
+ * file is missing or not a journal (see _last_error). `log` should not itself
+ * be journaling. */
+CE_API int32_t ce_movie_log_journal_open(ce_movie_log *log, const char *path);
+CE_API void ce_movie_log_journal_close(ce_movie_log *log, int32_t remove);
+CE_API int32_t ce_movie_log_journaling(const ce_movie_log *log);
+CE_API int64_t ce_movie_log_journal_replay(ce_movie_log *log, const char *path);
+
 /* ---- movie header ----
  *
  * The Header.txt lump: "Key Value" per line. Parsing keeps the FIRST

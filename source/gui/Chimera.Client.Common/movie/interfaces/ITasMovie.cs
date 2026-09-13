@@ -56,6 +56,9 @@ namespace Chimera.Client.Common
 		void FlagChanges();
 		void ClearChanges();
 
+		/// <summary>The movie holds work its project file does not: it was opened from recovered work (ProjectRecovery).</summary>
+		void MarkRecovered();
+
 		/// <summary>
 		/// Replaces the given frame's input with an empty frame
 		/// </summary>
