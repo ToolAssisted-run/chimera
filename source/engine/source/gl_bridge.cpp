@@ -51,6 +51,7 @@
 
 #include "gl-bridge.h"
 #include "gl-bridge-ops.h"
+#include "gl_sync_names.h"
 
 #include <cstdio>
 #include <cstring>
@@ -891,6 +892,81 @@ static bool pixelReadGuarded(GLenum format, GLenum type, GLsizei width, GLsizei 
 }
 
 /* ---------------------------------------------------------------------------
+ * Sync objects are NAMED to the guest, never handed to it.
+ *
+ * glFenceSync returns a GLsync, which is a pointer into the DRIVER's memory,
+ * and the generated dispatcher returned it to the guest verbatim - precisely
+ * what the note at the top of this file forbids. A pointer into our address
+ * space then lives in the guest's heap, where the sandbox cannot let it be
+ * read, and where nothing can make it mean the same thing twice.
+ *
+ * What follows is that a saved state becomes unusable outside the process that
+ * wrote it: reloaded, it still holds the old pointers, and the first
+ * glGetSynciv or glDeleteSync on one hands the driver an address belonging to a
+ * process that has since exited.
+ *
+ * What does NOT follow - measured, not assumed - is determinism. Two identical
+ * twenty-frame Ruffle runs on a real GTX 1060 still diverge with this in place,
+ * by millions of bytes and a different dirty-page count, so the leaked pointer
+ * was never the reason a drawing core fails to reproduce itself. What that
+ * cause is, this does not say and did not measure. Differences of that kind
+ * have previously been traced to host addresses left in DEAD guest stack
+ * (below the stack pointer, varying with ASLR) and to GPU-derived bytes
+ * entering guest memory through readbacks; naming syncs removes one source of
+ * the former without settling the question.
+ *
+ * So the guest gets a NAME: a slot index, plus a generation bumped each time
+ * the slot is reused. The name is small, it is ours, and a name from an older
+ * session cannot be mistaken for a live one - the generation will not match.
+ * Such a name reads as a fence that has already passed, which is the truth
+ * about any GPU work a reloaded state could still be waiting for: it finished,
+ * in a process that is gone.
+ */
+struct SyncSlot
+{
+	GLsync sync;   /* the driver's pointer; null when the slot is free */
+	uint32_t gen;  /* bumped on every reuse, so an old name stays old */
+};
+static std::vector<SyncSlot> g_syncs;
+
+/* The name for a driver sync: generation in the high half, slot+1 in the low,
+ * so a name is never zero and never collides with a name from a past life. */
+static uintptr_t syncName(GLsync sync)
+{
+	size_t at = g_syncs.size();
+	for (size_t i = 0; i < g_syncs.size(); i++)
+	{
+		if (g_syncs[i].sync == nullptr) { at = i; break; }
+	}
+	if (at == g_syncs.size()) g_syncs.push_back(SyncSlot{ nullptr, 0 });
+	g_syncs[at].sync = sync;
+	g_syncs[at].gen++;
+	return (uintptr_t)ce_gl_sync_name_make((uint64_t)at, g_syncs[at].gen);
+}
+
+/* The driver sync a name stands for, or null if the name is not a live one -
+ * which is what every name restored from an older session looks like. */
+static GLsync syncFor(GLsync name)
+{
+	const uint64_t v = (uint64_t)(uintptr_t)name;
+	const uint64_t slot = ce_gl_sync_name_slot(v);
+	if (slot >= (uint64_t)g_syncs.size()) return nullptr;
+	const SyncSlot &s = g_syncs[(size_t)slot];
+	if (s.gen != ce_gl_sync_name_generation(v)) return nullptr;
+	return s.sync;
+}
+
+/* Gives the slot back, so a later fence can have it under a new generation. */
+static void syncForget(GLsync name)
+{
+	const uint64_t v = (uint64_t)(uintptr_t)name;
+	const uint64_t slot = ce_gl_sync_name_slot(v);
+	if (slot >= (uint64_t)g_syncs.size()) return;
+	SyncSlot &s = g_syncs[(size_t)slot];
+	if (s.gen == ce_gl_sync_name_generation(v)) s.sync = nullptr;
+}
+
+/* ---------------------------------------------------------------------------
  * Buffer names, recycled.
  *
  * Measured on a GTX 1060 (Ruffle, New Star Soccer): a hundred and thirty-nine
@@ -1245,6 +1321,75 @@ static uintptr_t ce_gl_dispatch_one(uintptr_t op, uintptr_t a, uintptr_t b,
 			}
 			glGetTexImage(p->target, p->level, p->format, p->type, p->pixels);
 			return 0;
+		}
+
+		/* Sync objects: the guest deals in names, this side in driver pointers.
+		 * A name that no longer stands for anything - every name a reloaded
+		 * state carries - answers as a fence that has already passed, because
+		 * it has: the work it waited on finished in a process that is gone. */
+		case CHIMERA_GL_OP_glFenceSync:
+		{
+			auto *p = reinterpret_cast<ChimeraGlArgs_glFenceSync *>(a);
+			GLsync sync = glFenceSync(p->condition, p->flags);
+			if (sync == nullptr) return 0;
+			return syncName(sync);
+		}
+
+		case CHIMERA_GL_OP_glClientWaitSync:
+		{
+			auto *p = reinterpret_cast<ChimeraGlArgs_glClientWaitSync *>(a);
+			GLsync sync = syncFor(p->sync);
+			if (sync == nullptr) return (uintptr_t)GL_ALREADY_SIGNALED;
+			return (uintptr_t)glClientWaitSync(sync, p->flags, p->timeout);
+		}
+
+		case CHIMERA_GL_OP_glWaitSync:
+		{
+			auto *p = reinterpret_cast<ChimeraGlArgs_glWaitSync *>(a);
+			GLsync sync = syncFor(p->sync);
+			if (sync != nullptr) glWaitSync(sync, p->flags, p->timeout);
+			return 0;
+		}
+
+		case CHIMERA_GL_OP_glGetSynciv:
+		{
+			auto *p = reinterpret_cast<ChimeraGlArgs_glGetSynciv *>(a);
+			GLsync sync = syncFor(p->sync);
+			if (sync != nullptr)
+			{
+				glGetSynciv(sync, p->pname, p->count, p->length, p->values);
+				return 0;
+			}
+			/* Answer for a fence that is over, in the guest's own buffers. */
+			if (p->count > 0 && p->values != nullptr)
+			{
+				switch (p->pname)
+				{
+					case GL_OBJECT_TYPE:     p->values[0] = GL_SYNC_FENCE; break;
+					case GL_SYNC_STATUS:     p->values[0] = GL_SIGNALED; break;
+					case GL_SYNC_CONDITION:  p->values[0] = GL_SYNC_GPU_COMMANDS_COMPLETE; break;
+					case GL_SYNC_FLAGS:      p->values[0] = 0; break;
+					default:                 p->values[0] = 0; break;
+				}
+				if (p->length != nullptr) *p->length = 1;
+			}
+			else if (p->length != nullptr) *p->length = 0;
+			return 0;
+		}
+
+		case CHIMERA_GL_OP_glDeleteSync:
+		{
+			auto *p = reinterpret_cast<ChimeraGlArgs_glDeleteSync *>(a);
+			GLsync sync = syncFor(p->sync);
+			if (sync != nullptr) glDeleteSync(sync);
+			syncForget(p->sync);
+			return 0;
+		}
+
+		case CHIMERA_GL_OP_glIsSync:
+		{
+			auto *p = reinterpret_cast<ChimeraGlArgs_glIsSync *>(a);
+			return (uintptr_t)(syncFor(p->sync) != nullptr ? GL_TRUE : GL_FALSE);
 		}
 
 		default:
