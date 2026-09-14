@@ -53,8 +53,45 @@ namespace Chimera.Client.Common
 			return new Point((int)Math.Round(x), (int)Math.Round(y));
 		}
 
+		/// <summary>
+		/// The frame counter: where the machine is, over where the RUN ends.
+		///
+		/// The total is the last frame with anything pressed on it, not the
+		/// length of the log. A log goes on past its last press - every frame
+		/// recorded, seeked through or played past the end adds an empty entry
+		/// - so FrameCount answers "how many entries are stored", which is not
+		/// what a person reading a counter wants to know. LastNonEmptyInputFrame
+		/// is where the input actually stops.
+		///
+		/// "(Finished)" is asked of the FRAME for the same reason it is in the
+		/// fps line: MovieMode.Finished is set by MovieEndAction when PLAYBACK
+		/// reaches the end, so it never arrives while recording, and not at all
+		/// when the end action is Record or Stop. Asking the frame keeps the two
+		/// readouts from contradicting each other on screen.
+		///
+		/// A movie that is not a TAS movie has no last-press to ask about, so it
+		/// keeps the old length-and-mode answer.
+		/// </summary>
 		private string MakeFrameCounter()
 		{
+			if (_movieSession.Movie is ITasMovie tasMovie && tasMovie.IsActive())
+			{
+				// zero BOTH for an empty log and for one with nothing pressed
+				// anywhere, so an empty movie must not read as finished
+				var lastInput = tasMovie.LastNonEmptyInputFrame;
+				var sb = new StringBuilder();
+				sb
+					.Append(_emulator.Frame)
+					.Append('/')
+					.Append(lastInput);
+				if (tasMovie.InputLogLength > 0 && _emulator.Frame > lastInput)
+				{
+					sb.Append(" (Finished)");
+				}
+
+				return sb.ToString();
+			}
+
 			if (_movieSession.Movie.IsFinished())
 			{
 				var sb = new StringBuilder();
