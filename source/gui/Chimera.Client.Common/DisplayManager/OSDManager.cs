@@ -63,11 +63,11 @@ namespace Chimera.Client.Common
 		/// what a person reading a counter wants to know. LastNonEmptyInputFrame
 		/// is where the input actually stops.
 		///
-		/// "(Finished)" is asked of the FRAME for the same reason it is in the
-		/// fps line: MovieMode.Finished is set by MovieEndAction when PLAYBACK
-		/// reaches the end, so it never arrives while recording, and not at all
-		/// when the end action is Record or Stop. Asking the frame keeps the two
-		/// readouts from contradicting each other on screen.
+		/// "(Finished)" is asked of the FRAME, not of MovieMode.Finished, which
+		/// is a different question: that mode is set by MovieEndAction when
+		/// PLAYBACK reaches the end, so it never arrives while recording, and
+		/// not at all when the end action is Record or Stop. This is simply "we
+		/// are past the last input frame", whatever the mode.
 		///
 		/// A movie that is not a TAS movie has no last-press to ask about, so it
 		/// keeps the old length-and-mode answer.

@@ -2807,27 +2807,6 @@ namespace Chimera.Client.GUI
 					" >>";
 			}
 
-			// Past the end of what was recorded: the machine is still running,
-			// but nothing the movie says is driving it any more.
-			//
-			// Asked of the frame rather than of MovieMode.Finished, which is a
-			// different question: that mode is set by MovieEndAction when
-			// PLAYBACK reaches the end, so it never arrives while recording,
-			// and not at all when the end action is Record or Stop. This is
-			// simply "we are beyond the last input frame", whatever the mode.
-			//
-			// LastNonEmptyInputFrame is zero BOTH for a log with nothing in it
-			// and for one where nothing is pressed anywhere, so an empty movie
-			// would otherwise read as finished from frame one onwards - hence
-			// the length check as well.
-			if (MovieSession.Movie is ITasMovie tasMovie
-				&& tasMovie.IsActive()
-				&& tasMovie.InputLogLength > 0
-				&& Emulator.Frame > tasMovie.LastNonEmptyInputFrame)
-			{
-				fpsString += " (Finished)";
-			}
-
 			OSD.Fps = fpsString;
 
 			// need to refresh window caption in this case
