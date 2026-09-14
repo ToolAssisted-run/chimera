@@ -182,6 +182,14 @@ int main(int argc, char **argv)
 	std::string savedataDir;
 	std::string projectPath;
 	std::string historyIn, historyOut;
+	/* --history-out-later: save the history the way a PROJECT save does - queued
+	 * on the writer (ce_session_history_save_later) and waited for - rather than
+	 * in line. The frontend's autosave takes the queued path and chimera-run has
+	 * only ever taken the synchronous one, which is the one structural
+	 * difference between them; this exists to ask whether that is why a
+	 * greenzone reloaded through the frontend diverges when one reloaded through
+	 * this tool does not. */
+	bool historyOutLater = false;
 	/* --play/--edit-from/--final-state: the re-recording shape. Play a while,
 	 * seek back, put a DIFFERENT movie in from that frame on, and carry on past
 	 * where the first pass reached. What comes out has to be what a straight run
@@ -275,6 +283,7 @@ int main(int argc, char **argv)
 		}
 		else if (arg == "--history-in" && i + 1 < argc) historyIn = argv[++i];
 		else if (arg == "--history-out" && i + 1 < argc) historyOut = argv[++i];
+		else if (arg == "--history-out-later" && i + 1 < argc) { historyOut = argv[++i]; historyOutLater = true; }
 		else if (arg == "--firmware" && i + 1 < argc)
 		{
 			std::string spec = argv[++i];
@@ -1026,11 +1035,24 @@ int main(int argc, char **argv)
 	if (!historyOut.empty())
 	{
 		const auto t0 = std::chrono::steady_clock::now();
-		if (ce_session_history_save(session, historyOut.c_str(), "chimera-run") != 0)
+		if (historyOutLater)
+		{
+			/* queued, then waited for - exactly what a project save does */
+			if (ce_session_history_save_later(session, historyOut.c_str(), "chimera-run") != 0)
+			{
+				return fail(metaPath, std::string("history (queued): ") + ce_session_last_error(session));
+			}
+			if (ce_session_history_save_wait(session) != 0)
+			{
+				return fail(metaPath, std::string("history (wait): ") + ce_session_last_error(session));
+			}
+		}
+		else if (ce_session_history_save(session, historyOut.c_str(), "chimera-run") != 0)
 		{
 			return fail(metaPath, std::string("history: ") + ce_session_last_error(session));
 		}
-		std::fprintf(stderr, "chimera-run: history saved in %.1f ms\n",
+		std::fprintf(stderr, "chimera-run: history saved%s in %.1f ms\n",
+			historyOutLater ? " (queued, as a project save does)" : "",
 			std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count());
 	}
 
