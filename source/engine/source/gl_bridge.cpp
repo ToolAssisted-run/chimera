@@ -62,6 +62,7 @@
 #else
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
+#include <unistd.h>   /* getpid: per-process entropy for a context's identity */
 #ifndef EGL_PLATFORM_SURFACELESS_MESA
 #define EGL_PLATFORM_SURFACELESS_MESA 0x31DD
 #endif
@@ -1472,8 +1473,40 @@ extern "C" void *ce_gl_flight_recorder(uint32_t *bytes)
 static void mint_context_id()
 {
 	static uint64_t made;
+
+	/* Where this process sits in memory is NOT per-process entropy on Windows.
+	 * A DLL's base is randomised once per BOOT and shared by every process that
+	 * loads it, so &g_context_id inside libchimera.dll is the same address in
+	 * every Chimera on the machine until it reboots. Measured 2026-09-14: two
+	 * separate chimera-run processes minted 0x7ff746ec6fc1f001 and
+	 * 0x7ff746ec6fc1f101 - identical but for one tick of the clock term.
+	 *
+	 * That left `time()`, at one-second granularity, as the only thing telling
+	 * two processes apart (`made` is 1 in both, being a fresh static in each).
+	 * Two processes minting within the same second therefore got the SAME id,
+	 * and a guest comparing it concludes its GL objects are still good - keeps
+	 * the names a dead process's context handed out, and gives them to the
+	 * driver. The whole safety of carrying GPU state across a restart rests on
+	 * this number differing, so it must not rest on a one-second clock.
+	 *
+	 * The pid and a high-resolution counter are what actually differ per
+	 * process; both are cheap and neither can be constant across two of them. */
+	uint64_t per_process;
+#ifdef _WIN32
+	LARGE_INTEGER qpc;
+	QueryPerformanceCounter(&qpc);
+	per_process = (static_cast<uint64_t>(GetCurrentProcessId()) << 32)
+		^ static_cast<uint64_t>(qpc.QuadPart);
+#else
+	struct timespec ts;
+	clock_gettime(CLOCK_MONOTONIC, &ts);
+	per_process = (static_cast<uint64_t>(getpid()) << 32)
+		^ (static_cast<uint64_t>(ts.tv_sec) * 1000000000ull + static_cast<uint64_t>(ts.tv_nsec));
+#endif
+
 	g_context_id = (static_cast<uint64_t>(reinterpret_cast<uintptr_t>(&g_context_id)) << 16)
 		^ (static_cast<uint64_t>(time(nullptr)) << 8)
+		^ per_process
 		^ (++made);
 	if (g_context_id == 0) g_context_id = 1; /* 0 means "cannot tell" */
 	flightNote(kFlightSession, 0);
