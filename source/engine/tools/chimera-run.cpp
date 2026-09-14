@@ -206,6 +206,25 @@ int main(int argc, char **argv)
 	 * degrades a little on each pass, and only a repetition shows it. */
 	int64_t rewindTo = -1;
 	int64_t rewindTimes = 0;
+	/* --greenzone-check: the machine at the seek/rewind destination, restored
+	 * through the history, must be byte-for-byte the machine the first pass had
+	 * at that frame. A full ce_session_save_state is captured there on the way
+	 * out, and every landing is compared against it. This catches a greenzone
+	 * DELTA restore that drops or mis-restores a guest page - which a dump
+	 * comparison at the end cannot, because a replay from the landing runs the
+	 * GPU (outside the savestate) and its output is not deterministic, whereas
+	 * the guest memory AT the frame is. The suspected cause of the Ruffle
+	 * rewind crashes (guest heap/GC corruption after a restore, 2026-09-14). */
+	bool greenzoneCheck = false;
+	/* --greenzone-check-vs-restore: take the reference from the FIRST restore
+	 * rather than from the forward pass. Comparing a restore against the
+	 * forward pass asks whether the history reproduces the machine the run
+	 * HAD; comparing restores against each other asks whether the history is
+	 * self-consistent - and for a core whose guest memory takes bytes back
+	 * from a GPU (outside the savestate), only the second question has a
+	 * defined answer. */
+	bool gzTruthFromRestore = false;
+	std::vector<uint8_t> gzTruth;
 	/* How many frames before the destination to start DRAWING again. A seek
 	 * replays with rendering off, and a renderer whose display stage carries
 	 * state from frame to frame needs a few composed frames to catch up. */
@@ -243,6 +262,8 @@ int main(int argc, char **argv)
 		else if (arg == "--gpu") wantGpu = true;
 		else if (arg == "--render-every-frame") renderEveryFrame = true;
 		else if (arg == "--draw-every-frame") drawEveryFrame = true;
+		else if (arg == "--greenzone-check") greenzoneCheck = true;
+		else if (arg == "--greenzone-check-vs-restore") { greenzoneCheck = true; gzTruthFromRestore = true; }
 		else if (arg == "--rewind-warmup" && i + 1 < argc) rewindWarmup = std::atoll(argv[++i]);
 		else if (arg == "--rewind-loop" && i + 1 < argc)
 		{
@@ -692,7 +713,78 @@ int main(int argc, char **argv)
 			if (p == nullptr) return fail(metaPath, ce_session_last_error(session));
 			state.assign(p, p + len);
 		}
+		/* the ground truth for --greenzone-check: the machine as the first,
+		 * straight pass had it at the frame every later restore lands on */
+		if (greenzoneCheck && !gzTruthFromRestore && gzTruth.empty())
+		{
+			const int64_t checkFrame = rewindTo >= 0 ? rewindTo : seekFrame;
+			if (checkFrame >= 0 && ce_session_frame(session) == checkFrame)
+			{
+				uint64_t len = 0;
+				const uint8_t *p = ce_session_save_state(session, &len);
+				if (p == nullptr) return fail(metaPath, ce_session_last_error(session));
+				gzTruth.assign(p, p + len);
+			}
+		}
 	}
+
+	/* Compare the machine at a restore landing to that ground truth. First
+	 * differing byte, and how many differ, is enough to point at the dropped
+	 * page; the delta restore is the whole guest image, so an offset maps
+	 * straight to a memory domain. */
+	auto greenzoneVerify = [&](const char *what, int64_t landedFrame) -> const char * {
+		if (!greenzoneCheck) return nullptr;
+		uint64_t len = 0;
+		const uint8_t *p = ce_session_save_state(session, &len);
+		if (p == nullptr) return ce_session_last_error(session);
+		if (gzTruth.empty())
+		{
+			if (!gzTruthFromRestore) return "the ground-truth frame was never reached in the first pass";
+			gzTruth.assign(p, p + len);
+			std::fprintf(stderr, "[greenzone-check] %s at frame %lld: reference taken from this restore (%llu bytes)\n",
+				what, (long long)landedFrame, (unsigned long long)len);
+			std::fflush(stderr);
+			return nullptr;
+		}
+		/* Both machines to disk on any mismatch. The blob carries the dirty map
+		 * and the dirty pages themselves, so comparing the two offline says
+		 * exactly which guest pages the restore failed to reproduce - which a
+		 * size or a first-differing-byte alone cannot. */
+		auto dumpBoth = [&]() {
+			writeWholeFile("gz-truth.state", gzTruth.data(), gzTruth.size());
+			writeWholeFile("gz-restored.state", p, static_cast<size_t>(len));
+			std::fprintf(stderr, "[greenzone-check] wrote gz-truth.state (%zu) and gz-restored.state (%llu)\n",
+				gzTruth.size(), (unsigned long long)len);
+			std::fflush(stderr);
+		};
+		if (len != gzTruth.size())
+		{
+			std::fprintf(stderr, "[greenzone-check] %s at frame %lld: state SIZE changed %zu -> %llu (%lld bytes, %lld pages)\n",
+				what, (long long)landedFrame, gzTruth.size(), (unsigned long long)len,
+				(long long)len - (long long)gzTruth.size(),
+				((long long)len - (long long)gzTruth.size()) / 4096);
+			dumpBoth();
+			return "greenzone restore changed the state size";
+		}
+		uint64_t first = UINT64_MAX, differ = 0;
+		for (uint64_t k = 0; k < len; k++)
+		{
+			if (p[k] != gzTruth[k]) { if (first == UINT64_MAX) first = k; differ++; }
+		}
+		if (differ != 0)
+		{
+			std::fprintf(stderr, "[greenzone-check] %s at frame %lld: %llu of %llu state bytes differ,"
+				" first at 0x%llx (truth %02x, restored %02x)\n",
+				what, (long long)landedFrame, (unsigned long long)differ, (unsigned long long)len,
+				(unsigned long long)first, gzTruth[first], p[first]);
+			dumpBoth();
+			return "greenzone restore did not reproduce the machine";
+		}
+		std::fprintf(stderr, "[greenzone-check] %s at frame %lld: exact (%llu bytes)\n",
+			what, (long long)landedFrame, (unsigned long long)len);
+		std::fflush(stderr);
+		return nullptr;
+	};
 
 	if (seekFrame >= 0)
 	{
@@ -702,6 +794,7 @@ int main(int argc, char **argv)
 		 * it would just restore the cached end state and prove nothing. */
 		if (ce_session_seek(session, seekFrame) != 0) return fail(metaPath, ce_session_last_error(session));
 		if (ce_session_frame(session) != seekFrame) return fail(metaPath, "seek landed on the wrong frame");
+		if (const char *bad = greenzoneVerify("seek", seekFrame)) return fail(metaPath, bad);
 		/* --stop-at-seek dumps the machine the seek ARRIVED AT, rather than the
 		 * machine at the end of a replay from it. It is the difference between
 		 * asking whether the run still finishes correctly and asking whether
@@ -758,6 +851,12 @@ int main(int argc, char **argv)
 	{
 		if (ce_session_seek(session, rewindTo) != 0) return fail(metaPath, ce_session_last_error(session));
 		if (ce_session_frame(session) != rewindTo) return fail(metaPath, "rewind landed on the wrong frame");
+		if (const char *bad = greenzoneVerify("rewind", rewindTo))
+		{
+			std::fprintf(stderr, "[rewind-loop] failed on pass %lld of %lld\n",
+				(long long)(pass + 1), (long long)rewindTimes);
+			return fail(metaPath, bad);
+		}
 		ce_session_greenzone_invalidate(session, rewindTo);
 		/* Stop ONE frame short and take the last one by hand, drawing. A seek
 		 * replays with rendering off - correctly, nobody is looking at the
