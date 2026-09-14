@@ -278,22 +278,42 @@ namespace Chimera.Tests.Client.Common.Movie
 
 		/// <summary>
 		/// ...and a core that SAYS its renderer builds its objects again when the context it drew on is
-		/// gone is not taken at its word. Ruffle says so, and a New Star Soccer greenzone saved by one
+		/// gone is taken at its word once more.
+		///
+		/// It was not, between 2026-09-13 and 2026-09-14: a New Star Soccer greenzone saved by one
 		/// process and restored twenty-one frames deep in the next died inside the NVIDIA driver on the
-		/// first frame after (2026-09-13). The claim is still written down - it is what the core said -
-		/// but the states go the way every GPU-drawn machine's do.
+		/// first frame after, so every GPU-drawn machine's states were dropped whatever it declared.
+		/// What answers that crash is the core comparing the bridge's context id against the one saved
+		/// beside its objects and rebuilding the backend when it moves - which is what the declaration
+		/// means, and which has been in Ruffle since 2026-09-07.
+		///
+		/// Re-measured on a GTX 1060 (2026-09-14), each against a run that never stopped and each
+		/// byte-identical: a state reloaded in a fresh process; a greenzone restored twenty-one frames
+		/// deep; and one restored 7768 frames deep from a 1.07 GB history, that last with the bridge's
+		/// own audit reporting 55 of the names the state believed in already handed out to something
+		/// else - the case that draws the wrong thing rather than crashing. The picture came back exact.
+		///
+		/// A machine whose core claims nothing is unchanged (see the test above): its states still go,
+		/// and the person is still told why.
 		/// </summary>
 		[TestMethod]
-		public void EvenARendererThatSaysItRebuildsStartsCold()
+		public void ARendererThatSaysItRebuildsKeepsItsStates()
 		{
 			var path = Path.Combine(_dir, "rebuilds.chimeraProject");
 			var movie = MakeWorkedMovie(path, gpuRenderer: "4.5 Mesa on llvmpipe", statesSurvive: true);
+			foreach (var f in new[] { 1, 2, 3, 4 }) movie.States.Capture(f);
 			Assert.IsFalse(movie.Save().IsError);
+			Assert.IsTrue(File.Exists(movie.StateHistoryFilename),
+				"a core that says its states survive gets a history file like any other");
 
 			var loaded = LoadFresh(path);
 			Assert.AreEqual(6, loaded.InputLogLength, "the work itself is untouched");
-			Assert.IsNull(loaded.Branches[0].CoreData, "the branch keeps its input and loses its state");
-			Assert.IsNotNull(loaded.DroppedCacheNote, "and the person is told why the greenzone is empty");
+			foreach (var f in new[] { 1, 2, 3, 4 })
+			{
+				Assert.IsTrue(loaded.States.Has(f), $"frame {f} came back");
+			}
+			Assert.IsNotNull(loaded.Branches[0].CoreData, "and the branch keeps its state too");
+			Assert.IsNull(loaded.DroppedCacheNote, "nothing was dropped, so there is nothing to say");
 			Assert.AreEqual("1", loaded.HeaderEntries[HeaderKeys.GpuStatesSurvive],
 				"what the core declared is still on record");
 		}
@@ -433,6 +453,29 @@ namespace Chimera.Tests.Client.Common.Movie
 			Assert.IsTrue(File.Exists(loaded.GreenZoneFilename), "and is in the cache instead");
 			Assert.IsNull(loaded.DroppedCacheNote, "it was used, not discarded");
 			CollectionAssert.AreEqual(new[] { "legacy.chimeraProject" }, SiblingsOf(path));
+		}
+
+		/// <summary>
+		/// The other half of <see cref="ARendererThatSaysItRebuildsKeepsItsStates"/>:
+		/// a GPU-drawn machine whose core makes no such claim still starts cold, and
+		/// the person is told why rather than simply finding their cached states gone.
+		/// </summary>
+		[TestMethod]
+		public void AGpuMachineThatClaimsNothingStillStartsCold()
+		{
+			var path = Path.Combine(_dir, "gpu-silent.chimeraProject");
+			var movie = MakeWorkedMovie(path, "4.6.0 NVIDIA 581.42 on NVIDIA GeForce GTX 1060");
+			foreach (var f in new[] { 1, 2, 3, 4 }) movie.States.Capture(f);
+			Assert.IsFalse(movie.Save().IsError);
+			Assert.IsFalse(File.Exists(movie.StateHistoryFilename),
+				"a machine whose core does not claim its states survive writes none");
+
+			var loaded = LoadFresh(path);
+			foreach (var f in new[] { 1, 2, 3, 4 })
+			{
+				Assert.IsFalse(loaded.States.Has(f), $"frame {f} did not come back");
+			}
+			Assert.IsNotNull(loaded.DroppedCacheNote, "and the person is told why");
 		}
 
 		/// <summary>
