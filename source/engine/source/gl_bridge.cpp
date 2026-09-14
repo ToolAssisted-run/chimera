@@ -753,6 +753,144 @@ static uintptr_t ce_gl_dispatch_one(uintptr_t op, uintptr_t a, uintptr_t b,
                                     uintptr_t c, uintptr_t d, uintptr_t e);
 
 /* ---------------------------------------------------------------------------
+ * Driver -> guest reads go through a bounce buffer, never the guest's heap.
+ *
+ * A readback (glGetBufferSubData, and glReadPixels into client memory) hands the
+ * driver a destination in the caller's address space and a size, and the driver
+ * writes there itself. The driver is outside the sandbox. If it writes even one
+ * byte past that size - a row padded to the pack alignment, a device that
+ * rounds up - it lands in the GUEST's own heap, and corrupts an allocator that
+ * then dies, seemingly at random, many frames later. That is the New Star
+ * Soccer crash (guest musl malloc, 0xc0000005; dumps read 2026-09-13): the
+ * driver over-wrote a guest buffer, the guest's free list was poisoned, and the
+ * next allocation followed a wild pointer. It shows on the real driver and not
+ * on the software one the gate uses, which is exactly how a padding difference
+ * would behave.
+ *
+ * So the driver never sees a guest pointer for these: it writes into a host
+ * buffer sized generously for what it might write, with a canary past the bytes
+ * the guest asked for, and exactly those bytes are copied on to the guest. A
+ * driver that overruns hits the canary here - named, at the call, the frame it
+ * happened - and the guest heap is untouched either way.
+ */
+static uint8_t *g_bounce;
+static size_t g_bounceCap;
+static const size_t kBounceCanary = 4096; /* room past the ask for an overrun to land in */
+static const uint8_t kCanaryByte = 0xCE;
+static uint64_t g_bounceOverruns;
+
+/* A scratch buffer holding at least `need` bytes plus the canary, or null if it
+ * could not be grown (the caller then falls back to a direct, unguarded call -
+ * a readback is better done unguarded than not at all). The canary is laid down
+ * fresh each time, right where the guest's bytes end. */
+static uint8_t *bounceFor(size_t need)
+{
+	const size_t want = need + kBounceCanary;
+	if (want > g_bounceCap)
+	{
+		size_t grown = g_bounceCap ? g_bounceCap : 1u << 16;
+		while (grown < want) grown <<= 1;
+		uint8_t *bigger = (uint8_t *)realloc(g_bounce, grown);
+		if (bigger == nullptr) return nullptr;
+		g_bounce = bigger;
+		g_bounceCap = grown;
+	}
+	memset(g_bounce + need, kCanaryByte, kBounceCanary);
+	return g_bounce;
+}
+
+/* Did the driver write past the `need` bytes it was asked for? Says so once per
+ * breach, with how far it reached - the whole point of the guard is to name the
+ * call that the crash never could. */
+static void bounceCheckCanary(size_t need, const char *what)
+{
+	size_t over = 0;
+	for (size_t i = kBounceCanary; i-- > 0;)
+	{
+		if (g_bounce[need + i] != kCanaryByte) { over = i + 1; break; }
+	}
+	if (over == 0) return;
+	g_bounceOverruns++;
+	fprintf(stderr, "[ce-gl-guard] %s asked for %zu bytes and the driver wrote at least"
+		" %zu past them - the guest heap was spared (overrun #%llu)\n",
+		what, need, over, (unsigned long long)g_bounceOverruns);
+	fflush(stderr);
+}
+
+/* Pixels a readback into client memory will write, per the pack state the guest
+ * set. Returns false when this cannot be sized safely - a packed or exotic
+ * format, a skip offset, a bound pixel-pack buffer (then the write goes to the
+ * buffer, not client memory) - and the caller passes the guest pointer straight
+ * through, exactly as before. `tight` is the spec's write (the last row not
+ * padded); `scratch` allows for a driver that pads the last row too. */
+static bool pixelBytes(GLenum format, GLenum type, GLsizei width, GLsizei height,
+                       size_t *tight, size_t *scratch)
+{
+	if (width <= 0 || height <= 0) return false;
+
+	int components;
+	switch (format)
+	{
+		case GL_RED: case GL_GREEN: case GL_BLUE: case GL_ALPHA:
+		case GL_RED_INTEGER: case GL_GREEN_INTEGER: case GL_BLUE_INTEGER:
+		case GL_DEPTH_COMPONENT: case GL_STENCIL_INDEX:
+			components = 1; break;
+		case GL_RG: case GL_RG_INTEGER:
+			components = 2; break;
+		case GL_RGB: case GL_BGR: case GL_RGB_INTEGER: case GL_BGR_INTEGER:
+			components = 3; break;
+		case GL_RGBA: case GL_BGRA: case GL_RGBA_INTEGER: case GL_BGRA_INTEGER:
+			components = 4; break;
+		default:
+			return false; /* DEPTH_STENCIL and anything unlisted: pass through */
+	}
+
+	int pixel;
+	switch (type)
+	{
+		case GL_UNSIGNED_BYTE: case GL_BYTE:
+			pixel = components * 1; break;
+		case GL_UNSIGNED_SHORT: case GL_SHORT: case GL_HALF_FLOAT:
+			pixel = components * 2; break;
+		case GL_UNSIGNED_INT: case GL_INT: case GL_FLOAT:
+			pixel = components * 4; break;
+		default:
+			return false; /* packed types fold components into one unit: pass through */
+	}
+
+	/* A skip offset would move where the driver starts writing; only the plain
+	 * case (what a renderer doing a readback uses) is sized here. */
+	GLint rowLength = 0, skipPixels = 0, skipRows = 0, alignment = 4;
+	glGetIntegerv(GL_PACK_ROW_LENGTH, &rowLength);
+	glGetIntegerv(GL_PACK_SKIP_PIXELS, &skipPixels);
+	glGetIntegerv(GL_PACK_SKIP_ROWS, &skipRows);
+	glGetIntegerv(GL_PACK_ALIGNMENT, &alignment);
+	if (skipPixels != 0 || skipRows != 0) return false;
+	if (alignment != 1 && alignment != 2 && alignment != 4 && alignment != 8) return false;
+
+	const size_t effectiveWidth = rowLength > 0 ? (size_t)rowLength : (size_t)width;
+	const size_t rowRaw = (size_t)pixel * effectiveWidth;
+	const size_t rowStride = (rowRaw + (size_t)alignment - 1) & ~((size_t)alignment - 1);
+	*tight = rowStride * ((size_t)height - 1) + (size_t)pixel * (size_t)width;
+	*scratch = rowStride * (size_t)height; /* generous: a padded last row lands here */
+	return true;
+}
+
+/* Whether a readback with these args writes into client memory and can be sized
+ * (so it goes through the bounce buffer). False when a pixel-pack buffer is
+ * bound - then `pixels` is an offset into that buffer, not a client pointer -
+ * or the format cannot be sized. Fills the byte counts when true. */
+static bool pixelReadGuarded(GLenum format, GLenum type, GLsizei width, GLsizei height,
+                             const void *pixels, size_t *tight, size_t *scratch)
+{
+	if (pixels == nullptr) return false;
+	GLint packBuffer = 0;
+	glGetIntegerv(GL_PIXEL_PACK_BUFFER_BINDING, &packBuffer);
+	if (packBuffer != 0) return false;
+	return pixelBytes(format, type, width, height, tight, scratch);
+}
+
+/* ---------------------------------------------------------------------------
  * Buffer names, recycled.
  *
  * Measured on a GTX 1060 (Ruffle, New Star Soccer): a hundred and thirty-nine
@@ -1038,6 +1176,80 @@ static uintptr_t ce_gl_dispatch_one(uintptr_t op, uintptr_t a, uintptr_t b,
                                     uintptr_t c, uintptr_t d, uintptr_t e)
 {
 	(void)d; (void)e;
+
+	/* Readbacks that would have the driver write into guest memory go through
+	 * the bounce buffer above rather than the generated case below. */
+	switch (op)
+	{
+		case CHIMERA_GL_OP_glGetBufferSubData:
+		{
+			auto *p = reinterpret_cast<ChimeraGlArgs_glGetBufferSubData *>(a);
+			/* size is exactly the bytes written - no computation to get wrong */
+			if (p->data == nullptr || p->size <= 0)
+			{
+				glGetBufferSubData(p->target, p->offset, p->size, p->data);
+				return 0;
+			}
+			const size_t need = (size_t)p->size;
+			uint8_t *scratch = bounceFor(need);
+			if (scratch == nullptr) /* cannot guard it; a readback direct beats none */
+			{
+				glGetBufferSubData(p->target, p->offset, p->size, p->data);
+				return 0;
+			}
+			glGetBufferSubData(p->target, p->offset, p->size, scratch);
+			bounceCheckCanary(need, "glGetBufferSubData");
+			memcpy(p->data, scratch, need);
+			return 0;
+		}
+
+		case CHIMERA_GL_OP_glReadPixels:
+		{
+			auto *p = reinterpret_cast<ChimeraGlArgs_glReadPixels *>(a);
+			size_t tight = 0, scratch = 0;
+			uint8_t *buf = nullptr;
+			if (pixelReadGuarded(p->format, p->type, p->width, p->height, p->pixels, &tight, &scratch)
+				&& (buf = bounceFor(scratch)) != nullptr)
+			{
+				glReadPixels(p->x, p->y, p->width, p->height, p->format, p->type, buf);
+				bounceCheckCanary(scratch, "glReadPixels");
+				memcpy(p->pixels, buf, tight);
+				return 0;
+			}
+			glReadPixels(p->x, p->y, p->width, p->height, p->format, p->type, p->pixels);
+			return 0;
+		}
+
+		case CHIMERA_GL_OP_glGetTexImage:
+		{
+			auto *p = reinterpret_cast<ChimeraGlArgs_glGetTexImage *>(a);
+			/* the level's width and height are the driver's to know; ask it, so
+			 * the size matches what it will write. A cube-map or array target,
+			 * or a level query that fails, falls through to a direct call. */
+			GLint w = 0, h = 0;
+			size_t tight = 0, scratch = 0;
+			uint8_t *buf = nullptr;
+			if (p->pixels != nullptr && (p->target == GL_TEXTURE_2D || p->target == GL_TEXTURE_RECTANGLE))
+			{
+				glGetTexLevelParameteriv(p->target, p->level, GL_TEXTURE_WIDTH, &w);
+				glGetTexLevelParameteriv(p->target, p->level, GL_TEXTURE_HEIGHT, &h);
+			}
+			if (w > 0 && h > 0
+				&& pixelReadGuarded(p->format, p->type, w, h, p->pixels, &tight, &scratch)
+				&& (buf = bounceFor(scratch)) != nullptr)
+			{
+				glGetTexImage(p->target, p->level, p->format, p->type, buf);
+				bounceCheckCanary(scratch, "glGetTexImage");
+				memcpy(p->pixels, buf, tight);
+				return 0;
+			}
+			glGetTexImage(p->target, p->level, p->format, p->type, p->pixels);
+			return 0;
+		}
+
+		default:
+			break;
+	}
 
 	switch (op)
 	{
