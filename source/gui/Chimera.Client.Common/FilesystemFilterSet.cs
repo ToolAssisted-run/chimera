@@ -40,5 +40,15 @@ namespace Chimera.Client.Common
 		public static readonly FilesystemFilterSet Palettes = new(new FilesystemFilter("Palette Files", new[] { "pal" }));
 
 		public static readonly FilesystemFilterSet Screenshots = new FilesystemFilterSet(FilesystemFilter.PNGs, new FilesystemFilter(".bmp Files", new[] { "bmp" }));
+
+		/// <summary>
+		/// What an encode is saved as. MP4 first, because it is the extension the
+		/// encode dialog falls back to when the ffmpeg command names no container
+		/// of its own, and the first entry is the one a save dialog offers.
+		/// </summary>
+		public static readonly FilesystemFilterSet Videos = new FilesystemFilterSet(
+			new FilesystemFilter("MP4 Files", new[] { "mp4" }),
+			new FilesystemFilter("AVI Files", new[] { "avi" }),
+			new FilesystemFilter("Matroska Files", new[] { "mkv" }));
 	}
 }

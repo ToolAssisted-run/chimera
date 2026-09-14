@@ -79,7 +79,9 @@ namespace Chimera.Client.GUI
 				CancelVideoEncode,
 				() => EncodeProgress,
 				current => this.ShowFileSaveDialog(
-					filter: FilesystemFilterSet.Screenshots,
+					// an encode is a video: this used to offer the SCREENSHOT
+					// filters (png, bmp), which name nothing this dialog can write
+					filter: FilesystemFilterSet.Videos,
 					initDir: Path.GetDirectoryName(current) ?? Config.PathEntries.AvAbsolutePath(),
 					initFileName: Path.GetFileName(current)),
 				confirmOverwrite: path => this.ModalMessageBox2(
