@@ -64,7 +64,7 @@ namespace Chimera.Client.Common
 			// emulator arrives there is nowhere to put it. A machine a GPU drew
 			// makes states good only in the session that made them, so it starts
 			// cold (docs/gpu-bridge.md).
-			if (!StatesMadeByGpu || GpuStatesSurviveRecorded) States.Load(StateHistoryFilename, MachineIdentityOf(Project));
+			if (!StatesMadeByGpu) States.Load(StateHistoryFilename, MachineIdentityOf(Project));
 			RefreshPins();
 
 			base.Attach(emulator);

@@ -3077,3 +3077,37 @@ bridge keeps a flight recorder (docs/gpu-bridge.md, "The flight recorder") and
 the note carries its last calls: always on, because the crash that needs it is
 never the run somebody switched a trace on for, and read from outside, because
 nothing inside runs after a fast fail.
+
+## A GPU core's word is withdrawn again, after it bricked a project (user-decided, 2026-09-14)
+
+35be468 honored `video.gpuStatesSurviveTheContext` again the morning after it was
+withdrawn, on measurements that were all true: a Ruffle state reloaded in a
+fresh process, one restored twenty-one frames deep, and one restored 7768 frames
+deep out of a 1.07 GB history, each drawing the right picture. By the evening
+the person could not open their project at all.
+
+The project's history had been written by a session that went on to die of
+guest heap corruption (musl's footer check in `__bin_chunk`). Opening the
+project, TAStudio went to its remembered frame, 8915, restored the nearest state,
+8890, from that history, and the first draw after it killed the process inside
+the NVIDIA driver: generated driver code indexing a table with a garbage count
+that came from the restored guest. Every open, the same frame. It reproduced on
+the same GTX 1060 from an isolated copy of the build and a copy of the cache:
+with `history.bin` the process dies in the same driver function with the same
+register fingerprint; without it the project opens and draws. A clean session's
+history, reopened in a new process, restored and landed without incident. So
+what 35be468 measured is still true, and it could not have seen this: it never
+restored a state from a session that was already going wrong.
+
+That asymmetry decides it. A greenzone that starts empty costs a replay; a
+history that crashes on open costs the project until someone knows which file to
+rename. And the hardware path does not reproduce itself run to run - two
+identical runs to frame 60 differ in about a megabyte of guest heap - so a state
+carried into another process is not the machine that process would have made.
+
+So a machine a GPU drew keeps its states for its own session again, exactly as
+the section above had it. A history already on disk from the day the claim was
+honored is not loaded when the project opens - it opens cold and says why - and
+the next save removes it. Honoring the claim again needs the missing half first:
+a hardware path that reproduces itself, and a way to tell a history from a
+session that ended in a crash.

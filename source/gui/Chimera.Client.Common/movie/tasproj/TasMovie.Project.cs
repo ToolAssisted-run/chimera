@@ -328,7 +328,7 @@ namespace Chimera.Client.Common
 				// in the file is the history as it stands right here; frames
 				// captured afterwards belong to the next save. The barrier is at
 				// Dispose, where the project is let go of.
-				if (States is not null && (!DrawnByGpu || GpuStatesSurviveDeclared)) States.SaveLater(StateHistoryFilename, MachineIdentityOf(p));
+				if (States is not null && !DrawnByGpu) States.SaveLater(StateHistoryFilename, MachineIdentityOf(p));
 				else TryDelete(StateHistoryFilename);
 				// and where this machine keeps the project's files, in a sibling of
 				// its own: the project itself stays distributable, carrying names and
@@ -437,45 +437,6 @@ namespace Chimera.Client.Common
 				&& !string.IsNullOrWhiteSpace(driver);
 
 		/// <summary>
-		/// Whether the machine says its states outlive the context that drew them
-		/// (<c>video.gpuStatesSurviveTheContext</c>), asked of the EMULATOR - which
-		/// is who there is to ask while a project is being saved.
-		///
-		/// The claim is honoured again. It was withdrawn on 2026-09-13, when a
-		/// Ruffle greenzone saved by one process and restored in the next died
-		/// inside the NVIDIA driver: the renderer went on using GL object names a
-		/// dead context had handed out. What answers that is the core comparing the
-		/// bridge's context id against the one saved beside its objects and
-		/// rebuilding when it moves, and that is what the claim now means.
-		///
-		/// Measured on a GTX 1060 (2026-09-14), all byte-for-byte against a run
-		/// that never stopped: a state reloaded in a fresh process, a greenzone
-		/// restored twenty-one frames deep, and one restored 7768 frames deep out
-		/// of a 1.07 GB history - the last with the bridge's own audit reporting 55
-		/// of the names it believed in already handed out to something else, which
-		/// is the case that draws the wrong thing rather than crashing. The picture
-		/// came back identical every time.
-		///
-		/// Not covered by that evidence, and worth knowing before widening this:
-		/// the SAME-process reopen (issue #43, tests/gpu/reopen.cpp), which takes a
-		/// different path - a fresh id minted for the new session rather than a new
-		/// process - and which cannot be exercised by the software renderer, since
-		/// a core drawing in software answers 0 for the context id by design.
-		///
-		/// A machine that claims nothing is unchanged: its states are still dropped.
-		/// </summary>
-		private bool GpuStatesSurviveDeclared
-			=> Emulator is IGpuRendered { GpuStatesSurviveTheContext: true };
-
-		/// <summary>
-		/// The same claim read back from the project, for the load side: a project
-		/// is parsed before its core is booted, so there is no emulator to ask and
-		/// what the last save wrote down is the answer (see <see cref="StatesMadeByGpu"/>).
-		/// </summary>
-		private bool GpuStatesSurviveRecorded
-			=> HeaderEntries.TryGetValue(HeaderKeys.GpuStatesSurvive, out var v) && v == "1";
-
-		/// <summary>
 		/// The regenerable bulk, beside the project: greenzone, lag log, session
 		/// position, column layout, verification log, branch states and
 		/// screenshots (joined to the project's branches by order). A failed
@@ -526,12 +487,10 @@ namespace Chimera.Client.Common
 				foreach (var b in Branches)
 				{
 					// the branch's picture and its metadata are worth keeping; the
-					// machine behind it is kept too when the core says its states
-					// outlive the context that drew them, and dropped when it does
-					// not, for the same reason the greenzone is (see DrawnByGpu and
-					// GpuStatesSurviveDeclared). Skipped for ALL branches or none:
+					// machine behind it is not, for the same reason the greenzone
+					// is not (see DrawnByGpu). Skipped for ALL branches or none:
 					// these lumps are joined to the branches by order.
-					if (b.CoreData is not null && (!DrawnByGpu || GpuStatesSurviveDeclared))
+					if (b.CoreData is not null && !DrawnByGpu)
 					{
 						bs.PutLump(ncore, (Stream s) => s.Write(b.CoreData, 0, b.CoreData.Length));
 					}
@@ -767,12 +726,10 @@ namespace Chimera.Client.Common
 				var ncoreframebuffer = new IndexedStateLump(BinaryStateLump.BranchCoreFrameBuffer);
 				foreach (var b in Branches)
 				{
-					// a state a GPU drew belongs to the session that drew it unless
-					// the core says otherwise; an older cache may still hold one
-					// from a machine that claimed nothing, and loading that would
-					// put a machine that cannot draw on the screen (see
-					// StatesMadeByGpu and GpuStatesSurviveRecorded)
-					if (!StatesMadeByGpu || GpuStatesSurviveRecorded)
+					// a state a GPU drew belongs to the session that drew it; an
+					// older cache may still hold one, and loading it would put a
+					// machine that cannot draw on the screen (see DrawnByGpu)
+					if (!StatesMadeByGpu)
 					{
 						bl.GetLump(ncore, abort: false, (Stream s, long _) => b.CoreData = s.ReadAllBytes());
 					}
@@ -800,7 +757,7 @@ namespace Chimera.Client.Common
 				// Said when there is work to say it about: a project with frames in
 				// it opens with an empty greenzone on a machine a GPU draws, and a
 				// person who is not told simply sees their cached states gone.
-				if (StatesMadeByGpu && !GpuStatesSurviveRecorded && DroppedCacheNote is null && InputLogLength > 0)
+				if (StatesMadeByGpu && DroppedCacheNote is null && InputLogLength > 0)
 				{
 					DroppedCacheNote =
 						"This machine is drawn by a GPU, and what it draws lives outside the machine: a state"

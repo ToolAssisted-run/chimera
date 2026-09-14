@@ -447,7 +447,7 @@ the NVIDIA driver (0xc0000409), reproducibly - a path the old
 drop-everything-ahead capture had kept anyone from reaching (see
 docs/design-principles.md, "A GPU core's word that its states survive is not
 taken"). The in-process reopen below still works; it is the cross-process
-restore that is unproven. Rewind and branches within a session are untouched either
+restore that is unproven. It was honored again on 2026-09-14 and withdrawn the same day, when a history written by a session that was already corrupting its guest crashed the driver on every open of the project (docs/design-principles.md, "A GPU core's word is withdrawn again, after it bricked a project"). Rewind and branches within a session are untouched either
 way - the objects are still there - and a project that loses its cache replays,
 which is what an empty greenzone has always meant.
 
