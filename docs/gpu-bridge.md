@@ -386,7 +386,8 @@ failing call one that names an object.
 ### Noticing, and building them again
 
 A renderer can be told which context its calls are landing on: `GL_OP_CONTEXT_ID`
-answers with an identity the bridge mints for each SESSION that takes it (0 means
+answers with an identity the bridge mints for each SESSION that takes it, and
+afresh on every state load (see "Per load, too" below; 0 means
 "cannot tell" - no bridge, or a host older than the question, and a guest must
 read that as "assume nothing moved"). A renderer that stores that number beside
 its objects can see, at the top of any frame, that the ground has moved - and
@@ -433,6 +434,73 @@ after it, the id has moved, the renderer rebuilds, and the picture returns
 an NVIDIA GTX 1060 (581.42) and on llvmpipe, so it is the rebuild logic that
 was never triggered rather than anything a particular driver does.
 
+### Per load, too (issue #43 again, 2026-09-15)
+
+A state loaded into the session that made it has the opposite problem: every
+name still means an object, just not the object the state remembers. The frames
+after the restored one went on reallocating, redrawing and reattaching, and none
+of that is in guest memory. A renderer's caches come back from the state saying
+what each name held at that frame, and the driver holds something else.
+
+Found on the reporter's FlatOut 2 project with a seeded TAStudio stress on the
+GTX 1060. Both the build they used and the current one died on the same step,
+three minutes in: an insert behind the playhead, a restore to frame 272, then
+a replay. xemu's surface cache said texture 56 was a 512x512 `DEPTH_COMPONENT16`
+buffer, and the driver refused to attach it:
+
+    [ce-gl!] op=178 raised 0x502   (glFramebufferTexture2D)
+    [ce-gl!] op=168 raised 0x506   (glDrawArrays)
+    [fbo] status=8cd6 ... ifmt=81a5 att=8d00 w=512 h=512 buf=56
+    Assertion failed: glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE
+
+`CHIMERA_GL_STATEAUDIT` showed all four restores with 0 objects deleted since
+and 0 handed out again, so nothing a lifetime check can see was wrong. Without
+`CHIMERA_GL_CHECK` the same state fails one assert earlier
+(`glGetError() == GL_NO_ERROR`, render_surface_to). A renderer with fewer asserts
+would not stop at all; it would draw from the wrong texture.
+
+Upstream xemu has its own protocol for this: before a savestate it downloads
+every dirty surface into VRAM, and after a load it flushes its caches. A sandbox
+snapshot takes the whole machine from underneath and runs neither.
+
+So `ce_gl_state_loaded` moves the id, and a load is a reopen as far as a core
+can tell: it rebuilds its objects from emulated memory, as described above.
+The fix is in the engine, because every bridged core already rebuilds on a
+moved id. The same stress ran its whole 20 minutes (212 steps) with it.
+`CHIMERA_GL_KEEP_OBJECTS_ON_LOAD` keeps the old behaviour for A/B.
+
+Running every core's rebuild after every rewind turned up a bug in the bridge's
+buffer pool (see `bufferPool()` in gl_bridge.cpp). Dolphin crashed on its first
+pass: its JIT vertex loader wrote a batch of vertices to address 0. The same run
+with the id left alone went 19 passes, and with `CHIMERA_GL_NO_POOL` it passed
+too. A log in Dolphin's `ResetBuffer` found the cause:
+
+    [chimera-vm] vertex Map NULL: err=0 ours=3 isBuffer=1 bound=3 bound_mapped=1
+
+The pool keeps a deleted buffer's name instead of deleting it, on the grounds
+that a guest will call `glBufferData` on it again and replace everything. That
+holds for mutable storage only. Dolphin's stream buffers are
+`glBufferStorage`, immutable and persistently mapped, and its rebuild deletes
+them. A recycled name came back still mapped, or with its storage fixed, and the
+new buffer's storage call and map failed. `CHIMERA_GL_POOL_TRACE` showed the last
+case exactly:
+
+    [pool] storage target=0x8c2a bound=0 size=16777216 ...  (texel buffer 5)
+    [pool] delete 5: ours=1 mapped=0 immutable=0 -> pooled
+    [pool] gen 5 (recycled)
+    [pool] storage target=0x8892 bound=5 size=67108864 flags=0xc2 err=0x502
+    [pool] mapRange target=0x8892 bound=5 access=0xc2 -> 0000000000000000
+
+The texel buffer lives on `GL_TEXTURE_BUFFER`, a target the tracking did not yet
+know, so it was never marked immutable. It came back as the vertex buffer,
+`glBufferStorage` refused it, and the map handed Dolphin NULL.
+
+The pool now notes maps, unmaps and immutable storage as they cross, on every
+buffer target GL has, and never recycles a buffer that is mapped or immutable;
+deleting one is a real delete. A map or storage call on a target it cannot
+identify turns the pool off for the rest of the process. A reopen could hit the
+same path; rewinding just hits it more often.
+
 ### What the frontend does with that
 
 A core declares `video.gpuStatesSurviveTheContext` when its renderer does this,
@@ -447,8 +515,9 @@ the NVIDIA driver (0xc0000409), reproducibly - a path the old
 drop-everything-ahead capture had kept anyone from reaching (see
 docs/design-principles.md, "A GPU core's word that its states survive is not
 taken"). The in-process reopen below still works; it is the cross-process
-restore that is unproven. It was honored again on 2026-09-14 and withdrawn the same day, when a history written by a session that was already corrupting its guest crashed the driver on every open of the project (docs/design-principles.md, "A GPU core's word is withdrawn again, after it bricked a project"). Rewind and branches within a session are untouched either
-way - the objects are still there - and a project that loses its cache replays,
+restore that is unproven. It was honored again on 2026-09-14 and withdrawn the same day, when a history written by a session that was already corrupting its guest crashed the driver on every open of the project (docs/design-principles.md, "A GPU core's word is withdrawn again, after it bricked a project"). Rewind and branches within a session keep their states
+either way - a load there moves the id and the core rebuilds (see "Per load,
+too" above) - and a project that loses its cache replays,
 which is what an empty greenzone has always meant.
 
 Every core that draws on the host's GPU now says yes. Saying it is not the same

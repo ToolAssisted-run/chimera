@@ -16,6 +16,13 @@
 #include <cstring>
 
 extern "C" void ce_gl_state_loaded(int64_t to); /* the engine's own; the session calls it on every restore */
+/* what the guest calls; sysv on Windows, as gl_bridge.cpp's BRIDGE_ABI says */
+#ifdef _WIN32
+extern "C" uintptr_t __attribute__((sysv_abi)) ce_gl_dispatch(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t);
+#else
+extern "C" uintptr_t ce_gl_dispatch(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t);
+#endif
+const uintptr_t kContextIdOp = 4; /* GL_OP_CONTEXT_ID, miniBox source/gl/gl-bridge.h */
 
 namespace {
 
@@ -85,6 +92,17 @@ int main()
 	e = newestOf(recorder);
 	assert(e.op == kStateLoaded && e.detail == h.capacity + 2);
 
-	std::printf("test_gl_flight: ok (%u entries in %u bytes)\n", h.capacity, bytes);
+	/* A restore moves the id the guest compares (issue #43): its objects' names
+	 * came back, what they held did not, and a renderer rebuilds on a moved id.
+	 * Asked the way the guest asks, after the ring checks because a dispatch is
+	 * itself a flight entry. */
+	const uintptr_t beforeLoad = ce_gl_dispatch(kContextIdOp, 0, 0, 0, 0, 0);
+	ce_gl_state_loaded(7);
+	const uintptr_t afterLoad = ce_gl_dispatch(kContextIdOp, 0, 0, 0, 0, 0);
+	assert(afterLoad != 0 && afterLoad != beforeLoad);
+	ce_gl_state_loaded(7);
+	assert(ce_gl_dispatch(kContextIdOp, 0, 0, 0, 0, 0) != afterLoad);
+
+	std::printf("test_gl_flight: ok (%u entries in %u bytes; a load moves the context id)\n", h.capacity, bytes);
 	return 0;
 }

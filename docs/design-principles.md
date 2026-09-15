@@ -3193,3 +3193,47 @@ The synth core dies on cue for the tests (all eight buttons: an abort; all but
 Up: a wild pointer), and the witness checks both, twice: chimera-run stops with
 the reason, and headless Chimera exits 65 with it, without a native crash, with
 the journal left behind.
+
+## A restore is a new context to a GPU core (user-decided, 2026-09-15)
+
+Issue #43 (xemu, FlatOut 2: "crashes at some point, while seeking or autosaving")
+was not a missing syscall and not the greenzone. The reporter's project, on the
+reporter's build and on the current one, died on the same step of a seeded
+TAStudio stress every time, three minutes in: an insert behind the playhead, a
+restore to frame 272, a replay. xemu's renderer asserted
+(`glCheckFramebufferStatus == GL_FRAMEBUFFER_COMPLETE`, surface.c) and aborted.
+
+The restored state said texture 56 was a 512x512 depth buffer. It had been
+something else since: the frames after 272 reallocated it. A whole-machine state
+brings back a renderer's IDEA of its GL objects - the surface cache, which name
+holds what - but not the objects, which live in the driver and stay as the
+future left them. Same session, same names, so nothing was ever dead
+(`CHIMERA_GL_STATEAUDIT`: 0 deleted, 0 reissued) and nothing told the renderer;
+the context id, the one signal a bridged core rebuilds on, only moved per
+session. docs/gpu-bridge.md said "rewind and branches within a session are
+untouched - the objects are still there". The objects were; what they held was
+not. Upstream xemu has the protocol for its own savestates - download the
+surfaces into VRAM before saving, flush the caches after loading - and a
+sandbox snapshot runs neither.
+
+So every state load moves the id (`ce_gl_state_loaded`), and a GPU core treats
+a restore exactly as it treats a reopen: it builds its objects again from
+emulated memory. No core changed; every one of them (dolphin, flycast, pcsx2,
+rpcs3, ruffle, xemu) already rebuilds on a moved id, and the user chose one rule
+for all of them over a per-core flush. `CHIMERA_GL_KEEP_OBJECTS_ON_LOAD` puts
+the old behaviour back for A/B.
+
+Measured on the GTX 1060: the stress that died at step 13 on both builds ran its
+whole 20 minutes with the id moving - 212 steps, no stop.
+
+Making every core rebuild on every rewind exposed a bridge bug the rare reopen
+had hidden. The buffer pool keeps a deleted buffer's name for reuse rather than
+deleting it, assuming the guest will respecify it with `glBufferData`. Dolphin's
+stream buffers are `glBufferStorage` - immutable, persistently mapped - and its
+rebuild deletes them. A recycled name came back still mapped or with its storage
+fixed, the new buffer's storage and map failed, and Dolphin's vertex loader
+wrote to address 0. The rule: recycling a name must behave like a real delete,
+or it is a different operation. A buffer that is mapped or immutable is never
+pooled, and a target the pool cannot identify turns it off. It took a trace
+(`CHIMERA_GL_POOL_TRACE`) to find the last gap - the texel buffer on
+`GL_TEXTURE_BUFFER` - after two fixes reasoned from the code had each missed it.

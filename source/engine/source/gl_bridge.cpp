@@ -633,9 +633,26 @@ extern "C" void ce_gl_audit_frame(int64_t frame)
  * leaked: made after the frame being restored, so the guest has just forgotten
  *         it and nothing will ever delete it.
  */
+static void mint_context_id();
+
 extern "C" void ce_gl_state_loaded(int64_t to)
 {
 	flightNote(kFlightStateLoaded, (uint32_t)to);
+	/* A restore is a new context as far as the guest can tell (issue #43). The
+	 * state puts back the renderer's idea of every object - a surface cache
+	 * saying texture 56 is a 512x512 depth buffer - but not the objects: those
+	 * stayed as the frames AFTER the restored one left them, reallocated,
+	 * redrawn, reattached. Same session, same names, different things. xemu
+	 * attached that texture, the driver refused it, and the renderer's own
+	 * assert took the machine down; a renderer that asserts less draws garbage
+	 * instead. Every bridged core already rebuilds from emulated memory when
+	 * this id moves (the cross-session reload), which is exactly the answer,
+	 * so a load moves it. Proved on FlatOut 2: a seeded TAStudio stress died
+	 * at step 13 on every build, and ran 212 steps with this.
+	 *
+	 * CHIMERA_GL_KEEP_OBJECTS_ON_LOAD puts the old behaviour back, for A/B. */
+	static const bool keepObjects = getenv("CHIMERA_GL_KEEP_OBJECTS_ON_LOAD") != nullptr;
+	if (!keepObjects) mint_context_id();
 	if (!glAudit()) return;
 	uint64_t dead = 0, reused = 0, held = 0, leaked = 0;
 	for (int k = 0; k < kAuditKinds; k++)
@@ -982,20 +999,29 @@ static void syncForget(GLsync name)
  * for itself twice over.
  *
  * So a deleted buffer's name is kept rather than given back to the driver, and
- * the next request for one is answered from that list. Three things make this
+ * the next request for one is answered from that list. Four things make this
  * safe rather than clever:
  *
  *  - a recycled buffer is RE-SPECIFIED before use. Every one of those
  *    hundred and thirty-nine is followed by a glBufferData, which replaces its
  *    size and its contents outright and orphans whatever the GPU still held.
- *    (Immutable storage would not allow that, but a guest across this bridge
- *    cannot have ARB_buffer_storage - it hands out a host pointer - so the
- *    mutable path is the only path here.)
+ *    Immutable storage would not allow that, and a guest CAN have it (Dolphin
+ *    does), so a buffer given immutable storage is never pooled - see the last
+ *    point.
  *  - only names this bridge HANDED OUT are pooled. A guest deleting something
  *    it never generated is a guest with a bug, and passing that through to the
  *    driver is how it stays visible.
  *  - the list is bounded. Past the cap the delete is a real delete, so a guest
  *    that frees far more than it allocates cannot make this a leak.
+ *  - a MAPPED buffer, or one with IMMUTABLE storage, is never pooled. A real
+ *    delete unmaps it and frees its storage; a pooled name keeps both, so the
+ *    guest's next buffer would come back still mapped, or refuse its
+ *    glBufferStorage, and the map after it would hand the guest NULL. The
+ *    first point assumes no guest has immutable storage, and Dolphin does:
+ *    its stream buffers are glBufferStorage and persistently mapped, and its
+ *    rebuild wrote a batch of vertices to address 0 through a recycled one
+ *    (issue #43). Maps, unmaps and storage are tracked as they cross
+ *    (bufferMapped(), bufferImmutable()), and such a buffer's delete is real.
  *
  * What it does NOT do is textures, and the reason is worth recording: they are
  * created with glTexStorage2D, which is immutable. A recycled texture would
@@ -1012,6 +1038,14 @@ static bool glPool()
 
 /* Both lazily constructed rather than namespace-scope globals: see auditLives()
  * for why this file must not have a static initialiser. */
+/* CHIMERA_GL_POOL_TRACE: every buffer name the pool hands out or takes back,
+ * and every map, unmap and immutable storage it notes, as it happens. */
+static bool poolTrace()
+{
+	static const bool on = getenv("CHIMERA_GL_POOL_TRACE") != nullptr;
+	return on;
+}
+
 static std::vector<GLuint> &bufferPool()
 {
 	static std::vector<GLuint> pool;
@@ -1037,6 +1071,104 @@ static void poolMarkOurs(GLuint name)
 static bool poolIsOurs(GLuint name)
 {
 	return name != 0 && (size_t)name < bufferOurs().size() && bufferOurs()[name];
+}
+
+/* indexed by name: is it mapped right now? */
+static std::vector<bool> &bufferMapped()
+{
+	static std::vector<bool> mapped;
+	return mapped;
+}
+
+static void poolNoteMapped(GLuint name, bool mapped)
+{
+	if (name == 0) return;
+	if (bufferMapped().size() <= (size_t)name)
+	{
+		if (!mapped) return;
+		bufferMapped().resize((size_t)name + 1024, false);
+	}
+	bufferMapped()[name] = mapped;
+}
+
+static bool poolIsMapped(GLuint name)
+{
+	return name != 0 && (size_t)name < bufferMapped().size() && bufferMapped()[name];
+}
+
+/* indexed by name: was it ever given immutable storage? A property of the
+ * object for as long as the name lives, so only a real delete clears it. */
+static std::vector<bool> &bufferImmutable()
+{
+	static std::vector<bool> immutable;
+	return immutable;
+}
+
+static void poolNoteImmutable(GLuint name, bool immutable)
+{
+	if (name == 0) return;
+	if (bufferImmutable().size() <= (size_t)name)
+	{
+		if (!immutable) return;
+		bufferImmutable().resize((size_t)name + 1024, false);
+	}
+	bufferImmutable()[name] = immutable;
+}
+
+static bool poolIsImmutable(GLuint name)
+{
+	return name != 0 && (size_t)name < bufferImmutable().size() && bufferImmutable()[name];
+}
+
+/* Set once a buffer is mapped or given storage on a target boundBuffer() does
+ * not know: the pool can no longer tell which names are safe to recycle, so it
+ * stops for the rest of the process and gives back what it holds. */
+static bool &poolDistrusted()
+{
+	static bool distrusted;
+	return distrusted;
+}
+
+static void poolDistrust(GLenum target)
+{
+	if (poolDistrusted()) return;
+	poolDistrusted() = true;
+	fprintf(stderr, "[ce-gl] buffer pool off: a buffer was mapped or given storage on target %#x,"
+		" which it cannot track\n", (unsigned)target);
+	if (!bufferPool().empty()) glDeleteBuffers((GLsizei)bufferPool().size(), bufferPool().data());
+	bufferPool().clear();
+}
+
+/* The buffer a map, unmap or storage on `target` names: whatever is bound there.
+ * Every buffer target GL has, by value, because the texel buffer Dolphin gives
+ * immutable storage lives on GL_TEXTURE_BUFFER and a list without it let that
+ * name be recycled (issue #43). A target not listed distrusts the pool. */
+static GLuint boundBuffer(GLenum target)
+{
+	GLenum binding;
+	switch (target)
+	{
+		case 0x8C2A: binding = 0x8C2A; break; /* GL_TEXTURE_BUFFER -> GL_TEXTURE_BUFFER_BINDING */
+		case 0x90EE: binding = 0x90EF; break; /* GL_DISPATCH_INDIRECT_BUFFER -> _BINDING */
+		case 0x92C0: binding = 0x92C1; break; /* GL_ATOMIC_COUNTER_BUFFER -> _BINDING */
+		case 0x9192: binding = 0x9193; break; /* GL_QUERY_BUFFER -> _BINDING */
+		case GL_ARRAY_BUFFER: binding = GL_ARRAY_BUFFER_BINDING; break;
+		case GL_ELEMENT_ARRAY_BUFFER: binding = GL_ELEMENT_ARRAY_BUFFER_BINDING; break;
+		case GL_PIXEL_PACK_BUFFER: binding = GL_PIXEL_PACK_BUFFER_BINDING; break;
+		case GL_PIXEL_UNPACK_BUFFER: binding = GL_PIXEL_UNPACK_BUFFER_BINDING; break;
+		case GL_UNIFORM_BUFFER: binding = GL_UNIFORM_BUFFER_BINDING; break;
+		case GL_COPY_READ_BUFFER: binding = GL_COPY_READ_BUFFER_BINDING; break;
+		case GL_COPY_WRITE_BUFFER: binding = GL_COPY_WRITE_BUFFER_BINDING; break;
+		case GL_TRANSFORM_FEEDBACK_BUFFER: binding = GL_TRANSFORM_FEEDBACK_BUFFER_BINDING; break;
+		case GL_SHADER_STORAGE_BUFFER: binding = GL_SHADER_STORAGE_BUFFER_BINDING; break;
+		case GL_DRAW_INDIRECT_BUFFER: binding = GL_DRAW_INDIRECT_BUFFER_BINDING; break;
+		default:
+			poolDistrust(target);
+			return 0;
+	}
+	GLint name = 0;
+	glGetIntegerv(binding, &name);
+	return (GLuint)name;
 }
 
 
@@ -1112,7 +1244,7 @@ extern "C" uintptr_t BRIDGE_ABI ce_gl_dispatch(uintptr_t op, uintptr_t a, uintpt
 	{
 		struct ChimeraGlArgs_glGenBuffers *args = (struct ChimeraGlArgs_glGenBuffers *)a;
 		GLsizei served = 0;
-		while (served < args->n && !bufferPool().empty())
+		while (served < args->n && !poolDistrusted() && !bufferPool().empty())
 		{
 			args->buffers[served++] = bufferPool().back();
 			bufferPool().pop_back();
@@ -1126,6 +1258,9 @@ extern "C" uintptr_t BRIDGE_ABI ce_gl_dispatch(uintptr_t op, uintptr_t a, uintpt
 		 * object as far as the guest is concerned, and counting it is the whole
 		 * point of the audit. */
 		for (GLsizei i = 0; i < args->n; i++) auditGen(kAuditBuffer, args->buffers[i]);
+		if (poolTrace())
+			for (GLsizei i = 0; i < args->n; i++)
+				fprintf(stderr, "[pool] gen %u (%s)\n", (unsigned)args->buffers[i], i < served ? "recycled" : "driver");
 		return 0;
 	}
 	if (glPool() && op == CHIMERA_GL_OP_glDeleteBuffers)
@@ -1134,14 +1269,23 @@ extern "C" uintptr_t BRIDGE_ABI ce_gl_dispatch(uintptr_t op, uintptr_t a, uintpt
 		for (GLsizei i = 0; i < args->n; i++)
 		{
 			const GLuint name = args->buffers[i];
-			if (poolIsOurs(name) && bufferPool().size() < kBufferPoolMax)
+			if (poolTrace())
+				fprintf(stderr, "[pool] delete %u: ours=%d mapped=%d immutable=%d -> %s\n", (unsigned)name,
+					(int)poolIsOurs(name), (int)poolIsMapped(name), (int)poolIsImmutable(name),
+					poolIsOurs(name) && !poolIsMapped(name) && !poolIsImmutable(name)
+						&& bufferPool().size() < kBufferPoolMax ? "pooled" : "real");
+			if (poolIsOurs(name) && !poolIsMapped(name) && !poolIsImmutable(name)
+				&& !poolDistrusted() && bufferPool().size() < kBufferPoolMax)
 			{
 				bufferPool().push_back(name);
 				continue;
 			}
-			/* not ours, or the pool is full: a real delete, so a guest bug
-			 * stays visible and a lopsided guest cannot leak */
+			/* not ours, still mapped, immutable, or the pool is full: a real
+			 * delete, so a guest bug stays visible, a mapping and a storage end
+			 * the way the guest meant, and a lopsided guest cannot leak */
 			glDeleteBuffers(1, &name);
+			poolNoteMapped(name, false);
+			poolNoteImmutable(name, false);
 			if (name != 0 && (size_t)name < bufferOurs().size()) bufferOurs()[name] = false;
 		}
 		return 0;
@@ -1258,6 +1402,67 @@ static uintptr_t ce_gl_dispatch_one(uintptr_t op, uintptr_t a, uintptr_t b,
 	 * the bounce buffer above rather than the generated case below. */
 	switch (op)
 	{
+		/* Maps and unmaps, noted for the buffer pool (see bufferPool()): it must
+		 * never recycle a buffer that is still mapped. */
+		case CHIMERA_GL_OP_glMapBufferRange:
+		{
+			auto *p = reinterpret_cast<ChimeraGlArgs_glMapBufferRange *>(a);
+			void *mapped = glMapBufferRange(p->target, p->offset, p->length, p->access);
+			if (mapped != nullptr && glPool()) poolNoteMapped(boundBuffer(p->target), true);
+			if (poolTrace())
+				fprintf(stderr, "[pool] mapRange target=%#x bound=%u access=%#x -> %p\n", (unsigned)p->target,
+					(unsigned)boundBuffer(p->target), (unsigned)p->access, mapped);
+			return (uintptr_t)mapped;
+		}
+		case CHIMERA_GL_OP_glMapBuffer:
+		{
+			auto *p = reinterpret_cast<ChimeraGlArgs_glMapBuffer *>(a);
+			void *mapped = glMapBuffer(p->target, p->access);
+			if (mapped != nullptr && glPool()) poolNoteMapped(boundBuffer(p->target), true);
+			return (uintptr_t)mapped;
+		}
+		case CHIMERA_GL_OP_glMapNamedBufferRange:
+		{
+			auto *p = reinterpret_cast<ChimeraGlArgs_glMapNamedBufferRange *>(a);
+			void *mapped = glMapNamedBufferRange(p->buffer, p->offset, p->length, p->access);
+			if (mapped != nullptr) poolNoteMapped(p->buffer, true);
+			return (uintptr_t)mapped;
+		}
+		case CHIMERA_GL_OP_glUnmapBuffer:
+		{
+			auto *p = reinterpret_cast<ChimeraGlArgs_glUnmapBuffer *>(a);
+			const GLuint name = glPool() ? boundBuffer(p->target) : 0;
+			const GLboolean ok = glUnmapBuffer(p->target);
+			poolNoteMapped(name, false);
+			if (poolTrace())
+				fprintf(stderr, "[pool] unmap target=%#x bound=%u -> %d\n", (unsigned)p->target, (unsigned)name, (int)ok);
+			return (uintptr_t)ok;
+		}
+		case CHIMERA_GL_OP_glBufferStorage:
+		{
+			auto *p = reinterpret_cast<ChimeraGlArgs_glBufferStorage *>(a);
+			glBufferStorage(p->target, p->size, p->data, p->flags);
+			if (glPool()) poolNoteImmutable(boundBuffer(p->target), true);
+			if (poolTrace())
+				fprintf(stderr, "[pool] storage target=%#x bound=%u size=%lld flags=%#x err=%#x\n", (unsigned)p->target,
+					(unsigned)boundBuffer(p->target), (long long)p->size, (unsigned)p->flags, (unsigned)glGetError());
+			return 0;
+		}
+		case CHIMERA_GL_OP_glNamedBufferStorage:
+		{
+			auto *p = reinterpret_cast<ChimeraGlArgs_glNamedBufferStorage *>(a);
+			glNamedBufferStorage(p->buffer, p->size, p->data, p->flags);
+			poolNoteImmutable(p->buffer, true);
+			return 0;
+		}
+		case CHIMERA_GL_OP_glUnmapNamedBuffer:
+		{
+			auto *p = reinterpret_cast<ChimeraGlArgs_glUnmapNamedBuffer *>(a);
+			const GLboolean ok = glUnmapNamedBuffer(p->buffer);
+			poolNoteMapped(p->buffer, false);
+			return (uintptr_t)ok;
+		}
+
 		case CHIMERA_GL_OP_glGetBufferSubData:
 		{
 			auto *p = reinterpret_cast<ChimeraGlArgs_glGetBufferSubData *>(a);
@@ -1411,7 +1616,10 @@ static uintptr_t ce_gl_dispatch_one(uintptr_t op, uintptr_t a, uintptr_t b,
 			 * live in guest memory - so they survive a savestate into a session
 			 * where they name nothing, and every call using one is refused
 			 * without the guest ever hearing about it. Storing this number
-			 * beside them is how a renderer can tell, and rebuild. */
+			 * beside them is how a renderer can tell, and rebuild. It moves per
+			 * session and on every state load: a load in the same session
+			 * brings the names back but not what the objects held
+			 * (ce_gl_state_loaded). */
 			return g_context_id;
 
 		case GL_OP_VERSION:
@@ -1509,7 +1717,6 @@ static void mint_context_id()
 		^ per_process
 		^ (++made);
 	if (g_context_id == 0) g_context_id = 1; /* 0 means "cannot tell" */
-	flightNote(kFlightSession, 0);
 }
 
 extern "C" int32_t ce_gl_start(char *error_out, int32_t error_len)
@@ -1530,6 +1737,7 @@ extern "C" int32_t ce_gl_start(char *error_out, int32_t error_len)
 		 * (issue #43). A fresh process already gets a new id from the block
 		 * below; this is the same signal for the in-process case. */
 		mint_context_id();
+		flightNote(kFlightSession, 0);
 		return 1;
 	}
 
@@ -1579,6 +1787,7 @@ extern "C" int32_t ce_gl_start(char *error_out, int32_t error_len)
 	/* An identity the guest stores beside its GL objects and compares. Minted
 	 * per session, not merely per context (see the g_ready path above). */
 	mint_context_id();
+	flightNote(kFlightSession, 0);
 	return_current();
 	return 1;
 }
