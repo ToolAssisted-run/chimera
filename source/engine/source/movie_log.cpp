@@ -449,11 +449,11 @@ int32_t ce_movie_log_parse(ce_movie_log *log, const char *text, uint64_t len)
 
 const char *ce_movie_log_last_error(ce_movie_log *log) { return log->lastError.c_str(); }
 
-int64_t ce_movie_log_count(const ce_movie_log *log) { return static_cast<int64_t>(log->entries.size()); }
+int64_t ce_movie_log_count(const ce_movie_log *log) { return log == nullptr ? 0 : static_cast<int64_t>(log->entries.size()); }
 
 const char *ce_movie_log_entry(const ce_movie_log *log, int64_t index)
 {
-	if (index < 0 || index >= static_cast<int64_t>(log->entries.size())) return nullptr;
+	if (log == nullptr || index < 0 || index >= static_cast<int64_t>(log->entries.size())) return nullptr;
 	return log->entries[static_cast<size_t>(index)].c_str();
 }
 

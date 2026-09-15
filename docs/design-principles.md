@@ -3178,6 +3178,18 @@ markers:
 4. Close without saving, after asking. The recovery journal is ended without its
    clean-up, so the next open finds the work and offers it back.
 
-Headless runs still fail loudly, with the reason. The synth core dies on cue for
-the tests (all eight buttons: an abort; all but Up: a wild pointer), and the
-witness checks that both stop a run with their reason while the process lives.
+A headless run has nobody to ask: it prints the reason, keeps the recovery
+journal, and ends the ordinary way with exit code 65
+(`HeadlessMode.EXIT_CODE_CORE_STOPPED`).
+
+The stop reaches the frontend as a STATE (`ICoreStops.CoreStopped`, set by the
+frame advance that did not run), and MainForm raises `CoreStoppedException` from
+its own frame. Thrown from the emulator's frame advance, just back from the
+engine, the same exception crashed Mono in its unwinder in most runs - and did
+so with the previous host and a stop the engine only pretended, so it was never
+the sandbox - while thrown one frame further up it never did.
+
+The synth core dies on cue for the tests (all eight buttons: an abort; all but
+Up: a wild pointer), and the witness checks both, twice: chimera-run stops with
+the reason, and headless Chimera exits 65 with it, without a native crash, with
+the journal left behind.

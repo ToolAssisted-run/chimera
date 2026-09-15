@@ -25,6 +25,7 @@ using Chimera.Common.StringExtensions;
 using Chimera.Client.Common;
 
 using Chimera.Emulation.Common;
+using Chimera.Emulation.Common.Engine;
 using Chimera.Emulation.Common.Waterbox;
 
 using Chimera.Client.GUI.ToolExtensions;
@@ -532,6 +533,12 @@ namespace Chimera.Client.GUI
 						while (!pre.PrecompileDone)
 						{
 							Emulator.FrameAdvance(InputManager.ControllerOutput, false, false);
+							if (Emulator is ICoreStops { CoreStopped: { } stoppedWhy })
+							{
+								// nobody watches a precompile session, and it would pump a dead machine for ever
+								Console.Error.WriteLine($"precompile session {request.Index} of {request.Count}: the core stopped: {stoppedWhy}");
+								Environment.Exit(HeadlessMode.EXIT_CODE_CORE_STOPPED);
+							}
 							var (done, total) = pre.PrecompileProgress;
 							if (done != lastDone) { Console.WriteLine($"Precompiled {done}/{total} modules"); lastDone = done; }
 						}
@@ -884,8 +891,19 @@ namespace Chimera.Client.GUI
 					// A frame that throws - the core, the movie, a tool - pauses the session instead of
 					// ending it. Headless runs still fail, loudly, once the work is kept.
 					KeepWorkSafe();
-					if (HeadlessMode.Enabled) throw;
-					RecoverFromError(ex, "Emulation stopped on an error");
+					if (HeadlessMode.Enabled)
+					{
+						// A core whose machine died is not an error IN Chimera, and a run nobody watches has
+						// nobody to ask: say why, keep the journal, and end the ordinary way - rethrowing it
+						// through the run loop took the process down in the runtime on its way out.
+						if ((ex as CoreStoppedException ?? ex.GetBaseException() as CoreStoppedException) is not { } stopped) throw;
+						Console.Error.WriteLine($"[headless] The core stopped: {stopped.Reason}");
+						CloseKeepingRecovery(HeadlessMode.EXIT_CODE_CORE_STOPPED);
+					}
+					else
+					{
+						RecoverFromError(ex, "Emulation stopped on an error");
+					}
 				}
 				LoopTrace.Add(LoopTrace.Core, phaseStarted);
 				phaseStarted = LoopTrace.Enabled ? Stopwatch.GetTimestamp() : 0;
@@ -2506,6 +2524,16 @@ namespace Chimera.Client.GUI
 			}
 		}
 
+		/// <summary>
+		/// A frame the core's machine died in did not run, and the frontend says so HERE, from its own
+		/// frame: thrown from the emulator's frame advance, just back from the engine, the same exception
+		/// crashed Mono in its unwinder more often than not.
+		/// </summary>
+		private void ThrowIfCoreStopped()
+		{
+			if (Emulator is ICoreStops { CoreStopped: { } why }) throw new CoreStoppedException(why);
+		}
+
 		private void StepRunLoop_Core(bool force = false)
 		{
 			var runFrame = false;
@@ -2686,6 +2714,7 @@ namespace Chimera.Client.GUI
 					|| atSeekEnd;
 				long advanceStarted = LoopTrace.Enabled ? Stopwatch.GetTimestamp() : 0;
 				bool newFrame = Emulator.FrameAdvance(InputManager.ControllerOutput, render, renderSound);
+				ThrowIfCoreStopped();
 				LoopTrace.Add(LoopTrace.Advance, advanceStarted);
 
 				// an encode reaching the end of the movie is the encode finishing, not
@@ -2759,6 +2788,7 @@ namespace Chimera.Client.GUI
 						frameCount++;
 						MovieSession.HandleFrameBefore();
 						Emulator.FrameAdvance(InputManager.ControllerOutput, true, false);
+						ThrowIfCoreStopped();
 						CheatList.Pulse();
 						// No tools updates here. No existing tool (except Lua, but that gets the ShowFutureFrameCallback) needs to do anything.
 						// Maybe in the future we'll add a special update type, or add a callback for this.

@@ -513,6 +513,60 @@ PY
 		fi
 	fi
 
+	# --- a core that stops, in the real frontend ---
+	# The synth core dies on cue (SPEC.md): all eight buttons abort, all but Up
+	# follow a wild pointer - the second arrives as a SIGSEGV inside a process
+	# whose runtime has signal handlers of its own. Headless Chimera must end the
+	# run the ordinary way with the reason and HeadlessMode.EXIT_CODE_CORE_STOPPED
+	# (65), not die in native code, and leave the recovery journal behind.
+	if [ "$record" -eq 0 ]; then
+		for cue in "abort:|UDLRABsS|:the core aborted" "wild:|.DLRABsS|:the core crashed: it wrote to address"; do
+			cname="${cue%%:*}"; rest="${cue#*:}"; cline="${rest%%:*}"; cwant="${rest#*:}"
+			cdir="$work/stops-$cname"
+			rm -rf "$cdir" && mkdir -p "$cdir"
+			cp "$here/roms/gridWalker.testrom" "$cdir/gridWalker.testrom"
+			sed "12s/.*/$cline/" "$here/movies/gridWalker.win.txt" > "$cdir/movie.txt"
+			python3 - "$cdir/movie.txt" "$cdir/gridWalker.testrom" "$cdir/stops.chimeraProject" <<'PY'
+import hashlib, json, sys
+entries = [l.rstrip("\r\n") for l in open(sys.argv[1]) if l.startswith("|")]
+logkey = "#P1 Up|P1 Down|P1 Left|P1 Right|P1 A|P1 B|P1 Select|P1 Start|"
+sha1 = hashlib.sha1(open(sys.argv[2], "rb").read()).hexdigest().upper()
+json.dump({
+    "id": "0123456789abcdef0123456789abc0de",
+    "title": "stops",
+    "core": {"name": "Synth", "version": "", "sha1": ""},
+    "headers": {"MovieVersion": "Chimera Project File v1.1", "Platform": "Synth"},
+    "files": [{"name": "gridWalker.testrom", "sha1": sha1, "slot": "rom"}],
+    "input": "[Input]\nLogKey:" + logkey + "\n" + "\n".join(entries) + "\n[/Input]\n",
+}, open(sys.argv[3], "w"))
+PY
+			cjob="$work/job.stops-$cname.txt"
+			{
+				echo "outram=$cdir/ram.bin"
+				echo "outvram=$cdir/vram.bin"
+				echo "meta=$cdir/meta.txt"
+			} > "$cjob"
+			cp "$config" "$work/config.stops-$cname.ini"
+			( cd "$repo_root" && CHIMERA_JOB="$cjob" timeout 120 mono "$emu_exe" --headless \
+				"--config=$work/config.stops-$cname.ini" "--core=$repo_root/build/Cores/synth-box.chimeraCore" \
+				"--project=$cdir/stops.chimeraProject" "--lua=$here/synth-movie-dump.lua" ) > "$cdir/log.txt" 2>&1
+			crc=$?
+			if grep -qE "Native Crash|Got a SIG|SIGSEGV while executing native" "$cdir/log.txt"; then
+				report "S:frontend:$cname" FAIL "the runtime reported a native crash (see $cdir/log.txt)"
+			elif [ "$crc" -ne 65 ]; then
+				report "S:frontend:$cname" FAIL "the process ended with $crc, not 65 (see $cdir/log.txt)"
+			elif ! grep -q "\[headless\] The core stopped: $cwant" "$cdir/log.txt"; then
+				report "S:frontend:$cname" FAIL "the stopped core was not reported (see $cdir/log.txt)"
+			elif ! ls -d "$XDG_DATA_HOME"/*/Recovery/0123456789abcdef0123456789abc0de >/dev/null 2>&1 \
+				&& ! find "$XDG_DATA_HOME" -type d -name 0123456789abcdef0123456789abc0de -path "*Recovery*" | grep -q .; then
+				report "S:frontend:$cname" FAIL "the recovery journal was not left behind"
+			else
+				report "S:frontend:$cname" PASS "headless Chimera stops with the reason, lives, and keeps the journal"
+			fi
+			find "$XDG_DATA_HOME" -type d -name 0123456789abcdef0123456789abc0de -path "*Recovery*" -exec rm -rf {} + 2>/dev/null
+		done
+	fi
+
 	# --- a run becomes a video ---
 	# Encode Video, end to end: part of a real run reproduced into a real file
 	# through the real writer. The checks are the ones that used to be a person's

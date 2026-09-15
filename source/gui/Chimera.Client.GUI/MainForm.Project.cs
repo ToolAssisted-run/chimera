@@ -428,13 +428,13 @@ namespace Chimera.Client.GUI
 		/// Closes without saving, and without the clean end that would delete the recovery journal - so
 		/// the next open finds the work and offers it back (ProjectRecovery.FindUnfinished).
 		/// </summary>
-		private void CloseKeepingRecovery()
+		private void CloseKeepingRecovery(int? exitCode = null)
 		{
 			KeepWorkSafe();
 			_recovery?.End(clean: false);
 			_recovery = null;
 			// unattended: the question the project's own "save changes?" would ask has just been answered
-			CloseEmulator();
+			CloseEmulator(exitCode);
 		}
 
 		private int _errorsShown;

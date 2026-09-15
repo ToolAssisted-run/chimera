@@ -963,23 +963,28 @@ namespace Chimera.Emulation.Common.Engine
 			return false;
 		}
 
-		public long Count => ChimeraEngine.Instance.ce_movie_log_count(_log);
+		// Every member below answers as an EMPTY log once this one is freed. A finalizer can reach a
+		// log another finalizer already freed - their order is the runtime's - and handing the engine
+		// a null log killed the process on its way out (a headless run that ended on an error).
+		private bool Freed => _log == IntPtr.Zero;
+
+		public long Count => Freed ? 0 : ChimeraEngine.Instance.ce_movie_log_count(_log);
 
 		public string this[long index]
-			=> ChimeraEngine.PtrToStringUtf8(ChimeraEngine.Instance.ce_movie_log_entry(_log, index))
+			=> (Freed ? null : ChimeraEngine.PtrToStringUtf8(ChimeraEngine.Instance.ce_movie_log_entry(_log, index)))
 				?? throw new ArgumentOutOfRangeException(nameof(index));
 
-		public void Add(string entry) => ChimeraEngine.Instance.ce_movie_log_add(_log, entry);
+		public void Add(string entry) { if (!Freed) ChimeraEngine.Instance.ce_movie_log_add(_log, entry); }
 
-		public void Set(long index, string entry) => ChimeraEngine.Instance.ce_movie_log_set(_log, index, entry);
+		public void Set(long index, string entry) { if (!Freed) ChimeraEngine.Instance.ce_movie_log_set(_log, index, entry); }
 
-		public void Insert(long index, string entry) => ChimeraEngine.Instance.ce_movie_log_insert(_log, index, entry);
+		public void Insert(long index, string entry) { if (!Freed) ChimeraEngine.Instance.ce_movie_log_insert(_log, index, entry); }
 
-		public void RemoveRange(long index, long count) => ChimeraEngine.Instance.ce_movie_log_remove_range(_log, index, count);
+		public void RemoveRange(long index, long count) { if (!Freed) ChimeraEngine.Instance.ce_movie_log_remove_range(_log, index, count); }
 
-		public void Truncate(long count) => ChimeraEngine.Instance.ce_movie_log_truncate(_log, count);
+		public void Truncate(long count) { if (!Freed) ChimeraEngine.Instance.ce_movie_log_truncate(_log, count); }
 
-		public void Clear() => ChimeraEngine.Instance.ce_movie_log_clear(_log);
+		public void Clear() { if (!Freed) ChimeraEngine.Instance.ce_movie_log_clear(_log); }
 
 		/// <summary>Replaces this log's entries and LogKey with another's, engine-side.</summary>
 		public void AssignFrom(EngineMovieLog source) => ChimeraEngine.Instance.ce_movie_log_assign(_log, source.Handle);
@@ -991,14 +996,14 @@ namespace Chimera.Emulation.Common.Engine
 			return result < 0 ? null : result;
 		}
 
-		public bool HasStateFrame => ChimeraEngine.Instance.ce_movie_log_has_state_frame(_log) is not 0;
+		public bool HasStateFrame => !Freed && ChimeraEngine.Instance.ce_movie_log_has_state_frame(_log) is not 0;
 
-		public int StateFrame => ChimeraEngine.Instance.ce_movie_log_state_frame(_log);
+		public int StateFrame => Freed ? 0 : ChimeraEngine.Instance.ce_movie_log_state_frame(_log);
 
 		public string? Key
 		{
-			get => ChimeraEngine.PtrToStringUtf8(ChimeraEngine.Instance.ce_movie_log_key(_log));
-			set => ChimeraEngine.Instance.ce_movie_log_set_key(_log, value);
+			get => Freed ? null : ChimeraEngine.PtrToStringUtf8(ChimeraEngine.Instance.ce_movie_log_key(_log));
+			set { if (!Freed) ChimeraEngine.Instance.ce_movie_log_set_key(_log, value); }
 		}
 
 		/// <summary>
@@ -1013,7 +1018,7 @@ namespace Chimera.Emulation.Common.Engine
 		/// Appends one of the frontend's own records (its markers, its branches) to the journal, flushed and
 		/// synced exactly like an input change. Nothing happens when the log is not journaling.
 		/// </summary>
-		public void JournalNote(string record) => ChimeraEngine.Instance.ce_movie_log_journal_note(_log, record);
+		public void JournalNote(string record) { if (!Freed) ChimeraEngine.Instance.ce_movie_log_journal_note(_log, record); }
 
 		/// <summary>The frontend's records the last replay into this log found, in the order they were written.</summary>
 		public IReadOnlyList<string> JournalNotes
@@ -1031,10 +1036,10 @@ namespace Chimera.Emulation.Common.Engine
 		}
 
 		/// <summary>Stops journaling; <paramref name="remove"/> also deletes the journal (a session that ended cleanly).</summary>
-		public void JournalClose(bool remove) => ChimeraEngine.Instance.ce_movie_log_journal_close(_log, remove ? 1 : 0);
+		public void JournalClose(bool remove) { if (!Freed) ChimeraEngine.Instance.ce_movie_log_journal_close(_log, remove ? 1 : 0); }
 
 		/// <summary>Whether changes are being journaled right now (a journal that could not be written stops).</summary>
-		public bool Journaling => ChimeraEngine.Instance.ce_movie_log_journaling(_log) is not 0;
+		public bool Journaling => !Freed && ChimeraEngine.Instance.ce_movie_log_journaling(_log) is not 0;
 
 		/// <summary>
 		/// A log rebuilt from a journal file - everything entered up to the moment the process ended -
@@ -1817,15 +1822,31 @@ namespace Chimera.Emulation.Common.Engine
 			}
 		}
 
-		/// <summary>One frame; true when it was a lag frame.</summary>
-		/// <exception cref="CoreStoppedException">the core's machine died during the frame, or had
-		/// already died; nothing more runs until a state is loaded (a greenzone restore, a branch)</exception>
+		/// <summary>
+		/// One frame; true when it was a lag frame. When the core's machine died during the frame, or
+		/// had already died, nothing ran: <see cref="Stopped"/> says why, and nothing more runs until a
+		/// state is loaded (a greenzone restore, a branch).
+		/// </summary>
+		/// <remarks>
+		/// A state, not an exception, and deliberately: a managed exception thrown from this frame, just
+		/// back from the engine, crashed Mono in its unwinder more often than not (the same exception
+		/// thrown one frame further up did not). The frontend raises <see cref="CoreStoppedException"/>
+		/// from its own frame instead.
+		/// </remarks>
 		public bool FrameAdvance(ulong buttons, bool render)
 		{
 			var lag = E.ce_session_frame_advance(_session, buttons, render ? 1 : 0);
-			if (lag < 0) throw new CoreStoppedException(GuestDeath ?? LastError);
+			if (lag < 0)
+			{
+				Stopped = GuestDeath ?? LastError;
+				return false;
+			}
+			Stopped = null;
 			return lag is not 0;
 		}
+
+		/// <summary>Why the last frame did not run - the core's machine is dead - or null when it ran.</summary>
+		public string Stopped { get; private set; }
 
 		/// <summary>Why the core's machine died, or null while it lives.</summary>
 		public string GuestDeath => ChimeraEngine.PtrToStringUtf8(E.ce_session_guest_death(_session));

@@ -15,6 +15,12 @@ namespace Chimera.Client.Common
 		/// <summary>distinct from regular exit codes so harnesses can tell "a dialog would have blocked here" from other failures</summary>
 		public const int EXIT_CODE_DIALOG = 64;
 
+		/// <summary>
+		/// The core's machine died during a frame (CoreStoppedException). The run ends the ordinary way,
+		/// with the reason on stderr and the recovery journal kept - a stopped core is not a bug in Chimera.
+		/// </summary>
+		public const int EXIT_CODE_CORE_STOPPED = 65;
+
 		public static bool Enabled { get; set; }
 
 		/// <summary>logs a dialog that cannot be meaningfully answered without a user, then terminates the process</summary>

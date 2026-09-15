@@ -28,7 +28,7 @@ namespace Chimera.Emulation.Common.Waterbox
 		author: "miniBox",
 		portedVersion: "1.0.0",
 		portedUrl: "https://github.com/SergioMartin86/miniBox")]
-	public sealed partial class WaterboxCore : IEmulator, IVideoProvider, ISoundProvider, IStatable, IStateHistory, IInputPollable, IGpuRendered, ICorePrecompile,
+	public sealed partial class WaterboxCore : IEmulator, IVideoProvider, ISoundProvider, IStatable, IStateHistory, IInputPollable, IGpuRendered, ICorePrecompile, ICoreStops,
 		ICoreIdentity, ISettable<WaterboxCoreSettings>, IDriveLights
 	{
 		/// <summary>
@@ -277,6 +277,9 @@ namespace Chimera.Emulation.Common.Waterbox
 			return def.MakeImmutable();
 		}
 
+		/// <inheritdoc/>
+		public string CoreStopped { get; private set; }
+
 		public bool FrameAdvance(IController controller, bool render, bool renderSound = true)
 		{
 			CheckDisposed();
@@ -312,6 +315,13 @@ namespace Chimera.Emulation.Common.Waterbox
 			}
 
 			IsLagFrame = _session.FrameAdvance(input, render);
+			CoreStopped = _session.Stopped;
+			if (CoreStopped is not null)
+			{
+				// the frame never ran: no frame counted, no picture or sound from a machine that is gone
+				IsLagFrame = false;
+				return false;
+			}
 			DrainTrace();
 			Frame++;
 			if (IsLagFrame) LagCount++;
