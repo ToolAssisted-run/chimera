@@ -3263,3 +3263,37 @@ anything else wrong with them still fails, and everywhere else a native crash
 still fails. On Windows the frontend runs on .NET Framework and is not affected.
 A Linux user whose core dies can still see the crash this feature was meant to
 replace. Finding the cause is owed.
+
+## A branch is its input, and a stack's leftovers are not the machine (2026-09-15)
+
+Issue #80: branches in a reopened project either would not load or replayed to
+their frame. Both messages came from TAStudio.LoadBranch, and they were two
+different problems.
+
+"This branch has no saved state beside the project; it cannot be loaded." A
+branch's input lives in the project; its state and picture are cache beside it,
+and a cache that was lost or set aside leaves the input alone. That is still the
+branch. It now loads the input and replays to the branch's frame, the way a
+refused state already did (ReplayToBranchFrame, which also tells a Lua
+onbranchload watcher). Checked headless on a PPSSPP project with a branch at 60
+and no state: the branch loads, the run reaches 60, the callback fires.
+
+"This branch's saved state was made by a different machine; replaying to its
+frame instead." That is the right answer when the core build changed. It was
+also the answer on Windows when nothing had changed at all. miniBox names a
+machine by a hash of its sealed baseline, and a state from another hash is
+refused. On Windows a stack page written before the seal keeps a snapshot -
+nothing reports a stack's writes there, so they are found by comparing - and
+the hash took that snapshot's bytes. What sits on a stack at seal is whatever
+the boot left below the stack pointer. For PPSSPP that was timer readings,
+different in every process, so every state was refused in the next session.
+
+Proved with `chimera-run` and PPSSPP on Beta Bloc, one package throughout: a
+state saved in one process loaded in a second on Linux and was refused in a
+second on Windows. Dumping both sealed baselines (miniBox `MB_SEAL_DUMP`) found
+341,677 pages, 2 different, both stack snapshots. The hash now takes such a page
+by its tag, as it always has on Linux, so Linux hashes and caches are unchanged.
+After it a Windows state loads in a new process and continues exactly: RAM and
+VRAM after the load match a straight run to the same frame. miniBox's
+`test_stack_leftovers_are_not_identity` fails against the old hash on the
+cross-built Windows run and passes against the new one.

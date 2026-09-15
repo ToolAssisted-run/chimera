@@ -1543,11 +1543,19 @@ namespace Chimera.Client.GUI
 				return;
 			}
 
-			// a branch is its input and its state; the state is cache, and a cache
-			// that was lost or set aside leaves the branch with nothing to jump to
+			// A branch is its input and its state. The input is in the project; the
+			// state is cache beside it, and a cache that was lost or set aside - a
+			// project carried to another machine, a cleared cache, one set aside for
+			// another core build - leaves only the input. That is still the branch:
+			// load it and replay to its frame, as a refused state does (issue #80).
 			if (branch.CoreData is null)
 			{
-				MainForm.AddOnScreenMessage("This branch has no saved state beside the project; it cannot be loaded.");
+				_suspendEditLogic = true;
+				CurrentTasMovie.LoadBranch(branch);
+				_suspendEditLogic = false;
+				ReplayToBranchFrame(branch,
+					"This branch has no saved state beside the project; replaying to its frame instead.",
+					$"No saved state for this branch: replaying to frame {branch.Frame}.");
 				return;
 			}
 
@@ -1567,12 +1575,9 @@ namespace Chimera.Client.GUI
 				// reach its frame faster; the history reaches it by replay instead.
 				// The refused state is let go so it is not offered again.
 				branch.CoreData = null;
-				MainForm.AddOnScreenMessage("This branch's saved state was made by a different machine; replaying to its frame instead.");
-				MessageStatusLabel.Text = $"Branch state refused ({ex.Message}): replaying to frame {branch.Frame}.";
-				var from = PriorStateForFramebuffer(branch.Frame);
-				if (from >= 0) LoadStateAt(from);
-				GoToFrame(branch.Frame);
-				RefreshDialog();
+				ReplayToBranchFrame(branch,
+					"This branch's saved state was made by a different machine; replaying to its frame instead.",
+					$"Branch state refused ({ex.Message}): replaying to frame {branch.Frame}.");
 				return;
 			}
 
@@ -1589,6 +1594,22 @@ namespace Chimera.Client.GUI
 			}
 
 			StopSeeking();
+			RefreshDialog();
+		}
+
+		/// <summary>
+		/// A branch whose input is loaded but whose state cannot be used: reach its
+		/// frame the way the greenzone reaches any frame, from the nearest state at
+		/// or before it. The branch did load, so a script watching for that is told.
+		/// </summary>
+		private void ReplayToBranchFrame(TasBranch branch, string onScreen, string status)
+		{
+			MainForm.AddOnScreenMessage(onScreen);
+			MessageStatusLabel.Text = status;
+			var from = PriorStateForFramebuffer(branch.Frame);
+			if (from >= 0) LoadStateAt(from);
+			GoToFrame(branch.Frame);
+			BranchLoadedCallback?.Invoke(CurrentTasMovie.Branches.IndexOf(branch));
 			RefreshDialog();
 		}
 	}
