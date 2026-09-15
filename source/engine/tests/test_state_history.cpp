@@ -8,6 +8,7 @@
  */
 
 #include "../source/state_history.hpp"
+#include "../source/greenzone_shape.h"
 
 #include <algorithm>
 #include <array>
@@ -320,22 +321,51 @@ int main(void)
 		assert(h.count() == 0);
 	}
 
-	{ // Every frame the history offers must be a frame it can actually produce,
-	  // after the bands have merged most of them away.
+	{ // Under its budget a greenzone keeps every frame it captured: nothing is
+	  // thinned by distance any more (user-decided, 2026-09-15). A 16 GB
+	  // greenzone used to sit at 3 GB while long rewinds replayed 1200 frames.
 		const chimera::HostApi api = fakeHost();
 		g_machine = Machine{};
-
 		chimera::StateHistory h;
 		h.configure(&api, nullptr, 64ull << 20);
-		/* narrow enough that coarsening runs almost every frame */
-		h.bands(2, 6, 3, 12, 1000);
+		h.bands(2, 6, 3, 12, 1000);   /* the old narrow bands: they must do nothing now */
+		h.capture(0);
+		for (int64_t f = 1; f <= 120; f++)
+		{
+			h.beforeAdvance();
+			advance(f);
+			h.capture(f);
+		}
+		assert(h.count() == 121);
+		for (int64_t f = 0; f <= 120; f++) assert(h.nearest(f) == f);
+	}
 
-		std::vector<std::array<uint8_t, Machine::kCells>> truth;
-		truth.resize(1);
+	{ // Over its budget it gives frames up toward the shape - bands measured back
+	  // from the frontier that double in length, the fullest band giving one up,
+	  // never a band's last - and every frame it still offers is one it can
+	  // actually produce, with the note of the frame it lands on.
+		const chimera::HostApi api = fakeHost();
+		const int64_t kFrames = 240;
+
+		/* what those frames weigh kept whole, so the budget below really bites */
+		g_machine = Machine{};
+		chimera::StateHistory probe;
+		probe.configure(&api, nullptr, 64ull << 20);
+		probe.bands(0, 0, 0, 0, 1000);
+		probe.capture(0);
+		for (int64_t f = 1; f <= kFrames; f++) { probe.beforeAdvance(); advance(f); probe.capture(f); }
+		const uint64_t whole = probe.bytes();
+
+		g_machine = Machine{};
+		chimera::StateHistory h;
+		const uint64_t budget = whole / 3;
+		h.configure(&api, nullptr, budget);
+		h.bands(0, 0, 0, 0, 1000);   /* one stretch: every link may be merged */
+		h.bandGoal(2);               /* bands of 8, 24, 56, 120, 248 frames */
+
+		std::vector<std::array<uint8_t, Machine::kCells>> truth(1);
 		std::memcpy(truth[0].data(), g_machine.cell, Machine::kCells);
 		h.capture(0);
-
-		const int64_t kFrames = 120;
 		for (int64_t f = 1; f <= kFrames; f++)
 		{
 			h.beforeAdvance();
@@ -345,67 +375,114 @@ int main(void)
 			std::array<uint8_t, Machine::kCells> at{};
 			std::memcpy(at.data(), g_machine.cell, Machine::kCells);
 			truth.push_back(at);
+			assert(h.bytes() <= budget);            /* the budget is met at every step */
+			assert(h.nearest(0) == 0);              /* frame 0 never goes */
+			assert(h.nearest(f) == f);              /* nor the frontier */
 		}
-
-		/* the bands really did thin it, or the rest of this proves nothing */
-		assert(h.count() < kFrames / 2);
-
-		/* but not where the work is: the near band's promise is every frame,
-		 * and it is the one somebody actually feels */
-		for (int64_t f = kFrames - 1; f <= kFrames; f++) assert(h.nearest(f) == f);
 
 		int64_t checked = 0;
 		for (int64_t f = 0; f <= kFrames; f++)
 		{
-			if (h.nearest(f) != f) continue;   /* not a frame it claims to hold */
+			if (h.nearest(f) != f) continue;
 			assert(h.restore(f, error));
 			assert(std::memcmp(g_machine.cell, truth[static_cast<size_t>(f)].data(), Machine::kCells) == 0);
-			checked++;
-		}
-		assert(checked > 4);   /* including some the bands merged their way to */
-
-		/* The caller's note rides along, and a merge keeps the note of the frame
-		 * the surviving link LANDS on - the note describes that frame, not the
-		 * ones composed into it. */
-		int64_t withNotes = 0;
-		for (int64_t f = 1; f <= kFrames; f++)
-		{
-			if (h.nearest(f) != f) continue;
 			size_t len = 0;
 			const uint8_t *note = h.noteFor(f, len);
-			assert(note != nullptr && len == 2);
-			assert(note[0] == static_cast<uint8_t>(f & 0xFF) && note[1] == 0xA5);
-			withNotes++;
+			if (f > 0)
+			{
+				assert(note != nullptr && len == 2);
+				assert(note[0] == static_cast<uint8_t>(f & 0xFF) && note[1] == 0xA5);
+			}
+			checked++;
 		}
-		assert(withNotes > 4);
+		assert(checked > 4);
+		assert(h.count() < kFrames / 2);            /* it really did thin */
+		assert(h.bytes() <= budget);                /* and the budget is met at the end */
 	}
 
-	{ // A pinned frame stays reachable however hard the bands thin around it -
-	  // the marker somebody wants to jump to instantly.
+	{ // A budget too small for even one snapshot in every band is MISSED rather
+	  // than a band emptied: whatever the budget, every band behind the frontier
+	  // still holds a frame to replay from (user-decided, 2026-09-15).
 		const chimera::HostApi api = fakeHost();
 		g_machine = Machine{};
-
 		chimera::StateHistory h;
-		h.configure(&api, nullptr, 64ull << 20);
-		h.bands(2, 6, 3, 12, 1000);
-
-		/* frames deliberately off every band's grid, so nothing but the pin
-		 * could keep them */
-		const int64_t wanted[] = { 7, 13, 31, 55 };
-		for (int64_t f : wanted) h.pin(f, true);
-
-		std::vector<std::array<uint8_t, Machine::kCells>> truth(1);
+		h.configure(&api, nullptr, 64);   /* less than the anchor alone */
+		h.bands(0, 0, 0, 0, 1000);
+		h.bandGoal(1);                    /* bands of 4, 12, 28, 60, 124, 252 frames */
+		const int64_t kFrames = 240;
 		h.capture(0);
-		for (int64_t f = 1; f <= 120; f++)
+		for (int64_t f = 1; f <= kFrames; f++)
 		{
 			h.beforeAdvance();
 			advance(f);
 			h.capture(f);
-			std::array<uint8_t, Machine::kCells> at{};
-			std::memcpy(at.data(), g_machine.cell, Machine::kCells);
-			truth.push_back(at);
 		}
+		assert(h.bytes() > 64);           /* missed, and knowingly */
+		assert(h.nearest(0) == 0);
+		assert(h.nearest(kFrames) == kFrames);
+		std::vector<int64_t> members;
+		for (int64_t f = 1; f < kFrames; f++)   /* frame 0 and the frontier are kept on their own account */
+		{
+			if (h.nearest(f) != f) continue;
+			const int band = CeGreenzoneShape::bandOf(kFrames - f, 4, 1);
+			if (static_cast<size_t>(band) >= members.size()) members.resize(static_cast<size_t>(band) + 1, 0);
+			members[static_cast<size_t>(band)]++;
+		}
+		/* The tail stays exponential even when the budget cannot be met: between
+		 * any two frames it keeps, the gap is at most twice the width of the band
+		 * the older one is in. A band can be empty for a moment - its one frame
+		 * ages into the next before another arrives - but never a run of them:
+		 * counting frame 0 and the frontier as members once collapsed this to
+		 * just those two frames, a gap of the whole run. */
+		std::vector<int64_t> kept;
+		for (int64_t f = 0; f <= kFrames; f++) if (h.nearest(f) == f) kept.push_back(f);
+		assert(kept.size() >= 5);
+		for (size_t i = 0; i + 1 < kept.size(); i++)
+		{
+			const int band = CeGreenzoneShape::bandOf(kFrames - kept[i], 4, 1);
+			const int64_t width = CeGreenzoneShape::bandEnd(band, 4, 1) - (band == 0 ? 0 : CeGreenzoneShape::bandEnd(band - 1, 4, 1));
+			assert(kept[i + 1] - kept[i] <= 2 * width);
+		}
+		/* and it did thin as far as the rule lets it: at most two in any band */
+		for (int64_t m : members) assert(m <= 2);
+	}
 
+	{ // A pinned frame stays reachable however hard the budget thins around it -
+	  // the marker somebody wants to jump to instantly.
+		const chimera::HostApi api = fakeHost();
+		const int64_t kFrames = 240;
+		g_machine = Machine{};
+		chimera::StateHistory probe;
+		probe.configure(&api, nullptr, 64ull << 20);
+		probe.bands(0, 0, 0, 0, 1000);
+		probe.capture(0);
+		for (int64_t f = 1; f <= kFrames; f++) { probe.beforeAdvance(); advance(f); probe.capture(f); }
+		const uint64_t budget = probe.bytes() / 4;
+
+		const int64_t wanted[] = { 7, 13, 31, 55 };
+		const auto run = [&](chimera::StateHistory &h, bool pin, std::vector<std::array<uint8_t, Machine::kCells>> &truth) {
+			g_machine = Machine{};
+			h.configure(&api, nullptr, budget);
+			h.bands(0, 0, 0, 0, 1000);
+			h.bandGoal(2);
+			if (pin) for (int64_t f : wanted) h.pin(f, true);
+			truth.assign(1, {});
+			std::memcpy(truth[0].data(), g_machine.cell, Machine::kCells);
+			h.capture(0);
+			for (int64_t f = 1; f <= kFrames; f++)
+			{
+				h.beforeAdvance();
+				advance(f);
+				h.capture(f);
+				std::array<uint8_t, Machine::kCells> at{};
+				std::memcpy(at.data(), g_machine.cell, Machine::kCells);
+				truth.push_back(at);
+			}
+		};
+
+		chimera::StateHistory h;
+		std::vector<std::array<uint8_t, Machine::kCells>> truth;
+		run(h, true, truth);
 		for (int64_t f : wanted)
 		{
 			assert(h.nearest(f) == f);      /* still there */
@@ -413,24 +490,15 @@ int main(void)
 			assert(std::memcmp(g_machine.cell, truth[static_cast<size_t>(f)].data(), Machine::kCells) == 0);
 		}
 
-		/* and unpinning lets the bands have them - checked on a second run,
-		 * because coarsening a frame already past is not something that happens
-		 * again just for being asked */
+		/* and unpinned, the budget has them: the pin was doing the work, not luck */
 		chimera::StateHistory loose;
-		g_machine = Machine{};
-		loose.configure(&api, nullptr, 64ull << 20);
-		loose.bands(2, 6, 3, 12, 1000);
-		loose.capture(0);
-		for (int64_t f = 1; f <= 120; f++)
-		{
-			loose.beforeAdvance();
-			advance(f);
-			loose.capture(f);
-		}
+		std::vector<std::array<uint8_t, Machine::kCells>> looseTruth;
+		run(loose, false, looseTruth);
 		int64_t survived = 0;
 		for (int64_t f : wanted) if (loose.nearest(f) == f) survived++;
-		assert(survived < 4);   /* the pin was doing the work, not luck */
+		assert(survived < 4);
 	}
+
 
 	{ // A history whose links have been merged still survives a round trip to
 	  // disk, landings and all.

@@ -224,39 +224,59 @@ if [ "$level" = "both" ] || [ "$level" = "e" ]; then
 			fi
 		done
 
-		# THINNED: bands narrow enough that the history is composing links away
-		# almost every frame - what minutes of real play reach with the defaults.
-		# Seeking then lands on a MERGED link, and the machine it lands on has to
-		# be the machine a straight run reaches at that frame.
+		# THINNED: a greenzone over its memory budget gives frames up toward its
+		# shape (bands doubling back from the frontier), and a frame it keeps can
+		# be one that other frames were COMPOSED into. Seeking to such a frame has
+		# to land on the machine a straight run reaches there.
 		#
-		# The comparison is against a run stopped at frame 10, not against the
+		# The comparison is against a run stopped at that frame, not against the
 		# goldens at the end of the movie, and that distinction is the whole leg:
 		# this core's ending is decided by its inputs, so a replay from a WRONG
-		# frame 8 still finishes on the goldens and proves nothing.
+		# frame still finishes on the goldens and proves nothing.
 		#
-		# The target is on the coarsest band's grid on purpose. A frame the bands
-		# have merged away is reached by restoring the anchor and replaying, which
-		# is correct however broken the merging is - so seeking to one would prove
-		# nothing either. The trace is checked as well, since without it the leg
-		# would pass on a build that never merged anything at all.
+		# The target is chosen from the history itself: a frame the trace says a
+		# landing was merged into AND that the finished history still holds. A
+		# frame thinned away is reached by restoring something earlier and
+		# replaying, which is correct however broken the merging is - so seeking
+		# to one would prove nothing either. A run that never merged fails.
+		#
+		# The budget is in bytes, since this machine weighs under a megabyte, and
+		# it is taken from the movie itself: 40% of what its history weighs kept
+		# whole (the movies differ - one is 21 frames and 286 KB, which a fixed
+		# budget never made thin), with a goal of one snapshot a band.
 		for movie in "$here"/movies/*.txt; do
 			tname="$(basename "$movie" .txt)"
 			trom="$here/roms/${tname%%.*}.testrom"
 			ttag="$tname.engine.thinned"
-			rm -f "$work/$ttag.ram.bin" "$work/$ttag.at8.ram.bin"
-			"$chimera_run" "$epkg" "$trom" "$movie" --frames 8 \
-				--dump "RAM=$work/$ttag.at8.ram.bin" > "$work/$ttag.ref.log" 2>&1
-			CHIMERA_HISTORY_TRACE=1 "$chimera_run" "$epkg" "$trom" "$movie" --seek 8 --stop-at-seek \
-				--bands 2,4,2,4,1000 --dump "RAM=$work/$ttag.ram.bin" \
-				> "$work/$ttag.log" 2>&1
-			if [ ! -s "$work/$ttag.at8.ram.bin" ]; then
+			rm -f "$work/$ttag.ram.bin" "$work/$ttag.ref.ram.bin" "$work/$ttag.map"
+			CHIMERA_HISTORY_TRACE=1 "$chimera_run" "$epkg" "$trom" "$movie" \
+				--greenzone-map "$work/$ttag.whole.map" > "$work/$ttag.whole.log" 2>&1
+			whole="$(grep -a -o '[0-9]* total' "$work/$ttag.whole.log" | tail -1 | awk '{print $1}')"
+			if [ -z "$whole" ]; then
+				report "E:$tname:thinned" FAIL "could not weigh the history kept whole (see work/$ttag.whole.log)"
+				continue
+			fi
+			thin="--greenzone-bytes $((whole * 4 / 10)) --greenzone-band-goal 1"
+			CHIMERA_HISTORY_TRACE=1 "$chimera_run" "$epkg" "$trom" "$movie" $thin \
+				--greenzone-map "$work/$ttag.map" > "$work/$ttag.plan.log" 2>&1
+			target=""
+			for into in $(grep -a -o "merged the landing at [0-9]* into [0-9]*" "$work/$ttag.plan.log" | awk '{print $NF}' | sort -n -u); do
+				if grep -qx "$into" "$work/$ttag.map" 2>/dev/null && [ "$into" -gt 0 ]; then target="$into"; fi
+			done
+			if [ -z "$target" ]; then
+				report "E:$tname:thinned" FAIL "nothing it kept was ever merged into (see work/$ttag.plan.log)"
+				continue
+			fi
+			"$chimera_run" "$epkg" "$trom" "$movie" --frames "$target" \
+				--dump "RAM=$work/$ttag.ref.ram.bin" > "$work/$ttag.ref.log" 2>&1
+			CHIMERA_HISTORY_TRACE=1 "$chimera_run" "$epkg" "$trom" "$movie" --seek "$target" --stop-at-seek $thin \
+				--dump "RAM=$work/$ttag.ram.bin" > "$work/$ttag.log" 2>&1
+			if [ ! -s "$work/$ttag.ref.ram.bin" ]; then
 				report "E:$tname:thinned" FAIL "the reference run wrote nothing (see work/$ttag.ref.log)"
-			elif ! grep -q "merged the landing" "$work/$ttag.log"; then
-				report "E:$tname:thinned" FAIL "nothing was ever merged (see work/$ttag.log)"
-			elif cmp -s "$work/$ttag.ram.bin" "$work/$ttag.at8.ram.bin"; then
-				report "E:$tname:thinned" PASS "seeking a thinned history lands on the real frame 8"
+			elif cmp -s "$work/$ttag.ram.bin" "$work/$ttag.ref.ram.bin"; then
+				report "E:$tname:thinned" PASS "seeking a thinned history lands on the real frame $target, a merged one"
 			else
-				report "E:$tname:thinned" FAIL "RAM at the seek differs from a straight run (see work/$ttag.log)"
+				report "E:$tname:thinned" FAIL "RAM at frame $target differs from a straight run (see work/$ttag.log)"
 			fi
 		done
 

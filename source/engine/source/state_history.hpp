@@ -40,6 +40,7 @@
 #include <mutex>
 
 #include "stride_tuner.h"
+#include "greenzone_shape.h"
 #include "host_dyn.hpp"
 #include "work_thread.hpp"
 
@@ -261,6 +262,9 @@ public:
 	/* The widest the near band's stride may grow, 1 to 32 (a setting: see
 	 * stride_tuner.h). The stride follows a lowered cap at once. */
 	void maxNearStride(int64_t cap);
+	/* How many snapshots each band of a full greenzone aims to hold (default
+	 * 32). A goal, not a quota: see greenzone_shape.h. */
+	void bandGoal(int64_t goal);
 
 	/* Writes the history to a file, and reads one back.
 	 *
@@ -579,12 +583,10 @@ private:
 	 * gives up the stretch that would not walk. Always returns false. */
 	bool restoreFailed(const Segment *seg, std::string &error, int64_t *landedOn);
 
-	/* Thins the bands the newest frame has just pushed a landing out of. Runs
-	 * after every capture and does at most one merge per boundary, because the
-	 * playhead moves one frame at a time and so exactly one landing crosses
-	 * each boundary per frame. That is what keeps this off the critical path:
-	 * coarsening follows DISTANCE, not the budget, so it is a little work every
-	 * frame rather than a stall when the budget fills. */
+	/* What a capture does to what is already stored: settles spilled stretches
+	 * the far band has passed. Nothing is thinned by distance any more - a
+	 * greenzone keeps every frame until its budget is full (user-decided,
+	 * 2026-09-15), and then evict() thins it toward greenzone_shape.h. */
 	void coarsen(int64_t newestFrame);
 
 	/* Watches what a capture costs against what the run costs and moves the
@@ -594,19 +596,22 @@ private:
 	 * see its definition for the arithmetic that says why. */
 	void noteAnchorCost();
 
-	/* Drops the landing at `frame` if the band it has fallen into does not want
-	 * one there, by composing its link into the one after it. The landings a
-	 * band keeps are the multiples of its stride, which makes this idempotent
-	 * and the result independent of the order frames arrive in. */
-	void tidy(int64_t frame, int64_t stride);
 
 	/* The union of two links, if the caps allow: together they must fit the
 	 * merge cap and the anchor they walk from. True when `merged` holds it. */
-	bool composePair(const Link &a, const Link &b, uint64_t anchorLen, Bytes &merged);
+	bool composePair(const Link &a, const Link &b, uint64_t anchorLen, Bytes &merged, bool capped = true);
 
 	/* Composes the link at `i` into the one after it, if the caps allow. True
 	 * when it did. */
-	bool composeInto(Segment &seg, size_t i);
+	bool composeInto(Segment &seg, size_t i, bool capped = true);
+
+	/* Gives up ONE stored frame toward the shape a full greenzone keeps: from
+	 * the band holding the most snapshots (ties to the farthest), never a band's
+	 * last, never frame 0, a pinned frame or the frontier; inside that band the
+	 * frame whose going leaves the smallest gap. A merge counts against
+	 * `mergeLeft`, the composition this call may still spend. False when there
+	 * is nothing left that may go. See evict(). */
+	bool thinOne(uint64_t &mergeLeft);
 
 	/* A stretch that was spilled before the far band reached it keeps the
 	 * density it had when it went - which used to be forever. Once the far
@@ -676,7 +681,8 @@ private:
 	std::set<int64_t> m_pinned;
 
 	std::string m_spillDir;
-	int64_t m_newest = -1;             /* the last frame captured: where the bands are measured from */
+	int64_t m_newest = -1;             /* the last frame captured */
+	int64_t m_bandGoal = CeGreenzoneShape::kDefaultGoal;   /* snapshots each band aims for */
 
 	/* The spill file is open TWICE, and which handle a thread may touch is the
 	 * whole of the rule that makes the writer safe.

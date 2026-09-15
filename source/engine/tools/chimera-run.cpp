@@ -180,6 +180,8 @@ int main(int argc, char **argv)
 	int64_t greenzoneDiskMb = 0;
 	std::string greenzoneMap; // where to write the frames the history holds at the end
 	int64_t greenzoneMaxStride = 0; // 0: the engine's default cap
+	int64_t greenzoneBandGoal = 0; // 0: the engine's default goal
+	int64_t greenzoneBytes = -1;   // an exact budget in bytes, for machines too small to fill a megabyte
 	std::string recordPath;
 	std::string savedataDir;
 	std::string projectPath;
@@ -263,6 +265,8 @@ int main(int argc, char **argv)
 		else if (arg == "--greenzone-disk" && i + 1 < argc) greenzoneDiskMb = std::atoll(argv[++i]);
 		else if (arg == "--greenzone-map" && i + 1 < argc) greenzoneMap = argv[++i];
 		else if (arg == "--greenzone-max-stride" && i + 1 < argc) greenzoneMaxStride = std::atoll(argv[++i]);
+		else if (arg == "--greenzone-band-goal" && i + 1 < argc) greenzoneBandGoal = std::atoll(argv[++i]);
+		else if (arg == "--greenzone-bytes" && i + 1 < argc) greenzoneBytes = std::atoll(argv[++i]);
 		else if (arg == "--stop-at-seek") stopAtSeek = true;
 		else if (arg == "--record" && i + 1 < argc) recordPath = argv[++i];
 		else if (arg == "--settings" && i + 1 < argc) settings = argv[++i];
@@ -581,7 +585,8 @@ int main(int argc, char **argv)
 	/* --rewind-loop needs the history too: it seeks back through it, and a run
 	 * without one fails at the first pass with "no stored state at or before
 	 * the target frame". */
-	if (seekFrame >= 0 || rewindTo >= 0 || !historyIn.empty() || !historyOut.empty() || !greenzoneMap.empty())
+	if (seekFrame >= 0 || rewindTo >= 0 || !historyIn.empty() || !historyOut.empty() || !greenzoneMap.empty()
+		|| greenzoneBytes > 0)
 	{
 		/* Bands before enabling: enabling captures the anchor, and the anchor
 		 * spacing decides whether it is the only one. */
@@ -606,7 +611,8 @@ int main(int argc, char **argv)
 		if (!spillDir.empty()) ce_session_greenzone_spill(session, spillDir.c_str());
 		ce_session_greenzone_disk_budget(session, (uint64_t)greenzoneDiskMb << 20);
 		if (greenzoneMaxStride > 0) ce_session_greenzone_max_near_stride(session, greenzoneMaxStride);
-		ce_session_greenzone_enable(session, (uint64_t)greenzoneMb << 20);
+		if (greenzoneBandGoal > 0) ce_session_greenzone_band_goal(session, greenzoneBandGoal);
+		ce_session_greenzone_enable(session, greenzoneBytes > 0 ? (uint64_t)greenzoneBytes : (uint64_t)greenzoneMb << 20);
 	}
 	/* A history kept from a previous run, which is the thing a reopened project
 	 * lives on. The machine id is this tool's own convention; a frontend passes

@@ -2154,6 +2154,12 @@ void ce_session_greenzone_disk_budget(ce_session *s, uint64_t budget_bytes)
 	s->history.diskBudget(budget_bytes);
 }
 
+void ce_session_greenzone_band_goal(ce_session *s, int64_t goal)
+{
+	if (s == nullptr) return;
+	s->history.bandGoal(goal);
+}
+
 void ce_session_greenzone_max_near_stride(ce_session *s, int64_t max_stride)
 {
 	if (s == nullptr) return;

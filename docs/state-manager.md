@@ -354,34 +354,87 @@ from 59 ms to 3 on the N64 and from 54 ms to 2 on the Game Boy. That the two
 were the same number before, with deltas four times apart in size, was the
 whole diagnosis.
 
-## The policy: dense near the work
+## The policy: everything until the budget is full, then a doubling shape (user-decided, 2026-09-15)
 
-Editing a movie is local. The frames somebody steps through, rewinds over and
-re-records are the ones around the playhead; the frames from ten minutes ago are
-visited to jump to, not to scrub through. So the history keeps three bands,
-measured as distance from the newest captured frame:
+Editing a movie is local, and rewinds are not: somebody working near the end
+of a long run also jumps back a thousand frames to check something, and what
+that costs is the replay from the nearest stored frame. So the greenzone keeps
+every frame it captures until its memory budget is full, and only then gives
+frames up - toward a shape that stays dense where the work is and gets
+exponentially sparser behind it.
 
-| band | spacing | what it is for |
+Until 2026-09-15 the history thinned by DISTANCE whatever the budget: every
+frame for 120 frames behind the newest, one in 3 for 1800 behind that, one in
+1200 beyond. Reported on New Star Soccer: a 16 GB budget sat at 3 GB used,
+while a jump 2000 frames back replayed up to 1200 frames. The user's rule: "only
+discard snapshots on full memory budget use. Then keep a near 4-max separation
+snapshot band, then exponentially grow it 8, 16, 32, 64, 128, 256... so that mid
+and long term regressions are not that expensive."
+
+**The bands** are measured back from the frontier - the newest stored frame -
+and double in length (greenzone_shape.h). With the near spacing s0 (the
+`GreenzoneMaxNearStride` setting, 4 by default) and a goal of G snapshots a band
+(32, `ce_session_greenzone_band_goal`), band k covers the frames between
+s0*G*(2^k - 1) and s0*G*(2^(k+1) - 1) behind the frontier:
+
+| band | frames behind the frontier | 32 snapshots are |
 |---|---|---|
-| near | every frame | stepping, rewinding, re-recording - the work |
-| mid | one in a few | scrubbing back over the recent past |
-| far | one in a great many | jumping to somewhere else in the run |
+| 0 | 0 - 128 | 4 apart |
+| 1 | 128 - 384 | 8 apart |
+| 2 | 384 - 896 | 16 apart |
+| 3 | 896 - 1920 | 32 apart |
+| 4 | 1920 - 3968 | 64 apart |
+| 5 | 3968 - 8064 | 128 apart |
+| ... | as many as the run is long | doubling |
 
-A frame does not stay in a band. It is captured into the near band, and as the
-playhead moves on it falls through the mid band into the far one, being made
-coarser as it goes. Coarsening is driven by distance and not by the budget, so
-it is incremental and bounded: each captured frame pushes a couple of points
-across a boundary and pays for those, rather than a stall when the budget fills.
+**G is a goal, not a quota.** A heavy core may not have the budget for 32
+snapshots in all, so over the budget each frame given up comes from the band
+holding the MOST snapshots, ties to the farthest. A band that aged with more than
+its share (frames captured 4 apart that are now 2000 back) sheds it first; once
+bands are level every band shrinks in turn, so the budget is spread round robin
+across them. **A band's last snapshot is never given up**, and neither is frame
+0, a pinned frame, or the frontier. Frame 0 and the frontier are kept on their own
+account and do not count as a band's last: counted, the frontier was always the
+near band's "last", the frame before it always went, and under a starved budget
+nothing ever aged into a farther band - the history collapsed to frame 0 and the
+frontier. A band can still be empty for a moment, when its one snapshot ages into
+the next before another arrives, but the tail stays exponential: between any two
+kept frames the gap is at most twice the width of the older one's band. If
+nothing may go, the budget is missed rather than a band emptied - the promise
+pins already made. Inside the chosen
+band the frame that goes is the one whose going leaves the smallest gap: a link
+in the middle of a stretch is composed into the next, a stretch's last link is
+dropped, and an anchor only goes once its stretch holds nothing else.
 
-Only NEW frames are captured into the near band. Going back and playing the same
-input forward is a replay, and a replay changes nothing (user-decided,
-2026-09-13): a capture of a frame the history already reaches past stores
-nothing and drops nothing, so what is ahead is still there to jump back to.
-What changes the timeline - an edit, recording over an entry, input that is not
-the movie's, a different log - calls `invalidateAfter` itself before the frame
-is played. Until 2026-09-13 every capture dropped everything after it, and on a
-Ruffle project returning 3000 frames to the end after a look back was 99 s of
-emulation (docs/design-principles.md, "A replay changes nothing").
+**When and how much.** Only when `m_bytes > m_budget`, and then down to 95% of
+it so a full greenzone is not thinned again on every frame; that extra is at
+most 16 frames a call, and composition 32 MB a call (the first merge of a call
+always happens, however big, so a heavy core can always make progress). Getting
+back under the budget itself is not bounded - the budget is the promise.
+
+**The merge caps are not thinning's.** composePair refuses a merge over 8 MB or
+bigger than the anchor; those caps were there for coarsening by distance, a
+little every frame whatever the budget. A greenzone over its budget cannot drop
+a frame in the middle of a stretch - only compose it - and a merge always gives
+memory back, so thinning ignores them and bounds its own spend. Measured before
+that was understood: a single stretch stayed at 1478 bytes against a budget of
+821.
+
+**Spilling** (a headless tool's option; the frontend spills nowhere) still puts
+the oldest stretch on disk first, keeps the stretch being written whole in
+memory, and settles what is on disk to the far stride once near_frames +
+mid_frames have passed it; `ce_session_greenzone_bands`' four band values now
+mean only that.
+
+Only NEW frames are captured. Going back and playing the same input forward is a
+replay, and a replay changes nothing (user-decided, 2026-09-13): a capture of a
+frame the history already reaches past stores nothing and drops nothing, so what
+is ahead is still there to jump back to. What changes the timeline - an edit,
+recording over an entry, input that is not the movie's, a different log - calls
+`invalidateAfter` itself before the frame is played. Until 2026-09-13 every
+capture dropped everything after it, and on a Ruffle project returning 3000
+frames to the end after a look back was 99 s of emulation (docs/design-principles.md,
+"A replay changes nothing").
 
 ### A delta continues only the machine that was stored (issue #68, 2026-09-15)
 
@@ -419,8 +472,8 @@ that two copies of one machine can disagree about.
 The budget then decides only what happens to the far band. The engine can send
 it to disk, oldest first, into a directory its caller names (the spill described
 below, which `chimera-run --spill` still uses). **Chimera does not** (user-decided,
-2026-09-15): a greenzone over its budget thins its far band and then drops the
-oldest of it, and nothing is written to disk until the project is saved.
+2026-09-15): a greenzone over its budget gives frames up toward its doubling
+bands (see "The policy"), and nothing is written to disk until the project is saved.
 
 Every boundary in that table is a knob with a per-core default, in frames rather
 than seconds, because the engine does not know a core's frame rate and the
@@ -429,8 +482,9 @@ frontend does.
 ### One budget, in memory, and it is not a reservation
 
 A history holds what fits in its memory budget - four gigabytes by default - and
-nothing more. Past it the far band is thinned, and then the oldest of it is
-dropped, which costs replaying to reach a frame that used to be stored.
+nothing more. Every frame is kept until it is full; past it frames are given up
+toward the doubling bands of "The policy", which costs replaying to reach a frame
+that used to be stored.
 
 It used to hold more than that on disk: memory's overflow was spilled into the
 project's cache, under a second, disk budget of ten gigabytes (user-asked,

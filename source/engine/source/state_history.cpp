@@ -878,14 +878,14 @@ const uint8_t *StateHistory::noteFor(int64_t frame, size_t &lenOut) const
 
 int64_t StateHistory::nearest(int64_t frame) const
 {
-	int64_t best = -1;
-	for (const Segment &s : m_segments)
-	{
-		if (s.anchorFrame > frame) break;              /* ordered: nothing later helps */
-		const int64_t here = s.nearestIn(frame);
-		if (here > best) best = here;
-	}
-	return best;
+	/* Stretches are ordered and never overlap, so the answer is in the last one
+	 * that starts at or before `frame` - found by searching rather than walking,
+	 * because a greenzone that keeps everything until its budget is full holds
+	 * many more stretches, and the piano roll asks this up to twice a row. */
+	const auto it = std::upper_bound(m_segments.begin(), m_segments.end(), frame,
+		[](int64_t f, const Segment &s) { return f < s.anchorFrame; });
+	if (it == m_segments.begin()) return -1;
+	return (it - 1)->nearestIn(frame);
 }
 
 void StateHistory::beforeAdvance()
@@ -948,6 +948,11 @@ void StateHistory::fixNearStride(int64_t stride)
 	m_strideFixed = stride > 0;
 	if (stride > 0) m_nearStride = stride;
 	m_tuner.stride = m_nearStride;
+}
+
+void StateHistory::bandGoal(int64_t goal)
+{
+	m_bandGoal = goal < 1 ? 1 : goal;
 }
 
 void StateHistory::maxNearStride(int64_t cap)
@@ -1666,31 +1671,16 @@ void StateHistory::unpinAll()
 void StateHistory::coarsen(int64_t newestFrame)
 {
 	if (!composeAvailable()) return;   /* an older host: keep every link */
-	tidy(newestFrame - m_nearFrames, m_midStride);
-	tidy(newestFrame - m_nearFrames - m_midFrames, m_farStride);
+	/* Nothing in memory is thinned by distance. It used to be: every frame kept
+	 * for 120, one in 3 for 1800 behind that, one in 1200 beyond - whatever the
+	 * budget - so a 16 GB greenzone sat at 3 GB while a jump 2000 frames back
+	 * replayed up to 1200 of them (user-reported on nss, 2026-09-15). A
+	 * greenzone now keeps every frame it captured until its budget is full,
+	 * and evict() thins it then. What is on disk still settles to the far band. */
 	settleSpilled(newestFrame - m_nearFrames - m_midFrames);
 }
 
-void StateHistory::tidy(int64_t frame, int64_t stride)
-{
-	if (stride <= 1 || frame <= 0) return;
-	if (frame % stride == 0) return;   /* on the grid: this band wants it */
-	if (pinned(frame)) return;         /* and somebody wants this one whatever the band says */
-
-	for (Segment &seg : m_segments)
-	{
-		if (seg.spilled) continue;   /* its bytes are on disk and its band is settled */
-		if (seg.lastFrame() < frame) continue;
-		if (seg.anchorFrame >= frame) break;         /* ordered: nothing later holds it */
-		const int64_t steps = seg.stepsTo(frame);
-		if (steps <= 0) return;                      /* not a landing, or the anchor */
-		const size_t i = static_cast<size_t>(steps) - 1;
-		composeInto(seg, i);
-		return;
-	}
-}
-
-bool StateHistory::composePair(const Link &a, const Link &b, uint64_t anchorLen, Bytes &merged)
+bool StateHistory::composePair(const Link &a, const Link &b, uint64_t anchorLen, Bytes &merged, bool capped)
 {
 	/* A merge reads both links and writes their union, so it costs their
 	 * combined size - and coarsening merges into a neighbour that KEEPS the
@@ -1714,8 +1704,15 @@ bool StateHistory::composePair(const Link &a, const Link &b, uint64_t anchorLen,
 	 * walking from. */
 	static constexpr uint64_t kMergeCap = 8u << 20;
 	const uint64_t together = a.bytes.size() + b.bytes.size();
-	if (together > kMergeCap) return false;
-	if (anchorLen != 0 && together > anchorLen) return false;
+	/* Both caps were about thinning by DISTANCE, a little every frame whatever
+	 * the budget. Meeting the budget is another matter: a frame in the middle of
+	 * a stretch can only go by composition, and a merge always gives memory back
+	 * (the union is at most both), so a greenzone over its budget that refused
+	 * them would simply stay over it - measured: a single stretch held 1478 bytes
+	 * against a budget of 821. thinOne passes capped=false and bounds its own
+	 * spend per call instead. */
+	if (capped && together > kMergeCap) return false;
+	if (capped && anchorLen != 0 && together > anchorLen) return false;
 
 	merged.clear();
 	/* The merge of two sorted lists is at most both of them, and asking for
@@ -1742,7 +1739,7 @@ bool StateHistory::composePair(const Link &a, const Link &b, uint64_t anchorLen,
 	return r.ok();   /* a merge that will not happen costs memory, nothing else */
 }
 
-bool StateHistory::composeInto(Segment &seg, size_t i)
+bool StateHistory::composeInto(Segment &seg, size_t i, bool capped)
 {
 	/* composePair reads the anchor's LENGTH, which is fixed when the anchor is
 	 * planned, and a merge reads link bodies, which the drainer never touches -
@@ -1751,7 +1748,7 @@ bool StateHistory::composeInto(Segment &seg, size_t i)
 	Link &a = seg.links[i];
 	Link &b = seg.links[i + 1];
 	Bytes merged;
-	if (!composePair(a, b, seg.anchor.size(), merged)) return false;
+	if (!composePair(a, b, seg.anchor.size(), merged, capped)) return false;
 
 	const uint64_t was = a.bytes.size() + b.bytes.size();
 	seg.bytes -= was;
@@ -1771,7 +1768,7 @@ bool StateHistory::composeInto(Segment &seg, size_t i)
 
 /* ---- settling what was spilled too early ----
  *
- * The bands are kept by tidy(), which composes a landing into its neighbour as
+ * The bands were once kept by tidy(), which composed a landing into its neighbour as
  * the playhead moves away from it - and skips a spilled stretch, whose bytes
  * are on disk. So a stretch spilled out of the near or mid band, which a budget
  * smaller than those bands does every time, kept every frame's delta on disk
@@ -2231,6 +2228,23 @@ bool StateHistory::spill(Segment &seg)
 	 * the stretch still being filled */
 	if (m_planPending && seg.anchorFrame == m_planFrame) finishPlan();
 
+	/* A stretch the far boundary has already passed goes to disk on the far
+	 * grid: its landings off the grid are composed into the next, here, while
+	 * the bytes are still in memory - the same merges, under the same caps, that
+	 * settleSpilled would otherwise read back and rewrite, appending to the file
+	 * a second copy the compaction has to reclaim. This used to happen in memory
+	 * as the playhead moved (tidy); nothing thins by distance now, so it happens
+	 * at the one moment it still matters. */
+	const bool pastFar = m_newest >= 0 && seg.lastFrame() < m_newest - m_nearFrames - m_midFrames;
+	if (pastFar && m_farStride > 1 && composeAvailable())
+	{
+		for (size_t i = 0; i + 1 < seg.links.size();)
+		{
+			const int64_t end = seg.links[i].endFrame;
+			if (end % m_farStride == 0 || pinned(end) || !composeInto(seg, i)) i++;
+		}
+	}
+
 	/* Let the writer catch up before handing it more than it can hold. See
 	 * writeQueueCap: a queue nobody bounds is memory the budget cannot see and
 	 * a file full of ranges that were dropped before they were written. */
@@ -2271,9 +2285,24 @@ bool StateHistory::spill(Segment &seg)
 	 * definition, and taking its bytes off the count afterwards takes nothing. */
 	releaseBytes(seg.memoryBytes(), "spill");
 	seg.spilled = true;
-	/* on the far grid already if the far boundary has passed it - tidy() did
-	 * that as it went - and then settleSpilled() has nothing to read back */
-	seg.settled = m_newest >= 0 && seg.lastFrame() < m_newest - m_nearFrames - m_midFrames;
+	/* Settled means there is nothing for settleSpilled to do: it was put on the
+	 * far grid just above (a merge the caps refused stays refused there too),
+	 * every link it holds already lands on the grid or is pinned, or it has too
+	 * few to merge. */
+	seg.settled = pastFar || seg.links.size() <= 1;
+	if (!seg.settled && m_farStride > 1)
+	{
+		bool onGrid = true;
+		for (const Link &l : seg.links)
+		{
+			if (l.endFrame % m_farStride != 0 && !pinned(l.endFrame)) { onGrid = false; break; }
+		}
+		seg.settled = onGrid;
+	}
+	else if (m_farStride <= 1)
+	{
+		seg.settled = true;   /* a far stride of one keeps everything: nothing to settle */
+	}
 	seg.spillAt = at;
 	seg.spillLength = length;
 	/* Not counted against the disk yet: what it will weigh there is decided by
@@ -2351,14 +2380,31 @@ bool StateHistory::restoreSpilled(const Segment &seg, int64_t steps, std::string
 	return true;
 }
 
-/* Under budget pressure the history thins from the FAR end of the oldest
- * segment: dropping a trailing delta costs precision back there and orphans
- * nothing, because nothing chains through the end of a chain. The first
- * segment's anchor is never dropped - it is what keeps every frame reachable
- * at all - and neither is the newest segment's, which is where the work is. */
+/* Over the memory budget, and only then, the history gives frames up.
+ *
+ * First choice, when a spill directory is set, is still to put the oldest
+ * stretch on disk (the frontend sets none: a greenzone is kept in memory).
+ * Otherwise frames go one at a time toward the shape in greenzone_shape.h
+ * (user-decided, 2026-09-15): bands measured back from the frontier that double
+ * in length, each aiming for the same number of snapshots; the band holding the
+ * most gives one up, so what aged with more than its share goes first and then
+ * every band shrinks in turn; a band's last snapshot, frame 0, a pinned frame
+ * and the frontier never go. If nothing may go, the budget is missed rather
+ * than a band emptied - the promise pins already made.
+ *
+ * Once over the budget it thins a little further, to 95%, so a full greenzone
+ * is not thinned again on every frame; that extra is bounded per call
+ * (kThinExtraPerCall frames), and composition by kThinMergeBytes, so meeting
+ * the budget is a little work each frame rather than a stall. Getting back
+ * under the budget itself is not bounded - the budget is the promise. */
 void StateHistory::evict()
 {
-	while (m_bytes > m_budget)
+	static constexpr int kThinExtraPerCall = 16;
+	static constexpr uint64_t kThinMergeBytes = 32u << 20;   /* as thinOne's kThinMergeBytesPerCall */
+	const uint64_t target = m_budget - m_budget / 20;
+	uint64_t mergeLeft = kThinMergeBytes;
+	int thinned = 0;
+	while (m_bytes > m_budget || (thinned > 0 && thinned < kThinExtraPerCall && m_bytes > target))
 	{
 		/* First choice: put the oldest stretch on disk, oldest to newest. It
 		 * costs reading it back rather than replaying to it, and the far end of
@@ -2401,44 +2447,125 @@ void StateHistory::evict()
 		}
 		if (moved) continue;
 
-		/* Thin the oldest stretch that still holds anything, and NEVER the
-		 * newest - it is where the playhead is, and its last link is the frame
-		 * that was captured a moment ago.
-		 *
-		 * Taking it was a loop: capture a delta, evict it again because the
-		 * budget was already unmeetable, then have nothing to chain to next
-		 * frame and write a whole anchor instead, spill that, and go round. Six
-		 * thousand Game Boy frames under a budget too small for them made two
-		 * thousand seven hundred anchors and five gigabytes of spill file. The
-		 * drop-a-whole-stretch path below has always spared the newest; this one
-		 * did not, and it is the one that runs first. */
-		Segment *victim = nullptr;
-		for (size_t i = 0; i + 1 < m_segments.size(); i++)
-		{
-			Segment &s = m_segments[i];
-			if (s.links.empty() || s.spilled) continue;
-			if (pinned(s.links.back().endFrame)) continue;   /* somebody wants that one */
-			victim = &s;
-			break;
-		}
-		if (victim != nullptr)
-		{
-			uint64_t n = victim->links.back().bytes.size();
-			victim->bytes -= n;
-			releaseBytes(n, "evict");
-			victim->links.pop_back();
-			continue;
-		}
-		/* Nothing left to thin: give a whole stretch up, chosen to keep what
-		 * remains spread over the run (chooseVictim), and stop when there is
-		 * nothing that may go. A spilled segment costs nothing in memory, so
-		 * dropping one would not help - and a stretch somebody pinned a frame in
-		 * is spilled, never dropped: if it could not be spilled it stays, and
-		 * the budget is missed rather than the promise. */
-		const size_t drop = chooseVictim(false);
-		if (drop == m_segments.size()) return;
-		forgetSegment(drop);
+		if (!thinOne(mergeLeft)) return;
+		thinned++;
 	}
+}
+
+bool StateHistory::thinOne(uint64_t &mergeLeft)
+{
+	static constexpr uint64_t kThinMergeBytesPerCall = 32u << 20;   /* evict's allowance, below */
+	if (m_segments.empty()) return false;
+	const int64_t frontier = m_segments.back().lastFrame();
+	const int64_t nearSpacing = m_tuner.maxStride < 1 ? 1 : m_tuner.maxStride;
+
+	/* Every stored frame in order, with the band it has fallen into. Spilled
+	 * stretches count as members of their bands - they are still reachable -
+	 * but cost nothing in memory, so none of their frames is a candidate. */
+	struct Entry
+	{
+		int64_t frame;
+		size_t seg;
+		std::ptrdiff_t link;   /* -1: the stretch's anchor */
+		int band;
+	};
+	std::vector<Entry> entries;
+	entries.reserve(static_cast<size_t>(count()));
+	std::vector<int64_t> counts;
+	for (size_t si = 0; si < m_segments.size(); si++)
+	{
+		const Segment &seg = m_segments[si];
+		const auto add = [&](int64_t frame, std::ptrdiff_t link) {
+			const int band = CeGreenzoneShape::bandOf(frontier - frame, nearSpacing, m_bandGoal);
+			if (static_cast<size_t>(band) >= counts.size()) counts.resize(static_cast<size_t>(band) + 1, 0);
+			counts[static_cast<size_t>(band)]++;
+			entries.push_back(Entry{ frame, si, link, band });
+		};
+		add(seg.anchorFrame, -1);
+		for (size_t li = 0; li < seg.links.size(); li++) add(seg.links[li].endFrame, static_cast<std::ptrdiff_t>(li));
+	}
+	/* Frame 0 and the frontier are kept on their own account, so they are not
+	 * what a band keeps as its last snapshot. Counted, the frontier was always
+	 * the near band's "last", the frame before it always went, and under a
+	 * starved budget no frame ever lived long enough to age into a farther band:
+	 * the history collapsed to frame 0 and the frontier. */
+	if (!entries.empty())
+	{
+		counts[static_cast<size_t>(entries.front().band)]--;
+		if (entries.size() > 1) counts[static_cast<size_t>(entries.back().band)]--;
+	}
+
+	/* A history that spills keeps the stretch being written whole in memory, as
+	 * it always has: its stretches go to disk in time, and settling composes
+	 * them there. The frontend spills nowhere, so for it the newest is thinned
+	 * like any other - the frontier itself aside. */
+	const bool keepNewest = !m_spillDir.empty() && !m_spillFailed;
+	for (const int band : CeGreenzoneShape::removalOrder(counts))
+	{
+		/* this band's frames that may go, by the gap their going leaves */
+		std::vector<std::pair<int64_t, size_t>> candidates;
+		for (size_t i = 1; i + 1 < entries.size(); i++)   /* never the first frame, never the frontier */
+		{
+			const Entry &e = entries[i];
+			if (e.band != band) continue;
+			const Segment &seg = m_segments[e.seg];
+			if (seg.spilled) continue;
+			if (keepNewest && e.seg + 1 == m_segments.size()) continue;
+			if (pinned(e.frame)) continue;
+			if (e.link < 0 && (e.seg == 0 || !seg.links.empty())) continue;   /* an anchor goes only alone */
+			candidates.emplace_back(entries[i + 1].frame - entries[i - 1].frame, i);
+		}
+		std::sort(candidates.begin(), candidates.end());
+
+		for (const auto &[gap, i] : candidates)
+		{
+			const Entry e = entries[i];
+			Segment &seg = m_segments[e.seg];
+			if (e.link < 0)
+			{
+				if (historyTrace())
+				{
+					fprintf(stderr, "[history] dropped the stretch at %lld from band %d (%lld there, gap %lld)\n",
+						(long long)e.frame, band, (long long)counts[static_cast<size_t>(band)], (long long)gap);
+					fflush(stderr);
+				}
+				forgetSegment(e.seg);
+				return true;
+			}
+			const size_t li = static_cast<size_t>(e.link);
+			if (li + 1 == seg.links.size())
+			{
+				const uint64_t n = seg.links.back().bytes.size();
+				seg.bytes -= n;
+				releaseBytes(n, "thin");
+				seg.links.pop_back();
+				if (historyTrace())
+				{
+					fprintf(stderr, "[history] thinned frame %lld from band %d (%lld there, gap %lld)\n",
+						(long long)e.frame, band, (long long)counts[static_cast<size_t>(band)], (long long)gap);
+					fflush(stderr);
+				}
+				return true;
+			}
+			const uint64_t input = seg.links[li].bytes.size() + seg.links[li + 1].bytes.size();
+			/* The first merge of a call always happens, however big - otherwise a
+			 * heavy core whose links outgrow the allowance could never thin at all;
+			 * after it, this call composes no more than the allowance. */
+			if (mergeLeft < kThinMergeBytesPerCall && input > mergeLeft) continue;
+			if (composeInto(seg, li, false))
+			{
+				mergeLeft = input > mergeLeft ? 0 : mergeLeft - input;
+				if (historyTrace())
+				{
+					fprintf(stderr, "[history] thinned frame %lld from band %d (%lld there, gap %lld)\n",
+						(long long)e.frame, band, (long long)counts[static_cast<size_t>(band)], (long long)gap);
+					fflush(stderr);
+				}
+				return true;
+			}
+		}
+	}
+	return false;
 }
 
 /* A restore that fails part way is the worst thing this file can do quietly.

@@ -3352,3 +3352,40 @@ done on, not about the movie. The tuner still thins when a frame is dear, but a
 rewind right behind the playhead replays at most three frames. The measurements
 and the misleading share are in docs/state-manager.md, "How close the near band
 stays".
+
+## A greenzone keeps everything until its budget is full, then thins to a doubling shape (user-decided, 2026-09-15)
+
+Reported on New Star Soccer: a greenzone given 16 GB used 3 GB, and rewinds of a
+few thousand frames replayed for a long time. The history was thinning by
+distance whatever the budget - one frame in 1200 beyond about 2000 frames back -
+and, once a budget did fill, deleting from the oldest end without regard to
+spacing.
+
+The user's rule replaced both: discard nothing until the budget is full; then
+keep a near band at most 4 frames apart and bands behind it whose spacing
+doubles - 8, 16, 32, 64 ... - as many as the run is long. Two refinements came in
+review. Measured back from the frontier (the newest stored frame), because
+thinning cannot be undone and a band centred on the playhead would thin the work
+somebody scrolled away from. And 32 snapshots a band is a goal, not a quota -
+"heavier cores won't even have the budget for 32 entries in total" - so the band
+holding the most gives a frame up first, the budget is spread round robin across
+the bands, and a band's last snapshot is never removed.
+
+Two things the first cut got wrong, both caught by the unit test before any
+real core ran it. The merge caps (8 MB, and never bigger than the anchor) existed
+for distance coarsening, and applied to budget thinning they left a single long
+stretch stuck over its budget, because a frame in the middle of a stretch can
+only go by composition; thinning now ignores them and bounds its own work per
+call. And a history that spills to disk must keep the stretch being written
+whole, or settling on disk finds merged links it cannot compose.
+
+A third, found the same way: frame 0 and the frontier had been counted as their
+bands' members, so the frontier was always the near band's "last" snapshot and
+the frame before it always went; under a starved budget nothing aged into a
+farther band and the history collapsed to those two frames. They are kept on
+their own account now, and the tail stays exponential however small the budget.
+
+Frame 0, pins and the frontier are never given up; if nothing may go the budget
+is missed rather than a band emptied. The design is docs/state-manager.md, "The
+policy: everything until the budget is full, then a doubling shape";
+greenzone_shape.h and test_greenzone_shape hold the bands.

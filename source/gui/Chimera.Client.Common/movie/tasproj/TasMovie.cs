@@ -46,9 +46,9 @@ namespace Chimera.Client.Common
 			// as the anchor everything else is reached from.
 			States = emulator.AsStateHistory();
 			// Memory only (user-decided, 2026-09-15). No spill directory is set, so
-			// the history never writes to disk while the project is open: over its
-			// budget it thins its far band and then drops the oldest of it
-			// (docs/state-manager.md). The disk is written when the project is
+			// the history never writes to disk while the project is open: it keeps
+			// every frame until its budget is full, then thins toward bands that
+			// double in length behind the newest frame (docs/state-manager.md). The disk is written when the project is
 			// SAVED. Spill files an earlier build left here would now never be swept
 			// by anybody, and they are gigabytes each, so they go as it opens.
 			ProjectCache.DeleteSpillFiles(Project.Id);

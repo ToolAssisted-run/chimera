@@ -11,8 +11,10 @@ namespace Chimera.Client.Common
 
 		/// <summary>
 		/// What the state history may hold, in megabytes - all of it in memory.
-		/// Beyond it the far band is thinned and then the oldest of it dropped,
-		/// which costs replaying to reach a frame that used to be stored. Nothing
+		/// Every captured frame is kept until it is full; then frames are given up
+		/// toward bands that double in length behind the newest one (4 apart,
+		/// then 8, 16, 32 ...), which costs replaying to reach a frame that used
+		/// to be stored. Nothing
 		/// goes to disk while a project is open; the disk is written when the
 		/// project is saved (user-decided, 2026-09-15; docs/state-manager.md).
 		/// </summary>

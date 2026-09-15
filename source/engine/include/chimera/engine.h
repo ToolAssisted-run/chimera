@@ -1150,16 +1150,17 @@ CE_API int32_t ce_session_movie_advance(ce_session *s, uint64_t buttons, const i
 CE_API void ce_session_greenzone_enable(ce_session *s, uint64_t budget_bytes);
 CE_API int64_t ce_session_greenzone_count(const ce_session *s);
 
-/* How dense the history is at each distance from the newest frame it holds,
- * all in FRAMES because the engine does not know a core's frame rate and the
- * caller does. Any argument left at 0 keeps the current value.
+/* Anchor spacing, and the density of what is SPILLED to disk, all in FRAMES
+ * because the engine does not know a core's frame rate and the caller does.
+ * Any argument left at 0 keeps the current value.
  *
- * Editing a movie is local, so the history is dense where the work is: every
- * frame within near_frames of the playhead, one in mid_stride across the
- * mid_frames behind that, and one in far_stride beyond. A frame is captured
- * into the near band and coarsened as the playhead leaves it behind - two
- * adjacent deltas merging into one that spans both - which costs a little work
- * every frame rather than a stall when the budget fills.
+ * near_frames, mid_frames, mid_stride and far_stride once decided how dense the
+ * history was at each distance from the newest frame, whatever the budget. Since
+ * 2026-09-15 a greenzone keeps every frame in memory until its budget is full and
+ * is then thinned toward ce_session_greenzone_band_goal's shape; these four now
+ * only decide how a stretch already spilled to disk is settled once the far
+ * boundary (near_frames + mid_frames behind the newest frame) passes it, to one
+ * in far_stride.
  *
  * anchor_spacing is the one that decides what a seek costs: a restore walks the
  * links of one anchor's stretch and no further, so it trades memory for
@@ -1259,6 +1260,17 @@ CE_API void ce_session_greenzone_disk_budget(ce_session *s, uint64_t budget_byte
  * playhead replays at most max_stride - 1 frames; each step down costs speed
  * (docs/state-manager.md, "How close the near band stays"). */
 CE_API void ce_session_greenzone_max_near_stride(ce_session *s, int64_t max_stride);
+
+/* How many snapshots each band of a full greenzone aims to hold, 32 by default.
+ *
+ * A greenzone keeps every frame it captures until its memory budget is full;
+ * then it gives frames up toward bands measured back from the newest stored
+ * frame that double in length - with the defaults the last 128 frames, then to
+ * 384, 896, 1920 ... - each aiming for this many snapshots, so 4 apart, then 8,
+ * 16, 32 ... A goal, not a quota: the band holding the most gives one up first,
+ * so a budget too small for the goal is spread across the bands, and a band's
+ * last snapshot is never given up (docs/state-manager.md). */
+CE_API void ce_session_greenzone_band_goal(ce_session *s, int64_t goal);
 
 /* What the stretches now in the spill file weigh. */
 CE_API uint64_t ce_session_greenzone_disk_bytes(const ce_session *s);

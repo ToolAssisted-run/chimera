@@ -12,9 +12,9 @@ namespace Chimera.Client.GUI
 	/// What a greenzone may weigh: the default for every project, and what one
 	/// project asks for instead.
 	///
-	/// TWO NUMBERS. The first is memory. A history holds what fits in it; past it the
-	/// far band is thinned and then the oldest of it dropped, which costs
-	/// replaying and never work. Nothing is written to disk while a project is
+	/// TWO NUMBERS. The first is memory. A history keeps every frame until it is
+	/// full; past it frames are given up toward bands that double in length
+	/// behind the newest one, which costs replaying and never work. Nothing is written to disk while a project is
 	/// open - the disk is written when the project is saved (user-decided,
 	/// 2026-09-15; docs/state-manager.md). There used to be a second number, what
 	/// the spill of memory's overflow could weigh on disk; spilling is off, and

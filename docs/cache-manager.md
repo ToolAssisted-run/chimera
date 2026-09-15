@@ -124,7 +124,7 @@ number that disagrees with the box beside it.
 
 The window also owns what a greenzone MAY weigh, which is the other end of the
 same question as what the cache does weigh. One number: what a history may hold
-in **memory** (4GB). Past it the far band is thinned and then dropped; it is not
+in **memory** (4GB). Every frame is kept until it is full; past it frames are given up toward bands that double in length behind the newest one; it is not
 written to disk while a project is open - the disk is written when the project is
 saved (user-decided, 2026-09-15; docs/state-manager.md). There used to be a
 second, disk budget for the spill that overflow produced; spilling is off and that
