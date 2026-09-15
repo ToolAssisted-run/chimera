@@ -3237,3 +3237,29 @@ or it is a different operation. A buffer that is mapped or immutable is never
 pooled, and a target the pool cannot identify turns it off. It took a trace
 (`CHIMERA_GL_POOL_TRACE`) to find the last gap - the texel buffer on
 `GL_TEXTURE_BUFFER` - after two fixes reasoned from the code had each missed it.
+
+## A crash only the CI runner has is tracked, not waited on (user-decided, 2026-09-15)
+
+The two witness legs that make the synth core stop on purpose (`S:frontend:abort`,
+`S:frontend:wild`) pass here every time and crash Mono on the GitHub runner every
+time. The runner's log shows the core stopping correctly; the crash is Mono's own,
+while CoreStoppedException is thrown. Symbolized with Ubuntu's `mono-runtime-dbg`
+(fetched with `apt-get download` and unpacked, no install needed), the frames are
+`mono_amd64_throw_exception` -> `mono_handle_exception_internal` ->
+`unwinder_unwind_frame`, at `mini-exceptions.c:662`: `*lmf = (*lmf)->previous_lmf`,
+with the LMF - Mono's chain of managed-to-native transitions - pointing at
+0xdab80. The chain is already corrupt when the exception walks it.
+
+What it is not: the compiler (natives and guest built with the runner's gcc 13.3
+here - the guest came out byte-identical), the CPU count (pinned to four cores),
+Mono's version or the OS (identical), or a one-off (a rerun failed the same way).
+160 local runs, none crashed. The same unwinder crash was met while the feature
+was being written, with a faked stop and the previous miniBox host, which is
+why the throw moved to MainForm's own frame; on the runner that is not enough.
+
+Releases were not held for it. On the runner, and only there (GITHUB_ACTIONS),
+those two legs report KNOWN when Mono crashes, which does not fail the run;
+anything else wrong with them still fails, and everywhere else a native crash
+still fails. On Windows the frontend runs on .NET Framework and is not affected.
+A Linux user whose core dies can still see the crash this feature was meant to
+replace. Finding the cause is owed.
