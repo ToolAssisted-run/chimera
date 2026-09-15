@@ -3698,21 +3698,11 @@ namespace Chimera.Client.GUI
 		{
 			subtitle ??= string.Empty;
 			initDir = SanitiseForFileDialog(initDir ?? string.Empty);
-			if (OSTailoredCode.IsUnixHost)
-			{
-				// FolderBrowserEx doesn't work in Mono for obvious reasons
-				using FolderBrowserDialog f = new();
-				f.Description = subtitle;
-				f.SelectedPath = initDir;
-				return f.ShowDialog().IsOk() ? f.SelectedPath.WithoutWslgMirror() : null;
-			}
-			else
-			{
-				using FolderBrowserEx f = new();
-				f.Description = subtitle;
-				f.SelectedPath = initDir;
-				return f.ShowDialog().IsOk() ? f.SelectedPath : null;
-			}
+			// FolderBrowserEx chooses the dialog: the one with an address bar on Windows, the toolkit's elsewhere
+			using FolderBrowserEx f = new();
+			f.Description = subtitle;
+			f.SelectedPath = initDir;
+			return f.ShowDialog(dialogParent as IWin32Window).IsOk() ? f.SelectedPath.WithoutWslgMirror() : null;
 		}
 
 		public void ShowMessageBox(

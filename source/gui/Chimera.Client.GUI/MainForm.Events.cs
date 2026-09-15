@@ -437,7 +437,7 @@ namespace Chimera.Client.GUI
 				},
 				pickFolder: () =>
 				{
-					using FolderBrowserDialog picker = new() { Description = "Scan a folder for firmware files" };
+					using FolderBrowserEx picker = new() { Description = "Scan a folder for firmware files" };
 					return picker.ShowDialog(this) is DialogResult.OK ? picker.SelectedPath.WithoutWslgMirror() : null;
 				},
 				scanFolder: folder =>

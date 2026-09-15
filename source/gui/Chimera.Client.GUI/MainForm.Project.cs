@@ -168,7 +168,7 @@ namespace Chimera.Client.GUI
 				firmwareSearchDirs: [ Config.PathEntries.FirmwareAbsolutePath() ],
 				pickFirmwareFolder: () =>
 				{
-					using FolderBrowserDialog picker = new()
+					using FolderBrowserEx picker = new()
 					{
 						Description = "Scan a folder for firmware files",
 					};
@@ -316,7 +316,7 @@ namespace Chimera.Client.GUI
 				},
 				locateFolder: () =>
 				{
-					using FolderBrowserDialog picker = new()
+					using FolderBrowserEx picker = new()
 					{
 						Description = "Scan a folder for the project's files",
 					};

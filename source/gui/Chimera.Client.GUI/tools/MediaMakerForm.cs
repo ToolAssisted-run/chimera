@@ -226,7 +226,7 @@ namespace Chimera.Client.GUI
 
 		private void PickFolder()
 		{
-			using FolderBrowserDialog dialog = new()
+			using FolderBrowserEx dialog = new()
 			{
 				Description = "The folder to pack",
 			};
