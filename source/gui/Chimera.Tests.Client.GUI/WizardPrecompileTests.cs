@@ -266,6 +266,10 @@ namespace Chimera.Tests.Client.GUI
 		StringAssert.Contains(PrecompileOrchestrator.WhyItDied(unchecked((int)0xC0000017)), "out of memory");
 		// seen once in three eight-session runs, and it named itself
 		StringAssert.Contains(PrecompileOrchestrator.WhyItDied(unchecked((int)0xC00000FD)), "stack");
+		// the sandbox stops a machine that cannot go on with an illegal instruction:
+		// SIGILL on Linux, 0xC000001D on Windows (issue #74, eight sessions at once)
+		StringAssert.Contains(PrecompileOrchestrator.WhyItDied(132), "illegal instruction");
+		StringAssert.Contains(PrecompileOrchestrator.WhyItDied(unchecked((int)0xC000001D)), "illegal instruction");
 		// and anything unrecognised still names itself rather than saying nothing
 		StringAssert.Contains(PrecompileOrchestrator.WhyItDied(42), "42");
 		foreach (var code in new[] { 1, 2, 42, 134, 137, 139, -1, unchecked((int)0xC0000005) })

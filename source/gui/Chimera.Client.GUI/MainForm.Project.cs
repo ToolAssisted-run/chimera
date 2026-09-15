@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using System.Windows.Forms;
 
+using Chimera.Common.PathExtensions;
 using Chimera.Client.Common;
 using Chimera.Emulation.Common;
 using Chimera.Emulation.Common.Engine;
@@ -157,12 +158,12 @@ namespace Chimera.Client.GUI
 							? $"{slot.Title} ({filter})|{filter}|All files (*.*)|*.*"
 							: "All files (*.*)|*.*",
 					};
-					return dialog.ShowDialog(this) is DialogResult.OK ? dialog.FileNames : [ ];
+					return dialog.ShowDialog(this) is DialogResult.OK ? dialog.FileNames.Select(static f => f.WithoutWslgMirror()).ToArray() : [ ];
 				},
 				pickFirmwareFile: title =>
 				{
 					using OpenFileDialog dialog = new() { Title = title };
-					return dialog.ShowDialog(this) is DialogResult.OK ? dialog.FileName : null;
+					return dialog.ShowDialog(this) is DialogResult.OK ? dialog.FileName.WithoutWslgMirror() : null;
 				},
 				firmwareSearchDirs: [ Config.PathEntries.FirmwareAbsolutePath() ],
 				pickFirmwareFolder: () =>
@@ -171,7 +172,7 @@ namespace Chimera.Client.GUI
 					{
 						Description = "Scan a folder for firmware files",
 					};
-					return picker.ShowDialog(this) is DialogResult.OK ? picker.SelectedPath : null;
+					return picker.ShowDialog(this) is DialogResult.OK ? picker.SelectedPath.WithoutWslgMirror() : null;
 				},
 				rememberedFirmwarePaths: coreName => CoreFirmwareStore.RememberedPaths(Config, coreName),
 				rememberedFirmwarePath: (coreName, id) =>
@@ -251,7 +252,7 @@ namespace Chimera.Client.GUI
 				Filter = new FilesystemFilterSet(FilesystemFilter.TAStudioProjects).ToString(),
 				Title = "Open Chimera Project",
 			};
-			return dialog.ShowDialog(this) is DialogResult.OK ? dialog.FileName : null;
+			return dialog.ShowDialog(this) is DialogResult.OK ? dialog.FileName.WithoutWslgMirror() : null;
 		}
 
 		/// <summary>
@@ -311,7 +312,7 @@ namespace Chimera.Client.GUI
 				using ProjectResolutionForm dialog = new(project, locateFile: title =>
 				{
 					using OpenFileDialog picker = new() { Title = title };
-					return picker.ShowDialog(this) is DialogResult.OK ? picker.FileName : null;
+					return picker.ShowDialog(this) is DialogResult.OK ? picker.FileName.WithoutWslgMirror() : null;
 				},
 				locateFolder: () =>
 				{
@@ -319,7 +320,7 @@ namespace Chimera.Client.GUI
 					{
 						Description = "Scan a folder for the project's files",
 					};
-					return picker.ShowDialog(this) is DialogResult.OK ? picker.SelectedPath : null;
+					return picker.ShowDialog(this) is DialogResult.OK ? picker.SelectedPath.WithoutWslgMirror() : null;
 				});
 				if (dialog.ShowDialog(this) is not DialogResult.OK)
 				{

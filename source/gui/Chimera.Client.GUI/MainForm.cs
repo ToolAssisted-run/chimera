@@ -395,17 +395,34 @@ namespace Chimera.Client.GUI
 
 			var savedOutputMethod = Config.SoundOutputMethod;
 			if (savedOutputMethod is ESoundOutputMethod.Dummy) Config.SoundOutputMethod = ESoundOutputMethod.OpenAL;
+			// A precompile session plays nothing, so it has no business opening a
+			// device - and the wizard runs eight of them at once. It never saves
+			// its config, so this does not follow the person into their next session.
+			if (_argParser.cmdPrecompile is not null) Config.SoundOutputMethod = ESoundOutputMethod.Dummy;
 			try
 			{
 				Sound = new Sound(Config, () => Emulator.VsyncRate());
 			}
 			catch
 			{
-				if (savedOutputMethod is not ESoundOutputMethod.Dummy)
+				const string noDevice = "Couldn't initialize sound device! Try changing the output method in Sound config.";
+				if (savedOutputMethod is ESoundOutputMethod.Dummy)
+				{
+					// said once already, when it last failed
+				}
+				else if (HeadlessMode.Enabled)
+				{
+					// Silence is the fallback either way, so the run carries on and
+					// nothing is lost; a headless run that died here instead turned a
+					// machine with no working sound (WSL, issue #78) into one that could
+					// not compile a game at all.
+					HeadlessMode.LogSuppressedWarning(noDevice);
+				}
+				else
 				{
 					ShowMessageBox(
 						owner: null,
-						text: "Couldn't initialize sound device! Try changing the output method in Sound config.",
+						text: noDevice,
 						caption: "Initialization Error",
 						EMsgBoxIcon.Error);
 				}
@@ -3618,7 +3635,7 @@ namespace Chimera.Client.GUI
 			};
 			var result = dialogParent.ShowDialogWithTempMute(ofd);
 			filterIndex = ofd.FilterIndex;
-			return result.IsOk() && ofd.FileNames.Length is not 0 ? ofd.FileNames : null;
+			return result.IsOk() && ofd.FileNames.Length is not 0 ? ofd.FileNames.Select(static f => f.WithoutWslgMirror()).ToArray() : null;
 		}
 
 		public string/*?*/ ShowFileSaveDialog(
@@ -3641,7 +3658,7 @@ namespace Chimera.Client.GUI
 				ValidateNames = false, // only raises confusing errors, doesn't affect result
 			};
 			var result = dialogParent.ShowDialogWithTempMute(sfd);
-			return result.IsOk() ? sfd.FileName : null;
+			return result.IsOk() ? sfd.FileName.WithoutWslgMirror() : null;
 		}
 
 		public string ShowFolderSelectDialog(
@@ -3657,7 +3674,7 @@ namespace Chimera.Client.GUI
 				using FolderBrowserDialog f = new();
 				f.Description = subtitle;
 				f.SelectedPath = initDir;
-				return f.ShowDialog().IsOk() ? f.SelectedPath : null;
+				return f.ShowDialog().IsOk() ? f.SelectedPath.WithoutWslgMirror() : null;
 			}
 			else
 			{

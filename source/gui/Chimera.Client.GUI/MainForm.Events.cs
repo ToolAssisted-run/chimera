@@ -433,12 +433,12 @@ namespace Chimera.Client.GUI
 				pickFile: title =>
 				{
 					using OpenFileDialog picker = new() { Title = title, Filter = "All Files|*.*" };
-					return picker.ShowDialog(this) is DialogResult.OK ? picker.FileName : null;
+					return picker.ShowDialog(this) is DialogResult.OK ? picker.FileName.WithoutWslgMirror() : null;
 				},
 				pickFolder: () =>
 				{
 					using FolderBrowserDialog picker = new() { Description = "Scan a folder for firmware files" };
-					return picker.ShowDialog(this) is DialogResult.OK ? picker.SelectedPath : null;
+					return picker.ShowDialog(this) is DialogResult.OK ? picker.SelectedPath.WithoutWslgMirror() : null;
 				},
 				scanFolder: folder =>
 				{

@@ -162,6 +162,27 @@ namespace Chimera.Common.PathExtensions
 		/// <returns><see langword="false"/> iff <paramref name="path"/> is blank, or is <c>"."</c> (relative path to CWD), regardless of trailing slash</returns>
 		public static bool PathIsSet(this string path) => !string.IsNullOrWhiteSpace(path) && path != "." && path != "./" && path != ".\\";
 
+		/// <summary>
+		/// WSLg mounts the distro's own root a second time at <c>/mnt/wslg/distro</c>,
+		/// READ-ONLY, and Mono's file dialogs list it among the places to pick from.
+		/// A path picked through it names the right file and cannot be written:
+		/// the Reproducible Media Maker failed with "cannot create
+		/// /mnt/wslg/distro/home/..." for a folder the person owned (issue #77).
+		/// It is the same filesystem, so the same path under <c>/</c>
+		/// is the one meant.
+		/// </summary>
+		/// <returns><paramref name="path"/> with the mirror's prefix removed; unchanged anywhere but WSL</returns>
+		public static string WithoutWslgMirror(this string path) => WithoutWslgMirror(path, OSTailoredCode.IsWSL);
+
+		/// <inheritdoc cref="WithoutWslgMirror(string)"/>
+		public static string WithoutWslgMirror(string path, bool onWsl)
+		{
+			const string MIRROR = "/mnt/wslg/distro";
+			if (!onWsl || string.IsNullOrEmpty(path)) return path;
+			if (path is MIRROR or MIRROR + "/") return "/";
+			return path.StartsWithOrdinal(MIRROR + "/") ? path.Substring(MIRROR.Length) : path;
+		}
+
 		public static string RemoveInvalidFileSystemChars(this string name) => string.Concat(name.Split(Path.GetInvalidFileNameChars()));
 
 		public static (string? Dir, string File) SplitPathToDirAndFile(this string path)

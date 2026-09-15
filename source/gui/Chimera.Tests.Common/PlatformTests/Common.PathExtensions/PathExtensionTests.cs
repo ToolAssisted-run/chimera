@@ -89,5 +89,23 @@ namespace Chimera.Tests.Common.PathExtensions
 			// `MakeRelativeTo` is supposed to return an absolute path (the receiver is assumed to be absolute) iff the receiver isn't a child of the given base path
 			Assert.AreEqual(isChild ? expectedRelPath : absolutePath, absolutePath.MakeRelativeTo(basePath), "absolute.MakeRelativeTo(base)");
 		}
+
+		/// <summary>
+		/// Issue #77: WSLg mounts the distro's root again, read-only, at
+		/// /mnt/wslg/distro, and a path picked through it could not be written.
+		/// </summary>
+		[TestMethod]
+		[DataRow("/mnt/wslg/distro/home/tas/SonicUnleashed.iso", true, "/home/tas/SonicUnleashed.iso")]
+		[DataRow("/mnt/wslg/distro", true, "/")]
+		[DataRow("/mnt/wslg/distro/", true, "/")]
+		[DataRow("/mnt/wslg/distros/x", true, "/mnt/wslg/distros/x")] // a longer name, not the mirror
+		[DataRow("/home/tas/a.iso", true, "/home/tas/a.iso")]
+		[DataRow("/mnt/wslg/distro/home/tas/a.iso", false, "/mnt/wslg/distro/home/tas/a.iso")] // only WSL has the mirror
+		[DataRow("", true, "")]
+		public void TestWithoutWslgMirror(string path, bool onWsl, string expected)
+		{
+			PlatformTestUtils.RunEverywhere();
+			Assert.AreEqual(expected, PE.WithoutWslgMirror(path, onWsl));
+		}
 	}
 }

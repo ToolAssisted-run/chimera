@@ -96,10 +96,12 @@ namespace Chimera.Client.GUI
 			137 => "killed by the system (out of memory)",          // 128 + SIGKILL
 			139 => "crashed (segmentation fault)",                  // 128 + SIGSEGV
 			134 => "aborted",                                       // 128 + SIGABRT
+			132 => "crashed (illegal instruction)",                 // 128 + SIGILL: how the sandbox stops a machine
 			-1073741819 => "crashed (access violation)",            // 0xC0000005
 			-1073741801 => "out of memory",                         // 0xC0000017
 			-1073740791 => "crashed (stack buffer overrun)",        // 0xC0000409
 			-1073741571 => "crashed (ran out of stack)",            // 0xC00000FD
+			-1073741795 => "crashed (illegal instruction)",         // 0xC000001D: the same, on Windows
 			_ => $"exit code {code}",
 		};
 

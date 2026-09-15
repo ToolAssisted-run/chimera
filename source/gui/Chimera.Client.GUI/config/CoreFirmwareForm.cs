@@ -6,6 +6,7 @@ using System.IO;
 using System.Linq;
 using System.Windows.Forms;
 
+using Chimera.Common.PathExtensions;
 using Chimera.Client.Common;
 
 namespace Chimera.Client.GUI
@@ -239,7 +240,7 @@ namespace Chimera.Client.GUI
 				InitialDirectory = entry.Path is null ? "" : Path.GetDirectoryName(entry.Path) ?? "",
 			};
 			if (ofd.ShowDialog(this) is not DialogResult.OK) return;
-			_setPath(entry, ofd.FileName);
+			_setPath(entry, ofd.FileName.WithoutWslgMirror());
 			Populate();
 		}
 

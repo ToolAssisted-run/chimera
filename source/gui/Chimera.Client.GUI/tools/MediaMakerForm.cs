@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
+using Chimera.Common.PathExtensions;
 using Chimera.Client.Common;
 using Chimera.Emulation.Common.Engine;
 
@@ -230,14 +231,15 @@ namespace Chimera.Client.GUI
 				Description = "The folder to pack",
 			};
 			if (dialog.ShowDialog(this) is not DialogResult.OK) return;
-			_folder.Text = dialog.SelectedPath;
+			var folder = dialog.SelectedPath.WithoutWslgMirror();
+			_folder.Text = folder;
 			if (_output.Text.Length == 0)
 			{
 				// beside the folder, named after it: the obvious answer, and one
 				// that never silently overwrites what is inside it
-				var name = new DirectoryInfo(dialog.SelectedPath).Name;
-				var parent = Path.GetDirectoryName(dialog.SelectedPath.TrimEnd(Path.DirectorySeparatorChar));
-				_output.Text = Path.Combine(parent ?? dialog.SelectedPath, name + Chosen.Extension);
+				var name = new DirectoryInfo(folder).Name;
+				var parent = Path.GetDirectoryName(folder.TrimEnd(Path.DirectorySeparatorChar));
+				_output.Text = Path.Combine(parent ?? folder, name + Chosen.Extension);
 			}
 			UpdateEnabled();
 		}
@@ -253,7 +255,7 @@ namespace Chimera.Client.GUI
 				OverwritePrompt = true,
 			};
 			if (dialog.ShowDialog(this) is not DialogResult.OK) return;
-			_output.Text = dialog.FileName;
+			_output.Text = dialog.FileName.WithoutWslgMirror();
 			UpdateEnabled();
 		}
 
