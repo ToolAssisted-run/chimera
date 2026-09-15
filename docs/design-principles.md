@@ -3297,3 +3297,33 @@ After it a Windows state loads in a new process and continues exactly: RAM and
 VRAM after the load match a straight run to the same frame. miniBox's
 `test_stack_leftovers_are_not_identity` fails against the old hash on the
 cross-built Windows run and passes against the new one.
+
+## A recycled buffer name has one owner, and a second delete frees nothing (2026-09-15)
+
+After the #43 change a Ruffle project's picture broke on its first rewind. With
+the rebuild working, a same-session rewind still came back with its background
+missing, and `CHIMERA_GL_CHECK` showed a run of glBufferSubData refused with
+GL_INVALID_VALUE after every rebuild. With `CHIMERA_GL_NO_POOL` the same rewind
+was pixel-exact. The pool was handing one buffer to two owners.
+
+The bridge keeps a guest's deleted buffer names and serves them to later gens
+(bufferPool()). It pooled any delete of a name it had made, and a name already
+in the pool still counted as made - so deleting it again pushed it a second
+time, and two gens were served the same buffer. The second owner's glBufferData
+shrank the first owner's storage, and every upload after that was refused.
+Deleting a deleted name is legal GL, and the driver ignores it. After a restore
+it is ordinary: the restored renderer lets go of handles whose buffers the
+frames after the restored one had already deleted.
+
+A name in the pool is now marked, and a delete of a marked name does nothing,
+as the driver would. The bookkeeping moved into gl_buffer_pool.h, apart from the
+GL calls, and `test_gl_buffer_pool` checks it without a driver: a double delete
+serves the name once, and mapped, immutable, foreign and overflow deletes still
+reach the driver. On the GTX 1060 a Ruffle project rewound three times to frame
+300 and replayed to 600 draws the same 220,400 pixels as a straight run, with no
+GL error, pool on.
+
+The Ruffle core had its own half of this: old handles dropped lazily after the
+rebuild deleted numbers the new backend had been handed. That is fixed in the
+core (its gl-map.cpp keeps the new backend off the old numbers), because only
+the guest knows which generation a name belongs to.

@@ -52,6 +52,7 @@
 #include "gl-bridge.h"
 #include "gl-bridge-ops.h"
 #include "gl_sync_names.h"
+#include "gl_buffer_pool.h"
 
 #include <cstdio>
 #include <cstring>
@@ -1021,7 +1022,7 @@ static void syncForget(GLsync name)
  *    its stream buffers are glBufferStorage and persistently mapped, and its
  *    rebuild wrote a batch of vertices to address 0 through a recycled one
  *    (issue #43). Maps, unmaps and storage are tracked as they cross
- *    (bufferMapped(), bufferImmutable()), and such a buffer's delete is real.
+ *    (gl_buffer_pool.h), and such a buffer's delete is real.
  *
  * What it does NOT do is textures, and the reason is worth recording: they are
  * created with glTexStorage2D, which is immutable. A recycled texture would
@@ -1046,97 +1047,24 @@ static bool poolTrace()
 	return on;
 }
 
-static std::vector<GLuint> &bufferPool()
+/* The bookkeeping itself lives in gl_buffer_pool.h, apart from the GL calls,
+ * so test_gl_buffer_pool.cpp can check it without a driver. */
+static CeGlBufferPool &bufferPool()
 {
-	static std::vector<GLuint> pool;
+	static CeGlBufferPool pool;
 	return pool;
 }
 
-/* indexed by name: did we hand it out? */
-static std::vector<bool> &bufferOurs()
-{
-	static std::vector<bool> ours;
-	return ours;
-}
-
-static const size_t kBufferPoolMax = 4096;
-
-static void poolMarkOurs(GLuint name)
-{
-	if (name == 0) return;
-	if (bufferOurs().size() <= (size_t)name) bufferOurs().resize((size_t)name + 1024, false);
-	bufferOurs()[name] = true;
-}
-
-static bool poolIsOurs(GLuint name)
-{
-	return name != 0 && (size_t)name < bufferOurs().size() && bufferOurs()[name];
-}
-
-/* indexed by name: is it mapped right now? */
-static std::vector<bool> &bufferMapped()
-{
-	static std::vector<bool> mapped;
-	return mapped;
-}
-
-static void poolNoteMapped(GLuint name, bool mapped)
-{
-	if (name == 0) return;
-	if (bufferMapped().size() <= (size_t)name)
-	{
-		if (!mapped) return;
-		bufferMapped().resize((size_t)name + 1024, false);
-	}
-	bufferMapped()[name] = mapped;
-}
-
-static bool poolIsMapped(GLuint name)
-{
-	return name != 0 && (size_t)name < bufferMapped().size() && bufferMapped()[name];
-}
-
-/* indexed by name: was it ever given immutable storage? A property of the
- * object for as long as the name lives, so only a real delete clears it. */
-static std::vector<bool> &bufferImmutable()
-{
-	static std::vector<bool> immutable;
-	return immutable;
-}
-
-static void poolNoteImmutable(GLuint name, bool immutable)
-{
-	if (name == 0) return;
-	if (bufferImmutable().size() <= (size_t)name)
-	{
-		if (!immutable) return;
-		bufferImmutable().resize((size_t)name + 1024, false);
-	}
-	bufferImmutable()[name] = immutable;
-}
-
-static bool poolIsImmutable(GLuint name)
-{
-	return name != 0 && (size_t)name < bufferImmutable().size() && bufferImmutable()[name];
-}
-
-/* Set once a buffer is mapped or given storage on a target boundBuffer() does
+/* Called once a buffer is mapped or given storage on a target boundBuffer() does
  * not know: the pool can no longer tell which names are safe to recycle, so it
  * stops for the rest of the process and gives back what it holds. */
-static bool &poolDistrusted()
-{
-	static bool distrusted;
-	return distrusted;
-}
-
 static void poolDistrust(GLenum target)
 {
-	if (poolDistrusted()) return;
-	poolDistrusted() = true;
+	if (bufferPool().isDistrusted()) return;
 	fprintf(stderr, "[ce-gl] buffer pool off: a buffer was mapped or given storage on target %#x,"
 		" which it cannot track\n", (unsigned)target);
-	if (!bufferPool().empty()) glDeleteBuffers((GLsizei)bufferPool().size(), bufferPool().data());
-	bufferPool().clear();
+	const std::vector<uint32_t> held = bufferPool().distrust();
+	if (!held.empty()) glDeleteBuffers((GLsizei)held.size(), held.data());
 }
 
 /* The buffer a map, unmap or storage on `target` names: whatever is bound there.
@@ -1244,15 +1172,16 @@ extern "C" uintptr_t BRIDGE_ABI ce_gl_dispatch(uintptr_t op, uintptr_t a, uintpt
 	{
 		struct ChimeraGlArgs_glGenBuffers *args = (struct ChimeraGlArgs_glGenBuffers *)a;
 		GLsizei served = 0;
-		while (served < args->n && !poolDistrusted() && !bufferPool().empty())
+		while (served < args->n)
 		{
-			args->buffers[served++] = bufferPool().back();
-			bufferPool().pop_back();
+			const GLuint name = bufferPool().take();
+			if (name == 0) break;
+			args->buffers[served++] = name;
 		}
 		if (served < args->n)
 		{
 			glGenBuffers(args->n - served, args->buffers + served);
-			for (GLsizei i = served; i < args->n; i++) poolMarkOurs(args->buffers[i]);
+			for (GLsizei i = served; i < args->n; i++) bufferPool().made(args->buffers[i]);
 		}
 		/* Including the pooled ones: a name the pool hands back IS a different
 		 * object as far as the guest is concerned, and counting it is the whole
@@ -1269,24 +1198,18 @@ extern "C" uintptr_t BRIDGE_ABI ce_gl_dispatch(uintptr_t op, uintptr_t a, uintpt
 		for (GLsizei i = 0; i < args->n; i++)
 		{
 			const GLuint name = args->buffers[i];
+			const bool ours = bufferPool().isOurs(name), mapped = bufferPool().isMapped(name),
+				immutable = bufferPool().isImmutable(name);
+			const CeGlBufferPool::Delete what = bufferPool().deleted(name);
 			if (poolTrace())
 				fprintf(stderr, "[pool] delete %u: ours=%d mapped=%d immutable=%d -> %s\n", (unsigned)name,
-					(int)poolIsOurs(name), (int)poolIsMapped(name), (int)poolIsImmutable(name),
-					poolIsOurs(name) && !poolIsMapped(name) && !poolIsImmutable(name)
-						&& bufferPool().size() < kBufferPoolMax ? "pooled" : "real");
-			if (poolIsOurs(name) && !poolIsMapped(name) && !poolIsImmutable(name)
-				&& !poolDistrusted() && bufferPool().size() < kBufferPoolMax)
-			{
-				bufferPool().push_back(name);
-				continue;
-			}
+					(int)ours, (int)mapped, (int)immutable,
+					what == CeGlBufferPool::Delete::Ignore ? "already deleted, ignored"
+						: what == CeGlBufferPool::Delete::Pool ? "pooled" : "real");
 			/* not ours, still mapped, immutable, or the pool is full: a real
 			 * delete, so a guest bug stays visible, a mapping and a storage end
 			 * the way the guest meant, and a lopsided guest cannot leak */
-			glDeleteBuffers(1, &name);
-			poolNoteMapped(name, false);
-			poolNoteImmutable(name, false);
-			if (name != 0 && (size_t)name < bufferOurs().size()) bufferOurs()[name] = false;
+			if (what == CeGlBufferPool::Delete::Real) glDeleteBuffers(1, &name);
 		}
 		return 0;
 	}
@@ -1408,7 +1331,7 @@ static uintptr_t ce_gl_dispatch_one(uintptr_t op, uintptr_t a, uintptr_t b,
 		{
 			auto *p = reinterpret_cast<ChimeraGlArgs_glMapBufferRange *>(a);
 			void *mapped = glMapBufferRange(p->target, p->offset, p->length, p->access);
-			if (mapped != nullptr && glPool()) poolNoteMapped(boundBuffer(p->target), true);
+			if (mapped != nullptr && glPool()) bufferPool().noteMapped(boundBuffer(p->target), true);
 			if (poolTrace())
 				fprintf(stderr, "[pool] mapRange target=%#x bound=%u access=%#x -> %p\n", (unsigned)p->target,
 					(unsigned)boundBuffer(p->target), (unsigned)p->access, mapped);
@@ -1418,14 +1341,14 @@ static uintptr_t ce_gl_dispatch_one(uintptr_t op, uintptr_t a, uintptr_t b,
 		{
 			auto *p = reinterpret_cast<ChimeraGlArgs_glMapBuffer *>(a);
 			void *mapped = glMapBuffer(p->target, p->access);
-			if (mapped != nullptr && glPool()) poolNoteMapped(boundBuffer(p->target), true);
+			if (mapped != nullptr && glPool()) bufferPool().noteMapped(boundBuffer(p->target), true);
 			return (uintptr_t)mapped;
 		}
 		case CHIMERA_GL_OP_glMapNamedBufferRange:
 		{
 			auto *p = reinterpret_cast<ChimeraGlArgs_glMapNamedBufferRange *>(a);
 			void *mapped = glMapNamedBufferRange(p->buffer, p->offset, p->length, p->access);
-			if (mapped != nullptr) poolNoteMapped(p->buffer, true);
+			if (mapped != nullptr) bufferPool().noteMapped(p->buffer, true);
 			return (uintptr_t)mapped;
 		}
 		case CHIMERA_GL_OP_glUnmapBuffer:
@@ -1433,7 +1356,7 @@ static uintptr_t ce_gl_dispatch_one(uintptr_t op, uintptr_t a, uintptr_t b,
 			auto *p = reinterpret_cast<ChimeraGlArgs_glUnmapBuffer *>(a);
 			const GLuint name = glPool() ? boundBuffer(p->target) : 0;
 			const GLboolean ok = glUnmapBuffer(p->target);
-			poolNoteMapped(name, false);
+			bufferPool().noteMapped(name, false);
 			if (poolTrace())
 				fprintf(stderr, "[pool] unmap target=%#x bound=%u -> %d\n", (unsigned)p->target, (unsigned)name, (int)ok);
 			return (uintptr_t)ok;
@@ -1442,7 +1365,7 @@ static uintptr_t ce_gl_dispatch_one(uintptr_t op, uintptr_t a, uintptr_t b,
 		{
 			auto *p = reinterpret_cast<ChimeraGlArgs_glBufferStorage *>(a);
 			glBufferStorage(p->target, p->size, p->data, p->flags);
-			if (glPool()) poolNoteImmutable(boundBuffer(p->target), true);
+			if (glPool()) bufferPool().noteImmutable(boundBuffer(p->target), true);
 			if (poolTrace())
 				fprintf(stderr, "[pool] storage target=%#x bound=%u size=%lld flags=%#x err=%#x\n", (unsigned)p->target,
 					(unsigned)boundBuffer(p->target), (long long)p->size, (unsigned)p->flags, (unsigned)glGetError());
@@ -1452,14 +1375,14 @@ static uintptr_t ce_gl_dispatch_one(uintptr_t op, uintptr_t a, uintptr_t b,
 		{
 			auto *p = reinterpret_cast<ChimeraGlArgs_glNamedBufferStorage *>(a);
 			glNamedBufferStorage(p->buffer, p->size, p->data, p->flags);
-			poolNoteImmutable(p->buffer, true);
+			bufferPool().noteImmutable(p->buffer, true);
 			return 0;
 		}
 		case CHIMERA_GL_OP_glUnmapNamedBuffer:
 		{
 			auto *p = reinterpret_cast<ChimeraGlArgs_glUnmapNamedBuffer *>(a);
 			const GLboolean ok = glUnmapNamedBuffer(p->buffer);
-			poolNoteMapped(p->buffer, false);
+			bufferPool().noteMapped(p->buffer, false);
 			return (uintptr_t)ok;
 		}
 

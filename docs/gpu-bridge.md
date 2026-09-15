@@ -501,6 +501,19 @@ deleting one is a real delete. A map or storage call on a target it cannot
 identify turns the pool off for the rest of the process. A reopen could hit the
 same path; rewinding just hits it more often.
 
+A second bug in the same pool showed up on Ruffle (2026-09-15). After a rewind
+its picture came back with the background missing, and `CHIMERA_GL_CHECK` showed
+glBufferSubData refused with GL_INVALID_VALUE after every rebuild; with
+`CHIMERA_GL_NO_POOL` the picture was exact. A name already in the pool still
+counted as one the pool had made, so a guest deleting it a second time pushed it
+again, and two later gens were served the same buffer. The second owner's
+`glBufferData` shrank the first owner's storage. Deleting a deleted name is
+legal GL, and after a restore it is ordinary: the restored renderer lets go of
+handles whose buffers were already deleted by the frames after the restored
+one. A pooled name is now marked, and a delete of it does nothing, as the
+driver would. The bookkeeping is in `gl_buffer_pool.h`, and
+`test_gl_buffer_pool` checks it without a driver.
+
 ### What the frontend does with that
 
 A core declares `video.gpuStatesSurviveTheContext` when its renderer does this,
