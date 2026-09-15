@@ -559,6 +559,14 @@ CE_API int32_t ce_project_set_settings_text(ce_project *p, const char *json, con
  * package, recorded so a later open can check it is the same compiled code. */
 CE_API const char *ce_project_core_cache_text(ce_project *p, uint64_t *len_out);
 CE_API int32_t ce_project_set_core_cache_text(ce_project *p, const char *json, const char **error_out);
+/* TAStudio's layout of the piano roll (columns, order, widths, orientation, lag
+ * display) as a JSON object the frontend wrote and reads back; the engine only
+ * keeps it. "" when the project has none. The setter clears it on "" or null,
+ * and otherwise rejects anything that is not a JSON object. Not a sync setting:
+ * it travels with the project because it is part of the work somebody set up
+ * (issue #83). */
+CE_API const char *ce_project_tastudio_text(ce_project *p, uint64_t *len_out);
+CE_API int32_t ce_project_set_tastudio_text(ce_project *p, const char *json, const char **error_out);
 CE_API const char *ce_project_firmware_text(ce_project *p, uint64_t *len_out);
 CE_API int32_t ce_project_set_firmware_text(ce_project *p, const char *json, const char **error_out);
 

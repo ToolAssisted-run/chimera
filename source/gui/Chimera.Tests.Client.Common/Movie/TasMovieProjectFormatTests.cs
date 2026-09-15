@@ -500,6 +500,40 @@ namespace Chimera.Tests.Client.Common.Movie
 			Assert.AreEqual(1, other.States.Count, "and it starts from the anchor alone");
 		}
 
+		/// <summary>
+		/// TAStudio's layout travels in the project (issue #83): it survives the cache being set aside by a
+		/// machine change - which is what a new core or Chimera build is - and the cache being lost, and a
+		/// project with no layout stays without the key, which is what an older build can still open.
+		/// </summary>
+		[TestMethod]
+		public void TheTAStudioLayoutIsInTheProjectAndOutlivesTheCache()
+		{
+			const string LAYOUT = """{"$type":"test","Columns":[[{"Name":"A","Width":23,"Visible":true}]],"HorizontalOrientation":false}""";
+			var path = Path.Combine(_dir, "layout.chimeraProject");
+			var movie = MakeWorkedMovie(path);
+			movie.ClientSettingsForSave = () => LAYOUT;
+			Assert.IsFalse(movie.Save().IsError);
+			StringAssert.Contains(File.ReadAllText(path), "\"tastudio\"", "the layout is written into the project file");
+
+			// a new core: the machine the cache belongs to is not this one any more
+			using (var p = Chimera.Emulation.Common.Engine.EngineProject.Open(path))
+			{
+				p.SetSettingsJson(PalSettings);
+				p.Save(path);
+			}
+			var afterMachineChange = LoadFresh(path);
+			Assert.IsNotNull(afterMachineChange.DroppedCacheNote, "the cache really was set aside");
+			StringAssert.Contains(afterMachineChange.LoadedClientSettings, "\"Width\":23", "and the layout came back anyway");
+
+			File.Delete(afterMachineChange.GreenZoneFilename);
+			var afterLostCache = LoadFresh(path);
+			StringAssert.Contains(afterLostCache.LoadedClientSettings, "\"Width\":23", "with no cache at all, too");
+
+			var plainPath = Path.Combine(_dir, "nolayout.chimeraProject");
+			Assert.IsFalse(MakeWorkedMovie(plainPath).Save().IsError);
+			Assert.IsFalse(File.ReadAllText(plainPath).Contains("\"tastudio\""), "no layout, no key");
+		}
+
 		[TestMethod]
 		public void ALostCacheCostsRecomputationNeverWork()
 		{

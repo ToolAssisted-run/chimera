@@ -337,6 +337,12 @@ namespace Chimera.Emulation.Common.Engine
 		public abstract int ce_project_set_core_cache_text(IntPtr project, string json, ref IntPtr errorOut);
 
 		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_project_tastudio_text(IntPtr project, ref ulong lenOut);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract int ce_project_set_tastudio_text(IntPtr project, string json, ref IntPtr errorOut);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_project_log_text(IntPtr project, ref ulong lenOut);
 
 		[ChimeraImport(CallingConvention.Cdecl)]
@@ -1446,6 +1452,32 @@ namespace Chimera.Emulation.Common.Engine
 			if (ChimeraEngine.Instance.ce_project_set_core_cache_text(_project, json, ref error) is not 0)
 			{
 				throw new InvalidOperationException(ChimeraEngine.PtrToStringUtf8(error) ?? "bad coreCache");
+			}
+		}
+
+		/// <summary>
+		/// TAStudio's layout of the piano roll - columns, their order and widths, orientation, lag
+		/// display - as the JSON object TAStudio wrote; "" when the project has none. It travels with
+		/// the project (issue #83); the engine only keeps it.
+		/// </summary>
+		public string TAStudioJson
+		{
+			get
+			{
+				ulong len = 0;
+				var p = ChimeraEngine.Instance.ce_project_tastudio_text(_project, ref len);
+				return ChimeraEngine.PtrToStringUtf8(p, len) ?? "";
+			}
+		}
+
+		/// <summary>"" or null clears it.</summary>
+		/// <exception cref="InvalidOperationException">not a JSON object</exception>
+		public void SetTAStudioJson(string json)
+		{
+			var error = IntPtr.Zero;
+			if (ChimeraEngine.Instance.ce_project_set_tastudio_text(_project, json ?? "", ref error) is not 0)
+			{
+				throw new InvalidOperationException(ChimeraEngine.PtrToStringUtf8(error) ?? "bad tastudio layout");
 			}
 		}
 

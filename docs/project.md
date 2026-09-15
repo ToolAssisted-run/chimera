@@ -45,6 +45,15 @@ themselves, which are named by their SHA1:
   the movie; publishing a finished TAS means handing over the project
   file, and anyone holding files matching the SHA1s can reproduce
   everything.
+- **TAStudio's layout** (user-decided, 2026-09-15, issue #83): which
+  piano-roll columns are shown, their order and widths, the orientation
+  and how lag frames are shown - the `tastudio` object, written by the
+  frontend and kept verbatim by the engine. It is not a sync setting; it
+  is here because it is part of the work somebody set up. It used to live
+  in the greenzone cache, which is set aside whenever the machine changes
+  (a new core, a new Chimera) and holds only what the last save wrote, so
+  people set their columns up again after every update. A project saved
+  before the move still has it in its cache, which is read once.
 
 Not in the project:
 
@@ -63,8 +72,10 @@ Not in the project:
   hashes) and is used only when the project still describes that machine:
   a savestate is the memory of one exact machine, and the sandbox checks
   only the core binary when it loads one.
-- **Per-user preferences.** Keybinds, window layout, hotkeys stay in user
-  config; the project holds only what affects sync and reproduction.
+- **Per-user preferences.** Keybinds, window positions, hotkeys and
+  TAStudio's own preferences (font, autosave, scrolling) stay in user
+  config; the project holds what affects sync and reproduction, and the
+  one exception above.
 
 ## Creation
 

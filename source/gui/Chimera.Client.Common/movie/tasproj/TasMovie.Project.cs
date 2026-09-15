@@ -317,6 +317,22 @@ namespace Chimera.Client.Common
 				}
 			}
 
+			// The piano roll as it is laid out - which columns, in what order and width, which way round,
+			// how lag is shown - is part of the work somebody set up, so it is in the project and not in
+			// the cache beside it, which a new core or a crash throws away (issue #83). Backups and the
+			// recovery snapshot are this same write, so they carry it too.
+			if (ClientSettingsForSave is not null)
+			{
+				try
+				{
+					p.SetTAStudioJson(ClientSettingsForSave());
+				}
+				catch (InvalidOperationException)
+				{
+					// a layout that would not serialize is not a reason to lose the save
+				}
+			}
+
 			EngineProgress.Report("writing the project");
 			try
 			{
@@ -498,11 +514,6 @@ namespace Chimera.Client.Common
 				// which machine these states belong to - checked before any is loaded
 				bs.PutLump(BinaryStateLump.Machine, tw => tw.WriteLine(MachineIdentityOf(Project)));
 				bs.PutLump(BinaryStateLump.LagLog, tw => LagLog.Save(tw), zstdCompress: true);
-				if (ClientSettingsForSave != null)
-				{
-					var clientSettingsJson = ClientSettingsForSave();
-					bs.PutLump(BinaryStateLump.ClientSettings, (TextWriter tw) => tw.Write(clientSettingsJson));
-				}
 				if (VerificationLog.Count is not 0)
 				{
 					bs.PutLump(BinaryStateLump.VerificationLog, tw => tw.WriteLine(VerificationLog.ToInputLog()));
@@ -587,6 +598,11 @@ namespace Chimera.Client.Common
 			Subtitles.Sort();
 
 			SettingsJson = WrapSettings(p.SettingsJson);
+
+			// TAStudio's layout, from the project itself (issue #83); a project saved before it lived there
+			// still has it in the cache, read below when this is empty
+			var layout = p.TAStudioJson;
+			if (layout.Length is not 0) LoadedClientSettings = layout;
 
 			var logText = p.LogText;
 			if (logText.Length is not 0)
@@ -720,11 +736,16 @@ namespace Chimera.Client.Common
 			{
 				bl.GetLump(BinaryStateLump.LagLog, abort: false, tr => LagLog.Load(tr));
 
-				bl.GetLump(BinaryStateLump.ClientSettings, abort: false, tr =>
+				// only for a project saved before the layout moved into it (issue #83); its next save
+				// puts the layout where a new core cannot take it away
+				if (LoadedClientSettings is null)
 				{
-					var clientSettings = tr.ReadToEnd();
-					if (!string.IsNullOrEmpty(clientSettings)) LoadedClientSettings = clientSettings;
-				});
+					bl.GetLump(BinaryStateLump.ClientSettings, abort: false, tr =>
+					{
+						var clientSettings = tr.ReadToEnd();
+						if (!string.IsNullOrEmpty(clientSettings)) LoadedClientSettings = clientSettings;
+					});
+				}
 
 				bl.GetLump(BinaryStateLump.VerificationLog, abort: false, tr =>
 				{
