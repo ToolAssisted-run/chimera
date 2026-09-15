@@ -1575,7 +1575,11 @@ namespace Chimera.Client.GUI
 			}
 
 			CurrentTasMovie.States.Capture(Emulator.Frame);
-			QuickBmpFile.Copy(new BitmapBufferVideoProvider(branch.CoreFrameBuffer), VideoProvider);
+			// the picture is cache too, and a cache can hold a branch's state without it
+			if (branch.CoreFrameBuffer is not null)
+			{
+				QuickBmpFile.Copy(new BitmapBufferVideoProvider(branch.CoreFrameBuffer), VideoProvider);
+			}
 
 			if (Settings.OldControlSchemeForBranches && TasPlaybackBox.RecordingMode)
 			{

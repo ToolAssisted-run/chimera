@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 
 using Chimera.Client.Common;
+using Chimera.Display;
 using Chimera.Emulation.Common;
 
 namespace Chimera.Tests.Client.Common.Movie
@@ -485,6 +486,32 @@ namespace Chimera.Tests.Client.Common.Movie
 			Assert.AreEqual(1, loaded.Branches.Count, "the branch itself is work");
 			Assert.AreEqual("risky route", loaded.Branches[0].UserText);
 			Assert.IsNull(loaded.Branches[0].CoreData, "only its state was cache");
+		}
+
+		/// <summary>
+		/// A branch's pictures are cache: they come back with the project's cache and are simply absent
+		/// without it. TAStudio treated them as always there, so hovering a branch that was opened without
+		/// its cache - on another machine, after a clear, or set aside for another build of the core - threw
+		/// a NullReferenceException (issue #79). This pins both halves of what the UI now has to expect.
+		/// </summary>
+		[TestMethod]
+		public void ABranchsPicturesAreCacheAndMayBeAbsent()
+		{
+			var path = Path.Combine(_dir, "pictures.chimeraProject");
+			var movie = MakeWorkedMovie(path);
+			movie.Branches[0].OSDFrameBuffer = new BitmapBuffer(2, 2, new[] { 1, 2, 3, 4 });
+			movie.Branches[0].CoreFrameBuffer = new BitmapBuffer(2, 2, new[] { 5, 6, 7, 8 });
+			Assert.IsFalse(movie.Save().IsError);
+
+			var withCache = LoadFresh(path);
+			Assert.IsNotNull(withCache.Branches[0].OSDFrameBuffer, "the cache brings the screenshot back");
+			Assert.IsNotNull(withCache.Branches[0].CoreFrameBuffer, "and the machine's own picture");
+
+			File.Delete(movie.GreenZoneFilename);
+			var withoutCache = LoadFresh(path);
+			Assert.AreEqual(1, withoutCache.Branches.Count, "the branch itself is work");
+			Assert.IsNull(withoutCache.Branches[0].OSDFrameBuffer, "without the cache there is no screenshot to show");
+			Assert.IsNull(withoutCache.Branches[0].CoreFrameBuffer, "nor a picture to put back on the screen");
 		}
 
 		[TestMethod]

@@ -640,11 +640,13 @@ namespace Chimera.Client.GUI
 		{
 			if (e.NewCell?.RowIndex != null && e.NewCell.Column != null && e.NewCell.RowIndex < Branches.Count)
 			{
+				// A branch's screenshot lives in the project's cache, never in the project file, so a branch
+				// opened without that cache - another machine, a cleared cache, one set aside because another
+				// build of the core made it - has none to show. Hovering it threw (issue #79).
 				if (BranchView.CurrentCell is { RowIndex: int targetRow, Column.Name: BranchNumberColumnName }
-					&& targetRow < Branches.Count)
+					&& targetRow < Branches.Count
+					&& Branches[targetRow] is { OSDFrameBuffer: { } bb } branch)
 				{
-					var branch = Branches[targetRow];
-					var bb = branch.OSDFrameBuffer;
 					var width = bb.Width;
 					Point location = PointToScreen(Location);
 					var bottom = location.Y + bb.Height;
