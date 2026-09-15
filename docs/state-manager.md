@@ -383,6 +383,39 @@ is played. Until 2026-09-13 every capture dropped everything after it, and on a
 Ruffle project returning 3000 frames to the end after a look back was 99 s of
 emulation (docs/design-principles.md, "A replay changes nothing").
 
+### A delta continues only the machine that was stored (issue #68, 2026-09-15)
+
+A delta is what the machine changed since its epoch was marked, so it means
+something only on top of the exact machine the epoch was marked on. Two ways of
+breaking that were found by a TAStudio crash on Ruffle - a guest heap musl
+aborted on, a few ops after an edit behind the playhead - and both built
+machines that never existed:
+
+- **Across a gap.** The epoch is marked where the machine stands before a
+  frame. An edit behind the playhead cut the stretch back to the edited frame,
+  a frame ran before the seek back, and its delta was pushed straight after the
+  edit: what one frame did at 268 applied to the machine at 230.
+- **After a replay.** A replay that reached the stretch's last frame and went
+  on measured its next delta on the machine it had emulated to, and pushed it
+  onto the machine that was STORED there. Those are not the same bytes on a GPU
+  core - the picture is read back into guest memory, and one replayed Ruffle
+  frame measured 74 to 85 bytes apart - so the restore was half of each pass.
+
+So the history knows where the machine stands and whether it is the stored copy
+of that frame (just captured, or just restored). An epoch is marked only on the
+stored copy of the stretch's last frame, and a delta is taken only from such an
+epoch; after a replay the next frame is an anchor. Frames played after an edit
+made behind the machine are not stored at all - they are the timeline the edit
+replaced - until a restore or a load puts the machine back at or before the
+edit. A direct load (a branch) lets the epoch go, and an edit that arrives while
+a load has left the machine's frame unknown is decided by the next capture.
+
+`CHIMERA_HISTORY_VERIFY=1` checks this on a real core: every stored frame's
+machine is hashed, every restore is hashed again, and a restore that differs is
+named with its chain. The comparison is of the machine rather than of the bytes
+of its state, because a state also carries bookkeeping - which pages are dirty -
+that two copies of one machine can disagree about.
+
 The budget then decides only what happens to the far band. The engine can send
 it to disk, oldest first, into a directory its caller names (the spill described
 below, which `chimera-run --spill` still uses). **Chimera does not** (user-decided,

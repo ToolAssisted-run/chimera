@@ -49,6 +49,10 @@ struct HostApi
 	void (*wbx_seal)(void *obj, WbxReturn *ret);
 	/* the sealed machine's 32-byte identity; optional (older hosts lack it) */
 	void (*wbx_machine_hash)(void *obj, uint8_t *out, WbxReturn *ret);
+	/* page introspection: how many pages, and one page's status with 0x80 for
+	 * dirty and 0x40 for invisible; optional, and only CHIMERA_HISTORY_VERIFY asks */
+	void (*wbx_get_page_len)(void *obj, WbxReturn *ret);
+	void (*wbx_get_page_data)(void *obj, uintptr_t index, WbxReturn *ret);
 	void (*wbx_mount_file)(void *obj, const char *name, WbxReadCb cb, uintptr_t userdata, uint8_t writable, WbxReturn *ret);
 	/* read-only, read from the host's disk as the guest asks - no copy */
 	void (*wbx_mount_file_path)(void *obj, const char *name, const char *host_path, WbxReturn *ret);

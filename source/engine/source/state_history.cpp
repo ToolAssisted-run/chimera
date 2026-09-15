@@ -14,7 +14,9 @@
 #include <unistd.h>
 #endif
 #include <chrono>
+#include <functional>
 #include <new>
+#include <string_view>
 
 namespace chimera
 {
@@ -117,6 +119,15 @@ bool historyTrace()
 {
 	static const int on = [] {
 		const char *e = getenv("CHIMERA_HISTORY_TRACE");
+		return e != nullptr && e[0] != '\0' && e[0] != '0' ? 1 : 0;
+	}();
+	return on != 0;
+}
+
+bool historyVerify()
+{
+	static const int on = [] {
+		const char *e = getenv("CHIMERA_HISTORY_VERIFY");
 		return e != nullptr && e[0] != '\0' && e[0] != '0' ? 1 : 0;
 	}();
 	return on != 0;
@@ -888,9 +899,21 @@ void StateHistory::beforeAdvance()
 	 * measuring from the last landing and must go on doing so, or what those
 	 * frames did is lost. Opening a new one here would forget it. */
 	if (m_epochOpen) return;
+	/* A delta continues the stretch, so the machine it is measured from has to
+	 * BE the stretch's last frame - the very machine stored there, captured or
+	 * restored a moment ago - and not merely a machine at that frame number.
+	 * Emulating to a stored frame again does not give back the same bytes on
+	 * every core: a GPU core reads its picture back into guest memory, and one
+	 * replayed frame measured 74 to 85 bytes apart on Ruffle. A delta taken
+	 * after such a replay, pushed onto the stored frame, restores as a machine
+	 * that is half one pass and half the other (issue #68: a guest heap musl
+	 * aborted on). So the frame after a replay is an anchor instead. */
+	if (m_machineFrame < 0 || !m_machineStored) return;
+	if (m_segments.back().lastFrame() != m_machineFrame) return;   /* a replay: nothing to measure */
 	WbxReturn r{};
 	m_host->wbx_epoch_begin(m_obj, &r);
 	m_epochOpen = r.ok();
+	m_epochFrame = m_machineFrame;
 }
 
 /* The near band's stride, from what capture is costing against what the run is.
@@ -919,8 +942,15 @@ void StateHistory::noteAnchorCost()
 	m_lastCaptureEnded = nowSeconds();
 }
 
+void StateHistory::fixNearStride(int64_t stride)
+{
+	m_strideFixed = stride > 0;
+	if (stride > 0) m_nearStride = stride;
+}
+
 void StateHistory::tuneStride(double captureSeconds, double wallSeconds)
 {
+	if (m_strideFixed) return;
 	if (wallSeconds <= 0 || captureSeconds < 0) return;
 	const double a = 0.05;   /* the mean follows a couple of hundred frames */
 	m_captureSeconds = m_captureSeconds == 0 ? captureSeconds : m_captureSeconds * (1 - a) + captureSeconds * a;
@@ -978,6 +1008,20 @@ void StateHistory::tuneStride(double captureSeconds, double wallSeconds)
  */
 void StateHistory::capture(int64_t frame, const uint8_t *note, size_t noteLen)
 {
+	if (m_machineFrame < 0 && m_editWhileUnknown >= 0)
+	{
+		/* an edit came while a load had left the machine's frame unknown: the
+		 * machine was on frame - 1 then, and past the edit if that is after it */
+		if (frame - 1 > m_editWhileUnknown && (m_pastEditAt < 0 || m_editWhileUnknown < m_pastEditAt))
+		{
+			m_pastEditAt = m_editWhileUnknown;
+		}
+		m_editWhileUnknown = -1;
+	}
+	/* whether or not anything is stored, this is where the machine now stands -
+	 * and it is the stored copy of that frame only if this capture stores it */
+	m_machineFrame = frame;
+	m_machineStored = false;
 	for (;;)
 	{
 		try
@@ -1103,6 +1147,188 @@ bool StateHistory::captureAnchorPlanned(int64_t frame, std::vector<uint8_t> &car
 	return true;
 }
 
+void StateHistory::beforeLoad()
+{
+	finishPlan();
+	m_epochOpen = false;
+	m_machineFrame = -1;
+	m_machineStored = false;
+	/* whatever is loaded, the caller put it there on purpose: a branch is the
+	 * new timeline's machine, not the old one's */
+	m_pastEditAt = -1;
+	m_editWhileUnknown = -1;
+}
+
+/* CHIMERA_HISTORY_VERIFY=1: the whole machine is hashed as each frame is stored,
+ * and again after each restore, and the two are compared. A history that hands
+ * back a machine that never existed then says so AT the restore that built it,
+ * with the stretch and the chain - instead of a guest heap failing some frames
+ * later, in code that had nothing to do with it. Merges and spills are covered
+ * too: a frame keeps its digest whatever happens to the links that reach it.
+ *
+ * It costs a whole save per stored frame and per restore, and it finishes each
+ * planned anchor at once, so it is a diagnostic and nothing else. */
+namespace
+{
+/* The machine a state describes, ignoring what the state only KEEPS about it.
+ *
+ * A whole state is the status map, the dirty map and every dirty page (miniBox
+ * host.c and memblock.c). "Dirty" is bookkeeping - which pages differ from the
+ * sealed baseline and so must be carried - and two copies of one machine can
+ * disagree about it: a delta restore marks every page it writes dirty, where
+ * the machine it was taken from had un-dirtied a page it zeroed. So this hashes
+ * the status map, the program break, the thread set and the non-zero dirty
+ * pages by index, and skips zero pages (a zero page is the baseline of nearly
+ * all of them). It also counts FREE pages that hold anything but zeros, which
+ * no correct machine has. Invisible pages are dirty and never written into a
+ * state, and nothing in the state says which they are, so the host is asked.
+ * False when the bytes are not that layout. */
+bool canonicalDigest(const uint8_t *s, size_t n, const std::vector<uint8_t> &invisible,
+	uint64_t &out, size_t &freeNonZero)
+{
+	static const char hostStart[] = "ActivatedWaterboxHost_v1";
+	static const char blockMagic[] = "ActivatedMemoryBlock";
+	const size_t brkAt = (sizeof hostStart - 1) + 10 + 13;
+	const size_t head = brkAt + sizeof(uintptr_t) + 9 + 32;
+	const size_t maps = head + (sizeof blockMagic - 1) + 32 + 2 * sizeof(uintptr_t);
+	if (n < maps || std::memcmp(s, hostStart, sizeof hostStart - 1) != 0
+		|| std::memcmp(s + head, blockMagic, sizeof blockMagic - 1) != 0) return false;
+	uintptr_t size = 0;
+	std::memcpy(&size, s + maps - sizeof(uintptr_t), sizeof(uintptr_t));
+	const size_t npages = static_cast<size_t>(size >> 12);
+	if (maps + 2 * npages > n) return false;
+	const std::hash<std::string_view> hash;
+	auto view = [&](size_t at, size_t len) { return std::string_view(reinterpret_cast<const char *>(s) + at, len); };
+	const uint8_t *const status = s + maps;
+	const uint8_t *const dirty = s + maps + npages;
+	uint64_t h = hash(view(maps, npages)) ^ (hash(view(brkAt, sizeof(uintptr_t))) * 0x9e3779b97f4a7c15ull);
+	size_t at = maps + 2 * npages;
+	freeNonZero = 0;
+	for (size_t i = 0; i < npages; i++)
+	{
+		if (!dirty[i]) continue;
+		if (i < invisible.size() && invisible[i]) continue;
+		if (at + 4096 > n) return false;
+		const uint8_t *const page = s + at;
+		at += 4096;
+		bool zero = true;
+		for (size_t k = 0; k < 4096; k++) if (page[k] != 0) { zero = false; break; }
+		if (zero) continue;
+		if (status[i] == 0) { freeNonZero++; continue; }
+		h = (h * 1099511628211ull) ^ (hash(view(at - 4096, 4096)) + i);
+	}
+	out = (h * 1099511628211ull) ^ hash(view(at, n - at));   /* the thread set and the end */
+	return true;
+}
+
+/* how many blocks differ, and the offsets of the first few */
+std::string describeDifference(const std::vector<uint64_t> &a, const std::vector<uint64_t> &b, size_t &count)
+{
+	count = 0;
+	std::string where;
+	if (a.empty() || b.empty() || a[0] != b[0]) where = " (sizes differ)";
+	const size_t n = a.size() < b.size() ? a.size() : b.size();
+	for (size_t i = 1; i < n; i++)
+	{
+		if (a[i] == b[i]) continue;
+		if (++count <= 4)
+		{
+			char at[32];
+			std::snprintf(at, sizeof at, " 0x%llx", (unsigned long long)((i - 1) * 4096));
+			where += at;
+		}
+	}
+	return where;
+}
+} // namespace
+
+StateHistory::MachineDigest StateHistory::machineDigest(bool &ok)
+{
+	/* one hash per 4 KB of the state, so a mismatch can say where */
+	ok = false;
+	MachineDigest d;
+	if (m_host == nullptr || m_host->wbx_save_state == nullptr) return d;
+	finishPlan();
+	Bytes bytes;
+	if (m_lastAnchorBytes != 0) bytes.reserve(m_lastAnchorBytes);
+	ByteSink sink{ &bytes };
+	WbxReturn r{};
+	m_host->wbx_save_state(m_obj, sinkWrite, reinterpret_cast<uintptr_t>(&sink), &r);
+	if (!r.ok()) return d;
+	ok = true;
+	static constexpr size_t kBlock = 4096;
+	d.blocks.reserve(bytes.size() / kBlock + 2);
+	d.blocks.push_back(bytes.size());
+	for (size_t at = 0; at < bytes.size(); at += kBlock)
+	{
+		const size_t n = bytes.size() - at < kBlock ? bytes.size() - at : kBlock;
+		d.blocks.push_back(std::hash<std::string_view>{}(
+			std::string_view(reinterpret_cast<const char *>(bytes.data()) + at, n)));
+	}
+	if (m_verifyInvisible.empty() && m_host->wbx_get_page_len != nullptr && m_host->wbx_get_page_data != nullptr)
+	{
+		/* fixed at the seal, so asked once */
+		WbxReturn pr{};
+		m_host->wbx_get_page_len(m_obj, &pr);
+		const size_t pages = pr.ok() ? static_cast<size_t>(pr.data) : 0;
+		m_verifyInvisible.assign(pages, 0);
+		for (size_t i = 0; i < pages; i++)
+		{
+			WbxReturn qr{};
+			m_host->wbx_get_page_data(m_obj, i, &qr);
+			if (qr.ok() && (qr.data & 0x40) != 0) m_verifyInvisible[i] = 1;
+		}
+	}
+	d.canonicalOk = !m_verifyInvisible.empty()
+		&& canonicalDigest(bytes.data(), bytes.size(), m_verifyInvisible, d.canonical, d.freeNonZero);
+	return d;
+}
+
+void StateHistory::verifyStored(int64_t frame)
+{
+	bool ok = false;
+	MachineDigest digest = machineDigest(ok);
+	if (ok) m_verify[frame] = std::move(digest);
+	else m_verify.erase(frame);
+}
+
+void StateHistory::verifyRestored(int64_t frame, int64_t anchorFrame, int64_t steps, bool spilled)
+{
+	const auto it = m_verify.find(frame);
+	if (it == m_verify.end()) return;
+	bool ok = false;
+	const MachineDigest digest = machineDigest(ok);
+	if (!ok) return;
+	m_verifyChecked++;
+	const MachineDigest &stored = it->second;
+	if (digest.blocks != stored.blocks)
+	{
+		const bool sameMachine = digest.canonicalOk && stored.canonicalOk && digest.canonical == stored.canonical;
+		if (sameMachine) m_verifyBookkeeping++;
+		else m_verifyWrong++;
+		size_t count = 0;
+		const std::string where = describeDifference(stored.blocks, digest.blocks, count);
+		fprintf(stderr, "[history-verify] restore %lld (anchor %lld + %lld deltas%s): %s;"
+			" %zu of %zu blocks differ, at%s; free pages holding bytes: stored %zu, restored %zu"
+			" (%llu wrong, %llu bookkeeping only, of %llu checked)\n",
+			(long long)frame, (long long)anchorFrame, (long long)steps, spilled ? ", from disk" : "",
+			!digest.canonicalOk || !stored.canonicalOk ? "the layout could not be read"
+				: sameMachine ? "the same machine, only the dirty bookkeeping differs"
+				: "is NOT the machine stored there",
+			count, digest.blocks.size() - 1, where.c_str(), stored.freeNonZero, digest.freeNonZero,
+			(unsigned long long)m_verifyWrong, (unsigned long long)m_verifyBookkeeping,
+			(unsigned long long)m_verifyChecked);
+		fflush(stderr);
+	}
+	else if (m_verifyChecked == 1 || m_verifyChecked % 100 == 0)
+	{
+		fprintf(stderr, "[history-verify] %llu restores checked, %llu wrong, %llu bookkeeping only\n",
+			(unsigned long long)m_verifyChecked, (unsigned long long)m_verifyWrong,
+			(unsigned long long)m_verifyBookkeeping);
+		fflush(stderr);
+	}
+}
+
 void StateHistory::finishPlan()
 {
 	if (!m_planPending) return;
@@ -1154,8 +1380,17 @@ void StateHistory::captureOnce(int64_t frame, const uint8_t *note, size_t noteLe
 	 * on nss102. What changes the timeline says so itself, with invalidateAfter:
 	 * every TAStudio edit, recording over an entry, input that is not the
 	 * movie's. So nothing is stored and nothing is dropped, and the epoch is let
-	 * go - the next frame's delta is measured from where the machine stands
-	 * then, which is the history's own last frame by the time it matters. */
+	 * go. A replay that goes on past the stretch's end starts an anchor there
+	 * rather than a delta: see beforeAdvance. */
+	/* A machine that was already past an edit when it was made (issue #68) is
+	 * playing the timeline the edit replaced, and nothing it reaches belongs
+	 * in the history - until a restore or a load puts it back at or before the
+	 * edit, which is the only way a frame this low can arrive. */
+	if (m_pastEditAt >= 0)
+	{
+		if (frame > m_pastEditAt + 1) { m_epochOpen = false; return; }
+		m_pastEditAt = -1;
+	}
 	if (!m_segments.empty() && frame <= m_segments.back().lastFrame())
 	{
 		m_epochOpen = false;
@@ -1179,6 +1414,7 @@ void StateHistory::captureOnce(int64_t frame, const uint8_t *note, size_t noteLe
 	 * kept. */
 	if (m_epochOpen && m_nearStride > 1 && !m_segments.empty()
 		&& !m_segments.back().spilled
+		&& m_epochFrame == m_segments.back().lastFrame()
 		&& m_segments.back().lastFrame() < frame
 		&& frame - m_segments.back().lastFrame() < m_nearStride
 		&& hasRoom(m_segments.back()))
@@ -1210,9 +1446,15 @@ void StateHistory::captureOnce(int64_t frame, const uint8_t *note, size_t noteLe
 		}
 	}
 
+	/* A delta is what changed since its epoch was marked, so it continues the
+	 * stretch only if it was marked ON the stretch's last frame. Pushed after
+	 * any other it describes a machine that never existed - which is what
+	 * issue #68 was: an epoch marked past an edit, pushed after the frame the
+	 * edit cut the stretch back to, and a heap the guest aborted on later. */
 	const bool wantDelta = m_epochOpen
 		&& !m_segments.empty()
 		&& !m_segments.back().spilled
+		&& m_epochFrame == m_segments.back().lastFrame()
 		&& m_segments.back().lastFrame() < frame
 		&& hasRoom(m_segments.back());
 	m_epochOpen = false;
@@ -1229,6 +1471,8 @@ void StateHistory::captureOnce(int64_t frame, const uint8_t *note, size_t noteLe
 			m_segments.back().links.push_back(Link{ Body::make(std::move(bytes)), frame, std::move(carried) });
 			m_segments.back().bytes += added;
 			m_bytes += added;
+			m_machineStored = true;
+			if (historyVerify()) verifyStored(frame);
 			const size_t links = m_segments.back().links.size();
 			coarsen(frame);
 			const double tCoarsened = historyTrace() ? nowSeconds() : 0.0;
@@ -1261,6 +1505,8 @@ void StateHistory::captureOnce(int64_t frame, const uint8_t *note, size_t noteLe
 	finishPlan();
 	if (captureAnchorPlanned(frame, carried))
 	{
+		m_machineStored = true;
+		if (historyVerify()) verifyStored(frame);
 		coarsen(frame);
 		evict();
 		evictDisk();
@@ -1288,6 +1534,8 @@ void StateHistory::captureOnce(int64_t frame, const uint8_t *note, size_t noteLe
 		fflush(stderr);
 	}
 	m_segments.push_back(std::move(seg));
+	m_machineStored = true;
+	if (historyVerify()) verifyStored(frame);
 	coarsen(frame);
 	evict();
 	evictDisk();
@@ -1334,6 +1582,27 @@ void StateHistory::invalidateAfter(int64_t frame)
 {
 	/* the stretch being filled may be one of the ones about to go */
 	if (m_planPending && m_planFrame > frame) finishPlan();
+	/* The machine itself past the edit: what it plays from here is the old
+	 * timeline, until a restore or a load puts it at or before the edit. Its
+	 * epoch was marked beyond the cut, so that goes too. */
+	if (m_machineFrame > frame)
+	{
+		if (m_pastEditAt < 0 || frame < m_pastEditAt) m_pastEditAt = frame;
+		m_epochOpen = false;
+		m_machineStored = false;
+	}
+	else if (m_machineFrame < 0 && (m_editWhileUnknown < 0 || frame < m_editWhileUnknown))
+	{
+		m_editWhileUnknown = frame;
+	}
+	if (historyVerify())
+	{
+		for (auto it = m_verify.begin(); it != m_verify.end();)
+		{
+			if (it->first > frame) it = m_verify.erase(it);
+			else ++it;
+		}
+	}
 	while (!m_segments.empty() && m_segments.back().anchorFrame > frame)
 	{
 		forgetSegment(m_segments.size() - 1);
@@ -2206,6 +2475,10 @@ bool StateHistory::restoreFailed(const Segment *seg, std::string &error, int64_t
 	}
 	if (landedOn != nullptr) *landedOn = consistent ? anchorFrame : -1;
 	m_epochOpen = false;
+	m_machineFrame = consistent ? anchorFrame : -1;
+	m_machineStored = consistent;
+	m_pastEditAt = -1;
+	m_editWhileUnknown = -1;
 	return false;
 }
 
@@ -2239,6 +2512,11 @@ bool StateHistory::restore(int64_t frame, std::string &error, int64_t *landedOn)
 				(nowSeconds() - t0) * 1000);
 		}
 		m_epochOpen = false;
+		m_machineFrame = frame;
+		m_machineStored = true;
+		m_pastEditAt = -1;
+		m_editWhileUnknown = -1;
+		if (historyVerify()) verifyRestored(frame, seg->anchorFrame, steps, true);
 		return true;
 	}
 
@@ -2275,6 +2553,11 @@ bool StateHistory::restore(int64_t frame, std::string &error, int64_t *landedOn)
 	}
 	/* whatever epoch was marked described the machine we have just left */
 	m_epochOpen = false;
+	m_machineFrame = frame;
+	m_machineStored = true;
+	m_pastEditAt = -1;
+	m_editWhileUnknown = -1;
+	if (historyVerify()) verifyRestored(frame, seg->anchorFrame, steps, false);
 	return true;
 }
 

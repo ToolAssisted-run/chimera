@@ -28,6 +28,7 @@
 
 #include <cstdint>
 #include <cstdio>
+#include <unordered_map>
 #include <functional>
 #include <set>
 #include <string>
@@ -243,6 +244,19 @@ public:
 	 * CAN be trusted on rather than half way through a chain, and `landedOn`
 	 * (when given) says which - see the definition. */
 	bool restore(int64_t frame, std::string &error, int64_t *landedOn = nullptr);
+
+	/* Called before something outside the history rewrites the machine - a
+	 * direct load. A state still being copied in the background is finished
+	 * first, because the drainer must not be reading pages the load replaces;
+	 * and the open epoch is let go, because it measures a machine that is about
+	 * to be gone. Where the load leaves the machine, the next capture says. */
+	void beforeLoad();
+
+	/* Holds the near band's stride where it is put, rather than where the
+	 * measured cost of capturing would move it. For tests: a fake machine costs
+	 * nothing to capture, so the tuner always brings the stride back to one and
+	 * the frames a stride skips would never be exercised. 0 gives it back. */
+	void fixNearStride(int64_t stride);
 
 	/* Writes the history to a file, and reads one back.
 	 *
@@ -613,6 +627,33 @@ private:
 	uint64_t m_bytes = 0;
 	std::vector<Segment> m_segments;   /* ordered by anchorFrame, never overlapping */
 	bool m_epochOpen = false;          /* an epoch is marked and a delta is wanted */
+	int64_t m_epochFrame = -1;         /* the frame the machine stood on when it was marked */
+	int64_t m_machineFrame = -1;       /* where the machine stands, as the last capture or
+	                                    * restore left it; -1 once a load from outside has */
+	bool m_machineStored = false;      /* and the machine IS the stored copy of that frame -
+	                                    * captured into the history or restored from it, not
+	                                    * emulated to it again */
+	int64_t m_pastEditAt = -1;         /* an edit made behind the machine: until the machine is
+	                                    * back at or before it, it is playing the old timeline */
+	int64_t m_editWhileUnknown = -1;   /* an edit made while where the machine stands was not
+	                                    * known (after a load): the next capture says which side */
+
+	/* CHIMERA_HISTORY_VERIFY: see machineDigest */
+	struct MachineDigest
+	{
+		std::vector<uint64_t> blocks;   /* the state's size, then a hash per 4 KB */
+		uint64_t canonical = 0;         /* the machine, bookkeeping aside: see canonicalDigest */
+		bool canonicalOk = false;
+		size_t freeNonZero = 0;
+	};
+	std::unordered_map<int64_t, MachineDigest> m_verify;   /* stored frame -> its machine */
+	uint64_t m_verifyChecked = 0;
+	uint64_t m_verifyWrong = 0;
+	uint64_t m_verifyBookkeeping = 0;
+	std::vector<uint8_t> m_verifyInvisible;   /* the pages a state never carries, asked of the host once */
+	MachineDigest machineDigest(bool &ok);
+	void verifyStored(int64_t frame);
+	void verifyRestored(int64_t frame, int64_t anchorFrame, int64_t steps, bool spilled);
 
 	/* Defaults for 60 frames a second, and conservative on purpose: they are
 	 * what a core gets before anyone has measured it. See the band table in
@@ -720,6 +761,7 @@ private:
 	 * tenth of a second. */
 	static constexpr double kCostShare = 0.15;
 	int64_t m_nearStride = 1;
+	bool m_strideFixed = false;        /* fixNearStride: the tuner leaves it alone */
 	double m_captureSeconds = 0;       /* exponential means, in seconds */
 	double m_wallSeconds = 0;
 	double m_lastCaptureEnded = 0;

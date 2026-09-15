@@ -19,6 +19,7 @@
 #include <fstream>
 #include <fcntl.h>
 #include <unistd.h>
+#include <map>
 #include <string>
 #include <new>
 #include <vector>
@@ -1654,6 +1655,216 @@ int main(void)
 			assert(h.restore(h.nearest(60), error));
 			h.invalidateAfter(60);
 			assert(h.nearest(INT64_MAX) <= 60);
+			std::filesystem::remove_all(dir);
+		}
+	}
+
+	{ // An edit BEHIND the machine, and the machine goes on (issue #68).
+	  //
+	  // TAStudio can change a frame before the playhead and let a frame run
+	  // before it seeks back. The epoch that frame's delta measures was marked
+	  // where the machine stood, past the edit - and the invalidation had just
+	  // cut the stretch back to the edit. The delta was pushed onto it anyway,
+	  // so a restore through it applied what one frame changed onto a machine
+	  // many frames earlier: on Ruffle a heap musl then aborted on, a few ops
+	  // later, reproducibly. And what those frames are is the OLD timeline, so
+	  // even stored whole they would not belong.
+		const chimera::HostApi api = fakeHost();
+		g_machine = Machine{};
+		chimera::StateHistory h;
+		h.configure(&api, nullptr, 1u << 20);
+		h.bands(1000, 1000, 1, 1, 0);
+		std::vector<std::array<uint8_t, Machine::kCells>> truth(1);
+		std::memcpy(truth[0].data(), g_machine.cell, Machine::kCells);
+		h.capture(0);
+		auto step = [&](int64_t f) {
+			h.beforeAdvance();
+			advance(f);
+			std::array<uint8_t, Machine::kCells> at{};
+			std::memcpy(at.data(), g_machine.cell, Machine::kCells);
+			if (f < static_cast<int64_t>(truth.size())) truth[static_cast<size_t>(f)] = at;
+			else truth.push_back(at);
+			h.capture(f);
+		};
+		for (int64_t f = 1; f <= 30; f++) step(f);
+
+		/* the playhead on 30, the epoch for 31 already marked, and the edit at 10 */
+		h.beforeAdvance();
+		h.invalidateAfter(10);
+		advance(31);
+		std::array<uint8_t, Machine::kCells> at31{};
+		std::memcpy(at31.data(), g_machine.cell, Machine::kCells);
+		truth.push_back(at31);
+		h.capture(31);
+		step(32);
+		step(33);
+		assert(h.nearest(INT64_MAX) == 10);    /* nothing of the old timeline is kept */
+		for (int64_t f = 0; f <= 33; f++)
+		{
+			if (h.nearest(f) != f) continue;
+			assert(h.restore(f, error));
+			assert(std::memcmp(g_machine.cell, truth[static_cast<size_t>(f)].data(), Machine::kCells) == 0);
+		}
+
+		/* back on the timeline, what follows is stored again - as deltas */
+		assert(h.restore(10, error));
+		for (int64_t f = 11; f <= 16; f++)
+		{
+			step(f);
+			assert(h.nearest(f) == f);
+		}
+		assert(h.anchors() == 1);
+		for (int64_t f = 0; f <= 16; f++)
+		{
+			assert(h.restore(f, error));
+			assert(std::memcmp(g_machine.cell, truth[static_cast<size_t>(f)].data(), Machine::kCells) == 0);
+		}
+	}
+
+	{ // TAStudio-shaped use at random, every restore checked (issue #68).
+	  //
+	  // A frame here depends on the input just before it and on the machine it
+	  // starts from, so a frame kept from a timeline an edit replaced, a delta
+	  // pushed across a gap, a merge of the wrong pair and a spilled stretch read
+	  // back wrong all come back as a machine the current inputs do not give.
+	  //
+	  // The NOISY configurations are a GPU core: emulating a frame again does not
+	  // write the same bytes (the picture read back into guest memory), so the
+	  // machine at a frame differs between passes. There the check is against
+	  // what was STORED at that frame, and what it catches is a delta measured on
+	  // one pass pushed onto a frame stored by another - a machine that is half
+	  // of each, which is what a guest heap aborts on.
+		const chimera::HostApi api = fakeHost();
+		struct Config { uint64_t budget; int64_t stride; bool spill; bool noisy; };
+		const Config configs[] = {
+			{ 1u << 20, 1, false, false }, { 1u << 20, 3, false, false },
+			{ 6000, 1, true, false }, { 6000, 4, true, false },
+			{ 1u << 20, 1, false, true }, { 6000, 3, true, true },
+		};
+		for (const Config &cfg : configs)
+		{
+			const std::string dir = "work-history-fuzz";
+			std::filesystem::remove_all(dir);
+			std::filesystem::create_directories(dir);
+			g_machine = Machine{};
+			std::vector<uint8_t> input(4096, 0);
+			uint8_t pass = 1;   /* which emulation pass the machine is on: a restore or a load starts another */
+			auto stepCells = [&](uint8_t *cell, int64_t f, bool live) {
+				const uint8_t in = input[static_cast<size_t>(f - 1)];
+				for (int k = 0; k < 3; k++)
+				{
+					const size_t at = static_cast<size_t>((f * 7 + k * 11 + in * 5) % Machine::kCells);
+					cell[at] = static_cast<uint8_t>(cell[(at + 13) % Machine::kCells] + f + in);
+				}
+				if (live && cfg.noisy) cell[static_cast<size_t>((f * 29) % Machine::kCells)] = pass;
+			};
+			auto truthAt = [&](int64_t f) {
+				std::array<uint8_t, Machine::kCells> m{};
+				for (int64_t i = 1; i <= f; i++) stepCells(m.data(), i, false);
+				return m;
+			};
+			chimera::StateHistory h;
+			h.configure(&api, nullptr, cfg.budget);
+			h.bands(8, 40, 4, 16, 50);
+			if (cfg.spill) h.spillTo(dir.c_str());
+			h.fixNearStride(cfg.stride);
+			int64_t frame = 0;
+			h.capture(0);
+			/* what the machine WAS when each frame was stored */
+			std::map<int64_t, std::array<uint8_t, Machine::kCells>> storedAs;
+			storedAs[0] = std::array<uint8_t, Machine::kCells>{};
+			auto play = [&](int64_t to) {
+				while (frame < to)
+				{
+					h.beforeAdvance();
+					frame++;
+					stepCells(g_machine.cell, frame, true);
+					const int64_t reached = h.nearest(INT64_MAX);
+					h.capture(frame);
+					if (frame > reached && h.nearest(frame) == frame)
+					{
+						std::array<uint8_t, Machine::kCells> now{};
+						std::memcpy(now.data(), g_machine.cell, Machine::kCells);
+						storedAs[frame] = now;
+					}
+				}
+			};
+			uint32_t rng = 0x68u + static_cast<uint32_t>(cfg.budget) + static_cast<uint32_t>(cfg.stride) + (cfg.noisy ? 7u : 0u);
+			auto rnd = [&](int64_t lo, int64_t hi) {
+				rng = rng * 1664525u + 1013904223u;
+				return lo + static_cast<int64_t>((rng >> 8) % static_cast<uint32_t>(hi - lo + 1));
+			};
+			std::vector<std::string> said;   /* what was done, for when a restore is wrong */
+			auto did = [&](const std::string &t) { said.push_back(t); };
+			auto checkRestore = [&](int64_t s) {
+				assert(h.restore(s, error));
+				frame = s;
+				pass++;
+				const auto was = storedAs.find(s);
+				const bool built = was != storedAs.end()
+					&& std::memcmp(was->second.data(), g_machine.cell, Machine::kCells) != 0;
+				const bool timeline = !cfg.noisy
+					&& std::memcmp(g_machine.cell, truthAt(s).data(), Machine::kCells) != 0;
+				if (!built && !timeline) return;
+				std::fprintf(stderr, "fuzz (budget %llu, stride %lld, spill %d, noisy %d): restore %lld is wrong - %s\n",
+					(unsigned long long)cfg.budget, (long long)cfg.stride, cfg.spill ? 1 : 0, cfg.noisy ? 1 : 0,
+					(long long)s, built ? "not the machine that was stored" : "a machine from another timeline");
+				for (size_t i = said.size() > 14 ? said.size() - 14 : 0; i < said.size(); i++)
+					std::fprintf(stderr, "  %s\n", said[i].c_str());
+				assert(!"a restore built a machine that was never there");
+			};
+			int restores = 0;
+			for (int op = 0; op < 3000; op++)
+			{
+				switch (rnd(0, 6))
+				{
+				case 0: case 1: { /* a seek the way TAStudio does it: from the state before the target */
+					const int64_t target = rnd(1, 1500);
+					const int64_t s = h.nearest(target - 1);
+					did("seek " + std::to_string(target) + " from " + std::to_string(frame) + " via " + std::to_string(s));
+					if (s >= 0 && (target < frame || s > frame)) { checkRestore(s); restores++; }
+					if (target > frame) play(target);
+					break;
+				}
+				case 2: { /* an edit, behind the machine or ahead of it, and maybe a frame or two before anything else */
+					const int64_t f = rnd(frame > 100 ? frame - 100 : 0, frame + 100);
+					input[static_cast<size_t>(f)] = static_cast<uint8_t>(input[static_cast<size_t>(f)] + 1 + rnd(0, 2));
+					h.invalidateAfter(f);
+					storedAs.erase(storedAs.upper_bound(f), storedAs.end());
+					did("edit " + std::to_string(f) + " at " + std::to_string(frame));
+					if (rnd(0, 1) == 1) { play(frame + rnd(1, 3)); did("  played on to " + std::to_string(frame)); }
+					break;
+				}
+				case 3: { /* a branch: the machine from outside the history, on the current timeline */
+					const int64_t x = rnd(0, 1500);
+					h.beforeLoad();
+					const auto m = truthAt(x);
+					std::memcpy(g_machine.cell, m.data(), Machine::kCells);
+					frame = x;
+					pass++;
+					did("branch " + std::to_string(x));
+					break;
+				}
+				case 4:
+					play(frame + rnd(1, 200));
+					did("play to " + std::to_string(frame));
+					break;
+				default: { /* one back */
+					const int64_t back = frame - 1;
+					const int64_t s = h.nearest(back > 0 ? back - 1 : 0);
+					did("back to " + std::to_string(back) + " via " + std::to_string(s));
+					if (s >= 0 && back > 0) { checkRestore(s); restores++; play(back); }
+					break;
+				}
+				}
+			}
+			assert(restores > 100);
+			/* and everything it still claims, merged, spilled or not */
+			for (int64_t f = 0; f <= 1800; f++)
+			{
+				if (h.nearest(f) != f) continue;
+				checkRestore(f);
+			}
 			std::filesystem::remove_all(dir);
 		}
 	}

@@ -1511,6 +1511,9 @@ const uint8_t *ce_session_save_state(ce_session *s, uint64_t *len_out)
 int32_t ce_session_load_state(ce_session *s, const uint8_t *data, uint64_t len)
 {
 	s->error.clear();
+	/* a load rewrites the machine the history may still be copying an anchor of
+	 * in the background (a branch loaded right after one was taken) */
+	s->history.beforeLoad();
 	ByteStream stream{ data, len };
 	chimera::WbxReturn r{};
 	s->host->wbx_load_state(s->obj, streamRead, reinterpret_cast<uintptr_t>(&stream), &r); // see save re: no bracket
