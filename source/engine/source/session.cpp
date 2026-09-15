@@ -2154,6 +2154,12 @@ void ce_session_greenzone_disk_budget(ce_session *s, uint64_t budget_bytes)
 	s->history.diskBudget(budget_bytes);
 }
 
+void ce_session_greenzone_max_near_stride(ce_session *s, int64_t max_stride)
+{
+	if (s == nullptr) return;
+	s->history.maxNearStride(max_stride);
+}
+
 uint64_t ce_session_greenzone_disk_bytes(const ce_session *s)
 {
 	if (s == nullptr) return 0;

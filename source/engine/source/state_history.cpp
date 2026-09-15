@@ -170,6 +170,7 @@ void StateHistory::clear()
 	m_epochOpen = false;
 	m_newest = -1;
 	m_nearStride = 1;
+	m_tuner.stride = 1;
 	m_captureSeconds = 0;
 	m_wallSeconds = 0;
 	m_lastCaptureEnded = 0;
@@ -946,10 +947,29 @@ void StateHistory::fixNearStride(int64_t stride)
 {
 	m_strideFixed = stride > 0;
 	if (stride > 0) m_nearStride = stride;
+	m_tuner.stride = m_nearStride;
+}
+
+void StateHistory::maxNearStride(int64_t cap)
+{
+	m_tuner.setMaxStride(cap);
+	if (!m_strideFixed && m_nearStride > m_tuner.maxStride) m_nearStride = m_tuner.maxStride;
 }
 
 void StateHistory::tuneStride(double captureSeconds, double wallSeconds)
 {
+	/* CHIMERA_NEAR_STRIDE=n pins the near band's stride, for measuring what a
+	 * stride costs against what it keeps. Not a setting: nothing reads it but
+	 * a person timing runs. */
+	static const long long forced = [] {
+		const char *e = getenv("CHIMERA_NEAR_STRIDE");
+		return e != nullptr ? std::atoll(e) : 0LL;
+	}();
+	if (forced > 0)
+	{
+		m_nearStride = forced;
+		return;
+	}
 	if (m_strideFixed) return;
 	if (wallSeconds <= 0 || captureSeconds < 0) return;
 	const double a = 0.05;   /* the mean follows a couple of hundred frames */
@@ -964,26 +984,17 @@ void StateHistory::tuneStride(double captureSeconds, double wallSeconds)
 	 * frame and a tenth of that to store is not a machine anybody is waiting
 	 * for, and the near band's promise - every frame, where the work is - is
 	 * worth more than the tenth. Only a capture measured in milliseconds can
-	 * move the stride up. */
-	static constexpr double kWorthThinning = 0.002;
+	 * move the stride up - and never past the cap (stride_tuner.h). */
 	const double share = m_captureSeconds / m_wallSeconds;
-	int64_t want = m_nearStride;
-	if (share > kCostShare && m_captureSeconds > kWorthThinning)
-	{
-		want = static_cast<int64_t>(m_nearStride * (share / kCostShare) + 0.5);
-	}
-	else if ((share < kCostShare / 3 || m_captureSeconds <= kWorthThinning) && m_nearStride > 1)
-	{
-		want = m_nearStride - 1;
-	}
-	if (want < 1) want = 1;
-	if (want > 32) want = 32;          /* past this the replay is the cost */
+	m_tuner.stride = m_nearStride;
+	const int64_t want = m_tuner.decide(m_captureSeconds, m_wallSeconds);
 	if (want == m_nearStride) return;
 	if (historyTrace())
 	{
 		fprintf(stderr, "[history] capture is %.0f%% of the run: the near band keeps"
-			" one frame in %lld rather than one in %lld\n",
-			share * 100, (long long)want, (long long)m_nearStride);
+			" one frame in %lld rather than one in %lld%s\n",
+			share * 100, (long long)want, (long long)m_nearStride,
+			want == m_tuner.maxStride && want > m_nearStride ? " (the cap)" : "");
 		fflush(stderr);
 	}
 	m_nearStride = want;

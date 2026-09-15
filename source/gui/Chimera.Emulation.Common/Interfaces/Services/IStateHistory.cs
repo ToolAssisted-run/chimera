@@ -20,6 +20,12 @@ namespace Chimera.Emulation.Common
 		/// <summary>Bytes to keep in memory; 0 turns it off and drops everything.</summary>
 		void Enable(long budgetBytes);
 
+		/// <summary>
+		/// At most one frame in this many is kept right behind the playhead (1 to 32).
+		/// The history may keep more; it never thins past this.
+		/// </summary>
+		void MaxNearStride(int stride);
+
 		/// <summary>Frames it can produce - not the number of stored objects.</summary>
 		long Count { get; }
 

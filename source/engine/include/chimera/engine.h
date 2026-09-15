@@ -1250,6 +1250,16 @@ CE_API void ce_session_greenzone_spill(ce_session *s, const char *dir);
  */
 CE_API void ce_session_greenzone_disk_budget(ce_session *s, uint64_t budget_bytes);
 
+/* The widest the near band's stride may grow: at most one frame in this many
+ * is kept right behind the playhead, 1 to 32, 4 by default.
+ *
+ * The history thins the near band when storing every frame costs too much of
+ * the run, and on a heavy core it used to climb to one in 32 - the frames a
+ * person rewinds to were then the sparsest ones it held. A rewind near the
+ * playhead replays at most max_stride - 1 frames; each step down costs speed
+ * (docs/state-manager.md, "How close the near band stays"). */
+CE_API void ce_session_greenzone_max_near_stride(ce_session *s, int64_t max_stride);
+
 /* What the stretches now in the spill file weigh. */
 CE_API uint64_t ce_session_greenzone_disk_bytes(const ce_session *s);
 

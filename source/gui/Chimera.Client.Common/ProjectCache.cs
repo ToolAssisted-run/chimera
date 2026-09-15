@@ -233,7 +233,10 @@ namespace Chimera.Client.Common
 		{
 			public int? MemoryMb { get; init; }
 
-			public bool Any => MemoryMb.HasValue;
+			/// <summary>How close the greenzone stays behind the playhead, where it differs.</summary>
+			public int? MaxNearStride { get; init; }
+
+			public bool Any => MemoryMb.HasValue || MaxNearStride.HasValue;
 		}
 
 		/// <summary>
@@ -275,6 +278,7 @@ namespace Chimera.Client.Common
 				return new ProjectBudgets
 				{
 					MemoryMb = (int?) root["memoryMb"],
+					MaxNearStride = (int?) root["maxNearStride"],
 				};
 			}
 			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException
@@ -302,6 +306,7 @@ namespace Chimera.Client.Common
 				}
 				JObject root = new();
 				if (budgets.MemoryMb.HasValue) root["memoryMb"] = budgets.MemoryMb.Value;
+				if (budgets.MaxNearStride.HasValue) root["maxNearStride"] = budgets.MaxNearStride.Value;
 				root.Remove("diskMb");   /* a budget earlier builds kept; nothing reads it now */
 				Ensure(projectId);
 				File.WriteAllText(path, root.ToString(Formatting.Indented));

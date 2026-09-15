@@ -39,6 +39,7 @@
 #include <atomic>
 #include <mutex>
 
+#include "stride_tuner.h"
 #include "host_dyn.hpp"
 #include "work_thread.hpp"
 
@@ -257,6 +258,9 @@ public:
 	 * nothing to capture, so the tuner always brings the stride back to one and
 	 * the frames a stride skips would never be exercised. 0 gives it back. */
 	void fixNearStride(int64_t stride);
+	/* The widest the near band's stride may grow, 1 to 32 (a setting: see
+	 * stride_tuner.h). The stride follows a lowered cap at once. */
+	void maxNearStride(int64_t cap);
 
 	/* Writes the history to a file, and reads one back.
 	 *
@@ -759,7 +763,8 @@ private:
 	 * costs, not between bytes and anything: a delta worth 20MB is dear on a
 	 * core whose frame is three milliseconds and cheap on one whose frame is a
 	 * tenth of a second. */
-	static constexpr double kCostShare = 0.15;
+	static constexpr double kCostShare = CeStrideTuner::kCostShare;
+	CeStrideTuner m_tuner;             /* decides the stride; see stride_tuner.h */
 	int64_t m_nearStride = 1;
 	bool m_strideFixed = false;        /* fixNearStride: the tuner leaves it alone */
 	double m_captureSeconds = 0;       /* exponential means, in seconds */

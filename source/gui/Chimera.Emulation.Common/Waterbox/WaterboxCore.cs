@@ -460,6 +460,8 @@ namespace Chimera.Emulation.Common.Waterbox
 
 		public void Enable(long budgetBytes) => _session.GreenzoneEnable((ulong)Math.Max(budgetBytes, 0));
 
+		public void MaxNearStride(int stride) => _session.GreenzoneMaxNearStride(stride);
+
 		public long Count => _session.GreenzoneCount;
 
 		public int Nearest(int frame) => checked((int)_session.GreenzoneNearest(frame));

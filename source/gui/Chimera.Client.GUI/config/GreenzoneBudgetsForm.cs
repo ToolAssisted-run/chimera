@@ -12,13 +12,15 @@ namespace Chimera.Client.GUI
 	/// What a greenzone may weigh: the default for every project, and what one
 	/// project asks for instead.
 	///
-	/// ONE NUMBER, and it is memory. A history holds what fits in it; past it the
+	/// TWO NUMBERS. The first is memory. A history holds what fits in it; past it the
 	/// far band is thinned and then the oldest of it dropped, which costs
 	/// replaying and never work. Nothing is written to disk while a project is
 	/// open - the disk is written when the project is saved (user-decided,
 	/// 2026-09-15; docs/state-manager.md). There used to be a second number, what
 	/// the spill of memory's overflow could weigh on disk; spilling is off, and
-	/// that number went with it.
+	/// that number went with it. The second is how close the greenzone stays
+	/// behind the playhead: at most one frame in that many is kept there
+	/// (user-decided, 2026-09-15; docs/state-manager.md).
 	///
 	/// Reached from the Cache Manager because that is the window somebody is
 	/// already in when they are looking at what a greenzone weighs.
@@ -36,16 +38,25 @@ namespace Chimera.Client.GUI
 		private readonly string? _projectLabel;
 
 		private readonly NumericUpDown _memory;
+		private readonly NumericUpDown _nearStride;
 		private readonly CheckBox? _override;
 		private readonly NumericUpDown? _projectMemory;
+		private readonly NumericUpDown? _projectNearStride;
 
 		/// <summary>The default as the window leaves it.</summary>
 		public int DefaultMemoryMb => (int) _memory.Value;
 
+		/// <summary>The default near-band cap as the window leaves it.</summary>
+		public int DefaultMaxNearStride => (int) _nearStride.Value;
+
 		/// <summary>What the named project asks for, or nothing when it asks for the default.</summary>
 		public ProjectCache.ProjectBudgets ProjectBudgets
 			=> _override is { Checked: true }
-				? new ProjectCache.ProjectBudgets { MemoryMb = (int) _projectMemory!.Value }
+				? new ProjectCache.ProjectBudgets
+				{
+					MemoryMb = (int) _projectMemory!.Value,
+					MaxNearStride = (int) _projectNearStride!.Value,
+				}
 				: new ProjectCache.ProjectBudgets();
 
 		/// <summary>
@@ -69,6 +80,7 @@ namespace Chimera.Client.GUI
 		/// </param>
 		public GreenzoneBudgetsForm(
 			int defaultMemoryMb,
+			int defaultMaxNearStride = 4,
 			string? projectLabel = null,
 			ProjectCache.ProjectBudgets? projectBudgets = null)
 		{
@@ -103,7 +115,15 @@ namespace Chimera.Client.GUI
 
 			_memory = Spin(MovieConfig.MinimumBudgetMb, 1024 * 1024, defaultMemoryMb, 256);
 			AddRow("Keep in memory", _memory, "MB", margin, y, labelWidth, boxWidth, unitWidth, width);
-			y += row + UIHelper.ScaleY(10);
+			y += row;
+
+			_nearStride = Spin(MovieConfig.MinimumNearStride, MovieConfig.MaximumNearStride, defaultMaxNearStride, 1);
+			AddRow("Behind the playhead, 1 frame in", _nearStride, "", margin, y, labelWidth, boxWidth, unitWidth, width);
+			y += row;
+			Controls.Add(Note(
+				"1 keeps every frame and plays slowest. Higher plays faster on a heavy core.",
+				margin, y, width - (2 * margin), UIHelper.ScaleY(32)));
+			y += UIHelper.ScaleY(36) + UIHelper.ScaleY(10);
 
 			if (projectLabel is { Length: > 0 })
 			{
@@ -125,6 +145,12 @@ namespace Chimera.Client.GUI
 				_projectMemory = Spin(MovieConfig.MinimumBudgetMb, 1024 * 1024,
 					known.MemoryMb ?? defaultMemoryMb, 256);
 				AddRow("Keep in memory", _projectMemory, "MB", margin, y, labelWidth, boxWidth, unitWidth, width);
+				y += row;
+
+				_projectNearStride = Spin(MovieConfig.MinimumNearStride, MovieConfig.MaximumNearStride,
+					known.MaxNearStride ?? defaultMaxNearStride, 1);
+				AddRow("Behind the playhead, 1 frame in", _projectNearStride, "",
+					margin, y, labelWidth, boxWidth, unitWidth, width);
 				y += row;
 
 				_override.CheckedChanged += (_, _) => SyncOverride();
@@ -164,6 +190,7 @@ namespace Chimera.Client.GUI
 		private void SyncOverride()
 		{
 			if (_projectMemory is not null) _projectMemory.Enabled = _override is { Checked: true };
+			if (_projectNearStride is not null) _projectNearStride.Enabled = _override is { Checked: true };
 		}
 
 		private void AddRow(string text, NumericUpDown box, string unit, int margin, int y,

@@ -178,6 +178,8 @@ int main(int argc, char **argv)
 	std::string spillDir;
 	int64_t greenzoneMb = 256;
 	int64_t greenzoneDiskMb = 0;
+	std::string greenzoneMap; // where to write the frames the history holds at the end
+	int64_t greenzoneMaxStride = 0; // 0: the engine's default cap
 	std::string recordPath;
 	std::string savedataDir;
 	std::string projectPath;
@@ -259,6 +261,8 @@ int main(int argc, char **argv)
 		else if (arg == "--spill" && i + 1 < argc) spillDir = argv[++i];
 		else if (arg == "--greenzone" && i + 1 < argc) greenzoneMb = std::atoll(argv[++i]);
 		else if (arg == "--greenzone-disk" && i + 1 < argc) greenzoneDiskMb = std::atoll(argv[++i]);
+		else if (arg == "--greenzone-map" && i + 1 < argc) greenzoneMap = argv[++i];
+		else if (arg == "--greenzone-max-stride" && i + 1 < argc) greenzoneMaxStride = std::atoll(argv[++i]);
 		else if (arg == "--stop-at-seek") stopAtSeek = true;
 		else if (arg == "--record" && i + 1 < argc) recordPath = argv[++i];
 		else if (arg == "--settings" && i + 1 < argc) settings = argv[++i];
@@ -577,7 +581,7 @@ int main(int argc, char **argv)
 	/* --rewind-loop needs the history too: it seeks back through it, and a run
 	 * without one fails at the first pass with "no stored state at or before
 	 * the target frame". */
-	if (seekFrame >= 0 || rewindTo >= 0 || !historyIn.empty() || !historyOut.empty())
+	if (seekFrame >= 0 || rewindTo >= 0 || !historyIn.empty() || !historyOut.empty() || !greenzoneMap.empty())
 	{
 		/* Bands before enabling: enabling captures the anchor, and the anchor
 		 * spacing decides whether it is the only one. */
@@ -601,6 +605,7 @@ int main(int argc, char **argv)
 		 * measurement of what the disk costs. */
 		if (!spillDir.empty()) ce_session_greenzone_spill(session, spillDir.c_str());
 		ce_session_greenzone_disk_budget(session, (uint64_t)greenzoneDiskMb << 20);
+		if (greenzoneMaxStride > 0) ce_session_greenzone_max_near_stride(session, greenzoneMaxStride);
 		ce_session_greenzone_enable(session, (uint64_t)greenzoneMb << 20);
 	}
 	/* A history kept from a previous run, which is the thing a reopened project
@@ -906,6 +911,25 @@ int main(int argc, char **argv)
 		{
 			return fail(metaPath, "recorded " + std::to_string(ce_movie_log_count(log))
 				+ " entries for " + std::to_string(frames) + " frames");
+		}
+	}
+
+	/* --greenzone-map: every frame the history can restore without replaying,
+	 * newest first, one per line - the spacing a person sees in TAStudio's
+	 * green rows, read from the engine rather than from the screen. */
+	if (!greenzoneMap.empty())
+	{
+		std::string text;
+		for (int64_t f = ce_session_frame(session); f >= 0;)
+		{
+			const int64_t stored = ce_session_greenzone_nearest(session, f);
+			if (stored < 0) break;
+			text += std::to_string(stored) + "\n";
+			f = stored - 1;
+		}
+		if (!writeWholeFile(greenzoneMap, reinterpret_cast<const uint8_t *>(text.data()), text.size()))
+		{
+			return fail(metaPath, "could not write " + greenzoneMap);
 		}
 	}
 

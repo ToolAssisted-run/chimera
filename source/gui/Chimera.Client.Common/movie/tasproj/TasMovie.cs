@@ -59,6 +59,10 @@ namespace Chimera.Client.Common
 			var memoryMb = Math.Max(
 				budgets.MemoryMb ?? Session.Settings.GreenzoneBudgetMb,
 				MovieConfig.MinimumBudgetMb);
+			// Before enabling, so the first stretch is already held to it.
+			States.MaxNearStride(Math.Min(Math.Max(
+				budgets.MaxNearStride ?? Session.Settings.GreenzoneMaxNearStride,
+				MovieConfig.MinimumNearStride), MovieConfig.MaximumNearStride));
 			States.Enable((long)memoryMb * 1024 * 1024);
 			// Read here and not with the rest of the cache, because until the
 			// emulator arrives there is nowhere to put it. A machine a GPU drew

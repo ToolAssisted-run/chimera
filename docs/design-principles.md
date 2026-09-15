@@ -3327,3 +3327,28 @@ The Ruffle core had its own half of this: old handles dropped lazily after the
 rebuild deleted numbers the new backend had been handed. That is fixed in the
 core (its gl-map.cpp keeps the new backend off the old numbers), because only
 the guest knows which generation a name belongs to.
+
+## The greenzone stays close to the playhead, and how close is a setting (user-decided, 2026-09-15)
+
+Reported while editing a Ruffle project: the greenzone near the last input got
+sparser and sparser as the run went on. The near band's stride tuner thins the
+frames behind the playhead when storing every one costs more than 15% of the
+run, and nothing held it back below one frame in 32. A Ruffle frame is dear to
+store, so it climbed there within a couple of thousand frames and stayed - and
+because the frames further back had been captured before it climbed, the history
+was densest where nobody was working and sparsest where somebody was.
+
+The trade is real, and measured on the user's project on a GTX 1060 over 2500
+frames: every frame 71 s, one in 4 41 s, one in 8 32 s, one in 32 22 s, no
+history 12-18 s. A first attempt that kept a sparser band only when the measured
+capture share fell was wrong about the cost - a stored frame also slows the
+emulation itself, which that share never sees - and ran 2.6 times slower; it was
+thrown away before it shipped.
+
+The user chose a cap of one in four, as a setting beside the memory budget: for
+every project, and per project in the project's cache like the budget, because
+how dense a greenzone can afford to be is a fact about the machine the work is
+done on, not about the movie. The tuner still thins when a frame is dear, but a
+rewind right behind the playhead replays at most three frames. The measurements
+and the misleading share are in docs/state-manager.md, "How close the near band
+stays".

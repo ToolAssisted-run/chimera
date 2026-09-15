@@ -52,6 +52,11 @@ namespace Chimera.Tests.Client.Common.Movie
 		private readonly System.Collections.Generic.HashSet<int> _pins = new();
 		public long BudgetBytes { get; private set; }
 
+		/// <summary>The near-band cap the movie last asked for; 0 until it asks.</summary>
+		public int NearStrideCap { get; private set; }
+
+		public void MaxNearStride(int stride) => NearStrideCap = stride;
+
 		public void Enable(long budgetBytes)
 		{
 			BudgetBytes = budgetBytes;

@@ -79,6 +79,40 @@ namespace Chimera.Tests.Client.GUI
 		}
 
 		/// <summary>
+		/// The near band's cap travels like the budget: a default for every
+		/// project, and this project's own only while its box is ticked
+		/// (user-decided, 2026-09-15).
+		/// </summary>
+		[TestMethod]
+		public void TheNearBandCapIsADefaultAndAProjectSetting()
+		{
+			using (GreenzoneBudgetsForm form = new(defaultMemoryMb: 1024, defaultMaxNearStride: 8))
+			{
+				form.Show();
+				Assert.AreEqual(8, form.DefaultMaxNearStride);
+			}
+
+			using (GreenzoneBudgetsForm form = new(
+				defaultMemoryMb: 1024,
+				defaultMaxNearStride: 4,
+				projectLabel: "a finished run",
+				projectBudgets: new ProjectCache.ProjectBudgets { MaxNearStride = 2 }))
+			{
+				form.Show();
+				Assert.IsTrue(form.ProjectBudgets.Any, "a project that asked keeps asking");
+				Assert.AreEqual(2, form.ProjectBudgets.MaxNearStride);
+				Assert.AreEqual(4, form.DefaultMaxNearStride);
+			}
+
+			/* out of range is clamped rather than refused */
+			using (GreenzoneBudgetsForm form = new(defaultMemoryMb: 1024, defaultMaxNearStride: 99))
+			{
+				form.Show();
+				Assert.AreEqual(MovieConfig.MaximumNearStride, form.DefaultMaxNearStride);
+			}
+		}
+
+		/// <summary>
 		/// A row's label has to stop where its box starts. Reported from use: the
 		/// grey ran on over the number and hid the first digit of it. The rows are
 		/// indented under their caption, so the label began 12 past the margin and
@@ -102,7 +136,7 @@ namespace Chimera.Tests.Client.GUI
 			form.Show();
 
 			var boxes = form.Controls.OfType<NumericUpDown>().ToList();
-			Assert.AreEqual(2, boxes.Count, "one budget for every project, one for this one");
+			Assert.AreEqual(4, boxes.Count, "memory and near-band spacing, for every project and for this one");
 
 			foreach (var box in boxes)
 			{

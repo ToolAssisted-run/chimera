@@ -2114,6 +2114,47 @@ So an anchor now only resets the clock the next delta measures against. On the
 PlayStation 2 run above the near band thins once, for deltas that really are
 expensive on that machine, and then comes back to keeping every frame.
 
+#### How close the near band stays (user-decided, 2026-09-15)
+
+The tuner above thins the near band when storing every frame costs more than
+`kCostShare` of the run. Nothing capped it but 32, and on a heavy core it got
+there and stayed: a user editing a Ruffle project reported that "as I progress,
+the greenzone snapshots are starting to get more and more scattered. They
+should be always closer to the last input". Mapped with `chimera-run
+--greenzone-map` after 2500 frames of that project, the history kept one frame
+in 32 right behind the playhead and one in two a thousand frames back - the
+older ones had been captured before the stride rose, so the frames a person
+rewinds to were the sparsest it held.
+
+What each stride cost, measured on the GTX 1060 with the stride pinned
+(`CHIMERA_NEAR_STRIDE`), 2500 frames, memory budget 2 GB:
+
+| near band | wall time | frames kept in the last 120 |
+|---|---|---|
+| no history | 12-18 s | - |
+| every frame | 71-74 s | 120 |
+| one in 2 | 52 s | 62 |
+| one in 4 | 41 s | 33 |
+| one in 8 | 32 s | 19 |
+| one in 16 | 24 s | 10 |
+| one in 32 | 22 s | 5 |
+
+A sparser band is genuinely faster, and more than the tuner's own number says:
+the share it measures is the time inside a capture, while a stored frame also
+runs slower - miniBox write-tracks the pages it touches - and that lands in the
+emulation. The share stayed near a third from stride 1 to 10 while the run got
+much faster. A first fix that kept a raise only when the share fell undid raises
+that were paying, and ran 2.6 times slower; it was not kept.
+
+So the stride is capped, and the cap is a setting: `GreenzoneMaxNearStride`, 4
+by default, beside the memory budget in the Greenzone budgets window, for every
+project and per project (`budgets.json` in the project's cache directory, like
+the budget - a fact about the machine, not the movie). At 4 a rewind right
+behind the playhead replays at most three frames. The engine takes it as
+`ce_session_greenzone_max_near_stride`; `chimera-run --greenzone-max-stride`
+does the same. The decision itself is `stride_tuner.h`, checked without a
+machine by `test_stride_tuner`.
+
 #### The four defects the testing found
 
 None of these would have been caught by a green unit suite, and each is the
