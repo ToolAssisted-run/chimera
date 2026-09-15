@@ -27,11 +27,10 @@ namespace Chimera.Tests.Client.GUI
 		[TestMethod]
 		public void ItOpensWithoutAProject()
 		{
-			using GreenzoneBudgetsForm form = new(defaultMemoryMb: 1024, defaultDiskMb: 4096);
+			using GreenzoneBudgetsForm form = new(defaultMemoryMb: 1024);
 			form.Show();
 			Assert.AreEqual("Greenzone budgets", form.Text);
 			Assert.AreEqual(1024, form.DefaultMemoryMb);
-			Assert.AreEqual(4096, form.DefaultDiskMb);
 		}
 
 		/// <summary>
@@ -44,7 +43,6 @@ namespace Chimera.Tests.Client.GUI
 		{
 			using GreenzoneBudgetsForm form = new(
 				defaultMemoryMb: 1024,
-				defaultDiskMb: 4096,
 				projectLabel: "a finished run");
 			form.Show();
 			Assert.AreEqual("Greenzone budgets: a finished run", form.Text);
@@ -56,7 +54,6 @@ namespace Chimera.Tests.Client.GUI
 		{
 			using GreenzoneBudgetsForm form = new(
 				defaultMemoryMb: 1024,
-				defaultDiskMb: 4096,
 				projectLabel: LONG_LABEL);
 			form.Show();
 			Assert.IsTrue(
@@ -75,7 +72,6 @@ namespace Chimera.Tests.Client.GUI
 		{
 			using GreenzoneBudgetsForm form = new(
 				defaultMemoryMb: 1024,
-				defaultDiskMb: 4096,
 				projectLabel: "a finished run");
 			form.Config = new Config { UseStaticWindowTitles = true };
 			form.Show();
@@ -99,15 +95,14 @@ namespace Chimera.Tests.Client.GUI
 		[TestMethod]
 		public void ARowLabelDoesNotOverlapItsBox()
 		{
-			// with a project, so the four rows exist: two shared, two for it
+			// with a project, so both rows exist: the default and this project's
 			using GreenzoneBudgetsForm form = new(
 				defaultMemoryMb: 1024,
-				defaultDiskMb: 4096,
 				projectLabel: "a finished run");
 			form.Show();
 
 			var boxes = form.Controls.OfType<NumericUpDown>().ToList();
-			Assert.AreEqual(4, boxes.Count, "two budgets for every project, two for this one");
+			Assert.AreEqual(2, boxes.Count, "one budget for every project, one for this one");
 
 			foreach (var box in boxes)
 			{

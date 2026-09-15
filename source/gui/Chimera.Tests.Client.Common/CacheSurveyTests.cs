@@ -46,6 +46,34 @@ namespace Chimera.Tests.Client.Common
 			File.WriteAllBytes(Path.Combine(dir, name), new byte[bytes]);
 		}
 
+		/// <summary>
+		/// A greenzone lives in memory now (user-decided, 2026-09-15), so the spill files an
+		/// earlier build left in a project's cache are swept when it opens - and only they
+		/// are: the saved history and everything else beside them stay. A project with no
+		/// cache directory has nothing to sweep and must not be given one for asking.
+		/// </summary>
+		[TestMethod]
+		public void OpeningAProjectSweepsTheSpillFilesAndNothingElse()
+		{
+			const string id = "00000000000000af";
+			var dir = ProjectCache.Ensure(id);
+			Fill(dir, "history-spill-4242-1.bin", 1024);
+			Fill(dir, "history-spill-4242-2.bin", 1024);
+			Fill(dir, "history.bin", 2048);
+			Fill(dir, "greenzone.chimeraGreenZone", 128);
+			Fill(dir, "budgets.json", 16);
+
+			Assert.AreEqual(2, ProjectCache.DeleteSpillFiles(id));
+			CollectionAssert.AreEquivalent(
+				new[] { "budgets.json", "greenzone.chimeraGreenZone", "history.bin" },
+				Directory.GetFiles(dir).Select(Path.GetFileName).ToArray());
+			Assert.AreEqual(0, ProjectCache.DeleteSpillFiles(id), "a second sweep finds nothing");
+
+			const string never = "00000000000000bd";
+			Assert.AreEqual(0, ProjectCache.DeleteSpillFiles(never));
+			Assert.IsFalse(Directory.Exists(ProjectCache.DirectoryFor(never)), "sweeping must not create a cache directory");
+		}
+
 		[TestMethod]
 		public void EachKindOfCacheIsFound()
 		{

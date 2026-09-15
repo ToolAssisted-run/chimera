@@ -15,7 +15,6 @@ namespace Chimera.Tests.Client.Common.Movie
 		/// <summary>False, as for a renderer that does not rebuild after a context change.</summary>
 		public bool GpuStatesSurviveTheContext { get; set; }
 
-
 		private BasicServiceProvider _serviceProvider;
 		public IEmulatorServiceProvider ServiceProvider => _serviceProvider;
 
@@ -43,7 +42,7 @@ namespace Chimera.Tests.Client.Common.Movie
 
 		// ---- IStateHistory ----
 		//
-		// The real one is the engine's and keeps deltas, bands and a spill file;
+		// The real one is the engine's and keeps deltas and bands;
 		// this keeps a set of frame numbers, which is all the movie machinery
 		// above it can observe. It exists because a movie without a history is
 		// not a case production has - every Chimera core is a waterbox core - and
@@ -53,22 +52,12 @@ namespace Chimera.Tests.Client.Common.Movie
 		private readonly System.Collections.Generic.HashSet<int> _pins = new();
 		public long BudgetBytes { get; private set; }
 
-		public long DiskBudgetBytes { get; private set; }
-		public string SpillDirectory { get; private set; }
-
 		public void Enable(long budgetBytes)
 		{
 			BudgetBytes = budgetBytes;
 			_states.Clear();
 			if (budgetBytes is not 0) _states.Add(Frame);
 		}
-
-		public void SpillTo(string directory) => SpillDirectory = directory;
-
-		public void DiskBudget(long budgetBytes) => DiskBudgetBytes = budgetBytes;
-
-		/// <summary>Set by a test that wants to see what a full disk does.</summary>
-		public bool SpillFailed { get; set; }
 
 		public long Count => _states.Count;
 
@@ -95,7 +84,6 @@ namespace Chimera.Tests.Client.Common.Movie
 			Frame = frame;
 			return true;
 		}
-
 
 		public void InvalidateAfter(int afterFrame) => _states.RemoveWhere(f => f > afterFrame);
 

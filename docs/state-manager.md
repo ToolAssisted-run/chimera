@@ -383,45 +383,41 @@ is played. Until 2026-09-13 every capture dropped everything after it, and on a
 Ruffle project returning 3000 frames to the end after a look back was 99 s of
 emulation (docs/design-principles.md, "A replay changes nothing").
 
-The budget then decides only what happens to the far band, and what happens is
-that it goes to disk, oldest first, into the project's cache directory. That is
-the right thing to spill precisely because it is far: large, rarely touched, and
-- if the disk copy is lost - regenerable like everything else here.
+The budget then decides only what happens to the far band. The engine can send
+it to disk, oldest first, into a directory its caller names (the spill described
+below, which `chimera-run --spill` still uses). **Chimera does not** (user-decided,
+2026-09-15): a greenzone over its budget thins its far band and then drops the
+oldest of it, and nothing is written to disk until the project is saved.
 
 Every boundary in that table is a knob with a per-core default, in frames rather
 than seconds, because the engine does not know a core's frame rate and the
 frontend does.
 
-### Two budgets, and neither is a reservation (user-asked, 2026-09-10)
+### One budget, in memory, and it is not a reservation
 
-A history costs two things and bounding one bounds nothing.
+A history holds what fits in its memory budget - four gigabytes by default - and
+nothing more. Past it the far band is thinned, and then the oldest of it is
+dropped, which costs replaying to reach a frame that used to be stored.
 
-* **Memory** - what it may hold in RAM. Four gigabytes by default.
-* **Disk** - what the spill file that overflow produces may weigh. Ten
-  gigabytes by default, and 0 means no limit, which is what it was before.
+It used to hold more than that on disk: memory's overflow was spilled into the
+project's cache, under a second, disk budget of ten gigabytes (user-asked,
+2026-09-10). That extended a greenzone past what the machine could hold, and did
+it by writing gigabytes to the drive continuously while somebody worked - a cost
+paid by the SSD, in wear, for a convenience. Chimera no longer turns spilling on,
+and the disk budget is gone (user-decided, 2026-09-15; docs/design-principles.md,
+"A greenzone lives in memory, and the disk is for saving"). The history file is
+still written when a project is saved, which is the one moment somebody asked for
+the disk. Spill files an earlier build left in a project's cache are deleted when
+the project is next opened, because nothing else would ever remove them.
 
-The disk number is **never below the memory number**, wherever it is set.
-Memory fills first and its overflow is what goes to disk, so a smaller disk
-budget describes a file that is full the moment memory is: every stretch pushed
-out would be dropped as it arrived, paid for in writes and worth nothing.
-Raising memory raises disk with it.
-
-Both are set in Tools > Cache Manager, which is where somebody looking at what a
-greenzone weighs already is, and where the cache limit next door makes the same
-kind of promise about the same disk. Both can be set **per project**, and a
-project's own numbers live in its cache directory rather than in the
+The budget is set in Tools > Cache Manager, and can be set **per project**; a
+project's own number lives in its cache directory rather than in the
 `.chimeraProject`: a budget is a fact about the machine the work is being done
 on, and the project file is the one thing that gets handed to somebody else. A
-run edited on a workstation must not arrive at a laptop insisting on
-thirty-two gigabytes.
+run edited on a workstation must not arrive at a laptop insisting on thirty-two
+gigabytes.
 
-The disk number is what the FILE may weigh, because that is what somebody
-watching a disk fill up can check. Half of it is kept reachable; a compaction
-copies every live byte, so one per drop would copy the same bytes over and over,
-and waiting until the dead part is the bigger part makes it one copy per byte
-written. The file sits between the live total and twice it, which is why half.
-
-**Neither is a reservation.** A short session never comes near either.
+**It is not a reservation.** A short session never comes near it.
 
 ### Running out of memory halves the budget
 

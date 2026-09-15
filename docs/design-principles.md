@@ -3111,3 +3111,38 @@ honored is not loaded when the project opens - it opens cold and says why - and
 the next save removes it. Honoring the claim again needs the missing half first:
 a hardware path that reproduces itself, and a way to tell a history from a
 session that ended in a crash.
+
+## A greenzone lives in memory, and the disk is for saving (user-decided, 2026-09-15)
+
+A greenzone used to spill: once it outgrew its memory budget, the oldest
+stretches were written into the project's cache directory, up to a disk budget
+of ten gigabytes (2026-09-10), and a helper thread did the writing so the run
+never waited on it (2026-09-12). It extended a greenzone past what the machine
+could hold. It also meant that a person working in TAStudio was writing
+gigabytes to their drive, continuously, for as long as they worked - and a
+single session on nss102 left spill files of four and five gigabytes in its
+cache. That is a cost paid by the SSD, in wear, for a convenience nobody sees.
+
+So Chimera keeps a greenzone in memory only. It no longer gives the history a
+directory to spill into, so a history over its budget thins its far band and
+then drops the oldest of it - which costs replaying, never work. The disk is
+written when a project is saved, and that is the moment somebody asked for it.
+The disk budget is gone from the settings and from the per-project budgets, and
+TAStudio's note about a greenzone that could not reach the disk went with it,
+since it can no longer happen.
+
+The engine keeps the capability. Spilling is tested there, `chimera-run --spill`
+and the benchmarks still use it, and it costs Chimera nothing it does not turn on.
+What changed is the frontend's choice, not what the engine can do.
+
+Two cleanups belong to the decision. Spill files an earlier build left behind are
+deleted when their project is next opened: the engine only ever swept them when
+it was given a spill directory, so nothing else would remove them. And a
+`config.ini` or per-project budget file that still names a disk budget loads
+without complaint; the key is ignored and the next save drops it.
+
+Not changed, and deliberately left for a separate decision: crash recovery still
+writes while a project has unsaved work (a snapshot of the project every few
+seconds, and every input change to a journal), because that is the promise that
+entered work survives a crash; and TAStudio's autosave is a project save on a
+timer, and writes the history like any other save.

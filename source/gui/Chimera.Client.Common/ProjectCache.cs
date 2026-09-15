@@ -233,9 +233,35 @@ namespace Chimera.Client.Common
 		{
 			public int? MemoryMb { get; init; }
 
-			public int? DiskMb { get; init; }
+			public bool Any => MemoryMb.HasValue;
+		}
 
-			public bool Any => MemoryMb.HasValue || DiskMb.HasValue;
+		/// <summary>
+		/// Deletes the spill files a history left in this project's directory, and says how many.
+		///
+		/// Chimera keeps a greenzone in memory only (user-decided, 2026-09-15), so nothing
+		/// writes these any more - and nothing sweeps them either: the engine only sweeps
+		/// when it is given a directory to spill into, and it no longer is. A file an earlier
+		/// build left is gigabytes of nothing, named for a process that has ended. A file
+		/// another process still holds open refuses to go on Windows, which is the right
+		/// answer, and is simply left.
+		/// </summary>
+		public static int DeleteSpillFiles(string projectId)
+		{
+			var dir = DirectoryFor(projectId);
+			if (!Directory.Exists(dir)) return 0;
+			var removed = 0;
+			foreach (var file in Directory.EnumerateFiles(dir, "history-spill-*.bin"))
+			{
+				try
+				{
+					File.Delete(file);
+					removed++;
+				}
+				catch (IOException) { }
+				catch (UnauthorizedAccessException) { }
+			}
+			return removed;
 		}
 
 		/// <summary>What this project asked for, or nothing if it never asked.</summary>
@@ -249,7 +275,6 @@ namespace Chimera.Client.Common
 				return new ProjectBudgets
 				{
 					MemoryMb = (int?) root["memoryMb"],
-					DiskMb = (int?) root["diskMb"],
 				};
 			}
 			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException
@@ -277,7 +302,7 @@ namespace Chimera.Client.Common
 				}
 				JObject root = new();
 				if (budgets.MemoryMb.HasValue) root["memoryMb"] = budgets.MemoryMb.Value;
-				if (budgets.DiskMb.HasValue) root["diskMb"] = budgets.DiskMb.Value;
+				root.Remove("diskMb");   /* a budget earlier builds kept; nothing reads it now */
 				Ensure(projectId);
 				File.WriteAllText(path, root.ToString(Formatting.Indented));
 			}

@@ -45,20 +45,20 @@ namespace Chimera.Client.Common
 			// it on, which captures the machine as it stands - frame zero, here -
 			// as the anchor everything else is reached from.
 			States = emulator.AsStateHistory();
-			States.SpillTo(ProjectCache.Ensure(Project.Id));
-			// Two budgets, and the settings are only the DEFAULT for both: a
-			// project can carry its own, kept beside its greenzone rather than in
-			// the file people hand each other (ProjectCache.ProjectBudgets).
+			// Memory only (user-decided, 2026-09-15). No spill directory is set, so
+			// the history never writes to disk while the project is open: over its
+			// budget it thins its far band and then drops the oldest of it
+			// (docs/state-manager.md). The disk is written when the project is
+			// SAVED. Spill files an earlier build left here would now never be swept
+			// by anybody, and they are gigabytes each, so they go as it opens.
+			ProjectCache.DeleteSpillFiles(Project.Id);
+			// The setting is only the DEFAULT: a project can carry its own, kept
+			// beside its greenzone rather than in the file people hand each other
+			// (ProjectCache.ProjectBudgets).
 			var budgets = ProjectCache.BudgetsOf(Project.Id);
 			var memoryMb = Math.Max(
 				budgets.MemoryMb ?? Session.Settings.GreenzoneBudgetMb,
 				MovieConfig.MinimumBudgetMb);
-			// Whatever the two numbers say, the disk one is never the smaller: its
-			// whole job is to hold what memory pushed out, and a config file
-			// edited by hand can say otherwise.
-			var diskMb = MovieConfig.DiskBudgetFor(
-				Math.Max(budgets.DiskMb ?? Session.Settings.GreenzoneDiskBudgetMb, 0), memoryMb);
-			States.DiskBudget((long)diskMb * 1024 * 1024);
 			States.Enable((long)memoryMb * 1024 * 1024);
 			// Read here and not with the rest of the cache, because until the
 			// emulator arrives there is nowhere to put it. A machine a GPU drew
