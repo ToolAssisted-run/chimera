@@ -969,6 +969,12 @@ CE_API int64_t ce_session_domain_read(const ce_session *s, int32_t index, int64_
 /* "" when no error. Invalidated by the next call on the same session. */
 CE_API const char *ce_session_last_error(ce_session *s);
 
+/* Whether the machine's guest has died (aborted, halted, faulted, exited), and
+ * why, as one line; null while it lives. A frame advance, movie advance or seek
+ * on a dead machine fails and runs nothing. Loading a state - a greenzone
+ * restore, a branch - brings it back. Borrowed until the next call. */
+CE_API const char *ce_session_guest_death(ce_session *s);
+
 /* What built the waterbox host this engine loads (its wbx_build_info JSON):
  * the frontend shows it and movies record it. NULL when the host is not
  * loadable. Static string, never invalidated. */

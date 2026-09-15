@@ -53,6 +53,11 @@ struct HostApi
 	 * dirty and 0x40 for invisible; optional, and only CHIMERA_HISTORY_VERIFY asks */
 	void (*wbx_get_page_len)(void *obj, WbxReturn *ret);
 	void (*wbx_get_page_data)(void *obj, uintptr_t index, WbxReturn *ret);
+	/* Whether the guest has died - aborted, halted, faulted, exited - and why.
+	 * A dead guest returns from the call it died in, runs nothing until a state
+	 * is loaded, and the session reports it as an error. Optional: an older host
+	 * has no such thing, and its guest takes the process down as it always did. */
+	void (*wbx_get_death)(void *obj, char *out, uintptr_t cap, WbxReturn *ret);
 	void (*wbx_mount_file)(void *obj, const char *name, WbxReadCb cb, uintptr_t userdata, uint8_t writable, WbxReturn *ret);
 	/* read-only, read from the host's disk as the guest asks - no copy */
 	void (*wbx_mount_file_path)(void *obj, const char *name, const char *host_path, WbxReturn *ret);

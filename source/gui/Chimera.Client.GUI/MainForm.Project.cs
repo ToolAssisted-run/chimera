@@ -351,6 +351,92 @@ namespace Chimera.Client.GUI
 		/// </summary>
 		public void KeepWorkSafe() => _recovery?.SaveNow();
 
+		private bool _coreStoppedAsking;
+
+		/// <summary>
+		/// The core's machine died mid-frame (miniBox handed control back; the process is fine). Emulation
+		/// pauses, the work is kept, and the person chooses where to go from here - and every choice keeps
+		/// the inputs, branches and markers, because the recovery journal holds them whatever happens.
+		/// Loading any state brings the machine back; until then a frame only reports the death again.
+		/// </summary>
+		private void OnCoreStopped(CoreStoppedException stopped)
+		{
+			try
+			{
+				PauseEmulator();
+			}
+			catch (Exception)
+			{
+				// pausing is part of recovering, not a reason to stop
+			}
+			KeepWorkSafe();
+			Console.Error.WriteLine($"The core stopped: {stopped.Reason}");
+			if (_coreStoppedAsking) return;   // the same death, reported again while the question is open
+
+			var tas = Tools.IsLoaded<TAStudio>() ? Tools.TAStudio : null;
+			var history = tas?.CurrentTasMovie?.States;
+			var stoppedAt = Emulator.Frame;
+			var safePoint = history?.Nearest(stoppedAt) ?? -1;
+			var canRestart = history is not null && history.Nearest(0) == 0;
+			CoreStoppedForm.Choice chosen;
+			_coreStoppedAsking = true;
+			try
+			{
+				using CoreStoppedForm form = new(stopped.Reason, stoppedAt, safePoint, canRestart, tas is not null);
+				form.ShowDialog(this);
+				chosen = form.Chosen;
+			}
+			finally
+			{
+				_coreStoppedAsking = false;
+			}
+
+			switch (chosen)
+			{
+				case CoreStoppedForm.Choice.BackToSafePoint:
+					if (!tas!.GoBackToSafePoint(safePoint))
+					{
+						this.ModalMessageBox($"Frame {safePoint} could not be restored. The machine is still stopped;"
+							+ " seek to another frame in the greenzone, or restart it.", "The core stopped");
+					}
+					break;
+				case CoreStoppedForm.Choice.RestartFromFrameZero:
+					if (!tas!.RestartFromFrameZero())
+					{
+						this.ModalMessageBox("Frame 0 could not be restored. The machine is still stopped.", "The core stopped");
+					}
+					break;
+				case CoreStoppedForm.Choice.SaveInputsAndClose:
+					// nothing is left unsaved afterwards, so the ordinary close asks nothing
+					if (tas!.SaveProjectWithoutGreenzone() && Tools.AskSave()) Close();
+					break;
+				case CoreStoppedForm.Choice.CloseWithoutSaving:
+					if (this.ModalMessageBox2(
+						"Close Chimera without saving the project?\n\n"
+							+ "Nothing is lost: every input, marker and branch is in the recovery journal,"
+							+ " and the next time this project is opened Chimera offers to recover them.",
+						"Close without saving",
+						EMsgBoxIcon.Question))
+					{
+						CloseKeepingRecovery();
+					}
+					break;
+			}
+		}
+
+		/// <summary>
+		/// Closes without saving, and without the clean end that would delete the recovery journal - so
+		/// the next open finds the work and offers it back (ProjectRecovery.FindUnfinished).
+		/// </summary>
+		private void CloseKeepingRecovery()
+		{
+			KeepWorkSafe();
+			_recovery?.End(clean: false);
+			_recovery = null;
+			// unattended: the question the project's own "save changes?" would ask has just been answered
+			CloseEmulator();
+		}
+
 		private int _errorsShown;
 
 		private DateTime _errorsSince = DateTime.MinValue;
@@ -363,6 +449,12 @@ namespace Chimera.Client.GUI
 		/// </summary>
 		public void RecoverFromError(Exception error, string what)
 		{
+			// a machine that died is not an error in Chimera, and has choices of its own
+			if ((error as CoreStoppedException ?? error.GetBaseException() as CoreStoppedException) is { } stopped)
+			{
+				OnCoreStopped(stopped);
+				return;
+			}
 			try
 			{
 				PauseEmulator();

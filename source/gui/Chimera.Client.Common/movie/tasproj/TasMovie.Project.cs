@@ -169,6 +169,29 @@ namespace Chimera.Client.Common
 		/// </summary>
 		internal FileWriteResult WriteRecoverySnapshot(string path) => Write(path, isBackup: true);
 
+		/// <summary>Set for the duration of <see cref="SaveWithoutGreenzone"/>.</summary>
+		private bool _savingWithoutGreenzone;
+
+		/// <summary>
+		/// The project as <see cref="MovieBase.Save"/> writes it - inputs, markers, branches, settings -
+		/// but with no state history, and none left from an earlier save: the file the next open would
+		/// have loaded is removed. For a greenzone nobody should trust any more, which is what a machine
+		/// that died mid-frame leaves behind (the core-stopped dialog offers it). The history in memory
+		/// is untouched; only what reaches the disk is.
+		/// </summary>
+		public FileWriteResult SaveWithoutGreenzone()
+		{
+			_savingWithoutGreenzone = true;
+			try
+			{
+				return Save();
+			}
+			finally
+			{
+				_savingWithoutGreenzone = false;
+			}
+		}
+
 		/// <summary>Raised when the input log is replaced by another object (a branch load), so a journal can follow it.</summary>
 		public event Action InputLogReplaced;
 
@@ -328,8 +351,13 @@ namespace Chimera.Client.Common
 				// in the file is the history as it stands right here; frames
 				// captured afterwards belong to the next save. The barrier is at
 				// Dispose, where the project is let go of.
-				if (States is not null && !DrawnByGpu) States.SaveLater(StateHistoryFilename, MachineIdentityOf(p));
-				else TryDelete(StateHistoryFilename);
+				if (States is not null && !DrawnByGpu && !_savingWithoutGreenzone) States.SaveLater(StateHistoryFilename, MachineIdentityOf(p));
+				else
+				{
+					// a save an earlier call queued may still be writing that very file
+					States?.SaveWait();
+					TryDelete(StateHistoryFilename);
+				}
 				// and where this machine keeps the project's files, in a sibling of
 				// its own: the project itself stays distributable, carrying names and
 				// hashes and no paths at all (docs/project.md). Merged over whatever

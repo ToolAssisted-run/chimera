@@ -1030,11 +1030,11 @@ namespace Chimera.Client.GUI
 			}
 		}
 
-		private FileWriteResult SaveTas(bool saveBackup = false)
+		private FileWriteResult SaveTas(bool saveBackup = false, bool withoutGreenzone = false)
 		{
 			if (string.IsNullOrEmpty(CurrentTasMovie.Filename) || CurrentTasMovie.Filename == DefaultTasProjName())
 			{
-				return SaveAsTas();
+				return SaveAsTas(withoutGreenzone);
 			}
 
 			_autosaveTimer.Stop();
@@ -1053,6 +1053,8 @@ namespace Chimera.Client.GUI
 			{
 				if (saveBackup)
 					result = movieToSave.SaveBackup();
+				else if (withoutGreenzone)
+					result = CurrentTasMovie.SaveWithoutGreenzone();
 				else
 					result = movieToSave.Save();
 			}
@@ -1073,7 +1075,7 @@ namespace Chimera.Client.GUI
 			return result;
 		}
 
-		private FileWriteResult SaveAsTas()
+		private FileWriteResult SaveAsTas(bool withoutGreenzone = false)
 		{
 			_autosaveTimer.Stop();
 
@@ -1096,7 +1098,7 @@ namespace Chimera.Client.GUI
 				MessageStatusLabel.Owner.Update();
 				Cursor = Cursors.WaitCursor;
 				CurrentTasMovie.Filename = fileInfo.FullName;
-				saveResult = CurrentTasMovie.Save();
+				saveResult = withoutGreenzone ? CurrentTasMovie.SaveWithoutGreenzone() : CurrentTasMovie.Save();
 				Settings.RecentTas.Add(CurrentTasMovie.Filename);
 				Cursor = Cursors.Default;
 

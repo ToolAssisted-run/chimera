@@ -499,6 +499,28 @@ struct ce_session
 		return true;
 	}
 
+	/* Whether the guest died in the call just made (miniBox: an abort, a halt,
+	 * a fault, an exit). If so the session's error says why, and nothing more of
+	 * this frame is asked of the machine - its calls would only return 0, and a
+	 * null picture or audio buffer is not somewhere to copy from. A state load
+	 * (a greenzone restore, a branch) brings the machine back. */
+	std::string death;
+	bool guestDied()
+	{
+		if (host == nullptr || obj == nullptr || host->wbx_get_death == nullptr) return false;
+		char why[512] = {};
+		chimera::WbxReturn r{};
+		host->wbx_get_death(obj, why, sizeof why, &r);
+		if (!r.ok() || r.data == 0)
+		{
+			death.clear();
+			return false;
+		}
+		death = why;
+		error = std::string("the core stopped: ") + why;
+		return true;
+	}
+
 	uintptr_t proc(const char *name, int argCount, bool required, std::string &err)
 	{
 		chimera::WbxReturn r{};
@@ -843,8 +865,14 @@ void ce_session::wantRendering(int32_t on)
 
 int32_t ce_session::advanceCore(const uint8_t *buttons, int32_t render)
 {
+	if (guestDied()) return -1;
 	wantRendering(render != 0 ? 1 : 0);
 	frameAdvance(sendButtons(buttons));
+	if (guestDied())
+	{
+		ce_gl_release();   /* the frame's borrowed context, which the frame never gave back */
+		return -1;
+	}
 	if (render != 0) copyVideo();
 	int32_t nsamp = getAudioSampleCount != nullptr ? getAudioSampleCount() : cfg.samplesPerFrame;
 	if (nsamp < 0) nsamp = 0;
@@ -1441,8 +1469,15 @@ void ce_session_set_button(ce_session *s, int32_t index, int32_t pressed)
 
 int32_t ce_session_frame_advance(ce_session *s, uint64_t buttons, int32_t render)
 {
+	/* -1: the guest is dead (ce_session_guest_death says why); nothing ran */
+	if (s->guestDied()) return -1;
 	s->wantRendering(render != 0 ? 1 : 0);
 	s->frameAdvance(s->sendButtons(s->computeEffective(buttons)));
+	if (s->guestDied())
+	{
+		ce_gl_release();
+		return -1;
+	}
 	if (render != 0) s->copyVideo();
 	/* a core that reports its own count may produce a different number every
 	 * frame (blip resamplers do); the declared samplesPerFrame is the buffer
@@ -1578,6 +1613,12 @@ int64_t ce_session_domain_read(const ce_session *s, int32_t index, int64_t offse
 }
 
 const char *ce_session_last_error(ce_session *s) { return s->error.c_str(); }
+
+const char *ce_session_guest_death(ce_session *s)
+{
+	if (s == nullptr) return nullptr;
+	return s->guestDied() ? s->death.c_str() : nullptr;
+}
 
 const char *ce_host_build_info(void)
 {
@@ -1999,6 +2040,7 @@ int32_t ce_session_movie_advance(ce_session *s, uint64_t buttons, const int32_t 
 			if (s->setAxis != nullptr) s->setAxis(static_cast<int32_t>(i), movieAxes[i]);
 		}
 		lag = s->advanceCore(s->movieButtons.data(), render);
+		if (lag < 0) return -1;   /* the guest died: the error says why */
 	}
 	else
 	{
@@ -2021,12 +2063,20 @@ int32_t ce_session_movie_advance(ce_session *s, uint64_t buttons, const int32_t 
 		/* the caller's input: the packed mask OR'd with the set_button states,
 		 * so a wide controller records exactly what the machine receives */
 		const uint8_t *effective = s->computeEffective(buttons);
+		/* a dead machine records nothing: the input was never played */
+		if (s->guestDied()) return -1;
 		if (s->movieMode == 2)
 		{
 			std::string entry = s->layout.generate(effective, axes, s->mnemonics);
 			ce_movie_log_add(s->movie, entry.c_str());
 		}
 		lag = s->advanceCore(effective, render);
+		if (lag < 0)
+		{
+			/* it died playing it: the entry describes a frame that never happened */
+			if (s->movieMode == 2) ce_movie_log_truncate(s->movie, s->frame);
+			return -1;
+		}
 	}
 	s->greenzoneCapture();
 	return lag;
@@ -2252,7 +2302,7 @@ int32_t ce_session_seek(ce_session *s, int64_t frame)
 			if (s->setAxis != nullptr) s->setAxis(static_cast<int32_t>(i), movieAxes[i]);
 		}
 		s->greenzoneBeforeAdvance();
-		s->advanceCore(s->movieButtons.data(), 0);
+		if (s->advanceCore(s->movieButtons.data(), 0) < 0) return 1;   /* the guest died */
 		s->greenzoneCapture();
 	}
 	if (s->movieMode == 3 && s->frame < ce_movie_log_count(s->movie)) s->movieMode = 1;

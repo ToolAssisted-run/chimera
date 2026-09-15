@@ -237,6 +237,7 @@ minibox_host_src = files(
   minibox_host / 'tripguard.c',
   minibox_host / 'interop_bin.c',
   minibox_host / 'context.c',
+  minibox_host / 'guarded.S',
   minibox_host / 'elf.c',
   minibox_host / 'fs.c',
   minibox_host / 'host.c',

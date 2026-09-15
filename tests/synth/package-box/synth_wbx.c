@@ -70,7 +70,26 @@ ECL_EXPORT int Init(void) {
 
 /* The button mask is 64-bit (guest ABI): button i of waterbox.config is bit i.
  * The synth machine has 8 buttons, so only the low byte is meaningful here. */
-ECL_EXPORT void FrameAdvance(uint64_t pad) { synth_frame(g_synth, (uint8_t)pad); }
+/* All eight buttons at once is not a game input: it is how a test makes this
+ * core die on cue - it says so, then abort()s the way a panicking core does;
+ * all but Up follows a wild pointer instead -
+ * so that everything above the sandbox can be tested against a core that stops
+ * (miniBox hands control back; Chimera offers what to do next). No witness movie
+ * presses all eight. */
+ECL_EXPORT void FrameAdvance(uint64_t pad) {
+	if ((uint8_t)pad == 0xFF) {
+		fprintf(stderr, "synth: all eight buttons at once - stopping on purpose\n");
+		abort();
+	}
+	/* all but Up: the other way a core dies - a wild pointer, which arrives as
+	 * a fault in the host (the vectored handler on Windows, SIGSEGV on Linux)
+	 * rather than as a syscall */
+	if ((uint8_t)pad == 0xFE) {
+		volatile uintptr_t wild = 0x10;
+		*(volatile uint32_t *)wild = 1;
+	}
+	synth_frame(g_synth, (uint8_t)pad);
+}
 
 /* Guest-memory pointers the host reads while active (RAM/VRAM/audio domains). */
 ECL_EXPORT uint8_t *GetRam(void)         { return synth_get_ram(g_synth); }

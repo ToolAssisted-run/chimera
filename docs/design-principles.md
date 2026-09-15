@@ -3146,3 +3146,38 @@ writes while a project has unsaved work (a snapshot of the project every few
 seconds, and every input change to a journal), because that is the promise that
 entered work survives a crash; and TAStudio's autosave is a project save on a
 timer, and writes the history like any other save.
+
+## A core that stops is a question, not a crash (user-decided, 2026-09-15)
+
+A core's machine dies in ways that are no fault of Chimera: it aborts (a Rust
+panic, a failed allocation, an assertion - issue #43 met one as "unimplemented
+syscall 200"), it halts on finding its own heap corrupt, it follows a wild
+pointer, it exits, it deadlocks, it asks for something the sandbox does not
+provide. Each of those used to take the whole frontend with it.
+
+miniBox now hands control back instead (its "A guest that dies"): the call into
+the guest returns, the machine is marked dead with a one-line reason - the core's
+own last words when it wrote any - and it runs nothing until a state is loaded,
+which revives it. Only a fault in host code, which cannot be trusted, stays fatal.
+
+The engine reports it as an error on the frame (`ce_session_guest_death`, and -1
+from a frame advance, a movie advance or a seek) and records nothing for a frame
+that never happened. The frontend raises `CoreStoppedException`, pauses, keeps the
+work, and asks what to do next. Every answer keeps the inputs, branches and
+markers:
+
+1. Go back to the latest safe point - the newest greenzone frame at or before the
+   one the machine died on, named by number. A state load, so the machine lives
+   again.
+2. Restart the machine and run again from frame 0 - the greenzone cleared back to
+   its first frame and the machine put back on it. Not a reboot: a reboot reloads
+   the project from disk, and would lose what was not saved.
+3. Save the project's inputs without the greenzone, and close. A history from a
+   run whose machine died is not one to trust; the file an earlier save wrote goes
+   too (`TasMovie.SaveWithoutGreenzone`).
+4. Close without saving, after asking. The recovery journal is ended without its
+   clean-up, so the next open finds the work and offers it back.
+
+Headless runs still fail loudly, with the reason. The synth core dies on cue for
+the tests (all eight buttons: an abort; all but Up: a wild pointer), and the
+witness checks that both stop a run with their reason while the process lives.

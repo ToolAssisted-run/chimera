@@ -437,6 +437,33 @@ namespace Chimera.Tests.Client.Common.Movie
 		}
 
 		/// <summary>
+		/// A project saved without its greenzone - what the core-stopped dialog offers when the
+		/// history comes from a run whose machine died - keeps every input, marker and branch, and
+		/// leaves no history behind for the next open to load, not even the one an earlier save wrote.
+		/// </summary>
+		[TestMethod]
+		public void AProjectCanBeSavedWithoutItsGreenzone()
+		{
+			var path = Path.Combine(_dir, "nogreenzone.chimeraProject");
+			var movie = MakeWorkedMovie(path);
+			foreach (var f in new[] { 1, 2, 3, 4 }) movie.States.Capture(f);
+			Assert.IsFalse(movie.Save().IsError);
+			Assert.IsTrue(File.Exists(movie.StateHistoryFilename), "an ordinary save writes the history");
+
+			Assert.IsFalse(movie.SaveWithoutGreenzone().IsError);
+			Assert.IsFalse(File.Exists(movie.StateHistoryFilename), "this one takes it away");
+
+			var loaded = LoadFresh(path);
+			foreach (var f in new[] { 1, 2, 3, 4 })
+			{
+				Assert.IsFalse(loaded.States.Has(f), $"frame {f} does not come back");
+			}
+			Assert.AreEqual(movie.InputLogLength, loaded.InputLogLength, "every input does");
+			Assert.AreEqual(movie.Markers.Count, loaded.Markers.Count, "and every marker");
+			Assert.AreEqual(movie.Branches.Count, loaded.Branches.Count, "and every branch");
+		}
+
+		/// <summary>
 		/// The states survive closing and reopening, which is the entire point of
 		/// keeping them. The engine owns the history and proves its own file
 		/// round trips; what is checked here is the wiring above it - that the

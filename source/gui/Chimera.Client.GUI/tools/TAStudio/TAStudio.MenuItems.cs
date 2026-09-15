@@ -71,6 +71,50 @@ namespace Chimera.Client.GUI
 		public void SaveProjectBackup()
 			=> DisplayMessageIfFailed(() => SaveTas(saveBackup: true), "Failed to save backup.");
 
+		/// <summary>
+		/// The project's inputs, markers and branches, saved with no greenzone (a core that stopped
+		/// leaves one nobody should trust). True when it was saved; a Save As that was cancelled is not.
+		/// </summary>
+		public bool SaveProjectWithoutGreenzone()
+		{
+			FileWriteResult result = null;
+			DisplayMessageIfFailed(() => result = SaveTas(withoutGreenzone: true), "Failed to save the project.");
+			return result is { IsError: false };
+		}
+
+		/// <summary>
+		/// After the core stopped: the machine put back on a stored frame, which brings it back to life,
+		/// and one short seek to <paramref name="frame"/> so there is a picture again. False when the
+		/// greenzone cannot produce anything at or before it.
+		/// </summary>
+		public bool GoBackToSafePoint(int frame)
+		{
+			var prior = CurrentTasMovie.States.Nearest(frame > 0 ? frame - 1 : 0);
+			if (prior < 0 || !CurrentTasMovie.States.RestoreTo(prior)) return false;
+			AfterStateLoaded(prior, null);
+			if (prior != frame) GoToFrame(frame);
+			RefreshDialog();
+			return true;
+		}
+
+		/// <summary>
+		/// After the core stopped: the greenzone cleared back to its first frame, the machine put back
+		/// on frame 0 - the state it booted to - and played from there. Nothing is reloaded, so nothing
+		/// unsaved is lost; the inputs replay into a machine that starts again. False when the greenzone
+		/// does not hold frame 0.
+		/// </summary>
+		public bool RestartFromFrameZero()
+		{
+			if (CurrentTasMovie.States.Nearest(0) != 0) return false;
+			CurrentTasMovie.States.InvalidateAfter(0);
+			if (!CurrentTasMovie.States.RestoreTo(0)) return false;
+			AfterStateLoaded(0, null);
+			TastudioPlayMode();
+			RefreshDialog();
+			MainForm.UnpauseEmulator();
+			return true;
+		}
+
 		private void SaveSelectionToMacroMenuItem_Click(object sender, EventArgs e)
 		{
 			if (!AnyRowsSelected)

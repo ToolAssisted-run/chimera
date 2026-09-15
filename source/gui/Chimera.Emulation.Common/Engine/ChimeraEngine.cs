@@ -704,6 +704,9 @@ namespace Chimera.Emulation.Common.Engine
 		public abstract IntPtr ce_session_last_error(IntPtr session);
 
 		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_session_guest_death(IntPtr session);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_host_build_info();
 
 		[ChimeraImport(CallingConvention.Cdecl)]
@@ -1814,8 +1817,18 @@ namespace Chimera.Emulation.Common.Engine
 			}
 		}
 
+		/// <summary>One frame; true when it was a lag frame.</summary>
+		/// <exception cref="CoreStoppedException">the core's machine died during the frame, or had
+		/// already died; nothing more runs until a state is loaded (a greenzone restore, a branch)</exception>
 		public bool FrameAdvance(ulong buttons, bool render)
-			=> E.ce_session_frame_advance(_session, buttons, render ? 1 : 0) is not 0;
+		{
+			var lag = E.ce_session_frame_advance(_session, buttons, render ? 1 : 0);
+			if (lag < 0) throw new CoreStoppedException(GuestDeath ?? LastError);
+			return lag is not 0;
+		}
+
+		/// <summary>Why the core's machine died, or null while it lives.</summary>
+		public string GuestDeath => ChimeraEngine.PtrToStringUtf8(E.ce_session_guest_death(_session));
 
 		/// <summary>Borrowed: the last rendered frame, BGRA, Width*Height ints.</summary>
 		public IntPtr VideoBuffer => E.ce_session_video(_session);

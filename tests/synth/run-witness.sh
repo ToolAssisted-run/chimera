@@ -166,6 +166,38 @@ if [ "$level" = "both" ] || [ "$level" = "e" ]; then
 			fi
 		done
 
+		# A CORE THAT DIES: all eight buttons at once make the synth core abort on
+		# cue (SPEC.md). The run must stop with the reason and the core's own last
+		# words - miniBox handing control back - and the process must not crash.
+		dmovie="$work/dies-at-11.txt"
+		sed '12s/.*/|UDLRABsS|/' "$here/movies/gridWalker.win.txt" > "$dmovie"
+		rm -f "$work/dies.meta.txt"
+		"$chimera_run" "$epkg" "$here/roms/gridWalker.testrom" "$dmovie" \
+			--meta "$work/dies.meta.txt" > "$work/dies.log" 2>&1
+		drc=$?
+		if [ "$drc" -ge 128 ]; then
+			report "E:core-dies" FAIL "the process died with signal $((drc - 128)) (see work/dies.log)"
+		elif ! grep -q "^status=ERROR" "$work/dies.meta.txt" 2>/dev/null; then
+			report "E:core-dies" FAIL "the run did not report a stopped core (see work/dies.log)"
+		elif grep -q "the core aborted" "$work/dies.meta.txt" && grep -q "stopping on purpose" "$work/dies.meta.txt"; then
+			report "E:core-dies" PASS "a core that aborts stops the run with its reason, and the process survives"
+		else
+			report "E:core-dies" FAIL "the reason or the core's words are missing: $(grep '^detail=' "$work/dies.meta.txt")"
+		fi
+		# and the same death arriving as a FAULT (all but Up: a wild pointer)
+		sed '12s/.*/|.DLRABsS|/' "$here/movies/gridWalker.win.txt" > "$work/crashes-at-11.txt"
+		rm -f "$work/crashes.meta.txt"
+		"$chimera_run" "$epkg" "$here/roms/gridWalker.testrom" "$work/crashes-at-11.txt" \
+			--meta "$work/crashes.meta.txt" > "$work/crashes.log" 2>&1
+		crc=$?
+		if [ "$crc" -ge 128 ]; then
+			report "E:core-crashes" FAIL "the process died with signal $((crc - 128)) (see work/crashes.log)"
+		elif grep -q "^detail=the core stopped: the core crashed: it wrote to address" "$work/crashes.meta.txt" 2>/dev/null; then
+			report "E:core-crashes" PASS "a core that follows a wild pointer stops the run, and the process survives"
+		else
+			report "E:core-crashes" FAIL "no stopped core reported (see work/crashes.log)"
+		fi
+
 		# the history OUTLIVES its process, which is what reopening a project
 		# asks of it. One run plays the movie and keeps its history to a file; a
 		# second, fresh process starts from that file, seeks back into states it

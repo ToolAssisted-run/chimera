@@ -18,6 +18,10 @@ All multi-byte values are little-endian, in roms and in serialized state.
 - Frame rate: exactly 60 fps (frontend timing 60/1).
 - Input: one pad, 8 buttons, bitmask (bit 0..7):
   Up=0x01 Down=0x02 Left=0x04 Right=0x08 A=0x10 B=0x20 Select=0x40 Start=0x80.
+  All eight at once (0xFF) is reserved: the waterboxed core aborts on that
+  frame, on purpose, to test what happens above a core that dies. All but Up
+  (0xFE) is reserved too: the core writes through a wild pointer, which is the
+  same death arriving as a fault instead of a syscall. No movie presses either.
 - Registers: R0..R7, int32. PC: byte offset into CODE, u32.
 - RAM: 4096 bytes (0x000..0xFFF), all zero at power-on. This is the memory
   space the witness compares and the frontend exposes as the "RAM" domain.

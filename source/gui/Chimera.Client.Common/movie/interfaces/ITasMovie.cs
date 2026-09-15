@@ -58,6 +58,11 @@ namespace Chimera.Client.Common
 
 		/// <summary>The movie holds work its project file does not: it was opened from recovered work (ProjectRecovery).</summary>
 		void MarkRecovered();
+		/// <summary>
+		/// Saves inputs, markers, branches and settings with no state history - and removes the one an
+		/// earlier save left - for a greenzone nobody should trust (a machine that died mid-frame).
+		/// </summary>
+		FileWriteResult SaveWithoutGreenzone();
 
 		/// <summary>
 		/// Replaces the given frame's input with an empty frame
