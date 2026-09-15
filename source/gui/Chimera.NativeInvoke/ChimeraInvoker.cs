@@ -90,6 +90,12 @@ namespace Chimera.NativeInvoke
 		private static readonly int StringOffset;
 
 		/// <summary>
+		/// The largest string, in UTF-8 bytes, marshaled onto the calling thread's stack; a longer one is
+		/// copied into a pinned array. Far below the smallest stack a frontend thread gets.
+		/// </summary>
+		internal const int MaxStackStringBytes = 16 * 1024;
+
+		/// <summary>
 		/// How far into a value array type element 0 is.
 		/// </summary>
 		private static readonly int ValueArrayElementOffset;
@@ -616,6 +622,18 @@ namespace Chimera.NativeInvoke
 				il.Emit(OpCodes.Stloc, strval);
 
 				var bytes = il.DeclareLocal(typeof(IntPtr));
+				// A string past MaxStackStringBytes goes to a pinned managed array instead of the stack. The
+				// stack was the only choice once, and a 1.2 MB branch journal (issue #68) overflowed a Windows
+				// main thread, whose whole stack is 1 MB - a .NET StackOverflowException, which nothing can
+				// catch. Linux gives the main thread 8 MB, so no test there saw it. Small strings stay on the
+				// stack: most calls pass a line or a name, and many are made every frame.
+				var onHeap = il.DefineLabel();
+				var haveBuffer = il.DefineLabel();
+				var heapBytes = il.DeclareLocal(typeof(byte[]), true); // pin!
+				il.Emit(OpCodes.Ldloc, strlenbytes);
+				il.Emit(OpCodes.Ldc_I4, MaxStackStringBytes);
+				il.Emit(OpCodes.Bgt, onHeap);
+
 				il.Emit(OpCodes.Ldloc, strlenbytes);
 				il.Emit(OpCodes.Ldc_I4_1);
 				il.Emit(OpCodes.Add); // +1 for null byte
@@ -624,6 +642,22 @@ namespace Chimera.NativeInvoke
 				// That's why we have to split every parameter load into two parts, the first of which runs on an empty stack.
 				il.Emit(OpCodes.Localloc);
 				il.Emit(OpCodes.Stloc, bytes);
+				il.Emit(OpCodes.Br, haveBuffer);
+
+				il.MarkLabel(onHeap);
+				il.Emit(OpCodes.Ldloc, strlenbytes);
+				il.Emit(OpCodes.Ldc_I4_1);
+				il.Emit(OpCodes.Add); // +1 for null byte, which a new array already holds
+				il.Emit(OpCodes.Newarr, typeof(byte));
+				il.Emit(OpCodes.Stloc, heapBytes);
+				il.Emit(OpCodes.Ldloc, heapBytes);
+				il.Emit(OpCodes.Conv_I);
+				il.Emit(OpCodes.Ldc_I4, ValueArrayElementOffset);
+				il.Emit(OpCodes.Conv_I);
+				il.Emit(OpCodes.Add);
+				il.Emit(OpCodes.Stloc, bytes);
+
+				il.MarkLabel(haveBuffer);
 
 				// this
 				il.Emit(OpCodes.Ldloc, encoding);

@@ -1,3 +1,7 @@
+using System;
+using System.IO;
+using System.Threading;
+
 using Chimera.Emulation.Common.Engine;
 
 namespace Chimera.Tests.Emulation.Common.Engine
@@ -61,6 +65,52 @@ namespace Chimera.Tests.Emulation.Common.Engine
 			Assert.AreEqual("[Input]\nLogKey:\n|.|\n[/Input]\n", log.Serialize(crlf: false));
 			log.Key = "#K|";
 			Assert.AreEqual("[Input]\nLogKey:#K|\n|.|\n[/Input]\n", log.Serialize(crlf: false));
+		}
+
+		/// <summary>
+		/// A string far bigger than a thread's stack reaches the engine. The invoker used to copy every string
+		/// argument onto the calling thread's stack, so the crash recovery's branch journal - 1.2 MB for a
+		/// project with long branches (issue #68) - overflowed a Windows main thread, whose stack is 1 MB, and
+		/// the process died with a StackOverflowException nothing can catch. This passes the same kind of
+		/// argument through the same call, JournalTo's image, on a thread asking for 256 KB - and makes the
+		/// image bigger than any thread's default stack, so the death does not depend on that being honoured.
+		/// </summary>
+		[TestMethod]
+		public void AStringBiggerThanTheStackReachesTheEngine()
+		{
+			const int imageBytes = 20 * 1024 * 1024;
+			var image = new string('x', imageBytes - 1) + "\n";
+			var dir = Path.Combine(Path.GetTempPath(), "chimera-invoker-" + Guid.NewGuid().ToString("N"));
+			Directory.CreateDirectory(dir);
+			var path = Path.Combine(dir, "journal.log");
+			try
+			{
+				var opened = false;
+				string failure = null;
+				var thread = new Thread(() =>
+				{
+					try
+					{
+						using EngineMovieLog log = new();
+						opened = log.JournalTo(path, image);
+						log.JournalClose(remove: false);
+					}
+					catch (Exception ex)
+					{
+						failure = ex.ToString();
+					}
+				}, maxStackSize: 256 * 1024);
+				thread.Start();
+				thread.Join();
+
+				Assert.IsNull(failure);
+				Assert.IsTrue(opened, "the journal was not written");
+				Assert.IsTrue(new FileInfo(path).Length >= imageBytes, "the whole image reached the journal");
+			}
+			finally
+			{
+				Directory.Delete(dir, recursive: true);
+			}
 		}
 	}
 }
