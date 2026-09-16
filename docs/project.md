@@ -21,7 +21,13 @@ A single JSON file (extension `.chimeraProject`) that contains literally
 everything required to reproduce the work, except the data bytes
 themselves, which are named by their SHA1:
 
-- **Core identity**: package name, version, hash - pinned at creation.
+- **Core identity**: package name, version, hash - pinned at creation, and
+  re-pinned by a save to the core that actually ran. Opening a project on
+  another build warns and starts the greenzone empty (the cached states were
+  another machine's); saving then records the build in use, so the question is
+  asked once rather than at every open. The Chimera version is rewritten by
+  every save the same way, with the one that created the project kept beside it
+  (`OriginalEmuVersion`).
 - **File manifest**: names + SHA1 + the core-defined slot id each file
   fills (cdrom, floppy, hdd, config, ...), order within a slot = swap
   order, cue-referenced bins auto-added as support, cue closure enforced.

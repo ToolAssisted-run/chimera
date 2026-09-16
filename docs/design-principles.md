@@ -3389,3 +3389,22 @@ Frame 0, pins and the frontier are never given up; if nothing may go the budget
 is missed rather than a band emptied. The design is docs/state-manager.md, "The
 policy: everything until the budget is full, then a doubling shape";
 greenzone_shape.h and test_greenzone_shape hold the bands.
+
+## A save records the core that ran (user-reported, 2026-09-16)
+
+Opening a project on a different core build already does the right things: it
+warns, and it starts the greenzone empty because the cached states were made by
+another machine. What it did not do was write the new build down. The project
+was saved with the pin it was created with - name, version and package hash of a
+core nobody was running - so the next open warned again, and the one after that.
+
+A save now records the core that ran, when it can be named exactly: the pin is a
+package, so only a loaded package may replace it, and the name, the version and
+the package SHA1 travel together (a name from one build beside a hash from
+another would describe a machine that never existed). A movie with no core
+headers and an emulator that came from no package - a test's fake - still leaves
+the pin alone, which is what keeps a project openable at all.
+
+The Chimera version was already rewritten by every save, with the version that
+created the project kept as `OriginalEmuVersion`; the core now follows the same
+rule.

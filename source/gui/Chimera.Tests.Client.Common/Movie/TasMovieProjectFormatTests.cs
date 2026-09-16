@@ -642,6 +642,36 @@ namespace Chimera.Tests.Client.Common.Movie
 		}
 
 		/// <summary>
+		/// A save records the core that RAN, not the one the project was created
+		/// with: a project opened on another build warns, drops its cached states
+		/// and carries on, and used to be written back out still pinned to the old
+		/// build - so every later open asked about a core nobody was using
+		/// (user-reported, 2026-09-16).
+		///
+		/// The pin is a package, so only a loaded package may replace it, and the
+		/// three parts travel together: a name from one build beside a hash from
+		/// another would describe a machine that never existed.
+		/// </summary>
+		[TestMethod]
+		public void ASaveRecordsTheCoreThatRan()
+		{
+			FakeEmulator emu = new();
+
+			// nothing identifies the running core: the project keeps its pin, which
+			// is what ThePinSurvivesAMovieThatSaysNothing checks end to end
+			Assert.IsNull(TasMovie.RunningCoreIdentity(emu, ""), "a core from no package cannot replace a pin");
+			Assert.IsNull(TasMovie.RunningCoreIdentity(emu, "   "));
+			Assert.IsNull(TasMovie.RunningCoreIdentity(null, new string('A', 40)), "and neither can no core at all");
+
+			// a loaded package: name, version and hash together
+			var ran = TasMovie.RunningCoreIdentity(emu, new string('C', 40));
+			Assert.IsNotNull(ran);
+			Assert.AreEqual("Fake", ran.Value.Name);
+			Assert.AreEqual(new string('C', 40), ran.Value.Sha1);
+			Assert.AreEqual("", ran.Value.Version, "a core that states no version claims none");
+		}
+
+		/// <summary>
 		/// The wizard records every exposed setting at its chosen value, and the
 		/// movie that starts from that project has no settings text of its own -
 		/// the project boot fills headers, never settings. Saving must keep the

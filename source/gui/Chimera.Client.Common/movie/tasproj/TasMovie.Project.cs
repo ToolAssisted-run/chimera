@@ -164,6 +164,30 @@ namespace Chimera.Client.Common
 			=> string.IsNullOrWhiteSpace(headerValue) ? pinned : headerValue;
 
 		/// <summary>
+		/// Who a save records as the project's core: the one that RAN, when it can
+		/// be named exactly.
+		///
+		/// A project opened on another core build says so, drops its cached states
+		/// and carries on - and used to be written back out still pinned to the
+		/// build it was created with, so every later open asked the same question
+		/// about a core nobody was using any more (user-reported, 2026-09-16). The
+		/// pin is a package, so only a loaded package may replace it: the answer is
+		/// the running core's name, the version it states, and the SHA1 of the
+		/// package file, together or not at all - a name from one build beside a
+		/// hash from another would describe a machine that never existed.
+		/// Null when nothing identifies the running core (no emulator, or one that
+		/// came from no package - a test's fake, a core loaded outside the store),
+		/// and then the project keeps the pin it had.
+		/// </summary>
+		internal static (string Name, string Version, string Sha1)? RunningCoreIdentity(IEmulator emulator, string packageSha1)
+		{
+			if (emulator is null || string.IsNullOrWhiteSpace(packageSha1)) return null;
+			var name = emulator.Attributes().CoreName;
+			if (string.IsNullOrWhiteSpace(name)) return null;
+			return (name, emulator.CoreVersion() ?? "", packageSha1);
+		}
+
+		/// <summary>
 		/// The project as it stands, written to <paramref name="path"/> for <see cref="ProjectRecovery"/>:
 		/// exactly what a backup writes, so no greenzone and no change to what counts as saved.
 		/// </summary>
@@ -222,13 +246,27 @@ namespace Chimera.Client.Common
 			{
 				p.Title = Header[HeaderKeys.GameName];
 			}
+			// The core that RAN, when it can be named (RunningCoreIdentity); otherwise
 			// the pin is the project's, and a movie header that does not carry it is
 			// silent rather than empty: writing "" here would unpin the core and leave
 			// a project nothing can run
-			p.SetCore(
-				Keep(Header[HeaderKeys.Core], p.CoreName),
-				Keep(Header[HeaderKeys.CoreVersion], p.CoreVersion),
-				Keep(Header[HeaderKeys.CorePackageSha1], p.CoreSha1));
+			var ran = RunningCoreIdentity(Emulator, CoreRegistry.Instance.PackageSha1Of(Emulator) ?? "");
+			if (ran is { } core)
+			{
+				// the movie's own headers say the same, so what it reports and what
+				// the next open checks against are one answer
+				Header[HeaderKeys.Core] = core.Name;
+				Header[HeaderKeys.CoreVersion] = core.Version;
+				Header[HeaderKeys.CorePackageSha1] = core.Sha1;
+				p.SetCore(core.Name, core.Version, core.Sha1);
+			}
+			else
+			{
+				p.SetCore(
+					Keep(Header[HeaderKeys.Core], p.CoreName),
+					Keep(Header[HeaderKeys.CoreVersion], p.CoreVersion),
+					Keep(Header[HeaderKeys.CorePackageSha1], p.CoreSha1));
+			}
 			p.Rerecords = Rerecords;
 			// The settings are the movie's when it has them, and the project's
 			// own when it is silent - the same rule as the core pin above. A
