@@ -3112,6 +3112,40 @@ the next save removes it. Honoring the claim again needs the missing half first:
 a hardware path that reproduces itself, and a way to tell a history from a
 session that ended in a crash.
 
+
+## A greenzone is trusted when the session that wrote it finished (user-decided, 2026-09-16)
+
+The 2026-09-14 withdrawal above is narrowed, not reversed. It refused every
+GPU-drawn greenzone because one bricked a project - but the asymmetry it
+identified was never the renderer. The history that bricked nss102 was written
+by a session that went on to die of guest heap corruption; the same entry
+records that a clean session's history, reopened in a new process, restored and
+landed without incident.
+
+Measured on the real project, 2026-09-16, GTX 1060, the released Ruffle
+54c45bae replaying the project's own 8916-frame input log: a 626 MB greenzone
+written by one process and reloaded by another loaded in 2.4 s, rebuilt the GL
+context, and drew frame 8915 PIXEL FOR PIXEL identical to the straight run - with
+a control at frame 8815 differing by 76,129 bytes, so the comparison could tell
+frames apart. No guest died in any run, and no minibox-diag.log was written. Five
+synthetic fresh-process reloads with 66 rewinds between them behaved the same.
+
+So the gate is the shutdown, not the renderer. `ProjectRecovery` already knows:
+`End(clean: true)` deletes the recovery folder, so "no folder" is a session that
+finished. `LastSessionEndedCleanly` says so explicitly rather than leaving
+callers to read a missing `Leftover` as clean - which it is not, because
+`FindUnfinishedIn` also returns none when another Chimera has the project open
+and when a folder holds no work at all.
+
+What still does not travel is a BRANCH's machine: it rides inside the project
+file, which people hand to each other and open on other PCs, and a state a GPU
+drew is only good where that GPU is. That stays refused for a GPU-drawn machine,
+and is now refused after an unclean shutdown as well.
+
+The cost of being wrong is unchanged and still asymmetric - a greenzone that
+starts empty costs a replay; a history that crashes on open costs the project -
+which is why the gate refuses on doubt rather than on evidence of harm.
+
 ## A greenzone lives in memory, and the disk is for saving (user-decided, 2026-09-15)
 
 A greenzone used to spill: once it outgrew its memory budget, the oldest

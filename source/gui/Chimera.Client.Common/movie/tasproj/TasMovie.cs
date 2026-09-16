@@ -65,10 +65,26 @@ namespace Chimera.Client.Common
 				MovieConfig.MinimumNearStride), MovieConfig.MaximumNearStride));
 			States.Enable((long)memoryMb * 1024 * 1024);
 			// Read here and not with the rest of the cache, because until the
-			// emulator arrives there is nowhere to put it. A machine a GPU drew
-			// makes states good only in the session that made them, so it starts
-			// cold (docs/gpu-bridge.md).
-			if (!StatesMadeByGpu) States.Load(StateHistoryFilename, MachineIdentityOf(Project));
+			// emulator arrives there is nowhere to put it.
+			//
+			// A greenzone is trusted only when the session that wrote it FINISHED.
+			// What bricked nss102 was not that a GPU drew it - a clean GPU session's
+			// history reloads and lands correctly, measured on the real 8916-frame
+			// project - but that its history came from a session already dying of
+			// guest heap corruption: restoring a state from it killed the process
+			// inside the NVIDIA driver, every open, before anything in Chimera could
+			// catch it (docs/design-principles.md, 2026-09-14/2026-09-16).
+			//
+			// So the gate is the shutdown, not the renderer. A crashed session's
+			// history is left on disk and ignored; the movie replays instead.
+			// Two conditions, and both are about EVIDENCE rather than a promise: the
+			// core must be one whose greenzone has been shown to reload correctly
+			// (see GreenzoneMayOutliveSession), and the session that wrote this one
+			// must have finished.
+			if (GreenzoneMayOutliveSession && ProjectRecovery.LastSessionEndedCleanly(Project.Id))
+			{
+				States.Load(StateHistoryFilename, MachineIdentityOf(Project));
+			}
 			RefreshPins();
 
 			base.Attach(emulator);

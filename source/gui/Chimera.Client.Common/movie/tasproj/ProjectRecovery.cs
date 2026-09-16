@@ -73,6 +73,30 @@ namespace Chimera.Client.Common
 		public static string DirectoryFor(string projectId)
 			=> Path.Combine(Root, Path.GetFileName(ProjectCache.DirectoryFor(projectId)));
 
+		/// <summary>
+		/// Did the last session for this project end cleanly?
+		///
+		/// <see cref="End"/> deletes the folder on a clean end, so "no folder" is the answer - but a
+		/// missing <see cref="Leftover"/> is NOT: <see cref="FindUnfinishedIn"/> also returns none when
+		/// another Chimera still has the project open, and when a folder holds neither snapshot nor
+		/// journal. Neither of those is a session that finished, and a cached greenzone is only worth
+		/// trusting when one did: the history that bricked nss102 was written by a session that went on
+		/// to die of guest heap corruption, and restoring a state from it killed the process inside the
+		/// GPU driver on every open (docs/design-principles.md, 2026-09-14).
+		/// </summary>
+		public static bool LastSessionEndedCleanly(string projectId)
+		{
+			MoveLegacy(projectId);
+			var dir = DirectoryFor(projectId);
+			if (!Directory.Exists(dir)) return true;   // End(clean: true) took it away
+			// Somebody else is working in it. Not a crash, but not a finished
+			// session either - and its history is being written as we look.
+			if (ReadSession(dir) is { } session && IsRunning(session)) return false;
+			// A folder with no work in it is the remains of a clean end whose
+			// delete did not land; FindUnfinishedIn discards those.
+			return FindUnfinishedIn(dir) is null;
+		}
+
 		/// <summary>Where the folder was before it was a cache entry of its own: inside the project's cache.</summary>
 		private static string LegacyDirectoryFor(string projectId) => Path.Combine(ProjectCache.DirectoryFor(projectId), "recovery");
 

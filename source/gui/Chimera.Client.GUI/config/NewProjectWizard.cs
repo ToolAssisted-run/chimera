@@ -722,8 +722,8 @@ namespace Chimera.Client.GUI
 		/// </summary>
 		internal const string HardwareRendererCaveat =
 			"Hardware renderers use your PC's GPU: fast, but the picture is drawn outside the savestate, so video "
-			+ "can differ on another PC. The greenzone is not kept between sessions: reopening replays the movie "
-			+ "from the start.";
+			+ "can differ on another PC. The greenzone is kept between sessions, unless Chimera closed unexpectedly - "
+			+ "then it replays.";
 
 		private void ShowRendererCaveat()
 			=> _rendererCaveat.Text = IsHardware(ChosenRenderer) ? HardwareRendererCaveat : "";

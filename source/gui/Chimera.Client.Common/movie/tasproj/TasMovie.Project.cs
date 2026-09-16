@@ -1,4 +1,6 @@
-﻿using System.Globalization;
+﻿using System;
+using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -405,7 +407,10 @@ namespace Chimera.Client.Common
 				// in the file is the history as it stands right here; frames
 				// captured afterwards belong to the next save. The barrier is at
 				// Dispose, where the project is let go of.
-				if (States is not null && !DrawnByGpu && !_savingWithoutGreenzone) States.SaveLater(StateHistoryFilename, MachineIdentityOf(p));
+				if (States is not null && !_savingWithoutGreenzone && GreenzoneMayOutliveSession)
+				{
+					States.SaveLater(StateHistoryFilename, MachineIdentityOf(p));
+				}
 				else
 				{
 					// a save an earlier call queued may still be writing that very file
@@ -495,24 +500,108 @@ namespace Chimera.Client.Common
 		/// is what an empty greenzone has always meant.
 		///
 		/// A core may declare that its states DO survive a new context
-		/// (<c>video.gpuStatesSurviveTheContext</c>), and that is no longer taken on
-		/// trust. Ruffle declares it, and on the GTX 1060 a New Star Soccer greenzone
-		/// saved by one process and restored twenty-one frames deep in the next died
-		/// inside the NVIDIA driver (0xc0000409, nvoglv64.dll) on the first frame
-		/// after - reproducibly, headless, 2026-09-13. It had never been exercised:
-		/// until a replay stopped discarding the greenzone ahead, the first capture of
-		/// every session threw away all but frame 0 of what was loaded. So a machine a
-		/// GPU drew keeps its states for its own session, whatever it declares.
+		/// (<c>video.gpuStatesSurviveTheContext</c>), and that is still not taken on
+		/// trust for a state that TRAVELS: a branch's machine rides inside the project
+		/// file, which is handed to other people and opened on other PCs, and a state a
+		/// GPU drew is only good where that GPU is.
+		///
+		/// The greenzone is a different case and is decided elsewhere (see
+		/// <see cref="ProjectRecovery.LastSessionEndedCleanly"/>): it is a per-machine
+		/// cache beside the project, and what bricked nss102 in 2026-09-14 was not the
+		/// renderer but the SESSION - its history came from one already dying of guest
+		/// heap corruption. A clean GPU session's history reloads and lands correctly,
+		/// measured 2026-09-16 on the real 8916-frame project: a 626 MB greenzone
+		/// written by one process and reloaded by another drew frame 8915 pixel for
+		/// pixel, with no guest death in any run.
 		/// </summary>
 		private bool DrawnByGpu
 			=> Emulator is IGpuRendered { GpuRenderer: { Length: > 0 } };
 
 		/// <summary>
-		/// The same question asked of the cache rather than of the machine, and
-		/// it has to be: a project is READ before its core is booted, so there is
-		/// no emulator to ask when the cache is opened. What there is, is what
-		/// the project's last save wrote down - the driver that drew it - which
-		/// is exactly the session those states belonged to.
+		/// The GPU-drawn cores whose greenzone is known to survive a reload, by EVIDENCE:
+		/// a history written by one process, reloaded by another, drawing the same frame
+		/// pixel for pixel, with no guest death.
+		///
+		/// Ruffle: the real 8916-frame nss102 project, 626 MB greenzone, frame 8915
+		/// identical (2026-09-16), with a control at 8815 differing so the comparison
+		/// could tell frames apart.
+		///
+		/// Dolphin: Pro Rally 2002, 1000 frames of no input, 192 MB greenzone written by
+		/// one process and reloaded by another in 969 ms; frame 999 identical to the
+		/// straight run, 0 of 286,720 pixels different, control at frame 899 differing
+		/// by 98.9% (2026-09-16). No guest died.
+		///
+		/// xemu: Prince of Persia, 1000 frames of no input, a 241 MB greenzone ending at
+		/// frame 300 - BEFORE the title's static tail, so the reload had to replay 700
+		/// changing frames - loaded by another process in 966 ms; frame 999 identical,
+		/// 0 of 307,200 pixels different, control at frame 300 differing by 99.0%
+		/// (2026-09-16). An earlier attempt whose control sat inside the static tail
+		/// matched trivially and proved nothing; the frame a control photographs has to
+		/// be one the picture actually changes on.
+		///
+		/// PCSX2 (Gran Turismo 4), flycast (Re-Volt) and PPSSPP (Ridge Racer), all
+		/// 2026-09-16, all 1000 frames of no input with the greenzone ending at frame
+		/// 400 so the reload had to replay 600 changing frames: frame 999 identical in
+		/// every case - 0 of 286,720, 0 of 307,200 and 0 of 130,560 pixels - reloaded in
+		/// 436, 73 and 167 ms, no guest death. Controls differ by 99.5%, 6.9% and 99.2%.
+		///
+		/// flycast's evidence is the THINNEST of the six: Re-Volt's picture is static
+		/// except for a narrow window, so its control could only differ by 6.9%. It
+		/// passes, but a title that animates throughout would say more.
+		///
+		/// RPCS3 (a PopCap title, 2026-09-16) reloaded a 100 MB greenzone - the largest
+		/// of the seven - in a fresh process and replayed to frame 999 identically: 0 of
+		/// 921,600 pixels. Its control differs by 99.82%, the widest here. Read that
+		/// with its shape in mind: frame 999 is a dark screen, 72.6% pure black over 273
+		/// colours, so the match rests on the 252,811 pixels (27.4%) that carry
+		/// something. Solid evidence, but a darker target than PCSX2's.
+		///
+		/// The PS3 could not be photographed at all until the same day. It died during
+		/// RSX bring-up because the core embedded only Icons/ui/*.png and never the 36
+		/// icons under home/32 and home/256: the home-menu overlay asked for one, got an
+		/// image_info with null data and zero width, and the renderer built a GL texture
+		/// out of it - rpcs3's own "Invalid OpenGL texture definition" killed the RSX
+		/// thread, and all 26 guest threads then waited forever on a thread that was
+		/// gone. Fixed in the core (gen-assets.py walks the tree).
+		///
+		/// Every other GPU core keeps the old behaviour - greenzone cleared on save and
+		/// load - until its own evidence exists. A core's own declaration is NOT enough:
+		/// Ruffle declared <c>gpuStatesSurviveTheContext</c> while being the core that
+		/// bricked a project (docs/design-principles.md, 2026-09-14).
+		/// </summary>
+		private static readonly HashSet<string> GreenzoneSurvivesReload =
+			new(new[] { "Ruffle", "Dolphin", "xemu", "PCSX2", "flycast", "PPSSPP", "RPCS3" },
+				StringComparer.OrdinalIgnoreCase);
+
+		/// <summary>
+		/// Whether this project's greenzone may outlive its session: a machine no GPU
+		/// drew always may; one a GPU drew only if its core is on the evidence list
+		/// above. The core is named by the project's own header, because a project is
+		/// read before its core is booted.
+		/// </summary>
+		private bool GreenzoneMayOutliveSession
+		{
+			get
+			{
+				if (!StatesMadeByGpu) return true;   // nothing outside the savestate drew it
+				// The project's own record first: a project READ from disk may carry no
+				// Core header at all (nss102 does not), while the project object always
+				// knows the core it was made with.
+				var core = Project.CoreName;
+				if (core.Length is 0) HeaderEntries.TryGetValue(HeaderKeys.Core, out core);
+				return core is { Length: > 0 } && GreenzoneSurvivesReload.Contains(core);
+			}
+		}
+
+		/// <summary>
+		/// The same question asked of the project file rather than of the machine,
+		/// and it has to be: a project is READ before its core is booted, so there
+		/// is no emulator to ask. What there is, is what the last save wrote down -
+		/// the driver that drew it.
+		///
+		/// This decides the BRANCH states only, which travel inside the project
+		/// file. The greenzone beside it is decided by the shutdown instead (see
+		/// <see cref="ProjectRecovery.LastSessionEndedCleanly"/>).
 		/// </summary>
 		private bool StatesMadeByGpu
 			=> HeaderEntries.TryGetValue(HeaderKeys.GpuRenderer, out var driver)
@@ -525,9 +614,9 @@ namespace Chimera.Client.Common
 		/// cache write never fails the save - the cache is the one file whose
 		/// loss costs recomputation only.
 		///
-		/// The states themselves are left out for a machine a GPU drew (see
-		/// <see cref="DrawnByGpu"/>): they could only be loaded back into a
-		/// machine that cannot draw, and for a PlayStation 3 each one is the
+		/// The BRANCH states are left out for a machine a GPU drew (see
+		/// <see cref="DrawnByGpu"/>): they ride inside the project file, which
+		/// travels, and for a PlayStation 3 each one is the
 		/// better part of a gigabyte.
 		/// </summary>
 		private static void TryDelete(string path)
@@ -563,10 +652,13 @@ namespace Chimera.Client.Common
 				var ncoreframebuffer = new IndexedStateLump(BinaryStateLump.BranchCoreFrameBuffer);
 				foreach (var b in Branches)
 				{
-					// the branch's picture and its metadata are worth keeping; the
-					// machine behind it is not, for the same reason the greenzone
-					// is not (see DrawnByGpu). Skipped for ALL branches or none:
-					// these lumps are joined to the branches by order.
+					// A branch's picture and metadata are always worth keeping. The
+					// machine behind it rides INSIDE the project file, which people
+					// hand to each other and open on other PCs - and a state a GPU
+					// drew is only good where that GPU is. So it is still left out
+					// for a GPU-drawn machine (see DrawnByGpu); the greenzone, which
+					// is a per-machine cache beside the project, is not. Skipped for
+					// ALL branches or none: these lumps are joined to them by order.
 					if (b.CoreData is not null && !DrawnByGpu)
 					{
 						bs.PutLump(ncore, (Stream s) => s.Write(b.CoreData, 0, b.CoreData.Length));
@@ -813,10 +905,12 @@ namespace Chimera.Client.Common
 				var ncoreframebuffer = new IndexedStateLump(BinaryStateLump.BranchCoreFrameBuffer);
 				foreach (var b in Branches)
 				{
-					// a state a GPU drew belongs to the session that drew it; an
-					// older cache may still hold one, and loading it would put a
-					// machine that cannot draw on the screen (see DrawnByGpu)
-					if (!StatesMadeByGpu)
+					// a state a GPU drew belongs where that GPU is, and a project
+					// travels; an older file may still hold one, and loading it
+					// would put a machine that cannot draw on the screen. A session
+					// that did not finish is not trusted either, for the reason the
+					// greenzone is not (see TasMovie.Attach).
+					if (!StatesMadeByGpu && ProjectRecovery.LastSessionEndedCleanly(Project.Id))
 					{
 						bl.GetLump(ncore, abort: false, (Stream s, long _) => b.CoreData = s.ReadAllBytes());
 					}
@@ -844,12 +938,20 @@ namespace Chimera.Client.Common
 				// Said when there is work to say it about: a project with frames in
 				// it opens with an empty greenzone on a machine a GPU draws, and a
 				// person who is not told simply sees their cached states gone.
-				if (StatesMadeByGpu && DroppedCacheNote is null && InputLogLength > 0)
+				if (DroppedCacheNote is null && InputLogLength > 0 && !GreenzoneMayOutliveSession)
 				{
 					DroppedCacheNote =
-						"This machine is drawn by a GPU, and what it draws lives outside the machine: a state"
-						+ " it made is good only in the session that made it. The greenzone therefore starts"
-						+ " empty and fills again as the movie plays.";
+						"This machine is drawn by a GPU, and its core is not yet known to reload a greenzone"
+						+ " correctly, so the states are not kept between sessions. The greenzone starts empty"
+						+ " and fills again as the movie plays.";
+				}
+				else if (DroppedCacheNote is null && InputLogLength > 0
+					&& !ProjectRecovery.LastSessionEndedCleanly(Project.Id))
+				{
+					DroppedCacheNote =
+						"Chimera did not close normally the last time this project was open, so its saved"
+						+ " greenzone is not trusted: a history written by a session that was already going"
+						+ " wrong can carry a broken machine back in. It starts empty and fills as the movie plays.";
 				}
 			}
 		}

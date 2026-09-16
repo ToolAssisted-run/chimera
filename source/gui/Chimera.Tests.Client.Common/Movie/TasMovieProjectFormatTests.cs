@@ -65,7 +65,8 @@ namespace Chimera.Tests.Client.Common.Movie
 				.OrderBy(static n => n, StringComparer.Ordinal)
 				.ToArray();
 
-		private static TasMovie MakeWorkedMovie(string path, string gpuRenderer = "", bool statesSurvive = false)
+		private static TasMovie MakeWorkedMovie(string path, string gpuRenderer = "", bool statesSurvive = false,
+			string coreName = "quickernes")
 		{
 			FakeEmulator emu = new() { GpuRenderer = gpuRenderer, GpuStatesSurviveTheContext = statesSurvive };
 			FakeMovieSession session = new(emu);
@@ -76,7 +77,7 @@ namespace Chimera.Tests.Client.Common.Movie
 			movie.SetBoolState(3, "A", true);
 
 			movie.HeaderEntries[HeaderKeys.Author] = "sergio";
-			movie.HeaderEntries[HeaderKeys.Core] = "quickernes";
+			movie.HeaderEntries[HeaderKeys.Core] = coreName;
 			movie.HeaderEntries[HeaderKeys.CoreVersion] = "abc123+local";
 			movie.HeaderEntries[HeaderKeys.CorePackageSha1] = new string('B', 40);
 			movie.HeaderEntries[HeaderKeys.GameName] = "sprilo";
@@ -239,21 +240,22 @@ namespace Chimera.Tests.Client.Common.Movie
 		}
 
 		/// <summary>
-		/// A machine a GPU drew keeps its states for the session that drew them.
+		/// A state a GPU drew does not TRAVEL: a branch's machine rides inside the
+		/// project file, which people hand to each other and open on other PCs, and
+		/// the renderer holds its OpenGL objects by names a particular driver handed
+		/// out. So a branch keeps its input and loses its machine.
 		///
-		/// The renderer holds its OpenGL objects by the names a driver handed
-		/// out, those names live in guest memory, and a savestate carries them
-		/// into a session where they mean nothing: the driver refuses every call
-		/// naming one, the core is never told, and what comes out is a machine
-		/// that runs and draws nothing - a black screen, then a crash. So the
-		/// cache carries no states from such a machine, and any older cache's
-		/// are not used.
+		/// The greenzone is the other case and is decided by the SHUTDOWN, not the
+		/// renderer (2026-09-16): it is a per-machine cache beside the project, and a
+		/// cleanly closed session's history reloads correctly - measured on the real
+		/// 8916-frame nss102 project, where a 626 MB greenzone written by one process
+		/// and reloaded by another drew frame 8915 pixel for pixel.
 		/// </summary>
 		[TestMethod]
-		public void StatesAGpuDrewDoNotOutliveTheirSession()
+		public void AGpuDrawnBranchLosesItsMachineButTheGreenzoneSurvivesACleanClose()
 		{
 			var path = Path.Combine(_dir, "gpudrawn.chimeraProject");
-			var movie = MakeWorkedMovie(path, gpuRenderer: "4.5 (Core Profile) Mesa on llvmpipe");
+			var movie = MakeWorkedMovie(path, gpuRenderer: "4.5 (Core Profile) Mesa on llvmpipe", coreName: "Ruffle");
 			Assert.IsFalse(movie.Save().IsError);
 
 			var loaded = LoadFresh(path);
@@ -261,11 +263,9 @@ namespace Chimera.Tests.Client.Common.Movie
 			Assert.AreEqual(1, loaded.Branches.Count);
 			Assert.AreEqual("risky route", loaded.Branches[0].UserText, "and so is what a branch IS");
 			Assert.IsNull(loaded.Branches[0].CoreData, "the branch keeps its input and loses its state");
-			// a cold greenzone is not an empty one: the machine as it stands is
-			// always the anchor, or no frame could be reached at all
-			Assert.AreEqual(1, loaded.States?.Count ?? 0, "nothing came back but the anchor");
-			Assert.IsNotNull(loaded.DroppedCacheNote, "and the person is told why it is empty");
-			StringAssert.Contains(loaded.DroppedCacheNote, "GPU");
+			// ...but nothing is said about the greenzone, because nothing was taken
+			// away: this project closed cleanly, so its history is trusted
+			Assert.IsNull(loaded.DroppedCacheNote, "a clean close keeps the greenzone, whoever drew it");
 
 			// the same project on a machine no GPU drew keeps its states, which is
 			// what every deterministic core does and must go on doing
@@ -278,23 +278,94 @@ namespace Chimera.Tests.Client.Common.Movie
 		}
 
 		/// <summary>
-		/// ...and a core that SAYS its renderer builds its objects again when the context it drew on is
-		/// gone is not taken at its word. Ruffle says so, and a New Star Soccer greenzone saved by one
-		/// process and restored twenty-one frames deep in the next died inside the NVIDIA driver on the
-		/// first frame after (2026-09-13). The claim is still written down - it is what the core said -
-		/// but the states go the way every GPU-drawn machine's do.
+		/// A GPU-drawn core with no evidence behind it keeps the old behaviour: its greenzone is not
+		/// kept between sessions at all, however cleanly the last one closed.
+		///
+		/// The list is evidence, not a promise a core makes about itself: Ruffle DECLARED that its
+		/// states survive a new context while being the core that bricked a project (2026-09-14). A core
+		/// joins the list when a history written by one process has been reloaded by another and shown
+		/// to draw the same frame.
 		/// </summary>
 		[TestMethod]
-		public void EvenARendererThatSaysItRebuildsStartsCold()
+		public void AGpuCoreWithNoEvidenceStillStartsCold()
+		{
+			var path = Path.Combine(_dir, "unproven.chimeraProject");
+			var movie = MakeWorkedMovie(path, gpuRenderer: "4.5 (Core Profile) Mesa on llvmpipe",
+				statesSurvive: true, coreName: "some-unproven-core");
+			Assert.IsFalse(movie.Save().IsError);
+
+			var loaded = LoadFresh(path);
+			Assert.AreEqual(6, loaded.InputLogLength, "the work itself is untouched");
+			Assert.IsNotNull(loaded.DroppedCacheNote, "and the person is told the states were not kept");
+			StringAssert.Contains(loaded.DroppedCacheNote, "not yet known to reload");
+		}
+
+		/// <summary>
+		/// A history written by a session that did not finish is not trusted - the case that decided the
+		/// policy (docs/design-principles.md, 2026-09-14/2026-09-16).
+		///
+		/// nss102's greenzone came from a session that went on to die of guest heap corruption. Opening
+		/// the project restored a state from it and the first draw killed the process inside the NVIDIA
+		/// driver, every time: nothing in Chimera could catch it, because the process was gone. So the
+		/// gate is the shutdown, and it refuses on doubt: a recovery folder still holding work means the
+		/// last session never got to say it had finished.
+		/// </summary>
+		[TestMethod]
+		public void AHistoryFromASessionThatDidNotFinishIsNotTrusted()
+		{
+			var path = Path.Combine(_dir, "crashed.chimeraProject");
+			var movie = MakeWorkedMovie(path, gpuRenderer: "4.5 (Core Profile) Mesa on llvmpipe", coreName: "Ruffle");
+			Assert.IsFalse(movie.Save().IsError);
+			var dir = ProjectRecovery.DirectoryFor(movie.Project.Id);
+			try
+			{
+				// the session that never closed: work on disk, and an owner whose process is gone
+				var recovery = ProjectRecovery.Begin(movie, movie.Project.Id, path);
+				Assert.IsNotNull(recovery);
+				recovery.Tick();
+				ProjectRecovery.WriteSession(dir, new ProjectRecovery.SessionRecord
+				{
+					ProcessId = int.MaxValue, ProcessStartedUtcTicks = 1, ProjectPath = path,
+				});
+				Assert.IsFalse(ProjectRecovery.LastSessionEndedCleanly(movie.Project.Id),
+					"a folder still holding work is a session that did not finish");
+
+				var loaded = LoadFresh(path);
+				Assert.AreEqual(6, loaded.InputLogLength, "the work itself is never in doubt");
+				Assert.IsNotNull(loaded.DroppedCacheNote, "and the person is told the greenzone was not used");
+				StringAssert.Contains(loaded.DroppedCacheNote, "did not close normally");
+			}
+			finally
+			{
+				// Discard takes the Leftover, and the folder lives in the real
+				// per-user cache root - so it is taken away by hand either way,
+				// and a test never leaves work behind in somebody's cache.
+				if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+			}
+
+			// ...and with the folder gone, the very same project keeps its history:
+			// the refusal is the unfinished session's doing and nothing else's
+			Assert.IsTrue(ProjectRecovery.LastSessionEndedCleanly(movie.Project.Id));
+			Assert.IsNull(LoadFresh(path).DroppedCacheNote, "a clean close is trusted again");
+		}
+
+		/// <summary>
+		/// ...and a core that SAYS its renderer builds its objects again when the context it drew on is
+		/// gone is still not taken at its word for a state that TRAVELS. The claim is written down - it
+		/// is what the core said - and the branch's machine is left out all the same, because the
+		/// project file goes to other people and other PCs.
+		/// </summary>
+		[TestMethod]
+		public void ARendererThatSaysItRebuildsStillDoesNotTravel()
 		{
 			var path = Path.Combine(_dir, "rebuilds.chimeraProject");
-			var movie = MakeWorkedMovie(path, gpuRenderer: "4.5 Mesa on llvmpipe", statesSurvive: true);
+			var movie = MakeWorkedMovie(path, gpuRenderer: "4.5 Mesa on llvmpipe", statesSurvive: true, coreName: "Ruffle");
 			Assert.IsFalse(movie.Save().IsError);
 
 			var loaded = LoadFresh(path);
 			Assert.AreEqual(6, loaded.InputLogLength, "the work itself is untouched");
 			Assert.IsNull(loaded.Branches[0].CoreData, "the branch keeps its input and loses its state");
-			Assert.IsNotNull(loaded.DroppedCacheNote, "and the person is told why the greenzone is empty");
+			Assert.IsNull(loaded.DroppedCacheNote, "the greenzone is untouched: this project closed cleanly");
 			Assert.AreEqual("1", loaded.HeaderEntries[HeaderKeys.GpuStatesSurvive],
 				"what the core declared is still on record");
 		}
