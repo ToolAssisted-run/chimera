@@ -540,14 +540,23 @@ namespace Chimera.Client.Common
 		/// be one the picture actually changes on.
 		///
 		/// PCSX2 (Gran Turismo 4), flycast (Re-Volt) and PPSSPP (Ridge Racer), all
-		/// 2026-09-16, all 1000 frames of no input with the greenzone ending at frame
-		/// 400 so the reload had to replay 600 changing frames: frame 999 identical in
-		/// every case - 0 of 286,720, 0 of 307,200 and 0 of 130,560 pixels - reloaded in
-		/// 436, 73 and 167 ms, no guest death. Controls differ by 99.5%, 6.9% and 99.2%.
+		/// 2026-09-16, all 1000 frames of no input with the greenzone written at frame
+		/// 900 and reloaded in a fresh process: frame 999 identical in every case - 0 of
+		/// 286,720, 0 of 307,200 and 0 of 130,560 pixels - and no guest died.
 		///
-		/// flycast's evidence is the THINNEST of the six: Re-Volt's picture is static
-		/// except for a narrow window, so its control could only differ by 6.9%. It
-		/// passes, but a title that animates throughout would say more.
+		/// A control frame is half the measurement, and choosing one badly is how this
+		/// nearly shipped a false claim. flycast first "passed" against a control that
+		/// was 100% PURE BLACK, which made its 6.9% difference meaningless: it was
+		/// black against a frame 93% black. Re-Volt's picture also CYCLES on a period
+		/// of about 400 frames, so frames 400 apart are byte-identical and any control
+		/// at that spacing proves nothing whichever way it falls. Re-measured on the
+		/// current core against frame 850, in the other phase of that cycle, it differs
+		/// by 98.52% - and the target carries 900 colours. Greenzone 21.7 MB.
+		///
+		/// PCSX2's control (frame 200) is 88% near-black, which looked like the same
+		/// trap and is not: its target at frame 999 carries 1,066 colours and is 0.6%
+		/// near-black, so the 99.51% difference is real content, not an absence of it.
+		/// Greenzone 158.7 MB.
 		///
 		/// RPCS3 (a PopCap title, 2026-09-16) reloaded a 100 MB greenzone - the largest
 		/// of the seven - in a fresh process and replayed to frame 999 identically: 0 of
