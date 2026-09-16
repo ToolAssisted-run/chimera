@@ -79,10 +79,14 @@ namespace Chimera.Tests.Client.GUI
 				"a software renderer has nothing to be careful about");
 
 			form.SetRenderer("opengl-hw");
-			StringAssert.Contains(form.RendererCaveatText, "video output",
+			StringAssert.Contains(form.RendererCaveatText, "video can differ",
 				"the cost - a picture that can differ elsewhere - is said where the choice is made");
-			StringAssert.Contains(form.RendererCaveatText, "greenzone",
-				"and so is what to do about it");
+			StringAssert.Contains(form.RendererCaveatText, "not kept between sessions",
+				"and the other cost: a GPU-drawn machine's states do not outlive their session (2026-09-16)");
+			StringAssert.Contains(form.RendererCaveatText, "replays",
+				"so the person is told what reopening the project will actually cost them");
+			Assert.IsTrue(form.RendererCaveatText.Length <= 240,
+				$"and it fits the space the window reserves for it (442x46 px, about three lines): {form.RendererCaveatText.Length} chars");
 
 			form.SetRenderer("software");
 			Assert.AreEqual("", form.RendererCaveatText, "and it goes away again");

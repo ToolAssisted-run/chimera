@@ -721,10 +721,9 @@ namespace Chimera.Client.GUI
 		/// warning that is always on screen is a warning nobody reads.
 		/// </summary>
 		internal const string HardwareRendererCaveat =
-			"Hardware renderers draw on your PC's GPU, which is fast. The picture is drawn outside the savestate, so "
-			+ "it may not look exactly the same on another PC or driver - differences in video output may occur. The "
-			+ "machine itself is unaffected: your run continues normally, its greenzone loads and picks up where you "
-			+ "left off. Choose a software renderer for a movie whose video must look identical everywhere.";
+			"Hardware renderers use your PC's GPU: fast, but the picture is drawn outside the savestate, so video "
+			+ "can differ on another PC. The greenzone is not kept between sessions: reopening replays the movie "
+			+ "from the start.";
 
 		private void ShowRendererCaveat()
 			=> _rendererCaveat.Text = IsHardware(ChosenRenderer) ? HardwareRendererCaveat : "";
