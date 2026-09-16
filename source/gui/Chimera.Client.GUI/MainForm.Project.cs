@@ -370,6 +370,11 @@ namespace Chimera.Client.GUI
 				// pausing is part of recovering, not a reason to stop
 			}
 			KeepWorkSafe();
+			// Before any choice is offered: whatever is done next, nothing this session
+			// stored may be trusted on a later open. Three of the four choices leave the
+			// session running or closing through the ordinary save, which would otherwise
+			// write the greenzone of a machine that had already died.
+			if (Tools.IsLoaded<TAStudio>()) Tools.TAStudio.CurrentTasMovie?.NoteCoreDied();
 			Console.Error.WriteLine($"The core stopped: {stopped.Reason}");
 			if (_coreStoppedAsking) return;   // the same death, reported again while the question is open
 

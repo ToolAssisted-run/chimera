@@ -579,10 +579,29 @@ namespace Chimera.Client.Common
 		/// above. The core is named by the project's own header, because a project is
 		/// read before its core is booted.
 		/// </summary>
+		/// <summary>
+		/// The core's machine died at some point in this session (the core-stopped dialog was raised).
+		/// Sticky until the project is let go of: a machine that died may have been wrong for some time
+		/// before it faulted, so every state captured in this session is suspect, not just the last one.
+		/// </summary>
+		/// <remarks>
+		/// "Save inputs and close" already wrote without a greenzone, but that is one of four choices.
+		/// Going back to a safe point or restarting from frame zero leaves the session running, and the
+		/// ordinary save at the end of it would write the greenzone as if nothing had happened - which
+		/// is how a 430 MB history came to be written by a session whose Ruffle machine had died in
+		/// naga's shader namer (2026-09-16).
+		/// </remarks>
+		public bool CoreDiedThisSession { get; private set; }
+
+		/// <summary>Remembers that the machine died, so nothing captured in this session outlives it.</summary>
+		public void NoteCoreDied() => CoreDiedThisSession = true;
+
 		private bool GreenzoneMayOutliveSession
 		{
 			get
 			{
+				// A session that lost its machine cannot vouch for what it stored.
+				if (CoreDiedThisSession) return false;
 				if (!StatesMadeByGpu) return true;   // nothing outside the savestate drew it
 				// The project's own record first: a project READ from disk may carry no
 				// Core header at all (nss102 does not), while the project object always

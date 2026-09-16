@@ -17,6 +17,15 @@ namespace Chimera.Client.Common
 		void RefreshPins();
 
 		/// <summary>
+		/// Remembers that the core's machine died in this session, so nothing it stored outlives it:
+		/// the greenzone is not written on save, and any earlier one is removed.
+		/// </summary>
+		void NoteCoreDied();
+
+		/// <summary>Whether the machine died at some point in this session. Sticky once set.</summary>
+		bool CoreDiedThisSession { get; }
+
+		/// <summary>
 		/// Why the cache beside the project was set aside on load, or null when it
 		/// was used (or there was none). One sentence, for the person opening it.
 		/// </summary>

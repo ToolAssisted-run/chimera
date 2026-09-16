@@ -278,6 +278,41 @@ namespace Chimera.Tests.Client.Common.Movie
 		}
 
 		/// <summary>
+		/// A session whose machine DIED keeps nothing, however tidily it then shut down.
+		///
+		/// The core-stopped dialog offers four ways on, and only one of them ("save inputs and close")
+		/// went through the no-greenzone save. Going back to a safe point or restarting from frame zero
+		/// leaves the session running, and its ordinary save would write the greenzone as though the
+		/// death had not happened. That is not hypothetical: on 2026-09-16 a Ruffle machine died in
+		/// naga's shader namer and the session went on to write a 430 MB history, which the next open
+		/// would have loaded and trusted.
+		///
+		/// The death is sticky because a machine that faults may have been wrong for some time first,
+		/// so every state captured in that session is suspect - not merely the last one.
+		/// </summary>
+		[TestMethod]
+		public void ASessionWhoseMachineDiedLeavesNoGreenzoneBehind()
+		{
+			var path = Path.Combine(_dir, "died.chimeraProject");
+			var movie = MakeWorkedMovie(path, gpuRenderer: "4.5 (Core Profile) Mesa on llvmpipe", coreName: "Ruffle");
+			Assert.IsFalse(movie.Save().IsError);
+			Assert.IsTrue(File.Exists(movie.StateHistoryFilename),
+				"a clean Ruffle session writes one - that is the behaviour this guards");
+
+			movie.NoteCoreDied();
+			Assert.IsTrue(movie.CoreDiedThisSession, "and it stays said");
+			Assert.IsFalse(movie.Save().IsError);
+			Assert.IsFalse(File.Exists(movie.StateHistoryFilename),
+				"the history of a session that lost its machine is removed, not left for the next open");
+
+			// and a core that never had a greenzone to lose is unaffected
+			var plain = Path.Combine(_dir, "diedplain.chimeraProject");
+			var cpu = MakeWorkedMovie(plain);
+			cpu.NoteCoreDied();
+			Assert.IsFalse(cpu.Save().IsError, "a death is not a save failure");
+		}
+
+		/// <summary>
 		/// A GPU-drawn core with no evidence behind it keeps the old behaviour: its greenzone is not
 		/// kept between sessions at all, however cleanly the last one closed.
 		///
