@@ -636,6 +636,16 @@ extern "C" void ce_gl_audit_frame(int64_t frame)
  */
 static void mint_context_id();
 
+/* Whether a same-session load moves the context id. Global and set before a
+ * session opens, the way ce_gl_request and ce_cache_dir are; 1 unless a core
+ * declares otherwise, so nothing changes for a core that says nothing. */
+static bool g_rebuildOnStateLoad = true;
+
+extern "C" void ce_gl_rebuild_on_state_load(int32_t on)
+{
+	g_rebuildOnStateLoad = on != 0;
+}
+
 extern "C" void ce_gl_state_loaded(int64_t to)
 {
 	flightNote(kFlightStateLoaded, (uint32_t)to);
@@ -653,7 +663,11 @@ extern "C" void ce_gl_state_loaded(int64_t to)
 	 *
 	 * CHIMERA_GL_KEEP_OBJECTS_ON_LOAD puts the old behaviour back, for A/B. */
 	static const bool keepObjects = getenv("CHIMERA_GL_KEEP_OBJECTS_ON_LOAD") != nullptr;
-	if (!keepObjects) mint_context_id();
+	/* ...and a core may say the same of itself, because for some renderers the
+	 * rebuild is the damage rather than the repair (see
+	 * ce_gl_rebuild_on_state_load). A core that declares nothing keeps the
+	 * behaviour above exactly. */
+	if (!keepObjects && g_rebuildOnStateLoad) mint_context_id();
 	if (!glAudit()) return;
 	uint64_t dead = 0, reused = 0, held = 0, leaked = 0;
 	for (int k = 0; k < kAuditKinds; k++)

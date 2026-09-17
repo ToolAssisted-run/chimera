@@ -44,5 +44,31 @@ namespace Chimera.Tests.Emulation.Common
 			Assert.IsTrue(cfg.Video.DrawEveryFrame);
 			Assert.IsTrue(cfg.Video.GpuStatesSurviveTheContext);
 		}
+
+		/// <summary>
+		/// A core that says nothing about rebuilding on a state load keeps the
+		/// behaviour every core had before the question existed (issue #43: a
+		/// restore looks like a new context, so a renderer builds its objects
+		/// again). Only a core that declares FALSE is changed.
+		///
+		/// This is the guarantee the whole declaration rests on: adding it must
+		/// not move a single other core.
+		/// </summary>
+		[TestMethod]
+		public void ACoreThatSaysNothingStillRebuildsOnAStateLoad()
+		{
+			var silent = Newtonsoft.Json.JsonConvert.DeserializeObject<WaterboxConfig>(
+				"{\"video\":{\"width\":640,\"height\":480}}");
+			Assert.IsTrue(silent.Video.RebuildOnStateLoad,
+				"a package that never mentions it must behave exactly as before");
+
+			var declined = Newtonsoft.Json.JsonConvert.DeserializeObject<WaterboxConfig>(
+				"{\"video\":{\"rebuildOnStateLoad\":false}}");
+			Assert.IsFalse(declined.Video.RebuildOnStateLoad, "and one that declines is taken at its word");
+
+			var asked = Newtonsoft.Json.JsonConvert.DeserializeObject<WaterboxConfig>(
+				"{\"video\":{\"rebuildOnStateLoad\":true}}");
+			Assert.IsTrue(asked.Video.RebuildOnStateLoad);
+		}
 	}
 }

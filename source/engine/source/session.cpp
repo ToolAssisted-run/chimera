@@ -71,6 +71,10 @@ struct SessionConfig
 	std::vector<chimera::EntryAxis> axes;
 	bool deterministic = false;
 	bool drawEveryFrame = false; // video.drawEveryFrame - see ce_session_draw_every_frame
+	/* video.rebuildOnStateLoad - whether a SAME-SESSION load should look like a
+	 * new context to this core's renderer (issue #43). Absent means true, which
+	 * is what every core did before the question existed. */
+	bool rebuildOnStateLoad = true;
 	std::string defaultsJson; // JSON object: every declared setting at its default
 	std::string settingsJson; // the effective settings, serialized for the guest
 };
@@ -194,6 +198,13 @@ bool parseConfig(const char *json, uint64_t len, const char *overrides, SessionC
 	cfg.vsyncDen = intOf(video, "vsyncDenominator");
 	cfg.getBgra = strOf(video, "getBgra", "GetVideoBgra");
 	cfg.drawEveryFrame = cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(video, "drawEveryFrame"));
+	/* ABSENT MEANS TRUE here, unlike the flags above: a core that says nothing
+	 * must behave exactly as it did before this declaration existed, so only a
+	 * package that explicitly declines is changed. */
+	{
+		const cJSON *rebuild = cJSON_GetObjectItemCaseSensitive(video, "rebuildOnStateLoad");
+		cfg.rebuildOnStateLoad = rebuild == nullptr || cJSON_IsTrue(rebuild);
+	}
 	cfg.samplesPerFrame = intOf(audio, "samplesPerFrame");
 	cfg.channels = intOf(audio, "channels", 1);
 	cfg.getAudio = strOf(audio, "get", "GetAudio");
@@ -306,6 +317,7 @@ extern "C" void ce_gl_release(void);
  * world and the guest's stop agreeing - see CHIMERA_GL_STATEAUDIT. */
 extern "C" void ce_gl_audit_frame(int64_t frame);
 extern "C" void ce_gl_state_loaded(int64_t to);
+extern "C" void ce_gl_rebuild_on_state_load(int32_t on);
 extern "C" uintptr_t ce_gl_dispatch(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t);
 
 struct ce_session
@@ -699,6 +711,11 @@ void ce_session::probeOptionalGroups()
 	 * here rather than in a frontend because it is a property of the core, and
 	 * every host that opens this package needs it to hold. */
 	drawAlways = cfg.drawEveryFrame ? 1 : 0;
+	/* ...and whether a restore should look like a new context to this renderer.
+	 * Here for the same reason drawAlways is: it is a property of the core, and
+	 * every host that opens this package - the frontend, chimera-run, a gate -
+	 * needs it to hold without being told separately. */
+	ce_gl_rebuild_on_state_load(cfg.rebuildOnStateLoad ? 1 : 0);
 
 	// savedata export: all four or nothing. Only the POINTERS are kept - the
 	// file list is dynamic (a game creates files while it runs), so it is

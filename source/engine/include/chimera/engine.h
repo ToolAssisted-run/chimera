@@ -839,6 +839,23 @@ CE_API void ce_gl_release(void);
  * memory, written as calls cross, so a crash module reading the dead process
  * finds what the driver was doing (docs/gpu-bridge.md, "The flight recorder").
  * Null and 0 bytes in a build without the bridge. */
+/* Whether a SAME-SESSION state load should move the context id.
+ *
+ * A load moves it by default (issue #43): the state puts back a renderer's idea
+ * of its GL objects but not the objects, so the renderer must build them again
+ * or attach handles the driver has since given to something else. That is right
+ * for a renderer whose caches survive the load holding stale names.
+ *
+ * It is wrong for one whose picture lives in the objects the rebuild throws
+ * away: RPCS3 tears down its render targets and texture cache on a moved id,
+ * and a rewind then presents an opaque black clear while the machine plays on
+ * (and, after a few rewinds, aborts in its texture cache). Such a core declares
+ * video.rebuildOnStateLoad false and keeps its renderer across a rewind.
+ *
+ * A genuinely new context still mints a new id at ce_gl_start, so a core that
+ * opts out here still rebuilds when a project is reopened - which is the case
+ * the rebuild exists for. Default 1: a core that says nothing is unaffected. */
+CE_API void ce_gl_rebuild_on_state_load(int32_t on);
 CE_API void *ce_gl_flight_recorder(uint32_t *bytes);
 
 /* ---------------------------------------------------------------------------

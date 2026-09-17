@@ -387,11 +387,11 @@ failing call one that names an object.
 
 A renderer can be told which context its calls are landing on: `GL_OP_CONTEXT_ID`
 answers with an identity the bridge mints for each SESSION that takes it, and
-afresh on every state load (see "Per load, too" below; 0 means
-"cannot tell" - no bridge, or a host older than the question, and a guest must
-read that as "assume nothing moved"). A renderer that stores that number beside
-its objects can see, at the top of any frame, that the ground has moved - and
-rebuild.
+afresh on every state load, unless the package declines that (see "Per load,
+too" below; 0 means "cannot tell" - no bridge, or a host older than the
+question, and a guest must read that as "assume nothing moved"). A renderer
+that stores that number beside its objects can see, at the top of any frame,
+that the ground has moved - and rebuild.
 
 Per session, not per context, and the difference is the whole of issue #43. The
 GL context is made once per process and shared by every session, because there
@@ -468,6 +468,36 @@ can tell: it rebuilds its objects from emulated memory, as described above.
 The fix is in the engine, because every bridged core already rebuilds on a
 moved id. The same stress ran its whole 20 minutes (212 steps) with it.
 `CHIMERA_GL_KEEP_OBJECTS_ON_LOAD` keeps the old behaviour for A/B.
+
+### ...unless the core says otherwise (user-decided, 2026-09-17)
+
+For one core the rebuild is the damage rather than the repair. RPCS3 keeps the
+picture in the render targets and texture cache that a rebuild tears down, and
+a rewind then clears the window to opaque black while the machine rewinds and
+plays on correctly - measured on Prince of Persia (BLUS30214) on the GTX 1060 as
+100% near-black and ONE colour, against a rewind with the rebuild skipped that
+reproduced a straight run byte for byte. Drawing 1, 5, 30 or 100 frames before
+the capture changed nothing, so it is not the warm-up problem PCSX2 had; three
+rewinds and the RSX thread aborted inside the emptied texture cache, taking all
+26 threads with it.
+
+The two events were being asked one question. A cross-session REOPEN really is
+a new context and every core must rebuild. A same-session LOAD is not: the
+context is alive and the objects are valid, and whether rebuilding helps depends
+on where the core keeps its picture.
+
+So a core answers for itself with `video.rebuildOnStateLoad`, and ABSENT MEANS
+TRUE - a package that never mentions it behaves exactly as before, and only
+RPCS3, which declares false, is changed. A reopen still mints at `ce_gl_start`,
+so the rebuild described above still happens where it is needed. The engine
+parses and applies it beside `video.drawEveryFrame`, for that declaration's own
+reason: it is a property of the core, and every host that opens the package -
+the frontend, chimera-run, a gate - needs it to hold without being told.
+
+Still open: WHY the flip produces black. The window is cleared to opaque black
+exactly when `image_to_flip` is null, and the CPU-upload fallback that should
+prevent that fires during normal forward play while the picture is correct.
+Five source-level explanations were checked and all were wrong.
 
 Running every core's rebuild after every rewind turned up a bug in the bridge's
 buffer pool (see `bufferPool()` in gl_bridge.cpp). Dolphin crashed on its first

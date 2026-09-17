@@ -3507,3 +3507,48 @@ engine answers repeat calls from a cache keyed by path, size and mtime, so
 Create's hashing of the same file costs a lookup, and there is one notion of a
 file's identity rather than two. It is an optimisation and never a duty: a pick
 that fails to hash is a pick the compile step hashes itself, exactly as before.
+
+## A restore is a new context, unless the core says it is not (user-decided, 2026-09-17)
+
+Every state load moves the bridge's context id, so every bridged renderer builds
+its GL objects again (issue #43, 2026-09-15). That was made universal on
+purpose: a restore puts back a renderer's IDEA of its objects but not the
+objects, which stayed as the frames after the restored one left them. xemu
+attached a texture the driver had since given to something else and asserted;
+FlatOut 2 died at step 13 on every build without this, and ran 212 steps with
+it.
+
+For RPCS3 the same rebuild is the damage rather than the repair. Measured on the
+GTX 1060 with Prince of Persia (BLUS30214): one rewind with the rebuild leaves
+the picture 100% near-black, ONE colour, while the machine rewinds and plays on
+correctly; the same rewind with the rebuild skipped reproduces a straight run
+BYTE FOR BYTE. Drawing 1, 5, 30 or 100 frames before the capture changes
+nothing, so this is not the warm-up problem PCSX2 had. Three rewinds and the RSX
+thread aborts inside the texture cache the rebuild emptied, taking all 26
+threads with it.
+
+So the frontend was asking one question where there are two. A cross-session
+REOPEN really is a new context: the names in the state belong to a dead one, and
+every core must rebuild. A same-session LOAD is not: the context is alive and the
+objects are valid, and whether rebuilding is right depends on where the core
+keeps its picture. xemu keeps a cache that goes stale; RPCS3 keeps the picture in
+the render targets and texture cache a rebuild discards.
+
+A core answers for itself: `video.rebuildOnStateLoad`, and ABSENT MEANS TRUE, so
+a package that never mentions it behaves exactly as before - only RPCS3, which
+declares false, is changed. A reopen still mints a new id at `ce_gl_start`, so
+the rebuild patch 0021 exists for still happens where it is needed.
+
+It is parsed and applied in the ENGINE, beside `video.drawEveryFrame`, for that
+declaration's own reason: it is a property of the core, and every host that opens
+the package - the frontend, chimera-run, a gate - needs it to hold without being
+told separately. A first attempt routed it through the frontend and was wrong
+twice over: chimera-run would not have honoured it, and two authorities writing
+one global race.
+
+What was NOT settled: why the flip produces black. The window is cleared to
+opaque black exactly when `image_to_flip` is null, and the CPU-upload fallback
+that should prevent that fires during normal forward play while the picture is
+correct. Five source-level explanations were checked and all were wrong; the
+bisection that would have answered it could not be completed. The declaration
+fixes the symptom and the crash; the mechanism is still open.

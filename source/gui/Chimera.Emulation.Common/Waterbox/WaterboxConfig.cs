@@ -467,6 +467,27 @@ namespace Chimera.Emulation.Common.Waterbox
 			public bool GpuStatesSurviveTheContext { get; set; }
 
 			/// <summary>
+			/// Whether a SAME-SESSION state load should look like a new context
+			/// to this core, so that its renderer builds its GL objects again.
+			///
+			/// True for everyone by default, which is issue #43: a restore puts
+			/// back the renderer's idea of its objects but not the objects, and
+			/// a renderer that attaches those stale names either asserts (xemu)
+			/// or draws the wrong thing. Nothing here changes for a core that
+			/// does not mention it.
+			///
+			/// A core declares FALSE when the rebuild is the damage rather than
+			/// the repair - when its picture lives in the very objects a rebuild
+			/// discards. RPCS3 is one: a rewind tore down its render targets and
+			/// texture cache, and the flip then cleared the window to opaque
+			/// black while the machine went on playing correctly; a few rewinds
+			/// further on it aborted inside the texture cache it had emptied.
+			/// Such a core still rebuilds when the context REALLY changes,
+			/// because reopening a project mints a new id anyway.
+			/// </summary>
+			public bool RebuildOnStateLoad { get; set; } = true;
+
+			/// <summary>
 			/// Never tell this core to stop drawing. Turbo then skips only the
 			/// READBACK - the picture the host copies out - and the renderer
 			/// goes on running.

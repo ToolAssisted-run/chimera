@@ -16,6 +16,7 @@
 #include <cstring>
 
 extern "C" void ce_gl_state_loaded(int64_t to); /* the engine's own; the session calls it on every restore */
+extern "C" void ce_gl_rebuild_on_state_load(int32_t on);
 /* what the guest calls; sysv on Windows, as gl_bridge.cpp's BRIDGE_ABI says */
 #ifdef _WIN32
 extern "C" uintptr_t __attribute__((sysv_abi)) ce_gl_dispatch(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t);
@@ -103,6 +104,25 @@ int main()
 	ce_gl_state_loaded(7);
 	assert(ce_gl_dispatch(kContextIdOp, 0, 0, 0, 0, 0) != afterLoad);
 
-	std::printf("test_gl_flight: ok (%u entries in %u bytes; a load moves the context id)\n", h.capacity, bytes);
+	/* A core may decline that (video.rebuildOnStateLoad false): for a renderer
+	 * whose picture lives in the objects a rebuild discards, moving the id is
+	 * the damage. RPCS3 declares it - a rewind went black and then aborted in
+	 * the texture cache the rebuild had emptied.
+	 *
+	 * The guarantee that matters is the OTHER one: a core that says nothing is
+	 * unaffected, so this puts it back and checks the id moves again. */
+	const uintptr_t beforeOptOut = ce_gl_dispatch(kContextIdOp, 0, 0, 0, 0, 0);
+	ce_gl_rebuild_on_state_load(0);
+	ce_gl_state_loaded(9);
+	assert(ce_gl_dispatch(kContextIdOp, 0, 0, 0, 0, 0) == beforeOptOut);
+	ce_gl_state_loaded(9);
+	assert(ce_gl_dispatch(kContextIdOp, 0, 0, 0, 0, 0) == beforeOptOut);
+
+	ce_gl_rebuild_on_state_load(1);
+	ce_gl_state_loaded(9);
+	assert(ce_gl_dispatch(kContextIdOp, 0, 0, 0, 0, 0) != beforeOptOut);
+
+	std::printf("test_gl_flight: ok (%u entries in %u bytes; a load moves the context id,"
+		" and does not for a core that declines)\n", h.capacity, bytes);
 	return 0;
 }
