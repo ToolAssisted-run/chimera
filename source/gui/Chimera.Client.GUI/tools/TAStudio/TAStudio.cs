@@ -1188,7 +1188,7 @@ namespace Chimera.Client.GUI
 		/// </summary>
 		public void LoadBranchState(TasBranch branch, int branchIndex)
 		{
-			StatableEmulator.LoadStateBinary(new BinaryReader(new MemoryStream(branch.CoreData, false)));
+			StatableEmulator.LoadStateFromFile(CurrentTasMovie.BranchStatePath(branch.StateFile));
 			AfterStateLoaded(branch.Frame, branchIndex);
 		}
 
@@ -1548,7 +1548,7 @@ namespace Chimera.Client.GUI
 			// project carried to another machine, a cleared cache, one set aside for
 			// another core build - leaves only the input. That is still the branch:
 			// load it and replay to its frame, as a refused state does (issue #80).
-			if (branch.CoreData is null)
+			if (branch.StateFile is null)
 			{
 				_suspendEditLogic = true;
 				CurrentTasMovie.LoadBranch(branch);
@@ -1566,7 +1566,7 @@ namespace Chimera.Client.GUI
 			{
 				LoadBranchState(branch, CurrentTasMovie.Branches.IndexOf(branch));
 			}
-			catch (InvalidOperationException ex)
+			catch (Exception ex) when (ex is InvalidOperationException or IOException)
 			{
 				// The sandbox refuses a state another machine made - a different
 				// build of the core, most often, which is what an autosaved xemu
@@ -1574,7 +1574,7 @@ namespace Chimera.Client.GUI
 				// branch's input is already loaded, and the state is only a way to
 				// reach its frame faster; the history reaches it by replay instead.
 				// The refused state is let go so it is not offered again.
-				branch.CoreData = null;
+				branch.StateFile = null;
 				ReplayToBranchFrame(branch,
 					"This branch's saved state was made by a different machine; replaying to its frame instead.",
 					$"Branch state refused ({ex.Message}): replaying to frame {branch.Frame}.");

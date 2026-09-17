@@ -80,6 +80,36 @@ namespace Chimera.Emulation.Common
 		/// Creates a byte array copy of the core's current state
 		/// This creates a new buffer, and should not be used in performance sensitive situations
 		/// </summary>
+		/// <summary>
+		/// The core's state in a file, by whichever way the core has. One that is
+		/// <see cref="IStateFiles"/> streams it there itself, with no size it cannot be; any other
+		/// is written through a stream, which is fine for what such a core's state weighs.
+		/// </summary>
+		public static void SaveStateToFile(this IStatable core, string path)
+		{
+			if (core is IStateFiles files)
+			{
+				files.SaveStateToFile(path);
+				return;
+			}
+			using FileStream fs = new(path, FileMode.Create, FileAccess.Write);
+			using BinaryWriter bw = new(fs);
+			core.SaveStateBinary(bw);
+		}
+
+		/// <exception cref="System.InvalidOperationException">the machine refused the state</exception>
+		public static void LoadStateFromFile(this IStatable core, string path)
+		{
+			if (core is IStateFiles files)
+			{
+				files.LoadStateFromFile(path);
+				return;
+			}
+			using FileStream fs = new(path, FileMode.Open, FileAccess.Read);
+			using BinaryReader br = new(fs);
+			core.LoadStateBinary(br);
+		}
+
 		public static byte[] CloneSavestate(this IStatable core)
 		{
 			using var ms = new MemoryStream();

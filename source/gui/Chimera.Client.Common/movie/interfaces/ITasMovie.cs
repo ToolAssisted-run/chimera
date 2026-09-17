@@ -43,6 +43,15 @@ namespace Chimera.Client.Common
 		/// </summary>
 		int LastNonEmptyInputFrame { get; }
 		ITasBranchCollection Branches { get; }
+
+		/// <summary>Where a branch's state file is, from the name the branch holds (<see cref="TasBranch.StateFile"/>).</summary>
+		string BranchStatePath(string stateFile);
+
+		/// <summary>A path for a new branch's state, in a directory that exists; <paramref name="stateFile"/> is the name to keep.</summary>
+		string NewBranchStatePath(out string stateFile);
+
+		/// <summary>Removes the state files no branch names, nor <paramref name="alsoKeep"/>.</summary>
+		void RemoveUnusedBranchStates(params string[] alsoKeep);
 		TasLagLog LagLog { get; }
 		IStringLog VerificationLog { get; }
 

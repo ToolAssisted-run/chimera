@@ -12,6 +12,7 @@
 
 #include "movie_entry.hpp"
 #include "file_io.hpp"
+#include "zstd_dyn.hpp"
 #include "host_dyn.hpp"
 #include "progress.hpp"
 #include "state_history.hpp"
@@ -1595,6 +1596,30 @@ const int16_t *ce_session_audio(const ce_session *s, int32_t *sample_count)
 	return s->audioBuf.data();
 }
 
+/* What every load owes the machine afterwards, however the state arrived. */
+static void afterStateLoaded(ce_session *s)
+{
+	/* a savestate is guest memory, and the guest's wide-input latches are
+	 * guest memory too: the load just rewrote what the guest believes is
+	 * held, so the delta tracker must forget its history and resend every
+	 * button's current state on the next advance */
+	std::fill(s->btnSent.begin(), s->btnSent.end(), uint8_t{ 0xFF });
+	/* the turbo flag is host policy rather than machine state and belongs in
+	 * memory the state does not cover - but a core that kept it in ordinary
+	 * memory would have just had it rewritten, so forget what we told it */
+	s->renderingSent = -1;
+
+	/* a savestate is guest memory, and the guest's "tracing on" flag is guest
+	 * memory too: re-assert the desired flag, and discard whatever lines the
+	 * restored buffer holds - they were traced before the load and would
+	 * appear out of order */
+	if (s->traceSetEnabled != nullptr)
+	{
+		s->traceSetEnabled(s->traceDesired ? 1 : 0);
+		if (s->traceClear != nullptr) s->traceClear();
+	}
+}
+
 const uint8_t *ce_session_save_state(ce_session *s, uint64_t *len_out)
 {
 	s->error.clear();
@@ -1643,25 +1668,164 @@ int32_t ce_session_load_state(ce_session *s, const uint8_t *data, uint64_t len)
 		s->error = r.errorMessage;
 		return 1;
 	}
-	/* a savestate is guest memory, and the guest's wide-input latches are
-	 * guest memory too: the load just rewrote what the guest believes is
-	 * held, so the delta tracker must forget its history and resend every
-	 * button's current state on the next advance */
-	std::fill(s->btnSent.begin(), s->btnSent.end(), uint8_t{ 0xFF });
-	/* the turbo flag is host policy rather than machine state and belongs in
-	 * memory the state does not cover - but a core that kept it in ordinary
-	 * memory would have just had it rewritten, so forget what we told it */
-	s->renderingSent = -1;
+	afterStateLoaded(s);
+	return 0;
+}
 
-	/* a savestate is guest memory, and the guest's "tracing on" flag is guest
-	 * memory too: re-assert the desired flag, and discard whatever lines the
-	 * restored buffer holds - they were traced before the load and would
-	 * appear out of order */
-	if (s->traceSetEnabled != nullptr)
+/* ---- a state kept in a file (engine.h, "A state kept in a file") ----------
+ *
+ * The sandbox saves and loads a state through a write and a read callback, so
+ * the state never has to exist whole anywhere: it goes from the machine through
+ * zstd to the file, and back the same way. That is the whole reason this exists
+ * - a PS3's state is past 2 GiB, which is more than a frontend array can be. */
+namespace
+{
+constexpr char STATE_FILE_MAGIC[8] = { 'C', 'E', 'S', 'T', 'A', 'T', 'E', '1' };
+constexpr size_t STATE_FILE_CHUNK = size_t{ 1 } << 20;
+
+struct StateFileSink
+{
+	chimera::FileWriter *out;
+	const chimera::ZstdApi *z;
+	void *zcs;
+	std::vector<uint8_t> buf;
+	bool failed = false;
+
+	bool feed(const void *src, size_t size, int endOp)
 	{
-		s->traceSetEnabled(s->traceDesired ? 1 : 0);
-		if (s->traceClear != nullptr) s->traceClear();
+		if (failed) return false;
+		if (zcs == nullptr) return out->write(src, size) || !(failed = true);
+		chimera::ZstdApi::Buffer in{ src, size, 0 };
+		for (;;)
+		{
+			chimera::ZstdApi::OutBuffer o{ buf.data(), buf.size(), 0 };
+			const size_t left = z->compressStream2(zcs, &o, &in, endOp);
+			if (z->isError(left) || !out->write(buf.data(), o.pos)) { failed = true; return false; }
+			if (endOp == 0 ? in.pos == in.size : left == 0) return true;
+		}
 	}
+};
+
+extern "C" int32_t stateFileWrite(uintptr_t userdata, const void *src, uintptr_t size)
+{
+	return reinterpret_cast<StateFileSink *>(userdata)->feed(src, size, 0) ? 0 : 1;
+}
+
+struct StateFileSource
+{
+	chimera::FileReader *in;
+	const chimera::ZstdApi *z;
+	void *zds;
+	std::vector<uint8_t> buf;
+	size_t have = 0, pos = 0;
+	bool failed = false;
+
+	size_t take(void *dst, size_t want)
+	{
+		if (zds == nullptr) return static_cast<size_t>(in->read(static_cast<uint8_t *>(dst), want));
+		chimera::ZstdApi::OutBuffer o{ dst, want, 0 };
+		while (o.pos < want && !failed)
+		{
+			if (pos == have)
+			{
+				have = static_cast<size_t>(in->read(buf.data(), buf.size()));
+				pos = 0;
+				if (have == 0) break; /* the end of the file is the end of the state */
+			}
+			chimera::ZstdApi::Buffer i{ buf.data(), have, pos };
+			if (z->isError(z->decompressStream(zds, &o, &i))) failed = true;
+			pos = i.pos;
+		}
+		return o.pos;
+	}
+};
+
+extern "C" intptr_t stateFileRead(uintptr_t userdata, void *dst, uintptr_t size)
+{
+	return static_cast<intptr_t>(reinterpret_cast<StateFileSource *>(userdata)->take(dst, size));
+}
+} // namespace
+
+int32_t ce_session_state_save_file(ce_session *s, const char *utf8_path, const uint8_t *tag, uint32_t tag_len)
+{
+	s->error.clear();
+	if (utf8_path == nullptr || (tag == nullptr && tag_len != 0)) { s->error = "no path to save the state to"; return 1; }
+	chimera::FileWriter out;
+	if (!out.open(utf8_path)) { s->error = std::string("could not create ") + utf8_path; return 1; }
+
+	const char *why = nullptr;
+	const chimera::ZstdApi *z = chimera::zstdApi(&why); /* without it the file is simply bigger */
+	void *zcs = z != nullptr ? z->createCStream() : nullptr;
+	if (zcs != nullptr && z->isError(z->initCStream(zcs, 1))) { z->freeCStream(zcs); zcs = nullptr; }
+
+	const uint8_t compressed = zcs != nullptr ? 1 : 0;
+	out.write(STATE_FILE_MAGIC, sizeof STATE_FILE_MAGIC);
+	out.write(&compressed, 1);
+	out.write(&tag_len, sizeof tag_len);
+	out.write(tag, tag_len);
+
+	StateFileSink sink{ &out, z, zcs, std::vector<uint8_t>(STATE_FILE_CHUNK) };
+	chimera::WbxReturn r{};
+	s->host->wbx_save_state(s->obj, stateFileWrite, reinterpret_cast<uintptr_t>(&sink), &r); // see ce_session_save_state re: no bracket
+	const bool flushed = sink.feed(nullptr, 0, 2) || zcs == nullptr;
+	if (zcs != nullptr) z->freeCStream(zcs);
+
+	if (!r.ok()) { s->error = r.errorMessage; return 1; }
+	if (sink.failed || !flushed || !out.commit())
+	{
+		s->error = std::string("could not write ") + utf8_path + " (is the disk full?)";
+		return 1;
+	}
+	return 0;
+}
+
+int32_t ce_session_state_load_file(ce_session *s, const char *utf8_path, uint8_t *tag_out, uint32_t tag_cap, uint32_t *tag_len_out)
+{
+	s->error.clear();
+	if (tag_len_out != nullptr) *tag_len_out = 0;
+	chimera::FileReader in;
+	char magic[sizeof STATE_FILE_MAGIC];
+	uint8_t compressed = 0;
+	uint32_t tagLen = 0;
+	if (utf8_path == nullptr || !in.open(utf8_path)
+		|| in.read(reinterpret_cast<uint8_t *>(magic), sizeof magic) != sizeof magic
+		|| std::memcmp(magic, STATE_FILE_MAGIC, sizeof magic) != 0
+		|| in.read(&compressed, 1) != 1
+		|| in.read(reinterpret_cast<uint8_t *>(&tagLen), sizeof tagLen) != sizeof tagLen
+		|| tagLen > (1u << 20))
+	{
+		s->error = std::string(utf8_path != nullptr ? utf8_path : "(no path)") + " is not a state file";
+		return 2; /* the machine was not touched */
+	}
+	std::vector<uint8_t> tag(tagLen);
+	if (in.read(tag.data(), tagLen) != tagLen) { s->error = std::string(utf8_path) + " is cut short"; return 2; }
+
+	const char *why = nullptr;
+	const chimera::ZstdApi *z = compressed != 0 ? chimera::zstdApi(&why) : nullptr;
+	void *zds = z != nullptr ? z->createDStream() : nullptr;
+	if (compressed != 0 && (zds == nullptr || z->isError(z->initDStream(zds))))
+	{
+		if (zds != nullptr) z->freeDStream(zds);
+		s->error = std::string("the state file is compressed and zstd is not available") + (why != nullptr ? std::string(": ") + why : "");
+		return 2;
+	}
+
+	s->history.beforeLoad(); /* see ce_session_load_state */
+	StateFileSource source{ &in, z, zds, std::vector<uint8_t>(STATE_FILE_CHUNK) };
+	chimera::WbxReturn r{};
+	s->host->wbx_load_state(s->obj, stateFileRead, reinterpret_cast<uintptr_t>(&source), &r);
+	if (zds != nullptr) z->freeDStream(zds);
+	ce_gl_release();
+	ce_gl_state_loaded(s->frame);
+	if (!r.ok() || source.failed)
+	{
+		s->error = !r.ok() ? r.errorMessage : std::string(utf8_path) + " is damaged";
+		return 1;
+	}
+	afterStateLoaded(s);
+
+	if (tag_len_out != nullptr) *tag_len_out = tagLen;
+	if (tag_out != nullptr && tagLen != 0) std::memcpy(tag_out, tag.data(), tagLen < tag_cap ? tagLen : tag_cap);
 	return 0;
 }
 

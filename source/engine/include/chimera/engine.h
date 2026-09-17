@@ -1009,6 +1009,22 @@ CE_API const int16_t *ce_session_audio(const ce_session *s, int32_t *sample_coun
 CE_API const uint8_t *ce_session_save_state(ce_session *s, uint64_t *len_out);
 CE_API int32_t ce_session_load_state(ce_session *s, const uint8_t *data, uint64_t len);
 
+/* A state kept in a file. _save_state hands the whole machine over as one
+ * buffer, and a frontend array cannot be more than 2 GiB; a PS3's state is
+ * (issue #84: creating a branch threw an overflow). Here the state goes from the
+ * machine through zstd to the file and back without ever existing whole, so it
+ * has no size it cannot be. This is what a TAStudio branch keeps: its state is a
+ * file beside the project, not bytes in the frontend.
+ *
+ * tag is the caller's own few bytes, stored with the state and handed back on a
+ * load - the frontend's frame and lag counters, which are not the machine's. The
+ * file is written beside its name and moved into place, so a failed save leaves
+ * whatever was there. _save: 0 done, 1 not (see _last_error). _load: 0 loaded;
+ * 1 the machine refused the state or the file is damaged, and the machine is
+ * where a refused load leaves it; 2 not a state file, the machine untouched. */
+CE_API int32_t ce_session_state_save_file(ce_session *s, const char *utf8_path, const uint8_t *tag, uint32_t tag_len);
+CE_API int32_t ce_session_state_load_file(ce_session *s, const char *utf8_path, uint8_t *tag_out, uint32_t tag_cap, uint32_t *tag_len_out);
+
 /* The guest's self-described memory domains. */
 CE_API int32_t ce_session_domain_count(const ce_session *s);
 CE_API const char *ce_session_domain_name(const ce_session *s, int32_t index);

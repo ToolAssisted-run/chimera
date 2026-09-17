@@ -29,7 +29,7 @@ namespace Chimera.Emulation.Common.Waterbox
 		portedVersion: "1.0.0",
 		portedUrl: "https://github.com/SergioMartin86/miniBox")]
 	public sealed partial class WaterboxCore : IEmulator, IVideoProvider, ISoundProvider, IStatable, IStateHistory, IInputPollable, IGpuRendered, ICorePrecompile, ICoreStops,
-		ICoreIdentity, ISettable<WaterboxCoreSettings>, IDriveLights
+		ICoreIdentity, ISettable<WaterboxCoreSettings>, IDriveLights, IStateFiles
 	{
 		/// <summary>
 		/// The identity of the PACKAGE this instance is running - what the status bar,
@@ -593,6 +593,33 @@ namespace Chimera.Emulation.Common.Waterbox
 			writer.Write(IsLagFrame);
 			writer.Write(LagCount);
 			writer.Write(Frame);
+		}
+
+		// ---------------- IStateFiles ----------------
+		// The same state as SaveStateBinary - the machine, then the three counters that are the
+		// frontend's and not the machine's - with the machine streamed by the engine and the
+		// counters riding as the file's tag.
+
+		public void SaveStateToFile(string path)
+		{
+			CheckDisposed();
+			using MemoryStream tag = new();
+			using (BinaryWriter writer = new(tag, System.Text.Encoding.UTF8, leaveOpen: true))
+			{
+				writer.Write(IsLagFrame);
+				writer.Write(LagCount);
+				writer.Write(Frame);
+			}
+			_session.SaveStateToFile(path, tag.ToArray());
+		}
+
+		public void LoadStateFromFile(string path)
+		{
+			CheckDisposed();
+			using BinaryReader reader = new(new MemoryStream(_session.LoadStateFromFile(path)));
+			IsLagFrame = reader.ReadBoolean();
+			LagCount = reader.ReadInt32();
+			Frame = reader.ReadInt32();
 		}
 
 		public void LoadStateBinary(BinaryReader reader)

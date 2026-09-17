@@ -598,6 +598,12 @@ namespace Chimera.Emulation.Common.Engine
 		public abstract int ce_session_drive_media_count(IntPtr session, int index);
 
 		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract int ce_session_state_save_file(IntPtr session, string utf8Path, byte[] tag, uint tagLen);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract int ce_session_state_load_file(IntPtr session, string utf8Path, byte[] tagOut, uint tagCap, ref uint tagLenOut);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_session_drive_media_name(IntPtr session, int index, int media);
 
 		[ChimeraImport(CallingConvention.Cdecl)]
@@ -2013,6 +2019,32 @@ namespace Chimera.Emulation.Common.Engine
 			if (p == IntPtr.Zero) throw new InvalidOperationException(LastError);
 			length = checked((int)len);
 			return p;
+		}
+
+		/// <summary>
+		/// The whole machine, streamed by the engine into a compressed file - never through a
+		/// managed array, which cannot be more than 2 GiB and which a PS3's state is (issue #84).
+		/// <paramref name="tag"/> is the caller's own few bytes, kept with it.
+		/// </summary>
+		public void SaveStateToFile(string path, byte[] tag)
+		{
+			if (E.ce_session_state_save_file(_session, path, tag, (uint) tag.Length) is not 0)
+			{
+				throw new InvalidOperationException(LastError);
+			}
+		}
+
+		/// <summary>Loads one back and returns its tag. Throws when the machine refuses it or the file is not one.</summary>
+		public byte[] LoadStateFromFile(string path)
+		{
+			var tag = new byte[256];
+			uint length = 0;
+			if (E.ce_session_state_load_file(_session, path, tag, (uint) tag.Length, ref length) is not 0)
+			{
+				throw new InvalidOperationException(LastError);
+			}
+			Array.Resize(ref tag, (int) Math.Min(length, (uint) tag.Length));
+			return tag;
 		}
 
 		public void LoadState(byte[] data, int length)

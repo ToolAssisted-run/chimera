@@ -94,6 +94,18 @@ Taken by the user, 2026-09-08:
    (`TasBranch.CoreData`, a `CloneSavestate`), and phase 3 keeps it that way
    rather than making a branch an anchor in the session's history.
 
+   WHERE that whole state is changed on 2026-09-17 (user-decided; issue #84).
+   It was a byte array in the frontend, and an array cannot be more than 2 GiB:
+   a PS3's state is 4.3 GiB even compressed, and creating a branch threw an
+   overflow. The state is now a FILE beside the project's cache
+   (`Branches/<id>.state`), written and read by the engine
+   (`ce_session_state_save_file` / `_load_file`), which streams the machine
+   through zstd to the file and back - the sandbox saves and loads through
+   callbacks, so the state never exists whole anywhere and has no size it
+   cannot be. The branch holds the file's NAME (`TasBranch.StateFile`). The
+   decision itself is untouched: a branch still owns a whole state, outside the
+   history, and one without it replays to its frame.
+
    Jumping to a branch may still hand its state to the history to hold as an
    anchor, which is what happens today - but that copy is the history's, and
    losing it changes nothing about the branch. What stays true either way is

@@ -3797,3 +3797,59 @@ order the files happened to be added in, and the only remedy was to remove
 everything and start again. A slot that takes more than one file now has Up and
 Down beside its list; they follow the selection, the moved file stays selected
 so a button can be pressed again, and a slot that takes one file has neither.
+
+## A branch's state is a file the engine writes (user-decided, 2026-09-17)
+
+Issue #84, and then the user's own machine: creating a TAStudio branch in a PS3
+project threw `OverflowException`. A branch kept a whole copy of the machine in
+a byte array, and an array cannot be more than 2 GiB. Oblivion copies gigabytes
+of disc data onto the console's hard disk, the disk is part of the machine, and
+its state is 4.31 GiB AFTER zstd. The greenzone never had the problem: the
+engine holds its states natively.
+
+Three answers were offered - degrade an oversized branch to "input only, replay
+on load" (the path a GPU project's branch already takes after a reopen), that
+now and the proper fix later, or the proper fix - and the user chose the proper
+fix: the engine holds branch states.
+
+"Holds" became "writes to a file", for three reasons found on the way. The
+sandbox saves and loads a state through a write and a read callback, so the
+engine can stream the machine through zstd straight into a file and back, and
+the state never exists whole anywhere - not in the frontend, and not in the
+engine either, where five 4 GiB branches would otherwise sit in RAM. A file is
+also already persistent: there is no second step at project save in which
+gigabytes are copied into the cache zip (whose lumps had the same 2 GiB problem
+waiting). And the thing the frontend holds shrinks to a NAME, which is what thin
+C# wants it to be.
+
+So: `ce_session_state_save_file` / `_load_file` in the engine, with a small
+caller-owned tag riding along (the frontend's frame and lag counters, which are
+not the machine's). The file is written beside its name and moved into place, so
+a failed save leaves what was there. `TasBranch.CoreData` is gone;
+`TasBranch.StateFile` names a file in `Projects/<id>/Branches/`. WHICH file is
+which branch's is recorded in the cache zip where the state itself used to be,
+under the same rules as before - not for a GPU-drawn machine, not after a
+session that did not end cleanly, not when the cache is another machine's - so
+every reason a branch could lose its state and replay instead still applies,
+unchanged. A cache written before this still holds the old state lumps; they are
+not read, and those branches replay to their frame once.
+
+Files that no branch names are removed: when a project is loaded (a branch that
+was never saved, a cache that was set aside) and as branches are made, updated
+and removed, sparing the one TAStudio's undo may bring back. "Undo Branch Load"
+used to clone the whole machine on EVERY branch load; when the last state written
+was over 512 MB that backup now keeps its input alone and the undo replays to it,
+because a second multi-gigabyte write per load, for an undo rarely used, is the
+wrong trade.
+
+`TasBranchCollection.Save/Load`, a second copy of the branch format nothing
+called, was deleted rather than converted.
+
+Proved: the synthetic gate saves to a file and loads straight back mid-movie in
+all four movies and ends byte-identical to the goldens, and refuses a garbage
+file and a truncated one without taking the process down (57/57). On the GTX
+1060 with Oblivion: a state saved at frame 2400 is 4.31 GiB; saved and loaded
+back at frame 2000, the console's 256 MiB of main memory 200 frames later is
+identical to a run that never did it. Cost, measured roughly: about half a
+minute per save or load of that size. Not yet done: clicking the button in
+TAStudio on Windows.

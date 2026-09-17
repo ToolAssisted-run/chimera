@@ -28,7 +28,14 @@ namespace Chimera.Client.Common
 		}
 
 		public int Frame { get; set; }
-		public byte[] CoreData { get; set; }
+		/// <summary>
+		/// The machine at this branch, as the NAME of a state file in the movie's branch-state
+		/// directory (<see cref="TasMovie.BranchStatePath"/>); null when the branch has only its
+		/// input, and is reached by replaying to its frame. It used to be the state itself, as a
+		/// byte array - which cannot be more than 2 GiB, and a PS3's state is (issue #84). The
+		/// engine streams the machine to the file and back, so it never has to fit anywhere.
+		/// </summary>
+		public string StateFile { get; set; }
 		public IStringLog InputLog { get; set; }
 		public BitmapBuffer CoreFrameBuffer { get; set; }
 		public BitmapBuffer OSDFrameBuffer { get; set; }
@@ -51,8 +58,6 @@ namespace Chimera.Client.Common
 		void Swap(int b1, int b2);
 		void Replace(TasBranch old, TasBranch newBranch);
 
-		void Save(ZipStateSaver bs);
-		void Load(ZipStateLoader bl, ITasMovie movie);
 	}
 
 	public class TasBranchCollection : List<TasBranch>, ITasBranchCollection
@@ -128,154 +133,6 @@ namespace Chimera.Client.Common
 			}
 
 			return result;
-		}
-
-		public void Save(ZipStateSaver bs)
-		{
-			var nheader = new IndexedStateLump(BinaryStateLump.BranchHeader);
-			var ncore = new IndexedStateLump(BinaryStateLump.BranchCoreData);
-			var ninput = new IndexedStateLump(BinaryStateLump.BranchInputLog);
-			var nframebuffer = new IndexedStateLump(BinaryStateLump.BranchFrameBuffer);
-			var ncoreframebuffer = new IndexedStateLump(BinaryStateLump.BranchCoreFrameBuffer);
-			var nmarkers = new IndexedStateLump(BinaryStateLump.BranchMarkers);
-			var nusertext = new IndexedStateLump(BinaryStateLump.BranchUserText);
-			foreach (var b in this)
-			{
-				bs.PutLump(nheader, tw => tw.WriteLine(JsonConvert.SerializeObject(b.ForSerial)));
-
-				bs.PutLump(ncore, (Stream s) => s.Write(b.CoreData, 0, b.CoreData.Length));
-
-				bs.PutLump(ninput, tw =>
-				{
-					int todo = b.InputLog.Count;
-					for (int i = 0; i < todo; i++)
-					{
-						tw.WriteLine(b.InputLog[i]);
-					}
-				});
-
-				bs.PutLump(nframebuffer, s =>
-				{
-					var vp = new BitmapBufferVideoProvider(b.OSDFrameBuffer);
-					QuickBmpFile.Save(vp, s, b.OSDFrameBuffer.Width, b.OSDFrameBuffer.Height);
-				}, zstdCompress: false);
-
-				bs.PutLump(ncoreframebuffer, s =>
-				{
-					var vp = new BitmapBufferVideoProvider(b.CoreFrameBuffer);
-					QuickBmpFile.Save(vp, s, b.CoreFrameBuffer.Width, b.CoreFrameBuffer.Height);
-				}, zstdCompress: false);
-
-				bs.PutLump(nmarkers, tw => tw.WriteLine(b.Markers.ToString()));
-
-				bs.PutLump(nusertext, tw => tw.WriteLine(b.UserText));
-
-				nheader.Increment();
-				ncore.Increment();
-				ninput.Increment();
-				nframebuffer.Increment();
-				ncoreframebuffer.Increment();
-				nmarkers.Increment();
-				nusertext.Increment();
-			}
-		}
-
-		public void Load(ZipStateLoader bl, ITasMovie movie)
-		{
-			var nheader = new IndexedStateLump(BinaryStateLump.BranchHeader);
-			var ncore = new IndexedStateLump(BinaryStateLump.BranchCoreData);
-			var ninput = new IndexedStateLump(BinaryStateLump.BranchInputLog);
-			var nframebuffer = new IndexedStateLump(BinaryStateLump.BranchFrameBuffer);
-			var ncoreframebuffer = new IndexedStateLump(BinaryStateLump.BranchCoreFrameBuffer);
-			var nmarkers = new IndexedStateLump(BinaryStateLump.BranchMarkers);
-			var nusertext = new IndexedStateLump(BinaryStateLump.BranchUserText);
-
-			Clear();
-
-			while (true)
-			{
-				var b = new TasBranch();
-				b.ChangeLog = new TasMovieChangeLog(movie);
-				b.ChangeLog.MaxSteps = movie.ChangeLog.MaxSteps;
-
-				if (!bl.GetLump(nheader, abort: false, tr =>
-				{
-					var header = (dynamic)JsonConvert.DeserializeObject(tr.ReadLine());
-					b.Frame = (int)header.Frame;
-
-					var timestamp = header.TimeStamp;
-
-					if (timestamp != null)
-					{
-						b.TimeStamp = (DateTime)timestamp;
-					}
-					else
-					{
-						b.TimeStamp = DateTime.Now;
-					}
-
-					var identifier = header.UniqueIdentifier;
-					if (identifier != null)
-					{
-						b.Uuid = (Guid)identifier;
-					}
-				}))
-				{
-					return;
-				}
-
-				bl.GetLump(ncore, abort: true, (s, _) =>
-				{
-					b.CoreData = s.ReadAllBytes();
-				});
-
-				bl.GetLump(ninput, abort: true, tr =>
-				{
-					b.InputLog = StringLogUtil.MakeStringLog();
-					string line;
-					while ((line = tr.ReadLine()) != null)
-					{
-						b.InputLog.Add(line);
-					}
-				});
-
-				bl.GetLump(nframebuffer, abort: true, (s, _) =>
-				{
-					QuickBmpFile.LoadAuto(s, out var vp);
-					b.OSDFrameBuffer = new BitmapBuffer(vp.BufferWidth, vp.BufferHeight, vp.GetVideoBuffer());
-				});
-
-				bl.GetLump(ncoreframebuffer, abort: false, (s, _) =>
-				{
-					QuickBmpFile.LoadAuto(s, out var vp);
-					b.CoreFrameBuffer = new BitmapBuffer(vp.BufferWidth, vp.BufferHeight, vp.GetVideoBuffer());
-				});
-
-				b.Markers = new TasMovieMarkerList(movie);
-				bl.GetLump(nmarkers, abort: false, b.Markers.LoadFromFile);
-
-				bl.GetLump(nusertext, abort: false, tr =>
-				{
-					string line;
-					if ((line = tr.ReadLine()) != null)
-					{
-						if (!string.IsNullOrWhiteSpace(line))
-						{
-							b.UserText = line;
-						}
-					}
-				});
-
-				Add(b);
-
-				nheader.Increment();
-				ncore.Increment();
-				ninput.Increment();
-				nframebuffer.Increment();
-				ncoreframebuffer.Increment();
-				nmarkers.Increment();
-				nusertext.Increment();
-			}
 		}
 	}
 

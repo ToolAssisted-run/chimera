@@ -50,8 +50,11 @@ namespace Chimera.Client.Common
 		public static BinaryStateLump Machine { get; private set; }
 
 		// branch stuff
-		[Name("Branches/CoreData", "bin")]
-		public static BinaryStateLump BranchCoreData { get; private set; }
+		// which state file is the branch's (the name; the file is beside this cache). It was
+		// "Branches/CoreData", the state itself; a cache written then still holds one, and it is
+		// not read - that branch replays to its frame once
+		[Name("Branches/StateFile", "txt")]
+		public static BinaryStateLump BranchStateFile { get; private set; }
 		[Name("Branches/InputLog", "txt")]
 		public static BinaryStateLump BranchInputLog { get; private set; }
 		[Name("Branches/FrameBuffer", "bmp")]

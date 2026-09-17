@@ -178,6 +178,7 @@ namespace Chimera.Client.GUI
 			// does, keeps it there
 			Movie.States.Capture(Tastudio.Emulator.Frame);
 			Movie.RefreshPins();
+			TidyBranchStates();
 			BranchView.ScrollToIndex(Branches.Current);
 			BranchView.DeselectAll();
 			Select(Branches.Current, true);
@@ -188,12 +189,43 @@ namespace Chimera.Client.GUI
 		public TasBranch SelectedBranch
 			=> BranchView.AnyRowsSelected ? Branches[BranchView.FirstSelectedRowIndex] : null;
 
-		private TasBranch CreateBranch()
+		/// <summary>How big the last branch state written was: what decides whether an undo is worth one.</summary>
+		private long _lastStateBytes;
+
+		/// <summary>From this size on, the branch kept for "Undo Branch Load" has no state of its own.</summary>
+		private const long UndoKeepsStateBelow = 512L * 1024 * 1024;
+
+		/// <summary>
+		/// The machine as it stands, in a file of its own beside the project's cache; null when it
+		/// could not be written, and the branch then has its input alone and replays to its frame.
+		/// The ENGINE writes it: it used to be cloned into a byte array, which cannot be more than
+		/// 2 GiB, and a PS3's state is - creating a branch threw an overflow (issue #84).
+		/// </summary>
+		private string SaveBranchState()
+		{
+			try
+			{
+				var path = Movie.NewBranchStatePath(out var stateFile);
+				Tastudio.Emulator.AsStatable().SaveStateToFile(path);
+				_lastStateBytes = new FileInfo(path).Length;
+				return stateFile;
+			}
+			catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException)
+			{
+				Tastudio.MainForm.AddOnScreenMessage($"This branch has no saved state ({ex.Message}); loading it will replay to its frame.");
+				return null;
+			}
+		}
+
+		/// <summary>State files no branch names any more - and not the undo's either - are removed: they can be gigabytes each.</summary>
+		private void TidyBranchStates() => Movie.RemoveUnusedBranchStates(_backupBranch?.StateFile);
+
+		private TasBranch CreateBranch(bool withState = true)
 		{
 			return new()
 			{
 				Frame = Tastudio.Emulator.Frame,
-				CoreData = Tastudio.Emulator.AsStatable().CloneSavestate(),
+				StateFile = withState ? SaveBranchState() : null,
 				InputLog = Movie.GetLogEntries().Clone(),
 				CoreFrameBuffer = MainForm.MakeScreenshotImage(),
 				OSDFrameBuffer = MainForm.CaptureOSD(),
@@ -242,7 +274,10 @@ namespace Chimera.Client.GUI
 
 		private bool PrepareHistoryAndLoadSelectedBranch()
 		{
-			_backupBranch = CreateBranch();
+			// What "Undo Branch Load" goes back to. For a machine whose state is hundreds of
+			// megabytes that is a second state written on EVERY load, to serve an undo that is
+			// rarely used; such a backup keeps its input alone and the undo replays to it.
+			_backupBranch = CreateBranch(withState: _lastStateBytes < UndoKeepsStateBelow);
 
 			var currentHashes = Branches.Select(b => b.Uuid.GetHashCode()).ToList();
 			do
@@ -287,6 +322,7 @@ namespace Chimera.Client.GUI
 			Branches.Replace(SelectedBranch, branch);
 			Movie.States.Capture(Tastudio.Emulator.Frame);
 			Movie.RefreshPins();
+			TidyBranchStates();
 			Tastudio.BranchSavedCallback?.Invoke(Branches.Current);
 		}
 

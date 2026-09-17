@@ -51,6 +51,48 @@ namespace Chimera.Client.Common
 		/// remembered file paths moved first (<see cref="ProjectLocalPaths"/>);
 		/// this is the large one.
 		/// </summary>
+		/// <summary>
+		/// Where the branches' machine states are: one file each, beside the rest of this
+		/// project's cache, written and read by the engine (see <see cref="TasBranch.StateFile"/>).
+		/// They are cache like the greenzone is - a branch without one replays to its frame.
+		/// </summary>
+		public string BranchStateDirectory => Path.Combine(ProjectCache.DirectoryFor(Project.Id), "Branches");
+
+		/// <summary>Where a branch's state file is, from the name the branch holds.</summary>
+		public string BranchStatePath(string stateFile) => Path.Combine(BranchStateDirectory, stateFile);
+
+		/// <summary>A name nothing else has, in a directory that exists: where a new branch's state goes.</summary>
+		public string NewBranchStatePath(out string stateFile)
+		{
+			Directory.CreateDirectory(BranchStateDirectory);
+			stateFile = $"{Guid.NewGuid():N}.state";
+			return BranchStatePath(stateFile);
+		}
+
+		/// <summary>
+		/// Removes the state files no branch names - plus <paramref name="alsoKeep"/>, for a branch
+		/// that is not in the list but can come back (TAStudio's undo). A state is gigabytes on a
+		/// PS3, and one whose branch is gone is never read again.
+		/// </summary>
+		public void RemoveUnusedBranchStates(params string[] alsoKeep)
+		{
+			try
+			{
+				if (!Directory.Exists(BranchStateDirectory)) return;
+				var used = new HashSet<string>(
+					Branches.Select(static b => b.StateFile).Concat(alsoKeep).Where(static n => n is not null),
+					StringComparer.OrdinalIgnoreCase);
+				foreach (var file in Directory.GetFiles(BranchStateDirectory))
+				{
+					if (!used.Contains(Path.GetFileName(file))) File.Delete(file);
+				}
+			}
+			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+			{
+				// it is cache; what would not go now goes next time
+			}
+		}
+
 		public string GreenZoneFilename
 			=> Path.Combine(ProjectCache.DirectoryFor(Project.Id), "greenzone.chimeraGreenZone");
 
@@ -675,7 +717,7 @@ namespace Chimera.Client.Common
 				}
 				bs.PutLump(BinaryStateLump.Session, tw => tw.WriteLine(JsonConvert.SerializeObject(TasSession)));
 
-				var ncore = new IndexedStateLump(BinaryStateLump.BranchCoreData);
+				var ncore = new IndexedStateLump(BinaryStateLump.BranchStateFile);
 				var nframebuffer = new IndexedStateLump(BinaryStateLump.BranchFrameBuffer);
 				var ncoreframebuffer = new IndexedStateLump(BinaryStateLump.BranchCoreFrameBuffer);
 				foreach (var b in Branches)
@@ -687,9 +729,12 @@ namespace Chimera.Client.Common
 					// for a GPU-drawn machine (see DrawnByGpu); the greenzone, which
 					// is a per-machine cache beside the project, is not. Skipped for
 					// ALL branches or none: these lumps are joined to them by order.
-					if (b.CoreData is not null && !DrawnByGpu)
+					// The state itself is already a file beside this one (the engine wrote it
+					// when the branch was made); what is recorded is WHICH file is this
+					// branch's. The rule above decides whether the next session may use it.
+					if (b.StateFile is not null && !DrawnByGpu)
 					{
-						bs.PutLump(ncore, (Stream s) => s.Write(b.CoreData, 0, b.CoreData.Length));
+						bs.PutLump(ncore, tw => tw.WriteLine(b.StateFile));
 					}
 					if (b.OSDFrameBuffer is not null)
 					{
@@ -815,6 +860,9 @@ namespace Chimera.Client.Common
 
 			EngineProgress.Report("reading the greenzone");
 			LoadCacheFile();
+			// a state file no branch names - its branch was never saved, or the cache above was
+			// another machine's and was not used - is never read again, and may be gigabytes
+			RemoveUnusedBranchStates();
 
 			ChangeLog.Clear();
 			Changes = false;
@@ -928,7 +976,7 @@ namespace Chimera.Client.Common
 				});
 
 				// branch states and screenshots, joined by order
-				var ncore = new IndexedStateLump(BinaryStateLump.BranchCoreData);
+				var ncore = new IndexedStateLump(BinaryStateLump.BranchStateFile);
 				var nframebuffer = new IndexedStateLump(BinaryStateLump.BranchFrameBuffer);
 				var ncoreframebuffer = new IndexedStateLump(BinaryStateLump.BranchCoreFrameBuffer);
 				foreach (var b in Branches)
@@ -940,7 +988,13 @@ namespace Chimera.Client.Common
 					// greenzone is not (see TasMovie.Attach).
 					if (!StatesMadeByGpu && ProjectRecovery.LastSessionEndedCleanly(Project.Id))
 					{
-						bl.GetLump(ncore, abort: false, (Stream s, long _) => b.CoreData = s.ReadAllBytes());
+						bl.GetLump(ncore, abort: false, tr =>
+						{
+							// a name and nothing else: a cache somebody edited must not be able to
+							// point a branch at a path
+							var name = Path.GetFileName(tr.ReadLine()?.Trim() ?? "");
+							if (name.Length is not 0 && File.Exists(BranchStatePath(name))) b.StateFile = name;
+						});
 					}
 					bl.GetLump(nframebuffer, abort: false, (Stream s, long _) =>
 					{

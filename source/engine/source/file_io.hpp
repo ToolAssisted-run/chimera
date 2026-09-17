@@ -9,6 +9,7 @@
 #define CHIMERA_FILE_IO_HPP
 
 #include <cstdint>
+#include <string>
 #include <vector>
 
 namespace chimera {
@@ -37,6 +38,28 @@ private:
 	void *_f = nullptr;   /* FILE*, kept opaque so the header stays clean */
 };
 
+
+/* The other direction: a file written a piece at a time, beside its final name
+ * and moved into place by commit(), so a reader never finds half of one and a
+ * write that fails leaves whatever was there before. */
+class FileWriter
+{
+public:
+	FileWriter() = default;
+	~FileWriter();
+	FileWriter(const FileWriter &) = delete;
+	FileWriter &operator=(const FileWriter &) = delete;
+
+	bool open(const char *utf8Path);
+	bool write(const void *src, uint64_t len);
+	/* closes and moves into place; false (and nothing left behind) on any failure */
+	bool commit();
+
+private:
+	void *_f = nullptr;
+	std::string _path, _tmp;
+	bool _failed = false;
+};
 
 bool fileExists(const char *utf8Path);
 

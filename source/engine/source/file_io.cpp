@@ -1,5 +1,7 @@
 #include "file_io.hpp"
 
+#include <filesystem>
+#include <system_error>
 #include <cstdio>
 #include <string>
 
@@ -67,6 +69,55 @@ bool FileReader::ok() const
 void FileReader::close()
 {
 	if (_f != nullptr) { std::fclose(static_cast<FILE *>(_f)); _f = nullptr; }
+}
+
+FileWriter::~FileWriter()
+{
+	if (_f != nullptr)
+	{
+		std::fclose(static_cast<FILE *>(_f));
+		std::error_code ec;
+		std::filesystem::remove(std::filesystem::u8path(_tmp), ec);
+	}
+}
+
+bool FileWriter::open(const char *utf8Path)
+{
+	_path = utf8Path;
+	_tmp = _path + ".writing";
+	_failed = false;
+	_f = openWrite(_tmp.c_str());
+	return _f != nullptr;
+}
+
+bool FileWriter::write(const void *src, uint64_t len)
+{
+	if (_f == nullptr || _failed) return false;
+	if (len != 0 && std::fwrite(src, 1, static_cast<size_t>(len), static_cast<FILE *>(_f)) != len) _failed = true;
+	return !_failed;
+}
+
+bool FileWriter::commit()
+{
+	if (_f == nullptr) return false;
+	const bool closed = std::fclose(static_cast<FILE *>(_f)) == 0;
+	_f = nullptr;
+	std::error_code ec;
+	const auto tmp = std::filesystem::u8path(_tmp), target = std::filesystem::u8path(_path);
+	if (_failed || !closed)
+	{
+		std::filesystem::remove(tmp, ec);
+		return false;
+	}
+	std::filesystem::rename(tmp, target, ec);
+	if (ec)
+	{
+		/* not every platform's rename replaces */
+		std::filesystem::remove(target, ec);
+		std::filesystem::rename(tmp, target, ec);
+	}
+	if (ec) std::filesystem::remove(tmp, ec);
+	return !ec;
 }
 
 bool readFile(const char *utf8Path, std::vector<uint8_t> &out)

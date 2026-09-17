@@ -54,6 +54,9 @@
  * and the SHA1 it expects; this tool has no user to ask, so it mounts what it
  * is given and the engine checks the hash.
  * --save-state <frame>=<path> writes the whole machine after that frame;
+ * --save-state-file <frame>=<path> and --state-file <path> are the same through a
+ * state KEPT IN A FILE (no size limit; what a TAStudio branch keeps), and
+ * --state-file-roundtrip <frame> saves to one and loads it straight back.
  * --state <path> starts from one instead of from power-on, and --frames <n>
  * stops after n. The three together are for looking at a picture: a state saved
  * near the end of a long movie makes "what does this frame look like" a
@@ -170,6 +173,9 @@ int main(int argc, char **argv)
 	std::vector<std::pair<std::string, std::string>> firmwareArgs; // id -> path
 	std::map<int64_t, std::string> stateOuts; // frame -> state path
 	std::string stateIn;
+	std::string stateFileIn;                       // --state-file: the same, from a state kept in a file
+	std::map<int64_t, std::string> stateFileOuts; // --save-state-file frame -> path
+	int64_t stateFileRoundTrip = -1;               // --state-file-roundtrip frame
 	int64_t frameLimit = -1;
 	bool rerecord = false;
 	int64_t seekFrame = -1;
@@ -307,6 +313,15 @@ int main(int argc, char **argv)
 			stateOuts[std::atoll(spec.substr(0, eq).c_str())] = spec.substr(eq + 1);
 		}
 		else if (arg == "--state" && i + 1 < argc) stateIn = argv[++i];
+		else if (arg == "--state-file" && i + 1 < argc) stateFileIn = argv[++i];
+		else if (arg == "--state-file-roundtrip" && i + 1 < argc) stateFileRoundTrip = std::atoll(argv[++i]);
+		else if (arg == "--save-state-file" && i + 1 < argc)
+		{
+			std::string spec = argv[++i];
+			auto eq = spec.find('=');
+			if (eq == std::string::npos) return fail(metaPath, "--save-state-file wants <frame>=<path>");
+			stateFileOuts[std::atoll(spec.substr(0, eq).c_str())] = spec.substr(eq + 1);
+		}
 		else if (arg == "--frames" && i + 1 < argc) frameLimit = std::atoll(argv[++i]);
 		else if (arg == "--screenshot" && i + 1 < argc)
 		{
@@ -676,6 +691,19 @@ int main(int argc, char **argv)
 		}
 	}
 
+	/* --state-file: the same beginning, from a state the engine kept in a file
+	 * (ce_session_state_save_file) - what a TAStudio branch keeps */
+	if (!stateFileIn.empty())
+	{
+		uint8_t tag[64];
+		uint32_t tagLen = 0;
+		if (ce_session_state_load_file(session, stateFileIn.c_str(), tag, sizeof tag, &tagLen) != 0)
+		{
+			return fail(metaPath, ce_session_last_error(session));
+		}
+		fprintf(stderr, "state file tag: %.*s\n", (int)(tagLen < sizeof tag ? tagLen : sizeof tag), (const char *)tag);
+	}
+
 	std::vector<uint8_t> state;
 	if (rerecord)
 	{
@@ -725,6 +753,27 @@ int main(int argc, char **argv)
 			{
 				return fail(metaPath, "could not write " + st->second);
 			}
+		}
+		auto sf = stateFileOuts.find(i);
+		if (sf != stateFileOuts.end())
+		{
+			const std::string tag = "frame " + std::to_string(i);
+			if (ce_session_state_save_file(session, sf->second.c_str(), reinterpret_cast<const uint8_t *>(tag.data()), (uint32_t)tag.size()) != 0)
+			{
+				return fail(metaPath, ce_session_last_error(session));
+			}
+		}
+		/* saved to a file and loaded straight back: the machine must not notice,
+		 * so a run that does this ends exactly where one that does not ends */
+		if (i == stateFileRoundTrip)
+		{
+			const std::string path = (metaPath.empty() ? std::string("chimera-run") : metaPath) + ".roundtrip.state";
+			if (ce_session_state_save_file(session, path.c_str(), nullptr, 0) != 0
+				|| ce_session_state_load_file(session, path.c_str(), nullptr, 0, nullptr) != 0)
+			{
+				return fail(metaPath, ce_session_last_error(session));
+			}
+			std::remove(path.c_str());
 		}
 		if (rerecord)
 		{

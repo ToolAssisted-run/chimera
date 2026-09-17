@@ -169,6 +169,35 @@ if [ "$level" = "both" ] || [ "$level" = "e" ]; then
 			fi
 		done
 
+		# A STATE KEPT IN A FILE (what a TAStudio branch keeps; engine.h). Saved to a
+		# file and loaded straight back mid-movie, the machine must not notice: the
+		# run ends byte for byte where the goldens say. Then the two ways a file can
+		# be wrong - not a state at all, and a state cut short - must each be refused
+		# with a reason and without taking the process down.
+		for movie in "$here"/movies/*.txt; do
+			sname="$(basename "$movie" .txt)"
+			srom="$here/roms/${sname%%.*}.testrom"
+			stag="$sname.engine.statefile"
+			rm -f "$work/$stag.ram.bin" "$work/$stag.vram.bin" "$work/$stag.state"
+			"$chimera_run" "$epkg" "$srom" "$movie" --state-file-roundtrip 10 --save-state-file "10=$work/$stag.state" 				--meta "$work/$stag.meta.txt" --dump "RAM=$work/$stag.ram.bin" --dump "VRAM=$work/$stag.vram.bin" 				> "$work/$stag.log" 2>&1
+			if cmp -s "$work/$stag.ram.bin" "$golden_dir/$sname.ram.bin" 				&& cmp -s "$work/$stag.vram.bin" "$golden_dir/$sname.vram.bin" && [ -s "$work/$stag.state" ]; then
+				report "E:$sname:statefile" PASS "saved to a file and loaded back mid-movie, byte-identical"
+			else
+				report "E:$sname:statefile" FAIL "RAM or VRAM differs after a state-file round trip (see work/$stag.log)"
+			fi
+		done
+		sfirst="$(ls "$here"/movies/*.txt | head -1)"; sname="$(basename "$sfirst" .txt)"; srom="$here/roms/${sname%%.*}.testrom"
+		printf 'this is not a state' > "$work/not-a-state.state"
+		"$chimera_run" "$epkg" "$srom" "$sfirst" --state-file "$work/not-a-state.state" > "$work/statefile-garbage.log" 2>&1; garbage_rc=$?
+		head -c 300 "$work/$sname.engine.statefile.state" > "$work/cut-short.state"
+		"$chimera_run" "$epkg" "$srom" "$sfirst" --state-file "$work/cut-short.state" > "$work/statefile-short.log" 2>&1; short_rc=$?
+		"$chimera_run" "$epkg" "$srom" "$sfirst" --state-file "$work/$sname.engine.statefile.state" > "$work/statefile-good.log" 2>&1; good_rc=$?
+		if [ "$garbage_rc" -ne 0 ] && [ "$garbage_rc" -lt 128 ] && grep -q "is not a state file" "$work/statefile-garbage.log" 			&& [ "$short_rc" -ne 0 ] && [ "$short_rc" -lt 128 ] 			&& [ "$good_rc" -eq 0 ] && grep -q "state file tag: frame 10" "$work/statefile-good.log"; then
+			report "E:statefile:refusals" PASS "a whole file loads and hands its tag back; garbage and a cut-short file are refused, no crash"
+		else
+			report "E:statefile:refusals" FAIL "garbage rc=$garbage_rc short rc=$short_rc good rc=$good_rc (see work/statefile-*.log)"
+		fi
+
 		# A CORE THAT DIES: all eight buttons at once make the synth core abort on
 		# cue (SPEC.md). The run must stop with the reason and the core's own last
 		# words - miniBox handing control back - and the process must not crash.

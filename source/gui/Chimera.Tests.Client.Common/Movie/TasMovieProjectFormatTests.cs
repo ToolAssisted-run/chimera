@@ -94,17 +94,51 @@ namespace Chimera.Tests.Client.Common.Movie
 				Frame = 4,
 				UserText = "risky route",
 				TimeStamp = new DateTime(2026, 8, 26, 21, 0, 0, DateTimeKind.Utc),
-				CoreData = [1, 2, 3, 4],
 				InputLog = StringLogUtil.MakeStringLog(),
 				Markers = new TasMovieMarkerList(movie),
 			};
 			branch.InputLog.Add(movie.GetInputLogEntry(0));
 			branch.InputLog.Add(movie.GetInputLogEntry(3));
 			branch.Markers.Add(new TasMovieMarker(1, "setup"), skipHistory: true);
+			// the branch's machine is a FILE beside the project's cache, which the engine writes
+			// for a real core; four bytes stand in for it here
+			File.WriteAllBytes(movie.NewBranchStatePath(out var stateFile), [1, 2, 3, 4]);
+			branch.StateFile = stateFile;
 			movie.Branches.Add(branch);
 
 			return movie;
 		}
+
+		/// <summary>
+		/// A branch's state is a file, and on a PS3 a file of gigabytes (issue #84): one that no
+		/// branch names is never read again and has to go - but not the one TAStudio's undo may
+		/// still bring back, and never anything outside the branch-state directory.
+		/// </summary>
+		[TestMethod]
+		public void StateFilesNoBranchNamesAreRemovedAndTheUndosIsKept()
+		{
+			var movie = MakeWorkedMovie(Path.Combine(_dir, "tidy.chimeraProject"));
+			var named = movie.Branches[0].StateFile;
+			File.WriteAllBytes(movie.NewBranchStatePath(out var orphan), [9]);
+			File.WriteAllBytes(movie.NewBranchStatePath(out var undo), [8]);
+			var outside = Path.Combine(Path.GetDirectoryName(movie.BranchStateDirectory)!, "not-a-branch-state.bin");
+			File.WriteAllBytes(outside, [7]);
+
+			movie.RemoveUnusedBranchStates(undo);
+
+			Assert.IsTrue(File.Exists(movie.BranchStatePath(named)), "a branch's own state stays");
+			Assert.IsTrue(File.Exists(movie.BranchStatePath(undo)), "and so does the one the undo would bring back");
+			Assert.IsFalse(File.Exists(movie.BranchStatePath(orphan)), "the one nothing names goes");
+			Assert.IsTrue(File.Exists(outside), "nothing beside the directory is touched");
+
+			movie.Branches.Clear();
+			movie.RemoveUnusedBranchStates();
+			Assert.AreEqual(0, Directory.GetFiles(movie.BranchStateDirectory).Length);
+		}
+
+		/// <summary>What a branch's state file holds, or null for a branch that has none.</summary>
+		private static byte[] StateOf(TasMovie movie, TasBranch branch)
+			=> branch.StateFile is null ? null : File.ReadAllBytes(movie.BranchStatePath(branch.StateFile));
 
 		private static TasMovie LoadFresh(string path)
 		{
@@ -236,7 +270,7 @@ namespace Chimera.Tests.Client.Common.Movie
 			Assert.AreEqual(new DateTime(2026, 8, 26, 21, 0, 0, DateTimeKind.Utc), branch.TimeStamp.ToUniversalTime());
 			Assert.AreEqual(2, branch.InputLog.Count);
 			Assert.AreEqual("setup", branch.Markers.Single().Message);
-			CollectionAssert.AreEqual(new byte[] { 1, 2, 3, 4 }, branch.CoreData, "the state came from the cache");
+			CollectionAssert.AreEqual(new byte[] { 1, 2, 3, 4 }, StateOf(loaded, branch), "the state came from the cache");
 		}
 
 		/// <summary>
@@ -262,7 +296,7 @@ namespace Chimera.Tests.Client.Common.Movie
 			Assert.AreEqual(6, loaded.InputLogLength, "the work itself is untouched");
 			Assert.AreEqual(1, loaded.Branches.Count);
 			Assert.AreEqual("risky route", loaded.Branches[0].UserText, "and so is what a branch IS");
-			Assert.IsNull(loaded.Branches[0].CoreData, "the branch keeps its input and loses its state");
+			Assert.IsNull(loaded.Branches[0].StateFile, "the branch keeps its input and loses its state");
 			// ...but nothing is said about the greenzone, because nothing was taken
 			// away: this project closed cleanly, so its history is trusted
 			Assert.IsNull(loaded.DroppedCacheNote, "a clean close keeps the greenzone, whoever drew it");
@@ -273,7 +307,7 @@ namespace Chimera.Tests.Client.Common.Movie
 			Assert.IsFalse(MakeWorkedMovie(plain).Save().IsError);
 			var plainLoaded = LoadFresh(plain);
 			Assert.IsNull(plainLoaded.DroppedCacheNote);
-			CollectionAssert.AreEqual(new byte[] { 1, 2, 3, 4 }, plainLoaded.Branches[0].CoreData,
+			CollectionAssert.AreEqual(new byte[] { 1, 2, 3, 4 }, StateOf(plainLoaded, plainLoaded.Branches[0]),
 				"the state came from the cache, as it always has");
 		}
 
@@ -399,7 +433,7 @@ namespace Chimera.Tests.Client.Common.Movie
 
 			var loaded = LoadFresh(path);
 			Assert.AreEqual(6, loaded.InputLogLength, "the work itself is untouched");
-			Assert.IsNull(loaded.Branches[0].CoreData, "the branch keeps its input and loses its state");
+			Assert.IsNull(loaded.Branches[0].StateFile, "the branch keeps its input and loses its state");
 			Assert.IsNull(loaded.DroppedCacheNote, "the greenzone is untouched: this project closed cleanly");
 			Assert.AreEqual("1", loaded.HeaderEntries[HeaderKeys.GpuStatesSurvive],
 				"what the core declared is still on record");
@@ -457,7 +491,7 @@ namespace Chimera.Tests.Client.Common.Movie
 
 			var same = LoadFresh(path);
 			Assert.IsNull(same.DroppedCacheNote, "the same machine uses its cache");
-			CollectionAssert.AreEqual(new byte[] { 1, 2, 3, 4 }, same.Branches[0].CoreData);
+			CollectionAssert.AreEqual(new byte[] { 1, 2, 3, 4 }, StateOf(same, same.Branches[0]));
 
 			// the project's settings change underneath the cache
 			using (var p = Chimera.Emulation.Common.Engine.EngineProject.Open(path))
@@ -470,7 +504,7 @@ namespace Chimera.Tests.Client.Common.Movie
 			StringAssert.Contains(other.DroppedCacheNote, "other settings");
 			Assert.AreEqual(6, other.InputLogLength, "the work is untouched");
 			Assert.AreEqual(1, other.Branches.Count);
-			Assert.IsNull(other.Branches[0].CoreData, "the branch keeps its input and loses its state");
+			Assert.IsNull(other.Branches[0].StateFile, "the branch keeps its input and loses its state");
 
 			// saving from the new machine writes a cache that is its own
 			other.InsertEmptyFrame(0, 1);
@@ -652,7 +686,7 @@ namespace Chimera.Tests.Client.Common.Movie
 			Assert.AreEqual(6, loaded.InputLogLength, "the input log is work, not cache");
 			Assert.AreEqual(1, loaded.Branches.Count, "the branch itself is work");
 			Assert.AreEqual("risky route", loaded.Branches[0].UserText);
-			Assert.IsNull(loaded.Branches[0].CoreData, "only its state was cache");
+			Assert.IsNull(loaded.Branches[0].StateFile, "only its state was cache");
 		}
 
 		/// <summary>
