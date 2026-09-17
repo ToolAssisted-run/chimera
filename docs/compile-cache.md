@@ -42,7 +42,7 @@ names carry the module hash, its version and the CPU, so the same firmware
 library compiles once for every game.
 
 The engine sets the directory with `ce_cache_dir` before opening a session,
-the frontend names it `<data home>/CompiledCode/<core>/<package version>/`
+the frontend names it `<data home>/Cache/PrecompiledCode/<game sha1>/`
 (see `CacheStore`; the data home is `%LOCALAPPDATA%\Chimera` or
 `$XDG_DATA_HOME/chimera`), and
 `ce_session_cache_stored` / `ce_session_cache_fetched` say what a session did.
@@ -111,14 +111,36 @@ is worse than no list.
 **Create stays unavailable until every listed module is green.** A project
 whose game is not compiled is a project that boots into a minutes-long stall,
 so it is not created at all. This is the only place the cache is filled from;
-the core's menu offers only "Clear Compiled Code".
+removing what it filled is `Config > Pre-compiled modules...`, which lists the
+games and takes them away one at a time.
 
-What a game needs is remembered beside the objects, in
-`<core>/<version>/games/<rom sha1>.json`: the list of names and hashes the
-sessions produced. The project records the same list under `coreCache`, so
-opening it later can say whether the compiled code is the same code. The
-files themselves are never in the project: they regenerate from the game and
-the package.
+What a game needs is remembered beside the objects, in the game's own
+directory as `manifest.json`: the list of names and hashes the sessions
+produced, and which core and package build produced them. The project records
+the same list under `coreCache`, so opening it later can say whether the
+compiled code is the same code. The files themselves are never in the project:
+they regenerate from the game and the package.
+
+## One directory per game (user-decided, 2026-09-17)
+
+A game's compiled code is filed under the game's own SHA1 and nothing else.
+Neither the core's name nor the package version is in the path.
+
+This replaced one directory per core and package version. That layout kept a
+rebuilt core from reading the objects an older build compiled, which is a real
+hazard - different patches generate different code - but it paid for it with a
+directory that never went away: five of them and 231 MB on the machine this was
+decided on, one per local core build, with no way to tell which was still
+wanted. The manifest now carries the core name and package version instead, and
+a manifest that does not vouch for the build now running is not believed, so the
+game compiles again. A rebuild is cheaper than an directory that accumulates
+forever.
+
+Objects are **not** shared between games: each game keeps its own copy of
+everything it needs, firmware libraries included. Measured on the deciding
+machine, the shared firmware set was 12 MB against a game's own 47 MB - so the
+duplication buys a directory that can be deleted whole, with nothing else
+depending on what is inside it, for about a quarter again of its size.
 
 What this guarantees is boot time, not correctness: a module a game generates
 at runtime cannot be precompiled, and the core compiles it when it meets it,

@@ -16,12 +16,18 @@ namespace Chimera.Tests.Client.GUI
 	[TestClass]
 	public class WizardPrecompileTests
 	{
-		private static WaterboxConfig CfgThatCompiles()
-			=> WaterboxConfig.FromJson("""
+		/// <summary>
+		/// A core that compiles. The version is a parameter because a game's
+		/// code is filed under the game alone now: which package build produced
+		/// it is recorded in the manifest, so a test that wants "the same core,
+		/// rebuilt" changes this and nothing else.
+		/// </summary>
+		private static WaterboxConfig CfgThatCompiles(string version = "1")
+			=> WaterboxConfig.FromJson($$"""
 				{
 				  "coreName": "compiles",
 				  "systemId": "PS3",
-				  "version": "1",
+				  "version": "{{version}}",
 				  "precompile": true,
 				  "video": { "width": 640, "height": 480 },
 				  "audio": { "samplesPerFrame": 1024 },
@@ -57,18 +63,64 @@ namespace Chimera.Tests.Client.GUI
 		/// <summary>Writes an object and the manifest that says the game needs it.</summary>
 		private static void Compiled(string cacheRoot, WaterboxConfig cfg, string romPath, string name, string contents)
 		{
-			var dir = WaterboxCore.CoreCacheDirectoryFor(cacheRoot, cfg.CoreName, cfg.Version);
+			var romSha1 = Sha1Of(romPath);
+			var dir = WaterboxCore.CoreCacheDirectoryFor(cacheRoot, romSha1);
 			var file = Path.Combine(dir, name);
 			Directory.CreateDirectory(Path.GetDirectoryName(file)!);
 			File.WriteAllText(file, contents);
-			var romSha1 = Sha1Of(romPath);
 			CoreCacheManifest manifest = new()
 			{
 				RomName = Path.GetFileName(romPath),
 				RomSha1 = romSha1,
+				// the manifest vouches for which build compiled it now that the
+				// directory no longer does
+				CoreName = cfg.CoreName,
+				CoreVersion = cfg.Version,
+				Compiled = DateTime.UtcNow,
 				Files = [ new CoreCacheFile { Name = name, Sha1 = CoreCacheManifest.HashOf(dir, name) } ],
 			};
-			manifest.Save(dir, romSha1);
+			manifest.Save(dir);
+		}
+
+		/// <summary>
+		/// A game's code is filed under the game alone, so the manifest is the
+		/// only thing that says WHICH build compiled it. Objects a different
+		/// build produced are different code, and the step must not offer them
+		/// as this game's - it must ask for the compile again.
+		///
+		/// This is what the old one-directory-per-package-version layout used to
+		/// guarantee by filing them apart; it is worth a test precisely because
+		/// nothing in the path enforces it any more.
+		/// </summary>
+		[TestMethod]
+		public void CodeCompiledByAnotherBuildIsNotOffered()
+		{
+			var dir = TempDir();
+			try
+			{
+				var cfg = CfgThatCompiles();
+				var rom = MakeRom(dir);
+				Compiled(dir, cfg, rom, "cache/ppu-abc/module.obj.gz", "compiled bytes");
+
+				// the object is present and unchanged; only the build differs
+				var manifest = CoreCacheManifest.Load(WaterboxCore.CoreCacheDirectoryFor(dir, Sha1Of(rom)));
+				Assert.IsNotNull(manifest, "the manifest was written where the game's hash says");
+				Assert.IsTrue(manifest.CompiledBy(cfg.CoreName, cfg.Version), "its own build vouches for it");
+				Assert.IsFalse(manifest.CompiledBy(cfg.CoreName, cfg.Version + "-rebuilt"),
+					"another package build does not");
+				Assert.IsFalse(manifest.CompiledBy("SomeOtherCore", cfg.Version), "nor another core");
+
+				using NewProjectWizard form = new([ ], static _ => [ ]);
+				form.Show();
+				form.UsePrecompileFrom(CfgThatCompiles(version: "rebuilt"), dir, rom);
+				Assert.AreEqual(0, form.PrecompileEntries.Count,
+					"code another build compiled is not listed as this game's");
+				Assert.IsFalse(form.PrecompileReady, "and the project cannot be created against it");
+			}
+			finally
+			{
+				Directory.Delete(dir, recursive: true);
+			}
 		}
 
 		private static string Sha1Of(string path)
@@ -185,7 +237,7 @@ namespace Chimera.Tests.Client.GUI
 				var rom = MakeRom(dir);
 				Compiled(dir, cfg, rom, "cache/ppu-abc/module.obj.gz", "compiled bytes");
 				// something else wrote over it: same name, other content
-				var file = Path.Combine(WaterboxCore.CoreCacheDirectoryFor(dir, cfg.CoreName, cfg.Version), "cache/ppu-abc/module.obj.gz");
+				var file = Path.Combine(WaterboxCore.CoreCacheDirectoryFor(dir, Sha1Of(rom)), "cache/ppu-abc/module.obj.gz");
 				File.WriteAllText(file, "not what was compiled");
 				using NewProjectWizard form = new([ ], static _ => [ ]);
 				form.Show();

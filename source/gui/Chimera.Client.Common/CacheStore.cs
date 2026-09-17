@@ -34,6 +34,33 @@ namespace Chimera.Client.Common
 		/// <summary>What cores compiled for a game: <c>&lt;core&gt;/&lt;package version&gt;</c>.</summary>
 		public static string CompiledCode => Path.Combine(ProjectCache.DataHome, "CompiledCode");
 
+		/// <summary>
+		/// Where a game's precompiled code lives now: one directory per game,
+		/// named by the game's own SHA1 and nothing else (user-decided,
+		/// 2026-09-17).
+		///
+		/// The game's hash is the whole key. Neither the core's name nor the
+		/// package version is in the path, so a game has ONE directory however
+		/// many times the core is rebuilt - the old layout kept one per package
+		/// version and quietly accumulated them, five of them and 231 MB on the
+		/// machine this was decided on. What that layout bought - never reading
+		/// objects an older build compiled - is bought instead by recording the
+		/// core and version INSIDE the manifest and recompiling when they do
+		/// not match, which costs a rebuild rather than a directory forever.
+		///
+		/// Objects are not shared between games: each game keeps its own copy of
+		/// everything it needs, firmware libraries included. They are 12 MB
+		/// against a game's own 47 MB, and the price of that duplication is one
+		/// directory that can be deleted whole, with nothing else depending on
+		/// what is inside it.
+		/// </summary>
+		public static string PrecompiledCode
+			=> Path.Combine(ProjectCache.DataHome, "Cache", "PrecompiledCode");
+
+		/// <summary>This game's precompiled code, by its SHA1. Null when there is no hash to file it under.</summary>
+		public static string PrecompiledCodeFor(string gameSha1)
+			=> string.IsNullOrEmpty(gameSha1) ? null : Path.Combine(PrecompiledCode, gameSha1.ToUpperInvariant());
+
 		/// <summary>Where both of them used to be, together, inside the install.</summary>
 		public static string Legacy => Path.Combine(PathUtils.ExeDirectoryPath, "CoreCache");
 

@@ -16,9 +16,6 @@ namespace Chimera.Client.Common
 		/// <summary>A core package unzipped so it can be loaded.</summary>
 		CorePackage,
 
-		/// <summary>A core's translation of a game's code (docs/compile-cache.md).</summary>
-		CompiledCode,
-
 		/// <summary>What each core's repository last said it had published.</summary>
 		CoreVersions,
 
@@ -111,7 +108,6 @@ namespace Chimera.Client.Common
 		{
 			CacheKind.Project => "The run replays instead of resuming, and its files are asked for once more.",
 			CacheKind.CorePackage => "The package is unzipped again the next time it is loaded.",
-			CacheKind.CompiledCode => "The game's code is translated again, which is minutes on a first boot.",
 			CacheKind.CoreVersions => "The Core Manager asks each repository again instead of showing what it saw last.",
 			CacheKind.Recovery => "Unsaved work - inputs, markers and branches a session never saved. Removing it loses that work for good.",
 			_ => "",
@@ -258,12 +254,10 @@ namespace Chimera.Client.Common
 		/// or for the running session.
 		/// </summary>
 		/// <param name="corePackageCacheRoot">where packages are unzipped (beside the executable)</param>
-		/// <param name="compiledCodeRoot">the Core Cache path, where translated code lives</param>
 		/// <param name="openProjectId">the project open right now, or null</param>
 		/// <param name="loadedPackageSha1s">packages a loaded core is using right now</param>
 		public static IReadOnlyList<CacheItem> Take(
 			string? corePackageCacheRoot,
-			string? compiledCodeRoot,
 			string? openProjectId = null,
 			IReadOnlyCollection<string>? loadedPackageSha1s = null)
 		{
@@ -339,25 +333,11 @@ namespace Chimera.Client.Common
 				});
 			}
 
-			// <core>/<package version>/, one directory per build that compiled
-			// anything - a different build generates different code and must not
-			// read the old one's objects.
-			foreach (var coreDir in Directories(compiledCodeRoot))
-			{
-				foreach (var versionDir in Directories(coreDir))
-				{
-					items.Add(new CacheItem
-					{
-						Kind = CacheKind.CompiledCode,
-						Label = System.IO.Path.GetFileName(coreDir),
-						Detail = Short(System.IO.Path.GetFileName(versionDir)),
-						Path = versionDir,
-						Bytes = SizeOf(versionDir),
-						LastUsed = TouchedAt(versionDir),
-						Locked = CacheLocks.IsLocked(locks, CacheKind.CompiledCode, versionDir),
-					});
-				}
-			}
+			// Compiled code is NOT surveyed here (user-decided, 2026-09-17). It
+			// is filed per game now, and a game's compiled code is listed and
+			// removed in Config > Pre-compiled modules... - one place, at the
+			// granularity a person thinks in. A second view of it here, by core
+			// and build, described a layout that no longer exists.
 
 			var feed = System.IO.Path.Combine(CoreStore.Path, ".feed-cache");
 			if (Directory.Exists(feed))
@@ -570,7 +550,6 @@ namespace Chimera.Client.Common
 		{
 			CacheKind.Project => "Project",
 			CacheKind.CorePackage => "Unpacked core",
-			CacheKind.CompiledCode => "Compiled code",
 			CacheKind.CoreVersions => "Core versions",
 			CacheKind.Recovery => "Unsaved work",
 			_ => kind.ToString(),

@@ -53,7 +53,7 @@ Everything the window lists is under the user's data directory -
 | --- | --- |
 | `Projects/<id>/` | one run's greenzone and what its project is called |
 | `UnpackedCores/<name>-<sha1>/` | a `.chimeraCore` unzipped so it can be loaded |
-| `CompiledCode/<core>/<version>/` | what cores compiled for a game |
+| `Cache/PrecompiledCode/<game sha1>/` | what a core compiled for one game (not the manager's: `Config > Pre-compiled modules...`) |
 | `Cores/.feed-cache/` | what each core repository last said it published |
 | `Recovery/<id>/` | unsaved work: one project's recovery journal, snapshot and session |
 | `cache-locks.json` | which entries the auto-clean may not take |

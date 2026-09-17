@@ -970,20 +970,57 @@ namespace Chimera.Client.GUI
 
 		private string? _romSha1Path, _romSha1;
 
+		/// <summary>
+		/// Hashes the game as soon as it is picked, so that the compile step
+		/// opens on an answer instead of on a stall.
+		///
+		/// Only for a core that compiles anything, and only for the file that
+		/// step would actually ask about: hashing every pick would charge a
+		/// person gigabytes of reading for firmware and track files that are
+		/// not the game. Nothing here is allowed to throw - a pick that fails
+		/// to hash is simply a pick the compile step hashes itself, the way it
+		/// always did - and the answer lands in the same memo either way.
+		/// </summary>
+		private void HashGameForPrecompileNow(string path)
+		{
+			if (_cfg?.Precompile is not true) return;
+			if (!string.Equals(PrecompileRomPath(), path, StringComparison.Ordinal)) return;
+			if (_romSha1Path == path && _romSha1 is not null) return;
+			try
+			{
+				using var progress = ProgressDialog.Begin(this, "Adding game");
+				progress.Step($"hashing {Path.GetFileName(path)}");
+				PrecompileRomSha1();
+			}
+			catch (Exception)
+			{
+				// left for the compile step: this was an optimisation, not a duty
+			}
+		}
+
+		/// <summary>
+		/// The game's identity, which is what the precompiled code is filed
+		/// under (docs/compile-cache.md).
+		///
+		/// Taken through the ENGINE's hasher, not a private one: it answers
+		/// repeat calls from a cache keyed by path, size and mtime, and Create
+		/// hashes the very same file again when it adds it to the project. Two
+		/// independent hashings of a 5 GB disc image is one read too many, and
+		/// two notions of what a file's identity is, is one too many as well.
+		/// </summary>
 		private string? PrecompileRomSha1()
 		{
 			var path = PrecompileRomPath();
 			if (path is null || !File.Exists(path)) return null;
 			if (_romSha1Path == path && _romSha1 is not null) return _romSha1;
-			using var stream = File.OpenRead(path);
-			using var sha1 = System.Security.Cryptography.SHA1.Create();
-			_romSha1 = BitConverter.ToString(sha1.ComputeHash(stream)).Replace("-", "");
+			if (ChimeraEngine.Sha1OfFile(path) is not { } hashed) return null;
+			_romSha1 = hashed.Sha1;
 			_romSha1Path = path;
 			return _romSha1;
 		}
 
 		private string? PrecompileCacheDir()
-			=> _cfg is null ? null : WaterboxCore.CoreCacheDirectoryFor(_cfg);
+			=> _cfg is null ? null : WaterboxCore.CoreCacheDirectoryFor(WaterboxCore.CoreCacheRoot, PrecompileRomSha1());
 
 		/// <summary>Every module this game needs is compiled and unchanged.</summary>
 		private bool PrecompileSatisfied()
@@ -1000,7 +1037,15 @@ namespace Chimera.Client.GUI
 
 		private void BuildPrecompilePage()
 		{
-			_precompileManifest = CoreCacheManifest.Load(PrecompileCacheDir(), PrecompileRomSha1());
+			var manifest = CoreCacheManifest.Load(PrecompileCacheDir());
+			// Objects a DIFFERENT build of the package compiled are different
+			// code. The old layout kept them apart by filing them under the
+			// version; a game has one directory now, so the manifest is asked
+			// instead, and one that cannot vouch for itself is not believed.
+			_precompileManifest = manifest is not null && _cfg is not null
+				&& !manifest.CompiledBy(_cfg.CoreName, _cfg.Version)
+					? null
+					: manifest;
 			RefreshPrecompileList();
 		}
 
@@ -1146,7 +1191,9 @@ namespace Chimera.Client.GUI
 			_rememberFirmwareNow(ChosenCore.Name, ProvidedFirmwarePaths);
 
 			var manifest = PrecompileOrchestrator.Run(
-				ChosenCore.Path, _configPath, romPath, romSha1, dir, Entry, Progress, cancelled: PumpAndCheckCancel,
+				ChosenCore.Path, _configPath, romPath, romSha1, dir,
+				_cfg?.CoreName ?? ChosenCore.Name, _cfg?.Version ?? "",
+				Entry, Progress, cancelled: PumpAndCheckCancel,
 				firmware: ProvidedFirmwarePaths);
 
 			_precompiling = false;
@@ -1522,6 +1569,20 @@ namespace Chimera.Client.GUI
 			}
 
 			list.Items.Add(new PickedFile(name, path, tracks));
+
+			// A core that compiles its game's code files that code under the
+			// game's own hash, so the hash has to exist BEFORE the compile step
+			// opens - that step looks the game up to say what is already
+			// compiled, and looking it up is the first thing it does.
+			//
+			// Hashing here rather than there is what keeps that lookup instant.
+			// A disc image is gigabytes and the compile step used to hash one on
+			// the UI thread while building its page: a silent freeze, no
+			// progress, no cancel, at the exact moment the person arrived. Here
+			// the wait is where a wait is expected - they just chose a file -
+			// and it is said out loud. The engine memoizes by path, size and
+			// mtime, so Create's own hashing of the same file costs nothing.
+			HashGameForPrecompileNow(path);
 
 			// A slot that names its formats has still not been given a rule: the
 			// picker offers "All files" too, and a person who renamed something

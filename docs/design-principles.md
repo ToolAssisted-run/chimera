@@ -3442,3 +3442,68 @@ the pin alone, which is what keeps a project openable at all.
 The Chimera version was already rewritten by every save, with the version that
 created the project kept as `OriginalEmuVersion`; the core now follows the same
 rule.
+
+## A game's compiled code is filed under the game (user-decided, 2026-09-17)
+
+Compiled code used to live in one directory per core and per package version:
+`CompiledCode/<core>/<build>/`, with a per-game manifest inside it. That layout
+bought one real thing - a rebuilt core could not read the objects an older build
+compiled, because they were filed somewhere else - and paid for it with
+directories that never went away. On the machine this was decided on there were
+five of them, 231 MB, one per local core build, and nothing said which was still
+wanted. One of the five had no manifest at all: 39 MB no tool could name and no
+person could find.
+
+A game's code is now filed under the game's own SHA1 and nothing else:
+`Cache/PrecompiledCode/<game sha1>/`. Neither the core's name nor the package
+version is in the path, so a game has ONE directory however often the core is
+rebuilt. What the old layout guaranteed by separation is now guaranteed by
+evidence: the manifest records which core and which package build produced the
+objects, and a manifest that cannot vouch for the build now running is not
+believed - the game compiles again. A rebuild costs minutes; a directory that
+accumulates forever costs them every time, and silently.
+
+Games share no objects. Each keeps its own copy of everything it needs,
+firmware libraries included, even where two games would compile the same
+library. Measured before deciding: the shared firmware set was 12 MB against a
+game's own 47 MB. So the duplication is about a quarter again of a game's size,
+and what it buys is that a row in a window is one directory - removable whole,
+with nothing else depending on what is inside it, and no question of whether
+some other game still needs a file before it can go.
+
+That is what makes the removal safe to offer per game. `Config > Pre-compiled
+modules...` lists what is there - the game, the core that compiled it, when,
+how many modules, what it weighs - and takes one away at a time. It replaced
+"Clear Compiled Code", which could only empty everything for a whole core, and
+it is the only place the store is emptied; filling it is still the wizard's,
+where a project is not created until its game is compiled. Compiled code left
+the Cache Manager with it: two views of one store, at two granularities, meant
+the coarser one described a layout that no longer exists.
+
+A directory nothing can name is still listed. A compile that stopped half way
+leaves objects and no manifest, and that is precisely the case worth showing:
+unnameable leftovers are the ones nobody would otherwise find. What the previous
+layout left is offered the same way, as one row that says what it is, so the
+231 MB is something a person can see and reclaim rather than bytes that simply
+stay.
+
+## The game is hashed when it is picked, not when it is needed (user-decided, 2026-09-17)
+
+The wizard's compile step looks a game up by its hash to say what is already
+compiled, and looking it up is the first thing it does. It used to hash the game
+right there, on the UI thread, while building the page: a silent freeze with no
+progress and no cancel, at the moment somebody arrived at the step. A disc image
+is gigabytes - the game this was found on is 5.1 GB, and one in the same folder
+is 19 GB.
+
+Worse, it was the second hashing of the same bytes. Create hashes every file the
+project takes, through the engine, behind a progress dialog that says which file
+it is on; the compile step had its own private `SHA1.Create()` and its own idea
+of what a file's identity was.
+
+The game is now hashed when it is PICKED, through the engine's hasher, with the
+wait shown where a wait is expected - somebody has just chosen a file. The
+engine answers repeat calls from a cache keyed by path, size and mtime, so
+Create's hashing of the same file costs a lookup, and there is one notion of a
+file's identity rather than two. It is an optimisation and never a duty: a pick
+that fails to hash is a pick the compile step hashes itself, exactly as before.

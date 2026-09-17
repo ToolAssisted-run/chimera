@@ -97,18 +97,34 @@ namespace Chimera.Emulation.Common.Waterbox
 		public static PrecompileRequest PrecompileRequest { get; set; }
 
 		/// <summary>
-		/// One directory per core and package version: a different build of the
-		/// package generates different code, so it must not read the old one's.
+		/// One directory per GAME, named by the game's own SHA1 (user-decided,
+		/// 2026-09-17). The core and the package version are recorded inside the
+		/// manifest instead of in the path, so a game keeps one directory however
+		/// often the core is rebuilt, and objects an older build compiled are
+		/// refused by <see cref="CoreCacheManifest.CompiledBy"/> rather than by
+		/// being filed somewhere else.
 		/// </summary>
-		public static string CoreCacheDirectoryFor(string cacheRoot, string coreName, string coreVersion)
+		public static string CoreCacheDirectoryFor(string cacheRoot, string gameSha1)
 		{
-			if (string.IsNullOrEmpty(cacheRoot)) return null;
+			if (string.IsNullOrEmpty(cacheRoot) || string.IsNullOrEmpty(gameSha1)) return null;
 			static string Safe(string s) => string.Concat((s ?? "").Select(c => char.IsLetterOrDigit(c) || c is '-' or '_' or '.' ? c : '_'));
-			return Path.Combine(cacheRoot, Safe(coreName), Safe(string.IsNullOrEmpty(coreVersion) ? "dev" : coreVersion));
+			return Path.Combine(cacheRoot, Safe(gameSha1.ToUpperInvariant()));
 		}
 
-		public static string CoreCacheDirectoryFor(WaterboxConfig cfg)
-			=> cfg.Precompile ? CoreCacheDirectoryFor(CoreCacheRoot, cfg.CoreName, cfg.Version) : null;
+		/// <summary>
+		/// Where this boot's core keeps its compiled code: the game's directory,
+		/// or null when the core compiles nothing or the game has no identity to
+		/// file it under.
+		///
+		/// The hash is taken through the engine, which answers from a memo keyed
+		/// by path, size and mtime - the wizard hashed this same file when it was
+		/// picked, so this costs a lookup rather than a read of a disc image.
+		/// </summary>
+		public static string CoreCacheDirectoryFor(WaterboxConfig cfg, string romPath)
+			=> cfg.Precompile && romPath is { Length: > 0 } && File.Exists(romPath)
+				&& ChimeraEngine.Sha1OfFile(romPath) is { } hashed
+					? CoreCacheDirectoryFor(CoreCacheRoot, hashed.Sha1)
+					: null;
 
 		public WaterboxCore(byte[] rom, string romPath, WaterboxConfig cfg, string packageDir, WaterboxCoreSettings settings = null, IReadOnlyDictionary<string, byte[]> firmware = null, IReadOnlyList<CoreFile> extraFiles = null)
 		{
@@ -146,7 +162,7 @@ namespace Chimera.Emulation.Common.Waterbox
 				_session = EngineSession.Open(
 					packageDir, rom, romPath, SerializeSettings(effective), firmware, extraFiles,
 					wantGpu: WantsGpu(effective),
-					cacheDir: CoreCacheDirectoryFor(cfg),
+					cacheDir: CoreCacheDirectoryFor(cfg, romPath),
 					precompile: PrecompileRequest);
 			}
 			catch (InvalidOperationException ex)

@@ -467,7 +467,7 @@ namespace Chimera.Client.GUI
 			// where the core store and the project caches do rather than wherever
 			// somebody's config last said (see CacheStore).
 			CacheStore.AdoptLegacy();
-			WaterboxCore.CoreCacheRoot = CacheStore.CompiledCode;
+			WaterboxCore.CoreCacheRoot = CacheStore.PrecompiledCode;
 			if (_argParser.cmdPrecompile is { } precompileSpec)
 			{
 				var parts = precompileSpec.Split('/');
@@ -1718,21 +1718,10 @@ namespace Chimera.Client.GUI
 				GenericCoreSubMenu.DropDownItems.Add(firmwareMenuItem);
 			}
 
-			// What this core has compiled for games so far (docs/compile-cache.md).
-			// Emptying it is the only action: filling it belongs to the wizard,
-			// where a project is not created until its game is compiled.
-			if (CoreRegistry.Instance.AllFactories.OfType<WaterboxCoreFactory>().FirstOrDefault(f => f.Config.Precompile) is { } precompiling
-				&& WaterboxCore.CoreCacheDirectoryFor(precompiling.Config) is { } cacheDir)
-			{
-				var mb = PrecompileOrchestrator.CacheBytes(cacheDir) / (1024.0 * 1024.0);
-				ToolStripMenuItem clearCacheMenuItem = new() { Text = $"&Clear Compiled Code ({mb:F0} MB)" };
-				clearCacheMenuItem.Click += (_, _) =>
-				{
-					if (ShowMessageBox2(owner: this, "Delete the code this core compiled for your games? Each project's game must be compiled again before it opens.", "Clear Compiled Code", EMsgBoxIcon.Question))
-						PrecompileOrchestrator.Clear(cacheDir);
-				};
-				GenericCoreSubMenu.DropDownItems.Add(clearCacheMenuItem);
-			}
+			// Compiled code is no longer emptied from here. It is filed per game
+			// rather than per core now, so "clear what this core compiled" is not
+			// a thing that can be pointed at: Config > Pre-compiled modules...
+			// lists the games and removes them one at a time.
 			if (Emulator.SystemId is VSystemID.Raw.NULL) return; // a core, but no machine running yet
 
 			// The way OUT for what this machine keeps (docs/save-data.md): present

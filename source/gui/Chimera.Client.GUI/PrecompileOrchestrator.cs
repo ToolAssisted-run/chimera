@@ -159,9 +159,9 @@ namespace Chimera.Client.GUI
 		}
 
 		/// <summary>What a game needs and what of it is there, from the manifest a previous compile left.</summary>
-		public static List<Entry> Survey(string cacheDir, string romSha1)
+		public static List<Entry> Survey(string cacheDir)
 		{
-			var manifest = CoreCacheManifest.Load(cacheDir, romSha1);
+			var manifest = CoreCacheManifest.Load(cacheDir);
 			if (manifest is null) return [ ];
 			return manifest.Files
 				.Select(f => new Entry
@@ -174,20 +174,10 @@ namespace Chimera.Client.GUI
 		}
 
 		/// <summary>Everything the game needs is on disk and unchanged.</summary>
-		public static bool Satisfied(string cacheDir, string romSha1)
+		public static bool Satisfied(string cacheDir)
 		{
-			var entries = Survey(cacheDir, romSha1);
+			var entries = Survey(cacheDir);
 			return entries.Count is not 0 && entries.All(e => e.Present);
-		}
-
-		public static long CacheBytes(string cacheDir)
-			=> cacheDir is null || !Directory.Exists(cacheDir)
-				? 0
-				: new DirectoryInfo(cacheDir).EnumerateFiles("*", SearchOption.AllDirectories).Sum(f => f.Length);
-
-		public static void Clear(string cacheDir)
-		{
-			if (cacheDir is not null && Directory.Exists(cacheDir)) Directory.Delete(cacheDir, recursive: true);
 		}
 
 		/// <summary>
@@ -199,6 +189,7 @@ namespace Chimera.Client.GUI
 		/// </summary>
 		public static CoreCacheManifest Run(
 			string packagePath, string configPath, string romPath, string romSha1, string cacheDir,
+			string coreName, string coreVersion,
 			Action<Entry> onEntry, Action<uint, uint> onProgress, Func<bool> cancelled,
 			IReadOnlyDictionary<string, string> firmware = null)
 		{
@@ -332,6 +323,13 @@ namespace Chimera.Client.GUI
 			{
 				RomName = Path.GetFileName(romPath),
 				RomSha1 = romSha1,
+				// Who compiled it, which the directory used to say by its name.
+				// A game's code is filed under the game alone now, so this is the
+				// only record of which build produced these objects - and the only
+				// thing standing between a rebuilt core and somebody else's code.
+				CoreName = coreName,
+				CoreVersion = coreVersion,
+				Compiled = DateTime.UtcNow,
 				Files = found.OrderBy(kv => kv.Key, StringComparer.Ordinal)
 					.Select(kv => new CoreCacheFile { Name = kv.Key, Sha1 = kv.Value })
 					.ToList(),
@@ -341,7 +339,7 @@ namespace Chimera.Client.GUI
 				LastFailure = refused ?? "the sessions compiled nothing for this game";
 				return null;
 			}
-			manifest.Save(cacheDir, romSha1);
+			manifest.Save(cacheDir);
 			return manifest;
 		}
 	}

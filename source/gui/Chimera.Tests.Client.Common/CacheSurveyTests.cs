@@ -91,10 +91,8 @@ namespace Chimera.Tests.Client.Common
 			var packages = Path.Combine(_dir, "CoreCache-packages");
 			Fill(Path.Combine(packages, "xemu-23df374e61f4b5f212a436b86625546ce1e61324"), "core.wbx", 2048);
 
-			var compiled = Path.Combine(_dir, "CoreCache-compiled");
-			Fill(Path.Combine(compiled, "rpcs3", "e6bdd2b2ef65"), "obj.bin", 8192);
 
-			var items = CacheSurvey.Take(packages, compiled);
+			var items = CacheSurvey.Take(packages);
 
 			var project = items.Single(i => i.Detail is "00000000000000aa");
 			Assert.AreEqual("Prince of Persia", project.Label, "a project is named, not shown as a hex id");
@@ -106,10 +104,6 @@ namespace Chimera.Tests.Client.Common
 			var package = items.Single(i => i.Kind is CacheKind.CorePackage && i.Label is "xemu");
 			Assert.AreEqual("xemu", package.Label);
 			Assert.AreEqual("23df374e", package.Detail, "the hash is shown at the length a person reads");
-
-			var code = items.Single(i => i.Kind is CacheKind.CompiledCode && i.Label is "rpcs3");
-			Assert.AreEqual("rpcs3", code.Label);
-			Assert.AreEqual("e6bdd2b2", code.Detail, "compiled code belongs to one build of one core");
 
 			foreach (var item in items)
 			{
@@ -123,13 +117,13 @@ namespace Chimera.Tests.Client.Common
 			ProjectCache.Ensure("00000000000000bb");
 			Fill(ProjectCache.DirectoryFor("00000000000000bb"), "history.bin", 1024);
 
-			var open = CacheSurvey.Take(null, null, openProjectId: "00000000000000bb")
+			var open = CacheSurvey.Take(null, openProjectId: "00000000000000bb")
 				.Single(i => i.Detail is "00000000000000bb");
 			Assert.IsTrue(open.InUse, "the project standing open cannot be pulled out from under itself");
 			StringAssert.Contains(CacheSurvey.Remove(open) ?? "", "in use", "and removing it is refused, not attempted");
 			Assert.IsTrue(Directory.Exists(open.Path), "so it is still there");
 
-			var closed = CacheSurvey.Take(null, null).Single(i => i.Detail is "00000000000000bb");
+			var closed = CacheSurvey.Take(null).Single(i => i.Detail is "00000000000000bb");
 			Assert.IsFalse(closed.InUse, "with nothing open it is an ordinary row");
 			Assert.IsNull(CacheSurvey.Remove(closed));
 			Assert.IsFalse(Directory.Exists(closed.Path), "and it goes");
@@ -142,11 +136,11 @@ namespace Chimera.Tests.Client.Common
 			var sha1 = "4B1E5D554FB41E29B49F1883269A29A85674DBF8";
 			Fill(Path.Combine(packages, $"snes9x-{sha1}"), "core.wbx", 512);
 
-			var idle = CacheSurvey.Take(packages, null).Single(i => i.Label is "snes9x");
+			var idle = CacheSurvey.Take(packages).Single(i => i.Label is "snes9x");
 			Assert.IsFalse(idle.InUse);
 
 			// the registry reports the hash in its own case; the match must not care
-			var busy = CacheSurvey.Take(packages, null, null, new[] { sha1.ToLowerInvariant() })
+			var busy = CacheSurvey.Take(packages, null, new[] { sha1.ToLowerInvariant() })
 				.Single(i => i.Label is "snes9x");
 			Assert.IsTrue(busy.InUse, "a package a loaded core is running out of is in use");
 		}
@@ -167,7 +161,7 @@ namespace Chimera.Tests.Client.Common
 			ProjectCache.Ensure("00000000000000dd");
 			ProjectCache.Remember("00000000000000dd", new ProjectCache.ProjectFacts { Title = "long gone", ProjectPath = Path.Combine(_dir, "deleted.chimeraProject") });
 
-			var items = CacheSurvey.Take(null, null);
+			var items = CacheSurvey.Take(null);
 			var here = items.Single(i => i.Detail is "00000000000000cc");
 			var gone = items.Single(i => i.Detail is "00000000000000dd");
 
@@ -189,7 +183,7 @@ namespace Chimera.Tests.Client.Common
 			ProjectCache.Ensure("00000000000000ee");
 			ProjectCache.Remember("00000000000000ee", new ProjectCache.ProjectFacts { Title = "moved but open", ProjectPath = Path.Combine(_dir, "somewhere-else.chimeraProject") });
 
-			var item = CacheSurvey.Take(null, null, openProjectId: "00000000000000ee")
+			var item = CacheSurvey.Take(null, openProjectId: "00000000000000ee")
 				.Single(i => i.Detail is "00000000000000ee");
 			Assert.IsTrue(item.InUse);
 			Assert.IsFalse(item.Orphaned);
@@ -210,7 +204,7 @@ namespace Chimera.Tests.Client.Common
 				Games = new[] { "disc1.cue", "disc2.cue" },
 			});
 
-			var item = CacheSurvey.Take(null, null).Single(i => i.Detail is "00000000000000ff");
+			var item = CacheSurvey.Take(null).Single(i => i.Detail is "00000000000000ff");
 			Assert.AreEqual(2, item.Games.Count);
 			StringAssert.Contains(item.Game, "disc1.cue", "the first is named");
 			StringAssert.Contains(item.Game, "+1 more", "and the rest are counted rather than run off the column");
@@ -219,8 +213,8 @@ namespace Chimera.Tests.Client.Common
 		[TestMethod]
 		public void AnAbsentRootIsNoRowsRatherThanAnError()
 		{
-			var items = CacheSurvey.Take(Path.Combine(_dir, "never-existed"), Path.Combine(_dir, "nor-this"));
-			Assert.IsFalse(items.Any(static i => i.Kind is CacheKind.CorePackage or CacheKind.CompiledCode));
+			var items = CacheSurvey.Take(Path.Combine(_dir, "never-existed"));
+			Assert.IsFalse(items.Any(static i => i.Kind is CacheKind.CorePackage));
 		}
 
 		/// <summary>
@@ -236,7 +230,7 @@ namespace Chimera.Tests.Client.Common
 			var packages = Path.Combine(_dir, "CoreCache-defaults");
 			Fill(Path.Combine(packages, "gpgx-4ed3532117ad"), "core.wbx", 2048);
 
-			var items = CacheSurvey.Take(packages, null);
+			var items = CacheSurvey.Take(packages);
 			Assert.IsFalse(items.Single(i => i.Detail is "0000000000000101").Locked,
 				"a greenzone is what the limit is for, so it is the thing the limit can reach");
 			Assert.IsTrue(items.Single(i => i.Kind is CacheKind.CorePackage && i.Label is "gpgx").Locked,
@@ -261,11 +255,11 @@ namespace Chimera.Tests.Client.Common
 			ProjectCache.Ensure("0000000000000102");
 			Fill(ProjectCache.DirectoryFor("0000000000000102"), "history.bin", 8192);
 
-			var before = CacheSurvey.Take(null, null).Single(i => i.Detail is "0000000000000102");
+			var before = CacheSurvey.Take(null).Single(i => i.Detail is "0000000000000102");
 			Assert.IsFalse(before.Locked);
 			CacheLocks.Set(new[] { before }, locked: true);
 
-			var locked = CacheSurvey.Take(null, null).Single(i => i.Detail is "0000000000000102");
+			var locked = CacheSurvey.Take(null).Single(i => i.Detail is "0000000000000102");
 			Assert.IsTrue(locked.Locked, "and it survives the survey being taken again");
 			Assert.AreEqual(0, CacheSurvey.WhatWouldGo(new[] { locked }, limitBytes: 0).Count,
 				"nothing the auto-clean does can reach it");
@@ -287,7 +281,7 @@ namespace Chimera.Tests.Client.Common
 		{
 			ProjectCache.Ensure("0000000000000103");
 			Fill(ProjectCache.DirectoryFor("0000000000000103"), "history.bin", 512);
-			var item = CacheSurvey.Take(null, null).Single(i => i.Detail is "0000000000000103");
+			var item = CacheSurvey.Take(null).Single(i => i.Detail is "0000000000000103");
 
 			CacheLocks.Set(new[] { item }, locked: true);
 			Assert.IsTrue(CacheLocks.Read().ContainsKey(item.Path));
@@ -317,19 +311,19 @@ namespace Chimera.Tests.Client.Common
 				Title = "The lost run",
 			});
 
-			var work = CacheSurvey.Take(null, null).Single(i => i.Kind is CacheKind.Recovery && i.Detail is id);
+			var work = CacheSurvey.Take(null).Single(i => i.Kind is CacheKind.Recovery && i.Detail is id);
 			Assert.AreEqual("The lost run", work.Label);
 			Assert.IsTrue(work.Locked, "unsaved work starts locked");
 			Assert.IsFalse(work.InUse);
 			Assert.AreEqual(0, CacheSurvey.WhatWouldGo(new[] { work }, limitBytes: 0).Count, "the auto-clean cannot reach it");
 			StringAssert.Contains(work.Cost, "loses");
 
-			var open = CacheSurvey.Take(null, null, openProjectId: id).Single(i => i.Kind is CacheKind.Recovery && i.Detail is id);
+			var open = CacheSurvey.Take(null, openProjectId: id).Single(i => i.Kind is CacheKind.Recovery && i.Detail is id);
 			Assert.IsTrue(open.InUse, "the open project's journal cannot be pulled out from under it");
 
 			ProjectCache.Ensure(id);
 			Fill(ProjectCache.DirectoryFor(id), "history.bin", 2048);
-			var greenzone = CacheSurvey.Take(null, null).Single(i => i.Kind is CacheKind.Project && i.Detail is id);
+			var greenzone = CacheSurvey.Take(null).Single(i => i.Kind is CacheKind.Project && i.Detail is id);
 			Assert.IsNull(CacheSurvey.Remove(greenzone));
 			Assert.IsTrue(Directory.Exists(dir), "removing the greenzone never takes the unsaved work");
 

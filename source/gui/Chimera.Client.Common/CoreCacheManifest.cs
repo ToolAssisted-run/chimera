@@ -33,15 +33,47 @@ namespace Chimera.Client.Common
 		[JsonProperty("romSha1")]
 		public string RomSha1 { get; set; }
 
+		/// <summary>
+		/// Which core compiled this, and which build of its package.
+		///
+		/// The directory used to say this - one per core and package version -
+		/// and a game's code now lives under the game's hash alone, so the
+		/// answer had to move in here. It is not decoration: objects compiled by
+		/// a different build of the package are different code, and reading them
+		/// would be reading somebody else's answer. <see cref="CompiledBy"/> is
+		/// what refuses that.
+		/// </summary>
+		[JsonProperty("core")]
+		public string CoreName { get; set; }
+
+		[JsonProperty("coreVersion")]
+		public string CoreVersion { get; set; }
+
+		/// <summary>When the sessions produced it, so a person can see what is old.</summary>
+		[JsonProperty("compiled")]
+		public DateTime? Compiled { get; set; }
+
 		[JsonProperty("files")]
 		public List<CoreCacheFile> Files { get; set; } = [ ];
 
-		private static string PathFor(string dir, string romSha1)
-			=> dir is null || string.IsNullOrEmpty(romSha1) ? null : Path.Combine(dir, "games", romSha1 + ".json");
+		/// <summary>The manifest sits inside the game's own directory, so removing that directory removes it too.</summary>
+		private static string PathFor(string dir)
+			=> dir is null ? null : Path.Combine(dir, "manifest.json");
 
-		public static CoreCacheManifest Load(string dir, string romSha1)
+		/// <summary>
+		/// Whether this was compiled by the core and package build now running.
+		/// A manifest that predates the core+version fields cannot say, and is
+		/// treated as not matching: compiling again is cheap beside trusting
+		/// objects nothing vouches for.
+		/// </summary>
+		public bool CompiledBy(string coreName, string coreVersion)
+			=> !string.IsNullOrEmpty(CoreName)
+				&& string.Equals(CoreName, coreName, StringComparison.OrdinalIgnoreCase)
+				&& string.Equals(CoreVersion ?? "", coreVersion ?? "", StringComparison.Ordinal);
+
+		public static CoreCacheManifest Load(string dir)
 		{
-			var path = PathFor(dir, romSha1);
+			var path = PathFor(dir);
 			if (path is null || !File.Exists(path)) return null;
 			try
 			{
@@ -53,9 +85,9 @@ namespace Chimera.Client.Common
 			}
 		}
 
-		public void Save(string dir, string romSha1)
+		public void Save(string dir)
 		{
-			var path = PathFor(dir, romSha1);
+			var path = PathFor(dir);
 			if (path is null) return;
 			Directory.CreateDirectory(Path.GetDirectoryName(path)!);
 			File.WriteAllText(path, JsonConvert.SerializeObject(this, Formatting.Indented));

@@ -418,6 +418,21 @@ namespace Chimera.Client.GUI
 		/// core that is gone takes its rows with it (its chosen paths stay in the
 		/// config for when it is put back).
 		/// </summary>
+		/// <summary>
+		/// Config &gt; Pre-compiled modules: the games a core has translated code
+		/// for, and the only place that code is removed (docs/compile-cache.md).
+		///
+		/// The old layout's leftovers are handed in as a second root, so that
+		/// what a previous Chimera compiled is something a person can see and
+		/// take away rather than bytes nothing can read and nobody can find.
+		/// </summary>
+		private void PrecompiledModulesMenuItem_Click(object sender, EventArgs e)
+		{
+			using PrecompiledModulesForm form = new(
+				() => PrecompiledCodeSurvey.Take(CacheStore.PrecompiledCode, CacheStore.CompiledCode));
+			this.ShowDialogWithTempMute(form);
+		}
+
 		private void FirmwareMenuItem_Click(object sender, EventArgs e)
 		{
 			var firmwareFolder = Config.PathEntries.FirmwareAbsolutePath();
@@ -531,7 +546,6 @@ namespace Chimera.Client.GUI
 		private IReadOnlyList<CacheItem> TakeCacheSurvey()
 			=> CacheSurvey.Take(
 				corePackageCacheRoot: CacheStore.UnpackedCores,
-				compiledCodeRoot: CacheStore.CompiledCode,
 				// what is open right now may not be pulled out from under itself
 				openProjectId: _openProject?.Id,
 				loadedPackageSha1s: CoreRegistry.Instance.LoadedPackages
