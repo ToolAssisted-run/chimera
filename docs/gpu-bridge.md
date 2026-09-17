@@ -499,6 +499,21 @@ exactly when `image_to_flip` is null, and the CPU-upload fallback that should
 prevent that fires during normal forward play while the picture is correct.
 Five source-level explanations were checked and all were wrong.
 
+RESOLVED the same day. The cause was found by bisecting RPCS3's teardown with a
+runtime-selectable skip per step: `gl::driver_state` caches what is bound so a
+redundant call can be skipped, and the rebuild never reset it. Teardown frees
+the stream buffers' texture views, the driver hands the just-freed names
+straight back, and `bind_texture` finds the name "already bound" and skips the
+bind - while deleting the old texture had unbound it, so every vertex fetch read
+nothing. A full rebuild minus ONLY the stream-buffer reset drew a picture (the
+new names differed, so the cache missed). Fixed in the core (rpcs3 patch 0024,
+`driver_state::reset()` between teardown and setup), with patch 0025 for the
+texture cache's `clear()` sentinel that caused the abort. RPCS3 therefore no
+longer declares `video.rebuildOnStateLoad` and rebuilds on a load like every
+other core; the declaration stays in the engine, default true, for a core that
+genuinely needs it. Verified: rebuild active, five rewinds, 12.34% near-black
+and 44,375 colours against a straight-run control of 12.34% / 44,384.
+
 Running every core's rebuild after every rewind turned up a bug in the bridge's
 buffer pool (see `bufferPool()` in gl_bridge.cpp). Dolphin crashed on its first
 pass: its JIT vertex loader wrote a batch of vertices to address 0. The same run
