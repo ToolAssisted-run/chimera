@@ -198,6 +198,7 @@ namespace Chimera.Client.Common
 			{
 				Directory.CreateDirectory(_cacheDir);
 				File.WriteAllText(CachePath(repo), JsonConvert.SerializeObject(new CachedFeed { ETag = etag, Body = body }));
+				CoreVersionDates.Refresh(); // the dates shown beside installed versions are read from this cache
 			}
 			catch (Exception)
 			{

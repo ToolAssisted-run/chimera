@@ -176,7 +176,9 @@ namespace Chimera.Client.GUI
 			_pickFirmwareFolder = pickFirmwareFolder;
 			_rememberedFirmwarePath = rememberedFirmwarePath ?? (static (_, _) => null);
 			_rememberFirmwareNow = rememberFirmwareNow ?? (static (_, _) => { });
-			_cores = cores.Where(static c => c.Error is null).ToList();
+			// the versions of one core newest first (issue #67): the picker opens on the latest, and so
+			// does everything below that takes "the first package that ..."
+			_cores = CoreVersionDates.NewestFirst(cores.Where(static c => c.Error is null));
 			_pickFiles = pickFiles;
 
 			SuspendLayout();
@@ -217,7 +219,9 @@ namespace Chimera.Client.GUI
 				// this is a picker, and "12d65377b7d3-dirty+local" says nothing here
 				// that "12d65377 local" does not
 				var build = sharedNames.Contains(core.Name) && core.Sha1 is { Length: >= 8 } ? $"  [package {core.Sha1.Substring(0, 8)}]" : "";
-				_core.Items.Add($"{core.Name}  ({SystemNames.Of(core.Systems)}{(core.ShortVersion.Length is 0 ? "" : $", {core.ShortVersion}")}){build}");
+				// dated (issue #67): a commit says which version this is, and only a date says which is newer
+				var version = core.DatedVersion;
+				_core.Items.Add($"{core.Name}  ({SystemNames.Of(core.Systems)}{(version.Length is 0 ? "" : $", {version}")}){build}");
 			}
 			p1.Controls.Add(_core);
 
@@ -480,6 +484,11 @@ namespace Chimera.Client.GUI
 			b.Click += (_, _) => onClick();
 			return b;
 		}
+
+		/// <summary>The core picker as it reads, top to bottom, and which line it is on (for tests).</summary>
+		public IReadOnlyList<string> CoreChoiceLines => _core.Items.Cast<object>().Select(static o => o.ToString() ?? "").ToList();
+
+		public int CoreChoiceIndex => _core.SelectedIndex;
 
 		private DiscoveredCorePackage? ChosenCore
 			=> _core.SelectedIndex is >= 0 and var i && i < _cores.Count ? _cores[i] : null;

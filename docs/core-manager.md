@@ -442,6 +442,24 @@ is named. So it reads as one trailing word: a published core is `4ed35321`, a
 hand-built one is `12d65377 local`. This applies wherever a core is named,
 including the project wizard's core picker.
 
+**A version is never listed without its date** (issue #67, user-decided
+2026-09-17). Two commits say which versions they are and nothing about which is
+newer, and with several builds of one core in the New Project picker the only
+way to find out was the core manager's Check for updates. So wherever a version
+is listed it reads `2026-09-17  (4ed35321)`, the versions of one core are
+offered newest first, and the newest is the one a picker opens on.
+
+The date is the package's own: the build script stamps `versionDate` beside
+`version` in the packaged `waterbox.config`. It is the COMMIT's date, in UTC,
+and never the build's - a package is a pure function of its commit, and a build
+time would make the same commit produce two different packages. A package from
+before the stamp is looked up in the core manager's feed cache, by commit, read
+from disk and never fetched: listing versions must not be what puts the frontend
+on the network. A commit published twice (dev, then a nightly) takes the first
+date. A version neither knows is listed by its commit alone rather than with a
+guess - the file's own time is when it was copied here, which is not the
+question.
+
 ## What replaces "one commit pins one bundle"
 
 Two things, and between them they are stronger than what was lost:

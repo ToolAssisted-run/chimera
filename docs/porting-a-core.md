@@ -188,6 +188,10 @@ One command, and every leg says what it compared. Advice earned the hard way:
 - **`waterbox.config`** - the machine: name, system id, video (buffer capacity
   and the live size the core reports per frame), audio, vsync as a rational,
   the memory layout, the button list, settings, firmware.
+- **`version` and `versionDate`** are not yours to write: `build-package.sh`
+  stamps both into the packaged `waterbox.config` - the commit, and the date of
+  that commit in UTC (never the build's date, which would make one commit two
+  packages). The frontend shows them together wherever a version is listed.
 - **`file_slots.json`** - what the wizard asks for. Think about what the
   project IS: usually the game, with the machine's ROM as firmware, because one
   ROM serves every game.

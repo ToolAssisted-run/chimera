@@ -3629,3 +3629,45 @@ Sharp edges, and what changed on the way:
   more than 2^31 candidates lists its first 2^31, and selecting all of a
   hundred million rows is as slow as it always was. Both are the control's, not
   the search's.
+
+## A version is listed with its date, newest first (user-decided, 2026-09-17)
+
+Issue #67: with several builds of one core installed, the New Project picker
+listed commits, and a commit does not say which of two is newer. The user's
+ruling: the date is shown whenever a core version is listed, and versions are
+offered latest first with the latest as the default.
+
+Where the date comes from was the only real question, because a package has
+none: it is a byte-reproducible zip and every time inside it is 1980. Three
+sources were on the table - the feed the core manager already fetches, a note
+written at install time, or the package itself - and the user chose the
+package. It is the only one that is true offline, for a core copied in by hand,
+and for a local build; the other two know only what was downloaded through the
+core manager after the change. So every core's `build-package.sh` stamps
+`versionDate` beside `version`: the commit's date in UTC, not the build's, so
+the same commit still makes the same package.
+
+Packages already published have no stamp, so the frontend falls back to the
+core manager's feed cache, matched by commit and read from disk only. Nothing
+is fetched to paint a list. A version with no date from either is listed by its
+commit alone; the file's modification time was rejected as a fallback because
+it answers "when was this copied here", and showing it would look like an
+answer to the question that was asked.
+
+Ordering is one function (`CoreVersionDates.NewestFirst`): cores stay where they
+were, the versions of one core go newest first, undated ones after the dated.
+The wizard sorts its package list with it once, which is what makes "latest is
+the default" true everywhere at no further cost - the picker opens on the first
+line, and guessing a core from a dropped file and seeding from a previous
+project both take the first package that matches. The core manager's version
+selector had the same defect in another shape: a build that was installed but
+not published came after every published one however new it was. It is one
+list by date now.
+
+Found on the way: the UI test gate took its verdict from the pipeline that
+filters the runner's output, which is the grep's status - "there was output".
+A run with five failing tests printed `failed: 5`, exited 0 and never named
+them. It now reads the runner's status and the failed count, and prints the
+tail on failure; a planted failing test turns it red and removing it turns it
+green. What the five were is not known: they appeared in one run straight after
+a partial rebuild and in none of the six runs since.

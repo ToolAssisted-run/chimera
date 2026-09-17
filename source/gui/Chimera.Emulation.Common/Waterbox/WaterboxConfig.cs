@@ -34,6 +34,13 @@ namespace Chimera.Emulation.Common.Waterbox
 		public string Version { get; set; }
 
 		/// <summary>
+		/// When the commit in <see cref="Version"/> was made, ISO 8601, stamped by the core's build
+		/// script beside it (issue #67). The COMMIT's date and not the build's, so that building the
+		/// same commit twice still makes the same package. Absent from packages older than the stamp.
+		/// </summary>
+		public string VersionDate { get; set; }
+
+		/// <summary>
 		/// The guest ABI this package was built against (see <see cref="GuestAbi"/>).
 		/// Absent means <see cref="GuestAbi.Assumed"/>: a package published before the
 		/// field existed, which by definition is the first ABI.

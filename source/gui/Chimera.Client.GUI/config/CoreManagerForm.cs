@@ -419,7 +419,7 @@ namespace Chimera.Client.GUI
 		private static string InstalledText(CoreManagerRow row)
 		{
 			if (!row.IsInstalled) return "not installed";
-			var versions = row.Installed.Select(static p => p.ShortVersion).Where(static v => v.Length is not 0).ToList();
+			var versions = CoreVersionDates.NewestFirst(row.Installed).Select(static p => p.DatedVersion).Where(static v => v.Length is not 0).ToList();
 			var text = versions.Count switch
 			{
 				0 => $"{row.Installed.Count} installed",
@@ -466,17 +466,23 @@ namespace Chimera.Client.GUI
 			_versions.Items.Clear();
 			if (row is not null)
 			{
+				List<VersionChoice> choices = new();
 				foreach (var release in Offered(row))
 				{
 					// a version that is both published and installed is ONE line: it can
 					// be removed, and there is nothing to install
 					var have = row.Installed.FirstOrDefault(p => string.Equals(p.Version, release.Version, StringComparison.OrdinalIgnoreCase));
-					_versions.Items.Add(new VersionChoice(release, have?.Path));
+					choices.Add(new VersionChoice(release, have?.Path));
 				}
 				foreach (var package in row.Installed.Where(p => Offered(row).All(r => !string.Equals(r.Version, p.Version, StringComparison.OrdinalIgnoreCase))))
 				{
-					_versions.Items.Add(new VersionChoice(package));
+					choices.Add(new VersionChoice(package));
 				}
+				// one list, newest first, whichever kind a line is (issue #67): a build that is only
+				// installed used to come after every published one, however new it was. The top line
+				// is the latest and is the one selected. OrderBy is stable, so undated lines keep their place
+				// at the end.
+				foreach (var choice in choices.OrderByDescending(static c => c.When ?? DateTimeOffset.MinValue)) _versions.Items.Add(choice);
 			}
 			_versions.EndUpdate();
 			if (_versions.Items.Count > 0) _versions.SelectedIndex = 0;
@@ -918,17 +924,22 @@ namespace Chimera.Client.GUI
 				InstalledPath = installedPath;
 				Installed = installedPath is not null;
 				Detail = $"Published {release.PublishedAt.ToLocalTime():yyyy-MM-dd}{Environment.NewLine}Commit {release.DisplayVersion}";
+				When = release.PublishedAt == default ? null : release.PublishedAt;
 			}
 
 			public VersionChoice(DiscoveredCorePackage package)
 			{
 				InstalledPath = package.Path;
 				Installed = true;
-				_text = package.ShortVersion.Length is 0 ? Path.GetFileNameWithoutExtension(package.Path) : package.ShortVersion;
+				_text = package.DatedVersion.Length is 0 ? Path.GetFileNameWithoutExtension(package.Path) : package.DatedVersion;
 				Detail = $"Installed at {package.Path}";
+				When = CoreVersionDates.Of(package);
 			}
 
 			private readonly string? _text;
+
+			/// <summary>When this version was made or published, which is what the list is ordered by; null when nobody knows.</summary>
+			public DateTimeOffset? When { get; }
 
 			public CoreRelease? Release { get; }
 

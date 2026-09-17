@@ -73,6 +73,30 @@ namespace Chimera.Client.Common
 			}
 		}
 
+		/// <summary>
+		/// When this version was made, as the package itself says (see
+		/// <see cref="Chimera.Emulation.Common.WaterboxConfig.VersionDate"/>). Null for a package
+		/// from before packages said; <see cref="CoreVersionDates.Of"/> then asks what the core
+		/// manager last heard.
+		/// </summary>
+		public DateTimeOffset? VersionDate { get; init; }
+
+		/// <summary>
+		/// How a version is written wherever one is listed (issue #67): the date first, because
+		/// that is what says which of two is newer, then the commit that says which it IS -
+		/// <c>2026-09-17  (4ed35321)</c>. Just the commit when no date is known.
+		/// </summary>
+		public string DatedVersion
+		{
+			get
+			{
+				var date = CoreVersionDates.Of(this);
+				if (date is null) return ShortVersion;
+				var day = date.Value.ToLocalTime().ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+				return ShortVersion.Length is 0 ? day : $"{day}  ({ShortVersion})";
+			}
+		}
+
 		/// <summary>Rom extension (leading dot, lowercase) -&gt; system id.</summary>
 		public IReadOnlyDictionary<string, string> Extensions { get; init; } = new Dictionary<string, string>();
 
@@ -294,6 +318,7 @@ namespace Chimera.Client.Common
 				Sha1 = sha1,
 				Name = string.IsNullOrWhiteSpace(cfg.CoreName) ? fallbackName : cfg.CoreName,
 				Version = cfg.Version ?? "",
+				VersionDate = CoreVersionDates.Parse(cfg.VersionDate),
 				Systems = systems,
 				Extensions = NormaliseExtensions(cfg.AllExtensions),
 				Abi = cfg.Abi,
