@@ -3733,3 +3733,47 @@ time) and through the real frontend, headless: a config with a pending move
 starts, the directory is moved, the setting follows and the pending flag is gone;
 a config pointing at a path that cannot exist warns, runs on the default and
 keeps its setting.
+
+## The status bar says which disc is in the drive (user-decided, 2026-09-17)
+
+A machine with four floppies or two discs swaps between them through its own
+inputs, and nothing on screen said which was selected or whether it had gone
+in. The user asked for both, "for all cores where swapping is an option".
+
+They are two facts, not one, and that is the reason the feature is worth more
+than a counter. DOSBox-X's changer is a selector that Previous/Next move and a
+Swap input that puts the selected image in: after a Next the machine is still
+reading the OLD disc, and a person who cannot see the selector cannot tell one
+that moved from one that did not (issue #47 was exactly that, found by reading a
+log line). A Sega CD's tray can also simply be empty. So the guest reports, per
+drive, its list of images, where the selector stands, and which image is in -
+or -1 for none. When the two agree the bar says it once, `2/4 ..(Disk B).fdi`;
+when they do not, `1/2 Disc 1 | selected 2/2 Disc 2`; an open tray reads
+`empty | selected ...`.
+
+It rides the existing drive-light group rather than being a new tool: the drives
+are already enumerated there, per medium the PROJECT put in, and the label that
+held a light now holds a light and a name. The names are copied out once at
+load; the two indices are asked of the running machine as the bar is painted,
+because they are whole-machine state and a rewind takes them back. The engine
+holds what the guest says to the list it declared, so an index can never name
+an image the frontend does not have.
+
+Long names are cut in the MIDDLE. The disks of one game share a long beginning
+and differ at the end - "... (Disk 1 of 4)(Disk A).fdi" - so cutting the tail
+would leave four labels that read the same; the tooltip has the whole name.
+
+Which cores: DOSBox-X (floppy and CD, selector plus swap) and Genesis Plus GX
+(Sega CD, one-step swap, tray can be empty). Opera declares Previous/Next Disc
+on the wire but upstream has no swap entry point yet, so it has nothing to show
+and shows nothing. DOSBox-X had no floppy drive in the list at all, and its
+"Hard Disk" light came on for floppies too - one flag for every FAT image. The
+FAT driver now tells a floppy from a hard disk, so the floppy drive has a light
+of its own and the hard disk's means the hard disk. Neither lights while a
+guest OS booted from the image does its own disk I/O through the BIOS; that was
+already true of the hard disk and is left as it is.
+
+Proved in the sandbox harness with the gate's two discs: untouched reads
+selected 1 / inserted 1; a Next alone reads selected 2 / inserted 1; Next with
+Swap reads 2 / 2; and the Next-alone answer is the same with a save and load
+around every frame. Not yet seen in the real status bar on a running project.

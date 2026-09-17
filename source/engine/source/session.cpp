@@ -372,6 +372,11 @@ struct ce_session
 	uintptr_t (*driveName)(int32_t) = nullptr;
 	int32_t (*driveLight)(int32_t) = nullptr;
 	std::vector<std::string> driveNames;
+	/* what each drive can hold (engine.h, "What is in a drive"): the names are
+	 * copied at load, the two indices are asked of the running machine */
+	int32_t (*driveMediaSelected)(int32_t) = nullptr;
+	int32_t (*driveMediaInserted)(int32_t) = nullptr;
+	std::vector<std::vector<std::string>> driveMedia;
 
 	int32_t (*isButtonActive)(int32_t) = nullptr;
 	int32_t (*isAxisActive)(int32_t) = nullptr;
@@ -601,6 +606,29 @@ void ce_session::probeOptionalGroups()
 			{
 				const char *nm = cstr(name(i));
 				driveNames.push_back(nm != nullptr ? nm : "Drive");
+			}
+
+			/* what the drives hold: all four or none, for the lights' reason -
+			 * a count of images with no way to ask which one is in is a label
+			 * that can only ever be wrong */
+			auto mediaCount = reinterpret_cast<int32_t (*)(int32_t)>(opt("GetDriveMediaCount", 1));
+			auto mediaName = reinterpret_cast<uintptr_t (*)(int32_t, int32_t)>(opt("GetDriveMediaName", 2));
+			auto mediaSelected = reinterpret_cast<int32_t (*)(int32_t)>(opt("GetDriveMediaSelected", 1));
+			auto mediaInserted = reinterpret_cast<int32_t (*)(int32_t)>(opt("GetDriveMediaInserted", 1));
+			driveMedia.assign(static_cast<size_t>(n > 0 ? n : 0), {});
+			if (mediaCount != nullptr && mediaName != nullptr && mediaSelected != nullptr && mediaInserted != nullptr)
+			{
+				driveMediaSelected = mediaSelected;
+				driveMediaInserted = mediaInserted;
+				for (int32_t i = 0; i < n; i++)
+				{
+					const int32_t held = mediaCount(i);
+					for (int32_t m = 0; m < held; m++)
+					{
+						const char *nm = cstr(mediaName(i, m));
+						driveMedia[static_cast<size_t>(i)].push_back(nm != nullptr ? nm : "");
+					}
+				}
 			}
 		}
 	}
@@ -1449,6 +1477,36 @@ int32_t ce_session_drive_light(const ce_session *s, int32_t index)
 	if (s->driveLight == nullptr || index < 0
 		|| static_cast<size_t>(index) >= s->driveNames.size()) return 0;
 	return s->driveLight(index) != 0 ? 1 : 0;
+}
+
+int32_t ce_session_drive_media_count(const ce_session *s, int32_t index)
+{
+	if (s == nullptr || index < 0 || static_cast<size_t>(index) >= s->driveMedia.size()) return 0;
+	return static_cast<int32_t>(s->driveMedia[static_cast<size_t>(index)].size());
+}
+
+const char *ce_session_drive_media_name(const ce_session *s, int32_t index, int32_t media)
+{
+	if (media < 0 || media >= ce_session_drive_media_count(s, index)) return nullptr;
+	return s->driveMedia[static_cast<size_t>(index)][static_cast<size_t>(media)].c_str();
+}
+
+/* What the guest says, held to the list it declared: an index the list does not
+ * have would be a name the frontend cannot show. */
+int32_t ce_session_drive_media_selected(const ce_session *s, int32_t index)
+{
+	const int32_t held = ce_session_drive_media_count(s, index);
+	if (held == 0 || s->driveMediaSelected == nullptr) return 0;
+	const int32_t at = s->driveMediaSelected(index);
+	return at < 0 ? 0 : at >= held ? held - 1 : at;
+}
+
+int32_t ce_session_drive_media_inserted(const ce_session *s, int32_t index)
+{
+	const int32_t held = ce_session_drive_media_count(s, index);
+	if (held == 0 || s->driveMediaInserted == nullptr) return -1;
+	const int32_t at = s->driveMediaInserted(index);
+	return at < 0 || at >= held ? -1 : at;
 }
 
 int32_t ce_session_button_active(const ce_session *s, int64_t index)

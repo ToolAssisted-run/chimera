@@ -916,6 +916,32 @@ CE_API int32_t ce_session_drive_count(const ce_session *s);
 CE_API const char *ce_session_drive_name(const ce_session *s, int32_t index);
 CE_API int32_t ce_session_drive_light(const ce_session *s, int32_t index);
 
+/* What is in a drive, for a drive that can be given something else: a machine
+ * with several floppies or discs swaps between them through its own inputs, and
+ * until this existed nothing on screen said which one was selected or whether
+ * it had actually gone in.
+ *
+ * SELECTED and INSERTED are two facts and a core may keep them apart. DOSBox-X's
+ * changer is a selector that Previous/Next move and a Swap input that puts the
+ * selected image in: between the two, the image selected is not the image the
+ * machine is reading. A Sega CD's tray can be EMPTY, which is inserted = -1. A
+ * core whose swap is one step reports the same index for both.
+ *
+ * The guest's optional exports GetDriveMediaCount/Name/Selected/Inserted, all
+ * four or none, indexed like the drive lights. _count is 0 for a drive that
+ * holds one fixed thing (a hard disk) and for every core that exports none, and
+ * the frontend then shows nothing - an indicator that never changes is noise.
+ * _name is the image's name in the project, as the guest was given it; it is
+ * copied out at load, because the list is settled then, while _selected and
+ * _inserted are asked of the running machine. They are whole-machine state:
+ * loading a state, a rewind included, answers with what was true at that
+ * frame. */
+CE_API int32_t ce_session_drive_media_count(const ce_session *s, int32_t index);
+CE_API const char *ce_session_drive_media_name(const ce_session *s, int32_t index, int32_t media);
+CE_API int32_t ce_session_drive_media_selected(const ce_session *s, int32_t index);
+/* -1 when the drive is empty */
+CE_API int32_t ce_session_drive_media_inserted(const ce_session *s, int32_t index);
+
 CE_API int32_t ce_session_button_active(const ce_session *s, int64_t index);
 CE_API int32_t ce_session_axis_active(const ce_session *s, int64_t index);
 

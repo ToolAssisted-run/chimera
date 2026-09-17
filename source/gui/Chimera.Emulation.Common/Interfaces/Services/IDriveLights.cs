@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace Chimera.Emulation.Common
 {
 	/// <summary>
@@ -25,5 +27,36 @@ namespace Chimera.Emulation.Common
 
 		/// <summary>Whether that drive was read or written during the last frame.</summary>
 		bool DriveLightOn(int index);
+
+		/// <summary>
+		/// What the drive holds, for one that can be given something else - several floppies or
+		/// discs the machine swaps between through its own inputs. Null for a drive that holds one
+		/// fixed thing, which is every drive of most cores. Asked whenever the status bar is
+		/// painted: it is the running machine's state, and a rewind takes it back.
+		/// </summary>
+		DriveMedia DriveMediaOf(int index);
+	}
+
+	/// <summary>
+	/// A drive's images, where its selector stands, and which image is actually in it.
+	/// SELECTED and INSERTED are two facts, and a core may keep them apart: a changer whose
+	/// Previous/Next move a selector and whose Swap puts the selected image in is, between the
+	/// two, reading one image while pointing at another. <see cref="Inserted"/> is -1 for an
+	/// empty drive.
+	/// </summary>
+	public sealed class DriveMedia
+	{
+		public DriveMedia(IReadOnlyList<string> names, int selected, int inserted)
+		{
+			Names = names;
+			Selected = selected;
+			Inserted = inserted;
+		}
+
+		public IReadOnlyList<string> Names { get; }
+
+		public int Selected { get; }
+
+		public int Inserted { get; }
 	}
 }

@@ -219,6 +219,17 @@ Probed once after `Init`; absent exports simply mean the tool is not offered.
   runs), export a **bus** instead: `GetBusCount/Name/Size/Writable`,
   `PeekBus`, `PokeBus`, resolved per access. Cache one page of translation and
   a RAM search costs nothing.
+- **Drives** - `GetDriveCount/Name/Light`: one entry per medium the PROJECT
+  put in the machine, lit on a frame it was read or written. Report none rather
+  than a light that can never come on. **If a drive swaps between images, say
+  what it holds**: `GetDriveMediaCount/Name/Selected/Inserted`, all four. The
+  status bar then shows which image is in the drive and, when it is another
+  one, which the selector is on. SELECTED and INSERTED are separate because
+  machines keep them separate - a changer whose Next moves a selector and whose
+  Swap inserts is, in between, reading one disc and pointing at another - and
+  Inserted is -1 for an empty drive. A core whose swap is one step returns the
+  same index for both. Keep both in guest memory like any other machine state:
+  a rewind has to take them back.
 - Registers, trace, core-rendered surfaces, save-data export, turbo
   (`SetRenderingEnabled`). **Turbo means "skip what is pure OUTPUT", not "skip
   the renderer".** If the export can only be implemented by skipping drawing -

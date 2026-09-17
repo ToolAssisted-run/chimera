@@ -2343,7 +2343,13 @@ namespace Chimera.Client.GUI
 					label.Image = lights.DriveLightOn(i)
 						? _statusBarDiskLightOnImage
 						: _statusBarDiskLightOffImage;
-					label.ToolTipText = lights.DriveLightName(i);
+					// WHICH image, for a drive that swaps: the one that is in, and the one the
+					// selector is on when that is another. Asked as the bar is painted because it
+					// is the running machine's state - a rewind takes it back with everything else.
+					var media = lights.DriveMediaOf(i);
+					var text = media is null ? "" : DriveMediaText.Short(media);
+					if (label.Text != text) label.Text = text; // a status bar that is re-laid-out every frame flickers
+					label.ToolTipText = media is null ? lights.DriveLightName(i) : DriveMediaText.Long(lights.DriveLightName(i), media);
 					label.Visible = true;
 				}
 				for (int i = lights.DriveLightCount; i < _extraDriveLights.Count + 1; i++)

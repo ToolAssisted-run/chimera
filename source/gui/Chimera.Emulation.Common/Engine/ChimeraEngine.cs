@@ -595,6 +595,18 @@ namespace Chimera.Emulation.Common.Engine
 		public abstract int ce_session_drive_light(IntPtr session, int index);
 
 		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract int ce_session_drive_media_count(IntPtr session, int index);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_session_drive_media_name(IntPtr session, int index, int media);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract int ce_session_drive_media_selected(IntPtr session, int index);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract int ce_session_drive_media_inserted(IntPtr session, int index);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_session_button_active(IntPtr session, long index);
 
 		[ChimeraImport(CallingConvention.Cdecl)]
@@ -1912,6 +1924,18 @@ namespace Chimera.Emulation.Common.Engine
 			=> ChimeraEngine.PtrToStringUtf8(E.ce_session_drive_name(_session, index)) ?? "Drive";
 
 		public bool DriveLight(int index) => E.ce_session_drive_light(_session, index) is not 0;
+
+		/// <summary>How many images a drive can be given; zero for one that holds a fixed thing, and for most cores.</summary>
+		public int DriveMediaCount(int index) => E.ce_session_drive_media_count(_session, index);
+
+		public string DriveMediaName(int index, int media)
+			=> ChimeraEngine.PtrToStringUtf8(E.ce_session_drive_media_name(_session, index, media)) ?? "";
+
+		/// <summary>Where the drive's selector stands.</summary>
+		public int DriveMediaSelected(int index) => E.ce_session_drive_media_selected(_session, index);
+
+		/// <summary>Which image is actually in the drive, or -1 when it is empty.</summary>
+		public int DriveMediaInserted(int index) => E.ce_session_drive_media_inserted(_session, index);
 
 		public bool ButtonActive(int index) => E.ce_session_button_active(_session, index) is not 0;
 

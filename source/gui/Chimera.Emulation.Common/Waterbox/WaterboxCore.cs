@@ -364,6 +364,24 @@ namespace Chimera.Emulation.Common.Waterbox
 
 		public bool DriveLightOn(int index) => _session.DriveLight(index);
 
+		// the names are settled at load and do not change; only the two indices are the machine's
+		private IReadOnlyList<string>[] _driveMediaNames;
+
+		public DriveMedia DriveMediaOf(int index)
+		{
+			_driveMediaNames ??= new IReadOnlyList<string>[_session.DriveCount];
+			if (index < 0 || index >= _driveMediaNames.Length) return null;
+			var names = _driveMediaNames[index];
+			if (names is null)
+			{
+				var held = _session.DriveMediaCount(index);
+				var read = new string[held];
+				for (int i = 0; i < held; i++) read[i] = _session.DriveMediaName(index, i);
+				names = _driveMediaNames[index] = read;
+			}
+			return names.Count is 0 ? null : new DriveMedia(names, _session.DriveMediaSelected(index), _session.DriveMediaInserted(index));
+		}
+
 		public int Frame { get; private set; }
 
 		public string SystemId => _machine?.Id ?? _cfg.SystemId;
