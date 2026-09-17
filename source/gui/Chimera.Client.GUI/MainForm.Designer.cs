@@ -78,6 +78,7 @@ namespace Chimera.Client.GUI
 			this.PathsMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.FirmwareMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.PrecompiledModulesMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
+			this.DataDirectoryMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.MessagesMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.AutofireMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.ClientOptionsMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
@@ -543,6 +544,7 @@ namespace Chimera.Client.GUI
             this.PathsMenuItem,
             this.FirmwareMenuItem,
             this.PrecompiledModulesMenuItem,
+            this.DataDirectoryMenuItem,
             this.MessagesMenuItem,
             this.AutofireMenuItem,
             this.ClientOptionsMenuItem,
@@ -591,6 +593,11 @@ namespace Chimera.Client.GUI
 			// 
 			this.PrecompiledModulesMenuItem.Text = "Pre-compiled modules...";
 			this.PrecompiledModulesMenuItem.Click += new System.EventHandler(this.PrecompiledModulesMenuItem_Click);
+			// 
+			// DataDirectoryMenuItem
+			// 
+			this.DataDirectoryMenuItem.Text = "Data Directory...";
+			this.DataDirectoryMenuItem.Click += new System.EventHandler(this.DataDirectoryMenuItem_Click);
 			// 
 			// MessagesMenuItem
 			// 
@@ -1219,6 +1226,7 @@ namespace Chimera.Client.GUI
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx PathsMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx FirmwareMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx PrecompiledModulesMenuItem;
+		private Chimera.WinForms.Controls.ToolStripMenuItemEx DataDirectoryMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx DisplayRerecordCountMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx ScreenshotSubMenu;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx ScreenshotMenuItem;

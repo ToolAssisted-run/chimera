@@ -34,35 +34,14 @@ namespace Chimera.Client.Common
 		/// <c>CHIMERA_DATA_HOME</c> wins where it is set, which is how a portable
 		/// install keeps everything under one root. Otherwise this is the platform's
 		/// per-user data location: <c>%LOCALAPPDATA%\Chimera\Cores</c> on Windows,
-		/// <c>$XDG_DATA_HOME/chimera/Cores</c> (default <c>~/.local/share</c>) elsewhere.
+		/// <c>$XDG_DATA_HOME/chimera/Cores</c> (default <c>~/.local/share</c>) elsewhere - or wherever
+		/// the user moved the data directory to (issue #52).
+		///
+		/// One resolver, <see cref="ProjectCache.DataHome"/>, and asked every time: this class
+		/// used to work the same answer out for itself and keep it, which was one more place to
+		/// teach about a setting and one that would have gone on pointing at the old directory.
 		/// </summary>
-		public static string Path => _path ??= Resolve();
-
-		private static string? _path;
-
-		private static string Resolve()
-		{
-			var dataHome = Environment.GetEnvironmentVariable("CHIMERA_DATA_HOME");
-			if (!string.IsNullOrWhiteSpace(dataHome))
-			{
-				return System.IO.Path.Combine(dataHome!, CorePackageDiscovery.DefaultDirName);
-			}
-			if (OSTailoredCode.IsUnixHost)
-			{
-				var xdg = Environment.GetEnvironmentVariable("XDG_DATA_HOME");
-				var home = Environment.GetEnvironmentVariable("HOME") ?? ".";
-				var baseDir = string.IsNullOrWhiteSpace(xdg)
-					? System.IO.Path.Combine(home, ".local", "share")
-					: xdg!;
-				return System.IO.Path.Combine(baseDir, "chimera", CorePackageDiscovery.DefaultDirName);
-			}
-			var local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData, Environment.SpecialFolderOption.DoNotVerify);
-			// an empty LocalApplicationData means a profile this process cannot see;
-			// falling back beside the executable is worse than nothing only if it is
-			// unwritable, which the caller finds out the ordinary way
-			if (string.IsNullOrWhiteSpace(local)) return System.IO.Path.Combine(PathUtils.DataDirectoryPath, CorePackageDiscovery.DefaultDirName);
-			return System.IO.Path.Combine(local, "Chimera", CorePackageDiscovery.DefaultDirName);
-		}
+		public static string Path => System.IO.Path.Combine(ProjectCache.DataHome, CorePackageDiscovery.DefaultDirName);
 
 		/// <summary>Creates the store if it is not there. Returns the path either way.</summary>
 		/// <exception cref="IOException">the directory cannot be created</exception>

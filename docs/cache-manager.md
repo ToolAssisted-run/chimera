@@ -58,6 +58,14 @@ Everything the window lists is under the user's data directory -
 | `Recovery/<id>/` | unsaved work: one project's recovery journal, snapshot and session |
 | `cache-locks.json` | which entries the auto-clean may not take |
 
+**It does not have to be on the system drive** (issue #52). `Config > Data
+Directory...` sends the whole directory somewhere else - all of it, the rows
+above and the downloaded cores and crash notes beside them (user-decided,
+2026-09-17), which is what `CHIMERA_DATA_HOME` always did for anyone who knew
+to set it. The variable still wins where it is set. The window only records the
+change; the next start carries it out before anything in the directory is open
+(`DataDirectory`, and docs/design-principles.md for why).
+
 **Nothing cached goes in the install directory.** A Chimera bundle is a zip
 somebody unpacks, and updating it means unpacking a newer one - anything that
 grows inside it is lost on every update, and makes the size of the install

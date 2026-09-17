@@ -29,6 +29,40 @@ namespace Chimera.Client.GUI
 		[return: MarshalAs(UnmanagedType.Bool)]
 		private static extern bool DeleteFileW(string lpFileName);
 
+		private static void SettleDataDirectory(Config config, string configPath)
+		{
+			static void Tell(string message)
+			{
+				if (HeadlessMode.Enabled) HeadlessMode.LogSuppressedWarning(message);
+				else MessageBox.Show(message, "Chimera's data directory", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+			}
+
+			if (config.DataDirectoryPending is not null)
+			{
+				var told = DataDirectory.ApplyPending(config, static (from, to) =>
+				{
+					using var progress = ProgressDialog.Begin(null, "Moving Chimera's data");
+					return DataDirectory.Move(from, to, (done, total) => progress.Report($"moving to {to}", done, total));
+				});
+				// now, not at exit: a session that dies must not find the change still waiting and
+				// try to move a directory that has already gone
+				if (ConfigService.Save(configPath, config).IsError) Console.WriteLine("[data] the config could not be saved");
+				if (told is not null) Tell(told);
+			}
+
+			var custom = config.DataDirectory;
+			if (custom.Length is not 0 && !ProjectCache.DecidedByEnvironment && !DataDirectory.Writable(custom))
+			{
+				// a drive that is not plugged in today. The setting is KEPT: tomorrow it may be back,
+				// and forgetting it would leave the data there orphaned and a fresh set growing here.
+				Tell($"Chimera's data directory, {custom}, cannot be used right now (is the drive there?).\n\n"
+					+ $"This session keeps its data in {ProjectCache.DefaultDataHome} instead. The setting has not been changed.");
+				custom = "";
+			}
+			ProjectCache.CustomDataHome = custom;
+			if (CrashCapture.Repoint() is { } why) Console.WriteLine($"[crash] notes stay where they were: {why}");
+		}
+
 		public static void EnsureWinFormsInitialized()
 		{
 			Application.EnableVisualStyles();
@@ -305,6 +339,12 @@ namespace Chimera.Client.GUI
 			}
 			initialConfig.ResolveDefaults();
 			// initialConfig should really be globalConfig as it's mutable
+
+			// Where everything per-user lives (issue #52), settled HERE: after the config that says
+			// so has been read and before anything has opened a file there. A change asked for in
+			// the last session is carried out now for the same reason - nothing holds a state
+			// history, a package or a journal open yet, so nothing has to be closed to move it.
+			SettleDataDirectory(initialConfig, configPath);
 
 			// must be done VERY early, before any SDL_Init calls can be done
 			// if this isn't done, SIGINT/SIGTERM get swallowed by SDL

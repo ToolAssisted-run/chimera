@@ -99,6 +99,22 @@ namespace Chimera.Client.Common
 		public List<RosterCore> ExternalCores { get; set; } = new();
 
 		/// <summary>
+		/// Where everything Chimera keeps per user lives, when that is not the platform's usual
+		/// place (issue #52). Empty means the usual place. See <see cref="DataDirectory"/>.
+		/// </summary>
+		public string DataDirectory { get; set; } = "";
+
+		/// <summary>
+		/// A change of <see cref="DataDirectory"/> that was asked for and waits for the next start,
+		/// which carries it out before anything in the data directory is opened. Null when none is
+		/// waiting; empty means "back to the usual place".
+		/// </summary>
+		public string? DataDirectoryPending { get; set; }
+
+		/// <summary>Whether that change carries the existing data over, or leaves it where it is.</summary>
+		public bool DataDirectoryPendingMove { get; set; }
+
+		/// <summary>
 		/// Whether Tools &gt; Cache Manager holds the cache under
 		/// <see cref="CacheSizeLimitMb"/> on its own, removing the oldest
 		/// unlocked entries when it goes over. On by default; see

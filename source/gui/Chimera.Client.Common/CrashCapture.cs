@@ -112,6 +112,32 @@ namespace Chimera.Client.Common
 		/// moved install, a test copy that was deleted). Only this module's name
 		/// is touched; other programs' helpers are theirs.
 		/// </summary>
+		/// <summary>
+		/// Tells the armed crash module where notes go now. Crash capture is armed before the
+		/// config is read - a crash while reading it should leave a note too - and so before the
+		/// data directory is known when the user has moved it (issue #52). The module reads the
+		/// folder out of this process's memory at the moment of the crash, so the block is simply
+		/// rewritten. Returns why not, or null.
+		/// </summary>
+		public static string? Repoint()
+		{
+			if (_block == IntPtr.Zero) return null;
+			try
+			{
+				var root = Path.GetFullPath(Root);
+				if (root.Length >= FolderChars) return $"the crash folder's path is too long: {root}";
+				Directory.CreateDirectory(root);
+				var folder = new byte[FolderChars * 2]; // zero-filled: the old path may have been longer
+				Encoding.Unicode.GetBytes(root, 0, root.Length, folder, 0);
+				Marshal.Copy(folder, 0, _block + 8, folder.Length);
+				return null;
+			}
+			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+			{
+				return ex.Message;
+			}
+		}
+
 		private static void ForgetMissingModules(RegistryKey key)
 		{
 			foreach (var name in key.GetValueNames())

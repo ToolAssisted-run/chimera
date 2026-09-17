@@ -158,6 +158,10 @@ namespace Chimera.Client.GUI
 		/// <summary>A step of the frontend's own, in the same stream as the engine's.</summary>
 		public void Step(string stage) => OnReport(stage, 0, 0);
 
+		/// <summary>The same, with how far along it is: for work that is the frontend's own and has a size.</summary>
+		public void Report(string stage, long done, long total)
+			=> OnReport(stage, (ulong) Math.Max(0, done), (ulong) Math.Max(0, total));
+
 		private void OnReport(string stage, ulong done, ulong total)
 		{
 			lock (_lock)

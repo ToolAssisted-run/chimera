@@ -3671,3 +3671,64 @@ them. It now reads the runner's status and the failed count, and prints the
 tail on failure; a planted failing test turns it red and removing it turns it
 green. What the five were is not known: they appeared in one run straight after
 a partial rebuild and in none of the six runs since.
+
+## The data directory can be moved, and the next start is what moves it (user-decided, 2026-09-17)
+
+Issue #52: everything Chimera keeps per user is under `%LOCALAPPDATA%\Chimera`,
+which is the system drive, and a greenzone or a PS3 game's compiled code is
+gigabytes. The only way to put it elsewhere was `CHIMERA_DATA_HOME`, which
+nobody who needs this will find.
+
+Two things were the user's to decide. WHAT moves: the regenerable caches alone
+(keeping recovery journals and crash notes on the system drive, where a missing
+external disk cannot take unsaved work with it), the caches and the core store,
+or everything - and the answer was everything, the same thing the variable has
+always done. And what becomes of the data already there: the user is asked, and
+may move it or start empty and leave it.
+
+So there is one setting, `DataDirectory`, and one resolver. `CoreStore` used to
+work the same location out for itself and remember it; it asks
+`ProjectCache.DataHome` now, every time, because a second resolver is a second
+place to teach and a remembered answer is one that goes on pointing at the old
+directory. The environment variable still wins: a portable install or a test
+that sets it means it, and the window says so rather than offering a choice it
+would not honour.
+
+The window does not move anything. A running session holds a state history and
+a recovery journal open, the package list holds paths into the core store, and
+Windows holds the crash folder's path; moving the directory under that is moving
+files in use, and every one of those holders would need its own way of letting
+go and picking up again. Instead the change is RECORDED (`DataDirectoryPending`)
+and carried out by the next start, after the config is read and before anything
+else exists. None of those problems has to be solved, because at that moment
+none of them has happened yet. Crash capture is the one thing armed earlier - a
+crash while reading the config should leave a note too - so it is armed at the
+default place and repointed once the directory is known; the helper reads the
+folder out of the process's memory at the moment of the crash, so repointing is
+rewriting it.
+
+A move is a rename where that works and otherwise a copy that is checked before
+any original is deleted. Until the last entry is in the new place the old place
+is whole; a failure or a full disk puts back what was renamed, removes what was
+copied, and leaves the setting alone. The pending change is cleared and the
+config saved BEFORE the user is told anything, so a session that dies cannot
+find the change still waiting and try to move a directory that has gone.
+
+Three refusals, each because the alternative loses data. A folder that already
+has other things in it is not taken over: the data gets a `Chimera` directory
+inside it, so "everything in the data directory is Chimera's" stays true and a
+later move can take all of it. A folder that already holds Chimera data is
+adopted as it is and never merged into. And a directory is not moved into or out
+of itself.
+
+A data directory that cannot be reached at startup - the drive is not plugged in
+today - is a warning and a session on the default location, with the setting
+KEPT. Forgetting it would orphan the data on the drive and start a second set
+growing on the system drive, which is the problem the setting was for.
+
+Proved without a window (`DataDirectoryTests`: a second volume is stood in for
+by a rename that refuses, a failure half way by one that refuses the second
+time) and through the real frontend, headless: a config with a pending move
+starts, the directory is moved, the setting follows and the pending flag is gone;
+a config pointing at a path that cannot exist warns, runs on the default and
+keeps its setting.

@@ -61,10 +61,32 @@ namespace Chimera.Client.Common
 
 		private const string DirName = "Projects";
 
+		/// <summary>
+		/// Where the user asked for it to be instead (Config &gt; Data Directory, issue #52): the
+		/// config's <c>DataDirectory</c>, set once at startup and empty for "where it always was".
+		/// <c>CHIMERA_DATA_HOME</c> still wins - a portable install or a test that sets it means it.
+		/// </summary>
+		public static string CustomDataHome { get; set; } = "";
+
+		/// <summary>Where the data is when nobody has said otherwise: the platform's per-user location.</summary>
+		public static string DefaultDataHome => PlatformDefault();
+
+		/// <summary>True when the environment decides, and the setting therefore cannot.</summary>
+		public static bool DecidedByEnvironment => !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("CHIMERA_DATA_HOME"));
+
+		/// <summary>What a given setting means as a directory; empty means the default.</summary>
+		public static string DataHomeFor(string? setting) => string.IsNullOrWhiteSpace(setting) ? PlatformDefault() : setting!;
+
 		private static string Resolve()
 		{
 			var dataHome = Environment.GetEnvironmentVariable("CHIMERA_DATA_HOME");
 			if (!string.IsNullOrWhiteSpace(dataHome)) return dataHome!;
+			if (!string.IsNullOrWhiteSpace(CustomDataHome)) return CustomDataHome;
+			return PlatformDefault();
+		}
+
+		private static string PlatformDefault()
+		{
 			if (OSTailoredCode.IsUnixHost)
 			{
 				var xdg = Environment.GetEnvironmentVariable("XDG_DATA_HOME");

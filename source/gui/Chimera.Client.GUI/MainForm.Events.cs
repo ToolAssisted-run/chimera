@@ -433,6 +433,19 @@ namespace Chimera.Client.GUI
 			this.ShowDialogWithTempMute(form);
 		}
 
+		/// <summary>
+		/// Where everything per-user lives (issue #52). The window records a change and the next
+		/// start carries it out, so the config is saved as it closes: a change that only lived in
+		/// memory would be lost with a session that ends any way but cleanly.
+		/// </summary>
+		private void DataDirectoryMenuItem_Click(object sender, EventArgs e)
+		{
+			var before = (Config.DataDirectoryPending, Config.DataDirectoryPendingMove);
+			using DataDirectoryForm form = new(Config);
+			this.ShowDialogWithTempMute(form);
+			if (before != (Config.DataDirectoryPending, Config.DataDirectoryPendingMove)) SaveConfig();
+		}
+
 		private void FirmwareMenuItem_Click(object sender, EventArgs e)
 		{
 			var firmwareFolder = Config.PathEntries.FirmwareAbsolutePath();
