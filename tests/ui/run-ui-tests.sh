@@ -91,10 +91,17 @@ for project in "${projects[@]}"; do
 		continue
 	fi
 	# mono's X11 backend chatters about xkb keysyms on a bare Xvfb; drop that noise
-	if out="$(cd "$tests_dir" && timeout 600 mono "$exe" 2>&1 | grep -vE 'xkbcomp|^> *Warning:|^Errors from xkbcomp')"; then
-		summary="$(printf '%s\n' "$out" | grep -E '^  (total|failed|succeeded|skipped):' | tr -s ' ' | paste -sd' ' -)"
+	# The verdict is the RUNNER's, and the count's. It used to be the pipeline's, which is the
+	# grep's, which is "there was output": a run with five failing tests printed "failed: 5" and
+	# passed the gate, and never said which five.
+	raw="$(cd "$tests_dir" && timeout 600 mono "$exe" 2>&1)"; status=$?
+	out="$(printf '%s\n' "$raw" | grep -vE 'xkbcomp|^> *Warning:|^Errors from xkbcomp')"
+	summary="$(printf '%s\n' "$out" | grep -E '^  (total|failed|succeeded|skipped):' | tr -s ' ' | paste -sd' ' -)"
+	failing="$(printf '%s\n' "$summary" | sed -n 's/.*failed: \([0-9][0-9]*\).*/\1/p')"
+	if [ "$status" -eq 0 ] && [ -n "$summary" ] && [ "${failing:-1}" -eq 0 ]; then
 		printf "%-36s %s\n" "$project" "$summary"
 	else
+		[ -n "$summary" ] && printf "%-36s %s\n" "$project" "$summary"
 		printf "%-36s FAILED\n" "$project"
 		printf '%s\n' "$out" | tail -40
 		failed=$((failed + 1))
