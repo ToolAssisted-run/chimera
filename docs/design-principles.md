@@ -3777,3 +3777,23 @@ Proved in the sandbox harness with the gate's two discs: untouched reads
 selected 1 / inserted 1; a Next alone reads selected 2 / inserted 1; Next with
 Swap reads 2 / 2; and the Next-alone answer is the same with a save and load
 around every frame. Not yet seen in the real status bar on a running project.
+
+## The game is hashed when the file form is left, and the files can be ordered (user, 2026-09-17)
+
+Two corrections to the New Project wizard's file form, both from using it.
+
+"The game is hashed when it is picked" (above, same day) was the wrong moment.
+It read a multi-gigabyte disc the instant it was dropped, before the person had
+finished choosing; and which file IS the game is "the first of its slot", which
+adding, removing and reordering all change, so a hash taken at pick time could
+be of a file that was no longer the game by the time it was used. The purpose
+stands - the compile step must open on an answer, not on a stall - and it is
+served by hashing at Next: the list is settled, and the file is read once.
+
+And the order of a slot's files could not be changed. It is not a convenience:
+the first file is what is in the drive at boot and the rest follow in swap
+order, and a PC-98 game can want its second disk booted. The order was whatever
+order the files happened to be added in, and the only remedy was to remove
+everything and start again. A slot that takes more than one file now has Up and
+Down beside its list; they follow the selection, the moved file stays selected
+so a button can be pressed again, and a slot that takes one file has neither.

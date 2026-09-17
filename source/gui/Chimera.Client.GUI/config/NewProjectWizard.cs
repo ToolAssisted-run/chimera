@@ -88,6 +88,9 @@ namespace Chimera.Client.GUI
 		/// <summary>the package whose declaration <see cref="_cfg"/> holds</summary>
 		private string? _cfgCore;
 		private readonly Dictionary<string, ListBox> _slotLists = new();
+
+		/// <summary>Per slot that orders its files: re-evaluates whether Up and Down apply.</summary>
+		private readonly Dictionary<string, Action> _slotOrderRefresh = new();
 		private readonly Dictionary<string, GroupBox> _slotGroups = new();
 		private readonly ToolTip _tips = new();
 
@@ -930,6 +933,9 @@ namespace Chimera.Client.GUI
 				case 1:
 					var complaint = CardinalityComplaint();
 					if (complaint is not null) { _status.Text = complaint; return; }
+					// the files are settled now - which they are, and in what order - so this is
+					// where the game is hashed, once, and not at every pick along the way
+					HashGameForPrecompileNow();
 					if (!BuildSettingsPage()) return;
 					ShowPage(2);
 					break;
@@ -980,20 +986,24 @@ namespace Chimera.Client.GUI
 		private string? _romSha1Path, _romSha1;
 
 		/// <summary>
-		/// Hashes the game as soon as it is picked, so that the compile step
-		/// opens on an answer instead of on a stall.
+		/// Hashes the game when the file form is LEFT (Next), so that the compile
+		/// step opens on an answer instead of on a stall.
+		///
+		/// It used to run as each file was added, and that was the wrong moment
+		/// (user, 2026-09-17): a multi-gigabyte disc was read the instant it was
+		/// dropped, before the person had finished choosing - and which file is
+		/// "the game" is the FIRST of its slot, which adding, removing and
+		/// reordering all change. At Next the list is settled and it is read once.
 		///
 		/// Only for a core that compiles anything, and only for the file that
-		/// step would actually ask about: hashing every pick would charge a
-		/// person gigabytes of reading for firmware and track files that are
-		/// not the game. Nothing here is allowed to throw - a pick that fails
-		/// to hash is simply a pick the compile step hashes itself, the way it
-		/// always did - and the answer lands in the same memo either way.
+		/// step would actually ask about. Nothing here is allowed to throw - a
+		/// game that fails to hash is one the compile step hashes itself, the way
+		/// it always did - and the answer lands in the same memo either way.
 		/// </summary>
-		private void HashGameForPrecompileNow(string path)
+		private void HashGameForPrecompileNow()
 		{
 			if (_cfg?.Precompile is not true) return;
-			if (!string.Equals(PrecompileRomPath(), path, StringComparison.Ordinal)) return;
+			if (PrecompileRomPath() is not { } path) return;
 			if (_romSha1Path == path && _romSha1 is not null) return;
 			try
 			{
@@ -1377,6 +1387,7 @@ namespace Chimera.Client.GUI
 			_slotsHost.Controls.Clear();
 			_slotLists.Clear();
 			_slotGroups.Clear();
+			_slotOrderRefresh.Clear();
 			var y = 0;
 			// What the chosen MACHINE exposes, before any file is picked. A slot
 			// only a different sub-system takes is not an option that is greyed -
@@ -1407,7 +1418,8 @@ namespace Chimera.Client.GUI
 					Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
 					IntegralHeight = false,
 					Location = Pt(8, 18),
-					Size = new(UIHelper.ScaleX(402), UIHelper.ScaleY(70)),
+					// a slot that takes several files leaves room for the two buttons that order them
+					Size = new(UIHelper.ScaleX(slot.Max is 1 ? 402 : 368), UIHelper.ScaleY(70)),
 				};
 				_tips.SetToolTip(list, help);
 
@@ -1437,6 +1449,37 @@ namespace Chimera.Client.GUI
 					RefreshSlotAvailability();
 				};
 				group.Controls.AddRange([ list, add, remove ]);
+
+				// THE ORDER IS PART OF THE MACHINE, not a convenience: the first file is what is in
+				// the drive at boot and the rest follow in swap order, and a PC-98 game can want
+				// its second disk booted. It used to be fixed by the order files happened to be
+				// added in, and the only way to change it was to remove everything and start again.
+				if (slot.Max is not 1)
+				{
+					Button MakeArrow(string glyph, string tip, int top, int delta)
+					{
+						Button b = new()
+						{
+							Location = Pt(378, top),
+							Size = new(UIHelper.ScaleX(32), UIHelper.ScaleY(28)),
+							Text = glyph,
+							Enabled = false,
+						};
+						_tips.SetToolTip(b, tip);
+						b.Click += (_, _) => MoveFileInSlot(slot.Id, list.SelectedIndex, delta);
+						return b;
+					}
+					var up = MakeArrow("\u25B2", "Move up: earlier in the swap order. The first file is the one in the drive at boot.", 18, -1);
+					var down = MakeArrow("\u25BC", "Move down: later in the swap order.", 50, +1);
+					void Refresh()
+					{
+						up.Enabled = list.SelectedIndex > 0;
+						down.Enabled = list.SelectedIndex >= 0 && list.SelectedIndex < list.Items.Count - 1;
+					}
+					list.SelectedIndexChanged += (_, _) => Refresh();
+					_slotOrderRefresh[slot.Id] = Refresh;
+					group.Controls.AddRange([ up, down ]);
+				}
 				_slotsHost.Controls.Add(group);
 				_slotLists[slot.Id] = list;
 				_slotGroups[slot.Id] = group;
@@ -1553,6 +1596,31 @@ namespace Chimera.Client.GUI
 					: [ ];
 
 		/// <summary>Adds a file to a slot's list; public in behaviour so tests can drive the form without a picker.</summary>
+		/// <summary>
+		/// Moves the file at <paramref name="index"/> of a slot one place up (-1) or down (+1) and
+		/// keeps it selected, so the same button can be pressed again. Out of range is nothing.
+		/// </summary>
+		public void MoveFileInSlot(string slotId, int index, int delta)
+		{
+			if (!_slotLists.TryGetValue(slotId, out var list)) return;
+			var to = index + delta;
+			if (index < 0 || index >= list.Items.Count || to < 0 || to >= list.Items.Count) return;
+			var moved = list.Items[index];
+			list.Items.RemoveAt(index);
+			list.Items.Insert(to, moved);
+			list.SelectedIndex = to;
+			if (_slotOrderRefresh.TryGetValue(slotId, out var refresh)) refresh();
+			// what is first decides things elsewhere (a slot exposed by an extension, the game
+			// the compile step asks about), exactly as adding and removing do
+			RefreshSlotAvailability();
+		}
+
+		/// <summary>The files of a slot, in order, for tests.</summary>
+		public IReadOnlyList<string> FilesInSlot(string slotId)
+			=> _slotLists.TryGetValue(slotId, out var list)
+				? list.Items.OfType<PickedFile>().Select(static f => f.Path).ToList()
+				: [ ];
+
 		public void AddFileToSlot(string slotId, string path)
 		{
 			if (!_slotLists.TryGetValue(slotId, out var list)) return;
@@ -1591,7 +1659,6 @@ namespace Chimera.Client.GUI
 			// the wait is where a wait is expected - they just chose a file -
 			// and it is said out loud. The engine memoizes by path, size and
 			// mtime, so Create's own hashing of the same file costs nothing.
-			HashGameForPrecompileNow(path);
 
 			// A slot that names its formats has still not been given a rule: the
 			// picker offers "All files" too, and a person who renamed something
