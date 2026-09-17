@@ -163,7 +163,8 @@ Three rules, learned building the first six:
 
 Built for: PCSX2 (memcard1.ps2, memcard2.ps2, bios.nvm), Flycast (vmu_A1.bin,
 vmu_A2.bin), Opera (NVRAM.ram), PPSSPP (the stick, as a zip), quickerNES and
-QuickerNesHawk (battery.sav, and disk.sav on an FDS).
+QuickerNesHawk (battery.sav, and disk.sav on an FDS), and RPCS3 (the user's
+savedata folder, as a zip: `savedata/<save>/<file>`; 2026-09-17).
 
 ## Tenants
 
