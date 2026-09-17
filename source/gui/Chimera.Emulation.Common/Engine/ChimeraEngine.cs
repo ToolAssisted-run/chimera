@@ -805,6 +805,86 @@ namespace Chimera.Emulation.Common.Engine
 		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract long ce_session_savedata_read(IntPtr session, int index, long offset, byte[] buf, long len);
 
+		// ---- RAM Search (engine.h): the candidate set lives in the engine ----
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_ramsearch_create(IntPtr basePtr, IntPtr readFn, IntPtr user, long domainSize);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract void ce_ramsearch_destroy(IntPtr rs);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract int ce_ramsearch_start(IntPtr rs, int size, int misaligned, int bigEndian, int detailed);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract long ce_ramsearch_count(IntPtr rs);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract int ce_ramsearch_row(IntPtr rs, long index, ref ulong address, ref uint current, ref uint previous, ref uint changes);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract long ce_ramsearch_index_of(IntPtr rs, ulong address);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract long ce_ramsearch_search(IntPtr rs, int compare, int op, int display, uint value, uint differentBy, int previousType);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract int ce_ramsearch_would_remove(IntPtr rs, long index, int compare, int op, int display, uint value, uint differentBy);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract int ce_ramsearch_update(IntPtr rs, int previousType);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract int ce_ramsearch_set_previous_to_current(IntPtr rs);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract void ce_ramsearch_clear_change_counts(IntPtr rs);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract void ce_ramsearch_set_big_endian(IntPtr rs, int bigEndian);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract int ce_ramsearch_set_previous_type(IntPtr rs, int previousType);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract int ce_ramsearch_remove_indices(IntPtr rs, long[] indices, long n);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract int ce_ramsearch_remove_addresses(IntPtr rs, ulong[] addresses, long n, int recordUndo);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract int ce_ramsearch_add_addresses(IntPtr rs, ulong[] addresses, long n, int append);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract int ce_ramsearch_convert_to(IntPtr rs, int size);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract int ce_ramsearch_sort(IntPtr rs, int column, int reverse, int display);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract long ce_ramsearch_out_of_range_count(IntPtr rs);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract int ce_ramsearch_remove_out_of_range(IntPtr rs);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract void ce_ramsearch_set_undo_enabled(IntPtr rs, int on);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract int ce_ramsearch_can_undo(IntPtr rs);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract int ce_ramsearch_can_redo(IntPtr rs);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract void ce_ramsearch_clear_history(IntPtr rs);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract long ce_ramsearch_undo(IntPtr rs);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract long ce_ramsearch_redo(IntPtr rs);
+
 
 
 

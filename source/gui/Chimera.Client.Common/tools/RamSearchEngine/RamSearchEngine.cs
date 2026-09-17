@@ -1,22 +1,24 @@
 using System.Collections.Generic;
 using System.Linq;
 
-using Chimera.Common;
-using Chimera.Common.CollectionExtensions;
-using Chimera.Common.NumberExtensions;
 using Chimera.Emulation.Common;
-using static Chimera.Common.NumberExtensions.NumberExtensions;
+using Chimera.Emulation.Common.Engine;
 
-// ReSharper disable PossibleInvalidCastExceptionInForeachLoop
 namespace Chimera.Client.Common.RamSearchEngine
 {
-	public class RamSearchEngine
+	/// <summary>
+	/// RAM Search, as the tool sees it. The search itself - the candidates, their
+	/// previous values and change counts, the undo history - is the engine's
+	/// (<see cref="EngineRamSearch"/>, engine.h): it costs what the memory searched
+	/// costs, so a domain of any size can be searched (issue #89). What is left
+	/// here is the settings the tool edits and the translation of its enums.
+	/// </summary>
+	public sealed class RamSearchEngine : IDisposable
 	{
 		private Compare _compareTo = Compare.Previous;
 
-		private IMiniWatch[] _watchList = Array.Empty<IMiniWatch>();
+		private EngineRamSearch? _search;
 		private readonly SearchEngineSettings _settings;
-		private readonly UndoHistory<IEnumerable<IMiniWatch>> _history = new UndoHistory<IEnumerable<IMiniWatch>>(true, new List<IMiniWatch>()); //TODO use IList instead of IEnumerable and stop calling `.ToArray()` (i.e. cloning) on reads and writes?
 
 		public RamSearchEngine(SearchEngineSettings settings, IMemoryDomains memoryDomains)
 		{
@@ -40,129 +42,83 @@ namespace Chimera.Client.Common.RamSearchEngine
 			CompareValue = compareValue;
 		}
 
-		public IEnumerable<long> OutOfRangeAddress => _watchList
-			.Where(watch => !watch.IsValid(Domain))
-			.Select(watch => watch.Address);
-
+		/// <exception cref="OutOfMemoryException">the host has not the memory for this domain</exception>
 		public void Start()
 		{
-			_history.Clear();
-			var domain = _settings.Domain;
-			int stepSize = _settings.CheckMisAligned ? 1 : (int)_settings.Size;
-			long listSize = domain.Size / stepSize - (int)_settings.Size + stepSize;
-
-			_watchList = new IMiniWatch[listSize];
-			using var @lock = Domain.EnterExit();
-			switch (_settings.Size)
+			_search?.Dispose();
+			_search = null;
+			var search = new EngineRamSearch(_settings.Domain);
+			try
 			{
-				default:
-				case WatchSize.Byte:
-					if (_settings.IsDetailed())
-					{
-						for (var i = 0; i < _watchList.Length; i++) _watchList[i] = new MiniByteWatchDetailed(domain, i);
-					}
-					else
-					{
-						for (var i = 0; i < _watchList.Length; i++) _watchList[i] = new MiniByteWatch(domain, i);
-					}
-					break;
-				case WatchSize.Word:
-					if (_settings.IsDetailed())
-					{
-						for (var i = 0; i < _watchList.Length; i++)
-						{
-							_watchList[i] = new MiniWordWatchDetailed(domain, i * stepSize, _settings.BigEndian);
-						}
-					}
-					else
-					{
-						for (var i = 0; i < _watchList.Length; i++)
-						{
-							_watchList[i] = new MiniWordWatch(domain, i * stepSize, _settings.BigEndian);
-						}
-					}
-					break;
-				case WatchSize.DWord:
-					if (_settings.IsDetailed())
-					{
-						for (var i = 0; i < _watchList.Length; i++)
-						{
-							_watchList[i] = new MiniDWordWatchDetailed(domain, i * stepSize, _settings.BigEndian);
-						}
-					}
-					else
-					{
-						for (var i = 0; i < _watchList.Length; i++)
-						{
-							_watchList[i] = new MiniDWordWatch(domain, i * stepSize, _settings.BigEndian);
-						}
-					}
-					break;
+				search.SetUndoEnabled(_settings.UseUndoHistory);
+				search.Start((int) _settings.Size, _settings.CheckMisAligned, _settings.BigEndian, _settings.IsDetailed());
+				search.SetPreviousType((int) _settings.PreviousType);
 			}
+			catch
+			{
+				search.Dispose();
+				throw;
+			}
+			_search = search;
 		}
 
 		/// <summary>
 		/// Exposes the current watch state based on index
 		/// </summary>
-		public Watch this[int index] =>
-			Watch.GenerateWatch(
-				_settings.Domain,
-				_watchList[index].Address,
-				_settings.Size,
-				_settings.Type,
-				_settings.BigEndian,
-				"",
-				0,
-				_watchList[index].Previous,
-				_settings.IsDetailed() ? ((IMiniWatchDetails)_watchList[index]).ChangeCount : 0);
-
-		public int DoSearch()
+		public Watch this[long index]
 		{
-			int before = _watchList.Length;
-
-			using (Domain.EnterExit())
+			get
 			{
-				_watchList = _compareTo switch
-				{
-					Compare.Previous => ComparePrevious(_watchList).ToArray(),
-					Compare.SpecificValue => CompareSpecificValue(_watchList).ToArray(),
-					Compare.SpecificAddress => CompareSpecificAddress(_watchList).ToArray(),
-					Compare.Changes => CompareChanges(_watchList).ToArray(),
-					Compare.Difference => CompareDifference(_watchList).ToArray(),
-					_ => ComparePrevious(_watchList).ToArray(),
-				};
-
-				if (_settings.PreviousType == PreviousType.LastSearch)
-				{
-					SetPreviousToCurrent();
-				}
+				if (_search is null || !_search.TryGetRow(index, out var row)) throw new ArgumentOutOfRangeException(nameof(index));
+				return Watch.GenerateWatch(
+					_settings.Domain,
+					row.Address,
+					_settings.Size,
+					_settings.Type,
+					_settings.BigEndian,
+					"",
+					0,
+					row.Previous,
+					row.ChangeCount);
 			}
-
-			if (UndoEnabled)
-			{
-				_history.AddState(_watchList.ToArray());
-			}
-
-			return before - _watchList.Length;
 		}
 
-		public bool Preview(int index)
-		{
-			var addressWatch = _watchList[index];
-			IMiniWatch[] listOfOne = [ addressWatch ];
+		/// <summary>The address listed at <paramref name="index"/>, without building a watch for it.</summary>
+		public long AddressAt(long index)
+			=> _search is not null && _search.TryGetRow(index, out var row) ? row.Address : -1;
 
-			return _compareTo switch
-			{
-				Compare.Previous => !ComparePrevious(listOfOne).Any(),
-				Compare.SpecificValue => !CompareSpecificValue(listOfOne).Any(),
-				Compare.SpecificAddress => !CompareSpecificAddress(listOfOne).Any(),
-				Compare.Changes => !CompareChanges(listOfOne).Any(),
-				Compare.Difference => !CompareDifference(listOfOne).Any(),
-				_ => !ComparePrevious(listOfOne).Any(),
-			};
+		/// <summary>Where <paramref name="address"/> is listed, or -1.</summary>
+		public long IndexOf(long address) => _search?.IndexOf(address) ?? -1;
+
+		/// <returns>how many addresses the search removed</returns>
+		public long DoSearch()
+		{
+			if (_search is null) return 0;
+			if (_compareTo is Compare.Changes && !_settings.IsDetailed()) throw new InvalidOperationException();
+			return _search.Search((int) _compareTo, (int) Operator, Display, RequiredCompareValue, RequiredDifferentBy, (int) _settings.PreviousType);
 		}
 
-		public int Count => _watchList.Length;
+		public bool Preview(long index)
+		{
+			if (_search is null) return false;
+			if (_compareTo is Compare.Changes && !_settings.IsDetailed()) throw new InvalidOperationException();
+			return _search.WouldRemove(index, (int) _compareTo, (int) Operator, Display, RequiredCompareValue, RequiredDifferentBy);
+		}
+
+		private int Display => _settings.Type switch
+		{
+			WatchDisplayType.Signed => 1,
+			WatchDisplayType.Float => 2,
+			_ => 0,
+		};
+
+		private uint RequiredCompareValue
+			=> _compareTo is Compare.Previous ? 0 : CompareValue ?? throw new InvalidOperationException();
+
+		private uint RequiredDifferentBy
+			=> Operator is ComparisonOperator.DifferentBy ? DifferentBy ?? throw new InvalidOperationException() : 0;
+
+		public long Count => _search?.Count ?? 0;
 
 		public SearchMode Mode => _settings.Mode;
 
@@ -189,25 +145,21 @@ namespace Chimera.Client.Common.RamSearchEngine
 
 		public ComparisonOperator Operator { get; set; }
 
-		/// <remarks>
-		/// zero 07-sep-2014 - this isn't ideal. but don't bother changing it (to a long, for instance) until it can support floats. maybe store it as a double here.<br/>
-		/// it already supported floats by way of reinterpret-cast, it just wasn't implemented correctly on this side --yoshi
-		/// </remarks>
 		public uint? DifferentBy { get; set; }
 
 		public void Update()
 		{
 			if (!_settings.IsDetailed()) return;
-			using var @lock = _settings.Domain.EnterExit();
-			foreach (IMiniWatchDetails watch in _watchList)
-			{
-				watch.Update(_settings.PreviousType, _settings.Domain, _settings.BigEndian);
-			}
+			_search?.Update((int) _settings.PreviousType);
 		}
 
 		public void SetType(WatchDisplayType type) => _settings.Type = type;
 
-		public void SetEndian(bool bigEndian) => _settings.BigEndian = bigEndian;
+		public void SetEndian(bool bigEndian)
+		{
+			_settings.BigEndian = bigEndian;
+			_search?.SetBigEndian(bigEndian);
+		}
 
 		/// <exception cref="InvalidOperationException"><see cref="Mode"/> is <see cref="SearchMode.Fast"/> and <paramref name="type"/> is <see cref="PreviousType.LastFrame"/></exception>
 		public void SetPreviousType(PreviousType type)
@@ -218,446 +170,69 @@ namespace Chimera.Client.Common.RamSearchEngine
 			}
 
 			_settings.PreviousType = type;
+			_search?.SetPreviousType((int) type);
 		}
 
-		public void SetPreviousToCurrent()
-		{
-			Array.ForEach(_watchList, w => w.SetPreviousToCurrent(_settings.Domain, _settings.BigEndian));
-		}
+		public void SetPreviousToCurrent() => _search?.SetPreviousToCurrent();
 
-		public void ClearChangeCounts()
-		{
-			if (!_settings.IsDetailed()) return;
-			foreach (var watch in _watchList.Cast<IMiniWatchDetails>())
-			{
-				watch.ClearChangeCount();
-			}
-		}
+		public void ClearChangeCounts() => _search?.ClearChangeCounts();
 
-		/// <summary>
-		/// Remove a set of watches
-		/// However, this should not be used with large data sets (100k or more) as it uses a contains logic to perform the task
-		/// </summary>
+		public bool HasOutOfRangeAddresses => _search is not null && _search.OutOfRangeCount > 0;
+
+		public void RemoveOutOfRangeAddresses() => _search?.RemoveOutOfRange();
+
+		/// <summary>Removes a set of watches; can be undone.</summary>
 		public void RemoveSmallWatchRange(IEnumerable<Watch> watches)
-		{
-			if (UndoEnabled)
-			{
-				_history.AddState(_watchList.ToArray());
-			}
+			=> _search?.RemoveAddresses(watches.Select(static w => (ulong) w.Address).ToArray(), recordUndo: true);
 
-			var addresses = watches.Select(w => w.Address);
-			RemoveAddressRange(addresses);
-		}
-
+		/// <summary>Removes the rows listed at <paramref name="indices"/>; can be undone.</summary>
 		public void RemoveRange(IEnumerable<int> indices)
-		{
-			if (UndoEnabled)
-			{
-				_history.AddState(_watchList.ToArray());
-			}
-
-			var removeList = indices.Select(i => _watchList[i]); // This will fail after int.MaxValue but RAM Search fails on domains that large anyway
-			_watchList = _watchList.Except(removeList).ToArray();
-		}
-
-		public void RemoveAddressRange(IEnumerable<long> addresses)
-		{
-			_watchList = _watchList.Where(w => !addresses.Contains(w.Address)).ToArray();
-		}
+			=> _search?.RemoveIndices(indices.Select(static i => (long) i).ToArray());
 
 		public void AddRange(IEnumerable<long> addresses, bool append)
-		{
-			using var @lock = Domain.EnterExit();
-			var list = _settings.Size switch
-			{
-				WatchSize.Byte => addresses.ToBytes(_settings),
-				WatchSize.Word => addresses.ToWords(_settings),
-				WatchSize.DWord => addresses.ToDWords(_settings),
-				_ => addresses.ToBytes(_settings),
-			};
-
-			_watchList = (append ? _watchList.Concat(list) : list).ToArray();
-		}
+			=> _search?.AddAddresses(addresses.Select(static a => (ulong) a).ToArray(), append);
 
 		public void ConvertTo(WatchSize size)
 		{
-			using var @lock = Domain.EnterExit();
-			var maxAddress = Domain.Size - (int)size;
-			var addresses = AllAddresses().Where(address => address <= maxAddress);
-			_watchList = size switch
-			{
-				WatchSize.Byte => addresses.ToBytes(_settings).ToArray(),
-				WatchSize.Word when _settings.CheckMisAligned => addresses.ToWords(_settings).ToArray(),
-				WatchSize.Word => addresses.Where(static address => address % 2 == 0).ToWords(_settings).ToArray(),
-				WatchSize.DWord when _settings.CheckMisAligned => addresses.ToDWords(_settings).ToArray(),
-				WatchSize.DWord => addresses.Where(static address => address % 4 == 0).ToDWords(_settings).ToArray(),
-				_ => _watchList,
-			};
-
+			_search?.ConvertTo((int) size);
 			_settings.Size = size;
-		}
-
-		private IEnumerable<long> AllAddresses()
-		{
-			foreach (var watch in _watchList)
-			{
-				if (_settings.CheckMisAligned)
-				{
-					yield return watch.Address;
-				}
-				else
-				{
-					switch (_settings.Size)
-					{
-						case WatchSize.Word:
-							yield return watch.Address;
-							yield return watch.Address + 1;
-							break;
-						case WatchSize.DWord:
-							yield return watch.Address;
-							yield return watch.Address + 1;
-							yield return watch.Address + 2;
-							yield return watch.Address + 3;
-							break;
-						default:
-							yield return watch.Address;
-							break;
-					}
-				}
-			}
 		}
 
 		public void Sort(string column, bool reverse)
 		{
-			switch (column)
+			int? col = column switch
 			{
-				case WatchList.Address:
-					_watchList = _watchList.OrderBy(w => w.Address, reverse).ToArray();
-					break;
-				case WatchList.Value:
-					_watchList = _watchList.OrderBy(w => GetValue(w), reverse).ToArray();
-					break;
-				case WatchList.Prev:
-					_watchList = _watchList.OrderBy(w => w.Previous, reverse).ToArray();
-					break;
-				case WatchList.ChangesCol:
-					if (!_settings.IsDetailed()) break;
-					_watchList = _watchList
-						.Cast<IMiniWatchDetails>()
-						.OrderBy(w => w.ChangeCount, reverse)
-						.Cast<IMiniWatch>()
-						.ToArray();
-					break;
-				case WatchList.Diff:
-					_watchList = _watchList.OrderBy(w => GetValue(w) - w.Previous, reverse).ToArray();
-					break;
-			}
+				WatchList.Address => 0,
+				WatchList.Value => 1,
+				WatchList.Prev => 2,
+				WatchList.ChangesCol => 3,
+				WatchList.Diff => 4,
+				_ => null,
+			};
+			if (col is int c) _search?.Sort(c, reverse, Display);
 		}
 
 		public bool UndoEnabled
 		{
 			get => _settings.UseUndoHistory;
-			set => _settings.UseUndoHistory = value;
-		}
-
-		public bool CanUndo => UndoEnabled && _history.CanUndo;
-
-		public bool CanRedo => UndoEnabled && _history.CanRedo;
-
-		public void ClearHistory() => _history.Clear();
-
-		public int Undo()
-		{
-			int origCount = _watchList.Length;
-			if (UndoEnabled)
+			set
 			{
-				_watchList = _history.Undo().ToArray();
-				return _watchList.Length - origCount;
-			}
-
-			return _watchList.Length;
-		}
-
-		public int Redo()
-		{
-			int origCount = _watchList.Length;
-			if (UndoEnabled)
-			{
-				_watchList = _history.Redo().ToArray();
-				return origCount - _watchList.Length;
-			}
-
-			return _watchList.Length;
-		}
-
-		private IEnumerable<IMiniWatch> ComparePrevious(IEnumerable<IMiniWatch> watchList)
-		{
-			if (_settings.Type is not WatchDisplayType.Float)
-			{
-				switch (Operator)
-				{
-					default:
-					case ComparisonOperator.Equal:
-						return watchList.Where(w => SignExtendAsNeeded(GetValue(w)) == SignExtendAsNeeded(w.Previous));
-					case ComparisonOperator.NotEqual:
-						return watchList.Where(w => SignExtendAsNeeded(GetValue(w)) != SignExtendAsNeeded(w.Previous));
-					case ComparisonOperator.GreaterThan:
-						return watchList.Where(w => SignExtendAsNeeded(GetValue(w)) > SignExtendAsNeeded(w.Previous));
-					case ComparisonOperator.GreaterThanEqual:
-						return watchList.Where(w => SignExtendAsNeeded(GetValue(w)) >= SignExtendAsNeeded(w.Previous));
-					case ComparisonOperator.LessThan:
-						return watchList.Where(w => SignExtendAsNeeded(GetValue(w)) < SignExtendAsNeeded(w.Previous));
-					case ComparisonOperator.LessThanEqual:
-						return watchList.Where(w => SignExtendAsNeeded(GetValue(w)) <= SignExtendAsNeeded(w.Previous));
-					case ComparisonOperator.DifferentBy:
-						if (DifferentBy is not uint differentBy) throw new InvalidOperationException();
-						return watchList.Where(w =>
-							differentBy == Math.Abs(SignExtendAsNeeded(GetValue(w)) - SignExtendAsNeeded(w.Previous)));
-				}
-			}
-			switch (Operator)
-			{
-				default:
-				case ComparisonOperator.Equal:
-					return watchList.Where(w => ReinterpretAsF32(GetValue(w)).ApproxFloatEquality(ReinterpretAsF32(w.Previous)));
-				case ComparisonOperator.NotEqual:
-					return watchList.Where(w => !ReinterpretAsF32(GetValue(w)).ApproxFloatEquality(ReinterpretAsF32(w.Previous)));
-				case ComparisonOperator.GreaterThan:
-					return watchList.Where(w => ReinterpretAsF32(GetValue(w)) > ReinterpretAsF32(w.Previous));
-				case ComparisonOperator.GreaterThanEqual:
-					return watchList.Where(w =>
-					{
-						var val = ReinterpretAsF32(GetValue(w));
-						var prev = ReinterpretAsF32(w.Previous);
-						return val > prev || val.ApproxFloatEquality(prev);
-					});
-				case ComparisonOperator.LessThan:
-					return watchList.Where(w => ReinterpretAsF32(GetValue(w)) < ReinterpretAsF32(w.Previous));
-				case ComparisonOperator.LessThanEqual:
-					return watchList.Where(w =>
-					{
-						var val = ReinterpretAsF32(GetValue(w));
-						var prev = ReinterpretAsF32(w.Previous);
-						return val < prev || val.ApproxFloatEquality(prev);
-					});
-				case ComparisonOperator.DifferentBy:
-					if (DifferentBy is not uint differentBy) throw new InvalidOperationException();
-					var differentByF = ReinterpretAsF32(differentBy);
-					return watchList.Where(w => Math.Abs(ReinterpretAsF32(GetValue(w)) - ReinterpretAsF32(w.Previous))
-						.ApproxFloatEquality(differentByF));
+				_settings.UseUndoHistory = value;
+				_search?.SetUndoEnabled(value);
 			}
 		}
 
-		private IEnumerable<IMiniWatch> CompareSpecificValue(IEnumerable<IMiniWatch> watchList)
-		{
-			if (CompareValue is not uint compareValue) throw new InvalidOperationException();
-			if (_settings.Type is not WatchDisplayType.Float)
-			{
-				switch (Operator)
-				{
-					default:
-					case ComparisonOperator.Equal:
-						return watchList.Where(w => SignExtendAsNeeded(GetValue(w)) == SignExtendAsNeeded(compareValue));
-					case ComparisonOperator.NotEqual:
-						return watchList.Where(w => SignExtendAsNeeded(GetValue(w)) != SignExtendAsNeeded(compareValue));
-					case ComparisonOperator.GreaterThan:
-						return watchList.Where(w => SignExtendAsNeeded(GetValue(w)) > SignExtendAsNeeded(compareValue));
-					case ComparisonOperator.GreaterThanEqual:
-						return watchList.Where(w => SignExtendAsNeeded(GetValue(w)) >= SignExtendAsNeeded(compareValue));
-					case ComparisonOperator.LessThan:
-						return watchList.Where(w => SignExtendAsNeeded(GetValue(w)) < SignExtendAsNeeded(compareValue));
-					case ComparisonOperator.LessThanEqual:
-						return watchList.Where(w => SignExtendAsNeeded(GetValue(w)) <= SignExtendAsNeeded(compareValue));
-					case ComparisonOperator.DifferentBy:
-						if (DifferentBy is not uint differentBy) throw new InvalidOperationException();
-						return watchList.Where(w =>
-							differentBy == Math.Abs(SignExtendAsNeeded(GetValue(w)) - SignExtendAsNeeded(compareValue)));
-				}
-			}
-			var compareValueF = ReinterpretAsF32(compareValue);
-			switch (Operator)
-			{
-				default:
-				case ComparisonOperator.Equal:
-					return watchList.Where(w => ReinterpretAsF32(GetValue(w)).ApproxFloatEquality(compareValueF));
-				case ComparisonOperator.NotEqual:
-					return watchList.Where(w => !ReinterpretAsF32(GetValue(w)).ApproxFloatEquality(compareValueF));
-				case ComparisonOperator.GreaterThan:
-					return watchList.Where(w => ReinterpretAsF32(GetValue(w)) > compareValueF);
-				case ComparisonOperator.GreaterThanEqual:
-					return watchList.Where(w =>
-					{
-						var val = ReinterpretAsF32(GetValue(w));
-						return val > compareValueF || val.ApproxFloatEquality(compareValueF);
-					});
-				case ComparisonOperator.LessThan:
-					return watchList.Where(w => ReinterpretAsF32(GetValue(w)) < compareValueF);
-				case ComparisonOperator.LessThanEqual:
-					return watchList.Where(w =>
-					{
-						var val = ReinterpretAsF32(GetValue(w));
-						return val < compareValueF || val.ApproxFloatEquality(compareValueF);
-					});
-				case ComparisonOperator.DifferentBy:
-					if (DifferentBy is not uint differentBy) throw new InvalidOperationException();
-					var differentByF = ReinterpretAsF32(differentBy);
-					return watchList.Where(w => Math.Abs(ReinterpretAsF32(GetValue(w)) - compareValueF)
-						.ApproxFloatEquality(differentByF));
-			}
-		}
+		public bool CanUndo => UndoEnabled && _search is not null && _search.CanUndo;
 
-		private IEnumerable<IMiniWatch> CompareSpecificAddress(IEnumerable<IMiniWatch> watchList)
-		{
-			if (CompareValue is not uint compareValue) throw new InvalidOperationException();
-			switch (Operator)
-			{
-				default:
-				case ComparisonOperator.Equal:
-					return watchList.Where(w => w.Address == compareValue);
-				case ComparisonOperator.NotEqual:
-					return watchList.Where(w => w.Address != compareValue);
-				case ComparisonOperator.GreaterThan:
-					return watchList.Where(w => w.Address > compareValue);
-				case ComparisonOperator.GreaterThanEqual:
-					return watchList.Where(w => w.Address >= compareValue);
-				case ComparisonOperator.LessThan:
-					return watchList.Where(w => w.Address < compareValue);
-				case ComparisonOperator.LessThanEqual:
-					return watchList.Where(w => w.Address <= compareValue);
-				case ComparisonOperator.DifferentBy:
-					if (DifferentBy is not uint differentBy) throw new InvalidOperationException();
-					return watchList.Where(w => Math.Abs(w.Address - compareValue) == differentBy);
-			}
-		}
+		public bool CanRedo => UndoEnabled && _search is not null && _search.CanRedo;
 
-		private IEnumerable<IMiniWatch> CompareChanges(IEnumerable<IMiniWatch> watchList)
-		{
-			if (!_settings.IsDetailed()) throw new InvalidCastException(); //TODO matches previous behaviour; was this intended to skip processing? --yoshi
-			if (CompareValue is not uint compareValue) throw new InvalidOperationException();
-			switch (Operator)
-			{
-				default:
-				case ComparisonOperator.Equal:
-					return watchList
-						.Cast<IMiniWatchDetails>()
-						.Where(w => w.ChangeCount == compareValue);
-				case ComparisonOperator.NotEqual:
-					return watchList
-						.Cast<IMiniWatchDetails>()
-						.Where(w => w.ChangeCount != compareValue);
-				case ComparisonOperator.GreaterThan:
-					return watchList
-						.Cast<IMiniWatchDetails>()
-						.Where(w => w.ChangeCount > compareValue);
-				case ComparisonOperator.GreaterThanEqual:
-					return watchList
-						.Cast<IMiniWatchDetails>()
-						.Where(w => w.ChangeCount >= compareValue);
-				case ComparisonOperator.LessThan:
-					return watchList
-						.Cast<IMiniWatchDetails>()
-						.Where(w => w.ChangeCount < compareValue);
-				case ComparisonOperator.LessThanEqual:
-					return watchList
-						.Cast<IMiniWatchDetails>()
-						.Where(w => w.ChangeCount <= compareValue);
-				case ComparisonOperator.DifferentBy:
-					if (DifferentBy is not uint differentBy) throw new InvalidOperationException();
-					return watchList
-						.Cast<IMiniWatchDetails>()
-						.Where(w => Math.Abs(w.ChangeCount - compareValue) == differentBy);
-			}
-		}
+		public void ClearHistory() => _search?.ClearHistory();
 
-		private IEnumerable<IMiniWatch> CompareDifference(IEnumerable<IMiniWatch> watchList)
-		{
-			if (CompareValue is not uint compareValue) throw new InvalidOperationException();
-			if (_settings.Type is not WatchDisplayType.Float)
-			{
-				switch (Operator)
-				{
-					default:
-					case ComparisonOperator.Equal:
-						return watchList.Where(w => SignExtendAsNeeded(GetValue(w)) - SignExtendAsNeeded(w.Previous) == compareValue);
-					case ComparisonOperator.NotEqual:
-						return watchList.Where(w => SignExtendAsNeeded(GetValue(w)) - SignExtendAsNeeded(w.Previous) != compareValue);
-					case ComparisonOperator.GreaterThan:
-						return watchList.Where(w => SignExtendAsNeeded(GetValue(w)) - SignExtendAsNeeded(w.Previous) > compareValue);
-					case ComparisonOperator.GreaterThanEqual:
-						return watchList.Where(w => SignExtendAsNeeded(GetValue(w)) - SignExtendAsNeeded(w.Previous) >= compareValue);
-					case ComparisonOperator.LessThan:
-						return watchList.Where(w => SignExtendAsNeeded(GetValue(w)) - SignExtendAsNeeded(w.Previous) < compareValue);
-					case ComparisonOperator.LessThanEqual:
-						return watchList.Where(w => SignExtendAsNeeded(GetValue(w)) - SignExtendAsNeeded(w.Previous) <= compareValue);
-					case ComparisonOperator.DifferentBy:
-						if (DifferentBy is not uint differentBy) throw new InvalidOperationException();
-						return watchList.Where(w =>
-							differentBy == Math.Abs(SignExtendAsNeeded(GetValue(w)) - SignExtendAsNeeded(w.Previous) - compareValue));
-				}
-			}
-			var compareValueF = ReinterpretAsF32(compareValue);
-			switch (Operator)
-			{
-				default:
-				case ComparisonOperator.Equal:
-					return watchList.Where(w => (ReinterpretAsF32(GetValue(w)) - ReinterpretAsF32(w.Previous)).ApproxFloatEquality(compareValueF));
-				case ComparisonOperator.NotEqual:
-					return watchList.Where(w => !(ReinterpretAsF32(GetValue(w)) - ReinterpretAsF32(w.Previous)).ApproxFloatEquality(compareValueF));
-				case ComparisonOperator.GreaterThan:
-					return watchList.Where(w => ReinterpretAsF32(GetValue(w)) - ReinterpretAsF32(w.Previous) > compareValueF);
-				case ComparisonOperator.GreaterThanEqual:
-					return watchList.Where(w =>
-					{
-						var diff = ReinterpretAsF32(GetValue(w)) - ReinterpretAsF32(w.Previous);
-						return diff > compareValueF || diff.ApproxFloatEquality(compareValueF);
-					});
-				case ComparisonOperator.LessThan:
-					return watchList.Where(w => ReinterpretAsF32(GetValue(w)) - ReinterpretAsF32(w.Previous) < compareValueF);
-				case ComparisonOperator.LessThanEqual:
-					return watchList.Where(w =>
-					{
-						var diff = ReinterpretAsF32(GetValue(w)) - ReinterpretAsF32(w.Previous);
-						return diff < compareValueF || diff.ApproxFloatEquality(compareValueF);
-					});
-				case ComparisonOperator.DifferentBy:
-					if (DifferentBy is not uint differentBy) throw new InvalidOperationException();
-					var differentByF = ReinterpretAsF32(differentBy);
-					return watchList.Where(w => Math.Abs(ReinterpretAsF32(GetValue(w)) - ReinterpretAsF32(w.Previous) - compareValueF)
-						.ApproxFloatEquality(differentByF));
-			}
-		}
+		/// <returns>how many addresses came back</returns>
+		public long Undo() => _search?.Undo() ?? 0;
 
-		private long SignExtendAsNeeded(uint val)
-		{
-			if (_settings.Type != WatchDisplayType.Signed)
-			{
-				return val;
-			}
-
-			return _settings.Size switch
-			{
-				WatchSize.Byte => (sbyte) val,
-				WatchSize.Word => (short) val,
-				WatchSize.DWord => (int) val,
-				_ => (sbyte) val,
-			};
-		}
-
-		private uint GetValue(IMiniWatch watch)
-		{
-			if (watch is IMiniWatchDetails detailedWatch)
-			{
-				return detailedWatch.Current;
-			}
-
-			return _settings.Size switch
-			{
-				WatchSize.Byte => MiniByteWatch.GetByte(watch.Address, Domain),
-				WatchSize.Word => MiniWordWatch.GetUshort(watch.Address, Domain, _settings.BigEndian),
-				WatchSize.DWord => MiniDWordWatch.GetUint(watch.Address, Domain, _settings.BigEndian),
-				_ => MiniByteWatch.GetByte(watch.Address, Domain),
-			};
-		}
+		/// <returns>how many addresses went again</returns>
+		public long Redo() => -(_search?.Redo() ?? 0);
 
 		private bool CanDoCompareType(Compare compareType)
 		{
@@ -667,6 +242,12 @@ namespace Chimera.Client.Common.RamSearchEngine
 				SearchMode.Fast => (compareType != Compare.Changes),
 				_ => true,
 			};
+		}
+
+		public void Dispose()
+		{
+			_search?.Dispose();
+			_search = null;
 		}
 	}
 }

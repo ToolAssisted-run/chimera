@@ -1337,6 +1337,66 @@ CE_API int32_t ce_session_history_save_later(ce_session *s, const char *path, co
 CE_API int32_t ce_session_history_save_pending(ce_session *s);
 CE_API int32_t ce_session_history_save_wait(ce_session *s);
 
+/* ---------------------------------------------------------------------------
+ * RAM Search. The candidate set, its previous values, its change counts and
+ * its undo history live here, so that a search costs what the memory searched
+ * costs and no more: a domain of any size can be searched, and the only limit
+ * is the host's memory (issue #89; the frontend used to hold one object per
+ * address and refused a domain over 64 MiB).
+ *
+ * A search is independent of any session: it is given the domain's memory as a
+ * pointer, or - for a domain with no linear backing, such as a bus - as a
+ * function that copies a range out. The pointer must outlive the search.
+ *
+ * Numbering. size: 1, 2, 4 bytes. compare: 0 previous value, 1 specific value,
+ * 2 specific address, 3 number of changes, 4 difference. op: 0 ==, 1 >, 2 >=,
+ * 3 <, 4 <=, 5 !=, 6 different by. display: 0 unsigned (and anything shown
+ * from the raw bits), 1 signed, 2 float. previous_type: 0 original, 1 last
+ * search, 2 last frame, 3 last change. column: 0 address, 1 value, 2 previous,
+ * 3 changes, 4 difference.
+ *
+ * Calls that can need memory return 0 when they worked and -1 when the host
+ * had none to give (_search returns the number removed, or -1).
+ */
+typedef struct ce_ramsearch ce_ramsearch;
+/* Copies [offset, offset+len) into buf; returns the bytes copied. */
+typedef int64_t (*ce_ramsearch_read_fn)(void *user, int64_t offset, uint8_t *buf, int64_t len);
+
+CE_API ce_ramsearch *ce_ramsearch_create(const uint8_t *base, ce_ramsearch_read_fn fn, void *user, int64_t domain_size);
+CE_API void ce_ramsearch_destroy(ce_ramsearch *rs);
+/* Every address becomes a candidate. detailed keeps a current value and a
+ * change count per candidate, fed by _update once a frame. */
+CE_API int32_t ce_ramsearch_start(ce_ramsearch *rs, int32_t size, int32_t misaligned, int32_t big_endian, int32_t detailed);
+CE_API int64_t ce_ramsearch_count(const ce_ramsearch *rs);
+/* The index-th candidate as listed; 0 when there is no such row. */
+CE_API int32_t ce_ramsearch_row(const ce_ramsearch *rs, int64_t index, uint64_t *address, uint32_t *current, uint32_t *previous, uint32_t *changes);
+/* Where an address is listed, or -1. */
+CE_API int64_t ce_ramsearch_index_of(const ce_ramsearch *rs, uint64_t address);
+CE_API int64_t ce_ramsearch_search(ce_ramsearch *rs, int32_t compare, int32_t op, int32_t display, uint32_t value, uint32_t different_by, int32_t previous_type);
+/* Whether that search would remove this row (the preview colouring). */
+CE_API int32_t ce_ramsearch_would_remove(const ce_ramsearch *rs, int64_t index, int32_t compare, int32_t op, int32_t display, uint32_t value, uint32_t different_by);
+CE_API int32_t ce_ramsearch_update(ce_ramsearch *rs, int32_t previous_type);
+CE_API int32_t ce_ramsearch_set_previous_to_current(ce_ramsearch *rs);
+CE_API void ce_ramsearch_clear_change_counts(ce_ramsearch *rs);
+CE_API void ce_ramsearch_set_big_endian(ce_ramsearch *rs, int32_t big_endian);
+CE_API int32_t ce_ramsearch_set_previous_type(ce_ramsearch *rs, int32_t previous_type);
+CE_API int32_t ce_ramsearch_remove_indices(ce_ramsearch *rs, const int64_t *indices, int64_t n);
+CE_API int32_t ce_ramsearch_remove_addresses(ce_ramsearch *rs, const uint64_t *addresses, int64_t n, int32_t record_undo);
+CE_API int32_t ce_ramsearch_add_addresses(ce_ramsearch *rs, const uint64_t *addresses, int64_t n, int32_t append);
+/* Re-reads the candidates at another size; forgets the history. */
+CE_API int32_t ce_ramsearch_convert_to(ce_ramsearch *rs, int32_t size);
+CE_API int32_t ce_ramsearch_sort(ce_ramsearch *rs, int32_t column, int32_t reverse, int32_t display);
+CE_API int64_t ce_ramsearch_out_of_range_count(const ce_ramsearch *rs);
+CE_API int32_t ce_ramsearch_remove_out_of_range(ce_ramsearch *rs);
+/* Undo: a search and a removal can each be taken back, five deep. */
+CE_API void ce_ramsearch_set_undo_enabled(ce_ramsearch *rs, int32_t on);
+CE_API int32_t ce_ramsearch_can_undo(const ce_ramsearch *rs);
+CE_API int32_t ce_ramsearch_can_redo(const ce_ramsearch *rs);
+CE_API void ce_ramsearch_clear_history(ce_ramsearch *rs);
+/* Each returns the change in the candidate count. */
+CE_API int64_t ce_ramsearch_undo(ce_ramsearch *rs);
+CE_API int64_t ce_ramsearch_redo(ce_ramsearch *rs);
+
 #ifdef __cplusplus
 }
 #endif

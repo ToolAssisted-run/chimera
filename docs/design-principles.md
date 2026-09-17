@@ -3567,3 +3567,65 @@ longer declares `video.rebuildOnStateLoad` and rebuilds on a load like every
 other core; the declaration stays in the engine, default true, for a core that
 genuinely needs it. Verified: rebuild active, five rewinds, 12.34% near-black
 and 44,375 colours against a straight-run control of 12.34% / 44,384.
+
+## RAM Search has no size it refuses (user-decided, 2026-09-17)
+
+Issue #89: DOSBox-X's 1997 machine exposes 95 MiB of extended memory and 96 MiB
+of physical RAM, and RAM Search greyed both out - in fast mode as well as
+detailed - behind a 64 MiB constant whose own comment said it would crash
+beyond that. The user's ruling was general: "There should be no limits for RAM
+search".
+
+The limit was not arbitrary, it was the cost of the design. The inherited
+search held one heap object per candidate address, in an array of references,
+and copied that array whole for every search and every undo level. A hundred
+million objects is gigabytes before the first comparison, and nothing about it
+could be tuned: the shape was the problem. So the search moved into the engine
+(`ram_search.cpp`, `ce_ramsearch_*`), which is also where a
+thing that decides rather than shows belongs, and the C# `RamSearchEngine` is now the settings the
+tool edits and a translation of its enums.
+
+The candidate set has two shapes and the switch between them is nobody's
+business but its own. While most of the domain is still a candidate it is
+DENSE: a bit per slot, and "previous" is a byte image of the domain - so a first
+search costs the domain again plus an eighth, however many candidates there are.
+Once a search has cut it to a thirty-second of the slots it turns SPARSE:
+parallel arrays, a few bytes per survivor, the only shape that can hold an order
+other than by address or an address that was added from a file. Rows of a dense
+set are found by a running count per 4096 slots, so the list view can ask for
+row ninety million as cheaply as row nine.
+
+Memory comes through the domain's pointer when it has one - every waterbox
+domain has - and through a read function in 1 MiB pieces when it has not (a bus
+resolved by the guest's mapper, a test's byte array). The search is independent
+of any session, which is what lets `test_ram_search.cpp` hold it to an oracle
+with no machine: a model that keeps one record per address, exactly as the
+frontend used to, runs a random script of searches, polls, removals, sorts,
+conversions and undos beside it, and every row must agree after every step,
+through both shapes and both ways of reading. Four deliberate breakages of the
+implementation were each caught.
+
+Measured, 256 MiB searched by bytes (four times the old refusal): 0.2 s to
+start, 0.6 s for the first search, 864 MB peak including the domain itself and
+one undo level. The only limit left is the host's memory, and running out is
+reported in the tool's message line with the search left as it was.
+
+Sharp edges, and what changed on the way:
+
+- "Last change" moves one candidate's previous at a time, which a byte image
+  cannot hold when candidates overlap (misaligned, wider than a byte). That one
+  combination is always sparse, and costs what sparse costs.
+- Undo is a real undo now: the state BEFORE a search or a removal is kept, five
+  deep, so the first search can be taken back (it could not before). A dense
+  level costs the image again; if there is no memory for a level the history is
+  dropped rather than the search refused.
+- Sorting by value, previous or difference sorts by what is SHOWN (signed and
+  float order), where it used to sort the raw bits; and a "difference" search in
+  signed display accepts a negative difference, which the raw comparison could
+  never match.
+- Domains of 1 MiB and more still START in fast mode, because detailed polls
+  every candidate every frame. That is a default; the user can switch back.
+- The list view counts rows in an int and "select all" walks them: a search of
+  more than 2^31 candidates lists its first 2^31, and selecting all of a
+  hundred million rows is as slow as it always was. Both are the control's, not
+  the search's.

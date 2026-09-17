@@ -22,8 +22,10 @@ namespace Chimera.Client.GUI
 	/// </summary>
 	public partial class RamSearch : ToolFormBase, IToolFormAutoConfig
 	{
-		private const int MaxDetailedSize = 1024 * 1024; // 1mb, semi-arbitrary decision, sets the size to check for and automatically switch to fast mode for the user
-		private const int MaxSupportedSize = 1024 * 1024 * 64; // 64mb, semi-arbitrary decision, sets the maximum size RAM Search will support (as it will crash beyond this)
+		// From this size a domain STARTS in fast mode: detailed polls every candidate every frame. It is a
+		// default and not a limit - the user can switch back - and there is no size RAM Search refuses: the
+		// search is the engine's and costs what the memory searched costs (issue #89).
+		private const int MaxDetailedSize = 1024 * 1024;
 
 		public static Icon ToolIcon
 			=> Resources.SearchIcon;
@@ -136,11 +138,19 @@ namespace Chimera.Client.GUI
 			Settings.Columns = WatchListView.AllColumns;
 		}
 
+		protected override void OnFormClosed(FormClosedEventArgs e)
+		{
+			// the search holds an image of the domain in the engine: let it go now, not at a finalizer's leisure
+			_searches?.Dispose();
+			base.OnFormClosed(e);
+		}
+
 		private void RamSearch_Load(object sender, EventArgs e)
 		{
 			RamSearchMenu.Items.Add(WatchListView.ToColumnsMenu(ColumnToggleCallback));
 
 			_settings = new SearchEngineSettings(MemoryDomains, Settings.UseUndoHistory);
+			_searches?.Dispose();
 			_searches = new RamSearchEngine(_settings, MemoryDomains);
 
 			ErrorIconButton.Visible = false;
@@ -183,7 +193,7 @@ namespace Chimera.Client.GUI
 
 		private void OutOfRangeCheck()
 		{
-			ErrorIconButton.Visible = _searches.OutOfRangeAddress.Any();
+			ErrorIconButton.Visible = _searches.HasOutOfRangeAddresses;
 		}
 
 		private void ListView_QueryItemBkColor(InputRoll sender, int index, RollColumn column, ref Color color)
@@ -253,7 +263,7 @@ namespace Chimera.Client.GUI
 		/// </summary>
 		private void UpdateList()
 		{
-			WatchListView.RowCount = _searches.Count;
+			WatchListView.RowCount = ListedRows;
 			SetTotal();
 		}
 
@@ -280,7 +290,7 @@ namespace Chimera.Client.GUI
 				_searches.Update();
 
 				_forcePreviewClear = false;
-				WatchListView.RowCount = _searches.Count;
+				WatchListView.RowCount = ListedRows;
 			}
 		}
 
@@ -303,7 +313,7 @@ namespace Chimera.Client.GUI
 				}
 
 				_forcePreviewClear = false;
-				WatchListView.RowCount = _searches.Count;
+				WatchListView.RowCount = ListedRows;
 			}
 		}
 
@@ -325,6 +335,7 @@ namespace Chimera.Client.GUI
 			if (!IsHandleCreated) return;
 
 			_settings = new SearchEngineSettings(MemoryDomains, Settings.UseUndoHistory);
+			_searches?.Dispose();
 			_searches = new RamSearchEngine(_settings, MemoryDomains);
 			MessageLabel.Text = "Search restarted";
 			DoDomainSizeCheck();
@@ -341,11 +352,26 @@ namespace Chimera.Client.GUI
 			var compareVal = _searches.CompareValue;
 			var differentBy = _searches.DifferentBy;
 
+			_searches.Dispose();
 			_searches = new RamSearchEngine(_settings, MemoryDomains, compareTo, compareVal, differentBy);
-			_searches.Start();
+			try
+			{
+				_searches.Start();
+			}
+			catch (OutOfMemoryException)
+			{
+				// the one limit there is: the search stays empty and says why
+				UpdateList();
+				ToggleSearchDependentToolBarItems();
+				SetDomainLabel();
+				MessageLabel.Text = $"Not enough memory to search {_settings.Domain.Name}";
+				return;
+			}
+
 			if (Settings.AlwaysExcludeRamWatch)
 			{
 				RemoveRamWatchesFromList();
+				_searches.ClearHistory(); // a new search has nothing to take back
 			}
 
 			UpdateList();
@@ -547,12 +573,26 @@ namespace Chimera.Client.GUI
 			_searches.Operator = Operator;
 			_searches.CompareTo = Compare;
 
-			var removed = _searches.DoSearch();
+			long removed;
+			try
+			{
+				removed = _searches.DoSearch();
+			}
+			catch (OutOfMemoryException)
+			{
+				UpdateList();
+				MessageLabel.Text = "Not enough memory for that search";
+				return;
+			}
+
 			UpdateList();
 			SetRemovedMessage(removed);
 			ToggleSearchDependentToolBarItems();
 			_forcePreviewClear = true;
 		}
+
+		/// <summary>The list view counts its rows in an int; a search of more than that lists its first int.MaxValue.</summary>
+		private int ListedRows => (int) Math.Min(_searches.Count, int.MaxValue);
 
 		private IEnumerable<int> SelectedIndices => WatchListView.SelectedRows;
 
@@ -563,7 +603,7 @@ namespace Chimera.Client.GUI
 		private bool MayPokeAllSelected
 			=> WatchListView.AnyRowsSelected && SelectedWatches.All(static w => w.Domain.Writable);
 
-		private void SetRemovedMessage(int val)
+		private void SetRemovedMessage(long val)
 		{
 			MessageLabel.Text = $"{val} {(val == 1 ? "address" : "addresses")} removed";
 		}
@@ -645,7 +685,14 @@ namespace Chimera.Client.GUI
 		private void SetPreviousType(PreviousType type)
 		{
 			_settings.PreviousType = type;
-			_searches.SetPreviousType(type);
+			try
+			{
+				_searches.SetPreviousType(type);
+			}
+			catch (OutOfMemoryException)
+			{
+				MessageLabel.Text = "Not enough memory to track the last change of this many addresses";
+			}
 		}
 
 		private void HandleWatchSizeSelected(WatchSize newWatchSize)
@@ -933,15 +980,13 @@ namespace Chimera.Client.GUI
 			{
 				try
 				{
-					var addr = int.Parse(prompt.PromptText, NumberStyles.HexNumber);
-					for (int index = 0; index < _searches.Count; index++)
+					var addr = long.Parse(prompt.PromptText, NumberStyles.HexNumber);
+					var index = _searches.IndexOf(addr);
+					if (index >= 0 && index < ListedRows)
 					{
-						if (_searches[index].Address == addr)
-						{
-							WatchListView.SelectRow(index, true);
-							WatchListView.ScrollToIndex(index);
-							return; // Don't re-show dialog on success
-						}
+						WatchListView.SelectRow((int) index, true);
+						WatchListView.ScrollToIndex((int) index);
+						return; // Don't re-show dialog on success
 					}
 
 					// TODO add error text to dialog?
@@ -1014,7 +1059,7 @@ namespace Chimera.Client.GUI
 			if (!string.IsNullOrWhiteSpace(_currentFileName))
 			{
 				var watches = new WatchList(MemoryDomains, Emu.SystemId) { CurrentFileName = _currentFileName };
-				for (var i = 0; i < _searches.Count; i++)
+				for (long i = 0; i < _searches.Count; i++)
 				{
 					watches.Add(_searches[i]);
 				}
@@ -1058,7 +1103,7 @@ namespace Chimera.Client.GUI
 		private void SaveAsMenuItem_Click(object sender, EventArgs e)
 		{
 			var watches = new WatchList(MemoryDomains, Emu.SystemId) { CurrentFileName = _currentFileName };
-			for (var i = 0; i < _searches.Count; i++)
+			for (long i = 0; i < _searches.Count; i++)
 			{
 				watches.Add(_searches[i]);
 			}
@@ -1092,7 +1137,7 @@ namespace Chimera.Client.GUI
 		}
 
 		private void MemoryDomainsSubMenu_DropDownOpened(object sender, EventArgs e)
-			=> MemoryDomainsSubMenu.ReplaceDropDownItems(MemoryDomains.MenuItems(SetMemoryDomain, _searches.Domain.Name, MaxSupportedSize).ToArray());
+			=> MemoryDomainsSubMenu.ReplaceDropDownItems(MemoryDomains.MenuItems(SetMemoryDomain, _searches.Domain.Name).ToArray());
 
 		private void SizeSubMenu_DropDownOpened(object sender, EventArgs e)
 		{
@@ -1246,7 +1291,7 @@ namespace Chimera.Client.GUI
 		{
 			if (_searches.CanUndo)
 			{
-				int restoredCount = _searches.Undo();
+				var restoredCount = _searches.Undo();
 				UpdateList();
 				ToggleSearchDependentToolBarItems();
 				_forcePreviewClear = true;
@@ -1259,7 +1304,7 @@ namespace Chimera.Client.GUI
 		{
 			if (_searches.CanRedo)
 			{
-				int restoredCount = _searches.Redo();
+				var restoredCount = _searches.Redo();
 				UpdateList();
 				ToggleSearchDependentToolBarItems();
 				_forcePreviewClear = true;
@@ -1464,9 +1509,9 @@ namespace Chimera.Client.GUI
 
 		private void ErrorIconButton_Click(object sender, EventArgs e)
 		{
-			var outOfRangeAddresses = _searches.OutOfRangeAddress.ToList();
-			_searches.RemoveAddressRange(outOfRangeAddresses);
-			SetRemovedMessage(outOfRangeAddresses.Count);
+			var before = _searches.Count;
+			_searches.RemoveOutOfRangeAddresses();
+			SetRemovedMessage(before - _searches.Count);
 
 			UpdateList();
 			ToggleSearchDependentToolBarItems();

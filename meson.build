@@ -308,6 +308,7 @@ engine_src = files(
   'source/engine/source/media_iso.cpp',
   'source/engine/source/media_fat12.cpp',
   'source/engine/source/gl_bridge.cpp',
+  'source/engine/source/ram_search.cpp',
   'extern/miniz/miniz.c',  # vendored (MIT): the zip half of the state container
   'extern/cjson/cJSON.c',  # vendored (MIT): bundle JSON
 )
@@ -406,7 +407,7 @@ if not meson.is_cross_build()
     build_by_default: false,
   )
 
-  foreach engine_test : ['sha1', 'movie_log', 'movie_text', 'movie_entry', 'state_container', 'package', 'multifile', 'project', 'firmware', 'state_history', 'media', 'gl_flight', 'gl_sync', 'gl_buffer_pool', 'stride_tuner', 'greenzone_shape']
+  foreach engine_test : ['sha1', 'movie_log', 'movie_text', 'movie_entry', 'state_container', 'package', 'multifile', 'project', 'firmware', 'state_history', 'media', 'gl_flight', 'gl_sync', 'gl_buffer_pool', 'stride_tuner', 'greenzone_shape', 'ram_search']
     test(
       'engine_' + engine_test,
       executable(
