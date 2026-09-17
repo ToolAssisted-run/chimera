@@ -111,7 +111,7 @@ is worse than no list.
 **Create stays unavailable until every listed module is green.** A project
 whose game is not compiled is a project that boots into a minutes-long stall,
 so it is not created at all. This is the only place the cache is filled from;
-removing what it filled is `Config > Pre-compiled modules...`, which lists the
+removing what it filled is `Tools > Pre-Compiled Modules...`, which lists the
 games and takes them away one at a time.
 
 What a game needs is remembered beside the objects, in the game's own

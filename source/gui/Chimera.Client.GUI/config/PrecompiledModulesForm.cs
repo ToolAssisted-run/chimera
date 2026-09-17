@@ -13,7 +13,7 @@ using Chimera.Common;
 namespace Chimera.Client.GUI
 {
 	/// <summary>
-	/// Config &gt; Pre-compiled modules: the games a core has translated code for,
+	/// Tools &gt; Pre-Compiled Modules: the games a core has translated code for,
 	/// and the only place that code is taken away (docs/compile-cache.md).
 	///
 	/// FILLING the cache is the wizard's - a project is not created until its
@@ -64,7 +64,7 @@ namespace Chimera.Client.GUI
 
 		private List<PrecompiledGame> _items = new();
 
-		protected override string WindowTitleStatic => "Pre-compiled modules";
+		protected override string WindowTitleStatic => "Pre-Compiled Modules";
 
 		/// <param name="survey">what is on disk; called on open and after every removal</param>
 		/// <param name="remove">takes one row away; the model's, so this window can be tested without a disk</param>
@@ -256,7 +256,7 @@ namespace Chimera.Client.GUI
 					this,
 					$"Remove {what}?\n\n{Size(going.Sum(static g => g.Bytes))} will be freed. "
 						+ "Each game is compiled again the next time a project needs it.",
-					"Pre-compiled modules",
+					"Pre-Compiled Modules",
 					MessageBoxButtons.YesNo,
 					MessageBoxIcon.Question);
 				if (answer is not DialogResult.Yes) return;
@@ -270,7 +270,7 @@ namespace Chimera.Client.GUI
 				}
 				catch (Exception ex)
 				{
-					MessageBox.Show(this, $"{game.Label} could not be removed: {ex.Message}", "Pre-compiled modules",
+					MessageBox.Show(this, $"{game.Label} could not be removed: {ex.Message}", "Pre-Compiled Modules",
 						MessageBoxButtons.OK, MessageBoxIcon.Warning);
 				}
 				_ticked.Remove(game.Path);

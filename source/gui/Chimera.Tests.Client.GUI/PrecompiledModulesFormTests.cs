@@ -8,7 +8,7 @@ using Chimera.Client.GUI;
 namespace Chimera.Tests.Client.GUI
 {
 	/// <summary>
-	/// Config &gt; Pre-compiled modules: that the window shows what the survey
+	/// Tools &gt; Pre-Compiled Modules: that the window shows what the survey
 	/// found, and that Remove takes the ticked row and only the ticked row.
 	///
 	/// No disk here. The survey is proved against real directories in

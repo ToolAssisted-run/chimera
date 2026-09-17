@@ -335,7 +335,7 @@ namespace Chimera.Client.Common
 
 			// Compiled code is NOT surveyed here (user-decided, 2026-09-17). It
 			// is filed per game now, and a game's compiled code is listed and
-			// removed in Config > Pre-compiled modules... - one place, at the
+			// removed in Tools > Pre-Compiled Modules... - one place, at the
 			// granularity a person thinks in. A second view of it here, by core
 			// and build, described a layout that no longer exists.
 

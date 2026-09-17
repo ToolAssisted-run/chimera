@@ -3471,8 +3471,9 @@ and what it buys is that a row in a window is one directory - removable whole,
 with nothing else depending on what is inside it, and no question of whether
 some other game still needs a file before it can go.
 
-That is what makes the removal safe to offer per game. `Config > Pre-compiled
-modules...` lists what is there - the game, the core that compiled it, when,
+That is what makes the removal safe to offer per game. `Tools > Pre-Compiled
+Modules...` (it was under Config for its first day; the user moved it beside the
+other managers, below Reproducible Media Maker, 2026-09-17) lists what is there - the game, the core that compiled it, when,
 how many modules, what it weighs - and takes one away at a time. It replaced
 "Clear Compiled Code", which could only empty everything for a whole core, and
 it is the only place the store is emptied; filling it is still the wizard's,

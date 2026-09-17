@@ -1720,7 +1720,7 @@ namespace Chimera.Client.GUI
 
 			// Compiled code is no longer emptied from here. It is filed per game
 			// rather than per core now, so "clear what this core compiled" is not
-			// a thing that can be pointed at: Config > Pre-compiled modules...
+			// a thing that can be pointed at: Tools > Pre-Compiled Modules...
 			// lists the games and removes them one at a time.
 			if (Emulator.SystemId is VSystemID.Raw.NULL) return; // a core, but no machine running yet
 

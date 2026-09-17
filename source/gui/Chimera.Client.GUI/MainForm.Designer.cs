@@ -543,7 +543,6 @@ namespace Chimera.Client.GUI
             this.SoundMenuItem,
             this.PathsMenuItem,
             this.FirmwareMenuItem,
-            this.PrecompiledModulesMenuItem,
             this.DataDirectoryMenuItem,
             this.MessagesMenuItem,
             this.AutofireMenuItem,
@@ -591,7 +590,7 @@ namespace Chimera.Client.GUI
 			// 
 			// PrecompiledModulesMenuItem
 			// 
-			this.PrecompiledModulesMenuItem.Text = "Pre-compiled modules...";
+			this.PrecompiledModulesMenuItem.Text = "Pre-Compiled Modules...";
 			this.PrecompiledModulesMenuItem.Click += new System.EventHandler(this.PrecompiledModulesMenuItem_Click);
 			// 
 			// DataDirectoryMenuItem
@@ -812,6 +811,7 @@ namespace Chimera.Client.GUI
             this.CoreManagerMenuItem,
             this.CacheManagerMenuItem,
             this.MediaMakerMenuItem,
+            this.PrecompiledModulesMenuItem,
             this.toolStripSeparatorManagers,
             this.RamWatchMenuItem,
             this.RamSearchMenuItem,

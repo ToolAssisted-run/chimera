@@ -419,7 +419,7 @@ namespace Chimera.Client.GUI
 		/// config for when it is put back).
 		/// </summary>
 		/// <summary>
-		/// Config &gt; Pre-compiled modules: the games a core has translated code
+		/// Tools &gt; Pre-Compiled Modules: the games a core has translated code
 		/// for, and the only place that code is removed (docs/compile-cache.md).
 		///
 		/// The old layout's leftovers are handed in as a second root, so that
