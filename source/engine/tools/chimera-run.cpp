@@ -758,10 +758,25 @@ int main(int argc, char **argv)
 		if (sf != stateFileOuts.end())
 		{
 			const std::string tag = "frame " + std::to_string(i);
+			const auto began = std::chrono::steady_clock::now();
 			if (ce_session_state_save_file(session, sf->second.c_str(), reinterpret_cast<const uint8_t *>(tag.data()), (uint32_t)tag.size()) != 0)
 			{
 				return fail(metaPath, ce_session_last_error(session));
 			}
+			const auto saved = std::chrono::steady_clock::now();
+			uint64_t rawBytes = 0, storedBytes = 0;
+			ce_session_state_file_bytes(session, &rawBytes, &storedBytes);
+			/* and straight back, timed: what a branch costs both ways */
+			if (ce_session_state_load_file(session, sf->second.c_str(), nullptr, 0, nullptr) != 0)
+			{
+				return fail(metaPath, ce_session_last_error(session));
+			}
+			const auto loaded = std::chrono::steady_clock::now();
+			fprintf(stderr, "state file at frame %lld: raw %llu bytes, stored %llu bytes (%.2fx), save %lld ms, load %lld ms\n",
+				(long long)i, (unsigned long long)rawBytes, (unsigned long long)storedBytes,
+				storedBytes != 0 ? (double)rawBytes / (double)storedBytes : 0.0,
+				(long long)std::chrono::duration_cast<std::chrono::milliseconds>(saved - began).count(),
+				(long long)std::chrono::duration_cast<std::chrono::milliseconds>(loaded - saved).count());
 		}
 		/* saved to a file and loaded straight back: the machine must not notice,
 		 * so a run that does this ends exactly where one that does not ends */

@@ -68,13 +68,30 @@ namespace Chimera.Client.GUI
 		/// get a silent one: nothing to draw for, and a gate must not wait on a
 		/// window.
 		/// </summary>
-		public static ProgressDialog Begin(Form? owner, string title)
+		public static ProgressDialog Begin(Form? owner, string title) => Begin(owner, title, showAfterMs: 0);
+
+		/// <summary>
+		/// The same, for work that is usually over before anybody could read a window: nothing is
+		/// shown until it has lasted <paramref name="showAfterMs"/>, and if it finishes sooner
+		/// nothing is shown at all. Saving a branch is a few milliseconds on an NES and half a
+		/// minute on a PS3, from the same button; a window that flashed on every press would be
+		/// worse than none, and none at all left the long case looking like a hang.
+		/// </summary>
+		public static ProgressDialog Begin(Form? owner, string title, int showAfterMs)
 		{
-			ProgressDialog dialog = new(owner, title);
+			ProgressDialog dialog = new(owner, title) { _showAfterMs = showAfterMs };
 			EngineProgress.Reported += dialog.OnReport;
 			if (!HeadlessMode.Enabled) dialog.StartWindow(title, owner);
 			return dialog;
 		}
+
+		private int _showAfterMs;
+
+		/// <summary>Set when the work is over, so a window still waiting to appear never does.</summary>
+		private readonly ManualResetEventSlim _over = new(false);
+
+		/// <summary>Whether a window was ever put up. For tests.</summary>
+		public bool WindowWasShown => _window is not null;
 
 		private ProgressDialog(Form? owner, string title)
 		{
@@ -99,11 +116,15 @@ namespace Chimera.Client.GUI
 			};
 			_thread.SetApartmentState(ApartmentState.STA);
 			_thread.Start();
-			_ready.Wait(2000); // the window's handle exists past this; if it timed out we simply post to nothing
+			// the window's handle exists past this; if it timed out we simply post to nothing. A
+			// window that is waiting to see whether it is needed is not waited for.
+			if (_showAfterMs <= 0) _ready.Wait(2000);
 		}
 
 		private void WindowThread(string title, Point? center)
 		{
+			if (_showAfterMs > 0 && _over.Wait(_showAfterMs)) return; // it was over before it was worth a window
+
 			_window = new Form
 			{
 				Text = title,
@@ -239,6 +260,7 @@ namespace Chimera.Client.GUI
 		{
 			if (_disposed) return;
 			_disposed = true;
+			_over.Set();
 			EngineProgress.Reported -= OnReport;
 
 			var window = _window;
@@ -255,6 +277,18 @@ namespace Chimera.Client.GUI
 				{
 				}
 				_thread?.Join(2000);
+			}
+			else
+			{
+				// it may be between deciding to appear and appearing: let it finish either way
+				_thread?.Join(2000);
+				var late = _window;
+				if (late is { IsDisposed: false })
+				{
+					try { if (late.IsHandleCreated) late.BeginInvoke((Action)(() => { if (!late.IsDisposed) late.Close(); })); }
+					catch (System.Exception) { }
+					_thread?.Join(2000);
+				}
 			}
 			_ready.Dispose();
 			if (_owner is not null && !_owner.IsDisposed) _owner.Enabled = _ownerWasEnabled;

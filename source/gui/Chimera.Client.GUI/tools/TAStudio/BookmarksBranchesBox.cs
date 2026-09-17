@@ -206,7 +206,11 @@ namespace Chimera.Client.GUI
 			try
 			{
 				var path = Movie.NewBranchStatePath(out var stateFile);
-				Tastudio.Emulator.AsStatable().SaveStateToFile(path);
+				// a window only if it lasts: milliseconds on a small machine, half a minute on a PS3
+				using (ProgressDialog.Begin(Tastudio, "Saving the branch", showAfterMs: 400))
+				{
+					Tastudio.Emulator.AsStatable().SaveStateToFile(path);
+				}
 				_lastStateBytes = new FileInfo(path).Length;
 				return stateFile;
 			}

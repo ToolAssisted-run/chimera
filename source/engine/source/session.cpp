@@ -378,6 +378,8 @@ struct ce_session
 	int32_t (*driveMediaSelected)(int32_t) = nullptr;
 	int32_t (*driveMediaInserted)(int32_t) = nullptr;
 	std::vector<std::vector<std::string>> driveMedia;
+	/* what the last state kept in a file weighed, as the machine and as the file */
+	uint64_t stateFileRawBytes = 0, stateFileStoredBytes = 0;
 
 	int32_t (*isButtonActive)(int32_t) = nullptr;
 	int32_t (*isAxisActive)(int32_t) = nullptr;
@@ -1683,24 +1685,43 @@ namespace
 constexpr char STATE_FILE_MAGIC[8] = { 'C', 'E', 'S', 'T', 'A', 'T', 'E', '1' };
 constexpr size_t STATE_FILE_CHUNK = size_t{ 1 } << 20;
 
+/* how often a save or a load says how far it is: often enough for a bar to move,
+ * rarely enough that a small machine's state is one report */
+constexpr uint64_t STATE_FILE_REPORT_EVERY = uint64_t{ 32 } << 20;
+
 struct StateFileSink
 {
 	chimera::FileWriter *out;
 	const chimera::ZstdApi *z;
 	void *zcs;
 	std::vector<uint8_t> buf;
+	uint64_t expected = 0; /* what the last state of this machine weighed, 0 when none has been taken */
 	bool failed = false;
+	uint64_t raw = 0, stored = 0, reportedAt = 0;
 
 	bool feed(const void *src, size_t size, int endOp)
 	{
 		if (failed) return false;
-		if (zcs == nullptr) return out->write(src, size) || !(failed = true);
+		raw += size;
+		if (raw - reportedAt >= STATE_FILE_REPORT_EVERY)
+		{
+			reportedAt = raw;
+			/* a state is as big as it turns out to be; the last one is the best guess there is,
+			 * and one that has been overtaken is an end nobody knows */
+			chimera::progress("saving the machine state", raw, expected > raw ? expected : 0);
+		}
+		if (zcs == nullptr)
+		{
+			stored += size;
+			return out->write(src, size) || !(failed = true);
+		}
 		chimera::ZstdApi::Buffer in{ src, size, 0 };
 		for (;;)
 		{
 			chimera::ZstdApi::OutBuffer o{ buf.data(), buf.size(), 0 };
 			const size_t left = z->compressStream2(zcs, &o, &in, endOp);
 			if (z->isError(left) || !out->write(buf.data(), o.pos)) { failed = true; return false; }
+			stored += o.pos;
 			if (endOp == 0 ? in.pos == in.size : left == 0) return true;
 		}
 	}
@@ -1717,12 +1738,26 @@ struct StateFileSource
 	const chimera::ZstdApi *z;
 	void *zds;
 	std::vector<uint8_t> buf;
+	uint64_t fileBytes = 0; /* the whole file, which is what a load knows the length of */
 	size_t have = 0, pos = 0;
 	bool failed = false;
+	uint64_t raw = 0, consumed = 0, reportedAt = 0;
+
+	void report()
+	{
+		if (consumed - reportedAt < STATE_FILE_REPORT_EVERY / 4) return;
+		reportedAt = consumed;
+		chimera::progress("loading the machine state", consumed, fileBytes);
+	}
 
 	size_t take(void *dst, size_t want)
 	{
-		if (zds == nullptr) return static_cast<size_t>(in->read(static_cast<uint8_t *>(dst), want));
+		if (zds == nullptr)
+		{
+			const size_t got = static_cast<size_t>(in->read(static_cast<uint8_t *>(dst), want));
+			raw += got; consumed += got; report();
+			return got;
+		}
 		chimera::ZstdApi::OutBuffer o{ dst, want, 0 };
 		while (o.pos < want && !failed)
 		{
@@ -1731,11 +1766,14 @@ struct StateFileSource
 				have = static_cast<size_t>(in->read(buf.data(), buf.size()));
 				pos = 0;
 				if (have == 0) break; /* the end of the file is the end of the state */
+				consumed += have;
+				report();
 			}
 			chimera::ZstdApi::Buffer i{ buf.data(), have, pos };
 			if (z->isError(z->decompressStream(zds, &o, &i))) failed = true;
 			pos = i.pos;
 		}
+		raw += o.pos;
 		return o.pos;
 	}
 };
@@ -1753,10 +1791,17 @@ int32_t ce_session_state_save_file(ce_session *s, const char *utf8_path, const u
 	chimera::FileWriter out;
 	if (!out.open(utf8_path)) { s->error = std::string("could not create ") + utf8_path; return 1; }
 
+	/* Level 1 unless somebody measuring says otherwise: CHIMERA_STATE_RAW=1 writes the state as
+	 * it is, CHIMERA_STATE_ZSTD_LEVEL picks another level. They exist so the cost of compressing
+	 * can be told apart from the cost of the state itself. */
+	const char *rawEnv = std::getenv("CHIMERA_STATE_RAW");
+	const char *levelEnv = std::getenv("CHIMERA_STATE_ZSTD_LEVEL");
+	const bool wantRaw = rawEnv != nullptr && rawEnv[0] == '1';
+	const int level = levelEnv != nullptr && std::atoi(levelEnv) != 0 ? std::atoi(levelEnv) : 1;
 	const char *why = nullptr;
-	const chimera::ZstdApi *z = chimera::zstdApi(&why); /* without it the file is simply bigger */
+	const chimera::ZstdApi *z = wantRaw ? nullptr : chimera::zstdApi(&why); /* without it the file is simply bigger */
 	void *zcs = z != nullptr ? z->createCStream() : nullptr;
-	if (zcs != nullptr && z->isError(z->initCStream(zcs, 1))) { z->freeCStream(zcs); zcs = nullptr; }
+	if (zcs != nullptr && z->isError(z->initCStream(zcs, level))) { z->freeCStream(zcs); zcs = nullptr; }
 
 	const uint8_t compressed = zcs != nullptr ? 1 : 0;
 	out.write(STATE_FILE_MAGIC, sizeof STATE_FILE_MAGIC);
@@ -1764,7 +1809,7 @@ int32_t ce_session_state_save_file(ce_session *s, const char *utf8_path, const u
 	out.write(&tag_len, sizeof tag_len);
 	out.write(tag, tag_len);
 
-	StateFileSink sink{ &out, z, zcs, std::vector<uint8_t>(STATE_FILE_CHUNK) };
+	StateFileSink sink{ &out, z, zcs, std::vector<uint8_t>(STATE_FILE_CHUNK), s->stateFileRawBytes };
 	chimera::WbxReturn r{};
 	s->host->wbx_save_state(s->obj, stateFileWrite, reinterpret_cast<uintptr_t>(&sink), &r); // see ce_session_save_state re: no bracket
 	const bool flushed = sink.feed(nullptr, 0, 2) || zcs == nullptr;
@@ -1776,7 +1821,15 @@ int32_t ce_session_state_save_file(ce_session *s, const char *utf8_path, const u
 		s->error = std::string("could not write ") + utf8_path + " (is the disk full?)";
 		return 1;
 	}
+	s->stateFileRawBytes = sink.raw;
+	s->stateFileStoredBytes = sink.stored;
 	return 0;
+}
+
+void ce_session_state_file_bytes(const ce_session *s, uint64_t *raw_out, uint64_t *stored_out)
+{
+	if (raw_out != nullptr) *raw_out = s->stateFileRawBytes;
+	if (stored_out != nullptr) *stored_out = s->stateFileStoredBytes;
 }
 
 int32_t ce_session_state_load_file(ce_session *s, const char *utf8_path, uint8_t *tag_out, uint32_t tag_cap, uint32_t *tag_len_out)
@@ -1812,6 +1865,11 @@ int32_t ce_session_state_load_file(ce_session *s, const char *utf8_path, uint8_t
 
 	s->history.beforeLoad(); /* see ce_session_load_state */
 	StateFileSource source{ &in, z, zds, std::vector<uint8_t>(STATE_FILE_CHUNK) };
+	{
+		uint64_t size = 0;
+		int64_t mtime = 0;
+		if (chimera::fileStamp(utf8_path, &size, &mtime)) source.fileBytes = size;
+	}
 	chimera::WbxReturn r{};
 	s->host->wbx_load_state(s->obj, stateFileRead, reinterpret_cast<uintptr_t>(&source), &r);
 	if (zds != nullptr) z->freeDStream(zds);
@@ -1823,6 +1881,8 @@ int32_t ce_session_state_load_file(ce_session *s, const char *utf8_path, uint8_t
 		return 1;
 	}
 	afterStateLoaded(s);
+	s->stateFileRawBytes = source.raw;
+	s->stateFileStoredBytes = source.fileBytes;
 
 	if (tag_len_out != nullptr) *tag_len_out = tagLen;
 	if (tag_out != nullptr && tagLen != 0) std::memcpy(tag_out, tag.data(), tagLen < tag_cap ? tagLen : tag_cap);

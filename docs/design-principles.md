@@ -3883,3 +3883,41 @@ The size formatter still shows nothing for zero - that is deliberate for list
 cells and a test pins it - so the blank was fixed in the sentence that had it.
 The tests that pinned the floor were written in bytes, where a one-gigabyte
 guarantee swallows every case; they are at the sizes the rule is about now.
+
+## What a PS3 state weighs, and why compressing it is not the answer (measured, 2026-09-17)
+
+The user expected compression to help a great deal with PS3 states, and asked
+for it to be built and measured, with a progress window for the wait. It was
+already built - a branch's state file goes through zstd level 1 - so what was
+missing was the measurement. Oblivion at frame 2400, GTX 1060 machine, NVMe,
+one save and one load of the same state:
+
+| how | file | save | load |
+|---|---|---|---|
+| raw (`CHIMERA_STATE_RAW=1`) | 5.45 GiB | 11.6 s | 3.9 s |
+| zstd level 1 (the default) | 4.31 GiB, 1.27x | 11.1 s | 2.7 s |
+| zstd level 3 | 4.25 GiB, 1.28x | 18.3 s | 2.7 s |
+
+Level 1 is free - the save is no slower than raw and the load is faster, there
+being less to read - and it barely helps; level 3 buys nothing for seven
+seconds. Every other machine measured compresses 8 to 118 times. This one does
+not because of WHAT it is: the game's caching thread copies 41 files, 4.30 GiB,
+from the disc to the console's hard disk (its texture, voice and mesh archives),
+and that disk is the machine's memory filesystem. Four fifths of the state is a
+second copy of files that are in the ISO, already compressed by their authors.
+
+So the lever for PS3 is not a better compressor. It is not carrying the disc
+twice: a hard-disk file whose bytes are the disc's could be held as a reference
+to the disc file the project already has, and would then cost a state nothing -
+which would shrink a branch, its save and load, AND every greenzone anchor by
+the same four gigabytes. That is a change to the core's memory filesystem and is
+not done here; it is recorded because the measurement is what found it.
+
+What was built: the engine reports progress through a save (against what the
+last state of the machine weighed - the end of a save is not known until it is
+reached) and a load (against the file's length), `ce_session_state_file_bytes`
+says what the last one weighed raw and stored, and the two environment switches
+above exist for measuring. The progress window now has a delay: TAStudio's
+branch save and load open one only if the work has lasted 400 ms, so the same
+button that takes milliseconds on an NES never flashes a window, and the half
+minute it takes on a PS3 no longer looks like a hang.

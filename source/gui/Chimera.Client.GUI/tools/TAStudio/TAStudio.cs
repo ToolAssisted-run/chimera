@@ -1188,7 +1188,10 @@ namespace Chimera.Client.GUI
 		/// </summary>
 		public void LoadBranchState(TasBranch branch, int branchIndex)
 		{
-			StatableEmulator.LoadStateFromFile(CurrentTasMovie.BranchStatePath(branch.StateFile));
+			using (ProgressDialog.Begin(this, "Loading the branch", showAfterMs: 400))
+			{
+				StatableEmulator.LoadStateFromFile(CurrentTasMovie.BranchStatePath(branch.StateFile));
+			}
 			AfterStateLoaded(branch.Frame, branchIndex);
 		}
 

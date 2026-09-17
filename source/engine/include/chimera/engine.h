@@ -1024,6 +1024,11 @@ CE_API int32_t ce_session_load_state(ce_session *s, const uint8_t *data, uint64_
  * where a refused load leaves it; 2 not a state file, the machine untouched. */
 CE_API int32_t ce_session_state_save_file(ce_session *s, const char *utf8_path, const uint8_t *tag, uint32_t tag_len);
 CE_API int32_t ce_session_state_load_file(ce_session *s, const char *utf8_path, uint8_t *tag_out, uint32_t tag_cap, uint32_t *tag_len_out);
+/* What the last state saved to or loaded from a file weighed: as the machine gave
+ * it, and as the file holds it. Both saves and loads report through ce_progress_set
+ * as they go - a load against the file's length, a save against what the last
+ * state weighed (the end of a save is not known until it is reached). */
+CE_API void ce_session_state_file_bytes(const ce_session *s, uint64_t *raw_out, uint64_t *stored_out);
 
 /* The guest's self-described memory domains. */
 CE_API int32_t ce_session_domain_count(const ce_session *s);
