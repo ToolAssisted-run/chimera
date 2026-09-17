@@ -520,6 +520,7 @@ namespace Chimera.Client.GUI
 				{
 					Config.CacheAutoClean = p.Enabled;
 					Config.CacheSizeLimitMb = (int) (p.LimitBytes / 1024 / 1024);
+					Config.CacheFreeSpaceFloorMb = (int) (p.FreeSpaceFloorBytes / 1024 / 1024);
 				},
 				freeSpace: () => CacheSurvey.FreeSpaceAt(ProjectCache.DataHome),
 				editBudgets: EditGreenzoneBudgets);

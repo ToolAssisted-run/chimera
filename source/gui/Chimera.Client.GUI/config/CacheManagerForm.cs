@@ -76,6 +76,7 @@ namespace Chimera.Client.GUI
 		private readonly Func<long> _freeSpace;
 
 		private long _free = long.MaxValue;
+		private NumericUpDown _floor = null!;
 
 		private static readonly ImageList _padlocks = BuildPadlocks();
 
@@ -171,7 +172,15 @@ namespace Chimera.Client.GUI
 			var unitWidth = UIHelper.ScaleX(28);
 			var limitWidth = UIHelper.ScaleX(80);
 			var sayWidth = UIHelper.ScaleX(150);
-			var right = ClientSize.Width - margin;
+			// One sentence, read left to right: "[x] Keep the cache under [N] GB and leave the disk
+			// at least [M] GB free". The free-space half sits at the right edge and the limit half
+			// to its left, so `right` - where the limit half ends - stops short of the edge.
+			var floorSayWidth = UIHelper.ScaleX(172);
+			var floorWidth = UIHelper.ScaleX(64);
+			var floorUnitWidth = UIHelper.ScaleX(54);
+			var floorGap = UIHelper.ScaleX(6);
+			var edge = ClientSize.Width - margin;
+			var right = edge - floorUnitWidth - floorWidth - floorGap - floorSayWidth - floorGap;
 			Label unit = new()
 			{
 				Anchor = AnchorStyles.Top | AnchorStyles.Right,
@@ -206,6 +215,41 @@ namespace Chimera.Client.GUI
 				Text = "Keep the cache under",
 			};
 			_autoClean.CheckedChanged += (_, _) => PolicyChanged();
+
+			// THE OTHER LIMIT, in the open (issue #88). "Leave the disk this much free" always
+			// existed and always won over the box beside it when the disk was low - as a config
+			// value nobody could see, so a cache that was held below the number on screen looked
+			// like a setting that did not save. Zero turns it off: whoever keeps a disk nearly
+			// full on purpose is entitled to say so.
+			var floorRight = edge;
+			Label floorUnit = new()
+			{
+				Anchor = AnchorStyles.Top | AnchorStyles.Right,
+				AutoSize = false,
+				Location = new(floorRight - floorUnitWidth, UIHelper.ScaleY(68)),
+				Size = new(floorUnitWidth, UIHelper.ScaleY(20)),
+				Text = "GB free",
+			};
+			_floor = new NumericUpDown
+			{
+				Anchor = AnchorStyles.Top | AnchorStyles.Right,
+				Increment = 5m,
+				Location = new(floorRight - floorUnitWidth - floorWidth, UIHelper.ScaleY(64)),
+				Maximum = 100_000m,
+				Minimum = 0m,
+				Value = Math.Min(100_000m, Math.Round(_policy.FreeSpaceFloorBytes / 1024m / 1024m / 1024m, MidpointRounding.AwayFromZero)),
+				Width = floorWidth,
+			};
+			_floor.ValueChanged += (_, _) => PolicyChanged();
+			Label floorSay = new()
+			{
+				Anchor = AnchorStyles.Top | AnchorStyles.Right,
+				AutoSize = false,
+				Location = new(floorRight - floorUnitWidth - floorWidth - floorGap - floorSayWidth, UIHelper.ScaleY(68)),
+				Size = new(floorSayWidth, UIHelper.ScaleY(20)),
+				Text = "and leave the disk at least",
+				TextAlign = System.Drawing.ContentAlignment.TopRight,
+			};
 
 			_list = new ListView
 			{
@@ -351,7 +395,7 @@ namespace Chimera.Client.GUI
 
 			Controls.AddRange(new Control[]
 			{
-				_header, _selectAll, _autoClean, _limit, unit, _list, _detail, _status,
+				_header, _selectAll, floorSay, _floor, floorUnit, _autoClean, _limit, unit, _list, _detail, _status,
 				_remove, _lock, _selectOrphans, _budgets, _openFolder, _cleanNow, close,
 			});
 			AcceptButton = close;
@@ -657,6 +701,7 @@ namespace Chimera.Client.GUI
 		{
 			_policy.Enabled = _autoClean.Checked;
 			_policy.LimitBytes = (long) (_limit.Value * 1024m * 1024m * 1024m);
+			_policy.FreeSpaceFloorBytes = (long) (_floor.Value * 1024m * 1024m * 1024m);
 			_savePolicy(_policy);
 			UpdateHeader();
 			UpdateButtons();
@@ -709,9 +754,7 @@ namespace Chimera.Client.GUI
 			var over = total - limit;
 			var going = CacheSurvey.WhatWouldGo(_items, limit);
 			return Environment.NewLine
-				+ (limit < _policy.LimitBytes
-					? $"The disk is low, so the cache is being held to {CacheSurvey.Size(limit)} rather than to the number beside it. "
-					: "")
+				+ (limit < _policy.LimitBytes ? DiskIsLow(limit) : "")
 				+ $"That is {CacheSurvey.Size(over)} over. "
 				+ (going.Sum(static i => i.Bytes) < over
 					? "What is left is locked, in use, or the run last worked on, so the limit cannot be met without unlocking something."
@@ -719,6 +762,18 @@ namespace Chimera.Client.GUI
 						? "The oldest unlocked items go when this window or a project closes, or now with Clean Now."
 						: "Nothing is enforcing it while the tick is off; Clean Now applies it once.");
 		}
+
+		/// <summary>
+		/// Why the cache is being held to less than the box says: which rule, by how much, and
+		/// what would actually fix it. It used to say "held to [blank] rather than to the number
+		/// beside it" - the rule unnamed, the figure missing when it was zero - and read as a
+		/// setting that would not save (issue #88).
+		/// </summary>
+		private string DiskIsLow(long limit)
+			=> $"The disk has {CacheSurvey.Size(_free)} free and is to be left {CacheSurvey.Size(_policy.FreeSpaceFloorBytes)} free, "
+				+ $"so the cache is being held to {(limit is 0 ? "nothing" : CacheSurvey.Size(limit))} rather than to the {_limit.Value:0} GB asked for"
+				+ (limit <= CacheCleanPolicy.DiskFloorNeverBelowBytes ? " (it is never held to less than that because of the disk)" : "")
+				+ ". Lower the free-space figure, or move everything to a roomier disk with Config > Data Directory. ";
 
 		private static decimal Gigabytes(long bytes)
 		{
@@ -825,6 +880,16 @@ namespace Chimera.Client.GUI
 
 		/// <summary>What the box is showing. For tests: a limit nobody can read is not a limit.</summary>
 		public string LimitText => _limit.Text;
+
+		/// <summary>The line above the list, as it reads. For tests.</summary>
+		public string HeaderText => _header.Text;
+
+		/// <summary>What the free-space box shows, in whole gigabytes; setting it is somebody typing in it. For tests.</summary>
+		public int FreeSpaceFloorGb
+		{
+			get => (int) _floor.Value;
+			set => _floor.Value = value;
+		}
 
 		/// <summary>Whether the cache is being held to the limit on its own. For tests.</summary>
 		public bool AutoCleanTicked

@@ -432,33 +432,64 @@ namespace Chimera.Tests.Client.Common
 		[TestMethod]
 		public void TheDiskCanLowerTheLimitButNeverRaiseIt()
 		{
-			CacheCleanPolicy policy = new() { LimitBytes = 1000, FreeSpaceFloorBytes = 100 };
+			const long GB = 1024L * 1024 * 1024;
+			CacheCleanPolicy policy = new() { LimitBytes = 100 * GB, FreeSpaceFloorBytes = 20 * GB };
 
-			Assert.AreEqual(1000, CacheSurvey.EffectiveLimit(policy, cacheBytes: 800, freeBytes: 5000),
+			Assert.AreEqual(100 * GB, CacheSurvey.EffectiveLimit(policy, cacheBytes: 80 * GB, freeBytes: 500 * GB),
 				"with room to spare the setting is the whole of it");
-			Assert.AreEqual(1000, CacheSurvey.EffectiveLimit(policy, cacheBytes: 800, freeBytes: 100),
+			Assert.AreEqual(100 * GB, CacheSurvey.EffectiveLimit(policy, cacheBytes: 80 * GB, freeBytes: 20 * GB),
 				"exactly at the floor is not below it");
 
-			// 40 short of the floor, so the cache has to give 40 of its 800 back
-			Assert.AreEqual(760, CacheSurvey.EffectiveLimit(policy, cacheBytes: 800, freeBytes: 60));
-			Assert.AreEqual(0, CacheSurvey.EffectiveLimit(policy, cacheBytes: 50, freeBytes: 0),
-				"a cache smaller than the shortfall gives everything it has and no more");
-			Assert.AreEqual(1000, CacheSurvey.EffectiveLimit(policy, cacheBytes: 800, freeBytes: long.MaxValue),
+			// 4 short of the floor, so the cache has to give 4 of its 80 back
+			Assert.AreEqual(76 * GB, CacheSurvey.EffectiveLimit(policy, cacheBytes: 80 * GB, freeBytes: 16 * GB));
+			Assert.AreEqual(100 * GB, CacheSurvey.EffectiveLimit(policy, cacheBytes: 80 * GB, freeBytes: long.MaxValue),
 				"and a machine that will not say how much is free is not read as having none");
+		}
+
+		/// <summary>
+		/// Issue #88: 14 GB free on a 237 GB disk, a 94 MB cache, and every greenzone and
+		/// unpacked core removed at every start - the floor worked out a limit of ZERO, to
+		/// recover six gigabytes the cache never held. The floor is there to stop Chimera
+		/// filling a disk, not to bill the user for one that is full of something else.
+		/// </summary>
+		[TestMethod]
+		public void ADiskThatIsLowForItsOwnReasonsDoesNotCostTheWholeCache()
+		{
+			const long GB = 1024L * 1024 * 1024, MB = 1024L * 1024;
+			CacheCleanPolicy policy = new() { LimitBytes = 100 * GB, FreeSpaceFloorBytes = 20 * GB };
+
+			var limit = CacheSurvey.EffectiveLimit(policy, cacheBytes: 94 * MB, freeBytes: 14 * GB);
+			Assert.AreEqual(CacheCleanPolicy.DiskFloorNeverBelowBytes, limit, "a gigabyte is always the user's");
+			Assert.IsTrue(94 * MB < limit, "so the reporter's cache is under its limit and nothing is taken");
+
+			// a cache that COULD give the shortfall back still gives it, down to that gigabyte
+			Assert.AreEqual(44 * GB, CacheSurvey.EffectiveLimit(policy, cacheBytes: 50 * GB, freeBytes: 14 * GB));
+			Assert.AreEqual(1 * GB, CacheSurvey.EffectiveLimit(policy, cacheBytes: 6 * GB + 100 * MB, freeBytes: 14 * GB));
+
+			// whoever asked for LESS than a gigabyte is held to what they asked for, not raised to one
+			policy.LimitBytes = 300 * MB;
+			Assert.AreEqual(300 * MB, CacheSurvey.EffectiveLimit(policy, cacheBytes: 94 * MB, freeBytes: 14 * GB));
+
+			// and the floor set to zero is the floor turned off
+			policy = new() { LimitBytes = 100 * GB, FreeSpaceFloorBytes = 0 };
+			Assert.AreEqual(100 * GB, CacheSurvey.EffectiveLimit(policy, cacheBytes: 50 * GB, freeBytes: 1 * MB));
 		}
 
 		[TestMethod]
 		public void AFullDiskCleansEvenWhenTheCacheIsUnderItsLimit()
 		{
-			CacheItem[] items = { Aged("/old", 400, daysAgo: 90), Aged("/new", 400, daysAgo: 1) };
-			// well under the limit, but the disk is 300 short of its floor
+			// at the sizes this is about: the part that is always the user's is a gigabyte, so
+			// a test in bytes would never see the disk decide anything (issue #88)
+			const long GB = 1024L * 1024 * 1024;
+			CacheItem[] items = { Aged("/old", 4 * GB, daysAgo: 90), Aged("/new", 4 * GB, daysAgo: 1) };
+			// well under the limit, but the disk is 3 short of its floor
 			var result = CacheSurvey.AutoClean(
 				items,
-				new CacheCleanPolicy { LimitBytes = 100_000, FreeSpaceFloorBytes = 1000 },
-				freeBytes: 700);
+				new CacheCleanPolicy { LimitBytes = 1000 * GB, FreeSpaceFloorBytes = 10 * GB },
+				freeBytes: 7 * GB);
 
 			Assert.IsTrue(result.DiskDecidedTheLimit);
-			Assert.AreEqual(500, result.Limit, "the cache has to give back exactly what the floor is short by");
+			Assert.AreEqual(5 * GB, result.Limit, "the cache has to give back exactly what the floor is short by");
 			CollectionAssert.AreEqual(new[] { "/old" }, result.Removed.Select(static i => i.Path).ToArray());
 		}
 

@@ -166,6 +166,16 @@ namespace Chimera.Client.Common
 		public long FreeSpaceFloorBytes { get; set; } = DefaultFreeSpaceFloorMb * 1024L * 1024L;
 
 		public const int DefaultFreeSpaceFloorMb = 20 * 1024;
+
+		/// <summary>
+		/// What the disk floor may never take the cache below (user-decided, 2026-09-17; issue
+		/// #88). The floor is there to stop CHIMERA filling a disk. On a disk that is low for
+		/// other reasons it used to work out a limit of zero: a machine with 14 GB free and a
+		/// 94 MB cache had that cache emptied at every start, greenzones and all, to recover 6 GB
+		/// it never held - the user punished for a disk Chimera did not fill, and gaining nothing.
+		/// A gigabyte, or the user's own limit where that is smaller, is always theirs.
+		/// </summary>
+		public const long DiskFloorNeverBelowBytes = 1024L * 1024L * 1024L;
 	}
 
 	/// <summary>What one pass of the auto-clean did.</summary>
@@ -453,7 +463,10 @@ namespace Chimera.Client.Common
 			// cache can only give what it holds
 			var shortBy = policy.FreeSpaceFloorBytes - freeBytes;
 			var fromCache = cacheBytes - shortBy;
-			return Math.Max(0, Math.Min(policy.LimitBytes, fromCache));
+			// ... but never less than the part that is always the user's: a disk that is low
+			// for reasons of its own must not cost them every greenzone at every start
+			var always = Math.Min(CacheCleanPolicy.DiskFloorNeverBelowBytes, policy.LimitBytes);
+			return Math.Max(always, Math.Min(policy.LimitBytes, fromCache));
 		}
 
 		/// <summary>

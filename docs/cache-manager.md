@@ -125,8 +125,27 @@ A machine that will not say how much is free counts as having plenty. An unknown
 answer must never be read as "none left", which would empty the cache on a
 filesystem nobody could measure.
 
-When the disk is what set the limit, the window says so instead of showing a
-number that disagrees with the box beside it.
+**The floor never takes the cache below 1 GB** (or the user's own limit where
+that is smaller; user-decided, 2026-09-17, issue #88). The floor exists to stop
+CHIMERA filling a disk. On a disk that is low for reasons of its own it used to
+work out a limit of zero: a machine with 14 GB free and a 94 MB cache had that
+cache emptied at every start - every greenzone, every unpacked core - to recover
+six gigabytes it never held. The user was billed for a disk Chimera had not
+filled, and nothing was gained. A cache that can give the shortfall back still
+gives it, down to that gigabyte.
+
+**The floor is on screen**, beside the limit, as the second half of one
+sentence: "Keep the cache under [N] GB and leave the disk at least [M] GB free".
+It was a config value nobody could see, which is why a cache held below the
+number in the box read as a setting that would not save. Zero turns it off:
+whoever keeps a disk nearly full on purpose is entitled to say so.
+
+When the disk is what set the limit, the window says which rule, with the
+figures - how much is free, how much is to be left, what the cache is held to
+and what was asked for - and what would fix it: lower the free-space figure, or
+move everything to a roomier disk with `Config > Data Directory` (issue #52). It
+used to say "held to [blank] rather than to the number beside it", the rule
+unnamed and the figure missing whenever it was zero.
 
 ## The greenzone budget
 

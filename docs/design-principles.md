@@ -3853,3 +3853,33 @@ back at frame 2000, the console's 256 MiB of main memory 200 frames later is
 identical to a run that never did it. Cost, measured roughly: about half a
 minute per save or load of that size. Not yet done: clicking the button in
 TAStudio on Windows.
+
+## The disk floor never costs the whole cache, and it is on screen (user-decided, 2026-09-17)
+
+Issue #88 was titled "Cache value not saved, all cache deleted on every boot",
+and neither half was what it looked like. The value was saved. It was being
+overridden by a second rule the window never showed - leave the disk 20 GB
+free - and on the reporter's machine, 14 GB free of 237, that rule worked out a
+limit of ZERO: the shortfall was 6 GB, the whole cache was 94 MB, and "the cache
+gives back what the floor is short by" clamps at nothing. So every start emptied
+it, greenzones and unpacked cores alike (they had locked the cores to save them),
+and the window explained itself with "held to  rather than to the number beside
+it" - a blank, because the size formatter shows nothing for zero.
+
+The floor is right in its own case: it stops Chimera filling a disk. It was
+wrong here because it did not ask whether the cache was the problem. Four
+changes, all the user's: the floor never takes the cache below a gigabyte (or
+the user's own limit, where smaller); it is a box of its own beside the limit,
+saved like it, with zero for off; the message names the rule and the figures and
+never prints a blank; and it points at Config > Data Directory (issue #52), which
+is what a person with a full system drive actually needs.
+
+A discontinuous alternative was considered and dropped: "a cache that could not
+reach the floor even if emptied is left alone". It would leave a 5.9 GB cache
+untouched and cut a 6.1 GB one to a gigabyte. The guaranteed minimum alone is
+continuous and says the same thing where it matters.
+
+The size formatter still shows nothing for zero - that is deliberate for list
+cells and a test pins it - so the blank was fixed in the sentence that had it.
+The tests that pinned the floor were written in bytes, where a one-gigabyte
+guarantee swallows every case; they are at the sizes the rule is about now.

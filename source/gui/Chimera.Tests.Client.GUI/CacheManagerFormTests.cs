@@ -222,5 +222,57 @@ namespace Chimera.Tests.Client.GUI
 			Assert.IsFalse(form.RemoveEnabled, "with nothing listed there is nothing to press");
 			Assert.IsFalse(form.OpenFolderEnabled);
 		}
+
+		/// <summary>
+		/// Issue #88. "Leave the disk this much free" always won over the box beside it when the
+		/// disk was low, as a config value nobody could see - so a cache held below the number on
+		/// screen looked like a setting that would not save. It is a box of its own now, it is
+		/// saved like the other, and zero turns it off.
+		/// </summary>
+		[TestMethod]
+		public void TheFreeSpaceFloorIsShownAndSavedAndZeroTurnsItOff()
+		{
+			const long GB = 1024L * 1024 * 1024;
+			CacheCleanPolicy saved = null;
+			using CacheManagerForm form = new(() => Three(),
+				policy: new CacheCleanPolicy { LimitBytes = 100 * GB, FreeSpaceFloorBytes = 20 * GB },
+				savePolicy: p => saved = p,
+				freeSpace: static () => 14 * GB);
+			Assert.AreEqual(20, form.FreeSpaceFloorGb, "the floor that was always there is on screen");
+
+			form.FreeSpaceFloorGb = 5;
+			Assert.AreEqual(5 * GB, saved!.FreeSpaceFloorBytes, "changing it saves it, like the limit beside it");
+			Assert.AreEqual(100 * GB, saved.LimitBytes, "and the limit is left as it was");
+
+			form.FreeSpaceFloorGb = 0;
+			Assert.AreEqual(0, saved.FreeSpaceFloorBytes);
+			Assert.IsFalse(form.HeaderText.Contains("to be left"), "with no floor the disk has nothing to say");
+		}
+
+		/// <summary>
+		/// What the window says when the disk decides: which rule, the figures, and what would fix
+		/// it. It used to read "held to [blank] rather than to the number beside it".
+		/// </summary>
+		[TestMethod]
+		public void WhenTheDiskDecidesTheWindowSaysWhichRuleAndWhatWouldFixIt()
+		{
+			const long GB = 1024L * 1024 * 1024;
+			// a cache big enough to be over what the disk allows: 3 x 4 GB, 14 free, 20 wanted
+			CacheItem[] big =
+			[
+				new() { Kind = CacheKind.Project, Label = "a", Path = "/a", Bytes = 4 * GB, LastUsed = DateTime.Now.AddDays(-9) },
+				new() { Kind = CacheKind.Project, Label = "b", Path = "/b", Bytes = 4 * GB, LastUsed = DateTime.Now.AddDays(-5) },
+				new() { Kind = CacheKind.Project, Label = "c", Path = "/c", Bytes = 4 * GB, LastUsed = DateTime.Now.AddDays(-1) },
+			];
+			using CacheManagerForm form = new(() => big,
+				policy: new CacheCleanPolicy { LimitBytes = 100 * GB, FreeSpaceFloorBytes = 20 * GB },
+				freeSpace: static () => 14 * GB);
+			var header = form.HeaderText;
+			StringAssert.Contains(header, "14.0 GB free");
+			StringAssert.Contains(header, "to be left 20.0 GB free");
+			StringAssert.Contains(header, "held to 6.0 GB rather than to the 100 GB asked for");
+			StringAssert.Contains(header, "Config > Data Directory");
+			Assert.IsFalse(header.Contains("held to  "), "never a blank where the figure goes");
+		}
 	}
 }
