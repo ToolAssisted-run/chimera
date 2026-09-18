@@ -1,18 +1,27 @@
 ﻿using System.Drawing;
+using System.IO;
 using System.Windows.Forms;
 
 namespace Chimera.Client.GUI.Properties
 {
 	internal static class Resources
 	{
+		private static Stream EmbeddedResourceStream(string embedPath)
+		{
+			const string EMBED_PREFIX = "Chimera.Client.GUI.images.";
+			var fullPath = EMBED_PREFIX + embedPath;
+			return typeof(Resources).Assembly.GetManifestResourceStream(fullPath)
+				?? throw new ArgumentException(paramName: nameof(embedPath), message: $"resource at {fullPath} not found");
+		}
+
 		/// <param name="filename">Dir separator is '<c>.</c>'. Filename is relative to <c>&lt;NS>/images</c> and omits <c>.png</c> extension.</param>
-		private static Bitmap ReadEmbeddedBitmap(string filename) => new Bitmap(ReflectionCache.EmbeddedResourceStream($"images.{filename}.png"));
+		private static Bitmap ReadEmbeddedBitmap(string filename) => new Bitmap(EmbeddedResourceStream($"{filename}.png"));
 
 		/// <param name="filename">Dir separator is '<c>.</c>'. Filename is relative to <c>&lt;NS>/images</c> and omits <c>.ico</c> extension.</param>
-		private static Icon ReadEmbeddedIcon(string filename) => new Icon(ReflectionCache.EmbeddedResourceStream($"images.{filename}.ico"));
+		private static Icon ReadEmbeddedIcon(string filename) => new Icon(EmbeddedResourceStream($"{filename}.ico"));
 
 		/// <param name="filename">Dir separator is '<c>.</c>'. Filename is relative to <c>&lt;NS>/images</c> and omits <c>.ico</c> extension.</param>
-		private static Bitmap ReadEmbeddedIconAsBitmap(string filename) => new Bitmap(ReflectionCache.EmbeddedResourceStream($"images.{filename}.ico"));
+		private static Bitmap ReadEmbeddedIconAsBitmap(string filename) => new Bitmap(EmbeddedResourceStream($"{filename}.ico"));
 
 
 		internal static readonly Bitmap Add = ReadEmbeddedBitmap("add");
@@ -26,7 +35,7 @@ namespace Chimera.Client.GUI.Properties
 		internal static readonly Bitmap Back = ReadEmbeddedBitmap("Back");
 		internal static readonly Bitmap BackMore = ReadEmbeddedBitmap("BackMore");
 		internal static readonly Bitmap Blank = ReadEmbeddedBitmap("Blank");
-		internal static readonly Lazy<Cursor> BlankCursor = new(static () => new(ReflectionCache.EmbeddedResourceStream("images.BlankCursor.cur")));
+		internal static readonly Lazy<Cursor> BlankCursor = new(static () => new(EmbeddedResourceStream("BlankCursor.cur")));
 		internal static readonly Bitmap BlueDown = ReadEmbeddedBitmap("BlueDown");
 		internal static readonly Bitmap BlueUp = ReadEmbeddedBitmap("BlueUp");
 		internal static readonly Bitmap Both = ReadEmbeddedBitmap("Both");
