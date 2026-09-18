@@ -3944,5 +3944,8 @@ Oblivion (PS3, 8 GB budget) a stretch went from 2.45 GB to 0.26-0.44 GB, the
 frames held from 312 to 817, and a rewind to frame 1200 that used to land on
 frame 434 and replay 766 frames lands on 1198 and decodes for a second. The
 whole account, with the measurements, is in docs/state-manager.md, "A closed
-stretch is packed in memory". Not done: a history file that carries the frames
-as they are held, which would make a PS3 save nearly free.
+stretch is packed in memory". Done the same day, at the user's word: a history
+file that carries the bodies as they are held (`ChimeraHistory5`), so a save of
+packed stretches is a copy and a load takes them as they are: the same PS3
+history, 2.57 GB, saved in 4.7 s instead of 18.5 and loaded in 1.0 s instead
+of 23.1.

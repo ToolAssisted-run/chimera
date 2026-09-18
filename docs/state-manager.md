@@ -2200,10 +2200,9 @@ against the B.
 
 **What reads a packed body.** A restore streams it into the sandbox through a
 `MemBodyReader` - the in-memory twin of `SpillBodyReader`, a megabyte at a
-time, never the body decoded whole. A save streams it out the same way into
-the file's own zstd stream (so a save decodes and re-encodes; a format that
-carried the frames as they are would make a PS3 save nearly free, and is the
-obvious next step if saves are what hurts). A merge decodes its two inputs
+time, never the body decoded whole. A save writes it as it is (see "A saved
+history carries its bodies as they are held", below; the first version decoded
+and re-encoded it into the file's stream). A merge decodes its two inputs
 whole - they are capped at megabytes - and packs the result again in line, so
 a packed stretch stays packed as it thins. A load packs every stretch but the
 newest IN LINE, before the budget looks at it: a history saved from twenty
@@ -2235,6 +2234,50 @@ states do not shrink): every frame of every packed stretch restores exactly,
 threaded and in line; a saved history comes back no heavier; and a budget that
 forces merges inside packed stretches (35 of them, through the decode path)
 still answers every offered frame exactly.
+
+#### A saved history carries its bodies as they are held (user-asked, 2026-09-18)
+
+`ChimeraHistory4` was 3's layout as one zstd stream, and with the stretches
+already packed in memory a save had to decode every frame and encode it again
+into that stream, and a load had to decode the stream and pack every stretch
+again in line. `ChimeraHistory5` writes each body as it is held: a record is
+`raw length, held length, bytes`, and held < raw says the bytes are a zstd
+frame (a packed body is only ever kept when it shrank, so the two lengths are
+the flag and there is no other). A body still raw at the save - the newest
+stretch, one that would not shrink - is packed on the way out, so the file is
+no bigger than 4 was. The file itself is not compressed; its bodies are. A
+load takes a frame as it is, without decoding it: one that will not decode is
+found by the restore that needs it, which drops that stretch and says so, as
+any chain that will not walk is treated. 3 and 4 are still read (a 4 is
+hand-built in the test from a 3 through libzstd), 1 and 2 stay superseded,
+and `CHIMERA_HISTORY_RAW=1` still writes 3. A spilled stretch is copied in one
+body at a time - read raw, packed, written - so an anchor is the most that is
+held whole meanwhile; the frontend spills nothing.
+
+**Measured, Oblivion (PS3) on the GTX 1060**, 2400 frames under an 8 GB
+budget, the same history written by both writers, then loaded by a fresh
+process that seeks back to 1500 through it:
+
+| | `ChimeraHistory4` | `ChimeraHistory5` |
+|---|---|---|
+| the file | 2.567 GB | 2.568 GB |
+| the save | 18.5 s | **4.7 s** |
+| the load | 23.1 s | **1.0 s** |
+| the restore of 1497 from the loaded stretch | 0.80 s | 0.82 s |
+
+What is left of the save is the newest stretch being packed on the way out and
+2.5 GB going to the disk; what is left of the load is reading 2.5 GB. The
+restore is the same because the stretch arrives as it was held either way.
+
+Found on the way, and NOT caused by any of this: `--greenzone-check` on this
+PS3 run reports the machine restored at 1500 as 543 to 552 pages (2.2 MB)
+larger than the straight pass's state - in the same process with no history
+file, cross-process from a 4, a 5 and a raw (`CHIMERA_HISTORY_PACK=0`) file
+alike, so it is the core's, not the history's; the restore itself lands on the
+same frame and the MainRAM comparisons of the rewind runs were byte-identical.
+What those pages are is an open question for the rpcs3 core (its per-process
+addresses, or pages a load dirties without changing), recorded here so it is
+not rediscovered as a greenzone bug.
 
 #### The stride tuner stopped listening to anchors
 

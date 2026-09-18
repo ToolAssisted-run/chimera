@@ -3039,11 +3039,22 @@ bool StateHistory::restore(int64_t frame, std::string &error, int64_t *landedOn)
 namespace
 {
 
-const char kMagic[] = "ChimeraHistory4";
+/* 5: the bodies as they are HELD. A closed stretch's bodies are zstd frames in
+ * memory already (see packSegmentLater), so a save copies them out as they are
+ * and a load takes them back as they are - no decoding, no re-encoding, and no
+ * packing in line before the budget looks. A body still raw at the save (the
+ * newest stretch, one that would not shrink) is packed on the way out. Every
+ * body record is `raw length, held length, bytes`, and held < raw says it is a
+ * frame: a packed body is only ever kept when it shrank, so the two lengths
+ * are the flag. The file itself is not compressed: its bodies are. */
+const char kMagic[] = "ChimeraHistory5";
 
-/* The same layout uncompressed, one version back. Still read, and still what is
- * written when there is no libzstd or CHIMERA_HISTORY_RAW=1 asks for it: 4 is
- * the magic followed by 3's layout as one zstd stream, and nothing else. */
+/* One version back: 3's layout as one zstd stream behind the magic. Read, no
+ * longer written. */
+const char kMagicV4[] = "ChimeraHistory4";
+
+/* Two back, uncompressed. Still read, and still what is written when
+ * CHIMERA_HISTORY_RAW=1 asks for it. */
 const char kMagicRaw[] = "ChimeraHistory3";
 
 bool historyRaw()
@@ -3111,6 +3122,66 @@ bool StateHistory::copySpilledBody(std::FILE *spill, const std::function<bool(co
 	return true;
 }
 
+/* One body into a ChimeraHistory5 file: packed on the way out if it is not
+ * already, and written as it is held. */
+static bool putBodyV5(const std::function<bool(const void *, size_t)> &put, const StateHistory::Body &b)
+{
+	auto u64 = [&](uint64_t v) { return put(&v, sizeof v); };
+	return u64(b.size()) && u64(b.held()) && put(b.p ? b.p->data() : nullptr, b.held());
+}
+
+bool StateHistory::writeSegmentBodyV5(const std::function<bool(const void *, size_t)> &put, const Segment &seg)
+{
+	auto u64 = [&](uint64_t v) { return put(&v, sizeof v); };
+	bool ok = putBodyV5(put, packBody(seg.anchor))
+		&& u64(seg.anchorNote.size())
+		&& put(seg.anchorNote.data(), seg.anchorNote.size())
+		&& u64(seg.links.size());
+	for (const Link &l : seg.links)
+	{
+		if (!ok) break;
+		ok = u64(static_cast<uint64_t>(l.endFrame))
+			&& u64(l.note.size())
+			&& put(l.note.data(), l.note.size())
+			&& putBodyV5(put, packBody(l.bytes));
+	}
+	return ok;
+}
+
+/* A spilled stretch into a ChimeraHistory5 file. Its bodies come out of the
+ * spill file raw, one at a time, and go in packed; one body - an anchor at
+ * most - is held whole meanwhile, never the stretch. (The frontend spills
+ * nothing; this is chimera-run's --spill.) */
+bool StateHistory::copySpilledBodyV5(std::FILE *spill, const std::function<bool(const void *, size_t)> &put,
+	const Segment &seg)
+{
+	auto u64 = [&](uint64_t v) { return put(&v, sizeof v); };
+	SpillBodyReader body;
+	if (!body.open(spill, seg.physAt, seg.physLength, seg.packed)) return false;
+	auto oneBody = [&](uint64_t len) {
+		Bytes raw(static_cast<size_t>(len));
+		if (!body.read(raw.data(), raw.size())) return false;
+		return putBodyV5(put, packBody(Body::make(std::move(raw))));
+	};
+	uint64_t anchorLen = 0, noteLen = 0, count = 0;
+	if (!body.readU64(anchorLen) || anchorLen > seg.spillLength) return false;
+	if (!oneBody(anchorLen)) return false;
+	if (!body.readU64(noteLen) || noteLen > kMaxNote) return false;
+	if (!u64(noteLen) || !copyFromReader(body, put, noteLen)) return false;
+	if (!body.readU64(count)) return false;
+	if (count > seg.links.size()) count = seg.links.size();
+	if (!u64(count)) return false;
+	for (uint64_t k = 0; k < count; k++)
+	{
+		uint64_t endFrame = 0, len = 0;
+		if (!body.readU64(endFrame) || !body.readU64(noteLen) || noteLen > kMaxNote) return false;
+		if (!u64(endFrame) || !u64(noteLen) || !copyFromReader(body, put, noteLen)) return false;
+		if (!body.readU64(len) || len > seg.spillLength) return false;
+		if (!oneBody(len)) return false;
+	}
+	return true;
+}
+
 /* The whole of writing a history, with nothing of the history in it but the
  * segments handed over. That is what lets it happen on the writer: the bodies
  * are shared and immutable, the metadata is a copy taken the moment the save
@@ -3125,22 +3196,14 @@ bool StateHistory::writeHistoryFile(std::FILE *spill, const char *path, const st
 		return false;
 	}
 
-	/* Compressed when it can be (ChimeraHistory4): a saved history is what the
-	 * greenzone was, a machine's worth of mostly unwritten memory per anchor,
-	 * and it compresses the way a spill file does. Streamed through the
-	 * compressor exactly as it was streamed to the file - nothing of it is
-	 * assembled in memory, which is the promise this function exists to keep. */
-	const ZstdApi *z = historyRaw() ? nullptr : zstdApi(nullptr);
-	std::unique_ptr<ZstdBodySink> sink;
-	if (z != nullptr && z->createCStream != nullptr && z->initCStream != nullptr
-		&& z->freeCStream != nullptr && z->compressStream2 != nullptr)
-	{
-		sink = std::make_unique<ZstdBodySink>(f, z);
-		if (sink->failed) sink.reset();   /* nothing written yet: the raw layout instead */
-	}
-	const bool packed = sink != nullptr;
+	/* ChimeraHistory5: the bodies as they are held, packed where they were
+	 * not. A saved history is what the greenzone was, and most of it is
+	 * already zstd frames in memory, so most of a save is a copy. Nothing of
+	 * the history is assembled in memory, which is the promise this function
+	 * exists to keep; CHIMERA_HISTORY_RAW=1 writes 3's raw layout instead. */
+	const bool packed = !historyRaw();
 	const std::function<bool(const void *, size_t)> put = [&](const void *d, size_t n) {
-		return packed ? sink->write(d, n) : writeAll(f, d, n);
+		return writeAll(f, d, n);
 	};
 	auto u64 = [&](uint64_t v) { return put(&v, sizeof v); };
 
@@ -3162,13 +3225,11 @@ bool StateHistory::writeHistoryFile(std::FILE *spill, const char *path, const st
 			 * edit that truncated it left the old timeline's links in the file,
 			 * and copying the body whole put them in the saved history, where
 			 * a reopened project offered frames the movie no longer had. */
-			ok = copySpilledBody(spill, put, seg);
+			ok = packed ? copySpilledBodyV5(spill, put, seg) : copySpilledBody(spill, put, seg);
 			continue;
 		}
-		ok = writeSegmentBodyTo(put, seg);
+		ok = packed ? writeSegmentBodyV5(put, seg) : writeSegmentBodyTo(put, seg);
 	}
-	if (ok && packed) ok = sink->finish();
-	sink.reset();   /* before the file goes */
 	if (std::fclose(f) != 0) ok = false;
 	if (!ok)
 	{
@@ -3287,8 +3348,13 @@ bool StateHistory::loadFrom(const char *path, const char *machineId, std::string
 
 	char magic[sizeof kMagic - 1];
 	if (!readAll(f, magic, sizeof magic)) return give_up("that is not a state history");
-	bool packed = false;
+	bool packed = false;   /* 4: one zstd stream */
+	bool held = false;     /* 5: bodies as held */
 	if (std::memcmp(magic, kMagic, sizeof magic) == 0)
+	{
+		held = true;
+	}
+	else if (std::memcmp(magic, kMagicV4, sizeof magic) == 0)
 	{
 		packed = true;
 	}
@@ -3329,50 +3395,68 @@ bool StateHistory::loadFrom(const char *path, const char *machineId, std::string
 		return true;
 	}
 
+	/* A body record. 3 and 4: length, bytes. 5: raw length, held length,
+	 * bytes - and held < raw is a zstd frame, taken as it is. A frame is not
+	 * decoded here to be checked; one that will not decode is found by the
+	 * restore that needs it, which drops that stretch and says so, the way any
+	 * chain that will not walk is treated. */
+	auto readBody = [&](Body &out) {
+		uint64_t rawLen = 0, heldLen = 0;
+		if (!in.readU64(rawLen)) return false;
+		heldLen = rawLen;
+		if (held)
+		{
+			if (!in.readU64(heldLen) || heldLen > rawLen) return false;
+			/* what a frame that long could decode to, at zstd's densest */
+			if (heldLen < rawLen && rawLen > (heldLen << 16)) return false;
+		}
+		if (heldLen > most) return false;
+		Bytes bytes(static_cast<size_t>(heldLen));
+		if (!in.read(bytes.data(), bytes.size())) return false;
+		out = heldLen < rawLen ? Body::makePacked(std::move(bytes), rawLen) : Body::make(std::move(bytes));
+		return true;
+	};
+
 	uint64_t segCount = 0;
 	if (!in.readU64(segCount)) return give_up("the state history is damaged");
 	for (uint64_t i = 0; i < segCount; i++)
 	{
 		Segment seg;
-		uint64_t anchorFrame = 0, anchorLen = 0, deltaCount = 0, noteLen = 0;
-		if (!in.readU64(anchorFrame) || !in.readU64(anchorLen)) return give_up("the state history is damaged");
+		uint64_t anchorFrame = 0, deltaCount = 0, noteLen = 0;
+		if (!in.readU64(anchorFrame)) return give_up("the state history is damaged");
 		seg.anchorFrame = static_cast<int64_t>(anchorFrame);
-		if (anchorLen > most) return give_up("the state history is damaged");
-		Bytes anchorBody(static_cast<size_t>(anchorLen));
-		if (!in.read(anchorBody.data(), anchorBody.size())) return give_up("the state history is damaged");
-		seg.anchor = Body::make(std::move(anchorBody));
+		if (!readBody(seg.anchor)) return give_up("the state history is damaged");
 		if (!in.readU64(noteLen) || noteLen > kMaxNote) return give_up("the state history is damaged");
 		seg.anchorNote.resize(static_cast<size_t>(noteLen));
 		if (!in.read(seg.anchorNote.data(), seg.anchorNote.size())) return give_up("the state history is damaged");
 		if (!in.readU64(deltaCount)) return give_up("the state history is damaged");
-		seg.bytes = anchorLen;
+		seg.bytes = seg.anchor.held();
 		int64_t landed = seg.anchorFrame;
 		for (uint64_t d = 0; d < deltaCount; d++)
 		{
-			uint64_t endFrame = 0, len = 0;
+			uint64_t endFrame = 0;
 			if (!in.readU64(endFrame) || !in.readU64(noteLen) || noteLen > kMaxNote)
 			{
 				return give_up("the state history is damaged");
 			}
 			std::vector<uint8_t> note(static_cast<size_t>(noteLen));
 			if (!in.read(note.data(), note.size())) return give_up("the state history is damaged");
-			if (!in.readU64(len)) return give_up("the state history is damaged");
 			/* the spans have to tile: a file whose links go backwards or stand
 			 * still would offer frames it cannot walk to */
 			if (static_cast<int64_t>(endFrame) <= landed) return give_up("the state history is damaged");
 			landed = static_cast<int64_t>(endFrame);
-			if (len > most) return give_up("the state history is damaged");
-			Bytes delta(static_cast<size_t>(len));
-			if (!in.read(delta.data(), delta.size())) return give_up("the state history is damaged");
-			seg.bytes += len;
-			seg.links.push_back(Link{ Body::make(std::move(delta)), landed, std::move(note) });
+			Body delta;
+			if (!readBody(delta)) return give_up("the state history is damaged");
+			seg.bytes += delta.held();
+			seg.links.push_back(Link{ std::move(delta), landed, std::move(note) });
 		}
 		m_bytes += seg.bytes;
-		/* packed here, in line, before the budget looks at it: a history saved
-		 * from twenty packed stretches would otherwise be thinned to three the
-		 * moment it came back. The newest stretch is the one still written to,
-		 * and stays raw until it closes. */
-		if (i + 1 < segCount) packSegmentNow(seg);
+		/* An older file's bodies arrive raw and are packed here, in line,
+		 * before the budget looks at them: a history saved from twenty packed
+		 * stretches would otherwise be thinned to three the moment it came
+		 * back. The newest stretch is the one still written to, and stays raw
+		 * until it closes. A 5 arrives as it was held. */
+		if (!held && i + 1 < segCount) packSegmentNow(seg);
 		m_segments.push_back(std::move(seg));
 		/* Per segment, not at the end: a history can be larger than the budget
 		 * - that is what spilling is for - and holding all of it at once while

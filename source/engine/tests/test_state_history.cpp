@@ -9,6 +9,7 @@
 
 #include "../source/state_history.hpp"
 #include "../source/greenzone_shape.h"
+#include "../source/zstd_dyn.hpp"
 
 #include <algorithm>
 #include <array>
@@ -1961,9 +1962,11 @@ int main(void)
 	{ // A saved history is compressed, and it comes back exactly as it went.
 	  //
 	  // A project's history is a machine's worth of mostly unwritten memory per
-	  // anchor, so it is saved as one zstd stream behind a magic of its own
-	  // (ChimeraHistory4). The raw layout one version back is still read - the
-	  // hand-built files above are all ChimeraHistory3 - and this is the half
+	  // anchor. It was saved as one zstd stream (ChimeraHistory4); it is saved
+	  // now with each body as it is HELD (ChimeraHistory5), packed on the way
+	  // out where it was not, so a save of packed stretches is a copy and a
+	  // load takes them as they are. 3 and 4 are still read - the hand-built
+	  // files above are all 3, and a 4 is built below - and this is the half
 	  // that proves the new one is a history rather than just a smaller file.
 		const chimera::HostApi api = fakeHost();
 		g_machine = Machine{};
@@ -1990,7 +1993,7 @@ int main(void)
 			in.read(magic, sizeof magic);
 			const std::string m(magic, sizeof magic);
 			const bool rawAsked = getenv("CHIMERA_HISTORY_RAW") != nullptr && getenv("CHIMERA_HISTORY_RAW")[0] == '1';
-			assert(m == (rawAsked ? "ChimeraHistory3" : "ChimeraHistory4"));
+			assert(m == (rawAsked ? "ChimeraHistory3" : "ChimeraHistory5"));
 		}
 		chimera::StateHistory back;
 		back.configure(&api, nullptr, 1u << 20);
@@ -2023,6 +2026,26 @@ int main(void)
 		assert(cut.count() == 0);
 		std::remove("work-history-v4.bin");
 		std::remove("work-history-v4-cut.bin");
+
+		/* a 4 - 3's layout as one zstd stream - is still read, exactly */
+		if (const chimera::ZstdApi *z = chimera::zstdApi(nullptr))
+		{
+			const std::vector<uint8_t> v3 = historyFile("ChimeraHistory3", "machine", 8, { 10, 12, 16 });
+			const size_t magicLen = std::strlen("ChimeraHistory3");
+			std::vector<uint8_t> v4;
+			putStr(v4, "ChimeraHistory4");
+			std::vector<uint8_t> frame(z->compressBound(v3.size() - magicLen));
+			const size_t n = z->compress(frame.data(), frame.size(), v3.data() + magicLen, v3.size() - magicLen, 1);
+			assert(!z->isError(n));
+			v4.insert(v4.end(), frame.begin(), frame.begin() + static_cast<std::ptrdiff_t>(n));
+			write(v4);
+			chimera::StateHistory old;
+			old.configure(&api, nullptr, 1u << 20);
+			assert(old.loadFrom(kPath, "machine", error));
+			assert(old.count() == 4);
+			for (int64_t f : { 8, 10, 12, 16 }) assert(old.nearest(f) == f);
+			assert(old.nearest(11) == 10);
+		}
 	}
 
 	{ // The anchor spacing, chosen by weight.
@@ -2117,6 +2140,9 @@ int main(void)
 	  // is measured on real machines, not here.
 		const chimera::HostApi api = fakeHost();
 		g_pad = 4096;
+		/* CHIMERA_HISTORY_PACK=0 is the A of the A/B: then nothing packs, and
+		 * what is asserted is only that everything still restores */
+		const bool packing = !(getenv("CHIMERA_HISTORY_PACK") != nullptr && getenv("CHIMERA_HISTORY_PACK")[0] == '0');
 		for (int pass = 0; pass < 2; pass++)
 		{
 			const bool threaded = pass == 0;
@@ -2139,11 +2165,11 @@ int main(void)
 				h.capture(f);
 			}
 			assert(h.anchors() >= 9);
-			assert(h.costs().packedRaw != 0);
+			assert(!packing || h.costs().packedRaw != 0);
 			/* nine packed stretches and one raw: well under what raw would be -
 			 * 201 bodies of 4 KB and more */
 			const uint64_t held = h.bytes();
-			assert(held < 201 * 4096);
+			assert(!packing || held < 201 * 4096);
 			for (int64_t f = 0; f <= 200; f++)
 			{
 				assert(h.nearest(f) == f);
@@ -2171,7 +2197,7 @@ int main(void)
 			 * stretch before the newest raw, whose packing is taken at the next
 			 * close - so the loaded one is lighter, never heavier */
 			assert(back.bytes() <= held);
-			assert(back.bytes() < 201 * 4096);
+			assert(!packing || back.bytes() < 201 * 4096);
 		}
 		g_pad = 0;
 	}

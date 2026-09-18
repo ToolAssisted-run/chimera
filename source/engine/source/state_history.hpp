@@ -587,6 +587,10 @@ private:
 	 * Static, and handed the spill file, because the writer does this too. */
 	static bool copySpilledBody(std::FILE *spill, const std::function<bool(const void *, size_t)> &put,
 		const Segment &seg);
+	/* The same two, into a ChimeraHistory5 file: bodies as they are held. */
+	static bool writeSegmentBodyV5(const std::function<bool(const void *, size_t)> &put, const Segment &seg);
+	static bool copySpilledBodyV5(std::FILE *spill, const std::function<bool(const void *, size_t)> &put,
+		const Segment &seg);
 	/* The whole of writing a history file, with nothing of `this` in it. */
 	static bool writeHistoryFile(std::FILE *spill, const char *path, const std::string &id,
 		const std::vector<Segment> &segments, std::string &error);
