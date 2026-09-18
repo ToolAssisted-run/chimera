@@ -230,6 +230,16 @@ Probed once after `Init`; absent exports simply mean the tool is not offered.
   Inserted is -1 for an empty drive. A core whose swap is one step returns the
   same index for both. Keep both in guest memory like any other machine state:
   a rewind has to take them back.
+- **`StateLoaded()`** - told after every load of the machine: a savestate, a
+  branch file, a greenzone restore (anchor and deltas applied), with the
+  machine stopped and before it runs again. For a core that keeps something
+  DERIVED from guest memory in memory a state does not carry (`alloc_invisible`)
+  and has to throw it away when what it was derived from is replaced. xemu's
+  translated-code cache is the case: 215 MB of every state was TCG output
+  that any restore can regenerate, so the buffer is invisible and this export
+  flushes it. Nothing a state needs may live there - only what the machine can
+  rebuild from its own memory - or a state loaded in another session runs on
+  a cache of the wrong machine.
 - Registers, trace, core-rendered surfaces, save-data export, turbo
   (`SetRenderingEnabled`). **Turbo means "skip what is pure OUTPUT", not "skip
   the renderer".** If the export can only be implemented by skipping drawing -

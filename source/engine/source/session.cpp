@@ -383,6 +383,12 @@ struct ce_session
 
 	int32_t (*isButtonActive)(int32_t) = nullptr;
 	int32_t (*isAxisActive)(int32_t) = nullptr;
+	/* Optional: told after every load of the machine - a savestate, a branch
+	 * file, a greenzone restore. For a core that keeps something DERIVED
+	 * outside its states (xemu's translated-code cache lives in invisible
+	 * memory) and has to throw it away when the memory it was derived from is
+	 * replaced. Called with the machine stopped, before it runs again. */
+	void (*stateLoaded)(void) = nullptr;
 	std::vector<uint8_t> buttonActive;
 	std::vector<uint8_t> axisActive;
 	void buildControlActivity();
@@ -638,6 +644,7 @@ void ce_session::probeOptionalGroups()
 
 	isButtonActive = reinterpret_cast<int32_t (*)(int32_t)>(opt("IsButtonActive", 1));
 	isAxisActive = reinterpret_cast<int32_t (*)(int32_t)>(opt("IsAxisActive", 1));
+	stateLoaded = reinterpret_cast<void (*)(void)>(opt("StateLoaded", 0));
 
 	// surfaces: all five or nothing
 	{
@@ -976,9 +983,14 @@ bool ce_session::greenzoneRestore(int64_t to)
 		 * asked for. Following it here is what keeps the session's idea of
 		 * where it is and the machine itself the same thing - a seek that
 		 * refuses is recoverable, a session that has quietly moved is not. */
-		if (landed >= 0) frame = landed;
+		if (landed >= 0)
+		{
+			frame = landed;
+			if (stateLoaded != nullptr) stateLoaded();   /* the anchor was loaded, and stays */
+		}
 		return false;
 	}
+	if (stateLoaded != nullptr) stateLoaded();
 	if (traceSetEnabled != nullptr)
 	{
 		traceSetEnabled(traceDesired ? 1 : 0);
@@ -1601,6 +1613,9 @@ const int16_t *ce_session_audio(const ce_session *s, int32_t *sample_count)
 /* What every load owes the machine afterwards, however the state arrived. */
 static void afterStateLoaded(ce_session *s)
 {
+	/* what the core derived from the memory that was just replaced goes first:
+	 * nothing below may run guest code on a cache of the old machine */
+	if (s->stateLoaded != nullptr) s->stateLoaded();
 	/* a savestate is guest memory, and the guest's wide-input latches are
 	 * guest memory too: the load just rewrote what the guest believes is
 	 * held, so the delta tracker must forget its history and resend every
