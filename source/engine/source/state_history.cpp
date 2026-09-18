@@ -158,6 +158,7 @@ void StateHistory::flushWrites()
 
 void StateHistory::helpers(bool on)
 {
+	m_packer.setThreaded(on);
 	m_writer.setThreaded(on);
 	applyWrites();   /* setThreaded(false) finishes what was queued; take its word now */
 }
@@ -165,6 +166,10 @@ void StateHistory::helpers(bool on)
 void StateHistory::clear()
 {
 	finishPlan();
+	/* a packer job holds bodies of stretches that are about to go; it finishes
+	 * (bounded by one stretch) and its result is thrown away with them */
+	m_packer.drain();
+	m_packJobs.clear();
 	m_segments.clear();
 	m_bytes = 0;
 	m_epochOpen = false;
@@ -200,11 +205,160 @@ static bool deltasRefused()
  *   links:  count, then per link: the frame it lands on, note length, note,
  *           length, bytes
  */
+namespace
+{
+
+/* CHIMERA_HISTORY_PACK=0 keeps every body raw in memory: the A against the B
+ * for what packing costs a restore and buys a budget. */
+bool packRefused()
+{
+	static const int off = [] {
+		const char *e = getenv("CHIMERA_HISTORY_PACK");
+		return e != nullptr && e[0] == '0' ? 1 : 0;
+	}();
+	return off != 0;
+}
+
+/* The raw bytes of a body, in order, whether it is held raw or as a zstd
+ * frame - what a restore streams into the sandbox and a save copies out. It
+ * never holds a packed body decoded whole: a gigabyte anchor comes out a
+ * megabyte at a time. */
+class MemBodyReader
+{
+public:
+	explicit MemBodyReader(const StateHistory::Body &b) : m_body(b)
+	{
+		if (!b.packed) return;
+		const ZstdApi *z = zstdApi(nullptr);
+		if (z == nullptr) { m_failed = true; return; }
+		m_stream = z->createDStream();
+		if (m_stream == nullptr || z->isError(z->initDStream(m_stream))) { m_failed = true; return; }
+		m_out.resize(1u << 20);
+	}
+	~MemBodyReader()
+	{
+		if (m_stream != nullptr)
+		{
+			if (const ZstdApi *z = zstdApi(nullptr)) z->freeDStream(m_stream);
+		}
+	}
+	MemBodyReader(const MemBodyReader &) = delete;
+	MemBodyReader &operator=(const MemBodyReader &) = delete;
+
+	bool read(void *out, size_t n)
+	{
+		if (m_failed) return false;
+		uint8_t *dst = static_cast<uint8_t *>(out);
+		if (!m_body.packed)
+		{
+			if (m_pos + n > m_body.size()) return false;
+			std::memcpy(dst, m_body.data() + m_pos, n);
+			m_pos += n;
+			return true;
+		}
+		while (n != 0)
+		{
+			if (m_outPos == m_outLen && !refill()) return false;
+			const size_t take = m_outLen - m_outPos < n ? m_outLen - m_outPos : n;
+			std::memcpy(dst, m_out.data() + m_outPos, take);
+			m_outPos += take;
+			dst += take;
+			n -= take;
+			m_pos += take;
+		}
+		return true;
+	}
+	/* how far into the raw body the next read begins */
+	uint64_t pos() const { return m_pos; }
+
+private:
+	bool refill()
+	{
+		const ZstdApi *z = zstdApi(nullptr);
+		if (z == nullptr) return false;
+		const Bytes &frame = *m_body.p;
+		for (;;)
+		{
+			ZstdApi::Buffer in{ frame.data() + m_consumed, frame.size() - m_consumed, 0 };
+			ZstdApi::OutBuffer o{ m_out.data(), m_out.size(), 0 };
+			const size_t rc = z->decompressStream(m_stream, &o, &in);
+			if (z->isError(rc)) return false;
+			m_consumed += in.pos;
+			if (o.pos != 0)
+			{
+				m_outPos = 0;
+				m_outLen = o.pos;
+				return true;
+			}
+			if (m_consumed >= frame.size()) return false;   /* the frame is exhausted */
+		}
+	}
+
+	using Bytes = StateHistory::Bytes;
+	const StateHistory::Body &m_body;
+	uint64_t m_pos = 0;
+	bool m_failed = false;
+	void *m_stream = nullptr;
+	size_t m_consumed = 0;
+	std::vector<uint8_t> m_out;
+	size_t m_outPos = 0, m_outLen = 0;
+};
+
+/* A read callback over a body in memory, for handing an anchor or a link
+ * straight to the sandbox - raw or packed alike. */
+struct BodySource
+{
+	MemBodyReader *body;
+	uint64_t left;
+};
+
+intptr_t bodyRead(uintptr_t ud, void *out, uintptr_t len)
+{
+	auto *s = reinterpret_cast<BodySource *>(ud);
+	if (len > s->left) len = static_cast<uintptr_t>(s->left);
+	if (len == 0) return -1;
+	if (!s->body->read(out, len)) return -1;
+	s->left -= len;
+	return static_cast<intptr_t>(len);
+}
+
+/* A packed body decoded whole - for a merge, which reads both of its inputs
+ * at random and is capped at megabytes anyway. */
+bool unpackBody(const StateHistory::Body &b, StateHistory::Bytes &out)
+{
+	out.resize(b.size());
+	if (b.size() == 0) return true;
+	if (!b.packed)
+	{
+		std::memcpy(out.data(), b.data(), b.size());
+		return true;
+	}
+	MemBodyReader r(b);
+	return r.read(out.data(), out.size());
+}
+
+} // namespace
+
 bool StateHistory::writeSegmentBodyTo(const std::function<bool(const void *, size_t)> &put, const Segment &seg)
 {
 	auto u64 = [&](uint64_t v) { return put(&v, sizeof v); };
+	/* a packed body goes out decoded, a megabyte at a time; a raw one goes
+	 * out as it lies */
+	auto body = [&](const Body &b) {
+		if (!b.packed) return put(b.data(), b.size());
+		MemBodyReader in(b);
+		std::vector<uint8_t> chunk(1u << 20);
+		uint64_t n = b.size();
+		while (n != 0)
+		{
+			const size_t take = static_cast<size_t>(n < chunk.size() ? n : chunk.size());
+			if (!in.read(chunk.data(), take) || !put(chunk.data(), take)) return false;
+			n -= take;
+		}
+		return true;
+	};
 	bool ok = u64(seg.anchor.size())
-		&& put(seg.anchor.data(), seg.anchor.size())
+		&& body(seg.anchor)
 		&& u64(seg.anchorNote.size())
 		&& put(seg.anchorNote.data(), seg.anchorNote.size())
 		&& u64(seg.links.size());
@@ -215,7 +369,7 @@ bool StateHistory::writeSegmentBodyTo(const std::function<bool(const void *, siz
 			&& u64(l.note.size())
 			&& put(l.note.data(), l.note.size())
 			&& u64(l.bytes.size())
-			&& put(l.bytes.data(), l.bytes.size());
+			&& body(l.bytes);
 	}
 	return ok;
 }
@@ -286,6 +440,148 @@ struct ZstdBodySink
 };
 
 } // namespace
+
+/* One body as a zstd frame, level 1 - the level the writer uses, for the
+ * same reason: it is the fastest and a machine state gives it nearly all it
+ * gives any level. Streamed into the frame a megabyte at a time, so the
+ * frame is the only new allocation. A body that will not pack - no libzstd,
+ * a failure, or one that did not shrink - stays as it is. */
+StateHistory::Body StateHistory::packBody(const Body &b)
+{
+	if (b.packed || b.empty() || packRefused()) return b;
+	const ZstdApi *z = zstdApi(nullptr);
+	if (z == nullptr || z->createCStream == nullptr || z->initCStream == nullptr
+		|| z->freeCStream == nullptr || z->compressStream2 == nullptr)
+	{
+		return b;
+	}
+	void *cs = z->createCStream();
+	if (cs == nullptr) return b;
+	if (z->isError(z->initCStream(cs, 1))) { z->freeCStream(cs); return b; }
+	Bytes frame;
+	/* a state packs at least seven times; asked for up front so the frame is
+	 * one allocation on the common path, and grown when it is not */
+	frame.resize(static_cast<size_t>(b.size() / 4) + (1u << 16));
+	size_t at = 0;
+	ZstdApi::Buffer in{ b.data(), b.size(), 0 };
+	bool ok = true;
+	for (;;)
+	{
+		if (frame.size() - at < (1u << 16)) frame.resize(frame.size() + frame.size() / 2 + (1u << 16));
+		ZstdApi::OutBuffer o{ frame.data() + at, frame.size() - at, 0 };
+		const size_t rc = z->compressStream2(cs, &o, &in, 2);
+		if (z->isError(rc)) { ok = false; break; }
+		at += o.pos;
+		if (rc == 0) break;
+	}
+	z->freeCStream(cs);
+	if (!ok || at >= b.size()) return b;
+	frame.resize(at);
+	frame.shrink_to_fit();
+	return Body::makePacked(std::move(frame), b.size());
+}
+
+bool StateHistory::packingAvailable() const
+{
+	return !packRefused() && zstdApi(nullptr) != nullptr;
+}
+
+/* Every body of a stretch, in line, and the stretch's cost corrected. */
+void StateHistory::packSegmentNow(Segment &seg)
+{
+	if (seg.spilled || !packingAvailable()) return;
+	const uint64_t was = seg.bytes;
+	seg.anchor = packBody(seg.anchor);
+	for (Link &l : seg.links) l.bytes = packBody(l.bytes);
+	seg.bytes = seg.anchor.held();
+	for (const Link &l : seg.links) seg.bytes += l.bytes.held();
+	if (was > seg.bytes) releaseBytes(was - seg.bytes, "pack");
+	else m_bytes += seg.bytes - was;
+}
+
+void StateHistory::packSegmentLater(size_t index)
+{
+	if (index >= m_segments.size() || !packingAvailable()) return;
+	const Segment &seg = m_segments[index];
+	if (seg.spilled) return;
+	auto job = std::make_unique<PackJob>();
+	job->anchorFrame = seg.anchorFrame;
+	if (!seg.anchor.packed && !seg.anchor.empty()) job->in.push_back(seg.anchor.p);
+	for (const Link &l : seg.links)
+	{
+		if (!l.bytes.packed && !l.bytes.empty()) job->in.push_back(l.bytes.p);
+	}
+	if (job->in.empty()) return;
+	PackJob *const j = job.get();
+	m_packJobs.push_back(std::move(job));
+	m_packer.post([j]() {
+		const double t0 = nowSeconds();
+		j->out.reserve(j->in.size());
+		for (const auto &p : j->in)
+		{
+			j->out.push_back(packBody(Body{ p, p->size(), false }));
+		}
+		j->seconds = nowSeconds() - t0;
+	});
+}
+
+/* Takes what the packer has made. The wait is for a job posted a whole
+ * stretch ago, so it is normally nothing; it is paid at all only so that the
+ * moment the budget changes is the same threaded as in line. */
+void StateHistory::finishPacking()
+{
+	if (m_packJobs.empty()) return;
+	const double tWait = nowSeconds();
+	m_packer.drain();
+	const double waited = nowSeconds() - tWait;
+	if (waited > 0.001)
+	{
+		m_costs.packWaits++;
+		m_costs.packWaitSeconds += waited;
+		if (historyTrace())
+		{
+			fprintf(stderr, "[history] waited %.0f ms for the packer\n", waited * 1000);
+			fflush(stderr);
+		}
+	}
+	for (auto &job : m_packJobs)
+	{
+		Segment *seg = nullptr;
+		for (Segment &s : m_segments)
+		{
+			if (s.anchorFrame == job->anchorFrame) { seg = &s; break; }
+		}
+		if (seg == nullptr || seg->spilled || job->out.size() != job->in.size()) continue;
+		const uint64_t was = seg->bytes;
+		uint64_t rawPacked = 0;
+		auto take = [&](Body &b) {
+			for (size_t i = 0; i < job->in.size(); i++)
+			{
+				if (b.p != job->in[i] || !job->out[i].packed) continue;
+				rawPacked += b.size();
+				b = job->out[i];
+				return;
+			}
+		};
+		take(seg->anchor);
+		for (Link &l : seg->links) take(l.bytes);
+		seg->bytes = seg->anchor.held();
+		for (const Link &l : seg->links) seg->bytes += l.bytes.held();
+		if (was > seg->bytes) releaseBytes(was - seg->bytes, "pack");
+		else m_bytes += seg->bytes - was;
+		m_costs.packedRaw += rawPacked;
+		m_costs.packedHeld += seg->bytes;
+		if (historyTrace())
+		{
+			fprintf(stderr, "[history] packed the stretch at %lld: %llu -> %llu bytes (%.1fx), %.0f ms on the packer (%llu total)\n",
+				(long long)seg->anchorFrame, (unsigned long long)was, (unsigned long long)seg->bytes,
+				seg->bytes != 0 ? static_cast<double>(was) / static_cast<double>(seg->bytes) : 0.0,
+				job->seconds * 1000, (unsigned long long)m_bytes);
+			fflush(stderr);
+		}
+	}
+	m_packJobs.clear();
+}
 
 bool StateHistory::writeSegmentBodyPacked(std::FILE *f, const Segment &seg, bool &packed)
 {
@@ -431,6 +727,8 @@ StateHistory::~StateHistory()
 	/* the drainer is reading the machine's pages; it stops before anything else
 	 * does, because what it is reading belongs to somebody who is also going */
 	finishPlan();
+	m_packer.drain();
+	m_packJobs.clear();
 	dropSpillFile();
 }
 
@@ -1137,6 +1435,10 @@ bool StateHistory::captureAnchorPlanned(int64_t frame, std::vector<uint8_t> &car
 	seg.anchorNote = std::move(carried);
 	m_bytes += seg.bytes;
 	m_segments.push_back(std::move(seg));
+	/* the stretch before this one has closed: what the packer made of the one
+	 * before THAT is taken, and this one goes to it */
+	finishPacking();
+	if (m_segments.size() >= 2) packSegmentLater(m_segments.size() - 2);
 
 	m_planPending = true;
 	m_planFrame = frame;
@@ -1550,6 +1852,8 @@ void StateHistory::captureOnce(int64_t frame, const uint8_t *note, size_t noteLe
 		fflush(stderr);
 	}
 	m_segments.push_back(std::move(seg));
+	finishPacking();
+	if (m_segments.size() >= 2) packSegmentLater(m_segments.size() - 2);
 	m_machineStored = true;
 	if (historyVerify()) verifyStored(frame);
 	coarsen(frame);
@@ -1632,7 +1936,7 @@ void StateHistory::invalidateAfter(int64_t frame)
 		 * What it can still answer shrinks, which is the point. */
 		if (!s.spilled)
 		{
-			const uint64_t n = s.links.back().bytes.size();
+			const uint64_t n = s.links.back().bytes.held();
 			s.bytes -= n;
 			releaseBytes(n, "invalidateAfter");
 		}
@@ -1715,6 +2019,20 @@ bool StateHistory::composePair(const Link &a, const Link &b, uint64_t anchorLen,
 	if (capped && anchorLen != 0 && together > anchorLen) return false;
 
 	merged.clear();
+	/* a packed input is decoded whole for the merge: it is at most megabytes,
+	 * and a merge reads its inputs at random */
+	Bytes ua, ub;
+	const uint8_t *pa = a.bytes.data(), *pb = b.bytes.data();
+	if (a.bytes.packed)
+	{
+		if (!unpackBody(a.bytes, ua)) return false;
+		pa = ua.data();
+	}
+	if (b.bytes.packed)
+	{
+		if (!unpackBody(b.bytes, ub)) return false;
+		pb = ub.data();
+	}
 	/* The merge of two sorted lists is at most both of them, and asking for
 	 * that up front is one allocation instead of a dozen doublings with a
 	 * copy each - on a delta of megabytes that is most of the write. */
@@ -1725,13 +2043,13 @@ bool StateHistory::composePair(const Link &a, const Link &b, uint64_t anchorLen,
 	{
 		/* Both are already contiguous here, so the host has no reason to
 		 * copy them into buffers of its own to look at them. */
-		m_host->wbx_compose_delta_mem(a.bytes.data(), a.bytes.size(), b.bytes.data(), b.bytes.size(),
+		m_host->wbx_compose_delta_mem(pa, a.bytes.size(), pb, b.bytes.size(),
 			sinkWrite, reinterpret_cast<uintptr_t>(&sink), &r);
 	}
 	else
 	{
-		ByteSource sa{ a.bytes.data(), a.bytes.size(), 0 };
-		ByteSource sb{ b.bytes.data(), b.bytes.size(), 0 };
+		ByteSource sa{ pa, a.bytes.size(), 0 };
+		ByteSource sb{ pb, b.bytes.size(), 0 };
 		m_host->wbx_compose_delta(sourceRead, reinterpret_cast<uintptr_t>(&sa),
 			sourceRead, reinterpret_cast<uintptr_t>(&sb),
 			sinkWrite, reinterpret_cast<uintptr_t>(&sink), &r);
@@ -1750,18 +2068,25 @@ bool StateHistory::composeInto(Segment &seg, size_t i, bool capped)
 	Bytes merged;
 	if (!composePair(a, b, seg.anchor.size(), merged, capped)) return false;
 
-	const uint64_t was = a.bytes.size() + b.bytes.size();
+	const uint64_t was = a.bytes.held() + b.bytes.held();
+	const uint64_t wasRaw = a.bytes.size() + b.bytes.size();
+	/* a merge in a packed stretch stays packed: the result is small (a merge
+	 * gives memory back, and thinning bounds what it spends), so packing it
+	 * here costs a few milliseconds and keeps the stretch's cost what it was */
+	Body result = Body::make(std::move(merged));
+	if (a.bytes.packed || b.bytes.packed) result = packBody(result);
 	seg.bytes -= was;
 	releaseBytes(was, "tidy");
-	seg.bytes += merged.size();
-	m_bytes += merged.size();
+	seg.bytes += result.held();
+	m_bytes += result.held();
 	if (historyTrace())
 	{
-		fprintf(stderr, "[history] merged the landing at %lld into %lld: %llu -> %zu bytes\n",
-			(long long)a.endFrame, (long long)b.endFrame, (unsigned long long)was, merged.size());
+		fprintf(stderr, "[history] merged the landing at %lld into %lld: %llu -> %zu bytes%s\n",
+			(long long)a.endFrame, (long long)b.endFrame, (unsigned long long)wasRaw, result.size(),
+			result.packed ? " (packed)" : "");
 		fflush(stderr);
 	}
-	b.bytes = Body::make(std::move(merged));
+	b.bytes = std::move(result);
 	seg.links.erase(seg.links.begin() + static_cast<std::ptrdiff_t>(i));
 	return true;
 }
@@ -2136,8 +2461,8 @@ void StateHistory::applyWrites()
 			{
 				s.links[i].bytes = w.body.links[i].bytes;
 			}
-			s.bytes = s.anchor.size();
-			for (const Link &l : s.links) s.bytes += l.bytes.size();
+			s.bytes = s.anchor.held();
+			for (const Link &l : s.links) s.bytes += l.bytes.held();
 			m_bytes += s.bytes;
 			break;
 		}
@@ -2535,7 +2860,7 @@ bool StateHistory::thinOne(uint64_t &mergeLeft)
 			const size_t li = static_cast<size_t>(e.link);
 			if (li + 1 == seg.links.size())
 			{
-				const uint64_t n = seg.links.back().bytes.size();
+				const uint64_t n = seg.links.back().bytes.held();
 				seg.bytes -= n;
 				releaseBytes(n, "thin");
 				seg.links.pop_back();
@@ -2593,8 +2918,9 @@ bool StateHistory::restoreFailed(const Segment *seg, std::string &error, int64_t
 	if (!seg->spilled)
 	{
 		WbxReturn r{};
-		ByteSource anchor{ seg->anchor.data(), seg->anchor.size(), 0 };
-		m_host->wbx_load_state(m_obj, sourceRead, reinterpret_cast<uintptr_t>(&anchor), &r);
+		MemBodyReader in(seg->anchor);
+		BodySource anchor{ &in, seg->anchor.size() };
+		m_host->wbx_load_state(m_obj, bodyRead, reinterpret_cast<uintptr_t>(&anchor), &r);
 		consistent = r.ok();
 	}
 	else
@@ -2659,8 +2985,11 @@ bool StateHistory::restore(int64_t frame, std::string &error, int64_t *landedOn)
 	}
 
 	WbxReturn r{};
-	ByteSource anchor{ seg->anchor.data(), seg->anchor.size(), 0 };
-	m_host->wbx_load_state(m_obj, sourceRead, reinterpret_cast<uintptr_t>(&anchor), &r);
+	{
+		MemBodyReader in(seg->anchor);
+		BodySource anchor{ &in, seg->anchor.size() };
+		m_host->wbx_load_state(m_obj, bodyRead, reinterpret_cast<uintptr_t>(&anchor), &r);
+	}
 	if (!r.ok())
 	{
 		/* the anchor itself: nothing was applied on top of it, so the machine is
@@ -2672,8 +3001,9 @@ bool StateHistory::restore(int64_t frame, std::string &error, int64_t *landedOn)
 	for (int64_t i = 0; i < steps; i++)
 	{
 		const Body &d = seg->links[static_cast<size_t>(i)].bytes;
-		ByteSource src{ d.data(), d.size(), 0 };
-		m_host->wbx_load_delta(m_obj, sourceRead, reinterpret_cast<uintptr_t>(&src), &r);
+		MemBodyReader in(d);
+		BodySource src{ &in, d.size() };
+		m_host->wbx_load_delta(m_obj, bodyRead, reinterpret_cast<uintptr_t>(&src), &r);
 		if (!r.ok())
 		{
 			error = r.errorMessage;
@@ -2685,8 +3015,9 @@ bool StateHistory::restore(int64_t frame, std::string &error, int64_t *landedOn)
 		const int64_t chain = steps;
 		const double t2 = nowSeconds();
 		fprintf(stderr,
-			"[history] restore %lld: anchor %lld (%.1f MB) %.0f ms + %lld deltas %.0f ms = %.0f ms\n",
+			"[history] restore %lld: anchor %lld (%.1f MB%s) %.0f ms + %lld deltas %.0f ms = %.0f ms\n",
 			(long long)frame, (long long)seg->anchorFrame, seg->anchor.size() / 1048576.0,
+			seg->anchor.packed ? ", packed" : "",
 			(t1 - t0) * 1000, (long long)chain, (t2 - t1) * 1000, (t2 - t0) * 1000);
 	}
 	/* whatever epoch was marked described the machine we have just left */
@@ -3037,6 +3368,11 @@ bool StateHistory::loadFrom(const char *path, const char *machineId, std::string
 			seg.links.push_back(Link{ Body::make(std::move(delta)), landed, std::move(note) });
 		}
 		m_bytes += seg.bytes;
+		/* packed here, in line, before the budget looks at it: a history saved
+		 * from twenty packed stretches would otherwise be thinned to three the
+		 * moment it came back. The newest stretch is the one still written to,
+		 * and stays raw until it closes. */
+		if (i + 1 < segCount) packSegmentNow(seg);
 		m_segments.push_back(std::move(seg));
 		/* Per segment, not at the end: a history can be larger than the budget
 		 * - that is what spilling is for - and holding all of it at once while

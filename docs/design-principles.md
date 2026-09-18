@@ -3930,3 +3930,19 @@ above exist for measuring. The progress window now has a delay: TAStudio's
 branch save and load open one only if the work has lasted 400 ms, so the same
 button that takes milliseconds on an NES never flashes a window, and the half
 minute it takes on a PS3 no longer looks like a hang.
+
+## The greenzone is packed in memory, one stretch behind the machine (user-asked, 2026-09-18)
+
+With the disc out of the state, the user asked for compression in memory too.
+A stretch of the history that has closed - the next anchor has been taken - is
+only ever read or shortened again, so its bodies are held as zstd frames; the
+newest stretch, the one being written to, stays raw. The packing is a helper's,
+and its result is taken at one moment only, when the next stretch closes, so
+the budget's arithmetic is identical threaded and in line - the property the
+history's differential fuzz pins and the reason "phase 2" was never built. On
+Oblivion (PS3, 8 GB budget) a stretch went from 2.45 GB to 0.26-0.44 GB, the
+frames held from 312 to 817, and a rewind to frame 1200 that used to land on
+frame 434 and replay 766 frames lands on 1198 and decodes for a second. The
+whole account, with the measurements, is in docs/state-manager.md, "A closed
+stretch is packed in memory". Not done: a history file that carries the frames
+as they are held, which would make a PS3 save nearly free.

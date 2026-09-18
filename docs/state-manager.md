@@ -2164,6 +2164,78 @@ restores every offered frame from a compressed file and checks every note,
 checks which magic was written, and refuses a compressed file cut in half; it
 passes compressed, raw and with the helpers off.
 
+#### A closed stretch is packed in memory (user-asked, 2026-09-18)
+
+The disk was compressed and memory was not, and memory is where the greenzone
+lives now. The user asked for compression to be measured on PS3 states once
+the disc was no longer carried twice (rpcs3 76b992c): the remaining 1.23 GB of
+an Oblivion state packed 7.7x at zstd level 1 in 1.1 s. So the history packs
+its bodies in memory, and the question was where and when, because "phase 2"
+had already been left undone for exactly the reason that threatened here: a
+helper that lands its result whenever it finishes gives a history that holds
+different frames threaded than in line, and the differential fuzz is the
+reason the history is trusted.
+
+**What is packed.** A stretch that has CLOSED - the next anchor has been taken.
+From then on it is only read (a restore, a save) or shortened (a merge, a pop,
+a drop), never written to, so its anchor and its links are each held as one
+zstd frame (level 1, the writer's level, for the writer's reason). The newest
+stretch stays raw: it is the one still being appended to and the one a
+backwards step lands in most. A `Body` now says what it IS (`size()`, the raw
+length, which every decision is made from - the merge caps, when a stretch
+closes, what a spill reserves) apart from what it COSTS (`held()`, which is
+what the budget counts). A body that does not shrink stays raw.
+
+**When the budget learns of it.** The packing is on a helper of its own (a
+gigabyte is a third of a second at best), and its result is taken on the
+emulation thread at ONE moment: when the next stretch closes. The job was
+posted a whole stretch ago, so the wait is normally nothing, and it is paid at
+all only so that the moment `bytes()` changes is the same threaded as in line -
+the differential fuzz's signature includes `bytes()` step by step, and it
+passes unchanged. A body is matched back by identity, so a stretch shortened
+meanwhile keeps what it still has and a stretch dropped meanwhile takes
+nothing. `CHIMERA_HISTORY_TRACE=1` prints each stretch as it is packed and any
+wait for the packer; `CHIMERA_HISTORY_PACK=0` keeps everything raw, for the A
+against the B.
+
+**What reads a packed body.** A restore streams it into the sandbox through a
+`MemBodyReader` - the in-memory twin of `SpillBodyReader`, a megabyte at a
+time, never the body decoded whole. A save streams it out the same way into
+the file's own zstd stream (so a save decodes and re-encodes; a format that
+carried the frames as they are would make a PS3 save nearly free, and is the
+obvious next step if saves are what hurts). A merge decodes its two inputs
+whole - they are capped at megabytes - and packs the result again in line, so
+a packed stretch stays packed as it thins. A load packs every stretch but the
+newest IN LINE, before the budget looks at it: a history saved from twenty
+packed PS3 stretches would otherwise be thinned to three the moment it came
+back.
+
+**Measured, Oblivion (PS3) on the GTX 1060**: 2400 frames, an 8 GB budget, a
+rewind to frame 1200 three times, everything else the same.
+
+| | raw (`CHIMERA_HISTORY_PACK=0`) | packed |
+|---|---|---|
+| a stretch (anchor 1.2 GB + its deltas) | 2.45 GB | 0.26 to 0.44 GB (5.6x to 9.2x) |
+| frames held at the end | 312 | **817** |
+| the rewind to 1200 landed on | anchor 434, then 766 frames replayed | **frame 1198**: anchor 910 + 72 deltas |
+| that restore | 0.19 to 0.35 s (then the replay) | 0.99 to 1.20 s |
+| packing a stretch, on the helper | - | 2.1 to 2.6 s |
+| waits for the packer on the emulation thread | - | none |
+
+The deltas pack worse than the anchor (a PS3 frame's churn is not zeros), so a
+stretch packs six to nine times where a lone state packs eight. The restore is
+slower per byte - 1.2 GB decoded at about 3 GB/s is 0.4 s the raw path did not
+pay - and faster per rewind, because the raw budget had thinned frame 1200's
+neighbourhood away and the packed one had not: a second of decoding against
+766 frames of PlayStation 3 emulation. That is the trade the whole history
+makes, restated: memory is depth, and depth is what a rewind costs.
+
+`test_state_history` gained two blocks under a padded fake machine (its 64-byte
+states do not shrink): every frame of every packed stretch restores exactly,
+threaded and in line; a saved history comes back no heavier; and a budget that
+forces merges inside packed stretches (35 of them, through the decode path)
+still answers every offered frame exactly.
+
 #### The stride tuner stopped listening to anchors
 
 Found while measuring rather than while looking, and true before any of this

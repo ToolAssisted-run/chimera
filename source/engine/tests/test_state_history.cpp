@@ -107,12 +107,30 @@ Machine g_machine;
 
 using Cells = std::vector<std::pair<uint8_t, uint8_t>>;   /* index -> value, ascending */
 
+/* Zero bytes every state and delta carries after its cells, when a test asks:
+ * this machine is 64 bytes, and a body that small packs to nothing or not at
+ * all, so a test of packed bodies pads them out to something zstd can bite. */
+size_t g_pad = 0;
+
+void readPad(chimera::WbxReadCb cb, uintptr_t ud)
+{
+	std::vector<uint8_t> pad(g_pad);
+	if (g_pad != 0) cb(ud, pad.data(), pad.size());
+}
+
+void writePad(chimera::WbxWriteCb cb, uintptr_t ud)
+{
+	std::vector<uint8_t> pad(g_pad, 0);
+	if (g_pad != 0) cb(ud, pad.data(), pad.size());
+}
+
 Cells readCells(chimera::WbxReadCb cb, uintptr_t ud)
 {
 	uint32_t n = 0;
 	cb(ud, &n, sizeof n);
 	Cells out(n);
 	for (auto &c : out) { cb(ud, &c.first, 1); cb(ud, &c.second, 1); }
+	readPad(cb, ud);
 	return out;
 }
 
@@ -121,6 +139,7 @@ void writeCells(chimera::WbxWriteCb cb, uintptr_t ud, const Cells &c)
 	const uint32_t n = static_cast<uint32_t>(c.size());
 	cb(ud, &n, sizeof n);
 	for (const auto &e : c) { cb(ud, &e.first, 1); cb(ud, &e.second, 1); }
+	writePad(cb, ud);
 }
 
 /* Set to have the next delta load refuse, the way a damaged one would. Nothing
@@ -138,12 +157,14 @@ void fakeSaveState(void *, chimera::WbxWriteCb cb, uintptr_t ud, chimera::WbxRet
 	if (g_outOfMemoryFor > 0) { g_outOfMemoryFor--; throw std::bad_alloc(); }
 	*r = {};
 	cb(ud, g_machine.cell, Machine::kCells);
+	writePad(cb, ud);
 }
 
 void fakeLoadState(void *, chimera::WbxReadCb cb, uintptr_t ud, chimera::WbxReturn *r)
 {
 	*r = {};
 	cb(ud, g_machine.cell, Machine::kCells);
+	readPad(cb, ud);
 }
 
 void fakeEpochBegin(void *, chimera::WbxReturn *r)
@@ -2080,6 +2101,116 @@ int main(void)
 			byDefault.capture(f);
 		}
 		assert(byDefault.anchors() == weighed.anchors());
+	}
+
+	{ // A closed stretch is packed in memory, and nothing can tell.
+	  //
+	  // Once the next anchor is taken a stretch is only ever read or shortened,
+	  // so its bodies are held as zstd frames (user-asked, 2026-09-18: a PS3
+	  // anchor is 1.2 GB and packs seven times). The packer is a helper whose
+	  // result is taken when the NEXT stretch closes, so the differential above
+	  // holds; here, threaded and in line alike: every frame of every packed
+	  // stretch restores exactly, a merge inside one stays packed and exact, a
+	  // save comes back as it went, and the packer was actually handed bodies.
+	  // This machine is 64 bytes and a delta 10, which zstd cannot shrink, so
+	  // every body is padded with 4 KB of zeros here (g_pad) - the ratio itself
+	  // is measured on real machines, not here.
+		const chimera::HostApi api = fakeHost();
+		g_pad = 4096;
+		for (int pass = 0; pass < 2; pass++)
+		{
+			const bool threaded = pass == 0;
+			g_machine = Machine{};
+			chimera::StateHistory h;
+			h.configure(&api, nullptr, 4u << 20);
+			h.helpers(threaded);
+			h.anchorWalkFloor(1);
+			h.bands(1000, 1000, 1, 1, 20);   /* a stretch every 20 frames */
+			std::vector<std::array<uint8_t, Machine::kCells>> truth(1);
+			std::memcpy(truth[0].data(), g_machine.cell, Machine::kCells);
+			h.capture(0);
+			for (int64_t f = 1; f <= 200; f++)
+			{
+				h.beforeAdvance();
+				advance(f);
+				std::array<uint8_t, Machine::kCells> at{};
+				std::memcpy(at.data(), g_machine.cell, Machine::kCells);
+				truth.push_back(at);
+				h.capture(f);
+			}
+			assert(h.anchors() >= 9);
+			assert(h.costs().packedRaw != 0);
+			/* nine packed stretches and one raw: well under what raw would be -
+			 * 201 bodies of 4 KB and more */
+			const uint64_t held = h.bytes();
+			assert(held < 201 * 4096);
+			for (int64_t f = 0; f <= 200; f++)
+			{
+				assert(h.nearest(f) == f);
+				assert(h.restore(f, error));
+				assert(std::memcmp(g_machine.cell, truth[static_cast<size_t>(f)].data(), Machine::kCells) == 0);
+			}
+			/* a restore changes nothing about what is held */
+			assert(h.bytes() == held);
+			/* the budget forces merges inside stretches that are already packed:
+			 * what remains still answers exactly */
+			assert(h.saveTo(kPath, "fake", error));
+			chimera::StateHistory back;
+			back.configure(&api, nullptr, 4u << 20);
+			back.helpers(threaded);
+			assert(back.loadFrom(kPath, "fake", error));
+			assert(back.count() == h.count());
+			for (int64_t f = 0; f <= 200; f++)
+			{
+				assert(back.nearest(f) == f);
+				assert(back.restore(f, error));
+				assert(std::memcmp(g_machine.cell, truth[static_cast<size_t>(f)].data(), Machine::kCells) == 0);
+			}
+			/* and it came back no heavier: a loaded history is packed in line
+			 * before the budget sees it, while the live one still holds the
+			 * stretch before the newest raw, whose packing is taken at the next
+			 * close - so the loaded one is lighter, never heavier */
+			assert(back.bytes() <= held);
+			assert(back.bytes() < 201 * 4096);
+		}
+		g_pad = 0;
+	}
+
+	{ // Packed stretches under a budget that forces merges and pops inside them:
+	  // a merge decodes its two inputs, composes, and packs the result again.
+		const chimera::HostApi api = fakeHost();
+		g_pad = 4096;
+		g_machine = Machine{};
+		chimera::StateHistory h;
+		/* the newest stretch is raw: ten frames of 4 KB. The budget holds that
+		 * and a handful of packed stretches, so the rest thins */
+		h.configure(&api, nullptr, 64u << 10);
+		h.anchorWalkFloor(1);
+		h.bands(1000, 1000, 1, 1, 10);
+		std::vector<std::array<uint8_t, Machine::kCells>> truth(1);
+		std::memcpy(truth[0].data(), g_machine.cell, Machine::kCells);
+		h.capture(0);
+		for (int64_t f = 1; f <= 300; f++)
+		{
+			h.beforeAdvance();
+			advance(f);
+			std::array<uint8_t, Machine::kCells> at{};
+			std::memcpy(at.data(), g_machine.cell, Machine::kCells);
+			truth.push_back(at);
+			h.capture(f);
+		}
+		assert(h.anchors() >= 2);
+		assert(h.bytes() <= 64u << 10);
+		int64_t offered = 0;
+		for (int64_t f = 0; f <= 300; f++)
+		{
+			if (h.nearest(f) != f) continue;
+			offered++;
+			assert(h.restore(f, error));
+			assert(std::memcmp(g_machine.cell, truth[static_cast<size_t>(f)].data(), Machine::kCells) == 0);
+		}
+		assert(offered > 0 && offered < 301);
+		g_pad = 0;
 	}
 
 	/* the spill file belongs to the history and goes with it */
