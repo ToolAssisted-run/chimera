@@ -2269,15 +2269,33 @@ What is left of the save is the newest stretch being packed on the way out and
 2.5 GB going to the disk; what is left of the load is reading 2.5 GB. The
 restore is the same because the stretch arrives as it was held either way.
 
-Found on the way, and NOT caused by any of this: `--greenzone-check` on this
-PS3 run reports the machine restored at 1500 as 543 to 552 pages (2.2 MB)
+Found on the way, and run down the same day (user-asked): `--greenzone-check`
+on this PS3 run reported the machine restored at 1500 as 543 to 552 pages
 larger than the straight pass's state - in the same process with no history
-file, cross-process from a 4, a 5 and a raw (`CHIMERA_HISTORY_PACK=0`) file
-alike, so it is the core's, not the history's; the restore itself lands on the
-same frame and the MainRAM comparisons of the rewind runs were byte-identical.
-What those pages are is an open question for the rpcs3 core (its per-process
-addresses, or pages a load dirties without changing), recorded here so it is
-not rediscovered as a greenzone bug.
+file, and from a 4, a 5 and a raw file alike, so not the history's. Two
+things, once the two states were aligned page for page:
+
+- **A miniBox defect, fixed (chimera-common-minibox b5092e5).** A page the
+  guest gives back inside an epoch (munmap, MADV_DONTNEED) is zeroed and made
+  CLEAN on the live machine, its baseline being zero - but the epoch still
+  listed it, so the delta carried its zeros and `delta_apply` marked it dirty.
+  A machine rebuilt from deltas therefore held pages a machine that ran the
+  frames did not: identical bytes, a bigger state. On Oblivion, 100 pages
+  after a 55-delta restore, all zero. A data entry's index now carries a
+  "clean" flag in its top bit, the composers keep the later entry's flag, and
+  apply leaves such a page clean. With the fix, and the GL rebuild off, the
+  restored state is the same size and the same page set as the straight one.
+- **What is left is the GPU's, not the machine's.** 44 KB in 106 pages, sizes
+  equal: about ninety pages of RGBA pixel rows (the RSX's readback into guest
+  memory - the redrawn picture, which after a restore is drawn by GL objects in
+  another state), two counters one apart, and a few read-only pages holding
+  host addresses. With the rebuild on (the default, issue #43) the rebuild's
+  own allocations add some 400 pages on top. MainRAM is identical throughout.
+
+So the byte-exact oracle cannot pass on a GPU-bridged core whose readback
+lands in guest memory, and that is not a greenzone defect; the oracle for
+such a core is the memory domain (`--dump MainRAM`), which is what every
+comparison today used.
 
 #### The stride tuner stopped listening to anchors
 
