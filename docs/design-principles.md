@@ -3913,6 +3913,15 @@ which would shrink a branch, its save and load, AND every greenzone anchor by
 the same four gigabytes. That is a change to the core's memory filesystem and is
 not done here; it is recorded because the measurement is what found it.
 
+Done the next day, in the core (rpcs3 76b992c, "not carrying the disc twice"):
+a file the game writes whose bytes are provably a stretch of a disc file is
+held as a reference to that stretch. The same state, raw, went from 5.85 GB to
+1.23 GB, its save from 12.7 s to 1.7 s and its load from 4.1 s to 1.0 s, with
+the machine byte-identical to the control through the whole movie and across
+state-file round trips. Compression of PS3 states is now a question about the
+remaining 1.2 GB, which is the machine proper (its 256 MB main memory, the
+SPUs, the RSX's local memory and the emulator's own tables).
+
 What was built: the engine reports progress through a save (against what the
 last state of the machine weighed - the end of a save is not known until it is
 reached) and a load (against the file's length), `ce_session_state_file_bytes`
