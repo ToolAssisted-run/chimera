@@ -205,7 +205,7 @@ namespace Chimera.Client.GUI
 				row.SubItems.Add(game.By);
 				row.SubItems.Add(game.Compiled is { } when ? when.ToLocalTime().ToString("yyyy-MM-dd HH:mm") : "");
 				row.SubItems.Add(game.Modules is 0 ? "" : game.Modules.ToString());
-				row.SubItems.Add(Size(game.Bytes));
+				row.SubItems.Add(SizeText(game.Bytes));
 				_list.Items.Add(row);
 			}
 			_list.EndUpdate();
@@ -214,7 +214,7 @@ namespace Chimera.Client.GUI
 			var total = PrecompiledCodeSurvey.TotalBytes(_items);
 			_header.Text = _items.Count is 0
 				? "No game has compiled code yet. A core that translates its game's code fills this when a project is created."
-				: $"{_items.Count} game{(_items.Count is 1 ? "" : "s")}, {Size(total)}. "
+				: $"{_items.Count} game{(_items.Count is 1 ? "" : "s")}, {SizeText(total)}. "
 					+ "Removing one means its game is compiled again the next time a project needs it, which costs minutes and never work.";
 			Ticked();
 			ShowDetail();
@@ -230,7 +230,7 @@ namespace Chimera.Client.GUI
 			}
 			var bytes = _items.Where(i => _ticked.Contains(i.Path)).Sum(static i => i.Bytes);
 			_removeButton.Enabled = _ticked.Count is not 0;
-			_removeButton.Text = _ticked.Count is 0 ? "&Remove" : $"&Remove ({Size(bytes)})";
+			_removeButton.Text = _ticked.Count is 0 ? "&Remove" : $"&Remove ({SizeText(bytes)})";
 		}
 
 		private void ShowDetail()
@@ -254,7 +254,7 @@ namespace Chimera.Client.GUI
 				var what = going.Count is 1 ? going[0].Label : $"{going.Count} games' compiled code";
 				var answer = MessageBox.Show(
 					this,
-					$"Remove {what}?\n\n{Size(going.Sum(static g => g.Bytes))} will be freed. "
+					$"Remove {what}?\n\n{SizeText(going.Sum(static g => g.Bytes))} will be freed. "
 						+ "Each game is compiled again the next time a project needs it.",
 					"Pre-Compiled Modules",
 					MessageBoxButtons.YesNo,
@@ -291,7 +291,7 @@ namespace Chimera.Client.GUI
 			}
 		}
 
-		private static string Size(long bytes)
+		private static string SizeText(long bytes)
 		{
 			var gb = bytes / (1024.0 * 1024 * 1024);
 			if (gb >= 1.0) return $"{gb:0.00} GB";

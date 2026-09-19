@@ -109,7 +109,11 @@ namespace Chimera.Client.Common
 		/// which carries it out before anything in the data directory is opened. Null when none is
 		/// waiting; empty means "back to the usual place".
 		/// </summary>
+		// this project is not yet in a nullable context as a whole (the newer files
+		// opt in one by one), so the annotation has to say where it applies
+#nullable enable annotations
 		public string? DataDirectoryPending { get; set; }
+#nullable restore annotations
 
 		/// <summary>Whether that change carries the existing data over, or leaves it where it is.</summary>
 		public bool DataDirectoryPendingMove { get; set; }

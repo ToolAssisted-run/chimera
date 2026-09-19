@@ -61,7 +61,7 @@ namespace Chimera.Client.GUI
 		private bool _precompiling;
 
 		/// <summary>the game's modules, and how many the sessions have finished</summary>
-		private uint _precompileExpected, _precompileDone;
+		private uint _precompileExpected;
 
 		/// <summary>Cancel was pressed while the sessions were running</summary>
 		private bool _precompileCancelled;
@@ -1162,7 +1162,6 @@ namespace Chimera.Client.GUI
 			_precompileCancelled = false;
 			// what this game needed last time, when it was compiled before
 			_precompileExpected = (uint)(_precompileManifest?.Files.Count ?? 0);
-			_precompileDone = 0;
 			_precompileBar.Visible = true;
 			_precompileBar.Value = 0;
 			// nothing behind this step may be changed while it runs: the sessions

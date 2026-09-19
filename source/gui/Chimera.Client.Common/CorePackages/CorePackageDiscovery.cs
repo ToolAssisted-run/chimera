@@ -75,7 +75,7 @@ namespace Chimera.Client.Common
 
 		/// <summary>
 		/// When this version was made, as the package itself says (see
-		/// <see cref="Chimera.Emulation.Common.WaterboxConfig.VersionDate"/>). Null for a package
+		/// <see cref="Chimera.Emulation.Common.Waterbox.WaterboxConfig.VersionDate"/>). Null for a package
 		/// from before packages said; <see cref="CoreVersionDates.Of"/> then asks what the core
 		/// manager last heard.
 		/// </summary>

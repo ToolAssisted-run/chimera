@@ -80,12 +80,6 @@ namespace Chimera.Emulation.Common.Waterbox
 		/// </summary>
 		public static string HostBuildInfo => EngineSession.HostBuildInfo;
 
-		/// <param name="rom">the game's bytes, or null when <paramref name="romPath"/> is given</param>
-		/// <param name="romPath">
-		/// Where the game lies, for the usual case of a file on disk: the engine
-		/// mounts it and the machine reads it from there, so nothing is loaded.
-		/// A disc image is routinely bigger than a byte[] can be.
-		/// </param>
 		/// <summary>
 		/// The root under which every core keeps the code it compiled for a game
 		/// (the frontend sets it from its paths); empty means none. A core's own
@@ -101,7 +95,7 @@ namespace Chimera.Emulation.Common.Waterbox
 		/// 2026-09-17). The core and the package version are recorded inside the
 		/// manifest instead of in the path, so a game keeps one directory however
 		/// often the core is rebuilt, and objects an older build compiled are
-		/// refused by <see cref="CoreCacheManifest.CompiledBy"/> rather than by
+		/// refused by <c>CoreCacheManifest.CompiledBy</c> rather than by
 		/// being filed somewhere else.
 		/// </summary>
 		public static string CoreCacheDirectoryFor(string cacheRoot, string gameSha1)
@@ -126,6 +120,12 @@ namespace Chimera.Emulation.Common.Waterbox
 					? CoreCacheDirectoryFor(CoreCacheRoot, hashed.Sha1)
 					: null;
 
+		/// <param name="rom">the game's bytes, or null when <paramref name="romPath"/> is given</param>
+		/// <param name="romPath">
+		/// Where the game lies, for the usual case of a file on disk: the engine
+		/// mounts it and the machine reads it from there, so nothing is loaded.
+		/// A disc image is routinely bigger than a byte[] can be.
+		/// </param>
 		public WaterboxCore(byte[] rom, string romPath, WaterboxConfig cfg, string packageDir, WaterboxCoreSettings settings = null, IReadOnlyDictionary<string, byte[]> firmware = null, IReadOnlyList<CoreFile> extraFiles = null)
 		{
 			_cfg = cfg;

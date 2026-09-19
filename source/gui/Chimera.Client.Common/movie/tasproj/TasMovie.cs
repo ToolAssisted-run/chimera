@@ -11,7 +11,7 @@ namespace Chimera.Client.Common
 {
 	internal sealed partial class TasMovie : MovieBase, ITasMovie
 	{
-		public new const string Extension = "chimeraProject";
+		public const string Extension = "chimeraProject";
 		private IInputPollable _inputPollable;
 
 		public const double CurrentVersion = 1.1;

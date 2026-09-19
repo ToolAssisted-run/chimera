@@ -519,7 +519,7 @@ namespace Chimera.Client.GUI
 		/// <summary>
 		/// File &gt; Core Manager. Chimera ships no cores; this is where they come
 		/// from. Opened by hand here, and by itself once when nothing is installed
-		/// (see <see cref="OpenCoreManagerIfNothingIsInstalled"/>).
+		/// (see <see cref="OfferTheCoreManagerIfNothingIsInstalled"/>).
 		/// </summary>
 		private void CoreManagerMenuItem_Click(object sender, EventArgs e) => ShowCacheManagerOrCoreManager(core: true);
 
@@ -563,7 +563,11 @@ namespace Chimera.Client.GUI
 		/// project asks for instead. A project row carries its id in Detail, which
 		/// is the key its budgets are kept under.
 		/// </summary>
+		// this project is not yet in a nullable context as a whole (the newer files
+		// opt in one by one), so the annotation has to say where it applies
+#nullable enable annotations
 		private void EditGreenzoneBudgets(CacheItem? project)
+#nullable restore annotations
 		{
 			var id = project?.Detail ?? "";
 			using GreenzoneBudgetsForm form = new(

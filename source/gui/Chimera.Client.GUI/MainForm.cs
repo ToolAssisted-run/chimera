@@ -3521,7 +3521,7 @@ namespace Chimera.Client.GUI
 
 		/// <summary>
 		/// This closes the game but does not set things up for using the client with the new null emulator.
-		/// This method should only be called (outside of <see cref="LoadNullRom(bool)"/>) if the caller is about to load a new game with no user interaction between close and load.
+		/// This method should only be called (outside of <see cref="LoadNullRom()"/>) if the caller is about to load a new game with no user interaction between close and load.
 		/// </summary>
 		/// <returns>True if the game was closed. False if the user cancelled due to unsaved changes.</returns>
 		private bool CloseGame()

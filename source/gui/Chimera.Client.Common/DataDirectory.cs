@@ -38,7 +38,7 @@ namespace Chimera.Client.Common
 	/// NOTHING HERE RUNS WHILE THE DATA IS IN USE. A project holds its state history open, the
 	/// package list holds paths into the core store, Windows holds the crash folder's path. So a
 	/// change is recorded and carried out by the next start, before any of that exists
-	/// (<see cref="Pending"/>), and this class never has to reason about who has what open.
+	/// (<see cref="ApplyPending"/>), and this class never has to reason about who has what open.
 	///
 	/// A move is a copy that is checked and only then a delete: until the last byte is in the new
 	/// place the old place is whole, and a failure at any point leaves things as they were and
