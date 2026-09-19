@@ -39,7 +39,7 @@ namespace Chimera.Emulation.Common.Waterbox
 		/// names the side that is behind, because "incompatible" on its own tells
 		/// somebody holding two files nothing about which one to replace.
 		/// </summary>
-		public static string/*?*/ Refuse(int abi)
+		public static string? Refuse(int abi)
 		{
 			if (abi > Current)
 			{

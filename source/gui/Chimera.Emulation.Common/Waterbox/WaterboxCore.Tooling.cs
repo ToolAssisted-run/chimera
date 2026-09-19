@@ -27,7 +27,7 @@ namespace Chimera.Emulation.Common.Waterbox
 		private string[] _surfaceNames = [ ];
 		private int[][] _surfaceBuffs = [ ];
 		private string[] _regNames = [ ];
-		private ITraceSink _traceSink;
+		private ITraceSink? _traceSink;
 		private bool _traceOverflowed;
 
 		/// <summary>
@@ -163,7 +163,7 @@ namespace Chimera.Emulation.Common.Waterbox
 		/// a buffer of its own and we drain it once per frame - a callback per
 		/// instruction would cross the sandbox boundary millions of times a second.
 		/// </summary>
-		public ITraceSink Sink
+		public ITraceSink? Sink
 		{
 			get => _traceSink;
 			set

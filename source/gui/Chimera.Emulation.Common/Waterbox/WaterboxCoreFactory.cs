@@ -22,13 +22,13 @@ namespace Chimera.Emulation.Common.Waterbox
 		public WaterboxCoreFactory(string packageDir)
 		{
 			_packageDir = packageDir;
-			_cfg = WaterboxConfig.FromJson(File.ReadAllText(Path.Combine(packageDir, ConfigFileName)));
-			if (_cfg is null) throw new InvalidOperationException($"{ConfigFileName} is empty or invalid");
+			_cfg = WaterboxConfig.FromJson(File.ReadAllText(Path.Combine(packageDir, ConfigFileName)))
+				?? throw new InvalidOperationException($"{ConfigFileName} is empty or invalid");
 			// before anything else is read out of it: a package from the far side of an
 			// ABI change may declare fields this build has no idea how to interpret, so
 			// the version check cannot come after the interpreting
 			if (GuestAbi.Refuse(_cfg.Abi) is { } refusal) throw new NotSupportedException($"core package \"{_cfg.CoreName}\" is {refusal}");
-			if (_cfg.HasMachines)
+			if (_cfg.Machines is { Count: > 0 } machines)
 			{
 				// a package of machines must say which setting picks one, and that
 				// setting must be one it actually declares - otherwise every session
@@ -41,7 +41,7 @@ namespace Chimera.Emulation.Common.Waterbox
 				{
 					throw new InvalidOperationException($"{ConfigFileName}: machineSetting \"{_cfg.MachineSetting}\" is not one of this package's settings");
 				}
-				foreach (var machine in _cfg.Machines)
+				foreach (var machine in machines)
 				{
 					if (string.IsNullOrEmpty(machine.Id)) throw new InvalidOperationException($"{ConfigFileName}: a machine has no id");
 					// a machine without its own controller uses the package's -
@@ -119,24 +119,30 @@ namespace Chimera.Emulation.Common.Waterbox
 		/// Without this a .sms opened with no project would boot the package's first
 		/// machine, which is a Mega Drive, and refuse the cartridge.
 		/// </summary>
-		private WaterboxCoreSettings MachinePinnedSettings(CoreCreationContext ctx)
+		private WaterboxCoreSettings? MachinePinnedSettings(CoreCreationContext ctx)
 		{
 			var settings = ctx.Settings as WaterboxCoreSettings;
-			if (!_cfg.HasMachines) return settings;
+			// both together: the constructor above refuses a package that declares
+			// machines without naming the setting that picks between them
+			if (_cfg.Machines is not { Count: > 0 } machines
+				|| _cfg.MachineSetting is not { Length: > 0 } machineSetting)
+			{
+				return settings;
+			}
 
 			// what the CALLER said, not what the package defaults to: every package
 			// has a default machine, so asking the effective settings would mean the
 			// rom never gets a say
-			var pinned = settings?.Values is not null && settings.Values.TryGetValue(_cfg.MachineSetting, out var value)
+			var pinned = settings?.Values is not null && settings.Values.TryGetValue(machineSetting, out var value)
 				? value?.ToString() ?? ""
 				: "";
-			if (_cfg.Machines.Exists(m => m.Selects(pinned))) return settings;
+			if (machines.Exists(m => m.Selects(pinned))) return settings;
 
 			var routed = _cfg.MachineForSystem(ctx.Game?.System);
 			if (routed is null) return settings;
 
 			settings = settings?.Clone() ?? new WaterboxCoreSettings();
-			settings.Values[_cfg.MachineSetting] = routed.When is { Count: > 0 } ? routed.When[0] : routed.Id;
+			settings.Values[machineSetting] = routed.When is { Count: > 0 } ? routed.When[0] : routed.Id ?? "";
 			return settings;
 		}
 
@@ -223,12 +229,12 @@ namespace Chimera.Emulation.Common.Waterbox
 				if (slots is null || slots.Count is 0) return "{}";
 				var exposed = Engine.EngineSlotsGate.Evaluate(
 					declJson, "{}", Newtonsoft.Json.JsonConvert.SerializeObject(effective));
-				var candidates = slots.Where(sl => exposed.Contains((string)sl["id"])).ToList();
+				var candidates = slots.Where(sl => exposed.Contains((string?) sl["id"] ?? "")).ToList();
 				if (candidates.Count is 0) candidates = slots.ToList();
 				// the game slot is the first that must be filled; failing that, the first
 				var chosen = candidates.FirstOrDefault(sl => (int?)sl["min"] >= 1) ?? candidates[0];
-				primary = (string)chosen["id"];
-				if (string.IsNullOrEmpty(primary)) return "{}";
+				primary = (string?) chosen["id"] ?? "";
+				if (primary.Length is 0) return "{}";
 			}
 			catch (Exception)
 			{

@@ -688,10 +688,12 @@ namespace Chimera.Emulation.Common.Engine
 		public abstract void ce_session_greenzone_before_advance(IntPtr session);
 
 		[ChimeraImport(CallingConvention.Cdecl)]
-		public abstract int ce_session_greenzone_capture(IntPtr session, long frame, byte[] note, uint noteLen);
+		// note: null for a frame with nothing to remember about it
+		public abstract int ce_session_greenzone_capture(IntPtr session, long frame, byte[]? note, uint noteLen);
 
 		[ChimeraImport(CallingConvention.Cdecl)]
-		public abstract uint ce_session_greenzone_note(IntPtr session, long frame, byte[] outBuf, uint outLen);
+		// outBuf: null asks only how many bytes there are
+		public abstract uint ce_session_greenzone_note(IntPtr session, long frame, byte[]? outBuf, uint outLen);
 
 		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_session_greenzone_restore(IntPtr session, long frame);
@@ -1806,8 +1808,8 @@ namespace Chimera.Emulation.Common.Engine
 			IReadOnlyDictionary<string, byte[]>? firmware,
 			IReadOnlyList<CoreFile>? extraFiles = null,
 			bool wantGpu = false,
-			string cacheDir = null,
-			PrecompileRequest precompile = null)
+			string? cacheDir = null,
+			PrecompileRequest? precompile = null)
 		{
 			var count = firmware?.Count ?? 0;
 			var ids = new IntPtr[Math.Max(count, 1)];
@@ -1991,10 +1993,10 @@ namespace Chimera.Emulation.Common.Engine
 		}
 
 		/// <summary>Why the last frame did not run - the core's machine is dead - or null when it ran.</summary>
-		public string Stopped { get; private set; }
+		public string? Stopped { get; private set; }
 
 		/// <summary>Why the core's machine died, or null while it lives.</summary>
-		public string GuestDeath => ChimeraEngine.PtrToStringUtf8(E.ce_session_guest_death(_session));
+		public string? GuestDeath => ChimeraEngine.PtrToStringUtf8(E.ce_session_guest_death(_session));
 
 		/// <summary>Borrowed: the last rendered frame, BGRA, Width*Height ints.</summary>
 		public IntPtr VideoBuffer => E.ce_session_video(_session);
@@ -2111,11 +2113,11 @@ namespace Chimera.Emulation.Common.Engine
 		/// coarsening and spill the history does; keeping it in a table here
 		/// would mean mirroring all of that.
 		/// </summary>
-		public void GreenzoneCapture(long frame, byte[] note = null)
+		public void GreenzoneCapture(long frame, byte[]? note = null)
 			=> E.ce_session_greenzone_capture(_session, frame, note, (uint)(note?.Length ?? 0));
 
 		/// <summary>What was stored with that frame, or null.</summary>
-		public byte[] GreenzoneNote(long frame)
+		public byte[]? GreenzoneNote(long frame)
 		{
 			var len = E.ce_session_greenzone_note(_session, frame, null, 0);
 			if (len is 0) return null;
