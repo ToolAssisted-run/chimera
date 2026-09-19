@@ -805,12 +805,14 @@ namespace Chimera.Client.GUI
 
 			var coreName = project.CoreName;
 			// the Firmware folder, every dump ever remembered for this core (Config >
-			// Firmware, earlier projects), and where this project's own sidecar
-			// last had them - all hashed, none believed on its name
+			// Firmware, earlier projects), where this project's own sidecar last had
+			// them, and what this run was told on the command line (--firmware, which
+			// goes ahead of anything remembered) - all hashed, none believed on its name
 			var index = FirmwareLocator.BuildIndex(
 				[ Config.PathEntries.FirmwareAbsolutePath() ],
 				CoreFirmwareStore.RememberedPaths(Config, coreName)
 					.Concat(pins.Select(pin => local.Firmware.TryGetValue(pin.Id, out var beside) ? beside : null))
+					.Concat(pins.Select(pin => CoreFirmwareStore.CommandLineFirmware.TryGetValue(pin.Id, out var named) ? named : null))
 					.Where(static path => path is not null)!);
 
 			List<string> unsatisfied = new();
