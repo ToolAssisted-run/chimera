@@ -113,6 +113,13 @@
       "systems": [ "Flash" ],
       "repo": "ToolAssisted-run/chimera-core-ruffle",
       "tested": ""
+    },
+    {
+      "id": "applewin",
+      "name": "AppleWin",
+      "systems": [ "AppleII" ],
+      "repo": "ToolAssisted-run/chimera-core-applewin",
+      "tested": ""
     }
   ]
 }
