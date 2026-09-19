@@ -78,13 +78,6 @@ The officially maintained cores are:
 | Flash | [Ruffle](https://github.com/ToolAssisted-run/chimera-core-ruffle) |
 | Symbian / Nokia N-Gage | [EKA2L1](https://github.com/ToolAssisted-run/chimera-core-eka2l1) |
 
-Where a system has more than one core, they are different emulators and not
-interchangeable: a movie names the package that recorded it, and two cores
-disagree about the machine in ways a run depends on. ares carries twenty-six
-machines in one package and its own README says which of them are proven, which
-have only been run against a commercial game off the record, and which are
-declared but not to be trusted yet.
-
 ## Getting a build
 
 The frontend is built for Linux and Windows and published here:
