@@ -1632,6 +1632,28 @@ namespace Chimera.Client.GUI
 			var name = Path.GetFileName(path);
 			if (list.Items.OfType<PickedFile>().Any(f => f.Name == name)) return;
 
+			// a slot whose files are read BY NAME says which names (issue #105: a
+			// memory card called anything but vmu_A1.bin..vmu_D1.bin was taken here
+			// and refused by the core at boot, a screen later)
+			var namedSlot = _declaration?.Slots.FirstOrDefault(sl => sl.Id == slotId);
+			if (namedSlot?.NamePattern is { Length: not 0 } pattern)
+			{
+				bool matches;
+				try
+				{
+					matches = System.Text.RegularExpressions.Regex.IsMatch(name, pattern);
+				}
+				catch (ArgumentException)
+				{
+					matches = true; // a core that misspells its pattern refuses nothing
+				}
+				if (!matches)
+				{
+					_status.Text = $"{name}: {(namedSlot.NameHelp.Length is 0 ? namedSlot.Help : namedSlot.NameHelp)}";
+					return;
+				}
+			}
+
 			// a cue sheet is one pick, but its track files must be next to it -
 			// the same all-or-nothing rule the engine applies at creation,
 			// raised here so the complaint lands at pick time

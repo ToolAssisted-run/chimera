@@ -256,6 +256,13 @@ to build the form, and by `ce_project_*` to validate a manifest:
   floppy or a hard disk - the user's slot choice resolves what
   sniffing had to guess).
 - `help`: the circled-question-mark tooltip text.
+- `namePattern` / `nameHelp` (optional): a regular expression the FILE
+  NAME must match, for a slot whose files the core reads by name (a
+  Dreamcast's memory cards are `vmu_A1.bin`..`vmu_D1.bin` and nothing
+  else). The wizard refuses a file that does not match when it is
+  picked, saying `nameHelp` (or `help`), instead of the core refusing
+  the whole project at boot. The engine does not enforce it: the core
+  still says no at load, which is what a hand-written project meets.
 - `exposedWhen` (optional): the condition language above, evaluated over
   the CURRENT slot map (settings do not take part - the files come
   first in the wizard). The form re-evaluates after every add and

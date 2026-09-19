@@ -30,6 +30,18 @@ namespace Chimera.Client.Common
 			public string Help { get; init; } = "";
 
 			/// <summary>
+			/// A regular expression the FILE NAME must match, when the core reads a
+			/// slot's files by name (a Dreamcast's memory cards are vmu_A1.bin..vmu_D1.bin
+			/// and nothing else): the wizard refuses a file that does not match at
+			/// pick time, with <see cref="NameHelp"/> as the reason, instead of the
+			/// core refusing the whole project at boot. Null when any name will do.
+			/// </summary>
+			public string? NamePattern { get; init; }
+
+			/// <summary>What to say when a name is refused; the slot's help when empty.</summary>
+			public string NameHelp { get; init; } = "";
+
+			/// <summary>
 			/// True when the slot's exposedWhen condition reads only SETTINGS
 			/// (directly or through combinators) - the machine decides it, and
 			/// the answer cannot change while files are being picked. A wizard
@@ -77,6 +89,8 @@ namespace Chimera.Client.Common
 							? formats.Values<string>().OfType<string>().ToList()
 							: [ ],
 						Help = item.Value<string>("help") ?? "",
+						NamePattern = item.Value<string>("namePattern"),
+						NameHelp = item.Value<string>("nameHelp") ?? "",
 						SettingGatedOnly = item["exposedWhen"] is JToken when && ReadsOnlySettings(when),
 					});
 				}
