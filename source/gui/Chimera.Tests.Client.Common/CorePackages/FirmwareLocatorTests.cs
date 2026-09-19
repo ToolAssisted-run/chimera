@@ -64,7 +64,9 @@ namespace Chimera.Tests.Client.Common.CorePackages
 				Assert.AreEqual(Sha1OfStream(path), found.Sha1);
 
 				CoreFirmwareDecl decl = new() { Id = "hdd", Display = "Hard Disk Image", Sha1 = found.Sha1 };
-				Assert.AreEqual(found.Path, FirmwareLocator.FindFor(decl, index)?.Path);
+				var byHash = FirmwareLocator.FindFor(decl, index);
+				Assert.IsNotNull(byHash, "its own digest did not find it");
+				Assert.AreEqual(found.Path, byHash.Path);
 			}
 			finally
 			{
@@ -90,8 +92,12 @@ namespace Chimera.Tests.Client.Common.CorePackages
 
 				CoreFirmwareDecl unpinned = new() { Id = "bios", Display = "Flash ROM", Name = "complex_4627.bin" };
 				Assert.IsNull(FirmwareLocator.FindFor(unpinned, index), "there is no hash to find it by");
-				StringAssert.Contains(FirmwareLocator.FindNamed(unpinned, index)?.Path, "Complex_4627.bin");
-				StringAssert.Contains(FirmwareLocator.FindEither(unpinned, index)?.Path, "Complex_4627.bin");
+				var named = FirmwareLocator.FindNamed(unpinned, index);
+				Assert.IsNotNull(named, "the declared name found nothing");
+				StringAssert.Contains(named.Path, "Complex_4627.bin");
+				var either = FirmwareLocator.FindEither(unpinned, index);
+				Assert.IsNotNull(either, "neither the hash nor the name found it");
+				StringAssert.Contains(either.Path, "Complex_4627.bin");
 
 				// and where there IS a hash, the name plays no part: only the
 				// bytes answer, and a wrong file with the right name does not

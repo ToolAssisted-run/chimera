@@ -37,16 +37,17 @@ namespace Chimera.Tests.Client.Common.Movie
 		}
 
 		/// <summary>
-		/// Per test, not once per class: ClassCleanup defaults to running at the
-		/// END OF THE ASSEMBLY, so another class restoring this variable can land
-		/// in the middle of this one's tests and send a greenzone to the real
-		/// user cache.
+		/// Per test, not once per class. ClassCleanup DEFAULTS to running at the
+		/// end of the assembly, so another class restoring this variable could
+		/// land in the middle of this one's tests and send a greenzone to the
+		/// real user cache; the cleanup below now says EndOfClass, and this stays
+		/// as the belt to that pair of braces.
 		/// </summary>
 		[TestInitialize]
 		public void UseThePlaygroundDataHome()
 			=> Environment.SetEnvironmentVariable("CHIMERA_DATA_HOME", Path.Combine(_dir, "data-home"));
 
-		[ClassCleanup]
+		[ClassCleanup(ClassCleanupBehavior.EndOfClass)]
 		public static void RemovePlayground()
 		{
 			Environment.SetEnvironmentVariable("CHIMERA_DATA_HOME", _dataHomeWas.Length is 0 ? null : _dataHomeWas);

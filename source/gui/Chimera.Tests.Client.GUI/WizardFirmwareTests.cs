@@ -24,7 +24,7 @@ namespace Chimera.Tests.Client.GUI
 			Directory.CreateDirectory(_dir);
 		}
 
-		[ClassCleanup]
+		[ClassCleanup(ClassCleanupBehavior.EndOfClass)]
 		public static void RemovePlayground() => Directory.Delete(_dir, recursive: true);
 
 		private static NewProjectWizard MakeForm(out string dir)

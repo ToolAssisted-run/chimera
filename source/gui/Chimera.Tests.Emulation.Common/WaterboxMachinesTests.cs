@@ -81,12 +81,24 @@ namespace Chimera.Tests.Emulation.Common
 			Assert.AreEqual("SMS", cfg.AllExtensions[".sms"]);
 		}
 
+		/// <summary>
+		/// A machine is always settled on, so "which one" is two questions: that
+		/// there is one at all, and that it is the right one. Asked separately so
+		/// that none says so rather than reading as the wrong id.
+		/// </summary>
+		private static void AssertMachineIs(string id, WaterboxConfig cfg, WaterboxCoreSettings settings)
+		{
+			var machine = cfg.MachineFor(WaterboxCore.EffectiveSettingsFor(cfg, settings));
+			Assert.IsNotNull(machine, "no machine was settled on at all");
+			Assert.AreEqual(id, machine.Id);
+		}
+
 		[TestMethod]
 		public void TheSettingPicksTheMachine()
 		{
 			var cfg = Cfg;
-			Assert.AreEqual("SMS", cfg.MachineFor(WaterboxCore.EffectiveSettingsFor(cfg, Pin("sms")))?.Id);
-			Assert.AreEqual("GEN", cfg.MachineFor(WaterboxCore.EffectiveSettingsFor(cfg, Pin("genesis")))?.Id);
+			AssertMachineIs("SMS", cfg, Pin("sms"));
+			AssertMachineIs("GEN", cfg, Pin("genesis"));
 		}
 
 		[TestMethod]
@@ -95,14 +107,14 @@ namespace Chimera.Tests.Emulation.Common
 			var cfg = Cfg;
 			// the machine setting's own default decides, so a session always has a
 			// machine and never has none
-			Assert.AreEqual("GEN", cfg.MachineFor(WaterboxCore.EffectiveSettingsFor(cfg, null))?.Id);
+			AssertMachineIs("GEN", cfg, null);
 		}
 
 		[TestMethod]
 		public void AValueNamingNoMachineFallsBackRatherThanFailing()
 		{
 			var cfg = Cfg;
-			Assert.AreEqual("GEN", cfg.MachineFor(WaterboxCore.EffectiveSettingsFor(cfg, Pin("nonesuch")))?.Id);
+			AssertMachineIs("GEN", cfg, Pin("nonesuch"));
 		}
 
 		[TestMethod]

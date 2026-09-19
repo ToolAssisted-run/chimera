@@ -97,7 +97,8 @@ namespace Chimera.Tests.Client.Common.CorePackages
 				["gpgx"] = [ Release("cccccccc", DateTimeOffset.Parse("2026-09-07T05:00:00Z")), Release("bbbbbbbb", DateTimeOffset.Parse("2026-09-05T05:00:00Z")) ],
 			};
 			var rows = CoreManagerModel.Build([ Roster("gpgx", "Genesis Plus GX", "GEN") ], [ Package("Genesis Plus GX", "bbbbbbbb") ], feeds);
-			Assert.AreEqual("cccccccc", rows[0].Update?.Version);
+			Assert.IsNotNull(rows[0].Update, "no update was offered at all");
+			Assert.AreEqual("cccccccc", rows[0].Update.Version);
 			Assert.IsTrue(rows[0].Has(feeds["gpgx"][1]));
 			Assert.IsFalse(rows[0].Has(feeds["gpgx"][0]));
 		}

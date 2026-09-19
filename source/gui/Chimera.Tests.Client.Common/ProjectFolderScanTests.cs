@@ -17,7 +17,7 @@ namespace Chimera.Tests.Client.Common
 			Directory.CreateDirectory(_dir);
 		}
 
-		[ClassCleanup]
+		[ClassCleanup(ClassCleanupBehavior.EndOfClass)]
 		public static void RemovePlayground() => Directory.Delete(_dir, recursive: true);
 
 		/// <summary>a saved two-file project whose files live nowhere near it</summary>

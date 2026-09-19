@@ -54,7 +54,7 @@ namespace Chimera.Tests.Client.Common.CorePackages
 		[TestMethod]
 		public void AFutureRosterIsRefusedRatherThanHalfRead()
 		{
-			Assert.ThrowsException<NotSupportedException>(static () => CoreRoster.Parse(@"{ ""formatVersion"": 99, ""cores"": [] }"));
+			Assert.ThrowsExactly<NotSupportedException>(static () => CoreRoster.Parse(@"{ ""formatVersion"": 99, ""cores"": [] }"));
 		}
 
 		[TestMethod]
