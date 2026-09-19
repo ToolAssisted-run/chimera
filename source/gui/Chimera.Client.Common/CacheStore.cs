@@ -58,8 +58,8 @@ namespace Chimera.Client.Common
 			=> Path.Combine(ProjectCache.DataHome, "Cache", "PrecompiledCode");
 
 		/// <summary>This game's precompiled code, by its SHA1. Null when there is no hash to file it under.</summary>
-		public static string PrecompiledCodeFor(string gameSha1)
-			=> string.IsNullOrEmpty(gameSha1) ? null : Path.Combine(PrecompiledCode, gameSha1.ToUpperInvariant());
+		public static string? PrecompiledCodeFor(string? gameSha1)
+			=> gameSha1 is { Length: > 0 } sha1 ? Path.Combine(PrecompiledCode, sha1.ToUpperInvariant()) : null;
 
 		/// <summary>Where both of them used to be, together, inside the install.</summary>
 		public static string Legacy => Path.Combine(PathUtils.ExeDirectoryPath, "CoreCache");

@@ -316,7 +316,7 @@ namespace Chimera.Client.Common
 			{
 				Path = path,
 				Sha1 = sha1,
-				Name = string.IsNullOrWhiteSpace(cfg.CoreName) ? fallbackName : cfg.CoreName,
+				Name = cfg.CoreName is { } named && !string.IsNullOrWhiteSpace(named) ? named : fallbackName,
 				Version = cfg.Version ?? "",
 				VersionDate = CoreVersionDates.Parse(cfg.VersionDate),
 				Systems = systems,

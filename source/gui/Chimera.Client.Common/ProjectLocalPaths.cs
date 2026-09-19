@@ -65,7 +65,7 @@ namespace Chimera.Client.Common
 		/// taken over: read, and then removed once its contents are safely here, so
 		/// the project folder ends up holding only the project.
 		/// </summary>
-		public static ProjectLocalPaths Read(EngineProject project, string projectPath = null)
+		public static ProjectLocalPaths Read(EngineProject project, string? projectPath = null)
 		{
 			ProjectLocalPaths local = new();
 			var path = PathFor(project);

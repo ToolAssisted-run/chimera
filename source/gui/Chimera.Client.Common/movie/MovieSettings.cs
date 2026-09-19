@@ -20,10 +20,10 @@ namespace Chimera.Client.Common
 		/// <returns>null when the text holds no usable settings</returns>
 		public static WaterboxCoreSettings? Decode(string? json)
 		{
-			if (string.IsNullOrWhiteSpace(json)) return null;
+			if (json is not { } text || string.IsNullOrWhiteSpace(text)) return null;
 			try
 			{
-				var root = JObject.Parse(json);
+				var root = JObject.Parse(text);
 				// wrapped movie shape, or the project's bare flat map
 				var values = root["Values"] as JObject ?? root;
 				Dictionary<string, object> map = new();

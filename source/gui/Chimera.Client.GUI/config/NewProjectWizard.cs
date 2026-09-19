@@ -57,7 +57,7 @@ namespace Chimera.Client.GUI
 		private Button _precompileButton;
 		private Label _precompileStatus;
 		private ProgressBar _precompileBar;
-		private CoreCacheManifest _precompileManifest;
+		private CoreCacheManifest? _precompileManifest;
 		private bool _precompiling;
 
 		/// <summary>the game's modules, and how many the sessions have finished</summary>
@@ -653,11 +653,11 @@ namespace Chimera.Client.GUI
 				}
 			}
 
-			if (_cfg?.HasMachines is true)
+			if (_cfg?.Machines is { Count: > 0 } machines)
 			{
 				var effective = WaterboxCore.EffectiveSettingsFor(_cfg, _settings);
 				var machine = _cfg.MachineFor(effective);
-				var at = machine is null ? -1 : _cfg.Machines.IndexOf(machine);
+				var at = machine is null ? -1 : machines.IndexOf(machine);
 				if (at >= 0) _machine.SelectedIndex = at;
 			}
 			// read before the pickers are refreshed: refreshing them selects the
@@ -784,10 +784,17 @@ namespace Chimera.Client.GUI
 		/// </summary>
 		private void PinMachine()
 		{
-			if (_cfg?.HasMachines is not true || _settings is null) return;
-			var index = Math.Max(0, Math.Min(_cfg.Machines.Count - 1, _machine.SelectedIndex));
-			var machine = _cfg.Machines[index];
-			_settings.Values[_cfg.MachineSetting] = machine.When is { Count: > 0 } ? machine.When[0] : machine.Id;
+			// the package's own loader refuses machines without a setting to pick
+			// between them, so these two are there together or not at all
+			if (_cfg?.Machines is not { Count: > 0 } machines
+				|| _cfg.MachineSetting is not { Length: > 0 } machineSetting
+				|| _settings is null)
+			{
+				return;
+			}
+			var index = Math.Max(0, Math.Min(machines.Count - 1, _machine.SelectedIndex));
+			var machine = machines[index];
+			_settings.Values[machineSetting] = machine.When is { Count: > 0 } ? machine.When[0] : machine.Id ?? "";
 			// the machine decides which files the project takes, so a form built for
 			// another machine is stale
 			_declarationCore = null;
@@ -795,8 +802,8 @@ namespace Chimera.Client.GUI
 
 		/// <summary>The machine chosen on page one, for tests.</summary>
 		public string? ChosenMachine
-			=> _cfg?.HasMachines is true && _machine.SelectedIndex >= 0
-				? _cfg.Machines[_machine.SelectedIndex].Id
+			=> _cfg?.Machines is { Count: > 0 } machines && _machine.SelectedIndex >= 0
+				? machines[_machine.SelectedIndex].Id
 				: null;
 
 		/// <summary>
@@ -1366,7 +1373,7 @@ namespace Chimera.Client.GUI
 
 		/// <summary>the exposed settings, in order, for tests</summary>
 		public string[] ExposedSettingNames
-			=> (_settings?.Declarations ?? [ ]).Select(static d => d.Name).ToArray();
+			=> (_settings?.Declarations ?? [ ]).Select(static d => d.Name ?? "").ToArray();
 
 		/// <summary>sets a value as the grid would, re-running the gate - for tests</summary>
 		internal void SetSettingValue(string name, object value)
@@ -1804,7 +1811,7 @@ namespace Chimera.Client.GUI
 			var all = _cfg.SettingsByDeclarationIndexFor(_cfg.MachineFor(effective));
 			var declarations = exposed
 				.Where(entry => entry.Index >= 0 && entry.Index < all.Count
-					&& all[entry.Index] is not null && all[entry.Index].Name == entry.Name)
+					&& all[entry.Index] is { } decl && decl.Name == entry.Name)
 				.Select(entry => all[entry.Index])
 				// ...except the renderer and the machine, which are asked beside
 				// the core on page one and would only be asked twice here
@@ -2147,8 +2154,8 @@ namespace Chimera.Client.GUI
 				Dictionary<string, object> recorded = new();
 				foreach (var decl in _settings?.Declarations ?? [ ])
 				{
-					recorded[decl.Name] = _settings!.Values is not null
-						&& _settings.Values.TryGetValue(decl.Name, out var value)
+					recorded[decl.Key] = _settings!.Values is not null
+						&& _settings.Values.TryGetValue(decl.Key, out var value)
 							? value
 							: decl.DefaultValue;
 				}
@@ -2158,8 +2165,8 @@ namespace Chimera.Client.GUI
 				// because the slot gates and the engine's own validation read it
 				if (RendererDecl() is { } rendererDecl)
 				{
-					recorded[rendererDecl.Name] = _settings?.Values is not null
-						&& _settings.Values.TryGetValue(rendererDecl.Name, out var chosen)
+					recorded[rendererDecl.Key] = _settings?.Values is not null
+						&& _settings.Values.TryGetValue(rendererDecl.Key, out var chosen)
 							? chosen
 							: rendererDecl.DefaultValue;
 				}

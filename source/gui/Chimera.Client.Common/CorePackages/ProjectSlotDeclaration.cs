@@ -69,10 +69,10 @@ namespace Chimera.Client.Common
 		/// <returns>null when the text is not a usable declaration</returns>
 		public static ProjectSlotDeclaration? Parse(string? json)
 		{
-			if (string.IsNullOrWhiteSpace(json)) return null;
+			if (json is not { } text || string.IsNullOrWhiteSpace(text)) return null;
 			try
 			{
-				var root = JObject.Parse(json);
+				var root = JObject.Parse(text);
 				if (root["slots"] is not JArray slots) return null;
 				List<Slot> parsed = new();
 				foreach (var item in slots.OfType<JObject>())

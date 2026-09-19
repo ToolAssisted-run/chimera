@@ -208,28 +208,30 @@ namespace Chimera.Client.GUI
 				Text = "Sync to audio",
 			};
 			Controls.Add(_audioSync);
+			// the two boxes are each other's handlers, so both exist before either
+			// is wired up
 			_captureOsd = new CheckBox
 			{
 				AutoSize = true,
 				Location = Pt(140, 170),
 				Text = "Capture OSD",
 			};
-			_captureOsd.CheckedChanged += (_, _) =>
-			{
-				// the OSD is drawn over the lua layer, so it cannot be had without it
-				if (_captureOsd.Checked) _captureLua.Checked = true;
-			};
-			Controls.Add(_captureOsd);
 			_captureLua = new CheckBox
 			{
 				AutoSize = true,
 				Location = Pt(272, 170),
 				Text = "Capture Lua",
 			};
+			_captureOsd.CheckedChanged += (_, _) =>
+			{
+				// the OSD is drawn over the lua layer, so it cannot be had without it
+				if (_captureOsd.Checked) _captureLua.Checked = true;
+			};
 			_captureLua.CheckedChanged += (_, _) =>
 			{
 				if (!_captureLua.Checked) _captureOsd.Checked = false;
 			};
+			Controls.Add(_captureOsd);
 			Controls.Add(_captureLua);
 
 			// ---- how it is going -------------------------------------------------

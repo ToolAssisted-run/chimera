@@ -236,7 +236,9 @@ namespace Chimera.Client.GUI
 			{
 				Title = $"{entry.CoreName}: {entry.Decl.DisplayName}",
 				Filter = "All Files|*.*",
-				FileName = entry.Path,
+				// "" and null mean the same thing to the dialog, which answers ""
+				// either way; saying "" keeps what it answers a string
+				FileName = entry.Path ?? "",
 				InitialDirectory = entry.Path is null ? "" : Path.GetDirectoryName(entry.Path) ?? "",
 			};
 			if (ofd.ShowDialog(this) is not DialogResult.OK) return;

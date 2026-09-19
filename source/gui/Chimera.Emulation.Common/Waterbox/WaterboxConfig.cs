@@ -224,7 +224,7 @@ namespace Chimera.Emulation.Common.Waterbox
 		/// own settings was quietly dropped that way, which is how a Neo Geo
 		/// came to show none of its DIP switches.
 		/// </summary>
-		public IReadOnlyList<SettingDecl> SettingsByDeclarationIndexFor(MachineConfig machine)
+		public IReadOnlyList<SettingDecl> SettingsByDeclarationIndexFor(MachineConfig? machine)
 		{
 			var decls = Settings ?? new List<SettingDecl>();
 			var key = (machine?.Id ?? "") + "\u0000"
