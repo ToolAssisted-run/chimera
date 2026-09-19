@@ -69,7 +69,7 @@ namespace Chimera.Client.Common
 			_apiContainer = apiContainer;
 
 			// Register lua libraries
-			foreach (var lib in ReflectionCache_Chi_Cli_Com.Types
+			foreach (var lib in typeof(LuaLibraries).Assembly.GetTypesWithoutLoadErrors()
 				.Where(static t => typeof(LuaLibraryBase).IsAssignableFrom(t) && t.IsSealed))
 			{
 				{

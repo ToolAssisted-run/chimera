@@ -10,6 +10,7 @@ using System.Runtime.InteropServices;
 
 using Chimera.Display;
 using Chimera.Client.Common.Filters;
+using Chimera.Common;
 using Chimera.Common.CollectionExtensions;
 using Chimera.Common.PathExtensions;
 using Chimera.Emulation.Common;
@@ -39,6 +40,14 @@ namespace Chimera.Client.Common
 		}
 
 		public const int DEFAULT_DPI = 96;
+
+		private static Stream EmbeddedResourceStream(string embedPath)
+		{
+			const string EMBED_PREFIX = "Chimera.Client.Common.Resources.";
+			var fullPath = EMBED_PREFIX + embedPath;
+			return typeof(DisplayManagerBase).Assembly.GetManifestResourceStream(fullPath)
+				?? throw new ArgumentException(paramName: nameof(embedPath), message: $"resource at {fullPath} not found");
+		}
 
 		public OSDManager OSD { get; }
 
@@ -75,9 +84,9 @@ namespace Chimera.Client.Common
 			}
 
 			{
-				using var gens = ReflectionCache.EmbeddedResourceStream("Resources.gens.ttf");
+				using var gens = EmbeddedResourceStream("gens.ttf");
 				LoadCustomFont(gens);
-				using var fceux = ReflectionCache.EmbeddedResourceStream("Resources.fceux.ttf");
+				using var fceux = EmbeddedResourceStream("fceux.ttf");
 				LoadCustomFont(fceux);
 			}
 
@@ -147,8 +156,8 @@ namespace Chimera.Client.Common
 
 				if (_theOneFont?.LineHeight != fontSize)
 				{
-					using var fontInfo = ReflectionCache.EmbeddedResourceStream($"Resources.courier{fontSize}px.fnt");
-					using var tex = ReflectionCache.EmbeddedResourceStream($"Resources.courier{fontSize}px_0.png");
+					using var fontInfo = EmbeddedResourceStream($"courier{fontSize}px.fnt");
+					using var tex = EmbeddedResourceStream($"courier{fontSize}px_0.png");
 					_theOneFont = new(_gl, fontInfo, tex);
 				}
 

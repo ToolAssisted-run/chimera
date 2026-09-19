@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 
+using Chimera.Common;
 using Chimera.Emulation.Common;
 
 namespace Chimera.Client.Common
@@ -14,7 +15,7 @@ namespace Chimera.Client.Common
 
 		static ApiManager()
 		{
-			foreach (var implType in ReflectionCache_Chi_Cli_Com.Types
+			foreach (var implType in typeof(IExternalApi).Assembly.GetTypesWithoutLoadErrors()
 				.Where(t => /*t.IsClass &&*/t.IsSealed)) // small optimisation; api impl. types are all sealed classes
 			{
 				AddApiType(implType);
