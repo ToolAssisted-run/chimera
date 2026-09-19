@@ -57,6 +57,8 @@ The officially maintained cores are:
 | Game Gear | [Genesis Plus GX](https://github.com/ToolAssisted-run/chimera-core-gpgx), [ares](https://github.com/ToolAssisted-run/chimera-core-ares) |
 | SG-1000 | [Genesis Plus GX](https://github.com/ToolAssisted-run/chimera-core-gpgx), [ares](https://github.com/ToolAssisted-run/chimera-core-ares) |
 | Dreamcast | [Flycast](https://github.com/ToolAssisted-run/chimera-core-flycast) |
+| Sega NAOMI / NAOMI 2 (arcade) | [Flycast](https://github.com/ToolAssisted-run/chimera-core-flycast) |
+| Sammy Atomiswave (arcade) | [Flycast](https://github.com/ToolAssisted-run/chimera-core-flycast) |
 | PlayStation | [ares](https://github.com/ToolAssisted-run/chimera-core-ares) |
 | PlayStation 2 | [PCSX2](https://github.com/ToolAssisted-run/chimera-core-pcsx2) |
 | PlayStation Portable | [PPSSPP](https://github.com/ToolAssisted-run/chimera-core-ppsspp) |

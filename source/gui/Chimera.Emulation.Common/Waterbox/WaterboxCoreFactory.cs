@@ -169,10 +169,10 @@ namespace Chimera.Emulation.Common.Waterbox
 			// asked for, which is how a PS3 disc reached the machine with no system
 			// software and refused itself. A precompile session loads exactly this
 			// way, so this is the path its firmware depends on.
-			if (slotsJson is "{}") slotsJson = SlotsFromRom(ctx);
-
 			var effective = WaterboxCore.EffectiveSettingsFor(
-				_cfg, ctx.Settings as WaterboxCoreSettings);
+				_cfg, MachinePinnedSettings(ctx));
+			if (slotsJson is "{}") slotsJson = SlotsFromRom(ctx, effective);
+
 			var applicable = Engine.EngineFirmware.Evaluate(
 				_cfg.RawFirmwareJson, slotsJson, Newtonsoft.Json.JsonConvert.SerializeObject(effective));
 
@@ -206,8 +206,11 @@ namespace Chimera.Emulation.Common.Waterbox
 		/// The slot map a directly-opened rom implies: its file in the package's
 		/// first required slot, which is the one the wizard calls the game. Only
 		/// the name is needed - conditions test the slot and its extension.
+		/// Among the slots THIS MACHINE exposes: a package that is several
+		/// machines declares a slot per machine (a Dreamcast's disc, a NAOMI's
+		/// rom set), and the rom belongs in the one its machine has.
 		/// </summary>
-		private string SlotsFromRom(CoreCreationContext ctx)
+		private string SlotsFromRom(CoreCreationContext ctx, Dictionary<string, object> effective)
 		{
 			var path = ctx.Roms is { Count: > 0 } roms ? roms[0]?.RomPath : null;
 			if (string.IsNullOrEmpty(path)) return "{}";
@@ -218,8 +221,12 @@ namespace Chimera.Emulation.Common.Waterbox
 				var decl = Newtonsoft.Json.Linq.JObject.Parse(declJson);
 				var slots = decl["slots"] as Newtonsoft.Json.Linq.JArray;
 				if (slots is null || slots.Count is 0) return "{}";
+				var exposed = Engine.EngineSlotsGate.Evaluate(
+					declJson, "{}", Newtonsoft.Json.JsonConvert.SerializeObject(effective));
+				var candidates = slots.Where(sl => exposed.Contains((string)sl["id"])).ToList();
+				if (candidates.Count is 0) candidates = slots.ToList();
 				// the game slot is the first that must be filled; failing that, the first
-				var chosen = slots.FirstOrDefault(sl => (int?)sl["min"] >= 1) ?? slots[0];
+				var chosen = candidates.FirstOrDefault(sl => (int?)sl["min"] >= 1) ?? candidates[0];
 				primary = (string)chosen["id"];
 				if (string.IsNullOrEmpty(primary)) return "{}";
 			}

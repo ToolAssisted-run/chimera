@@ -54,7 +54,7 @@
     {
       "id": "flycast",
       "name": "Flycast",
-      "systems": [ "DC" ],
+      "systems": [ "DC", "NAOMI", "NAOMI2", "AW" ],
       "repo": "ToolAssisted-run/chimera-core-flycast",
       "tested": ""
     },
