@@ -1544,6 +1544,12 @@ const char *ce_session_axis_name(const ce_session *s, int64_t index)
 	return s->cfg.axes[static_cast<size_t>(index)].name.c_str();
 }
 
+int32_t ce_session_axis_neutral(const ce_session *s, int64_t index)
+{
+	if (index < 0 || index >= static_cast<int64_t>(s->cfg.axes.size())) return 0;
+	return s->cfg.axes[static_cast<size_t>(index)].neutral;
+}
+
 void ce_session_set_axis(ce_session *s, int32_t index, int32_t value)
 {
 	if (s->setAxis != nullptr) s->setAxis(index, value);

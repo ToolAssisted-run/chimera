@@ -696,9 +696,12 @@ int main(int argc, char **argv)
 		{
 			std::vector<uint8_t> states(static_cast<size_t>(buttonCount), 0);
 			std::vector<int32_t> axes(static_cast<size_t>(axisCount), 0);
-			/* past the source movie's end the input is idle, which is what the
-			 * two vectors already hold. A run may outlast its input source
-			 * while recording (see --frames above); it may not read past it. */
+			for (int64_t a = 0; a < axisCount; a++) axes[static_cast<size_t>(a)] = ce_session_axis_neutral(session, a);
+			/* past the source movie's end the input is idle: no button, every
+			 * axis at its neutral (0 on a signed stick, 127 on an Apple II
+			 * paddle - zero there is the stick held hard up-left). A run may
+			 * outlast its input source while recording (see --frames above);
+			 * it may not read past it. */
 			if (i < sourceFrames && ce_session_movie_entry_decode_wide(
 					session, ce_movie_log_entry(movie, i),
 					buttonCount != 0 ? states.data() : nullptr,

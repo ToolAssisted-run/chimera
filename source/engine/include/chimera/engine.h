@@ -893,6 +893,9 @@ CE_API int64_t ce_session_button_count(const ce_session *s);
 CE_API const char *ce_session_button_name(const ce_session *s, int64_t index);
 CE_API int64_t ce_session_axis_count(const ce_session *s);
 CE_API const char *ce_session_axis_name(const ce_session *s, int64_t index);
+/* The value an axis rests at when nothing moves it (the package's `neutral`;
+ * 127 on an Apple II paddle, 0 on a signed stick). What idle input carries. */
+CE_API int32_t ce_session_axis_neutral(const ce_session *s, int64_t index);
 
 /* Whether a declared control is one THIS machine has.
  *
