@@ -874,6 +874,7 @@ namespace Chimera.Client.GUI
 				}
 
 				InputManager.RunControllerChain(Config);
+				NoteThatPlaybackOwnsTheInput();
 
 				// emu.yield()'ing scripts
 				if (Tools.Has<LuaConsole>())
@@ -1054,6 +1055,33 @@ namespace Chimera.Client.GUI
 		/// Used to disable secondary throttling (e.g. vsync, audio) for unthrottled modes or when the primary (clock) throttle is taking over (e.g. during fast forward/rewind).
 		/// </summary>
 		public static bool DisableSecondaryThrottling { get; set; }
+
+		/// <summary>
+		/// When the machine is replaying a movie, the LOG is the input and a hand on
+		/// the pad changes nothing - which is right, and was invisible: a person
+		/// pressing buttons at a game that ignores them has no way to tell that from
+		/// a bug, and reported one (issue #95). Say it, at most once every few
+		/// seconds, and only while something is actually being held.
+		/// </summary>
+		private void NoteThatPlaybackOwnsTheInput()
+		{
+			if (MovieSession.Movie is not { } movie || !movie.IsPlaying()) return;
+			if ((DateTime.UtcNow - _lastPlaybackInputNote).TotalSeconds < 6) return;
+			var held = InputManager.ActiveController;
+			var definition = held?.Definition;
+			if (definition is null) return;
+			foreach (var button in definition.BoolButtons)
+			{
+				if (!held.IsPressed(button)) continue;
+				_lastPlaybackInputNote = DateTime.UtcNow;
+				AddOnScreenMessage(Tools.IsLoaded<TAStudio>()
+					? "Playing back: the movie's input is in charge. Tick Recording mode to type your own."
+					: "Playing back: the movie's input is in charge.");
+				return;
+			}
+		}
+
+		private DateTime _lastPlaybackInputNote = DateTime.MinValue;
 
 		public void AddOnScreenMessage(string message, [LiteralExpected] int? duration = null)
 		{
