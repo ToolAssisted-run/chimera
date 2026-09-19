@@ -135,6 +135,31 @@ To run: `build\Chimera.exe` on Windows, `build/ChimeraMono.sh` on Linux, then
 
 The witness gate runs with `tests/synth/run-witness.sh`. The engineering log (objectives, procedure, and the sharp edges found along the way) is in [docs/design-principles.md](docs/design-principles.md); the engine migration is chronicled in [docs/engine-migration.md](docs/engine-migration.md). Building a new core, and joining it to this bundle, is [docs/porting-a-core.md](docs/porting-a-core.md).
 
+## Reporting a problem
+
+Open an issue on this repository, whichever core it concerns - one inbox,
+and the issue template asks for what a fix needs. The three things that
+settle most reports before anybody opens a debugger:
+
+- **The build strings.** Help > About names the frontend build
+  (`Nightly 2026-09-19 (cd4b89cd)`); the Core Manager names each core with
+  its date and commit. A frontend and a core from different days may not
+  understand each other's states, so before reporting a save/load problem,
+  match them.
+- **The project file.** A `.chimeraProject` is small and names every file
+  by hash, so attach it rather than describing it.
+- **The three crash files.** When Chimera or a core dies it writes a crash
+  note and a minidump, `<date> pid<N>.txt` and `.dmp`, into the `Crashes`
+  folder of the data directory (Config > Data Directory... opens it;
+  `%LOCALAPPDATA%\Chimera` by default on Windows), and the sandbox writes
+  `minibox-diag.log` next to `Chimera.exe`. Attach all three: the note
+  carries the faulting instruction and the machine's last words, and two of
+  three crashes in one recent report were fixed off those files alone.
+
+For an RPCS3 game that boots to nothing or draws wrongly, add a firmware
+entry named `logtrace` to the project: the core then writes its own log
+into Chimera's, and that log says what the RSX was drawing to.
+
 ## Contributing
 
 Pull requests are welcome, from people and from people working with AI assistants alike. A contribution is judged on its merits: it should build, pass the witness gate, and keep to the project's scope. The one firm requirement is legal cleanliness: you must have the right to submit the code under this repository's MIT license, and anything derived from other works must respect their licenses and carry the attribution they require.
