@@ -565,6 +565,94 @@ PY
 		fi
 	fi
 
+	# --- a script's input, while TAStudio extends the movie past its end ---
+	# The piano roll open is a different frame loop, and past the end of the log
+	# it is not replaying anything: each frame out there is AUTHORED as it is
+	# reached. A seek turns recording off for its duration so the rows it passes
+	# over are not typed over - and out past the end, where there are no rows to
+	# protect, that used to throw away everything being pressed: the frames were
+	# written from the autoholds alone, so a script's joypad.set reached neither
+	# the movie nor the machine (issue #95).
+	#
+	# Three runs pin both halves of the rule. Recording asked for and a button
+	# held must reach the log AND the core (the controller it is handed, and a
+	# RAM that diverges from the run that held nothing); recording asked for and
+	# nothing held must stay empty; and read-only play past the end must STILL
+	# extend from the autoholds alone, whatever a script presses - nobody is
+	# recording there.
+	#
+	# The project is the win movie cut to its first five frames, so the game is
+	# still being played when the extension starts: gridWalker FREEZES once it
+	# is won or lost (SPEC/rom), and a frozen machine ignores input, which would
+	# make the RAM comparison prove nothing. Held from there, Down retraces the
+	# winning path, so every extended frame is a real move.
+	if [ "$record" -eq 0 ]; then
+		tname=gridWalker.win
+		trom="$here/roms/${tname%%.*}.testrom"
+		tdir="$work/tastudio-input-leg"
+		rm -rf "$tdir" && mkdir -p "$tdir"
+		cp "$trom" "$tdir/gridWalker.testrom"
+		python3 - "$here/movies/$tname.txt" "$tdir/gridWalker.testrom" "$tdir/$tname.chimeraProject" <<'TASPY'
+import hashlib, json, sys
+entries = [l.rstrip("\r\n") for l in open(sys.argv[1]) if l.startswith("|")][:5]
+logkey = "#P1 Up|P1 Down|P1 Left|P1 Right|P1 A|P1 B|P1 Select|P1 Start|"
+sha1 = hashlib.sha1(open(sys.argv[2], "rb").read()).hexdigest().upper()
+json.dump({
+    "title": "gridWalker.win",
+    "core": {"name": "Synth", "version": "", "sha1": ""},
+    "headers": {"MovieVersion": "Chimera Project File v1.1", "Platform": "Synth"},
+    "files": [{"name": "gridWalker.testrom", "sha1": sha1, "slot": "rom"}],
+    "input": "[Input]\nLogKey:" + logkey + "\n" + "\n".join(entries) + "\n[/Input]\n",
+}, open(sys.argv[3], "w"))
+TASPY
+		textend=8
+		tfailed=0
+		for case in "held:1:1" "empty:1:0" "readonly:0:1"; do
+			cname="${case%%:*}"; trest="${case#*:}"
+			trecord="${trest%%:*}"; tpress="${trest#*:}"
+			tjob="$work/job.tastudio-$cname.txt"
+			{
+				echo "meta=$tdir/$cname.meta.txt"
+				echo "outram=$tdir/$cname.ram.bin"
+				echo "extend=$textend"
+				echo "button=P1 Down"
+				echo "press=$tpress"
+				echo "record=$trecord"
+			} > "$tjob"
+			rm -f "$tdir/$cname.meta.txt" "$tdir/$cname.ram.bin"
+			cp "$config" "$work/config.tastudio-$cname.ini"
+			( cd "$repo_root" && CHIMERA_JOB="$tjob" timeout 300 mono "$emu_exe" --headless \
+				"--config=$work/config.tastudio-$cname.ini" "--core=$repo_root/build/Cores/synth-box.chimeraCore" \
+				"--project=$tdir/$tname.chimeraProject" "--lua=$here/synth-tastudio-input.lua" ) > "$tdir/$cname.log" 2>&1
+			if [ ! -f "$tdir/$cname.meta.txt" ] || ! grep -q "^status=OK" "$tdir/$cname.meta.txt"; then
+				report "T:box:$cname" FAIL "$(sed -n 's/^detail=//p' "$tdir/$cname.meta.txt" 2>/dev/null || echo "run failed") (see $tdir/$cname.log)"
+				tfailed=1
+			fi
+		done
+		if [ "$tfailed" -eq 0 ]; then
+			theld="$(sed -n 's/^recorded=//p' "$tdir/held.meta.txt")"
+			theldout="$(sed -n 's/^machine=//p' "$tdir/held.meta.txt")"
+			tempty="$(sed -n 's/^recorded=//p' "$tdir/empty.meta.txt")"
+			tro="$(sed -n 's/^recorded=//p' "$tdir/readonly.meta.txt")"
+			if [ "$theld" != "$textend" ]; then
+				report "T:box:luaInput" FAIL "the held button reached $theld of $textend extended frames in the log"
+			elif [ "$theldout" != "$textend" ]; then
+				report "T:box:luaInput" FAIL "the log holds every press but the core was handed $theldout of $textend"
+			elif cmp -s "$tdir/held.ram.bin" "$tdir/empty.ram.bin"; then
+				report "T:box:luaInput" FAIL "RAM identical to the run that held nothing - the press never moved the machine"
+			else
+				report "T:box:luaInput" PASS "a script's press authors every extended frame, and the core plays it"
+			fi
+			if [ "$tempty" != "0" ]; then
+				report "T:box:luaQuiet" FAIL "nothing was pressed, yet $tempty extended frames hold the button"
+			elif [ "$tro" != "0" ]; then
+				report "T:box:luaQuiet" FAIL "read-only play past the end wrote $tro pressed frames; only the autoholds may reach it"
+			else
+				report "T:box:luaQuiet" PASS "an unpressed frame stays empty, and read-only extension still takes only the autoholds"
+			fi
+		fi
+	fi
+
 	# --- a core that stops, in the real frontend ---
 	# The synth core dies on cue (SPEC.md): all eight buttons abort, all but Up
 	# follow a wild pointer - the second arrives as a SIGSEGV inside a process

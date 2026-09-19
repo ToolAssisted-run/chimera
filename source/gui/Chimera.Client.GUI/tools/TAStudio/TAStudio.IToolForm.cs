@@ -57,7 +57,27 @@ namespace Chimera.Client.GUI
 		{
 			if (CurrentTasMovie.IsAtEnd() && !CurrentTasMovie.IsRecording())
 			{
-				CurrentTasMovie.RecordFrame(CurrentTasMovie.Emulator.Frame, MovieSession.StickySource);
+				// Past the end of the log there is no row to play back, so this frame
+				// is AUTHORED here rather than replayed - and what it holds is what
+				// the machine is then handed, because MovieSession reads the row back
+				// a moment later.
+				//
+				// A seek turns recording off for its duration (GoToFrame) so that the
+				// rows it passes over are replayed instead of being typed over. Out
+				// here there are no rows to protect, and writing the autoholds alone
+				// would throw away everything actually being pressed - a hand on the
+				// pad, or a script's joypad.set - for as long as the movie is being
+				// extended. WasRecording is the person's own answer to "am I
+				// authoring": when it is set, the extension is written from the same
+				// input record mode would have written (MovieIn), so a script and a
+				// hand reach the movie the same way (issue #95).
+				//
+				// Read-only play past the end is untouched: with nobody recording,
+				// the autoholds remain the only way to hold a button out here.
+				IController extendFrom = WasRecording && MovieSession.MovieIn is not null
+					? MovieSession.MovieIn
+					: MovieSession.StickySource;
+				CurrentTasMovie.RecordFrame(CurrentTasMovie.Emulator.Frame, extendFrom);
 			}
 		}
 

@@ -3949,3 +3949,54 @@ file that carries the bodies as they are held (`ChimeraHistory5`), so a save of
 packed stretches is a copy and a load takes them as they are: the same PS3
 history, 2.57 GB, saved in 4.7 s instead of 18.5 and loaded in 1.0 s instead
 of 23.1.
+
+## A script's input reaches the frames TAStudio invents (issue #95, 2026-09-19)
+
+Reported against a PS2 project: a Lua script opened TAStudio, asked for
+recording mode and pressed a button every frame for a hundred frames, and the
+movie log held the press on none of them - nor did the machine's own pad
+readout. Reproduced on Linux with the synth core in seconds, and the press
+turned out not to be lost where the report pointed.
+
+With TAStudio actually recording, `joypad.set` reaches the log and the core on
+every frame: it lands on `ActiveController` through the override adapter, which
+is where a physical press lands too, and record mode writes whatever is there.
+What loses it is the state the script was really in. TAStudio owns playback, so
+a script drives it with `tastudio.setplayback(target)` - and a seek turns
+recording OFF for its duration (`GoToFrame`), so that the rows it passes over
+are replayed rather than typed over. That rule is right, and it is kept.
+
+Past the END of the log there are no rows to protect. A seek out there cannot
+replay anything: every frame has to be AUTHORED as it is reached, which
+TAStudio does itself in `UpdateBefore` - and it was writing them from
+`MovieSession.StickySource`, the autohold/autofire controller alone. So the
+extension threw away everything actually being pressed, by a hand on the pad as
+much as by a script, and because `MovieSession` then reads that same row back
+to feed the core, the machine saw nothing pressed either. Both halves of the
+report, one cause.
+
+The extension now takes its input from `MovieSession.MovieIn` - the same
+controller record mode would have written - whenever `WasRecording` says the
+person asked to record and a seek is what took it away. Read-only play past the
+end is untouched: with nobody recording, the autoholds remain the only way to
+hold a button out there, which is what that mode has always meant. Witnessed by
+three runs of a new Level-B leg (`T:box:luaInput`, `T:box:luaQuiet`): a held
+button must reach every extended row, the controller the core is handed, and
+the machine's RAM; an unpressed run must leave those rows empty; and a
+read-only run must leave them empty however hard a script presses.
+
+Two traps worth writing down for the next unattended TAStudio script. The piano
+roll pauses again on its own the moment a seek ends, so `client.unpause()`
+belongs INSIDE the loop, with `emu.yield()` and not `emu.frameadvance()` - a
+script parked in frameadvance is never resumed to notice it was paused, and
+what looks like a hang is the run loop spinning beside it. And the order of the
+two calls matters: `setrecording` before `setplayback` is the shape that used
+to lose the input, because the seek is what suspends recording.
+
+Found in the same round: every tastudio Lua method that asked for the tool
+without calling `Engaged()` first handed the script a raw
+NullReferenceException, because `Tools.TAStudio` is a get-or-CREATE - the call
+built a window and died inside it on the project that was not there.
+`getrecording`, `setrecording`, `togglerecording`, `setbranchtext` and
+`get_branch_index_by_id` now answer the way the rest of the library already
+did: false, nil, or nothing done.

@@ -78,17 +78,24 @@ namespace Chimera.Client.GUI
 			return Tools.Has<TAStudio>(); // TODO: eventually tastudio should have an engaged flag
 		}
 
+		// Nothing here reaches for the piano roll before Engaged() says there is
+		// one. Tools.TAStudio is a GET-OR-CREATE, so an ungated call on a session
+		// with no TAStudio open does not fail politely: it builds the window and
+		// then dies inside it on the project that is not there, and what the
+		// script is handed is a raw NullReferenceException from a property it
+		// never named. engaged() exists so a script can ask; a script that did
+		// not ask still gets an answer, not a stack trace.
+
 		[LuaMethodExample("if ( tastudio.getrecording( ) ) then\r\n\tconsole.log( \"returns whether or not TAStudio is in recording mode\" );\r\nend;")]
-		[LuaMethod("getrecording", "returns whether or not TAStudio is in recording mode")]
+		[LuaMethod("getrecording", "returns whether or not TAStudio is in recording mode (false if TAStudio is not open)")]
 		public bool GetRecording()
-		{
-			return Tastudio.TasPlaybackBox.RecordingMode;
-		}
+			=> Engaged() && Tastudio.TasPlaybackBox.RecordingMode;
 
 		[LuaMethodExample("tastudio.setrecording( true );")]
 		[LuaMethod("setrecording", "sets the recording mode on/off depending on the parameter")]
 		public void SetRecording(bool val)
 		{
+			if (!Engaged()) return;
 			if (Tastudio.TasPlaybackBox.RecordingMode != val)
 			{
 				Tastudio.ToggleReadOnly();
@@ -99,6 +106,7 @@ namespace Chimera.Client.GUI
 		[LuaMethod("togglerecording", "toggles tastudio recording mode on/off depending on its current state")]
 		public void SetRecording()
 		{
+			if (!Engaged()) return;
 			Tastudio.ToggleReadOnly();
 		}
 
@@ -457,6 +465,7 @@ namespace Chimera.Client.GUI
 		[LuaMethod("setbranchtext", "adds the given message to the existing branch, or to the branch that will be created next if branch index is not specified")]
 		public void SetBranchText(string text, int? index = null)
 		{
+			if (!Engaged()) return;
 			var text1 = text;
 			if (index != null)
 			{
@@ -498,6 +507,7 @@ namespace Chimera.Client.GUI
 			description: "Finds the branch with the given UUID (0-indexed). Returns nil if not found.")]
 		public int? GetBranchIndexByID(string id)
 		{
+			if (!Engaged()) return null;
 			if (!Guid.TryParseExact(id, format: "D", out var parsed))
 			{
 				Log($"not a valid UUID: {id}");
