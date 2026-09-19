@@ -389,6 +389,8 @@ executable(
   cpp_args: engine_build_args,
   c_args: engine_build_args,
   dependencies: [dl_dep] + gl_bridge_deps,
+  # CommandLineToArgvW: the tool takes its arguments from the wide command line on Windows
+  link_args: host_machine.system() == 'windows' ? ['-lshell32'] : [],
   install: true,
   install_dir: 'dll',  # beside libminiboxhost + libzstd, which it loads from its own directory
 )

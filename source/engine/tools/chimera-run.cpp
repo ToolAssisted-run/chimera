@@ -85,6 +85,9 @@
 
 #ifdef _WIN32
 #include <direct.h>
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <shellapi.h>
 #else
 #include <sys/stat.h>
 #endif
@@ -161,10 +164,44 @@ int fail(const std::string &metaPath, const std::string &detail)
 	return 2;
 }
 
+#if defined(_WIN32)
+// The C runtime hands main an ANSI argv: a path with a letter outside the
+// code page ("Broderbund" with its o-slash) arrives already wrong. The wide
+// command line is what the shell really said; every path here is UTF-8 from
+// this point on, as the engine takes them.
+std::vector<std::string> utf8Arguments()
+{
+	std::vector<std::string> out;
+	int n = 0;
+	wchar_t **wide = CommandLineToArgvW(GetCommandLineW(), &n);
+	if (wide == nullptr) return out;
+	for (int i = 0; i < n; i++)
+	{
+		int len = WideCharToMultiByte(CP_UTF8, 0, wide[i], -1, nullptr, 0, nullptr, nullptr);
+		std::string s(len > 0 ? static_cast<size_t>(len - 1) : 0, '\0');
+		if (len > 0) WideCharToMultiByte(CP_UTF8, 0, wide[i], -1, &s[0], len, nullptr, nullptr);
+		out.push_back(std::move(s));
+	}
+	LocalFree(wide);
+	return out;
+}
+#endif
+
 } // namespace
 
 int main(int argc, char **argv)
 {
+#if defined(_WIN32)
+	std::vector<std::string> utf8 = utf8Arguments();
+	std::vector<char *> utf8Argv;
+	if (!utf8.empty())
+	{
+		for (std::string &a : utf8) utf8Argv.push_back(&a[0]);
+		utf8Argv.push_back(nullptr);
+		argc = static_cast<int>(utf8.size());
+		argv = utf8Argv.data();
+	}
+#endif
 	const char *packagePath = nullptr, *romPath = nullptr, *moviePath = nullptr;
 	const char *settings = nullptr;
 	std::string metaPath;
