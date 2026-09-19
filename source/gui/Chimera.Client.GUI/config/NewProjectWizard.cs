@@ -329,11 +329,11 @@ namespace Chimera.Client.GUI
 			_firmwareList.Columns.Add("Status", UIHelper.ScaleX(160));
 			_firmwareList.SelectedIndexChanged += (_, _) => UpdateFirmwareButtons();
 			_firmwareList.DoubleClick += (_, _) => SetFirmwareFile();
-			_firmwareSetButton = new Button { AutoSize = true, Location = Pt(8, 344), Text = "Select File..." };
+			_firmwareSetButton = new Button { Anchor = AnchorStyles.Bottom | AnchorStyles.Left, AutoSize = true, Location = Pt(8, 344), Text = "Select File..." };
 			_firmwareSetButton.Click += (_, _) => SetFirmwareFile();
-			_firmwareClearButton = new Button { AutoSize = true, Location = Pt(110, 344), Text = "Clear" };
+			_firmwareClearButton = new Button { Anchor = AnchorStyles.Bottom | AnchorStyles.Left, AutoSize = true, Location = Pt(110, 344), Text = "Clear" };
 			_firmwareClearButton.Click += (_, _) => ClearFirmwareFile();
-			Button firmwareScanButton = new() { AutoSize = true, Location = Pt(178, 344), Text = "Scan Folder..." };
+			Button firmwareScanButton = new() { Anchor = AnchorStyles.Bottom | AnchorStyles.Left, AutoSize = true, Location = Pt(178, 344), Text = "Scan Folder..." };
 			firmwareScanButton.Click += (_, _) => ScanFirmwareFolder();
 			firmwareScanButton.Visible = pickFirmwareFolder is not null;
 			p4.Controls.AddRange([ _firmwareList, _firmwareSetButton, _firmwareClearButton, firmwareScanButton ]);
@@ -374,7 +374,7 @@ namespace Chimera.Client.GUI
 				Size = new(UIHelper.ScaleX(544), UIHelper.ScaleY(14)),
 				Visible = false,
 			};
-			_precompileButton = new Button { AutoSize = true, Location = Pt(8, 344), Text = "Compile" };
+			_precompileButton = new Button { Anchor = AnchorStyles.Bottom | AnchorStyles.Left, AutoSize = true, Location = Pt(8, 344), Text = "Compile" };
 			_precompileButton.Click += (_, _) => RunPrecompile();
 			_precompileStatus = new Label
 			{
@@ -1437,12 +1437,15 @@ namespace Chimera.Client.GUI
 					foreach (var path in DroppedPaths(e)) AddFileToSlot(slot.Id, path);
 				};
 
-				Button add = new() { AutoSize = true, Location = Pt(416, 18), Text = "Add..." };
+				// The buttons are anchored to the RIGHT like the list is, so a wider
+				// window widens the list and moves them along; anchored to the left
+				// they stayed put and the list grew over them (issue #103).
+				Button add = new() { Anchor = AnchorStyles.Top | AnchorStyles.Right, AutoSize = true, Location = Pt(416, 18), Text = "Add..." };
 				add.Click += (_, _) =>
 				{
 					foreach (var path in _pickFiles(slot)) AddFileToSlot(slot.Id, path);
 				};
-				Button remove = new() { AutoSize = true, Location = Pt(416, 48), Text = "Remove" };
+				Button remove = new() { Anchor = AnchorStyles.Top | AnchorStyles.Right, AutoSize = true, Location = Pt(416, 48), Text = "Remove" };
 				remove.Click += (_, _) =>
 				{
 					if (list.SelectedIndex >= 0) list.Items.RemoveAt(list.SelectedIndex);
@@ -1460,6 +1463,7 @@ namespace Chimera.Client.GUI
 					{
 						Button b = new()
 						{
+							Anchor = AnchorStyles.Top | AnchorStyles.Right,
 							Location = Pt(378, top),
 							Size = new(UIHelper.ScaleX(32), UIHelper.ScaleY(28)),
 							Text = glyph,
