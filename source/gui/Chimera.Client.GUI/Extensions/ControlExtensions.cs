@@ -1,5 +1,6 @@
 ﻿#nullable enable
 
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -389,6 +390,87 @@ namespace Chimera.Client.GUI
 
 		public static bool IsCtrlShift(this KeyEventArgs e, Keys key)
 			=> !e.Alt && e.Control && e.Shift && e.KeyCode == key;
+
+		/// <summary>
+		/// The grid's own description pane holds two lines and then gives up, and
+		/// a core's setting is described in a paragraph - so the pane showed
+		/// "Size the state pool to this machine and this system when a movie loads: a
+		/// quarter of the RAM that is actually free (never less..." and the rest was
+		/// only readable as a tooltip, one line wide enough to cross the screen
+		/// (issue #41). This puts a read-only text box under the grid instead: it
+		/// wraps, it SCROLLS, and it is filled from whatever row is selected. The
+		/// grid's own pane and its tooltip are turned off, so there is one place a
+		/// description is read and it is a place that can hold one.
+		/// </summary>
+		/// <param name="lines">how tall the box is, in lines of the grid's font</param>
+		public static TextBox UseScrollableDescription(this PropertyGrid grid, int lines = 5)
+		{
+			grid.HelpVisible = false;
+			SuppressGridTooltip(grid);
+
+			var gap = UIHelper.ScaleY(4);
+			var height = (grid.Font.Height * lines) + UIHelper.ScaleY(8);
+			TextBox box = new()
+			{
+				Anchor = (grid.Anchor & ~AnchorStyles.Top) | AnchorStyles.Bottom,
+				BackColor = SystemColors.Window,
+				BorderStyle = BorderStyle.FixedSingle,
+				Location = new Point(grid.Left, grid.Bottom - height),
+				Multiline = true,
+				ReadOnly = true,
+				ScrollBars = ScrollBars.Vertical,
+				Size = new Size(grid.Width, height),
+				TabStop = false,
+				WordWrap = true,
+			};
+			grid.Height -= height + gap;
+			grid.Parent?.Controls.Add(box);
+			box.BringToFront();
+
+			void Show(GridItem item)
+			{
+				var pd = item?.PropertyDescriptor;
+				box.Text = pd is null
+					? ""
+					: string.IsNullOrEmpty(pd.Description)
+						? pd.DisplayName
+						: pd.DisplayName + Environment.NewLine + Environment.NewLine + pd.Description;
+				box.Select(0, 0);
+			}
+			grid.SelectedGridItemChanged += (_, e) => Show(e.NewSelection);
+			// and when the grid is given something else to show: the first row of a
+			// fresh object is selected without the item-changed event being raised
+			// on every runtime, which left the box empty until something was clicked
+			grid.SelectedObjectsChanged += (_, _) => Show(grid.SelectedGridItem);
+			Show(grid.SelectedGridItem);
+			return box;
+		}
+
+		/// <summary>
+		/// The hover tooltip the grid shows for a row repeats the description as a
+		/// single line, which for a paragraph is a line wider than the screen. There
+		/// is no property for it, so this reaches for the view's tooltip and turns
+		/// it off; a runtime that keeps it somewhere else simply keeps its tooltip,
+		/// and the description box above is what people read either way.
+		/// </summary>
+		private static void SuppressGridTooltip(PropertyGrid grid)
+		{
+			try
+			{
+				foreach (var field in grid.GetType().GetFields(BindingFlags.Instance | BindingFlags.NonPublic))
+				{
+					if (field.GetValue(grid) is not Control view) continue;
+					foreach (var inner in view.GetType().GetFields(BindingFlags.Instance | BindingFlags.NonPublic))
+					{
+						if (inner.GetValue(view) is ToolTip tip) tip.Active = false;
+					}
+				}
+			}
+			catch
+			{
+				// a tooltip that will not be found is a tooltip, not a failure
+			}
+		}
 
 		/// <summary>
 		/// Changes the description height area to match the rows needed for the largest description in the list

@@ -308,6 +308,11 @@ namespace Chimera.Client.GUI
 				UpdateNavLabels();
 			};
 			p3.Controls.Add(_settingsGrid);
+			// AFTER the page owns it: the box goes in beside the grid, and a grid
+			// with no parent has nowhere to put one. A core describes its settings
+			// in paragraphs (waterbox.config) and the grid's own pane holds two
+			// lines of them (issue #41).
+			_settingsGrid.UseScrollableDescription();
 
 			// ---- page 4: firmware, decided by everything chosen above ------------
 			var p4 = _pages[3];
