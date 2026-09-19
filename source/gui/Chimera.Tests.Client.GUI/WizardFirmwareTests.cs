@@ -114,7 +114,7 @@ namespace Chimera.Tests.Client.GUI
 			File.WriteAllText(Path.Combine(dir, "some other file.bin"), "not firmware");
 			var index = FirmwareLocator.BuildIndex([ dir ]);
 
-			var cfg = Chimera.Emulation.Common.Waterbox.WaterboxConfig.FromJson("""
+			var cfg = TestPackages.Config("""
 				{
 				  "coreName": "xemu", "systemId": "XBOX",
 				  "video": { "width": 640, "height": 480 },

@@ -233,7 +233,7 @@ namespace Chimera.Tests.Client.GUI
 		public void TheFreeSpaceFloorIsShownAndSavedAndZeroTurnsItOff()
 		{
 			const long GB = 1024L * 1024 * 1024;
-			CacheCleanPolicy saved = null;
+			CacheCleanPolicy? saved = null;
 			using CacheManagerForm form = new(() => Three(),
 				policy: new CacheCleanPolicy { LimitBytes = 100 * GB, FreeSpaceFloorBytes = 20 * GB },
 				savePolicy: p => saved = p,

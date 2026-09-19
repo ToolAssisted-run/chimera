@@ -29,7 +29,7 @@ namespace Chimera.Tests.Client.GUI
 		{
 			NewProjectWizard form = new([ ], static _ => [ ]);
 			form.Show();
-			form.UseDeclaration(ProjectSlotDeclaration.Parse(Declaration));
+			form.UseDeclaration(TestPackages.Slots(Declaration));
 			return form;
 		}
 
@@ -62,7 +62,7 @@ namespace Chimera.Tests.Client.GUI
 		[TestMethod]
 		public void TheParserReadsThePattern()
 		{
-			var decl = ProjectSlotDeclaration.Parse(Declaration)!;
+			var decl = TestPackages.Slots(Declaration);
 			var save = System.Linq.Enumerable.First(decl.Slots, static s => s.Id == "savedata");
 			Assert.AreEqual("^vmu_[A-D][12]\\.bin$", save.NamePattern);
 			Assert.IsNull(System.Linq.Enumerable.First(decl.Slots, static s => s.Id == "disc").NamePattern);

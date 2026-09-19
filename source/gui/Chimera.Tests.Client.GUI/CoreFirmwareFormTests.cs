@@ -20,9 +20,9 @@ namespace Chimera.Tests.Client.GUI
 			string core,
 			string id,
 			CoreFirmwareState state,
-			string path = null,
+			string? path = null,
 			bool required = true,
-			string sha1 = null,
+			string? sha1 = null,
 			params string[] expected)
 			=> new()
 			{
@@ -52,7 +52,7 @@ namespace Chimera.Tests.Client.GUI
 
 		private static CoreFirmwareForm MakeForm(
 			IReadOnlyList<CoreFirmwareEntry> entries,
-			Action<CoreFirmwareEntry, string> setPath = null)
+			Action<CoreFirmwareEntry, string?>? setPath = null)
 		{
 			var rows = entries.ToList();
 			CoreFirmwareForm form = new(() => rows, (entry, path) => setPath?.Invoke(entry, path));
@@ -100,7 +100,8 @@ namespace Chimera.Tests.Client.GUI
 		[TestMethod]
 		public void ClearForgetsTheSelectedRow()
 		{
-			List<(string Core, string Id, string Path)> calls = new();
+			// a clear hands back a null path, which is exactly what is asserted below
+			List<(string Core, string Id, string? Path)> calls = new();
 			using var form = MakeForm(
 				[ Entry("Core", "bios", CoreFirmwareState.Good, "/roms/disksys.rom") ],
 				(entry, path) => calls.Add((entry.CoreName, entry.Decl.Id, path)));

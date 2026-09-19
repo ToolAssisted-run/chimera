@@ -86,7 +86,7 @@ namespace Chimera.Tests.Emulation.Common.Engine
 			try
 			{
 				var opened = false;
-				string failure = null;
+				string? failure = null;
 				var thread = new Thread(() =>
 				{
 					try

@@ -73,7 +73,7 @@ namespace Chimera.Tests.Client.GUI
 		{
 			if (ShotDir is null) { Assert.Inconclusive("set CHIMERA_UI_SHOTS to write screenshots"); return; }
 
-			CoreFirmwareEntry Entry(string core, string id, string display, string description, CoreFirmwareState state, string path, bool required = true)
+			CoreFirmwareEntry Entry(string core, string id, string display, string description, CoreFirmwareState state, string? path, bool required = true)
 				=> new()
 				{
 					CoreName = core,

@@ -70,7 +70,7 @@ namespace Chimera.Tests.Client.GUI
 		{
 			if (ShotDir is null) { Assert.Inconclusive("set CHIMERA_UI_SHOTS to write screenshots"); return; }
 			using var form = MakeWizard();
-			form.UseRenderersFrom(WaterboxConfig.FromJson("""
+			form.UseRenderersFrom(TestPackages.Config("""
 				{
 				  "coreName": "flycast",
 				  "systemId": "DC",
@@ -99,7 +99,7 @@ namespace Chimera.Tests.Client.GUI
 				File.WriteAllText(Path.Combine(dir, "bonus (track 1).bin"), "data track");
 				File.WriteAllText(Path.Combine(dir, "bonus (track 2).bin"), "audio track");
 				using var form = MakeWizard();
-				form.UseDeclaration(ProjectSlotDeclaration.Parse(DosboxDeclaration));
+				form.UseDeclaration(TestPackages.Slots(DosboxDeclaration));
 				form.AddFileToSlot("floppy", "/home/you/games/alleycat/disk1.img");
 				form.AddFileToSlot("floppy", "/home/you/games/alleycat/disk2.img");
 				form.AddFileToSlot("cdrom", Path.Combine(dir, "bonus.cue"));
@@ -117,7 +117,7 @@ namespace Chimera.Tests.Client.GUI
 			if (ShotDir is null) { Assert.Inconclusive("set CHIMERA_UI_SHOTS to write screenshots"); return; }
 			using var form = MakeWizard();
 			// mutually exclusive slots: the picked disk greys the cartridge
-			form.UseDeclaration(ProjectSlotDeclaration.Parse("""
+			form.UseDeclaration(TestPackages.Slots("""
 				{
 				  "slots": [
 				    { "id": "cart", "title": "Cartridge", "min": 1, "max": 1, "formats": ["nes"],
@@ -179,7 +179,7 @@ namespace Chimera.Tests.Client.GUI
 		{
 			if (ShotDir is null) { Assert.Inconclusive("set CHIMERA_UI_SHOTS to write screenshots"); return; }
 			using var form = MakeWizard();
-			var cfg = WaterboxConfig.FromJson("""
+			var cfg = TestPackages.Config("""
 				{
 				  "coreName": "PCSX2",
 				  "systemId": "PS2",

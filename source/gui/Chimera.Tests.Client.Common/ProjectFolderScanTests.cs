@@ -8,7 +8,7 @@ namespace Chimera.Tests.Client.Common
 	[TestClass]
 	public class ProjectFolderScanTests
 	{
-		private static string _dir;
+		private static string _dir = "";
 
 		[ClassInitialize]
 		public static void MakePlayground(TestContext _)

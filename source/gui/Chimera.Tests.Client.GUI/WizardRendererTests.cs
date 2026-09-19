@@ -15,7 +15,7 @@ namespace Chimera.Tests.Client.GUI
 	public class WizardRendererTests
 	{
 		private static WaterboxConfig CfgWithRenderers()
-			=> WaterboxConfig.FromJson("""
+			=> TestPackages.Config("""
 				{
 				  "coreName": "two-renderers",
 				  "systemId": "DC",
@@ -30,7 +30,7 @@ namespace Chimera.Tests.Client.GUI
 				""");
 
 		private static WaterboxConfig CfgWithoutRenderers()
-			=> WaterboxConfig.FromJson("""
+			=> TestPackages.Config("""
 				{
 				  "coreName": "one-renderer",
 				  "systemId": "NES",

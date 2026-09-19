@@ -67,7 +67,7 @@ namespace Chimera.Tests.Client.GUI
 			form.Show();
 			form.UseSettingsFrom(TwoMachines());
 			form.SetSettingValue("machine", machine);
-			form.UseDeclaration(ProjectSlotDeclaration.Parse(Declaration));
+			form.UseDeclaration(TestPackages.Slots(Declaration));
 			return form;
 		}
 
@@ -102,7 +102,7 @@ namespace Chimera.Tests.Client.GUI
 			form.Show();
 			using (form)
 			{
-				form.UseDeclaration(ProjectSlotDeclaration.Parse(Declaration));
+				form.UseDeclaration(TestPackages.Slots(Declaration));
 				CollectionAssert.AreEqual(new[] { "nes", "fds" }, new List<string>(form.OfferedFormats("rom")),
 					"no machines declared means nothing to narrow by");
 			}

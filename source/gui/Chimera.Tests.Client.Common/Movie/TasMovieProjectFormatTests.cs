@@ -138,7 +138,7 @@ namespace Chimera.Tests.Client.Common.Movie
 		}
 
 		/// <summary>What a branch's state file holds, or null for a branch that has none.</summary>
-		private static byte[] StateOf(TasMovie movie, TasBranch branch)
+		private static byte[]? StateOf(TasMovie movie, TasBranch branch)
 			=> branch.StateFile is null ? null : File.ReadAllBytes(movie.BranchStatePath(branch.StateFile));
 
 		private static TasMovie LoadFresh(string path)

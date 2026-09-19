@@ -33,12 +33,13 @@ namespace Chimera.Tests.Client.GUI
 			internal readonly List<VideoEncodeRequest> Started = new();
 			internal int Cancels;
 			internal VideoEncodeProgress Progress = new(VideoEncodePhase.Idle, 0, 0, 0, 0, null, null);
-			internal string Refusal;
+			/// <summary>why the next encode is refused, or null to let it start</summary>
+			internal string? Refusal;
 			internal readonly List<string> AskedToOverwrite = new();
 			internal bool Overwrite = true;
 			internal readonly EncodeVideoForm Form;
 
-			internal Harness(IReadOnlyList<TasMovieMarker> markers = null, Config config = null)
+			internal Harness(IReadOnlyList<TasMovieMarker>? markers = null, Config? config = null)
 			{
 				Form = new(
 					markers ?? Markers(),

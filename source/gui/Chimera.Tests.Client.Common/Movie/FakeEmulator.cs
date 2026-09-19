@@ -118,9 +118,11 @@ namespace Chimera.Tests.Client.Common.Movie
 
 		public int SavesQueued { get; private set; }
 
-		public string LastSavePath { get; private set; }
+		/// <summary>null until something has actually been saved.</summary>
+		public string? LastSavePath { get; private set; }
 
-		public string LastSaveMachineId { get; private set; }
+		/// <summary>null until something has actually been saved.</summary>
+		public string? LastSaveMachineId { get; private set; }
 
 		public bool SaveLater(string path, string machineId)
 		{

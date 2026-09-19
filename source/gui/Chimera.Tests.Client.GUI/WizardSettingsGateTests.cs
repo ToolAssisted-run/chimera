@@ -24,7 +24,7 @@ namespace Chimera.Tests.Client.GUI
 			""";
 
 		private static WaterboxConfig MakeCfg()
-			=> WaterboxConfig.FromJson("""
+			=> TestPackages.Config("""
 				{
 				  "coreName": "GPGX-shaped",
 				  "systemId": "GEN",
@@ -48,7 +48,7 @@ namespace Chimera.Tests.Client.GUI
 		{
 			NewProjectWizard form = new([ ], static _ => [ ]);
 			form.Show();
-			form.UseDeclaration(ProjectSlotDeclaration.Parse(Declaration));
+			form.UseDeclaration(TestPackages.Slots(Declaration));
 			form.AddFileToSlot("cart", $"/games/{cartName}");
 			form.UseSettingsFrom(MakeCfg());
 			return form;
@@ -78,7 +78,7 @@ namespace Chimera.Tests.Client.GUI
 		}
 
 		private static WaterboxConfig MakeCfgWithFirmware()
-			=> WaterboxConfig.FromJson("""
+			=> TestPackages.Config("""
 				{
 				  "coreName": "GPGX-shaped",
 				  "systemId": "GEN",
@@ -111,7 +111,7 @@ namespace Chimera.Tests.Client.GUI
 			using (form)
 			{
 				form.Show();
-				form.UseDeclaration(ProjectSlotDeclaration.Parse(Declaration));
+				form.UseDeclaration(TestPackages.Slots(Declaration));
 				form.AddFileToSlot("cart", "/games/sonic.md");
 				form.UseSettingsFrom(MakeCfgWithFirmware());
 

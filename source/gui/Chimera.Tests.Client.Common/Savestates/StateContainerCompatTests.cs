@@ -63,7 +63,7 @@ namespace Chimera.Tests.Client.Common.Savestates
 				using var loader = ZipStateLoader.LoadAndDetect(path);
 				Assert.IsNotNull(loader);
 				Assert.AreEqual(3, loader.Version);
-				byte[] read = null;
+				byte[]? read = null;
 				Assert.IsTrue(loader.GetLump(BinaryStateLump.Corestate, abort: false, br => read = br.ReadBytes(coreState.Length + 1)));
 				CollectionAssert.AreEqual(coreState, read, "streaming-compressed zstd lump survived");
 				var header = "";
@@ -142,7 +142,7 @@ namespace Chimera.Tests.Client.Common.Savestates
 
 				using var loader = ZipStateLoader.LoadAndDetect(path);
 				Assert.IsNotNull(loader);
-				byte[] read = null;
+				byte[]? read = null;
 				loader.GetCoreState(br => read = br.ReadBytes(coreState.Length + 1), tr => { });
 				CollectionAssert.AreEqual(coreState, read);
 			}

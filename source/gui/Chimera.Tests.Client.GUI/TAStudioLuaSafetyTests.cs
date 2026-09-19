@@ -30,19 +30,19 @@ namespace Chimera.Tests.Client.GUI
 		/// </summary>
 		private sealed class NoLuaLibraries : ILuaLibraries
 		{
-			public LuaFile CurrentFile => null;
+			public LuaFile? CurrentFile => null;
 
 			public bool IsRebootingCore { get; set; }
 
 			public bool IsUpdateSupressed { get; set; }
 
-			public PathEntryCollection PathEntries => null;
+			public PathEntryCollection? PathEntries => null;
 
 			public ApiGroup ProhibitedApis => ApiGroup.NONE;
 
-			public NLuaTableHelper GetTableHelper() => null;
+			public NLuaTableHelper? GetTableHelper() => null;
 
-			public void Sandbox(LuaFile luaFile, Action callback, Action<string> exceptionCallback = null, ApiGroup prohibitedApis = ApiGroup.NONE)
+			public void Sandbox(LuaFile luaFile, Action callback, Action<string>? exceptionCallback = null, ApiGroup prohibitedApis = ApiGroup.NONE)
 				=> callback();
 		}
 

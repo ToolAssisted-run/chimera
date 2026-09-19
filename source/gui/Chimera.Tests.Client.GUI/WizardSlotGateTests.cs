@@ -28,7 +28,7 @@ namespace Chimera.Tests.Client.GUI
 		{
 			NewProjectWizard form = new([ ], static _ => [ ]);
 			form.Show();
-			form.UseDeclaration(ProjectSlotDeclaration.Parse(Declaration));
+			form.UseDeclaration(TestPackages.Slots(Declaration));
 			return form;
 		}
 

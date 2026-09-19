@@ -17,7 +17,7 @@ namespace Chimera.Tests.Client.GUI
 	[TestClass]
 	public class FirmwareSurveyFormTests
 	{
-		private static FirmwareSurveyRow Row(string core, string id, string label, CoreFirmwareState state, string sha1 = null, string path = null)
+		private static FirmwareSurveyRow Row(string core, string id, string? label, CoreFirmwareState state, string? sha1 = null, string? path = null)
 			=> new()
 			{
 				CoreName = core,
@@ -41,8 +41,11 @@ namespace Chimera.Tests.Client.GUI
 
 		private sealed class Harness : IDisposable
 		{
-			internal readonly List<(FirmwareSurveyRow Row, string Path)> Remembered = new();
-			internal string NextPick;
+			// a clear remembers a null path, which is the whole point of it
+			internal readonly List<(FirmwareSurveyRow Row, string? Path)> Remembered = new();
+
+			/// <summary>what the file picker answers next; null is a cancelled pick</summary>
+			internal string? NextPick;
 			internal IReadOnlyList<FirmwareSurveyGroup> Groups;
 			internal readonly FirmwareSurveyForm Form;
 
@@ -98,6 +101,7 @@ namespace Chimera.Tests.Client.GUI
 			using Harness h = new(Ps2(releases: 2, onHand: 1));
 			var list = ListOf(h.Form);
 			list.Items[1].Selected = true;
+			Assert.IsNotNull(h.Form.SelectedRow, "clicking a row selected nothing");
 			Assert.AreEqual("release 1", h.Form.SelectedRow.Decl.Label);
 
 			h.NextPick = "/somewhere/else.bin";

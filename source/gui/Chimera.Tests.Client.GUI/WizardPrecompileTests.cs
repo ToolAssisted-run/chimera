@@ -23,7 +23,7 @@ namespace Chimera.Tests.Client.GUI
 		/// rebuilt" changes this and nothing else.
 		/// </summary>
 		private static WaterboxConfig CfgThatCompiles(string version = "1")
-			=> WaterboxConfig.FromJson($$"""
+			=> TestPackages.Config($$"""
 				{
 				  "coreName": "compiles",
 				  "systemId": "PS3",
@@ -36,7 +36,7 @@ namespace Chimera.Tests.Client.GUI
 				""");
 
 		private static WaterboxConfig CfgThatDoesNot()
-			=> WaterboxConfig.FromJson("""
+			=> TestPackages.Config("""
 				{
 				  "coreName": "plain",
 				  "systemId": "NES",

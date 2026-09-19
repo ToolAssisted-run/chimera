@@ -59,7 +59,7 @@ namespace Chimera.Tests.Client.Common.CorePackages
 		private static readonly Build Newer = new() { Sha1 = new string('b', 40), Installed = new(2026, 9, 12) };
 		private static readonly Build Local = new() { Sha1 = new string('c', 40), Installed = new(2026, 9, 5) };
 
-		private static Build Pick(string pinned, string chosen, params Build[] builds)
+		private static Build? Pick(string? pinned, string? chosen, params Build[] builds)
 			=> CoreChoices.PickBuild(builds, static b => b.Sha1, static b => b.Installed, pinned, chosen);
 
 		[TestMethod]
