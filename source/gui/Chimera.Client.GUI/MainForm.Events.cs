@@ -1,3 +1,4 @@
+using System;
 ﻿using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -230,12 +231,38 @@ namespace Chimera.Client.GUI
 		private void WindowSizeSubMenu_DropDownOpened(object sender, EventArgs e)
 		{
 			var windowScale = Config.GetWindowScaleFor(Emulator.SystemId);
+			// Which sizes this screen can hold: FrameBufferResized walks the asked
+			// zoom DOWN until the window fits the working area, so on a 1080p
+			// screen a 1280x720 PS3 picture is 1x whatever was picked, and a menu
+			// that showed 2x checked with 1x, 2x and 3x all doing the same thing
+			// was reporting the wish and not the window (issue #101). The entries
+			// that cannot fit say so and are disabled; the check mark sits on the
+			// size the window actually is.
+			var fits = int.MaxValue;
+			if (_currentVideoProvider is not null && WindowState is FormWindowState.Normal)
+			{
+				var area = Screen.FromControl(this).WorkingArea;
+				var borderWidth = Size.Width - _presentationPanel.Control.Size.Width;
+				var borderHeight = Size.Height - _presentationPanel.Control.Size.Height;
+				fits = 0;
+				for (var zoom = 1; zoom <= EmuClientApi.WINDOW_SCALE_MAX; zoom++)
+				{
+					var size = DisplayManager.CalculateClientSize(_currentVideoProvider, zoom);
+					if (size.Width + borderWidth >= area.Width || size.Height + borderHeight >= area.Height) break;
+					fits = zoom;
+				}
+			}
+			var effective = fits is int.MaxValue ? windowScale : Math.Max(1, Math.Min(windowScale, fits));
 			foreach (var item in WindowSizeSubMenu.DropDownItems)
 			{
 				// filter out separators
 				if (item is ToolStripMenuItem menuItem && menuItem.Tag is int itemScale)
 				{
-					menuItem.Checked = itemScale == windowScale && Config.ResizeWithFramebuffer;
+					var tooBig = fits is not int.MaxValue && itemScale > fits;
+					menuItem.Checked = itemScale == effective && Config.ResizeWithFramebuffer;
+					menuItem.Enabled = !tooBig;
+					var label = $"{(itemScale >= 10 ? (itemScale / 10).ToString() : string.Empty)}&{itemScale % 10}x";
+					menuItem.Text = tooBig ? $"{label}  (larger than this screen)" : label;
 				}
 			}
 			DisableResizeWithFramebufferMenuItem.Checked = !Config.ResizeWithFramebuffer;
