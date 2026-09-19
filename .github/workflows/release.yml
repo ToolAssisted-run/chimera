@@ -156,11 +156,34 @@ jobs:
       - name: Release notes
         id: notes
         if: steps.moved.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           short="${{ steps.what.outputs.short }}"
+          # Everything that landed since the previous build of this kind, not
+          # just the top commit (issue #76): the last nightly tag for a
+          # nightly, the dev release's commit for dev. With nothing to measure
+          # from (the first build, a shallow clone) the top commit alone.
+          if [ "${{ steps.what.outputs.kind }}" = "dev" ]; then
+            since=$(gh release view dev --json targetCommitish --jq .targetCommitish 2>/dev/null || true)
+          else
+            since=$(git tag -l 'nightly-*' --sort=-creatordate | head -1)
+          fi
+          if [ -n "$since" ] && git rev-parse -q --verify "$since^{commit}" >/dev/null 2>&1 \
+             && [ "$(git rev-parse "$since^{commit}")" != "$(git rev-parse HEAD)" ]; then
+            changes=$(git log --no-merges --format='- %s (`%h`)' "$since..HEAD")
+          else
+            changes=""
+          fi
           {
             echo "Built from \`$short\` - $(git log -1 --format=%s)"
             echo
+            if [ -n "$changes" ]; then
+              echo "Since ${since#nightly-}:"
+              echo
+              echo "$changes"
+              echo
+            fi
             echo "| what | file |"
             echo "| --- | --- |"
             echo "| Windows x64 | \`chimera-win-x64-$short.zip\` |"
