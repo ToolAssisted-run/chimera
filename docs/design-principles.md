@@ -4031,3 +4031,63 @@ The corollary, learned the same week at the cost of a shipped regression:
 with its own commit body saying no disc on hand used the format, so the fix
 "waits for a game of sprites to prove it". A game of sprites arrived the next
 day and the fix was itself the bug.
+
+## The colours are data, and Light is the ones we had (user-decided, 2026-09-20)
+
+Issue #112: the bright white is a strain on the eyes, and the reporter, who
+does not write code, offered to contribute palettes. The decision was: do it
+everywhere rather than on a subset of windows, ship at least Light and Dark,
+and Light must be pixel-for-pixel what Chimera has today.
+
+The shape follows from the second half of that. If Light has to be today's
+palette, then today's palette has to be written down somewhere, and once it is
+written down there is no reason for it to be the only one. So a theme is one
+colour for every role the frontend paints with - `ThemeColorRole`, about ninety
+of them - and nothing else: a flat JSON object of role name to `#RRGGBB`, read
+from `Themes/` under the data directory, with Light and Dark compiled in as the
+same kind of file. A role that a theme does not answer is an error naming the
+role, not a default: a window that is dark except for one panel is worse to
+look at and much harder to report than one that is not dark at all. `basedOn`
+lets a contributor change five colours instead of ninety, and Config > Theme >
+Write a Copy to Edit hands them a complete file to start from.
+
+Light says `"system:ControlText"` where the code said `SystemColors.ControlText`,
+so it is the desktop's palette rather than a guess at it. The one shim is
+`system:Control`: Mono answers that with a beige nobody wants, and every window
+in the frontend has replaced it with WhiteSmoke since long before themes, so
+that substitution is part of what `system:` means. Under Light the tool strips
+and the ListView headers are also left with the drawing they already had -
+a colour table built out of system colours is the same colours and a different
+drawing, and looking different is the one thing Light must not do.
+`LightThemeBaselineTests` carries the literals copied out of the code they used
+to live in and fails by name if `light.json` moves one.
+
+Applying it is explicit, because WinForms has none of this. One walk sets each
+control's colours from its type; the surfaces a BackColor does not reach are
+handled by name (tool strips through a renderer, DataGridView through its cell
+styles, ListView headers by owner-drawing them, LinkLabel through LinkColor);
+and a control that paints itself takes the theme through `IThemedControl`
+rather than being guessed at. The obligation is carried by the base class -
+every window derives from `ThemedForm`, which runs the walk on handle creation,
+and `ThemingContractTests` fails the build if one is added that does not. That
+is the part that was asked for explicitly: a window added later must be themed
+by existing, not by somebody remembering.
+
+Two rules fell out of doing it. A colour that MEANS something is declared as a
+role (`SetForeRole(ThemeColorRole.AccentError)`) rather than assigned, or the
+walk flattens it back to plain text on the next theme change - and the wizard
+was reading a colour back OUT as state, counting its green rows to say how many
+modules were compiled, which any theme would have broken. And a control made
+after the window opened has to be themed when it arrives: TAStudio's piano
+rolls are built when a project opens, and were the one white thing left on a
+dark window until the walk started hooking the containers it passes.
+
+Where a user already had a say, the theme yields to it. TAStudio's palette, the
+hex editor's six colours and the OSD's four follow the theme only while nobody
+has set them; a config from before themes holds the old light values, and those
+are read as "nobody set anything" so an old config follows the theme too.
+
+What no theme reaches, and it is worth being plain about: scroll bars, the tick
+inside a check box, the window's own title bar. Those are drawn by the desktop
+out of the desktop's colours and WinForms offers no way to ask for others. A
+dark Chimera has light scroll bars.
