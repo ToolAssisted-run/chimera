@@ -878,6 +878,21 @@ namespace Chimera.Client.GUI
 		}
 
 		/// <summary>
+		/// Go back to a step because something is wrong with it, saying what.
+		/// ShowPage clears the status - it is moving to a fresh step and the last
+		/// step's complaint does not belong there - so a refusal that sets the
+		/// text and THEN calls ShowPage erases its own reason a line later. Every
+		/// create-time failure did exactly that, which is why they arrived as a
+		/// progress bar that flickered and a wizard that went backwards for no
+		/// stated reason.
+		/// </summary>
+		private void ShowPageBecause(int page, string why)
+		{
+			ShowPage(page);
+			_status.Text = why;
+		}
+
+		/// <summary>
 		/// Whether a step applies at all. A machine that needs no firmware is not
 		/// asked about firmware; a core that compiles nothing has nothing to
 		/// compile. Both depend on the choices made so far, so this is re-asked
@@ -1762,6 +1777,12 @@ namespace Chimera.Client.GUI
 		/// <summary>The page's live complaint line, for tests.</summary>
 		public string StatusText => _status.Text;
 
+		/// <summary>ShowPage, for the test that checks a clean arrival says nothing</summary>
+		public void ShowPageForTest(int page) => ShowPage(page);
+
+		/// <summary>ShowPageBecause, for the test that checks a refusal survives the page change</summary>
+		public void ShowPageBecauseForTest(int page, string why) => ShowPageBecause(page, why);
+
 		/// <summary>The canonical names in one slot, in order, for tests.</summary>
 		public string[] SlotFileNames(string slotId)
 			=> _slotLists.TryGetValue(slotId, out var list)
@@ -2165,9 +2186,8 @@ namespace Chimera.Client.GUI
 			}
 			catch (InvalidOperationException ex)
 			{
-				_status.Text = ex.Message;
 				project.Dispose();
-				ShowPage(1);
+				ShowPageBecause(1, ex.Message);
 				return;
 			}
 
@@ -2239,9 +2259,8 @@ namespace Chimera.Client.GUI
 			}
 			if (declarationJson is not null && project.Validate(declarationJson) is { } refusal)
 			{
-				_status.Text = refusal;
 				project.Dispose();
-				ShowPage(1);
+				ShowPageBecause(1, refusal);
 				return;
 			}
 
