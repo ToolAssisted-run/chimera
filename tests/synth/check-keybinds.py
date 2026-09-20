@@ -10,6 +10,12 @@ shipped = json.load(open(sys.argv[2]))
 name = sys.argv[3]
 
 want = shipped["AllTrollers"][name]
+# An empty set of shipped bindings agrees with ANY config: the comparison below
+# is over want's own keys, so with nothing to want, nothing can differ and the
+# check passes having compared nothing. That is how a gate stays green over an
+# empty database, so say it instead.
+if not want:
+    sys.exit(f"the package ships no bindings for '{name}' - there is nothing to check")
 got = cfg.get("AllTrollers", {}).get(name)
 if got is None:
     sys.exit(f"the frontend has no bindings at all for '{name}'")
