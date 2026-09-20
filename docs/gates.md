@@ -80,6 +80,12 @@ The check inspects the thing at rest and never in the state where it breaks.
 > opens on Dark. Every test built its windows under Light, which is the one
 > starting state in which the bug cannot happen.
 
+> And a third time on the same control, which is what makes it a pattern rather
+> than three mistakes: after the normal row and the chosen row came the row
+> under the POINTER, drawn as a bar with nothing written on it. A control the
+> frontend draws itself has no toolkit underneath, so a state nobody enumerated
+> is not drawn wrong - it is not drawn.
+
 **What to do.** Enumerate the states the thing has - selected, focused, empty,
 disabled, mid-operation, at a boundary - and say which the leg covers. A leg
 that covers one state should say so in its own description, so the next person

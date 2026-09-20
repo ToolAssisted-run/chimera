@@ -110,6 +110,16 @@ namespace Chimera.Client.Common
 
 		InactiveSelectionText,
 
+		/// <summary>
+		/// The row the pointer is on. A tint of the background and nothing more:
+		/// the text on a hovered row keeps its own colour, because a colour that
+		/// MEANS something - a firmware file that is missing, a game nothing can
+		/// name - has to keep meaning it while somebody points at it. That is also
+		/// why there is no HoverText: every text role has to stay readable on this
+		/// one, and ThemeContrastTests holds each of them to it.
+		/// </summary>
+		HoverBackground,
+
 		// ---- lists, grids, headers -----------------------------------------
 
 		/// <summary>The rules between cells in a grid or a list.</summary>

@@ -3,6 +3,8 @@
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
+using System.ComponentModel;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Windows.Forms;
 
@@ -240,7 +242,93 @@ namespace Chimera.Client.GUI
 			}
 		}
 
+		/// <summary>
+		/// A list is painted with its own events held off - see <see cref="Quietly"/>
+		/// for why - and everything else is painted directly.
+		/// </summary>
 		private static void ApplyToOne(Control c, Theme theme, Overrides? own)
+		{
+			if (c is ListView list)
+			{
+				Quietly(list, () => Paint(c, theme, own));
+				return;
+			}
+			Paint(c, theme, own);
+		}
+
+		/// <summary>
+		/// The events a ListView raises when its handle is remade, which is not a
+		/// thing that happened: the rows were not ticked and the selection did not
+		/// move, the control was rebuilt underneath them.
+		/// </summary>
+		private static readonly string[] SpuriousListEvents =
+		[
+			// .NET Framework's names, then Mono's for the same three
+			"EVENT_ITEMCHECKED", "EVENT_SELECTEDINDEXCHANGED", "EVENT_ITEMSELECTIONCHANGED",
+			"ItemCheckedEvent", "SelectedIndexChangedEvent", "ItemSelectionChangedEvent",
+		];
+
+		private static PropertyInfo? _componentEvents;
+
+		/// <summary>
+		/// Paints a list with its tick and selection handlers unhooked, and hooks
+		/// them back afterwards whatever happens.
+		///
+		/// Giving a ListView a different border recreates its handle, and WinForms
+		/// rebuilds a recreated list by pushing every item back into it one at a
+		/// time - raising ItemChecked for each, and moving the selection on the way.
+		/// The window on the other end of those events has no way to know they are
+		/// not real. Pre-Compiled Modules died of it on being opened: its handler
+		/// walks ListView.Items, and a collection half way through being rebuilt is
+		/// a NullReferenceException out of the toolkit's own enumerator.
+		///
+		/// A theme is a coat of paint. It must not be able to tell a window that
+		/// somebody ticked a row.
+		///
+		/// The handlers are reached through the EventHandlerList every Component
+		/// keeps, which is the only way to take a subscriber off an event you do not
+		/// own. The key for each event is a private static field whose name differs
+		/// between the two toolkits, so both names are tried; if neither is there,
+		/// nothing is unhooked and the paint still happens. Failing to find it costs
+		/// the suppression, never the painting.
+		/// </summary>
+		private static void Quietly(ListView list, Action paint)
+		{
+			List<(object Key, Delegate Handler)> held = [];
+			EventHandlerList? events = null;
+			try
+			{
+				_componentEvents ??= typeof(Component)
+					.GetProperty("Events", BindingFlags.Instance | BindingFlags.NonPublic);
+				events = _componentEvents?.GetValue(list) as EventHandlerList;
+				if (events is not null)
+				{
+					foreach (var name in SpuriousListEvents)
+					{
+						var field = typeof(ListView).GetField(name, BindingFlags.Static | BindingFlags.NonPublic);
+						if (field?.GetValue(null) is not { } key) continue;
+						if (events[key] is not { } handler) continue;
+						events.RemoveHandler(key, handler);
+						held.Add((key, handler));
+					}
+				}
+			}
+			catch (Exception)
+			{
+				// a toolkit that does not keep its events where we looked; paint anyway
+			}
+
+			try
+			{
+				paint();
+			}
+			finally
+			{
+				foreach (var (key, handler) in held) events!.AddHandler(key, handler);
+			}
+		}
+
+		private static void Paint(Control c, Theme theme, Overrides? own)
 		{
 			var state = own ?? For(c);
 			// before anything is assigned, and only ever once: what the toolkit
@@ -647,8 +735,20 @@ namespace Chimera.Client.GUI
 			// recreated list comes back with nothing selected and scrolled to the
 			// top. Changing the theme is not an instruction to forget which row
 			// somebody had picked.
-			var chosen = list.SelectedIndices.Cast<int>().ToArray();
-			var top = list.View is View.Details ? list.TopItem?.Index ?? -1 : -1;
+			//
+			// Only for a list that is already on screen, though, and that guard is
+			// load-bearing: asking a ListView for SelectedIndices or TopItem CREATES
+			// its handle, and creating a ListView's handle inserts its items into the
+			// native control one at a time, each insertion raising ItemChecked. The
+			// walk runs when the WINDOW's handle is made, which is before the
+			// children have theirs, so this was manufacturing a burst of tick events
+			// inside a window that had not finished opening. Pre-Compiled Modules
+			// died of it: its handler walks ListView.Items, and ListView.Items is not
+			// walkable half way through being rebuilt. A list with no handle has
+			// nothing chosen and nothing scrolled, so there is nothing to preserve.
+			var live = list.IsHandleCreated;
+			var chosen = live ? list.SelectedIndices.Cast<int>().ToArray() : [];
+			var top = live && list.View is View.Details ? list.TopItem?.Index ?? -1 : -1;
 			if (wanted)
 			{
 				list.OwnerDraw = true;
@@ -686,25 +786,48 @@ namespace Chimera.Client.GUI
 			list.Invalidate();
 		}
 
-		/// <summary>What a row's background is: the selection when it is one, otherwise whatever the row was given.</summary>
-		private static Color RowBackground(ListView list, ListViewItem item, Theme theme)
-			=> item.Selected
-				? theme[list.Focused ? ThemeColorRole.Selection : ThemeColorRole.InactiveSelection]
-				: item.BackColor;
+		/// <summary>
+		/// Every state a row can be in. A list that is owner-drawn is drawn ENTIRELY
+		/// by us, so a state nobody thought about is not "drawn by the toolkit
+		/// instead", it is not drawn at all - which is how a row the pointer was on
+		/// became an empty bar.
+		///
+		/// The order matters and is the order below: disabled beats everything,
+		/// then the selection, then the pointer. A row that is both selected and
+		/// under the pointer stays the selection, deliberately - the selection is
+		/// the stronger statement and moving the mouse over the row you have
+		/// already chosen should not change what it looks like.
+		/// </summary>
+		private static bool Hot(ListViewItemStates states) => (states & ListViewItemStates.Hot) is not 0;
+
+		/// <summary>What a row's background is, in whichever state it is in.</summary>
+		private static Color RowBackground(ListView list, ListViewItem item, Theme theme, ListViewItemStates states)
+		{
+			if (!list.Enabled) return theme[ThemeColorRole.DisabledBackground];
+			if (item.Selected) return theme[list.Focused ? ThemeColorRole.Selection : ThemeColorRole.InactiveSelection];
+			return Hot(states) ? theme[ThemeColorRole.HoverBackground] : item.BackColor;
+		}
 
 		/// <summary>
 		/// And its text. A selected row's own colour is given up to the selection,
 		/// which is what every list does - a colour that means something (a missing
 		/// firmware file in red) is readable again the moment the row is not
 		/// selected, and unreadable text on the highlight helps nobody.
+		///
+		/// A HOVERED row is the other way round: only its background changes, and
+		/// the text keeps the colour that means something. So every text role has
+		/// to stay readable on HoverBackground, which ThemeContrastTests checks.
 		/// </summary>
 		private static Color RowForeground(ListView list, ListViewItem item, ListViewItem.ListViewSubItem sub, Theme theme)
-			=> item.Selected
+		{
+			if (!list.Enabled) return theme[ThemeColorRole.DisabledText];
+			return item.Selected
 				? theme[list.Focused ? ThemeColorRole.SelectionText : ThemeColorRole.InactiveSelectionText]
 				// a sub-item's own ForeColor is the LIST's until somebody turns
 				// UseItemStyleForSubItems off; reading it instead of the item's is
 				// how a whole window of red and green firmware rows came out grey
 				: item.UseItemStyleForSubItems ? item.ForeColor : sub.ForeColor;
+		}
 
 		private static void DrawHeader(object sender, DrawListViewColumnHeaderEventArgs e)
 		{
@@ -788,7 +911,7 @@ namespace Chimera.Client.GUI
 				e.DrawDefault = true;
 				return;
 			}
-			using SolidBrush back = new(RowBackground(list, e.Item, Current));
+			using SolidBrush back = new(RowBackground(list, e.Item, Current, e.State));
 			var right = Math.Max(e.Bounds.Right, list.ClientRectangle.Right);
 			e.Graphics.FillRectangle(back, new Rectangle(e.Bounds.Left, e.Bounds.Top, right - e.Bounds.Left, e.Bounds.Height));
 		}
@@ -801,9 +924,19 @@ namespace Chimera.Client.GUI
 			var item = e.Item;
 			if (item is null) return;
 
-			using SolidBrush back = new(item.Selected || item.UseItemStyleForSubItems
-				? RowBackground(list, item, theme)
-				: (e.SubItem ?? item.SubItems[0]).BackColor);
+			// WinForms hands this event a null SubItem when it is redrawing a row
+			// because the pointer moved onto it - the same event, with ItemIndex -1
+			// and nothing in SubItem. The background was being painted from that and
+			// the TEXT was being skipped, so pointing at a row wiped it: a coloured
+			// bar with nothing written on it. The cell is identified by its COLUMN,
+			// which is always there, so look the sub-item up rather than trusting it
+			// to arrive.
+			var sub = e.SubItem
+				?? (e.ColumnIndex >= 0 && e.ColumnIndex < item.SubItems.Count ? item.SubItems[e.ColumnIndex] : item.SubItems[0]);
+
+			using SolidBrush back = new(item.Selected || item.UseItemStyleForSubItems || Hot(e.ItemState) || !list.Enabled
+				? RowBackground(list, item, theme, e.ItemState)
+				: sub.BackColor);
 			e.Graphics.FillRectangle(back, e.Bounds);
 
 			var x = e.Bounds.Left + 2;
@@ -813,7 +946,7 @@ namespace Chimera.Client.GUI
 				{
 					var side = Math.Min(13, e.Bounds.Height - 2);
 					Rectangle box = new(x, e.Bounds.Top + ((e.Bounds.Height - side) / 2), side, side);
-					DrawTick(e.Graphics, box, item.Checked, theme);
+					DrawTick(e.Graphics, box, item.Checked, theme, list.Enabled);
 					x = box.Right + 3;
 				}
 				var images = list.SmallImageList;
@@ -826,16 +959,16 @@ namespace Chimera.Client.GUI
 				}
 			}
 
-			var text = e.SubItem?.Text ?? "";
+			var text = sub.Text ?? "";
 			if (text.Length is 0) return;
-			var font = e.SubItem?.Font ?? item.Font ?? list.Font;
+			var font = sub.Font ?? item.Font ?? list.Font;
 			Rectangle textArea = new(x, e.Bounds.Top, Math.Max(0, e.Bounds.Right - x - 2), e.Bounds.Height);
 			TextRenderer.DrawText(
 				e.Graphics,
 				text,
 				font,
 				textArea,
-				RowForeground(list, item, e.SubItem ?? item.SubItems[0], theme),
+				RowForeground(list, item, sub, theme),
 				Align(e.Header?.TextAlign) | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
 		}
 
@@ -851,14 +984,14 @@ namespace Chimera.Client.GUI
 		/// square whatever is around it, which on a dark list is the brightest
 		/// thing on the window.
 		/// </summary>
-		private static void DrawTick(Graphics g, Rectangle box, bool ticked, Theme theme)
+		private static void DrawTick(Graphics g, Rectangle box, bool ticked, Theme theme, bool enabled = true)
 		{
-			using SolidBrush fill = new(theme[ThemeColorRole.InputBackground]);
+			using SolidBrush fill = new(theme[enabled ? ThemeColorRole.InputBackground : ThemeColorRole.DisabledBackground]);
 			g.FillRectangle(fill, box);
-			using Pen edge = new(theme[ThemeColorRole.Border]);
+			using Pen edge = new(theme[enabled ? ThemeColorRole.Border : ThemeColorRole.DisabledText]);
 			g.DrawRectangle(edge, box.X, box.Y, box.Width - 1, box.Height - 1);
 			if (!ticked) return;
-			using Pen tick = new(theme[ThemeColorRole.GlyphForeground], 2f);
+			using Pen tick = new(theme[enabled ? ThemeColorRole.GlyphForeground : ThemeColorRole.DisabledText], 2f);
 			Point[] check =
 			[
 				new(box.Left + 3, box.Top + (box.Height / 2)),
@@ -909,9 +1042,14 @@ namespace Chimera.Client.GUI
 			var box = (ListBox) sender;
 			var theme = Current;
 			var selected = (e.State & DrawItemState.Selected) is not 0;
-			using SolidBrush back = new(theme[selected
-				? box.Focused ? ThemeColorRole.Selection : ThemeColorRole.InactiveSelection
-				: ThemeColorRole.InputBackground]);
+			// the same enumeration the ListView above has to do: a list box the
+			// toolkit no longer draws has no state it can fall back on
+			var off = !box.Enabled || (e.State & DrawItemState.Disabled) is not 0;
+			using SolidBrush back = new(theme[off
+				? ThemeColorRole.DisabledBackground
+				: selected
+					? box.Focused ? ThemeColorRole.Selection : ThemeColorRole.InactiveSelection
+					: ThemeColorRole.InputBackground]);
 			e.Graphics.FillRectangle(back, e.Bounds);
 			if (e.Index < 0 || e.Index >= box.Items.Count) return;
 			TextRenderer.DrawText(
@@ -919,9 +1057,11 @@ namespace Chimera.Client.GUI
 				box.GetItemText(box.Items[e.Index]),
 				e.Font ?? box.Font,
 				Rectangle.Inflate(e.Bounds, -2, 0),
-				theme[selected
-					? box.Focused ? ThemeColorRole.SelectionText : ThemeColorRole.InactiveSelectionText
-					: ThemeColorRole.InputText],
+				theme[off
+					? ThemeColorRole.DisabledText
+					: selected
+						? box.Focused ? ThemeColorRole.SelectionText : ThemeColorRole.InactiveSelectionText
+						: ThemeColorRole.InputText],
 				TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
 		}
 

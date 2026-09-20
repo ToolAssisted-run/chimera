@@ -38,6 +38,7 @@
 		"SelectionText": "#FFFFFF",
 		"InactiveSelection": "#3A3A3A",
 		"InactiveSelectionText": "#D0D0D0",
+		"HoverBackground": "#2F2F2F",
 
 		"GridLines": "#3C3C3C",
 		"HeaderBackground": "#333333",

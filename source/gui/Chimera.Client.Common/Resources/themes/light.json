@@ -39,6 +39,7 @@
 		"SelectionText": "system:HighlightText",
 		"InactiveSelection": "system:Control",
 		"InactiveSelectionText": "system:ControlText",
+		"HoverBackground": "system:ControlLight",
 
 		"GridLines": "system:ControlLight",
 		"HeaderBackground": "system:Control",

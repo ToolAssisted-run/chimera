@@ -96,6 +96,24 @@ namespace Chimera.Tests.Client.Common
 			yield return (ThemeColorRole.SelectionText, ThemeColorRole.Selection);
 			yield return (ThemeColorRole.InactiveSelectionText, ThemeColorRole.InactiveSelection);
 
+			// A HOVERED row keeps the text colour it already had - only the
+			// background moves - so every colour a row's text is ever given has to
+			// be readable on this one too. The row under the pointer is the third
+			// state of the same control, after normal and chosen, and it is the one
+			// that shipped as an empty bar.
+			foreach (var ink in new[]
+			{
+				ThemeColorRole.InputText, ThemeColorRole.MutedText, ThemeColorRole.DisabledText,
+				ThemeColorRole.AccentGood, ThemeColorRole.AccentReady,
+				ThemeColorRole.AccentWarning, ThemeColorRole.AccentError,
+			})
+			{
+				yield return (ink, ThemeColorRole.HoverBackground);
+			}
+
+			// and the same colours on a row of a list that has been switched off
+			yield return (ThemeColorRole.DisabledText, ThemeColorRole.DisabledBackground);
+
 			// colours that say something
 			yield return (ThemeColorRole.AccentGood, ThemeColorRole.WindowBackground);
 			yield return (ThemeColorRole.AccentGood, ThemeColorRole.InputBackground);

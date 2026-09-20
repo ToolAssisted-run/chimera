@@ -269,19 +269,68 @@ whether visual styles override either, are all decided by the toolkit. So:
   Windows toolkit honours what the walk sets. Whether a window that is already
   open actually repaints when a person picks a theme from the menu.
 
-That last one is where both of the reported bugs lived, so it has a harness of
-its own: `tests/ui/windows/live-theme-switch.sh`. It compiles a small program
-against the frontend assemblies this tree has just built, opens a window made
-of the controls the walk treats differently, and puts it through the case the
-frontend actually lands in - born under the theme Chimera starts on, then told
-to be the other one - on real Windows, in one process. It is not part of the
-gate, because the gate runs on Linux; run it by hand from WSL after `dotnet
-build source/gui/Chimera.sln`, and run it whenever the walk changes.
+That last one is where the reported bugs lived, so it has a harness of its own:
+`tests/ui/windows/live-theme-switch.sh`. It compiles a small program against
+the frontend assemblies this tree has just built and asks, on real Windows, in
+one process, the three questions Mono cannot be asked:
+
+- does a window that is already open change when the theme does, and does it
+  land exactly where a window born in that theme is;
+- does painting a theme onto a window raise EVENTS inside it - a ListView whose
+  handle is remade raises a tick for every item it puts back;
+- does a real frontend window (Pre-Compiled Modules, the one that crashed) open
+  on a dark theme without throwing.
+
+It is not part of the gate, because the gate runs on Linux; run it by hand from
+WSL after `dotnet build source/gui/Chimera.sln`, and run it whenever the walk
+changes.
 
 It photographs with `PrintWindow`, which renders the window into a bitmap of
 the program's own. That is deliberate and worth keeping: it reads no screen
 pixels, so it cannot capture anything else on the developer's desktop even by
 accident, and it works with the session locked.
+
+### What this suite keeps failing to notice
+
+Five bugs reached the author of this program through a green run of it while
+this branch was being written. They are not five unrelated mistakes; they fall
+into three kinds, and the kinds are worth knowing before adding to any of this.
+
+**1. States of a control the frontend draws itself.** A list the theme has
+taken over is drawn ENTIRELY here. There is no toolkit underneath, so a state
+nobody wrote code for is not drawn in the toolkit's colours - it is not drawn
+at all. It has now happened three times: the CHOSEN row came out a beige bar
+with invisible writing on it; the row under the POINTER came out a bar with no
+writing at all; and the check box, the small image and the disabled list were
+each written only once someone went looking. A test that renders a control in
+one state tells you nothing about the others, and "it looked right in the
+screenshot" means the screenshot was of the resting state.
+`ListRowStateTests` now enumerates the states and asserts every one of them -
+and the enumeration, not any single assertion, is the thing to keep current.
+
+**2. Events raised as a side effect of painting.** Theming writes properties,
+and writing a property can make the toolkit remake a control's handle, and
+remaking a handle makes the toolkit replay the control's contents - ticking
+every ticked row on the way past. The window on the other end has no way to
+know those events are not real. This crashed Pre-Compiled Modules on being
+opened. Painting is now done with those events held off (`ThemeEngine.Quietly`)
+and the walk no longer brings a control to life just to read its scroll
+position, but the general rule is the one to remember: **a coat of paint must
+not be able to tell a window that something happened in it.**
+
+**3. Anything that is the Windows toolkit's.** Covered above, and it is the
+reason the harness exists. Worth saying once more because it interacts with the
+other two: the states a control can be in and the events a handle recreation
+raises are both decided by the toolkit, and the toolkit under the tests is not
+the toolkit under the users.
+
+One honest note on the second kind: the crash was diagnosed from the stack
+trace the author sent and fixed at both ends - the walk no longer causes the
+events, and the window no longer answers one by walking a collection that may
+be mid-rebuild, which is what its own comments always said it should do. The
+exact timing was not reproduced in a harness. The Windows harness opens that
+window on a dark theme and would catch a plain regression; it is not proof that
+the original race cannot recur.
 
 ## Why Light is not a new palette
 

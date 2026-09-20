@@ -305,6 +305,63 @@ namespace Chimera.Tests.Client.GUI
 		}
 
 		/// <summary>
+		/// Theming a window must not bring its controls to life.
+		///
+		/// This is not tidiness. Asking a ListView for SelectedIndices or TopItem
+		/// CREATES its handle, and creating a ListView's handle pushes its items
+		/// into the native control one at a time, raising ItemChecked for each. The
+		/// walk runs when the WINDOW's handle is made, which is before its children
+		/// have theirs - so the walk was manufacturing a burst of tick events inside
+		/// a window that had not finished opening, and Pre-Compiled Modules died of
+		/// it with a NullReferenceException in its own tick handler.
+		///
+		/// The two halves are checked separately because they fail separately: a
+		/// handle that should not exist, and events that should not have been
+		/// raised.
+		///
+		/// BE CLEAR ABOUT WHAT THIS PROVES. Neither half fails on Mono when the
+		/// guard is taken out, because Mono's SelectedIndices and TopItem do not
+		/// create a handle and Mono raises nothing when one is made. It was checked:
+		/// the guard was removed and this test stayed green. So what it holds here
+		/// is the SHAPE of the rule, against a change gross enough for either
+		/// toolkit to notice. The version of it with teeth runs on Windows, in
+		/// tests/ui/windows/live-theme-switch.sh, where the toolkit does both.
+		/// </summary>
+		[TestMethod]
+		public void TheWalkDoesNotBringAListToLife()
+		{
+			using Form form = new();
+			ListView list = new() { View = View.Details, CheckBoxes = true };
+			list.Columns.Add("Name", 120);
+			foreach (var name in new[] { "one", "two", "three" })
+			{
+				list.Items.Add(new ListViewItem(name));
+			}
+			list.Items[1].Checked = true;
+			var ticks = 0;
+			list.ItemChecked += (_, _) => ticks++;
+			form.Controls.Add(list);
+
+			Assert.IsFalse(list.IsHandleCreated, "the list should not have a handle before its window is shown");
+
+			ThemeEngine.Apply(form, ThemeLibrary.Select("Dark"));
+			var madeAHandle = list.IsHandleCreated;
+			var raised = ticks;
+			ThemeLibrary.Select("Light");
+
+			Assert.IsFalse(
+				madeAHandle,
+				"the theme walk created the list's handle. Creating a ListView's handle inserts its items, "
+					+ "and every insertion raises ItemChecked inside a window that is still being built - "
+					+ "which is a crash in somebody's handler, not a repaint.");
+			Assert.AreEqual(
+				0,
+				raised,
+				$"the theme walk raised {raised} ItemChecked events. Painting a window is not an instruction "
+					+ "to tell it its rows have been ticked.");
+		}
+
+		/// <summary>
 		/// The Light theme must leave a tool strip exactly as the frontend left it
 		/// before there were themes: a colour table built out of system colours
 		/// still does not draw what the system renderer draws, and the strips are

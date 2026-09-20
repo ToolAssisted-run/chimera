@@ -30,6 +30,81 @@ using System.Windows.Forms;
 using Chimera.Client.Common;
 using Chimera.Client.GUI;
 
+// A window with a ticked list on it, for the question Mono cannot be asked:
+// does painting a theme onto a window raise events in it?
+//
+// On Windows, reading a ListView's SelectedIndices or TopItem creates its
+// handle, and creating the handle pushes the items into the native control one
+// at a time, raising ItemChecked for each - inside a window that has not
+// finished opening. Pre-Compiled Modules died of exactly that, with a
+// NullReferenceException in its own tick handler, because the handler walks
+// ListView.Items and ListView.Items cannot be walked half way through being
+// rebuilt. Mono neither creates the handle nor raises the events, so no Linux
+// test can see any of it.
+internal sealed class Ticked : ThemedForm
+{
+	// when false this window is not themed at all, which is the baseline: a
+	// ListView raises ItemChecked as its handle is made whatever anybody paints
+	private readonly bool _themed;
+
+	protected override bool ThemingEnabled { get { return _themed; } }
+
+	public readonly ListView List;
+
+	public int Ticks;
+
+	public string Trouble = "";
+
+	public Ticked(bool themed)
+	{
+		_themed = themed;
+		Text = "ticked list";
+		StartPosition = FormStartPosition.Manual;
+		Location = new Point(60, 60);
+		ClientSize = new Size(420, 200);
+		List = new ListView
+		{
+			Dock = DockStyle.Fill,
+			View = View.Details,
+			CheckBoxes = true,
+			FullRowSelect = true,
+		};
+		List.Columns.Add("Name", 260);
+		List.Columns.Add("Size", 120);
+		for (var i = 0; i < 5; i++)
+		{
+			var row = new ListViewItem("game " + i);
+			row.SubItems.Add((i * 1024) + " KB");
+			List.Items.Add(row);
+		}
+		List.Items[1].Checked = true;
+		List.Items[3].Checked = true;
+		Controls.Add(List);
+		// The shape the real window has, and the reason this reproduces anything:
+		// BeginUpdate creates the list's handle, so the list is ALREADY live when
+		// the theme is painted on - and giving a live list a different border
+		// recreates its handle, which rebuilds the items and raises a tick for each.
+		// Without this the handle is made later, by the window opening, and the
+		// recreation - the thing that crashed - never happens.
+		List.BeginUpdate();
+		List.EndUpdate();
+		// the shape of the handler that died
+		List.ItemChecked += delegate
+		{
+			Ticks++;
+			try
+			{
+				var n = 0;
+				foreach (ListViewItem row in List.Items) { if (row.Checked) n++; }
+			}
+			catch (Exception ex)
+			{
+				if (Trouble.Length == 0) Trouble = ex.GetType().Name + ": " + ex.Message;
+			}
+		};
+	}
+}
+
 internal sealed class Probe : ThemedForm
 {
 	public Probe()
@@ -143,6 +218,58 @@ internal static class LiveThemeSwitch
 		return n;
 	}
 
+	// Opens the real Pre-Compiled Modules window on a dark theme. That window died
+	// on being opened, with a NullReferenceException out of the toolkit's own
+	// ListView enumerator: a tick event had arrived while the list was being
+	// rebuilt, and the window's handler answered it by walking ListView.Items.
+	//
+	// The rows are filled in by reflection because PrecompiledGame's properties are
+	// init-only and the compiler this is built with predates that. Only the fields
+	// the window shows are set.
+	private static PrecompiledGame Game(string sha, string name, long bytes)
+	{
+		var game = (PrecompiledGame) Activator.CreateInstance(typeof(PrecompiledGame));
+		Set(game, "GameSha1", sha);
+		Set(game, "GameName", name);
+		Set(game, "CoreName", "ares");
+		Set(game, "Bytes", bytes);
+		Set(game, "Modules", 8);
+		Set(game, "Complete", true);
+		Set(game, "Path", @"C:\nowhere\" + sha);
+		return game;
+	}
+
+	private static void Set(object target, string name, object value)
+	{
+		var property = typeof(PrecompiledGame).GetProperty(name);
+		if (property != null) property.GetSetMethod(true).Invoke(target, new object[] { value });
+	}
+
+	private static string RealWindow()
+	{
+		try
+		{
+			var rows = new System.Collections.Generic.List<PrecompiledGame>();
+			rows.Add(Game("aaaaaa", "one.rom", 1234567));
+			rows.Add(Game("bbbbbb", "two.rom", 222222));
+			Func<System.Collections.Generic.IReadOnlyList<PrecompiledGame>> survey = delegate { return rows; };
+
+			var form = new PrecompiledModulesForm(survey, delegate { });
+			form.StartPosition = FormStartPosition.Manual;
+			form.Location = new Point(60, 60);
+			form.Show();
+			Pump();
+			form.Close();
+			Pump();
+			return "";
+		}
+		catch (Exception ex)
+		{
+			var inner = ex.InnerException == null ? ex : ex.InnerException;
+			return inner.GetType().Name + ": " + inner.Message;
+		}
+	}
+
 	private static Bitmap Born(string born, string told)
 	{
 		ThemeLibrary.Select(born);
@@ -194,6 +321,37 @@ internal static class LiveThemeSwitch
 		}
 		Console.WriteLine("wrote " + sheet + " (born Dark | told Light | born Light | told Dark)");
 
+		// ...and the other thing Mono cannot be asked: does PAINTING a theme raise
+		// events in the window it is painting?
+		//
+		// The window is opened bare and left to settle first, so that everything
+		// the toolkit raises while a window opens has already happened and been
+		// forgotten. What is counted after that is the walk's alone. Giving a live
+		// ListView a different border recreates its handle, and WinForms rebuilds a
+		// recreated list by pushing every item back into it - a tick event each,
+		// into a handler that has no way to know they are not real. That is what
+		// killed Pre-Compiled Modules on being opened.
+		ThemeLibrary.Select("Light");
+		var ticked = new Ticked(themed: false);
+		ticked.Show();
+		Pump();
+		ticked.Ticks = 0;
+		ticked.Trouble = "";
+		ThemeEngine.Apply(ticked, ThemeLibrary.Select("Dark"));
+		Pump();
+		var raised = ticked.Ticks;
+		var trouble = ticked.Trouble;
+		ticked.Close();
+		Pump();
+		Console.WriteLine("tick events raised by painting the theme: " + raised + "   (must be 0)");
+		Console.WriteLine("what the tick handler hit: " + (trouble.Length == 0 ? "nothing" : trouble));
+
+		// and the window it actually happened to
+		ThemeLibrary.Select("Dark");
+		var realWindow = RealWindow();
+		Console.WriteLine("opening the real Pre-Compiled Modules window on Dark: "
+			+ (realWindow.Length == 0 ? "no exception" : realWindow));
+
 		if (changed == 0)
 		{
 			Console.WriteLine("FAIL: choosing a theme changed nothing in a window that was already open");
@@ -202,6 +360,16 @@ internal static class LiveThemeSwitch
 		if (wrongLight != 0 || wrongDark != 0)
 		{
 			Console.WriteLine("FAIL: a window does not end up where one born in that theme is");
+			return 1;
+		}
+		if (raised != 0 || trouble.Length != 0)
+		{
+			Console.WriteLine("FAIL: painting a theme onto a window raised events inside it");
+			return 1;
+		}
+		if (realWindow.Length != 0)
+		{
+			Console.WriteLine("FAIL: a real window of the frontend does not open on a dark theme");
 			return 1;
 		}
 		Console.WriteLine("PASS");

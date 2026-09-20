@@ -65,6 +65,13 @@ namespace Chimera.Tests.Client.Common
 			[ThemeColorRole.InactiveSelection] = Control,
 			[ThemeColorRole.InactiveSelectionText] = SystemColors.ControlText,
 
+			// Light never paints this one: it is the desktop's palette, so its lists
+			// are drawn by the toolkit and the toolkit draws its own hover. The value
+			// is here because every role must have one, and it is ControlLight
+			// because that is what the desktop would tint a row with if it were ever
+			// asked to.
+			[ThemeColorRole.HoverBackground] = SystemColors.ControlLight,
+
 			[ThemeColorRole.GridLines] = SystemColors.ControlLight,
 			[ThemeColorRole.HeaderBackground] = Control,
 			[ThemeColorRole.HeaderText] = SystemColors.ControlText,
