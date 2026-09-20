@@ -82,9 +82,11 @@ namespace Chimera.Client.GUI
 				},
 			};
 
-			_canvas = new() { BackColor = Color.Black, Location = new(0, 0) };
+			_canvas = new() { BackColor = ThemeEngine.Color(ThemeColorRole.EmulatorViewport), Location = new(0, 0) };
 			_canvas.Paint += Canvas_Paint;
-			_scrollPanel = new() { AutoScroll = true, Dock = DockStyle.Fill, BackColor = Color.Black };
+			_scrollPanel = new() { AutoScroll = true, Dock = DockStyle.Fill, BackColor = ThemeEngine.Color(ThemeColorRole.EmulatorViewport) };
+			_canvas.SetBackRole(ThemeColorRole.EmulatorViewport);
+			_scrollPanel.SetBackRole(ThemeColorRole.EmulatorViewport);
 			_scrollPanel.Controls.Add(_canvas);
 
 			_status = new() { Spring = true, TextAlign = ContentAlignment.MiddleLeft };

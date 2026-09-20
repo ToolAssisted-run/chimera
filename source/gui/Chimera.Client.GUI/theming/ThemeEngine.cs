@@ -97,8 +97,29 @@ namespace Chimera.Client.GUI
 			return item;
 		}
 
+		/// <summary>The background of an item on a tool strip - a button tinted to say something.</summary>
+		public static T SetItemBackRole<T>(this T item, ThemeColorRole role) where T : ToolStripItem
+		{
+			TaggedItems.GetValue(item, static _ => new Overrides()).Back = role;
+			item.BackColor = Current[role];
+			return item;
+		}
+
 		/// <summary>The colour a role is right now. For a place that has to compute with it.</summary>
 		public static Color Color(ThemeColorRole role) => Current[role];
+
+		/// <summary>
+		/// A row colour nudged to say the pointer is on it. Away from the
+		/// background, so it darkens on a light theme and lightens on a dark one -
+		/// the old code only ever subtracted, and subtracting from a dark colour
+		/// wrapped the byte round to bright.
+		/// </summary>
+		public static Color Hovered(Color c)
+		{
+			var step = Current.IsDark ? 24 : -24;
+			static int Clamp(int v) => v < 0 ? 0 : v > 255 ? 255 : v;
+			return System.Drawing.Color.FromArgb(Clamp(c.A - 24), Clamp(c.R + step), Clamp(c.G + step), Clamp(c.B + step));
+		}
 
 		// ---- the walk ------------------------------------------------------
 
@@ -111,9 +132,10 @@ namespace Chimera.Client.GUI
 			if (root is null) return;
 			if (Tagged.TryGetValue(root, out var own) && own.Skip) return;
 
+			// a control that paints itself takes the whole theme and is not told
+			// anything further: the type table below would overwrite what it chose
 			if (root is IThemedControl themed) themed.ApplyTheme(theme);
-
-			ApplyToOne(root, theme, own);
+			else ApplyToOne(root, theme, own);
 
 			foreach (Control child in root.Controls) Apply(child, theme);
 
@@ -129,6 +151,7 @@ namespace Chimera.Client.GUI
 		private static void ApplyToOne(Control c, Theme theme, Overrides? own)
 		{
 			var systemPalette = IsSystemPalette(theme);
+			if (!systemPalette) FlattenBorder(c);
 
 			if (own?.Back is { } backRole) c.BackColor = theme[backRole];
 			if (own?.Fore is { } foreRole) c.ForeColor = theme[foreRole];
@@ -137,11 +160,6 @@ namespace Chimera.Client.GUI
 			{
 				case ToolStrip strip:
 					ApplyStrip(strip, theme);
-					return;
-				case InputRoll roll:
-					// InputRoll is IThemedControl and has already taken its colours
-					roll.BackColor = theme[ThemeColorRole.RollBackground];
-					roll.ForeColor = theme[ThemeColorRole.RollText];
 					return;
 				case DataGridView grid:
 					ApplyGrid(grid, theme);
@@ -204,6 +222,25 @@ namespace Chimera.Client.GUI
 					Back(c, own, theme, ThemeColorRole.WindowBackground);
 					Fore(c, own, theme, ThemeColorRole.WindowText);
 					return;
+			}
+		}
+
+		/// <summary>
+		/// A sunken 3D border is drawn by the toolkit out of the system's own light
+		/// and shadow colours, so on a dark window it is a bright white frame round
+		/// every list and text box. A single-line border is drawn in the control's
+		/// own colours instead. Only away from the desktop's palette, where the 3D
+		/// border is correct and is what the frontend has always had.
+		/// </summary>
+		private static void FlattenBorder(Control c)
+		{
+			switch (c)
+			{
+				case ListBox { BorderStyle: BorderStyle.Fixed3D } list: list.BorderStyle = BorderStyle.FixedSingle; break;
+				case ListView { BorderStyle: BorderStyle.Fixed3D } view: view.BorderStyle = BorderStyle.FixedSingle; break;
+				case TreeView { BorderStyle: BorderStyle.Fixed3D } tree: tree.BorderStyle = BorderStyle.FixedSingle; break;
+				case TextBoxBase { BorderStyle: BorderStyle.Fixed3D } text: text.BorderStyle = BorderStyle.FixedSingle; break;
+				case Panel { BorderStyle: BorderStyle.Fixed3D } panel: panel.BorderStyle = BorderStyle.FixedSingle; break;
 			}
 		}
 
@@ -326,7 +363,9 @@ namespace Chimera.Client.GUI
 		private static void ApplyItem(ToolStripItem item, Theme theme, bool onDropDown)
 		{
 			if (TaggedItems.TryGetValue(item, out var own) && own.Skip) return;
-			item.BackColor = theme[onDropDown ? ThemeColorRole.MenuBackground : ThemeColorRole.ToolStripBackground];
+			item.BackColor = own?.Back is { } back
+				? theme[back]
+				: theme[onDropDown ? ThemeColorRole.MenuBackground : ThemeColorRole.ToolStripBackground];
 			item.ForeColor = own?.Fore is { } role
 				? theme[role]
 				: theme[onDropDown ? ThemeColorRole.MenuText : ThemeColorRole.ToolStripText];

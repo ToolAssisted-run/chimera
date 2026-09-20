@@ -86,14 +86,15 @@ namespace Chimera.Client.GUI
 			Input.Instance.ClearEvents();
 			_lastPress = null;
 			_timer.Start();
-			BackColor = Color.FromArgb(unchecked((int)0xFFC0FFFF)); // Color.LightCyan is too light on Windows 8, this is a bit darker
+			// LightCyan is too light on Windows 8, so the Light theme's value is a bit darker
+			BackColor = ThemeEngine.Color(ThemeColorRole.InputAwaitingBackground);
 		}
 
 		protected override void OnLeave(EventArgs e)
 		{
 			_timer.Stop();
 			UpdateLabel();
-			BackColor = SystemColors.Window;
+			BackColor = ThemeEngine.Color(ThemeColorRole.InputBackground);
 			base.OnLeave(e);
 		}
 

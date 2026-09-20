@@ -30,7 +30,7 @@ namespace Chimera.Client.GUI
 
 			GraphicsControl = GraphicsControlFactory.CreateGraphicsControl(gl);
 			GraphicsControl.Dock = DockStyle.Fill;
-			GraphicsControl.BackColor = Color.Black;
+			GraphicsControl.BackColor = ThemeEngine.Color(ThemeColorRole.EmulatorViewport);
 
 			// pass through these events to the form. we might need a more scalable solution for mousedown etc. for zapper and whatnot.
 			// http://stackoverflow.com/questions/547172/pass-through-mouse-events-to-parent-control (HTTRANSPARENT)

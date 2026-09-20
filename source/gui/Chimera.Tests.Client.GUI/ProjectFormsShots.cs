@@ -21,20 +21,7 @@ namespace Chimera.Tests.Client.GUI
 		private static string ShotDir
 			=> Environment.GetEnvironmentVariable("CHIMERA_UI_SHOTS");
 
-		private static void Shoot(Form form, string name)
-		{
-			var dir = ShotDir;
-			form.Show();
-			form.Refresh();
-			Application.DoEvents();
-			using System.Drawing.Bitmap bmp = new(form.Width, form.Height);
-			using (var g = System.Drawing.Graphics.FromImage(bmp))
-			{
-				g.CopyFromScreen(form.Location, System.Drawing.Point.Empty, form.Size);
-			}
-			Directory.CreateDirectory(dir);
-			bmp.Save(Path.Combine(dir, $"{name}.png"), System.Drawing.Imaging.ImageFormat.Png);
-		}
+		private static void Shoot(Form form, string name) => UiShots.Shoot(form, name);
 
 		private static readonly string DosboxDeclaration = """
 			{

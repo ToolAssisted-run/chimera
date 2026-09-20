@@ -27,6 +27,7 @@ namespace Chimera.Client.GUI
 			if (colorDialog1.ShowDialog().IsOk())
 			{
 				_hexEditor.Colors.Background = colorDialog1.Color;
+				_hexEditor.ColorsCustomised = true;
 				_hexEditor.Header.BackColor = colorDialog1.Color;
 				_hexEditor.MemoryViewerBox.BackColor = _hexEditor.Colors.Background;
 				HexBackgrnd.BackColor = colorDialog1.Color;
@@ -38,6 +39,7 @@ namespace Chimera.Client.GUI
 			if (colorDialog1.ShowDialog().IsOk())
 			{
 				_hexEditor.Colors.Foreground = colorDialog1.Color;
+				_hexEditor.ColorsCustomised = true;
 				_hexEditor.Header.ForeColor = colorDialog1.Color;
 				_hexEditor.MemoryViewerBox.ForeColor = _hexEditor.Colors.Foreground;
 				HexForegrnd.BackColor = colorDialog1.Color;
@@ -49,6 +51,7 @@ namespace Chimera.Client.GUI
 			if (colorDialog1.ShowDialog().IsOk())
 			{
 				_hexEditor.Colors.MenuBar = colorDialog1.Color;
+				_hexEditor.ColorsCustomised = true;
 				_hexEditor.HexMenuStrip.BackColor = _hexEditor.Colors.MenuBar;
 				HexMenubar.BackColor = colorDialog1.Color;
 			}
@@ -59,6 +62,7 @@ namespace Chimera.Client.GUI
 			if (colorDialog1.ShowDialog().IsOk())
 			{
 				_hexEditor.Colors.Highlight = colorDialog1.Color;
+				_hexEditor.ColorsCustomised = true;
 				HexHighlight.BackColor = colorDialog1.Color;
 			}
 		}
@@ -68,6 +72,7 @@ namespace Chimera.Client.GUI
 			if (colorDialog1.ShowDialog().IsOk())
 			{
 				_hexEditor.Colors.Freeze = colorDialog1.Color;
+				_hexEditor.ColorsCustomised = true;
 				HexFreeze.BackColor = colorDialog1.Color;
 			}
 		}
@@ -77,6 +82,7 @@ namespace Chimera.Client.GUI
 			if (colorDialog1.ShowDialog().IsOk())
 			{
 				_hexEditor.Colors.HighlightFreeze = colorDialog1.Color;
+				_hexEditor.ColorsCustomised = true;
 				HexFreezeHL.BackColor = colorDialog1.Color;
 			}
 		}

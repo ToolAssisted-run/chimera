@@ -1,5 +1,7 @@
 using System.Drawing;
 
+using Chimera.Client.Common;
+
 namespace Chimera.Client.GUI
 {
 	/// <remarks>
@@ -7,8 +9,47 @@ namespace Chimera.Client.GUI
 	/// (I've already used CurrentFrame_InputLog in the definition of SeekFrame_InputLog, they differed only in alpha)
 	/// --yoshi
 	/// </remarks>
-	public readonly struct TAStudioPalette
+	public readonly struct TAStudioPalette : IEquatable<TAStudioPalette>
 	{
+		/// <summary>
+		/// The row colours the current theme asks for. This is where TAStudio's
+		/// colours come from unless somebody has set their own in
+		/// TAStudioColorSettingsForm, and <see cref="Default"/> below - which is
+		/// what every config written before themes holds - is read as "nobody has".
+		/// </summary>
+		public static TAStudioPalette FromTheme(Theme theme)
+			=> new(
+				currentFrame_InputLog: theme[ThemeColorRole.TasCurrentFrame],
+				greenZone_FrameCol: theme[ThemeColorRole.TasGreenZone],
+				greenZone_InputLog: theme[ThemeColorRole.TasGreenZoneInput],
+				greenZone_InputLog_Stated: theme[ThemeColorRole.TasGreenZoneInputStated],
+				greenZone_InputLog_Invalidated: theme[ThemeColorRole.TasGreenZoneInputInvalidated],
+				lagZone_FrameCol: theme[ThemeColorRole.TasLagZone],
+				lagZone_InputLog: theme[ThemeColorRole.TasLagZoneInput],
+				lagZone_InputLog_Stated: theme[ThemeColorRole.TasLagZoneInputStated],
+				lagZone_InputLog_Invalidated: theme[ThemeColorRole.TasLagZoneInputInvalidated],
+				marker_FrameCol: theme[ThemeColorRole.TasMarker],
+				permanentMarker_FrameCol: theme[ThemeColorRole.TasPermanentMarker],
+				analogEdit_Col: theme[ThemeColorRole.TasAnalogEdit]);
+
+		public bool Equals(TAStudioPalette other)
+			=> CurrentFrame_InputLog == other.CurrentFrame_InputLog
+				&& GreenZone_FrameCol == other.GreenZone_FrameCol
+				&& GreenZone_InputLog == other.GreenZone_InputLog
+				&& GreenZone_InputLog_Stated == other.GreenZone_InputLog_Stated
+				&& GreenZone_InputLog_Invalidated == other.GreenZone_InputLog_Invalidated
+				&& LagZone_FrameCol == other.LagZone_FrameCol
+				&& LagZone_InputLog == other.LagZone_InputLog
+				&& LagZone_InputLog_Stated == other.LagZone_InputLog_Stated
+				&& LagZone_InputLog_Invalidated == other.LagZone_InputLog_Invalidated
+				&& Marker_FrameCol == other.Marker_FrameCol
+				&& PermanentMarker_FrameCol == other.PermanentMarker_FrameCol
+				&& AnalogEdit_Col == other.AnalogEdit_Col;
+
+		public override bool Equals(object obj) => obj is TAStudioPalette other && Equals(other);
+
+		public override int GetHashCode() => CurrentFrame_InputLog.GetHashCode() ^ Marker_FrameCol.GetHashCode();
+
 		public static readonly TAStudioPalette Default = new(
 //			currentFrame_FrameCol: Color.FromArgb(0xCF, 0xED, 0xFC),
 			currentFrame_InputLog: Color.FromArgb(0xB5, 0xE7, 0xF7),

@@ -199,8 +199,8 @@ namespace Chimera.Client.GUI
 					// a row nothing can name, and one missing pieces, are the two
 					// worth an eye: neither is an error, both are worth seeing
 					ForeColor = game.Unknown || game.Legacy
-						? SystemColors.GrayText
-						: game.Complete ? SystemColors.WindowText : Color.Firebrick,
+						? ThemeEngine.Color(ThemeColorRole.DisabledText)
+						: game.Complete ? ThemeEngine.Color(ThemeColorRole.InputText) : ThemeEngine.Color(ThemeColorRole.AccentError),
 				};
 				row.SubItems.Add(game.By);
 				row.SubItems.Add(game.Compiled is { } when ? when.ToLocalTime().ToString("yyyy-MM-dd HH:mm") : "");

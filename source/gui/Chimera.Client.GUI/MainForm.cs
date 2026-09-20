@@ -1420,7 +1420,7 @@ namespace Chimera.Client.GUI
 					// It seems that some StatusBar elements composite with the backcolor.
 					// Maybe we could add another control under the StatusBar. with a different backcolor
 					Padding = new Padding(1);
-					BackColor = Color.Black;
+					BackColor = ThemeEngine.Color(ThemeColorRole.EmulatorViewport);
 
 					// FUTURE WORK:
 					// re-add this padding back into the display manager (so the image will get cut off a little but, but a few more resolutions will fully fit into the screen)
@@ -1446,7 +1446,7 @@ namespace Chimera.Client.GUI
 
 					// it's important that we set the form color back to this, because the StatusBar icons blend onto the mainform, not onto the StatusBar--
 					// so we need the StatusBar and mainform backdrop color to match
-					BackColor = SystemColors.Control;
+					BackColor = ThemeEngine.Color(ThemeColorRole.WindowBackground);
 				}
 
 				_inFullscreen = false;

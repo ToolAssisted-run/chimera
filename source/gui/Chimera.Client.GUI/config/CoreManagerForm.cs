@@ -344,7 +344,7 @@ namespace Chimera.Client.GUI
 				if (!row.IsOfficial && !separatorDone)
 				{
 					separatorDone = true;
-					ListViewItem divide = new("External cores") { Tag = null, ForeColor = SystemColors.GrayText };
+					ListViewItem divide = new("External cores") { Tag = null, ForeColor = ThemeEngine.Color(ThemeColorRole.DisabledText) };
 					divide.SubItems.Add("");
 					divide.SubItems.Add("added by hand");
 					divide.SubItems.Add("");
@@ -358,7 +358,7 @@ namespace Chimera.Client.GUI
 				item.SubItems.Add(ReleasedText(row));
 				item.SubItems.Add(SizeText(row));
 				item.SubItems.Add(row.Source);
-				if (!row.IsInstalled) item.ForeColor = SystemColors.GrayText;
+				if (!row.IsInstalled) item.ForeColor = ThemeEngine.Color(ThemeColorRole.DisabledText);
 				item.Checked = _ticked.Contains(row.Name);
 				_cores.Items.Add(item);
 			}

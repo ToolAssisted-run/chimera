@@ -429,6 +429,116 @@ namespace Chimera.Client.GUI
 			if (this.ShowDialogWithTempMute(form).IsOk()) AddOnScreenMessage("Message settings saved");
 		}
 
+		/// <summary>
+		/// Config &gt; Theme. Built every time it opens rather than once, because the
+		/// list is a folder's contents and the folder is the user's to change while
+		/// Chimera is running.
+		/// </summary>
+		private void ThemeSubMenu_DropDownOpened(object sender, EventArgs e)
+		{
+			ThemeSubMenu.DropDownItems.Clear();
+			foreach (var theme in ThemeLibrary.All)
+			{
+				ToolStripMenuItemEx item = new()
+				{
+					Checked = string.Equals(theme.Name, ThemeLibrary.Current.Name, StringComparison.OrdinalIgnoreCase),
+					Text = theme.Name,
+					ToolTipText = theme.Description,
+				};
+				var chosen = theme.Name;
+				item.Click += (_, _) => ChooseTheme(chosen);
+				ThemeSubMenu.DropDownItems.Add(item);
+			}
+
+			ThemeSubMenu.DropDownItems.Add(new ToolStripSeparator());
+
+			ToolStripMenuItemEx folder = new() { Text = "Open Themes Folder" };
+			folder.Click += (_, _) => OpenThemesFolder();
+			ThemeSubMenu.DropDownItems.Add(folder);
+
+			ToolStripMenuItemEx export = new() { Text = "Write a Copy to Edit..." };
+			export.Click += (_, _) => ExportCurrentTheme();
+			ThemeSubMenu.DropDownItems.Add(export);
+
+			ToolStripMenuItemEx reload = new() { Text = "Reload Themes" };
+			reload.Click += (_, _) =>
+			{
+				ThemeLibrary.Reload();
+				ThemeEngine.ApplyToOpenForms(ThemeLibrary.Current);
+				ReportThemeFailures();
+				AddOnScreenMessage($"{ThemeLibrary.All.Count} themes");
+			};
+			ThemeSubMenu.DropDownItems.Add(reload);
+
+			var failures = ThemeLibrary.Failures;
+			if (failures.Count is not 0)
+			{
+				ToolStripMenuItemEx bad = new() { Text = $"{failures.Count} theme file(s) would not load..." };
+				bad.SetItemForeRole(ThemeColorRole.AccentError);
+				bad.Click += (_, _) => ReportThemeFailures();
+				ThemeSubMenu.DropDownItems.Add(bad);
+			}
+		}
+
+		private void ChooseTheme(string name)
+		{
+			var theme = ThemeLibrary.Select(name);
+			Config.Theme = theme.Name;
+			ThemeEngine.ApplyToOpenForms(theme);
+			AddOnScreenMessage($"Theme: {theme.Name}");
+		}
+
+		private void ReportThemeFailures()
+		{
+			var failures = ThemeLibrary.Failures;
+			if (failures.Count is 0)
+			{
+				DialogController.ShowMessageBox("Every theme file in the folder loaded.", "Themes");
+				return;
+			}
+			DialogController.ShowMessageBox(
+				string.Join("\n\n", failures.Select(static f => f.Message)),
+				"These theme files were not loaded",
+				EMsgBoxIcon.Error);
+		}
+
+		private void OpenThemesFolder()
+		{
+			try
+			{
+				Directory.CreateDirectory(ThemeLibrary.ThemesDirectory);
+				Process.Start(new ProcessStartInfo(ThemeLibrary.ThemesDirectory) { UseShellExecute = true });
+			}
+			catch (Exception ex)
+			{
+				DialogController.ShowMessageBox($"Could not open {ThemeLibrary.ThemesDirectory}:\n{ex.Message}", "Themes", EMsgBoxIcon.Error);
+			}
+		}
+
+		/// <summary>
+		/// Writes the theme that is on into the themes folder as a file somebody can
+		/// edit - which is how a theme gets contributed without anybody having to
+		/// type ninety colour names from memory.
+		/// </summary>
+		private void ExportCurrentTheme()
+		{
+			var theme = ThemeLibrary.Current;
+			var path = Path.Combine(ThemeLibrary.ThemesDirectory, $"{theme.Name} copy{ThemeFile.Extension}");
+			try
+			{
+				Directory.CreateDirectory(ThemeLibrary.ThemesDirectory);
+				var text = ThemeFile.Write(theme).Replace($"\"{theme.Name}\"", $"\"{theme.Name} copy\"");
+				File.WriteAllText(path, text);
+				DialogController.ShowMessageBox(
+					$"Written to:\n{path}\n\nEdit the colours, change the name inside it, then Config > Theme > Reload Themes.",
+					"Themes");
+			}
+			catch (Exception ex)
+			{
+				DialogController.ShowMessageBox($"Could not write {path}:\n{ex.Message}", "Themes", EMsgBoxIcon.Error);
+			}
+		}
+
 		private void PathsMenuItem_Click(object sender, EventArgs e)
 		{
 			using PathConfig form = new(

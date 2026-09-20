@@ -1,6 +1,8 @@
 using System.Drawing;
 using System.Windows.Forms;
 
+using Chimera.Client.Common;
+
 using Chimera.Display;
 
 namespace Chimera.Client.GUI
@@ -101,8 +103,10 @@ namespace Chimera.Client.GUI
 			e.Graphics.DrawImage(_bitmap!, new Rectangle(0, 0, Width, _drawingHeight));
 			if (Padding > 0)
 			{
-				e.Graphics.DrawRectangle(Pens.Black, new Rectangle(new Point(0, _drawingHeight), new Size(Width - 1, Padding - 1)));
-				e.Graphics.DrawString(Text, Font, Brushes.Black, new Rectangle(2, _drawingHeight, Width - 2, Height));
+				using Pen edge = new(ThemeEngine.Color(ThemeColorRole.WindowText));
+				using SolidBrush ink = new(ThemeEngine.Color(ThemeColorRole.WindowText));
+				e.Graphics.DrawRectangle(edge, new Rectangle(new Point(0, _drawingHeight), new Size(Width - 1, Padding - 1)));
+				e.Graphics.DrawString(Text, Font, ink, new Rectangle(2, _drawingHeight, Width - 2, Height));
 			}
 
 			base.OnPaint(e);

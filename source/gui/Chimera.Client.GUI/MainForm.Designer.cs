@@ -80,6 +80,7 @@ namespace Chimera.Client.GUI
 			this.PrecompiledModulesMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.DataDirectoryMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.MessagesMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
+			this.ThemeSubMenu = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.AutofireMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.ClientOptionsMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.toolStripSeparator9 = new Chimera.WinForms.Controls.ToolStripSeparatorEx();
@@ -545,6 +546,7 @@ namespace Chimera.Client.GUI
             this.FirmwareMenuItem,
             this.DataDirectoryMenuItem,
             this.MessagesMenuItem,
+            this.ThemeSubMenu,
             this.AutofireMenuItem,
             this.ClientOptionsMenuItem,
             this.toolStripSeparator9,
@@ -602,6 +604,11 @@ namespace Chimera.Client.GUI
 			// 
 			this.MessagesMenuItem.Text = "&Messages...";
 			this.MessagesMenuItem.Click += new System.EventHandler(this.MessagesMenuItem_Click);
+			// 
+			// ThemeSubMenu
+			// 
+			this.ThemeSubMenu.Text = "&Theme";
+			this.ThemeSubMenu.DropDownOpened += new System.EventHandler(this.ThemeSubMenu_DropDownOpened);
 			// 
 			// AutofireMenuItem
 			// 
@@ -1223,6 +1230,7 @@ namespace Chimera.Client.GUI
 		private StatusStripEx MainStatusBar;
 		private Chimera.WinForms.Controls.StatusLabelEx EmuStatus;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx MessagesMenuItem;
+		private Chimera.WinForms.Controls.ToolStripMenuItemEx ThemeSubMenu;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx PathsMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx FirmwareMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx PrecompiledModulesMenuItem;

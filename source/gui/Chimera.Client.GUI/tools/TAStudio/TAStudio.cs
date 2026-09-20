@@ -69,7 +69,32 @@ namespace Chimera.Client.GUI
 		[ConfigPersist]
 		public TAStudioSettings Settings { get; set; } = new TAStudioSettings();
 
-		public TAStudioPalette Palette => Settings.Palette;
+		/// <summary>
+		/// The row colours in use. They come from the theme unless somebody set
+		/// their own (TAStudio &gt; Settings &gt; Colors); a config written before
+		/// there were themes holds the light palette as a value, and that value is
+		/// read as "nobody set anything", so an old config follows the theme too.
+		/// Cached because it is asked for once per painted cell.
+		/// </summary>
+		public TAStudioPalette Palette => _palette;
+
+		private TAStudioPalette _palette = TAStudioPalette.FromTheme(ThemeLibrary.Current);
+
+		private void RefreshPalette()
+			=> _palette = Settings.Palette is { } chosen && !chosen.Equals(TAStudioPalette.Default)
+				? chosen
+				: TAStudioPalette.FromTheme(ThemeLibrary.Current);
+
+		/// <inheritdoc/>
+		protected override void ApplyTheme(Theme theme)
+		{
+			base.ApplyTheme(theme);
+			RefreshPalette();
+			// the playback arrows and the marker and anchor pins are bitmaps drawn
+			// once, so a change of theme has to draw them again
+			if (_inputRolls.Count is not 0) GenerateIcons();
+			foreach (var roll in _inputRolls) roll.Invalidate();
+		}
 
 		/// <summary>
 		/// This is meant to be used by Lua.
@@ -115,7 +140,6 @@ namespace Chimera.Client.GUI
 				DenoteMarkersWithIcons = false;
 				DenoteMarkersWithBGColor = true;
 
-				Palette = TAStudioPalette.Default;
 				MoveWithMainWindow = true;
 			}
 
@@ -160,7 +184,13 @@ namespace Chimera.Client.GUI
 			public bool BindMarkersToInput { get; set; }
 			public bool CopyIncludesFrameNo { get; set; }
 			public bool AutoadjustInput { get; set; } // Currently unsupported due to being broken
-			public TAStudioPalette Palette { get; set; }
+			/// <summary>
+			/// Row colours somebody chose for themselves, or null to follow the
+			/// theme. Nullable since themes arrived; a config from before holds the
+			/// light palette here, which <see cref="TAStudio.RefreshPalette"/> reads
+			/// as "follow the theme" so that an old config is not stuck light.
+			/// </summary>
+			public TAStudioPalette? Palette { get; set; }
 			public int MaxUndoSteps { get; set; } = 1000;
 
 			/// <summary>

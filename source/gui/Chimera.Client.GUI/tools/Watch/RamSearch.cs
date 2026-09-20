@@ -86,6 +86,7 @@ namespace Chimera.Client.GUI
 			RedoToolBarItem.Image = Resources.Redo;
 			RebootToolbarButton.Image = Resources.Reboot;
 			ErrorIconButton.Image = Resources.ExclamationRed;
+			ErrorIconButton.SetItemBackRole(ThemeColorRole.AccentWarningBackground);
 			SearchButton.Image = Resources.Search;
 
 			WatchListView.QueryItemText += ListView_QueryItemText;
@@ -200,24 +201,24 @@ namespace Chimera.Client.GUI
 		{
 			if ((_searches.Count > 0) && (index < _searches.Count))
 			{
-				var nextColor = Color.White;
+				var nextColor = ThemeEngine.Color(ThemeColorRole.RowDefault);
 				var search = _searches[index];
 				var isCheat = MainForm.CheatList.IsActive(_settings.Domain, search.Address);
 				var isWeeded = Settings.PreviewMode && !_forcePreviewClear && _searches.Preview(index);
 
 				if (!search.IsValid)
 				{
-					nextColor = Color.PeachPuff;
+					nextColor = ThemeEngine.Color(ThemeColorRole.RowInvalid);
 				}
 				else if (isCheat)
 				{
-					nextColor = isWeeded ? Color.Lavender : Color.LightCyan;
+					nextColor = ThemeEngine.Color(isWeeded ? ThemeColorRole.RowExcludedActive : ThemeColorRole.RowActive);
 				}
 				else
 				{
 					if (isWeeded)
 					{
-						nextColor = Color.Pink;
+						nextColor = ThemeEngine.Color(ThemeColorRole.RowExcluded);
 					}
 				}
 

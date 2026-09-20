@@ -30,22 +30,7 @@ namespace Chimera.Tests.Client.GUI
 		private static string ShotDir
 			=> Environment.GetEnvironmentVariable("CHIMERA_UI_SHOTS");
 
-		private static void Shoot(Form form, string name)
-		{
-			var dir = ShotDir;
-			form.Show();
-			form.Refresh();
-			Application.DoEvents();
-			using Bitmap bmp = new(form.Width, form.Height);
-			using (var g = Graphics.FromImage(bmp))
-			{
-				// the window is real and on a (headless) screen, so grab it from there:
-				// DrawToBitmap skips the non-client area and mis-renders ListViews on Mono
-				g.CopyFromScreen(form.Location, Point.Empty, form.Size);
-			}
-			Directory.CreateDirectory(dir);
-			bmp.Save(Path.Combine(dir, $"{name}.png"), ImageFormat.Png);
-		}
+		private static void Shoot(Form form, string name) => UiShots.Shoot(form, name);
 
 		/// <summary>
 		/// The About window: it says what this build is, and nothing else. Worth a

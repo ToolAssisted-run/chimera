@@ -346,6 +346,11 @@ namespace Chimera.Client.GUI
 			// history, a package or a journal open yet, so nothing has to be closed to move it.
 			SettleDataDirectory(initialConfig, configPath);
 
+			// ...and only then the theme, which is read from a folder under that
+			// directory. Before any window exists, so the first one comes up in the
+			// right colours rather than repainting in front of the user.
+			ThemeLibrary.Select(initialConfig.Theme);
+
 			// must be done VERY early, before any SDL_Init calls can be done
 			// if this isn't done, SIGINT/SIGTERM get swallowed by SDL
 			if (OSTailoredCode.IsUnixHost)

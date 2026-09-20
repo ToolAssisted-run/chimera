@@ -106,17 +106,28 @@ namespace Chimera.Client.Common
 		}
 
 		/// <summary>
-		/// Loads the built-ins and then the folder. Used directly by the tests, which
-		/// want a library over a directory of their own rather than the user's.
+		/// The built-ins plus whatever is in a folder, as a pair of lists, without
+		/// touching the theme that is on. This is what the loading tests use: the
+		/// library itself is one static thing per process, and a test that swapped
+		/// it out would be answering questions another test had asked.
 		/// </summary>
+		public static (IReadOnlyList<Theme> Themes, IReadOnlyList<ThemeLoadFailure> Failures) Read(string? directory)
+		{
+			List<Theme> themes = new();
+			List<ThemeLoadFailure> failures = new();
+			LoadBuiltIns(themes);
+			LoadDirectory(directory, themes, failures);
+			return (themes, failures);
+		}
+
+		/// <summary>Loads the built-ins and then the folder, and makes that the library.</summary>
 		public static void LoadFrom(string? directory)
 		{
 			lock (Sync)
 			{
-				_themes = new();
-				_failures = new();
-				LoadBuiltInsLocked();
-				LoadDirectoryLocked(directory);
+				(var themes, var failures) = Read(directory);
+				_themes = themes.ToList();
+				_failures = failures.ToList();
 				_current = FindLocked(_current?.Name ?? DefaultThemeName) ?? FindLocked(DefaultThemeName) ?? _themes[0];
 			}
 			Changed?.Invoke(Current);
@@ -125,8 +136,8 @@ namespace Chimera.Client.Common
 		private static void EnsureLoadedLocked()
 		{
 			if (_themes.Count is not 0) return;
-			LoadBuiltInsLocked();
-			LoadDirectoryLocked(SafeThemesDirectory());
+			LoadBuiltIns(_themes);
+			LoadDirectory(SafeThemesDirectory(), _themes, _failures);
 		}
 
 		private static string? SafeThemesDirectory()
@@ -142,17 +153,17 @@ namespace Chimera.Client.Common
 			}
 		}
 
-		private static void LoadBuiltInsLocked()
+		private static void LoadBuiltIns(List<Theme> into)
 		{
 			foreach (var name in new[] { "light", "dark" })
 			{
 				using var stream = ReflectionCache.EmbeddedResourceStream($"Resources.themes.{name}.json");
 				using StreamReader reader = new(stream);
-				_themes.Add(ThemeFile.Parse(reader.ReadToEnd(), $"built-in theme \"{name}\"", FindLocked));
+				into.Add(ThemeFile.Parse(reader.ReadToEnd(), $"built-in theme \"{name}\"", n => In(into, n)));
 			}
 		}
 
-		private static void LoadDirectoryLocked(string? directory)
+		private static void LoadDirectory(string? directory, List<Theme> into, List<ThemeLoadFailure> failures)
 		{
 			if (string.IsNullOrWhiteSpace(directory) || !Directory.Exists(directory)) return;
 			// sorted so that two files claiming the same name resolve the same way every run
@@ -160,30 +171,32 @@ namespace Chimera.Client.Common
 			{
 				try
 				{
-					var theme = ThemeFile.Parse(File.ReadAllText(path), Path.GetFileName(path), FindLocked);
-					if (FindLocked(theme.Name) is not null)
+					var theme = ThemeFile.Parse(File.ReadAllText(path), Path.GetFileName(path), n => In(into, n));
+					if (In(into, theme.Name) is not null)
 					{
-						_failures.Add(new(path, $"there is already a theme called \"{theme.Name}\"; rename it in the file's \"name\""));
+						failures.Add(new(path, $"{Path.GetFileName(path)}: there is already a theme called \"{theme.Name}\"; rename it in the file's \"name\""));
 						continue;
 					}
-					_themes.Add(theme);
+					into.Add(theme);
 				}
 				catch (ThemeFormatException ex)
 				{
-					_failures.Add(new(path, ex.Message));
+					failures.Add(new(path, ex.Message));
 				}
 				catch (IOException ex)
 				{
-					_failures.Add(new(path, ex.Message));
+					failures.Add(new(path, $"{Path.GetFileName(path)}: {ex.Message}"));
 				}
 				catch (UnauthorizedAccessException ex)
 				{
-					_failures.Add(new(path, ex.Message));
+					failures.Add(new(path, $"{Path.GetFileName(path)}: {ex.Message}"));
 				}
 			}
 		}
 
-		private static Theme? FindLocked(string name)
-			=> _themes.FirstOrDefault(t => string.Equals(t.Name, name, StringComparison.OrdinalIgnoreCase));
+		private static Theme? In(IReadOnlyList<Theme> themes, string name)
+			=> themes.FirstOrDefault(t => string.Equals(t.Name, name, StringComparison.OrdinalIgnoreCase));
+
+		private static Theme? FindLocked(string name) => In(_themes, name);
 	}
 }
