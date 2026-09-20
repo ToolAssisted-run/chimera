@@ -2,6 +2,7 @@
 	<a href="https://github.com/ToolAssisted-run/chimera/actions/workflows/ci.yml"><img src="https://github.com/ToolAssisted-run/chimera/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
 	<a href="https://github.com/ToolAssisted-run/chimera/releases/tag/dev"><img src="https://img.shields.io/github/v/release/ToolAssisted-run/chimera?include_prereleases&sort=date&label=download&color=2DB3A6" alt="Latest development build"></a>
 	<a href="https://github.com/ToolAssisted-run/chimera/releases"><img src="https://img.shields.io/github/downloads/ToolAssisted-run/chimera/total?label=downloads&color=8A63E8" alt="Downloads"></a>
+	<a href="https://discord.gg/VsKDT9XB6u"><img src="https://img.shields.io/discord/1537060793894314097?logo=discord&logoColor=white&label=discord&color=5865F2" alt="toolAssisted.run on Discord"></a>
 </p>
 
 <p align="center">
