@@ -1571,16 +1571,20 @@ namespace Chimera.Client.GUI
 			}
 			catch (Exception ex) when (ex is InvalidOperationException or IOException)
 			{
-				// The sandbox refuses a state another machine made - a different
-				// build of the core, most often, which is what an autosaved xemu
-				// project reopened beside a second xemu version met (issue #63). The
-				// branch's input is already loaded, and the state is only a way to
-				// reach its frame faster; the history reaches it by replay instead.
-				// The refused state is let go so it is not offered again.
+				// Two refusals reach here. The sandbox refuses a state another machine
+				// made - a different build of the core, most often, which is what an
+				// autosaved xemu project reopened beside a second xemu version met
+				// (issue #63). The engine refuses one written in another savestate
+				// format before the machine ever sees it, and says which two formats
+				// (issue #115). Either way the branch's input is already loaded and the
+				// state was only a way to reach its frame faster; the history reaches
+				// it by replay instead, and the refused state is let go so it is not
+				// offered again. The reason is shown as given: it is the only place a
+				// person is told WHY, and the format one names both builds.
 				branch.StateFile = null;
 				ReplayToBranchFrame(branch,
-					"This branch's saved state was made by a different machine; replaying to its frame instead.",
-					$"Branch state refused ({ex.Message}): replaying to frame {branch.Frame}.");
+					$"This branch's saved state could not be loaded, so it replays to its frame instead. {ex.Message}",
+					$"Branch state refused: replaying to frame {branch.Frame}.");
 				return;
 			}
 

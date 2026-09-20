@@ -289,6 +289,7 @@ engine_src = files(
   'source/engine/source/movie_log.cpp',
   'source/engine/source/movie_text.cpp',
   'source/engine/source/state_container.cpp',
+  'source/engine/source/state_format.cpp',
   'source/engine/source/zstd_dyn.cpp',
   'source/engine/source/sha1.cpp',
   'source/engine/source/progress.cpp',
@@ -322,6 +323,9 @@ endif
 engine_build_args = [
   '-I' + repo_root / 'extern/chimera-common-minibox/source/cache',
   '-DCE_BUILD_COMMIT="' + engine_commit + '"',
+  # where the tree is, for the one test that reads it: test_state_format checks
+  # the sandbox's own magic strings still say what the state layout claims
+  '-DCE_REPO_ROOT="' + repo_root + '"',
   '-DCE_BUILD_COMPILER="' + meson.get_compiler('cpp').get_id() + ' ' + meson.get_compiler('cpp').version() + '"',
   '-DCE_BUILD_OS="' + minibox_build_os + '"',
   # miniz's zlib-name-compat macros (#define compress mz_compress) leak into
@@ -409,7 +413,7 @@ if not meson.is_cross_build()
     build_by_default: false,
   )
 
-  foreach engine_test : ['sha1', 'movie_log', 'movie_text', 'movie_entry', 'state_container', 'package', 'multifile', 'project', 'firmware', 'state_history', 'media', 'gl_flight', 'gl_sync', 'gl_buffer_pool', 'stride_tuner', 'greenzone_shape', 'ram_search']
+  foreach engine_test : ['sha1', 'movie_log', 'movie_text', 'movie_entry', 'state_container', 'state_format', 'package', 'multifile', 'project', 'firmware', 'state_history', 'media', 'gl_flight', 'gl_sync', 'gl_buffer_pool', 'stride_tuner', 'greenzone_shape', 'ram_search']
     test(
       'engine_' + engine_test,
       executable(

@@ -1,10 +1,12 @@
 ﻿using System;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 
 using Chimera.Client.Common;
 using Chimera.Display;
 using Chimera.Emulation.Common;
+using Chimera.Emulation.Common.Engine;
 
 namespace Chimera.Tests.Client.Common.Movie
 {
@@ -512,6 +514,72 @@ namespace Chimera.Tests.Client.Common.Movie
 			Assert.IsFalse(other.Save().IsError);
 			var again = LoadFresh(path);
 			Assert.IsNull(again.DroppedCacheNote, "the cache the new machine wrote is used");
+		}
+
+		/// <summary>
+		/// Issue #115. A project records the savestate format its cached states were
+		/// written in. When this build reads another number, the person is told once, at
+		/// open, what happened and why - instead of finding out one refused branch at a
+		/// time, or not at all. The engine still refuses each state for itself; this is
+		/// the same news about the whole cache, said earlier.
+		/// </summary>
+		[TestMethod]
+		public void AProjectSaysWhichSavestateFormatItsStatesAreIn()
+		{
+			var path = Path.Combine(_dir, "stateformat.chimeraProject");
+			var movie = MakeWorkedMovie(path);
+			Assert.IsFalse(movie.Save().IsError);
+
+			var current = ChimeraEngine.StateFormat.ToString(CultureInfo.InvariantCulture);
+			var saved = LoadFresh(path);
+			Assert.AreEqual(current, saved.HeaderEntries[HeaderKeys.StateFormat], "a save records the format it wrote in");
+			Assert.AreEqual(ChimeraEngine.StateWriterId, saved.HeaderEntries[HeaderKeys.StateWrittenBy]);
+			Assert.IsNull(saved.DroppedCacheNote, "the same build says nothing at all");
+
+			// the same project, as a build on another format would find it
+			using (var p = Chimera.Emulation.Common.Engine.EngineProject.Open(path))
+			{
+				p.HeaderSet(HeaderKeys.StateFormat, (ChimeraEngine.StateFormat + 1).ToString(CultureInfo.InvariantCulture));
+				p.HeaderSet(HeaderKeys.StateWrittenBy, "Chimera commit deadbeef1234");
+				p.Save(path);
+			}
+			var other = LoadFresh(path);
+			Assert.IsNotNull(other.DroppedCacheNote, "another format is explained");
+			StringAssert.Contains(other.DroppedCacheNote, (ChimeraEngine.StateFormat + 1).ToString(CultureInfo.InvariantCulture));
+			StringAssert.Contains(other.DroppedCacheNote, current);
+			StringAssert.Contains(other.DroppedCacheNote, "Chimera commit deadbeef1234");
+			StringAssert.Contains(other.DroppedCacheNote, ChimeraEngine.StateWriterId);
+			Assert.AreEqual(6, other.InputLogLength, "and the work is untouched");
+
+			// a project written before the record says nothing, and silence is not a disagreement
+			using (var p = Chimera.Emulation.Common.Engine.EngineProject.Open(path))
+			{
+				p.HeaderSet(HeaderKeys.StateFormat, null);
+				p.HeaderSet(HeaderKeys.StateWrittenBy, null);
+				p.Save(path);
+			}
+			Assert.IsNull(LoadFresh(path).DroppedCacheNote, "a project from before this existed is not nagged about");
+		}
+
+		/// <summary>
+		/// Issue #115, the date heuristic: the engine owns the threshold and the wording,
+		/// and this side only asks. A pairing that works must keep working, so it is
+		/// silent unless the two builds are far apart, and silent whenever either side
+		/// does not date itself.
+		/// </summary>
+		[TestMethod]
+		public void BuildsFarApartAreMentionedAndCloseOnesAreNot()
+		{
+			Assert.IsNull(ChimeraEngine.VersionSkew("2026-09-20", "a", "2026-09-13", "b", "quickerNES"));
+			Assert.IsNull(ChimeraEngine.VersionSkew("2026-09-20", "a", "", "b", "quickerNES"), "no date, no guess");
+
+			var far = ChimeraEngine.VersionSkew("2026-09-20", "Commit 229fc29c3", "2026-08-01", "4713 0d81", "quickerNES");
+			Assert.IsNotNull(far);
+			StringAssert.Contains(far, "2026-09-20");
+			StringAssert.Contains(far, "2026-08-01");
+			StringAssert.Contains(far, "Commit 229fc29c3");
+			StringAssert.Contains(far, "quickerNES");
+			StringAssert.Contains(far, "Core Manager");
 		}
 
 		[TestMethod]

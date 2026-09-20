@@ -1,8 +1,10 @@
 ﻿using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Windows.Forms;
 
+using Chimera.Common;
 using Chimera.Common.PathExtensions;
 using Chimera.Client.Common;
 using Chimera.Emulation.Common;
@@ -736,6 +738,7 @@ namespace Chimera.Client.GUI
 
 			SetMainformMovieInfo();
 			WarnOnMovieVsLoadedCore();
+			WarnOnFrontendVsCoreBuild();
 
 			// only a project that HAS a file can be recent, and only one that has a
 			// file has somewhere to keep the note of where its files were found
@@ -921,6 +924,36 @@ namespace Chimera.Client.GUI
 						+ "\n\nRun on the installed build anyway? The project will record what actually ran.");
 			}
 			return true;
+		}
+
+		/// <summary>
+		/// Issue #115, the first of three: this Chimera and the core package it just
+		/// booted, held against each other by the dates they were built on. It is a
+		/// heuristic and it says so - a pairing that works must keep working, so this
+		/// never refuses anything and never asks a question. The exact answer is the
+		/// savestate format number, which the engine checks state by state.
+		///
+		/// The engine owns the threshold and the sentence; this side finds the two
+		/// dates and shows what comes back. Either side may not date itself - a package
+		/// built before "versionDate" existed, or a Chimera built outside a git
+		/// checkout - and then nothing is said at all, because half a comparison is
+		/// worse than none.
+		/// </summary>
+		private void WarnOnFrontendVsCoreBuild()
+		{
+			var running = CoreRegistry.Instance.PackageSha1Of(Emulator);
+			if (string.IsNullOrWhiteSpace(running)) return;
+			var package = _discoveredCorePackages.FirstOrDefault(
+				pkg => running.Equals(pkg.Sha1, StringComparison.OrdinalIgnoreCase));
+			if (package is null || CoreVersionDates.Of(package) is not { } built) return;
+
+			var message = ChimeraEngine.VersionSkew(
+				VersionInfo.GIT_SHORTDATE,
+				VersionInfo.GetEmuVersion(),
+				built.ToUniversalTime().ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+				package.ShortVersion,
+				package.Name);
+			if (message is not null) AddOnScreenMessage(message, 15);
 		}
 
 		/// <summary>When a package landed on this machine: "newest installed" is the newest file, not the newest version string.</summary>
