@@ -241,6 +241,52 @@ namespace Chimera.Tests.Client.GUI
 			Assert.AreEqual(light[ThemeColorRole.AccentError].ToArgb(), declared.ForeColor.ToArgb(), "a declared role was not applied");
 		}
 
+		/// <summary>
+		/// What Config &gt; Theme does when a theme is picked: every window that is
+		/// open repaints, including ones that were opened before the choice and
+		/// ones that override ApplyTheme to colour something the walk cannot reach.
+		/// </summary>
+		[TestMethod]
+		public void PickingAThemeRepaintsEveryWindowThatIsOpen()
+		{
+			using Recorder first = new();
+			using Recorder second = new();
+			first.Show();
+			second.Show();
+			try
+			{
+				var dark = ThemeLibrary.Select("Dark");
+				ThemeEngine.ApplyToOpenForms(dark);
+
+				Assert.AreEqual(dark[ThemeColorRole.WindowBackground].ToArgb(), first.BackColor.ToArgb());
+				Assert.AreEqual(dark[ThemeColorRole.WindowBackground].ToArgb(), second.BackColor.ToArgb());
+				Assert.AreEqual("Dark", first.LastTold, "the window was not told which theme it is now wearing");
+				Assert.AreEqual("Dark", second.LastTold);
+
+				var light = ThemeLibrary.Select("Light");
+				ThemeEngine.ApplyToOpenForms(light);
+				Assert.AreEqual("Light", first.LastTold);
+			}
+			finally
+			{
+				ThemeLibrary.Select("Light");
+				first.Close();
+				second.Close();
+			}
+		}
+
+		/// <summary>A window that colours something of its own, so the repaint can be seen to reach it.</summary>
+		private sealed class Recorder : ThemedForm
+		{
+			public string LastTold { get; private set; } = "";
+
+			protected override void ApplyTheme(Theme theme)
+			{
+				base.ApplyTheme(theme);
+				LastTold = theme.Name;
+			}
+		}
+
 		/// <summary>A control that asked to be left alone is left alone, and so is everything in it.</summary>
 		[TestMethod]
 		public void SkippedControlsAreLeftAlone()
