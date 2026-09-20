@@ -269,10 +269,10 @@ namespace Chimera.Client.GUI
 			{
 				Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
 				AutoSize = false,
-				ForeColor = SystemColors.GrayText,
 				Location = Pt(110, 138),
 				Size = new(UIHelper.ScaleX(442), UIHelper.ScaleY(46)),
 			};
+			_rendererCaveat.SetForeRole(ThemeColorRole.DisabledText);
 			p1.Controls.Add(_rendererCaveat);
 			p1.Controls.Add(MakeIssuesNotice());
 			_core.SelectedIndexChanged += (_, _) => LoadChosenPackage();
@@ -397,10 +397,10 @@ namespace Chimera.Client.GUI
 			{
 				Anchor = AnchorStyles.Bottom | AnchorStyles.Left,
 				AutoEllipsis = true,
-				ForeColor = Color.Firebrick,
 				Location = Pt(8, 386),
 				Size = new(UIHelper.ScaleX(360), UIHelper.ScaleY(16)),
 			};
+			_status.SetForeRole(ThemeColorRole.AccentError);
 			_backButton = MakeNavButton("< Back", GoBack);
 			_nextButton = MakeNavButton("Next >", Advance);
 			Button cancel = MakeNavButton("Cancel", CancelPressed);
@@ -442,12 +442,12 @@ namespace Chimera.Client.GUI
 			{
 				Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
 				AutoSize = false,
-				ForeColor = SystemColors.GrayText,
 				LinkBehavior = LinkBehavior.HoverUnderline,
 				Location = Pt(8, 352),
 				Size = new(UIHelper.ScaleX(544), UIHelper.ScaleY(20)),
 				Text = text,
 			};
+			notice.SetForeRole(ThemeColorRole.DisabledText);
 			notice.Links.Clear();
 			notice.Links.Add(text.IndexOf(IssuesUrl, StringComparison.Ordinal), IssuesUrl.Length, IssuesUrl);
 			notice.LinkClicked += static (_, e) => Util.OpenUrlExternal((string) e.Link.LinkData);
@@ -1063,7 +1063,7 @@ namespace Chimera.Client.GUI
 		/// <summary>what the compile step lists right now, for tests: name, hash, present</summary>
 		public IReadOnlyList<(string Name, string Sha1, bool Present)> PrecompileEntries
 			=> _precompileList.Items.Cast<ListViewItem>()
-				.Select(i => (i.SubItems[0].Text, i.SubItems[1].Text, i.ForeColor == Color.ForestGreen))
+				.Select(i => (i.SubItems[0].Text, i.SubItems[1].Text, i.Tag is true))
 				.ToList();
 
 		private void BuildPrecompilePage()
@@ -1101,7 +1101,14 @@ namespace Chimera.Client.GUI
 		/// </summary>
 		private void AddPrecompileRow(string name, string sha1, bool present)
 		{
-			ListViewItem item = new(name) { ForeColor = present ? Color.ForestGreen : Color.Firebrick, ToolTipText = name };
+			// the flag is on the row, not read back out of its colour: the colour is
+			// the theme's to change, and counting greens would then count wrong
+			ListViewItem item = new(name)
+			{
+				ForeColor = ThemeEngine.Color(present ? ThemeColorRole.AccentReady : ThemeColorRole.AccentError),
+				Tag = present,
+				ToolTipText = name,
+			};
 			item.SubItems.Add(sha1);
 			item.SubItems.Add(present ? "Compiled" : "Missing");
 			_precompileList.Items.Add(item);
@@ -1133,7 +1140,7 @@ namespace Chimera.Client.GUI
 		private void UpdatePrecompileStatus()
 		{
 			var total = _precompileList.Items.Count;
-			var green = _precompileList.Items.Cast<ListViewItem>().Count(i => i.ForeColor == Color.ForestGreen);
+			var green = _precompileList.Items.Cast<ListViewItem>().Count(static i => i.Tag is true);
 			// While it runs, a row exists only once its module is compiled, so the
 			// total cannot come from the list - it comes from the sessions, and
 			// only once they have looked at the game. Until then there is nothing
@@ -1149,7 +1156,7 @@ namespace Chimera.Client.GUI
 					: green == total
 						? $"All {total} modules compiled."
 						: $"{total - green} of {total} modules are missing.";
-			_precompileStatus.ForeColor = !_precompiling && total is not 0 && green == total ? Color.ForestGreen : SystemColors.ControlText;
+			_precompileStatus.SetForeRole(!_precompiling && total is not 0 && green == total ? ThemeColorRole.AccentReady : ThemeColorRole.WindowText);
 			// Compile is offered exactly when there is compiling left to do
 			_precompileButton.Enabled = !_precompiling && !PrecompileSatisfied();
 			UpdateCreateEnabled();
@@ -1934,7 +1941,7 @@ namespace Chimera.Client.GUI
 				ListViewItem item = new(title)
 				{
 					ToolTipText = need.Decl?.Description ?? "",
-					ForeColor = need.Satisfied ? System.Drawing.Color.DarkGreen : System.Drawing.Color.Firebrick,
+					ForeColor = ThemeEngine.Color(need.Satisfied ? ThemeColorRole.AccentGood : ThemeColorRole.AccentError),
 				};
 				item.SubItems.Add(need.Decl?.Name ?? "");
 				item.SubItems.Add(string.IsNullOrEmpty(need.Decl?.Sha1) ? "(your own dump)" : need.Decl!.Sha1);

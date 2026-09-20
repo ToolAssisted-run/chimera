@@ -5,7 +5,7 @@ namespace Chimera.Client.GUI
 	/// <summary>
 	/// implements a minimal dialog for configuring JMDWriter
 	/// </summary>
-	public partial class JmdForm : Form
+	public partial class JmdForm : ThemedForm
 	{
 		public JmdForm()
 		{

@@ -383,8 +383,10 @@ namespace Chimera.Client.GUI
 
 			ts_h_arrow_blue = new(arrowSize, arrowSize * 2);
 			ts_h_arrow_green = new(arrowSize, arrowSize * 2);
-			DoPolygon(ts_h_arrow_blue, new SolidBrush(Color.FromArgb(83, 217, 255)), arrowPoints);
-			DoPolygon(ts_h_arrow_green, new SolidBrush(Color.FromArgb(0, 194, 64)), arrowPoints);
+			using SolidBrush playback = new(ThemeEngine.Color(ThemeColorRole.TasIconPlayback));
+			using SolidBrush recording = new(ThemeEngine.Color(ThemeColorRole.TasIconRecording));
+			DoPolygon(ts_h_arrow_blue, playback, arrowPoints);
+			DoPolygon(ts_h_arrow_green, recording, arrowPoints);
 
 			ts_v_arrow_blue = ts_h_arrow_blue.Clone() as Bitmap;
 			ts_v_arrow_green = ts_h_arrow_green.Clone() as Bitmap;
@@ -394,9 +396,12 @@ namespace Chimera.Client.GUI
 			icon_anchor = new(anchorSize, anchorSize);
 			icon_marker = new(anchorSize, anchorSize);
 			icon_anchor_lag = new(anchorSize, anchorSize);
-			DoPolygon(icon_marker, new SolidBrush(Color.FromArgb(252, 209, 55)), anchorPoints);
-			DoPolygon(icon_anchor, new SolidBrush(Color.FromArgb(0, 222, 98)), anchorPoints);
-			DoPolygon(icon_anchor_lag, new SolidBrush(Color.FromArgb(255, 96, 100)), anchorPoints);
+			using SolidBrush markerInk = new(ThemeEngine.Color(ThemeColorRole.TasIconMarker));
+			using SolidBrush anchorInk = new(ThemeEngine.Color(ThemeColorRole.TasIconAnchor));
+			using SolidBrush lagAnchorInk = new(ThemeEngine.Color(ThemeColorRole.TasIconLagAnchor));
+			DoPolygon(icon_marker, markerInk, anchorPoints);
+			DoPolygon(icon_anchor, anchorInk, anchorPoints);
+			DoPolygon(icon_anchor_lag, lagAnchorInk, anchorPoints);
 		}
 
 		private void TasView_QueryItemIcon(InputRoll sender, int index, RollColumn column, ref Bitmap bitmap, ref int offsetX, ref int offsetY)
@@ -476,7 +481,7 @@ namespace Chimera.Client.GUI
 
 			if (columnName == CursorColumnName)
 			{
-				color = Color.FromArgb(0xFE, 0xFF, 0xFF);
+				color = ThemeEngine.Color(ThemeColorRole.TasCursorColumn);
 			}
 
 			if (columnName == FrameColumnName)
@@ -491,7 +496,7 @@ namespace Chimera.Client.GUI
 				}
 				else
 				{
-					color = Color.FromArgb(0x60, 0xFF, 0xFF, 0xFF);
+					color = ThemeEngine.Color(ThemeColorRole.TasFrameColumnWash);
 				}
 			}
 			else if (columnName == AxisEditColumn && sender.IsRowSelected(index))
@@ -505,7 +510,7 @@ namespace Chimera.Client.GUI
 					return playerNumber % 2 is 0 && playerNumber is not 0;
 				}))
 			{
-				color = Color.FromArgb(0x0D, 0x00, 0x00, 0x00);
+				color = ThemeEngine.Color(ThemeColorRole.TasAlternatePlayer);
 			}
 		}
 
@@ -549,7 +554,7 @@ namespace Chimera.Client.GUI
 			}
 			else
 			{
-				color = Color.FromArgb(0xFF, 0xFE, 0xEE);
+				color = ThemeEngine.Color(ThemeColorRole.TasDefaultRow);
 			}
 		}
 

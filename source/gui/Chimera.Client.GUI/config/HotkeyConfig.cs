@@ -10,7 +10,7 @@ using Chimera.Common.StringExtensions;
 
 namespace Chimera.Client.GUI
 {
-	public partial class HotkeyConfig : Form
+	public partial class HotkeyConfig : ThemedForm
 	{
 		private readonly Config _config;
 

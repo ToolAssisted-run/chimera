@@ -21,20 +21,7 @@ namespace Chimera.Tests.Client.GUI
 		private static string ShotDir
 			=> Environment.GetEnvironmentVariable("CHIMERA_UI_SHOTS");
 
-		private static void Shoot(Form form, string name)
-		{
-			var dir = ShotDir;
-			form.Show();
-			form.Refresh();
-			Application.DoEvents();
-			using System.Drawing.Bitmap bmp = new(form.Width, form.Height);
-			using (var g = System.Drawing.Graphics.FromImage(bmp))
-			{
-				g.CopyFromScreen(form.Location, System.Drawing.Point.Empty, form.Size);
-			}
-			Directory.CreateDirectory(dir);
-			bmp.Save(Path.Combine(dir, $"{name}.png"), System.Drawing.Imaging.ImageFormat.Png);
-		}
+		private static void Shoot(Form form, string name) => UiShots.Shoot(form, name);
 
 		private static readonly string DosboxDeclaration = """
 			{
@@ -56,7 +43,6 @@ namespace Chimera.Tests.Client.GUI
 		[TestMethod]
 		public void WizardCoreStep()
 		{
-			if (ShotDir is null) { Assert.Inconclusive("set CHIMERA_UI_SHOTS to write screenshots"); return; }
 			using var form = MakeWizard();
 			Shoot(form, "wizard-1-core");
 		}
@@ -68,7 +54,6 @@ namespace Chimera.Tests.Client.GUI
 		[TestMethod]
 		public void WizardCoreStepWithRenderers()
 		{
-			if (ShotDir is null) { Assert.Inconclusive("set CHIMERA_UI_SHOTS to write screenshots"); return; }
 			using var form = MakeWizard();
 			form.UseRenderersFrom(TestPackages.Config("""
 				{
@@ -88,7 +73,6 @@ namespace Chimera.Tests.Client.GUI
 		[TestMethod]
 		public void WizardFileForm()
 		{
-			if (ShotDir is null) { Assert.Inconclusive("set CHIMERA_UI_SHOTS to write screenshots"); return; }
 			var dir = Path.Combine(Path.GetTempPath(), $"chimera-shot-files-{System.Diagnostics.Process.GetCurrentProcess().Id}");
 			Directory.CreateDirectory(dir);
 			try
@@ -114,7 +98,6 @@ namespace Chimera.Tests.Client.GUI
 		[TestMethod]
 		public void WizardFileFormAdapts()
 		{
-			if (ShotDir is null) { Assert.Inconclusive("set CHIMERA_UI_SHOTS to write screenshots"); return; }
 			using var form = MakeWizard();
 			// mutually exclusive slots: the picked disk greys the cartridge
 			form.UseDeclaration(TestPackages.Slots("""
@@ -136,7 +119,6 @@ namespace Chimera.Tests.Client.GUI
 		[TestMethod]
 		public void WizardSettingsStep()
 		{
-			if (ShotDir is null) { Assert.Inconclusive("set CHIMERA_UI_SHOTS to write screenshots"); return; }
 			using var form = MakeWizard();
 			form.UseSettingsDecls(
 			[
@@ -152,7 +134,6 @@ namespace Chimera.Tests.Client.GUI
 		[TestMethod]
 		public void WizardFirmwareStep()
 		{
-			if (ShotDir is null) { Assert.Inconclusive("set CHIMERA_UI_SHOTS to write screenshots"); return; }
 			var dir = Path.Combine(Path.GetTempPath(), $"chimera-shot-fw-{System.Diagnostics.Process.GetCurrentProcess().Id}");
 			Directory.CreateDirectory(dir);
 			try
@@ -177,7 +158,6 @@ namespace Chimera.Tests.Client.GUI
 		[TestMethod]
 		public void WizardFirmwareStepOneExactDump()
 		{
-			if (ShotDir is null) { Assert.Inconclusive("set CHIMERA_UI_SHOTS to write screenshots"); return; }
 			using var form = MakeWizard();
 			var cfg = TestPackages.Config("""
 				{
@@ -265,7 +245,6 @@ namespace Chimera.Tests.Client.GUI
 		[TestMethod]
 		public void ResolutionDialog()
 		{
-			if (ShotDir is null) { Assert.Inconclusive("set CHIMERA_UI_SHOTS to write screenshots"); return; }
 			var dir = Path.Combine(Path.GetTempPath(), $"chimera-shot-resolve-{System.Diagnostics.Process.GetCurrentProcess().Id}");
 			Directory.CreateDirectory(dir);
 			try

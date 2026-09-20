@@ -9,7 +9,7 @@ using Chimera.Common.StringExtensions;
 
 namespace Chimera.Client.GUI
 {
-	public partial class ArchiveChooser : Form
+	public partial class ArchiveChooser : ThemedForm
 	{
 		private readonly IList<ListViewItem> _archiveItems = new List<ListViewItem>();
 		private readonly ToolTip _errorBalloon = new ToolTip();

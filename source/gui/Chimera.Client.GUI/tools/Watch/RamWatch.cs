@@ -55,6 +55,7 @@ namespace Chimera.Client.GUI
 			MoveTopContextMenuItem.Image = Resources.MoveTop;
 			MoveBottomContextMenuItem.Image = Resources.MoveBottom;
 			ErrorIconButton.Image = Resources.ExclamationRed;
+			ErrorIconButton.SetItemBackRole(ThemeColorRole.AccentWarningBackground);
 			newToolStripButton.Image = Resources.NewFile;
 			openToolStripButton.Image = Resources.OpenFile;
 			saveToolStripButton.Image = Resources.SaveAs;
@@ -671,11 +672,11 @@ namespace Chimera.Client.GUI
 			}
 			else if (!_watches[index].IsValid)
 			{
-				color = Color.PeachPuff;
+				color = ThemeEngine.Color(ThemeColorRole.RowInvalid);
 			}
 			else if (MainForm.CheatList.IsActive(_watches[index].Domain, _watches[index].Address))
 			{
-				color = Color.LightCyan;
+				color = ThemeEngine.Color(ThemeColorRole.RowActive);
 			}
 		}
 

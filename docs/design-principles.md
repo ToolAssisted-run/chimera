@@ -4031,3 +4031,147 @@ The corollary, learned the same week at the cost of a shipped regression:
 with its own commit body saying no disc on hand used the format, so the fix
 "waits for a game of sprites to prove it". A game of sprites arrived the next
 day and the fix was itself the bug.
+
+## The colours are data, and Light is the ones we had (user-decided, 2026-09-20)
+
+Issue #112: the bright white is a strain on the eyes, and the reporter, who
+does not write code, offered to contribute palettes. The decision was: do it
+everywhere rather than on a subset of windows, ship at least Light and Dark,
+and Light must be pixel-for-pixel what Chimera has today.
+
+The shape follows from the second half of that. If Light has to be today's
+palette, then today's palette has to be written down somewhere, and once it is
+written down there is no reason for it to be the only one. So a theme is one
+colour for every role the frontend paints with - `ThemeColorRole`, about ninety
+of them - and nothing else: a flat JSON object of role name to `#RRGGBB`, read
+from `Themes/` under the data directory, with Light and Dark compiled in as the
+same kind of file. A role that a theme does not answer is an error naming the
+role, not a default: a window that is dark except for one panel is worse to
+look at and much harder to report than one that is not dark at all. `basedOn`
+lets a contributor change five colours instead of ninety, and Config > Theme >
+Write a Copy to Edit hands them a complete file to start from.
+
+Light says `"system:ControlText"` where the code said `SystemColors.ControlText`,
+so it is the desktop's palette rather than a guess at it, and
+`LightThemeBaselineTests` carries the literals copied out of the code they used
+to live in and fails by name if `light.json` moves one.
+
+That was not enough on its own, and finding out why is the useful part. Every
+screenshot the UI tests take was compared pixel by pixel against the same
+window built from the commit before this work, and the first round differed on
+five of them - because assigning a colour is not free even when it is the same
+colour. A Button handed a BackColor stops using visual styles. A sunken 3D
+border redrawn is a line. A menu given a colour table built out of system
+colours stops going through the system renderer. A read-only text box given
+"the read-only background" stops being white, which WinForms never did. Same
+palette, different drawing, and "different" is the one thing Light must not be.
+
+So Light carries `"desktop": true`, and under a theme that says so the walk
+assigns nothing by control type at all: the roles the frontend declared by
+name, the controls that paint themselves, and otherwise the toolkit's own
+drawing untouched - which is also where the Mono beige fix goes back to living,
+in FormBase, exactly where it was. With that, every Light screenshot is
+byte-identical to the one from before the branch, and the property is a
+property of the code rather than of ninety hex values happening to be right.
+
+Applying it is explicit, because WinForms has none of this. One walk sets each
+control's colours from its type; the surfaces a BackColor does not reach are
+handled by name (tool strips through a renderer, DataGridView through its cell
+styles, ListView headers by owner-drawing them, LinkLabel through LinkColor);
+and a control that paints itself takes the theme through `IThemedControl`
+rather than being guessed at. The obligation is carried by the base class -
+every window derives from `ThemedForm`, which runs the walk on handle creation,
+and `ThemingContractTests` fails the build if one is added that does not. That
+is the part that was asked for explicitly: a window added later must be themed
+by existing, not by somebody remembering.
+
+Two rules fell out of doing it. A colour that MEANS something is declared as a
+role (`SetForeRole(ThemeColorRole.AccentError)`) rather than assigned, or the
+walk flattens it back to plain text on the next theme change - and the wizard
+was reading a colour back OUT as state, counting its green rows to say how many
+modules were compiled, which any theme would have broken. And a control made
+after the window opened has to be themed when it arrives: TAStudio's piano
+rolls are built when a project opens, and were the one white thing left on a
+dark window until the walk started hooking the containers it passes.
+
+The defect that came back from review is the one worth keeping: a list's
+chosen row was a beige bar with invisible writing on it, in a screenshot this
+work had itself produced, while every assertion about every control's colours
+passed. A ListView paints its selected row, its column headers and the strip
+past its last column out of the desktop's colours and answers no property
+about any of them - so a test that reads properties cannot see it, and a
+picture nobody looks at is not a witness. The lesson is the same one as the
+gate that went green over an empty game database: a test has to be asked
+whether it would notice.
+
+So the list is drawn here now, in Details view, away from the desktop's
+palette - and the strip past the last column, which no event is raised for and
+nothing can paint over, is removed by growing the last column to the edge. And
+the screenshots are inspected as they are taken, every run: no toolkit colour
+in a header band or behind a chosen row, and a chosen row's text must have
+contrast against what it is written on. Both checks were confirmed against the
+broken drawing before the fix went in, which is the only way to know a test
+bites. On top of that, every role that carries text is paired with the
+background it lands on and held to 3:1 - the accessibility floor - for every
+theme that is not the desktop's, because a contributed theme is ninety numbers
+somebody typed and two of them being the same shade is exactly the failure
+that is invisible on the page and obvious on the screen.
+
+Three follow-ups after Sergio tested the staged build (user-decided,
+2026-09-20). Dark is what a config being created now starts with; a config
+that already existed and had never chosen keeps Light, because changing
+somebody's colours under them on an update is a surprise and the theme is one
+click away either way. Twenty-one menu items had no icon and now have one,
+from one place, with the items that are better bare - anything that can be
+ticked, since the tick lives in the image margin; labels that are not
+commands; Exit - named as decisions rather than omissions. And the title bar,
+written up the round before as unreachable, is reachable: WinForms cannot
+colour it but Windows will, through one DwmSetWindowAttribute call, which
+ThemedForm makes on handle creation and on every theme change. That call
+cannot be exercised anywhere but Windows, so what the tests cover is that
+every window ASKS; whether Windows honours it was checked by hand on the
+Windows side of this box, build 22631, and photographed.
+
+The fourth thing that round taught is the one worth keeping. The Theme menu
+shipped dead - clicking it did nothing at all - while 873 tests were green,
+because a ToolStripMenuItem whose DropDownItems is empty never opens, so the
+handler that fills it never ran. Every one of those tests reached the theme
+engine directly; the only route a USER has to the feature was untested. That
+is the same class as the gate over an empty game database, in a new place: the
+mechanism was covered and the entry point was not. MenuContractTests now reads
+the Designer files and fails on any menu that fills itself when it opens and
+starts with nothing in it, which is the eleven that exist and the twelfth
+somebody writes.
+
+And the fourth report, which is the most instructive of the lot: on the staged
+build, choosing Light while wearing Dark changed the title bar and nothing
+else. The cause was the design decision two paragraphs up. "The desktop theme
+assigns nothing" is right for a window built under it and is exactly wrong for
+a window that is currently dark - there was nothing to put the colours back to,
+because nothing had ever recorded what they were. The title bar changed
+because it is not part of that mechanism at all: it is an unconditional call.
+
+So the first walk over a control now records everything the walk can change -
+colours, border style, visual-style flag, flat appearance, link colours, a
+property grid's six, a data grid's cell styles, a strip's renderer - and the
+desktop theme runs that record backwards. Two things surfaced while fixing it
+that are worth keeping. A ToolStrip handed the renderer it already holds keeps
+the render mode it was put back to, so renderers are made per application now
+rather than shared per theme; and a strip item's colour is the STRIP's until
+somebody sets one, so recording what an item reads back after the strip has
+gone dark records the dark colour - items are reset, not restored.
+
+The test that was green throughout checked that a repaint happened. It now
+checks what the window LOOKS like afterwards, against a window that started in
+that theme, in both directions. That is the third time on this branch that the
+check covered the mechanism and not the state a person actually lands in.
+
+Where a user already had a say, the theme yields to it. TAStudio's palette, the
+hex editor's six colours and the OSD's four follow the theme only while nobody
+has set them; a config from before themes holds the old light values, and those
+are read as "nobody set anything" so an old config follows the theme too.
+
+What no theme reaches, and it is worth being plain about: scroll bars, the tick
+inside a check box, the window's own title bar. Those are drawn by the desktop
+out of the desktop's colours and WinForms offers no way to ask for others. A
+dark Chimera has light scroll bars.

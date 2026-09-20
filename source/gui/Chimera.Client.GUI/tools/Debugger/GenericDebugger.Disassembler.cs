@@ -4,6 +4,8 @@ using System.Linq;
 using System.Text;
 using System.Windows.Forms;
 
+using Chimera.Client.Common;
+
 using Chimera.Common.NumberExtensions;
 
 namespace Chimera.Client.GUI
@@ -92,7 +94,7 @@ namespace Chimera.Client.GUI
 			{
 				if (_disassemblyLines[index].Address == _currentDisassemblerAddress)
 				{
-					color = Color.LightCyan;
+					color = ThemeEngine.Color(ThemeColorRole.RowActive);
 				}
 			}
 		}

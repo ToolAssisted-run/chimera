@@ -260,10 +260,10 @@ namespace Chimera.Client.GUI
 			_levels = new AudioLevelMeter
 			{
 				Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
-				BackColor = SystemColors.ControlDarkDark,
 				Location = Pt(56, 270),
 				Size = new(UIHelper.ScaleX(516), UIHelper.ScaleY(26)),
 			};
+			_levels.SetBackRole(ThemeColorRole.ShadedBackground);
 			Controls.Add(_levels);
 
 			// ---- the four things you can do --------------------------------------
@@ -453,7 +453,7 @@ namespace Chimera.Client.GUI
 			_range.Text = frames > 0
 				? $"frames {StartFrame} to {EndFrame} ({frames:N0} frames)"
 				: "the end marker is before the start marker";
-			_range.ForeColor = frames > 0 ? SystemColors.GrayText : Color.Firebrick;
+			_range.SetForeRole(frames > 0 ? ThemeColorRole.DisabledText : ThemeColorRole.AccentError);
 			if (!_running) _start.Enabled = frames > 0;
 		}
 
@@ -489,7 +489,7 @@ namespace Chimera.Client.GUI
 			if (File.Exists(request.OutputPath) && !_confirmOverwrite(request.OutputPath))
 			{
 				_status.Text = $"{Path.GetFileName(request.OutputPath)} was kept; pick another name to encode.";
-				_status.ForeColor = Color.Firebrick;
+				_status.SetForeRole(ThemeColorRole.AccentError);
 				return;
 			}
 
@@ -497,7 +497,7 @@ namespace Chimera.Client.GUI
 			if (error is not null)
 			{
 				_status.Text = error;
-				_status.ForeColor = Color.Firebrick;
+				_status.SetForeRole(ThemeColorRole.AccentError);
 				return;
 			}
 
@@ -556,7 +556,7 @@ namespace Chimera.Client.GUI
 			_progress.Maximum = Math.Max(1, progress.FramesTotal);
 			_progress.Value = Math.Min(_progress.Maximum, Math.Max(0, progress.FramesDone));
 
-			_status.ForeColor = progress.Phase is VideoEncodePhase.Failed ? Color.Firebrick : SystemColors.ControlText;
+			_status.SetForeRole(progress.Phase is VideoEncodePhase.Failed ? ThemeColorRole.AccentError : ThemeColorRole.WindowText);
 			_status.Text = progress.Phase switch
 			{
 				VideoEncodePhase.Idle => "",
@@ -604,7 +604,7 @@ namespace Chimera.Client.GUI
 			if (!File.Exists(_written))
 			{
 				_status.Text = $"{Path.GetFileName(_written)} is no longer there.";
-				_status.ForeColor = Color.Firebrick;
+				_status.SetForeRole(ThemeColorRole.AccentError);
 				_openVideo.Enabled = false;
 				return;
 			}

@@ -10,7 +10,7 @@ using Chimera.Emulation.Common;
 
 namespace Chimera.Client.GUI
 {
-	public partial class TAStudioSettingsForm : Form
+	public partial class TAStudioSettingsForm : ThemedForm
 	{
 		private TAStudio.AllSettings _settings;
 		private ControllerDefinition _controllerDef;
@@ -22,7 +22,7 @@ namespace Chimera.Client.GUI
 		private bool _changedByUser = true;
 
 		private Font _font;
-		private TAStudioPalette _palette;
+		private TAStudioPalette? _palette;
 
 		public TAStudioSettingsForm(
 			TAStudio.AllSettings editorSettings,
@@ -514,7 +514,7 @@ namespace Chimera.Client.GUI
 
 		private void ColorsButton_Click(object sender, EventArgs e)
 		{
-			using TAStudioColorSettingsForm form = new(_palette, p => _palette = p)
+			using TAStudioColorSettingsForm form = new(_palette ?? TAStudioPalette.FromTheme(ThemeLibrary.Current), p => _palette = p)
 			{
 				Owner = this,
 				StartPosition = FormStartPosition.Manual,

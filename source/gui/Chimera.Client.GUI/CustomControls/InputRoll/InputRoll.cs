@@ -5,6 +5,7 @@ using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
 
+using Chimera.Client.Common;
 using Chimera.Client.GUI.CustomControls;
 using Chimera.Common;
 using Chimera.Common.CollectionExtensions;
@@ -17,8 +18,45 @@ namespace Chimera.Client.GUI
 	// Row width depends on font size and padding
 	// Column width is specified in column headers
 	// Row width is specified for horizontal orientation
-	public partial class InputRoll : Control
+	public partial class InputRoll : Control, IThemedControl
 	{
+		/// <summary>
+		/// The roll's own chrome - everything it paints that is not a cell colour a
+		/// caller supplied. These used to be SystemColors read at the point of
+		/// drawing; they are fields now so a theme can say what they are, and the
+		/// Light theme says exactly what those SystemColors said.
+		/// </summary>
+		public Color ColumnBackColor { get; set; } = SystemColors.ControlLight;
+
+		public Color ColumnBorderColor { get; set; } = Color.Black;
+
+		public Color GridLineColor { get; set; } = SystemColors.ControlLight;
+
+		public Color SelectionColor { get; set; } = SystemColors.Highlight;
+
+		public Color SelectionTextColor { get; set; } = SystemColors.HighlightText;
+
+		/// <summary>The ghost of a column's name, shown in an empty cell under the pointer.</summary>
+		public Color HintTextColor { get; set; } = SystemColors.GrayText;
+
+		/// <summary>The tint over a column somebody asked to have emphasised.</summary>
+		public Color EmphasisColor { get; set; } = SystemColors.ActiveBorder;
+
+		/// <inheritdoc/>
+		public void ApplyTheme(Theme theme)
+		{
+			BackColor = theme[ThemeColorRole.RollBackground];
+			ForeColor = theme[ThemeColorRole.RollText];
+			ColumnBackColor = theme[ThemeColorRole.RollColumnBackground];
+			ColumnBorderColor = theme[ThemeColorRole.RollColumnBorder];
+			GridLineColor = theme[ThemeColorRole.RollGridLines];
+			SelectionColor = theme[ThemeColorRole.RollSelection];
+			SelectionTextColor = theme[ThemeColorRole.RollSelectionText];
+			HintTextColor = theme[ThemeColorRole.RollHintText];
+			EmphasisColor = theme[ThemeColorRole.RollEmphasisColumn];
+			Invalidate();
+		}
+
 		private readonly IControlRenderer _renderer;
 
 		private CellList _selectedItems = new();

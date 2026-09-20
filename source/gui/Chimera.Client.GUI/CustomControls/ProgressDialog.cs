@@ -153,10 +153,10 @@ namespace Chimera.Client.GUI
 			_detailLabel = new Label
 			{
 				AutoEllipsis = true,
-				ForeColor = SystemColors.GrayText,
 				Location = new(UIHelper.ScaleX(12), UIHelper.ScaleY(64)),
 				Size = new(UIHelper.ScaleX(396), UIHelper.ScaleY(18)),
 			};
+			_detailLabel.SetForeRole(ThemeColorRole.DisabledText);
 			_window.Controls.AddRange([ _stageLabel, _bar, _detailLabel ]);
 			if (center is { } c)
 			{

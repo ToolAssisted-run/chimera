@@ -149,61 +149,101 @@ namespace Chimera.Client.GUI
 				new OpenGLProvider());
 		}
 
+		/// <summary>
+		/// The picture beside each menu item. Every one of them comes from
+		/// <see cref="MenuIcons"/>, which is where the reasoning about which
+		/// picture and which items go bare lives; this is only the wiring.
+		/// </summary>
 		private void SetImages()
 		{
-			CloseRomMenuItem.Image = Properties.Resources.Close;
-			EncodeVideoMenuItem.Image = Properties.Resources.Avi;
-			ScreenshotMenuItem.Image = Properties.Resources.Camera;
-			PauseMenuItem.Image = Properties.Resources.Pause;
-			RebootCoreMenuItem.Image = Properties.Resources.Reboot;
-			SwitchToFullscreenMenuItem.Image = Properties.Resources.Fullscreen;
-			ControllersMenuItem.Image = Properties.Resources.GameController;
-			HotkeysMenuItem.Image = Properties.Resources.HotKeys;
-			DisplayConfigMenuItem.Image = Properties.Resources.TvIcon;
-			SoundMenuItem.Image = Properties.Resources.Audio;
-			PathsMenuItem.Image = Properties.Resources.CopyFolder;
-			MessagesMenuItem.Image = Properties.Resources.MessageConfig;
-			AutofireMenuItem.Image = Properties.Resources.Lightning;
-			SaveConfigMenuItem.Image = Properties.Resources.Save;
-			LoadConfigMenuItem.Image = Properties.Resources.LoadConfig;
+			// File
+			NewProjectMenuItem.Image = MenuIcons.NewProject;
+			OpenProjectMenuItem.Image = MenuIcons.OpenProject;
+			RecentProjectSubMenu.Image = MenuIcons.RecentProjects;
+			SaveProjectMenuItem.Image = MenuIcons.SaveProject;
+			SaveProjectAsMenuItem.Image = MenuIcons.SaveProjectAs;
+			SaveProjectBackupMenuItem.Image = MenuIcons.SaveProjectBackup;
+			CloseRomMenuItem.Image = MenuIcons.CloseProject;
+			EncodeVideoMenuItem.Image = MenuIcons.EncodeVideo;
+			ScreenshotSubMenu.Image = MenuIcons.Screenshot;
+			ScreenshotMenuItem.Image = MenuIcons.Screenshot;
+			ScreenshotAsMenuItem.Image = MenuIcons.ScreenshotAs;
+
+			// System
+			PauseMenuItem.Image = MenuIcons.Pause;
+			RebootCoreMenuItem.Image = MenuIcons.RebootCore;
+
+			// View
+			WindowSizeSubMenu.Image = MenuIcons.WindowSize;
+			SwitchToFullscreenMenuItem.Image = MenuIcons.Fullscreen;
+			DisplayLogWindowMenuItem.Image = MenuIcons.LogWindow;
+
+			// Config
+			ControllersMenuItem.Image = MenuIcons.Controllers;
+			HotkeysMenuItem.Image = MenuIcons.Hotkeys;
+			DisplayConfigMenuItem.Image = MenuIcons.Display;
+			SoundMenuItem.Image = MenuIcons.Sound;
+			PathsMenuItem.Image = MenuIcons.Paths;
+			FirmwareMenuItem.Image = MenuIcons.Firmware;
+			DataDirectoryMenuItem.Image = MenuIcons.DataDirectory;
+			MessagesMenuItem.Image = MenuIcons.Messages;
+			ThemeSubMenu.Image = MenuIcons.ThemePalette;
+			AutofireMenuItem.Image = MenuIcons.Autofire;
+			ClientOptionsMenuItem.Image = MenuIcons.Customize;
+			SpeedSkipSubMenu.Image = MenuIcons.SpeedSkip;
+			KeyPrioritySubMenu.Image = MenuIcons.KeyPriority;
+			SaveConfigMenuItem.Image = MenuIcons.SaveConfig;
+			SaveConfigAsMenuItem.Image = MenuIcons.SaveConfigAs;
+			LoadConfigMenuItem.Image = MenuIcons.LoadConfig;
+			LoadConfigFromMenuItem.Image = MenuIcons.LoadConfigFrom;
+
+			// Tools
+			CoreManagerMenuItem.Image = MenuIcons.CoreManager;
+			CacheManagerMenuItem.Image = MenuIcons.CacheManager;
+			MediaMakerMenuItem.Image = MenuIcons.MediaMaker;
+			PrecompiledModulesMenuItem.Image = MenuIcons.PrecompiledModules;
+			MacroToolMenuItem.Image = MenuIcons.MacroTool;
+			BatchRunnerMenuItem.Image = MenuIcons.BatchRunner;
 			(RamWatchMenuItem.Image, /*RamWatchMenuItem.Text*/_) = ToolManager.IconAndNameCache[typeof(RamWatch)]
-				= (/*RamWatch.ToolIcon.ToBitmap()*/Properties.Resources.Watch, "RAM Watch");
+				= (MenuIcons.RamWatch, "RAM Watch");
 			(RamSearchMenuItem.Image, /*RamSearchMenuItem.Text*/_) = ToolManager.IconAndNameCache[typeof(RamSearch)]
-				= (/*RamSearch.ToolIcon.ToBitmap()*/Properties.Resources.Search, "RAM Search");
+				= (MenuIcons.RamSearch, "RAM Search");
 			(LuaConsoleMenuItem.Image, /*LuaConsoleMenuItem.Text*/_) = ToolManager.IconAndNameCache[typeof(LuaConsole)]
-				= (/*LuaConsole.ToolIcon.ToBitmap()*/Properties.Resources.TextDoc, "Lua Console");
-			ToolManager.IconAndNameCache[typeof(TAStudio)]
-				= (/*TAStudio.ToolIcon.ToBitmap()*/Properties.Resources.TAStudio, "TAStudio");
+				= (MenuIcons.LuaConsole, "Lua Console");
+			ToolManager.IconAndNameCache[typeof(TAStudio)] = (MenuIcons.TAStudio, "TAStudio");
 			(HexEditorMenuItem.Image, /*HexEditorMenuItem.Text*/_) = ToolManager.IconAndNameCache[typeof(HexEditor)]
-				= (/*HexEditor.ToolIcon.ToBitmap()*/Properties.Resources.Poke, "Hex Editor");
-			ToolManager.IconAndNameCache[typeof(GenericDebugger)]
-				= (/*GenericDebugger.ToolIcon.ToBitmap()*/Properties.Resources.Bug, "Debugger");
-			OnlineHelpMenuItem.Image = Properties.Resources.Help;
-			AboutMenuItem.Image = Properties.Resources.ChimeraSmall;
+				= (MenuIcons.HexEditor, "Hex Editor");
+			ToolManager.IconAndNameCache[typeof(GenericDebugger)] = (MenuIcons.Debugger, "Debugger");
+
+			// Help
+			OnlineHelpMenuItem.Image = MenuIcons.OnlineHelp;
+			AboutMenuItem.Image = MenuIcons.About;
+
+			// the status bar, and the context menu, which mirrors the menus above
 			PlayRecordStatusButton.Image = Properties.Resources.Blank;
 			PauseStatusButton.Image = Properties.Resources.Blank;
-			RebootStatusBarIcon.Image = Properties.Resources.Reboot;
+			RebootStatusBarIcon.Image = MenuIcons.RebootCore;
 			AVStatusLabel.Image = Properties.Resources.Blank;
 			LedLightStatusLabel.Image = Properties.Resources.LightOff;
-			KeyPriorityStatusLabel.Image = Properties.Resources.Both;
-			CoreNameStatusBarButton.Image = Properties.Resources.ChimeraSmall;
+			KeyPriorityStatusLabel.Image = MenuIcons.KeyPriority;
+			CoreNameStatusBarButton.Image = MenuIcons.About;
 			LinkConnectStatusBarButton.Image = Properties.Resources.Connect16X16;
 			RestartMovieContextMenuItem.Image = Properties.Resources.Restart;
 			StopMovieContextMenuItem.Image = Properties.Resources.Stop;
 			StopNoSaveContextMenuItem.Image = Properties.Resources.Stop;
 			SaveMovieContextMenuItem.Image = Properties.Resources.SaveAs;
 			SaveMovieAsContextMenuItem.Image = Properties.Resources.SaveAs;
-			toolStripMenuItem6.Image = Properties.Resources.GameController;
-			toolStripMenuItem7.Image = Properties.Resources.HotKeys;
-			toolStripMenuItem8.Image = Properties.Resources.TvIcon;
-			toolStripMenuItem9.Image = Properties.Resources.Audio;
-			toolStripMenuItem10.Image = Properties.Resources.CopyFolder;
-			toolStripMenuItem12.Image = Properties.Resources.MessageConfig;
-			toolStripMenuItem13.Image = Properties.Resources.Lightning;
-			toolStripMenuItem66.Image = Properties.Resources.Save;
-			toolStripMenuItem67.Image = Properties.Resources.LoadConfig;
-			ScreenshotContextMenuItem.Image = Properties.Resources.Camera;
-			CloseRomContextMenuItem.Image = Properties.Resources.Close;
+			toolStripMenuItem6.Image = MenuIcons.Controllers;
+			toolStripMenuItem7.Image = MenuIcons.Hotkeys;
+			toolStripMenuItem8.Image = MenuIcons.Display;
+			toolStripMenuItem9.Image = MenuIcons.Sound;
+			toolStripMenuItem10.Image = MenuIcons.Paths;
+			toolStripMenuItem12.Image = MenuIcons.Messages;
+			toolStripMenuItem13.Image = MenuIcons.Autofire;
+			toolStripMenuItem66.Image = MenuIcons.SaveConfig;
+			toolStripMenuItem67.Image = MenuIcons.LoadConfig;
+			ScreenshotContextMenuItem.Image = MenuIcons.Screenshot;
+			CloseRomContextMenuItem.Image = MenuIcons.CloseProject;
 		}
 
 		public MainForm(
@@ -1420,7 +1460,7 @@ namespace Chimera.Client.GUI
 					// It seems that some StatusBar elements composite with the backcolor.
 					// Maybe we could add another control under the StatusBar. with a different backcolor
 					Padding = new Padding(1);
-					BackColor = Color.Black;
+					BackColor = ThemeEngine.Color(ThemeColorRole.EmulatorViewport);
 
 					// FUTURE WORK:
 					// re-add this padding back into the display manager (so the image will get cut off a little but, but a few more resolutions will fully fit into the screen)
@@ -1446,7 +1486,7 @@ namespace Chimera.Client.GUI
 
 					// it's important that we set the form color back to this, because the StatusBar icons blend onto the mainform, not onto the StatusBar--
 					// so we need the StatusBar and mainform backdrop color to match
-					BackColor = SystemColors.Control;
+					BackColor = ThemeEngine.Color(ThemeColorRole.WindowBackground);
 				}
 
 				_inFullscreen = false;

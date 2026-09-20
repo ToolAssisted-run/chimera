@@ -10,7 +10,7 @@ using Chimera.Common.StringExtensions;
 
 namespace Chimera.Client.GUI
 {
-	public partial class LuaFunctionsForm : Form
+	public partial class LuaFunctionsForm : ThemedForm
 	{
 		private readonly LuaDocumentation _docs;
 		private readonly Sorting _columnSort = new Sorting();

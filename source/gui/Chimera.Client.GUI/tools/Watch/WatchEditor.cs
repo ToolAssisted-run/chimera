@@ -11,7 +11,7 @@ using Emu = Chimera.Emulation.Common;
 
 namespace Chimera.Client.GUI
 {
-	public sealed class WatchEditor : Form
+	public sealed class WatchEditor : ThemedForm
 	{
 		public enum Mode
 		{

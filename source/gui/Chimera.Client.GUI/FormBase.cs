@@ -9,7 +9,7 @@ using Chimera.Common;
 
 namespace Chimera.Client.GUI
 {
-	public class FormBase : Form
+	public class FormBase : ThemedForm
 	{
 		private const string PLACEHOLDER_TITLE = "(will take value from WindowTitle/WindowTitleStatic)";
 
@@ -90,7 +90,11 @@ namespace Chimera.Client.GUI
 				Close();
 				return;
 			}
-			if (OSTailoredCode.IsUnixHost) FixBackColorOnControls(this);
+			// The Mono beige fix, which is what this window did before there were
+			// themes and still does under a theme that is the desktop's own
+			// colours. A theme with colours of its own has already set them all in
+			// ThemedForm, and this would undo them.
+			if (OSTailoredCode.IsUnixHost && ThemeEngine.IsSystemPalette(ThemeLibrary.Current)) FixBackColorOnControls(this);
 			UpdateWindowTitle();
 
 			if (MainMenuStrip != null)
@@ -98,6 +102,17 @@ namespace Chimera.Client.GUI
 				MainMenuStrip.MenuActivate += (_, _) => MenuIsOpen = true;
 				MainMenuStrip.MenuDeactivate += (_, _) => MenuIsOpen = false;
 			}
+		}
+
+		/// <inheritdoc/>
+		protected override void ApplyTheme(Theme theme)
+		{
+			base.ApplyTheme(theme);
+			// The Mono beige fix, again. OnLoad does it when a window opens under a
+			// desktop theme; a window that opened under a DARK one never did it, so
+			// switching to Light afterwards would put back the beige the control
+			// was captured with instead of the WhiteSmoke a fresh light start has.
+			if (OSTailoredCode.IsUnixHost && ThemeEngine.IsSystemPalette(theme)) FixBackColorOnControls(this);
 		}
 
 		public void UpdateWindowTitle()

@@ -30,22 +30,7 @@ namespace Chimera.Tests.Client.GUI
 		private static string ShotDir
 			=> Environment.GetEnvironmentVariable("CHIMERA_UI_SHOTS");
 
-		private static void Shoot(Form form, string name)
-		{
-			var dir = ShotDir;
-			form.Show();
-			form.Refresh();
-			Application.DoEvents();
-			using Bitmap bmp = new(form.Width, form.Height);
-			using (var g = Graphics.FromImage(bmp))
-			{
-				// the window is real and on a (headless) screen, so grab it from there:
-				// DrawToBitmap skips the non-client area and mis-renders ListViews on Mono
-				g.CopyFromScreen(form.Location, Point.Empty, form.Size);
-			}
-			Directory.CreateDirectory(dir);
-			bmp.Save(Path.Combine(dir, $"{name}.png"), ImageFormat.Png);
-		}
+		private static void Shoot(Form form, string name) => UiShots.Shoot(form, name);
 
 		/// <summary>
 		/// The About window: it says what this build is, and nothing else. Worth a
@@ -54,12 +39,65 @@ namespace Chimera.Tests.Client.GUI
 		[TestMethod]
 		public void AboutWindow()
 		{
-			if (ShotDir is null) { Assert.Inconclusive("set CHIMERA_UI_SHOTS to write screenshots"); return; }
-
 			using AboutBox form = new();
 			form.StartPosition = FormStartPosition.Manual;
 			form.Location = new Point(0, 0);
 			Shoot(form, "about");
+		}
+
+		/// <summary>
+		/// The firmware survey, which is the one list in the frontend that uses
+		/// GROUPS - and group headers are drawn by the toolkit even when the rest
+		/// of the list has been taken over for theming, which is a claim worth
+		/// having a picture of rather than a comment about.
+		/// </summary>
+		[TestMethod]
+		public void FirmwareSurveyWindow()
+		{
+			FirmwareSurveyRow Row(string core, string id, string? label, CoreFirmwareState state, string? path)
+				=> new()
+				{
+					CoreName = core,
+					Decl = new() { Id = id, Display = "Console BIOS", Label = label, Size = 4096, Sha1 = "57FE1BDEE955BB48D357E463CCBF129496930B62" },
+					State = state,
+					Path = path,
+					Where = path is null ? FirmwareWhere.Nowhere : FirmwareWhere.Chosen,
+				};
+
+			List<FirmwareSurveyGroup> groups =
+			[
+				new()
+				{
+					CoreName = "PCSX2",
+					Rows =
+					[
+						Row("PCSX2", "bios.bin", "USA v2.20", CoreFirmwareState.Good, "/dumps/ps2-usa.bin"),
+						Row("PCSX2", "bios.bin", "Europe v2.30", CoreFirmwareState.Unrecognised, "/dumps/ps2-eur.bin"),
+						Row("PCSX2", "bios.bin", "Japan v1.60", CoreFirmwareState.Missing, null),
+					],
+				},
+				new()
+				{
+					CoreName = "xemu",
+					Rows =
+					[
+						Row("xemu", "mcpx", null, CoreFirmwareState.Good, "/dumps/mcpx_1.0.bin"),
+						Row("xemu", "hdd", null, CoreFirmwareState.Missing, null),
+					],
+				},
+				new() { CoreName = "Stella", Rows = [ ] },
+			];
+
+			using FirmwareSurveyForm form = new(() => groups, (_, _) => { }, static _ => null);
+			form.StartPosition = FormStartPosition.Manual;
+			form.Location = new(0, 0);
+			form.Show();
+			foreach (var list in form.Controls.OfType<ListView>())
+			{
+				list.HideSelection = false;
+				if (list.Items.Count > 1) list.Items[1].Selected = true;
+			}
+			Shoot(form, "firmware-survey");
 		}
 
 		/// <summary>
@@ -71,8 +109,6 @@ namespace Chimera.Tests.Client.GUI
 		[TestMethod]
 		public void FirmwareWindow()
 		{
-			if (ShotDir is null) { Assert.Inconclusive("set CHIMERA_UI_SHOTS to write screenshots"); return; }
-
 			CoreFirmwareEntry Entry(string core, string id, string display, string description, CoreFirmwareState state, string? path, bool required = true)
 				=> new()
 				{
@@ -127,8 +163,6 @@ namespace Chimera.Tests.Client.GUI
 		[TestMethod]
 		public void CoreManagerWindow()
 		{
-			if (ShotDir is null) { Assert.Inconclusive("set CHIMERA_UI_SHOTS to write screenshots"); return; }
-
 			List<RosterCore> roster =
 			[
 				new() { Id = "gpgx", Name = "Genesis Plus GX", Repo = "ToolAssisted-run/chimera-core-gpgx", Systems = [ "GEN", "SMS", "GG", "SG" ] },
@@ -175,7 +209,6 @@ namespace Chimera.Tests.Client.GUI
 		[TestMethod]
 		public void CacheManager()
 		{
-			if (ShotDir is null) { Assert.Inconclusive("set CHIMERA_UI_SHOTS to write screenshots"); return; }
 			var items = new List<CacheItem>
 			{
 				new() { Kind = CacheKind.Project, Label = "Prince of Persia The Sands of Time", Detail = "9f2c14ab7d3e5501", System = "XBOX", Core = "xemu", Games = new[] { "Prince of Persia The Sands of Time.iso" }, ProjectPath = @"D:\TAS\projects\xbox\Prince of Persia.chimeraProject", Path = @"C:\Users\you\AppData\Local\Chimera\Projects\9f2c14ab7d3e5501", Bytes = 2_684_354_560L, LastUsed = new DateTime(2026, 9, 7, 18, 42, 0) },
@@ -204,8 +237,6 @@ namespace Chimera.Tests.Client.GUI
 		[TestMethod]
 		public void NoCoresPrompt()
 		{
-			if (ShotDir is null) { Assert.Inconclusive("set CHIMERA_UI_SHOTS to write screenshots"); return; }
-
 			using CoreManagerPrompt form = new();
 			form.StartPosition = FormStartPosition.Manual;
 			form.Location = new Point(0, 0);

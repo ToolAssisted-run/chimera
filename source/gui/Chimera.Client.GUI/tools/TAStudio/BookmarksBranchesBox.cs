@@ -140,7 +140,7 @@ namespace Chimera.Client.GUI
 			if (BranchView.CurrentCell is { RowIndex: int targetRow, Column.Name: BranchNumberColumnName }
 				&& index == targetRow && column.Name is BranchNumberColumnName)
 			{
-				color = Color.FromArgb((byte)(color.A - 24), (byte)(color.R - 24), (byte)(color.G - 24), (byte)(color.B - 24));
+				color = ThemeEngine.Hovered(color);
 			}
 		}
 

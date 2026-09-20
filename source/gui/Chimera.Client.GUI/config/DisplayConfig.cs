@@ -12,7 +12,7 @@ using Chimera.WinForms.Controls;
 
 namespace Chimera.Client.GUI
 {
-	public partial class DisplayConfig : Form, IDialogParent
+	public partial class DisplayConfig : ThemedForm, IDialogParent
 	{
 		private readonly Config _config;
 

@@ -73,10 +73,25 @@ The check inspects the thing at rest and never in the state where it breaks.
 > selected rows in every list were unreadable - light text on a light
 > selection. It only ever looked at UNSELECTED rows.
 
+> The theme round-trip test took a window Light - Dark - Light and compared it
+> against one that started Light. Both ends of that journey are Light whether
+> the middle worked or not, and the middle - a window wearing Light after being
+> born Dark - was the only state a user ever saw, because the frontend now
+> opens on Dark. Every test built its windows under Light, which is the one
+> starting state in which the bug cannot happen.
+
+> And a third time on the same control, which is what makes it a pattern rather
+> than three mistakes: after the normal row and the chosen row came the row
+> under the POINTER, drawn as a bar with nothing written on it. A control the
+> frontend draws itself has no toolkit underneath, so a state nobody enumerated
+> is not drawn wrong - it is not drawn.
+
 **What to do.** Enumerate the states the thing has - selected, focused, empty,
 disabled, mid-operation, at a boundary - and say which the leg covers. A leg
 that covers one state should say so in its own description, so the next person
-does not read it as covering all of them.
+does not read it as covering all of them. Where a thing has a starting state as
+well as an end state, the starting state is one of them: a check that only ever
+starts from the default has not been told what the default hides.
 
 ## E. A synthetic stand-in that does not behave like the real subject
 
@@ -94,10 +109,20 @@ uncatchable - not missed, uncatchable.
 > not always (issue #120). The gate is green and the guarantee it stands for is
 > unestablished for games.
 
+> Every frontend test runs on Mono under Xvfb. The people who use Chimera run
+> .NET Framework WinForms on Windows. That toolkit decides what an assignment
+> to `BackColor` does, whether a control repaints, and whether visual styles
+> override either - so 889 green tests said nothing at all about whether the
+> theme menu worked, which twice it did not.
+
 **What to do.** A synthetic subject is often the only lawful one - a gate
-cannot ship somebody's game. That is fine, but write down what it does NOT
-stand in for, in PLAN.md, next to the leg. The failure is not using a stand-in;
-it is forgetting that it is one.
+cannot ship somebody's game, and it cannot run Windows on a Linux runner. That
+is fine, but write down what it does NOT stand in for, in PLAN.md, next to the
+leg. The failure is not using a stand-in; it is forgetting that it is one. Then
+ask what the cheapest real-subject check would be: for the theme menu it was
+one program compiled against the frontend assemblies and run on the developer's
+own Windows box (`tests/ui/windows/live-theme-switch.sh`), which found the bug
+in a minute after two rounds of guessing at it.
 
 ## F. A timing or ordering assumption that makes the check vacuous
 

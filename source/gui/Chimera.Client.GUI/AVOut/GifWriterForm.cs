@@ -3,7 +3,7 @@ using Chimera.Client.Common;
 
 namespace Chimera.Client.GUI
 {
-	public partial class GifWriterForm : Form
+	public partial class GifWriterForm : ThemedForm
 	{
 		public GifWriterForm()
 		{

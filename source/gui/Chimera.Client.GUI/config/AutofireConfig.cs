@@ -3,7 +3,7 @@ using Chimera.Client.Common;
 
 namespace Chimera.Client.GUI
 {
-	public partial class AutofireConfig : Form
+	public partial class AutofireConfig : ThemedForm
 	{
 		private readonly Config _config;
 		private readonly AutofireController _autoFireController;

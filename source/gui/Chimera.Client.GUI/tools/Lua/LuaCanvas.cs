@@ -12,8 +12,11 @@ using NLua;
 namespace Chimera.Client.GUI
 {
 	[Description("Represents a canvas object, as returned by the `gui.createcanvas()` method.\nNote that the member functions do not have a `self` parameter, and so must be called with the regular invocation syntax, not the OOP syntax.")]
-	public sealed class LuaCanvas : Form
+	public sealed class LuaCanvas : ThemedForm
 	{
+		/// <summary>A script's drawing surface. Every colour on it is the script's, so the theme keeps off.</summary>
+		protected override bool ThemingEnabled => false;
+
 		private readonly IEmulationApi _emuLib;
 
 		private readonly PathEntryCollection _pathEntrys;

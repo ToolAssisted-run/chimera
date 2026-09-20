@@ -412,6 +412,34 @@ namespace Chimera.Client.Common
 
 		public bool UseStaticWindowTitles { get; set; }
 
+		/// <summary>
+		/// The colour scheme every window paints with, by the name inside the theme
+		/// (Config &gt; Theme). "Light" is the palette Chimera has always had. A name
+		/// that is not on offer - a theme file somebody deleted - quietly becomes
+		/// Light again rather than leaving the frontend with no colours.
+		///
+		/// Empty means nobody has chosen yet, which is not the same as choosing the
+		/// default: see <see cref="ResolveTheme"/>.
+		/// </summary>
+		public string Theme { get; set; } = "";
+
+		/// <summary>
+		/// Settles the theme the first time it matters, and records what it settled
+		/// on so the question is asked once.
+		///
+		/// A config file that already existed and says nothing about themes was
+		/// written before there were any, by somebody who has been looking at the
+		/// light one for as long as they have used Chimera. They keep it. A config
+		/// that is being created now starts Dark, which is what it was asked to do.
+		/// Either way it is one click in Config &gt; Theme to change, and the choice
+		/// is written down from here on.
+		/// </summary>
+		public void ResolveTheme(bool configExisted)
+		{
+			if (!string.IsNullOrWhiteSpace(Theme)) return;
+			Theme = configExisted ? ThemeLibrary.FallbackThemeName : ThemeLibrary.NewConfigThemeName;
+		}
+
 		public string MainFormStaticWindowTitleOverride { get; set; } = string.Empty;
 
 		[JsonIgnore]

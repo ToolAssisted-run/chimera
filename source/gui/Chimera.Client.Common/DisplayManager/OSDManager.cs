@@ -34,8 +34,27 @@ namespace Chimera.Client.Common
 
 		public string Fps { get; set; }
 
-		public Color FixedMessagesColor => Color.FromArgb(_config.MessagesColor);
-		public Color FixedAlertMessageColor => Color.FromArgb(_config.AlertMessageColor);
+		/// <summary>
+		/// An OSD colour: the one in config if somebody chose it there (Config &gt;
+		/// Messages), otherwise the theme's. The four in config default to the same
+		/// values the built-in themes carry, so "still at its default" is the same
+		/// question as "nobody has chosen", and a theme can move them without
+		/// overriding a choice.
+		/// </summary>
+		private static Color Osd(int configured, int builtInDefault, ThemeColorRole role)
+			=> configured == builtInDefault ? ThemeLibrary.Current[role] : Color.FromArgb(configured);
+
+		public Color FixedMessagesColor
+			=> Osd(_config.MessagesColor, DefaultMessagePositions.MessagesColor, ThemeColorRole.OsdMessage);
+
+		public Color FixedAlertMessageColor
+			=> Osd(_config.AlertMessageColor, DefaultMessagePositions.AlertMessageColor, ThemeColorRole.OsdAlert);
+
+		private Color MovieInputColor
+			=> Osd(_config.MovieInputColor, DefaultMessagePositions.MovieInputColor, ThemeColorRole.OsdMovieInput);
+
+		private Color LastInputColor
+			=> Osd(_config.LastInputColor, DefaultMessagePositions.LastInputColor, ThemeColorRole.OsdLastInput);
 
 
 
@@ -262,7 +281,7 @@ namespace Chimera.Client.Common
 			{
 				var message = MakeFrameCounter();
 				var point = GetCoordinates(g, _config.FrameCounter, message);
-				DrawOsdMessage(g, message, Color.FromArgb(_config.MessagesColor), point.X, point.Y);
+				DrawOsdMessage(g, message, FixedMessagesColor, point.X, point.Y);
 
 				if (_emulator.CanPollInput() && _emulator.AsInputPollable().IsLagFrame)
 				{
@@ -276,15 +295,15 @@ namespace Chimera.Client.Common
 				{
 					var input = InputStrMovie();
 					var point = GetCoordinates(g, _config.InputDisplay, input);
-					var c = Color.FromArgb(_config.MovieInputColor);
+					var c = MovieInputColor;
 					g.DrawString(input, c, point.X, point.Y);
 				}
 				else // TODO: message config -- allow setting of "mixed", and "auto"
 				{
-					var previousColor = _movieSession.Movie.IsRecording() ? Color.FromArgb(_config.LastInputColor) : Color.FromArgb(_config.MovieInputColor);
-					var currentColor = Color.FromArgb(_config.MessagesColor);
-					var stickyColor = Color.Pink;
-					var currentAndPreviousColor = Color.PeachPuff;
+					var previousColor = _movieSession.Movie.IsRecording() ? LastInputColor : MovieInputColor;
+					var currentColor = FixedMessagesColor;
+					var stickyColor = ThemeLibrary.Current[ThemeColorRole.OsdStickyInput];
+					var currentAndPreviousColor = ThemeLibrary.Current[ThemeColorRole.OsdCurrentAndPreviousInput];
 
 					// now, we're going to render these repeatedly, with higher priority draws overwriting all lower priority draws
 					// in order of highest priority to lowest, we are effectively displaying (in different colors):
@@ -351,7 +370,7 @@ namespace Chimera.Client.Common
 
 				var message = sb.ToString();
 				var point = GetCoordinates(g, _config.Autohold, message);
-				g.DrawString(message, Color.White, point.X, point.Y);
+				g.DrawString(message, ThemeLibrary.Current[ThemeColorRole.OsdAutoHold], point.X, point.Y);
 			}
 
 			if (_movieSession.Movie.IsActive() && _config.DisplaySubtitles)

@@ -118,14 +118,45 @@ namespace Chimera.Client.GUI
 			public Color Freeze { get; set;  }= Color.LightBlue;
 			public Color Highlight { get; set; } = Color.Pink;
 			public Color HighlightFreeze { get; set; } = Color.Violet;
+
+			/// <summary>What the current theme says these six should be.</summary>
+			public static ColorConfig FromTheme(Theme theme)
+				=> new()
+				{
+					Background = theme[ThemeColorRole.HexBackground],
+					Foreground = theme[ThemeColorRole.HexText],
+					MenuBar = theme[ThemeColorRole.HexMenuBar],
+					Freeze = theme[ThemeColorRole.HexFreeze],
+					Highlight = theme[ThemeColorRole.HexHighlight],
+					HighlightFreeze = theme[ThemeColorRole.HexHighlightFreeze],
+				};
 		}
 
 		[ConfigPersist]
 		internal ColorConfig Colors { get; set; } = new ColorConfig();
 
+		/// <summary>
+		/// Whether somebody picked these colours themselves (Settings &gt; Colors).
+		/// Until they do, the hex editor follows the theme like everything else;
+		/// afterwards it keeps what they chose, which is the whole point of that
+		/// dialog. A config written before there were themes has this false, so it
+		/// starts following the theme rather than staying light.
+		/// </summary>
+		[ConfigPersist]
+		internal bool ColorsCustomised { get; set; }
+
+		/// <inheritdoc/>
+		protected override void ApplyTheme(Theme theme)
+		{
+			base.ApplyTheme(theme);
+			if (!ColorsCustomised) Colors = ColorConfig.FromTheme(theme);
+			LoadConfigSettings();
+			Refresh();
+		}
+
 		private WatchSize WatchSize => (WatchSize)DataSize;
 
-		private readonly Pen _blackPen = Pens.Black;
+		private Pen _blackPen = Pens.Black;
 
 		private SolidBrush _freezeBrush;
 		private SolidBrush _freezeHighlightBrush;
@@ -502,6 +533,8 @@ namespace Chimera.Client.GUI
 			_freezeHighlightBrush = new SolidBrush(Colors.HighlightFreeze);
 			_highlightBrush = new SolidBrush(Colors.Highlight);
 			_secondaryHighlightBrush = new SolidBrush(Color.FromArgb(0x44, Colors.Highlight));
+			if (_blackPen != Pens.Black) _blackPen.Dispose();
+			_blackPen = new Pen(Colors.Foreground);
 		}
 
 		private void CloseHexFind()
@@ -676,9 +709,7 @@ namespace Chimera.Client.GUI
 				HexScrollBar.Value = 0;
 			}
 
-			AddressesLabel.ForeColor = _domain.Writable
-				? SystemColors.ControlText
-				: SystemColors.ControlDarkDark;
+			AddressesLabel.SetForeRole(_domain.Writable ? ThemeColorRole.HexText : ThemeColorRole.MutedText);
 
 			if (AllHighlightedAddresses.DefaultIfEmpty().Max() >= _domain.Size)
 			{
@@ -1587,12 +1618,11 @@ namespace Chimera.Client.GUI
 
 		private void ResetColorsToDefaultMenuItem_Click(object sender, EventArgs e)
 		{
-			MemoryViewerBox.BackColor = Color.FromName("Control");
-			MemoryViewerBox.ForeColor = Color.FromName("ControlText");
-			HexMenuStrip.BackColor = Color.FromName("Control");
-			Header.BackColor = Color.FromName("Control");
-			Header.ForeColor = Color.FromName("ControlText");
-			Colors = new ColorConfig();
+			// "default" is the theme's, not the light one's
+			ColorsCustomised = false;
+			Colors = ColorConfig.FromTheme(ThemeLibrary.Current);
+			LoadConfigSettings();
+			Refresh();
 		}
 
 		private void HexEditor_Resize(object sender, EventArgs e)

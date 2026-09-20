@@ -114,8 +114,8 @@ namespace Chimera.Client.GUI
 				ListViewItem item = new(_project.FileName(i));
 				item.SubItems.Add(_project.FileSlot(i));
 				item.SubItems.Add(StatusText(i));
-				if (_project.FileStatus(i) is 2) item.ForeColor = Color.Firebrick;
-				else if (_project.FileStatus(i) is 1) item.ForeColor = Color.DarkGoldenrod;
+				if (_project.FileStatus(i) is 2) item.ForeColor = ThemeEngine.Color(ThemeColorRole.AccentError);
+				else if (_project.FileStatus(i) is 1) item.ForeColor = ThemeEngine.Color(ThemeColorRole.AccentWarning);
 				_list.Items.Add(item);
 			}
 			if (selected >= 0 && selected < _list.Items.Count) _list.Items[selected].Selected = true;

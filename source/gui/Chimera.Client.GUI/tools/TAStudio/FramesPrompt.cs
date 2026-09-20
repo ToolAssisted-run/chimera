@@ -2,7 +2,7 @@ using System.Windows.Forms;
 
 namespace Chimera.Client.GUI
 {
-	public partial class FramesPrompt : Form
+	public partial class FramesPrompt : ThemedForm
 	{
 		public FramesPrompt()
 		{

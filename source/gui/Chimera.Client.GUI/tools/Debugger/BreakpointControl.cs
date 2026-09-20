@@ -48,9 +48,9 @@ namespace Chimera.Client.GUI
 			e.Item.SubItems.Add(entry.Type.ToString());
 			e.Item.SubItems.Add(entry.Name);
 
-			e.Item.BackColor = entry.ReadOnly ? SystemColors.Control
-				: entry.Active ? Color.LightCyan
-				: Color.White;
+			e.Item.BackColor = ThemeEngine.Color(entry.ReadOnly ? ThemeColorRole.DisabledBackground
+				: entry.Active ? ThemeColorRole.RowActive
+				: ThemeColorRole.RowDefault);
 		}
 
 		private uint? BreakpointCallback(uint addr, uint value, uint flags)

@@ -3,11 +3,12 @@ using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
 
+using Chimera.Client.Common;
 using Chimera.WinForms.Controls;
 
 namespace Chimera.Client.GUI
 {
-	public sealed class TAStudioColorSettingsForm : Form
+	public sealed class TAStudioColorSettingsForm : ThemedForm
 	{
 		public TAStudioColorSettingsForm(TAStudioPalette initPalette, Action<TAStudioPalette> save)
 		{
@@ -87,7 +88,8 @@ namespace Chimera.Client.GUI
 			SzButtonEx btnDefaults = new() { Size = btnSize, Text = "Defaults" };
 			btnDefaults.Click += (_, _) =>
 			{
-				Init(TAStudioPalette.Default);
+				// "Defaults" means the theme's colours, not the light ones
+				Init(TAStudioPalette.FromTheme(ThemeLibrary.Current));
 				foreach (var panel in flpPanels.Controls.Cast<SingleRowFLP>().Select(flp => (Panel)flp.Controls[0]))
 				{
 					panel.BackColor = colours[(string) panel.Tag];

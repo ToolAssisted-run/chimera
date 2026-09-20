@@ -348,19 +348,8 @@ namespace Chimera.Tests.Client.GUI
 		[TestMethod]
 		public void PictureIt()
 		{
-			var dir = Environment.GetEnvironmentVariable("CHIMERA_UI_SHOTS");
-			if (dir is null) { Assert.Inconclusive("set CHIMERA_UI_SHOTS to write screenshots"); return; }
-
 			using Harness h = new();
-			h.Form.Refresh();
-			System.Windows.Forms.Application.DoEvents();
-			using System.Drawing.Bitmap bmp = new(h.Form.Width, h.Form.Height);
-			using (var g = System.Drawing.Graphics.FromImage(bmp))
-			{
-				g.CopyFromScreen(h.Form.Location, System.Drawing.Point.Empty, h.Form.Size);
-			}
-			System.IO.Directory.CreateDirectory(dir);
-			bmp.Save(System.IO.Path.Combine(dir, "encode-video.png"), System.Drawing.Imaging.ImageFormat.Png);
+			UiShots.Shoot(h.Form, "encode-video");
 		}
 
 		[TestMethod]

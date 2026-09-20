@@ -9,7 +9,7 @@ using Chimera.Emulation.Common;
 
 namespace Chimera.Client.GUI
 {
-	public partial class BatchRun : Form, IDialogParent
+	public partial class BatchRun : ThemedForm, IDialogParent
 	{
 		private readonly Config _config;
 

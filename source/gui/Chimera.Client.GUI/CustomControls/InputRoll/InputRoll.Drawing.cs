@@ -211,7 +211,7 @@ namespace Chimera.Client.GUI
 
 				if (IsHoveringOnColumnCell && column == CurrentCell.Column)
 				{
-					_renderer.PrepDrawString(Font, SystemColors.HighlightText);
+					_renderer.PrepDrawString(Font, SelectionTextColor);
 					DrawString(column.Text, new Rectangle(x, y, w, h));
 					_renderer.PrepDrawString(Font, _foreColor);
 				}
@@ -277,12 +277,12 @@ namespace Chimera.Client.GUI
 						currentCell.RowIndex = f + startRow;
 						if (foreColor == null && selectedCells.Contains(currentCell))
 						{
-							foreColor = SystemColors.HighlightText;
+							foreColor = SelectionTextColor;
 						}
 						if (string.IsNullOrEmpty(text) && mouseCell == currentCell)
 						{
 							font = new Font(Font, FontStyle.Regular);
-							foreColor = SystemColors.GrayText;
+							foreColor = HintTextColor;
 							text = col.Text;
 						}
 						_renderer.PrepDrawString(font, foreColor ?? _foreColor, rotate: col.Rotatable);
@@ -338,12 +338,12 @@ namespace Chimera.Client.GUI
 						currentCell.RowIndex = f + startRow;
 						if (foreColor == null && selectedCells.Contains(currentCell))
 						{
-							foreColor = SystemColors.HighlightText;
+							foreColor = SelectionTextColor;
 						}
 						if (string.IsNullOrEmpty(text) && mouseCell == currentCell)
 						{
 							font = new Font(Font, FontStyle.Regular);
-							foreColor = SystemColors.GrayText;
+							foreColor = HintTextColor;
 							text = column.Text;
 						}
 
@@ -356,8 +356,8 @@ namespace Chimera.Client.GUI
 
 		private void DrawColumnBg(List<RollColumn> visibleColumns, Rectangle rect)
 		{
-			_renderer.SetBrush(SystemColors.ControlLight);
-			_renderer.SetSolidPen(Color.Black);
+			_renderer.SetBrush(ColumnBackColor);
+			_renderer.SetSolidPen(ColumnBorderColor);
 
 			if (HorizontalOrientation)
 			{
@@ -409,7 +409,7 @@ namespace Chimera.Client.GUI
 			// Emphasis
 			foreach (var column in visibleColumns.Where(c => c.Emphasis))
 			{
-				_renderer.SetBrush(SystemColors.ActiveBorder);
+				_renderer.SetBrush(EmphasisColor);
 				if (HorizontalOrientation)
 				{
 					_renderer.FillRectangle(new Rectangle(1, column.Left + 1, MaxColumnWidth - 1, column.ScaledWidth - 1));
@@ -436,8 +436,8 @@ namespace Chimera.Client.GUI
 						int height = visibleColumns[i].ScaledWidth;
 
 						_renderer.SetBrush(CurrentCell.Column!.Emphasis
-							? SystemColors.Highlight.Add(0x00222222)
-							: SystemColors.Highlight);
+							? SelectionColor.Add(0x00222222)
+							: SelectionColor);
 
 						_renderer.FillRectangle(new Rectangle(1, top + 1, MaxColumnWidth - 1, height - 1));
 					}
@@ -459,8 +459,8 @@ namespace Chimera.Client.GUI
 							int width = column.Right - _hBar.Value - left;
 
 							_renderer.SetBrush(CurrentCell.Column!.Emphasis
-								? SystemColors.Highlight.Add(0x00550000)
-								: SystemColors.Highlight);
+								? SelectionColor.Add(0x00550000)
+								: SelectionColor);
 
 							_renderer.FillRectangle(new Rectangle(left + 1, 1, width - 1, ColumnHeight - 1));
 						}
@@ -480,7 +480,7 @@ namespace Chimera.Client.GUI
 
 			if (GridLines)
 			{
-				_renderer.SetSolidPen(SystemColors.ControlLight);
+				_renderer.SetSolidPen(GridLineColor);
 				if (HorizontalOrientation)
 				{
 					// Columns
@@ -573,9 +573,9 @@ namespace Chimera.Client.GUI
 
 				// Alpha layering for selection
 				alpha = 0.33f;
-				cellColor = Color.FromArgb(cellColor.R - (int)((cellColor.R - SystemColors.Highlight.R) * alpha),
-					cellColor.G - (int)((cellColor.G - SystemColors.Highlight.G) * alpha),
-					cellColor.B - (int)((cellColor.B - SystemColors.Highlight.B) * alpha));
+				cellColor = Color.FromArgb(cellColor.R - (int)((cellColor.R - SelectionColor.R) * alpha),
+					cellColor.G - (int)((cellColor.G - SelectionColor.G) * alpha),
+					cellColor.B - (int)((cellColor.B - SelectionColor.B) * alpha));
 				DrawCellBG(cellColor, relativeCell);
 			}
 		}
