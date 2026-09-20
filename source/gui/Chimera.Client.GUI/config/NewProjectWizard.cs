@@ -447,6 +447,7 @@ namespace Chimera.Client.GUI
 				Size = new(UIHelper.ScaleX(544), UIHelper.ScaleY(20)),
 				Text = text,
 			};
+			notice.SetForeRole(ThemeColorRole.DisabledText);
 			notice.Links.Clear();
 			notice.Links.Add(text.IndexOf(IssuesUrl, StringComparison.Ordinal), IssuesUrl.Length, IssuesUrl);
 			notice.LinkClicked += static (_, e) => Util.OpenUrlExternal((string) e.Link.LinkData);

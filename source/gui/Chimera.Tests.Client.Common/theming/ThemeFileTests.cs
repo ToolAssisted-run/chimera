@@ -44,7 +44,7 @@ namespace Chimera.Tests.Client.Common
 		public void AMissingColourIsRefusedAndNamed()
 		{
 			var json = Complete().Replace($"\t\t\"{ThemeColorRole.WindowText}\": \"#123456\",\n", "");
-			var ex = Assert.ThrowsException<ThemeFormatException>(() => ThemeFile.Parse(json, "mytheme.json"));
+			var ex = Assert.ThrowsExactly<ThemeFormatException>(() => ThemeFile.Parse(json, "mytheme.json"));
 			StringAssert.Contains(ex.Message, nameof(ThemeColorRole.WindowText));
 			StringAssert.Contains(ex.Message, "mytheme.json");
 			StringAssert.Contains(ex.Message, "basedOn");
@@ -54,7 +54,7 @@ namespace Chimera.Tests.Client.Common
 		public void AMisspelledColourIsRefusedWithTheNameItMeant()
 		{
 			var json = Complete().Replace($"\"{ThemeColorRole.WindowText}\"", "\"WindowTxet\"");
-			var ex = Assert.ThrowsException<ThemeFormatException>(() => ThemeFile.Parse(json, "t"));
+			var ex = Assert.ThrowsExactly<ThemeFormatException>(() => ThemeFile.Parse(json, "t"));
 			StringAssert.Contains(ex.Message, "WindowTxet");
 			StringAssert.Contains(ex.Message, nameof(ThemeColorRole.WindowText));
 		}
@@ -65,7 +65,7 @@ namespace Chimera.Tests.Client.Common
 			foreach (var bad in new[] { "blue", "#12345", "#GGGGGG", "", "rgb(1,2,3)" })
 			{
 				var json = Complete().Replace($"\"{ThemeColorRole.WindowText}\": \"#123456\"", $"\"{ThemeColorRole.WindowText}\": \"{bad}\"");
-				var ex = Assert.ThrowsException<ThemeFormatException>(() => ThemeFile.Parse(json, "t"), $"\"{bad}\" was accepted as a colour");
+				var ex = Assert.ThrowsExactly<ThemeFormatException>(() => { ThemeFile.Parse(json, "t"); }, $"\"{bad}\" was accepted as a colour");
 				StringAssert.Contains(ex.Message, nameof(ThemeColorRole.WindowText));
 			}
 		}
@@ -74,21 +74,21 @@ namespace Chimera.Tests.Client.Common
 		public void AFileWithNoNameIsRefused()
 		{
 			var json = Complete().Replace("\t\"name\": \"Test\",\n", "");
-			Assert.ThrowsException<ThemeFormatException>(() => ThemeFile.Parse(json, "t"));
+			Assert.ThrowsExactly<ThemeFormatException>(() => ThemeFile.Parse(json, "t"));
 		}
 
 		[TestMethod]
 		public void AStraySettingIsRefused()
 		{
 			var json = Complete(extra: "\t\"darkmode\": true,\n");
-			var ex = Assert.ThrowsException<ThemeFormatException>(() => ThemeFile.Parse(json, "t"));
+			var ex = Assert.ThrowsExactly<ThemeFormatException>(() => ThemeFile.Parse(json, "t"));
 			StringAssert.Contains(ex.Message, "darkmode");
 		}
 
 		[TestMethod]
 		public void BrokenJsonIsRefusedWithoutThrowingSomethingElse()
 		{
-			var ex = Assert.ThrowsException<ThemeFormatException>(() => ThemeFile.Parse("{ not json", "t"));
+			var ex = Assert.ThrowsExactly<ThemeFormatException>(() => ThemeFile.Parse("{ not json", "t"));
 			StringAssert.Contains(ex.Message, "JSON");
 		}
 
@@ -106,7 +106,7 @@ namespace Chimera.Tests.Client.Common
 		public void BasedOnSomethingThatIsNotThereIsRefused()
 		{
 			var json = "{\n\t\"name\": \"Child\",\n\t\"basedOn\": \"Nowhere\",\n\t\"colors\": { \"WindowText\": \"#ABCDEF\" }\n}";
-			var ex = Assert.ThrowsException<ThemeFormatException>(() => ThemeFile.Parse(json, "child", static _ => null));
+			var ex = Assert.ThrowsExactly<ThemeFormatException>(() => ThemeFile.Parse(json, "child", static _ => null));
 			StringAssert.Contains(ex.Message, "Nowhere");
 		}
 
@@ -143,6 +143,21 @@ namespace Chimera.Tests.Client.Common
 			CollectionAssert.Contains(names, "Dark");
 			Assert.IsFalse(ThemeLibrary.Find("Light")!.IsDark);
 			Assert.IsTrue(ThemeLibrary.Find("Dark")!.IsDark);
+		}
+
+		/// <summary>
+		/// Only the built-in Light theme says it is the desktop's own colours, and
+		/// a copy written out for somebody to edit must not: they are about to give
+		/// it colours of its own, which have to be painted.
+		/// </summary>
+		[TestMethod]
+		public void OnlyLightFollowsTheDesktop()
+		{
+			Assert.IsTrue(ThemeLibrary.Find("Light")!.FollowsDesktop);
+			Assert.IsFalse(ThemeLibrary.Find("Dark")!.FollowsDesktop);
+			Assert.IsFalse(ThemeFile.Parse(ThemeFile.Write(ThemeLibrary.Find("Light")!), "copy").FollowsDesktop);
+			Assert.IsFalse(ThemeFile.Parse(Complete(), "t").FollowsDesktop);
+			Assert.IsTrue(ThemeFile.Parse(Complete(extra: "\t\"desktop\": true,\n"), "t").FollowsDesktop);
 		}
 
 		[TestMethod]

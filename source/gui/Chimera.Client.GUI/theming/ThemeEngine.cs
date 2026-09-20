@@ -33,16 +33,15 @@ namespace Chimera.Client.GUI
 		public static Theme Current => ThemeLibrary.Current;
 
 		/// <summary>
-		/// True when the theme is the desktop's own colours, so the controls
-		/// Windows draws with visual styles (buttons, tab pages, combo boxes) are
-		/// already the right colour and are left alone. Turning visual styles off
-		/// to force a colour that is already correct would only make them flatter
-		/// than they are today, which is the one thing the Light theme must not do.
+		/// True when the theme says it IS the desktop's own colours. Then the walk
+		/// sets nothing by control type: every control already has those colours,
+		/// and assigning them again is not free - a Button stops using visual
+		/// styles, a sunken border becomes a line, a menu gets a colour table
+		/// instead of the system renderer. Same colours, different drawing. What
+		/// still happens is everything the frontend declared for itself: a role put
+		/// on a control by name, and a control that paints itself.
 		/// </summary>
-		public static bool IsSystemPalette(Theme theme)
-			=> theme[ThemeColorRole.WindowBackground] == ThemeFile.SystemColorByName(nameof(SystemColors.Control))
-				&& theme[ThemeColorRole.WindowText] == SystemColors.ControlText
-				&& theme[ThemeColorRole.InputBackground] == SystemColors.Window;
+		public static bool IsSystemPalette(Theme theme) => theme.FollowsDesktop;
 
 		private sealed class Overrides
 		{
@@ -165,10 +164,14 @@ namespace Chimera.Client.GUI
 		private static void ApplyToOne(Control c, Theme theme, Overrides? own)
 		{
 			var systemPalette = IsSystemPalette(theme);
-			if (!systemPalette) FlattenBorder(c);
 
 			if (own?.Back is { } backRole) c.BackColor = theme[backRole];
 			if (own?.Fore is { } foreRole) c.ForeColor = theme[foreRole];
+
+			// the desktop's own palette is already on every control; only what the
+			// frontend asked for by name is set, and the rest is left as drawn
+			if (systemPalette) return;
+			FlattenBorder(c);
 
 			switch (c)
 			{
@@ -185,20 +188,19 @@ namespace Chimera.Client.GUI
 					return;
 				case CheckBox cb:
 					// the box itself is drawn by the OS; only its caption is ours
-					if (!systemPalette) cb.UseVisualStyleBackColor = false;
+					cb.UseVisualStyleBackColor = false;
 					Back(c, own, theme, ThemeColorRole.WindowBackground);
 					Fore(c, own, theme, ThemeColorRole.WindowText);
 					return;
 				case RadioButton rb:
-					if (!systemPalette) rb.UseVisualStyleBackColor = false;
+					rb.UseVisualStyleBackColor = false;
 					Back(c, own, theme, ThemeColorRole.WindowBackground);
 					Fore(c, own, theme, ThemeColorRole.WindowText);
 					return;
 				case ButtonBase bb:
-					if (!systemPalette && bb is Button plain) plain.UseVisualStyleBackColor = false;
+					if (bb is Button plain) plain.UseVisualStyleBackColor = false;
 					Back(c, own, theme, ThemeColorRole.ButtonBackground);
 					Fore(c, own, theme, ThemeColorRole.ButtonText);
-					if (!systemPalette)
 					{
 						bb.FlatStyle = FlatStyle.Flat;
 						bb.FlatAppearance.BorderColor = theme[ThemeColorRole.ButtonBorder];
@@ -207,28 +209,43 @@ namespace Chimera.Client.GUI
 					}
 					return;
 				case TextBoxBase text:
-					Back(text, own, theme, text.ReadOnly ? ThemeColorRole.ReadOnlyBackground : ThemeColorRole.InputBackground);
-					Fore(text, own, theme, text.ReadOnly ? ThemeColorRole.MutedText : ThemeColorRole.InputText);
+					// not a special case for ReadOnly: WinForms does not colour a
+					// read-only box differently either, and a box that should look
+					// different says so with SetBackRole(ReadOnlyBackground)
+					Back(text, own, theme, ThemeColorRole.InputBackground);
+					Fore(text, own, theme, ThemeColorRole.InputText);
 					return;
 				case ComboBox combo:
-					if (!systemPalette && combo.FlatStyle is FlatStyle.Standard) combo.FlatStyle = FlatStyle.Flat;
+					if (combo.FlatStyle is FlatStyle.Standard) combo.FlatStyle = FlatStyle.Flat;
 					Back(combo, own, theme, ThemeColorRole.InputBackground);
 					Fore(combo, own, theme, ThemeColorRole.InputText);
 					return;
-				case ListBox or CheckedListBox or TreeView or NumericUpDown or DateTimePicker or PropertyGrid:
+				case PropertyGrid grid2:
+					// the grid's own surfaces are separate properties; BackColor only
+					// reaches the strip around them
+					Back(grid2, own, theme, ThemeColorRole.WindowBackground);
+					Fore(grid2, own, theme, ThemeColorRole.WindowText);
+					grid2.ViewBackColor = theme[ThemeColorRole.InputBackground];
+					grid2.ViewForeColor = theme[ThemeColorRole.InputText];
+					grid2.HelpBackColor = theme[ThemeColorRole.WindowBackground];
+					grid2.HelpForeColor = theme[ThemeColorRole.WindowText];
+					grid2.LineColor = theme[ThemeColorRole.GridLines];
+					grid2.CategoryForeColor = theme[ThemeColorRole.WindowText];
+					return;
+				case ListBox or CheckedListBox or TreeView or NumericUpDown or DateTimePicker:
 					Back(c, own, theme, ThemeColorRole.InputBackground);
 					Fore(c, own, theme, ThemeColorRole.InputText);
 					return;
 				case ListView list:
 					Back(list, own, theme, ThemeColorRole.InputBackground);
 					Fore(list, own, theme, ThemeColorRole.InputText);
-					ApplyListViewHeaders(list, theme, systemPalette);
+					ApplyListViewHeaders(list);
 					return;
 				case ProgressBar:
 					// drawn entirely by the OS; setting colours on it does nothing but confuse
 					return;
 				case TabPage page:
-					if (!systemPalette) page.UseVisualStyleBackColor = false;
+					page.UseVisualStyleBackColor = false;
 					Back(page, own, theme, ThemeColorRole.WindowBackground);
 					Fore(page, own, theme, ThemeColorRole.WindowText);
 					return;
@@ -305,10 +322,10 @@ namespace Chimera.Client.GUI
 		/// drawing) are taken over, and only when the theme is not the desktop's
 		/// own, so that the Light theme keeps exactly the drawing it has today.
 		/// </summary>
-		private static void ApplyListViewHeaders(ListView list, Theme theme, bool systemPalette)
+		private static void ApplyListViewHeaders(ListView list)
 		{
 			var state = For(list);
-			var wanted = list.View is View.Details && !systemPalette;
+			var wanted = list.View is View.Details;
 			if (wanted == state.HeaderOwnerDraw) return;
 			state.HeaderOwnerDraw = wanted;
 			if (wanted)
@@ -367,12 +384,7 @@ namespace Chimera.Client.GUI
 		/// </summary>
 		public static void ApplyStrip(ToolStrip strip, Theme theme)
 		{
-			if (IsSystemPalette(theme))
-			{
-				if (OSTailoredCode.IsUnixHost) strip.Renderer = FormBase.GlobalToolStripRenderer;
-				else strip.RenderMode = ToolStripRenderMode.ManagerRenderMode;
-				return;
-			}
+			if (IsSystemPalette(theme)) return;
 			strip.Renderer = ThemeToolStripRenderer.For(theme);
 			var status = strip is StatusStrip;
 			strip.BackColor = theme[status ? ThemeColorRole.StatusBarBackground : ThemeColorRole.ToolStripBackground];

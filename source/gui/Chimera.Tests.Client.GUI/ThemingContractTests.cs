@@ -174,7 +174,8 @@ namespace Chimera.Tests.Client.GUI
 		/// A control whose colour was declared as a ROLE follows the theme; a
 		/// control the walk coloured by its type does too. Both matter: the second
 		/// is most of the frontend and the first is every place a colour means
-		/// something.
+		/// something. Under Light the ordinary label is not assigned at all - it
+		/// already has the desktop's colour, which is what the role resolves to.
 		/// </summary>
 		[TestMethod]
 		public void ARoleFollowsTheThemeAndTheTypeTableDoesToo()
@@ -197,6 +198,47 @@ namespace Chimera.Tests.Client.GUI
 			Assert.AreEqual(dark[ThemeColorRole.AccentError].ToArgb(), error.ForeColor.ToArgb());
 			Assert.AreEqual(dark[ThemeColorRole.WindowText].ToArgb(), ordinary.ForeColor.ToArgb());
 			Assert.AreEqual(dark[ThemeColorRole.WindowBackground].ToArgb(), form.BackColor.ToArgb());
+		}
+
+		/// <summary>
+		/// The Light theme is the desktop's own colours, and the proof that it
+		/// cannot change how anything looks is that it does not assign anything: a
+		/// control with a colour of its own keeps it, and so does one with the
+		/// colour the toolkit gave it. Only what the frontend declared by name is
+		/// set. This is what makes "Light is the palette Chimera already had" a
+		/// property of the code rather than of ninety hex values being right.
+		/// </summary>
+		[TestMethod]
+		public void TheDesktopThemeAssignsNothingItWasNotAskedFor()
+		{
+			var light = ThemeLibrary.Select("Light");
+			Assert.IsTrue(light.FollowsDesktop, "the Light theme no longer says it is the desktop's palette");
+
+			using Form form = new();
+			Label deliberate = new() { BackColor = Color.Magenta, ForeColor = Color.Lime };
+			TextBox box = new();
+			Button button = new();
+			ListView list = new() { View = View.Details };
+			Label declared = new();
+			form.Controls.AddRange([ deliberate, box, button, list, declared ]);
+			declared.SetForeRole(ThemeColorRole.AccentError);
+			form.CreateControl();
+
+			var wasBoxBack = box.BackColor;
+			var wasButtonBack = button.BackColor;
+			var wasButtonVisualStyle = button.UseVisualStyleBackColor;
+			var wasListBorder = list.BorderStyle;
+
+			ThemeEngine.Apply(form, light);
+
+			Assert.AreEqual(Color.Magenta.ToArgb(), deliberate.BackColor.ToArgb(), "a control's own colour was overwritten");
+			Assert.AreEqual(Color.Lime.ToArgb(), deliberate.ForeColor.ToArgb(), "a control's own text colour was overwritten");
+			Assert.AreEqual(wasBoxBack.ToArgb(), box.BackColor.ToArgb());
+			Assert.AreEqual(wasButtonBack.ToArgb(), button.BackColor.ToArgb());
+			Assert.AreEqual(wasButtonVisualStyle, button.UseVisualStyleBackColor, "the button stopped using visual styles");
+			Assert.AreEqual(wasListBorder, list.BorderStyle, "the list's border was flattened");
+			Assert.IsFalse(list.OwnerDraw, "the list's headers were taken over");
+			Assert.AreEqual(light[ThemeColorRole.AccentError].ToArgb(), declared.ForeColor.ToArgb(), "a declared role was not applied");
 		}
 
 		/// <summary>A control that asked to be left alone is left alone, and so is everything in it.</summary>

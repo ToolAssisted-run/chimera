@@ -4052,15 +4052,27 @@ lets a contributor change five colours instead of ninety, and Config > Theme >
 Write a Copy to Edit hands them a complete file to start from.
 
 Light says `"system:ControlText"` where the code said `SystemColors.ControlText`,
-so it is the desktop's palette rather than a guess at it. The one shim is
-`system:Control`: Mono answers that with a beige nobody wants, and every window
-in the frontend has replaced it with WhiteSmoke since long before themes, so
-that substitution is part of what `system:` means. Under Light the tool strips
-and the ListView headers are also left with the drawing they already had -
-a colour table built out of system colours is the same colours and a different
-drawing, and looking different is the one thing Light must not do.
+so it is the desktop's palette rather than a guess at it, and
 `LightThemeBaselineTests` carries the literals copied out of the code they used
 to live in and fails by name if `light.json` moves one.
+
+That was not enough on its own, and finding out why is the useful part. Every
+screenshot the UI tests take was compared pixel by pixel against the same
+window built from the commit before this work, and the first round differed on
+five of them - because assigning a colour is not free even when it is the same
+colour. A Button handed a BackColor stops using visual styles. A sunken 3D
+border redrawn is a line. A menu given a colour table built out of system
+colours stops going through the system renderer. A read-only text box given
+"the read-only background" stops being white, which WinForms never did. Same
+palette, different drawing, and "different" is the one thing Light must not be.
+
+So Light carries `"desktop": true`, and under a theme that says so the walk
+assigns nothing by control type at all: the roles the frontend declared by
+name, the controls that paint themselves, and otherwise the toolkit's own
+drawing untouched - which is also where the Mono beige fix goes back to living,
+in FormBase, exactly where it was. With that, every Light screenshot is
+byte-identical to the one from before the branch, and the property is a
+property of the code rather than of ninety hex values happening to be right.
 
 Applying it is explicit, because WinForms has none of this. One walk sets each
 control's colours from its type; the surfaces a BackColor does not reach are

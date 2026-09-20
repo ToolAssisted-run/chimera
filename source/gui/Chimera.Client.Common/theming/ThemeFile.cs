@@ -118,13 +118,13 @@ namespace Chimera.Client.Common
 				throw new ThemeFormatException($"{origin}: not valid JSON ({ex.Message})");
 			}
 
-			string[] known = ["name", "description", "author", "dark", "basedOn", "colors"];
+			string[] known = ["name", "description", "author", "dark", "desktop", "basedOn", "colors"];
 			var stray = root.Properties().Select(static p => p.Name)
 				.Where(n => !known.Contains(n, StringComparer.OrdinalIgnoreCase))
 				.ToList();
 			if (stray.Count is not 0)
 			{
-				throw new ThemeFormatException($"{origin}: there is no such setting as {Join(stray)} - a theme file has name, description, author, dark, basedOn and colors");
+				throw new ThemeFormatException($"{origin}: there is no such setting as {Join(stray)} - a theme file has name, description, author, dark, desktop, basedOn and colors");
 			}
 
 			var name = (string?) root["name"];
@@ -133,6 +133,7 @@ namespace Chimera.Client.Common
 			var description = (string?) root["description"] ?? "";
 			var author = (string?) root["author"] ?? "";
 			var isDark = (bool?) root["dark"] ?? false;
+			var followsDesktop = (bool?) root["desktop"] ?? false;
 
 			Color[] colors;
 			var have = new bool[Theme.RoleCount];
@@ -183,7 +184,7 @@ namespace Chimera.Client.Common
 						+ " Either give every colour, or add \"basedOn\": \"Light\" (or \"Dark\") and give only the ones that differ");
 			}
 
-			return new Theme(name!.Trim(), description, author, isDark, origin, colors);
+			return new Theme(name!.Trim(), description, author, isDark, followsDesktop, origin, colors);
 		}
 
 		/// <summary>Writes a theme out in the form <see cref="Parse"/> reads, for a person to copy and edit.</summary>

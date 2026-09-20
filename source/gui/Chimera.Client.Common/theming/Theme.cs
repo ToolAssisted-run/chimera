@@ -40,13 +40,25 @@ namespace Chimera.Client.Common
 		/// <summary>Where it came from, for a message: a file path, or "built in".</summary>
 		public string Origin { get; }
 
-		public Theme(string name, string description, string author, bool isDark, string origin, Color[] colors)
+		/// <summary>
+		/// True only of the built-in Light theme: these ARE the desktop's own
+		/// colours, so the frontend leaves alone every surface the toolkit already
+		/// paints from them - the menu renderer, list headers, 3D borders, link
+		/// colours, the property grid's own surfaces. Painting those again from a
+		/// colour table built out of the same system colours would be the same
+		/// colours and a DIFFERENT drawing, and looking different is the one thing
+		/// Light must not do.
+		/// </summary>
+		public bool FollowsDesktop { get; }
+
+		public Theme(string name, string description, string author, bool isDark, bool followsDesktop, string origin, Color[] colors)
 		{
 			if (colors.Length != RoleCount) throw new ArgumentException($"a theme needs {RoleCount} colours, got {colors.Length}", nameof(colors));
 			Name = name;
 			Description = description;
 			Author = author;
 			IsDark = isDark;
+			FollowsDesktop = followsDesktop;
 			Origin = origin;
 			_colors = (Color[]) colors.Clone();
 		}

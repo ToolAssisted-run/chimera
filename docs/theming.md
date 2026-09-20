@@ -33,7 +33,8 @@ A theme is a JSON object. `name` is what the menu shows and what the config
 records, so it has to be unique; `dark` tells the frontend this is a dark theme
 (a few places pick a drawing rather than a colour, and guessing from the
 background gets that wrong for anything in between). `colors` is a flat map of
-role name to colour.
+role name to colour. There is one more, `desktop`, which only the built-in
+Light theme sets - see the last section.
 
 A colour is `#RRGGBB`, or `#AARRGGBB` where it is meant to show through what is
 behind it - the frame-number wash and the alternate-player stripe in the piano
@@ -173,15 +174,28 @@ has to stay that way: nobody asked for the frontend to look different, only for
 it to be able to. So the roles that were system colours say so - `"WindowText":
 "system:ControlText"` - and resolve to whatever the desktop answers. The one
 exception is `system:Control`, which Mono answers with a beige nobody wants and
-which every window in Chimera has replaced with WhiteSmoke for years; that
-substitution is part of what `system:` means here, so Light is the same colours
-on both platforms rather than an approximation of them.
-
-`LightThemeBaselineTests` is what holds that: it carries the literals and the
-`SystemColors` members copied out of the code they used to live in, and fails
-by name if `light.json` moves one. Under Light the frontend also leaves the
-tool strips and the `ListView` headers exactly as it always did, rather than
-re-drawing them from a colour table built out of system colours - which would
-be the same colours and a different drawing.
+which every window Chimera derives from `FormBase` has replaced with WhiteSmoke
+for years; that substitution is part of what `system:` means here.
 
 `system:` is there for that one job. A theme somebody writes should use hex.
+
+Light also carries `"desktop": true`, and that is the part that actually
+guarantees it changes nothing. Under a theme that says so, the walk assigns
+nothing by control type: it applies the roles the frontend declared by name,
+hands the theme to the controls that paint themselves, and otherwise leaves
+every control exactly as the toolkit drew it. This matters because assigning a
+colour is not free even when it is the same colour - a `Button` handed a
+`BackColor` stops using visual styles, a sunken border redrawn becomes a line,
+a menu given a colour table stops going through the system renderer. Same
+colours, different drawing. `TheDesktopThemeAssignsNothingItWasNotAskedFor`
+holds that, and every screenshot in `tests/ui/shots` was compared pixel by
+pixel against the same window built from the commit before this work: they are
+identical.
+
+`LightThemeBaselineTests` holds the other half - that the hex values in
+`light.json` are still the ones the code used - so that a theme which does
+paint (a contributor's light theme, or Dark) paints what Chimera had.
+
+Only the built-in Light theme sets `desktop`. A copy written out by "Write a
+Copy to Edit" deliberately does not: it is about to be given colours of its
+own, and those have to be painted.
