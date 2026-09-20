@@ -522,13 +522,24 @@ namespace Chimera.Client.GUI
 		/// </summary>
 		private void ExportCurrentTheme()
 		{
-			var theme = ThemeLibrary.Current;
-			var path = Path.Combine(ThemeLibrary.ThemesDirectory, $"{theme.Name} copy{ThemeFile.Extension}");
+			var current = ThemeLibrary.Current;
+			// a copy is a theme in its own right, so it is given its own name here
+			// rather than by rewriting the file afterwards - and it does NOT inherit
+			// "desktop", because a theme somebody is about to give colours of its
+			// own has to have them painted
+			Theme theme = new(
+				name: $"{current.Name} copy",
+				description: current.Description,
+				author: current.Author,
+				isDark: current.IsDark,
+				followsDesktop: false,
+				origin: current.Origin,
+				colors: current.ToArray());
+			var path = Path.Combine(ThemeLibrary.ThemesDirectory, $"{theme.Name}{ThemeFile.Extension}");
 			try
 			{
 				Directory.CreateDirectory(ThemeLibrary.ThemesDirectory);
-				var text = ThemeFile.Write(theme).Replace($"\"{theme.Name}\"", $"\"{theme.Name} copy\"");
-				File.WriteAllText(path, text);
+				File.WriteAllText(path, ThemeFile.Write(theme));
 				DialogController.ShowMessageBox(
 					$"Written to:\n{path}\n\nEdit the colours, change the name inside it, then Config > Theme > Reload Themes.",
 					"Themes");
