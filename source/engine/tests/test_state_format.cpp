@@ -134,6 +134,7 @@ int main(void)
 		assert(why.find("Chimera commit deadbeef1234") != std::string::npos);
 		assert(why.find(stateWriterId()) != std::string::npos);
 		assert(why.find("not touched") != std::string::npos);
+		assert(why[0] == 'T'); // a sentence a person reads, shown as it stands
 	}
 
 	{ // 2c. a state with NO format number: read as 1, the layout it was written under

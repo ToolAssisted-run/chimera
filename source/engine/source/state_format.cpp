@@ -146,7 +146,9 @@ int readStateFileHeader(const uint8_t *data, size_t len, StateFileHeader &h, std
 
 	if (h.format != kStateFormat)
 	{
-		why = "this state was written in savestate format " + std::to_string(h.format)
+		/* A whole sentence, capitalised: it is shown to a person as it stands,
+		 * on its own or after a lead line, and never with a path in front. */
+		why = "This state was written in savestate format " + std::to_string(h.format)
 			+ " by " + (h.writer.empty() ? std::string("a build from before states said which") : h.writer)
 			+ ", and this Chimera (" + stateWriterId() + ") writes and reads format "
 			+ std::to_string(kStateFormat)
