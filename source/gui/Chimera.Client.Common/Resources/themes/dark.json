@@ -5,14 +5,14 @@
 	"colors": {
 		"WindowBackground": "#2B2B2B",
 		"WindowText": "#E0E0E0",
-		"DisabledText": "#7A7A7A",
+		"DisabledText": "#808080",
 		"DisabledBackground": "#333333",
 		"MutedText": "#9A9A9A",
 		"Border": "#4A4A4A",
 		"LinkText": "#4FA3E3",
 		"ShadedBackground": "#1B1B1B",
 		"GlyphForeground": "#E0E0E0",
-		"GlyphShadow": "#6E6E6E",
+		"GlyphShadow": "#7A7A7A",
 
 		"InputBackground": "#1E1E1E",
 		"InputText": "#E8E8E8",

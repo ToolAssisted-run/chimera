@@ -51,7 +51,15 @@ namespace Chimera.Client.GUI
 
 			public bool Skip;
 
-			public bool HeaderOwnerDraw;
+			public bool OwnerDrawn;
+
+			/// <summary>The last column's width as somebody other than the walk left it.</summary>
+			public int NaturalLastWidth;
+
+			/// <summary>What the walk last set it to, so a change by anybody else can be told apart.</summary>
+			public int AssignedLastWidth = -1;
+
+			public bool Refilling;
 
 			public bool Hooked;
 		}
@@ -230,14 +238,19 @@ namespace Chimera.Client.GUI
 					properties.LineColor = theme[ThemeColorRole.GridLines];
 					properties.CategoryForeColor = theme[ThemeColorRole.WindowText];
 					return;
-				case ListBox or CheckedListBox or TreeView or NumericUpDown or DateTimePicker:
+				case ListBox box:
+					Back(box, own, theme, ThemeColorRole.InputBackground);
+					Fore(box, own, theme, ThemeColorRole.InputText);
+					if (box is not CheckedListBox) ApplyListBox(box);
+					return;
+				case TreeView or NumericUpDown or DateTimePicker:
 					Back(c, own, theme, ThemeColorRole.InputBackground);
 					Fore(c, own, theme, ThemeColorRole.InputText);
 					return;
 				case ListView list:
 					Back(list, own, theme, ThemeColorRole.InputBackground);
 					Fore(list, own, theme, ThemeColorRole.InputText);
-					ApplyListViewHeaders(list);
+					ApplyListView(list);
 					return;
 				case ProgressBar:
 					// drawn entirely by the OS; setting colours on it does nothing but confuse
@@ -306,69 +319,286 @@ namespace Chimera.Client.GUI
 			grid.DefaultCellStyle.SelectionBackColor = theme[ThemeColorRole.Selection];
 			grid.DefaultCellStyle.SelectionForeColor = theme[ThemeColorRole.SelectionText];
 			grid.AlternatingRowsDefaultCellStyle.BackColor = theme[ThemeColorRole.AlternateRowBackground];
+			grid.AlternatingRowsDefaultCellStyle.ForeColor = theme[ThemeColorRole.InputText];
+			grid.AlternatingRowsDefaultCellStyle.SelectionBackColor = theme[ThemeColorRole.Selection];
+			grid.AlternatingRowsDefaultCellStyle.SelectionForeColor = theme[ThemeColorRole.SelectionText];
 			grid.ColumnHeadersDefaultCellStyle.BackColor = theme[ThemeColorRole.HeaderBackground];
 			grid.ColumnHeadersDefaultCellStyle.ForeColor = theme[ThemeColorRole.HeaderText];
+			grid.ColumnHeadersDefaultCellStyle.SelectionBackColor = theme[ThemeColorRole.HeaderBackground];
+			grid.ColumnHeadersDefaultCellStyle.SelectionForeColor = theme[ThemeColorRole.HeaderText];
 			grid.RowHeadersDefaultCellStyle.BackColor = theme[ThemeColorRole.HeaderBackground];
 			grid.RowHeadersDefaultCellStyle.ForeColor = theme[ThemeColorRole.HeaderText];
+			grid.RowHeadersDefaultCellStyle.SelectionBackColor = theme[ThemeColorRole.Selection];
+			grid.RowHeadersDefaultCellStyle.SelectionForeColor = theme[ThemeColorRole.SelectionText];
 		}
 
 		/// <summary>
-		/// A ListView's column headers are drawn by the OS and ignore every colour
-		/// set on the control, which on a dark theme leaves a bright white bar
-		/// across the top of every list. Owner-drawing is the only way to colour
-		/// them, so the headers (and only the headers - rows keep the default
-		/// drawing) are taken over, and only when the theme is not the desktop's
-		/// own, so that the Light theme keeps exactly the drawing it has today.
+		/// A ListView draws itself out of the desktop's colours and ignores almost
+		/// everything set on it: the column headers, the highlight behind a
+		/// selected row, and - the one that is easiest to miss - the strip to the
+		/// right of the last column, which belongs to no cell and no header.
+		/// Owner-drawing is the only way in, so in Details view the whole thing is
+		/// taken over. Only away from the desktop's palette: under Light the list
+		/// keeps exactly the drawing it has today.
+		///
+		/// What is reimplemented here is what those lists actually use - the tick
+		/// box, the small image, per-item and per-subitem colours and fonts,
+		/// alignment. Group headers are left to the toolkit, which still draws them
+		/// under owner-draw.
 		/// </summary>
-		private static void ApplyListViewHeaders(ListView list)
+		private static void ApplyListView(ListView list)
 		{
 			var state = For(list);
 			var wanted = list.View is View.Details;
-			if (wanted == state.HeaderOwnerDraw) return;
-			state.HeaderOwnerDraw = wanted;
+			if (wanted == state.OwnerDrawn) return;
+			state.OwnerDrawn = wanted;
 			if (wanted)
 			{
 				list.OwnerDraw = true;
 				list.DrawColumnHeader += DrawHeader;
-				list.DrawItem += DrawDefaultItem;
-				list.DrawSubItem += DrawDefaultSubItem;
+				list.DrawItem += DrawRow;
+				list.DrawSubItem += DrawCell;
+				list.Resize += RefillLastColumn;
+				list.ColumnWidthChanged += RefillLastColumn;
 			}
 			else
 			{
 				list.DrawColumnHeader -= DrawHeader;
-				list.DrawItem -= DrawDefaultItem;
-				list.DrawSubItem -= DrawDefaultSubItem;
+				list.DrawItem -= DrawRow;
+				list.DrawSubItem -= DrawCell;
+				list.Resize -= RefillLastColumn;
+				list.ColumnWidthChanged -= RefillLastColumn;
 				list.OwnerDraw = false;
 			}
+			FillLastColumn(list, wanted);
 			list.Invalidate();
 		}
+
+		/// <summary>What a row's background is: the selection when it is one, otherwise whatever the row was given.</summary>
+		private static Color RowBackground(ListView list, ListViewItem item, Theme theme)
+			=> item.Selected
+				? theme[list.Focused ? ThemeColorRole.Selection : ThemeColorRole.InactiveSelection]
+				: item.BackColor;
+
+		/// <summary>
+		/// And its text. A selected row's own colour is given up to the selection,
+		/// which is what every list does - a colour that means something (a missing
+		/// firmware file in red) is readable again the moment the row is not
+		/// selected, and unreadable text on the highlight helps nobody.
+		/// </summary>
+		private static Color RowForeground(ListView list, ListViewItem item, ListViewItem.ListViewSubItem sub, Theme theme)
+			=> item.Selected
+				? theme[list.Focused ? ThemeColorRole.SelectionText : ThemeColorRole.InactiveSelectionText]
+				// a sub-item's own ForeColor is the LIST's until somebody turns
+				// UseItemStyleForSubItems off; reading it instead of the item's is
+				// how a whole window of red and green firmware rows came out grey
+				: item.UseItemStyleForSubItems ? item.ForeColor : sub.ForeColor;
 
 		private static void DrawHeader(object sender, DrawListViewColumnHeaderEventArgs e)
 		{
 			var theme = Current;
+			var bounds = e.Bounds;
 			using SolidBrush back = new(theme[ThemeColorRole.HeaderBackground]);
-			e.Graphics.FillRectangle(back, e.Bounds);
+			e.Graphics.FillRectangle(back, bounds);
 			using Pen edge = new(theme[ThemeColorRole.Border]);
 			e.Graphics.DrawLine(edge, e.Bounds.Right - 1, e.Bounds.Top, e.Bounds.Right - 1, e.Bounds.Bottom - 1);
-			e.Graphics.DrawLine(edge, e.Bounds.Left, e.Bounds.Bottom - 1, e.Bounds.Right - 1, e.Bounds.Bottom - 1);
-			TextFormatFlags align = e.Header?.TextAlign switch
-			{
-				HorizontalAlignment.Center => TextFormatFlags.HorizontalCenter,
-				HorizontalAlignment.Right => TextFormatFlags.Right,
-				_ => TextFormatFlags.Left,
-			};
+			e.Graphics.DrawLine(edge, bounds.Left, bounds.Bottom - 1, bounds.Right - 1, bounds.Bottom - 1);
 			TextRenderer.DrawText(
 				e.Graphics,
 				e.Header?.Text ?? "",
 				e.Font ?? SystemFonts.DefaultFont,
 				Rectangle.Inflate(e.Bounds, -4, 0),
 				theme[ThemeColorRole.HeaderText],
-				align | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+				Align(e.Header?.TextAlign) | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
 		}
 
-		private static void DrawDefaultItem(object sender, DrawListViewItemEventArgs e) => e.DrawDefault = true;
+		/// <summary>
+		/// The strip to the right of the last column belongs to no column, so no
+		/// DrawColumnHeader is raised for it and nothing can paint over it: the
+		/// toolkit fills it with the desktop's colour and keeps it there, which on
+		/// a dark list is a bright block in the corner of every window. The only
+		/// way to be rid of it is for there to be no strip, so the last column is
+		/// grown to the edge.
+		///
+		/// It only ever GROWS a column, and only into space nothing else is using,
+		/// so no horizontal scroll bar can appear because of it. The width the
+		/// column would have had is remembered, and given back when the window is
+		/// narrowed again or the theme goes back to the desktop's.
+		/// </summary>
+		private static void FillLastColumn(ListView list, bool wanted)
+		{
+			if (list.View is not View.Details || list.Columns.Count is 0) return;
+			var state = For(list);
+			var last = list.Columns[list.Columns.Count - 1];
 
-		private static void DrawDefaultSubItem(object sender, DrawListViewSubItemEventArgs e) => e.DrawDefault = true;
+			// somebody else set this width - the form as it populates, or a person
+			// dragging the edge - so that is the width to give back
+			if (state.AssignedLastWidth != last.Width) state.NaturalLastWidth = last.Width;
+
+			var others = 0;
+			for (var i = 0; i < list.Columns.Count - 1; i++) others += list.Columns[i].Width;
+			var natural = state.NaturalLastWidth;
+			var width = wanted ? Math.Max(natural, list.ClientSize.Width - others) : natural;
+			if (last.Width != width) last.Width = width;
+			state.AssignedLastWidth = last.Width;
+			state.NaturalLastWidth = natural;
+		}
+
+		private static void RefillLastColumn(object sender, EventArgs e) => FillLastColumn((ListView) sender, wanted: true);
+
+		private static void RefillLastColumn(object sender, ColumnWidthChangedEventArgs e)
+		{
+			var list = (ListView) sender;
+			var state = For(list);
+			if (state.Refilling) return;
+			state.Refilling = true;
+			try
+			{
+				FillLastColumn(list, wanted: true);
+			}
+			finally
+			{
+				state.Refilling = false;
+			}
+		}
+
+		/// <summary>
+		/// The row's background, across the whole row INCLUDING the strip past the
+		/// last column - the cells paint their own bounds, and that strip is not in
+		/// any of them, which is how a selected row came out half themed and half
+		/// the desktop's beige.
+		/// </summary>
+		private static void DrawRow(object sender, DrawListViewItemEventArgs e)
+		{
+			var list = (ListView) sender;
+			if (list.View is not View.Details)
+			{
+				e.DrawDefault = true;
+				return;
+			}
+			using SolidBrush back = new(RowBackground(list, e.Item, Current));
+			var right = Math.Max(e.Bounds.Right, list.ClientRectangle.Right);
+			e.Graphics.FillRectangle(back, new Rectangle(e.Bounds.Left, e.Bounds.Top, right - e.Bounds.Left, e.Bounds.Height));
+		}
+
+		/// <summary>One cell: its tick box and image if it is the first, then its text.</summary>
+		private static void DrawCell(object sender, DrawListViewSubItemEventArgs e)
+		{
+			var list = (ListView) sender;
+			var theme = Current;
+			var item = e.Item;
+			if (item is null) return;
+
+			using SolidBrush back = new(item.Selected || item.UseItemStyleForSubItems
+				? RowBackground(list, item, theme)
+				: (e.SubItem ?? item.SubItems[0]).BackColor);
+			e.Graphics.FillRectangle(back, e.Bounds);
+
+			var x = e.Bounds.Left + 2;
+			if (e.ColumnIndex is 0)
+			{
+				if (list.CheckBoxes)
+				{
+					var side = Math.Min(13, e.Bounds.Height - 2);
+					Rectangle box = new(x, e.Bounds.Top + ((e.Bounds.Height - side) / 2), side, side);
+					DrawTick(e.Graphics, box, item.Checked, theme);
+					x = box.Right + 3;
+				}
+				var images = list.SmallImageList;
+				var index = ImageIndexOf(images, item);
+				if (images is not null && index >= 0)
+				{
+					var y = e.Bounds.Top + ((e.Bounds.Height - images.ImageSize.Height) / 2);
+					images.Draw(e.Graphics, x, y, index);
+					x += images.ImageSize.Width + 2;
+				}
+			}
+
+			var text = e.SubItem?.Text ?? "";
+			if (text.Length is 0) return;
+			var font = e.SubItem?.Font ?? item.Font ?? list.Font;
+			Rectangle textArea = new(x, e.Bounds.Top, Math.Max(0, e.Bounds.Right - x - 2), e.Bounds.Height);
+			TextRenderer.DrawText(
+				e.Graphics,
+				text,
+				font,
+				textArea,
+				RowForeground(list, item, e.SubItem ?? item.SubItems[0], theme),
+				Align(e.Header?.TextAlign) | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+		}
+
+		private static int ImageIndexOf(ImageList? images, ListViewItem item)
+		{
+			if (images is null) return -1;
+			if (item.ImageIndex >= 0 && item.ImageIndex < images.Images.Count) return item.ImageIndex;
+			return string.IsNullOrEmpty(item.ImageKey) ? -1 : images.Images.IndexOfKey(item.ImageKey);
+		}
+
+		/// <summary>
+		/// A tick box in the theme's colours. The one the toolkit draws is a white
+		/// square whatever is around it, which on a dark list is the brightest
+		/// thing on the window.
+		/// </summary>
+		private static void DrawTick(Graphics g, Rectangle box, bool ticked, Theme theme)
+		{
+			using SolidBrush fill = new(theme[ThemeColorRole.InputBackground]);
+			g.FillRectangle(fill, box);
+			using Pen edge = new(theme[ThemeColorRole.Border]);
+			g.DrawRectangle(edge, box.X, box.Y, box.Width - 1, box.Height - 1);
+			if (!ticked) return;
+			using Pen tick = new(theme[ThemeColorRole.GlyphForeground], 2f);
+			Point[] check =
+			[
+				new(box.Left + 3, box.Top + (box.Height / 2)),
+				new(box.Left + (box.Width / 2) - 1, box.Bottom - 4),
+				new(box.Right - 3, box.Top + 3),
+			];
+			g.DrawLines(tick, check);
+		}
+
+		private static TextFormatFlags Align(HorizontalAlignment? alignment) => alignment switch
+		{
+			HorizontalAlignment.Center => TextFormatFlags.HorizontalCenter,
+			HorizontalAlignment.Right => TextFormatFlags.Right,
+			_ => TextFormatFlags.Left,
+		};
+
+		/// <summary>
+		/// A list box has the same problem in miniature: the highlight behind the
+		/// chosen line is the desktop's, not the theme's. It has no images and no
+		/// tick boxes, so taking it over is a fill and a string.
+		/// </summary>
+		private static void ApplyListBox(ListBox box)
+		{
+			var state = For(box);
+			if (state.OwnerDrawn) return;
+			state.OwnerDrawn = true;
+			box.DrawMode = DrawMode.OwnerDrawFixed;
+			box.DrawItem += DrawListBoxItem;
+			box.Invalidate();
+		}
+
+		private static void DrawListBoxItem(object sender, DrawItemEventArgs e)
+		{
+			var box = (ListBox) sender;
+			var theme = Current;
+			var selected = (e.State & DrawItemState.Selected) is not 0;
+			using SolidBrush back = new(theme[selected
+				? box.Focused ? ThemeColorRole.Selection : ThemeColorRole.InactiveSelection
+				: ThemeColorRole.InputBackground]);
+			e.Graphics.FillRectangle(back, e.Bounds);
+			if (e.Index < 0 || e.Index >= box.Items.Count) return;
+			TextRenderer.DrawText(
+				e.Graphics,
+				box.GetItemText(box.Items[e.Index]),
+				e.Font ?? box.Font,
+				Rectangle.Inflate(e.Bounds, -2, 0),
+				theme[selected
+					? box.Focused ? ThemeColorRole.SelectionText : ThemeColorRole.InactiveSelectionText
+					: ThemeColorRole.InputText],
+				TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+		}
+
 
 		/// <summary>
 		/// A menu bar, tool bar, status bar or context menu, and everything on it.

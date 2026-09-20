@@ -129,7 +129,6 @@ namespace Chimera.Tests.Client.GUI
 		[TestMethod]
 		public void PianoRoll()
 		{
-			if (UiShots.Dir is null) { Assert.Inconclusive("set CHIMERA_UI_SHOTS to write screenshots"); return; }
 			using var form = BuildRoll();
 			UiShots.Shoot(form, "piano-roll");
 		}

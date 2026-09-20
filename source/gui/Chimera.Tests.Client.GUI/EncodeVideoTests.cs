@@ -348,9 +348,6 @@ namespace Chimera.Tests.Client.GUI
 		[TestMethod]
 		public void PictureIt()
 		{
-			var dir = Environment.GetEnvironmentVariable("CHIMERA_UI_SHOTS");
-			if (dir is null) { Assert.Inconclusive("set CHIMERA_UI_SHOTS to write screenshots"); return; }
-
 			using Harness h = new();
 			UiShots.Shoot(h.Form, "encode-video");
 		}
