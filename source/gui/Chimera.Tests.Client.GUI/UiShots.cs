@@ -141,7 +141,7 @@ namespace Chimera.Tests.Client.GUI
 
 			var complaints = ListsUnderDark(form, name);
 
-			ThemeEngine.Apply(form, ThemeLibrary.Select(ThemeLibrary.DefaultThemeName));
+			ThemeEngine.Apply(form, ThemeLibrary.Select(ThemeLibrary.FallbackThemeName));
 			form.Refresh();
 			Application.DoEvents();
 			Assert.AreEqual(0, complaints.Count, string.Join("\n", complaints));

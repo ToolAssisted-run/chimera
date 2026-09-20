@@ -319,6 +319,10 @@ namespace Chimera.Client.GUI
 				CoreFirmwareStore.ParseFirmwareArgs(cliFlags.cmdFirmware);
 
 			var configPath = cliFlags.cmdConfigFile ?? Path.Combine(PathUtils.ExeDirectoryPath, "config.ini");
+			// asked BEFORE anything can write one: a config that already exists was
+			// written by somebody who has been using Chimera, and the theme they are
+			// used to is the one they keep (Config.ResolveTheme)
+			var configExisted = File.Exists(configPath);
 
 			Config initialConfig;
 			try
@@ -349,6 +353,7 @@ namespace Chimera.Client.GUI
 			// ...and only then the theme, which is read from a folder under that
 			// directory. Before any window exists, so the first one comes up in the
 			// right colours rather than repainting in front of the user.
+			initialConfig.ResolveTheme(configExisted);
 			ThemeLibrary.Select(initialConfig.Theme);
 
 			// must be done VERY early, before any SDL_Init calls can be done
@@ -470,6 +475,10 @@ namespace Chimera.Client.GUI
 				{
 					initialConfig = ConfigService.Load<Config>(iniPath);
 					initialConfig.ResolveDefaults();
+					// a config somebody is loading from a file is one that already
+					// existed, so an old one keeps the light theme rather than
+					// turning the window dark as it is read
+					initialConfig.ResolveTheme(configExisted: true);
 					// ReSharper disable once AccessToDisposedClosure
 					mf.Config = initialConfig;
 				};

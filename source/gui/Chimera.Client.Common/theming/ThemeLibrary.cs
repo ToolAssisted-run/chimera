@@ -19,8 +19,21 @@ namespace Chimera.Client.Common
 	/// </summary>
 	public static class ThemeLibrary
 	{
-		/// <summary>The theme that is on if nothing says otherwise, and the one a broken choice falls back to.</summary>
-		public const string DefaultThemeName = "Light";
+		/// <summary>
+		/// What a config that has never chosen a theme starts with (user-decided,
+		/// 2026-09-20). A config that HAS been written before is left alone - see
+		/// <see cref="Config.ResolveTheme"/> - because changing somebody's colours
+		/// under them on an update is a surprise, not a feature.
+		/// </summary>
+		public const string NewConfigThemeName = "Dark";
+
+		/// <summary>
+		/// What anything falls back to when the theme it wanted is not there: a
+		/// theme file somebody deleted, a name nothing recognises, a built-in that
+		/// would not parse. Light, because it is always present and is exactly the
+		/// desktop's own colours, so it cannot itself be the thing that is wrong.
+		/// </summary>
+		public const string FallbackThemeName = "Light";
 
 		private static readonly Lock Sync = new();
 
@@ -40,7 +53,7 @@ namespace Chimera.Client.Common
 					if (_current is null)
 					{
 						EnsureLoadedLocked();
-						_current = FindLocked(DefaultThemeName) ?? _themes[0];
+						_current = FindLocked(FallbackThemeName) ?? _themes[0];
 					}
 					return _current;
 				}
@@ -72,7 +85,7 @@ namespace Chimera.Client.Common
 		}
 
 		/// <summary>
-		/// Turns a theme on. An unknown name falls back to <see cref="DefaultThemeName"/>,
+		/// Turns a theme on. An unknown name falls back to <see cref="FallbackThemeName"/>,
 		/// which is what happens when a config names a theme file that has since been
 		/// deleted. Returns the theme that is now on.
 		/// </summary>
@@ -82,7 +95,7 @@ namespace Chimera.Client.Common
 			lock (Sync)
 			{
 				EnsureLoadedLocked();
-				chosen = FindLocked(name ?? "") ?? FindLocked(DefaultThemeName) ?? _themes[0];
+				chosen = FindLocked(name ?? "") ?? FindLocked(FallbackThemeName) ?? _themes[0];
 				if (ReferenceEquals(chosen, _current)) return chosen;
 				_current = chosen;
 			}
@@ -128,7 +141,7 @@ namespace Chimera.Client.Common
 				(var themes, var failures) = Read(directory);
 				_themes = themes.ToList();
 				_failures = failures.ToList();
-				_current = FindLocked(_current?.Name ?? DefaultThemeName) ?? FindLocked(DefaultThemeName) ?? _themes[0];
+				_current = FindLocked(_current?.Name ?? FallbackThemeName) ?? FindLocked(FallbackThemeName) ?? _themes[0];
 			}
 			Changed?.Invoke(Current);
 		}
