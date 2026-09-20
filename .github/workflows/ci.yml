@@ -107,6 +107,23 @@ jobs:
           meson compile -C build/meson-linux
           meson install -C build/meson-linux
 
+      - name: Engine unit tests
+        # The 18 `meson test` cases over the engine: sha1, the movie log and its
+        # text form, the state container and its format, packages, multi-file
+        # media, projects, firmware, the GL flight/sync/buffer-pool bridge, the
+        # stride tuner, greenzone shape and RAM search. The step above already
+        # COMPILES every one of them - they are ordinary targets in meson.build -
+        # so until now CI paid for the build and then threw the result away, and
+        # the engine's own tests gated nothing. They take about eight seconds.
+        run: meson test -C build/meson-linux --print-errorlogs
+
+      - name: Upload engine test logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: engine-meson-logs
+          path: build/meson-linux/meson-logs/
+
       - name: Build the managed solution
         run: dotnet build source/gui/Chimera.sln -c Release /nodeReuse:false -p:UseSharedCompilation=false
 
