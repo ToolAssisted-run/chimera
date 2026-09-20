@@ -24,6 +24,18 @@ namespace Chimera.Emulation.Common.Engine
 		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_build_info();
 
+		/// <summary>Issue #115: the sentence to show when this build and a core package are far apart, or null.</summary>
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_version_skew(string frontendDate, string frontendBuild, string coreDate, string coreBuild, string coreName);
+
+		/// <summary>The build that writes this session's states - the engine's commit, which is the frontend's.</summary>
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_state_writer_id();
+
+		/// <summary>The shape of a machine state as this build writes and reads it (issue #115).</summary>
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract uint ce_state_format();
+
 		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_movie_log_new();
 
@@ -956,6 +968,25 @@ namespace Chimera.Emulation.Common.Engine
 
 		/// <summary>Engine build provenance (JSON), for the frontend to show and movies to record.</summary>
 		public static string BuildInfo => PtrToStringUtf8(Instance.ce_build_info()) ?? "{}";
+
+		/// <summary>
+		/// The savestate format this build writes and reads (issue #115). A project records it,
+		/// so a whole cache of states can be explained at open rather than one refusal at a time.
+		/// </summary>
+		public static uint StateFormat => Instance.ce_state_format();
+
+		/// <summary>The build that wrote the states this session writes.</summary>
+		public static string StateWriterId => PtrToStringUtf8(Instance.ce_state_writer_id()) ?? "";
+
+		/// <summary>
+		/// Whether this Chimera and the core package a project runs on were built far enough
+		/// apart to be worth a word, and the word to say. Null when they are close enough or
+		/// when either side does not date itself. A heuristic, never a refusal: the engine owns
+		/// the threshold and the wording, this side only shows it.
+		/// </summary>
+		public static string? VersionSkew(string frontendDate, string frontendBuild, string coreDate, string coreBuild, string coreName)
+			=> PtrToStringUtf8(Instance.ce_version_skew(
+				frontendDate ?? "", frontendBuild ?? "", coreDate ?? "", coreBuild ?? "", coreName ?? ""));
 
 		/// <summary>The identity hash the frontend uses everywhere: SHA1, 40 uppercase hex chars.</summary>
 		public static string Sha1Hex(byte[] data)

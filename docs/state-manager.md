@@ -2461,3 +2461,93 @@ rather than a mean. A change that improves the average and keeps the hitch has
 not done the thing it was built to do.
 
 Only then does any of it become a commit.
+
+## The savestate format number (issue #115, decided with the user 2026-09-20)
+
+Split out of #111, where a savestate problem turned out to be a frontend and a
+core from different weeks. The state layout genuinely changed three times in the
+week of 2026-09-14 - the memory filesystem, the sandbox's delta format, and
+greenzone packing (`ChimeraHistory5`) - and nothing in a state said so. What a
+person saw was "core stopped", or a state that loaded into nonsense, or a
+corrupt-file error naming a file that was not corrupt.
+
+Three answers to one question now exist, weakest first. Only the third decides;
+the first two are for a person to read.
+
+### 1. The build dates, compared at open
+
+`ce_version_skew` holds this Chimera's commit date against the date the core
+package stamped into its own `waterbox.config` (`versionDate`, issue #67). More
+than a fortnight apart and the frontend says so, once, as an on-screen message
+naming both dates, both builds and what to do about it. It is a guess: it will
+sometimes fire when nothing is wrong, so it never refuses and never asks a
+question - an old pairing that works must keep working. Either side may not date
+itself (a package from before `versionDate`, a Chimera built outside a git
+checkout) and then nothing at all is said, because half a comparison is worse
+than none. The threshold and the wording are the engine's; the frontend finds
+the two dates and shows what comes back.
+
+### 2. What wrote each state, recorded
+
+Every state file the engine writes carries the build that wrote it
+(`ce_state_writer_id`, the engine's commit - which is the frontend's, since the
+two come out of one repository at one commit). A project records the same beside
+the format number it was last saved under, in its `StateFormat` and
+`StateWrittenBy` headers, so a whole cache can be explained at open rather than
+one refusal at a time.
+
+### 3. The format number, which is the one that decides
+
+`chimera::kStateFormat` in `source/engine/source/state_format.hpp`, currently
+**1**. It is the shape of a machine state as a build writes and reads it, and it
+is checked in three places:
+
+- **State files** (`ce_session_state_save_file` / `_load_file` - a TAStudio
+  branch's state). The header is `"CESTATE2"`, a u32 format, a u32 writer length
+  and the writer, then the compressed flag, the tag and the machine. A load that
+  meets another format returns 2 - the machine was never offered the state and is
+  untouched - with a sentence naming both formats and both builds.
+- **The greenzone history** (`history.bin`). The format rides in the history's
+  machine id, which already carries the sandbox's machine hash. A history of
+  another format does exactly what a history of another machine does: it is
+  dropped, quietly, and rebuilt by playing. That is the contract for losing a
+  cache - it costs recomputation, never work.
+- **Nothing else.** The zip-of-lumps container (`ChimeraState 1.0`) holds no
+  machine state any more: the greenzone cache zip keeps the lag log, the session
+  position, branch state FILE NAMES and screenshots, and the states themselves
+  are the engine's own files. There is nothing there for a format number to
+  guard.
+
+### States written before this change
+
+They have no format number. A state file written by an older build carries the
+old magic `"CESTATE1"` and is read as **format 1** - because 1 is what the layout
+was on the day the number arrived. So nothing in the wild is refused today: every
+state an older Chimera wrote still loads, and a same-build round trip is exactly
+what it was. The first real bump, to 2, is what starts refusing them, and it
+refuses them by name ("written by a build from before states said which").
+
+A `history.bin` written before this change has no format in its id and is dropped
+once, on the first open after it - one greenzone rebuilt by replaying, which is
+the same cost as opening the project on a new core build.
+
+### Keeping the number honest
+
+Forgetting to bump it is the failure mode, so it is made hard to do:
+
+- `kStateLayout` in `state_format.hpp` spells out every piece of framing the
+  number stands for, and it is BUILT FROM the magic strings the writers actually
+  write - they are defined in that header and used in `session.cpp` and
+  `state_history.cpp`. Renaming one moves the layout on its own.
+- `test_state_format` hashes `kStateLayout` and compares it with
+  `kStateLayoutDigest`. A layout change that leaves the number alone fails the
+  engine gate, and the failure prints the new digest and says what to do: bump
+  `kStateFormat`, paste the digest.
+- The same test checks miniBox's own magics (`ActivatedWaterboxHost_v1`,
+  `MiniBoxHostDelta_v1`, `MiniBoxDelta1`, `ActivatedMemoryBlock`) are still in
+  its sources, so a sandbox that RENAMES its format takes this number with it.
+
+What none of that catches: a sandbox change that alters the bytes without
+renaming any of its magics - miniBox's layout is miniBox's, and the engine
+cannot hash what it never sees. That case is a hand bump, and it is exactly the
+case the date heuristic exists for.

@@ -28,6 +28,15 @@ themselves, which are named by their SHA1:
   asked once rather than at every open. The Chimera version is rewritten by
   every save the same way, with the one that created the project kept beside it
   (`OriginalEmuVersion`).
+- **What the cached states are** (issue #115): `StateFormat`, the savestate
+  format number the engine was on when this project was last saved, and
+  `StateWrittenBy`, the build that wrote them. Read at the next open: when the
+  number has moved, the person is told once that those states cannot be loaded
+  and why, instead of finding out one refused branch at a time. The engine still
+  checks every state file for itself - this is the same news, said earlier and
+  about the whole cache (docs/state-manager.md, "The savestate format number").
+  A project saved before these existed says nothing, and silence is not a
+  disagreement.
 - **File manifest**: names + SHA1 + the core-defined slot id each file
   fills (cdrom, floppy, hdd, config, ...), order within a slot = swap
   order, cue-referenced bins auto-added as support, cue closure enforced.
@@ -340,6 +349,15 @@ Core pin mismatch (the pinned build is not installed, and another build of the
 core is): refuse by default with a clear pinned-vs-installed message,
 with a knowing override - and the project then records what actually ran,
 mirroring the file-hash posture.
+
+Build skew (issue #115): once the core is running, the date this Chimera was
+built on is held against the date the core package says it was built on
+(`versionDate`, issue #67). More than a fortnight apart and an on-screen message
+names both dates, both builds and what to do. It is a heuristic and nothing
+more: it never refuses, never asks, and says nothing at all when either side
+does not date itself. What actually decides whether a state can be read is the
+savestate format number, checked state by state in the engine
+(docs/state-manager.md).
 
 Opening boots the machine EXACTLY ONCE. The movie (which is the project)
 is queued before the rom load, so the single boot already runs with the

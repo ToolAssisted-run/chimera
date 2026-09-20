@@ -59,6 +59,16 @@ namespace Chimera.Client.Common
 		public const string CoreVersion = "CoreVersion"; // the core's authoritative version: the commit its published build was made from
 		public const string CorePackageSha1 = "CorePackageSHA1"; // SHA1 of the package file; the same version can be built twice, this says which build
 
+		/// <summary>
+		/// The savestate format the states this project cached were written in, and the
+		/// build that wrote them (issue #115). The engine owns the number
+		/// (<see cref="Chimera.Emulation.Common.Engine.ChimeraEngine.StateFormat"/>) and
+		/// refuses a state of another one file by file; these are here so that a whole
+		/// cache can be explained at open, before any single state is asked for.
+		/// </summary>
+		public const string StateFormat = "StateFormat";
+		public const string StateWrittenBy = "StateWrittenBy";
+
 		private static FrozenSet<string> field;
 
 		private static ISet<string> AllValues

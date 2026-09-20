@@ -282,6 +282,13 @@ namespace Chimera.Client.Common
 				Header[HeaderKeys.OriginalEmulatorVersion] = Header[HeaderKeys.EmulatorVersion];
 			}
 			Header[HeaderKeys.EmulatorVersion] = VersionInfo.GetEmuVersion();
+			// Which savestate format this project's cached states are in, and who wrote
+			// them (issue #115). The engine decides the number; a save records what it
+			// says now, because a save is when the states beside this project were last
+			// written. Read back at the next open to explain a whole cache at once - the
+			// per-state check in the engine is the one that actually refuses.
+			Header[HeaderKeys.StateFormat] = ChimeraEngine.StateFormat.ToString(CultureInfo.InvariantCulture);
+			Header[HeaderKeys.StateWrittenBy] = ChimeraEngine.StateWriterId;
 
 			var p = Project;
 
@@ -899,9 +906,35 @@ namespace Chimera.Client.Common
 			}
 		}
 
+		/// <summary>
+		/// What the project says its cached states were written in, against what this build
+		/// reads (issue #115). Null when they agree, or when the project predates the record
+		/// and so says nothing - silence is not a disagreement. The engine refuses a state of
+		/// another format one file at a time; this is the same news said once, at open, for a
+		/// whole cache, and it is the more specific explanation when several apply.
+		/// </summary>
+		private string StateFormatNote()
+		{
+			if (!Header.TryGetValue(HeaderKeys.StateFormat, out var recorded)
+				|| !uint.TryParse(recorded, NumberStyles.None, CultureInfo.InvariantCulture, out var was)
+				|| was == ChimeraEngine.StateFormat)
+			{
+				return null;
+			}
+			_ = Header.TryGetValue(HeaderKeys.StateWrittenBy, out var wroteThem);
+			var who = string.IsNullOrWhiteSpace(wroteThem) ? "another build" : wroteThem;
+			return $"This project's saved states are in savestate format {was}, written by {who}, and this"
+				+ $" Chimera ({ChimeraEngine.StateWriterId}) reads format {ChimeraEngine.StateFormat}."
+				+ " The machine's layout changed between the two, so those states cannot be loaded:"
+				+ " the greenzone starts empty and fills as the movie plays, and a branch saved by"
+				+ " the older build replays to its frame instead of loading. Nothing is lost but"
+				+ " the time to replay it.";
+		}
+
 		private void LoadCacheFile()
 		{
 			DroppedCacheNote = null;
+			var formatNote = StateFormatNote();
 			ZipStateLoader bl = null;
 			try
 			{
@@ -932,6 +965,8 @@ namespace Chimera.Client.Common
 					bl = null;
 				}
 			}
+
+			DroppedCacheNote ??= formatNote;
 
 			// No cache, or one of another machine: the lag log and the session
 			// position stay as they were, which for a fresh load is empty. The

@@ -42,6 +42,35 @@ CE_API uint32_t ce_abi_version(void);
  * Static string, never invalidated. */
 CE_API const char *ce_build_info(void);
 
+/* ---- do this build and this state understand each other? (issue #115) ----
+ *
+ * Three answers to one question, weakest first. The first two are for a person
+ * to read; the third is what actually decides.
+ *
+ * 1. ce_version_skew: whether this Chimera and the core package a project runs
+ *    on were built far enough apart to be worth mentioning. Both dates are
+ *    YYYY-MM-DD - the frontend's is its commit's date, the core's is the
+ *    "versionDate" its package stamps (issue #67). Returns the sentence to show,
+ *    or NULL when they are close enough or either side does not say. It is a
+ *    guess and never a refusal: an old pairing that works must keep working.
+ *    Borrowed until the next call on this thread.
+ *
+ * 2. ce_state_writer_id: the build that wrote the states this session writes.
+ *    The engine and the frontend come out of one repository at one commit, so
+ *    this names the frontend too. Static string.
+ *
+ * 3. ce_state_format: the shape of a machine state as this build writes and
+ *    reads it (source/engine/source/state_format.hpp). Every state file carries
+ *    it and every load checks it, so a state of another format is refused by
+ *    name instead of reaching a machine that cannot read it. The frontend
+ *    records it in the project so a whole cache can be explained at open,
+ *    before any one state is asked for. */
+CE_API const char *ce_version_skew(
+	const char *frontend_date, const char *frontend_build,
+	const char *core_date, const char *core_build, const char *core_name);
+CE_API const char *ce_state_writer_id(void);
+CE_API uint32_t ce_state_format(void);
+
 /* ---- movie input log ----
  *
  * The [Input] lump of a movie: an ordered list of frame entries (the "|..|"
@@ -1022,9 +1051,18 @@ CE_API int32_t ce_session_load_state(ce_session *s, const uint8_t *data, uint64_
  * tag is the caller's own few bytes, stored with the state and handed back on a
  * load - the frontend's frame and lag counters, which are not the machine's. The
  * file is written beside its name and moved into place, so a failed save leaves
- * whatever was there. _save: 0 done, 1 not (see _last_error). _load: 0 loaded;
- * 1 the machine refused the state or the file is damaged, and the machine is
- * where a refused load leaves it; 2 not a state file, the machine untouched. */
+ * whatever was there.
+ *
+ * The file says which savestate format it is (ce_state_format) and which build
+ * wrote it (ce_state_writer_id), and a load checks the format before a byte
+ * reaches the machine: a state of another format is refused by name rather than
+ * loaded into nonsense (issue #115).
+ *
+ * _save: 0 done, 1 not (see _last_error). _load: 0 loaded; 1 the machine refused
+ * the state or the file is damaged, and the machine is where a refused load
+ * leaves it; 2 the state was never offered to the machine, which is untouched -
+ * not a state file, cut short, or written in another savestate format, and
+ * _last_error says which. */
 CE_API int32_t ce_session_state_save_file(ce_session *s, const char *utf8_path, const uint8_t *tag, uint32_t tag_len);
 CE_API int32_t ce_session_state_load_file(ce_session *s, const char *utf8_path, uint8_t *tag_out, uint32_t tag_cap, uint32_t *tag_len_out);
 /* What the last state saved to or loaded from a file weighed: as the machine gave

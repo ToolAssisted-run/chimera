@@ -16,6 +16,7 @@
 #include "host_dyn.hpp"
 #include "progress.hpp"
 #include "state_history.hpp"
+#include "state_format.hpp"
 
 #include "../../extern/cjson/cJSON.h"
 
@@ -1703,7 +1704,6 @@ int32_t ce_session_load_state(ce_session *s, const uint8_t *data, uint64_t len)
  * - a PS3's state is past 2 GiB, which is more than a frontend array can be. */
 namespace
 {
-constexpr char STATE_FILE_MAGIC[8] = { 'C', 'E', 'S', 'T', 'A', 'T', 'E', '1' };
 constexpr size_t STATE_FILE_CHUNK = size_t{ 1 } << 20;
 
 /* how often a save or a load says how far it is: often enough for a bar to move,
@@ -1763,6 +1763,26 @@ struct StateFileSource
 	size_t have = 0, pos = 0;
 	bool failed = false;
 	uint64_t raw = 0, consumed = 0, reportedAt = 0;
+	/* What reading the header over-read. A FileReader cannot seek, and the
+	 * header's length is not known until it is parsed, so the bytes past it are
+	 * handed back here rather than read twice. */
+	std::vector<uint8_t> pending;
+	size_t pendingPos = 0;
+
+	/* the file from where the header stopped, pending bytes first */
+	uint64_t fill(uint8_t *dst, uint64_t max)
+	{
+		uint64_t got = 0;
+		if (pendingPos < pending.size())
+		{
+			got = pending.size() - pendingPos;
+			if (got > max) got = max;
+			std::memcpy(dst, pending.data() + pendingPos, static_cast<size_t>(got));
+			pendingPos += static_cast<size_t>(got);
+			if (got == max) return got;
+		}
+		return got + in->read(dst + got, max - got);
+	}
 
 	void report()
 	{
@@ -1775,7 +1795,7 @@ struct StateFileSource
 	{
 		if (zds == nullptr)
 		{
-			const size_t got = static_cast<size_t>(in->read(static_cast<uint8_t *>(dst), want));
+			const size_t got = static_cast<size_t>(fill(static_cast<uint8_t *>(dst), want));
 			raw += got; consumed += got; report();
 			return got;
 		}
@@ -1784,7 +1804,7 @@ struct StateFileSource
 		{
 			if (pos == have)
 			{
-				have = static_cast<size_t>(in->read(buf.data(), buf.size()));
+				have = static_cast<size_t>(fill(buf.data(), buf.size()));
 				pos = 0;
 				if (have == 0) break; /* the end of the file is the end of the state */
 				consumed += have;
@@ -1824,11 +1844,16 @@ int32_t ce_session_state_save_file(ce_session *s, const char *utf8_path, const u
 	void *zcs = z != nullptr ? z->createCStream() : nullptr;
 	if (zcs != nullptr && z->isError(z->initCStream(zcs, level))) { z->freeCStream(zcs); zcs = nullptr; }
 
-	const uint8_t compressed = zcs != nullptr ? 1 : 0;
-	out.write(STATE_FILE_MAGIC, sizeof STATE_FILE_MAGIC);
-	out.write(&compressed, 1);
-	out.write(&tag_len, sizeof tag_len);
-	out.write(tag, tag_len);
+	/* The header says which savestate format this is and which build wrote it,
+	 * so a load can refuse by name rather than hand the machine bytes it cannot
+	 * read (issue #115, state_format.hpp). */
+	chimera::StateFileHeader head;
+	head.compressed = zcs != nullptr;
+	head.writer = chimera::stateWriterId();
+	if (tag != nullptr && tag_len != 0) head.tag.assign(tag, tag + tag_len);
+	std::vector<uint8_t> headBytes;
+	chimera::writeStateFileHeader(head, headBytes);
+	out.write(headBytes.data(), headBytes.size());
 
 	StateFileSink sink{ &out, z, zcs, std::vector<uint8_t>(STATE_FILE_CHUNK), s->stateFileRawBytes };
 	chimera::WbxReturn r{};
@@ -1858,34 +1883,51 @@ int32_t ce_session_state_load_file(ce_session *s, const char *utf8_path, uint8_t
 	s->error.clear();
 	if (tag_len_out != nullptr) *tag_len_out = 0;
 	chimera::FileReader in;
-	char magic[sizeof STATE_FILE_MAGIC];
-	uint8_t compressed = 0;
-	uint32_t tagLen = 0;
-	if (utf8_path == nullptr || !in.open(utf8_path)
-		|| in.read(reinterpret_cast<uint8_t *>(magic), sizeof magic) != sizeof magic
-		|| std::memcmp(magic, STATE_FILE_MAGIC, sizeof magic) != 0
-		|| in.read(&compressed, 1) != 1
-		|| in.read(reinterpret_cast<uint8_t *>(&tagLen), sizeof tagLen) != sizeof tagLen
-		|| tagLen > (1u << 20))
+	if (utf8_path == nullptr || !in.open(utf8_path))
 	{
 		s->error = std::string(utf8_path != nullptr ? utf8_path : "(no path)") + " is not a state file";
 		return 2; /* the machine was not touched */
 	}
-	std::vector<uint8_t> tag(tagLen);
-	if (in.read(tag.data(), tagLen) != tagLen) { s->error = std::string(utf8_path) + " is cut short"; return 2; }
 
-	const char *why = nullptr;
-	const chimera::ZstdApi *z = compressed != 0 ? chimera::zstdApi(&why) : nullptr;
+	/* The header, read in growing prefixes because its length is in it (a tag
+	 * is a handful of bytes in practice, so the first read is nearly always the
+	 * only one) and a FileReader cannot seek back. */
+	chimera::StateFileHeader head;
+	std::vector<uint8_t> prefix;
+	std::string why;
+	int headRc = 2;
+	for (size_t want = 8192;; want *= 4)
+	{
+		const size_t was = prefix.size();
+		prefix.resize(want);
+		const uint64_t got = in.read(prefix.data() + was, want - was);
+		prefix.resize(was + static_cast<size_t>(got));
+		headRc = chimera::readStateFileHeader(prefix.data(), prefix.size(), head, why);
+		/* a short read means the file ended: nothing more is coming */
+		if (headRc != 2 || prefix.size() < want || want >= (2u << 20)) break;
+	}
+	if (headRc != 0)
+	{
+		/* A format disagreement is a whole sentence about two builds and reads as
+		 * one; a damaged or foreign file is about THIS file, and wants naming. */
+		s->error = headRc == 1 ? why : std::string(utf8_path) + " " + why;
+		return 2; /* another format, or not a state file: either way, untouched */
+	}
+	const uint8_t compressed = head.compressed ? 1 : 0;
+
+	const char *zwhy = nullptr;
+	const chimera::ZstdApi *z = compressed != 0 ? chimera::zstdApi(&zwhy) : nullptr;
 	void *zds = z != nullptr ? z->createDStream() : nullptr;
 	if (compressed != 0 && (zds == nullptr || z->isError(z->initDStream(zds))))
 	{
 		if (zds != nullptr) z->freeDStream(zds);
-		s->error = std::string("the state file is compressed and zstd is not available") + (why != nullptr ? std::string(": ") + why : "");
+		s->error = std::string("the state file is compressed and zstd is not available") + (zwhy != nullptr ? std::string(": ") + zwhy : "");
 		return 2;
 	}
 
 	s->history.beforeLoad(); /* see ce_session_load_state */
 	StateFileSource source{ &in, z, zds, std::vector<uint8_t>(STATE_FILE_CHUNK) };
+	source.pending.assign(prefix.begin() + static_cast<std::ptrdiff_t>(head.length), prefix.end());
 	{
 		uint64_t size = 0;
 		int64_t mtime = 0;
@@ -1905,8 +1947,9 @@ int32_t ce_session_state_load_file(ce_session *s, const char *utf8_path, uint8_t
 	s->stateFileRawBytes = source.raw;
 	s->stateFileStoredBytes = source.fileBytes;
 
+	const uint32_t tagLen = static_cast<uint32_t>(head.tag.size());
 	if (tag_len_out != nullptr) *tag_len_out = tagLen;
-	if (tag_out != nullptr && tagLen != 0) std::memcpy(tag_out, tag.data(), tagLen < tag_cap ? tagLen : tag_cap);
+	if (tag_out != nullptr && tagLen != 0) std::memcpy(tag_out, head.tag.data(), tagLen < tag_cap ? tagLen : tag_cap);
 	return 0;
 }
 
@@ -2536,15 +2579,22 @@ void ce_session_greenzone_invalidate(ce_session *s, int64_t after_frame)
 static std::string historyId(ce_session *s, const char *machine_id)
 {
 	std::string id = machine_id != nullptr ? machine_id : "";
-	if (s->host->wbx_machine_hash == nullptr) return id;   /* an older host: caller's half alone */
+	/* The savestate format rides in the id (issue #115). A history is a cache of
+	 * states, and states of another format cannot be fed to this build's machine
+	 * any more than another machine's can - so the same answer serves: the file
+	 * is dropped, quietly, and the greenzone is rebuilt by playing. A history
+	 * written before formats were numbered carries no suffix and is dropped once,
+	 * on the first open after this change. */
+	const std::string format = chimera::historyFormatSuffix();
+	if (s->host->wbx_machine_hash == nullptr) return id + format;   /* an older host: caller's half alone */
 	uint8_t hash[32] = { 0 };
 	chimera::WbxReturn r{};
 	s->host->wbx_machine_hash(s->obj, hash, &r);
-	if (!r.ok()) return id;
+	if (!r.ok()) return id + format;
 	static const char hex[] = "0123456789abcdef";
 	id += '@';
 	for (uint8_t b : hash) { id += hex[b >> 4]; id += hex[b & 15]; }
-	return id;
+	return id + format;
 }
 
 int32_t ce_session_history_save(ce_session *s, const char *path, const char *machine_id)
