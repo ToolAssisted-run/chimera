@@ -75,10 +75,14 @@ the C# either side of the dialog and nothing of the dialog itself.
   offers the answer it holds, acts on what comes back, remembers it for the next
   scan, and ignores it entirely when the picker returned no folder; and that a
   page shows a check box of its own exactly where the picker cannot carry one -
-  both halves of that, because the test tells `FolderBrowserEx` what to say
-  about the platform (`PretendCanShowCheckBox`) rather than asking the one it is
-  standing on.
-- **NOT covered by the suite**: everything that is Windows'. Whether the dialog
+  the half of that which is true on the platform the suite is standing on.
+- **NOT covered by the suite**: the other half of "exactly one control offers
+  the choice". On Linux the page carries the box, and that nothing hides it on
+  Windows is checked by the harness below, not here. Making the suite ask both
+  halves needs production code that will lie about which platform it is on, and
+  a seam that exists only for a test is not worth the rule it proves - so it was
+  removed (2026-09-20, Sergio's call).
+- **NOT covered by the suite**: everything else that is Windows'. Whether the dialog
   draws the check button at all. Whether `AddCheckButton` and
   `GetCheckButtonState` are at the vtable offsets this code believes they are -
   a wrong offset calls some other method, and on Linux nothing calls anything.

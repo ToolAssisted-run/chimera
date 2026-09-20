@@ -103,40 +103,37 @@ namespace Chimera.Tests.Client.GUI
 		}
 
 		/// <summary>
-		/// One control for one setting. The page carries a box of its own exactly where the folder picker
-		/// cannot carry one - so on Mono it is on the page, on Windows it is in the dialog, never both.
+		/// One control for one setting: the page carries a box of its own exactly where the folder picker
+		/// cannot carry one. On Mono that is the page; on Windows it is the dialog; never both.
 		///
-		/// BOTH halves are asked here, on whichever platform this runs, by telling the picker what to say
-		/// about itself. Asking only <see cref="FolderBrowserEx.CanShowCheckBox"/> as it really is would
-		/// check one half and leave the other - the one that hides the page's box - untested on the only
-		/// platform the suite runs on, which is exactly how a rule with two sides ships half-broken.
+		/// This asks the half that is true HERE, on whichever platform the suite is running. The other half
+		/// cannot be asked from here without production code existing to lie about the platform, which is
+		/// not worth having - so it is checked where it is real, by
+		/// tests/ui/windows/folder-picker-checkbox.sh, and NOT by this suite. A green run on Linux says
+		/// nothing about what the Windows frontend shows.
 		/// </summary>
 		[TestMethod]
 		public void ExactlyOneControlOffersTheChoice()
 		{
-			try
+			using var form = MakeForm((ref bool _) => null);
+			if (FolderBrowserEx.CanShowCheckBox)
 			{
-				FolderBrowserEx.PretendCanShowCheckBox = true;
-				using var pickerCarriesIt = MakeForm((ref bool _) => null);
-				Assert.IsFalse(pickerCarriesIt.FirmwareScanSubfoldersVisible,
-					"the dialog asks, so the page must not ask as well");
-				Assert.IsTrue(pickerCarriesIt.FirmwareScanSubfolders,
-					"hidden, but still the page's memory of the answer, and still ticked to start with");
-
-				FolderBrowserEx.PretendCanShowCheckBox = false;
-				using var pageCarriesIt = MakeForm((ref bool _) => null);
-				Assert.IsTrue(pageCarriesIt.FirmwareScanSubfoldersVisible,
+				Assert.IsFalse(form.FirmwareScanSubfoldersVisible,
+					"the dialog asks on this platform, so the page must not ask as well");
+			}
+			else
+			{
+				Assert.IsTrue(form.FirmwareScanSubfoldersVisible,
 					"a picker with nowhere to put the option leaves the page to offer it");
+			}
 
-				// and a wizard with no Scan Folder button at all shows neither
-				using NewProjectWizard noPicker = new([ ], static _ => [ ]);
-				noPicker.Show();
-				Assert.IsFalse(noPicker.FirmwareScanSubfoldersVisible, "no Scan Folder button, no option beside it");
-			}
-			finally
-			{
-				FolderBrowserEx.PretendCanShowCheckBox = null;
-			}
+			// either way the page keeps the answer, and starts ticked
+			Assert.IsTrue(form.FirmwareScanSubfolders, "sub-folders are included unless somebody says otherwise");
+
+			// and a wizard with no Scan Folder button at all shows neither
+			using NewProjectWizard noPicker = new([ ], static _ => [ ]);
+			noPicker.Show();
+			Assert.IsFalse(noPicker.FirmwareScanSubfoldersVisible, "no Scan Folder button, no option beside it");
 		}
 	}
 }

@@ -78,15 +78,7 @@ namespace Chimera.Client.GUI
 		/// not for one dialog: a Windows that falls back to the tree has no tick box on that occasion, which
 		/// only <see cref="CheckBoxShown"/> can say, and then the scan runs on the state passed in.
 		/// </summary>
-		public static bool CanShowCheckBox => PretendCanShowCheckBox ?? !OSTailoredCode.IsUnixHost;
-
-		/// <summary>
-		/// Answers <see cref="CanShowCheckBox"/> as if this were the other platform; null asks the real one.
-		/// It exists because the rule it decides - never two controls for one setting - has two halves, and a
-		/// test can only ever stand on one platform, so without this the half that hides the page's own box
-		/// is untestable everywhere the suite runs. Set it in a try/finally; nothing but a test touches it.
-		/// </summary>
-		internal static bool? PretendCanShowCheckBox;
+		public static bool CanShowCheckBox => !OSTailoredCode.IsUnixHost;
 
 		/// <summary>Shows the folder picker with the specified owner window.</summary>
 		public DialogResult ShowDialog(IWin32Window owner = null)
