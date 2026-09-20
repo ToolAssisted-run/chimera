@@ -76,6 +76,7 @@ namespace Chimera.Client.GUI.Properties
 		internal static readonly Bitmap LuaPictureBox = ReadEmbeddedBitmap("luaPictureBox");
 		internal static readonly Bitmap MessageConfig = ReadEmbeddedBitmap("MessageConfig");
 		internal static readonly Icon MonitorIcon = ReadEmbeddedIcon("monitor");
+		internal static readonly Bitmap Monitor = ReadEmbeddedBitmap("monitor");
 		internal static readonly Bitmap MoveBottom = ReadEmbeddedBitmap("MoveBottom");
 		internal static readonly Bitmap MoveDown = ReadEmbeddedBitmap("MoveDown");
 		internal static readonly Bitmap MoveLeft = ReadEmbeddedBitmap("MoveLeft");
