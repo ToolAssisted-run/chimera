@@ -49,16 +49,25 @@ namespace Chimera.Client.Common
 			nlf.OnRemove += () => memCallbackImpl.Remove(memCallback);
 		}
 
-		private void LogMemoryCallbacksNotImplemented(bool isWildcard)
-			=> Log($"{Emulator.Attributes().CoreName} does not implement {(isWildcard ? "wildcard " : string.Empty)}memory callbacks");
+		/* A registration that cannot be honoured raises a Lua error rather than
+		 * handing the script an id. It used to log a line and return the empty
+		 * GUID, which reads as success: the script carries on, the callback
+		 * never fires, and the run looks like a bug in the script or in the
+		 * game rather than a feature that was never there. A callback that
+		 * never fires is worse than one that refuses, because nothing says so
+		 * at the point the script is wrong (ToolAssisted-run/chimera#113).
+		 *
+		 * The sandbox catches this, shows it against the script and stops that
+		 * script; the frontend and the emulation are unaffected. */
+		private Exception MemoryCallbacksNotImplemented(bool isWildcard, bool execute)
+			=> new InvalidOperationException(
+				$"{Emulator.Attributes().CoreName} does not implement {(isWildcard ? "wildcard " : string.Empty)}memory {(execute ? "execute " : string.Empty)}callbacks. "
+				+ "No Chimera core does: a core runs as a waterbox guest, and that ABI is one FrameAdvance call per frame with no re-entry, "
+				+ "so a core cannot stop part way through a frame to run a callback. Remove the registration or guard it.");
 
-		private void LogMemoryExecuteCallbacksNotImplemented(bool isWildcard)
-			=> Log($"{Emulator.Attributes().CoreName} does not implement {(isWildcard ? "wildcard " : string.Empty)}memory execute callbacks");
-
-		private void LogScopeNotAvailable(string scope)
-		{
-			Log($"{scope} is not an available scope for {Emulator.Attributes().CoreName}");
-		}
+		private Exception ScopeNotAvailable(string scope)
+			=> new InvalidOperationException(
+				$"{scope} is not an available scope for {Emulator.Attributes().CoreName}");
 
 		[LuaMethod("can_use_callback_params", "Returns whether Chimera will pass arguments to callbacks. The current version passes arguments to \"memory\" callbacks (RAM/ROM/bus R/W), so this function will return true for that input. (It returns false for any other input.) This tells you whether it's necessary to enable workarounds/hacks because a script is running in a version without parameter support.")]
 		[LuaMethodExample("local mem_callback = event.can_use_callback_params(\"memory\") and mem_callback or mem_callback_pre_29;")]
@@ -81,34 +90,34 @@ namespace Chimera.Client.Common
 		[LuaMethod("oninputpoll", "Calls the given lua function after each time the emulator core polls for input")]
 		public string OnInputPoll(LuaFunction luaf, string name = null)
 		{
-			var nlf = CreateAndRegisterNamedFunction(luaf, NamedLuaFunction.EVENT_TYPE_INPUTPOLL, ApiGroup.PROHIBITED_MID_FRAME, name: name);
-			//TODO should we bother registering the function if the service isn't supported? none of the other events work this way --yoshi
-
-			if (InputPollableCore != null)
+			// The core is asked FIRST, and the function is registered only once
+			// the answer is yes. The old order registered and then discovered it
+			// could not hook anything, which left the script a function that was
+			// never going to be called.
+			IInputCallbackSystem inputCallbackImpl;
+			try
 			{
-				try
-				{
-					var inputCallbackImpl = InputPollableCore.InputCallbacks;
-					Action InputCallback = () => nlf.Call();
-					inputCallbackImpl.Add(InputCallback);
-					nlf.OnRemove += () => inputCallbackImpl.Remove(InputCallback);
-					return nlf.GuidStr;
-				}
-				catch (NotImplementedException)
-				{
-					LogNotImplemented();
-					return EMPTY_UUID_STR;
-				}
+				if (InputPollableCore is null) throw InputPollCallbacksNotImplemented();
+				inputCallbackImpl = InputPollableCore.InputCallbacks;
+			}
+			catch (NotImplementedException)
+			{
+				throw InputPollCallbacksNotImplemented();
 			}
 
-			LogNotImplemented();
-			return EMPTY_UUID_STR;
+			var nlf = CreateAndRegisterNamedFunction(luaf, NamedLuaFunction.EVENT_TYPE_INPUTPOLL, ApiGroup.PROHIBITED_MID_FRAME, name: name);
+			Action InputCallback = () => nlf.Call();
+			inputCallbackImpl.Add(InputCallback);
+			nlf.OnRemove += () => inputCallbackImpl.Remove(InputCallback);
+			return nlf.GuidStr;
 		}
 
-		private void LogNotImplemented()
-		{
-			Log($"Error: {Emulator.Attributes().CoreName} does not yet implement input polling callbacks");
-		}
+		/// <summary>Same refusal as the memory callbacks above, for the same reason.</summary>
+		private Exception InputPollCallbacksNotImplemented()
+			=> new InvalidOperationException(
+				$"{Emulator.Attributes().CoreName} does not implement input polling callbacks. "
+				+ "No Chimera core does: a core runs as a waterbox guest, and that ABI is one FrameAdvance call per frame with no re-entry, "
+				+ "so a core cannot stop part way through a frame to run a callback. Remove the registration or guard it.");
 
 		[LuaDeprecatedMethod]
 		[LuaMethod("onmemoryexecute", "Fires immediately before the given address is executed by the core. Your callback can have 3 parameters {{(addr, val, flags)}}. {{val}} is the value to be executed (or {{0}} always, if this feature is only partially implemented).")]
@@ -136,11 +145,7 @@ namespace Chimera.Client.Common
 					&& DebuggableCore.MemoryCallbacksAvailable()
 					&& DebuggableCore.MemoryCallbacks.ExecuteCallbacksAvailable)
 				{
-					if (!HasScope(scope))
-					{
-						LogScopeNotAvailable(scope);
-						return EMPTY_UUID_STR;
-					}
+					if (!HasScope(scope)) throw ScopeNotAvailable(scope);
 
 					var nlf = CreateAndRegisterNamedFunction(luaf, NamedLuaFunction.EVENT_TYPE_MEMEXEC, ApiGroup.PROHIBITED_MID_FRAME, name: name);
 					AddMemCallbackOnCore(nlf, MemoryCallbackType.Execute, scope, address);
@@ -149,12 +154,10 @@ namespace Chimera.Client.Common
 			}
 			catch (NotImplementedException)
 			{
-				LogMemoryExecuteCallbacksNotImplemented(isWildcard: false);
-				return EMPTY_UUID_STR;
+				throw MemoryCallbacksNotImplemented(isWildcard: false, execute: true);
 			}
 
-			LogMemoryExecuteCallbacksNotImplemented(isWildcard: false);
-			return EMPTY_UUID_STR;
+			throw MemoryCallbacksNotImplemented(isWildcard: false, execute: true);
 		}
 
 		[LuaDeprecatedMethod]
@@ -180,11 +183,7 @@ namespace Chimera.Client.Common
 				if (DebuggableCore?.MemoryCallbacksAvailable() == true
 					&& DebuggableCore.MemoryCallbacks.ExecuteCallbacksAvailable)
 				{
-					if (!HasScope(scope))
-					{
-						LogScopeNotAvailable(scope);
-						return EMPTY_UUID_STR;
-					}
+					if (!HasScope(scope)) throw ScopeNotAvailable(scope);
 
 					var nlf = CreateAndRegisterNamedFunction(luaf, NamedLuaFunction.EVENT_TYPE_MEMEXECANY, ApiGroup.PROHIBITED_MID_FRAME, name: name);
 					AddMemCallbackOnCore(nlf, MemoryCallbackType.Execute, scope, address: null);
@@ -196,8 +195,7 @@ namespace Chimera.Client.Common
 			{
 				// fall through
 			}
-			LogMemoryExecuteCallbacksNotImplemented(isWildcard: true);
-			return EMPTY_UUID_STR;
+			throw MemoryCallbacksNotImplemented(isWildcard: true, execute: true);
 		}
 
 		[LuaDeprecatedMethod]
@@ -224,11 +222,7 @@ namespace Chimera.Client.Common
 			{
 				if (DebuggableCore?.MemoryCallbacksAvailable() == true)
 				{
-					if (!HasScope(scope))
-					{
-						LogScopeNotAvailable(scope);
-						return EMPTY_UUID_STR;
-					}
+					if (!HasScope(scope)) throw ScopeNotAvailable(scope);
 
 					var nlf = CreateAndRegisterNamedFunction(luaf, NamedLuaFunction.EVENT_TYPE_MEMREAD, ApiGroup.PROHIBITED_MID_FRAME, name: name);
 					AddMemCallbackOnCore(nlf, MemoryCallbackType.Read, scope, address);
@@ -237,12 +231,10 @@ namespace Chimera.Client.Common
 			}
 			catch (NotImplementedException)
 			{
-				LogMemoryCallbacksNotImplemented(isWildcard: address is null);
-				return EMPTY_UUID_STR;
+				throw MemoryCallbacksNotImplemented(isWildcard: address is null, execute: false);
 			}
 
-			LogMemoryCallbacksNotImplemented(isWildcard: address is null);
-			return EMPTY_UUID_STR;
+			throw MemoryCallbacksNotImplemented(isWildcard: address is null, execute: false);
 		}
 
 		[LuaDeprecatedMethod]
@@ -269,11 +261,7 @@ namespace Chimera.Client.Common
 			{
 				if (DebuggableCore?.MemoryCallbacksAvailable() == true)
 				{
-					if (!HasScope(scope))
-					{
-						LogScopeNotAvailable(scope);
-						return EMPTY_UUID_STR;
-					}
+					if (!HasScope(scope)) throw ScopeNotAvailable(scope);
 
 					var nlf = CreateAndRegisterNamedFunction(luaf, NamedLuaFunction.EVENT_TYPE_MEMWRITE, ApiGroup.PROHIBITED_MID_FRAME, name: name);
 					AddMemCallbackOnCore(nlf, MemoryCallbackType.Write, scope, address);
@@ -282,12 +270,10 @@ namespace Chimera.Client.Common
 			}
 			catch (NotImplementedException)
 			{
-				LogMemoryCallbacksNotImplemented(isWildcard: address is null);
-				return EMPTY_UUID_STR;
+				throw MemoryCallbacksNotImplemented(isWildcard: address is null, execute: false);
 			}
 
-			LogMemoryCallbacksNotImplemented(isWildcard: address is null);
-			return EMPTY_UUID_STR;
+			throw MemoryCallbacksNotImplemented(isWildcard: address is null, execute: false);
 		}
 
 		[LuaMethodExample("local steveone = event.onexit(\r\n\tfunction()\r\n\t\tconsole.log( \"Fires after the calling script has stopped\" );\r\n\tend\r\n\t, \"Frame name\" );")]
