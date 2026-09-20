@@ -11,6 +11,17 @@
 # Neither kind can tell you a window LOOKS right. For that, --shots renders the
 # windows to PNGs under tests/ui/shots/ for a person to look at.
 #
+# And neither kind can tell you anything about WINDOWS. All of this runs on
+# Mono, under Xvfb; the people who use Chimera run .NET Framework WinForms.
+# That is a different toolkit, and it decides what an assignment to BackColor
+# does, whether a control repaints, and whether visual styles override either.
+# A green run here has twice coexisted with a theme that did not work on
+# Windows at all. What is Windows' own has its own harnesses, which are not
+# part of this gate because this gate runs on Linux:
+#   tests/ui/windows/live-theme-switch.sh   does choosing a theme change a
+#                                           window that is already open?
+# See docs/theming.md, "What the tests cover, and what they do not".
+#
 # Usage:
 #   ./run-ui-tests.sh              # every test project
 #   ./run-ui-tests.sh --shots      # ...and write screenshots to tests/ui/shots

@@ -65,8 +65,10 @@ namespace Chimera.Client.GUI
 
 			/// <summary>
 			/// Puts this control back the way the toolkit had it, before any theme
-			/// touched it. Built the first time the control is walked, whichever
-			/// theme that is, so it always records the toolkit's own values.
+			/// touched it. Built by <see cref="Prime"/>, which runs over the whole
+			/// window before the walk paints any of it - being walked is too late,
+			/// because by then this control's parent is already wearing the theme
+			/// and a colour this control never set reads as the parent's.
 			/// </summary>
 			public Action? Restore;
 
@@ -156,6 +158,7 @@ namespace Chimera.Client.GUI
 		/// </summary>
 		public static void Apply(Control root, Theme theme)
 		{
+			Prime(root);
 			if (root is not Form window)
 			{
 				Walk(root, theme);
@@ -166,6 +169,41 @@ namespace Chimera.Client.GUI
 			if (focused is not null && !focused.IsDisposed && focused.FindForm() == window)
 			{
 				window.ActiveControl = focused;
+			}
+		}
+
+		/// <summary>
+		/// Records what the toolkit gave every control on this window, before the
+		/// walk paints a single one of them.
+		///
+		/// It has to be a pass of its own, and this is why: a control that was
+		/// never given a colour of its own does not HAVE one - asking it returns
+		/// its parent's. The walk paints a parent before it reaches the children,
+		/// so a capture taken as each control is painted reads, for every child,
+		/// the colour the theme has just put on the parent. Recording that as "what
+		/// the toolkit gave it" and writing it back on the way out nails the theme
+		/// on for good.
+		///
+		/// That is the bug this pass exists for. Chimera starts on Dark; every
+		/// window was therefore built and captured wearing Dark; and choosing Light
+		/// afterwards changed the title bar, which is set from the theme directly,
+		/// and nothing else, which was all being "restored" to dark. It looked like
+		/// a Windows-only fault because the tests all built their windows under
+		/// Light, where the capture happens to be taken before anything is dark.
+		///
+		/// Capturing first means every value read is the one the toolkit really
+		/// gave, inherited or not, so writing it back is right again.
+		/// </summary>
+		private static void Prime(Control root)
+		{
+			if (root is null) return;
+			if (Tagged.TryGetValue(root, out var skip) && skip.Skip) return;
+			For(root).Restore ??= Capture(root);
+			foreach (Control child in root.Controls) Prime(child);
+			if (root.ContextMenuStrip is not null) For(root.ContextMenuStrip).Restore ??= Capture((Control)root.ContextMenuStrip);
+			if (root is Form form && form.MainMenuStrip is not null && !form.Controls.Contains(form.MainMenuStrip))
+			{
+				For(form.MainMenuStrip).Restore ??= Capture((Control)form.MainMenuStrip);
 			}
 		}
 
@@ -901,7 +939,10 @@ namespace Chimera.Client.GUI
 		public static void ApplyStrip(ToolStrip strip, Theme theme)
 		{
 			var state = For(strip);
-			state.Restore ??= Capture(strip);
+			// the Control capture, not the ToolStrip one: it takes the colours AND
+			// appends the renderer, so a strip reached only through here is undone
+			// the same way as one the walk reached
+			state.Restore ??= Capture((Control)strip);
 			if (IsSystemPalette(theme))
 			{
 				state.Restore!();
@@ -953,7 +994,7 @@ namespace Chimera.Client.GUI
 				case ToolStripDropDownItem drop:
 				{
 					var below = For(drop.DropDown);
-					below.Restore ??= Capture(drop.DropDown);
+					below.Restore ??= Capture((Control)drop.DropDown);
 					drop.DropDown.Renderer = ThemeToolStripRenderer.For(theme);
 					drop.DropDown.BackColor = theme[ThemeColorRole.MenuBackground];
 					drop.DropDown.ForeColor = theme[ThemeColorRole.MenuText];

@@ -21,6 +21,18 @@ namespace Chimera.Tests.Client.GUI
 	///
 	/// Both directions, because the desktop theme is the asymmetric one: it is the
 	/// only theme that has to put things BACK rather than set them.
+	///
+	/// And both BIRTHS, which took another round to learn: a window's colours are
+	/// captured the first time it is walked, so the theme it was built under is
+	/// part of its state. The round trips below could not see that - both ends of
+	/// Dark -&gt; Light -&gt; Dark are dark whether the middle worked or not - and every
+	/// test here built its windows under Light, which is the one starting point at
+	/// which the bug cannot happen. The frontend opens on Dark.
+	///
+	/// None of this can speak for Windows: it runs on Mono under Xvfb, and whether
+	/// the Windows toolkit honours what the walk sets is decided by the Windows
+	/// toolkit. That question has a harness of its own,
+	/// tests/ui/windows/live-theme-switch.sh; see docs/theming.md.
 	/// </summary>
 	[TestClass]
 	public class ThemeRoundTripTests
@@ -207,6 +219,64 @@ namespace Chimera.Tests.Client.GUI
 		public void GoingToLightAndBackLeavesTheWindowDark() => RoundTrip("Dark", "Light");
 
 		/// <summary>
+		/// The theme a window was BORN in, which is the thing the round trip above
+		/// cannot see. It photographs where the window ends up, and both ends of
+		/// Dark -&gt; Light -&gt; Dark are dark whether the middle worked or not.
+		///
+		/// The middle is the whole feature. A window born Dark and then told to be
+		/// Light has to look like one that was only ever Light - and until the
+		/// capture was fixed it did not, because a control that never had a colour
+		/// of its own reads its PARENT's, the parent had already been painted dark
+		/// by the time the child was captured, and so "put it back" wrote the dark
+		/// one in permanently.
+		///
+		/// Which is why every window in the real frontend was affected and no test
+		/// was: the tests all built their windows under Light, where the capture is
+		/// taken before anything is dark, and the frontend now starts on Dark.
+		/// </summary>
+		private static void BornThenTold(string born, string told)
+		{
+			Form travelled = null!;
+			try
+			{
+				using var wanted = Fresh(told);
+
+				ThemeLibrary.Select(born);
+				travelled = Window();
+				travelled.Show();
+				travelled.Activate();
+				ThemeEngine.Apply(travelled, ThemeLibrary.Current);
+				ThemeEngine.Apply(travelled, ThemeLibrary.Select(told));
+				using var got = Shoot(travelled);
+
+				var differences = Differences(wanted, got);
+				if (differences >= 40) Keep(wanted, got, $"born-{born}-told-{told}".ToLowerInvariant());
+				Assert.IsTrue(
+					differences < 40,
+					$"a window born on {born} and then told to be {told} does not look like one born on {told}: "
+						+ $"{differences} pixels differ. The theme a window is CHOSEN in is not the theme it was "
+						+ "built in, and what it has to be put back to is what the toolkit gave it, not what the "
+						+ "theme it was born in left behind.");
+			}
+			finally
+			{
+				travelled?.Close();
+				travelled?.Dispose();
+				ThemeLibrary.Select("Light");
+			}
+		}
+
+		/// <summary>
+		/// The one the user reported twice: Chimera starts on Dark, you choose
+		/// Light, and nothing but the title bar changes.
+		/// </summary>
+		[TestMethod]
+		public void AWindowBornDarkAndToldToBeLightLooksLight() => BornThenTold("Dark", "Light");
+
+		[TestMethod]
+		public void AWindowBornLightAndToldToBeDarkLooksDark() => BornThenTold("Light", "Dark");
+
+		/// <summary>
 		/// And the plainest form of the same question: two windows, one that has
 		/// only ever been Light and one that has been Dark and come back, must not
 		/// differ in a single control's colours.
@@ -231,6 +301,92 @@ namespace Chimera.Tests.Client.GUI
 			}
 			ThemeLibrary.Select("Light");
 			Assert.AreEqual(0, wrong.Count, "controls that did not come back:\n" + string.Join("\n", wrong));
+		}
+
+		/// <summary>
+		/// The same question asked of a REAL frontend window rather than the
+		/// assembled one above, and asked the way the frontend asks it: the window
+		/// is themed by <see cref="ThemedForm"/> when its handle is created, so
+		/// selecting the theme before it is shown is what "born in it" means here.
+		///
+		/// About is the window used because it is all layout and nothing in it
+		/// depends on a core, a project or a file on disk - the question is about
+		/// the walk, not about what the window contains.
+		/// </summary>
+		[TestMethod]
+		public void ARealWindowBornDarkAndToldToBeLightLooksLight()
+		{
+			static Bitmap Show(string born, string told)
+			{
+				ThemeLibrary.Select(born);
+				using AboutBox box = new()
+				{
+					StartPosition = FormStartPosition.Manual,
+					Location = new(0, 0),
+				};
+				box.Show();
+				box.Activate();
+				if (told != born) ThemeEngine.Apply(box, ThemeLibrary.Select(told));
+				Application.DoEvents();
+				box.Refresh();
+				Application.DoEvents();
+				Bitmap bmp = new(box.Width, box.Height);
+				using (var g = Graphics.FromImage(bmp)) g.CopyFromScreen(box.Location, Point.Empty, box.Size);
+				box.Close();
+				Application.DoEvents();
+				return bmp;
+			}
+
+			try
+			{
+				using var wanted = Show("Light", "Light");
+				using var got = Show("Dark", "Light");
+				var differences = Differences(wanted, got);
+				if (differences >= 40) Keep(wanted, got, "about-born-dark-told-light");
+				Assert.IsTrue(
+					differences < 40,
+					"the About window born Dark and then told to be Light does not look like one born Light: "
+						+ $"{differences} pixels differ.");
+			}
+			finally
+			{
+				ThemeLibrary.Select("Light");
+			}
+		}
+
+		/// <summary>
+		/// The same, control by control rather than pixel by pixel, for the window
+		/// that was born Dark: this one can say WHICH control did not come back,
+		/// which a pixel count cannot.
+		/// </summary>
+		[TestMethod]
+		public void AWindowBornDarkHasEveryControlBackOnLight()
+		{
+			ThemeLibrary.Select("Light");
+			using Form reference = Window();
+			reference.Show();
+			ThemeEngine.Apply(reference, ThemeLibrary.Current);
+			var wanted = Colours(reference);
+			reference.Close();
+
+			ThemeLibrary.Select("Dark");
+			using Form born = Window();
+			born.Show();
+			ThemeEngine.Apply(born, ThemeLibrary.Current);
+			ThemeEngine.Apply(born, ThemeLibrary.Select("Light"));
+			var got = Colours(born);
+			born.Close();
+
+			List<string> wrong = new();
+			foreach (var key in wanted.Keys)
+			{
+				if (got.TryGetValue(key, out var mine) && wanted[key] != mine)
+				{
+					wrong.Add($"{key}: a window born Light has {wanted[key]}, one born Dark has {mine}");
+				}
+			}
+			ThemeLibrary.Select("Light");
+			Assert.AreEqual(0, wrong.Count, "controls still wearing the theme they were born in:\n" + string.Join("\n", wrong));
 		}
 
 		/// <summary>Every control's colours, by a name that says where it is.</summary>

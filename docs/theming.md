@@ -248,6 +248,41 @@ manager once shipped a chosen row that was a beige bar with invisible writing
 on it, in a picture this very code had produced, while every colour read off
 every control was correct.
 
+## What the tests cover, and what they do not
+
+Worth reading before trusting a green run, because this feature has now twice
+been reported broken by its author while every test passed.
+
+`./tests/ui/run-ui-tests.sh` runs on **Linux, on Mono, under Xvfb**. Chimera's
+users run **.NET Framework WinForms on Windows**. Those are two different
+implementations of the toolkit, and the difference is not cosmetic: what an
+assignment to `BackColor` does, whether a control repaints when it is made, and
+whether visual styles override either, are all decided by the toolkit. So:
+
+- **Covered by the suite**: the theme files and their parsing; the roles and
+  their contrast; which colour every control ends up holding; and, under Mono,
+  what a window looks like as pixels - per theme, round-tripped, and for every
+  real window the shot harness can build.
+- **Not covered by the suite**: anything that is Windows'. The title bar, which
+  is a DWM call that does not exist on Linux - `TitleBarContractTests` checks
+  only that every window *asked*, via `WindowFrame.LastAskedFor`. Whether the
+  Windows toolkit honours what the walk sets. Whether a window that is already
+  open actually repaints when a person picks a theme from the menu.
+
+That last one is where both of the reported bugs lived, so it has a harness of
+its own: `tests/ui/windows/live-theme-switch.sh`. It compiles a small program
+against the frontend assemblies this tree has just built, opens a window made
+of the controls the walk treats differently, and puts it through the case the
+frontend actually lands in - born under the theme Chimera starts on, then told
+to be the other one - on real Windows, in one process. It is not part of the
+gate, because the gate runs on Linux; run it by hand from WSL after `dotnet
+build source/gui/Chimera.sln`, and run it whenever the walk changes.
+
+It photographs with `PrintWindow`, which renders the window into a bitmap of
+the program's own. That is deliberate and worth keeping: it reads no screen
+pixels, so it cannot capture anything else on the developer's desktop even by
+accident, and it works with the session locked.
+
 ## Why Light is not a new palette
 
 Light is the palette Chimera had before there were themes, written down, and it
@@ -289,6 +324,25 @@ A consequence worth knowing when adding to the walk: **anything the walk
 writes has to be captured next to the line that writes it.** A property changed
 without being recorded makes the theme one-way again, silently, and only in the
 direction nobody tests by hand.
+
+And a second one, which cost two more rounds to find: **the capture is a pass
+of its own, before the walk paints anything.** A control that was never given a
+colour of its own does not have one - asking it returns its parent's. The walk
+paints a parent before it reaches the children, so a capture taken as each
+control was painted read, for every child, the colour the theme had just put on
+its parent. That was recorded as "what the toolkit gave it" and written back on
+the way out, which nailed the theme on permanently.
+
+It was invisible for as long as the frontend opened on Light, because then the
+value being read was the right one anyway. Making Dark the default is what
+exposed it: every window was now born Dark, captured wearing Dark, and choosing
+Light put the dark colours back. What the user saw was a theme that "only works
+after restarting" - the title bar changed, because that is set from the theme
+directly rather than restored, and nothing else did. `ThemeEngine.Prime` is
+that pass, and `ThemeRoundTripTests` now asks the question the old round trip
+could not: not "does Dark and back come out Light", whose two ends are both
+Light whether the middle worked or not, but "does a window **born** Dark and
+told to be Light look like one born Light".
 
 `LightThemeBaselineTests` holds the other half - that the hex values in
 `light.json` are still the ones the code used - so that a theme which does
