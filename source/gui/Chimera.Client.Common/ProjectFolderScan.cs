@@ -101,7 +101,14 @@ namespace Chimera.Client.Common
 		}
 
 		/// <summary>every file under the folder, walking subfolders, skipping what cannot be listed</summary>
-		public static IEnumerable<string> Enumerate(string folder)
+		/// <param name="recurse">
+		/// walk sub-folders too. True is what every caller did before this
+		/// parameter existed and is still the default: somebody who points at
+		/// a firmware folder means the things under it. False is for a person
+		/// who has said so, because a folder that holds a whole collection is
+		/// a long scan and the MaxFiles cap is a blunt way to end it.
+		/// </param>
+		public static IEnumerable<string> Enumerate(string folder, bool recurse = true)
 		{
 			Queue<string> dirs = new();
 			dirs.Enqueue(folder);
@@ -112,7 +119,7 @@ namespace Chimera.Client.Common
 				try
 				{
 					files = Directory.GetFiles(dir);
-					foreach (var sub in Directory.GetDirectories(dir)) dirs.Enqueue(sub);
+					if (recurse) foreach (var sub in Directory.GetDirectories(dir)) dirs.Enqueue(sub);
 				}
 				catch (IOException) { continue; }
 				catch (UnauthorizedAccessException) { continue; }

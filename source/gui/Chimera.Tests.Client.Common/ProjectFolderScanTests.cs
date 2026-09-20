@@ -1,4 +1,5 @@
 using System.IO;
+using System.Linq;
 
 using Chimera.Client.Common;
 using Chimera.Emulation.Common.Engine;
@@ -19,6 +20,31 @@ namespace Chimera.Tests.Client.Common
 
 		[ClassCleanup(ClassCleanupBehavior.EndOfClass)]
 		public static void RemovePlayground() => Directory.Delete(_dir, recursive: true);
+
+		/// <summary>
+		/// Enumerate descends by default and stops when told not to. The
+		/// default is what every caller relied on before the parameter existed,
+		/// so a change to it would silently narrow every scan in the frontend.
+		/// </summary>
+		[TestMethod]
+		public void SubFoldersAreWalkedUnlessTheScanIsToldNotTo()
+		{
+			var root = Path.Combine(_dir, "recurse-case");
+			var nested = Path.Combine(root, "deeper", "deeper still");
+			Directory.CreateDirectory(nested);
+			var atTop = Path.Combine(root, "top.rom");
+			var buried = Path.Combine(nested, "buried.rom");
+			File.WriteAllText(atTop, "top");
+			File.WriteAllText(buried, "buried");
+
+			var withSubfolders = ProjectFolderScan.Enumerate(root).ToList();
+			CollectionAssert.Contains(withSubfolders, atTop);
+			CollectionAssert.Contains(withSubfolders, buried, "the default must still descend");
+
+			var topOnly = ProjectFolderScan.Enumerate(root, recurse: false).ToList();
+			CollectionAssert.Contains(topOnly, atTop);
+			CollectionAssert.DoesNotContain(topOnly, buried, "unticked, the scan must stay in the folder it was given");
+		}
 
 		/// <summary>a saved two-file project whose files live nowhere near it</summary>
 		private static string MakeProject(string name, out string romBytes, out string biosBytes)

@@ -126,6 +126,9 @@ namespace Chimera.Client.GUI
 		private readonly ListView _firmwareList;
 		private readonly Button _firmwareSetButton;
 		private readonly Button _firmwareClearButton;
+
+		/// <summary>whether Scan Folder walks below the folder it is given; ticked</summary>
+		private readonly CheckBox _firmwareScanSubfolders;
 		private readonly Func<string?>? _pickFirmwareFolder;
 		private List<FirmwareNeed> _firmwareNeeds = new();
 		private IReadOnlyList<FirmwareLocator.IndexedFile> _firmwareIndex = [ ];
@@ -341,7 +344,21 @@ namespace Chimera.Client.GUI
 			Button firmwareScanButton = new() { Anchor = AnchorStyles.Bottom | AnchorStyles.Left, AutoSize = true, Location = Pt(178, 344), Text = "Scan Folder..." };
 			firmwareScanButton.Click += (_, _) => ScanFirmwareFolder();
 			firmwareScanButton.Visible = pickFirmwareFolder is not null;
-			p4.Controls.AddRange([ _firmwareList, _firmwareSetButton, _firmwareClearButton, firmwareScanButton ]);
+			// Ticked, because that is what the scan always did and what somebody
+			// pointing at a firmware folder means. It is here so the behaviour is
+			// visible and so it can be turned OFF: a folder holding a whole
+			// collection takes a while, and stopping at the MaxFiles cap is a
+			// blunter way to end a scan than not descending in the first place.
+			_firmwareScanSubfolders = new CheckBox
+			{
+				Anchor = AnchorStyles.Bottom | AnchorStyles.Left,
+				AutoSize = true,
+				Checked = true,
+				Location = Pt(268, 348),
+				Text = "Include sub-folders",
+				Visible = pickFirmwareFolder is not null,
+			};
+			p4.Controls.AddRange([ _firmwareList, _firmwareSetButton, _firmwareClearButton, firmwareScanButton, _firmwareScanSubfolders ]);
 
 			// ---- page 5: the code the core compiles for this game -----------------
 			var p5 = _pages[4];
@@ -2032,7 +2049,7 @@ namespace Chimera.Client.GUI
 			try
 			{
 				var found = Chimera.Client.Common.ProjectFolderScan
-					.Enumerate(folder)
+					.Enumerate(folder, recurse: _firmwareScanSubfolders?.Checked is not false)
 					.Take(Chimera.Client.Common.ProjectFolderScan.MaxFiles)
 					.ToList();
 				// one hashed index answers every pinned requirement
