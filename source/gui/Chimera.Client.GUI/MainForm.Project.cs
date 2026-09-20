@@ -146,6 +146,14 @@ namespace Chimera.Client.GUI
 		private EngineProject RunNewProjectWizard(string startFrom = null)
 		{
 			ScanForCorePackages();
+			// Where each of the wizard's pickers opens. Config > Paths is an
+			// answer the person has already given, so a picker that ignores it
+			// and reopens wherever the process last happened to be sends them
+			// browsing for a folder they have already named (chimera#114). A
+			// configured folder that does not exist is no use as a starting
+			// point, so in that case the dialog is left to its own default.
+			string OpensIn(string configured)
+				=> !string.IsNullOrWhiteSpace(configured) && Directory.Exists(configured) ? configured : "";
 			using NewProjectWizard wizard = new(
 				_discoveredCorePackages,
 				pickFiles: slot =>
@@ -154,6 +162,7 @@ namespace Chimera.Client.GUI
 					{
 						Multiselect = true,
 						Title = $"Add to {slot.Title}",
+						InitialDirectory = OpensIn(Config.PathEntries.RomAbsolutePath()),
 						Filter = ProjectSlotDeclaration.FilterFor(slot) is { } filter
 							? $"{slot.Title} ({filter})|{filter}|All files (*.*)|*.*"
 							: "All files (*.*)|*.*",
@@ -162,7 +171,11 @@ namespace Chimera.Client.GUI
 				},
 				pickFirmwareFile: title =>
 				{
-					using OpenFileDialog dialog = new() { Title = title };
+					using OpenFileDialog dialog = new()
+					{
+						Title = title,
+						InitialDirectory = OpensIn(Config.PathEntries.FirmwareAbsolutePath()),
+					};
 					return dialog.ShowDialog(this) is DialogResult.OK ? dialog.FileName.WithoutWslgMirror() : null;
 				},
 				firmwareSearchDirs: [ Config.PathEntries.FirmwareAbsolutePath() ],
@@ -171,6 +184,7 @@ namespace Chimera.Client.GUI
 					using FolderBrowserEx picker = new()
 					{
 						Description = "Scan a folder for firmware files",
+						SelectedPath = OpensIn(Config.PathEntries.FirmwareAbsolutePath()),
 					};
 					return picker.ShowDialog(this) is DialogResult.OK ? picker.SelectedPath.WithoutWslgMirror() : null;
 				},

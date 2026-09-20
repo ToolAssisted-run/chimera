@@ -485,14 +485,27 @@ namespace Chimera.Client.GUI
 			using FirmwareSurveyForm form = new(
 				Survey,
 				(row, path) => CoreFirmwareStore.Remember(Config, row.CoreName, row.Decl, path),
+				// Both pickers open in the firmware folder Config > Paths names,
+				// which is the folder this whole form is about (chimera#114);
+				// a folder that is not there is no starting point, so then the
+				// dialog keeps its own default.
 				pickFile: title =>
 				{
-					using OpenFileDialog picker = new() { Title = title, Filter = "All Files|*.*" };
+					using OpenFileDialog picker = new()
+					{
+						Title = title,
+						Filter = "All Files|*.*",
+						InitialDirectory = Directory.Exists(firmwareFolder) ? firmwareFolder : "",
+					};
 					return picker.ShowDialog(this) is DialogResult.OK ? picker.FileName.WithoutWslgMirror() : null;
 				},
 				pickFolder: () =>
 				{
-					using FolderBrowserEx picker = new() { Description = "Scan a folder for firmware files" };
+					using FolderBrowserEx picker = new()
+					{
+						Description = "Scan a folder for firmware files",
+						SelectedPath = Directory.Exists(firmwareFolder) ? firmwareFolder : "",
+					};
 					return picker.ShowDialog(this) is DialogResult.OK ? picker.SelectedPath.WithoutWslgMirror() : null;
 				},
 				scanFolder: folder =>
