@@ -1,4 +1,4 @@
-using System.ComponentModel;
+﻿using System.ComponentModel;
 
 using NLua;
 using Chimera.Emulation.Common;
@@ -62,8 +62,12 @@ namespace Chimera.Client.Common
 		private Exception MemoryCallbacksNotImplemented(bool isWildcard, bool execute)
 			=> new InvalidOperationException(
 				$"{Emulator.Attributes().CoreName} does not implement {(isWildcard ? "wildcard " : string.Empty)}memory {(execute ? "execute " : string.Empty)}callbacks. "
-				+ "No Chimera core does: a core runs as a waterbox guest, and that ABI is one FrameAdvance call per frame with no re-entry, "
-				+ "so a core cannot stop part way through a frame to run a callback. Remove the registration or guard it.");
+				+ "Memory callbacks are a core-by-core feature: a core has them when it carries the memory hook, which is the core "
+				+ "watching its own addresses and calling out only when the machine touches one. A core that emulates its CPU by "
+				+ (execute
+					? "interpretation can see every instruction fetch; one that recompiles usually cannot, which is why it may have read and write callbacks but not execute ones. "
+					: "interpretation can carry it; one that recompiles into host code usually cannot. ")
+				+ "Remove the registration or guard it.");
 
 		private Exception ScopeNotAvailable(string scope)
 			=> new InvalidOperationException(
@@ -116,8 +120,8 @@ namespace Chimera.Client.Common
 		private Exception InputPollCallbacksNotImplemented()
 			=> new InvalidOperationException(
 				$"{Emulator.Attributes().CoreName} does not implement input polling callbacks. "
-				+ "No Chimera core does: a core runs as a waterbox guest, and that ABI is one FrameAdvance call per frame with no re-entry, "
-				+ "so a core cannot stop part way through a frame to run a callback. Remove the registration or guard it.");
+				+ "No Chimera core does yet: unlike the memory hook, nothing tells a core to report the moment it reads a controller. "
+				+ "Remove the registration or guard it.");
 
 		[LuaDeprecatedMethod]
 		[LuaMethod("onmemoryexecute", "Fires immediately before the given address is executed by the core. Your callback can have 3 parameters {{(addr, val, flags)}}. {{val}} is the value to be executed (or {{0}} always, if this feature is only partially implemented).")]

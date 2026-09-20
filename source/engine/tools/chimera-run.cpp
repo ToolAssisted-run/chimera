@@ -189,6 +189,23 @@ std::vector<std::string> utf8Arguments()
 
 } // namespace
 
+/* --memhook's sink. It counts rather than prints: an execute callback on a
+ * busy address fires tens of thousands of times a frame, and a gate wants the
+ * number, not the log. The value is never replaced - a gate must measure the
+ * machine it would have had. */
+static uint64_t g_memhookHits = 0;
+static uint64_t g_memhookWrongAddr = 0;
+static int64_t g_memhookFirstAddr = -1;
+static int64_t g_memhookWatched = -1;  /* -1 until --memhook names one address */
+
+static int64_t memhookSink(int32_t, uint32_t addr, uint32_t, uint32_t, void *)
+{
+	g_memhookHits++;
+	if (g_memhookFirstAddr < 0) g_memhookFirstAddr = static_cast<int64_t>(addr);
+	if (g_memhookWatched >= 0 && static_cast<int64_t>(addr) != g_memhookWatched) g_memhookWrongAddr++;
+	return -1; // leave the value alone
+}
+
 int main(int argc, char **argv)
 {
 #if defined(_WIN32)
@@ -206,6 +223,11 @@ int main(int argc, char **argv)
 	const char *settings = nullptr;
 	std::string metaPath;
 	std::vector<std::pair<std::string, std::string>> dumps; // domain -> path
+	/* --memhook <scope>:<addr>:<rwx>, repeatable. Registers a memory callback
+	 * and counts what it sees, which is how a gate holds the feature to
+	 * working rather than to compiling: a run that reports 0 is a run where
+	 * the callbacks silently did nothing. */
+	std::vector<std::string> memhooks;
 	std::map<int64_t, std::string> shots; // frame -> TGA path
 	std::vector<std::pair<std::string, std::string>> firmwareArgs; // id -> path
 	std::map<int64_t, std::string> stateOuts; // frame -> state path
@@ -315,6 +337,7 @@ int main(int argc, char **argv)
 		else if (arg == "--settings" && i + 1 < argc) settings = argv[++i];
 		else if (arg == "--export-savedata" && i + 1 < argc) savedataDir = argv[++i];
 		else if (arg == "--meta" && i + 1 < argc) metaPath = argv[++i];
+		else if (arg == "--memhook" && i + 1 < argc) memhooks.emplace_back(argv[++i]);
 		else if (arg == "--project" && i + 1 < argc) projectPath = argv[++i];
 		else if (arg == "--files" && i + 1 < argc) fileDirs.push_back(argv[++i]);
 		else if (arg == "--allow-core-mismatch") allowCoreMismatch = true;
@@ -382,7 +405,7 @@ int main(int argc, char **argv)
 	bool projectMode = !projectPath.empty();
 	if (projectMode ? packagePath == nullptr : moviePath == nullptr)
 	{
-		std::fprintf(stderr, "usage: chimera-run <package> <rom> <movie.txt> [--rerecord] [--seek <frame>] [--play <n>] [--edit-from <movie>] [--stop-at-seek] [--bands n,m,ms,fs,anchor] [--record <out.txt>] [--settings <json>] [--dump <domain>=<path>]... [--firmware <id>=<path>]... [--state <path>] [--frames <n>] [--save-state <frame>=<path>]... [--screenshot <frame>=<path>]... [--export-savedata <dir>] [--meta <path>] [--gpu] [--draw-every-frame]\n"
+		std::fprintf(stderr, "usage: chimera-run <package> <rom> <movie.txt> [--rerecord] [--seek <frame>] [--play <n>] [--edit-from <movie>] [--stop-at-seek] [--bands n,m,ms,fs,anchor] [--record <out.txt>] [--settings <json>] [--dump <domain>=<path>]... [--firmware <id>=<path>]... [--state <path>] [--frames <n>] [--save-state <frame>=<path>]... [--screenshot <frame>=<path>]... [--export-savedata <dir>] [--meta <path>] [--memhook <scope>:<addr>:<rwx>]... [--gpu] [--draw-every-frame]\n"
 			"       chimera-run --project <p.chimeraProject> <package> [--files <dir>]... [--allow-core-mismatch] [the same run flags]\n");
 		return 1;
 	}
@@ -617,6 +640,48 @@ int main(int argc, char **argv)
 	if (session == nullptr) return fail(metaPath, error != nullptr ? error : "session open failed");
 
 	if (drawEveryFrame) ce_session_draw_every_frame(session, 1);
+
+	if (!memhooks.empty())
+	{
+		if (ce_session_memhook_available(session) == 0)
+		{
+			return fail(metaPath, "--memhook: this core exports no memory hook");
+		}
+		ce_memhook_set_sink(memhookSink, nullptr);
+		for (const std::string &spec : memhooks)
+		{
+			// <scope>:<addr>:<rwx>; addr "*" watches every address in the scope
+			const size_t c1 = spec.find(':'), c2 = spec.rfind(':');
+			if (c1 == std::string::npos || c1 == c2)
+			{
+				return fail(metaPath, "--memhook wants <scope>:<addr>:<rwx>");
+			}
+			const std::string scopeName = spec.substr(0, c1);
+			const std::string addrText = spec.substr(c1 + 1, c2 - c1 - 1);
+			const std::string rwx = spec.substr(c2 + 1);
+			int32_t scope = -1;
+			for (int32_t i2 = 0; i2 < ce_session_memhook_scope_count(session); i2++)
+			{
+				const char *n = ce_session_memhook_scope_name(session, i2);
+				if (n != nullptr && scopeName == n) { scope = i2; break; }
+			}
+			if (scope < 0) return fail(metaPath, "--memhook: no scope named '" + scopeName + "'");
+			int32_t flags = 0;
+			if (rwx.find('r') != std::string::npos) flags |= CE_MEMHOOK_READ;
+			if (rwx.find('w') != std::string::npos) flags |= CE_MEMHOOK_WRITE;
+			if (rwx.find('x') != std::string::npos) flags |= CE_MEMHOOK_EXEC;
+			if (flags == 0) return fail(metaPath, "--memhook: <rwx> named no access");
+			const int64_t addr = addrText == "*" ? -1 : std::strtoll(addrText.c_str(), nullptr, 0);
+			/* one watched address means the sink can also check that nothing
+			 * ELSE arrives, which is what separates "the hook fires" from
+			 * "the hook fires for the right address" */
+			g_memhookWatched = memhooks.size() == 1 ? addr : -1;
+			if (ce_session_memhook_watch(session, scope, addr, flags) == 0)
+			{
+				return fail(metaPath, "--memhook: the core would not watch '" + spec + "'");
+			}
+		}
+	}
 
 	int64_t frames = ce_movie_log_count(movie);
 
@@ -1194,6 +1259,12 @@ int main(int argc, char **argv)
 	{
 		std::string meta = "status=OK\ndetail=\nframes=" + std::to_string(frames) + "\nstartframe=0\n";
 		writeWholeFile(metaPath, reinterpret_cast<const uint8_t *>(meta.data()), meta.size());
+	}
+	if (!memhooks.empty())
+	{
+		std::printf("memhookHits=%llu\nmemhookWrongAddr=%llu\nmemhookFirstAddr=%lld\nmemhookCrossings=%llu\n",
+			(unsigned long long)g_memhookHits, (unsigned long long)g_memhookWrongAddr,
+			(long long)g_memhookFirstAddr, (unsigned long long)ce_memhook_calls());
 	}
 	std::printf("frames=%lld\n", static_cast<long long>(frames));
 	ce_movie_log_free(movie);

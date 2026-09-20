@@ -438,6 +438,9 @@ namespace Chimera.Emulation.Common.Waterbox
 			// The engine's own teardown drains the writer as well - this is the
 			// one that can still report a failure.
 			if (!_session.Disposed) _session.HistorySaveWait();
+			// The guest is about to go; the engine must stop being told where
+			// to report a match before it does.
+			_memoryCallbacks?.Dispose();
 			_resampler?.Dispose();
 			_session.Dispose();
 		}

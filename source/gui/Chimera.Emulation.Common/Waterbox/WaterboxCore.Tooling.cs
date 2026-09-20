@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text;
 
@@ -28,6 +28,7 @@ namespace Chimera.Emulation.Common.Waterbox
 		private int[][] _surfaceBuffs = [ ];
 		private string[] _regNames = [ ];
 		private ITraceSink? _traceSink;
+		private WaterboxMemoryCallbacks? _memoryCallbacks;
 		private bool _traceOverflowed;
 
 		/// <summary>
@@ -68,8 +69,13 @@ namespace Chimera.Emulation.Common.Waterbox
 					1));
 			}
 
+			/* The memory hook is the fourth thing IDebuggable can back, so it
+			 * is probed before the service is dropped: a core with a hook and
+			 * no registers still has callbacks. */
+			if (_session.MemHookAvailable) _memoryCallbacks = new WaterboxMemoryCallbacks(_session);
+
 			if (surfaces is 0) services.Unregister<ICoreSurfaces>();
-			if (_regNames.Length is 0) services.Unregister<IDebuggable>();
+			if (_regNames.Length is 0 && _memoryCallbacks is null) services.Unregister<IDebuggable>();
 			if (!_session.TraceAvailable) services.Unregister<ITraceable>();
 			if (!_session.SaveDataAvailable) services.Unregister<ICoreSaveData>();
 		}
@@ -125,10 +131,17 @@ namespace Chimera.Emulation.Common.Waterbox
 			throw new InvalidOperationException($"no such register: {register}");
 		}
 
-		// Breakpoints and stepping would need the guest to give up control mid-frame,
-		// which the waterbox ABI (one FrameAdvance call, no re-entry) doesn't allow.
+		/// <summary>
+		/// The memory callbacks, when the core exports the memory-hook group.
+		/// The watched addresses live in the GUEST (engine.h, "memory
+		/// callbacks"): nothing managed runs on an access that matches
+		/// nothing. A core that does not export the group has none, and says
+		/// so by name rather than handing a script a callback that never
+		/// fires.
+		/// </summary>
 		public IMemoryCallbackSystem MemoryCallbacks
-			=> throw new NotImplementedException("waterbox cores do not support memory callbacks");
+			=> _memoryCallbacks ?? throw new NotImplementedException(
+				$"{_cfg.CoreName} does not implement memory callbacks: its core.wbx exports no memory hook");
 
 		public bool CanStep(StepType type) => false;
 

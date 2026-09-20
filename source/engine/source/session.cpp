@@ -302,6 +302,8 @@ bool composeSettings(const std::string &defaultsJson, const char *overrides, std
  * CE_GL_BRIDGE answers that it has no context and nothing here happens. */
 extern "C" int32_t ce_gl_start(char *error_out, int32_t error_len);
 extern "C" uintptr_t ce_cache_dispatch(uintptr_t op, uintptr_t a, uintptr_t b, uintptr_t c, uintptr_t d, uintptr_t e);
+/* source/engine/source/mem_hook.cpp - the memory callbacks' seam */
+extern "C" uintptr_t ce_memhook_dispatch(uintptr_t op, uintptr_t a, uintptr_t b, uintptr_t c, uintptr_t d, uintptr_t e);
 
 /* precompile sessions: asked for before open, like the GPU */
 static int32_t s_precompileIndex = 0, s_precompileCount = 0, s_precompileFirmware = 1;
@@ -445,6 +447,25 @@ struct ce_session
 	std::vector<std::string> busNames;
 	std::vector<int64_t> busSizes;
 	std::vector<bool> busWritables;
+	/* memory hook (docs/porting-a-core.md): the watched addresses live in the
+	 * GUEST, so an access that matches nothing never crosses the sandbox. The
+	 * engine keeps the list only so it can be re-asserted - a core is free to
+	 * keep its table in ordinary memory, where a state load would replace it. */
+	bool memHookInstalled = false;
+	void (*memHookClear)() = nullptr;
+	int32_t (*memHookWatch)(int32_t, int64_t, int32_t) = nullptr;
+	int32_t memHookExecutes = 0;
+	std::vector<std::string> memHookScopeNames;
+	std::vector<int64_t> memHookScopeSizes;
+	struct MemHookWatch { int32_t scope; int64_t addr; int32_t flags; };
+	std::vector<MemHookWatch> memHookWatches;
+	void memHookReassert()
+	{
+		if (memHookClear == nullptr || memHookWatch == nullptr) return;
+		memHookClear();
+		for (const auto &w : memHookWatches) memHookWatch(w.scope, w.addr, w.flags);
+	}
+
 	// savedata export (docs/save-data.md); a snapshot maps engine index ->
 	// guest index because entries with unclean paths are dropped here
 	int32_t (*sdCount)() = nullptr;
@@ -718,6 +739,44 @@ void ce_session::probeOptionalGroups()
 			}
 			busPeek = peek;
 			busPoke = poke;
+		}
+	}
+
+	/* memory hook: the scope list plus the two setters, all or nothing. A core
+	 * that exports only some of them would leave a script able to register a
+	 * callback that could never be told to fire. */
+	{
+		auto count = reinterpret_cast<int32_t (*)()>(opt("GetMemHookScopeCount", 0));
+		auto name = reinterpret_cast<uintptr_t (*)(int32_t)>(opt("GetMemHookScopeName", 1));
+		auto clear = reinterpret_cast<void (*)()>(opt("ClearMemHookWatches", 0));
+		auto watch = reinterpret_cast<int32_t (*)(int32_t, int64_t, int32_t)>(opt("SetMemHookWatch", 3));
+		if (memHookInstalled && (count == nullptr || name == nullptr || clear == nullptr || watch == nullptr))
+		{
+			/* SetMemHook without the rest is a core half-way through the port,
+			 * and silence there is what the whole feature exists to avoid:
+			 * a script would register a callback that could never fire. */
+			fprintf(stderr, "%s: exports SetMemHook but not the whole memory-hook group "
+				"(GetMemHookScopeCount/Name, ClearMemHookWatches, SetMemHookWatch) - no memory callbacks\n",
+				cfg.coreName.c_str());
+		}
+		if (count != nullptr && name != nullptr && clear != nullptr && watch != nullptr && memHookInstalled)
+		{
+			auto size = reinterpret_cast<int64_t (*)(int32_t)>(opt("GetMemHookScopeSize", 1));
+			auto executes = reinterpret_cast<int32_t (*)()>(opt("GetMemHookExecutes", 0));
+			const int32_t n = count();
+			for (int32_t i = 0; i < n; i++)
+			{
+				const char *sn = cstr(name(i));
+				memHookScopeNames.emplace_back(sn != nullptr ? sn : ("Scope " + std::to_string(i)));
+				memHookScopeSizes.push_back(size != nullptr ? size(i) : 0x10000);
+			}
+			/* A core with no exec hook still gets read and write callbacks;
+			 * the frontend refuses the exec ones by name rather than
+			 * registering something that never fires. */
+			memHookExecutes = executes != nullptr ? executes() : 0;
+			memHookClear = clear;
+			memHookWatch = watch;
+			clear(); // nothing is watched until a script says so
 		}
 	}
 
@@ -1289,6 +1348,29 @@ ce_session *ce_session_open(
 		}
 	}
 
+	/* The memory hook, before Init for the same reason the cache bridge is:
+	 * the pointer the guest stores must be in the sealed baseline, so it is
+	 * the same in every run. It is a FIXED slot address (miniBox hands out
+	 * 0x35f00000300 + slot*16), never a host pointer, so a savestate carrying
+	 * it says the same thing in the next process. Slot 0 is the GPU bridge,
+	 * slot 1 the compile cache. */
+	{
+		std::string ignored;
+		auto setHook = reinterpret_cast<void (*)(uint64_t)>(s->proc("SetMemHook", 1, false, ignored));
+		if (setHook != nullptr)
+		{
+			chimera::WbxReturn r;
+			host->wbx_get_callback_addr(s->obj, reinterpret_cast<void *>(&ce_memhook_dispatch), 2, &r);
+			if (!r.ok() || r.data == 0)
+				fprintf(stderr, "chimera memory hook: the sandbox would not take the callback\n");
+			else
+			{
+				setHook(static_cast<uint64_t>(r.data));
+				s->memHookInstalled = true;
+			}
+		}
+	}
+
 	/* A precompile session: the core boots, compiles its share and stops. */
 	if (s_precompileCount > 0)
 	{
@@ -1642,6 +1724,13 @@ static void afterStateLoaded(ce_session *s)
 		s->traceSetEnabled(s->traceDesired ? 1 : 0);
 		if (s->traceClear != nullptr) s->traceClear();
 	}
+
+	/* ...and the watched addresses, for the same reason. This core keeps its
+	 * table in invisible memory, where a load cannot reach it, but that is the
+	 * core's choice and not something the engine may assume: a core that keeps
+	 * the table in ordinary memory has just had it replaced by whatever the
+	 * state was made with. Re-asserting costs one call per watch, per load. */
+	s->memHookReassert();
 }
 
 const uint8_t *ce_session_save_state(ce_session *s, uint64_t *len_out)
@@ -2216,6 +2305,57 @@ int64_t ce_session_savedata_read(ce_session *s, int32_t index, int64_t offset, u
 int32_t ce_session_trace_available(const ce_session *s) { return s->traceSetEnabled != nullptr ? 1 : 0; }
 
 const char *ce_session_trace_header(const ce_session *s) { return s->traceHeader.c_str(); }
+
+/* ---- the memory hook ----
+ *
+ * The frontend names addresses; the GUEST compares them. Nothing here runs per
+ * access: registering is rare, a match is rare, an access is constant.
+ */
+
+int32_t ce_session_memhook_available(const ce_session *s)
+{
+	return s != nullptr && s->memHookWatch != nullptr ? 1 : 0;
+}
+
+int32_t ce_session_memhook_executes(const ce_session *s)
+{
+	return s != nullptr ? s->memHookExecutes : 0;
+}
+
+int32_t ce_session_memhook_scope_count(const ce_session *s)
+{
+	return s != nullptr ? static_cast<int32_t>(s->memHookScopeNames.size()) : 0;
+}
+
+const char *ce_session_memhook_scope_name(const ce_session *s, int32_t index)
+{
+	if (s == nullptr || index < 0 || static_cast<size_t>(index) >= s->memHookScopeNames.size()) return nullptr;
+	return s->memHookScopeNames[static_cast<size_t>(index)].c_str();
+}
+
+int64_t ce_session_memhook_scope_size(const ce_session *s, int32_t index)
+{
+	if (s == nullptr || index < 0 || static_cast<size_t>(index) >= s->memHookScopeSizes.size()) return 0;
+	return s->memHookScopeSizes[static_cast<size_t>(index)];
+}
+
+void ce_session_memhook_clear(ce_session *s)
+{
+	if (s == nullptr) return;
+	s->memHookWatches.clear();
+	if (s->memHookClear != nullptr) s->memHookClear();
+}
+
+int32_t ce_session_memhook_watch(ce_session *s, int32_t scope, int64_t addr, int32_t flags)
+{
+	if (s == nullptr || s->memHookWatch == nullptr) return 0;
+	if (scope < 0 || static_cast<size_t>(scope) >= s->memHookScopeNames.size()) return 0;
+	if ((flags & 7) == 0) return 0;
+	if (addr >= 0 && addr >= s->memHookScopeSizes[static_cast<size_t>(scope)]) return 0;
+	if (s->memHookWatch(scope, addr, flags & 7) == 0) return 0;
+	s->memHookWatches.push_back({ scope, addr, flags & 7 });
+	return 1;
+}
 
 void ce_session_trace_enable(ce_session *s, int32_t on)
 {

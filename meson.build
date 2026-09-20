@@ -286,6 +286,7 @@ engine_inc = include_directories('source/engine/include')
 engine_src = files(
   'source/engine/source/engine.cpp',
   'source/engine/source/cache_bridge.cpp',
+  'source/engine/source/mem_hook.cpp',
   'source/engine/source/movie_log.cpp',
   'source/engine/source/movie_text.cpp',
   'source/engine/source/state_container.cpp',

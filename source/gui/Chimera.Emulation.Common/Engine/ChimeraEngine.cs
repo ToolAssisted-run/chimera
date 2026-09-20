@@ -807,6 +807,36 @@ namespace Chimera.Emulation.Common.Engine
 		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract void ce_session_bus_poke(IntPtr session, int index, int addr, int value);
 
+		// the memory hook: the watched addresses live in the GUEST, so nothing
+		// here runs per access - see engine.h "memory callbacks"
+		/// <summary>fn is a Cdecl (addr, value, flags, user) function pointer returning -1 to leave the value alone, or zero to stop the calls</summary>
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract void ce_memhook_set_sink(IntPtr fn, IntPtr user);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract ulong ce_memhook_calls();
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract int ce_session_memhook_available(IntPtr session);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract int ce_session_memhook_executes(IntPtr session);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract int ce_session_memhook_scope_count(IntPtr session);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_session_memhook_scope_name(IntPtr session, int index);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract long ce_session_memhook_scope_size(IntPtr session, int index);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract void ce_session_memhook_clear(IntPtr session);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract int ce_session_memhook_watch(IntPtr session, int scope, long addr, int flags);
+
 		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_session_trace_available(IntPtr session);
 
@@ -2239,6 +2269,24 @@ namespace Chimera.Emulation.Common.Engine
 		public bool BusWritable(int index) => E.ce_session_bus_writable(_session, index) is not 0;
 		public byte BusPeek(int index, int addr) => unchecked((byte)E.ce_session_bus_peek(_session, index, addr));
 		public void BusPoke(int index, int addr, byte value) => E.ce_session_bus_poke(_session, index, addr, value);
+
+		/// <summary>Whether the running core exports the memory-hook group (engine.h "memory callbacks").</summary>
+		public bool MemHookAvailable => E.ce_session_memhook_available(_session) is not 0;
+		/// <summary>Whether it can also see instruction fetches.</summary>
+		public bool MemHookExecutes => E.ce_session_memhook_executes(_session) is not 0;
+		public int MemHookScopeCount => E.ce_session_memhook_scope_count(_session);
+		public string MemHookScopeName(int index)
+			=> ChimeraEngine.PtrToStringUtf8(E.ce_session_memhook_scope_name(_session, index)) ?? $"Scope {index}";
+		public long MemHookScopeSize(int index) => E.ce_session_memhook_scope_size(_session, index);
+		/// <summary>Forgets every watch, here and in the guest.</summary>
+		public void MemHookClear() => E.ce_session_memhook_clear(_session);
+		/// <summary>Watches one address (addr &lt; 0: every address in the scope). False when the core would not take it.</summary>
+		public bool MemHookWatch(int scope, long addr, int flags)
+			=> E.ce_session_memhook_watch(_session, scope, addr, flags) is not 0;
+		/// <summary>How many matches have crossed the sandbox since the process started.</summary>
+		public static ulong MemHookCalls => ChimeraEngine.Instance.ce_memhook_calls();
+		/// <summary>Where a match is reported; zero stops the calls.</summary>
+		public static void MemHookSetSink(IntPtr fn, IntPtr user) => ChimeraEngine.Instance.ce_memhook_set_sink(fn, user);
 
 		public bool TraceAvailable => E.ce_session_trace_available(_session) is not 0;
 		public string TraceHeader => ChimeraEngine.PtrToStringUtf8(E.ce_session_trace_header(_session)) ?? "Instructions";

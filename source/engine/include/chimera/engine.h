@@ -1179,6 +1179,88 @@ CE_API const uint8_t *ce_session_trace_drain(
 	ce_session *s, uint64_t *len_out, int32_t *line_count_out, int32_t *overflow_out);
 
 
+/* ---- memory callbacks (the memory hook) ----
+ *
+ * A debugger wants to be told when the machine reads, writes or executes an
+ * address. The cost of that is decided by WHERE THE ADDRESS COMPARISON LIVES.
+ * Doing it in the host means a sandbox crossing on every access, which is a
+ * crossing per emulated cycle and makes a hooked run unusable. So it lives in
+ * the GUEST: the engine names what to watch, the core compares, and only a
+ * MATCH crosses. A run that watches nothing pays nothing.
+ *
+ * This is an OPTIONAL GROUP. A core opts in by exporting
+ *
+ *   void SetMemHook(uint64_t bridge)        // before Init, like SetCacheBridge
+ *   int  GetMemHookScopeCount(void)
+ *   const char *GetMemHookScopeName(int)    // "System Bus", "CPU", ...
+ *   int64_t GetMemHookScopeSize(int)        // optional; 0x10000 assumed
+ *   int  GetMemHookExecutes(void)           // optional; 0 assumed
+ *   void ClearMemHookWatches(void)
+ *   int  SetMemHookWatch(int scope, int64_t addr, int flags)  // addr<0 = every address
+ *
+ * All but the two optional ones, or none: a core that exported half of them
+ * would let a script register a callback that could never be told to fire.
+ * ce_session_memhook_available answers for the core that is running, and the
+ * frontend refuses by name when it answers no. A core that cannot see its own
+ * instruction fetches (a recompiler with no interpreter) exports
+ * GetMemHookExecutes returning 0 and still gets read and write callbacks.
+ *
+ * The table a core keeps SHOULD live outside its savestate (emulibc's
+ * ECL_INVISIBLE), so a watched machine and an unwatched one produce identical
+ * states. The engine re-asserts every watch after each state load anyway, for
+ * cores that cannot do that.
+ *
+ * WHAT IT COSTS THE MACHINE. Nothing, while no callback returns a value. A
+ * callback that REPLACES a value changes what the machine does, and that
+ * change is not in the movie: a movie recorded with such a script replayed
+ * without it desyncs. This is a research tool, used before a TAS is made
+ * (user-decided, 2026-09-20).
+ *
+ * Re-emulation fires callbacks again: a seek or a rewind replays frames, and
+ * a script counting accesses counts them once per replay, not once per frame.
+ */
+
+/* flags, on a watch and on a call */
+#define CE_MEMHOOK_READ 1
+#define CE_MEMHOOK_WRITE 2
+#define CE_MEMHOOK_EXEC 4
+
+/* What a match is reported to. `scope` is the index into the scope list.
+ * Returns -1 to leave the value alone, or the replacement value
+ * (0..0xFFFFFFFF). Called on the thread that is advancing
+ * the frame, with the machine stopped mid-access: it may peek and poke the
+ * machine's memory, and must not advance it or load a state. */
+typedef int64_t (*ce_memhook_fn)(int32_t scope, uint32_t addr, uint32_t value, uint32_t flags, void *user);
+
+/* One sink for the process, like the progress sink: one machine runs at a
+ * time, and `user` says which of the caller's objects a call belongs to.
+ * NULL stops the calls (the guest keeps comparing until the watches are
+ * cleared, so clear them too). */
+CE_API void ce_memhook_set_sink(ce_memhook_fn fn, void *user);
+
+/* How many matches have crossed since the process started - a gate's way to
+ * prove a callback fired without trusting the script that printed it. */
+CE_API uint64_t ce_memhook_calls(void);
+
+/* 1 when the running core exports the group. */
+CE_API int32_t ce_session_memhook_available(const ce_session *s);
+/* 1 when it can also see instruction fetches. */
+CE_API int32_t ce_session_memhook_executes(const ce_session *s);
+CE_API int32_t ce_session_memhook_scope_count(const ce_session *s);
+/* Borrowed; NULL when out of range. */
+CE_API const char *ce_session_memhook_scope_name(const ce_session *s, int32_t index);
+CE_API int64_t ce_session_memhook_scope_size(const ce_session *s, int32_t index);
+
+/* Forgets every watch, in the engine and in the guest. */
+CE_API void ce_session_memhook_clear(ce_session *s);
+/* Watches one address (addr < 0: every address in the scope) for the given
+ * flags. Returns 1 when the core took it, 0 when the scope or the address is
+ * not one it has. Watches ACCUMULATE; there is no unwatch - the frontend
+ * clears and re-adds what is left, because a core cannot know whether two
+ * scripts wanted the same address. */
+CE_API int32_t ce_session_memhook_watch(ce_session *s, int32_t scope, int64_t addr, int32_t flags);
+
+
 /* ---- the session's movie ----
  *
  * The session can carry the movie itself: the input log lives inside the

@@ -4000,3 +4000,107 @@ built a window and died inside it on the project that was not there.
 `getrecording`, `setrecording`, `togglerecording`, `setbranchtext` and
 `get_branch_index_by_id` now answer the way the rest of the library already
 did: false, nil, or nothing done.
+
+## Memory callbacks are the core watching itself (user-decided, 2026-09-20)
+
+`event.on_bus_read`, `on_bus_write`, `on_bus_exec` and `on_bus_exec_any` had
+never worked, for any core. Every Chimera core is a waterbox guest, and
+`WaterboxCore.MemoryCallbacks` threw `NotImplementedException` with a comment
+saying why: the ABI is one `FrameAdvance` per frame with no re-entry, so a
+guest cannot hand control back part way through a frame.
+
+That reason was wrong, and had been wrong since the GPU bridge landed. A guest
+CANNOT return from `FrameAdvance` early - that much is true, and miniBox's only
+path out of a frame is the death escape in `guarded.S`, which is terminal. But
+it does not need to. It can CALL OUT, through the sandbox's external-callback
+slot, and carry on when the call returns; the machine spec allows two levels of
+that (guest -> host -> guest, on the alt stack pair), and two bridges already
+use it - the GPU bridge tens of thousands of times a frame, the compile cache
+whenever a core wants a compiled object. A memory callback is the same shape.
+The vsched schedulers the heavy cores carry are not the seam and never were:
+they switch between threads INSIDE the guest and never reach the host.
+
+So the decision (Sergio, 2026-09-20): scope it and build it. Backwards
+reproducibility is not a concern, and determinism is not much of one either -
+people use this for research, before there is a TAS to keep.
+
+**Where the comparison lives is the whole design.** The report that started
+this (chimera#113, against BizHawk's Octoshock) is not about callbacks being
+slow. It is about a core that, while ANY execute callback exists, calls managed
+code on EVERY instruction so that the managed side can check the address. The
+cost is one boundary crossing per emulated cycle, and for us that boundary is a
+sandbox. So the addresses go in the GUEST: the engine names what to watch, the
+core compares, and only a match crosses. Chimera's own rule (thin C#, heavy
+C++) says the same thing one layer up - and here it says it twice, because the
+comparison does not belong in the ENGINE either.
+
+quickerNES is the first core to carry it. It keeps one byte per CPU address -
+64 KiB covers the whole 6502 space, so a lookup is a load and never a search -
+behind a gate byte that is the OR of every flag anyone asked for, and is zero
+in every run that is not a debugging session.
+
+**A run with no callbacks pays nothing, and "nothing" was measured rather than
+argued.** The first attempt put the gate in the CPU's memory macros and cost
+2% with nothing registered (4.61s -> 4.70s over 20,000 frames, best of eight
+interleaved pairs). Two percent of every TAS for a feature almost nobody has is
+the wrong trade, so the interpreter is now compiled TWICE, templated on whether
+the hook is in it, and `Cpu::run` picks per call. A run with no watches
+executes an interpreter with no hook in it at all - not a hook switched off -
+and measures as no change (1.66s vs 1.67s over 120,000 sandboxed frames; the
+binary grows 17%, which is the second copy).
+
+What it costs when you DO ask: a watch that never matches, 0.32s -> 0.36s over
+20,000 frames, which is the hooked interpreter's gate and table lookup. A watch
+that matches is then about 6ns per match, all of it the crossing: 194 million
+matches (a wildcard execute watch over 20,000 frames) took 1.16s. You pay for
+the matches you asked for and almost nothing for the asking.
+
+**What changes about states.** Nothing, and that was made true rather than
+hoped for. The table and the gate live in INVISIBLE memory, so a savestate
+skips them: states taken at the same frame with no watch, one watch and a
+wildcard watch are byte-identical, and so are the RAM dumps. Invisible memory
+also survives a load untouched, which keeps the watches standing; the engine
+re-asserts them after every load anyway, for a core that puts its table
+somewhere ordinary.
+
+Three things are NOT free, and are limits rather than bugs:
+
+- a callback that RETURNS A VALUE replaces what the machine read, and that is
+  not in the movie. A movie recorded under such a script and replayed without
+  it desyncs. This is the user changing the machine, and it is the price of the
+  feature being useful at all;
+- re-emulation fires callbacks again. A seek or a rewind replays frames, so a
+  script counting accesses counts them once per replay, not once per frame;
+- a callback runs INSIDE the frame, on the thread advancing it, with the
+  machine stopped where the access happened. That is what makes it worth
+  having - it can read the memory the access was about - and it is why the Lua
+  side registers these under `ApiGroup.PROHIBITED_MID_FRAME`, which was already
+  there waiting.
+
+**A core says no by name.** The group is optional and probed like every other
+one. A core that exports nothing has no callbacks and the Lua error names the
+core; a core that emulates by recompiling into host code can still carry read
+and write callbacks and answer `GetMemHookExecutes` with 0, which is an honest
+partial answer rather than an execute callback that never fires. A core that
+exports HALF the group gets a line on stderr, because that is the one case
+where silence would look exactly like success.
+
+### What it found on the way: miniBox could only call 32 guest exports
+
+The first attempt failed with the memory hook's exports apparently missing from
+a `core.wbx` that plainly contained them. miniBox mints a thunk per host->guest
+entry point out of a single page - 4096 bytes at 128 bytes each, 32 of them,
+shared with the guest->host callback wrappers - and `mb_thunks_get` returned 0
+when it ran out. `mb_host_proc_addr` reports that exactly the way it reports a
+symbol that is not there.
+
+quickerNES asks for 45 exports. It had been silently getting 32 since the day
+it gained its fifth optional group: everything past `GetBusWritable` - the
+whole trace logger, save-data export, and `SetRenderingEnabled`, which is
+TURBO - was quietly unavailable in the frontend, and had been read as "this
+core does not have those". The core's own gate never saw it because that gate
+drives the core through its own runner, not through the engine.
+
+The fix is two lines of arithmetic (16 pages, 512 thunks) and one that matters
+more: exhaustion now says so on stderr. A cap that presents as a missing
+feature is worse than a cap.

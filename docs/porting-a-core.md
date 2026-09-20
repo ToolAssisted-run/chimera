@@ -240,6 +240,29 @@ Probed once after `Init`; absent exports simply mean the tool is not offered.
   flushes it. Nothing a state needs may live there - only what the machine can
   rebuild from its own memory - or a state loaded in another session runs on
   a cache of the wrong machine.
+- **The memory hook** - what a debugger and a Lua script mean by "tell me when
+  the machine touches this address": `SetMemHook(uint64_t bridge)` (taken
+  before Init, like `SetCacheBridge`), `GetMemHookScopeCount/Name`,
+  `ClearMemHookWatches`, `SetMemHookWatch(scope, addr, flags)`, plus optional
+  `GetMemHookScopeSize` and `GetMemHookExecutes`. All of the required ones or
+  none: a core exporting half of them lets a script register a callback that
+  could never fire, and the engine says so on stderr rather than pretending.
+  **THE WATCHED ADDRESSES LIVE IN THE CORE.** That is the whole feature. Asking
+  the host on every access is a sandbox crossing per emulated cycle, which is
+  what makes memory callbacks unusable in the emulator this rule comes from
+  (ToolAssisted-run/chimera#113); comparing in the core means only a MATCH
+  crosses. quickerNES keeps one byte per CPU address - a 64 KiB table covering
+  the whole 6502 space, so a lookup is a load and never a search - behind a
+  single global that is zero whenever nothing is watched.
+  A run with no callbacks must cost NOTHING, not "a little": quickerNES
+  compiles its interpreter twice, templated on whether the hook is in it, and
+  `Cpu::run` picks per call, which measured as no change at all (the cost of a
+  gate in the loop measured as 2%). Put the table and the gate in INVISIBLE
+  memory (`ECL_INVISIBLE`): a watched machine and an unwatched one then save
+  byte-identical states, and the engine re-asserts every watch after a load
+  anyway for cores that cannot. A core that recompiles into host code can still
+  carry read and write callbacks and answer `GetMemHookExecutes` with 0; that
+  is an honest partial answer and the frontend names it.
 - Registers, trace, core-rendered surfaces, save-data export, turbo
   (`SetRenderingEnabled`). **Turbo means "skip what is pure OUTPUT", not "skip
   the renderer".** If the export can only be implemented by skipping drawing -
