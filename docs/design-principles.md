@@ -4094,6 +4094,29 @@ after the window opened has to be themed when it arrives: TAStudio's piano
 rolls are built when a project opens, and were the one white thing left on a
 dark window until the walk started hooking the containers it passes.
 
+The defect that came back from review is the one worth keeping: a list's
+chosen row was a beige bar with invisible writing on it, in a screenshot this
+work had itself produced, while every assertion about every control's colours
+passed. A ListView paints its selected row, its column headers and the strip
+past its last column out of the desktop's colours and answers no property
+about any of them - so a test that reads properties cannot see it, and a
+picture nobody looks at is not a witness. The lesson is the same one as the
+gate that went green over an empty game database: a test has to be asked
+whether it would notice.
+
+So the list is drawn here now, in Details view, away from the desktop's
+palette - and the strip past the last column, which no event is raised for and
+nothing can paint over, is removed by growing the last column to the edge. And
+the screenshots are inspected as they are taken, every run: no toolkit colour
+in a header band or behind a chosen row, and a chosen row's text must have
+contrast against what it is written on. Both checks were confirmed against the
+broken drawing before the fix went in, which is the only way to know a test
+bites. On top of that, every role that carries text is paired with the
+background it lands on and held to 3:1 - the accessibility floor - for every
+theme that is not the desktop's, because a contributed theme is ninety numbers
+somebody typed and two of them being the same shade is exactly the failure
+that is invisible on the page and obvious on the screen.
+
 Where a user already had a say, the theme yields to it. TAStudio's palette, the
 hex editor's six colours and the OSD's four follow the theme only while nobody
 has set them; a config from before themes holds the old light values, and those

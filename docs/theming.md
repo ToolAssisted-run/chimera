@@ -130,10 +130,13 @@ desktop's own colours, and WinForms gives no way to ask for anything else:
   visible thing about a dark Chimera and there is no fix short of replacing
   every scrolling control.
 - **The check inside a check box, and the dot inside a radio button.** The
-  caption beside them is themed; the box itself is the OS's.
+  caption beside them is themed; the box itself is the OS's. (The tick boxes
+  inside a list ARE themed - that list is drawn here.)
 - **The window's title bar and border.** The desktop draws those.
 - **Progress bars.** Deliberately left alone: setting colours on one under
   visual styles does nothing at all.
+- **A list's group headers.** Left to the toolkit, which on Mono does not draw
+  them at all, with a theme or without one.
 
 And some colours are not the frontend's to set: a Lua script's canvas and any
 window a script builds, a movie's subtitle colours, and the padding colour a
@@ -146,9 +149,18 @@ WinForms has no theming, so it is explicit, and it lives in two files.
 `ThemeEngine` walks a control tree and sets each control's colours from what
 kind of control it is, with the surfaces a `BackColor` cannot reach handled by
 name: tool strips through a renderer, `DataGridView` through its cell styles,
-`ListView` column headers by owner-drawing them, `LinkLabel` through
-`LinkColor`. A control that paints itself implements `IThemedControl` and is
-handed the theme instead of being guessed at.
+`LinkLabel` through `LinkColor`, and `ListView` and `ListBox` by drawing them.
+A control that paints itself implements `IThemedControl` and is handed the
+theme instead of being guessed at.
+
+A list in Details view is drawn here entirely, because three of the things it
+paints answer to no property at all: the column headers, the highlight behind a
+chosen row, and the strip to the right of the last column. The first two are
+owner-drawn - background, tick box, small image, text with its own font,
+alignment and per-item colour. The third cannot be painted by anybody, since no
+event is raised for it, so the last column is grown to the edge instead and
+given its width back when the window is narrowed or the theme goes back to the
+desktop's.
 
 `ThemedForm` is what every window in the frontend derives from, and it runs
 that walk when the window's handle is created - so a window is themed by
@@ -157,7 +169,8 @@ the build if a `Form` is added that does not. A window that genuinely must keep
 its own colours (a Lua script's) still derives from it and overrides
 `ThemingEnabled`.
 
-Two things follow from that and are worth knowing when adding to the frontend:
+Three things follow from that and are worth knowing when adding to the
+frontend:
 
 - **A colour that means something is declared, not assigned.**
   `control.SetForeRole(ThemeColorRole.AccentError)` instead of
@@ -166,6 +179,24 @@ Two things follow from that and are worth knowing when adding to the frontend:
 - **A control made after the window opened is themed when it arrives** - the
   walk hooks each container it passes. TAStudio's piano rolls are made when a
   project opens and would otherwise be the one white thing on a dark window.
+- **A new colour role that carries text belongs in `ThemeContrastTests`,**
+  paired with the background it lands on. A theme is ninety numbers somebody
+  typed, and two of them being the same shade is not something anyone spots by
+  reading the file - it is something they find later, as a row that looks
+  blank. Every theme that is not the desktop's is held to 3:1, which is the
+  accessibility floor for anything a person has to pick out.
+
+## Looking at it
+
+`./tests/ui/run-ui-tests.sh --shots` renders every window this project can
+build, once per theme, into `tests/ui/shots/`. Those pictures are also
+inspected as they are taken, every run, with or without `--shots`: under a
+theme of its own, no part of a list's header band or of a chosen row may still
+be one of the toolkit's own colours, and a chosen row's text has to have
+contrast against what it is written on. That check exists because the core
+manager once shipped a chosen row that was a beige bar with invisible writing
+on it, in a picture this very code had produced, while every colour read off
+every control was correct.
 
 ## Why Light is not a new palette
 
