@@ -83,13 +83,42 @@ else
 	projects=(Chimera.Tests.Common Chimera.Tests.Emulation.Common Chimera.Tests.Client.Common Chimera.Tests.Client.GUI)
 fi
 
+# This gate runs what is BUILT in build/tests, never the sources, and that has
+# lied in both directions. An edit that was not built shows up as failures in
+# tests that are perfectly fine - fifty-six phantom ones on 2026-09-20 - with
+# nothing in the output naming the build. And a project whose exe is missing
+# printed "SKIP (not built)" and did not count, so a project that failed to
+# compile left the gate green: with build/tests empty the run reported four
+# SKIPs and exited 0, having run no tests at all.
+#
+# Refuse both, and say the command that fixes them. Refusing rather than
+# building: build/tests has no configuration in its path (TestProjects.props),
+# so Debug and Release land in the same directory and a build from here would
+# quietly replace one with the other.
+build_cmd="dotnet build $repo_root/source/gui/Chimera.sln -c Release"
+oldest=""
+for project in "${projects[@]}"; do
+	exe="$tests_dir/$project.exe"
+	[ -f "$exe" ] || {
+		echo "$project.exe is not in build/tests - it did not build. Build first:" >&2
+		echo "  $build_cmd" >&2
+		exit 1
+	}
+	if [ -z "$oldest" ] || [ "$exe" -ot "$oldest" ]; then oldest="$exe"; fi
+done
+newer="$(find "$repo_root/source/gui" \( -name obj -o -name bin \) -prune -o \
+	-type f \( -name '*.cs' -o -name '*.csproj' -o -name '*.props' \) \
+	-newer "$oldest" -print -quit)"
+if [ -n "$newer" ]; then
+	echo "build/tests is stale: $newer is newer than $(basename "$oldest")." >&2
+	echo "The failures this would report are not real. Build first:" >&2
+	echo "  $build_cmd" >&2
+	exit 1
+fi
+
 failed=0
 for project in "${projects[@]}"; do
 	exe="$tests_dir/$project.exe"
-	if [ ! -f "$exe" ]; then
-		printf "%-36s SKIP (not built)\n" "$project"
-		continue
-	fi
 	# mono's X11 backend chatters about xkb keysyms on a bare Xvfb; drop that noise
 	# The verdict is the RUNNER's, and the count's. It used to be the pipeline's, which is the
 	# grep's, which is "there was output": a run with five failing tests printed "failed: 5" and
