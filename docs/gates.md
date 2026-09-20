@@ -84,10 +84,11 @@ The gate runs a small program of its own. That program exercises a different
 path from the thing users run, so a whole class of bug is structurally
 uncatchable - not missed, uncatchable.
 
-> The flycast gate's GPU legs use `flip.elf`, which draws with the CPU. Its
-> texture cache therefore never holds a section over a render target, which is
-> precisely the condition of the state-load crash in issue #110. No amount of
-> running that leg could ever have found it.
+> The flycast gate's GPU legs use `triangle.elf`, which draws one untextured
+> flat polygon. Its texture cache therefore never holds a section over a render
+> target, which is precisely the condition of the state-load crash in issue
+> #110. No amount of running that leg could ever have found it. (rpcs3's
+> `flip.elf` is the same shape for the same reason: it draws with the CPU.)
 >
 > The rpcs3 gate's own programs agree native == sandbox exactly. Real games do
 > not always (issue #120). The gate is green and the guarantee it stands for is
