@@ -1,6 +1,5 @@
 #nullable enable
 
-using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
 
@@ -91,23 +90,19 @@ namespace Chimera.Client.GUI
 	/// </summary>
 	public sealed class ThemeToolStripRenderer : ToolStripProfessionalRenderer
 	{
-		private static readonly Dictionary<Theme, ThemeToolStripRenderer> Cache = new();
-
-		private static readonly Lock Sync = new();
-
 		/// <summary>
-		/// The renderer for this theme. Never asked for under a theme that follows
+		/// A renderer for this theme. Never asked for under a theme that follows
 		/// the desktop: those strips keep the renderer they already had, because
 		/// this one would draw the same colours differently.
+		///
+		/// A new one every time, deliberately. These used to be shared per theme,
+		/// which meant that a strip going Dark, then Light, then Dark again was
+		/// handed the very object it already held - and a ToolStrip whose Renderer
+		/// is set to what it already has keeps the render mode it was put back to,
+		/// so the menu stayed light while every item on it went dark. An object per
+		/// strip per switch is a few dozen bytes and no puzzle.
 		/// </summary>
-		public static ThemeToolStripRenderer For(Theme theme)
-		{
-			lock (Sync)
-			{
-				if (!Cache.TryGetValue(theme, out var renderer)) Cache[theme] = renderer = new(theme);
-				return renderer;
-			}
-		}
+		public static ThemeToolStripRenderer For(Theme theme) => new(theme);
 
 		private readonly Theme _theme;
 

@@ -104,6 +104,17 @@ namespace Chimera.Client.GUI
 			}
 		}
 
+		/// <inheritdoc/>
+		protected override void ApplyTheme(Theme theme)
+		{
+			base.ApplyTheme(theme);
+			// The Mono beige fix, again. OnLoad does it when a window opens under a
+			// desktop theme; a window that opened under a DARK one never did it, so
+			// switching to Light afterwards would put back the beige the control
+			// was captured with instead of the WhiteSmoke a fresh light start has.
+			if (OSTailoredCode.IsUnixHost && ThemeEngine.IsSystemPalette(theme)) FixBackColorOnControls(this);
+		}
+
 		public void UpdateWindowTitle()
 			=> base.Text = Config?.UseStaticWindowTitles == true
 				? (_windowTitleStatic ??= WindowTitleStatic)

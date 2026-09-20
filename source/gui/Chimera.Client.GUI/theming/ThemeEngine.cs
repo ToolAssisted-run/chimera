@@ -62,6 +62,16 @@ namespace Chimera.Client.GUI
 			public bool Refilling;
 
 			public bool Hooked;
+
+			/// <summary>
+			/// Puts this control back the way the toolkit had it, before any theme
+			/// touched it. Built the first time the control is walked, whichever
+			/// theme that is, so it always records the toolkit's own values.
+			/// </summary>
+			public Action? Restore;
+
+			/// <summary>A list box's own draw mode, before it was taken over.</summary>
+			public DrawMode ListBoxDrawMode = DrawMode.Normal;
 		}
 
 		private static readonly ConditionalWeakTable<Control, Overrides> Tagged = new();
@@ -135,8 +145,31 @@ namespace Chimera.Client.GUI
 		/// <summary>Paints <paramref name="root"/> and everything under it with the current theme.</summary>
 		public static void Apply(Control root) => Apply(root, Current);
 
-		/// <summary>Paints <paramref name="root"/> and everything under it.</summary>
+		/// <summary>
+		/// Paints <paramref name="root"/> and everything under it.
+		///
+		/// The control that was active is made active again at the end. Turning a
+		/// list's owner drawing on or off recreates its handle, and a recreated
+		/// control is no longer the form's active one - changing the theme is not
+		/// an instruction to move somebody's cursor out of the box they were
+		/// typing in.
+		/// </summary>
 		public static void Apply(Control root, Theme theme)
+		{
+			if (root is not Form window)
+			{
+				Walk(root, theme);
+				return;
+			}
+			var focused = window.ActiveControl;
+			Walk(window, theme);
+			if (focused is not null && !focused.IsDisposed && focused.FindForm() == window)
+			{
+				window.ActiveControl = focused;
+			}
+		}
+
+		private static void Walk(Control root, Theme theme)
 		{
 			if (root is null) return;
 			if (Tagged.TryGetValue(root, out var own) && own.Skip) return;
@@ -146,7 +179,7 @@ namespace Chimera.Client.GUI
 			if (root is IThemedControl themed) themed.ApplyTheme(theme);
 			else ApplyToOne(root, theme, own);
 
-			foreach (Control child in root.Controls) Apply(child, theme);
+			foreach (Control child in root.Controls) Walk(child, theme);
 
 			// A window builds most of itself before it is ever shown, but not all:
 			// TAStudio's piano rolls are made when a project opens, long after the
@@ -171,14 +204,34 @@ namespace Chimera.Client.GUI
 
 		private static void ApplyToOne(Control c, Theme theme, Overrides? own)
 		{
-			var systemPalette = IsSystemPalette(theme);
+			var state = own ?? For(c);
+			// before anything is assigned, and only ever once: what the toolkit
+			// gave this control. Without it there is nothing for the desktop theme
+			// to put a window BACK to, which is how switching from Dark to Light
+			// once changed the title bar and nothing else.
+			state.Restore ??= Capture(c);
 
-			if (own?.Back is { } backRole) c.BackColor = theme[backRole];
-			if (own?.Fore is { } foreRole) c.ForeColor = theme[foreRole];
+			if (IsSystemPalette(theme))
+			{
+				// the desktop's own palette IS what the toolkit had, so the whole
+				// of it is the undo, plus the roles the frontend declared for
+				// itself - which under this theme are the same colours again
+				state.Restore!();
+				if (state.Back is { } desktopBack) c.BackColor = theme[desktopBack];
+				if (state.Fore is { } desktopFore) c.ForeColor = theme[desktopFore];
+				switch (c)
+				{
+					case ToolStrip strip: ApplyStrip(strip, theme); break;
+					case ListView list: ApplyListView(list, wanted: false); break;
+					case CheckedListBox: break;
+					case ListBox box: ApplyListBox(box, wanted: false); break;
+				}
+				return;
+			}
 
-			// the desktop's own palette is already on every control; only what the
-			// frontend asked for by name is set, and the rest is left as drawn
-			if (systemPalette) return;
+			if (state.Back is { } backRole) c.BackColor = theme[backRole];
+			if (state.Fore is { } foreRole) c.ForeColor = theme[foreRole];
+
 			FlattenBorder(c);
 
 			switch (c)
@@ -190,25 +243,25 @@ namespace Chimera.Client.GUI
 					ApplyGrid(grid, theme);
 					return;
 				case LinkLabel link:
-					Back(link, own, theme, ThemeColorRole.WindowBackground);
-					Fore(link, own, theme, ThemeColorRole.WindowText);
+					Back(link, state, theme, ThemeColorRole.WindowBackground);
+					Fore(link, state, theme, ThemeColorRole.WindowText);
 					link.LinkColor = link.ActiveLinkColor = link.VisitedLinkColor = theme[ThemeColorRole.LinkText];
 					return;
 				case CheckBox cb:
 					// the box itself is drawn by the OS; only its caption is ours
 					cb.UseVisualStyleBackColor = false;
-					Back(c, own, theme, ThemeColorRole.WindowBackground);
-					Fore(c, own, theme, ThemeColorRole.WindowText);
+					Back(c, state, theme, ThemeColorRole.WindowBackground);
+					Fore(c, state, theme, ThemeColorRole.WindowText);
 					return;
 				case RadioButton rb:
 					rb.UseVisualStyleBackColor = false;
-					Back(c, own, theme, ThemeColorRole.WindowBackground);
-					Fore(c, own, theme, ThemeColorRole.WindowText);
+					Back(c, state, theme, ThemeColorRole.WindowBackground);
+					Fore(c, state, theme, ThemeColorRole.WindowText);
 					return;
 				case ButtonBase bb:
 					if (bb is Button plain) plain.UseVisualStyleBackColor = false;
-					Back(c, own, theme, ThemeColorRole.ButtonBackground);
-					Fore(c, own, theme, ThemeColorRole.ButtonText);
+					Back(c, state, theme, ThemeColorRole.ButtonBackground);
+					Fore(c, state, theme, ThemeColorRole.ButtonText);
 					bb.FlatStyle = FlatStyle.Flat;
 					bb.FlatAppearance.BorderColor = theme[ThemeColorRole.ButtonBorder];
 					bb.FlatAppearance.MouseOverBackColor = theme[ThemeColorRole.MenuSelectedBackground];
@@ -218,19 +271,19 @@ namespace Chimera.Client.GUI
 					// not a special case for ReadOnly: WinForms does not colour a
 					// read-only box differently either, and a box that should look
 					// different says so with SetBackRole(ReadOnlyBackground)
-					Back(text, own, theme, ThemeColorRole.InputBackground);
-					Fore(text, own, theme, ThemeColorRole.InputText);
+					Back(text, state, theme, ThemeColorRole.InputBackground);
+					Fore(text, state, theme, ThemeColorRole.InputText);
 					return;
 				case ComboBox combo:
 					if (combo.FlatStyle is FlatStyle.Standard) combo.FlatStyle = FlatStyle.Flat;
-					Back(combo, own, theme, ThemeColorRole.InputBackground);
-					Fore(combo, own, theme, ThemeColorRole.InputText);
+					Back(combo, state, theme, ThemeColorRole.InputBackground);
+					Fore(combo, state, theme, ThemeColorRole.InputText);
 					return;
 				case PropertyGrid properties:
 					// the grid's own surfaces are separate properties; BackColor only
 					// reaches the strip around them
-					Back(properties, own, theme, ThemeColorRole.WindowBackground);
-					Fore(properties, own, theme, ThemeColorRole.WindowText);
+					Back(properties, state, theme, ThemeColorRole.WindowBackground);
+					Fore(properties, state, theme, ThemeColorRole.WindowText);
 					properties.ViewBackColor = theme[ThemeColorRole.InputBackground];
 					properties.ViewForeColor = theme[ThemeColorRole.InputText];
 					properties.HelpBackColor = theme[ThemeColorRole.WindowBackground];
@@ -239,30 +292,30 @@ namespace Chimera.Client.GUI
 					properties.CategoryForeColor = theme[ThemeColorRole.WindowText];
 					return;
 				case ListBox box:
-					Back(box, own, theme, ThemeColorRole.InputBackground);
-					Fore(box, own, theme, ThemeColorRole.InputText);
-					if (box is not CheckedListBox) ApplyListBox(box);
+					Back(box, state, theme, ThemeColorRole.InputBackground);
+					Fore(box, state, theme, ThemeColorRole.InputText);
+					if (box is not CheckedListBox) ApplyListBox(box, wanted: true);
 					return;
 				case TreeView or NumericUpDown or DateTimePicker:
-					Back(c, own, theme, ThemeColorRole.InputBackground);
-					Fore(c, own, theme, ThemeColorRole.InputText);
+					Back(c, state, theme, ThemeColorRole.InputBackground);
+					Fore(c, state, theme, ThemeColorRole.InputText);
 					return;
 				case ListView list:
-					Back(list, own, theme, ThemeColorRole.InputBackground);
-					Fore(list, own, theme, ThemeColorRole.InputText);
-					ApplyListView(list);
+					Back(list, state, theme, ThemeColorRole.InputBackground);
+					Fore(list, state, theme, ThemeColorRole.InputText);
+					ApplyListView(list, wanted: list.View is View.Details);
 					return;
 				case ProgressBar:
 					// drawn entirely by the OS; setting colours on it does nothing but confuse
 					return;
 				case TabPage page:
 					page.UseVisualStyleBackColor = false;
-					Back(page, own, theme, ThemeColorRole.WindowBackground);
-					Fore(page, own, theme, ThemeColorRole.WindowText);
+					Back(page, state, theme, ThemeColorRole.WindowBackground);
+					Fore(page, state, theme, ThemeColorRole.WindowText);
 					return;
 				default:
-					Back(c, own, theme, ThemeColorRole.WindowBackground);
-					Fore(c, own, theme, ThemeColorRole.WindowText);
+					Back(c, state, theme, ThemeColorRole.WindowBackground);
+					Fore(c, state, theme, ThemeColorRole.WindowText);
 					return;
 			}
 		}
@@ -284,6 +337,207 @@ namespace Chimera.Client.GUI
 				case TextBoxBase { BorderStyle: BorderStyle.Fixed3D } text: text.BorderStyle = BorderStyle.FixedSingle; break;
 				case Panel { BorderStyle: BorderStyle.Fixed3D } panel: panel.BorderStyle = BorderStyle.FixedSingle; break;
 			}
+		}
+
+		/// <summary>
+		/// Assigns only when it would change something. A theme that asks for the
+		/// colour a control already has should touch nothing at all - that is what
+		/// makes the desktop theme provably unable to alter a window it was the
+		/// first theme applied to.
+		/// </summary>
+		private static void Set(Control c, Color value)
+		{
+			if (c.BackColor != value) c.BackColor = value;
+		}
+
+		/// <summary>
+		/// Everything the walk is about to change on this control, remembered as a
+		/// way of putting it back.
+		///
+		/// It is a closure rather than a record so that each thing is captured
+		/// beside the line that restores it, and the two cannot drift apart. Only
+		/// the properties this file actually writes are here; adding a write
+		/// without adding it here is how a theme becomes one-way, which is exactly
+		/// what happened.
+		/// </summary>
+		private static Action Capture(Control c)
+		{
+			var back = c.BackColor;
+			var fore = c.ForeColor;
+			Action restore = () =>
+			{
+				if (c.BackColor != back) c.BackColor = back;
+				if (c.ForeColor != fore) c.ForeColor = fore;
+			};
+
+			switch (c)
+			{
+				case LinkLabel link:
+				{
+					var normal = link.LinkColor;
+					var active = link.ActiveLinkColor;
+					var visited = link.VisitedLinkColor;
+					restore += () =>
+					{
+						link.LinkColor = normal;
+						link.ActiveLinkColor = active;
+						link.VisitedLinkColor = visited;
+					};
+					break;
+				}
+				case DataGridView grid:
+				{
+					var headers = grid.EnableHeadersVisualStyles;
+					var background = grid.BackgroundColor;
+					var lines = grid.GridColor;
+					var styles = new[] { grid.DefaultCellStyle, grid.AlternatingRowsDefaultCellStyle, grid.ColumnHeadersDefaultCellStyle, grid.RowHeadersDefaultCellStyle }
+						.Select(static style => (Style: style, style.BackColor, style.ForeColor, style.SelectionBackColor, style.SelectionForeColor))
+						.ToArray();
+					restore += () =>
+					{
+						grid.EnableHeadersVisualStyles = headers;
+						grid.BackgroundColor = background;
+						grid.GridColor = lines;
+						foreach (var was in styles)
+						{
+							was.Style.BackColor = was.BackColor;
+							was.Style.ForeColor = was.ForeColor;
+							was.Style.SelectionBackColor = was.SelectionBackColor;
+							was.Style.SelectionForeColor = was.SelectionForeColor;
+						}
+					};
+					break;
+				}
+				case PropertyGrid properties:
+				{
+					var view = properties.ViewBackColor;
+					var viewInk = properties.ViewForeColor;
+					var help = properties.HelpBackColor;
+					var helpInk = properties.HelpForeColor;
+					var lines = properties.LineColor;
+					var category = properties.CategoryForeColor;
+					restore += () =>
+					{
+						properties.ViewBackColor = view;
+						properties.ViewForeColor = viewInk;
+						properties.HelpBackColor = help;
+						properties.HelpForeColor = helpInk;
+						properties.LineColor = lines;
+						properties.CategoryForeColor = category;
+					};
+					break;
+				}
+				case ComboBox combo:
+				{
+					var flat = combo.FlatStyle;
+					restore += () => combo.FlatStyle = flat;
+					break;
+				}
+			}
+
+			// the ones that are not exclusive: a CheckBox is a ButtonBase, a
+			// ListBox has a border AND a draw mode
+			if (c is ButtonBase button)
+			{
+				var flat = button.FlatStyle;
+				var edge = button.FlatAppearance.BorderColor;
+				var over = button.FlatAppearance.MouseOverBackColor;
+				var down = button.FlatAppearance.MouseDownBackColor;
+				restore += () =>
+				{
+					button.FlatStyle = flat;
+					button.FlatAppearance.BorderColor = edge;
+					button.FlatAppearance.MouseOverBackColor = over;
+					button.FlatAppearance.MouseDownBackColor = down;
+				};
+			}
+			switch (c)
+			{
+				case Button plain:
+				{
+					var styled = plain.UseVisualStyleBackColor;
+					restore += () => plain.UseVisualStyleBackColor = styled;
+					break;
+				}
+				case CheckBox tick:
+				{
+					var styled = tick.UseVisualStyleBackColor;
+					restore += () => tick.UseVisualStyleBackColor = styled;
+					break;
+				}
+				case RadioButton radio:
+				{
+					var styled = radio.UseVisualStyleBackColor;
+					restore += () => radio.UseVisualStyleBackColor = styled;
+					break;
+				}
+				case TabPage page:
+				{
+					var styled = page.UseVisualStyleBackColor;
+					restore += () => page.UseVisualStyleBackColor = styled;
+					break;
+				}
+			}
+
+			// FlattenBorder's undo
+			switch (c)
+			{
+				case ListBox list: restore += Border(list.BorderStyle, style => list.BorderStyle = style); break;
+				case ListView view: restore += Border(view.BorderStyle, style => view.BorderStyle = style); break;
+				case TreeView tree: restore += Border(tree.BorderStyle, style => tree.BorderStyle = style); break;
+				case TextBoxBase text: restore += Border(text.BorderStyle, style => text.BorderStyle = style); break;
+				case Panel panel: restore += Border(panel.BorderStyle, style => panel.BorderStyle = style); break;
+			}
+
+			if (c is ListBox box) For(box).ListBoxDrawMode = box.DrawMode;
+			// a strip is reached both through the walk and directly, and it is the
+			// renderer that paints it - miss this and a menu stays dark for ever
+			// while its BackColor says otherwise
+			if (c is ToolStrip strip) restore += Capture(strip);
+			return restore;
+		}
+
+		private static Action Border(BorderStyle was, Action<BorderStyle> set) => () => set(was);
+
+		/// <summary>
+		/// The same, for something on a tool strip. It resets rather than records:
+		/// an item's colour is the STRIP's until somebody sets one, and by the time
+		/// the walk reaches the items the strip has already been recoloured - so
+		/// recording what the item reads back gives you the strip's new colour, and
+		/// "restoring" it writes the dark one in permanently. Resetting puts the
+		/// item back to following its strip, which is what it was doing.
+		///
+		/// An item that had a colour of its own has a ROLE saying so, and
+		/// RestoreItem puts that back afterwards; the two that exist (the RAM
+		/// tools' error button) do.
+		/// </summary>
+		private static Action Capture(ToolStripItem item)
+			=> () =>
+			{
+				item.ResetBackColor();
+				item.ResetForeColor();
+			};
+
+		/// <summary>
+		/// And for the strip itself, which is mostly its renderer: a ToolStrip
+		/// paints its own background and border, so the renderer is the change and
+		/// putting the old one back is the undo. Restoring a guess instead - the
+		/// system renderer, say - is how a menu came back looking not quite like
+		/// one that had never been dark.
+		/// </summary>
+		private static Action Capture(ToolStrip strip)
+		{
+			var back = strip.BackColor;
+			var fore = strip.ForeColor;
+			var mode = strip.RenderMode;
+			var renderer = mode is ToolStripRenderMode.Custom ? strip.Renderer : null;
+			return () =>
+			{
+				strip.BackColor = back;
+				strip.ForeColor = fore;
+				if (renderer is not null) strip.Renderer = renderer;
+				else strip.RenderMode = mode;
+			};
 		}
 
 		/// <summary>
@@ -346,12 +600,17 @@ namespace Chimera.Client.GUI
 		/// alignment. Group headers are left to the toolkit, which still draws them
 		/// under owner-draw.
 		/// </summary>
-		private static void ApplyListView(ListView list)
+		private static void ApplyListView(ListView list, bool wanted)
 		{
 			var state = For(list);
-			var wanted = list.View is View.Details;
 			if (wanted == state.OwnerDrawn) return;
 			state.OwnerDrawn = wanted;
+			// Turning owner drawing on or off recreates the control's handle, and a
+			// recreated list comes back with nothing selected and scrolled to the
+			// top. Changing the theme is not an instruction to forget which row
+			// somebody had picked.
+			var chosen = list.SelectedIndices.Cast<int>().ToArray();
+			var top = list.View is View.Details ? list.TopItem?.Index ?? -1 : -1;
 			if (wanted)
 			{
 				list.OwnerDraw = true;
@@ -371,6 +630,21 @@ namespace Chimera.Client.GUI
 				list.OwnerDraw = false;
 			}
 			FillLastColumn(list, wanted);
+			foreach (var i in chosen)
+			{
+				if (i >= 0 && i < list.Items.Count) list.Items[i].Selected = true;
+			}
+			if (top > 0 && top < list.Items.Count)
+			{
+				try
+				{
+					list.TopItem = list.Items[top];
+				}
+				catch (InvalidOperationException)
+				{
+					// a list that cannot be scrolled yet; it is at the top anyway
+				}
+			}
 			list.Invalidate();
 		}
 
@@ -568,13 +842,27 @@ namespace Chimera.Client.GUI
 		/// chosen line is the desktop's, not the theme's. It has no images and no
 		/// tick boxes, so taking it over is a fill and a string.
 		/// </summary>
-		private static void ApplyListBox(ListBox box)
+		private static void ApplyListBox(ListBox box, bool wanted)
 		{
 			var state = For(box);
-			if (state.OwnerDrawn) return;
-			state.OwnerDrawn = true;
-			box.DrawMode = DrawMode.OwnerDrawFixed;
-			box.DrawItem += DrawListBoxItem;
+			if (wanted == state.OwnerDrawn) return;
+			state.OwnerDrawn = wanted;
+			// same as the list view: changing the draw mode recreates the handle
+			var chosen = box.SelectedIndices.Cast<int>().ToArray();
+			if (wanted)
+			{
+				box.DrawMode = DrawMode.OwnerDrawFixed;
+				box.DrawItem += DrawListBoxItem;
+			}
+			else
+			{
+				box.DrawItem -= DrawListBoxItem;
+				box.DrawMode = state.ListBoxDrawMode;
+			}
+			foreach (var i in chosen)
+			{
+				if (i >= 0 && i < box.Items.Count) box.SetSelected(i, true);
+			}
 			box.Invalidate();
 		}
 
@@ -612,7 +900,14 @@ namespace Chimera.Client.GUI
 		/// </summary>
 		public static void ApplyStrip(ToolStrip strip, Theme theme)
 		{
-			if (IsSystemPalette(theme)) return;
+			var state = For(strip);
+			state.Restore ??= Capture(strip);
+			if (IsSystemPalette(theme))
+			{
+				state.Restore!();
+				foreach (ToolStripItem item in strip.Items) RestoreItem(item);
+				return;
+			}
 			strip.Renderer = ThemeToolStripRenderer.For(theme);
 			var status = strip is StatusStrip;
 			strip.BackColor = theme[status ? ThemeColorRole.StatusBarBackground : ThemeColorRole.ToolStripBackground];
@@ -620,24 +915,51 @@ namespace Chimera.Client.GUI
 			foreach (ToolStripItem item in strip.Items) ApplyItem(item, theme, onDropDown: false);
 		}
 
+		/// <summary>Puts an item, and anything under it, back to the colours it had.</summary>
+		private static void RestoreItem(ToolStripItem item)
+		{
+			if (TaggedItems.TryGetValue(item, out var state))
+			{
+				state.Restore?.Invoke();
+				if (state.Back is { } back) item.BackColor = Current[back];
+				if (state.Fore is { } fore) item.ForeColor = Current[fore];
+			}
+			switch (item)
+			{
+				case ToolStripDropDownItem drop:
+					if (For(drop.DropDown).Restore is { } putBack) putBack();
+					foreach (ToolStripItem child in drop.DropDownItems) RestoreItem(child);
+					break;
+				case ToolStripControlHost host when host.Control is not null:
+					Apply(host.Control, Current);
+					break;
+			}
+		}
+
 		private static void ApplyItem(ToolStripItem item, Theme theme, bool onDropDown)
 		{
-			if (TaggedItems.TryGetValue(item, out var own) && own.Skip) return;
-			item.BackColor = own?.Back is { } back
+			var own = TaggedItems.GetValue(item, static _ => new Overrides());
+			if (own.Skip) return;
+			own.Restore ??= Capture(item);
+			item.BackColor = own.Back is { } back
 				? theme[back]
 				: theme[onDropDown ? ThemeColorRole.MenuBackground : ThemeColorRole.ToolStripBackground];
-			item.ForeColor = own?.Fore is { } role
+			item.ForeColor = own.Fore is { } role
 				? theme[role]
 				: theme[onDropDown ? ThemeColorRole.MenuText : ThemeColorRole.ToolStripText];
 
 			switch (item)
 			{
 				case ToolStripDropDownItem drop:
+				{
+					var below = For(drop.DropDown);
+					below.Restore ??= Capture(drop.DropDown);
 					drop.DropDown.Renderer = ThemeToolStripRenderer.For(theme);
 					drop.DropDown.BackColor = theme[ThemeColorRole.MenuBackground];
 					drop.DropDown.ForeColor = theme[ThemeColorRole.MenuText];
 					foreach (ToolStripItem child in drop.DropDownItems) ApplyItem(child, theme, onDropDown: true);
 					break;
+				}
 				case ToolStripControlHost host when host.Control is not null:
 					Apply(host.Control, theme);
 					break;
