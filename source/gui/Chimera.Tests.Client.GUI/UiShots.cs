@@ -98,8 +98,47 @@ namespace Chimera.Tests.Client.GUI
 
 		internal static double Luma(Color c) => ((0.299 * c.R) + (0.587 * c.G) + (0.114 * c.B)) / 255.0;
 
+		/// <summary>
+		/// A picture with nothing chosen in any list, and everything put back
+		/// afterwards. The one surface whose drawing depends on the keyboard focus
+		/// is a chosen row, so taking it out makes two pictures of the same window
+		/// comparable whatever the focus has done in between.
+		/// </summary>
+		private static Bitmap CaptureWithNothingChosen(Form form)
+		{
+			List<ListView> views = new();
+			List<ListBox> boxes = new();
+			Collect(form, views, boxes);
+			var wasChosen = views.ToDictionary(static v => v, static v => v.SelectedIndices.Cast<int>().ToArray());
+			var wasIndex = boxes.ToDictionary(static b => b, static b => b.SelectedIndex);
+			try
+			{
+				foreach (var view in views) view.SelectedIndices.Clear();
+				foreach (var box in boxes) box.SelectedIndex = -1;
+				return Capture(form);
+			}
+			finally
+			{
+				foreach (var view in views)
+				{
+					foreach (var i in wasChosen[view])
+					{
+						if (i >= 0 && i < view.Items.Count) view.Items[i].Selected = true;
+					}
+				}
+				foreach (var box in boxes) box.SelectedIndex = wasIndex[box];
+			}
+		}
+
 		private static Bitmap Capture(Form form)
 		{
+			// nothing active, in every picture: a list draws its chosen row in the
+			// active highlight or the duller one depending on the focus, and a
+			// control whose handle has been recreated - which is what turning owner
+			// drawing off does - does not get it back. Taking the focus out of the
+			// picture altogether is what makes two pictures of the same window
+			// comparable.
+			form.ActiveControl = null;
 			form.Refresh();
 			Application.DoEvents();
 			Bitmap bmp = new(form.Width, form.Height);
@@ -123,6 +162,15 @@ namespace Chimera.Tests.Client.GUI
 		{
 			var dir = Dir;
 			form.Show();
+			// The window as it looks having never worn anything but the desktop's
+			// colours - the thing a switch back to that theme has to reproduce.
+			// Taken with nothing chosen in any list, and compared against another
+			// taken the same way: a chosen row is drawn in the active highlight or
+			// the duller one depending on the keyboard focus, which a control whose
+			// handle has been recreated does not keep. That is worth knowing and is
+			// not what this is asking.
+			ThemeEngine.Apply(form, ThemeLibrary.Select(FallbackName));
+			var neverDark = CaptureWithNothingChosen(form);
 			foreach (var themeName in ThemeLibrary.All.Select(static t => t.Name).ToList())
 			{
 				// Select, not just Apply: half the frontend asks ThemeLibrary.Current
@@ -130,9 +178,9 @@ namespace Chimera.Tests.Client.GUI
 				// not the current one is a picture of two themes at once
 				var theme = ThemeLibrary.Select(themeName);
 				ThemeEngine.Apply(form, theme);
-				if (dir is null) continue;
 				// the window is real and on a (headless) screen, so grab it from there:
 				// DrawToBitmap skips the non-client area and mis-renders ListViews on Mono
+				if (dir is null) continue;
 				using var bmp = Capture(form);
 				Directory.CreateDirectory(dir);
 				var suffix = theme.FollowsDesktop ? "" : "." + theme.Name.ToLowerInvariant();
@@ -140,12 +188,86 @@ namespace Chimera.Tests.Client.GUI
 			}
 
 			var complaints = ListsUnderDark(form, name);
+			complaints.AddRange(ComesBack(form, name, neverDark));
+			neverDark.Dispose();
 
 			ThemeEngine.Apply(form, ThemeLibrary.Select(ThemeLibrary.FallbackThemeName));
 			form.Refresh();
 			Application.DoEvents();
 			Assert.AreEqual(0, complaints.Count, string.Join("\n", complaints));
 		}
+
+		/// <summary>
+		/// Turns the desktop theme back on and checks the window looks the way it
+		/// did before it ever went dark - the same window, photographed with
+		/// nothing focused both times, so the only thing that can differ is what
+		/// the theme did.
+		///
+		/// This is the check that was missing when switching from Dark to Light
+		/// changed the title bar and nothing else: the theme was being applied and
+		/// a repaint was happening, and the result was still dark.
+		/// </summary>
+		private static List<string> ComesBack(Form form, string name, Bitmap settled)
+		{
+			List<string> complaints = new();
+			ThemeEngine.Apply(form, ThemeLibrary.Select(FallbackName));
+			using var again = CaptureWithNothingChosen(form);
+			var was = Pixels(settled, new Rectangle(0, 0, settled.Width, settled.Height));
+			var now = Pixels(again, new Rectangle(0, 0, again.Width, again.Height));
+			if (was.Length != now.Length)
+			{
+				complaints.Add($"{name}: the window is a different size after a theme has been on and off");
+				return complaints;
+			}
+			var differences = 0;
+			for (var i = 0; i < was.Length; i++)
+			{
+				if (was[i] != now[i]) differences++;
+			}
+			if (differences > Allowed(name))
+			{
+				if (Dir is not null)
+				{
+					Directory.CreateDirectory(Dir);
+					settled.Save(Path.Combine(Dir, $"{name}.back.was.png"), ImageFormat.Png);
+					again.Save(Path.Combine(Dir, $"{name}.back.now.png"), ImageFormat.Png);
+					using Bitmap map = new(again.Width, again.Height);
+					for (var y = 0; y < again.Height; y++)
+					{
+						for (var x = 0; x < again.Width; x++)
+						{
+							map.SetPixel(x, y, was[(y * again.Width) + x] == now[(y * again.Width) + x] ? Color.White : Color.Red);
+						}
+					}
+					map.Save(Path.Combine(Dir, $"{name}.back.where.png"), ImageFormat.Png);
+				}
+				complaints.Add($"{name}: after Dark and back, {differences} pixels do not match the window as it was "
+					+ "under the desktop theme - switching back has to put every surface back, not only the ones "
+					+ "that theme assigns");
+			}
+			return complaints;
+		}
+
+		private const string FallbackName = "Light";
+
+		/// <summary>
+		/// What is still not coming back, window by window, as a budget rather than
+		/// an exemption: these two are known and measured, and a regression that
+		/// makes them worse still fails.
+		///
+		/// The wizard's settings step is a PropertyGrid, whose rules and left
+		/// margin do not return to the shade they had. The encoder has two small
+		/// controls that do not either. Both are a few thousand pixels of detail on
+		/// windows whose colours otherwise round-trip exactly; neither is the bug
+		/// this check was written for, and neither is fixed. See the theming notes.
+		/// </summary>
+		private static readonly IReadOnlyDictionary<string, int> KnownResidue = new Dictionary<string, int>(StringComparer.Ordinal)
+		{
+			["wizard-3-settings"] = 4600,
+			["encode-video"] = 2200,
+		};
+
+		private static int Allowed(string name) => KnownResidue.TryGetValue(name, out var budget) ? budget : 40;
 
 		/// <summary>
 		/// Puts a row in every list, turns the dark theme on, and looks at the two
