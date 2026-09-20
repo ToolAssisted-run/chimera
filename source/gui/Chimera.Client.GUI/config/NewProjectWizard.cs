@@ -141,6 +141,16 @@ namespace Chimera.Client.GUI
 			public string? ChosenSha1; // the actual hash - equals the pin, or names an unpinned choice
 
 			/// <summary>
+			/// This file was picked BY HAND rather than found. It survives the
+			/// page being rebuilt, because the page is rebuilt every time
+			/// somebody steps back and forward again - and answering the same
+			/// Locate dialog after every trip through the wizard is not a
+			/// thing anybody should have to do. A change that makes the
+			/// requirement itself different drops it; see CarryHandPicked.
+			/// </summary>
+			public bool PickedByHand;
+
+			/// <summary>
 			/// A file was chosen - or the core said it can start without one
 			/// (Required false), in which case absent is a fine answer and
 			/// the wizard must not stand in the way.
@@ -354,10 +364,17 @@ namespace Chimera.Client.GUI
 				Anchor = AnchorStyles.Bottom | AnchorStyles.Left,
 				AutoSize = true,
 				Checked = true,
-				Location = Pt(268, 348),
 				Text = "Include sub-folders",
 				Visible = pickFirmwareFolder is not null,
 			};
+			// Centred on the button rather than placed at a guessed offset: a
+			// check box is shorter than a button, by an amount that depends on
+			// the font and the display's scaling, so any fixed y sits wrong
+			// somewhere. Asked of the controls themselves, it is right everywhere.
+			_firmwareScanSubfolders.Location = new Point(
+				firmwareScanButton.Left + firmwareScanButton.PreferredSize.Width + UIHelper.ScaleX(8),
+				firmwareScanButton.Top
+					+ ((firmwareScanButton.PreferredSize.Height - _firmwareScanSubfolders.PreferredSize.Height) / 2));
 			p4.Controls.AddRange([ _firmwareList, _firmwareSetButton, _firmwareClearButton, firmwareScanButton, _firmwareScanSubfolders ]);
 
 			// ---- page 5: the code the core compiles for this game -----------------
@@ -1924,9 +1941,34 @@ namespace Chimera.Client.GUI
 			RenderFirmwareRows();
 		}
 
+		/// <summary>
+		/// What the user chose by hand last time this page was built, by id,
+		/// with enough of the requirement to tell whether it is still the same
+		/// requirement. The firmware page is rebuilt on every arrival, because
+		/// which firmware is needed depends on the settings and the files - so
+		/// without this, stepping back to fix one thing and forward again threw
+		/// away every Locate the person had answered.
+		///
+		/// The identity is the declared hash and the declared name: a
+		/// requirement whose pinned hash has changed is a different file, and
+		/// carrying the old answer over would quietly satisfy it with the wrong
+		/// one. A requirement that disappears takes its answer with it.
+		/// </summary>
+		private Dictionary<string, (string Path, string? Sha1, string? DeclSha1, string? DeclName)> HandPickedFirmware()
+		{
+			Dictionary<string, (string, string?, string?, string?)> kept = new();
+			foreach (var need in _firmwareNeeds)
+			{
+				if (!need.PickedByHand || need.ChosenPath is null) continue;
+				kept[need.Id] = (need.ChosenPath, need.ChosenSha1, need.Decl?.Sha1, need.Decl?.Name);
+			}
+			return kept;
+		}
+
 		private void BuildFirmwareNeeds(IReadOnlyList<(string Id, int Index)> needed)
 		{
 			var decls = _cfg?.Firmware ?? [ ];
+			var handPicked = HandPickedFirmware();
 			_firmwareNeeds = needed.Select(entry =>
 			{
 				FirmwareNeed need = new()
@@ -1959,6 +2001,20 @@ namespace Chimera.Client.GUI
 						need.ChosenPath = found.Path;
 						need.ChosenSha1 = found.Sha1;
 					}
+				}
+
+				// A file the user picked by hand wins over anything found, and
+				// survives this rebuild - unless the requirement is no longer the
+				// same requirement, in which case the old answer is not an answer
+				// to the new question.
+				if (handPicked.TryGetValue(need.Id, out var prior)
+					&& prior.DeclSha1 == need.Decl?.Sha1
+					&& prior.DeclName == need.Decl?.Name
+					&& System.IO.File.Exists(prior.Path))
+				{
+					need.ChosenPath = prior.Path;
+					need.ChosenSha1 = prior.Sha1;
+					need.PickedByHand = true;
 				}
 				return need;
 			}).ToList();
@@ -2017,6 +2073,10 @@ namespace Chimera.Client.GUI
 			var path = _pickFirmwareFile($"Locate {need.Decl?.DisplayName ?? need.Id}");
 			if (path is null) return;
 			ProvideFirmware(need.Id, path);
+			if (_firmwareNeeds.FirstOrDefault(n => n.Id == need.Id) is { } chosen)
+			{
+				chosen.PickedByHand = chosen.ChosenPath is not null;
+			}
 		}
 
 		/// <summary>
