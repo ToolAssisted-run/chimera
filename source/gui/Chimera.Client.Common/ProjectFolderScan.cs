@@ -32,7 +32,8 @@ namespace Chimera.Client.Common
 		/// size, so candidates are tried smallest-first and the scan stops the
 		/// moment every file is resolved.
 		/// </summary>
-		public static int Resolve(EngineProject project, string folder)
+		/// <param name="recurse">walk sub-folders too; see <see cref="Enumerate"/></param>
+		public static int Resolve(EngineProject project, string folder, bool recurse = true)
 		{
 			List<int> wanted = new();
 			for (var i = 0; i < project.FileCount; i++)
@@ -41,7 +42,7 @@ namespace Chimera.Client.Common
 			}
 			if (wanted.Count is 0 || !Directory.Exists(folder)) return 0;
 
-			var candidates = Enumerate(folder).Take(MaxFiles)
+			var candidates = Enumerate(folder, recurse).Take(MaxFiles)
 				.Select(static path =>
 				{
 					try

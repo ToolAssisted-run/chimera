@@ -91,6 +91,34 @@ namespace Chimera.Tests.Client.Common
 			Assert.IsTrue(p.FilesOk, "the hash is the identity; the on-disk names play no part");
 		}
 
+		/// <summary>
+		/// Resolve carries the same choice down to Enumerate. It is a separate
+		/// check from the one above because Resolve calls Enumerate itself, and
+		/// a caller who passes the flag to Resolve has no other way to know it
+		/// arrived.
+		/// </summary>
+		[TestMethod]
+		public void ResolveStaysInTheFolderWhenToldNotToDescend()
+		{
+			var path = MakeProject("shallow", out var romBytes, out var biosBytes);
+			var stash = Path.Combine(_dir, "shallow-stash");
+			Directory.CreateDirectory(Path.Combine(stash, "below"));
+			File.WriteAllText(Path.Combine(stash, "game.nes"), romBytes);
+			File.WriteAllText(Path.Combine(stash, "below", "bios.bin"), biosBytes);
+
+			using (var shallow = EngineProject.Open(path))
+			{
+				Assert.AreEqual(1, ProjectFolderScan.Resolve(shallow, stash, recurse: false),
+					"only the file in the folder itself; the one below it was not to be looked at");
+				Assert.IsFalse(shallow.FilesOk);
+			}
+
+			using var deep = EngineProject.Open(path);
+			Assert.AreEqual(2, ProjectFolderScan.Resolve(deep, stash),
+				"and the default reaches the one below");
+			Assert.IsTrue(deep.FilesOk);
+		}
+
 		[TestMethod]
 		public void NameIsTheFallbackAndItsVerdictIsHonest()
 		{

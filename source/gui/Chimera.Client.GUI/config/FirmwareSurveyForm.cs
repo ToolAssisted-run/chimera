@@ -46,8 +46,16 @@ namespace Chimera.Client.GUI
 		private readonly Func<IReadOnlyList<FirmwareSurveyGroup>> _survey;
 		private readonly Action<FirmwareSurveyRow, string?> _remember;
 		private readonly Func<string, string?> _pickFile;
-		private readonly Func<string?>? _pickFolder;
-		private readonly Action<string>? _scanFolder;
+		private readonly PickScanFolder? _pickFolder;
+		private readonly Action<string, bool>? _scanFolder;
+
+		/// <summary>
+		/// Whether Scan Folder walks below the folder it is given. Ticked, which is what this window always
+		/// did; the folder picker offers the choice where it can carry one, and this remembers the answer
+		/// between scans. Where it cannot (Mono's dialog, and the tree fallback) the scan runs on this value,
+		/// which is the behaviour the window had before the option existed.
+		/// </summary>
+		private bool _scanSubfolders = true;
 
 		private List<FirmwareSurveyGroup> _groups = new();
 		private List<FirmwareSurveyRow?> _rowOf = new(); // list index -> row, null for a "more" line
@@ -57,14 +65,14 @@ namespace Chimera.Client.GUI
 		/// <param name="survey">builds the rows from the packages present now (called on open and after every change)</param>
 		/// <param name="remember">remembers (or, for null, forgets) the file chosen for one declaration</param>
 		/// <param name="pickFile">shows a file picker titled for one row; the dialog belongs to the owner</param>
-		/// <param name="pickFolder">shows a folder picker for Scan Folder; null hides the button</param>
-		/// <param name="scanFolder">hashes a folder and remembers what it matched</param>
+		/// <param name="pickFolder">shows a folder picker for Scan Folder, carrying the sub-folders choice; null hides the button</param>
+		/// <param name="scanFolder">hashes a folder (below it too, when told to) and remembers what it matched</param>
 		public FirmwareSurveyForm(
 			Func<IReadOnlyList<FirmwareSurveyGroup>> survey,
 			Action<FirmwareSurveyRow, string?> remember,
 			Func<string, string?> pickFile,
-			Func<string?>? pickFolder = null,
-			Action<string>? scanFolder = null)
+			PickScanFolder? pickFolder = null,
+			Action<string, bool>? scanFolder = null)
 		{
 			_survey = survey;
 			_remember = remember;
@@ -321,12 +329,15 @@ namespace Chimera.Client.GUI
 
 		private void ScanFolder()
 		{
-			var folder = _pickFolder?.Invoke();
-			if (folder is null || _scanFolder is null) return;
+			if (_pickFolder is null || _scanFolder is null) return;
+			var recurse = _scanSubfolders;
+			var folder = _pickFolder(ref recurse);
+			if (folder is null) return;
+			_scanSubfolders = recurse;
 			UseWaitCursor = true;
 			try
 			{
-				_scanFolder(folder);
+				_scanFolder(folder, recurse);
 			}
 			finally
 			{

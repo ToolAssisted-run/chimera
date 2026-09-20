@@ -127,9 +127,14 @@ namespace Chimera.Client.GUI
 		private readonly Button _firmwareSetButton;
 		private readonly Button _firmwareClearButton;
 
-		/// <summary>whether Scan Folder walks below the folder it is given; ticked</summary>
+		/// <summary>
+		/// Whether Scan Folder walks below the folder it is given; ticked. It is the page's memory of the
+		/// choice in every case, and is SHOWN only where the folder picker cannot carry the option itself
+		/// (see <see cref="FolderBrowserEx.CanShowCheckBox"/>) - on Windows the dialog asks, and two
+		/// controls for one setting would be worse than either.
+		/// </summary>
 		private readonly CheckBox _firmwareScanSubfolders;
-		private readonly Func<string?>? _pickFirmwareFolder;
+		private readonly PickScanFolder? _pickFirmwareFolder;
 		private List<FirmwareNeed> _firmwareNeeds = new();
 		private IReadOnlyList<FirmwareLocator.IndexedFile> _firmwareIndex = [ ];
 
@@ -179,7 +184,7 @@ namespace Chimera.Client.GUI
 			Func<ProjectSlotDeclaration.Slot, string[]> pickFiles,
 			Func<string, string?>? pickFirmwareFile = null,
 			IReadOnlyList<string>? firmwareSearchDirs = null,
-			Func<string?>? pickFirmwareFolder = null,
+			PickScanFolder? pickFirmwareFolder = null,
 			Func<string, string, string?>? rememberedFirmwarePath = null,
 			Action<string, IReadOnlyDictionary<string, string>>? rememberFirmwareNow = null,
 			string? configPath = null,
@@ -355,17 +360,22 @@ namespace Chimera.Client.GUI
 			firmwareScanButton.Click += (_, _) => ScanFirmwareFolder();
 			firmwareScanButton.Visible = pickFirmwareFolder is not null;
 			// Ticked, because that is what the scan always did and what somebody
-			// pointing at a firmware folder means. It is here so the behaviour is
+			// pointing at a firmware folder means. It exists so the behaviour is
 			// visible and so it can be turned OFF: a folder holding a whole
 			// collection takes a while, and stopping at the MaxFiles cap is a
 			// blunter way to end a scan than not descending in the first place.
+			//
+			// Where the folder picker can carry the option itself it is hidden,
+			// not removed: it is still where this page remembers the answer
+			// between scans, and it is what a person sets on a toolkit whose
+			// folder dialog has no room for a control of ours.
 			_firmwareScanSubfolders = new CheckBox
 			{
 				Anchor = AnchorStyles.Bottom | AnchorStyles.Left,
 				AutoSize = true,
 				Checked = true,
-				Text = "Include sub-folders",
-				Visible = pickFirmwareFolder is not null,
+				Text = FolderBrowserEx.ScanSubfoldersLabel,
+				Visible = pickFirmwareFolder is not null && !FolderBrowserEx.CanShowCheckBox,
 			};
 			// Centred on the button rather than placed at a guessed offset: a
 			// check box is shorter than a button, by an amount that depends on
@@ -2117,20 +2127,27 @@ namespace Chimera.Client.GUI
 
 		/// <summary>
 		/// "My files are somewhere in here": scans a folder (subfolders
-		/// included) and fills every requirement it can. A hash-pinned
-		/// requirement takes only its exact file, any name; an unpinned one
-		/// takes the file bearing its declared name, hashed and recorded like
-		/// any hand-picked choice. What the user already chose is left alone.
+		/// included, unless the person said otherwise) and fills every
+		/// requirement it can. A hash-pinned requirement takes only its exact
+		/// file, any name; an unpinned one takes the file bearing its declared
+		/// name, hashed and recorded like any hand-picked choice. What the user
+		/// already chose is left alone.
 		/// </summary>
 		private void ScanFirmwareFolder()
 		{
-			var folder = _pickFirmwareFolder?.Invoke();
+			if (_pickFirmwareFolder is null) return;
+			// The check box holds the answer whether or not it is on show; the
+			// picker offers it, and hands back whatever the person settled on
+			// (unchanged, when that picker had nowhere to put it).
+			var recurse = _firmwareScanSubfolders?.Checked is not false;
+			var folder = _pickFirmwareFolder(ref recurse);
 			if (folder is null) return;
+			if (_firmwareScanSubfolders is not null) _firmwareScanSubfolders.Checked = recurse;
 			UseWaitCursor = true;
 			try
 			{
 				var found = Chimera.Client.Common.ProjectFolderScan
-					.Enumerate(folder, recurse: _firmwareScanSubfolders?.Checked is not false)
+					.Enumerate(folder, recurse: recurse)
 					.Take(Chimera.Client.Common.ProjectFolderScan.MaxFiles)
 					.ToList();
 				// one hashed index answers every pinned requirement
@@ -2205,6 +2222,15 @@ namespace Chimera.Client.GUI
 
 		public string? ChosenFirmwarePath(string id)
 			=> _firmwareNeeds.FirstOrDefault(n => n.Id == id)?.ChosenPath;
+
+		/// <summary>presses Scan Folder, for tests</summary>
+		public void ScanFirmwareFolderForTest() => ScanFirmwareFolder();
+
+		/// <summary>the sub-folders answer this page holds, shown or not, for tests</summary>
+		public bool FirmwareScanSubfolders => _firmwareScanSubfolders?.Checked is not false;
+
+		/// <summary>whether the page shows a sub-folders box of its own (it does not where the picker carries one), for tests</summary>
+		public bool FirmwareScanSubfoldersVisible => _firmwareScanSubfolders?.Visible is true;
 
 		// ---- creation -------------------------------------------------------------
 

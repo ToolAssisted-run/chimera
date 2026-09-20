@@ -4175,3 +4175,53 @@ What no theme reaches, and it is worth being plain about: scroll bars, the tick
 inside a check box, the window's own title bar. Those are drawn by the desktop
 out of the desktop's colours and WinForms offers no way to ask for others. A
 dark Chimera has light scroll bars.
+
+## The sub-folders option belongs to the folder picker (user-decided, 2026-09-20)
+
+Three places in the frontend scan a folder somebody points at: the New Project
+wizard's firmware step, the Firmware Manager, and locating a project's files.
+All three walked sub-folders, which is what a person pointing at a firmware
+folder means and exactly wrong for one pointing at a collection - so the choice
+had to be offerable, and the day before it had appeared as a check box beside
+the wizard's Scan Folder button. One page out of three, with the other two left
+as they were and no reason but which page had been open at the time.
+
+The choice is not the page's. It belongs to the act of choosing a folder, and
+so it now lives in the picker: on Windows, a check button added to the shell's
+own common item dialog through IFileDialogCustomize. Every Scan Folder in the
+frontend gets it, including the two that never had it, and a fourth one written
+next year gets it without anybody remembering to add it.
+
+One delegate carries the answer both ways - the flag goes in as the state to
+open on and comes back as what the person settled on - because a picker that
+only returns a path cannot report a control it does not know about, and a
+picker that returns a pair forces every caller to care. The ref parameter is
+the shape that lets a caller which does not care pass a value it never reads.
+
+Three pickers cannot carry the control: Mono's dialog, the SHBrowseForFolder
+tree, and a Windows whose shell refuses the customisation interface. In all
+three the value comes back exactly as it went in, and that is written down as a
+rule rather than left to fall out of the code, because "unchanged" and "the
+person said no" are the same bits and only the contract tells them apart. So is
+the other case they share with a cancelled dialog: cancel never changes the
+remembered answer.
+
+The wizard's on-page box is hidden where the dialog carries the option, not
+deleted - it is still where that page remembers the answer between scans, and
+it is what a person on Mono actually sets. Exactly one of the two is ever
+visible; two controls for one setting reads as two settings.
+
+What this cost in testing is the point of it. The suite runs on Mono under
+Xvfb and the control is raw COM against a shell that is not there, so every
+Linux test stops at the delegate. Two of them would have been vacuous and are
+not. The check that a page shows a box exactly where the picker cannot carry
+one has two halves, and a test can only ever stand on one platform - so it
+tells FolderBrowserEx what to say about the platform instead of asking the one
+it is standing on, and asks both. And the vtable offsets, where a wrong slot
+calls some other method entirely, are answered by a harness on real Windows
+(tests/ui/windows/folder-picker-checkbox.sh) that finds the control among the
+dialog's child windows, clicks it, and checks what the caller gets back -
+including the cancel case, which is the one a person is most likely to hit and
+the one no Linux test can reach. Both new Linux legs were watched failing
+against a deliberately broken build before being believed. docs/folder-picker.md
+says plainly what the green run does and does not stand for.

@@ -620,22 +620,26 @@ namespace Chimera.Client.GUI
 					};
 					return picker.ShowDialog(this) is DialogResult.OK ? picker.FileName.WithoutWslgMirror() : null;
 				},
-				pickFolder: () =>
+				pickFolder: (ref bool includeSubfolders) =>
 				{
 					using FolderBrowserEx picker = new()
 					{
 						Description = "Scan a folder for firmware files",
 						SelectedPath = Directory.Exists(firmwareFolder) ? firmwareFolder : "",
+						CheckBoxLabel = FolderBrowserEx.ScanSubfoldersLabel,
+						CheckBoxChecked = includeSubfolders,
 					};
-					return picker.ShowDialog(this) is DialogResult.OK ? picker.SelectedPath.WithoutWslgMirror() : null;
+					if (picker.ShowDialog(this) is not DialogResult.OK) return null;
+					includeSubfolders = picker.CheckBoxChecked;
+					return picker.SelectedPath.WithoutWslgMirror();
 				},
-				scanFolder: folder =>
+				scanFolder: (folder, includeSubfolders) =>
 				{
 					// every pinned declaration of every installed core, answered by hash
-					// from the folder and its subfolders; what is found is remembered
-					// where it lies
+					// from the folder and, unless the person said otherwise in the
+					// picker, what is under it; what is found is remembered where it lies
 					var packages = CorePackageDiscovery.ScanFor(Config);
-					var scanned = FirmwareLocator.BuildIndex([ ], ProjectFolderScan.Enumerate(folder).Take(ProjectFolderScan.MaxFiles));
+					var scanned = FirmwareLocator.BuildIndex([ ], ProjectFolderScan.Enumerate(folder, includeSubfolders).Take(ProjectFolderScan.MaxFiles));
 					foreach (var package in packages.Where(static p => p.Error is null))
 					{
 						foreach (var decl in FirmwareSurvey.DeclarationsOf(package.Path).Decls)

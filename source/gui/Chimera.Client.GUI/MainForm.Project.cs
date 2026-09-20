@@ -181,14 +181,18 @@ namespace Chimera.Client.GUI
 					return dialog.ShowDialog(this) is DialogResult.OK ? dialog.FileName.WithoutWslgMirror() : null;
 				},
 				firmwareSearchDirs: [ Config.PathEntries.FirmwareAbsolutePath() ],
-				pickFirmwareFolder: () =>
+				pickFirmwareFolder: (ref bool includeSubfolders) =>
 				{
 					using FolderBrowserEx picker = new()
 					{
 						Description = "Scan a folder for firmware files",
 						SelectedPath = OpensIn(Config.PathEntries.FirmwareAbsolutePath()),
+						CheckBoxLabel = FolderBrowserEx.ScanSubfoldersLabel,
+						CheckBoxChecked = includeSubfolders,
 					};
-					return picker.ShowDialog(this) is DialogResult.OK ? picker.SelectedPath.WithoutWslgMirror() : null;
+					if (picker.ShowDialog(this) is not DialogResult.OK) return null;
+					includeSubfolders = picker.CheckBoxChecked;
+					return picker.SelectedPath.WithoutWslgMirror();
 				},
 				rememberedFirmwarePaths: coreName => CoreFirmwareStore.RememberedPaths(Config, coreName),
 				rememberedFirmwarePath: (coreName, id) =>
@@ -330,13 +334,17 @@ namespace Chimera.Client.GUI
 					using OpenFileDialog picker = new() { Title = title };
 					return picker.ShowDialog(this) is DialogResult.OK ? picker.FileName.WithoutWslgMirror() : null;
 				},
-				locateFolder: () =>
+				locateFolder: (ref bool includeSubfolders) =>
 				{
 					using FolderBrowserEx picker = new()
 					{
 						Description = "Scan a folder for the project's files",
+						CheckBoxLabel = FolderBrowserEx.ScanSubfoldersLabel,
+						CheckBoxChecked = includeSubfolders,
 					};
-					return picker.ShowDialog(this) is DialogResult.OK ? picker.SelectedPath.WithoutWslgMirror() : null;
+					if (picker.ShowDialog(this) is not DialogResult.OK) return null;
+					includeSubfolders = picker.CheckBoxChecked;
+					return picker.SelectedPath.WithoutWslgMirror();
 				});
 				if (dialog.ShowDialog(this) is not DialogResult.OK)
 				{
