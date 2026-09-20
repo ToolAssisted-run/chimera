@@ -201,12 +201,10 @@ namespace Chimera.Client.GUI
 					if (bb is Button plain) plain.UseVisualStyleBackColor = false;
 					Back(c, own, theme, ThemeColorRole.ButtonBackground);
 					Fore(c, own, theme, ThemeColorRole.ButtonText);
-					{
-						bb.FlatStyle = FlatStyle.Flat;
-						bb.FlatAppearance.BorderColor = theme[ThemeColorRole.ButtonBorder];
-						bb.FlatAppearance.MouseOverBackColor = theme[ThemeColorRole.MenuSelectedBackground];
-						bb.FlatAppearance.MouseDownBackColor = theme[ThemeColorRole.Selection];
-					}
+					bb.FlatStyle = FlatStyle.Flat;
+					bb.FlatAppearance.BorderColor = theme[ThemeColorRole.ButtonBorder];
+					bb.FlatAppearance.MouseOverBackColor = theme[ThemeColorRole.MenuSelectedBackground];
+					bb.FlatAppearance.MouseDownBackColor = theme[ThemeColorRole.Selection];
 					return;
 				case TextBoxBase text:
 					// not a special case for ReadOnly: WinForms does not colour a
@@ -220,17 +218,17 @@ namespace Chimera.Client.GUI
 					Back(combo, own, theme, ThemeColorRole.InputBackground);
 					Fore(combo, own, theme, ThemeColorRole.InputText);
 					return;
-				case PropertyGrid grid2:
+				case PropertyGrid properties:
 					// the grid's own surfaces are separate properties; BackColor only
 					// reaches the strip around them
-					Back(grid2, own, theme, ThemeColorRole.WindowBackground);
-					Fore(grid2, own, theme, ThemeColorRole.WindowText);
-					grid2.ViewBackColor = theme[ThemeColorRole.InputBackground];
-					grid2.ViewForeColor = theme[ThemeColorRole.InputText];
-					grid2.HelpBackColor = theme[ThemeColorRole.WindowBackground];
-					grid2.HelpForeColor = theme[ThemeColorRole.WindowText];
-					grid2.LineColor = theme[ThemeColorRole.GridLines];
-					grid2.CategoryForeColor = theme[ThemeColorRole.WindowText];
+					Back(properties, own, theme, ThemeColorRole.WindowBackground);
+					Fore(properties, own, theme, ThemeColorRole.WindowText);
+					properties.ViewBackColor = theme[ThemeColorRole.InputBackground];
+					properties.ViewForeColor = theme[ThemeColorRole.InputText];
+					properties.HelpBackColor = theme[ThemeColorRole.WindowBackground];
+					properties.HelpForeColor = theme[ThemeColorRole.WindowText];
+					properties.LineColor = theme[ThemeColorRole.GridLines];
+					properties.CategoryForeColor = theme[ThemeColorRole.WindowText];
 					return;
 				case ListBox or CheckedListBox or TreeView or NumericUpDown or DateTimePicker:
 					Back(c, own, theme, ThemeColorRole.InputBackground);

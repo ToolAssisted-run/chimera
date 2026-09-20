@@ -96,11 +96,9 @@ namespace Chimera.Client.GUI
 		private static readonly Lock Sync = new();
 
 		/// <summary>
-		/// The renderer for this theme. For the desktop's own palette this is still
-		/// a professional renderer rather than the system one the frontend used
-		/// before, because a system renderer cannot be told any colours at all -
-		/// and the colours it is told here are the desktop's, so it draws what it
-		/// drew.
+		/// The renderer for this theme. Never asked for under a theme that follows
+		/// the desktop: those strips keep the renderer they already had, because
+		/// this one would draw the same colours differently.
 		/// </summary>
 		public static ThemeToolStripRenderer For(Theme theme)
 		{
