@@ -170,7 +170,16 @@ between flavors), GPU objects, and anything the core caches across `Init`.
 
 ## The gate
 
-One command, and every leg says what it compared. Advice earned the hard way:
+One command, and every leg says what it compared.
+
+**Read [gates.md](gates.md) before writing a leg.** It is the seven ways a gate
+goes green on a broken thing, each one taken from a mistake this project
+actually shipped, and the rule they all come down to: a leg that has never been
+seen to fail is a leg that has not been tested. Breaking the thing on purpose
+and watching the leg go red takes minutes and is the highest-value act in
+testing.
+
+Advice earned the hard way:
 
 - **Name the test content.** A leg that takes "the first `.rar` in the folder"
   changes meaning the day the user adds a game, and three legs go red for

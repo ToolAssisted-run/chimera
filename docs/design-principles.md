@@ -4000,3 +4000,34 @@ built a window and died inside it on the project that was not there.
 `getrecording`, `setrecording`, `togglerecording`, `setbranchtext` and
 `get_branch_index_by_id` now answer the way the rest of the library already
 did: false, nil, or nothing done.
+
+## A gate that has never failed has not been tested (2026-09-20)
+
+Seven distinct instances of a gate passing while the thing it vouched for was
+broken were found in one day, across three repositories. Written up as
+[gates.md](gates.md), because seven in a day is a class of mistake and not
+seven accidents.
+
+The worst of them, by how long it lasted and how much it covered: the PCSX2
+core ran EVERY PlayStation 2 game with an empty per-title database - no clamp
+modes, no round modes, no game fixes, none of the corrections upstream keeps
+for hundreds of titles - and the gate was green throughout, because no leg ever
+asked whether the database had anything in it. The user-visible symptom was two
+separate bug reports about Final Fantasy X.
+
+The cheapest of them to have prevented: miniBox's thunk pool ran out at 32 and
+answered 0 for the rest, which `mb_host_proc_addr` reports exactly the way it
+reports a symbol that is not in the ELF. Seventeen of quickerNES's exports read
+as "this core does not have that feature" while sitting in the binary. One line
+on stderr when the pool runs out would have made it obvious on the first run.
+
+The rule the seven come down to, and the one worth keeping when the detail has
+faded: **a leg that has never been seen to fail is a leg that has not been
+tested.** Break the thing, watch the leg go red, revert, and say in the commit
+that you did. It costs minutes and it converts a belief into a fact.
+
+The corollary, learned the same week at the cost of a shipped regression:
+"fixed by construction" is not fixed. A paletted-texture fix went in on 2026-09-19
+with its own commit body saying no disc on hand used the format, so the fix
+"waits for a game of sprites to prove it". A game of sprites arrived the next
+day and the fix was itself the bug.
