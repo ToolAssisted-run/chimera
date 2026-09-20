@@ -10,7 +10,7 @@ using Chimera.Emulation.Common;
 
 namespace Chimera.Client.GUI
 {
-	public partial class TAStudioSettingsForm : Form
+	public partial class TAStudioSettingsForm : ThemedForm
 	{
 		private TAStudio.AllSettings _settings;
 		private ControllerDefinition _controllerDef;

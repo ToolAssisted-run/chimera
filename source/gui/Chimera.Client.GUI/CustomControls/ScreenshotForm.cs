@@ -11,7 +11,7 @@ namespace Chimera.Client.GUI
 	/// so show only the actual contents and avoid stealing focus, while still being topmost:
 	/// <see href="https://stackoverflow.com/a/25219399"/>
 	/// </remarks>
-	public class ScreenshotForm : Form
+	public class ScreenshotForm : ThemedForm
 	{
 		private const int WS_EX_TOPMOST = 0x00000008;
 

@@ -3,7 +3,7 @@ using System.Windows.Forms;
 
 namespace Chimera.Client.GUI
 {
-	public partial class ExceptionBox : Form
+	public partial class ExceptionBox : ThemedForm
 	{
 		public ExceptionBox(string str)
 		{

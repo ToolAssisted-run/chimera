@@ -412,6 +412,14 @@ namespace Chimera.Client.Common
 
 		public bool UseStaticWindowTitles { get; set; }
 
+		/// <summary>
+		/// The colour scheme every window paints with, by the name inside the theme
+		/// (Config &gt; Theme). "Light" is the palette Chimera has always had. A name
+		/// that is not on offer - a theme file somebody deleted - quietly becomes
+		/// Light again rather than leaving the frontend with no colours.
+		/// </summary>
+		public string Theme { get; set; } = ThemeLibrary.DefaultThemeName;
+
 		public string MainFormStaticWindowTitleOverride { get; set; } = string.Empty;
 
 		[JsonIgnore]

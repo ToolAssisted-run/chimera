@@ -7,7 +7,7 @@ using Chimera.WinForms.Controls;
 
 namespace Chimera.Client.GUI
 {
-	public sealed class TAStudioColorSettingsForm : Form
+	public sealed class TAStudioColorSettingsForm : ThemedForm
 	{
 		public TAStudioColorSettingsForm(TAStudioPalette initPalette, Action<TAStudioPalette> save)
 		{

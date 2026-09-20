@@ -7,7 +7,7 @@ using Chimera.Emulation.Common;
 
 namespace Chimera.Client.GUI
 {
-	public partial class PlatformChooser : Form
+	public partial class PlatformChooser : ThemedForm
 	{
 		public PlatformChooser()
 			=> InitializeComponent();

@@ -2,7 +2,7 @@ using System.Windows.Forms;
 
 namespace Chimera.Client.GUI
 {
-	public partial class PathInfo : Form
+	public partial class PathInfo : ThemedForm
 	{
 		public PathInfo()
 		{

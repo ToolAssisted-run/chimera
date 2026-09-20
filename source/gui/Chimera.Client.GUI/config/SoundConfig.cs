@@ -5,7 +5,7 @@ using Chimera.Client.Common;
 
 namespace Chimera.Client.GUI
 {
-	public partial class SoundConfig : Form, IDialogParent
+	public partial class SoundConfig : ThemedForm, IDialogParent
 	{
 		private readonly Config _config;
 

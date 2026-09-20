@@ -5,8 +5,11 @@ using Chimera.Client.Common;
 
 namespace Chimera.Client.GUI
 {
-	public partial class LuaWinform : Form, IKeepFileRunning
+	public partial class LuaWinform : ThemedForm, IKeepFileRunning
 	{
+		/// <summary>A window a script built, control by control. Its colours are the script's.</summary>
+		protected override bool ThemingEnabled => false;
+
 		public List<LuaEvent> ControlEvents { get; } = new List<LuaEvent>();
 
 		private readonly LuaFile _ownerFile;

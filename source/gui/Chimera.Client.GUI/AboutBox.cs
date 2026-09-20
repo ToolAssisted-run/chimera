@@ -7,7 +7,7 @@ using Chimera.Common;
 
 namespace Chimera.Client.GUI
 {
-	public partial class AboutBox : Form
+	public partial class AboutBox : ThemedForm
 	{
 		public AboutBox()
 		{

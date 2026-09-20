@@ -9,7 +9,7 @@ using Chimera.Common;
 
 namespace Chimera.Client.GUI
 {
-	public class FormBase : Form
+	public class FormBase : ThemedForm
 	{
 		private const string PLACEHOLDER_TITLE = "(will take value from WindowTitle/WindowTitleStatic)";
 
@@ -24,21 +24,15 @@ namespace Chimera.Client.GUI
 		}
 
 		/// <summary>
-		/// Under Mono, <see cref="SystemColors.Control">SystemColors.Control</see> returns an ugly beige.<br/>
-		/// This method recursively replaces the <see cref="Control.BackColor"/> of the given <paramref name="control"/> (can be a <see cref="Form"/>) with <see cref="Color.WhiteSmoke"/>
-		/// iff they have the default of <see cref="SystemColors.Control">SystemColors.Control</see>.<br/>
-		/// (Also adds a custom <see cref="ToolStrip.Renderer"/> to <see cref="ToolStrip">ToolStrips</see> to change their colors.)
+		/// The renderer a tool strip gets under the Light theme on a Unix host,
+		/// which is what every strip in the frontend got before there were themes.
+		/// <see cref="ThemeEngine.ApplyStrip"/> is the only caller; the walk it
+		/// belongs to has taken over the rest of what used to happen here (Mono
+		/// hands back an ugly beige for SystemColors.Control, so every control in
+		/// every window was recoloured to WhiteSmoke - the Light theme says exactly
+		/// that, in <c>ThemeFile.SystemColorByName</c>, and says it on both
+		/// platforms).
 		/// </summary>
-		public static void FixBackColorOnControls(Control control)
-		{
-			if (control.BackColor == SystemColors.Control) control.BackColor = Color.WhiteSmoke;
-			foreach (Control c1 in control.Controls)
-			{
-				if (c1 is ToolStrip ts) ts.Renderer = GlobalToolStripRenderer;
-				else FixBackColorOnControls(c1);
-			}
-		}
-
 		public static readonly ToolStripSystemRenderer GlobalToolStripRenderer = new();
 
 		private string? _windowTitleStatic;
@@ -90,7 +84,6 @@ namespace Chimera.Client.GUI
 				Close();
 				return;
 			}
-			if (OSTailoredCode.IsUnixHost) FixBackColorOnControls(this);
 			UpdateWindowTitle();
 
 			if (MainMenuStrip != null)

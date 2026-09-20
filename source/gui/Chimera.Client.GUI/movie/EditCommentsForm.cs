@@ -4,7 +4,7 @@ using Chimera.Client.Common;
 
 namespace Chimera.Client.GUI
 {
-	public partial class EditCommentsForm : Form
+	public partial class EditCommentsForm : ThemedForm
 	{
 		private readonly IMovie _movie;
 		private readonly bool _readOnly;

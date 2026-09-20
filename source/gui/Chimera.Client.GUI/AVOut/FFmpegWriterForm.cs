@@ -7,7 +7,7 @@ namespace Chimera.Client.GUI
 	/// <summary>
 	/// configures the FFmpegWriter
 	/// </summary>
-	public partial class FFmpegWriterForm : Form
+	public partial class FFmpegWriterForm : ThemedForm
 	{
 		/// <summary>
 		/// stores a single format preset

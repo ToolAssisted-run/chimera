@@ -9,7 +9,7 @@ using Chimera.Emulation.Common;
 
 namespace Chimera.Client.GUI
 {
-	public sealed partial class PathConfig : Form, IDialogParent
+	public sealed partial class PathConfig : ThemedForm, IDialogParent
 	{
 		private readonly PathEntryCollection _pathEntries;
 

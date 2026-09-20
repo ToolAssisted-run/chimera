@@ -8,7 +8,7 @@ using Chimera.WinForms.Controls;
 
 namespace Chimera.Client.GUI
 {
-	public partial class MessageConfig : Form
+	public partial class MessageConfig : ThemedForm
 	{
 		private readonly Config _config;
 

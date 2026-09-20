@@ -12,7 +12,7 @@ using Chimera.Emulation.Common;
 
 namespace Chimera.Client.GUI
 {
-	public partial class ControllerConfig : Form, IDialogParent
+	public partial class ControllerConfig : ThemedForm, IDialogParent
 	{
 		private readonly IEmulator _emulator;
 		private readonly Config _config;

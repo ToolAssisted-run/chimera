@@ -4,7 +4,7 @@ using Chimera.Client.Common;
 
 namespace Chimera.Client.GUI
 {
-	public partial class UndoHistoryForm : Form
+	public partial class UndoHistoryForm : ThemedForm
 	{
 		private const string IdColumnName = "ID";
 		private const string UndoColumnName = "Undo Step";

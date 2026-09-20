@@ -2,7 +2,7 @@ using System.Windows.Forms;
 
 namespace Chimera.Client.GUI
 {
-	public partial class HexColorsForm : Form
+	public partial class HexColorsForm : ThemedForm
 	{
 		private readonly HexEditor _hexEditor;
 
