@@ -85,7 +85,7 @@
 			// label4
 			// 
 			this.label4.Font = new System.Drawing.Font("Microsoft Sans Serif", 9.75F, System.Drawing.FontStyle.Italic, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-			this.label4.Location = new System.Drawing.Point(207, 31);
+			this.label4.Location = new System.Drawing.Point(197, 31);
 			this.label4.Name = "label4";
 			this.label4.Text = "\"A modular framework for tool-assisted speedruns (TAS)\"";
 			// 
@@ -155,7 +155,7 @@
 			this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
 			this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
 			this.CancelButton = this.OK;
-			this.ClientSize = new System.Drawing.Size(448, 230);
+			this.ClientSize = new System.Drawing.Size(584, 230);
 			this.Controls.Add(this.DateLabel);
 			this.Controls.Add(this.linkLabelBizHawk);
 			this.Controls.Add(this.linkLabel3);
@@ -167,7 +167,7 @@
 			this.Controls.Add(this.linkLabel1);
 			this.Controls.Add(this.pictureBox1);
 			this.Controls.Add(this.OK);
-			this.MinimumSize = new System.Drawing.Size(453, 240);
+			this.MinimumSize = new System.Drawing.Size(589, 240);
 			this.Name = "AboutBox";
 			this.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
 			this.Text = "About Chimera";
