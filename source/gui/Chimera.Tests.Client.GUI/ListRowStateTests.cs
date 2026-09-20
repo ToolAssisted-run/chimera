@@ -19,8 +19,7 @@ namespace Chimera.Tests.Client.GUI
 	///
 	/// That has now shipped twice. First the CHOSEN row, which came out as a beige
 	/// bar with invisible writing on it. Then the row under the POINTER, which came
-	/// out as a bar with no writing at all, because WinForms raises DrawSubItem for
-	/// a hovered row with a null SubItem and the text was being taken from it.
+	/// out as a bar with most of its writing gone.
 	///
 	/// So this does not test a state. It tests the LIST of states, and every one of
 	/// them, by driving the real draw handlers the walk installs and looking at what
@@ -31,6 +30,11 @@ namespace Chimera.Tests.Client.GUI
 	///   normal, chosen, chosen while the list has no focus, under the pointer,
 	///   chosen AND under the pointer, on a list that is switched off,
 	///   and the tick box in each of ticked and not.
+	///
+	/// And one thing that is not a state at all but belongs with them, because it
+	/// is what actually shipped: a row repainted in PART - see
+	/// <see cref="RepaintingOneColumnOfARowLeavesTheOthersAlone"/>. Hovering does
+	/// not ask for a row to be redrawn. It invalidates a piece of one.
 	/// </summary>
 	[TestClass]
 	public class ListRowStateTests
@@ -124,10 +128,13 @@ namespace Chimera.Tests.Client.GUI
 				CheckBoxes = true,
 				Bounds = new Rectangle(0, 0, Width, 120),
 			};
-			list.Columns.Add("Name", Width);
+			list.Columns.Add("Name", Width / 2);
+			list.Columns.Add("More", Width / 2);
 			foreach (var name in new[] { "plain", "chosen", "ticked" })
 			{
-				list.Items.Add(new ListViewItem(name));
+				var row = new ListViewItem(name);
+				row.SubItems.Add("second " + name);
+				list.Items.Add(row);
 			}
 			list.Items[1].Selected = true;
 			list.Items[2].Checked = true;
@@ -211,6 +218,92 @@ namespace Chimera.Tests.Client.GUI
 			yield return ("ticked and under the pointer", 2, ListViewItemStates.Hot, false, false);
 			yield return ("switched off", 0, default, false, true);
 			yield return ("switched off and ticked", 2, default, false, true);
+		}
+
+		/// <summary>
+		/// A row repainted in PART keeps the part that was not repainted.
+		///
+		/// This is the one that actually shipped, and it took a log of the toolkit's
+		/// own calls on Windows to see. Moving the pointer onto a row does not ask
+		/// for the row to be redrawn - it invalidates a piece of it, and the toolkit
+		/// then raises DrawItem for the row and DrawSubItem for only the columns it
+		/// means to redraw. Measured: one DrawItem, then DrawSubItem for column 0
+		/// and no others.
+		///
+		/// Anything DrawItem paints outside those columns is therefore destruction:
+		/// it wipes cells that no DrawSubItem is coming for. The row filled its own
+		/// full width, so pointing at a row in the Core Manager wiped every column
+		/// but the first, and the entry appeared to vanish.
+		///
+		/// So: draw a whole row, then ask for column 0 alone the way the toolkit
+		/// does, and the other columns must still be there.
+		/// </summary>
+		[TestMethod]
+		public void RepaintingOneColumnOfARowLeavesTheOthersAlone()
+		{
+			List<string> complaints = new();
+			foreach (var theme in ThemeLibrary.All.Where(static t => !t.FollowsDesktop))
+			{
+				ThemeLibrary.Select(theme.Name);
+				using Form host = new() { ClientSize = new(Width, 160) };
+				using var list = Build();
+				host.Controls.Add(list);
+				host.Show();
+				ThemeEngine.Apply(host, theme);
+
+				var item = list.Items[0];
+				Rectangle bounds = new(0, 0, Width, Height);
+				// the far half of the row, which the partial repaint must not touch
+				Rectangle far = new(Width / 2, 0, Width / 2, Height);
+
+				using Bitmap whole = new(Width, Height, PixelFormat.Format32bppArgb);
+				using (var g = Graphics.FromImage(whole))
+				{
+					g.Clear(Color.Magenta);
+					Raise(list, "OnDrawItem", new DrawListViewItemEventArgs(g, item, bounds, 0, default));
+					for (var column = 0; column < list.Columns.Count; column++)
+					{
+						Raise(list, "OnDrawSubItem", new DrawListViewSubItemEventArgs(
+							g, Cell(list, bounds, column), item, item.SubItems[column], 0, column, list.Columns[column], default));
+					}
+				}
+				var before = Census(Crop(whole, far));
+
+				// ...and now the shape a hover really has: the row, then one column
+				using (var g = Graphics.FromImage(whole))
+				{
+					Raise(list, "OnDrawItem", new DrawListViewItemEventArgs(g, item, bounds, 0, default));
+					Raise(list, "OnDrawSubItem", new DrawListViewSubItemEventArgs(
+						g, Cell(list, bounds, 0), item, item.SubItems[0], 0, 0, list.Columns[0], default));
+				}
+				var after = Census(Crop(whole, far));
+				host.Close();
+
+				var lostColour = before.Count > after.Count;
+				if (lostColour)
+				{
+					complaints.Add($"{theme.Name}: repainting column 0 of a row erased what was in the other columns "
+						+ $"({before.Count} colours there before, {after.Count} after). The toolkit repaints part of a "
+						+ "row when the pointer moves onto it, and only the columns it names are coming back.");
+				}
+			}
+
+			ThemeLibrary.Select("Light");
+			Assert.AreEqual(0, complaints.Count, string.Join("\n", complaints));
+		}
+
+		/// <summary>Where one column sits inside a row, the way a ListView lays them out.</summary>
+		private static Rectangle Cell(ListView list, Rectangle row, int column)
+		{
+			var left = row.Left;
+			for (var i = 0; i < column; i++) left += list.Columns[i].Width;
+			return new Rectangle(left, row.Top, list.Columns[column].Width, row.Height);
+		}
+
+		private static Bitmap Crop(Bitmap source, Rectangle area)
+		{
+			area.Intersect(new Rectangle(0, 0, source.Width, source.Height));
+			return source.Clone(area, source.PixelFormat);
 		}
 
 		/// <summary>

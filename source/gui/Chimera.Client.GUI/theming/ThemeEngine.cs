@@ -911,9 +911,27 @@ namespace Chimera.Client.GUI
 				e.DrawDefault = true;
 				return;
 			}
-			using SolidBrush back = new(RowBackground(list, e.Item, Current, e.State));
+			// ONLY the strip to the right of the last column. The cells paint their
+			// own backgrounds, and painting over them from here is not free.
+			//
+			// When the toolkit repaints part of a row - which is exactly what it
+			// does when the pointer moves onto one - it raises DrawItem for the row
+			// and DrawSubItem for only the columns it means to redraw. Measured on
+			// Windows: one DrawItem, then DrawSubItem for column 0 and no others.
+			// Filling the whole row here wiped the columns that were not coming, and
+			// what the person saw was a row losing its text as they pointed at it.
+			//
+			// So this paints only what no cell will: the gap past the last column,
+			// which belongs to no sub-item and for which no DrawSubItem is ever
+			// raised. FillLastColumn usually leaves that gap empty; this is what
+			// covers it when it cannot.
+			var columns = 0;
+			foreach (ColumnHeader column in list.Columns) columns += column.Width;
+			var left = e.Bounds.Left + columns;
 			var right = Math.Max(e.Bounds.Right, list.ClientRectangle.Right);
-			e.Graphics.FillRectangle(back, new Rectangle(e.Bounds.Left, e.Bounds.Top, right - e.Bounds.Left, e.Bounds.Height));
+			if (right <= left) return;
+			using SolidBrush back = new(RowBackground(list, e.Item, Current, e.State));
+			e.Graphics.FillRectangle(back, new Rectangle(left, e.Bounds.Top, right - left, e.Bounds.Height));
 		}
 
 		/// <summary>One cell: its tick box and image if it is the first, then its text.</summary>
@@ -924,13 +942,11 @@ namespace Chimera.Client.GUI
 			var item = e.Item;
 			if (item is null) return;
 
-			// WinForms hands this event a null SubItem when it is redrawing a row
-			// because the pointer moved onto it - the same event, with ItemIndex -1
-			// and nothing in SubItem. The background was being painted from that and
-			// the TEXT was being skipped, so pointing at a row wiped it: a coloured
-			// bar with nothing written on it. The cell is identified by its COLUMN,
-			// which is always there, so look the sub-item up rather than trusting it
-			// to arrive.
+			// WinForms can hand this event a null SubItem, with ItemIndex -1. The
+			// cell is identified by its COLUMN, which is always there, so look the
+			// sub-item up rather than trusting it to arrive; painting a background
+			// and then skipping the text because the sub-item was missing would
+			// leave a coloured bar with nothing written on it.
 			var sub = e.SubItem
 				?? (e.ColumnIndex >= 0 && e.ColumnIndex < item.SubItems.Count ? item.SubItems[e.ColumnIndex] : item.SubItems[0]);
 

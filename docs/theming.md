@@ -299,14 +299,30 @@ into three kinds, and the kinds are worth knowing before adding to any of this.
 **1. States of a control the frontend draws itself.** A list the theme has
 taken over is drawn ENTIRELY here. There is no toolkit underneath, so a state
 nobody wrote code for is not drawn in the toolkit's colours - it is not drawn
-at all. It has now happened three times: the CHOSEN row came out a beige bar
-with invisible writing on it; the row under the POINTER came out a bar with no
-writing at all; and the check box, the small image and the disabled list were
-each written only once someone went looking. A test that renders a control in
-one state tells you nothing about the others, and "it looked right in the
-screenshot" means the screenshot was of the resting state.
+at all. It has now happened twice: the CHOSEN row came out a beige bar with
+invisible writing on it, and the check box, the small image and the disabled
+list were each written only once someone went looking. A test that renders a
+control in one state tells you nothing about the others, and "it looked right
+in the screenshot" means the screenshot was of the resting state.
 `ListRowStateTests` now enumerates the states and asserts every one of them -
 and the enumeration, not any single assertion, is the thing to keep current.
+
+**1b. Drawing more than you were asked to draw.** The nastier relative of the
+above, and the one that took two tries to find. Moving the pointer onto a row
+does not ask for the row to be redrawn - it invalidates a PIECE of one, and the
+toolkit then raises `DrawItem` for the row and `DrawSubItem` for only the
+columns it means to repaint. Logged on Windows: one `DrawItem`, then
+`DrawSubItem` for column 0 and no others. `DrawItem` was filling the row's full
+width, so it wiped every column that was not coming back, and pointing at an
+entry in the Core Manager made it vanish. It now paints only the strip past the
+last column, which is the one part no `DrawSubItem` is ever raised for.
+
+The rule that generalises: **in a partial repaint, paint only what you were
+asked for.** An owner-draw handler does not know what else is about to be
+drawn, and the pixels it did not have to touch belong to somebody else. The
+first attempt at this bug guessed at a null `SubItem` instead and fixed
+something real but unrelated; what settled it was logging every `Draw*` call
+the real toolkit made, which is what the Windows harness is for.
 
 **2. Events raised as a side effect of painting.** Theming writes properties,
 and writing a property can make the toolkit remake a control's handle, and
