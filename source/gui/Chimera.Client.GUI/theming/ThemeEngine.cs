@@ -53,6 +53,8 @@ namespace Chimera.Client.GUI
 			public bool Skip;
 
 			public bool HeaderOwnerDraw;
+
+			public bool Hooked;
 		}
 
 		private static readonly ConditionalWeakTable<Control, Overrides> Tagged = new();
@@ -138,6 +140,18 @@ namespace Chimera.Client.GUI
 			else ApplyToOne(root, theme, own);
 
 			foreach (Control child in root.Controls) Apply(child, theme);
+
+			// A window builds most of itself before it is ever shown, but not all:
+			// TAStudio's piano rolls are made when a project opens, long after the
+			// walk ran, and a control made later would be the one control on the
+			// window still painted white. Hooking the container means a control is
+			// themed when it arrives, whenever that is.
+			var state = own ?? For(root);
+			if (!state.Hooked)
+			{
+				state.Hooked = true;
+				root.ControlAdded += OnControlAdded;
+			}
 
 			// A form's context menu and a control's own context menu are not in
 			// Controls, so the walk would never reach them.
@@ -249,6 +263,12 @@ namespace Chimera.Client.GUI
 		/// it is sitting on top of something that has already been themed, and
 		/// giving it a colour of its own would hide that.
 		/// </summary>
+		private static void OnControlAdded(object sender, ControlEventArgs e)
+		{
+			if (e.Control is null) return;
+			Apply(e.Control, Current);
+		}
+
 		private static void Back(Control c, Overrides? own, Theme theme, ThemeColorRole fallback)
 		{
 			if (own?.Back is null && c.BackColor != System.Drawing.Color.Transparent) c.BackColor = theme[fallback];

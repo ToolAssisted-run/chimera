@@ -79,7 +79,7 @@
 		"TasAnalogEdit": "#6E6E50",
 		"TasDefaultRow": "#232323",
 		"TasCursorColumn": "#2A3038",
-		"TasFrameColumnWash": "#60000000",
+		"TasFrameColumnWash": "#28FFFFFF",
 		"TasAlternatePlayer": "#14FFFFFF",
 		"TasIconPlayback": "#53D9FF",
 		"TasIconRecording": "#00C240",
