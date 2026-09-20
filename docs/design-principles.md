@@ -4117,6 +4117,32 @@ theme that is not the desktop's, because a contributed theme is ninety numbers
 somebody typed and two of them being the same shade is exactly the failure
 that is invisible on the page and obvious on the screen.
 
+Three follow-ups after Sergio tested the staged build (user-decided,
+2026-09-20). Dark is what a config being created now starts with; a config
+that already existed and had never chosen keeps Light, because changing
+somebody's colours under them on an update is a surprise and the theme is one
+click away either way. Twenty-one menu items had no icon and now have one,
+from one place, with the items that are better bare - anything that can be
+ticked, since the tick lives in the image margin; labels that are not
+commands; Exit - named as decisions rather than omissions. And the title bar,
+written up the round before as unreachable, is reachable: WinForms cannot
+colour it but Windows will, through one DwmSetWindowAttribute call, which
+ThemedForm makes on handle creation and on every theme change. That call
+cannot be exercised anywhere but Windows, so what the tests cover is that
+every window ASKS; whether Windows honours it was checked by hand on the
+Windows side of this box, build 22631, and photographed.
+
+The fourth thing that round taught is the one worth keeping. The Theme menu
+shipped dead - clicking it did nothing at all - while 873 tests were green,
+because a ToolStripMenuItem whose DropDownItems is empty never opens, so the
+handler that fills it never ran. Every one of those tests reached the theme
+engine directly; the only route a USER has to the feature was untested. That
+is the same class as the gate over an empty game database, in a new place: the
+mechanism was covered and the entry point was not. MenuContractTests now reads
+the Designer files and fails on any menu that fills itself when it opens and
+starts with nothing in it, which is the eleven that exist and the twelfth
+somebody writes.
+
 Where a user already had a say, the theme yields to it. TAStudio's palette, the
 hex editor's six colours and the OSD's four follow the theme only while nobody
 has set them; a config from before themes holds the old light values, and those

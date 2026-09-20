@@ -12,6 +12,12 @@ open window repaints, including TAStudio. The choice is saved with the rest of
 the config and read back before the first window exists, so a start is never a
 flash of the wrong colours.
 
+A config being created now starts on **Dark**. A config that already existed
+and had never chosen a theme was written before there were any, so it keeps
+**Light** - changing somebody's colours under them on an update is a surprise,
+not a feature. Either way the answer is written into the config the first time
+it matters, so the question is asked once.
+
 The same menu has:
 
 - **Open Themes Folder** - where a theme file goes. It is `Themes/` under the
@@ -132,7 +138,8 @@ desktop's own colours, and WinForms gives no way to ask for anything else:
 - **The check inside a check box, and the dot inside a radio button.** The
   caption beside them is themed; the box itself is the OS's. (The tick boxes
   inside a list ARE themed - that list is drawn here.)
-- **The window's title bar and border.** The desktop draws those.
+- **The window's border.** The desktop draws it. The title bar is no longer on
+  this list: see below.
 - **Progress bars.** Deliberately left alone: setting colours on one under
   visual styles does nothing at all.
 - **A list's group headers.** Left to the toolkit, which on Mono does not draw
@@ -141,6 +148,49 @@ desktop's own colours, and WinForms gives no way to ask for anything else:
 And some colours are not the frontend's to set: a Lua script's canvas and any
 window a script builds, a movie's subtitle colours, and the padding colour a
 core declares for its own picture.
+
+## The title bar
+
+The title bar belongs to the desktop compositor, not to WinForms - but on
+Windows the compositor will draw it dark if the window asks, through one call
+to `DwmSetWindowAttribute` with `DWMWA_USE_IMMERSIVE_DARK_MODE`. There is
+nothing to draw and nothing to theme: the window says what it is, and the
+buttons, their hover states and the inactive shade all follow.
+
+`WindowFrame` makes that call and `ThemedForm` makes it on handle creation and
+again on a theme change, so every window is covered by existing. It is
+deliberately not made from `ApplyTheme`, which is the hook a window overrides:
+a window that overrode it and forgot the base call would be left with a light
+frame on a dark window. A theme that follows the desktop asks for nothing,
+since those ARE the desktop's colours.
+
+Off Windows it does nothing: there is no dwmapi, and a Unix window manager
+owns the frame and has its own opinion about it. A missing dll, an attribute
+an older build does not know, and a window whose handle has gone are all
+silent.
+
+## The menus
+
+Every image beside a menu item comes from `MenuIcons`, which is one place so
+that the gaps are visible as gaps. `MenuIconTests` walks it by reflection and
+measures each icon against every theme's menu colour, because an icon has to
+read on a white menu and on a near-black one and nobody will re-check that by
+eye.
+
+Three kinds of item are bare on purpose:
+
+- **Anything that can be ticked.** A ticked menu item draws its tick in the
+  image margin, so an image there fights the tick. Every Display-this toggle,
+  every throttle mode, every window scale.
+- **Labels that are not commands** - "Loaded core: ...", the movie status line.
+- **Exit**, alone after a separator, which no icon says anything useful about.
+
+And one rule with a test behind it, `MenuContractTests`: a menu that fills
+itself in `DropDownOpened` must be seeded with at least one item in the
+designer. A `ToolStripMenuItem` whose `DropDownItems` is empty does not open a
+dropdown at all, so such a menu never opens and its handler never runs. That
+is not a hypothetical - it is how the Theme menu shipped, dead, with every
+test green.
 
 ## How it is applied
 
