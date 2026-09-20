@@ -4143,6 +4143,29 @@ the Designer files and fails on any menu that fills itself when it opens and
 starts with nothing in it, which is the eleven that exist and the twelfth
 somebody writes.
 
+And the fourth report, which is the most instructive of the lot: on the staged
+build, choosing Light while wearing Dark changed the title bar and nothing
+else. The cause was the design decision two paragraphs up. "The desktop theme
+assigns nothing" is right for a window built under it and is exactly wrong for
+a window that is currently dark - there was nothing to put the colours back to,
+because nothing had ever recorded what they were. The title bar changed
+because it is not part of that mechanism at all: it is an unconditional call.
+
+So the first walk over a control now records everything the walk can change -
+colours, border style, visual-style flag, flat appearance, link colours, a
+property grid's six, a data grid's cell styles, a strip's renderer - and the
+desktop theme runs that record backwards. Two things surfaced while fixing it
+that are worth keeping. A ToolStrip handed the renderer it already holds keeps
+the render mode it was put back to, so renderers are made per application now
+rather than shared per theme; and a strip item's colour is the STRIP's until
+somebody sets one, so recording what an item reads back after the strip has
+gone dark records the dark colour - items are reset, not restored.
+
+The test that was green throughout checked that a repaint happened. It now
+checks what the window LOOKS like afterwards, against a window that started in
+that theme, in both directions. That is the third time on this branch that the
+check covered the mechanism and not the state a person actually lands in.
+
 Where a user already had a say, the theme yields to it. TAStudio's palette, the
 hex editor's six colours and the OSD's four follow the theme only while nobody
 has set them; a config from before themes holds the old light values, and those

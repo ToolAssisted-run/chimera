@@ -263,8 +263,8 @@ for years; that substitution is part of what `system:` means here.
 Light also carries `"desktop": true`, and that is the part that actually
 guarantees it changes nothing. Under a theme that says so, the walk assigns
 nothing by control type: it applies the roles the frontend declared by name,
-hands the theme to the controls that paint themselves, and otherwise leaves
-every control exactly as the toolkit drew it. This matters because assigning a
+hands the theme to the controls that paint themselves, and otherwise puts every
+control back the way the toolkit had it. This matters because assigning a
 colour is not free even when it is the same colour - a `Button` handed a
 `BackColor` stops using visual styles, a sunken border redrawn becomes a line,
 a menu given a colour table stops going through the system renderer. Same
@@ -272,6 +272,23 @@ colours, different drawing. `TheDesktopThemeAssignsNothingItWasNotAskedFor`
 holds that, and every screenshot in `tests/ui/shots` was compared pixel by
 pixel against the same window built from the commit before this work: they are
 identical.
+
+"Puts back" is doing real work in that paragraph, and it was missing at first.
+The first time a control is walked - whichever theme that is - everything the
+walk is about to change is recorded: the two colours, the border style, the
+visual-style flag, the flat appearance, a link's three link colours, a property
+grid's six, a data grid's cell styles, a strip's renderer. That record is the
+undo, and the desktop theme is the undo being run. Without it the desktop theme
+was not "leave this alone", it was "leave this DARK": a window wearing Dark had
+nothing to be put back to, and choosing Light changed the title bar and nothing
+else. `ThemeRoundTripTests` compares a window taken Light - Dark - Light
+against one that started Light, in both directions and pixel by pixel, and the
+screenshot check does the same for every real window it photographs.
+
+A consequence worth knowing when adding to the walk: **anything the walk
+writes has to be captured next to the line that writes it.** A property changed
+without being recorded makes the theme one-way again, silently, and only in the
+direction nobody tests by hand.
 
 `LightThemeBaselineTests` holds the other half - that the hex values in
 `light.json` are still the ones the code used - so that a theme which does
