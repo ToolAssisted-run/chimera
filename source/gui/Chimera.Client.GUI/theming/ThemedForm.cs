@@ -17,6 +17,10 @@ namespace Chimera.Client.GUI
 	/// it and adds the window-title contract; a window that cannot live with that
 	/// contract still derives from this, so it is still themed. ThemingContractTests
 	/// fails if a Form is added that derives from neither.
+	///
+	/// It is also where the title bar is asked to go dark - see
+	/// <see cref="WindowFrame"/> - for the same reason: every window is here, so
+	/// no window can be forgotten.
 	/// </summary>
 	public class ThemedForm : Form
 	{
@@ -32,7 +36,23 @@ namespace Chimera.Client.GUI
 		protected override void OnHandleCreated(EventArgs e)
 		{
 			base.OnHandleCreated(e);
-			if (!DesignMode && ThemingEnabled) ApplyTheme(ThemeLibrary.Current);
+			if (DesignMode) return;
+			TakeTheme(ThemeLibrary.Current);
+		}
+
+		/// <summary>
+		/// Everything a window takes from a theme. The title bar is done here and
+		/// not in <see cref="ApplyTheme"/> on purpose: ApplyTheme is the hook a
+		/// window overrides, and a window that overrides it and forgets to call the
+		/// base would otherwise be left with the desktop's title bar on a dark
+		/// window. It also applies to a window whose contents are not ours to
+		/// colour - a Lua script's canvas is the script's, but the frame around it
+		/// is still Chimera's.
+		/// </summary>
+		private void TakeTheme(Theme theme)
+		{
+			WindowFrame.Apply(this, theme);
+			if (ThemingEnabled) ApplyTheme(theme);
 		}
 
 		/// <summary>
@@ -47,9 +67,6 @@ namespace Chimera.Client.GUI
 		}
 
 		/// <summary>Called by <see cref="ThemeEngine.ApplyToOpenForms"/>; not part of the window's own API.</summary>
-		internal void RaiseThemeChanged(Theme theme)
-		{
-			if (ThemingEnabled) ApplyTheme(theme);
-		}
+		internal void RaiseThemeChanged(Theme theme) => TakeTheme(theme);
 	}
 }
