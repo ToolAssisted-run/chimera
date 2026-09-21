@@ -1738,7 +1738,7 @@ namespace Chimera.Client.GUI
 			}
 		}
 
-		private static readonly IList<Type> SpecializedTools = ReflectionCache.Types
+		private static readonly IList<Type> SpecializedTools = typeof(MainForm).Assembly.GetTypesWithoutLoadErrors()
 			.Where(static t => !t.IsAbstract && typeof(IToolForm).IsAssignableFrom(t)
 				&& t.GetCustomAttribute<SpecializedToolAttribute>() is not null)
 			.ToList();

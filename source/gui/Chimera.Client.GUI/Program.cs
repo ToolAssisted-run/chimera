@@ -196,33 +196,6 @@ namespace Chimera.Client.GUI
 				AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
 			}
 
-			// this check has to be done VERY early.  i stepped through a debug build with wrong .dll versions purposely used,
-			// and there was a TypeLoadException before the first line of SubMain was reached (some static ColorType init?)
-			var thisAsmVer = ReflectionCache.AsmVersion;
-			if (new[]
-				{
-					ReflectionCache_Chi_Nat.AsmVersion,
-					ReflectionCache_Chi_Aud.AsmVersion,
-					ReflectionCache_Chi_Dis.AsmVersion,
-					ReflectionCache_Chi_Dis_Con.AsmVersion,
-					ReflectionCache_Chi_Inp.AsmVersion,
-					ReflectionCache_Chi_Cli_Com.AsmVersion,
-					ReflectionCache_Chi_Com.AsmVersion,
-					ReflectionCache_Chi_Emu_Com.AsmVersion,
-					ReflectionCache_Chi_Win_Con.AsmVersion,
-				}.Any(asmVer => asmVer != thisAsmVer))
-			{
-				const string MISMATCH_MSG = "One or more of the Chimera.* assemblies have the wrong version!\n(Did you attempt to update by overwriting an existing install?)";
-				if (HeadlessMode.Enabled)
-				{
-					Console.Error.WriteLine(MISMATCH_MSG);
-					return -1;
-				}
-				EnsureWinFormsInitialized();
-				MessageBox.Show(MISMATCH_MSG);
-				return -1;
-			}
-
 			string dllDir = null;
 			if (!OSTailoredCode.IsUnixHost)
 			{
