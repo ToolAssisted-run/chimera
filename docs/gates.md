@@ -182,6 +182,30 @@ your instrument made.
 > "differ" turned out to be two runs of the SAME configuration because a knob
 > lived in a file that had been reverted between builds.
 
+> Two more from the same hunt, a week later, both instruments that could not
+> see what they were pointed at. The first: to ask whether a store made with the
+> guest's stack pointer behaved differently from one made with the handler's,
+> the handler swapped `rsp` to the guest's value, stored, and let a data
+> breakpoint fire. Windows lays an exception's context record at a fixed
+> distance below the interrupted `rsp` - so the nested exception put its record
+> exactly where the outer exception's record already sat, and every reading
+> taken through it described a corrupted outer context. The "rule map" built on
+> that killed the guest with a wild read; the four numbers it had produced
+> before dying were void. A nested exception at the same stack pointer is not a
+> measurement, it is a second experiment overwriting the first.
+>
+> The second is quieter. To learn what an exception's delivery writes below
+> `rsp`, the handler filled the region with a marker on its way out and read it
+> back at the next exception's entry; the marker survived, and "delivery writes
+> nothing there" went into the record. What delivery actually does is put back
+> the bytes as they were at the previous exception's return - and the marker
+> WAS those bytes. An exit-write, entry-read census is structurally blind to a
+> restore-to-last-exit, and it hid the mechanism for two rounds. The reading
+> that saw it was a second thread watching the same words while the guest ran,
+> with nothing written from the handler at all: the guest's value appeared and
+> was then replaced. When the effect you are looking for might be "put back
+> what was there", the instrument must not be the thing that was there.
+
 **What to do.** Three habits, all cheap:
 
 - **Re-run every finding with the lightest instrument that can still see it.**
