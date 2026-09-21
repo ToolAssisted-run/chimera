@@ -4271,3 +4271,48 @@ its layout back (asserted at both ends, because a NULL that was never set would
 pass on its own), and a Windows-only child that points the layout at an address
 that is not there and counts what the handler managed to write - two lines
 guarded, 659 unguarded, which is the user's log reproduced.
+
+## Guest code keeps nothing below the stack pointer (user-decided, 2026-09-21)
+
+A SysV x86-64 leaf function may keep live values in the 128 bytes below `%rsp`
+- the red zone - because nothing on Linux writes there behind its back: a
+signal handler runs on its own stack. Windows delivers an exception onto the
+interrupted thread's own stack, which during guest execution IS the guest's
+stack, and in a guest process something in that delivery rewrites the bytes
+below `%rsp - 0x28` with their content as of the previous exception's return.
+A guest leaf interrupted by a dirty-page fault then reads back stale spills.
+
+That is not a hypothetical. It is why Flycast's `cpu=jit` produced a wrong
+Dreamcast on Windows whenever the greenzone was on: the CHD decompressor
+spilled its two limits below `%rsp`, a dirty-page fault landed in the middle
+of the routine, the reload came back as zeros, the hunk decode failed, and the
+emulated machine parted from its Linux twin at frame 137 and never came back.
+It was found by restoring those 128 bytes from inside the fault handler, which
+made the machine byte-identical to Linux, and by replaying the Windows bytes
+into the Linux guest, which made Linux diverge the same way.
+
+**The decision: every guest is built with no red zone.** Not per core - in the
+shared toolchain, in the `*cc1` entry of the musl-gcc specs that every core's
+guest compile passes through, in musl's own flags and libstdc++'s, and in the
+Rust guest's target spec, which is where LLVM is told. And it is enforced
+rather than remembered: `check-wbx.sh`, the guest-image check every core
+already runs, counts memory operands with a negative displacement from `%rsp`
+and requires zero, with a named allowlist that currently holds one symbol.
+
+The reason to enforce it rather than trust the flag is the shape of the bug.
+It does not announce itself: no crash, no diagnostic, no wrong pixel - a
+savestate that quietly stops matching, hundreds of frames after the fault that
+caused it, on one host only. A core added next year that finds its own way
+around the specs would reintroduce it silently, and the only thing standing in
+the way is a check that runs on the image rather than on the build recipe.
+
+Cost, measured before the decision was asked for: 1000 frames of the same game
+three times each, means 0.01 s apart on 55.6 s, inside either run's spread. A
+94 MB guest image grew 92 KB.
+
+What is deliberately still open: WHICH component performs the rewrite, and
+what enables it. Plain Windows processes keep the bytes, so do sandbox blocks
+with `%rsp` inside them, so does a thread given real TEB stack bounds, and so
+does one carrying the guest's FS base across the exception. The flag removes
+the exposure; it does not explain it. miniBox `docs/RED-ZONE.md` holds the
+measurements and names the two saved instrument patches for whoever resumes.
