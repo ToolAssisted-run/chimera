@@ -327,3 +327,106 @@ rasteriser and nothing else.
 - **The display scaler and the encoder's own filter** are the other half of
   what #102's screenshots show, and they belong to the frontend, not to any
   core.
+
+## Issue #122: the second list, sorted by measurement (2026-09-21)
+
+The follow-up asked for eleven more options across three cores, and asked the
+question this document had only answered in the abstract: "if scaled graphics
+write different bytes to RAM, can a TAS still be reproduced given this
+condition is consistent?" Yes - a constant is reproducible, and every declared
+setting is already a constant the project pins and the movie cites. The thing
+to decide per option is therefore not whether it CAN be a setting but WHICH
+KIND of thing it is, and Sergio's rule for this round was:
+
+> enable these options in the Config > Video (or related existing menu), if
+> they are postprocessing options (no desync by changing them). For internal
+> core settings enabling them (always better to do it at original, because the
+> core developer knows best how to do it for their specific system), make it a
+> core setting where relevant.
+
+So three bins. **(P) post-processing**: applied to the finished picture, cannot
+change a byte of the machine; lives in the frontend's Display configuration,
+in user config, never in a project or a movie. **(C) core**: changes how the
+core renders in a way the game can observe; declared in the core's
+waterbox.config, applied by the core's own code at boot, pinned by the
+project. **(X) not done**, with the reason. And the bin is decided by running
+the core with the option at two values over the same frames and comparing
+every memory domain, the audio, the lag count and the whole-run picture hash -
+after first running the instrument against itself (docs/gates.md, H): two
+identical runs, every core, every flavour, byte-equal before any comparison
+was believed. Each core's docs/PLAN.md carries its full table; this is the
+summary.
+
+| core | option | memory | picture | bin | where it is now |
+| --- | --- | --- | --- | --- | --- |
+| xemu | Internal Resolution | DIFFERS: 1,571,601 bytes of RAM, 2x vs 1x, 600 frames of Prince of Persia; 1x vs 1x identical | 1280x960 at 2x, 1920x1440 at 3x | C | `internalResolution` (1x/2x/3x), declared, gated |
+| xemu | Aspect Ratio | inert: consumed only by `ui/xui/gl-helpers.cc`, which the headless build does not compile | - | X / P | the frontend's Display > Aspect Ratio Selection already does the job |
+| Flycast | Transparent Sorting | identical (four domains, audio, lag), 1800 frames of Re-Volt | differs | C | `transparentSorting` (perTriangle/perStrip), declared, gated |
+| PCSX2 | Aspect Ratio | identical | identical | X / P | present-pass only; this core does not present. The frontend's Display config has it |
+| PCSX2 | FMV Aspect Ratio Override | identical | identical | X | present-pass only, and nothing outside the core knows when an FMV plays |
+| PCSX2 | Deinterlacing | identical, both renderers | differs | already declared (issue #7) | unchanged |
+| PCSX2 | Bilinear Filtering | identical | identical | X / P | present-pass only. The frontend's Display > Final Filter is the same switch |
+| PCSX2 | Anti-Blur | identical | identical, five discs x 900 frames software and up to 6000 frames on the GPU | X | inert on every disc on hand; not declared |
+| PCSX2 | Texture Filtering | identical | differs (Maximo 2400/6000, Gran Turismo 4 900/3000) | C | `textureFiltering` (machine/nearest/linear/linearNoSprites), declared, gated |
+| PCSX2 | Mipmapping | identical | identical, four discs, up to 6000 frames | X | inert on every disc on hand; not declared |
+| PCSX2 | Auto-Flush | identical | identical, four discs, up to 6000 frames | X | inert on every disc on hand; not declared |
+| PCSX2 | FXAA | identical | differs under the GL renderers; a BLACK frame under the software device | C (post-process by the core) | `fxaa` (bool), declared, forced off without a GL device, gated |
+
+Three things the table settles that the first round only argued:
+
+**xemu's internal resolution is a machine setting, measured, and that is
+fine.** The first round refused it as a picture setting because the UMA
+download decimates a scaled surface; this round put a number on it and then
+declared it anyway, under the rule's second clause: it is xemu's own
+`surface_scale`, applied by xemu's own renderer, and a project that pins 2x
+replays at 2x everywhere. The declaration says in as many words that a movie
+recorded at one value needs the same value to play back, and that the moment
+to choose it is when the project is created. That is the expectation the
+reporter should carry: an encode at 2x is a project made at 2x, not a knob
+turned the night before. The picture reaches the frontend at 1280x960 and
+1920x1440 (the declared frame grew to 1920x1440 for it); a 720p mode at 2x
+does not fit and falls back to the machine's own-size picture.
+
+**Two of PCSX2's eleven are post-processing in the strict sense and both
+already have their frontend switch.** Aspect ratio and bilinear presentation
+act in PCSX2's present pass, and this core never presents - `ChimeraGSGetFrame`
+hands the merged texture over and the frontend's display pipeline draws it,
+under Config > Display's aspect selection (system, custom ratio, custom size,
+1:1) and final filter (none, bilinear). Nothing was added there, because it
+was already there. One observation for whoever owns the PS2 declaration: the
+core's `virtualWidth`/`virtualHeight` are 640x448, so "use system's
+recommendation" is 10:7 - square pixels, which PCSX2 also offers by that name -
+where PCSX2's own default is "Auto 4:3/3:2". A person who wants the TV's 4:3
+sets a custom ratio today; changing the declaration is a decision, not made
+here.
+
+**A core-implemented post-process is a core setting, by necessity, and the
+deinterlacer set the precedent.** PCSX2's FXAA cannot change the machine
+(measured: three discs, picture only) and cannot live in the frontend either:
+it is PCSX2's own shader, the frontend has no shader stage to run one in, and
+a value reaches a core only as a declared setting. So it sits beside the
+deinterlacer from issue #7, which this round measured to be exactly the same
+kind of thing, and its description says a movie made with it plays back
+without it. The cost is the one already recorded under "What is left": every
+setting is structural, so flipping FXAA restarts the core and clears the
+greenzone even though the inputs replay exactly. A non-sync class of setting
+would fix that for FXAA, the deinterlacer and Flycast's three at once; the
+declaration model (`SettingDecl`) has no such flag today, which is why each
+of these descriptions carries the sync fact in prose.
+
+**Three of PCSX2's options are not declared because nothing could be seen to
+change.** Hardware mipmapping, auto-flush and PCRTC anti-blur were wired,
+run on four discs for up to 6000 frames on the GPU bridge (and anti-blur on
+five discs natively), and did not move a pixel. A setting nobody can watch do
+anything is a setting no gate leg could hold red, and a promise with no leg
+behind it is what docs/gates.md is about. They stay at PCSX2's defaults
+(mipmapping on, auto-flush off, anti-blur on); a disc that shows one of them
+moving turns it into two lines and a column in the existing leg.
+
+Every declared setting has a leg that was watched red with its wiring
+removed: xemu `gpu:internalResolution` (2x and 3x are different machines and
+bigger pictures; nothing changes under the null renderer), Flycast
+`picture:transparentSorting` (one machine, two pictures over 1800 frames of a
+disc named by `FLYCAST_GFX_DISC`), PCSX2 `gpu:picture` (one machine, three
+pictures over 2400 frames of a disc named by `PCSX2_GFX_DISC`). All three
+need content and SKIP on CI, and each PLAN.md records what they said here.
