@@ -1197,6 +1197,24 @@ namespace Chimera.Client.GUI
 
 		protected override void OnMouseDown(MouseEventArgs e)
 		{
+			// The roll learns where the pointer is from mouse moves, and none arrive
+			// while a context menu is open: the menu takes the pointer, the roll is
+			// told it left (OnMouseLeave, CurrentCell = null), and the next thing it
+			// hears can be this - a click on a cell it has not looked at, which is a
+			// second right-click on a branch or marker row while the menu is still
+			// up (issue #121). Look first, as the move that precedes every other
+			// click would have, and it is then an ordinary fresh click, for every
+			// button and every roll. It used to be looked at only for the right
+			// button on rolls that select on right-click, and only AFTER
+			// RightButtonHeld was set, so the look itself read CurrentCell.RowIndex
+			// to decide whether a right-drag was in progress - with nothing there to
+			// read. On the piano roll, which does not select on right-click, the
+			// click was not looked at at all and was silently lost.
+			if (CurrentCell is null)
+			{
+				OnMouseMove(e);
+			}
+
 			if (e.Button == MouseButtons.Left)
 			{
 				if (IsHoveringOnColumnEdge)
@@ -1219,10 +1237,6 @@ namespace Chimera.Client.GUI
 				{
 					RightButtonHeld = true;
 				}
-
-				// In the case that we have a context menu already open, we must manually update the CurrentCell as MouseMove isn't triggered while it is open.
-				if (AllowRightClickSelection && CurrentCell == null)
-					OnMouseMove(e);
 			}
 
 			if (IsHoveringOnDataCell && QueryShouldSelectCell?.Invoke(this, e.Button) != false)
