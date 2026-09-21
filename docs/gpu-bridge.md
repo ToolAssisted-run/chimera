@@ -469,6 +469,68 @@ The fix is in the engine, because every bridged core already rebuilds on a
 moved id. The same stress ran its whole 20 minutes (212 steps) with it.
 `CHIMERA_GL_KEEP_OBJECTS_ON_LOAD` keeps the old behaviour for A/B.
 
+### The one state that did not rebuild: the frame-0 anchor (issue #126, 2026-09-21)
+
+"Every bridged core already rebuilds on a moved id" was true of every state but
+one, and the exception was in each core rather than here.
+
+A core stores the id beside its objects in a guest static that starts at ZERO
+and is first written the first time it looks - which is at the top of a frame
+advance, because that is where a renderer can safely be torn down. Every core
+that has this reads its own stored zero the same way:
+
+    if (live == 0 || live == s_chimera_gl_context) return;   /* nothing moved */
+    if (s_chimera_gl_context != 0) { ...rebuild... }          /* <- the hole */
+    s_chimera_gl_context = live;
+
+`live == 0` really does mean "cannot tell" and a core is right to assume
+nothing moved. A STORED zero is a different statement, and it was being read as
+the same one. It means "this state was taken before the core ever looked", and
+there is exactly one such state in every session: **the greenzone's frame-0
+anchor**, captured right after Init and before the first frame advance - by
+which time the renderer's device exists and holds objects. Load it and the core
+concluded it had nothing to rebuild, while the objects in the driver were
+whatever the frames after the anchor had left: textures resized, render targets
+deleted and handed out again, framebuffers reattached. The renderer then drew
+from guest memory describing frame 0 into driver objects as of frame N. That is
+the same hazard as the section above, arriving through the one door it left
+open.
+
+Reported on PCSX2 and Maximo: Ghosts to Glory - the movie played from frame 0
+or frame 1 is corrupt and from frame 2 is clean, and the branch state clears
+it. The frame numbers are the proof rather than a coincidence: TAStudio goes to
+a frame by loading the state BEFORE it and emulating forward one
+(`PriorStateForFramebuffer` is `Nearest(frame - 1)`), so frames 0 and 1 both
+reach for the frame-0 anchor and frame 2 is the first that does not.
+
+Measured with `chimera-run --gpu --greenzone 4096 --rewind-loop N,1` under
+`CHIMERA_GL_TRACE=1 CHIMERA_GL_STATEAUDIT=1`, counting the calls that cross the
+bridge on the frame after the restore (PCSX2, a GS device rebuild is ~4500
+calls, an idle frame is 1):
+
+| restore to | before | after |
+|---|---|---|
+| frame 0 | **1 - no rebuild** | 4542 |
+| frame 1 | 4542 | 4542 |
+| frame 2 | 4542 | 4542 |
+| a fresh boot (no load at all) | no rebuild | no rebuild, unchanged |
+
+The engine's side of the contract is unchanged and was never wrong: it mints on
+every load, and it cannot write the guest's static. The fix is a core's, and
+it is to stop inferring "a state was loaded" from the number. Chimera already
+tells every core that, through the optional `StateLoaded()` export
+(docs/porting-a-core.md), and after one of those the stored zero cannot be
+trusted:
+
+    if (s_chimera_gl_context != 0 || aStateWasLoadedSinceWeLastLooked) rebuild;
+
+**This shape is in every bridged core** - it was copied between them, which is
+how it came to be identical in each. PCSX2 is fixed (its `gl:rebuild-at-zero`
+gate leg, which was watched failing on the build that had the bug). Flycast's
+`chimera_check_gl_context` in `core/rend/gles/gles.cpp` is the same code to the
+line and is unfixed; xemu, Dolphin, Ruffle and RPCS3 hold the same comparison
+and have not been checked against it.
+
 ### ...unless the core says otherwise (user-decided, 2026-09-17)
 
 For one core the rebuild is the damage rather than the repair. RPCS3 keeps the
