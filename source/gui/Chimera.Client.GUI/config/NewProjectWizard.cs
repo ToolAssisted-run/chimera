@@ -97,6 +97,9 @@ namespace Chimera.Client.GUI
 
 		// page 3
 		private readonly PropertyGrid _settingsGrid;
+		private readonly Panel _presetRow;
+		private readonly ComboBox _presets;
+		private readonly Button _applyPreset;
 		private WaterboxCoreSettings? _settings;
 		private WaterboxConfig? _cfg;
 
@@ -313,6 +316,42 @@ namespace Chimera.Client.GUI
 			// ---- page 3: settings ------------------------------------------------
 			var p3 = _pages[2];
 			p3.Controls.Add(MakeHeading("Please specify the emulation configuration settings."));
+			// The preset row sits ABOVE the settings, because that is the order the
+			// decisions are made in: pick a machine somebody else has already got
+			// working, then adjust it. It is absent - not disabled, not empty -
+			// for a core that suggests nothing, so no core grows a dead control.
+			_presetRow = new Panel
+			{
+				Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
+				Location = Pt(8, 46),
+				Size = new(UIHelper.ScaleX(544), UIHelper.ScaleY(28)),
+				Visible = false,
+			};
+			var presetLabel = new Label
+			{
+				AutoSize = true,
+				Location = Pt(0, 6),
+				Text = "Preset:",
+			};
+			_presets = new ComboBox
+			{
+				Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
+				DropDownStyle = ComboBoxStyle.DropDownList,
+				Location = Pt(52, 2),
+				Size = new(UIHelper.ScaleX(414), UIHelper.ScaleY(23)),
+			};
+			_applyPreset = new Button
+			{
+				Anchor = AnchorStyles.Top | AnchorStyles.Right,
+				Location = Pt(472, 1),
+				Size = new(UIHelper.ScaleX(72), UIHelper.ScaleY(25)),
+				Text = "Apply",
+			};
+			_applyPreset.Click += (_, _) => ApplySelectedPreset();
+			_presetRow.Controls.Add(presetLabel);
+			_presetRow.Controls.Add(_presets);
+			_presetRow.Controls.Add(_applyPreset);
+			p3.Controls.Add(_presetRow);
 			_settingsGrid = new PropertyGrid
 			{
 				Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
@@ -1499,6 +1538,25 @@ namespace Chimera.Client.GUI
 			if (index >= 0) _renderer.SelectedIndex = index;
 		}
 
+		/// <summary>whether the preset selector is on screen at all - for tests</summary>
+		public bool PresetsAreOffered => _presetRow.Visible;
+
+		/// <summary>the presets on offer, as the selector labels them - for tests</summary>
+		public string[] PresetNames
+			=> _presets.Items.Cast<PresetChoice>().Select(static c => c.Decl.DisplayName).ToArray();
+
+		/// <summary>picks a preset by id as the dropdown would - for tests</summary>
+		internal void SelectPreset(string id)
+		{
+			for (var i = 0; i < _presets.Items.Count; i++)
+			{
+				if (((PresetChoice) _presets.Items[i]).Decl.Id == id) { _presets.SelectedIndex = i; return; }
+			}
+		}
+
+		/// <summary>presses Apply - for tests</summary>
+		internal void ApplyPreset() => ApplySelectedPreset();
+
 		/// <summary>the exposed settings, in order, for tests</summary>
 		public string[] ExposedSettingNames
 			=> (_settings?.Declarations ?? [ ]).Select(static d => d.Name ?? "").ToArray();
@@ -1927,6 +1985,7 @@ namespace Chimera.Client.GUI
 		private void RefreshExposedSettings()
 		{
 			if (_cfg is null || _settings is null) return;
+			RefreshPresets(); // the machine may have moved, and with it what is offered
 			var effective = WaterboxCore.EffectiveSettingsFor(_cfg, _settings);
 			var exposed = Chimera.Emulation.Common.Engine.EngineSettingsGate.Evaluate(
 				_cfg.RawSettingsJson,
@@ -1959,6 +2018,107 @@ namespace Chimera.Client.GUI
 			}
 			_settings.Declarations = declarations;
 			_settingsGrid.Refresh();
+		}
+
+		/// <summary>One preset, as the selector shows it.</summary>
+		private sealed class PresetChoice
+		{
+			public PresetChoice(WaterboxConfig.PresetDecl decl) => Decl = decl;
+
+			public WaterboxConfig.PresetDecl Decl { get; }
+
+			public override string ToString() => Decl.DisplayName;
+		}
+
+		/// <summary>
+		/// Offers the presets the chosen machine has, and nothing at all when it has
+		/// none: the row is hidden and the grid takes the space back, so a core that
+		/// suggests nothing shows no evidence that presets exist.
+		/// </summary>
+		private void RefreshPresets()
+		{
+			var machine = _cfg is null || _settings is null
+				? null
+				: _cfg.MachineFor(WaterboxCore.EffectiveSettingsFor(_cfg, _settings));
+			var offered = _cfg?.PresetsFor(machine) ?? [ ];
+			if (offered.Count is 0)
+			{
+				_presets.Items.Clear();
+				_presetRow.Visible = false;
+				PlaceSettingsGrid(withPresetRow: false);
+				return;
+			}
+			// Rebuild only when the OFFER changed - a machine change can happen while
+			// somebody is reading the list, and a selector that resets itself on every
+			// settings edit would be unusable.
+			var showing = _presets.Items.Cast<PresetChoice>().Select(static c => c.Decl.Id).ToList();
+			if (!showing.SequenceEqual(offered.Select(static p => p.Id)))
+			{
+				var keep = (_presets.SelectedItem as PresetChoice)?.Decl.Id;
+				_presets.BeginUpdate();
+				_presets.Items.Clear();
+				foreach (var decl in offered) _presets.Items.Add(new PresetChoice(decl));
+				_presets.EndUpdate();
+				var again = offered.ToList().FindIndex(p => p.Id == keep);
+				_presets.SelectedIndex = again >= 0 ? again : 0;
+			}
+			_presetRow.Visible = true;
+			PlaceSettingsGrid(withPresetRow: true);
+		}
+
+		/// <summary>Moves the grid down to make room for the preset row, or back up.</summary>
+		private void PlaceSettingsGrid(bool withPresetRow)
+		{
+			var top = UIHelper.ScaleY(withPresetRow ? 80 : 48);
+			if (_settingsGrid.Top == top) return;
+			var bottom = _settingsGrid.Bottom;
+			_settingsGrid.Top = top;
+			_settingsGrid.Height = Math.Max(bottom - top, UIHelper.ScaleY(48));
+		}
+
+		/// <summary>
+		/// Writes the chosen preset's values INTO the settings. Nothing about the
+		/// preset survives the click: what the project pins and the movie cites is
+		/// the values, which are now sitting in the grid where anyone can read them
+		/// and change any of them afterwards.
+		///
+		/// The machine and the renderer are asked on page one and are not a preset's
+		/// to move - changing the machine changes which files the project takes, and
+		/// this page is downstream of that decision.
+		/// </summary>
+		private void ApplySelectedPreset()
+		{
+			if (_cfg is null || _settings is null || _presets.SelectedItem is not PresetChoice chosen) return;
+			var values = chosen.Decl.Values;
+			if (values is null || values.Count is 0) return;
+
+			var effective = WaterboxCore.EffectiveSettingsFor(_cfg, _settings);
+			Dictionary<string, WaterboxConfig.SettingDecl> byName = new(StringComparer.Ordinal);
+			foreach (var decl in _cfg.SettingsFor(_cfg.MachineFor(effective)))
+			{
+				if (decl.Name is { Length: > 0 } name && !byName.ContainsKey(name)) byName[name] = decl;
+			}
+
+			var applied = 0;
+			List<string> ignored = [ ];
+			foreach (var pair in values)
+			{
+				if (pair.Key == RendererSetting || pair.Key == _cfg.MachineSetting) continue;
+				if (!byName.TryGetValue(pair.Key, out var decl)) { ignored.Add(pair.Key); continue; }
+				// through the declaration's own coercion, so a preset written by hand
+				// cannot put a string where the core declared a number
+				_settings.Values[pair.Key] = decl.Coerce(pair.Value);
+				applied++;
+			}
+
+			// a preset's values can gate further settings, so the exposed set is asked again
+			RefreshExposedSettings();
+			_settingsGrid.Refresh();
+			UpdateNavLabels();
+			_status.Text = ignored.Count is 0
+				? $"Applied \"{chosen.Decl.DisplayName}\": {applied} setting{(applied is 1 ? "" : "s")}."
+				: $"Applied \"{chosen.Decl.DisplayName}\": {applied} setting{(applied is 1 ? "" : "s")}; "
+					+ $"this machine has no setting named {string.Join(", ", ignored)}.";
 		}
 
 		/// <summary>Renders given firmware needs directly - the test and screenshot door.</summary>

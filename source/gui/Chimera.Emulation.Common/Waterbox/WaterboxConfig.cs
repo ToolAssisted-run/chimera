@@ -322,6 +322,58 @@ namespace Chimera.Emulation.Common.Waterbox
 		public List<SettingDecl>? Settings { get; set; }
 
 		/// <summary>
+		/// Named bundles of setting values the core suggests - "a 1993 486 PS/2",
+		/// "Windows 98 with a Voodoo". A preset is NOT a setting and is not part of
+		/// the project: choosing one WRITES its values into the settings and is then
+		/// finished with. What the project pins and the movie cites is the resolved
+		/// values, exactly as if they had been typed in one at a time.
+		///
+		/// That is the whole design. The alternative - a "preset" setting the core
+		/// resolves for itself at boot - is what DOSBox-X shipped, applying a .conf
+		/// file last so it overrode whatever the user had chosen above it. Settings
+		/// then had to document themselves as "Auto uses the configuration preset's
+		/// default", the grid stopped meaning what it said, and a movie recorded a
+		/// preset NAME whose meaning could change under it with the next core build.
+		/// </summary>
+		public List<PresetDecl>? Presets { get; set; }
+
+		/// <summary>
+		/// The presets a machine offers - gated by <see cref="PresetDecl.When"/>
+		/// exactly as settings are, so a package that is several machines does not
+		/// offer a DOS preset to a PC-98.
+		/// </summary>
+		public IReadOnlyList<PresetDecl> PresetsFor(MachineConfig? machine)
+			=> (Presets ?? [ ])
+				.Where(p => p.AppliesTo(machine is null ? null : machine.When is { Count: > 0 } ? machine.When[0] : machine.Id))
+				.ToList();
+
+		/// <summary>One named bundle of setting values.</summary>
+		public sealed class PresetDecl
+		{
+			/// <summary>Stable id. Never reaches the guest; it identifies the preset in tests and logs.</summary>
+			public string? Id { get; set; }
+
+			/// <summary>What the selector shows. Falls back to the id.</summary>
+			public string? Label { get; set; }
+
+			/// <summary>Prose shown beside the selector, if any.</summary>
+			public string? Description { get; set; }
+
+			/// <summary>Machine ids this preset belongs to; absent means every machine.</summary>
+			public List<string>? When { get; set; }
+
+			/// <summary>Setting name to value. Names not declared as settings are ignored.</summary>
+			public Dictionary<string, object>? Values { get; set; }
+
+			public string DisplayName => string.IsNullOrWhiteSpace(Label) ? Id ?? "" : Label;
+
+			public bool AppliesTo(string? machineValue)
+				=> When is not { Count: > 0 }
+					|| machineValue is null
+					|| When.Exists(v => string.Equals(v, machineValue, StringComparison.OrdinalIgnoreCase));
+		}
+
+		/// <summary>
 		/// One user-tunable setting. Enough for the frontend to draw a labelled,
 		/// typed, documented row without knowing what the setting means.
 		/// </summary>

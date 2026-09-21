@@ -160,6 +160,47 @@ copies of one binary, and since a package registers its core by name, four
 packages all called "Genesis Plus GX" meant three were silently dropped when
 all four were installed.
 
+### Configuration presets
+
+A core may suggest whole machines: "1981 IBM PC/XT 5150", "Windows 98 with a
+Voodoo 2". These are declared in `waterbox.config` beside the settings, and the
+settings page offers them in a selector above the grid with an Apply button -
+absent entirely, not disabled and not empty, for a core that suggests nothing.
+
+```json
+"presets": [
+  { "id": "xt_1981", "label": "1981 IBM PC/XT 5150",
+    "description": "an 8088 at 4.77 MHz, CGA, no sound card",
+    "when": ["ibm"],
+    "values": { "cputype": "8086", "cycles": 315, "memsize": 1, "sbtype": "none" } }
+]
+```
+
+- `when` gates the preset by machine, exactly as a setting's `when` does, so a
+  PC-98 is not offered an IBM PC's machine.
+- `values` is a setting name to value map. Names are coerced through the
+  setting's own declaration, so a value written by hand cannot put a string
+  where the core declared an int; a name the chosen machine does not have is
+  ignored and NAMED on the status line, because a core that misdeclares a
+  preset should not do it quietly.
+- The machine setting and the renderer are not a preset's to move: both are
+  asked on page one, and changing the machine changes which files the project
+  takes.
+
+**Apply WRITES the values into the settings, and then the preset is finished
+with.** Nothing about it is stored: the project pins the resolved values and
+the movie cites them, exactly as if each had been typed in by hand, and every
+one of them is sitting in the grid where it can be read and changed afterwards.
+
+This is the whole point, and it is a correction. DOSBox-X shipped the other
+design: a "Configuration Preset" SETTING that the core resolved for itself at
+boot by appending a `.conf` file AFTER everything the user had chosen, so the
+preset silently won. Seven settings then had to describe themselves as "Auto
+uses the configuration preset's default" - the grid no longer said what the
+machine would be - and a movie recorded a preset NAME whose meaning the next
+core build could change under it. A preset is a starting point somebody else
+has already got working, not a layer that outranks the user.
+
 ### The firmware decision tree
 
 A firmware entry in waterbox.config may carry "requiredWhen", a
