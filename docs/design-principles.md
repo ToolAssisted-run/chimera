@@ -4225,3 +4225,49 @@ including the cancel case, which is the one a person is most likely to hit and
 the one no Linux test can reach. Both new Linux legs were watched failing
 against a deliberately broken build before being believed. docs/folder-picker.md
 says plainly what the green run does and does not stand for.
+
+## The fault handler gives up its pointers, and never reports twice (chimera#127, 2026-09-21)
+
+A PS3 core died in the main menu of a game. Everything Chimera is built to do
+about that worked: the guest death was caught, the dialog came up naming the
+frame and offering the four ways out, the inputs were safe, the process was
+alive. Ninety-two seconds later the process was gone, and the crash note said
+`stack overflow` at an address in `msvcrt.dll`, with a stack of nothing but
+ntdll and `libminiboxhost.dll` repeating the same four frames fifty times over.
+
+Two faults, and the note named neither.
+
+`minibox-diag.log` had the shape, once it is recognised: one line reporting a
+perfectly ordinary fault in host code - a write the CLR raises and handles
+every day - and then fifteen hundred identical lines, all naming one
+instruction inside `libminiboxhost.dll` reading one address. Disassembling a
+mingw build of the same miniBox commit at the offset the crash note gives
+settles what that instruction is: the first load in `say_region`, reading
+`g_layout` - the pointer the fault handler uses to say which region of the
+guest an address landed in. It sits immediately after the `mb_diag` that
+printed the last line in the log, and after a null check that passed. So the
+handler read the layout, faulted, and Windows called the handler again FOR ITS
+OWN FAULT. A vectored exception handler has no depth limit and no second
+chance; it ends when the stack runs out.
+
+`g_layout` points inside the `mb_host`, and `mb_host_destroy` freed the host
+without taking it back - the same mistake that had already been found and fixed
+one field over, for `mb_guest_ctx`, whose comment two lines above says exactly
+why: a host that is gone must not be what the fault handlers read. On Linux a
+freed chunk usually still reads like itself and the report is merely wrong. On
+Windows it is really gone.
+
+The general rule the second fault leaves behind, which is the part worth
+keeping: **handling a fault may nest; REPORTING one may not.** The guest's own
+fault handler runs guest code, which can trip a clean page and fault again, and
+that must be served. But the report walks the layout, the block list, the bytes
+at `rip` and the guest's stack, and any of those can be the thing that is
+wrong - so a fault arriving while a report is running is now said once, in one
+sentence, and passed straight on. Saying more is exactly what just failed.
+
+Fixed in miniBox (`fix(tripguard): a destroyed machine is not what the fault
+handler reads`), with both legs watched failing first: a destroyed host gives
+its layout back (asserted at both ends, because a NULL that was never set would
+pass on its own), and a Windows-only child that points the layout at an address
+that is not there and counts what the handler managed to write - two lines
+guarded, 659 unguarded, which is the user's log reproduced.
