@@ -1,6 +1,7 @@
 ﻿#nullable enable
 
 using System;
+using System.ComponentModel;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -895,6 +896,66 @@ namespace Chimera.Client.GUI
 			ShowPage(0);
 		}
 
+		/// <summary>
+		/// How tall the current page's content wants to be, inside the page, or
+		/// -1 when this page cannot say. Only the two pages whose content is a
+		/// core's rather than the wizard's can outgrow the window: the file form,
+		/// which has a group per declared slot, and the settings grid, which has
+		/// a row per declared setting. A DOSBox-X project has enough of both to
+		/// need a taller window than a quickerNES one, and nobody should have to
+		/// drag the corner to find that out.
+		/// </summary>
+		private int ContentHeightForPage(int page)
+		{
+			if (page is 1 && _slotsHost is not null)
+			{
+				var bottom = 0;
+				foreach (Control child in _slotsHost.Controls) bottom = Math.Max(bottom, child.Bottom);
+				return bottom is 0 ? -1 : _slotsHost.Top + bottom + UIHelper.ScaleY(8);
+			}
+			if (page is 2 && _settingsGrid is not null)
+			{
+				var rows = _settingsGrid.SelectedObject is ICustomTypeDescriptor described
+					? described.GetProperties().Count
+					: 0;
+				if (rows is 0) return -1;
+				// The grid will not say how tall its contents are - it reports a
+				// PreferredSize of zero and exposes no scroll bar to ask - so the
+				// rows are counted and measured. The pitch is the font's height
+				// plus the cell's own padding; erring a little large costs a
+				// slightly taller window, erring small costs the scrolling this
+				// is here to remove.
+				var pitch = _settingsGrid.Font.Height + UIHelper.ScaleY(5);
+				var description = 0;
+				foreach (Control child in _settingsGrid.Controls)
+				{
+					if (child is TextBox) description = Math.Max(description, child.Height);
+				}
+				return _settingsGrid.Top + (rows * pitch) + description + UIHelper.ScaleY(12);
+			}
+			return -1;
+		}
+
+		/// <summary>
+		/// Grow the window so the page fits, never past what the screen holds and
+		/// never smaller than it already is. Only ever grows: stepping between a
+		/// long page and a short one must not make the window jump about, and a
+		/// size somebody has chosen by hand is theirs to keep.
+		/// </summary>
+		private void FitToContent()
+		{
+			var wanted = ContentHeightForPage(_page);
+			if (wanted <= 0) return;
+			var have = _pages[_page].Height;
+			if (wanted <= have) return;
+
+			var grow = wanted - have;
+			var room = Screen.FromControl(this).WorkingArea.Height - UIHelper.ScaleY(80);
+			var target = Math.Min(Height + grow, room);
+			if (target <= Height) return;
+			Height = target;
+		}
+
 		private void ShowPage(int page)
 		{
 			_page = Math.Max(0, Math.Min(_pages.Length - 1, page));
@@ -902,6 +963,7 @@ namespace Chimera.Client.GUI
 			_backButton.Enabled = _page > 0;
 			_status.Text = "";
 			UpdateNavLabels();
+			FitToContent();
 		}
 
 		/// <summary>
