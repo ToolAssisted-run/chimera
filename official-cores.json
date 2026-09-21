@@ -120,6 +120,13 @@
       "systems": [ "AppleII" ],
       "repo": "ToolAssisted-run/chimera-core-applewin",
       "tested": ""
+    },
+    {
+      "id": "pcem",
+      "name": "PCem",
+      "systems": [ "PC" ],
+      "repo": "ToolAssisted-run/chimera-core-pcem",
+      "tested": ""
     }
   ]
 }
