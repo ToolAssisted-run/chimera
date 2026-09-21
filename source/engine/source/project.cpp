@@ -17,6 +17,7 @@
 #include "manifest_util.hpp"
 #include "conditions.hpp"
 #include "sha1.hpp"
+#include "thread_string.hpp"
 
 #include "../../extern/cjson/cJSON.h"
 
@@ -31,7 +32,7 @@ namespace {
 
 using namespace chimera::manifest;
 
-thread_local std::string g_error;
+thread_local chimera::ThreadString g_error;   /* never destroyed: see thread_string.hpp */
 
 struct FileEntry
 {
@@ -80,15 +81,15 @@ struct Branch
 
 const char *fail(std::string message, const char **error_out)
 {
-	g_error = std::move(message);
-	if (error_out != nullptr) *error_out = g_error.c_str();
+	*g_error = std::move(message);
+	if (error_out != nullptr) *error_out = g_error->c_str();
 	return nullptr;
 }
 
 int32_t failInt(std::string message, const char **error_out)
 {
-	g_error = std::move(message);
-	if (error_out != nullptr) *error_out = g_error.c_str();
+	*g_error = std::move(message);
+	if (error_out != nullptr) *error_out = g_error->c_str();
 	return 1;
 }
 
@@ -876,7 +877,7 @@ void ce_project_subtitle_remove(ce_project *p, int32_t index)
 
 const char *ce_cue_references(const char *cue_bytes, uint64_t cue_len, uint64_t *len_out)
 {
-	static thread_local std::string g_cueRefs;
+	static thread_local chimera::ThreadString g_cueRefs;   /* never destroyed: see thread_string.hpp */
 	cJSON *arr = cJSON_CreateArray();
 	if (cue_bytes != nullptr && cue_len > 0)
 	{
@@ -887,11 +888,11 @@ const char *ce_cue_references(const char *cue_bytes, uint64_t cue_len, uint64_t 
 		}
 	}
 	char *printed = cJSON_PrintUnformatted(arr);
-	g_cueRefs = printed != nullptr ? printed : "[]";
+	*g_cueRefs = printed != nullptr ? printed : "[]";
 	cJSON_free(printed);
 	cJSON_Delete(arr);
-	if (len_out != nullptr) *len_out = g_cueRefs.size();
-	return g_cueRefs.c_str();
+	if (len_out != nullptr) *len_out = g_cueRefs->size();
+	return g_cueRefs->c_str();
 }
 
 int32_t ce_project_file_add(ce_project *p, const char *name, const char *slot, const char *source_path, const char **error_out)

@@ -1,6 +1,7 @@
 /* state_format.cpp - see state_format.hpp. */
 
 #include "state_format.hpp"
+#include "thread_string.hpp"
 
 #include "chimera/engine.h"
 
@@ -200,14 +201,14 @@ const char *ce_version_skew(
 	const char *frontend_date, const char *frontend_build,
 	const char *core_date, const char *core_build, const char *core_name)
 {
-	static thread_local std::string message;
-	message = chimera::versionSkewMessage(
+	static thread_local chimera::ThreadString message;   /* never destroyed: see thread_string.hpp */
+	*message = chimera::versionSkewMessage(
 		frontend_date != nullptr ? frontend_date : "",
 		frontend_build != nullptr ? frontend_build : "",
 		core_date != nullptr ? core_date : "",
 		core_build != nullptr ? core_build : "",
 		core_name != nullptr ? core_name : "");
-	return message.empty() ? nullptr : message.c_str();
+	return message->empty() ? nullptr : message->c_str();
 }
 
 } // extern "C"

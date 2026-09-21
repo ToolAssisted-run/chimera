@@ -13,6 +13,7 @@
 #include "file_io.hpp"
 #include "manifest_util.hpp"
 #include "sha1.hpp"
+#include "thread_string.hpp"
 
 #include "../../extern/cjson/cJSON.h"
 
@@ -25,7 +26,7 @@ namespace {
 
 using namespace chimera::manifest;
 
-thread_local std::string g_error;
+thread_local chimera::ThreadString g_error;   /* never destroyed: see thread_string.hpp */
 
 struct Entry
 {
@@ -117,8 +118,8 @@ ce_multifile *ce_multifile_open(const char *descriptor_path, const char **error_
 {
 	auto fail = [&](std::string message) -> ce_multifile *
 	{
-		g_error = std::move(message);
-		if (error_out != nullptr) *error_out = g_error.c_str();
+		*g_error = std::move(message);
+		if (error_out != nullptr) *error_out = g_error->c_str();
 		return nullptr;
 	};
 	if (error_out != nullptr) *error_out = nullptr;
@@ -288,8 +289,8 @@ int32_t ce_multifile_save(
 {
 	auto fail = [&](std::string message) -> int32_t
 	{
-		g_error = std::move(message);
-		if (error_out != nullptr) *error_out = g_error.c_str();
+		*g_error = std::move(message);
+		if (error_out != nullptr) *error_out = g_error->c_str();
 		return 1;
 	};
 	if (error_out != nullptr) *error_out = nullptr;

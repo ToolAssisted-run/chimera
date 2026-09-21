@@ -12,6 +12,7 @@
 #include "chimera/engine.h"
 #include "zstd_dyn.hpp"
 #include "progress.hpp"
+#include "thread_string.hpp"
 
 #include <algorithm>
 
@@ -269,7 +270,7 @@ struct ce_state_reader
 
 namespace {
 
-thread_local std::string g_openError; // concurrent opens must not clobber each other's story
+thread_local chimera::ThreadString g_openError; // concurrent opens must not clobber each other's story (never destroyed: see thread_string.hpp)
 
 /* the loader's prefix handling: strip a common "<dir>/" prefix (the pre-
  * tarbomb layout); any other common prefix means tarbomb, strip nothing */
@@ -349,8 +350,8 @@ ce_state_reader *ce_state_reader_open(
 		if (name.size() >= 4 && name.compare(name.size() - 4, 4, ".zst") == 0) key += ".zst";
 		if (!r->entries.emplace(key, i).second)
 		{
-			g_openError = "Duplicate file found in zip archive: " + key + ". Please delete one.";
-			if (error_out != nullptr) *error_out = g_openError.c_str();
+			*g_openError = "Duplicate file found in zip archive: " + key + ". Please delete one.";
+			if (error_out != nullptr) *error_out = g_openError->c_str();
 			ce_state_reader_free(r);
 			return nullptr;
 		}

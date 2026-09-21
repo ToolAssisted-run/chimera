@@ -10,6 +10,13 @@
  *   - A returned const char* is BORROWED unless the declaration says otherwise;
  *     each declaration names the call that invalidates it.
  *   - UTF-8 everywhere. NUL-terminated unless a length is passed alongside.
+ *   - An error string written through an `error_out` (or returned by a
+ *     `..._last_error`) is per-thread and lives until the next such call ON
+ *     THAT THREAD - and no shorter: the storage behind it is never destroyed,
+ *     not when the thread ends and not when the process does. That is a
+ *     requirement on the engine, not a convenience: see
+ *     source/engine/source/thread_string.hpp for the Windows heap corruption
+ *     that destroying it caused (chimera#123).
  */
 
 #ifndef CHIMERA_ENGINE_H

@@ -10,6 +10,7 @@
 #include "chimera/engine.h"
 #include "file_io.hpp"
 #include "sha1.hpp"
+#include "thread_string.hpp"
 
 #include "../../extern/miniz/miniz.h"
 
@@ -22,7 +23,7 @@
 
 namespace {
 
-thread_local std::string g_openError;
+thread_local chimera::ThreadString g_openError;   /* never destroyed: see thread_string.hpp */
 
 constexpr const char *WBX_FILE = "core.wbx";
 constexpr const char *CONFIG_FILE = "waterbox.config";
@@ -88,8 +89,8 @@ ce_package *ce_package_open(const char *path, const char **error_out)
 		delete p;
 		if (looksLikeZip)
 		{
-			g_openError = "not a readable zip archive";
-			if (error_out != nullptr) *error_out = g_openError.c_str();
+			*g_openError = "not a readable zip archive";
+			if (error_out != nullptr) *error_out = g_openError->c_str();
 		}
 		return nullptr; // otherwise: not a zip, so not a package - the quiet case
 	}

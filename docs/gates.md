@@ -159,6 +159,19 @@ what CI actually runs, and treat the gap as a known, named risk rather than an
 oversight waiting to be discovered. If CI cannot run a leg, somebody owns
 running it, and the PLAN.md says who and when.
 
+### This repo's legs that CI cannot run, and who runs them
+
+`.github/workflows/ci.yml` runs on Ubuntu only. Everything below needs a
+Windows box, so CI does not run it and never will; each is run BY HAND by
+whoever changes the code it covers, and the commit that changes that code says
+what the leg said. They are all quick.
+
+| leg | what it stands for | when it must be run |
+| --- | --- | --- |
+| `tests/ui/windows/live-theme-switch.sh` | a theme chosen while a window is open, on .NET Framework WinForms rather than Mono | any change to theming or to a control that paints itself |
+| `tests/ui/windows/folder-picker-checkbox.sh` | the real folder picker, which Mono does not have | any change to the folder picker |
+| `tests/engine/windows/refused-open.sh` | the engine as a DLL: a refused open must not free the string it just handed out (chimera#123 - a mingw DLL destroys a `thread_local` twice) | any change to how the engine stores or returns an error, and any new `thread_local` in the engine |
+
 ---
 
 ## H. The instrument changes the answer

@@ -15,6 +15,7 @@
 #include "zstd_dyn.hpp"
 #include "host_dyn.hpp"
 #include "progress.hpp"
+#include "thread_string.hpp"
 #include "state_history.hpp"
 #include "state_format.hpp"
 
@@ -28,7 +29,7 @@
 
 namespace {
 
-thread_local std::string g_openError;
+thread_local chimera::ThreadString g_openError;   /* never destroyed: see thread_string.hpp */
 
 struct ByteStream
 {
@@ -1024,8 +1025,8 @@ ce_session *ce_session_open(
 {
 	auto fail = [&](std::string message) -> ce_session *
 	{
-		g_openError = std::move(message);
-		if (error_out != nullptr) *error_out = g_openError.c_str();
+		*g_openError = std::move(message);
+		if (error_out != nullptr) *error_out = g_openError->c_str();
 		return nullptr;
 	};
 	if (error_out != nullptr) *error_out = nullptr;
