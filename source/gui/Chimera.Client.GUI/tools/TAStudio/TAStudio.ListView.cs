@@ -1,3 +1,4 @@
+using System;
 using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
@@ -1620,8 +1621,15 @@ namespace Chimera.Client.GUI
 				return;
 			}
 
+			// Four host pixels per STEP, where a step is a fraction of the axis
+			// rather than the literal value 1. An absolute screen position is
+			// declared 0..65535 across the picture, so a drag that moved the
+			// value by one would need a quarter of a million pixels to cross
+			// the screen; a paddle declared 0..255 still steps by one, because
+			// that is what a fine step comes to at that size.
+			int step = AxisFineStep(AxisEditColumn);
 			int increment = (_axisEditYPos - e.Y) / 4;
-			AnalogChangeBy(increment);
+			AnalogChangeBy(increment * step);
 			_axisEditYPos -= increment * 4;
 		}
 
@@ -1676,24 +1684,41 @@ namespace Chimera.Client.GUI
 			UpdateActiveMovieInputs();
 		}
 
+		/// <summary>
+		/// A fine step for an axis: one unit on a small range, proportionally
+		/// more on a large one. The nudge hotkeys and the drag are written in
+		/// terms of "a step" rather than the number 1 because an axis is as
+		/// wide as it declares - an absolute screen position spans 0..65535,
+		/// where a step of one is invisible, and a paddle spans 0..255, where
+		/// it is exactly right. 1024 steps crosses any axis in about the same
+		/// number of gestures.
+		/// </summary>
+		private int AxisFineStep(string axisName)
+			=> ControllerType.Axes.TryGetValue(axisName, out var spec)
+				? Math.Max(1, (int)(spec.Range.Count() / 1024))
+				: 1;
+
+		/// <summary>The coarse step, sixteen fine ones, for the by-ten hotkeys.</summary>
+		private int AxisCoarseStep(string axisName) => AxisFineStep(axisName) * 16;
+
 		public void AnalogIncrementByOne()
 		{
-			AnalogChangeBy(1);
+			if (AxisEditingMode) AnalogChangeBy(AxisFineStep(AxisEditColumn));
 		}
 
 		public void AnalogDecrementByOne()
 		{
-			AnalogChangeBy(-1);
+			if (AxisEditingMode) AnalogChangeBy(-AxisFineStep(AxisEditColumn));
 		}
 
 		public void AnalogIncrementByTen()
 		{
-			AnalogChangeBy(10);
+			if (AxisEditingMode) AnalogChangeBy(AxisCoarseStep(AxisEditColumn));
 		}
 
 		public void AnalogDecrementByTen()
 		{
-			AnalogChangeBy(-10);
+			if (AxisEditingMode) AnalogChangeBy(-AxisCoarseStep(AxisEditColumn));
 		}
 
 		private void AnalogChangeBy(int change)
