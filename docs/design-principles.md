@@ -4316,3 +4316,85 @@ with `%rsp` inside them, so does a thread given real TEB stack bounds, and so
 does one carrying the guest's FS base across the exception. The flag removes
 the exposure; it does not explain it. miniBox `docs/RED-ZONE.md` holds the
 measurements and names the two saved instrument patches for whoever resumes.
+
+## A pointer names a fraction of the screen, not a number in a plane (user-decided, 2026-09-22)
+
+An absolute input - a mouse pointer, a light gun, a touch panel - has to name a
+place on a picture whose size the declaration cannot know. `waterbox.config`
+fixes an axis range a priori, a limitation carried over from BizHawk, and DOS
+and PCem change video mode whenever they like. The user's framing was that the
+range "should always be the guest's screen resolution"; what they chose, after
+the survey below, was to keep a normalised wire and **fix the unit**.
+
+**The survey changed the problem.** The value was already resolution
+independent: `DisplayManager.UntransformPoint` returns guest pixels,
+`MainForm.cs:904-914` divides by the LIVE `BufferWidth`/`BufferHeight`, and
+`Controller.cs:130-152` expands that into the declared range. The unit was
+simply arbitrary - "1/2560ths of the screen" for DOSBox-X - and, worse,
+**the core divided by a different number than the config declared**:
+`dosbox-driver.cpp` used 800 against a declared 2560, so pointing at the middle
+of the window put the DOS cursor 1.6x past the right edge. Measured on that
+build with the position held, every value across the whole declared range
+answered the middle of the screen: the axis did not reach the machine at all.
+
+**The rule, for DOSBox-X and PCem:** an absolute position is declared
+`0..65535` neutral `32768`, and the core converts it against **its own live
+picture size**, never a constant and never a number the frontend supplied.
+`pixel = axis * screen / 65536` - 65535 is the largest value, 65536 the number
+of steps. (Measured: dividing by 65535 instead changes no reading a gate can
+take, because the clamp absorbs it; 65536 is a matter of not depending on the
+clamp.)
+
+**It is a spelling, not a new idea, and the tree is deliberately not uniform.**
+Every core with an absolute axis already normalises and scales in the core -
+opera, pcsx2 and flycast take a signed `-32768..32767` and immediately add
+32768 and divide; Ruffle carries `0..8191` and multiplies by its live stage;
+snes9x declares gun coordinates in SNES pixels and clamps Y against the live
+`PPU.ScreenHeight`. None of those is wrong, so **the user scoped this to
+DOSBox-X and PCem and left the rest alone**. `0..65535` is the preferred
+spelling for new work; it is not a migration anyone owes.
+
+**Three consequences worth writing down.**
+
+*The digits problem dissolved.* `65535` is exactly five characters, which is
+what both implementations of the entry format already pad an axis field to
+(`movie_entry.cpp:139-141`, `LogEntryGenerator.cs:57`). Column width, the
+typed-digit limit and the OSD's six-character field all come out unchanged, and
+**the engine needed no change at all** - it never reads `min` or `max`, only
+`neutral`.
+
+*An absolute position must be asserted every frame, not when it changes.* A
+fraction is not a fixed pixel: the same 32768 is pixel 160 in a 320-wide mode
+and 320 in a 640-wide one. DOSBox-X's `Mouse_AfterNewVideoMode` also resets the
+cursor to the middle of the new range on every mode set, so a position that
+only wrote itself on a change was overwritten and never recovered. An axis
+driven by an explicit relative speed is exempt, or a movie steering relatively
+gets dragged back to the neutral - which is now mid-screen.
+
+*The wire must be differenced in pixels, and this is the one that hides.* Where
+a core also derives relative movement from the position (DOSBox-X's issue #61
+rule, and PCem, which has no absolute device at all), one wire unit is about a
+hundredth of a pixel at 640 wide. Differencing the wire makes every delta a
+hundredfold too large **while the absolute cursor still lands in exactly the
+right place** - so no test of position can see it. It needs its own check: that
+the same movement asked for by position and by speed reaches the machine as the
+same number. Both cores now have one, and in both the negative control fired
+where the position check stayed green.
+
+**An axis is as wide as it declares, in the frontend too.** TAStudio's axis
+drag moved the value by one per four host pixels and its nudge hotkeys by a
+literal 1 and 10 - right for a 0..255 paddle, useless at 0..65535, where
+crossing the picture would take a quarter of a million pixels of mouse travel.
+Both are now a fraction of the range. The custom autofire pattern's value box
+had `+/-10000` fixed in the designer and would have silently kept its own value
+rather than refusing one it could not hold.
+
+**PCem gained the axis it never had, with a limit stated rather than hidden.**
+Its entire mouse list is two serial, two PS/2 and two machine-integrated mice,
+every one relative, with no VMware backdoor or tablet anywhere in the tree. So
+a position is turned into the movement that would reach it: open-loop
+targeting, which drifts if the guest accelerates or warps the cursor and cannot
+be measured from outside. A mouse also reports in bytes, so a screen-wide jump
+cannot fit in one packet and PCem's devices drop what is over the edge - the
+remainder is now kept and delivered over the next polls, and the negative
+control for that showed a 639-pixel jump arriving as 127.
