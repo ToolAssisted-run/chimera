@@ -1398,6 +1398,14 @@ CE_API void ce_session_greenzone_disk_budget(ce_session *s, uint64_t budget_byte
  * (docs/state-manager.md, "How close the near band stays"). */
 CE_API void ce_session_greenzone_max_near_stride(ce_session *s, int64_t max_stride);
 
+/* Stops the greenzone's work, or starts it again (TAStudio's "Maintain
+ * Greenzone"). While stopped, ce_session_greenzone_before_advance and
+ * ce_session_greenzone_capture store nothing and cost nothing - they only note
+ * where the machine is, so that edits made meanwhile are still honoured - and
+ * what is already stored stays usable. After starting again the next capture
+ * is a whole state: capture the current frame to have one there at once. */
+CE_API void ce_session_greenzone_suspend(ce_session *s, int32_t suspended);
+
 /* How many snapshots each band of a full greenzone aims to hold, 32 by default.
  *
  * A greenzone keeps every frame it captures until its memory budget is full;

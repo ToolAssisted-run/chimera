@@ -26,6 +26,13 @@ namespace Chimera.Emulation.Common
 		/// </summary>
 		void MaxNearStride(int stride);
 
+		/// <summary>
+		/// Stops the history's work, or starts it again. While stopped, BeforeAdvance and
+		/// Capture store nothing and cost nothing; what is stored stays, and Restore still
+		/// works. The first capture after starting again is a whole state.
+		/// </summary>
+		void Suspend(bool suspended);
+
 		/// <summary>Frames it can produce - not the number of stored objects.</summary>
 		long Count { get; }
 

@@ -10,6 +10,14 @@ namespace Chimera.Client.Common
 		IMovieChangeLog ChangeLog { get; }
 		IStateHistory States { get; }
 
+		/// <summary>
+		/// Whether the greenzone is kept as the movie plays - TAStudio's "Maintain
+		/// Greenzone", on whenever a project opens. Off, the history does no work at all
+		/// and new frames are not green; what is already stored stays. Turned back on,
+		/// the current frame is stored as a whole state and the history goes on from it.
+		/// </summary>
+		bool MaintainGreenzone { get; set; }
+
 		/// <summary>Before the machine moves, every frame.</summary>
 		void GreenzoneBeforeFrame();
 

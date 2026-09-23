@@ -421,7 +421,7 @@ namespace Chimera.Client.GUI
 			this.TasPlaybackBox.Location = new System.Drawing.Point(0, 0);
 			this.TasPlaybackBox.Margin = new System.Windows.Forms.Padding(3, 3, 3, 44);
 			this.TasPlaybackBox.Name = "TasPlaybackBox";
-			this.TasPlaybackBox.Size = new System.Drawing.Size(200, 108);
+			this.TasPlaybackBox.Size = new System.Drawing.Size(200, 129);
 			this.TasPlaybackBox.TabIndex = 5;
 			this.TasPlaybackBox.Tastudio = null;
 			// 
@@ -569,7 +569,7 @@ namespace Chimera.Client.GUI
 			// BookMarkControl
 			// 
 			this.BookMarkControl.Dock = System.Windows.Forms.DockStyle.Fill;
-			this.BookMarkControl.Location = new System.Drawing.Point(0, 108);
+			this.BookMarkControl.Location = new System.Drawing.Point(0, 129);
 			this.BookMarkControl.Name = "BookMarkControl";
 			this.BookMarkControl.Size = new System.Drawing.Size(200, 185);
 			this.BookMarkControl.TabIndex = 8;

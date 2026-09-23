@@ -57,6 +57,11 @@ namespace Chimera.Tests.Client.Common.Movie
 
 		public void MaxNearStride(int stride) => NearStrideCap = stride;
 
+		/// <summary>Whether the movie has the history's work stopped.</summary>
+		public bool Suspended { get; private set; }
+
+		public void Suspend(bool suspended) => Suspended = suspended;
+
 		public void Enable(long budgetBytes)
 		{
 			BudgetBytes = budgetBytes;
@@ -81,7 +86,10 @@ namespace Chimera.Tests.Client.Common.Movie
 
 		public void BeforeAdvance() { }
 
-		public void Capture(int frame) => _states.Add(frame);
+		public void Capture(int frame)
+		{
+			if (!Suspended) _states.Add(frame);   /* the engine stores nothing while suspended */
+		}
 
 		public bool RestoreTo(int frame)
 		{

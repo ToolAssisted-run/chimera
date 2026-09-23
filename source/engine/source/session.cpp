@@ -2548,6 +2548,12 @@ void ce_session_greenzone_max_near_stride(ce_session *s, int64_t max_stride)
 	s->history.maxNearStride(max_stride);
 }
 
+void ce_session_greenzone_suspend(ce_session *s, int32_t suspended)
+{
+	if (s == nullptr) return;
+	s->history.suspend(suspended != 0);
+}
+
 uint64_t ce_session_greenzone_disk_bytes(const ce_session *s)
 {
 	if (s == nullptr) return 0;

@@ -1174,6 +1174,7 @@ namespace Chimera.Client.GUI
 			}
 
 			MarkerControl?.UpdateValues();
+			TasPlaybackBox?.ShowMaintainGreenzone();
 
 			if (refreshBranches)
 			{

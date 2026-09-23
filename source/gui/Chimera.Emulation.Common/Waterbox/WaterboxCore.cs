@@ -506,6 +506,8 @@ namespace Chimera.Emulation.Common.Waterbox
 
 		public void MaxNearStride(int stride) => _session.GreenzoneMaxNearStride(stride);
 
+		public void Suspend(bool suspended) => _session.GreenzoneSuspend(suspended);
+
 		public long Count => _session.GreenzoneCount;
 
 		public int Nearest(int frame) => checked((int)_session.GreenzoneNearest(frame));

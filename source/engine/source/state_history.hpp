@@ -214,6 +214,18 @@ public:
 	 * forced: an epoch has to be open before the machine moves. */
 	void beforeAdvance();
 
+	/* Suspends the history's work (user request, 2026-09-23: TAStudio's
+	 * "Maintain Greenzone" unticked, for a cutscene or for re-recording with
+	 * branches alone). While suspended, beforeAdvance opens no epoch and capture
+	 * stores nothing - no delta, no anchor, no thinning, no packing, no spill -
+	 * and only notes where the machine stands, which is what keeps an edit made
+	 * meanwhile from letting an old timeline's frames in later. What is already
+	 * stored stays, and restore, pins and invalidation work as ever. Resuming
+	 * stores nothing either: the machine is not the stored copy of any frame, so
+	 * the first capture after it is an anchor, never a delta across the gap. */
+	void suspend(bool suspended);
+	bool suspended() const { return m_suspended; }
+
 	/* Called immediately after that advance, with the frame now standing at.
 	 *
 	 * `note` is the caller's own bookkeeping for this frame, stored with it and
@@ -830,6 +842,7 @@ private:
 	CeStrideTuner m_tuner;             /* decides the stride; see stride_tuner.h */
 	int64_t m_nearStride = 1;
 	bool m_strideFixed = false;        /* fixNearStride: the tuner leaves it alone */
+	bool m_suspended = false;          /* suspend(): nothing is captured or stored */
 	double m_captureSeconds = 0;       /* exponential means, in seconds */
 	double m_wallSeconds = 0;
 	double m_lastCaptureEnded = 0;

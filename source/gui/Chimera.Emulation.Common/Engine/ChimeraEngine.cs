@@ -678,6 +678,9 @@ namespace Chimera.Emulation.Common.Engine
 		public abstract void ce_session_greenzone_max_near_stride(IntPtr session, long maxStride);
 
 		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract void ce_session_greenzone_suspend(IntPtr session, int suspended);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract void ce_session_greenzone_bands(
 			IntPtr session, long nearFrames, long midFrames, long midStride, long farStride, long anchorSpacing);
 
@@ -2133,6 +2136,8 @@ namespace Chimera.Emulation.Common.Engine
 		public void GreenzoneDiskBudget(ulong budgetBytes) => E.ce_session_greenzone_disk_budget(_session, budgetBytes);
 
 		public void GreenzoneMaxNearStride(long maxStride) => E.ce_session_greenzone_max_near_stride(_session, maxStride);
+
+		public void GreenzoneSuspend(bool suspended) => E.ce_session_greenzone_suspend(_session, suspended ? 1 : 0);
 
 		public void GreenzoneBands(long nearFrames, long midFrames, long midStride, long farStride, long anchorSpacing)
 			=> E.ce_session_greenzone_bands(_session, nearFrames, midFrames, midStride, farStride, anchorSpacing);

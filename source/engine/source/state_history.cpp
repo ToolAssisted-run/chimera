@@ -1186,8 +1186,18 @@ int64_t StateHistory::nearest(int64_t frame) const
 	return (it - 1)->nearestIn(frame);
 }
 
+void StateHistory::suspend(bool suspended)
+{
+	m_suspended = suspended;
+	/* an epoch open now would measure from a machine the resumed history no
+	 * longer continues from, and keep the sandbox write-tracking meanwhile */
+	m_epochOpen = false;
+	m_machineStored = false;
+}
+
 void StateHistory::beforeAdvance()
 {
+	if (m_suspended) { m_epochOpen = false; return; }
 	if (!enabled() || !deltasAvailable()) { m_epochOpen = false; return; }
 	/* A delta continues the newest segment, and only while there is one with
 	 * room. Otherwise the coming capture is an anchor and needs no epoch. */
@@ -1336,6 +1346,15 @@ void StateHistory::capture(int64_t frame, const uint8_t *note, size_t noteLen)
 	 * and it is the stored copy of that frame only if this capture stores it */
 	m_machineFrame = frame;
 	m_machineStored = false;
+	if (m_suspended)
+	{
+		/* nothing stored, and nothing to do but keep the edit bookkeeping true:
+		 * a machine brought back to the edit (a restore) has left the timeline
+		 * the edit replaced, as captureOnce would have noticed */
+		m_epochOpen = false;
+		if (m_pastEditAt >= 0 && frame <= m_pastEditAt + 1) m_pastEditAt = -1;
+		return;
+	}
 	for (;;)
 	{
 		try

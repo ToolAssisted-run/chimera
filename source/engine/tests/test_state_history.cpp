@@ -153,8 +153,14 @@ int g_refuseDeltaLoadIn = -1;
  * is expected to survive rather than report. */
 int g_outOfMemoryFor = 0;
 
+/* Every call that captures: a state, an epoch, a delta, a composition. A
+ * suspended history must make none of them - the point of suspending it is
+ * that the sandbox does no greenzone work at all. */
+int64_t g_captureCalls = 0;
+
 void fakeSaveState(void *, chimera::WbxWriteCb cb, uintptr_t ud, chimera::WbxReturn *r)
 {
+	g_captureCalls++;
 	if (g_outOfMemoryFor > 0) { g_outOfMemoryFor--; throw std::bad_alloc(); }
 	*r = {};
 	cb(ud, g_machine.cell, Machine::kCells);
@@ -170,12 +176,14 @@ void fakeLoadState(void *, chimera::WbxReadCb cb, uintptr_t ud, chimera::WbxRetu
 
 void fakeEpochBegin(void *, chimera::WbxReturn *r)
 {
+	g_captureCalls++;
 	*r = {};
 	g_machine.epochBase.assign(g_machine.cell, g_machine.cell + Machine::kCells);
 }
 
 void fakeSaveDelta(void *, bool forward, chimera::WbxWriteCb cb, uintptr_t ud, chimera::WbxReturn *r)
 {
+	g_captureCalls++;
 	if (g_outOfMemoryFor > 0) { g_outOfMemoryFor--; throw std::bad_alloc(); }
 	*r = {};
 	if (g_machine.epochBase.empty()) { std::snprintf(r->errorMessage, sizeof r->errorMessage, "no epoch"); return; }
@@ -210,6 +218,7 @@ void fakeLoadDelta(void *, chimera::WbxReadCb cb, uintptr_t ud, chimera::WbxRetu
 void fakeComposeDelta(chimera::WbxReadCb a, uintptr_t aud, chimera::WbxReadCb b, uintptr_t bud,
 	chimera::WbxWriteCb out, uintptr_t oud, chimera::WbxReturn *r)
 {
+	g_captureCalls++;
 	*r = {};
 	Cells merged = readCells(a, aud);
 	for (const auto &c : readCells(b, bud))
@@ -2237,6 +2246,69 @@ int main(void)
 		}
 		assert(offered > 0 && offered < 301);
 		g_pad = 0;
+	}
+
+	{ // Suspended (TAStudio's "Maintain Greenzone" unticked): nothing is stored
+	  // while it lasts, what was stored stays, resuming stores a whole state at
+	  // the frame it resumes on, and an edit made meanwhile still keeps the
+	  // timeline it replaced out. No epoch, state or delta is asked of the
+	  // sandbox meanwhile, so it surveys no pages (user request, 2026-09-23).
+		const chimera::HostApi api = fakeHost();
+		g_machine = Machine{};
+		chimera::StateHistory h;
+		h.configure(&api, nullptr, 64u << 20);
+		std::vector<std::array<uint8_t, Machine::kCells>> truth(1);
+		std::memcpy(truth[0].data(), g_machine.cell, Machine::kCells);
+		auto step = [&](int64_t f) {
+			h.beforeAdvance();
+			advance(f);
+			std::array<uint8_t, Machine::kCells> at{};
+			std::memcpy(at.data(), g_machine.cell, Machine::kCells);
+			if (truth.size() <= static_cast<size_t>(f)) truth.resize(static_cast<size_t>(f) + 1);
+			truth[static_cast<size_t>(f)] = at;
+			h.capture(f);
+		};
+		h.capture(0);
+		for (int64_t f = 1; f <= 20; f++) step(f);
+		const int64_t anchorsBefore = h.anchors();
+		const uint64_t bytesBefore = h.bytes();
+
+		h.suspend(true);
+		const int64_t callsBefore = g_captureCalls;
+		for (int64_t f = 21; f <= 40; f++) step(f);
+		assert(g_captureCalls == callsBefore);        /* and nothing asked of the sandbox */
+		assert(h.nearest(40) == 20);                  /* nothing stored meanwhile */
+		assert(h.bytes() == bytesBefore);
+		assert(h.anchors() == anchorsBefore);
+
+		h.suspend(false);
+		h.capture(40);                                /* what TAStudio does on resuming */
+		assert(h.nearest(40) == 40);
+		assert(h.anchors() == anchorsBefore + 1);     /* a whole state, not a delta across the gap */
+		for (int64_t f = 41; f <= 50; f++) step(f);
+		assert(h.nearest(50) == 50);
+		assert(h.anchors() == anchorsBefore + 1);     /* and deltas again after it */
+		for (const int64_t f : { 5, 20, 40, 45, 50 })
+		{
+			assert(h.nearest(f) == f);
+			assert(h.restore(f, error));
+			assert(std::memcmp(g_machine.cell, truth[static_cast<size_t>(f)].data(), Machine::kCells) == 0);
+		}
+
+		/* an edit behind the machine while suspended: the machine plays the old
+		 * timeline on, and resuming there must not store it */
+		assert(h.restore(50, error));
+		h.suspend(true);
+		for (int64_t f = 51; f <= 60; f++) step(f);
+		h.invalidateAfter(54);
+		h.suspend(false);
+		h.capture(60);
+		assert(h.nearest(60) <= 54);
+		/* brought back to the edit, the machine is on the new timeline and resuming stores again */
+		assert(h.restore(h.nearest(54), error));
+		const int64_t back = h.nearest(54);
+		for (int64_t f = back + 1; f <= 58; f++) step(f);
+		assert(h.nearest(58) == 58);
 	}
 
 	/* the spill file belongs to the history and goes with it */

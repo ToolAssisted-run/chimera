@@ -31,7 +31,9 @@
  * (near frames, mid frames, mid stride, far stride, anchor spacing; 0 keeps a
  * default). Its use in a test is to make the bands narrow enough that the
  * history is constantly coarsening, which is what the defaults spend minutes
- * of real play reaching.
+ * of real play reaching. --greenzone-suspend-at <frame> enables the history
+ * and switches it off at that frame of the first pass, to measure what a run
+ * costs with TAStudio's "Maintain greenzone" off.
  *
  * --stop-at-seek ends the run where the seek landed, so the dumps describe
  * frame N itself rather than the end of a replay from it.
@@ -225,6 +227,7 @@ int main(int argc, char **argv)
 	int64_t greenzoneMaxStride = 0; // 0: the engine's default cap
 	int64_t greenzoneBandGoal = 0; // 0: the engine's default goal
 	int64_t greenzoneBytes = -1;   // an exact budget in bytes, for machines too small to fill a megabyte
+	int64_t greenzoneSuspendAt = -1; // the frame the history is switched off at: what TAStudio's "Maintain greenzone" off costs
 	std::string recordPath;
 	std::string savedataDir;
 	std::string projectPath;
@@ -311,6 +314,7 @@ int main(int argc, char **argv)
 		else if (arg == "--greenzone-max-stride" && i + 1 < argc) greenzoneMaxStride = std::atoll(argv[++i]);
 		else if (arg == "--greenzone-band-goal" && i + 1 < argc) greenzoneBandGoal = std::atoll(argv[++i]);
 		else if (arg == "--greenzone-bytes" && i + 1 < argc) greenzoneBytes = std::atoll(argv[++i]);
+		else if (arg == "--greenzone-suspend-at" && i + 1 < argc) greenzoneSuspendAt = std::atoll(argv[++i]);
 		else if (arg == "--stop-at-seek") stopAtSeek = true;
 		else if (arg == "--record" && i + 1 < argc) recordPath = argv[++i];
 		else if (arg == "--settings" && i + 1 < argc) settings = argv[++i];
@@ -655,7 +659,7 @@ int main(int argc, char **argv)
 	 * without one fails at the first pass with "no stored state at or before
 	 * the target frame". */
 	if (seekFrame >= 0 || rewindTo >= 0 || !historyIn.empty() || !historyOut.empty() || !greenzoneMap.empty()
-		|| greenzoneBytes > 0)
+		|| greenzoneBytes > 0 || greenzoneSuspendAt >= 0)
 	{
 		/* Bands before enabling: enabling captures the anchor, and the anchor
 		 * spacing decides whether it is the only one. */
@@ -773,6 +777,7 @@ int main(int argc, char **argv)
 	const int64_t firstPass = playFrames >= 0 && playFrames < frames ? playFrames : frames;
 	for (int64_t i = 0; i < firstPass; i++)
 	{
+		if (i == greenzoneSuspendAt) ce_session_greenzone_suspend(session, 1);
 		if (rerecord && ce_session_load_state(session, state.data(), state.size()) != 0)
 		{
 			return fail(metaPath, ce_session_last_error(session));

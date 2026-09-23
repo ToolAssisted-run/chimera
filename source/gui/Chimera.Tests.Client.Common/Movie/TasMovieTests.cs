@@ -73,6 +73,36 @@ namespace Chimera.Tests.Client.Common.Movie
 
 #pragma warning disable BHI1600 //TODO disambiguate assert calls
 		[TestMethod]
+		public void MaintainGreenzoneOffStoresNothingAndOnAnchorsTheCurrentFrame()
+		{
+			TasMovie movie = MakeMovie(100);
+			FakeEmulator emu = (FakeEmulator)movie.Emulator;
+			Assert.IsTrue(movie.MaintainGreenzone, "a project opens keeping its greenzone");
+
+			movie.MaintainGreenzone = false;
+			Assert.IsTrue(emu.Suspended);
+			emu.Frame = 30;
+			movie.States.Capture(30);
+			Assert.IsFalse(movie.States.Has(30), "nothing is stored while switched off");
+
+			emu.Frame = 40;
+			movie.MaintainGreenzone = true;
+			Assert.IsFalse(emu.Suspended);
+			Assert.IsTrue(movie.States.Has(40), "switching it on stores an anchor at the current frame");
+			Assert.IsFalse(movie.States.Has(30));
+		}
+
+		[TestMethod]
+		public void MaintainGreenzoneOffSurvivesAReattach()
+		{
+			TasMovie movie = MakeMovie(10);
+			movie.MaintainGreenzone = false;
+			FakeEmulator other = new FakeEmulator();
+			movie.Attach(other);
+			Assert.IsTrue(other.Suspended, "a machine attached while switched off stays off");
+		}
+
+		[TestMethod]
 		public void AllOperationsFlagChanges()
 		{
 			ITasMovie movie = MakeMovie(10);
