@@ -1,3 +1,4 @@
+using System;
 using System.Threading;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -20,11 +21,27 @@ namespace Chimera.Common
 		/// they wanted a video; there is nothing to ask any more, and nothing to
 		/// pin, because the build and the binary arrive together.
 		/// </summary>
-		public static string FFmpegPath => Path.Combine(PathUtils.DataDirectoryPath, "dll", OSTailoredCode.IsUnixHost ? "ffmpeg" : "ffmpeg.exe");
+		/// <remarks>
+		/// Beside the program, not in the data directory: the data directory is
+		/// wherever CHIMERA_DATA_HOME (or the Data Directory setting) says, and on
+		/// Linux it is usually not the install folder - which is how the encoder
+		/// reported a binary it was standing next to as missing (chimera#137). On
+		/// Windows the two are the same folder, so nothing there ever showed it.
+		/// </remarks>
+		public static string FFmpegPath => Path.Combine(PathUtils.DllDirectoryPath, OSTailoredCode.IsUnixHost ? "ffmpeg" : "ffmpeg.exe");
 
-		/// <summary>What to say when it is not there, which now means a broken install.</summary>
+		/// <summary>
+		/// What to say when it cannot be used: not there at all (a broken
+		/// install), or there and not answering - which are different problems
+		/// with different cures, and used to read the same.
+		/// </summary>
 		public static string MissingMessage
-			=> $"ffmpeg is missing from this build of Chimera. It should be at {FFmpegPath}.";
+			=> File.Exists(FFmpegPath)
+				? $"ffmpeg is at {FFmpegPath}, but running it did not work: {_lastFailure ?? "it did not say it was ffmpeg"}."
+				: $"ffmpeg is missing from this build of Chimera. It should be at {FFmpegPath}.";
+
+		/// <summary>Why the last availability check failed, for <see cref="MissingMessage"/>.</summary>
+		private static string _lastFailure;
 
 		public class AudioQueryResult
 		{
@@ -52,12 +69,21 @@ namespace Chimera.Common
 		/// </summary>
 		public static bool QueryServiceAvailable()
 		{
+			_lastFailure = null;
+			if (!File.Exists(FFmpegPath)) return false;
 			try
 			{
-				return File.Exists(FFmpegPath) && Run("-version").Text.ContainsOrdinal("ffmpeg version");
+				var result = Run("-version");
+				if (result.Text.ContainsOrdinal("ffmpeg version")) return true;
+				var said = result.Text.Trim();
+				_lastFailure = $"it exited with code {result.ExitCode}"
+					+ (said.Length is 0 ? " and printed nothing" : $" and printed \"{(said.Length > 200 ? said.Substring(0, 200) + "..." : said)}\"");
+				return false;
 			}
-			catch
+			catch (Exception ex)
 			{
+				// e.g. not executable (a bundle unpacked without its permissions)
+				_lastFailure = ex.Message;
 				return false;
 			}
 		}
@@ -126,6 +152,10 @@ namespace Chimera.Common
 			proc.BeginOutputReadLine();
 			proc.BeginErrorReadLine();
 			proc.WaitForExit();
+			// The process having exited does not mean its last lines have been
+			// delivered: the reads are asynchronous, and reading the text before
+			// both streams have closed can find it empty.
+			Task.WaitAll(new Task[] { outputCloseEvent.Task, errorCloseEvent.Task }, 5000);
 			string resultText = "";
 			m.WaitOne();
 			resultText = outputBuilder.ToString();
