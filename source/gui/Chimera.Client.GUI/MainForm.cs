@@ -520,6 +520,35 @@ namespace Chimera.Client.GUI
 					Environment.Exit(2);
 				}
 				WaterboxCore.PrecompileRequest = new(preIndex, preCount, FirmwareToo: !parts.Skip(2).Contains("game"));
+				// the project's other files - licence, packages, disc key - mounted
+				// the way a project mounts them, or a game that needs them to boot
+				// compiles nothing (chimera#140)
+				if (_argParser.cmdPrecompileSlots is { Length: > 0 } slotsFile)
+				{
+					try
+					{
+						var doc = Newtonsoft.Json.Linq.JObject.Parse(File.ReadAllText(slotsFile));
+						var extras = new List<CoreFile>
+						{
+							new("slots", System.Text.Encoding.UTF8.GetBytes(
+								(doc["slots"] ?? new Newtonsoft.Json.Linq.JObject()).ToString(Newtonsoft.Json.Formatting.None))),
+						};
+						if (doc["files"] is Newtonsoft.Json.Linq.JObject files)
+						{
+							foreach (var file in files.Properties())
+							{
+								if (file.Value.Type is Newtonsoft.Json.Linq.JTokenType.String)
+									extras.Add(new(file.Name, file.Value.ToString()));
+							}
+						}
+						RomLoader.PlainLoadExtraFiles = extras;
+					}
+					catch (Exception ex) when (ex is IOException or Newtonsoft.Json.JsonException)
+					{
+						Console.Error.WriteLine($"bad --precompile-slots {slotsFile}: {ex.Message}");
+						Environment.Exit(2);
+					}
+				}
 			}
 			ScanForCorePackages();
 			// the menus built at construction time predate the packages

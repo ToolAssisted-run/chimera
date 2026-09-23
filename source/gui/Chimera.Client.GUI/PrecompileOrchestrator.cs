@@ -191,7 +191,7 @@ namespace Chimera.Client.GUI
 			string packagePath, string configPath, string romPath, string romSha1, string cacheDir,
 			string coreName, string coreVersion,
 			Action<Entry> onEntry, Action<uint, uint> onProgress, Func<bool> cancelled,
-			IReadOnlyDictionary<string, string> firmware = null)
+			IReadOnlyDictionary<string, string> firmware = null, string slotsFile = null)
 		{
 			LastFailure = null;
 			if (string.IsNullOrEmpty(romPath) || !File.Exists(romPath) || cacheDir is null)
@@ -269,6 +269,10 @@ namespace Chimera.Client.GUI
 					{
 						args.Add($"--firmware={id}={path}");
 					}
+					// and the project's other files: a licensed package, an
+					// update, an encrypted disc boot on the game file alone
+					// nowhere (chimera#140)
+					if (!string.IsNullOrEmpty(slotsFile)) args.Add($"--precompile-slots={slotsFile}");
 					args.Add(romPath);
 					var index = i;
 					var p = SelfProcess.Start(args, line => Line(index, line));

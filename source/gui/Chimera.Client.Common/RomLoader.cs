@@ -377,6 +377,15 @@ namespace Chimera.Client.Common
 			if (!string.IsNullOrEmpty(nextEmulator.SystemId)) game.System = nextEmulator.SystemId;
 		}
 
+		/// <summary>
+		/// Files mounted beside a game opened directly, the way a project mounts
+		/// its slots: the slot map as "slots" and every file under its name. Only
+		/// a precompile session sets it (--precompile-slots): the wizard compiles
+		/// before the project exists, and a licensed package, an installed update
+		/// or an encrypted disc does not boot on the game file alone (chimera#140).
+		/// </summary>
+		public static IReadOnlyList<CoreFile> PlainLoadExtraFiles { get; set; }
+
 		private IEmulator MakeCoreFromRegistry(LoadParameters lp, string forcedCoreName = null)
 		{
 			IReadOnlyList<ICoreFactory> factories;
@@ -420,6 +429,7 @@ namespace Chimera.Client.Common
 						DeterministicEmulationRequested = Deterministic,
 						Settings = GetCoreSettings(factory.CoreType, factory.SettingsType),
 						FirmwareProvider = CoreFirmwareStore.ProviderFor(_config, factory.CoreName),
+						ExtraFiles = PlainLoadExtraFiles,
 					};
 					var created = factory.Create(ctx);
 					CoreRegistry.Instance.NoteCreated(created, factory);

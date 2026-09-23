@@ -1425,11 +1425,25 @@ namespace Chimera.Client.GUI
 			// nothing: the session boots, is refused for want of it, and exits.
 			_rememberFirmwareNow(ChosenCore.Name, ProvidedFirmwarePaths);
 
-			var manifest = PrecompileOrchestrator.Run(
-				ChosenCore.Path, _configPath, romPath, romSha1, dir,
-				_cfg?.CoreName ?? ChosenCore.Name, _cfg?.Version ?? "",
-				Entry, Progress, cancelled: PumpAndCheckCancel,
-				firmware: ProvidedFirmwarePaths);
+			// The sessions boot the game as the project will, so they are handed
+			// every file the project will hold, not the game file alone: a
+			// licensed package needs its .rap, an update its base game, an
+			// encrypted disc its key - without them a session is refused at boot
+			// and compiles nothing (chimera#140).
+			var slotsFile = WriteSlotsForPrecompile();
+			CoreCacheManifest manifest;
+			try
+			{
+				manifest = PrecompileOrchestrator.Run(
+					ChosenCore.Path, _configPath, romPath, romSha1, dir,
+					_cfg?.CoreName ?? ChosenCore.Name, _cfg?.Version ?? "",
+					Entry, Progress, cancelled: PumpAndCheckCancel,
+					firmware: ProvidedFirmwarePaths, slotsFile: slotsFile);
+			}
+			finally
+			{
+				if (slotsFile is not null) try { File.Delete(slotsFile); } catch (IOException) { }
+			}
 
 			_precompiling = false;
 			_precompileBar.Visible = false;
@@ -2335,6 +2349,31 @@ namespace Chimera.Client.GUI
 		// ---- firmware: the last word, decided by everything before it ------------
 
 		/// <summary>The slot map exactly as the session will mount it, from the form's current picks.</summary>
+		/// <summary>
+		/// The slot map and where each file lies, written for the precompile
+		/// sessions (--precompile-slots); null when there is nothing beside the
+		/// game to hand over. The names are the ones the project will record.
+		/// </summary>
+		private string? WriteSlotsForPrecompile()
+		{
+			if (_declaration is null) return null;
+			Newtonsoft.Json.Linq.JObject files = new();
+			foreach (var slot in _declaration.Slots)
+			{
+				if (!_slotLists.TryGetValue(slot.Id, out var list)) continue;
+				foreach (var file in list.Items.OfType<PickedFile>()) files[file.Name] = file.Path;
+			}
+			if (files.Count is 0) return null;
+			var doc = new Newtonsoft.Json.Linq.JObject
+			{
+				["slots"] = Newtonsoft.Json.Linq.JObject.Parse(CurrentSlotsJson()),
+				["files"] = files,
+			};
+			var path = Path.Combine(Path.GetTempPath(), $"chimera-precompile-slots-{Guid.NewGuid():N}.json");
+			File.WriteAllText(path, doc.ToString(Newtonsoft.Json.Formatting.None));
+			return path;
+		}
+
 		private string CurrentSlotsJson()
 		{
 			Newtonsoft.Json.Linq.JObject slots = new();
