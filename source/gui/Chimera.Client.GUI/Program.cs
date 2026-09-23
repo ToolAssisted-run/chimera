@@ -183,7 +183,8 @@ namespace Chimera.Client.GUI
 		private static int SubMain(string[] args)
 		{
 			// raw scan, not ArgParser: several dialogs below can fire before arguments are parsed
-			if (Array.IndexOf(args, "--headless") >= 0 || Array.Exists(args, a => a.StartsWith("--precompile", StringComparison.Ordinal))) HeadlessMode.Enabled = true;
+			if (Array.IndexOf(args, "--headless") >= 0 || Array.IndexOf(args, "--suggest-settings") >= 0
+				|| Array.Exists(args, a => a.StartsWith("--precompile", StringComparison.Ordinal))) HeadlessMode.Enabled = true;
 
 			// An error that can be caught must not be what ends a session (docs/project.md,
 			// "Recovery"). On the UI thread it is survived: the work is snapshotted, emulation
@@ -286,6 +287,31 @@ namespace Chimera.Client.GUI
 			if (!OSTailoredCode.IsUnixHost && CrashCapture.Arm(Path.Combine(AppContext.BaseDirectory, "dll")) is { } crashNotesOff)
 			{
 				Console.Error.WriteLine($"[crash] no crash notes this session: {crashNotesOff}");
+			}
+
+			// --suggest-settings <package> <game>: what the core would choose for this
+			// game, printed as its JSON, and nothing else - no window, no config. The
+			// new-project wizard asks this in a child process, so a core that falls
+			// over while it looks never takes the wizard with it.
+			var suggestAt = Array.IndexOf(args, "--suggest-settings");
+			if (suggestAt >= 0)
+			{
+				if (suggestAt + 2 >= args.Length)
+				{
+					Console.Error.WriteLine("usage: --suggest-settings <core package> <game file>");
+					return 2;
+				}
+				try
+				{
+					Console.Out.Write(Chimera.Emulation.Common.Engine.EngineSession.Suggest(args[suggestAt + 1], args[suggestAt + 2]));
+					Console.Out.Flush();
+					return 0;
+				}
+				catch (InvalidOperationException e)
+				{
+					Console.Error.WriteLine(e.Message);
+					return 1;
+				}
 			}
 
 			TempFileManager.Start();

@@ -304,6 +304,9 @@ bool composeSettings(const std::string &defaultsJson, const char *overrides, std
 extern "C" int32_t ce_gl_start(char *error_out, int32_t error_len);
 extern "C" uintptr_t ce_cache_dispatch(uintptr_t op, uintptr_t a, uintptr_t b, uintptr_t c, uintptr_t d, uintptr_t e);
 
+/* suggestion sessions (ce_suggest_settings): open stops before Init */
+static bool s_suggestOnly = false;
+
 /* precompile sessions: asked for before open, like the GPU */
 static int32_t s_precompileIndex = 0, s_precompileCount = 0, s_precompileFirmware = 1;
 
@@ -333,6 +336,8 @@ struct ce_session
 	bool gpuDrew = false;
 	/* the compile cache and precompile sessions (optional exports) */
 	bool precompile = false;
+	/* what the core suggested, in a suggestion session (ce_suggest_settings) */
+	std::string suggestion;
 	uintptr_t fnCacheStored = 0, fnCacheFetched = 0;
 	uintptr_t fnPrecompileDone = 0, fnPrecompileDoneCount = 0, fnPrecompileTotal = 0;
 
@@ -1220,6 +1225,19 @@ ce_session *ce_session_open(
 
 	std::string err;
 	if (!s->activate(err)) return abort(std::move(err));
+
+	/* A suggestion session ends here: the files are mounted exactly as a run
+	 * would have them, and the core is asked what it suggests for them
+	 * instead of being started. ce_suggest_settings reads the answer and frees
+	 * the session; nothing else ever sees one. */
+	if (s_suggestOnly)
+	{
+		std::string ignored;
+		auto suggest = reinterpret_cast<uintptr_t (*)()>(s->proc("SuggestSettings", 0, false, ignored));
+		const char *text = suggest != nullptr ? reinterpret_cast<const char *>(suggest()) : nullptr;
+		s->suggestion = text != nullptr ? text : "";
+		return s;
+	}
 
 	/* The GPU bridge, before Init because Init is where a core picks its
 	 * renderer. Three things have to be true and any of them may not be: the
@@ -2706,6 +2724,33 @@ extern "C" uint64_t ce_session_cache_fetched(const ce_session *s)
 {
 	if (s == nullptr || s->fnCacheFetched == 0) return 0;
 	return reinterpret_cast<uint64_t (*)()>(s->fnCacheFetched)();
+}
+
+extern "C" const char *ce_suggest_settings(
+	const char *package_path,
+	const uint8_t *rom, uint64_t rom_len, const char *rom_path,
+	const char *settings_overrides_json,
+	const char *const *firmware_ids, const uint8_t *const *firmware_data,
+	const uint64_t *firmware_lens, int32_t firmware_count,
+	const char *const *extra_names, const uint8_t *const *extra_data,
+	const uint64_t *extra_lens, const char *const *extra_paths, int32_t extra_count,
+	uint64_t *len_out, const char **error_out)
+{
+	/* never destroyed: a thread_local std::string is freed twice by a mingw
+	 * DLL at exit (thread_string.hpp, chimera#123) */
+	static thread_local chimera::ThreadString answer;
+	answer->clear();
+	if (len_out != nullptr) *len_out = 0;
+	s_suggestOnly = true;
+	ce_session *s = ce_session_open(package_path, rom, rom_len, rom_path, settings_overrides_json,
+		firmware_ids, firmware_data, firmware_lens, firmware_count,
+		extra_names, extra_data, extra_lens, extra_paths, extra_count, error_out);
+	s_suggestOnly = false;
+	if (s == nullptr) return nullptr;
+	*answer = s->suggestion;
+	ce_session_free(s);
+	if (len_out != nullptr) *len_out = answer->size();
+	return answer->c_str();
 }
 
 extern "C" int32_t ce_session_precompile_done(const ce_session *s)

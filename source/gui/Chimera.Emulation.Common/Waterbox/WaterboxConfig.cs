@@ -61,6 +61,13 @@ namespace Chimera.Emulation.Common.Waterbox
 		/// </summary>
 		public bool Precompile { get; set; }
 
+		/// <summary>
+		/// The core can say what it would choose for a game before one boots (it
+		/// exports SuggestSettings; engine.h, ce_suggest_settings): the wizard asks
+		/// when it reaches the settings page and applies the answer there.
+		/// </summary>
+		public bool SuggestSettings { get; set; }
+
 		/// <summary>Guest heap sizes in MiB, in order: sbrk, sealed, invis, plain, mmap.</summary>
 		public uint[]? MemoryLayoutMiB { get; set; }
 

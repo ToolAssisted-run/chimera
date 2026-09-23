@@ -249,6 +249,7 @@ int main(int argc, char **argv)
 	std::vector<std::string> fileDirs;
 	bool allowCoreMismatch = false;
 	bool wantGpu = false;
+	bool suggest = false;
 	/* Frames are drawn only when a screenshot asks for one, which makes this
 	 * runner a measurement of a seek rather than of play. --render-every-frame
 	 * is the other half of that A/B: the same run, drawing. */
@@ -313,6 +314,7 @@ int main(int argc, char **argv)
 		else if (arg == "--stop-at-seek") stopAtSeek = true;
 		else if (arg == "--record" && i + 1 < argc) recordPath = argv[++i];
 		else if (arg == "--settings" && i + 1 < argc) settings = argv[++i];
+		else if (arg == "--suggest") suggest = true;
 		else if (arg == "--export-savedata" && i + 1 < argc) savedataDir = argv[++i];
 		else if (arg == "--meta" && i + 1 < argc) metaPath = argv[++i];
 		else if (arg == "--project" && i + 1 < argc) projectPath = argv[++i];
@@ -380,10 +382,11 @@ int main(int argc, char **argv)
 		else return fail(metaPath, "unexpected argument: " + arg);
 	}
 	bool projectMode = !projectPath.empty();
-	if (projectMode ? packagePath == nullptr : moviePath == nullptr)
+	if (projectMode ? packagePath == nullptr : (suggest ? romPath == nullptr : moviePath == nullptr))
 	{
 		std::fprintf(stderr, "usage: chimera-run <package> <rom> <movie.txt> [--rerecord] [--seek <frame>] [--play <n>] [--edit-from <movie>] [--stop-at-seek] [--bands n,m,ms,fs,anchor] [--record <out.txt>] [--settings <json>] [--dump <domain>=<path>]... [--firmware <id>=<path>]... [--state <path>] [--frames <n>] [--save-state <frame>=<path>]... [--screenshot <frame>=<path>]... [--export-savedata <dir>] [--meta <path>] [--gpu] [--draw-every-frame]\n"
-			"       chimera-run --project <p.chimeraProject> <package> [--files <dir>]... [--allow-core-mismatch] [the same run flags]\n");
+			"       chimera-run --project <p.chimeraProject> <package> [--files <dir>]... [--allow-core-mismatch] [the same run flags]\n"
+			"       chimera-run <package> <rom> --suggest [--settings <json>] [--firmware <id>=<path>]...\n");
 		return 1;
 	}
 	if (projectMode && settings != nullptr)
@@ -392,7 +395,7 @@ int main(int argc, char **argv)
 	}
 
 	std::vector<uint8_t> rom, movieText;
-	if (!projectMode && !readWholeFile(moviePath, movieText)) return fail(metaPath, std::string("could not read movie ") + moviePath);
+	if (!projectMode && !suggest && !readWholeFile(moviePath, movieText)) return fail(metaPath, std::string("could not read movie ") + moviePath);
 
 	/* A .chimeraMultiFile rom is a multi-file game: the first image mounts as
 	 * the rom (rom.name carrying its real name), further images as rom2..N,
@@ -581,7 +584,7 @@ int main(int argc, char **argv)
 	}
 
 	ce_movie_log *movie = ce_movie_log_new();
-	if (ce_movie_log_parse(movie, reinterpret_cast<const char *>(movieText.data()), movieText.size()) != 0)
+	if (!suggest && ce_movie_log_parse(movie, reinterpret_cast<const char *>(movieText.data()), movieText.size()) != 0)
 	{
 		return fail(metaPath, std::string("movie: ") + ce_movie_log_last_error(movie));
 	}
@@ -609,6 +612,20 @@ int main(int argc, char **argv)
 	}
 
 	const char *error = nullptr;
+	/* --suggest: what the core would choose for this game, printed as its
+	 * JSON, and nothing is started (ce_suggest_settings) */
+	if (suggest)
+	{
+		uint64_t len = 0;
+		const char *answer = ce_suggest_settings(
+			packagePath, rom.data(), rom.size(), romPathStore.empty() ? nullptr : romPathStore.c_str(),
+			settings, fwIds.data(), fwData.data(), fwLens.data(), static_cast<int32_t>(fwIds.size()),
+			extraNames.data(), extraData.data(), extraLens.data(), extraPaths.data(),
+			static_cast<int32_t>(extraNames.size()), &len, &error);
+		if (answer == nullptr) return fail(metaPath, error != nullptr ? error : "could not open the core");
+		std::printf("%.*s\n", static_cast<int>(len), answer);
+		return 0;
+	}
 	ce_session *session = ce_session_open(
 		packagePath, rom.data(), rom.size(), romPathStore.empty() ? nullptr : romPathStore.c_str(),
 		settings, fwIds.data(), fwData.data(), fwLens.data(), static_cast<int32_t>(fwIds.size()),

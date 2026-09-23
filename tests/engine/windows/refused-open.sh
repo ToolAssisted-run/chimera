@@ -11,7 +11,8 @@
 # It never touches an installed Chimera: everything is copied into a scratch
 # folder of its own under the Windows temp directory, and removed afterwards.
 # With build/Cores/quickernes.chimeraCore present it also drives a real machine
-# refused at Init; without it that half says SKIP and why.
+# refused at Init, and with build/Cores/rpcs3.chimeraCore a settings suggestion
+# long enough to own a heap buffer; without them those halves say SKIP and why.
 #
 # CI cannot run this (the runners are Linux). See docs/gates.md, mode G, for
 # who owns running it.
@@ -45,6 +46,17 @@ if [ -f "$core" ]; then
 	head -c 4096 /dev/urandom > "$work/not-a-rom.nes"
 	cp "$core" "$work/core.chimeraCore"
 	args="core.chimeraCore not-a-rom.nes"
+fi
+
+# and a core that SUGGESTS settings, whose answer is a sentence: the only
+# answer long enough to own a heap buffer, and so the only one a double free
+# can hurt (the RPCS3 core answers even for a file it cannot identify)
+suggester="$repo_root/build/Cores/rpcs3.chimeraCore"
+if [ -f "$suggester" ]; then
+	[ -n "$args" ] || args="- -"
+	head -c 4096 /dev/urandom > "$work/not-a-game.elf"
+	cp "$suggester" "$work/suggester.chimeraCore"
+	args="$args suggester.chimeraCore not-a-game.elf"
 fi
 
 # A fault in host code writes minibox-diag.log beside the process; there must

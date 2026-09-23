@@ -98,6 +98,25 @@ namespace Chimera.Client.GUI
 		// page 3
 		private readonly PropertyGrid _settingsGrid;
 		private readonly Panel _presetRow;
+		private bool _presetRowShown;
+
+		/// <summary>
+		/// What the core said about this game when the settings page was reached
+		/// (a core that exports SuggestSettings): where the values it applied come
+		/// from, or that it found nothing. Hidden for a core that says nothing.
+		/// </summary>
+		private readonly TextBox _suggestionNote;
+		private bool _suggestionShown;
+
+		/// <summary>The core and game the suggestion was last asked for, and what it set.</summary>
+		private string? _suggestedFor;
+		private List<string> _suggestedKeys = [ ];
+
+		/// <summary>
+		/// The core and game a seeded project arrived with: its settings are the
+		/// project's own, so the suggestion is shown for them but not applied.
+		/// </summary>
+		private string? _seededFor;
 		private readonly ComboBox _presets;
 		private readonly Button _applyPreset;
 		private WaterboxCoreSettings? _settings;
@@ -352,6 +371,20 @@ namespace Chimera.Client.GUI
 			_presetRow.Controls.Add(_presets);
 			_presetRow.Controls.Add(_applyPreset);
 			p3.Controls.Add(_presetRow);
+			// selectable, so the source it names can be copied into a browser
+			_suggestionNote = new TextBox
+			{
+				Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
+				Location = Pt(8, 46),
+				Size = new(UIHelper.ScaleX(544), UIHelper.ScaleY(62)),
+				Multiline = true,
+				ReadOnly = true,
+				WordWrap = true,
+				ScrollBars = ScrollBars.Vertical,
+				Visible = false,
+				TabStop = false,
+			};
+			p3.Controls.Add(_suggestionNote);
 			_settingsGrid = new PropertyGrid
 			{
 				Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
@@ -697,6 +730,7 @@ namespace Chimera.Client.GUI
 			LoadChosenPackage();
 
 			SeedSettings(answers.SettingsJson);
+			_seededFor = null; // settled below, once the files are in
 
 			// the slot form has to exist before anything can be put in it
 			if (!BuildSlotForm()) return;
@@ -708,6 +742,9 @@ namespace Chimera.Client.GUI
 			// and the files can decide settings in their turn
 			RefreshExposedSettings();
 			_settingsGrid.SelectedObject = _settings;
+			// the project's settings are its own: what the core would suggest for
+			// this game is shown on the settings page, not applied over them
+			_seededFor = SuggestionKey();
 		}
 
 		/// <summary>
@@ -1109,6 +1146,7 @@ namespace Chimera.Client.GUI
 					// where the game is hashed, once, and not at every pick along the way
 					HashGameForPrecompileNow();
 					if (!BuildSettingsPage()) return;
+					SuggestSettingsNow();
 					ShowPage(2);
 					break;
 				case 2:
@@ -2045,7 +2083,8 @@ namespace Chimera.Client.GUI
 			{
 				_presets.Items.Clear();
 				_presetRow.Visible = false;
-				PlaceSettingsGrid(withPresetRow: false);
+				_presetRowShown = false;
+				PlaceSettingsGrid();
 				return;
 			}
 			// Rebuild only when the OFFER changed - a machine change can happen while
@@ -2063,13 +2102,28 @@ namespace Chimera.Client.GUI
 				_presets.SelectedIndex = again >= 0 ? again : 0;
 			}
 			_presetRow.Visible = true;
-			PlaceSettingsGrid(withPresetRow: true);
+			_presetRowShown = true;
+			PlaceSettingsGrid();
 		}
 
-		/// <summary>Moves the grid down to make room for the preset row, or back up.</summary>
-		private void PlaceSettingsGrid(bool withPresetRow)
+		/// <summary>
+		/// Stacks what sits above the grid - the preset row, then the suggestion
+		/// note - and moves the grid down under them, or back up.
+		/// </summary>
+		private void PlaceSettingsGrid()
 		{
-			var top = UIHelper.ScaleY(withPresetRow ? 80 : 48);
+			var y = UIHelper.ScaleY(46);
+			if (_presetRowShown)
+			{
+				_presetRow.Top = y;
+				y += UIHelper.ScaleY(34);
+			}
+			if (_suggestionShown)
+			{
+				_suggestionNote.Top = y;
+				y += _suggestionNote.Height + UIHelper.ScaleY(4);
+			}
+			var top = Math.Max(y, UIHelper.ScaleY(48));
 			if (_settingsGrid.Top == top) return;
 			var bottom = _settingsGrid.Bottom;
 			_settingsGrid.Top = top;
@@ -2119,6 +2173,150 @@ namespace Chimera.Client.GUI
 				? $"Applied \"{chosen.Decl.DisplayName}\": {applied} setting{(applied is 1 ? "" : "s")}."
 				: $"Applied \"{chosen.Decl.DisplayName}\": {applied} setting{(applied is 1 ? "" : "s")}; "
 					+ $"this machine has no setting named {string.Join(", ", ignored)}.";
+		}
+
+		/// <summary>The core and the game a suggestion is for, or null when there is no game yet.</summary>
+		private string? SuggestionKey()
+			=> PrecompileRomPath() is { } game ? (ChosenCore?.Path ?? "") + "\n" + game : null;
+
+		/// <summary>Stands in for the child process - the test door for the settings page's lookup.</summary>
+		internal Func<string, (string? Json, string Why)>? SuggestionSourceForTest { get; set; }
+
+		/// <summary>Arrives at the settings page with this game, as Next does.</summary>
+		internal void ArriveAtSettingsForTest(string gamePath)
+		{
+			_precompileRomOverride = gamePath;
+			SuggestSettingsNow();
+		}
+
+		/// <summary>The note above the settings, "" when none is shown - for tests.</summary>
+		public string SuggestionNoteText => _suggestionShown ? _suggestionNote.Text : "";
+
+		/// <summary>
+		/// Asks the core what it would choose for this game, on arriving at the
+		/// settings page (user, 2026-09-23), and puts the answer into the settings
+		/// the way a preset is: as values, in the grid, where they can be read and
+		/// changed like any other. The note above the grid says where they came
+		/// from - the RPCS3 core names the RPCS3 wiki page and the compatibility
+		/// status - or that the game was not found, in which case nothing moves
+		/// and every setting is still there to experiment with.
+		///
+		/// Once per core and game: coming back to this page after editing does not
+		/// undo the edits, and choosing a different game first takes back what
+		/// the previous one's suggestion set. Asked in a child process, because the
+		/// core has to be loaded to answer and a core that falls over while it
+		/// looks must not take the wizard with it.
+		/// </summary>
+		private void SuggestSettingsNow()
+		{
+			var key = SuggestionKey();
+			if (_cfg?.SuggestSettings is not true || _settings is null || key is null
+				|| (ChosenCore is null && SuggestionSourceForTest is null))
+			{
+				ShowSuggestionNote(null);
+				return;
+			}
+			if (key == _suggestedFor) return;
+
+			// what the last game's suggestion set goes back to the default
+			foreach (var name in _suggestedKeys) _settings.Values.Remove(name);
+			_suggestedKeys = [ ];
+			_suggestedFor = key;
+
+			_status.Text = "Looking this game up...";
+			_status.Refresh();
+			var game = PrecompileRomPath()!;
+			var (json, why) = SuggestionSourceForTest?.Invoke(game) ?? AskCoreForSuggestion(ChosenCore!.Path, game);
+			_status.Text = "";
+			if (json is null)
+			{
+				ShowSuggestionNote($"No suggested settings: {why}");
+				return;
+			}
+
+			string? note = null;
+			var applied = new List<string>();
+			var appliedKeys = new List<string>();
+			try
+			{
+				var root = Newtonsoft.Json.Linq.JObject.Parse(json);
+				note = root.Value<string>("note");
+				if (key != _seededFor && root["values"] is Newtonsoft.Json.Linq.JObject values)
+				{
+					var effective = WaterboxCore.EffectiveSettingsFor(_cfg, _settings);
+					var byName = _cfg.SettingsFor(_cfg.MachineFor(effective))
+						.Where(static d => d.Name is { Length: > 0 })
+						.GroupBy(static d => d.Name!, StringComparer.Ordinal)
+						.ToDictionary(static g => g.Key, static g => g.First(), StringComparer.Ordinal);
+					foreach (var pair in values)
+					{
+						// never the machine or the renderer: page one decided those
+						if (pair.Key == RendererSetting || pair.Key == _cfg.MachineSetting) continue;
+						if (!byName.TryGetValue(pair.Key, out var decl)) continue;
+						if (pair.Value is not Newtonsoft.Json.Linq.JValue v || v.Value is null) continue;
+						_settings.Values[pair.Key] = decl.Coerce(v.Value);
+						applied.Add(decl.DisplayName ?? pair.Key);
+						appliedKeys.Add(pair.Key);
+					}
+				}
+			}
+			catch (Newtonsoft.Json.JsonException)
+			{
+				ShowSuggestionNote("No suggested settings: the core's answer could not be read.");
+				return;
+			}
+			_suggestedKeys = appliedKeys;
+
+			var text = note ?? "";
+			if (applied.Count is not 0)
+				text += $"{Environment.NewLine}Applied below: {string.Join(", ", applied)}.";
+			else if (key == _seededFor)
+				text += $"{Environment.NewLine}This project's own settings are kept.";
+			ShowSuggestionNote(text);
+			RefreshExposedSettings();
+			_settingsGrid.Refresh();
+			UpdateNavLabels();
+		}
+
+		/// <summary>Shows the note above the settings, or hides it (null).</summary>
+		private void ShowSuggestionNote(string? text)
+		{
+			_suggestionShown = !string.IsNullOrEmpty(text);
+			_suggestionNote.Text = text ?? "";
+			_suggestionNote.Visible = _suggestionShown;
+			PlaceSettingsGrid();
+		}
+
+		/// <summary>
+		/// Runs <c>Chimera --suggest-settings package game</c> and returns the
+		/// core's JSON, or null and why. The UI keeps painting while it waits.
+		/// </summary>
+		private static (string? Json, string Why) AskCoreForSuggestion(string packagePath, string gamePath)
+		{
+			var lines = new List<string>();
+			using var p = SelfProcess.Start(["--suggest-settings", packagePath, gamePath], line =>
+			{
+				lock (lines) lines.Add(line);
+			});
+			if (p is null) return (null, "the lookup could not be started");
+			var clock = System.Diagnostics.Stopwatch.StartNew();
+			while (!p.WaitForExit(50))
+			{
+				Application.DoEvents();
+				if (clock.Elapsed > TimeSpan.FromMinutes(2))
+				{
+					try { p.Kill(); } catch (InvalidOperationException) { }
+					return (null, "the core took too long to answer");
+				}
+			}
+			p.WaitForExit(); // drains the redirected streams
+			lock (lines)
+			{
+				var json = lines.LastOrDefault(static l => l.TrimStart().StartsWith("{", StringComparison.Ordinal));
+				if (p.ExitCode is 0 && json is not null) return (json, "");
+				var said = lines.LastOrDefault(static l => !string.IsNullOrWhiteSpace(l));
+				return (null, said ?? $"the lookup ended with code {p.ExitCode}");
+			}
 		}
 
 		/// <summary>Renders given firmware needs directly - the test and screenshot door.</summary>

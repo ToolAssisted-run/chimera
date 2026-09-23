@@ -4398,3 +4398,66 @@ be measured from outside. A mouse also reports in bytes, so a screen-wide jump
 cannot fit in one packet and PCem's devices drop what is over the edge - the
 remainder is now kept and delivered over the next polls, and the negative
 control for that showed a 639-pixel jump arriving as 127.
+
+## A core may suggest settings for a game, and the wizard applies them where they can be read (user-decided, 2026-09-23)
+
+The RPCS3 wiki keeps a table of recommended settings per game, and the RPCS3
+core carries a snapshot of it (with its source, date and licence). The user's
+decision: **those recommendations are core settings like any other**, applied
+automatically when the new-project wizard reaches its settings page - where
+the provenance and the compatibility level are shown too - and **present even
+when the game is not in the wiki**, so a person can still experiment with them.
+
+**Every setting the wiki recommends became a declared setting.** 43 of the
+wiki's 59 setting names map onto something the core can run with; the other 16
+are refused per game with a reason (a Vulkan-only option, the host's audio
+device, a camera, a network the sandbox never has). Each display name is the
+wiki's own, so a recommendation on a page and a row in the grid read the same,
+and each enum's options are rpcs3's own spellings, handed to rpcs3's own
+parser - a spelling it does not know is refused, not guessed. **Every default is
+what the core ran with before the setting existed**, including the settings the
+core pins for determinism (the frame limiter, the vblank rate, the PPU thread
+count): a project records only the values somebody chose, and an untouched one
+resolves to the package default at load, so a new default would silently move
+the machine of every existing project. The pinned ones say in their
+description that a change is an experiment, and one a movie must keep.
+
+**The lookup runs in the core, before anything boots.** Which game a file is
+takes reading the file the way the core reads it - a package's content id, a
+disc image's or a disc archive's PARAM.SFO, PS3_DISC.SFB when the data is
+encrypted - and that knowledge belongs to the core, not to the frontend or the
+engine. So a core declares `"suggestSettings": true` and exports
+`SuggestSettings`; `ce_suggest_settings` mounts the files exactly as a run
+would and calls it **instead of** `Init`. The wizard asks through a child
+process (`Chimera --suggest-settings package game`), as the precompile step
+does, because the core has to be loaded to answer and one that falls over
+while it looks must not take the wizard with it.
+
+**What arrives is values, the way a preset is.** They land in the grid, where
+they can be read and changed like any other, and nothing about a suggestion is
+remembered by the project - it pins the values. Three rules keep that honest:
+the lookup happens once per core and game, so going Back and Next does not undo
+an edit; choosing a different game first takes back what the previous game's
+suggestion set, because game A's recommendation is not game B's; and a project
+the wizard was seeded from keeps its own settings - the note is shown, the
+values are not applied over them.
+
+**The note says where the values came from, or that nothing was found.** It is
+the same sentence the core prints at boot: the compatibility list's status and
+date, what the wiki recommends, what the core cannot express, and the page and
+licence - or that the title is not in the list or the wiki at that snapshot.
+Recognised titles went from 1300 with an applicable recommendation to 2300
+once every expressible setting was declared.
+
+**The answer string obeys the engine's `thread_local` rule, and a Windows leg
+now proves it.** The first build kept the answer in a `thread_local
+std::string`, and on Windows every `--suggest-settings` child died at exit
+with an access violation after printing a correct answer - the mingw double
+destroy of chimera#123, which the wizard would have read as a failed lookup.
+It is a `ThreadString` now. `tests/engine/windows/refused-open.sh` asks for a
+suggestion too, and the negative control is recorded because the first two
+versions of the check could not fail: a core that answers `""` owns no heap
+buffer, and a call made on a worker thread is destroyed once, when the worker
+ends. The detector is a long answer (the RPCS3 core's sentence) asked for on
+the thread that ends the process - with the old string back it writes a fault
+report; with the fix it passes.

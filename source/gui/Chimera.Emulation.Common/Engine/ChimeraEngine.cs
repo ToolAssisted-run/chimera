@@ -570,6 +570,15 @@ namespace Chimera.Emulation.Common.Engine
 		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract void ce_precompile_request(int index, int count, int firmwareToo);
 
+		// what a core suggests for these files before any machine exists
+		// (engine.h: the arguments are ce_session_open's; nothing is started)
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_suggest_settings(
+			string packagePath, byte[]? rom, ulong romLen, string? romPath, string? settingsOverridesJson,
+			IntPtr[]? firmwareIds, IntPtr[]? firmwareData, ulong[]? firmwareLens, int firmwareCount,
+			IntPtr[]? extraNames, IntPtr[]? extraData, ulong[]? extraLens, IntPtr[]? extraPaths, int extraCount,
+			ref ulong lenOut, ref IntPtr errorOut);
+
 		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract ulong ce_session_cache_stored(IntPtr session);
 
@@ -1907,6 +1916,29 @@ namespace Chimera.Emulation.Common.Engine
 			{
 				foreach (var p in allocated) Marshal.FreeHGlobal(p);
 			}
+		}
+
+		/// <summary>
+		/// What the core suggests for this game before any machine exists - the
+		/// core's own JSON (<c>{"values": {...}, "note": "..."}</c>), or "" when
+		/// it suggests nothing. The package is loaded and the game mounted as a
+		/// run would have them; nothing is started. Throws when either cannot be
+		/// opened at all.
+		/// </summary>
+		public static string Suggest(string packagePath, string romPath, string? settingsJson = null)
+		{
+			var len = 0UL;
+			var error = IntPtr.Zero;
+			var none = new IntPtr[1];
+			var answer = ChimeraEngine.Instance.ce_suggest_settings(
+				packagePath, null, 0, romPath, settingsJson,
+				none, none, new ulong[1], 0,
+				none, none, new ulong[1], none, 0, ref len, ref error);
+			if (answer == IntPtr.Zero)
+			{
+				throw new InvalidOperationException(ChimeraEngine.PtrToStringUtf8(error) ?? "the engine could not open the core");
+			}
+			return ChimeraEngine.PtrToStringUtf8(answer, len);
 		}
 
 		public void Dispose()

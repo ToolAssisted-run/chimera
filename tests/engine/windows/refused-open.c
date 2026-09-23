@@ -57,6 +57,19 @@ typedef void *(*ce_session_open_fn)(
 
 static ce_session_open_fn ce_session_open;
 
+typedef const char *(*ce_suggest_settings_fn)(
+	const char *package_path, const unsigned char *rom, unsigned long long rom_len,
+	const char *rom_path, const char *settings_overrides_json,
+	const char *const *firmware_ids, const unsigned char *const *firmware_data,
+	const unsigned long long *firmware_lens, int firmware_count,
+	const char *const *extra_names, const unsigned char *const *extra_data,
+	const unsigned long long *extra_lens, const char *const *extra_paths, int extra_count,
+	unsigned long long *len_out, const char **error_out);
+
+static ce_suggest_settings_fn ce_suggest_settings;
+static const char *g_answer;      /* what ce_suggest_settings returned */
+static char g_answer_text[512];
+
 static const char *g_package;    /* what the worker opens */
 static const char *g_rom_path;   /* NULL for the no-such-package case */
 static const char *g_error;      /* what the engine answered, kept past the thread */
@@ -72,6 +85,36 @@ static DWORD WINAPI refused_open(LPVOID unused)
 	g_error = error;
 	if (error != NULL) snprintf(g_error_text, sizeof g_error_text, "%s", error);
 	return 0;
+}
+
+/* The suggestion call keeps its answer in a per-thread string too
+ * (ce_suggest_settings): the same rule, the same way to break it. */
+static DWORD WINAPI suggest(LPVOID unused)
+{
+	const char *error = NULL;
+	unsigned long long len = 0;
+	(void)unused;
+	g_answer = ce_suggest_settings(g_package, NULL, 0, g_rom_path, NULL,
+	                               NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, 0, &len, &error);
+	g_error = error;
+	if (error != NULL) snprintf(g_error_text, sizeof g_error_text, "%s", error);
+	if (g_answer != NULL) snprintf(g_answer_text, sizeof g_answer_text, "%.*s", (int)len, g_answer);
+	return 0;
+}
+
+static int suggest_on_its_own_thread(const char *package, const char *rom_path)
+{
+	HANDLE t;
+	g_package = package;
+	g_rom_path = rom_path;
+	g_error = NULL;
+	g_answer = NULL;
+	g_error_text[0] = g_answer_text[0] = '\0';
+	t = CreateThread(NULL, 0, suggest, NULL, 0, NULL);
+	if (t == NULL) { fprintf(stderr, "FAIL could not start a thread\n"); return 0; }
+	WaitForSingleObject(t, INFINITE);
+	CloseHandle(t);
+	return 1;
 }
 
 /* Runs refused_open on a thread of its own and waits for that thread to END,
@@ -161,7 +204,7 @@ int main(int argc, char **argv)
 	 *    this did not crash on its own - the heap is too quiet in a program
 	 *    this small - so it is here as the regression it is, not as the
 	 *    detector. */
-	if (argc >= 3)
+	if (argc >= 3 && strcmp(argv[1], "-") != 0)
 	{
 		if (!open_on_its_own_thread(argv[1], argv[2])) return 2;
 		if (g_session != NULL)
@@ -188,6 +231,57 @@ int main(int argc, char **argv)
 	{
 		printf("SKIP the refused-Init half: no core package and rom given "
 		       "(would prove: a machine refused at Init is torn down and the heap survives it)\n");
+	}
+
+	/* 4. The suggestion call, both ways: a package that is not there (an error
+	 *    through error_out) and, when given one, a core asked about a file -
+	 *    a core with no SuggestSettings answers "". Each on a thread that then
+	 *    ends; the heap must be whole after, and the process must end cleanly,
+	 *    which the script checks (exit status, no fault report). Before the
+	 *    answer was a ThreadString, every such process died at exit with an
+	 *    access violation in the heap. */
+	ce_suggest_settings = (ce_suggest_settings_fn)(void *)GetProcAddress(engine, "ce_suggest_settings");
+	if (ce_suggest_settings == NULL)
+	{
+		fprintf(stderr, "FAIL libchimera.dll exports no ce_suggest_settings\n");
+		failures++;
+	}
+	else
+	{
+		if (!suggest_on_its_own_thread("no-such-package.chimeraCore", NULL)) return 2;
+		printf("suggest, no package: %s \"%s\"\n", g_answer == NULL ? "refused" : "ANSWERED", g_error_text);
+		if (g_answer != NULL) failures++;
+		/* A core that answers "" proves nothing here - an empty string owns no
+		 * heap buffer, so freeing it twice is harmless (thread_string.hpp).
+		 * The detector is a core that answers in a SENTENCE: argv[3] and
+		 * argv[4], a core with SuggestSettings and a file to ask about. */
+		if (argc >= 5)
+		{
+			/* ON THE MAIN THREAD, deliberately: the double destroy happens on
+			 * the thread that ends the process (thread_string.hpp), which is
+			 * where Chimera --suggest-settings asks. A worker's copy is
+			 * destroyed once, when it ends, and hides the bug. */
+			g_package = argv[3];
+			g_rom_path = argv[4];
+			suggest(NULL);
+			printf("suggest, %s: %s %u bytes\n", argv[3], g_answer == NULL ? "REFUSED" : "answered",
+			       (unsigned)strlen(g_answer_text));
+			if (g_answer == NULL || strlen(g_answer_text) < 64)
+			{
+				fprintf(stderr, "FAIL the suggesting core gave no long answer, so this check tested nothing\n");
+				failures++;
+			}
+		}
+		else
+		{
+			printf("SKIP the suggestion's long answer: no suggesting core given "
+			       "(would prove: its answer string is not freed twice at exit)\n");
+		}
+		if (!HeapValidate(crt, 0, NULL))
+		{
+			fprintf(stderr, "FAIL the C runtime's heap is corrupt after the suggestion calls\n");
+			failures++;
+		}
 	}
 
 	printf(failures == 0 ? "PASS refused-open\n" : "FAIL refused-open: %d check(s) failed\n", failures);

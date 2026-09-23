@@ -925,6 +925,31 @@ CE_API void ce_precompile_request(int32_t index, int32_t count, int32_t firmware
 /* -1 when this session is no precompile session or the core has none. */
 CE_API int32_t ce_session_precompile_done(const ce_session *s);
 CE_API int32_t ce_session_precompile_progress(const ce_session *s, uint32_t *done_out, uint32_t *total_out);
+
+/* ---------------------------------------------------------------------------
+ * Suggested settings. Before a project exists, a core may say what it would
+ * choose for these files - the RPCS3 core looks the game up in the RPCS3
+ * wiki's recommendations it carries. The arguments are ce_session_open's: the
+ * package is loaded and the files mounted exactly as a run would have them,
+ * then the core's optional SuggestSettings export is called INSTEAD of Init,
+ * and the machine is thrown away unstarted.
+ *
+ * Returns the core's answer, a JSON object - {"values": {setting: value, ...},
+ * "note": "where they come from, or that nothing was found", ...} - valid
+ * until the next call on this thread; "" (length 0) when the core has no
+ * such export; NULL with *error_out when the package or files cannot be
+ * opened at all. The values are suggestions for the settings page, never
+ * applied by the engine.
+ */
+CE_API const char *ce_suggest_settings(
+	const char *package_path,
+	const uint8_t *rom, uint64_t rom_len, const char *rom_path,
+	const char *settings_overrides_json,
+	const char *const *firmware_ids, const uint8_t *const *firmware_data,
+	const uint64_t *firmware_lens, int32_t firmware_count,
+	const char *const *extra_names, const uint8_t *const *extra_data,
+	const uint64_t *extra_lens, const char *const *extra_paths, int32_t extra_count,
+	uint64_t *len_out, const char **error_out);
 CE_API int64_t ce_session_button_count(const ce_session *s);
 CE_API const char *ce_session_button_name(const ce_session *s, int64_t index);
 CE_API int64_t ce_session_axis_count(const ce_session *s);
