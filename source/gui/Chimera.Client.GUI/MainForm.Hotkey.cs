@@ -302,10 +302,9 @@ namespace Chimera.Client.GUI
 					var playbackBox2 = Tools.TAStudio.TasPlaybackBox;
 					playbackBox2.TurboSeek = !playbackBox2.TurboSeek;
 					break;
-				case "Toggle Maintain Greenzone":
+				case "Cycle Greenzone":
 					if (!Tools.IsLoaded<TAStudio>()) return false;
-					var playbackBox3 = Tools.TAStudio.TasPlaybackBox;
-					playbackBox3.MaintainGreenzone = !playbackBox3.MaintainGreenzone;
+					Tools.TAStudio.TasGreenzoneBox.Cycle();
 					break;
 				case "Undo":
 					if (!Tools.IsLoaded<TAStudio>()) return false;

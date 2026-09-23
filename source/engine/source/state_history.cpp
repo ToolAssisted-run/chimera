@@ -1186,18 +1186,22 @@ int64_t StateHistory::nearest(int64_t frame) const
 	return (it - 1)->nearestIn(frame);
 }
 
-void StateHistory::suspend(bool suspended)
+void StateHistory::capturePeriod(int64_t period)
 {
-	m_suspended = suspended;
-	/* an epoch open now would measure from a machine the resumed history no
-	 * longer continues from, and keep the sandbox write-tracking meanwhile */
+	if (period < 0) period = 0;
+	if (period == m_capturePeriod) return;
+	if (m_capturePeriod == 0) m_storeNext = true;
+	m_capturePeriod = period;
+	if (period != 0) return;
+	/* an epoch open now would keep the sandbox write-tracking while off, and
+	 * measure from a machine the history no longer continues from after */
 	m_epochOpen = false;
 	m_machineStored = false;
 }
 
 void StateHistory::beforeAdvance()
 {
-	if (m_suspended) { m_epochOpen = false; return; }
+	if (m_capturePeriod == 0) { m_epochOpen = false; return; }
 	if (!enabled() || !deltasAvailable()) { m_epochOpen = false; return; }
 	/* A delta continues the newest segment, and only while there is one with
 	 * room. Otherwise the coming capture is an anchor and needs no epoch. */
@@ -1346,7 +1350,7 @@ void StateHistory::capture(int64_t frame, const uint8_t *note, size_t noteLen)
 	 * and it is the stored copy of that frame only if this capture stores it */
 	m_machineFrame = frame;
 	m_machineStored = false;
-	if (m_suspended)
+	if (m_capturePeriod == 0)
 	{
 		/* nothing stored, and nothing to do but keep the edit bookkeeping true:
 		 * a machine brought back to the edit (a restore) has left the timeline
@@ -1744,12 +1748,21 @@ void StateHistory::captureOnce(int64_t frame, const uint8_t *note, size_t noteLe
 	 * restore reads the file - where the old timeline's links still are at
 	 * those positions. The frames after the edit would come back as the
 	 * frames before it. A fresh anchor starts a stretch of its own instead. */
+	/* A sparse history (capturePeriod) stores only the multiples of its
+	 * period, and skips the rest exactly as the stride below does: the epoch
+	 * stays open and the delta at the next multiple describes them all. An
+	 * epoch that cannot continue the stretch is left to the multiple as well,
+	 * which then stores an anchor. The first frame after the history was off
+	 * is stored wherever it falls. */
+	if (m_capturePeriod > 1 && !m_storeNext && frame % m_capturePeriod != 0) return;
+	m_storeNext = false;
+
 	/* A frame the near band's stride skips is not stored at all: the epoch
 	 * stays open and the next delta describes this frame along with it. The
 	 * invalidation above has already happened, which is what matters - a
 	 * timeline that no longer happens must go whether or not this frame is
 	 * kept. */
-	if (m_epochOpen && m_nearStride > 1 && !m_segments.empty()
+	if (m_epochOpen && m_capturePeriod == 1 && m_nearStride > 1 && !m_segments.empty()
 		&& !m_segments.back().spilled
 		&& m_epochFrame == m_segments.back().lastFrame()
 		&& m_segments.back().lastFrame() < frame
@@ -1826,7 +1839,9 @@ void StateHistory::captureOnce(int64_t frame, const uint8_t *note, size_t noteLe
 					(tSaved - tCapture0) * 1000, (tCoarsened - tSaved) * 1000, (now - tCoarsened) * 1000);
 				fflush(stderr);
 			}
-			tuneStride(now - tCapture0, m_lastCaptureEnded > 0 ? now - m_lastCaptureEnded : 0);
+			/* the stride is about a history that stores every frame it can; a
+			 * sparse one's rare captures would talk it down to nothing */
+			if (m_capturePeriod == 1) tuneStride(now - tCapture0, m_lastCaptureEnded > 0 ? now - m_lastCaptureEnded : 0);
 			m_lastCaptureEnded = now;
 			return;
 		}

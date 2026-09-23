@@ -11,12 +11,13 @@ namespace Chimera.Client.Common
 		IStateHistory States { get; }
 
 		/// <summary>
-		/// Whether the greenzone is kept as the movie plays - TAStudio's "Maintain
-		/// Greenzone", on whenever a project opens. Off, the history does no work at all
-		/// and new frames are not green; what is already stored stays. Turned back on,
-		/// the current frame is stored as a whole state and the history goes on from it.
+		/// How often the greenzone stores a frame as the movie plays - TAStudio's
+		/// "Greenzone" box: 1 every frame, N one frame in N, 0 off. Every frame whenever
+		/// a project opens. Off, the history does no work at all and new frames are not
+		/// green; what is already stored stays. Turned back on, the current frame is
+		/// stored as a whole state and the history goes on from it.
 		/// </summary>
-		bool MaintainGreenzone { get; set; }
+		int GreenzonePeriod { get; set; }
 
 		/// <summary>Before the machine moves, every frame.</summary>
 		void GreenzoneBeforeFrame();

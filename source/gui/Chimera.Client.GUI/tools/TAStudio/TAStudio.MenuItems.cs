@@ -1044,6 +1044,7 @@ namespace Chimera.Client.GUI
 
 					UpdateChangeLogMaxSteps(Settings.MaxUndoSteps);
 					CurrentTasMovie.BindMarkersToInput = Settings.BindMarkersToInput;
+					TasGreenzoneBox.Apply();   // the periods may have changed
 
 					UpdateActiveMovieInputs();
 				}

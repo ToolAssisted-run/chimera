@@ -64,8 +64,8 @@ namespace Chimera.Client.Common
 				budgets.MaxNearStride ?? Session.Settings.GreenzoneMaxNearStride,
 				MovieConfig.MinimumNearStride), MovieConfig.MaximumNearStride));
 			States.Enable((long)memoryMb * 1024 * 1024);
-			// a machine attached while the greenzone is switched off keeps it off
-			if (!_maintainGreenzone) States.Suspend(true);
+			// a machine attached while the greenzone is sparse or off stays so
+			if (_greenzonePeriod != 1) States.SetCapturePeriod(_greenzonePeriod);
 			// Read here and not with the rest of the cache, because until the
 			// emulator arrives there is nowhere to put it.
 			//
@@ -127,25 +127,23 @@ namespace Chimera.Client.Common
 		/// </summary>
 		public IStateHistory States { get; private set; }
 
-		private bool _maintainGreenzone = true;
+		private int _greenzonePeriod = 1;
 
 		/// <remarks>
-		/// Not saved with the project: a project always opens keeping its greenzone,
-		/// so somebody who switched it off for a cutscene is not left wondering next
-		/// time why nothing turns green.
-		/// The engine does the work of it (IStateHistory.Suspend); this only says when.
+		/// Not saved with the project: a project always opens storing every frame,
+		/// so somebody who turned it down for a cutscene is not left wondering next
+		/// time why nothing turns green. The engine does the work of it, including
+		/// the whole state stored on turning it on (IStateHistory.SetCapturePeriod).
 		/// </remarks>
-		public bool MaintainGreenzone
+		public int GreenzonePeriod
 		{
-			get => _maintainGreenzone;
+			get => _greenzonePeriod;
 			set
 			{
-				if (value == _maintainGreenzone) return;
-				_maintainGreenzone = value;
-				if (States is null) return;
-				States.Suspend(!value);
-				// the anchor the history goes on from, where the playhead is now
-				if (value) States.Capture(Emulator.Frame);
+				if (value < 0) value = 0;
+				if (value == _greenzonePeriod) return;
+				_greenzonePeriod = value;
+				States?.SetCapturePeriod(value);
 			}
 		}
 

@@ -73,33 +73,37 @@ namespace Chimera.Tests.Client.Common.Movie
 
 #pragma warning disable BHI1600 //TODO disambiguate assert calls
 		[TestMethod]
-		public void MaintainGreenzoneOffStoresNothingAndOnAnchorsTheCurrentFrame()
+		public void GreenzoneOffStoresNothingAndOnAnchorsTheCurrentFrame()
 		{
 			TasMovie movie = MakeMovie(100);
 			FakeEmulator emu = (FakeEmulator)movie.Emulator;
-			Assert.IsTrue(movie.MaintainGreenzone, "a project opens keeping its greenzone");
+			Assert.AreEqual(1, movie.GreenzonePeriod, "a project opens storing every frame");
 
-			movie.MaintainGreenzone = false;
-			Assert.IsTrue(emu.Suspended);
+			movie.GreenzonePeriod = 0;
+			Assert.AreEqual(0, emu.CapturePeriod);
 			emu.Frame = 30;
 			movie.States.Capture(30);
-			Assert.IsFalse(movie.States.Has(30), "nothing is stored while switched off");
+			Assert.IsFalse(movie.States.Has(30), "nothing is stored while off");
 
-			emu.Frame = 40;
-			movie.MaintainGreenzone = true;
-			Assert.IsFalse(emu.Suspended);
-			Assert.IsTrue(movie.States.Has(40), "switching it on stores an anchor at the current frame");
+			emu.Frame = 45;
+			movie.GreenzonePeriod = 32;
+			Assert.AreEqual(32, emu.CapturePeriod);
+			Assert.IsTrue(movie.States.Has(45), "turning it on stores the current frame, whatever the period");
 			Assert.IsFalse(movie.States.Has(30));
+			movie.States.Capture(50);
+			Assert.IsFalse(movie.States.Has(50), "a sparse greenzone skips the frames between");
+			movie.States.Capture(64);
+			Assert.IsTrue(movie.States.Has(64));
 		}
 
 		[TestMethod]
-		public void MaintainGreenzoneOffSurvivesAReattach()
+		public void GreenzonePeriodSurvivesAReattach()
 		{
 			TasMovie movie = MakeMovie(10);
-			movie.MaintainGreenzone = false;
+			movie.GreenzonePeriod = 0;
 			FakeEmulator other = new FakeEmulator();
 			movie.Attach(other);
-			Assert.IsTrue(other.Suspended, "a machine attached while switched off stays off");
+			Assert.AreEqual(0, other.CapturePeriod, "a machine attached while off stays off");
 		}
 
 		[TestMethod]

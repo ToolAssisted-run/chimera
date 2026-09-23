@@ -57,10 +57,19 @@ namespace Chimera.Tests.Client.Common.Movie
 
 		public void MaxNearStride(int stride) => NearStrideCap = stride;
 
-		/// <summary>Whether the movie has the history's work stopped.</summary>
-		public bool Suspended { get; private set; }
+		/// <summary>How often the movie has the history store a frame; 0 is off.</summary>
+		public int CapturePeriod { get; private set; } = 1;
 
-		public void Suspend(bool suspended) => Suspended = suspended;
+		private bool _storeNext;
+
+		public void SetCapturePeriod(int period)
+		{
+			bool resuming = CapturePeriod == 0 && period > 0;
+			CapturePeriod = period;
+			if (!resuming) return;
+			_storeNext = true;
+			Capture(Frame);   /* the engine stores the frame it resumes on at once */
+		}
 
 		public void Enable(long budgetBytes)
 		{
@@ -88,7 +97,11 @@ namespace Chimera.Tests.Client.Common.Movie
 
 		public void Capture(int frame)
 		{
-			if (!Suspended) _states.Add(frame);   /* the engine stores nothing while suspended */
+			/* the engine stores nothing while off, and only multiples of a sparse period */
+			if (CapturePeriod == 0) return;
+			if (CapturePeriod > 1 && !_storeNext && frame % CapturePeriod != 0) return;
+			_storeNext = false;
+			_states.Add(frame);
 		}
 
 		public bool RestoreTo(int frame)

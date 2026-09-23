@@ -1022,46 +1022,60 @@ already held, repeatedly, inside every capture. The sandbox knows how many pages
 the frame touched before any of them are read (`wbx_get_epoch_page_count`), so
 the room is asked for once; an anchor asks for what the last anchor took.
 
-## Switching the greenzone off: "Maintain greenzone" (user request, 2026-09-23)
+## How often the greenzone stores a frame: the Greenzone box (user request, 2026-09-23)
 
-TAStudio's playback box has a "Maintain greenzone" checkbox beside "Recording
-mode", ticked by default, with a bindable hotkey ("Toggle Maintain Greenzone",
-unbound). Unticked, the history does no work at all: nothing is captured,
-stored, compressed or spilled, and the sandbox is asked for no epoch, state or
-delta, so it surveys no pages. What was stored before stays, and every frame
-reached meanwhile is simply not green. Ticked again, it stores a whole state at
-the frame the machine stands on - a delta cannot span frames nobody measured -
-and carries on as normal from there. The point is speed: a cutscene that needs
-no re-recording, or someone who only works the traditional way (load a branch,
-play, save a branch) and never edits the piano roll.
+TAStudio has a "Greenzone" group under "Playback" with four radio buttons:
+"Every frame" (the default), "Every 32 frames", "Every 1000 frames" and "Off".
+The two numbers are TAStudio settings (Misc tab); the choice itself is not
+saved, so a project always opens on "Every frame". One hotkey, "Cycle
+Greenzone" (unbound), steps through the four and round again. It replaced a
+single "Maintain greenzone" checkbox the same day, and radio buttons replaced
+the first idea for its successor - three independent checkboxes - because only
+the densest ticked one would ever have mattered.
 
-How: `ce_session_greenzone_suspend` sets `StateHistory::suspend`. `capture`
-then records where the machine stands and returns, which leaves
-`m_machineStored` false, and `beforeAdvance` only opens an epoch on a stored
-frame, so no epoch opens either. Edits made meanwhile are still kept: a frame
-after an edit the machine has not gone back to is still refused when the
-history resumes. The switch is not saved with the project; a project always
-opens with it ticked, so nobody is left wondering why nothing turns green.
+The choice changes WHICH frames are stored and nothing else. The engine takes
+it as a period, `ce_session_greenzone_capture_period` (`StateHistory::
+capturePeriod`): 1 is the ordinary history, N stores only the multiples of N,
+0 stores nothing. Anchors, deltas, bands, thinning, packing and spills are the
+same code whatever the period.
 
-What it costs afterwards: nothing the machine would not pay without a greenzone.
-The sandbox's per-frame work (holding the writable pages again, snapshotting
-the hot ones, the Windows stack shadows) happens only when an epoch opens. The
-last epoch opened before the switch is left to lapse: each page it held faults
-once on its next write and is writable from then on, the cost of one captured
-frame. The baseline dirty tracking savestates need is not the greenzone's and
-stays. Measured with `chimera-run --record --frames 11000` on snes9x (The Last
+- **A sparse period stores deltas, not whole states.** The frames between the
+  multiples are skipped exactly as the near band's stride skips them: the epoch
+  stays open and the delta at the next multiple describes them all. A whole
+  state every 32 frames would cost the whole machine each time - 4.31 GiB on a
+  PlayStation 3. With a period the stride is not consulted and not tuned; its
+  rare captures would talk it down to nothing.
+- **Off does no work at all.** `capture` records where the machine stands and
+  returns, which leaves `m_machineStored` false, and `beforeAdvance` only opens
+  an epoch on a stored frame, so no epoch opens and the sandbox is asked for no
+  epoch, state or delta - it surveys no pages. The last epoch opened before is
+  left to lapse: each page it held faults once on its next write, the cost of
+  one captured frame. The baseline dirty tracking savestates need is not the
+  greenzone's and stays.
+- **Leaving Off stores a whole state at once**, at the frame the machine stands
+  on, whatever the new period: the machine is not the stored copy of any frame,
+  so there is nothing to measure a delta from. The session does it inside
+  `ce_session_greenzone_capture_period`, so the frontend only names the period.
+- **Edits made while Off are still honoured**: a frame after an edit the
+  machine has not gone back to is refused when storing resumes.
+
+Measured with `chimera-run --record --frames 11000` on snes9x (The Last
 Super), seconds, two runs each:
 
-| | wall time |
-|---|---|
-| no greenzone | 2.33, 2.32 |
-| greenzone on | 2.90, 2.92 |
-| suspended from frame 0 | 2.32, 2.29 |
-| suspended from frame 1000 | 2.37, 2.36 |
+| | wall time | peak memory |
+|---|---|---|
+| no greenzone | 2.30, 2.29 | 69 MB |
+| every frame | 2.98, 2.97 | 338 MB |
+| every 32 frames | 2.37, 2.34 | 81 MB |
+| every 1000 frames | 2.31, 2.34 | 72 MB |
+| off | 2.30, 2.33 | 69 MB |
 
-`--greenzone-suspend-at <frame>` is the switch in chimera-run. The engine test
-counts every capturing call the fake sandbox receives and asserts none arrive
-while suspended; dropping the guard in `capture` fails it.
+`--seek 1500 --greenzone-check` lands exactly at both sparse periods. The
+switch in chimera-run is `--greenzone-period <n>`, set at the frame
+`--greenzone-period-at` names. The engine test counts every capturing call the
+fake sandbox receives and asserts none while off, and that a sparse period
+stores only its multiples, as deltas, with one epoch per stored frame; removing
+either guard fails it.
 
 ## Phasing
 

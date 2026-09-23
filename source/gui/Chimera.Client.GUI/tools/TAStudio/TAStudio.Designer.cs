@@ -83,6 +83,7 @@ namespace Chimera.Client.GUI
 			this.toolStripStatusLabel2 = new System.Windows.Forms.ToolStripStatusLabel();
 			this.SplicerStatusLabel = new System.Windows.Forms.ToolStripStatusLabel();
 			this.TasPlaybackBox = new Chimera.Client.GUI.PlaybackBox();
+			this.TasGreenzoneBox = new Chimera.Client.GUI.GreenzoneBox();
 			this.MarkerControl = new Chimera.Client.GUI.MarkerControl();
 			this.RightClickMenu = new System.Windows.Forms.ContextMenuStrip(this.components);
 			this.SetMarkersContextMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
@@ -421,9 +422,18 @@ namespace Chimera.Client.GUI
 			this.TasPlaybackBox.Location = new System.Drawing.Point(0, 0);
 			this.TasPlaybackBox.Margin = new System.Windows.Forms.Padding(3, 3, 3, 44);
 			this.TasPlaybackBox.Name = "TasPlaybackBox";
-			this.TasPlaybackBox.Size = new System.Drawing.Size(200, 129);
+			this.TasPlaybackBox.Size = new System.Drawing.Size(200, 108);
 			this.TasPlaybackBox.TabIndex = 5;
 			this.TasPlaybackBox.Tastudio = null;
+			// 
+			// TasGreenzoneBox
+			// 
+			this.TasGreenzoneBox.Dock = System.Windows.Forms.DockStyle.Top;
+			this.TasGreenzoneBox.Location = new System.Drawing.Point(0, 108);
+			this.TasGreenzoneBox.Name = "TasGreenzoneBox";
+			this.TasGreenzoneBox.Size = new System.Drawing.Size(200, 100);
+			this.TasGreenzoneBox.TabIndex = 6;
+			this.TasGreenzoneBox.Tastudio = null;
 			// 
 			// MarkerControl
 			// 
@@ -569,7 +579,7 @@ namespace Chimera.Client.GUI
 			// BookMarkControl
 			// 
 			this.BookMarkControl.Dock = System.Windows.Forms.DockStyle.Fill;
-			this.BookMarkControl.Location = new System.Drawing.Point(0, 129);
+			this.BookMarkControl.Location = new System.Drawing.Point(0, 208);
 			this.BookMarkControl.Name = "BookMarkControl";
 			this.BookMarkControl.Size = new System.Drawing.Size(200, 185);
 			this.BookMarkControl.TabIndex = 8;
@@ -587,15 +597,16 @@ namespace Chimera.Client.GUI
 			// BranchesMarkersSplit.Panel1
 			// 
 			this.BranchesMarkersSplit.Panel1.Controls.Add(this.BookMarkControl);
+			this.BranchesMarkersSplit.Panel1.Controls.Add(this.TasGreenzoneBox);
 			this.BranchesMarkersSplit.Panel1.Controls.Add(this.TasPlaybackBox);
-			this.BranchesMarkersSplit.Panel1MinSize = 200;
+			this.BranchesMarkersSplit.Panel1MinSize = 300;
 			this.BranchesMarkersSplit.Panel2MinSize = 90;
 			// 
 			// BranchesMarkersSplit.Panel2
 			// 
 			this.BranchesMarkersSplit.Panel2.Controls.Add(this.MarkerControl);
 			this.BranchesMarkersSplit.Size = new System.Drawing.Size(200, 524);
-			this.BranchesMarkersSplit.SplitterDistance = 293;
+			this.BranchesMarkersSplit.SplitterDistance = 393;
 			this.BranchesMarkersSplit.TabIndex = 9;
 			this.BranchesMarkersSplit.SplitterMoved += new System.Windows.Forms.SplitterEventHandler(this.BranchesMarkersSplit_SplitterMoved);
 			// 
@@ -736,6 +747,7 @@ namespace Chimera.Client.GUI
 		private StatusStripEx TasStatusStrip;
 		private System.Windows.Forms.ToolStripStatusLabel MessageStatusLabel;
 		public PlaybackBox TasPlaybackBox;
+		public GreenzoneBox TasGreenzoneBox;
 		private System.Windows.Forms.ToolStripStatusLabel SplicerStatusLabel;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx MetaSubMenu;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx HeaderMenuItem;

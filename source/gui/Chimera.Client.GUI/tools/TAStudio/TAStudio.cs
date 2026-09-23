@@ -202,6 +202,10 @@ namespace Chimera.Client.GUI
 			public bool MoveWithMainWindow { get; set; }
 			public int RewindStep { get; set; } = 1;
 			public int RewindStepFast { get; set; } = 4;
+
+			/// <summary>The greenzone box's "every N frames" choices (user request, 2026-09-23).</summary>
+			public int GreenzoneSparsePeriod { get; set; } = 32;
+			public int GreenzoneSparsestPeriod { get; set; } = 1000;
 			public bool ScrollSync { get; set; } = true;
 			public bool StatesForMarkers { get; set; } = true;
 			public PatternPaintModeEnum PatternPaintMode { get; set; } = TAStudioSettings.PatternPaintModeEnum.Never;
@@ -269,6 +273,7 @@ namespace Chimera.Client.GUI
 			WantsToControlStopMovie = true;
 			WantsToControlRestartMovie = true;
 			TasPlaybackBox.Tastudio = this;
+			TasGreenzoneBox.Tastudio = this;
 			MarkerControl.Tastudio = this;
 			BookMarkControl.Tastudio = this;
 		}
@@ -472,6 +477,7 @@ namespace Chimera.Client.GUI
 			PasteInsertMenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["Paste Insert"];
 
 			TasPlaybackBox.UpdateHotkeyTooltips(Config);
+			TasGreenzoneBox.UpdateHotkeyTooltips(Config);
 			BookMarkControl.UpdateHotkeyTooltips(Config);
 			MarkerControl.UpdateHotkeyTooltips(Config);
 		}
@@ -1174,7 +1180,7 @@ namespace Chimera.Client.GUI
 			}
 
 			MarkerControl?.UpdateValues();
-			TasPlaybackBox?.ShowMaintainGreenzone();
+			TasGreenzoneBox?.ShowMovie();
 
 			if (refreshBranches)
 			{

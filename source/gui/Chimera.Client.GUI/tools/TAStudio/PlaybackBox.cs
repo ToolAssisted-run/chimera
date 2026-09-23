@@ -57,25 +57,6 @@ namespace Chimera.Client.GUI
 			}
 		}
 
-		[Browsable(true)]
-		[DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
-		public bool MaintainGreenzone
-		{
-			get => Tastudio.CurrentTasMovie.MaintainGreenzone;
-			set
-			{
-				MaintainGreenzoneCheckbox.Checked = value;
-				Tastudio.CurrentTasMovie.MaintainGreenzone = value;
-				Tastudio.RefreshDialog();
-			}
-		}
-
-		/// <summary>The box follows the movie: a project always opens with the greenzone maintained.</summary>
-		public void ShowMaintainGreenzone()
-		{
-			if (Tastudio?.CurrentTasMovie is { } movie) MaintainGreenzoneCheckbox.Checked = movie.MaintainGreenzone;
-		}
-
 		public PlaybackBox()
 		{
 			InitializeComponent();
@@ -119,10 +100,6 @@ namespace Chimera.Client.GUI
 				+ "\nWhen enabled, TAStudio will run the emulator as fast as possible during seeks.");
 			toolTip1.SetToolTip(RecordingModeCheckbox, GetBindingText("Toggle read-only")
 				+ "\nWhen enabled, you can record inputs while unpaused or when frame advancing.");
-			toolTip1.SetToolTip(MaintainGreenzoneCheckbox, GetBindingText("Toggle Maintain Greenzone")
-				+ "\nWhen disabled, no new greenzone states are captured or stored; the saved ones stay."
-				+ "\nUseful to run through parts that need no re-recording, such as cutscenes."
-				+ "\nEnabling it again stores a full state at the current frame and resumes as normal.");
 		}
 
 		protected override void OnLoad(EventArgs e)
@@ -137,7 +114,6 @@ namespace Chimera.Client.GUI
 			AutoRestoreCheckbox.Checked = Tastudio.Settings.AutoRestoreLastPosition;
 			FollowCursorCheckbox.Checked = Tastudio.Settings.FollowCursor;
 			RecordingModeCheckbox.Checked = RecordingMode;
-			MaintainGreenzoneCheckbox.Checked = MaintainGreenzone;
 
 			_loading = false;
 		}
@@ -184,11 +160,6 @@ namespace Chimera.Client.GUI
 		{
 			RecordingMode = !RecordingMode;
 			Tastudio.WasRecording = RecordingMode; // hard reset at manual click and hotkey
-		}
-
-		private void MaintainGreenzoneCheckbox_MouseClick(object sender, MouseEventArgs e)
-		{
-			MaintainGreenzone = !MaintainGreenzone;
 		}
 
 		private void RewindButton_MouseDown(object sender, MouseEventArgs e)

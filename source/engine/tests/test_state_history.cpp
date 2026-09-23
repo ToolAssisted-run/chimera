@@ -154,9 +154,11 @@ int g_refuseDeltaLoadIn = -1;
 int g_outOfMemoryFor = 0;
 
 /* Every call that captures: a state, an epoch, a delta, a composition. A
- * suspended history must make none of them - the point of suspending it is
- * that the sandbox does no greenzone work at all. */
+ * history that is off must make none of them - the point of turning it off is
+ * that the sandbox does no greenzone work at all. And the epochs alone, which
+ * a sparse history must open once per stored frame and not once per frame. */
 int64_t g_captureCalls = 0;
+int64_t g_epochBegins = 0;
 
 void fakeSaveState(void *, chimera::WbxWriteCb cb, uintptr_t ud, chimera::WbxReturn *r)
 {
@@ -177,6 +179,7 @@ void fakeLoadState(void *, chimera::WbxReadCb cb, uintptr_t ud, chimera::WbxRetu
 void fakeEpochBegin(void *, chimera::WbxReturn *r)
 {
 	g_captureCalls++;
+	g_epochBegins++;
 	*r = {};
 	g_machine.epochBase.assign(g_machine.cell, g_machine.cell + Machine::kCells);
 }
@@ -2248,10 +2251,10 @@ int main(void)
 		g_pad = 0;
 	}
 
-	{ // Suspended (TAStudio's "Maintain Greenzone" unticked): nothing is stored
-	  // while it lasts, what was stored stays, resuming stores a whole state at
-	  // the frame it resumes on, and an edit made meanwhile still keeps the
-	  // timeline it replaced out. No epoch, state or delta is asked of the
+	{ // Off (TAStudio's "Greenzone" box, capturePeriod 0): nothing is stored
+	  // while it lasts, what was stored stays, turning it on stores a whole
+	  // state at the frame it resumes on, and an edit made meanwhile still keeps
+	  // the timeline it replaced out. No epoch, state or delta is asked of the
 	  // sandbox meanwhile, so it surveys no pages (user request, 2026-09-23).
 		const chimera::HostApi api = fakeHost();
 		g_machine = Machine{};
@@ -2273,7 +2276,7 @@ int main(void)
 		const int64_t anchorsBefore = h.anchors();
 		const uint64_t bytesBefore = h.bytes();
 
-		h.suspend(true);
+		h.capturePeriod(0);
 		const int64_t callsBefore = g_captureCalls;
 		for (int64_t f = 21; f <= 40; f++) step(f);
 		assert(g_captureCalls == callsBefore);        /* and nothing asked of the sandbox */
@@ -2281,7 +2284,7 @@ int main(void)
 		assert(h.bytes() == bytesBefore);
 		assert(h.anchors() == anchorsBefore);
 
-		h.suspend(false);
+		h.capturePeriod(1);
 		h.capture(40);                                /* what TAStudio does on resuming */
 		assert(h.nearest(40) == 40);
 		assert(h.anchors() == anchorsBefore + 1);     /* a whole state, not a delta across the gap */
@@ -2298,10 +2301,10 @@ int main(void)
 		/* an edit behind the machine while suspended: the machine plays the old
 		 * timeline on, and resuming there must not store it */
 		assert(h.restore(50, error));
-		h.suspend(true);
+		h.capturePeriod(0);
 		for (int64_t f = 51; f <= 60; f++) step(f);
 		h.invalidateAfter(54);
-		h.suspend(false);
+		h.capturePeriod(1);
 		h.capture(60);
 		assert(h.nearest(60) <= 54);
 		/* brought back to the edit, the machine is on the new timeline and resuming stores again */
@@ -2309,6 +2312,64 @@ int main(void)
 		const int64_t back = h.nearest(54);
 		for (int64_t f = back + 1; f <= 58; f++) step(f);
 		assert(h.nearest(58) == 58);
+	}
+
+	{ // Sparse (capturePeriod N): only multiples of N are stored, as deltas that
+	  // span the frames between - one epoch per stored frame, not per frame -
+	  // and every stored frame restores exactly. Turning it on from off stores
+	  // the current frame whatever N is (user request, 2026-09-23).
+		const chimera::HostApi api = fakeHost();
+		g_machine = Machine{};
+		chimera::StateHistory h;
+		h.configure(&api, nullptr, 64u << 20);
+		std::vector<std::array<uint8_t, Machine::kCells>> truth(1);
+		std::memcpy(truth[0].data(), g_machine.cell, Machine::kCells);
+		auto step = [&](int64_t f) {
+			h.beforeAdvance();
+			advance(f);
+			std::array<uint8_t, Machine::kCells> at{};
+			std::memcpy(at.data(), g_machine.cell, Machine::kCells);
+			if (truth.size() <= static_cast<size_t>(f)) truth.resize(static_cast<size_t>(f) + 1);
+			truth[static_cast<size_t>(f)] = at;
+			h.capture(f);
+		};
+		h.capture(0);
+		for (int64_t f = 1; f <= 10; f++) step(f);
+		assert(h.nearest(10) == 10);
+
+		h.capturePeriod(8);
+		const int64_t anchorsBefore = h.anchors();
+		const int64_t epochsBefore = g_epochBegins;
+		for (int64_t f = 11; f <= 100; f++) step(f);
+		for (int64_t f = 11; f <= 100; f++) assert(h.nearest(f) == (f < 16 ? 10 : f / 8 * 8));
+		assert(h.anchors() == anchorsBefore);               /* deltas, not whole states */
+		assert(g_epochBegins - epochsBefore <= 12);         /* 11 stored frames, not 90 */
+		for (const int64_t f : { 10, 16, 56, 96 })
+		{
+			assert(h.restore(f, error));
+			assert(std::memcmp(g_machine.cell, truth[static_cast<size_t>(f)].data(), Machine::kCells) == 0);
+		}
+
+		/* off, then on again at a frame that is no multiple: stored there at once */
+		assert(h.restore(96, error));
+		for (int64_t f = 97; f <= 100; f++) step(f);
+		h.capturePeriod(0);
+		for (int64_t f = 101; f <= 110; f++) step(f);
+		h.capturePeriod(32);
+		h.capture(110);                                       /* what the session does on turning it on */
+		assert(h.nearest(110) == 110);
+		for (int64_t f = 111; f <= 140; f++) step(f);
+		assert(h.nearest(127) == 110);
+		assert(h.nearest(140) == 128);
+		assert(h.restore(128, error));
+		assert(std::memcmp(g_machine.cell, truth[128].data(), Machine::kCells) == 0);
+
+		/* and back to every frame */
+		for (int64_t f = 129; f <= 140; f++) step(f);
+		h.capturePeriod(1);
+		for (int64_t f = 141; f <= 150; f++) step(f);
+		assert(h.nearest(150) == 150);
+		assert(h.nearest(145) == 145);
 	}
 
 	/* the spill file belongs to the history and goes with it */

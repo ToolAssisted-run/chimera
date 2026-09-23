@@ -85,6 +85,12 @@
 			this.label8 = new System.Windows.Forms.Label();
 			this.RewindNum = new System.Windows.Forms.NumericUpDown();
 			this.label7 = new System.Windows.Forms.Label();
+			this.GreenzoneSparseLabel = new System.Windows.Forms.Label();
+			this.GreenzoneSparseNum = new System.Windows.Forms.NumericUpDown();
+			this.GreenzoneSparseFramesLabel = new System.Windows.Forms.Label();
+			this.GreenzoneSparsestLabel = new System.Windows.Forms.Label();
+			this.GreenzoneSparsestNum = new System.Windows.Forms.NumericUpDown();
+			this.GreenzoneSparsestFramesLabel = new System.Windows.Forms.Label();
 			this.BindMarkersCheckbox = new System.Windows.Forms.CheckBox();
 			this.IncludeFrameNumberCheckbox = new System.Windows.Forms.CheckBox();
 			this.UndoCountNum = new System.Windows.Forms.NumericUpDown();
@@ -121,6 +127,8 @@
 			this.tabPage3.SuspendLayout();
 			((System.ComponentModel.ISupportInitialize)(this.FastRewindNum)).BeginInit();
 			((System.ComponentModel.ISupportInitialize)(this.RewindNum)).BeginInit();
+			((System.ComponentModel.ISupportInitialize)(this.GreenzoneSparseNum)).BeginInit();
+			((System.ComponentModel.ISupportInitialize)(this.GreenzoneSparsestNum)).BeginInit();
 			((System.ComponentModel.ISupportInitialize)(this.UndoCountNum)).BeginInit();
 			this.tabPage6.SuspendLayout();
 			this.groupBox4.SuspendLayout();
@@ -734,6 +742,12 @@
 			this.tabPage3.Controls.Add(this.UndoCountNum);
 			this.tabPage3.Controls.Add(this.label1);
 			this.tabPage3.Controls.Add(this.AutopauseCheckbox);
+			this.tabPage3.Controls.Add(this.GreenzoneSparseLabel);
+			this.tabPage3.Controls.Add(this.GreenzoneSparseNum);
+			this.tabPage3.Controls.Add(this.GreenzoneSparseFramesLabel);
+			this.tabPage3.Controls.Add(this.GreenzoneSparsestLabel);
+			this.tabPage3.Controls.Add(this.GreenzoneSparsestNum);
+			this.tabPage3.Controls.Add(this.GreenzoneSparsestFramesLabel);
 			this.tabPage3.Location = new System.Drawing.Point(4, 22);
 			this.tabPage3.Name = "tabPage3";
 			this.tabPage3.Size = new System.Drawing.Size(366, 407);
@@ -816,6 +830,88 @@
 			this.label7.Size = new System.Drawing.Size(69, 13);
 			this.label7.TabIndex = 12;
 			this.label7.Text = "Rewind step:";
+			// 
+			// GreenzoneSparseLabel
+			// 
+			this.GreenzoneSparseLabel.AutoSize = true;
+			this.GreenzoneSparseLabel.Location = new System.Drawing.Point(9, 233);
+			this.GreenzoneSparseLabel.Name = "GreenzoneSparseLabel";
+			this.GreenzoneSparseLabel.Size = new System.Drawing.Size(140, 13);
+			this.GreenzoneSparseLabel.TabIndex = 519;
+			this.GreenzoneSparseLabel.Text = "Greenzone, sparse: every";
+			// 
+			// GreenzoneSparseNum
+			// 
+			this.GreenzoneSparseNum.Location = new System.Drawing.Point(160, 229);
+			this.GreenzoneSparseNum.Maximum = new decimal(new int[] {
+            1000000,
+            0,
+            0,
+            0});
+			this.GreenzoneSparseNum.Minimum = new decimal(new int[] {
+            2,
+            0,
+            0,
+            0});
+			this.GreenzoneSparseNum.Name = "GreenzoneSparseNum";
+			this.GreenzoneSparseNum.Size = new System.Drawing.Size(67, 20);
+			this.GreenzoneSparseNum.TabIndex = 520;
+			this.toolTip1.SetToolTip(this.GreenzoneSparseNum, "The second choice in the Greenzone box: the greenzone stores one frame in this many.");
+			this.GreenzoneSparseNum.Value = new decimal(new int[] {
+            32,
+            0,
+            0,
+            0});
+			// 
+			// GreenzoneSparseFramesLabel
+			// 
+			this.GreenzoneSparseFramesLabel.AutoSize = true;
+			this.GreenzoneSparseFramesLabel.Location = new System.Drawing.Point(231, 233);
+			this.GreenzoneSparseFramesLabel.Name = "GreenzoneSparseFramesLabel";
+			this.GreenzoneSparseFramesLabel.Size = new System.Drawing.Size(38, 13);
+			this.GreenzoneSparseFramesLabel.TabIndex = 521;
+			this.GreenzoneSparseFramesLabel.Text = "frames";
+			// 
+			// GreenzoneSparsestLabel
+			// 
+			this.GreenzoneSparsestLabel.AutoSize = true;
+			this.GreenzoneSparsestLabel.Location = new System.Drawing.Point(9, 258);
+			this.GreenzoneSparsestLabel.Name = "GreenzoneSparsestLabel";
+			this.GreenzoneSparsestLabel.Size = new System.Drawing.Size(140, 13);
+			this.GreenzoneSparsestLabel.TabIndex = 522;
+			this.GreenzoneSparsestLabel.Text = "Greenzone, sparsest: every";
+			// 
+			// GreenzoneSparsestNum
+			// 
+			this.GreenzoneSparsestNum.Location = new System.Drawing.Point(160, 254);
+			this.GreenzoneSparsestNum.Maximum = new decimal(new int[] {
+            1000000,
+            0,
+            0,
+            0});
+			this.GreenzoneSparsestNum.Minimum = new decimal(new int[] {
+            2,
+            0,
+            0,
+            0});
+			this.GreenzoneSparsestNum.Name = "GreenzoneSparsestNum";
+			this.GreenzoneSparsestNum.Size = new System.Drawing.Size(67, 20);
+			this.GreenzoneSparsestNum.TabIndex = 523;
+			this.toolTip1.SetToolTip(this.GreenzoneSparsestNum, "The third choice in the Greenzone box: the greenzone stores one frame in this many.");
+			this.GreenzoneSparsestNum.Value = new decimal(new int[] {
+            1000,
+            0,
+            0,
+            0});
+			// 
+			// GreenzoneSparsestFramesLabel
+			// 
+			this.GreenzoneSparsestFramesLabel.AutoSize = true;
+			this.GreenzoneSparsestFramesLabel.Location = new System.Drawing.Point(231, 258);
+			this.GreenzoneSparsestFramesLabel.Name = "GreenzoneSparsestFramesLabel";
+			this.GreenzoneSparsestFramesLabel.Size = new System.Drawing.Size(38, 13);
+			this.GreenzoneSparsestFramesLabel.TabIndex = 524;
+			this.GreenzoneSparsestFramesLabel.Text = "frames";
 			// 
 			// BindMarkersCheckbox
 			// 
@@ -1086,6 +1182,8 @@
 			this.tabPage3.PerformLayout();
 			((System.ComponentModel.ISupportInitialize)(this.FastRewindNum)).EndInit();
 			((System.ComponentModel.ISupportInitialize)(this.RewindNum)).EndInit();
+			((System.ComponentModel.ISupportInitialize)(this.GreenzoneSparseNum)).EndInit();
+			((System.ComponentModel.ISupportInitialize)(this.GreenzoneSparsestNum)).EndInit();
 			((System.ComponentModel.ISupportInitialize)(this.UndoCountNum)).EndInit();
 			this.tabPage6.ResumeLayout(false);
 			this.tabPage6.PerformLayout();
@@ -1148,6 +1246,12 @@
 		private System.Windows.Forms.Label label8;
 		private System.Windows.Forms.NumericUpDown RewindNum;
 		private System.Windows.Forms.Label label7;
+		private System.Windows.Forms.Label GreenzoneSparseLabel;
+		private System.Windows.Forms.NumericUpDown GreenzoneSparseNum;
+		private System.Windows.Forms.Label GreenzoneSparseFramesLabel;
+		private System.Windows.Forms.Label GreenzoneSparsestLabel;
+		private System.Windows.Forms.NumericUpDown GreenzoneSparsestNum;
+		private System.Windows.Forms.Label GreenzoneSparsestFramesLabel;
 		private System.Windows.Forms.Button SettingsCancelButton;
 		private System.Windows.Forms.Button ApplyButton;
 		private System.Windows.Forms.Label label9;

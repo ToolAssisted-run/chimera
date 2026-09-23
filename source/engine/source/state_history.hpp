@@ -214,17 +214,29 @@ public:
 	 * forced: an epoch has to be open before the machine moves. */
 	void beforeAdvance();
 
-	/* Suspends the history's work (user request, 2026-09-23: TAStudio's
-	 * "Maintain Greenzone" unticked, for a cutscene or for re-recording with
-	 * branches alone). While suspended, beforeAdvance opens no epoch and capture
-	 * stores nothing - no delta, no anchor, no thinning, no packing, no spill -
-	 * and only notes where the machine stands, which is what keeps an edit made
-	 * meanwhile from letting an old timeline's frames in later. What is already
-	 * stored stays, and restore, pins and invalidation work as ever. Resuming
-	 * stores nothing either: the machine is not the stored copy of any frame, so
-	 * the first capture after it is an anchor, never a delta across the gap. */
-	void suspend(bool suspended);
-	bool suspended() const { return m_suspended; }
+	/* How often a frame is stored (user request, 2026-09-23: TAStudio's
+	 * "Greenzone" box - every frame, one in 32, one in 1000, or off). It picks
+	 * WHICH frames are stored and nothing else: anchors, deltas, bands,
+	 * thinning, packing and spills go on as ever.
+	 *
+	 *   1  every frame the near band's stride allows - the ordinary history.
+	 *   N  only frames that are multiples of N. The frames between are skipped
+	 *      the way the stride skips them: the epoch stays open across them and
+	 *      the next delta describes them all, so a sparse history still costs
+	 *      a delta, not a whole state, per stored frame.
+	 *   0  off: beforeAdvance opens no epoch and capture stores nothing - no
+	 *      delta, no anchor, no thinning, no packing, no spill - and only notes
+	 *      where the machine stands, which keeps an edit made meanwhile from
+	 *      letting an old timeline's frames in later. The sandbox is asked for
+	 *      nothing, so it surveys no pages.
+	 *
+	 * What is already stored stays whatever the period, and restore, pins and
+	 * invalidation work as ever. Leaving 0 makes the next frame that can be
+	 * stored a stored one whatever N is, and it is an anchor: the machine is
+	 * not the stored copy of any frame, so there is nothing to measure a delta
+	 * from. */
+	void capturePeriod(int64_t period);
+	int64_t capturePeriod() const { return m_capturePeriod; }
 
 	/* Called immediately after that advance, with the frame now standing at.
 	 *
@@ -842,7 +854,8 @@ private:
 	CeStrideTuner m_tuner;             /* decides the stride; see stride_tuner.h */
 	int64_t m_nearStride = 1;
 	bool m_strideFixed = false;        /* fixNearStride: the tuner leaves it alone */
-	bool m_suspended = false;          /* suspend(): nothing is captured or stored */
+	int64_t m_capturePeriod = 1;       /* capturePeriod(): 0 off, 1 every frame, N one in N */
+	bool m_storeNext = false;          /* leaving 0: the next storable frame is stored */
 	double m_captureSeconds = 0;       /* exponential means, in seconds */
 	double m_wallSeconds = 0;
 	double m_lastCaptureEnded = 0;

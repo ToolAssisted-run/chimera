@@ -110,7 +110,7 @@ namespace Chimera.Client.Common
 			Bind("TAStudio", "Toggle Auto-Restore", "Alt+R");
 			Bind("TAStudio", "Seek To Green Arrow", "R");
 			Bind("TAStudio", "Toggle Turbo Seek", "Shift+S");
-			Bind("TAStudio", "Toggle Maintain Greenzone");
+			Bind("TAStudio", "Cycle Greenzone");
 			Bind("TAStudio", "Undo", "Ctrl+Z"); // TODO: these are getting not unique enough
 			Bind("TAStudio", "Redo", "Ctrl+Y");
 			Bind("TAStudio", "Seek To Prev Marker", "Shift+PageUp");
