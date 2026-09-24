@@ -888,8 +888,9 @@ namespace Chimera.Client.GUI
 			// 
 			// ShowTAStudioMenuItem
 			// 
-			// Only while TAStudio is hidden with its "<< Hide" button. The menu
-			// flows, so it cannot be pushed to the right edge; it comes last.
+			// Only while TAStudio is hidden with its "<< Hide" button. Right-aligned
+			// in a flowing menu, which MenuStripEx does itself.
+			this.ShowTAStudioMenuItem.Alignment = System.Windows.Forms.ToolStripItemAlignment.Right;
 			this.ShowTAStudioMenuItem.Text = "Show TAStudio >>";
 			this.ShowTAStudioMenuItem.Visible = false;
 			this.ShowTAStudioMenuItem.Click += new System.EventHandler(this.ShowTAStudioMenuItem_Click);
