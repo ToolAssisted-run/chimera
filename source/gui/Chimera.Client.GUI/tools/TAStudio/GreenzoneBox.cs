@@ -6,17 +6,17 @@ using Chimera.Client.Common;
 namespace Chimera.Client.GUI
 {
 	/// <summary>
-	/// How often the greenzone stores a frame: every frame, one in a few, one in many,
-	/// or not at all (user request, 2026-09-23). Only the frequency changes; the engine
-	/// keeps the greenzone the same way whichever is chosen. The two periods are
-	/// TAStudio settings; the choice itself is not saved, so a project always opens
-	/// storing every frame.
+	/// How often the greenzone stores a frame: every frame, one in N, or not at all
+	/// (user request, 2026-09-23/24). Only the frequency changes; the engine keeps the
+	/// greenzone the same way whichever is chosen. N is kept in TAStudio's settings;
+	/// the choice itself is not saved, so a project always opens storing every frame.
 	/// </summary>
 	public partial class GreenzoneBox : UserControl
 	{
-		public enum Level { EveryFrame, Sparse, Sparsest, Off }
+		public enum Level { EveryFrame, EveryN, Off }
 
 		private Level _level = Level.EveryFrame;
+		private bool _loading = true;
 
 		public TAStudio Tastudio { get; set; }
 
@@ -24,8 +24,7 @@ namespace Chimera.Client.GUI
 		{
 			InitializeComponent();
 			EveryFrameRadio.Click += (_, _) => Selected = Level.EveryFrame;
-			SparseRadio.Click += (_, _) => Selected = Level.Sparse;
-			SparsestRadio.Click += (_, _) => Selected = Level.Sparsest;
+			EveryNRadio.Click += (_, _) => Selected = Level.EveryN;
 			OffRadio.Click += (_, _) => Selected = Level.Off;
 		}
 
@@ -39,22 +38,20 @@ namespace Chimera.Client.GUI
 			}
 		}
 
-		/// <summary>The "Cycle Greenzone" hotkey: every frame, sparse, sparsest, off, and round again.</summary>
-		public void Cycle() => Selected = (Level)(((int)_level + 1) % 4);
+		/// <summary>The "Cycle Greenzone" hotkey: every frame, every N, off, and round again.</summary>
+		public void Cycle() => Selected = (Level)(((int)_level + 1) % 3);
 
 		private int PeriodOf(Level level) => level switch
 		{
 			Level.EveryFrame => 1,
-			Level.Sparse => Math.Max(2, Tastudio.Settings.GreenzoneSparsePeriod),
-			Level.Sparsest => Math.Max(2, Tastudio.Settings.GreenzoneSparsestPeriod),
+			Level.EveryN => (int)PeriodNum.Value,
 			_ => 0,
 		};
 
-		/// <summary>The level or the settings changed: the labels, the buttons and the movie follow.</summary>
-		public void Apply()
+		/// <summary>The level or N changed: the buttons and the movie follow.</summary>
+		private void Apply()
 		{
 			if (Tastudio?.CurrentTasMovie is not { } movie) return;
-			ShowPeriods();
 			movie.GreenzonePeriod = PeriodOf(_level);
 			ShowLevel();
 			Tastudio.RefreshDialog();
@@ -63,8 +60,6 @@ namespace Chimera.Client.GUI
 		/// <summary>
 		/// A movie that stores every frame while another level is chosen is one just
 		/// opened - a project always opens storing every frame - so the box follows it.
-		/// Anything else the box itself set, and it keeps its choice even while a new
-		/// period from the settings is on its way to the movie.
 		/// </summary>
 		public void ShowMovie()
 		{
@@ -73,18 +68,18 @@ namespace Chimera.Client.GUI
 			ShowLevel();
 		}
 
-		private void ShowPeriods()
-		{
-			SparseRadio.Text = $"Every {PeriodOf(Level.Sparse)} frames";
-			SparsestRadio.Text = $"Every {PeriodOf(Level.Sparsest)} frames";
-		}
-
 		private void ShowLevel()
 		{
 			EveryFrameRadio.Checked = _level == Level.EveryFrame;
-			SparseRadio.Checked = _level == Level.Sparse;
-			SparsestRadio.Checked = _level == Level.Sparsest;
+			EveryNRadio.Checked = _level == Level.EveryN;
 			OffRadio.Checked = _level == Level.Off;
+		}
+
+		private void PeriodNum_ValueChanged(object sender, EventArgs e)
+		{
+			if (_loading) return;
+			Tastudio.Settings.GreenzonePeriod = (int)PeriodNum.Value;
+			if (_level == Level.EveryN) Apply();
 		}
 
 		public void UpdateHotkeyTooltips(Config config)
@@ -94,13 +89,10 @@ namespace Chimera.Client.GUI
 
 			toolTip1.SetToolTip(EveryFrameRadio, hotkey
 				+ "\nThe greenzone stores every frame it can afford.");
-			toolTip1.SetToolTip(SparseRadio, hotkey
+			toolTip1.SetToolTip(EveryNRadio, hotkey
 				+ "\nThe greenzone stores one frame in this many, which runs faster;"
-				+ "\nreaching a frame between costs replaying from the one before it."
-				+ "\nThe number is set in TAStudio's settings.");
-			toolTip1.SetToolTip(SparsestRadio, hotkey
-				+ "\nThe greenzone stores one frame in this many, which runs faster still."
-				+ "\nThe number is set in TAStudio's settings.");
+				+ "\nreaching a frame between costs replaying from the one before it.");
+			toolTip1.SetToolTip(PeriodNum, "How many frames apart the greenzone stores one (2 to 999).");
 			toolTip1.SetToolTip(OffRadio, hotkey
 				+ "\nNo new greenzone at all; what is stored stays. Useful through parts"
 				+ "\nthat need no re-recording, or when only branches are used."
@@ -111,7 +103,8 @@ namespace Chimera.Client.GUI
 		{
 			base.OnLoad(e);
 			if (DesignMode || Tastudio is null) return;
-			ShowPeriods();
+			PeriodNum.Value = Math.Min(Math.Max(Tastudio.Settings.GreenzonePeriod, (int)PeriodNum.Minimum), (int)PeriodNum.Maximum);
+			_loading = false;
 			ShowMovie();
 		}
 	}

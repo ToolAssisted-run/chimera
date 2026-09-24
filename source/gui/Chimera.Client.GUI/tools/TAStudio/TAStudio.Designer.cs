@@ -431,7 +431,7 @@ namespace Chimera.Client.GUI
 			this.TasGreenzoneBox.Dock = System.Windows.Forms.DockStyle.Top;
 			this.TasGreenzoneBox.Location = new System.Drawing.Point(0, 108);
 			this.TasGreenzoneBox.Name = "TasGreenzoneBox";
-			this.TasGreenzoneBox.Size = new System.Drawing.Size(200, 100);
+			this.TasGreenzoneBox.Size = new System.Drawing.Size(200, 80);
 			this.TasGreenzoneBox.TabIndex = 6;
 			this.TasGreenzoneBox.Tastudio = null;
 			// 
@@ -579,7 +579,7 @@ namespace Chimera.Client.GUI
 			// BookMarkControl
 			// 
 			this.BookMarkControl.Dock = System.Windows.Forms.DockStyle.Fill;
-			this.BookMarkControl.Location = new System.Drawing.Point(0, 208);
+			this.BookMarkControl.Location = new System.Drawing.Point(0, 188);
 			this.BookMarkControl.Name = "BookMarkControl";
 			this.BookMarkControl.Size = new System.Drawing.Size(200, 185);
 			this.BookMarkControl.TabIndex = 8;
@@ -599,14 +599,14 @@ namespace Chimera.Client.GUI
 			this.BranchesMarkersSplit.Panel1.Controls.Add(this.BookMarkControl);
 			this.BranchesMarkersSplit.Panel1.Controls.Add(this.TasGreenzoneBox);
 			this.BranchesMarkersSplit.Panel1.Controls.Add(this.TasPlaybackBox);
-			this.BranchesMarkersSplit.Panel1MinSize = 300;
+			this.BranchesMarkersSplit.Panel1MinSize = 280;
 			this.BranchesMarkersSplit.Panel2MinSize = 90;
 			// 
 			// BranchesMarkersSplit.Panel2
 			// 
 			this.BranchesMarkersSplit.Panel2.Controls.Add(this.MarkerControl);
 			this.BranchesMarkersSplit.Size = new System.Drawing.Size(200, 524);
-			this.BranchesMarkersSplit.SplitterDistance = 393;
+			this.BranchesMarkersSplit.SplitterDistance = 373;
 			this.BranchesMarkersSplit.TabIndex = 9;
 			this.BranchesMarkersSplit.SplitterMoved += new System.Windows.Forms.SplitterEventHandler(this.BranchesMarkersSplit_SplitterMoved);
 			// 

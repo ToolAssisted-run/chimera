@@ -97,8 +97,6 @@ namespace Chimera.Client.GUI
 			UndoCountNum.Value = _settings.GeneralClientSettings.MaxUndoSteps;
 			RewindNum.Value = _settings.GeneralClientSettings.RewindStep;
 			FastRewindNum.Value = _settings.GeneralClientSettings.RewindStepFast;
-			GreenzoneSparseNum.Value = Math.Min(Math.Max(_settings.GeneralClientSettings.GreenzoneSparsePeriod, 2), 1000000);
-			GreenzoneSparsestNum.Value = Math.Min(Math.Max(_settings.GeneralClientSettings.GreenzoneSparsestPeriod, 2), 1000000);
 			ScrollSpeedNum.Value = _settings.GeneralClientSettings.ScrollSpeed;
 			StatesForMarkersCheckbox.Checked = _settings.GeneralClientSettings.StatesForMarkers;
 
@@ -488,8 +486,6 @@ namespace Chimera.Client.GUI
 			_settings.GeneralClientSettings.MaxUndoSteps = (int)UndoCountNum.Value;
 			_settings.GeneralClientSettings.RewindStep = (int)RewindNum.Value;
 			_settings.GeneralClientSettings.RewindStepFast = (int)FastRewindNum.Value;
-			_settings.GeneralClientSettings.GreenzoneSparsePeriod = (int)GreenzoneSparseNum.Value;
-			_settings.GeneralClientSettings.GreenzoneSparsestPeriod = (int)GreenzoneSparsestNum.Value;
 			_settings.GeneralClientSettings.StatesForMarkers = StatesForMarkersCheckbox.Checked;
 
 			if (ScrollToViewRadio.Checked) _settings.GeneralClientSettings.FollowCursorScrollMethod = "near";

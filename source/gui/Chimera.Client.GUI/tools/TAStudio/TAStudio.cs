@@ -203,9 +203,8 @@ namespace Chimera.Client.GUI
 			public int RewindStep { get; set; } = 1;
 			public int RewindStepFast { get; set; } = 4;
 
-			/// <summary>The greenzone box's "every N frames" choices (user request, 2026-09-23).</summary>
-			public int GreenzoneSparsePeriod { get; set; } = 32;
-			public int GreenzoneSparsestPeriod { get; set; } = 1000;
+			/// <summary>The greenzone box's "Every N frames" number, kept between sessions (user request, 2026-09-24).</summary>
+			public int GreenzonePeriod { get; set; } = 2;
 			public bool ScrollSync { get; set; } = true;
 			public bool StatesForMarkers { get; set; } = true;
 			public PatternPaintModeEnum PatternPaintMode { get; set; } = TAStudioSettings.PatternPaintModeEnum.Never;

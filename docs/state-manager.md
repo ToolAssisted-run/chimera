@@ -1022,16 +1022,17 @@ already held, repeatedly, inside every capture. The sandbox knows how many pages
 the frame touched before any of them are read (`wbx_get_epoch_page_count`), so
 the room is asked for once; an anchor asks for what the last anchor took.
 
-## How often the greenzone stores a frame: the Greenzone box (user request, 2026-09-23)
+## How often the greenzone stores a frame: the Greenzone box (user request, 2026-09-23/24)
 
-TAStudio has a "Greenzone" group under "Playback" with four radio buttons:
-"Every frame" (the default), "Every 32 frames", "Every 1000 frames" and "Off".
-The two numbers are TAStudio settings (Misc tab); the choice itself is not
-saved, so a project always opens on "Every frame". One hotkey, "Cycle
-Greenzone" (unbound), steps through the four and round again. It replaced a
-single "Maintain greenzone" checkbox the same day, and radio buttons replaced
-the first idea for its successor - three independent checkboxes - because only
-the densest ticked one would ever have mattered.
+TAStudio has a "Greenzone" group under "Playback" with three radio buttons:
+"Every frame" (the default), "Every [N] frames" with N picked by a spin box from
+2 to 999 (2 by default, remembered in TAStudio's settings), and "Off". The
+choice itself is not saved, so a project always opens on "Every frame". One
+hotkey, "Cycle Greenzone" (unbound), steps through the three and round again.
+It went through three shapes in two days: a single "Maintain greenzone"
+checkbox; then four radio buttons with two fixed periods (32 and 1000, set in
+the settings dialog) - chosen over three independent checkboxes, because only
+the densest ticked one would ever have mattered; then this one.
 
 The choice changes WHICH frames are stored and nothing else. The engine takes
 it as a period, `ce_session_greenzone_capture_period` (`StateHistory::
@@ -1068,9 +1069,11 @@ Super), seconds, two runs each:
 | every frame | 2.98, 2.97 | 338 MB |
 | every 32 frames | 2.37, 2.34 | 81 MB |
 | every 1000 frames | 2.31, 2.34 | 72 MB |
+| every 2 frames | 2.77, 2.73 | |
 | off | 2.30, 2.33 | 69 MB |
 
-`--seek 1500 --greenzone-check` lands exactly at both sparse periods. The
+`--seek 1500 --greenzone-check` lands exactly at periods 32 and 1000, and
+`--seek 1501` at 2 and 999, the ends of the spin box. The
 switch in chimera-run is `--greenzone-period <n>`, set at the frame
 `--greenzone-period-at` names. The engine test counts every capturing call the
 fake sandbox receives and asserts none while off, and that a sparse period
