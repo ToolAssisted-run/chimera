@@ -339,6 +339,38 @@ namespace Chimera.Client.GUI
 			};
 		}
 
+		/// <summary>
+		/// Hidden with "&lt;&lt; Hide" (user request, 2026-09-24): the window goes, taskbar
+		/// entry and all, and everything else goes on as before - a tool is active while its
+		/// window exists, not while it is shown. The main window offers "Show TAStudio &gt;&gt;"
+		/// meanwhile, which brings it back through the same path that opens it.
+		/// </summary>
+		private bool _hiddenByUser;
+
+		private void HideMenuItem_Click(object sender, EventArgs e)
+		{
+			_hiddenByUser = true;
+			Hide();
+			MainForm.TAStudioHidden(true);
+			MainWindow?.Activate();   // the keys go on reaching the hotkeys
+		}
+
+		protected override void OnVisibleChanged(EventArgs e)
+		{
+			base.OnVisibleChanged(e);
+			if (!Visible || !_hiddenByUser) return;
+			_hiddenByUser = false;
+			MainForm.TAStudioHidden(false);
+		}
+
+		protected override void OnFormClosed(FormClosedEventArgs e)
+		{
+			base.OnFormClosed(e);
+			if (!_hiddenByUser) return;
+			_hiddenByUser = false;
+			MainForm.TAStudioHidden(false);
+		}
+
 		/// <summary>the main window's right edge when we last looked, to tell whether we were docked to it</summary>
 		private int _lastMainRight;
 

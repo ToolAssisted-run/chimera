@@ -3648,6 +3648,10 @@ namespace Chimera.Client.GUI
 		public bool EnsureCoreIsAccurate()
 			=> true; // single-core build: no more-accurate alternative to offer
 
+		public void TAStudioHidden(bool hidden) => ShowTAStudioMenuItem.Visible = hidden;
+
+		private void ShowTAStudioMenuItem_Click(object sender, EventArgs e) => Tools.Load<TAStudio>();
+
 		private void CaptureRewind(bool suppressCaptureRewind)
 		{
 			if (ToolControllingRewind is { } tool)

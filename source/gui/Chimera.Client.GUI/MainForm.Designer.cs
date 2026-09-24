@@ -131,6 +131,7 @@ namespace Chimera.Client.GUI
 			this.toolStripSeparator22 = new Chimera.WinForms.Controls.ToolStripSeparatorEx();
 			this.GenericCoreSubMenu = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.HelpSubMenu = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
+			this.ShowTAStudioMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.OnlineHelpMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.AboutMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.MainStatusBar = new Chimera.WinForms.Controls.StatusStripEx();
@@ -189,7 +190,8 @@ namespace Chimera.Client.GUI
             this.ConfigSubMenu,
             this.ToolsSubMenu,
             this.GenericCoreSubMenu,
-            this.HelpSubMenu});
+            this.HelpSubMenu,
+            this.ShowTAStudioMenuItem});
 			this.MainformMenu.LayoutStyle = System.Windows.Forms.ToolStripLayoutStyle.Flow;
 			this.MainformMenu.MenuActivate += new System.EventHandler(this.MainformMenu_MenuActivate);
 			this.MainformMenu.MenuDeactivate += new System.EventHandler(this.MainformMenu_MenuDeactivate);
@@ -884,6 +886,14 @@ namespace Chimera.Client.GUI
             this.AboutMenuItem});
 			this.HelpSubMenu.Text = "&Help";
 			// 
+			// ShowTAStudioMenuItem
+			// 
+			// Only while TAStudio is hidden with its "<< Hide" button. The menu
+			// flows, so it cannot be pushed to the right edge; it comes last.
+			this.ShowTAStudioMenuItem.Text = "Show TAStudio >>";
+			this.ShowTAStudioMenuItem.Visible = false;
+			this.ShowTAStudioMenuItem.Click += new System.EventHandler(this.ShowTAStudioMenuItem_Click);
+			// 
 			// OnlineHelpMenuItem
 			// 
 			this.OnlineHelpMenuItem.Text = "Open toolAssisted.run in Browser";
@@ -1190,6 +1200,7 @@ namespace Chimera.Client.GUI
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx ConfigSubMenu;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx ToolsSubMenu;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx HelpSubMenu;
+		private Chimera.WinForms.Controls.ToolStripMenuItemEx ShowTAStudioMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx PauseMenuItem;
 		private Chimera.WinForms.Controls.ToolStripSeparatorEx toolStripSeparator1;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx RebootCoreMenuItem;

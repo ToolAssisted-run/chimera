@@ -77,6 +77,7 @@ namespace Chimera.Client.GUI
 			this.ColumnsSubMenu = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.toolStripSeparator19 = new Chimera.WinForms.Controls.ToolStripSeparatorEx();
 			this.WindowSubMenu = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
+			this.HideMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.TasStatusStrip = new Chimera.WinForms.Controls.StatusStripEx();
 			this.MessageStatusLabel = new System.Windows.Forms.ToolStripStatusLabel();
 			this.ProgressBar = new System.Windows.Forms.ToolStripProgressBar();
@@ -140,7 +141,8 @@ namespace Chimera.Client.GUI
             this.MetaSubMenu,
             this.SettingsSubMenu,
             this.ColumnsSubMenu,
-            this.WindowSubMenu});
+            this.WindowSubMenu,
+            this.HideMenuItem});
 			this.TASMenu.TabIndex = 0;
 			// 
 			// saveSelectionToMacroToolStripMenuItem
@@ -380,6 +382,12 @@ namespace Chimera.Client.GUI
 			this.WindowSubMenu.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.MoveWithMainWindowMenuItem});
 			this.WindowSubMenu.Text = "&Window";
+			// 
+			// HideMenuItem
+			// 
+			this.HideMenuItem.Alignment = System.Windows.Forms.ToolStripItemAlignment.Right;
+			this.HideMenuItem.Text = "<< Hide";
+			this.HideMenuItem.Click += new System.EventHandler(this.HideMenuItem_Click);
 			this.WindowSubMenu.DropDownOpened += new System.EventHandler(this.WindowSubMenu_DropDownOpened);
 			// 
 			// TasStatusStrip
@@ -743,6 +751,7 @@ namespace Chimera.Client.GUI
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx GoToFrameMenuItem;
 		private Chimera.WinForms.Controls.ToolStripSeparatorEx toolStripSeparator6;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx WindowSubMenu;
+		private Chimera.WinForms.Controls.ToolStripMenuItemEx HideMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx SettingsSubMenu;
 		private StatusStripEx TasStatusStrip;
 		private System.Windows.Forms.ToolStripStatusLabel MessageStatusLabel;

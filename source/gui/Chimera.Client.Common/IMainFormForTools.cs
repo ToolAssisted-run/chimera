@@ -38,6 +38,10 @@ namespace Chimera.Client.Common
 		/// <remarks>only referenced from TAStudio</remarks>
 		bool EnsureCoreIsAccurate();
 
+		/// <summary>TAStudio was hidden with its "&lt;&lt; Hide" button, or shown again: the main window offers it back while hidden.</summary>
+		/// <remarks>only referenced from TAStudio</remarks>
+		void TAStudioHidden(bool hidden);
+
 		/// <summary>
 		/// True while a shutdown NOBODY IS SITTING IN FRONT OF is under way - one
 		/// asked for through the API, which is what a Lua script's client.exit()
