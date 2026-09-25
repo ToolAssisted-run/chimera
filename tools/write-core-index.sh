@@ -100,7 +100,7 @@ Chimera reads it instead of asking GitHub's API, which allows an unauthenticated
 address only 60 requests an hour.
 
 Do not delete it - the address is what every Chimera installation asks." \
-		--prerelease
+		--prerelease --latest=false
 fi
 
 # --clobber replaces the asset in place, so the address does not change. There

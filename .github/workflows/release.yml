@@ -13,7 +13,8 @@ name: Release
 #   dev      a ROLLING prerelease, replaced on every green push to main. One
 #            link that is always the newest; the assets carry the short commit
 #            in their names, so a downloaded file still says what it is.
-#   nightly  an IMMUTABLE dated prerelease, once a day and only when main moved.
+#   nightly  an IMMUTABLE dated release, once a day and only when main moved;
+#            the newest is the one GitHub shows as Latest.
 #            The point is not freshness (dev has that) but PERMANENCE. A movie
 #            cites the build that recorded it, and someone replaying that run in
 #            five years needs THAT build - not a rebuild, because a package's
