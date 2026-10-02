@@ -18,6 +18,8 @@ namespace Chimera.Client.GUI
 {
 	public class ToolManager : IToolLoader
 	{
+		private static readonly Type[] TypesInAssembly = typeof(MainForm).Assembly.GetTypesWithoutLoadErrors().ToArray();
+
 		static ToolManager()
 		{
 			// APIs are used by tools, so this seems like a good place to add API types to the manager.
@@ -476,7 +478,7 @@ namespace Chimera.Client.GUI
 				string.IsNullOrWhiteSpace(name) ? toolType.Name : name);
 		}
 
-		public IEnumerable<Type> AvailableTools => ReflectionCache.Types
+		public IEnumerable<Type> AvailableTools => TypesInAssembly
 			.Where(t => !t.IsInterface && typeof(IToolForm).IsAssignableFrom(t) && IsAvailable(t));
 
 		/// <summary>
@@ -662,7 +664,7 @@ namespace Chimera.Client.GUI
 			}
 		}
 
-		private static readonly IReadOnlyCollection<string> PossibleToolTypeNames = ReflectionCache.Types
+		private static readonly IReadOnlyCollection<string> PossibleToolTypeNames = TypesInAssembly
 			.Select(static t => t.AssemblyQualifiedName).ToHashSet();
 
 		public bool IsAvailable(Type tool)

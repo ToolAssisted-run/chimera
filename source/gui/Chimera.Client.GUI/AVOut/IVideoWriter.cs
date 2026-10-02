@@ -135,7 +135,7 @@ namespace Chimera.Client.GUI
 
 		static VideoWriterInventory()
 		{
-			foreach (var t in ReflectionCache.Types)
+			foreach (var t in typeof(IVideoWriter).Assembly.GetTypesWithoutLoadErrors())
 			{
 				if (!t.IsInterface
 					&& typeof(IVideoWriter).IsAssignableFrom(t)
