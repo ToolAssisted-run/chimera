@@ -1455,6 +1455,20 @@ ce_session *ce_session_open(
 	s->vsyncNum = s->cfg.vsyncNum;
 	s->vsyncDen = s->cfg.vsyncDen;
 	s->readRate();
+	/* launch window: the first rendered frame may be many frames away (or
+	 * never, when paused on frame 0), and until copyVideo runs the display
+	 * shows the buffer capacity. Seed the live size from the guest now
+	 * (same clamp as copyVideo); a guest that has not rendered yet answers
+	 * <= 0 and keeps the capacity default. */
+	if (s->getVideoWidth != nullptr && s->getVideoHeight != nullptr)
+	{
+		int32_t w = s->getVideoWidth(), h = s->getVideoHeight();
+		if (w > 0 && h > 0)
+		{
+			s->vidW = w < s->cfg.width ? w : s->cfg.width;
+			s->vidH = h < s->cfg.height ? h : s->cfg.height;
+		}
+	}
 	if (!s->cfg.inputWasRead.empty())
 	{
 		s->inputWasRead = reinterpret_cast<int32_t (*)()>(s->proc(s->cfg.inputWasRead.c_str(), 0, true, err));
