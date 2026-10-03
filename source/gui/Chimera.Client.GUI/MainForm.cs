@@ -3551,6 +3551,17 @@ namespace Chimera.Client.GUI
 				return;
 			}
 
+			// The system ROM dir need not exist (not every system keeps
+			// its ROMs there), and the dialog helper throws in DEBUG
+			// builds for a missing initial dir - so fall back to the
+			// last opened location, then to the dialog default (empty
+			// is allowed).
+			var romDir = Config.PathEntries.RomAbsolutePath(Emulator.SystemId);
+			var lastDir = Config.PathEntries.LastRomPath;
+			var initDir = romDir.Length is not 0 && Directory.Exists(romDir) ? romDir
+				: lastDir.Length is not 0 && lastDir is not "." && Directory.Exists(lastDir) ? lastDir
+				: string.Empty;
+
 			try
 			{
 				var chunk = new byte[1 << 20]; // ranged reads: a big file streams
@@ -3563,7 +3574,7 @@ namespace Chimera.Client.GUI
 						: new FilesystemFilterSet(new FilesystemFilter($"{ext} files", new[] { ext }));
 					var result = this.ShowFileSaveDialog(
 						filter: filterSet,
-						initDir: Config.PathEntries.RomAbsolutePath(Emulator.SystemId),
+						initDir: initDir,
 						initFileName: name);
 					if (result is null) return;
 					using var fs = new FileStream(result, FileMode.Create, FileAccess.Write);
@@ -3573,7 +3584,7 @@ namespace Chimera.Client.GUI
 				{
 					var result = this.ShowFileSaveDialog(
 						filter: new(new FilesystemFilter("Zip Archives", new[] { "zip" })),
-						initDir: Config.PathEntries.RomAbsolutePath(Emulator.SystemId),
+						initDir: initDir,
 						initFileName: $"{Game.FilesystemSafeName()} (save data).zip");
 					if (result is null) return;
 					using var fs = new FileStream(result, FileMode.Create, FileAccess.Write);
