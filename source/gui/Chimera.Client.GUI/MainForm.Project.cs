@@ -1,8 +1,10 @@
 ﻿using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Windows.Forms;
 
+using Chimera.Common;
 using Chimera.Common.PathExtensions;
 using Chimera.Client.Common;
 using Chimera.Emulation.Common;
@@ -39,6 +41,74 @@ namespace Chimera.Client.GUI
 		/// </summary>
 		private bool _bootingProject;
 
+		/// <summary>True while <see cref="RebootProject"/> is replacing the machine under the open project.</summary>
+		private bool _rebootingProject;
+
+		public bool ProjectIsRebooting => _rebootingProject;
+
+		/// <summary>
+		/// Reboot Core inside a project (user-decided, 2026-10-06): the project
+		/// stays. The machine is destroyed and booted again from power-on, and the
+		/// SAME movie - inputs, markers, branches, undo history, unsaved edits - is
+		/// the one it runs, from frame 0.
+		///
+		/// It used to be a rom reload like any other, and the tool restart that ends
+		/// a rom load had TAStudio stop its movie and start a blank one: a reboot
+		/// asked to save the project and then replaced it with an empty
+		/// default.chimeraProject. The recovery session went on holding the movie
+		/// that had been replaced, whose machine was gone, so the next thing that
+		/// asked for the work to be kept called the engine with a session that no
+		/// longer existed and the process died (issue #196: Export Core Log offers
+		/// a reboot, and then any caught error did it).
+		///
+		/// What does not survive is the greenzone: the engine held it for the machine
+		/// that is gone, and the new machine starts with frame 0 alone. The saved
+		/// greenzone is not read back either - it belongs to the saved inputs, not
+		/// necessarily to these. Branch states are files beside the project and are
+		/// still there.
+		/// </summary>
+		private bool RebootProject(ITasMovie tasMovie)
+		{
+			// whatever the boot below does, the work as it stands now is kept
+			KeepWorkSafe();
+			var wasRecording = tasMovie.IsRecording();
+			var oldDefaultCores = new Dictionary<string, string>(Config.DefaultCores);
+			_rebootingProject = true;
+			// the tool restart inside the rom load must not start a movie of its own
+			_bootingProject = true;
+			try
+			{
+				// before the machine goes: nothing may ask the old one's history again
+				tasMovie.MachineIsGoing();
+				MovieSession.QueueNewMovie(
+					tasMovie,
+					systemId: tasMovie.SystemID,
+					loadedRomHash: tasMovie.Hash ?? "",
+					Config.PathEntries,
+					Config.DefaultCores);
+				if (!LoadRom(
+					CurrentlyOpenRomArgs.OpenAdvanced.SimplePath,
+					CurrentlyOpenRomArgs with { ForcedSysID = Emulator.SystemId }))
+				{
+					return false;
+				}
+				// never record mode: starting a recording clears the movie
+				MovieSession.RunQueuedMovie(recordMode: false, Emulator);
+				if (wasRecording) tasMovie.SwitchToRecord();
+			}
+			finally
+			{
+				_bootingProject = false;
+				_rebootingProject = false;
+				MovieSession.AbortQueuedMovie();
+				Config.DefaultCores = oldDefaultCores;
+			}
+
+			SetMainformMovieInfo();
+			if (Tools.IsLoaded<TAStudio>()) Tools.TAStudio.ProjectRebooted();
+			return true;
+		}
+
 		/// <summary>
 		/// A project and TAStudio are one thing: the window IS the session, so one is
 		/// open exactly when the other is. This is the single place that ends both,
@@ -60,6 +130,9 @@ namespace Chimera.Client.GUI
 				_recovery?.End(clean: true);
 				_recovery = null;
 				CrashCapture.DescribeSession("no project open");
+				// its firmware pins end with it: a game loaded next takes what the
+				// person points at, not a closed project's own files
+				CoreFirmwareStore.ProjectPins = null;
 			}
 			finally
 			{
@@ -142,10 +215,18 @@ namespace Chimera.Client.GUI
 			if (chosen is not null) LoadProject(chosen);
 		}
 
+		/// <param name="seed">the answers to open on instead of the last project's - what a movie made elsewhere dictates</param>
 		/// <returns>the created project, in memory and unwritten, or null when cancelled</returns>
-		private EngineProject RunNewProjectWizard(string startFrom = null)
+		private EngineProject RunNewProjectWizard(string startFrom = null, ProjectAnswers seed = null)
 		{
 			ScanForCorePackages();
+			// Where each of the wizard's pickers opens. Config > Paths is an
+			// answer the person has already given, so a picker that ignores it
+			// and reopens wherever the process last happened to be sends them
+			// browsing for a folder they have already named (chimera#114). A
+			// configured folder that does not exist is no use as a starting
+			// point, so in that case the dialog is left to its own default.
+			static string OpensIn(string configured) => PathEntryExtensions.FirstExistingDir(configured);
 			using NewProjectWizard wizard = new(
 				_discoveredCorePackages,
 				pickFiles: slot =>
@@ -154,6 +235,7 @@ namespace Chimera.Client.GUI
 					{
 						Multiselect = true,
 						Title = $"Add to {slot.Title}",
+						InitialDirectory = OpensIn(Config.PathEntries.RomAbsolutePath()),
 						Filter = ProjectSlotDeclaration.FilterFor(slot) is { } filter
 							? $"{slot.Title} ({filter})|{filter}|All files (*.*)|*.*"
 							: "All files (*.*)|*.*",
@@ -162,17 +244,26 @@ namespace Chimera.Client.GUI
 				},
 				pickFirmwareFile: title =>
 				{
-					using OpenFileDialog dialog = new() { Title = title };
+					using OpenFileDialog dialog = new()
+					{
+						Title = title,
+						InitialDirectory = OpensIn(Config.PathEntries.FirmwareAbsolutePath()),
+					};
 					return dialog.ShowDialog(this) is DialogResult.OK ? dialog.FileName.WithoutWslgMirror() : null;
 				},
 				firmwareSearchDirs: [ Config.PathEntries.FirmwareAbsolutePath() ],
-				pickFirmwareFolder: () =>
+				pickFirmwareFolder: (ref bool includeSubfolders) =>
 				{
 					using FolderBrowserEx picker = new()
 					{
 						Description = "Scan a folder for firmware files",
+						SelectedPath = OpensIn(Config.PathEntries.FirmwareAbsolutePath()),
+						CheckBoxLabel = FolderBrowserEx.ScanSubfoldersLabel,
+						CheckBoxChecked = includeSubfolders,
 					};
-					return picker.ShowDialog(this) is DialogResult.OK ? picker.SelectedPath.WithoutWslgMirror() : null;
+					if (picker.ShowDialog(this) is not DialogResult.OK) return null;
+					includeSubfolders = picker.CheckBoxChecked;
+					return picker.SelectedPath.WithoutWslgMirror();
 				},
 				rememberedFirmwarePaths: coreName => CoreFirmwareStore.RememberedPaths(Config, coreName),
 				rememberedFirmwarePath: (coreName, id) =>
@@ -196,22 +287,22 @@ namespace Chimera.Client.GUI
 				},
 				// a precompile session is this frontend again: it must read the
 				// same config, or it would look for its cache somewhere else
-				configPath: _getConfigPath());
+				configPath: _getConfigPath(),
+				kind: Config.NewProjectKind);
 			// The wizard opens on the last project's answers - the open one, or the
 			// last one there was. This is how a project is reconfigured: changing a
 			// sync setting changes the machine, so there is no editing one in place,
 			// and what made that unbearable was answering every question again to
 			// change one of them.
-			var answers = _openProject is not null ? ProjectAnswers.Of(_openProject) : _lastAnswers;
+			var answers = seed ?? (_openProject is not null ? ProjectAnswers.Of(_openProject) : _lastAnswers);
 
 			// A dropped file decides the core, so the last project's answers are
 			// only worth restoring when they were for the SAME core - otherwise
 			// they would put another machine's files and settings behind this one.
 			if (startFrom is not null)
 			{
-				var guess = wizard.GuessCoreIndexFor(startFrom);
-				var sameCore = guess >= 0 && answers is not null
-					&& string.Equals(_discoveredCorePackages[guess].Name, answers.CoreName, StringComparison.OrdinalIgnoreCase);
+				var sameCore = wizard.GuessCoreFor(startFrom) is { } guess && answers is not null
+					&& string.Equals(guess.Name, answers.CoreName, StringComparison.OrdinalIgnoreCase);
 				if (sameCore) wizard.SeedFrom(answers);
 				wizard.StartFrom(startFrom);
 			}
@@ -221,6 +312,8 @@ namespace Chimera.Client.GUI
 			}
 
 			if (wizard.ShowDialog(this) is not DialogResult.OK) return null;
+			// the next wizard opens on this kind of core, when it has no project's answers to open on
+			Config.NewProjectKind = wizard.Kind;
 
 			// remember where the firmware lives, keyed the way the resolver reads
 			// it back at load (Config.CoreFirmware) - and WRITE IT DOWN. Held in
@@ -260,7 +353,12 @@ namespace Chimera.Client.GUI
 		/// pin, boot the machine from the manifest's mounts, start the project
 		/// as the movie it IS, and land in TAStudio (docs/project.md).
 		/// </summary>
-		public bool LoadProject(string path)
+		/// <param name="firstBoot">
+		/// the file was just written from a wizard's project rather than saved from a
+		/// session (a movie import): what only a running machine knows is filled in on
+		/// this boot as for a new project, and written straight back
+		/// </param>
+		public bool LoadProject(string path, bool firstBoot = false)
 		{
 			EngineProject project;
 			ProjectLocalPaths local;
@@ -314,13 +412,17 @@ namespace Chimera.Client.GUI
 					using OpenFileDialog picker = new() { Title = title };
 					return picker.ShowDialog(this) is DialogResult.OK ? picker.FileName.WithoutWslgMirror() : null;
 				},
-				locateFolder: () =>
+				locateFolder: (ref bool includeSubfolders) =>
 				{
 					using FolderBrowserEx picker = new()
 					{
 						Description = "Scan a folder for the project's files",
+						CheckBoxLabel = FolderBrowserEx.ScanSubfoldersLabel,
+						CheckBoxChecked = includeSubfolders,
 					};
-					return picker.ShowDialog(this) is DialogResult.OK ? picker.SelectedPath.WithoutWslgMirror() : null;
+					if (picker.ShowDialog(this) is not DialogResult.OK) return null;
+					includeSubfolders = picker.CheckBoxChecked;
+					return picker.SelectedPath.WithoutWslgMirror();
 				});
 				if (dialog.ShowDialog(this) is not DialogResult.OK)
 				{
@@ -337,7 +439,7 @@ namespace Chimera.Client.GUI
 
 			// the firmware the project pins is looked for where this machine last
 			// had it, as well as in the Firmware folder
-			if (!BootProject(project, path, saved: true, local)) return false;
+			if (!BootProject(project, path, saved: true, local, firstBoot)) return false;
 			if (recovered && MovieSession.Movie is ITasMovie recoveredMovie) recoveredMovie.MarkRecovered();
 			return true;
 		}
@@ -578,11 +680,12 @@ namespace Chimera.Client.GUI
 		/// machine up EXACTLY ONCE with the project's own core and settings,
 		/// with the project queued as the movie it IS.
 		/// </summary>
-		private bool BootProject(EngineProject project, string path, bool saved, ProjectLocalPaths local = null)
+		private bool BootProject(EngineProject project, string path, bool saved, ProjectLocalPaths local = null, bool firstBoot = false)
 		{
 			local ??= new ProjectLocalPaths();
 			// where the LAST project's firmware was found is not this one's answer
 			ProjectLocalPaths.ForgetSessionFirmware();
+			CoreFirmwareStore.ProjectPins = null;
 			if (!EnsureProjectCore(project))
 			{
 				project.Dispose();
@@ -669,7 +772,7 @@ namespace Chimera.Client.GUI
 			PinIfSilent(tasMovie, HeaderKeys.CoreVersion, project.CoreVersion);
 			PinIfSilent(tasMovie, HeaderKeys.CorePackageSha1, project.CoreSha1);
 
-			var isFresh = tasMovie.InputLogLength is 0;
+			var isFresh = tasMovie.InputLogLength is 0 || firstBoot;
 
 			var oldDefaultCores = new Dictionary<string, string>(Config.DefaultCores);
 			_bootingProject = true;
@@ -713,6 +816,12 @@ namespace Chimera.Client.GUI
 				}
 				PopulateWithDefaultHeaderValues(tasMovie);
 				tasMovie.ClearChanges();
+				// a file that already exists gets them now, or it would never have them:
+				// they are filled on a fresh boot only, and the next one is not fresh
+				if (firstBoot && tasMovie.Save() is { IsError: true } unwritten)
+				{
+					ShowMessageBox(owner: null, unwritten.UserFriendlyErrorMessage(), "Cannot save the project");
+				}
 			}
 
 			// what this project was built from, for the next wizard to open on -
@@ -722,6 +831,7 @@ namespace Chimera.Client.GUI
 
 			SetMainformMovieInfo();
 			WarnOnMovieVsLoadedCore();
+			WarnOnFrontendVsCoreBuild();
 
 			// only a project that HAS a file can be recent, and only one that has a
 			// file has somewhere to keep the note of where its files were found
@@ -804,13 +914,20 @@ namespace Chimera.Client.GUI
 			if (pins.Count is 0) return true;
 
 			var coreName = project.CoreName;
+			// what the boot mounts: the pinned file, which for a game core may be
+			// the project's own and not the declared one (CoreFirmwareStore.GetPath)
+			CoreFirmwareStore.ProjectPins = (coreName, pins
+				.GroupBy(static pin => pin.Id, StringComparer.Ordinal)
+				.ToDictionary(static g => g.Key, static g => g.First().Sha1, StringComparer.Ordinal));
 			// the Firmware folder, every dump ever remembered for this core (Config >
-			// Firmware, earlier projects), and where this project's own sidecar
-			// last had them - all hashed, none believed on its name
+			// Firmware, earlier projects), where this project's own sidecar last had
+			// them, and what this run was told on the command line (--firmware, which
+			// goes ahead of anything remembered) - all hashed, none believed on its name
 			var index = FirmwareLocator.BuildIndex(
 				[ Config.PathEntries.FirmwareAbsolutePath() ],
 				CoreFirmwareStore.RememberedPaths(Config, coreName)
 					.Concat(pins.Select(pin => local.Firmware.TryGetValue(pin.Id, out var beside) ? beside : null))
+					.Concat(pins.Select(pin => CoreFirmwareStore.CommandLineFirmware.TryGetValue(pin.Id, out var named) ? named : null))
 					.Where(static path => path is not null)!);
 
 			List<string> unsatisfied = new();
@@ -905,6 +1022,36 @@ namespace Chimera.Client.GUI
 						+ "\n\nRun on the installed build anyway? The project will record what actually ran.");
 			}
 			return true;
+		}
+
+		/// <summary>
+		/// Issue #115, the first of three: this Chimera and the core package it just
+		/// booted, held against each other by the dates they were built on. It is a
+		/// heuristic and it says so - a pairing that works must keep working, so this
+		/// never refuses anything and never asks a question. The exact answer is the
+		/// savestate format number, which the engine checks state by state.
+		///
+		/// The engine owns the threshold and the sentence; this side finds the two
+		/// dates and shows what comes back. Either side may not date itself - a package
+		/// built before "versionDate" existed, or a Chimera built outside a git
+		/// checkout - and then nothing is said at all, because half a comparison is
+		/// worse than none.
+		/// </summary>
+		private void WarnOnFrontendVsCoreBuild()
+		{
+			var running = CoreRegistry.Instance.PackageSha1Of(Emulator);
+			if (string.IsNullOrWhiteSpace(running)) return;
+			var package = _discoveredCorePackages.FirstOrDefault(
+				pkg => running.Equals(pkg.Sha1, StringComparison.OrdinalIgnoreCase));
+			if (package is null || CoreVersionDates.Of(package) is not { } built) return;
+
+			var message = ChimeraEngine.VersionSkew(
+				VersionInfo.GIT_SHORTDATE,
+				VersionInfo.GetEmuVersion(),
+				built.ToUniversalTime().ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+				package.ShortVersion,
+				package.Name);
+			if (message is not null) AddOnScreenMessage(message, 15);
 		}
 
 		/// <summary>When a package landed on this machine: "newest installed" is the newest file, not the newest version string.</summary>

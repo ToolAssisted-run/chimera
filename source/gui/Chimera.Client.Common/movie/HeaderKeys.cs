@@ -23,7 +23,6 @@ namespace Chimera.Client.Common
 		public const string BoardName = "BoardName";
 		public const string CycleCount = "CycleCount";
 		public const string ClockRate = "ClockRate";
-		public const string VsyncAttoseconds = "VsyncAttoseconds"; // used for Arcade due to it representing thousands of different systems with different vsync rates
 
 		// The rate the machine actually ran at, as the core reports it. Chimera
 		// keeps no per-system rate table - the exact rate is the core's, and a
@@ -38,6 +37,16 @@ namespace Chimera.Client.Common
 		// wants where the run's input stops should not have to know what a
 		// neutral entry looks like for this core's controller.
 		public const string LastInputFrame = "LastInputFrame";
+
+		// A game core's own timer (its property table's "gameTimer"; docs/game-cores.md)
+		// at the end of the movie: the milliseconds the game counted, the same as a timer
+		// shows them (mm:ss.mmm), and the frame they were read at - the movie's length,
+		// the machine as it stands after the last frame. Written only when the machine
+		// has run to that frame since anything before it was edited, and removed when
+		// it has not, so a value that is there is the movie's.
+		public const string GameTimeMs = "GameTimeMs";
+		public const string GameTime = "GameTime";
+		public const string GameTimeFrame = "GameTimeFrame";
 
 		// A GPU outside the sandbox drew this run's pictures - much faster than
 		// the software rasteriser and NOT deterministic: the GPU is outside the
@@ -58,6 +67,16 @@ namespace Chimera.Client.Common
 		public const string Firmware = "Firmware"; // "<id>=<sha1>" per file the core was given; a BIOS changes what runs
 		public const string CoreVersion = "CoreVersion"; // the core's authoritative version: the commit its published build was made from
 		public const string CorePackageSha1 = "CorePackageSHA1"; // SHA1 of the package file; the same version can be built twice, this says which build
+
+		/// <summary>
+		/// The savestate format the states this project cached were written in, and the
+		/// build that wrote them (issue #115). The engine owns the number
+		/// (<see cref="Chimera.Emulation.Common.Engine.ChimeraEngine.StateFormat"/>) and
+		/// refuses a state of another one file by file; these are here so that a whole
+		/// cache can be explained at open, before any single state is asked for.
+		/// </summary>
+		public const string StateFormat = "StateFormat";
+		public const string StateWrittenBy = "StateWrittenBy";
 
 		private static FrozenSet<string> field;
 

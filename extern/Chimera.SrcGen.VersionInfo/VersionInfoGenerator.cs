@@ -50,6 +50,10 @@ public class VersionInfoGenerator : IIncrementalGenerator
 		var branch = ExecuteGitWithArguments($"-C {projectDir} rev-parse --abbrev-ref HEAD") ?? "master";
 		var hash = ExecuteGitWithArguments($"-C {projectDir} log -1 --format=\"%H\"") ?? "0000000000000000000000000000000000000000";
 		var commitDate = ExecuteGitWithArguments($"-C {projectDir} log -1 --format=\"%cs\"") ?? "unknown";
+		// the commit's own time, in UTC whatever zone it was made or built in
+		var commitTime = long.TryParse(ExecuteGitWithArguments($"-C {projectDir} log -1 --format=\"%ct\""), out var seconds)
+			? System.DateTimeOffset.FromUnixTimeSeconds(seconds).ToString("yyyy-MM-dd HH:mm", System.Globalization.CultureInfo.InvariantCulture)
+			: commitDate;
 
 		// Generated source code
 		string source = $@"namespace Chimera.Common
@@ -61,6 +65,7 @@ public class VersionInfoGenerator : IIncrementalGenerator
 		public const string GIT_HASH = ""{hash}"";
 		public const string GIT_SHORTHASH = ""{hash.Substring(startIndex: 0, length: 9)}"";
 		public const string GIT_SHORTDATE = ""{commitDate}"";
+		public const string GIT_COMMITTIME = ""{commitTime}"";
 	}}
 }}
 ";

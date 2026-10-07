@@ -147,7 +147,7 @@ namespace Chimera.Client.Common
 		/// discovery. Throws with a user-showable message on any problem.
 		/// </summary>
 		/// <returns>the package's manifest, the SHA1 of its file (null for directory-form packages), and the factories it registered</returns>
-		public (CorePackageManifest Manifest, string/*?*/ PackageSha1, IReadOnlyList<ICoreFactory> Factories) LoadCorePackage(string path)
+		public (CorePackageManifest Manifest, string? PackageSha1, IReadOnlyList<ICoreFactory> Factories) LoadCorePackage(string path)
 		{
 			var (manifest, factories, packageDir, packageSha1) = CorePackageLoader.LoadPackage(path);
 			foreach (var factory in factories)

@@ -38,6 +38,29 @@ namespace Chimera.Client.Common
 		public IReadOnlyList<string> Systems { get; init; } = [ ];
 
 		/// <summary>
+		/// What the package calls its systems, by id. A package says this for
+		/// itself (waterbox.config's systemNames): the frontend has no table of
+		/// machines, so an id the package did not name is shown as it is.
+		/// </summary>
+		public IReadOnlyDictionary<string, string> SystemNames { get; init; } = new Dictionary<string, string>();
+
+		/// <summary>The package's word for one of its systems, or the id.</summary>
+		public string SystemNameOf(string systemId)
+			=> SystemNames.TryGetValue(systemId, out var name) && !string.IsNullOrWhiteSpace(name) ? name : systemId;
+
+		/// <summary>Every system the package emulates, spelled out, in order.</summary>
+		public string SystemsSpelled => string.Join(", ", Systems.Select(SystemNameOf));
+
+		/// <summary>What the package says its media needs, for the media maker.</summary>
+		public IReadOnlyList<WaterboxConfig.MediaRecipeDecl> Media { get; init; } = [ ];
+
+		/// <summary>
+		/// True for a game core (docs/game-cores.md): one game played from its own files,
+		/// listed apart from the emulators wherever cores are listed.
+		/// </summary>
+		public bool IsGameCore { get; init; }
+
+		/// <summary>
 		/// What the package says its version is: for one published by the automated
 		/// build, the commit it was made from. A package built by hand says so ("+local"),
 		/// and one that says nothing is empty.
@@ -75,7 +98,7 @@ namespace Chimera.Client.Common
 
 		/// <summary>
 		/// When this version was made, as the package itself says (see
-		/// <see cref="Chimera.Emulation.Common.WaterboxConfig.VersionDate"/>). Null for a package
+		/// <see cref="Chimera.Emulation.Common.Waterbox.WaterboxConfig.VersionDate"/>). Null for a package
 		/// from before packages said; <see cref="CoreVersionDates.Of"/> then asks what the core
 		/// manager last heard.
 		/// </summary>
@@ -84,7 +107,9 @@ namespace Chimera.Client.Common
 		/// <summary>
 		/// How a version is written wherever one is listed (issue #67): the date first, because
 		/// that is what says which of two is newer, then the commit that says which it IS -
-		/// <c>2026-09-17  (4ed35321)</c>. Just the commit when no date is known.
+		/// <c>2026-09-17 08:30  (4ed35321)</c>. The time is there because a core often has
+		/// several versions in one day, and the day alone left them looking alike (the order
+		/// was always by the full timestamp). Just the commit when no date is known.
 		/// </summary>
 		public string DatedVersion
 		{
@@ -92,7 +117,7 @@ namespace Chimera.Client.Common
 			{
 				var date = CoreVersionDates.Of(this);
 				if (date is null) return ShortVersion;
-				var day = date.Value.ToLocalTime().ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+				var day = CoreVersionDates.Format(date.Value);
 				return ShortVersion.Length is 0 ? day : $"{day}  ({ShortVersion})";
 			}
 		}
@@ -316,10 +341,13 @@ namespace Chimera.Client.Common
 			{
 				Path = path,
 				Sha1 = sha1,
-				Name = string.IsNullOrWhiteSpace(cfg.CoreName) ? fallbackName : cfg.CoreName,
+				Name = cfg.CoreName is { } named && !string.IsNullOrWhiteSpace(named) ? named : fallbackName,
 				Version = cfg.Version ?? "",
 				VersionDate = CoreVersionDates.Parse(cfg.VersionDate),
 				Systems = systems,
+				SystemNames = systems.ToDictionary(static id => id, cfg.SystemNameOf),
+				Media = cfg.Media,
+				IsGameCore = cfg.IsGameCore,
 				Extensions = NormaliseExtensions(cfg.AllExtensions),
 				Abi = cfg.Abi,
 				IsAbiIncompatible = refusal is not null,

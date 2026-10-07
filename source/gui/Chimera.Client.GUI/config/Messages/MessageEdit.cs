@@ -161,7 +161,7 @@ namespace Chimera.Client.GUI
 					break;
 			}
 
-			var p = Pens.Black;
+			using Pen p = new(ThemeEngine.Color(ThemeColorRole.WindowText));
 			e.Graphics.DrawLine(p, new Point(x, y), new Point(x + 8, y + 8));
 			e.Graphics.DrawLine(p, new Point(x + 8, y), new Point(x, y + 8));
 			e.Graphics.DrawRectangle(p, new Rectangle(x, y, 8, 8));

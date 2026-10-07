@@ -67,8 +67,12 @@ namespace Chimera.Tests.Client.Common.CorePackages
 			var releases = CoreReleases.Parse(json, "gpgx");
 			// dev is newer, and is still not the default: it is replaced on every push,
 			// so a movie recorded against it can stop being fetchable
-			Assert.AreEqual("bbbbbbbbbbbb", CoreReleases.Newest(releases).Version);
-			Assert.AreEqual("cccccccccccc", CoreReleases.Newest(releases, CoreChannel.Dev).Version);
+			var stable = CoreReleases.Newest(releases);
+			Assert.IsNotNull(stable, "no stable release was found at all");
+			Assert.AreEqual("bbbbbbbbbbbb", stable.Version);
+			var dev = CoreReleases.Newest(releases, CoreChannel.Dev);
+			Assert.IsNotNull(dev, "no dev release was found at all");
+			Assert.AreEqual("cccccccccccc", dev.Version);
 		}
 
 		[TestMethod]

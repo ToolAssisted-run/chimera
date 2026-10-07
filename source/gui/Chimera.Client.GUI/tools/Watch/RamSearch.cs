@@ -86,6 +86,7 @@ namespace Chimera.Client.GUI
 			RedoToolBarItem.Image = Resources.Redo;
 			RebootToolbarButton.Image = Resources.Reboot;
 			ErrorIconButton.Image = Resources.ExclamationRed;
+			ErrorIconButton.SetItemBackRole(ThemeColorRole.AccentWarningBackground);
 			SearchButton.Image = Resources.Search;
 
 			WatchListView.QueryItemText += ListView_QueryItemText;
@@ -107,6 +108,10 @@ namespace Chimera.Client.GUI
 
 		[OptionalService]
 		public IInputPollable InputPollableCore { get; set; }
+
+		/// <summary>A game core's properties (docs/game-cores.md): an address that starts one is shown by its name.</summary>
+		[OptionalService]
+		public IGameProperties GameProperties { get; set; }
 
 		[ConfigPersist]
 		public RamSearchSettings Settings { get; set; }
@@ -200,24 +205,24 @@ namespace Chimera.Client.GUI
 		{
 			if ((_searches.Count > 0) && (index < _searches.Count))
 			{
-				var nextColor = Color.White;
+				var nextColor = ThemeEngine.Color(ThemeColorRole.RowDefault);
 				var search = _searches[index];
 				var isCheat = MainForm.CheatList.IsActive(_settings.Domain, search.Address);
 				var isWeeded = Settings.PreviewMode && !_forcePreviewClear && _searches.Preview(index);
 
 				if (!search.IsValid)
 				{
-					nextColor = Color.PeachPuff;
+					nextColor = ThemeEngine.Color(ThemeColorRole.RowInvalid);
 				}
 				else if (isCheat)
 				{
-					nextColor = isWeeded ? Color.Lavender : Color.LightCyan;
+					nextColor = ThemeEngine.Color(isWeeded ? ThemeColorRole.RowExcludedActive : ThemeColorRole.RowActive);
 				}
 				else
 				{
 					if (isWeeded)
 					{
-						nextColor = Color.Pink;
+						nextColor = ThemeEngine.Color(ThemeColorRole.RowExcluded);
 					}
 				}
 
@@ -237,7 +242,7 @@ namespace Chimera.Client.GUI
 			var columnName = column.Name;
 			text = columnName switch
 			{
-				WatchList.Address => _searches[index].AddressString,
+				WatchList.Address => AddressText(_searches[index]),
 				WatchList.Value => _searches[index].ValueString,
 				WatchList.Prev => _searches[index].PreviousStr,
 				WatchList.ChangesCol => _searches[index].ChangeCount.ToString(),
@@ -245,6 +250,12 @@ namespace Chimera.Client.GUI
 				_ => text,
 			};
 		}
+
+		/// <summary>An address as listed: followed by the name of the game property it starts, if it starts one.</summary>
+		private string AddressText(Watch watch)
+			=> GamePropertyWatches.StartingAt(GameProperties, watch.Domain, watch.Address) is { } element
+				? $"{watch.AddressString} {element.Name}"
+				: watch.AddressString;
 
 		private void LoadConfigSettings()
 		{
@@ -596,7 +607,9 @@ namespace Chimera.Client.GUI
 
 		private IEnumerable<int> SelectedIndices => WatchListView.SelectedRows;
 
-		private IEnumerable<Watch> SelectedItems => SelectedIndices.Select(index => _searches[index]);
+		// named after the game property each starts, so a watch or a freeze made from
+		// one carries the name
+		private IEnumerable<Watch> SelectedItems => SelectedIndices.Select(index => GamePropertyWatches.Named(_searches[index], GameProperties));
 
 		private IEnumerable<Watch> SelectedWatches => SelectedItems.Where(x => !x.IsSeparator);
 

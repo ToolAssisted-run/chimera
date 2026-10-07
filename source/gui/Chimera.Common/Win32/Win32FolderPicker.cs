@@ -16,7 +16,11 @@ namespace Chimera.Common
 	{
 		private static readonly Guid CLSID_FileOpenDialog = new("DC1C5A9C-E88A-4dde-A5A1-60F82A20AEF7");
 		private static readonly Guid IID_IFileOpenDialog = new("d57c7288-d4ad-4768-be02-9d969532d960");
+		private static readonly Guid IID_IFileDialogCustomize = new("e6fdd21a-163f-4975-9c8c-a69f1ba37034");
 		private static readonly Guid IID_IShellItem = new("43826d1e-e718-42ee-bc55-a1e261c37bfe");
+
+		/// <remarks>the id of our one added control; any non-zero number the dialog does not use itself will do</remarks>
+		private const uint CHECK_BUTTON_ID = 0x1000;
 
 		private const uint FOS_NOCHANGEDIR = 0x8;
 		private const uint FOS_PICKFOLDERS = 0x20;
@@ -52,7 +56,7 @@ namespace Chimera.Common
 			public struct Vtbl
 			{
 				// IUnknown
-				public IntPtr QueryInterface;
+				public delegate* unmanaged[Stdcall]<IFileOpenDialog*, Guid*, out IntPtr, int> QueryInterface;
 				public delegate* unmanaged[Stdcall]<IFileOpenDialog*, uint> AddRef;
 				public delegate* unmanaged[Stdcall]<IFileOpenDialog*, uint> Release;
 				// IModalWindow
@@ -81,6 +85,71 @@ namespace Chimera.Common
 			public Vtbl* lpVtbl;
 		}
 
+		/// <summary>
+		/// The same dialog object asked for its customisation face. QueryInterface on the IFileOpenDialog
+		/// returns it; the controls added through it are laid out by the dialog itself, along the bottom.
+		/// </summary>
+		[StructLayout(LayoutKind.Sequential)]
+		private struct IFileDialogCustomize
+		{
+			[StructLayout(LayoutKind.Sequential)]
+			public struct Vtbl
+			{
+				// IUnknown
+				public IntPtr QueryInterface;
+				public IntPtr AddRef;
+				public delegate* unmanaged[Stdcall]<IFileDialogCustomize*, uint> Release;
+				// IFileDialogCustomize, in declaration order; only the two that are called have a typed slot
+				public IntPtr EnableOpenDropDown;
+				public IntPtr AddMenu;
+				public IntPtr AddPushButton;
+				public IntPtr AddComboBox;
+				public IntPtr AddRadioButtonList;
+				public delegate* unmanaged[Stdcall]<IFileDialogCustomize*, uint, char*, int, int> AddCheckButton;
+				public IntPtr AddEditBox;
+				public IntPtr AddSeparator;
+				public IntPtr AddText;
+				public IntPtr SetControlLabel;
+				public IntPtr GetControlState;
+				public IntPtr SetControlState;
+				public IntPtr GetEditBoxText;
+				public IntPtr SetEditBoxText;
+				public delegate* unmanaged[Stdcall]<IFileDialogCustomize*, uint, out int, int> GetCheckButtonState;
+				// SetCheckButtonState ... SetControlItemText follow, and are never called
+			}
+
+			public Vtbl* lpVtbl;
+		}
+
+		/// <summary>
+		/// A tick box for the dialog to carry, for a choice that belongs to the act of choosing a folder
+		/// rather than to whichever window happens to have the button. <see cref="Checked"/> goes IN as the
+		/// state to open on and comes back OUT as what the person left it at.
+		/// </summary>
+		/// <remarks>
+		/// <see cref="Checked"/> is left exactly as the caller set it in every case but one: the person
+		/// ticked or unticked the box and then confirmed. A cancelled dialog does not change it, and
+		/// neither does a Windows that could not be asked for the control - which <see cref="Shown"/>
+		/// reports, so a caller can put the choice somewhere else instead.
+		/// </remarks>
+		public sealed class CheckButton
+		{
+			public CheckButton(string label, bool isChecked)
+			{
+				Label = label;
+				Checked = isChecked;
+			}
+
+			/// <summary>what is written beside the box</summary>
+			public string Label { get; }
+
+			/// <summary>in: the state to open on. out: the state it was confirmed in.</summary>
+			public bool Checked { get; set; }
+
+			/// <summary>whether the dialog that came up actually carried the box. False means nobody was asked.</summary>
+			public bool Shown { get; internal set; }
+		}
+
 		/// <summary>What <see cref="Show"/> came to.</summary>
 		public enum Outcome
 		{
@@ -95,9 +164,14 @@ namespace Chimera.Common
 		/// <paramref name="initialFolder"/> when that exists. Must be called on an STA thread, as every WinForms
 		/// dialog is.
 		/// </summary>
-		public static Outcome Show(IntPtr owner, string? title, string? initialFolder, out string? path)
+		/// <param name="checkButton">
+		/// a tick box for the dialog to carry, read back when the person confirms; null (the default, and what
+		/// every caller passed before this existed) is the dialog exactly as it was, with no added control.
+		/// </param>
+		public static Outcome Show(IntPtr owner, string? title, string? initialFolder, out string? path, CheckButton? checkButton = null)
 		{
 			path = null;
+			if (checkButton is not null) checkButton.Shown = false;
 			if (OSTailoredCode.IsUnixHost) return Outcome.Unavailable;
 			int hr;
 			IntPtr pdlg;
@@ -112,6 +186,7 @@ namespace Chimera.Common
 			if (hr < 0 || pdlg == IntPtr.Zero) return Outcome.Unavailable;
 
 			var dlg = (IFileOpenDialog*)pdlg;
+			IFileDialogCustomize* custom = null;
 			try
 			{
 				if (dlg->lpVtbl->GetOptions(dlg, out var options) < 0
@@ -131,10 +206,35 @@ namespace Chimera.Common
 					_ = dlg->lpVtbl->SetFolder(dlg, folder);
 					folder->lpVtbl->Release(folder);
 				}
+				// The control has to be added before the dialog is shown, and the same object answers
+				// for it: IFileDialogCustomize is another face of this dialog, not another dialog.
+				if (checkButton is not null)
+				{
+					var iid = IID_IFileDialogCustomize;
+					if (dlg->lpVtbl->QueryInterface(dlg, &iid, out var pcustom) >= 0 && pcustom != IntPtr.Zero)
+					{
+						custom = (IFileDialogCustomize*)pcustom;
+						fixed (char* label = checkButton.Label)
+						{
+							checkButton.Shown = custom->lpVtbl->AddCheckButton(custom, CHECK_BUTTON_ID, label, checkButton.Checked ? 1 : 0) >= 0;
+						}
+						if (!checkButton.Shown)
+						{
+							custom->lpVtbl->Release(custom);
+							custom = null;
+						}
+					}
+				}
 
 				hr = dlg->lpVtbl->Show(dlg, owner);
 				if (hr == HR_CANCELLED) return Outcome.Cancelled;
 				if (hr < 0) return Outcome.Unavailable;
+				// Read only on the path where the person confirmed: a cancelled dialog must leave the
+				// caller's value exactly as it was, and the returns below are all cancellations.
+				if (custom is not null && custom->lpVtbl->GetCheckButtonState(custom, CHECK_BUTTON_ID, out var state) >= 0)
+				{
+					checkButton!.Checked = state is not 0;
+				}
 
 				if (dlg->lpVtbl->GetResult(dlg, out var item) < 0 || item == null) return Outcome.Cancelled;
 				try
@@ -160,6 +260,7 @@ namespace Chimera.Common
 			}
 			finally
 			{
+				if (custom is not null) custom->lpVtbl->Release(custom);
 				dlg->lpVtbl->Release(dlg);
 			}
 		}

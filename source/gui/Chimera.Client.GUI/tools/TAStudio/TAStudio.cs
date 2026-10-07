@@ -69,7 +69,32 @@ namespace Chimera.Client.GUI
 		[ConfigPersist]
 		public TAStudioSettings Settings { get; set; } = new TAStudioSettings();
 
-		public TAStudioPalette Palette => Settings.Palette;
+		/// <summary>
+		/// The row colours in use. They come from the theme unless somebody set
+		/// their own (TAStudio &gt; Settings &gt; Colors); a config written before
+		/// there were themes holds the light palette as a value, and that value is
+		/// read as "nobody set anything", so an old config follows the theme too.
+		/// Cached because it is asked for once per painted cell.
+		/// </summary>
+		public TAStudioPalette Palette => _palette;
+
+		private TAStudioPalette _palette = TAStudioPalette.FromTheme(ThemeLibrary.Current);
+
+		private void RefreshPalette()
+			=> _palette = Settings.Palette is { } chosen && !chosen.Equals(TAStudioPalette.Default)
+				? chosen
+				: TAStudioPalette.FromTheme(ThemeLibrary.Current);
+
+		/// <inheritdoc/>
+		protected override void ApplyTheme(Theme theme)
+		{
+			base.ApplyTheme(theme);
+			RefreshPalette();
+			// the playback arrows and the marker and anchor pins are bitmaps drawn
+			// once, so a change of theme has to draw them again
+			if (_inputRolls.Count is not 0) GenerateIcons();
+			foreach (var roll in _inputRolls) roll.Invalidate();
+		}
 
 		/// <summary>
 		/// This is meant to be used by Lua.
@@ -115,7 +140,6 @@ namespace Chimera.Client.GUI
 				DenoteMarkersWithIcons = false;
 				DenoteMarkersWithBGColor = true;
 
-				Palette = TAStudioPalette.Default;
 				MoveWithMainWindow = true;
 			}
 
@@ -160,7 +184,13 @@ namespace Chimera.Client.GUI
 			public bool BindMarkersToInput { get; set; }
 			public bool CopyIncludesFrameNo { get; set; }
 			public bool AutoadjustInput { get; set; } // Currently unsupported due to being broken
-			public TAStudioPalette Palette { get; set; }
+			/// <summary>
+			/// Row colours somebody chose for themselves, or null to follow the
+			/// theme. Nullable since themes arrived; a config from before holds the
+			/// light palette here, which <see cref="TAStudio.RefreshPalette"/> reads
+			/// as "follow the theme" so that an old config is not stuck light.
+			/// </summary>
+			public TAStudioPalette? Palette { get; set; }
 			public int MaxUndoSteps { get; set; } = 1000;
 
 			/// <summary>
@@ -172,6 +202,9 @@ namespace Chimera.Client.GUI
 			public bool MoveWithMainWindow { get; set; }
 			public int RewindStep { get; set; } = 1;
 			public int RewindStepFast { get; set; } = 4;
+
+			/// <summary>The greenzone box's "Every N frames" number, kept between sessions (user request, 2026-09-24).</summary>
+			public int GreenzonePeriod { get; set; } = 2;
 			public bool ScrollSync { get; set; } = true;
 			public bool StatesForMarkers { get; set; } = true;
 			public PatternPaintModeEnum PatternPaintMode { get; set; } = TAStudioSettings.PatternPaintModeEnum.Never;
@@ -191,6 +224,14 @@ namespace Chimera.Client.GUI
 
 			public AutoPatternBool[] BoolPatterns { get; set; }
 			public AutoPatternAxis[] AxisPatterns { get; set; }
+
+			/// <summary>
+			/// The Greenzone box's choice for this project: 1 every frame, N one in N,
+			/// 0 off. Saved in the project so reopening it finds the choice it was left
+			/// with (issue #158, user-decided 2026-09-28: in the .chimeraProject). A
+			/// project saved before this reads as 1, which is what it always opened on.
+			/// </summary>
+			public int GreenzonePeriod { get; set; } = 1;
 		}
 
 		public class AllSettings
@@ -239,6 +280,7 @@ namespace Chimera.Client.GUI
 			WantsToControlStopMovie = true;
 			WantsToControlRestartMovie = true;
 			TasPlaybackBox.Tastudio = this;
+			TasGreenzoneBox.Tastudio = this;
 			MarkerControl.Tastudio = this;
 			BookMarkControl.Tastudio = this;
 		}
@@ -303,6 +345,38 @@ namespace Chimera.Client.GUI
 				main.Move -= FollowFromMainWindow;
 				main.SizeChanged -= FollowMainWindowResize;
 			};
+		}
+
+		/// <summary>
+		/// Hidden with "&lt;&lt; Hide" (user request, 2026-09-24): the window goes, taskbar
+		/// entry and all, and everything else goes on as before - a tool is active while its
+		/// window exists, not while it is shown. The main window offers "Show TAStudio &gt;&gt;"
+		/// meanwhile, which brings it back through the same path that opens it.
+		/// </summary>
+		private bool _hiddenByUser;
+
+		private void HideMenuItem_Click(object sender, EventArgs e)
+		{
+			_hiddenByUser = true;
+			Hide();
+			MainForm.TAStudioHidden(true);
+			MainWindow?.Activate();   // the keys go on reaching the hotkeys
+		}
+
+		protected override void OnVisibleChanged(EventArgs e)
+		{
+			base.OnVisibleChanged(e);
+			if (!Visible || !_hiddenByUser) return;
+			_hiddenByUser = false;
+			MainForm.TAStudioHidden(false);
+		}
+
+		protected override void OnFormClosed(FormClosedEventArgs e)
+		{
+			base.OnFormClosed(e);
+			if (!_hiddenByUser) return;
+			_hiddenByUser = false;
+			MainForm.TAStudioHidden(false);
 		}
 
 		/// <summary>the main window's right edge when we last looked, to tell whether we were docked to it</summary>
@@ -442,6 +516,7 @@ namespace Chimera.Client.GUI
 			PasteInsertMenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["Paste Insert"];
 
 			TasPlaybackBox.UpdateHotkeyTooltips(Config);
+			TasGreenzoneBox.UpdateHotkeyTooltips(Config);
 			BookMarkControl.UpdateHotkeyTooltips(Config);
 			MarkerControl.UpdateHotkeyTooltips(Config);
 		}
@@ -838,6 +913,7 @@ namespace Chimera.Client.GUI
 			movie.ClientSettingsForSave = () =>
 			{
 				_movieSettings.Columns = _inputRolls.Select(static r => r.AllColumns).ToArray();
+				_movieSettings.GreenzonePeriod = movie.GreenzonePeriod;
 				return ConfigService.SaveWithType(_movieSettings);
 			};
 			movie.BindMarkersToInput = Settings.BindMarkersToInput;
@@ -892,6 +968,7 @@ namespace Chimera.Client.GUI
 					else if (settings is MovieClientSettings clientSettings)
 					{
 						_movieSettings = clientSettings;
+						CurrentTasMovie.GreenzonePeriod = Math.Max(0, _movieSettings.GreenzonePeriod);
 						if (_movieSettings.Columns.Length == 0)
 						{
 							// This will happen if the movie was a build between 2.11 and 2.11.1
@@ -988,6 +1065,32 @@ namespace Chimera.Client.GUI
 			{
 				WasRecording = TasPlaybackBox.RecordingMode;
 			}
+		}
+
+		/// <summary>
+		/// The machine under the project was rebooted (Reboot Core): the same movie
+		/// is now running on a freshly booted machine, at power-on. Nothing of the
+		/// project changed, so nothing is reloaded - the roll, its columns, the
+		/// selection, the markers and the branches are where they were. What has
+		/// changed is where the machine is and what it remembers: any seek is over,
+		/// the machine is paused where it booted, and the greenzone shows what the
+		/// new machine holds.
+		/// </summary>
+		public void ProjectRebooted()
+		{
+			if (!IsActive || CurrentTasMovie is null) return;
+
+			MainForm.PauseOnFrame = null;
+			MainForm.PauseEmulator();
+			RestorePositionFrame = -1;
+			_lastRecordAction = -1;
+			_doPause = false;
+			StopSeeking();
+			MovieSession.ReadOnly = true;
+			_engaged = true;
+			SetVisibleFrame(Emulator.Frame);
+			RefreshDialog();
+			MainForm.AddOnScreenMessage("Core rebooted: the project is at power-on");
 		}
 
 		private void TastudioStopMovie()
@@ -1105,6 +1208,7 @@ namespace Chimera.Client.GUI
 				if (!saveResult.IsError)
 				{
 					MessageStatusLabel.Text = "File saved.";
+					MainForm.ProjectSavedAs(CurrentTasMovie.Filename);
 					ScheduleAutoSave(Settings.AutosaveInterval);
 				}
 				else
@@ -1144,6 +1248,7 @@ namespace Chimera.Client.GUI
 			}
 
 			MarkerControl?.UpdateValues();
+			TasGreenzoneBox?.ShowMovie();
 
 			if (refreshBranches)
 			{
@@ -1188,7 +1293,10 @@ namespace Chimera.Client.GUI
 		/// </summary>
 		public void LoadBranchState(TasBranch branch, int branchIndex)
 		{
-			StatableEmulator.LoadStateFromFile(CurrentTasMovie.BranchStatePath(branch.StateFile));
+			using (ProgressDialog.Begin(this, "Loading the branch", showAfterMs: 400))
+			{
+				StatableEmulator.LoadStateFromFile(CurrentTasMovie.BranchStatePath(branch.StateFile));
+			}
 			AfterStateLoaded(branch.Frame, branchIndex);
 		}
 
@@ -1492,7 +1600,7 @@ namespace Chimera.Client.GUI
 				{
 					if (axisSpec.HasValue)
 					{
-						string mnemonic = MnemonicLookup.LookupAxis(name, MovieSession.Movie.SystemID);
+						string mnemonic = MovieSession.MovieController.Definition.AxisHeaderFor(name);
 						yield return (name, mnemonic, axisSpec.Value.MaxCharacters);
 					}
 					else
@@ -1568,16 +1676,20 @@ namespace Chimera.Client.GUI
 			}
 			catch (Exception ex) when (ex is InvalidOperationException or IOException)
 			{
-				// The sandbox refuses a state another machine made - a different
-				// build of the core, most often, which is what an autosaved xemu
-				// project reopened beside a second xemu version met (issue #63). The
-				// branch's input is already loaded, and the state is only a way to
-				// reach its frame faster; the history reaches it by replay instead.
-				// The refused state is let go so it is not offered again.
+				// Two refusals reach here. The sandbox refuses a state another machine
+				// made - a different build of the core, most often, which is what an
+				// autosaved xemu project reopened beside a second xemu version met
+				// (issue #63). The engine refuses one written in another savestate
+				// format before the machine ever sees it, and says which two formats
+				// (issue #115). Either way the branch's input is already loaded and the
+				// state was only a way to reach its frame faster; the history reaches
+				// it by replay instead, and the refused state is let go so it is not
+				// offered again. The reason is shown as given: it is the only place a
+				// person is told WHY, and the format one names both builds.
 				branch.StateFile = null;
 				ReplayToBranchFrame(branch,
-					"This branch's saved state was made by a different machine; replaying to its frame instead.",
-					$"Branch state refused ({ex.Message}): replaying to frame {branch.Frame}.");
+					$"This branch's saved state could not be loaded, so it replays to its frame instead. {ex.Message}",
+					$"Branch state refused: replaying to frame {branch.Frame}.");
 				return;
 			}
 

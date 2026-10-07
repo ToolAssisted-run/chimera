@@ -35,8 +35,23 @@ namespace Chimera.Emulation.Common
 
 		private Dictionary<string, char>? _mnemonicsCache;
 
-		/// <summary>The system the cache was built for, so a control outside it can still be looked up.</summary>
-		private string? _mnemonicsSysId;
+		/// <summary>
+		/// What this controller's controls are called (<see cref="IControlNames"/>).
+		/// The core that declares the controller supplies its own; a definition
+		/// built from something else - a movie's log key, a selection of columns -
+		/// takes them from the machine it is shown beside
+		/// (<see cref="BuildMnemonicsCache(IControlNames)"/>). Until somebody
+		/// says, the engine's rule answers.
+		/// </summary>
+		public IControlNames ControlNames { get; private set; } = GenericControlNames.Instance;
+
+		/// <summary>The core's own names, given while the definition is being built.</summary>
+		public ControllerDefinition WithControlNames(IControlNames names)
+		{
+			AssertMutable();
+			ControlNames = names;
+			return this;
+		}
 
 		/// <summary>
 		/// A mapping between buttons names and their movie-log mnemonics.
@@ -47,15 +62,26 @@ namespace Chimera.Emulation.Common
 		/// <remarks>
 		/// TODO: this should probably be called in <see cref="MakeImmutable"/>,
 		/// </remarks>
-		public void BuildMnemonicsCache(string sysID)
+		public void BuildMnemonicsCache()
 		{
 			if (_mutable)
 				throw new InvalidOperationException($"this {nameof(ControllerDefinition)} has not yet been built and sealed; can't build mnemonics cache");
 
-			_mnemonicsSysId ??= sysID;
 			_mnemonicsCache ??= BoolButtons.ToDictionary(
 				static buttonName => buttonName,
-				buttonName => MnemonicLookup.Lookup(buttonName, sysID));
+				buttonName => ControlNames.MnemonicOf(buttonName));
+		}
+
+		/// <summary>
+		/// The same, for a definition that is not a machine's own: it is called
+		/// what <paramref name="names"/> calls its controls - the running
+		/// machine's, so a movie's columns read as the machine's do. A definition
+		/// whose cache is already built keeps it.
+		/// </summary>
+		public void BuildMnemonicsCache(IControlNames names)
+		{
+			if (_mnemonicsCache is null) ControlNames = names;
+			BuildMnemonicsCache();
 		}
 
 		/// <summary>
@@ -70,7 +96,10 @@ namespace Chimera.Emulation.Common
 		public char MnemonicFor(string buttonName)
 			=> _mnemonicsCache is not null && _mnemonicsCache.TryGetValue(buttonName, out var c)
 				? c
-				: MnemonicLookup.Lookup(buttonName, _mnemonicsSysId ?? string.Empty);
+				: ControlNames.MnemonicOf(buttonName);
+
+		/// <summary>The header of an axis's input column.</summary>
+		public string AxisHeaderFor(string axisName) => ControlNames.AxisHeaderOf(axisName);
 
 		public ControllerDefinition(string name)
 			=> Name = name;
@@ -83,7 +112,7 @@ namespace Chimera.Emulation.Common
 			HapticsChannels.AddRange(copyFrom.HapticsChannels);
 			CategoryLabels = copyFrom.CategoryLabels;
 			_mnemonicsCache = copyFrom._mnemonicsCache;
-			_mnemonicsSysId = copyFrom._mnemonicsSysId;
+			ControlNames = copyFrom.ControlNames;
 			MakeImmutable();
 		}
 

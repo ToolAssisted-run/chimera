@@ -47,7 +47,7 @@ namespace Chimera.Emulation.Common
 		public static readonly GameInfo NullInstance = new()
 		{
 			Name = "Null",
-			System = VSystemID.Raw.NULL,
+			System = NullEmulator.NullSystemId,
 			Hash = "",
 			Region = "",
 			Status = RomStatus.GoodDump,
@@ -164,7 +164,7 @@ namespace Chimera.Emulation.Common
 	{
 		public static bool IsNullInstance(this IGameInfo game)
 		{
-			return game == null || game.System == VSystemID.Raw.NULL;
+			return game == null || game.System == NullEmulator.NullSystemId;
 		}
 
 		public static bool IsRomStatusBad(this IGameInfo game)

@@ -10,9 +10,6 @@ namespace Chimera.Common
 
 		public static readonly string? CustomBuildString;
 
-		/// <summary>Chimera's contributors, and through them BizHawk's: the About box links here.</summary>
-		public static readonly string CreditsListURI = "https://github.com/ToolAssisted-run/chimera/blob/main/CREDITS.md";
-
 		public static readonly string UserAgentEscaped;
 
 		static VersionInfo()
@@ -35,26 +32,24 @@ namespace Chimera.Common
 			}/{GIT_SHORTHASH}";
 		}
 
-		public static (string Label, string TargetURI) GetGitCommitLink()
-			=> ($"Commit {GIT_SHORTHASH} ({GIT_SHORTDATE})", $"https://github.com/ToolAssisted-run/chimera/commit/{GIT_HASH}");
+		/// <summary>The project's site.</summary>
+		public static readonly string SiteURI = "https://toolassisted.run";
+
+		/// <summary>The commit this build was made from, on the web.</summary>
+		public static readonly string CommitURI = $"https://github.com/ToolAssisted-run/chimera/commit/{GIT_HASH}";
+
+		/// <summary>
+		/// What this build is called wherever it is named - the About box, a bug
+		/// report: its commit, and when that commit was made.
+		/// </summary>
+		public static string GetBuildName()
+			=> $"Commit {GIT_SHORTHASH} ({GIT_COMMITTIME} UTC)";
 
 		/// <summary>
 		/// Chimera has no versions: a build is identified by its commit and that
 		/// commit's date (never a build wall-clock, which would break reproducible
 		/// builds).
 		/// </summary>
-		public static string GetFullVersionDetails()
-		{
-			//TODO prepare for AArch64/RISC-V
-			var targetArch = UIntPtr.Size is 8 ? "x64" : "x86";
-#if DEBUG
-			const string buildConfig = "Debug";
-#else
-			const string buildConfig = "Release";
-#endif
-			return $"Commit {GIT_SHORTHASH} ({buildConfig}, {targetArch})";
-		}
-
 		public static string GetEmuVersion()
 			=> $"Commit {GIT_SHORTHASH}";
 

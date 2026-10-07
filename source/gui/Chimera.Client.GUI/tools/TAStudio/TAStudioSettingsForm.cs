@@ -10,7 +10,7 @@ using Chimera.Emulation.Common;
 
 namespace Chimera.Client.GUI
 {
-	public partial class TAStudioSettingsForm : Form
+	public partial class TAStudioSettingsForm : ThemedForm
 	{
 		private TAStudio.AllSettings _settings;
 		private ControllerDefinition _controllerDef;
@@ -22,7 +22,7 @@ namespace Chimera.Client.GUI
 		private bool _changedByUser = true;
 
 		private Font _font;
-		private TAStudioPalette _palette;
+		private TAStudioPalette? _palette;
 
 		public TAStudioSettingsForm(
 			TAStudio.AllSettings editorSettings,
@@ -309,6 +309,13 @@ namespace Chimera.Client.GUI
 					index = _controllerDef.Axes.IndexOf(SelectedButton);
 
 					LagBox.Checked = _axisPatterns[index].SkipsLag;
+					// The box is as wide as the axis declares. Its designed
+					// bounds were +/-10000, which cannot hold an absolute
+					// screen position (0..65535) and silently refused the
+					// value instead of saying so.
+					var patternSpec = _controllerDef.Axes[SelectedButton];
+					ValueNum.Minimum = patternSpec.Min;
+					ValueNum.Maximum = patternSpec.Max;
 					ValueNum.Value = int.Parse(_patternValues[PatternList.SelectedIndex]);
 					CountNum.Value = _patternCounts[PatternList.SelectedIndex];
 				}
@@ -514,7 +521,7 @@ namespace Chimera.Client.GUI
 
 		private void ColorsButton_Click(object sender, EventArgs e)
 		{
-			using TAStudioColorSettingsForm form = new(_palette, p => _palette = p)
+			using TAStudioColorSettingsForm form = new(_palette ?? TAStudioPalette.FromTheme(ThemeLibrary.Current), p => _palette = p)
 			{
 				Owner = this,
 				StartPosition = FormStartPosition.Manual,

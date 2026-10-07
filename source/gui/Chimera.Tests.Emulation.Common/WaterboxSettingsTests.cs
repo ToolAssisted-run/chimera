@@ -161,7 +161,9 @@ namespace Chimera.Tests.Emulation.Common
 		{
 			// values come from a JSON file a user can edit
 			Assert.AreEqual(0, Int("n", 0).Coerce("not a number"));
-			Assert.AreEqual(false, new WaterboxConfig.SettingDecl { Type = "bool", Default = false }.Coerce("banana"));
+			var coerced = new WaterboxConfig.SettingDecl { Type = "bool", Default = false }.Coerce("banana");
+			Assert.IsInstanceOfType<bool>(coerced, "a bool setting stays a bool whatever the file said");
+			Assert.IsFalse((bool)coerced);
 		}
 
 		[TestMethod]

@@ -162,9 +162,14 @@ Three rules, learned building the first six:
   MEMORY, since its file source wants fcntl and a sandbox does not answer.
 
 Built for: PCSX2 (memcard1.ps2, memcard2.ps2, bios.nvm), Flycast (vmu_A1.bin,
-vmu_A2.bin), Opera (NVRAM.ram), PPSSPP (the stick, as a zip), quickerNES and
-QuickerNesHawk (battery.sav, and disk.sav on an FDS), and RPCS3 (the user's
-savedata folder, as a zip: `savedata/<save>/<file>`; 2026-09-17).
+vmu_A2.bin), Opera (NVRAM.ram), quickerNES and QuickerNesHawk (battery.sav,
+and disk.sav on an FDS), RPCS3 (the user's savedata folder, as a zip:
+`savedata/<save>/<file>`; 2026-09-17) and PPSSPP (the stick, as a zip;
+2026-09-29, issue #161 - this line named PPSSPP from the start, but its slot
+was never built until then). PPSSPP takes a second slot beside it, DLC, the
+same way: a zip entry under `PSP/` goes where it says, any other is a folder
+taken off a stick and goes under `PSP/SAVEDATA` (save data) or `PSP/GAME`
+(DLC).
 
 ## Tenants
 

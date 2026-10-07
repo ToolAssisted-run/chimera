@@ -43,6 +43,46 @@ namespace Chimera.Tests.Client.Common.CorePackages
 		}
 
 		[TestMethod]
+		public void AnOpenProjectMountsTheFileItPins()
+		{
+			// A game core's firmware may be a file of the project's own, and the
+			// project pins ITS hash. The declared dump - remembered under its own
+			// hash, because the person once pointed at it - must not stand in
+			// for it: that boots the project on the original instead.
+			var original = FileOf(8192, 1);
+			var own = FileOf(8192, 2);
+			var originalSha1 = CoreFirmwareStore.Sha1Of(File.ReadAllBytes(original));
+			var ownSha1 = CoreFirmwareStore.Sha1Of(File.ReadAllBytes(own));
+			var decl = Decl(8192, originalSha1);
+			Config config = new();
+			CoreFirmwareStore.Remember(config, "QuickNES", decl, original);
+			CoreFirmwareStore.Remember(config, "QuickNES", new CoreFirmwareDecl { Id = "bios", Sha1 = ownSha1 }, own);
+			CoreFirmwareStore.SetPath(config, "QuickNES", "bios", own);
+			try
+			{
+				Assert.AreEqual(original, CoreFirmwareStore.GetPath(config, "QuickNES", decl), "no project: the declared dump");
+
+				CoreFirmwareStore.ProjectPins = ("QuickNES", new Dictionary<string, string> { ["bios"] = ownSha1 });
+				Assert.AreEqual(own, CoreFirmwareStore.GetPath(config, "QuickNES", decl), "the project's own file, by its pin");
+				var entry = CoreFirmwareStore.Describe(config, "QuickNES", decl);
+				Assert.AreEqual(ownSha1, entry.Sha1, "what is described (and recorded) is what is mounted");
+				Assert.AreEqual(CoreFirmwareState.Unrecognised, entry.State, "and it is said to be no original");
+
+				CoreFirmwareStore.ProjectPins = ("SomeOtherCore", new Dictionary<string, string> { ["bios"] = ownSha1 });
+				Assert.AreEqual(original, CoreFirmwareStore.GetPath(config, "QuickNES", decl), "another core's pins are not this core's");
+
+				CoreFirmwareStore.ProjectPins = ("QuickNES", new Dictionary<string, string> { ["bios"] = originalSha1 });
+				Assert.AreEqual(original, CoreFirmwareStore.GetPath(config, "QuickNES", decl), "a pin that is the declared hash changes nothing");
+			}
+			finally
+			{
+				CoreFirmwareStore.ProjectPins = null;
+				File.Delete(original);
+				File.Delete(own);
+			}
+		}
+
+		[TestMethod]
 		public void OnlyTheDeclarationsALoadUsedAreJudged()
 		{
 			// A package may declare a hundred BIOS dumps and use the one the project

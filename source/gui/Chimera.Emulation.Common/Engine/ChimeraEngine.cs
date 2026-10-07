@@ -24,6 +24,18 @@ namespace Chimera.Emulation.Common.Engine
 		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_build_info();
 
+		/// <summary>Issue #115: the sentence to show when this build and a core package are far apart, or null.</summary>
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_version_skew(string frontendDate, string frontendBuild, string coreDate, string coreBuild, string coreName);
+
+		/// <summary>The build that writes this session's states - the engine's commit, which is the frontend's.</summary>
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_state_writer_id();
+
+		/// <summary>The shape of a machine state as this build writes and reads it (issue #115).</summary>
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract uint ce_state_format();
+
 		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_movie_log_new();
 
@@ -503,6 +515,9 @@ namespace Chimera.Emulation.Common.Engine
 		public abstract int ce_session_virtual_width(IntPtr session);
 
 		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract int ce_session_display_aspect(IntPtr session, out int x, out int y);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_session_virtual_height(IntPtr session);
 
 		[ChimeraImport(CallingConvention.Cdecl)]
@@ -544,11 +559,33 @@ namespace Chimera.Emulation.Common.Engine
 		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_media_make(string folder, string outPath, int format, IntPtr progress, IntPtr user);
 
+		/// <summary>1 when the folder is what the recipe (a package's media declaration, as JSON) is for, 0 when not, -1 when the recipe cannot be read.</summary>
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract int ce_media_recipe_applies([MarshalAs(UnmanagedType.LPUTF8Str)] string recipeJson, string folder);
+
+		/// <summary>The format a recipe writes (as ce_media_make's), or -1.</summary>
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract int ce_media_recipe_format([MarshalAs(UnmanagedType.LPUTF8Str)] string recipeJson);
+
+		/// <summary>ce_media_make in the recipe's format, with what the recipe asks for.</summary>
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract int ce_media_make_with(string folder, string outPath, [MarshalAs(UnmanagedType.LPUTF8Str)] string recipeJson, IntPtr progress, IntPtr user);
+
 		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_media_last_sha1();
 
 		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_media_last_error();
+
+		/// <summary>The core log: a UTF-8 path turns it on (1, or 0 with ce_core_log_error), "" turns it off.</summary>
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract int ce_core_log(string path);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_core_log_path();
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_core_log_error();
 
 		// the compile cache and precompile sessions (docs: a core's compiled
 		// objects, kept on the host; never machine state)
@@ -557,6 +594,24 @@ namespace Chimera.Emulation.Common.Engine
 
 		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract void ce_precompile_request(int index, int count, int firmwareToo);
+
+		// what a core suggests for these files before any machine exists
+		// (engine.h: the arguments are ce_session_open's; nothing is started)
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_suggest_settings(
+			string packagePath, byte[]? rom, ulong romLen, string? romPath, string? settingsOverridesJson,
+			IntPtr[]? firmwareIds, IntPtr[]? firmwareData, ulong[]? firmwareLens, int firmwareCount,
+			IntPtr[]? extraNames, IntPtr[]? extraData, ulong[]? extraLens, IntPtr[]? extraPaths, int extraCount,
+			ref ulong lenOut, ref IntPtr errorOut);
+
+		// what a movie made elsewhere amounts to, as the core reads it (engine.h:
+		// the arguments are ce_session_open's; the movie is mounted as "movie")
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_import_movie(
+			string packagePath, byte[]? rom, ulong romLen, string? romPath, string? settingsOverridesJson,
+			IntPtr[]? firmwareIds, IntPtr[]? firmwareData, ulong[]? firmwareLens, int firmwareCount,
+			IntPtr[]? extraNames, IntPtr[]? extraData, ulong[]? extraLens, IntPtr[]? extraPaths, int extraCount,
+			ref ulong lenOut, ref IntPtr errorOut);
 
 		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract ulong ce_session_cache_stored(IntPtr session);
@@ -579,11 +634,88 @@ namespace Chimera.Emulation.Common.Engine
 		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_session_button_name(IntPtr session, long index);
 
+		// what a control is called where a person reads very little of it: the
+		// package's own letters and headers, and the engine's rule where it
+		// declared none (control_names.hpp)
+		/// <summary>One character a button, in declaration order.</summary>
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_session_button_mnemonics(IntPtr session);
+
+		/// <summary>The letter of ANY control name, looked up the way the session's own are.</summary>
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract int ce_session_mnemonic_of(IntPtr session, [MarshalAs(UnmanagedType.LPUTF8Str)] string name);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_session_axis_header_of(IntPtr session, [MarshalAs(UnmanagedType.LPUTF8Str)] string name);
+
+		/// <summary>The rule alone: the letter of a name no package describes.</summary>
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract int ce_control_mnemonic([MarshalAs(UnmanagedType.LPUTF8Str)] string name);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_control_axis_header([MarshalAs(UnmanagedType.LPUTF8Str)] string name);
+
+		/// <summary>The package's own word for the session's system, or its id.</summary>
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_session_system_name(IntPtr session);
+
 		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract long ce_session_axis_count(IntPtr session);
 
 		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_session_axis_name(IntPtr session, long index);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_session_game_settings(IntPtr session);
+
+		/// <summary>engine.h ce_property_value: a game property's value, by kind (CE_PROPERTY_*).</summary>
+		[StructLayout(LayoutKind.Sequential)]
+		public struct CePropertyValue
+		{
+			public int Kind;
+			public int Reserved;
+			public long I;
+			public ulong U;
+			public double F;
+			public IntPtr Data;
+			public long Len;
+		}
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_session_property_table(IntPtr session);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract int ce_session_property_find(IntPtr session, [MarshalAs(UnmanagedType.LPUTF8Str)] string name, out uint element);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract int ce_session_property_at(IntPtr session, [MarshalAs(UnmanagedType.LPUTF8Str)] string domain, long address, out uint element, out int starts);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract int ce_session_property_get(IntPtr session, int index, uint element, ref CePropertyValue value);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract int ce_session_property_set(IntPtr session, int index, uint element, ref CePropertyValue value);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract int ce_session_property_text(IntPtr session, int index, uint element, int named, byte[] buf, int cap);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract int ce_session_property_set_text(IntPtr session, int index, uint element, [MarshalAs(UnmanagedType.LPUTF8Str)] string text);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract int ce_session_property_dynamic(IntPtr session);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract int ce_session_property_refresh(IntPtr session);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract long ce_session_property_offset(IntPtr session, int index, uint element);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract int ce_session_game_time_ms(IntPtr session, out long ms);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract int ce_game_time_text(long ms, byte[] buf, int cap);
 
 		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_session_drive_count(IntPtr session);
@@ -657,6 +789,9 @@ namespace Chimera.Emulation.Common.Engine
 		public abstract void ce_session_greenzone_max_near_stride(IntPtr session, long maxStride);
 
 		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract void ce_session_greenzone_capture_period(IntPtr session, long period);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract void ce_session_greenzone_bands(
 			IntPtr session, long nearFrames, long midFrames, long midStride, long farStride, long anchorSpacing);
 
@@ -688,10 +823,12 @@ namespace Chimera.Emulation.Common.Engine
 		public abstract void ce_session_greenzone_before_advance(IntPtr session);
 
 		[ChimeraImport(CallingConvention.Cdecl)]
-		public abstract int ce_session_greenzone_capture(IntPtr session, long frame, byte[] note, uint noteLen);
+		// note: null for a frame with nothing to remember about it
+		public abstract int ce_session_greenzone_capture(IntPtr session, long frame, byte[]? note, uint noteLen);
 
 		[ChimeraImport(CallingConvention.Cdecl)]
-		public abstract uint ce_session_greenzone_note(IntPtr session, long frame, byte[] outBuf, uint outLen);
+		// outBuf: null asks only how many bytes there are
+		public abstract uint ce_session_greenzone_note(IntPtr session, long frame, byte[]? outBuf, uint outLen);
 
 		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_session_greenzone_restore(IntPtr session, long frame);
@@ -792,6 +929,10 @@ namespace Chimera.Emulation.Common.Engine
 
 		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract void ce_session_bus_poke(IntPtr session, int index, int addr, int value);
+
+		/// <summary>A run of a bus at once (engine.h): len bytes from addr into buf.</summary>
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract long ce_session_bus_read(IntPtr session, int index, long addr, byte[] buf, long len);
 
 		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_session_trace_available(IntPtr session);
@@ -955,6 +1096,44 @@ namespace Chimera.Emulation.Common.Engine
 		/// <summary>Engine build provenance (JSON), for the frontend to show and movies to record.</summary>
 		public static string BuildInfo => PtrToStringUtf8(Instance.ce_build_info()) ?? "{}";
 
+		/// <summary>
+		/// The core log (ce_core_log): from now on, everything the cores say is kept in
+		/// <paramref name="path"/>, and a core opened while it is on is asked for its fuller
+		/// log. It is on only because somebody asked (Tools &gt; Export Core Log...), and
+		/// nothing remembers it: every run of Chimera starts with it off.
+		/// </summary>
+		public static bool StartCoreLog(string path, out string error)
+		{
+			var ok = Instance.ce_core_log(path) is not 0;
+			error = ok ? "" : PtrToStringUtf8(Instance.ce_core_log_error()) ?? "the core log could not be started";
+			return ok;
+		}
+
+		/// <summary>Stops the core log; the file stays where it is.</summary>
+		public static void StopCoreLog() => Instance.ce_core_log("");
+
+		/// <summary>Where the core log is being written, or "" while it is off.</summary>
+		public static string CoreLogPath => PtrToStringUtf8(Instance.ce_core_log_path()) ?? "";
+
+		/// <summary>
+		/// The savestate format this build writes and reads (issue #115). A project records it,
+		/// so a whole cache of states can be explained at open rather than one refusal at a time.
+		/// </summary>
+		public static uint StateFormat => Instance.ce_state_format();
+
+		/// <summary>The build that wrote the states this session writes.</summary>
+		public static string StateWriterId => PtrToStringUtf8(Instance.ce_state_writer_id()) ?? "";
+
+		/// <summary>
+		/// Whether this Chimera and the core package a project runs on were built far enough
+		/// apart to be worth a word, and the word to say. Null when they are close enough or
+		/// when either side does not date itself. A heuristic, never a refusal: the engine owns
+		/// the threshold and the wording, this side only shows it.
+		/// </summary>
+		public static string? VersionSkew(string frontendDate, string frontendBuild, string coreDate, string coreBuild, string coreName)
+			=> PtrToStringUtf8(Instance.ce_version_skew(
+				frontendDate ?? "", frontendBuild ?? "", coreDate ?? "", coreBuild ?? "", coreName ?? ""));
+
 		/// <summary>The identity hash the frontend uses everywhere: SHA1, 40 uppercase hex chars.</summary>
 		public static string Sha1Hex(byte[] data)
 		{
@@ -988,7 +1167,37 @@ namespace Chimera.Emulation.Common.Engine
 		/// Returning false cancels, and a cancelled pack leaves no file behind.
 		/// Called on the calling thread, which is not the UI thread.
 		/// </param>
+		/// <summary>The engine's rule for a control no package describes: one letter.</summary>
+		public static char ControlMnemonic(string name) => (char) Instance.ce_control_mnemonic(name);
+
+		/// <summary>The same for an axis: a short header.</summary>
+		public static string ControlAxisHeader(string name)
+			=> PtrToStringUtf8(Instance.ce_control_axis_header(name)) ?? name;
+
 		public static bool MakeMedia(string folder, string outPath, int format,
+			Func<string, ulong, ulong, ulong, ulong, bool>? progress,
+			out string sha1, out string error)
+			=> MakeMedia(folder, outPath, format, recipeJson: null, progress, out sha1, out error);
+
+		/// <summary>
+		/// Whether a folder is what a core's media recipe is for. The recipe is
+		/// one object of a package's "media" declaration, as the package wrote
+		/// it; the answer is the engine's (ce_media_recipe_applies). A recipe it
+		/// cannot read applies to nothing.
+		/// </summary>
+		public static bool MediaRecipeApplies(string recipeJson, string folder)
+			=> Instance.ce_media_recipe_applies(recipeJson, folder) is 1;
+
+		/// <summary>The format a recipe writes (0 zip, 1 ISO, 2 FAT12), or -1 when it cannot be read.</summary>
+		public static int MediaRecipeFormat(string recipeJson)
+			=> Instance.ce_media_recipe_format(recipeJson);
+
+		/// <param name="recipeJson">
+		/// What a core says its media needs beyond the files, or null for the
+		/// files alone. With a recipe the format is the recipe's and
+		/// <paramref name="format"/> is not looked at.
+		/// </param>
+		public static bool MakeMedia(string folder, string outPath, int format, string? recipeJson,
 			Func<string, ulong, ulong, ulong, ulong, bool>? progress,
 			out string sha1, out string error)
 		{
@@ -1001,7 +1210,9 @@ namespace Chimera.Emulation.Common.Engine
 				handle = Marshal.GetFunctionPointerForDelegate(shim);
 			}
 
-			var ok = Instance.ce_media_make(folder, outPath, format, handle, IntPtr.Zero) is not 0;
+			var ok = (recipeJson is null
+				? Instance.ce_media_make(folder, outPath, format, handle, IntPtr.Zero)
+				: Instance.ce_media_make_with(folder, outPath, recipeJson, handle, IntPtr.Zero)) is not 0;
 			// the delegate must outlive the call it was handed to
 			GC.KeepAlive(shim);
 
@@ -1025,6 +1236,14 @@ namespace Chimera.Emulation.Common.Engine
 
 		public static unsafe string PtrToStringUtf8(IntPtr p, ulong len)
 			=> Encoding.UTF8.GetString((byte*)p, checked((int)len));
+
+		/// <summary>A game time in milliseconds as a timer shows it: "mm:ss.mmm" (the engine's format).</summary>
+		public static string GameTimeText(long ms)
+		{
+			var buf = new byte[48];
+			var n = Instance.ce_game_time_text(ms, buf, buf.Length);
+			return Encoding.ASCII.GetString(buf, 0, Math.Min(Math.Max(n, 0), buf.Length - 1));
+		}
 	}
 
 	/// <summary>
@@ -1806,8 +2025,8 @@ namespace Chimera.Emulation.Common.Engine
 			IReadOnlyDictionary<string, byte[]>? firmware,
 			IReadOnlyList<CoreFile>? extraFiles = null,
 			bool wantGpu = false,
-			string cacheDir = null,
-			PrecompileRequest precompile = null)
+			string? cacheDir = null,
+			PrecompileRequest? precompile = null)
 		{
 			var count = firmware?.Count ?? 0;
 			var ids = new IntPtr[Math.Max(count, 1)];
@@ -1876,6 +2095,83 @@ namespace Chimera.Emulation.Common.Engine
 			}
 		}
 
+		/// <summary>
+		/// What the core suggests for this game before any machine exists - the
+		/// core's own JSON (<c>{"values": {...}, "note": "..."}</c>), or "" when
+		/// it suggests nothing. The package is loaded and the game mounted as a
+		/// run would have them; nothing is started. Throws when either cannot be
+		/// opened at all.
+		/// </summary>
+		public static string Suggest(string packagePath, string romPath, string? settingsJson = null)
+		{
+			var len = 0UL;
+			var error = IntPtr.Zero;
+			var none = new IntPtr[1];
+			var answer = ChimeraEngine.Instance.ce_suggest_settings(
+				packagePath, null, 0, romPath, settingsJson,
+				none, none, new ulong[1], 0,
+				none, none, new ulong[1], none, 0, ref len, ref error);
+			if (answer == IntPtr.Zero)
+			{
+				throw new InvalidOperationException(ChimeraEngine.PtrToStringUtf8(error) ?? "the engine could not open the core");
+			}
+			return ChimeraEngine.PtrToStringUtf8(answer, len);
+		}
+
+		/// <summary>
+		/// What a movie made elsewhere amounts to, as the core reads it
+		/// (ce_import_movie): the core's own JSON - its refusal
+		/// (<c>{"error": ...}</c>) or the configuration and input the movie
+		/// dictates - or "" when the core has no importer. The movie is mounted as
+		/// "movie" and every other file under the name given; the import options
+		/// travel in the settings JSON. Nothing is started. Throws when the package
+		/// or a file cannot be opened at all.
+		/// </summary>
+		public static string ImportMovie(string packagePath, string moviePath,
+			IReadOnlyList<(string Name, string Path)> files, string? settingsJson)
+		{
+			var mounts = new List<(string Name, string Path)> { ("movie", moviePath) };
+			mounts.AddRange(files);
+			var count = mounts.Count;
+			var names = new IntPtr[count];
+			var paths = new IntPtr[count];
+			var datas = new IntPtr[count];
+			var lens = new ulong[count];
+			var allocated = new List<IntPtr>();
+			IntPtr AllocUtf8(string text)
+			{
+				var bytes = Encoding.UTF8.GetBytes(text + "\0");
+				var ptr = Marshal.AllocHGlobal(bytes.Length);
+				allocated.Add(ptr);
+				Marshal.Copy(bytes, 0, ptr, bytes.Length);
+				return ptr;
+			}
+			try
+			{
+				for (var i = 0; i < count; i++)
+				{
+					names[i] = AllocUtf8(mounts[i].Name);
+					paths[i] = AllocUtf8(mounts[i].Path);
+				}
+				var len = 0UL;
+				var error = IntPtr.Zero;
+				var none = new IntPtr[1];
+				var answer = ChimeraEngine.Instance.ce_import_movie(
+					packagePath, null, 0, null, settingsJson,
+					none, none, new ulong[1], 0,
+					names, datas, lens, paths, count, ref len, ref error);
+				if (answer == IntPtr.Zero)
+				{
+					throw new InvalidOperationException(ChimeraEngine.PtrToStringUtf8(error) ?? "the engine could not open the core");
+				}
+				return ChimeraEngine.PtrToStringUtf8(answer, len);
+			}
+			finally
+			{
+				foreach (var p in allocated) Marshal.FreeHGlobal(p);
+			}
+		}
+
 		public void Dispose()
 		{
 			if (_session == IntPtr.Zero) return;
@@ -1892,6 +2188,13 @@ namespace Chimera.Emulation.Common.Engine
 		public int Width => E.ce_session_width(_session);
 		public int Height => E.ce_session_height(_session);
 		public int VirtualWidth => E.ce_session_virtual_width(_session);
+
+		/// <summary>
+		/// The display aspect the core reports for what it shows now (x:y), or
+		/// null when it does not say and the declared virtual size stands.
+		/// </summary>
+		public (int X, int Y)? DisplayAspect
+			=> E.ce_session_display_aspect(_session, out var x, out var y) != 0 ? (x, y) : null;
 		public int VirtualHeight => E.ce_session_virtual_height(_session);
 		public int VsyncNumerator => E.ce_session_vsync_numerator(_session);
 		public int VsyncDenominator => E.ce_session_vsync_denominator(_session);
@@ -1926,6 +2229,115 @@ namespace Chimera.Emulation.Common.Engine
 		/// </summary>
 		public int DriveCount => E.ce_session_drive_count(_session);
 
+		/// <summary>
+		/// The settings this game has beyond the package's (an arcade game's dip
+		/// switches), as a JSON array of declarations; "" when the core has none.
+		/// </summary>
+		public string GameSettingsJson
+			=> ChimeraEngine.PtrToStringUtf8(E.ce_session_game_settings(_session)) ?? "";
+
+		// ---- a game core's properties (docs/game-cores.md; engine.h ce_session_property_*) ----
+		// The engine owns what the bytes mean; these only carry values across.
+
+		/// <summary>The property table as the engine understood it: {"properties": [...], "problems": [...]}.</summary>
+		public string PropertyTableJson
+			=> ChimeraEngine.PtrToStringUtf8(E.ce_session_property_table(_session)) ?? "";
+
+		/// <summary>
+		/// The game's own elapsed time in milliseconds, as the game counts it now (the
+		/// table's "gameTimer"); null when the core names no timer.
+		/// </summary>
+		public long? GameTimeMs
+			=> E.ce_session_game_time_ms(_session, out var ms) is not 0 ? ms : null;
+
+		/// <summary>
+		/// Whether the table is the core's answer for now and not for good: a movie's
+		/// variables, which come, move and go while it runs (engine.h, dynamic tables).
+		/// </summary>
+		public bool PropertyDynamic => E.ce_session_property_dynamic(_session) is not 0;
+
+		/// <summary>Has a dynamic table listed again by the core; how many it lists now.</summary>
+		public int PropertyRefresh() => E.ce_session_property_refresh(_session);
+
+		/// <summary>Where an element is in its domain now; -1 for one that is not there.</summary>
+		public long PropertyOffset(int index, uint element) => E.ce_session_property_offset(_session, index, element);
+
+		/// <summary>"Name" or "Name[3]": the property's index and the element, or -1.</summary>
+		public int PropertyFind(string name, out uint element)
+			=> E.ce_session_property_find(_session, name, out element);
+
+		/// <summary>The property one of whose elements covers the address, or -1.</summary>
+		public int PropertyAt(string domain, long address, out uint element, out bool starts)
+		{
+			var index = E.ce_session_property_at(_session, domain, address, out element, out var startsFlag);
+			starts = startsFlag is not 0;
+			return index;
+		}
+
+		/// <summary>
+		/// A property's value: a long for a signed integer, a ulong for an unsigned one, a
+		/// double, a bool, a string or a byte[]; null for no such property.
+		/// </summary>
+		public object? PropertyGet(int index, uint element)
+		{
+			LibChimera.CePropertyValue v = default;
+			if (E.ce_session_property_get(_session, index, element, ref v) is not 0) return null;
+			var bytes = new byte[v.Len];
+			if (v.Len > 0) Marshal.Copy(v.Data, bytes, 0, bytes.Length);
+			return v.Kind switch
+			{
+				0 => v.I,
+				1 => v.U,
+				2 => v.F,
+				3 => v.I is not 0,
+				4 => Encoding.UTF8.GetString(bytes),
+				_ => bytes,
+			};
+		}
+
+		/// <summary>Sets a property's value (see <see cref="PropertyGet"/> for the kinds); null when set, else why not.</summary>
+		public unsafe string? PropertySet(int index, uint element, object value)
+		{
+			LibChimera.CePropertyValue v = default;
+			byte[]? data = null;
+			switch (value)
+			{
+				case bool b: v.Kind = 3; v.I = b ? 1 : 0; break;
+				case long l: v.Kind = 0; v.I = l; break;
+				case int i: v.Kind = 0; v.I = i; break;
+				case ulong u: v.Kind = 1; v.U = u; break;
+				case double d: v.Kind = 2; v.F = d; break;
+				case float f: v.Kind = 2; v.F = f; break;
+				case string text: v.Kind = 4; data = Encoding.UTF8.GetBytes(text); break;
+				case byte[] raw: v.Kind = 5; data = raw; break;
+				default: return $"a property takes a number, a boolean, text or bytes, not {value?.GetType().Name ?? "nothing"}";
+			}
+			fixed (byte* p = data)
+			{
+				v.Data = (IntPtr)p;
+				v.Len = data?.LongLength ?? 0;
+				return E.ce_session_property_set(_session, index, element, ref v) is 0 ? null : LastError;
+			}
+		}
+
+		/// <summary>A value as a person reads it: an enumeration's name when <paramref name="named"/>; "" for no such property.</summary>
+		public string PropertyText(int index, uint element, bool named)
+		{
+			var buf = new byte[256];
+			var n = E.ce_session_property_text(_session, index, element, named ? 1 : 0, buf, buf.Length);
+			if (n < 0) return "";
+			if (n >= buf.Length)
+			{
+				buf = new byte[n + 1];
+				n = E.ce_session_property_text(_session, index, element, named ? 1 : 0, buf, buf.Length);
+			}
+			return Encoding.UTF8.GetString(buf, 0, n);
+		}
+
+		/// <summary>Sets a value from text, the inverse of <see cref="PropertyText"/>; null when set, else why not.</summary>
+		public string? PropertySetText(int index, uint element, string text)
+			=> E.ce_session_property_set_text(_session, index, element, text) is 0 ? null : LastError;
+
 		public string DriveName(int index)
 			=> ChimeraEngine.PtrToStringUtf8(E.ce_session_drive_name(_session, index)) ?? "Drive";
 
@@ -1944,6 +2356,23 @@ namespace Chimera.Emulation.Common.Engine
 		public int DriveMediaInserted(int index) => E.ce_session_drive_media_inserted(_session, index);
 
 		public bool ButtonActive(int index) => E.ce_session_button_active(_session, index) is not 0;
+
+		/// <summary>
+		/// The letter a control writes into a movie's text: the package's own,
+		/// or the engine's rule where it declared none. Any name may be asked -
+		/// a movie can carry a control this machine does not have.
+		/// </summary>
+		public char MnemonicOf(string name)
+			=> Disposed ? ChimeraEngine.ControlMnemonic(name) : (char) E.ce_session_mnemonic_of(_session, name);
+
+		/// <summary>The short header of an axis's input column, found the same way.</summary>
+		public string AxisHeaderOf(string name)
+			=> Disposed
+				? ChimeraEngine.ControlAxisHeader(name)
+				: ChimeraEngine.PtrToStringUtf8(E.ce_session_axis_header_of(_session, name)) ?? name;
+
+		/// <summary>What to call this machine's system in front of a person: the package's word for it, or its id.</summary>
+		public string SystemName => ChimeraEngine.PtrToStringUtf8(E.ce_session_system_name(_session)) ?? "";
 
 		public bool AxisActive(int index) => E.ce_session_axis_active(_session, index) is not 0;
 
@@ -1991,10 +2420,10 @@ namespace Chimera.Emulation.Common.Engine
 		}
 
 		/// <summary>Why the last frame did not run - the core's machine is dead - or null when it ran.</summary>
-		public string Stopped { get; private set; }
+		public string? Stopped { get; private set; }
 
 		/// <summary>Why the core's machine died, or null while it lives.</summary>
-		public string GuestDeath => ChimeraEngine.PtrToStringUtf8(E.ce_session_guest_death(_session));
+		public string? GuestDeath => ChimeraEngine.PtrToStringUtf8(E.ce_session_guest_death(_session));
 
 		/// <summary>Borrowed: the last rendered frame, BGRA, Width*Height ints.</summary>
 		public IntPtr VideoBuffer => E.ce_session_video(_session);
@@ -2069,6 +2498,8 @@ namespace Chimera.Emulation.Common.Engine
 
 		public void GreenzoneMaxNearStride(long maxStride) => E.ce_session_greenzone_max_near_stride(_session, maxStride);
 
+		public void GreenzoneCapturePeriod(int period) => E.ce_session_greenzone_capture_period(_session, period);
+
 		public void GreenzoneBands(long nearFrames, long midFrames, long midStride, long farStride, long anchorSpacing)
 			=> E.ce_session_greenzone_bands(_session, nearFrames, midFrames, midStride, farStride, anchorSpacing);
 
@@ -2111,11 +2542,11 @@ namespace Chimera.Emulation.Common.Engine
 		/// coarsening and spill the history does; keeping it in a table here
 		/// would mean mirroring all of that.
 		/// </summary>
-		public void GreenzoneCapture(long frame, byte[] note = null)
+		public void GreenzoneCapture(long frame, byte[]? note = null)
 			=> E.ce_session_greenzone_capture(_session, frame, note, (uint)(note?.Length ?? 0));
 
 		/// <summary>What was stored with that frame, or null.</summary>
-		public byte[] GreenzoneNote(long frame)
+		public byte[]? GreenzoneNote(long frame)
 		{
 			var len = E.ce_session_greenzone_note(_session, frame, null, 0);
 			if (len is 0) return null;
@@ -2206,6 +2637,9 @@ namespace Chimera.Emulation.Common.Engine
 		public bool BusWritable(int index) => E.ce_session_bus_writable(_session, index) is not 0;
 		public byte BusPeek(int index, int addr) => unchecked((byte)E.ce_session_bus_peek(_session, index, addr));
 		public void BusPoke(int index, int addr, byte value) => E.ce_session_bus_poke(_session, index, addr, value);
+
+		/// <summary>Fills <paramref name="buf"/> from <paramref name="addr"/> on: one call, however long, rather than a peek per byte.</summary>
+		public void BusRead(int index, long addr, byte[] buf) => E.ce_session_bus_read(_session, index, addr, buf, buf.LongLength);
 
 		public bool TraceAvailable => E.ce_session_trace_available(_session) is not 0;
 		public string TraceHeader => ChimeraEngine.PtrToStringUtf8(E.ce_session_trace_header(_session)) ?? "Instructions";

@@ -89,7 +89,8 @@ namespace Chimera.Tests.Client.Common.CorePackages
 				Assert.IsNull(result.Error, $"a good package was refused: {result.Error}");
 				Assert.IsNotNull(result.Path);
 				Assert.IsTrue(File.Exists(result.Path), "the store has no file where the installer said it put one");
-				Assert.AreEqual(Version, result.Package?.Version, "installed under the wrong version");
+				Assert.IsNotNull(result.Package, "the installer said nothing about what it installed");
+				Assert.AreEqual(Version, result.Package.Version, "installed under the wrong version");
 			}
 			finally
 			{

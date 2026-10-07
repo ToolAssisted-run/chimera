@@ -36,6 +36,12 @@ namespace Chimera.Client.GUI
 		[OptionalService]
 		private IDebuggable Debuggable { get; set; }
 
+		/// <summary>A game core's properties (docs/game-cores.md), which name the watches on them.</summary>
+		[OptionalService]
+		private IGameProperties GameProperties { get; set; }
+
+		private readonly ToolStripMenuItemEx _addGamePropertiesMenuItem = new() { Text = "Add Game &Properties..." };
+
 		protected override string WindowTitleStatic => "RAM Watch";
 
 		public RamWatch()
@@ -55,6 +61,7 @@ namespace Chimera.Client.GUI
 			MoveTopContextMenuItem.Image = Resources.MoveTop;
 			MoveBottomContextMenuItem.Image = Resources.MoveBottom;
 			ErrorIconButton.Image = Resources.ExclamationRed;
+			ErrorIconButton.SetItemBackRole(ThemeColorRole.AccentWarningBackground);
 			newToolStripButton.Image = Resources.NewFile;
 			openToolStripButton.Image = Resources.OpenFile;
 			saveToolStripButton.Image = Resources.SaveAs;
@@ -107,7 +114,8 @@ namespace Chimera.Client.GUI
 				while (i < _watches.Count)
 				{
 					w = _watches[i];
-					if (w.IsSeparator)
+					// a property's watch is known by its name, and never a duplicate of an address's
+					if (w.IsSeparator || w is PropertyWatch)
 					{
 						i++;
 						continue;
@@ -125,10 +133,15 @@ namespace Chimera.Client.GUI
 			};
 			_ = WatchesSubMenu.DropDownItems.InsertBefore(toolStripSeparator3, insert: deduperMenuItem);
 
+			_addGamePropertiesMenuItem.Click += (_, _) => AddGameProperties();
+			_ = WatchesSubMenu.DropDownItems.InsertBefore(EditWatchMenuItem, insert: _addGamePropertiesMenuItem);
+
 			Settings = new RamWatchSettings();
 
 			WatchListView.QueryItemText += WatchListView_QueryItemText;
 			WatchListView.QueryItemBkColor += WatchListView_QueryItemBkColor;
+			WatchListView.QueryItemIcon += WatchListView_QueryItemIcon;
+			WatchListView.MouseDown += WatchListView_MouseDown;
 			Closing += (o, e) =>
 			{
 				if (AskSaveChanges())
@@ -148,11 +161,20 @@ namespace Chimera.Client.GUI
 			SetColumns();
 		}
 
-		public override bool IsActive => Config!.DisplayRamWatch || base.IsActive;
+		public override bool IsActive => Config!.DisplayWatchesOnScreen || base.IsActive;
 		public override bool IsLoaded => base.IsActive;
+
+		private static RollColumn OnScreenColumn()
+			=> new(name: WatchList.OnScreen, widthUnscaled: 26, text: "OSD");
 
 		private void SetColumns()
 		{
+			// columns saved before the On Screen one existed gain it, first
+			if (!Settings.Columns.Exists(static c => c.Name == WatchList.OnScreen))
+			{
+				Settings.Columns.Insert(0, OnScreenColumn());
+			}
+
 			WatchListView.AllColumns.AddRange(Settings.Columns);
 			WatchListView.Refresh();
 		}
@@ -166,6 +188,7 @@ namespace Chimera.Client.GUI
 			{
 				Columns = new List<RollColumn>
 				{
+					OnScreenColumn(),
 					new(name: WatchList.Address, widthUnscaled: 60, text: "Address"),
 					new(name: WatchList.Value, widthUnscaled: 59, text: "Value"),
 					new(name: WatchList.Prev, widthUnscaled: 59, text: "Prev") { Visible = false },
@@ -196,7 +219,8 @@ namespace Chimera.Client.GUI
 
 		public void AddWatch(Watch watch)
 		{
-			_watches.Add(watch);
+			// one on a game property is called by the property's name, wherever it came from
+			_watches.Add(GamePropertyWatches.Named(watch, GameProperties));
 			WatchListView.RowCount = _watches.Count;
 			GeneralUpdate();
 			UpdateWatchCount();
@@ -277,7 +301,7 @@ namespace Chimera.Client.GUI
 
 		public override void Restart()
 		{
-			if ((!IsHandleCreated || IsDisposed) && !Config.DisplayRamWatch)
+			if ((!IsHandleCreated || IsDisposed) && !Config.DisplayWatchesOnScreen)
 			{
 				return;
 			}
@@ -287,6 +311,7 @@ namespace Chimera.Client.GUI
 				&& _watches.All(w => w.Domain == null || MemoryDomains.Select(m => m.Name).Contains(w.Domain.Name))
 				&& (Config.RecentWatches.AutoLoad || (IsHandleCreated || !IsDisposed)))
 			{
+				_watches.GameProperties = GameProperties;
 				_watches.RefreshDomains(MemoryDomains, Config.RamWatchDefinePrevious);
 				_watches.Reload();
 				GeneralUpdate();
@@ -294,7 +319,7 @@ namespace Chimera.Client.GUI
 			}
 			else
 			{
-				_watches = new WatchList(MemoryDomains, Emu.SystemId);
+				_watches = new WatchList(MemoryDomains, Emu.SystemId) { GameProperties = GameProperties };
 				NewWatchList(true);
 			}
 		}
@@ -315,7 +340,7 @@ namespace Chimera.Client.GUI
 
 		private void MinimalUpdate()
 		{
-			if ((!IsHandleCreated || IsDisposed) && !Config.DisplayRamWatch)
+			if ((!IsHandleCreated || IsDisposed) && !Config.DisplayWatchesOnScreen)
 			{
 				return;
 			}
@@ -329,7 +354,7 @@ namespace Chimera.Client.GUI
 
 		private void FrameUpdate()
 		{
-			if ((!IsHandleCreated || IsDisposed) && !Config.DisplayRamWatch)
+			if ((!IsHandleCreated || IsDisposed) && !Config.DisplayWatchesOnScreen)
 			{
 				return;
 			}
@@ -351,18 +376,19 @@ namespace Chimera.Client.GUI
 
 		private void DisplayOnScreenWatches()
 		{
-			if (Config.DisplayRamWatch)
+			if (Config.DisplayWatchesOnScreen)
 			{
 				DisplayManager.OSD.ClearRamWatches();
-				for (var i = 0; i < _watches.Count; i++)
+				var line = 0;
+				foreach (var watch in _watches.OnScreenWatches)
 				{
-					var frozen = !_watches[i].IsSeparator && MainForm.CheatList.IsActive(_watches[i].Domain, _watches[i].Address);
+					var frozen = MainForm.CheatList.IsActive(watch.Domain, watch.Address);
 					DisplayManager.OSD.AddRamWatch(
-						_watches[i].ToDisplayString(),
+						watch.ToDisplayString(),
 						new MessagePosition
 						{
 							X = Config.RamWatches.X,
-							Y = Config.RamWatches.Y + (i * 14),
+							Y = Config.RamWatches.Y + (line++ * 14),
 							Anchor = Config.RamWatches.Anchor,
 						},
 						Color.Black,
@@ -401,7 +427,7 @@ namespace Chimera.Client.GUI
 			var clipboardRows = clipboardText.Split([ "\n" ], StringSplitOptions.RemoveEmptyEntries);
 			foreach (var row in clipboardRows)
 			{
-				var watch = Watch.FromString(row, MemoryDomains);
+				var watch = Watch.FromString(row, MemoryDomains, GameProperties);
 				if (watch is not null)
 				{
 					_watches.Add(watch);
@@ -438,6 +464,17 @@ namespace Chimera.Client.GUI
 		{
 			var indexes = SelectedIndices.ToList();
 
+			// a game property's watch is the property, known by its name: there is no
+			// address, size or type of it to edit
+			if (SelectedWatches.Any(static w => w is PropertyWatch))
+			{
+				this.ModalMessageBox(
+					caption: "Game property",
+					text: "A game property's watch reads the property itself, by its name, so there is nothing of it to edit. "
+						+ "Poke sets its value; Add Game Properties adds another.");
+				return;
+			}
+
 			if (SelectedWatches.Any())
 			{
 				var we = new WatchEditor
@@ -460,6 +497,7 @@ namespace Chimera.Client.GUI
 					{
 						for (var i = 0; i < we.Watches.Count; i++)
 						{
+							we.Watches[i].OnScreen = _watches[indexes[i]].OnScreen;
 							_watches[indexes[i]] = we.Watches[i];
 						}
 					}
@@ -497,6 +535,8 @@ namespace Chimera.Client.GUI
 
 		private string ComputeDisplayType(Watch w)
 		{
+			if (w is PropertyWatch property) return property.Element.Property.TypeText;
+
 			string s = w.Size == WatchSize.Byte ? "1" : (w.Size == WatchSize.Word ? "2" : "4");
 			switch (w.Type)
 			{
@@ -671,11 +711,11 @@ namespace Chimera.Client.GUI
 			}
 			else if (!_watches[index].IsValid)
 			{
-				color = Color.PeachPuff;
+				color = ThemeEngine.Color(ThemeColorRole.RowInvalid);
 			}
 			else if (MainForm.CheatList.IsActive(_watches[index].Domain, _watches[index].Address))
 			{
-				color = Color.LightCyan;
+				color = ThemeEngine.Color(ThemeColorRole.RowActive);
 			}
 		}
 
@@ -699,6 +739,9 @@ namespace Chimera.Client.GUI
 
 			switch (column.Name)
 			{
+				case WatchList.OnScreen:
+					text = " "; // not empty, or the roll writes the column's name over the box on hover
+					break;
 				case WatchList.Address:
 					text = _watches[index].AddressString;
 					break;
@@ -784,6 +827,32 @@ namespace Chimera.Client.GUI
 			PokeAddressMenuItem.Enabled =
 				FreezeAddressMenuItem.Enabled =
 					MayPokeAllSelected;
+
+			// only a game core has properties to offer
+			_addGamePropertiesMenuItem.Visible = GameProperties is not null;
+		}
+
+		/// <summary>
+		/// Offers the core's properties by name and watches the ones ticked, each named
+		/// after its property and read at its own width and sign.
+		/// </summary>
+		private void AddGameProperties()
+		{
+			if (GameProperties is null) return;
+			using GamePropertyPicker picker = new(
+				GameProperties,
+				e => GameProperties.Text(e),
+				// a dynamic table's property is known by its name alone: where it is changes
+				e => _watches.Any(w => !w.IsSeparator && w.Notes == e.Name && w.Domain?.Name == e.Property.Domain && (e.Property.Dynamic || w.Address == e.Offset)));
+			if (!this.ShowDialogWithTempMute(picker).IsOk()) return;
+			foreach (var element in picker.Chosen)
+			{
+				if (MemoryDomains[element.Property.Domain] is { } domain) _watches.Add(GamePropertyWatches.WatchOf(GameProperties, element, domain));
+			}
+			Changes();
+			UpdateWatchCount();
+			WatchListView.RowCount = _watches.Count;
+			GeneralUpdate();
 		}
 
 		private MemoryDomain _currentDomain;
@@ -806,7 +875,7 @@ namespace Chimera.Client.GUI
 			};
 			we.SetWatch(CurrentDomain);
 			if (!this.ShowDialogWithTempMute(we).IsOk()) return;
-			_watches.Add(we.Watches[0]);
+			_watches.Add(GamePropertyWatches.Named(we.Watches[0], GameProperties));
 			Changes();
 			UpdateWatchCount();
 			WatchListView.RowCount = _watches.Count;
@@ -850,6 +919,7 @@ namespace Chimera.Client.GUI
 			var ab = _watches[index];
 			if (!ab.IsSplittable) return;
 			var (a, b) = SplitWatch(ab);
+			a.OnScreen = b.OnScreen = ab.OnScreen;
 			_watches[index] = a;
 			_watches.Insert(index + 1, b);
 		}
@@ -871,6 +941,14 @@ namespace Chimera.Client.GUI
 
 		private void PokeAddress()
 		{
+			// a game property takes what the engine parses - a name, text, a 64-bit number -
+			// which the numeric poke box cannot enter
+			if (SelectedWatches.Any(static w => w is PropertyWatch))
+			{
+				PokeProperties();
+				return;
+			}
+
 			if (SelectedWatches.Any())
 			{
 				var poke = new RamPoke(DialogController, SelectedWatches, MainForm.CheatList)
@@ -883,6 +961,30 @@ namespace Chimera.Client.GUI
 					GeneralUpdate();
 				}
 			}
+		}
+
+		/// <summary>
+		/// Sets the selected game properties from one line of text, as the engine reads it: a
+		/// number (hex after 0x), a value's name, true/false, text, or hex bytes.
+		/// </summary>
+		private void PokeProperties()
+		{
+			var properties = SelectedWatches.OfType<PropertyWatch>().ToList();
+			using InputPrompt prompt = new()
+			{
+				Text = "Poke " + (properties.Count is 1 ? properties[0].Element.Name : $"{properties.Count} properties"),
+				StartLocation = this.ChildPointToScreen(WatchListView),
+				Message = $"Value ({properties[0].Element.Property.TypeText}):",
+				TextInputType = InputPrompt.InputType.Text,
+				InitialValue = properties[0].RawText,
+			};
+			if (!this.ShowDialogWithTempMute(prompt).IsOk()) return;
+			var refused = properties.Where(p => !p.Poke(prompt.PromptText)).ToList();
+			if (refused.Count is not 0)
+			{
+				this.ModalMessageBox(caption: "Not set", text: string.Join("\n", refused.Select(static p => $"{p.Element.Name}: {p.LastPokeError}")));
+			}
+			GeneralUpdate();
 		}
 
 		private void FreezeAddressMenuItem_Click(object sender, EventArgs e)
@@ -1026,7 +1128,7 @@ namespace Chimera.Client.GUI
 
 		private void SettingsSubMenu_DropDownOpened(object sender, EventArgs e)
 		{
-			WatchesOnScreenMenuItem.Checked = Config.DisplayRamWatch;
+			WatchesOnScreenMenuItem.Checked = Config.DisplayWatchesOnScreen;
 		}
 
 		private void DefinePreviousValueSubMenu_DropDownOpened(object sender, EventArgs e)
@@ -1053,8 +1155,8 @@ namespace Chimera.Client.GUI
 
 		private void WatchesOnScreenMenuItem_Click(object sender, EventArgs e)
 		{
-			Config.DisplayRamWatch = !Config.DisplayRamWatch;
-			if (!Config.DisplayRamWatch)
+			Config.DisplayWatchesOnScreen = !Config.DisplayWatchesOnScreen;
+			if (!Config.DisplayWatchesOnScreen)
 			{
 				DisplayManager.OSD.ClearRamWatches();
 			}
@@ -1091,7 +1193,7 @@ namespace Chimera.Client.GUI
 					.First(x => x.Name == "GeneratedColumnsSubMenu"));
 
 			RamWatchMenu.Items.Add(WatchListView.ToColumnsMenu(ColumnToggleCallback));
-			Config.DisplayRamWatch = false;
+			Config.DisplayWatchesOnScreen = true;
 			WatchListView.AllColumns.Clear();
 			SetColumns();
 			WatchListView.Refresh();
@@ -1099,7 +1201,7 @@ namespace Chimera.Client.GUI
 
 		private void RamWatch_Load(object sender, EventArgs e)
 		{
-			_watches = new WatchList(MemoryDomains, Emu.SystemId);
+			_watches = new WatchList(MemoryDomains, Emu.SystemId) { GameProperties = GameProperties };
 			LoadConfigSettings();
 			RamWatchMenu.Items.Add(WatchListView.ToColumnsMenu(ColumnToggleCallback));
 			UpdateStatusBar();
@@ -1260,7 +1362,61 @@ namespace Chimera.Client.GUI
 
 		private void WatchListView_MouseDoubleClick(object sender, MouseEventArgs e)
 		{
+			// a double click on the box is two ticks, not an edit
+			if (WatchListView.CurrentCell?.Column?.Name == WatchList.OnScreen)
+			{
+				return;
+			}
+
 			OpenWatch();
+		}
+
+		private static readonly Dictionary<(int Size, bool Ticked), Bitmap> CheckBoxes = new();
+
+		private static Bitmap CheckBox(int size, bool ticked)
+		{
+			if (!CheckBoxes.TryGetValue((size, ticked), out var box))
+			{
+				box = new Bitmap(size, size);
+				using var g = Graphics.FromImage(box);
+				ControlPaint.DrawCheckBox(g, 0, 0, size, size, ButtonState.Flat | (ticked ? ButtonState.Checked : ButtonState.Normal));
+				CheckBoxes[(size, ticked)] = box;
+			}
+
+			return box;
+		}
+
+		private void WatchListView_QueryItemIcon(InputRoll sender, int index, RollColumn column, ref Bitmap icon, ref int offsetX, ref int offsetY)
+		{
+			if (column.Name != WatchList.OnScreen || index >= _watches.Count || _watches[index].IsSeparator)
+			{
+				return;
+			}
+
+			var size = Math.Max(9, sender.Font.Height - 2);
+			icon = CheckBox(size, _watches[index].OnScreen);
+			offsetX = Math.Max(0, (column.ScaledWidth - size) / 2 - 2);
+		}
+
+		/// <summary>A plain click on a watch's On Screen box ticks it or clears it.</summary>
+		private void WatchListView_MouseDown(object sender, MouseEventArgs e)
+		{
+			if (e.Button != MouseButtons.Left || ModifierKeys != Keys.None
+				|| WatchListView.CurrentCell is not { Column.Name: WatchList.OnScreen, RowIndex: int index }
+				|| index >= _watches.Count || _watches[index].IsSeparator)
+			{
+				return;
+			}
+
+			ToggleOnScreen(index);
+		}
+
+		private void ToggleOnScreen(int index)
+		{
+			_watches[index].OnScreen = !_watches[index].OnScreen;
+			Changes();
+			DisplayOnScreenWatches();
+			WatchListView.Refresh();
 		}
 
 		private void WatchListView_ColumnClick(object sender, InputRoll.ColumnClickEventArgs e)

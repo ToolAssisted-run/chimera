@@ -34,6 +34,26 @@ namespace Chimera.Client.Common
 		public IReadOnlyList<string> Systems
 			=> Core?.Systems is { Count: not 0 } fromRoster ? fromRoster : Installed.FirstOrDefault()?.Systems ?? [ ];
 
+		/// <summary>
+		/// What to call one of this core's systems: the roster row's word for it
+		/// (which is how a core nobody has installed is named at all), else what
+		/// an installed package of it says, else the id. Nothing here knows a
+		/// machine: both are the core's own words.
+		/// </summary>
+		public string SystemNameOf(string systemId)
+		{
+			if (Core?.SystemNameOf(systemId) is { } fromRoster) return fromRoster;
+			foreach (var package in Installed)
+			{
+				var named = package.SystemNameOf(systemId);
+				if (named != systemId) return named;
+			}
+			return systemId;
+		}
+
+		/// <summary>Every system the core runs, spelled out, in order.</summary>
+		public string SystemsSpelled => string.Join(", ", Systems.Select(SystemNameOf));
+
 		public bool IsInstalled => Installed.Count is not 0;
 
 		/// <summary>
@@ -43,11 +63,18 @@ namespace Chimera.Client.Common
 		public bool IsUnclaimed => Core is null;
 
 		/// <summary>
-		/// Which half of the list this belongs in. Official cores are the ones this
-		/// build ships a roster entry for; everything else - cores added by hand, and
-		/// packages nothing claims - is external, and sits below them.
+		/// Official cores are the ones this build ships a roster entry for; everything
+		/// else - cores added by hand, and packages nothing claims - is external, and is
+		/// listed after them, its source saying so.
 		/// </summary>
 		public bool IsOfficial => Core is { IsExternal: false };
+
+		/// <summary>
+		/// True for a game core (docs/game-cores.md), listed after every emulator. The
+		/// roster says so for a core that is not here yet; a package says so for itself,
+		/// which covers one added by hand or dropped in with no roster entry at all.
+		/// </summary>
+		public bool IsGameCore => Core is { IsGameCore: true } || Installed.Any(static p => p.IsGameCore);
 
 		/// <summary>
 		/// Whether removing this core should take its row away with it. An official
@@ -190,10 +217,12 @@ namespace Chimera.Client.Common
 				rows.Add(new CoreManagerRow { Installed = Newest(group.ToList()) });
 			}
 
-			// official first, then everything else: the window draws a separator
-			// between the two halves and this is what decides which side a row is on
+			// emulators, then game cores, and within each official first, then
+			// everything else - one list, whose Type and Source columns say which
+			// is which (the window filters by kind; it draws no dividers)
 			return rows
-				.OrderBy(static r => r.IsOfficial ? 0 : 1)
+				.OrderBy(static r => r.IsGameCore ? 1 : 0)
+				.ThenBy(static r => r.IsOfficial ? 0 : 1)
 				.ThenBy(static r => r.Name, StringComparer.OrdinalIgnoreCase)
 				.ToList();
 		}

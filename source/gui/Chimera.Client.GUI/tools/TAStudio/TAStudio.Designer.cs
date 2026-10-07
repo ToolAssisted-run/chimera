@@ -77,12 +77,14 @@ namespace Chimera.Client.GUI
 			this.ColumnsSubMenu = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.toolStripSeparator19 = new Chimera.WinForms.Controls.ToolStripSeparatorEx();
 			this.WindowSubMenu = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
+			this.HideMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.TasStatusStrip = new Chimera.WinForms.Controls.StatusStripEx();
 			this.MessageStatusLabel = new System.Windows.Forms.ToolStripStatusLabel();
 			this.ProgressBar = new System.Windows.Forms.ToolStripProgressBar();
 			this.toolStripStatusLabel2 = new System.Windows.Forms.ToolStripStatusLabel();
 			this.SplicerStatusLabel = new System.Windows.Forms.ToolStripStatusLabel();
 			this.TasPlaybackBox = new Chimera.Client.GUI.PlaybackBox();
+			this.TasGreenzoneBox = new Chimera.Client.GUI.GreenzoneBox();
 			this.MarkerControl = new Chimera.Client.GUI.MarkerControl();
 			this.RightClickMenu = new System.Windows.Forms.ContextMenuStrip(this.components);
 			this.SetMarkersContextMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
@@ -139,7 +141,8 @@ namespace Chimera.Client.GUI
             this.MetaSubMenu,
             this.SettingsSubMenu,
             this.ColumnsSubMenu,
-            this.WindowSubMenu});
+            this.WindowSubMenu,
+            this.HideMenuItem});
 			this.TASMenu.TabIndex = 0;
 			// 
 			// saveSelectionToMacroToolStripMenuItem
@@ -379,6 +382,12 @@ namespace Chimera.Client.GUI
 			this.WindowSubMenu.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.MoveWithMainWindowMenuItem});
 			this.WindowSubMenu.Text = "&Window";
+			// 
+			// HideMenuItem
+			// 
+			this.HideMenuItem.Alignment = System.Windows.Forms.ToolStripItemAlignment.Right;
+			this.HideMenuItem.Text = "<< Hide";
+			this.HideMenuItem.Click += new System.EventHandler(this.HideMenuItem_Click);
 			this.WindowSubMenu.DropDownOpened += new System.EventHandler(this.WindowSubMenu_DropDownOpened);
 			// 
 			// TasStatusStrip
@@ -424,6 +433,15 @@ namespace Chimera.Client.GUI
 			this.TasPlaybackBox.Size = new System.Drawing.Size(200, 108);
 			this.TasPlaybackBox.TabIndex = 5;
 			this.TasPlaybackBox.Tastudio = null;
+			// 
+			// TasGreenzoneBox
+			// 
+			this.TasGreenzoneBox.Dock = System.Windows.Forms.DockStyle.Top;
+			this.TasGreenzoneBox.Location = new System.Drawing.Point(0, 108);
+			this.TasGreenzoneBox.Name = "TasGreenzoneBox";
+			this.TasGreenzoneBox.Size = new System.Drawing.Size(200, 80);
+			this.TasGreenzoneBox.TabIndex = 6;
+			this.TasGreenzoneBox.Tastudio = null;
 			// 
 			// MarkerControl
 			// 
@@ -569,7 +587,7 @@ namespace Chimera.Client.GUI
 			// BookMarkControl
 			// 
 			this.BookMarkControl.Dock = System.Windows.Forms.DockStyle.Fill;
-			this.BookMarkControl.Location = new System.Drawing.Point(0, 108);
+			this.BookMarkControl.Location = new System.Drawing.Point(0, 188);
 			this.BookMarkControl.Name = "BookMarkControl";
 			this.BookMarkControl.Size = new System.Drawing.Size(200, 185);
 			this.BookMarkControl.TabIndex = 8;
@@ -587,15 +605,16 @@ namespace Chimera.Client.GUI
 			// BranchesMarkersSplit.Panel1
 			// 
 			this.BranchesMarkersSplit.Panel1.Controls.Add(this.BookMarkControl);
+			this.BranchesMarkersSplit.Panel1.Controls.Add(this.TasGreenzoneBox);
 			this.BranchesMarkersSplit.Panel1.Controls.Add(this.TasPlaybackBox);
-			this.BranchesMarkersSplit.Panel1MinSize = 200;
+			this.BranchesMarkersSplit.Panel1MinSize = 280;
 			this.BranchesMarkersSplit.Panel2MinSize = 90;
 			// 
 			// BranchesMarkersSplit.Panel2
 			// 
 			this.BranchesMarkersSplit.Panel2.Controls.Add(this.MarkerControl);
 			this.BranchesMarkersSplit.Size = new System.Drawing.Size(200, 524);
-			this.BranchesMarkersSplit.SplitterDistance = 293;
+			this.BranchesMarkersSplit.SplitterDistance = 373;
 			this.BranchesMarkersSplit.TabIndex = 9;
 			this.BranchesMarkersSplit.SplitterMoved += new System.Windows.Forms.SplitterEventHandler(this.BranchesMarkersSplit_SplitterMoved);
 			// 
@@ -732,10 +751,12 @@ namespace Chimera.Client.GUI
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx GoToFrameMenuItem;
 		private Chimera.WinForms.Controls.ToolStripSeparatorEx toolStripSeparator6;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx WindowSubMenu;
+		private Chimera.WinForms.Controls.ToolStripMenuItemEx HideMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx SettingsSubMenu;
 		private StatusStripEx TasStatusStrip;
 		private System.Windows.Forms.ToolStripStatusLabel MessageStatusLabel;
 		public PlaybackBox TasPlaybackBox;
+		public GreenzoneBox TasGreenzoneBox;
 		private System.Windows.Forms.ToolStripStatusLabel SplicerStatusLabel;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx MetaSubMenu;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx HeaderMenuItem;

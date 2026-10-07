@@ -36,6 +36,15 @@ namespace Chimera.Tests.Client.GUI
 				form.Rows.ToArray());
 		}
 
+		[TestMethod]
+		public void SelectAllTicksEveryRowThatCanGo()
+		{
+			using CacheManagerForm form = new(() => Three());
+			form.Show();
+			form.SelectAllForTest(true);
+			CollectionAssert.AreEquivalent(new[] { Idle, Gone }, form.TickedPaths.ToArray(), "what is open is never ticked");
+		}
+
 		/// <summary>
 		/// Removing acts on what is TICKED, so with nothing ticked there is nothing
 		/// for it to do and it says so by being unavailable rather than by
@@ -233,7 +242,7 @@ namespace Chimera.Tests.Client.GUI
 		public void TheFreeSpaceFloorIsShownAndSavedAndZeroTurnsItOff()
 		{
 			const long GB = 1024L * 1024 * 1024;
-			CacheCleanPolicy saved = null;
+			CacheCleanPolicy? saved = null;
 			using CacheManagerForm form = new(() => Three(),
 				policy: new CacheCleanPolicy { LimitBytes = 100 * GB, FreeSpaceFloorBytes = 20 * GB },
 				savePolicy: p => saved = p,

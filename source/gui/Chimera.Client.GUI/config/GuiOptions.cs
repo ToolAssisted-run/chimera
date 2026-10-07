@@ -5,7 +5,7 @@ using Chimera.Common.NumberExtensions;
 
 namespace Chimera.Client.GUI
 {
-	public partial class GuiOptions : Form
+	public partial class GuiOptions : ThemedForm
 	{
 		private readonly Action _reinitHostKeybinds;
 

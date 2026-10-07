@@ -8,7 +8,7 @@ namespace Chimera.Client.Common
 {
 
 	// don't take my word for it, but here is a guide...
-	// user -> Input -> ActiveController -> UDLR -> StickyXORPlayerInputAdapter -> TurboAdapter(TBD) -> Lua(?TBD?) -> ..
+	// user -> Input -> ActiveController -> StickyXORPlayerInputAdapter -> TurboAdapter(TBD) -> Lua(?TBD?) -> ..
 	// .. -> MovieInputSourceAdapter -> (MovieSession) -> MovieOutputAdapter -> ControllerOutput(1) -> Game
 	// (1)->Input Display
 #pragma warning disable MA0104 // unlikely to conflict with System.Windows.Input.InputManager
@@ -23,8 +23,6 @@ namespace Chimera.Client.Common
 
 		// the "output" port for the controller chain.
 		public CopyControllerAdapter ControllerOutput { get; } = new CopyControllerAdapter();
-
-		private UdlrControllerAdapter UdLRControllerAdapter { get; } = new UdlrControllerAdapter();
 
 		public StickyHoldController StickyHoldController { get; private set; }
 		public StickyAutofireController StickyAutofireController { get; private set; }
@@ -58,35 +56,13 @@ namespace Chimera.Client.Common
 		public void SyncControls(IEmulator emulator, IMovieSession session, Config config)
 		{
 			var def = emulator.ControllerDefinition;
-			def.BuildMnemonicsCache(emulator.SystemId);
+			def.BuildMnemonicsCache();
 
 			// Core packages may ship default bindings for the controllers they declare
-			// (default_keybinds.json); adopt them for controllers this config has never
-			// seen. A controller the config names but binds NOTHING for counts as never
-			// seen: a session from before the package carried bindings leaves that
-			// empty section behind, and it must not shadow the defaults forever. Any
-			// actual user binding wins, as always.
-			var packageDefaults = CoreRegistry.Instance.PackageControlDefaults;
-			if (!(config.AllTrollers.TryGetValue(def.Name, out var seenBinds) && seenBinds.Count is not 0)
-				&& packageDefaults.AllTrollers.TryGetValue(def.Name, out var defaultBinds))
-			{
-				config.AllTrollers[def.Name] = new Dictionary<string, string>(defaultBinds);
-			}
-			if (!(config.AllTrollersAutoFire.TryGetValue(def.Name, out var seenAF) && seenAF.Count is not 0)
-				&& packageDefaults.AllTrollersAutoFire.TryGetValue(def.Name, out var defaultAFBinds))
-			{
-				config.AllTrollersAutoFire[def.Name] = new Dictionary<string, string>(defaultAFBinds);
-			}
-			if (!(config.AllTrollersAnalog.TryGetValue(def.Name, out var seenAnalog) && seenAnalog.Count is not 0)
-				&& packageDefaults.AllTrollersAnalog.TryGetValue(def.Name, out var defaultAnalogBinds))
-			{
-				config.AllTrollersAnalog[def.Name] = new Dictionary<string, AnalogBind>(defaultAnalogBinds);
-			}
-			if (!(config.AllTrollersFeedbacks.TryGetValue(def.Name, out var seenFB) && seenFB.Count is not 0)
-				&& packageDefaults.AllTrollersFeedbacks.TryGetValue(def.Name, out var defaultFeedbackBinds))
-			{
-				config.AllTrollersFeedbacks[def.Name] = new Dictionary<string, FeedbackBind>(defaultFeedbackBinds);
-			}
+			// (default_keybinds.json): a controller this config has never bound takes
+			// them, and one whose bindings are still the package's follows the package
+			// when its defaults change. Any actual user binding wins, as always.
+			ControlDefaultsAdoption.Apply(config, CoreRegistry.Instance.PackageControlDefaults, def.Name);
 
 			ActiveController = BindToDefinition(def, config.AllTrollers, config.AllTrollersAnalog, config.AllTrollersFeedbacks);
 			AutoFireController = BindToDefinitionAF(emulator, config.AllTrollersAutoFire, config.AutofireOn, config.AutofireOff);
@@ -100,12 +76,9 @@ namespace Chimera.Client.Common
 
 			// Wire up input chain
 
-			UdLRControllerAdapter.Source = ActiveController.Or(AutoFireController);
-			UdLRControllerAdapter.OpposingDirPolicy = config.OpposingDirPolicy;
-
 			StickyController = StickyHoldController.Or(StickyAutofireController);
 
-			session.MovieIn = UdLRControllerAdapter.Xor(StickyController);
+			session.MovieIn = ActiveController.Or(AutoFireController).Xor(StickyController);
 			session.StickySource = StickyController;
 			ControllerOutput.Source = session.MovieOut;
 		}

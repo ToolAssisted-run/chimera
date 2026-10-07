@@ -1,6 +1,7 @@
 ﻿#nullable enable
 
 using System;
+using System.ComponentModel;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -31,6 +32,18 @@ namespace Chimera.Client.GUI
 	public sealed class NewProjectWizard : FormBase
 	{
 		private readonly IReadOnlyList<DiscoveredCorePackage> _cores;
+
+		/// <summary>The package on each line of the core picker: the installed cores of the chosen kind.</summary>
+		private readonly List<DiscoveredCorePackage> _coreAt = new();
+
+		/// <summary>
+		/// An emulator or a game (docs/game-cores.md), chosen above the core; the core picker lists
+		/// that kind only, where it used to list both with a divider line between them.
+		/// </summary>
+		private readonly CoreKindFilterBox _kind;
+
+		/// <summary>Two builds of one core installed side by side, whose lines name their packages.</summary>
+		private readonly List<string> _sharedNames;
 		private readonly Func<ProjectSlotDeclaration.Slot, string[]> _pickFiles;
 
 		private readonly Panel[] _pages = new Panel[5];
@@ -57,11 +70,11 @@ namespace Chimera.Client.GUI
 		private Button _precompileButton;
 		private Label _precompileStatus;
 		private ProgressBar _precompileBar;
-		private CoreCacheManifest _precompileManifest;
+		private CoreCacheManifest? _precompileManifest;
 		private bool _precompiling;
 
 		/// <summary>the game's modules, and how many the sessions have finished</summary>
-		private uint _precompileExpected, _precompileDone;
+		private uint _precompileExpected;
 
 		/// <summary>Cancel was pressed while the sessions were running</summary>
 		private bool _precompileCancelled;
@@ -96,6 +109,42 @@ namespace Chimera.Client.GUI
 
 		// page 3
 		private readonly PropertyGrid _settingsGrid;
+		private readonly Panel _presetRow;
+		private bool _presetRowShown;
+
+		/// <summary>
+		/// What the core said about this game when the settings page was reached
+		/// (a core that exports SuggestSettings): where the values it applied come
+		/// from, or that it found nothing. Hidden for a core that says nothing.
+		/// </summary>
+		private readonly TextBox _suggestionNote;
+		private bool _suggestionShown;
+
+		/// <summary>The core and game the suggestion was last asked for, and what it set.</summary>
+		private string? _suggestedFor;
+		private List<string> _suggestedKeys = [ ];
+
+		/// <summary>
+		/// The chosen game's own settings, as the core declared them in its
+		/// suggestion (an arcade game's dip switches). Shown after the package's.
+		/// </summary>
+		private List<WaterboxConfig.SettingDecl> _gameSettings = [ ];
+
+		/// <summary>
+		/// The core and game a seeded project arrived with: its settings are the
+		/// project's own, so the suggestion is shown for them but not applied.
+		/// </summary>
+		private string? _seededFor;
+
+		/// <summary>
+		/// The game and the core the wizard was seeded with, for as long as what that
+		/// core suggested for that game may still be sitting in the settings (see
+		/// <see cref="TakeBackTheSeededSuggestion"/>).
+		/// </summary>
+		private string? _seededGame;
+		private string? _seededCore;
+		private readonly ComboBox _presets;
+		private readonly Button _applyPreset;
 		private WaterboxCoreSettings? _settings;
 		private WaterboxConfig? _cfg;
 
@@ -126,7 +175,15 @@ namespace Chimera.Client.GUI
 		private readonly ListView _firmwareList;
 		private readonly Button _firmwareSetButton;
 		private readonly Button _firmwareClearButton;
-		private readonly Func<string?>? _pickFirmwareFolder;
+
+		/// <summary>
+		/// Whether Scan Folder walks below the folder it is given; ticked. It is the page's memory of the
+		/// choice in every case, and is SHOWN only where the folder picker cannot carry the option itself
+		/// (see <see cref="FolderBrowserEx.CanShowCheckBox"/>) - on Windows the dialog asks, and two
+		/// controls for one setting would be worse than either.
+		/// </summary>
+		private readonly CheckBox _firmwareScanSubfolders;
+		private readonly PickScanFolder? _pickFirmwareFolder;
 		private List<FirmwareNeed> _firmwareNeeds = new();
 		private IReadOnlyList<FirmwareLocator.IndexedFile> _firmwareIndex = [ ];
 
@@ -134,8 +191,26 @@ namespace Chimera.Client.GUI
 		{
 			public string Id = "";
 			public CoreFirmwareDecl? Decl;
-			public string? ChosenPath; // for a pinned entry, set only when the hash matched exactly
-			public string? ChosenSha1; // the actual hash - equals the pin, or names an unpinned choice
+			public string? ChosenPath; // for a pinned entry, set only when the hash matched exactly - or, for a game core, a file of the project's own
+			public string? ChosenSha1; // the actual hash - equals the pin, or names an unpinned (or custom) choice
+
+			/// <summary>
+			/// The chosen file is not the one the declaration pins: a game
+			/// core's firmware may be a file of the project's own (a modified
+			/// one), and the project pins ITS hash (docs/game-cores.md).
+			/// </summary>
+			public bool Custom => ChosenSha1 is not null && Decl?.Sha1 is { Length: > 0 } pinned
+				&& !ChosenSha1.Equals(pinned, StringComparison.OrdinalIgnoreCase);
+
+			/// <summary>
+			/// This file was picked BY HAND rather than found. It survives the
+			/// page being rebuilt, because the page is rebuilt every time
+			/// somebody steps back and forward again - and answering the same
+			/// Locate dialog after every trip through the wizard is not a
+			/// thing anybody should have to do. A change that makes the
+			/// requirement itself different drops it; see CarryHandPicked.
+			/// </summary>
+			public bool PickedByHand;
 
 			/// <summary>
 			/// A file was chosen - or the core said it can start without one
@@ -166,11 +241,12 @@ namespace Chimera.Client.GUI
 			Func<ProjectSlotDeclaration.Slot, string[]> pickFiles,
 			Func<string, string?>? pickFirmwareFile = null,
 			IReadOnlyList<string>? firmwareSearchDirs = null,
-			Func<string?>? pickFirmwareFolder = null,
+			PickScanFolder? pickFirmwareFolder = null,
 			Func<string, string, string?>? rememberedFirmwarePath = null,
 			Action<string, IReadOnlyDictionary<string, string>>? rememberFirmwareNow = null,
 			string? configPath = null,
-			Func<string, IReadOnlyList<string>>? rememberedFirmwarePaths = null)
+			Func<string, IReadOnlyList<string>>? rememberedFirmwarePaths = null,
+			CoreKindFilter kind = CoreKindFilter.Emulators)
 		{
 			_rememberedFirmwarePaths = rememberedFirmwarePaths ?? (static _ => [ ]);
 			_configPath = configPath;
@@ -181,7 +257,7 @@ namespace Chimera.Client.GUI
 			_rememberFirmwareNow = rememberFirmwareNow ?? (static (_, _) => { });
 			// the versions of one core newest first (issue #67): the picker opens on the latest, and so
 			// does everything below that takes "the first package that ..."
-			_cores = CoreVersionDates.NewestFirst(cores.Where(static c => c.Error is null));
+			_cores = CoreVersionDates.NewestFirst(cores.Where(static c => c.Error is null)).ToList();
 			_pickFiles = pickFiles;
 
 			SuspendLayout();
@@ -204,38 +280,40 @@ namespace Chimera.Client.GUI
 
 			// ---- page 1: the machine ---------------------------------------------
 			var p1 = _pages[0];
-			p1.Controls.Add(MakeHeading("Please select the emulation core."));
-			p1.Controls.Add(MakeLabel("Emulation core:", 8, 52));
+			p1.Controls.Add(MakeHeading("Please select the core: an emulator, or a game."));
+			// the kind first: it decides what the core picker lists. A kind no installed core
+			// is cannot be chosen, and the wizard opens on the one asked for (the last project's)
+			// when there is one of it to choose
+			p1.Controls.Add(MakeLabel("Kind:", 8, 52));
+			_kind = new CoreKindFilterBox(null, offerAll: false) { Location = Pt(110, 50) };
+			var anyEmulator = _cores.Any(static c => !c.IsGameCore);
+			var anyGame = _cores.Any(static c => c.IsGameCore);
+			_kind.Offer(anyEmulator, anyGame);
+			_kind.Value = kind is CoreKindFilter.Games && anyGame || !anyEmulator ? CoreKindFilter.Games : CoreKindFilter.Emulators;
+			p1.Controls.Add(_kind);
+
+			p1.Controls.Add(MakeLabel("Core:", 8, 84));
 			_core = new ComboBox
 			{
 				Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
 				DropDownStyle = ComboBoxStyle.DropDownList,
-				Location = Pt(110, 48),
+				Location = Pt(110, 80),
 				Width = UIHelper.ScaleX(442),
 			};
 			// two builds of one core can be installed side by side (issue #63), and the version
 			// alone does not tell them apart when both are local builds of one commit
-			var sharedNames = _cores.GroupBy(static c => c.Name).Where(static g => g.Count() > 1).Select(static g => g.Key).ToList();
-			foreach (var core in _cores)
-			{
-				// the version at commit length, not the build script's full bookkeeping:
-				// this is a picker, and "12d65377b7d3-dirty+local" says nothing here
-				// that "12d65377 local" does not
-				var build = sharedNames.Contains(core.Name) && core.Sha1 is { Length: >= 8 } ? $"  [package {core.Sha1.Substring(0, 8)}]" : "";
-				// dated (issue #67): a commit says which version this is, and only a date says which is newer
-				var version = core.DatedVersion;
-				_core.Items.Add($"{core.Name}  ({SystemNames.Of(core.Systems)}{(version.Length is 0 ? "" : $", {version}")}){build}");
-			}
+			_sharedNames = _cores.GroupBy(static c => c.Name).Where(static g => g.Count() > 1).Select(static g => g.Key).ToList();
+			FillCores();
 			p1.Controls.Add(_core);
 
 			// The core decides the systems, the system decides the renderers: the
 			// combos read top to bottom in the order they inform each other.
-			_machineLabel = MakeLabel("System:", 8, 84);
+			_machineLabel = MakeLabel("System:", 8, 116);
 			_machine = new ComboBox
 			{
 				Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
 				DropDownStyle = ComboBoxStyle.DropDownList,
-				Location = Pt(110, 80),
+				Location = Pt(110, 112),
 				Width = UIHelper.ScaleX(442),
 			};
 			_machine.SelectedIndexChanged += (_, _) =>
@@ -246,12 +324,12 @@ namespace Chimera.Client.GUI
 			};
 			p1.Controls.AddRange([ _machineLabel, _machine ]);
 
-			p1.Controls.Add(MakeLabel("Renderer:", 8, 116));
+			p1.Controls.Add(MakeLabel("Renderer:", 8, 148));
 			_renderer = new ComboBox
 			{
 				Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
 				DropDownStyle = ComboBoxStyle.DropDownList,
-				Location = Pt(110, 112),
+				Location = Pt(110, 144),
 				Width = UIHelper.ScaleX(442),
 			};
 			_renderer.SelectedIndexChanged += (_, _) =>
@@ -269,14 +347,20 @@ namespace Chimera.Client.GUI
 			{
 				Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
 				AutoSize = false,
-				ForeColor = SystemColors.GrayText,
-				Location = Pt(110, 138),
+				Location = Pt(110, 170),
 				Size = new(UIHelper.ScaleX(442), UIHelper.ScaleY(46)),
 			};
+			_rendererCaveat.SetForeRole(ThemeColorRole.DisabledText);
 			p1.Controls.Add(_rendererCaveat);
 			p1.Controls.Add(MakeIssuesNotice());
 			_core.SelectedIndexChanged += (_, _) => LoadChosenPackage();
-			if (_core.Items.Count is not 0) _core.SelectedIndex = 0;
+			// another kind lists its cores, and the first - the newest of the first core - is chosen
+			_kind.Changed += () =>
+			{
+				FillCores();
+				if (_coreAt.Count is not 0) _core.SelectedIndex = 0;
+			};
+			if (_coreAt.Count is not 0) _core.SelectedIndex = 0;
 			LoadChosenPackage();
 
 			// ---- page 2: the core-informed file form -----------------------------
@@ -294,6 +378,56 @@ namespace Chimera.Client.GUI
 			// ---- page 3: settings ------------------------------------------------
 			var p3 = _pages[2];
 			p3.Controls.Add(MakeHeading("Please specify the emulation configuration settings."));
+			// The preset row sits ABOVE the settings, because that is the order the
+			// decisions are made in: pick a machine somebody else has already got
+			// working, then adjust it. It is absent - not disabled, not empty -
+			// for a core that suggests nothing, so no core grows a dead control.
+			_presetRow = new Panel
+			{
+				Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
+				Location = Pt(8, 46),
+				Size = new(UIHelper.ScaleX(544), UIHelper.ScaleY(28)),
+				Visible = false,
+			};
+			var presetLabel = new Label
+			{
+				AutoSize = true,
+				Location = Pt(0, 6),
+				Text = "Preset:",
+			};
+			_presets = new ComboBox
+			{
+				Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
+				DropDownStyle = ComboBoxStyle.DropDownList,
+				Location = Pt(52, 2),
+				Size = new(UIHelper.ScaleX(414), UIHelper.ScaleY(23)),
+			};
+			_applyPreset = new Button
+			{
+				Anchor = AnchorStyles.Top | AnchorStyles.Right,
+				Location = Pt(472, 1),
+				Size = new(UIHelper.ScaleX(72), UIHelper.ScaleY(25)),
+				Text = "Apply",
+			};
+			_applyPreset.Click += (_, _) => ApplySelectedPreset();
+			_presetRow.Controls.Add(presetLabel);
+			_presetRow.Controls.Add(_presets);
+			_presetRow.Controls.Add(_applyPreset);
+			p3.Controls.Add(_presetRow);
+			// selectable, so the source it names can be copied into a browser
+			_suggestionNote = new TextBox
+			{
+				Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
+				Location = Pt(8, 46),
+				Size = new(UIHelper.ScaleX(544), UIHelper.ScaleY(62)),
+				Multiline = true,
+				ReadOnly = true,
+				WordWrap = true,
+				ScrollBars = ScrollBars.Vertical,
+				Visible = false,
+				TabStop = false,
+			};
+			p3.Controls.Add(_suggestionNote);
 			_settingsGrid = new PropertyGrid
 			{
 				Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
@@ -308,6 +442,11 @@ namespace Chimera.Client.GUI
 				UpdateNavLabels();
 			};
 			p3.Controls.Add(_settingsGrid);
+			// AFTER the page owns it: the box goes in beside the grid, and a grid
+			// with no parent has nowhere to put one. A core describes its settings
+			// in paragraphs (waterbox.config) and the grid's own pane holds two
+			// lines of them (issue #41).
+			_settingsGrid.UseScrollableDescription();
 
 			// ---- page 4: firmware, decided by everything chosen above ------------
 			var p4 = _pages[3];
@@ -329,14 +468,48 @@ namespace Chimera.Client.GUI
 			_firmwareList.Columns.Add("Status", UIHelper.ScaleX(160));
 			_firmwareList.SelectedIndexChanged += (_, _) => UpdateFirmwareButtons();
 			_firmwareList.DoubleClick += (_, _) => SetFirmwareFile();
-			_firmwareSetButton = new Button { AutoSize = true, Location = Pt(8, 344), Text = "Select File..." };
+			_firmwareSetButton = new Button { Anchor = AnchorStyles.Bottom | AnchorStyles.Left, AutoSize = true, Location = Pt(8, 344), Text = "Select File..." };
 			_firmwareSetButton.Click += (_, _) => SetFirmwareFile();
-			_firmwareClearButton = new Button { AutoSize = true, Location = Pt(110, 344), Text = "Clear" };
+			_firmwareClearButton = new Button { Anchor = AnchorStyles.Bottom | AnchorStyles.Left, AutoSize = true, Location = Pt(110, 344), Text = "Clear" };
 			_firmwareClearButton.Click += (_, _) => ClearFirmwareFile();
-			Button firmwareScanButton = new() { AutoSize = true, Location = Pt(178, 344), Text = "Scan Folder..." };
+			Button firmwareScanButton = new() { Anchor = AnchorStyles.Bottom | AnchorStyles.Left, AutoSize = true, Location = Pt(178, 344), Text = "Scan Folder..." };
 			firmwareScanButton.Click += (_, _) => ScanFirmwareFolder();
 			firmwareScanButton.Visible = pickFirmwareFolder is not null;
-			p4.Controls.AddRange([ _firmwareList, _firmwareSetButton, _firmwareClearButton, firmwareScanButton ]);
+			// Ticked, because that is what the scan always did and what somebody
+			// pointing at a firmware folder means. It exists so the behaviour is
+			// visible and so it can be turned OFF: a folder holding a whole
+			// collection takes a while, and stopping at the MaxFiles cap is a
+			// blunter way to end a scan than not descending in the first place.
+			//
+			// Where the folder picker can carry the option itself it is hidden,
+			// not removed: it is still where this page remembers the answer
+			// between scans, and it is what a person sets on a toolkit whose
+			// folder dialog has no room for a control of ours.
+			_firmwareScanSubfolders = new CheckBox
+			{
+				Anchor = AnchorStyles.Bottom | AnchorStyles.Left,
+				AutoSize = true,
+				Checked = true,
+				Text = FolderBrowserEx.ScanSubfoldersLabel,
+				Visible = pickFirmwareFolder is not null && !FolderBrowserEx.CanShowCheckBox,
+			};
+			// Centred on the button rather than placed at a guessed offset: a
+			// check box is shorter than a button, by an amount that depends on
+			// the font and the display's scaling, so any fixed y sits wrong
+			// somewhere. Asked of the controls themselves, it is right everywhere.
+			// The buttons are laid out the same way, each after the one before it
+			// (issue #160): at fixed x the Clear button - never narrower than a
+			// button's default width - covered the left edge of Scan Folder.
+			// An AutoSize button grows but does not shrink below its default
+			// size, so its right edge is the wider of the two.
+			static int RightOf(Control c) => c.Left + Math.Max(c.Width, c.PreferredSize.Width);
+			_firmwareClearButton.Left = RightOf(_firmwareSetButton) + UIHelper.ScaleX(6);
+			firmwareScanButton.Left = RightOf(_firmwareClearButton) + UIHelper.ScaleX(6);
+			_firmwareScanSubfolders.Location = new Point(
+				RightOf(firmwareScanButton) + UIHelper.ScaleX(8),
+				firmwareScanButton.Top
+					+ ((firmwareScanButton.PreferredSize.Height - _firmwareScanSubfolders.PreferredSize.Height) / 2));
+			p4.Controls.AddRange([ _firmwareList, _firmwareSetButton, _firmwareClearButton, firmwareScanButton, _firmwareScanSubfolders ]);
 
 			// ---- page 5: the code the core compiles for this game -----------------
 			var p5 = _pages[4];
@@ -374,7 +547,7 @@ namespace Chimera.Client.GUI
 				Size = new(UIHelper.ScaleX(544), UIHelper.ScaleY(14)),
 				Visible = false,
 			};
-			_precompileButton = new Button { AutoSize = true, Location = Pt(8, 344), Text = "Compile" };
+			_precompileButton = new Button { Anchor = AnchorStyles.Bottom | AnchorStyles.Left, AutoSize = true, Location = Pt(8, 344), Text = "Compile" };
 			_precompileButton.Click += (_, _) => RunPrecompile();
 			_precompileStatus = new Label
 			{
@@ -392,10 +565,10 @@ namespace Chimera.Client.GUI
 			{
 				Anchor = AnchorStyles.Bottom | AnchorStyles.Left,
 				AutoEllipsis = true,
-				ForeColor = Color.Firebrick,
 				Location = Pt(8, 386),
 				Size = new(UIHelper.ScaleX(360), UIHelper.ScaleY(16)),
 			};
+			_status.SetForeRole(ThemeColorRole.AccentError);
 			_backButton = MakeNavButton("< Back", GoBack);
 			_nextButton = MakeNavButton("Next >", Advance);
 			Button cancel = MakeNavButton("Cancel", CancelPressed);
@@ -437,12 +610,12 @@ namespace Chimera.Client.GUI
 			{
 				Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
 				AutoSize = false,
-				ForeColor = SystemColors.GrayText,
 				LinkBehavior = LinkBehavior.HoverUnderline,
 				Location = Pt(8, 352),
 				Size = new(UIHelper.ScaleX(544), UIHelper.ScaleY(20)),
 				Text = text,
 			};
+			notice.SetForeRole(ThemeColorRole.DisabledText);
 			notice.Links.Clear();
 			notice.Links.Add(text.IndexOf(IssuesUrl, StringComparison.Ordinal), IssuesUrl.Length, IssuesUrl);
 			notice.LinkClicked += static (_, e) => Util.OpenUrlExternal((string) e.Link.LinkData);
@@ -493,8 +666,57 @@ namespace Chimera.Client.GUI
 
 		public int CoreChoiceIndex => _core.SelectedIndex;
 
+		/// <summary>Picks a line of the core picker as a person would, for tests.</summary>
+		public void ChooseCoreLine(int line) => _core.SelectedIndex = line;
+
+		/// <summary>The kind the core picker lists: the owner remembers it for the next project.</summary>
+		public CoreKindFilter Kind => _kind.Value;
+
+		/// <summary>Chooses a kind as a person would, for tests.</summary>
+		public void ChooseKindForTest(CoreKindFilter kind) => _kind.ChooseForTest(kind);
+
 		private DiscoveredCorePackage? ChosenCore
-			=> _core.SelectedIndex is >= 0 and var i && i < _cores.Count ? _cores[i] : null;
+			=> _core.SelectedIndex is >= 0 and var i && i < _coreAt.Count ? _coreAt[i] : null;
+
+		/// <summary>The picker's line for a package among the kind it lists, or -1.</summary>
+		private int LineOf(DiscoveredCorePackage? core) => core is null ? -1 : _coreAt.IndexOf(core);
+
+		/// <summary>Lists the installed cores of the chosen kind in the core picker.</summary>
+		private void FillCores()
+		{
+			_core.BeginUpdate();
+			_core.Items.Clear();
+			_coreAt.Clear();
+			foreach (var core in _cores.Where(c => _kind.Value.Shows(c.IsGameCore)))
+			{
+				// the version at commit length, not the build script's full bookkeeping:
+				// this is a picker, and "12d65377b7d3-dirty+local" says nothing here
+				// that "12d65377 local" does not
+				var build = _sharedNames.Contains(core.Name) && core.Sha1 is { Length: >= 8 } ? $"  [package {core.Sha1.Substring(0, 8)}]" : "";
+				// dated (issue #67): a commit says which version this is, and only a date says which is newer
+				var version = core.DatedVersion;
+				_core.Items.Add($"{core.Name}  ({core.SystemsSpelled}{(version.Length is 0 ? "" : $", {version}")}){build}");
+				_coreAt.Add(core);
+			}
+			_core.EndUpdate();
+		}
+
+		/// <summary>
+		/// Chooses a package, showing its kind first when the picker lists the other: a file
+		/// dropped on the wizard, or a project's answers, can name a core of either.
+		/// </summary>
+		private bool Choose(DiscoveredCorePackage? core)
+		{
+			if (core is null) return false;
+			var kind = core.IsGameCore ? CoreKindFilter.Games : CoreKindFilter.Emulators;
+			if (_kind.Value != kind)
+			{
+				_kind.Value = kind;
+				FillCores();
+			}
+			_core.SelectedIndex = LineOf(core);
+			return true;
+		}
 
 		/// <summary>
 		/// Reads the chosen package's declaration and offers its machines. Done as
@@ -526,7 +748,7 @@ namespace Chimera.Client.GUI
 			else if (core is not null)
 			{
 				// a package that is one machine still says which machine it is
-				_machine.Items.Add(SystemNames.Of(core.Systems));
+				_machine.Items.Add(core.SystemsSpelled);
 			}
 			if (_machine.Items.Count is not 0) _machine.SelectedIndex = 0;
 			// one system is not a choice, and a disabled box still says what it is
@@ -563,10 +785,7 @@ namespace Chimera.Client.GUI
 		/// <returns>false when no installed core claims the extension</returns>
 		public bool StartFrom(string path)
 		{
-			var index = GuessCoreIndexFor(path);
-			if (index < 0) return false;
-
-			_core.SelectedIndex = index;
+			if (!Choose(GuessCoreFor(path))) return false;
 			LoadChosenPackage();
 			if (!BuildSlotForm()) return false;
 
@@ -576,12 +795,15 @@ namespace Chimera.Client.GUI
 			return true;
 		}
 
-		/// <summary>Which installed package says it handles this file, or -1.</summary>
-		public int GuessCoreIndexFor(string path)
+		/// <summary>The picker's line for the installed package that says it handles this file, or -1.</summary>
+		public int GuessCoreIndexFor(string path) => LineOf(GuessCoreFor(path));
+
+		/// <summary>Which installed package says it handles this file, or null.</summary>
+		public DiscoveredCorePackage? GuessCoreFor(string path)
 		{
 			var extension = Path.GetExtension(path);
-			if (string.IsNullOrEmpty(extension)) return -1;
-			return _cores.ToList().FindIndex(c => c.Extensions.ContainsKey(extension.ToLowerInvariant()));
+			if (string.IsNullOrEmpty(extension)) return null;
+			return _cores.FirstOrDefault(c => c.Extensions.ContainsKey(extension.ToLowerInvariant()));
 		}
 
 		/// <summary>
@@ -601,13 +823,13 @@ namespace Chimera.Client.GUI
 
 		public void SeedFrom(ProjectAnswers answers)
 		{
-			var index = _cores.ToList().FindIndex(c =>
-				string.Equals(c.Name, answers.CoreName, StringComparison.OrdinalIgnoreCase));
-			if (index < 0) return;   // that core is not installed; leave the wizard blank
-			_core.SelectedIndex = index;
+			// that core not installed: the wizard is left blank
+			if (!Choose(_cores.FirstOrDefault(c => answers.CorePath is not null && c.Path == answers.CorePath)
+				?? _cores.FirstOrDefault(c => string.Equals(c.Name, answers.CoreName, StringComparison.OrdinalIgnoreCase)))) return;
 			LoadChosenPackage();
 
 			SeedSettings(answers.SettingsJson);
+			_seededFor = null; // settled below, once the files are in
 
 			// the slot form has to exist before anything can be put in it
 			if (!BuildSlotForm()) return;
@@ -619,7 +841,16 @@ namespace Chimera.Client.GUI
 			// and the files can decide settings in their turn
 			RefreshExposedSettings();
 			_settingsGrid.SelectedObject = _settings;
+			// the project's settings are its own: what the core would suggest for
+			// this game is shown on the settings page, not applied over them
+			_seededFor = SuggestionKey();
+			_seededGame = PrecompileRomPath();
+			_seededCore = ChosenCore?.Path;
+			_seededFirmware = answers.Firmware;
 		}
+
+		/// <summary>Firmware the answers came with (<see cref="ProjectAnswers.Firmware"/>), offered on every firmware page build.</summary>
+		private IReadOnlyList<(string Id, string Path)> _seededFirmware = [ ];
 
 		/// <summary>
 		/// Puts a project's saved values into the settings object, then lets the
@@ -648,11 +879,11 @@ namespace Chimera.Client.GUI
 				}
 			}
 
-			if (_cfg?.HasMachines is true)
+			if (_cfg?.Machines is { Count: > 0 } machines)
 			{
 				var effective = WaterboxCore.EffectiveSettingsFor(_cfg, _settings);
 				var machine = _cfg.MachineFor(effective);
-				var at = machine is null ? -1 : _cfg.Machines.IndexOf(machine);
+				var at = machine is null ? -1 : machines.IndexOf(machine);
 				if (at >= 0) _machine.SelectedIndex = at;
 			}
 			// read before the pickers are refreshed: refreshing them selects the
@@ -779,10 +1010,17 @@ namespace Chimera.Client.GUI
 		/// </summary>
 		private void PinMachine()
 		{
-			if (_cfg?.HasMachines is not true || _settings is null) return;
-			var index = Math.Max(0, Math.Min(_cfg.Machines.Count - 1, _machine.SelectedIndex));
-			var machine = _cfg.Machines[index];
-			_settings.Values[_cfg.MachineSetting] = machine.When is { Count: > 0 } ? machine.When[0] : machine.Id;
+			// the package's own loader refuses machines without a setting to pick
+			// between them, so these two are there together or not at all
+			if (_cfg?.Machines is not { Count: > 0 } machines
+				|| _cfg.MachineSetting is not { Length: > 0 } machineSetting
+				|| _settings is null)
+			{
+				return;
+			}
+			var index = Math.Max(0, Math.Min(machines.Count - 1, _machine.SelectedIndex));
+			var machine = machines[index];
+			_settings.Values[machineSetting] = machine.When is { Count: > 0 } ? machine.When[0] : machine.Id ?? "";
 			// the machine decides which files the project takes, so a form built for
 			// another machine is stale
 			_declarationCore = null;
@@ -790,8 +1028,8 @@ namespace Chimera.Client.GUI
 
 		/// <summary>The machine chosen on page one, for tests.</summary>
 		public string? ChosenMachine
-			=> _cfg?.HasMachines is true && _machine.SelectedIndex >= 0
-				? _cfg.Machines[_machine.SelectedIndex].Id
+			=> _cfg?.Machines is { Count: > 0 } machines && _machine.SelectedIndex >= 0
+				? machines[_machine.SelectedIndex].Id
 				: null;
 
 		/// <summary>
@@ -839,6 +1077,66 @@ namespace Chimera.Client.GUI
 			ShowPage(0);
 		}
 
+		/// <summary>
+		/// How tall the current page's content wants to be, inside the page, or
+		/// -1 when this page cannot say. Only the two pages whose content is a
+		/// core's rather than the wizard's can outgrow the window: the file form,
+		/// which has a group per declared slot, and the settings grid, which has
+		/// a row per declared setting. A DOSBox-X project has enough of both to
+		/// need a taller window than a quickerNES one, and nobody should have to
+		/// drag the corner to find that out.
+		/// </summary>
+		private int ContentHeightForPage(int page)
+		{
+			if (page is 1 && _slotsHost is not null)
+			{
+				var bottom = 0;
+				foreach (Control child in _slotsHost.Controls) bottom = Math.Max(bottom, child.Bottom);
+				return bottom is 0 ? -1 : _slotsHost.Top + bottom + UIHelper.ScaleY(8);
+			}
+			if (page is 2 && _settingsGrid is not null)
+			{
+				var rows = _settingsGrid.SelectedObject is ICustomTypeDescriptor described
+					? described.GetProperties().Count
+					: 0;
+				if (rows is 0) return -1;
+				// The grid will not say how tall its contents are - it reports a
+				// PreferredSize of zero and exposes no scroll bar to ask - so the
+				// rows are counted and measured. The pitch is the font's height
+				// plus the cell's own padding; erring a little large costs a
+				// slightly taller window, erring small costs the scrolling this
+				// is here to remove.
+				var pitch = _settingsGrid.Font.Height + UIHelper.ScaleY(5);
+				var description = 0;
+				foreach (Control child in _settingsGrid.Controls)
+				{
+					if (child is TextBox) description = Math.Max(description, child.Height);
+				}
+				return _settingsGrid.Top + (rows * pitch) + description + UIHelper.ScaleY(12);
+			}
+			return -1;
+		}
+
+		/// <summary>
+		/// Grow the window so the page fits, never past what the screen holds and
+		/// never smaller than it already is. Only ever grows: stepping between a
+		/// long page and a short one must not make the window jump about, and a
+		/// size somebody has chosen by hand is theirs to keep.
+		/// </summary>
+		private void FitToContent()
+		{
+			var wanted = ContentHeightForPage(_page);
+			if (wanted <= 0) return;
+			var have = _pages[_page].Height;
+			if (wanted <= have) return;
+
+			var grow = wanted - have;
+			var room = Screen.FromControl(this).WorkingArea.Height - UIHelper.ScaleY(80);
+			var target = Math.Min(Height + grow, room);
+			if (target <= Height) return;
+			Height = target;
+		}
+
 		private void ShowPage(int page)
 		{
 			_page = Math.Max(0, Math.Min(_pages.Length - 1, page));
@@ -846,6 +1144,22 @@ namespace Chimera.Client.GUI
 			_backButton.Enabled = _page > 0;
 			_status.Text = "";
 			UpdateNavLabels();
+			FitToContent();
+		}
+
+		/// <summary>
+		/// Go back to a step because something is wrong with it, saying what.
+		/// ShowPage clears the status - it is moving to a fresh step and the last
+		/// step's complaint does not belong there - so a refusal that sets the
+		/// text and THEN calls ShowPage erases its own reason a line later. Every
+		/// create-time failure did exactly that, which is why they arrived as a
+		/// progress bar that flickered and a wizard that went backwards for no
+		/// stated reason.
+		/// </summary>
+		private void ShowPageBecause(int page, string why)
+		{
+			ShowPage(page);
+			_status.Text = why;
 		}
 
 		/// <summary>
@@ -856,10 +1170,20 @@ namespace Chimera.Client.GUI
 		/// </summary>
 		private bool PageApplies(int page) => page switch
 		{
+			1 => FilesPageApplies(),
 			3 => AnyFirmwareRequired(),
 			4 => PrecompileApplies(),
 			_ => true,
 		};
+
+		/// <summary>
+		/// A core that takes no file at all - a game core whose game is all
+		/// firmware (SDLPoP2's, SyndicatFX's) - has no file step: the wizard goes
+		/// from the core straight to its settings, and Back comes straight back
+		/// (user, 2026-09-30). Until the core's declaration is read, the step is
+		/// assumed to be there.
+		/// </summary>
+		private bool FilesPageApplies() => _declaration is not { Slots.Count: 0 };
 
 		/// <summary>The next step that applies after this one, or -1 when this is the last.</summary>
 		private int NextApplicablePage(int page)
@@ -928,8 +1252,8 @@ namespace Chimera.Client.GUI
 				case 0:
 					if (ChosenCore is null) { _status.Text = "pick a core (none are installed?)"; return; }
 					if (!BuildSlotForm()) return;
-					ShowPage(1);
-					break;
+					if (PageApplies(1)) { ShowPage(1); break; }
+					goto case 1; // no files to ask for: on to the settings
 				case 1:
 					var complaint = CardinalityComplaint();
 					if (complaint is not null) { _status.Text = complaint; return; }
@@ -937,6 +1261,7 @@ namespace Chimera.Client.GUI
 					// where the game is hashed, once, and not at every pick along the way
 					HashGameForPrecompileNow();
 					if (!BuildSettingsPage()) return;
+					SuggestSettingsNow();
 					ShowPage(2);
 					break;
 				case 2:
@@ -1051,7 +1376,7 @@ namespace Chimera.Client.GUI
 		/// <summary>what the compile step lists right now, for tests: name, hash, present</summary>
 		public IReadOnlyList<(string Name, string Sha1, bool Present)> PrecompileEntries
 			=> _precompileList.Items.Cast<ListViewItem>()
-				.Select(i => (i.SubItems[0].Text, i.SubItems[1].Text, i.ForeColor == Color.ForestGreen))
+				.Select(i => (i.SubItems[0].Text, i.SubItems[1].Text, i.Tag is true))
 				.ToList();
 
 		private void BuildPrecompilePage()
@@ -1089,7 +1414,14 @@ namespace Chimera.Client.GUI
 		/// </summary>
 		private void AddPrecompileRow(string name, string sha1, bool present)
 		{
-			ListViewItem item = new(name) { ForeColor = present ? Color.ForestGreen : Color.Firebrick, ToolTipText = name };
+			// the flag is on the row, not read back out of its colour: the colour is
+			// the theme's to change, and counting greens would then count wrong
+			ListViewItem item = new(name)
+			{
+				ForeColor = ThemeEngine.Color(present ? ThemeColorRole.AccentReady : ThemeColorRole.AccentError),
+				Tag = present,
+				ToolTipText = name,
+			};
 			item.SubItems.Add(sha1);
 			item.SubItems.Add(present ? "Compiled" : "Missing");
 			_precompileList.Items.Add(item);
@@ -1121,7 +1453,7 @@ namespace Chimera.Client.GUI
 		private void UpdatePrecompileStatus()
 		{
 			var total = _precompileList.Items.Count;
-			var green = _precompileList.Items.Cast<ListViewItem>().Count(i => i.ForeColor == Color.ForestGreen);
+			var green = _precompileList.Items.Cast<ListViewItem>().Count(static i => i.Tag is true);
 			// While it runs, a row exists only once its module is compiled, so the
 			// total cannot come from the list - it comes from the sessions, and
 			// only once they have looked at the game. Until then there is nothing
@@ -1137,7 +1469,7 @@ namespace Chimera.Client.GUI
 					: green == total
 						? $"All {total} modules compiled."
 						: $"{total - green} of {total} modules are missing.";
-			_precompileStatus.ForeColor = !_precompiling && total is not 0 && green == total ? Color.ForestGreen : SystemColors.ControlText;
+			_precompileStatus.SetForeRole(!_precompiling && total is not 0 && green == total ? ThemeColorRole.AccentReady : ThemeColorRole.WindowText);
 			// Compile is offered exactly when there is compiling left to do
 			_precompileButton.Enabled = !_precompiling && !PrecompileSatisfied();
 			UpdateCreateEnabled();
@@ -1157,7 +1489,6 @@ namespace Chimera.Client.GUI
 			_precompileCancelled = false;
 			// what this game needed last time, when it was compiled before
 			_precompileExpected = (uint)(_precompileManifest?.Files.Count ?? 0);
-			_precompileDone = 0;
 			_precompileBar.Visible = true;
 			_precompileBar.Value = 0;
 			// nothing behind this step may be changed while it runs: the sessions
@@ -1209,11 +1540,25 @@ namespace Chimera.Client.GUI
 			// nothing: the session boots, is refused for want of it, and exits.
 			_rememberFirmwareNow(ChosenCore.Name, ProvidedFirmwarePaths);
 
-			var manifest = PrecompileOrchestrator.Run(
-				ChosenCore.Path, _configPath, romPath, romSha1, dir,
-				_cfg?.CoreName ?? ChosenCore.Name, _cfg?.Version ?? "",
-				Entry, Progress, cancelled: PumpAndCheckCancel,
-				firmware: ProvidedFirmwarePaths);
+			// The sessions boot the game as the project will, so they are handed
+			// every file the project will hold, not the game file alone: a
+			// licensed package needs its .rap, an update its base game, an
+			// encrypted disc its key - without them a session is refused at boot
+			// and compiles nothing (chimera#140).
+			var slotsFile = WriteSlotsForPrecompile();
+			CoreCacheManifest manifest;
+			try
+			{
+				manifest = PrecompileOrchestrator.Run(
+					ChosenCore.Path, _configPath, romPath, romSha1, dir,
+					_cfg?.CoreName ?? ChosenCore.Name, _cfg?.Version ?? "",
+					Entry, Progress, cancelled: PumpAndCheckCancel,
+					firmware: ProvidedFirmwarePaths, slotsFile: slotsFile);
+			}
+			finally
+			{
+				if (slotsFile is not null) try { File.Delete(slotsFile); } catch (IOException) { }
+			}
 
 			_precompiling = false;
 			_precompileBar.Visible = false;
@@ -1360,9 +1705,32 @@ namespace Chimera.Client.GUI
 			if (index >= 0) _renderer.SelectedIndex = index;
 		}
 
+		/// <summary>whether the preset selector is on screen at all - for tests</summary>
+		public bool PresetsAreOffered => _presetRow.Visible;
+
+		/// <summary>the presets on offer, as the selector labels them - for tests</summary>
+		public string[] PresetNames
+			=> _presets.Items.Cast<PresetChoice>().Select(static c => c.Decl.DisplayName).ToArray();
+
+		/// <summary>picks a preset by id as the dropdown would - for tests</summary>
+		internal void SelectPreset(string id)
+		{
+			for (var i = 0; i < _presets.Items.Count; i++)
+			{
+				if (((PresetChoice) _presets.Items[i]).Decl.Id == id) { _presets.SelectedIndex = i; return; }
+			}
+		}
+
+		/// <summary>presses Apply - for tests</summary>
+		internal void ApplyPreset() => ApplySelectedPreset();
+
+		/// <summary>the default an exposed setting's row shows - for tests</summary>
+		public object? SettingDefault(string name)
+			=> (_settings?.Declarations ?? [ ]).FirstOrDefault(d => d.Name == name)?.DefaultValue;
+
 		/// <summary>the exposed settings, in order, for tests</summary>
 		public string[] ExposedSettingNames
-			=> (_settings?.Declarations ?? [ ]).Select(static d => d.Name).ToArray();
+			=> (_settings?.Declarations ?? [ ]).Select(static d => d.Name ?? "").ToArray();
 
 		/// <summary>sets a value as the grid would, re-running the gate - for tests</summary>
 		internal void SetSettingValue(string name, object value)
@@ -1437,12 +1805,15 @@ namespace Chimera.Client.GUI
 					foreach (var path in DroppedPaths(e)) AddFileToSlot(slot.Id, path);
 				};
 
-				Button add = new() { AutoSize = true, Location = Pt(416, 18), Text = "Add..." };
+				// The buttons are anchored to the RIGHT like the list is, so a wider
+				// window widens the list and moves them along; anchored to the left
+				// they stayed put and the list grew over them (issue #103).
+				Button add = new() { Anchor = AnchorStyles.Top | AnchorStyles.Right, AutoSize = true, Location = Pt(416, 18), Text = "Add..." };
 				add.Click += (_, _) =>
 				{
 					foreach (var path in _pickFiles(slot)) AddFileToSlot(slot.Id, path);
 				};
-				Button remove = new() { AutoSize = true, Location = Pt(416, 48), Text = "Remove" };
+				Button remove = new() { Anchor = AnchorStyles.Top | AnchorStyles.Right, AutoSize = true, Location = Pt(416, 48), Text = "Remove" };
 				remove.Click += (_, _) =>
 				{
 					if (list.SelectedIndex >= 0) list.Items.RemoveAt(list.SelectedIndex);
@@ -1460,6 +1831,7 @@ namespace Chimera.Client.GUI
 					{
 						Button b = new()
 						{
+							Anchor = AnchorStyles.Top | AnchorStyles.Right,
 							Location = Pt(378, top),
 							Size = new(UIHelper.ScaleX(32), UIHelper.ScaleY(28)),
 							Text = glyph,
@@ -1506,15 +1878,29 @@ namespace Chimera.Client.GUI
 		/// several machines declares which rom extensions each machine claims,
 		/// and a slot offering any of them is narrowed to the claimed ones: a
 		/// Famicom Disk System project takes .fds and nothing else, a Genesis
-		/// project does not offer .sms. A slot the machine claims none of (save
-		/// data, patches) is not the machine's to narrow and keeps its own list.
+		/// project does not offer .sms.
+		///
+		/// What is taken away is only what ANOTHER machine of the package claims
+		/// and this one does not. A format no machine claims - a save file, a
+		/// patch, a dongle - is nobody's to narrow and stays, even in a slot
+		/// that also takes roms: a PS2's save data (.ps2, .nvm, .bin) used to be
+		/// cut to the .bin its discs share, and a memory card could not be
+		/// picked at all (chimera#156).
 		/// </summary>
 		private ProjectSlotDeclaration.Slot ForMachine(ProjectSlotDeclaration.Slot slot)
 		{
 			var machine = _cfg?.MachineFor(EffectiveSettings());
 			if (machine?.Extensions is not { Count: > 0 } || slot.Formats.Count is 0) return slot;
+			// a slot this machine claims none of (a Super Famicom's sub-cartridge,
+			// which takes the Game Boy carts the Super Game Boy plays) is not its
+			// to narrow at all
+			if (!slot.Formats.Any(f => machine.Extensions.ContainsKey("." + f.ToLowerInvariant()))) return slot;
+			var claimedByAny = (_cfg!.Machines ?? [ ])
+				.SelectMany(static m => m.Extensions?.Keys ?? (IEnumerable<string>) [ ])
+				.ToHashSet(StringComparer.OrdinalIgnoreCase);
 			var claimed = slot.Formats
-				.Where(f => machine.Extensions.ContainsKey("." + f.ToLowerInvariant()))
+				.Where(f => machine.Extensions.ContainsKey("." + f.ToLowerInvariant())
+					|| !claimedByAny.Contains("." + f))
 				.ToList();
 			if (claimed.Count is 0 || claimed.Count == slot.Formats.Count) return slot;
 			return new()
@@ -1628,6 +2014,28 @@ namespace Chimera.Client.GUI
 			var name = Path.GetFileName(path);
 			if (list.Items.OfType<PickedFile>().Any(f => f.Name == name)) return;
 
+			// a slot whose files are read BY NAME says which names (issue #105: a
+			// memory card called anything but vmu_A1.bin..vmu_D1.bin was taken here
+			// and refused by the core at boot, a screen later)
+			var namedSlot = _declaration?.Slots.FirstOrDefault(sl => sl.Id == slotId);
+			if (namedSlot?.NamePattern is { Length: not 0 } pattern)
+			{
+				bool matches;
+				try
+				{
+					matches = System.Text.RegularExpressions.Regex.IsMatch(name, pattern);
+				}
+				catch (ArgumentException)
+				{
+					matches = true; // a core that misspells its pattern refuses nothing
+				}
+				if (!matches)
+				{
+					_status.Text = $"{name}: {(namedSlot.NameHelp.Length is 0 ? namedSlot.Help : namedSlot.NameHelp)}";
+					return;
+				}
+			}
+
 			// a cue sheet is one pick, but its track files must be next to it -
 			// the same all-or-nothing rule the engine applies at creation,
 			// raised here so the complaint lands at pick time
@@ -1701,6 +2109,15 @@ namespace Chimera.Client.GUI
 		/// <summary>The page's live complaint line, for tests.</summary>
 		public string StatusText => _status.Text;
 
+		/// <summary>The step on screen (0 the core, 1 the files, 2 the settings, 3 the firmware, 4 the compile), for tests.</summary>
+		public int PageForTest => _page;
+
+		/// <summary>ShowPage, for the test that checks a clean arrival says nothing</summary>
+		public void ShowPageForTest(int page) => ShowPage(page);
+
+		/// <summary>ShowPageBecause, for the test that checks a refusal survives the page change</summary>
+		public void ShowPageBecauseForTest(int page, string why) => ShowPageBecause(page, why);
+
 		/// <summary>The canonical names in one slot, in order, for tests.</summary>
 		public string[] SlotFileNames(string slotId)
 			=> _slotLists.TryGetValue(slotId, out var list)
@@ -1756,6 +2173,7 @@ namespace Chimera.Client.GUI
 		private void RefreshExposedSettings()
 		{
 			if (_cfg is null || _settings is null) return;
+			RefreshPresets(); // the machine may have moved, and with it what is offered
 			var effective = WaterboxCore.EffectiveSettingsFor(_cfg, _settings);
 			var exposed = Chimera.Emulation.Common.Engine.EngineSettingsGate.Evaluate(
 				_cfg.RawSettingsJson,
@@ -1774,11 +2192,14 @@ namespace Chimera.Client.GUI
 			var all = _cfg.SettingsByDeclarationIndexFor(_cfg.MachineFor(effective));
 			var declarations = exposed
 				.Where(entry => entry.Index >= 0 && entry.Index < all.Count
-					&& all[entry.Index] is not null && all[entry.Index].Name == entry.Name)
+					&& all[entry.Index] is { } decl && decl.Name == entry.Name)
 				.Select(entry => all[entry.Index])
 				// ...except the renderer and the machine, which are asked beside
 				// the core on page one and would only be asked twice here
 				.Where(decl => decl.Name != RendererSetting && decl.Name != _cfg.MachineSetting)
+				// ...and the chosen game's own settings, last (an arcade game's dip
+				// switches: the core named them when it was asked about the game)
+				.Concat(_gameSettings)
 				.ToList();
 			var current = _settings.Declarations;
 			if (current is not null && current.Count == declarations.Count
@@ -1790,6 +2211,332 @@ namespace Chimera.Client.GUI
 			_settingsGrid.Refresh();
 		}
 
+		/// <summary>One preset, as the selector shows it.</summary>
+		private sealed class PresetChoice
+		{
+			public PresetChoice(WaterboxConfig.PresetDecl decl) => Decl = decl;
+
+			public WaterboxConfig.PresetDecl Decl { get; }
+
+			public override string ToString() => Decl.DisplayName;
+		}
+
+		/// <summary>
+		/// Offers the presets the chosen machine has, and nothing at all when it has
+		/// none: the row is hidden and the grid takes the space back, so a core that
+		/// suggests nothing shows no evidence that presets exist.
+		/// </summary>
+		private void RefreshPresets()
+		{
+			var machine = _cfg is null || _settings is null
+				? null
+				: _cfg.MachineFor(WaterboxCore.EffectiveSettingsFor(_cfg, _settings));
+			var offered = _cfg?.PresetsFor(machine) ?? [ ];
+			if (offered.Count is 0)
+			{
+				_presets.Items.Clear();
+				_presetRow.Visible = false;
+				_presetRowShown = false;
+				PlaceSettingsGrid();
+				return;
+			}
+			// Rebuild only when the OFFER changed - a machine change can happen while
+			// somebody is reading the list, and a selector that resets itself on every
+			// settings edit would be unusable.
+			var showing = _presets.Items.Cast<PresetChoice>().Select(static c => c.Decl.Id).ToList();
+			if (!showing.SequenceEqual(offered.Select(static p => p.Id)))
+			{
+				var keep = (_presets.SelectedItem as PresetChoice)?.Decl.Id;
+				_presets.BeginUpdate();
+				_presets.Items.Clear();
+				foreach (var decl in offered) _presets.Items.Add(new PresetChoice(decl));
+				_presets.EndUpdate();
+				var again = offered.ToList().FindIndex(p => p.Id == keep);
+				_presets.SelectedIndex = again >= 0 ? again : 0;
+			}
+			_presetRow.Visible = true;
+			_presetRowShown = true;
+			PlaceSettingsGrid();
+		}
+
+		/// <summary>
+		/// Stacks what sits above the grid - the preset row, then the suggestion
+		/// note - and moves the grid down under them, or back up.
+		/// </summary>
+		private void PlaceSettingsGrid()
+		{
+			var y = UIHelper.ScaleY(46);
+			if (_presetRowShown)
+			{
+				_presetRow.Top = y;
+				y += UIHelper.ScaleY(34);
+			}
+			if (_suggestionShown)
+			{
+				_suggestionNote.Top = y;
+				y += _suggestionNote.Height + UIHelper.ScaleY(4);
+			}
+			var top = Math.Max(y, UIHelper.ScaleY(48));
+			if (_settingsGrid.Top == top) return;
+			var bottom = _settingsGrid.Bottom;
+			_settingsGrid.Top = top;
+			_settingsGrid.Height = Math.Max(bottom - top, UIHelper.ScaleY(48));
+		}
+
+		/// <summary>
+		/// Writes the chosen preset's values INTO the settings. Nothing about the
+		/// preset survives the click: what the project pins and the movie cites is
+		/// the values, which are now sitting in the grid where anyone can read them
+		/// and change any of them afterwards.
+		///
+		/// The machine and the renderer are asked on page one and are not a preset's
+		/// to move - changing the machine changes which files the project takes, and
+		/// this page is downstream of that decision.
+		/// </summary>
+		private void ApplySelectedPreset()
+		{
+			if (_cfg is null || _settings is null || _presets.SelectedItem is not PresetChoice chosen) return;
+			var values = chosen.Decl.Values;
+			if (values is null || values.Count is 0) return;
+
+			var effective = WaterboxCore.EffectiveSettingsFor(_cfg, _settings);
+			Dictionary<string, WaterboxConfig.SettingDecl> byName = new(StringComparer.Ordinal);
+			foreach (var decl in _cfg.SettingsFor(_cfg.MachineFor(effective)))
+			{
+				if (decl.Name is { Length: > 0 } name && !byName.ContainsKey(name)) byName[name] = decl;
+			}
+
+			var applied = 0;
+			List<string> ignored = [ ];
+			foreach (var pair in values)
+			{
+				if (pair.Key == RendererSetting || pair.Key == _cfg.MachineSetting) continue;
+				if (!byName.TryGetValue(pair.Key, out var decl)) { ignored.Add(pair.Key); continue; }
+				// through the declaration's own coercion, so a preset written by hand
+				// cannot put a string where the core declared a number
+				_settings.Values[pair.Key] = decl.Coerce(pair.Value);
+				applied++;
+			}
+
+			// a preset's values can gate further settings, so the exposed set is asked again
+			RefreshExposedSettings();
+			_settingsGrid.Refresh();
+			UpdateNavLabels();
+			_status.Text = ignored.Count is 0
+				? $"Applied \"{chosen.Decl.DisplayName}\": {applied} setting{(applied is 1 ? "" : "s")}."
+				: $"Applied \"{chosen.Decl.DisplayName}\": {applied} setting{(applied is 1 ? "" : "s")}; "
+					+ $"this machine has no setting named {string.Join(", ", ignored)}.";
+		}
+
+		/// <summary>The core and the game a suggestion is for, or null when there is no game yet.</summary>
+		private string? SuggestionKey()
+			=> PrecompileRomPath() is { } game ? (ChosenCore?.Path ?? "") + "\n" + game : null;
+
+		/// <summary>Stands in for the child process - the test door for the settings page's lookup.</summary>
+		internal Func<string, (string? Json, string Why)>? SuggestionSourceForTest { get; set; }
+
+		/// <summary>Arrives at the settings page with this game, as Next does.</summary>
+		internal void ArriveAtSettingsForTest(string gamePath)
+		{
+			_precompileRomOverride = gamePath;
+			SuggestSettingsNow();
+		}
+
+		/// <summary>
+		/// Seeds the settings as a wizard opened on the last project's answers has
+		/// them: that project's values, and its game as the one they belong to.
+		/// </summary>
+		internal void SeedSettingsForTest(string settingsJson, string gamePath)
+		{
+			SeedSettings(settingsJson);
+			_precompileRomOverride = gamePath;
+			_seededFor = SuggestionKey();
+			_seededGame = gamePath;
+			_seededCore = ChosenCore?.Path;
+		}
+
+		/// <summary>The note above the settings, "" when none is shown - for tests.</summary>
+		public string SuggestionNoteText => _suggestionShown ? _suggestionNote.Text : "";
+
+		/// <summary>
+		/// Asks the core what it would choose for this game, on arriving at the
+		/// settings page (user, 2026-09-23), and puts the answer into the settings
+		/// the way a preset is: as values, in the grid, where they can be read and
+		/// changed like any other. The note above the grid says where they came
+		/// from - the RPCS3 core names the RPCS3 wiki page and the compatibility
+		/// status - or that the game was not found, in which case nothing moves
+		/// and every setting is still there to experiment with.
+		///
+		/// Once per core and game: coming back to this page after editing does not
+		/// undo the edits, and choosing a different game first takes back what
+		/// the previous one's suggestion set. Asked in a child process, because the
+		/// core has to be loaded to answer and a core that falls over while it
+		/// looks must not take the wizard with it.
+		/// </summary>
+		private void SuggestSettingsNow()
+		{
+			var key = SuggestionKey();
+			if (_cfg?.SuggestSettings is not true || _settings is null || key is null
+				|| (ChosenCore is null && SuggestionSourceForTest is null))
+			{
+				ShowSuggestionNote(null);
+				return;
+			}
+			if (key == _suggestedFor) return;
+
+			if (_seededGame is { } seededGame && key != _seededFor)
+			{
+				_seededGame = null;
+				if (ChosenCore?.Path == _seededCore) TakeBackTheSeededSuggestion(seededGame);
+			}
+
+			// what the last game's suggestion set goes back to the default, and the
+			// last game's own settings go with it - another game has other ones
+			foreach (var name in _suggestedKeys) _settings.Values.Remove(name);
+			_suggestedKeys = [ ];
+			if (key != _seededFor)
+				foreach (var decl in _gameSettings) _settings.Values.Remove(decl.Key);
+			_gameSettings = [ ];
+			_suggestedFor = key;
+
+			_status.Text = "Looking this game up...";
+			_status.Refresh();
+			var game = PrecompileRomPath()!;
+			var (json, why) = SuggestionSourceForTest?.Invoke(game) ?? AskCoreForSuggestion(ChosenCore!.Path, game);
+			_status.Text = "";
+			if (json is null)
+			{
+				ShowSuggestionNote($"No suggested settings: {why}");
+				return;
+			}
+
+			string? note = null;
+			var applied = new List<string>();
+			var appliedKeys = new List<string>();
+			try
+			{
+				var root = Newtonsoft.Json.Linq.JObject.Parse(json);
+				note = root.Value<string>("note");
+				if (root["settings"] is Newtonsoft.Json.Linq.JArray gameSettings)
+					_gameSettings = WaterboxConfig.ParseGameSettings(gameSettings.ToString(),
+						_cfg.Settings?.Select(static d => d.Key) ?? [ ]);
+				if (key != _seededFor && root["values"] is Newtonsoft.Json.Linq.JObject values)
+				{
+					var effective = WaterboxCore.EffectiveSettingsFor(_cfg, _settings);
+					var byName = _cfg.SettingsFor(_cfg.MachineFor(effective))
+						.Where(static d => d.Name is { Length: > 0 })
+						.GroupBy(static d => d.Name!, StringComparer.Ordinal)
+						.ToDictionary(static g => g.Key, static g => g.First(), StringComparer.Ordinal);
+					foreach (var pair in values)
+					{
+						// never the machine or the renderer: page one decided those
+						if (pair.Key == RendererSetting || pair.Key == _cfg.MachineSetting) continue;
+						if (!byName.TryGetValue(pair.Key, out var decl)) continue;
+						if (pair.Value is not Newtonsoft.Json.Linq.JValue v || v.Value is null) continue;
+						_settings.Values[pair.Key] = decl.Coerce(v.Value);
+						applied.Add(decl.DisplayName ?? pair.Key);
+						appliedKeys.Add(pair.Key);
+					}
+				}
+			}
+			catch (Newtonsoft.Json.JsonException)
+			{
+				ShowSuggestionNote("No suggested settings: the core's answer could not be read.");
+				return;
+			}
+			_suggestedKeys = appliedKeys;
+
+			var text = note ?? "";
+			if (applied.Count is not 0)
+				text += $"{Environment.NewLine}Applied below: {string.Join(", ", applied)}.";
+			else if (key == _seededFor)
+				text += $"{Environment.NewLine}This project's own settings are kept.";
+			ShowSuggestionNote(text);
+			RefreshExposedSettings();
+			_settingsGrid.Refresh();
+			UpdateNavLabels();
+		}
+
+		/// <summary>
+		/// A wizard seeded from the last project opens holding that project's
+		/// settings - the ones the core suggested for ITS game among them, and
+		/// nothing in a project says which those were. Another game has other ones:
+		/// a game the core knows nothing about kept the previous game's (issue
+		/// #214). So before another game's suggestion is looked up, the core is
+		/// asked what it would suggest for the seeded game, and every setting that
+		/// still holds exactly that goes back to its default. A value the user had
+		/// moved away from the suggestion is theirs, and stays.
+		/// </summary>
+		private void TakeBackTheSeededSuggestion(string seededGame)
+		{
+			var (json, _) = SuggestionSourceForTest?.Invoke(seededGame) ?? AskCoreForSuggestion(ChosenCore!.Path, seededGame);
+			if (json is null) return;
+			try
+			{
+				if (Newtonsoft.Json.Linq.JObject.Parse(json)["values"] is not Newtonsoft.Json.Linq.JObject values) return;
+				var effective = WaterboxCore.EffectiveSettingsFor(_cfg!, _settings!);
+				var byName = _cfg!.SettingsFor(_cfg.MachineFor(effective))
+					.Where(static d => d.Name is { Length: > 0 })
+					.GroupBy(static d => d.Name!, StringComparer.Ordinal)
+					.ToDictionary(static g => g.Key, static g => g.First(), StringComparer.Ordinal);
+				foreach (var pair in values)
+				{
+					if (pair.Key == RendererSetting || pair.Key == _cfg.MachineSetting) continue;
+					if (!byName.TryGetValue(pair.Key, out var decl)) continue;
+					if (pair.Value is not Newtonsoft.Json.Linq.JValue v || v.Value is null) continue;
+					if (_settings!.Values.TryGetValue(pair.Key, out var held) && Equals(decl.Coerce(held), decl.Coerce(v.Value)))
+					{
+						_settings.Values.Remove(pair.Key);
+					}
+				}
+			}
+			catch (Newtonsoft.Json.JsonException)
+			{
+				// an answer that cannot be read takes nothing back
+			}
+		}
+
+		/// <summary>Shows the note above the settings, or hides it (null).</summary>
+		private void ShowSuggestionNote(string? text)
+		{
+			_suggestionShown = !string.IsNullOrEmpty(text);
+			_suggestionNote.Text = text ?? "";
+			_suggestionNote.Visible = _suggestionShown;
+			PlaceSettingsGrid();
+		}
+
+		/// <summary>
+		/// Runs <c>Chimera --suggest-settings package game</c> and returns the
+		/// core's JSON, or null and why. The UI keeps painting while it waits.
+		/// </summary>
+		private static (string? Json, string Why) AskCoreForSuggestion(string packagePath, string gamePath)
+		{
+			var lines = new List<string>();
+			using var p = SelfProcess.Start(["--suggest-settings", packagePath, gamePath], line =>
+			{
+				lock (lines) lines.Add(line);
+			});
+			if (p is null) return (null, "the lookup could not be started");
+			var clock = System.Diagnostics.Stopwatch.StartNew();
+			while (!p.WaitForExit(50))
+			{
+				Application.DoEvents();
+				if (clock.Elapsed > TimeSpan.FromMinutes(2))
+				{
+					try { p.Kill(); } catch (InvalidOperationException) { }
+					return (null, "the core took too long to answer");
+				}
+			}
+			p.WaitForExit(); // drains the redirected streams
+			lock (lines)
+			{
+				var json = lines.LastOrDefault(static l => l.TrimStart().StartsWith("{", StringComparison.Ordinal));
+				if (p.ExitCode is 0 && json is not null) return (json, "");
+				var said = lines.LastOrDefault(static l => !string.IsNullOrWhiteSpace(l));
+				return (null, said ?? $"the lookup ended with code {p.ExitCode}");
+			}
+		}
+
 		/// <summary>Renders given firmware needs directly - the test and screenshot door.</summary>
 		internal void UseFirmwareNeeds(
 			WaterboxConfig cfg,
@@ -1799,6 +2546,7 @@ namespace Chimera.Client.GUI
 			_cfg = cfg;
 			_firmwareIndex = index ?? [ ];
 			BuildFirmwareNeeds(needed);
+			ApplySeededFirmware();
 			RenderFirmwareRows();
 			ShowPage(3);
 		}
@@ -1806,6 +2554,31 @@ namespace Chimera.Client.GUI
 		// ---- firmware: the last word, decided by everything before it ------------
 
 		/// <summary>The slot map exactly as the session will mount it, from the form's current picks.</summary>
+		/// <summary>
+		/// The slot map and where each file lies, written for the precompile
+		/// sessions (--precompile-slots); null when there is nothing beside the
+		/// game to hand over. The names are the ones the project will record.
+		/// </summary>
+		private string? WriteSlotsForPrecompile()
+		{
+			if (_declaration is null) return null;
+			Newtonsoft.Json.Linq.JObject files = new();
+			foreach (var slot in _declaration.Slots)
+			{
+				if (!_slotLists.TryGetValue(slot.Id, out var list)) continue;
+				foreach (var file in list.Items.OfType<PickedFile>()) files[file.Name] = file.Path;
+			}
+			if (files.Count is 0) return null;
+			var doc = new Newtonsoft.Json.Linq.JObject
+			{
+				["slots"] = Newtonsoft.Json.Linq.JObject.Parse(CurrentSlotsJson()),
+				["files"] = files,
+			};
+			var path = Path.Combine(Path.GetTempPath(), $"chimera-precompile-slots-{Guid.NewGuid():N}.json");
+			File.WriteAllText(path, doc.ToString(Newtonsoft.Json.Formatting.None));
+			return path;
+		}
+
 		private string CurrentSlotsJson()
 		{
 			Newtonsoft.Json.Linq.JObject slots = new();
@@ -1839,12 +2612,56 @@ namespace Chimera.Client.GUI
 				.Concat(_rememberedFirmwarePaths(ChosenCoreName ?? ""));
 			_firmwareIndex = FirmwareLocator.BuildIndex(_firmwareSearchDirs, remembered);
 			BuildFirmwareNeeds(needed);
+			ApplySeededFirmware();
 			RenderFirmwareRows();
+		}
+
+		/// <summary>
+		/// What the answers came with stands in for a pick on this page, checked
+		/// the same way - unless the person has since picked something else.
+		/// </summary>
+		private void ApplySeededFirmware()
+		{
+			foreach (var (id, path) in _seededFirmware)
+			{
+				if (_firmwareNeeds.FirstOrDefault(n => n.Id == id) is { PickedByHand: false } && File.Exists(path))
+				{
+					ProvideFirmware(id, path);
+				}
+			}
+		}
+
+		/// <summary>Firmware as answers would bring it, without a package to seed from - the test door.</summary>
+		internal void SeedFirmwareForTest(IReadOnlyList<(string Id, string Path)> firmware) => _seededFirmware = firmware;
+
+		/// <summary>
+		/// What the user chose by hand last time this page was built, by id,
+		/// with enough of the requirement to tell whether it is still the same
+		/// requirement. The firmware page is rebuilt on every arrival, because
+		/// which firmware is needed depends on the settings and the files - so
+		/// without this, stepping back to fix one thing and forward again threw
+		/// away every Locate the person had answered.
+		///
+		/// The identity is the declared hash and the declared name: a
+		/// requirement whose pinned hash has changed is a different file, and
+		/// carrying the old answer over would quietly satisfy it with the wrong
+		/// one. A requirement that disappears takes its answer with it.
+		/// </summary>
+		private Dictionary<string, (string Path, string? Sha1, string? DeclSha1, string? DeclName)> HandPickedFirmware()
+		{
+			Dictionary<string, (string, string?, string?, string?)> kept = new();
+			foreach (var need in _firmwareNeeds)
+			{
+				if (!need.PickedByHand || need.ChosenPath is null) continue;
+				kept[need.Id] = (need.ChosenPath, need.ChosenSha1, need.Decl?.Sha1, need.Decl?.Name);
+			}
+			return kept;
 		}
 
 		private void BuildFirmwareNeeds(IReadOnlyList<(string Id, int Index)> needed)
 		{
 			var decls = _cfg?.Firmware ?? [ ];
+			var handPicked = HandPickedFirmware();
 			_firmwareNeeds = needed.Select(entry =>
 			{
 				FirmwareNeed need = new()
@@ -1878,6 +2695,20 @@ namespace Chimera.Client.GUI
 						need.ChosenSha1 = found.Sha1;
 					}
 				}
+
+				// A file the user picked by hand wins over anything found, and
+				// survives this rebuild - unless the requirement is no longer the
+				// same requirement, in which case the old answer is not an answer
+				// to the new question.
+				if (handPicked.TryGetValue(need.Id, out var prior)
+					&& prior.DeclSha1 == need.Decl?.Sha1
+					&& prior.DeclName == need.Decl?.Name
+					&& System.IO.File.Exists(prior.Path))
+				{
+					need.ChosenPath = prior.Path;
+					need.ChosenSha1 = prior.Sha1;
+					need.PickedByHand = true;
+				}
 				return need;
 			}).ToList();
 		}
@@ -1897,12 +2728,12 @@ namespace Chimera.Client.GUI
 				ListViewItem item = new(title)
 				{
 					ToolTipText = need.Decl?.Description ?? "",
-					ForeColor = need.Satisfied ? System.Drawing.Color.DarkGreen : System.Drawing.Color.Firebrick,
+					ForeColor = ThemeEngine.Color(need.Satisfied ? ThemeColorRole.AccentGood : ThemeColorRole.AccentError),
 				};
 				item.SubItems.Add(need.Decl?.Name ?? "");
 				item.SubItems.Add(string.IsNullOrEmpty(need.Decl?.Sha1) ? "(your own dump)" : need.Decl!.Sha1);
 				item.SubItems.Add(need.ChosenPath is not null
-					? $"found: {Path.GetFileName(need.ChosenPath)}"
+					? need.Custom ? $"your own: {Path.GetFileName(need.ChosenPath)}" : $"found: {Path.GetFileName(need.ChosenPath)}"
 					: need.Satisfied ? "optional - core default used" : "not found");
 				_firmwareList.Items.Add(item);
 			}
@@ -1935,12 +2766,19 @@ namespace Chimera.Client.GUI
 			var path = _pickFirmwareFile($"Locate {need.Decl?.DisplayName ?? need.Id}");
 			if (path is null) return;
 			ProvideFirmware(need.Id, path);
+			if (_firmwareNeeds.FirstOrDefault(n => n.Id == need.Id) is { } chosen)
+			{
+				chosen.PickedByHand = chosen.ChosenPath is not null;
+			}
 		}
 
 		/// <summary>
 		/// Points one requirement at a file the user chose - allowed even when
 		/// the folder already found one. The hash decides: the requirement names
-		/// ONE exact file, and only that file satisfies it.
+		/// ONE exact file, and only that file satisfies it - except for a game
+		/// core, whose firmware may be a file of the project's own (a modified
+		/// one): that is taken, said so, and its own hash is what the project
+		/// pins (user-decided, 2026-09-29; docs/game-cores.md).
 		/// </summary>
 		public void ProvideFirmware(string id, string path)
 		{
@@ -1960,8 +2798,9 @@ namespace Chimera.Client.GUI
 			// a pinned entry names ONE exact file; an unpinned one (no declared
 			// hash - a file only the user can own, like a console's own font
 			// region nothing ships) takes what is chosen and records its hash
-			if (!string.IsNullOrEmpty(need.Decl?.Sha1)
-				&& !sha1.Equals(need.Decl!.Sha1, StringComparison.OrdinalIgnoreCase))
+			var custom = !string.IsNullOrEmpty(need.Decl?.Sha1)
+				&& !sha1.Equals(need.Decl!.Sha1, StringComparison.OrdinalIgnoreCase);
+			if (custom && _cfg?.IsGameCore is not true)
 			{
 				_status.Text = $"{System.IO.Path.GetFileName(path)} is not this file: its hash is {sha1},"
 					+ $" the requirement is {need.Decl!.Sha1}";
@@ -1969,26 +2808,36 @@ namespace Chimera.Client.GUI
 			}
 			need.ChosenPath = System.IO.Path.GetFullPath(path);
 			need.ChosenSha1 = sha1;
-			_status.Text = "";
+			_status.Text = custom
+				? $"{System.IO.Path.GetFileName(path)} is a file of your own, not the original {need.Id}:"
+					+ $" the project pins its hash ({sha1})"
+				: "";
 			RenderFirmwareRows();
 		}
 
 		/// <summary>
 		/// "My files are somewhere in here": scans a folder (subfolders
-		/// included) and fills every requirement it can. A hash-pinned
-		/// requirement takes only its exact file, any name; an unpinned one
-		/// takes the file bearing its declared name, hashed and recorded like
-		/// any hand-picked choice. What the user already chose is left alone.
+		/// included, unless the person said otherwise) and fills every
+		/// requirement it can. A hash-pinned requirement takes only its exact
+		/// file, any name; an unpinned one takes the file bearing its declared
+		/// name, hashed and recorded like any hand-picked choice. What the user
+		/// already chose is left alone.
 		/// </summary>
 		private void ScanFirmwareFolder()
 		{
-			var folder = _pickFirmwareFolder?.Invoke();
+			if (_pickFirmwareFolder is null) return;
+			// The check box holds the answer whether or not it is on show; the
+			// picker offers it, and hands back whatever the person settled on
+			// (unchanged, when that picker had nowhere to put it).
+			var recurse = _firmwareScanSubfolders?.Checked is not false;
+			var folder = _pickFirmwareFolder(ref recurse);
 			if (folder is null) return;
+			if (_firmwareScanSubfolders is not null) _firmwareScanSubfolders.Checked = recurse;
 			UseWaitCursor = true;
 			try
 			{
 				var found = Chimera.Client.Common.ProjectFolderScan
-					.Enumerate(folder)
+					.Enumerate(folder, recurse: recurse)
 					.Take(Chimera.Client.Common.ProjectFolderScan.MaxFiles)
 					.ToList();
 				// one hashed index answers every pinned requirement
@@ -2051,11 +2900,20 @@ namespace Chimera.Client.GUI
 			=> _firmwareNeeds.Where(static n => n.ChosenPath is not null)
 				.ToDictionary(static n => n.Id, static n => n.ChosenPath!);
 
-		/// <summary>The same, by declaration: what to remember under each dump's own key, so the survey and later projects find it.</summary>
+		/// <summary>
+		/// The same, by declaration: what to remember under each dump's own key,
+		/// so the survey and later projects find it. A file of the project's own
+		/// is remembered under ITS hash - never under the original's, where it
+		/// would stand in for the original in every other project.
+		/// </summary>
 		public IReadOnlyList<(Chimera.Emulation.Common.CoreFirmwareDecl Decl, string Path)> ProvidedFirmwareDumps
 			=> _firmwareNeeds.Where(static n => n.ChosenPath is not null && n.Decl is not null)
-				.Select(static n => (n.Decl!, n.ChosenPath!))
+				.Select(static n => (n.Custom ? new Chimera.Emulation.Common.CoreFirmwareDecl { Id = n.Id, Sha1 = n.ChosenSha1 } : n.Decl!, n.ChosenPath!))
 				.ToList();
+
+		/// <summary>whether the file chosen for a requirement is the project's own, for tests</summary>
+		public bool FirmwareIsCustom(string id)
+			=> _firmwareNeeds.FirstOrDefault(n => n.Id == id)?.Custom is true;
 
 		/// <summary>the requirement states, for tests</summary>
 		public bool FirmwareSatisfied(string id)
@@ -2063,6 +2921,15 @@ namespace Chimera.Client.GUI
 
 		public string? ChosenFirmwarePath(string id)
 			=> _firmwareNeeds.FirstOrDefault(n => n.Id == id)?.ChosenPath;
+
+		/// <summary>presses Scan Folder, for tests</summary>
+		public void ScanFirmwareFolderForTest() => ScanFirmwareFolder();
+
+		/// <summary>the sub-folders answer this page holds, shown or not, for tests</summary>
+		public bool FirmwareScanSubfolders => _firmwareScanSubfolders?.Checked is not false;
+
+		/// <summary>whether the page shows a sub-folders box of its own (it does not where the picker carries one), for tests</summary>
+		public bool FirmwareScanSubfoldersVisible => _firmwareScanSubfolders?.Visible is true;
 
 		// ---- creation -------------------------------------------------------------
 
@@ -2104,9 +2971,8 @@ namespace Chimera.Client.GUI
 			}
 			catch (InvalidOperationException ex)
 			{
-				_status.Text = ex.Message;
 				project.Dispose();
-				ShowPage(1);
+				ShowPageBecause(1, ex.Message);
 				return;
 			}
 
@@ -2117,8 +2983,8 @@ namespace Chimera.Client.GUI
 				Dictionary<string, object> recorded = new();
 				foreach (var decl in _settings?.Declarations ?? [ ])
 				{
-					recorded[decl.Name] = _settings!.Values is not null
-						&& _settings.Values.TryGetValue(decl.Name, out var value)
+					recorded[decl.Key] = _settings!.Values is not null
+						&& _settings.Values.TryGetValue(decl.Key, out var value)
 							? value
 							: decl.DefaultValue;
 				}
@@ -2128,8 +2994,8 @@ namespace Chimera.Client.GUI
 				// because the slot gates and the engine's own validation read it
 				if (RendererDecl() is { } rendererDecl)
 				{
-					recorded[rendererDecl.Name] = _settings?.Values is not null
-						&& _settings.Values.TryGetValue(rendererDecl.Name, out var chosen)
+					recorded[rendererDecl.Key] = _settings?.Values is not null
+						&& _settings.Values.TryGetValue(rendererDecl.Key, out var chosen)
 							? chosen
 							: rendererDecl.DefaultValue;
 				}
@@ -2178,9 +3044,8 @@ namespace Chimera.Client.GUI
 			}
 			if (declarationJson is not null && project.Validate(declarationJson) is { } refusal)
 			{
-				_status.Text = refusal;
 				project.Dispose();
-				ShowPage(1);
+				ShowPageBecause(1, refusal);
 				return;
 			}
 

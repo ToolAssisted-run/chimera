@@ -109,7 +109,11 @@ namespace Chimera.Client.Common
 		/// which carries it out before anything in the data directory is opened. Null when none is
 		/// waiting; empty means "back to the usual place".
 		/// </summary>
+		// this project is not yet in a nullable context as a whole (the newer files
+		// opt in one by one), so the annotation has to say where it applies
+#nullable enable annotations
 		public string? DataDirectoryPending { get; set; }
+#nullable restore annotations
 
 		/// <summary>Whether that change carries the existing data over, or leaves it where it is.</summary>
 		public bool DataDirectoryPendingMove { get; set; }
@@ -151,7 +155,6 @@ namespace Chimera.Client.Common
 		public bool AcceptBackgroundInputControllerOnly { get; set; }
 		public bool HandleAlternateKeyboardLayouts { get; set; }
 		public bool SingleInstanceMode { get; set; }
-		public OpposingDirPolicy OpposingDirPolicy { get; set; }
 		public bool ShowContextMenu { get; set; } = true;
 		public bool HotkeyConfigAutoTab { get; set; } = true;
 		public bool InputConfigAutoTab { get; set; } = true;
@@ -209,6 +212,8 @@ namespace Chimera.Client.Common
 		public bool DisplayLagCounter { get; set; }
 		public bool DisplayInput { get; set; }
 		public bool DisplayRerecordCount { get; set; }
+		/// <summary>A game core's own timer (IGT, mm:ss.mmm), for a core whose property table names one.</summary>
+		public bool DisplayGameTime { get; set; } = true;
 		public bool DisplayMessages { get; set; } = true;
 
 		public bool DispFixAspectRatio { get; set; } = true;
@@ -225,6 +230,7 @@ namespace Chimera.Client.Common
 		public MessagePosition Messages { get; set; } = DefaultMessagePositions.Messages.Clone();
 		public MessagePosition Autohold { get; set; } = DefaultMessagePositions.Autohold.Clone();
 		public MessagePosition RamWatches { get; set; } = DefaultMessagePositions.RamWatches.Clone();
+		public MessagePosition GameTime { get; set; } = DefaultMessagePositions.GameTime.Clone();
 
 		public int MessagesColor { get; set; } = DefaultMessagePositions.MessagesColor;
 		public int AlertMessageColor { get; set; } = DefaultMessagePositions.AlertMessageColor;
@@ -331,7 +337,19 @@ namespace Chimera.Client.Common
 		// Watch Settings
 		public RecentFiles RecentWatches { get; set; } = new RecentFiles(8);
 		public PreviousType RamWatchDefinePrevious { get; set; } = PreviousType.LastFrame;
-		public bool DisplayRamWatch { get; set; }
+
+		/// <summary>
+		/// Whether the watches ticked On Screen are drawn on the screen. On by default, since a watch
+		/// is not drawn until it is ticked. It was <c>DisplayRamWatch</c>, which drew every watch and
+		/// was off: renamed so a config saved with the old switch's default starts with this one on.
+		/// </summary>
+		public bool DisplayWatchesOnScreen { get; set; } = true;
+
+		// Which cores each list of them shows, and the kind the new-project wizard opens on
+		// (docs/game-cores.md): remembered per window, as a person left it
+		public CoreKindFilter CoreManagerShows { get; set; } = CoreKindFilter.All;
+		public CoreKindFilter FirmwareShows { get; set; } = CoreKindFilter.All;
+		public CoreKindFilter NewProjectKind { get; set; } = CoreKindFilter.Emulators;
 
 		// Video dumping settings
 		public string VideoWriter { get; set; } = "";
@@ -380,6 +398,14 @@ namespace Chimera.Client.Common
 		public Dictionary<string, Dictionary<string, FeedbackBind>> AllTrollersFeedbacks { get; set; } = new Dictionary<string, Dictionary<string, FeedbackBind>>();
 
 		/// <summary>
+		/// Which core package defaults each controller's bindings were last taken
+		/// from, as a fingerprint (<see cref="ControlDefaultsAdoption"/>): so a core
+		/// that changes its defaults reaches every config whose bindings nobody has
+		/// touched since (issue #157), and none whose bindings somebody has.
+		/// </summary>
+		public Dictionary<string, string> AdoptedControlDefaults { get; set; } = new Dictionary<string, string>();
+
+		/// <summary>
 		/// The core a system's roms open with, keyed by system ID - remembered from the last time the
 		/// user chose one (Emulator > Core), and consulted by RomLoader when more than one loaded
 		/// package can run the file. Not a matrix of everything the frontend could do: it holds only
@@ -407,6 +433,34 @@ namespace Chimera.Client.Common
 		public string LastWrittenFromDetailed { get; set; } = VersionInfo.GetEmuVersion();
 
 		public bool UseStaticWindowTitles { get; set; }
+
+		/// <summary>
+		/// The colour scheme every window paints with, by the name inside the theme
+		/// (Config &gt; Theme). "Light" is the palette Chimera has always had. A name
+		/// that is not on offer - a theme file somebody deleted - quietly becomes
+		/// Light again rather than leaving the frontend with no colours.
+		///
+		/// Empty means nobody has chosen yet, which is not the same as choosing the
+		/// default: see <see cref="ResolveTheme"/>.
+		/// </summary>
+		public string Theme { get; set; } = "";
+
+		/// <summary>
+		/// Settles the theme the first time it matters, and records what it settled
+		/// on so the question is asked once.
+		///
+		/// A config file that already existed and says nothing about themes was
+		/// written before there were any, by somebody who has been looking at the
+		/// light one for as long as they have used Chimera. They keep it. A config
+		/// that is being created now starts Dark, which is what it was asked to do.
+		/// Either way it is one click in Config &gt; Theme to change, and the choice
+		/// is written down from here on.
+		/// </summary>
+		public void ResolveTheme(bool configExisted)
+		{
+			if (!string.IsNullOrWhiteSpace(Theme)) return;
+			Theme = configExisted ? ThemeLibrary.FallbackThemeName : ThemeLibrary.NewConfigThemeName;
+		}
 
 		public string MainFormStaticWindowTitleOverride { get; set; } = string.Empty;
 

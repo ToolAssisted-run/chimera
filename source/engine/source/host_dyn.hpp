@@ -106,6 +106,10 @@ struct HostApi
 	void (*wbx_state_pages)(void *obj, WbxReturn *ret);
 	void (*wbx_state_fill)(void *obj, uint64_t from, uint64_t to, WbxReturn *ret);
 	void (*wbx_state_finish)(void *obj, WbxReturn *ret);
+	/* The core log: every guest stdout/stderr write also appended to this
+	 * file, or stopped with nullptr. Process-wide. Optional: an older host
+	 * has no way to keep a core's log, and says so through ce_core_log. */
+	void (*wbx_set_output_file)(const char *path, WbxReturn *ret);
 };
 
 /* The loaded host, or nullptr with *error set. Loads once, then cached. */

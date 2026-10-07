@@ -1,3 +1,4 @@
+using System;
 using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
@@ -383,8 +384,10 @@ namespace Chimera.Client.GUI
 
 			ts_h_arrow_blue = new(arrowSize, arrowSize * 2);
 			ts_h_arrow_green = new(arrowSize, arrowSize * 2);
-			DoPolygon(ts_h_arrow_blue, new SolidBrush(Color.FromArgb(83, 217, 255)), arrowPoints);
-			DoPolygon(ts_h_arrow_green, new SolidBrush(Color.FromArgb(0, 194, 64)), arrowPoints);
+			using SolidBrush playback = new(ThemeEngine.Color(ThemeColorRole.TasIconPlayback));
+			using SolidBrush recording = new(ThemeEngine.Color(ThemeColorRole.TasIconRecording));
+			DoPolygon(ts_h_arrow_blue, playback, arrowPoints);
+			DoPolygon(ts_h_arrow_green, recording, arrowPoints);
 
 			ts_v_arrow_blue = ts_h_arrow_blue.Clone() as Bitmap;
 			ts_v_arrow_green = ts_h_arrow_green.Clone() as Bitmap;
@@ -394,9 +397,12 @@ namespace Chimera.Client.GUI
 			icon_anchor = new(anchorSize, anchorSize);
 			icon_marker = new(anchorSize, anchorSize);
 			icon_anchor_lag = new(anchorSize, anchorSize);
-			DoPolygon(icon_marker, new SolidBrush(Color.FromArgb(252, 209, 55)), anchorPoints);
-			DoPolygon(icon_anchor, new SolidBrush(Color.FromArgb(0, 222, 98)), anchorPoints);
-			DoPolygon(icon_anchor_lag, new SolidBrush(Color.FromArgb(255, 96, 100)), anchorPoints);
+			using SolidBrush markerInk = new(ThemeEngine.Color(ThemeColorRole.TasIconMarker));
+			using SolidBrush anchorInk = new(ThemeEngine.Color(ThemeColorRole.TasIconAnchor));
+			using SolidBrush lagAnchorInk = new(ThemeEngine.Color(ThemeColorRole.TasIconLagAnchor));
+			DoPolygon(icon_marker, markerInk, anchorPoints);
+			DoPolygon(icon_anchor, anchorInk, anchorPoints);
+			DoPolygon(icon_anchor_lag, lagAnchorInk, anchorPoints);
 		}
 
 		private void TasView_QueryItemIcon(InputRoll sender, int index, RollColumn column, ref Bitmap bitmap, ref int offsetX, ref int offsetY)
@@ -476,7 +482,7 @@ namespace Chimera.Client.GUI
 
 			if (columnName == CursorColumnName)
 			{
-				color = Color.FromArgb(0xFE, 0xFF, 0xFF);
+				color = ThemeEngine.Color(ThemeColorRole.TasCursorColumn);
 			}
 
 			if (columnName == FrameColumnName)
@@ -491,7 +497,7 @@ namespace Chimera.Client.GUI
 				}
 				else
 				{
-					color = Color.FromArgb(0x60, 0xFF, 0xFF, 0xFF);
+					color = ThemeEngine.Color(ThemeColorRole.TasFrameColumnWash);
 				}
 			}
 			else if (columnName == AxisEditColumn && sender.IsRowSelected(index))
@@ -505,7 +511,7 @@ namespace Chimera.Client.GUI
 					return playerNumber % 2 is 0 && playerNumber is not 0;
 				}))
 			{
-				color = Color.FromArgb(0x0D, 0x00, 0x00, 0x00);
+				color = ThemeEngine.Color(ThemeColorRole.TasAlternatePlayer);
 			}
 		}
 
@@ -549,7 +555,7 @@ namespace Chimera.Client.GUI
 			}
 			else
 			{
-				color = Color.FromArgb(0xFF, 0xFE, 0xEE);
+				color = ThemeEngine.Color(ThemeColorRole.TasDefaultRow);
 			}
 		}
 
@@ -1336,6 +1342,44 @@ namespace Chimera.Client.GUI
 			}
 		}
 
+		/// <summary>
+		/// What a selection drag does to the rows when the pointer goes from one row
+		/// to another: the ranges to select or deselect, in order. The drag began on
+		/// <paramref name="dragStart"/>, whose own state (<paramref name="dragState"/>)
+		/// is the state the drag spreads.
+		///
+		/// The roll does not always know where the pointer WAS. While a context menu
+		/// has the pointer the roll is told it left, so the first move after a click
+		/// that closed the menu comes from a cell with no row (issue #195: clicking a
+		/// frame number with the menu open threw "Nullable object must have a
+		/// value"). A drag with no row behind it comes from where it began.
+		/// </summary>
+		internal static List<(int From, int To, bool Selected)> SelectionDragSteps(int? oldRow, int newRow, int dragStart, bool dragState)
+		{
+			List<(int From, int To, bool Selected)> steps = new();
+			int rawStart = oldRow ?? dragStart;
+			int rawEnd = newRow;
+			int sign = Math.Sign(rawEnd - rawStart);
+			if (sign == 0) return steps; // moved to another cell horizontally
+
+			int startDiff = rawStart - dragStart;
+			int endDiff = rawEnd - dragStart;
+			if (Math.Sign(startDiff) == Math.Sign(endDiff))
+			{
+				// select if moving away from start, deselect if moving towards
+				bool movingAway = Math.Abs(endDiff) > Math.Abs(startDiff);
+				if (movingAway) steps.Add((rawStart + sign, rawEnd, dragState));
+				else steps.Add((rawStart, rawEnd - sign, !dragState));
+			}
+			else
+			{
+				// crossing from one side of selection start to the other
+				if (rawStart != dragStart) steps.Add((rawStart, dragStart - sign, !dragState));
+				if (rawEnd != dragStart) steps.Add((dragStart + sign, rawEnd, dragState));
+			}
+			return steps;
+		}
+
 		private void TasView_PointedCellChanged(object sender, InputRoll.CellEventArgs e)
 		{
 			InputRoll roll = (InputRoll)sender;
@@ -1383,26 +1427,10 @@ namespace Chimera.Client.GUI
 					if (a < b) for (int i = a; i <= b; i++) roll.SelectRow(i, v);
 					else for (int i = b; i <= a; i++) roll.SelectRow(i, v);
 				}
-				int rawStart = e.OldCell.RowIndex.Value;
-				int rawEnd = e.NewCell.RowIndex.Value;
-				int sign = Math.Sign(rawEnd - rawStart);
-				int startDiff = rawStart - _startSelectionDrag;
-				int endDiff = rawEnd - _startSelectionDrag;
-				if (sign != 0) // moved to another cell horizontally
+				foreach (var (from, to, selected) in SelectionDragSteps(
+					e.OldCell?.RowIndex, e.NewCell.RowIndex.Value, _startSelectionDrag, _selectionDragState))
 				{
-					if (Math.Sign(startDiff) == Math.Sign(endDiff))
-					{
-						// select if moving away from start, deselect if moving towards
-						bool movingAway = Math.Abs(endDiff) > Math.Abs(startDiff);
-						if (movingAway) selectRange(rawStart + sign, rawEnd, _selectionDragState);
-						else selectRange(rawStart, rawEnd - sign, !_selectionDragState);
-					}
-					else
-					{
-						// crossing from one side of selection start to the other
-						if (rawStart != _startSelectionDrag) selectRange(rawStart, _startSelectionDrag - sign, !_selectionDragState);
-						if (rawEnd != _startSelectionDrag) selectRange(_startSelectionDrag + sign, rawEnd, _selectionDragState);
-					}
+					selectRange(from, to, selected);
 				}
 
 				SetSplicer();
@@ -1615,8 +1643,15 @@ namespace Chimera.Client.GUI
 				return;
 			}
 
+			// Four host pixels per STEP, where a step is a fraction of the axis
+			// rather than the literal value 1. An absolute screen position is
+			// declared 0..65535 across the picture, so a drag that moved the
+			// value by one would need a quarter of a million pixels to cross
+			// the screen; a paddle declared 0..255 still steps by one, because
+			// that is what a fine step comes to at that size.
+			int step = AxisFineStep(AxisEditColumn);
 			int increment = (_axisEditYPos - e.Y) / 4;
-			AnalogChangeBy(increment);
+			AnalogChangeBy(increment * step);
 			_axisEditYPos -= increment * 4;
 		}
 
@@ -1671,24 +1706,41 @@ namespace Chimera.Client.GUI
 			UpdateActiveMovieInputs();
 		}
 
+		/// <summary>
+		/// A fine step for an axis: one unit on a small range, proportionally
+		/// more on a large one. The nudge hotkeys and the drag are written in
+		/// terms of "a step" rather than the number 1 because an axis is as
+		/// wide as it declares - an absolute screen position spans 0..65535,
+		/// where a step of one is invisible, and a paddle spans 0..255, where
+		/// it is exactly right. 1024 steps crosses any axis in about the same
+		/// number of gestures.
+		/// </summary>
+		private int AxisFineStep(string axisName)
+			=> ControllerType.Axes.TryGetValue(axisName, out var spec)
+				? Math.Max(1, (int)(spec.Range.Count() / 1024))
+				: 1;
+
+		/// <summary>The coarse step, sixteen fine ones, for the by-ten hotkeys.</summary>
+		private int AxisCoarseStep(string axisName) => AxisFineStep(axisName) * 16;
+
 		public void AnalogIncrementByOne()
 		{
-			AnalogChangeBy(1);
+			if (AxisEditingMode) AnalogChangeBy(AxisFineStep(AxisEditColumn));
 		}
 
 		public void AnalogDecrementByOne()
 		{
-			AnalogChangeBy(-1);
+			if (AxisEditingMode) AnalogChangeBy(-AxisFineStep(AxisEditColumn));
 		}
 
 		public void AnalogIncrementByTen()
 		{
-			AnalogChangeBy(10);
+			if (AxisEditingMode) AnalogChangeBy(AxisCoarseStep(AxisEditColumn));
 		}
 
 		public void AnalogDecrementByTen()
 		{
-			AnalogChangeBy(-10);
+			if (AxisEditingMode) AnalogChangeBy(-AxisCoarseStep(AxisEditColumn));
 		}
 
 		private void AnalogChangeBy(int change)

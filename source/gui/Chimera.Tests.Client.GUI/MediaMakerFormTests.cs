@@ -1,3 +1,4 @@
+using System.IO;
 using System.Linq;
 using System.Windows.Forms;
 
@@ -60,6 +61,84 @@ namespace Chimera.Tests.Client.GUI
 			form.Show();
 			var make = form.Controls.OfType<Button>().Single(b => b.Text == "Make");
 			Assert.IsFalse(make.Enabled);
+		}
+
+		private const string DiscRecipe =
+			@"{ ""id"": ""disc"", ""label"": ""Testbox disc"", ""format"": ""iso9660"", ""when"": { ""rootFile"": ""DISC.ID"" },
+			    ""systemArea"": [ { ""at"": 0, ""u32be"": 1 }, { ""at"": 12, ""u32be"": ""lastSector"" } ] }";
+
+		private static string Folder(string name, params string[] files)
+		{
+			var dir = Path.Combine(Path.GetTempPath(), "chimera-mediamaker-tests", name);
+			if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+			Directory.CreateDirectory(dir);
+			foreach (var f in files) File.WriteAllText(Path.Combine(dir, f), f);
+			return dir;
+		}
+
+		/// <summary>
+		/// The window knows no machine. What a disc of some console needs beyond
+		/// its files is the core's to declare, and all the window does with a
+		/// recipe is ask the engine whether the folder is one it was written for,
+		/// say so, and hand it over.
+		/// </summary>
+		[TestMethod]
+		public void AFolderACoreRecognisesIsSaidToBe()
+		{
+			using MediaMakerForm form = new([ new MediaMakerForm.CoreRecipe("Testbox", "Testbox disc", DiscRecipe) ]);
+			form.Show();
+			form.SetFormat(1); // the ISO
+
+			form.SetFolder(Folder("disc", "disc.id", "game.bin")); // the name is matched whatever its case
+			Assert.IsNotNull(form.Recognised);
+			StringAssert.Contains(form.RecognisedText, "Testbox disc");
+			StringAssert.Contains(form.RecognisedText, "Testbox reads it");
+
+			// the recipe is for an ISO: as a zip the same folder is just its files
+			form.SetFormat(0);
+			Assert.IsNull(form.Recognised);
+			Assert.AreEqual("", form.RecognisedText);
+			form.SetFormat(1);
+			Assert.IsNotNull(form.Recognised);
+
+			// and a folder it was not written for
+			form.SetFolder(Folder("plain", "readme.txt"));
+			Assert.IsNull(form.Recognised);
+			Assert.AreEqual("", form.RecognisedText);
+		}
+
+		/// <summary>With no core declaring anything, nothing is ever recognised - whatever the folder holds.</summary>
+		[TestMethod]
+		public void WithNoRecipesAnImageIsItsFiles()
+		{
+			using MediaMakerForm form = new();
+			form.Show();
+			form.SetFormat(1);
+			form.SetFolder(Folder("disc2", "DISC.ID", "PS3_DISC.SFB"));
+			Assert.IsNull(form.Recognised);
+			Assert.AreEqual("", form.RecognisedText);
+		}
+
+		/// <summary>
+		/// The recipe reaches the image: the same folder packed with and without
+		/// it differs in the system area and nowhere else, and the engine's own
+		/// test says what the values are.
+		/// </summary>
+		[TestMethod]
+		public void TheRecipeReachesTheImage()
+		{
+			var folder = Folder("disc3", "DISC.ID", "a.bin");
+			var with = Path.Combine(Path.GetTempPath(), "chimera-mediamaker-tests", "with.iso");
+			var without = Path.Combine(Path.GetTempPath(), "chimera-mediamaker-tests", "without.iso");
+			Assert.IsTrue(Chimera.Emulation.Common.Engine.ChimeraEngine.MakeMedia(folder, with, 1, DiscRecipe, null, out var shaWith, out var error), error);
+			Assert.IsTrue(Chimera.Emulation.Common.Engine.ChimeraEngine.MakeMedia(folder, without, 1, null, out var shaWithout, out error), error);
+			Assert.AreNotEqual(shaWith, shaWithout);
+			var a = File.ReadAllBytes(with);
+			var b = File.ReadAllBytes(without);
+			Assert.AreEqual(a.Length, b.Length);
+			Assert.AreEqual(1, a[3], "the count the recipe asks for, big-endian at 0");
+			Assert.IsTrue(b.Take(32768).All(static x => x is 0), "no recipe: a system area of zeros");
+			Assert.IsTrue(a.Skip(32768).SequenceEqual(b.Skip(32768)), "and past it the same image");
 		}
 
 		/// <summary>

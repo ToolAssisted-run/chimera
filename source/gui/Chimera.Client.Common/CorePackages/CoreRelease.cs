@@ -81,7 +81,7 @@ namespace Chimera.Client.Common
 		public string DateAndCommit
 			=> PublishedAt == default
 				? ShortVersion
-				: $"{PublishedAt.ToLocalTime():yyyy-MM-dd}  ({ShortVersion})";
+				: $"{CoreVersionDates.Format(PublishedAt)}  ({ShortVersion})";
 
 		public override string ToString() => $"{DisplayVersion} ({Channel}, {PublishedAt:yyyy-MM-dd})";
 	}

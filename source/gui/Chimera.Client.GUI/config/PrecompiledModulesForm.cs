@@ -110,7 +110,7 @@ namespace Chimera.Client.GUI
 			_list.Columns.Add("When", UIHelper.ScaleX(150));
 			_list.Columns.Add("Modules", UIHelper.ScaleX(80), HorizontalAlignment.Right);
 			_list.Columns.Add("Size", UIHelper.ScaleX(100), HorizontalAlignment.Right);
-			_list.ItemChecked += (_, _) => Ticked();
+			_list.ItemChecked += (_, e) => Ticked(e.Item);
 			_list.SelectedIndexChanged += (_, _) => ShowDetail();
 
 			_detail = new Label
@@ -199,13 +199,13 @@ namespace Chimera.Client.GUI
 					// a row nothing can name, and one missing pieces, are the two
 					// worth an eye: neither is an error, both are worth seeing
 					ForeColor = game.Unknown || game.Legacy
-						? SystemColors.GrayText
-						: game.Complete ? SystemColors.WindowText : Color.Firebrick,
+						? ThemeEngine.Color(ThemeColorRole.DisabledText)
+						: game.Complete ? ThemeEngine.Color(ThemeColorRole.InputText) : ThemeEngine.Color(ThemeColorRole.AccentError),
 				};
 				row.SubItems.Add(game.By);
 				row.SubItems.Add(game.Compiled is { } when ? when.ToLocalTime().ToString("yyyy-MM-dd HH:mm") : "");
 				row.SubItems.Add(game.Modules is 0 ? "" : game.Modules.ToString());
-				row.SubItems.Add(Size(game.Bytes));
+				row.SubItems.Add(SizeText(game.Bytes));
 				_list.Items.Add(row);
 			}
 			_list.EndUpdate();
@@ -214,23 +214,44 @@ namespace Chimera.Client.GUI
 			var total = PrecompiledCodeSurvey.TotalBytes(_items);
 			_header.Text = _items.Count is 0
 				? "No game has compiled code yet. A core that translates its game's code fills this when a project is created."
-				: $"{_items.Count} game{(_items.Count is 1 ? "" : "s")}, {Size(total)}. "
+				: $"{_items.Count} game{(_items.Count is 1 ? "" : "s")}, {SizeText(total)}. "
 					+ "Removing one means its game is compiled again the next time a project needs it, which costs minutes and never work.";
 			Ticked();
 			ShowDetail();
 		}
 
-		private void Ticked()
+		/// <param name="changed">
+		/// The one row whose tick moved, when this is a tick event; null when the
+		/// whole list has just been rebuilt and everything has to be counted again.
+		///
+		/// Taking the row from the event rather than walking the list is the point.
+		/// A tick event can arrive while ListView.Items is mid-rebuild - the toolkit
+		/// raises one per item as it puts the items back into a handle it has just
+		/// remade - and a collection being rebuilt cannot be walked: that is a
+		/// NullReferenceException out of the toolkit's own enumerator, which is how
+		/// this window died on being opened. It is also what this class always meant
+		/// to do; see the note on <see cref="_ticked"/>.
+		/// </param>
+		private void Ticked(ListViewItem? changed = null)
 		{
 			if (!_ready || _suppressCheckEvents) return;
-			_ticked.Clear();
-			foreach (ListViewItem row in _list.Items)
+			if (changed is not null)
 			{
-				if (row.Checked && row.Tag is PrecompiledGame game) _ticked.Add(game.Path);
+				if (changed.Tag is not PrecompiledGame moved) return;
+				if (changed.Checked) _ticked.Add(moved.Path);
+				else _ticked.Remove(moved.Path);
+			}
+			else
+			{
+				_ticked.Clear();
+				foreach (ListViewItem row in _list.Items)
+				{
+					if (row.Checked && row.Tag is PrecompiledGame game) _ticked.Add(game.Path);
+				}
 			}
 			var bytes = _items.Where(i => _ticked.Contains(i.Path)).Sum(static i => i.Bytes);
 			_removeButton.Enabled = _ticked.Count is not 0;
-			_removeButton.Text = _ticked.Count is 0 ? "&Remove" : $"&Remove ({Size(bytes)})";
+			_removeButton.Text = _ticked.Count is 0 ? "&Remove" : $"&Remove ({SizeText(bytes)})";
 		}
 
 		private void ShowDetail()
@@ -254,7 +275,7 @@ namespace Chimera.Client.GUI
 				var what = going.Count is 1 ? going[0].Label : $"{going.Count} games' compiled code";
 				var answer = MessageBox.Show(
 					this,
-					$"Remove {what}?\n\n{Size(going.Sum(static g => g.Bytes))} will be freed. "
+					$"Remove {what}?\n\n{SizeText(going.Sum(static g => g.Bytes))} will be freed. "
 						+ "Each game is compiled again the next time a project needs it.",
 					"Pre-Compiled Modules",
 					MessageBoxButtons.YesNo,
@@ -291,7 +312,7 @@ namespace Chimera.Client.GUI
 			}
 		}
 
-		private static string Size(long bytes)
+		private static string SizeText(long bytes)
 		{
 			var gb = bytes / (1024.0 * 1024 * 1024);
 			if (gb >= 1.0) return $"{gb:0.00} GB";

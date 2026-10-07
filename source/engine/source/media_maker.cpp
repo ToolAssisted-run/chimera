@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "../../../extern/miniz/miniz.h"
+#include "../../../extern/cjson/cJSON.h"
 
 namespace chimera {
 namespace {
@@ -399,8 +400,111 @@ bool mediaCollect(const std::string &folder, std::vector<MediaEntry> &out, std::
 	return true;
 }
 
+bool mediaParseRecipe(const char *json, MediaRecipe &out, std::string &error)
+{
+	out = MediaRecipe();
+	cJSON *root = json != nullptr ? cJSON_Parse(json) : nullptr;
+	if (!cJSON_IsObject(root))
+	{
+		cJSON_Delete(root);
+		error = "the media recipe is not a JSON object";
+		return false;
+	}
+	bool ok = true;
+	const cJSON *format = cJSON_GetObjectItemCaseSensitive(root, "format");
+	const std::string name = cJSON_IsString(format) ? format->valuestring : "";
+	if (name == "iso9660") out.format = MediaFormat::Iso9660;
+	else if (name == "zip") out.format = MediaFormat::ZipStored;
+	else if (name == "fat12") out.format = MediaFormat::Fat12;
+	else
+	{
+		error = "the media recipe names no format this packer writes (iso9660, zip, fat12): \"" + name + "\"";
+		ok = false;
+	}
+	const cJSON *when = cJSON_GetObjectItemCaseSensitive(root, "when");
+	if (ok && when != nullptr)
+	{
+		const cJSON *rootFile = cJSON_GetObjectItemCaseSensitive(when, "rootFile");
+		if (!cJSON_IsObject(when) || !cJSON_IsString(rootFile) || rootFile->valuestring[0] == '\0')
+		{
+			error = "the media recipe's \"when\" wants a \"rootFile\"";
+			ok = false;
+		}
+		else out.rootFile = rootFile->valuestring;
+	}
+	const cJSON *area = cJSON_GetObjectItemCaseSensitive(root, "systemArea");
+	if (ok && area != nullptr)
+	{
+		if (!cJSON_IsArray(area) || out.format != MediaFormat::Iso9660)
+		{
+			error = "a system area is an array, and only an ISO 9660 image has one";
+			ok = false;
+		}
+		const cJSON *item = nullptr;
+		cJSON_ArrayForEach(item, area)
+		{
+			if (!ok) break;
+			MediaPatch patch;
+			const cJSON *at = cJSON_GetObjectItemCaseSensitive(item, "at");
+			const cJSON *be = cJSON_GetObjectItemCaseSensitive(item, "u32be");
+			const cJSON *le = cJSON_GetObjectItemCaseSensitive(item, "u32le");
+			const cJSON *value = be != nullptr ? be : le;
+			/* sixteen sectors of 2048 bytes, and a value is four of them */
+			if (!cJSON_IsNumber(at) || at->valuedouble < 0 || at->valuedouble > 16 * 2048 - 4
+				|| value == nullptr || (be != nullptr && le != nullptr))
+			{
+				error = "a system area entry wants \"at\" (0..32764) and one of \"u32be\", \"u32le\"";
+				ok = false;
+				break;
+			}
+			patch.at = static_cast<uint32_t>(at->valuedouble);
+			patch.bigEndian = be != nullptr;
+			if (cJSON_IsNumber(value) && value->valuedouble >= 0 && value->valuedouble <= 4294967295.0)
+			{
+				patch.literal = static_cast<uint32_t>(value->valuedouble);
+			}
+			else if (cJSON_IsString(value) && std::strcmp(value->valuestring, "lastSector") == 0)
+			{
+				patch.value = MediaPatch::Value::LastSector;
+			}
+			else if (cJSON_IsString(value) && std::strcmp(value->valuestring, "sectors") == 0)
+			{
+				patch.value = MediaPatch::Value::Sectors;
+			}
+			else
+			{
+				error = "a system area value is a number, \"lastSector\" or \"sectors\"";
+				ok = false;
+				break;
+			}
+			out.systemArea.push_back(patch);
+		}
+	}
+	cJSON_Delete(root);
+	return ok;
+}
+
+bool mediaRecipeApplies(const MediaRecipe &recipe, const std::string &folder)
+{
+	if (recipe.rootFile.empty()) return true;
+	const auto lower = [](std::string s) {
+		for (char &c : s)
+			if (c >= 'A' && c <= 'Z') c = static_cast<char>(c - 'A' + 'a');
+		return s;
+	};
+	const std::string wanted = lower(recipe.rootFile);
+	std::error_code ec;
+	for (std::filesystem::directory_iterator it(std::filesystem::u8path(folder), ec), end; !ec && it != end; it.increment(ec))
+	{
+		std::error_code inner;
+		if (it->is_regular_file(inner) && lower(it->path().filename().u8string()) == wanted) return true;
+	}
+	return false;
+}
+
 bool mediaMake(const std::string &folder, const std::string &outPath, MediaFormat format,
-	const MediaProgress &progress, std::string &sha1Out, std::string &error)
+	const MediaProgress &progress, std::string &sha1Out, std::string &error,
+	const MediaRecipe *recipe)
 {
 	std::vector<MediaEntry> files;
 	if (!mediaCollect(folder, files, error)) return false;
@@ -410,7 +514,7 @@ bool mediaMake(const std::string &folder, const std::string &outPath, MediaForma
 		case MediaFormat::ZipStored:
 			return mediaWriteZipStored(files, outPath, progress, sha1Out, error);
 		case MediaFormat::Iso9660:
-			return mediaWriteIso9660(files, outPath, progress, sha1Out, error);
+			return mediaWriteIso9660(files, outPath, progress, sha1Out, error, recipe);
 		case MediaFormat::Fat12:
 			return mediaWriteFat12(files, outPath, progress, sha1Out, error);
 	}
@@ -428,6 +532,29 @@ extern "C" {
 
 static std::string g_lastSha1;
 static std::string g_lastError;
+
+/* the pack both entry points run */
+static int32_t runMediaMake(const char *folder, const char *out_path, chimera::MediaFormat fmt,
+	const chimera::MediaRecipe *recipe, ce_media_progress_fn progress, void *user)
+{
+	chimera::MediaProgress cb;
+	if (progress != nullptr)
+	{
+		cb = [progress, user](const char *file, uint64_t done, uint64_t total, uint64_t filesDone,
+				  uint64_t filesTotal) {
+			return progress(file, done, total, filesDone, filesTotal, user) != 0;
+		};
+	}
+
+	std::string sha, err;
+	if (!chimera::mediaMake(folder, out_path, fmt, cb, sha, err, recipe))
+	{
+		g_lastError = err;
+		return 0;
+	}
+	g_lastSha1 = sha;
+	return 1;
+}
 
 CE_API int32_t ce_media_make(const char *folder, const char *out_path, int32_t format,
 	ce_media_progress_fn progress, void *user)
@@ -449,24 +576,59 @@ CE_API int32_t ce_media_make(const char *folder, const char *out_path, int32_t f
 			g_lastError = "unknown format";
 			return 0;
 	}
+	return runMediaMake(folder, out_path, fmt, nullptr, progress, user);
+}
 
-	chimera::MediaProgress cb;
-	if (progress != nullptr)
+CE_API int32_t ce_media_recipe_applies(const char *recipe_json, const char *folder)
+{
+	g_lastError.clear();
+	chimera::MediaRecipe recipe;
+	std::string err;
+	if (folder == nullptr || !chimera::mediaParseRecipe(recipe_json, recipe, err))
 	{
-		cb = [progress, user](const char *file, uint64_t done, uint64_t total, uint64_t filesDone,
-				  uint64_t filesTotal) {
-			return progress(file, done, total, filesDone, filesTotal, user) != 0;
-		};
+		g_lastError = folder == nullptr ? "no folder" : err;
+		return -1;
 	}
+	return chimera::mediaRecipeApplies(recipe, folder) ? 1 : 0;
+}
 
-	std::string sha, err;
-	if (!chimera::mediaMake(folder, out_path, fmt, cb, sha, err))
+CE_API int32_t ce_media_recipe_format(const char *recipe_json)
+{
+	g_lastError.clear();
+	chimera::MediaRecipe recipe;
+	std::string err;
+	if (!chimera::mediaParseRecipe(recipe_json, recipe, err))
+	{
+		g_lastError = err;
+		return -1;
+	}
+	switch (recipe.format)
+	{
+		case chimera::MediaFormat::ZipStored: return CE_MEDIA_ZIP_STORED;
+		case chimera::MediaFormat::Iso9660: return CE_MEDIA_ISO9660;
+		case chimera::MediaFormat::Fat12: return CE_MEDIA_FAT12;
+	}
+	return -1;
+}
+
+CE_API int32_t ce_media_make_with(const char *folder, const char *out_path, const char *recipe_json,
+	ce_media_progress_fn progress, void *user)
+{
+	g_lastSha1.clear();
+	g_lastError.clear();
+	if (folder == nullptr || out_path == nullptr)
+	{
+		g_lastError = "no folder or no output file";
+		return 0;
+	}
+	chimera::MediaRecipe recipe;
+	std::string err;
+	if (!chimera::mediaParseRecipe(recipe_json, recipe, err))
 	{
 		g_lastError = err;
 		return 0;
 	}
-	g_lastSha1 = sha;
-	return 1;
+	return runMediaMake(folder, out_path, recipe.format, &recipe, progress, user);
 }
 
 CE_API const char *ce_media_last_sha1(void) { return g_lastSha1.c_str(); }

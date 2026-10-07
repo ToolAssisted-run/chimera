@@ -47,16 +47,10 @@
 			this.label2 = new Chimera.WinForms.Controls.LocLabelEx();
 			this.label38 = new Chimera.WinForms.Controls.LocLabelEx();
 			this.btnMisc = new Chimera.Client.GUI.MenuButton();
-			this.flpUDLR = new Chimera.WinForms.Controls.LocSingleRowFLP();
-			this.lblUDLR = new Chimera.WinForms.Controls.LabelEx();
-			this.rbUDLRForbid = new Chimera.WinForms.Controls.RadioButtonEx();
-			this.rbUDLRPriority = new Chimera.WinForms.Controls.RadioButtonEx();
-			this.rbUDLRAllow = new Chimera.WinForms.Controls.RadioButtonEx();
 			this.tabControl1.SuspendLayout();
 			this.tableLayoutPanel1.SuspendLayout();
 			((System.ComponentModel.ISupportInitialize)(this.pictureBox1)).BeginInit();
 			this.contextMenuStrip1.SuspendLayout();
-			this.flpUDLR.SuspendLayout();
 			this.SuspendLayout();
 			// 
 			// tabControl1
@@ -223,39 +217,6 @@
 			this.btnMisc.Text = "Misc...";
 			this.btnMisc.UseVisualStyleBackColor = true;
 			// 
-			// flpUDLR
-			// 
-			this.flpUDLR.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-			this.flpUDLR.Controls.Add(this.lblUDLR);
-			this.flpUDLR.Controls.Add(this.rbUDLRForbid);
-			this.flpUDLR.Controls.Add(this.rbUDLRPriority);
-			this.flpUDLR.Controls.Add(this.rbUDLRAllow);
-			this.flpUDLR.Location = new System.Drawing.Point(474, 468);
-			this.flpUDLR.Name = "flpUDLR";
-			// 
-			// lblUDLR
-			// 
-			this.lblUDLR.Name = "lblUDLR";
-			this.lblUDLR.Text = "U+D/L+R:";
-			// 
-			// rbUDLRForbid
-			// 
-			this.rbUDLRForbid.Margin = new System.Windows.Forms.Padding(0, 3, 0, 3);
-			this.rbUDLRForbid.Name = "rbUDLRForbid";
-			this.rbUDLRForbid.Text = "Forbid";
-			// 
-			// rbUDLRPriority
-			// 
-			this.rbUDLRPriority.Margin = new System.Windows.Forms.Padding(0, 3, 0, 3);
-			this.rbUDLRPriority.Name = "rbUDLRPriority";
-			this.rbUDLRPriority.Text = "Priority";
-			// 
-			// rbUDLRAllow
-			// 
-			this.rbUDLRAllow.Margin = new System.Windows.Forms.Padding(0, 3, 0, 3);
-			this.rbUDLRAllow.Name = "rbUDLRAllow";
-			this.rbUDLRAllow.Text = "Allow";
-			// 
 			// ControllerConfig
 			// 
 			this.AcceptButton = this.buttonOK;
@@ -263,7 +224,6 @@
 			this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
 			this.CancelButton = this.buttonCancel;
 			this.ClientSize = new System.Drawing.Size(932, 572);
-			this.Controls.Add(this.flpUDLR);
 			this.Controls.Add(this.label3);
 			this.Controls.Add(this.label2);
 			this.Controls.Add(this.label38);
@@ -282,8 +242,6 @@
 			this.tableLayoutPanel1.ResumeLayout(false);
 			((System.ComponentModel.ISupportInitialize)(this.pictureBox1)).EndInit();
 			this.contextMenuStrip1.ResumeLayout(false);
-			this.flpUDLR.ResumeLayout(false);
-			this.flpUDLR.PerformLayout();
 			this.ResumeLayout(false);
 			this.PerformLayout();
 
@@ -309,10 +267,5 @@
 				private Chimera.WinForms.Controls.LocLabelEx label3;
 				private Chimera.WinForms.Controls.LocLabelEx label2;
 				private Chimera.WinForms.Controls.LocLabelEx label38;
-		private WinForms.Controls.LocSingleRowFLP flpUDLR;
-		private WinForms.Controls.RadioButtonEx rbUDLRForbid;
-		private WinForms.Controls.RadioButtonEx rbUDLRPriority;
-		private WinForms.Controls.RadioButtonEx rbUDLRAllow;
-		private WinForms.Controls.LabelEx lblUDLR;
 	}
 }

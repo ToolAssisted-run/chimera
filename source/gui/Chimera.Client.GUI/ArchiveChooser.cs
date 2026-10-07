@@ -9,7 +9,7 @@ using Chimera.Common.StringExtensions;
 
 namespace Chimera.Client.GUI
 {
-	public partial class ArchiveChooser : Form
+	public partial class ArchiveChooser : ThemedForm
 	{
 		private readonly IList<ListViewItem> _archiveItems = new List<ListViewItem>();
 		private readonly ToolTip _errorBalloon = new ToolTip();
@@ -33,9 +33,7 @@ namespace Chimera.Client.GUI
 				var lvi = new ListViewItem { Tag = i };
 				lvi.SubItems.Add(new ListViewItem.ListViewSubItem());
 				lvi.Text = item.Name;
-				long size = item.Size;
-				if (size % 1024 is 16 && Path.GetExtension(item.Name)?.EqualsIgnoreCase(".NES") is true) size -= 16;
-				lvi.SubItems[1].Text = Util.FormatFileSize(size);
+				lvi.SubItems[1].Text = Util.FormatFileSize(item.Size);
 				_archiveItems.Add(lvi);
 			}
 

@@ -38,10 +38,13 @@ namespace Chimera.Emulation.Common.Waterbox
 		/// </summary>
 		public CoreAttribute CoreIdentity => IdentityOf(_cfg);
 
+		/// <summary>One game rather than a machine (<c>"kind": "game"</c>; docs/game-cores.md).</summary>
+		public bool IsGameCore => _cfg.IsGameCore;
+
 		/// <summary>Builds a core's identity from its package declaration.</summary>
 		internal static CoreAttribute IdentityOf(WaterboxConfig cfg)
 			=> new PortedCoreAttribute(
-				name: string.IsNullOrWhiteSpace(cfg.CoreName) ? "Waterbox" : cfg.CoreName,
+				name: cfg.CoreName is { } named && !string.IsNullOrWhiteSpace(named) ? named : "Waterbox",
 				author: cfg.Author ?? "",
 				portedVersion: cfg.Version ?? "",
 				portedUrl: cfg.Url ?? "");
@@ -49,8 +52,9 @@ namespace Chimera.Emulation.Common.Waterbox
 		private readonly WaterboxConfig _cfg;
 
 		/// <summary>the machine this session is, for a package that can be several</summary>
-		private readonly WaterboxConfig.MachineConfig _machine;
+		private readonly WaterboxConfig.MachineConfig? _machine;
 
+		private readonly WaterboxConfig.VideoConfig _video;
 		private readonly EngineSession _session;
 		private WaterboxCoreSettings _settings;
 
@@ -63,7 +67,7 @@ namespace Chimera.Emulation.Common.Waterbox
 		// resampled here, once per frame, on its way to whoever asks for samples -
 		// the sound output and the encoder alike. Presentation only: the guest's
 		// bytes, which the gates hash, are untouched.
-		private readonly SDLResampler _resampler;
+		private readonly SDLResampler? _resampler;
 		private short[] _resampled = [ ];
 		private int _resampledCount;
 		private readonly string[] _buttons;
@@ -80,12 +84,6 @@ namespace Chimera.Emulation.Common.Waterbox
 		/// </summary>
 		public static string HostBuildInfo => EngineSession.HostBuildInfo;
 
-		/// <param name="rom">the game's bytes, or null when <paramref name="romPath"/> is given</param>
-		/// <param name="romPath">
-		/// Where the game lies, for the usual case of a file on disk: the engine
-		/// mounts it and the machine reads it from there, so nothing is loaded.
-		/// A disc image is routinely bigger than a byte[] can be.
-		/// </param>
 		/// <summary>
 		/// The root under which every core keeps the code it compiled for a game
 		/// (the frontend sets it from its paths); empty means none. A core's own
@@ -94,21 +92,21 @@ namespace Chimera.Emulation.Common.Waterbox
 		public static string CoreCacheRoot { get; set; } = "";
 
 		/// <summary>The precompile session the next core opens as (null: a normal run).</summary>
-		public static PrecompileRequest PrecompileRequest { get; set; }
+		public static PrecompileRequest? PrecompileRequest { get; set; }
 
 		/// <summary>
 		/// One directory per GAME, named by the game's own SHA1 (user-decided,
 		/// 2026-09-17). The core and the package version are recorded inside the
 		/// manifest instead of in the path, so a game keeps one directory however
 		/// often the core is rebuilt, and objects an older build compiled are
-		/// refused by <see cref="CoreCacheManifest.CompiledBy"/> rather than by
+		/// refused by <c>CoreCacheManifest.CompiledBy</c> rather than by
 		/// being filed somewhere else.
 		/// </summary>
-		public static string CoreCacheDirectoryFor(string cacheRoot, string gameSha1)
+		public static string? CoreCacheDirectoryFor(string? cacheRoot, string? gameSha1)
 		{
-			if (string.IsNullOrEmpty(cacheRoot) || string.IsNullOrEmpty(gameSha1)) return null;
-			static string Safe(string s) => string.Concat((s ?? "").Select(c => char.IsLetterOrDigit(c) || c is '-' or '_' or '.' ? c : '_'));
-			return Path.Combine(cacheRoot, Safe(gameSha1.ToUpperInvariant()));
+			if (cacheRoot is not { Length: > 0 } root || gameSha1 is not { Length: > 0 } sha1) return null;
+			static string Safe(string s) => string.Concat(s.Select(c => char.IsLetterOrDigit(c) || c is '-' or '_' or '.' ? c : '_'));
+			return Path.Combine(root, Safe(sha1.ToUpperInvariant()));
 		}
 
 		/// <summary>
@@ -120,13 +118,19 @@ namespace Chimera.Emulation.Common.Waterbox
 		/// by path, size and mtime - the wizard hashed this same file when it was
 		/// picked, so this costs a lookup rather than a read of a disc image.
 		/// </summary>
-		public static string CoreCacheDirectoryFor(WaterboxConfig cfg, string romPath)
+		public static string? CoreCacheDirectoryFor(WaterboxConfig cfg, string? romPath)
 			=> cfg.Precompile && romPath is { Length: > 0 } && File.Exists(romPath)
 				&& ChimeraEngine.Sha1OfFile(romPath) is { } hashed
 					? CoreCacheDirectoryFor(CoreCacheRoot, hashed.Sha1)
 					: null;
 
-		public WaterboxCore(byte[] rom, string romPath, WaterboxConfig cfg, string packageDir, WaterboxCoreSettings settings = null, IReadOnlyDictionary<string, byte[]> firmware = null, IReadOnlyList<CoreFile> extraFiles = null)
+		/// <param name="rom">the game's bytes, or null when <paramref name="romPath"/> is given</param>
+		/// <param name="romPath">
+		/// Where the game lies, for the usual case of a file on disk: the engine
+		/// mounts it and the machine reads it from there, so nothing is loaded.
+		/// A disc image is routinely bigger than a byte[] can be.
+		/// </param>
+		public WaterboxCore(byte[]? rom, string? romPath, WaterboxConfig cfg, string packageDir, WaterboxCoreSettings? settings = null, IReadOnlyDictionary<string, byte[]>? firmware = null, IReadOnlyList<CoreFile>? extraFiles = null)
 		{
 			_cfg = cfg;
 			_settings = settings?.Clone() ?? new WaterboxCoreSettings();
@@ -134,22 +138,31 @@ namespace Chimera.Emulation.Common.Waterbox
 			// controller, the picture and the system id all come from it, and a
 			// package that is only ever one machine has none and uses the top level.
 			_machine = cfg.MachineFor(EffectiveSettingsFor(cfg, _settings));
-			var input = _machine?.Input ?? cfg.Input;
-			_width = cfg.Video.Width;
-			_height = cfg.Video.Height;
-			_samplesPerFrame = cfg.Audio.SamplesPerFrame;
+			// The three blocks the adapter cannot build a session without. A
+			// package that omits one is malformed, and it used to fail as a null
+			// dereference here; saying which block is missing names the package
+			// instead. Nothing about a package that HAS them changes.
+			_video = cfg.Video ?? throw new InvalidOperationException(
+				$"{WaterboxCoreFactory.ConfigFileName}: no \"video\" block, so the picture has no size");
+			var audio = cfg.Audio ?? throw new InvalidOperationException(
+				$"{WaterboxCoreFactory.ConfigFileName}: no \"audio\" block, so the sound has no rate");
+			var input = _machine?.Input ?? cfg.Input ?? throw new InvalidOperationException(
+				$"{WaterboxCoreFactory.ConfigFileName}: no \"input\" block, so the machine has no controller");
+			_width = _video.Width;
+			_height = _video.Height;
+			_samplesPerFrame = audio.SamplesPerFrame;
 			_videoBuff = new int[_width * _height];
 			_stereoBuff = new short[_samplesPerFrame * 2];
-			if (cfg.Audio.Rate is > 0 and not 44100)
+			if (audio.Rate is > 0 and not 44100)
 			{
-				_resampler = new SDLResampler(cfg.Audio.Rate, 44100, (buf, n) =>
+				_resampler = new SDLResampler(audio.Rate, 44100, (buf, n) =>
 				{
 					if (_resampled.Length < n * 2) _resampled = new short[n * 2];
 					Buffer.BlockCopy(buf, 0, _resampled, 0, n * 2 * sizeof(short));
 					_resampledCount = n;
 				});
 			}
-			_buttons = input.Buttons.ToArray();
+			_buttons = input.Buttons?.ToArray() ?? [ ];
 			_axes = input.Axes?.ToArray() ?? [ ];
 
 			ServiceProvider = new BasicServiceProvider(this);
@@ -177,6 +190,11 @@ namespace Chimera.Emulation.Common.Waterbox
 			// An inactive control is not in the controller, not a TAStudio column
 			// and not a character in a movie entry - but the arrays here stay the
 			// DECLARATION's, because an index on the wire must never move.
+			// The settings THIS GAME has beyond the package's (an arcade game's dip
+			// switches), which only the loaded core can name. Shown in the settings
+			// grid beside the package's; their values travel like any other.
+			_gameDecls = WaterboxConfig.ParseGameSettings(_session.GameSettingsJson, Decls.Select(static d => d.Key));
+
 			_buttonActive = new bool[_buttons.Length];
 			for (int i = 0; i < _buttons.Length; i++) _buttonActive[i] = _session.ButtonActive(i);
 			_axisActive = new bool[_axes.Length];
@@ -203,7 +221,17 @@ namespace Chimera.Emulation.Common.Waterbox
 			// The optional tooling ABI (see WaterboxCore.Tooling.cs) - may append bus
 			// domains to the list, so it runs before the domains are published.
 			InitTooling((BasicServiceProvider)ServiceProvider, domains);
-			((BasicServiceProvider)ServiceProvider).Register<IMemoryDomains>(new MemoryDomainList(domains));
+			PublishMemory((BasicServiceProvider)ServiceProvider, domains);
+
+			// A game core's properties (docs/game-cores.md): named places in the domains
+			// above, which the tools watch, poke and freeze by name. The engine checked the
+			// table (and said what it left out); offered only when it names one - or is
+			// dynamic, a table that may name nothing yet and a hundred things a frame on.
+			EngineGameProperties properties = new(_session);
+			if (properties.IsDynamic || properties.Properties.Count is not 0)
+			{
+				((BasicServiceProvider)ServiceProvider).Register<IGameProperties>(properties);
+			}
 		}
 
 		// ---- settings ----
@@ -215,6 +243,20 @@ namespace Chimera.Emulation.Common.Waterbox
 		/// is understood here without this file changing. A core with no renderer
 		/// setting never asks, which is most of them.
 		/// </summary>
+		/// <summary>
+		/// Offers the machine's memory to the tools - when it has any. The memory
+		/// tools (RAM Watch, RAM Search, the hex editor) require the service and
+		/// start from its first domain, so a machine that describes no memory at
+		/// all must not offer an empty list: they would be enabled, and fail on
+		/// opening (issue #197, a Flash movie). Without the service they are greyed
+		/// out, and a script that asks for memory is told the core has none.
+		/// </summary>
+		internal static void PublishMemory(BasicServiceProvider services, IList<MemoryDomain> domains)
+		{
+			if (domains.Count is 0) return;
+			services.Register<IMemoryDomains>(new MemoryDomainList(domains));
+		}
+
 		internal static bool WantsGpu(IReadOnlyDictionary<string, object> effective)
 			=> effective.TryGetValue("renderer", out var r)
 				&& r?.ToString() is string name
@@ -228,7 +270,7 @@ namespace Chimera.Emulation.Common.Waterbox
 		private Dictionary<string, object> EffectiveSettings()
 		{
 			var effective = new Dictionary<string, object>();
-			foreach (var decl in Decls) effective[decl.Name] = decl.DefaultValue;
+			foreach (var decl in Decls) effective[decl.Key] = decl.DefaultValue;
 			foreach (var kv in _settings.Values ?? new()) effective[kv.Key] = kv.Value;
 			return effective;
 		}
@@ -239,7 +281,7 @@ namespace Chimera.Emulation.Common.Waterbox
 		/// wizard) need them without booting anything.
 		/// </summary>
 		public static Dictionary<string, object> EffectiveSettingsFor(
-			WaterboxConfig cfg, WaterboxCoreSettings settings)
+			WaterboxConfig cfg, WaterboxCoreSettings? settings)
 		{
 			// Two passes, because a package of machines has settings whose defaults
 			// and legal values depend on WHICH machine - and which machine is itself
@@ -251,10 +293,10 @@ namespace Chimera.Emulation.Common.Waterbox
 		}
 
 		private static Dictionary<string, object> Defaults(
-			IReadOnlyList<WaterboxConfig.SettingDecl> decls, WaterboxCoreSettings settings)
+			IReadOnlyList<WaterboxConfig.SettingDecl>? decls, WaterboxCoreSettings? settings)
 		{
 			var effective = new Dictionary<string, object>();
-			foreach (var decl in decls ?? (IReadOnlyList<WaterboxConfig.SettingDecl>) [ ]) effective[decl.Name] = decl.DefaultValue;
+			foreach (var decl in decls ?? (IReadOnlyList<WaterboxConfig.SettingDecl>) [ ]) effective[decl.Key] = decl.DefaultValue;
 			foreach (var kv in settings?.Values ?? new()) effective[kv.Key] = kv.Value;
 			return effective;
 		}
@@ -262,6 +304,13 @@ namespace Chimera.Emulation.Common.Waterbox
 		/// <summary>The settings as the machine this session is has them.</summary>
 		private IReadOnlyList<WaterboxConfig.SettingDecl> Decls
 			=> _cfg.SettingsFor(_machine);
+
+		/// <summary>
+		/// The loaded game's own settings (GetGameSettings). Not in the default
+		/// merge: before the machine runs they are not known, and one left alone
+		/// is the core's own default anyway.
+		/// </summary>
+		private List<WaterboxConfig.SettingDecl> _gameDecls = [ ];
 
 
 		// Delivered as a flat JSON object, e.g. {"initFillByte":171}. The guest
@@ -272,11 +321,15 @@ namespace Chimera.Emulation.Common.Waterbox
 		public IEmulatorServiceProvider ServiceProvider { get; }
 
 		public ControllerDefinition ControllerDefinition => _controllerDefinition ??= MakeControllerDefinition();
-		private ControllerDefinition _controllerDefinition;
+		private ControllerDefinition? _controllerDefinition;
 
 		private ControllerDefinition MakeControllerDefinition()
 		{
-			var def = new ControllerDefinition((_machine?.Input ?? _cfg.Input).Name ?? "Waterbox Controller");
+			// the names are the package's own, as the engine read them: a letter
+			// for each button and a header for each axis, or the engine's rule
+			// where the package declared none
+			var def = new ControllerDefinition((_machine?.Input ?? _cfg.Input)?.Name ?? "Waterbox Controller")
+				.WithControlNames(new SessionControlNames(_session));
 			// only the controls this machine HAS: a Four Score's players 3 and 4,
 			// or an Arkanoid's paddle, are declared by every NES package and exist
 			// only when a project plugged one in
@@ -288,13 +341,28 @@ namespace Chimera.Emulation.Common.Waterbox
 			{
 				if (!_axisActive[i]) continue;
 				var axis = _axes[i];
-				def.Axes.Add(axis.Name, new AxisSpec(axis.Min.RangeTo(axis.Max), axis.Neutral));
+				def.Axes.Add(axis.Name ?? $"Axis {i}", new AxisSpec(axis.Min.RangeTo(axis.Max), axis.Neutral));
 			}
 			return def.MakeImmutable();
 		}
 
+		/// <summary>
+		/// A machine's control names, asked of its session - and of the rule
+		/// alone once the session is gone, since a definition can outlive it.
+		/// </summary>
+		private sealed class SessionControlNames : IControlNames
+		{
+			private readonly EngineSession _session;
+
+			public SessionControlNames(EngineSession session) => _session = session;
+
+			public char MnemonicOf(string button) => _session.MnemonicOf(button);
+
+			public string AxisHeaderOf(string axis) => _session.AxisHeaderOf(axis);
+		}
+
 		/// <inheritdoc/>
-		public string CoreStopped { get; private set; }
+		public string? CoreStopped { get; private set; }
 
 		public bool FrameAdvance(IController controller, bool render, bool renderSound = true)
 		{
@@ -365,9 +433,9 @@ namespace Chimera.Emulation.Common.Waterbox
 		public bool DriveLightOn(int index) => _session.DriveLight(index);
 
 		// the names are settled at load and do not change; only the two indices are the machine's
-		private IReadOnlyList<string>[] _driveMediaNames;
+		private IReadOnlyList<string>[]? _driveMediaNames;
 
-		public DriveMedia DriveMediaOf(int index)
+		public DriveMedia? DriveMediaOf(int index)
 		{
 			_driveMediaNames ??= new IReadOnlyList<string>[_session.DriveCount];
 			if (index < 0 || index >= _driveMediaNames.Length) return null;
@@ -384,7 +452,7 @@ namespace Chimera.Emulation.Common.Waterbox
 
 		public int Frame { get; private set; }
 
-		public string SystemId => _machine?.Id ?? _cfg.SystemId;
+		public string SystemId => _machine?.Id ?? _cfg.SystemId ?? "";
 
 		/// <summary>
 		/// A machine a GPU drew is not deterministic whatever its config says, so
@@ -397,7 +465,13 @@ namespace Chimera.Emulation.Common.Waterbox
 		/// Whether a GPU outside the sandbox drew, and what it calls itself.
 		/// Empty when none did, which is every ordinary run.
 		/// </summary>
-		public string GpuRenderer => _session.GpuDescription;
+		/// <remarks>
+		/// Empty once the core is disposed. Whoever still holds a core that is gone
+		/// is wrong to ask, but the answer must not be a null session handed to the
+		/// engine: that is a crash of the whole process, and it is how a recovery
+		/// snapshot taken after a reboot ended the session it was protecting (issue #196).
+		/// </remarks>
+		public string GpuRenderer => _session.Disposed ? "" : _session.GpuDescription;
 
 		/// <summary>
 		/// Whether this core's renderer rebuilds after the context it drew on
@@ -448,11 +522,19 @@ namespace Chimera.Emulation.Common.Waterbox
 		// honest answer for a machine whose picture changes size (a Flash movie
 		// declares its own stage). Declaring it, as a machine with non-square
 		// pixels must, still wins.
-		public int VirtualWidth => _machine?.VirtualWidth
-			?? (_cfg.Video.VirtualWidth > 0 ? _cfg.Video.VirtualWidth : BufferWidth);
+		//
+		// A core that reports the aspect of what it shows NOW wins over both
+		// (an arcade game whose monitor stood on its side is 3:4 on a machine
+		// declared 4:3): the height stays the picture's, the width follows.
+		public int VirtualWidth => LiveAspect is var (x, y)
+			? Math.Max(1, (int)Math.Round((double)BufferHeight * x / y))
+			: _machine?.VirtualWidth ?? (_video.VirtualWidth > 0 ? _video.VirtualWidth : BufferWidth);
 
-		public int VirtualHeight => _machine?.VirtualHeight
-			?? (_cfg.Video.VirtualHeight > 0 ? _cfg.Video.VirtualHeight : BufferHeight);
+		public int VirtualHeight => LiveAspect is not null
+			? BufferHeight
+			: _machine?.VirtualHeight ?? (_video.VirtualHeight > 0 ? _video.VirtualHeight : BufferHeight);
+
+		private (int X, int Y)? LiveAspect => _session.Disposed ? null : _session.DisplayAspect;
 		public int BackgroundColor => unchecked((int)0xFF000000);
 		public int VsyncNumerator => _session.VsyncNumerator;
 		public int VsyncDenominator => _session.VsyncDenominator;
@@ -495,6 +577,8 @@ namespace Chimera.Emulation.Common.Waterbox
 		public void Enable(long budgetBytes) => _session.GreenzoneEnable((ulong)Math.Max(budgetBytes, 0));
 
 		public void MaxNearStride(int stride) => _session.GreenzoneMaxNearStride(stride);
+
+		public void SetCapturePeriod(int period) => _session.GreenzoneCapturePeriod(period);
 
 		public long Count => _session.GreenzoneCount;
 
@@ -651,7 +735,7 @@ namespace Chimera.Emulation.Common.Waterbox
 		public WaterboxCoreSettings GetSettings()
 		{
 			var s = _settings.Clone();
-			s.Declarations = Decls;
+			s.Declarations = Decls.Concat(_gameDecls).ToList();
 			return s;
 		}
 

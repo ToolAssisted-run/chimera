@@ -28,5 +28,12 @@
 		/// Use this for <see cref="SeparatorWatch"/>
 		/// </summary>
 		Separator = 0,
+
+		/// <summary>
+		/// A game core's property (docs/game-cores.md) that no 1-, 2- or 4-byte watch can
+		/// hold as it is - 64 bits, text, bytes, a bit field, named values. Use this for
+		/// <see cref="PropertyWatch"/>, which the engine reads.
+		/// </summary>
+		Property = 16,
 	}
 }

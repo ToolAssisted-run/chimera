@@ -1,6 +1,7 @@
 #nullable enable
 
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.Threading;
@@ -28,6 +29,15 @@ namespace Chimera.Client.GUI
 	/// The packing is the engine's (ce_media_make); this window chooses the
 	/// folder, the shape and the name, shows how far it has got, and lets it be
 	/// stopped. Nothing here decides anything about the bytes.
+	///
+	/// WHAT A CORE MAY ADD. The packer knows no machine: an image is the files.
+	/// One emulator wants more than that of a disc - a table in the part of an
+	/// ISO the standard leaves alone - and says so in its package ("media"), as
+	/// a recipe the engine understands. This window is given the installed
+	/// cores' recipes; when the folder is one a recipe was written for, it says
+	/// which, and hands that recipe to the engine with the folder. Which folders
+	/// those are and what the image needs are both the recipe's, read by the
+	/// engine and by nothing here.
 	/// </summary>
 	public sealed class MediaMakerForm : FormBase
 	{
@@ -63,8 +73,18 @@ namespace Chimera.Client.GUI
 				+ "quietly left out."),
 		};
 
-		public MediaMakerForm()
+		/// <summary>One installed core's recipe, and the core that declares it.</summary>
+		public sealed record CoreRecipe(string Core, string Label, string Json);
+
+		private readonly IReadOnlyList<CoreRecipe> _recipes;
+
+		/// <summary>The recipe the chosen folder and format call for, if any.</summary>
+		public CoreRecipe? Recognised { get; private set; }
+
+		/// <param name="recipes">What the installed cores say their media needs; none, and an image is the files alone.</param>
+		public MediaMakerForm(IReadOnlyList<CoreRecipe>? recipes = null)
 		{
+			_recipes = recipes ?? [ ];
 			SuspendLayout();
 			FormBorderStyle = FormBorderStyle.FixedDialog;
 			MaximizeBox = false;
@@ -121,6 +141,11 @@ namespace Chimera.Client.GUI
 
 			_formatHelp = Note("", margin + labelWidth, y, fieldWidth, UIHelper.ScaleY(32));
 			Controls.Add(_formatHelp);
+			y += UIHelper.ScaleY(36);
+
+			// what a core's recipe recognised the folder as; empty for most folders
+			_recognised = Note("", margin + labelWidth, y, fieldWidth, UIHelper.ScaleY(32));
+			Controls.Add(_recognised);
 			y += UIHelper.ScaleY(36);
 
 			Controls.Add(Caption("Save as", margin, y, labelWidth));
@@ -197,6 +222,54 @@ namespace Chimera.Client.GUI
 
 		private readonly Label _formatHelp;
 
+		private readonly Label _recognised;
+
+		/// <summary>The line that says what the folder was recognised as (for the tests to read).</summary>
+		public string RecognisedText => _recognised.Text;
+
+		/// <summary>
+		/// Asks the engine which installed core's recipe, if any, the folder and
+		/// the chosen shape call for. The first that applies is taken, in the
+		/// order the cores were listed.
+		/// </summary>
+		private void Recognise()
+		{
+			Recognised = null;
+			var folder = _folder.Text;
+			if (folder.Length is not 0)
+			{
+				foreach (var recipe in _recipes)
+				{
+					if (ChimeraEngine.MediaRecipeFormat(recipe.Json) != Chosen.Format) continue;
+					if (!ChimeraEngine.MediaRecipeApplies(recipe.Json, folder)) continue;
+					Recognised = recipe;
+					break;
+				}
+			}
+			_recognised.Text = Recognised is null
+				? ""
+				: $"This folder is a {Recognised.Label}: the image is written the way {Recognised.Core} reads it.";
+		}
+
+		/// <summary>Sets the folder as browsing for it does (for the tests, which cannot browse).</summary>
+		public void SetFolder(string folder)
+		{
+			_folder.Text = folder;
+			if (_output.Text.Length == 0)
+			{
+				// beside the folder, named after it: the obvious answer, and one
+				// that never silently overwrites what is inside it
+				var name = new DirectoryInfo(folder).Name;
+				var parent = Path.GetDirectoryName(folder.TrimEnd(Path.DirectorySeparatorChar));
+				_output.Text = Path.Combine(parent ?? folder, name + Chosen.Extension);
+			}
+			Recognise();
+			UpdateEnabled();
+		}
+
+		/// <summary>Chooses a shape by its place in the box (for the tests).</summary>
+		public void SetFormat(int index) => _format.SelectedIndex = index;
+
 		private static Label Caption(string text, int x, int y, int width) => new()
 		{
 			AutoSize = false,
@@ -222,6 +295,7 @@ namespace Chimera.Client.GUI
 			// keep the suggested name in step with the shape being made
 			if (_output.Text.Length != 0 && _folder.Text.Length != 0)
 				_output.Text = Path.ChangeExtension(_output.Text, Chosen.Extension);
+			Recognise();
 		}
 
 		private void PickFolder()
@@ -231,17 +305,7 @@ namespace Chimera.Client.GUI
 				Description = "The folder to pack",
 			};
 			if (dialog.ShowDialog(this) is not DialogResult.OK) return;
-			var folder = dialog.SelectedPath.WithoutWslgMirror();
-			_folder.Text = folder;
-			if (_output.Text.Length == 0)
-			{
-				// beside the folder, named after it: the obvious answer, and one
-				// that never silently overwrites what is inside it
-				var name = new DirectoryInfo(folder).Name;
-				var parent = Path.GetDirectoryName(folder.TrimEnd(Path.DirectorySeparatorChar));
-				_output.Text = Path.Combine(parent ?? folder, name + Chosen.Extension);
-			}
-			UpdateEnabled();
+			SetFolder(dialog.SelectedPath.WithoutWslgMirror());
 		}
 
 		private void PickOutput()
@@ -287,6 +351,9 @@ namespace Chimera.Client.GUI
 			var folder = _folder.Text;
 			var output = _output.Text;
 			var format = Chosen.Format;
+			// what the folder was recognised as travels with it: the recipe is
+			// the core's, and the engine does what it says
+			var recipe = Recognised?.Json;
 			var token = _cancel.Token;
 
 			// The bar is redrawn from the packing thread through Invoke, but not
@@ -299,7 +366,7 @@ namespace Chimera.Client.GUI
 			var error = "";
 			await Task.Run(() =>
 			{
-				ok = ChimeraEngine.MakeMedia(folder, output, format,
+				ok = ChimeraEngine.MakeMedia(folder, output, format, recipe,
 					(file, done, total, filesDone, filesTotal) =>
 					{
 						if (token.IsCancellationRequested) return false;

@@ -4,7 +4,7 @@ using Chimera.Emulation.Common;
 
 namespace Chimera.Client.GUI
 {
-	public partial class AddBreakpointDialog : Form
+	public partial class AddBreakpointDialog : ThemedForm
 	{
 		public AddBreakpointDialog(BreakpointOperation op)
 		{

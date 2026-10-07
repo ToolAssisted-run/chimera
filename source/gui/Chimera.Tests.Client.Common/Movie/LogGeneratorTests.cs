@@ -14,12 +14,12 @@ namespace Chimera.Tests.Client.Common.Movie
 		public void Initializer()
 		{
 			_boolController = new(new ControllerDefinition("Dummy Gamepad") { BoolButtons = { "A" } }.MakeImmutable());
-			_boolController.Definition.BuildMnemonicsCache(VSystemID.Raw.NES);
+			_boolController.Definition.BuildMnemonicsCache();
 			_axisController = new(
 				new ControllerDefinition("Dummy Gamepad")
 					.AddXYPair("Stick{0}", AxisPairOrientation.RightAndUp, 0.RangeTo(200), 100)
 					.MakeImmutable());
-			_axisController.Definition.BuildMnemonicsCache(VSystemID.Raw.NES);
+			_axisController.Definition.BuildMnemonicsCache();
 		}
 
 #pragma warning disable BHI1600 //TODO disambiguate assert calls
@@ -36,7 +36,7 @@ namespace Chimera.Tests.Client.Common.Movie
 		public void LogKeyControlsTheMachineLacksDoNotThrow()
 		{
 			var machine = new ControllerDefinition("NES Controller") { BoolButtons = { "P1 A", "P1 B" } }.MakeImmutable();
-			machine.BuildMnemonicsCache(VSystemID.Raw.NES);
+			machine.BuildMnemonicsCache();
 
 			var movie = new MovieController(machine, "#P1 A|P1 B|#P2 A|P2 B|");
 			movie.SetFromMnemonic("|A.|AB|");
@@ -60,7 +60,7 @@ namespace Chimera.Tests.Client.Common.Movie
 		public void GenerateLogEntry_UnknownButtonsAreAbbreviated()
 		{
 			SimpleController controller = new(new ControllerDefinition("Dummy Gamepad") { BoolButtons = { "Unknown Button" } }.MakeImmutable());
-			controller.Definition.BuildMnemonicsCache(VSystemID.Raw.NES);
+			controller.Definition.BuildMnemonicsCache();
 			controller["Unknown Button"] = true;
 			var actual = LogEntryGenerator.GenerateLogEntry(controller);
 			Assert.AreEqual("|B|", actual);
@@ -93,7 +93,7 @@ namespace Chimera.Tests.Client.Common.Movie
 		public void GenerateLogEntry_NoStupidHack()
 		{
 			var upController = new SimpleController(new ControllerDefinition("Dummy Gamepad") { BoolButtons = { "Up" } }.MakeImmutable());
-			upController.Definition.BuildMnemonicsCache(VSystemID.Raw.NES);
+			upController.Definition.BuildMnemonicsCache();
 
 			var logEntry = LogEntryGenerator.GenerateLogEntry(upController);
 			Assert.AreEqual("|.|", logEntry);
@@ -103,7 +103,7 @@ namespace Chimera.Tests.Client.Common.Movie
 		public void GenerateLogEntry_EmptyPlayerGroups()
 		{
 			var upController = new SimpleController(new ControllerDefinition("Dummy Gamepad") { BoolButtons = { "P2 Up" } }.MakeImmutable());
-			upController.Definition.BuildMnemonicsCache(VSystemID.Raw.NES);
+			upController.Definition.BuildMnemonicsCache();
 
 			var logEntry = LogEntryGenerator.GenerateLogEntry(upController);
 			Assert.AreEqual("|||.|", logEntry);
@@ -113,7 +113,7 @@ namespace Chimera.Tests.Client.Common.Movie
 		public void GenerateLogKey_EmptyPlayerGroups()
 		{
 			var upControllerDefinition = new ControllerDefinition("Dummy Gamepad") { BoolButtons = { "P2 Up" } }.MakeImmutable();
-			upControllerDefinition.BuildMnemonicsCache(VSystemID.Raw.NES);
+			upControllerDefinition.BuildMnemonicsCache();
 
 			var logKey = LogEntryGenerator.GenerateLogKey(upControllerDefinition);
 			Assert.AreEqual("###P2 Up|", logKey);
@@ -123,7 +123,7 @@ namespace Chimera.Tests.Client.Common.Movie
 		public void GenerateLogEntry_MovieController()
 		{
 			var simpleController = new SimpleController(new ControllerDefinition("Dummy Gamepad") { BoolButtons = { "P1 Up", "P3 A" } }.MakeImmutable());
-			simpleController.Definition.BuildMnemonicsCache(VSystemID.Raw.NES);
+			simpleController.Definition.BuildMnemonicsCache();
 
 			var originalLogEntry = LogEntryGenerator.GenerateLogEntry(simpleController);
 			var originalLogKey = LogEntryGenerator.GenerateLogKey(simpleController.Definition);

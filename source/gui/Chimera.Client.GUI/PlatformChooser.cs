@@ -4,10 +4,11 @@ using System.Windows.Forms;
 
 using Chimera.Client.Common;
 using Chimera.Emulation.Common;
+using Chimera.Emulation.Common.Waterbox;
 
 namespace Chimera.Client.GUI
 {
-	public partial class PlatformChooser : Form
+	public partial class PlatformChooser : ThemedForm
 	{
 		public PlatformChooser()
 			=> InitializeComponent();
@@ -25,10 +26,14 @@ namespace Chimera.Client.GUI
 
 			ExtensionLabel.Text = RomGame.Extension.ToLowerInvariant();
 			HashBox.Text = RomGame.GameInfo.Hash;
-			// choosable platforms are the systems provided by loaded core packages
+			// choosable platforms are the systems provided by loaded core packages -
+			// the emulators': a game core plays its own game and no other file
+			// (docs/game-cores.md)
 			int count = 0;
 			int spacing = 25;
-			foreach (var systemId in CoreRegistry.Instance.AllFactories.SelectMany(static f => f.SystemIds).Distinct())
+			foreach (var systemId in CoreRegistry.Instance.AllFactories
+				.Where(static f => f is not WaterboxCoreFactory { Config.IsGameCore: true })
+				.SelectMany(static f => f.SystemIds).Distinct())
 			{
 				var radio = new RadioButton
 				{

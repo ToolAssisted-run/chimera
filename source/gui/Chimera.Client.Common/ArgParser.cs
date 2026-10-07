@@ -63,6 +63,17 @@ namespace Chimera.Client.Common
 		/// knows the paths a person chose, and a core may call a firmware optional
 		/// that the game in hand cannot boot without. So the sessions are told.
 		/// </summary>
+		/// <summary>
+		/// The project's files beyond the game, for a precompile session: a JSON
+		/// file {"slots": {slot: [name, ...]}, "files": {name: path}} the wizard
+		/// writes. A game that needs its licence, its packages or its disc key to
+		/// boot cannot be compiled without them (chimera#140).
+		/// </summary>
+		private static readonly Option<string?> OptionPrecompileSlots = new("--precompile-slots")
+		{
+			Description = "JSON file: the slot map and file paths a precompile session mounts beside the rom",
+		};
+
 		private static readonly Option<string[]> OptionFirmware = new("--firmware")
 		{
 			Description = "<id>=<path>; use this file as the firmware the core declares under <id>, ahead of anything remembered in the config. May be repeated",
@@ -158,6 +169,7 @@ namespace Chimera.Client.Common
 			root.Add(/* --core */ OptionCorePackagePath);
 			root.Add(/* --precompile */ OptionPrecompile);
 			root.Add(/* --firmware */ OptionFirmware);
+			root.Add(/* --precompile-slots */ OptionPrecompileSlots);
 			root.Add(/* --dump-close */ OptionAVDumpQuitWhenDone);
 			root.Add(/* --dump-frames */ OptionAVDumpFrameList);
 			root.Add(/* --dump-length */ OptionAVDumpEndAtFrame);
@@ -284,7 +296,8 @@ namespace Chimera.Client.Common
 				cmdRom: result.GetValue(ArgumentRomFilePath),
 				cmdCorePackage: result.GetValue(OptionCorePackagePath),
 				cmdPrecompile: result.GetValue(OptionPrecompile),
-				cmdFirmware: result.GetValue(OptionFirmware)
+				cmdFirmware: result.GetValue(OptionFirmware),
+				cmdPrecompileSlots: result.GetValue(OptionPrecompileSlots)
 			);
 			return null;
 		}

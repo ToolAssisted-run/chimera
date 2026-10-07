@@ -2,6 +2,7 @@
 	<a href="https://github.com/ToolAssisted-run/chimera/actions/workflows/ci.yml"><img src="https://github.com/ToolAssisted-run/chimera/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
 	<a href="https://github.com/ToolAssisted-run/chimera/releases/tag/dev"><img src="https://img.shields.io/github/v/release/ToolAssisted-run/chimera?include_prereleases&sort=date&label=download&color=2DB3A6" alt="Latest development build"></a>
 	<a href="https://github.com/ToolAssisted-run/chimera/releases"><img src="https://img.shields.io/github/downloads/ToolAssisted-run/chimera/total?label=downloads&color=8A63E8" alt="Downloads"></a>
+	<a href="https://discord.gg/VsKDT9XB6u"><img src="https://img.shields.io/discord/1537060793894314097?logo=discord&logoColor=white&label=discord&color=5865F2" alt="toolAssisted.run on Discord"></a>
 </p>
 
 <p align="center">
@@ -24,19 +25,16 @@ Chimera is a minimal frontend for creating tool-assisted speedruns (TAS).
 
 - **Performance.** All functional machinery (the sandbox host, movies, savestates, file formats, the running machine itself) lives in `libchimera`, a native C++ engine the GUI calls into.
 
-- **Stronger reproducibility guarantees.** A movie's reproduction contract is the pair *(movie, core package)*: nothing about a Chimera build (compiler, libraries, OS) is allowed to affect whether a movie syncs. Movies record the exact core version, package hash, firmware hashes, and host provenance.
+- **Stronger reproducibility guarantees.** Every core runs inside the [miniBox](https://github.com/ToolAssisted-run/chimera-common-minibox) sandbox, so the same project and input files play the same movie on any machine.
 
 Chimera is not designed for casual play. For that, use the original emulators directly, or a multi-emulation frontend such as RetroArch.
 
-## Supported systems
+## Cores
 
-Chimera ships **no cores**. Each is a separate project with its own repository,
-its own release history and its own licence; you install the ones you want from
-inside Chimera, through **File > Core Manager**, which downloads them from the
-projects below and checks each download against what that project published.
-See [docs/core-manager.md](docs/core-manager.md).
+Chimera ships no cores. Install them from **File > Core Manager**
+([docs/core-manager.md](docs/core-manager.md)).
 
-The officially maintained cores are:
+### Emulation cores
 
 | System | Core |
 | --- | --- |
@@ -49,6 +47,7 @@ The officially maintained cores are:
 | Wii | [Dolphin](https://github.com/ToolAssisted-run/chimera-core-dolphin) |
 | Game Boy / Game Boy Color | [ares](https://github.com/ToolAssisted-run/chimera-core-ares) |
 | Game Boy Advance | [ares](https://github.com/ToolAssisted-run/chimera-core-ares) |
+| Nintendo 3DS / New Nintendo 3DS | [Azahar](https://github.com/ToolAssisted-run/chimera-core-azahar) |
 | Mega Drive / Genesis | [Genesis Plus GX](https://github.com/ToolAssisted-run/chimera-core-gpgx), [ares](https://github.com/ToolAssisted-run/chimera-core-ares) |
 | Mega Drive 32X | [ares](https://github.com/ToolAssisted-run/chimera-core-ares) |
 | Sega CD / Mega CD | [Genesis Plus GX](https://github.com/ToolAssisted-run/chimera-core-gpgx), [ares](https://github.com/ToolAssisted-run/chimera-core-ares) |
@@ -57,9 +56,15 @@ The officially maintained cores are:
 | Game Gear | [Genesis Plus GX](https://github.com/ToolAssisted-run/chimera-core-gpgx), [ares](https://github.com/ToolAssisted-run/chimera-core-ares) |
 | SG-1000 | [Genesis Plus GX](https://github.com/ToolAssisted-run/chimera-core-gpgx), [ares](https://github.com/ToolAssisted-run/chimera-core-ares) |
 | Dreamcast | [Flycast](https://github.com/ToolAssisted-run/chimera-core-flycast) |
+| Sega NAOMI / NAOMI 2 (arcade) | [Flycast](https://github.com/ToolAssisted-run/chimera-core-flycast) |
+| Sammy Atomiswave (arcade) | [Flycast](https://github.com/ToolAssisted-run/chimera-core-flycast) |
+| Capcom CPS-1 / CPS-2 / CPS-3 (arcade) | [FBNeo](https://github.com/ToolAssisted-run/chimera-core-fbneo) |
+| Neo Geo MVS (arcade) | [FBNeo](https://github.com/ToolAssisted-run/chimera-core-fbneo) |
+| Sega System 16 (arcade) | [FBNeo](https://github.com/ToolAssisted-run/chimera-core-fbneo) |
 | PlayStation | [ares](https://github.com/ToolAssisted-run/chimera-core-ares) |
 | PlayStation 2 | [PCSX2](https://github.com/ToolAssisted-run/chimera-core-pcsx2) |
 | PlayStation Portable | [PPSSPP](https://github.com/ToolAssisted-run/chimera-core-ppsspp) |
+| PlayStation Vita | [Vita3K](https://github.com/ToolAssisted-run/chimera-core-vita3k) |
 | PlayStation 3 | [RPCS3](https://github.com/ToolAssisted-run/chimera-core-rpcs3) |
 | Xbox | [xemu](https://github.com/ToolAssisted-run/chimera-core-xemu) |
 | 3DO Interactive Multiplayer | [Opera](https://github.com/ToolAssisted-run/chimera-core-opera) |
@@ -72,17 +77,28 @@ The officially maintained cores are:
 | Neo Geo AES | [ares](https://github.com/ToolAssisted-run/chimera-core-ares) |
 | Neo Geo Pocket / Color | [ares](https://github.com/ToolAssisted-run/chimera-core-ares) |
 | WonderSwan / WonderSwan Color | [ares](https://github.com/ToolAssisted-run/chimera-core-ares) |
-| MS-DOS | [DOSBox-X](https://github.com/ToolAssisted-run/chimera-core-dosbox-x) |
-| Windows 3.1 / 95 / 98 | [DOSBox-X](https://github.com/ToolAssisted-run/chimera-core-dosbox-x) |
+| Apple II / II Plus / IIe (and the Pravets, TK3000 and Base64A clones) | [AppleWin](https://github.com/ToolAssisted-run/chimera-core-applewin) |
+| Sharp X68000 | [MAME X68000](https://github.com/ToolAssisted-run/chimera-core-x68k) |
+| MS-DOS | [DOSBox-X](https://github.com/ToolAssisted-run/chimera-core-dosbox-x), [PCem](https://github.com/ToolAssisted-run/chimera-core-pcem) |
+| Windows 3.1 / 95 / 98 | [DOSBox-X](https://github.com/ToolAssisted-run/chimera-core-dosbox-x), [PCem](https://github.com/ToolAssisted-run/chimera-core-pcem) |
+| Windows XP | [PCem](https://github.com/ToolAssisted-run/chimera-core-pcem) |
+| Linux (x86) | [PCem](https://github.com/ToolAssisted-run/chimera-core-pcem) |
 | Flash | [Ruffle](https://github.com/ToolAssisted-run/chimera-core-ruffle) |
 | Symbian / Nokia N-Gage | [EKA2L1](https://github.com/ToolAssisted-run/chimera-core-eka2l1) |
+| iPhone OS 2.x-4.0 (iPhone, iPod touch and iPad apps) | [touchHLE](https://github.com/ToolAssisted-run/chimera-core-touchhle) |
 
-Where a system has more than one core, they are different emulators and not
-interchangeable: a movie names the package that recorded it, and two cores
-disagree about the machine in ways a run depends on. ares carries twenty-six
-machines in one package and its own README says which of them are proven, which
-have only been run against a commercial game off the record, and which are
-declared but not to be trusted yet.
+### Game cores
+
+One game each, run from the game's own files ([docs/game-cores.md](docs/game-cores.md)).
+
+| Game | Core |
+| --- | --- |
+| Prince of Persia (DOS) | [SDLPoP](https://github.com/ToolAssisted-run/chimera-core-sdlpop) |
+| Prince of Persia 2: The Shadow and the Flame (DOS) | [SDLPoP2](https://github.com/ToolAssisted-run/chimera-core-sdlpop2) |
+| Sword of the Samurai (DOS) | [OpenSamurai](https://github.com/ToolAssisted-run/chimera-core-opensamurai) |
+| Syndicate (DOS) | [SyndicatFX](https://github.com/ToolAssisted-run/chimera-core-syndicatfx) |
+| Another World | [rawgl](https://github.com/ToolAssisted-run/chimera-core-rawgl) |
+| Doom, Doom II, Final Doom, Heretic, Hexen, Chex Quest, Freedoom | [DSDA-Doom](https://github.com/ToolAssisted-run/chimera-core-dsda) |
 
 ## Getting a build
 
@@ -139,6 +155,30 @@ To run: `build\Chimera.exe` on Windows, `build/ChimeraMono.sh` on Linux, then
 
 The witness gate runs with `tests/synth/run-witness.sh`. The engineering log (objectives, procedure, and the sharp edges found along the way) is in [docs/design-principles.md](docs/design-principles.md); the engine migration is chronicled in [docs/engine-migration.md](docs/engine-migration.md). Building a new core, and joining it to this bundle, is [docs/porting-a-core.md](docs/porting-a-core.md).
 
+## Reporting a problem
+
+Open an issue on this repository, whichever core it concerns - one inbox,
+and the issue template asks for what a fix needs. What settles most
+reports before anybody opens a debugger:
+
+- **The build strings.** Help > Copy Version Info puts the frontend's build
+  and the running core's version on the clipboard, in the template's words.
+  A frontend and a core from different days may not
+  understand each other's states, so before reporting a save/load problem,
+  match them.
+- **The project file.** A `.chimeraProject` is small and names every file
+  by hash, so attach it rather than describing it.
+- **The three crash files.** When Chimera or a core dies it writes a crash
+  note and a minidump, `<date> pid<N>.txt` and `.dmp`, into the `Crashes`
+  folder of the data directory (Config > Data Directory... opens it;
+  `%LOCALAPPDATA%\Chimera` by default on Windows), and the sandbox writes
+  `minibox-diag.log` next to `Chimera.exe`. Attach all three: the note
+  carries the faulting instruction and the machine's last words, and two of
+  three crashes in one recent report were fixed off those files alone.
+- **The core's log.** Tools > Export Core Log... keeps everything the core
+  says in a file you choose; it is off until asked for, and reboots the core
+  so the log starts at boot. Use it again to turn it off, and attach the file.
+
 ## Contributing
 
 Pull requests are welcome, from people and from people working with AI assistants alike. A contribution is judged on its merits: it should build, pass the witness gate, and keep to the project's scope. The one firm requirement is legal cleanliness: you must have the right to submit the code under this repository's MIT license, and anything derived from other works must respect their licenses and carry the attribution they require.
@@ -147,4 +187,4 @@ Pull requests are welcome, from people and from people working with AI assistant
 
 **Chimera is a derivative fork of [BizHawk](https://github.com/TASEmulators/BizHawk).** most of the frontend, TAS tooling, and the architecture it builds on are the original work of the BizHawk team, and all credit for them belongs to BizHawk's developers.
 
-Chimera is provided under the MIT License, preserving the BizHawk team's copyright; see [LICENSE](LICENSE), which also covers the native libraries built from `extern/`, the vendored test suite, and why core packages carry their own licenses. The people behind Chimera itself are in [CREDITS.md](CREDITS.md).
+Chimera is provided under the MIT License, preserving the BizHawk team's copyright; see [LICENSE](LICENSE) for the terms and [NOTICE](NOTICE) for whose work it is and what the terms do not cover: the native libraries built from `extern/`, the vendored test suite, and why core packages carry their own licenses. The people behind Chimera itself are in [CREDITS.md](CREDITS.md).

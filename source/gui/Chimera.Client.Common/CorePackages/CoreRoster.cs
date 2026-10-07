@@ -6,11 +6,65 @@ using System.IO;
 using System.Linq;
 
 using Chimera.Common.PathExtensions;
+using Chimera.Emulation.Common.Waterbox;
 
 using Newtonsoft.Json;
 
 namespace Chimera.Client.Common
 {
+	/// <summary>
+	/// One system of a roster core: the id movies and projects are keyed by, and
+	/// what to call it in front of a person. The name is the CORE's - copied
+	/// here from its package when it joined the roster - because this is the
+	/// only place a core nobody has installed yet can say anything at all.
+	/// </summary>
+	[JsonConverter(typeof(RosterSystemConverter))]
+	public sealed class RosterSystem
+	{
+		public string Id { get; set; } = "";
+
+		/// <summary>Empty when the row gave only an id; shown as the id then.</summary>
+		public string Name { get; set; } = "";
+
+		public string Spelled => Name.Length is 0 ? Id : Name;
+	}
+
+	/// <summary>
+	/// A system is written <c>{ "id": "NES", "name": "..." }</c>. A bare
+	/// <c>"NES"</c> is read too: a core somebody added by hand is remembered
+	/// in the config with whatever its row said at the time.
+	/// </summary>
+	public sealed class RosterSystemConverter : JsonConverter<RosterSystem>
+	{
+		public override RosterSystem? ReadJson(JsonReader reader, Type objectType, RosterSystem? existingValue, bool hasExistingValue, JsonSerializer serializer)
+		{
+			if (reader.TokenType is JsonToken.String) return new RosterSystem { Id = (string) reader.Value! };
+			var token = Newtonsoft.Json.Linq.JToken.Load(reader);
+			if (token is not Newtonsoft.Json.Linq.JObject obj) return null;
+			return new RosterSystem
+			{
+				Id = obj["id"]?.ToString() ?? "",
+				Name = obj["name"]?.ToString() ?? "",
+			};
+		}
+
+		public override void WriteJson(JsonWriter writer, RosterSystem? value, JsonSerializer serializer)
+		{
+			// a system nobody named is written as it was read: its id
+			if (value is null || value.Name.Length is 0)
+			{
+				writer.WriteValue(value?.Id ?? "");
+				return;
+			}
+			writer.WriteStartObject();
+			writer.WritePropertyName("id");
+			writer.WriteValue(value?.Id ?? "");
+			writer.WritePropertyName("name");
+			writer.WriteValue(value?.Name ?? "");
+			writer.WriteEndObject();
+		}
+	}
+
 	/// <summary>One official core: where it is published, and which build was tested.</summary>
 	public sealed class RosterCore
 	{
@@ -25,8 +79,36 @@ namespace Chimera.Client.Common
 		[JsonProperty("name")]
 		public string Name { get; set; } = "";
 
+		/// <summary>The systems the core runs, each with the core's own name for it.</summary>
 		[JsonProperty("systems")]
-		public List<string> Systems { get; set; } = new();
+		public List<RosterSystem> SystemList { get; set; } = new();
+
+		/// <summary>
+		/// Their ids alone, in order. Set, it makes a row that names nothing but
+		/// ids - which is all a core added by hand has to say until a package of
+		/// it is installed and says the rest.
+		/// </summary>
+		[JsonIgnore]
+		public IReadOnlyList<string> Systems
+		{
+			get => SystemList.Where(static s => s.Id.Length is not 0).Select(static s => s.Id).ToList();
+			set => SystemList = value.Select(static id => new RosterSystem { Id = id }).ToList();
+		}
+
+		/// <summary>The row's name for a system, or null when it has none to give.</summary>
+		public string? SystemNameOf(string systemId)
+			=> SystemList.Find(s => s.Id == systemId) is { Name.Length: > 0 } named ? named.Name : null;
+
+		/// <summary>
+		/// <c>"game"</c> for a game core (docs/game-cores.md); absent for an emulator, which
+		/// is what every entry was before game cores. The roster says it so a core nobody
+		/// has downloaded yet is already listed on the right side of the divide.
+		/// </summary>
+		[JsonProperty("kind", NullValueHandling = NullValueHandling.Ignore)]
+		public string? Kind { get; set; }
+
+		[JsonIgnore]
+		public bool IsGameCore => CoreKind.IsGame(Kind);
 
 		/// <summary><c>owner/repo</c> on GitHub: the only place versions of this core come from.</summary>
 		[JsonProperty("repo")]
@@ -103,7 +185,11 @@ namespace Chimera.Client.Common
 	{
 		public const string FileName = "official-cores.json";
 
-		public const int SupportedFormatVersion = 1;
+		/// <summary>
+		/// 2: a row's systems are <c>{ id, name }</c>. 1 listed bare ids, and the
+		/// names lived in a table of this frontend's; it is still read.
+		/// </summary>
+		public const int SupportedFormatVersion = 2;
 
 		/// <summary>The roster as shipped, beside the executable.</summary>
 		public static string DefaultPath => System.IO.Path.Combine(PathUtils.ExeDirectoryPath, FileName);
@@ -151,7 +237,7 @@ namespace Chimera.Client.Common
 		{
 			var doc = JsonConvert.DeserializeObject<RosterFile>(json)
 				?? throw new InvalidOperationException($"{FileName} deserialized to null");
-			if (doc.FormatVersion is not SupportedFormatVersion)
+			if (doc.FormatVersion is not (1 or SupportedFormatVersion))
 			{
 				throw new NotSupportedException($"{FileName} formatVersion {doc.FormatVersion}, this build supports {SupportedFormatVersion}");
 			}

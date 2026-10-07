@@ -20,6 +20,12 @@ namespace Chimera.Client.Common
 		private int _val;
 		private bool _enabled;
 
+		/// <summary>
+		/// What a freeze of a game property holds (docs/game-cores.md): the value as text the
+		/// engine takes back exactly, since no int can hold 64 bits, a double or a string.
+		/// </summary>
+		private readonly string _propertyValue;
+
 		public Cheat(Watch watch, int value, int? compare = null, bool enabled = true, CompareType comparisonType = CompareType.None)
 		{
 			_enabled = enabled;
@@ -27,6 +33,7 @@ namespace Chimera.Client.Common
 			_compare = compare;
 			_val = value;
 			ComparisonType = comparisonType;
+			if (watch is PropertyWatch property) _propertyValue = property.RawText;
 
 			Pulse();
 		}
@@ -38,6 +45,13 @@ namespace Chimera.Client.Common
 				_enabled = false;
 				_watch = SeparatorWatch.Instance;
 				_compare = null;
+			}
+			else if (cheat._watch is PropertyWatch property)
+			{
+				// a property's watch is the engine's view of it; the copy holds the same value
+				_enabled = cheat.Enabled;
+				_watch = property;
+				_propertyValue = cheat._propertyValue;
 			}
 			else
 			{
@@ -92,6 +106,7 @@ namespace Chimera.Client.Common
 		public string AddressStr => _watch.AddressString;
 
 		public string ValueStr =>
+			_watch is PropertyWatch ? _propertyValue :
 			_watch.Size switch
 				{
 					WatchSize.Byte => ((ByteWatch) _watch).FormatValue((byte)_val),
@@ -165,6 +180,12 @@ namespace Chimera.Client.Common
 		{
 			if (!IsSeparator && _enabled)
 			{
+				if (_watch is PropertyWatch property)
+				{
+					property.Poke(_propertyValue);
+					return;
+				}
+
 				if (ShouldPoke())
 				{
 					switch (_watch.Size)
@@ -181,8 +202,8 @@ namespace Chimera.Client.Common
 					}
 				}
 
-				// This will take effect only for NES, and will pulse the cheat with compare option directly to the core
-				// Only works for byte cheats currently
+				// A core that takes cheats itself (a memory domain that answers SendCheatToCore) is handed
+				// the cheat with its compare option directly. Only works for byte cheats currently
 				if (_watch.Size == WatchSize.Byte && _watch.Domain.Name == "System Bus")
 				{
 					if (Compare.HasValue)
@@ -229,8 +250,17 @@ namespace Chimera.Client.Common
 					return addr == _watch.Address || addr == _watch.Address + 1;
 				case WatchSize.DWord:
 					return addr >= _watch.Address && addr <= _watch.Address + 3;
+				case WatchSize.Property:
+					return addr >= _watch.Address && addr < _watch.Address + _watch.ByteSize;
 			}
 		}
+
+		/// <summary>
+		/// Finds a frozen game property again in a core that was reloaded, by name; false when
+		/// that core no longer has it. Any other freeze is left as it is.
+		/// </summary>
+		public bool Rebind(IGameProperties properties)
+			=> _watch is not PropertyWatch property || property.Rebind(properties);
 
 		public void PokeValue(int val)
 		{

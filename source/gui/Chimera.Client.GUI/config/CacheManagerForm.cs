@@ -440,7 +440,7 @@ namespace Chimera.Client.GUI
 				row.SubItems.Add(item.Path);
 				row.SubItems.Add(CacheSurvey.Size(item.Bytes));
 				row.SubItems.Add(item.LastUsed == default ? "" : item.LastUsed.ToLocalTime().ToString("yyyy-MM-dd HH:mm"));
-				if (item.InUse) row.ForeColor = SystemColors.GrayText;
+				if (item.InUse) row.ForeColor = ThemeEngine.Color(ThemeColorRole.DisabledText);
 				row.Checked = _ticked.Contains(item.Path);
 				_list.Items.Add(row);
 			}
@@ -810,8 +810,8 @@ namespace Chimera.Client.GUI
 				g.FillRectangle(body, 3, 8, 10, 7);
 				return bmp;
 			}
-			list.Images.Add(Padlock(Color.FromArgb(190, 40, 40), shut: false));
-			list.Images.Add(Padlock(Color.FromArgb(0, 140, 0), shut: true));
+			list.Images.Add(Padlock(ThemeEngine.Color(ThemeColorRole.GlyphError), shut: false));
+			list.Images.Add(Padlock(ThemeEngine.Color(ThemeColorRole.GlyphGood), shut: true));
 			return list;
 		}
 
@@ -848,6 +848,9 @@ namespace Chimera.Client.GUI
 			}
 			return false;
 		}
+
+		/// <summary>Ticks or clears "Select all", as a person would. For tests.</summary>
+		public void SelectAllForTest(bool ticked) => _selectAll.Checked = ticked;
 
 		/// <summary>Ticks every orphaned row, as the button does. For tests and screenshots.</summary>
 		public void TickOrphans() => SelectOrphans();

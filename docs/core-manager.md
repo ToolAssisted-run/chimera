@@ -115,7 +115,8 @@ first run.
 **The roster** - `official-cores.json`, beside the executable, copied into the
 bundle by `tools/build-bundle.sh`. For each official core: its id (which is
 also the base name of its published asset and of the file in the store), its
-display name, the systems it emulates, its `owner/repo`, and the version this
+display name, the systems it emulates (each an `{ "id", "name" }` pair, the
+name being the core's own), its `owner/repo`, and the version this
 Chimera release's CI matrix passed against. An empty `tested` means the matrix
 has not run against that core yet, which is where every core starts; the
 manager then offers the newest of the chosen channel.
@@ -123,6 +124,13 @@ manager then offers the newest of the chosen channel.
 A missing or malformed roster is an EMPTY roster, never an error: a Chimera
 that lost the file should still run every core already installed and simply
 say it knows of none to fetch.
+
+Chimera has no list of systems of its own. An installed package names its
+systems in its `waterbox.config`; the roster row repeats those names
+(`"systems": [ { "id": "PSV", "name": "PlayStation Vita" } ]`, format 2) so a
+core not yet installed reads the same. A bare id (`"systems": [ "PSV" ]`, as
+format 1 had it, or a core added by hand) is still read, and is shown as the
+id. A test holds the roster to what the installed packages say.
 
 The roster is what lets the manager show you that a core *exists* before you
 have it, and it is what the first-run offer installs. It is not a catalogue of
@@ -396,7 +404,7 @@ Per core, six columns:
 | column | what it is |
 |---|---|
 | Core | its name |
-| Systems | the systems it emulates, spelled out (`SystemNames`) |
+| Systems | the systems it emulates, by the names the core gives them (the package's `systemNames`; the roster row's until it is installed) |
 | Installed | which version is here, or *not installed*, plus *update available* |
 | Released | when the **installed** version was published |
 | Size | how big it is |
@@ -446,8 +454,11 @@ including the project wizard's core picker.
 2026-09-17). Two commits say which versions they are and nothing about which is
 newer, and with several builds of one core in the New Project picker the only
 way to find out was the core manager's Check for updates. So wherever a version
-is listed it reads `2026-09-17  (4ed35321)`, the versions of one core are
-offered newest first, and the newest is the one a picker opens on.
+is listed it reads `2026-09-17 08:30  (4ed35321)`, the versions of one core are
+offered newest first, and the newest is the one a picker opens on. The minute
+(local time) was added on 2026-09-29: a core often has several versions in one
+day, and the day alone left them looking alike - the order was always by the
+full timestamp.
 
 The date is the package's own: the build script stamps `versionDate` beside
 `version` in the packaged `waterbox.config`. It is the COMMIT's date, in UTC,

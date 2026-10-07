@@ -3,6 +3,7 @@ using System.Windows.Forms;
 
 using Chimera.Client.Common;
 using Chimera.Emulation.Common;
+using Chimera.Emulation.Common.Waterbox;
 using Chimera.WinForms.Controls;
 
 namespace Chimera.Client.GUI
@@ -20,13 +21,16 @@ namespace Chimera.Client.GUI
 		/// <summary>
 		/// Rebuilds the "Emulator" menu for whatever core is running.
 		///
-		/// The menu is named "Emulator", always, and never after the system: a
-		/// top-level menu whose title moves around as you load games is a menu the
-		/// user has to re-find every time. It is absent until a project is running;
+		/// The menu is named "Emulator", and never after the system: a top-level
+		/// menu whose title moves around as you load games is a menu the user has
+		/// to re-find every time. The one exception is a game core, whose menu is
+		/// "Game" (user-decided, 2026-09-29): there is no emulator, and the menu
+		/// holds the game's own options. It is absent until a project is running;
 		/// its CONTENTS are what varies by core.
 		/// </summary>
 		private void HandlePlatformMenus()
 		{
+			GenericCoreSubMenu.Text = Emulator is WaterboxCore { IsGameCore: true } ? "&Game" : "E&mulator";
 			DisplayDefaultCoreMenu();
 			// Everything in either menu is about a machine: the Emulator menu holds
 			// what a core brought, and System pauses and reboots it. With none

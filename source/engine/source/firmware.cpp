@@ -6,6 +6,7 @@
 #include "chimera/engine.h"
 
 #include "conditions.hpp"
+#include "thread_string.hpp"
 
 #include "../../extern/cjson/cJSON.h"
 
@@ -15,8 +16,8 @@
 
 namespace {
 
-thread_local std::string g_record;
-thread_local std::string g_evaluated;
+thread_local chimera::ThreadString g_record;      /* never destroyed: see thread_string.hpp */
+thread_local chimera::ThreadString g_evaluated;   /* likewise */
 
 bool equalsIgnoreCase(const std::string &a, const std::string &b)
 {
@@ -75,14 +76,14 @@ const char *ce_firmware_record_line(const char *pairs, uint64_t *len_out)
 		{
 			return a.substr(0, a.find('=')) < b.substr(0, b.find('='));
 		});
-	g_record.clear();
+	g_record->clear();
 	for (const auto &entry : entries)
 	{
-		if (!g_record.empty()) g_record.append(1, ' ');
-		g_record.append(entry);
+		if (!g_record->empty()) g_record->append(1, ' ');
+		g_record->append(entry);
 	}
-	if (len_out != nullptr) *len_out = g_record.size();
-	return g_record.c_str();
+	if (len_out != nullptr) *len_out = g_record->size();
+	return g_record->c_str();
 }
 
 const char *ce_firmware_evaluate(
@@ -122,15 +123,15 @@ const char *ce_firmware_evaluate(
 	}
 
 	char *text = cJSON_PrintUnformatted(out);
-	g_evaluated = text != nullptr ? text : "[]";
+	*g_evaluated = text != nullptr ? text : "[]";
 	if (text != nullptr) cJSON_free(text);
 	cJSON_Delete(out);
 	cJSON_Delete(decl);
 	cJSON_Delete(slots);
 	cJSON_Delete(settings);
 
-	if (len_out != nullptr) *len_out = g_evaluated.size();
-	return g_evaluated.c_str();
+	if (len_out != nullptr) *len_out = g_evaluated->size();
+	return g_evaluated->c_str();
 }
 
 const char *ce_settings_evaluate(
@@ -169,15 +170,15 @@ const char *ce_settings_evaluate(
 	}
 
 	char *text = cJSON_PrintUnformatted(out);
-	g_evaluated = text != nullptr ? text : "[]";
+	*g_evaluated = text != nullptr ? text : "[]";
 	if (text != nullptr) cJSON_free(text);
 	cJSON_Delete(out);
 	cJSON_Delete(decl);
 	cJSON_Delete(slots);
 	cJSON_Delete(settings);
 
-	if (len_out != nullptr) *len_out = g_evaluated.size();
-	return g_evaluated.c_str();
+	if (len_out != nullptr) *len_out = g_evaluated->size();
+	return g_evaluated->c_str();
 }
 
 const char *ce_slots_evaluate(
@@ -213,15 +214,15 @@ const char *ce_slots_evaluate(
 	}
 
 	char *text = cJSON_PrintUnformatted(out);
-	g_evaluated = text != nullptr ? text : "[]";
+	*g_evaluated = text != nullptr ? text : "[]";
 	if (text != nullptr) cJSON_free(text);
 	cJSON_Delete(out);
 	cJSON_Delete(decl);
 	cJSON_Delete(slots);
 	cJSON_Delete(settings);
 
-	if (len_out != nullptr) *len_out = g_evaluated.size();
-	return g_evaluated.c_str();
+	if (len_out != nullptr) *len_out = g_evaluated->size();
+	return g_evaluated->c_str();
 }
 
 } // extern "C"

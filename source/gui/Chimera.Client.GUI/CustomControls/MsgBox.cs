@@ -7,7 +7,7 @@ namespace Chimera.Client.GUI.CustomControls
 	/// <summary>
 	/// A customizable Dialog box with 3 buttons, custom icon, and checkbox.
 	/// </summary>
-	internal partial class MsgBox : Form
+	internal partial class MsgBox : ThemedForm
 	{
 		private readonly Icon _msgIcon;
 		private static readonly int FormYMargin = UIHelper.ScaleY(10);

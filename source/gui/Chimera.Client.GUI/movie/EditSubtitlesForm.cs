@@ -8,7 +8,7 @@ using Chimera.Common.NumberExtensions;
 
 namespace Chimera.Client.GUI
 {
-	public partial class EditSubtitlesForm : Form, IDialogParent
+	public partial class EditSubtitlesForm : ThemedForm, IDialogParent
 	{
 		private static readonly FilesystemFilterSet SubRipFilesFSFilterSet = new(new FilesystemFilter("SubRip Files", new[] { "srt" }));
 

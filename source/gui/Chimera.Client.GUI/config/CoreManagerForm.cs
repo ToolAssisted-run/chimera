@@ -54,6 +54,7 @@ namespace Chimera.Client.GUI
 		private readonly Button _downloadLatest;
 		private readonly Button _removeCore;
 		private readonly Button _addExternal;
+		private readonly Button _systems;
 		private readonly CheckBox _devChannel;
 
 		/// <summary>Set while the code is ticking boxes, so its own events do not answer back.</summary>
@@ -85,6 +86,8 @@ namespace Chimera.Client.GUI
 		private readonly Dictionary<string, string> _feedErrors = new(StringComparer.OrdinalIgnoreCase);
 
 		private List<CoreManagerRow> _rows = new();
+		private readonly CoreKindFilterBox _shows;
+		private readonly Action<CoreKindFilter>? _rememberShows;
 		private CancellationTokenSource? _work;
 		private bool _busy;
 
@@ -99,7 +102,9 @@ namespace Chimera.Client.GUI
 			Action<RosterCore>? forgetExternal = null,
 			Func<string?>? askForUrl = null,
 			Action? changed = null,
-			Action<DiscoveredCorePackage>? installed = null)
+			Action<DiscoveredCorePackage>? installed = null,
+			CoreKindFilter shows = CoreKindFilter.All,
+			Action<CoreKindFilter>? rememberShows = null)
 		{
 			_roster = roster;
 			_scan = scan;
@@ -110,12 +115,13 @@ namespace Chimera.Client.GUI
 			_forgetExternal = forgetExternal;
 			_askForUrl = askForUrl;
 			_changed = changed;
+			_rememberShows = rememberShows;
 
 			SuspendLayout();
-			// wide because the list carries six columns; the three it originally had
+			// wide because the list carries seven columns; the three it originally had
 			// already filled the width exactly, so every column added since has had
 			// to bring its own room with it
-			ClientSize = new(UIHelper.ScaleX(1180), UIHelper.ScaleY(500));
+			ClientSize = new(UIHelper.ScaleX(1250), UIHelper.ScaleY(500));
 			MinimumSize = new(UIHelper.ScaleX(900), UIHelper.ScaleY(420));
 			StartPosition = FormStartPosition.CenterParent;
 			ShowIcon = false;
@@ -161,14 +167,17 @@ namespace Chimera.Client.GUI
 			// side panel and the margins), or the last one is only reachable by
 			// scrolling sideways
 			_cores.Columns.Add("Core", UIHelper.ScaleX(130));
+			// an emulator or a game (docs/game-cores.md): what the divider rows used to say
+			_cores.Columns.Add("Type", UIHelper.ScaleX(70));
 			_cores.Columns.Add("Systems", UIHelper.ScaleX(160));
-			_cores.Columns.Add("Installed", UIHelper.ScaleX(140));
-			_cores.Columns.Add("Released", UIHelper.ScaleX(85));
+			_cores.Columns.Add("Installed", UIHelper.ScaleX(190));
+			_cores.Columns.Add("Released", UIHelper.ScaleX(115));
 			// right-aligned, because a column of sizes is read by comparing them
 			_cores.Columns.Add("Size", UIHelper.ScaleX(60), HorizontalAlignment.Right);
 			// owner/name rather than the whole address: it is the identifying part,
 			// and the full URL is on the right where there is room for it
-			_cores.Columns.Add("Source", UIHelper.ScaleX(215));
+			// wide enough for an external core's "(added by hand)" after its repository
+			_cores.Columns.Add("Source", UIHelper.ScaleX(250));
 			_cores.SelectedIndexChanged += (_, _) => ShowSelectedCore();
 			_cores.ItemChecked += (_, e) =>
 			{
@@ -182,12 +191,18 @@ namespace Chimera.Client.GUI
 				}
 				UpdateButtons();
 			};
-			// the separator is a row, and a row in a checkbox ListView has a box; it
-			// is not a core, so it never ticks
-			_cores.ItemCheck += (_, e) =>
+
+			// which kinds of core the list shows, right-aligned above it on the select-all's line
+			_shows = new CoreKindFilterBox("Show:", offerAll: true)
 			{
-				// same reason as _ready: this can fire before the list has rows
-				if (e.Index >= 0 && e.Index < _cores.Items.Count && _cores.Items[e.Index].Tag is null) e.NewValue = CheckState.Unchecked;
+				Anchor = AnchorStyles.Top | AnchorStyles.Right,
+				Value = shows,
+			};
+			_shows.Location = new(_cores.Right - _shows.PreferredSize.Width, UIHelper.ScaleY(31));
+			_shows.Changed += () =>
+			{
+				_rememberShows?.Invoke(_shows.Value);
+				Reload();
 			};
 
 			// The right column is a panel of its own so everything in it is placed
@@ -303,6 +318,20 @@ namespace Chimera.Client.GUI
 			};
 			_addExternal.Click += async (_, _) => await AddExternalCore().ConfigureAwait(true);
 
+			// which machines all of this adds up to, and which core runs each (#172)
+			_systems = new Button
+			{
+				Anchor = AnchorStyles.Bottom | AnchorStyles.Left,
+				Location = new(margin + (4 * (bw + gap)), buttonRow),
+				Size = new(bw, UIHelper.ScaleY(26)),
+				Text = "Systems...",
+			};
+			_systems.Click += (_, _) =>
+			{
+				using SupportedSystemsForm form = new(SupportedSystems.From(_rows));
+				form.ShowDialog(this);
+			};
+
 			Button close = new()
 			{
 				Anchor = AnchorStyles.Bottom | AnchorStyles.Right,
@@ -312,7 +341,7 @@ namespace Chimera.Client.GUI
 				Text = "Close",
 			};
 
-			Controls.AddRange(new Control[] { _header, _selectAll, _cores, side, _status, _checkUpdates, _downloadLatest, _removeCore, _addExternal, close });
+			Controls.AddRange(new Control[] { _header, _selectAll, _shows, _cores, side, _status, _checkUpdates, _downloadLatest, _removeCore, _addExternal, _systems, close });
 			AcceptButton = close;
 			ResumeLayout();
 
@@ -330,35 +359,23 @@ namespace Chimera.Client.GUI
 			// what was ticked survives a reload: an install or a removal must not
 			// silently change what the next button press would act on. A row that
 			// is gone leaves with it, or Remove would keep acting on a core that no
-			// longer has a line in the list.
-			_ticked.IntersectWith(_rows.Select(static r => r.Name));
+			// longer has a line in the list - and so does one the filter hides: the
+			// buttons act on what can be seen ticked, never on something out of view.
+			_ticked.IntersectWith(Shown().Select(static r => r.Name));
 
 			_suppressCheckEvents = true;
 			_cores.BeginUpdate();
 			_cores.Items.Clear();
-			var separatorDone = false;
-			foreach (var row in _rows)
+			foreach (var row in Shown())
 			{
-				// ListViewGroups would be the obvious way to do this and Mono's
-				// ListView ignores them in Details view, so the divide is a row.
-				if (!row.IsOfficial && !separatorDone)
-				{
-					separatorDone = true;
-					ListViewItem divide = new("External cores") { Tag = null, ForeColor = SystemColors.GrayText };
-					divide.SubItems.Add("");
-					divide.SubItems.Add("added by hand");
-					divide.SubItems.Add("");
-					divide.SubItems.Add("");
-					divide.SubItems.Add("");
-					_cores.Items.Add(divide);
-				}
 				ListViewItem item = new(row.Name) { Tag = row };
-				item.SubItems.Add(SystemNames.Of(row.Systems));
+				item.SubItems.Add(CoreKindFilterExtensions.KindText(row.IsGameCore));
+				item.SubItems.Add(row.SystemsSpelled);
 				item.SubItems.Add(InstalledText(row));
 				item.SubItems.Add(ReleasedText(row));
 				item.SubItems.Add(SizeText(row));
-				item.SubItems.Add(row.Source);
-				if (!row.IsInstalled) item.ForeColor = SystemColors.GrayText;
+				item.SubItems.Add(SourceText(row));
+				if (!row.IsInstalled) item.ForeColor = ThemeEngine.Color(ThemeColorRole.DisabledText);
 				item.Checked = _ticked.Contains(row.Name);
 				_cores.Items.Add(item);
 			}
@@ -366,19 +383,30 @@ namespace Chimera.Client.GUI
 			_suppressCheckEvents = false;
 
 			var installed = _rows.Count(static r => r.IsInstalled);
-			_header.Text = $"Download or update emulation cores to use with Chimera. Currently installed cores: {installed}";
+			_header.Text = $"Download or update the cores to use with Chimera. Currently installed cores: {installed}";
 
 			if (wasSelected is not null && ItemFor(wasSelected) is { } keep) keep.Selected = true;
-			else if (_cores.Items.Count > 0 && _cores.Items[0].Tag is not null) _cores.Items[0].Selected = true;
+			else if (_cores.Items.Count > 0) _cores.Items[0].Selected = true;
 			ShowSelectedCore();
 			UpdateButtons();
 		}
+
+		/// <summary>The rows the filter lets through, in the model's order: the emulators, then the games.</summary>
+		private IEnumerable<CoreManagerRow> Shown() => _rows.Where(r => _shows.Value.Shows(r.IsGameCore));
+
+		/// <summary>
+		/// Where a core comes from. One the roster does not ship - added with Add external
+		/// core, or a package dropped into the Cores folder - says so, as the "External
+		/// cores" divider row used to.
+		/// </summary>
+		private static string SourceText(CoreManagerRow row)
+			=> row.IsOfficial ? row.Source : row.Source.Length is 0 ? "added by hand" : $"{row.Source}  (added by hand)";
 
 		/// <summary>The rows whose box is ticked, in list order.</summary>
 		private List<CoreManagerRow> Checked()
 			=> _rows.FindAll(r => _ticked.Contains(r.Name));
 
-		/// <summary>The list item for one core, or null. The separator has no row.</summary>
+		/// <summary>The list item for one core, or null when it is not listed.</summary>
 		private ListViewItem? ItemFor(string name)
 		{
 			foreach (ListViewItem item in _cores.Items)
@@ -407,11 +435,8 @@ namespace Chimera.Client.GUI
 			if (_suppressCheckEvents) return;
 			_suppressCheckEvents = true;
 			_ticked.Clear();
-			if (_selectAll.Checked) _ticked.UnionWith(_rows.Select(static r => r.Name));
-			foreach (ListViewItem item in _cores.Items)
-			{
-				if (item.Tag is not null) item.Checked = _selectAll.Checked;
-			}
+			if (_selectAll.Checked) _ticked.UnionWith(Shown().Select(static r => r.Name));
+			foreach (ListViewItem item in _cores.Items) item.Checked = _selectAll.Checked;
 			_suppressCheckEvents = false;
 			UpdateButtons();
 		}
@@ -435,7 +460,7 @@ namespace Chimera.Client.GUI
 		/// in the moment somebody presses Fetch versions or Check for updates.
 		/// </summary>
 		private static string ReleasedText(CoreManagerRow row)
-			=> row.PublishedAt is { } when ? when.ToLocalTime().ToString("yyyy-MM-dd") : "";
+			=> row.PublishedAt is { } when ? CoreVersionDates.Format(when) : "";
 
 		/// <summary>
 		/// How big the core is, to one decimal place. Cores run from half a megabyte
@@ -923,7 +948,7 @@ namespace Chimera.Client.GUI
 				Release = release;
 				InstalledPath = installedPath;
 				Installed = installedPath is not null;
-				Detail = $"Published {release.PublishedAt.ToLocalTime():yyyy-MM-dd}{Environment.NewLine}Commit {release.DisplayVersion}";
+				Detail = $"Published {CoreVersionDates.Format(release.PublishedAt)}{Environment.NewLine}Commit {release.DisplayVersion}";
 				When = release.PublishedAt == default ? null : release.PublishedAt;
 			}
 

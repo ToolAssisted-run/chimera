@@ -9,6 +9,7 @@
 
 #include "../source/state_history.hpp"
 #include "../source/greenzone_shape.h"
+#include "../source/zstd_dyn.hpp"
 
 #include <algorithm>
 #include <array>
@@ -107,12 +108,30 @@ Machine g_machine;
 
 using Cells = std::vector<std::pair<uint8_t, uint8_t>>;   /* index -> value, ascending */
 
+/* Zero bytes every state and delta carries after its cells, when a test asks:
+ * this machine is 64 bytes, and a body that small packs to nothing or not at
+ * all, so a test of packed bodies pads them out to something zstd can bite. */
+size_t g_pad = 0;
+
+void readPad(chimera::WbxReadCb cb, uintptr_t ud)
+{
+	std::vector<uint8_t> pad(g_pad);
+	if (g_pad != 0) cb(ud, pad.data(), pad.size());
+}
+
+void writePad(chimera::WbxWriteCb cb, uintptr_t ud)
+{
+	std::vector<uint8_t> pad(g_pad, 0);
+	if (g_pad != 0) cb(ud, pad.data(), pad.size());
+}
+
 Cells readCells(chimera::WbxReadCb cb, uintptr_t ud)
 {
 	uint32_t n = 0;
 	cb(ud, &n, sizeof n);
 	Cells out(n);
 	for (auto &c : out) { cb(ud, &c.first, 1); cb(ud, &c.second, 1); }
+	readPad(cb, ud);
 	return out;
 }
 
@@ -121,6 +140,7 @@ void writeCells(chimera::WbxWriteCb cb, uintptr_t ud, const Cells &c)
 	const uint32_t n = static_cast<uint32_t>(c.size());
 	cb(ud, &n, sizeof n);
 	for (const auto &e : c) { cb(ud, &e.first, 1); cb(ud, &e.second, 1); }
+	writePad(cb, ud);
 }
 
 /* Set to have the next delta load refuse, the way a damaged one would. Nothing
@@ -133,27 +153,40 @@ int g_refuseDeltaLoadIn = -1;
  * is expected to survive rather than report. */
 int g_outOfMemoryFor = 0;
 
+/* Every call that captures: a state, an epoch, a delta, a composition. A
+ * history that is off must make none of them - the point of turning it off is
+ * that the sandbox does no greenzone work at all. And the epochs alone, which
+ * a sparse history must open once per stored frame and not once per frame. */
+int64_t g_captureCalls = 0;
+int64_t g_epochBegins = 0;
+
 void fakeSaveState(void *, chimera::WbxWriteCb cb, uintptr_t ud, chimera::WbxReturn *r)
 {
+	g_captureCalls++;
 	if (g_outOfMemoryFor > 0) { g_outOfMemoryFor--; throw std::bad_alloc(); }
 	*r = {};
 	cb(ud, g_machine.cell, Machine::kCells);
+	writePad(cb, ud);
 }
 
 void fakeLoadState(void *, chimera::WbxReadCb cb, uintptr_t ud, chimera::WbxReturn *r)
 {
 	*r = {};
 	cb(ud, g_machine.cell, Machine::kCells);
+	readPad(cb, ud);
 }
 
 void fakeEpochBegin(void *, chimera::WbxReturn *r)
 {
+	g_captureCalls++;
+	g_epochBegins++;
 	*r = {};
 	g_machine.epochBase.assign(g_machine.cell, g_machine.cell + Machine::kCells);
 }
 
 void fakeSaveDelta(void *, bool forward, chimera::WbxWriteCb cb, uintptr_t ud, chimera::WbxReturn *r)
 {
+	g_captureCalls++;
 	if (g_outOfMemoryFor > 0) { g_outOfMemoryFor--; throw std::bad_alloc(); }
 	*r = {};
 	if (g_machine.epochBase.empty()) { std::snprintf(r->errorMessage, sizeof r->errorMessage, "no epoch"); return; }
@@ -188,6 +221,7 @@ void fakeLoadDelta(void *, chimera::WbxReadCb cb, uintptr_t ud, chimera::WbxRetu
 void fakeComposeDelta(chimera::WbxReadCb a, uintptr_t aud, chimera::WbxReadCb b, uintptr_t bud,
 	chimera::WbxWriteCb out, uintptr_t oud, chimera::WbxReturn *r)
 {
+	g_captureCalls++;
 	*r = {};
 	Cells merged = readCells(a, aud);
 	for (const auto &c : readCells(b, bud))
@@ -1940,9 +1974,11 @@ int main(void)
 	{ // A saved history is compressed, and it comes back exactly as it went.
 	  //
 	  // A project's history is a machine's worth of mostly unwritten memory per
-	  // anchor, so it is saved as one zstd stream behind a magic of its own
-	  // (ChimeraHistory4). The raw layout one version back is still read - the
-	  // hand-built files above are all ChimeraHistory3 - and this is the half
+	  // anchor. It was saved as one zstd stream (ChimeraHistory4); it is saved
+	  // now with each body as it is HELD (ChimeraHistory5), packed on the way
+	  // out where it was not, so a save of packed stretches is a copy and a
+	  // load takes them as they are. 3 and 4 are still read - the hand-built
+	  // files above are all 3, and a 4 is built below - and this is the half
 	  // that proves the new one is a history rather than just a smaller file.
 		const chimera::HostApi api = fakeHost();
 		g_machine = Machine{};
@@ -1969,7 +2005,7 @@ int main(void)
 			in.read(magic, sizeof magic);
 			const std::string m(magic, sizeof magic);
 			const bool rawAsked = getenv("CHIMERA_HISTORY_RAW") != nullptr && getenv("CHIMERA_HISTORY_RAW")[0] == '1';
-			assert(m == (rawAsked ? "ChimeraHistory3" : "ChimeraHistory4"));
+			assert(m == (rawAsked ? "ChimeraHistory3" : "ChimeraHistory5"));
 		}
 		chimera::StateHistory back;
 		back.configure(&api, nullptr, 1u << 20);
@@ -2002,6 +2038,26 @@ int main(void)
 		assert(cut.count() == 0);
 		std::remove("work-history-v4.bin");
 		std::remove("work-history-v4-cut.bin");
+
+		/* a 4 - 3's layout as one zstd stream - is still read, exactly */
+		if (const chimera::ZstdApi *z = chimera::zstdApi(nullptr))
+		{
+			const std::vector<uint8_t> v3 = historyFile("ChimeraHistory3", "machine", 8, { 10, 12, 16 });
+			const size_t magicLen = std::strlen("ChimeraHistory3");
+			std::vector<uint8_t> v4;
+			putStr(v4, "ChimeraHistory4");
+			std::vector<uint8_t> frame(z->compressBound(v3.size() - magicLen));
+			const size_t n = z->compress(frame.data(), frame.size(), v3.data() + magicLen, v3.size() - magicLen, 1);
+			assert(!z->isError(n));
+			v4.insert(v4.end(), frame.begin(), frame.begin() + static_cast<std::ptrdiff_t>(n));
+			write(v4);
+			chimera::StateHistory old;
+			old.configure(&api, nullptr, 1u << 20);
+			assert(old.loadFrom(kPath, "machine", error));
+			assert(old.count() == 4);
+			for (int64_t f : { 8, 10, 12, 16 }) assert(old.nearest(f) == f);
+			assert(old.nearest(11) == 10);
+		}
 	}
 
 	{ // The anchor spacing, chosen by weight.
@@ -2080,6 +2136,240 @@ int main(void)
 			byDefault.capture(f);
 		}
 		assert(byDefault.anchors() == weighed.anchors());
+	}
+
+	{ // A closed stretch is packed in memory, and nothing can tell.
+	  //
+	  // Once the next anchor is taken a stretch is only ever read or shortened,
+	  // so its bodies are held as zstd frames (user-asked, 2026-09-18: a PS3
+	  // anchor is 1.2 GB and packs seven times). The packer is a helper whose
+	  // result is taken when the NEXT stretch closes, so the differential above
+	  // holds; here, threaded and in line alike: every frame of every packed
+	  // stretch restores exactly, a merge inside one stays packed and exact, a
+	  // save comes back as it went, and the packer was actually handed bodies.
+	  // This machine is 64 bytes and a delta 10, which zstd cannot shrink, so
+	  // every body is padded with 4 KB of zeros here (g_pad) - the ratio itself
+	  // is measured on real machines, not here.
+		const chimera::HostApi api = fakeHost();
+		g_pad = 4096;
+		/* CHIMERA_HISTORY_PACK=0 is the A of the A/B: then nothing packs, and
+		 * what is asserted is only that everything still restores */
+		const bool packing = !(getenv("CHIMERA_HISTORY_PACK") != nullptr && getenv("CHIMERA_HISTORY_PACK")[0] == '0');
+		for (int pass = 0; pass < 2; pass++)
+		{
+			const bool threaded = pass == 0;
+			g_machine = Machine{};
+			chimera::StateHistory h;
+			h.configure(&api, nullptr, 4u << 20);
+			h.helpers(threaded);
+			h.anchorWalkFloor(1);
+			h.bands(1000, 1000, 1, 1, 20);   /* a stretch every 20 frames */
+			std::vector<std::array<uint8_t, Machine::kCells>> truth(1);
+			std::memcpy(truth[0].data(), g_machine.cell, Machine::kCells);
+			h.capture(0);
+			for (int64_t f = 1; f <= 200; f++)
+			{
+				h.beforeAdvance();
+				advance(f);
+				std::array<uint8_t, Machine::kCells> at{};
+				std::memcpy(at.data(), g_machine.cell, Machine::kCells);
+				truth.push_back(at);
+				h.capture(f);
+			}
+			assert(h.anchors() >= 9);
+			assert(!packing || h.costs().packedRaw != 0);
+			/* nine packed stretches and one raw: well under what raw would be -
+			 * 201 bodies of 4 KB and more */
+			const uint64_t held = h.bytes();
+			assert(!packing || held < 201 * 4096);
+			for (int64_t f = 0; f <= 200; f++)
+			{
+				assert(h.nearest(f) == f);
+				assert(h.restore(f, error));
+				assert(std::memcmp(g_machine.cell, truth[static_cast<size_t>(f)].data(), Machine::kCells) == 0);
+			}
+			/* a restore changes nothing about what is held */
+			assert(h.bytes() == held);
+			/* the budget forces merges inside stretches that are already packed:
+			 * what remains still answers exactly */
+			assert(h.saveTo(kPath, "fake", error));
+			chimera::StateHistory back;
+			back.configure(&api, nullptr, 4u << 20);
+			back.helpers(threaded);
+			assert(back.loadFrom(kPath, "fake", error));
+			assert(back.count() == h.count());
+			for (int64_t f = 0; f <= 200; f++)
+			{
+				assert(back.nearest(f) == f);
+				assert(back.restore(f, error));
+				assert(std::memcmp(g_machine.cell, truth[static_cast<size_t>(f)].data(), Machine::kCells) == 0);
+			}
+			/* and it came back no heavier: a loaded history is packed in line
+			 * before the budget sees it, while the live one still holds the
+			 * stretch before the newest raw, whose packing is taken at the next
+			 * close - so the loaded one is lighter, never heavier */
+			assert(back.bytes() <= held);
+			assert(!packing || back.bytes() < 201 * 4096);
+		}
+		g_pad = 0;
+	}
+
+	{ // Packed stretches under a budget that forces merges and pops inside them:
+	  // a merge decodes its two inputs, composes, and packs the result again.
+		const chimera::HostApi api = fakeHost();
+		g_pad = 4096;
+		g_machine = Machine{};
+		chimera::StateHistory h;
+		/* the newest stretch is raw: ten frames of 4 KB. The budget holds that
+		 * and a handful of packed stretches, so the rest thins */
+		h.configure(&api, nullptr, 64u << 10);
+		h.anchorWalkFloor(1);
+		h.bands(1000, 1000, 1, 1, 10);
+		std::vector<std::array<uint8_t, Machine::kCells>> truth(1);
+		std::memcpy(truth[0].data(), g_machine.cell, Machine::kCells);
+		h.capture(0);
+		for (int64_t f = 1; f <= 300; f++)
+		{
+			h.beforeAdvance();
+			advance(f);
+			std::array<uint8_t, Machine::kCells> at{};
+			std::memcpy(at.data(), g_machine.cell, Machine::kCells);
+			truth.push_back(at);
+			h.capture(f);
+		}
+		assert(h.anchors() >= 2);
+		assert(h.bytes() <= 64u << 10);
+		int64_t offered = 0;
+		for (int64_t f = 0; f <= 300; f++)
+		{
+			if (h.nearest(f) != f) continue;
+			offered++;
+			assert(h.restore(f, error));
+			assert(std::memcmp(g_machine.cell, truth[static_cast<size_t>(f)].data(), Machine::kCells) == 0);
+		}
+		assert(offered > 0 && offered < 301);
+		g_pad = 0;
+	}
+
+	{ // Off (TAStudio's "Greenzone" box, capturePeriod 0): nothing is stored
+	  // while it lasts, what was stored stays, turning it on stores a whole
+	  // state at the frame it resumes on, and an edit made meanwhile still keeps
+	  // the timeline it replaced out. No epoch, state or delta is asked of the
+	  // sandbox meanwhile, so it surveys no pages (user request, 2026-09-23).
+		const chimera::HostApi api = fakeHost();
+		g_machine = Machine{};
+		chimera::StateHistory h;
+		h.configure(&api, nullptr, 64u << 20);
+		std::vector<std::array<uint8_t, Machine::kCells>> truth(1);
+		std::memcpy(truth[0].data(), g_machine.cell, Machine::kCells);
+		auto step = [&](int64_t f) {
+			h.beforeAdvance();
+			advance(f);
+			std::array<uint8_t, Machine::kCells> at{};
+			std::memcpy(at.data(), g_machine.cell, Machine::kCells);
+			if (truth.size() <= static_cast<size_t>(f)) truth.resize(static_cast<size_t>(f) + 1);
+			truth[static_cast<size_t>(f)] = at;
+			h.capture(f);
+		};
+		h.capture(0);
+		for (int64_t f = 1; f <= 20; f++) step(f);
+		const int64_t anchorsBefore = h.anchors();
+		const uint64_t bytesBefore = h.bytes();
+
+		h.capturePeriod(0);
+		const int64_t callsBefore = g_captureCalls;
+		for (int64_t f = 21; f <= 40; f++) step(f);
+		assert(g_captureCalls == callsBefore);        /* and nothing asked of the sandbox */
+		assert(h.nearest(40) == 20);                  /* nothing stored meanwhile */
+		assert(h.bytes() == bytesBefore);
+		assert(h.anchors() == anchorsBefore);
+
+		h.capturePeriod(1);
+		h.capture(40);                                /* what TAStudio does on resuming */
+		assert(h.nearest(40) == 40);
+		assert(h.anchors() == anchorsBefore + 1);     /* a whole state, not a delta across the gap */
+		for (int64_t f = 41; f <= 50; f++) step(f);
+		assert(h.nearest(50) == 50);
+		assert(h.anchors() == anchorsBefore + 1);     /* and deltas again after it */
+		for (const int64_t f : { 5, 20, 40, 45, 50 })
+		{
+			assert(h.nearest(f) == f);
+			assert(h.restore(f, error));
+			assert(std::memcmp(g_machine.cell, truth[static_cast<size_t>(f)].data(), Machine::kCells) == 0);
+		}
+
+		/* an edit behind the machine while suspended: the machine plays the old
+		 * timeline on, and resuming there must not store it */
+		assert(h.restore(50, error));
+		h.capturePeriod(0);
+		for (int64_t f = 51; f <= 60; f++) step(f);
+		h.invalidateAfter(54);
+		h.capturePeriod(1);
+		h.capture(60);
+		assert(h.nearest(60) <= 54);
+		/* brought back to the edit, the machine is on the new timeline and resuming stores again */
+		assert(h.restore(h.nearest(54), error));
+		const int64_t back = h.nearest(54);
+		for (int64_t f = back + 1; f <= 58; f++) step(f);
+		assert(h.nearest(58) == 58);
+	}
+
+	{ // Sparse (capturePeriod N): only multiples of N are stored, as deltas that
+	  // span the frames between - one epoch per stored frame, not per frame -
+	  // and every stored frame restores exactly. Turning it on from off stores
+	  // the current frame whatever N is (user request, 2026-09-23).
+		const chimera::HostApi api = fakeHost();
+		g_machine = Machine{};
+		chimera::StateHistory h;
+		h.configure(&api, nullptr, 64u << 20);
+		std::vector<std::array<uint8_t, Machine::kCells>> truth(1);
+		std::memcpy(truth[0].data(), g_machine.cell, Machine::kCells);
+		auto step = [&](int64_t f) {
+			h.beforeAdvance();
+			advance(f);
+			std::array<uint8_t, Machine::kCells> at{};
+			std::memcpy(at.data(), g_machine.cell, Machine::kCells);
+			if (truth.size() <= static_cast<size_t>(f)) truth.resize(static_cast<size_t>(f) + 1);
+			truth[static_cast<size_t>(f)] = at;
+			h.capture(f);
+		};
+		h.capture(0);
+		for (int64_t f = 1; f <= 10; f++) step(f);
+		assert(h.nearest(10) == 10);
+
+		h.capturePeriod(8);
+		const int64_t anchorsBefore = h.anchors();
+		const int64_t epochsBefore = g_epochBegins;
+		for (int64_t f = 11; f <= 100; f++) step(f);
+		for (int64_t f = 11; f <= 100; f++) assert(h.nearest(f) == (f < 16 ? 10 : f / 8 * 8));
+		assert(h.anchors() == anchorsBefore);               /* deltas, not whole states */
+		assert(g_epochBegins - epochsBefore <= 12);         /* 11 stored frames, not 90 */
+		for (const int64_t f : { 10, 16, 56, 96 })
+		{
+			assert(h.restore(f, error));
+			assert(std::memcmp(g_machine.cell, truth[static_cast<size_t>(f)].data(), Machine::kCells) == 0);
+		}
+
+		/* off, then on again at a frame that is no multiple: stored there at once */
+		assert(h.restore(96, error));
+		for (int64_t f = 97; f <= 100; f++) step(f);
+		h.capturePeriod(0);
+		for (int64_t f = 101; f <= 110; f++) step(f);
+		h.capturePeriod(32);
+		h.capture(110);                                       /* what the session does on turning it on */
+		assert(h.nearest(110) == 110);
+		for (int64_t f = 111; f <= 140; f++) step(f);
+		assert(h.nearest(127) == 110);
+		assert(h.nearest(140) == 128);
+		assert(h.restore(128, error));
+		assert(std::memcmp(g_machine.cell, truth[128].data(), Machine::kCells) == 0);
+
+		/* and back to every frame */
+		for (int64_t f = 129; f <= 140; f++) step(f);
+		h.capturePeriod(1);
+		for (int64_t f = 141; f <= 150; f++) step(f);
+		assert(h.nearest(150) == 150);
+		assert(h.nearest(145) == 145);
 	}
 
 	/* the spill file belongs to the history and goes with it */

@@ -1,117 +1,312 @@
 {
-  "_comment": "The official cores: which repository publishes each one, and the build this Chimera was tested against. Chimera ships no cores (see docs/core-manager.md); this roster is how File > Core Manager knows what EXISTS before anything is installed. Versions are not listed here - they come from the core's own GitHub releases, on demand.",
-  "formatVersion": 1,
+  "_comment": "The official cores: which repository publishes each one, and the build this Chimera was tested against. Chimera ships no cores (see docs/core-manager.md); this roster is how File > Core Manager knows what EXISTS before anything is installed. Versions are not listed here - they come from the core's own GitHub releases, on demand. A row carries each system's id (what movies and projects are keyed by) and the CORE'S OWN NAME for it, copied from the core's package when it joined: Chimera has no table of machines, and a core nobody has installed yet has nowhere else to say what it runs.",
+  "formatVersion": 2,
   "cores": [
     {
       "id": "quickernes",
       "name": "quickerNES",
-      "systems": [ "NES" ],
+      "systems": [
+        { "id": "NES", "name": "Nintendo Entertainment System" }
+      ],
       "repo": "ToolAssisted-run/chimera-core-quickernes",
       "tested": ""
     },
     {
       "id": "quickerneshawk",
       "name": "QuickerNesHawk",
-      "systems": [ "NES", "FDS" ],
+      "systems": [
+        { "id": "NES", "name": "Nintendo Entertainment System" },
+        { "id": "FDS", "name": "Famicom Disk System" }
+      ],
       "repo": "ToolAssisted-run/chimera-core-neshawk",
       "tested": ""
     },
     {
       "id": "gpgx",
       "name": "Genesis Plus GX",
-      "systems": [ "GEN", "SMS", "GG", "SG" ],
+      "systems": [
+        { "id": "GEN", "name": "Mega Drive / Genesis" },
+        { "id": "SMS", "name": "Master System" },
+        { "id": "GG", "name": "Game Gear" },
+        { "id": "SG", "name": "SG-1000" }
+      ],
       "repo": "ToolAssisted-run/chimera-core-gpgx",
       "tested": ""
     },
     {
       "id": "snes9x",
       "name": "Snes9x",
-      "systems": [ "SNES" ],
+      "systems": [
+        { "id": "SNES", "name": "Super Nintendo" }
+      ],
       "repo": "ToolAssisted-run/chimera-core-snes9x",
       "tested": ""
     },
     {
       "id": "stella",
       "name": "Stella",
-      "systems": [ "A26" ],
+      "systems": [
+        { "id": "A26", "name": "Atari 2600" }
+      ],
       "repo": "ToolAssisted-run/chimera-core-stella",
       "tested": ""
     },
     {
       "id": "opera",
       "name": "Opera",
-      "systems": [ "3DO" ],
+      "systems": [
+        { "id": "3DO", "name": "3DO Interactive Multiplayer" }
+      ],
       "repo": "ToolAssisted-run/chimera-core-opera",
       "tested": ""
     },
     {
       "id": "dosbox-x",
       "name": "DOSBox-X",
-      "systems": [ "DOS" ],
+      "systems": [
+        { "id": "DOS", "name": "MS-DOS" }
+      ],
       "repo": "ToolAssisted-run/chimera-core-dosbox-x",
       "tested": ""
     },
     {
       "id": "flycast",
       "name": "Flycast",
-      "systems": [ "DC" ],
+      "systems": [
+        { "id": "DC", "name": "Dreamcast" },
+        { "id": "NAOMI", "name": "Sega NAOMI" },
+        { "id": "NAOMI2", "name": "Sega NAOMI 2" },
+        { "id": "AW", "name": "Sammy Atomiswave" }
+      ],
       "repo": "ToolAssisted-run/chimera-core-flycast",
       "tested": ""
     },
     {
       "id": "dolphin",
       "name": "Dolphin",
-      "systems": [ "GC", "Wii" ],
+      "systems": [
+        { "id": "GC", "name": "GameCube" },
+        { "id": "Wii", "name": "Wii" }
+      ],
       "repo": "ToolAssisted-run/chimera-core-dolphin",
       "tested": ""
     },
     {
       "id": "ppsspp",
       "name": "PPSSPP",
-      "systems": [ "PSP" ],
+      "systems": [
+        { "id": "PSP", "name": "PlayStation Portable" }
+      ],
       "repo": "ToolAssisted-run/chimera-core-ppsspp",
       "tested": ""
     },
     {
       "id": "pcsx2",
       "name": "PCSX2",
-      "systems": [ "PS2" ],
+      "systems": [
+        { "id": "PS2", "name": "PlayStation 2" }
+      ],
       "repo": "ToolAssisted-run/chimera-core-pcsx2",
       "tested": ""
     },
     {
       "id": "rpcs3",
       "name": "RPCS3",
-      "systems": [ "PS3" ],
+      "systems": [
+        { "id": "PS3", "name": "PlayStation 3" }
+      ],
       "repo": "ToolAssisted-run/chimera-core-rpcs3",
       "tested": ""
     },
     {
       "id": "xemu",
       "name": "xemu",
-      "systems": [ "XBOX" ],
+      "systems": [
+        { "id": "XBOX", "name": "Xbox" }
+      ],
       "repo": "ToolAssisted-run/chimera-core-xemu",
       "tested": ""
     },
     {
       "id": "eka2l1",
       "name": "EKA2L1",
-      "systems": [ "SYMBIAN" ],
+      "systems": [
+        { "id": "SYMBIAN", "name": "Symbian (Nokia N-Gage)" }
+      ],
       "repo": "ToolAssisted-run/chimera-core-eka2l1",
       "tested": ""
     },
     {
       "id": "ares",
       "name": "ares",
-      "systems": [ "N64", "NES", "GB", "GBC", "GEN", "SMS", "GG", "SG", "A26", "WS", "WSC", "ZXS", "MYV", "GBA", "CV", "MSX", "PS1", "A52", "NGP", "NGPC", "NG", "SFC", "32X", "MSX2", "PCE", "SGX", "MCD", "MCD32X", "PCECD" ],
+      "systems": [
+        { "id": "N64", "name": "Nintendo 64" },
+        { "id": "NES", "name": "Nintendo Entertainment System" },
+        { "id": "GB", "name": "Game Boy" },
+        { "id": "GBC", "name": "Game Boy Color" },
+        { "id": "GEN", "name": "Mega Drive / Genesis" },
+        { "id": "SMS", "name": "Master System" },
+        { "id": "GG", "name": "Game Gear" },
+        { "id": "SG", "name": "SG-1000" },
+        { "id": "A26", "name": "Atari 2600" },
+        { "id": "WS", "name": "WonderSwan" },
+        { "id": "WSC", "name": "WonderSwan Color" },
+        { "id": "ZXS", "name": "ZX Spectrum" },
+        { "id": "MYV", "name": "MyVision" },
+        { "id": "GBA", "name": "Game Boy Advance" },
+        { "id": "CV", "name": "ColecoVision" },
+        { "id": "MSX", "name": "MSX" },
+        { "id": "PS1", "name": "PlayStation" },
+        { "id": "A52", "name": "Atari 5200" },
+        { "id": "NGP", "name": "Neo Geo Pocket" },
+        { "id": "NGPC", "name": "Neo Geo Pocket Color" },
+        { "id": "NG", "name": "Neo Geo AES" },
+        { "id": "SFC", "name": "Super Famicom / SNES" },
+        { "id": "32X", "name": "Mega Drive 32X" },
+        { "id": "MSX2", "name": "MSX2" },
+        { "id": "PCE", "name": "PC Engine / TurboGrafx-16" },
+        { "id": "SGX", "name": "SuperGrafx" },
+        { "id": "MCD", "name": "Mega CD / Sega CD" },
+        { "id": "MCD32X", "name": "Mega CD 32X / Sega CD 32X" },
+        { "id": "PCECD", "name": "PC Engine CD" }
+      ],
       "repo": "ToolAssisted-run/chimera-core-ares",
       "tested": ""
     },
     {
       "id": "ruffle",
       "name": "Ruffle",
-      "systems": [ "Flash" ],
+      "systems": [
+        { "id": "Flash", "name": "Flash" }
+      ],
       "repo": "ToolAssisted-run/chimera-core-ruffle",
+      "tested": ""
+    },
+    {
+      "id": "applewin",
+      "name": "AppleWin",
+      "systems": [
+        { "id": "AppleII", "name": "Apple II" }
+      ],
+      "repo": "ToolAssisted-run/chimera-core-applewin",
+      "tested": ""
+    },
+    {
+      "id": "pcem",
+      "name": "PCem",
+      "systems": [
+        { "id": "PC", "name": "IBM PC compatible" }
+      ],
+      "repo": "ToolAssisted-run/chimera-core-pcem",
+      "tested": ""
+    },
+    {
+      "id": "fbneo",
+      "name": "FBNeo",
+      "systems": [
+        { "id": "CPS1", "name": "Capcom CPS-1" },
+        { "id": "CPS2", "name": "Capcom CPS-2" },
+        { "id": "CPS3", "name": "Capcom CPS-3" },
+        { "id": "NEOGEO", "name": "SNK Neo Geo MVS" },
+        { "id": "SYS16", "name": "Sega System 16" }
+      ],
+      "repo": "ToolAssisted-run/chimera-core-fbneo",
+      "tested": ""
+    },
+    {
+      "id": "azahar",
+      "name": "Azahar",
+      "systems": [
+        { "id": "3DS", "name": "Nintendo 3DS" }
+      ],
+      "repo": "ToolAssisted-run/chimera-core-azahar",
+      "tested": ""
+    },
+    {
+      "id": "x68k",
+      "name": "MAME X68000",
+      "systems": [
+        { "id": "X68000", "name": "Sharp X68000" }
+      ],
+      "repo": "ToolAssisted-run/chimera-core-x68k",
+      "tested": ""
+    },
+    {
+      "id": "touchhle",
+      "name": "touchHLE",
+      "systems": [
+        { "id": "iOS", "name": "iPhone OS" }
+      ],
+      "repo": "ToolAssisted-run/chimera-core-touchhle",
+      "tested": ""
+    },
+    {
+      "id": "vita3k",
+      "name": "Vita3K",
+      "systems": [
+        { "id": "PSV", "name": "PlayStation Vita" }
+      ],
+      "repo": "ToolAssisted-run/chimera-core-vita3k",
+      "tested": ""
+    },
+    {
+      "id": "sdlpop",
+      "name": "SDLPoP",
+      "systems": [
+        { "id": "PrinceOfPersia", "name": "Prince of Persia" }
+      ],
+      "kind": "game",
+      "repo": "ToolAssisted-run/chimera-core-sdlpop",
+      "tested": ""
+    },
+    {
+      "id": "sdlpop2",
+      "name": "SDLPoP2",
+      "systems": [
+        { "id": "PrinceOfPersia2", "name": "Prince of Persia 2" }
+      ],
+      "kind": "game",
+      "repo": "ToolAssisted-run/chimera-core-sdlpop2",
+      "tested": ""
+    },
+    {
+      "id": "opensamurai",
+      "name": "OpenSamurai",
+      "systems": [
+        { "id": "SwordOfTheSamurai", "name": "Sword of the Samurai" }
+      ],
+      "kind": "game",
+      "repo": "ToolAssisted-run/chimera-core-opensamurai",
+      "tested": ""
+    },
+    {
+      "id": "syndicatfx",
+      "name": "SyndicatFX",
+      "systems": [
+        { "id": "Syndicate", "name": "Syndicate" }
+      ],
+      "kind": "game",
+      "repo": "ToolAssisted-run/chimera-core-syndicatfx",
+      "tested": ""
+    },
+    {
+      "id": "rawgl",
+      "name": "rawgl",
+      "systems": [
+        { "id": "AnotherWorld", "name": "Another World" }
+      ],
+      "kind": "game",
+      "repo": "ToolAssisted-run/chimera-core-rawgl",
+      "tested": ""
+    },
+    {
+      "id": "dsda",
+      "name": "DSDA-Doom",
+      "systems": [
+        { "id": "Doom", "name": "Doom" }
+      ],
+      "kind": "game",
+      "repo": "ToolAssisted-run/chimera-core-dsda",
       "tested": ""
     }
   ]

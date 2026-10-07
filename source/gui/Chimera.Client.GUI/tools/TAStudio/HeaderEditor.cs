@@ -4,7 +4,7 @@ using Chimera.Client.Common;
 
 namespace Chimera.Client.GUI
 {
-	public partial class MovieHeaderEditor : Form
+	public partial class MovieHeaderEditor : ThemedForm
 	{
 		private readonly IBasicMovieInfo _movie;
 		private readonly Config _config;

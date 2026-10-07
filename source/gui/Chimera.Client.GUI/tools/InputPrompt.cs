@@ -10,7 +10,7 @@ namespace Chimera.Client.GUI
 	/// A simple form that prompts the user for a single line of input.
 	/// Supports multiline messages
 	/// </summary>
-	public partial class InputPrompt : Form
+	public partial class InputPrompt : ThemedForm
 	{
 		public InputPrompt()
 		{

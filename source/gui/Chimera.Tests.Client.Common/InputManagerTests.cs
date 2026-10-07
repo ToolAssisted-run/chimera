@@ -508,6 +508,37 @@ namespace Chimera.Tests.Client.Common
 
 			Assert.IsTrue(manager.ControllerOutput.IsPressed("Down"));
 		}
+
+		/// <summary>
+		/// What is pressed is what the machine gets. There was a U+D/L+R
+		/// setting that, by default, let only the later of two opposite
+		/// directions through - and found "opposite" by the words in a
+		/// button's name, so two mouse buttons could not be held together.
+		/// </summary>
+		[TestMethod]
+		public void OppositeDirectionsAreSentAsPressed()
+		{
+			Context context = new(_hotkeys);
+			InputManager manager = context.manager;
+			FakeInputSource source = context.source;
+
+			manager.ActiveController.BindMulti("Up", "W");
+			manager.ActiveController.BindMulti("Down", "S");
+			manager.ActiveController.BindMulti("Mouse Left", "Z");
+			manager.ActiveController.BindMulti("Mouse Right", "X");
+
+			source.MakePressEvent("W");
+			context.BasicInputProcessing();
+			source.MakePressEvent("S");
+			source.MakePressEvent("Z");
+			source.MakePressEvent("X");
+			context.BasicInputProcessing();
+
+			Assert.IsTrue(manager.ControllerOutput.IsPressed("Up"));
+			Assert.IsTrue(manager.ControllerOutput.IsPressed("Down"));
+			Assert.IsTrue(manager.ControllerOutput.IsPressed("Mouse Left"));
+			Assert.IsTrue(manager.ControllerOutput.IsPressed("Mouse Right"));
+		}
 #pragma warning restore BHI1600
 	}
 }

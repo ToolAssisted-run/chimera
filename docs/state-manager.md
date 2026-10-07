@@ -1022,6 +1022,64 @@ already held, repeatedly, inside every capture. The sandbox knows how many pages
 the frame touched before any of them are read (`wbx_get_epoch_page_count`), so
 the room is asked for once; an anchor asks for what the last anchor took.
 
+## How often the greenzone stores a frame: the Greenzone box (user request, 2026-09-23/24)
+
+TAStudio has a "Greenzone" group under "Playback" with three radio buttons:
+"Every frame" (the default), "Every [N] frames" with N picked by a spin box from
+2 to 999 (2 by default, remembered in TAStudio's settings), and "Off". The
+choice itself is not saved, so a project always opens on "Every frame". One
+hotkey, "Cycle Greenzone" (unbound), steps through the three and round again.
+It went through three shapes in two days: a single "Maintain greenzone"
+checkbox; then four radio buttons with two fixed periods (32 and 1000, set in
+the settings dialog) - chosen over three independent checkboxes, because only
+the densest ticked one would ever have mattered; then this one.
+
+The choice changes WHICH frames are stored and nothing else. The engine takes
+it as a period, `ce_session_greenzone_capture_period` (`StateHistory::
+capturePeriod`): 1 is the ordinary history, N stores only the multiples of N,
+0 stores nothing. Anchors, deltas, bands, thinning, packing and spills are the
+same code whatever the period.
+
+- **A sparse period stores deltas, not whole states.** The frames between the
+  multiples are skipped exactly as the near band's stride skips them: the epoch
+  stays open and the delta at the next multiple describes them all. A whole
+  state every 32 frames would cost the whole machine each time - 4.31 GiB on a
+  PlayStation 3. With a period the stride is not consulted and not tuned; its
+  rare captures would talk it down to nothing.
+- **Off does no work at all.** `capture` records where the machine stands and
+  returns, which leaves `m_machineStored` false, and `beforeAdvance` only opens
+  an epoch on a stored frame, so no epoch opens and the sandbox is asked for no
+  epoch, state or delta - it surveys no pages. The last epoch opened before is
+  left to lapse: each page it held faults once on its next write, the cost of
+  one captured frame. The baseline dirty tracking savestates need is not the
+  greenzone's and stays.
+- **Leaving Off stores a whole state at once**, at the frame the machine stands
+  on, whatever the new period: the machine is not the stored copy of any frame,
+  so there is nothing to measure a delta from. The session does it inside
+  `ce_session_greenzone_capture_period`, so the frontend only names the period.
+- **Edits made while Off are still honoured**: a frame after an edit the
+  machine has not gone back to is refused when storing resumes.
+
+Measured with `chimera-run --record --frames 11000` on snes9x (The Last
+Super), seconds, two runs each:
+
+| | wall time | peak memory |
+|---|---|---|
+| no greenzone | 2.30, 2.29 | 69 MB |
+| every frame | 2.98, 2.97 | 338 MB |
+| every 32 frames | 2.37, 2.34 | 81 MB |
+| every 1000 frames | 2.31, 2.34 | 72 MB |
+| every 2 frames | 2.77, 2.73 | |
+| off | 2.30, 2.33 | 69 MB |
+
+`--seek 1500 --greenzone-check` lands exactly at periods 32 and 1000, and
+`--seek 1501` at 2 and 999, the ends of the spin box. The
+switch in chimera-run is `--greenzone-period <n>`, set at the frame
+`--greenzone-period-at` names. The engine test counts every capturing call the
+fake sandbox receives and asserts none while off, and that a sparse period
+stores only its multiples, as deltas, with one epoch per stored frame; removing
+either guard fails it.
+
 ## Phasing
 
 Each phase is separately gated and separately landable.
@@ -2164,6 +2222,139 @@ restores every offered frame from a compressed file and checks every note,
 checks which magic was written, and refuses a compressed file cut in half; it
 passes compressed, raw and with the helpers off.
 
+#### A closed stretch is packed in memory (user-asked, 2026-09-18)
+
+The disk was compressed and memory was not, and memory is where the greenzone
+lives now. The user asked for compression to be measured on PS3 states once
+the disc was no longer carried twice (rpcs3 76b992c): the remaining 1.23 GB of
+an Oblivion state packed 7.7x at zstd level 1 in 1.1 s. So the history packs
+its bodies in memory, and the question was where and when, because "phase 2"
+had already been left undone for exactly the reason that threatened here: a
+helper that lands its result whenever it finishes gives a history that holds
+different frames threaded than in line, and the differential fuzz is the
+reason the history is trusted.
+
+**What is packed.** A stretch that has CLOSED - the next anchor has been taken.
+From then on it is only read (a restore, a save) or shortened (a merge, a pop,
+a drop), never written to, so its anchor and its links are each held as one
+zstd frame (level 1, the writer's level, for the writer's reason). The newest
+stretch stays raw: it is the one still being appended to and the one a
+backwards step lands in most. A `Body` now says what it IS (`size()`, the raw
+length, which every decision is made from - the merge caps, when a stretch
+closes, what a spill reserves) apart from what it COSTS (`held()`, which is
+what the budget counts). A body that does not shrink stays raw.
+
+**When the budget learns of it.** The packing is on a helper of its own (a
+gigabyte is a third of a second at best), and its result is taken on the
+emulation thread at ONE moment: when the next stretch closes. The job was
+posted a whole stretch ago, so the wait is normally nothing, and it is paid at
+all only so that the moment `bytes()` changes is the same threaded as in line -
+the differential fuzz's signature includes `bytes()` step by step, and it
+passes unchanged. A body is matched back by identity, so a stretch shortened
+meanwhile keeps what it still has and a stretch dropped meanwhile takes
+nothing. `CHIMERA_HISTORY_TRACE=1` prints each stretch as it is packed and any
+wait for the packer; `CHIMERA_HISTORY_PACK=0` keeps everything raw, for the A
+against the B.
+
+**What reads a packed body.** A restore streams it into the sandbox through a
+`MemBodyReader` - the in-memory twin of `SpillBodyReader`, a megabyte at a
+time, never the body decoded whole. A save writes it as it is (see "A saved
+history carries its bodies as they are held", below; the first version decoded
+and re-encoded it into the file's stream). A merge decodes its two inputs
+whole - they are capped at megabytes - and packs the result again in line, so
+a packed stretch stays packed as it thins. A load packs every stretch but the
+newest IN LINE, before the budget looks at it: a history saved from twenty
+packed PS3 stretches would otherwise be thinned to three the moment it came
+back.
+
+**Measured, Oblivion (PS3) on the GTX 1060**: 2400 frames, an 8 GB budget, a
+rewind to frame 1200 three times, everything else the same.
+
+| | raw (`CHIMERA_HISTORY_PACK=0`) | packed |
+|---|---|---|
+| a stretch (anchor 1.2 GB + its deltas) | 2.45 GB | 0.26 to 0.44 GB (5.6x to 9.2x) |
+| frames held at the end | 312 | **817** |
+| the rewind to 1200 landed on | anchor 434, then 766 frames replayed | **frame 1198**: anchor 910 + 72 deltas |
+| that restore | 0.19 to 0.35 s (then the replay) | 0.99 to 1.20 s |
+| packing a stretch, on the helper | - | 2.1 to 2.6 s |
+| waits for the packer on the emulation thread | - | none |
+
+The deltas pack worse than the anchor (a PS3 frame's churn is not zeros), so a
+stretch packs six to nine times where a lone state packs eight. The restore is
+slower per byte - 1.2 GB decoded at about 3 GB/s is 0.4 s the raw path did not
+pay - and faster per rewind, because the raw budget had thinned frame 1200's
+neighbourhood away and the packed one had not: a second of decoding against
+766 frames of PlayStation 3 emulation. That is the trade the whole history
+makes, restated: memory is depth, and depth is what a rewind costs.
+
+`test_state_history` gained two blocks under a padded fake machine (its 64-byte
+states do not shrink): every frame of every packed stretch restores exactly,
+threaded and in line; a saved history comes back no heavier; and a budget that
+forces merges inside packed stretches (35 of them, through the decode path)
+still answers every offered frame exactly.
+
+#### A saved history carries its bodies as they are held (user-asked, 2026-09-18)
+
+`ChimeraHistory4` was 3's layout as one zstd stream, and with the stretches
+already packed in memory a save had to decode every frame and encode it again
+into that stream, and a load had to decode the stream and pack every stretch
+again in line. `ChimeraHistory5` writes each body as it is held: a record is
+`raw length, held length, bytes`, and held < raw says the bytes are a zstd
+frame (a packed body is only ever kept when it shrank, so the two lengths are
+the flag and there is no other). A body still raw at the save - the newest
+stretch, one that would not shrink - is packed on the way out, so the file is
+no bigger than 4 was. The file itself is not compressed; its bodies are. A
+load takes a frame as it is, without decoding it: one that will not decode is
+found by the restore that needs it, which drops that stretch and says so, as
+any chain that will not walk is treated. 3 and 4 are still read (a 4 is
+hand-built in the test from a 3 through libzstd), 1 and 2 stay superseded,
+and `CHIMERA_HISTORY_RAW=1` still writes 3. A spilled stretch is copied in one
+body at a time - read raw, packed, written - so an anchor is the most that is
+held whole meanwhile; the frontend spills nothing.
+
+**Measured, Oblivion (PS3) on the GTX 1060**, 2400 frames under an 8 GB
+budget, the same history written by both writers, then loaded by a fresh
+process that seeks back to 1500 through it:
+
+| | `ChimeraHistory4` | `ChimeraHistory5` |
+|---|---|---|
+| the file | 2.567 GB | 2.568 GB |
+| the save | 18.5 s | **4.7 s** |
+| the load | 23.1 s | **1.0 s** |
+| the restore of 1497 from the loaded stretch | 0.80 s | 0.82 s |
+
+What is left of the save is the newest stretch being packed on the way out and
+2.5 GB going to the disk; what is left of the load is reading 2.5 GB. The
+restore is the same because the stretch arrives as it was held either way.
+
+Found on the way, and run down the same day (user-asked): `--greenzone-check`
+on this PS3 run reported the machine restored at 1500 as 543 to 552 pages
+larger than the straight pass's state - in the same process with no history
+file, and from a 4, a 5 and a raw file alike, so not the history's. Two
+things, once the two states were aligned page for page:
+
+- **A miniBox defect, fixed (chimera-common-minibox b5092e5).** A page the
+  guest gives back inside an epoch (munmap, MADV_DONTNEED) is zeroed and made
+  CLEAN on the live machine, its baseline being zero - but the epoch still
+  listed it, so the delta carried its zeros and `delta_apply` marked it dirty.
+  A machine rebuilt from deltas therefore held pages a machine that ran the
+  frames did not: identical bytes, a bigger state. On Oblivion, 100 pages
+  after a 55-delta restore, all zero. A data entry's index now carries a
+  "clean" flag in its top bit, the composers keep the later entry's flag, and
+  apply leaves such a page clean. With the fix, and the GL rebuild off, the
+  restored state is the same size and the same page set as the straight one.
+- **What is left is the GPU's, not the machine's.** 44 KB in 106 pages, sizes
+  equal: about ninety pages of RGBA pixel rows (the RSX's readback into guest
+  memory - the redrawn picture, which after a restore is drawn by GL objects in
+  another state), two counters one apart, and a few read-only pages holding
+  host addresses. With the rebuild on (the default, issue #43) the rebuild's
+  own allocations add some 400 pages on top. MainRAM is identical throughout.
+
+So the byte-exact oracle cannot pass on a GPU-bridged core whose readback
+lands in guest memory, and that is not a greenzone defect; the oracle for
+such a core is the memory domain (`--dump MainRAM`), which is what every
+comparison today used.
+
 #### The stride tuner stopped listening to anchors
 
 Found while measuring rather than while looking, and true before any of this
@@ -2328,3 +2519,93 @@ rather than a mean. A change that improves the average and keeps the hitch has
 not done the thing it was built to do.
 
 Only then does any of it become a commit.
+
+## The savestate format number (issue #115, decided with the user 2026-09-20)
+
+Split out of #111, where a savestate problem turned out to be a frontend and a
+core from different weeks. The state layout genuinely changed three times in the
+week of 2026-09-14 - the memory filesystem, the sandbox's delta format, and
+greenzone packing (`ChimeraHistory5`) - and nothing in a state said so. What a
+person saw was "core stopped", or a state that loaded into nonsense, or a
+corrupt-file error naming a file that was not corrupt.
+
+Three answers to one question now exist, weakest first. Only the third decides;
+the first two are for a person to read.
+
+### 1. The build dates, compared at open
+
+`ce_version_skew` holds this Chimera's commit date against the date the core
+package stamped into its own `waterbox.config` (`versionDate`, issue #67). More
+than a fortnight apart and the frontend says so, once, as an on-screen message
+naming both dates, both builds and what to do about it. It is a guess: it will
+sometimes fire when nothing is wrong, so it never refuses and never asks a
+question - an old pairing that works must keep working. Either side may not date
+itself (a package from before `versionDate`, a Chimera built outside a git
+checkout) and then nothing at all is said, because half a comparison is worse
+than none. The threshold and the wording are the engine's; the frontend finds
+the two dates and shows what comes back.
+
+### 2. What wrote each state, recorded
+
+Every state file the engine writes carries the build that wrote it
+(`ce_state_writer_id`, the engine's commit - which is the frontend's, since the
+two come out of one repository at one commit). A project records the same beside
+the format number it was last saved under, in its `StateFormat` and
+`StateWrittenBy` headers, so a whole cache can be explained at open rather than
+one refusal at a time.
+
+### 3. The format number, which is the one that decides
+
+`chimera::kStateFormat` in `source/engine/source/state_format.hpp`, currently
+**1**. It is the shape of a machine state as a build writes and reads it, and it
+is checked in three places:
+
+- **State files** (`ce_session_state_save_file` / `_load_file` - a TAStudio
+  branch's state). The header is `"CESTATE2"`, a u32 format, a u32 writer length
+  and the writer, then the compressed flag, the tag and the machine. A load that
+  meets another format returns 2 - the machine was never offered the state and is
+  untouched - with a sentence naming both formats and both builds.
+- **The greenzone history** (`history.bin`). The format rides in the history's
+  machine id, which already carries the sandbox's machine hash. A history of
+  another format does exactly what a history of another machine does: it is
+  dropped, quietly, and rebuilt by playing. That is the contract for losing a
+  cache - it costs recomputation, never work.
+- **Nothing else.** The zip-of-lumps container (`ChimeraState 1.0`) holds no
+  machine state any more: the greenzone cache zip keeps the lag log, the session
+  position, branch state FILE NAMES and screenshots, and the states themselves
+  are the engine's own files. There is nothing there for a format number to
+  guard.
+
+### States written before this change
+
+They have no format number. A state file written by an older build carries the
+old magic `"CESTATE1"` and is read as **format 1** - because 1 is what the layout
+was on the day the number arrived. So nothing in the wild is refused today: every
+state an older Chimera wrote still loads, and a same-build round trip is exactly
+what it was. The first real bump, to 2, is what starts refusing them, and it
+refuses them by name ("written by a build from before states said which").
+
+A `history.bin` written before this change has no format in its id and is dropped
+once, on the first open after it - one greenzone rebuilt by replaying, which is
+the same cost as opening the project on a new core build.
+
+### Keeping the number honest
+
+Forgetting to bump it is the failure mode, so it is made hard to do:
+
+- `kStateLayout` in `state_format.hpp` spells out every piece of framing the
+  number stands for, and it is BUILT FROM the magic strings the writers actually
+  write - they are defined in that header and used in `session.cpp` and
+  `state_history.cpp`. Renaming one moves the layout on its own.
+- `test_state_format` hashes `kStateLayout` and compares it with
+  `kStateLayoutDigest`. A layout change that leaves the number alone fails the
+  engine gate, and the failure prints the new digest and says what to do: bump
+  `kStateFormat`, paste the digest.
+- The same test checks miniBox's own magics (`ActivatedWaterboxHost_v1`,
+  `MiniBoxHostDelta_v1`, `MiniBoxDelta1`, `ActivatedMemoryBlock`) are still in
+  its sources, so a sandbox that RENAMES its format takes this number with it.
+
+What none of that catches: a sandbox change that alters the bytes without
+renaming any of its magics - miniBox's layout is miniBox's, and the engine
+cannot hash what it never sees. That case is a hand bump, and it is exactly the
+case the date heuristic exists for.

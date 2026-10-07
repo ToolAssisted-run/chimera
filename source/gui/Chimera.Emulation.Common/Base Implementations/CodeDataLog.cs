@@ -181,7 +181,6 @@ namespace Chimera.Emulation.Common
 			string id = br.ReadString();
 			SubType = id switch
 			{
-				"CHIMERA-CDL-1" => "PCE",
 				"CHIMERA-CDL-2" => br.ReadString().TrimEnd(' '),
 				_ => throw new InvalidOperationException("File is not a Chimera CDL file!"),
 			};

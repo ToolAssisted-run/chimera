@@ -23,7 +23,7 @@ namespace Chimera.Tests.Emulation.Common.Engine
 			File.WriteAllText(Path.Combine(_dir, "extra.img"), "more floppy bytes");
 		}
 
-		[ClassCleanup]
+		[ClassCleanup(ClassCleanupBehavior.EndOfClass)]
 		public static void RemovePlayground() => Directory.Delete(_dir, recursive: true);
 
 		[TestMethod]
@@ -92,11 +92,11 @@ namespace Chimera.Tests.Emulation.Common.Engine
 		public void TheEngineRulesSurfaceAsExceptionsWithReasons()
 		{
 			using var p = EngineProject.New();
-			var refused = Assert.ThrowsException<InvalidOperationException>(
+			var refused = Assert.ThrowsExactly<InvalidOperationException>(
 				() => p.FileAdd("a/b.img", "floppy", Path.Combine(_dir, "game.img")));
 			StringAssert.Contains(refused.Message, "bare");
-			Assert.ThrowsException<InvalidOperationException>(() => p.SetSettingsJson("[]"));
-			Assert.ThrowsException<InvalidOperationException>(
+			Assert.ThrowsExactly<InvalidOperationException>(() => p.SetSettingsJson("[]"));
+			Assert.ThrowsExactly<InvalidOperationException>(
 				() => EngineProject.Open(Path.Combine(_dir, "does-not-exist.chimeraProject")));
 		}
 

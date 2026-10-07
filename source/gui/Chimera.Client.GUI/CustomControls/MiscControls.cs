@@ -1,6 +1,8 @@
 ﻿using System.Drawing;
 using System.Windows.Forms;
 
+using Chimera.Client.Common;
+
 namespace Chimera.Client.GUI
 {
 	public class HorizontalLine : Control
@@ -18,7 +20,7 @@ namespace Chimera.Client.GUI
 
 	public class CustomCheckBox : CheckBox
 	{
-		private Color _checkBackColor = SystemColors.Control;
+		private Color _checkBackColor = ThemeEngine.Color(ThemeColorRole.WindowBackground);
 		public Color CheckBackColor
 		{
 			get => _checkBackColor;
@@ -56,7 +58,7 @@ namespace Chimera.Client.GUI
 			{
 				glyphLoc.Y--;
 				glyphLoc.X++;
-				ControlPaint.DrawMenuGlyph(pevent.Graphics, glyphLoc, MenuGlyph.Checkmark, Color.Black, Color.Transparent);
+				ControlPaint.DrawMenuGlyph(pevent.Graphics, glyphLoc, MenuGlyph.Checkmark, ThemeEngine.Color(ThemeColorRole.GlyphForeground), Color.Transparent);
 			}
 
 			// draw a border on top of it all

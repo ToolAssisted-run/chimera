@@ -183,7 +183,8 @@ namespace Chimera.Client.GUI
 		private static int SubMain(string[] args)
 		{
 			// raw scan, not ArgParser: several dialogs below can fire before arguments are parsed
-			if (Array.IndexOf(args, "--headless") >= 0 || Array.Exists(args, a => a.StartsWith("--precompile", StringComparison.Ordinal))) HeadlessMode.Enabled = true;
+			if (Array.IndexOf(args, "--headless") >= 0 || Array.IndexOf(args, "--suggest-settings") >= 0 || Array.IndexOf(args, "--import-movie") >= 0
+				|| Array.Exists(args, a => a.StartsWith("--precompile", StringComparison.Ordinal))) HeadlessMode.Enabled = true;
 
 			// An error that can be caught must not be what ends a session (docs/project.md,
 			// "Recovery"). On the UI thread it is survived: the work is snapshotted, emulation
@@ -261,6 +262,63 @@ namespace Chimera.Client.GUI
 				Console.Error.WriteLine($"[crash] no crash notes this session: {crashNotesOff}");
 			}
 
+			// --suggest-settings <package> <game>: what the core would choose for this
+			// game, printed as its JSON, and nothing else - no window, no config. The
+			// new-project wizard asks this in a child process, so a core that falls
+			// over while it looks never takes the wizard with it.
+			var suggestAt = Array.IndexOf(args, "--suggest-settings");
+			if (suggestAt >= 0)
+			{
+				if (suggestAt + 2 >= args.Length)
+				{
+					Console.Error.WriteLine("usage: --suggest-settings <core package> <game file>");
+					return 2;
+				}
+				try
+				{
+					Console.Out.Write(Chimera.Emulation.Common.Engine.EngineSession.Suggest(args[suggestAt + 1], args[suggestAt + 2]));
+					Console.Out.Flush();
+					return 0;
+				}
+				catch (InvalidOperationException e)
+				{
+					Console.Error.WriteLine(e.Message);
+					return 1;
+				}
+			}
+
+			// --import-movie <request.json> <answer.json>: what a movie made elsewhere
+			// amounts to, as its core reads it (ce_import_movie). The request names
+			// the package, the movie, the files to mount beside it and the import
+			// options; the core's answer is written to the answer file whole, never
+			// to stdout, where a core's own printing could land in the middle of it.
+			// A child process for the same reason the suggestion is one: a core that
+			// falls over while it reads must not take the frontend with it.
+			var importAt = Array.IndexOf(args, "--import-movie");
+			if (importAt >= 0)
+			{
+				if (importAt + 2 >= args.Length)
+				{
+					Console.Error.WriteLine("usage: --import-movie <request.json> <answer.json>");
+					return 2;
+				}
+				try
+				{
+					var request = Chimera.Client.Common.MovieImportRequest.Read(args[importAt + 1]);
+					var answer = Chimera.Emulation.Common.Engine.EngineSession.ImportMovie(
+						request.Package, request.Movie,
+						request.Files.Select(static f => (f.Name, f.Path)).ToList(),
+						request.SettingsJson);
+					File.WriteAllText(args[importAt + 2], answer, new System.Text.UTF8Encoding(false));
+					return 0;
+				}
+				catch (Exception e) when (e is InvalidOperationException or IOException or Newtonsoft.Json.JsonException)
+				{
+					Console.Error.WriteLine(e.Message);
+					return 1;
+				}
+			}
+
 			TempFileManager.Start();
 
 			ChimeraFile.DearchivalMethod = SharpCompressDearchivalMethod.Instance;
@@ -292,6 +350,10 @@ namespace Chimera.Client.GUI
 				CoreFirmwareStore.ParseFirmwareArgs(cliFlags.cmdFirmware);
 
 			var configPath = cliFlags.cmdConfigFile ?? Path.Combine(PathUtils.ExeDirectoryPath, "config.ini");
+			// asked BEFORE anything can write one: a config that already exists was
+			// written by somebody who has been using Chimera, and the theme they are
+			// used to is the one they keep (Config.ResolveTheme)
+			var configExisted = File.Exists(configPath);
 
 			Config initialConfig;
 			try
@@ -318,6 +380,12 @@ namespace Chimera.Client.GUI
 			// the last session is carried out now for the same reason - nothing holds a state
 			// history, a package or a journal open yet, so nothing has to be closed to move it.
 			SettleDataDirectory(initialConfig, configPath);
+
+			// ...and only then the theme, which is read from a folder under that
+			// directory. Before any window exists, so the first one comes up in the
+			// right colours rather than repainting in front of the user.
+			initialConfig.ResolveTheme(configExisted);
+			ThemeLibrary.Select(initialConfig.Theme);
 
 			// must be done VERY early, before any SDL_Init calls can be done
 			// if this isn't done, SIGINT/SIGTERM get swallowed by SDL
@@ -438,6 +506,10 @@ namespace Chimera.Client.GUI
 				{
 					initialConfig = ConfigService.Load<Config>(iniPath);
 					initialConfig.ResolveDefaults();
+					// a config somebody is loading from a file is one that already
+					// existed, so an old one keeps the light theme rather than
+					// turning the window dark as it is read
+					initialConfig.ResolveTheme(configExisted: true);
 					// ReSharper disable once AccessToDisposedClosure
 					mf.Config = initialConfig;
 				};

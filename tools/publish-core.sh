@@ -7,7 +7,7 @@
 # Two kinds of release, the same two the frontend publishes (see release.yml):
 #
 #   dev      a ROLLING prerelease, replaced on every green push to main.
-#   nightly  an IMMUTABLE dated prerelease, nightly-YYYY-MM-DD, published only
+#   nightly  an IMMUTABLE dated release (the newest is GitHub's Latest), published only
 #            when main moved. NEVER deleted: a movie cites the core build that
 #            recorded it, and someone replaying that run in five years needs
 #            THAT package, because a package's identity is a function of its
@@ -127,11 +127,22 @@ retry() {
 	done
 	return 1
 }
+# A dated nightly is a full release and the one GitHub shows as Latest; the
+# rolling dev build is a pre-release and never Latest (user-decided,
+# 2026-09-25). The index release is made elsewhere and stays a pre-release.
+release_kind_flags() {
+	case "$1" in
+		nightly-*) echo "--latest" ;;
+		*) echo "--prerelease --latest=false" ;;
+	esac
+}
+
 ensure_release() { # <tag> <title>
 	local n
 	for n in 1 2 3 4; do
 		gh release view "$1" >/dev/null 2>&1 && return 0
-		gh release create "$1" --target "$sha" --prerelease --title "$2" --notes-file "$notes" && return 0
+		# shellcheck disable=SC2046
+		gh release create "$1" --target "$sha" $(release_kind_flags "$1") --title "$2" --notes-file "$notes" && return 0
 		[ "$n" -lt 4 ] && { echo "retrying in $((n * 15))s: release $1" >&2; sleep $((n * 15)); }
 	done
 	return 1

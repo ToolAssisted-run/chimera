@@ -24,11 +24,30 @@ namespace Chimera.Client.GUI
 	{
 		public string CoreName { get; private init; } = "";
 
+		/// <summary>The package to open on, when it has to be that build and not merely that core; null for any.</summary>
+		public string? CorePath { get; private init; }
+
 		/// <summary>The sync settings, as the flat JSON object the engine takes.</summary>
 		public string SettingsJson { get; private init; } = "{}";
 
 		/// <summary>Slot id and path, in the order the project holds them.</summary>
 		public IReadOnlyList<(string Slot, string Path)> Files { get; private init; } = [ ];
+
+		/// <summary>
+		/// Firmware already chosen, by requirement id - the IWAD a movie import was
+		/// given. The wizard takes each as if it had been picked on its firmware
+		/// page: an exact match, or for a game core a file of the project's own.
+		/// </summary>
+		public IReadOnlyList<(string Id, string Path)> Firmware { get; private init; } = [ ];
+
+		/// <summary>Answers from elsewhere than a project - a movie the core has read (MovieImportAnswer).</summary>
+		public static ProjectAnswers For(
+			string coreName,
+			string? corePath,
+			string settingsJson,
+			IReadOnlyList<(string Slot, string Path)> files,
+			IReadOnlyList<(string Id, string Path)>? firmware = null)
+			=> new() { CoreName = coreName, CorePath = corePath, SettingsJson = settingsJson, Files = files, Firmware = firmware ?? [ ] };
 
 		/// <summary>Reads a project's answers out of it, copying everything it needs.</summary>
 		public static ProjectAnswers Of(EngineProject project)

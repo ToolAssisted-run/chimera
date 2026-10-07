@@ -11,7 +11,7 @@ namespace Chimera.Client.Common
 {
 	internal sealed partial class TasMovie : MovieBase, ITasMovie
 	{
-		public new const string Extension = "chimeraProject";
+		public const string Extension = "chimeraProject";
 		private IInputPollable _inputPollable;
 
 		public const double CurrentVersion = 1.1;
@@ -64,6 +64,8 @@ namespace Chimera.Client.Common
 				budgets.MaxNearStride ?? Session.Settings.GreenzoneMaxNearStride,
 				MovieConfig.MinimumNearStride), MovieConfig.MaximumNearStride));
 			States.Enable((long)memoryMb * 1024 * 1024);
+			// a machine attached while the greenzone is sparse or off stays so
+			if (_greenzonePeriod != 1) States.SetCapturePeriod(_greenzonePeriod);
 			// Read here and not with the rest of the cache, because until the
 			// emulator arrives there is nowhere to put it.
 			//
@@ -81,10 +83,15 @@ namespace Chimera.Client.Common
 			// core must be one whose greenzone has been shown to reload correctly
 			// (see GreenzoneMayOutliveSession), and the session that wrote this one
 			// must have finished.
-			if (GreenzoneMayOutliveSession && ProjectRecovery.LastSessionEndedCleanly(Project.Id))
+			//
+			// And never on a machine that replaces one this movie was already running
+			// on (MachineIsGoing): the file holds the states of the SAVED inputs, and
+			// the movie in hand may have been edited since.
+			if (!_machineReplaced && GreenzoneMayOutliveSession && ProjectRecovery.LastSessionEndedCleanly(Project.Id))
 			{
 				States.Load(StateHistoryFilename, MachineIdentityOf(Project));
 			}
+			_machineReplaced = false;
 			RefreshPins();
 
 			base.Attach(emulator);
@@ -117,6 +124,19 @@ namespace Chimera.Client.Common
 
 		public TasLagLog LagLog { get; } = new TasLagLog();
 
+		/// <summary>
+		/// A game core's own timer (IGameProperties.GameTimeMs) after each frame the machine
+		/// ran, forgotten past an edit as the lag log is: what the project's GameTime headers
+		/// are written from.
+		/// </summary>
+		public SortedList<int, long> GameTimeLog { get; } = new();
+
+		private void GameTimeForgetAfter(int frame)
+		{
+			while (GameTimeLog.Count is not 0 && GameTimeLog.Keys[GameTimeLog.Count - 1] > frame)
+				GameTimeLog.RemoveAt(GameTimeLog.Count - 1);
+		}
+
 		public override string PreferredExtension => Extension;
 		/// <summary>
 		/// Where the machine has been. Held by the engine, and this is the remote
@@ -124,6 +144,70 @@ namespace Chimera.Client.Common
 		/// because a second copy is a second thing to keep true.
 		/// </summary>
 		public IStateHistory States { get; private set; }
+
+		private bool _machineReplaced;
+
+		/// <summary>
+		/// The machine this movie is running on is about to be destroyed and another
+		/// booted in its place - Reboot Core inside a project (issue #196). The movie
+		/// stays: its inputs, markers, branches and unsaved edits are the project.
+		/// What goes with the machine is the history of where it has been, which the
+		/// engine held for it; until <see cref="Attach"/> hands over the next
+		/// machine's, a question about stored states is answered "none" here rather
+		/// than asked of a session that no longer exists (a piano roll repainting in
+		/// the middle of the reboot asks exactly that, and the engine does not
+		/// survive being asked).
+		/// </summary>
+		public void MachineIsGoing()
+		{
+			States = NoStates.Instance;
+			_machineReplaced = true;
+		}
+
+		/// <summary>The history of a machine that is not there: holds nothing, keeps nothing.</summary>
+		private sealed class NoStates : IStateHistory
+		{
+			public static readonly NoStates Instance = new();
+
+			public void Enable(long budgetBytes) {}
+			public void MaxNearStride(int stride) {}
+			public void SetCapturePeriod(int period) {}
+			public long Count => 0;
+			public int Nearest(int frame) => -1;
+			public bool Has(int frame) => false;
+			public void BeforeAdvance() {}
+			public void Capture(int frame) {}
+			public bool RestoreTo(int frame) => false;
+			public void InvalidateAfter(int afterFrame) {}
+			public bool Save(string path, string machineId) => false;
+			public bool SaveLater(string path, string machineId) => false;
+			public bool SavePending => false;
+			public bool SaveWait() => true;
+			public bool Load(string path, string machineId) => false;
+			public void Pin(int frame, bool pinned) {}
+			public void UnpinAll() {}
+		}
+
+		private int _greenzonePeriod = 1;
+
+		/// <remarks>
+		/// Saved with the project, in TAStudio's part of it (issue #158, user-decided
+		/// 2026-09-28): a project reopens storing what it was left storing. It used to
+		/// open on every frame whatever it was saved with. The engine does the work of
+		/// it, including the whole state stored on turning it on
+		/// (IStateHistory.SetCapturePeriod).
+		/// </remarks>
+		public int GreenzonePeriod
+		{
+			get => _greenzonePeriod;
+			set
+			{
+				if (value < 0) value = 0;
+				if (value == _greenzonePeriod) return;
+				_greenzonePeriod = value;
+				States?.SetCapturePeriod(value);
+			}
+		}
 
 		public Action<int> GreenzoneInvalidated { get; set; }
 
@@ -218,6 +302,7 @@ namespace Chimera.Client.Common
 			}
 
 			LagLog.RemoveFrom(frame);
+			GameTimeForgetAfter(frame);
 			// asked before the drop, because afterwards there is nothing to see
 			var anyStateInvalidated = States.Nearest(int.MaxValue) > frame;
 			States.InvalidateAfter(frame);
@@ -300,6 +385,8 @@ namespace Chimera.Client.Common
 		public void GreenzoneCurrentFrame()
 		{
 			LagLog[Emulator.Frame] = _inputPollable.IsLagFrame;
+			if (Emulator.ServiceProvider.GetService<IGameProperties>()?.GameTimeMs is long gameMs)
+				GameTimeLog[Emulator.Frame] = gameMs;
 
 			// Every frame, unconditionally: the engine decides what a frame near
 			// the playhead costs to keep and what it costs once the playhead has
@@ -439,6 +526,7 @@ namespace Chimera.Client.Common
 			if (timelineBranchFrame.HasValue)
 			{
 				LagLog.RemoveFrom(timelineBranchFrame.Value);
+				GameTimeForgetAfter(timelineBranchFrame.Value);
 				States.InvalidateAfter(timelineBranchFrame.Value);
 				GreenzoneInvalidated?.Invoke(timelineBranchFrame.Value);
 			}

@@ -12,7 +12,7 @@ namespace Chimera.Tests.Client.Common.CorePackages
 	[TestClass]
 	public class PackageKeybindsTests
 	{
-		private string _dir;
+		private string _dir = "";
 
 		[TestInitialize]
 		public void Setup()
@@ -60,7 +60,9 @@ namespace Chimera.Tests.Client.Common.CorePackages
 				}
 			}
 			""");
-			var bind = PackageKeybinds.Read(_dir).AllTrollersAnalog["NES Controller"]["P2 Paddle"];
+			var keybinds = PackageKeybinds.Read(_dir);
+			Assert.IsNotNull(keybinds, "the package this test wrote was not read back");
+			var bind = keybinds.AllTrollersAnalog["NES Controller"]["P2 Paddle"];
 			Assert.AreEqual("WMouse X", bind.Value);
 			Assert.AreEqual(1.0f, bind.Mult);
 		}
@@ -84,7 +86,9 @@ namespace Chimera.Tests.Client.Common.CorePackages
 				"AllTrollers": { "Synth Controller": { "P1 A": "X" } }
 			}
 			""");
-			Assert.AreEqual("X", PackageKeybinds.Read(_dir).AllTrollers["Synth Controller"]["P1 A"]);
+			var keybinds = PackageKeybinds.Read(_dir);
+			Assert.IsNotNull(keybinds, "the package this test wrote was not read back");
+			Assert.AreEqual("X", keybinds.AllTrollers["Synth Controller"]["P1 A"]);
 		}
 
 		[TestMethod]

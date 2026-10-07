@@ -30,22 +30,7 @@ namespace Chimera.Tests.Client.GUI
 		private static string ShotDir
 			=> Environment.GetEnvironmentVariable("CHIMERA_UI_SHOTS");
 
-		private static void Shoot(Form form, string name)
-		{
-			var dir = ShotDir;
-			form.Show();
-			form.Refresh();
-			Application.DoEvents();
-			using Bitmap bmp = new(form.Width, form.Height);
-			using (var g = Graphics.FromImage(bmp))
-			{
-				// the window is real and on a (headless) screen, so grab it from there:
-				// DrawToBitmap skips the non-client area and mis-renders ListViews on Mono
-				g.CopyFromScreen(form.Location, Point.Empty, form.Size);
-			}
-			Directory.CreateDirectory(dir);
-			bmp.Save(Path.Combine(dir, $"{name}.png"), ImageFormat.Png);
-		}
+		private static void Shoot(Form form, string name) => UiShots.Shoot(form, name);
 
 		/// <summary>
 		/// The About window: it says what this build is, and nothing else. Worth a
@@ -54,12 +39,65 @@ namespace Chimera.Tests.Client.GUI
 		[TestMethod]
 		public void AboutWindow()
 		{
-			if (ShotDir is null) { Assert.Inconclusive("set CHIMERA_UI_SHOTS to write screenshots"); return; }
-
 			using AboutBox form = new();
 			form.StartPosition = FormStartPosition.Manual;
 			form.Location = new Point(0, 0);
 			Shoot(form, "about");
+		}
+
+		/// <summary>
+		/// The firmware survey, which is the one list in the frontend that uses
+		/// GROUPS - and group headers are drawn by the toolkit even when the rest
+		/// of the list has been taken over for theming, which is a claim worth
+		/// having a picture of rather than a comment about.
+		/// </summary>
+		[TestMethod]
+		public void FirmwareSurveyWindow()
+		{
+			FirmwareSurveyRow Row(string core, string id, string? label, CoreFirmwareState state, string? path)
+				=> new()
+				{
+					CoreName = core,
+					Decl = new() { Id = id, Display = "Console BIOS", Label = label, Size = 4096, Sha1 = "57FE1BDEE955BB48D357E463CCBF129496930B62" },
+					State = state,
+					Path = path,
+					Where = path is null ? FirmwareWhere.Nowhere : FirmwareWhere.Chosen,
+				};
+
+			List<FirmwareSurveyGroup> groups =
+			[
+				new()
+				{
+					CoreName = "PCSX2",
+					Rows =
+					[
+						Row("PCSX2", "bios.bin", "USA v2.20", CoreFirmwareState.Good, "/dumps/ps2-usa.bin"),
+						Row("PCSX2", "bios.bin", "Europe v2.30", CoreFirmwareState.Unrecognised, "/dumps/ps2-eur.bin"),
+						Row("PCSX2", "bios.bin", "Japan v1.60", CoreFirmwareState.Missing, null),
+					],
+				},
+				new()
+				{
+					CoreName = "xemu",
+					Rows =
+					[
+						Row("xemu", "mcpx", null, CoreFirmwareState.Good, "/dumps/mcpx_1.0.bin"),
+						Row("xemu", "hdd", null, CoreFirmwareState.Missing, null),
+					],
+				},
+				new() { CoreName = "Stella", Rows = [ ] },
+			];
+
+			using FirmwareSurveyForm form = new(() => groups, (_, _) => { }, static _ => null);
+			form.StartPosition = FormStartPosition.Manual;
+			form.Location = new(0, 0);
+			form.Show();
+			foreach (var list in form.Controls.OfType<ListView>())
+			{
+				list.HideSelection = false;
+				if (list.Items.Count > 1) list.Items[1].Selected = true;
+			}
+			Shoot(form, "firmware-survey");
 		}
 
 		/// <summary>
@@ -71,9 +109,7 @@ namespace Chimera.Tests.Client.GUI
 		[TestMethod]
 		public void FirmwareWindow()
 		{
-			if (ShotDir is null) { Assert.Inconclusive("set CHIMERA_UI_SHOTS to write screenshots"); return; }
-
-			CoreFirmwareEntry Entry(string core, string id, string display, string description, CoreFirmwareState state, string path, bool required = true)
+			CoreFirmwareEntry Entry(string core, string id, string display, string description, CoreFirmwareState state, string? path, bool required = true)
 				=> new()
 				{
 					CoreName = core,
@@ -127,8 +163,6 @@ namespace Chimera.Tests.Client.GUI
 		[TestMethod]
 		public void CoreManagerWindow()
 		{
-			if (ShotDir is null) { Assert.Inconclusive("set CHIMERA_UI_SHOTS to write screenshots"); return; }
-
 			List<RosterCore> roster =
 			[
 				new() { Id = "gpgx", Name = "Genesis Plus GX", Repo = "ToolAssisted-run/chimera-core-gpgx", Systems = [ "GEN", "SMS", "GG", "SG" ] },
@@ -136,12 +170,14 @@ namespace Chimera.Tests.Client.GUI
 				new() { Id = "pcsx2", Name = "PCSX2", Repo = "ToolAssisted-run/chimera-core-pcsx2", Systems = [ "PS2" ] },
 				new() { Id = "eka2l1", Name = "EKA2L1", Repo = "ToolAssisted-run/chimera-core-eka2l1", Systems = [ "SYMBIAN" ] },
 			];
+			roster.Add(new() { Id = "sdlpop", Name = "SDLPoP", Repo = "ToolAssisted-run/chimera-core-sdlpop", Systems = [ "PrinceOfPersia" ], Kind = "game" });
 			roster.Add(new() { Id = "aardvark", Name = "Aardvark", Repo = "someone/chimera-core-aardvark", Systems = [ "ARC" ], IsExternal = true });
 			List<DiscoveredCorePackage> installed =
 			[
 				new() { Name = "Genesis Plus GX", Version = "4ed3532117ad", Path = "/store/gpgx-4ed3532117ad.chimeraCore", Sha1 = new string('a', 40), Systems = [ "GEN" ] },
 				new() { Name = "quickerNES", Version = "12d65377b7d3-dirty+local", Path = "/store/quickernes-12d65377b7d3.chimeraCore", Sha1 = new string('b', 40), Systems = [ "NES" ] },
 				new() { Name = "Aardvark", Version = "aa11bb22cc33", Path = "/store/aardvark-aa11bb22cc33.chimeraCore", Sha1 = new string('c', 40), Systems = [ "ARC" ] },
+				new() { Name = "SDLPoP", Version = "64a73959daa9", Path = "/store/sdlpop-64a73959daa9.chimeraCore", Sha1 = new string('d', 40), Systems = [ "PrinceOfPersia" ], IsGameCore = true },
 			];
 
 			// a canned feed, so the picture shows the window with versions in it
@@ -167,6 +203,25 @@ namespace Chimera.Tests.Client.GUI
 			Shoot(form, "core-manager");
 		}
 
+		/// <summary>Core Manager &gt; Systems...: every system, its id and the cores that run it (#172).</summary>
+		[TestMethod]
+		public void SupportedSystemsWindow()
+		{
+			var systems = SupportedSystems.From(new (string, IReadOnlyList<(string Id, string Name)>, bool)[]
+			{
+				("Genesis Plus GX", [ ("GEN", "Mega Drive / Genesis"), ("SMS", "Master System"), ("GG", "Game Gear"), ("SG", "SG-1000") ], true),
+				("ares", [ ("GEN", "Mega Drive / Genesis"), ("SMS", "Master System"), ("GG", "Game Gear"), ("SG", "SG-1000"), ("PS1", "PlayStation"),
+					("WS", "WonderSwan"), ("WSC", "WonderSwan Color"), ("NES", "Nintendo Entertainment System"), ("SFC", "Super Famicom / SNES"), ("N64", "Nintendo 64") ], false),
+				("quickerNES", [ ("NES", "Nintendo Entertainment System") ], true),
+				("PCSX2", [ ("PS2", "PlayStation 2") ], true),
+			});
+			using SupportedSystemsForm form = new(systems);
+			form.StartPosition = FormStartPosition.Manual;
+			form.Location = new Point(0, 0);
+			form.Show();
+			Shoot(form, "supported-systems");
+		}
+
 		/// <summary>
 		/// File &gt; Cache Manager: what is on disk that could be worked out again.
 		/// Every row is safe to delete, so the picture is mostly about whether the
@@ -175,7 +230,6 @@ namespace Chimera.Tests.Client.GUI
 		[TestMethod]
 		public void CacheManager()
 		{
-			if (ShotDir is null) { Assert.Inconclusive("set CHIMERA_UI_SHOTS to write screenshots"); return; }
 			var items = new List<CacheItem>
 			{
 				new() { Kind = CacheKind.Project, Label = "Prince of Persia The Sands of Time", Detail = "9f2c14ab7d3e5501", System = "XBOX", Core = "xemu", Games = new[] { "Prince of Persia The Sands of Time.iso" }, ProjectPath = @"D:\TAS\projects\xbox\Prince of Persia.chimeraProject", Path = @"C:\Users\you\AppData\Local\Chimera\Projects\9f2c14ab7d3e5501", Bytes = 2_684_354_560L, LastUsed = new DateTime(2026, 9, 7, 18, 42, 0) },
@@ -204,8 +258,6 @@ namespace Chimera.Tests.Client.GUI
 		[TestMethod]
 		public void NoCoresPrompt()
 		{
-			if (ShotDir is null) { Assert.Inconclusive("set CHIMERA_UI_SHOTS to write screenshots"); return; }
-
 			using CoreManagerPrompt form = new();
 			form.StartPosition = FormStartPosition.Manual;
 			form.Location = new Point(0, 0);

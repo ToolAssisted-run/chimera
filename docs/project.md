@@ -28,6 +28,15 @@ themselves, which are named by their SHA1:
   asked once rather than at every open. The Chimera version is rewritten by
   every save the same way, with the one that created the project kept beside it
   (`OriginalEmuVersion`).
+- **What the cached states are** (issue #115): `StateFormat`, the savestate
+  format number the engine was on when this project was last saved, and
+  `StateWrittenBy`, the build that wrote them. Read at the next open: when the
+  number has moved, the person is told once that those states cannot be loaded
+  and why, instead of finding out one refused branch at a time. The engine still
+  checks every state file for itself - this is the same news, said earlier and
+  about the whole cache (docs/state-manager.md, "The savestate format number").
+  A project saved before these existed says nothing, and silence is not a
+  disagreement.
 - **File manifest**: names + SHA1 + the core-defined slot id each file
   fills (cdrom, floppy, hdd, config, ...), order within a slot = swap
   order, cue-referenced bins auto-added as support, cue closure enforced.
@@ -151,6 +160,47 @@ copies of one binary, and since a package registers its core by name, four
 packages all called "Genesis Plus GX" meant three were silently dropped when
 all four were installed.
 
+### Configuration presets
+
+A core may suggest whole machines: "1981 IBM PC/XT 5150", "Windows 98 with a
+Voodoo 2". These are declared in `waterbox.config` beside the settings, and the
+settings page offers them in a selector above the grid with an Apply button -
+absent entirely, not disabled and not empty, for a core that suggests nothing.
+
+```json
+"presets": [
+  { "id": "xt_1981", "label": "1981 IBM PC/XT 5150",
+    "description": "an 8088 at 4.77 MHz, CGA, no sound card",
+    "when": ["ibm"],
+    "values": { "cputype": "8086", "cycles": 315, "memsize": 1, "sbtype": "none" } }
+]
+```
+
+- `when` gates the preset by machine, exactly as a setting's `when` does, so a
+  PC-98 is not offered an IBM PC's machine.
+- `values` is a setting name to value map. Names are coerced through the
+  setting's own declaration, so a value written by hand cannot put a string
+  where the core declared an int; a name the chosen machine does not have is
+  ignored and NAMED on the status line, because a core that misdeclares a
+  preset should not do it quietly.
+- The machine setting and the renderer are not a preset's to move: both are
+  asked on page one, and changing the machine changes which files the project
+  takes.
+
+**Apply WRITES the values into the settings, and then the preset is finished
+with.** Nothing about it is stored: the project pins the resolved values and
+the movie cites them, exactly as if each had been typed in by hand, and every
+one of them is sitting in the grid where it can be read and changed afterwards.
+
+This is the whole point, and it is a correction. DOSBox-X shipped the other
+design: a "Configuration Preset" SETTING that the core resolved for itself at
+boot by appending a `.conf` file AFTER everything the user had chosen, so the
+preset silently won. Seven settings then had to describe themselves as "Auto
+uses the configuration preset's default" - the grid no longer said what the
+machine would be - and a movie recorded a preset NAME whose meaning the next
+core build could change under it. A preset is a starting point somebody else
+has already got working, not a layer that outranks the user.
+
 ### The firmware decision tree
 
 A firmware entry in waterbox.config may carry "requiredWhen", a
@@ -199,15 +249,20 @@ question asked of every installed core at once, before any project: it
 surveys the packages present, says what the folder already answers, and
 takes a file for the rest - remembered where it lives, never copied. A per-item Select File button
 covers what the folder could not - allowed even when something was
-found - and only the exact file satisfies. Create stays DISABLED until
-every requirement is satisfied.
+found - and only the exact file satisfies, except for a game core, whose
+firmware may be a file of the project's own (docs/game-cores.md): that is
+taken, said to be the project's own, and its hash is the pin. Create stays
+DISABLED until every requirement is satisfied.
 
 The project records the chosen files as pins ("firmware": [{"id",
 "sha1"}]), actual hashes as always; the frontend remembers paths
 per-user in its config, never in the project. REOPENING is stricter
 than creation: each pin must be matched exactly, by hash, from the
 Firmware folder or the remembered paths - whichever file matches is
-what the session mounts - and a pin nothing satisfies takes a severe
+what the session mounts, even when the pin is not the declared hash and
+the declared dump is also on hand (2026-09-29: until then the declared
+dump won, and a game core's project booted on the original instead of its
+own file) - and a pin nothing satisfies takes a severe
 are-you-sure (different firmware is a different machine: expect
 desync) to get past. "Plausible" is by size alone, and the bar is a
 gigabyte: a PS3 system software update is 206 MB and is firmware, and
@@ -256,6 +311,13 @@ to build the form, and by `ce_project_*` to validate a manifest:
   floppy or a hard disk - the user's slot choice resolves what
   sniffing had to guess).
 - `help`: the circled-question-mark tooltip text.
+- `namePattern` / `nameHelp` (optional): a regular expression the FILE
+  NAME must match, for a slot whose files the core reads by name (a
+  Dreamcast's memory cards are `vmu_A1.bin`..`vmu_D1.bin` and nothing
+  else). The wizard refuses a file that does not match when it is
+  picked, saying `nameHelp` (or `help`), instead of the core refusing
+  the whole project at boot. The engine does not enforce it: the core
+  still says no at load, which is what a hand-written project meets.
 - `exposedWhen` (optional): the condition language above, evaluated over
   the CURRENT slot map (settings do not take part - the files come
   first in the wizard). The form re-evaluates after every add and
@@ -269,6 +331,33 @@ to build the form, and by `ce_project_*` to validate a manifest:
 - `support` is a reserved id: files referenced by a listed cue are
   auto-added to the manifest with slot `support`; a core never declares
   it.
+
+### Importing a movie
+
+A core may read movies made elsewhere - a Doom demo - and say what
+project they make. It declares `movieImport` in its `waterbox.config`,
+and the frontend renders the import dialog from it, the way it renders
+settings:
+
+- `menu`: the item in the core's Game menu ("Import Demo (LMP)...");
+- `movie`: its label and extensions; it is always mounted as `movie`;
+- `files`: the other files the importer reads, each mounted under its own
+  name. `option` carries that name - a `multiple` input's names joined by
+  `separator` in the user's order, and left out when none are picked.
+  `firmware` marks a file that becomes the project's firmware, `slot` the
+  slot its files go in, and `required` one that must be given;
+- `options`: bool settings, sent only when ticked.
+
+The core's `ImportMovie` export answers instead of `Init`
+(`ce_import_movie`): a refusal is one sentence, shown in the dialog with
+everything still picked so a missing file can be added. An answer only
+SUGGESTS: the machine, the settings, the firmware and the files in load
+order, plus notes for the user and the movie as an input log. The New
+Project wizard then opens on those answers - with the firmware the dialog
+was given already chosen, whichever release it is (a game core's firmware
+may be a file of the project's own) - the project it creates gets the
+input log, the user chooses where it is written, and it opens. Nothing about an imported project is built outside the wizard, so
+it cannot drift from one made by hand.
 
 ## Editing
 
@@ -333,6 +422,15 @@ Core pin mismatch (the pinned build is not installed, and another build of the
 core is): refuse by default with a clear pinned-vs-installed message,
 with a knowing override - and the project then records what actually ran,
 mirroring the file-hash posture.
+
+Build skew (issue #115): once the core is running, the date this Chimera was
+built on is held against the date the core package says it was built on
+(`versionDate`, issue #67). More than a fortnight apart and an on-screen message
+names both dates, both builds and what to do. It is a heuristic and nothing
+more: it never refuses, never asks, and says nothing at all when either side
+does not date itself. What actually decides whether a state can be read is the
+savestate format number, checked state by state in the engine
+(docs/state-manager.md).
 
 Opening boots the machine EXACTLY ONCE. The movie (which is the project)
 is queued before the rom load, so the single boot already runs with the

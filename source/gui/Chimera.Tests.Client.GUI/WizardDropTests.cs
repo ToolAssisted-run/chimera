@@ -33,11 +33,11 @@ namespace Chimera.Tests.Client.GUI
 			return new DiscoveredCorePackage { Name = name, Path = $"/cores/{name}.chimeraCore", Extensions = map };
 		}
 
-		private static NewProjectWizard MakeForm(IReadOnlyList<DiscoveredCorePackage> cores = null)
+		private static NewProjectWizard MakeForm(IReadOnlyList<DiscoveredCorePackage>? cores = null)
 		{
 			NewProjectWizard form = new(cores ?? [ ], static _ => [ ]);
 			form.Show();
-			form.UseDeclaration(ProjectSlotDeclaration.Parse(Declaration));
+			form.UseDeclaration(TestPackages.Slots(Declaration));
 			return form;
 		}
 

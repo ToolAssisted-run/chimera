@@ -36,7 +36,7 @@ namespace Chimera.Emulation.Common.Waterbox
 		/// draw - which is correct, since no core is loaded to draw it for.
 		/// </summary>
 		[JsonIgnore]
-		public IReadOnlyList<WaterboxConfig.SettingDecl> Declarations { get; set; }
+		public IReadOnlyList<WaterboxConfig.SettingDecl>? Declarations { get; set; }
 
 		/// <summary>True if <paramref name="other"/> holds the same values.</summary>
 		public bool ValuesEqual(WaterboxSettingsBase other)
@@ -75,7 +75,7 @@ namespace Chimera.Emulation.Common.Waterbox
 
 		public EventDescriptor GetDefaultEvent() => TypeDescriptor.GetDefaultEvent(GetType(), noCustomTypeDesc: true);
 
-		public PropertyDescriptor GetDefaultProperty() => null;
+		public PropertyDescriptor? GetDefaultProperty() => null;
 
 		public object GetEditor(Type editorBaseType) => TypeDescriptor.GetEditor(GetType(), editorBaseType, noCustomTypeDesc: true);
 
@@ -87,7 +87,7 @@ namespace Chimera.Emulation.Common.Waterbox
 
 		public PropertyDescriptorCollection GetProperties() => GetProperties(null);
 
-		public PropertyDescriptorCollection GetProperties(Attribute[] attributes)
+		public PropertyDescriptorCollection GetProperties(Attribute[]? attributes)
 			=> new(Decls.Select(static d => (PropertyDescriptor) new SettingPropertyDescriptor(d)).ToArray());
 
 		/// <summary>One declared setting, presented to the grid as if it were a property.</summary>
@@ -96,7 +96,7 @@ namespace Chimera.Emulation.Common.Waterbox
 			private readonly WaterboxConfig.SettingDecl _decl;
 
 			public SettingPropertyDescriptor(WaterboxConfig.SettingDecl decl)
-				: base(decl.Name, BuildAttributes(decl))
+				: base(decl.Key, BuildAttributes(decl))
 				=> _decl = decl;
 
 			private static Attribute[] BuildAttributes(WaterboxConfig.SettingDecl decl)
@@ -119,14 +119,14 @@ namespace Chimera.Emulation.Common.Waterbox
 			public override object GetValue(object component)
 			{
 				var values = ((WaterboxSettingsBase) component).Values;
-				return _decl.Coerce(values is not null && values.TryGetValue(_decl.Name, out var v) ? v : _decl.Default);
+				return _decl.Coerce(values is not null && values.TryGetValue(_decl.Key, out var v) ? v : _decl.Default);
 			}
 
 			public override void SetValue(object component, object value)
 			{
 				var settings = (WaterboxSettingsBase) component;
 				settings.Values ??= new Dictionary<string, object>();
-				settings.Values[_decl.Name] = _decl.Coerce(value);
+				settings.Values[_decl.Key] = _decl.Coerce(value);
 			}
 
 			public override void ResetValue(object component) => SetValue(component, _decl.DefaultValue);
@@ -143,7 +143,9 @@ namespace Chimera.Emulation.Common.Waterbox
 		/// <summary>Turns an enum setting's declared options into a dropdown.</summary>
 		private sealed class OptionsConverter : StringConverter
 		{
-			private readonly WaterboxConfig.SettingDecl _decl;
+			// null when the grid built the converter from the attribute rather
+			// than from a declaration; it then knows no options and says so
+			private readonly WaterboxConfig.SettingDecl? _decl;
 
 			public OptionsConverter()
 			{

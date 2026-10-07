@@ -5,7 +5,7 @@
 - **Sergio Martin** ([SergioMartin86](https://github.com/SergioMartin86)): author and maintainer.
 - Development assisted by **Claude** (Anthropic); every assisted commit is marked as such in the history.
 
-Emulation cores are separate projects with their own authors and licenses; each loaded core presents its own credits in the About dialog, and each core package cites its source repository.
+Emulation cores are separate projects with their own authors and licenses; each core package carries its licenses and cites its source repository.
 
 ## BizHawk
 

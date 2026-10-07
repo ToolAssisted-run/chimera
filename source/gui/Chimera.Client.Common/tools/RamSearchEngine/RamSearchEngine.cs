@@ -17,7 +17,11 @@ namespace Chimera.Client.Common.RamSearchEngine
 	{
 		private Compare _compareTo = Compare.Previous;
 
+		// this project is not yet in a nullable context as a whole (the newer files
+		// opt in one by one), so the annotation has to say where it applies
+#nullable enable annotations
 		private EngineRamSearch? _search;
+#nullable restore annotations
 		private readonly SearchEngineSettings _settings;
 
 		public RamSearchEngine(SearchEngineSettings settings, IMemoryDomains memoryDomains)

@@ -13,16 +13,16 @@ namespace Chimera.Tests.Client.Common.CorePackages
 	[TestClass]
 	public class CorePackageListTests
 	{
-		private static DiscoveredCorePackage Pkg(string name, string path, string sha1 = null, string error = null)
+		private static DiscoveredCorePackage Pkg(string name, string path, string? sha1 = null, string? error = null)
 			=> new() { Name = name, Path = path, Sha1 = sha1, Error = error, Systems = [ "NES" ] };
 
-		private static CoreRegistry.LoadedCorePackage Loaded(string name, string path, string sha1 = null)
+		private static CoreRegistry.LoadedCorePackage Loaded(string name, string path, string? sha1 = null)
 			=> new() { Name = name, Path = path, Sha1 = sha1, CoreNames = [ name ] };
 
 		private static IReadOnlyList<CorePackageListEntry> Build(
 			IEnumerable<DiscoveredCorePackage> discovered,
 			IEnumerable<CoreRegistry.LoadedCorePackage> loaded,
-			IEnumerable<(DiscoveredCorePackage, string)> failures = null)
+			IEnumerable<(DiscoveredCorePackage, string)>? failures = null)
 			=> CorePackageList.Build(discovered, loaded, failures ?? [ ]);
 
 		[TestMethod]

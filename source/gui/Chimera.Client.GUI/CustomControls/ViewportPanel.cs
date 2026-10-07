@@ -4,6 +4,8 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
 
+using Chimera.Client.Common;
+
 namespace Chimera.Client.GUI
 {
 	/// <summary>
@@ -74,7 +76,8 @@ namespace Chimera.Client.GUI
 				else
 				{
 					{
-						var sb = Brushes.Black;
+						// the letterbox around a picture that does not fill the panel
+						using SolidBrush sb = new(ThemeEngine.Color(ThemeColorRole.EmulatorViewport));
 						g.FillRectangle(sb, _bmp.Width, 0, Width - _bmp.Width, Height);
 						g.FillRectangle(sb, 0, _bmp.Height, _bmp.Width, Height - _bmp.Height);
 					}

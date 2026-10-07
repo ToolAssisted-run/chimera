@@ -50,5 +50,35 @@ namespace Chimera.Tests.Client.GUI
 			EngineProgress.Report("compressing GreenZone", 1, 2); // must not throw into a disposed window
 			Assert.IsTrue(owner.Enabled);
 		}
+
+		/// <summary>
+		/// Saving a branch is milliseconds on an NES and half a minute on a PS3, from the same
+		/// button. Work that is over before a window could be read must not flash one, and work
+		/// that lasts must not be left looking like a hang.
+		/// </summary>
+		[TestMethod]
+		public void WorkThatIsOverAtOnceNeverShowsAWindow()
+		{
+			ProgressDialog dialog;
+			using (dialog = ProgressDialog.Begin(null, "Saving the branch", showAfterMs: 400))
+			{
+				System.Threading.Thread.Sleep(20);
+			}
+			Assert.IsFalse(dialog.WindowWasShown, "it was over long before it was worth a window");
+		}
+
+		[TestMethod]
+		public void WorkThatLastsGetsItsWindowAndItGoesAwayAgain()
+		{
+			ProgressDialog dialog;
+			using (dialog = ProgressDialog.Begin(null, "Saving the branch", showAfterMs: 100))
+			{
+				System.Threading.Thread.Sleep(600);
+				Assert.IsTrue(dialog.WindowWasShown, "past the wait, the window is up");
+				EngineProgress.Report("saving the machine state", 1UL << 30, 4UL << 30);
+				Assert.IsTrue(dialog.Determinate);
+				Assert.AreEqual(0.25, dialog.Fraction, 0.001);
+			}
+		}
 	}
 }

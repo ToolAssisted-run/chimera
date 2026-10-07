@@ -1,3 +1,4 @@
+using System;
 ﻿using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -13,6 +14,7 @@ using Chimera.Client.GUI.ToolExtensions;
 using Chimera.Common;
 using Chimera.Common.PathExtensions;
 using Chimera.Emulation.Common;
+using Chimera.Emulation.Common.Engine;
 using Chimera.WinForms.Controls;
 
 namespace Chimera.Client.GUI
@@ -230,12 +232,38 @@ namespace Chimera.Client.GUI
 		private void WindowSizeSubMenu_DropDownOpened(object sender, EventArgs e)
 		{
 			var windowScale = Config.GetWindowScaleFor(Emulator.SystemId);
+			// Which sizes this screen can hold: FrameBufferResized walks the asked
+			// zoom DOWN until the window fits the working area, so on a 1080p
+			// screen a 1280x720 PS3 picture is 1x whatever was picked, and a menu
+			// that showed 2x checked with 1x, 2x and 3x all doing the same thing
+			// was reporting the wish and not the window (issue #101). The entries
+			// that cannot fit say so and are disabled; the check mark sits on the
+			// size the window actually is.
+			var fits = int.MaxValue;
+			if (_currentVideoProvider is not null && WindowState is FormWindowState.Normal)
+			{
+				var area = Screen.FromControl(this).WorkingArea;
+				var borderWidth = Size.Width - _presentationPanel.Control.Size.Width;
+				var borderHeight = Size.Height - _presentationPanel.Control.Size.Height;
+				fits = 0;
+				for (var zoom = 1; zoom <= EmuClientApi.WINDOW_SCALE_MAX; zoom++)
+				{
+					var size = DisplayManager.CalculateClientSize(_currentVideoProvider, zoom);
+					if (size.Width + borderWidth >= area.Width || size.Height + borderHeight >= area.Height) break;
+					fits = zoom;
+				}
+			}
+			var effective = fits is int.MaxValue ? windowScale : Math.Max(1, Math.Min(windowScale, fits));
 			foreach (var item in WindowSizeSubMenu.DropDownItems)
 			{
 				// filter out separators
 				if (item is ToolStripMenuItem menuItem && menuItem.Tag is int itemScale)
 				{
-					menuItem.Checked = itemScale == windowScale && Config.ResizeWithFramebuffer;
+					var tooBig = fits is not int.MaxValue && itemScale > fits;
+					menuItem.Checked = itemScale == effective && Config.ResizeWithFramebuffer;
+					menuItem.Enabled = !tooBig;
+					var label = $"{(itemScale >= 10 ? (itemScale / 10).ToString() : string.Empty)}&{itemScale % 10}x";
+					menuItem.Text = tooBig ? $"{label}  (larger than this screen)" : label;
 				}
 			}
 			DisableResizeWithFramebufferMenuItem.Checked = !Config.ResizeWithFramebuffer;
@@ -271,6 +299,17 @@ namespace Chimera.Client.GUI
 		private void DisplayLagCounterMenuItem_Click(object sender, EventArgs e)
 		{
 			ToggleLagCounter();
+		}
+
+		private void GenericCoreSubMenu_DropDownOpened(object sender, EventArgs e)
+		{
+			DisplayGameTimeMenuItem.Checked = Config.DisplayGameTime;
+			DisplayGameTimeMenuItem.ShortcutKeyDisplayString = Config.HotkeyBindings["Game Time"];
+		}
+
+		private void DisplayGameTimeMenuItem_Click(object sender, EventArgs e)
+		{
+			ToggleGameTime();
 		}
 
 		private void DisplayInputMenuItem_Click(object sender, EventArgs e)
@@ -402,6 +441,127 @@ namespace Chimera.Client.GUI
 			if (this.ShowDialogWithTempMute(form).IsOk()) AddOnScreenMessage("Message settings saved");
 		}
 
+		/// <summary>
+		/// Config &gt; Theme. Built every time it opens rather than once, because the
+		/// list is a folder's contents and the folder is the user's to change while
+		/// Chimera is running.
+		/// </summary>
+		private void ThemeSubMenu_DropDownOpened(object sender, EventArgs e)
+		{
+			ThemeSubMenu.DropDownItems.Clear();
+			foreach (var theme in ThemeLibrary.All)
+			{
+				ToolStripMenuItemEx item = new()
+				{
+					Checked = string.Equals(theme.Name, ThemeLibrary.Current.Name, StringComparison.OrdinalIgnoreCase),
+					Text = theme.Name,
+					ToolTipText = theme.Description,
+				};
+				var chosen = theme.Name;
+				item.Click += (_, _) => ChooseTheme(chosen);
+				ThemeSubMenu.DropDownItems.Add(item);
+			}
+
+			ThemeSubMenu.DropDownItems.Add(new ToolStripSeparator());
+
+			ToolStripMenuItemEx folder = new() { Text = "Open Themes Folder" };
+			folder.Click += (_, _) => OpenThemesFolder();
+			ThemeSubMenu.DropDownItems.Add(folder);
+
+			ToolStripMenuItemEx export = new() { Text = "Write a Copy to Edit..." };
+			export.Click += (_, _) => ExportCurrentTheme();
+			ThemeSubMenu.DropDownItems.Add(export);
+
+			ToolStripMenuItemEx reload = new() { Text = "Reload Themes" };
+			reload.Click += (_, _) =>
+			{
+				ThemeLibrary.Reload();
+				ThemeEngine.ApplyToOpenForms(ThemeLibrary.Current);
+				ReportThemeFailures();
+				AddOnScreenMessage($"{ThemeLibrary.All.Count} themes");
+			};
+			ThemeSubMenu.DropDownItems.Add(reload);
+
+			var failures = ThemeLibrary.Failures;
+			if (failures.Count is not 0)
+			{
+				ToolStripMenuItemEx bad = new() { Text = $"{failures.Count} theme file(s) would not load..." };
+				bad.SetItemForeRole(ThemeColorRole.AccentError);
+				bad.Click += (_, _) => ReportThemeFailures();
+				ThemeSubMenu.DropDownItems.Add(bad);
+			}
+		}
+
+		private void ChooseTheme(string name)
+		{
+			var theme = ThemeLibrary.Select(name);
+			Config.Theme = theme.Name;
+			ThemeEngine.ApplyToOpenForms(theme);
+			AddOnScreenMessage($"Theme: {theme.Name}");
+		}
+
+		private void ReportThemeFailures()
+		{
+			var failures = ThemeLibrary.Failures;
+			if (failures.Count is 0)
+			{
+				DialogController.ShowMessageBox("Every theme file in the folder loaded.", "Themes");
+				return;
+			}
+			DialogController.ShowMessageBox(
+				string.Join("\n\n", failures.Select(static f => f.Message)),
+				"These theme files were not loaded",
+				EMsgBoxIcon.Error);
+		}
+
+		private void OpenThemesFolder()
+		{
+			try
+			{
+				Directory.CreateDirectory(ThemeLibrary.ThemesDirectory);
+				Process.Start(new ProcessStartInfo(ThemeLibrary.ThemesDirectory) { UseShellExecute = true });
+			}
+			catch (Exception ex)
+			{
+				DialogController.ShowMessageBox($"Could not open {ThemeLibrary.ThemesDirectory}:\n{ex.Message}", "Themes", EMsgBoxIcon.Error);
+			}
+		}
+
+		/// <summary>
+		/// Writes the theme that is on into the themes folder as a file somebody can
+		/// edit - which is how a theme gets contributed without anybody having to
+		/// type ninety colour names from memory.
+		/// </summary>
+		private void ExportCurrentTheme()
+		{
+			var current = ThemeLibrary.Current;
+			// a copy is a theme in its own right, so it is given its own name here
+			// rather than by rewriting the file afterwards - and it does NOT inherit
+			// "desktop", because a theme somebody is about to give colours of its
+			// own has to have them painted
+			Theme theme = new(
+				name: $"{current.Name} copy",
+				description: current.Description,
+				author: current.Author,
+				isDark: current.IsDark,
+				followsDesktop: false,
+				origin: current.Origin,
+				colors: current.ToArray());
+			var path = Path.Combine(ThemeLibrary.ThemesDirectory, $"{theme.Name}{ThemeFile.Extension}");
+			try
+			{
+				Directory.CreateDirectory(ThemeLibrary.ThemesDirectory);
+				File.WriteAllText(path, ThemeFile.Write(theme));
+				DialogController.ShowMessageBox(
+					$"Written to:\n{path}\n\nEdit the colours, change the name inside it, then Config > Theme > Reload Themes.",
+					"Themes");
+			}
+			catch (Exception ex)
+			{
+				DialogController.ShowMessageBox($"Could not write {path}:\n{ex.Message}", "Themes", EMsgBoxIcon.Error);
+			}
+		}
+
 		private void PathsMenuItem_Click(object sender, EventArgs e)
 		{
 			using PathConfig form = new(
@@ -458,23 +618,40 @@ namespace Chimera.Client.GUI
 			using FirmwareSurveyForm form = new(
 				Survey,
 				(row, path) => CoreFirmwareStore.Remember(Config, row.CoreName, row.Decl, path),
+				// Both pickers open in the firmware folder Config > Paths names,
+				// which is the folder this whole form is about (chimera#114);
+				// a folder that is not there is no starting point, so then the
+				// dialog keeps its own default.
 				pickFile: title =>
 				{
-					using OpenFileDialog picker = new() { Title = title, Filter = "All Files|*.*" };
+					using OpenFileDialog picker = new()
+					{
+						Title = title,
+						Filter = "All Files|*.*",
+						InitialDirectory = PathEntryExtensions.FirstExistingDir(firmwareFolder),
+					};
 					return picker.ShowDialog(this) is DialogResult.OK ? picker.FileName.WithoutWslgMirror() : null;
 				},
-				pickFolder: () =>
+				pickFolder: (ref bool includeSubfolders) =>
 				{
-					using FolderBrowserEx picker = new() { Description = "Scan a folder for firmware files" };
-					return picker.ShowDialog(this) is DialogResult.OK ? picker.SelectedPath.WithoutWslgMirror() : null;
+					using FolderBrowserEx picker = new()
+					{
+						Description = "Scan a folder for firmware files",
+						SelectedPath = PathEntryExtensions.FirstExistingDir(firmwareFolder),
+						CheckBoxLabel = FolderBrowserEx.ScanSubfoldersLabel,
+						CheckBoxChecked = includeSubfolders,
+					};
+					if (picker.ShowDialog(this) is not DialogResult.OK) return null;
+					includeSubfolders = picker.CheckBoxChecked;
+					return picker.SelectedPath.WithoutWslgMirror();
 				},
-				scanFolder: folder =>
+				scanFolder: (folder, includeSubfolders) =>
 				{
 					// every pinned declaration of every installed core, answered by hash
-					// from the folder and its subfolders; what is found is remembered
-					// where it lies
+					// from the folder and, unless the person said otherwise in the
+					// picker, what is under it; what is found is remembered where it lies
 					var packages = CorePackageDiscovery.ScanFor(Config);
-					var scanned = FirmwareLocator.BuildIndex([ ], ProjectFolderScan.Enumerate(folder).Take(ProjectFolderScan.MaxFiles));
+					var scanned = FirmwareLocator.BuildIndex([ ], ProjectFolderScan.Enumerate(folder, includeSubfolders).Take(ProjectFolderScan.MaxFiles));
 					foreach (var package in packages.Where(static p => p.Error is null))
 					{
 						foreach (var decl in FirmwareSurvey.DeclarationsOf(package.Path).Decls)
@@ -485,14 +662,16 @@ namespace Chimera.Client.GUI
 							}
 						}
 					}
-				});
+				},
+				shows: Config.FirmwareShows,
+				rememberShows: shows => Config.FirmwareShows = shows);
 			this.ShowDialogWithTempMute(form);
 		}
 
 		/// <summary>
 		/// File &gt; Core Manager. Chimera ships no cores; this is where they come
 		/// from. Opened by hand here, and by itself once when nothing is installed
-		/// (see <see cref="OpenCoreManagerIfNothingIsInstalled"/>).
+		/// (see <see cref="OfferTheCoreManagerIfNothingIsInstalled"/>).
 		/// </summary>
 		private void CoreManagerMenuItem_Click(object sender, EventArgs e) => ShowCacheManagerOrCoreManager(core: true);
 
@@ -536,7 +715,11 @@ namespace Chimera.Client.GUI
 		/// project asks for instead. A project row carries its id in Detail, which
 		/// is the key its budgets are kept under.
 		/// </summary>
+		// this project is not yet in a nullable context as a whole (the newer files
+		// opt in one by one), so the annotation has to say where it applies
+#nullable enable annotations
 		private void EditGreenzoneBudgets(CacheItem? project)
+#nullable restore annotations
 		{
 			var id = project?.Detail ?? "";
 			using GreenzoneBudgetsForm form = new(
@@ -657,7 +840,9 @@ namespace Chimera.Client.GUI
 				installed: package =>
 				{
 					if (package.Sha1 is not null) CoreChoices.MakeDefaultBuild(Config, package.Name, package.Sha1);
-				});
+				},
+				shows: Config.CoreManagerShows,
+				rememberShows: shows => Config.CoreManagerShows = shows);
 			this.ShowDialogWithTempMute(form);
 			ScanForCorePackages();
 		}
@@ -883,6 +1068,8 @@ namespace Chimera.Client.GUI
 			HexEditorMenuItem.Enabled = Tools.IsAvailable<HexEditor>();
 			RamSearchMenuItem.Enabled = Tools.IsAvailable<RamSearch>();
 			RamWatchMenuItem.Enabled = Tools.IsAvailable<RamWatch>();
+			// ticked while the core log is on, which is only ever because somebody asked
+			ExportCoreLogMenuItem.Checked = ChimeraEngine.CoreLogPath.Length is not 0;
 
 
 			// Core-managed tooling: available exactly when the loaded core backs the
@@ -921,7 +1108,15 @@ namespace Chimera.Client.GUI
 		/// </summary>
 		private void MediaMakerMenuItem_Click(object sender, EventArgs e)
 		{
-			using var form = new MediaMakerForm();
+			// what the installed cores say their media needs (one line a recipe,
+			// however many versions of a core declare it)
+			var recipes = CorePackageDiscovery.ScanFor(Config)
+				.Where(static p => p.Error is null)
+				.SelectMany(static p => p.Media.Select(m => new MediaMakerForm.CoreRecipe(p.Name, m.Label, m.Json)))
+				.GroupBy(static r => (r.Core, r.Json))
+				.Select(static g => g.First())
+				.ToList();
+			using var form = new MediaMakerForm(recipes);
 			this.ShowDialogWithTempMute(form);
 		}
 
@@ -934,6 +1129,33 @@ namespace Chimera.Client.GUI
 		private void OnlineHelpMenuItem_Click(object sender, EventArgs e)
 		{
 			Util.OpenUrlExternal("https://toolassisted.run");
+		}
+
+		/// <summary>
+		/// The build of Chimera and the running core's version, on the clipboard in the
+		/// words a bug report asks for them (issue #188).
+		/// </summary>
+		private void CopyVersionInfoMenuItem_Click(object sender, EventArgs e)
+		{
+			try
+			{
+				Clipboard.SetText(VersionReportOfThisSession());
+				AddOnScreenMessage("Version info copied");
+			}
+			catch (System.Runtime.InteropServices.ExternalException)
+			{
+				// another program has the clipboard open; nothing was copied
+				AddOnScreenMessage("The clipboard is busy: version info not copied");
+			}
+		}
+
+		internal string VersionReportOfThisSession()
+		{
+			var running = Emulator.IsNull() ? null : CoreRegistry.Instance.PackageSha1Of(Emulator);
+			var package = string.IsNullOrWhiteSpace(running)
+				? null
+				: _discoveredCorePackages.FirstOrDefault(pkg => running!.Equals(pkg.Sha1, StringComparison.OrdinalIgnoreCase));
+			return VersionReport.Text(VersionInfo.GetBuildName(), package?.Name, package?.DatedVersion);
 		}
 
 		private void AboutMenuItem_Click(object sender, EventArgs e)
@@ -1142,7 +1364,9 @@ namespace Chimera.Client.GUI
 		{
 			if (Config.RecentWatches.AutoLoad)
 			{
-				Tools.LoadRamWatch(!Config.DisplayRamWatch);
+				// the window opens: with the watches on the screen (the default) only the ones ticked
+				// On Screen are drawn, so the list is where the rest are seen
+				Tools.LoadRamWatch(true);
 			}
 
 			HandlePlatformMenus();

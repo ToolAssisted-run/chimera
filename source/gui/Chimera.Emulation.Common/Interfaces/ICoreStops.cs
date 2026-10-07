@@ -8,6 +8,6 @@
 	public interface ICoreStops
 	{
 		/// <summary>Why the last frame advance did not run, or null when it ran.</summary>
-		string CoreStopped { get; }
+		string? CoreStopped { get; }
 	}
 }

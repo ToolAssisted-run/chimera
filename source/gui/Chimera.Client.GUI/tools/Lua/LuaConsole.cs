@@ -464,8 +464,8 @@ namespace Chimera.Client.GUI
 		{
 			var lf = _openedFiles[index];
 			if (lf.IsSeparator) color = BackColor;
-			else if (lf.Paused) color = Color.LightPink;
-			else if (lf.Enabled) color = Color.LightCyan;
+			else if (lf.Paused) color = ThemeEngine.Color(ThemeColorRole.RowPaused);
+			else if (lf.Enabled) color = ThemeEngine.Color(ThemeColorRole.RowActive);
 		}
 
 		private void LuaListView_QueryItemText(InputRoll sender, int index, RollColumn column, out string text, ref int offsetX, ref int offsetY)

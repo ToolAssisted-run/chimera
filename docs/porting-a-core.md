@@ -170,7 +170,16 @@ between flavors), GPU objects, and anything the core caches across `Init`.
 
 ## The gate
 
-One command, and every leg says what it compared. Advice earned the hard way:
+One command, and every leg says what it compared.
+
+**Read [gates.md](gates.md) before writing a leg.** It is the seven ways a gate
+goes green on a broken thing, each one taken from a mistake this project
+actually shipped, and the rule they all come down to: a leg that has never been
+seen to fail is a leg that has not been tested. Breaking the thing on purpose
+and watching the leg go red takes minutes and is the highest-value act in
+testing.
+
+Advice earned the hard way:
 
 - **Name the test content.** A leg that takes "the first `.rar` in the folder"
   changes meaning the day the user adds a game, and three legs go red for
@@ -188,6 +197,29 @@ One command, and every leg says what it compared. Advice earned the hard way:
 - **`waterbox.config`** - the machine: name, system id, video (buffer capacity
   and the live size the core reports per frame), audio, vsync as a rational,
   the memory layout, the button list, settings, firmware.
+- **What things are called is yours to say.** Chimera keeps no table of
+  systems or of controls; a package that says nothing is shown by its ids.
+  - `"systemNames": { "PSV": "PlayStation Vita" }` at the top - the name of
+    every system id the package answers to (its own and each machine's).
+    The same names go in the core's row of `official-cores.json`, so the
+    system reads the same before the core is installed.
+  - `"mnemonics": { "Select": "s" }` in each input declaration (the
+    package's, and each machine's) - the one character a button writes into
+    a movie's text and heads its input column with. Keyed by the button's
+    whole name, or by its name without the player ("P2 Up" is found under
+    "Up"). One printable ASCII character, never `.` or `|`. Declare one for
+    every button: a button left out gets the rule's guess (the first letter
+    of its last word), which is how two columns of one pad come to share a
+    letter. An entry is read by position, so a letter may change without
+    harming a movie made before.
+  - `"header": "LX"` on each axis - its column's header, five characters at
+    most.
+  - `"media": [ ... ]` - what a disc of yours needs that a plain image does
+    not have, for Tools > Media Maker: `{ "id", "label", "format":
+    "iso9660", "when": { "rootFile": "PS3_DISC.SFB" }, "systemArea": [ {
+    "at": 0, "u32be": 1 }, { "at": 12, "u32be": "lastSector" } ] }`. The
+    recipe is offered when the folder has the root file; the engine writes
+    the patches into the image's system area.
 - **`version` and `versionDate`** are not yours to write: `build-package.sh`
   stamps both into the packaged `waterbox.config` - the commit, and the date of
   that commit in UTC (never the build's date, which would make one commit two
@@ -217,8 +249,13 @@ Probed once after `Init`; absent exports simply mean the tool is not offered.
 - **Memory domains** - a pointer and a size, published once. If the machine's
   memory is not a block (paged, per-chunk, or not allocated until the game
   runs), export a **bus** instead: `GetBusCount/Name/Size/Writable`,
-  `PeekBus`, `PokeBus`, resolved per access. Cache one page of translation and
-  a RAM search costs nothing.
+  `PeekBus`, `PokeBus`, resolved per access. Cache one page of translation,
+  and export `ReadBus` as well: `const uint8_t *ReadBus(int32_t bus, int64_t
+  addr, int32_t len)` fills up to 64 KiB at once and answers a pointer to it,
+  in an `ECL_INVISIBLE` buffer so what a tool read is no part of a savestate.
+  RAM Search reads the whole bus, and without it every byte is a call into the
+  sandbox: EKA2L1's 64 MB bus took 3 s a search that way and 0.2 s with it
+  (chimera#180). A core without it still works; the engine peeks for it.
 - **Drives** - `GetDriveCount/Name/Light`: one entry per medium the PROJECT
   put in the machine, lit on a frame it was read or written. Report none rather
   than a light that can never come on. **If a drive swaps between images, say
@@ -230,6 +267,39 @@ Probed once after `Init`; absent exports simply mean the tool is not offered.
   Inserted is -1 for an empty drive. A core whose swap is one step returns the
   same index for both. Keep both in guest memory like any other machine state:
   a rewind has to take them back.
+- **`StateLoaded()`** - told after every load of the machine: a savestate, a
+  branch file, a greenzone restore (anchor and deltas applied), with the
+  machine stopped and before it runs again. For a core that keeps something
+  DERIVED from guest memory in memory a state does not carry (`alloc_invisible`)
+  and has to throw it away when what it was derived from is replaced. xemu's
+  translated-code cache is the case: 215 MB of every state was TCG output
+  that any restore can regenerate, so the buffer is invisible and this export
+  flushes it. Nothing a state needs may live there - only what the machine can
+  rebuild from its own memory - or a state loaded in another session runs on
+  a cache of the wrong machine.
+- **`SuggestSettings()`** - what the core would choose for a game before one
+  boots, declared with `"suggestSettings": true` in `waterbox.config` so the
+  frontend never loads a core that has nothing to say. It is called INSTEAD of
+  `Init`, on exactly the mounts a run would have (`ce_suggest_settings`), and
+  returns a JSON object: `{"values": {setting: value, ...}, "note": "..."}`.
+  The new-project wizard asks when it reaches the settings page, puts the
+  values into the settings the way a preset is applied, and shows the note
+  above the grid - so the note must say where the values come from, or that
+  the game was not found. The RPCS3 core answers from the RPCS3 wiki's per-game
+  recommendations it carries; its note names the page, the compatibility
+  status and the licence. Read the files, answer, return: nothing that boots,
+  and nothing a later `Init` would find changed.
+- **`GetGameSettings()`** - the settings THIS GAME has beyond the package's
+  declaration, for a core whose games carry their own (an arcade game's dip
+  switches differ game to game, so they cannot be declared once per package).
+  A JSON array of declarations in `waterbox.config`'s own setting format,
+  read once after `Init`; the settings grid of a loaded project shows them
+  after the package's. The same array returned from `SuggestSettings` under
+  `"settings"` puts them in the new-project wizard before any machine runs,
+  and a different game takes them away again. Their values are ordinary
+  settings: mounted for `Init`, recorded in the project, cited by a movie. A
+  declaration may not reuse a package setting's name - it is dropped. The
+  FBNeo core names its switches `dip.<group>`.
 - Registers, trace, core-rendered surfaces, save-data export, turbo
   (`SetRenderingEnabled`). **Turbo means "skip what is pure OUTPUT", not "skip
   the renderer".** If the export can only be implemented by skipping drawing -

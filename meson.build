@@ -289,6 +289,7 @@ engine_src = files(
   'source/engine/source/movie_log.cpp',
   'source/engine/source/movie_text.cpp',
   'source/engine/source/state_container.cpp',
+  'source/engine/source/state_format.cpp',
   'source/engine/source/zstd_dyn.cpp',
   'source/engine/source/sha1.cpp',
   'source/engine/source/progress.cpp',
@@ -301,7 +302,9 @@ engine_src = files(
   'source/engine/source/package.cpp',
   'source/engine/source/host_dyn.cpp',
   'source/engine/source/movie_entry.cpp',
+  'source/engine/source/control_names.cpp',
   'source/engine/source/session.cpp',
+  'source/engine/source/core_log.cpp',
   'source/engine/source/state_history.cpp',
   'source/engine/source/work_thread.cpp',
   'source/engine/source/media_maker.cpp',
@@ -309,6 +312,7 @@ engine_src = files(
   'source/engine/source/media_fat12.cpp',
   'source/engine/source/gl_bridge.cpp',
   'source/engine/source/ram_search.cpp',
+  'source/engine/source/game_properties.cpp',
   'extern/miniz/miniz.c',  # vendored (MIT): the zip half of the state container
   'extern/cjson/cJSON.c',  # vendored (MIT): bundle JSON
 )
@@ -322,6 +326,9 @@ endif
 engine_build_args = [
   '-I' + repo_root / 'extern/chimera-common-minibox/source/cache',
   '-DCE_BUILD_COMMIT="' + engine_commit + '"',
+  # where the tree is, for the one test that reads it: test_state_format checks
+  # the sandbox's own magic strings still say what the state layout claims
+  '-DCE_REPO_ROOT="' + repo_root + '"',
   '-DCE_BUILD_COMPILER="' + meson.get_compiler('cpp').get_id() + ' ' + meson.get_compiler('cpp').version() + '"',
   '-DCE_BUILD_OS="' + minibox_build_os + '"',
   # miniz's zlib-name-compat macros (#define compress mz_compress) leak into
@@ -389,6 +396,8 @@ executable(
   cpp_args: engine_build_args,
   c_args: engine_build_args,
   dependencies: [dl_dep] + gl_bridge_deps,
+  # CommandLineToArgvW: the tool takes its arguments from the wide command line on Windows
+  link_args: host_machine.system() == 'windows' ? ['-lshell32'] : [],
   install: true,
   install_dir: 'dll',  # beside libminiboxhost + libzstd, which it loads from its own directory
 )
@@ -407,7 +416,7 @@ if not meson.is_cross_build()
     build_by_default: false,
   )
 
-  foreach engine_test : ['sha1', 'movie_log', 'movie_text', 'movie_entry', 'state_container', 'package', 'multifile', 'project', 'firmware', 'state_history', 'media', 'gl_flight', 'gl_sync', 'gl_buffer_pool', 'stride_tuner', 'greenzone_shape', 'ram_search']
+  foreach engine_test : ['sha1', 'movie_log', 'movie_text', 'movie_entry', 'control_names', 'state_container', 'state_format', 'package', 'multifile', 'project', 'firmware', 'state_history', 'media', 'gl_flight', 'gl_sync', 'gl_buffer_pool', 'stride_tuner', 'greenzone_shape', 'ram_search', 'game_properties']
     test(
       'engine_' + engine_test,
       executable(

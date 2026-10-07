@@ -21,7 +21,15 @@ namespace Chimera.Client.GUI
 	{
 		private readonly EngineProject _project;
 		private readonly Func<string, string?> _locateFile;
-		private readonly Func<string?>? _locateFolder;
+		private readonly PickScanFolder? _locateFolder;
+
+		/// <summary>
+		/// Whether Scan Folder walks below the folder it is given. Ticked, which is what this window always
+		/// did; the folder picker offers the choice where it can carry one, and this remembers the answer
+		/// between scans. Where it cannot, the scan runs on this value - the behaviour from before the
+		/// option existed.
+		/// </summary>
+		private bool _scanSubfolders = true;
 		private readonly ListView _list;
 		private readonly Label _detail;
 		private readonly Button _openButton;
@@ -31,8 +39,8 @@ namespace Chimera.Client.GUI
 
 		/// <param name="project">opened and auto-resolved by the caller; this form finishes the job</param>
 		/// <param name="locateFile">shows a file picker titled for one file; the dialog belongs to the owner</param>
-		/// <param name="locateFolder">shows a folder picker for Scan Folder; null hides the button</param>
-		public ProjectResolutionForm(EngineProject project, Func<string, string?> locateFile, Func<string?>? locateFolder = null)
+		/// <param name="locateFolder">shows a folder picker for Scan Folder, carrying the sub-folders choice; null hides the button</param>
+		public ProjectResolutionForm(EngineProject project, Func<string, string?> locateFile, PickScanFolder? locateFolder = null)
 		{
 			_project = project;
 			_locateFile = locateFile;
@@ -114,8 +122,8 @@ namespace Chimera.Client.GUI
 				ListViewItem item = new(_project.FileName(i));
 				item.SubItems.Add(_project.FileSlot(i));
 				item.SubItems.Add(StatusText(i));
-				if (_project.FileStatus(i) is 2) item.ForeColor = Color.Firebrick;
-				else if (_project.FileStatus(i) is 1) item.ForeColor = Color.DarkGoldenrod;
+				if (_project.FileStatus(i) is 2) item.ForeColor = ThemeEngine.Color(ThemeColorRole.AccentError);
+				else if (_project.FileStatus(i) is 1) item.ForeColor = ThemeEngine.Color(ThemeColorRole.AccentWarning);
 				_list.Items.Add(item);
 			}
 			if (selected >= 0 && selected < _list.Items.Count) _list.Items[selected].Selected = true;
@@ -190,20 +198,24 @@ namespace Chimera.Client.GUI
 		}
 
 		/// <summary>
-		/// "It is all somewhere in here": scans a folder (subfolders included)
-		/// and resolves whatever matches by hash - the identity, any file name -
+		/// "It is all somewhere in here": scans a folder (subfolders included,
+		/// unless the person said otherwise in the picker) and resolves
+		/// whatever matches by hash - the identity, any file name -
 		/// or, failing that, by the recorded name, whose verdict shows in the
 		/// row like any Locate would.
 		/// </summary>
 		public void ScanFolder()
 		{
-			var folder = _locateFolder?.Invoke();
+			if (_locateFolder is null) return;
+			var recurse = _scanSubfolders;
+			var folder = _locateFolder(ref recurse);
 			if (folder is null) return;
+			_scanSubfolders = recurse;
 			int resolved;
 			UseWaitCursor = true;
 			try
 			{
-				resolved = ProjectFolderScan.Resolve(_project, folder);
+				resolved = ProjectFolderScan.Resolve(_project, folder, recurse);
 			}
 			finally
 			{

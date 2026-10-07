@@ -27,7 +27,7 @@ namespace Chimera.Tests.Client.Common.Movie
 
 		static FakeEmulator()
 		{
-			_cd.BuildMnemonicsCache("fake");
+			_cd.BuildMnemonicsCache();
 		}
 
 		public ControllerDefinition ControllerDefinition => _cd;
@@ -57,6 +57,20 @@ namespace Chimera.Tests.Client.Common.Movie
 
 		public void MaxNearStride(int stride) => NearStrideCap = stride;
 
+		/// <summary>How often the movie has the history store a frame; 0 is off.</summary>
+		public int CapturePeriod { get; private set; } = 1;
+
+		private bool _storeNext;
+
+		public void SetCapturePeriod(int period)
+		{
+			bool resuming = CapturePeriod == 0 && period > 0;
+			CapturePeriod = period;
+			if (!resuming) return;
+			_storeNext = true;
+			Capture(Frame);   /* the engine stores the frame it resumes on at once */
+		}
+
 		public void Enable(long budgetBytes)
 		{
 			BudgetBytes = budgetBytes;
@@ -81,7 +95,14 @@ namespace Chimera.Tests.Client.Common.Movie
 
 		public void BeforeAdvance() { }
 
-		public void Capture(int frame) => _states.Add(frame);
+		public void Capture(int frame)
+		{
+			/* the engine stores nothing while off, and only multiples of a sparse period */
+			if (CapturePeriod == 0) return;
+			if (CapturePeriod > 1 && !_storeNext && frame % CapturePeriod != 0) return;
+			_storeNext = false;
+			_states.Add(frame);
+		}
 
 		public bool RestoreTo(int frame)
 		{
@@ -118,9 +139,11 @@ namespace Chimera.Tests.Client.Common.Movie
 
 		public int SavesQueued { get; private set; }
 
-		public string LastSavePath { get; private set; }
+		/// <summary>null until something has actually been saved.</summary>
+		public string? LastSavePath { get; private set; }
 
-		public string LastSaveMachineId { get; private set; }
+		/// <summary>null until something has actually been saved.</summary>
+		public string? LastSaveMachineId { get; private set; }
 
 		public bool SaveLater(string path, string machineId)
 		{

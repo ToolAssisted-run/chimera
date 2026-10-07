@@ -81,7 +81,12 @@ namespace Chimera.Client.Common
 		/// </param>
 		/// <param name="domains"><see cref="Watch"/>'s memory domain</param>
 		/// <returns>A brand new <see cref="Watch"/></returns>
-		public static Watch FromString(string line, IMemoryDomains domains)
+		/// <param name="properties">
+		/// the core's game properties, which a property watch (size <c>p</c>) is found in by the
+		/// name its line carries; without them, or when the core no longer has it, a property
+		/// watch's line gives null
+		/// </param>
+		public static Watch FromString(string line, IMemoryDomains domains, IGameProperties properties = null)
 		{
 			string[] parts = line.Split(new[] { '\t' }, 6);
 
@@ -102,6 +107,11 @@ namespace Chimera.Client.Common
 				bool bigEndian = parts[3] != "0";
 				MemoryDomain domain = domains[parts[4]];
 				string notes = parts[5].Trim('\r', '\n');
+
+				if (size is WatchSize.Property)
+				{
+					return PropertyWatch.Find(properties, domains, notes);
+				}
 
 				return GenerateWatch(
 					domain,
@@ -477,7 +487,10 @@ namespace Chimera.Client.Common
 		/// <summary>
 		/// Gets the address in the <see cref="MemoryDomain"/> formatted as string
 		/// </summary>
-		public string AddressString => Address.ToString(AddressFormatStr);
+		public virtual string AddressString => FormatAddress(Address);
+
+		/// <summary>An address the way this watch's domain writes one.</summary>
+		protected string FormatAddress(long address) => address.ToString(AddressFormatStr);
 
 		/// <summary>
 		/// Gets or sets a value indicating the endianess of current <see cref="Watch"/>
@@ -544,9 +557,19 @@ namespace Chimera.Client.Common
 		public string Notes { get; set; }
 
 		/// <summary>
+		/// Gets or sets whether the watch is drawn on the screen (the OSD) while watches are shown
+		/// there at all (<c>Config.DisplayWatchesOnScreen</c>). Off for a new watch; kept in the
+		/// list's file.
+		/// </summary>
+		public bool OnScreen { get; set; }
+
+		/// <summary>
 		/// Gets the current size of the watch
 		/// </summary>
 		public WatchSize Size { get; }
+
+		/// <summary>How many bytes the watch covers; <see cref="Size"/> for every watch but a property's.</summary>
+		public virtual int ByteSize => (int)Size;
 
 		// TODO: Replace all the following stuff by implementing ISerializable
 		public static string DisplayTypeToString(WatchDisplayType type)
@@ -581,6 +604,7 @@ namespace Chimera.Client.Common
 					WatchSize.Byte => 'b',
 					WatchSize.Word => 'w',
 					WatchSize.DWord => 'd',
+					WatchSize.Property => 'p',
 					_ => 'S',
 				};
 			}
@@ -594,6 +618,7 @@ namespace Chimera.Client.Common
 				'b' => WatchSize.Byte,
 				'w' => WatchSize.Word,
 				'd' => WatchSize.DWord,
+				'p' => WatchSize.Property,
 				_ => WatchSize.Separator,
 			};
 		}

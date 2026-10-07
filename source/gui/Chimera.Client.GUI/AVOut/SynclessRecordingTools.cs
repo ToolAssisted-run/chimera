@@ -10,7 +10,7 @@ using Chimera.Emulation.Common;
 
 namespace Chimera.Client.GUI
 {
-	public partial class SynclessRecordingTools : Form, IDialogParent
+	public partial class SynclessRecordingTools : ThemedForm, IDialogParent
 	{
 		private readonly Config _config;
 

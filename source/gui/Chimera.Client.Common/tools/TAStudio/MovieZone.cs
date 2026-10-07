@@ -72,7 +72,8 @@ namespace Chimera.Client.Common
 			}
 
 			_controller = new MovieController(d.MakeImmutable());
-			d.BuildMnemonicsCache(_sysId);
+			// a zone's columns are called what the movie's are
+			d.BuildMnemonicsCache(_movieDefinition.ControlNames);
 		}
 
 		public string Name { get; set; }

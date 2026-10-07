@@ -11,11 +11,16 @@
 #include <cstdlib>
 
 #include "movie_entry.hpp"
+#include "control_names.hpp"
 #include "file_io.hpp"
 #include "zstd_dyn.hpp"
 #include "host_dyn.hpp"
+#include "core_log.hpp"
 #include "progress.hpp"
+#include "thread_string.hpp"
 #include "state_history.hpp"
+#include "state_format.hpp"
+#include "game_properties.hpp"
 
 #include "../../extern/cjson/cJSON.h"
 
@@ -27,7 +32,7 @@
 
 namespace {
 
-thread_local std::string g_openError;
+thread_local chimera::ThreadString g_openError;   /* never destroyed: see thread_string.hpp */
 
 struct ByteStream
 {
@@ -70,6 +75,11 @@ struct SessionConfig
 	std::string inputName, inputWasRead;
 	std::vector<std::string> buttons;
 	std::vector<chimera::EntryAxis> axes;
+	/* what the package calls its controls and its system (control_names.hpp);
+	 * `mnemonics` is one character a button, in declaration order */
+	chimera::ControlNames names;
+	std::string mnemonics;
+	std::string systemName;
 	bool deterministic = false;
 	bool drawEveryFrame = false; // video.drawEveryFrame - see ce_session_draw_every_frame
 	/* video.rebuildOnStateLoad - whether a SAME-SESSION load should look like a
@@ -229,8 +239,36 @@ bool parseConfig(const char *json, uint64_t len, const char *overrides, SessionC
 			axis.min = intOf(item, "min");
 			axis.max = intOf(item, "max");
 			axis.neutral = intOf(item, "neutral");
+			const char *header = strOf(item, "header");
+			if (header[0] != '\0') cfg.names.axisHeaders[axis.name] = header;
 			cfg.axes.push_back(std::move(axis));
 		}
+	}
+	/* The letters the package gives its buttons. One that cannot be written
+	 * (longer than a character, a '.', a '|') is not taken: the rule answers
+	 * for that button, which is wrong in a way a person sees at once and no
+	 * movie is harmed by. */
+	const cJSON *mnemonics = cJSON_GetObjectItemCaseSensitive(input, "mnemonics");
+	if (cJSON_IsObject(mnemonics))
+	{
+		cJSON_ArrayForEach(item, mnemonics)
+		{
+			if (item->string != nullptr && cJSON_IsString(item) && item->valuestring[0] != '\0'
+				&& item->valuestring[1] == '\0' && chimera::usableMnemonic(item->valuestring[0]))
+			{
+				cfg.names.mnemonics[item->string] = item->valuestring[0];
+			}
+		}
+	}
+	for (const auto &b : cfg.buttons) cfg.mnemonics.push_back(cfg.names.mnemonicOf(b));
+	/* what to call the system in front of a person: the package's word for
+	 * this id, or the id */
+	cfg.systemName = cfg.systemId;
+	const cJSON *systemNames = cJSON_GetObjectItemCaseSensitive(root, "systemNames");
+	if (cJSON_IsObject(systemNames))
+	{
+		const char *named = strOf(systemNames, cfg.systemId.c_str());
+		if (named[0] != '\0') cfg.systemName = named;
 	}
 	const cJSON *lag = cJSON_GetObjectItemCaseSensitive(root, "lag");
 	if (cJSON_IsObject(lag)) cfg.inputWasRead = strOf(lag, "inputWasRead");
@@ -302,6 +340,12 @@ bool composeSettings(const std::string &defaultsJson, const char *overrides, std
 extern "C" int32_t ce_gl_start(char *error_out, int32_t error_len);
 extern "C" uintptr_t ce_cache_dispatch(uintptr_t op, uintptr_t a, uintptr_t b, uintptr_t c, uintptr_t d, uintptr_t e);
 
+/* Sessions that ask the core one question instead of starting it: open stops
+ * before Init, calls the named export (no arguments, a NUL-terminated string
+ * back) and keeps the answer. ce_suggest_settings asks SuggestSettings,
+ * ce_import_movie asks ImportMovie. nullptr is an ordinary session. */
+static const char *s_answerExport = nullptr;
+
 /* precompile sessions: asked for before open, like the GPU */
 static int32_t s_precompileIndex = 0, s_precompileCount = 0, s_precompileFirmware = 1;
 
@@ -331,6 +375,10 @@ struct ce_session
 	bool gpuDrew = false;
 	/* the compile cache and precompile sessions (optional exports) */
 	bool precompile = false;
+	/* what the core answered, in a session that only asks (s_answerExport) */
+	std::string suggestion;
+	/* the loaded game's own settings, declared by the core (GetGameSettings) */
+	std::string gameSettings;
 	uintptr_t fnCacheStored = 0, fnCacheFetched = 0;
 	uintptr_t fnPrecompileDone = 0, fnPrecompileDoneCount = 0, fnPrecompileTotal = 0;
 
@@ -378,9 +426,23 @@ struct ce_session
 	int32_t (*driveMediaSelected)(int32_t) = nullptr;
 	int32_t (*driveMediaInserted)(int32_t) = nullptr;
 	std::vector<std::vector<std::string>> driveMedia;
+	/* what the last state kept in a file weighed, as the machine and as the file */
+	uint64_t stateFileRawBytes = 0, stateFileStoredBytes = 0;
+
+	/* Optional, both or neither: the display aspect of what the machine shows
+	 * NOW, as x:y (4:3; 3:4 for an arcade game whose monitor stood on its
+	 * side). Wins over the declared virtual size. */
+	int32_t (*aspectX)() = nullptr;
+	int32_t (*aspectY)() = nullptr;
 
 	int32_t (*isButtonActive)(int32_t) = nullptr;
 	int32_t (*isAxisActive)(int32_t) = nullptr;
+	/* Optional: told after every load of the machine - a savestate, a branch
+	 * file, a greenzone restore. For a core that keeps something DERIVED
+	 * outside its states (xemu's translated-code cache lives in invisible
+	 * memory) and has to throw it away when the memory it was derived from is
+	 * replaced. Called with the machine stopped, before it runs again. */
+	void (*stateLoaded)(void) = nullptr;
 	std::vector<uint8_t> buttonActive;
 	std::vector<uint8_t> axisActive;
 	void buildControlActivity();
@@ -389,8 +451,29 @@ struct ce_session
 	uintptr_t (*mdPtr)(int32_t) = nullptr;
 	int64_t (*mdSize)(int32_t) = nullptr;
 	int32_t (*mdWritable)(int32_t) = nullptr;
+	CeGameProperties properties;    // a game core's (docs/game-cores.md); empty for an emulator
+	uintptr_t (*gameProperties)() = nullptr;             // GetGameProperties: the table, again when it is dynamic
+	uintptr_t (*gameProperty)(const char *) = nullptr;   // GetGameProperty: one entry by name (a dynamic table's)
+	/* a dynamic table's property, looked for again by name before it is used */
+	void placeProperty(int32_t index);
+	CeGameProperties::Value propertyValue; // what the last ce_session_property_get lent out
 
 	int32_t vsyncNum = 0, vsyncDen = 0;
+	/* the core's own rate exports, asked again after every shown frame: a game
+	 * core's step is as long as the game's logic makes it (docs/game-cores.md),
+	 * and a machine changes its refresh with its video mode */
+	int32_t (*getVsyncNum)() = nullptr;
+	int32_t (*getVsyncDen)() = nullptr;
+	void readRate()
+	{
+		if (getVsyncNum == nullptr || getVsyncDen == nullptr) return;
+		const int32_t n = getVsyncNum(), d = getVsyncDen();
+		if (n > 0 && d > 0)
+		{
+			vsyncNum = n;
+			vsyncDen = d;
+		}
+	}
 	// dynamic video size: a DOS machine changes modes; the guest reports the
 	// live frame size (clamped to the config's buffer) through optional
 	// exports, and the config's width/height stay the buffer's capacity
@@ -432,6 +515,7 @@ struct ce_session
 	std::vector<int32_t> regBits;
 	// buses
 	int32_t (*busPeek)(int32_t, int32_t) = nullptr;
+	uintptr_t (*busRead)(int32_t, int64_t, int32_t) = nullptr; /* optional: ReadBus */
 	void (*busPoke)(int32_t, int32_t, int32_t) = nullptr;
 	std::vector<std::string> busNames;
 	std::vector<int64_t> busSizes;
@@ -634,8 +718,27 @@ void ce_session::probeOptionalGroups()
 		}
 	}
 
+	/* the settings this GAME has beyond the package's (an arcade game's dip
+	 * switches): declared by the running core, read once, after Init */
+	if (auto gs = reinterpret_cast<uintptr_t (*)()>(opt("GetGameSettings", 0)))
+	{
+		const char *text = cstr(gs());
+		gameSettings = text != nullptr ? text : "";
+	}
+
+	{
+		auto ax = reinterpret_cast<int32_t (*)()>(opt("GetDisplayAspectX", 0));
+		auto ay = reinterpret_cast<int32_t (*)()>(opt("GetDisplayAspectY", 0));
+		if (ax != nullptr && ay != nullptr)
+		{
+			aspectX = ax;
+			aspectY = ay;
+		}
+	}
+
 	isButtonActive = reinterpret_cast<int32_t (*)(int32_t)>(opt("IsButtonActive", 1));
 	isAxisActive = reinterpret_cast<int32_t (*)(int32_t)>(opt("IsAxisActive", 1));
+	stateLoaded = reinterpret_cast<void (*)(void)>(opt("StateLoaded", 0));
 
 	// surfaces: all five or nothing
 	{
@@ -708,6 +811,7 @@ void ce_session::probeOptionalGroups()
 			}
 			busPeek = peek;
 			busPoke = poke;
+			busRead = reinterpret_cast<uintptr_t (*)(int32_t, int64_t, int32_t)>(opt("ReadBus", 3));
 		}
 	}
 
@@ -919,7 +1023,11 @@ int32_t ce_session::advanceCore(const uint8_t *buttons, int32_t render)
 		ce_gl_release();   /* the frame's borrowed context, which the frame never gave back */
 		return -1;
 	}
-	if (render != 0) copyVideo();
+	if (render != 0)
+	{
+		copyVideo();
+		readRate(); // for whoever paces the frames that are shown; a seek's are not
+	}
 	int32_t nsamp = getAudioSampleCount != nullptr ? getAudioSampleCount() : cfg.samplesPerFrame;
 	if (nsamp < 0) nsamp = 0;
 	if (nsamp > cfg.samplesPerFrame) nsamp = cfg.samplesPerFrame;
@@ -974,9 +1082,14 @@ bool ce_session::greenzoneRestore(int64_t to)
 		 * asked for. Following it here is what keeps the session's idea of
 		 * where it is and the machine itself the same thing - a seek that
 		 * refuses is recoverable, a session that has quietly moved is not. */
-		if (landed >= 0) frame = landed;
+		if (landed >= 0)
+		{
+			frame = landed;
+			if (stateLoaded != nullptr) stateLoaded();   /* the anchor was loaded, and stays */
+		}
 		return false;
 	}
+	if (stateLoaded != nullptr) stateLoaded();
 	if (traceSetEnabled != nullptr)
 	{
 		traceSetEnabled(traceDesired ? 1 : 0);
@@ -1009,8 +1122,8 @@ ce_session *ce_session_open(
 {
 	auto fail = [&](std::string message) -> ce_session *
 	{
-		g_openError = std::move(message);
-		if (error_out != nullptr) *error_out = g_openError.c_str();
+		*g_openError = std::move(message);
+		if (error_out != nullptr) *error_out = g_openError->c_str();
 		return nullptr;
 	};
 	if (error_out != nullptr) *error_out = nullptr;
@@ -1065,6 +1178,8 @@ ce_session *ce_session_open(
 		if (abytes == nullptr) return abort(std::string("package asset unreadable: ") + aname);
 		s->assetFiles.emplace_back(std::string(aname).substr(6), std::vector<uint8_t>(abytes, abytes + len));
 	}
+	const char *sha1 = ce_package_sha1(pkg);
+	const std::string packageSha1 = sha1 != nullptr ? sha1 : "";
 	ce_package_free(pkg);
 	pkg = nullptr; /* a later abort() must not free it again */
 
@@ -1073,7 +1188,7 @@ ce_session *ce_session_open(
 	s->settingsBytes = s->cfg.settingsJson;
 
 	// every mounted stream needs a stable address for the host's callback
-	s->streams.reserve(5 + static_cast<size_t>(firmware_count) + static_cast<size_t>(extra_count)
+	s->streams.reserve(6 + static_cast<size_t>(firmware_count) + static_cast<size_t>(extra_count)
 	                   + s->assetFiles.size());
 
 	chimera::WbxLayout layout{};
@@ -1202,8 +1317,34 @@ ce_session *ce_session_open(
 		if (!r.ok()) return abort(std::string("mounting ") + extra_names[i] + ": " + r.errorMessage);
 	}
 
+	/* The core log's request (ce_core_log): an empty file a core checks for
+	 * and never reads, so the machine is the same with the log on or off. A
+	 * caller that mounted its own "corelog" keeps it. */
+	if (chimera::coreLogOn())
+	{
+		static const uint8_t none = 0;
+		s->streams.push_back({ &none, 0 });
+		host->wbx_mount_file(s->obj, "corelog", streamRead, reinterpret_cast<uintptr_t>(&s->streams.back()), 0, &r);
+		chimera::coreLogNote("session: core package " + std::string(package_path)
+			+ (packageSha1.empty() ? std::string() : " (sha1 " + packageSha1 + ")"));
+	}
+
 	std::string err;
 	if (!s->activate(err)) return abort(std::move(err));
+
+	/* A session that only asks ends here: the files are mounted exactly as a
+	 * run would have them, and the core is asked its question instead of
+	 * being started - what it suggests for these files (SuggestSettings), or
+	 * what a movie it is handed amounts to (ImportMovie). The caller reads the
+	 * answer and frees the session; nothing else ever sees one. */
+	if (s_answerExport != nullptr)
+	{
+		std::string ignored;
+		auto ask = reinterpret_cast<uintptr_t (*)()>(s->proc(s_answerExport, 0, false, ignored));
+		const char *text = ask != nullptr ? reinterpret_cast<const char *>(ask()) : nullptr;
+		s->suggestion = text != nullptr ? text : "";
+		return s;
+	}
 
 	/* The GPU bridge, before Init because Init is where a core picks its
 	 * renderer. Three things have to be true and any of them may not be: the
@@ -1347,14 +1488,24 @@ ce_session *ce_session_open(
 	s->getVideoHeight = reinterpret_cast<int32_t (*)()>(s->proc("GetVideoHeight", 0, false, err));
 	s->vidW = s->cfg.width;
 	s->vidH = s->cfg.height;
-	auto vsyncN = reinterpret_cast<int32_t (*)()>(s->proc("GetVsyncNumerator", 0, false, err));
-	auto vsyncD = reinterpret_cast<int32_t (*)()>(s->proc("GetVsyncDenominator", 0, false, err));
-	s->vsyncNum = vsyncN != nullptr ? vsyncN() : 0;
-	s->vsyncDen = vsyncD != nullptr ? vsyncD() : 0;
-	if (s->vsyncNum <= 0 || s->vsyncDen <= 0)
+	s->getVsyncNum = reinterpret_cast<int32_t (*)()>(s->proc("GetVsyncNumerator", 0, false, err));
+	s->getVsyncDen = reinterpret_cast<int32_t (*)()>(s->proc("GetVsyncDenominator", 0, false, err));
+	s->vsyncNum = s->cfg.vsyncNum;
+	s->vsyncDen = s->cfg.vsyncDen;
+	s->readRate();
+	/* launch window: the first rendered frame may be many frames away (or
+	 * never, when paused on frame 0), and until copyVideo runs the display
+	 * shows the buffer capacity. Seed the live size from the guest now
+	 * (same clamp as copyVideo); a guest that has not rendered yet answers
+	 * <= 0 and keeps the capacity default. */
+	if (s->getVideoWidth != nullptr && s->getVideoHeight != nullptr)
 	{
-		s->vsyncNum = s->cfg.vsyncNum;
-		s->vsyncDen = s->cfg.vsyncDen;
+		int32_t w = s->getVideoWidth(), h = s->getVideoHeight();
+		if (w > 0 && h > 0)
+		{
+			s->vidW = w < s->cfg.width ? w : s->cfg.width;
+			s->vidH = h < s->cfg.height ? h : s->cfg.height;
+		}
 	}
 	if (!s->cfg.inputWasRead.empty())
 	{
@@ -1399,6 +1550,50 @@ ce_session *ce_session_open(
 	s->probeOptionalGroups();
 	s->buildControlActivity();
 	s->layout.build(s->cfg.buttons, s->cfg.axes, &s->buttonActive, &s->axisActive);
+
+	/* a game core's properties: a table read once and checked against the
+	 * domains, whose pointers hold for the session's lifetime - and against the
+	 * buses, which is why this comes after they were probed for */
+	{
+		const char *table = nullptr;
+		s->gameProperties = reinterpret_cast<uintptr_t (*)()>(s->proc("GetGameProperties", 0, false, err));
+		if (s->gameProperties != nullptr) table = reinterpret_cast<const char *>(s->gameProperties());
+		s->gameProperty = reinterpret_cast<uintptr_t (*)(const char *)>(s->proc("GetGameProperty", 1, false, err));
+		err.clear(); // allowed to be absent
+		std::vector<CeGameProperties::Domain> domains;
+		for (int32_t i = 0; table != nullptr && i < s->mdCount(); i++)
+		{
+			CeGameProperties::Domain d;
+			if (const char *name = reinterpret_cast<const char *>(s->mdName(i))) d.name = name;
+			d.base = reinterpret_cast<uint8_t *>(s->mdPtr(i));
+			d.size = s->mdSize(i);
+			d.writable = s->mdWritable(i) != 0;
+			domains.push_back(std::move(d));
+		}
+		/* A bus can hold properties too: it has no pointer, so its memory is
+		 * read and written through the bus (a Flash movie's variables are on
+		 * its emulator's heap, which is one - docs/game-cores.md). A domain
+		 * of the same name comes first and wins. */
+		for (int32_t b = 0; table != nullptr && b < static_cast<int32_t>(s->busNames.size()); b++)
+		{
+			CeGameProperties::Domain d;
+			d.name = s->busNames[static_cast<size_t>(b)];
+			d.size = s->busSizes[static_cast<size_t>(b)];
+			d.writable = s->busWritables[static_cast<size_t>(b)];
+			ce_session *session = s;
+			d.read = [session, b](int64_t offset, uint8_t *buf, int64_t len) { ce_session_bus_read(session, b, offset, buf, len); };
+			d.write = [session, b](int64_t offset, const uint8_t *buf, int64_t len)
+			{
+				for (int64_t k = 0; k < len; k++) ce_session_bus_poke(session, b, static_cast<int32_t>(offset + k), buf[k]);
+			};
+			domains.push_back(std::move(d));
+		}
+		s->properties.load(table, domains);
+		for (const std::string &problem : s->properties.problems())
+		{
+			fprintf(stderr, "[%s] game properties: %s\n", s->cfg.coreName.c_str(), problem.c_str());
+		}
+	}
 	return s;
 }
 
@@ -1431,6 +1626,16 @@ int32_t ce_session_width(const ce_session *s) { return s->cfg.width; }
 int32_t ce_session_height(const ce_session *s) { return s->cfg.height; }
 int32_t ce_session_virtual_width(const ce_session *s) { return s->cfg.virtualWidth; }
 int32_t ce_session_virtual_height(const ce_session *s) { return s->cfg.virtualHeight; }
+
+int32_t ce_session_display_aspect(const ce_session *s, int32_t *x_out, int32_t *y_out)
+{
+	if (s->aspectX == nullptr || s->aspectY == nullptr) return 0;
+	const int32_t x = s->aspectX(), y = s->aspectY();
+	if (x <= 0 || y <= 0) return 0;
+	if (x_out != nullptr) *x_out = x;
+	if (y_out != nullptr) *y_out = y;
+	return 1;
+}
 int32_t ce_session_vsync_numerator(const ce_session *s) { return s->vsyncNum; }
 int32_t ce_session_vsync_denominator(const ce_session *s) { return s->vsyncDen; }
 int32_t ce_session_samples_per_frame(const ce_session *s) { return s->cfg.samplesPerFrame; }
@@ -1462,6 +1667,11 @@ const char *ce_session_button_name(const ce_session *s, int64_t index)
  * never moves, so nothing else has to care. */
 /* The drive lights. Names are settled at load - a machine does not grow a
  * drive - and the light itself is asked every frame. */
+const char *ce_session_game_settings(const ce_session *s)
+{
+	return s->gameSettings.c_str();
+}
+
 int32_t ce_session_drive_count(const ce_session *s)
 {
 	return static_cast<int32_t>(s->driveNames.size());
@@ -1524,10 +1734,50 @@ int32_t ce_session_axis_active(const ce_session *s, int64_t index)
 	return s->axisActive[static_cast<size_t>(index)];
 }
 
+const char *ce_session_button_mnemonics(const ce_session *s)
+{
+	return s->cfg.mnemonics.c_str();
+}
+
+int32_t ce_session_mnemonic_of(const ce_session *s, const char *name)
+{
+	return name != nullptr ? s->cfg.names.mnemonicOf(name) : '?';
+}
+
+const char *ce_session_axis_header_of(const ce_session *s, const char *name)
+{
+	static thread_local std::string held;
+	held = name != nullptr ? s->cfg.names.axisHeaderOf(name) : std::string();
+	return held.c_str();
+}
+
+const char *ce_session_system_name(const ce_session *s)
+{
+	return s->cfg.systemName.c_str();
+}
+
+int32_t ce_control_mnemonic(const char *name)
+{
+	return name != nullptr ? chimera::genericMnemonic(name) : '?';
+}
+
+const char *ce_control_axis_header(const char *name)
+{
+	static thread_local std::string held;
+	held = name != nullptr ? chimera::genericAxisHeader(name) : std::string();
+	return held.c_str();
+}
+
 const char *ce_session_axis_name(const ce_session *s, int64_t index)
 {
 	if (index < 0 || index >= static_cast<int64_t>(s->cfg.axes.size())) return nullptr;
 	return s->cfg.axes[static_cast<size_t>(index)].name.c_str();
+}
+
+int32_t ce_session_axis_neutral(const ce_session *s, int64_t index)
+{
+	if (index < 0 || index >= static_cast<int64_t>(s->cfg.axes.size())) return 0;
+	return s->cfg.axes[static_cast<size_t>(index)].neutral;
 }
 
 void ce_session_set_axis(ce_session *s, int32_t index, int32_t value)
@@ -1554,7 +1804,11 @@ int32_t ce_session_frame_advance(ce_session *s, uint64_t buttons, int32_t render
 		ce_gl_release();
 		return -1;
 	}
-	if (render != 0) s->copyVideo();
+	if (render != 0)
+	{
+		s->copyVideo();
+		s->readRate(); // for whoever paces the frames that are shown; a seek's are not
+	}
 	/* a core that reports its own count may produce a different number every
 	 * frame (blip resamplers do); the declared samplesPerFrame is the buffer
 	 * we must not overrun */
@@ -1599,6 +1853,9 @@ const int16_t *ce_session_audio(const ce_session *s, int32_t *sample_count)
 /* What every load owes the machine afterwards, however the state arrived. */
 static void afterStateLoaded(ce_session *s)
 {
+	/* what the core derived from the memory that was just replaced goes first:
+	 * nothing below may run guest code on a cache of the old machine */
+	if (s->stateLoaded != nullptr) s->stateLoaded();
 	/* a savestate is guest memory, and the guest's wide-input latches are
 	 * guest memory too: the load just rewrote what the guest believes is
 	 * held, so the delta tracker must forget its history and resend every
@@ -1680,8 +1937,11 @@ int32_t ce_session_load_state(ce_session *s, const uint8_t *data, uint64_t len)
  * - a PS3's state is past 2 GiB, which is more than a frontend array can be. */
 namespace
 {
-constexpr char STATE_FILE_MAGIC[8] = { 'C', 'E', 'S', 'T', 'A', 'T', 'E', '1' };
 constexpr size_t STATE_FILE_CHUNK = size_t{ 1 } << 20;
+
+/* how often a save or a load says how far it is: often enough for a bar to move,
+ * rarely enough that a small machine's state is one report */
+constexpr uint64_t STATE_FILE_REPORT_EVERY = uint64_t{ 32 } << 20;
 
 struct StateFileSink
 {
@@ -1689,18 +1949,33 @@ struct StateFileSink
 	const chimera::ZstdApi *z;
 	void *zcs;
 	std::vector<uint8_t> buf;
+	uint64_t expected = 0; /* what the last state of this machine weighed, 0 when none has been taken */
 	bool failed = false;
+	uint64_t raw = 0, stored = 0, reportedAt = 0;
 
 	bool feed(const void *src, size_t size, int endOp)
 	{
 		if (failed) return false;
-		if (zcs == nullptr) return out->write(src, size) || !(failed = true);
+		raw += size;
+		if (raw - reportedAt >= STATE_FILE_REPORT_EVERY)
+		{
+			reportedAt = raw;
+			/* a state is as big as it turns out to be; the last one is the best guess there is,
+			 * and one that has been overtaken is an end nobody knows */
+			chimera::progress("saving the machine state", raw, expected > raw ? expected : 0);
+		}
+		if (zcs == nullptr)
+		{
+			stored += size;
+			return out->write(src, size) || !(failed = true);
+		}
 		chimera::ZstdApi::Buffer in{ src, size, 0 };
 		for (;;)
 		{
 			chimera::ZstdApi::OutBuffer o{ buf.data(), buf.size(), 0 };
 			const size_t left = z->compressStream2(zcs, &o, &in, endOp);
 			if (z->isError(left) || !out->write(buf.data(), o.pos)) { failed = true; return false; }
+			stored += o.pos;
 			if (endOp == 0 ? in.pos == in.size : left == 0) return true;
 		}
 	}
@@ -1717,25 +1992,62 @@ struct StateFileSource
 	const chimera::ZstdApi *z;
 	void *zds;
 	std::vector<uint8_t> buf;
+	uint64_t fileBytes = 0; /* the whole file, which is what a load knows the length of */
 	size_t have = 0, pos = 0;
 	bool failed = false;
+	uint64_t raw = 0, consumed = 0, reportedAt = 0;
+	/* What reading the header over-read. A FileReader cannot seek, and the
+	 * header's length is not known until it is parsed, so the bytes past it are
+	 * handed back here rather than read twice. */
+	std::vector<uint8_t> pending;
+	size_t pendingPos = 0;
+
+	/* the file from where the header stopped, pending bytes first */
+	uint64_t fill(uint8_t *dst, uint64_t max)
+	{
+		uint64_t got = 0;
+		if (pendingPos < pending.size())
+		{
+			got = pending.size() - pendingPos;
+			if (got > max) got = max;
+			std::memcpy(dst, pending.data() + pendingPos, static_cast<size_t>(got));
+			pendingPos += static_cast<size_t>(got);
+			if (got == max) return got;
+		}
+		return got + in->read(dst + got, max - got);
+	}
+
+	void report()
+	{
+		if (consumed - reportedAt < STATE_FILE_REPORT_EVERY / 4) return;
+		reportedAt = consumed;
+		chimera::progress("loading the machine state", consumed, fileBytes);
+	}
 
 	size_t take(void *dst, size_t want)
 	{
-		if (zds == nullptr) return static_cast<size_t>(in->read(static_cast<uint8_t *>(dst), want));
+		if (zds == nullptr)
+		{
+			const size_t got = static_cast<size_t>(fill(static_cast<uint8_t *>(dst), want));
+			raw += got; consumed += got; report();
+			return got;
+		}
 		chimera::ZstdApi::OutBuffer o{ dst, want, 0 };
 		while (o.pos < want && !failed)
 		{
 			if (pos == have)
 			{
-				have = static_cast<size_t>(in->read(buf.data(), buf.size()));
+				have = static_cast<size_t>(fill(buf.data(), buf.size()));
 				pos = 0;
 				if (have == 0) break; /* the end of the file is the end of the state */
+				consumed += have;
+				report();
 			}
 			chimera::ZstdApi::Buffer i{ buf.data(), have, pos };
 			if (z->isError(z->decompressStream(zds, &o, &i))) failed = true;
 			pos = i.pos;
 		}
+		raw += o.pos;
 		return o.pos;
 	}
 };
@@ -1753,18 +2065,30 @@ int32_t ce_session_state_save_file(ce_session *s, const char *utf8_path, const u
 	chimera::FileWriter out;
 	if (!out.open(utf8_path)) { s->error = std::string("could not create ") + utf8_path; return 1; }
 
+	/* Level 1 unless somebody measuring says otherwise: CHIMERA_STATE_RAW=1 writes the state as
+	 * it is, CHIMERA_STATE_ZSTD_LEVEL picks another level. They exist so the cost of compressing
+	 * can be told apart from the cost of the state itself. */
+	const char *rawEnv = std::getenv("CHIMERA_STATE_RAW");
+	const char *levelEnv = std::getenv("CHIMERA_STATE_ZSTD_LEVEL");
+	const bool wantRaw = rawEnv != nullptr && rawEnv[0] == '1';
+	const int level = levelEnv != nullptr && std::atoi(levelEnv) != 0 ? std::atoi(levelEnv) : 1;
 	const char *why = nullptr;
-	const chimera::ZstdApi *z = chimera::zstdApi(&why); /* without it the file is simply bigger */
+	const chimera::ZstdApi *z = wantRaw ? nullptr : chimera::zstdApi(&why); /* without it the file is simply bigger */
 	void *zcs = z != nullptr ? z->createCStream() : nullptr;
-	if (zcs != nullptr && z->isError(z->initCStream(zcs, 1))) { z->freeCStream(zcs); zcs = nullptr; }
+	if (zcs != nullptr && z->isError(z->initCStream(zcs, level))) { z->freeCStream(zcs); zcs = nullptr; }
 
-	const uint8_t compressed = zcs != nullptr ? 1 : 0;
-	out.write(STATE_FILE_MAGIC, sizeof STATE_FILE_MAGIC);
-	out.write(&compressed, 1);
-	out.write(&tag_len, sizeof tag_len);
-	out.write(tag, tag_len);
+	/* The header says which savestate format this is and which build wrote it,
+	 * so a load can refuse by name rather than hand the machine bytes it cannot
+	 * read (issue #115, state_format.hpp). */
+	chimera::StateFileHeader head;
+	head.compressed = zcs != nullptr;
+	head.writer = chimera::stateWriterId();
+	if (tag != nullptr && tag_len != 0) head.tag.assign(tag, tag + tag_len);
+	std::vector<uint8_t> headBytes;
+	chimera::writeStateFileHeader(head, headBytes);
+	out.write(headBytes.data(), headBytes.size());
 
-	StateFileSink sink{ &out, z, zcs, std::vector<uint8_t>(STATE_FILE_CHUNK) };
+	StateFileSink sink{ &out, z, zcs, std::vector<uint8_t>(STATE_FILE_CHUNK), s->stateFileRawBytes };
 	chimera::WbxReturn r{};
 	s->host->wbx_save_state(s->obj, stateFileWrite, reinterpret_cast<uintptr_t>(&sink), &r); // see ce_session_save_state re: no bracket
 	const bool flushed = sink.feed(nullptr, 0, 2) || zcs == nullptr;
@@ -1776,7 +2100,15 @@ int32_t ce_session_state_save_file(ce_session *s, const char *utf8_path, const u
 		s->error = std::string("could not write ") + utf8_path + " (is the disk full?)";
 		return 1;
 	}
+	s->stateFileRawBytes = sink.raw;
+	s->stateFileStoredBytes = sink.stored;
 	return 0;
+}
+
+void ce_session_state_file_bytes(const ce_session *s, uint64_t *raw_out, uint64_t *stored_out)
+{
+	if (raw_out != nullptr) *raw_out = s->stateFileRawBytes;
+	if (stored_out != nullptr) *stored_out = s->stateFileStoredBytes;
 }
 
 int32_t ce_session_state_load_file(ce_session *s, const char *utf8_path, uint8_t *tag_out, uint32_t tag_cap, uint32_t *tag_len_out)
@@ -1784,34 +2116,56 @@ int32_t ce_session_state_load_file(ce_session *s, const char *utf8_path, uint8_t
 	s->error.clear();
 	if (tag_len_out != nullptr) *tag_len_out = 0;
 	chimera::FileReader in;
-	char magic[sizeof STATE_FILE_MAGIC];
-	uint8_t compressed = 0;
-	uint32_t tagLen = 0;
-	if (utf8_path == nullptr || !in.open(utf8_path)
-		|| in.read(reinterpret_cast<uint8_t *>(magic), sizeof magic) != sizeof magic
-		|| std::memcmp(magic, STATE_FILE_MAGIC, sizeof magic) != 0
-		|| in.read(&compressed, 1) != 1
-		|| in.read(reinterpret_cast<uint8_t *>(&tagLen), sizeof tagLen) != sizeof tagLen
-		|| tagLen > (1u << 20))
+	if (utf8_path == nullptr || !in.open(utf8_path))
 	{
 		s->error = std::string(utf8_path != nullptr ? utf8_path : "(no path)") + " is not a state file";
 		return 2; /* the machine was not touched */
 	}
-	std::vector<uint8_t> tag(tagLen);
-	if (in.read(tag.data(), tagLen) != tagLen) { s->error = std::string(utf8_path) + " is cut short"; return 2; }
 
-	const char *why = nullptr;
-	const chimera::ZstdApi *z = compressed != 0 ? chimera::zstdApi(&why) : nullptr;
+	/* The header, read in growing prefixes because its length is in it (a tag
+	 * is a handful of bytes in practice, so the first read is nearly always the
+	 * only one) and a FileReader cannot seek back. */
+	chimera::StateFileHeader head;
+	std::vector<uint8_t> prefix;
+	std::string why;
+	int headRc = 2;
+	for (size_t want = 8192;; want *= 4)
+	{
+		const size_t was = prefix.size();
+		prefix.resize(want);
+		const uint64_t got = in.read(prefix.data() + was, want - was);
+		prefix.resize(was + static_cast<size_t>(got));
+		headRc = chimera::readStateFileHeader(prefix.data(), prefix.size(), head, why);
+		/* a short read means the file ended: nothing more is coming */
+		if (headRc != 2 || prefix.size() < want || want >= (2u << 20)) break;
+	}
+	if (headRc != 0)
+	{
+		/* A format disagreement is a whole sentence about two builds and reads as
+		 * one; a damaged or foreign file is about THIS file, and wants naming. */
+		s->error = headRc == 1 ? why : std::string(utf8_path) + " " + why;
+		return 2; /* another format, or not a state file: either way, untouched */
+	}
+	const uint8_t compressed = head.compressed ? 1 : 0;
+
+	const char *zwhy = nullptr;
+	const chimera::ZstdApi *z = compressed != 0 ? chimera::zstdApi(&zwhy) : nullptr;
 	void *zds = z != nullptr ? z->createDStream() : nullptr;
 	if (compressed != 0 && (zds == nullptr || z->isError(z->initDStream(zds))))
 	{
 		if (zds != nullptr) z->freeDStream(zds);
-		s->error = std::string("the state file is compressed and zstd is not available") + (why != nullptr ? std::string(": ") + why : "");
+		s->error = std::string("the state file is compressed and zstd is not available") + (zwhy != nullptr ? std::string(": ") + zwhy : "");
 		return 2;
 	}
 
 	s->history.beforeLoad(); /* see ce_session_load_state */
 	StateFileSource source{ &in, z, zds, std::vector<uint8_t>(STATE_FILE_CHUNK) };
+	source.pending.assign(prefix.begin() + static_cast<std::ptrdiff_t>(head.length), prefix.end());
+	{
+		uint64_t size = 0;
+		int64_t mtime = 0;
+		if (chimera::fileStamp(utf8_path, &size, &mtime)) source.fileBytes = size;
+	}
 	chimera::WbxReturn r{};
 	s->host->wbx_load_state(s->obj, stateFileRead, reinterpret_cast<uintptr_t>(&source), &r);
 	if (zds != nullptr) z->freeDStream(zds);
@@ -1823,9 +2177,12 @@ int32_t ce_session_state_load_file(ce_session *s, const char *utf8_path, uint8_t
 		return 1;
 	}
 	afterStateLoaded(s);
+	s->stateFileRawBytes = source.raw;
+	s->stateFileStoredBytes = source.fileBytes;
 
+	const uint32_t tagLen = static_cast<uint32_t>(head.tag.size());
 	if (tag_len_out != nullptr) *tag_len_out = tagLen;
-	if (tag_out != nullptr && tagLen != 0) std::memcpy(tag_out, tag.data(), tagLen < tag_cap ? tagLen : tag_cap);
+	if (tag_out != nullptr && tagLen != 0) std::memcpy(tag_out, head.tag.data(), tagLen < tag_cap ? tagLen : tag_cap);
 	return 0;
 }
 
@@ -1864,6 +2221,139 @@ const char *ce_host_build_info(void)
 	const char *error = nullptr;
 	const chimera::HostApi *host = chimera::hostApi(&error);
 	return host != nullptr ? host->wbx_build_info() : nullptr;
+}
+
+const char *ce_session_property_table(const ce_session *s) { return s->properties.describe().c_str(); }
+
+/* A dynamic table's property is where the core says it is NOW: asked by name
+ * before every use, because the thing it names (a variable on a heap) moves
+ * when its table grows and is gone when its object dies. One call into the
+ * core; the property keeps its index either way. */
+void ce_session::placeProperty(int32_t index)
+{
+	if (!properties.dynamic() || gameProperty == nullptr) return;
+	if (index < 0 || static_cast<size_t>(index) >= properties.all().size()) return;
+	const std::string name = properties.all()[static_cast<size_t>(index)].name;
+	properties.place(name, reinterpret_cast<const char *>(gameProperty(name.c_str())));
+}
+
+int32_t ce_session_property_dynamic(const ce_session *s) { return s->properties.dynamic() ? 1 : 0; }
+
+int32_t ce_session_property_refresh(ce_session *s)
+{
+	if (!s->properties.dynamic() || s->gameProperties == nullptr) return static_cast<int32_t>(s->properties.all().size());
+	return s->properties.relist(reinterpret_cast<const char *>(s->gameProperties()));
+}
+
+int64_t ce_session_property_offset(ce_session *s, int32_t index, uint32_t element)
+{
+	s->placeProperty(index);
+	const auto &all = s->properties.all();
+	if (index < 0 || static_cast<size_t>(index) >= all.size()) return -1;
+	const CeGameProperties::Property &p = all[static_cast<size_t>(index)];
+	return p.present && element < p.count ? p.elementOffset(element) : -1;
+}
+
+int32_t ce_session_game_time_ms(ce_session *s, int64_t *ms_out)
+{
+	if (ms_out != nullptr) *ms_out = 0;
+	CeGameProperties::Value v;
+	if (s->properties.timer() < 0 || !s->properties.read(s->properties.timer(), 0, v)) return 0;
+	if (ms_out != nullptr) *ms_out = v.kind == CeGameProperties::Value::UInt ? int64_t(v.u) : v.i;
+	return 1;
+}
+
+int32_t ce_game_time_text(int64_t ms, char *buf, int32_t cap)
+{
+	const std::string text = CeGameProperties::timeText(ms);
+	if (buf != nullptr && cap > 0)
+	{
+		const size_t n = std::min(text.size(), size_t(cap - 1));
+		std::memcpy(buf, text.data(), n);
+		buf[n] = '\0';
+	}
+	return int32_t(text.size());
+}
+
+int32_t ce_session_property_find(ce_session *s, const char *name, uint32_t *element_out)
+{
+	if (name == nullptr) return -1;
+	int32_t index = s->properties.find(name, element_out);
+	/* a dynamic table may not have listed it yet, or ever: the core is asked */
+	if (index < 0 && s->properties.dynamic() && s->gameProperty != nullptr)
+	{
+		index = s->properties.place(name, reinterpret_cast<const char *>(s->gameProperty(name)));
+		if (index >= 0 && !s->properties.all()[static_cast<size_t>(index)].present) index = -1;
+		if (element_out != nullptr) *element_out = 0;
+	}
+	return index;
+}
+
+int32_t ce_session_property_at(const ce_session *s, const char *domain, int64_t address, uint32_t *element_out, int32_t *starts_out)
+{
+	bool starts = false;
+	const int32_t index = domain != nullptr ? s->properties.at(domain, address, element_out, &starts) : -1;
+	if (starts_out != nullptr) *starts_out = starts ? 1 : 0;
+	return index;
+}
+
+int32_t ce_session_property_get(ce_session *s, int32_t index, uint32_t element, ce_property_value *out)
+{
+	s->error.clear();
+	s->placeProperty(index);
+	CeGameProperties::Value &v = s->propertyValue;
+	if (out == nullptr || !s->properties.read(index, element, v))
+	{
+		s->error = "no such property";
+		return 1;
+	}
+	*out = ce_property_value{};
+	out->kind = int32_t(v.kind);
+	out->i = v.i;
+	out->u = v.u;
+	out->f = v.f;
+	out->data = v.data.data();
+	out->len = int64_t(v.data.size());
+	return 0;
+}
+
+int32_t ce_session_property_set(ce_session *s, int32_t index, uint32_t element, const ce_property_value *in)
+{
+	s->error.clear();
+	if (in == nullptr || in->kind < CE_PROPERTY_INT || in->kind > CE_PROPERTY_BYTES)
+	{
+		s->error = "a value of no kind";
+		return 1;
+	}
+	CeGameProperties::Value v;
+	v.kind = CeGameProperties::Value::Kind(in->kind);
+	v.i = in->i;
+	v.u = in->u;
+	v.f = in->f;
+	if (in->data != nullptr && in->len > 0) v.data.assign(in->data, size_t(in->len));
+	s->placeProperty(index);
+	return s->properties.write(index, element, v, s->error) ? 0 : 1;
+}
+
+int32_t ce_session_property_text(ce_session *s, int32_t index, uint32_t element, int32_t named, char *buf, int32_t cap)
+{
+	if (index < 0 || size_t(index) >= s->properties.all().size() || element >= s->properties.all()[size_t(index)].count) return -1;
+	s->placeProperty(index);
+	const std::string text = s->properties.text(index, element, named != 0);
+	if (buf != nullptr && cap > 0)
+	{
+		const size_t n = std::min(text.size(), size_t(cap - 1));
+		std::memcpy(buf, text.data(), n);
+		buf[n] = '\0';
+	}
+	return int32_t(text.size());
+}
+
+int32_t ce_session_property_set_text(ce_session *s, int32_t index, uint32_t element, const char *text)
+{
+	s->error.clear();
+	s->placeProperty(index);
+	return s->properties.writeText(index, element, text != nullptr ? text : "", s->error) ? 0 : 1;
 }
 
 uint64_t ce_session_domain_ptr(const ce_session *s, int32_t index)
@@ -1983,6 +2473,40 @@ int32_t ce_session_bus_writable(const ce_session *s, int32_t index)
 int32_t ce_session_bus_peek(const ce_session *s, int32_t index, int32_t addr)
 {
 	return s->busPeek != nullptr ? s->busPeek(index, addr) : 0;
+}
+
+int64_t ce_session_bus_read(const ce_session *s, int32_t index, int64_t addr, uint8_t *buf, int64_t len)
+{
+	if (buf == nullptr || len <= 0) return 0;
+	if (s->busPeek == nullptr || index < 0 || index >= static_cast<int32_t>(s->busSizes.size()))
+	{
+		std::memset(buf, 0, static_cast<size_t>(len));
+		return 0;
+	}
+	const int64_t size = s->busSizes[static_cast<size_t>(index)];
+	int64_t done = 0;
+	while (done < len)
+	{
+		const int64_t at = addr + done;
+		int64_t n = std::min<int64_t>(len - done, CE_BUS_READ_CHUNK);
+		if (at < 0 || at >= size)
+		{
+			/* outside the bus: zeros, up to where the bus begins if it is ahead */
+			if (at < 0) n = std::min<int64_t>(n, -at);
+			std::memset(buf + done, 0, static_cast<size_t>(n));
+			done += n;
+			continue;
+		}
+		n = std::min<int64_t>(n, size - at);
+		const auto *from = s->busRead != nullptr
+			? reinterpret_cast<const uint8_t *>(s->busRead(index, at, static_cast<int32_t>(n)))
+			: nullptr;
+		if (from != nullptr) std::memcpy(buf + done, from, static_cast<size_t>(n));
+		else
+			for (int64_t i = 0; i < n; i++) buf[done + i] = static_cast<uint8_t>(s->busPeek(index, static_cast<int32_t>(at + i)));
+		done += n;
+	}
+	return len;
 }
 
 void ce_session_bus_poke(ce_session *s, int32_t index, int32_t addr, int32_t value)
@@ -2186,15 +2710,8 @@ void ce_session_movie_record(ce_session *s, const char *mnemonics)
 	}
 	else
 	{
-		/* neutral fallback: the button name's first character past any player
-		 * prefix - the frontend supplies its real per-system vocabulary */
-		s->mnemonics.clear();
-		for (const auto &b : s->cfg.buttons)
-		{
-			std::string bare = b;
-			if (chimera::playerNumberOf(bare) != 0) bare.erase(0, bare.find(' ') + 1);
-			s->mnemonics.push_back(bare.empty() ? '!' : bare[0]);
-		}
+		/* the package's own letters, and the rule where it gave none */
+		s->mnemonics = s->cfg.mnemonics;
 	}
 	s->movieMode = 2;
 }
@@ -2405,6 +2922,15 @@ void ce_session_greenzone_max_near_stride(ce_session *s, int64_t max_stride)
 	s->history.maxNearStride(max_stride);
 }
 
+void ce_session_greenzone_capture_period(ce_session *s, int64_t period)
+{
+	if (s == nullptr) return;
+	const bool resuming = s->history.capturePeriod() == 0 && period > 0;
+	s->history.capturePeriod(period);
+	/* the anchor the history goes on from, where the machine stands now */
+	if (resuming) s->greenzoneCapture();
+}
+
 uint64_t ce_session_greenzone_disk_bytes(const ce_session *s)
 {
 	if (s == nullptr) return 0;
@@ -2455,15 +2981,22 @@ void ce_session_greenzone_invalidate(ce_session *s, int64_t after_frame)
 static std::string historyId(ce_session *s, const char *machine_id)
 {
 	std::string id = machine_id != nullptr ? machine_id : "";
-	if (s->host->wbx_machine_hash == nullptr) return id;   /* an older host: caller's half alone */
+	/* The savestate format rides in the id (issue #115). A history is a cache of
+	 * states, and states of another format cannot be fed to this build's machine
+	 * any more than another machine's can - so the same answer serves: the file
+	 * is dropped, quietly, and the greenzone is rebuilt by playing. A history
+	 * written before formats were numbered carries no suffix and is dropped once,
+	 * on the first open after this change. */
+	const std::string format = chimera::historyFormatSuffix();
+	if (s->host->wbx_machine_hash == nullptr) return id + format;   /* an older host: caller's half alone */
 	uint8_t hash[32] = { 0 };
 	chimera::WbxReturn r{};
 	s->host->wbx_machine_hash(s->obj, hash, &r);
-	if (!r.ok()) return id;
+	if (!r.ok()) return id + format;
 	static const char hex[] = "0123456789abcdef";
 	id += '@';
 	for (uint8_t b : hash) { id += hex[b >> 4]; id += hex[b & 15]; }
-	return id;
+	return id + format;
 }
 
 int32_t ce_session_history_save(ce_session *s, const char *path, const char *machine_id)
@@ -2574,6 +3107,66 @@ extern "C" uint64_t ce_session_cache_fetched(const ce_session *s)
 {
 	if (s == nullptr || s->fnCacheFetched == 0) return 0;
 	return reinterpret_cast<uint64_t (*)()>(s->fnCacheFetched)();
+}
+
+/* Opens a session that asks `exportName` instead of Init (s_answerExport) and
+ * hands back its answer: "" when the core has no such export, nullptr with
+ * *error_out when the package or files cannot be opened at all. */
+static const char *askCore(const char *exportName,
+	const char *package_path,
+	const uint8_t *rom, uint64_t rom_len, const char *rom_path,
+	const char *settings_overrides_json,
+	const char *const *firmware_ids, const uint8_t *const *firmware_data,
+	const uint64_t *firmware_lens, int32_t firmware_count,
+	const char *const *extra_names, const uint8_t *const *extra_data,
+	const uint64_t *extra_lens, const char *const *extra_paths, int32_t extra_count,
+	uint64_t *len_out, const char **error_out)
+{
+	/* never destroyed: a thread_local std::string is freed twice by a mingw
+	 * DLL at exit (thread_string.hpp, chimera#123) */
+	static thread_local chimera::ThreadString answer;
+	answer->clear();
+	if (len_out != nullptr) *len_out = 0;
+	s_answerExport = exportName;
+	ce_session *s = ce_session_open(package_path, rom, rom_len, rom_path, settings_overrides_json,
+		firmware_ids, firmware_data, firmware_lens, firmware_count,
+		extra_names, extra_data, extra_lens, extra_paths, extra_count, error_out);
+	s_answerExport = nullptr;
+	if (s == nullptr) return nullptr;
+	*answer = s->suggestion;
+	ce_session_free(s);
+	if (len_out != nullptr) *len_out = answer->size();
+	return answer->c_str();
+}
+
+extern "C" const char *ce_suggest_settings(
+	const char *package_path,
+	const uint8_t *rom, uint64_t rom_len, const char *rom_path,
+	const char *settings_overrides_json,
+	const char *const *firmware_ids, const uint8_t *const *firmware_data,
+	const uint64_t *firmware_lens, int32_t firmware_count,
+	const char *const *extra_names, const uint8_t *const *extra_data,
+	const uint64_t *extra_lens, const char *const *extra_paths, int32_t extra_count,
+	uint64_t *len_out, const char **error_out)
+{
+	return askCore("SuggestSettings", package_path, rom, rom_len, rom_path, settings_overrides_json,
+		firmware_ids, firmware_data, firmware_lens, firmware_count,
+		extra_names, extra_data, extra_lens, extra_paths, extra_count, len_out, error_out);
+}
+
+extern "C" const char *ce_import_movie(
+	const char *package_path,
+	const uint8_t *rom, uint64_t rom_len, const char *rom_path,
+	const char *settings_overrides_json,
+	const char *const *firmware_ids, const uint8_t *const *firmware_data,
+	const uint64_t *firmware_lens, int32_t firmware_count,
+	const char *const *extra_names, const uint8_t *const *extra_data,
+	const uint64_t *extra_lens, const char *const *extra_paths, int32_t extra_count,
+	uint64_t *len_out, const char **error_out)
+{
+	return askCore("ImportMovie", package_path, rom, rom_len, rom_path, settings_overrides_json,
+		firmware_ids, firmware_data, firmware_lens, firmware_count,
+		extra_names, extra_data, extra_lens, extra_paths, extra_count, len_out, error_out);
 }
 
 extern "C" int32_t ce_session_precompile_done(const ce_session *s)

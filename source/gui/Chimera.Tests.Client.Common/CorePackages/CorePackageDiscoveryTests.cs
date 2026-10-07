@@ -18,7 +18,7 @@ namespace Chimera.Tests.Client.Common.CorePackages
 	[TestClass]
 	public class CorePackageDiscoveryTests
 	{
-		private string _root;
+		private string _root = "";
 
 		[TestInitialize]
 		public void SetUp()
@@ -79,7 +79,9 @@ namespace Chimera.Tests.Client.Common.CorePackages
 			Assert.AreEqual("NES", found[0].Extensions[".nes"]);
 			Assert.IsFalse(found[0].IsDirectoryForm);
 			Assert.IsNull(found[0].Error);
-			Assert.AreEqual(40, found[0].Sha1.Length, "a zip package's identity is the SHA1 of the file");
+			var sha1 = found[0].Sha1;
+			Assert.IsNotNull(sha1, "a zip package has an identity");
+			Assert.AreEqual(40, sha1.Length, "a zip package's identity is the SHA1 of the file");
 		}
 
 		[TestMethod]
@@ -92,6 +94,20 @@ namespace Chimera.Tests.Client.Common.CorePackages
 			Assert.IsTrue(found[0].IsDirectoryForm);
 			Assert.IsNull(found[0].Sha1, "a directory has no file to hash, so it has no identity");
 			Assert.AreEqual(found[0].Path, found[0].Key, "without a hash, the path is the only stable key");
+		}
+
+		[TestMethod]
+		public void AGameCoreSaysSoAndEveryOtherPackageIsAnEmulator()
+		{
+			// docs/game-cores.md: "kind": "game" in waterbox.config; absent is an emulator
+			_ = MakeDir("pop", ("core.wbx", "stub"), ("waterbox.config", @"{ ""coreName"": ""SDLPoP"", ""systemId"": ""PoP"", ""kind"": ""game"" }"));
+			_ = MakeDir("nes", ("core.wbx", "stub"), ("waterbox.config", WaterboxConfigJson("quickerNES", "NES", ".nes")));
+			_ = MakeDir("odd", ("core.wbx", "stub"), ("waterbox.config", @"{ ""coreName"": ""Oddity"", ""systemId"": ""ODD"", ""kind"": ""toaster"" }"));
+			var found = CorePackageDiscovery.Scan([ _root ]).ToDictionary(static p => p.Name);
+			Assert.IsTrue(found["SDLPoP"].IsGameCore);
+			Assert.IsFalse(found["quickerNES"].IsGameCore, "no kind is an emulator");
+			Assert.IsFalse(found["Oddity"].IsGameCore, "a kind this build does not know is listed with the machines");
+			Assert.IsNull(found["Oddity"].Error, "and is not refused");
 		}
 
 		[TestMethod]
@@ -130,7 +146,7 @@ namespace Chimera.Tests.Client.Common.CorePackages
 			Assert.AreEqual(2, found.Count);
 			Assert.IsTrue(found.All(static p => p.Error is not null), "both are unreadable and must say so");
 			Assert.IsTrue(found.All(static p => !p.IsLoadable));
-			Assert.IsTrue(found.Any(static p => p.Error.Contains("99")), "the version mismatch must name the version it saw");
+			Assert.IsTrue(found.Any(static p => p.Error?.Contains("99") is true), "the version mismatch must name the version it saw");
 		}
 
 		[TestMethod]

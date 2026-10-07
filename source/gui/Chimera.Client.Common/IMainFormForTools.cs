@@ -39,6 +39,28 @@ namespace Chimera.Client.Common
 		bool EnsureCoreIsAccurate();
 
 		/// <summary>
+		/// The project was written to a file of its own for the first time, or to a
+		/// new one: it is a recent project from now, and the list is written at
+		/// once - a session that ends badly would otherwise forget the project it
+		/// had just saved (issue #198).
+		/// </summary>
+		/// <remarks>only referenced from TAStudio</remarks>
+		void ProjectSavedAs(string path);
+
+		/// <summary>
+		/// True while Reboot Core is restarting the machine under an open project.
+		/// The project's movie is kept and runs on the new machine, so a tool told to
+		/// restart in the middle of it has nothing of the project's to replace, and
+		/// nothing to ask about saving.
+		/// </summary>
+		/// <remarks>only referenced from TAStudio</remarks>
+		bool ProjectIsRebooting { get; }
+
+		/// <summary>TAStudio was hidden with its "&lt;&lt; Hide" button, or shown again: the main window offers it back while hidden.</summary>
+		/// <remarks>only referenced from TAStudio</remarks>
+		void TAStudioHidden(bool hidden);
+
+		/// <summary>
 		/// True while a shutdown NOBODY IS SITTING IN FRONT OF is under way - one
 		/// asked for through the API, which is what a Lua script's client.exit()
 		/// is. A prompt raised then is a prompt nothing can answer: the window

@@ -4,6 +4,8 @@ using System;
 using System.Drawing;
 using System.Windows.Forms;
 
+using Chimera.Client.Common;
+
 namespace Chimera.Client.GUI
 {
 	/// <summary>
@@ -23,8 +25,32 @@ namespace Chimera.Client.GUI
 	/// way every meter's does, because a peak that vanishes in one frame at 60fps
 	/// is a peak nobody sees.
 	/// </summary>
-	public sealed class AudioLevelMeter : Control
+	public sealed class AudioLevelMeter : Control, IThemedControl
 	{
+		private Color _trough = SystemColors.ControlDark;
+
+		private Color _low = Color.ForestGreen;
+
+		private Color _mid = Color.Goldenrod;
+
+		private Color _high = Color.Firebrick;
+
+		private Color _peakInk = Color.White;
+
+		private Color _labelInk = SystemColors.ControlLightLight;
+
+		/// <inheritdoc/>
+		public void ApplyTheme(Theme theme)
+		{
+			_trough = theme[ThemeColorRole.MeterTrough];
+			_low = theme[ThemeColorRole.MeterLow];
+			_mid = theme[ThemeColorRole.MeterMid];
+			_high = theme[ThemeColorRole.MeterHigh];
+			_peakInk = theme[ThemeColorRole.MeterPeak];
+			_labelInk = theme[ThemeColorRole.MeterText];
+			Invalidate();
+		}
+
 		/// <summary>Below this the bar is empty; ordinary game audio is well above it.</summary>
 		private const double FloorDb = -60.0;
 
@@ -84,7 +110,7 @@ namespace Chimera.Client.GUI
 
 		private void DrawChannel(Graphics g, Rectangle bar, double level, double peak, string label)
 		{
-			using SolidBrush trough = new(SystemColors.ControlDark);
+			using SolidBrush trough = new(_trough);
 			g.FillRectangle(trough, bar);
 
 			var fraction = Fraction(level);
@@ -93,20 +119,20 @@ namespace Chimera.Client.GUI
 			{
 				// Three zones, so "loud" and "about to clip" do not look the same.
 				// The boundaries are the ones every meter uses: -12dB and -3dB.
-				DrawZone(g, bar, 0, Math.Min(filled, Scaled(bar.Width, -12)), Color.ForestGreen);
-				DrawZone(g, bar, Scaled(bar.Width, -12), Math.Min(filled, Scaled(bar.Width, -3)), Color.Goldenrod);
-				DrawZone(g, bar, Scaled(bar.Width, -3), filled, Color.Firebrick);
+				DrawZone(g, bar, 0, Math.Min(filled, Scaled(bar.Width, -12)), _low);
+				DrawZone(g, bar, Scaled(bar.Width, -12), Math.Min(filled, Scaled(bar.Width, -3)), _mid);
+				DrawZone(g, bar, Scaled(bar.Width, -3), filled, _high);
 			}
 
 			var peakX = (int)Math.Round(bar.Width * Fraction(peak));
 			if (peakX > 0)
 			{
-				using Pen pen = new(Color.White);
+				using Pen pen = new(_peakInk);
 				peakX = Math.Min(peakX, bar.Width - 1);
 				g.DrawLine(pen, bar.Left + peakX, bar.Top, bar.Left + peakX, bar.Bottom - 1);
 			}
 
-			using SolidBrush text = new(SystemColors.ControlLightLight);
+			using SolidBrush text = new(_labelInk);
 			g.DrawString(label, Font, text, bar.Left + 2, bar.Top - 1);
 		}
 

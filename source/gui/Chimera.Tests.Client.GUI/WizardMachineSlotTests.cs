@@ -52,7 +52,7 @@ namespace Chimera.Tests.Client.GUI
 				},
 			]);
 			form.SetSettingValue("systemHardware", machine);
-			form.UseDeclaration(ProjectSlotDeclaration.Parse(Declaration));
+			form.UseDeclaration(TestPackages.Slots(Declaration));
 			return form;
 		}
 
@@ -126,7 +126,7 @@ namespace Chimera.Tests.Client.GUI
 			using var _ = form;
 			form.Show();
 			form.UseSettingsDecls([ ]);
-			form.UseDeclaration(ProjectSlotDeclaration.Parse(declaration));
+			form.UseDeclaration(TestPackages.Slots(declaration));
 			Assert.IsTrue(form.SlotRendered("cart"), "the cartridge row belongs on the form");
 			Assert.IsTrue(form.SlotRendered("disk"), "the disk row belongs on the form");
 		}

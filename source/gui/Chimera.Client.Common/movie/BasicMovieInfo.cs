@@ -78,14 +78,6 @@ namespace Chimera.Client.Common
 					return num / den;
 				}
 
-				if (SystemID == VSystemID.Raw.Arcade && Header.TryGetValue(HeaderKeys.VsyncAttoseconds, out var vsyncAttoStr))
-				{
-					const decimal attosInSec = 1_000_000_000_000_000_000.0M;
-					var m = attosInSec;
-					m /= ulong.Parse(vsyncAttoStr);
-					return decimal.ToDouble(m);
-				}
-
 				return PlatformFrameRates.GetFrameRate(SystemID, IsPal);
 			}
 		}

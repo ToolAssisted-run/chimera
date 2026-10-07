@@ -36,6 +36,20 @@ namespace Chimera.Tests.Client.Common.CorePackages
 		}
 
 		[TestMethod]
+		public void TwoVersionsOfOneDayReadApart()
+		{
+			// the minute is written, in local time: a core often has several versions a day,
+			// and the day alone made them look alike
+			var morning = Package("SDLPoP2", "cd812c60fbe4", "2026-09-29T09:05:00Z");
+			var evening = Package("SDLPoP2", "0fcd225aa792", "2026-09-29T17:40:00Z");
+			Assert.AreNotEqual(morning.DatedVersion.Split(' ')[1], evening.DatedVersion.Split(' ')[1]);
+			var local = new DateTimeOffset(2026, 9, 29, 9, 5, 0, TimeSpan.Zero).ToLocalTime();
+			StringAssert.StartsWith(morning.DatedVersion, local.ToString("yyyy-MM-dd HH:mm", System.Globalization.CultureInfo.InvariantCulture));
+			Assert.AreEqual("0fcd225a", CoreVersionDates.NewestFirst([ morning, evening ])[0].ShortVersion.Substring(0, 8),
+				"the newest first, by the full timestamp");
+		}
+
+		[TestMethod]
 		public void APackageFromBeforeTheStampIsLookedUpInWhatTheCoreManagerLastHeard()
 		{
 			var cache = FeedCache(

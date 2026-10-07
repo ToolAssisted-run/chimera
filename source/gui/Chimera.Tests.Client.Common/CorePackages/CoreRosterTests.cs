@@ -22,13 +22,44 @@ namespace Chimera.Tests.Client.Common.CorePackages
 			]
 		}";
 
+		/// <summary>
+		/// A row carries each system's id and the core's own name for it; the
+		/// frontend has no table to look an id up in. The older shape, bare ids,
+		/// is still read - it is what a core added by hand was remembered as.
+		/// </summary>
+		[TestMethod]
+		public void ARowNamesItsSystems()
+		{
+			const string named = @"{
+				""formatVersion"": 2,
+				""cores"": [
+					{ ""id"": ""gpgx"", ""name"": ""Genesis Plus GX"", ""repo"": ""ToolAssisted-run/chimera-core-gpgx"",
+					  ""systems"": [ { ""id"": ""GEN"", ""name"": ""Mega Drive / Genesis"" }, { ""id"": ""SMS"", ""name"": ""Master System"" }, ""SG"" ] }
+				]
+			}";
+			var core = CoreRoster.Parse(named).Single();
+			CollectionAssert.AreEqual(new[] { "GEN", "SMS", "SG" }, core.Systems.ToList());
+			Assert.AreEqual("Mega Drive / Genesis", core.SystemNameOf("GEN"));
+			Assert.AreEqual("Master System", core.SystemNameOf("SMS"));
+			Assert.IsNull(core.SystemNameOf("SG"), "a bare id names nothing");
+			Assert.IsNull(core.SystemNameOf("NES"), "nor does a system the row does not have");
+
+			CoreManagerRow row = new() { Core = core };
+			Assert.AreEqual("Mega Drive / Genesis, Master System, SG", row.SystemsSpelled);
+
+			// written back, a row is the named shape
+			var written = Newtonsoft.Json.JsonConvert.SerializeObject(core);
+			StringAssert.Contains(written, @"{""id"":""GEN"",""name"":""Mega Drive / Genesis""}");
+			Assert.AreEqual("Mega Drive / Genesis", Newtonsoft.Json.JsonConvert.DeserializeObject<RosterCore>(written)!.SystemNameOf("GEN"));
+		}
+
 		[TestMethod]
 		public void ReadsCoresNameSorted()
 		{
 			var cores = CoreRoster.Parse(Sample);
 			CollectionAssert.AreEqual(new[] { "Genesis Plus GX", "Stella" }, cores.Select(static c => c.Name).ToList());
 			Assert.AreEqual("ToolAssisted-run/chimera-core-gpgx", cores[0].Repo);
-			CollectionAssert.AreEqual(new[] { "GEN", "SMS" }, cores[0].Systems);
+			CollectionAssert.AreEqual(new[] { "GEN", "SMS" }, cores[0].Systems.ToList());
 			Assert.AreEqual("4ed3532117ad", cores[0].Tested);
 		}
 
@@ -38,6 +69,17 @@ namespace Chimera.Tests.Client.Common.CorePackages
 			// empty means "newest of the chosen channel", which is where every core
 			// starts: the matrix has not run against it yet
 			Assert.AreEqual("", CoreRoster.Parse(Sample).Single(static c => c.Id is "stella").Tested);
+		}
+
+		[TestMethod]
+		public void TheRosterSaysWhichCoresAreGames()
+		{
+			var cores = CoreRoster.Parse(@"{ ""formatVersion"": 1, ""cores"": [
+				{ ""id"": ""sdlpop"", ""name"": ""SDLPoP"", ""kind"": ""game"", ""repo"": ""owner/sdlpop"" },
+				{ ""id"": ""gpgx"", ""name"": ""Genesis Plus GX"", ""repo"": ""owner/gpgx"" }
+			] }");
+			Assert.IsTrue(cores.Single(static c => c.Id is "sdlpop").IsGameCore);
+			Assert.IsFalse(cores.Single(static c => c.Id is "gpgx").IsGameCore, "no kind is an emulator");
 		}
 
 		[TestMethod]
@@ -54,7 +96,7 @@ namespace Chimera.Tests.Client.Common.CorePackages
 		[TestMethod]
 		public void AFutureRosterIsRefusedRatherThanHalfRead()
 		{
-			Assert.ThrowsException<NotSupportedException>(static () => CoreRoster.Parse(@"{ ""formatVersion"": 99, ""cores"": [] }"));
+			Assert.ThrowsExactly<NotSupportedException>(static () => CoreRoster.Parse(@"{ ""formatVersion"": 99, ""cores"": [] }"));
 		}
 
 		[TestMethod]

@@ -80,8 +80,18 @@ while IFS='|' read -r id repo; do
 	fi
 
 	# published as <id>-<version>.chimeraCore; the frontend finds packages by
-	# extension, so the name it lands under is the name it keeps
-	if gh release download "$tag" --repo "$repo" --pattern "$id-*.chimeraCore" --dir "$out" --clobber 2>/dev/null; then
+	# extension, so the name it lands under is the name it keeps. Three tries:
+	# a download that GitHub drops once failed the frontend's CI on 2026-09-30
+	# (rawgl, whose release was sitting there unchanged the whole time)
+	got=0
+	for attempt in 1 2 3; do
+		if gh release download "$tag" --repo "$repo" --pattern "$id-*.chimeraCore" --dir "$out" --clobber 2>/dev/null; then
+			got=1
+			break
+		fi
+		[ "$attempt" -lt 3 ] && { echo "$id: the download failed, trying again" >&2; sleep $((attempt * 5)); }
+	done
+	if [ "$got" -eq 1 ]; then
 		fetched=$((fetched + 1))
 		echo "$id: $tag"
 	else

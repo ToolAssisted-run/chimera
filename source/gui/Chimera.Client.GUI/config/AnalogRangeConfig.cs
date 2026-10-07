@@ -1,16 +1,44 @@
 using System.Drawing;
 using System.Windows.Forms;
 
+using Chimera.Client.Common;
+
 namespace Chimera.Client.GUI
 {
-	public partial class AnalogRangeConfig : Panel
+	public partial class AnalogRangeConfig : Panel, IThemedControl
 	{
+		private Pen _axisPen = Pens.Black;
+
+		private Pen _limitPen = Pens.Cyan;
+
+		private Brush _fieldBrush = SystemBrushes.Control;
+
+		private Brush _dotBrush = Brushes.White;
+
+		/// <inheritdoc/>
+		public void ApplyTheme(Theme theme)
+		{
+			Release(_axisPen);
+			Release(_limitPen);
+			Release(_fieldBrush);
+			Release(_dotBrush);
+			BackColor = theme[ThemeColorRole.AnalogRangeBackground];
+			_axisPen = new Pen(theme[ThemeColorRole.AnalogRangeAxis]);
+			_limitPen = new Pen(theme[ThemeColorRole.AnalogRangeLimit]);
+			_fieldBrush = new SolidBrush(theme[ThemeColorRole.AnalogRangeField]);
+			_dotBrush = new SolidBrush(theme[ThemeColorRole.AnalogRangeDot]);
+			Refresh();
+		}
+
+		/// <summary>The system's own pens and brushes are shared and must not be disposed.</summary>
+		private static void Release(object drawing)
+		{
+			if (drawing is Pen p && p != Pens.Black && p != Pens.Cyan) p.Dispose();
+			else if (drawing is Brush b && b != SystemBrushes.Control && b != Brushes.White) b.Dispose();
+		}
+
 		private const int ScaleFactor = 4;
 		private const int _3DPadding = 5;
-
-		private readonly Pen _blackPen = Pens.Black;
-
-		private readonly Pen _bluePen = Pens.Cyan;
 
 		private int _maxX = 127;
 		private int _maxY = 127;
@@ -82,14 +110,14 @@ namespace Chimera.Client.GUI
 
 		protected override void OnPaint(PaintEventArgs e)
 		{
-			e.Graphics.FillRectangle(SystemBrushes.Control, 0, 0, Width, Height);
-			e.Graphics.FillEllipse(Brushes.White, 0, 0, Width - _3DPadding, Height - _3DPadding);
-			e.Graphics.DrawEllipse(_blackPen, 0, 0, Width - _3DPadding, Height - _3DPadding);
+			e.Graphics.FillRectangle(_fieldBrush, 0, 0, Width, Height);
+			e.Graphics.FillEllipse(_dotBrush, 0, 0, Width - _3DPadding, Height - _3DPadding);
+			e.Graphics.DrawEllipse(_axisPen, 0, 0, Width - _3DPadding, Height - _3DPadding);
 
 			if (Radial)
 			{
 				e.Graphics.DrawEllipse(
-					_bluePen,
+					_limitPen,
 					TopLeft.X,
 					TopLeft.Y,
 					ScaledX * 2 - 4,
@@ -98,7 +126,7 @@ namespace Chimera.Client.GUI
 			else
 			{
 				e.Graphics.DrawRectangle(
-					_bluePen,
+					_limitPen,
 					TopLeft.X,
 					TopLeft.Y,
 					ScaledX * 2 - 3,

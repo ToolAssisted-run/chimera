@@ -140,7 +140,7 @@ namespace Chimera.Client.GUI
 			if (BranchView.CurrentCell is { RowIndex: int targetRow, Column.Name: BranchNumberColumnName }
 				&& index == targetRow && column.Name is BranchNumberColumnName)
 			{
-				color = Color.FromArgb((byte)(color.A - 24), (byte)(color.R - 24), (byte)(color.G - 24), (byte)(color.B - 24));
+				color = ThemeEngine.Hovered(color);
 			}
 		}
 
@@ -206,7 +206,11 @@ namespace Chimera.Client.GUI
 			try
 			{
 				var path = Movie.NewBranchStatePath(out var stateFile);
-				Tastudio.Emulator.AsStatable().SaveStateToFile(path);
+				// a window only if it lasts: milliseconds on a small machine, half a minute on a PS3
+				using (ProgressDialog.Begin(Tastudio, "Saving the branch", showAfterMs: 400))
+				{
+					Tastudio.Emulator.AsStatable().SaveStateToFile(path);
+				}
 				_lastStateBytes = new FileInfo(path).Length;
 				return stateFile;
 			}
@@ -683,9 +687,10 @@ namespace Chimera.Client.GUI
 					&& targetRow < Branches.Count
 					&& Branches[targetRow] is { OSDFrameBuffer: { } bb } branch)
 				{
-					var width = bb.Width;
+					var shown = ScreenshotForm.FitWithin(bb.Width, bb.Height, ScreenshotForm.BranchPreviewSide);
+					var width = shown.Width;
 					Point location = PointToScreen(Location);
-					var bottom = location.Y + bb.Height;
+					var bottom = location.Y + shown.Height;
 					location.Offset(-width, 0);
 
 					if (location.X < 0)
@@ -710,7 +715,7 @@ namespace Chimera.Client.GUI
 						branch.UserText,
 						location,
 						width: width,
-						height: bb.Height,
+						height: shown.Height,
 						Graphics.FromHwnd(Handle).MeasureString);
 					_screenshot.FadeIn();
 				}

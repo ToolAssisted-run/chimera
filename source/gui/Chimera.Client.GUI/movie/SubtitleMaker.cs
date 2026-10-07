@@ -5,7 +5,7 @@ using Chimera.Client.Common;
 
 namespace Chimera.Client.GUI
 {
-	public partial class SubtitleMaker : Form
+	public partial class SubtitleMaker : ThemedForm
 	{
 		public Subtitle Sub { get; set; } = new Subtitle();
 

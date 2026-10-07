@@ -62,6 +62,7 @@ namespace Chimera.Client.GUI
 			this.DisplayFPSMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.DisplayFrameCounterMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.DisplayLagCounterMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
+			this.DisplayGameTimeMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.DisplayInputMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.DisplayRerecordCountMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.DisplaySubtitlesMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
@@ -80,6 +81,7 @@ namespace Chimera.Client.GUI
 			this.PrecompiledModulesMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.DataDirectoryMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.MessagesMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
+			this.ThemeSubMenu = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.AutofireMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.ClientOptionsMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.toolStripSeparator9 = new Chimera.WinForms.Controls.ToolStripSeparatorEx();
@@ -126,11 +128,15 @@ namespace Chimera.Client.GUI
 			this.HexEditorMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.MacroToolMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.BatchRunnerMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
+			this.toolStripSeparatorCoreLog = new Chimera.WinForms.Controls.ToolStripSeparatorEx();
+			this.ExportCoreLogMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.MediaMakerMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.toolStripSeparator22 = new Chimera.WinForms.Controls.ToolStripSeparatorEx();
 			this.GenericCoreSubMenu = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.HelpSubMenu = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
+			this.ShowTAStudioMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.OnlineHelpMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
+			this.CopyVersionInfoMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.AboutMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.MainStatusBar = new Chimera.WinForms.Controls.StatusStripEx();
 			this.EmuStatus = new Chimera.WinForms.Controls.StatusLabelEx();
@@ -166,6 +172,7 @@ namespace Chimera.Client.GUI
 			this.toolStripMenuItem13 = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.customizeToolStripMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.toolStripSeparator30 = new Chimera.WinForms.Controls.ToolStripSeparatorEx();
+			this.toolStripSeparator31 = new Chimera.WinForms.Controls.ToolStripSeparatorEx();
 			this.toolStripMenuItem66 = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.toolStripMenuItem67 = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.ScreenshotContextMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
@@ -187,7 +194,8 @@ namespace Chimera.Client.GUI
             this.ConfigSubMenu,
             this.ToolsSubMenu,
             this.GenericCoreSubMenu,
-            this.HelpSubMenu});
+            this.HelpSubMenu,
+            this.ShowTAStudioMenuItem});
 			this.MainformMenu.LayoutStyle = System.Windows.Forms.ToolStripLayoutStyle.Flow;
 			this.MainformMenu.MenuActivate += new System.EventHandler(this.MainformMenu_MenuActivate);
 			this.MainformMenu.MenuDeactivate += new System.EventHandler(this.MainformMenu_MenuDeactivate);
@@ -504,6 +512,11 @@ namespace Chimera.Client.GUI
 			this.DisplayLagCounterMenuItem.Text = "Display Lag Frame Count";
 			this.DisplayLagCounterMenuItem.Click += new System.EventHandler(this.DisplayLagCounterMenuItem_Click);
 			// 
+			// DisplayGameTimeMenuItem
+			// 
+			this.DisplayGameTimeMenuItem.Text = "Display Game Time";
+			this.DisplayGameTimeMenuItem.Click += new System.EventHandler(this.DisplayGameTimeMenuItem_Click);
+			// 
 			// DisplayInputMenuItem
 			// 
 			this.DisplayInputMenuItem.Text = "Display Input";
@@ -545,6 +558,7 @@ namespace Chimera.Client.GUI
             this.FirmwareMenuItem,
             this.DataDirectoryMenuItem,
             this.MessagesMenuItem,
+            this.ThemeSubMenu,
             this.AutofireMenuItem,
             this.ClientOptionsMenuItem,
             this.toolStripSeparator9,
@@ -602,6 +616,18 @@ namespace Chimera.Client.GUI
 			// 
 			this.MessagesMenuItem.Text = "&Messages...";
 			this.MessagesMenuItem.Click += new System.EventHandler(this.MessagesMenuItem_Click);
+			// 
+			// ThemeSubMenu
+			// 
+			// Seeded with a separator, like RecentProjectSubMenu above and for the
+			// same reason: a ToolStripMenuItem whose DropDownItems is EMPTY does not
+			// open a dropdown at all, so DropDownOpened never fires and the handler
+			// that fills this menu never runs. The menu is built there, so without a
+			// starting item clicking Theme does nothing whatsoever.
+			this.ThemeSubMenu.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.toolStripSeparator31});
+			this.ThemeSubMenu.Text = "&Theme";
+			this.ThemeSubMenu.DropDownOpened += new System.EventHandler(this.ThemeSubMenu_DropDownOpened);
 			// 
 			// AutofireMenuItem
 			// 
@@ -818,7 +844,9 @@ namespace Chimera.Client.GUI
             this.LuaConsoleMenuItem,
             this.HexEditorMenuItem,
             this.MacroToolMenuItem,
-            this.BatchRunnerMenuItem});
+            this.BatchRunnerMenuItem,
+            this.toolStripSeparatorCoreLog,
+            this.ExportCoreLogMenuItem});
 			this.ToolsSubMenu.Text = "&Tools";
 			this.ToolsSubMenu.DropDownOpened += new System.EventHandler(this.ToolsSubMenu_DropDownOpened);
 			// 
@@ -858,6 +886,11 @@ namespace Chimera.Client.GUI
 			this.BatchRunnerMenuItem.Visible = false;
 			this.BatchRunnerMenuItem.Click += new System.EventHandler(this.BatchRunnerMenuItem_Click);
 			// 
+			// ExportCoreLogMenuItem
+			// 
+			this.ExportCoreLogMenuItem.Text = "Export Core &Log...";
+			this.ExportCoreLogMenuItem.Click += new System.EventHandler(this.ExportCoreLogMenuItem_Click);
+			// 
 			// GenericCoreSubMenu
 			// 
 			this.GenericCoreSubMenu.Text = "E&mulator";
@@ -866,13 +899,28 @@ namespace Chimera.Client.GUI
 			// 
 			this.HelpSubMenu.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.OnlineHelpMenuItem,
+            this.CopyVersionInfoMenuItem,
             this.AboutMenuItem});
 			this.HelpSubMenu.Text = "&Help";
+			// 
+			// ShowTAStudioMenuItem
+			// 
+			// Only while TAStudio is hidden with its "<< Hide" button. Right-aligned
+			// in a flowing menu, which MenuStripEx does itself.
+			this.ShowTAStudioMenuItem.Alignment = System.Windows.Forms.ToolStripItemAlignment.Right;
+			this.ShowTAStudioMenuItem.Text = "Show TAStudio >>";
+			this.ShowTAStudioMenuItem.Visible = false;
+			this.ShowTAStudioMenuItem.Click += new System.EventHandler(this.ShowTAStudioMenuItem_Click);
 			// 
 			// OnlineHelpMenuItem
 			// 
 			this.OnlineHelpMenuItem.Text = "Open toolAssisted.run in Browser";
 			this.OnlineHelpMenuItem.Click += new System.EventHandler(this.OnlineHelpMenuItem_Click);
+			// 
+			// CopyVersionInfoMenuItem
+			// 
+			this.CopyVersionInfoMenuItem.Text = "&Copy Version Info";
+			this.CopyVersionInfoMenuItem.Click += new System.EventHandler(this.CopyVersionInfoMenuItem_Click);
 			// 
 			// AboutMenuItem
 			// 
@@ -1175,10 +1223,12 @@ namespace Chimera.Client.GUI
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx ConfigSubMenu;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx ToolsSubMenu;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx HelpSubMenu;
+		private Chimera.WinForms.Controls.ToolStripMenuItemEx ShowTAStudioMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx PauseMenuItem;
 		private Chimera.WinForms.Controls.ToolStripSeparatorEx toolStripSeparator1;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx RebootCoreMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx OnlineHelpMenuItem;
+		private Chimera.WinForms.Controls.ToolStripMenuItemEx CopyVersionInfoMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx AboutMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx ControllersMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx HotkeysMenuItem;
@@ -1191,6 +1241,7 @@ namespace Chimera.Client.GUI
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx DisplayFrameCounterMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx DisplayInputMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx DisplayLagCounterMenuItem;
+		private Chimera.WinForms.Controls.ToolStripMenuItemEx DisplayGameTimeMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx LuaConsoleMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx RecentProjectSubMenu;
 		private Chimera.WinForms.Controls.ToolStripSeparatorEx toolStripSeparator3;
@@ -1223,6 +1274,7 @@ namespace Chimera.Client.GUI
 		private StatusStripEx MainStatusBar;
 		private Chimera.WinForms.Controls.StatusLabelEx EmuStatus;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx MessagesMenuItem;
+		private Chimera.WinForms.Controls.ToolStripMenuItemEx ThemeSubMenu;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx PathsMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx FirmwareMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx PrecompiledModulesMenuItem;
@@ -1282,6 +1334,8 @@ namespace Chimera.Client.GUI
 		private Chimera.WinForms.Controls.ToolStripSeparatorEx ShowMenuContextMenuSeparator;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx GenericCoreSubMenu;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx BatchRunnerMenuItem;
+		private Chimera.WinForms.Controls.ToolStripSeparatorEx toolStripSeparatorCoreLog;
+		private Chimera.WinForms.Controls.ToolStripMenuItemEx ExportCoreLogMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx MediaMakerMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx DisplayConfigMenuItem;
 		private Chimera.WinForms.Controls.StatusLabelEx CoreNameStatusBarButton;
@@ -1293,6 +1347,7 @@ namespace Chimera.Client.GUI
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx toolStripMenuItem12;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx toolStripMenuItem13;
 		private Chimera.WinForms.Controls.ToolStripSeparatorEx toolStripSeparator30;
+		private Chimera.WinForms.Controls.ToolStripSeparatorEx toolStripSeparator31;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx toolStripMenuItem66;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx toolStripMenuItem67;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx ClientOptionsMenuItem;

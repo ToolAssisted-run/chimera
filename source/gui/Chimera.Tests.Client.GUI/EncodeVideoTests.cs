@@ -33,12 +33,13 @@ namespace Chimera.Tests.Client.GUI
 			internal readonly List<VideoEncodeRequest> Started = new();
 			internal int Cancels;
 			internal VideoEncodeProgress Progress = new(VideoEncodePhase.Idle, 0, 0, 0, 0, null, null);
-			internal string Refusal;
+			/// <summary>why the next encode is refused, or null to let it start</summary>
+			internal string? Refusal;
 			internal readonly List<string> AskedToOverwrite = new();
 			internal bool Overwrite = true;
 			internal readonly EncodeVideoForm Form;
 
-			internal Harness(IReadOnlyList<TasMovieMarker> markers = null, Config config = null)
+			internal Harness(IReadOnlyList<TasMovieMarker>? markers = null, Config? config = null)
 			{
 				Form = new(
 					markers ?? Markers(),
@@ -60,6 +61,58 @@ namespace Chimera.Tests.Client.GUI
 			}
 
 			public void Dispose() => Form.Dispose();
+		}
+
+		[TestMethod]
+		public void RestoreDefaultsPutsTheEncodesChoicesBackAndLeavesTheRest()
+		{
+			// #169: a stray edit to the command had no way back but a copy kept elsewhere
+			Config edited = new()
+			{
+				FFmpegCustomCommand = "-c:v ffv1 -f matroska oops",
+				VideoWriterAudioSync = false,
+				AVWriterPad = true,
+				AviCaptureOsd = true,
+				AVWriterResizeWidth = 640,
+				AVWriterResizeHeight = 480,
+			};
+			edited.VideoWriterAudioSyncEffective = false;
+			using Harness h = new(config: edited);
+			h.Form.Choose(output: "/videos/mine.mkv", to: h.Form.MarkerChoices[1]);
+
+			h.Form.RestoreDefaults();
+			var asked = h.Form.BuildRequest();
+
+			Assert.AreEqual(EncodeVideoForm.DefaultCommand, asked.FFmpegCommand);
+			Assert.IsTrue(asked.AudioSync, "audio sync is on by default");
+			Assert.IsFalse(asked.Pad);
+			Assert.IsFalse(asked.CaptureOsd);
+			Assert.IsFalse(asked.CaptureLua);
+			Assert.AreEqual(0, asked.Width, "no resize");
+			StringAssert.StartsWith(asked.OutputPath, "/videos/mine.", "where it goes is this encode's own");
+			Assert.AreEqual(h.Form.EndFrame, asked.EndFrame, "and so are the frames");
+		}
+
+		[TestMethod]
+		public void OpenFolderNamesTheFolderTheVideoGoesTo()
+		{
+			using Harness h = new();
+			var folder = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"chimera-encode-{System.IO.Path.GetRandomFileName()}");
+			System.IO.Directory.CreateDirectory(folder);
+			try
+			{
+				h.Form.Choose(output: System.IO.Path.Combine(folder, "run.mp4"));
+				Assert.IsTrue(h.Form.OpenFolderEnabled, "a folder that exists can be opened before anything is written");
+				Assert.AreEqual(System.IO.Path.GetFullPath(folder), h.Form.OutputFolder);
+
+				h.Form.Choose(output: System.IO.Path.Combine(folder, "no such folder", "run.mp4"));
+				Assert.IsFalse(h.Form.OpenFolderEnabled, "and one that does not, cannot");
+				Assert.IsNull(h.Form.OutputFolder);
+			}
+			finally
+			{
+				System.IO.Directory.Delete(folder, recursive: true);
+			}
 		}
 
 		[TestMethod]
@@ -347,19 +400,8 @@ namespace Chimera.Tests.Client.GUI
 		[TestMethod]
 		public void PictureIt()
 		{
-			var dir = Environment.GetEnvironmentVariable("CHIMERA_UI_SHOTS");
-			if (dir is null) { Assert.Inconclusive("set CHIMERA_UI_SHOTS to write screenshots"); return; }
-
 			using Harness h = new();
-			h.Form.Refresh();
-			System.Windows.Forms.Application.DoEvents();
-			using System.Drawing.Bitmap bmp = new(h.Form.Width, h.Form.Height);
-			using (var g = System.Drawing.Graphics.FromImage(bmp))
-			{
-				g.CopyFromScreen(h.Form.Location, System.Drawing.Point.Empty, h.Form.Size);
-			}
-			System.IO.Directory.CreateDirectory(dir);
-			bmp.Save(System.IO.Path.Combine(dir, "encode-video.png"), System.Drawing.Imaging.ImageFormat.Png);
+			UiShots.Shoot(h.Form, "encode-video");
 		}
 
 		[TestMethod]

@@ -149,61 +149,102 @@ namespace Chimera.Client.GUI
 				new OpenGLProvider());
 		}
 
+		/// <summary>
+		/// The picture beside each menu item. Every one of them comes from
+		/// <see cref="MenuIcons"/>, which is where the reasoning about which
+		/// picture and which items go bare lives; this is only the wiring.
+		/// </summary>
 		private void SetImages()
 		{
-			CloseRomMenuItem.Image = Properties.Resources.Close;
-			EncodeVideoMenuItem.Image = Properties.Resources.Avi;
-			ScreenshotMenuItem.Image = Properties.Resources.Camera;
-			PauseMenuItem.Image = Properties.Resources.Pause;
-			RebootCoreMenuItem.Image = Properties.Resources.Reboot;
-			SwitchToFullscreenMenuItem.Image = Properties.Resources.Fullscreen;
-			ControllersMenuItem.Image = Properties.Resources.GameController;
-			HotkeysMenuItem.Image = Properties.Resources.HotKeys;
-			DisplayConfigMenuItem.Image = Properties.Resources.TvIcon;
-			SoundMenuItem.Image = Properties.Resources.Audio;
-			PathsMenuItem.Image = Properties.Resources.CopyFolder;
-			MessagesMenuItem.Image = Properties.Resources.MessageConfig;
-			AutofireMenuItem.Image = Properties.Resources.Lightning;
-			SaveConfigMenuItem.Image = Properties.Resources.Save;
-			LoadConfigMenuItem.Image = Properties.Resources.LoadConfig;
+			// File
+			NewProjectMenuItem.Image = MenuIcons.NewProject;
+			OpenProjectMenuItem.Image = MenuIcons.OpenProject;
+			RecentProjectSubMenu.Image = MenuIcons.RecentProjects;
+			SaveProjectMenuItem.Image = MenuIcons.SaveProject;
+			SaveProjectAsMenuItem.Image = MenuIcons.SaveProjectAs;
+			SaveProjectBackupMenuItem.Image = MenuIcons.SaveProjectBackup;
+			CloseRomMenuItem.Image = MenuIcons.CloseProject;
+			EncodeVideoMenuItem.Image = MenuIcons.EncodeVideo;
+			ScreenshotSubMenu.Image = MenuIcons.Screenshot;
+			ScreenshotMenuItem.Image = MenuIcons.Screenshot;
+			ScreenshotAsMenuItem.Image = MenuIcons.ScreenshotAs;
+
+			// System
+			PauseMenuItem.Image = MenuIcons.Pause;
+			RebootCoreMenuItem.Image = MenuIcons.RebootCore;
+
+			// View
+			WindowSizeSubMenu.Image = MenuIcons.WindowSize;
+			SwitchToFullscreenMenuItem.Image = MenuIcons.Fullscreen;
+			DisplayLogWindowMenuItem.Image = MenuIcons.LogWindow;
+
+			// Config
+			ControllersMenuItem.Image = MenuIcons.Controllers;
+			HotkeysMenuItem.Image = MenuIcons.Hotkeys;
+			DisplayConfigMenuItem.Image = MenuIcons.Display;
+			SoundMenuItem.Image = MenuIcons.Sound;
+			PathsMenuItem.Image = MenuIcons.Paths;
+			FirmwareMenuItem.Image = MenuIcons.Firmware;
+			DataDirectoryMenuItem.Image = MenuIcons.DataDirectory;
+			MessagesMenuItem.Image = MenuIcons.Messages;
+			ThemeSubMenu.Image = MenuIcons.ThemePalette;
+			AutofireMenuItem.Image = MenuIcons.Autofire;
+			ClientOptionsMenuItem.Image = MenuIcons.Customize;
+			SpeedSkipSubMenu.Image = MenuIcons.SpeedSkip;
+			KeyPrioritySubMenu.Image = MenuIcons.KeyPriority;
+			SaveConfigMenuItem.Image = MenuIcons.SaveConfig;
+			SaveConfigAsMenuItem.Image = MenuIcons.SaveConfigAs;
+			LoadConfigMenuItem.Image = MenuIcons.LoadConfig;
+			LoadConfigFromMenuItem.Image = MenuIcons.LoadConfigFrom;
+
+			// Tools
+			CoreManagerMenuItem.Image = MenuIcons.CoreManager;
+			CacheManagerMenuItem.Image = MenuIcons.CacheManager;
+			MediaMakerMenuItem.Image = MenuIcons.MediaMaker;
+			PrecompiledModulesMenuItem.Image = MenuIcons.PrecompiledModules;
+			MacroToolMenuItem.Image = MenuIcons.MacroTool;
+			BatchRunnerMenuItem.Image = MenuIcons.BatchRunner;
 			(RamWatchMenuItem.Image, /*RamWatchMenuItem.Text*/_) = ToolManager.IconAndNameCache[typeof(RamWatch)]
-				= (/*RamWatch.ToolIcon.ToBitmap()*/Properties.Resources.Watch, "RAM Watch");
+				= (MenuIcons.RamWatch, "RAM Watch");
 			(RamSearchMenuItem.Image, /*RamSearchMenuItem.Text*/_) = ToolManager.IconAndNameCache[typeof(RamSearch)]
-				= (/*RamSearch.ToolIcon.ToBitmap()*/Properties.Resources.Search, "RAM Search");
+				= (MenuIcons.RamSearch, "RAM Search");
 			(LuaConsoleMenuItem.Image, /*LuaConsoleMenuItem.Text*/_) = ToolManager.IconAndNameCache[typeof(LuaConsole)]
-				= (/*LuaConsole.ToolIcon.ToBitmap()*/Properties.Resources.TextDoc, "Lua Console");
-			ToolManager.IconAndNameCache[typeof(TAStudio)]
-				= (/*TAStudio.ToolIcon.ToBitmap()*/Properties.Resources.TAStudio, "TAStudio");
+				= (MenuIcons.LuaConsole, "Lua Console");
+			ToolManager.IconAndNameCache[typeof(TAStudio)] = (MenuIcons.TAStudio, "TAStudio");
 			(HexEditorMenuItem.Image, /*HexEditorMenuItem.Text*/_) = ToolManager.IconAndNameCache[typeof(HexEditor)]
-				= (/*HexEditor.ToolIcon.ToBitmap()*/Properties.Resources.Poke, "Hex Editor");
-			ToolManager.IconAndNameCache[typeof(GenericDebugger)]
-				= (/*GenericDebugger.ToolIcon.ToBitmap()*/Properties.Resources.Bug, "Debugger");
-			OnlineHelpMenuItem.Image = Properties.Resources.Help;
-			AboutMenuItem.Image = Properties.Resources.ChimeraSmall;
+				= (MenuIcons.HexEditor, "Hex Editor");
+			ToolManager.IconAndNameCache[typeof(GenericDebugger)] = (MenuIcons.Debugger, "Debugger");
+
+			// Help
+			OnlineHelpMenuItem.Image = MenuIcons.OnlineHelp;
+			CopyVersionInfoMenuItem.Image = MenuIcons.CopyVersionInfo;
+			AboutMenuItem.Image = MenuIcons.About;
+
+			// the status bar, and the context menu, which mirrors the menus above
 			PlayRecordStatusButton.Image = Properties.Resources.Blank;
 			PauseStatusButton.Image = Properties.Resources.Blank;
-			RebootStatusBarIcon.Image = Properties.Resources.Reboot;
+			RebootStatusBarIcon.Image = MenuIcons.RebootCore;
 			AVStatusLabel.Image = Properties.Resources.Blank;
 			LedLightStatusLabel.Image = Properties.Resources.LightOff;
-			KeyPriorityStatusLabel.Image = Properties.Resources.Both;
-			CoreNameStatusBarButton.Image = Properties.Resources.ChimeraSmall;
+			KeyPriorityStatusLabel.Image = MenuIcons.KeyPriority;
+			CoreNameStatusBarButton.Image = MenuIcons.About;
 			LinkConnectStatusBarButton.Image = Properties.Resources.Connect16X16;
 			RestartMovieContextMenuItem.Image = Properties.Resources.Restart;
 			StopMovieContextMenuItem.Image = Properties.Resources.Stop;
 			StopNoSaveContextMenuItem.Image = Properties.Resources.Stop;
 			SaveMovieContextMenuItem.Image = Properties.Resources.SaveAs;
 			SaveMovieAsContextMenuItem.Image = Properties.Resources.SaveAs;
-			toolStripMenuItem6.Image = Properties.Resources.GameController;
-			toolStripMenuItem7.Image = Properties.Resources.HotKeys;
-			toolStripMenuItem8.Image = Properties.Resources.TvIcon;
-			toolStripMenuItem9.Image = Properties.Resources.Audio;
-			toolStripMenuItem10.Image = Properties.Resources.CopyFolder;
-			toolStripMenuItem12.Image = Properties.Resources.MessageConfig;
-			toolStripMenuItem13.Image = Properties.Resources.Lightning;
-			toolStripMenuItem66.Image = Properties.Resources.Save;
-			toolStripMenuItem67.Image = Properties.Resources.LoadConfig;
-			ScreenshotContextMenuItem.Image = Properties.Resources.Camera;
-			CloseRomContextMenuItem.Image = Properties.Resources.Close;
+			toolStripMenuItem6.Image = MenuIcons.Controllers;
+			toolStripMenuItem7.Image = MenuIcons.Hotkeys;
+			toolStripMenuItem8.Image = MenuIcons.Display;
+			toolStripMenuItem9.Image = MenuIcons.Sound;
+			toolStripMenuItem10.Image = MenuIcons.Paths;
+			toolStripMenuItem12.Image = MenuIcons.Messages;
+			toolStripMenuItem13.Image = MenuIcons.Autofire;
+			toolStripMenuItem66.Image = MenuIcons.SaveConfig;
+			toolStripMenuItem67.Image = MenuIcons.LoadConfig;
+			ScreenshotContextMenuItem.Image = MenuIcons.Screenshot;
+			CloseRomContextMenuItem.Image = MenuIcons.CloseProject;
 		}
 
 		public MainForm(
@@ -283,6 +324,9 @@ namespace Chimera.Client.GUI
 			InitializeComponent();
 			Icon = Properties.Resources.Logo;
 			SetImages();
+			// here and not in the designer: the menu starts empty and is filled when a core
+			// runs (DisplayDefaultCoreMenu), and this only brings its checks up to date
+			GenericCoreSubMenu.DropDownOpened += GenericCoreSubMenu_DropDownOpened;
 #if !DEBUG
 #endif
 			Game = GameInfo.NullInstance;
@@ -480,6 +524,35 @@ namespace Chimera.Client.GUI
 					Environment.Exit(2);
 				}
 				WaterboxCore.PrecompileRequest = new(preIndex, preCount, FirmwareToo: !parts.Skip(2).Contains("game"));
+				// the project's other files - licence, packages, disc key - mounted
+				// the way a project mounts them, or a game that needs them to boot
+				// compiles nothing (chimera#140)
+				if (_argParser.cmdPrecompileSlots is { Length: > 0 } slotsFile)
+				{
+					try
+					{
+						var doc = Newtonsoft.Json.Linq.JObject.Parse(File.ReadAllText(slotsFile));
+						var extras = new List<CoreFile>
+						{
+							new("slots", System.Text.Encoding.UTF8.GetBytes(
+								(doc["slots"] ?? new Newtonsoft.Json.Linq.JObject()).ToString(Newtonsoft.Json.Formatting.None))),
+						};
+						if (doc["files"] is Newtonsoft.Json.Linq.JObject files)
+						{
+							foreach (var file in files.Properties())
+							{
+								if (file.Value.Type is Newtonsoft.Json.Linq.JTokenType.String)
+									extras.Add(new(file.Name, file.Value.ToString()));
+							}
+						}
+						RomLoader.PlainLoadExtraFiles = extras;
+					}
+					catch (Exception ex) when (ex is IOException or Newtonsoft.Json.JsonException)
+					{
+						Console.Error.WriteLine($"bad --precompile-slots {slotsFile}: {ex.Message}");
+						Environment.Exit(2);
+					}
+				}
 			}
 			ScanForCorePackages();
 			// the menus built at construction time predate the packages
@@ -874,6 +947,7 @@ namespace Chimera.Client.GUI
 				}
 
 				InputManager.RunControllerChain(Config);
+				NoteThatPlaybackOwnsTheInput();
 
 				// emu.yield()'ing scripts
 				if (Tools.Has<LuaConsole>())
@@ -1055,6 +1129,33 @@ namespace Chimera.Client.GUI
 		/// </summary>
 		public static bool DisableSecondaryThrottling { get; set; }
 
+		/// <summary>
+		/// When the machine is replaying a movie, the LOG is the input and a hand on
+		/// the pad changes nothing - which is right, and was invisible: a person
+		/// pressing buttons at a game that ignores them has no way to tell that from
+		/// a bug, and reported one (issue #95). Say it, at most once every few
+		/// seconds, and only while something is actually being held.
+		/// </summary>
+		private void NoteThatPlaybackOwnsTheInput()
+		{
+			if (MovieSession.Movie is not { } movie || !movie.IsPlaying()) return;
+			if ((DateTime.UtcNow - _lastPlaybackInputNote).TotalSeconds < 6) return;
+			var held = InputManager.ActiveController;
+			var definition = held?.Definition;
+			if (definition is null) return;
+			foreach (var button in definition.BoolButtons)
+			{
+				if (!held.IsPressed(button)) continue;
+				_lastPlaybackInputNote = DateTime.UtcNow;
+				AddOnScreenMessage(Tools.IsLoaded<TAStudio>()
+					? "Playing back: the movie's input is in charge. Tick Recording mode to type your own."
+					: "Playing back: the movie's input is in charge.");
+				return;
+			}
+		}
+
+		private DateTime _lastPlaybackInputNote = DateTime.MinValue;
+
 		public void AddOnScreenMessage(string message, [LiteralExpected] int? duration = null)
 		{
 #pragma warning disable CS0618 // this is the sanctioned call-site
@@ -1179,6 +1280,14 @@ namespace Chimera.Client.GUI
 			else
 			{
 				if (CurrentlyOpenRomArgs == null) return true;
+				// Inside a project the project stays (RebootProject). Not when another
+				// movie is already queued: that is somebody starting a different movie,
+				// and the reboot is theirs.
+				if (_openProject is not null && !MovieSession.NewMovieQueued
+					&& MovieSession.Movie is ITasMovie tasMovie && tasMovie.IsActive())
+				{
+					return RebootProject(tasMovie);
+				}
 				return LoadRom(
 					CurrentlyOpenRomArgs.OpenAdvanced.SimplePath,
 					CurrentlyOpenRomArgs with { ForcedSysID = Emulator.SystemId });
@@ -1392,7 +1501,7 @@ namespace Chimera.Client.GUI
 					// It seems that some StatusBar elements composite with the backcolor.
 					// Maybe we could add another control under the StatusBar. with a different backcolor
 					Padding = new Padding(1);
-					BackColor = Color.Black;
+					BackColor = ThemeEngine.Color(ThemeColorRole.EmulatorViewport);
 
 					// FUTURE WORK:
 					// re-add this padding back into the display manager (so the image will get cut off a little but, but a few more resolutions will fully fit into the screen)
@@ -1418,7 +1527,7 @@ namespace Chimera.Client.GUI
 
 					// it's important that we set the form color back to this, because the StatusBar icons blend onto the mainform, not onto the StatusBar--
 					// so we need the StatusBar and mainform backdrop color to match
-					BackColor = SystemColors.Control;
+					BackColor = ThemeEngine.Color(ThemeColorRole.WindowBackground);
 				}
 
 				_inFullscreen = false;
@@ -1722,7 +1831,7 @@ namespace Chimera.Client.GUI
 			// rather than per core now, so "clear what this core compiled" is not
 			// a thing that can be pointed at: Tools > Pre-Compiled Modules...
 			// lists the games and removes them one at a time.
-			if (Emulator.SystemId is VSystemID.Raw.NULL) return; // a core, but no machine running yet
+			if (Emulator.SystemId is NullEmulator.NullSystemId) return; // a core, but no machine running yet
 
 			// The way OUT for what this machine keeps (docs/save-data.md): present
 			// exactly when the core exports the savedata group, with no change
@@ -1732,6 +1841,22 @@ namespace Chimera.Client.GUI
 				ToolStripMenuItem exportSaveDataMenuItem = new() { Text = "Export Save &Data..." };
 				exportSaveDataMenuItem.Click += (_, _) => ExportSaveData();
 				GenericCoreSubMenu.DropDownItems.Insert(0, exportSaveDataMenuItem);
+			}
+
+			// what a game core's own game offers (docs/game-cores.md): the timer only for a
+			// game whose core names one, so it is not a View option every core would carry
+			if (Emulator.ServiceProvider.GetService<IGameProperties>()?.GameTimeMs is not null)
+			{
+				GenericCoreSubMenu.DropDownItems.Insert(0, DisplayGameTimeMenuItem);
+				if (GenericCoreSubMenu.DropDownItems.Count > 1) GenericCoreSubMenu.DropDownItems.Insert(1, new ToolStripSeparator());
+			}
+
+			// a movie made elsewhere, read by the core whose project this is (a Doom demo)
+			if (RunningMovieImport() is var (_, movieImport))
+			{
+				ToolStripMenuItem importMenuItem = new() { Text = movieImport.Menu ?? "Import Movie..." };
+				importMenuItem.Click += (_, _) => ImportMovieDialog();
+				GenericCoreSubMenu.DropDownItems.Add(importMenuItem);
 			}
 
 			var coreTools = CoreProvidedTools.Concat(SpecializedTools)
@@ -1963,6 +2088,13 @@ namespace Chimera.Client.GUI
 
 		/*internal*/public void Render()
 		{
+			// A window on its way out has nothing left to draw on: closing it (the
+			// core-stopped dialog's "save and close", issue #166) disposes the
+			// display before the run loop's last pass reaches here, and drawing -
+			// or asking where the pointer is over it - threw ObjectDisposedException
+			// in place of closing.
+			if (IsDisposed || _presentationPanel.Control.IsDisposed) return;
+
 			if (Config.DispSpeedupFeatures == 0)
 			{
 				DisplayManager.DiscardApiSurfaces();
@@ -2092,7 +2224,7 @@ namespace Chimera.Client.GUI
 			var result = this.ShowFileOpenDialog(
 				filter: RomLoader.RomFilter,
 				filterIndex: ref _lastOpenRomFilter,
-				initDir: Config.PathEntries.RomAbsolutePath(Emulator.SystemId));
+				initDir: Config.PathEntries.RomDialogDir(Emulator.SystemId));
 			if (result is null) return;
 			var filePath = new FileInfo(result).FullName;
 			_ = LoadRom(filePath, new LoadRomArgs(new OpenAdvanced_OpenRom(filePath)));
@@ -2181,6 +2313,9 @@ namespace Chimera.Client.GUI
 
 		private void ToggleLagCounter()
 			=> Config.DisplayLagCounter = !Config.DisplayLagCounter;
+
+		private void ToggleGameTime()
+			=> Config.DisplayGameTime = !Config.DisplayGameTime;
 
 		private void ToggleInputDisplay()
 			=> Config.DisplayInput = !Config.DisplayInput;
@@ -3312,7 +3447,7 @@ namespace Chimera.Client.GUI
 					// machine has different addresses
 					if (previousRom == CurrentlyOpenRom && Emulator.HasMemoryDomains())
 					{
-						CheatList.UpdateDomains(Emulator.AsMemoryDomains());
+						CheatList.UpdateDomains(Emulator.AsMemoryDomains(), Emulator.ServiceProvider.GetService<IGameProperties>());
 					}
 					else
 					{
@@ -3425,6 +3560,9 @@ namespace Chimera.Client.GUI
 				return;
 			}
 
+			// the system's ROM folder if there is one, else where the last ROM came from
+			var initDir = Config.PathEntries.RomDialogDir(Emulator.SystemId);
+
 			try
 			{
 				var chunk = new byte[1 << 20]; // ranged reads: a big file streams
@@ -3437,7 +3575,7 @@ namespace Chimera.Client.GUI
 						: new FilesystemFilterSet(new FilesystemFilter($"{ext} files", new[] { ext }));
 					var result = this.ShowFileSaveDialog(
 						filter: filterSet,
-						initDir: Config.PathEntries.RomAbsolutePath(Emulator.SystemId),
+						initDir: initDir,
 						initFileName: name);
 					if (result is null) return;
 					using var fs = new FileStream(result, FileMode.Create, FileAccess.Write);
@@ -3447,7 +3585,7 @@ namespace Chimera.Client.GUI
 				{
 					var result = this.ShowFileSaveDialog(
 						filter: new(new FilesystemFilter("Zip Archives", new[] { "zip" })),
-						initDir: Config.PathEntries.RomAbsolutePath(Emulator.SystemId),
+						initDir: initDir,
 						initFileName: $"{Game.FilesystemSafeName()} (save data).zip");
 					if (result is null) return;
 					using var fs = new FileStream(result, FileMode.Create, FileAccess.Write);
@@ -3493,7 +3631,7 @@ namespace Chimera.Client.GUI
 
 		/// <summary>
 		/// This closes the game but does not set things up for using the client with the new null emulator.
-		/// This method should only be called (outside of <see cref="LoadNullRom(bool)"/>) if the caller is about to load a new game with no user interaction between close and load.
+		/// This method should only be called (outside of <see cref="LoadNullRom()"/>) if the caller is about to load a new game with no user interaction between close and load.
 		/// </summary>
 		/// <returns>True if the game was closed. False if the user cancelled due to unsaved changes.</returns>
 		private bool CloseGame()
@@ -3505,7 +3643,9 @@ namespace Chimera.Client.GUI
 				return false;
 			}
 			// If TAStudio is open, we already asked about saving the movie.
-			if (!Tools.IsLoaded<TAStudio>())
+			// A project being rebooted keeps its movie: it is not stopped, saved or
+			// disposed here, with or without the piano roll open (RebootProject).
+			if (!_rebootingProject && !Tools.IsLoaded<TAStudio>())
 			{
 				TryAgainResult saveMovieResult = this.DoWithTryAgainBox(() => MovieSession.StopMovie(), "Failed to save movie.");
 				if (saveMovieResult == TryAgainResult.Canceled) return false;
@@ -3550,6 +3690,16 @@ namespace Chimera.Client.GUI
 
 		public bool EnsureCoreIsAccurate()
 			=> true; // single-core build: no more-accurate alternative to offer
+
+		public void TAStudioHidden(bool hidden) => ShowTAStudioMenuItem.Visible = hidden;
+
+		public void ProjectSavedAs(string path)
+		{
+			Config.RecentProjects.Add(path);
+			SaveConfig();
+		}
+
+		private void ShowTAStudioMenuItem_Click(object sender, EventArgs e) => Tools.Load<TAStudio>();
 
 		private void CaptureRewind(bool suppressCaptureRewind)
 		{

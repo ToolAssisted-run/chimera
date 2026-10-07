@@ -128,7 +128,8 @@ namespace Chimera.Client.Common
 		/// Re-points the freezes at the domains of the machine that is now running,
 		/// dropping any whose domain that machine does not have.
 		/// </summary>
-		public void UpdateDomains(IMemoryDomains domains)
+		/// <param name="properties">the running core's game properties, which a frozen property is found in again by name</param>
+		public void UpdateDomains(IMemoryDomains domains, IGameProperties properties = null)
 		{
 			for (int i = _cheatList.Count - 1; i >= 0; i--)
 			{
@@ -136,7 +137,7 @@ namespace Chimera.Client.Common
 				if (cheat.IsSeparator) continue;
 
 				var newDomain = domains[cheat.Domain.Name];
-				if (newDomain is not null)
+				if (newDomain is not null && cheat.Rebind(properties))
 				{
 					cheat.Domain = newDomain;
 				}

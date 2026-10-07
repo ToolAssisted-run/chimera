@@ -1,5 +1,8 @@
+using System;
 using System.Drawing;
 using System.Windows.Forms;
+
+using Chimera.Client.Common;
 
 using Chimera.Display;
 
@@ -11,11 +14,31 @@ namespace Chimera.Client.GUI
 	/// so show only the actual contents and avoid stealing focus, while still being topmost:
 	/// <see href="https://stackoverflow.com/a/25219399"/>
 	/// </remarks>
-	public class ScreenshotForm : Form
+	public class ScreenshotForm : ThemedForm
 	{
 		private const int WS_EX_TOPMOST = 0x00000008;
 
 		private const int Interval = 40;
+
+		/// <summary>The longest side a branch's screenshot is shown at (user, 2026-10-02, issue #183).</summary>
+		public const int BranchPreviewSide = 128;
+
+		/// <summary>
+		/// A picture of <paramref name="width"/> x <paramref name="height"/> shrunk to fit inside
+		/// <paramref name="side"/> x <paramref name="side"/>, its proportions kept. Never enlarged.
+		/// </summary>
+		/// <remarks>
+		/// The branch screenshot is the whole display as it was when the branch was made: 1280x960
+		/// for an Xbox at 2x, and more on a big window. Shown at that size it covered the game and,
+		/// placed beside TAStudio, could land off the screen altogether (issue #183).
+		/// </remarks>
+		public static Size FitWithin(int width, int height, int side)
+		{
+			if (width <= 0 || height <= 0) return new(0, 0);
+			if (width <= side && height <= side) return new(width, height);
+			var scale = Math.Min((double)side / width, (double)side / height);
+			return new(Math.Max(1, (int)Math.Round(width * scale)), Math.Max(1, (int)Math.Round(height * scale)));
+		}
 		private const double AlphaStep = 0.125;
 
 		private Bitmap/*?*/ _bitmap = null;
@@ -101,8 +124,10 @@ namespace Chimera.Client.GUI
 			e.Graphics.DrawImage(_bitmap!, new Rectangle(0, 0, Width, _drawingHeight));
 			if (Padding > 0)
 			{
-				e.Graphics.DrawRectangle(Pens.Black, new Rectangle(new Point(0, _drawingHeight), new Size(Width - 1, Padding - 1)));
-				e.Graphics.DrawString(Text, Font, Brushes.Black, new Rectangle(2, _drawingHeight, Width - 2, Height));
+				using Pen edge = new(ThemeEngine.Color(ThemeColorRole.WindowText));
+				using SolidBrush ink = new(ThemeEngine.Color(ThemeColorRole.WindowText));
+				e.Graphics.DrawRectangle(edge, new Rectangle(new Point(0, _drawingHeight), new Size(Width - 1, Padding - 1)));
+				e.Graphics.DrawString(Text, Font, ink, new Rectangle(2, _drawingHeight, Width - 2, Height));
 			}
 
 			base.OnPaint(e);

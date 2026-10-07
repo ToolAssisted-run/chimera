@@ -61,6 +61,9 @@ namespace Chimera.Client.Common
 		public string PackagePath { get; init; } = "";
 		public IReadOnlyList<FirmwareSurveyRow> Rows { get; init; } = [ ];
 
+		/// <summary>A game core's group: the game's own files, listed after every emulator's (docs/game-cores.md).</summary>
+		public bool IsGameCore { get; init; }
+
 		/// <summary>
 		/// The line beside the core's name. For an id declared many times - many
 		/// releases of one bios - any one dump on hand means a project that
@@ -159,9 +162,11 @@ namespace Chimera.Client.Common
 			// package listed the same firmware twice with nothing to tell the two
 			// apart (issue #60). The group is every declaration any of its versions
 			// makes, once each - a firmware one version added is still asked for.
+			// The emulators first and the game cores after them, as in every list of cores.
 			foreach (var sameCore in present
 				.GroupBy(static p => p.Name, StringComparer.OrdinalIgnoreCase)
-				.OrderBy(static g => g.Key, StringComparer.OrdinalIgnoreCase))
+				.OrderBy(static g => g.Any(static p => p.IsGameCore) ? 1 : 0)
+				.ThenBy(static g => g.Key, StringComparer.OrdinalIgnoreCase))
 			{
 				var first = sameCore.First();
 				List<FirmwareSurveyRow> rows = new();
@@ -188,7 +193,7 @@ namespace Chimera.Client.Common
 						});
 					}
 				}
-				groups.Add(new FirmwareSurveyGroup { CoreName = first.Name, PackagePath = first.Path, Rows = rows });
+				groups.Add(new FirmwareSurveyGroup { CoreName = first.Name, PackagePath = first.Path, Rows = rows, IsGameCore = sameCore.Any(static p => p.IsGameCore) });
 			}
 			return groups;
 		}

@@ -12,7 +12,7 @@ using Chimera.Emulation.Common;
 
 namespace Chimera.Client.GUI
 {
-	public partial class ControllerConfig : Form, IDialogParent
+	public partial class ControllerConfig : ThemedForm, IDialogParent
 	{
 		private readonly IEmulator _emulator;
 		private readonly Config _config;
@@ -138,20 +138,6 @@ namespace Chimera.Client.GUI
 			SuspendLayout();
 			LoadPanels(_config);
 
-			switch (_config.OpposingDirPolicy)
-			{
-				case OpposingDirPolicy.Priority:
-					rbUDLRPriority.Checked = true;
-					break;
-				case OpposingDirPolicy.Forbid:
-					rbUDLRForbid.Checked = true;
-					break;
-				case OpposingDirPolicy.Allow:
-					rbUDLRAllow.Checked = true;
-					break;
-				default:
-					throw new Exception();
-			}
 			checkBoxAutoTab.Checked = _config.InputConfigAutoTab;
 
 			// the frontend has no idea what any controller looks like; a package declares buttons,
@@ -271,9 +257,6 @@ namespace Chimera.Client.GUI
 
 		private void ButtonOk_Click(object sender, EventArgs e)
 		{
-			if (rbUDLRPriority.Checked) _config.OpposingDirPolicy = OpposingDirPolicy.Priority;
-			else if (rbUDLRForbid.Checked) _config.OpposingDirPolicy = OpposingDirPolicy.Forbid;
-			else if (rbUDLRAllow.Checked) _config.OpposingDirPolicy = OpposingDirPolicy.Allow;
 			_config.InputConfigAutoTab = checkBoxAutoTab.Checked;
 
 			Save();

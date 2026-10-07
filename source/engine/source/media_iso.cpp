@@ -1,12 +1,12 @@
 /* media_iso.cpp - ISO 9660 with Joliet, written reproducibly.
  *
- * Why this format and not UDF, which is what a real PlayStation 3 disc is:
- * because it is what the emulator reads. rpcs3's Loader/ISO.cpp walks volume
- * descriptors at 2048-byte steps looking for type 1 (primary) and type 2
- * (Joliet), decodes UCS-2 names from the second, and strips a trailing ";1" or
- * "." from either. So an ISO 9660 image with a Joliet tree is exactly what it
- * expects, and a faithful UDF image would be work spent on a reader that is not
- * there.
+ * Why this format and not UDF, which is what the discs of the newer consoles
+ * are: because it is what the emulators read. The one this was first written
+ * for walks volume descriptors at 2048-byte steps looking for type 1
+ * (primary) and type 2 (Joliet), decodes UCS-2 names from the second, and
+ * strips a trailing ";1" or "." from either. So an ISO 9660 image with a
+ * Joliet tree is exactly what it expects, and a faithful UDF image would be
+ * work spent on a reader that is not there.
  *
  * TWO TREES describe the same files. The primary one carries names ISO 9660
  * allows - uppercase, a short alphabet, a ";1" version - and exists because the
@@ -250,7 +250,8 @@ void emitDirExtent(std::vector<uint8_t> &v, const Node &d, bool joliet, uint32_t
 } // namespace
 
 bool mediaWriteIso9660(const std::vector<MediaEntry> &files, const std::string &outPath,
-	const MediaProgress &progress, std::string &sha1Out, std::string &error)
+	const MediaProgress &progress, std::string &sha1Out, std::string &error,
+	const MediaRecipe *recipe)
 {
 	for (const auto &e : files)
 	{
@@ -283,16 +284,6 @@ bool mediaWriteIso9660(const std::vector<MediaEntry> &files, const std::string &
 		f->abs = e.abs;
 		f->parent = at;
 		at->kids.push_back(std::move(f));
-	}
-
-	/* A PlayStation 3 disc announces itself with PS3_DISC.SFB beside PS3_GAME,
-	 * which is the same shape the rpcs3 core looks for in an archive. */
-	bool isPs3Disc = false;
-	for (const auto &k : root.kids)
-	{
-		std::string upper = k->name;
-		for (char &c : upper) c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
-		if (!k->dir && upper == "PS3_DISC.SFB") isPs3Disc = true;
 	}
 
 	/* names, then the order the records go in - both settled here so that
@@ -451,33 +442,28 @@ bool mediaWriteIso9660(const std::vector<MediaEntry> &files, const std::string &
 			emit(zeros, static_cast<size_t>(std::min<uint64_t>(kSector, bytes - written)));
 	};
 
-	/* ---- the system area, and the PS3 region table in it ----
+	/* ---- the system area ----
 	 *
-	 * Sectors 0-15 are reserved by ISO 9660 and mean nothing to it, which is
-	 * where a PlayStation 3 disc keeps the table that says which parts of it are
-	 * encrypted. rpcs3 does not treat that as optional: Loader/ISO.cpp reads a
-	 * big-endian region count out of the first four bytes and refuses anything
-	 * with a count below 1 as "non-PS3ISO", which reaches the user as "Invalid
-	 * file or folder" with nothing about a region table in it.
-	 *
-	 * An image built from a decrypted folder dump has exactly one region and it
-	 * is not encrypted, so that is what is written: count 1, and one region
-	 * ending at the last sector. Everything rpcs3 does after that check is
-	 * non-fatal - the Redump and 3k3y probes find nothing, leave the encryption
-	 * type NONE, and reads pass through untouched.
-	 *
-	 * Only for a disc that looks like a PS3 one. Another console's image gets the
-	 * zeros it has always had, because this table would be meaningless there. */
-	if (isPs3Disc)
+	 * Sectors 0-15 are reserved by ISO 9660 and mean nothing to it. They are
+	 * zeros unless the core the image is for declared otherwise: a recipe
+	 * (media_maker.hpp) says which values go where, and may ask for two this
+	 * writer knows and the recipe cannot - how many sectors the image has, and
+	 * its last one. */
+	if (recipe != nullptr && !recipe->systemArea.empty())
 	{
-		std::vector<uint8_t> sector0(kSector, 0);
-		const uint32_t lastSector = totalSectors - 1;
-		for (int i = 0; i < 4; i++)
+		std::vector<uint8_t> area(16ull * kSector, 0);
+		for (const MediaPatch &patch : recipe->systemArea)
 		{
-			sector0[i] = static_cast<uint8_t>(1u >> ((3 - i) * 8));           /* region count */
-			sector0[12 + i] = static_cast<uint8_t>(lastSector >> ((3 - i) * 8));
+			uint32_t value = patch.literal;
+			if (patch.value == MediaPatch::Value::LastSector) value = totalSectors - 1;
+			else if (patch.value == MediaPatch::Value::Sectors) value = totalSectors;
+			for (int i = 0; i < 4; i++)
+			{
+				const int shift = patch.bigEndian ? (3 - i) * 8 : i * 8;
+				area[patch.at + static_cast<uint32_t>(i)] = static_cast<uint8_t>(value >> shift);
+			}
 		}
-		emit(sector0.data(), sector0.size());
+		emit(area.data(), area.size());
 	}
 	padTo(16ull * kSector); /* the rest of the system area */
 

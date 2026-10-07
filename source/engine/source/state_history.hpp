@@ -184,6 +184,12 @@ public:
 		double waitSeconds = 0;
 		/* what the writer was handed, and what reached the file */
 		uint64_t spilledRaw = 0, spilledPacked = 0;
+		/* what the packer was handed, and what it is held as now */
+		uint64_t packedRaw = 0, packedHeld = 0;
+		/* how often a stretch closed before the packer had finished the one
+		 * before it, and what that cost the emulation thread */
+		uint64_t packWaits = 0;
+		double packWaitSeconds = 0;
 	};
 	Costs costs() const { return m_costs; }
 
@@ -207,6 +213,30 @@ public:
 	 * the sandbox will measure. Deciding here rather than after the advance is
 	 * forced: an epoch has to be open before the machine moves. */
 	void beforeAdvance();
+
+	/* How often a frame is stored (user request, 2026-09-23: TAStudio's
+	 * "Greenzone" box - every frame, one in 32, one in 1000, or off). It picks
+	 * WHICH frames are stored and nothing else: anchors, deltas, bands,
+	 * thinning, packing and spills go on as ever.
+	 *
+	 *   1  every frame the near band's stride allows - the ordinary history.
+	 *   N  only frames that are multiples of N. The frames between are skipped
+	 *      the way the stride skips them: the epoch stays open across them and
+	 *      the next delta describes them all, so a sparse history still costs
+	 *      a delta, not a whole state, per stored frame.
+	 *   0  off: beforeAdvance opens no epoch and capture stores nothing - no
+	 *      delta, no anchor, no thinning, no packing, no spill - and only notes
+	 *      where the machine stands, which keeps an edit made meanwhile from
+	 *      letting an old timeline's frames in later. The sandbox is asked for
+	 *      nothing, so it surveys no pages.
+	 *
+	 * What is already stored stays whatever the period, and restore, pins and
+	 * invalidation work as ever. Leaving 0 makes the next frame that can be
+	 * stored a stored one whatever N is, and it is an anchor: the machine is
+	 * not the stored copy of any frame, so there is nothing to measure a delta
+	 * from. */
+	void capturePeriod(int64_t period);
+	int64_t capturePeriod() const { return m_capturePeriod; }
 
 	/* Called immediately after that advance, with the frame now standing at.
 	 *
@@ -350,7 +380,6 @@ public:
 	/* What a state, a delta and a saved history are made of. */
 	using Bytes = std::vector<uint8_t, NoInit<uint8_t>>;
 
-private:
 	/* A body of bytes - an anchor or a delta - shared and never changed once it
 	 * is built.
 	 *
@@ -368,17 +397,34 @@ private:
 	struct Body
 	{
 		std::shared_ptr<const Bytes> p;
+		/* What the body IS, in bytes, whatever it is held as. A PACKED body is
+		 * held as one zstd frame and `raw` is what that frame decodes to; every
+		 * decision about the history - the caps on a merge, when a stretch
+		 * closes, what a spill reserves - is made from this, and never from how
+		 * the bytes happen to be held. */
+		uint64_t raw = 0;
+		bool packed = false;
 
-		size_t size() const { return p ? p->size() : 0; }
-		const uint8_t *data() const { return p ? p->data() : nullptr; }
+		size_t size() const { return static_cast<size_t>(raw); }
+		/* what it costs in MEMORY, which is what the budget is about */
+		size_t held() const { return p ? p->size() : 0; }
+		/* the raw bytes, which only an unpacked body has in hand */
+		const uint8_t *data() const { return p && !packed ? p->data() : nullptr; }
 		bool empty() const { return size() == 0; }
-		void reset() { p.reset(); }
+		void reset() { p.reset(); raw = 0; packed = false; }
 
 		static Body make(Bytes &&v)
 		{
-			return Body{ std::make_shared<const Bytes>(std::move(v)) };
+			const uint64_t n = v.size();
+			return Body{ std::make_shared<const Bytes>(std::move(v)), n, false };
+		}
+		static Body makePacked(Bytes &&frame, uint64_t rawLen)
+		{
+			return Body{ std::make_shared<const Bytes>(std::move(frame)), rawLen, true };
 		}
 	};
+
+private:
 
 	struct Link
 	{
@@ -437,7 +483,7 @@ private:
 
 		int64_t lastFrame() const { return links.empty() ? anchorFrame : links.back().endFrame; }
 		/* what walking every link costs in bytes, next to what loading the anchor does */
-		uint64_t linkBytes() const { return bytes - anchor.size(); }
+		uint64_t linkBytes() const { return bytes - anchor.held(); }
 
 		/* The greatest frame this segment can produce at or before `f`, or -1.
 		 * Not the same as being inside the segment: with strides above one,
@@ -564,6 +610,10 @@ private:
 	 * as far as the stretch still answers (an edit may have truncated it).
 	 * Static, and handed the spill file, because the writer does this too. */
 	static bool copySpilledBody(std::FILE *spill, const std::function<bool(const void *, size_t)> &put,
+		const Segment &seg);
+	/* The same two, into a ChimeraHistory5 file: bodies as they are held. */
+	static bool writeSegmentBodyV5(const std::function<bool(const void *, size_t)> &put, const Segment &seg);
+	static bool copySpilledBodyV5(std::FILE *spill, const std::function<bool(const void *, size_t)> &put,
 		const Segment &seg);
 	/* The whole of writing a history file, with nothing of `this` in it. */
 	static bool writeHistoryFile(std::FILE *spill, const char *path, const std::string &id,
@@ -729,6 +779,37 @@ private:
 	int64_t m_planFrame = -1;          /* the anchor being filled */
 	WorkThread m_drainer{ "history drainer" };
 
+	/* ---- packing what is no longer being written to -----------------------
+	 *
+	 * A stretch that has closed - the next anchor has been taken - is never
+	 * written to again, only read (a restore, a save) or shortened (a merge, a
+	 * pop, a drop). Its bodies are then compressed in memory: a machine state
+	 * packs 7 to 118 times at zstd level 1, and a budget that held three
+	 * PlayStation 3 anchors raw holds twenty packed. The packing is on a helper,
+	 * because a gigabyte takes a third of a second even at 3 GB/s; the RESULT
+	 * is taken on this thread at one moment only - when the next stretch closes
+	 * - so the budget's arithmetic is the same threaded as in line (the packer
+	 * has had a whole stretch to finish, and is waited for if it has not). A
+	 * body is matched back by identity: a stretch shortened meanwhile keeps
+	 * what it still has, and a stretch dropped meanwhile takes nothing. */
+	struct PackJob
+	{
+		int64_t anchorFrame = -1;
+		/* the bodies as they were, and what each became */
+		std::vector<std::shared_ptr<const Bytes>> in;
+		std::vector<Body> out;
+		double seconds = 0;
+	};
+	std::vector<std::unique_ptr<PackJob>> m_packJobs;
+	WorkThread m_packer{ "history packer" };
+	bool packingAvailable() const;
+	void packSegmentLater(size_t index);
+	void finishPacking();
+	/* one body, here and now: what the packer does per body, and what a merge
+	 * and a load do in line */
+	static Body packBody(const Body &b);
+	void packSegmentNow(Segment &seg);
+
 	WorkThread m_writer{ "history writer" };
 	std::mutex m_writtenLock;          /* only ever held by a writer job and by applyWrites */
 	std::vector<PendingWrite> m_written;
@@ -773,6 +854,8 @@ private:
 	CeStrideTuner m_tuner;             /* decides the stride; see stride_tuner.h */
 	int64_t m_nearStride = 1;
 	bool m_strideFixed = false;        /* fixNearStride: the tuner leaves it alone */
+	int64_t m_capturePeriod = 1;       /* capturePeriod(): 0 off, 1 every frame, N one in N */
+	bool m_storeNext = false;          /* leaving 0: the next storable frame is stored */
 	double m_captureSeconds = 0;       /* exponential means, in seconds */
 	double m_wallSeconds = 0;
 	double m_lastCaptureEnded = 0;

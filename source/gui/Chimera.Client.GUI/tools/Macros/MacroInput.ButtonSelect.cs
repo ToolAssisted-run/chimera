@@ -44,7 +44,7 @@ namespace Chimera.Client.GUI
 			}
 
 			CheckBox s = (CheckBox)sender;
-			s.ForeColor = s.Checked ? SystemColors.ControlText : SystemColors.ButtonShadow;
+			s.SetForeRole(s.Checked ? ThemeColorRole.WindowText : ThemeColorRole.GlyphShadow);
 			s.Refresh();
 
 			// Update the selected zone's key

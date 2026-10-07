@@ -94,8 +94,8 @@ namespace Chimera.Client.GUI
 			{
 				Location = new(UIHelper.ScaleX(12), UIHelper.ScaleY(136)),
 				Size = new(UIHelper.ScaleX(616), UIHelper.ScaleY(40)),
-				ForeColor = Color.DarkGoldenrod,
 			};
+			_pending.SetForeRole(ThemeColorRole.AccentWarning);
 			_status = new Label { Location = new(UIHelper.ScaleX(12), UIHelper.ScaleY(184)), Size = new(UIHelper.ScaleX(616), UIHelper.ScaleY(56)) };
 
 			Button Make(string text, int x, int width, Action click)

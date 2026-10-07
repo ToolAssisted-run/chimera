@@ -300,38 +300,82 @@ static void anIsoIsReproducibleAndHoldsWhatWentIn()
 	assert(got.count("a_first.txt") == 1 && got.count("Z_last.txt") == 1);
 }
 
-/* A PlayStation 3 disc keeps a region table in the ISO system area, and rpcs3
- * treats it as mandatory: Loader/ISO.cpp reads a big-endian region count out of
- * the first four bytes and refuses a count below 1 as "non-PS3ISO", which
- * reaches the user as "Invalid file or folder" with nothing said about regions.
- * An image built from a decrypted dump has one region and it is not encrypted.
- * Reported from use: the first ISO this tool made would not boot. */
-static void aPs3DiscCarriesItsRegionTable()
+/* What a core declares its media needs, written where it says. The first
+ * recipe there was is the test's: an emulator that reads a big-endian count
+ * out of the first four bytes of the system area and refuses a count below 1,
+ * with a last sector at byte 12. The packer knew that itself once, for any
+ * folder with a certain file at its root; now it is told. */
+static const char *kRecipe =
+	"{ \"id\": \"disc\", \"label\": \"a disc\", \"format\": \"iso9660\","
+	"  \"when\": { \"rootFile\": \"ps3_disc.sfb\" },"
+	"  \"systemArea\": [ { \"at\": 0, \"u32be\": 1 }, { \"at\": 12, \"u32be\": \"lastSector\" },"
+	"                    { \"at\": 32, \"u32le\": \"sectors\" } ] }";
+
+static void aRecipeWritesTheSystemArea()
 {
 	const fs::path a = workRoot() / "a"; /* PS3_DISC.SFB at its root */
-	const fs::path iso = workRoot() / "ps3.iso";
+	const fs::path iso = workRoot() / "recipe.iso";
 	std::string sha, err;
-	assert(chimera::mediaMake(a.string(), iso.string(), chimera::MediaFormat::Iso9660, nullptr, sha, err));
+	chimera::MediaRecipe recipe;
+	assert(chimera::mediaParseRecipe(kRecipe, recipe, err));
+	assert(recipe.format == chimera::MediaFormat::Iso9660 && recipe.systemArea.size() == 3);
+	/* the file's name is matched whatever its case */
+	assert(chimera::mediaRecipeApplies(recipe, a.string()));
+	assert(chimera::mediaMake(a.string(), iso.string(), recipe.format, nullptr, sha, err, &recipe));
 
 	const std::vector<uint8_t> img = slurp(iso);
 	const auto be32 = [&](size_t at) {
 		return (uint32_t(img[at]) << 24) | (uint32_t(img[at + 1]) << 16)
 			| (uint32_t(img[at + 2]) << 8) | uint32_t(img[at + 3]);
 	};
-	assert(be32(0) == 1); /* one region */
-	/* ending on the last sector of the image, so it covers all of it */
+	const auto le32 = [&](size_t at) {
+		return uint32_t(img[at]) | (uint32_t(img[at + 1]) << 8)
+			| (uint32_t(img[at + 2]) << 16) | (uint32_t(img[at + 3]) << 24);
+	};
+	assert(be32(0) == 1);
 	assert(be32(12) == (img.size() / 2048) - 1);
+	assert(le32(32) == img.size() / 2048);
 
-	/* and a disc that is not a PS3 one is left alone: the table would mean
-	 * nothing there, and the system area is reserved */
+	/* WITHOUT a recipe the same folder is its files and a system area of
+	 * zeros: the packer recognises no machine by a file's name any more */
+	const fs::path bare = workRoot() / "bare.iso";
+	std::string bareSha;
+	assert(chimera::mediaMake(a.string(), bare.string(), chimera::MediaFormat::Iso9660, nullptr, bareSha, err));
+	const std::vector<uint8_t> other = slurp(bare);
+	for (size_t i = 0; i < 16 * 2048; i++) assert(other[i] == 0);
+	assert(bareSha != sha);
+	/* and past the system area the two are the same image */
+	assert(other.size() == img.size());
+	assert(std::memcmp(other.data() + 16 * 2048, img.data() + 16 * 2048, img.size() - 16 * 2048) == 0);
+
+	/* a folder the recipe was not written for */
 	const fs::path plain = workRoot() / "plain";
 	fs::remove_all(plain);
 	put(plain / "readme.txt", "hello");
-	const fs::path plainIso = workRoot() / "plain.iso";
-	assert(chimera::mediaMake(plain.string(), plainIso.string(), chimera::MediaFormat::Iso9660,
-		nullptr, sha, err));
-	const std::vector<uint8_t> other = slurp(plainIso);
-	for (size_t i = 0; i < 32; i++) assert(other[i] == 0);
+	assert(!chimera::mediaRecipeApplies(recipe, plain.string()));
+}
+
+/* A recipe that is not understood is refused whole: half of one is another
+ * image, with another SHA1, that nobody else can make. */
+static void aRecipeNotUnderstoodIsRefused()
+{
+	chimera::MediaRecipe recipe;
+	std::string err;
+	assert(!chimera::mediaParseRecipe("not json", recipe, err));
+	assert(!chimera::mediaParseRecipe("{ \"format\": \"udf\" }", recipe, err));
+	assert(err.find("udf") != std::string::npos);
+	/* a value past the system area's end */
+	assert(!chimera::mediaParseRecipe(
+		"{ \"format\": \"iso9660\", \"systemArea\": [ { \"at\": 32765, \"u32be\": 1 } ] }", recipe, err));
+	/* a word the writer does not know */
+	assert(!chimera::mediaParseRecipe(
+		"{ \"format\": \"iso9660\", \"systemArea\": [ { \"at\": 0, \"u32be\": \"firstSector\" } ] }", recipe, err));
+	/* a system area on something that has none */
+	assert(!chimera::mediaParseRecipe(
+		"{ \"format\": \"zip\", \"systemArea\": [ { \"at\": 0, \"u32be\": 1 } ] }", recipe, err));
+	/* and one with nothing wrong, for any folder */
+	assert(chimera::mediaParseRecipe("{ \"format\": \"iso9660\" }", recipe, err));
+	assert(chimera::mediaRecipeApplies(recipe, workRoot().string()));
 }
 
 /* ---- FAT12 ---- */
@@ -399,7 +443,8 @@ int main()
 	collectSkipsWhatIsNotAFile();
 	progressCountsEveryByteAndFile();
 	anIsoIsReproducibleAndHoldsWhatWentIn();
-	aPs3DiscCarriesItsRegionTable();
+	aRecipeWritesTheSystemArea();
+	aRecipeNotUnderstoodIsRefused();
 	aFloppyIsReproducibleAndReadable();
 	aFloppyRefusesWhatDoesNotFit();
 	aCancelledPackLeavesNothing();

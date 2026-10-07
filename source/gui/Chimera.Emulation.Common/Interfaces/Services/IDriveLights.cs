@@ -34,7 +34,7 @@ namespace Chimera.Emulation.Common
 		/// fixed thing, which is every drive of most cores. Asked whenever the status bar is
 		/// painted: it is the running machine's state, and a rewind takes it back.
 		/// </summary>
-		DriveMedia DriveMediaOf(int index);
+		DriveMedia? DriveMediaOf(int index);
 	}
 
 	/// <summary>

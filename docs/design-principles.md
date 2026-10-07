@@ -3883,3 +3883,1128 @@ The size formatter still shows nothing for zero - that is deliberate for list
 cells and a test pins it - so the blank was fixed in the sentence that had it.
 The tests that pinned the floor were written in bytes, where a one-gigabyte
 guarantee swallows every case; they are at the sizes the rule is about now.
+
+## What a PS3 state weighs, and why compressing it is not the answer (measured, 2026-09-17)
+
+The user expected compression to help a great deal with PS3 states, and asked
+for it to be built and measured, with a progress window for the wait. It was
+already built - a branch's state file goes through zstd level 1 - so what was
+missing was the measurement. Oblivion at frame 2400, GTX 1060 machine, NVMe,
+one save and one load of the same state:
+
+| how | file | save | load |
+|---|---|---|---|
+| raw (`CHIMERA_STATE_RAW=1`) | 5.45 GiB | 11.6 s | 3.9 s |
+| zstd level 1 (the default) | 4.31 GiB, 1.27x | 11.1 s | 2.7 s |
+| zstd level 3 | 4.25 GiB, 1.28x | 18.3 s | 2.7 s |
+
+Level 1 is free - the save is no slower than raw and the load is faster, there
+being less to read - and it barely helps; level 3 buys nothing for seven
+seconds. Every other machine measured compresses 8 to 118 times. This one does
+not because of WHAT it is: the game's caching thread copies 41 files, 4.30 GiB,
+from the disc to the console's hard disk (its texture, voice and mesh archives),
+and that disk is the machine's memory filesystem. Four fifths of the state is a
+second copy of files that are in the ISO, already compressed by their authors.
+
+So the lever for PS3 is not a better compressor. It is not carrying the disc
+twice: a hard-disk file whose bytes are the disc's could be held as a reference
+to the disc file the project already has, and would then cost a state nothing -
+which would shrink a branch, its save and load, AND every greenzone anchor by
+the same four gigabytes. That is a change to the core's memory filesystem and is
+not done here; it is recorded because the measurement is what found it.
+
+Done the next day, in the core (rpcs3 76b992c, "not carrying the disc twice"):
+a file the game writes whose bytes are provably a stretch of a disc file is
+held as a reference to that stretch. The same state, raw, went from 5.85 GB to
+1.23 GB, its save from 12.7 s to 1.7 s and its load from 4.1 s to 1.0 s, with
+the machine byte-identical to the control through the whole movie and across
+state-file round trips. Compression of PS3 states is now a question about the
+remaining 1.2 GB, which is the machine proper (its 256 MB main memory, the
+SPUs, the RSX's local memory and the emulator's own tables).
+
+What was built: the engine reports progress through a save (against what the
+last state of the machine weighed - the end of a save is not known until it is
+reached) and a load (against the file's length), `ce_session_state_file_bytes`
+says what the last one weighed raw and stored, and the two environment switches
+above exist for measuring. The progress window now has a delay: TAStudio's
+branch save and load open one only if the work has lasted 400 ms, so the same
+button that takes milliseconds on an NES never flashes a window, and the half
+minute it takes on a PS3 no longer looks like a hang.
+
+## The greenzone is packed in memory, one stretch behind the machine (user-asked, 2026-09-18)
+
+With the disc out of the state, the user asked for compression in memory too.
+A stretch of the history that has closed - the next anchor has been taken - is
+only ever read or shortened again, so its bodies are held as zstd frames; the
+newest stretch, the one being written to, stays raw. The packing is a helper's,
+and its result is taken at one moment only, when the next stretch closes, so
+the budget's arithmetic is identical threaded and in line - the property the
+history's differential fuzz pins and the reason "phase 2" was never built. On
+Oblivion (PS3, 8 GB budget) a stretch went from 2.45 GB to 0.26-0.44 GB, the
+frames held from 312 to 817, and a rewind to frame 1200 that used to land on
+frame 434 and replay 766 frames lands on 1198 and decodes for a second. The
+whole account, with the measurements, is in docs/state-manager.md, "A closed
+stretch is packed in memory". Done the same day, at the user's word: a history
+file that carries the bodies as they are held (`ChimeraHistory5`), so a save of
+packed stretches is a copy and a load takes them as they are: the same PS3
+history, 2.57 GB, saved in 4.7 s instead of 18.5 and loaded in 1.0 s instead
+of 23.1.
+
+## A script's input reaches the frames TAStudio invents (issue #95, 2026-09-19)
+
+Reported against a PS2 project: a Lua script opened TAStudio, asked for
+recording mode and pressed a button every frame for a hundred frames, and the
+movie log held the press on none of them - nor did the machine's own pad
+readout. Reproduced on Linux with the synth core in seconds, and the press
+turned out not to be lost where the report pointed.
+
+With TAStudio actually recording, `joypad.set` reaches the log and the core on
+every frame: it lands on `ActiveController` through the override adapter, which
+is where a physical press lands too, and record mode writes whatever is there.
+What loses it is the state the script was really in. TAStudio owns playback, so
+a script drives it with `tastudio.setplayback(target)` - and a seek turns
+recording OFF for its duration (`GoToFrame`), so that the rows it passes over
+are replayed rather than typed over. That rule is right, and it is kept.
+
+Past the END of the log there are no rows to protect. A seek out there cannot
+replay anything: every frame has to be AUTHORED as it is reached, which
+TAStudio does itself in `UpdateBefore` - and it was writing them from
+`MovieSession.StickySource`, the autohold/autofire controller alone. So the
+extension threw away everything actually being pressed, by a hand on the pad as
+much as by a script, and because `MovieSession` then reads that same row back
+to feed the core, the machine saw nothing pressed either. Both halves of the
+report, one cause.
+
+The extension now takes its input from `MovieSession.MovieIn` - the same
+controller record mode would have written - whenever `WasRecording` says the
+person asked to record and a seek is what took it away. Read-only play past the
+end is untouched: with nobody recording, the autoholds remain the only way to
+hold a button out there, which is what that mode has always meant. Witnessed by
+three runs of a new Level-B leg (`T:box:luaInput`, `T:box:luaQuiet`): a held
+button must reach every extended row, the controller the core is handed, and
+the machine's RAM; an unpressed run must leave those rows empty; and a
+read-only run must leave them empty however hard a script presses.
+
+Two traps worth writing down for the next unattended TAStudio script. The piano
+roll pauses again on its own the moment a seek ends, so `client.unpause()`
+belongs INSIDE the loop, with `emu.yield()` and not `emu.frameadvance()` - a
+script parked in frameadvance is never resumed to notice it was paused, and
+what looks like a hang is the run loop spinning beside it. And the order of the
+two calls matters: `setrecording` before `setplayback` is the shape that used
+to lose the input, because the seek is what suspends recording.
+
+Found in the same round: every tastudio Lua method that asked for the tool
+without calling `Engaged()` first handed the script a raw
+NullReferenceException, because `Tools.TAStudio` is a get-or-CREATE - the call
+built a window and died inside it on the project that was not there.
+`getrecording`, `setrecording`, `togglerecording`, `setbranchtext` and
+`get_branch_index_by_id` now answer the way the rest of the library already
+did: false, nil, or nothing done.
+
+## A gate that has never failed has not been tested (2026-09-20)
+
+Seven distinct instances of a gate passing while the thing it vouched for was
+broken were found in one day, across three repositories. Written up as
+[gates.md](gates.md), because seven in a day is a class of mistake and not
+seven accidents.
+
+The worst of them, by how long it lasted and how much it covered: the PCSX2
+core ran EVERY PlayStation 2 game with an empty per-title database - no clamp
+modes, no round modes, no game fixes, none of the corrections upstream keeps
+for hundreds of titles - and the gate was green throughout, because no leg ever
+asked whether the database had anything in it. The user-visible symptom was two
+separate bug reports about Final Fantasy X.
+
+The cheapest of them to have prevented: miniBox's thunk pool ran out at 32 and
+answered 0 for the rest, which `mb_host_proc_addr` reports exactly the way it
+reports a symbol that is not in the ELF. Seventeen of quickerNES's exports read
+as "this core does not have that feature" while sitting in the binary. One line
+on stderr when the pool runs out would have made it obvious on the first run.
+
+The rule the seven come down to, and the one worth keeping when the detail has
+faded: **a leg that has never been seen to fail is a leg that has not been
+tested.** Break the thing, watch the leg go red, revert, and say in the commit
+that you did. It costs minutes and it converts a belief into a fact.
+
+The corollary, learned the same week at the cost of a shipped regression:
+"fixed by construction" is not fixed. A paletted-texture fix went in on 2026-09-19
+with its own commit body saying no disc on hand used the format, so the fix
+"waits for a game of sprites to prove it". A game of sprites arrived the next
+day and the fix was itself the bug.
+
+## The colours are data, and Light is the ones we had (user-decided, 2026-09-20)
+
+Issue #112: the bright white is a strain on the eyes, and the reporter, who
+does not write code, offered to contribute palettes. The decision was: do it
+everywhere rather than on a subset of windows, ship at least Light and Dark,
+and Light must be pixel-for-pixel what Chimera has today.
+
+The shape follows from the second half of that. If Light has to be today's
+palette, then today's palette has to be written down somewhere, and once it is
+written down there is no reason for it to be the only one. So a theme is one
+colour for every role the frontend paints with - `ThemeColorRole`, about ninety
+of them - and nothing else: a flat JSON object of role name to `#RRGGBB`, read
+from `Themes/` under the data directory, with Light and Dark compiled in as the
+same kind of file. A role that a theme does not answer is an error naming the
+role, not a default: a window that is dark except for one panel is worse to
+look at and much harder to report than one that is not dark at all. `basedOn`
+lets a contributor change five colours instead of ninety, and Config > Theme >
+Write a Copy to Edit hands them a complete file to start from.
+
+Light says `"system:ControlText"` where the code said `SystemColors.ControlText`,
+so it is the desktop's palette rather than a guess at it, and
+`LightThemeBaselineTests` carries the literals copied out of the code they used
+to live in and fails by name if `light.json` moves one.
+
+That was not enough on its own, and finding out why is the useful part. Every
+screenshot the UI tests take was compared pixel by pixel against the same
+window built from the commit before this work, and the first round differed on
+five of them - because assigning a colour is not free even when it is the same
+colour. A Button handed a BackColor stops using visual styles. A sunken 3D
+border redrawn is a line. A menu given a colour table built out of system
+colours stops going through the system renderer. A read-only text box given
+"the read-only background" stops being white, which WinForms never did. Same
+palette, different drawing, and "different" is the one thing Light must not be.
+
+So Light carries `"desktop": true`, and under a theme that says so the walk
+assigns nothing by control type at all: the roles the frontend declared by
+name, the controls that paint themselves, and otherwise the toolkit's own
+drawing untouched - which is also where the Mono beige fix goes back to living,
+in FormBase, exactly where it was. With that, every Light screenshot is
+byte-identical to the one from before the branch, and the property is a
+property of the code rather than of ninety hex values happening to be right.
+
+Applying it is explicit, because WinForms has none of this. One walk sets each
+control's colours from its type; the surfaces a BackColor does not reach are
+handled by name (tool strips through a renderer, DataGridView through its cell
+styles, ListView headers by owner-drawing them, LinkLabel through LinkColor);
+and a control that paints itself takes the theme through `IThemedControl`
+rather than being guessed at. The obligation is carried by the base class -
+every window derives from `ThemedForm`, which runs the walk on handle creation,
+and `ThemingContractTests` fails the build if one is added that does not. That
+is the part that was asked for explicitly: a window added later must be themed
+by existing, not by somebody remembering.
+
+Two rules fell out of doing it. A colour that MEANS something is declared as a
+role (`SetForeRole(ThemeColorRole.AccentError)`) rather than assigned, or the
+walk flattens it back to plain text on the next theme change - and the wizard
+was reading a colour back OUT as state, counting its green rows to say how many
+modules were compiled, which any theme would have broken. And a control made
+after the window opened has to be themed when it arrives: TAStudio's piano
+rolls are built when a project opens, and were the one white thing left on a
+dark window until the walk started hooking the containers it passes.
+
+The defect that came back from review is the one worth keeping: a list's
+chosen row was a beige bar with invisible writing on it, in a screenshot this
+work had itself produced, while every assertion about every control's colours
+passed. A ListView paints its selected row, its column headers and the strip
+past its last column out of the desktop's colours and answers no property
+about any of them - so a test that reads properties cannot see it, and a
+picture nobody looks at is not a witness. The lesson is the same one as the
+gate that went green over an empty game database: a test has to be asked
+whether it would notice.
+
+So the list is drawn here now, in Details view, away from the desktop's
+palette - and the strip past the last column, which no event is raised for and
+nothing can paint over, is removed by growing the last column to the edge. And
+the screenshots are inspected as they are taken, every run: no toolkit colour
+in a header band or behind a chosen row, and a chosen row's text must have
+contrast against what it is written on. Both checks were confirmed against the
+broken drawing before the fix went in, which is the only way to know a test
+bites. On top of that, every role that carries text is paired with the
+background it lands on and held to 3:1 - the accessibility floor - for every
+theme that is not the desktop's, because a contributed theme is ninety numbers
+somebody typed and two of them being the same shade is exactly the failure
+that is invisible on the page and obvious on the screen.
+
+Three follow-ups after Sergio tested the staged build (user-decided,
+2026-09-20). Dark is what a config being created now starts with; a config
+that already existed and had never chosen keeps Light, because changing
+somebody's colours under them on an update is a surprise and the theme is one
+click away either way. Twenty-one menu items had no icon and now have one,
+from one place, with the items that are better bare - anything that can be
+ticked, since the tick lives in the image margin; labels that are not
+commands; Exit - named as decisions rather than omissions. And the title bar,
+written up the round before as unreachable, is reachable: WinForms cannot
+colour it but Windows will, through one DwmSetWindowAttribute call, which
+ThemedForm makes on handle creation and on every theme change. That call
+cannot be exercised anywhere but Windows, so what the tests cover is that
+every window ASKS; whether Windows honours it was checked by hand on the
+Windows side of this box, build 22631, and photographed.
+
+The fourth thing that round taught is the one worth keeping. The Theme menu
+shipped dead - clicking it did nothing at all - while 873 tests were green,
+because a ToolStripMenuItem whose DropDownItems is empty never opens, so the
+handler that fills it never ran. Every one of those tests reached the theme
+engine directly; the only route a USER has to the feature was untested. That
+is the same class as the gate over an empty game database, in a new place: the
+mechanism was covered and the entry point was not. MenuContractTests now reads
+the Designer files and fails on any menu that fills itself when it opens and
+starts with nothing in it, which is the eleven that exist and the twelfth
+somebody writes.
+
+And the fourth report, which is the most instructive of the lot: on the staged
+build, choosing Light while wearing Dark changed the title bar and nothing
+else. The cause was the design decision two paragraphs up. "The desktop theme
+assigns nothing" is right for a window built under it and is exactly wrong for
+a window that is currently dark - there was nothing to put the colours back to,
+because nothing had ever recorded what they were. The title bar changed
+because it is not part of that mechanism at all: it is an unconditional call.
+
+So the first walk over a control now records everything the walk can change -
+colours, border style, visual-style flag, flat appearance, link colours, a
+property grid's six, a data grid's cell styles, a strip's renderer - and the
+desktop theme runs that record backwards. Two things surfaced while fixing it
+that are worth keeping. A ToolStrip handed the renderer it already holds keeps
+the render mode it was put back to, so renderers are made per application now
+rather than shared per theme; and a strip item's colour is the STRIP's until
+somebody sets one, so recording what an item reads back after the strip has
+gone dark records the dark colour - items are reset, not restored.
+
+The test that was green throughout checked that a repaint happened. It now
+checks what the window LOOKS like afterwards, against a window that started in
+that theme, in both directions. That is the third time on this branch that the
+check covered the mechanism and not the state a person actually lands in.
+
+Where a user already had a say, the theme yields to it. TAStudio's palette, the
+hex editor's six colours and the OSD's four follow the theme only while nobody
+has set them; a config from before themes holds the old light values, and those
+are read as "nobody set anything" so an old config follows the theme too.
+
+What no theme reaches, and it is worth being plain about: scroll bars, the tick
+inside a check box, the window's own title bar. Those are drawn by the desktop
+out of the desktop's colours and WinForms offers no way to ask for others. A
+dark Chimera has light scroll bars.
+
+## The sub-folders option belongs to the folder picker (user-decided, 2026-09-20)
+
+Three places in the frontend scan a folder somebody points at: the New Project
+wizard's firmware step, the Firmware Manager, and locating a project's files.
+All three walked sub-folders, which is what a person pointing at a firmware
+folder means and exactly wrong for one pointing at a collection - so the choice
+had to be offerable, and the day before it had appeared as a check box beside
+the wizard's Scan Folder button. One page out of three, with the other two left
+as they were and no reason but which page had been open at the time.
+
+The choice is not the page's. It belongs to the act of choosing a folder, and
+so it now lives in the picker: on Windows, a check button added to the shell's
+own common item dialog through IFileDialogCustomize. Every Scan Folder in the
+frontend gets it, including the two that never had it, and a fourth one written
+next year gets it without anybody remembering to add it.
+
+One delegate carries the answer both ways - the flag goes in as the state to
+open on and comes back as what the person settled on - because a picker that
+only returns a path cannot report a control it does not know about, and a
+picker that returns a pair forces every caller to care. The ref parameter is
+the shape that lets a caller which does not care pass a value it never reads.
+
+Three pickers cannot carry the control: Mono's dialog, the SHBrowseForFolder
+tree, and a Windows whose shell refuses the customisation interface. In all
+three the value comes back exactly as it went in, and that is written down as a
+rule rather than left to fall out of the code, because "unchanged" and "the
+person said no" are the same bits and only the contract tells them apart. So is
+the other case they share with a cancelled dialog: cancel never changes the
+remembered answer.
+
+The wizard's on-page box is hidden where the dialog carries the option, not
+deleted - it is still where that page remembers the answer between scans, and
+it is what a person on Mono actually sets. Exactly one of the two is ever
+visible; two controls for one setting reads as two settings.
+
+What this cost in testing is the point of it. The suite runs on Mono under
+Xvfb and the control is raw COM against a shell that is not there, so every
+Linux test stops at the delegate. Two of them would have been vacuous and are
+not. The check that a page shows a box exactly where the picker cannot carry
+one has two halves, and a test can only ever stand on one platform - so it
+tells FolderBrowserEx what to say about the platform instead of asking the one
+it is standing on, and asks both. And the vtable offsets, where a wrong slot
+calls some other method entirely, are answered by a harness on real Windows
+(tests/ui/windows/folder-picker-checkbox.sh) that finds the control among the
+dialog's child windows, clicks it, and checks what the caller gets back -
+including the cancel case, which is the one a person is most likely to hit and
+the one no Linux test can reach. Both new Linux legs were watched failing
+against a deliberately broken build before being believed. docs/folder-picker.md
+says plainly what the green run does and does not stand for.
+
+## The fault handler gives up its pointers, and never reports twice (chimera#127, 2026-09-21)
+
+A PS3 core died in the main menu of a game. Everything Chimera is built to do
+about that worked: the guest death was caught, the dialog came up naming the
+frame and offering the four ways out, the inputs were safe, the process was
+alive. Ninety-two seconds later the process was gone, and the crash note said
+`stack overflow` at an address in `msvcrt.dll`, with a stack of nothing but
+ntdll and `libminiboxhost.dll` repeating the same four frames fifty times over.
+
+Two faults, and the note named neither.
+
+`minibox-diag.log` had the shape, once it is recognised: one line reporting a
+perfectly ordinary fault in host code - a write the CLR raises and handles
+every day - and then fifteen hundred identical lines, all naming one
+instruction inside `libminiboxhost.dll` reading one address. Disassembling a
+mingw build of the same miniBox commit at the offset the crash note gives
+settles what that instruction is: the first load in `say_region`, reading
+`g_layout` - the pointer the fault handler uses to say which region of the
+guest an address landed in. It sits immediately after the `mb_diag` that
+printed the last line in the log, and after a null check that passed. So the
+handler read the layout, faulted, and Windows called the handler again FOR ITS
+OWN FAULT. A vectored exception handler has no depth limit and no second
+chance; it ends when the stack runs out.
+
+`g_layout` points inside the `mb_host`, and `mb_host_destroy` freed the host
+without taking it back - the same mistake that had already been found and fixed
+one field over, for `mb_guest_ctx`, whose comment two lines above says exactly
+why: a host that is gone must not be what the fault handlers read. On Linux a
+freed chunk usually still reads like itself and the report is merely wrong. On
+Windows it is really gone.
+
+The general rule the second fault leaves behind, which is the part worth
+keeping: **handling a fault may nest; REPORTING one may not.** The guest's own
+fault handler runs guest code, which can trip a clean page and fault again, and
+that must be served. But the report walks the layout, the block list, the bytes
+at `rip` and the guest's stack, and any of those can be the thing that is
+wrong - so a fault arriving while a report is running is now said once, in one
+sentence, and passed straight on. Saying more is exactly what just failed.
+
+Fixed in miniBox (`fix(tripguard): a destroyed machine is not what the fault
+handler reads`), with both legs watched failing first: a destroyed host gives
+its layout back (asserted at both ends, because a NULL that was never set would
+pass on its own), and a Windows-only child that points the layout at an address
+that is not there and counts what the handler managed to write - two lines
+guarded, 659 unguarded, which is the user's log reproduced.
+
+## Guest code keeps nothing below the stack pointer (user-decided, 2026-09-21)
+
+A SysV x86-64 leaf function may keep live values in the 128 bytes below `%rsp`
+- the red zone - because nothing on Linux writes there behind its back: a
+signal handler runs on its own stack. Windows delivers an exception onto the
+interrupted thread's own stack, which during guest execution IS the guest's
+stack, and in a guest process something in that delivery rewrites the bytes
+below `%rsp - 0x28` with their content as of the previous exception's return.
+A guest leaf interrupted by a dirty-page fault then reads back stale spills.
+
+That is not a hypothetical. It is why Flycast's `cpu=jit` produced a wrong
+Dreamcast on Windows whenever the greenzone was on: the CHD decompressor
+spilled its two limits below `%rsp`, a dirty-page fault landed in the middle
+of the routine, the reload came back as zeros, the hunk decode failed, and the
+emulated machine parted from its Linux twin at frame 137 and never came back.
+It was found by restoring those 128 bytes from inside the fault handler, which
+made the machine byte-identical to Linux, and by replaying the Windows bytes
+into the Linux guest, which made Linux diverge the same way.
+
+**The decision: every guest is built with no red zone.** Not per core - in the
+shared toolchain, in the `*cc1` entry of the musl-gcc specs that every core's
+guest compile passes through, in musl's own flags and libstdc++'s, and in the
+Rust guest's target spec, which is where LLVM is told. And it is enforced
+rather than remembered: `check-wbx.sh`, the guest-image check every core
+already runs, counts memory operands with a negative displacement from `%rsp`
+and requires zero, with a named allowlist that currently holds one symbol.
+
+The reason to enforce it rather than trust the flag is the shape of the bug.
+It does not announce itself: no crash, no diagnostic, no wrong pixel - a
+savestate that quietly stops matching, hundreds of frames after the fault that
+caused it, on one host only. A core added next year that finds its own way
+around the specs would reintroduce it silently, and the only thing standing in
+the way is a check that runs on the image rather than on the build recipe.
+
+Cost, measured before the decision was asked for: 1000 frames of the same game
+three times each, means 0.01 s apart on 55.6 s, inside either run's spread. A
+94 MB guest image grew 92 KB.
+
+What is deliberately still open: WHICH component performs the rewrite, and
+what enables it. Plain Windows processes keep the bytes, so do sandbox blocks
+with `%rsp` inside them, so does a thread given real TEB stack bounds, and so
+does one carrying the guest's FS base across the exception. The flag removes
+the exposure; it does not explain it. miniBox `docs/RED-ZONE.md` holds the
+measurements and names the two saved instrument patches for whoever resumes.
+
+## A pointer names a fraction of the screen, not a number in a plane (user-decided, 2026-09-22)
+
+An absolute input - a mouse pointer, a light gun, a touch panel - has to name a
+place on a picture whose size the declaration cannot know. `waterbox.config`
+fixes an axis range a priori, a limitation carried over from BizHawk, and DOS
+and PCem change video mode whenever they like. The user's framing was that the
+range "should always be the guest's screen resolution"; what they chose, after
+the survey below, was to keep a normalised wire and **fix the unit**.
+
+**The survey changed the problem.** The value was already resolution
+independent: `DisplayManager.UntransformPoint` returns guest pixels,
+`MainForm.cs:904-914` divides by the LIVE `BufferWidth`/`BufferHeight`, and
+`Controller.cs:130-152` expands that into the declared range. The unit was
+simply arbitrary - "1/2560ths of the screen" for DOSBox-X - and, worse,
+**the core divided by a different number than the config declared**:
+`dosbox-driver.cpp` used 800 against a declared 2560, so pointing at the middle
+of the window put the DOS cursor 1.6x past the right edge. Measured on that
+build with the position held, every value across the whole declared range
+answered the middle of the screen: the axis did not reach the machine at all.
+
+**The rule, for DOSBox-X and PCem:** an absolute position is declared
+`0..65535` neutral `32768`, and the core converts it against **its own live
+picture size**, never a constant and never a number the frontend supplied.
+`pixel = axis * screen / 65536` - 65535 is the largest value, 65536 the number
+of steps. (Measured: dividing by 65535 instead changes no reading a gate can
+take, because the clamp absorbs it; 65536 is a matter of not depending on the
+clamp.)
+
+**It is a spelling, not a new idea, and the tree is deliberately not uniform.**
+Every core with an absolute axis already normalises and scales in the core -
+opera, pcsx2 and flycast take a signed `-32768..32767` and immediately add
+32768 and divide; Ruffle carries `0..8191` and multiplies by its live stage;
+snes9x declares gun coordinates in SNES pixels and clamps Y against the live
+`PPU.ScreenHeight`. None of those is wrong, so **the user scoped this to
+DOSBox-X and PCem and left the rest alone**. `0..65535` is the preferred
+spelling for new work; it is not a migration anyone owes.
+
+**Three consequences worth writing down.**
+
+*The digits problem dissolved.* `65535` is exactly five characters, which is
+what both implementations of the entry format already pad an axis field to
+(`movie_entry.cpp:139-141`, `LogEntryGenerator.cs:57`). Column width, the
+typed-digit limit and the OSD's six-character field all come out unchanged, and
+**the engine needed no change at all** - it never reads `min` or `max`, only
+`neutral`.
+
+*An absolute position must be asserted every frame, not when it changes.* A
+fraction is not a fixed pixel: the same 32768 is pixel 160 in a 320-wide mode
+and 320 in a 640-wide one. DOSBox-X's `Mouse_AfterNewVideoMode` also resets the
+cursor to the middle of the new range on every mode set, so a position that
+only wrote itself on a change was overwritten and never recovered. An axis
+driven by an explicit relative speed is exempt, or a movie steering relatively
+gets dragged back to the neutral - which is now mid-screen.
+
+*The wire must be differenced in pixels, and this is the one that hides.* Where
+a core also derives relative movement from the position (DOSBox-X's issue #61
+rule, and PCem, which has no absolute device at all), one wire unit is about a
+hundredth of a pixel at 640 wide. Differencing the wire makes every delta a
+hundredfold too large **while the absolute cursor still lands in exactly the
+right place** - so no test of position can see it. It needs its own check: that
+the same movement asked for by position and by speed reaches the machine as the
+same number. Both cores now have one, and in both the negative control fired
+where the position check stayed green.
+
+**An axis is as wide as it declares, in the frontend too.** TAStudio's axis
+drag moved the value by one per four host pixels and its nudge hotkeys by a
+literal 1 and 10 - right for a 0..255 paddle, useless at 0..65535, where
+crossing the picture would take a quarter of a million pixels of mouse travel.
+Both are now a fraction of the range. The custom autofire pattern's value box
+had `+/-10000` fixed in the designer and would have silently kept its own value
+rather than refusing one it could not hold.
+
+**PCem gained the axis it never had, with a limit stated rather than hidden.**
+Its entire mouse list is two serial, two PS/2 and two machine-integrated mice,
+every one relative, with no VMware backdoor or tablet anywhere in the tree. So
+a position is turned into the movement that would reach it: open-loop
+targeting, which drifts if the guest accelerates or warps the cursor and cannot
+be measured from outside. A mouse also reports in bytes, so a screen-wide jump
+cannot fit in one packet and PCem's devices drop what is over the edge - the
+remainder is now kept and delivered over the next polls, and the negative
+control for that showed a 639-pixel jump arriving as 127.
+
+## A core may suggest settings for a game, and the wizard applies them where they can be read (user-decided, 2026-09-23)
+
+The RPCS3 wiki keeps a table of recommended settings per game, and the RPCS3
+core carries a snapshot of it (with its source, date and licence). The user's
+decision: **those recommendations are core settings like any other**, applied
+automatically when the new-project wizard reaches its settings page - where
+the provenance and the compatibility level are shown too - and **present even
+when the game is not in the wiki**, so a person can still experiment with them.
+
+**Every setting the wiki recommends became a declared setting.** 43 of the
+wiki's 59 setting names map onto something the core can run with; the other 16
+are refused per game with a reason (a Vulkan-only option, the host's audio
+device, a camera, a network the sandbox never has). Each display name is the
+wiki's own, so a recommendation on a page and a row in the grid read the same,
+and each enum's options are rpcs3's own spellings, handed to rpcs3's own
+parser - a spelling it does not know is refused, not guessed. **Every default is
+what the core ran with before the setting existed**, including the settings the
+core pins for determinism (the frame limiter, the vblank rate, the PPU thread
+count): a project records only the values somebody chose, and an untouched one
+resolves to the package default at load, so a new default would silently move
+the machine of every existing project. The pinned ones say in their
+description that a change is an experiment, and one a movie must keep.
+
+**The lookup runs in the core, before anything boots.** Which game a file is
+takes reading the file the way the core reads it - a package's content id, a
+disc image's or a disc archive's PARAM.SFO, PS3_DISC.SFB when the data is
+encrypted - and that knowledge belongs to the core, not to the frontend or the
+engine. So a core declares `"suggestSettings": true` and exports
+`SuggestSettings`; `ce_suggest_settings` mounts the files exactly as a run
+would and calls it **instead of** `Init`. The wizard asks through a child
+process (`Chimera --suggest-settings package game`), as the precompile step
+does, because the core has to be loaded to answer and one that falls over
+while it looks must not take the wizard with it.
+
+**What arrives is values, the way a preset is.** They land in the grid, where
+they can be read and changed like any other, and nothing about a suggestion is
+remembered by the project - it pins the values. Three rules keep that honest:
+the lookup happens once per core and game, so going Back and Next does not undo
+an edit; choosing a different game first takes back what the previous game's
+suggestion set, because game A's recommendation is not game B's; and a project
+the wizard was seeded from keeps its own settings - the note is shown, the
+values are not applied over them.
+
+**The note says where the values came from, or that nothing was found.** It is
+the same sentence the core prints at boot: the compatibility list's status and
+date, what the wiki recommends, what the core cannot express, and the page and
+licence - or that the title is not in the list or the wiki at that snapshot.
+Recognised titles went from 1300 with an applicable recommendation to 2300
+once every expressible setting was declared.
+
+**The answer string obeys the engine's `thread_local` rule, and a Windows leg
+now proves it.** The first build kept the answer in a `thread_local
+std::string`, and on Windows every `--suggest-settings` child died at exit
+with an access violation after printing a correct answer - the mingw double
+destroy of chimera#123, which the wizard would have read as a failed lookup.
+It is a `ThreadString` now. `tests/engine/windows/refused-open.sh` asks for a
+suggestion too, and the negative control is recorded because the first two
+versions of the check could not fail: a core that answers `""` owns no heap
+buffer, and a call made on a worker thread is destroyed once, when the worker
+ends. The detector is a long answer (the RPCS3 core's sentence) asked for on
+the thread that ends the process - with the old string back it writes a fault
+report; with the fix it passes.
+
+## A project remembers its Greenzone choice (user-decided, 2026-09-28)
+
+Issue #158: TAStudio's Greenzone box - every frame, one in N, off - reopened
+every project on "every frame", whatever it had been left on. That was
+deliberate (74d511d): somebody who turned the greenzone down for a cutscene
+would not be left wondering next session why nothing turns green. The user
+decided the other way, and decided where: **in the `.chimeraProject`**.
+
+**It lives in TAStudio's part of the file**, the `tastudio` object that already
+carries the piano roll's columns and lag display (issue #83), as
+`MovieClientSettings.GreenzonePeriod`: 1 every frame, N one in N, 0 off. The
+engine keeps that object without reading it, so the project format itself did
+not change and no older build refuses the file. A project saved before this
+has no such field and opens on 1, which is what it always opened on.
+
+This is not where a greenzone's memory budget lives, and the difference is
+deliberate: a budget is a fact about the machine the work is done on, and is
+kept beside the greenzone in the cache so a project handed to somebody with
+half the memory does not arrive carrying it (ProjectCache.ProjectBudgets). The
+choice of how often to store a frame is part of how the run is being worked on,
+and travels with it.
+
+**The box follows the movie on every refresh**, all three levels and N: a
+project reopened on one in seven shows "Every [7] frames", without that 7
+becoming the default N in TAStudio's settings.
+
+The witness leg `T:box:greenzoneChoice` opens a project in the real frontend,
+sets the file to one in seven between two runs, and checks that the second save
+writes the 7 back. With the line that applies the choice on opening taken out,
+it saves back 1 and fails.
+
+## Game cores are cores, listed apart, with properties by name (user-decided, 2026-09-28)
+
+An open or reconstructed game can be a core of its own: the same engine,
+sandbox, projects, movies and TAStudio, with the user's copy of the game's
+files as its firmware. SDLPoP (Prince of Persia) is the first, and it is built
+from the original DOS data files: a port that redistributes resources of its
+own does not use them. The spec is docs/game-cores.md; what the user decided
+is what follows.
+
+**A game core says so, and every list of cores shows it apart.**
+`waterbox.config` and the roster carry `"kind": "game"`; absence is an
+emulator, which is every core before this one, and a kind this build does not
+know is listed with the emulators rather than refused. The Core Manager, the
+Cache Manager, the new-project wizard's picker and the firmware window list
+the emulators first, then a grey divider row, then the game cores - a row
+rather than a ListView group, because Mono ignores groups in Details view. The
+Core Manager keeps its "External cores" divide inside each half. The platform
+chooser for an unknown file offers no game core at all: a game core plays its
+own game and nothing else.
+
+**Properties are a labelled domain, not a new kind of thing to watch.** The
+alternative - a property API the tools would each learn - was declined for the
+one that costs the tools nothing: the core keeps the properties in a block of
+its own memory, exposes it as a `Game State` domain, and describes it with a
+property table. RAM Watch, RAM Search, the Hex Editor, freezes and `memory.*`
+all work on properties as they are; the table only gives them names. Raw
+memory is exposed beside it where the game has it in one piece.
+
+**Every type a game holds, not the ones the first game used** (user-decided,
+the same day, reversing a narrowing that followed RAM Watch's 32 bits): 8- to
+64-bit integers, f32 and f64, bools, strings in four encodings, raw bytes,
+arrays with a stride (a field of an array of structures), big-endian values
+and bit fields. Where a tool cannot hold one, the tool grows - a property
+watch the engine reads, freezes kept as the engine's text - rather than the
+table shrinking.
+
+**The type system is the engine's.** Reading, writing, showing and parsing a
+property decide what bytes a poke or a freeze writes, so they live in
+libchimera (`ce_session_property_*`, source/engine/source/game_properties.cpp)
+under the thin-C# rule, tested by the engine's own test; the frontend lists,
+shows and forwards, and a solver linking the engine gets the same
+properties. The engine checks the table, not trusts it: a property on a domain
+the core does not have (or one with no memory of its own), past the end of
+one, of a type it does not read, with a name already taken, or a bit field
+that does not fit is left out and said; the rest of the table still works. A
+number that does not fit a property's width is refused, not wrapped - except
+that -1 sets every bit of a u64, the only way a signed 64-bit caller can.
+
+**A name is the identity.** Watches, freezes and scripts keep a property's
+name, never its offset, so a core may reorder its block between versions. A
+watch on the address a property starts at takes its name wherever it was made,
+unless somebody wrote a note of their own, and a freeze takes its watch's.
+
+**A step is as long as the game makes it, and the engine asks.** A game core's
+movie row is one step of the game's logic, and Prince of Persia's last 1/12 s
+walking, 1/10 s fighting and 1/60 s on the title. The engine read a core's rate
+once, after Init, which played every step at the first one's length (the title
+five times too slowly); it now asks again after every shown frame, which the
+frontend's throttle and sound already read every loop. Seeks do not ask - no
+one paces an unshown frame. A machine that changes its refresh with its video
+mode (the X68000's rate export) is live the same way. `chimera-run --rates`
+logs it: the SDLPoP route reads 12/s with 10 then 15 at each room change, and
+274 steps of 12 with the re-read taken out.
+
+**`game.*` says and carries on; it does not throw.** An exception thrown back
+through Lua after a script has yielded a frame took the whole process down
+under Mono, even inside a `pcall` - the first version of the witness leg
+crashed that way twice. An unknown name reads as nil and sets nothing, with
+the reason in the console, as `memory.*` treats a domain it does not know.
+
+The witness leg `T:box:gameProperties` drives the whole path through the synth
+core, whose table names gridWalker's RAM and one of every other kind over RAM
+the rom leaves alone: the names in the core's order, a property read against
+the same bytes through `memory.*`, every type's bytes (a u64 of all ones, the
+least s64, an f64, cut and padded text, utf16le, bytes, big-endian, two
+interleaved arrays, two bit fields in one byte), and the cursor moved by
+`game.set` drawn where it was put. With the table emptied it fails at the
+first check.
+
+## A game's own clock, to the millisecond (user-asked, 2026-09-29)
+
+A game core may name one property as the game's timer (`"gameTimer"` in its
+table; docs/game-cores.md): the milliseconds the game itself has counted, as
+its speedrunners count them. Prince of Persia's is TASVideos' GameTimer, the
+one quickerSDLPoP prints as `IGT m:ss.mmm`: the clock loses one tick of 1/12 s
+per tick of play and rolls a minute over after 719, so the time is the ticks
+between the clock the game started with and the clock now, times 1000/12. The
+arithmetic is the game's and lives in the core (thin C#, heavy C++); the
+engine checks that the name is one whole-number property, reads it, and owns
+the only formatting, `mm:ss.mmm` (user: "for humans to see"), so a solver
+linking the engine writes the same text the screen shows.
+
+It is shown on the screen (Game > Display Game Time, on by default; see the
+next section) and saved in the project as three headers - the
+number, the text and the frame - **at the end of the movie only, and never
+stale**. The frontend records the time each frame the machine shows and
+forgets it after an edit, as it forgets lag; the headers are written when the
+time at frame == InputLogLength is known and removed when it is not. A
+project opened with the headers seeds the end frame's time from them, so an
+open and a save without playing keep it, and an edit before the end drops it.
+Stale was the trap to avoid: a header that outlives an edit says a time the
+movie no longer makes, and a reader parsing projects has no way to tell.
+
+SDLPoP2's clock starts only with the first story scene after level 4, as the
+game's does, so on its own it counts nothing in levels 1 to 4 - the game's
+rule, not a gap. The core's IGT From Level 1 setting (user-asked, on by
+default) adds the ticks of play before then, so the time runs from the very
+beginning of level 1; the frontend sees only the number either way.
+
+## A watch is drawn on the screen only when it is ticked (user-decided, 2026-09-29)
+
+RAM Watch's "Display Watches On Screen" drew every watch in the list, so it
+was off by default and a list of any length made it useless. Each watch now
+has an On Screen box, the list's first column, off for a new watch (user:
+"Disabled by default"); the screen draws the ticked ones, one under the other
+in the list's order. The switch stays as the master (user: "Needs to be on by
+default"), and was renamed `DisplayWatchesOnScreen`: every existing config had
+saved the old switch's default, off, which would have kept the boxes dead on
+every machine that ever ran Chimera. A config that had it on loses nothing it
+can see - it drew everything before, and draws the ticked ones now.
+
+The ticks live in the watch file, as one line after the watches -
+`OnScreen<TAB>0,3`, the places of the ticked ones in the file. A watch's own
+line keeps its five tabs, because an older build reads only lines with
+exactly five and would misread a sixth field into the notes; the new line has
+one, so an older build skips it. The places count the file's lines, not the
+watches loaded: a property watch the running core no longer has gives no
+watch, and must not move the other ticks up by one (a test fails if it
+does). A clipboard copy carries no tick - a paste is a new watch.
+
+With the switch on by default, a watch file loaded at start-up (Recent >
+Auto-load) opens the RAM Watch window. It used to open hidden when the switch
+was on, the screen being where every watch was; now the screen shows only the
+ticked ones, and the window is where the rest are.
+
+## A game core's menu is "Game", and holds the game's own options (user-decided, 2026-09-29)
+
+The core's menu was "Emulator" always, never named after the system, so it
+stays where the user left it. A game core has no emulator to name: while one
+runs, the same menu is called Game, in the same place - the title follows the
+kind of core, not the game, so it still does not move from game to game.
+
+Display Game Time moved there from View. View is for what every core has
+(frames, lag, input); the timer is the game's, and only a game whose core
+names one (the two Prince of Persia cores) shows the item, rather than every
+core showing it greyed. The frontend asks the core whether it has a timer and
+never which game it is, so a third game core with a timer gets the item
+without a change here. The hotkey and the message position stay where the
+other displays' are.
+
+## The lists of cores filter by kind; they draw no dividers (user-decided, 2026-09-29)
+
+Game cores were set apart in every list by a divider row - a grey line reading
+"Game cores", with "External cores" and "External game cores" beside it in the
+Core Manager - because Mono's ListView ignores groups in Details view, so a row
+was the only divide that drew everywhere. The user found it did not look
+right: a divider row reads as a disabled entry, and has to be kept from being
+ticked, selected, sorted across and counted.
+
+Tabs, one per kind, were weighed and not taken. The windows act on everything
+at once - the Core Manager's Check for updates and Download latest, the Cache
+Manager's one budget and Clean Now - so a tab would split what is one list
+with one set of actions, and the wizard's core box, a drop-down, cannot hold
+tabs at all. Each list is now one list with a Type column and Show: All /
+Emulators / Games above it (Kind: Emulator / Game in the wizard, above the
+core). The column says on every row what the divider said once; the filter
+narrows the view without splitting the actions. A ticked row the filter hides
+is unticked, so no button acts on something out of view. The Core Manager's
+external cores went the same way: their Source says "(added by hand)".
+
+The Cache Manager has no distinction at all (user: not useful there): what a
+cached thing costs to lose does not depend on the kind of core that made it.
+
+## A game core's firmware may be a file of the project's own (user-decided, 2026-09-29)
+
+A game core's firmware is the game's own data. A modified PRINCE.DAT, another
+release's file, a translation: each is a legitimate thing to play, so the user
+asked that a game core take any file, with the project pinning the SHA-1 of the
+file it actually uses. That model was nearly in place already. Projects pin
+files by hash, and the frontend hands any readable file to a core, with a
+warning. Three pieces were missing:
+
+- **The wizard.** Select File took only the declared hash. For a game core it
+  now takes any file, says it is the project's own ("your own: ..."), and pins
+  that file's hash. The file is remembered under its own hash, never under the
+  original's: under the original's key it would stand in for the original in
+  every other project. An emulator core's firmware still takes only the exact
+  file.
+- **The mount.** Reopening already matched each pin by the project's own hash.
+  The mount then asked `GetPath` with the package's declaration, which prefers
+  the dump remembered under the DECLARED hash. So a person who had ever
+  pointed at the original booted the project on it, silently. That is a
+  different machine, and a movie made on the custom file desyncs.
+  `CoreFirmwareStore.ProjectPins`, set when a project boots and cleared when
+  it closes, makes the pinned file win for that core. What is described and
+  recorded is then what is mounted. It was proven both ways, headlessly: a
+  Prince of Persia 2 project pinning a modified PRINCE.DAT, with the original
+  remembered, got the original's level before the change and its own after.
+- **The cores.** Each checked every file against the original's hash and
+  refused anything else. They now take whatever they are given. They still
+  name a missing file, and still refuse a build known not to work:
+  - SDLPoP2: the 1993 floppy's PRINCE.EXE, whose tables it would read from
+    the wrong places;
+  - OpenSamurai: the floppy's older AdLib driver.
+
+The declarations keep the originals' hashes: they are how the wizard and the
+Firmware folder recognise the original, and how "your own" is told from it.
+
+## A core's log is kept only when asked for (user-decided, 2026-10-01)
+
+Tools > Export Core Log... keeps everything a core writes to stdout and
+stderr in a file the user chooses. Before this, a core's log reached nobody
+on Windows: a GUI process has no stderr. The only way to get RPCS3's log was
+a firmware entry named `logtrace`, which the GUI cannot add (#165's reporter
+was left stuck on the template line that asked for it).
+
+It is on only because somebody asked, and nothing remembers that they did:
+every run starts with it off. Turning it on reboots the core (with consent),
+because RPCS3 keeps its full log only from boot; using the item again turns
+it off and says where the file is. The work is in the engine and miniBox,
+not here: `ce_core_log` starts the file with the time and the engine build,
+notes each session's core package and sha1, and has miniBox copy every
+guest stdout/stderr write into it, flushed per write so a crash leaves it
+whole. A session opened while it is on gets an empty `corelog` file mounted.
+RPCS3 checks for it with `stat`, which allocates nothing in the guest, and
+then sends its log, at the levels it already keeps, to stderr too.
+
+**The machine does not move.** With the log on, the synth witness ends on
+its goldens, and RPCS3's RAM after 150 frames of Rayman Legends is
+byte-identical. Trace channels are not raised: a fuller log would change
+RPCS3.log, which lives in the console's memory.
+
+## A movie made elsewhere is imported through the wizard (user-decided, 2026-10-01)
+
+The DSDA core reads Doom demos (.lmp). Its author's contract, written for
+the user and relayed by another session, asked for four things: an item in
+the Game menu; NOT an isolated tool that writes .chimeraProject files,
+because the format may change and a separate writer would drift; a dialog
+that takes the demo, the IWAD, the PWADs and patches in order, and the
+flags; and the user choosing where the project goes, with nothing left to
+fix by hand.
+
+So the core only suggests. `ce_import_movie` runs the core's
+`ImportMovie` export on a session that is never started (the same path
+as `SuggestSettings`), in a child process so a core that falls over
+while reading takes nothing with it. The answer seeds the New Project
+wizard: the machine, the settings, the files in the core's load order,
+and the firmware picked in the dialog, which the wizard takes as if it
+had been picked on its own page. The user checks it and presses Create, as for any
+project; the input log is then set, the user picks the path, and the
+project opens. Its first open fills in the headers only a running machine
+knows and saves once, since a file that is not fresh never gets them.
+
+Nothing about Doom is in the frontend. The dialog is drawn from the
+core's `movieImport` declaration; a refusal is the core's own sentence.
+
+**No release setting (user-decided, 2026-10-01).** The first cut asked a
+Version beside the System - the IWAD release, from a `versionSetting` the
+core narrowed per machine. It could only offer the releases the core had
+hashes for, one for most games, so the box sat greyed with nothing to
+choose. Removed: the IWAD the person gives is the release, and the
+compatibility level is how it plays. The import hands that IWAD to the
+wizard whatever its hash, and a game core takes it as the project's own.
+
+
+## Chimera knows no system: the cores say what theirs are called (user-decided, 2026-10-05)
+
+Chimera carried three tables about the machines it does not emulate:
+`VSystemID` (the ids), `SystemNames` (89 names, most for systems no core
+here runs) and `MnemonicLookup` (the letter of every button and the header
+of every axis, per system). A new core meant an edit to Chimera, and a
+name was right only if somebody remembered to add it. The user's words:
+Chimera should be completely agnostic to whatever systems are run with it;
+the names should be provided by the cores themselves.
+
+Four decisions, all the user's:
+
+- **The roster row carries the names** of a core not yet installed:
+  `official-cores.json` is format 2, `"systems": [ { "id", "name" } ]`.
+  Format 1 and a bare id are still read. A test holds the roster to what
+  the installed packages say.
+- **A package that declares nothing gets the generic rule only** - no
+  legacy table kept for old packages. The system reads as its id; a button's
+  letter is the first usable character of its last word; an axis header is
+  its initials. Published packages read that way until they are rebuilt.
+- **Everything moved to the cores**, including the names no core used.
+- **The PlayStation 3 disc layout left the engine** in the same round. The
+  ISO writer detected `PS3_DISC.SFB` and wrote two fields into the system
+  area; that is now a `media` recipe RPCS3 declares, and the engine writes
+  whatever patches a recipe lists. The image is the same file, byte for
+  byte, as the engine made before.
+
+What a package declares is in docs/porting-a-core.md: `systemNames`,
+`mnemonics` in each input declaration, `header` on each axis, `media`.
+The engine resolves a control's letter (whole name, then the name without
+its player, then the rule) and the frontend asks it - C# holds no table
+and no rule of its own; a definition with no session behind it asks the
+engine for the rule's answer.
+
+Movies are not touched by any of it: an entry is read by position, and any
+character but `.` is "pressed". That is also why the letters could be
+corrected while they moved. Moving them found that seven keys had `.` or
+`|` for a letter (a pressed `.` reads back as not pressed; `|` parts an
+entry's groups), that the kana keys of one keyboard had letters outside
+ASCII, which the engine's byte-wise entry cannot carry as one character,
+and - once the uniqueness test read each MACHINE's controller rather than
+only the package's - that 44 pairs of controls on one pad shared a letter
+(the four C buttons of one pad were all `C`; L2 was the `L` of Left). All
+are fixed in the cores' declarations. Every other letter is what it was.
+
+Left where it is, and why:
+
+- `GreenzoneSurvivesReload` still names cores in the frontend. It is a list
+  of EVIDENCE, kept here on purpose (2026-09-14: a core's own declaration
+  was not enough). Moving it is a different decision.
+
+## Opposite directions are sent as pressed (user-decided, 2026-10-05)
+
+The controller dialog had a U+D/L+R setting - Priority (the default),
+Forbid, Allow - inherited from BizHawk, and an adapter in the input chain
+that enforced it. It found its pairs by NAME: any button with "Up" in it
+was held against the same name with "Down", and so for Left and Right. It
+was the last place the frontend guessed something about a core's controls
+from their spelling, and the guess was wrong wherever the words were not
+directions: "Mouse Left" and "Mouse Right" could not be held together,
+"Left Trigger" was held against the pad's Right.
+
+The user's words: the setting is legacy, we no longer need it. It is gone
+with its adapter, its enum and its config key (an old config that still
+carries `OpposingDirPolicy` is read; the key is ignored). What is pressed
+is what the machine gets, as Allow did. A machine whose pad cannot press
+both ways is the core's to model.
+
+The earlier note in this log about `joypad.set` and the SOCD filter is
+history: there is no filter to pass through now.
+
+## Reboot Core keeps the project (user-decided, 2026-10-06)
+
+Reboot Core was a rom reload like any other, inherited whole. A rom load
+ends by restarting the tools, and TAStudio's restart stops its movie and
+starts another: the most recent project file if this was it, a blank one
+otherwise. So a reboot inside a project asked whether to save, and then
+replaced the project - a 70-frame run became an empty
+`default.chimeraProject`. With the piano roll closed the movie was saved,
+stopped and disposed instead.
+
+The recovery session knew none of this. It went on holding the movie that
+had been replaced, whose machine was gone, and the next request to keep
+the work safe - a caught error, a core that stopped - read that machine's
+GPU description from the engine with a session that no longer existed. The
+process died (issue #196: Export Core Log offers a reboot, and a click in
+the piano roll then raised the error that asked).
+
+The user's words: reboot core should keep the project. So it does:
+
+- The SAME movie goes on to the new machine - inputs, markers, branches,
+  undo history, unsaved edits - queued before the load exactly as a
+  project boot queues it, so the machine boots once, with the project's
+  core and settings, and nothing is asked about saving.
+- The machine is at power-on, paused there when the piano roll is open.
+- The greenzone does not survive: the engine held it for the machine that
+  is gone. The saved greenzone is not read back either - it is the states
+  of the SAVED inputs, and the movie in hand may have been edited since.
+  Branch states are files beside the project and are still there.
+- Between the two machines the movie answers "nothing stored" itself
+  (`MachineIsGoing`) rather than ask the old machine's history: a piano
+  roll repainting in the middle of the reboot asks exactly that.
+- A disposed core answers "" for its GPU description instead of handing
+  the engine a null session.
+
+Proved by three witness legs (the roll closed, the roll open, and a core
+that dies after a reboot), each of which fails on the old path, and by a
+unit test of the movie changing machines.
+
+One thing found on the way and NOT fixed: under Mono, a core that dies
+with the piano roll open crashes in Mono's unwinder, reboot or no reboot.
+The death leg runs with the roll closed for that reason.
+
+## A branch's state follows the greenzone's rule (user-decided, 2026-10-06)
+
+Reopening an xemu or Flycast project and loading a branch said "This branch
+has no saved state beside the project; replaying to its frame instead", and
+replayed from power-on - every branch, every time (issue #186). The same
+project had its greenzone.
+
+Two rules had drifted apart. A branch's state was left out of the cache for
+ANY machine a GPU drew, from when that state rode inside the project file:
+a file people hand to each other, and a state a GPU drew is only good where
+that GPU is. Since the PS3's four-gigabyte states (2026-09-17) a branch's
+state is a file of its own in the cache beside the project, exactly as the
+greenzone is - and the greenzone has been kept since 2026-09-16 for the
+cores whose GPU-drawn states are known, by evidence, to reload in another
+process, after a clean close.
+
+The user's words: branches should follow the greenzone rule. They do: which
+file is a branch's state is recorded, and read back, exactly when the
+greenzone may outlive the session - a machine no GPU drew, or a core on the
+evidence list; never from a session whose machine died; never read from a
+session that did not finish. A core's own claim that its states survive
+still decides nothing.
+
+Measured before it was changed, on Flycast drawn through the GPU bridge:
+one process played the 240p test suite to frame 700 and saved a state; a
+second process loaded it and played 200 frames, and its picture was the
+first process's frame 899 pixel for pixel (the control, frames 700 and 899
+of one run, differs by 140 pixels). The frame right after the load draws
+nothing, as after any load on these cores; TAStudio shows the branch's own
+stored picture there.
+
+What it does not change: a cache an older build wrote for a GPU-drawn
+machine names no state files, so those branches replay once more and keep
+their state from the next save. A state the engine refuses still falls back
+to the replay, with the reason shown.
+
+## The About box is six lines, and versions are copied from the Help menu (user-decided, 2026-10-07)
+
+Issue #193 is the user's own specification of the About box, and it is
+exhaustive: the logo, small and centred; the name; the build, as its commit
+(a link to that commit) with the commit's date and time; a link to the
+repository; a link to toolAssisted.run; OK. The tagline, the credits link,
+the BizHawk line, the build configuration and the button that copied the
+commit hash are gone. Credit is where it was and still is: CREDITS.md.
+
+The build's time is the commit's, in UTC, read from git when the frontend
+is built (`GIT_COMMITTIME`, beside the day `GIT_SHORTDATE` the version-skew
+warning compares). Never the build's wall clock: a build must reproduce.
+
+Issue #188 asked for the running core's version to be copyable, next to
+Chimera's in the About box. The About box now has no room for it by
+decision, and the button it would have sat beside is one of the things
+removed. So the copying moved: Help > Copy Version Info puts two lines on
+the clipboard, in the words the bug report template asks for them -
+
+    **Chimera build:** Commit c7c06d7d5 (2026-10-06 16:55 UTC)
+    **Core and version:** RPCS3 2026-10-07 06:35  (1924ad8b)
+
+- the second only while a core is running, written as the Core Manager
+writes it. Where it went is the implementer's choice, not the user's: the
+user decided what the About box holds, and this is what followed from it.
+The text is built in `VersionReport` (tested); the menu item only asks the
+running core which package it is.
+
+## A property table can be dynamic: a Flash movie's variables, by name (user-decided, 2026-10-07)
+
+Issue #216 asked how to watch a value in a Flash game: a movie has no RAM,
+and the Ruffle core published no memory at all. Two things were decided, in
+this order.
+
+First the bytes (the user: "the quickest solution to expose the data"): the
+core's heap is a bus, `Heap`. Every tool that reads memory reads it, and a
+number a movie keeps can be searched for and poked. That is enough to work
+with and awkward to live with - a number is a double, three copies of it are
+on the heap of which one is the variable, and the variable moves.
+
+Then the names. The user proposed a tool for Ruffle alone: a dialog of every
+variable, its type and its address, and a way to add one to the watch list.
+What was built is that dialog as the one Chimera already had - RAM Watch's
+Add Game Properties - by letting a core's property table be DYNAMIC, and the
+user agreed to it ("yes, build it that way, AS1/2 first"). The reasons it is
+not a Ruffle tool: Chimera holds no system-specific code; the engine already
+reads, shows and parses every type a variable can have, which a byte watch
+cannot (RAM Watch has no 8-byte watch, and a movie's numbers are doubles);
+and Lua, freezes, the OSD and watch files then work on a variable with
+nothing written for them.
+
+What "dynamic" had to mean, since a variable is not a place:
+
+- a property is known by its NAME, and where it is gets asked before every
+  read and write (`GetGameProperty`); its index in the engine's table never
+  changes, so a watch holds on through a move and through an absence;
+- the list is the core's answer when asked (when the dialog opens, on
+  Refresh, on `game.list()`), never kept up behind the user's back;
+- a property can live on a bus, since a heap is one;
+- and the rule that carries the weight: ANSWERING MUST NOT CHANGE THE
+  MACHINE. Opening a dialog is not input. The core's walk allocates nothing,
+  calls nothing of the movie's, and writes its answer outside every state;
+  the gate proves it by counting allocator calls (0) and comparing the heap
+  before and after (identical), with a control that allocates 24 bytes and
+  is caught on both counts.
+
+Decided by the user in the same message: RAM Search is NOT changed. "It's
+meant for byte-based operations - searching over game properties isn't
+useful and a pain to implement." It searches the Heap bus as bytes like any
+other memory.
+
+Scope, stated so nobody assumes more: ActionScript 1 and 2 only - a movie in
+ActionScript 3 lists nothing yet. Numbers, booleans and strings held by
+clips, by objects and arrays reachable from them, and by `_global`; a clip's
+`_x`, `_y` and `_currentframe`. Strings and the clip values are read-only (a
+string is shared and never changed in place; a clip's position has caches
+behind it). A property with a getter has no place and is not listed. A write
+is a poke: the bytes change and the movie's code is not told.
+
+## LICENSE is the MIT text alone; the rest is in NOTICE (user-decided, 2026-10-07)
+
+`LICENSE` opened with three paragraphs - that Chimera is a fork of BizHawk,
+whose copyright is whose, and what in the tree is not under the MIT terms -
+and only then the MIT License. Nothing in it was wrong, and GitHub read the
+file as "Other": a licence it could not name. That is the first thing anyone
+checking the project's terms sees, a person or a program (it came up while
+looking at what signing the Windows binaries would need: a free signing
+service for open source asks for an OSI-approved licence, and "Other" is not
+an answer to that).
+
+So the file is split, and not one word of the terms changes. `LICENSE` is
+the MIT License with its two copyright lines. `NOTICE` is the paragraphs
+that stood in front of it, as they were, ending with where the terms are.
+A bundle carries both (`licenses/chimera-LICENSE`, `licenses/chimera-NOTICE`).
+
+miniBox's LICENSE had the same shape and read as "Other" too, and was split
+the same way the same day (miniBox dcb1f22): LICENSE the MIT text with its
+three copyright lines, NOTICE the summary of whose work each part is. No
+core package ships that file, so no package changes; and Chimera's pin of
+miniBox is not moved for it.
+

@@ -40,7 +40,14 @@ namespace Chimera.Emulation.Common
 
 		public int Frame => 0;
 
-		public string SystemId => VSystemID.Raw.NULL;
+		/// <summary>
+		/// What <see cref="SystemId"/> says when no machine is running. Not a
+		/// system: the word for there being none. (It is also half of a name
+		/// config files already hold, <c>Global_NULL</c>, so it cannot change.)
+		/// </summary>
+		public const string NullSystemId = "NULL";
+
+		public string SystemId => NullSystemId;
 
 		public bool DeterministicEmulation => true;
 

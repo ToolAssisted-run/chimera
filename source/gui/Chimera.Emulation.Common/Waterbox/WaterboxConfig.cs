@@ -19,26 +19,38 @@ namespace Chimera.Emulation.Common.Waterbox
 	/// </summary>
 	public sealed class WaterboxConfig
 	{
-		public string CoreName { get; set; }
+		public string? CoreName { get; set; }
 
 		/// <summary>
 		/// The machine this package is, when it is only one. A package that declares
 		/// <see cref="Machines"/> leaves this empty and names the machine there.
 		/// </summary>
-		public string SystemId { get; set; }
+		public string? SystemId { get; set; }
+
+		/// <summary>
+		/// What sort of core this is: <c>"game"</c> for one game rebuilt as a core, played from
+		/// the game's own files (docs/game-cores.md), and <c>"emulator"</c> - which is what
+		/// absence means, and every core before the first game core - for a machine that plays
+		/// games. Every list of cores shows the two apart.
+		/// </summary>
+		public string? Kind { get; set; }
+
+		/// <summary>Whether <see cref="Kind"/> says this is a game core.</summary>
+		[JsonIgnore]
+		public bool IsGameCore => CoreKind.IsGame(Kind);
 
 		/// <summary>Who wrote the core. Shown wherever the frontend introduces it.</summary>
-		public string Author { get; set; }
+		public string? Author { get; set; }
 
 		/// <summary>The core's own version string (not the package format's).</summary>
-		public string Version { get; set; }
+		public string? Version { get; set; }
 
 		/// <summary>
 		/// When the commit in <see cref="Version"/> was made, ISO 8601, stamped by the core's build
 		/// script beside it (issue #67). The COMMIT's date and not the build's, so that building the
 		/// same commit twice still makes the same package. Absent from packages older than the stamp.
 		/// </summary>
-		public string VersionDate { get; set; }
+		public string? VersionDate { get; set; }
 
 		/// <summary>
 		/// The guest ABI this package was built against (see <see cref="GuestAbi"/>).
@@ -48,7 +60,7 @@ namespace Chimera.Emulation.Common.Waterbox
 		public int Abi { get; set; } = GuestAbi.Assumed;
 
 		/// <summary>Where the core lives, for the about box.</summary>
-		public string Url { get; set; }
+		public string? Url { get; set; }
 
 		/// <summary>The mounted file name the guest reads the rom from (default "rom").</summary>
 		public string RomFile { get; set; } = "rom";
@@ -61,14 +73,21 @@ namespace Chimera.Emulation.Common.Waterbox
 		/// </summary>
 		public bool Precompile { get; set; }
 
+		/// <summary>
+		/// The core can say what it would choose for a game before one boots (it
+		/// exports SuggestSettings; engine.h, ce_suggest_settings): the wizard asks
+		/// when it reaches the settings page and applies the answer there.
+		/// </summary>
+		public bool SuggestSettings { get; set; }
+
 		/// <summary>Guest heap sizes in MiB, in order: sbrk, sealed, invis, plain, mmap.</summary>
-		public uint[] MemoryLayoutMiB { get; set; }
+		public uint[]? MemoryLayoutMiB { get; set; }
 
-		public VideoConfig Video { get; set; }
+		public VideoConfig? Video { get; set; }
 
-		public AudioConfig Audio { get; set; }
+		public AudioConfig? Audio { get; set; }
 
-		public InputConfig Input { get; set; }
+		public InputConfig? Input { get; set; }
 
 		/// <summary>
 		/// The machines one core.wbx can be. Genesis Plus GX is a Mega Drive, a Master
@@ -86,13 +105,72 @@ namespace Chimera.Emulation.Common.Waterbox
 		/// other structural choice, rather than being a property of which zip you
 		/// happened to install.
 		/// </summary>
-		public List<MachineConfig> Machines { get; set; }
+		public List<MachineConfig>? Machines { get; set; }
 
 		/// <summary>
 		/// The setting whose value picks the machine. Required when <see cref="Machines"/>
 		/// is declared, and it must be one of the package's own settings.
 		/// </summary>
-		public string MachineSetting { get; set; }
+		public string? MachineSetting { get; set; }
+
+		/// <summary>
+		/// How the core reads a movie made elsewhere (a Doom demo), when it can:
+		/// the files its ImportMovie export needs and the options it takes. The
+		/// frontend renders the import dialog from this, the way it renders
+		/// settings, and builds the project from the core's answer with its own
+		/// project creation (engine.h, ce_import_movie).
+		/// </summary>
+		public MovieImportDecl? MovieImport { get; set; }
+
+		/// <summary>See <see cref="MovieImport"/>.</summary>
+		public sealed class MovieImportDecl
+		{
+			/// <summary>The menu item, ellipsis included ("Import Demo (LMP)...").</summary>
+			public string? Menu { get; set; }
+
+			/// <summary>The movie itself, always mounted as "movie".</summary>
+			public MovieImportMovie? Movie { get; set; }
+
+			/// <summary>The other files the importer reads, in the order they are asked.</summary>
+			public List<MovieImportFile>? Files { get; set; }
+
+			/// <summary>Import options (bools), set in the settings JSON only when ticked.</summary>
+			public List<SettingDecl>? Options { get; set; }
+		}
+
+		public sealed class MovieImportMovie
+		{
+			public string? Label { get; set; }
+
+			public List<string>? Extensions { get; set; }
+		}
+
+		/// <summary>
+		/// One file input of the import dialog. Its picked files are mounted under
+		/// their own names, and <see cref="Option"/> carries that name - or, for a
+		/// <see cref="Multiple"/> input, the names in the user's order joined by
+		/// <see cref="Separator"/> (left out entirely when none are picked).
+		/// </summary>
+		public sealed class MovieImportFile
+		{
+			public string? Option { get; set; }
+
+			public string? Label { get; set; }
+
+			/// <summary>The picked file is the project's firmware for the id the answer names.</summary>
+			public bool Firmware { get; set; }
+
+			/// <summary>Each picked file is a project file in this slot, as the answer lists them.</summary>
+			public string? Slot { get; set; }
+
+			public bool Multiple { get; set; }
+
+			public string? Separator { get; set; }
+
+			public bool Required { get; set; }
+
+			public List<string>? Extensions { get; set; }
+		}
 
 		/// <summary>True when this package describes more than one machine.</summary>
 		public bool HasMachines => Machines is { Count: > 0 };
@@ -104,9 +182,48 @@ namespace Chimera.Emulation.Common.Waterbox
 		/// reboot that forces the core by name found "more than one" of it.
 		/// </summary>
 		public IReadOnlyList<string> SystemIds
-			=> HasMachines
-				? Machines.Select(static m => m.Id).Where(static id => !string.IsNullOrEmpty(id)).Distinct().ToList()
-				: string.IsNullOrEmpty(SystemId) ? [ ] : new[] { SystemId };
+			=> Machines is { Count: > 0 }
+				? Machines.Select(static m => m.Id ?? "").Where(static id => id.Length is not 0).Distinct().ToList()
+				: SystemId is { Length: > 0 } only ? new[] { only } : [ ];
+
+		/// <summary>
+		/// What each of the package's systems is called where a person reads it,
+		/// by system id ("PSV" -&gt; "PlayStation Vita"). The id is the identity a
+		/// movie and a project are keyed by and never changes; this is the word
+		/// for it, and it is the core's to say - the frontend holds no table of
+		/// machines. An id with no entry is shown as it is.
+		/// </summary>
+		public Dictionary<string, string>? SystemNames { get; set; }
+
+		/// <summary>The package's word for a system, or the id itself where it has none.</summary>
+		public string SystemNameOf(string systemId)
+			=> SystemNames is not null && SystemNames.TryGetValue(systemId, out var name) && !string.IsNullOrWhiteSpace(name)
+				? name
+				: systemId;
+
+		/// <summary>
+		/// What the core says its media needs beyond the files, for the media
+		/// maker: each a recipe the engine understands (ce_media_make_with), kept
+		/// here as the package wrote it. See <see cref="MediaRecipeDecl"/>.
+		/// </summary>
+		[JsonIgnore]
+		public IReadOnlyList<MediaRecipeDecl> Media { get; private set; } = [ ];
+
+		/// <summary>
+		/// One media recipe: which folders it is for and what the image needs,
+		/// both of which only the engine reads (<see cref="Json"/>); the frontend
+		/// reads the label, to say what it recognised.
+		/// </summary>
+		public sealed class MediaRecipeDecl
+		{
+			public string Id { get; init; } = "";
+
+			/// <summary>What the media is, in front of a person ("PlayStation 3 disc").</summary>
+			public string Label { get; init; } = "";
+
+			/// <summary>The declaration exactly as the package wrote it.</summary>
+			public string Json { get; init; } = "{}";
+		}
 
 		/// <summary>
 		/// Rom extension -&gt; system, over the whole package (every machine's).
@@ -135,12 +252,12 @@ namespace Chimera.Emulation.Common.Waterbox
 		/// package. A value naming no machine falls back to the first one declared,
 		/// so a package can never end up with no machine at all.
 		/// </summary>
-		public MachineConfig MachineFor(IReadOnlyDictionary<string, object> effectiveSettings)
+		public MachineConfig? MachineFor(IReadOnlyDictionary<string, object>? effectiveSettings)
 		{
-			if (!HasMachines) return null;
-			if (!string.IsNullOrEmpty(MachineSetting)
+			if (Machines is not { Count: > 0 }) return null;
+			if (MachineSetting is { Length: > 0 } setting
 				&& effectiveSettings is not null
-				&& effectiveSettings.TryGetValue(MachineSetting, out var value))
+				&& effectiveSettings.TryGetValue(setting, out var value))
 			{
 				var chosen = value?.ToString() ?? "";
 				var match = Machines.Find(m => m.Selects(chosen));
@@ -152,37 +269,42 @@ namespace Chimera.Emulation.Common.Waterbox
 		/// <summary>What a machine changes about one of the package's settings.</summary>
 		public sealed class SettingOverride
 		{
-			public List<string> Options { get; set; }
+			public List<string>? Options { get; set; }
 
-			public object Default { get; set; }
+			public object? Default { get; set; }
 		}
 
 		/// <summary>
 		/// The package's settings as this machine has them: same names, same
 		/// meanings, with whatever the machine narrows applied.
 		/// </summary>
-		public IReadOnlyList<SettingDecl> SettingsFor(MachineConfig machine)
+		public IReadOnlyList<SettingDecl> SettingsFor(MachineConfig? machine)
 		{
 			var decls = Settings ?? new List<SettingDecl>();
-			var scopes = machine?.When is { Count: > 0 } && decls.Exists(static d => d.When is { Count: > 0 });
-			var overrides = machine?.SettingOverrides is { Count: > 0 };
 			// The SAME list every time, for the same machine: callers compare
 			// declaration lists by reference to tell whether the exposed set
 			// changed, and a fresh list every call redraws forever. A package
 			// with nothing to scope and nothing to narrow answers with its own.
-			if (!scopes && !overrides) return decls;
+			if (machine is null) return decls;
+			// held as the lists themselves rather than as two bools, so the rest
+			// of the method can see that they are there
+			var scopes = machine.When is { Count: > 0 } && decls.Exists(static d => d.When is { Count: > 0 })
+				? machine.When
+				: null;
+			var overrides = machine.SettingOverrides is { Count: > 0 } ? machine.SettingOverrides : null;
+			if (scopes is null && overrides is null) return decls;
 			var key = (machine.Id ?? "") + "\u0000" + string.Join(",", machine.When ?? new List<string>());
 			if (_narrowed.TryGetValue(key, out var cached)) return cached;
 
-			var scoped = scopes
-				? decls.FindAll(d => d.When is not { Count: > 0 } || machine.When.Exists(d.AppliesTo))
+			var scoped = scopes is not null
+				? decls.FindAll(d => d.When is not { Count: > 0 } || scopes.Exists(d.AppliesTo))
 				: decls;
-			if (!overrides) { _narrowed[key] = scoped; return scoped; }
+			if (overrides is null) { _narrowed[key] = scoped; return scoped; }
 
 			List<SettingDecl> narrowed = new(scoped.Count);
 			foreach (var decl in scoped)
 			{
-				if (!machine.SettingOverrides.TryGetValue(decl.Name ?? "", out var over) || over is null)
+				if (!overrides.TryGetValue(decl.Name ?? "", out var over) || over is null)
 				{
 					narrowed.Add(decl);
 					continue;
@@ -219,7 +341,7 @@ namespace Chimera.Emulation.Common.Waterbox
 		/// own settings was quietly dropped that way, which is how a Neo Geo
 		/// came to show none of its DIP switches.
 		/// </summary>
-		public IReadOnlyList<SettingDecl> SettingsByDeclarationIndexFor(MachineConfig machine)
+		public IReadOnlyList<SettingDecl> SettingsByDeclarationIndexFor(MachineConfig? machine)
 		{
 			var decls = Settings ?? new List<SettingDecl>();
 			var key = (machine?.Id ?? "") + "\u0000"
@@ -248,9 +370,9 @@ namespace Chimera.Emulation.Common.Waterbox
 		private readonly Dictionary<string, IReadOnlyList<SettingDecl>> _byDeclIndex = new();
 
 		/// <summary>The machine that IS this system, or null.</summary>
-		public MachineConfig MachineForSystem(string systemId)
-			=> HasMachines && !string.IsNullOrEmpty(systemId)
-				? Machines.Find(m => string.Equals(m.Id, systemId, StringComparison.OrdinalIgnoreCase))
+		public MachineConfig? MachineForSystem(string? systemId)
+			=> Machines is { Count: > 0 } machines && !string.IsNullOrEmpty(systemId)
+				? machines.Find(m => string.Equals(m.Id, systemId, StringComparison.OrdinalIgnoreCase))
 				: null;
 
 		/// <summary>
@@ -260,16 +382,16 @@ namespace Chimera.Emulation.Common.Waterbox
 		public sealed class MachineConfig
 		{
 			/// <summary>The system this machine is (the movie's platform).</summary>
-			public string Id { get; set; }
+			public string? Id { get; set; }
 
 			/// <summary>What to call it in front of a user. Falls back to the id.</summary>
-			public string Label { get; set; }
+			public string? Label { get; set; }
 
 			/// <summary>Values of the package's machine setting that mean this machine.</summary>
-			public List<string> When { get; set; }
+			public List<string>? When { get; set; }
 
 			/// <summary>The controller this machine has.</summary>
-			public InputConfig Input { get; set; }
+			public InputConfig? Input { get; set; }
 
 			/// <summary>The picture it draws, when it differs from the package default.</summary>
 			public int? VirtualWidth { get; set; }
@@ -277,7 +399,7 @@ namespace Chimera.Emulation.Common.Waterbox
 			public int? VirtualHeight { get; set; }
 
 			/// <summary>Rom extensions that belong to this machine.</summary>
-			public Dictionary<string, string> Extensions { get; set; }
+			public Dictionary<string, string>? Extensions { get; set; }
 
 			/// <summary>
 			/// Settings this machine narrows: a Mega Drive port takes a mouse, an
@@ -286,35 +408,87 @@ namespace Chimera.Emulation.Common.Waterbox
 			/// so the machine says which, rather than the user being offered a
 			/// controller the machine cannot have.
 			/// </summary>
-			public Dictionary<string, SettingOverride> SettingOverrides { get; set; }
+			public Dictionary<string, SettingOverride>? SettingOverrides { get; set; }
 
-			public string DisplayName => string.IsNullOrWhiteSpace(Label) ? Id : Label;
+			public string? DisplayName => string.IsNullOrWhiteSpace(Label) ? Id : Label;
 
 			/// <summary>True when a machine-setting value names this machine.</summary>
-			public bool Selects(string settingValue)
+			public bool Selects(string? settingValue)
 				=> When is { Count: > 0 }
 					? When.Exists(v => string.Equals(v, settingValue, StringComparison.OrdinalIgnoreCase))
 					: string.Equals(Id, settingValue, StringComparison.OrdinalIgnoreCase);
 		}
 
-		public LagConfig Lag { get; set; }
+		public LagConfig? Lag { get; set; }
 
 		/// <summary>Rom file extension (with leading dot, lowercase) to system ID map - how files route to this core.</summary>
-		public Dictionary<string, string> Extensions { get; set; }
+		public Dictionary<string, string>? Extensions { get; set; }
 
 		/// <summary>
 		/// Files the core needs that it may not ship - a disk-system BIOS, say. Each is
 		/// mounted for the guest under its declared id, alongside the rom and the
 		/// settings; the guest opens it by that name during Init.
 		/// </summary>
-		public List<CoreFirmwareDecl> Firmware { get; set; }
+		public List<CoreFirmwareDecl>? Firmware { get; set; }
 
 		/// <summary>
 		/// The user-tunable settings this core offers, declared by the package. The
 		/// frontend renders them from this and nothing else - it has no per-core
 		/// settings dialogs to render them with.
 		/// </summary>
-		public List<SettingDecl> Settings { get; set; }
+		public List<SettingDecl>? Settings { get; set; }
+
+		/// <summary>
+		/// Named bundles of setting values the core suggests - "a 1993 486 PS/2",
+		/// "Windows 98 with a Voodoo". A preset is NOT a setting and is not part of
+		/// the project: choosing one WRITES its values into the settings and is then
+		/// finished with. What the project pins and the movie cites is the resolved
+		/// values, exactly as if they had been typed in one at a time.
+		///
+		/// That is the whole design. The alternative - a "preset" setting the core
+		/// resolves for itself at boot - is what DOSBox-X shipped, applying a .conf
+		/// file last so it overrode whatever the user had chosen above it. Settings
+		/// then had to document themselves as "Auto uses the configuration preset's
+		/// default", the grid stopped meaning what it said, and a movie recorded a
+		/// preset NAME whose meaning could change under it with the next core build.
+		/// </summary>
+		public List<PresetDecl>? Presets { get; set; }
+
+		/// <summary>
+		/// The presets a machine offers - gated by <see cref="PresetDecl.When"/>
+		/// exactly as settings are, so a package that is several machines does not
+		/// offer a DOS preset to a PC-98.
+		/// </summary>
+		public IReadOnlyList<PresetDecl> PresetsFor(MachineConfig? machine)
+			=> (Presets ?? [ ])
+				.Where(p => p.AppliesTo(machine is null ? null : machine.When is { Count: > 0 } ? machine.When[0] : machine.Id))
+				.ToList();
+
+		/// <summary>One named bundle of setting values.</summary>
+		public sealed class PresetDecl
+		{
+			/// <summary>Stable id. Never reaches the guest; it identifies the preset in tests and logs.</summary>
+			public string? Id { get; set; }
+
+			/// <summary>What the selector shows. Falls back to the id.</summary>
+			public string? Label { get; set; }
+
+			/// <summary>Prose shown beside the selector, if any.</summary>
+			public string? Description { get; set; }
+
+			/// <summary>Machine ids this preset belongs to; absent means every machine.</summary>
+			public List<string>? When { get; set; }
+
+			/// <summary>Setting name to value. Names not declared as settings are ignored.</summary>
+			public Dictionary<string, object>? Values { get; set; }
+
+			public string DisplayName => string.IsNullOrWhiteSpace(Label) ? Id ?? "" : Label;
+
+			public bool AppliesTo(string? machineValue)
+				=> When is not { Count: > 0 }
+					|| machineValue is null
+					|| When.Exists(v => string.Equals(v, machineValue, StringComparison.OrdinalIgnoreCase));
+		}
 
 		/// <summary>
 		/// One user-tunable setting. Enough for the frontend to draw a labelled,
@@ -323,21 +497,31 @@ namespace Chimera.Emulation.Common.Waterbox
 		public sealed class SettingDecl
 		{
 			/// <summary>Key the guest reads it under, in the mounted settings JSON.</summary>
-			public string Name { get; set; }
+			public string? Name { get; set; }
+
+			/// <summary>
+			/// The same name, for the places that read or write a settings map by
+			/// it. A declaration with no name cannot be read at all: it used to
+			/// arrive at a dictionary as a null key, which says nothing about
+			/// which package is wrong.
+			/// </summary>
+			[JsonIgnore]
+			public string Key => Name ?? throw new InvalidOperationException(
+				$"{WaterboxCoreFactory.ConfigFileName}: a setting has no name, so nothing can read it");
 
 			/// <summary>Label for the settings grid. Falls back to <see cref="Name"/>.</summary>
-			public string Display { get; set; }
+			public string? Display { get; set; }
 
 			/// <summary>The sentence shown when the row is selected.</summary>
-			public string Description { get; set; }
+			public string? Description { get; set; }
 
 			/// <summary>"bool", "int" or "enum" (the default is inferred from the other fields).</summary>
-			public string Type { get; set; }
+			public string? Type { get; set; }
 
-			public object Default { get; set; }
+			public object? Default { get; set; }
 
 			/// <summary>Allowed values, for an enum setting.</summary>
-			public List<string> Options { get; set; }
+			public List<string>? Options { get; set; }
 
 			public int? Min { get; set; }
 
@@ -353,16 +537,16 @@ namespace Chimera.Emulation.Common.Waterbox
 			/// at once would be a list nobody could read and a set of choices most
 			/// of which do nothing.
 			/// </summary>
-			public List<string> When { get; set; }
+			public List<string>? When { get; set; }
 
 			/// <summary>Whether this setting belongs to a machine selected by <paramref name="settingValue"/>.</summary>
-			public bool AppliesTo(string settingValue)
+			public bool AppliesTo(string? settingValue)
 				=> When is not { Count: > 0 }
 					|| (settingValue is not null
 						&& When.Exists(v => string.Equals(v, settingValue, StringComparison.OrdinalIgnoreCase)));
 
 
-			public string DisplayName => string.IsNullOrWhiteSpace(Display) ? Name : Display;
+			public string? DisplayName => string.IsNullOrWhiteSpace(Display) ? Name : Display;
 
 			/// <summary>
 			/// The .NET type the settings grid should edit this as. Enums arrive as
@@ -382,7 +566,7 @@ namespace Chimera.Emulation.Common.Waterbox
 			{
 				get
 				{
-					if (!string.IsNullOrWhiteSpace(Type)) return Type.ToLowerInvariant();
+					if (Type is { } declared && !string.IsNullOrWhiteSpace(declared)) return declared.ToLowerInvariant();
 					if (Options is { Count: > 0 }) return "enum";
 					return Default switch
 					{
@@ -401,7 +585,7 @@ namespace Chimera.Emulation.Common.Waterbox
 			/// Brings a value (from JSON, so possibly a boxed long or a string) to the
 			/// type this setting is edited as, clamping ints to any declared range.
 			/// </summary>
-			public object Coerce(object value)
+			public object Coerce(object? value)
 			{
 				switch (EffectiveType)
 				{
@@ -434,7 +618,13 @@ namespace Chimera.Emulation.Common.Waterbox
 						var s = value?.ToString() ?? "";
 						// an unknown option would leave the grid showing a value the core
 						// will not accept, so fall back to the first legal one
-						if (Options is { Count: > 0 } && !Options.Contains(s)) return Options.Contains(Default?.ToString()) ? Default.ToString() : Options[0];
+						if (Options is { Count: > 0 } && !Options.Contains(s))
+						{
+							// a declared default that IS a legal option is the better
+							// fallback; otherwise the first option is all there is
+							var fallback = Default?.ToString();
+							return fallback is not null && Options.Contains(fallback) ? fallback : Options[0];
+						}
 						return s;
 					}
 				}
@@ -457,7 +647,7 @@ namespace Chimera.Emulation.Common.Waterbox
 			public int VsyncDenominator { get; set; } = 1;
 
 			/// <summary>Guest export returning a Width*Height BGRA (0xFFrrggbb) frame.</summary>
-			public string GetBgra { get; set; }
+			public string? GetBgra { get; set; }
 
 			/// <summary>
 			/// Whether this core's savestates survive a change of GL context -
@@ -545,15 +735,24 @@ namespace Chimera.Emulation.Common.Waterbox
 			public int Rate { get; set; } = 44100;
 
 			/// <summary>Guest export returning SamplesPerFrame*Channels interleaved int16.</summary>
-			public string Get { get; set; }
+			public string? Get { get; set; }
 		}
 
 		public sealed class InputConfig
 		{
-			public string Name { get; set; }
+			public string? Name { get; set; }
 
 			/// <summary>Bool button names, in bit order (button i -&gt; bit i of the 64-bit FrameAdvance mask).</summary>
-			public List<string> Buttons { get; set; }
+			public List<string>? Buttons { get; set; }
+
+			/// <summary>
+			/// The letter each button writes into a movie's text and heads its
+			/// input column with, by the button's name - whole ("P2 Cross") or
+			/// without its player ("Cross", which then serves every pad). The
+			/// ENGINE reads these (control_names.hpp) and a window asks it; they
+			/// are here so a package's declaration can be looked at whole.
+			/// </summary>
+			public Dictionary<string, string>? Mnemonics { get; set; }
 
 			/// <summary>
 			/// Analog controls (paddles, sticks, triggers), in index order. They cannot
@@ -561,23 +760,26 @@ namespace Chimera.Emulation.Common.Waterbox
 			/// with the optional <c>SetAxis(index, value)</c> export before every frame.
 			/// A core that declares axes must export it.
 			/// </summary>
-			public List<AxisConfig> Axes { get; set; }
+			public List<AxisConfig>? Axes { get; set; }
 		}
 
 		public sealed class AxisConfig
 		{
-			public string Name { get; set; }
+			public string? Name { get; set; }
 			public int Min { get; set; }
 			public int Max { get; set; }
 
 			/// <summary>Value when the control is untouched (centre for a stick, rest position for a paddle).</summary>
 			public int Neutral { get; set; }
+
+			/// <summary>The short header of this axis's input column ("LX"). The engine reads it; absent, its rule answers.</summary>
+			public string? Header { get; set; }
 		}
 
 		public sealed class LagConfig
 		{
 			/// <summary>Guest export returning nonzero if input was polled this frame (lag = !this). Optional.</summary>
-			public string InputWasRead { get; set; }
+			public string? InputWasRead { get; set; }
 		}
 
 		/// <summary>
@@ -595,7 +797,37 @@ namespace Chimera.Emulation.Common.Waterbox
 		[JsonIgnore]
 		public string RawSettingsJson { get; private set; } = "[]";
 
-		public static WaterboxConfig FromJson(string json)
+		/// <summary>
+		/// The settings a core declares for ONE GAME (ce_session_game_settings, or
+		/// a SuggestSettings answer's "settings"): a JSON array in this file's own
+		/// setting format. An arcade game's dip switches differ game to game, so
+		/// they cannot be declared once per package. Entries with no name, or with
+		/// a name the package already declares, are dropped - a game cannot
+		/// redefine the package's settings, only add its own.
+		/// </summary>
+		public static List<SettingDecl> ParseGameSettings(string? json, IEnumerable<string> packageNames)
+		{
+			if (string.IsNullOrWhiteSpace(json)) return [ ];
+			List<SettingDecl>? decls;
+			try
+			{
+				decls = JsonConvert.DeserializeObject<List<SettingDecl>>(json);
+			}
+			catch (JsonException)
+			{
+				return [ ];
+			}
+			var taken = new HashSet<string>(packageNames, StringComparer.Ordinal);
+			var result = new List<SettingDecl>();
+			foreach (var d in decls ?? [ ])
+			{
+				if (d is null || string.IsNullOrEmpty(d.Name) || !taken.Add(d.Name)) continue;
+				result.Add(d);
+			}
+			return result;
+		}
+
+		public static WaterboxConfig? FromJson(string json)
 		{
 			var cfg = JsonConvert.DeserializeObject<WaterboxConfig>(json);
 			if (cfg is not null)
@@ -605,6 +837,21 @@ namespace Chimera.Emulation.Common.Waterbox
 					var root = Newtonsoft.Json.Linq.JObject.Parse(json);
 					if (root["firmware"] is Newtonsoft.Json.Linq.JArray fw) cfg.RawFirmwareJson = fw.ToString(Formatting.None);
 					if (root["settings"] is Newtonsoft.Json.Linq.JArray st) cfg.RawSettingsJson = st.ToString(Formatting.None);
+					if (root["media"] is Newtonsoft.Json.Linq.JArray media)
+					{
+						List<MediaRecipeDecl> recipes = new();
+						foreach (var item in media)
+						{
+							if (item is not Newtonsoft.Json.Linq.JObject recipe) continue;
+							recipes.Add(new MediaRecipeDecl
+							{
+								Id = recipe["id"]?.ToString() ?? "",
+								Label = recipe["label"]?.ToString() ?? "",
+								Json = recipe.ToString(Formatting.None),
+							});
+						}
+						cfg.Media = recipes;
+					}
 				}
 				catch (JsonException)
 				{

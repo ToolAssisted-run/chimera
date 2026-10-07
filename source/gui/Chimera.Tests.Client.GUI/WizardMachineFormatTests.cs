@@ -67,7 +67,7 @@ namespace Chimera.Tests.Client.GUI
 			form.Show();
 			form.UseSettingsFrom(TwoMachines());
 			form.SetSettingValue("machine", machine);
-			form.UseDeclaration(ProjectSlotDeclaration.Parse(Declaration));
+			form.UseDeclaration(TestPackages.Slots(Declaration));
 			return form;
 		}
 
@@ -96,13 +96,43 @@ namespace Chimera.Tests.Client.GUI
 		}
 
 		[TestMethod]
+		public void SaveDataSharingAnExtensionWithTheRomsKeepsItsWholeList()
+		{
+			// the PCSX2 shape (chimera#156): the PS2 machine claims .bin for its
+			// discs, and the save data slot takes .ps2 and .nvm as well as .bin -
+			// cut to the shared .bin, a memory card could not be picked at all
+			NewProjectWizard form = new([ ], static _ => [ ]);
+			form.Show();
+			using (form)
+			{
+				form.UseSettingsFrom(new WaterboxConfig
+				{
+					MachineSetting = "machine",
+					Machines = [ new() { Id = "PS2", When = [ "ps2" ], Extensions = new() { [".iso"] = "PS2", [".bin"] = "PS2" } } ],
+					Settings = [ new WaterboxConfig.SettingDecl { Name = "machine", Type = "enum", Options = [ "ps2" ], Default = "ps2" } ],
+				});
+				form.UseDeclaration(TestPackages.Slots("""
+					{
+					  "slots": [
+					    { "id": "disc", "title": "Disc", "min": 1, "max": 1, "formats": ["iso", "bin"] },
+					    { "id": "savedata", "title": "Save data", "min": 0, "max": 3, "formats": ["ps2", "nvm", "bin"] }
+					  ]
+					}
+					"""));
+				CollectionAssert.AreEqual(new[] { "ps2", "nvm", "bin" }, new List<string>(form.OfferedFormats("savedata")),
+					"a slot that takes what no machine boots is not a rom slot, and keeps every format");
+				CollectionAssert.AreEqual(new[] { "iso", "bin" }, new List<string>(form.OfferedFormats("disc")));
+			}
+		}
+
+		[TestMethod]
 		public void APackageThatIsOneMachineIsLeftAlone()
 		{
 			NewProjectWizard form = new([ ], static _ => [ ]);
 			form.Show();
 			using (form)
 			{
-				form.UseDeclaration(ProjectSlotDeclaration.Parse(Declaration));
+				form.UseDeclaration(TestPackages.Slots(Declaration));
 				CollectionAssert.AreEqual(new[] { "nes", "fds" }, new List<string>(form.OfferedFormats("rom")),
 					"no machines declared means nothing to narrow by");
 			}

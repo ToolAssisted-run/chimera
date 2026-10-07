@@ -28,12 +28,13 @@ namespace Chimera.Tests.Client.Common
 		}
 
 		/// <summary>See TasMovieProjectFormatTests: ClassCleanup runs at the end
-		/// of the assembly by default, so this is re-established per test.</summary>
+		/// of the assembly unless told otherwise, so this is re-established per
+		/// test as well as being pinned to EndOfClass below.</summary>
 		[TestInitialize]
 		public void UseThePlaygroundDataHome()
 			=> Environment.SetEnvironmentVariable("CHIMERA_DATA_HOME", Path.Combine(_dir, "data-home"));
 
-		[ClassCleanup]
+		[ClassCleanup(ClassCleanupBehavior.EndOfClass)]
 		public static void RemovePlayground()
 		{
 			Environment.SetEnvironmentVariable("CHIMERA_DATA_HOME", _dataHomeWas.Length is 0 ? null : _dataHomeWas);

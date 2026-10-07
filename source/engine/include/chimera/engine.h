@@ -10,6 +10,13 @@
  *   - A returned const char* is BORROWED unless the declaration says otherwise;
  *     each declaration names the call that invalidates it.
  *   - UTF-8 everywhere. NUL-terminated unless a length is passed alongside.
+ *   - An error string written through an `error_out` (or returned by a
+ *     `..._last_error`) is per-thread and lives until the next such call ON
+ *     THAT THREAD - and no shorter: the storage behind it is never destroyed,
+ *     not when the thread ends and not when the process does. That is a
+ *     requirement on the engine, not a convenience: see
+ *     source/engine/source/thread_string.hpp for the Windows heap corruption
+ *     that destroying it caused (chimera#123).
  */
 
 #ifndef CHIMERA_ENGINE_H
@@ -41,6 +48,35 @@ CE_API uint32_t ce_abi_version(void);
  * a function of the inputs only, shown by the frontend and cited by movies.
  * Static string, never invalidated. */
 CE_API const char *ce_build_info(void);
+
+/* ---- do this build and this state understand each other? (issue #115) ----
+ *
+ * Three answers to one question, weakest first. The first two are for a person
+ * to read; the third is what actually decides.
+ *
+ * 1. ce_version_skew: whether this Chimera and the core package a project runs
+ *    on were built far enough apart to be worth mentioning. Both dates are
+ *    YYYY-MM-DD - the frontend's is its commit's date, the core's is the
+ *    "versionDate" its package stamps (issue #67). Returns the sentence to show,
+ *    or NULL when they are close enough or either side does not say. It is a
+ *    guess and never a refusal: an old pairing that works must keep working.
+ *    Borrowed until the next call on this thread.
+ *
+ * 2. ce_state_writer_id: the build that wrote the states this session writes.
+ *    The engine and the frontend come out of one repository at one commit, so
+ *    this names the frontend too. Static string.
+ *
+ * 3. ce_state_format: the shape of a machine state as this build writes and
+ *    reads it (source/engine/source/state_format.hpp). Every state file carries
+ *    it and every load checks it, so a state of another format is refused by
+ *    name instead of reaching a machine that cannot read it. The frontend
+ *    records it in the project so a whole cache can be explained at open,
+ *    before any one state is asked for. */
+CE_API const char *ce_version_skew(
+	const char *frontend_date, const char *frontend_build,
+	const char *core_date, const char *core_build, const char *core_name);
+CE_API const char *ce_state_writer_id(void);
+CE_API uint32_t ce_state_format(void);
 
 /* ---- movie input log ----
  *
@@ -347,6 +383,31 @@ typedef int32_t (*ce_media_progress_fn)(const char *file, uint64_t bytes_done,
  * says "cancelled" when that is why). One pack at a time: the last hash and the
  * last error are the caller's until the next call. */
 CE_API int32_t ce_media_make(const char *folder, const char *out_path, int32_t format,
+	ce_media_progress_fn progress, void *user);
+
+/* A RECIPE is what a core says its media needs beyond the files: one object of
+ * the "media" array in its package's waterbox.config, handed over as the JSON
+ * the package wrote.
+ *
+ *   { "id": "disc", "label": "...", "format": "iso9660",
+ *     "when": { "rootFile": "NAME.EXT" },
+ *     "systemArea": [ { "at": 0, "u32be": 1 }, { "at": 12, "u32be": "lastSector" } ] }
+ *
+ * "when" says which folders it is for (a file at the root, ASCII case ignored;
+ * absent: any). "systemArea" writes 32-bit values into the sixteen sectors an
+ * ISO 9660 image reserves: a number, or "lastSector" / "sectors", which only
+ * the writer knows. The packer itself knows no machine: an image made without
+ * a recipe is the files and nothing else.
+ *
+ * ce_media_recipe_applies: 1 when `folder` is what the recipe is for, 0 when
+ * it is not, -1 when the recipe cannot be read (ce_media_last_error).
+ * ce_media_recipe_format: the CE_MEDIA_* it writes, or -1.
+ * ce_media_make_with: ce_media_make, in the recipe's format and with what it
+ * asks for. It does not ask whether the recipe applies: that was the caller's
+ * question, and a person may know better. */
+CE_API int32_t ce_media_recipe_applies(const char *recipe_json, const char *folder);
+CE_API int32_t ce_media_recipe_format(const char *recipe_json);
+CE_API int32_t ce_media_make_with(const char *folder, const char *out_path, const char *recipe_json,
 	ce_media_progress_fn progress, void *user);
 
 /* The SHA1 of what the last successful ce_media_make wrote - what a project
@@ -776,6 +837,21 @@ CE_API ce_session *ce_session_open(
 
 CE_API void ce_session_free(ce_session *s);
 
+/* The core log, kept only when a frontend asks for it. With a path (UTF-8),
+ * the file is started anew with a line saying when and by which Chimera, and
+ * from then on everything any core writes to its stdout and stderr is
+ * appended to it, flushed as it is written, so a crash leaves it whole. A
+ * session opened while it is on also notes its core package in it, and is
+ * mounted an empty file named "corelog": a core that keeps a fuller log only
+ * on request (RPCS3's) reads that as the request. It is checked for, never
+ * read, so the machine is the same with the log on or off. NULL or "" stops
+ * it; the file stays. 1 on success; 0 with ce_core_log_error() saying why.
+ * Process-wide, and never remembered: each run of a frontend starts off. */
+CE_API int32_t ce_core_log(const char *path);
+/* The file the core log goes to, or "" while it is off. */
+CE_API const char *ce_core_log_path(void);
+CE_API const char *ce_core_log_error(void);
+
 /* config-derived facts (borrowed strings live as long as the session) */
 CE_API const char *ce_session_core_name(const ce_session *s);
 CE_API const char *ce_session_system_id(const ce_session *s);
@@ -783,7 +859,16 @@ CE_API int32_t ce_session_width(const ce_session *s);
 CE_API int32_t ce_session_height(const ce_session *s);
 CE_API int32_t ce_session_virtual_width(const ce_session *s);
 CE_API int32_t ce_session_virtual_height(const ce_session *s);
-/* post-Init: the guest's own answer when it gives one, else the config's */
+/* The display aspect the machine reports for what it shows NOW, x:y, from the
+ * core's optional GetDisplayAspectX/GetDisplayAspectY exports (both or
+ * neither). 1 with the aspect written; 0 when the core does not say, and the
+ * declared virtual size stands. An arcade core answers 3:4 for a game whose
+ * monitor stood on its side, which no per-machine declaration can know. */
+CE_API int32_t ce_session_display_aspect(const ce_session *s, int32_t *x_out, int32_t *y_out);
+/* The rate of frames NOW: the guest's own answer when it gives one (asked
+ * after Init and again after every frame advanced with render on, since a
+ * machine changes its refresh with its video mode and a game core's step is as
+ * long as the game makes it), else the config's. */
 CE_API int32_t ce_session_vsync_numerator(const ce_session *s);
 CE_API int32_t ce_session_vsync_denominator(const ce_session *s);
 CE_API int32_t ce_session_samples_per_frame(const ce_session *s);
@@ -889,10 +974,93 @@ CE_API void ce_precompile_request(int32_t index, int32_t count, int32_t firmware
 /* -1 when this session is no precompile session or the core has none. */
 CE_API int32_t ce_session_precompile_done(const ce_session *s);
 CE_API int32_t ce_session_precompile_progress(const ce_session *s, uint32_t *done_out, uint32_t *total_out);
+
+/* ---------------------------------------------------------------------------
+ * Suggested settings. Before a project exists, a core may say what it would
+ * choose for these files - the RPCS3 core looks the game up in the RPCS3
+ * wiki's recommendations it carries. The arguments are ce_session_open's: the
+ * package is loaded and the files mounted exactly as a run would have them,
+ * then the core's optional SuggestSettings export is called INSTEAD of Init,
+ * and the machine is thrown away unstarted.
+ *
+ * Returns the core's answer, a JSON object - {"values": {setting: value, ...},
+ * "note": "where they come from, or that nothing was found", "settings":
+ * [the game's own setting declarations, as ce_session_game_settings has
+ * them], ...} - valid
+ * until the next call on this thread; "" (length 0) when the core has no
+ * such export; NULL with *error_out when the package or files cannot be
+ * opened at all. The values are suggestions for the settings page, never
+ * applied by the engine.
+ */
+CE_API const char *ce_suggest_settings(
+	const char *package_path,
+	const uint8_t *rom, uint64_t rom_len, const char *rom_path,
+	const char *settings_overrides_json,
+	const char *const *firmware_ids, const uint8_t *const *firmware_data,
+	const uint64_t *firmware_lens, int32_t firmware_count,
+	const char *const *extra_names, const uint8_t *const *extra_data,
+	const uint64_t *extra_lens, const char *const *extra_paths, int32_t extra_count,
+	uint64_t *len_out, const char **error_out);
+
+/* What a movie made elsewhere amounts to, as this core reads it - a Doom
+ * demo, say. The same session as ce_suggest_settings, asking the core's
+ * optional ImportMovie export instead of SuggestSettings: the files are
+ * mounted as given (the movie itself under the name "movie"), the settings
+ * JSON may carry import options the core declares (movieImport in
+ * waterbox.config), and the machine is thrown away unstarted.
+ *
+ * Returns the core's JSON answer: {"error": "<a sentence>"} when it refuses,
+ * otherwise the configuration the movie dictates - "settings", "firmware"
+ * [{id, sha1}], "files" [{name, sha1, slot}] in load order, "notes" - and
+ * "input", the movie as Chimera's input log. "" when the core has no such
+ * export; NULL with *error_out when the package or files cannot be opened.
+ * Nothing is applied: the frontend builds the project from it with its own
+ * project creation. */
+CE_API const char *ce_import_movie(
+	const char *package_path,
+	const uint8_t *rom, uint64_t rom_len, const char *rom_path,
+	const char *settings_overrides_json,
+	const char *const *firmware_ids, const uint8_t *const *firmware_data,
+	const uint64_t *firmware_lens, int32_t firmware_count,
+	const char *const *extra_names, const uint8_t *const *extra_data,
+	const uint64_t *extra_lens, const char *const *extra_paths, int32_t extra_count,
+	uint64_t *len_out, const char **error_out);
 CE_API int64_t ce_session_button_count(const ce_session *s);
 CE_API const char *ce_session_button_name(const ce_session *s, int64_t index);
 CE_API int64_t ce_session_axis_count(const ce_session *s);
 CE_API const char *ce_session_axis_name(const ce_session *s, int64_t index);
+/* WHAT A CONTROL IS CALLED where a person reads very little of it: the one
+ * character a pressed button writes into a movie's text and heads its input
+ * column with, and the short header of an axis's column. The core's package
+ * declares them ("mnemonics" and each axis's "header", in its input
+ * declaration); a name it declares nothing for gets the rule - the first
+ * character of the last word, the initials of an axis - which is all this
+ * engine knows about naming, and knows of no machine (control_names.hpp).
+ *
+ * ce_session_button_mnemonics: one character a button, in declaration order.
+ * ce_session_mnemonic_of / ce_session_axis_header_of: ANY name, looked up the
+ * way the session's own are - a movie can carry a control the running machine
+ * does not have. ce_control_mnemonic / ce_control_axis_header: the rule
+ * alone, for when there is no machine to ask.
+ *
+ * None of it is what a movie means: an entry is read by position, and any
+ * character but '.' is a pressed button.
+ *
+ * The strings returned by the *_header* calls belong to the calling thread
+ * until its next such call. */
+CE_API const char *ce_session_button_mnemonics(const ce_session *s);
+CE_API int32_t ce_session_mnemonic_of(const ce_session *s, const char *name);
+CE_API const char *ce_session_axis_header_of(const ce_session *s, const char *name);
+CE_API int32_t ce_control_mnemonic(const char *name);
+CE_API const char *ce_control_axis_header(const char *name);
+
+/* What to call the session's system in front of a person: the package's own
+ * word for it ("systemNames", by system id), or the id where it has none. */
+CE_API const char *ce_session_system_name(const ce_session *s);
+
+/* The value an axis rests at when nothing moves it (the package's `neutral`;
+ * 127 on an Apple II paddle, 0 on a signed stick). What idle input carries. */
+CE_API int32_t ce_session_axis_neutral(const ce_session *s, int64_t index);
 
 /* Whether a declared control is one THIS machine has.
  *
@@ -912,6 +1080,16 @@ CE_API const char *ce_session_axis_name(const ce_session *s, int64_t index);
  * and the count is zero - which is what a machine with no removable media
  * should show, rather than an icon that never lights. Names are settled at
  * load; the light is asked every frame. */
+/* The settings THIS GAME has beyond the package's declaration - an arcade
+ * game's dip switches, which differ game to game and so cannot be declared
+ * once per package. A JSON array of setting declarations in waterbox.config's
+ * own format ({"name", "display", "type", "options", "default",
+ * "description"}), from the core's optional GetGameSettings export, read once
+ * after Init. "" when the core declares none. A core that has them also
+ * returns them from SuggestSettings, under "settings", so a new project's
+ * wizard can show them before any machine runs. */
+CE_API const char *ce_session_game_settings(const ce_session *s);
+
 CE_API int32_t ce_session_drive_count(const ce_session *s);
 CE_API const char *ce_session_drive_name(const ce_session *s, int32_t index);
 CE_API int32_t ce_session_drive_light(const ce_session *s, int32_t index);
@@ -1019,11 +1197,25 @@ CE_API int32_t ce_session_load_state(ce_session *s, const uint8_t *data, uint64_
  * tag is the caller's own few bytes, stored with the state and handed back on a
  * load - the frontend's frame and lag counters, which are not the machine's. The
  * file is written beside its name and moved into place, so a failed save leaves
- * whatever was there. _save: 0 done, 1 not (see _last_error). _load: 0 loaded;
- * 1 the machine refused the state or the file is damaged, and the machine is
- * where a refused load leaves it; 2 not a state file, the machine untouched. */
+ * whatever was there.
+ *
+ * The file says which savestate format it is (ce_state_format) and which build
+ * wrote it (ce_state_writer_id), and a load checks the format before a byte
+ * reaches the machine: a state of another format is refused by name rather than
+ * loaded into nonsense (issue #115).
+ *
+ * _save: 0 done, 1 not (see _last_error). _load: 0 loaded; 1 the machine refused
+ * the state or the file is damaged, and the machine is where a refused load
+ * leaves it; 2 the state was never offered to the machine, which is untouched -
+ * not a state file, cut short, or written in another savestate format, and
+ * _last_error says which. */
 CE_API int32_t ce_session_state_save_file(ce_session *s, const char *utf8_path, const uint8_t *tag, uint32_t tag_len);
 CE_API int32_t ce_session_state_load_file(ce_session *s, const char *utf8_path, uint8_t *tag_out, uint32_t tag_cap, uint32_t *tag_len_out);
+/* What the last state saved to or loaded from a file weighed: as the machine gave
+ * it, and as the file holds it. Both saves and loads report through ce_progress_set
+ * as they go - a load against the file's length, a save against what the last
+ * state weighed (the end of a save is not known until it is reached). */
+CE_API void ce_session_state_file_bytes(const ce_session *s, uint64_t *raw_out, uint64_t *stored_out);
 
 /* The guest's self-described memory domains. */
 CE_API int32_t ce_session_domain_count(const ce_session *s);
@@ -1032,6 +1224,97 @@ CE_API int64_t ce_session_domain_size(const ce_session *s, int32_t index);
 CE_API int32_t ce_session_domain_writable(const ce_session *s, int32_t index);
 /* Copies out [offset, offset+len); returns bytes copied (clamped at end). */
 CE_API int64_t ce_session_domain_read(const ce_session *s, int32_t index, int64_t offset, uint8_t *buf, int64_t len);
+
+/* A game core's properties (docs/game-cores.md): named places in the memory
+ * domains above - integers, floats, bools, text, bytes, arrays of them, bit
+ * fields - from the JSON table of the core's optional GetGameProperties
+ * export, read once after Init and checked against the domains. The engine
+ * owns what the bytes mean: every read, write, text and parse below goes by
+ * the one set of rules, so a watch, a poke, a freeze and a script agree.
+ *
+ * _table: the table as the engine understood it, every field filled in, and
+ * what it left out and why - {"properties": [...], "problems": [...]}; a
+ * property's index is its place in that list. Borrowed for the session's
+ * lifetime. A core without the export has an empty table.
+ * _find: "Name" or "Name[3]" (an array's element, by the number the game
+ * calls it - from the table's `first`, 0 unless it says), any case; the
+ * index, or -1. *element_out gets the element counted from 0, which is what
+ * every other call here takes (0 without an index).
+ * _at: the first property, in the table's order, one of whose elements covers
+ * `address` in the named domain; -1 when none does. *starts_out: 1 when the
+ * address is the element's first byte.
+ * _get/_set: a value by kind (CE_PROPERTY_*). An integer comes back as INT
+ * when its type is signed and UINT when not; _set takes any numeric kind for
+ * a number - a float truncated - that fits the width as a signed or an
+ * unsigned value (so -1 sets every bit of a u64) and refuses one that does
+ * not; for a bool, anything but 0 is true; TEXT (as
+ * UTF-8) for a string - cut at a whole character, NUL-padded - and BYTES of
+ * exactly the property's length for bytes. _get's data is borrowed until the
+ * next call on the session.
+ * _text: the value as a person reads it - an enumeration's name when `named`
+ * and it has one, a float at the fewest digits that read back the same, text
+ * as UTF-8, bytes as hex pairs. Returns the length (without the NUL, which is
+ * always written when cap > 0); -1 for no such property.
+ * _set_text: the inverse - a whole number (decimal, or hex after 0x), an
+ * enumeration's name, true/false, a number, text, or hex bytes.
+ * The setters: 0 done; 1 not, and _last_error says why (no such property, a
+ * value of the wrong kind or out of range, a property the game works out
+ * afresh every step). */
+enum
+{
+	CE_PROPERTY_INT = 0,
+	CE_PROPERTY_UINT = 1,
+	CE_PROPERTY_FLOAT = 2,
+	CE_PROPERTY_BOOL = 3,
+	CE_PROPERTY_TEXT = 4,
+	CE_PROPERTY_BYTES = 5,
+};
+typedef struct ce_property_value
+{
+	int32_t kind;
+	int32_t reserved;
+	int64_t i;         /* INT; BOOL as 0 or 1 */
+	uint64_t u;        /* UINT */
+	double f;          /* FLOAT */
+	const char *data;  /* TEXT (UTF-8) or BYTES */
+	int64_t len;
+} ce_property_value;
+CE_API const char *ce_session_property_table(const ce_session *s);
+CE_API int32_t ce_session_property_find(ce_session *s, const char *name, uint32_t *element_out);
+CE_API int32_t ce_session_property_at(const ce_session *s, const char *domain, int64_t address, uint32_t *element_out, int32_t *starts_out);
+CE_API int32_t ce_session_property_get(ce_session *s, int32_t index, uint32_t element, ce_property_value *out);
+CE_API int32_t ce_session_property_set(ce_session *s, int32_t index, uint32_t element, const ce_property_value *in);
+CE_API int32_t ce_session_property_text(ce_session *s, int32_t index, uint32_t element, int32_t named, char *buf, int32_t cap);
+CE_API int32_t ce_session_property_set_text(ce_session *s, int32_t index, uint32_t element, const char *text);
+
+/* A DYNAMIC table (its "dynamic": true): properties that move and come and go
+ * while the machine runs - a Flash movie's variables, which live on its
+ * emulator's heap. The table of such a core is its listing at one moment.
+ * _dynamic: 1 when the table is one.
+ * _refresh: takes the listing again (the core's GetGameProperties) and returns
+ * how many it has. A property already known keeps its index and takes its new
+ * place; a new one is added at the end; one the listing no longer has stays,
+ * marked `"listed": false, "present": false` in _table. Nothing for a table
+ * that is not dynamic.
+ * _offset: where an element is now in its domain, -1 when it is not there.
+ *
+ * Between listings a dynamic property is looked for by NAME before every use
+ * (the core's GetGameProperty): _get, _set, _text, _set_text and _offset each
+ * ask where it is now, so a watch follows a variable that moved and reads
+ * nothing from one that is gone. _find asks the core for a name the listing
+ * did not have. */
+CE_API int32_t ce_session_property_dynamic(const ce_session *s);
+CE_API int32_t ce_session_property_refresh(ce_session *s);
+CE_API int64_t ce_session_property_offset(ce_session *s, int32_t index, uint32_t element);
+
+/* A game core's own timer (docs/game-cores.md: the table's "gameTimer"): the
+ * game's elapsed time in milliseconds as the game counts it now, in *ms_out.
+ * Returns 1 when the core names one, 0 when it does not (and *ms_out is 0).
+ * _text: a time in milliseconds as a timer shows it, "mm:ss.mmm" (more
+ * minute digits past 99); returns the length (without the NUL, always written
+ * when cap > 0). */
+CE_API int32_t ce_session_game_time_ms(ce_session *s, int64_t *ms_out);
+CE_API int32_t ce_game_time_text(int64_t ms, char *buf, int32_t cap);
 
 /* "" when no error. Invalidated by the next call on the same session. */
 CE_API const char *ce_session_last_error(ce_session *s);
@@ -1093,6 +1376,17 @@ CE_API const char *ce_session_bus_name(const ce_session *s, int32_t index);
 CE_API int64_t ce_session_bus_size(const ce_session *s, int32_t index);
 CE_API int32_t ce_session_bus_writable(const ce_session *s, int32_t index);
 CE_API int32_t ce_session_bus_peek(const ce_session *s, int32_t index, int32_t addr);
+/* A run of a bus at once: len bytes from addr into buf, the bytes that many
+ * peeks would read. A core that exports ReadBus is asked a chunk at a time -
+ * const uint8_t *ReadBus(int32_t bus, int64_t addr, int32_t len), len at most
+ * CE_BUS_READ_CHUNK, answering a pointer to len bytes in its own memory that
+ * stays good until the next call - and one without it is peeked a byte at a
+ * time from here, which still spares the caller a call per byte. Bytes outside
+ * the bus read as zero. Returns len, or 0 (and a zeroed buf) for a bus the core
+ * does not have. RAM Search reads a bus this way: 64 MB a byte per call was
+ * seconds of crossings into the guest (chimera#180). */
+#define CE_BUS_READ_CHUNK 65536
+CE_API int64_t ce_session_bus_read(const ce_session *s, int32_t index, int64_t addr, uint8_t *buf, int64_t len);
 CE_API void ce_session_bus_poke(ce_session *s, int32_t index, int32_t addr, int32_t value);
 
 /* savedata export: files the guest deems the user's progress (a memory
@@ -1319,6 +1613,17 @@ CE_API void ce_session_greenzone_disk_budget(ce_session *s, uint64_t budget_byte
  * playhead replays at most max_stride - 1 frames; each step down costs speed
  * (docs/state-manager.md, "How close the near band stays"). */
 CE_API void ce_session_greenzone_max_near_stride(ce_session *s, int64_t max_stride);
+
+/* How often the greenzone stores a frame (TAStudio's "Greenzone" box): 1 is
+ * every frame (the default), N stores only the multiples of N, 0 turns it off.
+ * Only which frames are stored changes; anchors, deltas and bands work as
+ * ever, and a sparse history stores deltas that span the frames between.
+ * While off, ce_session_greenzone_before_advance and
+ * ce_session_greenzone_capture store nothing and cost nothing - they only note
+ * where the machine is, so that edits made meanwhile are still honoured - and
+ * what is already stored stays usable. Turning it on from off stores a whole
+ * state at the current frame at once. */
+CE_API void ce_session_greenzone_capture_period(ce_session *s, int64_t period);
 
 /* How many snapshots each band of a full greenzone aims to hold, 32 by default.
  *

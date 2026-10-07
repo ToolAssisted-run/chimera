@@ -1,9 +1,11 @@
 using System.Drawing;
 using System.Windows.Forms;
 
+using Chimera.Client.Common;
+
 namespace Chimera.Client.GUI
 {
-	public partial class ExceptionBox : Form
+	public partial class ExceptionBox : ThemedForm
 	{
 		public ExceptionBox(string str)
 		{
@@ -28,7 +30,7 @@ namespace Chimera.Client.GUI
 				if (Clipboard.GetText() == txt)
 				{
 					lblDone.Text = "Done!";
-					lblDone.ForeColor = SystemColors.ControlText;
+					lblDone.SetForeRole(ThemeColorRole.WindowText);
 					return;
 				}
 			}
@@ -37,7 +39,7 @@ namespace Chimera.Client.GUI
 			}
 
 			lblDone.Text = "ERROR!";
-			lblDone.ForeColor = SystemColors.ControlText;
+			lblDone.SetForeRole(ThemeColorRole.WindowText);
 		}
 
 		protected override bool ProcessCmdKey(ref Message msg, Keys keyData)

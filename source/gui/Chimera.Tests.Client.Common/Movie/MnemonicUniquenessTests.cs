@@ -12,28 +12,65 @@ using Newtonsoft.Json.Linq;
 namespace Chimera.Tests.Client.Common
 {
 	/// <summary>
-	/// What TAStudio writes at the top of an input column, checked against the
-	/// controllers real cores actually declare.
+	/// What TAStudio writes at the top of an input column, checked against what
+	/// real cores declare.
 	///
-	/// The declarations are READ from installed packages' waterbox.config rather
-	/// than copied here, so a core that grows a button is covered the day it does.
-	/// Chimera ships no cores, so what is checked is whatever build/Cores holds -
-	/// in CI, every core's newest published package. With none there these are
-	/// inconclusive rather than green: a check that silently passes when its
-	/// subject is missing is worse than no check.
+	/// The letters and headers are the CORES' now (waterbox.config's
+	/// input.mnemonics and each axis's header); this frontend has no table of
+	/// them, and the engine holds only a rule for a name nobody declared. So
+	/// what is checked is the declarations: that a core which declares any
+	/// declares them all, usably, and tells one player's controls apart.
+	///
+	/// They are READ from installed packages rather than copied here, so a core
+	/// that grows a button is covered the day it does. Chimera ships no cores,
+	/// so what is checked is whatever build/Cores holds - in CI, every core's
+	/// newest published package. With none there these are inconclusive rather
+	/// than green: a check that silently passes when its subject is missing is
+	/// worse than no check. A package from before cores declared these is not
+	/// judged: it gets the rule, by decision, until it is rebuilt.
 	/// </summary>
 	[TestClass]
 	public class MnemonicUniquenessTests
 	{
 		private sealed class Controller
 		{
-			public string Core;
-			public string SystemId;
+			public string Core = "";
+			public string Where = "";
 			public List<string> Buttons = new();
-			public List<string> Axes = new();
+			public List<(string Name, string? Header)> Axes = new();
+			public Dictionary<string, string>? Declared;
+
+			/// <summary>The declared letter: by the whole name, then without the player.</summary>
+			public string? LetterOf(string button)
+			{
+				if (Declared is null) return null;
+				if (Declared.TryGetValue(button, out var whole)) return whole;
+				return Declared.TryGetValue(Bare(button), out var bare) ? bare : null;
+			}
 		}
 
-		/// <summary>Every installed package's declared controller.</summary>
+		/// <summary>"P2 Start" -> "Start"; "Reset" stays.</summary>
+		private static string Bare(string button)
+		{
+			var space = button.IndexOf(' ');
+			return space > 1 && button[0] is 'P' && button.Substring(1, space - 1).All(char.IsDigit) && space + 1 < button.Length
+				? button.Substring(space + 1)
+				: button;
+		}
+
+		private static Controller? Read(string core, string where, JObject? input)
+		{
+			if (input is null) return null;
+			Controller c = new() { Core = core, Where = where };
+			foreach (var b in input["buttons"] as JArray ?? new JArray()) c.Buttons.Add(b.Value<string>()!);
+			foreach (var a in input["axes"] as JArray ?? new JArray())
+				c.Axes.Add((a["name"]?.Value<string>() ?? "", a["header"]?.Value<string>()));
+			if (input["mnemonics"] is JObject declared)
+				c.Declared = declared.Properties().ToDictionary(static p => p.Name, static p => p.Value.ToString());
+			return c;
+		}
+
+		/// <summary>Every controller the installed packages declare: each package's own, and each machine's.</summary>
 		private static IReadOnlyList<Controller> Controllers()
 		{
 			var found = new List<Controller>();
@@ -46,42 +83,77 @@ namespace Chimera.Tests.Client.Common
 				try { root = JObject.Parse(text); }
 				catch { continue; }   // a core mid-edit is not this test's business
 
-				var input = root["input"] as JObject;
-				var systemId = root["systemId"]?.Value<string>();
-				if (input is null || string.IsNullOrEmpty(systemId)) continue;
-
-				Controller c = new() { Core = Chimera.Tests.Client.Common.CorePackages.InstalledPackages.NameOf(package), SystemId = systemId };
-				foreach (var b in input["buttons"] as JArray ?? new JArray())
-					c.Buttons.Add(b.Value<string>());
-				foreach (var a in input["axes"] as JArray ?? new JArray())
-					c.Axes.Add(a["name"]?.Value<string>());
-				found.Add(c);
+				var name = Chimera.Tests.Client.Common.CorePackages.InstalledPackages.NameOf(package);
+				if (Read(name, "the package", root["input"] as JObject) is { } own) found.Add(own);
+				foreach (var machine in root["machines"] as JArray ?? new JArray())
+				{
+					if (Read(name, machine["label"]?.Value<string>() ?? machine["id"]?.Value<string>() ?? "a machine", machine["input"] as JObject) is { } theirs)
+						found.Add(theirs);
+				}
 			}
 			return found;
 		}
 
-		private static IReadOnlyList<Controller> RequireControllers()
+		/// <summary>The controllers whose cores declare their letters.</summary>
+		private static IReadOnlyList<Controller> Declaring()
 		{
 			var all = Controllers();
 			if (all.Count is 0) Assert.Inconclusive("no core packages in build/Cores (see tools/fetch-cores.sh)");
-			return all;
+			var declaring = all.Where(static c => c.Declared is not null || c.Axes.Any(static a => a.Header is not null)).ToList();
+			if (declaring.Count is 0) Assert.Inconclusive("no installed package declares its mnemonics yet");
+			return declaring;
 		}
 
 		/// <summary>
-		/// '!' is what the lookup answers when it knows nothing about a name. A
-		/// column headed '!' tells a person only that something is wrong
-		/// somewhere, which is the least useful thing a header can say.
+		/// A core that declares letters declares one for every button: a button
+		/// left out gets the rule's guess, which is how two columns of one pad
+		/// come to share a letter with nobody having decided it.
 		/// </summary>
 		[TestMethod]
-		public void NoControlIsHeadedWithAnExclamationMark()
+		public void ACoreThatDeclaresLettersDeclaresThemAll()
 		{
-			var unnamed = RequireControllers()
-				.SelectMany(c => c.Buttons.Select(b => (c.Core, c.SystemId, Button: b)))
-				.Where(x => MnemonicLookup.Lookup(x.Button, x.SystemId) is '!')
-				.Select(x => $"{x.Core}: {x.Button}")
+			var missing = Declaring()
+				.Where(static c => c.Buttons.Count is not 0)
+				.SelectMany(c => c.Buttons.Where(b => c.LetterOf(b) is null).Select(b => $"{c.Core} ({c.Where}): {b}"))
 				.ToList();
+			Assert.AreEqual(0, missing.Count, string.Join("; ", missing.Take(40)));
+		}
 
-			Assert.AreEqual(0, unnamed.Count, string.Join("; ", unnamed));
+		/// <summary>
+		/// A letter is one character an entry can carry: printable ASCII, and
+		/// neither '.' (a button not pressed) nor '|' (which parts an entry's
+		/// groups). The engine refuses anything else and answers with the rule,
+		/// so a bad letter is a silent one.
+		/// </summary>
+		[TestMethod]
+		public void EveryDeclaredLetterCanBeWritten()
+		{
+			var bad = Declaring()
+				.Where(static c => c.Declared is not null)
+				.SelectMany(c => c.Declared!.Where(static pair => pair.Value.Length is not 1 || pair.Value[0] <= ' ' || pair.Value[0] >= 0x7F || pair.Value[0] is '.' or '|')
+					.Select(pair => $"{c.Core} ({c.Where}): {pair.Key} = \"{pair.Value}\""))
+				.ToList();
+			Assert.AreEqual(0, bad.Count, string.Join("; ", bad.Take(40)));
+		}
+
+		/// <summary>
+		/// What is declared is what the engine answers: the letters reach a
+		/// window through ce_session_mnemonic_of, and this asks the same rule the
+		/// engine falls back on for a name with no declaration, to pin that a
+		/// declared letter is never the rule's by accident of a typo in the key.
+		/// </summary>
+		[TestMethod]
+		public void NoDeclarationNamesAControlThatIsNotThere()
+		{
+			var stray = Declaring()
+				.Where(static c => c.Declared is not null)
+				.SelectMany(c =>
+				{
+					var names = new HashSet<string>(c.Buttons.Concat(c.Buttons.Select(Bare)));
+					return c.Declared!.Keys.Where(k => !names.Contains(k)).Select(k => $"{c.Core} ({c.Where}): {k}");
+				})
+				.ToList();
+			Assert.AreEqual(0, stray.Count, string.Join("; ", stray.Take(40)));
 		}
 
 		/// <summary>
@@ -91,17 +163,16 @@ namespace Chimera.Tests.Client.Common
 		/// longest any shipped controller needs.
 		/// </summary>
 		[TestMethod]
-		public void AxisHeadersAreShort()
+		public void AxisHeadersAreDeclaredAndShort()
 		{
 			const int LIMIT = 5;
-			var wide = RequireControllers()
-				.SelectMany(c => c.Axes.Select(a => (c.Core, c.SystemId, Axis: a)))
-				.Select(x => (x.Core, x.Axis, Header: MnemonicLookup.LookupAxis(x.Axis, x.SystemId)))
-				.Where(x => x.Header.Length > LIMIT)
-				.Select(x => $"{x.Core}: {x.Axis} -> \"{x.Header}\"")
+			var wrong = Declaring()
+				.SelectMany(c => c.Axes.Select(a => (c.Core, c.Where, a.Name, a.Header)))
+				.Where(static x => x.Header is null || x.Header.Length is 0 || x.Header.Length > LIMIT)
+				.Select(static x => $"{x.Core} ({x.Where}): {x.Name} -> {(x.Header is null ? "no header" : $"\"{x.Header}\"")}")
 				.ToList();
 
-			Assert.AreEqual(0, wide.Count, string.Join("; ", wide));
+			Assert.AreEqual(0, wrong.Count, string.Join("; ", wrong.Take(40)));
 		}
 
 		/// <summary>
@@ -111,7 +182,7 @@ namespace Chimera.Tests.Client.Common
 		/// tell apart. That is what happened to the PlayStation 2: L2 had the 'L'
 		/// of Left and R2 the 'R' of Right.
 		///
-		/// Held per PLAYER, not per controller: the lookup strips the "P2 " and
+		/// Held per PLAYER, not per controller: a declaration by the bare name
 		/// hands both players the same character on purpose, and TAStudio keeps
 		/// their columns in separate groups. Two players sharing an 'A' is the
 		/// design; one player owning two 'L's is the bug.
@@ -128,31 +199,74 @@ namespace Chimera.Tests.Client.Common
 		{
 			const int GAMEPAD_SIZED = 40;
 			var complaints = new List<string>();
-			foreach (var c in RequireControllers())
+			foreach (var c in Declaring().Where(static c => c.Declared is not null))
 			{
 				foreach (var group in c.Buttons.GroupBy(PlayerOf))
 				{
 					if (group.Count() > GAMEPAD_SIZED) continue;
 
-					var byChar = new Dictionary<char, string>();
+					var byChar = new Dictionary<string, string>();
 					foreach (var button in group)
 					{
-						var ch = MnemonicLookup.Lookup(button, c.SystemId);
+						// (an undeclared button is the other test's complaint)
+						if (c.LetterOf(button) is not { } ch) continue;
 						if (byChar.TryGetValue(ch, out var first))
-							complaints.Add($"{c.Core} {group.Key}: '{ch}' is both {first} and {button}");
+							complaints.Add($"{c.Core} ({c.Where}) {group.Key}: '{ch}' is both {first} and {button}");
 						else
 							byChar[ch] = button;
 					}
 				}
 			}
 
-			Assert.AreEqual(0, complaints.Count, string.Join("; ", complaints));
+			Assert.AreEqual(0, complaints.Count, string.Join("; ", complaints.Take(40)));
 		}
 
 		/// <summary>"P2 Start" belongs to player 2; "Reset" belongs to the console.</summary>
 		private static string PlayerOf(string button)
-			=> button.Length > 2 && button[0] is 'P' && char.IsDigit(button[1]) && button[2] is ' '
-				? button.Substring(0, 2)
-				: "console";
+			=> Bare(button) == button ? "console" : button.Substring(0, button.IndexOf(' '));
+
+		/// <summary>
+		/// The rule for a name nobody declared, as this frontend sees it through
+		/// the engine: the same answers the engine's own test pins, asked across
+		/// the boundary a window asks across.
+		/// </summary>
+		[TestMethod]
+		public void TheRuleForAnUndeclaredName()
+		{
+			Assert.AreEqual('U', GenericControlNames.Instance.MnemonicOf("P1 Up"));
+			Assert.AreEqual('F', GenericControlNames.Instance.MnemonicOf("Stick Fire"));
+			Assert.AreEqual('2', GenericControlNames.Instance.MnemonicOf("Insert Disk 2"));
+			Assert.AreEqual("P1LSX", GenericControlNames.Instance.AxisHeaderOf("P1 Left Stick X"));
+			Assert.AreEqual("LT", GenericControlNames.Instance.AxisHeaderOf("Left Trigger"));
+		}
+
+		/// <summary>
+		/// A definition is called what it is told its controls are called, and a
+		/// definition made from a movie's key takes the names of the machine it
+		/// is shown beside - including for a control that machine does not have.
+		/// </summary>
+		[TestMethod]
+		public void ADefinitionUsesTheNamesItIsGiven()
+		{
+			FixedControlNames names = new(
+				new Dictionary<string, char> { ["P1 Cross"] = 'X', ["P2 Cross"] = 'X', ["P1 Up"] = 'U' },
+				new Dictionary<string, string> { ["P1 Left Stick X"] = "LX" });
+			var machine = new ControllerDefinition("pad") { BoolButtons = { "P1 Cross", "P1 Up" } }
+				.WithControlNames(names)
+				.MakeImmutable();
+			machine.BuildMnemonicsCache();
+			Assert.AreEqual('X', machine.MnemonicFor("P1 Cross"));
+			Assert.AreEqual("LX", machine.AxisHeaderFor("P1 Left Stick X"));
+			// not in the cache, still the machine's word
+			Assert.AreEqual('X', machine.MnemonicFor("P2 Cross"));
+			// and one nobody named at all: the rule
+			Assert.AreEqual('C', machine.MnemonicFor("P2 Circle"));
+
+			var fromAKey = new ControllerDefinition("movie") { BoolButtons = { "P1 Cross", "P2 Cross" } }.MakeImmutable();
+			fromAKey.BuildMnemonicsCache(machine.ControlNames);
+			Assert.AreEqual('X', fromAKey.MnemonicFor("P2 Cross"));
+			// a copy keeps them
+			Assert.AreEqual('X', new ControllerDefinition(machine).MnemonicFor("P1 Cross"));
+		}
 	}
 }

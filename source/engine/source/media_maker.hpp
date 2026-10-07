@@ -43,6 +43,49 @@ struct MediaEntry
 	uint64_t size = 0;
 };
 
+/* WHAT A CORE SAYS ITS MEDIA NEEDS beyond the files (one object of the "media"
+ * array in its package's waterbox.config).
+ *
+ * The packer is nobody's in particular: it writes the files and nothing a
+ * machine would recognise. One emulator does look further - it wants a table
+ * in the ISO system area, the sixteen sectors ISO 9660 reserves and gives no
+ * meaning - and that used to be written here, for any folder that held a file
+ * of a certain name. It is the core's knowledge, so the core declares it: when
+ * the recipe is its (a file at the folder's root), and what goes where.
+ *
+ * The bytes still depend on the folder's contents and names and on nothing
+ * else, PROVIDED everybody packs with the same recipe - so a recipe is a
+ * format, and a core must never change one it has published. */
+struct MediaPatch
+{
+	enum class Value
+	{
+		Literal,    /* the number written in the recipe */
+		LastSector, /* the image's last sector (its count less one) */
+		Sectors,    /* how many sectors the image has */
+	};
+	uint32_t at = 0;          /* byte offset into the system area */
+	bool bigEndian = true;
+	Value value = Value::Literal;
+	uint32_t literal = 0;
+};
+
+struct MediaRecipe
+{
+	MediaFormat format = MediaFormat::Iso9660;
+	/* the recipe is meant for a folder with this file at its root (ASCII case
+	 * ignored); empty: for any folder */
+	std::string rootFile;
+	std::vector<MediaPatch> systemArea;
+};
+
+/* Reads a recipe as the package wrote it. False with `error` on anything it
+ * does not understand: a recipe half applied is another image. */
+bool mediaParseRecipe(const char *json, MediaRecipe &out, std::string &error);
+
+/* Whether `folder` is what the recipe was written for. */
+bool mediaRecipeApplies(const MediaRecipe &recipe, const std::string &folder);
+
 /* Called as the pack runs, often. Return false to cancel, which leaves no
  * output file behind - a half-written image that looks like an image is worse
  * than none. */
@@ -59,7 +102,8 @@ bool mediaCollect(const std::string &folder, std::vector<MediaEntry> &out, std::
  * written, taken as it was written. Returns false on failure or cancel, with
  * `error` set ("cancelled" when it was cancelled). */
 bool mediaMake(const std::string &folder, const std::string &outPath, MediaFormat format,
-	const MediaProgress &progress, std::string &sha1Out, std::string &error);
+	const MediaProgress &progress, std::string &sha1Out, std::string &error,
+	const MediaRecipe *recipe = nullptr);
 
 /* The writers, one per translation unit. Each takes the collected files already
  * sorted, and each is responsible for writing nothing at all when it fails: a
@@ -67,7 +111,8 @@ bool mediaMake(const std::string &folder, const std::string &outPath, MediaForma
 bool mediaWriteZipStored(const std::vector<MediaEntry> &files, const std::string &outPath,
 	const MediaProgress &progress, std::string &sha1Out, std::string &error);
 bool mediaWriteIso9660(const std::vector<MediaEntry> &files, const std::string &outPath,
-	const MediaProgress &progress, std::string &sha1Out, std::string &error);
+	const MediaProgress &progress, std::string &sha1Out, std::string &error,
+	const MediaRecipe *recipe = nullptr);
 bool mediaWriteFat12(const std::vector<MediaEntry> &files, const std::string &outPath,
 	const MediaProgress &progress, std::string &sha1Out, std::string &error);
 

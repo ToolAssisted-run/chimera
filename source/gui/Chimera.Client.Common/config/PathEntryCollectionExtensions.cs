@@ -195,6 +195,35 @@ namespace Chimera.Client.Common
 			return collection.AbsolutePathFor(path, null);
 		}
 
+		/// <summary>
+		/// Where a file or folder dialog should open: the first of <paramref name="candidates"/>
+		/// that is a folder that exists, or "" - which leaves the dialog to its own default.
+		/// A folder from Config > Paths is an answer the person has already given, so a
+		/// dialog starts there; but a folder that is not there is no starting point, and
+		/// MainForm's dialog helper refuses one outright in a DEBUG build. Null, empty and
+		/// blank candidates are passed over.
+		/// </summary>
+		public static string FirstExistingDir(params string[] candidates)
+		{
+			foreach (var candidate in candidates)
+			{
+				if (!string.IsNullOrWhiteSpace(candidate) && Directory.Exists(candidate)) return candidate;
+			}
+			return string.Empty;
+		}
+
+		/// <summary>
+		/// Where a dialog about a system's files opens (Open ROM, Export Save Data): the
+		/// system's ROM folder when that exists - not every system has one; by default it
+		/// is a folder nobody has made - else the folder the last ROM was opened from, else
+		/// "" for the dialog's own default. <see cref="PathEntryCollection.LastRomPath"/>
+		/// starts as "." and means nothing until a ROM has been opened.
+		/// </summary>
+		public static string RomDialogDir(this PathEntryCollection collection, string systemId = null)
+			=> FirstExistingDir(
+				collection.RomAbsolutePath(systemId),
+				collection.LastRomPath is "." ? string.Empty : collection.LastRomPath);
+
 		public static string RomAbsolutePath(this PathEntryCollection collection, string systemId = null)
 		{
 			if (string.IsNullOrWhiteSpace(systemId))

@@ -105,7 +105,7 @@ namespace Chimera.Emulation.Common
 		/// <summary>Display/identity name; must match the <see cref="CoreAttribute.CoreName"/> of the produced core (movies record it).</summary>
 		string CoreName { get; }
 
-		/// <summary>System IDs (<see cref="VSystemID.Raw"/>) this core can emulate.</summary>
+		/// <summary>The ids of the systems this core can emulate, as its package names them.</summary>
 		IReadOnlyList<string> SystemIds { get; }
 
 		/// <summary>

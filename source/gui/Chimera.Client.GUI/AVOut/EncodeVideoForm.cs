@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Linq;
@@ -56,6 +57,8 @@ namespace Chimera.Client.GUI
 		private readonly Button _start;
 		private readonly Button _stop;
 		private readonly Button _openVideo;
+		private readonly Button _openFolder;
+		private readonly Button _restoreDefaults;
 		private readonly Button _close;
 		private readonly Timer _tick;
 
@@ -103,7 +106,8 @@ namespace Chimera.Client.GUI
 
 			SuspendLayout();
 			ClientSize = new(UIHelper.ScaleX(580), UIHelper.ScaleY(364));
-			MinimumSize = new(UIHelper.ScaleX(520), UIHelper.ScaleY(364));
+			// wide enough that the buttons on the left never reach the ones on the right
+			MinimumSize = new(UIHelper.ScaleX(600), UIHelper.ScaleY(364));
 			StartPosition = FormStartPosition.CenterParent;
 			ShowIcon = false;
 			MaximizeBox = false;
@@ -208,28 +212,30 @@ namespace Chimera.Client.GUI
 				Text = "Sync to audio",
 			};
 			Controls.Add(_audioSync);
+			// the two boxes are each other's handlers, so both exist before either
+			// is wired up
 			_captureOsd = new CheckBox
 			{
 				AutoSize = true,
 				Location = Pt(140, 170),
 				Text = "Capture OSD",
 			};
-			_captureOsd.CheckedChanged += (_, _) =>
-			{
-				// the OSD is drawn over the lua layer, so it cannot be had without it
-				if (_captureOsd.Checked) _captureLua.Checked = true;
-			};
-			Controls.Add(_captureOsd);
 			_captureLua = new CheckBox
 			{
 				AutoSize = true,
 				Location = Pt(272, 170),
 				Text = "Capture Lua",
 			};
+			_captureOsd.CheckedChanged += (_, _) =>
+			{
+				// the OSD is drawn over the lua layer, so it cannot be had without it
+				if (_captureOsd.Checked) _captureLua.Checked = true;
+			};
 			_captureLua.CheckedChanged += (_, _) =>
 			{
 				if (!_captureLua.Checked) _captureOsd.Checked = false;
 			};
+			Controls.Add(_captureOsd);
 			Controls.Add(_captureLua);
 
 			// ---- how it is going -------------------------------------------------
@@ -258,10 +264,10 @@ namespace Chimera.Client.GUI
 			_levels = new AudioLevelMeter
 			{
 				Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
-				BackColor = SystemColors.ControlDarkDark,
 				Location = Pt(56, 270),
 				Size = new(UIHelper.ScaleX(516), UIHelper.ScaleY(26)),
 			};
+			_levels.SetBackRole(ThemeColorRole.ShadedBackground);
 			Controls.Add(_levels);
 
 			// ---- the four things you can do --------------------------------------
@@ -270,11 +276,34 @@ namespace Chimera.Client.GUI
 				Anchor = AnchorStyles.Bottom | AnchorStyles.Left,
 				Enabled = false,
 				Location = Pt(8, 324),
-				Size = new(UIHelper.ScaleX(96), UIHelper.ScaleY(26)),
+				Size = new(UIHelper.ScaleX(90), UIHelper.ScaleY(26)),
 				Text = "Open Video",
 			};
 			_openVideo.Click += (_, _) => OpenWrittenVideo();
 			Controls.Add(_openVideo);
+			// where the video is, in the machine's own file browser - with the
+			// file chosen once it has been written
+			_openFolder = new Button
+			{
+				Anchor = AnchorStyles.Bottom | AnchorStyles.Left,
+				Location = Pt(104, 324),
+				Size = new(UIHelper.ScaleX(90), UIHelper.ScaleY(26)),
+				Text = "Open Folder",
+			};
+			_openFolder.Click += (_, _) => OpenOutputFolder();
+			Controls.Add(_openFolder);
+			_output.TextChanged += (_, _) => _openFolder.Enabled = OutputFolder is not null;
+			// the command especially: one stray edit and the only way back was a
+			// copy of it kept somewhere else (#169)
+			_restoreDefaults = new Button
+			{
+				Anchor = AnchorStyles.Bottom | AnchorStyles.Left,
+				Location = Pt(200, 324),
+				Size = new(UIHelper.ScaleX(110), UIHelper.ScaleY(26)),
+				Text = "Restore Defaults",
+			};
+			_restoreDefaults.Click += (_, _) => RestoreDefaults();
+			Controls.Add(_restoreDefaults);
 			_start = new Button
 			{
 				Anchor = AnchorStyles.Bottom | AnchorStyles.Right,
@@ -311,6 +340,7 @@ namespace Chimera.Client.GUI
 
 			FillMarkers();
 			FillFromConfig(config);
+			_openFolder.Enabled = OutputFolder is not null;
 			ShowRange();
 			SyncSizeEnabled();
 			ShowProgress(new(VideoEncodePhase.Idle, 0, 0, 0, 0, null, null));
@@ -335,6 +365,27 @@ namespace Chimera.Client.GUI
 
 		/// <summary>Whether there is a finished video to open.</summary>
 		public bool OpenVideoEnabled => _openVideo.Enabled;
+
+		public bool OpenFolderEnabled => _openFolder.Enabled;
+
+		/// <summary>The folder the output file is in, when it exists; null otherwise.</summary>
+		public string? OutputFolder
+		{
+			get
+			{
+				var output = _output.Text.Trim();
+				if (output.Length is 0) return null;
+				try
+				{
+					var folder = Path.GetDirectoryName(Path.GetFullPath(output));
+					return folder is not null && Directory.Exists(folder) ? folder : null;
+				}
+				catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+				{
+					return null;
+				}
+			}
+		}
 
 		/// <summary>Where the level meters stand, 0 to 1 on their own dB scale.</summary>
 		public (double Left, double Right) AudioLevels => (_levels.LeftFraction, _levels.RightFraction);
@@ -396,6 +447,23 @@ namespace Chimera.Client.GUI
 			return ordered[box.SelectedIndex].Frame;
 		}
 
+		/// <summary>
+		/// Puts the encode's own choices back to a fresh install's: the ffmpeg
+		/// command, audio sync, the capture boxes and no resize. Where the video
+		/// goes and which frames it holds are this encode's, and are left alone.
+		/// </summary>
+		public void RestoreDefaults()
+		{
+			Config fresh = new();
+			_command.Text = DefaultCommand;
+			_audioSync.Checked = fresh.VideoWriterAudioSync;
+			_captureLua.Checked = fresh.AviCaptureLua || fresh.AviCaptureOsd;
+			_captureOsd.Checked = fresh.AviCaptureOsd;
+			_pad.Checked = fresh.AVWriterPad;
+			_resize.Checked = fresh.AVWriterResizeWidth > 0;
+			UseCurrentSize();
+		}
+
 		private void FillFromConfig(Config config)
 		{
 			_command.Text = string.IsNullOrWhiteSpace(config.FFmpegCustomCommand)
@@ -451,7 +519,7 @@ namespace Chimera.Client.GUI
 			_range.Text = frames > 0
 				? $"frames {StartFrame} to {EndFrame} ({frames:N0} frames)"
 				: "the end marker is before the start marker";
-			_range.ForeColor = frames > 0 ? SystemColors.GrayText : Color.Firebrick;
+			_range.SetForeRole(frames > 0 ? ThemeColorRole.DisabledText : ThemeColorRole.AccentError);
 			if (!_running) _start.Enabled = frames > 0;
 		}
 
@@ -487,7 +555,7 @@ namespace Chimera.Client.GUI
 			if (File.Exists(request.OutputPath) && !_confirmOverwrite(request.OutputPath))
 			{
 				_status.Text = $"{Path.GetFileName(request.OutputPath)} was kept; pick another name to encode.";
-				_status.ForeColor = Color.Firebrick;
+				_status.SetForeRole(ThemeColorRole.AccentError);
 				return;
 			}
 
@@ -495,7 +563,7 @@ namespace Chimera.Client.GUI
 			if (error is not null)
 			{
 				_status.Text = error;
-				_status.ForeColor = Color.Firebrick;
+				_status.SetForeRole(ThemeColorRole.AccentError);
 				return;
 			}
 
@@ -539,7 +607,7 @@ namespace Chimera.Client.GUI
 		private void SetInputsEnabled(bool enabled)
 		{
 			foreach (var control in new Control[]
-				{ _output, _browse, _command, _from, _to, _resize, _audioSync, _captureOsd, _captureLua })
+				{ _output, _browse, _command, _from, _to, _resize, _audioSync, _captureOsd, _captureLua, _restoreDefaults })
 			{
 				control.Enabled = enabled;
 			}
@@ -554,7 +622,7 @@ namespace Chimera.Client.GUI
 			_progress.Maximum = Math.Max(1, progress.FramesTotal);
 			_progress.Value = Math.Min(_progress.Maximum, Math.Max(0, progress.FramesDone));
 
-			_status.ForeColor = progress.Phase is VideoEncodePhase.Failed ? Color.Firebrick : SystemColors.ControlText;
+			_status.SetForeRole(progress.Phase is VideoEncodePhase.Failed ? ThemeColorRole.AccentError : ThemeColorRole.WindowText);
 			_status.Text = progress.Phase switch
 			{
 				VideoEncodePhase.Idle => "",
@@ -596,13 +664,40 @@ namespace Chimera.Client.GUI
 		/// has been moved or deleted since, say so here rather than letting the
 		/// system fail silently somewhere the person is not looking.
 		/// </summary>
+		/// <summary>
+		/// Shows the output's folder in the machine's file browser - Explorer with
+		/// the video selected once it exists - and says so when nothing can.
+		/// </summary>
+		private void OpenOutputFolder()
+		{
+			if (OutputFolder is not { } folder)
+			{
+				_status.Text = "The output file's folder does not exist.";
+				_status.SetForeRole(ThemeColorRole.AccentError);
+				_openFolder.Enabled = false;
+				return;
+			}
+			var file = Path.GetFullPath(_output.Text.Trim());
+			try
+			{
+				if (OSTailoredCode.IsUnixHost) Process.Start("xdg-open", folder);
+				else if (File.Exists(file)) Process.Start("explorer.exe", $"/select,\"{file}\"");
+				else Process.Start("explorer.exe", $"\"{folder}\"");
+			}
+			catch (Exception ex)
+			{
+				_status.Text = $"Could not open {folder}: {ex.Message}";
+				_status.SetForeRole(ThemeColorRole.AccentError);
+			}
+		}
+
 		private void OpenWrittenVideo()
 		{
 			if (_written is null) return;
 			if (!File.Exists(_written))
 			{
 				_status.Text = $"{Path.GetFileName(_written)} is no longer there.";
-				_status.ForeColor = Color.Firebrick;
+				_status.SetForeRole(ThemeColorRole.AccentError);
 				_openVideo.Enabled = false;
 				return;
 			}

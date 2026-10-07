@@ -5,7 +5,7 @@ using Chimera.Common.BufferExtensions;
 
 namespace Chimera.Client.GUI
 {
-	public partial class HexFind : Form
+	public partial class HexFind : ThemedForm
 	{
 		private readonly HexEditor _hexEditor;
 

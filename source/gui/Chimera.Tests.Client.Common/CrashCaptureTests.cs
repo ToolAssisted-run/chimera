@@ -126,6 +126,14 @@ namespace Chimera.Tests.Client.Common
 			}, left);
 		}
 
+		// MSTEST0032 is right that the compiler can fold every line below: these
+		// are consts against literals, so today they are all always true. That is
+		// the point. The numbers are a layout SHARED with C, and the one thing
+		// this test has to catch is somebody editing the C# side alone - at which
+		// moment the fold stops coming out true and the build stops. Rewriting
+		// them as something the compiler cannot see through would only hide the
+		// contract they exist to write down.
+#pragma warning disable MSTEST0032
 		[TestMethod]
 		public void TheBlockIsLaidOutAsTheModuleReadsIt()
 		{
@@ -139,6 +147,7 @@ namespace Chimera.Tests.Client.Common
 			Assert.AreEqual(1072, CrashCapture.SessionOffset);
 			Assert.AreEqual(17452, CrashCapture.BlockSize);
 		}
+#pragma warning restore MSTEST0032
 
 		[TestMethod]
 		public void OffWindowsNothingIsArmedAndItSaysWhy()

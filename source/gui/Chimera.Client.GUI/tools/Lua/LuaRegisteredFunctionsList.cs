@@ -6,7 +6,7 @@ using Chimera.Client.Common;
 
 namespace Chimera.Client.GUI
 {
-	public partial class LuaRegisteredFunctionsList : Form
+	public partial class LuaRegisteredFunctionsList : ThemedForm
 	{
 		private List<LuaFile> _scriptList;
 

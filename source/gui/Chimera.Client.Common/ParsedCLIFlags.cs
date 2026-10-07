@@ -54,6 +54,9 @@ namespace Chimera.Client.Common
 		/// <summary>"&lt;id&gt;=&lt;path&gt;" pairs: firmware for this run, ahead of the config</summary>
 		public readonly string[]? cmdFirmware;
 
+		/// <summary>a JSON file naming the project's other files, for a precompile session</summary>
+		public readonly string? cmdPrecompileSlots;
+
 		public ParsedCLIFlags(
 			string? cmdConfigFile,
 			string? cmdMovie,
@@ -76,7 +79,8 @@ namespace Chimera.Client.Common
 			string? cmdRom,
 			string? cmdCorePackage,
 			string? cmdPrecompile,
-			string[]? cmdFirmware = null)
+			string[]? cmdFirmware = null,
+			string? cmdPrecompileSlots = null)
 		{
 			this.cmdConfigFile = cmdConfigFile;
 			this.cmdMovie = cmdMovie;
@@ -100,6 +104,7 @@ namespace Chimera.Client.Common
 			this.cmdCorePackage = cmdCorePackage;
 			this.cmdPrecompile = cmdPrecompile;
 			this.cmdFirmware = cmdFirmware;
+			this.cmdPrecompileSlots = cmdPrecompileSlots;
 		}
 	}
 }

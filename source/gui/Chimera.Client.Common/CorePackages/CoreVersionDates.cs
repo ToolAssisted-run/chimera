@@ -36,6 +36,13 @@ namespace Chimera.Client.Common
 				System.Globalization.DateTimeStyles.AssumeUniversal,
 				out var parsed) ? parsed : null;
 
+		/// <summary>
+		/// A version's date as every list writes it: the local day and minute. The minute is what
+		/// tells apart several versions made on one day.
+		/// </summary>
+		public static string Format(DateTimeOffset when)
+			=> when.ToLocalTime().ToString("yyyy-MM-dd HH:mm", System.Globalization.CultureInfo.InvariantCulture);
+
 		public static DateTimeOffset? Of(DiscoveredCorePackage package)
 			=> package.VersionDate ?? Published(package.Version);
 

@@ -12,7 +12,7 @@ namespace Chimera.Client.Common
 {
 	public class PathEntryCollection
 	{
-		public static readonly string GLOBAL = string.Join("_", "Global", VSystemID.Raw.NULL);
+		public static readonly string GLOBAL = string.Join("_", "Global", NullEmulator.NullSystemId);
 
 		private static PathEntry BaseEntryFor(string sysID, string path)
 			=> new(sysID, "Base", path);

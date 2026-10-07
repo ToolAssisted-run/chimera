@@ -10,6 +10,7 @@
  *       [--rerecord] [--seek <frame>] [--play <n>] [--edit-from <movie>] [--stop-at-seek] [--bands n,m,ms,fs,anchor] [--record <out.txt>]
  *       [--settings <json>]
  *       [--dump <domain>=<path>]... [--export-savedata <dir>] [--meta <path>]
+ *       [--core-log <path>]
  *   chimera-run --project <p.chimeraProject> <package>
  *       [--files <dir>]... [--allow-core-mismatch] [the same run flags]
  *
@@ -31,7 +32,10 @@
  * (near frames, mid frames, mid stride, far stride, anchor spacing; 0 keeps a
  * default). Its use in a test is to make the bands narrow enough that the
  * history is constantly coarsening, which is what the defaults spend minutes
- * of real play reaching.
+ * of real play reaching. --greenzone-period <n> enables the history and sets
+ * how often it stores a frame (0 off, 1 every frame, n one in n) at the frame
+ * of the first pass --greenzone-period-at names (0 by default), to measure
+ * what each of TAStudio's "Greenzone" settings costs.
  *
  * --stop-at-seek ends the run where the seek landed, so the dumps describe
  * frame N itself rather than the end of a replay from it.
@@ -68,6 +72,24 @@
  * skips only the readback (ce_session_draw_every_frame) - which is what a core
  * whose picture persists on the GPU needs, and what --render-every-frame
  * over-pays for.
+ * --rates <path> writes each frame's rate as the machine reports it after that
+ * frame, "frame numerator denominator" a line, and draws every frame to get it:
+ * the engine asks a core its rate again after every shown frame, since a game
+ * core's step is as long as the game makes it (docs/game-cores.md).
+ * --ram-search-bench <domain> times RAM Search over that domain once the run is
+ * done, as the RAM Search window would run it (ce_ramsearch_*, straight onto
+ * the guest's memory): a start and an "equal to 0" search at each size,
+ * printed to stderr. The domain's memory is the machine's own, faults and all,
+ * which a benchmark over a host array is not.
+ * --property-trace <name>[,<name>...] prints, after every frame, where each of
+ * those game properties is and what it reads as - "prop <frame> <name> @
+ * <offset> = <text>", or "prop <frame> <name> gone" - found by name the way a
+ * watch finds it (ce_session_property_find, _offset, _text). After the run it
+ * has the table listed again (ce_session_property_refresh) and prints the
+ * count and whether the table is dynamic. --property-set <name>=<text> sets
+ * one from text before the first frame, and says so or says why not. Both are
+ * the witness's way to a dynamic table (docs/game-cores.md), whose properties
+ * move and come and go while the machine runs.
  * --screenshot <frame>=<path> writes one frame's picture as a TGA. Repeatable.
  * The run is otherwise undrawn (turbo), so only the frames asked for cost
  * anything to draw - which is what makes "show me frame 1910 of this movie" a
@@ -85,6 +107,9 @@
 
 #ifdef _WIN32
 #include <direct.h>
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <shellapi.h>
 #else
 #include <sys/stat.h>
 #endif
@@ -161,14 +186,55 @@ int fail(const std::string &metaPath, const std::string &detail)
 	return 2;
 }
 
+#if defined(_WIN32)
+// The C runtime hands main an ANSI argv: a path with a letter outside the
+// code page ("Broderbund" with its o-slash) arrives already wrong. The wide
+// command line is what the shell really said; every path here is UTF-8 from
+// this point on, as the engine takes them.
+std::vector<std::string> utf8Arguments()
+{
+	std::vector<std::string> out;
+	int n = 0;
+	wchar_t **wide = CommandLineToArgvW(GetCommandLineW(), &n);
+	if (wide == nullptr) return out;
+	for (int i = 0; i < n; i++)
+	{
+		int len = WideCharToMultiByte(CP_UTF8, 0, wide[i], -1, nullptr, 0, nullptr, nullptr);
+		std::string s(len > 0 ? static_cast<size_t>(len - 1) : 0, '\0');
+		if (len > 0) WideCharToMultiByte(CP_UTF8, 0, wide[i], -1, &s[0], len, nullptr, nullptr);
+		out.push_back(std::move(s));
+	}
+	LocalFree(wide);
+	return out;
+}
+#endif
+
 } // namespace
 
 int main(int argc, char **argv)
 {
+#if defined(_WIN32)
+	std::vector<std::string> utf8 = utf8Arguments();
+	std::vector<char *> utf8Argv;
+	if (!utf8.empty())
+	{
+		for (std::string &a : utf8) utf8Argv.push_back(&a[0]);
+		utf8Argv.push_back(nullptr);
+		argc = static_cast<int>(utf8.size());
+		argv = utf8Argv.data();
+	}
+#endif
 	const char *packagePath = nullptr, *romPath = nullptr, *moviePath = nullptr;
 	const char *settings = nullptr;
 	std::string metaPath;
+	/* --core-log <path>: what the core says, kept in a file (ce_core_log), and
+	 * the "corelog" request mounted so a core with a fuller log keeps it */
+	std::string coreLogPath;
+	std::string ratesPath;
 	std::vector<std::pair<std::string, std::string>> dumps; // domain -> path
+	std::string ramSearchBench;
+	std::vector<std::string> propertyTrace;
+	std::string propertySet;
 	std::map<int64_t, std::string> shots; // frame -> TGA path
 	std::vector<std::pair<std::string, std::string>> firmwareArgs; // id -> path
 	std::map<int64_t, std::string> stateOuts; // frame -> state path
@@ -188,6 +254,8 @@ int main(int argc, char **argv)
 	int64_t greenzoneMaxStride = 0; // 0: the engine's default cap
 	int64_t greenzoneBandGoal = 0; // 0: the engine's default goal
 	int64_t greenzoneBytes = -1;   // an exact budget in bytes, for machines too small to fill a megabyte
+	int64_t greenzonePeriod = -1;   // TAStudio's "Greenzone" setting: 0 off, 1 every frame, n one in n
+	int64_t greenzonePeriodAt = 0;  // the frame of the first pass it is set at
 	std::string recordPath;
 	std::string savedataDir;
 	std::string projectPath;
@@ -212,6 +280,13 @@ int main(int argc, char **argv)
 	std::vector<std::string> fileDirs;
 	bool allowCoreMismatch = false;
 	bool wantGpu = false;
+	bool suggest = false;
+	/* --import-movie: the positional "rom" is a movie made elsewhere (a Doom
+	 * demo), mounted as "movie", and the core's ImportMovie is asked what it
+	 * amounts to (ce_import_movie); --mount name=path adds the files it needs,
+	 * under the names given */
+	bool importMovie = false;
+	std::vector<std::pair<std::string, std::string>> mounts;
 	/* Frames are drawn only when a screenshot asks for one, which makes this
 	 * runner a measurement of a seek rather than of play. --render-every-frame
 	 * is the other half of that A/B: the same run, drawing. */
@@ -273,16 +348,29 @@ int main(int argc, char **argv)
 		else if (arg == "--greenzone-max-stride" && i + 1 < argc) greenzoneMaxStride = std::atoll(argv[++i]);
 		else if (arg == "--greenzone-band-goal" && i + 1 < argc) greenzoneBandGoal = std::atoll(argv[++i]);
 		else if (arg == "--greenzone-bytes" && i + 1 < argc) greenzoneBytes = std::atoll(argv[++i]);
+		else if (arg == "--greenzone-period" && i + 1 < argc) greenzonePeriod = std::atoll(argv[++i]);
+		else if (arg == "--greenzone-period-at" && i + 1 < argc) greenzonePeriodAt = std::atoll(argv[++i]);
 		else if (arg == "--stop-at-seek") stopAtSeek = true;
 		else if (arg == "--record" && i + 1 < argc) recordPath = argv[++i];
 		else if (arg == "--settings" && i + 1 < argc) settings = argv[++i];
+		else if (arg == "--suggest") suggest = true;
+		else if (arg == "--import-movie") importMovie = true;
+		else if (arg == "--mount" && i + 1 < argc)
+		{
+			const std::string spec = argv[++i];
+			const size_t eq = spec.find('=');
+			if (eq == std::string::npos) return fail(metaPath, "--mount wants <name>=<path>");
+			mounts.emplace_back(spec.substr(0, eq), spec.substr(eq + 1));
+		}
 		else if (arg == "--export-savedata" && i + 1 < argc) savedataDir = argv[++i];
 		else if (arg == "--meta" && i + 1 < argc) metaPath = argv[++i];
+		else if (arg == "--core-log" && i + 1 < argc) coreLogPath = argv[++i];
 		else if (arg == "--project" && i + 1 < argc) projectPath = argv[++i];
 		else if (arg == "--files" && i + 1 < argc) fileDirs.push_back(argv[++i]);
 		else if (arg == "--allow-core-mismatch") allowCoreMismatch = true;
 		else if (arg == "--gpu") wantGpu = true;
 		else if (arg == "--render-every-frame") renderEveryFrame = true;
+		else if (arg == "--rates" && i + 1 < argc) { ratesPath = argv[++i]; renderEveryFrame = true; }
 		else if (arg == "--draw-every-frame") drawEveryFrame = true;
 		else if (arg == "--greenzone-check") greenzoneCheck = true;
 		else if (arg == "--greenzone-check-vs-restore") { greenzoneCheck = true; gzTruthFromRestore = true; }
@@ -330,6 +418,18 @@ int main(int argc, char **argv)
 			if (eq == std::string::npos) return fail(metaPath, "--screenshot wants <frame>=<path>");
 			shots[std::atoll(spec.substr(0, eq).c_str())] = spec.substr(eq + 1);
 		}
+		else if (arg == "--ram-search-bench" && i + 1 < argc) ramSearchBench = argv[++i];
+		else if (arg == "--property-trace" && i + 1 < argc)
+		{
+			std::string names = argv[++i];
+			for (size_t at = 0; at <= names.size();)
+			{
+				const size_t comma = std::min(names.find(',', at), names.size());
+				if (comma > at) propertyTrace.push_back(names.substr(at, comma - at));
+				at = comma + 1;
+			}
+		}
+		else if (arg == "--property-set" && i + 1 < argc) propertySet = argv[++i];
 		else if (arg == "--dump" && i + 1 < argc)
 		{
 			std::string spec = argv[++i];
@@ -343,10 +443,12 @@ int main(int argc, char **argv)
 		else return fail(metaPath, "unexpected argument: " + arg);
 	}
 	bool projectMode = !projectPath.empty();
-	if (projectMode ? packagePath == nullptr : moviePath == nullptr)
+	if (projectMode ? packagePath == nullptr : (suggest || importMovie ? romPath == nullptr : moviePath == nullptr))
 	{
-		std::fprintf(stderr, "usage: chimera-run <package> <rom> <movie.txt> [--rerecord] [--seek <frame>] [--play <n>] [--edit-from <movie>] [--stop-at-seek] [--bands n,m,ms,fs,anchor] [--record <out.txt>] [--settings <json>] [--dump <domain>=<path>]... [--firmware <id>=<path>]... [--state <path>] [--frames <n>] [--save-state <frame>=<path>]... [--screenshot <frame>=<path>]... [--export-savedata <dir>] [--meta <path>] [--gpu] [--draw-every-frame]\n"
-			"       chimera-run --project <p.chimeraProject> <package> [--files <dir>]... [--allow-core-mismatch] [the same run flags]\n");
+		std::fprintf(stderr, "usage: chimera-run <package> <rom> <movie.txt> [--rerecord] [--seek <frame>] [--play <n>] [--edit-from <movie>] [--stop-at-seek] [--bands n,m,ms,fs,anchor] [--record <out.txt>] [--settings <json>] [--dump <domain>=<path>]... [--firmware <id>=<path>]... [--state <path>] [--frames <n>] [--save-state <frame>=<path>]... [--screenshot <frame>=<path>]... [--ram-search-bench <domain>] [--export-savedata <dir>] [--meta <path>] [--gpu] [--draw-every-frame]\n"
+			"       chimera-run --project <p.chimeraProject> <package> [--files <dir>]... [--allow-core-mismatch] [the same run flags]\n"
+			"       chimera-run <package> <rom> --suggest [--settings <json>] [--firmware <id>=<path>]...\n"
+			"       chimera-run <package> <movie> --import-movie [--mount <name>=<path>]... [--settings <json>]\n");
 		return 1;
 	}
 	if (projectMode && settings != nullptr)
@@ -355,7 +457,7 @@ int main(int argc, char **argv)
 	}
 
 	std::vector<uint8_t> rom, movieText;
-	if (!projectMode && !readWholeFile(moviePath, movieText)) return fail(metaPath, std::string("could not read movie ") + moviePath);
+	if (!projectMode && !suggest && !importMovie && !readWholeFile(moviePath, movieText)) return fail(metaPath, std::string("could not read movie ") + moviePath);
 
 	/* A .chimeraMultiFile rom is a multi-file game: the first image mounts as
 	 * the rom (rom.name carrying its real name), further images as rom2..N,
@@ -544,7 +646,7 @@ int main(int argc, char **argv)
 	}
 
 	ce_movie_log *movie = ce_movie_log_new();
-	if (ce_movie_log_parse(movie, reinterpret_cast<const char *>(movieText.data()), movieText.size()) != 0)
+	if (!suggest && !importMovie && ce_movie_log_parse(movie, reinterpret_cast<const char *>(movieText.data()), movieText.size()) != 0)
 	{
 		return fail(metaPath, std::string("movie: ") + ce_movie_log_last_error(movie));
 	}
@@ -572,6 +674,48 @@ int main(int argc, char **argv)
 	}
 
 	const char *error = nullptr;
+	/* --import-movie: the movie is mounted as "movie", not as the rom, and the
+	 * --mount files beside it; the core's answer is printed as its JSON */
+	if (importMovie)
+	{
+		std::vector<const char *> names, paths;
+		std::vector<const uint8_t *> datas;
+		std::vector<uint64_t> lens;
+		names.push_back("movie");
+		paths.push_back(romPath);
+		for (const auto &m : mounts)
+		{
+			names.push_back(m.first.c_str());
+			paths.push_back(m.second.c_str());
+		}
+		datas.assign(names.size(), nullptr);
+		lens.assign(names.size(), 0);
+		uint64_t len = 0;
+		const char *answer = ce_import_movie(
+			packagePath, nullptr, 0, nullptr,
+			settings, fwIds.data(), fwData.data(), fwLens.data(), static_cast<int32_t>(fwIds.size()),
+			names.data(), datas.data(), lens.data(), paths.data(),
+			static_cast<int32_t>(names.size()), &len, &error);
+		if (answer == nullptr) return fail(metaPath, error != nullptr ? error : "could not open the core");
+		std::printf("%.*s\n", static_cast<int>(len), answer);
+		return 0;
+	}
+	/* --suggest: what the core would choose for this game, printed as its
+	 * JSON, and nothing is started (ce_suggest_settings) */
+	if (suggest)
+	{
+		uint64_t len = 0;
+		const char *answer = ce_suggest_settings(
+			packagePath, rom.data(), rom.size(), romPathStore.empty() ? nullptr : romPathStore.c_str(),
+			settings, fwIds.data(), fwData.data(), fwLens.data(), static_cast<int32_t>(fwIds.size()),
+			extraNames.data(), extraData.data(), extraLens.data(), extraPaths.data(),
+			static_cast<int32_t>(extraNames.size()), &len, &error);
+		if (answer == nullptr) return fail(metaPath, error != nullptr ? error : "could not open the core");
+		std::printf("%.*s\n", static_cast<int>(len), answer);
+		return 0;
+	}
+	if (!coreLogPath.empty() && ce_core_log(coreLogPath.c_str()) == 0)
+		return fail(metaPath, std::string("--core-log: ") + ce_core_log_error());
 	ce_session *session = ce_session_open(
 		packagePath, rom.data(), rom.size(), romPathStore.empty() ? nullptr : romPathStore.c_str(),
 		settings, fwIds.data(), fwData.data(), fwLens.data(), static_cast<int32_t>(fwIds.size()),
@@ -601,7 +745,7 @@ int main(int argc, char **argv)
 	 * without one fails at the first pass with "no stored state at or before
 	 * the target frame". */
 	if (seekFrame >= 0 || rewindTo >= 0 || !historyIn.empty() || !historyOut.empty() || !greenzoneMap.empty()
-		|| greenzoneBytes > 0)
+		|| greenzoneBytes > 0 || greenzonePeriod >= 0)
 	{
 		/* Bands before enabling: enabling captures the anchor, and the anchor
 		 * spacing decides whether it is the only one. */
@@ -659,9 +803,12 @@ int main(int argc, char **argv)
 		{
 			std::vector<uint8_t> states(static_cast<size_t>(buttonCount), 0);
 			std::vector<int32_t> axes(static_cast<size_t>(axisCount), 0);
-			/* past the source movie's end the input is idle, which is what the
-			 * two vectors already hold. A run may outlast its input source
-			 * while recording (see --frames above); it may not read past it. */
+			for (int64_t a = 0; a < axisCount; a++) axes[static_cast<size_t>(a)] = ce_session_axis_neutral(session, a);
+			/* past the source movie's end the input is idle: no button, every
+			 * axis at its neutral (0 on a signed stick, 127 on an Apple II
+			 * paddle - zero there is the stick held hard up-left). A run may
+			 * outlast its input source while recording (see --frames above);
+			 * it may not read past it. */
 			if (i < sourceFrames && ce_session_movie_entry_decode_wide(
 					session, ce_movie_log_entry(movie, i),
 					buttonCount != 0 ? states.data() : nullptr,
@@ -714,8 +861,23 @@ int main(int argc, char **argv)
 	}
 
 	const int64_t firstPass = playFrames >= 0 && playFrames < frames ? playFrames : frames;
+	FILE *rates = ratesPath.empty() ? nullptr : std::fopen(ratesPath.c_str(), "w");
+	if (!ratesPath.empty() && rates == nullptr) return fail(metaPath, "could not write " + ratesPath);
+	if (!propertySet.empty())
+	{
+		const size_t eq = propertySet.find('=');
+		if (eq == std::string::npos) return fail(metaPath, "--property-set wants <name>=<text>");
+		const std::string name = propertySet.substr(0, eq);
+		uint32_t element = 0;
+		const int32_t index = ce_session_property_find(session, name.c_str(), &element);
+		if (index < 0) std::printf("prop set %s: no such property\n", name.c_str());
+		else if (ce_session_property_set_text(session, index, element, propertySet.c_str() + eq + 1) != 0)
+			std::printf("prop set %s: %s\n", name.c_str(), ce_session_last_error(session));
+		else std::printf("prop set %s: done\n", name.c_str());
+	}
 	for (int64_t i = 0; i < firstPass; i++)
 	{
+		if (greenzonePeriod >= 0 && i == greenzonePeriodAt) ce_session_greenzone_capture_period(session, greenzonePeriod);
 		if (rerecord && ce_session_load_state(session, state.data(), state.size()) != 0)
 		{
 			return fail(metaPath, ce_session_last_error(session));
@@ -736,6 +898,20 @@ int main(int argc, char **argv)
 			(renderEveryFrame || shot != shots.end()) ? 1 : 0) < 0)
 		{
 			return fail(metaPath, ce_session_last_error(session));
+		}
+		if (rates != nullptr)
+		{
+			std::fprintf(rates, "%lld %d %d\n", (long long)i, ce_session_vsync_numerator(session), ce_session_vsync_denominator(session));
+		}
+		for (const std::string &name : propertyTrace)
+		{
+			uint32_t element = 0;
+			const int32_t index = ce_session_property_find(session, name.c_str(), &element);
+			const int64_t offset = index < 0 ? -1 : ce_session_property_offset(session, index, element);
+			char text[256] = "";
+			if (offset >= 0) ce_session_property_text(session, index, element, 0, text, sizeof text);
+			if (offset >= 0) std::printf("prop %lld %s @ %lld = %s\n", (long long)i, name.c_str(), (long long)offset, text);
+			else std::printf("prop %lld %s gone\n", (long long)i, name.c_str());
 		}
 		if (shot != shots.end()
 			&& !writeTga(shot->second, ce_session_video(session),
@@ -758,10 +934,25 @@ int main(int argc, char **argv)
 		if (sf != stateFileOuts.end())
 		{
 			const std::string tag = "frame " + std::to_string(i);
+			const auto began = std::chrono::steady_clock::now();
 			if (ce_session_state_save_file(session, sf->second.c_str(), reinterpret_cast<const uint8_t *>(tag.data()), (uint32_t)tag.size()) != 0)
 			{
 				return fail(metaPath, ce_session_last_error(session));
 			}
+			const auto saved = std::chrono::steady_clock::now();
+			uint64_t rawBytes = 0, storedBytes = 0;
+			ce_session_state_file_bytes(session, &rawBytes, &storedBytes);
+			/* and straight back, timed: what a branch costs both ways */
+			if (ce_session_state_load_file(session, sf->second.c_str(), nullptr, 0, nullptr) != 0)
+			{
+				return fail(metaPath, ce_session_last_error(session));
+			}
+			const auto loaded = std::chrono::steady_clock::now();
+			fprintf(stderr, "state file at frame %lld: raw %llu bytes, stored %llu bytes (%.2fx), save %lld ms, load %lld ms\n",
+				(long long)i, (unsigned long long)rawBytes, (unsigned long long)storedBytes,
+				storedBytes != 0 ? (double)rawBytes / (double)storedBytes : 0.0,
+				(long long)std::chrono::duration_cast<std::chrono::milliseconds>(saved - began).count(),
+				(long long)std::chrono::duration_cast<std::chrono::milliseconds>(loaded - saved).count());
 		}
 		/* saved to a file and loaded straight back: the machine must not notice,
 		 * so a run that does this ends exactly where one that does not ends */
@@ -796,6 +987,7 @@ int main(int argc, char **argv)
 			}
 		}
 	}
+	if (rates != nullptr) std::fclose(rates);
 
 	/* Compare the machine at a restore landing to that ground truth. First
 	 * differing byte, and how many differ, is enough to point at the dropped
@@ -988,6 +1180,88 @@ int main(int argc, char **argv)
 		}
 	}
 
+	if (!propertyTrace.empty())
+	{
+		const int32_t listed = ce_session_property_refresh(session);
+		std::printf("prop table: %s, %d listed after the run\n", ce_session_property_dynamic(session) != 0 ? "dynamic" : "fixed", listed);
+		std::printf("prop table: %s\n", ce_session_property_table(session));
+	}
+	if (!ramSearchBench.empty())
+	{
+		int32_t found = -1;
+		for (int32_t d = 0; d < ce_session_domain_count(session); d++)
+			if (ramSearchBench == ce_session_domain_name(session, d)) found = d;
+		/* a bus is read through a function, as the frontend reads one: a byte
+		 * per call (what the frontend did until chimera#180) and then in runs */
+		int32_t bus = -1;
+		for (int32_t b = 0; found < 0 && b < ce_session_bus_count(session); b++)
+			if (ramSearchBench == ce_session_bus_name(session, b)) bus = b;
+		if (bus >= 0)
+		{
+			struct BusUser { ce_session *s; int32_t bus; };
+			BusUser user{ session, bus };
+			const ce_ramsearch_read_fn perByte = [](void *u, int64_t offset, uint8_t *buf, int64_t len) -> int64_t {
+				auto *bu = static_cast<BusUser *>(u);
+				for (int64_t i = 0; i < len; i++) buf[i] = static_cast<uint8_t>(ce_session_bus_peek(bu->s, bu->bus, static_cast<int32_t>(offset + i)));
+				return len;
+			};
+			const ce_ramsearch_read_fn inRuns = [](void *u, int64_t offset, uint8_t *buf, int64_t len) -> int64_t {
+				auto *bu = static_cast<BusUser *>(u);
+				return ce_session_bus_read(bu->s, bu->bus, offset, buf, len);
+			};
+			const int64_t size = ce_session_bus_size(session, bus);
+			/* the bulk read must BE the peeks, byte for byte: from an odd start,
+			 * across every chunk boundary, and past the end, where both read 0 */
+			{
+				const int64_t from = 3, span = size + 7;
+				std::vector<uint8_t> runs((size_t)span), peeks((size_t)span);
+				ce_session_bus_read(session, bus, from, runs.data(), span);
+				for (int64_t i = 0; i < span; i++)
+					peeks[(size_t)i] = from + i < size ? static_cast<uint8_t>(ce_session_bus_peek(session, bus, static_cast<int32_t>(from + i))) : 0;
+				for (int64_t i = 0; i < span; i++)
+					if (runs[(size_t)i] != peeks[(size_t)i])
+						return fail(metaPath, "--ram-search-bench: " + ramSearchBench + " read in runs differs from its peeks at " + std::to_string(from + i));
+				std::fprintf(stderr, "ram-search-bench %s: runs == peeks over %lld bytes\n", ramSearchBench.c_str(), (long long)span);
+			}
+			for (int way = 0; way < 2; way++)
+			{
+				ce_ramsearch *rs = ce_ramsearch_create(nullptr, way == 0 ? perByte : inRuns, &user, size);
+				if (rs == nullptr) return fail(metaPath, "--ram-search-bench: out of memory");
+				const auto t0 = std::chrono::steady_clock::now();
+				ce_ramsearch_start(rs, 1, 0, 0, 0);
+				const auto t1 = std::chrono::steady_clock::now();
+				ce_ramsearch_search(rs, 1, 0, 0, 0, 0, 1);
+				const auto t2 = std::chrono::steady_clock::now();
+				const auto ms = [](auto a, auto b) { return std::chrono::duration<double, std::milli>(b - a).count(); };
+				std::fprintf(stderr, "ram-search-bench %s (bus, %lld bytes) %s: start %.0f ms, equal-to-0 %.0f ms (%lld left)\n",
+					ramSearchBench.c_str(), (long long)size, way == 0 ? "a byte per call" : "in runs", ms(t0, t1), ms(t1, t2),
+					(long long)ce_ramsearch_count(rs));
+				ce_ramsearch_destroy(rs);
+			}
+		}
+		if (found < 0 && bus < 0) return fail(metaPath, "--ram-search-bench: no domain or bus named " + ramSearchBench);
+		const auto *base = found < 0 ? nullptr : reinterpret_cast<const uint8_t *>(static_cast<uintptr_t>(ce_session_domain_ptr(session, found)));
+		const int64_t size = found < 0 ? 0 : ce_session_domain_size(session, found);
+		for (int32_t width : { 1, 2, 4 })
+		{
+			if (found < 0) break;
+			ce_ramsearch *rs = ce_ramsearch_create(base, nullptr, nullptr, size);
+			if (rs == nullptr) return fail(metaPath, "--ram-search-bench: out of memory");
+			const auto t0 = std::chrono::steady_clock::now();
+			ce_ramsearch_start(rs, width, 0, 0, 0);
+			const auto t1 = std::chrono::steady_clock::now();
+			ce_ramsearch_search(rs, 1 /* specific value */, 0 /* equal */, 0, 0, 0, 1 /* last search */);
+			const auto t2 = std::chrono::steady_clock::now();
+			const int64_t left = ce_ramsearch_count(rs);
+			ce_ramsearch_search(rs, 0 /* previous */, 0, 0, 0, 0, 1);
+			const auto t3 = std::chrono::steady_clock::now();
+			const auto ms = [](auto a, auto b) { return std::chrono::duration<double, std::milli>(b - a).count(); };
+			std::fprintf(stderr, "ram-search-bench %s (%lld bytes) size %d: start %.0f ms, equal-to-0 %.0f ms (%lld left), previous %.0f ms\n",
+				ramSearchBench.c_str(), (long long)size, width, ms(t0, t1), ms(t1, t2), (long long)left, ms(t2, t3));
+			ce_ramsearch_destroy(rs);
+		}
+	}
+
 	for (const auto &dump : dumps)
 	{
 		int32_t count = ce_session_domain_count(session);
@@ -1138,6 +1412,18 @@ int main(int argc, char **argv)
 	if (!metaPath.empty())
 	{
 		std::string meta = "status=OK\ndetail=\nframes=" + std::to_string(frames) + "\nstartframe=0\n";
+		// the display aspect the core reports for the last picture, when it does
+		int32_t ax = 0, ay = 0;
+		if (ce_session_display_aspect(session, &ax, &ay))
+			meta += "aspect=" + std::to_string(ax) + ":" + std::to_string(ay) + "\n";
+		// a game core's own timer at the end of the run, when it has one
+		int64_t gameMs = 0;
+		if (ce_session_game_time_ms(session, &gameMs))
+		{
+			char text[48];
+			ce_game_time_text(gameMs, text, sizeof text);
+			meta += "gameTimeMs=" + std::to_string(gameMs) + "\ngameTime=" + text + "\n";
+		}
 		writeWholeFile(metaPath, reinterpret_cast<const uint8_t *>(meta.data()), meta.size());
 	}
 	std::printf("frames=%lld\n", static_cast<long long>(frames));

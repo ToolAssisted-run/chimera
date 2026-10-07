@@ -93,6 +93,9 @@ namespace Chimera.Client.GUI
 				case "Lag Counter":
 					if (Emulator.CanPollInput()) ToggleLagCounter();
 					break;
+				case "Game Time":
+					ToggleGameTime();
+					break;
 				case "Input Display":
 					ToggleInputDisplay();
 					break;
@@ -301,6 +304,10 @@ namespace Chimera.Client.GUI
 					if (!Tools.IsLoaded<TAStudio>()) return false;
 					var playbackBox2 = Tools.TAStudio.TasPlaybackBox;
 					playbackBox2.TurboSeek = !playbackBox2.TurboSeek;
+					break;
+				case "Cycle Greenzone":
+					if (!Tools.IsLoaded<TAStudio>()) return false;
+					Tools.TAStudio.TasGreenzoneBox.Cycle();
 					break;
 				case "Undo":
 					if (!Tools.IsLoaded<TAStudio>()) return false;

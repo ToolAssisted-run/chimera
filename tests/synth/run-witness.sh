@@ -230,6 +230,127 @@ if [ "$level" = "both" ] || [ "$level" = "e" ]; then
 			report "E:core-crashes" FAIL "no stopped core reported (see work/crashes.log)"
 		fi
 
+		# THE CORE LOG (ce_core_log, Tools > Export Core Log... in the frontend):
+		# asked for, it starts a file saying when and by which Chimera, notes
+		# the session's core package, and keeps everything the core writes - the
+		# dying core's last words included. The "corelog" request it mounts must
+		# not move the machine: the same movie with the log on ends on the
+		# goldens.
+		clmovie="$here/movies/gridWalker.win.txt"
+		rm -f "$work/core.log" "$work/core-on.ram.bin" "$work/core-on.vram.bin"
+		"$chimera_run" "$epkg" "$here/roms/gridWalker.testrom" "$dmovie" \
+			--core-log "$work/core.log" > "$work/core-log-dies.log" 2>&1
+		"$chimera_run" "$epkg" "$here/roms/gridWalker.testrom" "$clmovie" --core-log "$work/core-on.log" \
+			--dump "RAM=$work/core-on.ram.bin" --dump "VRAM=$work/core-on.vram.bin" > "$work/core-log-on.log" 2>&1
+		if ! grep -q '^Chimera core log, started ' "$work/core.log" 2>/dev/null; then
+			report "E:core-log" FAIL "no core log, or no header in it (see work/core-log-dies.log)"
+		elif ! grep -q 'session: core package .*synth-box.chimeraCore (sha1 ' "$work/core.log"; then
+			report "E:core-log" FAIL "the core log does not name the session's package"
+		elif ! grep -q 'stopping on purpose' "$work/core.log"; then
+			report "E:core-log" FAIL "the core log does not hold what the core said"
+		elif ! cmp -s "$work/core-on.ram.bin" "$golden_dir/gridWalker.win.ram.bin" \
+			|| ! cmp -s "$work/core-on.vram.bin" "$golden_dir/gridWalker.win.vram.bin"; then
+			report "E:core-log" FAIL "with the core log on the machine differs from the goldens"
+		else
+			report "E:core-log" PASS "asked for, the log names its build and package and keeps the core's words; the machine is the goldens'"
+		fi
+
+		# A MOVIE MADE ELSEWHERE (ce_import_movie, Game > Import ... in the
+		# frontend): the core is asked what the movie amounts to INSTEAD of being
+		# started - the movie mounted as "movie", the files it names beside it,
+		# the import options in the settings - and its answer comes back as JSON
+		# for the frontend's own project creation. The synth reads its own movie
+		# text, so every frame must come back as an input line, the option it
+		# was given as the setting it dictates, and a game that is not at hand
+		# must be refused in a sentence, not crash anything.
+		imovie="$here/movies/gridWalker.win.txt"
+		ianswer="$("$chimera_run" "$epkg" "$imovie" --import-movie \
+			--mount gridWalker.testrom="$here/roms/gridWalker.testrom" \
+			--settings '{"importRom":"gridWalker.testrom","importFill":7}' 2>"$work/import.err")"
+		irefused="$("$chimera_run" "$epkg" "$imovie" --import-movie --settings '{"importRom":"gone.testrom"}' 2>>"$work/import.err")"
+		iframes="$(grep -c '^|' "$imovie")"
+		if printf '%s' "$ianswer" | python3 -c "
+import json, sys
+a = json.loads(sys.stdin.read())
+lines = [l for l in a['input'].split('\n') if l.startswith('|')]
+assert a['settings'] == {'initFillByte': 7}, a['settings']
+assert a['files'] == [{'name': 'gridWalker.testrom', 'slot': 'rom'}], a['files']
+assert a['frames'] == $iframes and len(lines) == $iframes, (a['frames'], len(lines))
+assert a['input'].startswith('[Input]') and a['input'].rstrip().endswith('[/Input]')
+" 2>"$work/import.check" && printf '%s' "$irefused" | grep -q '"error": "the game gone.testrom is not at hand"'; then
+			report "E:import-movie" PASS "the core's answer comes back whole ($iframes frames, its setting, its file), and a missing game is a sentence"
+		else
+			report "E:import-movie" FAIL "$(tail -1 "$work/import.check" 2>/dev/null) refused=[$irefused] (see work/import.err)"
+		fi
+
+		# a bus read in runs is the bus read a byte at a time (chimera#180):
+		# "Bus" answers through the core's ReadBus, "Bus (peeks)" declines it
+		# and the engine peeks for itself. chimera-run compares every byte of
+		# each against PeekBus, from an odd start and past the end.
+		busok=1
+		for bus in "Bus" "Bus (peeks)"; do
+			"$chimera_run" "$epkg" "$here/roms/gridWalker.testrom" "$here/movies/gridWalker.win.txt" \
+				--ram-search-bench "$bus" > "$work/bus.log" 2>&1
+			grep -q "^ram-search-bench $bus: runs == peeks over" "$work/bus.log" || busok=0
+		done
+		if [ "$busok" = 1 ]; then
+			report "E:bus-read" PASS "both buses read in runs exactly as peeked, the core's ReadBus and the engine's own"
+		else
+			report "E:bus-read" FAIL "$(grep -m1 -E 'differs|no domain' "$work/bus.log")"
+		fi
+
+		# a DYNAMIC property table (engine.h; chimera#216): with its
+		# movingProperties setting on, the synth lists properties that move
+		# and come and go with the cursor's row, the way a Flash movie's
+		# variables do on its emulator's heap (package-box/synth_wbx.c says
+		# where each is). chimera-run asks for each by name after every frame
+		# of a whole game, as a watch does, and what it prints is checked
+		# against the rule the core states, not against a recording:
+		#   Wanderer is at 0x200 + 4 * Row, every frame;
+		#   Sometimes is there exactly while Row is odd;
+		#   Mirror, on a bus with no pointer, reads what the bus says;
+		#   a 77 written to Wanderer before the first frame (Row 0) stays at
+		#   0x200 - Origin - and Wanderer, once it has moved on, does not have it;
+		#   the table says it is dynamic, and a fresh listing has Sometimes
+		#   or not by the last row.
+		"$chimera_run" "$epkg" "$here/roms/gridWalker.testrom" "$here/movies/gridWalker.win.txt" \
+			--settings '{"movingProperties":1}' --property-set Wanderer=77 \
+			--property-trace Row,Steps,Wanderer,Sometimes,Mirror,Origin > "$work/dynamic.out" 2>"$work/dynamic.err"
+		if python3 - "$work/dynamic.out" > "$work/dynamic.check" 2>&1 <<'DYNAMIC'
+import json, sys
+frames, table, listed, set_line = {}, None, None, None
+for line in open(sys.argv[1]):
+    w = line.split()
+    if line.startswith("prop set "): set_line = line.strip()
+    elif line.startswith("prop table: {"): table = json.loads(line[len("prop table: "):])
+    elif line.startswith("prop table: "): listed = line.strip()
+    elif w and w[0] == "prop":
+        frames.setdefault(int(w[1]), {})[w[2]] = None if w[3] == "gone" else (int(w[4]), int(w[6]))
+assert set_line == "prop set Wanderer: done", set_line
+assert len(frames) >= 60, "only %d frames traced" % len(frames)
+rows = set()
+for f, p in sorted(frames.items()):
+    row, steps = p["Row"][1], p["Steps"][1]
+    rows.add(row)
+    assert p["Wanderer"] is not None and p["Wanderer"][0] == 0x200 + 4 * row, "frame %d: row %d, Wanderer %r" % (f, row, p["Wanderer"])
+    assert (p["Sometimes"] is not None) == (row % 2 == 1), "frame %d: row %d, Sometimes %r" % (f, row, p["Sometimes"])
+    assert p["Mirror"] == (4, (steps & 255) ^ 28), "frame %d: %d steps, Mirror %r" % (f, steps, p["Mirror"])
+    assert p["Origin"] == (0x200, 77), "frame %d: Origin %r" % (f, p["Origin"])
+    assert p["Wanderer"][1] == (77 if row == 0 else 0), "frame %d: row %d, Wanderer reads %d" % (f, row, p["Wanderer"][1])
+assert len(rows) >= 4, "the cursor only visited rows %r" % sorted(rows)
+last = frames[max(frames)]["Row"][1]
+names = {p["name"]: p for p in table["properties"]}
+assert table.get("dynamic") is True and listed == "prop table: dynamic, %d listed after the run" % (6 if last % 2 else 5), listed
+assert names["Sometimes"]["listed"] == (last % 2 == 1) and names["Sometimes"]["present"] == (last % 2 == 1), names["Sometimes"]
+assert names["Mirror"]["writable"] is False and names["Wanderer"]["offset"] == 0x200 + 4 * last
+print("%d frames over rows %s" % (len(frames), sorted(rows)))
+DYNAMIC
+		then
+			report "E:dynamic-properties" PASS "a property that moves is followed by name, one that goes is gone, one on a bus reads the bus ($(cat "$work/dynamic.check"))"
+		else
+			report "E:dynamic-properties" FAIL "$(tail -1 "$work/dynamic.check") (see work/dynamic.out)"
+		fi
+
 		# the history OUTLIVES its process, which is what reopening a project
 		# asks of it. One run plays the movie and keeps its history to a file; a
 		# second, fresh process starts from that file, seeks back into states it
@@ -565,6 +686,172 @@ PY
 		fi
 	fi
 
+	# --- a script's input, while TAStudio extends the movie past its end ---
+	# The piano roll open is a different frame loop, and past the end of the log
+	# it is not replaying anything: each frame out there is AUTHORED as it is
+	# reached. A seek turns recording off for its duration so the rows it passes
+	# over are not typed over - and out past the end, where there are no rows to
+	# protect, that used to throw away everything being pressed: the frames were
+	# written from the autoholds alone, so a script's joypad.set reached neither
+	# the movie nor the machine (issue #95).
+	#
+	# Three runs pin both halves of the rule. Recording asked for and a button
+	# held must reach the log AND the core (the controller it is handed, and a
+	# RAM that diverges from the run that held nothing); recording asked for and
+	# nothing held must stay empty; and read-only play past the end must STILL
+	# extend from the autoholds alone, whatever a script presses - nobody is
+	# recording there.
+	#
+	# The project is the win movie cut to its first five frames, so the game is
+	# still being played when the extension starts: gridWalker FREEZES once it
+	# is won or lost (SPEC/rom), and a frozen machine ignores input, which would
+	# make the RAM comparison prove nothing. Held from there, Down retraces the
+	# winning path, so every extended frame is a real move.
+	if [ "$record" -eq 0 ]; then
+		tname=gridWalker.win
+		trom="$here/roms/${tname%%.*}.testrom"
+		tdir="$work/tastudio-input-leg"
+		rm -rf "$tdir" && mkdir -p "$tdir"
+		cp "$trom" "$tdir/gridWalker.testrom"
+		python3 - "$here/movies/$tname.txt" "$tdir/gridWalker.testrom" "$tdir/$tname.chimeraProject" <<'TASPY'
+import hashlib, json, sys
+entries = [l.rstrip("\r\n") for l in open(sys.argv[1]) if l.startswith("|")][:5]
+logkey = "#P1 Up|P1 Down|P1 Left|P1 Right|P1 A|P1 B|P1 Select|P1 Start|"
+sha1 = hashlib.sha1(open(sys.argv[2], "rb").read()).hexdigest().upper()
+json.dump({
+    "title": "gridWalker.win",
+    "core": {"name": "Synth", "version": "", "sha1": ""},
+    "headers": {"MovieVersion": "Chimera Project File v1.1", "Platform": "Synth"},
+    "files": [{"name": "gridWalker.testrom", "sha1": sha1, "slot": "rom"}],
+    "input": "[Input]\nLogKey:" + logkey + "\n" + "\n".join(entries) + "\n[/Input]\n",
+}, open(sys.argv[3], "w"))
+TASPY
+		textend=8
+		tfailed=0
+		for case in "held:1:1" "empty:1:0" "readonly:0:1"; do
+			cname="${case%%:*}"; trest="${case#*:}"
+			trecord="${trest%%:*}"; tpress="${trest#*:}"
+			tjob="$work/job.tastudio-$cname.txt"
+			{
+				echo "meta=$tdir/$cname.meta.txt"
+				echo "outram=$tdir/$cname.ram.bin"
+				echo "extend=$textend"
+				echo "button=P1 Down"
+				echo "press=$tpress"
+				echo "record=$trecord"
+			} > "$tjob"
+			rm -f "$tdir/$cname.meta.txt" "$tdir/$cname.ram.bin"
+			cp "$config" "$work/config.tastudio-$cname.ini"
+			( cd "$repo_root" && CHIMERA_JOB="$tjob" timeout 300 mono "$emu_exe" --headless \
+				"--config=$work/config.tastudio-$cname.ini" "--core=$repo_root/build/Cores/synth-box.chimeraCore" \
+				"--project=$tdir/$tname.chimeraProject" "--lua=$here/synth-tastudio-input.lua" ) > "$tdir/$cname.log" 2>&1
+			if [ ! -f "$tdir/$cname.meta.txt" ] || ! grep -q "^status=OK" "$tdir/$cname.meta.txt"; then
+				report "T:box:$cname" FAIL "$(sed -n 's/^detail=//p' "$tdir/$cname.meta.txt" 2>/dev/null || echo "run failed") (see $tdir/$cname.log)"
+				tfailed=1
+			fi
+		done
+		if [ "$tfailed" -eq 0 ]; then
+			theld="$(sed -n 's/^recorded=//p' "$tdir/held.meta.txt")"
+			theldout="$(sed -n 's/^machine=//p' "$tdir/held.meta.txt")"
+			tempty="$(sed -n 's/^recorded=//p' "$tdir/empty.meta.txt")"
+			tro="$(sed -n 's/^recorded=//p' "$tdir/readonly.meta.txt")"
+			if [ "$theld" != "$textend" ]; then
+				report "T:box:luaInput" FAIL "the held button reached $theld of $textend extended frames in the log"
+			elif [ "$theldout" != "$textend" ]; then
+				report "T:box:luaInput" FAIL "the log holds every press but the core was handed $theldout of $textend"
+			elif cmp -s "$tdir/held.ram.bin" "$tdir/empty.ram.bin"; then
+				report "T:box:luaInput" FAIL "RAM identical to the run that held nothing - the press never moved the machine"
+			else
+				report "T:box:luaInput" PASS "a script's press authors every extended frame, and the core plays it"
+			fi
+			if [ "$tempty" != "0" ]; then
+				report "T:box:luaQuiet" FAIL "nothing was pressed, yet $tempty extended frames hold the button"
+			elif [ "$tro" != "0" ]; then
+				report "T:box:luaQuiet" FAIL "read-only play past the end wrote $tro pressed frames; only the autoholds may reach it"
+			else
+				report "T:box:luaQuiet" PASS "an unpressed frame stays empty, and read-only extension still takes only the autoholds"
+			fi
+		fi
+	fi
+
+	# --- TAStudio's Greenzone choice, saved with the project (issue #158) ---
+	# The choice - every frame, one in N, off - is kept in TAStudio's part of the
+	# .chimeraProject (user-decided, 2026-09-28). Two runs of one project: the
+	# first opens it in TAStudio and saves it, which writes TAStudio's part with
+	# the choice every movie starts on (1, every frame). The file is then set to
+	# one in seven, as if it had been left there, and the second run opens and
+	# saves it again. A project whose choice is read on opening writes the 7
+	# back; one that ignored it writes the 1 TAStudio started on - which is what
+	# every build before #158 did.
+	if [ "$record" -eq 0 ]; then
+		gdir="$work/greenzone-leg"
+		rm -rf "$gdir" && mkdir -p "$gdir"
+		cp "$tdir/gridWalker.testrom" "$gdir/gridWalker.testrom"
+		cp "$tdir/$tname.chimeraProject" "$gdir/g.chimeraProject"
+		gfailed=0
+		for gpass in first second; do
+			gjob="$work/job.greenzone-$gpass.txt"
+			echo "meta=$gdir/$gpass.meta.txt" > "$gjob"
+			cp "$config" "$work/config.greenzone-$gpass.ini"
+			( cd "$repo_root" && CHIMERA_JOB="$gjob" timeout 300 mono "$emu_exe" --headless \
+				"--config=$work/config.greenzone-$gpass.ini" "--core=$repo_root/build/Cores/synth-box.chimeraCore" \
+				"--project=$gdir/g.chimeraProject" "--lua=$here/synth-greenzone-choice.lua" ) > "$gdir/$gpass.log" 2>&1
+			if ! grep -q "^status=OK" "$gdir/$gpass.meta.txt" 2>/dev/null; then
+				report "T:box:greenzoneChoice" FAIL "the $gpass run: $(sed -n 's/^detail=//p' "$gdir/$gpass.meta.txt" 2>/dev/null || echo "run failed") (see $gdir/$gpass.log)"
+				gfailed=1
+				break
+			fi
+			if [ "$gpass" = first ]; then
+				if ! python3 - "$gdir/g.chimeraProject" <<'GZPY'
+import json, sys
+p = json.load(open(sys.argv[1]))
+# TAStudio's part is its settings object as ConfigService writes it: {"o": {...}}
+t = (p.get("tastudio") or {}).get("o")
+if not isinstance(t, dict) or t.get("GreenzonePeriod") != 1:
+    sys.exit("TAStudio's part holds no GreenzonePeriod of 1: " + json.dumps(t)[:200])
+t["GreenzonePeriod"] = 7
+json.dump(p, open(sys.argv[1], "w"))
+GZPY
+				then
+					report "T:box:greenzoneChoice" FAIL "the first save wrote no Greenzone choice into the project"
+					gfailed=1
+					break
+				fi
+			fi
+		done
+		if [ "$gfailed" -eq 0 ]; then
+			gperiod="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("tastudio", {}).get("o", {}).get("GreenzonePeriod"))' "$gdir/g.chimeraProject")"
+			if [ "$gperiod" = 7 ]; then
+				report "T:box:greenzoneChoice" PASS "a project left on one in seven reopens on it and saves it back"
+			else
+				report "T:box:greenzoneChoice" FAIL "a project left on one in seven saved back $gperiod - the choice in the file was not read on opening"
+			fi
+		fi
+	fi
+
+	# --- a core's game properties, by name (docs/game-cores.md) ---
+	# The synth exports a property table naming places in its RAM. A script reads
+	# the names back in the core's order, reads a property against the same bytes
+	# through memory.*, writes one by name and watches the game draw the cursor
+	# where it was put.
+	if [ "$record" -eq 0 ]; then
+		pdir="$work/properties-leg"
+		rm -rf "$pdir" && mkdir -p "$pdir"
+		cp "$tdir/gridWalker.testrom" "$pdir/gridWalker.testrom"
+		cp "$tdir/$tname.chimeraProject" "$pdir/p.chimeraProject"
+		pjob="$work/job.properties.txt"
+		echo "meta=$pdir/meta.txt" > "$pjob"
+		cp "$config" "$work/config.properties.ini"
+		( cd "$repo_root" && CHIMERA_JOB="$pjob" timeout 300 mono "$emu_exe" --headless \
+			"--config=$work/config.properties.ini" "--core=$repo_root/build/Cores/synth-box.chimeraCore" \
+			"--project=$pdir/p.chimeraProject" "--lua=$here/synth-game-properties.lua" ) > "$pdir/run.log" 2>&1
+		if grep -q "^status=OK" "$pdir/meta.txt" 2>/dev/null; then
+			report "T:box:gameProperties" PASS "every kind of property reads and sets its own bytes by name, and the game plays on what was set"
+		else
+			report "T:box:gameProperties" FAIL "$(sed -n 's/^detail=//p' "$pdir/meta.txt" 2>/dev/null || echo "run failed") (see $pdir/run.log)"
+		fi
+	fi
+
 	# --- a core that stops, in the real frontend ---
 	# The synth core dies on cue (SPEC.md): all eight buttons abort, all but Up
 	# follow a wild pointer - the second arrives as a SIGSEGV inside a process
@@ -624,6 +911,112 @@ PY
 			fi
 			find "$XDG_DATA_HOME" -type d -name 0123456789abcdef0123456789abc0de -path "*Recovery*" -exec rm -rf {} + 2>/dev/null
 		done
+	fi
+
+	# --- Reboot Core keeps the project ---
+	# A reboot inside a project is the same project on a machine booted again
+	# (issue #196). It used to replace the movie with a blank one when the piano
+	# roll was open, and stop and dispose it when it was closed - and the
+	# recovery session went on holding the movie that was gone, so the next
+	# request to keep the work safe crashed the process. Three legs: the project
+	# survives a reboot with the roll closed and with it open (same movie, same
+	# file, power-on, the marker set before, and the golden RAM at the end), and
+	# a core that dies AFTER a reboot is still survived, which is the request to
+	# keep the work that used to crash.
+	if [ "$record" -eq 0 ]; then
+		for roll in 0 1; do
+			rdir="$work/reboot-$roll"
+			rm -rf "$rdir" && mkdir -p "$rdir"
+			cp "$here/roms/gridWalker.testrom" "$rdir/gridWalker.testrom"
+			python3 - "$here/movies/gridWalker.win.txt" "$rdir/gridWalker.testrom" "$rdir/reboot.chimeraProject" <<'PY'
+import hashlib, json, sys
+entries = [l.rstrip("\r\n") for l in open(sys.argv[1]) if l.startswith("|")]
+logkey = "#P1 Up|P1 Down|P1 Left|P1 Right|P1 A|P1 B|P1 Select|P1 Start|"
+sha1 = hashlib.sha1(open(sys.argv[2], "rb").read()).hexdigest().upper()
+json.dump({
+    "id": "0123456789abcdef0123456789ab0196",
+    "title": "reboot",
+    "core": {"name": "Synth", "version": "", "sha1": ""},
+    "headers": {"MovieVersion": "Chimera Project File v1.1", "Platform": "Synth"},
+    "files": [{"name": "gridWalker.testrom", "sha1": sha1, "slot": "rom"}],
+    "input": "[Input]\nLogKey:" + logkey + "\n" + "\n".join(entries) + "\n[/Input]\n",
+}, open(sys.argv[3], "w"))
+PY
+			rjob="$work/job.reboot-$roll.txt"
+			{
+				echo "outram=$rdir/ram.bin"
+				echo "meta=$rdir/meta.txt"
+				echo "tastudio=$roll"
+				echo "rebootat=30"
+			} > "$rjob"
+			cp "$config" "$work/config.reboot-$roll.ini"
+			( cd "$repo_root" && CHIMERA_JOB="$rjob" timeout 120 mono "$emu_exe" --headless \
+				"--config=$work/config.reboot-$roll.ini" "--core=$repo_root/build/Cores/synth-box.chimeraCore" \
+				"--project=$rdir/reboot.chimeraProject" "--lua=$here/synth-reboot.lua" ) > "$rdir/log.txt" 2>&1
+			rlabel="closed"; [ "$roll" -eq 1 ] && rlabel="open"
+			if ! grep -q '^status=OK' "$rdir/meta.txt" 2>/dev/null; then
+				report "R:frontend:roll-$rlabel" FAIL "$(grep '^detail=' "$rdir/meta.txt" 2>/dev/null | cut -c8- || true) (see $rdir/log.txt)"
+			elif grep -q '\[recovery\]' "$rdir/log.txt"; then
+				report "R:frontend:roll-$rlabel" FAIL "the recovery session lost the movie (see $rdir/log.txt)"
+			elif ! cmp -s "$rdir/ram.bin" "$golden_dir/gridWalker.win.ram.bin"; then
+				report "R:frontend:roll-$rlabel" FAIL "the rebooted machine did not play the project's inputs to the golden"
+			else
+				report "R:frontend:roll-$rlabel" PASS "the same movie on a rebooted machine, played to the golden"
+			fi
+			find "$XDG_DATA_HOME" -type d -name 0123456789abcdef0123456789ab0196 -path "*Recovery*" -exec rm -rf {} + 2>/dev/null
+		done
+
+		# the core dies on cue (all eight buttons, frame 12) after a reboot at
+		# frame 5: the stop asks for the work to be kept, of a session whose
+		# machine has been replaced once already
+		ddir="$work/reboot-dies"
+		rm -rf "$ddir" && mkdir -p "$ddir"
+		cp "$here/roms/gridWalker.testrom" "$ddir/gridWalker.testrom"
+		sed '12s/.*/|UDLRABsS|/' "$here/movies/gridWalker.win.txt" > "$ddir/movie.txt"
+		python3 - "$ddir/movie.txt" "$ddir/gridWalker.testrom" "$ddir/reboot.chimeraProject" <<'PY'
+import hashlib, json, sys
+entries = [l.rstrip("\r\n") for l in open(sys.argv[1]) if l.startswith("|")]
+logkey = "#P1 Up|P1 Down|P1 Left|P1 Right|P1 A|P1 B|P1 Select|P1 Start|"
+sha1 = hashlib.sha1(open(sys.argv[2], "rb").read()).hexdigest().upper()
+json.dump({
+    "id": "0123456789abcdef0123456789ab0196",
+    "title": "reboot",
+    "core": {"name": "Synth", "version": "", "sha1": ""},
+    "headers": {"MovieVersion": "Chimera Project File v1.1", "Platform": "Synth"},
+    "files": [{"name": "gridWalker.testrom", "sha1": sha1, "slot": "rom"}],
+    "input": "[Input]\nLogKey:" + logkey + "\n" + "\n".join(entries) + "\n[/Input]\n",
+}, open(sys.argv[3], "w"))
+PY
+		djob="$work/job.reboot-dies.txt"
+		{
+			echo "outram=$ddir/ram.bin"
+			echo "meta=$ddir/meta.txt"
+			echo "tastudio=0"
+			echo "rebootat=5"
+		} > "$djob"
+		cp "$config" "$work/config.reboot-dies.ini"
+		( cd "$repo_root" && CHIMERA_JOB="$djob" timeout 120 mono "$emu_exe" --headless \
+			"--config=$work/config.reboot-dies.ini" "--core=$repo_root/build/Cores/synth-box.chimeraCore" \
+			"--project=$ddir/reboot.chimeraProject" "--lua=$here/synth-reboot.lua" ) > "$ddir/log.txt" 2>&1
+		drc=$?
+		if grep -qE "Native Crash|Got a SIG|SIGSEGV while executing native" "$ddir/log.txt"; then
+			if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+				report "R:frontend:dies-after" KNOWN "CI runner only: Mono's unwinder crashed on the stop (see $ddir/log.txt)"
+			else
+				report "R:frontend:dies-after" FAIL "the runtime reported a native crash (see $ddir/log.txt)"
+			fi
+		elif ! grep -q "\[synth-reboot\] rebooted" "$ddir/log.txt"; then
+			report "R:frontend:dies-after" FAIL "the core was never rebooted (see $ddir/log.txt)"
+		elif [ "$drc" -ne 65 ]; then
+			report "R:frontend:dies-after" FAIL "the process ended with $drc, not 65 (see $ddir/log.txt)"
+		elif ! grep -q "\[headless\] The core stopped: the core aborted" "$ddir/log.txt"; then
+			report "R:frontend:dies-after" FAIL "the stopped core was not reported (see $ddir/log.txt)"
+		elif ! find "$XDG_DATA_HOME" -type d -name 0123456789abcdef0123456789ab0196 -path "*Recovery*" | grep -q .; then
+			report "R:frontend:dies-after" FAIL "the recovery journal was not left behind"
+		else
+			report "R:frontend:dies-after" PASS "a core that dies after a reboot is survived, and the work is kept"
+		fi
+		find "$XDG_DATA_HOME" -type d -name 0123456789abcdef0123456789ab0196 -path "*Recovery*" -exec rm -rf {} + 2>/dev/null
 	fi
 
 	# --- a run becomes a video ---

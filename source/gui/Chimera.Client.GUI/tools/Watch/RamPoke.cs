@@ -8,7 +8,7 @@ using Chimera.Client.Common;
 namespace Chimera.Client.GUI
 {
 	// TODO: don't use textboxes as labels
-	public partial class RamPoke : Form, IDialogParent
+	public partial class RamPoke : ThemedForm, IDialogParent
 	{
 		private readonly List<Watch> _watchList;
 		private readonly CheatCollection _cheats;

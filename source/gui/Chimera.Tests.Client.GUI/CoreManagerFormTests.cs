@@ -27,6 +27,9 @@ namespace Chimera.Tests.Client.GUI
 			new() { Id = "gpgx", Name = "Genesis Plus GX", Repo = "ToolAssisted-run/chimera-core-gpgx", Systems = [ "GEN" ] },
 		];
 
+		/// <summary>A version's date as the lists write it: local day and minute.</summary>
+		private static string When(string iso) => CoreVersionDates.Format(CoreVersionDates.Parse(iso)!.Value);
+
 		private const string Feed = @"[
 			{ ""tag_name"": ""dev"", ""published_at"": ""2026-09-07T11:00:00Z"", ""assets"": [
 				{ ""name"": ""gpgx-cccccccccccc.chimeraCore"", ""browser_download_url"": ""https://example.invalid/c"", ""size"": 3145728 } ] },
@@ -75,7 +78,9 @@ namespace Chimera.Tests.Client.GUI
 			string body,
 			IReadOnlyList<DiscoveredCorePackage> installed,
 			HttpStatusCode status = HttpStatusCode.OK,
-			IReadOnlyList<RosterCore>? roster = null)
+			IReadOnlyList<RosterCore>? roster = null,
+			CoreKindFilter shows = CoreKindFilter.All,
+			Action<CoreKindFilter>? rememberShows = null)
 		{
 			// a cache directory of its own, so the test never reads or writes the
 			// store this machine actually uses
@@ -84,7 +89,18 @@ namespace Chimera.Tests.Client.GUI
 				() => roster ?? Roster,
 				() => installed,
 				new CoreFeed(new HttpClient(new Canned(body, status)), cache),
-				new CoreInstaller());
+				new CoreInstaller(),
+				shows: shows,
+				rememberShows: rememberShows);
+		}
+
+		private static CoreKindFilterBox ShowsOf(Form form) => form.Controls.OfType<CoreKindFilterBox>().Single();
+
+		/// <summary>A column of every listed row, by the column's header.</summary>
+		private static List<string> Column(ListView list, string header)
+		{
+			var at = list.Columns.Cast<ColumnHeader>().ToList().FindIndex(c => c.Text == header);
+			return list.Items.Cast<ListViewItem>().Select(i => i.SubItems[at].Text).ToList();
 		}
 
 		private static ComboBox VersionsOf(Form form)
@@ -113,7 +129,7 @@ namespace Chimera.Tests.Client.GUI
 			// the dev build is newest and is NOT offered by default: it is replaced on
 			// every push, so a movie recorded on it can stop being fetchable
 			CollectionAssert.AreEqual(
-				new[] { "2026-09-05  (bbbbbbbb)", "2026-09-01  (aaaaaaaa)" },
+				new[] { $"{When("2026-09-05T05:00:00Z")}  (bbbbbbbb)", $"{When("2026-09-01T05:00:00Z")}  (aaaaaaaa)" },
 				versions.Items.Cast<object>().Select(static i => i.ToString()).ToList());
 		}
 
@@ -126,7 +142,8 @@ namespace Chimera.Tests.Client.GUI
 			await form.FetchSelectedVersions();
 			foreach (var text in VersionsOf(form).Items.Cast<object>().Select(static i => i.ToString()))
 			{
-				StringAssert.Matches(text, new System.Text.RegularExpressions.Regex(@"^\d{4}-\d{2}-\d{2}\s+\([0-9a-f]{8}\)"), text);
+				// the day AND the minute: several versions in one day must read apart
+				StringAssert.Matches(text, new System.Text.RegularExpressions.Regex(@"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}\s+\([0-9a-f]{8}\)"), text);
 			}
 		}
 
@@ -178,7 +195,7 @@ namespace Chimera.Tests.Client.GUI
 		}
 
 		[TestMethod]
-		public void SelectAllTicksEveryCoreAndNotTheSeparator()
+		public void ExternalCoresFollowTheOfficialOnesAndSaySo()
 		{
 			List<RosterCore> roster =
 			[
@@ -188,33 +205,64 @@ namespace Chimera.Tests.Client.GUI
 			using var form = Open(Feed, [ ], roster: roster);
 			form.Show();
 			var list = ListOf(form);
-			Assert.AreEqual(3, list.Items.Count, "two cores and the separator between them");
+			CollectionAssert.AreEqual(new[] { "Genesis Plus GX", "Aardvark" }, list.Items.Cast<ListViewItem>().Select(static i => i.Text).ToList(), "one list: no divider row");
+			Assert.AreEqual("someone/aardvark  (added by hand)", Column(list, "Source")[1], "the source says what the divider said");
 
 			SelectAllOf(form).Checked = true;
-			var ticked = list.Items.Cast<ListViewItem>().Where(static i => i.Checked).ToList();
-			Assert.AreEqual(2, ticked.Count, "the separator is not a core and never ticks");
-			Assert.IsTrue(ticked.TrueForAll(static i => i.Tag is not null));
+			Assert.AreEqual(2, list.Items.Cast<ListViewItem>().Count(static i => i.Checked));
 		}
 
 		[TestMethod]
-		public void ExternalCoresComeAfterASeparator()
+		public void OneListWithATypeThatTheShowChoiceNarrows()
+		{
+			// docs/game-cores.md: no dividers; a Type column, and Show: All / Emulators / Games
+			// (user-decided, 2026-09-29). A game core added by hand is still a game core
+			List<RosterCore> roster =
+			[
+				new() { Id = "sdlpop", Name = "SDLPoP", Repo = "ToolAssisted-run/chimera-core-sdlpop", Systems = [ "PoP" ], Kind = "game" },
+				Roster[0],
+				new() { Id = "zork", Name = "Zork", Repo = "someone/zork", Systems = [ "ZRK" ], Kind = "game", IsExternal = true },
+				new() { Id = "aardvark", Name = "Aardvark", Repo = "someone/aardvark", Systems = [ "ARC" ], IsExternal = true },
+			];
+			List<CoreKindFilter> remembered = new();
+			using var form = Open(Feed, [ ], roster: roster, rememberShows: remembered.Add);
+			form.Show();
+			var list = ListOf(form);
+			CollectionAssert.AreEqual(new[] { "Genesis Plus GX", "Aardvark", "SDLPoP", "Zork" }, list.Items.Cast<ListViewItem>().Select(static i => i.Text).ToList(),
+				"the emulators, then the games, each official first");
+			CollectionAssert.AreEqual(new[] { "Emulator", "Emulator", "Game", "Game" }, Column(list, "Type"));
+
+			// everything ticked, then only the games shown: the emulators' ticks go with them,
+			// so no button acts on a core out of view
+			SelectAllOf(form).Checked = true;
+			ShowsOf(form).ChooseForTest(CoreKindFilter.Games);
+			CollectionAssert.AreEqual(new[] { "SDLPoP", "Zork" }, list.Items.Cast<ListViewItem>().Select(static i => i.Text).ToList());
+			CollectionAssert.AreEqual(new[] { CoreKindFilter.Games }, remembered, "the choice is handed to the owner to keep");
+			ShowsOf(form).ChooseForTest(CoreKindFilter.All);
+			CollectionAssert.AreEqual(new[] { "SDLPoP", "Zork" }, list.Items.Cast<ListViewItem>().Where(static i => i.Checked).Select(static i => i.Text).ToList());
+
+			ShowsOf(form).ChooseForTest(CoreKindFilter.Emulators);
+			SelectAllOf(form).Checked = false;
+			SelectAllOf(form).Checked = true;
+			CollectionAssert.AreEqual(new[] { "Genesis Plus GX", "Aardvark" }, list.Items.Cast<ListViewItem>().Where(static i => i.Checked).Select(static i => i.Text).ToList(), "select all ticks what is shown");
+		}
+
+		[TestMethod]
+		public void TheWindowOpensOnTheKindItWasLeftOn()
 		{
 			List<RosterCore> roster =
 			[
+				new() { Id = "sdlpop", Name = "SDLPoP", Repo = "ToolAssisted-run/chimera-core-sdlpop", Systems = [ "PoP" ], Kind = "game" },
 				Roster[0],
-				new() { Id = "aardvark", Name = "Aardvark", Repo = "someone/aardvark", Systems = [ "ARC" ], IsExternal = true },
 			];
-			using var form = Open(Feed, [ ], roster: roster);
+			using var form = Open(Feed, [ ], roster: roster, shows: CoreKindFilter.Games);
 			form.Show();
-			var list = ListOf(form);
-			CollectionAssert.AreEqual(
-				new[] { "Genesis Plus GX", "External cores", "Aardvark" },
-				list.Items.Cast<ListViewItem>().Select(static i => i.Text).ToList());
-			Assert.IsNull(list.Items[1].Tag, "the separator is not a row");
+			Assert.AreEqual(CoreKindFilter.Games, ShowsOf(form).Value);
+			CollectionAssert.AreEqual(new[] { "SDLPoP" }, ListOf(form).Items.Cast<ListViewItem>().Select(static i => i.Text).ToList());
 		}
 
 		[TestMethod]
-		public void WithNoExternalCoresThereIsNoSeparator()
+		public void OneCoreIsOneRow()
 		{
 			using var form = Open(Feed, [ ]);
 			form.Show();

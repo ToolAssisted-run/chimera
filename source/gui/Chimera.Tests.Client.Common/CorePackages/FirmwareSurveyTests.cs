@@ -95,6 +95,20 @@ namespace Chimera.Tests.Client.Common
 		}
 
 		[TestMethod]
+		public void TheGameCoresComeAfterEveryEmulator()
+		{
+			// docs/game-cores.md: a game core's files are its firmware, listed apart
+			var pop = new DiscoveredCorePackage { Name = "Apple", Path = "/cores/pop.chimeraCore", Sha1 = new string('C', 40), IsGameCore = true };
+			var packages = new[] { pop, Package("xemu"), Package("ares") };
+			var config = new Config();
+			var groups = FirmwareSurvey.Build(config, packages, static _ => ([ ], new JArray()),
+				_firmware, FirmwareSurvey.BuildIndex(config, _firmware, packages.Select(static p => p.Name)));
+			CollectionAssert.AreEqual(new[] { "ares", "xemu", "Apple" }, groups.Select(static g => g.CoreName).ToArray(),
+				"a game core sorts after the emulators whatever its name");
+			CollectionAssert.AreEqual(new[] { false, false, true }, groups.Select(static g => g.IsGameCore).ToArray());
+		}
+
+		[TestMethod]
 		public void TheFolderAnswersByHashAndByName()
 		{
 			var dump = FileOf(_firmware, "whatever-it-was-called.bin", 4096, seed: 3);

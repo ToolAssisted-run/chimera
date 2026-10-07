@@ -8,7 +8,7 @@ using Chimera.WinForms.Controls;
 
 namespace Chimera.Client.GUI
 {
-	public partial class MessageConfig : Form
+	public partial class MessageConfig : ThemedForm
 	{
 		private readonly Config _config;
 
@@ -20,6 +20,7 @@ namespace Chimera.Client.GUI
 		private MessagePosition _messages;
 		private MessagePosition _autohold;
 		private MessagePosition _ramWatches;
+		private MessagePosition _gameTime;
 
 		private readonly SzNUDEx _nudDuration;
 
@@ -33,6 +34,7 @@ namespace Chimera.Client.GUI
 			["Messages"] = _messages,
 			["Rerecords"] = _reRecordCounter,
 			["Autohold"] = _autohold,
+			["Game Time"] = _gameTime,
 		};
 
 		private Dictionary<string, int> Colors => new Dictionary<string, int>
@@ -57,6 +59,7 @@ namespace Chimera.Client.GUI
 			_messages = _config.Messages.Clone();
 			_autohold = _config.Autohold.Clone();
 			_ramWatches = _config.RamWatches.Clone();
+			_gameTime = _config.GameTime.Clone();
 
 			InitializeComponent();
 
@@ -150,6 +153,7 @@ namespace Chimera.Client.GUI
 			_config.Messages = _messages;
 			_config.Autohold = _autohold;
 			_config.RamWatches = _ramWatches;
+			_config.GameTime = _gameTime;
 
 			_config.MessagesColor = ColorRows.Single(r => r.Name == "Main Messages").SelectedColor;
 			_config.AlertMessageColor = ColorRows.Single(r => r.Name == "Alert Messages").SelectedColor;
@@ -176,6 +180,7 @@ namespace Chimera.Client.GUI
 			_messages = DefaultMessagePositions.Messages.Clone();
 			_autohold = DefaultMessagePositions.Autohold.Clone();
 			_ramWatches = DefaultMessagePositions.RamWatches.Clone();
+			_gameTime = DefaultMessagePositions.GameTime.Clone();
 
 			ColorRows.Single(r => r.Name == "Main Messages").SelectedColor = DefaultMessagePositions.MessagesColor;
 			ColorRows.Single(r => r.Name == "Alert Messages").SelectedColor = DefaultMessagePositions.AlertMessageColor;

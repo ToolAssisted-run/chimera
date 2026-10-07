@@ -1,0 +1,33 @@
+# The needs-info clock (docs: the issue intake plan, 2026-09-19). An issue
+# labelled needs-info that hears nothing for 14 days gets a reminder; 28 days
+# and it closes, reopenable with one click - reopening or commenting takes
+# the label off, and the issue goes straight back into the queue. Nothing
+# else is touched: needs-repro is on us and has no clock.
+name: needs-info clock
+on:
+  schedule:
+    - cron: '17 6 * * *'
+  workflow_dispatch:
+permissions:
+  issues: write
+jobs:
+  stale:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/stale@v9
+        with:
+          only-labels: needs-info
+          days-before-stale: 14
+          days-before-close: 14
+          stale-issue-label: stale
+          remove-stale-when-updated: true
+          labels-to-remove-when-unstale: needs-info
+          days-before-pr-stale: -1
+          days-before-pr-close: -1
+          stale-issue-message: >
+            This report is waiting on the information asked for above. If it
+            does not arrive in two weeks it closes; a comment with the missing
+            items reopens it and puts it straight back in the queue.
+          close-issue-message: >
+            Closed for lack of the information asked for. Nothing is lost:
+            reply with the missing items and it reopens.

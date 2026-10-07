@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 
 using Chimera.Emulation.Common.Waterbox;
@@ -48,7 +49,18 @@ namespace Chimera.Tests.Emulation.Common
 		}
 		""";
 
-		private static WaterboxConfig Cfg => WaterboxConfig.FromJson(TwoMachines);
+		/// <summary>
+		/// The package this test wrote. A declaration that did not parse is the
+		/// test's own mistake, and saying so beats an NRE three lines down.
+		/// </summary>
+		private static WaterboxConfig Parse(string json)
+		{
+			var cfg = WaterboxConfig.FromJson(json);
+			Assert.IsNotNull(cfg, "the package this test declares did not parse");
+			return cfg;
+		}
+
+		private static WaterboxConfig Cfg => Parse(TwoMachines);
 
 		private static WaterboxCoreSettings Pin(string machine)
 		{
@@ -67,7 +79,7 @@ namespace Chimera.Tests.Emulation.Common
 		[TestMethod]
 		public void TwoMachinesOfOneSystemListTheSystemOnce()
 		{
-			var cfg = WaterboxConfig.FromJson(TwoMachines.Replace("\"id\": \"SMS\"", "\"id\": \"GEN\""));
+			var cfg = Parse(TwoMachines.Replace("\"id\": \"SMS\"", "\"id\": \"GEN\""));
 			CollectionAssert.AreEqual(new[] { "GEN" }, cfg.SystemIds.ToArray());
 			CollectionAssert.AreEqual(new[] { "GEN", "SMS" }, Cfg.SystemIds.ToArray());
 		}
@@ -81,12 +93,24 @@ namespace Chimera.Tests.Emulation.Common
 			Assert.AreEqual("SMS", cfg.AllExtensions[".sms"]);
 		}
 
+		/// <summary>
+		/// A machine is always settled on, so "which one" is two questions: that
+		/// there is one at all, and that it is the right one. Asked separately so
+		/// that none says so rather than reading as the wrong id.
+		/// </summary>
+		private static void AssertMachineIs(string id, WaterboxConfig cfg, WaterboxCoreSettings? settings)
+		{
+			var machine = cfg.MachineFor(WaterboxCore.EffectiveSettingsFor(cfg, settings));
+			Assert.IsNotNull(machine, "no machine was settled on at all");
+			Assert.AreEqual(id, machine.Id);
+		}
+
 		[TestMethod]
 		public void TheSettingPicksTheMachine()
 		{
 			var cfg = Cfg;
-			Assert.AreEqual("SMS", cfg.MachineFor(WaterboxCore.EffectiveSettingsFor(cfg, Pin("sms")))?.Id);
-			Assert.AreEqual("GEN", cfg.MachineFor(WaterboxCore.EffectiveSettingsFor(cfg, Pin("genesis")))?.Id);
+			AssertMachineIs("SMS", cfg, Pin("sms"));
+			AssertMachineIs("GEN", cfg, Pin("genesis"));
 		}
 
 		[TestMethod]
@@ -95,14 +119,14 @@ namespace Chimera.Tests.Emulation.Common
 			var cfg = Cfg;
 			// the machine setting's own default decides, so a session always has a
 			// machine and never has none
-			Assert.AreEqual("GEN", cfg.MachineFor(WaterboxCore.EffectiveSettingsFor(cfg, null))?.Id);
+			AssertMachineIs("GEN", cfg, null);
 		}
 
 		[TestMethod]
 		public void AValueNamingNoMachineFallsBackRatherThanFailing()
 		{
 			var cfg = Cfg;
-			Assert.AreEqual("GEN", cfg.MachineFor(WaterboxCore.EffectiveSettingsFor(cfg, Pin("nonesuch")))?.Id);
+			AssertMachineIs("GEN", cfg, Pin("nonesuch"));
 		}
 
 		[TestMethod]
@@ -114,17 +138,25 @@ namespace Chimera.Tests.Emulation.Common
 
 			CollectionAssert.AreEqual(
 				new[] { "gamepad", "none", "mouse", "activator" },
-				gen.Single(static d => d.Name == "port1").Options.ToArray(),
+				OptionsOfPort1(gen),
 				"a Mega Drive port takes six devices");
 			CollectionAssert.AreEqual(
 				new[] { "gamepad", "none" },
-				sms.Single(static d => d.Name == "port1").Options.ToArray(),
+				OptionsOfPort1(sms),
 				"a Master System port takes a pad or nothing");
 
 			// narrowing must not invent or drop settings, only change what they allow
 			CollectionAssert.AreEqual(
 				gen.Select(static d => d.Name).ToArray(),
 				sms.Select(static d => d.Name).ToArray());
+		}
+
+		/// <summary>What the port-1 setting allows, which is the whole question here.</summary>
+		private static string[] OptionsOfPort1(IReadOnlyList<WaterboxConfig.SettingDecl> decls)
+		{
+			var port1 = decls.Single(static d => d.Name == "port1");
+			Assert.IsNotNull(port1.Options, "an enum setting with no options is not one");
+			return port1.Options.ToArray();
 		}
 
 		[TestMethod]
@@ -140,7 +172,7 @@ namespace Chimera.Tests.Emulation.Common
 		[TestMethod]
 		public void ASingleMachinePackageIsUnaffected()
 		{
-			var cfg = WaterboxConfig.FromJson("""
+			var cfg = Parse("""
 			{
 				"coreName": "quickerNES", "systemId": "NES",
 				"video": { "width": 256, "height": 240 }, "audio": { "samplesPerFrame": 735 },

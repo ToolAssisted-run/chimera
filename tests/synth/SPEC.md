@@ -203,3 +203,16 @@ Each test = (rom, movie, goal). Goals per the plan: win the game, lose the
 game, produce a certain video output, produce a certain audio output. Win and
 lose are game-defined conventions: by convention every rom writes a status
 byte at RAM[0x000]: 0 = playing, 1 = won, 2 = lost.
+
+## Game properties
+
+The waterboxed flavor also exports a game core's property table
+(docs/game-cores.md), naming places in RAM: `Status` (the byte above, with
+its three values named), and gridWalker's `Cursor.X` (0x001), `Cursor.Y`
+(0x002), `Steps` (0x004, u32) and `Started` (0x008, bool) - and a `Test`
+group over RAM the rom leaves alone (0x100 on) with one of every other kind:
+u64, s64, f64, ascii and utf16le strings, bytes, a big-endian u32, two
+interleaved arrays with a stride, and two bit fields sharing a byte. The synth is not a
+game core and the table belongs to its one test rom; it is there so the witness
+can drive the whole path - the engine reading the export, the frontend checking
+it, the tools and `game.*` using it - without a game core in the tree.

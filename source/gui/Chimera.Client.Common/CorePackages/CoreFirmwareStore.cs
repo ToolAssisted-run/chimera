@@ -50,7 +50,7 @@ namespace Chimera.Client.Common
 		public string? Sha1 { get; init; }
 
 		/// <summary>The SHA1s the core says are right, in declaration order. Empty when it pins none.</summary>
-		public IReadOnlyList<string> ExpectedSha1 => string.IsNullOrEmpty(Decl.Sha1) ? [ ] : [ Decl.Sha1 ];
+		public IReadOnlyList<string> ExpectedSha1 => Decl.Sha1 is { Length: > 0 } pinned ? [ pinned ] : [ ];
 
 		/// <summary>Short form for a column; the full value goes in the detail line.</summary>
 		public static string Short(string? sha1) => sha1 is null ? "" : sha1.ToUpperInvariant()[..8];
@@ -116,11 +116,32 @@ namespace Chimera.Client.Common
 		/// declaration has no hash to remember by and keeps the plain key.
 		/// </summary>
 		public static string KeyFor(string coreName, CoreFirmwareDecl decl)
-			=> string.IsNullOrEmpty(decl.Sha1) ? KeyFor(coreName, decl.Id) : $"{coreName}/{decl.Id}#{decl.Sha1.ToUpperInvariant()}";
+			=> decl.Sha1 is { Length: > 0 } pinned ? $"{coreName}/{decl.Id}#{pinned.ToUpperInvariant()}" : KeyFor(coreName, decl.Id);
 
-		/// <summary>The remembered path for THIS declaration: its own dump's first, then whatever is in use for its id.</summary>
+		/// <summary>
+		/// The firmware the open project pins, by id, for its core - set when a
+		/// project boots (MainForm's VerifyFirmwarePins), cleared when it closes.
+		/// A pin may name a file that is not the declared one: a game core's
+		/// firmware may be a file of the project's own (docs/game-cores.md), and
+		/// the project then pins ITS hash. Without this, the declared dump - if
+		/// the person ever pointed at it - is what <see cref="GetPath(Config,
+		/// string, CoreFirmwareDecl)"/> found first, and the project booted on
+		/// the original instead of its own file.
+		/// </summary>
+		public static (string Core, IReadOnlyDictionary<string, string> Pins)? ProjectPins { get; set; }
+
+		/// <summary>The remembered path for THIS declaration: the open project's pinned file first, its own dump's next, then whatever is in use for its id.</summary>
 		public static string? GetPath(Config config, string coreName, CoreFirmwareDecl decl)
 		{
+			if (ProjectPins is { } project
+				&& project.Core.Equals(coreName, StringComparison.OrdinalIgnoreCase)
+				&& project.Pins.TryGetValue(decl.Id, out var pin)
+				&& !pin.Equals(decl.Sha1 ?? "", StringComparison.OrdinalIgnoreCase)
+				&& config.CoreFirmware.TryGetValue(KeyFor(coreName, new CoreFirmwareDecl { Id = decl.Id, Sha1 = pin }), out var pinned)
+				&& !string.IsNullOrWhiteSpace(pinned))
+			{
+				return pinned;
+			}
 			if (!string.IsNullOrEmpty(decl.Sha1)
 				&& config.CoreFirmware.TryGetValue(KeyFor(coreName, decl), out var own) && !string.IsNullOrWhiteSpace(own))
 			{
@@ -255,7 +276,7 @@ namespace Chimera.Client.Common
 			}
 			var sha1 = Sha1Of(bytes); // computed even for a file that will be refused: the user wants to see WHAT they pointed at
 			// the verdict is the engine's (see docs/engine-migration.md)
-			var state = EngineFirmware.Classify(decl.Size, string.IsNullOrEmpty(decl.Sha1) ? [ ] : [ decl.Sha1 ], bytes.Length, sha1) switch
+			var state = EngineFirmware.Classify(decl.Size, decl.Sha1 is { Length: > 0 } pinned ? [ pinned ] : [ ], bytes.Length, sha1) switch
 			{
 				EngineFirmware.Verdict.WrongSize => CoreFirmwareState.Custom,
 				EngineFirmware.Verdict.Unrecognised => CoreFirmwareState.Unrecognised,
@@ -299,9 +320,12 @@ namespace Chimera.Client.Common
 		public static Func<CoreFirmwareDecl, byte[]?> ProviderFor(Config config, string coreName)
 			=> decl =>
 			{
+				// the delegate is declared to take a declaration, and everything
+				// below needs one; nothing to answer about is answered with nothing
+				if (decl is null) return null;
 				// said on the command line: use it, and say so if it cannot be read
 				// rather than quietly falling back to a different machine
-				if (decl is not null && CommandLineFirmware.TryGetValue(decl.Id, out var named))
+				if (CommandLineFirmware.TryGetValue(decl.Id, out var named))
 				{
 					try
 					{

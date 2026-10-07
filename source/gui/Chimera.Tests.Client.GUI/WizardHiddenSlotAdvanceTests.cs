@@ -58,7 +58,7 @@ namespace Chimera.Tests.Client.GUI
 			{
 				form.UseSettingsFrom(GcOrWii());
 				form.SetSettingValue("machine", "wii");
-				form.UseDeclaration(ProjectSlotDeclaration.Parse(Declaration));
+				form.UseDeclaration(TestPackages.Slots(Declaration));
 				Assert.IsFalse(form.SlotRendered("savedata"), "a Wii project has no memory card row");
 
 				form.AddFileToSlot("game", "/somewhere/wii-game.iso");

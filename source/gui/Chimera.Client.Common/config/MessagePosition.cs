@@ -38,6 +38,7 @@
 		public static readonly MessagePosition Messages = new MessagePosition { X = 0, Y = 0, Anchor = MessagePosition.AnchorType.BottomLeft };
 		public static readonly MessagePosition Autohold = new MessagePosition { X = 0, Y = 0, Anchor = MessagePosition.AnchorType.TopRight };
 		public static readonly MessagePosition RamWatches = new MessagePosition { X = 0, Y = 70 };
+		public static readonly MessagePosition GameTime = new MessagePosition { X = 0, Y = 14, Anchor = MessagePosition.AnchorType.TopRight };
 
 		public const int MessagesColor = unchecked((int) 0xFF_FF_FF_FF);
 

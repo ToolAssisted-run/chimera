@@ -11,8 +11,19 @@ namespace Chimera.Tests.Emulation.Common
 	[TestClass]
 	public class WaterboxAudioRateTests
 	{
+		/// <summary>
+		/// The package this test wrote. A declaration that did not parse is the
+		/// test's own mistake, and saying so beats an NRE three lines down.
+		/// </summary>
+		private static WaterboxConfig Parse(string json)
+		{
+			var cfg = WaterboxConfig.FromJson(json);
+			Assert.IsNotNull(cfg, "the package this test declares did not parse");
+			return cfg;
+		}
+
 		private static WaterboxConfig Cfg(string audio)
-			=> WaterboxConfig.FromJson($$"""
+			=> Parse($$"""
 				{
 				  "coreName": "rated",
 				  "systemId": "SYS",
@@ -25,13 +36,17 @@ namespace Chimera.Tests.Emulation.Common
 		[TestMethod]
 		public void APackageThatSaysNothingMixesAt44100()
 		{
-			Assert.AreEqual(44100, Cfg("""{ "samplesPerFrame": 1024 }""").Audio.Rate);
+			var cfg = Cfg("""{ "samplesPerFrame": 1024 }""");
+			Assert.IsNotNull(cfg.Audio);
+			Assert.AreEqual(44100, cfg.Audio.Rate);
 		}
 
 		[TestMethod]
 		public void APackageDeclaresItsRate()
 		{
-			Assert.AreEqual(48000, Cfg("""{ "samplesPerFrame": 2048, "channels": 2, "rate": 48000 }""").Audio.Rate);
+			var cfg = Cfg("""{ "samplesPerFrame": 2048, "channels": 2, "rate": 48000 }""");
+			Assert.IsNotNull(cfg.Audio);
+			Assert.AreEqual(48000, cfg.Audio.Rate);
 		}
 
 		[TestMethod]

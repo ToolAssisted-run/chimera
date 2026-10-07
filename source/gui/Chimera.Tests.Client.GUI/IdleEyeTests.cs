@@ -17,11 +17,14 @@ namespace Chimera.Tests.Client.GUI
 	[TestClass]
 	public class IdleEyeTests
 	{
-		private static string ShotDir => Environment.GetEnvironmentVariable("CHIMERA_UI_SHOTS");
+		private static string? ShotDir => Environment.GetEnvironmentVariable("CHIMERA_UI_SHOTS");
 
 		private static int[] Frames(IdleEyeVideo eye, int count)
 		{
-			int[] last = null;
+			// a caller asking for no frames at all would be asking for nothing,
+			// and every caller here asks for at least one
+			Assert.IsTrue(count > 0, "there is no last frame of none");
+			var last = System.Array.Empty<int>();
 			for (var i = 0; i < count; i++) last = (int[]) eye.GetVideoBuffer().Clone();
 			return last;
 		}

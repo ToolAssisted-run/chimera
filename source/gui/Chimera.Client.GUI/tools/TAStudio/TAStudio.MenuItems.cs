@@ -1037,6 +1037,7 @@ namespace Chimera.Client.GUI
 						UpdateColumnWidths(_inputRolls[i]);
 					}
 					GenerateIcons();
+					RefreshPalette();
 					foreach (InputRoll roll in _inputRolls) roll.ResumeDrawing();
 
 					UpdateAutoFire();

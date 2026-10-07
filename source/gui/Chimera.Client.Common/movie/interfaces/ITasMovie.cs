@@ -10,6 +10,15 @@ namespace Chimera.Client.Common
 		IMovieChangeLog ChangeLog { get; }
 		IStateHistory States { get; }
 
+		/// <summary>
+		/// How often the greenzone stores a frame as the movie plays - TAStudio's
+		/// "Greenzone" box: 1 every frame, N one frame in N, 0 off. Every frame whenever
+		/// a project opens. Off, the history does no work at all and new frames are not
+		/// green; what is already stored stays. Turned back on, the current frame is
+		/// stored as a whole state and the history goes on from it.
+		/// </summary>
+		int GreenzonePeriod { get; set; }
+
 		/// <summary>Before the machine moves, every frame.</summary>
 		void GreenzoneBeforeFrame();
 
@@ -60,6 +69,13 @@ namespace Chimera.Client.Common
 		/// store, so saves record what actually ran (docs/project.md).
 		/// </summary>
 		void UseResolvedProject(Chimera.Emulation.Common.Engine.EngineProject project);
+
+		/// <summary>
+		/// The machine under this movie is about to be replaced by a freshly booted
+		/// one (Reboot Core inside a project): the movie lets go of the old machine's
+		/// state history and waits for the next <see cref="IMovie.Attach"/>.
+		/// </summary>
+		void MachineIsGoing();
 		int LastEditedFrame { get; }
 		bool LastEditWasRecording { get; }
 

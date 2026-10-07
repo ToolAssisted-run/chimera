@@ -39,10 +39,9 @@ namespace Chimera.Tests.Emulation.Common
 		[TestMethod]
 		public void TheAnswersAreReadFromTheNamesThePackageUses()
 		{
-			var cfg = Newtonsoft.Json.JsonConvert.DeserializeObject<WaterboxConfig>(
-				"{\"video\":{\"drawEveryFrame\":true,\"gpuStatesSurviveTheContext\":true}}");
-			Assert.IsTrue(cfg.Video.DrawEveryFrame);
-			Assert.IsTrue(cfg.Video.GpuStatesSurviveTheContext);
+			var video = VideoOf("{\"video\":{\"drawEveryFrame\":true,\"gpuStatesSurviveTheContext\":true}}");
+			Assert.IsTrue(video.DrawEveryFrame);
+			Assert.IsTrue(video.GpuStatesSurviveTheContext);
 		}
 
 		/// <summary>
@@ -57,18 +56,26 @@ namespace Chimera.Tests.Emulation.Common
 		[TestMethod]
 		public void ACoreThatSaysNothingStillRebuildsOnAStateLoad()
 		{
-			var silent = Newtonsoft.Json.JsonConvert.DeserializeObject<WaterboxConfig>(
-				"{\"video\":{\"width\":640,\"height\":480}}");
-			Assert.IsTrue(silent.Video.RebuildOnStateLoad,
+			Assert.IsTrue(VideoOf("{\"video\":{\"width\":640,\"height\":480}}").RebuildOnStateLoad,
 				"a package that never mentions it must behave exactly as before");
 
-			var declined = Newtonsoft.Json.JsonConvert.DeserializeObject<WaterboxConfig>(
-				"{\"video\":{\"rebuildOnStateLoad\":false}}");
-			Assert.IsFalse(declined.Video.RebuildOnStateLoad, "and one that declines is taken at its word");
+			Assert.IsFalse(VideoOf("{\"video\":{\"rebuildOnStateLoad\":false}}").RebuildOnStateLoad,
+				"and one that declines is taken at its word");
 
-			var asked = Newtonsoft.Json.JsonConvert.DeserializeObject<WaterboxConfig>(
-				"{\"video\":{\"rebuildOnStateLoad\":true}}");
-			Assert.IsTrue(asked.Video.RebuildOnStateLoad);
+			Assert.IsTrue(VideoOf("{\"video\":{\"rebuildOnStateLoad\":true}}").RebuildOnStateLoad);
+		}
+
+		/// <summary>
+		/// The video block of the package this test wrote. A package that did not
+		/// parse, or that has no video block after all, is the test's own mistake
+		/// and says so rather than failing as a null dereference.
+		/// </summary>
+		private static WaterboxConfig.VideoConfig VideoOf(string json)
+		{
+			var cfg = Newtonsoft.Json.JsonConvert.DeserializeObject<WaterboxConfig>(json);
+			Assert.IsNotNull(cfg, "the package this test declares did not parse");
+			Assert.IsNotNull(cfg.Video, "the package this test declares has no video block");
+			return cfg.Video;
 		}
 	}
 }
