@@ -5008,3 +5008,37 @@ three copyright lines, NOTICE the summary of whose work each part is. No
 core package ships that file, so no package changes; and Chimera's pin of
 miniBox is not moved for it.
 
+## The ReflectionCache source generator is gone (user-directed, 2026-10-07)
+
+One of the three source generators inherited from BizHawk wrote, into every
+project, a class called `ReflectionCache_<abbreviated project name>` with
+four things in it: the assembly's types, its version, a list of its embedded
+resources and a way to open one. Pull request #92 (YoshiRulz, a draft titled
+"Drop managed (C#) cruft") removed it and stopped at that one commit; the
+user asked for it to be finished and merged.
+
+What replaced each of the four:
+
+- the types: the assembly is asked (`typeof(X).Assembly.GetTypesWithoutLoadErrors()`),
+  once, where a list of tools, Lua libraries, API implementations or video
+  writers is built;
+- an embedded resource: `Assembly.EmbeddedResourceStream(fullName)`, one
+  extension in Chimera.Common, called with the resource's whole name. (The
+  pull request had a private copy of it in each file that opened one; main
+  had gained a fourth caller, the themes, since it was written.)
+- the list of resources: nothing used it;
+- the version: only the check below used it.
+
+Removed with it: the check at the top of `Program.SubMain` that compared
+the versions of the ten Chimera assemblies and refused to start on a
+mismatch ("Did you attempt to update by overwriting an existing install?").
+It could not fire. No Chimera project sets a version, so every assembly is
+1.0.0.0 in every build, and the check compared equal numbers. BizHawk
+versions its releases; Chimera names a build by its commit. A mixed install
+is still possible and is now not checked for at all, which is what was
+already true.
+
+Also removed: the `MSBuildProjectName` compiler-visible property, which
+only that generator read. Two generators remain, both in use: VersionInfo
+(the commit and its time) and SettingsUtil.
+

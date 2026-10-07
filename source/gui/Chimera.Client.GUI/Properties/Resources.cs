@@ -2,17 +2,14 @@
 using System.IO;
 using System.Windows.Forms;
 
+using Chimera.Common;
+
 namespace Chimera.Client.GUI.Properties
 {
 	internal static class Resources
 	{
 		private static Stream EmbeddedResourceStream(string embedPath)
-		{
-			const string EMBED_PREFIX = "Chimera.Client.GUI.images.";
-			var fullPath = EMBED_PREFIX + embedPath;
-			return typeof(Resources).Assembly.GetManifestResourceStream(fullPath)
-				?? throw new ArgumentException(paramName: nameof(embedPath), message: $"resource at {fullPath} not found");
-		}
+			=> typeof(Resources).Assembly.EmbeddedResourceStream("Chimera.Client.GUI.images." + embedPath);
 
 		/// <param name="filename">Dir separator is '<c>.</c>'. Filename is relative to <c>&lt;NS>/images</c> and omits <c>.png</c> extension.</param>
 		private static Bitmap ReadEmbeddedBitmap(string filename) => new Bitmap(EmbeddedResourceStream($"{filename}.png"));

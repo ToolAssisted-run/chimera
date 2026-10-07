@@ -42,12 +42,7 @@ namespace Chimera.Client.Common
 		public const int DEFAULT_DPI = 96;
 
 		private static Stream EmbeddedResourceStream(string embedPath)
-		{
-			const string EMBED_PREFIX = "Chimera.Client.Common.Resources.";
-			var fullPath = EMBED_PREFIX + embedPath;
-			return typeof(DisplayManagerBase).Assembly.GetManifestResourceStream(fullPath)
-				?? throw new ArgumentException(paramName: nameof(embedPath), message: $"resource at {fullPath} not found");
-		}
+			=> typeof(DisplayManagerBase).Assembly.EmbeddedResourceStream("Chimera.Client.Common.Resources." + embedPath);
 
 		public OSDManager OSD { get; }
 

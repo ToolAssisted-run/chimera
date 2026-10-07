@@ -4,6 +4,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 
+using Chimera.Common;
+
 namespace Chimera.Client.Common
 {
 	/// <summary>A theme file that would not load, and why - kept so the frontend can say so once, in one place.</summary>
@@ -170,7 +172,7 @@ namespace Chimera.Client.Common
 		{
 			foreach (var name in new[] { "light", "dark" })
 			{
-				using var stream = ReflectionCache.EmbeddedResourceStream($"Resources.themes.{name}.json");
+				using var stream = typeof(ThemeLibrary).Assembly.EmbeddedResourceStream($"Chimera.Client.Common.Resources.themes.{name}.json");
 				using StreamReader reader = new(stream);
 				into.Add(ThemeFile.Parse(reader.ReadToEnd(), $"built-in theme \"{name}\"", n => In(into, n)));
 			}

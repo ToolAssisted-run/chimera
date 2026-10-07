@@ -44,7 +44,6 @@
 	</PropertyGroup>
 	<ItemGroup>
 		<PackageReference Include="Meziantou.Polyfill" PrivateAssets="all" />
-		<CompilerVisibleProperty Include="MSBuildProjectName" />
 		<InternalsVisibleTo Include="$(MSBuildProjectName.Replace('Chimera.', 'Chimera.Tests.'))" />
 		<Using Include="System" />
 		<Using Include="System.Object" Alias="Lock" />

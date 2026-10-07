@@ -20,12 +20,7 @@ namespace Chimera.Tests.Client.Common.Dearchive
 		};
 
 		private static Stream EmbeddedResourceStream(string embedPath)
-		{
-			const string EMBED_PREFIX = "Chimera.Tests.Client.Common.data.dearchive.";
-			var fullPath = EMBED_PREFIX + embedPath;
-			return typeof(DearchivalTests).Assembly.GetManifestResourceStream(fullPath)
-				?? throw new ArgumentException(paramName: nameof(embedPath), message: $"resource at {fullPath} not found");
-		}
+			=> typeof(DearchivalTests).Assembly.EmbeddedResourceStream("Chimera.Tests.Client.Common.data.dearchive." + embedPath);
 
 		private readonly Lazy<byte[]> _rom = new(static () => EmbeddedResourceStream("m3_scy_change.gb").ReadAllBytes());
 

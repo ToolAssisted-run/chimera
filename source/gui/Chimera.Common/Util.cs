@@ -121,6 +121,16 @@ namespace Chimera.Common
 			}
 		}
 
+		/// <summary>
+		/// One of <paramref name="assembly"/>'s embedded resources, by its full name:
+		/// the project's root namespace, the folders, the file, all joined by dots
+		/// (<c>Chimera.Client.Common.Resources.gens.ttf</c>).
+		/// </summary>
+		/// <exception cref="ArgumentException">the assembly embeds nothing by that name</exception>
+		public static Stream EmbeddedResourceStream(this Assembly assembly, string fullName)
+			=> assembly.GetManifestResourceStream(fullName)
+				?? throw new ArgumentException(paramName: nameof(fullName), message: $"resource at {fullName} not found");
+
 		/// <exception cref="ArgumentException"><paramref name="str"/> has an odd number of chars or contains a char not in <c>[0-9A-Fa-f]</c></exception>
 		public static byte[] HexStringToBytes(this string str)
 		{
