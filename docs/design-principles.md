@@ -5041,4 +5041,3 @@ already true.
 Also removed: the `MSBuildProjectName` compiler-visible property, which
 only that generator read. Two generators remain, both in use: VersionInfo
 (the commit and its time) and SettingsUtil.
-
