@@ -695,7 +695,11 @@ namespace Chimera.Client.GUI
 				var build = _sharedNames.Contains(core.Name) && core.Sha1 is { Length: >= 8 } ? $"  [package {core.Sha1.Substring(0, 8)}]" : "";
 				// dated (issue #67): a commit says which version this is, and only a date says which is newer
 				var version = core.DatedVersion;
-				_core.Items.Add($"{core.Name}  ({core.SystemsSpelled}{(version.Length is 0 ? "" : $", {version}")}){build}");
+				// The version BEFORE the systems (issue #231): a core that runs
+				// twenty-nine machines has a list longer than the box, and what
+				// fell off its end was the one thing that tells two entries of a
+				// core apart. The list may run off the edge; the version may not.
+				_core.Items.Add($"{core.Name}{(version.Length is 0 ? "" : $"  {version}")}{build}  -  {core.SystemsSpelled}");
 				_coreAt.Add(core);
 			}
 			_core.EndUpdate();

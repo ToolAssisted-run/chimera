@@ -559,6 +559,20 @@ namespace Chimera.Client.GUI
 				case ComboBox combo:
 				{
 					var flat = combo.FlatStyle;
+					// A flat combo box paints its own button, and a resize asks a
+					// control to repaint only what it uncovered: widened, the
+					// button stayed drawn where the right edge HAD been, beside
+					// the new one - a window with three boxes looked like it had
+					// six (chimera#230). So a themed one repaints whole.
+					// Hooked once, here, where a control is first met, and asking
+					// each time whether the box is flat NOW: the style comes and
+					// goes with the theme, and this capture does not run again.
+					// (SizeChanged, not Resize: Mono's combo box never raises the
+					// latter, and the tests run there.)
+					combo.SizeChanged += static (sender, _) =>
+					{
+						if (sender is ComboBox { FlatStyle: FlatStyle.Flat } box) box.Invalidate();
+					};
 					restore += () => combo.FlatStyle = flat;
 					break;
 				}

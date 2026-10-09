@@ -43,6 +43,29 @@ namespace Chimera.Tests.Client.GUI
 			Assert.AreEqual(0, form.CoreChoiceIndex, "the picker opens on the latest");
 		}
 
+		/// <summary>
+		/// Issue #231: a core's line said its systems first and its version last, and a core
+		/// with twenty-nine systems has a line longer than the box - so the version, which is
+		/// what tells two entries of one core apart, was the part that fell off the end.
+		/// </summary>
+		[TestMethod]
+		public void TheVersionComesBeforeTheSystems()
+		{
+			DiscoveredCorePackage many = new()
+			{
+				Name = "ares", Version = "bc8bb5b01234", VersionDate = CoreVersionDates.Parse("2026-10-08T12:00:00Z"),
+				Path = "/cores/ares.chimeraCore", Sha1 = "bc8bb5b0".PadRight(40, '0'), Systems = [ "N64", "NES", "ZXS" ],
+			};
+			using NewProjectWizard form = new([ many ], static _ => [ ]);
+			var line = form.CoreChoiceLines[0];
+
+			var name = line.IndexOf("ares", System.StringComparison.Ordinal);
+			var version = line.IndexOf("(bc8bb5b0)", System.StringComparison.Ordinal);
+			var systems = line.IndexOf(many.SystemsSpelled, System.StringComparison.Ordinal);
+			Assert.IsTrue(name >= 0 && version > name, $"the version follows the name: {line}");
+			Assert.IsTrue(systems > version, $"and the systems follow the version: {line}");
+		}
+
 		private static DiscoveredCorePackage Game(string name)
 			=> new() { Name = name, Version = "1a2b3c4d5e6f", Path = $"/cores/{name}.chimeraCore", Sha1 = "1".PadRight(40, '0'), Systems = [ "PoP" ], IsGameCore = true };
 

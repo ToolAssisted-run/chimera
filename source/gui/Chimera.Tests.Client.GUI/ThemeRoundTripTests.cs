@@ -277,6 +277,51 @@ namespace Chimera.Tests.Client.GUI
 		public void AWindowBornLightAndToldToBeDarkLooksDark() => BornThenTold("Light", "Dark");
 
 		/// <summary>
+		/// A themed combo box is flat, and a flat combo box paints its own button.
+		/// A resize asks a control to repaint only what it uncovered, so a box
+		/// that was widened kept the button it had drawn at its old right edge
+		/// beside the new one (chimera#230: three boxes in the New Project window
+		/// looked like six once it was maximised). Themed, a combo box asks for
+		/// the whole of itself to be painted again when its size changes - and
+		/// still does after the theme has gone away and come back.
+		///
+		/// This holds that the request is MADE. That the stale button is gone on
+		/// Windows, where it was seen, is tests/ui/windows/combo-widen.sh, which
+		/// reads the pixels the window holds.
+		/// </summary>
+		[TestMethod]
+		public void AThemedComboBoxRepaintsWholeWhenItIsResized()
+		{
+			ThemeLibrary.Select("Light");
+			using Form form = new() { ClientSize = new(400, 100), StartPosition = FormStartPosition.Manual, Location = new(0, 0) };
+			ComboBox box = new() { DropDownStyle = ComboBoxStyle.DropDownList, Location = new(10, 10), Width = 200 };
+			box.Items.Add("one");
+			form.Controls.Add(box);
+			form.Show();
+
+			var whole = 0;
+			var seen = "";
+			box.Invalidated += (_, e) =>
+			{
+				seen += $" {e.InvalidRect}";
+				if (e.InvalidRect.Contains(box.ClientRectangle)) whole++;
+			};
+
+			ThemeEngine.Apply(form, ThemeLibrary.Select("Dark"));
+			Assert.AreEqual(FlatStyle.Flat, box.FlatStyle, "the premise: Dark makes it flat");
+			whole = 0;
+			seen = "";
+			box.Width = 320;
+			Assert.IsTrue(whole > 0, $"widened under Dark, it repaints all of itself (client {box.ClientRectangle}; asked for:{seen})");
+
+			ThemeEngine.Apply(form, ThemeLibrary.Select("Light"));
+			ThemeEngine.Apply(form, ThemeLibrary.Select("Dark"));
+			whole = 0;
+			box.Width = 360;
+			Assert.IsTrue(whole > 0, "and again after the theme went away and came back");
+		}
+
+		/// <summary>
 		/// And the plainest form of the same question: two windows, one that has
 		/// only ever been Light and one that has been Dark and come back, must not
 		/// differ in a single control's colours.

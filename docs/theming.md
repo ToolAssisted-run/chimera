@@ -348,6 +348,23 @@ exact timing was not reproduced in a harness. The Windows harness opens that
 window on a dark theme and would catch a plain regression; it is not proof that
 the original race cannot recur.
 
+### A themed combo box repaints whole when it is resized (chimera#230)
+
+A themed combo box is flat, and a flat combo box paints its own button. A
+resize asks a control to repaint only what it uncovered, so a box widened
+with its window kept the button it had drawn at its old right edge beside the
+new one: the New Project window, maximised, showed what looked like a second
+box behind every box. The theme engine hooks a combo box's size when it first
+meets it and has a flat one repaint whole.
+
+`tests/ui/windows/combo-widen.sh` is the check that this is so on Windows: it
+reads the pixels the window holds (not a repaint, which is exactly what does
+not show a stale pixel) for a box widened from 300 to 760 and for one born
+760 wide, and they must be the same picture. Its control, a flat box the
+theme engine never saw, differs in 2505 pixels - the fault, as reported. The
+Mono test (`AThemedComboBoxRepaintsWholeWhenItIsResized`) holds only that the
+repaint is asked for.
+
 ## Why Light is not a new palette
 
 Light is the palette Chimera had before there were themes, written down, and it
