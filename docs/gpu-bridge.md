@@ -100,6 +100,17 @@ There is a line on standard error either way:
 
 `chimera-run --gpu` makes the same ask from the command line.
 
+## The strings are the guest's own
+
+`glGetString` and `glGetStringi` answer with a pointer into the driver, which
+a guest cannot read. The host copies each answer to the guest's side and the
+generated wrapper keeps it in a place of its own, one per (name, index), so
+that a renderer holding its vendor, renderer and version at once holds three
+strings (miniBox `source/gl/gl-string-keep.inc`; until 2026-10-09 it held the
+last one three times). The place is guest memory and a state carries it: a
+state loaded on another machine gets that machine's answers the next time the
+renderer asks, which a rebuild after a load does.
+
 ## The context is borrowed, never kept
 
 "Current context" is one slot per thread, and the frontend draws its own

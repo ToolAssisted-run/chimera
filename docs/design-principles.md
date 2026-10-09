@@ -5598,3 +5598,26 @@ from the machine's memory and whether that is the same thing.** A texture
 decoded from memory is; a render target, a frame half drawn, a copy at a
 higher resolution, a deinterlacer's fields, bytes waiting in a staging
 buffer are not - and the last of those is the machine itself.
+
+## Two strings a renderer holds at once are two strings (user-decided, 2026-10-09)
+
+Found by the session building a new core, on its first run through the GPU
+bridge: the renderer logged its GL vendor, renderer and version as the same
+three characters. `glGetString` answers with a pointer into the driver, which
+a guest cannot read, so the bridge copies the answer to the guest's side -
+into one buffer per call, in the wrapper miniBox generates for every core.
+OpenGL promises those strings are static, and a renderer that asks for three
+and reads them afterwards read the last one three times. It was not new:
+Flycast had been logging its version as its vendor on the GTX 1060, and
+Dolphin keeps the three pointers and chooses driver workarounds by them.
+
+miniBox bd8daaf gives every (name, index) a place of its own. What that
+changes is which workarounds a renderer picks on a real card, in every
+bridged core, and each would deserve its pictures measured again; asked, the
+owner chose the fix in miniBox alone, each core taking it at its next
+build, over measuring them one by one first. Two were looked at anyway
+because they were at hand: Flycast, exact after a load as before, and
+Dolphin - the one known to act on the strings - whose film is exact after a
+load and whose 3D race gives the same picture and the same system RAM at
+frame 7899 as the build before. xemu and Ruffle keep their generated wrapper
+in their repositories and have it when somebody generates it again.
