@@ -191,9 +191,11 @@ minibox_host_src = files(
 # for the CPU the host runs on (as miniBox's source/host/meson.build selects it).
 if host_machine.cpu_family() == 'aarch64'
   minibox_host_src += files(minibox_host / 'interop_aarch64.S', minibox_host / 'guarded_aarch64.S')
-else
+elif host_machine.cpu_family() == 'x86_64'
   minibox_host_src += files(minibox_host / 'interop_bin.c', minibox_host / 'guarded.S',
                             minibox_host / 'calling_convention_adapters.c')
+else
+  error('miniBox runs on x86-64 and aarch64 only, not ' + host_machine.cpu_family())
 endif
 # Provenance compiled into the host, matching what miniBox's own build stamps: the
 # frontend shows it and a movie records it, so every binary in the emulation path can
