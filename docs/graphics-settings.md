@@ -362,6 +362,10 @@ summary.
 | xemu | Internal Resolution | DIFFERS: 1,571,601 bytes of RAM, 2x vs 1x, 600 frames of Prince of Persia; 1x vs 1x identical | 1280x960 at 2x, 1920x1440 at 3x | C | `internalResolution` (1x/2x/3x), declared, gated |
 | xemu | Aspect Ratio | inert: consumed only by `ui/xui/gl-helpers.cc`, which the headless build does not compile | - | X / P | the frontend's Display > Aspect Ratio Selection already does the job |
 | Flycast | Transparent Sorting | identical (four domains, audio, lag), 1800 frames of Re-Volt | differs | C | `transparentSorting` (perTriangle/perStrip), declared, gated |
+| Azahar | Screen Layout, Swap, Upright, Large Screen Proportion | identical (RAM, both renderers; FCRAM byte for byte on the GTX 1060) | differs, and its size with it | C | `layout`, `swap_screens`, `upright`, `large_screen_proportion`, declared, gated (chimera#223) |
+| Azahar | Linear Filtering | identical | differs where a screen is scaled | C | `linear_filter`, declared, gated |
+| Azahar | Internal Resolution | DIFFERS at 2x, and a load around every frame gives another run than no load | 800x960 at 2x | X | not offered: the renderer is rebuilt from the console's memory, which holds the pictures at 1x |
+| Azahar | Texture Filter, Texture Sampling | DIFFERS (xBRZ at 2x; "linear" at 1x and 2x) | differs | X | not offered |
 | PCSX2 | Aspect Ratio | identical | identical | X / P | present-pass only; this core does not present. The frontend's Display config has it |
 | PCSX2 | FMV Aspect Ratio Override | identical | identical | X | present-pass only, and nothing outside the core knows when an FMV plays |
 | PCSX2 | Deinterlacing | identical, both renderers | differs | already declared (issue #7) | unchanged |

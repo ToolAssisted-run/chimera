@@ -65,6 +65,15 @@ that was never there.
 > in the ELF. Seventeen of quickerNES's forty-nine exports read as "this core
 > does not have that feature" while sitting in the binary.
 
+> The Azahar gate's savestate legs ran the sandbox twice - once plainly, once
+> with a save and a load around every frame - and passed when the two outputs
+> were the same. On 2026-10-09 the runner's memory layout fell behind the
+> package's, every sandboxed run died at Init, and both outputs were the same
+> one line of host chatter: "save+load around every frame changes nothing",
+> PASS, on a machine that never started. A dead run and a live one were told
+> apart by nothing. The legs now require a reported frame before they compare
+> anything.
+
 **What to do.** An optional probe needs three answers, not two: present,
 absent, and failed. Where the API cannot carry the third, make the failure
 loud - a line on stderr naming what ran out is enough, and it is what turned
@@ -121,6 +130,16 @@ uncatchable - not missed, uncatchable.
 > to `BackColor` does, whether a control repaints, and whether visual styles
 > override either - so 889 green tests said nothing at all about whether the
 > theme menu worked, which twice it did not.
+
+> Both of the PPSSPP core's gates hand their program to the core as a rom,
+> mounted as `/name`. A person opens a project, and a project mounts the game
+> in a slot under its bare name. When the pin moved to upstream master
+> (chimera#228), upstream had grown a lookup that lists the folder the game is
+> in; `/name`'s folder does not open and a bare name's does, and reading it is
+> a system call the sandbox does not provide. Thirteen legs green, and the
+> published core could not start a single game from the frontend. The reporter
+> found it within the hour. The leg that was missing writes a project and
+> boots it (`project:boot`); it fails on the build that was published.
 
 **What to do.** A synthetic subject is often the only lawful one - a gate
 cannot ship somebody's game, and it cannot run Windows on a Linux runner. That
