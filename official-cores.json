@@ -252,6 +252,17 @@
       "tested": ""
     },
     {
+      "id": "duckstation",
+      "name": "DuckStation",
+      "systems": [
+        { "id": "PS1", "name": "PlayStation" },
+        { "id": "NAMCOS11", "name": "Namco System 11" },
+        { "id": "KONAMIGQ", "name": "Konami GQ" }
+      ],
+      "repo": "ToolAssisted-run/chimera-core-duckstation",
+      "tested": ""
+    },
+    {
       "id": "sdlpop",
       "name": "SDLPoP",
       "systems": [
