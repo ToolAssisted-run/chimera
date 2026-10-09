@@ -21,6 +21,7 @@ The installed dll dir is meson's install folder for the Linux build
 when tools/fetch-ffmpeg.sh put it there, ffmpeg. Prints the folder's size and
 Qt's share of it."""
 import os
+import platform
 import shutil
 import subprocess
 import sys
@@ -97,10 +98,18 @@ desktop_may_lack = {"libxcb-cursor.so.0", "libxcb-icccm.so.4", "libxcb-image.so.
 def needed(path):
     o = subprocess.run(["readelf", "-d", path], capture_output=True, text=True).stdout
     return [line.split("[")[1].split("]")[0] for line in o.splitlines() if "(NEEDED)" in line]
+# ldconfig names each library's CPU: only the one this bundle is built for will do
+machine = platform.machine()
+if machine == "x86_64":
+    ldconfig_cpu = "x86-64"
+elif machine == "aarch64":
+    ldconfig_cpu = "AArch64"
+else:
+    sys.exit(f"Chimera's Linux bundle is built on x86-64 and aarch64 only, not {machine}")
 def system_path(name):
     o = subprocess.run(["ldconfig", "-p"], capture_output=True, text=True).stdout
     for line in o.splitlines():
-        if line.strip().startswith(name + " ") and "x86-64" in line:
+        if line.strip().startswith(name + " ") and f",{ldconfig_cpu})" in line:
             return line.split("=>")[1].strip()
     return None
 def elves():
