@@ -812,6 +812,18 @@ int main(int argc, char **argv)
 	 * Settled HERE, before the record block below decodes that many entries -
 	 * a limit applied after it would leave the decoded input shorter than the
 	 * run. */
+	/* --frames can only shorten a movie that is being played: it does not
+	 * lengthen one. Asked for more frames than the movie has, the run is the
+	 * movie's length - and with a movie of no rows that is NO frames, every
+	 * dump still written and the exit code still 0. Say so: a dump of frame 0
+	 * compared with a real run reads as a divergence (it cost somebody an
+	 * afternoon, 2026-10-09). To run a core for N frames with nothing pressed,
+	 * record a row and repeat it, or use --record. */
+	if (frameLimit > frames && recordPath.empty())
+	{
+		std::fprintf(stderr, "chimera-run: --frames %lld asked, but the movie has %lld frames and nothing is being recorded: %lld will run\n",
+			static_cast<long long>(frameLimit), static_cast<long long>(frames), static_cast<long long>(frames));
+	}
 	if (frameLimit >= 0 && (frameLimit < frames || !recordPath.empty())) frames = frameLimit;
 	/* --rewind-loop needs the history too: it seeks back through it, and a run
 	 * without one fails at the first pass with "no stored state at or before
