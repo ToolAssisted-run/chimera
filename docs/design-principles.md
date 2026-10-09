@@ -5500,3 +5500,47 @@ an unread state is wrong. Eight rewinds end on the picture and the three
 memories of a run that never took a state. Not carried: the result of a
 render-to-texture pass, which this core keeps on the card; a game that draws
 one once and goes on using it would lose it until it drew it again.
+
+**PCSX2: four frames, and what a scaled-up renderer cannot give back**
+(pcsx2 `waterbox/gs-shadow.cpp`, its patch 0026). The first frame after a
+load was an empty one and the three after it were off in 6 to 8% of their
+pixels - in three games, a still screen included. A render target is a
+texture on the card, and the GS's own memory under a frame buffer holds
+nothing, because the hardware renderer writes it there only when a game
+reads it; the rebuild after a load threw the texture cache away and made
+targets again from that memory. Gone with it: the frame drawn and not yet
+shown, the depth not yet cleared, and the four fields the deinterlacer keeps
+- which is why it took four frames, and why a picture that does not move was
+wrong too.
+
+PCSX2 answers `StateSaving` the way RPCS3 does. Every target of the texture
+cache, colour and depth, and the deinterlacer's textures are read into a
+block of the core's own memory; after a load the cache's targets are kept,
+every texture of the old context is let go before the device is opened
+again, and each target gets a new one with its pixels. Upstream has a switch
+that does the first half its own way - "read targets when closing", which
+writes them into the GS's memory - and it was not used, for the reason
+RPCS3's Write Color Buffers was not: a game can read that memory, the
+renderer falls back on it when a target goes, and a run that took a state
+would hold other bytes there than one that did not.
+
+On the card, at the machine's own resolution: twelve frames after a load,
+each bit for bit the picture it was, in all three games, through the
+greenzone and by a whole state, from states read and unread; untold, the
+first four are wrong, as they were. Eight rewinds end on the picture and the
+EE RAM of a run that never took a state. The price: 8.7 MB of textures in
+that scene, nearly all changing every frame, so a stored state is that much
+larger and the history keeps a third as many (1136 against 3701 over 3700
+frames); 40 s where it took 35.
+
+**Above the machine's own resolution it is not exact, and cannot cheaply
+be.** Drawn larger than the PS2 drew, a sprite's edge samples a texel past
+what its texture was loaded with - upstream's upscaling lines - and what is
+there is whatever the recycled texture held before: the history of a pool
+hundreds of textures deep. A new context's textures held nothing. After a
+load 0.12% of the picture differs at 2x and 0.03% at 3x, on its edge rows,
+for as long as the scene lasts; before, at 3x, it was 0.34% once the four
+bad frames had passed, which nobody had measured. Carrying the pool of spare
+targets as well was tried, and moved those pixels without removing them. A
+picture that depends on what a driver's texture last held is not one a state
+can be asked to reproduce; the machine is the same either way.
