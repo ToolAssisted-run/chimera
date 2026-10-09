@@ -5438,6 +5438,25 @@ machine here; whether that machine was exact was not checked before the fix.
 machine is copied whole just before each plan, and when the plan has been
 filled the two are compared page by page.
 
-RPCS3's picture after a load - the fighters drawn black - is the third, and
-is what the GPU drew not being in the state, as it was for xemu.
+**RPCS3's picture after a load** - the fighters drawn black - was the third,
+and was what the GPU drew not being in the state, as it had been for xemu:
+45 render targets in that fight, many drawn once long before, thrown away
+with the rest by the rebuild. Asked where the copy should be made, the user
+chose capture time (user-decided, 2026-10-08), and RPCS3 answers
+`StateSaving` now (its patch 0050): each target's pixels are read into a
+block of the core's own memory that the state carries, and after a load the
+surface store is kept and every surface is given a new image and its pixels
+back. It did not need the RSX thread, which was the proposal - reading an
+image changes nothing the renderer believes - and it does not write into the
+console's memory, which would have been less code: a game can read that, and
+would have read different bytes depending on whether a state had been taken.
+
+On the card: 45% of the picture's pixels differed after a load for as long
+as was measured, and under 1% do now, on shadow edges, where it cannot be
+seen; eight rewinds of 300 frames through the greenzone end on a picture
+that is bit for bit a straight run's; told and untold leave the same 256 MiB
+of main memory. The price is the largest any core pays for this: in that
+fight some 26 MB of surfaces change every frame, so a stored state is about
+25 MB larger and a run with the default greenzone takes 475 s where it took
+411. Multisampled targets are not carried.
 
