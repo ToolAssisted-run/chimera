@@ -11,6 +11,7 @@
  *   "input": {
  *     "buttons": [ "P1 Up", "P1 Cross", "P2 Up", "P2 Cross", "Power" ],
  *     "mnemonics": { "Up": "U", "Cross": "X", "Power": "P" },
+ *     "headers": { "Power": "PWR" },
  *     "axes": [ { "name": "P1 Left Stick X", "min": 0, "max": 255, "neutral": 128,
  *                 "header": "LX" } ]
  *   }
@@ -18,6 +19,11 @@
  * A mnemonic is looked up by the control's whole name first and then by its
  * name without the player ("P2 Cross" -> "Cross"), so one line serves every
  * pad; a keyboard, or a pad whose second player differs, names them whole.
+ *
+ * A header is what heads a button's input column where one character cannot
+ * tell it from its neighbours - a keyboard has two shifts and forty letters
+ * (chimera#225). It is looked up the way a mnemonic is, and a button with
+ * none is headed by its mnemonic. It is never written into a movie.
  *
  * What is here is that lookup and THE RULE FOR A NAME NOBODY DECLARED - an
  * older package, or a control a movie carries that the running machine does
@@ -43,6 +49,10 @@ std::string bareControlName(const std::string &name);
  * byte, because an entry is walked a byte at a time. */
 bool usableMnemonic(char c);
 
+/* A header a button's column may carry: one to eight characters of printable
+ * ASCII that neither begin nor end with a space. */
+bool usableButtonHeader(const std::string &header);
+
 /* The rule: the first character of the last word that begins with a usable
  * one ("Stick Fire" is F, "Insert Disk 2" is 2, a key named in another
  * script falls back on the word before it), and '?' when no word does. */
@@ -57,8 +67,11 @@ struct ControlNames
 {
 	std::map<std::string, char> mnemonics;          /* by whole or bare name */
 	std::map<std::string, std::string> axisHeaders; /* by whole name */
+	std::map<std::string, std::string> buttonHeaders; /* by whole or bare name */
 
 	char mnemonicOf(const std::string &button) const;
+	/* the declared header, or the mnemonic as one character */
+	std::string buttonHeaderOf(const std::string &button) const;
 	std::string axisHeaderOf(const std::string &axis) const;
 };
 

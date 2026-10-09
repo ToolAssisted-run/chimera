@@ -1030,18 +1030,23 @@ CE_API const char *ce_session_button_name(const ce_session *s, int64_t index);
 CE_API int64_t ce_session_axis_count(const ce_session *s);
 CE_API const char *ce_session_axis_name(const ce_session *s, int64_t index);
 /* WHAT A CONTROL IS CALLED where a person reads very little of it: the one
- * character a pressed button writes into a movie's text and heads its input
- * column with, and the short header of an axis's column. The core's package
- * declares them ("mnemonics" and each axis's "header", in its input
+ * character a pressed button writes into a movie's text, what heads its input
+ * column, and the short header of an axis's column. The core's package
+ * declares them ("mnemonics", "headers" and each axis's "header", in its input
  * declaration); a name it declares nothing for gets the rule - the first
  * character of the last word, the initials of an axis - which is all this
  * engine knows about naming, and knows of no machine (control_names.hpp).
  *
+ * A button's header is for a machine whose buttons one character cannot tell
+ * apart - a keyboard. It is one to eight characters, heads the column, and is
+ * never written into a movie; a button with none is headed by its mnemonic.
+ *
  * ce_session_button_mnemonics: one character a button, in declaration order.
- * ce_session_mnemonic_of / ce_session_axis_header_of: ANY name, looked up the
- * way the session's own are - a movie can carry a control the running machine
- * does not have. ce_control_mnemonic / ce_control_axis_header: the rule
- * alone, for when there is no machine to ask.
+ * ce_session_mnemonic_of / ce_session_button_header_of /
+ * ce_session_axis_header_of: ANY name, looked up the way the session's own
+ * are - a movie can carry a control the running machine does not have.
+ * ce_control_mnemonic / ce_control_button_header / ce_control_axis_header:
+ * the rule alone, for when there is no machine to ask.
  *
  * None of it is what a movie means: an entry is read by position, and any
  * character but '.' is a pressed button.
@@ -1050,8 +1055,10 @@ CE_API const char *ce_session_axis_name(const ce_session *s, int64_t index);
  * until its next such call. */
 CE_API const char *ce_session_button_mnemonics(const ce_session *s);
 CE_API int32_t ce_session_mnemonic_of(const ce_session *s, const char *name);
+CE_API const char *ce_session_button_header_of(const ce_session *s, const char *name);
 CE_API const char *ce_session_axis_header_of(const ce_session *s, const char *name);
 CE_API int32_t ce_control_mnemonic(const char *name);
+CE_API const char *ce_control_button_header(const char *name);
 CE_API const char *ce_control_axis_header(const char *name);
 
 /* What to call the session's system in front of a person: the package's own

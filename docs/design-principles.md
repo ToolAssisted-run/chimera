@@ -5621,3 +5621,32 @@ Dolphin - the one known to act on the strings - whose film is exact after a
 load and whose 3D race gives the same picture and the same system RAM at
 frame 7899 as the build before. xemu and Ruffle keep their generated wrapper
 in their repositories and have it when somebody generates it again.
+
+## A column may be headed by more than its letter (user-decided, 2026-10-09; chimera#225)
+
+Asked for: mnemonics of more than one character, or ones a person picks, since
+a keyboard's columns cannot be told apart by one. Of three ways - longer
+headers only, longer mnemonics in the movie's text, headers a person edits -
+the owner chose the first.
+
+A mnemonic is one byte because an entry is walked a byte at a time and read
+by position; widening it changes the movie's text, the format this log calls
+frozen, in the engine and in every tool that reads a movie. What was wrong is
+narrower than that: what a person READS at the top of a column. So a package
+may now declare, beside `"mnemonics"`, `"headers"` - by the button's whole
+name or its name without the player, as a mnemonic is found - and the engine
+answers a button's header as the declared one or else its letter
+(`ce_session_button_header_of`, and `ce_control_button_header` for the rule
+alone). One to eight characters of printable ASCII with no space at either
+end; anything else is not taken and the letter heads the column as before.
+
+TAStudio heads the column with it and fills a pressed cell with it, so a cell
+reads as its column does. Nothing else changed: the movie's text, the input
+display over the picture and a pasted entry all carry the one character.
+
+Measured with the synthetic core, which gives Select the header "SEL": asked
+as a window asks (`chimera-run --controls`), Select answers `s` and `SEL` and
+Start `S` and `S`, and a movie recorded with Select held has `s` in its text
+and `SEL` nowhere. The contract tests refuse a header the engine would drop, a
+header for a button that is not there, and one that two columns of a player
+share.

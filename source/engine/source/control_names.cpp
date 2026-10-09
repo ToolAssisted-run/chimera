@@ -18,6 +18,17 @@ bool usableMnemonic(char c)
 	return c > ' ' && c < 0x7F && c != '.' && c != '|';
 }
 
+bool usableButtonHeader(const std::string &header)
+{
+	if (header.empty() || header.size() > 8) return false;
+	if (header.front() == ' ' || header.back() == ' ') return false;
+	for (char c : header)
+	{
+		if (c < ' ' || c >= 0x7F) return false;
+	}
+	return true;
+}
+
 namespace {
 
 std::vector<std::string> wordsOf(const std::string &name)
@@ -73,6 +84,13 @@ char ControlNames::mnemonicOf(const std::string &button) const
 	auto it = mnemonics.find(button);
 	if (it == mnemonics.end()) it = mnemonics.find(bareControlName(button));
 	return it != mnemonics.end() ? it->second : genericMnemonic(button);
+}
+
+std::string ControlNames::buttonHeaderOf(const std::string &button) const
+{
+	auto it = buttonHeaders.find(button);
+	if (it == buttonHeaders.end()) it = buttonHeaders.find(bareControlName(button));
+	return it != buttonHeaders.end() ? it->second : std::string(1, mnemonicOf(button));
 }
 
 std::string ControlNames::axisHeaderOf(const std::string &axis) const

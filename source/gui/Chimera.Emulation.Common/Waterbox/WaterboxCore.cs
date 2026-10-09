@@ -361,6 +361,8 @@ namespace Chimera.Emulation.Common.Waterbox
 
 			public char MnemonicOf(string button) => _session.MnemonicOf(button);
 
+			public string ButtonHeaderOf(string button) => _session.ButtonHeaderOf(button);
+
 			public string AxisHeaderOf(string axis) => _session.AxisHeaderOf(axis);
 		}
 

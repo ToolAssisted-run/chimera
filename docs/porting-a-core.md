@@ -216,6 +216,14 @@ Advice earned the hard way:
     of its last word), which is how two columns of one pad come to share a
     letter. An entry is read by position, so a letter may change without
     harming a movie made before.
+  - `"headers": { "Keyboard CAPS SHIFT": "CS" }` beside the mnemonics, for a
+    machine whose buttons one character cannot tell apart - a keyboard. It
+    is what heads the button's column in TAStudio and fills its pressed
+    cells; the movie's text still carries the mnemonic and nothing else.
+    Keyed as a mnemonic is. One to eight characters of printable ASCII, no
+    space at either end, and not the header of another column of the same
+    player. A button given none is headed by its letter, so a pad needs
+    none of this.
   - `"header": "LX"` on each axis - its column's header, five characters at
     most.
   - `"media": [ ... ]` - what a disc of yours needs that a plain image does

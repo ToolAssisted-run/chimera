@@ -262,6 +262,21 @@ bool parseConfig(const char *json, uint64_t len, const char *overrides, SessionC
 		}
 	}
 	for (const auto &b : cfg.buttons) cfg.mnemonics.push_back(cfg.names.mnemonicOf(b));
+	/* What heads a button's column where a letter is not enough. One that is
+	 * not a header (empty, long, not ASCII) is not taken, and the column is
+	 * headed by the letter as it always was. */
+	const cJSON *headers = cJSON_GetObjectItemCaseSensitive(input, "headers");
+	if (cJSON_IsObject(headers))
+	{
+		cJSON_ArrayForEach(item, headers)
+		{
+			if (item->string != nullptr && cJSON_IsString(item)
+				&& chimera::usableButtonHeader(item->valuestring))
+			{
+				cfg.names.buttonHeaders[item->string] = item->valuestring;
+			}
+		}
+	}
 	/* what to call the system in front of a person: the package's word for
 	 * this id, or the id */
 	cfg.systemName = cfg.systemId;
@@ -1901,6 +1916,13 @@ int32_t ce_session_mnemonic_of(const ce_session *s, const char *name)
 	return name != nullptr ? s->cfg.names.mnemonicOf(name) : '?';
 }
 
+const char *ce_session_button_header_of(const ce_session *s, const char *name)
+{
+	static thread_local std::string held;
+	held = name != nullptr ? s->cfg.names.buttonHeaderOf(name) : std::string();
+	return held.c_str();
+}
+
 const char *ce_session_axis_header_of(const ce_session *s, const char *name)
 {
 	static thread_local std::string held;
@@ -1916,6 +1938,13 @@ const char *ce_session_system_name(const ce_session *s)
 int32_t ce_control_mnemonic(const char *name)
 {
 	return name != nullptr ? chimera::genericMnemonic(name) : '?';
+}
+
+const char *ce_control_button_header(const char *name)
+{
+	static thread_local std::string held;
+	held = name != nullptr ? std::string(1, chimera::genericMnemonic(name)) : std::string();
+	return held.c_str();
 }
 
 const char *ce_control_axis_header(const char *name)

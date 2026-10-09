@@ -426,6 +426,29 @@ assert a['input'].startswith('[Input]') and a['input'].rstrip().endswith('[/Inpu
 			report "E:settle-probe" FAIL "$(cat "$work/probe.5" "$work/probe.2" "$work/probe.0" "$work/probe.state.5" "$work/probe.state.0" "$work/probe.unseen" 2>/dev/null | grep -m1 '^settle-probe' | cut -c1-120); pictures read seen '$readSeen' unseen '$readUnseen' (see work/probe.*)"
 		fi
 
+		# What heads a button's column (chimera#225). A keyboard has more keys
+		# than one character tells apart, so a package may give a button a
+		# header as well as its letter. The synth gives Select one, "SEL", and
+		# no other button any. Asked as a window asks (chimera-run --controls:
+		# a control's name, the character it writes, what heads its column):
+		#   - Select is headed SEL and still writes s;
+		#   - a button with no header is headed by its letter;
+		#   - and a movie recorded with Select held has s in its text and SEL
+		#     nowhere: a header is never written into a movie.
+		printf '|........|\n|......s.|\n|......s.|\n|........|\n' > "$work/headers.in.txt"
+		"$chimera_run" "$epkg" "$here/roms/gridWalker.testrom" "$work/headers.in.txt" \
+			--record "$work/headers.out.txt" --controls "$work/headers.controls" > "$work/headers.log" 2>&1
+		tab="$(printf '\t')"
+		if grep -qx "P1 Select${tab}s${tab}SEL" "$work/headers.controls" 2>/dev/null \
+			&& grep -qx "P1 Start${tab}S${tab}S" "$work/headers.controls" \
+			&& [ "$(wc -l < "$work/headers.controls")" = 8 ] \
+			&& [ "$(grep -c '|......s.|$' "$work/headers.out.txt")" = 2 ] \
+			&& ! grep -q 'SEL' "$work/headers.out.txt"; then
+			report "E:column-headers" PASS "a button the package gave a header is headed by it (Select: SEL) and still writes its one character into the movie; the others are headed by their letters"
+		else
+			report "E:column-headers" FAIL "$(tr '\t\n' ' ;' < "$work/headers.controls" 2>/dev/null | cut -c1-160) (see work/headers.*)"
+		fi
+
 		# StateSaving, the export a core is told with BEFORE every state the
 		# engine takes of it (engine: ce_session::stateSaving; chimera#190 -
 		# xemu writes the surfaces its GPU drew into the console's RAM there,

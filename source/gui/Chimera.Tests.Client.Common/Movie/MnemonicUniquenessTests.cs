@@ -39,6 +39,14 @@ namespace Chimera.Tests.Client.Common
 			public List<string> Buttons = new();
 			public List<(string Name, string? Header)> Axes = new();
 			public Dictionary<string, string>? Declared;
+			public Dictionary<string, string> Headers = new();
+
+			/// <summary>What heads the button's column: its header, or its letter.</summary>
+			public string? HeaderOf(string button)
+			{
+				if (Headers.TryGetValue(button, out var whole)) return whole;
+				return Headers.TryGetValue(Bare(button), out var bare) ? bare : LetterOf(button);
+			}
 
 			/// <summary>The declared letter: by the whole name, then without the player.</summary>
 			public string? LetterOf(string button)
@@ -67,6 +75,8 @@ namespace Chimera.Tests.Client.Common
 				c.Axes.Add((a["name"]?.Value<string>() ?? "", a["header"]?.Value<string>()));
 			if (input["mnemonics"] is JObject declared)
 				c.Declared = declared.Properties().ToDictionary(static p => p.Name, static p => p.Value.ToString());
+			if (input["headers"] is JObject headers)
+				c.Headers = headers.Properties().ToDictionary(static p => p.Name, static p => p.Value.ToString());
 			return c;
 		}
 
@@ -221,6 +231,46 @@ namespace Chimera.Tests.Client.Common
 			Assert.AreEqual(0, complaints.Count, string.Join("; ", complaints.Take(40)));
 		}
 
+		/// <summary>
+		/// A header is what a package gives a button whose letter does not tell
+		/// it from its neighbours (chimera#225): one to eight characters of
+		/// printable ASCII with no space at either end, which is what the engine
+		/// takes - anything else it drops without a word and the column is
+		/// headed by the letter again. It names a control that is there, and it
+		/// heads one column of a player: a header that another column of the
+		/// same player is also headed by has told nothing apart.
+		/// </summary>
+		[TestMethod]
+		public void ADeclaredHeaderIsUsableAndHeadsOneColumn()
+		{
+			var complaints = new List<string>();
+			foreach (var c in Controllers().Where(static c => c.Headers.Count is not 0))
+			{
+				var names = new HashSet<string>(c.Buttons.Concat(c.Buttons.Select(Bare)));
+				foreach (var pair in c.Headers)
+				{
+					var h = pair.Value;
+					if (h.Length is 0 or > 8 || h[0] is ' ' || h[h.Length - 1] is ' ' || h.Any(static ch => ch < ' ' || ch >= 0x7F))
+						complaints.Add($"{c.Core} ({c.Where}): {pair.Key} = \"{h}\" is not a header");
+					if (!names.Contains(pair.Key))
+						complaints.Add($"{c.Core} ({c.Where}): a header for {pair.Key}, which is not a button");
+				}
+
+				foreach (var group in c.Buttons.GroupBy(PlayerOf))
+				{
+					var headed = group.Where(b => c.Headers.ContainsKey(b) || c.Headers.ContainsKey(Bare(b))).ToList();
+					foreach (var button in headed)
+					{
+						var twin = group.FirstOrDefault(other => other != button && c.HeaderOf(other) == c.HeaderOf(button));
+						if (twin is not null)
+							complaints.Add($"{c.Core} ({c.Where}) {group.Key}: \"{c.HeaderOf(button)}\" heads both {button} and {twin}");
+					}
+				}
+			}
+
+			Assert.AreEqual(0, complaints.Count, string.Join("; ", complaints.Take(40)));
+		}
+
 		/// <summary>"P2 Start" belongs to player 2; "Reset" belongs to the console.</summary>
 		private static string PlayerOf(string button)
 			=> Bare(button) == button ? "console" : button.Substring(0, button.IndexOf(' '));
@@ -238,6 +288,8 @@ namespace Chimera.Tests.Client.Common
 			Assert.AreEqual('2', GenericControlNames.Instance.MnemonicOf("Insert Disk 2"));
 			Assert.AreEqual("P1LSX", GenericControlNames.Instance.AxisHeaderOf("P1 Left Stick X"));
 			Assert.AreEqual("LT", GenericControlNames.Instance.AxisHeaderOf("Left Trigger"));
+			// a button nobody gave a header is headed by its letter
+			Assert.AreEqual("U", GenericControlNames.Instance.ButtonHeaderOf("P1 Up"));
 		}
 
 		/// <summary>
@@ -250,13 +302,18 @@ namespace Chimera.Tests.Client.Common
 		{
 			FixedControlNames names = new(
 				new Dictionary<string, char> { ["P1 Cross"] = 'X', ["P2 Cross"] = 'X', ["P1 Up"] = 'U' },
-				new Dictionary<string, string> { ["P1 Left Stick X"] = "LX" });
+				new Dictionary<string, string> { ["P1 Left Stick X"] = "LX" },
+				new Dictionary<string, string> { ["P1 Up"] = "UP" });
 			var machine = new ControllerDefinition("pad") { BoolButtons = { "P1 Cross", "P1 Up" } }
 				.WithControlNames(names)
 				.MakeImmutable();
 			machine.BuildMnemonicsCache();
 			Assert.AreEqual('X', machine.MnemonicFor("P1 Cross"));
 			Assert.AreEqual("LX", machine.AxisHeaderFor("P1 Left Stick X"));
+			// a header is the column's and not the movie's: the letter stays
+			Assert.AreEqual("UP", machine.ButtonHeaderFor("P1 Up"));
+			Assert.AreEqual('U', machine.MnemonicFor("P1 Up"));
+			Assert.AreEqual("X", machine.ButtonHeaderFor("P1 Cross"));
 			// not in the cache, still the machine's word
 			Assert.AreEqual('X', machine.MnemonicFor("P2 Cross"));
 			// and one nobody named at all: the rule

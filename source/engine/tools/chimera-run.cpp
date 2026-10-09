@@ -10,7 +10,7 @@
  *       [--rerecord] [--seek <frame>] [--play <n>] [--edit-from <movie>] [--stop-at-seek] [--bands n,m,ms,fs,anchor] [--record <out.txt>]
  *       [--settings <json>]
  *       [--dump <domain>=<path>]... [--export-savedata <dir>] [--meta <path>]
- *       [--core-log <path>]
+ *       [--core-log <path>] [--controls <path>]
  *   chimera-run --project <p.chimeraProject> <package>
  *       [--files <dir>]... [--allow-core-mismatch] [the same run flags]
  *
@@ -256,6 +256,7 @@ int main(int argc, char **argv)
 	/* --core-log <path>: what the core says, kept in a file (ce_core_log), and
 	 * the "corelog" request mounted so a core with a fuller log keeps it */
 	std::string coreLogPath;
+	std::string controlsPath;
 	std::string ratesPath;
 	std::vector<std::pair<std::string, std::string>> dumps; // domain -> path
 	std::string ramSearchBench;
@@ -404,6 +405,7 @@ int main(int argc, char **argv)
 		else if (arg == "--export-savedata" && i + 1 < argc) savedataDir = argv[++i];
 		else if (arg == "--meta" && i + 1 < argc) metaPath = argv[++i];
 		else if (arg == "--core-log" && i + 1 < argc) coreLogPath = argv[++i];
+		else if (arg == "--controls" && i + 1 < argc) controlsPath = argv[++i];
 		else if (arg == "--project" && i + 1 < argc) projectPath = argv[++i];
 		else if (arg == "--files" && i + 1 < argc) fileDirs.push_back(argv[++i]);
 		else if (arg == "--allow-core-mismatch") allowCoreMismatch = true;
@@ -870,6 +872,29 @@ int main(int argc, char **argv)
 		}
 		std::fprintf(stderr, "chimera-run: history loaded in %.1f ms\n",
 			std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count());
+	}
+
+	/* What the machine's controls are called, as a window would be told: a
+	 * line a control - its name, the character it writes into a movie, and
+	 * what heads its column - tab separated; an axis has no character. */
+	if (!controlsPath.empty())
+	{
+		std::string out;
+		const char *letters = ce_session_button_mnemonics(session);
+		const int64_t buttons = ce_session_button_count(session);
+		for (int64_t b = 0; b < buttons; b++)
+		{
+			const char *name = ce_session_button_name(session, b);
+			out += std::string(name) + "\t" + std::string(1, letters[b]) + "\t"
+				+ ce_session_button_header_of(session, name) + "\n";
+		}
+		const int64_t axes = ce_session_axis_count(session);
+		for (int64_t a = 0; a < axes; a++)
+		{
+			const char *name = ce_session_axis_name(session, a);
+			out += std::string(name) + "\t\t" + ce_session_axis_header_of(session, name) + "\n";
+		}
+		writeWholeFile(controlsPath, reinterpret_cast<const uint8_t *>(out.data()), out.size());
 	}
 
 	/* Record mode: decode the source movie's entries into machine input and

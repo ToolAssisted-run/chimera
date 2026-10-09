@@ -650,6 +650,11 @@ namespace Chimera.Client.GUI
 					else if (index < CurrentTasMovie.InputLogLength)
 					{
 						text = CurrentTasMovie.DisplayValue(index, columnName, !axisEditing);
+						// A pressed button's cell reads as its column does. The movie's
+						// text has one character for it; the column may be headed by
+						// more, and a cell that said something else would have to be
+						// looked up (chimera#225).
+						if (text.Length is not 0 && !column.Rotatable) text = column.Text;
 					}
 				}
 			}

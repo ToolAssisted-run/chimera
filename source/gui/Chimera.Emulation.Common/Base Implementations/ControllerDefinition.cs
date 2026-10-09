@@ -98,6 +98,12 @@ namespace Chimera.Emulation.Common
 				? c
 				: ControlNames.MnemonicOf(buttonName);
 
+		/// <summary>
+		/// What heads a button's input column and fills its pressed cells: the
+		/// header its package declared, or its letter.
+		/// </summary>
+		public string ButtonHeaderFor(string buttonName) => ControlNames.ButtonHeaderOf(buttonName);
+
 		/// <summary>The header of an axis's input column.</summary>
 		public string AxisHeaderFor(string axisName) => ControlNames.AxisHeaderOf(axisName);
 

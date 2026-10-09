@@ -1605,7 +1605,9 @@ namespace Chimera.Client.GUI
 					}
 					else
 					{
-						yield return (name, MovieSession.MovieController.Definition.MnemonicFor(name).ToString(), 1);
+						// headed by what its package calls it in a column - one letter
+						// unless the machine has more buttons than letters tell apart
+						yield return (name, MovieSession.MovieController.Definition.ButtonHeaderFor(name), 1);
 					}
 				}
 			}

@@ -84,8 +84,31 @@ static void whatAPackageDeclares()
 	assert(names.axisHeaderOf("P1 Left Stick X") == "LX");
 	assert(names.axisHeaderOf("P2 Left Stick X") == "P2LSX");
 
+	/* a header is found as a mnemonic is, and a button with none is headed
+	 * by its letter (chimera#225) */
+	names.mnemonics["Keyboard CAPS SHIFT"] = '^';
+	names.buttonHeaders["Keyboard CAPS SHIFT"] = "CS";
+	names.buttonHeaders["Start"] = "STA";
+	assert(names.buttonHeaderOf("Keyboard CAPS SHIFT") == "CS");
+	assert(names.mnemonicOf("Keyboard CAPS SHIFT") == '^');
+	assert(names.buttonHeaderOf("P2 Start") == "STA");
+	assert(names.buttonHeaderOf("P1 Cross") == "X");
+	assert(names.buttonHeaderOf("P1 Circle") == "C");
+
+	/* what a header may be */
+	assert(chimera::usableButtonHeader("CS"));
+	assert(chimera::usableButtonHeader("F 1"));
+	assert(chimera::usableButtonHeader("12345678"));
+	assert(!chimera::usableButtonHeader(""));
+	assert(!chimera::usableButtonHeader("123456789"));
+	assert(!chimera::usableButtonHeader(" CS"));
+	assert(!chimera::usableButtonHeader("CS "));
+	assert(!chimera::usableButtonHeader("C\tS"));
+	assert(!chimera::usableButtonHeader("\xC3\x89"));
+
 	/* a package that declares nothing: the rule everywhere */
 	const ControlNames none;
+	assert(none.buttonHeaderOf("P1 Cross") == "C");
 	assert(none.mnemonicOf("P1 Cross") == 'C');
 	assert(none.axisHeaderOf("P1 Left Stick X") == "P1LSX");
 }

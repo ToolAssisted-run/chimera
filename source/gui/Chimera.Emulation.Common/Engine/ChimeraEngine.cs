@@ -646,11 +646,17 @@ namespace Chimera.Emulation.Common.Engine
 		public abstract int ce_session_mnemonic_of(IntPtr session, [MarshalAs(UnmanagedType.LPUTF8Str)] string name);
 
 		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_session_button_header_of(IntPtr session, [MarshalAs(UnmanagedType.LPUTF8Str)] string name);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_session_axis_header_of(IntPtr session, [MarshalAs(UnmanagedType.LPUTF8Str)] string name);
 
 		/// <summary>The rule alone: the letter of a name no package describes.</summary>
 		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract int ce_control_mnemonic([MarshalAs(UnmanagedType.LPUTF8Str)] string name);
+
+		[ChimeraImport(CallingConvention.Cdecl)]
+		public abstract IntPtr ce_control_button_header([MarshalAs(UnmanagedType.LPUTF8Str)] string name);
 
 		[ChimeraImport(CallingConvention.Cdecl)]
 		public abstract IntPtr ce_control_axis_header([MarshalAs(UnmanagedType.LPUTF8Str)] string name);
@@ -1183,6 +1189,10 @@ namespace Chimera.Emulation.Common.Engine
 		/// </param>
 		/// <summary>The engine's rule for a control no package describes: one letter.</summary>
 		public static char ControlMnemonic(string name) => (char) Instance.ce_control_mnemonic(name);
+
+		/// <summary>What heads the column of a button no package describes: its letter.</summary>
+		public static string ControlButtonHeader(string name)
+			=> PtrToStringUtf8(Instance.ce_control_button_header(name)) ?? ControlMnemonic(name).ToString();
 
 		/// <summary>The same for an axis: a short header.</summary>
 		public static string ControlAxisHeader(string name)
@@ -2378,6 +2388,15 @@ namespace Chimera.Emulation.Common.Engine
 		/// </summary>
 		public char MnemonicOf(string name)
 			=> Disposed ? ChimeraEngine.ControlMnemonic(name) : (char) E.ce_session_mnemonic_of(_session, name);
+
+		/// <summary>
+		/// What heads a button's input column: the package's header for it, or
+		/// its letter. Never written into a movie.
+		/// </summary>
+		public string ButtonHeaderOf(string name)
+			=> Disposed
+				? ChimeraEngine.ControlButtonHeader(name)
+				: ChimeraEngine.PtrToStringUtf8(E.ce_session_button_header_of(_session, name)) ?? MnemonicOf(name).ToString();
 
 		/// <summary>The short header of an axis's input column, found the same way.</summary>
 		public string AxisHeaderOf(string name)
