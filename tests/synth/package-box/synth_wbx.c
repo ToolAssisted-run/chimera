@@ -155,8 +155,11 @@ ECL_EXPORT void SetRenderingEnabled(int on) { g_render = on != 0; }
 
 /* Palette-resolved presentation for the frontend's IVideoProvider (the raw
  * palette-index framebuffer is what the witness hashes; this is display only). */
+ECL_INVISIBLE static uint32_t g_read;  /* pictures handed over while drawing, this session: in no state */
+
 ECL_EXPORT uint32_t *GetVideoBgra(void)
 {
+	if (g_render) g_read++;
 	if (g_render) synth_get_video_bgra(g_synth, g_video);
 	if (g_render && g_garbleNow)
 		for (int i = 0; i < FB_W * FB_H; i++) g_video[i] ^= 0x00FFFFFFu ^ (uint32_t)(i * 2654435761u >> 8 & 0x00FFFFFFu);
@@ -173,10 +176,12 @@ ECL_EXPORT uint32_t *GetVideoBgra(void)
  * the engine reads properties through it, and no memory tool lists it. It
  * lives in memory that is in no state, and holds the four letters the Letter
  * property reads, followed by the three numbers of the StateSaving note
- * (above), filled in whenever it is asked for. */
+ * (above) and by how many pictures the frontend has read, filled in whenever
+ * it is asked for. The last is what tells a frame that was read from one that
+ * was only run (leg E:settle-probe, --settle-probe-unseen). */
 #define MD_COUNT 3
 static const char *const md_names[MD_COUNT] = { "RAM", "VRAM", "Mailbox" };
-ECL_INVISIBLE static uint8_t g_mailbox[16];
+ECL_INVISIBLE static uint8_t g_mailbox[20];
 
 ECL_EXPORT int GetMemoryDomainCount(void) { return MD_COUNT; }
 
@@ -191,6 +196,7 @@ ECL_EXPORT uint8_t *GetMemoryDomainPtr(int i) {
 		memcpy(g_mailbox + 4, &g_toldAt, 4);
 		memcpy(g_mailbox + 8, &g_framesRun, 4);
 		memcpy(g_mailbox + 12, &g_told, 4);
+		memcpy(g_mailbox + 16, &g_read, 4);
 		return g_mailbox;
 	}
 	return 0;

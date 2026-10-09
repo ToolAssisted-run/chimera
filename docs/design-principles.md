@@ -5460,3 +5460,43 @@ fight some 26 MB of surfaces change every frame, so a stored state is about
 25 MB larger and a run with the default greenzone takes 475 s where it took
 411. Multisampled targets are not carried.
 
+### The ones wrong for a few frames (user: "now fix the flycast and pcsx2 wrong frames", 2026-10-09)
+
+**Flycast: three frames, two causes, none left** (flycast patch 0020). The
+first frame after a load showed the picture of the moment the load was made
+FROM, and the next two were black.
+
+The black ones were an order of events. A frame is parsed, which finds its
+textures in the texture cache, and then drawn from them; the check that
+rebuilds the renderer after a load sat at the head of the drawing, so the
+rebuild fell between the two and freed the textures the frame was about to
+be drawn from. A game drawing thirty times a second kept that frame up for
+two. The check runs before the parse.
+
+The first one was something that is not in the machine: the picture of a
+frame the game draws nothing in is the last frame the renderer drew, kept in
+a framebuffer of the old context, and the read asked nothing about the
+context. Flycast answers `StateSaving` with a copy of that frame in its own
+memory, and the rebuild puts it back.
+
+**A frame that has been read needs no copy**, and this is the part worth
+keeping for the next core: the picture the frontend took is already in the
+core's own buffer, a state carries that, and after a load a read that finds
+no framebuffer leaves it standing. So the copy is made only of frames nobody
+looked at - what a seek that still draws leaves in a greenzone - and a state
+taken while somebody plays is exactly the size it was (the same 4059 states,
+byte for byte the same size, told and untold). The measurement had hidden
+this at first: a probe that reads every frame cannot tell a core that copies
+from one that does not, and the control passed. Hence `chimera-run
+--settle-probe-unseen`: the frames before the probe's are run as a seek runs
+them, no picture read, so the load lands on a state of a machine nobody was
+looking at. Witness leg E:settle-probe counts the pictures the synth hands
+over, 38 against 78.
+
+On the card, twelve frames after a load, each bit for bit the picture it
+was: through the greenzone, a whole state, onto a drawn frame and an undrawn
+one, at 1x and 3x, from states read and unread; untold, the first frame from
+an unread state is wrong. Eight rewinds end on the picture and the three
+memories of a run that never took a state. Not carried: the result of a
+render-to-texture pass, which this core keeps on the card; a game that draws
+one once and goes on using it would lose it until it drew it again.

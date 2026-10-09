@@ -320,6 +320,7 @@ int main(int argc, char **argv)
 	int64_t picturesMb = -1, picturesSettle = -1; /* --greenzone-pictures MiB[,settle] */
 	int64_t keptCheck = -1;                         /* --kept-pictures-check <frame> */
 	int64_t probeFrom = -1, probeCount = 0;         /* --settle-probe <frame>,<count>[,<tga prefix>] */
+	bool probeUnseen = false;                       /* --settle-probe-unseen: no picture read back before the probe's frames */
 	std::string probePrefix;
 	bool drawEveryFrame = false;
 	/* --rewind-loop <frame>,<times>: what re-recording actually does. A single
@@ -434,6 +435,13 @@ int main(int argc, char **argv)
 			if (c2 != std::string::npos) probePrefix = spec.substr(c2 + 1);
 			renderEveryFrame = true;
 		}
+		/* the frames before the probe's are run as a seek runs them, with no
+		 * picture read back: the state the load lands on is then one taken of
+		 * a machine nobody was looking at, which is most of a greenzone. With
+		 * --draw-every-frame they are still drawn, and what a core's renderer
+		 * holds at that state is the frame - only the core's copy of the last
+		 * picture read is old. */
+		else if (arg == "--settle-probe-unseen") probeUnseen = true;
 		else if (arg == "--rates" && i + 1 < argc) { ratesPath = argv[++i]; renderEveryFrame = true; }
 		else if (arg == "--draw-every-frame") drawEveryFrame = true;
 		else if (arg == "--greenzone-check") greenzoneCheck = true;
@@ -959,8 +967,9 @@ int main(int argc, char **argv)
 			? nullptr
 			: recAxes[static_cast<size_t>(i)].data();
 		auto shot = shots.find(i);
+		const bool unseen = probeUnseen && probeFrom >= 0 && i < probeFrom;
 		if (ce_session_movie_advance(session, 0, axes,
-			(renderEveryFrame || shot != shots.end()) ? 1 : 0) < 0)
+			((renderEveryFrame && !unseen) || shot != shots.end()) ? 1 : 0) < 0)
 		{
 			return fail(metaPath, ce_session_last_error(session));
 		}
