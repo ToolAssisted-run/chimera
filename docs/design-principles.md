@@ -5569,3 +5569,32 @@ scene, and both are the texture cache's copies of the EFB and the XFB, which
 are textures on the card as well: a few pixels in a thousand off by a few
 levels in the first drawn frame, and above 1x one frame shown at the
 machine's own size. Carrying those copies is the next step if it is wanted.
+
+**It was wanted (user-decided, 2026-10-09), and there was a third thing under
+it** (dolphin patch 0028). The texture cache's copies of the EFB and the XFB
+are carried like the EFB: read into the same block before a state, each
+named by its cache entry; after a load the entries stay, every GL object the
+cache holds is dropped before the rebuild makes anything, and each kept
+entry gets a new texture and its pixels. A copy of the XFB is carried only
+above 1x - at 1x the picture is the machine's own memory and nobody looks at
+the copy. The race is now exact for twelve frames after a load at 1x and at
+2x, where at 2x its first frame had been the machine's own 640x448; untold,
+both are back.
+
+The third thing is not a picture. Dolphin defers writing a copy into the
+machine's memory until the game says its drawing is done, and until then the
+bytes are in a staging texture on the card. A state taken in between held a
+machine whose memory was still to be written, and the rebuild began by
+flushing - reading a staging texture of a context that was gone and writing
+what came back into the machine. Nothing here was seen to go wrong by it; it
+was found reading the code that had to be changed. The bytes are carried
+too, and written when they would have been. Turning the deferral off would
+have been two lines, and was not done: it moves when those bytes land in the
+machine's memory, and every movie made so far was made with it on.
+
+That is the general shape of all five cores now, worth saying once: **what
+is on the card and in no state is found by asking what a rebuild makes again
+from the machine's memory and whether that is the same thing.** A texture
+decoded from memory is; a render target, a frame half drawn, a copy at a
+higher resolution, a deinterlacer's fields, bytes waiting in a staging
+buffer are not - and the last of those is the machine itself.
