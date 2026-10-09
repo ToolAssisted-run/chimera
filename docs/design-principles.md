@@ -5544,3 +5544,28 @@ bad frames had passed, which nobody had measured. Carrying the pool of spare
 targets as well was tried, and moved those pixels without removing them. A
 picture that depends on what a driver's texture last held is not one a state
 can be asked to reproduce; the machine is the same either way.
+
+**Dolphin: two black fields, and a batch of geometry nobody had missed**
+(dolphin patch 0027). In a film the second and third frames after a load were
+black. The EFB - the frame being drawn, colour and depth - is two textures
+on the card; a game showing thirty pictures a second draws into it during one
+field and copies it out to the XFB, which IS in the machine's memory, during
+the next; a state taken between the two held nothing of it, and the rebuild
+made the EFB again empty. Dolphin answers `StateSaving` with a copy of both
+textures in its own memory and the rebuild puts them back.
+
+It draws first whatever the vertex manager has queued. That was the second
+finding: a state can be taken mid-batch, and the rebuild had been abandoning
+the batch, because the buffer it was written into goes with the context.
+Drawn before the copy, it is in the EFB a state carries. Whether drawing it
+early is something the machine can see was the question, and the measurement
+says no: a state on every frame leaves the picture, the system RAM and the
+ARAM of 7900 frames of a race the same told and untold.
+
+On the card the film is exact for twelve frames after a load, at 1x and 2x,
+and black for two with the core left untold. A stored state is about 2 MB
+larger in a 3D scene. Two things are still not right after a load in that
+scene, and both are the texture cache's copies of the EFB and the XFB, which
+are textures on the card as well: a few pixels in a thousand off by a few
+levels in the first drawn frame, and above 1x one frame shown at the
+machine's own size. Carrying those copies is the next step if it is wanted.
