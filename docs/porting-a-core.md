@@ -9,6 +9,10 @@ Per-core reasoning lives in each core's own `docs/PLAN.md`. Read the closest
 one before starting a new port - a Symbian port and a PS2 port share more than
 you would think.
 
+[new-core.md](new-core.md) is the route this craft is used on: what a core
+request has to answer before any code, which existing core to start from,
+what proves each step, and the publishing checklist.
+
 ## What you are building
 
 Two builds of the same machine, and the claim that they are the same machine:
@@ -378,13 +382,9 @@ things:
    calling `ToolAssisted-run/chimera/.github/workflows/publish-core.yml@main` -
    see any wired core, or docs/core-manager.md.
 4. A row in Chimera's `official-cores.json` (which CI fetches published
-   packages by; the frontend does not read it) and in the README's core table,
-   which is where a user finds the core. The README also says which commit of
-   its emulator each core builds: `tools/core-versions.py <folder of core
-   checkouts>` rewrites that table from the cores' own submodule pins. It
-   takes the emulator to be the first submodule your `package-licenses.json`
-   names; if that is something else, say which in your roster row
-   (`"emulator": "<submodule path>"`).
+   packages by; the frontend does not read it) and in the README's table of
+   cores, which is where a user finds the core: its name linked to the
+   repository's main page, and the systems it runs beside it.
 
 **The publish job runs `./waterbox/build-package.sh -r <chimera>` in a fresh
 recursive checkout, and nothing else.** Two consequences, both of which have
