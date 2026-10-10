@@ -217,7 +217,7 @@ namespace Chimera.Tests.Client.GUI
 				Files = [ new("disc", "Game (USA).iso") ],
 				Settings = [ new("Renderer", "opengl-hw", "software"), new("Internal Resolution", "2", "1") ],
 			});
-			using ReportIssueForm form = new(report, [ @"C:\TAS\run.chimeraProject", @"C:\Chimera\Crashes\2026-10-09 pid2.txt", @"C:\Chimera\Crashes\2026-10-09 pid2.dmp" ]);
+			using ReportIssueForm form = new(report, [ @"C:\TAS\run.chimeraProject", @"C:\Chimera\Crashes\2026-10-09 pid2.txt", @"C:\Chimera\Crashes\2026-10-09 pid2.dmp" ], gamePicturePng: [ 1 ]);
 			form.StartPosition = FormStartPosition.Manual;
 			form.Location = new Point(0, 0);
 			form.Show();

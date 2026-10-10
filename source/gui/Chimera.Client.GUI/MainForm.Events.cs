@@ -1162,8 +1162,27 @@ namespace Chimera.Client.GUI
 		/// </summary>
 		private void ReportIssueMenuItem_Click(object sender, EventArgs e)
 		{
-			using ReportIssueForm form = new(IssueReportOfThisSession(), IssueFilesOfThisSession());
+			using ReportIssueForm form = new(IssueReportOfThisSession(), IssueFilesOfThisSession(), GamePictureForAReport());
 			this.ShowDialogWithTempMute(form);
+		}
+
+		/// <summary>The game's picture as it is now, as a PNG, or null when no game is running or it cannot be read.</summary>
+		private byte[] GamePictureForAReport()
+		{
+			if (Emulator.IsNull()) return null;
+			try
+			{
+				using var picture = MakeScreenshotImage();
+				using var bitmap = picture.ToSysdrawingBitmap();
+				using MemoryStream png = new();
+				bitmap.Save(png, System.Drawing.Imaging.ImageFormat.Png);
+				return png.ToArray();
+			}
+			catch (Exception e) when (e is InvalidOperationException or ArgumentException or System.Runtime.InteropServices.ExternalException)
+			{
+				// a core that has stopped has no picture to give; the report goes without one
+				return null;
+			}
 		}
 
 		internal string IssueReportOfThisSession()
@@ -1200,7 +1219,9 @@ namespace Chimera.Client.GUI
 			=> IssueReport.FilesToAttach(
 				_openProject is null ? null : MovieSession.Movie?.Filename,
 				CrashCapture.Root,
-				[ PathUtils.ExeDirectoryPath, Environment.CurrentDirectory ]);
+				[ PathUtils.ExeDirectoryPath, Environment.CurrentDirectory ],
+				// the core's log, while Tools > Export Core Log... is on
+				[ ChimeraEngine.CoreLogPath ]);
 
 		private void AboutMenuItem_Click(object sender, EventArgs e)
 		{

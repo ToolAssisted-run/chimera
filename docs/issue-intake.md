@@ -28,7 +28,8 @@ cannot be filed without the build identifiers.
 Help > Report an Issue (issue 243) shows the link to these forms and fills
 in the first five fields below from the running session, ready to paste. It
 also lists the project file, the newest crash note and the sandbox's log
-when they exist. It sends nothing.
+when they exist, and saves the ticked ones as one zip with the text and the
+game's picture. It sends nothing: the person attaches the zip.
 
 - *Chimera build: what Help > Copy Version Info copies (it copies the core's
   line too), the string from Help > About, or the release name

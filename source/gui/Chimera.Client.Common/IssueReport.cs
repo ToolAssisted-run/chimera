@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
 using System.Text;
 
@@ -129,7 +130,8 @@ namespace Chimera.Client.Common
 		/// <param name="projectPath">the open project's file, or null when it was never saved</param>
 		/// <param name="crashFolder">the data directory's Crashes folder</param>
 		/// <param name="logFolders">where the sandbox's log (minibox-diag.log) may be</param>
-		public static IReadOnlyList<string> FilesToAttach(string? projectPath, string crashFolder, IEnumerable<string> logFolders)
+		/// <param name="otherFiles">files to list when they exist, such as the core's log while it is being written</param>
+		public static IReadOnlyList<string> FilesToAttach(string? projectPath, string crashFolder, IEnumerable<string> logFolders, IEnumerable<string?>? otherFiles = null)
 		{
 			List<string> files = new();
 			try
@@ -154,12 +156,102 @@ namespace Chimera.Client.Common
 					files.Add(log);
 					break;
 				}
+				foreach (var other in otherFiles ?? [ ])
+				{
+					if (!string.IsNullOrWhiteSpace(other) && File.Exists(other) && !files.Contains(other!)) files.Add(other!);
+				}
 			}
 			catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException)
 			{
 				// a folder that cannot be read has nothing to offer; the list is a help, not a requirement
 			}
 			return files;
+		}
+
+		/// <summary>The largest file GitHub takes as an attachment to an issue.</summary>
+		public const long AttachmentLimit = 25L * 1024 * 1024;
+
+		/// <summary>The name the report's text has inside the zip.</summary>
+		public const string ReportEntry = "report.md";
+
+		/// <summary>The name the picture of the game has inside the zip.</summary>
+		public const string PictureEntry = "game.png";
+
+		/// <summary>What <see cref="WriteZip"/> wrote: the zip's size, and the files it could not read.</summary>
+		public sealed record ZipResult(long Bytes, IReadOnlyList<string> NotRead);
+
+		/// <summary>
+		/// Writes one zip to attach to a report: the report's text, the picture of
+		/// the game when there is one, and the files given, each under its own
+		/// name. A file that cannot be read is left out and named in the result;
+		/// the others are still written. Nothing is sent anywhere.
+		/// </summary>
+		/// <exception cref="IOException">the zip itself could not be written; no partial file is left</exception>
+		public static ZipResult WriteZip(string zipPath, string reportText, byte[]? gamePicturePng, IEnumerable<string> files)
+		{
+			List<string> notRead = new();
+			try
+			{
+				using (var stream = new FileStream(zipPath, FileMode.Create, FileAccess.Write, FileShare.None))
+				using (ZipArchive zip = new(stream, ZipArchiveMode.Create))
+				{
+					using (var text = new StreamWriter(zip.CreateEntry(ReportEntry, CompressionLevel.Optimal).Open(), new UTF8Encoding(false)))
+					{
+						text.Write(reportText.Replace("\r\n", "\n"));
+						text.Write('\n');
+					}
+					if (gamePicturePng is { Length: > 0 })
+					{
+						using var picture = zip.CreateEntry(PictureEntry, CompressionLevel.NoCompression).Open();
+						picture.Write(gamePicturePng, 0, gamePicturePng.Length);
+					}
+					HashSet<string> taken = new(StringComparer.OrdinalIgnoreCase) { ReportEntry, PictureEntry };
+					foreach (var file in files)
+					{
+						byte[] bytes;
+						try
+						{
+							// a log may still be open for writing by this very program
+							using var source = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+							using MemoryStream copy = new();
+							source.CopyTo(copy);
+							bytes = copy.ToArray();
+						}
+						catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+						{
+							notRead.Add(file);
+							continue;
+						}
+						var name = Path.GetFileName(file);
+						for (var n = 2; !taken.Add(name); n++) name = $"{Path.GetFileNameWithoutExtension(file)} ({n}){Path.GetExtension(file)}";
+						using var entry = zip.CreateEntry(name, CompressionLevel.Optimal).Open();
+						entry.Write(bytes, 0, bytes.Length);
+					}
+				}
+				return new(new FileInfo(zipPath).Length, notRead);
+			}
+			catch (Exception e) when (e is UnauthorizedAccessException or ArgumentException or NotSupportedException)
+			{
+				TryDelete(zipPath);
+				throw new IOException(e.Message, e);
+			}
+			catch (IOException)
+			{
+				TryDelete(zipPath);
+				throw;
+			}
+		}
+
+		private static void TryDelete(string path)
+		{
+			try
+			{
+				if (File.Exists(path)) File.Delete(path);
+			}
+			catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+			{
+				// nothing more can be done about a file that cannot be written or removed
+			}
 		}
 	}
 }

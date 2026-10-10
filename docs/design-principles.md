@@ -6025,15 +6025,30 @@ window with three things, each with a button that copies it:
    project, the newest crash note with the memory dump beside it, and the
    sandbox's log (`minibox-diag.log`).
 
-Why not a zip and a wizard: a zip would have to be attached by hand anyway,
-because Chimera sends nothing (it has no network code), and the project
-file and the crash files are already separate files a person can drag into
-the form. The text is the part people got wrong or left out.
+Why not a wizard: the text is the part people got wrong or left out, and a
+window with the text ready to copy gives it in one step.
+
+The zip (user-decided later the same day). The first version left the zip
+out, because it has to be attached by hand anyway. The owner then asked for
+it: a button, "Save as Zip...", under the list of files. The list has a tick
+box on every row, all ticked at first, so a person can leave out what they
+do not want to share. The zip holds:
+- `report.md`, the text of part 2, always;
+- `game.png`, the game's picture as it was when the window opened, when a
+  game is running;
+- every ticked file under its own name: the saved project, the newest crash
+  note and its memory dump, the sandbox's log, and the core's log while
+  Tools > Export Core Log... is on.
+A file that cannot be read is left out and named under the list. A zip
+larger than the 25 MB GitHub takes is said to be too large. The zip is
+written by `IssueReport.WriteZip`. It is still sent nowhere: the person
+attaches it to the report.
 
 What it does not do:
 - It sends nothing. The link is opened by the system's browser, the same
   way Help > "Open toolAssisted.run in Browser" does it.
-- It takes no screenshots.
+- It takes no pictures of Chimera's windows or of the screen. The only
+  picture is the game's own, and only when its row is ticked.
 - It names the graphics card only when a core drew on one in this session.
   That is when Chimera asks the driver for its name, and it is the case
   where the card matters. Otherwise the line carries a note asking the
@@ -6048,12 +6063,13 @@ what the session already knows, so it is interface code. Its labels are the
 ones in `.github/ISSUE_TEMPLATE/bug_report.md`; when that form changes,
 `IssueReport.Text` changes with it.
 
-Tested: 7 new tests of the text, the settings comparison and the file list
-(`IssueReportTests`), 2 of the window (`ReportIssueFormTests`) and a
-screenshot in both themes. The settings comparison was broken on purpose
-and its test failed. Interface tests after a full rebuild: 119 / 59 / 550 /
-296 with none failed (550 was 543, 296 was 293). Not tested: the window on
-Windows, and the buttons that use the clipboard and the browser.
+Tested: 9 tests of the text, the settings comparison, the file list and
+the zip (`IssueReportTests`), 3 of the window (`ReportIssueFormTests`) and a
+screenshot in both themes. The settings comparison and the tick boxes were
+each broken on purpose and their tests failed. Interface tests after a full
+rebuild: 119 / 59 / 552 / 302 with none failed. The same 12 tests pass on
+Windows, run there from a copy of the test build. Not tested: the buttons
+that use the clipboard, the browser and the save dialog, by hand.
 
 ## On Linux a button keeps its text whatever font the desktop chose (2026-10-10, issue 246)
 
