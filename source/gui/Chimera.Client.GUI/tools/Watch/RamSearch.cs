@@ -613,8 +613,11 @@ namespace Chimera.Client.GUI
 
 		private IEnumerable<Watch> SelectedWatches => SelectedItems.Where(x => !x.IsSeparator);
 
+		// every row of a search is in the search's own domain; with many rows
+		// selected that is asked once instead of of each row (issue 224)
 		private bool MayPokeAllSelected
-			=> WatchListView.AnyRowsSelected && SelectedWatches.All(static w => w.Domain.Writable);
+			=> WatchListView.AnyRowsSelected
+				&& (ManyRowsSelected ? _searches.Domain.Writable : SelectedWatches.All(static w => w.Domain.Writable));
 
 		private void SetRemovedMessage(long val)
 		{
@@ -944,6 +947,7 @@ namespace Chimera.Client.GUI
 
 		private void AddToRamWatch()
 		{
+			if (!MayActOnSelection("Add to RAM Watch")) return;
 			var watches = SelectedWatches.ToList();
 			if (watches.Count is not 0)
 			{
@@ -959,6 +963,7 @@ namespace Chimera.Client.GUI
 		private void PokeAddress()
 		{
 			if (!WatchListView.AnyRowsSelected) return;
+			if (!MayActOnSelection("Poke")) return;
 			using RamPoke poke = new(DialogController, SelectedItems, MainForm.CheatList) { InitialLocation = this.ChildPointToScreen(WatchListView) };
 			this.ShowDialogWithTempMute(poke);
 			UpdateList();
@@ -1360,6 +1365,7 @@ namespace Chimera.Client.GUI
 
 		private void FreezeAddressMenuItem_Click(object sender, EventArgs e)
 		{
+			if (!MayActOnSelection("Freeze or unfreeze")) return;
 			var allCheats = SelectedWatches.All(x => MainForm.CheatList.IsActive(x.Domain, x.Address));
 			if (allCheats)
 			{
@@ -1379,7 +1385,40 @@ namespace Chimera.Client.GUI
 		}
 
 		private void SelectAllMenuItem_Click(object sender, EventArgs e)
-			=> WatchListView.ToggleSelectAll();
+		{
+			// Ctrl+A is this item's shortcut, and a menu takes a shortcut before the
+			// control with the keyboard sees it. In a value box it means the box's
+			// text, not every address in the list (issue 224).
+			if (SelectionGuard.TextBoxWithKeyboard(this) is { } box)
+			{
+				box.SelectAll();
+				return;
+			}
+			// the list keeps one entry for each selected row: all of a large domain
+			// is tens of millions of them
+			if (SelectionGuard.SelectAllQuestion(_searches.Count) is { } question
+				&& !this.ModalMessageBox2(caption: "RAM Search", text: question, useOKCancel: true))
+			{
+				return;
+			}
+			WatchListView.ToggleSelectAll();
+		}
+
+		/// <summary>
+		/// Before an action that does something for every selected row: with more
+		/// rows than anyone picks by hand, asks first. A search starts with every
+		/// address of the domain, and all of them selected is millions.
+		/// </summary>
+		private bool MayActOnSelection(string action)
+		{
+			var question = SelectionGuard.Question(SelectedIndices.Count(), action);
+			return question is null
+				|| this.ModalMessageBox2(caption: "RAM Search", text: question, useOKCancel: true);
+		}
+
+		/// <summary>More rows selected than <see cref="SelectionGuard.ManyRows"/>; stops counting there.</summary>
+		private bool ManyRowsSelected
+			=> SelectedIndices.Skip(SelectionGuard.ManyRows).Any();
 
 		private void SettingsSubMenu_DropDownOpened(object sender, EventArgs e)
 		{
@@ -1463,7 +1502,7 @@ namespace Chimera.Client.GUI
 
 			ContextMenuSeparator3.Visible = WatchListView.AnyRowsSelected || MainForm.CheatList.AnyActive;
 
-			if (SelectedItems.All(watch => MainForm.CheatList.IsActive(_settings.Domain, watch.Address)))
+			if (!ManyRowsSelected && SelectedItems.All(watch => MainForm.CheatList.IsActive(_settings.Domain, watch.Address)))
 			{
 				FreezeContextMenuItem.Text = "&Unfreeze Address";
 				FreezeContextMenuItem.Image = Resources.Unfreeze;
@@ -1482,7 +1521,7 @@ namespace Chimera.Client.GUI
 
 		private void ViewInHexEditorContextMenuItem_Click(object sender, EventArgs e)
 		{
-			if (SelectedWatches.Any())
+			if (SelectedWatches.Any() && MayActOnSelection("Open in the Hex Editor"))
 			{
 				ViewInHexEditor(_searches.Domain, SelectedWatches.Select(x => x.Address), SelectedSize);
 			}
@@ -1532,6 +1571,7 @@ namespace Chimera.Client.GUI
 
 		private void CopyWatchesToClipBoard()
 		{
+			if (!MayActOnSelection("Copy")) return;
 			if (SelectedItems.Any())
 			{
 				var sb = new StringBuilder();

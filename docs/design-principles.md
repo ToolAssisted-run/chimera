@@ -5948,3 +5948,31 @@ Limits: a locale whose decimal separator is more than one byte is still not
 handled by the JSON library (it looks at the first byte only). A project
 file that was already written with "0,5" under the old build cannot be read
 and has to be corrected by hand.
+
+## RAM Search: Ctrl+A in a value box, and actions on a huge selection (2026-10-10, issue 224)
+
+Reported as a freeze. The reporter found the trigger and the code confirms
+it. Ctrl+A is the shortcut of RAM Search's "Select All" menu item, and a
+menu takes its shortcut before the control that has the keyboard sees the
+key. So Ctrl+A typed in the "Specific Value" box selected every address in
+the list, not the text of the box. A new search lists every address of the
+domain, so that was millions of rows. The next action on the selection then
+ran over all of them: a double-click adds every selected address to RAM
+Watch, Ctrl+C copies every one. The window stopped answering.
+
+What changed:
+- Ctrl+A in a text box selects the text of that box.
+- Add to RAM Watch, Poke, Freeze, Copy and Open in the Hex Editor ask first
+  when more than 1000 addresses are selected, and say how many.
+- Select All asks first when the list holds more than a million addresses,
+  because the list keeps one entry for every selected row.
+- The context menu no longer looks at every selected row each time it opens
+  when many are selected.
+
+Tested with three new tests of the two questions (`SelectionGuardTests`);
+one was broken on purpose and failed. Not tested: the keys pressed in a real
+RAM Search window.
+
+Still open in issue 224: the reporter lost about 1000 frames of input when
+the frozen program was closed, which the input journal should have kept.
+That part is not explained.
