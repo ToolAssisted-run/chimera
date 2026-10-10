@@ -198,6 +198,31 @@ if [ "$level" = "both" ] || [ "$level" = "e" ]; then
 			report "E:statefile:refusals" FAIL "garbage rc=$garbage_rc short rc=$short_rc good rc=$good_rc (see work/statefile-*.log)"
 		fi
 
+		# A PACKAGE WHOSE DECLARATIONS CANNOT BE READ says which file and what
+		# is in it. The sentence reaches a person through a window that shows
+		# one line (the project wizard's compile step), and "not readable JSON"
+		# alone left a report of it with nothing to go on (2026-10-10). The
+		# package here is the synthetic one unpacked, its waterbox.config
+		# saved as UTF-16, which is what a text editor can do to it.
+		badpkg="$work/unreadable-package"
+		rm -rf "$badpkg"; mkdir -p "$badpkg"
+		if (cd "$badpkg" && unzip -q "$epkg") 2>/dev/null && python3 -c "
+import codecs, sys
+p = sys.argv[1]
+t = open(p, encoding='utf-8').read()
+open(p, 'wb').write(codecs.BOM_UTF16_LE + t.encode('utf-16-le'))
+" "$badpkg/waterbox.config"; then
+			"$chimera_run" "$badpkg" "$here/roms/gridWalker.testrom" "$here/movies/gridWalker.win.txt" \
+				> "$work/unreadable-package.log" 2>&1 || true
+			if grep -q "waterbox.config is not readable JSON ($badpkg: [0-9]* bytes, starting with \\\\xff\\\\xfe" "$work/unreadable-package.log"; then
+				report "E:package:unreadable" PASS "the refusal names the package, its size and its first bytes"
+			else
+				report "E:package:unreadable" FAIL "$(tail -1 "$work/unreadable-package.log" | cut -c1-120)"
+			fi
+		else
+			report "E:package:unreadable" FAIL "could not prepare the package (unzip, python3)"
+		fi
+
 		# A CORE THAT DIES: all eight buttons at once make the synth core abort on
 		# cue (SPEC.md). The run must stop with the reason and the core's own last
 		# words - miniBox handing control back - and the process must not crash.

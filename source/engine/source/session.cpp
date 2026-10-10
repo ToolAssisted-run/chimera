@@ -26,6 +26,7 @@
 #include "../../extern/cjson/cJSON.h"
 
 #include <algorithm>
+#include <cstdio>
 #include <cstring>
 #include <map>
 #include <string>
@@ -150,6 +151,37 @@ const cJSON *chooseMachine(const cJSON *root, const char *overrides)
 	}
 	/* a value naming no machine is the first one: a session always has a machine */
 	return machines->child;
+}
+
+/* " (<package>: N bytes, starting with ...)": where the declarations were
+ * read from, how much there was, and its first bytes - text as text, anything
+ * else as \xNN - so a report of this error says what the file actually is. */
+std::string describeUnreadable(const char *packagePath, const uint8_t *bytes, uint64_t len)
+{
+	std::string out = " (";
+	out += packagePath != nullptr ? packagePath : "?";
+	out += ": " + std::to_string(len) + (len == 1 ? " byte" : " bytes");
+	if (bytes != nullptr && len != 0)
+	{
+		out += ", starting with ";
+		const uint64_t shown = len < 16 ? len : 16;
+		for (uint64_t i = 0; i < shown; i++)
+		{
+			const uint8_t b = bytes[i];
+			if (b >= 0x20 && b < 0x7f && b != '\\')
+			{
+				out += static_cast<char>(b);
+			}
+			else
+			{
+				char hex[8];
+				std::snprintf(hex, sizeof hex, "\\x%02x", static_cast<unsigned>(b));
+				out += hex;
+			}
+		}
+	}
+	out += ")";
+	return out;
 }
 
 bool parseConfig(const char *json, uint64_t len, const char *overrides, SessionConfig &cfg, std::string &error)
@@ -1329,6 +1361,12 @@ ce_session *ce_session_open(
 	std::string cfgError;
 	if (!parseConfig(reinterpret_cast<const char *>(entry), len, settings_overrides_json, s->cfg, cfgError))
 	{
+		/* Say which file and what is in it. This sentence reaches a person
+		 * through a window that shows one line (the project wizard's compile
+		 * step shows it for a child session), and the declarations alone not
+		 * being JSON does not tell an empty file from a damaged copy or from
+		 * one saved in another encoding. */
+		cfgError += describeUnreadable(package_path, entry, len);
 		return abort(std::move(cfgError));
 	}
 	entry = ce_package_entry(pkg, "core.wbx", &len);

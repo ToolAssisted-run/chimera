@@ -5881,3 +5881,27 @@ distribution of Chimera for that architecture, with its own cores.
 Every core changes when it is next rebuilt against this miniBox. None was
 rebuilt for this; the published packages keep working with the new host
 library, which is what the three core test scripts above ran.
+
+## A package that cannot be read says which file and what is in it (2026-10-10)
+
+A user reported that the project wizard's compile step for an RPCS3 game
+stopped with "waterbox.config is not readable JSON". That sentence is the
+engine's, said by a compile session (a child copy of the frontend) when the
+declarations file of the package it opened did not parse.
+
+It could not be reproduced. The published RPCS3 packages hold valid JSON, and
+on Windows with the published builds a compile session started without the
+error for a disc game, for a package game with its licence, and six at once
+on an empty data folder. Whatever the reporter's copy of the file holds, the
+message gave nothing to work with.
+
+So the message now adds where the file was read from, how many bytes it has
+and its first sixteen bytes (text as text, anything else as \xNN), for
+example: "waterbox.config is not readable JSON (C:/.../rpcs3-...: 2782
+bytes, starting with \xff\xfe{\x00...". One finding along the way: an
+EMPTY declarations file is reported differently ("package has no
+waterbox.config"), so the reporter's file is not empty.
+
+Tested by a new end-to-end check (`E:package:unreadable`): the synthetic
+package unpacked, with its declarations saved as UTF-16. It fails without
+the change and passes with it.
