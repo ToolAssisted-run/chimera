@@ -364,7 +364,7 @@ summary.
 | Flycast | Transparent Sorting | identical (four domains, audio, lag), 1800 frames of Re-Volt | differs | C | `transparentSorting` (perTriangle/perStrip), declared, gated |
 | Azahar | Screen Layout, Swap, Upright, Large Screen Proportion | identical (RAM, both renderers; FCRAM byte for byte on the GTX 1060) | differs, and its size with it | C | `layout`, `swap_screens`, `upright`, `large_screen_proportion`, declared, gated (chimera#223) |
 | Azahar | Linear Filtering | identical | differs where a screen is scaled | C | `linear_filter`, declared, gated |
-| Azahar | Internal Resolution | DIFFERS at 2x, and a load around every frame gives another run than no load | 800x960 at 2x | X | not offered: the renderer is rebuilt from the console's memory, which holds the pictures at 1x |
+| Azahar | Internal Resolution | DIFFERS from 1x (the VRAM; what was drawn is written back scaled down) | 800x960 at 2x, up to 1600x1920 at 4x | C | `internal_resolution` (1x to 4x), declared, tested. Above 1x every state carries the renderer's surface cache, so a load gives the same run back (2026-10-10, issue 223) |
 | Azahar | Texture Filter, Texture Sampling | DIFFERS (xBRZ at 2x; "linear" at 1x and 2x) | differs | X | not offered |
 | PCSX2 | Aspect Ratio | identical | identical | X / P | present-pass only; this core does not present. The frontend's Display config has it |
 | PCSX2 | FMV Aspect Ratio Override | identical | identical | X | present-pass only, and nothing outside the core knows when an FMV plays |

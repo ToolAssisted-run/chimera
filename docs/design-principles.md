@@ -5746,3 +5746,42 @@ Tested with a new unit test (it fails without the fix, with the greenzone
 set to every frame and to every 7 frames) and the existing randomized
 history test, which loads branches.
 
+
+## Azahar: internal resolution, with states that carry the renderer's surfaces (user-decided, 2026-10-10, issue 223)
+
+On 2026-10-09 Azahar's internal resolution was measured and left out: at 2x
+a savestate loaded around every frame gave a different run than no load.
+The reporter said upscaling matters to them, and the owner decided to do
+the work now.
+
+Cause: after a load the core rebuilds Azahar's OpenGL renderer, and the
+rebuilt renderer fills its surface cache from the console's memory. At 1x
+that memory holds every surface exactly. Above 1x it only holds scaled-down
+copies; the full-size pictures were textures on the graphics card and in no
+state.
+
+Decided: above 1x the core answers the engine's `StateSaving` call (added
+for issue 190) by copying every surface of the renderer's cache into its
+own memory, and gives them back to the renderer it builds after a load.
+Nothing in the engine or the frontend changed; this is the existing export
+used by one more core. All surfaces are kept, not only the upscaled ones,
+because which surfaces the cache holds decides what it does next. At 1x
+nothing changes. The details are in the core's docs/PLAN.md.
+
+It is declared as a setting of the machine: the VRAM differs between
+resolutions, so a movie wants the resolution it was made with.
+
+Measured:
+- Mesa llvmpipe, four games at 2x, 3x and 4x: a load around every frame,
+  and a state opened in a new process, give the run that never loaded.
+  Without the `StateSaving` call the run differs in the two games whose
+  first frames show it (Dark Witch from frame 90, Cars 2 from frame 1650).
+- GTX 1060, Cars 2 in a race, 2x and 4x: FCRAM, VRAM and the picture are
+  the same after a saved state, after that state is opened in a new process,
+  and after a load around every frame. At 2x twenty greenzone rewinds also
+  end the same, and the twelve frames after a greenzone load are each the
+  picture they were. Without the call the VRAM and the picture differ.
+- Cost on that card at 2x: about 12 ms for each state taken in a 3D scene,
+  and a saved state of 202 MB (238 MB at 4x).
+
+Not tested: 3x on a real card, other drivers, and TAStudio itself.
