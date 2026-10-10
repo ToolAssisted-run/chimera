@@ -218,6 +218,7 @@ namespace Chimera.Client.GUI
 			// Help
 			OnlineHelpMenuItem.Image = MenuIcons.OnlineHelp;
 			CopyVersionInfoMenuItem.Image = MenuIcons.CopyVersionInfo;
+			ReportIssueMenuItem.Image = MenuIcons.ReportIssue;
 			AboutMenuItem.Image = MenuIcons.About;
 
 			// the status bar, and the context menu, which mirrors the menus above

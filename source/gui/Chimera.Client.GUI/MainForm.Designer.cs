@@ -137,6 +137,7 @@ namespace Chimera.Client.GUI
 			this.ShowTAStudioMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.OnlineHelpMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.CopyVersionInfoMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
+			this.ReportIssueMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.AboutMenuItem = new Chimera.WinForms.Controls.ToolStripMenuItemEx();
 			this.MainStatusBar = new Chimera.WinForms.Controls.StatusStripEx();
 			this.EmuStatus = new Chimera.WinForms.Controls.StatusLabelEx();
@@ -900,6 +901,7 @@ namespace Chimera.Client.GUI
 			this.HelpSubMenu.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.OnlineHelpMenuItem,
             this.CopyVersionInfoMenuItem,
+            this.ReportIssueMenuItem,
             this.AboutMenuItem});
 			this.HelpSubMenu.Text = "&Help";
 			// 
@@ -921,6 +923,11 @@ namespace Chimera.Client.GUI
 			// 
 			this.CopyVersionInfoMenuItem.Text = "&Copy Version Info";
 			this.CopyVersionInfoMenuItem.Click += new System.EventHandler(this.CopyVersionInfoMenuItem_Click);
+			// 
+			// ReportIssueMenuItem
+			// 
+			this.ReportIssueMenuItem.Text = "&Report an Issue...";
+			this.ReportIssueMenuItem.Click += new System.EventHandler(this.ReportIssueMenuItem_Click);
 			// 
 			// AboutMenuItem
 			// 
@@ -1229,6 +1236,7 @@ namespace Chimera.Client.GUI
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx RebootCoreMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx OnlineHelpMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx CopyVersionInfoMenuItem;
+		private Chimera.WinForms.Controls.ToolStripMenuItemEx ReportIssueMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx AboutMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx ControllersMenuItem;
 		private Chimera.WinForms.Controls.ToolStripMenuItemEx HotkeysMenuItem;

@@ -25,6 +25,11 @@ Three forms. GitHub form templates (YAML) can make fields REQUIRED, so a report
 cannot be filed without the build identifiers.
 
 ### Bug report (required fields marked *)
+Help > Report an Issue (issue 243) shows the link to these forms and fills
+in the first five fields below from the running session, ready to paste. It
+also lists the project file, the newest crash note and the sandbox's log
+when they exist. It sends nothing.
+
 - *Chimera build: what Help > Copy Version Info copies (it copies the core's
   line too), the string from Help > About, or the release name
   (`Nightly 2026-09-19 (cd4b89cd)` / `Development build (5c6a32af)`).

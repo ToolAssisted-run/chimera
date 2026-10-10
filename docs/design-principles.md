@@ -5976,3 +5976,81 @@ RAM Search window.
 Still open in issue 224: the reporter lost about 1000 frames of input when
 the frozen program was closed, which the input journal should have kept.
 That part is not explained.
+
+## Core texts are written in plain language (user-decided, 2026-10-10, issue 241)
+
+A user writing a tutorial found the descriptions of settings and of the
+kinds of file a project takes hard to read. The owner asked for every
+core's text to be rewritten, all 30 public cores, one by one. This was done
+on 2026-10-10: each core repository has one commit titled "settings and
+file slots are described in plain language (chimera#241)".
+
+The rule for a description a user reads in Chimera (a setting, a firmware
+entry, a machine preset, a file slot):
+- short sentences, and few colons and semicolons;
+- no project term without saying what it means;
+- every fact of the old text is kept;
+- the same fact is said the same way everywhere, for example "It is part
+  of the machine, so a movie needs the same value." and "It changes the
+  picture only.".
+
+How each core was checked: a script compared the declarations with the
+previous commit with every description blanked out (they had to be
+identical), the core's generator was run again where there is one, and
+Chimera's package tests were run on the published package with the new
+declarations put in (15 of 15 for every core). No core was rebuilt by hand
+and no core's own test script was run, because only text changed.
+
+## No achievement services (user-decided, 2026-10-10, issue 242)
+
+RetroAchievements support was asked for and declined, for two reasons the
+owner gave. Chimera has no network code at all, by decision (2026-10-07):
+nothing is uploaded or downloaded. And Chimera is a tool for tool-assisted
+runs only, not for real-time or casual play; achievements earned with
+tools would be of doubtful value to the service that awards them.
+
+## Help > Report an Issue (user-decided, 2026-10-10, issue 243)
+
+Asked for: a wizard that gathers everything a bug report needs into a zip.
+Decided: a simpler form. One menu item, Help > Report an Issue, opens a
+window with three things, each with a button that copies it:
+1. the address of the report form on GitHub, and a button that hands it to
+   the system's browser;
+2. the first five lines of the bug report form, filled in from the session:
+   the Chimera build, the running core and its version, the operating
+   system, the graphics driver, the open project's files with the kind each
+   was given as, and the running core's settings that are not at their
+   default;
+3. the files the form asks for that exist on this computer: the saved
+   project, the newest crash note with the memory dump beside it, and the
+   sandbox's log (`minibox-diag.log`).
+
+Why not a zip and a wizard: a zip would have to be attached by hand anyway,
+because Chimera sends nothing (it has no network code), and the project
+file and the crash files are already separate files a person can drag into
+the form. The text is the part people got wrong or left out.
+
+What it does not do:
+- It sends nothing. The link is opened by the system's browser, the same
+  way Help > "Open toolAssisted.run in Browser" does it.
+- It takes no screenshots.
+- It names the graphics card only when a core drew on one in this session.
+  That is when Chimera asks the driver for its name, and it is the case
+  where the card matters. Otherwise the line carries a note asking the
+  person to type it.
+- It lists file names and slots, not folders. The list of files to attach
+  shows full paths, and that list is not part of the text to paste.
+- No setting is known by name: the list is every setting whose value
+  differs from what the core declares as its default.
+
+The text is made by `IssueReport` (Chimera.Client.Common). It only formats
+what the session already knows, so it is interface code. Its labels are the
+ones in `.github/ISSUE_TEMPLATE/bug_report.md`; when that form changes,
+`IssueReport.Text` changes with it.
+
+Tested: 7 new tests of the text, the settings comparison and the file list
+(`IssueReportTests`), 2 of the window (`ReportIssueFormTests`) and a
+screenshot in both themes. The settings comparison was broken on purpose
+and its test failed. Interface tests after a full rebuild: 119 / 59 / 550 /
+296 with none failed (550 was 543, 296 was 293). Not tested: the window on
+Windows, and the buttons that use the clipboard and the browser.

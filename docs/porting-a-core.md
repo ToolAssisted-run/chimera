@@ -201,6 +201,12 @@ Advice earned the hard way:
 - **`waterbox.config`** - the machine: name, system id, video (buffer capacity
   and the live size the core reports per frame), audio, vsync as a rational,
   the memory layout, the button list, settings, firmware.
+- **Descriptions are written in plain language** (issue 241). A user reads
+  the `description` of a setting, a firmware entry and a machine preset, and
+  the `help` of a file slot, in Chimera's windows. Write short sentences,
+  use no project term without saying what it means, and say the same fact
+  the same way every time: "It is part of the machine, so a movie needs the
+  same value." or "It changes the picture only.".
 - **What things are called is yours to say.** Chimera keeps no table of
   systems or of controls; a package that says nothing is shown by its ids.
   - `"systemNames": { "PSV": "PlayStation Vita" }` at the top - the name of

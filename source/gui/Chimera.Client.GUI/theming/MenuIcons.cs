@@ -89,6 +89,8 @@ namespace Chimera.Client.GUI
 
 		public static Image CopyVersionInfo => Resources.Duplicate;
 
+		public static Image ReportIssue => Resources.Bug;
+
 		// ---- the gaps, filled with something the frontend already had ------
 
 		public static Image NewProject => Resources.NewFile;

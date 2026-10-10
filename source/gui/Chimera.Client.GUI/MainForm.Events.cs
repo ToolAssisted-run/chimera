@@ -1155,6 +1155,53 @@ namespace Chimera.Client.GUI
 			return VersionReport.Text(VersionInfo.GetBuildName(), package?.Name, package?.DatedVersion);
 		}
 
+		/// <summary>
+		/// Help &gt; Report an Issue (#243): the report form's address, its first lines
+		/// filled in from this session, and the files worth attaching. Nothing is
+		/// sent; the person copies the text and files the report in their browser.
+		/// </summary>
+		private void ReportIssueMenuItem_Click(object sender, EventArgs e)
+		{
+			using ReportIssueForm form = new(IssueReportOfThisSession(), IssueFilesOfThisSession());
+			this.ShowDialogWithTempMute(form);
+		}
+
+		internal string IssueReportOfThisSession()
+		{
+			var running = Emulator.IsNull() ? null : CoreRegistry.Instance.PackageSha1Of(Emulator);
+			var package = string.IsNullOrWhiteSpace(running)
+				? null
+				: _discoveredCorePackages.FirstOrDefault(pkg => running!.Equals(pkg.Sha1, StringComparison.OrdinalIgnoreCase));
+			List<IssueReport.ProjectFile> files = null;
+			if (_openProject is not null)
+			{
+				files = new();
+				for (var i = 0; i < _openProject.FileCount; i++) files.Add(new(_openProject.FileSlot(i), _openProject.FileName(i)));
+			}
+			IReadOnlyList<IssueReport.ChangedSetting> settings = null;
+			if (!Emulator.IsNull())
+			{
+				var settable = GetSettingsAdapterForLoadedCoreUntyped();
+				settings = IssueReport.ChangedSettings(settable.HasSettings ? settable.GetSettings() as Chimera.Emulation.Common.Waterbox.WaterboxSettingsBase : null);
+			}
+			return IssueReport.Text(new()
+			{
+				Build = VersionInfo.GetBuildName(),
+				CoreName = package?.Name,
+				CoreVersion = package?.DatedVersion,
+				Os = $"{System.Runtime.InteropServices.RuntimeInformation.OSDescription.Trim()} ({System.Runtime.InteropServices.RuntimeInformation.OSArchitecture})",
+				Gpu = Emulator is IGpuRendered gpu ? gpu.GpuRenderer : "",
+				Files = files,
+				Settings = settings,
+			});
+		}
+
+		internal IReadOnlyList<string> IssueFilesOfThisSession()
+			=> IssueReport.FilesToAttach(
+				_openProject is null ? null : MovieSession.Movie?.Filename,
+				CrashCapture.Root,
+				[ PathUtils.ExeDirectoryPath, Environment.CurrentDirectory ]);
+
 		private void AboutMenuItem_Click(object sender, EventArgs e)
 		{
 			using AboutBox form = new();

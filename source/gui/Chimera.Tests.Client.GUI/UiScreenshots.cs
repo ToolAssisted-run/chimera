@@ -203,6 +203,27 @@ namespace Chimera.Tests.Client.GUI
 			Shoot(form, "supported-systems");
 		}
 
+		/// <summary>Help &gt; Report an Issue (#243): the link, the text to paste and the files to attach.</summary>
+		[TestMethod]
+		public void ReportIssue()
+		{
+			var report = IssueReport.Text(new()
+			{
+				Build = "Development build 785f31c7",
+				CoreName = "PCSX2",
+				CoreVersion = "2026-10-10 (18cd581)",
+				Os = "Microsoft Windows 10.0.19045 (X64)",
+				Gpu = "4.6.0 NVIDIA 536.23 on GeForce GTX 1060/PCIe/SSE2",
+				Files = [ new("disc", "Game (USA).iso") ],
+				Settings = [ new("Renderer", "opengl-hw", "software"), new("Internal Resolution", "2", "1") ],
+			});
+			using ReportIssueForm form = new(report, [ @"C:\TAS\run.chimeraProject", @"C:\Chimera\Crashes\2026-10-09 pid2.txt", @"C:\Chimera\Crashes\2026-10-09 pid2.dmp" ]);
+			form.StartPosition = FormStartPosition.Manual;
+			form.Location = new Point(0, 0);
+			form.Show();
+			Shoot(form, "report-issue");
+		}
+
 		/// <summary>
 		/// File &gt; Cache Manager: what is on disk that could be worked out again.
 		/// Every row is safe to delete, so the picture is mostly about whether the

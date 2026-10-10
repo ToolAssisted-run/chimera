@@ -143,6 +143,8 @@ Open an issue on this repository, whichever core it concerns - one inbox,
 and the issue template asks for what a fix needs. What settles most
 reports before anybody opens a debugger:
 
+- **Help > Report an Issue** shows the link to the report form and fills in
+  its first lines for you: build, core, system, files and changed settings.
 - **The build strings.** Help > Copy Version Info puts the frontend's build
   and the running core's version on the clipboard, in the template's words.
   A frontend and a core from different days may not
