@@ -30,6 +30,30 @@ namespace Chimera.Tests.Client.GUI
 			Assert.IsTrue(ButtonNamed(form, "CloseWithoutSaving").Enabled);
 		}
 
+		/// <summary>
+		/// When frozen addresses were switched off because the core stopped, the window says how
+		/// many; when none were, it says nothing about them.
+		/// </summary>
+		[TestMethod]
+		public void ItSaysWhenFrozenAddressesWereSwitchedOff()
+		{
+			using (CoreStoppedForm with = new("the core aborted", stoppedAt: 10, safePoint: 8, canRestart: true,
+				canSave: true, freezesSwitchedOff: 3))
+			{
+				with.Show();
+				StringAssert.Contains(with.Controls.Find("Freezes", true)[0].Text, "3 frozen addresses were switched off");
+			}
+			using (CoreStoppedForm one = new("the core aborted", stoppedAt: 10, safePoint: 8, canRestart: true,
+				canSave: true, freezesSwitchedOff: 1))
+			{
+				one.Show();
+				StringAssert.Contains(one.Controls.Find("Freezes", true)[0].Text, "1 frozen address was switched off");
+			}
+			using CoreStoppedForm without = new("the core aborted", stoppedAt: 10, safePoint: 8, canRestart: true, canSave: true);
+			without.Show();
+			Assert.AreEqual(0, without.Controls.Find("Freezes", true).Length);
+		}
+
 		/// <summary>A greenzone that holds nothing cannot be gone back to, and a restart needs its frame 0.</summary>
 		[TestMethod]
 		public void WhatTheGreenzoneCannotProduceIsNotOffered()

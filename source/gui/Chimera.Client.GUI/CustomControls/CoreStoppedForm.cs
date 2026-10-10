@@ -30,7 +30,9 @@ namespace Chimera.Client.GUI
 		/// <param name="safePoint">the newest stored greenzone frame at or before it, or -1</param>
 		/// <param name="canRestart">the greenzone still holds frame 0</param>
 		/// <param name="canSave">a project is open to save</param>
-		public CoreStoppedForm(string reason, int stoppedAt, int safePoint, bool canRestart, bool canSave)
+		/// <param name="freezesSwitchedOff">how many frozen addresses were switched off because the core stopped</param>
+		public CoreStoppedForm(string reason, int stoppedAt, int safePoint, bool canRestart, bool canSave,
+			int freezesSwitchedOff = 0)
 		{
 			FormBorderStyle = FormBorderStyle.FixedDialog;
 			StartPosition = FormStartPosition.CenterParent;
@@ -68,6 +70,23 @@ namespace Chimera.Client.GUI
 				Text = reason,
 				TabStop = false,
 			});
+			if (freezesSwitchedOff > 0)
+			{
+				// A frozen address is written on every frame. If one of them is what stopped the
+				// core, it would stop it again right after going back, so they are all off by now.
+				layout.Controls.Add(new Label
+				{
+					Name = "Freezes",
+					AutoSize = true,
+					MaximumSize = new Size(560, 0),
+					Text = (freezesSwitchedOff is 1
+							? "1 frozen address was switched off."
+							: $"{freezesSwitchedOff} frozen addresses were switched off.")
+						+ " Writing to the wrong address can stop a core, and a frozen address is written on"
+						+ " every frame. Freeze them again from RAM Search or RAM Watch if you still want them.",
+					Margin = new Padding(0, 6, 0, 0),
+				});
+			}
 			layout.Controls.Add(new Label
 			{
 				AutoSize = true,

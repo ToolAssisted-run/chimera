@@ -344,6 +344,7 @@ namespace Chimera.Client.GUI
 			{
 				Filter = new FilesystemFilterSet(FilesystemFilter.TAStudioProjects).ToString(),
 				Title = "Open Chimera Project",
+				InitialDirectory = MovieService.ProjectsOpenIn(Config.RecentProjects.MostRecent, Config.PathEntries.MovieAbsolutePath()),
 			};
 			return dialog.ShowDialog(this) is DialogResult.OK ? dialog.FileName.WithoutWslgMirror() : null;
 		}
@@ -478,6 +479,14 @@ namespace Chimera.Client.GUI
 			// write the greenzone of a machine that had already died.
 			if (Tools.IsLoaded<TAStudio>()) Tools.TAStudio.CurrentTasMovie?.NoteCoreDied();
 			Console.Error.WriteLine($"The core stopped: {stopped.Reason}");
+			// Frozen addresses go off before anything is restored. One of them may be what
+			// stopped the core, and it would be written again on the first frame after going
+			// back - which is why no recovery choice worked while they stayed on (issue 235).
+			var freezesSwitchedOff = CheatList.DisableActive();
+			if (freezesSwitchedOff > 0)
+			{
+				Console.Error.WriteLine($"{freezesSwitchedOff} frozen address(es) were switched off.");
+			}
 			if (_coreStoppedAsking) return;   // the same death, reported again while the question is open
 
 			var tas = Tools.IsLoaded<TAStudio>() ? Tools.TAStudio : null;
@@ -489,7 +498,8 @@ namespace Chimera.Client.GUI
 			_coreStoppedAsking = true;
 			try
 			{
-				using CoreStoppedForm form = new(stopped.Reason, stoppedAt, safePoint, canRestart, tas is not null);
+				using CoreStoppedForm form = new(stopped.Reason, stoppedAt, safePoint, canRestart, tas is not null,
+					freezesSwitchedOff);
 				form.ShowDialog(this);
 				chosen = form.Chosen;
 			}

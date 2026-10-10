@@ -24,6 +24,35 @@ namespace Chimera.Client.GUI
 		private Font _font;
 		private TAStudioPalette? _palette;
 
+		private readonly NumericUpDown _branchScreenshotNum = new()
+		{
+			Name = "BranchScreenshotNum",
+			Minimum = ScreenshotForm.SmallestBranchPreviewSide,
+			Maximum = ScreenshotForm.LargestBranchPreviewSide,
+			Increment = 32,
+			Location = new Point(190, 226),
+			Size = new Size(67, 20),
+		};
+
+		/// <summary>
+		/// "Branch screenshot size" on the Misc page, under the other branch options: how large the
+		/// picture shown over a branch's number may be (issue 237).
+		/// </summary>
+		private void AddBranchScreenshotSize()
+		{
+			Label label = new()
+			{
+				AutoSize = true,
+				Location = new Point(12, 228),
+				Text = "Branch screenshot size (pixels):",
+			};
+			toolTip1.SetToolTip(_branchScreenshotNum,
+				"The longest side of the picture shown when the mouse is over a branch's number.\n"
+				+ "A larger screenshot is shrunk to this size; a smaller one is shown as it is.");
+			tabPage3.Controls.Add(label);
+			tabPage3.Controls.Add(_branchScreenshotNum);
+		}
+
 		public TAStudioSettingsForm(
 			TAStudio.AllSettings editorSettings,
 			ControllerDefinition controllerDefinition,
@@ -31,6 +60,7 @@ namespace Chimera.Client.GUI
 		{
 			InitializeComponent();
 			Icon = Properties.Resources.TAStudioIcon;
+			AddBranchScreenshotSize();
 
 			_settings = editorSettings;
 			_controllerDef = controllerDefinition;
@@ -92,6 +122,7 @@ namespace Chimera.Client.GUI
 			BindMarkersCheckbox.Checked = _settings.GeneralClientSettings.BindMarkersToInput;
 			AutopauseCheckbox.Checked = _settings.GeneralClientSettings.AutoPause;
 			BranchDoubleClickCheckbox.Checked = _settings.GeneralClientSettings.LoadBranchOnDoubleClick;
+			_branchScreenshotNum.Value = ScreenshotForm.BranchPreviewSideFor(_settings.GeneralClientSettings.BranchScreenshotSide);
 			OldBranchesCheckbox.Checked = _settings.GeneralClientSettings.OldControlSchemeForBranches;
 			IncludeFrameNumberCheckbox.Checked = _settings.GeneralClientSettings.CopyIncludesFrameNo;
 			UndoCountNum.Value = _settings.GeneralClientSettings.MaxUndoSteps;
@@ -481,6 +512,7 @@ namespace Chimera.Client.GUI
 			_settings.GeneralClientSettings.BindMarkersToInput = BindMarkersCheckbox.Checked;
 			_settings.GeneralClientSettings.AutoPause = AutopauseCheckbox.Checked;
 			_settings.GeneralClientSettings.LoadBranchOnDoubleClick = BranchDoubleClickCheckbox.Checked;
+			_settings.GeneralClientSettings.BranchScreenshotSide = (int)_branchScreenshotNum.Value;
 			_settings.GeneralClientSettings.OldControlSchemeForBranches = OldBranchesCheckbox.Checked;
 			_settings.GeneralClientSettings.CopyIncludesFrameNo = IncludeFrameNumberCheckbox.Checked;
 			_settings.GeneralClientSettings.MaxUndoSteps = (int)UndoCountNum.Value;

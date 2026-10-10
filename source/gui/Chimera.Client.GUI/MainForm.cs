@@ -472,6 +472,8 @@ namespace Chimera.Client.GUI
 			InputManager.SyncControls(Emulator, MovieSession, Config);
 			CheatList = new CheatCollection(this);
 			CheatList.Changed += Tools.UpdateFreezeRelatedTools;
+			// the Movies folder is there from the first start, so it is clear where projects go
+			MovieService.EnsureMoviesFolder(Config.PathEntries);
 			RewireSound();
 
 			if (Config.SaveWindowPosition)

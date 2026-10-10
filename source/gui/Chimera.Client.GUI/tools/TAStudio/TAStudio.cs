@@ -131,6 +131,7 @@ namespace Chimera.Client.GUI
 				EditInvisibleColumns = true;
 				OldControlSchemeForBranches = false;
 				LoadBranchOnDoubleClick = true;
+				BranchScreenshotSide = ScreenshotForm.BranchPreviewSide;
 				CopyIncludesFrameNo = false;
 				AutoadjustInput = false;
 
@@ -151,6 +152,12 @@ namespace Chimera.Client.GUI
 			public bool FollowCursorAlwaysScroll { get; set; }
 			public string FollowCursorScrollMethod { get; set; }
 			public uint AutosaveInterval { get; set; }
+
+			/// <summary>
+			/// The longest side, in pixels, of the screenshot shown when the mouse is over a branch's
+			/// number. A larger picture is shrunk to it; a smaller one is shown as it is.
+			/// </summary>
+			public int BranchScreenshotSide { get; set; }
 			public bool AutosaveAsBackupFile { get; set; }
 			public bool BackupPerFileSave { get; set; }
 			public bool OldControlSchemeForBranches { get; set; }

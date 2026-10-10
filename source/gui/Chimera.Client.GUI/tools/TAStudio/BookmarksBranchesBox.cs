@@ -687,7 +687,8 @@ namespace Chimera.Client.GUI
 					&& targetRow < Branches.Count
 					&& Branches[targetRow] is { OSDFrameBuffer: { } bb } branch)
 				{
-					var shown = ScreenshotForm.FitWithin(bb.Width, bb.Height, ScreenshotForm.BranchPreviewSide);
+					var shown = ScreenshotForm.FitWithin(bb.Width, bb.Height,
+						ScreenshotForm.BranchPreviewSideFor(Tastudio.Settings.BranchScreenshotSide));
 					var width = shown.Width;
 					Point location = PointToScreen(Location);
 					var bottom = location.Y + shown.Height;
@@ -710,13 +711,7 @@ namespace Chimera.Client.GUI
 						location.Y += h;
 					}
 
-					_screenshot.UpdateValues(
-						bb,
-						branch.UserText,
-						location,
-						width: width,
-						height: shown.Height,
-						Graphics.FromHwnd(Handle).MeasureString);
+					_screenshot.UpdateValues(bb, location, width: width, height: shown.Height);
 					_screenshot.FadeIn();
 				}
 				else

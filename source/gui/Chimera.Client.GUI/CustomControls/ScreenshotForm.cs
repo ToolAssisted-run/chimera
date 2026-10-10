@@ -20,8 +20,22 @@ namespace Chimera.Client.GUI
 
 		private const int Interval = 40;
 
-		/// <summary>The longest side a branch's screenshot is shown at (user, 2026-10-02, issue #183).</summary>
-		public const int BranchPreviewSide = 128;
+		/// <summary>
+		/// The longest side, in pixels, a branch's screenshot is shown at unless the user sets another
+		/// (TAStudio's settings, "Branch screenshot size"). 128 from issue 183 was too small to compare
+		/// with the game; 320 since issue 237.
+		/// </summary>
+		public const int BranchPreviewSide = 320;
+
+		/// <summary>The smallest and largest sizes the setting accepts.</summary>
+		public const int SmallestBranchPreviewSide = 64;
+		public const int LargestBranchPreviewSide = 4096;
+
+		/// <summary>The size to use for a stored setting: the default for a missing one, limits applied.</summary>
+		public static int BranchPreviewSideFor(int setting)
+			=> setting <= 0
+				? BranchPreviewSide
+				: Math.Min(LargestBranchPreviewSide, Math.Max(SmallestBranchPreviewSide, setting));
 
 		/// <summary>
 		/// A picture of <paramref name="width"/> x <paramref name="height"/> shrunk to fit inside
@@ -94,42 +108,25 @@ namespace Chimera.Client.GUI
 			};
 		}
 
-		public void UpdateValues(
-			BitmapBuffer bb,
-			string captionText,
-			Point location,
-			int width,
-			int height,
-			Func<string, Font, int, SizeF> measureString)
+		/// <summary>
+		/// Shows the picture alone. The branch's text used to be printed under it; it is already in
+		/// the branch list beside the number being pointed at, so it was removed (issue 237).
+		/// </summary>
+		public void UpdateValues(BitmapBuffer bb, Point location, int width, int height)
 		{
 			bb.DiscardAlpha();
 			_bitmap = bb.ToSysdrawingBitmap();
 			Width = width;
-			Padding = (int)measureString(captionText, Font, width).Height;
+			Padding = 0;
 			_drawingHeight = height;
-			Text = captionText;
 			Location = location;
-
-			if (Padding > 0)
-			{
-				Padding += 2;
-			}
-
-			Height = _drawingHeight + Padding;
+			Height = _drawingHeight;
 			Refresh();
 		}
 
 		protected override void OnPaint(PaintEventArgs e)
 		{
 			e.Graphics.DrawImage(_bitmap!, new Rectangle(0, 0, Width, _drawingHeight));
-			if (Padding > 0)
-			{
-				using Pen edge = new(ThemeEngine.Color(ThemeColorRole.WindowText));
-				using SolidBrush ink = new(ThemeEngine.Color(ThemeColorRole.WindowText));
-				e.Graphics.DrawRectangle(edge, new Rectangle(new Point(0, _drawingHeight), new Size(Width - 1, Padding - 1)));
-				e.Graphics.DrawString(Text, Font, ink, new Rectangle(2, _drawingHeight, Width - 2, Height));
-			}
-
 			base.OnPaint(e);
 		}
 

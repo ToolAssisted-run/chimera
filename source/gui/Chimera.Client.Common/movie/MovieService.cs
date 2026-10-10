@@ -22,6 +22,48 @@ namespace Chimera.Client.Common
 			=> System.IO.Path.Combine(paths.MovieAbsolutePath(), $"{UnsavedProjectName}.{TasMovie.Extension}");
 
 		/// <summary>
+		/// Makes sure the Movies folder exists (the one Config > Paths calls "Movies", beside
+		/// Chimera.exe unless it was changed). A fresh install then shows where projects go, and
+		/// older projects can be copied in before the first one is saved (issue 233).
+		/// </summary>
+		/// <returns>false when the folder is missing and could not be made (a read-only install)</returns>
+		public static bool EnsureMoviesFolder(PathEntryCollection paths)
+		{
+			try
+			{
+				System.IO.Directory.CreateDirectory(paths.MovieAbsolutePath());
+				return true;
+			}
+			catch (System.Exception e) when (e is System.IO.IOException or System.UnauthorizedAccessException
+				or System.ArgumentException or System.NotSupportedException)
+			{
+				return false;
+			}
+		}
+
+		/// <summary>
+		/// Where "Open Project" starts: the folder of the project opened last, and before any
+		/// has been opened (or when that folder is gone) the Movies folder. "" leaves the
+		/// dialog to its own choice.
+		/// </summary>
+		public static string ProjectsOpenIn(string mostRecentProject, string moviesFolder)
+		{
+			string recentFolder = null;
+			if (!string.IsNullOrWhiteSpace(mostRecentProject))
+			{
+				try
+				{
+					recentFolder = System.IO.Path.GetDirectoryName(mostRecentProject);
+				}
+				catch (System.ArgumentException)
+				{
+					// a remembered path this system cannot read is no starting point
+				}
+			}
+			return PathEntryExtensions.FirstExistingDir(recentFolder, moviesFolder);
+		}
+
+		/// <summary>
 		/// Gets a list of extensions for all <see cref="IMovie"/> implementations
 		/// </summary>
 		public static IEnumerable<string> MovieExtensions => new[] { TasMovie.Extension };

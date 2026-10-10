@@ -182,5 +182,32 @@ namespace Chimera.Tests.Client.Common
 			cheats.UpdateDomains(domains, new FakeGameProperties(@"{ ""properties"": [], ""problems"": [] }"));
 			Assert.AreEqual(0, cheats.Count, "a core without the property has nothing to freeze");
 		}
+
+		/// <summary>
+		/// When the core stops, every freeze that is on is switched off, and the caller is told
+		/// how many there were. A freeze that was already off is not counted, and afterwards
+		/// nothing is written any more (issue 235).
+		/// </summary>
+		[TestMethod]
+		public void StoppingTheCoreSwitchesFreezesOff()
+		{
+			FakeGameProperties properties = new(Table);
+			var block = Block();
+			var frames = GamePropertyWatches.WatchOf(properties, properties.Find("Frames")!, block);
+			var hp = GamePropertyWatches.WatchOf(properties, properties.Find("Guard.HP")!, block);
+			CheatCollection cheats = new(dialogParent: null!);
+			cheats.Add(new Cheat(frames, frames.Value));
+			cheats.Add(new Cheat(hp, hp.Value, enabled: false));
+			Assert.IsTrue(cheats.AnyActive);
+
+			Assert.AreEqual(1, cheats.DisableActive(), "one freeze was on");
+			Assert.IsFalse(cheats.AnyActive);
+			Assert.AreEqual(2, cheats.Count, "they are switched off, not removed");
+			Assert.AreEqual(0, cheats.DisableActive(), "nothing is left to switch off");
+
+			var writesBefore = properties.Sets.Count;
+			cheats.Pulse();
+			Assert.AreEqual(writesBefore, properties.Sets.Count, "a freeze that is off writes nothing");
+		}
 	}
 }

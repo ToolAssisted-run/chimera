@@ -121,6 +121,18 @@ namespace Chimera.Client.Common
 			Touched();
 		}
 
+		/// <summary>
+		/// Switches off every freeze that is on, and returns how many there were.
+		/// Used when the core stops: a frozen address may be what stopped it, and it
+		/// would be written again on the first frame after the machine is restored.
+		/// </summary>
+		public int DisableActive()
+		{
+			var active = _cheatList.Count(static c => !c.IsSeparator && c.Enabled);
+			if (active is not 0) DisableAll();
+			return active;
+		}
+
 		public bool IsActive(MemoryDomain domain, long address)
 			=> _cheatList.Exists(cheat => !cheat.IsSeparator && cheat.Enabled && cheat.Domain == domain && cheat.Contains(address));
 

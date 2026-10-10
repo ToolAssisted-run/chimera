@@ -5670,3 +5670,47 @@ The owner decided: plain language everywhere.
 The rules are in AGENTS.md, which is what an agent or a contributor reads
 first.
 
+## When the core stops, frozen addresses are switched off (user-decided, 2026-10-10; chimera#235, chimera#234)
+
+Reported with the Flash core: a memory search with "Greater Than" on every
+frame, then "Freeze Address" on what was left. The core stopped, and after
+that none of the choices in the "core stopped" window worked - going back to
+a safe frame and restarting from frame 0 both stopped again at once.
+
+What happened: in the Flash core the searchable memory is the core's whole
+heap, so the search had kept the renderer's own counters (they grow every
+frame) and the freeze held them still. That stops the core. And a frozen
+address is written on every frame, so it was written again right after each
+recovery.
+
+Decided: when the core stops while addresses are frozen, Chimera switches
+every freeze off before anything is restored, and the window says how many
+were switched off. They are not deleted; the user can freeze them again.
+Freezing the emulator's own memory can still stop a core - that part is
+expected, and is not prevented. A warning before freezing in such memory
+was considered and not taken.
+
+## The branch screenshot is 320 pixels, and the size is a setting (user-decided, 2026-10-10; chimera#237)
+
+The picture shown when the mouse is over a branch's number was limited to
+128 pixels on its longer side on 2026-10-02 (issue 183), because a full-size
+Xbox picture covered the game. A user found 128 too small to compare with
+the game.
+
+Decided: the default is 320 pixels, and TAStudio's settings window has
+"Branch screenshot size (pixels)" on its Misc page (64 to 4096). A larger
+screenshot is shrunk to that size; a smaller one is shown as it is. The
+branch's text is no longer printed under the picture - it is already in the
+branch list.
+
+## A Movies folder exists from the first start (user-decided, 2026-10-10; chimera#233)
+
+A fresh install had no folder for projects, so it was not clear where they
+go, and older projects could not be copied in before one had been saved.
+
+Decided: Chimera creates the Movies folder at start if it is missing. It is
+the folder Config > Paths calls "Movies", which is beside Chimera.exe unless
+the user changed it. "Open Project" starts in the folder of the project
+opened last, and in the Movies folder when no project has been opened yet.
+"Save As" already started there. No files are moved.
+
