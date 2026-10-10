@@ -75,6 +75,9 @@ One game each, run from the game's own files ([docs/game-cores.md](docs/game-cor
 | [SyndicatFX](https://github.com/ToolAssisted-run/chimera-core-syndicatfx) | Syndicate (DOS) |
 | [rawgl](https://github.com/ToolAssisted-run/chimera-core-rawgl) | Another World |
 | [DSDA-Doom](https://github.com/ToolAssisted-run/chimera-core-dsda) | Doom, Doom II, Final Doom, Heretic, Hexen, Chex Quest, Freedoom |
+| [SRB2](https://github.com/P-AS/chimera-core-srb2) | Sonic Robo Blast 2 |
+
+SRB2 is published by its author, P-AS, from their own repository.
 
 ## Getting a build
 

@@ -321,6 +321,16 @@
       "kind": "game",
       "repo": "ToolAssisted-run/chimera-core-dsda",
       "tested": ""
+    },
+    {
+      "id": "srb2",
+      "name": "SRB2",
+      "systems": [
+        { "id": "SRB2", "name": "Sonic Robo Blast 2" }
+      ],
+      "kind": "game",
+      "repo": "P-AS/chimera-core-srb2",
+      "tested": ""
     }
   ]
 }

@@ -6102,3 +6102,33 @@ rebuild: 119 / 59 / 550 / 301 with none failed (301 was 296).
 Not fixed here: with a wider font some labels are cut off, for example
 "Auto-restore last position" in TAStudio. That is a separate, smaller
 problem of fixed layouts.
+
+## SRB2 joins the roster, the first core published outside the organisation (user-decided, 2026-10-10)
+
+The owner asked for the Sonic Robo Blast 2 game core to be added:
+https://github.com/P-AS/chimera-core-srb2. It is written and published by
+P-AS in their own repository, not under ToolAssisted-run.
+
+What changed here:
+- `official-cores.json` has a row for it (`"repo": "P-AS/chimera-core-srb2"`,
+  `"kind": "game"`), and the README lists it with the game cores and says
+  who publishes it.
+- That repository publishes two packages in each release, one for x64 and
+  one for arm64 (`srb2-<version>-x64.chimeraCore`, `...-arm64.chimeraCore`).
+  This Chimera runs x64 guests only, so `tools/fetch-cores.sh` now leaves a
+  package whose name ends in `-arm64` out of the folder it fills. Two
+  packages of one core in a folder would list the core twice.
+
+What follows from a row that points outside the organisation:
+- Chimera's CI downloads that core's newest dated build on every run and
+  checks it with the package tests. A broken build published there fails
+  Chimera's CI until it is fixed there or the row is taken out.
+- Release notifications are a setting of the core's own repository. Only
+  its owner can add it, so it was asked for in an issue on that repository.
+
+Tested: the published build `Nightly 2026-10-10` of the core, fetched with
+`fetch-cores.sh --kind nightly --core srb2` (the x64 package only arrives):
+package tests and roster tests, 19 of 19. The package tests also pass with
+both packages in the folder. Not tested here: starting the game. The core's
+own CI runs its tests on the game's data and Chimera's package tests before
+it publishes.

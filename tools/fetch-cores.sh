@@ -92,6 +92,10 @@ while IFS='|' read -r id repo; do
 		[ "$attempt" -lt 3 ] && { echo "$id: the download failed, trying again" >&2; sleep $((attempt * 5)); }
 	done
 	if [ "$got" -eq 1 ]; then
+		# a core may also publish a package for another processor, named
+		# <id>-<version>-arm64.chimeraCore. This Chimera runs x64 guests only,
+		# and two packages of one core in a folder is a core listed twice.
+		rm -f "$out/$id"-*-arm64.chimeraCore
 		fetched=$((fetched + 1))
 		echo "$id: $tag"
 	else
