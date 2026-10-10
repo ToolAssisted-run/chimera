@@ -223,6 +223,37 @@ open(p, 'wb').write(codecs.BOM_UTF16_LE + t.encode('utf-16-le'))
 			report "E:package:unreadable" FAIL "could not prepare the package (unzip, python3)"
 		fi
 
+		# NUMBERS DO NOT FOLLOW THE SYSTEM'S DECIMAL SEPARATOR (issue 244). On
+		# Linux the frontend's runtime puts the process in the user's locale;
+		# with a decimal comma the engine could not read "0.5" in a core's
+		# declarations or in settings, and would have written fractions nothing
+		# reads back. A German locale is built here (no root needed) and two
+		# things are run in it: the unit test's decimal-comma half, and this
+		# runner taking the environment's locale as the frontend's runtime
+		# does, with a fraction in its settings. The run must be the run the C
+		# locale gives. Where the locale cannot be built the check says it did
+		# not run.
+		loc="$work/locales"
+		rm -rf "$loc"; mkdir -p "$loc"
+		if command -v localedef > /dev/null 2>&1 && localedef -i de_DE -f UTF-8 "$loc/de_DE.UTF-8" > /dev/null 2>&1; then
+			"$chimera_run" "$epkg" "$here/roms/gridWalker.testrom" "$here/movies/gridWalker.win.txt" \
+				--settings '{"probe":0.5}' --dump "RAM=$work/locale-c.ram.bin" > "$work/locale-c.log" 2>&1 || true
+			LOCPATH="$loc" LC_ALL=de_DE.UTF-8 CHIMERA_TEST_NEEDS_COMMA_LOCALE=1 \
+				"$repo_root/build/meson-linux/test_plain_numbers" > "$work/locale-unit.log" 2>&1
+			unit_rc=$?
+			LOCPATH="$loc" LC_ALL=de_DE.UTF-8 "$chimera_run" "$epkg" "$here/roms/gridWalker.testrom" "$here/movies/gridWalker.win.txt" \
+				--locale-from-environment --settings '{"probe":0.5}' --dump "RAM=$work/locale-de.ram.bin" > "$work/locale-de.log" 2>&1
+			run_rc=$?
+			if [ "$unit_rc" = 0 ] && [ "$run_rc" = 0 ] && grep -q "decimal separator ','" "$work/locale-de.log" \
+				&& [ -s "$work/locale-c.ram.bin" ] && cmp -s "$work/locale-c.ram.bin" "$work/locale-de.ram.bin"; then
+				report "E:locale:decimal-comma" PASS "with a decimal comma: fractions read and written with a dot, and the run is the C locale's"
+			else
+				report "E:locale:decimal-comma" FAIL "unit rc=$unit_rc run rc=$run_rc: $(tail -1 "$work/locale-de.log" | cut -c1-90) (see work/locale-*.log)"
+			fi
+		else
+			report "E:locale:decimal-comma" KNOWN "did not run: no decimal-comma locale could be built here (localedef -i de_DE)"
+		fi
+
 		# A CORE THAT DIES: all eight buttons at once make the synth core abort on
 		# cue (SPEC.md). The run must stop with the reason and the core's own last
 		# words - miniBox handing control back - and the process must not crash.

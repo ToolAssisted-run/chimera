@@ -153,6 +153,8 @@ const cJSON *chooseMachine(const cJSON *root, const char *overrides)
 	return machines->child;
 }
 
+const char *const kConfigNotJson = "waterbox.config is not readable JSON";
+
 /* " (<package>: N bytes, starting with ...)": where the declarations were
  * read from, how much there was, and its first bytes - text as text, anything
  * else as \xNN - so a report of this error says what the file actually is. */
@@ -190,7 +192,7 @@ bool parseConfig(const char *json, uint64_t len, const char *overrides, SessionC
 	if (root == nullptr || !cJSON_IsObject(root))
 	{
 		cJSON_Delete(root);
-		error = "waterbox.config is not readable JSON";
+		error = kConfigNotJson;
 		return false;
 	}
 	const cJSON *machine = chooseMachine(root, overrides);
@@ -1365,8 +1367,10 @@ ce_session *ce_session_open(
 		 * through a window that shows one line (the project wizard's compile
 		 * step shows it for a child session), and the declarations alone not
 		 * being JSON does not tell an empty file from a damaged copy or from
-		 * one saved in another encoding. */
-		cfgError += describeUnreadable(package_path, entry, len);
+		 * one saved in another encoding.
+		 * Only for the declarations themselves: parseConfig also refuses
+		 * settings it cannot read, and those are not this file. */
+		if (cfgError == kConfigNotJson) cfgError += describeUnreadable(package_path, entry, len);
 		return abort(std::move(cfgError));
 	}
 	entry = ce_package_entry(pkg, "core.wbx", &len);

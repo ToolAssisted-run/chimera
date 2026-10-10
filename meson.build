@@ -312,6 +312,13 @@ engine_build_args = [
   # miniz's zlib-name-compat macros (#define compress mz_compress) leak into
   # everything that includes it; we use the mz_ names
   '-DMINIZ_NO_ZLIB_COMPATIBLE_NAMES',
+  # cJSON reads and writes numbers with strtod and sprintf, which use the
+  # decimal separator of the process's locale. Built this way it asks the
+  # locale what that is and translates, so JSON is always written and read
+  # with a dot. On Linux the frontend's runtime (Mono) puts the process in the
+  # user's locale; with a decimal comma, "0.5" in a core's declarations did
+  # not parse and a fraction was written as "0,5" (issue 244).
+  '-DENABLE_LOCALES',
   # the ce_ ABI is exported explicitly (see engine.h); cJSON must not export
   # its own symbols, which on mingw would also disable auto-exports
   '-DCHIMERA_BUILDING',
@@ -394,7 +401,7 @@ if not meson.is_cross_build()
     build_by_default: false,
   )
 
-  foreach engine_test : ['sha1', 'movie_log', 'movie_text', 'movie_entry', 'control_names', 'state_container', 'state_format', 'package', 'multifile', 'project', 'firmware', 'state_history', 'media', 'gl_flight', 'gl_sync', 'gl_buffer_pool', 'stride_tuner', 'greenzone_shape', 'ram_search', 'kept_pictures', 'game_properties']
+  foreach engine_test : ['sha1', 'movie_log', 'movie_text', 'movie_entry', 'control_names', 'state_container', 'state_format', 'package', 'multifile', 'project', 'firmware', 'state_history', 'media', 'gl_flight', 'gl_sync', 'gl_buffer_pool', 'stride_tuner', 'plain_numbers', 'greenzone_shape', 'ram_search', 'kept_pictures', 'game_properties']
     test(
       'engine_' + engine_test,
       executable(

@@ -5905,3 +5905,46 @@ waterbox.config"), so the reporter's file is not empty.
 Tested by a new end-to-end check (`E:package:unreadable`): the synthetic
 package unpacked, with its declarations saved as UTF-16. It fails without
 the change and passes with it.
+
+## Numbers in files do not follow the system's decimal separator (2026-10-10, issue 244)
+
+This is the cause of the report in the section above. It came back as issue
+244 with the missing detail: the reporter runs Linux, in a locale that
+writes a decimal comma.
+
+On Linux the frontend runs on Mono, and Mono puts the whole process in the
+user's locale. The engine reads and writes JSON with a small C library that
+uses the C functions `strtod` and `sprintf`, and those follow the process's
+locale. With a decimal comma, `strtod` stops at the dot of "0.0", so the
+RPCS3 package's declarations, which hold exactly one such number, did not
+parse. The DOSBox-X and PCem packages hold "0.5" and would have failed the
+same way. Writing was affected too: a fraction in a project's settings
+would have been written as "0,5", which nothing reads back. Windows was not
+affected, because there the C library stays in the plain C locale.
+
+What changed:
+- The JSON library is built with its own switch for this (`ENABLE_LOCALES`):
+  it asks the locale for the decimal separator and translates, so JSON is
+  read and written with a dot whatever the locale.
+- The property table of a game core used the same C functions for the text
+  of a fraction. It now uses conversions that have no locale
+  (`plain_numbers.hpp`), so 1.5 is typed and shown as 1.5 everywhere.
+- The headless runner has `--locale-from-environment`, which does what
+  Mono does at start, so a test can put the engine in the same position.
+
+Measured:
+- In the real frontend on Linux under a German locale, built in a scratch
+  folder with `localedef`: an RPCS3 compile session stops with "waterbox.
+  config is not readable JSON" before the change and compiles after it. In
+  the C locale it always compiled, which is why this machine never showed
+  it.
+- New unit test `plain_numbers` and end-to-end check
+  `E:locale:decimal-comma` (it builds the German locale itself). With the
+  switch taken out again, both fail under that locale.
+- Unit tests 22 of 22, end-to-end test 75 of 75, interface tests
+  119 / 59 / 543 / 290 with none failed, Windows cross-compile.
+
+Limits: a locale whose decimal separator is more than one byte is still not
+handled by the JSON library (it looks at the first byte only). A project
+file that was already written with "0,5" under the old build cannot be read
+and has to be corrected by hand.

@@ -1,6 +1,7 @@
 /* game_properties.cpp - a game core's properties (docs/game-cores.md). */
 
 #include "game_properties.hpp"
+#include "plain_numbers.hpp"
 
 #include "../../extern/cjson/cJSON.h"
 
@@ -133,14 +134,16 @@ bool decodeUtf8(const std::string &s, std::vector<std::pair<uint32_t, size_t>> &
 /* The fewest significant digits that read back as the same value. */
 std::string shortestFloat(double v, bool single)
 {
-	char buf[64];
+	/* in no locale (plain_numbers.hpp): the same text on every machine */
+	std::string text;
 	for (int digits = 1; digits <= 17; digits++)
 	{
-		std::snprintf(buf, sizeof buf, "%.*g", digits, v);
-		const double back = std::strtod(buf, nullptr);
+		text = chimera::formatPlainDouble(v, digits);
+		double back = 0;
+		if (!chimera::parsePlainDouble(text, back)) continue;
 		if (single ? (float)back == (float)v : back == v) break;
 	}
-	return buf;
+	return text;
 }
 
 /* A whole number as text: decimal with an optional sign, or hex after 0x.
@@ -1042,9 +1045,8 @@ bool CeGameProperties::writeText(int32_t index, uint32_t element, const std::str
 	case F64:
 	{
 		const std::string t = trim(text);
-		char *end = nullptr;
-		v.f = std::strtod(t.c_str(), &end);
-		if (t.empty() || end == nullptr || *end != '\0')
+		/* a dot, whatever the system's decimal separator is */
+		if (!chimera::parsePlainDouble(t, v.f))
 		{
 			error = "\"" + t + "\" is not a number";
 			return false;

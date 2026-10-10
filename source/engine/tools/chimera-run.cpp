@@ -115,6 +115,7 @@
 #include "chimera/engine.h"
 
 #include <chrono>
+#include <clocale>
 #include <cstdio>
 #include <cstring>
 #include <map>
@@ -410,6 +411,19 @@ int main(int argc, char **argv)
 		else if (arg == "--files" && i + 1 < argc) fileDirs.push_back(argv[++i]);
 		else if (arg == "--allow-core-mismatch") allowCoreMismatch = true;
 		else if (arg == "--gpu") wantGpu = true;
+		else if (arg == "--locale-from-environment")
+		{
+			/* What a frontend's runtime does at start (Mono calls
+			 * setlocale(LC_ALL, "")): the process takes the user's locale, and
+			 * with it the user's decimal separator. This runner stands in for
+			 * the frontend, so a test can put it in the same position
+			 * (issue 244). It says which separator it ended up with, so a test
+			 * can tell a run that proved something from one that did not. */
+			std::setlocale(LC_ALL, "");
+			const std::lconv *lc = std::localeconv();
+			std::fprintf(stderr, "chimera-run: locale from the environment, decimal separator '%s'\n",
+				lc != nullptr && lc->decimal_point != nullptr ? lc->decimal_point : "?");
+		}
 		else if (arg == "--render-every-frame") renderEveryFrame = true;
 		else if (arg == "--greenzone-pictures" && i + 1 < argc)
 		{
