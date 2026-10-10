@@ -5821,3 +5821,63 @@ receives can still hold both declarations of a name; the guest reads the
 first. The frontend sends every effective value, so this did not cause the
 bug above, but a headless run that leaves a machine-scoped setting unset
 gets the first declaration's default whatever the machine is.
+
+## miniBox: four pull requests merged, and the frontend's own signals on Linux (user-decided, 2026-10-10)
+
+Four pull requests from two contributors were waiting on miniBox. The owner
+decided each pair was to be reviewed, tested and merged if clean. They are
+merged (miniBox f890632) and Chimera's copy of miniBox now points there.
+
+What came in:
+
+- **7 and 8 (Randomno), for guests that opt into machine spec v3.** A fixed
+  `mmap` over pages that are already allocated hands them back zero-filled,
+  as Linux does. A thread that exits while every other thread is in a timed
+  wait no longer ends the machine: the clock moves to the earliest deadline.
+  For today's cores (all v2) nothing changes except one message: a machine
+  whose remaining threads all wait for ever is now reported as the deadlock
+  it is.
+- **9 (P-AS), Linux.** A fault inside a guest's own fault handler is served,
+  as it already was on Windows. Before, the kernel ended the process with no
+  message.
+- **10 (P-AS), Linux.** Signal handlers that were installed before miniBox
+  started (the frontend's runtime's) are wrapped: when one lands on the
+  thread that is running a guest, it runs with the host's thread pointer and
+  on the alternate stack, not on the guest's.
+
+Why 10 matters here: Mono stops threads for garbage collection with a
+signal. Ubuntu's Mono 6.8 does not signal a thread that is in native code by
+default, which is why Chimera on this machine never showed it. Forced with
+`MONO_THREADS_SUSPEND=preemptive MONO_GC_PARAMS=nursery-size=1m`, the real
+frontend running the PCSX2 core died with a segmentation fault in every run
+on the old miniBox, and runs with the new one, its memory identical to the
+native reference. The contributor met it unforced on another Mono.
+
+One thing was added to 10 before merging: the wrapper read the thread
+pointer with `rdfsbase` on every signal, on every thread. On a host that
+does not let programs use that instruction it would have been an illegal
+instruction at the runtime's first signal. It now runs only where the probe
+says the instruction exists, like the fault handler beside it. This machine
+has the instruction, so no test here can show that fault.
+
+Measured, with all four merged on top of main:
+- miniBox's own tests: 18 of 18 on Linux; on Windows the 12 unit tests and
+  the guest runner (standard, v3, probe off) pass. Each pull request's new
+  test fails without its fix.
+- Core test scripts against the merged host library: PCSX2 36 pass, 0 fail;
+  Vita3K 60, 0; RPCS3 33, 1. Vita3K and RPCS3 are the cores with their own
+  fault handler. RPCS3's one failure compares two native runs that do not
+  use miniBox; it is the known problem with the disc on this machine.
+- Chimera with the new miniBox: engine unit tests 21 of 21, the end-to-end
+  test 73 of 73, interface tests 119 / 59 / 543 / 290 with none failed, and
+  the engine compiles for Windows.
+
+A fifth pull request, a port of miniBox to aarch64, was answered and not
+merged: it stays a fork until there is an end-to-end proof - a working
+aarch64 build of Chimera, a core compiled for aarch64, and a tool-assisted
+run shown on a real aarch64 machine. Then it can come in as a separate
+distribution of Chimera for that architecture, with its own cores.
+
+Every core changes when it is next rebuilt against this miniBox. None was
+rebuilt for this; the published packages keep working with the new host
+library, which is what the three core test scripts above ran.
