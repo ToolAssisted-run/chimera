@@ -5650,3 +5650,23 @@ Start `S` and `S`, and a movie recorded with Select held has `s` in its text
 and `SEL` nowhere. The contract tests refuse a header the engine would drop, a
 header for a button that is not there, and one that two columns of a player
 share.
+
+## Plain language in commits, documents and replies (user-decided, 2026-10-10; chimera#239)
+
+A community member said the commit messages and documents were painful to
+read, and quoted "published with thirteen green legs" as an example nobody
+outside the project could understand.
+
+The owner decided: plain language everywhere.
+
+- A commit subject says what changed in ordinary words. Its body is short:
+  what changed, why, and how it was tested.
+- Project terms are not used without saying what they mean. Prefer the plain
+  word: "test" for "leg", "test script" for "gate", "passes" for "is green",
+  "the upstream version a core builds" for "the pin".
+- Documents are rewritten in this style as they are edited. Older sections
+  stay as they are until somebody touches them.
+
+The rules are in AGENTS.md, which is what an agent or a contributor reads
+first.
+

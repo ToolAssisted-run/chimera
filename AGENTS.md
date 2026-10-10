@@ -108,19 +108,29 @@ env -u DISPLAY bash tests/ui/run-ui-tests.sh     # the interface tests
 - **No network code.** Nothing downloads, nothing phones anywhere;
   `tools/check-no-network.sh` holds it.
 - **Decisions go in the design log** in the same commit as the code: a dated
-  section in `docs/design-principles.md`, in prose, with what was measured,
-  marked "(user-decided, YYYY-MM-DD)" when the owner decided it. The document
-  for the subject is updated in that commit too.
+  section in `docs/design-principles.md` with what was decided, why, and what
+  was measured, marked "(user-decided, YYYY-MM-DD)" when the owner decided it.
+  The document for the subject is updated in that commit too.
+- **Write in plain language** (user-decided, 2026-10-10, issue 239). Commit
+  messages, documents, code comments and issue replies are read by users and
+  contributors who have never seen this repository. Say what changed in
+  ordinary words. Do not use a project term without saying what it means the
+  first time: write "test" rather than "leg", "test script" rather than
+  "gate", "passes" rather than "is green", "the upstream version a core
+  builds" rather than "the pin". No riddles and no storytelling. When you
+  edit an older section that is not written this way, rewrite the part you
+  touch.
 - **Prose is ASCII.** No typographic dashes or quotes in any `.md`.
 - **The README is succinct**: a sentence or two a point, detail in `docs/`.
   Its tables of cores are by core - the name linked to the repository's main
   page, the systems beside it.
-- **Commits.** `type(scope): a sentence that says what is now true`, a body in
-  prose with the reasoning and the measurements, and the trailers this
-  project marks assisted commits with (CREDITS.md). One gated round, one
-  commit. Stage explicit paths - never `git add -A`. No amending, no force
-  push.
-- **Report what happened.** A leg that was skipped is said to be skipped; a
+- **Commits.** Subject: `type(scope): what changed`, for example
+  `fix(ppsspp): games opened from a project start again (#228)`. Body: short -
+  what changed, why, and how it was tested, with the numbers. A list is fine.
+  End with the trailers this project marks assisted commits with
+  (CREDITS.md). One tested round, one commit. Stage explicit paths - never
+  `git add -A`. No amending, no force push.
+- **Report what happened.** A test that was skipped is said to be skipped; a
   result seen only through a software GL is not said of a real card; a game
   that was not tried is not said to work.
 - **Content.** No commercial game, firmware or key is committed, uploaded to
