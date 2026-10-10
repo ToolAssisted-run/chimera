@@ -6054,3 +6054,51 @@ screenshot in both themes. The settings comparison was broken on purpose
 and its test failed. Interface tests after a full rebuild: 119 / 59 / 550 /
 296 with none failed (550 was 543, 296 was 293). Not tested: the window on
 Windows, and the buttons that use the clipboard and the browser.
+
+## On Linux a button keeps its text whatever font the desktop chose (2026-10-10, issue 246)
+
+Reported on Kubuntu 26.04: TAStudio's playback buttons and the OK button of
+a message box had no text. Other text was fine, and so were the taller
+buttons of the New Project window.
+
+Cause. On Linux the interface runs on Mono. Mono draws a button's text only
+when a whole line of it fits in the button; a line that is too tall is not
+clipped, it is left out. The room a button gives its text is its height
+less 8 pixels, or the height the font reports if that is more. For some
+fonts a line really takes one pixel more than the font reports. Which font
+is used is the desktop's choice, because Mono asks for "Microsoft Sans
+Serif" and the system substitutes its default:
+- DejaVu Sans 8.25pt (Ubuntu): reports 13, takes 14. A standard button, 23
+  pixels high, has 15. The text shows.
+- Noto Sans 8.25pt (Kubuntu): reports 15, takes 16. The same button is
+  blank. A button 26 pixels high shows its text.
+
+Reproduced here by giving Mono Noto Sans through a font configuration file
+of its own: a real message box's OK button (86 by 23) was blank.
+
+What changed. `ButtonTextFit` (interface code, Linux only) makes the font
+of such a button smaller in quarter points until a line fits, at most 3
+points. The button keeps its size and place. Chimera's own windows are done
+as they are created (`ThemedForm`), before the first paint. Windows Chimera
+did not make, a message box above all, are done the first time the
+interface is idle after they open. A button added later, resized or given
+another font is done again. Windows is not touched: it clips a button's
+text and does not leave it out.
+
+What was not chosen:
+- Making the buttons taller. Most windows are laid out by fixed positions,
+  and a taller button can run into its neighbour.
+- Choosing the font for the user. That would fix this desktop and no other,
+  and the measured rule holds for any font.
+
+Tested: 5 new tests (`ButtonTextFitTests`): the rule, the search for a
+size, a blank button getting its text back in both button styles, a button
+added later, and one of Chimera's own windows. With the rule switched off
+all 5 fail. They pass with DejaVu Sans and with Noto Sans as the default
+font. A real Mono message box under Noto Sans: OK button blank before (0
+dark pixels), text shown after (font 7.5pt). Interface tests after a full
+rebuild: 119 / 59 / 550 / 301 with none failed (301 was 296).
+
+Not fixed here: with a wider font some labels are cut off, for example
+"Auto-restore last position" in TAStudio. That is a separate, smaller
+problem of fixed layouts.

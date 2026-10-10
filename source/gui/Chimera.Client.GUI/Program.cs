@@ -67,6 +67,8 @@ namespace Chimera.Client.GUI
 		{
 			Application.EnableVisualStyles();
 			Application.SetCompatibleTextRenderingDefault(false); // prepopulates `Label.UseCompatibleTextRendering` and friends; `false` means to use the "new" renderer rather than the compatibility renderer
+			// windows Chimera did not make (a message box) get their buttons looked after too (issue #246)
+			ButtonTextFit.Watch();
 		}
 
 		private static void Show32BitWarningDialog()

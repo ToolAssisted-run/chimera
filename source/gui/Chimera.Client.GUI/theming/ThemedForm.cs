@@ -37,6 +37,9 @@ namespace Chimera.Client.GUI
 		{
 			base.OnHandleCreated(e);
 			if (DesignMode) return;
+			// before the first paint: on Linux a button whose font is too tall for
+			// it would otherwise be drawn without its text (issue #246)
+			ButtonTextFit.Fit(this);
 			TakeTheme(ThemeLibrary.Current);
 		}
 
