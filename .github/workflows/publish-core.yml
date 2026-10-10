@@ -25,9 +25,9 @@ name: Publish a core package
 #         core-id: pcsx2
 #         artifact: pcsx2-${{ github.sha }}
 #         package: pcsx2.chimeraCore
-#         arches: x86_64 aarch64
+#         arches: x64 arm64
 #
-# Without `arches`, the one artifact is the x86_64 package.
+# Without `arches`, the one artifact is the x64 package.
 #
 # A push to main publishes the rolling `dev`; a scheduled run publishes an
 # immutable `nightly-YYYY-MM-DD`. Nothing is published from a pull request, and
@@ -50,7 +50,7 @@ on:
         required: true
         type: string
       arches:
-        description: 'The CPUs the core is built for, space-separated (x86_64, aarch64): the package for each is in artifact <artifact>-<arch>. Blank: the one artifact <artifact>, x86_64'
+        description: 'The CPUs the core is built for, space-separated (x64, arm64): the package for each is in artifact <artifact>-<arch>. Blank: the one artifact <artifact>, x64'
         required: false
         type: string
         default: ''

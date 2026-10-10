@@ -42,10 +42,10 @@ command -v gh >/dev/null || { echo "gh is not installed" >&2; exit 1; }
 # A package is machine code for one CPU, published as
 # <id>-<version>-<arch>.chimeraCore (tools/publish-core.sh); the one fetched is
 # this machine's. A release from before packages carried their CPU names it
-# <id>-<version>.chimeraCore, and that one is x86_64.
+# <id>-<version>.chimeraCore, and that one is x64.
 case "$(uname -m)" in
-	x86_64|amd64) cpu=x86_64 ;;
-	aarch64|arm64) cpu=aarch64 ;;
+	x86_64|amd64) cpu=x64 ;;
+	aarch64|arm64) cpu=arm64 ;;
 	*) echo "no core is built for $(uname -m)" >&2; exit 1 ;;
 esac
 # the package for this CPU among a release's asset names (stdin), if any
@@ -53,8 +53,8 @@ pick_package() { # <id>
 	awk -v id="$1" -v cpu="$cpu" '
 		index($0, id "-") != 1 || $0 !~ /\.chimeraCore$/ { next }
 		$0 ~ ("-" cpu "\\.chimeraCore$") { mine = $0; next }
-		$0 ~ /-(x86_64|aarch64)\.chimeraCore$/ { next }
-		cpu == "x86_64" { old = $0 }
+		$0 ~ /-(x64|arm64)\.chimeraCore$/ { next }
+		cpu == "x64" { old = $0 }
 		END { if (mine != "") print mine; else if (old != "") print old }'
 }
 

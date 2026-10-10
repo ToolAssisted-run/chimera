@@ -126,7 +126,7 @@ jobs:
             exit 1
           fi
 
-  linux-aarch64:
+  linux-arm64:
     # The Linux bundle for arm64, built on an arm runner: its natives, its Qt
     # and its ffmpeg are machine code for the CPU they run on, so it is built
     # there rather than cross-compiled (on Ubuntu 26.04, which ubuntu-latest is
@@ -205,7 +205,7 @@ jobs:
   bundle:
     # Builds the x64 bundles and publishes them with the arm64 one - only when
     # that was built too, so a release never goes out a bundle short.
-    needs: [what, linux-aarch64]
+    needs: [what, linux-arm64]
     name: bundle (windows + linux x64) and publish
     runs-on: ubuntu-latest
     # the first run builds Qt for both platforms (then cached): hours, not minutes

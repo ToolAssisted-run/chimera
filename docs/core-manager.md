@@ -29,13 +29,13 @@ kinds of build the frontend already uses (see `.github/workflows/release.yml`):
   against in five years.
 
 One asset per CPU the core is built for: `<coreid>-<version>-<arch>.chimeraCore`,
-`<arch>` being `x86_64` or `aarch64`. A package is machine code for one CPU -
-miniBox runs `core.wbx` directly, and refuses one built for another CPU - but
-not for one OS: the same package runs on Linux and Windows. The version is the
+`<arch>` being `x64` or `arm64`, the names Chimera's own release bundles use. A
+package is machine code for one CPU - miniBox runs `core.wbx` directly, and
+refuses one built for another CPU - but not for one OS: the same package runs on Linux and Windows. The version is the
 commit the build was made from, which is what the package already stamps into
 `waterbox.config` and what a movie already cites (`CoreVersion`). Releases from
 before packages carried their CPU name one asset `<coreid>-<version>.chimeraCore`,
-which is x86_64.
+which is x64.
 
 Fifteen repositories publishing identically is fifteen copies of one job that
 will drift, so the logic lives once, here, in two files:
@@ -66,10 +66,10 @@ A core's own workflow adds one job:
       package: gpgx.chimeraCore
 ```
 
-That publishes the one package, as x86_64. A core built on more than one CPU
+That publishes the one package, as x64. A core built on more than one CPU
 gates on each (a matrix, one leg per CPU on a runner of that CPU), uploads each
 leg's package as `<artifact>-<arch>`, and names them with
-`arches: x86_64 aarch64`; the release then carries both.
+`arches: x64 arm64`; the release then carries both.
 
 plus a daily `schedule:` trigger, which is what makes a nightly. A push to main
 publishes `dev`; a scheduled run publishes `nightly-YYYY-MM-DD`, and only if

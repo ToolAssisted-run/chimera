@@ -18,7 +18,8 @@
 # refuses a guest built for another (the host's ELF machine check) - so a
 # release carries one package per CPU the core builds for, all of one version,
 # each named <core-id>-<version>-<arch>.chimeraCore. The arch is the caller's,
-# the CPU the gate that built the package ran on (x86_64 or aarch64); a
+# the CPU the gate that built the package ran on (x64 or arm64, the names
+# Chimera's own release bundles use); a
 # core.wbx inside must agree with it. The version is read OUT OF THE PACKAGE
 # rather than passed in: it is what the build stamped into waterbox.config, it
 # is what a movie cites, and it is what the core manager checks the download
@@ -28,7 +29,7 @@
 #                        --core-id <id> [--kind dev|nightly]
 #                        [--sha <commit>] [--notes <file>] [--dry-run]
 # Each --arch names the CPU of the --package before it. A lone package with no
-# --arch is x86_64, the CPU every core built for before aarch64.
+# --arch is x64, the CPU every core built for before arm64.
 set -eu
 
 packages=()
@@ -59,7 +60,7 @@ case "$kind" in
 	*) echo "kind must be dev or nightly" >&2; exit 2 ;;
 esac
 if [ "${#packages[@]}" -eq 1 ] && [ -z "${arches[0]}" ]; then
-	arches[0]=x86_64
+	arches[0]=x64
 fi
 
 [ -n "$sha" ] || sha="$(git rev-parse HEAD)"
@@ -77,9 +78,9 @@ for i in "${!packages[@]}"; do
 	arch="${arches[$i]}"
 	[ -f "$package" ] || { echo "no package at $package" >&2; exit 1; }
 	case "$arch" in
-		x86_64|aarch64) ;;
+		x64|arm64) ;;
 		"") echo "$package: no --arch; with more than one package, each names its CPU" >&2; exit 2 ;;
-		*) echo "$package: arch must be x86_64 or aarch64, not $arch" >&2; exit 2 ;;
+		*) echo "$package: arch must be x64 or arm64, not $arch" >&2; exit 2 ;;
 	esac
 	for a in "${assets[@]+"${assets[@]}"}"; do
 		case "$a" in *-"$arch".chimeraCore)
@@ -99,7 +100,7 @@ with zipfile.ZipFile(sys.argv[1]) as z:
     if "core.wbx" in z.namelist():
         head = z.open("core.wbx").read(20)
         if head[:4] == b"\x7fELF" and len(head) == 20:
-            machine = {62: "x86_64", 183: "aarch64"}.get(struct.unpack_from("<H", head, 18)[0], "other")
+            machine = {62: "x64", 183: "arm64"}.get(struct.unpack_from("<H", head, 18)[0], "other")
     print(v or "-", vdate.replace(" ", "T") or "-", machine)
 PY
 )

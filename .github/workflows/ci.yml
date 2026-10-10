@@ -37,9 +37,9 @@ jobs:
         # waterboxed core is built and checked on each (the arm runner is
         # Ubuntu 26.04, which ubuntu-latest is moving to, with 4 KiB pages)
         include:
-          - arch: x86_64
+          - arch: x64
             runner: ubuntu-latest
-          - arch: aarch64
+          - arch: arm64
             runner: ubuntu-26.04-arm
     steps:
       - uses: actions/checkout@v4
@@ -107,9 +107,9 @@ jobs:
         # waterboxed core is built and checked on each (the arm runner is
         # Ubuntu 26.04, which ubuntu-latest is moving to, with 4 KiB pages)
         include:
-          - arch: x86_64
+          - arch: x64
             runner: ubuntu-latest
-          - arch: aarch64
+          - arch: arm64
             runner: ubuntu-26.04-arm
     steps:
       - uses: actions/checkout@v4

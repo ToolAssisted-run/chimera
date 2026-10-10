@@ -187,7 +187,8 @@ cp "$tmp/$member" "$dest/$binary"
 chmod +x "$dest/$binary"
 
 {
-	printf "ffmpeg 4.4.1-static (%s, %s)\n\n" "$platform" "$([ "$platform" = windows ] && echo x86_64 || echo "$cpu")"
+	# the CPU by the name Chimera's release bundles give it
+	printf "ffmpeg 4.4.1-static (%s, %s)\n\n" "$platform" "$([ "$platform" = windows ] || [ "$cpu" = x86_64 ] && echo x64 || echo arm64)"
 	printf "Shipped as a separate program, which Chimera runs and talks to over a pipe.\n"
 	printf "It is not linked into Chimera and is not modified. Taken unaltered from:\n"
 	printf "  %s\n" "$url"
