@@ -207,6 +207,72 @@ namespace Chimera.Tests.Client.Common.CorePackages
 		}
 
 		/// <summary>
+		/// A sound rate a package or one of its machines states is a rate a sound
+		/// chip can have. The adapter builds a resampler from it; a typing slip
+		/// (4800, 480000) would otherwise be played as it stands (issue #226 is
+		/// where a machine came to state its own).
+		/// </summary>
+		[TestMethod]
+		public void EverySoundRateAPackageStatesIsARealOne()
+		{
+			List<string> wrong = new();
+			foreach (var path in Packages())
+			{
+				var dir = Extracted(path);
+				if (dir is null) continue;
+				try
+				{
+					var config = WaterboxConfig.FromJson(File.ReadAllText(Path.Combine(dir, WaterboxCoreFactory.ConfigFileName)));
+					if (config is null) continue;
+					wrong.AddRange(SoundRatesOutOfRange(config).Select(found => $"{InstalledPackages.NameOf(path)}: {found}"));
+				}
+				catch (Exception ex)
+				{
+					wrong.Add($"{InstalledPackages.NameOf(path)}: {ex.Message}");
+				}
+				finally
+				{
+					TryDelete(dir);
+				}
+			}
+			Assert.AreEqual(0, wrong.Count, string.Join("; ", wrong));
+		}
+
+		/// <summary>The rates a declaration states that no sound chip has: below 8 kHz or above 192 kHz.</summary>
+		private static List<string> SoundRatesOutOfRange(WaterboxConfig config)
+		{
+			static bool Real(int rate) => rate is >= 8000 and <= 192000;
+			List<string> wrong = new();
+			if (config.Audio is { } audio && !Real(audio.Rate)) wrong.Add($"audio.rate is {audio.Rate}");
+			foreach (var machine in config.Machines ?? new())
+			{
+				if (machine.AudioRate is { } rate && !Real(rate)) wrong.Add($"machine {machine.Id}: audioRate is {rate}");
+			}
+			return wrong;
+		}
+
+		/// <summary>The check above, shown to find what it looks for. Needs no package.</summary>
+		[TestMethod]
+		public void ASoundRateNoChipHasIsFound()
+		{
+			var config = WaterboxConfig.FromJson("""
+				{
+				  "coreName": "rates", "systemId": "SYS",
+				  "video": { "width": 320, "height": 240 },
+				  "audio": { "samplesPerFrame": 2048, "rate": 48000 },
+				  "input": { "buttons": [] },
+				  "machines": [
+				    { "id": "A", "when": [ "a" ], "audioRate": 64000 },
+				    { "id": "B", "when": [ "b" ], "audioRate": 6400 },
+				    { "id": "C", "when": [ "c" ] }
+				  ]
+				}
+				""");
+			Assert.IsNotNull(config);
+			CollectionAssert.AreEqual(new[] { "machine B: audioRate is 6400" }, SoundRatesOutOfRange(config));
+		}
+
+		/// <summary>
 		/// The check above, shown to find what it looks for. Needs no package.
 		/// The first declaration set is the PCSX2 package's mistake in small; the
 		/// second is the same with each declaration naming its machines.

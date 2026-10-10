@@ -137,9 +137,15 @@ hardware selected - so its `waterbox.config` declares a `machines` array and
 names the setting that picks between them (`machineSetting`). Each machine
 carries what makes it a different machine: the system id the movie records,
 the controller it has, the picture it draws, and the rom extensions that
-belong to it. What they share - the binary, the guest heap, the audio rate -
-stays at the top level, and a package with no `machines` is one machine
-exactly as before.
+belong to it. What they share - the binary, the guest heap, and the audio
+rate unless a machine states its own - stays at the top level, and a package
+with no `machines` is one machine exactly as before.
+
+A machine whose sound chip runs at another rate says so with `audioRate`, in
+Hz (issue 226). A Namco System 256 is a PlayStation 2 with every clock a
+third faster, so its chip mixes 64000 samples a second where the console's
+mixes 48000: its machine entry carries `"audioRate": 64000`. A machine that
+says nothing has the package's `audio.rate`.
 
 The choice belongs with the core, on step one, because everything after it
 depends on it: the files it takes (a Sega CD drive is not a Master System's),

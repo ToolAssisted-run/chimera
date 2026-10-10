@@ -201,6 +201,11 @@ Advice earned the hard way:
 - **`waterbox.config`** - the machine: name, system id, video (buffer capacity
   and the live size the core reports per frame), audio, vsync as a rational,
   the memory layout, the button list, settings, firmware.
+- **The sound's rate is the chip's.** `audio.rate` is the rate the core mixes
+  at, and Chimera converts it. In a package of several machines, one whose
+  chip runs at another rate states its own: `"audioRate": 64000` in its entry
+  of `machines` (issue 226). Check it by counting: the samples a run produces
+  over its frames must be the rate over the frame rate.
 - **Descriptions are written in plain language** (issue 241). A user reads
   the `description` of a setting, a firmware entry and a machine preset, and
   the `help` of a file slot, in Chimera's windows. Write short sentences,

@@ -266,6 +266,14 @@ namespace Chimera.Emulation.Common.Waterbox
 			return Machines[0];
 		}
 
+		/// <summary>
+		/// The rate the sound of <paramref name="machine"/> is mixed at: the
+		/// machine's own when it states one, the package's otherwise, and 44100
+		/// for a package that states none.
+		/// </summary>
+		public int AudioRateFor(MachineConfig? machine)
+			=> machine?.AudioRate is > 0 and var own ? own : Audio?.Rate ?? 44100;
+
 		/// <summary>What a machine changes about one of the package's settings.</summary>
 		public sealed class SettingOverride
 		{
@@ -397,6 +405,16 @@ namespace Chimera.Emulation.Common.Waterbox
 			public int? VirtualWidth { get; set; }
 
 			public int? VirtualHeight { get; set; }
+
+			/// <summary>
+			/// The rate this machine's sound is mixed at, in Hz, when it is not the
+			/// package's (<c>audio.rate</c>). One core can hold machines whose sound
+			/// chips run at different rates: a Namco System 256 is a PlayStation 2
+			/// with a faster clock, and its chip makes 64000 samples a second where
+			/// the console's makes 48000. Played at the package's one rate, a third
+			/// of that sound was too much and was dropped (issue #226).
+			/// </summary>
+			public int? AudioRate { get; set; }
 
 			/// <summary>Rom extensions that belong to this machine.</summary>
 			public Dictionary<string, string>? Extensions { get; set; }

@@ -153,9 +153,12 @@ namespace Chimera.Emulation.Common.Waterbox
 			_samplesPerFrame = audio.SamplesPerFrame;
 			_videoBuff = new int[_width * _height];
 			_stereoBuff = new short[_samplesPerFrame * 2];
-			if (audio.Rate is > 0 and not 44100)
+			// the machine's rate where it states one: two machines of one package
+			// can have sound chips that run at different rates (issue #226)
+			var rate = cfg.AudioRateFor(_machine);
+			if (rate is > 0 and not 44100)
 			{
-				_resampler = new SDLResampler(audio.Rate, 44100, (buf, n) =>
+				_resampler = new SDLResampler(rate, 44100, (buf, n) =>
 				{
 					if (_resampled.Length < n * 2) _resampled = new short[n * 2];
 					Buffer.BlockCopy(buf, 0, _resampled, 0, n * 2 * sizeof(short));

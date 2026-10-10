@@ -6148,3 +6148,46 @@ package tests and roster tests, 19 of 19. The package tests also pass with
 both packages in the folder. Not tested here: starting the game. The core's
 own CI runs its tests on the game's data and Chimera's package tests before
 it publishes.
+
+## A machine may state its own sound rate (user-decided, 2026-10-10, issue 226)
+
+Reported: sound problems in Time Crisis 4 and Tekken 5 Dark Resurrection,
+both on the Namco System 256 boards of the PCSX2 core. The reporter gave
+two videos and no description. Neither game is on the test machine; Super
+Dragon Ball Z, another System 256 game, is.
+
+What was measured, with the core run on its own for 600 frames at 59.94
+frames a second (48000 samples a second would be 480480 samples):
+- System 256: 637952 samples, 63,700 a second.
+- Super System 256: 717760 samples, 71,700 a second.
+
+Cause. Those boards run every clock faster than a PlayStation 2, by 4/3 and
+by 3/2, and the sound chip counts its samples on that clock: 49.152 MHz
+over 768 is 64000, 55.296 MHz over 768 is 72000. The arcade fork the board
+code comes from says the same (its console sample rate is the clock over
+768). The game agrees: started with a coin, Super Dragon Ball Z programs
+voice pitches 0x0C00 and 0x0480, which are 48000 Hz and 18000 Hz on a chip
+at 64000 and would be 36000 Hz and 13500 Hz on one at 48000. So the samples
+were right. What was wrong is that a package could state one sound rate,
+48000, for all its machines. Chimera played a third to a half too many
+samples at the console's rate: too low in pitch, and more sound than the
+frames have time for, so parts were dropped.
+
+Decided: a machine may state its own rate. `machines[].audioRate`, in Hz,
+is optional; a machine that says nothing has the package's `audio.rate`.
+The other choice put to the owner was to convert the sound to 48000 inside
+the core, which needs no change here but converts the sound twice.
+
+What changed here: `WaterboxConfig.MachineConfig.AudioRate`,
+`WaterboxConfig.AudioRateFor(machine)`, and the adapter builds its converter
+from that rate. The engine does not use the rate and is unchanged. A new
+package test refuses a rate no sound chip has (below 8 kHz or above 192
+kHz), for the package and for each machine.
+
+Tested: two new tests of the declaration and two of the package check; the
+rule was broken on purpose and its test failed. Interface tests after a
+full rebuild: 119 / 61 / 554 / 302 with none failed. Package tests on the
+30 published packages, dev and dated builds: 17 of 17. With the PCSX2
+core's new declarations, Chimera reads 48000 for the console and System
+246, 64000 for System 256 and 72000 for Super 256. Not tested: listening to
+a System 256 game in the interface, and the two games of the report.
