@@ -5714,3 +5714,35 @@ the user changed it. "Open Project" starts in the folder of the project
 opened last, and in the Movies folder when no project has been opened yet.
 "Save As" already started there. No files are moved.
 
+## A hole left by a branch load is filled when it is played through (user-decided, 2026-10-10; chimera#238)
+
+Reported: after loading a branch, no greenzone states were stored between
+the last frame the two branches share and the frame the branch was made at,
+however often those frames were played. It also survived a restart.
+
+Cause: loading a branch cuts the stored states at the last shared frame and
+puts the machine at the branch's own frame. The frames in between were never
+run, so nothing is stored for them. When they were played later, the engine
+saw that a state of a later frame existed and treated them as a replay of
+frames it already had, so it stored nothing. Editing a frame removed the
+later states, which is why that worked around it.
+
+Decided (of two fixes): the simple one. The engine remembers the hole when
+a branch is loaded. When play enters the hole, the states stored beyond it
+are dropped and storing continues from there, as after an edit. The frames
+beyond the hole have to be played again to be stored again; nothing in the
+movie changes. The exact fix - keeping the states beyond the hole and
+joining the two parts - means inserting into the middle of the state
+history, which only grows at its end today, and was not taken.
+
+Limits, stated plainly:
+- The hole is remembered in memory only. A project that was closed with a
+  hole and opened again does not know about it; loading the branch again,
+  or editing a frame in the hole, gets it filled.
+- Gaps the memory or disk budget made by dropping old states are not holes
+  in this sense and are left alone.
+
+Tested with a new unit test (it fails without the fix, with the greenzone
+set to every frame and to every 7 frames) and the existing randomized
+history test, which loads branches.
+

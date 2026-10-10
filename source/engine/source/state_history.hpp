@@ -865,6 +865,20 @@ private:
 	bool m_strideFixed = false;        /* fixNearStride: the tuner leaves it alone */
 	int64_t m_capturePeriod = 1;       /* capturePeriod(): 0 off, 1 every frame, N one in N */
 	bool m_storeNext = false;          /* leaving 0: the next storable frame is stored */
+
+	/* A hole a load from outside left (issue 238). Loading a TAStudio branch
+	 * cuts the history at the last frame the two timelines share and puts the
+	 * machine at the branch's own frame, further on: no frame strictly between
+	 * `after` and `before` was run, so none is stored. They are kept in memory
+	 * only - a history read back from a file does not know its holes. */
+	struct Hole
+	{
+		int64_t after;    /* the last frame stored on the near side */
+		int64_t before;   /* the first frame captured on the far side */
+	};
+	std::vector<Hole> m_holes;
+	bool m_loadedOutside = false;      /* beforeLoad() since the last capture or restore */
+	const Hole *holeAt(int64_t frame) const;
 	double m_captureSeconds = 0;       /* exponential means, in seconds */
 	double m_wallSeconds = 0;
 	double m_lastCaptureEnded = 0;

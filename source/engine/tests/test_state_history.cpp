@@ -1761,6 +1761,97 @@ int main(void)
 		}
 	}
 
+	{ // Loading a branch leaves a hole in the history, and playing through
+	  // the hole fills it (issue 238).
+	  //
+	  // A branch load cuts the history at the last frame the two timelines
+	  // share and puts the machine at the branch's own frame, further on. The
+	  // frames in between were never run in this session, so no state of them
+	  // is stored. When they were played later, nothing was stored either:
+	  // a state of a LATER frame existed, and every frame below the newest
+	  // stored one was taken for a replay of frames already held. The hole
+	  // stayed for good, and every seek into it replayed from its near side.
+		const chimera::HostApi api = fakeHost();
+		for (int64_t period : { int64_t(1), int64_t(7) })
+		{
+			g_machine = Machine{};
+			chimera::StateHistory h;
+			h.helpers(false);
+			h.configure(&api, nullptr, 4u << 20);
+			h.capturePeriod(period);
+			/* what the machine is on every frame of this timeline */
+			std::vector<std::array<uint8_t, Machine::kCells>> truth(1);
+			std::memcpy(truth[0].data(), g_machine.cell, Machine::kCells);
+			for (int64_t f = 1; f <= 200; f++)
+			{
+				advance(f);
+				std::array<uint8_t, Machine::kCells> at{};
+				std::memcpy(at.data(), g_machine.cell, Machine::kCells);
+				truth.push_back(at);
+			}
+			const auto machineIs = [&](int64_t f) {
+				return std::memcmp(g_machine.cell, truth[static_cast<size_t>(f)].data(), Machine::kCells) == 0;
+			};
+			const auto play = [&](int64_t from, int64_t to) {
+				for (int64_t f = from + 1; f <= to; f++)
+				{
+					h.beforeAdvance();
+					advance(f);
+					assert(machineIs(f));
+					h.capture(f);
+				}
+			};
+
+			/* the first 60 frames, stored as the period says */
+			std::memcpy(g_machine.cell, truth[0].data(), Machine::kCells);
+			h.capture(0);
+			play(0, 60);
+			/* the branch: the timelines part after frame 42, and the branch's
+			 * own state is frame 120's */
+			h.invalidateAfter(42);
+			h.beforeLoad();
+			std::memcpy(g_machine.cell, truth[120].data(), Machine::kCells);
+			play(120, 150);
+			h.flushWrites();
+			const int64_t nearSide = h.nearest(119);
+			assert(nearSide <= 42);                  /* the hole: nothing between 42 and 120 */
+			assert(h.nearest(150) > 150 - period);   /* and frames after the branch frame are held */
+
+			/* back to the near side of the hole, and forward through it */
+			assert(h.restore(nearSide, error));
+			assert(machineIs(nearSide));
+			play(nearSide, 119);
+			h.flushWrites();
+			/* every frame of the hole now has a state within one period below it */
+			for (int64_t f = nearSide + period; f <= 119; f++)
+			{
+				assert(h.nearest(f) > f - period);
+			}
+			/* and each stored one is the machine it says it is */
+			int checked = 0;
+			for (int64_t f = nearSide + 1; f <= 119; f++)
+			{
+				if (h.nearest(f) != f) continue;
+				assert(h.restore(f, error));
+				assert(machineIs(f));
+				checked++;
+			}
+			assert(checked > 0);
+			/* playing on across the far side and beyond keeps storing */
+			const int64_t resume = h.nearest(119);
+			assert(h.restore(resume, error));
+			play(resume, 170);
+			h.flushWrites();
+			assert(h.nearest(170) > 170 - period);
+			for (int64_t f = 120; f <= 170; f++)
+			{
+				if (h.nearest(f) != f) continue;
+				assert(h.restore(f, error));
+				assert(machineIs(f));
+			}
+		}
+	}
+
 	{ // An edit BEHIND the machine, and the machine goes on (issue #68).
 	  //
 	  // TAStudio can change a frame before the playhead and let a frame run

@@ -171,6 +171,8 @@ void StateHistory::clear()
 	m_packer.drain();
 	m_packJobs.clear();
 	m_segments.clear();
+	m_holes.clear();
+	m_loadedOutside = false;
 	m_bytes = 0;
 	m_epochOpen = false;
 	m_newest = -1;
@@ -1552,12 +1554,22 @@ bool StateHistory::captureAnchorPlanned(int64_t frame, std::vector<uint8_t> &car
 	return true;
 }
 
+const StateHistory::Hole *StateHistory::holeAt(int64_t frame) const
+{
+	for (const Hole &h : m_holes)
+	{
+		if (frame > h.after && frame < h.before) return &h;
+	}
+	return nullptr;
+}
+
 void StateHistory::beforeLoad()
 {
 	finishPlan();
 	m_epochOpen = false;
 	m_machineFrame = -1;
 	m_machineStored = false;
+	m_loadedOutside = true;
 	/* whatever is loaded, the caller put it there on purpose: a branch is the
 	 * new timeline's machine, not the old one's */
 	m_pastEditAt = -1;
@@ -1811,8 +1823,42 @@ void StateHistory::captureOnce(int64_t frame, const uint8_t *note, size_t noteLe
 	}
 	if (!m_segments.empty() && frame <= m_segments.back().lastFrame())
 	{
+		const Hole *hole = holeAt(frame);
+		if (hole == nullptr)
+		{
+			m_loadedOutside = false;
+			m_epochOpen = false;
+			return;
+		}
+		/* Not a replay after all: this frame is in a hole a branch load left,
+		 * and was never stored (issue 238). It used to be passed over like a
+		 * replay because a LATER frame is stored, so the hole never filled and
+		 * every seek into it replayed from its near side.
+		 *
+		 * The history only grows at its end, so what is stored beyond the hole
+		 * is let go, and storing goes on from here as it does after an edit
+		 * (user-decided, 2026-10-10: this over inserting into the middle). The
+		 * frames beyond have to be played again to be stored again. */
+		const int64_t farSide = hole->before;
+		while (!m_segments.empty() && m_segments.back().anchorFrame >= farSide)
+		{
+			forgetSegment(m_segments.size() - 1);
+		}
+		m_holes.erase(std::remove_if(m_holes.begin(), m_holes.end(),
+			[&](const Hole &h) { return h.before >= farSide; }), m_holes.end());
 		m_epochOpen = false;
-		return;
+		if (!m_segments.empty() && frame <= m_segments.back().lastFrame()) return;
+	}
+	/* The first frame captured after a load from outside: if it is not the one
+	 * right after what the history ends on, the frames in between were never
+	 * run, and that is a hole to fill when somebody plays through it. */
+	if (m_loadedOutside)
+	{
+		m_loadedOutside = false;
+		if (!m_segments.empty() && frame > m_segments.back().lastFrame() + 1)
+		{
+			m_holes.push_back({ m_segments.back().lastFrame(), frame });
+		}
 	}
 	m_newest = frame;
 
@@ -2044,6 +2090,9 @@ void StateHistory::invalidateAfter(int64_t frame)
 	{
 		forgetSegment(m_segments.size() - 1);
 	}
+	/* a hole whose far side has just gone is no longer a hole */
+	m_holes.erase(std::remove_if(m_holes.begin(), m_holes.end(),
+		[&](const Hole &h) { return h.before > frame; }), m_holes.end());
 	if (m_segments.empty()) return;
 	Segment &s = m_segments.back();
 	while (s.lastFrame() > frame && !s.links.empty())
@@ -3069,6 +3118,9 @@ bool StateHistory::restore(int64_t frame, std::string &error, int64_t *landedOn)
 	 * plan is holding pages of */
 	finishPlan();
 	if (landedOn != nullptr) *landedOn = -1;
+	/* the machine is about to be on a frame the history holds: whatever came
+	 * from outside before this is not where the next capture continues from */
+	m_loadedOutside = false;
 	const Segment *seg = nullptr;
 	int64_t steps = -1;
 	for (const Segment &s : m_segments)
