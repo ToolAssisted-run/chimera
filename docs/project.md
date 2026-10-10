@@ -151,6 +151,16 @@ and the movie cites it like every other structural choice, and the condition
 language already understood it: `{"setting": "systemHardware", "is": "sms"}`
 gates slots, settings and firmware alike.
 
+A setting that only some machines have says so in its own `when` list: the
+values of the machine setting it belongs to. `exposedWhen` is not a
+substitute. It decides whether a person is shown the setting; `when` decides
+whether the setting applies to the machine at all. This matters most when two
+declarations share a name, for example a console's Boot ROM and an arcade
+board's: each must name its machines in `when`, so that every machine is left
+with exactly one declaration. Without it both stay, and the later one's
+default wins on every machine. The package tests refuse a package that
+leaves a machine with two declarations of one setting.
+
 Loading a plain rom with no project has no pin, so the extension decides: the
 package's machines claim their own extensions, and a `.sms` opened with this
 package is a Master System.

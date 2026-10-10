@@ -167,6 +167,97 @@ namespace Chimera.Tests.Client.Common.CorePackages
 			Assert.AreEqual(0, unversioned.Count, string.Join("; ", unversioned));
 		}
 
+		/// <summary>
+		/// A package of several machines may declare one setting twice, once for
+		/// each kind of machine (a console's boot ROM and an arcade board's). A
+		/// machine's defaults come from the declarations that machine has, and of
+		/// two with the same name the later one wins. So every machine must be
+		/// left with ONE declaration of a name, which means the two say which
+		/// machines they belong to in their "when" lists. "exposedWhen" does not
+		/// do that: it decides what a person is shown, not what applies.
+		/// The PCSX2 package told its two boot ROM settings apart by "exposedWhen"
+		/// only (2026-09-20 to 2026-10-10): a PlayStation 2 project that did not
+		/// name its boot ROM got the arcade board's default, was asked for no
+		/// bios, and could not start.
+		/// </summary>
+		[TestMethod]
+		public void ASettingHasOneDeclarationOnEveryMachine()
+		{
+			List<string> twice = new();
+			foreach (var path in Packages())
+			{
+				var dir = Extracted(path);
+				if (dir is null) continue;
+				try
+				{
+					var config = WaterboxConfig.FromJson(File.ReadAllText(Path.Combine(dir, WaterboxCoreFactory.ConfigFileName)));
+					if (config is null) continue;
+					twice.AddRange(SettingsDeclaredTwice(config).Select(found => $"{InstalledPackages.NameOf(path)}: {found}"));
+				}
+				catch (Exception ex)
+				{
+					twice.Add($"{InstalledPackages.NameOf(path)}: {ex.Message}");
+				}
+				finally
+				{
+					TryDelete(dir);
+				}
+			}
+			Assert.AreEqual(0, twice.Count, string.Join("; ", twice));
+		}
+
+		/// <summary>
+		/// The check above, shown to find what it looks for. Needs no package.
+		/// The first declaration set is the PCSX2 package's mistake in small; the
+		/// second is the same with each declaration naming its machines.
+		/// </summary>
+		[TestMethod]
+		public void TwoDeclarationsOfOneSettingAreToldApartByTheirMachines()
+		{
+			const string Head = """
+				{ "machineSetting": "machine",
+				  "machines": [ { "id": "HOME", "when": [ "home" ] }, { "id": "ARCADE", "when": [ "arcade" ] } ],
+				  "settings": [
+				    { "name": "machine", "type": "enum", "options": [ "home", "arcade" ], "default": "home" },
+				""";
+			var shownOnly = WaterboxConfig.FromJson(Head + """
+				    { "name": "bios", "type": "enum", "options": [ "home-rom" ], "default": "home-rom",
+				      "exposedWhen": { "setting": "machine", "is": "home" } },
+				    { "name": "bios", "type": "enum", "options": [ "arcade-rom" ], "default": "arcade-rom",
+				      "exposedWhen": { "setting": "machine", "is": "arcade" } } ] }
+				""")!;
+			var found = SettingsDeclaredTwice(shownOnly).ToList();
+			Assert.AreEqual(2, found.Count, string.Join("; ", found));
+			StringAssert.Contains(found[0], "'bios'");
+			// and this is what it costs: the home machine starts on the arcade rom
+			Assert.AreEqual("arcade-rom", WaterboxCore.EffectiveSettingsFor(shownOnly, null)["bios"]);
+
+			var byMachine = WaterboxConfig.FromJson(Head + """
+				    { "name": "bios", "type": "enum", "options": [ "home-rom" ], "default": "home-rom",
+				      "when": [ "home" ], "exposedWhen": { "setting": "machine", "is": "home" } },
+				    { "name": "bios", "type": "enum", "options": [ "arcade-rom" ], "default": "arcade-rom",
+				      "when": [ "arcade" ], "exposedWhen": { "setting": "machine", "is": "arcade" } } ] }
+				""")!;
+			Assert.AreEqual(0, SettingsDeclaredTwice(byMachine).Count());
+			Assert.AreEqual("home-rom", WaterboxCore.EffectiveSettingsFor(byMachine, null)["bios"]);
+		}
+
+		/// <summary>Each setting a machine of this package is left with more than one declaration of.</summary>
+		private static IEnumerable<string> SettingsDeclaredTwice(WaterboxConfig config)
+		{
+			// a package with no machines is one machine, and narrows nothing
+			var machines = config.Machines is { Count: > 0 } several
+				? several.Cast<WaterboxConfig.MachineConfig?>()
+				: new WaterboxConfig.MachineConfig?[] { null };
+			foreach (var machine in machines)
+			{
+				foreach (var group in config.SettingsFor(machine).GroupBy(static d => d.Key).Where(static g => g.Count() > 1))
+				{
+					yield return $"'{group.Key}' has {group.Count()} declarations on {machine?.Id ?? "its one machine"}";
+				}
+			}
+		}
+
 		/// <summary>"P2 Start" -&gt; "Start"; anything without a player prefix unchanged.</summary>
 		private static string WithoutPlayer(string control)
 		{

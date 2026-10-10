@@ -5785,3 +5785,39 @@ Measured:
   and a saved state of 202 MB (238 MB at 4x).
 
 Not tested: 3x on a real card, other drivers, and TAStudio itself.
+
+## A setting has one declaration on every machine (user-decided, 2026-10-10)
+
+Found through a pull request to the PCSX2 core (chimera-core-pcsx2 pull
+request 1). That package declares the Boot ROM setting twice, once for the
+console and once for the arcade boards, and told the two apart only by
+`exposedWhen`. `exposedWhen` decides what a person is shown. What applies to
+a machine is decided by a setting's `when` list, and neither declaration had
+one. So both applied to every machine, and the later default won: a
+PlayStation 2 project that named no Boot ROM got the arcade board's default,
+was asked for no bios, and could not start. This had been so since the
+arcade boards were added on 2026-09-20. Projects that record their Boot ROM
+explicitly were not affected, which is why nobody reported it.
+
+The core was fixed by giving each declaration its `when` list. The owner
+asked for a test in Chimera as well, so that no package can do this unseen:
+
+- `InstalledCorePackagesTests.ASettingHasOneDeclarationOnEveryMachine` runs
+  on every installed package and fails when a machine is left with two
+  declarations of one setting name.
+- `TwoDeclarationsOfOneSettingAreToldApartByTheirMachines` shows, without
+  any package, that the check finds the mistake and accepts the fix.
+
+Measured: the check fails on the PCSX2 package published before the fix
+("Development build 5b6a3ba5", naming `bios` on all four machines) and passes
+on the fixed one ("Development build 5eeb211a"). All 30 published packages
+pass. In the real frontend a PlayStation 2 disc opened with no Boot ROM
+setting stops with PCSX2's "requires a BIOS" message before the fix and
+boots after it; that check now lives in the PCSX2 repository's frontend test.
+
+Known and not changed here: the engine builds its own default settings
+without narrowing by machine at all (`session.cpp`), so the settings a guest
+receives can still hold both declarations of a name; the guest reads the
+first. The frontend sends every effective value, so this did not cause the
+bug above, but a headless run that leaves a machine-scoped setting unset
+gets the first declaration's default whatever the machine is.
