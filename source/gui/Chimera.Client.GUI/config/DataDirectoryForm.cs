@@ -209,10 +209,9 @@ namespace Chimera.Client.GUI
 
 		private string? PickFolder()
 		{
-			using FolderBrowserDialog dialog = new()
+			using FolderBrowserEx dialog = new()
 			{
 				Description = "Where Chimera should keep its data. A folder that already has other things in it gets a Chimera folder of its own inside.",
-				ShowNewFolderButton = true,
 			};
 			return dialog.ShowDialog(this) is DialogResult.OK ? dialog.SelectedPath : null;
 		}

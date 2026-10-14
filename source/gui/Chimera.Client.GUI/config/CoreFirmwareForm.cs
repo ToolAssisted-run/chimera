@@ -232,7 +232,7 @@ namespace Chimera.Client.GUI
 		{
 			var entry = SelectedEntry;
 			if (entry is null) return;
-			using OpenFileDialog ofd = new()
+			using OpenFilePicker ofd = new()
 			{
 				Title = $"{entry.CoreName}: {entry.Decl.DisplayName}",
 				Filter = "All Files|*.*",

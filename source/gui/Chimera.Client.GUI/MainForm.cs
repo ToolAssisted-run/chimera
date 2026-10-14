@@ -3852,7 +3852,7 @@ namespace Chimera.Client.GUI
 			bool maySelectMultiple = false,
 			string/*?*/ windowTitle = null)
 		{
-			using OpenFileDialog ofd = new()
+			using OpenFilePicker ofd = new()
 			{
 				FileName = initFileName ?? string.Empty,
 				Filter = filterStr ?? string.Empty,
@@ -3877,7 +3877,7 @@ namespace Chimera.Client.GUI
 			string/*?*/ initFileName,
 			bool muteOverwriteWarning)
 		{
-			using SaveFileDialog sfd = new()
+			using SaveFilePicker sfd = new()
 			{
 				DefaultExt = fileExt ?? string.Empty,
 				FileName = initFileName ?? string.Empty,

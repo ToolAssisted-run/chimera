@@ -636,7 +636,7 @@ namespace Chimera.Client.GUI
 				// dialog keeps its own default.
 				pickFile: title =>
 				{
-					using OpenFileDialog picker = new()
+					using OpenFilePicker picker = new()
 					{
 						Title = title,
 						Filter = "All Files|*.*",

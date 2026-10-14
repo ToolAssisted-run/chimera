@@ -231,7 +231,7 @@ namespace Chimera.Client.GUI
 				_discoveredCorePackages,
 				pickFiles: slot =>
 				{
-					using OpenFileDialog dialog = new()
+					using OpenFilePicker dialog = new()
 					{
 						Multiselect = true,
 						Title = $"Add to {slot.Title}",
@@ -244,7 +244,7 @@ namespace Chimera.Client.GUI
 				},
 				pickFirmwareFile: title =>
 				{
-					using OpenFileDialog dialog = new()
+					using OpenFilePicker dialog = new()
 					{
 						Title = title,
 						InitialDirectory = OpensIn(Config.PathEntries.FirmwareAbsolutePath()),
@@ -340,7 +340,7 @@ namespace Chimera.Client.GUI
 
 		private string PickProjectToOpen()
 		{
-			using OpenFileDialog dialog = new()
+			using OpenFilePicker dialog = new()
 			{
 				Filter = new FilesystemFilterSet(FilesystemFilter.TAStudioProjects).ToString(),
 				Title = "Open Chimera Project",
@@ -410,7 +410,7 @@ namespace Chimera.Client.GUI
 			{
 				using ProjectResolutionForm dialog = new(project, locateFile: title =>
 				{
-					using OpenFileDialog picker = new() { Title = title };
+					using OpenFilePicker picker = new() { Title = title };
 					return picker.ShowDialog(this) is DialogResult.OK ? picker.FileName.WithoutWslgMirror() : null;
 				},
 				locateFolder: (ref bool includeSubfolders) =>

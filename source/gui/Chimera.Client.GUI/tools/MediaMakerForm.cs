@@ -310,7 +310,7 @@ namespace Chimera.Client.GUI
 
 		private void PickOutput()
 		{
-			using SaveFileDialog dialog = new()
+			using SaveFilePicker dialog = new()
 			{
 				Title = "Write the image to",
 				FileName = _output.Text,

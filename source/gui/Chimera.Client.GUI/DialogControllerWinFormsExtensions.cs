@@ -40,6 +40,12 @@ namespace Chimera.Client.GUI
 			return dialogParent.DialogController.DoWithTempMute(() => dialog.ShowDialog(dialogParent.AsWinFormsHandle()));
 		}
 
+		public static DialogResult ShowDialogWithTempMute(this IDialogParent dialogParent, FilePicker dialog)
+		{
+			HeadlessGuard(dialog.GetType().Name, dialog.Title);
+			return dialogParent.DialogController.DoWithTempMute(() => dialog.ShowDialog(dialogParent.AsWinFormsHandle()));
+		}
+
 		public static DialogResult ShowDialogWithTempMute(this IDialogParent dialogParent, FolderBrowserEx dialog)
 		{
 			HeadlessGuard(nameof(FolderBrowserEx), dialog.Description);

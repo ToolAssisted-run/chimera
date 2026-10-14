@@ -25,8 +25,9 @@ namespace Chimera.Client.GUI
 	/// <summary>
 	/// The one folder picker. On Windows it is the Explorer-style dialog with an address bar and a box to
 	/// type or paste a path into (<see cref="Win32FolderPicker"/>, issue #57); the old Browse For Folder tree
-	/// below is only what is left if that dialog cannot be had. Elsewhere it is the toolkit's own dialog.
-	/// Call ShowDialog() to bring it up.
+	/// below is only what is left if that dialog cannot be had. On Linux and the BSDs it is the desktop's
+	/// own chooser, through the XDG desktop portal (<see cref="PortalFileChooser"/>), and the toolkit's
+	/// dialog where there is no portal. Call ShowDialog() to bring it up.
 	/// </summary>
 	/// <remarks>
 	/// I believe this code is from http://support.microsoft.com/kb/306285<br/>
@@ -65,9 +66,9 @@ namespace Chimera.Client.GUI
 		public bool CheckBoxChecked;
 
 		/// <summary>
-		/// Whether the dialog that just came up actually carried the tick box. False after any of the three
-		/// pickers that cannot hold one - Mono's, the SHBrowseForFolder tree, and a Windows whose shell
-		/// refused the customisation face - and then <see cref="CheckBoxChecked"/> is untouched, because
+		/// Whether the dialog that just came up actually carried the tick box. False after any of the
+		/// pickers that cannot hold one - Mono's, the SHBrowseForFolder tree, a Windows whose shell refused
+		/// the customisation face, and a portal whose chooser did not draw it - and then <see cref="CheckBoxChecked"/> is untouched, because
 		/// nobody was asked. A window that needs the answer regardless must carry the choice itself.
 		/// </summary>
 		public bool CheckBoxShown { get; private set; }
@@ -78,7 +79,7 @@ namespace Chimera.Client.GUI
 		/// not for one dialog: a Windows that falls back to the tree has no tick box on that occasion, which
 		/// only <see cref="CheckBoxShown"/> can say, and then the scan runs on the state passed in.
 		/// </summary>
-		public static bool CanShowCheckBox => !OSTailoredCode.IsUnixHost;
+		public static bool CanShowCheckBox => !OSTailoredCode.IsUnixHost || PortalFileChooser.CanPickFolders;
 
 		/// <summary>Shows the folder picker with the specified owner window.</summary>
 		public DialogResult ShowDialog(IWin32Window owner = null)
@@ -86,6 +87,24 @@ namespace Chimera.Client.GUI
 			CheckBoxShown = false;
 			if (OSTailoredCode.IsUnixHost)
 			{
+				var request = new PortalFileChooser.Request
+				{
+					Directory = true,
+					Title = Description,
+					Folder = SelectedPath ?? string.Empty,
+					CheckBoxLabel = CheckBoxLabel,
+					CheckBoxChecked = CheckBoxChecked,
+				};
+				switch (PortalFileChooser.Show(owner, request, out var answer))
+				{
+					case PortalFileChooser.Outcome.Chosen:
+						SelectedPath = answer.Paths[0];
+						CheckBoxShown = answer.CheckBoxChecked is not null;
+						if (answer.CheckBoxChecked is { } ticked) CheckBoxChecked = ticked;
+						return DialogResult.OK;
+					case PortalFileChooser.Outcome.Cancelled:
+						return DialogResult.Cancel;
+				}
 				// Mono's own dialog: none of the Windows shell is there, and no room for a control of
 				// ours - so CheckBoxChecked comes back exactly as it went in, deliberately.
 				using FolderBrowserDialog toolkit = new() { Description = Description, SelectedPath = SelectedPath ?? string.Empty };

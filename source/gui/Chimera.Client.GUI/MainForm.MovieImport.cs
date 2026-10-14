@@ -51,7 +51,7 @@ namespace Chimera.Client.GUI
 				pickFiles: (title, extensions, several) =>
 				{
 					var filter = extensions.Count is 0 ? null : string.Join(";", extensions.Select(static e => "*." + e.TrimStart('.')));
-					using OpenFileDialog dialog = new()
+					using OpenFilePicker dialog = new()
 					{
 						Multiselect = several,
 						Title = title,
@@ -181,7 +181,7 @@ namespace Chimera.Client.GUI
 		private string? PickWhereImportGoes(string moviePath)
 		{
 			var extension = new FilesystemFilterSet(FilesystemFilter.TAStudioProjects).ToString();
-			using SaveFileDialog dialog = new()
+			using SaveFilePicker dialog = new()
 			{
 				Title = "Save the imported project",
 				Filter = extension,

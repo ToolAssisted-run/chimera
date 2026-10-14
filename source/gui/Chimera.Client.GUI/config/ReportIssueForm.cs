@@ -189,7 +189,7 @@ namespace Chimera.Client.GUI
 
 		private void AskWhereAndSaveZip()
 		{
-			using SaveFileDialog dialog = new()
+			using SaveFilePicker dialog = new()
 			{
 				AddExtension = true,
 				DefaultExt = "zip",

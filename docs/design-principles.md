@@ -7349,3 +7349,84 @@ only if memory was short.
 **Open, for the owner:** 8 GB is what a PlayStation 3 session holds, and it
 is a number about one core written into Chimera. The core should say it in
 its package (beside `"precompile": true`), which is a new declaration.
+
+## Files and folders are picked with the desktop's own chooser on Linux (2026-10-14)
+
+**Asked for:** on Linux, use the file chooser of the XDG desktop
+portal instead of Mono's file dialog, because it is far more usable and is the
+dialog the rest of the desktop shows.
+
+**Decided.**
+
+- On Linux and the BSDs every file and folder picker asks the portal's
+  `org.freedesktop.portal.FileChooser` first, over the session D-Bus, and
+  shows Mono's dialog only where the portal cannot be asked. Windows and macOS
+  are unchanged.
+- It is spoken to through `libdbus-1` directly (`DBusImports`), not through a
+  package: every Linux desktop has the library, and the frontend gains no
+  dependency. D-Bus is local; `tools/check-no-network.sh` is unchanged and
+  passes.
+- `OpenFilePicker` and `SaveFilePicker` replace `OpenFileDialog` and
+  `SaveFileDialog` in every window, with the same properties, so a window
+  says what it wants once and the platform decides the dialog.
+  `FolderBrowserEx` asks the portal on Unix. The data directory window used
+  `FolderBrowserDialog`, the one picker that went around `FolderBrowserEx`;
+  it uses `FolderBrowserEx` now, which on Windows is the Explorer-style
+  dialog instead of the old tree.
+- The folder picker's "Include sub-folders" box goes into the portal's dialog
+  as a choice, so on Linux with a portal it is in the dialog as on Windows,
+  and the wizard's own box is hidden there.
+
+**Measured**, against a stand-in portal on a private bus (details in
+docs/folder-picker.md): every answer the frontend reads came back as sent,
+including paths with spaces and quotes; with no bus, no portal, or a portal
+too old for folders, the toolkit dialog is used. The interface tests: 326
+run, 2 failed - `PictureIt` and `WizardSettingsStep`, which fail the same way
+without this change.
+
+Tried in the running frontend with KDE's chooser: opening a project, the wizard's
+firmware folder scan (the tick box was in KDE's dialog), the data directory,
+and a save typed without its extension. All four worked.
+
+**Every chooser that could be installed** was tried under niri, each behind a
+second portal on a private bus with a config of its own (table in
+docs/folder-picker.md): KDE, GNOME, GTK, COSMIC, LXQt, shana, termfilechooser,
+xapp (which has none, so the portal used GNOME's), a portal with its chooser
+turned off, and no bus. Two of them changed the code:
+
+- **No parent window in a Wayland session.** GNOME's chooser is Nautilus, and
+  Nautilus crashed on every request that named an `x11:` parent - a plain
+  `gdbus` request naming any X11 window did the same - and the portal answered
+  "failed". First a retry without the parent was tried, which cost a pause on
+  the first picker. Instead, in a Wayland session (`WAYLAND_DISPLAY` set) no
+  parent is sent at all: Chimera's windows belong to XWayland there, and the
+  parent attached no dialog under any chooser tried. The chooser is still
+  modal, because Chimera's windows take no input while it is open. An X11
+  session still sends the parent.
+- **"Failed" is Cancel.** shana answers every Cancel with response 2, "ended
+  some other way", where the portal's own documentation gives 1. With the
+  retry, Cancel reopened the chooser and then showed Mono's dialog. Now 2 is
+  Cancel, unless it comes within 300 ms of the request - sooner than anyone
+  can press Cancel - which only a chooser that never came up does, and then
+  Mono's dialog is shown.
+
+**Chimera's windows are kept from input, not disabled.** On Plasma and GNOME
+on Wayland, a chooser opened from Config > Firmware came up behind Chimera's
+windows and could not be brought in front. KWin's record of its windows
+showed the cause: a Mono window that is modal itself keeps the focus once it
+is disabled, and disabling every window was how the chooser was made modal.
+Now a message filter throws away clicks, keys and closing for Chimera's
+windows while the chooser is open, and they stay enabled. Measured on Plasma
+Wayland: the chooser opens on top and active, and comes back to the front
+after another window takes the focus; tried by hand on Plasma Wayland, GNOME
+and niri.
+
+termfilechooser does not draw the sub-folders box, and the wizard hides its
+own where the portal can pick folders, so there the scan uses the remembered
+answer. That is left for termfilechooser.
+
+Tried by hand under their own desktops as well: Plasma on Wayland and on X11
+(where the parent window is sent), GNOME and COSMIC. All worked.
+
+**Not proved:** LXQt's chooser under LXQt, and Windows, where the dialogs
+should be the ones they were.
