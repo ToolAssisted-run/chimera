@@ -83,7 +83,7 @@ namespace Chimera.Client.GUI.ToolExtensions
 								tsdd.Items.Add(tsmiCopyArchivePath);
 
 								var tsmiOpenArchive = new ToolStripMenuItem { Text = "Open &Archive" };
-								tsmiOpenArchive.Click += (_, _) => System.Diagnostics.Process.Start(filePathWithoutMember);
+								tsmiOpenArchive.Click += (_, _) => Util.OpenFileExternal(filePathWithoutMember);
 								tsdd.Items.Add(tsmiOpenArchive);
 							}
 							else
@@ -99,7 +99,11 @@ namespace Chimera.Client.GUI.ToolExtensions
 							// make a menuitem to let you explore to it
 							var tsmiExplore = new ToolStripMenuItem { Text = "&Explore" };
 							var explorePath = $"\"{filePathWithoutMember}\"";
-							tsmiExplore.Click += (o, ev) => { System.Diagnostics.Process.Start("explorer.exe", $"/select, {explorePath}"); };
+							tsmiExplore.Click += (o, ev) =>
+							{
+								if (OSTailoredCode.IsUnixHost) Util.OpenFolderExternal(Path.GetDirectoryName(filePathWithoutMember)!);
+								else System.Diagnostics.Process.Start("explorer.exe", $"/select, {explorePath}");
+							};
 							tsdd.Items.Add(tsmiExplore);
 
 							var tsmiCopyFile = new ToolStripMenuItem { Text = "Copy &File" };

@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Drawing;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -896,11 +895,7 @@ namespace Chimera.Client.GUI
 				}
 			}
 			File.Copy(sourceFileName: templatePath, destFileName: result, overwrite: true);
-			Process.Start(new ProcessStartInfo
-			{
-				Verb = "Open",
-				FileName = result,
-			});
+			Util.OpenFileExternal(result);
 
 			bool temp = Settings.DisableLuaScriptsOnLoad;
 			Settings.DisableLuaScriptsOnLoad = true; // don't start the new empty file
@@ -985,11 +980,7 @@ namespace Chimera.Client.GUI
 		{
 			foreach (var file in SelectedFiles)
 			{
-				Process.Start(new ProcessStartInfo
-				{
-					Verb = "Open",
-					FileName = file.Path,
-				});
+				Util.OpenFileExternal(file.Path);
 			}
 		}
 
@@ -1033,11 +1024,7 @@ namespace Chimera.Client.GUI
 				if (result is null) return;
 				string text = File.ReadAllText(script.Path);
 				File.WriteAllText(result, text);
-				Process.Start(new ProcessStartInfo
-				{
-					Verb = "Open",
-					FileName = result,
-				});
+				Util.OpenFileExternal(result);
 
 				bool temp = Settings.DisableLuaScriptsOnLoad;
 				Settings.DisableLuaScriptsOnLoad = true; // don't start the new file

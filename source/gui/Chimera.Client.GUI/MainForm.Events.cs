@@ -531,7 +531,7 @@ namespace Chimera.Client.GUI
 			try
 			{
 				Directory.CreateDirectory(ThemeLibrary.ThemesDirectory);
-				Process.Start(new ProcessStartInfo(ThemeLibrary.ThemesDirectory) { UseShellExecute = true });
+				Util.OpenFolderExternal(ThemeLibrary.ThemesDirectory);
 			}
 			catch (Exception ex)
 			{
@@ -861,7 +861,7 @@ namespace Chimera.Client.GUI
 				askForFolder: start => this.ShowFolderSelectDialog(
 					initDir: PathEntryExtensions.FirstExistingDir(start),
 					subtitle: "The folder Chimera looks for core packages in"),
-				openFolder: ShowInFileBrowser,
+				openFolder: Util.OpenFolderExternal,
 				// where versions that downloaded cores kept them, for somebody arriving from one
 				former: () => (CoresFolder.Former, CoresFolder.LeftInFormer(CoresFolder.For(Config))),
 				// a core that has just been put in the folder must be usable in this
@@ -872,13 +872,6 @@ namespace Chimera.Client.GUI
 				rememberShows: shows => Config.CoreManagerShows = shows);
 			this.ShowDialogWithTempMute(form);
 			ScanForCorePackages();
-		}
-
-		/// <summary>Shows a folder in the machine's file browser: Explorer, or whatever xdg-open hands it to.</summary>
-		private static void ShowInFileBrowser(string folder)
-		{
-			if (OSTailoredCode.IsUnixHost) Process.Start("xdg-open", folder);
-			else Process.Start("explorer.exe", $"\"{folder}\"");
 		}
 
 		private void SoundMenuItem_Click(object sender, EventArgs e)

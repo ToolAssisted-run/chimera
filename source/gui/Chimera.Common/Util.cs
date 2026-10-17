@@ -252,6 +252,67 @@ namespace Chimera.Common
 			}
 		}
 
+		/// <summary>Shows a folder in the machine's file browser.</summary>
+		public static void OpenFolderExternal(string folder)
+		{
+			if (OSTailoredCode.CurrentOS is OSTailoredCode.DistinctOS.Windows)
+			{
+				Process.Start(new ProcessStartInfo("explorer.exe", $"\"{folder}\"") { UseShellExecute = false })?.Dispose();
+			}
+			else
+			{
+				OpenWithDesktopOpener(folder);
+			}
+		}
+
+		/// <summary>Opens a file in the program the machine opens that kind of file with.</summary>
+		public static void OpenFileExternal(string path)
+		{
+			if (OSTailoredCode.CurrentOS is OSTailoredCode.DistinctOS.Windows)
+			{
+				Process.Start(new ProcessStartInfo(path) { UseShellExecute = true })?.Dispose();
+			}
+			else
+			{
+				OpenWithDesktopOpener(path);
+			}
+		}
+
+		/// <summary>
+		/// Hands a file or folder to the desktop's opener (open on macOS; gio, or
+		/// xdg-open where there is no gio, elsewhere) and returns at once.
+		/// </summary>
+		/// <remarks>
+		/// Mono's shell launch (UseShellExecute) of anything that is not a program
+		/// waits for xdg-open to exit. On a desktop xdg-open does not recognise, it
+		/// runs the program in the foreground and exits only when that program does,
+		/// which froze Chimera until the file manager or editor was closed. In that
+		/// mode xdg-open also runs a terminal program such as nvim in the terminal
+		/// Chimera was started from, where it fights Chimera's own output.
+		/// gio returns once the program has started and opens a terminal program in a
+		/// terminal window of its own. setsid and an empty input keep even the
+		/// xdg-open fallback away from Chimera's terminal.
+		/// </remarks>
+		private static void OpenWithDesktopOpener(string path)
+		{
+			if (OSTailoredCode.CurrentOS is OSTailoredCode.DistinctOS.macOS)
+			{
+				Process.Start(new ProcessStartInfo("open", $"\"{path}\"") { UseShellExecute = false })?.Dispose();
+				return;
+			}
+			const string script = "exec </dev/null; "
+				+ "opener=xdg-open; command -v gio >/dev/null 2>&1 && opener='gio open'; "
+				+ "command -v setsid >/dev/null 2>&1 && exec setsid $opener \"$1\"; "
+				+ "exec $opener \"$1\"";
+			Process.Start(new ProcessStartInfo("/bin/sh", $"-c {QuoteForShell(script)} sh {QuoteForShell(path)}") { UseShellExecute = false })?.Dispose();
+		}
+
+		/// <summary>
+		/// Quotes one argument the way Mono splits an argument string on Unix, which
+		/// is the shell's way: inside single quotes nothing is special but the quote.
+		/// </summary>
+		private static string QuoteForShell(string arg) => $"'{arg.Replace("'", "'\\''")}'";
+
 		// Process.Start does not correctly handle urls in mono version pre-6.12.0.122,
 		// so we use an explicit function handling it instead
 		public static void OpenUrlExternal(string url)
@@ -267,6 +328,7 @@ namespace Chimera.Common
 					try
 					{
 						Process.Start(new ProcessStartInfo(app, url) { UseShellExecute = true });
+						break; // one opener is enough; going on opened the link once in each
 					}
 					catch (Win32Exception)
 					{

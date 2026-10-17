@@ -2,7 +2,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
@@ -346,7 +345,7 @@ namespace Chimera.Client.GUI
 			if (Selected() is not { Path.Length: > 0 } game) return;
 			try
 			{
-				Process.Start(new ProcessStartInfo(game.Path) { UseShellExecute = true });
+				Util.OpenFolderExternal(game.Path);
 			}
 			catch (Exception)
 			{

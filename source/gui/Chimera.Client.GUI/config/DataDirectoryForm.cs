@@ -1,7 +1,6 @@
 #nullable enable
 
 using System;
-using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Windows.Forms;
@@ -199,7 +198,7 @@ namespace Chimera.Client.GUI
 			try
 			{
 				Directory.CreateDirectory(Current);
-				Process.Start(new ProcessStartInfo(Current) { UseShellExecute = true });
+				Util.OpenFolderExternal(Current);
 			}
 			catch (Exception ex)
 			{

@@ -2,7 +2,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
@@ -661,8 +660,7 @@ namespace Chimera.Client.GUI
 			if (Selected() is not { } item) return;
 			try
 			{
-				if (OSTailoredCode.IsUnixHost) Process.Start("xdg-open", item.Path);
-				else Process.Start("explorer.exe", $"\"{item.Path}\"");
+				Util.OpenFolderExternal(item.Path);
 				_status.Text = $"Opened {item.Path}";
 			}
 			catch (Exception ex)

@@ -680,9 +680,8 @@ namespace Chimera.Client.GUI
 			var file = Path.GetFullPath(_output.Text.Trim());
 			try
 			{
-				if (OSTailoredCode.IsUnixHost) Process.Start("xdg-open", folder);
-				else if (File.Exists(file)) Process.Start("explorer.exe", $"/select,\"{file}\"");
-				else Process.Start("explorer.exe", $"\"{folder}\"");
+				if (!OSTailoredCode.IsUnixHost && File.Exists(file)) Process.Start("explorer.exe", $"/select,\"{file}\"");
+				else Util.OpenFolderExternal(folder);
 			}
 			catch (Exception ex)
 			{
@@ -702,7 +701,7 @@ namespace Chimera.Client.GUI
 				return;
 			}
 
-			Util.OpenUrlExternal(_written);
+			Util.OpenFileExternal(_written);
 		}
 
 		private static string Describe(TimeSpan span)
