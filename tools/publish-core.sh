@@ -163,6 +163,12 @@ if [ -z "$notes" ]; then
 		echo "that is). A package runs only on the CPU it is built for. Chimera"
 		echo "downloads nothing itself."
 		echo
+		case " ${arches[*]} " in
+			*" arm64 "*)
+				echo "**You most likely want the x64 package.** Take the arm64 one only if you"
+				echo "know you are using an arm64 device. Put only one of them in the folder."
+				echo ;;
+		esac
 		echo "| | |"
 		echo "|---|---|"
 		echo "| Core | \`$core_id\` |"

@@ -12761,3 +12761,16 @@ models' tests: a save writes no greenzone, the close does, and an edit closed
 without saving leaves no state after its frame. The witness: a tool's project
 output made into a zip that opens, and one with a bad line refused.
 
+## Most users want the x64 package (user-decided, 2026-10-18)
+
+**What was decided.** Now that a core release can carry an x64 and an arm64
+package, and Chimera's release an arm64 Linux bundle beside the x64 ones,
+every place that offers both says which to take: most likely x64, and arm64
+only for someone who knows they are using an arm64 device. One package of a
+core goes in the `Cores` folder, not both. The words are the SRB2 core's
+(P-AS/chimera-core-srb2 b3f6dcc, 2026-10-10), which said it first.
+
+**Where.** The notes `tools/publish-core.sh` writes for every core, above the
+table of packages, only when the release has an arm64 package; Chimera's own
+release notes, above the table of bundles; the README's "Getting a build";
+`docs/core-manager.md`.

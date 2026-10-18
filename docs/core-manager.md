@@ -37,6 +37,11 @@ commit the build was made from, which is what the package already stamps into
 before packages carried their CPU name one asset `<coreid>-<version>.chimeraCore`,
 which is x64.
 
+Most users want the x64 package, and the notes `publish-core.sh` writes say so
+above the table whenever a release also has an arm64 one: take the arm64 one
+only if you know you are using an arm64 device, and put only one of them in the
+folder. Chimera's own release notes say the same of its bundles.
+
 Fifteen repositories publishing identically is fifteen copies of one job that
 will drift, so the logic lives once, here, in two files:
 

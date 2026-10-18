@@ -331,6 +331,9 @@ jobs:
               echo "$changes"
               echo
             fi
+            echo "**You most likely want an x64 bundle** (Windows or Linux). Take the Linux"
+            echo "arm64 one only if you know you are using an arm64 device."
+            echo
             echo "| what | file |"
             echo "| --- | --- |"
             echo "| Windows x64 | \`chimera-win-x64-$short.zip\` |"
