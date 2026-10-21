@@ -28,5 +28,5 @@
 	url = https://github.com/ericsink/cb.git
 	ignore = untracked
 [submodule "extern/chimera-common-minibox"]
-	url = https://github.com/ToolAssisted-run/chimera-common-minibox.git
+	url = https://github.com/P-AS/chimera-common-minibox.git
 	path = extern/chimera-common-minibox

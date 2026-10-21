@@ -28,8 +28,19 @@ jobs:
     # (including a per-frame whole-machine savestate pass). It needs only gcc,
     # python3 and meson - no .NET, Mono or X - so it runs on every push.
     # The full frontend gate (Level B) runs in parallel in witness-full below.
-    name: witness level A (core equivalence)
-    runs-on: ubuntu-latest
+    name: witness level A (core equivalence, ${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # Each CPU Chimera runs on: a package is machine code for one, so the
+        # waterboxed core is built and checked on each (the arm runner is
+        # Ubuntu 26.04, which ubuntu-latest is moving to, with 4 KiB pages)
+        include:
+          - arch: x64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-26.04-arm
     steps:
       - uses: actions/checkout@v4
         with:
@@ -66,7 +77,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: witness-level-a-work
+          name: witness-level-a-work-${{ matrix.arch }}
           path: tests/synth/work/
 
   witness-full:
@@ -81,9 +92,22 @@ jobs:
     # takes minutes rather than seconds. It still runs per push - the level A
     # job above gives fast feedback meanwhile - and on a daily schedule, which
     # catches environment drift (toolchain/runner image changes) with no commit.
-    name: witness levels A+B (frontend)
-    runs-on: ubuntu-latest
+    name: witness levels A+B (frontend, ${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        # Each CPU Chimera runs on: a package is machine code for one, so the
+        # waterboxed core is built and checked on each (the arm runner is
+        # Ubuntu 24.04, with 4 KiB pages: 26.04's Mono 6.14.1 aborts after
+        # Chimera.Tests.Common passes, in MSTest's AppDomain unload, where
+        # 24.04's Mono 6.8 does not)
+        include:
+          - arch: x64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v4
         with:
@@ -127,7 +151,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: engine-meson-logs
+          name: engine-meson-logs-${{ matrix.arch }}
           path: build/meson-linux/meson-logs/
 
       - name: Build the managed solution
@@ -148,7 +172,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: witness-full-work
+          name: witness-full-work-${{ matrix.arch }}
           path: tests/synth/work/
 
       - name: Upload UI screenshots
@@ -157,7 +181,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: ui-screenshots
+          name: ui-screenshots-${{ matrix.arch }}
           path: tests/ui/shots/
           if-no-files-found: warn
 
@@ -179,6 +203,12 @@ jobs:
     # nothing at all, which is exactly what hid this job needing the engine until
     # the first real packages arrived. The step below fails the job if the fetch
     # produced no packages, so a silent nothing cannot pass again.
+    #
+    # x86-64 only, for now: fetch-cores.sh takes the packages for the CPU it
+    # runs on, and no published core carries an arm64 one yet, so on an arm
+    # runner there would be nothing to check and the step below would fail.
+    # When cores publish arm64 packages this gains the same matrix as the
+    # witness jobs.
     name: published cores (package contract)
     runs-on: ubuntu-latest
     timeout-minutes: 30

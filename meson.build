@@ -35,6 +35,10 @@ thread_dep = dependency('threads')
 # ---------------------------------------------------------------------------
 # libchimerahash: hardware-accelerated hashing (in-repo sources)
 # ---------------------------------------------------------------------------
+# x86-64 only: it is CPUID, PCLMULQDQ and SHA-NI, and the frontend asks for it
+# only on an x64 process (CRC32.cs, SHA1Checksum.cs), computing both itself
+# everywhere else.
+if host_machine.cpu_family() == 'x86_64'
 chimerahash_src = files(
   'extern/LibChimeraHash/chimerainterface.c',
   'extern/LibChimeraHash/common/x86_features.c',
@@ -51,6 +55,7 @@ shared_library(
   install: true,
   install_dir: 'dll',
 )
+endif
 
 # ---------------------------------------------------------------------------
 # chimera_crash: the crash note a Windows fast-fail cannot stop (in-repo source;
@@ -225,17 +230,24 @@ minibox_host_src = files(
   minibox_host / 'sha256.c',
   minibox_host / 'memblock.c',
   minibox_host / 'tripguard.c',
-  minibox_host / 'interop_bin.c',
   minibox_host / 'context.c',
-  minibox_host / 'guarded.S',
   minibox_host / 'elf.c',
   minibox_host / 'fs.c',
   minibox_host / 'host.c',
   minibox_host / 'threading.c',
   minibox_host / 'cinterface.c',
-  minibox_host / 'calling_convention_adapters.c',
   minibox_host / (host_windows ? 'pal_win.c' : 'pal_linux.c'),
 )
+# The machine's own code - the interop area and the guarded call - is written
+# for the CPU the host runs on (as miniBox's source/host/meson.build selects it).
+if host_machine.cpu_family() == 'aarch64'
+  minibox_host_src += files(minibox_host / 'interop_aarch64.S', minibox_host / 'guarded_aarch64.S')
+elif host_machine.cpu_family() == 'x86_64'
+  minibox_host_src += files(minibox_host / 'interop_bin.c', minibox_host / 'guarded.S',
+                            minibox_host / 'calling_convention_adapters.c')
+else
+  error('miniBox runs on x86-64 and aarch64 only, not ' + host_machine.cpu_family())
+endif
 # Provenance compiled into the host, matching what miniBox's own build stamps: the
 # frontend shows it and a movie records it, so every binary in the emulation path can
 # say where it came from. Inputs only, never a timestamp.
