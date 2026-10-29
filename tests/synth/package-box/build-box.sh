@@ -25,6 +25,9 @@ $musl_gcc -c $cflags -o "$here/synthcore.o" "$here/../native/synthcore.c"
 $musl_gcc -c $cflags -o "$here/synth_wbx.o" "$here/synth_wbx.c"
 $musl_gcc -o "$here/synth.wbx" $cflags -static -no-pie -Wl,--eh-frame-hdr,-O2 \
 	-T "$mb/source/guest/linkscript.T" "$here/synth_wbx.o" "$here/synthcore.o" "$emulibc_o" -lgcc
+# finished as every guest is: on aarch64 the machine keeps the thread pointer
+# in a word of memory, and miniBox refuses an image that still reads TPIDR_EL0
+python3 "$mb/source/guest/wbx-tp-rewrite.py" "$here/synth.wbx"
 echo "built synth.wbx"
 
 # tester: links the miniBox host (headers live in source/host after the flatten)

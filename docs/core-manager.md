@@ -28,17 +28,28 @@ kinds of build the frontend already uses (see `.github/workflows/release.yml`):
   only when main moved. Never deleted. This is the archive a movie replays
   against in five years.
 
-One asset per release: `<coreid>-<version>.chimeraCore`. The version is the
+One asset per CPU the core is built for: `<coreid>-<version>-<arch>.chimeraCore`,
+`<arch>` being `x64` or `arm64`, the names Chimera's own release bundles use. A
+package is machine code for one CPU - miniBox runs `core.wbx` directly, and
+refuses one built for another CPU - but not for one OS: the same package runs on Linux and Windows. The version is the
 commit the build was made from, which is what the package already stamps into
-`waterbox.config` and what a movie already cites (`CoreVersion`).
+`waterbox.config` and what a movie already cites (`CoreVersion`). Releases from
+before packages carried their CPU name one asset `<coreid>-<version>.chimeraCore`,
+which is x64.
+
+Most users want the x64 package, and the notes `publish-core.sh` writes say so
+above the table whenever a release also has an arm64 one: take the arm64 one
+only if you know you are using an arm64 device, and put only one of them in the
+folder. Chimera's own release notes say the same of its bundles.
 
 Fifteen repositories publishing identically is fifteen copies of one job that
 will drift, so the logic lives once, here, in two files:
 
-* `tools/publish-core.sh` - reads the version **out of the package**, refuses a
-  hand-built one, names the asset, and creates or moves the release.
+* `tools/publish-core.sh` - reads the version **out of each package**, refuses a
+  hand-built one or two of different versions, checks a `core.wbx` is built for
+  the CPU it is given as, names the assets, and creates or moves the release.
 * `.github/workflows/publish-core.yml` - a `workflow_call` wrapper that
-  downloads the gated artifact and runs that script.
+  downloads the gated artifacts and runs that script.
 
 A release page ends with **What changed**: every commit since the core's last
 nightly, each linked, with the Chimera issues its subject names
@@ -59,6 +70,11 @@ A core's own workflow adds one job:
       artifact: gpgx-${{ github.sha }}
       package: gpgx.chimeraCore
 ```
+
+That publishes the one package, as x64. A core built on more than one CPU
+gates on each (a matrix, one leg per CPU on a runner of that CPU), uploads each
+leg's package as `<artifact>-<arch>`, and names them with
+`arches: x64 arm64`; the release then carries both.
 
 plus a daily `schedule:` trigger, which is what makes a nightly. A push to main
 publishes `dev`; a scheduled run publishes `nightly-YYYY-MM-DD`, and only if
@@ -194,7 +210,7 @@ folder is choosing it. Nothing is moved or copied for them.
 
 ### One file per version, and no version is ever replaced
 
-A published package is named `<coreid>-<version>.chimeraCore`. Two versions of
+A published package is named `<coreid>-<version>-<arch>.chimeraCore`. Two versions of
 one core are two files sitting side by side, and nothing Chimera does removes
 an older one: an old build is the only way to replay a movie recorded on it,
 and Chimera cannot fetch it again. Versions go only when the user removes them.

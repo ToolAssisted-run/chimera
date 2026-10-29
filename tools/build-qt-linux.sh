@@ -1,7 +1,8 @@
 #!/bin/sh
-# Builds Qt for Linux (x86_64) for the window Chimera ships (source/ui), as
-# tools/build-qt-windows.sh builds the Windows one: the same four modules,
-# without Qt's network module - Chimera has no network code, and QML
+# Builds Qt for Linux, for the CPU it runs on (x86-64 or aarch64), for the
+# window Chimera ships (source/ui), as tools/build-qt-windows.sh builds the
+# Windows one: the same four modules, without Qt's network module - Chimera
+# has no network code, and QML
 # without it cannot load anything from the network. Qt's prebuilt Linux
 # libraries (aqt) have it, so they serve only to build and test.
 #

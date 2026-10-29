@@ -10,6 +10,9 @@ name: Release
 # archive; the `cores` release here is the OLD one, kept because movies recorded
 # before the split cite packages in it, and it no longer grows.
 #
+# It is built three times - Windows x64 and Linux x64 on an x86-64 runner,
+# Linux arm64 on an arm one - and a release carries all three or none.
+#
 #   dev      a ROLLING prerelease, replaced on every green push to main. One
 #            link that is always the newest; the assets carry the short commit
 #            in their names, so a downloaded file still says what it is.
@@ -50,15 +53,22 @@ permissions:
   contents: write
 
 jobs:
-  bundle:
+  what:
+    # What is released, and whether anything is. The bundles are built by the
+    # jobs below, on the CPU each is for, only when this says so.
+    #
     # A push-triggered run only publishes when CI was green. A scheduled or
     # manual run has no CI run attached and is gated by the commit's own status
     # check below.
     if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
-    name: bundle (windows + linux)
+    name: what is released
     runs-on: ubuntu-latest
-    # the first run builds Qt for both platforms (then cached): hours, not minutes
-    timeout-minutes: 360
+    outputs:
+      sha: ${{ steps.what.outputs.sha }}
+      kind: ${{ steps.what.outputs.kind }}
+      short: ${{ steps.what.outputs.short }}
+      date: ${{ steps.what.outputs.date }}
+      skip: ${{ steps.moved.outputs.skip == 'true' }}
     steps:
       - name: What is being released
         id: what
@@ -78,13 +88,10 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ steps.what.outputs.sha }}
-          # NOT recursive: the bundle carries no cores (docs/core-manager.md), so
-          # what it needs checked out is what the FRONTEND is built from
+          # no submodules: nothing is built here. The whole history, for the
+          # nightly tags the checks below read.
           submodules: false
           fetch-depth: 0
-
-      - name: Check out what the frontend is built from
-        run: git submodule update --init --recursive extern
 
       - name: Has main moved since the last nightly?
         id: moved
@@ -119,8 +126,103 @@ jobs:
             exit 1
           fi
 
+  linux-arm64:
+    # The Linux bundle for arm64, built on an arm runner: its natives, its Qt
+    # and its ffmpeg are machine code for the CPU they run on, so it is built
+    # there rather than cross-compiled (on Ubuntu 26.04, which ubuntu-latest is
+    # moving to). Handed to the bundle job, which publishes everything together.
+    needs: what
+    if: needs.what.outputs.skip != 'true'
+    name: bundle (linux arm64)
+    runs-on: ubuntu-26.04-arm
+    # the first run builds Qt (then cached): hours, not minutes
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.what.outputs.sha }}
+          # NOT recursive: the bundle carries no cores (docs/core-manager.md), so
+          # what it needs checked out is what the FRONTEND is built from
+          submodules: false
+          fetch-depth: 0
+
+      - name: Check out what the frontend is built from
+        run: git submodule update --init --recursive extern
+
       - name: Install build dependencies
-        if: steps.moved.outputs.skip != 'true'
+        # the bundle job's, less the Windows build's mingw compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            meson ninja-build build-essential cmake pkg-config python3 python3-venv patchelf \
+            libgl1-mesa-dev libegl-dev libx11-dev libxext-dev libasound2-dev \
+            libfontconfig1-dev libfreetype-dev libx11-xcb-dev libxkbcommon-dev libxkbcommon-x11-dev \
+            libxcb1-dev libxcb-cursor-dev libxcb-glx0-dev libxcb-icccm4-dev libxcb-image0-dev \
+            libxcb-keysyms1-dev libxcb-randr0-dev libxcb-render-util0-dev libxcb-shape0-dev \
+            libxcb-shm0-dev libxcb-sync-dev libxcb-util-dev libxcb-xfixes0-dev libxcb-xinerama0-dev \
+            libxcb-xkb-dev libxcb-render0-dev
+
+      - name: Cache Qt
+        id: qt-cache
+        uses: actions/cache@v4
+        with:
+          # the Linux Qt that ships, built here without the network module
+          path: ~/qt-ship/linux
+          key: qt-ship-6.12.0-linux-arm64-${{ hashFiles('tools/build-qt-linux.sh', 'tools/qt-patches/*', 'tools/fetch-qt-source.sh') }}
+
+      - name: Qt's source
+        # its licence texts go in the bundle every time; the build below only when the cache had none
+        run: ./tools/fetch-qt-source.sh "$HOME/qt-src"
+
+      - name: Build Qt (once; then cached)
+        if: steps.qt-cache.outputs.cache-hit != 'true'
+        run: ./tools/build-qt-linux.sh "$HOME/qt-src" "$HOME/qt-ship/linux"
+
+      - name: Build the Linux bundle
+        run: ./tools/build-bundle.sh --platform linux --out build/bundle-linux --qt "$HOME/qt-ship/linux" --qt-source "$HOME/qt-src"
+
+      - name: The Linux bundle starts (headless, with no display)
+        run: |
+          out="$(env -u DISPLAY build/bundle-linux/chimera --version)"
+          echo "$out"
+          echo "$out" | grep -q "^Commit ${{ needs.what.outputs.short }}"
+
+      - name: Pack
+        run: |
+          short="${{ needs.what.outputs.short }}"
+          mkdir -p build/release
+          # under one folder named for the archive, as the x64 tarball is (issue 394)
+          tar -C build --transform "s,^bundle-linux,chimera-linux-arm64-$short," -czf "build/release/chimera-linux-arm64-$short.tar.gz" bundle-linux
+          ls -la build/release
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bundle-linux-arm64
+          path: build/release/chimera-linux-arm64-${{ needs.what.outputs.short }}.tar.gz
+          if-no-files-found: error
+          retention-days: 1
+
+  bundle:
+    # Builds the x64 bundles and publishes them with the arm64 one - only when
+    # that was built too, so a release never goes out a bundle short.
+    needs: [what, linux-arm64]
+    name: bundle (windows + linux x64) and publish
+    runs-on: ubuntu-latest
+    # the first run builds Qt for both platforms (then cached): hours, not minutes
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.what.outputs.sha }}
+          # NOT recursive: the bundle carries no cores (docs/core-manager.md), so
+          # what it needs checked out is what the FRONTEND is built from
+          submodules: false
+          fetch-depth: 0
+
+      - name: Check out what the frontend is built from
+        run: git submodule update --init --recursive extern
+
+      - name: Install build dependencies
         # the window's Qt is built here, for both platforms: X11's development
         # files for its Linux build, and the mingw compiler Chimera's Windows
         # build uses; patchelf to tell the Linux bundle's programs where their
@@ -138,7 +240,6 @@ jobs:
             libxcb-xkb-dev libxcb-render0-dev
 
       - name: Cache Qt
-        if: steps.moved.outputs.skip != 'true'
         id: qt-cache
         uses: actions/cache@v4
         with:
@@ -152,12 +253,11 @@ jobs:
           key: qt-ship-6.12.0-${{ hashFiles('tools/build-qt-linux.sh', 'tools/build-qt-windows.sh', 'tools/qt-patches/*', 'tools/fetch-qt-source.sh') }}
 
       - name: Qt's source
-        if: steps.moved.outputs.skip != 'true'
         # its licence texts go in the bundle every time; the build below only when the cache had none
         run: ./tools/fetch-qt-source.sh "$HOME/qt-src"
 
       - name: Build Qt for both platforms (once; then cached)
-        if: steps.moved.outputs.skip != 'true' && steps.qt-cache.outputs.cache-hit != 'true'
+        if: steps.qt-cache.outputs.cache-hit != 'true'
         run: |
           if [ ! -d "$HOME/qt/6.12.0/gcc_64" ]; then
             python3 -m venv "$HOME/qt/aqt-venv"
@@ -168,27 +268,23 @@ jobs:
           ./tools/build-qt-windows.sh "$HOME/qt/6.12.0/gcc_64" "$HOME/qt-src" "$HOME/qt-ship/mingw_64_posix"
 
       - name: Build the Linux bundle
-        if: steps.moved.outputs.skip != 'true'
         run: ./tools/build-bundle.sh --platform linux --out build/bundle-linux --qt "$HOME/qt-ship/linux" --qt-source "$HOME/qt-src"
 
       - name: Build the Windows bundle
-        if: steps.moved.outputs.skip != 'true'
         run: |
           ./tools/build-bundle.sh --platform windows --out build/bundle-windows --qt "$HOME/qt-ship/mingw_64_posix" \
             --host-qt "$HOME/qt/6.12.0/gcc_64" --qt-source "$HOME/qt-src"
 
       - name: The Linux bundle starts (headless, with no display)
-        if: steps.moved.outputs.skip != 'true'
         run: |
           out="$(env -u DISPLAY build/bundle-linux/chimera --version)"
           echo "$out"
-          echo "$out" | grep -q "^Commit ${{ steps.what.outputs.short }}"
+          echo "$out" | grep -q "^Commit ${{ needs.what.outputs.short }}"
 
       - name: Pack
         id: pack
-        if: steps.moved.outputs.skip != 'true'
         run: |
-          short="${{ steps.what.outputs.short }}"
+          short="${{ needs.what.outputs.short }}"
           mkdir -p build/release
           ( cd build/bundle-windows && zip -qr "../release/chimera-win-x64-$short.zip" . )
           # every file under one folder named for the archive, as a tarball is
@@ -199,18 +295,23 @@ jobs:
           cp build/bundle-windows/BUILD.txt build/release/BUILD.txt
           ls -la build/release
 
+      - name: The arm64 Linux bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: bundle-linux-arm64
+          path: build/release
+
       - name: Release notes
         id: notes
-        if: steps.moved.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          short="${{ steps.what.outputs.short }}"
+          short="${{ needs.what.outputs.short }}"
           # Everything that landed since the previous build of this kind, not
           # just the top commit (issue #76): the last nightly tag for a
           # nightly, the dev release's commit for dev. With nothing to measure
           # from (the first build, a shallow clone) the top commit alone.
-          if [ "${{ steps.what.outputs.kind }}" = "dev" ]; then
+          if [ "${{ needs.what.outputs.kind }}" = "dev" ]; then
             since=$(gh release view dev --json targetCommitish --jq .targetCommitish 2>/dev/null || true)
           else
             since=$(git tag -l 'nightly-*' --sort=-creatordate | head -1)
@@ -230,12 +331,16 @@ jobs:
               echo "$changes"
               echo
             fi
+            echo "**You most likely want an x64 bundle** (Windows or Linux). Take the Linux"
+            echo "arm64 one only if you know you are using an arm64 device."
+            echo
             echo "| what | file |"
             echo "| --- | --- |"
             echo "| Windows x64 | \`chimera-win-x64-$short.zip\` |"
             echo "| Linux x64 | \`chimera-linux-x64-$short.tar.gz\` |"
+            echo "| Linux arm64 | \`chimera-linux-arm64-$short.tar.gz\` |"
             echo
-            echo "Both carry Chimera and the libraries it needs. They carry **no cores**, and"
+            echo "Each carries Chimera and the libraries it needs. They carry **no cores**, and"
             echo "Chimera downloads none: get a core's \`.chimeraCore\` package from the"
             echo "project that builds it and put it in the \`cores\` folder beside Chimera."
             echo "\`BUILD.txt\` names the exact commit this was built from and"
@@ -249,7 +354,7 @@ jobs:
             echo "publisher; it is not signed, and there is no way around that warning"
             echo "short of buying a certificate."
             echo
-            if [ "${{ steps.what.outputs.kind }}" = "dev" ]; then
+            if [ "${{ needs.what.outputs.kind }}" = "dev" ]; then
               echo "> **Not for submissions.** A development build is replaced on every"
               echo "> change, so it may stop being downloadable - which means a movie made"
               echo "> on it can stop being replayable. Do **not** use a dev build to"
@@ -261,7 +366,7 @@ jobs:
           } > build/release/NOTES.md
 
       - name: Publish the rolling dev release
-        if: steps.moved.outputs.skip != 'true' && steps.what.outputs.kind == 'dev'
+        if: needs.what.outputs.kind == 'dev'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -282,10 +387,10 @@ jobs:
           source tools/release-retry.sh
           # when the commit was made, on the clock Chimera's build line shows
           # it in (issue 331), so the two can be matched by eye
-          made="$(python3 tools/european-time.py "$(git log -1 --format=%ct "${{ steps.what.outputs.sha }}")")"
+          made="$(python3 tools/european-time.py "$(git log -1 --format=%ct "${{ needs.what.outputs.sha }}")")"
           gh release delete dev --yes --cleanup-tag 2>/dev/null || true
-          ensure_release dev "${{ steps.what.outputs.sha }}" \
-            "Development build ${{ steps.what.outputs.short }} (made $made)" build/release/NOTES.md
+          ensure_release dev "${{ needs.what.outputs.sha }}" \
+            "Development build ${{ needs.what.outputs.short }} (made $made)" build/release/NOTES.md
 
           # straight away, so the window in which /releases/tag/dev has nothing
           # to download is as short as an upload
@@ -293,20 +398,20 @@ jobs:
             build/release/LICENSES.md build/release/BUILD.txt --clobber
 
       - name: Publish the nightly
-        if: steps.moved.outputs.skip != 'true' && steps.what.outputs.kind == 'nightly'
+        if: needs.what.outputs.kind == 'nightly'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           source tools/release-retry.sh
-          tag="nightly-${{ steps.what.outputs.date }}"
+          tag="nightly-${{ needs.what.outputs.date }}"
           # A nightly that holds its bundles is never republished; one that
           # exists EMPTY is a publish that died between create and upload, and
           # finishing it is the only way it becomes what its name says.
           if gh release view "$tag" --json assets --jq '.assets[].name' 2>/dev/null | grep -q '^chimera-.*\.zip$'; then
             echo "$tag already exists"; exit 0
           fi
-          made="$(python3 tools/european-time.py "$(git log -1 --format=%ct "${{ steps.what.outputs.sha }}")")"
-          ensure_release "$tag" "${{ steps.what.outputs.sha }}" \
-            "Nightly ${{ steps.what.outputs.date }} (${{ steps.what.outputs.short }}, made $made)" build/release/NOTES.md
+          made="$(python3 tools/european-time.py "$(git log -1 --format=%ct "${{ needs.what.outputs.sha }}")")"
+          ensure_release "$tag" "${{ needs.what.outputs.sha }}" \
+            "Nightly ${{ needs.what.outputs.date }} (${{ needs.what.outputs.short }}, made $made)" build/release/NOTES.md
           retry gh release upload "$tag" build/release/chimera-*.zip build/release/chimera-*.tar.gz \
             build/release/LICENSES.md build/release/BUILD.txt --clobber

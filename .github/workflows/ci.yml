@@ -28,8 +28,19 @@ jobs:
     # (including a per-frame whole-machine savestate pass). It needs only gcc,
     # python3 and meson - no display - so it runs on every push.
     # The full frontend gate (Level B) runs in parallel in witness-full below.
-    name: witness level A (core equivalence)
-    runs-on: ubuntu-latest
+    name: witness level A (core equivalence, ${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # Each CPU Chimera runs on: a package is machine code for one, so the
+        # waterboxed core is built and checked on each (the arm runner is
+        # Ubuntu 26.04, which ubuntu-latest is moving to, with 4 KiB pages)
+        include:
+          - arch: x64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-26.04-arm
     steps:
       - uses: actions/checkout@v4
         with:
@@ -71,7 +82,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: witness-level-a-work
+          name: witness-level-a-work-${{ matrix.arch }}
           path: tests/synth/work/
 
   witness-full:
@@ -86,9 +97,20 @@ jobs:
     # minutes rather than seconds. It still runs per push - the level A job
     # above gives fast feedback meanwhile - and on a daily schedule, which
     # catches environment drift (toolchain/runner image changes) with no commit.
-    name: witness levels A+B (frontend)
-    runs-on: ubuntu-latest
+    name: witness levels A+B (frontend, ${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        # Each CPU Chimera runs on: a package is machine code for one, so the
+        # waterboxed core is built and checked on each (the arm runner is
+        # Ubuntu 26.04, which ubuntu-latest is moving to, with 4 KiB pages)
+        include:
+          - arch: x64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-26.04-arm
     steps:
       - uses: actions/checkout@v4
         with:
@@ -100,7 +122,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/qt
-          key: qt-6.12.0-linux-aqt-3.3.0
+          key: qt-6.12.0-linux-${{ matrix.arch }}-aqt-3.3.0
 
       - name: Build Chimera (the engine, chimera-run and the window; installs into build/dll)
         run: ./tools/ci-chimera.sh "$HOME/qt"
@@ -120,7 +142,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: meson-logs
+          name: meson-logs-${{ matrix.arch }}
           path: build/meson-linux/meson-logs/
 
       - name: Witness - Levels A and B
@@ -130,5 +152,5 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: witness-full-work
+          name: witness-full-work-${{ matrix.arch }}
           path: tests/synth/work/

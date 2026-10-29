@@ -114,9 +114,14 @@ The frontend is built for Linux and Windows and published here:
 A bundle carries no cores, and Chimera never reaches the network - it downloads
 nothing, not a core and not a list of them. To set one up:
 
-1. Download a build above and unpack it.
+1. Download a build above and unpack it. **You most likely want an x64 build**
+   (Windows or Linux); take the Linux arm64 one only if you know you are using
+   an arm64 device.
 2. Download the `.chimeraCore` package of each core you want from that core's
-   releases page (the [Cores](#cores) tables link them), or build it.
+   releases page (the [Cores](#cores) tables link them), or build it. A release
+   with packages for both CPUs names them `<core>-<version>-x64.chimeraCore` and
+   `<core>-<version>-arm64.chimeraCore`: take the one for the CPU of your build
+   (most likely x64), and only one of them.
 3. Put the packages in the `cores` folder beside Chimera (`chimera.exe` on
    Windows, `chimera` on Linux), and start Chimera.
 
