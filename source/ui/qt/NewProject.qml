@@ -55,7 +55,12 @@ ApplicationWindow {
     }
     Connections {
         target: win.vm
-        function onValueChanged(key, value) { if (key === "status") win.said = value }
+        // a change made by the view model: QQmlPropertyMap sends valueChanged only for one made from QML
+        function onStatusChanged() { win.said = win.vm.status }
+        // made: the window's work is done, as Chimera's closed once Create had made the project
+        function onMadeChanged() { win.madeProject = true; win.close() }
+        // refused for its files: the files page, with why, as Chimera's went back to it
+        function onFilesRefusedChanged() { if (win.vm.filesRefused) { win.showPage(1); win.said = win.vm.status } }
     }
     // a path as a file dialog takes it
     function urlOf(path) { return localFiles.folderUrl(path) }
@@ -111,13 +116,14 @@ ApplicationWindow {
         if (win.vm.imported) { importSaveDialog.open(); return }
         win.askFirst(() => {
             win.run("create")
-            if (win.vm.error === "") { win.madeProject = true; win.close() }
-            else if (win.vm.clockWrong) win.showPage(2)
+            if (win.vm.error !== "" && win.vm.clockWrong) win.showPage(2)
         })
     }
 
     Shortcut { sequences: ["Return", "Enter"]; enabled: win.active && nextButton.enabled; onActivated: win.advance() }
-    Shortcut { sequence: "Escape"; enabled: win.active; onActivated: win.close() }
+    Shortcut { sequence: "Escape"; enabled: win.active && !win.vm.making; onActivated: win.close() }
+    // open until the project is made, so that a refusal is said here
+    onClosing: (close) => { if (win.vm.making) close.accepted = false }
 
     FileDialog {
         id: fileDialog
@@ -153,10 +159,7 @@ ApplicationWindow {
         // beside the movie, named after it
         currentFolder: win.urlOf(win.vm.importMovie.replace(/[\\/][^\\/]*$/, ""))
         selectedFile: win.vm.importMovie === "" ? "" : win.urlOf(win.vm.importMovie.replace(/\.[^.\\/]*$/, "") + ".chimeraProject")
-        onAccepted: win.askFirst(() => {
-            win.run("create", [selectedFile])
-            if (win.vm.error === "") { win.madeProject = true; win.close() }
-        })
+        onAccepted: win.askFirst(() => win.run("create", [selectedFile]))
     }
 
     component Heading: Label { Layout.fillWidth: true; Layout.bottomMargin: 10; elide: Text.ElideRight }
@@ -602,20 +605,22 @@ ApplicationWindow {
                 objectName: "wizardStatus"
                 text: win.said
                 color: win.errorColor
+                wrapMode: Text.Wrap
+                maximumLineCount: 3
                 elide: Text.ElideRight
                 Layout.fillWidth: true
             }
-            Button { text: qsTrId("new_project.back"); Layout.preferredWidth: 84; enabled: win.page > 0; onClicked: win.back() }
+            Button { text: qsTrId("new_project.back"); Layout.preferredWidth: 84; enabled: win.page > 0 && !win.vm.making; onClicked: win.back() }
             Button {
                 id: nextButton
                 objectName: "nextButton"
                 text: win.lastPage ? qsTrId("new_project.create") : qsTrId("new_project.next")
                 Layout.preferredWidth: 84
-                // the last page's Create waits for the firmware it requires
-                enabled: !win.lastPage || win.page !== 3 || win.vm.firmwareMissing === ""
+                // the last page's Create waits for the firmware it requires, and for the project it is making
+                enabled: (!win.lastPage || win.page !== 3 || win.vm.firmwareMissing === "") && !win.vm.making
                 onClicked: win.advance()
             }
-            Button { text: qsTrId("common.cancel"); Layout.preferredWidth: 84; onClicked: win.close() }
+            Button { text: qsTrId("common.cancel"); Layout.preferredWidth: 84; enabled: !win.vm.making; onClicked: win.close() }
         }
     }
 }

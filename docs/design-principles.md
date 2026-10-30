@@ -11543,3 +11543,49 @@ are untouched.
 Tested: the window builds and installs, and starts with `--headless`. The
 message itself was not seen on a Wayland desktop from this change; that is
 for the person who reported it to confirm.
+
+## New Project waits for the project it makes (2026-10-30, issue 422)
+
+With the build that shows a box for a project that does not open, the
+reporter's Create still did nothing. The cause came before the open:
+
+- Create closed New Project's window at once, and the project was then made
+  away from it, since making it reads and hashes every file. The engine
+  refuses a project with a file that is not one of the formats its slot
+  declares. That reason went to the line of a window that was already closed,
+  and nothing else happened. The reporter's file was a BBC Micro disk (.ssd),
+  picked with "All files" because the MAME home package's slot did not list
+  it (fixed in that core's own repository).
+- The wizard's line never showed what its view model said. The page listened
+  with onValueChanged, which Qt's QQmlPropertyMap sends only for a change made
+  from QML, never for one the view model makes. Movie Import waited for its
+  import the same way, so its window stayed open after an import as if
+  nothing had happened. Encode Video's line was never cleared.
+
+Now Create works as Chimera's Windows Forms wizard did. That wizard made the
+project before it closed, behind a progress window, and went back to the
+files page with the reason when the project was refused. The window now stays
+open, its buttons off, until the project is made. It closes once the project
+is made. A project refused for its files shows the files page with the reason
+on the wizard's line; any other refusal is said on the page shown. A script's
+or an agent's create_project is told the same: refused, with the reason,
+where before it was told the project was made. The pages now listen for each
+property's own change.
+
+Measured:
+
+- The view models' test makes a project with a file of another format. The
+  wizard is told "Not made: file 'notes.txt' is not a format slot 'rom'
+  accepts" and that it was for the files, and the agent is refused with the
+  same reason. With the reason dropped on purpose, the three new checks fail.
+- A new window test runs the window with New Project shown and a script
+  making the project through the view model, as the Create button does. A
+  refused project leaves the window open and opens nothing; a made one closes
+  it and opens. It also checks that no page uses onValueChanged. With the old
+  pages, the window stays open after a project is made, and both pages are
+  named.
+- Movie Import was run in the window with the synthetic core. Its window now
+  closes and the core's notes are shown; with the old page it stayed open.
+
+Not tried: the reporter's game, Windows, and pressing the Create button
+itself (the tests tell the window how the making went; they do not click).

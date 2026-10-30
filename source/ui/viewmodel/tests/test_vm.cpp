@@ -7486,6 +7486,14 @@ bool createForAgent(const char *package, const char *rom, const char *hashedPack
 	json::parse("{\"NoSuchSetting\": 1}", r.settings, error);
 	CHECK(ask(r).refusal == "Synth has no setting called 'NoSuchSetting'. describe_core lists its settings.");
 	r.settings = json::Json();
+	/* a file the slot does not take: refused when the project is made, and said so, not called made (issue 422) */
+	std::ofstream(dir / "notes.txt") << "not a game";
+	r.games.clear();
+	r.files = {{"rom", (dir / "notes.txt").string()}};
+	const auto wrongKind = ask(r);
+	CHECK(!wrongKind.made && wrongKind.refusal == "file 'notes.txt' is not a format slot 'rom' accepts");
+	r.files.clear();
+	r.games = {game};
 	/* by its package's file name; the firmware it pins found nowhere: listed, with where it was looked for */
 	r.core = "synth-hashed.chimeraCore";
 	const auto missing = ask(r);
@@ -7738,6 +7746,17 @@ bool newProjectWizard(const char *package, const char *rom, const char *slotsPac
 	/* a file of another kind is said, not refused, as Chimera's; more than the slot takes is said at Next */
 	CHECK(wizard.run("addFile", {std::string("rom"), (dir / "notes.txt").string()}, error).has_value() &&
 		wizard.status.get() == "notes.txt is not one of the formats this slot expects (.testrom)");
+	/* and refused when the project is made, the engine's rule: the wizard is told why and that it was
+	 * for its files, and stays open until then (issue 422: the window closed and nothing was said) */
+	const int64_t madeBefore = wizard.made.get();
+	{
+		const fs::path refused = dir / "refused.chimeraProject";
+		CHECK(wizard.ready.get() && wizard.run("create", {refused.string()}, error).has_value() && wizard.making.get());
+		CHECK(!wizard.run("create", {refused.string()}, error) && error == "Making the project...");
+		CHECK(d.until([&] { return !wizard.making.get(); }, 60));
+		CHECK(wizard.filesRefused.get() && wizard.made.get() == madeBefore && !fs::exists(refused));
+		CHECK(wizard.status.get() == "Not made: file 'notes.txt' is not a format slot 'rom' accepts");
+	}
 	CHECK(wizard.run("addFile", {std::string("rom"), game}, error).has_value() && wizard.filesComplaint.get() == "Game: takes exactly one, has 2");
 	CHECK(wizard.run("removeFile", {std::string("rom"), int64_t{0}}, error).has_value());
 	CHECK(wizard.ready.get() && wizard.problems.get().empty() && wizard.status.get().empty());
@@ -7757,6 +7776,7 @@ bool newProjectWizard(const char *package, const char *rom, const char *slotsPac
 	const fs::path plain = dir / "walker.chimeraProject";
 	CHECK(wizard.run("create", {plain.string()}, error).has_value());
 	CHECK(d.until([&] { return session.isOpen.get() && session.projectPath.get() == plain.string(); }, 60));
+	CHECK(wizard.made.get() == madeBefore + 1 && !wizard.making.get() && !wizard.filesRefused.get());
 	{
 		const std::string project = readFile(plain);
 		CHECK(std::regex_search(project, std::regex("\"initFillByte\"\\s*:\\s*7[^0-9]")));

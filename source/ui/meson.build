@@ -402,6 +402,16 @@ if qt_dep.found()
       repo_root / 'build/Cores/synth-box.chimeraCore', repo_root / 'tests/synth/roms/gridWalker.testrom'],
     timeout: 300,
   )
+  # New Project's window waits for the project it makes, and says why one
+  # is refused (issue 422); no page waits on a change Qt never sends
+  test(
+    'new project window',
+    find_program('python3'),
+    args: [files('qt/tests/new-project-window.py'), chimera_qt, meson.current_build_dir() / 'new-project-window-test',
+      repo_root / 'build/Cores/synth-box.chimeraCore', repo_root / 'tests/synth/roms/gridWalker.testrom',
+      meson.current_source_dir() / 'qt'],
+    timeout: 300,
+  )
   # a theme reaches Qt Quick's controls, which take the platform's colours
   # and not the application's unless each window is given the theme
   test_theme = executable(

@@ -12,6 +12,7 @@
 #include <iterator>
 #include <regex>
 #include <thread>
+#include <utility>
 #include <atomic>
 #include <ctime>
 #include <mutex>
@@ -480,6 +481,9 @@ NewProjectViewModel::NewProjectViewModel(Dispatcher &dispatcher, SessionViewMode
 	expose("importNotes", "the notes of the core's answer, a line each", importNotes);
 	expose("imported", "the project will take the imported movie's inputs", imported);
 	expose("clockWrong", "the last create was refused for the clock's start, which is not a time Chimera reads", clockWrong);
+	expose("making", "a project is being made: Create read and hashes its files away from the view", making);
+	expose("made", "how many projects were made; goes up once each is made, when it opens", made);
+	expose("filesRefused", "the last making was refused for its files (the reason is the status)", filesRefused);
 	expose("importFailure", "why the last import was not taken (\"\" when it was), in Chimera's words", importFailure);
 	expose("importSummary", "what the core said of the movie taken, when it noted anything (Chimera's message)", importSummary);
 	expose("importsTaken", "goes up with each import taken", importsTaken);
@@ -1096,6 +1100,11 @@ NewProjectViewModel::NewProjectViewModel(Dispatcher &dispatcher, SessionViewMode
 				error = tr("new_project.must_open");
 				return {};
 			}
+			if (making.get())
+			{
+				error = tr("new_project.making");
+				return {};
+			}
 			if (!ready.get())
 			{
 				error = tr("new_project.not_yet", {problems.get()});
@@ -1164,16 +1173,20 @@ NewProjectViewModel::NewProjectViewModel(Dispatcher &dispatcher, SessionViewMode
 			for (const Need &n : needs_)
 				if (n.how == "chosen" || n.how == "your own") cores_.rememberFirmware(coreName, n.id, n.path);
 			status.set(path.empty() ? tr("new_project.making") : tr("new_project.making_at", {path}));
+			making.set(true);
+			filesRefused.set(false);
 			session_.onMachine([=, this](ce_session *) {
 				ce_project *p = ce_project_new();
 				ce_project_set_core(p, coreName.c_str(), version.c_str(), sha.c_str());
 				if (!platform.empty()) ce_project_header_set(p, "Platform", platform.c_str());
 				const char *err = nullptr;
 				std::string why;
+				bool forFiles = false;
 				for (const auto &[slotId, f] : files)
 					if (ce_project_file_add(p, f.name.c_str(), slotId.c_str(), f.path.c_str(), &err) != 0)
 					{
 						why = tr("session.named_reason", {f.name, err != nullptr ? err : tr("new_project.not_added")});
+						forFiles = true;
 						break;
 					}
 				if (why.empty() && ce_project_set_settings_text(p, settings.c_str(), &err) != 0) why = err != nullptr ? err : "settings";
@@ -1184,25 +1197,35 @@ NewProjectViewModel::NewProjectViewModel(Dispatcher &dispatcher, SessionViewMode
 				ce_project_set_clock_start(p, *clock);
 				/* an imported movie's inputs are the project's */
 				if (!input.empty()) ce_project_set_log_text(p, input.data(), input.size());
+				/* the engine's rule for the files, which the wizard only says:
+				 * a file of a format its slot does not take is refused here */
 				if (why.empty() && !slotsText.empty() && ce_project_validate(p, slotsText.data(), slotsText.size(), &err) != 0)
+				{
 					why = err != nullptr ? err : tr("new_project.files_do_not_fit");
+					forFiles = true;
+				}
 				if (why.empty() && path.empty())
 				{
 					/* written nowhere: it opens as it is, and its first save
 					 * asks where it goes */
-					later([this] { status.set(tr("new_project.made_unsaved")); });
+					later([this] {
+						status.set(tr("new_project.made_unsaved"));
+						madeOrNot({}, false);
+					});
 					session_.openMadeProjectOnMachine(p, package);
 					return;
 				}
 				if (why.empty() && ce_project_save(p, path.c_str(), &err) != 0) why = err != nullptr ? err : tr("session.not_written");
 				ce_project_free(p);
-				later([this, why, path, package, open] {
+				later([this, why, forFiles, path, package, open] {
 					if (!why.empty())
 					{
 						status.set(tr("new_project.not_made", {why}));
+						madeOrNot(why, forFiles);
 						return;
 					}
 					status.set(tr("new_project.made", {path}));
+					madeOrNot({}, false);
 					std::string e;
 					if (open) session_.run("openProject", {path, package}, e);
 				});
@@ -1457,10 +1480,26 @@ void NewProjectViewModel::finishForAgent(const AgentRequest &request, const std:
 	 * in the agent's own folder is then found when the project opens */
 	for (const Need &n : needs_)
 		if (!n.path.empty() && n.how != "remembered") cores_.rememberFirmware(coreName, n.id, n.path);
-	if (!run("create", {}, error)) return refused(error);
-	AgentOutcome o;
-	o.made = true;
-	done(std::move(o));
+	/* told once the project is made, or why it was not */
+	makeTold_ = [done](const std::string &why) {
+		AgentOutcome o;
+		o.made = why.empty();
+		o.refusal = why;
+		done(std::move(o));
+	};
+	if (!run("create", {}, error))
+	{
+		makeTold_ = nullptr;
+		return refused(error);
+	}
+}
+
+void NewProjectViewModel::madeOrNot(const std::string &why, bool forFiles)
+{
+	making.set(false);
+	filesRefused.set(forFiles);
+	if (why.empty()) made.set(made.get() + 1);
+	if (auto told = std::exchange(makeTold_, nullptr)) told(why);
 }
 
 void NewProjectViewModel::listCores()

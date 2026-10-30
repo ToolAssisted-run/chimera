@@ -34,7 +34,8 @@ ApplicationWindow {
     property string said: ""
     Connections {
         target: win.vm
-        function onValueChanged(key) { if (key === "status") win.said = "" }
+        // a change made by the view model: QQmlPropertyMap sends valueChanged only for one made from QML
+        function onStatusChanged() { win.said = "" }
     }
     // a count as Chimera's N0 writes it: 1,234
     function grouped(n) { return Number(n).toLocaleString(Qt.locale("en_US"), "f", 0) }

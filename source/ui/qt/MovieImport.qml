@@ -39,10 +39,12 @@ ApplicationWindow {
     }
     Connections {
         target: win.vm
-        function onValueChanged(key, value) {
-            if (!win.visible) return
-            if (key === "importFailure" && value !== "") { win.said = value; win.asking = false }
-            if (key === "importsTaken") { win.asking = false; win.close(); win.taken() }
+        // a change made by the view model: QQmlPropertyMap sends valueChanged only for one made from QML
+        function onImportFailureChanged() {
+            if (win.visible && win.vm.importFailure !== "") { win.said = win.vm.importFailure; win.asking = false }
+        }
+        function onImportsTakenChanged() {
+            if (win.visible) { win.asking = false; win.close(); win.taken() }
         }
     }
     function importNow() {

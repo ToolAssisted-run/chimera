@@ -89,6 +89,14 @@ public:
 	Property<std::string> importNotes;
 	Property<bool> imported{false};
 	Property<bool> clockWrong{false};
+	/* Create makes the project away from the view, since it reads and hashes
+	 * every file: whether one is being made, a count that goes up with each
+	 * one made (the wizard closes on it, as Chimera's closed once Create had
+	 * made the project), and whether the last was refused for its files (the
+	 * wizard then shows the files page with the reason, as Chimera's did) */
+	Property<bool> making{false};
+	Property<int64_t> made{0};
+	Property<bool> filesRefused{false};
 	/* how the last import went, for Chimera's Import window: why it was not
 	 * taken ("" when it was), what the core said of it when it noted
 	 * anything (Chimera's message: "<core> read a <format> movie of <n>
@@ -179,6 +187,11 @@ private:
 	/* completeForAgent after the core's suggestion for the game came in */
 	void finishForAgent(const AgentRequest &request, const std::function<void(AgentOutcome)> &done);
 	Connection agentWait_;
+	/* how a making went, on the view's thread: why the project was not made
+	 * ("" when it was) and whether that was for its files; told to whoever
+	 * waits for it */
+	void madeOrNot(const std::string &why, bool forFiles);
+	std::function<void(const std::string &why)> makeTold_;
 	struct Picked
 	{
 		std::string name, path;
