@@ -6,8 +6,8 @@
 #   the video's, not the machine's own pixels.
 # - A script's text breaks at each new line ("\n"), in the window and in the
 #   video: gui.drawText's two lines and gui.text's are two rows each.
-# - The Lua Console's list of scripts has lines between its rows and
-#   columns, as Chimera's list had.
+# - The lists of the Lua Console, RAM Watch and RAM Search have lines
+#   between their rows and columns, as Chimera's lists had.
 #
 # The window plays the project with window-drawing.lua and is shot when the
 # run ends. The encode is skipped (said) without an ffmpeg.
@@ -130,36 +130,36 @@ if os.path.exists(shot):
     check(len(bands(rows, MAGENTA)) == 2, "the window: gui.drawText's two lines are two rows", bands(rows, MAGENTA))
     check(len(bands(rows, CYAN)) == 2, "the window: gui.text's two lines are two rows", bands(rows, CYAN))
 
-# the Lua Console: the script's row, the first thing in its list unlike the
-# list's empty background, has a line under it and lines between its columns
-console = os.path.join(work, "window-luaConsoleWindow.png")
-if os.path.exists(console):
-    w, h, rows = png(console)
+def grid(rows, w, h):
+    """a list's grid: a line one pixel high and 150 or more wide, unlike the
+    rows above and below it, with two or more lines of its colour standing on
+    it inside its ends, a row high (20 pixels); (y, left, right, columns) or None"""
     at = lambda x, y: rows[y][x * 3:x * 3 + 3]
-    empty = at(10, h - 80)
-    band, y = None, 60
-    while y < h - 80 and band is None:
-        if at(10, y) != empty:
-            end = y
-            while at(10, end + 1) == at(10, y):
+    for y in range(21, h - 1):
+        x = 0
+        while x < w:
+            colour, end = at(x, y), x
+            while end + 1 < w and at(end + 1, y) == colour:
                 end += 1
-            if end - y >= 14:
-                band = (y, end)
-            y = end
-        y += 1
-    check(band is not None, "the Lua Console shows the script's row")
-    if band is not None:
-        top, bottom = band
-        colour = at(10, top)
-        xs = [x for x in range(w) if at(x, top) == colour]
-        left, right = min(xs), max(xs)
-        line = at(10, bottom + 1)
-        lined = sum(at(x, bottom + 1) == line for x in range(left, right + 1))
-        check(line not in (colour, empty) and lined > (right - left) * 0.9, "a line under the row",
-              "%s under a %s row on %s, %d of %d pixels" % (line.hex(), colour.hex(), empty.hex(), lined, right - left + 1))
-        columns = [x for x in range(left, right + 1) if all(at(x, y) == line for y in range(top, bottom + 1))]
-        check(len(columns) >= 2, "lines between the columns, in the line's colour", columns)
-else:
-    check(False, "the Lua Console was open and shot", out)
+            if end - x >= 150:
+                span = range(x, end + 1)
+                if (sum(at(i, y - 1) != colour for i in span) > len(span) * 0.9
+                        and sum(at(i, y + 1) != colour for i in span) > len(span) * 0.9):
+                    columns = [i for i in range(x + 4, end - 3) if all(at(i, up) == colour for up in range(y - 20, y))]
+                    if len(columns) >= 2:
+                        return y, x, end, columns
+            x = end + 1
+    return None
+
+
+for name, what in (("luaConsoleWindow", "the Lua Console's scripts"), ("ramWatchWindow", "RAM Watch's watches"),
+                   ("ramSearchWindow", "RAM Search's addresses")):
+    picture = os.path.join(work, "window-%s.png" % name)
+    if not os.path.exists(picture):
+        check(False, what + ": the window was open and shot", out)
+        continue
+    w, h, rows = png(picture)
+    found = grid(rows, w, h)
+    check(found is not None, what + ": a line under the rows and lines between the columns", "none found")
 
 sys.exit(1 if failures else 0)

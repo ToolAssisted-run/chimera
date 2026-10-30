@@ -11631,3 +11631,17 @@ undone. The view models' encode
 test hands back a picture three times the shown size and finds every frame
 at that size; it fails when the size is ignored.
 
+## RAM Watch and RAM Search have their grid again (user-decided, 2026-10-30)
+
+The old RAM Watch and RAM Search lists were the same list control as the
+Lua Console's, with lines between rows and columns; the new ones had none.
+The owner asked for them after the Lua Console's came back. Both now draw a
+line under every row and at the left of every column but the first, in the
+theme's grid colour (RollGridLines), as the Lua Console's list does.
+
+Tested: the "window drawing" test opens RAM Watch with three watches and
+RAM Search after a new search, and finds in each window's picture a line
+one pixel high under a row with two or more lines a row high standing on
+it, as in the Lua Console's. With the three grids taken out, the three
+checks fail.
+

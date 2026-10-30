@@ -280,6 +280,14 @@ ApplicationWindow {
         win.vm.hiddenColumns = now.join(",")
     }
     readonly property var visibleColumns: win.columns.filter((c) => win.shown(c.key))
+    // the grid, as Chimera's list draws it, in the theme's colour: a line at the left of every column but the first
+    readonly property color gridColour: win.themeColor("RollGridLines", String(Qt.darker(palette.base, 1.25)))
+    readonly property var columnLines: {
+        const at = []
+        let x = 0
+        for (let i = 0; i + 1 < win.visibleColumns.length; i++) { x += win.visibleColumns[i].width; at.push(x) }
+        return at
+    }
 
     header: ToolBar {
         RowLayout {
@@ -427,6 +435,12 @@ ApplicationWindow {
                          : row.model.frozen ? (row.model.preview ? win.themeColor("RowExcludedActive", "#E6E6FA") : win.themeColor("RowActive", "#E0FFFF"))
                          : row.model.preview ? win.themeColor("RowExcluded", "#FFC0CB")
                          : win.themeColor("RowDefault", palette.base)
+                    // the grid, as Chimera's list draws it: a line under every row and between the columns
+                    Repeater {
+                        model: win.columnLines
+                        delegate: Rectangle { required property real modelData; x: modelData; width: 1; height: row.height; color: win.gridColour }
+                    }
+                    Rectangle { y: row.height - 1; width: row.width; height: 1; color: win.gridColour }
                     Row {
                         anchors.fill: parent
                         Repeater {
