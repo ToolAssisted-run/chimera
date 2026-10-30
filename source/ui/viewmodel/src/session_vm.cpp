@@ -3180,8 +3180,16 @@ void writeRecoveryRecord(const std::filesystem::path &dir, const std::string &pr
 	r.members.emplace_back("processStarted", json::Json::integer(processStarted(currentProcessId())));
 	r.members.emplace_back("projectPath", json::Json::string(projectPath));
 	r.members.emplace_back("lastWork", json::Json::integer(static_cast<int64_t>(std::time(nullptr))));
-	std::ofstream out(dir / "session.json", std::ios::binary | std::ios::trunc);
-	out << json::write(r);
+	/* written beside, then put in place, as the snapshot is: a crash (or a
+	 * copy) while it is written finds the last whole one, never an empty one */
+	const std::filesystem::path fresh = dir / "session.json.new";
+	{
+		std::ofstream out(fresh, std::ios::binary | std::ios::trunc);
+		out << json::write(r);
+		if (!out) return;
+	}
+	std::error_code ec;
+	std::filesystem::rename(fresh, dir / "session.json", ec);
 }
 
 /* when a file was last written, as the clock here reads it; 0 when it is not there */

@@ -116,7 +116,10 @@ Chimera's window: Qt 6.12, QML views over C++ view models. The code is in
   is never more than the last change old; it was up to five seconds old
   with the snapshot alone. The journal is written again from the start
   once it has grown past three times its last start (16 MB at least), as
-  Chimera's is.
+  Chimera's is. The snapshot and session.json (which process keeps the
+  folder) are each written beside and then put in place, so a crash while
+  one is written leaves the last whole one, never an empty file
+  (2026-10-30).
 - **Qt for Windows is built from source** (owner, 2026-10-24) with
   Chimera's own mingw (posix threading), without the network module, as
   it is now; Qt's prebuilt Windows libraries were set aside.

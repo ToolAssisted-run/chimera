@@ -11672,3 +11672,18 @@ The issue's other half, every word of the menu bar gone after the window
 was closed, was not reproduced: the same steps on a GTX 1060, in English
 and in Russian, left the menu bar's words in place.
 
+## The crash record is put in place whole (2026-10-30)
+
+The record of which window keeps a project's unsaved work against a crash
+(session.json, beside the snapshot) was emptied and written again in place
+at every snapshot, every five seconds while work is unsaved. The snapshot
+beside it was already written to another file and put in place. A crash
+in the moment between found the record empty, and a copy of the folder
+taken then (the view models' test takes one) did too: CI failed twice that
+way. The record is now written the way the snapshot is.
+
+Tested: the view models' crash test checks that the record is another
+file after the next snapshot (on Linux, by its inode); written in place
+again, that check fails. The test's own copy of the record no longer
+aborts the run when the process is not found in it: that is a check that
+fails.

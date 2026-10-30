@@ -32,9 +32,8 @@
 
 #ifndef _WIN32
 #include <dlfcn.h>
-#ifndef _WIN32
+#include <sys/stat.h>
 #include <sys/wait.h>
-#endif
 #endif
 
 #include "chimera/vm/bindings.hpp"
@@ -2784,8 +2783,21 @@ bool crashRecovery(const char *package, const char *rom)
 	CHECK(readFile(kept / "session.json").find("\"processId\": " + std::to_string(currentProcessId())) != std::string::npos);
 	/* the first at the first change, then every five seconds with what came since */
 	CHECK(d.until([&] { return lines(kept / "snapshot.chimeraProject") == 20; }, 10));
+#ifndef _WIN32
+	/* the record of who keeps it is put in place whole each time, as the
+	 * snapshot is: another file, never the one there cut short and written
+	 * again (a copy taken meanwhile found it empty) */
+	auto fileId = [](const fs::path &f) {
+		struct stat st {};
+		return ::stat(f.c_str(), &st) == 0 ? static_cast<uint64_t>(st.st_ino) : uint64_t{0};
+	};
+	const uint64_t recordBefore = fileId(kept / "session.json");
+#endif
 	CHECK(advance(25));
 	CHECK(d.until([&] { return lines(kept / "snapshot.chimeraProject") == 25; }, 10));
+#ifndef _WIN32
+	CHECK(recordBefore != 0 && d.until([&] { return fileId(kept / "session.json") != recordBefore; }, 10));
+#endif
 	/* saved: let go */
 	session.run("saveProject", {}, error);
 	CHECK(d.until([&] { return !session.unsaved.get(); }, 20));
@@ -2872,7 +2884,9 @@ bool crashRecovery(const char *package, const char *rom)
 	{
 		std::string record = readFile(kept / "session.json");
 		const std::string own = "\"processId\": " + std::to_string(currentProcessId());
-		record.replace(record.find(own), own.size(), "\"processId\": 2147483000");
+		const size_t at = record.find(own);
+		CHECK(at != std::string::npos);
+		if (at != std::string::npos) record.replace(at, own.size(), "\"processId\": 2147483000");
 		std::ofstream(kept / "session.json", std::ios::binary | std::ios::trunc) << record;
 	}
 	fs::last_write_time(kept / "snapshot.chimeraProject", fs::last_write_time(project) - std::chrono::hours(1));
