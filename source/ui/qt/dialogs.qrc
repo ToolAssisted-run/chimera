@@ -5,6 +5,8 @@
     <file alias="qmldir">dialogs/qmldir</file>
     <file alias="FileDialog.qml">dialogs/FileDialog.qml</file>
     <file alias="FolderDialog.qml">dialogs/FolderDialog.qml</file>
+    <file alias="PickerBase.qml">dialogs/PickerBase.qml</file>
+    <file alias="BuiltinChooser.qml">dialogs/BuiltinChooser.qml</file>
     <file alias="MessageDialog.qml">dialogs/MessageDialog.qml</file>
     <file alias="ColorDialog.qml">dialogs/ColorDialog.qml</file>
     <file alias="FontDialog.qml">dialogs/FontDialog.qml</file>

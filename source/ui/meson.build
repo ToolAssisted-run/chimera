@@ -255,7 +255,7 @@ qt6 = import('qt6')
 qt_dep = dependency('qt6', modules: ['Core', 'Gui', 'Qml', 'Quick', 'QuickControls2'], required: get_option('qt_ui'))
 if qt_dep.found()
   qt_moc = qt6.compile_moc(
-    headers: ['qt/qml_view_model.hpp', 'qt/picture_item.hpp', 'qt/piano_roll_item.hpp', 'qt/key_names.hpp', 'qt/menu_letters.hpp', 'qt/theme_palette.hpp', 'qt/clipboard_relay.hpp', 'qt/picture_files.hpp', 'qt/pointer_capture.hpp', 'qt/button_router.hpp', 'qt/headless_run.hpp'],
+    headers: ['qt/qml_view_model.hpp', 'qt/picture_item.hpp', 'qt/piano_roll_item.hpp', 'qt/key_names.hpp', 'qt/menu_letters.hpp', 'qt/theme_palette.hpp', 'qt/clipboard_relay.hpp', 'qt/picture_files.hpp', 'qt/pointer_capture.hpp', 'qt/button_router.hpp', 'qt/headless_run.hpp', 'qt/portal_file_chooser.hpp', 'qt/file_places.hpp', 'qt/system_file_dialog.hpp'],
     include_directories: [vm_inc, engine_inc],
     dependencies: [qt_dep],
   )
@@ -297,6 +297,10 @@ if qt_dep.found()
     'qt/pointer_capture.cpp',
     'qt/overlay_painter.cpp',
     'qt/jump_list.cpp',
+    'qt/portal_file_chooser.cpp',
+    'qt/file_places.cpp',
+    'qt/system_file_dialog.cpp',
+    'qt/win32_file_dialog.cpp',
     qt_moc,
     qt_rcc,
     qt_dialogs_rcc,
@@ -333,7 +337,8 @@ if qt_dep.found()
     chimera_qt = executable(
       'chimera',
       qt_sources,
-      dependencies: [vm_dep, qt_dep],
+      # libdbus is loaded when the desktop's file chooser is asked for (portal_file_chooser.cpp)
+      dependencies: [vm_dep, qt_dep, dl_dep],
       # the view models have a Signal::emit; Qt's "emit" keyword would eat it
       cpp_args: ['-DQT_NO_KEYWORDS'],
       override_options: ['cpp_std=c++20'],
@@ -401,12 +406,26 @@ if qt_dep.found()
   # and not the application's unless each window is given the theme
   test_theme = executable(
     'test-theme',
-    ['qt/tests/test_theme.cpp', 'qt/theme_palette.cpp', qt6.compile_moc(headers: ['qt/theme_palette.hpp'], dependencies: [qt_dep]), qt_dialogs_rcc],
-    dependencies: [qt_dep],
+    ['qt/tests/test_theme.cpp', 'qt/theme_palette.cpp', 'qt/portal_file_chooser.cpp', 'qt/file_places.cpp',
+      qt6.compile_moc(headers: ['qt/theme_palette.hpp', 'qt/portal_file_chooser.hpp', 'qt/file_places.hpp'], dependencies: [qt_dep]), qt_dialogs_rcc],
+    dependencies: [qt_dep, dl_dep],
     override_options: ['cpp_std=c++20'],
     cpp_args: ['-DCHIMERA_QT_QML_DIR="' + meson.current_source_dir() / 'qt' + '"'],
   )
-  test('theme', test_theme, env: ['QT_QPA_PLATFORM=offscreen', 'QT_QUICK_BACKEND=software'], timeout: 60)
+  test('theme', test_theme, env: ['QT_QPA_PLATFORM=offscreen', 'QT_QUICK_BACKEND=software', 'CHIMERA_FILE_CHOOSER=builtin'], timeout: 60)
+  # the file and folder dialogs on Linux: the desktop's chooser through its
+  # portal (a stand-in one on a bus of the test's own), and Chimera's own
+  # where there is none (docs/file-picker.md)
+  if host_machine.system() != 'windows'
+    test_file_chooser = executable(
+      'test-file-chooser',
+      ['qt/tests/test_file_chooser.cpp', 'qt/portal_file_chooser.cpp', 'qt/file_places.cpp',
+        qt6.compile_moc(headers: ['qt/portal_file_chooser.hpp', 'qt/file_places.hpp'], dependencies: [qt_dep]), qt_dialogs_rcc],
+      dependencies: [qt_dep, dl_dep],
+      override_options: ['cpp_std=c++20'],
+    )
+    test('file chooser', find_program('python3'), args: [files('qt/tests/file-chooser.py'), test_file_chooser], timeout: 180)
+  endif
   # the window's texts come from the engine's language tables, in the
   # language the person's system or choice gives (docs/translations.md)
   test_translations = executable(

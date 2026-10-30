@@ -220,6 +220,7 @@ ApplicationWindow {
         // where the file is now, and its name, as Chimera's opens
         currentFolder: win.outputFolder !== "" ? win.files.folderUrl(win.outputFolder) : ""
         selectedFile: win.vm.output !== "" ? win.files.folderUrl(win.vm.output) : ""
+        defaultSuffix: "mp4"
         nameFilters: [qsTrId("encode_video.mp4_files_mp4"), qsTrId("encode_video.avi_files_avi"), qsTrId("encode_video.matroska_files_mkv"), qsTrId("encode_video.all_files")]
         onAccepted: win.vm.output = win.files.localPath(selectedFile)
     }

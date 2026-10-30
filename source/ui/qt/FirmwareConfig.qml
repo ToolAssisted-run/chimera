@@ -69,7 +69,10 @@ ApplicationWindow {
         id: folderDialog
         title: qsTrId("firmware_config.scan_a_folder_for_firmware_files")
         currentFolder: win.folderOf ? win.folderOf("Firmware") : ""
-        onAccepted: win.keepingPlace("scanFolder", [localFiles.localPath(selectedFolder), true])
+        // in the dialog itself, as New Project's and Project Files' (docs/file-picker.md)
+        checkBoxText: qsTrId("firmware_config.include_sub_folders")
+        checkBoxChecked: true
+        onAccepted: win.keepingPlace("scanFolder", [localFiles.localPath(selectedFolder), checkBoxChecked])
     }
     function browse() {
         if (!win.vm.canSet) return

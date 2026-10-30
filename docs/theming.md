@@ -184,6 +184,7 @@ palette's "light" colour, which a theme gives its field colour
 which Qt's Fusion dialogs leave out.
 
 `test-theme` (run by `meson test`) holds that a theme reaches a window's
-buttons and fields, its menus, a window opened later, Qt's file dialog open in
-a window, and a theme chosen while they are open, and that a window marked
-unthemed (a Lua form) keeps the colours it set itself.
+buttons and fields, its menus, a window opened later, the file dialog open in
+a window (on Linux Chimera's own chooser, its places in the window's text,
+[file-picker.md](file-picker.md)), and a theme chosen while they are open, and
+that a window marked unthemed (a Lua form) keeps the colours it set itself.

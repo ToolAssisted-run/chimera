@@ -1101,6 +1101,7 @@ ApplicationWindow {
         id: saveConfigDialog
         title: qsTrId("main.save_the_settings_as")
         fileMode: FileDialog.SaveFile
+        defaultSuffix: "json"
         nameFilters: [qsTrId("main.settings_json")]
         onAccepted: root.configFiles.run("saveAs", [selectedFile])
     }
@@ -1114,6 +1115,7 @@ ApplicationWindow {
         id: screenshotAsDialog
         title: qsTrId("main.save_the_picture_as")
         fileMode: FileDialog.SaveFile
+        defaultSuffix: "png"
         nameFilters: [qsTrId("main.png_pictures_png"), qsTrId("main.jpeg_pictures_jpg")]
         // Capture OSD: the picture area as drawn, with what is over it
         onAccepted: {
@@ -1126,6 +1128,7 @@ ApplicationWindow {
         title: qsTrId("main.save_the_project_as")
         // its folder and file name are set as it opens (askSaveAs)
         fileMode: FileDialog.SaveFile
+        defaultSuffix: "chimeraProject"
         nameFilters: [qsTrId("main.chimera_projects_chimeraproject")]
         onAccepted: root.session.run("saveProject", [selectedFile])
         // a question that asked for this save is answered Cancel
@@ -1137,6 +1140,7 @@ ApplicationWindow {
         id: coreLogFileDialog
         title: qsTrId("main.export_core_log")
         fileMode: FileDialog.SaveFile
+        defaultSuffix: "txt"
         nameFilters: [qsTrId("main.text_files_txt")]
         onAccepted: {
             if (root.session.run("startCoreLog", [selectedFile]) === undefined) return
@@ -1188,6 +1192,8 @@ ApplicationWindow {
         property int files: 1
         title: qsTrId("main.export_save_data")
         fileMode: FileDialog.SaveFile
+        // one file is saved as the core names it; several go in a zip
+        defaultSuffix: files === 1 ? "" : "zip"
         nameFilters: files === 1 ? [qsTrId("common.all_files")] : [qsTrId("main.zip_archives_zip")]
         onAccepted: root.session.run("exportSaveData", [selectedFile])
     }

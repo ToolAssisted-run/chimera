@@ -1128,6 +1128,7 @@ ApplicationWindow {
         title: qsTrId("tastudio.save_the_frames_picked_as_a")
         currentFolder: tas.folderOf("Macros")
         fileMode: FileDialog.SaveFile
+        defaultSuffix: "chimeraMacro"
         nameFilters: [qsTrId("tastudio.movie_macros_chimeramacro")]
         onAccepted: tas.pianoRoll.run("saveMacro", [tas.pianoRoll.selectFirst, tas.pianoRoll.selectLast, selectedFile])
     }

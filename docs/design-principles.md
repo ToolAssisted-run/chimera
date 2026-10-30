@@ -11350,6 +11350,85 @@ samples 6 pauses remain, of 15 to 37 ms, QML's script memory clean-up; the
 waiting one more refresh as the machine's 60.07 frames a second drift
 against the screen's.
 
+## Files and folders are picked with the desktop's own chooser on Linux (user-decided, 2026-10-30)
+
+A person reported Linux's file dialog as unusable: Qt's own, drawn inside
+the window since issue 389. It is not the desktop's chooser, which many
+people prefer. A path cannot be typed into it. It has no way to show hidden
+files. Its folder dialog picks the folder highlighted in the list instead of
+the one shown. It lists no bookmarks, no drives and not even the root. They
+asked for the desktop's chooser through the XDG desktop portal, as PR 275
+did for the Windows Forms frontend, with a dialog of Chimera's own where
+there is no portal, and that dialog to fix the same points.
+
+- `ChimeraDialogs`' `FileDialog` and `FolderDialog` are now Chimera's own
+  objects with the properties of Qt's that the windows use, so no window
+  changed. On Windows and macOS they still open Qt's dialog, which is the
+  system's.
+- On Linux they ask the portal through libdbus, loaded when first needed,
+  since Chimera's Qt is built without D-Bus (`portal_file_chooser.cpp`). The
+  rules PR 275 found are kept: 2 within 300 ms is a chooser that never came
+  up, a later 2 is Cancel, the portal leaving the bus is no chooser, and the
+  windows take no input instead of being disabled. Under Wayland the chooser
+  is given no parent window.
+- Where there is no portal, Chimera's own chooser (`BuiltinChooser.qml`)
+  replaces Qt's: a Location box to type a path into, Show hidden files, the
+  root, home, the person's folders, GTK's and KDE's bookmarks and the mounted
+  drives beside the list, and a folder dialog that picks the folder it
+  shows. Issue 389 chose to fix Qt's dialog rather than write one of
+  Chimera's own. Qt's dialog has no way in for the points above, so this
+  goes the other way; the owner confirmed it when merging (2026-10-30, PR
+  420).
+- The theme test set Fusion's style before the application was made. With
+  KDE's Qt platform theme in use (`QT_QPA_PLATFORMTHEME=kde`, which a KDE
+  desktop sets and other desktops can too), that theme then set Breeze's
+  style in its place, so the test drew Breeze's controls, and its Lua form
+  check failed whatever the change. It now sets the style after the
+  application, as the window does.
+
+Measured: the new file chooser test passes both halves, with Chimera's
+chooser (no bus) and through a stand-in portal on a private bus (52 and 54
+checks). With the input filter not installed, the two checks of a key
+pressed while the chooser is open failed. Against the portal of the desktop
+it was built on (niri on Wayland, whose portal setup sends file choosing to
+KDE's chooser), a request was taken and its request object was at the path
+Chimera listens on.
+
+By hand, on niri on Wayland: the window was started on a private D-Bus
+session bus, whose desktop portal (xdg-desktop-portal 1.22.1) sent file
+choosing to one chooser alone, as PR 275 was tested. KDE's (6.8.2), GNOME's
+(51.0, with Nautilus 51.1), GTK's (1.15.3, with no pause), COSMIC's (1.10.0)
+and LXQt's (1.4.0) all worked, and so did Chimera's own, shown for a portal
+with no file chooser. Not tried: Plasma, GNOME and COSMIC under their own
+desktops, an X11 session, Windows and macOS.
+
+## Include sub-folders is a box in the folder dialog (2026-10-29)
+
+New Project's firmware page and Project Files had an "Include sub-folders"
+box beside their Scan Folder button, and Config > Firmware always looked in
+sub-folders. A contributor asked for such options to be in the file picker
+itself, on Windows and on Linux, as PR 275 did for the Windows Forms
+frontend, which the owner merged. Nothing from the owner says otherwise:
+issue 368's sub-folder depth setting, which the owner chose not to add, is
+about how deep a scan goes, not where its box is.
+
+- `FileDialog` and `FolderDialog` take `checkBoxText` and `checkBoxChecked`.
+  The three windows' folder dialogs carry "Include sub-folders", ticked to
+  begin with; the boxes beside the buttons are gone.
+- Through the portal, the box is a choice with no options and is read back
+  from the answer. Chimera's own chooser draws it in its bottom row.
+- On Windows, Qt's dialog takes no controls of a caller's. A dialog with a
+  box is shown by Chimera as Windows' own common item dialog with the box
+  added (`IFileDialogCustomize`); a dialog without one is still Qt's.
+
+Measured: the file chooser test's new checks pass (59 with Chimera's
+chooser, 66 through the stand-in portal). With the choice not sent, the six
+checks of the request's choices failed; with Chimera's chooser not handing
+its box back, the check of the dialog's box failed. meson test 50/50, witness
+121 ok. The Windows dialog code was built with mingw-w64 and linked against
+ole32, shell32 and uuid; run under Wine, the folder dialog came up and
+stayed open. Windows itself, and the dialog's box under Wine, were not tried.
+
 ## Config > Language has an icon (user-decided, 2026-10-30)
 
 The owner asked for an icon on Config > Language, as the other entries have.

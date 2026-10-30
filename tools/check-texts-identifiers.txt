@@ -383,3 +383,9 @@ CHIMERA REPRODUCIBLE MEDIA MAKER
 # a movie's state line (Chimera's movie format), a function's target (code)
 Frame 
 sha,sse4.1
+
+# the desktop portal's D-Bus method and signal names, and KDE's file of the
+# places a person added (portal_file_chooser.cpp, file_places.cpp)
+Get
+Response
+/user-places.xbel

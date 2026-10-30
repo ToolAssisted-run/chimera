@@ -109,6 +109,9 @@
 #include "picture_files.hpp"
 #include "overlay_painter.hpp"
 #include "pointer_capture.hpp"
+#include "portal_file_chooser.hpp"
+#include "system_file_dialog.hpp"
+#include "file_places.hpp"
 #include "button_router.hpp"
 #include "jump_list.hpp"
 #include "single_instance.hpp"
@@ -1431,6 +1434,12 @@ int main(int argc, char **argv)
 	qt::PointerCapture pointerCapture;
 	/* the pointer's buttons, routed as keys once the key routing is made */
 	qt::ButtonRouter buttonRouter;
+	/* files and folders picked with the desktop's own chooser, and what
+	 * Chimera's own lists where there is none (dialogs/PickerBase.qml) */
+	qt::PortalFileChooser portalChooser;
+	qt::FilePlaces filePlaces;
+	/* Windows' own dialog, for one that carries a tick box (Qt's takes none) */
+	qt::SystemFileDialog systemDialog;
 	pictureFiles.say = [&session](const std::string &text) { session.status.set(text); };
 	QQmlApplicationEngine engine;
 	/* Qt picks the look of the dialogs it draws itself by the style's name,
@@ -1501,6 +1510,9 @@ int main(int argc, char **argv)
 	engine.rootContext()->setContextProperty(QStringLiteral("localFiles"), &pictureFiles);
 	/* --headless, for every window: none is shown, and a dialog that opens ends the run */
 	engine.rootContext()->setContextProperty(QStringLiteral("headlessRun"), &headlessRun);
+	engine.rootContext()->setContextProperty(QStringLiteral("portalChooser"), &portalChooser);
+	engine.rootContext()->setContextProperty(QStringLiteral("filePlaces"), &filePlaces);
+	engine.rootContext()->setContextProperty(QStringLiteral("systemDialog"), &systemDialog);
 	/* every menu item reads it, the style's own (style/MenuItem.qml) */
 	engine.rootContext()->setContextProperty(QStringLiteral("menuLetters"), &menuLetters);
 	/* another language chosen in Config > Language: the window's words change at once */
@@ -1592,7 +1604,8 @@ int main(int argc, char **argv)
 		}
 		if (args.isSet(luaOpt) || args.isSet(luaConsoleOpt)) show("luaConsoleWindow");
 	}
-	/* forms.openfile: Qt's file dialog, shown and waited for, modal as Chimera's */
+	/* forms.openfile: the window's file dialog (the desktop's chooser on
+	 * Linux), shown and waited for, modal as Chimera's */
 	forms.openFile = [&engine, window, &headlessRun](const std::string &fileName, const std::string &folder, const std::vector<std::string> &filters) {
 		/* nobody to choose: the run ends, as on any dialog */
 		if (headlessRun.enabled())
@@ -1601,7 +1614,7 @@ int main(int argc, char **argv)
 			return std::string();
 		}
 		QQmlComponent component(&engine);
-		component.setData("import QtQuick.Dialogs\nFileDialog { fileMode: FileDialog.OpenFile }", QUrl());
+		component.setData("import ChimeraDialogs\nFileDialog { fileMode: FileDialog.OpenFile }", QUrl());
 		QStringList names;
 		for (const std::string &f : filters) names << QString::fromStdString(f);
 		QVariantMap initial{{QStringLiteral("nameFilters"), names}, {QStringLiteral("parentWindow"), QVariant::fromValue<QObject *>(window)}};

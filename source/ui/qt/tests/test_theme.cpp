@@ -7,12 +7,15 @@
  * the application's, so a theme set only as the application's palette
  * leaves them in the desktop's colours: this is what failed before each
  * window was given the theme as its own palette. */
+#include "../file_places.hpp"
+#include "../portal_file_chooser.hpp"
 #include "../theme_palette.hpp"
 
 #include <QColor>
 #include <QCoreApplication>
 #include <QGuiApplication>
 #include <QQmlComponent>
+#include <QQmlContext>
 #include <QQmlEngine>
 #include <QQmlFileSelector>
 #include <QQuickItem>
@@ -113,8 +116,10 @@ QColor colour(const std::unique_ptr<QObject> &o, const char *name)
 
 int main(int argc, char **argv)
 {
-	QQuickStyle::setStyle(QStringLiteral("Fusion"));
 	QGuiApplication app(argc, argv);
+	/* after the application, as the window sets its own (main.cpp): KDE's
+	 * platform theme sets Breeze's style as the application is made */
+	QQuickStyle::setStyle(QStringLiteral("Fusion"));
 	const QColor platformButton = QGuiApplication::palette().color(QPalette::Button);
 	const QColor window(0x2B, 0x2B, 0x2B), button(0x3C, 0x3F, 0x41), field(0x1E, 0x1E, 0x1E);
 	CHECK(platformButton != button);
@@ -138,8 +143,13 @@ int main(int argc, char **argv)
 	/* Qt's own dialogs draw their folder bar and side places in "light":
 	 * a field's colour, not the platform's white (issue 389) */
 	CHECK(colour(first, "lightColour") == field);
-	/* Qt's file dialog, open: the places beside its list in the theme's
-	 * button text (the window text here), not Fusion's black (issue 389) */
+	/* the file dialog, open (on Linux Chimera's own chooser, as with no
+	 * desktop chooser to ask): the places beside its list in the theme's
+	 * text, not Fusion's black (issue 389) */
+	chimera::qt::PortalFileChooser portalChooser;
+	chimera::qt::FilePlaces filePlaces;
+	engine.rootContext()->setContextProperty(QStringLiteral("portalChooser"), &portalChooser);
+	engine.rootContext()->setContextProperty(QStringLiteral("filePlaces"), &filePlaces);
 	{
 		auto window = make(engine, kFileDialog);
 		QObject *dialog = window ? window->property("dialog").value<QObject *>() : nullptr;
@@ -152,7 +162,13 @@ int main(int argc, char **argv)
 			for (QQuickItem *c : item->childItems())
 			{
 				const bool in = side || c->inherits("QQuickSideBar");
-				if (in && c->property("folderName").isValid())
+				/* the place shown is drawn as picked, in the highlight's text */
+				if (c->objectName() == QStringLiteral("chooserPlace"))
+				{
+					if (!c->property("highlighted").toBool())
+						if (auto *label = c->property("contentItem").value<QQuickItem *>()) places.append(label->property("color").value<QColor>());
+				}
+				else if (in && c->property("folderName").isValid())
 					if (auto *label = c->property("contentItem").value<QQuickItem *>()) places.append(label->property("color").value<QColor>());
 				walk(c, in);
 			}

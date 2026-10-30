@@ -139,7 +139,10 @@ ApplicationWindow {
         id: scanDialog
         title: qsTrId("new_project.scan_a_folder_for_firmware")
         currentFolder: win.folderOf ? win.folderOf("Firmware") : ""
-        onAccepted: win.run("scanFolder", [selectedFolder, scanSubfolders.checked])
+        // in the dialog itself, as a box of the chooser's (docs/file-picker.md)
+        checkBoxText: qsTrId("new_project.include_sub_folders")
+        checkBoxChecked: true
+        onAccepted: win.run("scanFolder", [selectedFolder, checkBoxChecked])
     }
     FileDialog {
         id: importSaveDialog
@@ -526,7 +529,6 @@ ApplicationWindow {
                         onClicked: win.run("clearFirmware", [firmwareList.itemAtIndex(win.firmwarePicked).id])
                     }
                     Button { text: qsTrId("common.scan_folder"); onClicked: scanDialog.open() }
-                    CheckBox { id: scanSubfolders; text: qsTrId("new_project.include_sub_folders"); checked: true }
                     Item { Layout.fillWidth: true }
                 }
             }

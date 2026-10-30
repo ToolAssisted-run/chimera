@@ -4,11 +4,15 @@
 # person found that window's Open and Cancel did nothing (issue 389), as
 # others have found of Qt's child windows there. Chimera's QML imports
 # ChimeraDialogs in place of QtQuick.Dialogs; everything else, the enums
-# among it, comes from QtQuick.Dialogs.
+# among it, comes from QtQuick.Dialogs. On Linux the file and folder dialogs
+# are the desktop's own chooser, or Chimera's where there is none
+# (PickerBase.qml); FileDialog keeps Qt's FileMode enum.
 module ChimeraDialogs
 import QtQuick.Dialogs auto
 FileDialog 6.0 FileDialog.qml
 FolderDialog 6.0 FolderDialog.qml
+internal PickerBase PickerBase.qml
+internal BuiltinChooser BuiltinChooser.qml
 MessageDialog 6.0 MessageDialog.qml
 ColorDialog 6.0 ColorDialog.qml
 FontDialog 6.0 FontDialog.qml

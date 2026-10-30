@@ -140,7 +140,6 @@ ApplicationWindow {
         RowLayout {
             Button { text: qsTrId("project_files.locate_3"); enabled: win.picked >= 0; onClicked: locateDialog.open() }
             Button { text: qsTrId("common.scan_folder"); onClicked: scanDialog.open() }
-            CheckBox { id: subfolders; text: qsTrId("project_files.include_sub_folders"); checked: true; padding: 2 }
             Item { Layout.fillWidth: true }
             // a missing file cannot be passed over; one that is not the recorded bytes can, knowingly
             Button {
@@ -167,8 +166,11 @@ ApplicationWindow {
     FolderDialog {
         id: scanDialog
         title: qsTrId("project_files.scan_a_folder_for_the_project")
+        // in the dialog itself, as a box of the chooser's (docs/file-picker.md)
+        checkBoxText: qsTrId("project_files.include_sub_folders")
+        checkBoxChecked: true
         onAccepted: {
-            const resolved = win.session.run("scanForProjectFiles", [selectedFolder, subfolders.checked])
+            const resolved = win.session.run("scanForProjectFiles", [selectedFolder, checkBoxChecked])
             // in Chimera's words
             win.scanSaid = !resolved ? qsTrId("project_files.the_scan_found_nothing_new") : resolved === 1 ? qsTrId("project_files.the_scan_resolved_1_file") : qsTrId("project_files.the_scan_resolved_files").arg(resolved)
         }
