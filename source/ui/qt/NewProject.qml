@@ -49,6 +49,8 @@ ApplicationWindow {
 
     onVisibleChanged: if (visible) {
         win.madeProject = false
+        // the cores folder as it is now: a package may have been put in or taken out since (issue 423)
+        win.vm.run("refresh")
         // the first core of the kind when none is chosen, as Chimera's opens
         if (win.vm.coreLine < 0 && win.vm.coreLines !== "") win.vm.run("chooseCoreLine", [0])
         win.showPage(0)

@@ -351,6 +351,7 @@ void CoresViewModel::scan()
 	status.set(folder.empty() ? tr("cores.no_folder") : tr("cores.packages_in", n, {folder}));
 	rows_.reset.emit();
 	sayManager();
+	scanned.emit();
 }
 
 std::string CoresViewModel::packageFor(const std::string &coreName, const std::string &pinnedSha1, std::string &note) const

@@ -680,8 +680,10 @@ NewProjectViewModel::NewProjectViewModel(Dispatcher &dispatcher, SessionViewMode
 		return {};
 	});
 
-	command("refresh", "lists the installed cores again", {}, [this](const Args &, std::string &) -> Value {
-		listCores();
+	command("refresh", "looks at the cores folder again and lists its cores: a package put in or taken out while the program "
+		"runs (issue 423)", {}, [this](const Args &, std::string &) -> Value {
+		std::string looked;
+		cores_.run("refresh", {}, looked);
 		return {};
 	});
 	command("chooseKind", "lists emulators (\"emulators\") or game cores (\"games\")", {"kind"},
@@ -1234,7 +1236,7 @@ NewProjectViewModel::NewProjectViewModel(Dispatcher &dispatcher, SessionViewMode
 		});
 
 	listCores();
-	coresWatch_ = cores_.count.changed.connect([this] { listCores(); });
+	coresWatch_ = cores_.scanned.connect([this] { listCores(); });
 	kindWatch_ = kind.changed.connect([this] { listCores(); });
 }
 
@@ -1524,6 +1526,18 @@ void NewProjectViewModel::listCores()
 	}
 	coreLines.set(lines);
 	coreLine.set(at);
+	/* the package chosen gone from the folder and another of its core there
+	 * (a newer one put in its place while the program runs, issue 423): the
+	 * project starts over with that one */
+	std::error_code ec;
+	if (at < 0 && !package_.empty() && !core.get().empty() && !fs::is_regular_file(package_, ec))
+		for (const auto &p : shown_)
+			if (p.name == core.get())
+			{
+				std::string error;
+				chooseCore(p.name, error, p.path);
+				break;
+			}
 }
 
 NewProjectViewModel::~NewProjectViewModel()

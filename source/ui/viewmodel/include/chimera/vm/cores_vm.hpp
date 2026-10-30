@@ -24,6 +24,9 @@ public:
 	 * a file chosen outside the firmware folder is found there again */
 	Property<std::string> chosenFirmware{"{}"};
 	Property<int64_t> count{0};
+	/* every look at the cores folder, whatever it found: a package put in
+	 * the place of another leaves the count as it was */
+	Signal<> scanned;
 	Property<std::string> status{tr("cores.no_folder")};
 	/* Chimera's Core Manager: which kinds of core it lists (0 all, 1 the emulators, 2 the games;
 	 * remembered), the two lines over the list, and the line under it */

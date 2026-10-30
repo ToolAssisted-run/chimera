@@ -11645,3 +11645,30 @@ one pixel high under a row with two or more lines a row high standing on
 it, as in the Lua Console's. With the three grids taken out, the three
 checks fail.
 
+## New Project looks at the cores folder each time it opens (2026-10-30, issue 423)
+
+A person put a newer package of a core in the cores folder, in the place
+of the old one, while the program ran. New Project still listed the old
+package, read when the program started, so choosing it said the package
+"cannot be read", and a project made with it would not open ("is not a
+core package"). The cores folder was looked at again only by the Cores
+window, and New Project relisted only when the number of packages
+changed, which a swap leaves as it was.
+
+New Project now looks at the folder each time it opens, as the Cores
+window does, and relists after every look, whatever it found. A core
+chosen whose package is gone, with another package of that core there,
+starts over with that one.
+
+Tested: the view models' wizard test renames the chosen package while the
+wizard is open; after a refresh the same core and line are chosen and
+choosing the line again reads the package. With the folder not looked at
+again, choosing the line fails; with the core not started over, the
+chosen line is lost (3 checks fail). Also seen on Windows: with the
+package swapped while the program ran, choosing the core said
+"...chimeraCore cannot be read" (build 36c2bffe).
+
+The issue's other half, every word of the menu bar gone after the window
+was closed, was not reproduced: the same steps on a GTX 1060, in English
+and in Russian, left the menu bar's words in place.
+

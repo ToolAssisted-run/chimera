@@ -7738,6 +7738,20 @@ bool newProjectWizard(const char *package, const char *rom, const char *slotsPac
 	/* a package of one kind of file: the game */
 	CHECK(wizard.run("chooseCore", {std::string("Synth")}, error).has_value());
 	CHECK(rowCount("slots") == 1 && text("slots", 0, 0) == "rom" && text("slots", 0, 4) == ".testrom" && text("slots", 0, 9) == "*.testrom");
+	/* the package put in the place of another while the program runs, as a
+	 * newer one is (issue 423): the wizard looks at the folder again and
+	 * starts over with it, where it kept the one gone */
+	{
+		const int64_t line = wizard.coreLine.get();
+		fs::rename(dir / "Cores" / "synth-box.chimeraCore", dir / "Cores" / "synth-box-newer.chimeraCore");
+		CHECK(wizard.run("refresh", {}, error).has_value());
+		CHECK(wizard.core.get() == "Synth" && wizard.coreLine.get() == line && installed.count.get() == 2);
+		error.clear();
+		CHECK(wizard.run("chooseCoreLine", {line}, error).has_value() && error.empty());
+		fs::rename(dir / "Cores" / "synth-box-newer.chimeraCore", dir / "Cores" / "synth-box.chimeraCore");
+		CHECK(wizard.run("refresh", {}, error).has_value() && wizard.core.get() == "Synth" && wizard.coreLine.get() == line);
+		CHECK(wizard.run("chooseCore", {std::string("Synth")}, error).has_value());
+	}
 	CHECK(wizard.problems.get() == "Game: a file is needed" && wizard.machines.get().empty());
 	/* the wizard's pages, in Chimera's words: the files page asked, what keeps it from going on */
 	CHECK(wizard.filesAsked.get() && wizard.filesComplaint.get() == "Game: needs exactly one, has 0" && text("slots", 0, 10) == "exactly one");
