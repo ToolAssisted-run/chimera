@@ -2,10 +2,11 @@
 // ffmpeg command or a preset's, the two markers to encode between, the size
 // and the sound's sync - then Start Encode winds the run there, encodes it
 // and gives the machine back. Closing the window stops it. What it refuses
-// is said in the status line in the error colour, as Chimera's. Capture OSD
-// and Capture Lua put what the window draws over the picture into the video,
-// at the machine's own size. Layout and bindings only, over the encoder view
-// model.
+// is said in the status line in the error colour, as Chimera's. Capture Lua
+// puts what scripts draw into the video at the machine's own size; Capture
+// OSD writes the picture as the window shows it, at the size of its picture
+// area, the counters and messages with it, as Chimera's. Layout and bindings
+// only, over the encoder view model.
 import QtQuick
 import QtQuick.Controls
 import ChimeraDialogs
@@ -59,11 +60,20 @@ ApplicationWindow {
     }
     onClosing: if (win.running) win.vm.run("stop")
     function useCurrentSize() {
-        win.vm.width = picture.pictureWidth > 0 ? picture.pictureWidth : 640
-        win.vm.height = picture.pictureHeight > 0 ? picture.pictureHeight : 480
+        win.vm.width = win.writtenWidth > 0 ? win.writtenWidth : 640
+        win.vm.height = win.writtenHeight > 0 ? win.writtenHeight : 480
     }
-    // the machine's own size now, from the main window's picture
+    // the main window's picture
     property Item picture: null
+    // the size a frame is written at now, unless resized, as Chimera's: with
+    // Capture OSD the picture area's, as the window shows it (its 2x or 3x),
+    // else the machine's own pixels; 0 before the first picture
+    readonly property bool pictured: win.picture !== null && win.picture.frameWidth > 0
+    readonly property int writtenWidth: !win.pictured ? 0 : win.vm.captureOsd ? Math.max(1, Math.round(win.picture.width)) : win.picture.frameWidth
+    readonly property int writtenHeight: !win.pictured ? 0 : win.vm.captureOsd ? Math.max(1, Math.round(win.picture.height)) : win.picture.frameHeight
+    // not resizing: the size boxes say the size written, as it changes
+    onWrittenWidthChanged: if (win.visible && !win.vm.resize) win.useCurrentSize()
+    onWrittenHeightChanged: if (win.visible && !win.vm.resize) win.useCurrentSize()
     Timer { interval: 200; repeat: true; running: win.running; onTriggered: win.vm.run("poll") }
 
     function start() {
@@ -153,7 +163,7 @@ ApplicationWindow {
             Label { text: "x" }
             SpinBox { from: 1; to: 8192; editable: true; value: win.vm.height; enabled: win.vm.resize; onValueModified: win.vm.height = value; Layout.preferredWidth: 100 }
             Button { text: qsTrId("encode_video.current_size"); enabled: win.vm.resize; onClicked: win.useCurrentSize() }
-            Label { text: win.picture && win.picture.pictureWidth > 0 ? qsTrId("encode_video.now_x").arg(win.picture.pictureWidth).arg(win.picture.pictureHeight) : "" }
+            Label { text: win.writtenWidth > 0 ? qsTrId("encode_video.now_x").arg(win.writtenWidth).arg(win.writtenHeight) : "" }
             CheckBox { text: qsTrId("encode_video.pad"); checked: win.vm.pad; enabled: win.vm.resize; onToggled: win.vm.pad = checked }
         }
         RowLayout {

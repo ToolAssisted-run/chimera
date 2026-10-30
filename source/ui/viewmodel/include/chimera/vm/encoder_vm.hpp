@@ -56,10 +56,15 @@ public:
 	 * is in the video too - the counters and messages with what scripts draw
 	 * (OSD), or what scripts draw alone (Lua) */
 	Property<bool> captureOsd{false}, captureLua{false};
-	/* puts that over a picture, at the picture's own size: the window draws
-	 * it, so the window sets this and it runs on the window's thread; `osd`
-	 * the counters and messages too. Unset, nothing is put over the picture */
-	std::function<void(std::vector<uint32_t> &pixels, int32_t width, int32_t height, bool osd)> compose;
+	/* puts that over a picture of width x height, shown at shownWidth x
+	 * shownHeight. Capture Lua: what scripts draw, at the picture's own
+	 * size. Capture OSD (`osd`): the picture as the window shows it, at the
+	 * size of its picture area, with the counters and messages, as
+	 * Chimera's; width and height become that size, its pixels square. The
+	 * window draws it, so the window sets this and it runs on the window's
+	 * thread. Unset, nothing is put over the picture */
+	std::function<void(std::vector<uint32_t> &pixels, int32_t &width, int32_t &height, double shownWidth, double shownHeight, bool osd)>
+		compose;
 	/* idle, encoding, done, stopped, failed */
 	Property<std::string> phase{"idle"}, status;
 	Property<int64_t> framesDone{0}, frameCount{0};

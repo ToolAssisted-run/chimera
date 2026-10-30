@@ -11589,3 +11589,45 @@ Measured:
 
 Not tried: the reporter's game, Windows, and pressing the Create button
 itself (the tests tell the window how the making went; they do not click).
+
+## Capture OSD writes the picture as the window shows it (user-decided, 2026-10-30)
+
+The owner reported that Encode Video's Current size no longer said the size
+of the video written, nor followed the window's 2x or 3x. Two things were
+wrong. The "now" beside Current size showed the size the picture is shown
+at (the declared size since issue 414: 320x240 for a 320x200 picture),
+while the video was written at the machine's own pixels (320x200). And
+Capture OSD drew the counters at the machine's own size, where the old
+window wrote the picture area itself, at its size: its offscreen render
+took the size of the window's picture control, so a window at 4x gave a
+4x video with the counters sharp.
+
+The owner chose the old window's way: with Capture OSD the video is the
+frame as the picture area shows it (shape, bars, crop, filter), at that
+area's size in square pixels, with what scripts draw on both surfaces and
+the counters and messages as the window lays them out. Capture Lua alone
+still writes the machine's own pixels with what scripts draw. The "now"
+label and Current size say the size that will be written. The picture
+item draws a frame as it shows it for the encoder, from the same fit the
+window uses (DisplayFit), and the shown size is worked out once, in the
+session (SessionViewModel::shownSize).
+
+Two more of the old window's ways came back with it. A script's text
+breaks at each new line, a line a row from the text's left, the text put
+at the point as a whole, as the old GDI+ drawing did: gui.drawText,
+gui.pixelText, gui.text and a form's drawString, in the window and in a
+video. The Lua Console's list has lines between its rows and columns in
+the theme's grid colour, as the old list (an input roll) drew them.
+
+Tested: a new window test, "window drawing", plays the synthetic core's
+project with a script that draws two lines of text both ways and encodes
+three frames with Capture OSD: the video is the picture area's 512x480 (the
+machine's picture is 128x120), the text is two rows in the video and in
+the window, and the Lua Console's row has a line under it and two between
+its columns. With the window's drawing at the machine's size, the text on
+one line, or the grid taken out, five checks fail (the video's text is
+then not looked at), and the video's two fail when only its text is
+undone. The view models' encode
+test hands back a picture three times the shown size and finds every frame
+at that size; it fails when the size is ignored.
+

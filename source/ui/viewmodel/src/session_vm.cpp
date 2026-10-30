@@ -4129,13 +4129,21 @@ void SessionViewModel::publishPictureOnMachine()
 	const uint32_t *px = ce_session_video(s_);
 	const int32_t w = ce_session_video_width(s_), h = ce_session_video_height(s_);
 	if (px == nullptr || w <= 0 || h <= 0) return;
-	/* the size it is shown at, as Chimera's: the picture's own height at the
-	 * shape the machine says it is now, else its declared virtual size (a
-	 * 640x400 picture declared 640x480 is shown 640x480, issue 414) */
-	int32_t ax = 0, ay = 0;
-	double shownWidth = ce_session_virtual_width(s_), shownHeight = ce_session_virtual_height(s_);
-	if (ce_session_display_aspect(s_, &ax, &ay) != 0 && ax > 0 && ay > 0) shownWidth = static_cast<double>(h) * ax / ay, shownHeight = h;
+	double shownWidth = 0, shownHeight = 0;
+	shownSize(s_, shownWidth, shownHeight);
 	screen.publish(px, w, h, shownWidth, shownHeight);
+}
+
+void SessionViewModel::shownSize(ce_session *s, double &width, double &height)
+{
+	int32_t ax = 0, ay = 0;
+	width = ce_session_virtual_width(s);
+	height = ce_session_virtual_height(s);
+	if (ce_session_display_aspect(s, &ax, &ay) != 0 && ax > 0 && ay > 0)
+	{
+		height = ce_session_video_height(s);
+		width = height * ax / ay;
+	}
 }
 
 void SessionViewModel::setScriptIdle(std::function<bool()> wanted, std::function<void()> idle)

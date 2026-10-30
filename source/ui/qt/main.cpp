@@ -47,6 +47,7 @@
 #include <algorithm>
 #include <atomic>
 #include <clocale>
+#include <cmath>
 #include <cstdio>
 #include <cstring>
 #include <mutex>
@@ -1530,16 +1531,31 @@ int main(int argc, char **argv)
 	if (engine.rootObjects().isEmpty()) return 1;
 	auto *window = qobject_cast<QQuickWindow *>(engine.rootObjects().first());
 	mainWindow = window;
-	/* Encode Video's Capture Lua and Capture OSD: what the window draws over
-	 * the picture, painted into each frame at the machine's own size - the
-	 * shapes scripts draw, and the counters and messages as the window lays
-	 * them out for that size (Main.qml's osdLayer) */
-	encoder.compose = [window, &guiOverlay](std::vector<uint32_t> &pixels, int32_t w, int32_t h, bool osd) {
-		QImage image(reinterpret_cast<uchar *>(pixels.data()), w, h, w * 4, QImage::Format_RGB32);
-		qt::paintShapes(image, QString::fromStdString(guiOverlay.shapes.get()));
-		if (!osd) return;
+	/* Encode Video's Capture Lua and Capture OSD, as Chimera's. Capture Lua:
+	 * the shapes scripts draw, painted into each frame at the machine's own
+	 * size. Capture OSD: the frame as the picture area shows it, at that
+	 * area's size (so the window's 2x or 3x is the video's), with what
+	 * scripts draw and the counters and messages as the window lays them
+	 * out (Main.qml's osdLayer) */
+	encoder.compose = [window, &guiOverlay](std::vector<uint32_t> &pixels, int32_t &w, int32_t &h, double shownW, double shownH, bool osd) {
+		auto *picture = window->findChild<qt::PictureItem *>(QStringLiteral("picture"));
+		if (!osd || picture == nullptr)
+		{
+			QImage image(reinterpret_cast<uchar *>(pixels.data()), w, h, w * 4, QImage::Format_RGB32);
+			qt::paintShapes(image, QString::fromStdString(guiOverlay.shapes.get()));
+			return;
+		}
+		qt::PictureItem::Drawn shown = picture->drawnAs(pixels.data(), w, h, shownW, shownH);
+		qt::ShapesPlace place;
+		place.surface = shown.surface;
+		place.scaleX = shown.scaleX;
+		place.scaleY = shown.scaleY;
+		place.textScale = window->property("osdScale").toDouble();
+		place.pictureArea = true;
+		qt::paintShapes(shown.image, QString::fromStdString(guiOverlay.shapes.get()), place);
 		QVariant layer;
-		QMetaObject::invokeMethod(window, "osdLayer", Q_RETURN_ARG(QVariant, layer), Q_ARG(QVariant, w), Q_ARG(QVariant, h));
+		QMetaObject::invokeMethod(window, "osdLayer", Q_RETURN_ARG(QVariant, layer), Q_ARG(QVariant, shown.image.width()),
+			Q_ARG(QVariant, shown.image.height()));
 		std::vector<qt::OverlayText> texts;
 		for (const QVariant &v : layer.toList())
 		{
@@ -1547,7 +1563,12 @@ int main(int argc, char **argv)
 			texts.push_back({m.value(QStringLiteral("text")).toString(), m.value(QStringLiteral("x")).toInt(), m.value(QStringLiteral("y")).toInt(),
 				QColor::fromString(m.value(QStringLiteral("color")).toString())});
 		}
-		qt::paintTexts(image, texts);
+		qt::paintTexts(shown.image, texts, static_cast<int>(std::lround(12 * place.textScale)));
+		w = shown.image.width();
+		h = shown.image.height();
+		pixels.resize(static_cast<size_t>(w) * h);
+		for (int y = 0; y < h; y++)
+			std::memcpy(pixels.data() + static_cast<size_t>(y) * w, shown.image.constScanLine(y), static_cast<size_t>(w) * 4);
 	};
 	/* the place and size kept last time, when asked (Display) */
 	if (display.saveWindowPosition.get())

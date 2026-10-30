@@ -63,6 +63,14 @@ YouTube presets scale to that shape (`dar` in ffmpeg's scale filter) with
 square pixels: that picture comes out 2880x2160. A size asked for in the
 window is written with square pixels.
 
+With Capture OSD ticked the video is the picture as the window shows it, at
+the size of the window's picture area, with the counters, the messages and
+what scripts draw, as the old window wrote it (owner, 2026-10-30): a 320x200
+picture shown 320x240 in a window at 4x is written 1280x960, in square
+pixels. Capture Lua alone writes the machine's own pixels with what scripts
+draw over them. The window's "now" beside Current size says the size that
+will be written, and Current size puts it in the size boxes.
+
 The default MP4 stores colour at half the width and height of the picture
 (YUV 4:2:0), as most players need, so a dither of two colours one pixel
 apart becomes their average. The 4:4:4 and lossless presets keep it; the

@@ -57,25 +57,31 @@ function draw(ctx, canvas, s, sx, sy, urlOf) {
         ctx.font = (style === "italic" ? "italic " : "") + (style === "bold" ? "bold " : "") + s.size + "px "
             + (s.family ? "\"" + s.family + "\", monospace" : "monospace")
         ctx.textBaseline = "top"
-        const w = ctx.measureText(s.text).width, h = Math.ceil(s.size * 1.15)
+        // a line a row, each from the text's left, as Chimera's
+        const lines = String(s.text).replace(/\r/g, "").split("\n")
+        const widths = lines.map(t => ctx.measureText(t).width)
+        const lh = Math.ceil(s.size * 1.15), w = Math.max(...widths), h = lh * lines.length
         const ha = (s.halign || "").toLowerCase(), va = (s.valign || "").toLowerCase()
         const x = s.x - (ha === "center" || ha === "middle" ? Math.floor(w / 2) : ha === "right" ? w : 0)
         const y = s.y - (va === "center" || va === "middle" ? Math.floor(h / 2) : va === "bottom" ? h : 0)
+        const each = (dx, dy) => lines.forEach((t, i) => ctx.fillText(t, x + dx, y + dy + i * lh))
         if (s.back !== "") {
             ctx.fillStyle = s.back
             if (s.outline) {
-                for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) ctx.fillText(s.text, x + dx, y + dy)
+                for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) each(dx, dy)
             } else {
                 ctx.fillRect(x, y, w, h)
             }
         }
         ctx.fillStyle = s.color
-        ctx.fillText(s.text, x, y)
+        each(0, 0)
         if (style === "underline" || style === "strikethrough") {
-            const ly = Math.round(y + (style === "underline" ? s.size : s.size * 0.55)) + 0.5
             ctx.beginPath()
-            ctx.moveTo(x, ly)
-            ctx.lineTo(x + w, ly)
+            lines.forEach((t, i) => {
+                const ly = Math.round(y + i * lh + (style === "underline" ? s.size : s.size * 0.55)) + 0.5
+                ctx.moveTo(x, ly)
+                ctx.lineTo(x + widths[i], ly)
+            })
             ctx.strokeStyle = s.color
             ctx.stroke()
         }

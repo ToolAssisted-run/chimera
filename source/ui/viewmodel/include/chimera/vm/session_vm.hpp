@@ -131,6 +131,11 @@ public:
 	 * frame advanced by hand when that is muted */
 	static int64_t frameVolume(bool soundOn, int64_t volume, bool fast, bool fastOn, int64_t fastVolume, bool advanced,
 		bool muteAdvance);
+	/* the size the machine's picture is shown at, at 1x, as Chimera's: its
+	 * own height at the shape the machine says it is now, else its declared
+	 * virtual size (a 640x400 picture declared 640x480 is shown 640x480,
+	 * issue 414) */
+	static void shownSize(ce_session *s, double &width, double &height);
 	/* Chimera's Skip Lag Frames: a frame advance that lands after a lag
 	 * frame runs on until one that is not (remembered) */
 	Property<bool> skipLagFrames{false};

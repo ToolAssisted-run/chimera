@@ -18,6 +18,8 @@ ApplicationWindow {
     property var localPath: (url) => url.toString()
     property QtObject clipboard: null
     property var themeColor: (role, fallback) => fallback
+    // the lines between the scripts' rows and columns, as the theme gives Chimera's lists
+    readonly property color gridColour: win.themeColor("RollGridLines", String(Qt.darker(palette.base, 1.25)))
     property QtObject customize: null
     property QtObject toolWindows: null
     property Window mainWindow: null
@@ -396,6 +398,12 @@ ApplicationWindow {
                          : row.model.state === "paused" ? win.themeColor("RowPaused", "#FFB6C1")
                          : row.model.state === "running" ? win.themeColor("RowActive", "#E0FFFF")
                          : palette.base
+                    // the grid, as Chimera's list draws it: a line under every row and between the columns
+                    Repeater {
+                        model: [24, 116]
+                        delegate: Rectangle { required property int modelData; x: modelData; width: 1; height: row.height; color: win.gridColour }
+                    }
+                    Rectangle { y: row.height - 1; width: row.width; height: 1; color: win.gridColour }
                     Image {
                         x: 4
                         anchors.verticalCenter: parent.verticalCenter

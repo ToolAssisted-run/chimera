@@ -142,12 +142,14 @@ ApplicationWindow {
         return p.anchor < 2 ? p.y * root.osdScale : pictureArea.height - p.y * root.osdScale - h
     }
     // Encode Video's Capture OSD: what is over the picture now, as lines of
-    // text placed for an area w by h (the encoder paints them over each frame
-    // at the machine's own size): {text, x, y, color} each, a line 14 high
-    TextMetrics { id: osdMetrics; font.family: "monospace"; font.pixelSize: 12 }
+    // text placed for an area w by h at the window's scale (the encoder
+    // paints them over each frame as the picture area shows it): {text, x,
+    // y, color} each, the text 12 * osdScale pixels, a line 14 * osdScale high
+    TextMetrics { id: osdMetrics; font.family: "monospace"; font.pixelSize: Math.round(12 * root.osdScale) }
     function osdLayer(w, h) {
         const out = []
         if (!root.session.isOpen || root.session.displayNothing) return out
+        const k = root.osdScale, lh = 14 * k
         function widthOf(t) { osdMetrics.text = t; return osdMetrics.advanceWidth }
         // a message longer than the picture is wide, in lines that fit, broken between words
         function wrap(t, room) {
@@ -164,10 +166,10 @@ ApplicationWindow {
             const p = root.osdPositions[name]
             lines = lines.filter(t => t !== "")
             if (!p || lines.length === 0) return
-            const bw = Math.max(...lines.map(widthOf)), bh = lines.length * 14
-            const x = p.anchor === 0 || p.anchor === 2 ? p.x : w - p.x - bw
-            const y = p.anchor < 2 ? p.y : h - p.y - bh
-            lines.forEach((t, i) => out.push({text: t, x: Math.round(x), y: Math.round(y + i * 14), color: String(color)}))
+            const bw = Math.max(...lines.map(widthOf)), bh = lines.length * lh
+            const x = p.anchor === 0 || p.anchor === 2 ? p.x * k : w - p.x * k - bw
+            const y = p.anchor < 2 ? p.y * k : h - p.y * k - bh
+            lines.forEach((t, i) => out.push({text: t, x: Math.round(x), y: Math.round(y + i * lh), color: String(color)}))
         }
         place("Fps", [[root.session.showFps ? root.session.fpsText : "",
                        root.session.showAverageFps ? root.session.averageFpsText : ""].filter(t => t !== "").join("   ")], root.osdMessageColor)
@@ -178,7 +180,7 @@ ApplicationWindow {
             for (let i = 0; i < onScreenMessages.count; i++) all.push(onScreenMessages.get(i).message)
             const shown = root.messages.stackMessages ? all : all.slice(-1)
             const p = root.osdPositions["Messages"]
-            const room = w - 2 * (p ? p.x : 0)
+            const room = w - 2 * (p ? p.x : 0) * k
             place("Messages", (p && p.anchor < 2 ? shown.reverse() : shown).flatMap(m => wrap(m, room)), root.osdMessageColor)
         }
         if (root.session.showFrameCounter)
@@ -1472,16 +1474,19 @@ ApplicationWindow {
                 const sx = src.width > 0 ? shown.width / src.width : 1, sy = src.height > 0 ? shown.height / src.height : 1
                 for (const s of luaCanvas.shapes) {
                     if (s.k === "screentext") {
-                        // a script's gui.text, sized and placed as the counters are
+                        // a script's gui.text, sized and placed as the counters are, a line a row
                         const k = root.osdScale
                         ctx.save()
                         ctx.font = "%1px monospace".arg(Math.round(12 * k))
                         ctx.textBaseline = "top"
-                        const w = ctx.measureText(s.text).width
+                        const lines = String(s.text).replace(/\r/g, "").split("\n")
+                        const w = Math.max(...lines.map(t => ctx.measureText(t).width)), lh = 14 * k
                         const right = s.anchor === "topright" || s.anchor === "bottomright" || s.anchor === "1" || s.anchor === "3"
                         const bottom = s.anchor === "bottomleft" || s.anchor === "bottomright" || s.anchor === "2" || s.anchor === "3"
+                        const x = right ? width - s.x * k - w : s.x * k
+                        const y = bottom ? height - (s.y + 12) * k - (lines.length - 1) * lh : s.y * k
                         ctx.fillStyle = s.color
-                        ctx.fillText(s.text, right ? width - s.x * k - w : s.x * k, bottom ? height - (s.y + 12) * k : s.y * k)
+                        lines.forEach((t, i) => ctx.fillText(t, x, y + i * lh))
                         ctx.restore()
                         continue
                     }

@@ -2,6 +2,7 @@
 /* Draws a view model's picture, centred, fitted as the Display window says
  * (vm::DisplayFit: its shape, bars or stretched, whole steps, crop). */
 
+#include <QImage>
 #include <QPointer>
 #include <QQuickItem>
 #include <QVariantMap>
@@ -27,6 +28,10 @@ class PictureItem : public QQuickItem
 	 * own: the size it says), 0 before the first: for the window's sizes */
 	Q_PROPERTY(int pictureWidth READ pictureWidth NOTIFY pictureSizeChanged)
 	Q_PROPERTY(int pictureHeight READ pictureHeight NOTIFY pictureSizeChanged)
+	/* the machine's picture's own pixels, 0 before the first: the size Encode
+	 * Video writes without Capture OSD */
+	Q_PROPERTY(int frameWidth READ frameWidth NOTIFY pictureSizeChanged)
+	Q_PROPERTY(int frameHeight READ frameHeight NOTIFY pictureSizeChanged)
 	/* where the picture is drawn in the item, and the part of its pixels
 	 * shown there (the crop taken off): for what is drawn over it in the
 	 * machine's pixels */
@@ -43,12 +48,26 @@ public:
 	bool smoothScaling() const { return smooth_; }
 	int pictureWidth() const { return pictureWidth_; }
 	int pictureHeight() const { return pictureHeight_; }
+	int frameWidth() const { return frameWidth_; }
+	int frameHeight() const { return frameHeight_; }
 	void setSmoothScaling(bool on);
 	QVariantMap fit() const { return fitMap_; }
 	QRectF shownRect() const { return shownRect_; }
 	QRectF sourceRect() const { return source_rect_; }
 	QRectF surfaceRect() const { return surfaceRect_; }
 	void setFit(const QVariantMap &fit);
+
+	/* a picture of the machine's drawn as this item draws it now - its
+	 * shape, bars, crop and filter - on black, in an image of the item's
+	 * size (Encode Video's Capture OSD, as Chimera's); with where the
+	 * surface scripts draw on is in it, and how large its pixels are there */
+	struct Drawn
+	{
+		QImage image;
+		QRectF surface;
+		double scaleX = 1, scaleY = 1;
+	};
+	Drawn drawnAs(const uint32_t *pixels, int width, int height, double shownWidth, double shownHeight) const;
 
 	/* pictures handed to the GPU so far, for measuring (any thread) */
 	qint64 framesShown() const { return shown_.load(); }
@@ -70,9 +89,9 @@ private:
 	QVariantMap fitMap_;
 	vm::DisplayFit fit_;
 	bool fitNew_ = false;
-	int pictureWidth_ = 0, pictureHeight_ = 0;
-	/* the GUI thread's: the size the render thread saw */
-	Q_INVOKABLE void sizeSeen(int width, int height);
+	int pictureWidth_ = 0, pictureHeight_ = 0, frameWidth_ = 0, frameHeight_ = 0;
+	/* the GUI thread's: the sizes the render thread saw */
+	Q_INVOKABLE void sizeSeen(int width, int height, int frameWidth, int frameHeight);
 	Q_INVOKABLE void placedAt(QRectF shown, QRectF source, QRectF surface);
 	QRectF shownRect_, source_rect_, surfaceRect_;
 	/* the render thread's: what it last said */

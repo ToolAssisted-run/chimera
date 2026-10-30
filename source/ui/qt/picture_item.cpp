@@ -1,9 +1,11 @@
 #include "picture_item.hpp"
 
 #include <QImage>
+#include <QPainter>
 #include <QQuickWindow>
 #include <QSGSimpleTextureNode>
 
+#include <algorithm>
 #include <cstring>
 
 #include "qml_view_model.hpp"
@@ -81,12 +83,38 @@ void PictureItem::placedAt(QRectF shown, QRectF source, QRectF surface)
 	Q_EMIT placementChanged();
 }
 
-void PictureItem::sizeSeen(int width, int height)
+void PictureItem::sizeSeen(int width, int height, int frameWidth, int frameHeight)
 {
-	if (width == pictureWidth_ && height == pictureHeight_) return;
+	if (width == pictureWidth_ && height == pictureHeight_ && frameWidth == frameWidth_ && frameHeight == frameHeight_) return;
 	pictureWidth_ = width;
 	pictureHeight_ = height;
+	frameWidth_ = frameWidth;
+	frameHeight_ = frameHeight;
 	Q_EMIT pictureSizeChanged();
+}
+
+PictureItem::Drawn PictureItem::drawnAs(const uint32_t *pixels, int width, int height, double shownWidth, double shownHeight) const
+{
+	Drawn d;
+	const int areaW = std::max(1, qRound(this->width())), areaH = std::max(1, qRound(this->height()));
+	d.image = QImage(areaW, areaH, QImage::Format_RGB32);
+	d.image.fill(Qt::black);
+	if (pixels == nullptr || width <= 0 || height <= 0) return d;
+	/* as updatePaintNode draws it: grown by whole steps, then placed, sharp or smoothed */
+	int stepX = 1, stepY = 1;
+	fit_.prescaleSteps(width, height, shownWidth, shownHeight, areaW, areaH, smooth_, kLargestSide, stepX, stepY);
+	QImage frame(reinterpret_cast<const uchar *>(pixels), width, height, width * 4, QImage::Format_RGB32);
+	if (stepX != 1 || stepY != 1) frame = frame.scaled(width * stepX, height * stepY, Qt::IgnoreAspectRatio, Qt::FastTransformation);
+	const vm::DisplayFit::Rect from = fit_.source(width, height);
+	const vm::DisplayFit::Rect to = fit_.place(width, height, shownWidth, shownHeight, areaW, areaH);
+	const vm::DisplayFit::Rect all = fit_.surface(width, height, shownWidth, shownHeight, areaW, areaH);
+	QPainter p(&d.image);
+	p.setRenderHint(QPainter::SmoothPixmapTransform, smooth_);
+	p.drawImage(QRectF(to.x, to.y, to.w, to.h), frame, QRectF(from.x * stepX, from.y * stepY, from.w * stepX, from.h * stepY));
+	d.surface = QRectF(all.x, all.y, all.w, all.h);
+	d.scaleX = from.w > 0 ? to.w / from.w : 1;
+	d.scaleY = from.h > 0 ? to.h / from.h : 1;
+	return d;
 }
 
 QSGNode *PictureItem::updatePaintNode(QSGNode *old, UpdatePaintNodeData *)
@@ -105,7 +133,7 @@ QSGNode *PictureItem::updatePaintNode(QSGNode *old, UpdatePaintNodeData *)
 		double nw = 0, nh = 0;
 		fit_.surfaceSize(frame_.width, frame_.height, frame_.shownWidth, frame_.shownHeight, nw, nh);
 		QMetaObject::invokeMethod(this, "sizeSeen", Qt::QueuedConnection, Q_ARG(int, static_cast<int>(nw + 0.5)),
-			Q_ARG(int, static_cast<int>(nh + 0.5)));
+			Q_ARG(int, static_cast<int>(nh + 0.5)), Q_ARG(int, frame_.width), Q_ARG(int, frame_.height));
 		fitNew_ = false;
 	}
 	if (node == nullptr)

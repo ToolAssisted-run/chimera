@@ -9209,11 +9209,21 @@ bool encodeVideo(const char *package, const char *rom)
 		session.setScriptTurns([&lua] { lua.frameStart(); }, [&lua] { lua.frameDone(); });
 		CHECK(lua.run("ended = 0 event.onframeend(function() ended = ended + 1 end)", "count", error));
 		int composed = 0, withOsd = 0, elsewhere = 0, w = 0, h = 0;
+		double shownW = 0, shownH = 0;
 		const auto window = std::this_thread::get_id();
-		encoder.compose = [&](std::vector<uint32_t> &pixels, int32_t pw, int32_t ph, bool osd) {
+		encoder.compose = [&](std::vector<uint32_t> &pixels, int32_t &pw, int32_t &ph, double sw, double sh, bool osd) {
 			composed++;
 			withOsd += osd;
 			elsewhere += std::this_thread::get_id() != window;
+			shownW = sw;
+			shownH = sh;
+			/* the OSD's picture is the window's, at its picture area's size: here three times the shown size */
+			if (osd)
+			{
+				pw = static_cast<int32_t>(sw) * 3;
+				ph = static_cast<int32_t>(sh) * 3;
+				pixels.assign(static_cast<size_t>(pw) * ph, 0xFF000000u);
+			}
 			w = pw;
 			h = ph;
 			pixels[0] = 0xFF123456u;
@@ -9238,12 +9248,18 @@ bool encodeVideo(const char *package, const char *rom)
 		/* the wind to the first marker lands (a seek's landing is a frame's end), then ten frames,
 		 * then the frame given back lands too */
 		CHECK(lua.run("print(ended)", "ended", error) && !said.empty() && said.back() == "12");
-		/* Capture OSD: the counters and messages too */
+		/* Capture OSD: the picture as the window shows it, at the size of
+		 * its picture area, as Chimera's; the machine's 128x120 picture is
+		 * shown 256x240 */
+		const int32_t machineW = w, machineH = h;
 		encoder.captureOsd.set(true);
 		encoder.output.set((dir / "osd.raw").string());
 		CHECK(encoder.run("start", {}, error).has_value());
 		CHECK(d.until([&] { return encoder.phase.get() != "encoding"; }, 120));
 		CHECK(encoder.phase.get() == "done" && composed == 20 && withOsd == 10);
+		CHECK(machineW == 128 && machineH == 120 && shownW == 256 && shownH == 240 && w == 768 && h == 720);
+		const std::string osdRaw = readFile(dir / "osd.raw");
+		CHECK(osdRaw.size() == static_cast<size_t>(w) * h * 4 * 10 && std::memcmp(osdRaw.data(), "\x56\x34\x12\xFF", 4) == 0);
 		session.setScriptTurns({}, {});
 		encoder.compose = nullptr;
 		encoder.captureLua.set(false);

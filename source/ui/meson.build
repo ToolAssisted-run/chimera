@@ -412,6 +412,16 @@ if qt_dep.found()
       meson.current_source_dir() / 'qt'],
     timeout: 300,
   )
+  # what the window draws, seen in its pictures: Capture OSD writes the
+  # picture area's size, a script's text breaks at new lines, and the Lua
+  # Console's list has its grid
+  test(
+    'window drawing',
+    find_program('python3'),
+    args: [files('qt/tests/window-drawing.py'), chimera_qt, meson.current_build_dir() / 'window-drawing-test', window_game[0],
+      repo_root / 'build/Cores/synth-box.chimeraCore', files('qt/tests/window-drawing.lua')],
+    timeout: 300,
+  )
   # a theme reaches Qt Quick's controls, which take the platform's colours
   # and not the application's unless each window is given the theme
   test_theme = executable(

@@ -89,7 +89,7 @@ struct EncoderViewModel::Job
 	bool resize = false, pad = false, audioSync = true;
 	/* what is drawn over the picture, put in by the window (Capture OSD, Capture Lua) */
 	bool osd = false, lua = false;
-	std::function<void(std::vector<uint32_t> &, int32_t, int32_t, bool)> compose;
+	std::function<void(std::vector<uint32_t> &, int32_t &, int32_t &, double, double, bool)> compose;
 	SessionViewModel *session = nullptr;
 	std::vector<uint32_t> composed;
 	int64_t from = 0, to = 0;
@@ -190,18 +190,32 @@ struct EncoderViewModel::Job
 			why = tr("encoder.no_picture");
 			return false;
 		}
-		/* what is drawn over it, at its own size, by the window: then made
-		 * the size asked for, as Chimera captures the OSD before it scales */
+		/* what is drawn over it, by the window, then made the size asked
+		 * for, as Chimera's: what scripts draw at the picture's own size
+		 * (Capture Lua), or the picture as the window shows it, at the size
+		 * of its picture area (Capture OSD), in square pixels */
+		bool square = false;
 		if ((osd || lua) && compose && session != nullptr)
 		{
 			composed.assign(px, px + static_cast<size_t>(sw) * sh);
 			for (uint32_t &p : composed) p |= 0xFF000000u;
-			if (!session->onWindowWait([&] { compose(composed, sw, sh, osd); }))
+			double shownW = 0, shownH = 0;
+			SessionViewModel::shownSize(s, shownW, shownH);
+			int32_t cw = sw, ch = sh;
+			if (!session->onWindowWait([&] { compose(composed, cw, ch, shownW, shownH, osd); }))
 			{
 				why = tr("encoder.window_closing");
 				return false;
 			}
+			if (cw <= 0 || ch <= 0 || composed.size() < static_cast<size_t>(cw) * ch)
+			{
+				why = tr("encoder.no_picture");
+				return false;
+			}
 			px = composed.data();
+			sw = cw;
+			sh = ch;
+			square = osd;
 		}
 		/* the picture at the size asked for */
 		const uint32_t *pic = px;
@@ -229,9 +243,9 @@ struct EncoderViewModel::Job
 			}
 			w = pw;
 			h = ph;
-			/* the shape the machine shows its picture in; a size asked for is
-			 * square pixels */
-			shape = resize && outW > 0 && outH > 0 ? std::make_pair(int64_t{1}, int64_t{1})
+			/* the shape the machine shows its picture in; a size asked for
+			 * and the window's picture are square pixels */
+			shape = (resize && outW > 0 && outH > 0) || square ? std::make_pair(int64_t{1}, int64_t{1})
 				: pixelShape(sw, sh, ce_session_virtual_width(s), ce_session_virtual_height(s));
 			fpsNum = ce_session_vsync_numerator(s);
 			fpsDen = ce_session_vsync_denominator(s);
