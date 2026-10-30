@@ -292,6 +292,25 @@ ApplicationWindow {
                             ColumnLayout {
                                 anchors.fill: parent
                                 spacing: 0
+                                // what the boxes do, above them (issue 418), and TAStudio's columns of a tab shown or hidden at once
+                                RowLayout {
+                                    visible: kind.modelData !== "autofire"
+                                    Layout.fillWidth: true
+                                    Layout.bottomMargin: 4
+                                    spacing: 6
+                                    function showAll(shown) {
+                                        win.controls.run("showColumns", [kind.modelData === "analog" ? "analog" : "buttons",
+                                            kind.groups.length > 1 ? kind.groups[groupTabs.currentIndex] : "", shown])
+                                    }
+                                    Label {
+                                        text: win.controls.columnsRoll > 0 ? qsTrId("controller_config.ticked_box_column_roll").arg(win.controls.columnsRoll)
+                                                                           : qsTrId("controller_config.ticked_box_column")
+                                        wrapMode: Text.Wrap
+                                        Layout.fillWidth: true
+                                    }
+                                    Button { objectName: "showAllColumns"; text: qsTrId("controller_config.show_all"); onClicked: parent.showAll(true) }
+                                    Button { objectName: "hideAllColumns"; text: qsTrId("controller_config.hide_all"); onClicked: parent.showAll(false) }
+                                }
                                 // a tab a player when there is more than one, as Chimera's
                                 TabBar {
                                     id: groupTabs
@@ -321,22 +340,6 @@ ApplicationWindow {
                                             Component { id: analogPage; AnalogPanel { group: page.modelData; everyGroup: kind.groups.length <= 1 } }
                                         }
                                     }
-                                }
-                                // TAStudio's columns: a tab's shown or hidden at once (the boxes do one)
-                                RowLayout {
-                                    visible: kind.modelData !== "autofire"
-                                    Layout.topMargin: 4
-                                    spacing: 6
-                                    function showAll(shown) {
-                                        win.controls.run("showColumns", [kind.modelData === "analog" ? "analog" : "buttons",
-                                            kind.groups.length > 1 ? kind.groups[groupTabs.currentIndex] : "", shown])
-                                    }
-                                    Label {
-                                        text: win.controls.columnsRoll > 0 ? qsTrId("controller_config.columns_in_tastudio_s_input_roll").arg(win.controls.columnsRoll)
-                                                                           : qsTrId("controller_config.columns_in_tastudio")
-                                    }
-                                    Button { objectName: "showAllColumns"; text: qsTrId("controller_config.show_all"); onClicked: parent.showAll(true) }
-                                    Button { objectName: "hideAllColumns"; text: qsTrId("controller_config.hide_all"); onClicked: parent.showAll(false) }
                                 }
                                 // Chimera's relative mouse sensitivity, for every control the pointer's movement moves
                                 RowLayout {

@@ -11432,3 +11432,18 @@ Measured: the view model test checks that a value set updates the row in
 place (it failed with the old rebuild put back). The grid was looked at in
 Project Settings with the VICE core; New Project's page uses the same list
 and was not looked at.
+
+## Controllers says what its boxes do (2026-10-30, issue 418)
+
+The boxes at the left of each control in Config > Controllers make it a
+column in TAStudio, but the window said so only in a tooltip and in a
+label beside Show all and Hide all under the list ("Columns in
+TAStudio:"), which was not read as being about the boxes. The label now
+says what a tick does, "A ticked box makes the control a column in
+TAStudio." (with several input rolls, the roll's number), and it sits
+above the list with Show all and Hide all, in all 26 languages; the two
+old texts are gone.
+
+Checked: the window pictured with the VICE core; the translation and
+text tests pass. No test of its own: nothing but where a label sits and
+what it says changed.
