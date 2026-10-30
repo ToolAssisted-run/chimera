@@ -11359,3 +11359,28 @@ three parallels and a straight meridian looked like a net at 16 pixels.
 tools/draw-language-icon.py draws it at 8x and scales it down, as the other
 drawn icons are made. It was looked at beside its neighbours on a light and
 a dark menu.
+
+## A project that does not open says why in a box (2026-10-30, issue 422)
+
+Opening a project that could not be opened looked like nothing happening.
+Chimera's Windows Forms window showed a "Cannot open the project" box with
+the reason. The new window only put the reason over the picture for the
+messages' time (a few seconds), cut off at the left when it was longer than
+the window, and not at all with View > Display Messages off. The report shows
+New Project's Create closing the wizard and nothing more, the same picture;
+why that build (ca75e07c, older than the MAME core package it ran) did not
+open the project was not found here.
+On Windows a headless run of such a project also waited for ever: a file
+the engine refused before the machine was asked to open it was not counted
+as a failed open.
+
+Now every failed open is counted, that refused file included, and the
+window shows the reason in a box titled "Cannot open the project", in
+every language. A headless run ends with 64 and the reason, as for the
+other failed opens.
+
+Measured: the headless test opens a file with a key no project has. It
+ends with 64 and names the key; with the count switched off it waited until
+the test's 60 seconds ran out. A project saved by the Windows Forms build
+in the old form (the "input" key, refused since 2026-10-28) now shows the
+box with 'unknown project key "input"'.

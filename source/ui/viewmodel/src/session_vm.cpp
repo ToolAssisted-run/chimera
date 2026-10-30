@@ -142,7 +142,7 @@ SessionViewModel::SessionViewModel(Dispatcher &dispatcher, InputLog &inputs)
 {
 	expose("isOpen", "whether a machine is open", isOpen);
 	expose("opens", "how many times a machine has been opened", opens);
-	expose("openFailures", "how many opens failed; the status says why", openFailures);
+	expose("openFailures", "how many opens failed, a file that is no project among them; the status says why", openFailures);
 	expose("unplayableMovies", "how many times the movie could not be played; the status says why", unplayableMovies);
 	expose("projectId", "the open project's id (its cache folder's name), \"\" for none", projectId);
 	expose("resolvingFiles", "a project is waiting for its files to be found (the projectFiles rows)", resolvingFiles);
@@ -1436,6 +1436,8 @@ SessionViewModel::SessionViewModel(Dispatcher &dispatcher, InputLog &inputs)
 			if (probe == nullptr)
 			{
 				status.set(tr("session.could_not_open", {project, unreadable != nullptr ? unreadable : tr("common.no_reason")}));
+				/* a failed open, as one the machine refuses: the window says why in a box */
+				openFailures.set(openFailures.get() + 1);
 				return false;
 			}
 			ce_project_free(probe);
@@ -1453,6 +1455,8 @@ SessionViewModel::SessionViewModel(Dispatcher &dispatcher, InputLog &inputs)
 			if (probe == nullptr)
 			{
 				status.set(tr("session.could_not_open", {project, unreadable != nullptr ? unreadable : tr("common.no_reason")}));
+				/* a failed open, as one the machine refuses: the window says why in a box */
+				openFailures.set(openFailures.get() + 1);
 				return false;
 			}
 			ce_project_free(probe);

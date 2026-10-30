@@ -136,6 +136,18 @@ except subprocess.TimeoutExpired:
 check(r is not None and r.returncode == 64 and "caption: Cannot open the project" in r.stderr and "core is installed" in r.stderr,
       "a project that cannot open ends the run with 64, saying why", said(r))
 
+# a file the engine does not read as a project (here a key no project has): 64, and why. It
+# used to be said only over the picture for a moment, and the run waited for ever (issue 422)
+proj, _ = project("unread")
+with open(proj) as f:
+    unread = json.load(f)
+unread["notAProjectKey"] = 1
+with open(proj, "w") as f:
+    json.dump(unread, f)
+r = run(proj, script("unread", "client.exit()\n"), seconds=60)
+check(r is not None and r.returncode == 64 and "caption: Cannot open the project" in r.stderr and "notAProjectKey" in r.stderr,
+      "a file that is no project ends the run with 64, saying why", said(r))
+
 # a script's file picker: nobody to pick, 64
 proj, _ = project("picker")
 r = run(proj, script("picker", "forms.openfile('x.txt')\nclient.exit()\n"))

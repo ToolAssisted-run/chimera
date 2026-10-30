@@ -1074,6 +1074,20 @@ ApplicationWindow {
         text: qsTrId("main.open_a_project_first_a_video")
         buttons: MessageDialog.Ok
     }
+    // a project that does not open says why in a box, as Chimera's did: a
+    // message over the picture went by unread, and the open seemed to do nothing (issue 422)
+    MessageDialog {
+        id: openFailedDialog
+        title: qsTrId("main.cannot_open_the_project")
+        buttons: MessageDialog.Ok
+    }
+    Connections {
+        target: root.session
+        function onOpenFailuresChanged() {
+            openFailedDialog.text = root.session.status
+            openFailedDialog.open()
+        }
+    }
     Connections {
         target: root.encoder
         function onPhaseChanged() {
