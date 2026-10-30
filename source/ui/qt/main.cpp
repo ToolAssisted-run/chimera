@@ -24,6 +24,7 @@
 #include <QFile>
 #include <QGuiApplication>
 #include <QIcon>
+#include <QLoggingCategory>
 #include <QQmlApplicationEngine>
 #include <QEventLoop>
 #include <QQmlComponent>
@@ -257,6 +258,12 @@ int main(int argc, char **argv)
 	/* a run nobody watches is drawn off screen, so it needs no display */
 	const bool headless = qt::HeadlessRun::askedFor(argc, argv);
 	if (headless) qt::HeadlessRun::prepare();
+	/* On Wayland, Qt's text-input code logs "Trying to disable <surface> but 0x0
+	 * is focused" whenever a window gives up focus it never held. It is Qt's
+	 * own bookkeeping and changes nothing, so that one category is muted unless
+	 * the person set their own logging rules. */
+	if (!qEnvironmentVariableIsSet("QT_LOGGING_RULES"))
+		QLoggingCategory::setFilterRules(QStringLiteral("qt.qpa.wayland.textinput.warning=false"));
 	QGuiApplication app(argc, argv);
 	/* Qt takes the person's locale for the C library too, and with a decimal
 	 * comma printf("%g") writes "0,5" into files read as "0.5": numbers stay

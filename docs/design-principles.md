@@ -11526,3 +11526,20 @@ old texts are gone.
 Checked: the window pictured with the VICE core; the translation and
 text tests pass. No test of its own: nothing but where a label sits and
 what it says changed.
+
+## The Wayland text-input warning is muted (user-decided, 2026-10-30)
+
+On Wayland the terminal showed, over and over, "qt.qpa.wayland.textinput:
+virtual void QtWaylandClient::QWaylandTextInputv3::disableSurface(wl_surface*)
+Trying to disable 0x... but 0x0 is focused". It comes from Qt's own Wayland
+text-input code: a window gives up text input it never held. It changes
+nothing in Chimera and cannot be fixed from here.
+
+The window now turns off that one logging category (`qt.qpa.wayland.textinput`
+warnings) before it starts Qt, unless the person set `QT_LOGGING_RULES`
+themselves, in which case their rules are used as they are. Other Qt messages
+are untouched.
+
+Tested: the window builds and installs, and starts with `--headless`. The
+message itself was not seen on a Wayland desktop from this change; that is
+for the person who reported it to confirm.
