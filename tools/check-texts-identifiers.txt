@@ -389,3 +389,6 @@ sha,sse4.1
 Get
 Response
 /user-places.xbel
+
+# a Qt logging rule, read by Qt and never shown (main.cpp: the Wayland text-input warning muted)
+qt.qpa.wayland.textinput.warning=false
