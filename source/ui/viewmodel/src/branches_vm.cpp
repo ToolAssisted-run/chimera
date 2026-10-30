@@ -56,12 +56,12 @@ BranchesViewModel::BranchesViewModel(Dispatcher &dispatcher, InputLog &inputs, S
 			}
 			const Picture::Frame &f = *branches_[static_cast<size_t>(i)].picture;
 			/* its shape as shown, then shrunk to fit, never grown */
-			const double height = f.height, width = f.aspect > 0 ? f.height * f.aspect : f.width;
+			const double height = f.height, width = f.height * f.aspect();
 			const double side = static_cast<double>(std::clamp<int64_t>(previewSide.get(), 64, 4096));
 			const double scale = std::min(1.0, side / std::max(width, height));
 			previewWidth.set(static_cast<int64_t>(width * scale + 0.5));
 			previewHeight.set(static_cast<int64_t>(height * scale + 0.5));
-			preview.publish(f.pixels.data(), f.width, f.height, f.aspect);
+			preview.publish(f.pixels.data(), f.width, f.height, f.shownWidth, f.shownHeight);
 			previewing.set(i);
 			previewChanged.emit();
 			return true;

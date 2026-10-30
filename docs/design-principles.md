@@ -11384,3 +11384,27 @@ ends with 64 and names the key; with the count switched off it waited until
 the test's 60 seconds ran out. A project saved by the Windows Forms build
 in the old form (the "input" key, refused since 2026-10-28) now shows the
 box with 'unknown project key "input"'.
+
+## The machine's own shape is the size it declares (2026-10-30, issue 414)
+
+With the picture's shape set to the machine's own (the default), the new
+window kept the picture's height and worked out its width from the shape
+the machine declares. Chimera's Windows Forms window showed the declared
+size itself, its "virtual size". The two differ when a picture is not as
+tall as its declared size: NP2kai's PC-98 picture is 640x400 and the core
+declares 640x480, so the new window showed it at 533x400 at 1x where
+Chimera's showed 640x480.
+
+Now each picture carries the size it is shown at, worked out as Chimera's
+was: the picture's own height at the shape the core reports while it runs
+(the optional display aspect exports), else the size the package or the
+machine declares (which is the picture's own size when nothing is
+declared). The machine's own shape uses that size. A ratio, a custom size
+and the raw pixels are as before. A branch's note still keeps only the
+shape, which is all its preview needs.
+
+Measured: the view model tests check a 640x400 picture declared 640x480
+is 640x480 at 1x, and that the synthetic core's 128x120 picture declared
+256x240 is shown at 256x240 (it was 128x120); with the change undone both
+fail. NP2kai itself was not run here: its PC-98 firmware is not on this
+machine.

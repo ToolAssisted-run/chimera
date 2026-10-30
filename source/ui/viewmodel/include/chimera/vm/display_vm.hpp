@@ -45,20 +45,21 @@ struct DisplayFit
 		double x = 0, y = 0, w = 0, h = 0;
 	};
 	Rect source(int width, int height) const;
-	/* its size shown at 1x: the height kept, the width its shape gives (a
-	 * custom size is that size) */
-	void naturalSize(int width, int height, double machineAspect, double &w, double &h) const;
+	/* its size shown at 1x: the machine's own is the size it says the picture
+	 * is shown at (shownWidth x shownHeight, Chimera's virtual size); a ratio
+	 * keeps the height and gives the width; a custom size is that size */
+	void naturalSize(int width, int height, double shownWidth, double shownHeight, double &w, double &h) const;
 	/* the surface at 1x: the picture shown with the game padding around it */
-	void surfaceSize(int width, int height, double machineAspect, double &w, double &h) const;
+	void surfaceSize(int width, int height, double shownWidth, double shownHeight, double &w, double &h) const;
 	/* where the surface goes in an area of areaW x areaH (inside the client
 	 * padding), and where the picture goes, inside its padding */
-	Rect surface(int width, int height, double machineAspect, double areaW, double areaH) const;
-	Rect place(int width, int height, double machineAspect, double areaW, double areaH) const;
+	Rect surface(int width, int height, double shownWidth, double shownHeight, double areaW, double areaH) const;
+	Rect place(int width, int height, double shownWidth, double shownHeight, double areaW, double areaH) const;
 	/* the whole steps the picture is grown by before it is drawn (Chimera's
 	 * PrescaleFilter then AutoPrescaleFilter): neither side past maxSide
 	 * pixels, the steps taken back one at a time as Chimera's are; 1 x 1
 	 * for no growing */
-	void prescaleSteps(int width, int height, double machineAspect, double areaW, double areaH, bool smooth, int maxSide,
+	void prescaleSteps(int width, int height, double shownWidth, double shownHeight, double areaW, double areaH, bool smooth, int maxSide,
 		int &stepX, int &stepY) const;
 };
 

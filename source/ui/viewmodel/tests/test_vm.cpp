@@ -1054,85 +1054,90 @@ void displayFit()
 	auto same = [&](const DisplayFit::Rect &r, double x, double y, double w, double h) {
 		return near(r.x, x) && near(r.y, y) && near(r.w, w) && near(r.h, h);
 	};
-	const double four3 = 4.0 / 3.0;
+	const double m160 = 160, m120 = 120;
 	/* Chimera's prescaling: the user's whole step, then with smoothing the
 	 * largest whole steps that fit where the picture is drawn */
 	{
 		DisplayFit p;
 		p.aspectMode = 0;
 		int x = 0, y = 0;
-		p.prescaleSteps(256, 224, four3, 800, 700, true, 8192, x, y);
+		p.prescaleSteps(256, 224, m160, m120, 800, 700, true, 8192, x, y);
 		CHECK(x == 1 && y == 1);
 		p.prescale = 2;
-		p.prescaleSteps(256, 224, four3, 800, 700, true, 8192, x, y);
+		p.prescaleSteps(256, 224, m160, m120, 800, 700, true, 8192, x, y);
 		CHECK(x == 2 && y == 2);
 		/* 800 x 700 holds 256 x 224 three times (768 x 672, letterboxed): 2 then 1 more */
 		p.prescale = 1;
 		p.autoPrescale = true;
-		p.prescaleSteps(256, 224, four3, 800, 700, true, 8192, x, y);
+		p.prescaleSteps(256, 224, m160, m120, 800, 700, true, 8192, x, y);
 		CHECK(x == 3 && y == 3);
 		/* not without smoothing */
-		p.prescaleSteps(256, 224, four3, 800, 700, false, 8192, x, y);
+		p.prescaleSteps(256, 224, m160, m120, 800, 700, false, 8192, x, y);
 		CHECK(x == 1 && y == 1);
 		/* stretched: each side its own */
 		p.letterbox = false;
-		p.prescaleSteps(256, 224, four3, 1100, 500, true, 8192, x, y);
+		p.prescaleSteps(256, 224, m160, m120, 1100, 500, true, 8192, x, y);
 		CHECK(x == 4 && y == 2);
 		/* a step that would pass the largest side is taken back */
 		p.letterbox = true;
 		p.autoPrescale = false;
 		p.prescale = 16;
-		p.prescaleSteps(1024, 512, four3, 800, 700, true, 8192, x, y);
+		p.prescaleSteps(1024, 512, m160, m120, 800, 700, true, 8192, x, y);
 		CHECK(x == 8 && y == 8);
 		/* the crop is not grown into: the part shown is what fits */
 		p.prescale = 1;
 		p.autoPrescale = true;
 		p.cropLeft = 64;
 		p.cropRight = 64;
-		p.prescaleSteps(256, 224, four3, 800, 700, true, 8192, x, y);
+		p.prescaleSteps(256, 224, m160, m120, 800, 700, true, 8192, x, y);
 		CHECK(x == 3 && y == 3);
 	}
 	DisplayFit f;
 	double w = 0, h = 0;
 	/* the machine's shape: 160x120 at 1x, kept with bars */
-	f.naturalSize(128, 120, four3, w, h);
+	f.naturalSize(128, 120, m160, m120, w, h);
 	CHECK(near(w, 160) && near(h, 120));
-	CHECK(same(f.place(128, 120, four3, 400, 300), 0, 0, 400, 300));
-	CHECK(same(f.place(128, 120, four3, 500, 300), 50, 0, 400, 300));
+	CHECK(same(f.place(128, 120, m160, m120, 400, 300), 0, 0, 400, 300));
+	CHECK(same(f.place(128, 120, m160, m120, 500, 300), 50, 0, 400, 300));
 	/* whole steps only: twice, not two and a half */
 	f.integerScale = true;
-	CHECK(same(f.place(128, 120, four3, 500, 300), 90, 30, 320, 240));
+	CHECK(same(f.place(128, 120, m160, m120, 500, 300), 90, 30, 320, 240));
 	/* smaller than 1x: shrunk freely */
-	CHECK(same(f.place(128, 120, four3, 80, 60), 0, 0, 80, 60));
+	CHECK(same(f.place(128, 120, m160, m120, 80, 60), 0, 0, 80, 60));
 	f.integerScale = false;
 	/* stretched to the area; by whole steps of each side when asked */
 	f.letterbox = false;
-	CHECK(same(f.place(128, 120, four3, 500, 300), 0, 0, 500, 300));
+	CHECK(same(f.place(128, 120, m160, m120, 500, 300), 0, 0, 500, 300));
 	f.integerScale = true;
-	CHECK(same(f.place(128, 120, four3, 500, 300), 10, 30, 480, 240));
+	CHECK(same(f.place(128, 120, m160, m120, 500, 300), 10, 30, 480, 240));
 	f.integerScale = false;
 	f.letterbox = true;
 	/* raw pixels, a size, a ratio */
 	f.aspectMode = 0;
-	f.naturalSize(128, 120, four3, w, h);
+	f.naturalSize(128, 120, m160, m120, w, h);
 	CHECK(near(w, 128) && near(h, 120));
 	f.aspectMode = 2;
 	f.customWidth = 256;
 	f.customHeight = 224;
-	f.naturalSize(128, 120, four3, w, h);
+	f.naturalSize(128, 120, m160, m120, w, h);
 	CHECK(near(w, 256) && near(h, 224));
 	f.aspectMode = 3;
 	f.ratioX = 16;
 	f.ratioY = 9;
-	f.naturalSize(128, 120, four3, w, h);
+	f.naturalSize(128, 120, m160, m120, w, h);
 	CHECK(near(w, 120 * 16.0 / 9.0) && near(h, 120));
+	/* the size the machine says, not only its shape: a 640x400 picture
+	 * declared 640x480 is 640x480 at 1x, as Chimera's (issue 414) */
+	f.aspectMode = 1;
+	f.naturalSize(640, 400, 640, 480, w, h);
+	CHECK(near(w, 640) && near(h, 480));
 	/* a crop: those pixels gone, the shape of what is left */
 	f.aspectMode = 1;
 	f.cropLeft = 16;
 	f.cropTop = 16;
 	const DisplayFit::Rect from = f.source(128, 120);
 	CHECK(same(from, 16, 16, 112, 104));
-	f.naturalSize(128, 120, four3, w, h);
+	f.naturalSize(128, 120, m160, m120, w, h);
 	CHECK(near(w, 140) && near(h, 104));
 	/* a crop that would leave nothing leaves the picture whole */
 	f.cropRight = 120;
@@ -1146,19 +1151,19 @@ void displayFit()
 		p.padLeft = 40;
 		p.padRight = 60;
 		p.padBottom = 20;
-		p.surfaceSize(128, 120, four3, w, h);
+		p.surfaceSize(128, 120, m160, m120, w, h);
 		CHECK(near(w, 228) && near(h, 140));
-		CHECK(same(p.surface(128, 120, four3, 456, 280), 0, 0, 456, 280));
-		CHECK(same(p.place(128, 120, four3, 456, 280), 80, 0, 256, 240));
+		CHECK(same(p.surface(128, 120, m160, m120, 456, 280), 0, 0, 456, 280));
+		CHECK(same(p.place(128, 120, m160, m120, 456, 280), 80, 0, 256, 240));
 		p.clientLeft = 10;
 		p.clientTop = 6;
 		p.clientRight = 10;
 		p.clientBottom = 14;
-		CHECK(same(p.surface(128, 120, four3, 476, 300), 10, 6, 456, 280));
-		CHECK(same(p.place(128, 120, four3, 476, 300), 90, 6, 256, 240));
+		CHECK(same(p.surface(128, 120, m160, m120, 476, 300), 10, 6, 456, 280));
+		CHECK(same(p.place(128, 120, m160, m120, 476, 300), 90, 6, 256, 240));
 		/* a crop with them: the surface starts where the crop does */
 		p.cropLeft = 8;
-		p.surfaceSize(128, 120, four3, w, h);
+		p.surfaceSize(128, 120, m160, m120, w, h);
 		CHECK(near(w, 220) && near(h, 140));
 	}
 	/* the view model's values, kept in range */
@@ -4038,7 +4043,7 @@ bool machine(const char *package, const char *rom)
 	{
 		Picture picture;
 		const uint32_t left[4] = {0x00102030u, 0x7F405060u, 0xFF708090u, 0x01A0B0C0u};
-		picture.publish(left, 2, 2, 1.0);
+		picture.publish(left, 2, 2, 2, 2);
 		const std::vector<uint32_t> opaque = {0xFF102030u, 0xFF405060u, 0xFF708090u, 0xFFA0B0C0u};
 		Picture::Frame shown;
 		CHECK(picture.takeIfNewer(0, shown) && shown.pixels == opaque);
@@ -6644,7 +6649,7 @@ bool controlsAndHotkeys(const char *package, const char *rom)
 		Picture::Frame shown;
 		CHECK(branches.run("preview", {int64_t{0}}, error) == Value(true) && branches.previewing.get() == 0);
 		CHECK(branches.preview.takeIfNewer(0, shown) && shown.width > 0);
-		const double h = shown.height, w = shown.height * shown.aspect;
+		const double h = shown.height, w = shown.height * shown.aspect();
 		const int64_t most = std::max(branches.previewWidth.get(), branches.previewHeight.get());
 		CHECK(most == std::min<int64_t>(320, static_cast<int64_t>(std::max(w, h) + 0.5)));
 		branches.previewSide.set(100);
@@ -9895,14 +9900,15 @@ bool squarePixels(const char *declared, const char *square, const char *rom)
 		d.until([&] { return session.screen.takeIfNewer(0, frame) && frame.width > 0; }, 20);
 		session.run("close", {}, error);
 		d.until([&] { return !session.isOpen.get(); }, 20);
-		return std::pair<double, int>(frame.aspect, frame.width);
+		return frame;
 	};
-	const auto [squareAspect, squareWidth] = shapeOf(square);
-	const auto [declaredAspect, declaredWidth] = shapeOf(declared);
-	std::printf("square pixels: %d wide at %.3f; declared 256x240: %d wide at %.3f\n", squareWidth, squareAspect, declaredWidth, declaredAspect);
-	/* drawn 128x120 in room for 320x120: shown 128:120, not 320:120 */
-	CHECK(squareWidth == 128 && std::abs(squareAspect - 128.0 / 120.0) < 1e-6);
-	CHECK(std::abs(declaredAspect - 256.0 / 240.0) < 1e-6);
+	const Picture::Frame squareFrame = shapeOf(square), declaredFrame = shapeOf(declared);
+	std::printf("square pixels: %d wide, shown %gx%g; declared 256x240: %d wide, shown %gx%g\n", squareFrame.width,
+		squareFrame.shownWidth, squareFrame.shownHeight, declaredFrame.width, declaredFrame.shownWidth, declaredFrame.shownHeight);
+	/* drawn 128x120 in room for 320x120: shown 128x120, not 320:120 */
+	CHECK(squareFrame.width == 128 && squareFrame.shownWidth == 128 && squareFrame.shownHeight == 120);
+	/* a declared size is the size it is shown at, whatever its picture's (issue 414) */
+	CHECK(declaredFrame.shownWidth == 256 && declaredFrame.shownHeight == 240);
 	return failures == before;
 }
 

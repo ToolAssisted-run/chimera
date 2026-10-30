@@ -23,8 +23,8 @@ class PictureItem : public QQuickItem
 	/* the Display window's fitting, by the display view model's names
 	 * (aspectMode, customWidth, ... cropBottom) */
 	Q_PROPERTY(QVariantMap fit READ fit WRITE setFit NOTIFY fitChanged)
-	/* the picture's size in the machine's shape (its height, and the width
-	 * its aspect gives), 0 before the first: for the window's sizes */
+	/* the picture's size at 1x as the Display settings show it (the machine's
+	 * own: the size it says), 0 before the first: for the window's sizes */
 	Q_PROPERTY(int pictureWidth READ pictureWidth NOTIFY pictureSizeChanged)
 	Q_PROPERTY(int pictureHeight READ pictureHeight NOTIFY pictureSizeChanged)
 	/* where the picture is drawn in the item, and the part of its pixels

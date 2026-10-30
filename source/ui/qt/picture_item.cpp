@@ -103,7 +103,7 @@ QSGNode *PictureItem::updatePaintNode(QSGNode *old, UpdatePaintNodeData *)
 	{
 		/* told to the GUI's thread, the picture's size at 1x as it is fitted, its game padding with it */
 		double nw = 0, nh = 0;
-		fit_.surfaceSize(frame_.width, frame_.height, frame_.aspect, nw, nh);
+		fit_.surfaceSize(frame_.width, frame_.height, frame_.shownWidth, frame_.shownHeight, nw, nh);
 		QMetaObject::invokeMethod(this, "sizeSeen", Qt::QueuedConnection, Q_ARG(int, static_cast<int>(nw + 0.5)),
 			Q_ARG(int, static_cast<int>(nh + 0.5)));
 		fitNew_ = false;
@@ -116,7 +116,7 @@ QSGNode *PictureItem::updatePaintNode(QSGNode *old, UpdatePaintNodeData *)
 	/* Chimera's prescaling: grown pixel by pixel by whole steps before it
 	 * is drawn (and smoothed only from there) */
 	int stepX = 1, stepY = 1;
-	fit_.prescaleSteps(frame_.width, frame_.height, frame_.aspect, width(), height(), smooth_, kLargestSide, stepX, stepY);
+	fit_.prescaleSteps(frame_.width, frame_.height, frame_.shownWidth, frame_.shownHeight, width(), height(), smooth_, kLargestSide, stepX, stepY);
 	if (fresh || node->texture() == nullptr || stepX != stepX_ || stepY != stepY_)
 	{
 		/* the image owns its pixels: the texture may be uploaded after this
@@ -135,10 +135,10 @@ QSGNode *PictureItem::updatePaintNode(QSGNode *old, UpdatePaintNodeData *)
 
 	const vm::DisplayFit::Rect from = fit_.source(frame_.width, frame_.height);
 	node->setSourceRect(QRectF(from.x * stepX, from.y * stepY, from.w * stepX, from.h * stepY));
-	const vm::DisplayFit::Rect to = fit_.place(frame_.width, frame_.height, frame_.aspect, width(), height());
+	const vm::DisplayFit::Rect to = fit_.place(frame_.width, frame_.height, frame_.shownWidth, frame_.shownHeight, width(), height());
 	node->setRect(QRectF(to.x, to.y, to.w, to.h));
 	/* told to the window's thread when it moves, for what is drawn over it */
-	const vm::DisplayFit::Rect all = fit_.surface(frame_.width, frame_.height, frame_.aspect, width(), height());
+	const vm::DisplayFit::Rect all = fit_.surface(frame_.width, frame_.height, frame_.shownWidth, frame_.shownHeight, width(), height());
 	const QRectF shown(to.x, to.y, to.w, to.h), source(from.x, from.y, from.w, from.h), surface(all.x, all.y, all.w, all.h);
 	if (shown != saidShown_ || source != saidSource_ || surface != saidSurface_)
 	{

@@ -116,7 +116,7 @@ bool IdleEyeViewModel::tick(double gaze)
 		snowTurn_++;
 		if (!now) return false;
 		snow();
-		eye.publish(snow_.data(), kSnowWidth, kSnowHeight, static_cast<double>(kSnowWidth) / kSnowHeight);
+		eye.publish(snow_.data(), kSnowWidth, kSnowHeight, kSnowWidth, kSnowHeight);
 		drawn.set(drawn.get() + 1);
 		eyeChanged.emit();
 		return true;
@@ -135,7 +135,7 @@ bool IdleEyeViewModel::tick(double gaze)
 	if (key == drawnKey_ || srcSize_ == 0) return false;
 	drawnKey_ = key;
 	draw();
-	eye.publish(buffer_.data(), kWidth, kHeight, static_cast<double>(kWidth) / kHeight);
+	eye.publish(buffer_.data(), kWidth, kHeight, kWidth, kHeight);
 	drawn.set(drawn.get() + 1);
 	eyeChanged.emit();
 	return true;

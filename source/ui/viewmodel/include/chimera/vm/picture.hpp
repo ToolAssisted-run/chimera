@@ -16,13 +16,21 @@ public:
 		int32_t width = 0, height = 0;
 		/* BGRA, width * height, every A 0xFF */
 		std::vector<uint32_t> pixels;
-		/* the shape the picture is shown at, width over height */
-		double aspect = 4.0 / 3.0;
+		/* the size the picture is shown at, at 1x: the machine's declared
+		 * size, or its own height at the shape the core says it is now, as
+		 * Chimera's virtual size; 0 for its own pixels */
+		double shownWidth = 0, shownHeight = 0;
 		uint64_t serial = 0;
+		/* its shape, width over height */
+		double aspect() const
+		{
+			if (shownWidth > 0 && shownHeight > 0) return shownWidth / shownHeight;
+			return width > 0 && height > 0 ? static_cast<double>(width) / height : 4.0 / 3.0;
+		}
 	};
 
 	/* any thread */
-	void publish(const uint32_t *pixels, int32_t width, int32_t height, double aspect)
+	void publish(const uint32_t *pixels, int32_t width, int32_t height, double shownWidth, double shownHeight)
 	{
 		std::lock_guard<std::mutex> lock(m_);
 		const size_t n = static_cast<size_t>(width) * static_cast<size_t>(height);
@@ -34,7 +42,8 @@ public:
 		for (size_t i = 0; i < n; i++) frame_.pixels[i] = pixels[i] | 0xFF000000u;
 		frame_.width = width;
 		frame_.height = height;
-		frame_.aspect = aspect;
+		frame_.shownWidth = shownWidth;
+		frame_.shownHeight = shownHeight;
 		frame_.serial++;
 	}
 
@@ -45,7 +54,8 @@ public:
 		if (frame_.serial == have) return false;
 		out.width = frame_.width;
 		out.height = frame_.height;
-		out.aspect = frame_.aspect;
+		out.shownWidth = frame_.shownWidth;
+		out.shownHeight = frame_.shownHeight;
 		out.serial = frame_.serial;
 		out.pixels.assign(frame_.pixels.begin(), frame_.pixels.end());
 		return true;

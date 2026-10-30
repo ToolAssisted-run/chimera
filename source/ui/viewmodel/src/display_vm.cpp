@@ -21,7 +21,7 @@ DisplayFit::Rect DisplayFit::source(int width, int height) const
 	return r;
 }
 
-void DisplayFit::naturalSize(int width, int height, double machineAspect, double &w, double &h) const
+void DisplayFit::naturalSize(int width, int height, double shownWidth, double shownHeight, double &w, double &h) const
 {
 	const Rect s = source(width, height);
 	if (aspectMode == 2 && customWidth > 0 && customHeight > 0)
@@ -31,17 +31,24 @@ void DisplayFit::naturalSize(int width, int height, double machineAspect, double
 		h = customHeight * s.h / height;
 		return;
 	}
+	if (aspectMode == 1 && shownWidth > 0 && shownHeight > 0)
+	{
+		/* the size the machine says, as Chimera's: a 640x400 picture declared
+		 * 640x480 is 640x480, not 533x400 (issue 414); a crop takes its share off */
+		w = shownWidth * s.w / width;
+		h = shownHeight * s.h / height;
+		return;
+	}
 	double shape = static_cast<double>(width) / height;
-	if (aspectMode == 1 && machineAspect > 0) shape = machineAspect;
 	if (aspectMode == 3 && ratioX > 0 && ratioY > 0) shape = ratioX / ratioY;
 	/* the whole picture's shape, then the crop's share of each side */
 	h = s.h;
 	w = height * shape * s.w / width;
 }
 
-void DisplayFit::surfaceSize(int width, int height, double machineAspect, double &w, double &h) const
+void DisplayFit::surfaceSize(int width, int height, double shownWidth, double shownHeight, double &w, double &h) const
 {
-	naturalSize(width, height, machineAspect, w, h);
+	naturalSize(width, height, shownWidth, shownHeight, w, h);
 	const Rect s = source(width, height);
 	if (s.w <= 0 || s.h <= 0) return;
 	/* the padding in the picture's own pixels, each as wide as one shown */
@@ -49,7 +56,7 @@ void DisplayFit::surfaceSize(int width, int height, double machineAspect, double
 	h += std::max(0, padTop + padBottom) * h / s.h;
 }
 
-DisplayFit::Rect DisplayFit::surface(int width, int height, double machineAspect, double areaW, double areaH) const
+DisplayFit::Rect DisplayFit::surface(int width, int height, double shownWidth, double shownHeight, double areaW, double areaH) const
 {
 	Rect r;
 	if (width <= 0 || height <= 0) return r;
@@ -59,7 +66,7 @@ DisplayFit::Rect DisplayFit::surface(int width, int height, double machineAspect
 	areaH -= ct + std::max(0, clientBottom);
 	if (areaW <= 0 || areaH <= 0) return r;
 	double nw = 0, nh = 0;
-	surfaceSize(width, height, machineAspect, nw, nh);
+	surfaceSize(width, height, shownWidth, shownHeight, nw, nh);
 	if (nw <= 0 || nh <= 0) return r;
 	if (!letterbox)
 	{
@@ -80,9 +87,9 @@ DisplayFit::Rect DisplayFit::surface(int width, int height, double machineAspect
 	return r;
 }
 
-DisplayFit::Rect DisplayFit::place(int width, int height, double machineAspect, double areaW, double areaH) const
+DisplayFit::Rect DisplayFit::place(int width, int height, double shownWidth, double shownHeight, double areaW, double areaH) const
 {
-	const Rect all = surface(width, height, machineAspect, areaW, areaH);
+	const Rect all = surface(width, height, shownWidth, shownHeight, areaW, areaH);
 	const Rect s = source(width, height);
 	if (all.w <= 0 || all.h <= 0 || s.w <= 0 || s.h <= 0) return all;
 	/* the picture inside its padding: the surface's pixels are the picture's */
@@ -95,7 +102,7 @@ DisplayFit::Rect DisplayFit::place(int width, int height, double machineAspect, 
 	return r;
 }
 
-void DisplayFit::prescaleSteps(int width, int height, double machineAspect, double areaW, double areaH, bool smooth, int maxSide,
+void DisplayFit::prescaleSteps(int width, int height, double shownWidth, double shownHeight, double areaW, double areaH, bool smooth, int maxSide,
 	int &stepX, int &stepY) const
 {
 	stepX = stepY = 1;
@@ -106,7 +113,7 @@ void DisplayFit::prescaleSteps(int width, int height, double machineAspect, doub
 	stepX = stepY = user;
 	/* growing to fit makes no sense without smoothing, as Chimera says */
 	if (!autoPrescale || !smooth) return;
-	const Rect from = source(width, height), to = place(width, height, machineAspect, areaW, areaH);
+	const Rect from = source(width, height), to = place(width, height, shownWidth, shownHeight, areaW, areaH);
 	if (from.w <= 0 || from.h <= 0) return;
 	/* the whole steps that fit where it is drawn, each side its own, at least one */
 	int x = std::max(1, static_cast<int>(to.w / (from.w * user) + 1e-9)), y = std::max(1, static_cast<int>(to.h / (from.h * user) + 1e-9));

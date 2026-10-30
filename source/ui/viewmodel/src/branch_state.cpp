@@ -47,7 +47,7 @@ bool writeNote(const fs::path &path, const Note &note)
 		std::ofstream out(writing, std::ios::binary | std::ios::trunc);
 		if (!out) return false;
 		char aspect[32];
-		std::snprintf(aspect, sizeof aspect, "%.17g", note.picture.aspect);
+		std::snprintf(aspect, sizeof aspect, "%.17g", note.picture.aspect());
 		/* a picture whose pixels are not all there is written as none: its
 		 * size with no pixels after it was a note no read would take */
 		const size_t n = static_cast<size_t>(note.picture.width) * static_cast<size_t>(note.picture.height);
@@ -93,7 +93,9 @@ bool readNote(const fs::path &path, Note &out)
 		if (static_cast<size_t>(in.gcount()) != count * sizeof(uint32_t)) return false;
 		n.picture.width = w;
 		n.picture.height = h;
-		n.picture.aspect = aspect > 0 ? aspect : static_cast<double>(w) / h;
+		/* the note keeps the shape: its height at that shape */
+		n.picture.shownHeight = h;
+		n.picture.shownWidth = h * (aspect > 0 ? aspect : static_cast<double>(w) / h);
 	}
 	out = std::move(n);
 	return true;

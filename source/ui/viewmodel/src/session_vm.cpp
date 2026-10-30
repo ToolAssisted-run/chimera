@@ -2830,7 +2830,7 @@ void SessionViewModel::borrowMachine(int64_t from, int64_t to, BorrowFrame frame
 				ce_session_movie_at(s_, was) == 0)
 			{
 				frameM_ = was;
-				if (shown.width > 0 && shown.height > 0) screen.publish(shown.pixels.data(), shown.width, shown.height, shown.aspect);
+				if (shown.width > 0 && shown.height > 0) screen.publish(shown.pixels.data(), shown.width, shown.height, shown.shownWidth, shown.shownHeight);
 			}
 			else
 			{
@@ -3702,7 +3702,7 @@ void SessionViewModel::loadBranch(Branch b, std::function<void(bool, std::string
 				fromState = true;
 				frameM_ = b.frame;
 				const Picture::Frame &shown = b.picture ? *b.picture : note.picture;
-				if (shown.width > 0 && shown.height > 0) screen.publish(shown.pixels.data(), shown.width, shown.height, shown.aspect);
+				if (shown.width > 0 && shown.height > 0) screen.publish(shown.pixels.data(), shown.width, shown.height, shown.shownWidth, shown.shownHeight);
 				for (const Hooks &h : hooksM_)
 					if (h.frame) h.frame(s_);
 			}
@@ -4129,11 +4129,13 @@ void SessionViewModel::publishPictureOnMachine()
 	const uint32_t *px = ce_session_video(s_);
 	const int32_t w = ce_session_video_width(s_), h = ce_session_video_height(s_);
 	if (px == nullptr || w <= 0 || h <= 0) return;
-	/* the machine's own answer, else its declared virtual size */
+	/* the size it is shown at, as Chimera's: the picture's own height at the
+	 * shape the machine says it is now, else its declared virtual size (a
+	 * 640x400 picture declared 640x480 is shown 640x480, issue 414) */
 	int32_t ax = 0, ay = 0;
-	if (ce_session_display_aspect(s_, &ax, &ay) == 0 || ax <= 0 || ay <= 0) ax = ce_session_virtual_width(s_), ay = ce_session_virtual_height(s_);
-	const double aspect = ax > 0 && ay > 0 ? static_cast<double>(ax) / ay : static_cast<double>(w) / h;
-	screen.publish(px, w, h, aspect);
+	double shownWidth = ce_session_virtual_width(s_), shownHeight = ce_session_virtual_height(s_);
+	if (ce_session_display_aspect(s_, &ax, &ay) != 0 && ax > 0 && ay > 0) shownWidth = static_cast<double>(h) * ax / ay, shownHeight = h;
+	screen.publish(px, w, h, shownWidth, shownHeight);
 }
 
 void SessionViewModel::setScriptIdle(std::function<bool()> wanted, std::function<void()> idle)
@@ -5504,7 +5506,7 @@ bool SessionViewModel::renderSurface(int32_t index, Picture &into)
 		const int32_t w = ce_session_surface_width(s, index), h = ce_session_surface_height(s, index);
 		const uint32_t *px = w > 0 && h > 0 ? ce_session_surface_render(s, index) : nullptr;
 		if (px == nullptr) return;
-		into.publish(px, w, h, static_cast<double>(w) / h);
+		into.publish(px, w, h, w, h);
 		drawn = true;
 	});
 	return drawn;
