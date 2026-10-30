@@ -4571,8 +4571,13 @@ bool settings(const char *package, const char *rom)
 	CHECK(!settings.run("set", {std::string("nothing"), int64_t{1}}, error) && error.find("no setting nothing") != std::string::npos);
 	CHECK(!settings.run("set", {std::string("initFillByte"), std::string("lots")}, error));
 
-	/* set, discarded, set again, applied */
+	/* set, discarded, set again, applied; a value set updates its row in
+	 * place, so a list keeps where it was scrolled to (issue 417) */
+	int resets = 0;
+	Connection resetSeen = rows.reset.connect([&] { resets++; });
 	CHECK(settings.run("set", {std::string("initFillByte"), int64_t{171}}, error).has_value());
+	CHECK(resets == 0);
+	resetSeen.disconnect();
 	CHECK(settings.pending.get());
 	bool edited = false;
 	fromValue(rows.cell(0, SettingsViewModel::kEdited), edited);

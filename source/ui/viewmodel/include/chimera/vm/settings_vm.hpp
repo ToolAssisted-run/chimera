@@ -58,6 +58,9 @@ private:
 	SessionViewModel &session_;
 	SettingsForm form_;
 	SettingsForm::Rows rows_{form_};
+	/* the rows the views were last told of: a change that keeps their number
+	 * updates them in place, and a list keeps its place (issue 417) */
+	int64_t rowsTold_ = 0;
 	SettingsForm::PresetRows presetRows_{form_};
 	Connection opensWatch_, clockWatch_;
 	json::Json applied_;

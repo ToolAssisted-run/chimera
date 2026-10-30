@@ -2467,7 +2467,8 @@ void NewProjectViewModel::evaluate()
 	compileAsked.set(pre != nullptr && pre->kind == json::Json::Kind::Bool && pre->boolean && !compileGame().empty());
 	refreshCompile();
 	slotRows_.reset.emit();
-	settingRows_.reset.emit();
+	settingRows_.refreshed(settingRowsTold_);
+	settingRowsTold_ = settingRows_.rowCount();
 	presetRows_.reset.emit();
 	firmwareRows_.reset.emit();
 }

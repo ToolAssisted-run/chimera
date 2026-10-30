@@ -188,7 +188,8 @@ void SettingsViewModel::evaluate()
 	compare();
 	form_.evaluate();
 	shown.set(static_cast<int64_t>(form_.exposed().size()));
-	rows_.reset.emit();
+	rows_.refreshed(rowsTold_);
+	rowsTold_ = rows_.rowCount();
 	presetRows_.reset.emit();
 }
 

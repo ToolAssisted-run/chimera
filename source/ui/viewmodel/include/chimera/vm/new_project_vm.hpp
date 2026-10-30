@@ -271,6 +271,8 @@ private:
 	SlotRows slotRows_{*this};
 	SettingsForm form_;
 	SettingsForm::Rows settingRows_{form_};
+	/* the setting rows the views were last told of (issue 417) */
+	int64_t settingRowsTold_ = 0;
 	SettingsForm::PresetRows presetRows_{form_};
 	FirmwareRows firmwareRows_{*this};
 	ImportFileRows importFileRows_{*this};

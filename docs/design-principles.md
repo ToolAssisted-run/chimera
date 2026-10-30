@@ -11408,3 +11408,27 @@ is 640x480 at 1x, and that the synthetic core's 128x120 picture declared
 256x240 is shown at 256x240 (it was 128x120); with the change undone both
 fail. NP2kai itself was not run here: its PC-98 firmware is not on this
 machine.
+
+## Settings are shown in Chimera's grid (2026-10-30, issue 417)
+
+New Project's settings page and Project Settings showed each setting as a
+bold name, its control beside it and its description under it. Only four
+or five settings fitted without scrolling, the controls did not line up
+with the names when the window was made wider, and setting a value
+scrolled the list back to the top. Chimera's Windows Forms window showed
+them in a property grid: the name and the value side by side, one line a
+setting, and the description of the chosen row in a box under the grid.
+
+The list is that grid again: the names take the left 45% of its width and
+the values the rest, so they stay lined up at any width; a row is chosen by
+a click or by its control taking the focus, the first one at the start;
+the box under the grid shows the chosen row's name and description, five
+lines tall and scrolled when longer, as Chimera's. The machine's clock is
+the grid's last row, as before. Setting a value no longer rebuilds the
+list: when the number of rows stays the same, the rows are updated in
+place, so the list keeps where it was scrolled to.
+
+Measured: the view model test checks that a value set updates the row in
+place (it failed with the old rebuild put back). The grid was looked at in
+Project Settings with the VICE core; New Project's page uses the same list
+and was not looked at.
