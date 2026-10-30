@@ -1327,18 +1327,15 @@ ApplicationWindow {
         objectName: "pictureArea"
         anchors.fill: parent
         color: "black"
-        // the pointer over the picture, in the machine's pixels, for Lua's input.getmouse:
-        // only watched, never taken from what is under it
-        PointHandler {
-            acceptedButtons: Qt.AllButtons
-            grabPermissions: PointerHandler.ApprovesTakeOverByAnything
-            onPointChanged: pictureArea.notePointer(point.position, point.pressedButtons)
+        // the pointer over the picture, in the machine's pixels, for the machine and Lua's input.getmouse
+        PicturePointer {
+            anchors.fill: parent
+            onNoted: (at, buttons) => pictureArea.notePointer(at, buttons)
         }
         HoverHandler {
             // full screen, the pointer hidden after two seconds still, as Chimera's (moving it more than 5 pixels shows it)
             cursorShape: root.cursorHidden || root.capturing ? Qt.BlankCursor : Qt.ArrowCursor
             onPointChanged: {
-                pictureArea.notePointer(point.position, -1)
                 const p = point.position
                 if (Math.abs(p.x - root.cursorAt.x) > 5 || Math.abs(p.y - root.cursorAt.y) > 5) {
                     root.cursorAt = p

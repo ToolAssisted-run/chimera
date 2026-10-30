@@ -4,6 +4,7 @@
     <file>Main.qml</file>
     <file>MenuDivider.qml</file>
     <file>MenuEntry.qml</file>
+    <file>PicturePointer.qml</file>
     <file>ProjectSettings.qml</file>
     <file>RollTable.qml</file>
     <file>McpServer.qml</file>

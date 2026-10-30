@@ -11687,3 +11687,24 @@ file after the next snapshot (on Linux, by its inode); written in place
 again, that check fails. The test's own copy of the record no longer
 aborts the run when the process is not found in it: that is a check that
 fails.
+
+## A button let go is told where the pointer was (2026-10-30, issue 424)
+
+Ruffle's Red Ball 2 did not take the first click: the reporter's project
+holds the left button at one place from frame 262 to 286, and frame 287,
+where it is let go, has the pointer at 0,0, back at its place the frame
+after. Qt's PointHandler empties its point when the last button is let go
+(no id, at 0,0, measured with Qt 6.12), and the window passed that on as
+the pointer's place until the hover handler said where it was. A Flash
+button let go away from itself is no click.
+
+The pointer over the picture is now watched by one QML part,
+PicturePointer.qml: a button let go is told where the pointer last was,
+and a pointer that leaves stays where it was last seen.
+
+Tested: a new test, "picture pointer", drives that part with Qt's test
+module: a press and a release at 50,60 are told at 50,60 with no button,
+and nothing is told at 0,0. With Qt's point passed on as it was, the three
+checks of a release fail; the test passed 30 times on a loaded machine.
+Red Ball 2 itself was not run here (the game is the reporter's).
+

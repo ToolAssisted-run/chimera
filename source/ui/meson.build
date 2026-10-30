@@ -480,6 +480,15 @@ if qt_dep.found()
       cpp_args: ['-DQT_NO_KEYWORDS'],
     )
     test('key filter', test_key_filter, env: ['QT_QPA_PLATFORM=offscreen', 'ALSOFT_DRIVERS=null'], timeout: 60)
+    # the pointer over the picture: a button let go is told where the
+    # pointer was, not at the corner Qt's emptied point says (issue 424)
+    test_picture_pointer = executable(
+      'test-picture-pointer',
+      ['qt/tests/test_picture_pointer.cpp', qt_rcc],
+      dependencies: [qt_test_dep],
+      override_options: ['cpp_std=c++20'],
+    )
+    test('picture pointer', test_picture_pointer, env: ['QT_QPA_PLATFORM=offscreen', 'QT_QUICK_BACKEND=software'], timeout: 60)
   endif
   # single instance mode's hand-over of the files named, in Chimera's payload
   test_single_instance = executable(
