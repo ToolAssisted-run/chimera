@@ -11349,3 +11349,13 @@ samples 6 pauses remain, of 15 to 37 ms, QML's script memory clean-up; the
 95th percentile of the window's frame times is 33 ms, a frame now and then
 waiting one more refresh as the machine's 60.07 frames a second drift
 against the screen's.
+
+## Config > Language has an icon (user-decided, 2026-10-30)
+
+The owner asked for an icon on Config > Language, as the other entries have.
+It is a globe in the blue of the Firmware icon beside it: a disc with one
+curved meridian each side of the middle and the equator. A first try with
+three parallels and a straight meridian looked like a net at 16 pixels.
+tools/draw-language-icon.py draws it at 8x and scales it down, as the other
+drawn icons are made. It was looked at beside its neighbours on a light and
+a dark menu.

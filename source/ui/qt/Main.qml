@@ -560,7 +560,7 @@ ApplicationWindow {
                 Menu {
                     delegate: keyedMenuItem
                     id: languageMenu
-                    title: qsTrId("main.language_menu")
+                    title: qsTrId("main.language_menu"); icon.source: "qrc:/chimera/menu/Language.png"
                     Instantiator {
                         model: root.customize.languages.split("\n")
                         delegate: MenuItem {

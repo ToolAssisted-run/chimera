@@ -159,6 +159,7 @@
     <file alias="menu/PrecompiledModules.png">menu-icons/PrecompiledModules.png</file>
     <file alias="menu/ThemePalette.png">menu-icons/ThemePalette.png</file>
     <file alias="menu/WindowSize.png">menu-icons/WindowSize.png</file>
+    <file alias="menu/Language.png">menu-icons/Language.png</file>
     <file alias="menu/RestartMovie.png">images/restart.png</file>
     <file alias="menu/StopMovie.png">images/Stop.png</file>
     <file alias="menu/SaveMovie.png">images/SaveAs.png</file>
