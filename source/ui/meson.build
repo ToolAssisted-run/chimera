@@ -489,6 +489,22 @@ if qt_dep.found()
       override_options: ['cpp_std=c++20'],
     )
     test('picture pointer', test_picture_pointer, env: ['QT_QPA_PLATFORM=offscreen', 'QT_QUICK_BACKEND=software'], timeout: 60)
+    # files dropped on a slot of New Project, every one of them, not only
+    # the first (issue 425): the window over the program's view model
+    test_new_project_drop = executable(
+      'test-new-project-drop',
+      ['qt/tests/test_new_project_drop.cpp', 'qt/qml_view_model.cpp', 'qt/portal_file_chooser.cpp', 'qt/file_places.cpp',
+        qt6.compile_moc(headers: ['qt/qml_view_model.hpp', 'qt/portal_file_chooser.hpp', 'qt/file_places.hpp'], dependencies: [qt_dep]),
+        qt_rcc, qt_dialogs_rcc],
+      dependencies: [qt_test_dep, vm_dep, dl_dep],
+      override_options: ['cpp_std=c++20'],
+      cpp_args: ['-DQT_NO_KEYWORDS'],
+    )
+    test('new project drop', test_new_project_drop,
+      args: [repo_root / 'build/Cores/synth-box.chimeraCore', repo_root / 'tests/synth/roms/gridWalker.testrom',
+        meson.current_build_dir() / 'new-project-drop-test'],
+      env: ['QT_QPA_PLATFORM=offscreen', 'QT_QUICK_BACKEND=software', 'CHIMERA_FILE_CHOOSER=builtin', 'ALSOFT_DRIVERS=null'],
+      timeout: 60)
   endif
   # single instance mode's hand-over of the files named, in Chimera's payload
   test_single_instance = executable(

@@ -71,6 +71,11 @@ ApplicationWindow {
         win.vm.run(command, args || [])
         if (win.vm.error !== "") win.said = win.vm.error
     }
+    // files into a slot, from here: each one added builds the slots again, so a
+    // loop in the slot that took a drop would end with it after the first (issue 425)
+    function addFiles(slotId, files) {
+        for (const f of files) win.run("addFile", [slotId, f])
+    }
 
     // the pages asked: the files when the package takes any, the firmware when the choices call for some
     function applies(p) { return p === 1 ? win.vm.filesAsked : p === 3 ? win.vm.firmwareAsked : p === 4 ? win.vm.compileAsked : true }
@@ -134,7 +139,7 @@ ApplicationWindow {
         currentFolder: win.folderOf ? win.folderOf("ROM") : ""
         onAccepted: {
             if (win.gameChosen && selectedFiles.length > 0) win.gameChosen(selectedFiles[0])
-            for (const f of selectedFiles) win.run("addFile", [win.slotFor, f])
+            win.addFiles(win.slotFor, selectedFiles)
         }
     }
     FileDialog {
@@ -340,8 +345,8 @@ ApplicationWindow {
                                                 id: slotDrop
                                                 anchors.fill: parent
                                                 onDropped: (drop) => {
-                                                    for (const u of drop.urls) win.run("addFile", [slot.id, u])
                                                     drop.accept()
+                                                    win.addFiles(slot.id, drop.urls)
                                                 }
                                             }
                                         }

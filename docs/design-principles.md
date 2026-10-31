@@ -11708,3 +11708,22 @@ and nothing is told at 0,0. With Qt's point passed on as it was, the three
 checks of a release fail; the test passed 30 times on a loaded machine.
 Red Ball 2 itself was not run here (the game is the reporter's).
 
+
+## Every file dropped on a slot is added (2026-10-31, issue 425)
+
+Several files dropped together on a slot of New Project's files page added
+only the first. Each file added makes the view model build its list of
+slots again, and the window then takes away the part that shows a slot and
+makes a new one. The loop over the dropped files ran inside the old part,
+so it stopped with an error after the first file ("Cannot call method of
+undefined"). The loop now runs in the window itself, which stays, and the
+file dialog's Add... goes through the same loop.
+
+The rule for the window's QML: a loop that changes a list must not run
+inside one of that list's rows.
+
+Tested: a new test, "new project drop", opens the New Project window over
+the program's own view model with the synthetic core and drops three files
+on its slot with Qt's test module; all three are in the slot, in order.
+With the loop back in the slot, one file is added and the check fails.
+Not tried by hand on Windows.
