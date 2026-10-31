@@ -263,8 +263,12 @@ are the owner's to approve. With that:
    index was written a second before the asset existed.
 4. **The roster and the README.** A row in `official-cores.json` - `id`,
    `name`, `systems` as id and name each, `repo`, and `"kind": "game"` for a
-   game core - and a row in the README's table of cores: the core's name
-   linked to its repository's main page, the systems it runs beside it.
+   game core - and a row in the README's table of official cores (emulation
+   or games): the core's name linked to its repository's main page, the
+   systems it runs beside it. A core somebody else makes and publishes from
+   their own repository is not an official core: it gets a row in
+   `third-party-cores.json` (the same fields and its `author`) and in the
+   README's third-party tables, and this project does not support it.
 5. **The issue.** Say what was built and which published build has it - the
    name read from the release (`gh release view dev --json name`), never
    guessed - what the user must bring, and what was not proved. Then close it.

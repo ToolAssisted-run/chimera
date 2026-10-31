@@ -34,7 +34,11 @@ Chimera does not include cores and does not download them. To use a core, downlo
 
 **Tools > Core Manager...** lists the cores in that folder and lets you point Chimera at a different one ([docs/core-manager.md](docs/core-manager.md)).
 
-### Emulation cores
+### Official cores
+
+Made, published and supported by this project. Report a problem with one in [Chimera's issues](https://github.com/ToolAssisted-run/chimera/issues).
+
+#### Emulation
 
 | Core | Systems |
 | --- | --- |
@@ -86,7 +90,7 @@ Chimera does not include cores and does not download them. To use a core, downlo
 | [OpenBOR](https://github.com/ToolAssisted-run/chimera-core-openbor) | OpenBOR (2D beat 'em up games) |
 | [Ikemen GO](https://github.com/ToolAssisted-run/chimera-core-ikemen) | Ikemen GO (fighting games made with it, and M.U.G.E.N characters and stages) |
 
-### Game cores
+#### Games
 
 One game each, run from the game's own files ([docs/game-cores.md](docs/game-cores.md)).
 
@@ -102,9 +106,23 @@ One game each, run from the game's own files ([docs/game-cores.md](docs/game-cor
 | [RSDKv5](https://github.com/ToolAssisted-run/chimera-core-rsdkv5) | Sonic Mania |
 | [DSDA-Doom](https://github.com/ToolAssisted-run/chimera-core-dsda) | Doom, Doom II, Final Doom, Heretic, Hexen, Chex Quest, Freedoom |
 | [Open4DBoxing](https://github.com/ToolAssisted-run/chimera-core-open4dboxing) | 4D Sports Boxing (DOS) |
-| [SRB2](https://github.com/P-AS/chimera-core-srb2) | Sonic Robo Blast 2 |
 
-SRB2 is published by its author, P-AS, from their own repository.
+### Third-party cores
+
+Made and published by other people from their own repositories, and listed here for information only. This project does not maintain or support them: report a problem with one in its own repository.
+
+#### Emulation
+
+| Core | Author | Systems |
+| --- | --- | --- |
+| [UnrealSpeccyP](https://github.com/CloakTheLurker/chimera-core-unrealspeccyp) | [CloakTheLurker](https://github.com/CloakTheLurker) | ZX Spectrum 128K (Pentagon), ZX Spectrum 48K |
+| [Eden](https://github.com/mayonnaisegoodfellas/chimera-core-eden) | [mayonnaisegoodfellas](https://github.com/mayonnaisegoodfellas) | Nintendo Switch |
+
+#### Games
+
+| Core | Author | Games |
+| --- | --- | --- |
+| [SRB2](https://github.com/P-AS/chimera-core-srb2) | [P-AS](https://github.com/P-AS) | Sonic Robo Blast 2 |
 
 ## Getting a build
 

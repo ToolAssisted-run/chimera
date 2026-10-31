@@ -33,8 +33,10 @@ The requests are the issues labelled `core-request`:
 
 A core is built in ITS OWN repository, a checkout beside this one. This
 repository changes for a new core in exactly two places - a row in
-`official-cores.json` and a row in the README's table of cores - and in
-nothing under `source/`.
+`official-cores.json` and a row in the README's tables of official cores - and
+in nothing under `source/`. A core someone else makes and publishes is a
+third-party core: a row in `third-party-cores.json` and in the README's
+third-party tables, with its author.
 
 ## Layout
 
@@ -51,8 +53,11 @@ nothing under `source/`.
   (`source/ui/meson.build`).
 - `tools/` - bundles, publishing (`publish-core.sh`, `write-core-index.sh`),
   `fetch-cores.sh`.
-- `official-cores.json` - the roster the Published cores workflow goes by (not
-  CI: Chimera depends on no core). The frontend does not read it.
+- `official-cores.json` - the roster of official cores, the ones this project
+  makes and supports; the Published cores workflow goes by it (not CI: Chimera
+  depends on no core). The frontend does not read it.
+- `third-party-cores.json` - cores other people make and publish, listed for
+  information only (README, website). Nothing downloads or checks them.
 - `docs/` - one document per subject; `design-principles.md` is the log.
 - `build/` - every output. Ignored by git. `build/Cores` is where a core's
   `build-package.sh -r <this checkout>` installs its package.

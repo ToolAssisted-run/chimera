@@ -1,5 +1,5 @@
 {
-  "_comment": "The cores this project publishes: which repository publishes each one. Chimera does NOT read this file and does not ship it - the frontend downloads nothing and lists only the packages somebody put in its Cores folder (docs/core-manager.md). It is kept in the repository for two readers: CI, which fetches each core's published package to check the frontend against it (tools/fetch-cores.sh), and the documentation, which lists where the cores are. A row carries each system's id (what movies and projects are keyed by) and the CORE'S OWN NAME for it, copied from the core's package when it joined; a test holds the row to what the packages say. \"tested\" is not used.",
+  "_comment": "The official cores: the ones this project makes, publishes and supports, and which repository publishes each one. Cores other people make are in third-party-cores.json. Chimera does NOT read this file and does not ship it - the frontend downloads nothing and lists only the packages somebody put in its Cores folder (docs/core-manager.md). It is kept in the repository for two readers: CI, which fetches each core's published package to check the frontend against it (tools/fetch-cores.sh), and the documentation, which lists where the cores are. A row carries each system's id (what movies and projects are keyed by) and the CORE'S OWN NAME for it, copied from the core's package when it joined; a test holds the row to what the packages say. \"tested\" is not used.",
   "formatVersion": 2,
   "cores": [
     {
@@ -588,16 +588,6 @@
         { "id": "Model3", "name": "Sega Model 3" }
       ],
       "repo": "ToolAssisted-run/chimera-core-supermodel",
-      "tested": ""
-    },
-    {
-      "id": "srb2",
-      "name": "SRB2",
-      "systems": [
-        { "id": "SRB2", "name": "Sonic Robo Blast 2" }
-      ],
-      "kind": "game",
-      "repo": "P-AS/chimera-core-srb2",
       "tested": ""
     }
   ]

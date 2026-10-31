@@ -1,0 +1,35 @@
+{
+  "_comment": "Third-party cores: Chimera cores other people make and publish from their own repositories. This project lists them for information only. It does not make, maintain or support them, and their issues go to their own repositories. The documentation and the website list them apart from the official cores (official-cores.json). Nothing reads this file to download or check a core. A row carries the core's name, its author, its repository, whether it is a game core, and each system's id and the core's own name for it, as its package declares them.",
+  "formatVersion": 1,
+  "cores": [
+    {
+      "id": "unrealspeccyp",
+      "name": "UnrealSpeccyP",
+      "author": "CloakTheLurker",
+      "systems": [
+        { "id": "ZXS", "name": "ZX Spectrum 128K" },
+        { "id": "ZXS48", "name": "ZX Spectrum 48K" }
+      ],
+      "repo": "CloakTheLurker/chimera-core-unrealspeccyp"
+    },
+    {
+      "id": "eden",
+      "name": "Eden",
+      "author": "mayonnaisegoodfellas",
+      "systems": [
+        { "id": "NSW", "name": "Nintendo Switch" }
+      ],
+      "repo": "mayonnaisegoodfellas/chimera-core-eden"
+    },
+    {
+      "id": "srb2",
+      "name": "SRB2",
+      "author": "P-AS",
+      "systems": [
+        { "id": "SRB2", "name": "Sonic Robo Blast 2" }
+      ],
+      "kind": "game",
+      "repo": "P-AS/chimera-core-srb2"
+    }
+  ]
+}

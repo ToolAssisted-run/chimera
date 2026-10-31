@@ -11956,3 +11956,21 @@ first published build is "Development build a874aa55 (made 2026-10-31
 Nothing in Chimera's own source changed: a roster row and the README's
 table of cores.
 
+## Official and third-party cores are listed apart (user-decided, 2026-10-31)
+
+The README and the website list cores in two groups, each split into
+emulation and games: official cores, which this project makes, publishes and
+supports, and third-party cores, which other people make and publish from
+their own repositories. A third-party core is listed for information only,
+with its author: this project does not maintain or support it, and problems
+with it are reported in its own repository.
+
+Where they are kept: `official-cores.json` stays the roster of official
+cores, which the Published cores workflow downloads and checks. Third-party
+cores are in a separate file, `third-party-cores.json` (the owner chose a
+separate list over one roster with a mark), so no workflow of this project
+downloads or checks a third-party package. SRB2 moved from the roster to
+that file. The first third-party cores: UnrealSpeccyP by CloakTheLurker
+(ZX Spectrum 128K and 48K), Eden by mayonnaisegoodfellas (Nintendo Switch)
+and SRB2 by P-AS (Sonic Robo Blast 2, a game core), each with the systems
+its package declares.
