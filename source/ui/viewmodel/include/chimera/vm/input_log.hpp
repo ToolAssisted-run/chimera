@@ -69,7 +69,14 @@ public:
 	/* the machine has run the frame (its lag flag is known), now or before
 	 * an edit sent the greenzone back past it */
 	bool ranAt(int64_t frame) const;
-	void clearLags();
+	/* how long the frame was, in picoseconds, by the rate the core gave after
+	 * it ran (0: never run); true when that changed. Frames put in or taken
+	 * out move the lengths after them, as they move the lag flags */
+	bool setLength(int64_t frame, int64_t picoseconds);
+	int64_t lengthAt(int64_t frame) const;
+	/* the frames' lag flags and lengths not known again, as for a machine
+	 * just opened */
+	void forgetRuns();
 
 	/* the machine's thread: the machine whose movie this is, nullptr for
 	 * none - before it frees one */
@@ -85,6 +92,7 @@ private:
 	/* a frame each: 1 lag, 0 not, kNotRun never run (put in since) */
 	static constexpr uint8_t kNotRun = 2;
 	std::vector<uint8_t> lags_;
+	std::vector<int64_t> lengths_;
 };
 
 /* a movie's line read against the machine's controller: its buttons, every

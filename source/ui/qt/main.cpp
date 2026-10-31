@@ -1028,6 +1028,7 @@ int main(int argc, char **argv)
 	config.keep(session, "captureOsd");
 	config.keep(session, "captureMouse");
 	config.keep(session, "showGameTime");
+	config.keep(session, "showRealTime");
 	config.keep(session, "autofireOn");
 	config.keep(session, "autofireOff");
 	config.keep(session, "autofireSkipsLag");

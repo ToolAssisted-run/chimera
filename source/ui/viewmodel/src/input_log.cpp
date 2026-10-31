@@ -98,6 +98,7 @@ void InputLog::insert(int64_t frame, int64_t count)
 	if (s_ == nullptr || frame < 0 || count <= 0) return;
 	ce_session_movie_insert(s_, frame, count);
 	if (frame < static_cast<int64_t>(lags_.size())) lags_.insert(lags_.begin() + frame, static_cast<size_t>(count), kNotRun);
+	if (frame < static_cast<int64_t>(lengths_.size())) lengths_.insert(lengths_.begin() + frame, static_cast<size_t>(count), 0);
 }
 
 void InputLog::remove(int64_t frame, int64_t count)
@@ -107,6 +108,8 @@ void InputLog::remove(int64_t frame, int64_t count)
 	ce_session_movie_remove(s_, frame, count);
 	if (frame < static_cast<int64_t>(lags_.size()))
 		lags_.erase(lags_.begin() + frame, lags_.begin() + std::min<int64_t>(frame + count, static_cast<int64_t>(lags_.size())));
+	if (frame < static_cast<int64_t>(lengths_.size()))
+		lengths_.erase(lengths_.begin() + frame, lengths_.begin() + std::min<int64_t>(frame + count, static_cast<int64_t>(lengths_.size())));
 }
 
 void InputLog::neutralAxes(int32_t *out) const
@@ -210,10 +213,27 @@ bool InputLog::lagAt(int64_t frame) const
 	return frame >= 0 && frame < static_cast<int64_t>(lags_.size()) && lags_[static_cast<size_t>(frame)] == 1;
 }
 
-void InputLog::clearLags()
+bool InputLog::setLength(int64_t frame, int64_t picoseconds)
+{
+	if (frame < 0) return false;
+	std::unique_lock lock(m_);
+	if (frame >= static_cast<int64_t>(lengths_.size())) lengths_.resize(static_cast<size_t>(frame) + 1, 0);
+	if (lengths_[static_cast<size_t>(frame)] == picoseconds) return false;
+	lengths_[static_cast<size_t>(frame)] = picoseconds;
+	return true;
+}
+
+int64_t InputLog::lengthAt(int64_t frame) const
+{
+	std::shared_lock lock(m_);
+	return frame >= 0 && frame < static_cast<int64_t>(lengths_.size()) ? lengths_[static_cast<size_t>(frame)] : 0;
+}
+
+void InputLog::forgetRuns()
 {
 	std::unique_lock lock(m_);
 	lags_.clear();
+	lengths_.clear();
 }
 
 void InputLog::bind(ce_session *s)

@@ -948,9 +948,10 @@ CE_API int32_t ce_session_virtual_height(const ce_session *s);
  * monitor stood on its side, which no per-machine declaration can know. */
 CE_API int32_t ce_session_display_aspect(const ce_session *s, int32_t *x_out, int32_t *y_out);
 /* The rate of frames NOW: the guest's own answer when it gives one (asked
- * after Init and again after every frame advanced with render on, since a
+ * after Init and again after every frame advanced, drawn or not, since a
  * machine changes its refresh with its video mode and a game core's step is as
- * long as the game makes it), else the config's. */
+ * long as the game makes it), else the config's. The rate read after a frame
+ * is that frame's length. */
 CE_API int32_t ce_session_vsync_numerator(const ce_session *s);
 CE_API int32_t ce_session_vsync_denominator(const ce_session *s);
 CE_API int32_t ce_session_samples_per_frame(const ce_session *s);

@@ -205,6 +205,14 @@ public:
 	bool renderSurface(int32_t index, Picture &into);
 	Property<bool> showGameTime{false};
 	Property<std::string> gameTimeText;
+	/* View > Display Real Time (owner, 2026-10-31): the time from the
+	 * movie's start to the current frame, each frame as long as the rate
+	 * the core gave after it ran, as shown: "RTA 01:02.345" */
+	Property<bool> showRealTime{false};
+	Property<std::string> realTimeText;
+	/* a time in milliseconds as Real Time shows it: "01:02.345", and
+	 * "1:02:03.456" from an hour on */
+	static std::string realTime(int64_t ms);
 	/* Export Core Log (Help > Export Core Log...): what the cores write, kept in a
 	 * file only when asked and never remembered (each run starts with it
 	 * off; the engine keeps it, ce_core_log). The file while it is on, ""
@@ -1185,6 +1193,8 @@ private:
 	 * length), and the lag frames counted up to a frame */
 	void updateOverlay(int64_t frame, int64_t changedFrom);
 	int64_t lastInputFor_ = -1, lastInput_ = 0, lagsTo_ = 0, lags_ = 0;
+	/* the frames' lengths added up to a frame, in picoseconds */
+	int64_t realTo_ = 0, realPs_ = 0;
 	/* what a script's emu.setlagcount added to the count, from which frame */
 	int64_t lagOffset_ = 0, lagOffsetFrom_ = INT64_MAX;
 	bool fastHeld_ = false, rewindHeld_ = false;
@@ -1273,6 +1283,9 @@ private:
 	std::atomic<bool> averageResetM_{false};
 	/* the game's timer, read with each report when shown */
 	std::atomic<bool> showGameTimeM_{false};
+	/* the length of the frame the machine ran last, in picoseconds: a frame
+	 * not run since the machine opened is counted as this long */
+	std::atomic<int64_t> frameLengthM_{0};
 	bool gameTimerM_ = false;
 	/* the game's timer after each frame the machine ran (kNoGameTime where it
 	 * has not been since), forgotten past an edit as the stored states are:

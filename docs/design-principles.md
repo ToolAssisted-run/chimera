@@ -11819,3 +11819,36 @@ names were already in the tables (their `english` field).
 Tested: the translations test checks the menu's names for German,
 Russian, Brazilian Portuguese and English; with the language's own name
 alone, three of those checks fail.
+
+## Display Real Time (user-decided, 2026-10-31)
+
+The owner asked for View > Display Real Time: a timer of the time from
+the movie's start to the current frame, "given the core's timing logic
+(could be fixed as many consoles, or cumulative as in dosbox)".
+
+Each frame is as long as the rate the core gives after it ran, and the
+timer adds them up to the current frame. A console's rate is fixed, so
+its time is the frames times one length; DOSBox's rate follows its video
+mode (70 Hz text, 60 Hz graphics), and each frame counts at its own. The
+owner chose this over a new export for the core's own clock, which every
+core whose rate changes would have needed.
+
+- The engine now asks the core for its rate after every frame, a seek's
+  too, where it asked only after a frame drawn. Two small calls a frame.
+- Each frame's length is kept beside its lag flag (in picoseconds), and
+  moves with it when frames are put in or taken out. Like the lag flag,
+  it is known only for frames run since the machine opened: a project
+  that opens on a later frame from its stored states counts the frames
+  before it as long as the last one run, exact for a fixed rate and a
+  guess for DOSBox until they are run again.
+- It reads "RTA 01:02.345", and "RTA 1:02:03.456" from an hour on (the
+  owner's choice of words, beside Game Time's IGT), at the top right
+  under Game Time; its place is in Config > Messages as Real Time.
+
+Tested: the view models' test runs the synthetic core (exactly 60 fps):
+20 frames read "RTA 00:00.333", back to frame 6 "00:00.100", 120 frames
+reached by a seek "00:02.000"; five frames given 1/70 s each read
+"00:00.088" at frame 6 (with every frame counted at the last length,
+that check fails); the hour's form; lengths moving with frames put in
+and taken out. A screenshot shows it under IGT. Not tested: a core whose
+rate changes, since the synthetic core's does not; DOSBox was not run.

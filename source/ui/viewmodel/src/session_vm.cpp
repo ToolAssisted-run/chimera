@@ -547,6 +547,9 @@ SessionViewModel::SessionViewModel(Dispatcher &dispatcher, InputLog &inputs)
 	expose("movieImportMenu", "the menu item of the core open's movie importer, in its package's words (\"\" when it has none)", movieImportMenu);
 	expose("showGameTime", "a game's own timer is shown over the picture", showGameTime, true);
 	expose("gameTimeText", "the game's timer as shown: \"IGT 01:02.345\"", gameTimeText);
+	expose("showRealTime", "the time from the movie's start to the current frame is shown over the picture", showRealTime, true);
+	expose("realTimeText", "the time from the movie's start to the current frame as shown: \"RTA 01:02.345\"; each frame "
+		"as long as the core's rate said after it ran", realTimeText);
 	expose("coreLogPath", "the file the core log goes to, \"\" while it is off", coreLogPath);
 	command("coreLogName", "the name Chimera suggests for a core log: the core, \"core log\", the date and time", {},
 		[this](const Args &, std::string &) -> Value {
@@ -679,10 +682,11 @@ SessionViewModel::SessionViewModel(Dispatcher &dispatcher, InputLog &inputs)
 	}));
 	/* turned on, a counter says at once what it has to say, counted afresh:
 	 * off, it heard of no change */
-	for (Property<bool> *shown : {&showFps, &showFrameCounter, &showLagCounter, &showInput})
+	for (Property<bool> *shown : {&showFps, &showFrameCounter, &showLagCounter, &showInput, &showRealTime})
 		overlayWatches_.push_back(shown->changed.connect([this] {
 			lastInputFor_ = -1;
 			lagsTo_ = lags_ = 0;
+			realTo_ = realPs_ = 0;
 			updateOverlay(frame.get(), -1);
 		}));
 	expose("autoheld", "the buttons autohold holds, a space between", autoheld);
@@ -5138,7 +5142,7 @@ void SessionViewModel::adoptOnMachine(ce_session *s, const std::string &package,
 	packageSha1M_.clear();
 	diedM_ = false;
 	inputs_.bind(s);
-	inputs_.clearLags();
+	inputs_.forgetRuns();
 	frameM_ = ce_session_frame(s);
 	greenEndM_ = 0;
 	gameTimeLogM_.clear();
@@ -5310,7 +5314,10 @@ void SessionViewModel::adoptOnMachine(ce_session *s, const std::string &package,
 
 	const int32_t num = ce_session_vsync_numerator(s), den = ce_session_vsync_denominator(s);
 	if (num > 0 && den > 0)
+	{
 		period_ = std::chrono::duration_cast<Clock::duration>(std::chrono::duration<double>(static_cast<double>(den) / num));
+		frameLengthM_.store((static_cast<int64_t>(den) * 1'000'000'000'000 + num / 2) / num);
+	}
 	const char *core = ce_session_core_name(s);
 	const char *system = ce_session_system_name(s);
 	const std::string coreText = core != nullptr ? core : "", systemText = system != nullptr ? system : "";
@@ -5879,6 +5886,12 @@ int32_t SessionViewModel::stepOnMachine(bool live, bool render, bool grow)
 	for (const Hooks &h : hooksM_)
 		if (h.frame) h.frame(s_);
 	if (inputs_.setLag(f, lag > 0)) changed = true;
+	if (const int32_t num = ce_session_vsync_numerator(s_), den = ce_session_vsync_denominator(s_); num > 0 && den > 0)
+	{
+		const int64_t length = (static_cast<int64_t>(den) * 1'000'000'000'000 + num / 2) / num;
+		frameLengthM_.store(length);
+		if (inputs_.setLength(f, length)) changed = true;
+	}
 	if (traceOnM_) drainTraceOnMachine();
 
 	if (live && soundM_ && !turboM_.load())
@@ -6283,6 +6296,33 @@ void SessionViewModel::updateOverlay(int64_t f, int64_t changedFrom)
 	if (f < lagOffsetFrom_) lagOffset_ = 0, lagOffsetFrom_ = INT64_MAX;
 	lagCount.set(lags_ + lagOffset_);
 	if (showInput.get()) inputText.set(inputDisplay(f - 1));
+	/* the time to this frame: each frame as long as the core's rate said
+	 * after it ran, one not run since the machine opened as long as the last
+	 * one run (owner, 2026-10-31); added on from where it was, unless the
+	 * machine went back or a length before changed */
+	if (showRealTime.get())
+	{
+		if (f < realTo_ || (changedFrom >= 0 && changedFrom < realTo_)) realTo_ = realPs_ = 0;
+		const int64_t guess = frameLengthM_.load();
+		for (; realTo_ < f; realTo_++)
+		{
+			const int64_t length = inputs_.lengthAt(realTo_);
+			realPs_ += length > 0 ? length : guess;
+		}
+		realTimeText.set(tr("session.real_time", {realTime(realPs_ / 1'000'000'000)}));
+	}
+}
+
+std::string SessionViewModel::realTime(int64_t ms)
+{
+	const int64_t h = ms / 3'600'000, m = ms / 60'000 % 60, sec = ms / 1000 % 60, milli = ms % 1000;
+	char text[48];
+	if (h > 0)
+		std::snprintf(text, sizeof text, "%lld:%02lld:%02lld.%03lld", static_cast<long long>(h), static_cast<long long>(m),
+			static_cast<long long>(sec), static_cast<long long>(milli));
+	else
+		std::snprintf(text, sizeof text, "%02lld:%02lld.%03lld", static_cast<long long>(m), static_cast<long long>(sec), static_cast<long long>(milli));
+	return text;
 }
 
 std::string SessionViewModel::inputDisplay(int64_t frame) const

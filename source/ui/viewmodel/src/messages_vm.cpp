@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <iterator>
 
 #include "chimera/vm/json.hpp"
 
@@ -12,10 +13,11 @@ namespace {
 using json::Json;
 
 const char *const kNames[] = {"Fps", "Frame Counter", "Lag Counter", "Input Display", "Watches", "Messages", "Rerecords",
-	"Autohold", "Game Time"};
-/* Chimera's default message positions */
+	"Autohold", "Game Time", "Real Time"};
+/* Chimera's default message positions; Real Time under Game Time */
 const int kDefaults[][3] = {{0, 0, 0}, {0, 14, 0}, {0, 42, 0}, {0, 28, 0}, {0, 70, 0}, {0, 0, 2}, {0, 56, 0}, {0, 0, 1},
-	{0, 14, 1}};
+	{0, 14, 1}, {0, 28, 1}};
+static_assert(std::size(kNames) == std::size(kDefaults));
 
 Json place(int64_t x, int64_t y, int64_t anchor)
 {
@@ -38,7 +40,7 @@ std::string MessagesViewModel::defaultPositions()
 {
 	Json all;
 	all.kind = Json::Kind::Object;
-	for (size_t i = 0; i < 9; i++) all.members.emplace_back(kNames[i], place(kDefaults[i][0], kDefaults[i][1], kDefaults[i][2]));
+	for (size_t i = 0; i < std::size(kNames); i++) all.members.emplace_back(kNames[i], place(kDefaults[i][0], kDefaults[i][1], kDefaults[i][2]));
 	return json::write(all);
 }
 
@@ -54,7 +56,7 @@ MessagesViewModel::MessagesViewModel(Dispatcher &dispatcher) : ViewModel("messag
 	expose("messageSeconds", "how long a message stays over the picture, 1 to 10 seconds", messageSeconds, true);
 	expose("stackMessages", "messages stack, the newest at their corner; else only the newest is shown", stackMessages, true);
 	command("setPosition", "where one thing goes: its name (Fps, Frame Counter, Lag Counter, Input Display, Watches, "
-		"Messages, Rerecords, Autohold, Game Time), x and y in pixels from its corner, and the corner (0 top left, 1 top "
+		"Messages, Rerecords, Autohold, Game Time, Real Time), x and y in pixels from its corner, and the corner (0 top left, 1 top "
 		"right, 2 bottom left, 3 bottom right)", {"name", "x", "y", "anchor"}, [this](const Args &a, std::string &error) -> Value {
 			std::string name;
 			int64_t x = 0, y = 0, anchor = 0;
@@ -129,7 +131,7 @@ MessagesViewModel::MessagesViewModel(Dispatcher &dispatcher) : ViewModel("messag
 			return;
 		}
 		bool added = false;
-		for (size_t i = 0; i < 9; i++)
+		for (size_t i = 0; i < std::size(kNames); i++)
 			if (all.find(kNames[i]) == nullptr)
 			{
 				all.members.emplace_back(kNames[i], place(kDefaults[i][0], kDefaults[i][1], kDefaults[i][2]));

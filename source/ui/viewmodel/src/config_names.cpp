@@ -68,6 +68,7 @@ const std::vector<ConfigName> &configNames()
 		{"ReRecordCounter", Kind::Place, "messages.positions", "Rerecords"},
 		{"Autohold", Kind::Place, "messages.positions", "Autohold"},
 		{"GameTime", Kind::Place, "messages.positions", "Game Time"},
+		{"RealTime", Kind::Place, "messages.positions", "Real Time"},
 		{"DispFinalFilter", Kind::Plain, "display.finalFilter", ""},
 		{"DispFixAspectRatio", Kind::Plain, "display.letterbox", ""},
 		{"DispFixScaleInteger", Kind::Plain, "display.integerScale", ""},

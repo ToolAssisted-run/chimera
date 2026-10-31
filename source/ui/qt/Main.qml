@@ -173,6 +173,7 @@ ApplicationWindow {
         place("Fps", [[root.session.showFps ? root.session.fpsText : "",
                        root.session.showAverageFps ? root.session.averageFpsText : ""].filter(t => t !== "").join("   ")], root.osdMessageColor)
         if (root.session.showGameTime) place("Game Time", [root.session.gameTimeText], root.osdMessageColor)
+        if (root.session.showRealTime) place("Real Time", [root.session.realTimeText], root.osdMessageColor)
         if (root.session.showRerecords) place("Rerecords", [String(root.session.rerecords)], root.osdMessageColor)
         if (root.session.showMessages) {
             const all = []
@@ -525,6 +526,7 @@ ApplicationWindow {
                 Action { property string hotkey: "Lag Counter"; text: qsTrId("main.display_lag_frame_count"); checkable: true; checked: root.session.showLagCounter; onTriggered: root.session.showLagCounter = checked }
                 Action { property string hotkey: "Input Display"; text: qsTrId("main.display_input"); checkable: true; checked: root.session.showInput; onTriggered: root.session.showInput = checked }
                 Action { text: qsTrId("main.display_rerecord_count"); checkable: true; checked: root.session.showRerecords; onTriggered: root.session.showRerecords = checked }
+                Action { text: qsTrId("main.display_real_time"); checkable: true; checked: root.session.showRealTime; onTriggered: root.session.showRealTime = checked }
                 Action { text: qsTrId("main.display_subtitles"); checkable: true; checked: root.projectDetails.showSubtitles; onTriggered: root.projectDetails.showSubtitles = checked }
                 MenuDivider {}
                 Action { text: qsTrId("main.display_status_bar"); checkable: true; checked: root.session.showStatusBar; onTriggered: root.session.showStatusBar = checked }
@@ -1507,6 +1509,14 @@ ApplicationWindow {
             place: "Game Time"
             visible: root.session.isOpen && root.session.showGameTime && text !== ""
             text: root.session.gameTimeText
+            color: root.osdMessageColor
+        }
+        // the time from the movie's start to this frame, under the game's own timer
+        OsdText {
+            objectName: "osdRealTime"
+            place: "Real Time"
+            visible: root.session.isOpen && root.session.showRealTime && text !== ""
+            text: root.session.realTimeText
             color: root.osdMessageColor
         }
         OsdText {

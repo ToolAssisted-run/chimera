@@ -901,7 +901,7 @@ struct ce_session
 	CeGameProperties::Value propertyValue; // what the last ce_session_property_get lent out
 
 	int32_t vsyncNum = 0, vsyncDen = 0;
-	/* the core's own rate exports, asked again after every shown frame: a game
+	/* the core's own rate exports, asked again after every frame: a game
 	 * core's step is as long as the game's logic makes it (docs/game-cores.md),
 	 * and a machine changes its refresh with its video mode */
 	int32_t (*getVsyncNum)() = nullptr;
@@ -1727,11 +1727,10 @@ int32_t ce_session::advanceCore(const uint8_t *buttons, int32_t render)
 		ce_gl_release();   /* the frame's borrowed context, which the frame never gave back */
 		return -1;
 	}
-	if (render != 0)
-	{
-		copyVideo();
-		readRate(); // for whoever paces the frames that are shown; a seek's are not
-	}
+	if (render != 0) copyVideo();
+	/* after every frame, a seek's too: a frame's length is the rate the core
+	 * says after it, which the window adds up (Display Real Time) */
+	readRate();
 	/* The core runs after its frame too - the picture's readback, the audio, the
 	 * input question - and can die in any of them. A frame a dead machine ended
 	 * is not counted, recorded or stored, as one that died in FrameAdvance is
@@ -3086,11 +3085,10 @@ int32_t ce_session_frame_advance(ce_session *s, uint64_t buttons, int32_t render
 		ce_gl_release();
 		return -1;
 	}
-	if (render != 0)
-	{
-		s->copyVideo();
-		s->readRate(); // for whoever paces the frames that are shown; a seek's are not
-	}
+	if (render != 0) s->copyVideo();
+	/* after every frame, a seek's too: a frame's length is the rate the core
+	 * says after it, which the window adds up (Display Real Time) */
+	s->readRate();
 	/* asked before the frame is counted: the core can die in it (advanceCore) */
 	const int32_t lag = s->inputWasRead != nullptr && s->inputWasRead() == 0 ? 1 : 0;
 	/* a core that reports its own count may produce a different number every

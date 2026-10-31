@@ -844,9 +844,9 @@ void configNamesList()
 	std::vector<std::string> names;
 	for (const ConfigName &s : configNames()) names.push_back(s.name);
 	std::sort(names.begin(), names.end());
-	CHECK(std::adjacent_find(names.begin(), names.end()) == names.end() && names.size() == 119);
+	CHECK(std::adjacent_find(names.begin(), names.end()) == names.end() && names.size() == 120);
 	const std::string forLua = configNamesText();
-	CHECK(std::count(forLua.begin(), forLua.end(), '\n') == 119);
+	CHECK(std::count(forLua.begin(), forLua.end(), '\n') == 120);
 }
 
 void bindings()
@@ -3793,6 +3793,36 @@ bool coreMenu(const char *package, const char *rom, const char *slotsPackage, co
 	std::printf("game time: %s\n", session.gameTimeText.get().c_str());
 	CHECK(std::regex_match(session.gameTimeText.get(), std::regex("IGT \\d\\d:\\d\\d\\.\\d\\d\\d")));
 	session.showGameTime.set(false);
+	/* Display Real Time: each frame as long as the core's rate said after it
+	 * ran, 1/60 s here, added up to the current frame (owner, 2026-10-31) */
+	CHECK(session.realTimeText.get().empty());
+	session.showRealTime.set(true);
+	CHECK(session.realTimeText.get() == "RTA 00:00.333");
+	CHECK(inputs.lengthAt(0) == 16'666'666'667 && inputs.lengthAt(19) == 16'666'666'667 && inputs.lengthAt(20) == 0);
+	session.run("seek", {int64_t{6}}, error);
+	CHECK(d.until([&] { return session.frame.get() == 6; }, 20));
+	CHECK(session.realTimeText.get() == "RTA 00:00.100");
+	/* frames run by a seek, which draws none, have their lengths too */
+	session.run("seek", {int64_t{120}}, error);
+	CHECK(d.until([&] { return session.frame.get() == 120; }, 30));
+	CHECK(session.realTimeText.get() == "RTA 00:02.000" && inputs.lengthAt(119) == 16'666'666'667);
+	/* frames of another length, as a machine's video mode gives them: five at 1/70 s */
+	session.run("seek", {int64_t{6}}, error);
+	CHECK(d.until([&] { return session.frame.get() == 6; }, 20));
+	session.showRealTime.set(false);
+	for (int64_t f = 0; f < 5; f++) inputs.setLength(f, 14'285'714'286);
+	session.showRealTime.set(true);
+	CHECK(session.realTimeText.get() == "RTA 00:00.088");
+	/* from an hour on, the hours */
+	CHECK(SessionViewModel::realTime(62'345) == "01:02.345" && SessionViewModel::realTime(3'723'456) == "1:02:03.456" &&
+		SessionViewModel::realTime(0) == "00:00.000");
+	/* frames put in and taken out move the lengths after them */
+	inputs.setLength(2, 7);
+	inputs.insert(1, 2);
+	CHECK(inputs.lengthAt(1) == 0 && inputs.lengthAt(2) == 0 && inputs.lengthAt(4) == 7);
+	inputs.remove(1, 2);
+	CHECK(inputs.lengthAt(2) == 7);
+	session.showRealTime.set(false);
 	session.run("close", {}, error);
 	CHECK(d.until([&] { return !session.isOpen.get(); }, 20));
 	/* a core that imports movies; a game core */
