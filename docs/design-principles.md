@@ -11852,3 +11852,30 @@ reached by a seek "00:02.000"; five frames given 1/70 s each read
 that check fails); the hour's form; lengths moving with frames put in
 and taken out. A screenshot shows it under IGT. Not tested: a core whose
 rate changes, since the synthetic core's does not; DOSBox was not run.
+
+## Proper nouns are never translated (user-decided, 2026-10-31)
+
+The owner, in their words: "Chimera should always be Chimera, no
+translation of proper nouns". Eight of the 26 tables had changed a name
+to fit their grammar: Czech, Polish and Hungarian put case endings on it
+("Chimery" in Czech and Polish), Finnish too ("Chimeran", "TAStudiossa",
+"Windowsin"), and Danish, Norwegian, Swedish and German a genitive "s"
+("Chimeras"). Those 100 texts now say the sentence with a common noun
+beside the name ("v programu Chimera", "Chimera-ohjelman", "MCP-serveren
+i Chimera"); a few
+had "FFmpeg" where the English names the program "ffmpeg". Korean attaches
+its particles to a name, in its own script, which leaves the name whole;
+those are kept. No table had replaced a name with a word of its own.
+
+The same question showed a bug report naming the build in the window's
+language (Russian's word for "build") on a form written in English. Copy
+Version Info and Report an Issue now write the build in the form's
+English, "Commit 1a2b3c4d5 (...)"; the About box keeps its own language.
+
+Tested: a new test, "proper nouns" (tools/check-proper-nouns.py), checks
+every table for the names an English text holds, unchanged and with no
+Latin letters glued to them; on the tables before this change it finds
+147 problems, after it none. The view models' test makes a Help view
+model while Chimera is in Russian and checks that its version text and
+report start with the English build line; with the translated name, both
+checks fail.

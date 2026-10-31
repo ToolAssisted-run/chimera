@@ -31,6 +31,10 @@ struct Facts
 	std::vector<Setting> changed;
 };
 
+/* the build as the form names it, in its English whatever the window's
+ * language: "Commit 1a2b3c4d5 (2026-10-26 18:35 CET)", the time left out
+ * when it is not known */
+std::string buildLine(const std::string &commit, const std::string &time);
 /* the build and the core open (Chimera's Copy Version Info) */
 std::string versionLines(const std::string &build, const std::string &core);
 /* every first line of a report */

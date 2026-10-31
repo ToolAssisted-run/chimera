@@ -5,6 +5,11 @@
 
 namespace chimera::vm::issue_report {
 
+std::string buildLine(const std::string &commit, const std::string &time)
+{
+	return "Commit " + commit + (time.empty() ? std::string() : " (" + time + ")");
+}
+
 std::string versionLines(const std::string &build, const std::string &core)
 {
 	std::string text = "**Chimera build:** " + build;

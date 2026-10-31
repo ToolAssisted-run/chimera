@@ -25,6 +25,19 @@ for tests), control names such as `P1 Up` (identifiers that movies, key
 bindings and scripts use), and names that are data rather than writing:
 game titles, MAME's machine names, the community's patch and cheat names.
 
+Proper nouns are never translated (owner, 2026-10-31): Chimera is always
+Chimera, and the names of other programs and services (TAStudio, GitHub,
+Lua, Windows, OpenGL, ffmpeg) are written as they are. A language whose
+grammar puts endings on names says the sentence with a common noun beside
+the name instead: "v programu Chimera", "Chimera-ohjelman", "MCP-serveren i
+Chimera". A particle written in another script, as Korean's and Japanese's
+are, leaves the name whole and is kept.
+
+A bug report is the exception the other way: its first lines are in the
+English of the issue form, whatever language the window is in, so Help >
+Copy Version Info and Report an Issue write "Commit 1a2b3c4d5 (...)" while
+the About box names the build in the window's language.
+
 ## The tables
 
 `languages/<code>.json`, one file per language, `en.json` among them:
@@ -165,6 +178,10 @@ arguments, plural forms, a key inside, JSON changed only where it holds a
 key, a missing language shown in English) and the C calls. `translations`
 checks the window's side: the language it starts in for a given system, a
 remembered choice, and what `qsTrId` answers.
+
+`proper nouns` (`tools/check-proper-nouns.py`) checks that every name an
+English text holds is in that text in every language, as it is written,
+with no Latin letters glued to it.
 
 `texts` (`tools/check-texts.py`) finds words written into Chimera's code:
 string literals that read as words and are none of what the rules leave

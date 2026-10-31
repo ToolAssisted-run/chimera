@@ -511,6 +511,8 @@ if not meson.is_cross_build()
   # no text written in the code: every text a person reads is a key in the
   # language tables (docs/translations.md, owner 2026-10-28)
   test('texts', find_program('python3'), args: [files('tools/check-texts.py'), meson.project_source_root()])
+  # proper nouns are never translated: Chimera is Chimera in every language (owner, 2026-10-31)
+  test('proper nouns', find_program('python3'), args: [files('tools/check-proper-nouns.py'), meson.project_source_root()])
   # the synthetic core's: every key its code returns is in its table
   test('synth_texts', find_program('python3'),
     args: [files('tools/check-core-texts.py'), meson.project_source_root() / 'tests/synth/package-box'])

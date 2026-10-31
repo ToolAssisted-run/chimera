@@ -51,6 +51,9 @@ public:
 private:
 	SessionViewModel &session_;
 	SettingsViewModel &settings_;
+	/* the build as a report names it: in the issue form's English, where
+	 * buildName is in the window's language (owner, 2026-10-31) */
+	std::string reportBuild_;
 };
 
 } // namespace chimera::vm

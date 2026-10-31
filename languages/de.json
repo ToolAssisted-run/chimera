@@ -1032,7 +1032,7 @@
 		"lua_console.clear_output": "Ausgabe leeren",
 		"lua_console.clear_output_mnemonic": "Ausgabe &leeren",
 		"lua_console.clear_registered_functions": "Registrierte Funktionen löschen",
-		"lua_console.completions_written": "Chimeras Lua-Vervollständigungen wurden nach %1 geschrieben",
+		"lua_console.completions_written": "Lua-Vervollständigungen für Chimera wurden nach %1 geschrieben",
 		"lua_console.copy": "&Kopieren",
 		"lua_console.could_not_make": "%1 konnte nicht angelegt werden",
 		"lua_console.deprecated": "[Veraltet] ",

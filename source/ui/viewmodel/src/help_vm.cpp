@@ -72,6 +72,7 @@ HelpViewModel::HelpViewModel(Dispatcher &dispatcher, SessionViewModel &session, 
 		commit.set(full.substr(0, 9));
 		commitUrl.set(homePage.get() + "/commit/" + full);
 		buildName.set(when > 0 ? tr("help.build_dated", {commit.get(), europeanTime(when)}) : tr("help.build", {commit.get()}));
+		reportBuild_ = issue_report::buildLine(commit.get(), when > 0 ? europeanTime(when) : std::string());
 	}
 	expose("buildName", "this build, as Chimera's About box and a report name it", buildName);
 	expose("commit", "the commit this build was made from, as Lua's client.getversion gives it", commit);
@@ -89,12 +90,12 @@ HelpViewModel::HelpViewModel(Dispatcher &dispatcher, SessionViewModel &session, 
 
 	command("versionReport", "the build and the core open, in the words a bug report asks for them (Chimera's Copy Version Info)",
 		{}, [this](const Args &, std::string &) -> Value {
-			return issue_report::versionLines(buildName.get(), coreAndVersion());
+			return issue_report::versionLines(reportBuild_, coreAndVersion());
 		});
 	command("makeReport", "fills in a report's first lines from this session and lists the files worth attaching, as "
 		"Chimera's Report an Issue", {}, [this](const Args &, std::string &) -> Value {
 			issue_report::Facts facts;
-			facts.build = buildName.get();
+			facts.build = reportBuild_;
 			facts.core = coreAndVersion();
 			facts.os = osName.get();
 			/* the card a core drew on in this session, in its driver's words; else the window's */

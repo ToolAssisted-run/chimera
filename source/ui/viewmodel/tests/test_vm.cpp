@@ -3614,6 +3614,17 @@ bool helpMenu(const char *package, const char *rom)
 		help.commitUrl.get().rfind("https://github.com/ToolAssisted-run/chimera/commit/" + help.commit.get(), 0) == 0);
 	/* nothing open: the build alone, and the report says what was not running */
 	CHECK(fromValue(help.run("versionReport", {}, error).value_or(Value()), text) && text == "**Chimera build:** " + help.buildName.get());
+	/* in another language the About box's name is that language's, and a
+	 * report's is still the form's English (owner, 2026-10-31) */
+	{
+		CHECK(ce_language_use("ru") != 0);
+		HelpViewModel russian(d, session, settings);
+		ce_language_use("en");
+		CHECK(russian.buildName.get().rfind("Commit ", 0) != 0);
+		CHECK(fromValue(russian.run("versionReport", {}, error).value_or(Value()), text) && text == "**Chimera build:** " + help.buildName.get());
+		CHECK(fromValue(russian.run("makeReport", {}, error).value_or(Value()), text) &&
+			text.rfind("**Chimera build:** " + help.buildName.get() + "\n", 0) == 0);
+	}
 	CHECK(fromValue(help.run("makeReport", {}, error).value_or(Value()), text));
 	CHECK(text.find("**Core and version:** <!-- no core was running -->") != std::string::npos &&
 		text.find("**Game:** <!-- no project was open -->") != std::string::npos &&
