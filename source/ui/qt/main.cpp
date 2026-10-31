@@ -1254,7 +1254,7 @@ int main(int argc, char **argv)
 	 * for, else English (docs/translations.md, owner 2026-10-28) */
 	{
 		QStringList offered;
-		for (const QString &l : qt::languages()) offered << l + QLatin1Char('\t') + qt::languageName(l);
+		for (const QString &l : qt::languages()) offered << l + QLatin1Char('\t') + qt::languageLabel(l);
 		customize.languages.set(offered.join(QLatin1Char('\n')).toStdString());
 		const QString start = qt::startLanguage(QString::fromStdString(customize.language.get()));
 		qt::useLanguage(app, start);

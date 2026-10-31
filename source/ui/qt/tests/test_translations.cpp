@@ -60,6 +60,11 @@ int main(int argc, char **argv)
 	CHECK(q::languageName(QStringLiteral("en")) == QStringLiteral("English"));
 	CHECK(q::languageName(QStringLiteral("fr")) == QString::fromUtf8("Fran\xc3\xa7" "ais"));
 	CHECK(q::languageEnglishName(QStringLiteral("de")) == QStringLiteral("German"));
+	/* the Language menu: each in itself and in English, whatever the window's language (issue 430) */
+	CHECK(q::languageLabel(QStringLiteral("de")) == QStringLiteral("Deutsch - German"));
+	CHECK(q::languageLabel(QStringLiteral("ru")) == QString::fromUtf8("\xd0\xa0\xd1\x83\xd1\x81\xd1\x81\xd0\xba\xd0\xb8\xd0\xb9 - Russian"));
+	CHECK(q::languageLabel(QStringLiteral("en")) == QStringLiteral("English"));
+	CHECK(q::languageLabel(QStringLiteral("pt")) == QString::fromUtf8("Portugu\xc3\xaas (Brasil) - Portuguese (Brazil)"));
 	/* a window's texts change with the language, asked for straight away or
 	 * through a function, with a key made as the window runs */
 	{

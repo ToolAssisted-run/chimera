@@ -107,7 +107,11 @@ the emulator in its terms and which it reports as its own.
 ## How the language is chosen
 
 Config > Language lists every table there is, each language named in
-itself. The window's texts change at once.
+itself and then in English, whatever language the window is in:
+"Deutsch - German", "Nederlands - Dutch", and English alone (owner,
+2026-10-31, issue 430). A dash parts them, since some names have
+brackets of their own (Brazilian Portuguese's). The window's texts
+change at once.
 
 The choice is remembered (`customize.language` in the window's settings).
 At the first open, when nothing is remembered yet, the window takes the

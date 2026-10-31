@@ -11804,3 +11804,18 @@ menu), CPU Registers alone, the game's timer with the package's importer
 and the Trace Logger parted by a divider, a game core's menu named Game.
 With the items greyed out as before, 4 of its 12 checks fail. The
 synthetic core's CPU Registers window was looked at in a screenshot.
+
+## The Language menu names each language in English too (user-decided, 2026-10-31, issue 430)
+
+Config > Language named each language only in itself, so someone asked
+which languages Chimera has could not say, nor type some of the names.
+Each is now named in itself and then in English, whatever language the
+window is in: "Deutsch - German", English alone. The owner chose English
+over the window's own language for the second name, and a dash over
+brackets, since some names have brackets of their own ("Portuguese
+(Brazil)"). No flags: a flag is a country, not a language. The English
+names were already in the tables (their `english` field).
+
+Tested: the translations test checks the menu's names for German,
+Russian, Brazilian Portuguese and English; with the language's own name
+alone, three of those checks fail.

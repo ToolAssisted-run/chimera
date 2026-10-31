@@ -26,7 +26,8 @@ CustomizeViewModel::CustomizeViewModel(Dispatcher &dispatcher, SessionViewModel 
 		"GameCube Adapter Support; read when the program starts)", gameCubeAdapter, true);
 	expose("language", "the language the window's words are in (\"en\" English, \"fr\", \"pt_BR\"), one of languages; "
 		"at the first open the first of the system's languages the window has", language, true);
-	expose("languages", "the languages the window has, a line each: its code, a tab, its name in itself", languages);
+	expose("languages", "the languages the window has, a line each: its code, a tab, its name in itself and in English "
+		"(\"Deutsch - German\"; English alone)", languages);
 	command("modifierKeys", "the names Chimera's rewrite replaces when the modifier keys are merged (true) or separated "
 		"(false), as {\"LeftShift\": \"Shift\"}", {"merging"}, [](const Args &a, std::string &error) -> Value {
 			bool merging = true;

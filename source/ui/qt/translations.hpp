@@ -29,5 +29,9 @@ bool useLanguage(QCoreApplication &app, const QString &language);
 /* a language's name in that language ("Deutsch"), and in English ("German") */
 QString languageName(const QString &language);
 QString languageEnglishName(const QString &language);
+/* as the Language menu names it: in itself and in English, "Deutsch -
+ * German", whatever language the window is in; English alone (owner,
+ * 2026-10-31, issue 430: a dash, since some names have brackets of their own) */
+QString languageLabel(const QString &language);
 
 } // namespace chimera::qt

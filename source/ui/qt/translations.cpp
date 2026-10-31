@@ -80,4 +80,10 @@ QString languageEnglishName(const QString &language)
 	return i < 0 ? language : QString::fromUtf8(ce_language_english_name(i));
 }
 
+QString languageLabel(const QString &language)
+{
+	const QString own = languageName(language), english = languageEnglishName(language);
+	return own == english ? own : own + QStringLiteral(" - ") + english;
+}
+
 } // namespace chimera::qt
