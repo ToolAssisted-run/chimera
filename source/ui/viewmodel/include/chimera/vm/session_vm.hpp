@@ -240,8 +240,9 @@ public:
 	 * with the project */
 	Property<int64_t> rerecords{0};
 	/* after an edit before the current frame, go back to the edit and run
-	 * forward to where the machine was, with the new inputs */
-	Property<bool> autoRestore{true};
+	 * forward to where the machine was, with the new inputs; off until
+	 * asked, as Chimera's TAStudio had it (issue 426) */
+	Property<bool> autoRestore{false};
 	/* TAStudio's Turbo seek, as Chimera's (off at first): on, a seek goes to
 	 * its frame at once, drawing nothing on the way; off, what the greenzone
 	 * holds is gone to at once and the rest is played at the machine's own

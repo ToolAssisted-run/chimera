@@ -11727,3 +11727,15 @@ the program's own view model with the synthetic core and drops three files
 on its slot with Qt's test module; all three are in the slot, in order.
 With the loop back in the slot, one file is added and the check fails.
 Not tried by hand on Windows.
+
+## Auto-restore is off until asked (2026-10-31, issue 426)
+
+TAStudio's "Auto-restore last position" was ticked in a new installation.
+Chimera's TAStudio had it off until the person ticked it; the new window
+had it on from its first version (b2e1b39d), with no decision behind it.
+It is off again by default. A setting already saved keeps its value.
+
+Tested: the view models' TAStudio test checks that a new session has it
+off; with the default on, that check fails. Seven older view-model tests
+were written with it on (an edit before the current frame was expected to
+run the machine back to where it was); they now turn it on themselves.

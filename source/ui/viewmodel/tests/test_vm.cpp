@@ -4674,6 +4674,8 @@ bool project(const char *package, const char *rom, const std::string &movies, co
 	ManualDispatcher d;
 	InputLog inputs;
 	SessionViewModel session(d, inputs);
+	/* edits before the current frame run the machine back to where it was */
+	session.autoRestore.set(true);
 	session.turboSeek.set(true);
 	PianoRollViewModel roll(d, inputs, session);
 	BranchesViewModel branches(d, inputs, session, roll);
@@ -5776,6 +5778,8 @@ bool pianoRollEditing(const char *package, const char *rom)
 	ManualDispatcher d;
 	InputLog inputs;
 	SessionViewModel session(d, inputs);
+	/* edits before the current frame run the machine back to where it was */
+	session.autoRestore.set(true);
 	session.turboSeek.set(true);
 	PianoRollViewModel roll(d, inputs, session);
 	std::string error;
@@ -6431,6 +6435,8 @@ bool controlsAndHotkeys(const char *package, const char *rom)
 	ManualDispatcher d;
 	InputLog inputs;
 	SessionViewModel session(d, inputs);
+	/* edits before the current frame run the machine back to where it was */
+	session.autoRestore.set(true);
 	session.turboSeek.set(true);
 	PianoRollViewModel roll(d, inputs, session);
 	BranchesViewModel branches(d, inputs, session, roll);
@@ -6881,6 +6887,8 @@ bool rerecordCount(const char *package, const char *rom)
 	ManualDispatcher d;
 	InputLog inputs;
 	SessionViewModel session(d, inputs);
+	/* edits before the current frame run the machine back to where it was */
+	session.autoRestore.set(true);
 	session.turboSeek.set(true);
 	PianoRollViewModel roll(d, inputs, session);
 	BranchesViewModel branches(d, inputs, session, roll);
@@ -7260,6 +7268,8 @@ bool freezes(const char *package, const char *rom)
 	ManualDispatcher d;
 	InputLog inputs;
 	SessionViewModel session(d, inputs);
+	/* edits before the current frame run the machine back to where it was */
+	session.autoRestore.set(true);
 	session.turboSeek.set(true);
 	PianoRollViewModel roll(d, inputs, session);
 	RamWatchViewModel watches(d, session);
@@ -8715,6 +8725,8 @@ bool luaParity(const char *package, const char *rom)
 	ManualDispatcher d;
 	InputLog inputs;
 	SessionViewModel session(d, inputs);
+	/* edits before the current frame run the machine back to where it was */
+	session.autoRestore.set(true);
 	session.turboSeek.set(true);
 	PianoRollViewModel roll(d, inputs, session);
 	ProjectDetailsViewModel details(d, session);
@@ -9779,6 +9791,8 @@ bool wideButtons(const char *package, const char *rom)
 	ManualDispatcher d;
 	InputLog inputs;
 	SessionViewModel session(d, inputs);
+	/* edits before the current frame run the machine back to where it was */
+	session.autoRestore.set(true);
 	session.turboSeek.set(true);
 	PianoRollViewModel roll(d, inputs, session);
 	std::string error;
@@ -10001,6 +10015,8 @@ bool tastudioPanel(const char *package, const char *rom)
 	BranchesViewModel branches(d, inputs, session, roll);
 	std::string error;
 	CHECK(!session.turboSeek.get());
+	/* off until asked, as Chimera's TAStudio had it (issue 426) */
+	CHECK(!session.autoRestore.get());
 	openGame(session, package, (dir / "walker.testrom").string(), error);
 	CHECK(d.until([&] { return session.isOpen.get(); }, 60));
 	const fs::path project = dir / "panel.chimeraProject";

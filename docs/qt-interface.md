@@ -325,7 +325,7 @@ menus (Edit, Metadata, Settings, Columns, Window) with "<< Hide" at their
 right; hidden, the main window shows "Show TAStudio >>" at the right of
 its menus. Beside the roll are Chimera's boxes: Playback (previous
 marker, a frame back, pause or run, a frame on, next marker, follow
-cursor, auto-restore), Greenzone (every frame, every N frames, off),
+cursor, auto-restore - off until ticked, as Chimera's, issue 426), Greenzone (every frame, every N frames, off),
 Branches and Markers, each with a few buttons and a right-click menu for
 the rest. Every movie has Chimera's three markers of its own: Run start
 on frame 0, Last input on the last frame anything is pressed on, Run end
