@@ -438,7 +438,10 @@ project they make. It declares `movieImport` in its `waterbox.config`,
 and the frontend renders the import dialog from it, the way it renders
 settings:
 
-- `menu`: the item in the core's Game menu ("Import Demo (LMP)...");
+- `menu`: the item in the Emulator menu (Game for a game core), in the
+  core's own words ("Import Demo (LMP)..."). Chimera has no name of its
+  own for it, so a core that leaves `menu` out has no item (owner,
+  2026-10-31, issue 428);
 - `movie`: its label and extensions; it is always mounted as `movie`;
 - `files`: the other files the importer reads, each mounted under its own
   name. `option` carries that name - a `multiple` input's names joined by

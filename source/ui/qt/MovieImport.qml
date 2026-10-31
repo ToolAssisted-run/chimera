@@ -19,7 +19,8 @@ ApplicationWindow {
     property var themeColor: (role, fallback) => fallback
     // the import was taken: the wizard is next
     signal taken()
-    title: win.vm.importMenu === "" ? qsTrId("movie_import.import_movie") : win.vm.importMenu.replace(/[.\s]+$/, "").replace("&", "")
+    // the core's own words for its importer, as its menu item has them
+    title: win.vm.importMenu.replace(/[.\s]+$/, "").replace("&", "")
     width: 600
     height: Math.max(260, content.implicitHeight + 24)
     minimumWidth: 600

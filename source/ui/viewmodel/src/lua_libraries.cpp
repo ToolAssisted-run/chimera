@@ -248,7 +248,7 @@ function emu.getboardname() return "" end
 function emu.getdisplaytype() return "" end
 function emu.getregisters()
 	local out = {}
-	for _, line in ipairs(lines(C.debugger.registerList())) do
+	for _, line in ipairs(lines(C.registers.registerList())) do
 		local name, value = string.match(line, "^(.-)=(%-?%d+)$")
 		if name then out[name] = math.tointeger(tonumber(value)) end
 	end
@@ -256,8 +256,8 @@ function emu.getregisters()
 end
 -- 0 for a register the machine does not have, as Chimera's
 function emu.getregister(name) return emu.getregisters()[name] or 0 end
-function emu.setregister(name, value) C.debugger.setRegisterNamed(name, value) end
-function emu.totalexecutedcycles() C.debugger.refresh() return C.debugger.cycles end
+function emu.setregister(name, value) C.registers.setRegisterNamed(name, value) end
+function emu.totalexecutedcycles() C.registers.refresh() return C.registers.cycles end
 function emu.limitframerate(on) C.session.unthrottled = not on end
 function emu.displayvsync() end
 function emu.setrenderplanes() print("SetRenderPlanes is not supported by this build (no core-specific handling available)") end
@@ -943,7 +943,7 @@ local toolList = {
 	{"ramsearch", "ram-search", function() return C.session.isOpen end, "ramSearch"},
 	{"hexeditor", "hex", function() return C.session.isOpen end, "hexEditor"},
 	{"tracelogger", "traceLoggerWindow", function() return C.session.hasTrace end, "traceLogger"},
-	{"genericdebugger", "debuggerWindow", function() return C.session.hasRegisters end, "debugger"},
+	{"genericdebugger", "cpuRegistersWindow", function() return C.session.hasRegisters end, "registers"},
 	{"macroinputtool", "macroToolWindow", function() return C.session.isOpen end, "macroTool"},
 	{"surfaceviewer", "surfaceViewerWindow", function() return C.session.surfaces ~= "[]" end, "surfaceViewer"},
 	{"logwindow", "logWindow", nil, nil},

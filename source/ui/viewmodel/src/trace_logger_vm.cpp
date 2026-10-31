@@ -164,7 +164,7 @@ GuiOverlayViewModel::GuiOverlayViewModel(Dispatcher &dispatcher) : ViewModel("gu
 		});
 }
 
-DebuggerViewModel::DebuggerViewModel(Dispatcher &dispatcher, SessionViewModel &session) : ViewModel("debugger", dispatcher), session_(session)
+RegistersViewModel::RegistersViewModel(Dispatcher &dispatcher, SessionViewModel &session) : ViewModel("registers", dispatcher), session_(session)
 {
 	expose("cycles", "the machine's cycles run, when the core counts them", cycles);
 	expose("hasCycles", "the core counts the cycles it runs", hasCycles);
@@ -239,7 +239,7 @@ DebuggerViewModel::DebuggerViewModel(Dispatcher &dispatcher, SessionViewModel &s
 		}, &session_.hasRegisters);
 }
 
-void DebuggerViewModel::refresh()
+void RegistersViewModel::refresh()
 {
 	int64_t c = 0;
 	bool counted = false;
@@ -249,13 +249,13 @@ void DebuggerViewModel::refresh()
 	rows_.reset.emit();
 }
 
-std::string DebuggerViewModel::Rows::columnName(int32_t column) const
+std::string RegistersViewModel::Rows::columnName(int32_t column) const
 {
 	static const char *const names[] = {"name", "value", "hex", "bits"};
 	return column >= 0 && column < 4 ? names[column] : "";
 }
 
-Value DebuggerViewModel::Rows::cell(int64_t row, int32_t column) const
+Value RegistersViewModel::Rows::cell(int64_t row, int32_t column) const
 {
 	if (row < 0 || row >= rowCount()) return {};
 	const SessionViewModel::Register &r = vm_.registers_[static_cast<size_t>(row)];

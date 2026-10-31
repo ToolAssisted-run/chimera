@@ -71,10 +71,10 @@ public:
 	Property<std::string> message;
 };
 
-class DebuggerViewModel : public ViewModel
+class RegistersViewModel : public ViewModel
 {
 public:
-	DebuggerViewModel(Dispatcher &dispatcher, SessionViewModel &session);
+	RegistersViewModel(Dispatcher &dispatcher, SessionViewModel &session);
 
 	/* the machine's cycles run, when the core counts them */
 	Property<int64_t> cycles{0};
@@ -85,14 +85,14 @@ private:
 	class Rows : public RowModel
 	{
 	public:
-		explicit Rows(DebuggerViewModel &vm) : vm_(vm) {}
+		explicit Rows(RegistersViewModel &vm) : vm_(vm) {}
 		int64_t rowCount() const override { return static_cast<int64_t>(vm_.registers_.size()); }
 		int32_t columnCount() const override { return 4; }
 		std::string columnName(int32_t column) const override;
 		Value cell(int64_t row, int32_t column) const override;
 
 	private:
-		DebuggerViewModel &vm_;
+		RegistersViewModel &vm_;
 	};
 	void refresh();
 	SessionViewModel &session_;

@@ -331,7 +331,7 @@ int main(int argc, char **argv)
 	QCommandLineOption mmfOpt(QStringLiteral("mmf"), QStringLiteral("the memory-mapped file Lua's comm.mmfScreenshot writes to, as Chimera's --mmf"),
 		QStringLiteral("name"));
 	QCommandLineOption schemeOpt(QStringLiteral("color-scheme"), QStringLiteral("light or dark: Chimera's built-in Light or Dark theme for this run (not remembered)"), QStringLiteral("scheme"));
-	QCommandLineOption showOpt(QStringLiteral("show"), QStringLiteral("open a tool window at the start: new-project, movie-import, ram-search, ram-watch, hex, controls, hotkeys, themes, lua, tastudio, undo-history, project-details, comments, subtitles, tastudio-settings, log, report, media, cache, customize, messages, sound, display, budgets, paths, firmware, data, precompiled, trace, debugger, surfaces, macros, encode, cores"), QStringLiteral("tool"));
+	QCommandLineOption showOpt(QStringLiteral("show"), QStringLiteral("open a tool window at the start: new-project, movie-import, ram-search, ram-watch, hex, controls, hotkeys, themes, lua, tastudio, undo-history, project-details, comments, subtitles, tastudio-settings, log, report, media, cache, customize, messages, sound, display, budgets, paths, firmware, data, precompiled, trace, registers, surfaces, macros, encode, cores"), QStringLiteral("tool"));
 	QCommandLineOption describeOpt(QStringLiteral("describe"), QStringLiteral("print every view model's properties and commands as JSON, and quit"));
 	/* Chimera's --mcp-server and --mcp-allow-changes: the server started for a run nobody clicks in */
 	QCommandLineOption mcpServerOpt(QStringLiteral("mcp-server"), QStringLiteral("start the MCP server (Tools > MCP Server...) at once"));
@@ -963,8 +963,8 @@ int main(int argc, char **argv)
 	qt::QmlViewModel precompiledQml(precompiled);
 	vm::TraceLoggerViewModel traceLogger(dispatcher, session);
 	qt::QmlViewModel traceLoggerQml(traceLogger);
-	vm::DebuggerViewModel debugger(dispatcher, session);
-	qt::QmlViewModel debuggerQml(debugger);
+	vm::RegistersViewModel registers(dispatcher, session);
+	qt::QmlViewModel registersQml(registers);
 	vm::GuiOverlayViewModel guiOverlay(dispatcher);
 	qt::QmlViewModel guiOverlayQml(guiOverlay);
 	/* the picture while nothing is open: Chimera's mark, read here and handed in */
@@ -1332,7 +1332,7 @@ int main(int argc, char **argv)
 	lua.add(dataFolder);
 	lua.add(precompiled);
 	lua.add(traceLogger);
-	lua.add(debugger);
+	lua.add(registers);
 	lua.add(guiOverlay);
 	lua.add(surfaceViewer);
 	lua.add(macroTool);
@@ -1495,7 +1495,7 @@ int main(int argc, char **argv)
 		{QStringLiteral("settings"), QVariant::fromValue<QObject *>(&settingsQml)},
 		{QStringLiteral("precompiled"), QVariant::fromValue<QObject *>(&precompiledQml)},
 		{QStringLiteral("traceLogger"), QVariant::fromValue<QObject *>(&traceLoggerQml)},
-		{QStringLiteral("debuggerTool"), QVariant::fromValue<QObject *>(&debuggerQml)},
+		{QStringLiteral("registersTool"), QVariant::fromValue<QObject *>(&registersQml)},
 		{QStringLiteral("guiOverlay"), QVariant::fromValue<QObject *>(&guiOverlayQml)},
 		{QStringLiteral("idleEye"), QVariant::fromValue<QObject *>(&idleEyeQml)},
 		{QStringLiteral("surfaceViewer"), QVariant::fromValue<QObject *>(&surfaceViewerQml)},
@@ -1625,7 +1625,7 @@ int main(int argc, char **argv)
 			{"customize", "customizeWindow"}, {"messages", "messagesWindow"}, {"sound", "soundWindow"},
 			{"display", "displayWindow"}, {"budgets", "greenzoneBudgetsWindow"}, {"paths", "pathsWindow"},
 			{"firmware", "firmwareWindow"}, {"data", "dataFolderWindow"}, {"precompiled", "precompiledWindow"},
-			{"trace", "traceLoggerWindow"}, {"debugger", "debuggerWindow"}, {"surfaces", "surfaceViewerWindow"},
+			{"trace", "traceLoggerWindow"}, {"registers", "cpuRegistersWindow"}, {"surfaces", "surfaceViewerWindow"},
 			{"macros", "macroToolWindow"}, {"encode", "encodeVideoWindow"}, {"cores", "coresWindow"}};
 		auto show = [window, headless](const char *objectName) {
 			if (headless) return;

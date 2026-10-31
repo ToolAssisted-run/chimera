@@ -541,10 +541,10 @@ SessionViewModel::SessionViewModel(Dispatcher &dispatcher, InputLog &inputs)
 	expose("hasGameTimer", "the game open has a timer of its own", hasGameTimer);
 	expose("hasSaveData", "the core open writes out the user's save data", hasSaveData);
 	expose("hasTrace", "the core traces what its CPU runs (the Trace Logger)", hasTrace);
-	expose("hasRegisters", "the core shows its registers (the Debugger)", hasRegisters);
+	expose("hasRegisters", "the core shows its registers (CPU Registers)", hasRegisters);
 	expose("traceHeader", "the core's words for its trace lines' columns", traceHeader);
 	expose("surfaces", "the pictures the core draws for itself, as [{\"name\", \"width\", \"height\"}]", surfaces);
-	expose("hasMovieImport", "the core open imports movies made elsewhere", hasMovieImport);
+	expose("movieImportMenu", "the menu item of the core open's movie importer, in its package's words (\"\" when it has none)", movieImportMenu);
 	expose("showGameTime", "a game's own timer is shown over the picture", showGameTime, true);
 	expose("gameTimeText", "the game's timer as shown: \"IGT 01:02.345\"", gameTimeText);
 	expose("coreLogPath", "the file the core log goes to, \"\" while it is off", coreLogPath);
@@ -5198,7 +5198,8 @@ void SessionViewModel::adoptOnMachine(ce_session *s, const std::string &package,
 	 * ranges as the package declares them (its own input, or a machine's) */
 	std::vector<Axis> axes;
 	std::string controller = "Waterbox Controller", picture;
-	bool gameCore = false, movieImport = false;
+	bool gameCore = false;
+	std::string movieImport;
 	int64_t ms = 0;
 	gameTimerM_ = ce_session_game_time_ms(s, &ms) == 1;
 	const bool timer = gameTimerM_, saveData = ce_session_savedata_available(s) != 0;
@@ -5250,7 +5251,8 @@ void SessionViewModel::adoptOnMachine(ce_session *s, const std::string &package,
 		if (read)
 		{
 			if (const json::Json *k = cfg.find("kind")) gameCore = k->text == "game";
-			movieImport = cfg.find("movieImport") != nullptr;
+			if (const json::Json *mi = cfg.find("movieImport"))
+				if (const json::Json *m = mi->find("menu")) movieImport = m->text;
 		}
 		auto declared = [&](const std::string &name) -> const json::Json * {
 			if (!read) return nullptr;
@@ -5331,7 +5333,7 @@ void SessionViewModel::adoptOnMachine(ce_session *s, const std::string &package,
 		isGameCore.set(gameCore);
 		hasGameTimer.set(timer);
 		hasSaveData.set(saveData);
-		hasMovieImport.set(movieImport);
+		movieImportMenu.set(movieImport);
 		gameTimeText.set("");
 		averageFpsText.set("");
 		buttonNames_ = names;

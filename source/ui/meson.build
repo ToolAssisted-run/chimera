@@ -490,6 +490,14 @@ if qt_dep.found()
       override_options: ['cpp_std=c++20'],
     )
     test('picture pointer', test_picture_pointer, env: ['QT_QPA_PLATFORM=offscreen', 'QT_QUICK_BACKEND=software'], timeout: 60)
+    # the Emulator menu: only what the core offers, nothing of Chimera's own (issue 428)
+    test_emulator_menu = executable(
+      'test-emulator-menu',
+      ['qt/tests/test_emulator_menu.cpp', qt_rcc],
+      dependencies: [qt_test_dep],
+      override_options: ['cpp_std=c++20'],
+    )
+    test('emulator menu', test_emulator_menu, env: ['QT_QPA_PLATFORM=offscreen', 'QT_QUICK_BACKEND=software'], timeout: 60)
     # files dropped on a slot of New Project, every one of them, not only
     # the first (issue 425): the window over the program's view model
     test_new_project_drop = executable(

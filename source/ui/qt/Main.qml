@@ -50,8 +50,7 @@ ApplicationWindow {
     required property QtObject settings
     required property QtObject precompiled
     required property QtObject traceLogger
-    // "debugger" is a word of JavaScript's own
-    required property QtObject debuggerTool
+    required property QtObject registersTool
     required property QtObject surfaceViewer
     required property QtObject guiOverlay
     required property QtObject idleEye
@@ -201,19 +200,7 @@ ApplicationWindow {
     // a menu item that shows the keys of the hotkey its action names
     Component {
         id: keyedMenuItem
-        MenuEntry {
-            id: keyedItem
-            readonly property string keys: action && action.hotkey ? (root.hotkeyKeys[action.hotkey] || "") : ""
-            rightPadding: padding + (keys !== "" ? keyLabel.implicitWidth + 24 : 0)
-            Label {
-                id: keyLabel
-                text: keyedItem.keys
-                anchors.right: parent.right
-                anchors.rightMargin: keyedItem.padding
-                anchors.verticalCenter: parent.verticalCenter
-                color: keyedItem.highlighted ? keyedItem.palette.highlightedText : keyedItem.palette.text
-            }
-        }
+        KeyedMenuEntry { keys: action && action.hotkey ? (root.hotkeyKeys[action.hotkey] || "") : "" }
     }
     // Chimera asks before a project with changes is left - closed, another
     // opened, the program quit - and saves it first when told to
@@ -335,6 +322,7 @@ ApplicationWindow {
     }
     // what a hotkey does when it is the window's: a menu's action, a dialog, a
     // window; TAStudio's editing is TAStudio's
+    Action { id: traceLoggerAction; enabled: root.session.hasTrace; onTriggered: root.bring(traceLoggerWindow) }
     readonly property var hotkeyActions: ({
         "RAM Search": ramSearchAction, "RAM Watch": ramWatchAction, "Hex Editor": hexEditorAction, "Lua Console": luaConsoleAction,
         "Open Project": openProjectAction, "Close Project": closeAction, "Trace Logger": traceLoggerAction
@@ -675,42 +663,27 @@ ApplicationWindow {
                 Action { id: hexEditorAction; property string hotkey: "Hex Editor"; text: qsTrId("main.hex_editor"); icon.source: "qrc:/chimera/menu/HexEditor.png"; onTriggered: { root.bring(hexEditorWindow) } }
                 Action { text: qsTrId("main.macro_tool"); icon.source: "qrc:/chimera/menu/MacroTool.png"; enabled: root.session.isOpen; onTriggered: { root.bring(macroToolWindow) } }
             }
-            // Chimera's Emulator menu, Game for a game core: only what the core
-            // open offers, and gone when it offers nothing
-            Menu {
-                readonly property bool shown: root.session.isOpen && (root.session.hasGameTimer || root.session.hasSaveData
-                    || root.session.hasMovieImport || root.session.hasTrace || root.session.hasRegisters || root.session.surfaces !== "[]")
-                delegate: keyedMenuItem
-                title: root.session.isGameCore ? qsTrId("main.game") : qsTrId("main.emulator")
-                Action {
-                    property string hotkey: "Game Time"
-                    text: qsTrId("main.display_game_time"); enabled: root.session.hasGameTimer
-                    checkable: true; checked: root.session.showGameTime; onTriggered: root.session.showGameTime = checked
+            EmulatorMenu {
+                session: root.session
+                keysOf: (hotkey) => root.hotkeyKeys[hotkey] || ""
+                onOpenTool: (tool) => {
+                    if (tool === "registers") root.bring(cpuRegistersWindow)
+                    else if (tool === "surfaces") root.bring(surfaceViewerWindow)
+                    else if (tool === "trace") root.bring(traceLoggerWindow)
+                    // the core's importer: its form first, then the wizard on its answers
+                    else if (tool === "import") { root.newProject.run("chooseCore", [root.session.coreName]); root.bring(movieImportWindow) }
                 }
-                Action {
-                    text: qsTrId("main.export_save_data_dialog"); enabled: root.session.hasSaveData
-                    onTriggered: {
-                        const names = root.session.run("saveDataFiles")
-                        if (names === undefined) return
-                        if (names === "") { root.note(qsTrId("main.this_machine_holds_no_save_data")); return }
-                        const list = names.split("\n")
-                        saveDataDialog.files = list.length
-                        // one file under its own name; more in a zip named for the game
-                        saveDataDialog.selectedFile = "file:///" + (list.length === 1 ? list[0].replace(/^.*[\\/]/, "")
-                                                                                       : qsTrId("main.save_data_file").arg(root.session.gameName))
-                        saveDataDialog.open()
-                    }
+                onExportSaveData: {
+                    const names = root.session.run("saveDataFiles")
+                    if (names === undefined) return
+                    if (names === "") { root.note(qsTrId("main.this_machine_holds_no_save_data")); return }
+                    const list = names.split("\n")
+                    saveDataDialog.files = list.length
+                    // one file under its own name; more in a zip named for the game
+                    saveDataDialog.selectedFile = "file:///" + (list.length === 1 ? list[0].replace(/^.*[\\/]/, "")
+                                                                                   : qsTrId("main.save_data_file").arg(root.session.gameName))
+                    saveDataDialog.open()
                 }
-                Action {
-                    text: qsTrId("main.import_movie"); enabled: root.session.hasMovieImport
-                    // Chimera's: the core's import form first, then the wizard on its answers
-                    onTriggered: { root.newProject.run("chooseCore", [root.session.coreName]); root.bring(movieImportWindow) }
-                }
-                MenuDivider {}
-                // the tools the core offers, by Chimera's names, in its order
-                Action { text: qsTrId("main.debugger"); icon.source: "qrc:/chimera/menu/Debugger.png"; enabled: root.session.hasRegisters; onTriggered: { root.bring(debuggerWindow) } }
-                Action { text: qsTrId("main.surface_viewer"); enabled: root.session.surfaces !== "[]"; onTriggered: { root.bring(surfaceViewerWindow) } }
-                Action { id: traceLoggerAction; property string hotkey: "Trace Logger"; text: qsTrId("main.trace_logger"); enabled: root.session.hasTrace; onTriggered: { root.bring(traceLoggerWindow) } }
             }
             Menu {
                 delegate: keyedMenuItem
@@ -1771,8 +1744,8 @@ ApplicationWindow {
         id: traceLoggerWindow; vm: root.traceLogger; session: root.session; visible: false
         folderOf: root.folderOf; customize: root.customize; toolWindows: root.toolWindows; mainWindow: root; themeColor: root.osdColor
     }
-    Debugger {
-        id: debuggerWindow; vm: root.debuggerTool; session: root.session; visible: false
+    CpuRegisters {
+        id: cpuRegistersWindow; vm: root.registersTool; session: root.session; visible: false
         customize: root.customize; toolWindows: root.toolWindows; mainWindow: root; themeColor: root.osdColor
     }
     SurfaceViewer {

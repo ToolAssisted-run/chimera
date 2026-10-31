@@ -84,7 +84,9 @@
     <file>DataFolderConfig.qml</file>
     <file>PrecompiledModules.qml</file>
     <file>TraceLogger.qml</file>
-    <file>Debugger.qml</file>
+    <file>CpuRegisters.qml</file>
+    <file>EmulatorMenu.qml</file>
+    <file>KeyedMenuEntry.qml</file>
     <file>SurfaceViewer.qml</file>
     <file>MacroTool.qml</file>
     <file>ProjectFiles.qml</file>

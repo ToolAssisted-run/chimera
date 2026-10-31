@@ -11771,3 +11771,36 @@ the checks fail. On Windows 11 with a GTX 1060
 and no core running, the report's line read "Windows 11 Version 23H2
 (x86_64), NVIDIA GeForce GTX 1060 6GB". Not tried: a report on Windows
 after an OpenGL core ran.
+
+## The Emulator menu is the core's (user-decided, 2026-10-31, issue 428)
+
+The Emulator menu showed Debugger, Surface Viewer and Trace Logger greyed
+out for a core that offered them only in part or not at all, and Import
+Movie... under Chimera's own name. The owner decided, in their words:
+"everything in 'emulator' is decided by the core, not by chimera", and
+"Chimera must have no default menu items for the cores".
+
+- An item is in the menu only when the core open offers what it needs,
+  never greyed out: Display Game Time (a game's own timer, SDLPoP2's),
+  Export Save Data..., the importer, CPU Registers, Surface Viewer, Trace
+  Logger. The menu itself is there only when one of them is.
+- The importer's item is named by the core's package (`movieImport`'s
+  `menu`, "Import Demo (LMP)..." for DSDA); Chimera's own "Import
+  Movie..." is gone from its tables, and a package that names no item has
+  none. The importer's window is titled with the same words.
+- The Debugger is gone. Its disassembler, breakpoints and stepping were
+  placeholders for every core: the engine has no call for them, since a
+  core runs a whole frame without giving control back. What worked, the
+  registers, is now CPU Registers: the registers and flags, read as the
+  machine moves and set by hand, for a core that shows them. Its view
+  model is "registers" (Lua's emu.getregisters and the like read it; a
+  script's client.gettool("genericdebugger") opens it).
+
+The menu is its own part, EmulatorMenu.qml, over the session.
+
+Tested: a new test, "emulator menu", opens that part over a stand-in for
+the session and reads the items shown: none with nothing offered (and no
+menu), CPU Registers alone, the game's timer with the package's importer
+and the Trace Logger parted by a divider, a game core's menu named Game.
+With the items greyed out as before, 4 of its 12 checks fail. The
+synthetic core's CPU Registers window was looked at in a screenshot.

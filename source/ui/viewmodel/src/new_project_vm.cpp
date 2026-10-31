@@ -1798,7 +1798,6 @@ bool NewProjectViewModel::chooseCore(const std::string &name, std::string &error
 				for (const Json &e : ex->items) filter += (filter.empty() ? "" : " ") + std::string("*.") + lower(e.text[0] == '.' ? e.text.substr(1) : e.text);
 			importMovieFilter.set(filter.empty() ? "*" : filter);
 		}
-		if (importMenu.get().empty()) importMenu.set(tr("import.menu"));
 	}
 	importFileRows_.reset.emit();
 	importOptionRows_.reset.emit();

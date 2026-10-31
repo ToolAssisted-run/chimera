@@ -2147,7 +2147,7 @@ bool traceAndRegisters(const char *package, const char *rom)
 	SessionViewModel session(d, inputs);
 	session.turboSeek.set(true);
 	TraceLoggerViewModel trace(d, session);
-	DebuggerViewModel debugger(d, session);
+	RegistersViewModel debugger(d, session);
 	std::string error;
 	openGame(session, package, std::string(rom), error);
 	CHECK(d.until([&] { return session.isOpen.get() && session.hasTrace.get() && session.hasRegisters.get(); }, 60));
@@ -2317,7 +2317,7 @@ bool luaLibraries(const char *package, const char *rom)
 	SessionViewModel session(d, inputs);
 	session.turboSeek.set(true);
 	PianoRollViewModel roll(d, inputs, session);
-	DebuggerViewModel debugger(d, session);
+	RegistersViewModel debugger(d, session);
 	GuiOverlayViewModel guiOverlay(d);
 	HostInputViewModel hostInput(d, session);
 	GamePropertiesViewModel gameProperties(d, session);
@@ -3769,7 +3769,7 @@ bool coreMenu(const char *package, const char *rom, const char *slotsPackage, co
 	std::string error;
 	openGame(session, package, std::string(rom), error);
 	CHECK(d.until([&] { return session.isOpen.get(); }, 60));
-	CHECK(session.hasSaveData.get() && session.hasGameTimer.get() && !session.isGameCore.get() && !session.hasMovieImport.get());
+	CHECK(session.hasSaveData.get() && session.hasGameTimer.get() && !session.isGameCore.get() && session.movieImportMenu.get().empty());
 	/* the save files, and written out */
 	std::string names;
 	CHECK(fromValue(session.run("saveDataFiles", {}, error).value_or(Value()), names) && names == "card/slot1.sav\nnotes.txt");
@@ -3798,7 +3798,7 @@ bool coreMenu(const char *package, const char *rom, const char *slotsPackage, co
 	/* a core that imports movies; a game core */
 	openGame(session, slotsPackage, std::string(rom), error);
 	CHECK(d.until([&] { return session.isOpen.get(); }, 60));
-	CHECK(session.hasMovieImport.get() && !session.isGameCore.get());
+	CHECK(session.movieImportMenu.get() == "Import Synth Movie..." && !session.isGameCore.get());
 	session.run("close", {}, error);
 	CHECK(d.until([&] { return !session.isOpen.get(); }, 20));
 	openGame(session, gamePackage, std::string(rom), error);
@@ -8748,7 +8748,7 @@ bool luaParity(const char *package, const char *rom)
 	GuiOverlayViewModel overlay(d);
 	FormsViewModel forms(d);
 	PathsViewModel paths(d);
-	DebuggerViewModel debugger(d, session);
+	RegistersViewModel debugger(d, session);
 	MessagesViewModel messages(d);
 	paths.programFolder.set(dir.string());
 	LuaBridge lua;
