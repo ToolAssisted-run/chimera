@@ -989,6 +989,11 @@ CE_API int32_t ce_gl_available(void);
  * movie header and for saying which GPU a recording was made on. Empty when
  * there is none. */
 CE_API const char *ce_gl_description(void);
+/* The card and the driver a core's OpenGL context runs on, as the driver
+ * gives them (GL_RENDERER, GL_VERSION) and in no language of Chimera's, for
+ * a bug report to quote. Empty when there is no context. */
+CE_API const char *ce_gl_renderer(void);
+CE_API const char *ce_gl_version(void);
 
 /* Give the current-context slot back to whoever had it.
  *

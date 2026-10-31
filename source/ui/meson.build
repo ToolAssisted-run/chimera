@@ -337,8 +337,9 @@ if qt_dep.found()
     chimera_qt = executable(
       'chimera',
       qt_sources,
-      # libdbus is loaded when the desktop's file chooser is asked for (portal_file_chooser.cpp)
-      dependencies: [vm_dep, qt_dep, dl_dep],
+      # libdbus is loaded when the desktop's file chooser is asked for (portal_file_chooser.cpp);
+      # Qt's private headers for the graphics card the window draws on (main.cpp)
+      dependencies: [vm_dep, qt_dep, dl_dep, dependency('qt6', modules: ['Core', 'Gui'], private_headers: true)],
       # the view models have a Signal::emit; Qt's "emit" keyword would eat it
       cpp_args: ['-DQT_NO_KEYWORDS'],
       override_options: ['cpp_std=c++20'],

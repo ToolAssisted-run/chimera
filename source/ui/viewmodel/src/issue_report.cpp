@@ -17,8 +17,9 @@ std::string firstLines(const Facts &f)
 	std::vector<std::string> fields;
 	fields.push_back("**Chimera build:** " + f.build);
 	fields.push_back("**Core and version:** " + (f.core.empty() ? std::string("<!-- no core was running -->") : f.core));
-	fields.push_back("**OS and GPU:** " + (f.os.empty() ? std::string("<!-- type your operating system here -->") : f.os) +
-		", <!-- type your graphics card here -->");
+	const std::string gpu = !f.glRenderer.empty() ? f.glRenderer + ", OpenGL " + f.glVersion : f.windowGpu;
+	fields.push_back("**OS and GPU:** " + (f.os.empty() ? std::string("<!-- type your operating system here -->") : f.os) + ", " +
+		(gpu.empty() ? std::string("<!-- type your graphics card here -->") : gpu));
 	std::string cpu = f.cpu.empty() ? std::string("<!-- type your processor here -->") : f.cpu;
 	if (f.threads > 0) cpu += " (" + std::to_string(f.threads) + " threads)";
 	char gb[32];

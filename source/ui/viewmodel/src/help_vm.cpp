@@ -80,6 +80,7 @@ HelpViewModel::HelpViewModel(Dispatcher &dispatcher, SessionViewModel &session, 
 	expose("siteUrl", "Chimera's site", siteUrl);
 	expose("formUrl", "where an issue is filed", formUrl);
 	expose("osName", "the computer's system, as the window's toolkit names it", osName, true);
+	expose("windowGpu", "the graphics card the window draws on, as the window's toolkit names it", windowGpu, true);
 	expose("reportText", "the report made last, its first lines filled in", reportText);
 	expose("reportFiles", "the files worth attaching to it, a line each", reportFiles);
 	expose("status", "what Help last had to say (the window says here what it copied)", status, true);
@@ -96,6 +97,10 @@ HelpViewModel::HelpViewModel(Dispatcher &dispatcher, SessionViewModel &session, 
 			facts.build = buildName.get();
 			facts.core = coreAndVersion();
 			facts.os = osName.get();
+			/* the card a core drew on in this session, in its driver's words; else the window's */
+			facts.glRenderer = ce_gl_renderer() != nullptr ? ce_gl_renderer() : "";
+			facts.glVersion = ce_gl_version() != nullptr ? ce_gl_version() : "";
+			facts.windowGpu = windowGpu.get();
 			facts.cpu = ce_host_cpu_name() != nullptr ? ce_host_cpu_name() : "";
 			facts.threads = std::thread::hardware_concurrency();
 			facts.memory = ce_host_memory_total();

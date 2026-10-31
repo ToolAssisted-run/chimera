@@ -5287,10 +5287,10 @@ What it does not do:
   way Help > "Open toolAssisted.run in Browser" does it.
 - It takes no pictures of Chimera's windows or of the screen. The only
   picture is the game's own, and only when its row is ticked.
-- It names the graphics card only when a core drew on one in this session.
-  That is when Chimera asks the driver for its name, and it is the case
-  where the card matters. Otherwise the line carries a note asking the
-  person to type it.
+- It names the graphics card: the one a core drew on through OpenGL in
+  this session, in its driver's words, else the one Chimera's window
+  draws on (owner, 2026-10-31, issue 427: see below). When neither is
+  known the line carries a note asking the person to type it.
 - It lists file names and slots, not folders. The list of files to attach
   shows full paths, and that list is not part of the text to paste.
 - No setting is known by name: the list is every setting whose value
@@ -11739,3 +11739,35 @@ Tested: the view models' TAStudio test checks that a new session has it
 off; with the default on, that check fails. Seven older view-model tests
 were written with it on (an edit before the current frame was expected to
 run the machine back to where it was); they now turn it on themselves.
+
+## Report an Issue names the graphics card (user-decided, 2026-10-31, issue 427)
+
+Help > Report an Issue left the graphics card for the person to type,
+always. The old window's report named the driver when a core had drawn on
+the card; that was lost when the window was rebuilt in Qt. And a report
+made with a core that draws on no card (NP2kai, the reporter's) named
+none, even under the old rule.
+
+The owner decided the card is always named when it can be:
+- a core that drew through OpenGL in this session: its card and driver in
+  the driver's own words, "<renderer>, OpenGL <version>" (two new engine
+  calls, ce_gl_renderer and ce_gl_version, give the driver's strings as
+  they are: the description the engine already had is translated, and the
+  report is written in the form's English);
+- otherwise the card Chimera's window draws on, as Qt names it (its
+  rendering layer, QRhi, which Qt gives with its private headers; the
+  Linux build now asks for those, as the Windows build already did).
+
+On a computer with two cards, the window's may not be the one a core
+would pick, and a Vulkan core's card is not asked: the window's is
+named for it.
+
+Tested: the engine's GL session test checks that the driver's strings
+are there while a context is (with Mesa on this machine); the view
+models' report test checks that the window's card is on the line, that a
+core's OpenGL driver comes before it, and that with no card known the
+note is. With the strings not kept, or the report not using the card,
+the checks fail. On Windows 11 with a GTX 1060
+and no core running, the report's line read "Windows 11 Version 23H2
+(x86_64), NVIDIA GeForce GTX 1060 6GB". Not tried: a report on Windows
+after an OpenGL core ran.

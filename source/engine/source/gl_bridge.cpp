@@ -85,6 +85,7 @@ bool g_ready;
 /* Which context is current - see GL_OP_CONTEXT_ID. Zero until one is made. */
 uint64_t g_context_id;
 char g_description[256];
+char g_renderer[256], g_versionText[256];
 
 /* ---------------------------------------------------------------------------
  * Windows: a context from a window nobody sees. WGL has no headless path and a
@@ -2644,6 +2645,16 @@ extern "C" const char *ce_gl_description(void)
 	return g_ready ? g_description : "";
 }
 
+extern "C" const char *ce_gl_renderer(void)
+{
+	return g_ready ? g_renderer : "";
+}
+
+extern "C" const char *ce_gl_version(void)
+{
+	return g_ready ? g_versionText : "";
+}
+
 extern "C" void *ce_gl_flight_recorder(uint32_t *bytes)
 {
 	if (bytes) *bytes = (uint32_t)sizeof g_flight;
@@ -2766,6 +2777,8 @@ extern "C" int32_t ce_gl_start(char *error_out, int32_t error_len)
 		glGetIntegerv(GL_CONTEXT_PROFILE_MASK, &profile);
 	snprintf(g_description, sizeof g_description, "%s", chimera::lang::tr((profile & GL_CONTEXT_CORE_PROFILE_BIT) != 0 ? "gl.description_core" : "gl.description_compatibility",
 		{version ? version : "?", renderer ? renderer : "?"}).c_str());
+	snprintf(g_renderer, sizeof g_renderer, "%s", renderer ? renderer : "");
+	snprintf(g_versionText, sizeof g_versionText, "%s", version ? version : "");
 
 	/* Every renderer here is written for OpenGL 3.3 or later, and saying a
 	 * driver offers less here is kinder than a null call in the middle of a
@@ -2874,6 +2887,8 @@ extern "C" void ce_gl_session_end(void)
 	g_ready = false;
 	g_context_id = 0;
 	g_description[0] = 0;
+	g_renderer[0] = 0;
+	g_versionText[0] = 0;
 }
 
 extern "C" void ce_gl_stop(void)
@@ -2886,6 +2901,8 @@ extern "C" void ce_gl_stop(void)
 	g_ready = false;
 	g_context_id = 0;
 	g_description[0] = 0;
+	g_renderer[0] = 0;
+	g_versionText[0] = 0;
 }
 
 #else /* !CE_GL_BRIDGE - a build without a GPU bridge answers honestly */
@@ -2897,6 +2914,8 @@ extern "C" void ce_gl_request(int32_t want) { g_requested = want ? 1 : 0; }
 extern "C" int32_t ce_gl_requested(void) { return g_requested; }
 extern "C" int32_t ce_gl_available(void) { return 0; }
 extern "C" const char *ce_gl_description(void) { return ""; }
+extern "C" const char *ce_gl_renderer(void) { return ""; }
+extern "C" const char *ce_gl_version(void) { return ""; }
 extern "C" void *ce_gl_flight_recorder(uint32_t *bytes) { if (bytes) *bytes = 0; return nullptr; }
 extern "C" void ce_vk_flight_note(unsigned) { }
 extern "C" void ce_gl_release(void) { }

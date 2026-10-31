@@ -37,6 +37,9 @@
 #include <QQuickItem>
 #include <QQuickItemGrabResult>
 #include <QQuickWindow>
+/* the graphics card the window draws on: Qt's rendering layer, which Qt
+ * gives with its private headers */
+#include <rhi/qrhi.h>
 #include <QPalette>
 #include <QStandardPaths>
 #include <QStyleHints>
@@ -1531,6 +1534,11 @@ int main(int argc, char **argv)
 	if (engine.rootObjects().isEmpty()) return 1;
 	auto *window = qobject_cast<QQuickWindow *>(engine.rootObjects().first());
 	mainWindow = window;
+	/* the graphics card the window draws on, for a bug report (issue 427):
+	 * Qt knows it once the window's scene is made, on its render thread */
+	QObject::connect(window, &QQuickWindow::sceneGraphInitialized, &app, [window, &help] {
+		if (QRhi *rhi = window->rhi()) help.windowGpu.set(rhi->driverInfo().deviceName.toStdString());
+	}, Qt::QueuedConnection);
 	/* Encode Video's Capture Lua and Capture OSD, as Chimera's. Capture Lua:
 	 * the shapes scripts draw, painted into each frame at the machine's own
 	 * size. Capture OSD: the frame as the picture area shows it, at that

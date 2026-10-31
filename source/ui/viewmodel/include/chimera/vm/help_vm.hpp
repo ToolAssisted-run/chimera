@@ -33,6 +33,10 @@ public:
 	/* the computer's system, as the window's toolkit names it (the window
 	 * says; "" leaves the report's line for the person to fill in) */
 	Property<std::string> osName;
+	/* the graphics card the window draws on, as the window's toolkit names
+	 * it (the window says once it has drawn; "" when it cannot tell). A
+	 * report names the card a core drew on first (issue 427) */
+	Property<std::string> windowGpu;
 	/* the report made last: its text, and the files to attach, a line each */
 	Property<std::string> reportText, reportFiles;
 	Property<std::string> status;

@@ -19,6 +19,9 @@ struct Setting
 struct Facts
 {
 	std::string build, core, os, cpu;
+	/* the graphics card: the one a core drew on through OpenGL, as its
+	 * driver gives it, else the one the window draws on; "" when not known */
+	std::string glRenderer, glVersion, windowGpu;
 	unsigned threads = 0;
 	uint64_t memory = 0;
 	bool projectOpen = false, coreRunning = false;

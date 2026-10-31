@@ -116,6 +116,8 @@ int main()
 		std::printf("test_gl_session: SKIP (no GL context here: %s)\n", err);
 		return 0;
 	}
+	/* the driver named for a bug report, in its own words (issue 427) */
+	assert(*ce_gl_renderer() != '\0' && *ce_gl_version() != '\0');
 	GLuint name = 0;
 	ChimeraGlArgs_glGenBuffers gen{ 1, &name };
 	call(CHIMERA_GL_OP_glGenBuffers, &gen);

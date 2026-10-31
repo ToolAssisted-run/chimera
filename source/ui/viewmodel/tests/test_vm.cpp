@@ -48,6 +48,7 @@
 #include "chimera/vm/project_details_vm.hpp"
 #include "chimera/vm/gamepads.hpp"
 #include "chimera/vm/help_vm.hpp"
+#include "chimera/vm/issue_report.hpp"
 
 /* the engine's miniz, to read a report's zip back */
 #define MINIZ_NO_ZLIB_COMPATIBLE_NAMES
@@ -3617,7 +3618,7 @@ bool helpMenu(const char *package, const char *rom)
 	CHECK(text.find("**Core and version:** <!-- no core was running -->") != std::string::npos &&
 		text.find("**Game:** <!-- no project was open -->") != std::string::npos &&
 		text.find("**Renderer and non-default settings:** <!-- no core was running -->") != std::string::npos &&
-		text.find("**OS and GPU:** <!-- type your operating system here -->") != std::string::npos);
+		text.find("**OS and GPU:** <!-- type your operating system here -->, <!-- type your graphics card here -->") != std::string::npos);
 	CHECK(text.find("**CPU and memory:** ") != std::string::npos && text.find(" threads)") != std::string::npos &&
 		text.find(" GB of memory") != std::string::npos);
 	/* nothing to attach: said, as Chimera's window says it */
@@ -3650,7 +3651,19 @@ bool helpMenu(const char *package, const char *rom)
 		text.rfind("**Chimera build:** " + help.buildName.get() + "\n**Core and version:** Synth ", 0) == 0);
 	CHECK(settings.run("set", {std::string("initFillByte"), int64_t{7}}, error).has_value());
 	help.osName.set("Some System (x86_64)");
+	/* the card the window draws on, when no core drew on one (issue 427) */
+	help.windowGpu.set("Some Card 1060");
 	CHECK(fromValue(help.run("makeReport", {}, error).value_or(Value()), text));
+	CHECK(text.find("**OS and GPU:** Some System (x86_64), Some Card 1060\n") != std::string::npos);
+	{
+		issue_report::Facts gl;
+		gl.os = "Some System (x86_64)";
+		gl.glRenderer = "GeForce GTX 1060/PCIe/SSE2";
+		gl.glVersion = "4.6.0 NVIDIA 581.57";
+		gl.windowGpu = "Some Card 1060";
+		CHECK(issue_report::firstLines(gl).find("**OS and GPU:** Some System (x86_64), GeForce GTX 1060/PCIe/SSE2, OpenGL 4.6.0 NVIDIA 581.57\n") !=
+			std::string::npos);
+	}
 	std::printf("report:\n%s\n", text.c_str());
 	CHECK(text.find("**Game:** rom: walker.testrom") != std::string::npos);
 	CHECK(text.find("\n- Initial RAM Fill: 7 (default: 0)") != std::string::npos);
