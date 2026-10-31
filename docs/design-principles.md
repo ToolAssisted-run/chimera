@@ -11949,7 +11949,8 @@ drums with the real rhythm ROM, its timer interrupt), Duck Hunt, both
 Arkanoids, two Four Score games and a Disk System game, each the same
 natively and in the sandbox with savestates; projects of Nova the
 Squirrel and of the EPSM test program end on the same RAM in Chimera for
-Windows (chimera-run.exe, Development build cb46d2b7) as on Linux. The
+Windows (chimera-run.exe, Development build cb46d2b7) as on Linux (as first
+written, that check ran no frames; see the next section). The
 first published build is "Development build a874aa55 (made 2026-10-31
 19:28 CET)".
 
@@ -11974,3 +11975,33 @@ that file. The first third-party cores: UnrealSpeccyP by CloakTheLurker
 (ZX Spectrum 128K and 48K), Eden by mayonnaisegoodfellas (Nintendo Switch)
 and SRB2 by P-AS (Sonic Robo Blast 2, a game core), each with the systems
 its package declares.
+
+
+## Mesen offers every system it emulates (user-decided, 2026-10-31)
+
+The owner, the day Mesen was published: "I want all its systems to be
+offered in the chimera core." The core now offers all 15 consoles MesenCE
+emulates at the commit it builds, picked by a Console setting: the NES (as
+published, and checked to be the same machine), the Super Nintendo with its
+chip programs as firmware a game asks for, the Super Game Boy, Game Boy and
+Game Boy Color, the Game Boy Advance (its BIOS required), the PC Engine,
+SuperGrafx and PC Engine CD (its System Card required), the Master System,
+Game Gear, SG-1000, ColecoVision (its BIOS required) and the WonderSwan and
+WonderSwan Color. The Satellaview and the Sufami Turbo are declared but have
+never run: their BIOSes were not available. The first build with them is
+"Development build 2d74d368 (made 2026-10-31 23:50 CET)".
+
+Tested in the core's repository: its test script 226 passed here with the
+owner's games and firmware, 151 on CI with test programs of its own for
+most consoles; games of each console the same natively and in the sandbox,
+with savestates. Test programs of eight consoles, 1200 frames each, end on
+the same RAM in Chimera for Windows as on Linux.
+
+A correction to the previous section: its Windows check, as first run,
+ran no frames. Its projects had no movie, and chimera-run runs only the
+frames a movie holds unless it is recording, so only the RAM at power-on
+was compared. Redone with recording on, the published build's projects ran
+their 3000 and 600 frames and ended on the same RAM on Windows as on Linux.
+A check through chimera-run says how many frames it ran (`frames=` in its
+--meta file); read it before saying what a check showed.
+

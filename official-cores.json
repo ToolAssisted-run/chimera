@@ -26,7 +26,21 @@
       "id": "mesen",
       "name": "Mesen",
       "systems": [
-        { "id": "NES", "name": "Nintendo Entertainment System" }
+        { "id": "NES", "name": "Nintendo Entertainment System" },
+        { "id": "SNES", "name": "Super NES / Super Famicom" },
+        { "id": "SGB", "name": "Super Game Boy" },
+        { "id": "GB", "name": "Game Boy" },
+        { "id": "GBC", "name": "Game Boy Color" },
+        { "id": "GBA", "name": "Game Boy Advance" },
+        { "id": "PCE", "name": "PC Engine / TurboGrafx-16" },
+        { "id": "SGX", "name": "SuperGrafx" },
+        { "id": "PCECD", "name": "PC Engine CD" },
+        { "id": "SMS", "name": "Master System" },
+        { "id": "GG", "name": "Game Gear" },
+        { "id": "SG", "name": "SG-1000" },
+        { "id": "CV", "name": "ColecoVision" },
+        { "id": "WS", "name": "WonderSwan" },
+        { "id": "WSC", "name": "WonderSwan Color" }
       ],
       "repo": "ToolAssisted-run/chimera-core-mesen",
       "tested": ""
