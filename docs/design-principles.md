@@ -11922,3 +11922,37 @@ computer, where the Model 3 runs at 57.5.
 Nothing in Chimera's own source changed: a roster row and the README's
 table of cores.
 
+
+## Mesen joins the official cores (user-decided, 2026-10-31)
+
+Issue 410 asked for Mesen 2 because of the EPSM, a Yamaha YMF288 sound
+expansion for the NES that some new games use. `chimera-core-mesen` builds
+MesenCE (the community edition, nesdev-org/MesenCE at 4b8a196e, GPL-3.0):
+the original Mesen2 repository now calls itself an archive and points to
+it, and MesenCE has two later EPSM fixes. NES, Famicom and Famicom Disk
+System games, the EPSM, the Four Score, the Zapper, the Arkanoid
+controller and the Famicom expansion port's devices. A game whose NES 2.0
+header says it has the EPSM gets it; for a plain iNES file an Expansion
+Port setting offers it, suggested when the game's program writes to the
+chip. The drums need the 8 KiB rhythm ROM the user gives as firmware.
+Mesen's netplay code is built out, so the core holds no network code.
+Mesen's other systems are compiled in and not offered yet.
+
+The owner decided to publish it before any game's EPSM music had been
+heard, and to let users steer it through issues: "Just publish as if we
+succeeded." The one file tried as an EPSM game has no EPSM code in it.
+What was proved, and what was not, is said on the issue.
+
+Tested: the core's test script, 47 passed on CI and 57 here with the
+owner's games: the EPSM on a test program of the core's own (FM, SSG, the
+drums with the real rhythm ROM, its timer interrupt), Duck Hunt, both
+Arkanoids, two Four Score games and a Disk System game, each the same
+natively and in the sandbox with savestates; projects of Nova the
+Squirrel and of the EPSM test program end on the same RAM in Chimera for
+Windows (chimera-run.exe, Development build cb46d2b7) as on Linux. The
+first published build is "Development build a874aa55 (made 2026-10-31
+19:28 CET)".
+
+Nothing in Chimera's own source changed: a roster row and the README's
+table of cores.
+

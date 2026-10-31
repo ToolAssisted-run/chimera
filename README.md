@@ -40,6 +40,7 @@ Chimera does not include cores and does not download them. To use a core, downlo
 | --- | --- |
 | [quickerNES](https://github.com/ToolAssisted-run/chimera-core-quickernes) | Nintendo Entertainment System / Famicom |
 | [QuickerNesHawk](https://github.com/ToolAssisted-run/chimera-core-neshawk) | Nintendo Entertainment System / Famicom, Famicom Disk System |
+| [Mesen](https://github.com/ToolAssisted-run/chimera-core-mesen) | Nintendo Entertainment System / Famicom, Famicom Disk System, with the EPSM sound expansion |
 | [ares](https://github.com/ToolAssisted-run/chimera-core-ares) | Nintendo Entertainment System / Famicom, Super Nintendo, Satellaview, Sufami Turbo, Nintendo 64, Nintendo 64DD, Game Boy / Game Boy Color, Game Boy Advance, Mega Drive / Genesis, Mega Drive 32X, Sega CD / Mega CD, Sega CD 32X, Master System, Game Gear, SG-1000, PlayStation, Atari 2600, Atari 5200, ColecoVision, MSX / MSX2, PC Engine / TurboGrafx-16 / SuperGrafx, PC Engine CD / TurboDuo, Neo Geo AES, Neo Geo Pocket / Color, WonderSwan / WonderSwan Color |
 | [Snes9x](https://github.com/ToolAssisted-run/chimera-core-snes9x) | Super Nintendo |
 | [Dolphin](https://github.com/ToolAssisted-run/chimera-core-dolphin) | GameCube, Wii |

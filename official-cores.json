@@ -23,6 +23,15 @@
       "tested": ""
     },
     {
+      "id": "mesen",
+      "name": "Mesen",
+      "systems": [
+        { "id": "NES", "name": "Nintendo Entertainment System" }
+      ],
+      "repo": "ToolAssisted-run/chimera-core-mesen",
+      "tested": ""
+    },
+    {
       "id": "gpgx",
       "name": "Genesis Plus GX",
       "systems": [
