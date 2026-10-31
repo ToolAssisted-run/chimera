@@ -11879,3 +11879,46 @@ Latin letters glued to them; on the tables before this change it finds
 model while Chimera is in Russian and checks that its version text and
 report start with the English build line; with the translated name, both
 checks fail.
+
+
+## Supermodel joins the official cores (user-decided, 2026-10-31)
+
+Issue 354 asked for Supermodel, the Sega Model 3 arcade emulator. The owner
+had the five open core requests built at once, each in a local repository
+of its own, and decided to publish this one once Virtua Fighter 3 ran,
+without waiting for a second game.
+
+`chimera-core-supermodel` is Supermodel's current main (036af1c, GPL-3.0),
+with six small patches. Every board runs on one thread, on the machine's
+own cycle clock; the PowerPC, the sound board's 68000 and the drive
+board's Z80 are interpreters. It draws with Supermodel's New3D renderer
+(OpenGL 4.1) on a software OpenGL inside the core, Mesa's llvmpipe, made
+to generate the same code on every computer, as the Godot and Ikemen GO
+cores do. The user brings the game's ROM set (MAME's zips); a clone's
+parent zip is a second file of the project. A Drawing Scale setting draws
+at 1x to 4x the Model 3's 496x384. Idle Skip (upstream's skipping of the
+PowerPC's idle loops) is on, as upstream has it; the owner chose to leave
+out AVX2 code in llvmpipe, which made it 14 to 21 percent faster but drew
+pictures that differ from one computer to another.
+
+Tested: the core's test script on a test program of its own (PowerPC and
+68000 code that draws a Real3D polygon, plays sound and reads the wheel,
+pedals and light gun): native and sandbox the same in pictures, sound and
+steps, with savestates, 26 passed on CI and 30 here with Virtua Fighter 3,
+which ran from switching on through the attract mode to a fight, the same
+natively and in the sandbox for 2400 frames, with savestates in the same
+process and in another. Its fight, recorded by chimera-run on Linux and
+replayed by chimera-run.exe of the published Chimera for Windows
+(Development build cb46d2b7), ends on the same picture, every pixel. The
+package passes Chimera's package checks. The first published build is
+"Development build 79e038b8 (made 2026-10-31 17:30 CET)".
+
+Not proved: any other game (Scud Race, Sega Rally 2 and The Lost World
+would test the sound and drive boards, the shifter and the light guns),
+the sound by ear, a real graphics card (the GPU bridge is not done), and
+speed: about 23 frames a second natively and 18 in the sandbox on a fast
+computer, where the Model 3 runs at 57.5.
+
+Nothing in Chimera's own source changed: a roster row and the README's
+table of cores.
+
