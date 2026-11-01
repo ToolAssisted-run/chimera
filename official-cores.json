@@ -40,7 +40,8 @@
         { "id": "SG", "name": "SG-1000" },
         { "id": "CV", "name": "ColecoVision" },
         { "id": "WS", "name": "WonderSwan" },
-        { "id": "WSC", "name": "WonderSwan Color" }
+        { "id": "WSC", "name": "WonderSwan Color" },
+        { "id": "PCV2", "name": "Pocket Challenge V2" }
       ],
       "repo": "ToolAssisted-run/chimera-core-mesen",
       "tested": ""
