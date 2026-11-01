@@ -28,7 +28,10 @@ ApplicationWindow {
     height: 600
 
     WindowOptions { id: windowOptions; window: win; tool: "ramSearch"; vm: win.toolWindows; mainWindow: win.mainWindow }
-    onVisibleChanged: if (visible) windowOptions.placeBack(false)
+    onVisibleChanged: {
+        win.vm.windowOpen = visible
+        if (visible) windowOptions.placeBack(false)
+    }
 
     MessageDialog { id: notice; buttons: MessageDialog.Ok }
     function tell(title, text) { notice.title = title; notice.text = text; notice.open() }

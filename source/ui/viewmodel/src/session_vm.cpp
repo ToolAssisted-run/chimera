@@ -1073,8 +1073,7 @@ SessionViewModel::SessionViewModel(Dispatcher &dispatcher, InputLog &inputs)
 					const char *n = ce_session_domain_name(s, i);
 					if (n == nullptr || domain != n) continue;
 					const int64_t size = ce_session_domain_size(s, i);
-					const uint64_t ptr = ce_session_domain_writable(s, i) != 0 ? ce_session_domain_ptr(s, i) : 0;
-					if (ptr == 0)
+					if (ce_session_domain_writable(s, i) == 0 || (ce_session_domain_bus(s, i) < 0 && ce_session_domain_ptr(s, i) == 0))
 					{
 						why = tr("session.domain_read_only", {domain});
 						return;
@@ -1084,7 +1083,7 @@ SessionViewModel::SessionViewModel(Dispatcher &dispatcher, InputLog &inputs)
 						why = tr("session.no_address", {domain, std::to_string(address + static_cast<int64_t>(bytes.size()) - 1)});
 						return;
 					}
-					std::memcpy(reinterpret_cast<uint8_t *>(ptr) + address, bytes.data(), bytes.size());
+					ce_session_domain_write(s, i, address, reinterpret_cast<const uint8_t *>(bytes.data()), static_cast<int64_t>(bytes.size()));
 					dropStatesAfterOnMachine(frameM_);
 					return;
 				}

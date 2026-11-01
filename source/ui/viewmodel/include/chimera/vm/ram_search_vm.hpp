@@ -82,6 +82,9 @@ public:
 	Property<bool> anyFrozen{false};
 	/* the .wch file last opened or saved */
 	Property<std::string> currentFile;
+	/* the window is open: a search starts when it opens with none open, and
+	 * again with each machine opened while it is, as Chimera's (issue 456) */
+	Property<bool> windowOpen{false};
 
 	/* Settings, remembered (Auto-Search is not) */
 	Property<bool> previewMode{true};
@@ -94,7 +97,8 @@ public:
 	Property<std::string> hiddenColumns{"Diff"};
 
 private:
-	void fastIfLarge();
+	/* then: run on the window's thread once Mode is settled */
+	void fastIfLarge(std::function<void()> then = {});
 	class Results : public RowModel
 	{
 	public:
@@ -155,7 +159,9 @@ private:
 	Connection freezesWatch_;
 	void freezesShown();
 	Connection opensWatch_, sizeWatch_, bigEndianWatch_, displayWatch_, previousWatch_, domainWatch_, fastWatch_, misalignedWatch_,
-		undoWatch_, autoWatch_, lagWatch_, excludeWatch_;
+		undoWatch_, autoWatch_, lagWatch_, excludeWatch_, windowOpenWatch_;
+	/* a new search of the domain picked, when a machine has memory to search */
+	void startWhileOpen();
 	std::vector<Connection> paramWatches_;
 	int64_t domainSize_ = 0;
 	bool domainWritable_ = false;
@@ -176,6 +182,12 @@ private:
 	ce_ramsearch *rs_ = nullptr;
 	int64_t rows_ = 0;
 	std::atomic<bool> refreshPosted_{false};
+	/* a search of a domain with no linear backing (a bus): the window's
+	 * thread reads its pages from copies the machine's thread makes */
+	std::atomic<bool> pagesPosted_{false};
+	bool pagedM_ = false; /* rs_'s, under rsM_ */
+	void pagesAsked();
+	void pagesOnMachine(ce_session *s);
 };
 
 } // namespace chimera::vm

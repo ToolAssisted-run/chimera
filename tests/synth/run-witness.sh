@@ -1159,7 +1159,8 @@ PYEOF
 		# against the rule the core states, not against a recording:
 		#   Wanderer is at 0x200 + 4 * Row, every frame;
 		#   Sometimes is there exactly while Row is odd;
-		#   Mirror, on a bus with no pointer, reads what the bus says;
+		#   Mirror, on a bus with no pointer, reads what the bus says, and can
+		#   be written as the bus can (chimera#456);
 		#   a 77 written to Wanderer before the first frame (Row 0) stays at
 		#   0x200 - Origin - and Wanderer, once it has moved on, does not have it;
 		#   the table says it is dynamic, and a fresh listing has Sometimes
@@ -1199,7 +1200,7 @@ names = {p["name"]: p for p in table["properties"]}
 assert table.get("dynamic") is True and listed == "prop table: dynamic, %d listed after the run" % (7 if last % 2 else 6), listed
 assert "wanderer" in names and "Wanderer" in names and names["wanderer"]["offset"] == 0x244, sorted(names)
 assert names["Sometimes"]["listed"] == (last % 2 == 1) and names["Sometimes"]["present"] == (last % 2 == 1), names["Sometimes"]
-assert names["Mirror"]["writable"] is False and names["Wanderer"]["offset"] == 0x200 + 4 * last
+assert names["Mirror"]["writable"] is True and names["Wanderer"]["offset"] == 0x200 + 4 * last
 print("%d frames over rows %s" % (len(frames), sorted(rows)))
 DYNAMIC
 		then

@@ -571,7 +571,9 @@ ECL_EXPORT int GetMemoryDomainHidden(int i) { return i >= 2 ? 1 : 0; }
  * own address, so an offset wrong by any amount reads something else. "Bus"
  * answers runs through ReadBus; "Bus (peeks)" declines them, and the engine
  * peeks it a byte at a time - both must read what PeekBus says (witness leg
- * E:bus-read). */
+ * E:bus-read). "Bus" can be written: a byte poked there goes into the RAM
+ * byte it mirrors, so that the bus reads it back (the memory tools write a
+ * bus, chimera#456); "Bus (peeks)" cannot. */
 #define BUS_SIZE 0x30000
 static uint8_t bus_byte(int64_t addr)
 {
@@ -583,6 +585,12 @@ ECL_EXPORT int32_t GetBusCount(void) { return g_synth ? 2 : 0; }
 ECL_EXPORT const char *GetBusName(int32_t b) { return b == 0 ? "Bus" : "Bus (peeks)"; }
 ECL_EXPORT int64_t GetBusSize(int32_t b) { (void)b; return BUS_SIZE; }
 ECL_EXPORT int32_t PeekBus(int32_t b, int32_t addr) { (void)b; return addr >= 0 && addr < BUS_SIZE ? bus_byte(addr) : 0; }
+ECL_EXPORT int32_t GetBusWritable(int32_t b) { return b == 0; }
+ECL_EXPORT void PokeBus(int32_t b, int32_t addr, int32_t value)
+{
+	if (b != 0 || addr < 0 || addr >= BUS_SIZE) return;
+	synth_get_ram(g_synth)[addr & 4095] = (uint8_t)((uint8_t)value ^ (uint8_t)(addr >> 12) ^ (uint8_t)(addr * 7));
+}
 
 ECL_INVISIBLE static uint8_t g_busRun[65536];
 ECL_EXPORT const uint8_t *ReadBus(int32_t b, int64_t addr, int32_t len)

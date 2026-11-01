@@ -1878,9 +1878,10 @@ int main(int argc, char **argv)
 	{
 		int32_t found = -1;
 		for (int32_t d = 0; d < ce_session_domain_count(session); d++)
-			if (ramSearchBench == ce_session_domain_name(session, d)) found = d;
-		/* a bus is read through a function, as the frontend reads one: a byte
-		 * per call (what the frontend did until chimera#180) and then in runs */
+			if (ce_session_domain_bus(session, d) < 0 && ramSearchBench == ce_session_domain_name(session, d)) found = d;
+		/* a bus (one of the domains, or not, chimera#456) is read through a
+		 * function, as the frontend reads one: a byte per call (what the
+		 * frontend did until chimera#180) and then in runs */
 		int32_t bus = -1;
 		for (int32_t b = 0; found < 0 && b < ce_session_bus_count(session); b++)
 			if (ramSearchBench == ce_session_bus_name(session, b)) bus = b;
@@ -1994,13 +1995,14 @@ int main(int argc, char **argv)
 		int32_t found = -1;
 		for (int32_t d = 0; d < count; d++)
 		{
-			if (dump.first == ce_session_domain_name(session, d))
+			if (ce_session_domain_bus(session, d) < 0 && dump.first == ce_session_domain_name(session, d))
 			{
 				found = d;
 				break;
 			}
 		}
-		/* Not a domain: a bus of that name. A bus is an address space and may
+		/* Not one of the core's domains: a bus of that name (the domain list
+		 * ends with the buses, chimera#456, but a bus is dumped as one). A bus is an address space and may
 		 * be 4 GiB, so what is written is not its bytes but a fingerprint of
 		 * every 64 KiB of it, eight bytes each (FNV-1a), in order: two runs
 		 * have the same machine where the two files are the same, and where
@@ -2061,11 +2063,7 @@ int main(int argc, char **argv)
 			{
 				had += (d ? ", " : "");
 				had += ce_session_domain_name(session, d);
-			}
-			for (int32_t b = 0; b < ce_session_bus_count(session); b++)
-			{
-				had += (had.empty() ? "" : ", ");
-				had += std::string(ce_session_bus_name(session, b)) + " (a bus)";
+				if (ce_session_domain_bus(session, d) >= 0) had += " (a bus)";
 			}
 			return fail(metaPath, "no memory domain named '" + dump.first
 				+ "'; this core has: " + had);

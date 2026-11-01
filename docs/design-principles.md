@@ -12188,3 +12188,69 @@ the shortcut rule ignoring Ctrl (3 checks), `setMarkerAt` adding no marker
 window's edge, as reported), and Enter not wired to OK (2). Not driven by a
 test: the click that gives the roll the keyboard (issue 462) and the double
 click itself in the window (issue 436); both were only read through.
+## Buses are memory domains again, and RAM Search starts searching when it opens (2026-11-01)
+
+RAM Search had nothing to search on Ruffle, and on every core it showed no
+addresses until New Search was pressed (issue 456, decided by the owner as
+"fix").
+
+Two things had gone when the old window was removed on 2026-10-27:
+
+- The old window added every bus to the list of memory domains, so the
+  Hex Editor, RAM Watch, RAM Search, freezes and Lua all offered it.
+  Ruffle's memory is only a bus ("Heap"), and ares' Nintendo 64 hides its
+  own copy of RDRAM because a bus shows it (chimera#288). The Qt window
+  listed domains alone, so those memories were in no tool.
+- The old RAM Search started a search when it opened, and again ("Search
+  restarted") for each machine opened while it was open.
+
+What changed:
+
+- The engine's domain list (`ce_session_domain_*`) is now the core's
+  domains followed by its buses, leaving out a bus that has a domain's name.
+  `ce_session_domain_bus` says which bus a list entry is. The new
+  `ce_session_domain_write` is the one way to write any of them (through
+  the core's pointer, or `PokeBus` for a bus), and freezes use it, so a bus
+  can be frozen. This is in the engine, not in each window, so every tool
+  and script gets it at once.
+- RAM Search searches a bus over the parts the core says are live
+  (`GetBusRanges`), as the engine's own tests did.
+- A bus is read through the core, and only the machine's thread may call
+  the core. In Fast mode RAM Search's list reads each value as it shows
+  it, on the window's thread: with Ruffle's Heap that call ended the
+  program (seen before this went in). The window's thread now reads copies
+  of the 4 KiB pages it asks for, which the machine's thread makes and
+  makes again after every frame; a page not copied yet reads as zeros for
+  that moment, and the list is read again once it is.
+- chimera-run and the MCP server list domains and buses apart, as they did
+  before.
+- RAM Search has a `windowOpen` property, set by its window. When the window
+  opens with no search, a search of the picked domain starts, and another
+  starts with each machine opened while the window is open.
+
+Tested: the synthetic core's "Bus" can now be written. A byte poked there
+goes into the RAM byte it mirrors; "Bus (peeks)" stays read-only. The view
+models' test checks:
+
+- RAM Search lists RAM, VRAM, Bus, Bus (peeks). A search of Bus has the
+  6144 bytes it says are live, and a search of Bus (peeks) has all 196608.
+- Lua's memory calls read the bus as the core reads it, write it, and refuse
+  to write the read-only one.
+- A freeze on the bus holds its value over two frames.
+- The Hex Editor lists both buses and writes the writable one, but not the
+  other.
+- With the window shown, opening a machine starts a search of RAM (4096
+  addresses). With it hidden, nothing starts, and showing it then starts one.
+
+- In Fast mode, the list's value for a row of the bus is the byte the
+  bus reads there, read from the test's own thread.
+
+Broken on purpose, each failed: with the engine's join undone, 13 checks;
+with the live ranges not given to the search and no search on opening, 3;
+with the list reading the bus directly, the test ended with the fault the
+Ruffle run had.
+The witness's dynamic-property test expected the property on the synthetic
+bus to be read-only; the bus can be written now, and so can it. With the
+published Ruffle package, the window now lists "Heap" (1 GiB) in Lua's
+memory domains and in RAM Search, and a search of it starts when the
+window opens; ares was not tried.

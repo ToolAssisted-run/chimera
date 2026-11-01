@@ -40,6 +40,7 @@ using chimera::lang::tr;
 #include <map>
 #include <memory>
 #include <mutex>
+#include <set>
 #include <string>
 #include <thread>
 #include <vector>
@@ -995,6 +996,9 @@ struct ce_session
 	std::vector<std::string> busNames;
 	std::vector<int64_t> busSizes;
 	std::vector<bool> busWritables;
+	/* the buses that follow the core's domains in the domain list, by bus
+	 * index: every bus but one a domain shares a name with (chimera#456) */
+	std::vector<int32_t> domainBuses;
 	// savedata export (docs/save-data.md); a snapshot maps engine index ->
 	// guest index because entries with unclean paths are dropped here
 	int32_t (*sdCount)() = nullptr;
@@ -2560,6 +2564,18 @@ static ce_session *openSession(
 	 * domains, whose pointers hold for the session's lifetime - and against the
 	 * buses, which is why this comes after they were probed for */
 	{
+		/* The domain list the memory tools and scripts go by is the core's
+		 * domains and then its buses, as the old window listed them
+		 * (chimera#456): a bus is read and written through the core, so it
+		 * has no pointer. A domain of the same name comes first and wins, as
+		 * it does for the game properties below. */
+		std::set<std::string> named;
+		for (int32_t i = 0; i < s->mdCount(); i++)
+			if (const char *name = reinterpret_cast<const char *>(s->mdName(i))) named.insert(name);
+		for (int32_t b = 0; b < static_cast<int32_t>(s->busNames.size()); b++)
+			if (named.insert(s->busNames[static_cast<size_t>(b)]).second) s->domainBuses.push_back(b);
+	}
+	{
 		const char *table = nullptr;
 		s->gameProperties = reinterpret_cast<uintptr_t (*)()>(s->proc("GetGameProperties", 0, false, err));
 		if (s->gameProperties != nullptr) table = reinterpret_cast<const char *>(s->gameProperties());
@@ -3634,18 +3650,34 @@ int32_t ce_session_state_load_file(ce_session *s, const char *utf8_path, uint8_t
 	return 0;
 }
 
-int32_t ce_session_domain_count(const ce_session *s) { return s->mdCount(); }
+int32_t ce_session_domain_count(const ce_session *s) { return s->mdCount() + static_cast<int32_t>(s->domainBuses.size()); }
 
+/* one of the core's own domains (a bus that follows them is not) */
 static bool domainIndexOk(const ce_session *s, int32_t index) { return index >= 0 && index < s->mdCount(); }
+
+int32_t ce_session_domain_bus(const ce_session *s, int32_t index)
+{
+	const int32_t at = index - s->mdCount();
+	return index >= 0 && at >= 0 && at < static_cast<int32_t>(s->domainBuses.size()) ? s->domainBuses[static_cast<size_t>(at)] : -1;
+}
 
 const char *ce_session_domain_name(const ce_session *s, int32_t index)
 {
+	if (const int32_t bus = ce_session_domain_bus(s, index); bus >= 0) return ce_session_bus_name(s, bus);
 	return domainIndexOk(s, index) ? reinterpret_cast<const char *>(s->mdName(index)) : nullptr;
 }
 
-int64_t ce_session_domain_size(const ce_session *s, int32_t index) { return domainIndexOk(s, index) ? s->mdSize(index) : 0; }
+int64_t ce_session_domain_size(const ce_session *s, int32_t index)
+{
+	if (const int32_t bus = ce_session_domain_bus(s, index); bus >= 0) return ce_session_bus_size(s, bus);
+	return domainIndexOk(s, index) ? s->mdSize(index) : 0;
+}
 
-int32_t ce_session_domain_writable(const ce_session *s, int32_t index) { return domainIndexOk(s, index) ? s->mdWritable(index) : 0; }
+int32_t ce_session_domain_writable(const ce_session *s, int32_t index)
+{
+	if (const int32_t bus = ce_session_domain_bus(s, index); bus >= 0) return ce_session_bus_writable(s, bus);
+	return domainIndexOk(s, index) ? s->mdWritable(index) : 0;
+}
 
 int32_t ce_session_domain_hidden(const ce_session *s, int32_t index)
 {
@@ -3654,10 +3686,12 @@ int32_t ce_session_domain_hidden(const ce_session *s, int32_t index)
 
 int64_t ce_session_domain_read(const ce_session *s, int32_t index, int64_t offset, uint8_t *buf, int64_t len)
 {
-	if (!domainIndexOk(s, index)) return 0;
-	int64_t size = s->mdSize(index);
+	const int32_t bus = ce_session_domain_bus(s, index);
+	if (!domainIndexOk(s, index) && bus < 0) return 0;
+	int64_t size = ce_session_domain_size(s, index);
 	if (offset < 0 || offset >= size || len <= 0) return 0;
 	int64_t n = len < size - offset ? len : size - offset;
+	if (bus >= 0) return ce_session_bus_read(s, bus, offset, buf, n);
 	const uint8_t *src = domainReadView(s, index, offset, n);
 	if (src == nullptr) return 0;
 	std::memcpy(buf, src, static_cast<size_t>(n));
@@ -3810,6 +3844,24 @@ int32_t ce_session_property_set_text(ce_session *s, int32_t index, uint32_t elem
 	s->error.clear();
 	s->placeProperty(index);
 	return s->properties.writeText(index, element, text != nullptr ? text : "", s->error) ? 0 : 1;
+}
+
+int64_t ce_session_domain_write(ce_session *s, int32_t index, int64_t offset, const uint8_t *buf, int64_t len)
+{
+	if (buf == nullptr || len <= 0 || offset < 0 || offset + len > ce_session_domain_size(s, index) ||
+		ce_session_domain_writable(s, index) == 0)
+		return 0;
+	if (const int32_t bus = ce_session_domain_bus(s, index); bus >= 0)
+	{
+		/* PokeBus takes a 32-bit address */
+		if (offset + len - 1 > INT32_MAX) return 0;
+		for (int64_t k = 0; k < len; k++) ce_session_bus_poke(s, bus, static_cast<int32_t>(offset + k), buf[k]);
+		return len;
+	}
+	const uintptr_t base = s->mdPtr(index);
+	if (base == 0) return 0;
+	std::memcpy(reinterpret_cast<uint8_t *>(base) + offset, buf, static_cast<size_t>(len));
+	return len;
 }
 
 uint64_t ce_session_domain_ptr(const ce_session *s, int32_t index)
@@ -5247,13 +5299,11 @@ void ce_session::applyFreezes()
 			properties.writeText(f.property, f.element, f.text, ignored);
 			continue;
 		}
-		if (f.domain < 0 || f.domain >= mdCount() || mdPtr == nullptr || f.address < 0 || f.address + f.size > mdSize(f.domain)) continue;
-		const uintptr_t base = mdPtr(f.domain);
-		if (base == 0) continue;
+		if (f.address < 0 || f.address + f.size > ce_session_domain_size(this, f.domain)) continue;
 		if (f.compareKind != 0)
 		{
-			const uint8_t *seen = domainReadView(this, f.domain, f.address, f.size);
-			if (seen == nullptr) continue;
+			uint8_t seen[4] = {};
+			if (ce_session_domain_read(this, f.domain, f.address, seen, f.size) != f.size) continue;
 			const uint64_t now = freezeRead(f, seen);
 			bool write = true;
 			switch (f.compareKind)
@@ -5268,8 +5318,9 @@ void ce_session::applyFreezes()
 			}
 			if (!write) continue;
 		}
-		uint8_t *at = reinterpret_cast<uint8_t *>(base) + f.address;
-		for (int32_t i = 0; i < f.size; i++) at[f.bigEndian ? f.size - 1 - i : i] = static_cast<uint8_t>(f.value >> (8 * i));
+		uint8_t bytes[4] = {};
+		for (int32_t i = 0; i < f.size; i++) bytes[f.bigEndian ? f.size - 1 - i : i] = static_cast<uint8_t>(f.value >> (8 * i));
+		ce_session_domain_write(this, f.domain, f.address, bytes, f.size);
 	}
 }
 
@@ -5277,18 +5328,18 @@ int32_t ce_session_freeze(ce_session *s, int32_t domain, int64_t address, int32_
 	int32_t compare_kind, uint64_t compare)
 {
 	s->error.clear();
-	if (!domainIndexOk(s, domain))
+	if (domain < 0 || domain >= ce_session_domain_count(s))
 	{
 		s->error = tr("session.no_domain", {std::to_string(domain)});
 		return -1;
 	}
-	const char *name = reinterpret_cast<const char *>(s->mdName(domain));
-	if (s->mdWritable(domain) == 0 || s->mdPtr == nullptr || s->mdPtr(domain) == 0)
+	const char *name = ce_session_domain_name(s, domain);
+	if (ce_session_domain_writable(s, domain) == 0 || (ce_session_domain_bus(s, domain) < 0 && s->mdPtr(domain) == 0))
 	{
 		s->error = tr("session.domain_read_only", {name != nullptr ? name : tr("engine.the_domain")});
 		return -1;
 	}
-	if ((size != 1 && size != 2 && size != 4) || address < 0 || address + size > s->mdSize(domain))
+	if ((size != 1 && size != 2 && size != 4) || address < 0 || address + size > ce_session_domain_size(s, domain))
 	{
 		s->error = tr("engine.domain_short", {name != nullptr ? name : tr("engine.the_domain"), std::to_string(size), std::to_string(address)});
 		return -1;

@@ -397,6 +397,11 @@ Probed once after `Init`; absent exports simply mean the tool is not offered.
   RAM Search reads the whole bus, and without it every byte is a call into the
   sandbox: EKA2L1's 64 MB bus took 3 s a search that way and 0.2 s with it
   (chimera#180). A core without it still works; the engine peeks for it.
+  The memory tools and scripts list a bus as a domain, after the domains
+  (chimera#456): RAM Search, RAM Watch, the Hex Editor, freezes and Lua's
+  memory library read it through `ReadBus` or `PeekBus` and write it through
+  `PokeBus`. A bus with the name of one of your domains is left out of that
+  list.
   **A bus that is mostly nothing says what is live**: a bus's size is read
   once, so one over a heap arena is a gigabyte whatever is mapped in it, and a
   RAM search pays for every byte. Export `const int64_t *GetBusRanges(int32_t

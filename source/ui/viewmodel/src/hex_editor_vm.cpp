@@ -652,7 +652,7 @@ void HexEditorViewModel::refreshDomains()
 				const std::string n = ce_session_domain_name(s, i);
 				names += (names.empty() ? "" : ",") + n;
 				sizes[n] = ce_session_domain_size(s, i);
-				canWrite[n] = ce_session_domain_writable(s, i) != 0 && ce_session_domain_ptr(s, i) != 0;
+				canWrite[n] = ce_session_domain_writable(s, i) != 0 && (ce_session_domain_bus(s, i) >= 0 || ce_session_domain_ptr(s, i) != 0);
 			}
 		later([this, names, sizes, canWrite] {
 			sizes_ = sizes;
@@ -762,14 +762,12 @@ bool HexEditorViewModel::writeNow(int64_t at, const std::vector<uint8_t> &bytes,
 			return;
 		}
 		const int32_t i = domainIndex(s, name);
-		const uint64_t ptr = i >= 0 ? ce_session_domain_ptr(s, i) : 0;
-		if (ptr == 0)
+		const int64_t n = static_cast<int64_t>(bytes.size());
+		if (i < 0 || ce_session_domain_write(s, i, at, bytes.data(), n) != n)
 		{
 			why = tr("hex.not_writable", {name});
 			return;
 		}
-		auto *mem = reinterpret_cast<uint8_t *>(static_cast<uintptr_t>(ptr));
-		std::copy(bytes.begin(), bytes.end(), mem + at);
 		/* the states after this frame were made without it */
 		session_.dropStatesAfterOnMachine(ce_session_frame(s));
 		readOnMachine(s);

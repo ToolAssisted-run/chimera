@@ -1269,7 +1269,8 @@ McpResult toolListMemory(ce_session *s)
 	cJSON *domains = cJSON_CreateArray();
 	for (int32_t i = 0; i < ce_session_domain_count(s); i++)
 	{
-		if (ce_session_domain_hidden(s, i) != 0) continue;
+		/* the buses the domain list ends with are listed as buses */
+		if (ce_session_domain_hidden(s, i) != 0 || ce_session_domain_bus(s, i) >= 0) continue;
 		cJSON *item = cJSON_CreateObject();
 		cJSON_AddStringToObject(item, "name", ce_session_domain_name(s, i));
 		cJSON_AddNumberToObject(item, "size", static_cast<double>(ce_session_domain_size(s, i)));
@@ -1296,7 +1297,7 @@ bool findMemory(ce_session *s, const std::string &name, int32_t &domainIndex, in
 	domainIndex = busIndex = -1;
 	for (int32_t i = 0; i < ce_session_domain_count(s) && domainIndex < 0; i++)
 	{
-		if (ce_session_domain_hidden(s, i) == 0 && name == ce_session_domain_name(s, i)) domainIndex = i;
+		if (ce_session_domain_hidden(s, i) == 0 && ce_session_domain_bus(s, i) < 0 && name == ce_session_domain_name(s, i)) domainIndex = i;
 	}
 	for (int32_t i = 0; domainIndex < 0 && i < ce_session_bus_count(s) && busIndex < 0; i++)
 	{

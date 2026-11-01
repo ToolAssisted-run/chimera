@@ -6,7 +6,11 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <functional>
+#include <map>
+#include <set>
 #include <sstream>
+#include <thread>
 
 #include "chimera/engine.h"
 #include "chimera/vm/json.hpp"
@@ -15,20 +19,64 @@
 namespace chimera::vm {
 
 namespace {
-/* a domain with no linear backing is read range by range */
+/* A domain with no linear backing is read range by range. A bus is read
+ * through the core, which only the machine's thread may call: the list's
+ * rows, read on the window's thread, called it there and ended the program
+ * (issue 456). The window's thread reads copies of the pages it asks for,
+ * which the machine's thread makes and makes again after every frame; a
+ * page not copied yet reads as zeros until it is. */
 struct DomainReader
 {
-	ce_session *s;
-	int32_t index;
+	ce_session *s = nullptr;
+	int32_t index = -1;
+	std::thread::id machine;
+	std::function<void()> asked;
+	std::mutex pagesM;
+	std::map<int64_t, std::vector<uint8_t>> pages;
+	std::set<int64_t> wanted;
 };
+constexpr int64_t kPage = 4096;
+/* 4 MiB: more than the rows any list shows */
+constexpr size_t kMostPages = 1024;
 
 int64_t readDomainRange(void *user, int64_t offset, uint8_t *buf, int64_t len)
 {
-	const auto *r = static_cast<const DomainReader *>(user);
-	return ce_session_domain_read(r->s, r->index, offset, buf, len);
+	auto *r = static_cast<DomainReader *>(user);
+	if (std::this_thread::get_id() == r->machine) return ce_session_domain_read(r->s, r->index, offset, buf, len);
+	bool missing = false;
+	{
+		std::lock_guard<std::mutex> lock(r->pagesM);
+		for (int64_t done = 0; done < len;)
+		{
+			const int64_t at = offset + done, page = at / kPage, in = at % kPage, n = std::min(len - done, kPage - in);
+			if (const auto it = r->pages.find(page); it != r->pages.end())
+				std::memcpy(buf + done, it->second.data() + in, static_cast<size_t>(n));
+			else
+			{
+				std::memset(buf + done, 0, static_cast<size_t>(n));
+				missing = r->wanted.insert(page).second || missing;
+			}
+			done += n;
+		}
+	}
+	if (missing && r->asked) r->asked();
+	return len;
 }
 
-DomainReader g_reader; /* the machine's thread's: one search at a time */
+/* the machine's thread: every copy made again, and the pages asked for made; true when some were asked for */
+bool copyPages(DomainReader &r)
+{
+	std::lock_guard<std::mutex> lock(r.pagesM);
+	if (r.pages.size() + r.wanted.size() > kMostPages) r.pages.clear();
+	const bool wanted = !r.wanted.empty();
+	for (const int64_t page : r.wanted) r.pages[page].resize(kPage);
+	r.wanted.clear();
+	for (auto &[page, bytes] : r.pages)
+		if (ce_session_domain_read(r.s, r.index, page * kPage, bytes.data(), kPage) < kPage) std::fill(bytes.begin(), bytes.end(), 0);
+	return wanted;
+}
+
+DomainReader g_reader; /* one search at a time */
 
 /* past this, a search starts in Fast mode, as Chimera's */
 constexpr int64_t kMaxDetailedSize = 1024 * 1024;
@@ -84,6 +132,8 @@ RamSearchViewModel::RamSearchViewModel(Dispatcher &dispatcher, SessionViewModel 
 	expose("selectionFrozen", "every row picked is frozen (Freeze Address reads Unfreeze Address)", selectionFrozen);
 	expose("anyFrozen", "any address is frozen (Unfreeze All is offered)", anyFrozen);
 	expose("currentFile", "the .wch file last opened or saved", currentFile);
+	expose("windowOpen", "the window is open: a search starts when it opens with none open, and with each machine opened while it "
+		"is, as Chimera's", windowOpen, true);
 	expose("previewMode", "Preview Mode: the rows the next search would remove are coloured", previewMode, true);
 	expose("autoSearch", "Auto-Search: the search is made after every frame", autoSearch, true);
 	expose("autoSearchAccountForLag", "Auto-Search Account for Lag: not after a lag frame", autoSearchAccountForLag, true);
@@ -646,28 +696,42 @@ RamSearchViewModel::RamSearchViewModel(Dispatcher &dispatcher, SessionViewModel 
 				domains.set(names);
 				const std::string d = "," + domain.get() + ",";
 				if (domain.get().empty() || ("," + names + ",").find(d) == std::string::npos) domain.set(first);
-				/* a domain of the same name may be another size on this machine, as Chimera checks at each restart */
-				fastIfLarge();
+				/* a domain of the same name may be another size on this machine, as Chimera checks at each restart;
+				 * the open window searches the new machine, as Chimera's restarts its search */
+				fastIfLarge([this] {
+					if (windowOpen.get()) startWhileOpen();
+				});
 			});
 		});
 	});
+	windowOpenWatch_ = windowOpen.changed.connect([this] {
+		if (windowOpen.get() && !searching.get()) startWhileOpen();
+	});
+}
+
+void RamSearchViewModel::startWhileOpen()
+{
+	if (!session_.isOpen.get() || domains.get().empty()) return;
+	std::string ignored;
+	run("newSearch", {}, ignored);
 }
 
 /* a large domain is searched fast (at start, at each new machine, and when
  * the domain changes) */
-void RamSearchViewModel::fastIfLarge()
+void RamSearchViewModel::fastIfLarge(std::function<void()> then)
 {
-	session_.onMachine([this, d = domain.get()](ce_session *s) {
+	session_.onMachine([this, d = domain.get(), then = std::move(then)](ce_session *s) {
 		int64_t bytes = 0;
 		if (s != nullptr)
 			for (int32_t i = 0; i < ce_session_domain_count(s); i++)
 				if (d == ce_session_domain_name(s, i)) bytes = ce_session_domain_size(s, i);
-		later([this, bytes] {
+		later([this, bytes, then] {
 			if (bytes >= kMaxDetailedSize && !fast.get())
 			{
 				fast.set(true);
 				status.set(tr("ram_search.fast_mode"));
 			}
+			if (then) then();
 		});
 	});
 }
@@ -822,6 +886,7 @@ void RamSearchViewModel::dropOnMachine()
 		if (rs_ == nullptr) return;
 		ce_ramsearch_destroy(rs_);
 		rs_ = nullptr;
+		pagedM_ = false;
 	}
 	later([this] {
 		rows_ = 0;
@@ -858,9 +923,27 @@ void RamSearchViewModel::startOnMachine(ce_session *s, const std::string &name, 
 		rs = ce_ramsearch_create(reinterpret_cast<const uint8_t *>(static_cast<uintptr_t>(ptr)), nullptr, nullptr, bytes);
 	else
 	{
-		g_reader = {s, index};
+		{
+			std::lock_guard<std::mutex> lock(g_reader.pagesM);
+			g_reader.s = s;
+			g_reader.index = index;
+			g_reader.machine = std::this_thread::get_id();
+			g_reader.asked = [this] { pagesAsked(); };
+			g_reader.pages.clear();
+			g_reader.wanted.clear();
+		}
 		rs = ce_ramsearch_create(nullptr, &readDomainRange, &g_reader, bytes);
 	}
+	const bool paged = ptr == 0;
+	/* a bus that says which of it is live is searched there alone: a heap
+	 * of a gigabyte with thirty megabytes in use (chimera#218, #456) */
+	if (const int32_t bus = ce_session_domain_bus(s, index); rs != nullptr && bus >= 0)
+		if (const int32_t n = ce_session_bus_ranges(s, bus, nullptr, 0); n >= 0)
+		{
+			std::vector<int64_t> pairs(2 * static_cast<size_t>(n));
+			const int32_t got = ce_session_bus_ranges(s, bus, pairs.data(), n);
+			ce_ramsearch_set_ranges(rs, pairs.data(), std::min(n, got));
+		}
 	if (rs == nullptr || ce_ramsearch_start(rs, sz, misaligned ? 1 : 0, be ? 1 : 0, detailed ? 1 : 0) != 0)
 	{
 		if (rs != nullptr) ce_ramsearch_destroy(rs);
@@ -879,6 +962,7 @@ void RamSearchViewModel::startOnMachine(ce_session *s, const std::string &name, 
 		std::lock_guard<std::mutex> lock(rsM_);
 		if (rs_ != nullptr) ce_ramsearch_destroy(rs_);
 		rs_ = rs;
+		pagedM_ = paged;
 	}
 	later([this, bytes, writable, name] {
 		domainSize_ = bytes;
@@ -914,7 +998,28 @@ void RamSearchViewModel::onSearch(std::function<std::string(ce_ramsearch *)> job
 	});
 }
 
-void RamSearchViewModel::afterFrameOnMachine(ce_session *)
+void RamSearchViewModel::pagesAsked()
+{
+	/* once, until the machine's thread has made them; then the rows are read again */
+	if (pagesPosted_.exchange(true)) return;
+	session_.onMachine([this](ce_session *s) {
+		pagesPosted_ = false;
+		pagesOnMachine(s);
+		if (!refreshPosted_.exchange(true))
+			later([this] {
+				refreshPosted_ = false;
+				if (rows_ > 0) results_.changed.emit(0, rows_ - 1);
+			});
+	});
+}
+
+void RamSearchViewModel::pagesOnMachine(ce_session *s)
+{
+	std::lock_guard<std::mutex> lock(rsM_);
+	if (rs_ != nullptr && pagedM_ && s != nullptr && s == g_reader.s) copyPages(g_reader);
+}
+
+void RamSearchViewModel::afterFrameOnMachine(ce_session *s)
 {
 	Params p;
 	{
@@ -927,6 +1032,8 @@ void RamSearchViewModel::afterFrameOnMachine(ce_session *)
 		if (rs_ == nullptr) return;
 		ce_ramsearch_update(rs_, p.previousType);
 	}
+	/* the copies of a bus's pages the window reads, made fresh */
+	pagesOnMachine(s);
 	/* Auto-Search: the search made after every frame, but not after a lag frame when told so */
 	if (autoM_.load() && p.ok && !(lagAwareM_.load() && session_.lastFrameLagOnMachine()))
 	{

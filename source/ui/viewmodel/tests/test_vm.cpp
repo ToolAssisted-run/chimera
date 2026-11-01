@@ -4532,6 +4532,78 @@ bool ramSearch(const char *package, const char *rom)
 	CHECK(search.rebootNeeded.get() && search.previousType.get() == 1 && search.hiddenColumns.get() == "Diff,Changes");
 	search.set("fast", false, error);
 	CHECK(search.hiddenColumns.get() == "Diff");
+	/* a bus is one of the domains, after the core's own (issue 456: Ruffle's memory is a bus alone, and the window
+	 * offered nothing to search). The synth's "Bus" says 6144 of its 196608 bytes are live and is searched there;
+	 * "Bus (peeks)" says nothing, so all of it is */
+	CHECK(search.domains.get() == "RAM,VRAM,Bus,Bus (peeks)");
+	search.set("size", int64_t{1}, error);
+	search.set("domain", std::string("Bus"), error);
+	search.run("newSearch", {}, error);
+	CHECK(d.until([&] { return search.searchedDomain.get() == "Bus" && search.count.get() == 6144; }, 20));
+	search.set("domain", std::string("Bus (peeks)"), error);
+	search.run("newSearch", {}, error);
+	CHECK(d.until([&] { return search.searchedDomain.get() == "Bus (peeks)" && search.count.get() == 0x30000; }, 20));
+	/* in Fast mode the list reads each value as it shows it, on the window's thread, which may not call the
+	 * core: it reads copies the machine's thread makes (the list called the core there and the program ended) */
+	search.set("fast", true, error);
+	search.set("domain", std::string("Bus"), error);
+	search.run("newSearch", {}, error);
+	CHECK(d.until([&] { return search.searchedDomain.get() == "Bus" && search.count.get() == 6144 && search.fast.get(); }, 20));
+	{
+		RowModel &busRows = *search.rowLists()[0].model;
+		std::string address, byte;
+		fromValue(busRows.cell(0, 0), address);
+		fromValue(session.run("readMemory", {std::string("Bus"), static_cast<int64_t>(std::stoll(address, nullptr, 16)), int64_t{1}}, error)
+			.value_or(Value()), byte);
+		const std::string want = byte.size() == 1 ? std::to_string(static_cast<uint8_t>(byte[0])) : "?";
+		CHECK(d.until([&] {
+			std::string shown;
+			fromValue(busRows.cell(0, 1), shown);
+			return shown == want;
+		}, 20));
+	}
+	search.set("fast", false, error);
+	{
+		/* a bus read as it reads, written through the core (into the RAM byte "Bus" mirrors there), and frozen */
+		const auto busByte = [](const std::vector<uint8_t> &r, int64_t a) {
+			return static_cast<char>(r[static_cast<size_t>(a & 4095)] ^ static_cast<uint8_t>(a >> 12) ^ static_cast<uint8_t>(a * 7));
+		};
+		const int64_t at = 0x1a00; /* RAM's 0xa00, which the walker leaves alone */
+		CHECK(session.run("readMemory", {std::string("Bus"), at, int64_t{1}}, error) == Value(std::string(1, busByte(session.readDomain("RAM"), at))));
+		CHECK(session.run("writeMemory", {std::string("Bus"), at, std::string("\x5a")}, error).has_value());
+		CHECK(session.run("readMemory", {std::string("Bus"), at, int64_t{1}}, error) == Value(std::string("\x5a")));
+		CHECK(!session.run("writeMemory", {std::string("Bus (peeks)"), at, std::string("\x5a")}, error).has_value());
+		SessionViewModel::Freeze f;
+		f.domain = "Bus";
+		f.address = at;
+		f.value = 0x77;
+		CHECK(session.freeze(f, error));
+		const int64_t was = session.frame.get();
+		session.run("frameAdvance", {}, error);
+		session.run("frameAdvance", {}, error);
+		CHECK(d.until([&] { return session.frame.get() == was + 2; }, 20));
+		CHECK(session.run("readMemory", {std::string("Bus"), at, int64_t{1}}, error) == Value(std::string("\x77")));
+		session.unfreezeAll();
+	}
+	/* the window opened starts a search of the domain picked, and so does each machine opened while it is, as
+	 * Chimera's (issue 456: nothing was listed until New Search) */
+	search.set("domain", std::string("RAM"), error);
+	session.run("close", {}, error);
+	CHECK(d.until([&] { return !search.searching.get() && search.count.get() == 0; }, 20));
+	search.set("windowOpen", true, error);
+	d.until([] { return false; }, 0.2);
+	CHECK(!search.searching.get());
+	openGame(session, package, std::string(rom), error);
+	CHECK(d.until([&] { return search.searching.get() && search.searchedDomain.get() == "RAM" && search.count.get() == 4096; }, 60));
+	search.set("windowOpen", false, error);
+	session.run("close", {}, error);
+	CHECK(d.until([&] { return !search.searching.get(); }, 20));
+	openGame(session, package, std::string(rom), error);
+	CHECK(d.until([&] { return session.isOpen.get() && search.domains.get().find("RAM") != std::string::npos; }, 60));
+	d.until([] { return false; }, 0.2);
+	CHECK(!search.searching.get());
+	search.set("windowOpen", true, error);
+	CHECK(d.until([&] { return search.searching.get() && search.count.get() == 4096; }, 20));
 	/* the machine closing ends the search: its memory goes with it */
 	session.run("close", {}, error);
 	CHECK(d.until([&] { return !search.searching.get() && search.count.get() == 0; }, 20));
@@ -5832,6 +5904,17 @@ bool hexEditor(const char *package, const char *rom)
 	CHECK(!hex.run("setColor", {std::string("Nope"), std::string("#000000")}, error));
 	hex.run("resetColors", {}, error);
 	CHECK(hex.colors.get() == "{}");
+	/* a bus is offered and written as any domain (issue 456); one that cannot be written says so */
+	CHECK(hex.domains.get() == "RAM,VRAM,Bus,Bus (peeks)");
+	hex.set("size", int64_t{1}, error);
+	hex.set("domain", std::string("Bus"), error);
+	CHECK(d.until([&] { return hex.lineCount.get() == 0x30000 / 16 && hex.writable.get(); }, 20));
+	CHECK(hex.run("poke", {int64_t{0x2a00}, std::string("C3")}, error).has_value());
+	CHECK(session.run("readMemory", {std::string("Bus"), int64_t{0x2a00}, int64_t{1}}, error) == Value(std::string("\xc3")));
+	hex.set("domain", std::string("Bus (peeks)"), error);
+	CHECK(d.until([&] { return hex.lineCount.get() == 0x30000 / 16 && !hex.writable.get(); }, 20));
+	CHECK(!hex.run("poke", {int64_t{0x2a00}, std::string("C3")}, error).has_value());
+	hex.set("domain", std::string("RAM"), error);
 	std::error_code ec;
 	std::filesystem::remove_all(dir, ec);
 	session.run("close", {}, error);

@@ -1361,11 +1361,18 @@ CE_API int32_t ce_session_state_load_file(ce_session *s, const char *utf8_path, 
  * state weighed (the end of a save is not known until it is reached). */
 CE_API void ce_session_state_file_bytes(const ce_session *s, uint64_t *raw_out, uint64_t *stored_out);
 
-/* The guest's self-described memory domains. */
+/* The memory domains: the guest's self-described ones, then each of its
+ * buses (below) that no domain shares a name with, as the old window listed
+ * them, so a core whose memory is a bus alone - Ruffle's heap - has it in
+ * every memory tool and script (chimera#456). A bus in this list has no
+ * pointer: it is read and written through the core, and ce_session_domain_bus
+ * says which bus it is. */
 CE_API int32_t ce_session_domain_count(const ce_session *s);
 CE_API const char *ce_session_domain_name(const ce_session *s, int32_t index);
 CE_API int64_t ce_session_domain_size(const ce_session *s, int32_t index);
 CE_API int32_t ce_session_domain_writable(const ce_session *s, int32_t index);
+/* The bus behind a domain of the list, or -1 for one of the core's own. */
+CE_API int32_t ce_session_domain_bus(const ce_session *s, int32_t index);
 /* A domain that is no memory of the machine's, only somewhere a core puts
  * what its game properties point at - a value with no one place of its own,
  * copied where the engine can read it (chimera#218) - or a block that a bus
@@ -1378,6 +1385,12 @@ CE_API int32_t ce_session_domain_writable(const ce_session *s, int32_t index);
 CE_API int32_t ce_session_domain_hidden(const ce_session *s, int32_t index);
 /* Copies out [offset, offset+len); returns bytes copied (clamped at end). */
 CE_API int64_t ce_session_domain_read(const ce_session *s, int32_t index, int64_t offset, uint8_t *buf, int64_t len);
+/* Writes [offset, offset+len) of a domain that can be written: through the
+ * core's pointer, or poked a byte at a time into a bus. Returns len, or 0 -
+ * nothing written - for a domain that cannot be written or a range that is
+ * not all inside it. The machine's thread; the states after this frame no
+ * longer hold, which is the caller's to say. */
+CE_API int64_t ce_session_domain_write(ce_session *s, int32_t index, int64_t offset, const uint8_t *buf, int64_t len);
 
 /* A game core's properties (docs/game-cores.md): named places in the memory
  * domains above - integers, floats, bools, text, bytes, arrays of them, bit
@@ -1491,9 +1504,9 @@ CE_API const char *ce_session_guest_death(ce_session *s);
  * loadable. Static string, never invalidated. */
 CE_API const char *ce_host_build_info(void);
 
-/* The raw guest pointer behind a memory domain, for pointer-backed peek/poke
- * (the hex editor's path). Stable for the session's lifetime - the guest is
- * non-PIE - and 0 when the domain has no linear backing. */
+/* The raw guest pointer behind a memory domain, for pointer-backed peek/poke.
+ * Stable for the session's lifetime - the guest is non-PIE - and 0 when the
+ * domain has no linear backing (a bus never has). */
 CE_API uint64_t ce_session_domain_ptr(const ce_session *s, int32_t index);
 /* The same domain for READING only: a pointer to the same bytes that never
  * runs the core's own code. A read through ce_session_domain_ptr can: a core
@@ -1956,7 +1969,7 @@ CE_API void ce_session_rerecord_counting(ce_session *s, int32_t on);
  * project or a state: frozen values are for looking into a game, not for
  * making a movie (the owner, 2026-10-24). A freeze changes the machine, so
  * the states kept while one is on are of the machine with it.
- * _freeze: bytes of a writable memory domain with linear backing - size 1, 2
+ * _freeze: bytes of a memory domain that can be written (a bus too) - size 1, 2
  * or 4 at address, value in the byte order asked (big_endian 1 or 0). With
  * compare_kind other than 0 the value is written only when `compare OP now`
  * holds, OP by kind: 1 ==, 2 !=, 3 >, 4 >=, 5 <, 6 <= (Chimera's conditional
