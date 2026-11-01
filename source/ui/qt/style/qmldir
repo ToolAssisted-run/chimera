@@ -2,6 +2,7 @@ module ChimeraStyle
 CheckBox 6.0 CheckBox.qml
 Dialog 6.0 Dialog.qml
 MenuBarItem 6.0 MenuBarItem.qml
+Menu 6.0 Menu.qml
 MenuItem 6.0 MenuItem.qml
 RadioButton 6.0 RadioButton.qml
 ScrollBar 6.0 ScrollBar.qml

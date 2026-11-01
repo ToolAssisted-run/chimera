@@ -179,6 +179,7 @@
     <file alias="qmldir">style/qmldir</file>
     <file alias="CheckBox.qml">style/CheckBox.qml</file>
     <file alias="Dialog.qml">style/Dialog.qml</file>
+    <file alias="Menu.qml">style/Menu.qml</file>
     <file alias="MenuBarItem.qml">style/MenuBarItem.qml</file>
     <file alias="MenuItem.qml">style/MenuItem.qml</file>
     <file alias="RadioButton.qml">style/RadioButton.qml</file>

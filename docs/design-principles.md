@@ -12323,3 +12323,31 @@ is running past it; paused, the same edit leaves it paused at the edit.
 It also checks the picture is empty after closing and right after a game
 opens, before its first frame. Broken on purpose (no run-on, no emptying)
 the test failed 2 and 2 checks.
+
+## Menus as wide as their rows, below the bar, closed with their window (2026-11-01)
+
+Four reports about the window's menus (issues 449, 450, 452, 463). The
+owner chose to fix each symptom and keep menus inside their window, not to
+give menus windows of their own:
+
+- **Rows cut short** (issue 452): Fusion's menu takes its width from its
+  background, 200 pixels, because its list says no width of its own. Every
+  menu was 200 wide and a longer row ("Reproducible Media Maker...") lost
+  its end. The window's style now has its own Menu, a copy of Fusion's
+  whose list is as wide as its widest row. TAStudio Settings' tabs were cut
+  short for another reason (a tab bar shares its width equally); they are
+  as wide as their names now, as every other tab bar's already were.
+- **A menu over the menu bar** (issue 463) and **a menu cut by a short
+  window** (issue 450): a menu that did not fit below its bar was moved up
+  over it. It now stays below the bar (the menu's top margin is the bar's
+  height) and scrolls its rows. It still cannot go past the window's edges.
+- **A menu left open** when another window was clicked (issue 449): a menu
+  now closes when its window loses the keyboard.
+
+Tested: a new window test, "menus", opens a menu bar's menu by a click in
+a window 160 pixels high: the rows are as wide as the widest (286 pixels),
+the menu is below the 26-pixel bar and no taller than the room, and it
+closes when another window is activated. With the style's Menu taken out,
+all three checks failed as reported (rows 198 wide, the menu at the top
+over the bar, still open). The TAStudio Settings tabs were not driven by a
+test.

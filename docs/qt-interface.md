@@ -187,6 +187,13 @@ Chimera's window: Qt 6.12, QML views over C++ view models. The code is in
   a marker's frame number drags the marker to another frame; and the left
   button held in the column before the frame numbers takes the machine
   along with the pointer.
+  The menus are the window's own style's (source/ui/qt/style/Menu.qml): a
+  menu is as wide as its widest row (Fusion's were always 200 pixels and
+  cut a longer row short, issue 452), stays below the menu bar in a short
+  window and scrolls its rows (issues 450, 463), and closes when its window
+  loses the keyboard to another (issue 449). A menu stays inside its window
+  (the owner kept menus there rather than in windows of their own). A tab
+  is as wide as its name (TAStudio Settings' were cut short, issue 452).
   Check boxes and radio buttons are drawn as Chimera's, which leaves them to
   the system: a light box or circle with a dark edge whatever the theme
   (Fusion's own went dark with a dark theme and could not be seen). This is

@@ -170,11 +170,11 @@ ApplicationWindow {
         TabBar {
             id: tabs
             Layout.fillWidth: true
-            TabButton { text: qsTrId("tastudio_settings.appearance") }
-            TabButton { text: qsTrId("tastudio_settings.autosave") }
-            TabButton { text: qsTrId("tastudio_settings.paint_patterns") }
-            TabButton { text: qsTrId("tastudio_settings.input_roll") }
-            TabButton { text: qsTrId("tastudio_settings.misc") }
+            TabButton { text: qsTrId("tastudio_settings.appearance"); width: implicitWidth }
+            TabButton { text: qsTrId("tastudio_settings.autosave"); width: implicitWidth }
+            TabButton { text: qsTrId("tastudio_settings.paint_patterns"); width: implicitWidth }
+            TabButton { text: qsTrId("tastudio_settings.input_roll"); width: implicitWidth }
+            TabButton { text: qsTrId("tastudio_settings.misc"); width: implicitWidth }
         }
         StackLayout {
             currentIndex: tabs.currentIndex
