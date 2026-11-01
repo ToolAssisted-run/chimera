@@ -123,6 +123,8 @@ std::string ControlsViewModel::groupsOf(const std::vector<std::string> &names) c
 ControlsViewModel::ControlsViewModel(Dispatcher &dispatcher, SessionViewModel &session, PianoRollViewModel *roll)
 	: ViewModel("controls", dispatcher), session_(session), roll_(roll)
 {
+	keyRowsMade_ = normalRows_.rowCount();
+	analogRowsMade_ = analogRows_.rowCount();
 	expose("saved", "the buttons' keys that differ from the package, every core's, as {\"core\": {\"button\": \"keys\"}}", saved, true);
 	expose("savedAutofire", "the autofire keys that differ from the package, as saved is", savedAutofire, true);
 	expose("savedAnalog", "the analog controls' bindings that differ from the package, as {\"core\": {\"control\": "
@@ -602,9 +604,19 @@ bool ControlsViewModel::columnShown(const std::string &name) const
 
 void ControlsViewModel::changed()
 {
-	normalRows_.reset.emit();
-	autofireRows_.reset.emit();
-	analogRows_.reset.emit();
+	/* the rows change in place while there are as many: made again, every
+	 * box of the window was made again for each key pressed, the window
+	 * opened or closed, or a TAStudio column changed (issues 438, 443) */
+	const int64_t keys = normalRows_.rowCount(), analog = analogRows_.rowCount();
+	for (KeyRows *rows : {&normalRows_, &autofireRows_})
+	{
+		if (keys != keyRowsMade_) rows->reset.emit();
+		else if (keys > 0) rows->changed.emit(0, keys - 1);
+	}
+	if (analog != analogRowsMade_) analogRows_.reset.emit();
+	else if (analog > 0) analogRows_.changed.emit(0, analog - 1);
+	keyRowsMade_ = keys;
+	analogRowsMade_ = analog;
 }
 
 std::string ControlsViewModel::KeyRows::columnName(int32_t column) const

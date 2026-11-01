@@ -12351,3 +12351,42 @@ closes when another window is activated. With the style's Menu taken out,
 all three checks failed as reported (rows 198 wide, the menu at the top
 over the bar, still open). The TAStudio Settings tabs were not driven by a
 test.
+
+## Controller Config builds only what is shown, and Stay on Top keeps the title bar (2026-11-01)
+
+Three reports the owner decided to fix:
+
+- **Controller Config was slow to open and close** (issue 438) and
+  **hiding a TAStudio column stalled the window** (issue 443), both with
+  ares' Nintendo 64. Measured on Banjo-Tooie (64 controls) in the window
+  run off screen: opening 1.5 s, closing 1.66 s, hiding a column 1.7 s,
+  all of it the window's own thread. Controller Config built a page for
+  every player of every kind (about 700 key boxes, each with a menu of six
+  items), even while hidden, and its view model made all its rows again
+  for every key pressed, the window opened or closed, and every TAStudio
+  column shown or hidden. Now only the page shown is built, while the
+  window is open; the rows change in place while there are as many (as
+  Configure Hotkeys' do since issue 388); and a key box makes its menu of
+  special bindings only when its arrow is clicked. Measured the same way
+  after: opening, closing and hiding a column under a millisecond each,
+  with the window open or not; TAStudio's worst gap between frames went
+  from 2,156 ms to 48 ms, and the main window's at start-up from 1.87 s to
+  234 ms (it had been the hidden Controller Config being built).
+- **Stay on Top took TAStudio's title bar away, and Float From Main Window
+  did nothing** (issue 441, Windows). The flags given were the window
+  kind and the stay-on-top hint alone, and with those Windows draws no
+  title bar; they now name the title bar and its buttons too. Windows takes
+  a window's owner when the window is shown, so a change made while it was
+  open waited for the next showing; the window is shown again at once.
+  Checked on Windows 11 with the program staged in %TEMP% and a script
+  turning the options on and off, reading TAStudio's window each second:
+  with the change the title bar stays, Stay on Top sets the window on top,
+  Float takes away its owner and turning it off gives it back; with the
+  window options as they were, Stay on Top drew no title bar and Float left
+  the owner as it was.
+
+Tested: the view models' test opens and closes Controller Config's copy
+and shows and hides a TAStudio column, and checks that the rows changed in
+place and were not made again; with the reset put back the check failed.
+The page-only building and the menu made on demand were measured, not
+driven by a test.

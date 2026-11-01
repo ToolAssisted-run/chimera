@@ -98,25 +98,30 @@ RowLayout {
         ToolTip.visible: hovered
         ToolTip.delay: 500
         ToolTip.text: qsTrId("binding_box.click_here_for_special_tricky_bindings")
-        onClicked: specialMenu.popup()
-        Menu {
-            delegate: MenuEntry {}
+        // made when asked for: a menu in every box was most of what a window
+        // of boxes cost to make (issue 438)
+        onClicked: specialMenu.createObject(this).popup()
+        Component {
             id: specialMenu
-            Repeater {
-                model: [
-                    { name: "Escape", tip: qsTrId("binding_box.binds_the_escape_key") },
-                    { name: "WMouse L", tip: qsTrId("binding_box.binds_the_left_mouse_button") },
-                    { name: "WMouse M", tip: qsTrId("binding_box.binds_the_middle_mouse_button") },
-                    { name: "WMouse R", tip: qsTrId("binding_box.binds_the_right_mouse_button") },
-                    { name: "WMouse 1", tip: qsTrId("binding_box.binds_the_mouse_auxiliary_button_1") },
-                    { name: "WMouse 2", tip: qsTrId("binding_box.binds_the_mouse_auxiliary_button_2") }
-                ]
-                delegate: MenuItem {
-                    required property var modelData
-                    text: modelData.name
-                    ToolTip.visible: hovered
-                    ToolTip.text: modelData.tip
-                    onTriggered: if (box.special(modelData.name) === true && box.next) box.next()
+            Menu {
+                delegate: MenuEntry {}
+                onClosed: destroy()
+                Repeater {
+                    model: [
+                        { name: "Escape", tip: qsTrId("binding_box.binds_the_escape_key") },
+                        { name: "WMouse L", tip: qsTrId("binding_box.binds_the_left_mouse_button") },
+                        { name: "WMouse M", tip: qsTrId("binding_box.binds_the_middle_mouse_button") },
+                        { name: "WMouse R", tip: qsTrId("binding_box.binds_the_right_mouse_button") },
+                        { name: "WMouse 1", tip: qsTrId("binding_box.binds_the_mouse_auxiliary_button_1") },
+                        { name: "WMouse 2", tip: qsTrId("binding_box.binds_the_mouse_auxiliary_button_2") }
+                    ]
+                    delegate: MenuItem {
+                        required property var modelData
+                        text: modelData.name
+                        ToolTip.visible: hovered
+                        ToolTip.text: modelData.tip
+                        onTriggered: if (box.special(modelData.name) === true && box.next) box.next()
+                    }
                 }
             }
         }

@@ -58,9 +58,16 @@ QtObject {
         value: opts.floating ? null : opts.mainWindow
         when: opts.mainWindow !== null
     }
+    // Windows takes a window's owner when the window is shown, so Float From
+    // Main Window did nothing to a window already open: it is shown again
+    // (issue 441)
+    onFloatingChanged: if (opts.window.visible) Qt.callLater(() => { opts.window.hide(); opts.window.show() })
+    // a title bar and its buttons named, as a window has them: with the
+    // stay-on-top hint alone Windows drew none (issue 441)
     property Binding above: Binding {
         target: opts.window
         property: "flags"
-        value: Qt.Window | (opts.onTop && opts.canStayOnTop ? Qt.WindowStaysOnTopHint : 0)
+        value: Qt.Window | Qt.WindowTitleHint | Qt.WindowSystemMenuHint | Qt.WindowMinMaxButtonsHint | Qt.WindowCloseButtonHint
+            | (opts.onTop && opts.canStayOnTop ? Qt.WindowStaysOnTopHint : 0)
     }
 }

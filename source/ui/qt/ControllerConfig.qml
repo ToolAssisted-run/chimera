@@ -286,6 +286,7 @@ ApplicationWindow {
                         model: ["normal", "autofire", "analog"]
                         delegate: Frame {
                             id: kind
+                            required property int index
                             required property string modelData
                             readonly property var groups: kind.modelData === "analog" ? win.axisGroups : win.buttonGroups
                             padding: 3
@@ -334,7 +335,14 @@ ApplicationWindow {
                                         model: kind.groups.length > 1 ? kind.groups : [""]
                                         delegate: Loader {
                                             id: page
+                                            required property int index
                                             required property string modelData
+                                            // only the page shown builds its boxes, while the window is open: every
+                                            // player's page of every kind made about 700 of them for a Nintendo 64,
+                                            // and opening, closing or a TAStudio column changed made them all again
+                                            // (issues 438, 443)
+                                            active: win.visible && kinds.currentIndex === kind.index
+                                                && (kind.groups.length > 1 ? groupTabs.currentIndex === page.index : true)
                                             sourceComponent: kind.modelData === "analog" ? analogPage : keyPage
                                             Component { id: keyPage; KeyPanel { table: kind.modelData; group: page.modelData; everyGroup: kind.groups.length <= 1 } }
                                             Component { id: analogPage; AnalogPanel { group: page.modelData; everyGroup: kind.groups.length <= 1 } }

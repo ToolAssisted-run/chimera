@@ -129,6 +129,8 @@ private:
 	std::vector<AnalogBind> analogDraft_;
 	KeyRows normalRows_{*this, Normal}, autofireRows_{*this, Autofire};
 	AnalogRows analogRows_{*this};
+	/* the rows each list had when it was last made: as many again change in place */
+	int64_t keyRowsMade_ = -1, analogRowsMade_ = -1;
 	Connection opensWatch_, columnsWatch_, savedWatch_, savedAutofireWatch_, savedAnalogWatch_, sensitivityWatch_;
 };
 

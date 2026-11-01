@@ -3997,6 +3997,20 @@ bool columnsMenu(const char *package, const char *rom)
 			return int64_t{-1};
 		};
 		CHECK(!flag(buttons, buttonRow("P2 B"), 6) && flag(buttons, buttonRow("P1 A"), 6));
+		/* the window opened and closed, a column changed in TAStudio: the rows change in place, not made
+		 * again, which made every box of the window again (over a second for a Nintendo 64, issues 438, 443) */
+		{
+			int resets = 0, changes = 0;
+			auto resetWatch = buttons->reset.connect([&] { resets++; });
+			auto changeWatch = buttons->changed.connect([&](int64_t first, int64_t last) {
+				changes += first == 0 && last == buttons->rowCount() - 1;
+			});
+			controls.run("edit", {}, error);
+			controls.run("cancel", {}, error);
+			roll.run("hideColumn", {std::string("P1 A")}, error);
+			roll.run("showColumn", {std::string("P1 A")}, error);
+			CHECK(resets == 0 && changes >= 4);
+		}
 		CHECK(controls.run("edit", {}, error).has_value() && controls.columnsRoll.get() == 0);
 		CHECK(controls.run("showColumn", {std::string("P1 A"), false}, error).has_value());
 		CHECK(controls.run("showColumns", {std::string("buttons"), std::string("Player 2"), true}, error).has_value());

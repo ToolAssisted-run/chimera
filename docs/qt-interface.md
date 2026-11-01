@@ -187,6 +187,15 @@ Chimera's window: Qt 6.12, QML views over C++ view models. The code is in
   a marker's frame number drags the marker to another frame; and the left
   button held in the column before the frame numbers takes the machine
   along with the pointer.
+  A tool window's Stay on Top keeps its title bar, and Float From Main
+  Window takes effect while the window is open: Windows takes a window's
+  owner when it is shown, so the window is shown again (issue 441).
+  Controller Config builds only the page shown, while it is open, and its
+  rows change in place: every player's page of every kind was built even
+  while it was hidden, and made again for each key pressed, the window
+  opened or closed, or a TAStudio column changed (about 700 boxes and
+  1.5 seconds a time for a Nintendo 64, issues 438 and 443). A key box's
+  menu of special bindings is made when its arrow is clicked.
   The menus are the window's own style's (source/ui/qt/style/Menu.qml): a
   menu is as wide as its widest row (Fusion's were always 200 pixels and
   cut a longer row short, issue 452), stays below the menu bar in a short
