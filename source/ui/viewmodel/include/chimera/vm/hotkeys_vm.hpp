@@ -44,6 +44,12 @@ public:
 	 * gives way to a button only when the key is a button, and a button to
 	 * a hotkey only when the key is a hotkey */
 	static Route route(int64_t priority, bool hotkeyBound, bool controlBound);
+	/* whether a combination pressed is a hotkey's or a control's rather than
+	 * a window's shortcut or menu letter (issue 405): a hotkey bound to the
+	 * combination takes it, and a control takes its key - but not with Ctrl
+	 * or the system key held, which make it a shortcut such as TAStudio's
+	 * Ctrl+C (issue 453) */
+	static bool takesCombination(int64_t priority, bool hotkeyBound, bool controlBound, bool commandHeld);
 
 	/* the keys changed: {"action": "keys"} */
 	Property<std::string> saved{"{}"};

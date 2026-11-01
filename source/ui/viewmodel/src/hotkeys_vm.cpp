@@ -450,6 +450,13 @@ HotkeysViewModel::Route HotkeysViewModel::route(int64_t priority, bool hotkeyBou
 	return r;
 }
 
+bool HotkeysViewModel::takesCombination(int64_t priority, bool hotkeyBound, bool controlBound, bool commandHeld)
+{
+	const bool control = controlBound && !commandHeld;
+	const Route r = route(priority, hotkeyBound, control);
+	return (r.hotkey && hotkeyBound) || (r.control && control);
+}
+
 std::string HotkeysViewModel::Rows::columnName(int32_t column) const
 {
 	static const char *const names[] = {"group", "action", "keys", "chimeraKeys", "changed", "labelKey", "labelNumber"};

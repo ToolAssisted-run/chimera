@@ -491,6 +491,14 @@ if qt_dep.found()
       override_options: ['cpp_std=c++20'],
     )
     test('picture pointer', test_picture_pointer, env: ['QT_QPA_PLATFORM=offscreen', 'QT_QUICK_BACKEND=software'], timeout: 60)
+    # TAStudio's text prompt: the field fits, Enter is OK (issues 437, 455)
+    test_text_prompt = executable(
+      'test-text-prompt',
+      ['qt/tests/test_text_prompt.cpp', qt_rcc],
+      dependencies: [qt_test_dep],
+      override_options: ['cpp_std=c++20'],
+    )
+    test('text prompt', test_text_prompt, env: ['QT_QPA_PLATFORM=offscreen', 'QT_QUICK_BACKEND=software'], timeout: 60)
     # the Emulator menu: only what the core offers, nothing of Chimera's own (issue 428)
     test_emulator_menu = executable(
       'test-emulator-menu',

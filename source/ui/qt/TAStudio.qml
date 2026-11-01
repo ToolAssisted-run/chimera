@@ -454,6 +454,11 @@ ApplicationWindow {
                         onRowMenuRequested: (row) => { oneRoll.use(); if (tas.pianoRoll.selectFirst >= 0 && tas.pianoRoll.selectLast < tas.pianoRoll.frameCount) { rowMenu.row = row; rowMenu.popup() } }
                         onCellDragged: (row, column) => tas.pianoRoll.run("drag", [row, column])
                         onFrameClicked: (row) => { oneRoll.use(); tas.session.run("seek", [row]) }
+                        // a double click on a frame number sets a marker there, or edits the person's own (issue 436)
+                        onFrameDoubleClicked: (row) => {
+                            const text = tas.pianoRoll.run("setMarkerAt", [row])
+                            if (text !== undefined) markerDialog.openFor(row, text)
+                        }
                         // Chimera's right-button drags on the frame numbers, and a marker moved with Alt
                         onRightDragStarted: (row, ctrl, shift, alt) => { oneRoll.use(); tas.pianoRoll.run("rightDragStart", [row, ctrl, shift, alt]) }
                         onRightDraggedTo: (row) => tas.pianoRoll.run("rightDragTo", [row])
@@ -990,25 +995,22 @@ ApplicationWindow {
         MenuDivider {}
         Action { text: qsTrId("common.remove"); icon.source: "qrc:/chimera/icons/Delete.png"; enabled: branchMenu.picked; onTriggered: tas.branches.run("remove", [tas.branches.selected]) }
     }
-    Dialog {
+    TextPrompt {
         id: branchTextDialog
         property string doing: "add"
         function openFor(what) {
             branchTextDialog.doing = what
-            branchTextField.text = what === "add" ? "" : tas.branchName(tas.branches.selected)
+            branchTextDialog.text = what === "add" ? "" : tas.branchName(tas.branches.selected)
             branchTextDialog.open()
         }
         title: qsTrId("tastudio.branch_text")
         anchors.centerIn: parent
-        modal: true
-        standardButtons: Dialog.Ok | Dialog.Cancel
-        TextField { id: branchTextField; width: 300; placeholderText: qsTrId("tastudio.branch_if_empty").arg(tas.branches.count + 1) }
-        onOpened: branchTextField.forceActiveFocus()
+        placeholderText: qsTrId("tastudio.branch_if_empty").arg(tas.branches.count + 1)
         onAccepted: {
-            if (doing === "add") tas.branches.run("create", [branchTextField.text])
+            if (doing === "add") tas.branches.run("create", [branchTextDialog.text])
             else {
                 if (doing === "update") tas.branches.run("saveSlot", [tas.branches.selected])
-                tas.branches.run("rename", [tas.branches.selected, branchTextField.text])
+                tas.branches.run("rename", [tas.branches.selected, branchTextDialog.text])
             }
         }
     }
@@ -1075,17 +1077,14 @@ ApplicationWindow {
         }
         onAccepted: if (seekTo.text !== "") tas.session.run("seek", [parseInt(seekTo.text)])
     }
-    Dialog {
+    TextPrompt {
         id: markerDialog
         property int frame: 0
-        function openFor(f, text) { markerDialog.frame = f; markerText.text = text; markerDialog.open() }
+        function openFor(f, text) { markerDialog.frame = f; markerDialog.text = text; markerDialog.open() }
         title: qsTrId("tastudio.marker_on_frame").arg(markerDialog.frame)
-        standardButtons: Dialog.Ok | Dialog.Cancel
         anchors.centerIn: parent
-        modal: true
-        TextField { id: markerText; placeholderText: qsTrId("tastudio.what_happens_here"); width: 300; focus: true }
-        onOpened: markerText.forceActiveFocus()
-        onAccepted: tas.pianoRoll.run("addMarker", [markerDialog.frame, markerText.text])
+        placeholderText: qsTrId("tastudio.what_happens_here")
+        onAccepted: tas.pianoRoll.run("addMarker", [markerDialog.frame, markerDialog.text])
     }
     // Chimera's Edit Marker Frame: the marker to another frame, not onto one that has a marker
     Dialog {

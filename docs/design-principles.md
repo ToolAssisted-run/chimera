@@ -12153,3 +12153,38 @@ passes: its tool writes the command line's project byte for byte (two
 demos; the Hexen one needs a folder of IWADs, which that run was not
 given), refuses a fifth player and writes nothing, and in Chimera's own
 sandbox writes the native tool's project pinned to the package.
+
+## TAStudio's keyboard, prompts and frame numbers (2026-11-01)
+
+Four fixes reported against TAStudio, all decided by the owner as "fix":
+
+- Ctrl+C and Ctrl+V did nothing in TAStudio when C or V was a button of
+  the machine (issue 453). The window gave the whole combination to the
+  machine's control, so the menu never saw it. Now a key with Ctrl (or the
+  system key) held is a shortcut, unless a hotkey is bound to that exact
+  combination. A plain key still goes to the machine as before. The rule is
+  `HotkeysViewModel::takesCombination`, so the view models' test covers it.
+- The branch text and marker text windows had a field wider than the
+  window, and Enter did not press OK (issues 437, 455). Both are now one
+  small window, `TextPrompt.qml`, whose field is 300 pixels wide inside it
+  and whose Enter accepts.
+- After typing in the greenzone's "every N frames" field, the hotkeys
+  stayed dead until another window was used (issue 462). A click in the
+  roll now takes the keyboard back.
+- A double click on a frame number now does what it did in Chimera's
+  TAStudio (issue 436): it opens the person's marker on that frame for its
+  text, or sets a marker with no text where there is none. The view model's
+  `setMarkerAt` command does it, so Lua and the MCP server can too.
+
+Tested: the view models' test checks the shortcut rule for each of the
+three key priorities (Ctrl+C with C a button goes to the menu; C alone goes
+to the button; Ctrl+C bound as a hotkey is the hotkey's) and `setMarkerAt`
+(a named marker's text back; a new marker on a frame with none). A new
+window test, "text prompt", opens the prompt, checks that the field fits
+inside it, types "abc" and presses Enter, and checks that the window was
+accepted with "abc" and closed. Each was broken once on purpose and failed:
+the shortcut rule ignoring Ctrl (3 checks), `setMarkerAt` adding no marker
+(2), the field given `width` instead of `implicitWidth` (1: it went past the
+window's edge, as reported), and Enter not wired to OK (2). Not driven by a
+test: the click that gives the roll the keyboard (issue 462) and the double
+click itself in the window (issue 436); both were only read through.

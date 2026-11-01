@@ -135,6 +135,8 @@ Q_SIGNALS:
 	void cellDragged(qint64 row, int column);
 	/* a press on a row's frame number */
 	void frameClicked(qint64 row);
+	/* a double click with the left button on a row's frame number (issue 436) */
+	void frameDoubleClicked(qint64 row);
 	/* Chimera's right-button drags on the frame numbers (Shift, Ctrl, Alt held): begun on a row,
 	 * gone on to another, let go */
 	void rightDragStarted(qint64 row, bool ctrl, bool shift, bool alt);
@@ -156,6 +158,7 @@ Q_SIGNALS:
 
 protected:
 	void mousePressEvent(QMouseEvent *e) override;
+	void mouseDoubleClickEvent(QMouseEvent *e) override;
 	void mouseMoveEvent(QMouseEvent *e) override;
 	void mouseReleaseEvent(QMouseEvent *e) override;
 	void wheelEvent(QWheelEvent *e) override;

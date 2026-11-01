@@ -926,6 +926,14 @@ void keyPriority()
 	CHECK(route(1, true, true) == "-C" && route(1, true, false) == "HC" && route(1, false, true) == "-C");
 	/* hotkeys first: a hotkey's key is not a button's; any other key still is */
 	CHECK(route(2, true, true) == "H-" && route(2, false, true) == "HC" && route(2, true, false) == "H-");
+	/* a combination: a hotkey bound to it, or a button's key, takes it from the window's shortcuts and menu
+	 * letters (issue 405); a button's key with Ctrl held is the window's shortcut (TAStudio's Ctrl+C, issue 453) */
+	for (int64_t p : {0, 1, 2})
+	{
+		CHECK(HotkeysViewModel::takesCombination(p, true, false, false) && HotkeysViewModel::takesCombination(p, true, false, true));
+		CHECK(HotkeysViewModel::takesCombination(p, false, true, false) && !HotkeysViewModel::takesCombination(p, false, true, true));
+		CHECK(!HotkeysViewModel::takesCombination(p, false, false, false) && !HotkeysViewModel::takesCombination(p, false, false, true));
+	}
 	ManualDispatcher d;
 	HotkeysViewModel hotkeys(d);
 	hotkeys.add("General", "Pause", "Pause", [](bool) {});
@@ -2988,6 +2996,12 @@ bool tastudioSettings(const char *package, const char *rom)
 	CHECK(roll.run("removeMarkers", {int64_t{6}, int64_t{7}}, error) == Value(int64_t{2}) && keeps(6) == -1 && keeps(7) == -1);
 	CHECK(keeps(5) == 0 && keeps(8) == 1 && roll.run("removeMarkers", {int64_t{8}, int64_t{9}}, error) == Value(int64_t{1}) && roll.markerCount.get() == 1);
 	CHECK(!roll.run("addMarkers", {int64_t{3}, int64_t{2}}, error).has_value());
+	/* a double click on a frame number (issue 436): the person's marker there is edited, its text handed back;
+	 * a frame with none gets an unnamed one */
+	CHECK(roll.run("setMarkerAt", {int64_t{5}}, error) == Value(std::string("named again")) && roll.markerCount.get() == 1);
+	CHECK(roll.run("setMarkerAt", {int64_t{9}}, error) == Value() && roll.markerCount.get() == 2 && keeps(9) == 1 &&
+		roll.run("markerAt", {int64_t{9}}, error) == Value(std::string()));
+	CHECK(roll.run("removeMarkers", {int64_t{9}, int64_t{9}}, error) == Value(int64_t{1}) && roll.markerCount.get() == 1);
 	roll.run("addMarker", {int64_t{6}, std::string("six")}, error);
 	/* the run's own markers, as Chimera's: Run end on the last frame, Last
 	 * input on the last press, following each edit; not removable */

@@ -58,8 +58,9 @@ bool KeyFilter::eventFilter(QObject *watched, QEvent *e)
 		auto *k = static_cast<QKeyEvent *>(e);
 		const QString name = qt::keyName(*k);
 		if (typing(*k) || name.isEmpty()) return QObject::eventFilter(watched, e);
-		bool taken = false;
-		routeOf(name, qt::keyCombination(name, k->modifiers()), taken);
+		const bool taken = vm::HotkeysViewModel::takesCombination(hotkeys_.keyPriority.get(),
+			hotkeys_.boundTo(qt::keyCombination(name, k->modifiers()).toStdString()), session_.keyIsBound(name.toStdString()),
+			(k->modifiers() & (Qt::ControlModifier | Qt::MetaModifier)) != 0);
 		if (taken)
 		{
 			e->accept();

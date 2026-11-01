@@ -345,8 +345,16 @@ project, as Chimera keeps it. A right
 click on the frames picked opens Chimera's menu for
 them: set markers (more than 50 asks first), a marker with text, remove
 markers, deselect, select between markers, clear greenzone, copy, paste,
-paste insert, cut, clear, delete, insert, clone, truncate, and branch. Keys pressed in TAStudio reach the machine and the hotkeys, as
-Chimera's TAStudio passes them on. Move with Main Window (on at first, as
+paste insert, cut, clear, delete, insert, clone, truncate, and branch.
+Keys pressed in TAStudio reach the machine and the hotkeys, as Chimera's
+TAStudio passes them on, except a key with Ctrl held: that is a menu's
+shortcut unless a hotkey is bound to it, so Ctrl+C copies where C is a
+button (issue 453). A click in the roll takes the keyboard back from a
+field such as the greenzone's period, so the hotkeys work again (issue
+462). A double click on a frame number opens the person's marker there
+to edit its text, or sets a marker with no text where there is none
+(issue 436). A branch's or a marker's text is asked for in a small window
+whose field fits inside it, and Enter is OK (issues 437, 455). Move with Main Window (on at first, as
 in Chimera) brings TAStudio along when the main window is dragged (not with Shift
 held, as Chimera's).
 

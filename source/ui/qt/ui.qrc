@@ -65,6 +65,7 @@
     <file>LuaConsole.qml</file>
     <file>WindowOptions.qml</file>
     <file>TAStudio.qml</file>
+    <file>TextPrompt.qml</file>
     <file>EncodeVideo.qml</file>
     <file>LuaForms.qml</file>
     <file>Shapes.js</file>

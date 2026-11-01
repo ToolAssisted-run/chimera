@@ -682,6 +682,15 @@ PianoRollViewModel::PianoRollViewModel(Dispatcher &dispatcher, InputLog &inputs,
 			}
 			return removed;
 		});
+	command("setMarkerAt", "TAStudio's double click on a frame number, as Chimera's: the person's own marker on the frame is to be "
+		"edited (its text back); with none, an unnamed marker is put there (nothing back)", {"frame"},
+		[this](const Args &a, std::string &error) -> Value {
+			int64_t f = 0;
+			if (!arg(a, 0, f, error)) return {};
+			if (const auto it = markers_.find(f); it != markers_.end()) return it->second.text;
+			run("addMarker", {f, std::string()}, error);
+			return {};
+		});
 	command("markerAt", "the text of the marker on a frame (the person's, else the run's own name); nothing for none", {"frame"},
 		[this](const Args &a, std::string &error) -> Value {
 			int64_t f = 0;

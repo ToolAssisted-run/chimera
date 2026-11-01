@@ -712,8 +712,24 @@ void PianoRollItem::hoverLeaveEvent(QHoverEvent *)
 	update();
 }
 
+void PianoRollItem::mouseDoubleClickEvent(QMouseEvent *e)
+{
+	const QPointF at = logical(e->position());
+	const int hs = headerSize();
+	if (e->button() == Qt::LeftButton && rows_ != nullptr && at.x() < frameColumnWidth() && at.y() >= hs)
+	{
+		const qint64 row = rowOnLine(static_cast<qint64>((at.y() - hs) / rowHeight_));
+		if (row < rowCount()) Q_EMIT frameDoubleClicked(row);
+	}
+	/* the second press of the double click is a press as well */
+	mousePressEvent(e);
+}
+
 void PianoRollItem::mousePressEvent(QMouseEvent *e)
 {
+	/* the roll takes the keyboard, from a field such as the greenzone's
+	 * period, so the hotkeys are heard again (issue 462) */
+	forceActiveFocus(Qt::MouseFocusReason);
 	qint64 row = 0;
 	int column = 0;
 	/* where it is in the roll as laid out upright */
