@@ -544,7 +544,6 @@ SessionViewModel::SessionViewModel(Dispatcher &dispatcher, InputLog &inputs)
 	expose("hasRegisters", "the core shows its registers (CPU Registers)", hasRegisters);
 	expose("traceHeader", "the core's words for its trace lines' columns", traceHeader);
 	expose("surfaces", "the pictures the core draws for itself, as [{\"name\", \"width\", \"height\"}]", surfaces);
-	expose("movieImportMenu", "the menu item of the core open's movie importer, in its package's words (\"\" when it has none)", movieImportMenu);
 	expose("showGameTime", "a game's own timer is shown over the picture", showGameTime, true);
 	expose("gameTimeText", "the game's timer as shown: \"IGT 01:02.345\"", gameTimeText);
 	expose("showRealTime", "the time from the movie's start to the current frame is shown over the picture", showRealTime, true);
@@ -5203,7 +5202,6 @@ void SessionViewModel::adoptOnMachine(ce_session *s, const std::string &package,
 	std::vector<Axis> axes;
 	std::string controller = "Waterbox Controller", picture;
 	bool gameCore = false;
-	std::string movieImport;
 	int64_t ms = 0;
 	gameTimerM_ = ce_session_game_time_ms(s, &ms) == 1;
 	const bool timer = gameTimerM_, saveData = ce_session_savedata_available(s) != 0;
@@ -5255,8 +5253,6 @@ void SessionViewModel::adoptOnMachine(ce_session *s, const std::string &package,
 		if (read)
 		{
 			if (const json::Json *k = cfg.find("kind")) gameCore = k->text == "game";
-			if (const json::Json *mi = cfg.find("movieImport"))
-				if (const json::Json *m = mi->find("menu")) movieImport = m->text;
 		}
 		auto declared = [&](const std::string &name) -> const json::Json * {
 			if (!read) return nullptr;
@@ -5329,7 +5325,7 @@ void SessionViewModel::adoptOnMachine(ce_session *s, const std::string &package,
 	/* another game, or the same started again: another average, as Chimera's */
 	averageResetM_.store(true);
 	later([this, names, players, headers, axes, mnemonics, keybinds, coreText, systemText, systemIdText, rate, label, inputsReplaced, frames, controller,
-			   picture, gameCore, timer, saveData, movieImport, package, traces, registers, traceHead, surfaceText, withOpen] {
+			   picture, gameCore, timer, saveData, package, traces, registers, traceHead, surfaceText, withOpen] {
 		surfaces.set(surfaceText);
 		hasTrace.set(traces);
 		hasRegisters.set(registers);
@@ -5340,7 +5336,6 @@ void SessionViewModel::adoptOnMachine(ce_session *s, const std::string &package,
 		isGameCore.set(gameCore);
 		hasGameTimer.set(timer);
 		hasSaveData.set(saveData);
-		movieImportMenu.set(movieImport);
 		gameTimeText.set("");
 		averageFpsText.set("");
 		buttonNames_ = names;

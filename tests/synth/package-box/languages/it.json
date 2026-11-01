@@ -5,10 +5,6 @@
 		"game_setting.gamelogo": "Logo del gioco",
 		"game_setting.gamelogo.about": "Proprio di questo gioco: mostra il suo logo, da un suo file.",
 		"game_setting.not_the_package_s": "Non del pacchetto",
-		"import.game_missing": "il gioco %1 non è a portata di mano",
-		"import.no_movie": "nessun filmato: il file \"movie\" non è montato",
-		"import.note": "importato dal core synth",
-		"import.which_game": "su quale gioco è stato fatto questo filmato? (importRom)",
 		"property.cursor_x": "Colonna della cella in cui si trova il cursore",
 		"property.letter": "Ciò che il core ha lasciato nella sua casella di posta",
 		"property.status": "Il byte di risultato di ogni ROM di test",
@@ -26,6 +22,11 @@
 			"one": "Il core sintetico suggerisce un riempimento di 9. Vede %n disco e la traccia di disk1.cue, a velocità disco %2.",
 			"other": "Il core sintetico suggerisce un riempimento di 9. Vede %n dischi e la traccia di disk1.cue, a velocità disco %2."
 		},
-		"suggest.nothing": "Il core sintetico non suggerisce nulla per questo gioco."
+		"suggest.nothing": "Il core sintetico non suggerisce nulla per questo gioco.",
+		"tool.unknown": "questo core non ha lo strumento %1",
+		"tool.no_output": "il file da scrivere non c'è",
+		"tool.no_parts": "non sono state date parti",
+		"tool.empty_part": "la parte %1 è vuota",
+		"tool.joined": "%1 parti unite, %2 byte"
 	}
 }

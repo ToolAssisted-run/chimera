@@ -5,10 +5,6 @@
 		"game_setting.gamelogo": "Logo gry",
 		"game_setting.gamelogo.about": "Własne ustawienie tej gry: pokazuje jej logo z jej własnego pliku.",
 		"game_setting.not_the_package_s": "Nie z pakietu",
-		"import.game_missing": "gry %1 nie ma pod ręką",
-		"import.no_movie": "brak nagrania: plik \"movie\" nie jest zamontowany",
-		"import.note": "zaimportowane przez rdzeń synth",
-		"import.which_game": "na jakiej grze zrobiono to nagranie? (importRom)",
 		"property.cursor_x": "Kolumna komórki, w której jest kursor",
 		"property.letter": "Co rdzeń zostawił w swojej skrzynce pocztowej",
 		"property.status": "Bajt wyniku każdego testowego ROM-u",
@@ -28,6 +24,11 @@
 			"few": "Syntetyczny rdzeń proponuje wypełnienie wartością 9. Widzi %n dyski i ścieżkę disk1.cue, przy prędkości dysku %2.",
 			"many": "Syntetyczny rdzeń proponuje wypełnienie wartością 9. Widzi %n dysków i ścieżkę disk1.cue, przy prędkości dysku %2."
 		},
-		"suggest.nothing": "Syntetyczny rdzeń nic nie proponuje dla tej gry."
+		"suggest.nothing": "Syntetyczny rdzeń nic nie proponuje dla tej gry.",
+		"tool.unknown": "ten rdzeń nie ma narzędzia %1",
+		"tool.no_output": "pliku do zapisania nie ma",
+		"tool.no_parts": "nie podano żadnych części",
+		"tool.empty_part": "część %1 jest pusta",
+		"tool.joined": "połączono części: %1, bajtów: %2"
 	}
 }

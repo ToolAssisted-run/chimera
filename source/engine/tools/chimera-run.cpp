@@ -13,19 +13,19 @@
  *       [--dump <domain>=<path>]... [--export-savedata <dir>] [--meta <path>]
  *       [--core-log <path>] [--controls <path>]
  *   chimera-run --project <p.chimeraProject> <package> --suggest
- *   chimera-run --project <p.chimeraProject> <package> --import-movie <movie> [--mount <name>=<path>]...
  *   chimera-run --project <p.chimeraProject> <package> --precompile <i>/<n>[/game] --cache-dir <folder>
  *   chimera-run --new-project <out.chimeraProject> <package> [<game> [<movie.txt>]]
  *       [--file <slot>=<path>]... [--movie <movie.txt>] [--settings <json>] [--firmware <id>=<path>]...
  *       [--title <text>] [--clock-start <seconds>]
+ *   chimera-run --run-tool <id> <package> [--input <name>=<path>]... [--output <name>=<path>]...
+ *       [--tool-options <json>]
  *
- * --new-project makes a project and runs nothing (newProject, below).
+ * --new-project makes a project and runs nothing (newProject, below), and
+ * --run-tool runs one of a core's own tools (runTool, below).
  *
- * The three helpers ask the core about a project and run nothing: --suggest
- * prints the settings the core suggests for its files (SuggestSettings),
- * --import-movie what a movie made elsewhere amounts to (ImportMovie; the
- * movie is mounted as "movie" and each --mount beside it), each as the
- * core's JSON on one line; --precompile is a compile session, which fills
+ * The two helpers ask the core about a project and run nothing: --suggest
+ * prints the settings the core suggests for its files (SuggestSettings), as
+ * the core's JSON on one line; --precompile is a compile session, which fills
  * the compile cache with share <i> of <n> of the game's code ("/game": not
  * the firmware's) and says how far it is ("Precompiled 3/21 modules").
  *
@@ -628,6 +628,70 @@ static int newProject(const std::vector<std::string> &args)
 	return 0;
 }
 
+/* --run-tool: one of a core's own tools (its package's "tools"), as the
+ * window's Emulator menu runs it, in a process of its own:
+ *
+ *   chimera-run --run-tool <id> <package> [--input <name>=<path>]...
+ *       [--output <name>=<path>]... [--tool-options <json>]
+ *
+ * Each --input is read under its name, each --output written there (made, or
+ * emptied first). The core's answer is printed as its JSON on one line,
+ * {"done": ...} or {"refused": ...}; exit 0 when the core answered. */
+static int runTool(const std::vector<std::string> &args)
+{
+	std::string id, package, options;
+	std::vector<std::pair<std::string, std::string>> inputs, outputs;
+	auto pair = [](const std::string &spec, std::pair<std::string, std::string> &out) {
+		const size_t eq = spec.find('=');
+		if (eq == std::string::npos || eq == 0) return false;
+		out = {spec.substr(0, eq), spec.substr(eq + 1)};
+		return true;
+	};
+	for (size_t i = 0; i < args.size(); i++)
+	{
+		const std::string &arg = args[i];
+		std::pair<std::string, std::string> p;
+		if (arg == "--input" && i + 1 < args.size())
+		{
+			if (!pair(args[++i], p)) return fail("", "--input wants <name>=<path>");
+			inputs.push_back(p);
+		}
+		else if (arg == "--output" && i + 1 < args.size())
+		{
+			if (!pair(args[++i], p)) return fail("", "--output wants <name>=<path>");
+			outputs.push_back(p);
+		}
+		else if (arg == "--tool-options" && i + 1 < args.size()) options = args[++i];
+		else if (arg.rfind("--", 0) == 0) return fail("", "--run-tool does not take " + arg);
+		else if (id.empty()) id = arg;
+		else if (package.empty()) package = arg;
+		else return fail("", "--run-tool takes one tool and one package");
+	}
+	if (id.empty() || package.empty())
+	{
+		std::fprintf(stderr, "usage: chimera-run --run-tool <id> <package> [--input <name>=<path>]... [--output <name>=<path>]... [--tool-options <json>]\n");
+		return 1;
+	}
+	std::vector<const char *> inNames, inPaths, outNames, outPaths;
+	for (const auto &f : inputs)
+	{
+		inNames.push_back(f.first.c_str());
+		inPaths.push_back(f.second.c_str());
+	}
+	for (const auto &f : outputs)
+	{
+		outNames.push_back(f.first.c_str());
+		outPaths.push_back(f.second.c_str());
+	}
+	const char *error = nullptr;
+	uint64_t len = 0;
+	const char *answer = ce_package_run_tool(package.c_str(), id.c_str(), inNames.data(), inPaths.data(), static_cast<int32_t>(inNames.size()),
+		outNames.data(), outPaths.data(), static_cast<int32_t>(outNames.size()), options.empty() ? nullptr : options.c_str(), &len, &error);
+	if (answer == nullptr) return fail("", error != nullptr ? error : "the tool did not run");
+	std::printf("%.*s\n", static_cast<int>(len), answer);
+	return 0;
+}
+
 int main(int argc, char **argv)
 {
 #if defined(_WIN32)
@@ -642,6 +706,7 @@ int main(int argc, char **argv)
 	}
 #endif
 	if (argc > 1 && std::strcmp(argv[1], "--new-project") == 0) return newProject(std::vector<std::string>(argv + 2, argv + argc));
+	if (argc > 1 && std::strcmp(argv[1], "--run-tool") == 0) return runTool(std::vector<std::string>(argv + 2, argv + argc));
 	const char *packagePath = nullptr;
 	std::string metaPath;
 	/* --core-log <path>: what the core says, kept in a file (ce_core_log), and
@@ -708,12 +773,6 @@ int main(int argc, char **argv)
 	bool wantGpu = false;
 	std::string cacheDir;
 	bool suggest = false;
-	/* --import-movie <movie>: a movie made elsewhere (a Doom demo), mounted as
-	 * "movie", and the core's ImportMovie is asked what it amounts to
-	 * (ce_project_import_movie); --mount name=path adds the files offered with
-	 * it that the project holds no slot for, under the names given */
-	std::string importMoviePath;
-	std::vector<std::pair<std::string, std::string>> mounts;
 	/* --precompile I/N[/game]: a compile session's share, 0 sessions for none */
 	int32_t precompileIndex = -1, precompileCount = 0;
 	bool precompileFirmware = true;
@@ -808,7 +867,6 @@ int main(int argc, char **argv)
 		else if (arg == "--record" && i + 1 < argc) recordPath = argv[++i];
 		else if (arg == "--record-key" && i + 1 < argc) recordKey = argv[++i];
 		else if (arg == "--suggest") suggest = true;
-		else if (arg == "--import-movie" && i + 1 < argc) importMoviePath = argv[++i];
 		else if (arg == "--precompile" && i + 1 < argc)
 		{
 			const std::string spec = argv[++i];
@@ -816,13 +874,6 @@ int main(int argc, char **argv)
 				precompileIndex >= precompileCount)
 				return fail(metaPath, "bad --precompile " + spec + " (want INDEX/COUNT[/game])");
 			precompileFirmware = spec.find("/game") == std::string::npos;
-		}
-		else if (arg == "--mount" && i + 1 < argc)
-		{
-			const std::string spec = argv[++i];
-			const size_t eq = spec.find('=');
-			if (eq == std::string::npos) return fail(metaPath, "--mount wants <name>=<path>");
-			mounts.emplace_back(spec.substr(0, eq), spec.substr(eq + 1));
 		}
 		else if (arg == "--export-savedata" && i + 1 < argc) savedataDir = argv[++i];
 		else if (arg == "--meta" && i + 1 < argc) metaPath = argv[++i];
@@ -971,21 +1022,18 @@ int main(int argc, char **argv)
 	 * and always report a divergence */
 	if (greenzoneCheck && seekFrame >= 0 && rewindTo >= 0 && seekFrame != rewindTo)
 		return fail(metaPath, "--greenzone-check checks one frame: give --seek and --rewind-loop the same frame, or only one of them");
-	const bool importMovie = !importMoviePath.empty();
 	if (projectPath.empty() || packagePath == nullptr)
 	{
 		std::fprintf(stderr, "usage: chimera-run --project <p.chimeraProject> <package> [--files <dir>]... [--allow-core-mismatch] [--firmware <id>=<path>]... [--rerecord] [--seek <frame>] [--play <n>] [--edit-from <movie>] [--stop-at-seek] [--bands n,m,ms,fs,anchor] [--record <out.txt>] [--record-key <LogKey>] [--dump <domain>=<path>]... [--state <path>] [--frames <n>] [--save-state <frame>=<path>]... [--screenshot <frame>=<path>]... [--ram-search-bench <domain>] [--export-savedata <dir>] [--meta <path>] [--gpu] [--draw-every-frame] [--cache-dir <folder>]\n"
 			"       chimera-run --project <p.chimeraProject> <package> --suggest\n"
-			"       chimera-run --project <p.chimeraProject> <package> --import-movie <movie> [--mount <name>=<path>]...\n"
 			"       chimera-run --project <p.chimeraProject> <package> --precompile <i>/<n>[/game] --cache-dir <folder>\n"
 			"       chimera-run --new-project <out.chimeraProject> <package> [<game> [<movie.txt>]] [--file <slot>=<path>]... [--movie <movie.txt>] [--settings <json>] [--firmware <id>=<path>]...\n"
+			"       chimera-run --run-tool <id> <package> [--input <name>=<path>]... [--output <name>=<path>]... [--tool-options <json>]\n"
 			"A game runs only in a project: --new-project makes one from a game file, and --project runs it.\n");
 		return 1;
 	}
-	if ((suggest ? 1 : 0) + (importMovie ? 1 : 0) + (precompileCount > 0 ? 1 : 0) > 1)
-		return fail(metaPath, "--suggest, --import-movie and --precompile are one question each: give one");
-	if (!mounts.empty() && !importMovie)
-		return fail(metaPath, "--mount gives files to --import-movie: give one");
+	if ((suggest ? 1 : 0) + (precompileCount > 0 ? 1 : 0) > 1)
+		return fail(metaPath, "--suggest and --precompile are one question each: give one");
 
 	/* resolution: the project's own folder first (the convenience), then
 	 * every --files dir; whatever is still missing or mismatched fails when
@@ -1008,7 +1056,7 @@ int main(int argc, char **argv)
 		movieText.assign(reinterpret_cast<const uint8_t *>(lump),
 			reinterpret_cast<const uint8_t *>(lump) + len);
 	}
-	const bool asking = suggest || importMovie || precompileCount > 0;
+	const bool asking = suggest || precompileCount > 0;
 
 	ce_movie_log *movie = ce_movie_log_new();
 	if (!asking && ce_movie_log_parse(movie, reinterpret_cast<const char *>(movieText.data()), movieText.size()) != 0)
@@ -1040,24 +1088,6 @@ int main(int argc, char **argv)
 	}
 
 	const char *error = nullptr;
-	/* --import-movie: the movie is mounted as "movie", and the --mount files
-	 * beside it; the core's answer is printed as its JSON */
-	if (importMovie)
-	{
-		std::vector<const char *> names, paths;
-		for (const auto &m : mounts)
-		{
-			names.push_back(m.first.c_str());
-			paths.push_back(m.second.c_str());
-		}
-		uint64_t len = 0;
-		const char *answer = ce_project_import_movie(packagePath, project, importMoviePath.c_str(),
-			names.data(), paths.data(), static_cast<int32_t>(names.size()),
-			fwIds.data(), fwData.data(), fwLens.data(), static_cast<int32_t>(fwIds.size()), &len, &error);
-		if (answer == nullptr) return fail(metaPath, error != nullptr ? error : "could not open the core");
-		std::printf("%.*s\n", static_cast<int>(len), answer);
-		return 0;
-	}
 	/* --suggest: what the core would choose for the project's files, printed
 	 * as its JSON, and nothing is started (ce_project_suggest_settings) */
 	if (suggest)

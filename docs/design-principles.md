@@ -12077,3 +12077,79 @@ and a file's name pass, a case ending or a lost name fail (for Chimera,
 TAStudio and a core's own name), a glued ending fails where English has
 no name, and Korean's particles pass; with the rule off, it fails.
 Chimera's 26 tables pass it.
+
+## A core's own tools, under Tools > Core-Specific Tools (user-decided, 2026-11-01)
+
+A core may now offer tools of its own: a job whose result is files, such as
+a compressed game decompressed or a demo made into a project. The owner's
+words, in two steps. First: "why can't a core add its own tool to the
+Emulator menu? That's the entire point of the emulator menu, to be
+extensible by each core. Whatever decision I made regarding this in Chimera
+before was misunderstood" - the section above on issue 428 had read "decided
+by the core" as a fixed set of items Chimera knows. Then, once it came up
+that the Emulator menu exists only while a game runs and that a compressed
+game has to be decompressed before a project can hold it: "Every core can
+expose tools, permanently offered at Tools > Core-Specific Tools for every
+installed core, grouped by core. The Emulator menu appears only on an opened
+project, and only provides settings that apply to the current project".
+
+What was decided, one question at a time:
+
+- A tool takes files in and writes files out (not, for now, a tool that
+  acts on the running game). Its window is drawn from the package's
+  declaration (`tools` in `waterbox.config`: the menu item, what it does,
+  the files it reads, its options, the files it writes), the way settings
+  are; Chimera knows nothing of what any tool does (docs/project.md, "A
+  core's own tools").
+- It runs in a process of its own, `chimera-run --run-tool`, which calls
+  the engine's `ce_package_run_tool`: the machine is made with no game, the
+  core's `RunTool` export is called instead of `Init`, and the machine is
+  thrown away. The core reads a request file (`tool`) naming the tool, its
+  options, the person's own name for each file, and the package's hash and
+  version.
+- A tool's output goes straight to the disk: miniBox has a writable file on
+  the host's disk now (`wbx_mount_file_path_writable`), so a decompressed
+  game of 1.5 GB never waits in memory. The engine writes it as
+  `<file>.part` and puts it in place only when the core answers `done`, so a
+  refusal, a failure or Cancel leaves what was there.
+- Chimera's movie importer is gone: the `movieImport` declaration, the
+  `ImportMovie` export, `ce_project_import_movie`, `chimera-run
+  --import-movie` and the import window. In the owner's words, it "is a DSDA
+  tool, offered only by DSDA, and shouldn't exist at all in Chimera". DSDA's
+  demo import is now DSDA's own tool, and it writes the whole
+  `.chimeraProject` itself, pinned to its package (the owner chose that over
+  a tool result that opens New Project).
+- The Emulator menu keeps what applies to the open project (Display Game
+  Time, Export Save Data, CPU Registers, Surface Viewer, Trace Logger); the
+  tools are not there.
+
+The first tools: Eden's Decompress NSZ (an `.nsz` whose archives are
+compressed as one stream cannot be read while a game plays; issue 1 of
+Eden's repository was such updates) and DSDA's Import Demo (LMP).
+
+Tested: a new unit test of miniBox's file system writes a file on the disk
+through a guest's descriptor (before the unmount, a gap read as zeros,
+single-open, cut short, an old file emptied; with the file not emptied 4 of
+its checks fail). The synthetic core's importer became a tool, "join",
+which writes its parts in their order into one file, turned around when its
+option is ticked: the witness runs it through chimera-run (E:core-tool:
+the file on the disk, an empty part and an unknown tool refused in a
+sentence, and a refused run leaving no file; 122 ok, 0 failed), and the
+view models' test runs it through the tool's form with nothing open (what
+is missing said in the tool's words, two files in an order changed with Up,
+the file named after the first input, a refusal leaving the earlier file as
+it was). Broken on purpose - the output never put in place - that test
+failed in 3 checks. A new window test, "core tools menu", reads Tools >
+Core-Specific Tools over a stand-in for the installed cores: greyed out with
+none, a submenu a core with its tools in order, a picked tool's core and id,
+a core gone with its submenu; it first failed on a real fault (inside a
+menu item `menu` named the item's own menu, not the submenu), now fixed.
+The Emulator menu's test was put back to the menu without tools. Meson
+tests 55 of 57: "installed packages" and "command line" fail on this
+machine with or without this change (published packages from before the
+language tables in build/Cores, and a copied program that cannot find Qt's
+libraries). The engine and miniBox compile for Windows. DSDA's test script
+passes: its tool writes the command line's project byte for byte (two
+demos; the Hexen one needs a folder of IWADs, which that run was not
+given), refuses a fifth player and writes nothing, and in Chimera's own
+sandbox writes the native tool's project pinned to the package.

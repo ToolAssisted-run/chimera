@@ -5,10 +5,6 @@
 		"game_setting.gamelogo": "Logo du jeu",
 		"game_setting.gamelogo.about": "Propre à ce jeu : affiche son logo, depuis un fichier à lui.",
 		"game_setting.not_the_package_s": "Pas celui du paquet",
-		"import.game_missing": "le jeu %1 n'est pas sous la main",
-		"import.no_movie": "pas de film : le fichier \"movie\" n'est pas monté",
-		"import.note": "importé par le cœur synth",
-		"import.which_game": "sur quel jeu ce film a-t-il été fait ? (importRom)",
 		"property.cursor_x": "Colonne de la case où se trouve le curseur",
 		"property.letter": "Ce que le cœur a laissé dans sa boîte aux lettres",
 		"property.status": "L'octet de résultat de chaque ROM de test",
@@ -26,6 +22,11 @@
 			"one": "Le cœur synthétique suggère un remplissage de 9. Il voit %n disque et la piste de disk1.cue, à la vitesse de disque %2.",
 			"other": "Le cœur synthétique suggère un remplissage de 9. Il voit %n disques et la piste de disk1.cue, à la vitesse de disque %2."
 		},
-		"suggest.nothing": "Le cœur synthétique ne suggère rien pour ce jeu."
+		"suggest.nothing": "Le cœur synthétique ne suggère rien pour ce jeu.",
+		"tool.unknown": "ce cœur n'a pas d'outil %1",
+		"tool.no_output": "le fichier à écrire n'est pas là",
+		"tool.no_parts": "aucune partie n'a été donnée",
+		"tool.empty_part": "la partie %1 est vide",
+		"tool.joined": "%1 parties jointes, %2 octets"
 	}
 }

@@ -32,6 +32,12 @@ public:
 	 * remembered), the two lines over the list, and the line under it */
 	Property<int64_t> shows{0};
 	Property<std::string> managerHeader, managerStatus;
+	/* Every installed core's own tools (its package's "tools", their texts
+	 * in the window's language), offered under Tools > Core-Specific Tools
+	 * whatever is open (owner, 2026-11-01): a JSON list of {"core", "package",
+	 * "tools"} by core, the newest package of each that can run here, "[]"
+	 * when none has any. */
+	Property<std::string> coreTools{"[]"};
 
 	/* any thread: the package to run for a core, "" when none is here;
 	 * `note` says when it is not the pinned one */
@@ -97,6 +103,8 @@ private:
 		std::vector<std::pair<std::string, std::string>> systemList;
 		int64_t size = 0;
 		std::string datedText;
+		/* its own tools as its package declares them ("" when none) */
+		std::string tools;
 	};
 	/* one core as the manager lists it: its packages here, newest first */
 	struct Managed

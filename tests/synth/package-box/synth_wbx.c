@@ -713,54 +713,81 @@ ECL_EXPORT const char *GetGameProperties(void)
 		"] }";
 }
 
-/* A movie made elsewhere, as this core reads it (engine.h, ce_project_import_movie):
- * called INSTEAD of Init. The synth's "foreign" movie is its own movie text -
- * one "|UDLRABsS|" line per frame - mounted as "movie", and the game it was
- * made on is named by the importRom option and mounted under that name. The
- * answer is what a real importer answers - the settings, firmware and files
- * the movie dictates, notes, and the input as Chimera's log - so the witness
- * and the frontend can take the whole path without a core that imports
- * anything real. An importFill option stands in for a setting a movie can
- * dictate. */
-static char g_import[64 * 1024];
+/* One of this core's own tools (engine.h, ce_package_run_tool): called
+ * INSTEAD of Init, with no game. "join" writes the parts picked (mounted as
+ * part.0, part.1, ...) one after another into "joined", each backwards when
+ * the "backwards" option is ticked; a part that is empty is refused by its
+ * own name, which the request file "tool" says. Enough of a tool for the
+ * witness and the window to take the whole path - several inputs in their
+ * order, an option, a file written straight to the disk, a refusal - with no
+ * core that has a real one. */
+static char g_tool[1024];
 
-ECL_EXPORT const char *ImportMovie(void)
+/* the name the person's file had, for a mount name, from the request's
+ * "inputs" ("" when it is not there) */
+static void request_input_name(const char *req, const char *mount, char *out, size_t cap)
 {
-	FILE *f = fopen("movie", "rb");
-	if (!f) return "{\"error\": \"import.no_movie\"}";
-	static char text[48 * 1024];
-	size_t n = fread(text, 1, sizeof text - 1, f);
-	fclose(f);
-	text[n] = 0;
-	char rom[128] = "";
-	wbx_setting_str("importRom", rom, sizeof rom);
-	if (rom[0] == 0) return "{\"error\": \"import.which_game\"}";
-	FILE *g = fopen(rom, "rb");
-	if (!g) {
-		snprintf(g_import, sizeof g_import, "{\"error\": \"import.game_missing\\u001f%s\"}", rom);
-		return g_import;
-	}
-	fclose(g);
-	const long fill = wbx_setting_long("importFill", 0);
+	out[0] = 0;
+	char key[64];
+	snprintf(key, sizeof key, "\"%s\":\"", mount);
+	const char *at = strstr(req, key);
+	if (!at) return;
+	at += strlen(key);
+	const char *end = strchr(at, '"');
+	if (!end) return;
+	size_t len = (size_t)(end - at);
+	if (len >= cap) len = cap - 1;
+	memcpy(out, at, len);
+	out[len] = 0;
+}
 
-	size_t o = (size_t)snprintf(g_import, sizeof g_import,
-		"{\"format\": \"Synth movie\", \"settings\": {\"initFillByte\": %ld}, \"firmware\": [],"
-		" \"files\": [{\"name\": \"%s\", \"slot\": \"rom\"}],"
-		" \"notes\": [\"import.note\"], \"input\": \"[Input]\\n", fill, rom);
-	long frames = 0;
-	for (const char *line = text; *line && o + 32 < sizeof g_import; ) {
-		const char *end = line;
-		while (*end && *end != '\n' && *end != '\r') end++;
-		if (*line == '|' && end > line) {
-			for (const char *c = line; c < end && o + 16 < sizeof g_import; c++) g_import[o++] = *c;
-			o += (size_t)snprintf(g_import + o, sizeof g_import - o, "\\n");
-			frames++;
-		}
-		line = end;
-		while (*line == '\n' || *line == '\r') line++;
+ECL_EXPORT const char *RunTool(void)
+{
+	static char req[4096];
+	FILE *r = fopen("tool", "rb");
+	size_t n = r ? fread(req, 1, sizeof req - 1, r) : 0;
+	if (r) fclose(r);
+	req[n] = 0;
+	if (!strstr(req, "\"tool\":\"join\"")) {
+		char id[64] = "";
+		const char *t = strstr(req, "\"tool\":\"");
+		if (t) sscanf(t + 8, "%63[^\"]", id);
+		snprintf(g_tool, sizeof g_tool, "{\"refused\": \"tool.unknown\\u001f%s\"}", id);
+		return g_tool;
 	}
-	snprintf(g_import + o, sizeof g_import - o, "[/Input]\\n\", \"frames\": %ld}", frames);
-	return g_import;
+	const int backwards = strstr(req, "\"backwards\":true") != NULL;
+	FILE *out = fopen("joined", "wb");
+	if (!out) return "{\"refused\": \"tool.no_output\"}";
+	static uint8_t buf[256 * 1024];
+	long total = 0;
+	int parts = 0;
+	for (;; parts++) {
+		char mount[32];
+		snprintf(mount, sizeof mount, "part.%d", parts);
+		FILE *in = fopen(mount, "rb");
+		if (!in) break;
+		size_t got = fread(buf, 1, sizeof buf, in);
+		fclose(in);
+		if (got == 0) {
+			fclose(out);
+			char name[256];
+			request_input_name(req, mount, name, sizeof name);
+			snprintf(g_tool, sizeof g_tool, "{\"refused\": \"tool.empty_part\\u001f%s\"}", name[0] ? name : mount);
+			return g_tool;
+		}
+		if (backwards)
+			for (size_t i = 0; i < got / 2; i++) {
+				uint8_t c = buf[i];
+				buf[i] = buf[got - 1 - i];
+				buf[got - 1 - i] = c;
+			}
+		fwrite(buf, 1, got, out);
+		total += (long)got;
+	}
+	fclose(out);
+	if (parts == 0) return "{\"refused\": \"tool.no_parts\"}";
+	snprintf(g_tool, sizeof g_tool, "{\"done\": \"tool.joined\\u001f%d\\u001f%ld\"}", parts, total);
+	return g_tool;
 }
 
 /* What this core would choose for a game before a project is final

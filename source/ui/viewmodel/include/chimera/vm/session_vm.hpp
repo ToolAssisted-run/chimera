@@ -173,11 +173,8 @@ public:
 	Property<std::string> averageFpsText;
 	/* Chimera's Emulator menu ("Game" for a game core) and what it offers
 	 * for the core open: a game core's own timer, shown at the top right 14
-	 * down ("IGT 01:02.345"); the user's save data, written out; a movie
-	 * made elsewhere, imported */
+	 * down ("IGT 01:02.345"); the user's save data, written out */
 	Property<bool> isGameCore{false}, hasGameTimer{false}, hasSaveData{false};
-	/* the core's importer, by the menu item its package names ("" when it has none) */
-	Property<std::string> movieImportMenu;
 	/* the core's tooling groups (the engine's): a trace of what its CPU runs,
 	 * and registers a debugger shows; the trace's own header */
 	Property<bool> hasTrace{false}, hasRegisters{false};

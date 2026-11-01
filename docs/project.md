@@ -431,41 +431,58 @@ to build the form, and by `ce_project_*` to validate a manifest:
   auto-added to the manifest with slot `support`; a core never declares
   it.
 
-### Importing a movie
+### A core's own tools
 
-A core may read movies made elsewhere - a Doom demo - and say what
-project they make. It declares `movieImport` in its `waterbox.config`,
-and the frontend renders the import dialog from it, the way it renders
-settings:
+A core may offer tools of its own (owner, 2026-11-01): a job whose result is
+files, such as a compressed game decompressed or a demo made into a project.
+The window offers every installed core's tools under Tools > Core-Specific
+Tools, a submenu a core, whatever is open - a project or none, since such a
+job often comes before the project (a game has to be decompressed before a
+project can hold it). The Emulator menu is there only with a project open
+and holds only what applies to it. Chimera knows nothing of what any tool
+does. A package declares them in `waterbox.config`, and the window draws each
+tool's window from the declaration, the way it draws settings:
 
-- `menu`: the item in the Emulator menu (Game for a game core), in the
-  core's own words ("Import Demo (LMP)..."). Chimera has no name of its
-  own for it, so a core that leaves `menu` out has no item (owner,
-  2026-10-31, issue 428);
-- `movie`: its label and extensions; it is always mounted as `movie`;
-- `files`: the other files the importer reads, each mounted under its own
-  name. `option` carries that name - a `multiple` input's names joined by
-  `separator` in the user's order, and left out when none are picked.
-  `firmware` marks a file that becomes the project's firmware, `slot` the
-  slot its files go in, and `required` one that must be given;
-- `options`: bool settings, sent only when ticked.
+```json
+"tools": [{
+  "id": "decompress_nsz",
+  "menu": "tool.decompress_nsz.menu",
+  "description": "tool.decompress_nsz.help",
+  "inputs": [{"name": "input", "label": "...", "extensions": ["nsz"], "required": true}],
+  "options": [{"name": "...", "display": "...", "description": "...", "default": false}],
+  "outputs": [{"name": "output", "label": "...", "extension": "nsp", "nameFrom": "input"}]
+}]
+```
 
-The core's `ImportMovie` export answers instead of `Init`
-(`ce_project_import_movie`), and it is asked of a project, as every other
-question about a game is (user-decided, 2026-10-26): the files picked that
-the import form gives a slot go in it, the options are its settings, and a
-file the core may take as firmware is mounted beside the movie under its
-own name, since only the answer says which firmware it is. The project is
-made in the helper process from the dialog's choices and thrown away
-afterwards. A refusal is one sentence, shown in the dialog with
-everything still picked so a missing file can be added. An answer only
-SUGGESTS: the machine, the settings, the firmware and the files in load
-order, plus notes for the user and the movie as an input log. The New
-Project wizard then opens on those answers - with the firmware the dialog
-was given already chosen, whichever release it is (a game core's firmware
-may be a file of the project's own) - the project it creates gets the
-input log, the user chooses where it is written, and it opens. Nothing about an imported project is built outside the wizard, so
-it cannot drift from one made by hand.
+- `id`: the tool, to the core. `menu`: its item in the core's submenu, in
+  the core's own words ("Decompress NSZ..."); the window's title is the
+  core's name and the same words ("Eden: Decompress NSZ"). `description`: what it does, shown at the top of its window. These
+  and every `label`, `display` and `description` are keys of the package's
+  language tables.
+- `inputs`: the files it reads. `required` must be given; `multiple` takes
+  several, in an order the person sets (Up and Down), mounted as
+  `<name>.0`, `<name>.1`, ...; one that takes one is mounted as `<name>`.
+- `options`: boxes to tick, each sent as true or false (`default` is how it
+  starts).
+- `outputs`: the files it writes, each where the person chooses; `nameFrom`
+  names an input whose name, with `extension`, is suggested beside it.
+
+Run picks nothing for the person: what is missing is said in the tool's own
+words. The tool runs in a process of its own (`chimera-run --run-tool`, which
+calls `ce_package_run_tool`): the machine is made with no game, the core's
+`RunTool` export is called instead of `Init`, and the machine is thrown away.
+The core finds each input under its name, writes each output under its name
+(what it writes goes straight to the disk, so a result of gigabytes never
+waits in memory: into `<file>.part`, put in the file's place only when the
+core says it is done, so a refusal, a failure or Cancel leaves what was
+there), and reads a file
+`tool`: `{"tool": "<id>", "package": {"sha1", "version"}, "options": {...},
+"inputs": {"<mount name>": "<the file's own name>"}, "outputs": {...}}` (the
+package's hash and version are there for a tool that writes a project, which
+pins its core as New Project does). It answers `{"done": "<a
+sentence>"}` or `{"refused": "<a sentence>"}`, keys of its tables with their
+arguments; the window shows the sentence, a refusal in the error colour.
+Cancel stops the process, and what it wrote is left as it was.
 
 ## Editing
 
@@ -714,10 +731,10 @@ opened a project. It does now, with the engine's sentence as the refusal.
   so is the engine's call that opened a machine from files alone
   (`ce_session_open`): every machine is opened by
   `ce_session_open_project`. The questions asked of a core before a
-  project is final - its suggested settings, a compile session, a movie
-  import - are asked of a project made from the choices so far
-  (`ce_project_suggest_settings`, `ce_project_import_movie`,
-  `chimera-run --project ... --suggest | --import-movie | --precompile`).
+  project is final - its suggested settings, a compile session - are asked
+  of a project made from the choices so far (`ce_project_suggest_settings`,
+  `chimera-run --project ... --suggest | --precompile`). A core's own tools
+  (2026-11-01) need no project (`chimera-run --run-tool`).
 - TODO: the frontend (start screen, creation wizard rendering
   file_slots.json, resolution dialog, TAStudio-as-application, removal
   of the casual paths); PPSSPP memstick-zip import and NES SRAM import

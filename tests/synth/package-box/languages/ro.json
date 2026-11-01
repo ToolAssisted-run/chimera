@@ -5,10 +5,6 @@
 		"game_setting.gamelogo": "Sigla jocului",
 		"game_setting.gamelogo.about": "Propriu acestui joc: îi arată sigla, dintr-un fișier al său.",
 		"game_setting.not_the_package_s": "Nu al pachetului",
-		"import.game_missing": "jocul %1 nu este la îndemână",
-		"import.no_movie": "niciun film: fișierul \"movie\" nu este montat",
-		"import.note": "importat de core-ul synth",
-		"import.which_game": "pe ce joc a fost făcut acest film? (importRom)",
 		"property.cursor_x": "Coloana celulei în care se află cursorul",
 		"property.letter": "Ce a lăsat core-ul în cutia sa poștală",
 		"property.status": "Octetul de rezultat al fiecărui ROM de test",
@@ -28,6 +24,11 @@
 			"few": "Core-ul sintetic sugerează o umplere cu 9. Vede %n discuri și pista din disk1.cue, la viteza de disc %2.",
 			"other": "Core-ul sintetic sugerează o umplere cu 9. Vede %n de discuri și pista din disk1.cue, la viteza de disc %2."
 		},
-		"suggest.nothing": "Core-ul sintetic nu sugerează nimic pentru acest joc."
+		"suggest.nothing": "Core-ul sintetic nu sugerează nimic pentru acest joc.",
+		"tool.unknown": "acest nucleu nu are unealta %1",
+		"tool.no_output": "fișierul de scris nu este acolo",
+		"tool.no_parts": "nu s-au dat părți",
+		"tool.empty_part": "partea %1 este goală",
+		"tool.joined": "%1 părți unite, %2 octeți"
 	}
 }

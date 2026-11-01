@@ -1,8 +1,10 @@
-// Chimera's Emulator menu, Game for a game core: only what the core open
-// offers, each item there only when it does, and the menu gone when it
-// offers nothing. Chimera puts nothing of its own here: an importer's item
-// is named by the core's package (owner, 2026-10-31, issue 428). Layout and
-// bindings only; the main window does what an item asks for.
+// Chimera's Emulator menu, Game for a game core: there only with a project
+// open, and holding only what applies to it - what the core open offers,
+// each item there only when it does (issue 428), the menu gone when it
+// offers nothing. A core's own tools are not here: they are offered for
+// every installed core under Tools > Core-Specific Tools (owner,
+// 2026-11-01). Layout and bindings only; the main window does what an item
+// asks for.
 import QtQuick
 import QtQuick.Controls
 
@@ -11,17 +13,16 @@ Menu {
     required property QtObject session
     // a hotkey's keys, for the item it runs
     property var keysOf: (hotkey) => ""
-    // a tool window asked for: "registers", "surfaces", "trace"; or "import", the core's importer
+    // a tool window asked for: "registers", "surfaces", "trace"
     signal openTool(string tool)
     signal exportSaveData()
 
     readonly property bool gameTime: session.isOpen && session.hasGameTimer
     readonly property bool saveData: session.isOpen && session.hasSaveData
-    readonly property bool importer: session.isOpen && session.movieImportMenu !== ""
     readonly property bool registers: session.isOpen && session.hasRegisters
     readonly property bool surfaces: session.isOpen && session.surfaces !== "[]"
     readonly property bool trace: session.isOpen && session.hasTrace
-    readonly property bool shown: gameTime || saveData || importer || registers || surfaces || trace
+    readonly property bool shown: gameTime || saveData || registers || surfaces || trace
     title: session.isGameCore ? qsTrId("main.game") : qsTrId("main.emulator")
 
     component Entry: KeyedMenuEntry { height: visible ? implicitHeight : 0 }
@@ -30,10 +31,8 @@ Menu {
         checkable: true; checked: menu.session.showGameTime; onTriggered: menu.session.showGameTime = checked
     }
     Entry { text: qsTrId("main.export_save_data_dialog"); visible: menu.saveData; onTriggered: menu.exportSaveData() }
-    // the core's own words for its importer, as its package names it
-    Entry { text: menu.session.movieImportMenu; visible: menu.importer; onTriggered: menu.openTool("import") }
     MenuDivider {
-        visible: (menu.gameTime || menu.saveData || menu.importer) && (menu.registers || menu.surfaces || menu.trace)
+        visible: (menu.gameTime || menu.saveData) && (menu.registers || menu.surfaces || menu.trace)
         height: visible ? implicitHeight : 0
     }
     // the tools the core offers, in Chimera's order

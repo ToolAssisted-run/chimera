@@ -1,11 +1,11 @@
-// Chimera's movie import (File > the core's Import menu item): what it does
-// at the top; the movie with Browse...;
-// each file the import reads (a list with Add..., Remove, Up and Down for
-// one that takes several, else a box with Browse...); the import's options;
-// what keeps it from going, in the error colour; Import and Cancel. Taken,
-// it gives way to the New Project wizard on the core's answers. A dialog
-// of the main window, as Chimera's. Layout and bindings only, over the
-// newProject view model.
+// One of a core's own tools (Tools > Core-Specific Tools): what the tool
+// does at the top; each file it reads (a list with Add..., Remove, Up and Down for one
+// that takes several, else a box with Browse...); its options; each file it
+// writes with Browse... to choose where; what the core said, or what keeps
+// the tool from going in the error colour; Run and Close. All of it is drawn
+// from the core's package: the window knows nothing of what a tool does. A
+// dialog of the main window. Layout and bindings only, over the coreTool
+// view model.
 import QtQuick
 import QtQuick.Controls
 import ChimeraDialogs
@@ -13,14 +13,11 @@ import QtQuick.Layouts
 
 ApplicationWindow {
     id: win
-    objectName: "movieImportWindow"
+    objectName: "coreToolWindow"
     required property QtObject vm
     property Window mainWindow: null
     property var themeColor: (role, fallback) => fallback
-    // the import was taken: the wizard is next
-    signal taken()
-    // the core's own words for its importer, as its menu item has them
-    title: win.vm.importMenu.replace(/[.\s]+$/, "").replace("&", "")
+    title: win.vm.title
     width: 600
     height: Math.max(260, content.implicitHeight + 24)
     minimumWidth: 600
@@ -29,51 +26,43 @@ ApplicationWindow {
     transientParent: win.mainWindow
     flags: Qt.Dialog
 
-    // what keeps the import from going, and whether the core is being asked
+    // what keeps the tool from going (a pick refused here)
     property string said: ""
-    property bool asking: false
     property string pickFor: ""
     onVisibleChanged: {
-        // closed while the core is asked: its answer is not taken
-        if (!visible && win.asking) win.vm.run("importCancel")
-        if (visible) { win.said = ""; win.asking = false }
+        // closed while it runs: the run is stopped
+        if (!visible && win.vm.running) win.vm.run("cancel")
+        if (visible) win.said = ""
     }
     Connections {
         target: win.vm
         // a change made by the view model: QQmlPropertyMap sends valueChanged only for one made from QML
-        function onImportFailureChanged() {
-            if (win.visible && win.vm.importFailure !== "") { win.said = win.vm.importFailure; win.asking = false }
-        }
-        function onImportsTakenChanged() {
-            if (win.visible) { win.asking = false; win.close(); win.taken() }
-        }
+        function onFailureChanged() { if (win.vm.failure !== "") win.said = "" }
     }
-    function importNow() {
+    function runNow() {
         win.said = ""
-        win.asking = true
-        win.vm.run("importRun")
-        if (win.vm.error !== "") { win.said = win.vm.error; win.asking = false }
+        win.vm.run("run")
+        if (win.vm.error !== "" && win.vm.failure === "") win.said = win.vm.error
     }
-    function addFiles(option, urls) {
+    function addFiles(input, urls) {
         win.said = ""
         for (const u of urls) {
-            win.vm.run("importAddFile", [option, u])
+            win.vm.run("addFile", [input, u])
             if (win.vm.error !== "") win.said = win.vm.error
         }
     }
 
-    Shortcut { sequences: ["Return", "Enter"]; enabled: win.active && !win.asking; onActivated: win.importNow() }
+    Shortcut { sequences: ["Return", "Enter"]; enabled: win.active && !win.vm.running; onActivated: win.runNow() }
     Shortcut { sequence: "Escape"; enabled: win.active; onActivated: win.close() }
 
     FileDialog {
-        id: movieDialog
-        title: win.vm.importMovieLabel
-        nameFilters: [win.vm.importMovieLabel + " (" + win.vm.importMovieFilter + ")", qsTrId("common.all_files")]
-        onAccepted: { win.said = ""; win.vm.run("importSetMovie", [selectedFile]) }
-    }
-    FileDialog {
         id: fileDialog
         onAccepted: win.addFiles(win.pickFor, fileMode === FileDialog.OpenFiles ? selectedFiles : [selectedFile])
+    }
+    FileDialog {
+        id: saveDialog
+        fileMode: FileDialog.SaveFile
+        onAccepted: { win.said = ""; win.vm.run("setOutput", [win.pickFor, selectedFile]) }
     }
 
     component RowName: Label { Layout.preferredWidth: 120; Layout.alignment: Qt.AlignTop; Layout.topMargin: 4; elide: Text.ElideRight }
@@ -85,21 +74,16 @@ ApplicationWindow {
         anchors.margins: 12
         spacing: 8
         Label {
-            text: qsTrId("movie_import.the_core_reads_these_files_and")
+            text: win.vm.description
+            visible: text !== ""
             wrapMode: Text.WordWrap
             Layout.fillWidth: true
         }
-        RowLayout {
-            Layout.fillWidth: true
-            RowName { text: (win.vm.importMovieLabel !== "" ? win.vm.importMovieLabel : qsTrId("movie_import.movie")) + ":" }
-            TextField { text: win.vm.importMovie; readOnly: true; activeFocusOnTab: false; Layout.fillWidth: true }
-            Side { text: qsTrId("common.browse"); onClicked: movieDialog.open() }
-        }
         Repeater {
-            model: win.vm.rows("importFiles")
+            model: win.vm.rows("inputs")
             delegate: RowLayout {
                 id: input
-                required property string option
+                required property string name
                 required property string label
                 required property string filter
                 required property bool multiple
@@ -150,9 +134,9 @@ ApplicationWindow {
                 ColumnLayout {
                     Layout.alignment: Qt.AlignTop
                     Side {
-                        text: input.multiple ? qsTrId("movie_import.add") : qsTrId("common.browse")
+                        text: input.multiple ? qsTrId("core_tool.add") : qsTrId("common.browse")
                         onClicked: {
-                            win.pickFor = input.option
+                            win.pickFor = input.name
                             fileDialog.title = input.label
                             fileDialog.fileMode = input.multiple ? FileDialog.OpenFiles : FileDialog.OpenFile
                             fileDialog.nameFilters = input.filter === "" || input.filter === "*" ? [qsTrId("common.all_files")]
@@ -163,19 +147,19 @@ ApplicationWindow {
                     Side {
                         visible: input.multiple
                         text: qsTrId("common.remove")
-                        onClicked: { if (input.picked >= 0) { win.vm.run("importRemoveFile", [input.option, input.picked]); input.picked = -1 } }
+                        onClicked: { if (input.picked >= 0) { win.vm.run("removeFile", [input.name, input.picked]); input.picked = -1 } }
                     }
                     Side {
                         visible: input.multiple
-                        text: qsTrId("movie_import.up")
-                        onClicked: { if (input.picked > 0) { win.vm.run("importMoveFile", [input.option, input.picked, input.picked - 1]); input.picked-- } }
+                        text: qsTrId("core_tool.up")
+                        onClicked: { if (input.picked > 0) { win.vm.run("moveFile", [input.name, input.picked, input.picked - 1]); input.picked-- } }
                     }
                     Side {
                         visible: input.multiple
-                        text: qsTrId("movie_import.down")
+                        text: qsTrId("core_tool.down")
                         onClicked: {
                             if (input.picked >= 0 && input.picked < input.names.length - 1) {
-                                win.vm.run("importMoveFile", [input.option, input.picked, input.picked + 1])
+                                win.vm.run("moveFile", [input.name, input.picked, input.picked + 1])
                                 input.picked++
                             }
                         }
@@ -183,33 +167,69 @@ ApplicationWindow {
                 }
             }
         }
-        // the importer's switches: only a ticked one is sent
         Repeater {
-            model: win.vm.rows("importOptions")
+            model: win.vm.rows("options")
             delegate: CheckBox {
                 required property string name
                 required property string label
+                required property string help
                 required property bool on
                 Layout.leftMargin: 124
                 text: label
                 checked: on
                 padding: 2
-                onToggled: win.vm.run("importSetOption", [name, checked])
+                ToolTip.visible: hovered && help !== ""
+                ToolTip.text: help
+                onToggled: win.vm.run("setOption", [name, checked])
             }
         }
-        Label {
-            objectName: "importStatus"
-            text: win.said
-            color: win.themeColor("AccentError", "#c62828")
-            wrapMode: Text.WordWrap
+        Repeater {
+            model: win.vm.rows("outputs")
+            delegate: RowLayout {
+                id: output
+                required property string name
+                required property string label
+                required property string extension
+                required property string path
+                Layout.fillWidth: true
+                RowName { text: output.label + ":" }
+                TextField { text: output.path; readOnly: true; activeFocusOnTab: false; Layout.fillWidth: true }
+                Side {
+                    text: qsTrId("common.browse")
+                    onClicked: {
+                        win.pickFor = output.name
+                        saveDialog.title = output.label
+                        saveDialog.nameFilters = output.extension === "" ? [qsTrId("common.all_files")]
+                            : [output.label + " (*." + output.extension + ")", qsTrId("common.all_files")]
+                        if (output.path !== "") saveDialog.selectedFile = "file:///" + output.path.replace(/^\/+/, "")
+                        saveDialog.open()
+                    }
+                }
+            }
+        }
+        RowLayout {
             Layout.fillWidth: true
-            Layout.preferredHeight: 48
-            verticalAlignment: Text.AlignTop
+            BusyIndicator { running: win.vm.running; visible: win.vm.running; Layout.preferredWidth: 28; Layout.preferredHeight: 28 }
+            Label {
+                objectName: "coreToolStatus"
+                readonly property bool bad: win.said !== "" || win.vm.failure !== ""
+                text: win.said !== "" ? win.said : win.vm.failure !== "" ? win.vm.failure
+                    : win.vm.running ? qsTrId("core_tool.running") : win.vm.result
+                color: bad ? win.themeColor("AccentError", "#c62828") : palette.windowText
+                wrapMode: Text.WordWrap
+                Layout.fillWidth: true
+                Layout.preferredHeight: 48
+                verticalAlignment: Text.AlignTop
+            }
         }
         RowLayout {
             Item { Layout.fillWidth: true }
-            Button { text: qsTrId("movie_import.import"); Layout.preferredWidth: 80; enabled: !win.asking; onClicked: win.importNow() }
-            Button { text: qsTrId("common.cancel"); Layout.preferredWidth: 76; onClicked: win.close() }
+            Button { text: qsTrId("core_tool.run"); Layout.preferredWidth: 80; enabled: !win.vm.running; onClicked: win.runNow() }
+            Button {
+                text: win.vm.running ? qsTrId("common.cancel") : qsTrId("common.close")
+                Layout.preferredWidth: 76
+                onClicked: { if (win.vm.running) win.vm.run("cancel"); else win.close() }
+            }
         }
     }
 }

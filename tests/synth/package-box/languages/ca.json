@@ -5,10 +5,6 @@
 		"game_setting.gamelogo": "Logotip del joc",
 		"game_setting.gamelogo.about": "Propi d'aquest joc: mostra el seu logotip, des d'un fitxer propi.",
 		"game_setting.not_the_package_s": "No és del paquet",
-		"import.game_missing": "el joc %1 no és a mà",
-		"import.no_movie": "no hi ha pel·lícula: el fitxer \"movie\" no està muntat",
-		"import.note": "importat pel nucli synth",
-		"import.which_game": "en quin joc es va fer aquesta pel·lícula? (importRom)",
 		"property.cursor_x": "Columna de la cel·la on és el cursor",
 		"property.letter": "El que el nucli ha deixat a la seva bústia",
 		"property.status": "El byte de resultat de cada ROM de prova",
@@ -26,6 +22,11 @@
 			"one": "El nucli sintètic suggereix un emplenament de 9. Veu %n disc i la pista de disk1.cue, a velocitat de disc %2.",
 			"other": "El nucli sintètic suggereix un emplenament de 9. Veu %n discos i la pista de disk1.cue, a velocitat de disc %2."
 		},
-		"suggest.nothing": "El nucli sintètic no suggereix res per a aquest joc."
+		"suggest.nothing": "El nucli sintètic no suggereix res per a aquest joc.",
+		"tool.unknown": "aquest nucli no té l'eina %1",
+		"tool.no_output": "el fitxer que cal escriure no hi és",
+		"tool.no_parts": "no s'han donat parts",
+		"tool.empty_part": "la part %1 és buida",
+		"tool.joined": "%1 parts unides, %2 bytes"
 	}
 }

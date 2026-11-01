@@ -481,6 +481,20 @@ Probed once after `Init`; absent exports simply mean the tool is not offered.
   several. So a disc can be read: the Mednafen core reads a Saturn disc's
   region to say which BIOS it needs. Firmware is not mounted then (the
   wizard asks before it is chosen).
+- **`RunTool()`** - the core's own tools, declared under `"tools"` in
+  `waterbox.config` (docs/project.md, "A core's own tools"): each is an item
+  of the window's Tools > Core-Specific Tools, offered whether a project is
+  open or not, a job whose result is files. It is called
+  INSTEAD of `Init`, with no game, in a process of its own
+  (`ce_package_run_tool`; `chimera-run --run-tool <id> <package> --input
+  <name>=<path> --output <name>=<path>` runs one from a shell). The file
+  `tool` says which tool and which options, and the name each picked file
+  had; each input is mounted under its name, and each output is a writable
+  file the core opens and writes, which goes straight to the disk. Return
+  `{"done": "<key>"}` or `{"refused": "<key>"}`, keys of the package's tables
+  with their arguments after 0x1F. Close what you write before returning.
+  The Eden core's Decompress NSZ is one; the DSDA core's demo import, which
+  writes a project, is another.
 - **`GetGameSettings()`** - the settings THIS GAME has beyond the package's
   declaration, for a core whose games carry their own (an arcade game's dip
   switches differ game to game, so they cannot be declared once per package).

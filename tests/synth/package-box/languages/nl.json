@@ -5,10 +5,6 @@
 		"game_setting.gamelogo": "Spellogo",
 		"game_setting.gamelogo.about": "Van dit spel zelf: toont zijn logo, uit een eigen bestand.",
 		"game_setting.not_the_package_s": "Niet van het pakket",
-		"import.game_missing": "het spel %1 is niet bij de hand",
-		"import.no_movie": "geen opname: het bestand \"movie\" is niet gekoppeld",
-		"import.note": "geïmporteerd door de synth-core",
-		"import.which_game": "op welk spel is deze opname gemaakt? (importRom)",
 		"property.cursor_x": "Kolom van de cel waarin de cursor staat",
 		"property.letter": "Wat de core in zijn brievenbus achterliet",
 		"property.status": "De resultaatbyte van elke test-ROM",
@@ -26,6 +22,11 @@
 			"one": "De synthetische core stelt een vulling van 9 voor. Hij ziet %n schijf en het spoor van disk1.cue, bij schijfsnelheid %2.",
 			"other": "De synthetische core stelt een vulling van 9 voor. Hij ziet %n schijven en het spoor van disk1.cue, bij schijfsnelheid %2."
 		},
-		"suggest.nothing": "De synthetische core stelt voor dit spel niets voor."
+		"suggest.nothing": "De synthetische core stelt voor dit spel niets voor.",
+		"tool.unknown": "deze core heeft geen hulpmiddel %1",
+		"tool.no_output": "het te schrijven bestand is er niet",
+		"tool.no_parts": "er zijn geen delen gegeven",
+		"tool.empty_part": "het deel %1 is leeg",
+		"tool.joined": "%1 delen samengevoegd, %2 bytes"
 	}
 }

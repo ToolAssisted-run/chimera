@@ -78,16 +78,6 @@ public:
 	Property<bool> firmwareAsked{false};
 	Property<std::string> firmwareMissing;
 
-	/* Importing a movie made elsewhere (the package's movieImport): the
-	 * menu item it asks for ("" when the core imports nothing), what the
-	 * movie is and the kinds it comes in, the movie picked, the notes the
-	 * core's answer had, and whether the project will take its inputs. */
-	Property<std::string> importMenu;
-	Property<std::string> importMovieLabel;
-	Property<std::string> importMovieFilter;
-	Property<std::string> importMovie;
-	Property<std::string> importNotes;
-	Property<bool> imported{false};
 	Property<bool> clockWrong{false};
 	/* Create makes the project away from the view, since it reads and hashes
 	 * every file: whether one is being made, a count that goes up with each
@@ -97,29 +87,11 @@ public:
 	Property<bool> making{false};
 	Property<int64_t> made{0};
 	Property<bool> filesRefused{false};
-	/* how the last import went, for Chimera's Import window: why it was not
-	 * taken ("" when it was), what the core said of it when it noted
-	 * anything (Chimera's message: "<core> read a <format> movie of <n>
-	 * frames, and notes: ..."), and a count that goes up with each import
-	 * taken, for the window to go on to the wizard */
-	Property<std::string> importFailure;
-	Property<std::string> importSummary;
-	Property<int64_t> importsTaken{0};
-	/* Asks the core what a movie amounts to, away from the machine running
-	 * (a process holds one machine): package, the movie, the files it reads
-	 * (with the slot each goes in, "" for one mounted by name), the import
-	 * settings - asked of a project of them (owner, 2026-10-26); done gets the
-	 * core's JSON answer or why there is none, on the view's thread. Without
-	 * one the engine is asked here, which only works with no machine open. */
-	using ImportRunner = std::function<void(const std::string &package, const std::string &movie,
-		const std::vector<AskFile> &files, const std::string &settings,
-		std::function<void(std::string answer, std::string error)> done)>;
-	void setImportRunner(ImportRunner runner) { importRunner_ = std::move(runner); }
 
 	/* What the core suggests for the game chosen, for a core that says it
 	 * suggests (its "suggestSettings"): where the values come from, and which
 	 * were applied ("" when nothing was asked). Asked once a game, away from
-	 * the machine running, as an import is, with the files and settings
+	 * the machine running (a process holds one machine), with the files and settings
 	 * chosen so far; the values a game's suggestion set go back when another
 	 * game is chosen. The game's own settings come after the package's, and
 	 * its own firmware (a package that says "gameFirmware") after the
@@ -230,30 +202,6 @@ private:
 	private:
 		NewProjectViewModel &vm_;
 	};
-	class ImportFileRows : public RowModel
-	{
-	public:
-		explicit ImportFileRows(NewProjectViewModel &vm) : vm_(vm) {}
-		int64_t rowCount() const override;
-		int32_t columnCount() const override { return 6; }
-		std::string columnName(int32_t column) const override;
-		Value cell(int64_t row, int32_t column) const override;
-
-	private:
-		NewProjectViewModel &vm_;
-	};
-	class ImportOptionRows : public RowModel
-	{
-	public:
-		explicit ImportOptionRows(NewProjectViewModel &vm) : vm_(vm) {}
-		int64_t rowCount() const override;
-		int32_t columnCount() const override { return 3; }
-		std::string columnName(int32_t column) const override;
-		Value cell(int64_t row, int32_t column) const override;
-
-	private:
-		NewProjectViewModel &vm_;
-	};
 	class FirmwareRows : public RowModel
 	{
 	public:
@@ -288,18 +236,13 @@ private:
 	int64_t settingRowsTold_ = 0;
 	SettingsForm::PresetRows presetRows_{form_};
 	FirmwareRows firmwareRows_{*this};
-	ImportFileRows importFileRows_{*this};
-	ImportOptionRows importOptionRows_{*this};
 	/* the core's answer, put into the form */
-	void applyImport(const std::string &answer);
-	const json::Json *importInput(const std::string &option) const;
-	ImportRunner importRunner_;
 	SuggestRunner suggestRunner_;
 	bool suggests_ = false;
 	std::string suggestedFor_;
-	/* the question asked last, of suggestions and of imports: an answer
-	 * carrying another is to a question since withdrawn */
-	uint64_t suggestTicket_ = 0, importTicket_ = 0;
+	/* the question asked last, of suggestions: an answer carrying another is
+	 * to a question since withdrawn */
+	uint64_t suggestTicket_ = 0;
 	std::vector<std::string> suggestedKeys_;
 	/* what the game's suggestion declared of the game's own */
 	std::vector<json::Json> gameSettings_;
@@ -308,7 +251,7 @@ private:
 	void declareSettings();
 	/* the package's firmware declarations, then the game's */
 	json::Json firmwareDecls() const;
-	/* an import or the last project's answers are filling the form: its
+	/* the last project's answers are filling the form: its
 	 * settings are the project's own. The core is still asked about that
 	 * game - for what the game has of its own, and its note - but what it
 	 * would set is not put over them (keptFor_: the game asked so). */
@@ -326,10 +269,6 @@ private:
 	/* asks for the game's suggestion when the game is another than last time */
 	void suggestFor(const std::string &game);
 	void applySuggestion(const std::string &answer, const std::string &why);
-	json::Json import_;
-	std::map<std::string, std::vector<std::string>> importPicked_;
-	std::map<std::string, bool> importOptions_;
-	std::string pendingInput_;
 
 	std::string package_, packageSha1_, version_, slotsText_;
 	json::Json cfg_;

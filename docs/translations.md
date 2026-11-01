@@ -78,15 +78,16 @@ language is Chimera's.
 What a core declares holds keys of them, never words: in `waterbox.config`
 a setting's `display`, `description` and `optionLabels`, a firmware entry's
 `display`, `description` and `label`, a preset's `label` and `description`,
-and the texts of `movieImport` (`menu`, the movie's and the files' `label`,
-the options' `display` and `description`); in `file_slots.json` a slot's
+and the texts of each of its own tools in `tools` (`menu`, `description`,
+the inputs' and outputs' `label`, the options' `display` and `description`);
+in `file_slots.json` a slot's
 `title`, `help` and `nameHelp`. The engine gives the window these files with
 every key replaced by its text in the language in use
 (`ce_package_entry_texts`).
 
 So does what the core returns while it runs: the reason `Init` refused
-(`GetLoadError`), the answers of `SuggestSettings` and `ImportMovie` (a
-note, notes, a refusal, the game's own settings and firmware), the game's
+(`GetLoadError`), the answers of `SuggestSettings` and `RunTool` (a note,
+a refusal, what a tool did, the game's own settings and firmware), the game's
 settings (`GetGameSettings`) and its properties' descriptions. In a JSON
 answer only the strings that are keys change; the rest stays byte for byte,
 so a number no double holds is not rounded.

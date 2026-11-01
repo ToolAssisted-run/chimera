@@ -5,10 +5,6 @@
 		"game_setting.gamelogo": "Oyun Logosu",
 		"game_setting.gamelogo.about": "Bu oyuna özgü: logosunu kendi dosyasından gösterir.",
 		"game_setting.not_the_package_s": "Paketin değil",
-		"import.game_missing": "%1 oyunu elde değil",
-		"import.no_movie": "film yok: \"movie\" dosyası bağlanmadı",
-		"import.note": "synth çekirdeği tarafından içe aktarıldı",
-		"import.which_game": "bu film hangi oyunda yapıldı? (importRom)",
 		"property.cursor_x": "İmlecin bulunduğu hücrenin sütunu",
 		"property.letter": "Çekirdeğin posta kutusunda bıraktığı şey",
 		"property.status": "Her test ROM'unun sonuç baytı",
@@ -26,6 +22,11 @@
 			"one": "Sentetik çekirdek 9 dolgusunu öneriyor. %n disk ve disk1.cue dosyasının izini görüyor, disk hızı %2.",
 			"other": "Sentetik çekirdek 9 dolgusunu öneriyor. %n disk ve disk1.cue dosyasının izini görüyor, disk hızı %2."
 		},
-		"suggest.nothing": "Sentetik çekirdek bu oyun için bir şey önermiyor."
+		"suggest.nothing": "Sentetik çekirdek bu oyun için bir şey önermiyor.",
+		"tool.unknown": "bu çekirdeğin %1 aracı yok",
+		"tool.no_output": "yazılacak dosya yok",
+		"tool.no_parts": "hiç parça verilmedi",
+		"tool.empty_part": "%1 parçası boş",
+		"tool.joined": "%1 parça birleştirildi, %2 bayt"
 	}
 }

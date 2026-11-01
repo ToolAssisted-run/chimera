@@ -59,6 +59,7 @@
 #include "chimera/vm/lua_console_vm.hpp"
 #include "chimera/vm/tool_windows_vm.hpp"
 #include "chimera/vm/new_project_vm.hpp"
+#include "chimera/vm/core_tool_vm.hpp"
 #include "chimera/vm/piano_roll_vm.hpp"
 #include "chimera/vm/process_stamp.hpp"
 #include "chimera/vm/crash_notes.hpp"
@@ -3767,7 +3768,7 @@ bool helpMenu(const char *package, const char *rom)
 
 /* Chimera's Emulator menu (Game for a game core) and what it offers for the
  * core open: a game's own timer over the picture, the save data written out
- * (one file as it is, more in a zip), a movie import */
+ * (one file as it is, more in a zip) */
 bool coreMenu(const char *package, const char *rom, const char *slotsPackage, const char *gamePackage)
 {
 	namespace fs = std::filesystem;
@@ -3780,7 +3781,7 @@ bool coreMenu(const char *package, const char *rom, const char *slotsPackage, co
 	std::string error;
 	openGame(session, package, std::string(rom), error);
 	CHECK(d.until([&] { return session.isOpen.get(); }, 60));
-	CHECK(session.hasSaveData.get() && session.hasGameTimer.get() && !session.isGameCore.get() && session.movieImportMenu.get().empty());
+	CHECK(session.hasSaveData.get() && session.hasGameTimer.get() && !session.isGameCore.get());
 	/* the save files, and written out */
 	std::string names;
 	CHECK(fromValue(session.run("saveDataFiles", {}, error).value_or(Value()), names) && names == "card/slot1.sav\nnotes.txt");
@@ -3836,10 +3837,10 @@ bool coreMenu(const char *package, const char *rom, const char *slotsPackage, co
 	session.showRealTime.set(false);
 	session.run("close", {}, error);
 	CHECK(d.until([&] { return !session.isOpen.get(); }, 20));
-	/* a core that imports movies; a game core */
+	/* another emulator; a game core */
 	openGame(session, slotsPackage, std::string(rom), error);
 	CHECK(d.until([&] { return session.isOpen.get(); }, 60));
-	CHECK(session.movieImportMenu.get() == "Import Synth Movie..." && !session.isGameCore.get());
+	CHECK(!session.isGameCore.get());
 	session.run("close", {}, error);
 	CHECK(d.until([&] { return !session.isOpen.get(); }, 20));
 	openGame(session, gamePackage, std::string(rom), error);
@@ -8459,106 +8460,92 @@ bool customFirmware(const char *rom, const char *hashedPackage, const char *game
 	return true;
 }
 
-/* A movie made elsewhere: the core says what it amounts to, the New Project
- * form takes its answer, and the project made has the movie's inputs */
-bool movieImport(const char *slotsPackage, const char *rom, const std::string &movies)
+/* A core's own tools (Tools > Core-Specific Tools): every installed core's,
+ * with nothing open; the form drawn from its package, what is missing said
+ * in the tool's words, several files in their order, an option, the file
+ * written where it was suggested, and a refusal by the core said as the
+ * failure, leaving the file that was there */
+bool coreTools(const char *slotsPackage, const char *rom)
 {
 	namespace fs = std::filesystem;
 	std::error_code ec;
-	if (fs::file_size(slotsPackage, ec) == 0 || ec || !fs::exists(movies + "/gridWalker.win.txt"))
+	if (fs::file_size(slotsPackage, ec) == 0 || ec)
 	{
-		std::printf("SKIP movie import: no slots package or no movie\n");
+		std::printf("SKIP core tools: no slots package\n");
 		return false;
 	}
-	const fs::path dir = fs::temp_directory_path() / ("chimera-test-import-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+	const fs::path dir = fs::temp_directory_path() / ("chimera-test-tool-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+	fs::create_directories(dir);
+	auto write = [&](const char *name, const std::string &bytes) {
+		std::ofstream out(dir / name, std::ios::binary);
+		out << bytes;
+	};
+	(void)rom;
+	write("a.part", "abc");
+	write("b.part", "de");
+	write("empty.part", "");
 	fs::create_directories(dir / "Cores");
-	fs::copy_file(slotsPackage, dir / "Cores" / "synth-slots.chimeraCore");
-	fs::copy_file(rom, dir / "gridWalker.testrom");
-	fs::copy_file(movies + "/gridWalker.win.txt", dir / "win.txt");
 	ManualDispatcher d;
-	InputLog inputs;
-	SessionViewModel session(d, inputs);
-	session.turboSeek.set(true);
 	CoresViewModel installed(d);
 	std::string error;
+	/* no core with tools: none offered */
 	installed.set("coresFolder", (dir / "Cores").string(), error);
-	installed.set("firmwareFolder", (dir / "Firmware").string(), error);
-	session.setFinders([&installed](const std::string &n, const std::string &h, std::string &note) { return installed.packageFor(n, h, note); },
-		[&installed] { return installed.firmwareFolders(); });
-	NewProjectViewModel wizard(d, session, installed);
-	CHECK(wizard.run("chooseCore", {std::string("Synth Slots")}, error).has_value());
-	CHECK(wizard.importMenu.get() == "Import Synth Movie..." && wizard.importMovieFilter.get() == "*.txt" && wizard.importMovieLabel.get() == "A synthetic movie");
-	RowModel *files = nullptr;
-	for (const auto &r : wizard.rowLists())
-		if (r.name == "importFiles") files = r.model;
-	CHECK(files != nullptr && files->rowCount() == 1);
+	CHECK(installed.coreTools.get() == "[]");
+	fs::copy_file(slotsPackage, dir / "Cores" / "synth-slots.chimeraCore");
+	installed.run("refresh", {}, error);
+	CHECK(installed.coreTools.get().find("\"core\": \"Synth Slots\"") != std::string::npos
+		&& installed.coreTools.get().find("\"menu\": \"Join Synth Parts...\"") != std::string::npos);
+	CoreToolViewModel tool(d, installed);
+	CHECK(!tool.run("open", {std::string("Synth Slots"), std::string("nothing")}, error).has_value() || !error.empty());
+	CHECK(error == "Synth Slots has no tool nothing.");
+	CHECK(tool.run("open", {std::string("Synth Slots"), std::string("join")}, error).has_value());
+	CHECK(tool.title.get() == "Synth Slots: Join Synth Parts" && tool.description.get() == "Joins the parts into one file, in the order they are listed.");
+	RowModel *in = nullptr, *out = nullptr, *opts = nullptr;
+	for (const auto &r : tool.rowLists())
+	{
+		if (r.name == "inputs") in = r.model;
+		if (r.name == "outputs") out = r.model;
+		if (r.name == "options") opts = r.model;
+	}
+	CHECK(in != nullptr && out != nullptr && opts != nullptr && in->rowCount() == 1 && out->rowCount() == 1 && opts->rowCount() == 1);
 	std::string t;
-	fromValue(files->cell(0, 0), t);
-	CHECK(t == "importRom");
-	fromValue(files->cell(0, 2), t);
-	CHECK(t == "*.testrom");
-	/* what is missing, in Chimera's words */
-	CHECK(!wizard.run("importRun", {}, error) && error == "Choose the a synthetic movie to import." && wizard.importFailure.get() == error);
-	CHECK(wizard.run("importSetMovie", {(dir / "win.txt").string()}, error).has_value());
-	CHECK(!wizard.run("importRun", {}, error) && error == "Choose the The game.");
-	CHECK(wizard.run("importAddFile", {std::string("importRom"), (dir / "gridWalker.testrom").string()}, error).has_value());
-	/* a single input gives its file up for another of the same name, as Chimera's */
-	{
-		fs::create_directories(dir / "again");
-		fs::copy_file(dir / "gridWalker.testrom", dir / "again" / "GRIDWALKER.testrom", fs::copy_options::overwrite_existing);
-		CHECK(wizard.run("importAddFile", {std::string("importRom"), (dir / "again" / "GRIDWALKER.testrom").string()}, error).has_value());
-		CHECK(wizard.run("importAddFile", {std::string("importRom"), (dir / "gridWalker.testrom").string()}, error).has_value());
-	}
-	fromValue(files->cell(0, 5), t);
-	CHECK(t == "gridWalker.testrom");
-	wizard.run("importSetOption", {std::string("importFill"), true}, error);
-	/* the form's value before: the movie's answer replaces it */
-	CHECK(wizard.run("set", {std::string("initFillByte"), int64_t{5}}, error).has_value());
-	CHECK(wizard.run("importRun", {}, error).has_value());
-	/* the answer in the form: its file in the slot, its setting, its notes */
-	int64_t frames = 0;
-	{
-		std::istringstream lines(readFile(dir / "win.txt"));
-		for (std::string l; std::getline(lines, l);) frames += !l.empty() && l[0] == '|' ? 1 : 0;
-	}
-	CHECK(wizard.status.get() == "Imported win.txt (" + std::to_string(frames) + " frames)");
-	/* taken: Chimera's message of what the core noted */
-	CHECK(wizard.importsTaken.get() == 1 && wizard.importFailure.get().empty());
-	std::printf("import summary: %s\n", wizard.importSummary.get().c_str());
-	CHECK(std::regex_match(wizard.importSummary.get(), std::regex("Synth Slots read a [^\n]* movie of " + std::to_string(frames) +
-		" frames, and notes:\n\n- imported by the synth core")));
-	CHECK(wizard.imported.get() && wizard.importNotes.get() == "imported by the synth core" && wizard.title.get() == "win");
-	/* the movie's settings are the project's own: the core's note is shown,
-	 * and what it would set is not put over them */
-	CHECK(wizard.suggestion.get() == "The synthetic core suggests a fill of 9.\nThis project's own settings are kept.");
-	RowModel *slots = nullptr, *settings = nullptr;
-	for (const auto &r : wizard.rowLists())
-	{
-		if (r.name == "slots") slots = r.model;
-		if (r.name == "settings") settings = r.model;
-	}
-	fromValue(slots->cell(0, 7), t);
-	CHECK(t == "gridWalker.testrom" && wizard.ready.get());
-	int64_t fill = -1;
-	for (int64_t r = 0; r < settings->rowCount(); r++)
-	{
-		std::string n;
-		fromValue(settings->cell(r, 0), n);
-		if (n == "initFillByte") fromValue(settings->cell(r, 3), fill);
-	}
-	/* what the synthetic importer dictates for a ticked option (sent as true,
-	 * as Chimera sends it, which it reads as no number) */
-	CHECK(fill == 0);
-	/* made: the project has the movie's inputs, and opens on them */
-	const fs::path project = dir / "win.chimeraProject";
-	CHECK(wizard.run("create", {project.string()}, error).has_value());
-	CHECK(d.until([&] { return session.isOpen.get() && session.projectPath.get() == project.string(); }, 60));
-	CHECK(inputs.size() == frames);
-	/* forgotten: the next project starts empty */
-	wizard.run("importForget", {}, error);
-	CHECK(!wizard.imported.get());
-	session.run("close", {}, error);
-	CHECK(d.until([&] { return !session.isOpen.get(); }, 20));
+	bool many = false;
+	fromValue(in->cell(0, 2), t);
+	CHECK(t == "*.part");
+	fromValue(in->cell(0, 4), many);
+	CHECK(many);
+	/* what is missing, in the tool's words */
+	CHECK(!tool.run("run", {}, error).has_value() || !error.empty());
+	CHECK(error == "Choose the Parts." && tool.failure.get() == error);
+	CHECK(tool.run("addFile", {std::string("part"), (dir / "a.part").string()}, error).has_value());
+	CHECK(tool.run("addFile", {std::string("part"), (dir / "b.part").string()}, error).has_value());
+	fromValue(in->cell(0, 5), t);
+	CHECK(t == "a.part\nb.part");
+	/* the file it writes, suggested beside the first part and named after it */
+	fromValue(out->cell(0, 3), t);
+	CHECK(t == (dir / "a.bin").string());
+	CHECK(tool.run("setOption", {std::string("backwards"), true}, error).has_value());
+	CHECK(tool.run("run", {}, error).has_value());
+	CHECK(d.until([&] { return tool.runs.get() == 1; }, 60));
+	CHECK(tool.result.get() == "joined 2 parts, 5 bytes" && tool.failure.get().empty() && !tool.running.get());
+	CHECK(readFile(dir / "a.bin") == "cbaed");
+	/* the order picked is the order read */
+	CHECK(tool.run("moveFile", {std::string("part"), int64_t{1}, int64_t{0}}, error).has_value());
+	CHECK(tool.run("setOption", {std::string("backwards"), false}, error).has_value());
+	CHECK(tool.run("setOutput", {std::string("joined"), (dir / "other.bin").string()}, error).has_value());
+	CHECK(tool.run("run", {}, error).has_value());
+	CHECK(d.until([&] { return tool.runs.get() == 2; }, 60));
+	CHECK(readFile(dir / "other.bin") == "deabc");
+	/* refused by the core: said as the failure, by the file's own name */
+	CHECK(tool.run("addFile", {std::string("part"), (dir / "empty.part").string()}, error).has_value());
+	CHECK(tool.run("run", {}, error).has_value());
+	CHECK(d.until([&] { return tool.runs.get() == 3; }, 60));
+	CHECK(tool.failure.get() == "the part empty.part is empty" && tool.result.get().empty());
+	/* and the file it was to write is as it was: nothing half-written over it */
+	CHECK(readFile(dir / "other.bin") == "deabc" && !fs::exists(dir / "other.bin.part"));
+	/* what the tool does not declare */
+	CHECK(!tool.run("setOutput", {std::string("nowhere"), (dir / "x").string()}, error).has_value() || !error.empty());
+	CHECK(error == "This tool writes no file nowhere.");
 	removeTree(dir);
 	return true;
 }
@@ -10313,14 +10300,14 @@ int main(int argc, char **argv)
 			else std::printf("SKIP choosing between cores: no second package given\n");
 			if (argc >= 7) ranMachine = newProjectWizard(argv[1], argv[2], argv[6]) && ranMachine;
 			if (argc >= 7) ranMachine = pianoRollAxes(argv[6], argv[2]) && ranMachine;
-			if (argc >= 7) ranMachine = movieImport(argv[6], argv[2], argv[3]) && ranMachine;
+			if (argc >= 7) ranMachine = coreTools(argv[6], argv[2]) && ranMachine;
 			else std::printf("SKIP New Project: no slots package given\n");
 			if (argc >= 9) ranMachine = customFirmware(argv[2], argv[7], argv[8]) && ranMachine;
 			else std::printf("SKIP custom firmware: no packages with a hashed firmware given\n");
 			if (argc >= 10) ranMachine = columnsMenu(argv[9], argv[2]) && ranMachine;
 			else std::printf("SKIP the Columns menu: no package with players and keys given\n");
 			if (argc >= 11) ranMachine = coreMenu(argv[1], argv[2], argv[6], argv[10]) && ranMachine;
-			else std::printf("SKIP the Emulator menu: no packages that import movies and are games given\n");
+			else std::printf("SKIP the Emulator menu: no packages with tools of their own and that are games given\n");
 			if (argc >= 12) ranMachine = firmwareWindow(argv[1], argv[6], argv[11], argv[8]) && ranMachine;
 			else std::printf("SKIP the Firmware window: no package with many releases of one firmware given\n");
 			if (argc >= 9) ranMachine = createForAgent(argv[1], argv[2], argv[7]) && ranMachine;

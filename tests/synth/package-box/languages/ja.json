@@ -5,10 +5,6 @@
 		"game_setting.gamelogo": "ゲームのロゴ",
 		"game_setting.gamelogo.about": "このゲーム独自の設定: 専用のファイルからロゴを表示します。",
 		"game_setting.not_the_package_s": "パッケージのものではありません",
-		"import.game_missing": "ゲーム %1 が手元にありません",
-		"import.no_movie": "ムービーがありません: ファイル \"movie\" がマウントされていません",
-		"import.note": "synth コアによってインポートされました",
-		"import.which_game": "このムービーはどのゲームで作られましたか? (importRom)",
 		"property.cursor_x": "カーソルがあるセルの列",
 		"property.letter": "コアがメールボックスに残したもの",
 		"property.status": "各テスト ROM の結果バイト",
@@ -24,6 +20,11 @@
 		"suggest.fill_disks_track": {
 			"other": "合成コアは 9 での埋めを提案します。ディスク %n 枚と disk1.cue のトラックが、ディスク速度 %2 で見えます。"
 		},
-		"suggest.nothing": "合成コアはこのゲームに何も提案しません。"
+		"suggest.nothing": "合成コアはこのゲームに何も提案しません。",
+		"tool.unknown": "このコアにはツール %1 がありません",
+		"tool.no_output": "書き込むファイルがありません",
+		"tool.no_parts": "パーツが指定されていません",
+		"tool.empty_part": "パーツ %1 は空です",
+		"tool.joined": "%1 個のパーツを結合しました (%2 バイト)"
 	}
 }

@@ -77,15 +77,17 @@ with zin, zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zout:
             # and its games have settings and firmware of their own
             cfg["suggestSettings"] = True
             cfg["gameFirmware"] = True
-            # the synthetic core's importer: a movie of its own lines, the game it
-            # was made on, and a setting the movie dictates
-            cfg["movieImport"] = {
-                "menu": "Import Synth Movie...",
-                "movie": {"label": "A synthetic movie", "extensions": ["txt"]},
-                "files": [{"option": "importRom", "label": "The game", "extensions": ["testrom"],
-                           "slot": "rom", "required": True}],
-                "options": [{"name": "importFill", "display": "Fill RAM", "type": "bool"}],
-            }
+            # a tool of the synthetic core's own (its Emulator menu): the parts
+            # picked, joined in their order into one file, each backwards when
+            # the option is ticked
+            cfg["tools"] = [{
+                "id": "join",
+                "menu": "Join Synth Parts...",
+                "description": "Joins the parts into one file, in the order they are listed.",
+                "inputs": [{"name": "part", "label": "Parts", "extensions": ["part"], "multiple": True, "required": True}],
+                "options": [{"name": "backwards", "display": "Backwards", "description": "Each part's bytes in the opposite order."}],
+                "outputs": [{"name": "joined", "label": "Joined file", "extension": "bin", "nameFrom": "part"}],
+            }]
             # a disc recipe (the Media Maker hands it to the engine for a folder it is for)
             cfg["media"] = [{"id": "disc", "label": "synthetic disc", "format": "iso9660",
                              "when": {"rootFile": "SYNTH.BIN"}, "systemArea": [{"at": 0, "u32be": 7}]}]

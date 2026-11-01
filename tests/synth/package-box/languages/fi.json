@@ -5,10 +5,6 @@
 		"game_setting.gamelogo": "Pelin logo",
 		"game_setting.gamelogo.about": "Tämän pelin oma: näyttää sen logon omasta tiedostostaan.",
 		"game_setting.not_the_package_s": "Ei paketin oma",
-		"import.game_missing": "peli %1 ei ole käsillä",
-		"import.no_movie": "ei elokuvaa: tiedostoa \"movie\" ei ole liitetty",
-		"import.note": "synth-ytimen tuoma",
-		"import.which_game": "millä pelillä tämä elokuva tehtiin? (importRom)",
 		"property.cursor_x": "Sen solun sarake, jossa kohdistin on",
 		"property.letter": "Mitä ydin jätti postilaatikkoonsa",
 		"property.status": "Jokaisen testi-ROMin tulostavu",
@@ -26,6 +22,11 @@
 			"one": "Synteettinen ydin ehdottaa täyttöä 9. Se näkee %n levyn ja tiedoston disk1.cue raidan, levynopeudella %2.",
 			"other": "Synteettinen ydin ehdottaa täyttöä 9. Se näkee %n levyä ja tiedoston disk1.cue raidan, levynopeudella %2."
 		},
-		"suggest.nothing": "Synteettinen ydin ei ehdota tälle pelille mitään."
+		"suggest.nothing": "Synteettinen ydin ei ehdota tälle pelille mitään.",
+		"tool.unknown": "tällä ytimellä ei ole työkalua %1",
+		"tool.no_output": "kirjoitettavaa tiedostoa ei ole",
+		"tool.no_parts": "osia ei annettu",
+		"tool.empty_part": "osa %1 on tyhjä",
+		"tool.joined": "yhdistettiin %1 osaa, %2 tavua"
 	}
 }

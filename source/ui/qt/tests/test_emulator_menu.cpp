@@ -1,9 +1,9 @@
 /* The Emulator menu holds only what the core open offers (owner,
  * 2026-10-31, issue 428): an item the core does not offer is not in it, not
- * greyed out, and the menu is gone when the core offers nothing. Chimera has
- * no item of its own there: an importer's item is named by the core's
- * package. EmulatorMenu.qml over a stand-in for the session, opened, and
- * the items it shows read. */
+ * greyed out, and the menu is gone when the core offers nothing. A core's
+ * own tools are under Tools instead (owner, 2026-11-01; test_core_tools_menu).
+ * EmulatorMenu.qml over a stand-in for the session, opened, and the items
+ * it shows read. */
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
 #include <QQuickItem>
@@ -38,7 +38,6 @@ ApplicationWindow {
         property bool hasGameTimer: false
         property bool showGameTime: false
         property bool hasSaveData: false
-        property string movieImportMenu: ""
         property bool hasRegisters: false
         property string surfaces: "[]"
         property bool hasTrace: false
@@ -86,16 +85,14 @@ int main(int argc, char **argv)
 	set("hasRegisters", true);
 	CHECK(menu->property("shown").toBool());
 	CHECK(shown() == QStringList({"main.cpu_registers"}));
-	/* a game's timer, the core's importer by its package's words, the trace:
-	 * the two groups parted */
+	/* a game's timer and the trace: the two groups parted */
 	set("hasRegisters", false);
 	set("hasGameTimer", true);
-	set("movieImportMenu", QStringLiteral("Import Demo (LMP)..."));
 	set("hasTrace", true);
-	CHECK(shown() == QStringList({"main.display_game_time", "Import Demo (LMP)...", "-", "main.trace_logger"}));
+	CHECK(shown() == QStringList({"main.display_game_time", "-", "main.trace_logger"}));
 	/* save data and the surfaces, no divider with one group only */
 	set("hasGameTimer", false);
-	set("movieImportMenu", QString());
+	set("hasTrace", false);
 	set("hasTrace", false);
 	set("hasSaveData", true);
 	CHECK(shown() == QStringList({"main.export_save_data_dialog"}));

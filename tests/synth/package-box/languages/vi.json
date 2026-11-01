@@ -5,10 +5,6 @@
 		"game_setting.gamelogo": "Logo trò chơi",
 		"game_setting.gamelogo.about": "Riêng của trò chơi này: hiển thị logo của nó, từ một tệp riêng.",
 		"game_setting.not_the_package_s": "Không phải của gói",
-		"import.game_missing": "trò chơi %1 không có sẵn",
-		"import.no_movie": "không có movie: tệp \"movie\" chưa được gắn",
-		"import.note": "được nhập bởi core synth",
-		"import.which_game": "movie này được làm trên trò chơi nào? (importRom)",
 		"property.cursor_x": "Cột của ô mà con trỏ đang ở",
 		"property.letter": "Những gì core để lại trong hộp thư của nó",
 		"property.status": "Byte kết quả của mỗi ROM thử nghiệm",
@@ -24,6 +20,11 @@
 		"suggest.fill_disks_track": {
 			"other": "Core tổng hợp đề xuất lấp đầy bằng 9. Nó thấy %n đĩa và rãnh của disk1.cue, ở tốc độ đĩa %2."
 		},
-		"suggest.nothing": "Core tổng hợp không đề xuất gì cho trò chơi này."
+		"suggest.nothing": "Core tổng hợp không đề xuất gì cho trò chơi này.",
+		"tool.unknown": "lõi này không có công cụ %1",
+		"tool.no_output": "không có tệp để ghi",
+		"tool.no_parts": "không có phần nào được đưa vào",
+		"tool.empty_part": "phần %1 trống",
+		"tool.joined": "đã nối %1 phần, %2 byte"
 	}
 }

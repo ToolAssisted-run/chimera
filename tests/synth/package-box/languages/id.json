@@ -5,10 +5,6 @@
 		"game_setting.gamelogo": "Logo Game",
 		"game_setting.gamelogo.about": "Milik game ini sendiri: menampilkan logonya, dari berkasnya sendiri.",
 		"game_setting.not_the_package_s": "Bukan milik paket",
-		"import.game_missing": "game %1 tidak tersedia",
-		"import.no_movie": "tidak ada movie: berkas \"movie\" tidak dipasang",
-		"import.note": "diimpor oleh core synth",
-		"import.which_game": "di game apa movie ini dibuat? (importRom)",
 		"property.cursor_x": "Kolom sel tempat kursor berada",
 		"property.letter": "Apa yang ditinggalkan core di kotak suratnya",
 		"property.status": "Byte hasil setiap ROM uji",
@@ -24,6 +20,11 @@
 		"suggest.fill_disks_track": {
 			"other": "Core sintetis menyarankan isian 9. Core ini melihat %n disk dan trek disk1.cue, pada kecepatan disk %2."
 		},
-		"suggest.nothing": "Core sintetis tidak menyarankan apa pun untuk game ini."
+		"suggest.nothing": "Core sintetis tidak menyarankan apa pun untuk game ini.",
+		"tool.unknown": "core ini tidak punya alat %1",
+		"tool.no_output": "berkas yang akan ditulis tidak ada",
+		"tool.no_parts": "tidak ada bagian yang diberikan",
+		"tool.empty_part": "bagian %1 kosong",
+		"tool.joined": "%1 bagian digabung, %2 byte"
 	}
 }

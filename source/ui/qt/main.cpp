@@ -87,6 +87,7 @@
 #include "chimera/vm/trace_logger_vm.hpp"
 #include "chimera/vm/idle_eye.hpp"
 #include "chimera/vm/surface_viewer_vm.hpp"
+#include "chimera/vm/core_tool_vm.hpp"
 #include "chimera/vm/macro_tool_vm.hpp"
 #include "chimera/vm/encoder_vm.hpp"
 #include "chimera/vm/host_input_vm.hpp"
@@ -331,7 +332,7 @@ int main(int argc, char **argv)
 	QCommandLineOption mmfOpt(QStringLiteral("mmf"), QStringLiteral("the memory-mapped file Lua's comm.mmfScreenshot writes to, as Chimera's --mmf"),
 		QStringLiteral("name"));
 	QCommandLineOption schemeOpt(QStringLiteral("color-scheme"), QStringLiteral("light or dark: Chimera's built-in Light or Dark theme for this run (not remembered)"), QStringLiteral("scheme"));
-	QCommandLineOption showOpt(QStringLiteral("show"), QStringLiteral("open a tool window at the start: new-project, movie-import, ram-search, ram-watch, hex, controls, hotkeys, themes, lua, tastudio, undo-history, project-details, comments, subtitles, tastudio-settings, log, report, media, cache, customize, messages, sound, display, budgets, paths, firmware, data, precompiled, trace, registers, surfaces, macros, encode, cores"), QStringLiteral("tool"));
+	QCommandLineOption showOpt(QStringLiteral("show"), QStringLiteral("open a tool window at the start: new-project, core-tool, ram-search, ram-watch, hex, controls, hotkeys, themes, lua, tastudio, undo-history, project-details, comments, subtitles, tastudio-settings, log, report, media, cache, customize, messages, sound, display, budgets, paths, firmware, data, precompiled, trace, registers, surfaces, macros, encode, cores"), QStringLiteral("tool"));
 	QCommandLineOption describeOpt(QStringLiteral("describe"), QStringLiteral("print every view model's properties and commands as JSON, and quit"));
 	/* Chimera's --mcp-server and --mcp-allow-changes: the server started for a run nobody clicks in */
 	QCommandLineOption mcpServerOpt(QStringLiteral("mcp-server"), QStringLiteral("start the MCP server (Tools > MCP Server...) at once"));
@@ -773,7 +774,7 @@ int main(int argc, char **argv)
 	if (cores.firmwareFolder.get().empty())
 		cores.firmwareFolder.set((QCoreApplication::applicationDirPath() + QStringLiteral("/firmware")).toStdString());
 	vm::NewProjectViewModel newProject(dispatcher, session, cores);
-	/* the core's suggested settings for a game, asked as an import is */
+	/* the core's suggested settings for a game, asked in a process of its own */
 	/* Chimera's compile step: its sessions are the headless runner, and what
 	 * they compile is kept where the machine's compiled code is */
 	{
@@ -820,7 +821,7 @@ int main(int argc, char **argv)
 			else if (code == 0 && !answer.isEmpty()) done(answer.toStdString(), {});
 			else done({}, err.isEmpty() ? vm::tr("chimera_run.no_answer") : err.split('\n').last().toStdString());
 		});
-		/* a runner that cannot start never finishes: say so, as the import does */
+		/* a runner that cannot start never finishes: say so */
 		QObject::connect(proc, &QProcess::errorOccurred, proc, [proc, done](QProcess::ProcessError e) {
 			if (e != QProcess::FailedToStart) return;
 			proc->deleteLater();
@@ -834,64 +835,10 @@ int main(int argc, char **argv)
 		for (const auto &r : cores.mediaRecipes()) recipes.push_back({r.core, r.label, r.json});
 		return recipes;
 	});
-	/* a movie import asks the core in a process of its own (one machine to a
-	 * process), as Chimera does: chimera-run, beside the program or, in the
-	 * build tree, where it is built (CHIMERA_RUN names another) */
-	const vm::NewProjectViewModel::ImportRunner importRunner = [&app](const std::string &package, const std::string &movie,
-								   const std::vector<vm::AskFile> &files, const std::string &settings,
-								   std::function<void(std::string, std::string)> done) {
-		const QString runner = runnerProgram();
-		if (runner.isEmpty())
-		{
-			done({}, vm::tr("chimera_run.missing"));
-			return;
-		}
-		/* asked of a project (owner, 2026-10-26): the files with a slot in it,
-		 * the import options its settings, the rest mounted by name */
-		auto *folder = new QTemporaryDir();
-		const std::string project = (folder->path() + QStringLiteral("/import.chimeraProject")).toStdString();
-		std::vector<std::string> dirs;
-		std::string why;
-		if (!folder->isValid() || !vm::saveAskingProject(package, files, settings, project, dirs, why))
-		{
-			delete folder;
-			done({}, why.empty() ? vm::tr("chimera_run.no_folder") : why);
-			return;
-		}
-		QStringList args{QStringLiteral("--project"), QString::fromStdString(project), QString::fromStdString(package),
-			QStringLiteral("--import-movie"), QString::fromStdString(movie)};
-		for (const std::string &d : dirs) args << QStringLiteral("--files") << QString::fromStdString(d);
-		for (const vm::AskFile &f : files)
-			if (f.slot.empty()) args << QStringLiteral("--mount") << QString::fromStdString(f.name + "=" + f.path);
-		auto *proc = new QProcess(&app);
-		QObject::connect(proc, &QObject::destroyed, [folder] { delete folder; });
-		/* two minutes, as Chimera gives a core to answer */
-		QTimer::singleShot(120000, proc, [proc] { proc->setProperty("tooLong", true); proc->kill(); });
-		QObject::connect(proc, &QProcess::finished, proc, [proc, done](int code, QProcess::ExitStatus) {
-			/* the answer is the last line that is a JSON object; a core may print */
-			const QList<QByteArray> lines = proc->readAllStandardOutput().split('\n');
-			QByteArray answer;
-			for (const QByteArray &l : lines)
-				if (l.trimmed().startsWith('{')) answer = l.trimmed();
-			const QByteArray err = proc->readAllStandardError().trimmed();
-			proc->deleteLater();
-			if (proc->property("tooLong").toBool()) done({}, vm::tr("chimera_run.too_long"));
-			else if (code == 0 && !answer.isEmpty()) done(answer.toStdString(), {});
-			else done({}, err.isEmpty() ? vm::tr("chimera_run.no_answer") : err.split('\n').last().toStdString());
-		});
-		QObject::connect(proc, &QProcess::errorOccurred, proc, [proc, done](QProcess::ProcessError e) {
-			if (e != QProcess::FailedToStart) return;
-			proc->deleteLater();
-			done({}, vm::tr("chimera_run.not_started"));
-		});
-		proc->start(runner, args);
-	};
-	newProject.setImportRunner(importRunner);
 	/* the MCP server's create_project: a New Project form of its own, never
 	 * shown, which the agent's answers fill as Chimera's wizard is filled */
 	vm::NewProjectViewModel agentProject(dispatcher, session, cores);
 	agentProject.setSuggestRunner(suggestRunner);
-	agentProject.setImportRunner(importRunner);
 	agentProject.compileRunner.set(newProject.compileRunner.get());
 	agentProject.compileRoot.set(newProject.compileRoot.get());
 	vm::Connection agentCompileRootWatch = session.compileCacheRoot.changed.connect([&] { agentProject.compileRoot.set(session.compileCacheRoot.get()); });
@@ -982,6 +929,56 @@ int main(int argc, char **argv)
 	qt::QmlViewModel idleEyeQml(idleEye);
 	vm::SurfaceViewerViewModel surfaceViewer(dispatcher, session);
 	qt::QmlViewModel surfaceViewerQml(surfaceViewer);
+	/* every installed core's own tools (Tools > Core-Specific Tools): each
+	 * run in a process of its own (one machine to a process), chimera-run
+	 * beside the program or, in the build tree, where it is built
+	 * (CHIMERA_RUN names another). No time limit: a tool may write gigabytes;
+	 * Cancel stops it. */
+	vm::CoreToolViewModel coreTool(dispatcher, cores);
+	coreTool.setRunner([&app](const std::string &package, const std::string &tool, const std::vector<vm::CoreToolViewModel::File> &inputs,
+						   const std::vector<vm::CoreToolViewModel::File> &outputs, const std::string &options,
+						   std::function<void(std::string, std::string)> done) -> std::function<void()> {
+		const QString runner = runnerProgram();
+		if (runner.isEmpty())
+		{
+			done({}, vm::tr("chimera_run.missing"));
+			return {};
+		}
+		QStringList args{QStringLiteral("--run-tool"), QString::fromStdString(tool), QString::fromStdString(package),
+			QStringLiteral("--tool-options"), QString::fromStdString(options)};
+		for (const auto &f : inputs) args << QStringLiteral("--input") << QString::fromStdString(f.name + "=" + f.path);
+		for (const auto &f : outputs) args << QStringLiteral("--output") << QString::fromStdString(f.name + "=" + f.path);
+		auto *proc = new QProcess(&app);
+		QObject::connect(proc, &QProcess::finished, proc, [proc, done, outputs](int code, QProcess::ExitStatus) {
+			/* the answer is the last line that is a JSON object; a core may print */
+			QByteArray answer;
+			for (const QByteArray &l : proc->readAllStandardOutput().split('\n'))
+				if (l.trimmed().startsWith('{')) answer = l.trimmed();
+			const QByteArray err = proc->readAllStandardError().trimmed();
+			proc->deleteLater();
+			/* stopped: what it was writing (the engine's <file>.part) goes */
+			if (proc->property("stopped").toBool())
+			{
+				for (const auto &f : outputs) QFile::remove(QString::fromStdString(f.path + ".part"));
+				return;
+			}
+			if (code == 0 && !answer.isEmpty()) done(answer.toStdString(), {});
+			else done({}, err.isEmpty() ? vm::tr("chimera_run.no_answer") : err.split('\n').last().toStdString());
+		});
+		QObject::connect(proc, &QProcess::errorOccurred, proc, [proc, done](QProcess::ProcessError e) {
+			if (e != QProcess::FailedToStart) return;
+			proc->deleteLater();
+			done({}, vm::tr("chimera_run.not_started"));
+		});
+		proc->start(runner, args);
+		QPointer<QProcess> held(proc);
+		return [held] {
+			if (held.isNull()) return;
+			held->setProperty("stopped", true);
+			held->kill();
+		};
+	});
+	qt::QmlViewModel coreToolQml(coreTool);
 	vm::MacroToolViewModel macroTool(dispatcher, pianoRoll, session);
 	qt::QmlViewModel macroToolQml(macroTool);
 	/* Chimera's Encode Video, with the ffmpeg the bundle keeps beside the program;
@@ -1336,6 +1333,7 @@ int main(int argc, char **argv)
 	lua.add(registers);
 	lua.add(guiOverlay);
 	lua.add(surfaceViewer);
+	lua.add(coreTool);
 	lua.add(macroTool);
 	lua.add(encoder);
 	lua.add(hostInput);
@@ -1500,6 +1498,7 @@ int main(int argc, char **argv)
 		{QStringLiteral("guiOverlay"), QVariant::fromValue<QObject *>(&guiOverlayQml)},
 		{QStringLiteral("idleEye"), QVariant::fromValue<QObject *>(&idleEyeQml)},
 		{QStringLiteral("surfaceViewer"), QVariant::fromValue<QObject *>(&surfaceViewerQml)},
+		{QStringLiteral("coreTool"), QVariant::fromValue<QObject *>(&coreToolQml)},
 		{QStringLiteral("macroTool"), QVariant::fromValue<QObject *>(&macroToolQml)},
 		{QStringLiteral("encoder"), QVariant::fromValue<QObject *>(&encoderQml)},
 		{QStringLiteral("hostInput"), QVariant::fromValue<QObject *>(&hostInputQml)},
@@ -1617,7 +1616,7 @@ int main(int argc, char **argv)
 	 * --luaconsole open the Lua Console, as Chimera's */
 	{
 		static const std::pair<const char *, const char *> tools[] = {{"new-project", "newProjectWindow"},
-			{"movie-import", "movieImportWindow"}, {"ram-search", "ramSearchWindow"}, {"ram-watch", "ramWatchWindow"},
+			{"core-tool", "coreToolWindow"}, {"ram-search", "ramSearchWindow"}, {"ram-watch", "ramWatchWindow"},
 			{"hex", "hexEditorWindow"}, {"controls", "controllerConfigWindow"}, {"hotkeys", "hotkeyConfigWindow"},
 			{"themes", "themesWindow"}, {"lua", "luaConsoleWindow"}, {"tastudio", "tastudioWindow"},
 			{"undo-history", "undoHistoryWindow"}, {"project-details", "headerInfoWindow"}, {"comments", "editCommentsWindow"},

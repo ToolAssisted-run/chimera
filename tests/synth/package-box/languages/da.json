@@ -5,10 +5,6 @@
 		"game_setting.gamelogo": "Spillogo",
 		"game_setting.gamelogo.about": "Spillets eget: viser dets logo fra en fil for sig selv.",
 		"game_setting.not_the_package_s": "Ikke pakkens",
-		"import.game_missing": "spillet %1 er ikke ved hånden",
-		"import.no_movie": "ingen film: filen \"movie\" er ikke monteret",
-		"import.note": "importeret af synth-kernen",
-		"import.which_game": "hvilket spil blev denne film lavet på? (importRom)",
 		"property.cursor_x": "Kolonnen for den celle, markøren står i",
 		"property.letter": "Det, kernen efterlod i sin postkasse",
 		"property.status": "Resultatbyten for hver test-ROM",
@@ -26,6 +22,11 @@
 			"one": "Den syntetiske kerne foreslår en udfyldning på 9. Den ser %n disk og sporet i disk1.cue ved diskhastighed %2.",
 			"other": "Den syntetiske kerne foreslår en udfyldning på 9. Den ser %n diske og sporet i disk1.cue ved diskhastighed %2."
 		},
-		"suggest.nothing": "Den syntetiske kerne foreslår intet for dette spil."
+		"suggest.nothing": "Den syntetiske kerne foreslår intet for dette spil.",
+		"tool.unknown": "denne kerne har intet værktøj %1",
+		"tool.no_output": "filen, der skal skrives, er der ikke",
+		"tool.no_parts": "der blev ikke givet nogen dele",
+		"tool.empty_part": "delen %1 er tom",
+		"tool.joined": "%1 dele sat sammen, %2 byte"
 	}
 }

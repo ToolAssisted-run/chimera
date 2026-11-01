@@ -5,10 +5,6 @@
 		"game_setting.gamelogo": "Játéklogó",
 		"game_setting.gamelogo.about": "A játék saját beállítása: megjeleníti a logóját egy saját fájlból.",
 		"game_setting.not_the_package_s": "Nem a csomagé",
-		"import.game_missing": "nincs kéznél a játék: %1",
-		"import.no_movie": "nincs felvétel: a \"movie\" fájl nincs csatolva",
-		"import.note": "a synth mag importálta",
-		"import.which_game": "melyik játékon készült ez a felvétel? (importRom)",
 		"property.cursor_x": "Annak a cellának az oszlopa, amelyben a kurzor áll",
 		"property.letter": "Amit a mag a postaládájában hagyott",
 		"property.status": "Minden teszt-ROM eredménybájtja",
@@ -26,6 +22,11 @@
 			"one": "A szintetikus mag 9-es kitöltést javasol. %n lemezt és a disk1.cue sávját látja, %2 lemezsebességgel.",
 			"other": "A szintetikus mag 9-es kitöltést javasol. %n lemezt és a disk1.cue sávját látja, %2 lemezsebességgel."
 		},
-		"suggest.nothing": "A szintetikus mag semmit sem javasol ehhez a játékhoz."
+		"suggest.nothing": "A szintetikus mag semmit sem javasol ehhez a játékhoz.",
+		"tool.unknown": "ennek a magnak nincs %1 eszköze",
+		"tool.no_output": "a megírandó fájl nincs ott",
+		"tool.no_parts": "nem adtak meg részeket",
+		"tool.empty_part": "a(z) %1 rész üres",
+		"tool.joined": "%1 rész összefűzve, %2 bájt"
 	}
 }

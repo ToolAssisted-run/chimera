@@ -812,45 +812,31 @@ json.dump(d, open(p, 'w'))
 			report "E:core-log" PASS "asked for, the log names its build and package and keeps the core's words; the machine is the goldens'"
 		fi
 
-		# A MOVIE MADE ELSEWHERE (ce_project_import_movie, Game > Import ... in
-		# the frontend): the core is asked what the movie amounts to INSTEAD of
-		# being started, and asked of a project - the files offered with the
-		# movie in their slots, the import options as its settings - with the
-		# movie mounted as "movie" and a file with no slot (--mount) beside it.
-		# Its answer comes back as JSON for the frontend's own project creation.
-		# The synth reads its own movie text, so every frame must come back as an
-		# input line, the option it was given as the setting it dictates, a file
-		# mounted by name must be found as one in the project is, and a game
-		# that is not at hand must be refused in a sentence, not crash anything.
-		# The refused one is a project of no game, which only a question may
-		# open (the synth's game slot must be filled to run).
-		imovie="$here/movies/gridWalker.win.txt"
-		idir="$work/import"
-		rm -rf "$idir" && mkdir -p "$idir"
-		"$chimera_run" --new-project "$idir/import.chimeraProject" "$epkg" "$here/roms/gridWalker.testrom" \
-			--settings '{"importRom":"gridWalker.testrom","importFill":7}' > "$idir/import.make.log" 2>&1
-		ianswer="$("$chimera_run" --project "$idir/import.chimeraProject" "$epkg" --files "$here/roms" --import-movie "$imovie" 2>"$work/import.err")"
-		printf '{"title": "import", "core": {"name": "Synth", "version": "", "sha1": ""}, "files": [], "settings": {"importRom": "%s"}}\n' \
-			"elsewhere.testrom" > "$idir/mounted.chimeraProject"
-		imounted="$("$chimera_run" --project "$idir/mounted.chimeraProject" "$epkg" --import-movie "$imovie" \
-			--mount elsewhere.testrom="$here/roms/gridWalker.testrom" 2>>"$work/import.err")"
-		printf '{"title": "import", "core": {"name": "Synth", "version": "", "sha1": ""}, "files": [], "settings": {"importRom": "gone.testrom"}}\n' \
-			> "$idir/refused.chimeraProject"
-		irefused="$("$chimera_run" --project "$idir/refused.chimeraProject" "$epkg" --import-movie "$imovie" 2>>"$work/import.err")"
-		iframes="$(grep -c '^|' "$imovie")"
-		if printf '%s' "$ianswer" | python3 -c "
-import json, sys
-a = json.loads(sys.stdin.read())
-lines = [l for l in a['input'].split('\n') if l.startswith('|')]
-assert a['settings'] == {'initFillByte': 7}, a['settings']
-assert a['files'] == [{'name': 'gridWalker.testrom', 'slot': 'rom'}], a['files']
-assert a['frames'] == $iframes and len(lines) == $iframes, (a['frames'], len(lines))
-assert a['input'].startswith('[Input]') and a['input'].rstrip().endswith('[/Input]')
-" 2>"$work/import.check" && printf '%s' "$imounted" | grep -q '"files": \[{"name": "elsewhere.testrom", "slot": "rom"}\]' \
-			&& printf '%s' "$irefused" | grep -q '"error": "the game gone.testrom is not at hand"'; then
-			report "E:import-movie" PASS "asked of a project, the core's answer comes back whole ($iframes frames, its setting, its file); a file mounted by name is found; a missing game is a sentence"
+		# A CORE'S OWN TOOL (ce_package_run_tool, the Emulator menu's own items):
+		# the core is asked to run a tool INSTEAD of being started, with no game.
+		# The synth's "join" writes its parts, read under part.0, part.1, ... in
+		# the order given, into the file "joined", which goes straight to the
+		# disk where it was asked; "backwards" turns each part around. A part
+		# that is empty is refused in a sentence that names the person's file,
+		# and a tool the core does not have is refused too; a refused run
+		# leaves no file (it writes <file>.part, put in place only when done) -
+		# the files and the answers both checked, so a tool that wrote nothing
+		# cannot pass.
+		tdir="$work/tool"
+		rm -rf "$tdir" && mkdir -p "$tdir"
+		printf 'abc' > "$tdir/first.part"; printf 'de' > "$tdir/second.part"; : > "$tdir/empty.part"
+		printf 'stale contents' > "$tdir/joined.bin"
+		tdone="$("$chimera_run" --run-tool join "$epkg" --input part.0="$tdir/first.part" --input part.1="$tdir/second.part" \
+			--output joined="$tdir/joined.bin" --tool-options '{"backwards":true}' 2>"$tdir/run.err")"
+		tempty="$("$chimera_run" --run-tool join "$epkg" --input part.0="$tdir/first.part" --input part.1="$tdir/empty.part" \
+			--output joined="$tdir/refused.bin" 2>>"$tdir/run.err")"
+		tunknown="$("$chimera_run" --run-tool shuffle "$epkg" --output joined="$tdir/unknown.bin" 2>>"$tdir/run.err")"
+		if [ "$tdone" = '{"done": "joined 2 parts, 5 bytes"}' ] && [ "$(cat "$tdir/joined.bin")" = "cbaed" ] \
+			&& [ "$tempty" = '{"refused": "the part empty.part is empty"}' ] && [ ! -e "$tdir/refused.bin" ] && [ ! -e "$tdir/refused.bin.part" ] \
+			&& [ "$tunknown" = '{"refused": "this core has no tool shuffle"}' ]; then
+			report "E:core-tool" PASS "a tool of the core's own wrote its file on the disk (5 bytes, parts in their order, turned around as asked, the old contents gone); an empty part and an unknown tool are refused in a sentence, and leave no file"
 		else
-			report "E:import-movie" FAIL "$(tail -1 "$work/import.check" 2>/dev/null) refused=[$irefused] (see work/import.err)"
+			report "E:core-tool" FAIL "done=[$tdone] file=[$(cat "$tdir/joined.bin" 2>/dev/null)] empty=[$tempty] unknown=[$tunknown] (see work/tool/run.err)"
 		fi
 
 		# THE OTHER QUESTIONS ARE ASKED OF A PROJECT TOO (user-decided,
@@ -2353,9 +2339,9 @@ REOPENPY
 		fi
 
 		# (The helpers New Project asks before a project is made - suggested
-		# settings, compile sessions, a movie import - are chimera-run's in
-		# Chimera's window, and level E asks each of them of a project:
-		# E:suggest, E:precompile, E:import-movie.)
+		# settings, compile sessions - are chimera-run's in Chimera's window,
+		# and level E asks each of them of a project: E:suggest, E:precompile.
+		# A core's own tools run there too, with no project: E:core-tool.)
 
 		# --- keybinds ship with the package ---
 		# The frontend has no bindings of its own: a controller it has never seen is played however

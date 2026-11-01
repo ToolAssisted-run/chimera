@@ -74,6 +74,7 @@ vm_lib = static_library(
     'viewmodel/src/comm_vm.cpp',
     'viewmodel/src/sql_vm.cpp',
     'viewmodel/src/surface_viewer_vm.cpp',
+    'viewmodel/src/core_tool_vm.cpp',
     'viewmodel/src/macro_tool_vm.cpp',
     'viewmodel/src/project_details_vm.cpp',
     'viewmodel/src/cores_vm.cpp',
@@ -498,6 +499,14 @@ if qt_dep.found()
       override_options: ['cpp_std=c++20'],
     )
     test('emulator menu', test_emulator_menu, env: ['QT_QPA_PLATFORM=offscreen', 'QT_QUICK_BACKEND=software'], timeout: 60)
+    # Tools > Core-Specific Tools: every installed core's own tools, by core (owner, 2026-11-01)
+    test_core_tools_menu = executable(
+      'test-core-tools-menu',
+      ['qt/tests/test_core_tools_menu.cpp', qt_rcc],
+      dependencies: [qt_test_dep],
+      override_options: ['cpp_std=c++20'],
+    )
+    test('core tools menu', test_core_tools_menu, env: ['QT_QPA_PLATFORM=offscreen', 'QT_QUICK_BACKEND=software'], timeout: 60)
     # files dropped on a slot of New Project, every one of them, not only
     # the first (issue 425): the window over the program's view model
     test_new_project_drop = executable(

@@ -5,10 +5,6 @@
 		"game_setting.gamelogo": "Logo hry",
 		"game_setting.gamelogo.about": "Vlastní nastavení této hry: zobrazuje její logo z jejího vlastního souboru.",
 		"game_setting.not_the_package_s": "Není z balíčku",
-		"import.game_missing": "hra %1 není po ruce",
-		"import.no_movie": "žádný záznam: soubor \"movie\" není připojen",
-		"import.note": "importováno jádrem synth",
-		"import.which_game": "na jaké hře byl tento záznam pořízen? (importRom)",
 		"property.cursor_x": "Sloupec buňky, ve které je kurzor",
 		"property.letter": "Co jádro nechalo ve své poštovní schránce",
 		"property.status": "Výsledný bajt každé testovací ROM",
@@ -28,6 +24,11 @@
 			"few": "Syntetické jádro navrhuje výplň 9. Vidí %n disky a stopu disk1.cue, při rychlosti disku %2.",
 			"other": "Syntetické jádro navrhuje výplň 9. Vidí %n disků a stopu disk1.cue, při rychlosti disku %2."
 		},
-		"suggest.nothing": "Syntetické jádro pro tuto hru nic nenavrhuje."
+		"suggest.nothing": "Syntetické jádro pro tuto hru nic nenavrhuje.",
+		"tool.unknown": "toto jádro nemá nástroj %1",
+		"tool.no_output": "soubor k zápisu tu není",
+		"tool.no_parts": "nebyly zadány žádné části",
+		"tool.empty_part": "část %1 je prázdná",
+		"tool.joined": "spojeno částí: %1, bajtů: %2"
 	}
 }

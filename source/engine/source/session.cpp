@@ -36,6 +36,7 @@ using chimera::lang::tr;
 #include <condition_variable>
 #include <cstdio>
 #include <cstring>
+#include <filesystem>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -494,12 +495,21 @@ extern "C" void ce_cache_announce(int32_t precompile);
 /* Sessions that ask the core one question instead of starting it: open stops
  * before Init, calls the named export (no arguments, a NUL-terminated string
  * back) and keeps the answer. ce_project_suggest_settings asks SuggestSettings,
- * ce_project_import_movie asks ImportMovie. nullptr is an ordinary session. One per
+ * ce_package_run_tool asks RunTool. nullptr is an ordinary session. One per
  * thread: process-wide, a question asked on one thread while another thread
  * opened a session turned that session into a question, with no frame
  * export, and its first frame called a null pointer (engine analysis,
  * 2026-10-18). */
 static thread_local const char *s_answerExport = nullptr;
+
+/* The files a core's tool writes (ce_package_run_tool): mounted on the disk,
+ * writable, after every other file. Set only around that call, on its thread;
+ * the vector is the caller's. */
+struct ToolOutput
+{
+	std::string name, path;
+};
+static thread_local const std::vector<ToolOutput> *t_toolOutputs = nullptr;
 
 /* precompile sessions: asked for before open, on the thread that opens, like
  * the question above */
@@ -2207,6 +2217,16 @@ static ce_session *openSession(
 		if (!r.ok()) return abort(tr("engine.mounting", {extra_names[i], r.errorMessage}));
 	}
 
+	/* what a core's tool writes, straight to the disk */
+	if (t_toolOutputs != nullptr)
+	{
+		for (const ToolOutput &out : *t_toolOutputs)
+		{
+			host->wbx_mount_file_path_writable(s->obj, out.name.c_str(), out.path.c_str(), &r);
+			if (!r.ok()) return abort(tr("engine.mounting", {out.name, r.errorMessage}));
+		}
+	}
+
 	/* The core log's request (ce_core_log): an empty file a core checks for
 	 * and never reads, so the machine is the same with the log on or off. A
 	 * caller that mounted its own "corelog" keeps it. */
@@ -2225,8 +2245,8 @@ static ce_session *openSession(
 	/* A session that only asks ends here: the files are mounted exactly as a
 	 * run would have them, and the core is asked its question instead of
 	 * being started - what it suggests for these files (SuggestSettings), or
-	 * what a movie it is handed amounts to (ImportMovie). The caller reads the
-	 * answer and frees the session; nothing else ever sees one. */
+	 * one of its tools run (RunTool). The caller reads the answer and frees
+	 * the session; nothing else ever sees one. */
 	if (s_answerExport != nullptr)
 	{
 		std::string ignored;
@@ -2632,8 +2652,7 @@ static ce_session *openMachine(
  * in engine.h: no caller outside asks for it. */
 static constexpr uint32_t kOpenToAsk = 0x80000000u;
 
-/* more_names/more_paths: files mounted after the project's own, by path - a
- * movie being imported and the files offered with it (ce_project_import_movie) */
+/* more_names/more_paths: files mounted after the project's own, by path */
 static ce_session *openProjectSession(
 	const char *package_path, ce_project *project,
 	const char *settings_overrides_json,
@@ -5017,21 +5036,147 @@ extern "C" const char *ce_project_suggest_settings(
 		firmware_ids, firmware_data, firmware_lens, firmware_count, len_out, error_out);
 }
 
-extern "C" const char *ce_project_import_movie(
-	const char *package_path, ce_project *project, const char *movie_path,
-	const char *const *mount_names, const char *const *mount_paths, int32_t mount_count,
-	const char *const *firmware_ids, const uint8_t *const *firmware_data,
-	const uint64_t *firmware_lens, int32_t firmware_count,
-	uint64_t *len_out, const char **error_out)
+extern "C" const char *ce_package_run_tool(const char *package_path, const char *tool_id,
+	const char *const *input_names, const char *const *input_paths, int32_t input_count,
+	const char *const *output_names, const char *const *output_paths, int32_t output_count,
+	const char *options_json, uint64_t *len_out, const char **error_out)
 {
-	std::vector<const char *> names{ "movie" }, paths{ movie_path };
-	for (int32_t i = 0; i < mount_count; i++)
+	/* never destroyed: a thread_local std::string is freed twice by a mingw
+	 * DLL at exit (thread_string.hpp, chimera#123) */
+	static thread_local chimera::ThreadString answer;
+	answer->clear();
+	if (len_out != nullptr) *len_out = 0;
+	if (error_out != nullptr) *error_out = nullptr;
+	if (package_path == nullptr || tool_id == nullptr || tool_id[0] == '\0') return openRefused(tr("engine.tool_not_named"), error_out), nullptr;
+	const char *hostError = nullptr;
+	const chimera::HostApi *host = chimera::hostApi(&hostError);
+	if (host == nullptr) return openRefused(hostError != nullptr ? hostError : "", error_out), nullptr;
+	if (host->wbx_mount_file_path_writable == nullptr) return openRefused(tr("engine.tool_host_too_old"), error_out), nullptr;
+
+	/* What the core is asked, as a file of its own ("tool"): which tool, the
+	 * options the person chose, and the name each picked file had - the core
+	 * reads a file by its mount name, and a person's names are worth keeping
+	 * (a decompressed game is called what the compressed one was). */
+	auto baseName = [](const char *path) {
+		std::string p = path != nullptr ? path : "";
+		const size_t cut = p.find_last_of("/\\");
+		return cut == std::string::npos ? p : p.substr(cut + 1);
+	};
+	cJSON *request = cJSON_CreateObject();
+	cJSON_AddStringToObject(request, "tool", tool_id);
+	/* the package's own hash and version, for a tool whose result names its
+	 * core (a project it writes pins the package, as New Project does) */
 	{
-		names.push_back(mount_names[i]);
-		paths.push_back(mount_paths[i]);
+		std::string sha1, version;
+		const char *packageError = nullptr;
+		if (ce_package *pkg = ce_package_open(package_path, &packageError))
+		{
+			if (const char *sha = ce_package_sha1(pkg)) sha1 = sha;
+			uint64_t len = 0;
+			if (const uint8_t *cfg = ce_package_entry(pkg, "waterbox.config", &len))
+				if (cJSON *c = cJSON_ParseWithLength(reinterpret_cast<const char *>(cfg), static_cast<size_t>(len)))
+				{
+					const cJSON *v = cJSON_GetObjectItemCaseSensitive(c, "version");
+					if (cJSON_IsString(v)) version = v->valuestring;
+					cJSON_Delete(c);
+				}
+			ce_package_free(pkg);
+		}
+		cJSON *pkgInfo = cJSON_AddObjectToObject(request, "package");
+		cJSON_AddStringToObject(pkgInfo, "sha1", sha1.c_str());
+		cJSON_AddStringToObject(pkgInfo, "version", version.c_str());
 	}
-	return askCore("ImportMovie", package_path, project, names.data(), paths.data(), static_cast<int32_t>(names.size()),
-		firmware_ids, firmware_data, firmware_lens, firmware_count, len_out, error_out);
+	cJSON *options = options_json != nullptr && options_json[0] != '\0' ? cJSON_Parse(options_json) : nullptr;
+	if (options == nullptr || !cJSON_IsObject(options))
+	{
+		if (options != nullptr) cJSON_Delete(options);
+		options = cJSON_CreateObject();
+	}
+	cJSON_AddItemToObject(request, "options", options);
+	cJSON *inputs = cJSON_AddObjectToObject(request, "inputs");
+	for (int32_t i = 0; i < input_count; i++) cJSON_AddStringToObject(inputs, input_names[i], baseName(input_paths[i]).c_str());
+	cJSON *outputs = cJSON_AddObjectToObject(request, "outputs");
+	/* each written as <path>.part, and put in its place only when the tool
+	 * says it is done: a refusal, a failure or a stop leaves what was there */
+	std::vector<ToolOutput> written;
+	for (int32_t i = 0; i < output_count; i++)
+	{
+		cJSON_AddStringToObject(outputs, output_names[i], baseName(output_paths[i]).c_str());
+		written.push_back({ output_names[i], std::string(output_paths[i]) + ".part" });
+	}
+	char *printed = cJSON_PrintUnformatted(request);
+	cJSON_Delete(request);
+	const std::string requestText = printed != nullptr ? printed : "{}";
+	cJSON_free(printed);
+
+	/* the picked files by path, then the request */
+	std::vector<const char *> names, paths;
+	std::vector<const uint8_t *> data;
+	std::vector<uint64_t> lens;
+	for (int32_t i = 0; i < input_count; i++)
+	{
+		names.push_back(input_names[i]);
+		paths.push_back(input_paths[i]);
+		data.push_back(nullptr);
+		lens.push_back(0);
+	}
+	names.push_back("tool");
+	paths.push_back(nullptr);
+	data.push_back(reinterpret_cast<const uint8_t *>(requestText.data()));
+	lens.push_back(requestText.size());
+
+	struct Running
+	{
+		explicit Running(const std::vector<ToolOutput> *outs) { s_answerExport = "RunTool"; t_toolOutputs = outs; }
+		~Running() { s_answerExport = nullptr; t_toolOutputs = nullptr; }
+	};
+	ce_session *s = nullptr;
+	{
+		Running running(&written);
+		/* no game: a tool is not a machine being played */
+		s = openMachine(package_path, nullptr, 0, nullptr, nullptr, nullptr, nullptr, nullptr, 0,
+			names.data(), data.data(), lens.data(), paths.data(), static_cast<int32_t>(names.size()), error_out);
+	}
+	if (s == nullptr) return nullptr;
+	*answer = s->suggestion;
+	/* Closing what the tool wrote says whether the disk took all of it. A
+	 * core that left a file open has it closed when the machine goes. */
+	std::string unfinished;
+	for (const ToolOutput &out : written)
+	{
+		chimera::WbxReturn r{};
+		host->wbx_unmount_file(s->obj, out.name.c_str(), nullptr, 0, &r);
+		if (!r.ok() && unfinished.empty() && std::strstr(r.errorMessage, "disk") != nullptr)
+		{
+			std::string shown = baseName(out.path.c_str());
+			shown.resize(shown.size() - 5);   /* without ".part" */
+			unfinished = tr("engine.tool_output_unfinished", {shown, std::string(r.errorMessage)});
+		}
+	}
+	ce_session_free(s);
+	bool done = false;
+	if (cJSON *a = cJSON_Parse(answer->c_str()))
+	{
+		done = cJSON_IsString(cJSON_GetObjectItemCaseSensitive(a, "done"));
+		cJSON_Delete(a);
+	}
+	for (int32_t i = 0; i < output_count; i++)
+	{
+		const std::filesystem::path part = std::filesystem::u8path(written[static_cast<size_t>(i)].path);
+		std::error_code ec;
+		if (done && unfinished.empty())
+		{
+			std::filesystem::rename(part, std::filesystem::u8path(output_paths[i]), ec);
+			if (ec && unfinished.empty())
+				unfinished = tr("engine.tool_output_unfinished", {baseName(output_paths[i]), ec.message()});
+		}
+		else
+			std::filesystem::remove(part, ec);
+	}
+	if (!unfinished.empty()) return openRefused(std::move(unfinished), error_out), nullptr;
+	if (answer->empty()) return openRefused(tr("engine.tool_no_answer", {tool_id}), error_out), nullptr;
+	if (len_out != nullptr) *len_out = answer->size();
+	return answer->c_str();
 }
 
 extern "C" int32_t ce_session_precompile_done(const ce_session *s)

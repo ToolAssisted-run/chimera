@@ -5,10 +5,6 @@
 		"game_setting.gamelogo": "Logotipo do jogo",
 		"game_setting.gamelogo.about": "Próprio deste jogo: mostra seu logotipo, a partir de um arquivo próprio.",
 		"game_setting.not_the_package_s": "Não é do pacote",
-		"import.game_missing": "o jogo %1 não está à mão",
-		"import.no_movie": "nenhum filme: o arquivo \"movie\" não está montado",
-		"import.note": "importado pelo núcleo synth",
-		"import.which_game": "em qual jogo este filme foi feito? (importRom)",
 		"property.cursor_x": "Coluna da célula em que o cursor está",
 		"property.letter": "O que o núcleo deixou em sua caixa de correio",
 		"property.status": "O byte de resultado de cada ROM de teste",
@@ -26,6 +22,11 @@
 			"one": "O núcleo sintético sugere um preenchimento de 9. Ele vê %n disco e a faixa de disk1.cue, à velocidade de disco %2.",
 			"other": "O núcleo sintético sugere um preenchimento de 9. Ele vê %n discos e a faixa de disk1.cue, à velocidade de disco %2."
 		},
-		"suggest.nothing": "O núcleo sintético não sugere nada para este jogo."
+		"suggest.nothing": "O núcleo sintético não sugere nada para este jogo.",
+		"tool.unknown": "este núcleo não tem a ferramenta %1",
+		"tool.no_output": "o arquivo a escrever não está lá",
+		"tool.no_parts": "nenhuma parte foi dada",
+		"tool.empty_part": "a parte %1 está vazia",
+		"tool.joined": "%1 partes unidas, %2 bytes"
 	}
 }

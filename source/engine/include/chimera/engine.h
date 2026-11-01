@@ -1090,28 +1090,30 @@ CE_API const char *ce_project_suggest_settings(
 	const uint64_t *firmware_lens, int32_t firmware_count,
 	uint64_t *len_out, const char **error_out);
 
-/* What a movie made elsewhere amounts to, as this core reads it - a Doom
- * demo, say. The same session as ce_project_suggest_settings, asking the
- * core's optional ImportMovie export instead of SuggestSettings. The project
- * holds the files the person offered that have a slot, and the import options
- * the core declares (movieImport in waterbox.config) as its settings; the
- * movie is mounted as "movie", and each mount_names[i] from mount_paths[i]
- * beside it - a file the core may take as firmware, whose firmware id only
- * its answer can say. The machine is thrown away unstarted.
+/* Runs one of a core's own tools (the package's "tools", which the window
+ * puts in its Emulator menu) - a job whose result is files, such as a
+ * compressed game decompressed. No game is loaded and nothing is played: the
+ * machine is made, the core's optional RunTool export is asked, and the
+ * machine is thrown away.
  *
- * Returns the core's JSON answer: {"error": "<a sentence>"} when it refuses,
- * otherwise the configuration the movie dictates - "settings", "firmware"
- * [{id, sha1}], "files" [{name, sha1, slot}] in load order, "notes" - and
- * "input", the movie as Chimera's input log. "" when the core has no such
- * export; NULL with *error_out when the package or the project cannot be
- * opened. Nothing is applied: the frontend builds the project from it with
- * its own project creation. */
-CE_API const char *ce_project_import_movie(
-	const char *package_path, ce_project *project, const char *movie_path,
-	const char *const *mount_names, const char *const *mount_paths, int32_t mount_count,
-	const char *const *firmware_ids, const uint8_t *const *firmware_data,
-	const uint64_t *firmware_lens, int32_t firmware_count,
-	uint64_t *len_out, const char **error_out);
+ * Each input_paths[i] is mounted read-only as input_names[i], each
+ * output_paths[i] as output_names[i], writable and straight to the disk:
+ * written as output_paths[i] + ".part", which is put in its place only when
+ * the core says it is done, and removed otherwise, so a refusal, a failure
+ * or a stopped run leaves what was there. The core also finds a file
+ * "tool": {"tool": "<tool_id>", "package": {"sha1", "version"}, "options":
+ * <options_json>, "inputs": {name: "<the picked file's own name>"},
+ * "outputs": {name: "<file name>"}}.
+ *
+ * Returns the core's JSON answer, its texts in the window's language:
+ * {"done": "<a sentence>"} or {"refused": "<a sentence>"}. NULL with
+ * *error_out when the core cannot be started, has no RunTool, or a file it
+ * wrote did not all reach the disk. Blocks for as long as the tool runs:
+ * the window calls it in a process of its own. */
+CE_API const char *ce_package_run_tool(const char *package_path, const char *tool_id,
+	const char *const *input_names, const char *const *input_paths, int32_t input_count,
+	const char *const *output_names, const char *const *output_paths, int32_t output_count,
+	const char *options_json, uint64_t *len_out, const char **error_out);
 CE_API int64_t ce_session_button_count(const ce_session *s);
 CE_API const char *ce_session_button_name(const ce_session *s, int64_t index);
 CE_API int64_t ce_session_axis_count(const ce_session *s);

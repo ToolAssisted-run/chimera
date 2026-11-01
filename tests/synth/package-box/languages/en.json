@@ -5,10 +5,6 @@
 		"game_setting.gamelogo": "Game Logo",
 		"game_setting.gamelogo.about": "This game's own: shows its logo, from a file of its own.",
 		"game_setting.not_the_package_s": "Not the package's",
-		"import.game_missing": "the game %1 is not at hand",
-		"import.no_movie": "no movie: the file \"movie\" is not mounted",
-		"import.note": "imported by the synth core",
-		"import.which_game": "which game was this movie made on? (importRom)",
 		"property.cursor_x": "Column of the cell the cursor is in",
 		"property.letter": "What the core left in its mailbox",
 		"property.status": "Every test rom's result byte",
@@ -26,6 +22,11 @@
 			"one": "The synthetic core suggests a fill of 9. It sees %n disk and the track of disk1.cue, at disk speed %2.",
 			"other": "The synthetic core suggests a fill of 9. It sees %n disks and the track of disk1.cue, at disk speed %2."
 		},
-		"suggest.nothing": "The synthetic core suggests nothing for this game."
+		"suggest.nothing": "The synthetic core suggests nothing for this game.",
+		"tool.unknown": "this core has no tool %1",
+		"tool.no_output": "the file to write is not there",
+		"tool.no_parts": "no parts were given",
+		"tool.empty_part": "the part %1 is empty",
+		"tool.joined": "joined %1 parts, %2 bytes"
 	}
 }

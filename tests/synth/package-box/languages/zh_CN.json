@@ -5,10 +5,6 @@
 		"game_setting.gamelogo": "游戏标志",
 		"game_setting.gamelogo.about": "此游戏专有：从它自己的文件显示其标志。",
 		"game_setting.not_the_package_s": "不属于软件包",
-		"import.game_missing": "游戏 %1 不在手边",
-		"import.no_movie": "没有录像：文件 \"movie\" 未挂载",
-		"import.note": "由 synth 核心导入",
-		"import.which_game": "这个录像是在哪个游戏上制作的？(importRom)",
 		"property.cursor_x": "光标所在单元格的列",
 		"property.letter": "核心在其信箱中留下的内容",
 		"property.status": "每个测试 ROM 的结果字节",
@@ -24,6 +20,11 @@
 		"suggest.fill_disks_track": {
 			"other": "合成核心建议填充值为 9。它看到 %n 张磁盘和 disk1.cue 的音轨，磁盘速度为 %2。"
 		},
-		"suggest.nothing": "合成核心对此游戏没有任何建议。"
+		"suggest.nothing": "合成核心对此游戏没有任何建议。",
+		"tool.unknown": "此核心没有工具 %1",
+		"tool.no_output": "要写入的文件不存在",
+		"tool.no_parts": "没有给出任何部分",
+		"tool.empty_part": "部分 %1 是空的",
+		"tool.joined": "已合并 %1 个部分，%2 字节"
 	}
 }

@@ -52,6 +52,7 @@ ApplicationWindow {
     required property QtObject traceLogger
     required property QtObject registersTool
     required property QtObject surfaceViewer
+    required property QtObject coreTool
     required property QtObject guiOverlay
     required property QtObject idleEye
     required property QtObject macroTool
@@ -658,6 +659,11 @@ ApplicationWindow {
                     icon.source: root.mcp.started ? "qrc:/chimera/menu/McpServerStarted.png" : "qrc:/chimera/menu/McpServer.png"
                     onTriggered: { root.bring(mcpServerWindow) }
                 }
+                // every installed core's own tools, whatever is open (owner, 2026-11-01)
+                CoreToolsMenu {
+                    cores: root.cores
+                    onOpenCoreTool: (core, id) => { root.coreTool.run("open", [core, id]); root.bring(coreToolWindow) }
+                }
                 MenuDivider {}
                 Action { id: ramWatchAction; property string hotkey: "RAM Watch"; text: qsTrId("main.ram_watch"); icon.source: "qrc:/chimera/menu/RamWatch.png"; onTriggered: { root.bring(ramWatchWindow) } }
                 Action { id: ramSearchAction; property string hotkey: "RAM Search"; text: qsTrId("main.ram_search"); icon.source: "qrc:/chimera/menu/RamSearch.png"; onTriggered: { root.bring(ramSearchWindow) } }
@@ -672,8 +678,6 @@ ApplicationWindow {
                     if (tool === "registers") root.bring(cpuRegistersWindow)
                     else if (tool === "surfaces") root.bring(surfaceViewerWindow)
                     else if (tool === "trace") root.bring(traceLoggerWindow)
-                    // the core's importer: its form first, then the wizard on its answers
-                    else if (tool === "import") { root.newProject.run("chooseCore", [root.session.coreName]); root.bring(movieImportWindow) }
                 }
                 onExportSaveData: {
                     const names = root.session.run("saveDataFiles")
@@ -952,25 +956,13 @@ ApplicationWindow {
             }
         }
     }
-    MovieImport {
-        id: movieImportWindow
-        vm: root.newProject
+    // one of a core's own tools (Tools > Core-Specific Tools)
+    CoreTool {
+        id: coreToolWindow
+        vm: root.coreTool
         mainWindow: root
         themeColor: root.osdColor
         visible: false
-        // what the core noted, as Chimera says it, before the wizard
-        onTaken: {
-            if (root.newProject.importSummary !== "") importNotesDialog.open()
-            else { root.bring(newProjectWindow) }
-        }
-    }
-    MessageDialog {
-        id: importNotesDialog
-        title: movieImportWindow.title
-        text: root.newProject.importSummary
-        buttons: MessageDialog.Ok
-        onAccepted: { root.bring(newProjectWindow) }
-        onRejected: { root.bring(newProjectWindow) }
     }
     // the project's own window, beside this one: open exactly when a project is
     TAStudio {

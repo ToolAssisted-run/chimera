@@ -5,10 +5,6 @@
 		"game_setting.gamelogo": "Spellogotyp",
 		"game_setting.gamelogo.about": "Spelets eget: visar dess logotyp, från en egen fil.",
 		"game_setting.not_the_package_s": "Inte paketets",
-		"import.game_missing": "spelet %1 finns inte till hands",
-		"import.no_movie": "ingen inspelning: filen \"movie\" är inte monterad",
-		"import.note": "importerad av synth-kärnan",
-		"import.which_game": "vilket spel gjordes den här inspelningen på? (importRom)",
 		"property.cursor_x": "Kolumnen för cellen som markören står i",
 		"property.letter": "Det som kärnan lämnade i sin brevlåda",
 		"property.status": "Resultatbyten för varje test-ROM",
@@ -26,6 +22,11 @@
 			"one": "Den syntetiska kärnan föreslår en fyllning på 9. Den ser %n disk och spåret i disk1.cue, med diskhastighet %2.",
 			"other": "Den syntetiska kärnan föreslår en fyllning på 9. Den ser %n diskar och spåret i disk1.cue, med diskhastighet %2."
 		},
-		"suggest.nothing": "Den syntetiska kärnan föreslår inget för detta spel."
+		"suggest.nothing": "Den syntetiska kärnan föreslår inget för detta spel.",
+		"tool.unknown": "den här kärnan har inget verktyg %1",
+		"tool.no_output": "filen som ska skrivas finns inte",
+		"tool.no_parts": "inga delar angavs",
+		"tool.empty_part": "delen %1 är tom",
+		"tool.joined": "%1 delar sammanfogade, %2 byte"
 	}
 }

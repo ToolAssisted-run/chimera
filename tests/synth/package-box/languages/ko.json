@@ -5,10 +5,6 @@
 		"game_setting.gamelogo": "게임 로고",
 		"game_setting.gamelogo.about": "이 게임 전용: 자체 파일에서 로고를 표시합니다.",
 		"game_setting.not_the_package_s": "패키지의 것이 아님",
-		"import.game_missing": "게임 %1이(가) 가까이에 없습니다",
-		"import.no_movie": "무비 없음: 파일 \"movie\"이(가) 마운트되지 않았습니다",
-		"import.note": "synth 코어가 가져옴",
-		"import.which_game": "이 무비는 어떤 게임에서 만들어졌습니까? (importRom)",
 		"property.cursor_x": "커서가 있는 셀의 열",
 		"property.letter": "코어가 우편함에 남긴 것",
 		"property.status": "각 테스트 ROM의 결과 바이트",
@@ -24,6 +20,11 @@
 		"suggest.fill_disks_track": {
 			"other": "합성 코어가 채우기 값으로 9를 제안합니다. 디스크 %n개와 disk1.cue의 트랙을 디스크 속도 %2(으)로 봅니다."
 		},
-		"suggest.nothing": "합성 코어는 이 게임에 대해 아무것도 제안하지 않습니다."
+		"suggest.nothing": "합성 코어는 이 게임에 대해 아무것도 제안하지 않습니다.",
+		"tool.unknown": "이 코어에는 도구 %1이(가) 없습니다",
+		"tool.no_output": "쓸 파일이 없습니다",
+		"tool.no_parts": "부분이 주어지지 않았습니다",
+		"tool.empty_part": "부분 %1이(가) 비어 있습니다",
+		"tool.joined": "%1개 부분을 합쳤습니다, %2바이트"
 	}
 }

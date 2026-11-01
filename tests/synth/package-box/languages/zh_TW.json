@@ -5,10 +5,6 @@
 		"game_setting.gamelogo": "遊戲標誌",
 		"game_setting.gamelogo.about": "此遊戲專屬：從它自己的檔案顯示其標誌。",
 		"game_setting.not_the_package_s": "不屬於套件",
-		"import.game_missing": "遊戲 %1 不在手邊",
-		"import.no_movie": "沒有影片：檔案 \"movie\" 未掛載",
-		"import.note": "由 synth 核心匯入",
-		"import.which_game": "這個影片是在哪個遊戲上製作的？(importRom)",
 		"property.cursor_x": "游標所在儲存格的欄",
 		"property.letter": "核心在其信箱中留下的內容",
 		"property.status": "每個測試 ROM 的結果位元組",
@@ -24,6 +20,11 @@
 		"suggest.fill_disks_track": {
 			"other": "合成核心建議填充值為 9。它看到 %n 張磁碟和 disk1.cue 的音軌，磁碟速度為 %2。"
 		},
-		"suggest.nothing": "合成核心對此遊戲沒有任何建議。"
+		"suggest.nothing": "合成核心對此遊戲沒有任何建議。",
+		"tool.unknown": "此核心沒有工具 %1",
+		"tool.no_output": "要寫入的檔案不存在",
+		"tool.no_parts": "沒有給出任何部分",
+		"tool.empty_part": "部分 %1 是空的",
+		"tool.joined": "已合併 %1 個部分，%2 位元組"
 	}
 }

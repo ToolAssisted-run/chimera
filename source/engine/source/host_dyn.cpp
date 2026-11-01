@@ -96,6 +96,13 @@ void loadOnce()
 	/* the core log, which an older host cannot keep */
 	if (!g_ok || !bind(g_api.wbx_set_output_file, "wbx_set_output_file")) g_api.wbx_set_output_file = nullptr;
 	if (!g_ok || !bind(g_api.wbx_set_clock_start, "wbx_set_clock_start")) g_api.wbx_set_clock_start = nullptr;
+	/* a core's tools, as a pair: writing without closing is no use */
+	if (!g_ok || !(bind(g_api.wbx_mount_file_path_writable, "wbx_mount_file_path_writable")
+			&& bind(g_api.wbx_unmount_file, "wbx_unmount_file")))
+	{
+		g_api.wbx_mount_file_path_writable = nullptr;
+		g_api.wbx_unmount_file = nullptr;
+	}
 	/* and the in-memory form of it, which an older host does not have */
 	if (!g_ok || !bind(g_api.wbx_compose_delta_mem, "wbx_compose_delta_mem")) g_api.wbx_compose_delta_mem = nullptr;
 

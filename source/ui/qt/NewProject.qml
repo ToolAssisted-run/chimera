@@ -6,9 +6,8 @@
 // file, skipped for a package that takes none. 3: the settings, with the
 // machine's presets above them and what the core suggests for the game.
 // 4: the firmware those decisions call for, skipped when they call for
-// none. A project made from an imported movie asks where it is saved. A
-// dialog of the main window, as Chimera's. Layout and bindings only, over
-// the newProject view model.
+// none. A dialog of the main window, as Chimera's. Layout and bindings
+// only, over the newProject view model.
 import QtQuick
 import QtQuick.Controls
 import ChimeraDialogs
@@ -64,8 +63,6 @@ ApplicationWindow {
         // refused for its files: the files page, with why, as Chimera's went back to it
         function onFilesRefusedChanged() { if (win.vm.filesRefused) { win.showPage(1); win.said = win.vm.status } }
     }
-    // a path as a file dialog takes it
-    function urlOf(path) { return localFiles.folderUrl(path) }
     // a command whose refusal is said on the wizard's line
     function run(command, args) {
         win.vm.run(command, args || [])
@@ -119,8 +116,6 @@ ApplicationWindow {
         else win.showPage(next)
     }
     function create() {
-        // a project made from an imported movie is saved at once, where asked
-        if (win.vm.imported) { importSaveDialog.open(); return }
         win.askFirst(() => {
             win.run("create")
             if (win.vm.error !== "" && win.vm.clockWrong) win.showPage(2)
@@ -156,17 +151,6 @@ ApplicationWindow {
         checkBoxText: qsTrId("new_project.include_sub_folders")
         checkBoxChecked: true
         onAccepted: win.run("scanFolder", [selectedFolder, checkBoxChecked])
-    }
-    FileDialog {
-        id: importSaveDialog
-        title: qsTrId("new_project.save_the_imported_project")
-        fileMode: FileDialog.SaveFile
-        defaultSuffix: "chimeraProject"
-        nameFilters: [qsTrId("new_project.tas_project_files_chimeraproject")]
-        // beside the movie, named after it
-        currentFolder: win.urlOf(win.vm.importMovie.replace(/[\\/][^\\/]*$/, ""))
-        selectedFile: win.vm.importMovie === "" ? "" : win.urlOf(win.vm.importMovie.replace(/\.[^.\\/]*$/, "") + ".chimeraProject")
-        onAccepted: win.askFirst(() => win.run("create", [selectedFile]))
     }
 
     component Heading: Label { Layout.fillWidth: true; Layout.bottomMargin: 10; elide: Text.ElideRight }

@@ -60,7 +60,8 @@
     <file alias="themes/dark.json">themes/dark.json</file>
     <file>SettingsList.qml</file>
     <file>NewProject.qml</file>
-    <file>MovieImport.qml</file>
+    <file>CoreTool.qml</file>
+    <file>CoreToolsMenu.qml</file>
     <file>LuaConsole.qml</file>
     <file>WindowOptions.qml</file>
     <file>TAStudio.qml</file>

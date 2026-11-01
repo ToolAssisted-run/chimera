@@ -28,6 +28,7 @@ CoresViewModel::CoresViewModel(Dispatcher &dispatcher) : ViewModel("cores", disp
 	expose("shows", "which kinds of core the Core Manager lists: 0 all, 1 the emulators, 2 the games", shows, true);
 	expose("managerHeader", "the Core Manager's two lines over the list: the folder and how many cores, and how a core arrives", managerHeader);
 	expose("managerStatus", "the Core Manager's line under the list", managerStatus, true);
+	expose("coreTools", "every installed core's own tools, for Tools > Core-Specific Tools: a JSON list of {core, package, tools} by core", coreTools);
 	rows("manager", "one row a core, as Chimera's Core Manager lists it (the emulators, then the games, each by name, through "
 		"Show): core, type, systems, version (the newest, and how many more), size, gameCore", managerRows_);
 	command("refreshList", "looks at the cores folder again and says how many cores are there (Refresh List)", {},
@@ -280,6 +281,8 @@ void CoresViewModel::scan()
 				take(cfg.find("extensions"));
 				if (const json::Json *machines = cfg.find("machines"))
 					for (const json::Json &m : machines->items) take(m.find("extensions"));
+				if (const json::Json *t = cfg.find("tools"); t != nullptr && t->kind == json::Json::Kind::Array && !t->items.empty())
+					c.tools = json::write(*t);
 				if (!c.coreName.empty()) found.push_back(std::move(c));
 			}
 			ce_package_free(p);
@@ -330,6 +333,26 @@ void CoresViewModel::scan()
 		if (!c.refused.empty()) c.line += "  -  " + c.refused;
 	}
 	const int64_t n = static_cast<int64_t>(found.size());
+	/* the tools: each core's newest package that runs here, once a core */
+	json::Json toolList;
+	toolList.kind = json::Json::Kind::Array;
+	for (size_t i = 0; i < found.size(); i++)
+	{
+		const Core &c = found[i];
+		if (c.tools.empty() || !c.refused.empty()) continue;
+		bool listed = false;
+		for (const json::Json &e : toolList.items)
+			if (const json::Json *name = e.find("core"); name != nullptr && name->text == c.coreName) listed = true;
+		if (listed) continue;
+		json::Json entry, tools;
+		std::string terr;
+		if (!json::parse(c.tools, tools, terr)) continue;
+		entry.kind = json::Json::Kind::Object;
+		entry.members.emplace_back("core", json::Json::string(c.coreName));
+		entry.members.emplace_back("package", json::Json::string(c.path));
+		entry.members.emplace_back("tools", tools);
+		toolList.items.push_back(entry);
+	}
 	/* Chimera's Core Manager: a row a core (its versions together, newest first), the emulators before the games, each by name */
 	std::vector<Managed> managed;
 	for (size_t i = 0; i < found.size(); i++)
@@ -348,6 +371,7 @@ void CoresViewModel::scan()
 		managed_ = std::move(managed);
 	}
 	count.set(n);
+	coreTools.set(json::write(toolList));
 	status.set(folder.empty() ? tr("cores.no_folder") : tr("cores.packages_in", n, {folder}));
 	rows_.reset.emit();
 	sayManager();

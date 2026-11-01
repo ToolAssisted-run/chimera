@@ -392,8 +392,10 @@ const char *const kTextFields[] = {
 	"waterbox.config:settings[].display", "waterbox.config:settings[].description", "waterbox.config:settings[].optionLabels.*",
 	"waterbox.config:firmware[].display", "waterbox.config:firmware[].description", "waterbox.config:firmware[].label",
 	"waterbox.config:presets[].label", "waterbox.config:presets[].description",
-	"waterbox.config:movieImport.menu", "waterbox.config:movieImport.movie.label", "waterbox.config:movieImport.files[].label",
-	"waterbox.config:movieImport.options[].display", "waterbox.config:movieImport.options[].description",
+	"waterbox.config:tools[].menu", "waterbox.config:tools[].description",
+	"waterbox.config:tools[].inputs[].label", "waterbox.config:tools[].outputs[].label",
+	"waterbox.config:tools[].options[].display", "waterbox.config:tools[].options[].description",
+	"waterbox.config:tools[].options[].optionLabels.*",
 	"file_slots.json:slots[].title", "file_slots.json:slots[].help", "file_slots.json:slots[].nameHelp",
 };
 
