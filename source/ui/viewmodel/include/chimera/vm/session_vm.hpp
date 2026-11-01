@@ -920,6 +920,8 @@ private:
 	 * edits that follow keep its frame. */
 	void restoreOnMachine(int64_t target);
 	int64_t restoreToM_ = -1;
+	/* the edit found the machine running by itself: once back, it runs on (issue 454) */
+	bool runOnAfterRestoreM_ = false;
 	bool restoringOnMachine() const
 	{
 		return restoreToM_ >= 0 && ((runningM_ && pauseOnFrameM_ == restoreToM_) || turboSeekToM_ == restoreToM_);

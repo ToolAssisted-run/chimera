@@ -1895,6 +1895,16 @@ bool overlay(const char *package, const char *rom)
 	CHECK(d.until([&] { return session.frame.get() == 1; }, 20));
 	CHECK(session.frameCounterText.get() == "1/2" && session.inputText.get() == std::string(" ") + session.mnemonics()[1] + "      ");
 	CHECK(session.lagCount.get() == (inputs.lagAt(0) ? 1 : 0));
+	/* the picture goes with the machine (issue 432), and a machine opened shows nothing of the last one's
+	 * until it draws (issue 464) */
+	Picture::Frame shown;
+	CHECK(session.screen.takeIfNewer(UINT64_MAX, shown) && shown.width > 0);
+	session.run("close", {}, error);
+	CHECK(d.until([&] { return !session.isOpen.get(); }, 20));
+	CHECK(session.screen.takeIfNewer(UINT64_MAX, shown) && shown.width == 0 && shown.pixels.empty());
+	openGame(session, package, std::string(rom), error);
+	CHECK(d.until([&] { return session.isOpen.get(); }, 60));
+	CHECK(session.frame.get() == 0 && session.screen.takeIfNewer(UINT64_MAX, shown) && shown.width == 0);
 	session.run("close", {}, error);
 	CHECK(d.until([&] { return !session.isOpen.get(); }, 20));
 	return true;
@@ -4365,6 +4375,32 @@ bool machine(const char *package, const char *rom)
 		session.turboSeek.set(true);
 		session.greenzonePeriod.set(1);
 		for (int64_t f = 100; f <= 199; f++) inputs.set(f, Buttons::first64(inputs.at(f).low() & ~(uint64_t{1} << right)));
+		inputs.resize(at);
+		session.run("seek", {at}, error);
+		CHECK(d.until([&] { return session.frame.get() == at; }, 60));
+	}
+
+	/* An edit while the machine runs by itself: it goes back to the edit and
+	 * runs on from there, as the old window did (issue 454: it was left
+	 * paused). Paused, it stays paused. */
+	{
+		const int64_t at = session.frame.get();
+		session.autoRestore.set(false);
+		roll.run("fill", {at + 400}, error);
+		session.run("play", {}, error);
+		CHECK(d.until([&] { return session.running.get() && session.frame.get() >= at + 60; }, 30));
+		int64_t lowest = INT64_MAX;
+		Connection watch = session.frame.changed.connect([&] { lowest = std::min(lowest, session.frame.get()); });
+		roll.run("toggle", {at + 10, static_cast<int64_t>(right)}, error);
+		CHECK(d.until([&] { return lowest <= at + 11 && session.running.get() && session.frame.get() > at + 20; }, 30));
+		session.run("pause", {}, error);
+		CHECK(d.until([&] { return !session.running.get(); }, 20));
+		const int64_t paused = session.frame.get();
+		roll.run("toggle", {at + 10, static_cast<int64_t>(right)}, error);
+		CHECK(d.until([&] { return session.frame.get() == at + 10; }, 30));
+		d.until([] { return false; }, 0.3);
+		CHECK(!session.running.get() && session.frame.get() == at + 10 && paused > at + 20);
+		session.autoRestore.set(true);
 		inputs.resize(at);
 		session.run("seek", {at}, error);
 		CHECK(d.until([&] { return session.frame.get() == at; }, 60));

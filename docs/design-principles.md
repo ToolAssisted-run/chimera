@@ -12300,3 +12300,26 @@ shortcut ran twice), "(Finished)" while recording (4), the speed set to 0
 on pause (1), the folder not made (1). The Core Manager's scrolling text
 was not driven by a test or seen in a picture: nothing is picked when the
 window opens.
+
+## An edit lets a running machine run on, and an old picture is not shown (2026-11-01)
+
+Two fixes the owner decided on:
+
+- **Inserting or deleting frames paused the machine** (issue 454). An
+  edit before the machine's frame sends it back, and the way back paused it
+  first, as Chimera's TAStudio did ("restore makes no sense without
+  pausing"). The reporter's old window left it running, which is more use
+  when shifting frames, and the owner agreed. The way back still pauses,
+  but a machine that was running by itself when the edit came runs on
+  once it is back. One on its way to a frame (a seek) stops there as
+  before, and the person's own pause, frame advance or seek ends the run-on.
+- **The last game's picture stayed** after its project closed (issue 432)
+  and on a new project's frame 0 (issue 464). The picture is now emptied
+  when a machine closes and when a new one is taken on, before it draws.
+
+Tested: the view models' test runs the machine, toggles a button ten
+frames behind it, and checks that the machine went back to the edit and
+is running past it; paused, the same edit leaves it paused at the edit.
+It also checks the picture is empty after closing and right after a game
+opens, before its first frame. Broken on purpose (no run-on, no emptying)
+the test failed 2 and 2 checks.

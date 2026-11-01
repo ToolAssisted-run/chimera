@@ -47,6 +47,16 @@ public:
 		frame_.serial++;
 	}
 
+	/* any thread: no picture, as before any machine has drawn one */
+	void clear()
+	{
+		std::lock_guard<std::mutex> lock(m_);
+		frame_.pixels.clear();
+		frame_.width = frame_.height = 0;
+		frame_.shownWidth = frame_.shownHeight = 0;
+		frame_.serial++;
+	}
+
 	/* any thread: copies the newest frame out when it is newer than `have` */
 	bool takeIfNewer(uint64_t have, Frame &out) const
 	{

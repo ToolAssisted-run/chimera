@@ -1588,6 +1588,7 @@ SessionViewModel::SessionViewModel(Dispatcher &dispatcher, InputLog &inputs)
 		submit([this] {
 			endTurboSeekOnMachine();
 			runningM_ = false;
+			runOnAfterRestoreM_ = false;
 			pauseOnFrameM_ = -1;
 			/* the speed shown is the last measured, as Chimera's keeps it while paused (issue 448) */
 			later([this] { running.set(false); seekingTo.set(-1); });
@@ -1599,6 +1600,7 @@ SessionViewModel::SessionViewModel(Dispatcher &dispatcher, InputLog &inputs)
 			if (s_ == nullptr) return;
 			endTurboSeekOnMachine();
 			runningM_ = false;
+			runOnAfterRestoreM_ = false;
 			passOnMachine(1, true, false);
 			/* Skip Lag Frames: on past lag frames, a few seconds' worth at most */
 			steppingM_ = true;
@@ -2332,6 +2334,7 @@ int64_t SessionViewModel::clockOnMachine() const
 void SessionViewModel::seekAsAskedOnMachine(int64_t target)
 {
 	restoreToM_ = -1;
+	runOnAfterRestoreM_ = false;
 	turboSeekToM_ = -1;
 	runningM_ = false;
 	pauseOnFrameM_ = -1;
@@ -2386,7 +2389,8 @@ void SessionViewModel::restoreOnMachine(int64_t target)
 	/* a movie made shorter is followed to its end: going back adds no frames */
 	target = std::min(target, ce_session_movie_length(s_));
 	/* as Chimera's TAStudio: the machine paused first ("restore makes no
-	 * sense without pausing"), then the seek */
+	 * sense without pausing"), then the seek; one that was running by itself
+	 * runs on once there (restoredOnMachine, issue 454) */
 	restoreToM_ = -1;
 	turboSeekToM_ = -1;
 	runningM_ = false;
@@ -2436,6 +2440,16 @@ void SessionViewModel::restoredOnMachine()
 	restoreToM_ = -1;
 	restoredMovesM_ = movesM_;
 	restoredAtM_ = frameM_;
+	/* an edit made while the machine ran by itself: it runs on from where it went back to, as the old
+	 * window did (issue 454) */
+	if (runOnAfterRestoreM_)
+	{
+		runOnAfterRestoreM_ = false;
+		runningM_ = true;
+		due_ = fpsSince_ = Clock::now();
+		fpsFrames_ = 0;
+		later([this] { running.set(true); });
+	}
 }
 
 void SessionViewModel::turboSeekPieceOnMachine()
@@ -5141,6 +5155,9 @@ void SessionViewModel::adoptOnMachine(ce_session *s, const std::string &package,
 	std::function<void()> withOpen)
 {
 	s_ = s;
+	/* the last machine's picture is not this one's: nothing is shown until it draws (issue 464) */
+	screen.clear();
+	later([this] { screenChanged.emit(); });
 	/* a script's input-poll functions go on with the machine opened again */
 	applyInputPollsOnMachine();
 	packageSha1M_.clear();
@@ -5402,7 +5419,10 @@ void SessionViewModel::closeOnMachine()
 	freeSessionOnMachine();
 	freeProjectOnMachine();
 	runningM_ = false;
+	/* the machine's picture goes with it (issue 432) */
+	screen.clear();
 	later([this] {
+		screenChanged.emit();
 		stoppedAt.set(-1);
 		isOpen.set(false);
 		running.set(false);
@@ -5601,10 +5621,12 @@ int32_t SessionViewModel::advanceOnMachine()
 	/* a seek that plays (Turbo seek off) stops on its frame */
 	if (pauseOnFrameM_ >= 0 && ce_session_frame(s_) >= pauseOnFrameM_)
 	{
-		if (restoringOnMachine()) restoredOnMachine();
+		const bool restoring = restoringOnMachine();
 		pauseOnFrameM_ = -1;
 		runningM_ = false;
 		later([this] { running.set(false); seekingTo.set(-1); });
+		/* after the stop: a way back after an edit may run on */
+		if (restoring) restoredOnMachine();
 	}
 	/* the step reports what it changed; here the frames added and the rate */
 	double measured = -1;
@@ -6037,6 +6059,8 @@ void SessionViewModel::edited(int64_t first)
 			 * seek asked for goes, never in one long run that keeps the
 			 * window waiting (issue 406) */
 			if (restoreFrameM_ < 0) restoreFrameM_ = frameM_;
+			/* running by itself, not on its way somewhere: it runs on once back */
+			if (runningM_ && pauseOnFrameM_ < 0 && turboSeekToM_ < 0) runOnAfterRestoreM_ = true;
 			restoreOnMachine(restore ? restoreFrameM_ : first);
 		}
 		else if (restoring && restoreToM_ > length)

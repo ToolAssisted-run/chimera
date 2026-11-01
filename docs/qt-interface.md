@@ -321,7 +321,8 @@ Chimera's title: Controller Config and Configure Hotkeys are two windows
 Info, Edit Comments and Edit Subtitles each in its own window (they were
 one Project Details window).
 
-The main window shows the picture alone. TAStudio is a window of its own,
+The main window shows the picture alone, and nothing of a machine that
+closed or of the last one before a new machine draws (issues 432, 464). TAStudio is a window of its own,
 as in Chimera: it opens when a project opens, at the main window's right
 side with their tops level (moved left as far as needed to stay on the
 screen), and closes with the project. Closing it closes the project, as
@@ -357,7 +358,9 @@ field such as the greenzone's period, so the hotkeys work again (issue
 462). A double click on a frame number opens the person's marker there
 to edit its text, or sets a marker with no text where there is none
 (issue 436). A branch's or a marker's text is asked for in a small window
-whose field fits inside it, and Enter is OK (issues 437, 455). Move with Main Window (on at first, as
+whose field fits inside it, and Enter is OK (issues 437, 455). An edit
+before the machine's frame sends it back; one that was running by itself
+runs on from there (issue 454). Move with Main Window (on at first, as
 in Chimera) brings TAStudio along when the main window is dragged (not with Shift
 held, as Chimera's).
 
