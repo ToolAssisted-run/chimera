@@ -12058,3 +12058,22 @@ cb46d2b7) ends on the same memory as on Linux, with the frames counted.
 Nothing in Chimera's own source changed: three roster rows and the
 README's rows.
 
+## The proper-noun rule is the engine's table check (2026-10-31)
+
+The rule above first went into a script of its own. It is now part of
+the engine's comparison of a language table with English, which already
+checks Chimera's tables (the test engine_language) and every core
+package's (the contract test test-packages). One rule, in one place, for
+both; the script is gone. For a
+core package, its own name (`coreName`) is a proper noun too. A changed
+stem ("Chimery") is caught where the English text names the program; a
+letter glued to the whole name ("Chimeran") is caught anywhere.
+
+The owner had the cores' tables fixed at once: 17 cores changed a name in
+about 209 texts, mostly Polish, Swedish and Finnish.
+
+Tested: the engine's language test checks a common noun beside the name
+and a file's name pass, a case ending or a lost name fail (for Chimera,
+TAStudio and a core's own name), a glued ending fails where English has
+no name, and Korean's particles pass; with the rule off, it fails.
+Chimera's 26 tables pass it.

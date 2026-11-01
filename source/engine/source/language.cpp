@@ -9,7 +9,9 @@
 #include "thread_string.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <cstring>
+#include <iterator>
 #include <filesystem>
 #include <functional>
 #include <memory>
@@ -267,13 +269,78 @@ std::string edges(const std::string &t)
 	return t.substr(0, a) + "|" + t.substr(b);
 }
 
+/* Proper nouns are never translated (owner, 2026-10-31): Chimera is always
+ * Chimera, and the programs and services the texts name are written as they
+ * are. A language whose grammar puts endings on names says the sentence with
+ * a common noun beside the name ("v programu Chimera"); a particle in
+ * another script, as Korean's, leaves the name whole. */
+const char *const kProperNouns[] = {"Chimera", "TAStudio", "GitHub", "Lua", "Windows", "Linux", "macOS", "OpenGL", "Vulkan",
+	"Direct3D", "SQLite", "Sublime Text", "miniBox", "ffmpeg", "Qt", "Wayland"};
+
+/* the letter of the Latin alphabet, ASCII or U+00C0..U+024F in UTF-8, that
+ * ends at `end` or starts at `at`: a name with one beside it is changed */
+bool latinEndsAt(const std::string &t, size_t end)
+{
+	if (end == 0) return false;
+	const unsigned char c = static_cast<unsigned char>(t[end - 1]);
+	if (c < 0x80) return std::isalpha(c) != 0;
+	/* back to the sequence's first byte, then the code point */
+	size_t at = end - 1;
+	while (at > 0 && (static_cast<unsigned char>(t[at]) & 0xC0) == 0x80) at--;
+	const unsigned char lead = static_cast<unsigned char>(t[at]);
+	if ((lead & 0xE0) != 0xC0 || end - at != 2) return false;
+	const unsigned cp = ((lead & 0x1Fu) << 6) | (static_cast<unsigned char>(t[at + 1]) & 0x3Fu);
+	return cp >= 0xC0 && cp <= 0x24F && cp != 0xD7 && cp != 0xF7;
+}
+
+bool latinStartsAt(const std::string &t, size_t at)
+{
+	if (at >= t.size()) return false;
+	const unsigned char c = static_cast<unsigned char>(t[at]);
+	if (c < 0x80) return std::isalpha(c) != 0;
+	if ((c & 0xE0) != 0xC0 || at + 1 >= t.size()) return false;
+	const unsigned cp = ((c & 0x1Fu) << 6) | (static_cast<unsigned char>(t[at + 1]) & 0x3Fu);
+	return cp >= 0xC0 && cp <= 0x24F && cp != 0xD7 && cp != 0xF7;
+}
+
+/* a file's name or a path ("*.chimeraProject", "chimera.lua"): no name in a sentence */
+bool inFileName(const std::string &t, size_t at)
+{
+	size_t a = at, b = at;
+	while (a > 0 && t[a - 1] != ' ' && t[a - 1] != '\n') a--;
+	while (b < t.size() && t[b] != ' ' && t[b] != '\n') b++;
+	for (size_t i = a; i < b; i++)
+		if (t[i] == '/' || t[i] == '\\' || t[i] == '*' ||
+			(t[i] == '.' && i + 1 < b && std::isalnum(static_cast<unsigned char>(t[i + 1])) != 0))
+			return true;
+	return false;
+}
+
+/* the name in the text, whole: true when it is there with no letter glued
+ * to it; `glued` set when a word starts with it and goes on (an ending put
+ * on it). Inside another word it is no name ("ares" in "auriculares") */
+bool holdsName(const std::string &t, const std::string &name, bool &glued)
+{
+	bool whole = false;
+	glued = false;
+	for (size_t at = t.find(name); at != std::string::npos; at = t.find(name, at + 1))
+	{
+		if (latinEndsAt(t, at)) continue;
+		if (!latinStartsAt(t, at + name.size())) whole = true;
+		else if (!inFileName(t, at)) glued = true;
+	}
+	return whole;
+}
+
 } // namespace
 
-std::vector<std::string> compare(const Table &english, const Table &other, const std::string &code)
+std::vector<std::string> compare(const Table &english, const Table &other, const std::string &code, const std::vector<std::string> &names)
 {
 	std::vector<std::string> out;
 	auto problem = [&](const std::string &key, const std::string &what) { out.push_back(code + ": " + key + ": " + what); };
 	const std::vector<std::string> forms = pluralForms(code);
+	std::vector<std::string> nouns(std::begin(kProperNouns), std::end(kProperNouns));
+	nouns.insert(nouns.end(), names.begin(), names.end());
 	if (forms.empty()) problem("(the table)", "no plural rule for this language (language.cpp)");
 	for (const auto &e : english.entries)
 	{
@@ -297,6 +364,15 @@ std::vector<std::string> compare(const Table &english, const Table &other, const
 			if (want != have) problem(e.first, "placeholders differ from English: " + x);
 			if (hasShortcut(en) && !hasShortcut(x)) problem(e.first, "no shortcut letter (&): " + x);
 			if (edges(en) != edges(x)) problem(e.first, "spaces or line breaks at the ends differ from English");
+			/* a proper noun English names is there as itself, and none has letters glued to it */
+			for (const std::string &n : nouns)
+			{
+				bool enGlued = false, glued = false;
+				const bool inEnglish = holdsName(en, n, enGlued), whole = holdsName(x, n, glued);
+				if (inEnglish && !whole) problem(e.first, n + " is not there as itself: " + x);
+				/* a short name starts words of other languages (Indonesian "Luapan"): only where English names it */
+				else if (glued && (inEnglish || n.size() > 3)) problem(e.first, n + " has letters glued to it: " + x);
+			}
 		}
 	}
 	for (const auto &e : other.entries)
@@ -366,11 +442,20 @@ std::vector<std::string> packageProblems(const std::function<bool(const std::str
 	};
 	Table english;
 	if (!table("en", english)) return lines;
+	/* the core's own name is a proper noun too */
+	std::vector<std::string> names;
+	if (std::string config; entry("waterbox.config", config))
+		if (cJSON *root = cJSON_ParseWithLength(config.data(), config.size()))
+		{
+			if (const cJSON *n = cJSON_GetObjectItemCaseSensitive(root, "coreName"); cJSON_IsString(n) && n->valuestring[0] != '\0')
+				names.emplace_back(n->valuestring);
+			cJSON_Delete(root);
+		}
 	for (const Language &l : languages())
 	{
 		Table other;
 		if (l.code == "en" || !table(l.code, other)) continue;
-		for (const std::string &line : compare(english, other, l.code)) lines.push_back(line);
+		for (const std::string &line : compare(english, other, l.code, names)) lines.push_back(line);
 	}
 	/* the declarations' texts: keys, never words written in */
 	for (const char *field : kTextFields)

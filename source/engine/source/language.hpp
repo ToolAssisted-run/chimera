@@ -72,9 +72,12 @@ bool readTable(const char *json, size_t length, Table &out, std::string &error);
 /* What is wrong with another language's table against English's: a line for
  * each key missing or not English's, each text whose %1..%9 or %n differ,
  * that lost a menu's shortcut letter or the spaces at its ends, each plural
- * key without the language's forms. Empty when nothing is; for the tests,
- * Chimera's tables and every core package's. */
-std::vector<std::string> compare(const Table &english, const Table &other, const std::string &code);
+ * key without the language's forms, and each text that changed a proper noun
+ * (Chimera, the programs and services the texts name, and `names`: a core
+ * package's own name). Empty when nothing is; for the tests, Chimera's
+ * tables and every core package's. */
+std::vector<std::string> compare(const Table &english, const Table &other, const std::string &code,
+	const std::vector<std::string> &names = {});
 
 /* What keeps a core package's languages from being Chimera's, a line each:
  * a table missing (languages/<code>.json, for every language Chimera has),

@@ -171,17 +171,15 @@ language's plural rule (`pluralForms` and `pluralForm` in
 
 `engine_language` checks every table against English: the same keys and
 no others, the same `%1`..`%9`, the plural forms the language takes, a
-menu's shortcut letter kept, and the spaces and line breaks at either end
-kept. It also checks the plural rules, the filling of `%1`..`%9`, a
+menu's shortcut letter kept, the spaces and line breaks at either end
+kept, and every proper noun the English text names there as it is
+written, with no letter of the Latin alphabet glued to it (the list is
+in `language.cpp`; a core package's own name is added for its tables). It also checks the plural rules, the filling of `%1`..`%9`, a
 language used and another in its place, a core package's texts (keys with
 arguments, plural forms, a key inside, JSON changed only where it holds a
 key, a missing language shown in English) and the C calls. `translations`
 checks the window's side: the language it starts in for a given system, a
 remembered choice, and what `qsTrId` answers.
-
-`proper nouns` (`tools/check-proper-nouns.py`) checks that every name an
-English text holds is in that text in every language, as it is written,
-with no Latin letters glued to it.
 
 `texts` (`tools/check-texts.py`) finds words written into Chimera's code:
 string literals that read as words and are none of what the rules leave
@@ -190,7 +188,8 @@ on-screen elements, config names) are listed in
 `tools/check-texts-identifiers.txt`.
 
 For the cores, `test-packages` checks every installed package: a table for
-every language Chimera has, each against the package's English as above,
+every language Chimera has, each against the package's English as above
+(its proper nouns too),
 and every text field of its declarations a key of it, given every argument
 its text uses. What a core's code returns only the code knows:
 `tools/check-core-texts.py <core checkout>` reads the core's own sources and

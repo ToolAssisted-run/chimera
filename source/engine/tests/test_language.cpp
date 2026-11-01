@@ -184,6 +184,40 @@ int main()
 		assert(problems == 0);
 	}
 
+	{ // proper nouns are never translated (owner, 2026-10-31): Chimera is Chimera
+		auto table = [](const char *json) {
+			lang::Table t;
+			std::string error;
+			assert(lang::readTable(json, std::strlen(json), t, error));
+			return t;
+		};
+		const lang::Table english = table(R"j({"texts": {"about": "About Chimera", "open": "Chimera projects (*.chimeraProject)",
+			"core": "DuckStation draws it", "tool": "A column in TAStudio"}})j");
+		auto problemsOf = [&](const char *json, const std::vector<std::string> &names = {}) {
+			std::string all;
+			for (const std::string &p : lang::compare(english, table(json), "pl", names)) all += p + "\n";
+			return all;
+		};
+		/* a common noun beside the name, and a file's name, are fine */
+		assert(problemsOf(R"j({"texts": {"about": "O programie Chimera", "open": "Projekty programu Chimera (*.chimeraProject)",
+			"core": "DuckStation to rysuje", "tool": "Kolumna w narzędziu TAStudio"}})j", {"DuckStation"}) == "");
+		/* a case ending on the name, or the name gone, is not */
+		const std::string bent = problemsOf(R"j({"texts": {"about": "O Chimerze", "open": "Projekty Chimery (*.chimeraProject)",
+			"core": "rysuje to DuckStationa", "tool": "Kolumna w TAStudiu"}})j", {"DuckStation"});
+		assert(bent.find("about: Chimera is not there as itself") != std::string::npos);
+		assert(bent.find("open: Chimera is not there as itself") != std::string::npos);
+		assert(bent.find("core: DuckStation is not there as itself") != std::string::npos);
+		assert(bent.find("tool: TAStudio is not there as itself") != std::string::npos);
+		/* a letter glued on where the name is also whole elsewhere, and in a text English names it in none */
+		const lang::Table plain = table(R"j({"texts": {"x": "Settings"}})j");
+		const lang::Table glued = table(R"j({"texts": {"x": "Chimeran asetukset"}})j");
+		assert(lang::compare(plain, glued, "fi").size() == 1 && lang::compare(plain, glued, "fi")[0].find("glued") != std::string::npos);
+		/* Korean's particles are its own script: the name stays whole */
+		const lang::Table korean = table(R"j({"texts": {"about": "Chimera 정보", "open": "Chimera 프로젝트 (*.chimeraProject)",
+			"core": "DuckStation이 그립니다", "tool": "TAStudio의 열"}})j");
+		assert(lang::compare(english, korean, "ko", {"DuckStation"}).empty());
+	}
+
 	{ // used, and another in its place; a key no table has comes back as itself
 		assert(lang::inUse() == "en");
 		assert(lang::tr("common.file") == "&File");
