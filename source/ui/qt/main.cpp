@@ -770,9 +770,9 @@ int main(int argc, char **argv)
 	 * unless the environment names others */
 	vm::CoresViewModel cores(dispatcher);
 	if (cores.coresFolder.get().empty())
-		cores.coresFolder.set((QCoreApplication::applicationDirPath() + QStringLiteral("/cores")).toStdString());
+		cores.coresFolder.set((QCoreApplication::applicationDirPath() + QStringLiteral("/Cores")).toStdString());
 	if (cores.firmwareFolder.get().empty())
-		cores.firmwareFolder.set((QCoreApplication::applicationDirPath() + QStringLiteral("/firmware")).toStdString());
+		cores.firmwareFolder.set((QCoreApplication::applicationDirPath() + QStringLiteral("/Firmware")).toStdString());
 	vm::NewProjectViewModel newProject(dispatcher, session, cores);
 	/* the core's suggested settings for a game, asked in a process of its own */
 	/* Chimera's compile step: its sessions are the headless runner, and what

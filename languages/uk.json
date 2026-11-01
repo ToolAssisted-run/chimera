@@ -2241,6 +2241,7 @@
 		"session.firmware_missing": "Немає прошивки (покладіть її в папку прошивок): %1",
 		"session.firmware_not_found": "Прошивку, яка потрібна проєкту, не знайдено: вкажіть її або проскануйте папку",
 		"session.fps": "%1 кдр/с",
+		"session.frame_counter_finished": "%1/%2 (завершено)",
 		"session.freezes_mixed": "Заморожування перемкнено (змішано)",
 		"session.freezes_off": "Заморожування перемкнено (вимкнено)",
 		"session.freezes_on": "Заморожування перемкнено (увімкнено)",

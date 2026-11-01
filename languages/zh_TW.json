@@ -2159,6 +2159,7 @@
 		"session.firmware_missing": "缺少韌體（請放入韌體資料夾）：%1",
 		"session.firmware_not_found": "找不到此專案所需的韌體：請指定其位置，或掃描一個資料夾",
 		"session.fps": "%1 fps",
+		"session.frame_counter_finished": "%1/%2 (已結束)",
 		"session.freezes_mixed": "凍結已切換（混合）",
 		"session.freezes_off": "凍結已切換（關閉）",
 		"session.freezes_on": "凍結已切換（開啟）",

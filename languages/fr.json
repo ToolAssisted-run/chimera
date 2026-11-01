@@ -2200,6 +2200,7 @@
 		"session.firmware_missing": "Firmware manquant (placez-le dans le dossier des firmwares) : %1",
 		"session.firmware_not_found": "Le firmware dont ce projet a besoin est introuvable : indiquez-le, ou analysez un dossier",
 		"session.fps": "%1 i/s",
+		"session.frame_counter_finished": "%1/%2 (terminé)",
 		"session.freezes_mixed": "Gels basculés (mixte)",
 		"session.freezes_off": "Gels basculés (désactivés)",
 		"session.freezes_on": "Gels basculés (activés)",

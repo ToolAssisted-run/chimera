@@ -64,24 +64,24 @@ json::Json objectOf(const std::string &text)
 
 const std::vector<std::pair<std::string, std::string>> &PathsViewModel::defaults()
 {
-	/* Chimera's global entries, in its order; the
-	 * folders named in lower case (owner, 2026-10-24) */
+	/* Chimera's global entries, in its order, the folders named as the old
+	 * window named them (owner, 2026-11-01, issue 435) */
 	static const std::vector<std::pair<std::string, std::string>> list = {
 		{"Base", "."},
 		{"ROM", "."},
-		{"Firmware", "./firmware"},
-		{"Movies", "./movies"},
-		{"Movie backups", "./movies/backup"},
+		{"Firmware", "./Firmware"},
+		{"Movies", "./Movies"},
+		{"Movie backups", "./Movies/backup"},
 		/* where Encode Video suggests a video goes */
 		{"A/V Dumps", "."},
-		{"Tools", "./tools"},
-		{"Lua", "./lua"},
-		{"Themes", "./themes"},
+		{"Tools", "./Tools"},
+		{"Lua", "./Lua"},
+		{"Themes", "./Themes"},
 		/* Watch and Debug Logs are under Tools when relative, as Chimera resolves them */
 		{"Watch (.wch)", "."},
 		{"Debug Logs", "."},
-		{"Bug reports", "./reports"},
-		{"Macros", "./movies/macros"},
+		{"Bug reports", "./Reports"},
+		{"Macros", "./Movies/Macros"},
 		{"Temp Files", ""},
 	};
 	return list;
@@ -90,9 +90,7 @@ const std::vector<std::pair<std::string, std::string>> &PathsViewModel::defaults
 std::vector<std::pair<std::string, std::string>> PathsViewModel::systemDefaults(const std::string &system)
 {
 	/* a system's entries: made for a system the first time something of it is asked for */
-	std::string folder = folderName(system);
-	for (char &c : folder) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-	return {{"Base", "./" + folder}, {"ROM", "."}, {"Savestates", "./state"}, {"Screenshots", "./screenshots"}};
+	return {{"Base", "./" + folderName(system)}, {"ROM", "."}, {"Savestates", "./State"}, {"Screenshots", "./Screenshots"}};
 }
 
 PathsViewModel::PathsViewModel(Dispatcher &dispatcher) : ViewModel("paths", dispatcher)
@@ -186,10 +184,12 @@ PathsViewModel::PathsViewModel(Dispatcher &dispatcher) : ViewModel("paths", disp
 			return rel == "." ? std::string(".") : "./" + rel.generic_string();
 		});
 	command("dialogFolder", "where a file dialog for this folder opens: the folder, or the nearest one above it that is "
-		"there (nothing is made); for ROM, where the last game came from when recentForRoms", {"name"},
+		"there; for ROM, where the last game came from when recentForRoms. With make, the folder is made first, for a "
+		"file about to be saved there (Save as Zip's report, issue 435)", {"name", "make"},
 		[this](const Args &a, std::string &error) -> Value {
 			std::string name;
-			if (!arg(a, 0, name, error)) return {};
+			bool make = false;
+			if (!arg(a, 0, name, error) || (a.size() > 1 && !arg(a, 1, make, error))) return {};
 			if (name == "ROM" && recentForRoms.get() && !lastRomFolder.get().empty() && fs::is_directory(lastRomFolder.get())) return lastRomFolder.get();
 			const std::string r = resolve(name);
 			if (r.empty())
@@ -198,6 +198,7 @@ PathsViewModel::PathsViewModel(Dispatcher &dispatcher) : ViewModel("paths", disp
 				return {};
 			}
 			std::error_code ec;
+			if (make) fs::create_directories(r, ec);
 			fs::path at(r);
 			while (!at.empty() && !fs::is_directory(at, ec) && at.has_parent_path() && at.parent_path() != at) at = at.parent_path();
 			return at.string();

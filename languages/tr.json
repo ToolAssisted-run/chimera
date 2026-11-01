@@ -2200,6 +2200,7 @@
 		"session.firmware_missing": "Yazılım (firmware) eksik (firmware klasörüne koyun): %1",
 		"session.firmware_not_found": "Bu projenin gerektirdiği yazılım bulunamadı: yerini gösterin ya da bir klasörü tarayın",
 		"session.fps": "%1 kare/sn",
+		"session.frame_counter_finished": "%1/%2 (bitti)",
 		"session.freezes_mixed": "Dondurmalar değiştirildi (karışık)",
 		"session.freezes_off": "Dondurmalar değiştirildi (kapalı)",
 		"session.freezes_on": "Dondurmalar değiştirildi (açık)",

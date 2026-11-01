@@ -2159,6 +2159,7 @@
 		"session.firmware_missing": "缺少固件（请放入固件文件夹）：%1",
 		"session.firmware_not_found": "未找到此项目所需的固件：请定位它，或扫描文件夹",
 		"session.fps": "%1 fps",
+		"session.frame_counter_finished": "%1/%2 (已结束)",
 		"session.freezes_mixed": "冻结已切换（混合）",
 		"session.freezes_off": "冻结已切换（关）",
 		"session.freezes_on": "冻结已切换（开）",

@@ -2200,6 +2200,7 @@
 		"session.firmware_missing": "Falta el firmware (póngalo en la carpeta de firmware): %1",
 		"session.firmware_not_found": "No se encontró el firmware que necesita este proyecto: localícelo, o busque en una carpeta",
 		"session.fps": "%1 fps",
+		"session.frame_counter_finished": "%1/%2 (terminada)",
 		"session.freezes_mixed": "Congelados alternados (mixto)",
 		"session.freezes_off": "Congelados alternados (desactivados)",
 		"session.freezes_on": "Congelados alternados (activados)",

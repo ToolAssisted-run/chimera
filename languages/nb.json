@@ -2200,6 +2200,7 @@
 		"session.firmware_missing": "Fastvare mangler (legg den i fastvaremappen): %1",
 		"session.firmware_not_found": "Fastvaren dette prosjektet trenger ble ikke funnet. Finn den, eller skann en mappe",
 		"session.fps": "%1 b/s",
+		"session.frame_counter_finished": "%1/%2 (ferdig)",
 		"session.freezes_mixed": "Frysing byttet (blandet)",
 		"session.freezes_off": "Frysing byttet (av)",
 		"session.freezes_on": "Frysing byttet (på)",

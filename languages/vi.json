@@ -2159,6 +2159,7 @@
 		"session.firmware_missing": "Thiếu firmware (hãy đặt vào thư mục firmware): %1",
 		"session.firmware_not_found": "Không tìm thấy firmware mà dự án này cần: hãy tìm nó, hoặc quét một thư mục",
 		"session.fps": "%1 fps",
+		"session.frame_counter_finished": "%1/%2 (đã hết)",
 		"session.freezes_mixed": "Đã bật/tắt đóng băng (hỗn hợp)",
 		"session.freezes_off": "Đã bật/tắt đóng băng (tắt)",
 		"session.freezes_on": "Đã bật/tắt đóng băng (bật)",

@@ -2200,6 +2200,7 @@
 		"session.firmware_missing": "Firmware mangler (læg den i firmwaremappen): %1",
 		"session.firmware_not_found": "Den firmware, projektet har brug for, blev ikke fundet: find den, eller scan en mappe",
 		"session.fps": "%1 b/s",
+		"session.frame_counter_finished": "%1/%2 (færdig)",
 		"session.freezes_mixed": "Frysninger skiftet (blandet)",
 		"session.freezes_off": "Frysninger skiftet (fra)",
 		"session.freezes_on": "Frysninger skiftet (til)",

@@ -2159,6 +2159,7 @@
 		"session.firmware_missing": "Firmware tidak ada (letakkan di folder firmware): %1",
 		"session.firmware_not_found": "Firmware yang dibutuhkan proyek ini tidak ditemukan: cari firmware itu, atau pindai sebuah folder",
 		"session.fps": "%1 fps",
+		"session.frame_counter_finished": "%1/%2 (selesai)",
 		"session.freezes_mixed": "Pembekuan diubah (campuran)",
 		"session.freezes_off": "Pembekuan diubah (nonaktif)",
 		"session.freezes_on": "Pembekuan diubah (aktif)",

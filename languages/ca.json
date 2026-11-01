@@ -2200,6 +2200,7 @@
 		"session.firmware_missing": "Falta el firmware (poseu-lo a la carpeta de firmware): %1",
 		"session.firmware_not_found": "No s'ha trobat el firmware que necessita aquest projecte: localitzeu-lo o cerqueu en una carpeta",
 		"session.fps": "%1 fps",
+		"session.frame_counter_finished": "%1/%2 (acabada)",
 		"session.freezes_mixed": "Congelacions canviades (barrejat)",
 		"session.freezes_off": "Congelacions canviades (desactivades)",
 		"session.freezes_on": "Congelacions canviades (activades)",

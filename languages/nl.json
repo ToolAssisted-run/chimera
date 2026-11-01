@@ -2200,6 +2200,7 @@
 		"session.firmware_missing": "Firmware ontbreekt (zet hem in de firmwaremap): %1",
 		"session.firmware_not_found": "De firmware die dit project nodig heeft, is niet gevonden: zoek hem op, of scan een map",
 		"session.fps": "%1 fps",
+		"session.frame_counter_finished": "%1/%2 (afgelopen)",
 		"session.freezes_mixed": "Bevriezingen omgeschakeld (gemengd)",
 		"session.freezes_off": "Bevriezingen omgeschakeld (uit)",
 		"session.freezes_on": "Bevriezingen omgeschakeld (aan)",

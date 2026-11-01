@@ -2159,6 +2159,7 @@
 		"session.firmware_missing": "ファームウェアがありません (ファームウェアフォルダーに入れてください): %1",
 		"session.firmware_not_found": "このプロジェクトに必要なファームウェアが見つかりませんでした: 場所を指定するか、フォルダーを走査してください",
 		"session.fps": "%1 fps",
+		"session.frame_counter_finished": "%1/%2 (終了)",
 		"session.freezes_mixed": "固定を切り替えました (混在)",
 		"session.freezes_off": "固定を切り替えました (オフ)",
 		"session.freezes_on": "固定を切り替えました (オン)",

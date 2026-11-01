@@ -116,7 +116,16 @@ ApplicationWindow {
             Layout.fillWidth: true
             Layout.topMargin: 6
             spacing: 10
-            Button { text: qsTrId("report_issue.save_as_zip"); Layout.preferredWidth: 120; onClicked: { zipDialog.selectedFile = zipDialog.currentFolder + "/" + win.zipName(); zipDialog.open() } }
+            Button {
+                text: qsTrId("report_issue.save_as_zip")
+                Layout.preferredWidth: 120
+                // in Paths' Bug reports folder, made if it is not there yet (issue 435)
+                onClicked: {
+                    zipDialog.currentFolder = win.folderOf("Bug reports", true)
+                    zipDialog.selectedFile = zipDialog.currentFolder + "/" + win.zipName()
+                    zipDialog.open()
+                }
+            }
             Label { objectName: "reportStatus"; text: win.vm.status; Layout.fillWidth: true; elide: Text.ElideRight }
             Button { text: qsTrId("common.close"); Layout.preferredWidth: 90; onClicked: win.close() }
         }
@@ -124,7 +133,6 @@ ApplicationWindow {
     FileDialog {
         id: zipDialog
         title: qsTrId("report_issue.save_the_report_s_files_as")
-        currentFolder: win.folderOf ? win.folderOf("Bug reports") : ""
         fileMode: FileDialog.SaveFile
         defaultSuffix: "zip"
         nameFilters: [qsTrId("report_issue.zip_archive_zip")]

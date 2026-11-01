@@ -499,6 +499,17 @@ if qt_dep.found()
       override_options: ['cpp_std=c++20'],
     )
     test('text prompt', test_text_prompt, env: ['QT_QPA_PLATFORM=offscreen', 'QT_QUICK_BACKEND=software'], timeout: 60)
+    # the box a key is bound in takes every key, a window's shortcut on it
+    # notwithstanding: Escape empties it again (issue 431)
+    test_binding_box = executable(
+      'test-binding-box',
+      ['qt/tests/test_binding_box.cpp', 'qt/key_names.cpp',
+        qt6.compile_moc(headers: ['qt/key_names.hpp'], dependencies: [qt_dep]), qt_rcc],
+      dependencies: [qt_test_dep],
+      override_options: ['cpp_std=c++20'],
+      cpp_args: ['-DQT_NO_KEYWORDS'],
+    )
+    test('binding box', test_binding_box, env: ['QT_QPA_PLATFORM=offscreen'], timeout: 60)
     # the Emulator menu: only what the core offers, nothing of Chimera's own (issue 428)
     test_emulator_menu = executable(
       'test-emulator-menu',

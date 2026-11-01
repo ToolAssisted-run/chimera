@@ -2159,6 +2159,7 @@
 		"session.firmware_missing": "펌웨어가 없습니다 (펌웨어 폴더에 넣으세요): %1",
 		"session.firmware_not_found": "이 프로젝트에 필요한 펌웨어를 찾을 수 없습니다: 직접 지정하거나 폴더를 검색하세요",
 		"session.fps": "%1 fps",
+		"session.frame_counter_finished": "%1/%2 (끝남)",
 		"session.freezes_mixed": "고정 전환됨 (혼합)",
 		"session.freezes_off": "고정 전환됨 (꺼짐)",
 		"session.freezes_on": "고정 전환됨 (켜짐)",

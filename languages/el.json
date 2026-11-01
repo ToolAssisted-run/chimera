@@ -2200,6 +2200,7 @@
 		"session.firmware_missing": "Λείπει το υλικολογισμικό (βάλτε το στον φάκελο υλικολογισμικού): %1",
 		"session.firmware_not_found": "Δεν βρέθηκε το υλικολογισμικό που χρειάζεται αυτό το έργο: εντοπίστε το ή ψάξτε σε έναν φάκελο",
 		"session.fps": "%1 fps",
+		"session.frame_counter_finished": "%1/%2 (τέλος)",
 		"session.freezes_mixed": "Τα πάγωμα άλλαξαν (μικτά)",
 		"session.freezes_off": "Τα πάγωμα άλλαξαν (ανενεργά)",
 		"session.freezes_on": "Τα πάγωμα άλλαξαν (ενεργά)",

@@ -5,7 +5,7 @@
 # It carries NO CORES, and Chimera downloads none (docs/core-manager.md). They
 # are other repositories that build, package and publish themselves; a user
 # downloads a core's package from its project, or builds it, and puts it in the
-# bundle's cores/ folder, which ships empty but for a README.txt saying so.
+# bundle's Cores/ folder, which ships empty but for a README.txt saying so.
 #
 # What is lost with them is "one chimera commit pins one exact bundle". What
 # replaces it: a movie cites the exact core package that recorded it, by
@@ -90,7 +90,7 @@ else
 fi
 
 # No list of cores goes in: Chimera downloads nothing and knows of no core it
-# has not been given (docs/core-manager.md). cores/ ships empty, and what a user
+# has not been given (docs/core-manager.md). Cores/ ships empty, and what a user
 # puts in it is what there is.
 
 say "licences"
@@ -112,7 +112,7 @@ say "build stamp"
 	printf "\nfiles (sha1):\n"
 	( cd "$out" && sha1sum "$program" | sed 's/^/  /' )
 	printf "\ncores: none, and Chimera downloads none. Get a core's package from its\n"
-	printf "project and put it in cores/; a movie names the exact package that recorded it.\n"
+	printf "project and put it in Cores/; a movie names the exact package that recorded it.\n"
 } > "$out/BUILD.txt"
 cat "$out/BUILD.txt"
 
@@ -125,10 +125,10 @@ done
 [ -s "$out/LICENSES.md" ] || { echo "MISSING: LICENSES.md" >&2; bad=1; }
 [ -s "$out/bin/chimera-run$suffix" ] || { echo "MISSING: bin/chimera-run$suffix" >&2; bad=1; }
 [ -s "$out/bin/chimera-mcp$suffix" ] || { echo "MISSING: bin/chimera-mcp$suffix (Tools > MCP Server... names it)" >&2; bad=1; }
-[ -s "$out/cores/README.txt" ] || { echo "MISSING: cores/README.txt (the folder a user puts core packages in)" >&2; bad=1; }
+[ -s "$out/Cores/README.txt" ] || { echo "MISSING: Cores/README.txt (the folder a user puts core packages in)" >&2; bad=1; }
 shipped=$(find "$root/Themes" -name '*.chimeraTheme.json' | wc -l)
-bundled=$(find "$out/themes" -name '*.chimeraTheme.json' | wc -l)
-[ "$shipped" -gt 0 ] && [ "$bundled" -eq "$shipped" ] || { echo "MISSING: themes/ has $bundled of the $shipped themes in the repository" >&2; bad=1; }
+bundled=$(find "$out/Themes" -name '*.chimeraTheme.json' | wc -l)
+[ "$shipped" -gt 0 ] && [ "$bundled" -eq "$shipped" ] || { echo "MISSING: Themes/ has $bundled of the $shipped themes in the repository" >&2; bad=1; }
 shipped=$(find "$root/languages" -name '*.json' | wc -l)
 bundled=$(find "$out/lib/languages" -name '*.json' | wc -l)
 [ "$shipped" -gt 0 ] && [ "$bundled" -eq "$shipped" ] || { echo "MISSING: lib/languages has $bundled of the $shipped language tables in the repository" >&2; bad=1; }

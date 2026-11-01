@@ -1222,22 +1222,22 @@ void pathsConfig()
 {
 	namespace fs = std::filesystem;
 	const fs::path dir = fs::temp_directory_path() / ("chimera-test-paths-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
-	fs::create_directories(dir / "program" / "lua");
+	fs::create_directories(dir / "program" / "Lua");
 	ManualDispatcher d;
 	PathsViewModel paths(d);
 	std::string error;
 	int moved = 0;
 	Connection watch = paths.moved.connect([&] { moved++; });
 	paths.programFolder.set((dir / "program").string());
-	CHECK(paths.resolve("Movie backups") == (dir / "program" / "movies" / "backup").string());
+	CHECK(paths.resolve("Movie backups") == (dir / "program" / "Movies" / "backup").string());
 	CHECK(paths.resolve("ROM") == (dir / "program").string());
 	CHECK(paths.resolve("Nothing").empty());
 	/* Watch and Debug Logs under Tools, as Chimera resolves them */
-	CHECK(paths.resolve("Tools") == (dir / "program" / "tools").string() && paths.resolve("Watch (.wch)") == (dir / "program" / "tools").string() &&
-		paths.resolve("Debug Logs") == (dir / "program" / "tools").string());
+	CHECK(paths.resolve("Tools") == (dir / "program" / "Tools").string() && paths.resolve("Watch (.wch)") == (dir / "program" / "Tools").string() &&
+		paths.resolve("Debug Logs") == (dir / "program" / "Tools").string());
 	/* a base of the person's */
 	paths.base.set((dir / "elsewhere").string());
-	CHECK(paths.resolve("Lua") == (dir / "elsewhere" / "lua").string());
+	CHECK(paths.resolve("Lua") == (dir / "elsewhere" / "Lua").string());
 	paths.base.set("");
 	/* a path changed: absolute, or relative to the base; Chimera's again is no change */
 	std::string got;
@@ -1246,7 +1246,7 @@ void pathsConfig()
 	CHECK(paths.changed.get() == "{\"Movies\": " + json::quote((dir / "runs").string()) + "}");
 	CHECK(paths.run("setPath", {std::string("Lua"), std::string("./Scripts")}, error).has_value() &&
 		paths.resolve("Lua") == (dir / "program" / "Scripts").string());
-	CHECK(paths.run("setPath", {std::string("Lua"), std::string("./lua")}, error).has_value() && paths.changed.get().find("Lua") == std::string::npos);
+	CHECK(paths.run("setPath", {std::string("Lua"), std::string("./Lua")}, error).has_value() && paths.changed.get().find("Lua") == std::string::npos);
 	CHECK(!paths.run("setPath", {std::string("Saves"), std::string(".")}, error) && error == "no folder called Saves");
 	CHECK(moved >= 5);
 	/* the rows: as set, made absolute, whether Chimera's */
@@ -1279,19 +1279,19 @@ void pathsConfig()
 	paths.run("setPath", {std::string("Lua"), std::string("")}, error);
 	/* the base is a row too */
 	CHECK(paths.run("setPath", {std::string("Base"), (dir / "elsewhere").string()}, error).has_value() &&
-		paths.resolve("Movies") == (dir / "runs").string() && paths.resolve("Lua") == (dir / "elsewhere" / "lua").string());
+		paths.resolve("Movies") == (dir / "runs").string() && paths.resolve("Lua") == (dir / "elsewhere" / "Lua").string());
 	paths.run("setPath", {std::string("Base"), std::string(".")}, error);
 	CHECK(paths.base.get().empty());
 	/* a system's own folders, made when a game for it is opened: under its base, which is under the global one */
 	paths.useSystem("NES");
 	CHECK(paths.systems.get() == "[\"NES\"]" && rows->rowCount() == 18);
-	CHECK(paths.resolveFor("NES", "Screenshots") == (dir / "program" / "nes" / "screenshots").string() &&
-		paths.resolveFor("NES", "ROM") == (dir / "program" / "nes").string() &&
-		paths.resolveFor("NES", "Savestates") == (dir / "program" / "nes" / "state").string());
+	CHECK(paths.resolveFor("NES", "Screenshots") == (dir / "program" / "NES" / "Screenshots").string() &&
+		paths.resolveFor("NES", "ROM") == (dir / "program" / "NES").string() &&
+		paths.resolveFor("NES", "Savestates") == (dir / "program" / "NES" / "State").string());
 	/* a kind it has not falls back to its base */
-	CHECK(paths.resolveFor("NES", "Cheats") == (dir / "program" / "nes").string());
+	CHECK(paths.resolveFor("NES", "Cheats") == (dir / "program" / "NES").string());
 	CHECK(fromValue(paths.run("setSystemPath", {std::string("NES"), std::string("Screenshots"), std::string("./Shots")}, error).value_or(Value()), got) &&
-		got == (dir / "program" / "nes" / "Shots").string());
+		got == (dir / "program" / "NES" / "Shots").string());
 	CHECK(paths.run("setSystemPath", {std::string("NES"), std::string("Base"), (dir / "nes").string()}, error).has_value() &&
 		paths.resolveFor("NES", "Screenshots") == (dir / "nes" / "Shots").string());
 	CHECK(!paths.run("setSystemPath", {std::string("NES"), std::string("Movies"), std::string(".")}, error) && error == "no folder called Movies");
@@ -1303,12 +1303,15 @@ void pathsConfig()
 	paths.run("setSystemPath", {std::string("NES"), std::string("Screenshots"), std::string("")}, error);
 	CHECK(paths.systemChanged.get() == "{}");
 	/* a dialog opens in the folder when it is there, else the nearest above it; nothing is made */
-	CHECK(fromValue(paths.run("dialogFolder", {std::string("Lua")}, error).value_or(Value()), got) && got == (dir / "program" / "lua").string());
+	CHECK(fromValue(paths.run("dialogFolder", {std::string("Lua")}, error).value_or(Value()), got) && got == (dir / "program" / "Lua").string());
 	CHECK(fromValue(paths.run("dialogFolder", {std::string("Macros")}, error).value_or(Value()), got) && got == (dir / "program").string());
-	CHECK(!fs::exists(dir / "program" / "movies"));
+	CHECK(!fs::exists(dir / "program" / "Movies"));
+	/* a folder a file is about to be saved in is made when asked: Save as Zip's report goes into Bug reports (issue 435) */
+	CHECK(fromValue(paths.run("dialogFolder", {std::string("Bug reports"), true}, error).value_or(Value()), got) &&
+		got == (dir / "program" / "Reports").string() && fs::is_directory(dir / "program" / "Reports"));
 	/* ROMs: where the last game came from, while it is there and asked for */
-	paths.lastRomFolder.set((dir / "program" / "lua").string());
-	CHECK(fromValue(paths.run("dialogFolder", {std::string("ROM")}, error).value_or(Value()), got) && got == (dir / "program" / "lua").string());
+	paths.lastRomFolder.set((dir / "program" / "Lua").string());
+	CHECK(fromValue(paths.run("dialogFolder", {std::string("ROM")}, error).value_or(Value()), got) && got == (dir / "program" / "Lua").string());
 	paths.recentForRoms.set(false);
 	CHECK(fromValue(paths.run("dialogFolder", {std::string("ROM")}, error).value_or(Value()), got) && got == (dir / "program").string());
 	/* a game picked in a dialog is where the last game came from (issue 402) */
@@ -1318,7 +1321,7 @@ void pathsConfig()
 	CHECK(paths.tempFolder().empty());
 	CHECK(paths.run("setPath", {std::string("Temp Files"), std::string("./tmp")}, error).has_value() &&
 		paths.tempFolder() == (dir / "program" / "tmp").string());
-	CHECK(paths.run("resetAll", {}, error).has_value() && paths.changed.get() == "{}" && paths.resolve("Movies") == (dir / "program" / "movies").string());
+	CHECK(paths.run("resetAll", {}, error).has_value() && paths.changed.get() == "{}" && paths.resolve("Movies") == (dir / "program" / "Movies").string());
 	CHECK(paths.tempFolder().empty());
 	removeTree(dir);
 }
@@ -1847,11 +1850,12 @@ bool overlay(const char *package, const char *rom)
 	session.key("Down", false);
 	std::printf("overlay: [%s] [%s] lags %lld mnemonics [%s]\n", session.frameCounterText.get().c_str(), session.inputText.get().c_str(),
 		static_cast<long long>(session.lagCount.get()), session.mnemonics().c_str());
-	CHECK(session.frameCounterText.get() == "3/2 (Finished)");
+	/* recording: every frame is the movie's new end, so not (Finished) (issue 433) */
+	CHECK(session.frameCounterText.get() == "3/2");
 	CHECK(session.inputText.get() == std::string(" ") + session.mnemonics()[1] + "      ");
 	session.run("frameAdvance", {}, error);
 	CHECK(d.until([&] { return session.frame.get() == 4; }, 20));
-	CHECK(session.inputText.get() == "        " && session.frameCounterText.get() == "4/2 (Finished)");
+	CHECK(session.inputText.get() == "        " && session.frameCounterText.get() == "4/2");
 	/* the lag frames are the machine's, counted up to the frame */
 	int64_t lags = 0;
 	for (int64_t f = 0; f < 4; f++) lags += inputs.lagAt(f) ? 1 : 0;
@@ -1867,8 +1871,25 @@ bool overlay(const char *package, const char *rom)
 	session.run("frameAdvance", {}, error);
 	CHECK(d.until([&] { return session.frame.get() == 5; }, 20));
 	CHECK(session.lagCount.get() == 2 + (inputs.lagAt(0) ? 1 : 0) + (inputs.lagAt(2) ? 1 : 0) + (inputs.lagAt(4) ? 1 : 0));
+	CHECK(session.frameCounterText.get() == "5/2");
+	/* not recording, past the last input is (Finished), said at once */
+	session.recordingMode.set(false);
 	CHECK(session.frameCounterText.get() == "5/2 (Finished)");
+	session.recordingMode.set(true);
+	CHECK(session.frameCounterText.get() == "5/2");
 	CHECK(session.fpsText.get().size() > 4 && session.fpsText.get().substr(session.fpsText.get().size() - 4) == " fps");
+	/* the speed shown stays as it was when paused, and a frame advanced by hand afterwards does not count the
+	 * pause (issue 448: it went to 0) */
+	session.run("play", {}, error);
+	CHECK(d.until([&] { return session.running.get() && session.fps.get() > 0; }, 20));
+	session.run("pause", {}, error);
+	CHECK(d.until([&] { return !session.running.get(); }, 20));
+	const double kept = session.fps.get();
+	d.until([] { return false; }, 0.7);
+	const int64_t paused = session.frame.get();
+	session.run("frameAdvance", {}, error);
+	CHECK(d.until([&] { return session.frame.get() == paused + 1; }, 20));
+	CHECK(kept > 0 && session.fps.get() == kept);
 	/* a frame with input past the last makes it the last; back before it, not finished */
 	session.run("seek", {int64_t{1}}, error);
 	CHECK(d.until([&] { return session.frame.get() == 1; }, 20));
@@ -9018,7 +9039,7 @@ bool luaParity(const char *package, const char *rom)
 		std::string saveTo;
 		fromValue(formRows.cell(formRows.rowCount() - 1, 3), title);
 		fromValue(controls.cell(controls.rowCount() - 1, 19), saveTo);
-		CHECK(title == "Mine" && saveTo.size() > 11 && saveTo.substr(saveTo.size() - 11) == "/canvas.png" && saveTo.find("screenshots") != std::string::npos);
+		CHECK(title == "Mine" && saveTo.size() > 11 && saveTo.substr(saveTo.size() - 11) == "/canvas.png" && saveTo.find("Screenshots") != std::string::npos);
 	}
 	/* a game open */
 	openGame(session, package, (dir / "walker.testrom").string(), error);

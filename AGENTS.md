@@ -4,7 +4,7 @@ Chimera is a frontend for tool-assisted speedruns: an engine in C++
 (`libchimera`), a window over it (Qt 6.12: QML views over C++ view models),
 and the miniBox sandbox every emulator core runs in. It ships no cores. Each
 core is its own repository, `ToolAssisted-run/chimera-core-<id>`, publishing
-one file, `<id>.chimeraCore`, that a user puts in the `cores` folder.
+one file, `<id>.chimeraCore`, that a user puts in the `Cores` folder.
 
 This file is the operating guide for an agent working here. The reasoning
 behind every rule in it is in [docs/design-principles.md](docs/design-principles.md),

@@ -2241,6 +2241,7 @@
 		"session.firmware_missing": "Firmware lipsă (pune-l în dosarul cu firmware): %1",
 		"session.firmware_not_found": "Firmware-ul de care are nevoie acest proiect nu a fost găsit: caută-l, sau scanează un dosar",
 		"session.fps": "%1 fps",
+		"session.frame_counter_finished": "%1/%2 (terminat)",
 		"session.freezes_mixed": "Blocările au fost comutate (amestecat)",
 		"session.freezes_off": "Blocările au fost comutate (dezactivate)",
 		"session.freezes_on": "Blocările au fost comutate (activate)",

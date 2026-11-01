@@ -2200,6 +2200,7 @@
 		"session.firmware_missing": "Laiteohjelmisto puuttuu (laita se laiteohjelmistokansioon): %1",
 		"session.firmware_not_found": "Projektin tarvitsemaa laiteohjelmistoa ei löytynyt. Etsi se tai skannaa kansio.",
 		"session.fps": "%1 fps",
+		"session.frame_counter_finished": "%1/%2 (päättynyt)",
 		"session.freezes_mixed": "Jäädytykset vaihdettu (sekaisin)",
 		"session.freezes_off": "Jäädytykset vaihdettu (pois)",
 		"session.freezes_on": "Jäädytykset vaihdettu (päällä)",

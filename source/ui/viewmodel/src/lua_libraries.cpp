@@ -1492,7 +1492,7 @@ local function canvasOf(form, box)
 		if not (string.match(path, "^/") or string.match(path, "^%a:[/\\]") or string.match(path, "^\\\\")) then
 			local folder = C.paths.resolveFor(C.session.systemId, "Screenshots")
 			-- no system open: a system's own default, under the base
-			if folder == "" then folder = C.paths.absolute("./screenshots", "") end
+			if folder == "" then folder = C.paths.absolute("./Screenshots", "") end
 			path = folder .. "/" .. path
 		end
 		C.forms.saveImage(box, path)

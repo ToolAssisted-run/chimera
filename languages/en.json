@@ -2200,6 +2200,7 @@
 		"session.firmware_missing": "Firmware missing (put it in the firmware folder): %1",
 		"session.firmware_not_found": "The firmware this project needs was not found: locate it, or scan a folder",
 		"session.fps": "%1 fps",
+		"session.frame_counter_finished": "%1/%2 (Finished)",
 		"session.freezes_mixed": "Freezes toggled (mixed)",
 		"session.freezes_off": "Freezes toggled (off)",
 		"session.freezes_on": "Freezes toggled (on)",

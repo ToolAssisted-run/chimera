@@ -525,7 +525,8 @@ SessionViewModel::SessionViewModel(Dispatcher &dispatcher, InputLog &inputs)
 	expose("showLagCounter", "the lag counter is shown over the picture", showLagCounter, true);
 	expose("showInput", "the input of the frame just run is shown over the picture", showInput, true);
 	expose("fpsText", "the speed as shown: \"60 fps\", with >> fast forwarding, << rewinding", fpsText);
-	expose("frameCounterText", "the frame counter as shown: the frame, the last frame with input, (Finished) past it", frameCounterText);
+	expose("frameCounterText", "the frame counter as shown: the frame, the last frame with input, (Finished) past it unless "
+		"TAStudio is recording", frameCounterText);
 	expose("inputText", "the input of the frame just run, as the input display writes it", inputText);
 	expose("lagCount", "lag frames so far", lagCount);
 	expose("lagFrame", "the frame just run was a lag frame", lagFrame);
@@ -756,7 +757,11 @@ SessionViewModel::SessionViewModel(Dispatcher &dispatcher, InputLog &inputs)
 	turboSeekWatch_ = turboSeek.changed.connect([this] { turboSeekM_.store(turboSeek.get()); });
 	expose("recordingMode", "TAStudio's recording mode: each frame played with the person's input becomes what is held; "
 		"off, the movie is played as it is", recordingMode, true);
-	recordingWatch_ = recordingMode.changed.connect([this] { recordingModeM_ = recordingMode.get(); });
+	recordingWatch_ = recordingMode.changed.connect([this] {
+		recordingModeM_ = recordingMode.get();
+		/* the frame counter says (Finished) only while not recording */
+		updateOverlay(frame.get(), -1);
+	});
 	command("toggleRecording", "recording mode on or off (Chimera's Toggle read-only)", {}, [this](const Args &, std::string &) -> Value {
 		recordingMode.set(!recordingMode.get());
 		return recordingMode.get();
@@ -1584,7 +1589,8 @@ SessionViewModel::SessionViewModel(Dispatcher &dispatcher, InputLog &inputs)
 			endTurboSeekOnMachine();
 			runningM_ = false;
 			pauseOnFrameM_ = -1;
-			later([this] { running.set(false); fps.set(0.0); seekingTo.set(-1); });
+			/* the speed shown is the last measured, as Chimera's keeps it while paused (issue 448) */
+			later([this] { running.set(false); seekingTo.set(-1); });
 		});
 		return {};
 	}, &isOpen);
@@ -2330,7 +2336,7 @@ void SessionViewModel::seekAsAskedOnMachine(int64_t target)
 	runningM_ = false;
 	pauseOnFrameM_ = -1;
 	mcpFastM_ = false;
-	later([this] { running.set(false); fps.set(0.0); seekingTo.set(-1); });
+	later([this] { running.set(false); seekingTo.set(-1); });
 	/* Turbo seek off, as Chimera's: what the greenzone holds is gone to at
 	 * once (from its state at or before the frame), and the rest is played at
 	 * the machine's own speed, every frame drawn */
@@ -2386,7 +2392,7 @@ void SessionViewModel::restoreOnMachine(int64_t target)
 	runningM_ = false;
 	pauseOnFrameM_ = -1;
 	mcpFastM_ = false;
-	later([this] { running.set(false); fps.set(0.0); seekingTo.set(-1); });
+	later([this] { running.set(false); seekingTo.set(-1); });
 	/* where it starts from: the nearest stored state before the target, and
 	 * before the edit while the machine is past it. All the greenzone holds
 	 * is gone at once */
@@ -5602,10 +5608,12 @@ int32_t SessionViewModel::advanceOnMachine()
 	}
 	/* the step reports what it changed; here the frames added and the rate */
 	double measured = -1;
-	fpsFrames_++;
+	/* the speed is of the frames the machine runs by itself: a frame advanced by hand after a pause would
+	 * count the pause, and the speed shown would fall to nothing (issue 448) */
+	if (!steppingM_) fpsFrames_++;
 	const auto now = Clock::now();
 	const double secs = std::chrono::duration<double>(now - fpsSince_).count();
-	if (secs >= 0.5)
+	if (!steppingM_ && secs >= 0.5)
 	{
 		measured = fpsFrames_ / secs;
 		lastFpsM_ = measured;
@@ -6276,7 +6284,11 @@ void SessionViewModel::updateOverlay(int64_t f, int64_t changedFrom)
 			}
 			lastInputFor_ = size;
 		}
-		frameCounterText.set(std::to_string(f) + "/" + std::to_string(lastInput_) + (size > 0 && f > lastInput_ ? " (Finished)" : ""));
+		/* past the last input the movie is finished, but not while recording, where every frame is the
+		 * movie's new end (issue 433) */
+		const std::string at = std::to_string(f), last = std::to_string(lastInput_);
+		frameCounterText.set(size > 0 && f > lastInput_ && !recordingMode.get() ? tr("session.frame_counter_finished", {at, last})
+																				: at + "/" + last);
 	}
 	/* counted on from where it was, unless something before changed; counted
 	 * whether it is shown or not, as scripts read it (emu.lagcount) */

@@ -2200,6 +2200,7 @@
 		"session.firmware_missing": "Firmware hiányzik (tegye a firmware mappába): %1",
 		"session.firmware_not_found": "A projekt által igényelt firmware nem található: keresse meg, vagy vizsgáljon át egy mappát",
 		"session.fps": "%1 kép/s",
+		"session.frame_counter_finished": "%1/%2 (befejezve)",
 		"session.freezes_mixed": "Zárolások átkapcsolva (vegyes)",
 		"session.freezes_off": "Zárolások átkapcsolva (ki)",
 		"session.freezes_on": "Zárolások átkapcsolva (be)",

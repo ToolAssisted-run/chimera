@@ -2241,6 +2241,7 @@
 		"session.firmware_missing": "Прошивка отсутствует (поместите её в папку прошивок): %1",
 		"session.firmware_not_found": "Нужная проекту прошивка не найдена: укажите её расположение или просканируйте папку",
 		"session.fps": "%1 кадр/с",
+		"session.frame_counter_finished": "%1/%2 (окончена)",
 		"session.freezes_mixed": "Заморозка переключена (смешанно)",
 		"session.freezes_off": "Заморозка переключена (выкл.)",
 		"session.freezes_on": "Заморозка переключена (вкл.)",

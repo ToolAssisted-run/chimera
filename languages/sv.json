@@ -2200,6 +2200,7 @@
 		"session.firmware_missing": "Firmware saknas (lägg den i firmwaremappen): %1",
 		"session.firmware_not_found": "Firmwaren som projektet behöver hittades inte: hitta den, eller sök igenom en mapp",
 		"session.fps": "%1 bps",
+		"session.frame_counter_finished": "%1/%2 (slut)",
 		"session.freezes_mixed": "Låsningar växlade (blandat)",
 		"session.freezes_off": "Låsningar växlade (av)",
 		"session.freezes_on": "Låsningar växlade (på)",

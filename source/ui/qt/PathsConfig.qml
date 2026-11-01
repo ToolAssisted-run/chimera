@@ -59,9 +59,9 @@ ApplicationWindow {
 
     // Chimera's defaults for every global folder (the by System tab keeps what it has)
     readonly property var chimeraGlobals: ({
-        "Base": ".", "ROM": ".", "Firmware": "./firmware", "Movies": "./movies", "Movie backups": "./movies/backup", "A/V Dumps": ".",
-        "Tools": "./tools", "Lua": "./lua", "Themes": "./themes", "Watch (.wch)": ".", "Debug Logs": ".", "Bug reports": "./reports",
-        "Macros": "./movies/macros", "Temp Files": ""
+        "Base": ".", "ROM": ".", "Firmware": "./Firmware", "Movies": "./Movies", "Movie backups": "./Movies/backup", "A/V Dumps": ".",
+        "Tools": "./Tools", "Lua": "./Lua", "Themes": "./Themes", "Watch (.wch)": ".", "Debug Logs": ".", "Bug reports": "./Reports",
+        "Macros": "./Movies/Macros", "Temp Files": ""
     })
 
     // one tab's rows: the path, Browse, the name

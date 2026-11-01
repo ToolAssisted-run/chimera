@@ -2200,6 +2200,7 @@
 		"session.firmware_missing": "Firmware mancante (mettilo nella cartella del firmware): %1",
 		"session.firmware_not_found": "Il firmware richiesto da questo progetto non è stato trovato: indicane la posizione, oppure analizza una cartella",
 		"session.fps": "%1 fps",
+		"session.frame_counter_finished": "%1/%2 (terminato)",
 		"session.freezes_mixed": "Blocchi attivati/disattivati (misto)",
 		"session.freezes_off": "Blocchi disattivati",
 		"session.freezes_on": "Blocchi attivati",

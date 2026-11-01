@@ -2241,6 +2241,7 @@
 		"session.firmware_missing": "Brak firmware (umieść go w folderze firmware): %1",
 		"session.firmware_not_found": "Nie znaleziono firmware, którego potrzebuje ten projekt. Wskaż go albo przeszukaj folder",
 		"session.fps": "%1 kl./s",
+		"session.frame_counter_finished": "%1/%2 (zakończony)",
 		"session.freezes_mixed": "Przełączono blokady (mieszane)",
 		"session.freezes_off": "Przełączono blokady (wyłączone)",
 		"session.freezes_on": "Przełączono blokady (włączone)",

@@ -178,16 +178,22 @@ ApplicationWindow {
                     Layout.preferredWidth: 155
                     onClicked: { removeVersion.path = win.versions[versionBox.currentIndex].path; removeVersion.open() }
                 }
-                Label {
-                    text: versionBox.currentIndex >= 0 && versionBox.currentIndex < win.versions.length
-                        ? (win.vm.run("versionDetail", [win.versions[versionBox.currentIndex].path]) || "") : ""
-                    wrapMode: Text.Wrap
-                    clip: true
+                // where it is, when it was built and its terms, scrolled when longer than the room (issue 461)
+                ScrollView {
+                    id: detailScroll
+                    objectName: "versionDetail"
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                     Layout.preferredHeight: 10
                     Layout.topMargin: 8
-                    verticalAlignment: Text.AlignTop
+                    contentWidth: availableWidth
+                    clip: true
+                    Label {
+                        width: detailScroll.availableWidth
+                        text: versionBox.currentIndex >= 0 && versionBox.currentIndex < win.versions.length
+                            ? (win.vm.run("versionDetail", [win.versions[versionBox.currentIndex].path]) || "") : ""
+                        wrapMode: Text.Wrap
+                    }
                 }
             }
         }

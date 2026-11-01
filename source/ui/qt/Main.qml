@@ -60,9 +60,10 @@ ApplicationWindow {
     required property QtObject hostInput
     required property QtObject forms
     // a Paths folder for a file dialog to open in (made when it is not there)
-    function folderOf(name) {
+    // make: the folder is made first, for a file about to be saved there
+    function folderOf(name, make) {
         root.paths.changed; root.paths.base; root.paths.lastRomFolder; root.paths.recentForRoms
-        return root.pictureFiles.folderUrl(root.paths.run("dialogFolder", [name]) || "")
+        return root.pictureFiles.folderUrl(root.paths.run("dialogFolder", [name, make === true]) || "")
     }
 
     // the picture alone: TAStudio is a window of its own beside it

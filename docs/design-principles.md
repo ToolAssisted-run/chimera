@@ -12254,3 +12254,49 @@ bus to be read-only; the bus can be written now, and so can it. With the
 published Ruffle package, the window now lists "Heap" (1 GiB) in Lua's
 memory domains and in RAM Search, and a search of it starts when the
 window opens; ares was not tried.
+## Escape empties a key box, the counters, the Core Manager's text, and folder names as before (2026-11-01)
+
+Five reports, each decided by the owner as "fix":
+
+- **Escape did nothing in a key box** of Configure Hotkeys or Controller
+  Config (issue 431). The box was a read-only text field, and a read-only
+  field turns down every key that could be a shortcut, so a window's or a
+  menu's shortcut on that key ran instead. A shortcut on Escape anywhere in
+  the window took it; one on Ctrl+S would take Ctrl+S from a box binding
+  it. The keys are now taken by a plain item over the field, which claims
+  every key but Alt+F4 before any shortcut sees it.
+- **"(Finished)" on every frame while recording** (issue 433). The frame
+  counter says "(Finished)" past the movie's last input, as the old window
+  did, but while TAStudio records every frame is the movie's new end. It
+  is no longer said while recording, and turning recording on or off
+  changes the counter at once. "(Finished)" was English in every language;
+  it is a text of the tables now.
+- **The speed fell to 0 when paused** (issue 448). It now keeps the last
+  speed measured, through a pause and the start of a seek, and a frame
+  advanced by hand is not measured (after a pause it would count the pause
+  and show nearly 0).
+- **The Core Manager's text about a version was cut off** (issue 461): it
+  scrolls now.
+- **Save as Zip went into the base folder** (issue 435): a file dialog
+  opens in the nearest folder that exists, and nothing made Reports. Save
+  as Zip now makes Paths' Bug reports folder first. The reporter also
+  expected the folder names capitalised, as the old window had them, and
+  the owner agreed (user-decided, 2026-11-01), reversing lower case
+  (2026-10-24): Cores, Firmware and Themes beside the program (and in the
+  bundles), Paths' Movies, Movies/backup, Movies/Macros, Tools, Lua,
+  Reports, and each system's folder (NES) with State and Screenshots. The
+  data folder's names are unchanged: Paths does not show them, and the
+  precompiled code's folder had another word, not only another case. On
+  Linux, where case matters, a folder made under the lower-case name is not
+  found under the new one; nothing reads the old name.
+
+Tested: a new window test, "binding box", presses A, Escape and Ctrl+S in
+a box whose window has a shortcut on Escape and Ctrl+S: the box takes all
+three and the shortcut runs none. The view models' test checks the counter
+while recording and not, the speed through a pause and a frame advance, the
+capitalised folders, and the Bug reports folder made when asked. Broken on
+purpose they failed: the old box (2 checks: it took A and Ctrl, the
+shortcut ran twice), "(Finished)" while recording (4), the speed set to 0
+on pause (1), the folder not made (1). The Core Manager's scrolling text
+was not driven by a test or seen in a picture: nothing is picked when the
+window opens.

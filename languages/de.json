@@ -2200,6 +2200,7 @@
 		"session.firmware_missing": "Firmware fehlt (legen Sie sie in den Firmware-Ordner): %1",
 		"session.firmware_not_found": "Die Firmware, die dieses Projekt braucht, wurde nicht gefunden: Suchen Sie sie, oder durchsuchen Sie einen Ordner",
 		"session.fps": "%1 fps",
+		"session.frame_counter_finished": "%1/%2 (beendet)",
 		"session.freezes_mixed": "Einfrierungen umgeschaltet (gemischt)",
 		"session.freezes_off": "Einfrierungen umgeschaltet (aus)",
 		"session.freezes_on": "Einfrierungen umgeschaltet (ein)",

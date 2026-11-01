@@ -23,61 +23,72 @@ RowLayout {
     property var themeColor: (role, fallback) => fallback
     readonly property string tips: qsTrId("binding_box.escape_clears_a_key_mapping_disable")
     spacing: 0
-    function focusField() { field.forceActiveFocus() }
+    function focusField() { catcher.forceActiveFocus() }
     function take(name) {
         if (box.press(name) === true && box.next) box.next()
         // the box keeps the focus: it waits for the next input
-        else if (field.activeFocus) box.session.run("catchPad")
+        else if (catcher.activeFocus) box.session.run("catchPad")
     }
     // the last key pressed, bound when a key is let go
     property string lastPress: ""
 
     Connections {
         target: box.session
-        enabled: field.activeFocus
+        enabled: catcher.activeFocus
         function onCaughtPadChanged() { if (box.session.caughtPad !== "") box.take(box.session.caughtPad) }
     }
     TextField {
         id: field
-        objectName: "bindingBox"
         Layout.fillWidth: true
         Layout.preferredHeight: 23
         readOnly: true
+        // the keys are taken by the catcher over it: a read-only field
+        // refuses every shortcut's override, so a window's or a menu's
+        // shortcut on Escape or Ctrl+S took the key from the box (issue 431)
+        focusPolicy: Qt.NoFocus
+        activeFocusOnPress: false
         text: box.keys
         padding: 2
         // the start of the keys shown, as a text box shows them
         onTextChanged: cursorPosition = 0
         Component.onCompleted: cursorPosition = 0
         background: Rectangle {
-            color: field.activeFocus ? box.themeColor("InputAwaitingBackground", "#e0ffff") : box.themeColor("InputBackground", palette.base)
-            border.color: field.activeFocus ? palette.highlight : palette.mid
+            color: catcher.activeFocus ? box.themeColor("InputAwaitingBackground", "#e0ffff") : box.themeColor("InputBackground", palette.base)
+            border.color: catcher.activeFocus ? palette.highlight : palette.mid
         }
         ToolTip.visible: hovered
         ToolTip.delay: 500
         ToolTip.text: qsTrId("binding_box.current_binding").arg(box.keys) + "\n---\n" + box.tips
-        onActiveFocusChanged: {
-            box.lastPress = ""
-            box.session.run(activeFocus ? "catchPad" : "stopCatchPad")
-        }
-        Keys.priority: Keys.BeforeItem
-        Keys.onPressed: (event) => {
+        Item {
+            id: catcher
+            objectName: "bindingBox"
+            anchors.fill: parent
+            activeFocusOnTab: true
+            onActiveFocusChanged: {
+                box.lastPress = ""
+                box.session.run(activeFocus ? "catchPad" : "stopCatchPad")
+            }
             // Alt+F4 still closes the window; nothing else gets past the box
-            if (event.key === Qt.Key_F4 && (event.modifiers & Qt.AltModifier)) return
-            event.accepted = true
-            if (event.isAutoRepeat) return
-            const name = box.keyNamer.name(event.key, event.modifiers, box.combination)
-            if (name === "") return
-            if (name === "Escape") { box.lastPress = ""; box.take(name); return }
-            box.lastPress = name
+            function closes(event) { return event.key === Qt.Key_F4 && (event.modifiers & Qt.AltModifier) }
+            Keys.onShortcutOverride: (event) => { event.accepted = !catcher.closes(event) }
+            Keys.onPressed: (event) => {
+                if (catcher.closes(event)) return
+                event.accepted = true
+                if (event.isAutoRepeat) return
+                const name = box.keyNamer.name(event.key, event.modifiers, box.combination)
+                if (name === "") return
+                if (name === "Escape") { box.lastPress = ""; box.take(name); return }
+                box.lastPress = name
+            }
+            Keys.onReleased: (event) => {
+                event.accepted = true
+                if (event.isAutoRepeat || box.lastPress === "") return
+                const name = box.lastPress
+                box.lastPress = ""
+                box.take(name)
+            }
         }
-        Keys.onReleased: (event) => {
-            event.accepted = true
-            if (event.isAutoRepeat || box.lastPress === "") return
-            const name = box.lastPress
-            box.lastPress = ""
-            box.take(name)
-        }
-        TapHandler { onTapped: field.forceActiveFocus() }
+        TapHandler { onTapped: catcher.forceActiveFocus() }
     }
     ToolButton {
         focusPolicy: Qt.NoFocus

@@ -2241,6 +2241,7 @@
 		"session.firmware_missing": "Firmware chybí (vložte jej do složky firmware): %1",
 		"session.firmware_not_found": "Firmware, který projekt potřebuje, nebyl nalezen: najděte jej, nebo prohledejte složku",
 		"session.fps": "%1 snímků za sekundu",
+		"session.frame_counter_finished": "%1/%2 (dokončeno)",
 		"session.freezes_mixed": "Zmrazení přepnuto (smíšené)",
 		"session.freezes_off": "Zmrazení přepnuto (vypnuto)",
 		"session.freezes_on": "Zmrazení přepnuto (zapnuto)",
