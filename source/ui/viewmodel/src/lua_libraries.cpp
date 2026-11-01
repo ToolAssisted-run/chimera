@@ -775,7 +775,7 @@ function movie.setrerecordcounting(counting) C.session.setCountingRerecords(coun
 function movie.setrerecordcount(count) if C.session.hasProject then C.session.setRerecords(wholeNumber(count)) end end
 function movie.getheader()
 	local out = {}
-	for _, line in ipairs(lines(C.projectDetails.headerEntries())) do
+	for _, line in ipairs(lines(C.session.headerEntries())) do
 		local key, value = string.match(line, "^([^\t]*)\t(.*)$")
 		if key then out[key] = value end
 	end
@@ -786,17 +786,6 @@ local function zeroBased(list)
 	local out = {}
 	for i, v in ipairs(list) do out[i - 1] = v end
 	return out
-end
-function movie.getcomments()
-	if not C.session.hasProject then return {} end
-	local list = {}
-	for line in string.gmatch(C.projectDetails.comments .. "\n", "(.-)\n") do list[#list + 1] = line end
-	if list[#list] == "" then list[#list] = nil end
-	return zeroBased(list)
-end
-function movie.getsubtitles()
-	if not C.session.hasProject then return {} end
-	return zeroBased(lines(C.projectDetails.subtitleLines()))
 end
 function movie.getinput(frame, controller)
 	-- nothing past the movie's end, as Chimera's

@@ -162,8 +162,8 @@ groups:
 - **The window's frame and title bar** are the desktop's.
 - **A window a Lua script builds**, and anything a script draws, keep the
   colours the script gives them.
-- **A movie's subtitle colours** and **the padding colour a core declares**
-  for its own picture are theirs, not the theme's.
+- **The padding colour a core declares** for its own picture is its own,
+  not the theme's.
 
 ## How it is applied
 

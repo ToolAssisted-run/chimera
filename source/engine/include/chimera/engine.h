@@ -189,85 +189,6 @@ CE_API void ce_movie_log_journal_note(ce_movie_log *log, const char *record);
 CE_API int64_t ce_movie_log_journal_note_count(const ce_movie_log *log);
 CE_API const char *ce_movie_log_journal_note_at(const ce_movie_log *log, int64_t index);
 
-/* ---- movie header ----
- *
- * The Header.txt lump: "Key Value" per line. Parsing keeps the FIRST
- * occurrence of a key; writing keeps insertion order. Values may contain
- * spaces; keys may not.
- */
-
-typedef struct ce_movie_header ce_movie_header;
-
-CE_API ce_movie_header *ce_movie_header_new(void);
-CE_API void ce_movie_header_free(ce_movie_header *header);
-
-/* Replaces contents. Whitespace-only lines and lines with no value are
- * skipped; "Key  Value" parses with the separator run eaten, trailing
- * whitespace kept, as every movie's header has always been read.
- * Never fails. */
-CE_API void ce_movie_header_parse(ce_movie_header *header, const char *text, uint64_t len);
-
-CE_API int64_t ce_movie_header_count(const ce_movie_header *header);
-
-/* Borrowed; invalidated by parse/set/free. NULL when index is out of range. */
-CE_API const char *ce_movie_header_key_at(const ce_movie_header *header, int64_t index);
-CE_API const char *ce_movie_header_value_at(const ce_movie_header *header, int64_t index);
-
-/* Overwrites in place when the key exists, appends otherwise. */
-CE_API void ce_movie_header_set(ce_movie_header *header, const char *key, const char *value);
-
-/* "Key Value" per line, then a closing blank line - the old writer wrapped
- * ToString() in WriteLine(), and that extra EOL is part of the format now.
- * Invalidated by any other call on the same header. */
-CE_API const char *ce_movie_header_serialize(ce_movie_header *header, int32_t crlf, uint64_t *len_out);
-
-/* ---- plain line lumps (Comments.txt and friends) ----
- *
- * A lump that is just lines: parsing keeps every line that has a non-
- * whitespace character, in order, duplicates included; serializing writes
- * each line then the same closing blank line as every other text lump.
- */
-
-typedef struct ce_text_lines ce_text_lines;
-
-CE_API ce_text_lines *ce_text_lines_new(void);
-CE_API void ce_text_lines_free(ce_text_lines *lines);
-CE_API void ce_text_lines_parse(ce_text_lines *lines, const char *text, uint64_t len);
-CE_API int64_t ce_text_lines_count(const ce_text_lines *lines);
-/* Borrowed; invalidated by parse/add/free. NULL when out of range. */
-CE_API const char *ce_text_lines_at(const ce_text_lines *lines, int64_t index);
-CE_API void ce_text_lines_add(ce_text_lines *lines, const char *line);
-/* Invalidated by any other call on the same object. */
-CE_API const char *ce_text_lines_serialize(ce_text_lines *lines, int32_t crlf, uint64_t *len_out);
-
-/* ---- subtitle lines ----
- *
- * One Subtitles.txt line: "subtitle FRAME X Y DURATION RRGGBBAA message...".
- * The leading word is ignored on parse (it always was), the message is the
- * space-joined tail with surrounding whitespace trimmed, and a line that does
- * not parse is reported, not fatal - the old loader skipped it silently.
- */
-
-typedef struct ce_subtitle_fields
-{
-	int32_t frame;
-	int32_t x;
-	int32_t y;
-	int32_t duration;
-	uint32_t color;
-} ce_subtitle_fields;
-
-/* Returns the message's byte length on success (message copied into
- * message_buf, NUL-terminated, when cap allows; a message can never be longer
- * than its line), or -1 when the line does not parse. */
-CE_API int64_t ce_subtitle_parse_line(
-	const char *line, ce_subtitle_fields *fields, char *message_buf, uint64_t cap);
-
-/* Renders the line (no EOL). Returns its byte length; writes NUL-terminated
- * into buf when cap allows, so call with cap 0 to size first if needed. */
-CE_API int64_t ce_subtitle_format_line(
-	const ce_subtitle_fields *fields, const char *message, char *buf, uint64_t cap);
-
 /* ---- the savestate/movie container ----
  *
  * Savestates and movies share one file shape: a zip of named lumps, each
@@ -712,11 +633,6 @@ CE_API const char *ce_project_header_value_at(const ce_project *p, int32_t index
 CE_API const char *ce_project_header_get(const ce_project *p, const char *key);
 CE_API void ce_project_header_set(ce_project *p, const char *key, const char *value);
 
-/* subtitles: verbatim display lines, in order */
-CE_API int32_t ce_project_subtitle_count(const ce_project *p);
-CE_API const char *ce_project_subtitle_at(const ce_project *p, int32_t index);
-CE_API void ce_project_subtitle_add(ce_project *p, const char *line);
-CE_API void ce_project_subtitle_remove(ce_project *p, int32_t index);
 
 /* Adds a file: canonical (bare) name, the slot it fills, and where its
  * bytes are RIGHT NOW - read and hashed immediately, so the entry is born

@@ -12390,3 +12390,36 @@ and shows and hides a TAStudio column, and checks that the rows changed in
 place and were not made again; with the reset put back the check failed.
 The page-only building and the menu made on demand were measured, not
 driven by a test.
+## Header Info, Comments and Subtitles are gone (user-decided, 2026-11-01)
+
+Issue 439 asked for Header Info to be updated, and issue 440 for Comments
+and Subtitles to be removed as little used. The owner decided to drop all
+three:
+
+- TAStudio's Metadata menu and its three windows (Header Info, Edit
+  Comments, Edit Subtitles), the main window's Edit Subtitles, Add
+  Subtitle (the Subtitle Maker) and Edit Comments, View > Display
+  Subtitles, the subtitles drawn over the picture, and Lua's
+  `movie.getcomments` and `movie.getsubtitles`. The Lua console's list of
+  Chimera's functions shows those two as not available, as it shows every
+  function the window does not have.
+- The default author for new projects, and the two settings read from
+  Chimera's config.ini for them (DefaultAuthor, DisplaySubtitles).
+- Subtitles in the project file: a project that has a `subtitles` list is
+  refused as any project with a key Chimera does not know is. Subtitles
+  were written only when a project had some.
+- The engine's text formats that only these used: Header.txt, Comments.txt
+  and the subtitle line (movie_text.cpp), which nothing else called.
+
+Kept: the project's header entries (Lua's `movie.getheader`, now read
+through the session), and the project's `description`, which Edit Comments
+edited. Every project file has a `description`, so removing it would refuse
+every project made so far; that is left to the owner.
+
+Tested: the engine's project test refuses a project with subtitles; the
+view models' test checks that `movie.getcomments` and `movie.getsubtitles`
+are gone, and the autosave test now makes its change with a marker, which
+it finds in the saved file. The 40 texts only these used are gone from
+every language table, and Chimera's config.ini names the window reads are
+118 now. Broken on purpose (subtitles accepted again, movie.getcomments
+defined again) both checks failed.

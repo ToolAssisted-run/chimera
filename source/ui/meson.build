@@ -76,7 +76,6 @@ vm_lib = static_library(
     'viewmodel/src/surface_viewer_vm.cpp',
     'viewmodel/src/core_tool_vm.cpp',
     'viewmodel/src/macro_tool_vm.cpp',
-    'viewmodel/src/project_details_vm.cpp',
     'viewmodel/src/cores_vm.cpp',
     'viewmodel/src/branch_state.cpp',
     'viewmodel/src/watch_values.cpp',

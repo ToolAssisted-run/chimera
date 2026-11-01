@@ -69,7 +69,6 @@
 #include "chimera/engine.h"
 #include "chimera/vm/branches_vm.hpp"
 #include "chimera/vm/tr.hpp"
-#include "chimera/vm/project_details_vm.hpp"
 #include "chimera/vm/config_store.hpp"
 #include "chimera/vm/crash_notes.hpp"
 #include "chimera/vm/help_vm.hpp"
@@ -425,7 +424,6 @@ int main(int argc, char **argv)
 	vm::HexEditorViewModel hexEditor(dispatcher, session);
 	hexEditor.setRamWatch(&ramWatch);
 	vm::BranchesViewModel branches(dispatcher, inputs, session, pianoRoll);
-	vm::ProjectDetailsViewModel projectDetails(dispatcher, session);
 	vm::ControlsViewModel controls(dispatcher, session, &pianoRoll);
 	vm::ThemesViewModel themes(dispatcher);
 	vm::Connection themesWatch;
@@ -1081,7 +1079,6 @@ int main(int argc, char **argv)
 	vm::ConfigFilesViewModel configFiles(dispatcher, config);
 	qt::QmlViewModel configFilesQml(configFiles);
 	vm::Connection configFilesSay = configFiles.status.changed.connect([&] { session.status.set(configFiles.status.get()); });
-	config.keep(projectDetails, "defaultAuthor");
 	config.keep(pianoRoll, "maxUndoSteps");
 	config.keep(pianoRoll, "copyFrameNumbers");
 	config.keep(pianoRoll, "followScroll");
@@ -1109,7 +1106,6 @@ int main(int argc, char **argv)
 	config.keep(branches, "loadOnDoubleClick");
 	config.keep(branches, "oldControlScheme");
 	config.keep(branches, "previewSide");
-	config.keep(projectDetails, "showSubtitles");
 	config.keep(session, "greenzoneEvery");
 	config.keep(ramWatch, "showOnScreen");
 	config.keep(controls, "saved");
@@ -1276,7 +1272,6 @@ int main(int argc, char **argv)
 		config.keep(display, name);
 	qt::QmlViewModel displayQml(display);
 	qt::QmlViewModel branchesQml(branches);
-	qt::QmlViewModel projectDetailsQml(projectDetails);
 	qt::QmlViewModel coresQml(cores);
 
 	/* scripts reach the same view models, by the same names */
@@ -1316,7 +1311,6 @@ int main(int argc, char **argv)
 	lua.add(luaConsole);
 	lua.add(toolWindows);
 	lua.add(branches);
-	lua.add(projectDetails);
 	lua.add(cores);
 	lua.add(help);
 	lua.add(mediaMaker);
@@ -1503,7 +1497,6 @@ int main(int argc, char **argv)
 		{QStringLiteral("encoder"), QVariant::fromValue<QObject *>(&encoderQml)},
 		{QStringLiteral("hostInput"), QVariant::fromValue<QObject *>(&hostInputQml)},
 		{QStringLiteral("forms"), QVariant::fromValue<QObject *>(&formsQml)},
-		{QStringLiteral("projectDetails"), QVariant::fromValue<QObject *>(&projectDetailsQml)},
 		{QStringLiteral("luaConsole"), QVariant::fromValue<QObject *>(&luaConsoleQml)},
 		{QStringLiteral("toolWindows"), QVariant::fromValue<QObject *>(&toolWindowsQml)},
 		{QStringLiteral("gameProperties"), QVariant::fromValue<QObject *>(&gamePropertiesQml)},

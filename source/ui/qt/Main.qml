@@ -20,7 +20,6 @@ ApplicationWindow {
     required property QtObject hotkeys
     required property QtObject keyNamer
     required property QtObject hotkeyRelay
-    required property QtObject projectDetails
     required property QtObject themes
     required property QtObject themeColors
     required property QtObject luaConsole
@@ -190,8 +189,6 @@ ApplicationWindow {
         if (root.session.showInput) place("Input Display", [root.session.inputText], root.osdMovieInputColor)
         if (root.session.showLagCounter) place("Lag Counter", [String(root.session.lagCount)], root.osdAlertColor)
         if (root.session.stickyArmed) place("Autohold", [root.session.stickyText], root.osdColor("OsdAutoHold", "#FFFFFF"))
-        for (const s of JSON.parse(root.projectDetails.onScreen))
-            out.push({text: s.text, x: Math.round(s.x), y: Math.round(s.y), color: String(s.color)})
         if (root.ramWatch.onScreenText !== "") place("Watches", root.ramWatch.onScreenText.split("\n"), "white")
         return out
     }
@@ -529,7 +526,6 @@ ApplicationWindow {
                 Action { property string hotkey: "Input Display"; text: qsTrId("main.display_input"); checkable: true; checked: root.session.showInput; onTriggered: root.session.showInput = checked }
                 Action { text: qsTrId("main.display_rerecord_count"); checkable: true; checked: root.session.showRerecords; onTriggered: root.session.showRerecords = checked }
                 Action { text: qsTrId("main.display_real_time"); checkable: true; checked: root.session.showRealTime; onTriggered: root.session.showRealTime = checked }
-                Action { text: qsTrId("main.display_subtitles"); checkable: true; checked: root.projectDetails.showSubtitles; onTriggered: root.projectDetails.showSubtitles = checked }
                 MenuDivider {}
                 Action { text: qsTrId("main.display_status_bar"); checkable: true; checked: root.session.showStatusBar; onTriggered: root.session.showStatusBar = checked }
                 Action { text: qsTrId("main.display_messages"); checkable: true; checked: root.session.showMessages; onTriggered: root.session.showMessages = checked }
@@ -773,10 +769,6 @@ ApplicationWindow {
             visible: root.session.hasProject && root.session.unsaved
             onTriggered: root.session.run("stopMovie")
         }
-        // the window has no read-only mode: the project is always edited, so Edit, as Chimera's says then
-        Shown { text: qsTrId("main.edit_subtitles"); visible: root.session.hasProject; onTriggered: tastudioWindow.showDetails("subtitles") }
-        Shown { text: qsTrId("main.add_subtitle"); visible: root.session.isOpen && root.session.hasProject; onTriggered: subtitleMaker.openOn(root.session.frame) }
-        Shown { text: qsTrId("main.edit_comments"); visible: root.session.hasProject; onTriggered: tastudioWindow.showDetails("comments") }
         Shown {
             text: qsTrId("main.save_movie"); icon.source: "qrc:/chimera/menu/SaveMovie.png"; visible: root.session.hasProject
             onTriggered: root.hotkeys.run("run", ["Save Movie"])
@@ -811,67 +803,6 @@ ApplicationWindow {
         MenuDivider {}
         Action { text: qsTrId("main.save_config"); icon.source: "qrc:/chimera/menu/SaveConfig.png"; onTriggered: root.configFiles.run("save") }
         Action { text: qsTrId("main.load_config"); icon.source: "qrc:/chimera/menu/LoadConfig.png"; onTriggered: root.configFiles.run("load") }
-    }
-
-    // Chimera's Subtitle Maker, for Add Subtitle: the frame the machine is on, or the subtitle already on it
-    Dialog {
-        id: subtitleMaker
-        title: qsTrId("main.subtitle_maker")
-        anchors.centerIn: parent
-        modal: true
-        width: 435
-        property int frame: 0
-        property int index: -1
-        property string color: "#FFFFFFFF"
-        function openOn(f) {
-            subtitleMaker.frame = f
-            const found = root.projectDetails.run("subtitleOn", [f])
-            const sub = found ? JSON.parse(found) : { index: -1, x: 0, y: 0, duration: 120, color: "#FFFFFFFF", message: "" }
-            subtitleMaker.index = sub.index
-            subX.value = sub.x
-            subY.value = sub.y
-            subDuration.value = sub.duration
-            subtitleMaker.color = sub.color
-            subMessage.text = sub.message
-            open()
-            subMessage.forceActiveFocus()
-        }
-        onAccepted: {
-            // as Chimera's: the one on this frame is replaced
-            if (subtitleMaker.index >= 0) root.projectDetails.run("removeSubtitle", [subtitleMaker.index])
-            root.projectDetails.run("addSubtitle", [subtitleMaker.frame, subX.value, subY.value, subDuration.value, subtitleMaker.color, subMessage.text])
-        }
-        ColorDialog {
-            id: subColorDialog
-            selectedColor: "#" + subtitleMaker.color.substring(3)
-            onAccepted: subtitleMaker.color = "#FF" + selectedColor.toString().substring(1).toUpperCase()
-        }
-        GridLayout {
-            anchors.fill: parent
-            columns: 4
-            Label { text: qsTrId("common.frame") }
-            SpinBox { from: 0; to: 2147483647; value: subtitleMaker.frame; enabled: false; Layout.columnSpan: 3; Layout.preferredWidth: 120 }
-            Label { text: qsTrId("main.message"); Layout.columnSpan: 4 }
-            TextField { id: subMessage; Layout.columnSpan: 4; Layout.fillWidth: true }
-            SpinBox { id: subX; from: 0; to: 320; editable: true; Layout.preferredWidth: 90 }
-            Label { text: qsTrId("main.x_position") }
-            SpinBox { id: subDuration; from: 0; to: 9999; editable: true; Layout.preferredWidth: 90 }
-            Label { text: qsTrId("main.duration") }
-            SpinBox { id: subY; from: 0; to: 240; editable: true; Layout.preferredWidth: 90 }
-            Label { text: qsTrId("main.y_position") }
-            Rectangle {
-                Layout.preferredWidth: 56
-                Layout.preferredHeight: 19
-                color: "#" + subtitleMaker.color.substring(3)
-                border.color: palette.mid
-                TapHandler { onDoubleTapped: subColorDialog.open() }
-            }
-            Label { text: qsTrId("main.color") }
-        }
-        footer: DialogButtonBox {
-            Button { text: qsTrId("common.save"); DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole }
-            Button { text: qsTrId("common.cancel_mnemonic"); DialogButtonBox.buttonRole: DialogButtonBox.RejectRole }
-        }
     }
 
     Dialog {
@@ -968,7 +899,7 @@ ApplicationWindow {
     // the project's own window, beside this one: open exactly when a project is
     TAStudio {
         id: tastudioWindow
-        session: root.session; pianoRoll: root.pianoRoll; branches: root.branches; projectDetails: root.projectDetails
+        session: root.session; pianoRoll: root.pianoRoll; branches: root.branches
         clipboard: root.clipboard; customize: root.customize; keyedItem: keyedMenuItem; folderOf: root.folderOf; mainWindow: root
         keyNamer: root.keyNamer; toolWindows: root.toolWindows; hotkeyKeys: root.hotkeyKeys
         showControllers: () => { controllerWindow.over = tastudioWindow; root.bring(controllerWindow) }
@@ -1577,17 +1508,6 @@ ApplicationWindow {
             text: root.session.stickyText
             color: root.osdColor("OsdAutoHold", "#FFFFFF")
         }
-        // the project's subtitles on this frame, where and in the colour each says
-        Repeater {
-            model: root.session.isOpen ? JSON.parse(root.projectDetails.onScreen) : []
-            delegate: OsdText {
-                required property var modelData
-                x: modelData.x
-                y: modelData.y
-                text: modelData.text
-                color: modelData.color
-            }
-        }
         // RAM Watch's on-screen watches, a line every 14, where Config >
         // Messages puts them (Chimera's place: the top left, 70 down)
         Column {
@@ -1682,7 +1602,6 @@ ApplicationWindow {
     Connections { target: root.session; function onStatusChanged() { root.note(root.session.status) } }
     Connections { target: root.hotkeys; function onStatusChanged() { root.note(root.hotkeys.status) } }
     Connections { target: root.branches; function onStatusChanged() { root.note(root.branches.status) } }
-    Connections { target: root.projectDetails; function onStatusChanged() { root.note(root.projectDetails.status) } }
     Timer {
         interval: 250
         repeat: true

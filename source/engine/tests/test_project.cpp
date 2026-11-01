@@ -112,7 +112,6 @@ int main(int argc, char **argv)
 		ce_project_branch_add(p, "risky route", 400, "2026-08-26 21:00:00", "|..|\n", 5);
 		ce_project_branch_marker_add(p, 0, 350, "the setup", 1);
 		ce_project_branch_marker_add(p, 0, 360, "no state here", 0);
-		ce_project_subtitle_add(p, "subtitle 100 10 10 300 FFFFFFFF hello");
 		ce_project_header_set(p, "Author", "sergio");
 		ce_project_header_set(p, "Platform", "DOS");
 		ce_project_header_set(p, "Platform", "DOSBox");
@@ -155,8 +154,6 @@ int main(int argc, char **argv)
 		/* a branch marker's keep-a-state choice survives the file, as a marker's does */
 		assert(ce_project_branch_marker_keep_state(p, 0, 0) == 1);
 		assert(ce_project_branch_marker_keep_state(p, 0, 1) == 0);
-		assert(ce_project_subtitle_count(p) == 1);
-		assert(std::strcmp(ce_project_subtitle_at(p, 0), "subtitle 100 10 10 300 FFFFFFFF hello") == 0);
 		assert(ce_project_header_count(p) == 2);
 		assert(std::strcmp(ce_project_header_key_at(p, 0), "Author") == 0);
 		assert(std::strcmp(ce_project_header_get(p, "Platform"), "DOSBox") == 0);
@@ -322,6 +319,8 @@ int main(int argc, char **argv)
 	expectReject("not json", "so very not json");
 	expectReject("not an object", "[1,2,3]");
 	expectReject("unknown key", "{\"totallyNew\":1}");
+	/* subtitles are gone from the format (owner, 2026-11-01, issue 440): a project with some is not opened */
+	expectReject("subtitles", "{\"subtitles\":[\"subtitle 100 10 10 300 FFFFFFFF hello\"]}");
 	expectReject("title type", "{\"title\":5}");
 	expectReject("core incomplete", "{\"core\":{\"name\":\"x\"}}");
 	expectReject("core sha malformed", "{\"core\":{\"name\":\"x\",\"version\":\"v\",\"sha1\":\"nope\"}}");

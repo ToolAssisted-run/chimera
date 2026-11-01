@@ -123,8 +123,6 @@ const std::vector<ConfigName> &configNames()
 		{"DataDirectoryPending", Kind::NullWhenEmpty, "dataFolder.pending", ""},
 		{"DataDirectoryPendingMove", Kind::Plain, "dataFolder.pendingMove", ""},
 		{"Theme", Kind::Plain, "themes.current", ""},
-		{"DefaultAuthor", Kind::Plain, "projectDetails.defaultAuthor", ""},
-		{"DisplaySubtitles", Kind::Plain, "projectDetails.showSubtitles", ""},
 		{"CompileSessionGigabytes", Kind::Plain, "precompiled.sessionGigabytes", ""},
 		{"SnowyNullCore", Kind::Choice, "idleEye.snowWhen", "Never|Always|WeekOfChristmas"},
 	};

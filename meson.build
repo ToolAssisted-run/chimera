@@ -237,7 +237,6 @@ engine_src = files(
   'source/engine/source/engine.cpp',
   'source/engine/source/cache_bridge.cpp',
   'source/engine/source/movie_log.cpp',
-  'source/engine/source/movie_text.cpp',
   'source/engine/source/state_container.cpp',
   'source/engine/source/state_format.cpp',
   'source/engine/source/zstd_dyn.cpp',
@@ -515,7 +514,7 @@ if not meson.is_cross_build()
   test('synth_texts', find_program('python3'),
     args: [files('tools/check-core-texts.py'), meson.project_source_root() / 'tests/synth/package-box'])
 
-  foreach engine_test : ['sha1', 'movie_log', 'movie_text', 'movie_entry', 'control_names', 'state_container', 'state_format', 'package', 'multifile', 'project', 'firmware', 'state_history', 'media', 'gl_flight', 'gl_sync', 'gl_buffer_pool', 'stride_tuner', 'plain_numbers', 'greenzone_shape', 'ram_search', 'kept_pictures', 'game_properties', 'mcp', 'average_fps', 'compile_sessions', 'host_machine', 'utf8_paths', 'work_thread', 'guest_calls', 'gl_session', 'resampler', 'language']
+  foreach engine_test : ['sha1', 'movie_log', 'movie_entry', 'control_names', 'state_container', 'state_format', 'package', 'multifile', 'project', 'firmware', 'state_history', 'media', 'gl_flight', 'gl_sync', 'gl_buffer_pool', 'stride_tuner', 'plain_numbers', 'greenzone_shape', 'ram_search', 'kept_pictures', 'game_properties', 'mcp', 'average_fps', 'compile_sessions', 'host_machine', 'utf8_paths', 'work_thread', 'guest_calls', 'gl_session', 'resampler', 'language']
     test(
       'engine_' + engine_test,
       executable(

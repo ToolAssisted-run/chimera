@@ -69,7 +69,6 @@
     <file>EncodeVideo.qml</file>
     <file>LuaForms.qml</file>
     <file>Shapes.js</file>
-    <file>ProjectDetails.qml</file>
     <file>UndoHistory.qml</file>
     <file>TAStudioSettings.qml</file>
     <file>LogWindow.qml</file>

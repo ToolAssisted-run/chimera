@@ -1,9 +1,8 @@
 // Chimera's TAStudio: the project's own window, opened beside the main one
-// when a project opens and closed with it. Its menus (Edit, Metadata,
-// Settings, Window, << Hide), the piano roll, and the boxes at its
-// side (Playback, Greenzone, Branches, Markers), as Chimera lays them out.
-// Layout and bindings only, over the session, pianoRoll, branches and
-// projectDetails view models.
+// when a project opens and closed with it. Its menus (Edit, Settings,
+// Window, << Hide), the piano roll, and the boxes at its side (Playback,
+// Greenzone, Branches, Markers), as Chimera lays them out. Layout and
+// bindings only, over the session, pianoRoll and branches view models.
 import QtQuick
 import QtQuick.Controls
 import ChimeraDialogs
@@ -18,7 +17,6 @@ ApplicationWindow {
     required property QtObject session
     required property QtObject pianoRoll
     required property QtObject branches
-    required property QtObject projectDetails
     required property QtObject clipboard
     required property QtObject customize
     // the main window's menu item that shows a hotkey's keys
@@ -98,12 +96,6 @@ ApplicationWindow {
         if (x + tas.width > right) x = Math.max(main.screen.virtualX, right - tas.width)
         tas.x = x
         tas.y = Math.max(main.screen.virtualY, Math.min(main.y, bottom - tas.height))
-    }
-    // Header Info, Edit Comments or Edit Subtitles, for the main window's right-click menu
-    function showDetails(part) {
-        const w = part === "comments" ? commentsWindow : part === "subtitles" ? subtitlesWindow : headerWindow
-        w.show()
-        w.raise()
     }
     function engage() {
         tas.hiddenByPerson = false
@@ -267,14 +259,6 @@ ApplicationWindow {
                         onObjectRemoved: (index, object) => recentMacrosMenu.removeItem(object)
                     }
                 }
-            }
-            Menu {
-                delegate: MenuEntry {}
-                title: qsTrId("tastudio.metadata")
-                enabled: tas.session.hasProject
-                Action { text: qsTrId("tastudio.header"); onTriggered: { headerWindow.show(); headerWindow.raise() } }
-                Action { text: qsTrId("tastudio.comments"); onTriggered: { commentsWindow.show(); commentsWindow.raise() } }
-                Action { text: qsTrId("tastudio.subtitles"); onTriggered: { subtitlesWindow.show(); subtitlesWindow.raise() } }
             }
             Menu {
                 delegate: MenuEntry {}
@@ -1138,10 +1122,6 @@ ApplicationWindow {
         nameFilters: [qsTrId("tastudio.movie_macros_chimeramacro"), qsTrId("common.all_files")]
         onAccepted: tas.pianoRoll.run("placeMacro", [tas.pianoRoll.selectFirst, selectedFile])
     }
-    // Chimera's Header Info, Edit Comments and Edit Subtitles, each a window of its own
-    ProjectDetails { id: headerWindow; part: "header"; vm: tas.projectDetails; visible: false }
-    ProjectDetails { id: commentsWindow; part: "comments"; vm: tas.projectDetails; visible: false }
-    ProjectDetails { id: subtitlesWindow; part: "subtitles"; vm: tas.projectDetails; visible: false }
     UndoHistory { id: undoHistoryWindow; vm: tas.pianoRoll; rollColor: tas.rollColor; visible: false }
     // a TAStudio colour as the roll draws it: its own (Set Colors), else the
     // theme's, each read when it changes (asked for every cell of the branch

@@ -1020,6 +1020,19 @@ SessionViewModel::SessionViewModel(Dispatcher &dispatcher, InputLog &inputs)
 			});
 			return out;
 		});
+	command("headerEntries", "the open project's header, every entry, a line each: its key, a tab, its value (Chimera's "
+		"movie.getheader); \"\" with no project", {}, [this](const Args &, std::string &) -> Value {
+			std::string out;
+			onProjectWait([&](ce_project *p) {
+				if (p == nullptr) return;
+				for (int32_t i = 0; i < ce_project_header_count(p); i++)
+				{
+					const char *key = ce_project_header_key_at(p, i), *value = ce_project_header_value_at(p, i);
+					out += std::string(key != nullptr ? key : "") + "\t" + (value != nullptr ? value : "") + "\n";
+				}
+			});
+			return out;
+		});
 	command("sha256", "bytes' SHA-256, upper-case hex (Chimera's memory.hash_region)", {"bytes"}, [this](const Args &a, std::string &error) -> Value {
 		std::string bytes;
 		if (!arg(a, 0, bytes, error)) return {};

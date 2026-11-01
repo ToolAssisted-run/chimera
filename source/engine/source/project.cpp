@@ -198,7 +198,6 @@ struct ce_project
 	std::vector<FileEntry> files;
 	std::vector<Marker> markers;
 	std::vector<Branch> branches;
-	std::vector<std::string> subtitles; // verbatim subtitle lines, in order
 	// movie metadata this format does not first-class (Author, emulator
 	// version, platform facts): ordered key/value pairs, carried verbatim
 	std::vector<std::pair<std::string, std::string>> headers;
@@ -499,8 +498,7 @@ static ce_project *openProject(const char *path, const char **error_out)
 	/* the format is strict: a key this build does not know is an error, not
 	 * something to drop silently on the next save */
 	static const char *known[] = { "id", "title", "description", "core", "rerecords", "clockStart",
-		"files", "settings", "firmware", "coreCache", "inputs", "markers", "branches", "subtitles",
-		"headers", "tastudio" };
+		"files", "settings", "firmware", "coreCache", "inputs", "markers", "branches", "headers", "tastudio" };
 	for (cJSON *item = root->child; item != nullptr; item = item->next)
 	{
 		bool ok = false;
@@ -721,15 +719,6 @@ static ce_project *openProject(const char *path, const char **error_out)
 			p->branches.push_back(std::move(b));
 		}
 	}
-	if ((j = cJSON_GetObjectItemCaseSensitive(root, "subtitles")) != nullptr)
-	{
-		if (!cJSON_IsArray(j)) return rejectP(tr("project.not_array", {"subtitles"}));
-		for (cJSON *item = j->child; item != nullptr; item = item->next)
-		{
-			if (!cJSON_IsString(item)) return rejectP(tr("project.subtitle_string"));
-			p->subtitles.push_back(item->valuestring);
-		}
-	}
 	if ((j = cJSON_GetObjectItemCaseSensitive(root, "headers")) != nullptr)
 	{
 		if (!cJSON_IsObject(j)) return rejectP(tr("project.field_not_object", {"headers"}));
@@ -850,14 +839,6 @@ int32_t ce_project_save(ce_project *p, const char *path, const char **error_out)
 			}
 		}
 		cJSON_AddItemToArray(branches, item);
-	}
-	if (!p->subtitles.empty())
-	{
-		cJSON *subs = cJSON_AddArrayToObject(root, "subtitles");
-		for (const std::string &s : p->subtitles)
-		{
-			cJSON_AddItemToArray(subs, cJSON_CreateString(s.c_str()));
-		}
 	}
 	if (!p->headers.empty())
 	{
@@ -1200,30 +1181,6 @@ void ce_project_header_set(ce_project *p, const char *key, const char *value)
 		return;
 	}
 	if (value != nullptr) p->headers.emplace_back(key, value);
-}
-
-/* ---- subtitles: verbatim lines, in order ---- */
-
-int32_t ce_project_subtitle_count(const ce_project *p)
-{
-	return static_cast<int32_t>(p->subtitles.size());
-}
-
-const char *ce_project_subtitle_at(const ce_project *p, int32_t index)
-{
-	if (index < 0 || index >= ce_project_subtitle_count(p)) return nullptr;
-	return p->subtitles[index].c_str();
-}
-
-void ce_project_subtitle_add(ce_project *p, const char *line)
-{
-	p->subtitles.push_back(line != nullptr ? line : "");
-}
-
-void ce_project_subtitle_remove(ce_project *p, int32_t index)
-{
-	if (index < 0 || index >= ce_project_subtitle_count(p)) return;
-	p->subtitles.erase(p->subtitles.begin() + index);
 }
 
 /* ---- files ---- */
