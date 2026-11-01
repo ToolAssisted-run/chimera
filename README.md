@@ -76,9 +76,11 @@ Made, published and supported by this project. Report a problem with one in [Chi
 | [PUAE](https://github.com/ToolAssisted-run/chimera-core-puae) | Commodore Amiga, Amiga CD32, Commodore CDTV |
 | [VICE](https://github.com/ToolAssisted-run/chimera-core-vice) | Commodore 64 |
 | [Fuse](https://github.com/ToolAssisted-run/chimera-core-fuse) | ZX Spectrum 16K / 48K / 128K / +2 / +3, Timex, Pentagon, Scorpion |
+| [ZEsarUX](https://github.com/ToolAssisted-run/chimera-core-zesarux) | ZX Spectrum Next |
 | [MAME X68000](https://github.com/ToolAssisted-run/chimera-core-x68k) | Sharp X68000 |
 | [DOSBox-X](https://github.com/ToolAssisted-run/chimera-core-dosbox-x) | MS-DOS, Windows 3.1 / 95 / 98 |
 | [PCem](https://github.com/ToolAssisted-run/chimera-core-pcem) | MS-DOS, Windows 3.1 / 95 / 98, Windows XP, Linux (x86) |
+| [86Box](https://github.com/ToolAssisted-run/chimera-core-86box) | IBM PC compatibles: IBM PC, XT and AT, a 486 and a Pentium board (MS-DOS) |
 | [Ruffle](https://github.com/ToolAssisted-run/chimera-core-ruffle) | Flash |
 | [EKA2L1](https://github.com/ToolAssisted-run/chimera-core-eka2l1) | Symbian / Nokia N-Gage |
 | [touchHLE](https://github.com/ToolAssisted-run/chimera-core-touchhle) | iPhone OS 2.x-4.0 (iPhone, iPod touch and iPad apps) |
@@ -104,6 +106,7 @@ One game each, run from the game's own files ([docs/game-cores.md](docs/game-cor
 | [RSDKv3](https://github.com/ToolAssisted-run/chimera-core-rsdkv3) | Sonic CD (the 2011 remake) |
 | [RSDKv4](https://github.com/ToolAssisted-run/chimera-core-rsdkv4) | Sonic the Hedgehog and Sonic the Hedgehog 2 (the 2013 remasters) |
 | [RSDKv5](https://github.com/ToolAssisted-run/chimera-core-rsdkv5) | Sonic Mania |
+| [RSDKv5U](https://github.com/ToolAssisted-run/chimera-core-rsdkv5u) | Sonic Origins (Sonic 1, Sonic 2, Sonic CD) |
 | [DSDA-Doom](https://github.com/ToolAssisted-run/chimera-core-dsda) | Doom, Doom II, Final Doom, Heretic, Hexen, Chex Quest, Freedoom |
 | [Open4DBoxing](https://github.com/ToolAssisted-run/chimera-core-open4dboxing) | 4D Sports Boxing (DOS) |
 

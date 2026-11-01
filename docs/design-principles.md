@@ -12005,3 +12005,56 @@ their 3000 and 600 frames and ended on the same RAM on Windows as on Linux.
 A check through chimera-run says how many frames it ran (`frames=` in its
 --meta file); read it before saying what a check showed.
 
+
+## 86Box, ZEsarUX and RSDKv5U join the official cores (user-decided, 2026-11-01)
+
+Three of the core requests of 2026-10-31 were built by agents in local
+repositories, checked here, and published at the owner's word ("All
+three"). Each was run on Windows before publishing: a project played by
+chimera-run.exe of the published Chimera for Windows (Development build
+cb46d2b7) ends on the same memory as on Linux, with the frames counted.
+
+- **86Box** (issue 408), `chimera-core-86box`, 86Box v6.0 (GPL; the
+  package is GPL-3.0-or-later for 86Box's LZW code). Seven machines so far,
+  a test each: the Xi 8088, the IBM PC (1981 and 1982), XT and AT, an ASUS
+  486 board and an ASUS Pentium board, the last two with 86Box's
+  recompiler (a patch makes the code it emits independent of where things
+  sit in memory, which differed between the sandbox and a native run). The
+  core carries the free XTIDE Universal BIOS for its hard disk card, sets
+  the CMOS from the project's settings and, on the Award boards, from each
+  board's own recorded defaults, so no movie has to press F1. It uses the
+  PCem core's system id and controller layout. Tested with the owner's ROM
+  set: FreeDOS on every machine, Kingdom of Kroz II, Alley Cat, Prince of
+  Persia and Doom (shareware, to E1M1 on the Pentium); on Windows, Doom's
+  8000-frame movie ends with the same 16 MB of RAM. First build
+  "Development build 295f741b (made 2026-11-01 08:28 CET)". Not proved:
+  the 486 board's own IDE port finds no hard disk; Windows 3.x and 9x;
+  sound on Windows.
+- **ZEsarUX** (issue 407), `chimera-core-zesarux`, ZEsarUX 13.0 (GPL-3.0),
+  the ZX Spectrum Next only. It starts NextZXOS from an SD card (with the
+  user's boot ROM), or does the boot firmware's work itself for the
+  official System/Next card images made for emulators, or loads a program
+  straight in with the 48K ROM it carries (Amstrad's terms, as the Fuse
+  core's). Patches add pieces of the Next that ZEsarUX 13.0 lacks for the
+  newest NextZXOS (the card's FAT32 rule, the Multiface NMI, three
+  registers, the CTC and the hardware IM2 mode). Tested on the System/Next
+  24.11 card's games, Monster Max and three Spectrum tapes; on Windows,
+  Revival Survival's 5600-frame movie ends on the same RAM. First build
+  "Development build 0ce0d15d (made 2026-10-31 18:58 CET)". Not proved:
+  the TX-1696 demo's picture (it stands still); a .tzx from NextZXOS's
+  Browser (it wants the Next's Raspberry Pi); sound on Windows.
+- **RSDKv5U** (issue 409), `chimera-core-rsdkv5u`, a game core: the RSDKv5
+  decompilation built as v5U, which runs Sonic Origins' Sonic 1, Sonic 2
+  and Sonic CD packs; the fork the request named is a Windows add-on to
+  SonicOrigins.exe and cannot run as a core, and Sonic 3 & Knuckles' logic
+  exists only in that program. Same non-commercial decompilation licence
+  and Plus setting as the other RSDK cores. It refuses the 2013 and 2011
+  standalone packs and names the RSDKv4 or RSDKv3 core that plays them
+  (owner, 2026-10-31). Tested only on two test games of its own made in
+  Origins' pack format; on Windows a test game ends on the same game
+  state. First build "Development build 0dbb9bdf (made 2026-10-31 17:58
+  CET)". Not proved: any Sonic Origins pack.
+
+Nothing in Chimera's own source changed: three roster rows and the
+README's rows.
+

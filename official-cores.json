@@ -227,6 +227,15 @@
       "tested": ""
     },
     {
+      "id": "86box",
+      "name": "86Box",
+      "systems": [
+        { "id": "PC", "name": "IBM PC compatible" }
+      ],
+      "repo": "ToolAssisted-run/chimera-core-86box",
+      "tested": ""
+    },
+    {
       "id": "fbneo",
       "name": "FBNeo",
       "systems": [
@@ -330,6 +339,15 @@
         { "id": "ZXS", "name": "ZX Spectrum" }
       ],
       "repo": "ToolAssisted-run/chimera-core-fuse",
+      "tested": ""
+    },
+    {
+      "id": "zesarux",
+      "name": "ZEsarUX",
+      "systems": [
+        { "id": "ZXN", "name": "ZX Spectrum Next" }
+      ],
+      "repo": "ToolAssisted-run/chimera-core-zesarux",
       "tested": ""
     },
     {
@@ -564,6 +582,16 @@
       ],
       "kind": "game",
       "repo": "ToolAssisted-run/chimera-core-rsdkv5",
+      "tested": ""
+    },
+    {
+      "id": "rsdkv5u",
+      "name": "RSDKv5U",
+      "systems": [
+        { "id": "SonicOrigins", "name": "Sonic Origins (Sonic 1, Sonic 2, Sonic CD)" }
+      ],
+      "kind": "game",
+      "repo": "ToolAssisted-run/chimera-core-rsdkv5u",
       "tested": ""
     },
     {
