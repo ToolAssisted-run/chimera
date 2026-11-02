@@ -237,23 +237,63 @@ PianoRollViewModel::PianoRollViewModel(Dispatcher &dispatcher, InputLog &inputs,
 	expose("scriptColumns", "a script's own columns after the machine's, JSON [{name, text, width}]", scriptColumns);
 	expose("scriptQueries", "a script colours or writes the roll's cells (Lua's tastudio.onqueryitem...)", scriptQueries, true);
 	expose("iconEpoch", "the icons a script names are read again when this moves", iconEpoch, true);
-	command("addScriptColumn", "a script's own column: its name (what the callbacks are told), its header and width", {"name", "text", "width"},
+	/* a script's own columns, by name: one a script adds again (it was stopped and started, or another script
+	 * names it too) is the same column, its header and width the newest, and it goes when the last script that
+	 * added it stops (issue 475: each start added another, and a stopped script's stayed) */
+	command("addScriptColumn", "a script's own column: its name (what the callbacks are told), its header and width, "
+		"and the script adding it (the column goes when every script that added it has stopped)", {"name", "text", "width", "script"},
 		[this](const Args &a, std::string &error) -> Value {
 			std::string name, text;
-			int64_t width = 30;
+			int64_t width = 30, script = 0;
 			if (!arg(a, 0, name, error) || !arg(a, 1, text, error)) return {};
 			if (a.size() > 2) arg(a, 2, width, error);
+			if (a.size() > 3) arg(a, 3, script, error);
 			json::Json list;
 			std::string err;
 			json::parse(scriptColumns.get(), list, err);
 			list.kind = json::Json::Kind::Array;
-			json::Json one;
-			one.kind = json::Json::Kind::Object;
-			one.members.emplace_back("name", json::Json::string(name));
-			one.members.emplace_back("text", json::Json::string(text));
-			one.members.emplace_back("width", json::Json::integer(std::clamp<int64_t>(width, 8, 1000)));
-			list.items.push_back(one);
+			json::Json *one = nullptr;
+			for (json::Json &c : list.items)
+				if (const json::Json *n = c.find("name"); n != nullptr && n->text == name) one = &c;
+			if (one == nullptr)
+			{
+				list.items.emplace_back();
+				one = &list.items.back();
+				one->kind = json::Json::Kind::Object;
+			}
+			json::Json scripts;
+			scripts.kind = json::Json::Kind::Array;
+			if (const json::Json *had = one->find("scripts")) scripts = *had;
+			if (std::none_of(scripts.items.begin(), scripts.items.end(), [&](const json::Json &x) { return x.text == std::to_string(script); }))
+				scripts.items.push_back(json::Json::integer(script));
+			one->members.clear();
+			one->members.emplace_back("name", json::Json::string(name));
+			one->members.emplace_back("text", json::Json::string(text));
+			one->members.emplace_back("width", json::Json::integer(std::clamp<int64_t>(width, 8, 1000)));
+			one->members.emplace_back("scripts", scripts);
 			scriptColumns.set(json::write(list));
+			return {};
+		});
+	command("removeScriptColumns", "a script stopped: the columns it added go, but those another running script added too",
+		{"script"}, [this](const Args &a, std::string &error) -> Value {
+			int64_t script = 0;
+			if (!arg(a, 0, script, error)) return {};
+			json::Json list;
+			std::string err;
+			if (!json::parse(scriptColumns.get(), list, err) || list.kind != json::Json::Kind::Array) return {};
+			std::vector<json::Json> kept;
+			for (json::Json &c : list.items)
+			{
+				json::Json *scripts = nullptr;
+				for (auto &[key, value] : c.members)
+					if (key == "scripts") scripts = &value;
+				if (scripts != nullptr)
+					std::erase_if(scripts->items, [&](const json::Json &x) { return x.text == std::to_string(script); });
+				if (scripts == nullptr || !scripts->items.empty()) kept.push_back(c);
+			}
+			list.items = std::move(kept);
+			const std::string now = json::write(list);
+			if (now != scriptColumns.get()) scriptColumns.set(now);
 			return {};
 		});
 	command("clearScriptColumns", "a script's own columns and callbacks gone (the script stopped)", {}, [this](const Args &, std::string &) -> Value {

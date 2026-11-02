@@ -85,6 +85,8 @@ function __chimera_script_stopped(id)
 	for _, f in ipairs(exits) do callNamed(f) end
 	removeRegistered(function(f) return f.script == id end)
 	if __chimera_forms_stopped then __chimera_forms_stopped(id) end
+	-- the TAStudio columns it added, but those another running script added too
+	if C.pianoRoll then C.pianoRoll.removeScriptColumns(id) end
 end
 function __chimera_script_keeps(id)
 	for _, f in ipairs(registered) do if f.script == id and f.event ~= "OnExit" then return true end end
@@ -1545,7 +1547,7 @@ function tastudio.clearIconCache() C.pianoRoll.iconEpoch = C.pianoRoll.iconEpoch
 function tastudio.onqueryitembg(fn, name) return queryRegister("OnQueryItemBg", fn, name) end
 function tastudio.onqueryitemtext(fn, name) return queryRegister("OnQueryItemText", fn, name) end
 function tastudio.addcolumn(name, text, width)
-	if C.session.hasProject then C.pianoRoll.addScriptColumn(tostring(name), tostring(text), width or 30) end
+	if C.session.hasProject then C.pianoRoll.addScriptColumn(tostring(name), tostring(text), width or 30, __chimera_script or 0) end
 end
 -- every script stopped: their own columns go too
 function __chimera_scripts_stopped()

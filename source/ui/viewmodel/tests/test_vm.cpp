@@ -9458,6 +9458,26 @@ tastudio.clearIconCache()
 		CHECK(seen.rfind("seen zone 2, zone 1", 0) == 0 && seen.find("save 0") != std::string::npos);
 		CHECK(seen.find("load 0") != std::string::npos && seen.find("remove 0") != std::string::npos);
 	}
+	{
+		/* a second script names "xp" too and adds its own (issue 475): one "xp", the newest header; stopped, its own
+		 * goes and "xp" stays for the first; started again, still one of each */
+		auto columns = [&](const std::string &name) {
+			const std::string all = roll.scriptColumns.get(), key = "\"name\": \"" + name + "\"";
+			int n = 0;
+			for (size_t at = all.find(key); at != std::string::npos; at = all.find(key, at + 1)) n++;
+			return n;
+		};
+		console.run("openScript", {scriptFile("tastudio.addcolumn(\"xp\", \"XP again\", 50)\n"
+			"tastudio.addcolumn(\"mine\", \"Mine\", 20)\nwhile true do emu.frameadvance() end\n", "second")}, error);
+		CHECK(d.until([&] { return columns("mine") == 1; }, 10));
+		CHECK(columns("xp") == 1 && roll.scriptColumns.get().find("\"XP again\"") != std::string::npos);
+		console.run("toggleRow", {int64_t{2}}, error);
+		CHECK(d.until([&] { return columns("mine") == 0; }, 10));
+		CHECK(columns("xp") == 1);
+		console.run("toggleRow", {int64_t{2}}, error);
+		CHECK(d.until([&] { return columns("mine") == 1; }, 10));
+		CHECK(columns("xp") == 1);
+	}
 	/* the script stopped: what it registered goes with it */
 	lua.stopAll();
 	CHECK(!roll.scriptQueries.get() && roll.scriptColumns.get() == "[]" && lua.query("__chimera_query_text", 7, "xp").empty());

@@ -12669,3 +12669,21 @@ byte order turned round; the view models' test searches a double typed as
 "440" and a signed difference of -5, freezes 8 bytes, shows a double and a
 big-endian hex watch, saves and reopens them (failed without the q letter),
 and reads and writes 8 bytes and a double from Lua.
+
+## A script's TAStudio column is one column, and goes with its script (2026-11-02)
+
+Issue 475: a script that called tastudio.addcolumn("Test", ...) added a
+second "Test" column each time it was started again, and its column stayed
+when it was stopped. A script's columns were only taken away when every
+script had stopped, and each call added one more. The interface document
+already said a script's columns go when the script stops.
+
+Now a column is known by its name: added again (the script restarted, or
+another script naming it), it is the same column with the newest header and
+width, and it records each script that added it; it goes when the last of
+them stops. A script stopping leaves a column another running script added.
+
+Tested: the view models' test starts a second script that adds the first
+one's column and one of its own: one column of the name, the new header;
+stopped, its own goes and the shared one stays; started again, one of each.
+With the old code five of those checks failed.
