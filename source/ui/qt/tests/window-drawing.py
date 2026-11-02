@@ -8,6 +8,8 @@
 #   video: gui.drawText's two lines and gui.text's are two rows each.
 # - The lists of the Lua Console, RAM Watch and RAM Search have lines
 #   between their rows and columns, as Chimera's lists had.
+# - TAStudio's input rolls stay out of its side's boxes, however many
+#   columns the first has (issue 442).
 #
 # The window plays the project with window-drawing.lua and is shot when the
 # run ends. The encode is skipped (said) without an ffmpeg.
@@ -161,5 +163,19 @@ for name, what in (("luaConsoleWindow", "the Lua Console's scripts"), ("ramWatch
     w, h, rows = png(picture)
     found = grid(rows, w, h)
     check(found is not None, what + ": a line under the rows and lines between the columns", "none found")
+
+# TAStudio with two input rolls, the first wider than the window with a
+# script's green column: green in the rolls, none under the side's boxes,
+# which take the window's last 208 pixels (issue 442)
+GREEN = lambda r, g, b: g > 200 and r < 60 and b < 60
+picture = os.path.join(work, "window-tastudioWindow.png")
+if not os.path.exists(picture):
+    check(False, "TAStudio: the window was open and shot", out)
+else:
+    w, h, rows = png(picture)
+    def greens(left, right):
+        return sum(1 for y in range(30, h - 30) for x in range(left, right) if GREEN(*rows[y][x * 3:x * 3 + 3]))
+    rolls, side = greens(0, w - 220), greens(w - 200, w)
+    check(rolls > 0 and side == 0, "TAStudio: a roll's columns stay out of the side's boxes", "green %d in the rolls, %d under the side" % (rolls, side))
 
 sys.exit(1 if failures else 0)

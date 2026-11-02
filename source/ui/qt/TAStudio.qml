@@ -394,12 +394,17 @@ ApplicationWindow {
                         required property int index
                         view: index
                         objectName: index === 0 ? "pianoRoll" : "pianoRoll" + (index + 1)
-                        // as Chimera's: each as wide as its columns (as tall, turned), the last taking the rest
+                        // as Chimera's: each as wide as its columns (as tall, turned), the last taking the rest;
+                        // but no wider than its share of the room, or one with many columns pushed the others
+                        // out of the window and drew under the side's boxes (issue 442)
                         readonly property bool last: index === tas.pianoRoll.rollCount - 1
+                        readonly property real share: ((tas.pianoRoll.horizontal ? rollsArea.height : rollsArea.width)
+                            - (tas.pianoRoll.horizontal ? rollsArea.rowSpacing : rollsArea.columnSpacing) * (tas.pianoRoll.rollCount - 1))
+                            / Math.max(1, tas.pianoRoll.rollCount)
                         Layout.fillWidth: tas.pianoRoll.horizontal || last
                         Layout.fillHeight: !tas.pianoRoll.horizontal || last
-                        Layout.preferredWidth: tas.pianoRoll.horizontal || last ? -1 : contentExtent
-                        Layout.preferredHeight: !tas.pianoRoll.horizontal || last ? -1 : contentExtent
+                        Layout.preferredWidth: tas.pianoRoll.horizontal || last ? -1 : Math.min(contentExtent, share)
+                        Layout.preferredHeight: !tas.pianoRoll.horizontal || last ? -1 : Math.min(contentExtent, share)
                         // where an input roll is when it does not scroll with the first
                         property int ownTop: 0
                         readonly property bool synced: tas.pianoRoll.scrollSync || index === 0

@@ -12502,3 +12502,27 @@ text and that no text is cut, then again with the letters shown. Broken on
 purpose (the width tied to visibility again) it failed for three items of
 five. Seen only in the test, on Linux with no display; not yet tried by
 hand on Windows.
+
+## An input roll gets no more than its share of the room (2026-11-02)
+
+Issue 442: with a second input roll (the column menu's New input roll),
+TAStudio's rolls drew under the side's boxes (Playback, Greenzone,
+Branches), which showed them through.
+
+Measured with the reporter's own project (Banjo-Tooie on ares): every roll
+but the last is as wide as its columns, as in Chimera, and the first
+roll's columns were 1952 pixels wide, all its controls' columns, in a
+place 500 pixels wide. As soon as a second roll was made, the first was
+held at 1952 pixels, reaching far under the side's boxes, and the new
+roll was put after it, at 1955 pixels, out of sight.
+
+The fix: a roll before the last is as wide as its columns, but no wider
+than its share of the room (the room less the gaps, divided by the number
+of rolls); the last still takes what is left. A roll narrower than its
+columns cuts them at its edge, as the only roll always did. The same
+holds turned on its side, for the rolls' heights.
+
+Tested: the window-drawing test opens TAStudio with a second roll and a
+script column 1500 pixels wide painted green, and finds green in the
+rolls and none under the side's boxes. With the old rule it failed
+(30612 green pixels under the side).
