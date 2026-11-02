@@ -2,9 +2,11 @@
 /* Chimera's Customize window (Config > Customize), for what the window
  * has: how the machine behaves around the window. Each is remembered.
  *
- * - startPaused: the first machine opened waits paused. After that a
- *   machine opened runs when the last one was running and waits when it
- *   was paused, as Chimera's pause is the person's and not the machine's.
+ * - startPaused (ticked at first): a project opened or made waits paused
+ *   (owner, 2026-11-02). Unticked, a project opened runs, or waits when the
+ *   person paused the last one, as Chimera's pause is the person's and not
+ *   the machine's. Either way the same project started again (Restart, a
+ *   change that restarts it) runs or waits as it was left.
  * - startFullscreen: the window opens full screen (read at the start).
  * Nothing else pauses the machine: neither a menu open nor the window going
  *   behind another (owner, 2026-10-24, Chimera's Run in background and
@@ -49,9 +51,12 @@ class CustomizeViewModel : public ViewModel
 public:
 	CustomizeViewModel(Dispatcher &dispatcher, SessionViewModel &session);
 
-	Property<bool> startPaused{false}, startFullscreen{false}, neverAskSave{false}, luaDuringTurbo{true}, showContextMenu{true};
+	Property<bool> startPaused{true}, startFullscreen{false}, neverAskSave{false}, luaDuringTurbo{true}, showContextMenu{true};
 	Property<bool> alternateLayouts{false}, mergeModifiers{true}, singleInstance{false}, gameCubeAdapter{false};
 	Property<std::string> language, languages{"en\tEnglish"};
+	/* a run nobody watches (--headless): Start Paused does not hold its
+	 * projects, which its script drives */
+	void setUnattended(bool on) { unattended_ = on; }
 
 	/* Chimera's rewrite of the keys bound when mergeModifiers changes: merging, each side's name becomes the kind's
 	 * ("LeftShift" and "RightShift" "Shift"); separating, the kind's becomes
@@ -65,8 +70,10 @@ public:
 private:
 	void say(const char *command);
 	SessionViewModel &session_;
-	/* a machine opened runs: the first by startPaused, the rest as the last was left */
-	bool firstOpen_ = true, runOnOpen_ = true;
+	/* a machine opened runs: a project by startPaused, a restart as the last was left */
+	bool runOnOpen_ = true;
+	/* a run nobody watches (--headless): nothing waits for a person, Start Paused included */
+	bool unattended_ = false;
 	uint64_t opensSeen_ = 0;
 	std::shared_ptr<int> alive_ = std::make_shared<int>(0);
 	Connection runningWatch_, opensWatch_;

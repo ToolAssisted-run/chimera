@@ -142,6 +142,8 @@ SessionViewModel::SessionViewModel(Dispatcher &dispatcher, InputLog &inputs)
 {
 	expose("isOpen", "whether a machine is open", isOpen);
 	expose("opens", "how many times a machine has been opened", opens);
+	expose("restarted", "the machine opened last is the same project started again (Restart, a change that restarts it, a "
+		"script's reboot), not a project opened or made", restarted);
 	expose("openFailures", "how many opens failed, a file that is no project among them; the status says why", openFailures);
 	expose("unplayableMovies", "how many times the movie could not be played; the status says why", unplayableMovies);
 	expose("projectId", "the open project's id (its cache folder's name), \"\" for none", projectId);
@@ -4617,7 +4619,8 @@ void SessionViewModel::bootProjectOnMachine(ce_project *p, const std::string &pa
 	/* the project is known by the time the machine says it is open: posted
 	 * after it, a person (or a test) acting on "open" met no project, and
 	 * recording turned on then was turned off by the project's arrival */
-	adoptOnMachine(s, package, (title.empty() ? path : title) + note, true, [this, path, title, answers, id] {
+	adoptOnMachine(s, package, (title.empty() ? path : title) + note, true, [this, path, title, answers, id, keepInputs] {
+		restarted.set(keepInputs);
 		projectPath.set(path);
 		projectTitle.set(title);
 		projectId.set(id);

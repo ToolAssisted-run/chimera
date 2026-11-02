@@ -2682,10 +2682,11 @@ bool greenzoneBudgets(const char *package, const char *rom)
 	return true;
 }
 
-/* Chimera's Customize window: a machine opened runs unless the person
- * paused the last one (or "start paused" holds the first); a menu open and
- * the window going behind another pause it when asked, and run it again;
- * scripts while turbo is held only when asked */
+/* Chimera's Customize window: "start paused" (ticked at first) holds every
+ * project opened, a restart running as the last was left (owner,
+ * 2026-11-02); unticked, a machine opened runs unless the person paused the
+ * last one; nothing else pauses it; scripts while turbo is held only when
+ * asked */
 bool customizeOptions(const char *package, const char *rom)
 {
 	std::string error;
@@ -2695,6 +2696,8 @@ bool customizeOptions(const char *package, const char *rom)
 		SessionViewModel session(d, inputs);
 		session.turboSeek.set(true);
 		CustomizeViewModel customize(d, session);
+		CHECK(customize.startPaused.get());
+		customize.startPaused.set(false);
 		auto openOne = [&] {
 			const int64_t was = session.opens.get();
 			openGame(session, package, std::string(rom), error);
@@ -2738,18 +2741,42 @@ bool customizeOptions(const char *package, const char *rom)
 		session.run("close", {}, error);
 		CHECK(d.until([&] { return !session.isOpen.get(); }, 20));
 	}
-	/* "start paused": the first machine waits */
+	/* "start paused", as it is at first: every project opened waits, even
+	 * after the last one ran; the same project started again runs as it was
+	 * left */
 	{
 		ManualDispatcher d;
 		InputLog inputs;
 		SessionViewModel session(d, inputs);
 		session.turboSeek.set(true);
 		CustomizeViewModel customize(d, session);
-		customize.startPaused.set(true);
-		openGame(session, package, std::string(rom), error);
-		CHECK(d.until([&] { return session.isOpen.get(); }, 60));
-		d.until([] { return false; }, 0.3);
-		CHECK(!session.running.get());
+		auto settled = [&](bool running) {
+			d.until([] { return false; }, 0.3);
+			return session.running.get() == running;
+		};
+		auto openOne = [&] {
+			const int64_t was = session.opens.get();
+			openGame(session, package, std::string(rom), error);
+			return d.until([&] { return session.opens.get() > was && session.isOpen.get(); }, 60);
+		};
+		CHECK(openOne() && settled(false) && !session.restarted.get());
+		session.run("play", {}, error);
+		CHECK(settled(true));
+		/* started again: it runs on */
+		{
+			const int64_t was = session.opens.get();
+			session.run("restart", {}, error);
+			CHECK(d.until([&] { return session.opens.get() > was && session.isOpen.get(); }, 60));
+			CHECK(session.restarted.get() && settled(true));
+		}
+		/* another project, opened while this one runs: it waits */
+		CHECK(openOne() && settled(false) && !session.restarted.get());
+		/* a run nobody watches (--headless): nobody to press Play, so a
+		 * project opened while the last one ran runs */
+		session.run("play", {}, error);
+		CHECK(settled(true));
+		customize.setUnattended(true);
+		CHECK(openOne() && settled(true));
 		session.run("close", {}, error);
 		CHECK(d.until([&] { return !session.isOpen.get(); }, 20));
 	}

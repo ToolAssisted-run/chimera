@@ -12423,3 +12423,34 @@ it finds in the saved file. The 40 texts only these used are gone from
 every language table, and Chimera's config.ini names the window reads are
 118 now. Broken on purpose (subtitles accepted again, movie.getcomments
 defined again) both checks failed.
+
+## A project opened or made starts paused (user-decided, 2026-11-02)
+
+The owner: "upon loading or creating a project, start paused". Before,
+Config > Customize > Start Paused (unticked at first) held only the first
+machine opened; after that a machine opened ran when the last one had been
+running. The owner chose to keep the setting, ticked at first, and have it
+hold every project opened or made (over removing it).
+
+- Ticked, a project opened or made waits paused, whatever the last one was
+  doing. Unticked, a project opened runs unless the person paused the last
+  one, as before.
+- The same project started again - Restart, a change to a structural
+  setting that restarts it, a script's reboot - is not a project opened: it
+  runs or waits as it was left. The session says which an open was
+  (`restarted`).
+- A `--headless` run is never held: nobody is there to press Play, and its
+  script drives the machine (the headless test hung for its five minutes
+  with the setting applied there, its script waiting on frames that never
+  came).
+
+The setting keeps its name and place; a settings file that already holds
+it unticked keeps it unticked.
+
+Tested: the view models' Customize test now checks that the setting starts
+ticked, that a project opened waits, that a restart of a running project
+runs, that another project opened while one runs waits, and that an
+unattended run is not held; with the setting unticked at first, 3 of its
+checks fail. Meson tests: every test passes but "installed packages" and
+"command line", which fail on this machine as before (old packages in
+build/Cores, a copied program that cannot find Qt); "headless" passes.

@@ -55,6 +55,10 @@ public:
 	/* how many times a machine has been opened: a view that keeps anything
 	 * of the last one knows to start again */
 	Property<int64_t> opens{0};
+	/* the machine opened last is the same project started again (Restart, a
+	 * change that restarts it, a script's reboot), not a project opened or
+	 * made: set before opens counts it */
+	Property<bool> restarted{false};
 	/* how many opens failed; the status says why (a run nobody watches ends on one) */
 	Property<int64_t> openFailures{0};
 	/* how many times the movie could not be played (an entry that does not read); the status says why */

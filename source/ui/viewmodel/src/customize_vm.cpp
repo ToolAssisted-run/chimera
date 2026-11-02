@@ -9,8 +9,8 @@ using json::Json;
 CustomizeViewModel::CustomizeViewModel(Dispatcher &dispatcher, SessionViewModel &session)
 	: ViewModel("customize", dispatcher), session_(session)
 {
-	expose("startPaused", "the first machine opened waits paused; after that a machine opened runs when the last was "
-		"running", startPaused, true);
+	expose("startPaused", "a project opened or made waits paused (ticked at first); unticked, it runs unless the person paused "
+		"the last one. The same project started again runs or waits as it was left", startPaused, true);
 	expose("startFullscreen", "the window opens full screen (read at the start)", startFullscreen, true);
 	expose("neverAskSave", "changes not saved are let go without asking when a project is closed, another opened or "
 		"the program quit", neverAskSave, true);
@@ -55,8 +55,10 @@ CustomizeViewModel::CustomizeViewModel(Dispatcher &dispatcher, SessionViewModel 
 	});
 	opensWatch_ = session_.opens.changed.connect([this] {
 		opensSeen_++;
-		const bool run = firstOpen_ ? !startPaused.get() : runOnOpen_;
-		firstOpen_ = false;
+		/* a project opened or made waits while Start Paused is ticked
+		 * (owner, 2026-11-02); the same project started again runs or waits
+		 * as the last machine was left */
+		const bool run = session_.restarted.get() ? runOnOpen_ : !(startPaused.get() && !unattended_) && runOnOpen_;
 		runOnOpen_ = run;
 		if (run) say("play");
 	});

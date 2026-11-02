@@ -1240,6 +1240,9 @@ int main(int argc, char **argv)
 	});
 	qt::QmlViewModel cacheManagerQml(cacheManager);
 	vm::CustomizeViewModel customize(dispatcher, session);
+	/* a run nobody watches has nobody to press Play: Start Paused is the
+	 * person's (its script drives the machine) */
+	customize.setUnattended(headless);
 	for (const char *name : {"startPaused", "startFullscreen", "neverAskSave", "luaDuringTurbo",
 			 "showContextMenu", "alternateLayouts", "mergeModifiers", "singleInstance", "gameCubeAdapter", "language"})
 		config.keep(customize, name);
