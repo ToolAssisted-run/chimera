@@ -12549,3 +12549,36 @@ Nintendo 64, the 64DD (whose own default wins), a Game Boy, a project that
 names its renderer, and a package of one machine. With the `when` check taken
 out, two of its checks failed.
 
+
+## A gamepad input bound to a hotkey runs it (user-decided, 2026-11-02)
+
+Issue 466: Configure Hotkeys takes a gamepad input in its boxes (the
+reporter had Pause on "X1 RightTrigger"), but pressing it did nothing. The
+gamepads were read only on the machine's thread just before a frame ran,
+and what was held went only to the machine's buttons; nothing ever handed a
+pad input to the hotkeys, and while paused the pads were not read at all.
+
+The owner chose to make them work as keys do:
+
+- The machine's thread reads the pads sixty times a second while any hotkey
+  has a pad input, the machine running or paused, as well as before each
+  frame. A press goes to the hotkeys once, until it is let go
+  (`SessionViewModel::routePads`, `padHotkey`); the window hands it to
+  `HotkeysViewModel::key` as it hands a key.
+- Key Priority decides between the hotkey and a button as it does for a
+  key: both, the button alone, or the hotkey alone, in which case the
+  machine does not see the input.
+- A pad behind other windows is heard only with background input on, as
+  for the machine's buttons; a binding box catching a pad input takes it
+  and runs no hotkey.
+- A pad input is a hotkey's alone, never with a keyboard modifier
+  ("Shift+X1 A" is not looked for on a pad).
+
+Tested: the view models' test routes pad inputs by each Key Priority, a
+press sent once until let go (it failed with the once-only check taken out).
+A window test, "gamepad hotkeys", puts a stand-in SDL2 beside the window
+whose one controller holds its right trigger two seconds in, binds Pause to
+it from a script, and checks that a project opened paused then plays (257
+frames of six seconds) and not from the start; with the window's hand-over
+to the hotkeys taken out it played 0 frames and failed. No real gamepad was
+tried.

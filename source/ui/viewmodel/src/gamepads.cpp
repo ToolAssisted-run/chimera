@@ -143,6 +143,15 @@ Gamepads::~Gamepads()
 
 bool Gamepads::available() const { return api_->started; }
 
+bool Gamepads::isPadInput(const std::string &name)
+{
+	/* the pad's prefix, as reopen() makes it: X or J, its number from 1, a space */
+	if (name.size() < 4 || (name[0] != 'X' && name[0] != 'J')) return false;
+	size_t i = 1;
+	while (i < name.size() && name[i] >= '0' && name[i] <= '9') i++;
+	return i > 1 && i + 1 < name.size() && name[i] == ' ';
+}
+
 std::vector<std::string> Gamepads::names() const
 {
 	std::vector<std::string> out;

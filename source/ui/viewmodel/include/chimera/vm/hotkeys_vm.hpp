@@ -30,6 +30,8 @@ public:
 	bool key(const std::string &name, bool down);
 	/* whether any action has this key */
 	bool boundTo(const std::string &name) const;
+	/* every key any action has */
+	std::vector<std::string> keys() const;
 
 	/* Chimera's Key Priority, for a key that is a hotkey and a button: 0 both
 	 * act, 1 the button wins (controls over hotkeys), 2 the hotkey wins; and

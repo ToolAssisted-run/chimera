@@ -1605,6 +1605,13 @@ int main(int argc, char **argv)
 	}, Qt::DirectConnection);
 	qt::KeyFilter keys(session, hotkeys, hostInput);
 	buttonRouter.route = [&keys](const QString &name, bool down) { keys.button(name, down); };
+	/* a gamepad input bound to a hotkey runs it as a key does, by Key Priority
+	 * (issue 466): the session reads the pads, and is told the hotkeys' keys */
+	auto padHotkeys = [&session, &hotkeys] { session.setPadHotkeys(hotkeys.keys(), hotkeys.keyPriority.get()); };
+	padHotkeys();
+	vm::Connection padKeysWatch = hotkeys.bound.changed.connect(padHotkeys);
+	vm::Connection padPriorityWatch = hotkeys.keyPriority.changed.connect(padHotkeys);
+	vm::Connection padHotkeyWatch = session.padHotkey.connect([&hotkeys](std::string name, bool down) { hotkeys.key(name, down); });
 	window->installEventFilter(&keys);
 	/* TAStudio passes the keys on too, as Chimera's does: the machine's and the hotkeys */
 	if (auto *tastudio = window->findChild<QQuickWindow *>(QStringLiteral("tastudioWindow"))) tastudio->installEventFilter(&keys);

@@ -973,6 +973,37 @@ void keyPriority()
 	CHECK(hotkeys.run("cycleKeyPriority", {}, error) == Value(int64_t{1}));
 }
 
+/* a gamepad input bound to a hotkey runs it as a key does (issue 466): its
+ * press sent once until it is let go, and Key Priority giving it to the
+ * hotkey, the machine's button or both; and a pad's names told from keys */
+void padHotkeys()
+{
+	const std::set<std::string> hotkeys = {"X1 RightTrigger", "X1 A"};
+	const auto isControl = [](const std::string &n) { return n == "X1 A" || n == "X1 B"; };
+	std::set<std::string> sent;
+	auto route = [&](std::vector<std::string> held, int64_t priority) {
+		const SessionViewModel::PadRoute r = SessionViewModel::routePads(held, sent, hotkeys, priority, isControl);
+		std::string out;
+		for (const auto &[name, down] : r.hotkeys) out += (down ? "+" : "-") + name + ";";
+		out += "|";
+		for (const std::string &name : r.machine) out += name + ";";
+		return out;
+	};
+	/* both: the hotkey's input to the hotkey, the button's to the machine */
+	CHECK(route({"X1 RightTrigger", "X1 B"}, 0) == "+X1 RightTrigger;|X1 RightTrigger;X1 B;");
+	/* held on: not pressed again; let go: let go once */
+	CHECK(route({"X1 RightTrigger"}, 0) == "|X1 RightTrigger;");
+	CHECK(route({}, 0) == "-X1 RightTrigger;|");
+	CHECK(route({}, 0) == "|");
+	/* an input both a hotkey's and a button's: both get it, the button alone, or the hotkey alone */
+	CHECK(route({"X1 A"}, 0) == "+X1 A;|X1 A;" && route({}, 0) == "-X1 A;|");
+	CHECK(route({"X1 A"}, 1) == "|X1 A;" && route({}, 1) == "|");
+	CHECK(route({"X1 A"}, 2) == "+X1 A;|" && route({}, 2) == "-X1 A;|");
+	CHECK(Gamepads::isPadInput("X1 A") && Gamepads::isPadInput("J12 POV0U") && Gamepads::isPadInput("X2 LStickUp"));
+	CHECK(!Gamepads::isPadInput("X") && !Gamepads::isPadInput("X1") && !Gamepads::isPadInput("Shift+X1 A") &&
+		!Gamepads::isPadInput("XA B") && !Gamepads::isPadInput("F1") && !Gamepads::isPadInput("WMouse L"));
+}
+
 /* Customize's Merge L+R modifier keys: when it changes, Chimera's rewrite
  * of the keys bound turns each side's name into the kind's, or the kind's
  * into the left's, in every key of a list and part of a combination, for
@@ -10370,6 +10401,7 @@ int main(int argc, char **argv)
 	settingTypes();
 	luaForAgent();
 	keyPriority();
+	padHotkeys();
 	modifierRewrite();
 	messagesConfig();
 	displayFit();

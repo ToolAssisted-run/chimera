@@ -2,6 +2,7 @@
 #include "chimera/vm/tr.hpp"
 
 #include "chimera/vm/cores_vm.hpp"
+#include "chimera/vm/hotkeys_vm.hpp"
 #include "chimera/vm/sha256.hpp"
 
 #include "chimera/vm/branch_state.hpp"
@@ -2059,7 +2060,7 @@ void SessionViewModel::loop()
 		mcpOnMachine();
 		std::function<void()> job;
 		bool advance = false, runOn = false, back = false, catchPoll = false, autosaveTick = false, keepTick = false,
-			journalTick = false, idleTick = false, turboPiece = false;
+			journalTick = false, idleTick = false, turboPiece = false, padTick = false;
 		/* the scripts' turns when no frame is run, while there are scripts */
 		const bool idleScripts = (s_ == nullptr || !runningM_) && scriptsIdleM_ && scriptsWantedM_ && scriptsWantedM_();
 		if (!idleScripts) idleDue_ = {};
@@ -2108,12 +2109,21 @@ void SessionViewModel::loop()
 					idleTick = true;
 					break;
 				}
+				/* a hotkey on a gamepad input: the pads looked at sixty times a
+				 * second, when no frame run has looked at them since */
+				const bool padsOn = padHotkeysOnM_.load() || !padSentM_.empty();
+				if (padsOn && Clock::now() >= padDue_)
+				{
+					padTick = true;
+					break;
+				}
 				/* a started MCP server is looked at sixty times a second */
 				const bool mcpOn = mcpOnM_.load();
-				const bool timed = autoOn || keepOn || mcpOn || idleScripts;
+				const bool timed = autoOn || keepOn || mcpOn || idleScripts || padsOn;
 				Clock::time_point wake = autoOn && keepOn ? std::min(autosaveDue_, recoveryDue_) : autoOn ? autosaveDue_ : recoveryDue_;
 				if (mcpOn) wake = (autoOn || keepOn) ? std::min(wake, Clock::now() + std::chrono::milliseconds(16)) : Clock::now() + std::chrono::milliseconds(16);
 				if (idleScripts) wake = (autoOn || keepOn || mcpOn) ? std::min(wake, idleDue_) : idleDue_;
+				if (padsOn) wake = (autoOn || keepOn || mcpOn || idleScripts) ? std::min(wake, padDue_) : padDue_;
 				/* a call waiting (not one the window is answering), or a move of the agent's that has stopped */
 				if (mcpOn && !mcpBusyM_ && (ce_mcp_pending() != 0 || (mcpMoveM_ && !(runningM_ && pauseOnFrameM_ >= 0) && turboSeekToM_ < 0))) break;
 				/* a turbo seek going in pieces: the next piece, once any job waiting has run */
@@ -2179,6 +2189,14 @@ void SessionViewModel::loop()
 		if (catchPoll)
 		{
 			catchPollOnMachine();
+			continue;
+		}
+		if (padTick)
+		{
+			if (!padsM_) padsM_ = std::make_unique<Gamepads>();
+			std::vector<std::string> held;
+			padsM_->poll(held);
+			padHotkeysOnMachine(held);
 			continue;
 		}
 		if (turboPiece)
@@ -4838,6 +4856,69 @@ void SessionViewModel::catchPollOnMachine()
 	catchHeldM_ = held;
 }
 
+void SessionViewModel::setPadHotkeys(const std::vector<std::string> &keys, int64_t priority)
+{
+	std::set<std::string> pads;
+	for (const std::string &k : keys)
+		if (Gamepads::isPadInput(k)) pads.insert(k);
+	const bool on = !pads.empty();
+	{
+		std::lock_guard<std::mutex> lock(padHotkeysLock_);
+		padHotkeyKeys_ = std::move(pads);
+		padPriority_ = priority;
+	}
+	padHotkeysOnM_.store(on);
+	/* the machine's thread waiting looks again, at its lock, so the change is not missed */
+	{
+		std::lock_guard<std::mutex> lock(m_);
+	}
+	cv_.notify_all();
+}
+
+SessionViewModel::PadRoute SessionViewModel::routePads(const std::vector<std::string> &held, std::set<std::string> &sent,
+	const std::set<std::string> &hotkeyKeys, int64_t priority, const std::function<bool(const std::string &)> &isControl)
+{
+	PadRoute out;
+	for (const std::string &name : held)
+	{
+		const bool hotkey = hotkeyKeys.count(name) != 0;
+		const HotkeysViewModel::Route r = HotkeysViewModel::route(priority, hotkey, isControl(name));
+		/* pressed: once, until let go */
+		if (r.hotkey && hotkey && sent.insert(name).second) out.hotkeys.emplace_back(name, true);
+		if (r.control) out.machine.push_back(name);
+	}
+	for (auto it = sent.begin(); it != sent.end();)
+		if (std::find(held.begin(), held.end(), *it) == held.end())
+		{
+			out.hotkeys.emplace_back(*it, false);
+			it = sent.erase(it);
+		}
+		else
+			++it;
+	return out;
+}
+
+std::vector<std::string> SessionViewModel::padHotkeysOnMachine(const std::vector<std::string> &held)
+{
+	padDue_ = Clock::now() + std::chrono::milliseconds(16);
+	if (!padHotkeysOnM_.load() && padSentM_.empty()) return held;
+	std::set<std::string> keys;
+	int64_t priority = 0;
+	{
+		std::lock_guard<std::mutex> lock(padHotkeysLock_);
+		keys = padHotkeyKeys_;
+		priority = padPriority_;
+	}
+	/* a key box catching a pad input takes it, not a hotkey; and a pad
+	 * behind other windows is not heard unless asked, as for the machine */
+	const bool heard = !catchingM_ && padsHeardM_.load();
+	PadRoute r = routePads(heard ? held : std::vector<std::string>{}, padSentM_, keys, priority,
+		[this](const std::string &name) { return !bindingsM_.buttonsOf(name).empty(); });
+	for (auto &[name, down] : r.hotkeys)
+		later([this, name = std::move(name), down = down] { padHotkey.emit(name, down); });
+	return heard ? std::move(r.machine) : held;
+}
+
 bool SessionViewModel::hiddenByDefault(const std::string &n)
 {
 	auto starts = [&n](const char *p) { return n.rfind(p, 0) == 0; };
@@ -5723,7 +5804,9 @@ int32_t SessionViewModel::stepOnMachine(bool live, bool render, bool grow)
 				padHeldCopy_ = padHeld_;
 				padAxesCopy_ = padAxes_;
 			}
-			for (const std::string &name : padHeld_)
+			/* an input a hotkey takes by Key Priority is not the machine's */
+			padForMachine_ = padHotkeysOnMachine(padHeld_);
+			for (const std::string &name : padForMachine_)
 				for (int b : bindingsM_.buttonsOf(name))
 					if (b >= 0) padHeld.set(static_cast<size_t>(b));
 			const std::vector<std::string> open = padsM_->names();
@@ -5755,7 +5838,7 @@ int32_t SessionViewModel::stepOnMachine(bool live, bool render, bool grow)
 				std::lock_guard<std::mutex> lock(keysHeldM_);
 				keys = keysHeld_;
 			}
-			if (padsHeardM_.load()) keys.insert(keys.end(), padHeld_.begin(), padHeld_.end());
+			if (padsHeardM_.load()) keys.insert(keys.end(), padForMachine_.begin(), padForMachine_.end());
 			Buttons firingKeys;
 			for (const std::string &k : keys)
 				for (int b : autofireBindingsM_.buttonsOf(k))

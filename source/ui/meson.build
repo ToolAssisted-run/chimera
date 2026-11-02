@@ -446,6 +446,16 @@ if qt_dep.found()
       override_options: ['cpp_std=c++20'],
     )
     test('file chooser', find_program('python3'), args: [files('qt/tests/file-chooser.py'), test_file_chooser], timeout: 180)
+    # a gamepad input bound to a hotkey runs it as a key does (issue 466): a
+    # stand-in SDL2's pad presses Pause, and a project opened paused runs
+    stand_in_sdl = shared_library('stand-in-sdl', 'qt/tests/stand_in_sdl.c', build_by_default: false)
+    test(
+      'gamepad hotkeys',
+      find_program('python3'),
+      args: [files('qt/tests/gamepad-hotkeys.py'), chimera_qt, meson.current_build_dir() / 'gamepad-hotkeys-test', window_game[0],
+        repo_root / 'build/Cores/synth-box.chimeraCore', stand_in_sdl, files('qt/tests/gamepad-hotkeys.lua')],
+      timeout: 120,
+    )
   endif
   # the window's texts come from the engine's language tables, in the
   # language the person's system or choice gives (docs/translations.md)

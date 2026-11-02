@@ -438,6 +438,14 @@ bool HotkeysViewModel::boundTo(const std::string &name) const
 	return false;
 }
 
+std::vector<std::string> HotkeysViewModel::keys() const
+{
+	std::vector<std::string> out;
+	for (const Action &a : actions_)
+		for (std::string &k : keyList(a.keys)) out.push_back(std::move(k));
+	return out;
+}
+
 HotkeysViewModel::Route HotkeysViewModel::route(int64_t priority, bool hotkeyBound, bool controlBound)
 {
 	Route r;

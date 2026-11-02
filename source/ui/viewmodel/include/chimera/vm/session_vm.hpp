@@ -15,6 +15,7 @@
 #include <filesystem>
 #include <memory>
 #include <mutex>
+#include <set>
 #include <thread>
 
 #include "chimera/vm/bindings.hpp"
@@ -517,6 +518,23 @@ public:
 		std::lock_guard<std::mutex> lock(padHeldCopyM_);
 		return padHeldCopy_;
 	}
+	/* the keys the hotkeys have and Key Priority (HotkeysViewModel's), so a
+	 * gamepad input bound to a hotkey runs it as a key does, the machine
+	 * running or not (issue 466); any thread */
+	void setPadHotkeys(const std::vector<std::string> &keys, int64_t priority);
+	/* a gamepad input bound to a hotkey went down or up: for HotkeysViewModel::key */
+	Signal<std::string, bool> padHotkey;
+	/* where the gamepad inputs held go, by Key Priority as a key's: the
+	 * presses and lets-go for the hotkeys, and the inputs left to the
+	 * machine's buttons. `sent` holds the inputs whose press went to the
+	 * hotkeys and whose letting go has not yet */
+	struct PadRoute
+	{
+		std::vector<std::pair<std::string, bool>> hotkeys;
+		std::vector<std::string> machine;
+	};
+	static PadRoute routePads(const std::vector<std::string> &held, std::set<std::string> &sent,
+		const std::set<std::string> &hotkeyKeys, int64_t priority, const std::function<bool(const std::string &)> &isControl);
 	/* the run's own markers' frames: their states are kept as a marker's are, never saved */
 	void setRunMarkers(std::vector<int64_t> frames);
 
@@ -1252,9 +1270,22 @@ private:
 	Connection periodWatch_;
 	std::atomic<int64_t> periodM_{1};
 	std::vector<std::string> padHeld_;
+	/* the pad inputs held that the machine's buttons take (not those Key Priority gives a hotkey) */
+	std::vector<std::string> padForMachine_;
 	mutable std::mutex padHeldCopyM_;
 	std::vector<std::string> padHeldCopy_;
 	size_t padCount_ = 0;
+	/* the hotkeys' keys and Key Priority (setPadHotkeys), and whether any key is a gamepad's */
+	std::mutex padHotkeysLock_;
+	std::set<std::string> padHotkeyKeys_;
+	int64_t padPriority_ = 0;
+	std::atomic<bool> padHotkeysOnM_{false};
+	/* the inputs whose press went to the hotkeys, and when the pads are looked
+	 * at next for them while no frame is run (sixty times a second) */
+	std::set<std::string> padSentM_;
+	Clock::time_point padDue_{};
+	/* the pads held, their hotkeys' presses and lets-go sent; what is left to the machine */
+	std::vector<std::string> padHotkeysOnMachine(const std::vector<std::string> &held);
 	std::unique_ptr<Sound> soundM_;
 
 	SharedButtons held_;

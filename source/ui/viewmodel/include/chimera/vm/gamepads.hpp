@@ -34,6 +34,9 @@ public:
 	/* the pads open now, by name */
 	std::vector<std::string> names() const;
 
+	/* whether a key's name is one a pad sends ("X1 A", "J2 POV0U") */
+	static bool isPadInput(const std::string &name);
+
 private:
 	struct Api;
 	struct Pad;
