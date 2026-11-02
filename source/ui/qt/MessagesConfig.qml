@@ -23,7 +23,8 @@ ApplicationWindow {
     height: 470
     modality: Qt.ApplicationModal
     transientParent: win.mainWindow
-    readonly property var names: ["Fps", "Frame Counter", "Lag Counter", "Input Display", "Watches", "Messages", "Rerecords", "Autohold", "Game Time", "Real Time"]
+    // the types listed: Game Time only while the open core has a game timer (issue 470)
+    readonly property var names: JSON.parse(win.vm.types)
     readonly property var places: JSON.parse(win.vm.positions)
     property string picked: "Fps"
     readonly property var place: win.places[win.picked] || ({ "x": 0, "y": 0, "anchor": 0 })

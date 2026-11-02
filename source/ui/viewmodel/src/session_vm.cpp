@@ -4673,10 +4673,15 @@ void SessionViewModel::bootProjectOnMachine(ce_project *p, const std::string &pa
 		if (source != nullptr && *source != '\0') answers.files.emplace_back(slot != nullptr ? slot : "", source);
 	}
 	const std::string id = ce_project_id(p) != nullptr ? ce_project_id(p) : "";
+	/* the game's name, its first file's without the kind */
+	const char *firstFile = ce_project_file_count(p) > 0 ? ce_project_file_name(p, 0) : nullptr;
+	const std::string stem = firstFile != nullptr ? std::filesystem::path(firstFile).stem().string() : title;
 	/* the project is known by the time the machine says it is open: posted
 	 * after it, a person (or a test) acting on "open" met no project, and
-	 * recording turned on then was turned off by the project's arrival */
-	adoptOnMachine(s, package, (title.empty() ? path : title) + note, true, [this, path, title, answers, id, keepInputs] {
+	 * recording turned on then was turned off by the project's arrival; the
+	 * game's name too (a script's gameinfo.getromname read "" at the open) */
+	adoptOnMachine(s, package, (title.empty() ? path : title) + note, true, [this, path, title, answers, id, keepInputs, stem] {
+		gameName.set(stem);
 		restarted.set(keepInputs);
 		projectPath.set(path);
 		projectTitle.set(title);
@@ -4703,11 +4708,6 @@ void SessionViewModel::bootProjectOnMachine(ce_project *p, const std::string &pa
 		std::error_code ec;
 		const std::filesystem::path where = std::filesystem::weakly_canonical(game, ec);
 		carryFreezesOnMachine(package + "\n" + (ec ? game : where.string()));
-	}
-	{
-		const char *first = ce_project_file_count(p) > 0 ? ce_project_file_name(p, 0) : nullptr;
-		std::string stem = first != nullptr ? std::filesystem::path(first).stem().string() : title;
-		later([this, stem] { gameName.set(stem); });
 	}
 	/* the game time the project was saved with, as the end of the movie's
 	 * own: an edit before the end forgets it, as it would one the machine

@@ -1266,6 +1266,9 @@ int main(int argc, char **argv)
 	for (const char *name : {"positions", "messagesColor", "alertColor", "lastInputColor", "movieInputColor", "messageSeconds", "stackMessages"})
 		config.keep(messages, name);
 	qt::QmlViewModel messagesQml(messages);
+	/* Game Time is a place only while the open core has a game timer (issue 470) */
+	messages.gameTimer.set(session.hasGameTimer.get());
+	vm::Connection messagesTimerWatch = session.hasGameTimer.changed.connect([&messages, &session] { messages.gameTimer.set(session.hasGameTimer.get()); });
 	vm::DisplayViewModel display(dispatcher);
 	for (const char *name : {"aspectMode", "customWidth", "customHeight", "ratioX", "ratioY", "letterbox", "integerScale", "cropLeft",
 			 "cropTop", "cropRight", "cropBottom", "finalFilter", "prescale", "autoPrescale", "scaleOsd", "osdFollowsWindow", "saveWindowPosition", "windowGeometry",

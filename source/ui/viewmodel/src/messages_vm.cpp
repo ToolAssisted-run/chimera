@@ -44,9 +44,22 @@ std::string MessagesViewModel::defaultPositions()
 	return json::write(all);
 }
 
+std::string MessagesViewModel::typesShown(bool gameTimer)
+{
+	Json all;
+	all.kind = Json::Kind::Array;
+	for (const char *name : kNames)
+		if (gameTimer || std::string(name) != "Game Time") all.items.push_back(Json::string(name));
+	return json::write(all);
+}
+
 MessagesViewModel::MessagesViewModel(Dispatcher &dispatcher) : ViewModel("messages", dispatcher)
 {
 	positions.set(defaultPositions());
+	types.set(typesShown(false));
+	expose("gameTimer", "the open core has a timer of its own: only then is Game Time listed", gameTimer);
+	expose("types", "the types the window lists, in Chimera's order (Game Time only with a game timer), a JSON array", types);
+	gameTimerWatch_ = gameTimer.changed.connect([this] { types.set(typesShown(gameTimer.get())); });
 	expose("positions", "where each thing drawn over the picture goes: {\"Fps\": {\"x\", \"y\", \"anchor\"}, ...} (anchor 0 "
 		"top left, 1 top right, 2 bottom left, 3 bottom right; x and y in pixels from that corner)", positions, true);
 	expose("messagesColor", "the messages' colour, #AARRGGBB (Chimera's default is the theme's)", messagesColor, true);

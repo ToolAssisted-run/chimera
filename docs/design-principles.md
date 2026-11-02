@@ -12582,3 +12582,18 @@ it from a script, and checks that a project opened paused then plays (257
 frames of six seconds) and not from the start; with the window's hand-over
 to the hotkeys taken out it played 0 frames and failed. No real gamepad was
 tried.
+
+## Config > Messages lists Game Time only with a game timer (user-decided, 2026-11-02)
+
+Issue 470: Config > Messages listed a "Game Time" place for every core,
+though only a game core with a timer of its own (SDLPoP2's) draws a game
+time; the Game menu's Display Game Time was already there only for such a
+core. The owner chose to list the row only while the open core has a game
+timer, as the menus do ("Chimera must have no default menu items for the
+cores"). Its place is still remembered, and used when such a core opens.
+The list of rows is the messages view model's (`types`, following the
+session's `hasGameTimer`); the window shows it.
+
+Tested: the view models' test checks the list without a game timer, with
+one (Game Time between Autohold and Real Time) and without again, the
+place kept; with the row always listed, the two checks without a timer failed.

@@ -1110,6 +1110,12 @@ void messagesConfig()
 	/* remembered before Game Time was a place: the rest kept, Game Time at Chimera's */
 	messages.positions.set(R"({"Fps": {"x": 9, "y": 9, "anchor": 1}})");
 	CHECK(at("Fps") == "9,9,1" && at("Game Time") == "0,14,1");
+	/* Game Time is listed only while the open core has a game timer (issue 470); its place is kept either way */
+	CHECK(messages.types.get().find("Game Time") == std::string::npos && messages.types.get().find("Real Time") != std::string::npos);
+	messages.gameTimer.set(true);
+	CHECK(messages.types.get().find("\"Autohold\", \"Game Time\", \"Real Time\"") != std::string::npos);
+	messages.gameTimer.set(false);
+	CHECK(messages.types.get().find("Game Time") == std::string::npos && at("Game Time") == "0,14,1");
 }
 
 /* Chimera's Display window: the picture's shape, bars or stretched, whole
