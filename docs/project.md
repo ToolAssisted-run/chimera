@@ -17,9 +17,22 @@ which learns to take a project file.
 
 ## What a project is
 
-A single JSON file (extension `.chimeraProject`) that contains literally
-everything required to reproduce the work, except the data bytes
-themselves, which are named by their SHA1:
+One file (extension `.chimeraProject`) that contains literally everything
+required to reproduce the work, except the data bytes themselves, which are
+named by their SHA1. The file is a zip (owner, 2026-11-02) of:
+
+- `project.json`: everything below but the input's lines - the identity,
+  the files, the settings, the input's columns, markers, branches.
+- `input.input`: the input, one frame a line, exactly as TAStudio's Copy
+  puts frames on the clipboard (`|..|U.......|`): nothing before or after
+  the lines, no quotes, no commas between them.
+- `branches/<n>.input`: each branch's input the same way, numbered from 1
+  in the branches' order.
+
+A part the format does not have is refused when the project opens, saying
+which. A project saved before 2026-11-02 is a single JSON file; this
+Chimera refuses it with a sentence saying so and keeps no reader for it
+(owner, 2026-11-02). What the project holds:
 
 - **Core identity**: package name, version, hash - pinned at creation, and
   re-pinned by a save to the core that actually ran. Opening a project on
@@ -71,15 +84,14 @@ themselves, which are named by their SHA1:
 - **The TAS work itself**: input log, markers, branches. The project IS
   the movie; publishing a finished TAS means handing over the project
   file, and anyone holding files matching the SHA1s can reproduce
-  everything. The input is the `inputs` object (owner, 2026-10-28):
-  `columns`, the movie's groups of columns in order (the console's first,
-  then each player's), each a list of the columns' names; and `entries`,
-  one string a frame, `|..|........|`, in the same groups. A branch has
-  its own `inputs`. A file written before 2026-10-28 has `input` instead,
-  the movie's text block (`[Input]`, a `LogKey:` line, the entries,
-  `[/Input]`) as one string; it is not read (owner, 2026-10-28: Chimera
-  keeps no old forms), and opening it says `unknown project key "input"`.
-  A build from before cannot open a project saved after.
+  everything. The input's columns are the `inputs` object of
+  `project.json` (owner, 2026-10-28): `columns`, the movie's groups of
+  columns in order (the console's first, then each player's), each a list
+  of the columns' names. Its frames are the lines of `input.input`, one a
+  frame, `|..|........|`, in the same groups (owner, 2026-11-02). A branch
+  has its own `inputs` and its own `branches/<n>.input`. A movie with no
+  columns named has no `inputs`, and its lines are in the machine's own
+  order. A build from before cannot open a project saved after.
   The groups and names are split from the movie's key, and joined back to
   it byte for byte: a control whose name holds a `#` or `|` of its own
   (a keypad's "P1 #", a keyboard's "| @") is still read whole by the
@@ -107,8 +119,15 @@ Not in the project:
 - **Greenzone / cached states.** Kept in the per-user cache, keyed by the
   project's id (docs/state-manager.md), not beside the project: a project
   folder is the folder people sync, and a multi-gigabyte sibling there is
-  uploaded again on every save. If present it is loaded, otherwise the
-  session starts from a clean state-memory slate. A greenzone left beside
+  uploaded again on every save. It is written there when the project
+  closes - Close, another project opened or made, Chimera quit - and not
+  by a save (owner, 2026-11-02): a save no longer waits on gigabytes going
+  to the disk. Closed with edits not saved, the states after the first
+  frame where the movie differs from the project's file are left out,
+  since they were made for input the file does not hold. A project never
+  saved keeps none, and a session that did not end (a crash) keeps none.
+  If present it is loaded, otherwise the session starts from a clean
+  state-memory slate. A greenzone left beside
   an older project is moved into the cache the first time it is opened.
   A project saved under another name gets an id of its own, and so a
   cache folder of its own; its branches' states and budgets go with it
@@ -470,6 +489,12 @@ tool's window from the declaration, the way it draws settings:
   starts).
 - `outputs`: the files it writes, each where the person chooses; `nameFrom`
   names an input whose name, with `extension`, is suggested beside it.
+  An output with `"project": true` is a project (owner, 2026-11-02): the
+  core writes its two parts, `<name>.json` (what `project.json` holds) and
+  `<name>.input` (its input's lines), and Chimera makes them into the
+  project's zip when the tool is done. A part Chimera would refuse when the
+  project opens is refused there, saying which, and nothing is written. The
+  core never needs to know the zip's layout.
 
 Run picks nothing for the person: what is missing is said in the tool's own
 words. The tool runs in a process of its own (`chimera-run --run-tool`, which

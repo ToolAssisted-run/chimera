@@ -29,6 +29,12 @@
 		"tool.no_output": "soubor k zápisu tu není",
 		"tool.no_parts": "nebyly zadány žádné části",
 		"tool.empty_part": "část %1 je prázdná",
-		"tool.joined": "spojeno částí: %1, bajtů: %2"
+		"tool.joined": "spojeno částí: %1, bajtů: %2",
+		"tool.make_project": "Vytvořit projekt...",
+		"tool.make_project.about": "Zapíše projekt o třech snímcích, jako to dělá nástroj jádra.",
+		"tool.make_project.broken": "Řádek, který není snímku",
+		"tool.make_project.broken.about": "Vstup projektu dostane řádek, který není snímku, a Chimera ho odmítne.",
+		"tool.make_project.project": "Projekt",
+		"tool.made_project": "vytvořen projekt o %1 snímcích"
 	}
 }

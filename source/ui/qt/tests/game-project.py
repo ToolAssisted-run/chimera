@@ -14,6 +14,10 @@ import shutil
 import sys
 import zipfile
 
+# a project is a zip (owner, 2026-11-02): written as the witness writes one
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "..", "tests", "synth"))
+import project_file  # noqa: E402
+
 package, game, out = sys.argv[1:4]
 with zipfile.ZipFile(package) as z:
     cfg = json.loads(z.read("waterbox.config"))
@@ -28,10 +32,9 @@ if os.path.abspath(game) != beside:
     shutil.copyfile(game, beside)
 with open(beside, "rb") as f:
     sha1 = hashlib.sha1(f.read()).hexdigest().upper()
-with open(out, "w", encoding="utf-8") as f:
-    json.dump({
-        "title": os.path.splitext(os.path.basename(game))[0],
-        "core": {"name": cfg["coreName"], "version": cfg.get("version", ""), "sha1": ""},
-        "headers": {"MovieVersion": "Chimera Project File v1.1", "Platform": cfg.get("systemId", "")},
-        "files": [{"name": os.path.basename(game), "sha1": sha1, "slot": slot}],
-    }, f)
+project_file.write(out, {
+    "title": os.path.splitext(os.path.basename(game))[0],
+    "core": {"name": cfg["coreName"], "version": cfg.get("version", ""), "sha1": ""},
+    "headers": {"MovieVersion": "Chimera Project File v1.1", "Platform": cfg.get("systemId", "")},
+    "files": [{"name": os.path.basename(game), "sha1": sha1, "slot": slot}],
+})

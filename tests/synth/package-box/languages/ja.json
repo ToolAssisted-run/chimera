@@ -25,6 +25,12 @@
 		"tool.no_output": "書き込むファイルがありません",
 		"tool.no_parts": "パーツが指定されていません",
 		"tool.empty_part": "パーツ %1 は空です",
-		"tool.joined": "%1 個のパーツを結合しました (%2 バイト)"
+		"tool.joined": "%1 個のパーツを結合しました (%2 バイト)",
+		"tool.make_project": "プロジェクトを作る...",
+		"tool.make_project.about": "コアのツールと同じように、3 フレームのプロジェクトを書きます。",
+		"tool.make_project.broken": "フレームのものではない行",
+		"tool.make_project.broken.about": "プロジェクトの入力にフレームのものではない行が入り、Chimera はそれを拒否します。",
+		"tool.make_project.project": "プロジェクト",
+		"tool.made_project": "%1 フレームのプロジェクトを作りました"
 	}
 }

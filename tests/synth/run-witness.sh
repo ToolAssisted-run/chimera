@@ -32,6 +32,8 @@ while [ $# -gt 0 ]; do
 done
 
 here="$(cd "$(dirname "$0")" && pwd)"
+# tests read and write projects through project_file.py (a project is a zip)
+export PYTHONPATH="$here${PYTHONPATH:+:$PYTHONPATH}"
 repo_root="$(cd "$here/../.." && pwd)"
 golden_dir="$here/goldens"
 work="$here/work"
@@ -265,7 +267,7 @@ KEYED
 		cp "$here/roms/gridWalker.testrom" "$jdir/ok/gridWalker.testrom"
 		head -c 64 "$here/roms/gridWalker.testrom" > "$jdir/changed/gridWalker.testrom"
 		python3 - "$here/movies/$jname.txt" "$jdir/ok/gridWalker.testrom" "$jdir" <<'PROJPY'
-import hashlib, json, sys
+import hashlib, json, sys, project_file
 entries = [l.rstrip("\r\n") for l in open(sys.argv[1]) if l.startswith("|")]
 logkey = "#P1 Up|P1 Down|P1 Left|P1 Right|P1 A|P1 B|P1 Select|P1 Start|"
 sha1 = hashlib.sha1(open(sys.argv[2], "rb").read()).hexdigest().upper()
@@ -279,7 +281,7 @@ def write(path, pin="", settings=None, firmware=None):
     }
     if settings is not None: doc["settings"] = settings
     if firmware is not None: doc["firmware"] = firmware
-    json.dump(doc, open(path, "w"))
+    project_file.write(path, doc)
 out = sys.argv[3]
 write(out + "/ok/p.chimeraProject")
 write(out + "/ok/settings.chimeraProject", settings={"initFillByte": 171})
@@ -323,7 +325,7 @@ PROJPY
 		mkdir -p "$jdir/clock"
 		{ cat "$here/roms/gridWalker.testrom"; printf 'CLOCKTEST'; } > "$jdir/clock/clock.testrom"
 		python3 - "$jdir/clock/clock.testrom" "$jdir/clock" <<'CLOCKPY'
-import hashlib, json, sys
+import hashlib, json, sys, project_file
 sha1 = hashlib.sha1(open(sys.argv[1], "rb").read()).hexdigest().upper()
 def write(path, start=None):
     doc = {
@@ -334,7 +336,7 @@ def write(path, start=None):
                    "entries": ["|........|"] * 3},
     }
     if start is not None: doc["clockStart"] = start
-    json.dump(doc, open(path, "w"))
+    project_file.write(path, doc)
 write(sys.argv[2] + "/start.chimeraProject", "2030-01-02T03:04:05Z")
 write(sys.argv[2] + "/default.chimeraProject")
 CLOCKPY
@@ -841,6 +843,42 @@ json.dump(d, open(p, 'w'))
 			report "E:core-tool" FAIL "done=[$tdone] file=[$(cat "$tdir/joined.bin" 2>/dev/null)] empty=[$tempty] unknown=[$tunknown] (see work/tool/run.err)"
 		fi
 
+		# A TOOL'S PROJECT (owner, 2026-11-02): an output the package declares
+		# "project" is two files to the core, <name>.json and <name>.input,
+		# which the engine makes into the project's zip when the tool is done.
+		# The synth's make_project writes a project of three frames pinned to
+		# the package; the zip must hold project.json and input.input, its
+		# lines exactly as written, and open (asked for a suggestion, which
+		# reads its settings). With "broken" one line is not a frame's: the
+		# engine refuses the project, says which line, and leaves no file.
+		mdir2="$work/tool-project"
+		rm -rf "$mdir2" && mkdir -p "$mdir2"
+		mdone="$("$chimera_run" --run-tool make_project "$epkg" --output project="$mdir2/made.chimeraProject" 2>"$mdir2/run.err")"
+		mbroken="$("$chimera_run" --run-tool make_project "$epkg" --output project="$mdir2/broken.chimeraProject" \
+			--tool-options '{"broken":true}' 2>&1)"; mbrc=$?
+		msuggest="$("$chimera_run" --project "$mdir2/made.chimeraProject" "$epkg" --suggest 2>>"$mdir2/run.err")"
+		mzip="$(python3 - "$mdir2/made.chimeraProject" "$epkg" <<'TOOLPROJPY'
+import hashlib, json, sys, zipfile
+z = zipfile.ZipFile(sys.argv[1])
+names = sorted(z.namelist())
+doc = json.loads(z.read("project.json"))
+sha1 = hashlib.sha1(open(sys.argv[2], "rb").read()).hexdigest().upper()
+ok = (names == ["input.input", "project.json"]
+      and z.read("input.input") == b"|U.|\n|.D|\n|UD|\n"
+      and doc.get("id") and doc["title"] == "made by a tool" and doc["core"]["sha1"] == sha1
+      and doc["inputs"] == {"columns": [["P1 Up", "P1 Down"]]} and doc["settings"] == {"initFillByte": 9})
+print("ok" if ok else "names=%s json=%s" % (names, json.dumps(doc)[:300]))
+TOOLPROJPY
+)"
+		if [ "$mdone" = '{"done": "made a project of 3 frames"}' ] && [ "$mzip" = ok ] \
+			&& printf '%s' "$msuggest" | grep -qF '"seen": "game none, 0 bytes, fill 9"' \
+			&& [ "$mbrc" -ne 0 ] && printf '%s' "$mbroken" | grep -qF "could not be made" && printf '%s' "$mbroken" | grep -qF "line 2" \
+			&& [ -z "$(ls "$mdir2" | grep -v -e '^made.chimeraProject$' -e '^run.err$')" ]; then
+			report "E:core-tool-project" PASS "a tool's project output, written as project.json and its input's lines, became a project zip that opens (its lines as written, pinned to the package); a project with a line that is not a frame's is refused, line named, and no file is left"
+		else
+			report "E:core-tool-project" FAIL "done=[$mdone] zip=[$mzip] suggest=[$(printf '%s' "$msuggest" | cut -c1-80)] broken rc=$mbrc [$(printf '%s' "$mbroken" | tail -1 | cut -c1-160)] files=[$(ls "$mdir2" | tr '\n' ' ')]"
+		fi
+
 		# THE OTHER QUESTIONS ARE ASKED OF A PROJECT TOO (user-decided,
 		# 2026-10-26). The core's suggested settings (SuggestSettings): the
 		# synth names the game the project gave it, its size and the fill byte
@@ -853,8 +891,8 @@ json.dump(d, open(p, 'w'))
 		"$chimera_run" --new-project "$qdir/game.chimeraProject" "$epkg" "$here/roms/gridWalker.testrom" \
 			--settings '{"initFillByte":5}' > "$qdir/game.make.log" 2>&1
 		qanswer="$("$chimera_run" --project "$qdir/game.chimeraProject" "$epkg" --files "$here/roms" --suggest 2>"$qdir/suggest.err")"
-		printf '{"title": "none", "core": {"name": "Synth", "version": "", "sha1": ""}, "files": [], "settings": {"initFillByte": 9}}\n' \
-			> "$qdir/none.chimeraProject"
+		python3 -c 'import project_file,sys; project_file.write(sys.argv[1], {"title": "none", "core": {"name": "Synth", "version": "", "sha1": ""}, "files": [], "settings": {"initFillByte": 9}})' \
+			"$qdir/none.chimeraProject"
 		qnone="$("$chimera_run" --project "$qdir/none.chimeraProject" "$epkg" --suggest 2>>"$qdir/suggest.err")"
 		"$chimera_run" "$epkg" "$here/roms/gridWalker.testrom" --suggest > "$qdir/alone.log" 2>&1; qalone=$?
 		# (the synth answers a fill of 9, and "seen" says what reached it)
@@ -1378,7 +1416,7 @@ DYNAMIC
 			"$chimera_run" --project "$mdir/$mtag.chimeraProject" "$epkg" "$@" \
 				--dump "RAM=$mdir/$mtag.ram.bin" --dump "VRAM=$mdir/$mtag.vram.bin" > "$mdir/$mtag.log" 2>&1
 		}
-		mfield() { python3 -c 'import json,sys; print(json.dumps(json.load(open(sys.argv[1])).get(sys.argv[2]), sort_keys=True))' "$mdir/$1.chimeraProject" "$2" 2>/dev/null; }
+		mfield() { python3 -c 'import json,sys,project_file; print(json.dumps(project_file.read(sys.argv[1]).get(sys.argv[2]), sort_keys=True))' "$mdir/$1.chimeraProject" "$2" 2>/dev/null; }
 		for movie in "$here"/movies/*.txt; do
 			mname="$(basename "$movie" .txt)"
 			mmake "$mname" "$epkg" "$mdir/${mname%%.*}.testrom" "$movie"
@@ -1428,7 +1466,7 @@ DYNAMIC
 		mwrongrc=$mrc
 		printf '{}' > "$mdir/game.chimeraMultiFile"
 		mmake whole "$epkg" "$mdir/game.chimeraMultiFile"
-		if [ "$mslotrc" -eq 0 ] && [ "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["files"][0]["slot"])' "$mdir/slot.chimeraProject" 2>/dev/null)" = cartridge ] \
+		if [ "$mslotrc" -eq 0 ] && [ "$(python3 -c 'import project_file,sys; print(project_file.read(sys.argv[1])["files"][0]["slot"])' "$mdir/slot.chimeraProject" 2>/dev/null)" = cartridge ] \
 			&& [ "$mwrongrc" -ne 0 ] && [ "$mwrongrc" -lt 128 ] && [ ! -e "$mdir/wrong-slot.chimeraProject" ] && grep -q "do not fit the package's slots" "$mdir/wrong-slot.make.log" \
 			&& [ "$mrc" -ne 0 ] && [ "$mrc" -lt 128 ] && [ ! -e "$mdir/whole.chimeraProject" ] && grep -q "a file at a time" "$mdir/whole.make.log"; then
 			report "E:made-project:slots" PASS "the game goes in the slot that takes its kind; a slot the package lacks and a game given whole are refused, no project written"
@@ -1484,7 +1522,7 @@ MACHPY
 		# the movie named with --movie, which a project of no game file needs:
 		# the same input as the movie after the game
 		mmake movie-option "$epkg" "$mdir/gridWalker.testrom" --movie "$here/movies/gridWalker.win.txt"
-		if [ "$mrc" -eq 0 ] && [ -n "$(mfield gridWalker.win input)" ] && [ "$(mfield movie-option input)" = "$(mfield gridWalker.win input)" ]; then
+		if [ "$mrc" -eq 0 ] && [ "$(mfield gridWalker.win inputs)" != null ] && [ "$(mfield movie-option inputs)" = "$(mfield gridWalker.win inputs)" ]; then
 			report "E:made-project:movie-option" PASS "a movie named with --movie is the project's input, as one after the game"
 		else
 			report "E:made-project:movie-option" FAIL "rc=$mrc, or the input differs (see work/made-project/movie-option.make.log)"
@@ -1690,18 +1728,18 @@ json.dump(d, open(p, 'w'))
 		rm -rf "$pdir" && mkdir -p "$pdir"
 		cp "$prom" "$pdir/gridWalker.testrom"
 		python3 - "$here/movies/$pname.txt" "$pdir/gridWalker.testrom" "$pdir/$pname.chimeraProject" <<'PY'
-import hashlib, json, sys
+import hashlib, json, sys, project_file
 entries = [l.rstrip("\r\n") for l in open(sys.argv[1]) if l.startswith("|")]
 logkey = "#P1 Up|P1 Down|P1 Left|P1 Right|P1 A|P1 B|P1 Select|P1 Start|"
 sha1 = hashlib.sha1(open(sys.argv[2], "rb").read()).hexdigest().upper()
-json.dump({
+project_file.write(sys.argv[3], {
     "title": "gridWalker.win",
     "core": {"name": "Synth", "version": "", "sha1": ""},
     "headers": {"MovieVersion": "Chimera Project File v1.1", "Platform": "Synth"},
     "files": [{"name": "gridWalker.testrom", "sha1": sha1, "slot": "rom"}],
     "settings": {"initFillByte": 171},
     "inputs": {"columns": [g.split("|")[:-1] for g in logkey.split("#")[1:]], "entries": entries},
-}, open(sys.argv[3], "w"))
+})
 PY
 		pjob="$work/job.project.txt"
 		{
@@ -1744,17 +1782,17 @@ PY
 		else
 			cp "$here/roms/gridWalker.testrom" "$wdir/gridWalker.testrom"
 			python3 - "$here/movies/$wname.txt" "$wdir/gridWalker.testrom" "$wdir/$wname.chimeraProject" <<'MCPPY'
-import hashlib, json, sys
+import hashlib, json, sys, project_file
 entries = [l.rstrip("\r\n") for l in open(sys.argv[1]) if l.startswith("|")]
 logkey = "#P1 Up|P1 Down|P1 Left|P1 Right|P1 A|P1 B|P1 Select|P1 Start|"
 sha1 = hashlib.sha1(open(sys.argv[2], "rb").read()).hexdigest().upper()
-json.dump({
+project_file.write(sys.argv[3], {
     "title": "gridWalker.win",
     "core": {"name": "Synth", "version": "", "sha1": ""},
     "headers": {"MovieVersion": "Chimera Project File v1.1", "Platform": "Synth"},
     "files": [{"name": "gridWalker.testrom", "sha1": sha1, "slot": "rom"}],
     "inputs": {"columns": [g.split("|")[:-1] for g in logkey.split("#")[1:]], "entries": entries},
-}, open(sys.argv[3], "w"))
+})
 MCPPY
 			cp "$config" "$wdir/settings.json"
 			CHIMERA_MCP_NAME="witness$$"; export CHIMERA_MCP_NAME
@@ -1864,17 +1902,17 @@ MCPPY
 		rm -rf "$tdir" && mkdir -p "$tdir"
 		cp "$trom" "$tdir/gridWalker.testrom"
 		python3 - "$here/movies/$tname.txt" "$tdir/gridWalker.testrom" "$tdir/$tname.chimeraProject" <<'TASPY'
-import hashlib, json, sys
+import hashlib, json, sys, project_file
 entries = [l.rstrip("\r\n") for l in open(sys.argv[1]) if l.startswith("|")][:5]
 logkey = "#P1 Up|P1 Down|P1 Left|P1 Right|P1 A|P1 B|P1 Select|P1 Start|"
 sha1 = hashlib.sha1(open(sys.argv[2], "rb").read()).hexdigest().upper()
-json.dump({
+project_file.write(sys.argv[3], {
     "title": "gridWalker.win",
     "core": {"name": "Synth", "version": "", "sha1": ""},
     "headers": {"MovieVersion": "Chimera Project File v1.1", "Platform": "Synth"},
     "files": [{"name": "gridWalker.testrom", "sha1": sha1, "slot": "rom"}],
     "inputs": {"columns": [g.split("|")[:-1] for g in logkey.split("#")[1:]], "entries": entries},
-}, open(sys.argv[3], "w"))
+})
 TASPY
 		textend=8
 		tfailed=0
@@ -1953,14 +1991,14 @@ TASPY
 			fi
 			if [ "$gpass" = first ]; then
 				if ! python3 - "$gdir/g.chimeraProject" <<'GZPY'
-import json, sys
-p = json.load(open(sys.argv[1]))
+import json, sys, project_file
+p = project_file.read(sys.argv[1])
 # TAStudio's part is its settings object as ConfigService writes it: {"o": {...}}
 t = (p.get("tastudio") or {}).get("o")
 if not isinstance(t, dict) or t.get("GreenzonePeriod") != 1:
     sys.exit("TAStudio's part holds no GreenzonePeriod of 1: " + json.dumps(t)[:200])
 t["GreenzonePeriod"] = 7
-json.dump(p, open(sys.argv[1], "w"))
+project_file.write(sys.argv[1], p)
 GZPY
 				then
 					report "T:box:greenzoneChoice" FAIL "the first save wrote no Greenzone choice into the project"
@@ -1970,7 +2008,7 @@ GZPY
 			fi
 		done
 		if [ "$gfailed" -eq 0 ]; then
-			gperiod="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("tastudio", {}).get("o", {}).get("GreenzonePeriod"))' "$gdir/g.chimeraProject")"
+			gperiod="$(python3 -c 'import project_file,sys; print(project_file.read(sys.argv[1]).get("tastudio", {}).get("o", {}).get("GreenzonePeriod"))' "$gdir/g.chimeraProject")"
 			if [ "$gperiod" = 7 ]; then
 				report "T:box:greenzoneChoice" PASS "a project left on one in seven reopens on it and saves it back"
 			else
@@ -2042,18 +2080,18 @@ GZPY
 			cp "$here/roms/gridWalker.testrom" "$cdir/gridWalker.testrom"
 			sed "12s/.*/$cline/" "$here/movies/gridWalker.win.txt" > "$cdir/movie.txt"
 			python3 - "$cdir/movie.txt" "$cdir/gridWalker.testrom" "$cdir/stops.chimeraProject" <<'PY'
-import hashlib, json, sys
+import hashlib, json, sys, project_file
 entries = [l.rstrip("\r\n") for l in open(sys.argv[1]) if l.startswith("|")]
 logkey = "#P1 Up|P1 Down|P1 Left|P1 Right|P1 A|P1 B|P1 Select|P1 Start|"
 sha1 = hashlib.sha1(open(sys.argv[2], "rb").read()).hexdigest().upper()
-json.dump({
+project_file.write(sys.argv[3], {
     "id": "0123456789abcdef0123456789abc0de",
     "title": "stops",
     "core": {"name": "Synth", "version": "", "sha1": ""},
     "headers": {"MovieVersion": "Chimera Project File v1.1", "Platform": "Synth"},
     "files": [{"name": "gridWalker.testrom", "sha1": sha1, "slot": "rom"}],
     "inputs": {"columns": [g.split("|")[:-1] for g in logkey.split("#")[1:]], "entries": entries},
-}, open(sys.argv[3], "w"))
+})
 PY
 			cjob="$work/job.stops-$cname.txt"
 			{
@@ -2097,18 +2135,18 @@ PY
 			rm -rf "$rdir" && mkdir -p "$rdir"
 			cp "$here/roms/gridWalker.testrom" "$rdir/gridWalker.testrom"
 			python3 - "$here/movies/gridWalker.win.txt" "$rdir/gridWalker.testrom" "$rdir/reboot.chimeraProject" <<'PY'
-import hashlib, json, sys
+import hashlib, json, sys, project_file
 entries = [l.rstrip("\r\n") for l in open(sys.argv[1]) if l.startswith("|")]
 logkey = "#P1 Up|P1 Down|P1 Left|P1 Right|P1 A|P1 B|P1 Select|P1 Start|"
 sha1 = hashlib.sha1(open(sys.argv[2], "rb").read()).hexdigest().upper()
-json.dump({
+project_file.write(sys.argv[3], {
     "id": "0123456789abcdef0123456789ab0196",
     "title": "reboot",
     "core": {"name": "Synth", "version": "", "sha1": ""},
     "headers": {"MovieVersion": "Chimera Project File v1.1", "Platform": "Synth"},
     "files": [{"name": "gridWalker.testrom", "sha1": sha1, "slot": "rom"}],
     "inputs": {"columns": [g.split("|")[:-1] for g in logkey.split("#")[1:]], "entries": entries},
-}, open(sys.argv[3], "w"))
+})
 PY
 			rjob="$work/job.reboot-$roll.txt"
 			{
@@ -2142,18 +2180,18 @@ PY
 		cp "$here/roms/gridWalker.testrom" "$ddir/gridWalker.testrom"
 		sed '12s/.*/|UDLRABsS|/' "$here/movies/gridWalker.win.txt" > "$ddir/movie.txt"
 		python3 - "$ddir/movie.txt" "$ddir/gridWalker.testrom" "$ddir/reboot.chimeraProject" <<'PY'
-import hashlib, json, sys
+import hashlib, json, sys, project_file
 entries = [l.rstrip("\r\n") for l in open(sys.argv[1]) if l.startswith("|")]
 logkey = "#P1 Up|P1 Down|P1 Left|P1 Right|P1 A|P1 B|P1 Select|P1 Start|"
 sha1 = hashlib.sha1(open(sys.argv[2], "rb").read()).hexdigest().upper()
-json.dump({
+project_file.write(sys.argv[3], {
     "id": "0123456789abcdef0123456789ab0196",
     "title": "reboot",
     "core": {"name": "Synth", "version": "", "sha1": ""},
     "headers": {"MovieVersion": "Chimera Project File v1.1", "Platform": "Synth"},
     "files": [{"name": "gridWalker.testrom", "sha1": sha1, "slot": "rom"}],
     "inputs": {"columns": [g.split("|")[:-1] for g in logkey.split("#")[1:]], "entries": entries},
-}, open(sys.argv[3], "w"))
+})
 PY
 		djob="$work/job.reboot-dies.txt"
 		{
@@ -2196,17 +2234,17 @@ PY
 		rm -rf "$edir" && mkdir -p "$edir"
 		cp "$erom" "$edir/gridWalker.testrom"
 		python3 - "$here/movies/$ename.txt" "$edir/gridWalker.testrom" "$edir/$ename.chimeraProject" <<'ENCPY'
-import hashlib, json, sys
+import hashlib, json, sys, project_file
 entries = [l.rstrip("\r\n") for l in open(sys.argv[1]) if l.startswith("|")]
 logkey = "#P1 Up|P1 Down|P1 Left|P1 Right|P1 A|P1 B|P1 Select|P1 Start|"
 sha1 = hashlib.sha1(open(sys.argv[2], "rb").read()).hexdigest().upper()
-json.dump({
+project_file.write(sys.argv[3], {
     "title": "gridWalker.win",
     "core": {"name": "Synth", "version": "", "sha1": ""},
     "headers": {"MovieVersion": "Chimera Project File v1.1", "Platform": "Synth"},
     "files": [{"name": "gridWalker.testrom", "sha1": sha1, "slot": "rom"}],
     "inputs": {"columns": [g.split("|")[:-1] for g in logkey.split("#")[1:]], "entries": entries},
-}, open(sys.argv[3], "w"))
+})
 ENCPY
 		evideo="$work/encode.mkv"
 		efrom=10
@@ -2273,17 +2311,17 @@ ENCPY
 		make_project() { # <movie name> <project path>
 			cp "$here/roms/${1%%.*}.testrom" "$rdir/${1%%.*}.testrom"
 			python3 - "$here/movies/$1.txt" "$rdir/${1%%.*}.testrom" "$2" <<'REOPENPY'
-import hashlib, json, sys
+import hashlib, json, sys, project_file
 entries = [l.rstrip("\r\n") for l in open(sys.argv[1]) if l.startswith("|")]
 logkey = "#P1 Up|P1 Down|P1 Left|P1 Right|P1 A|P1 B|P1 Select|P1 Start|"
 sha1 = hashlib.sha1(open(sys.argv[2], "rb").read()).hexdigest().upper()
-json.dump({
+project_file.write(sys.argv[3], {
     "title": sys.argv[1],
     "core": {"name": "Synth", "version": "", "sha1": ""},
     "headers": {"MovieVersion": "Chimera Project File v1.1", "Platform": "Synth"},
     "files": [{"name": sys.argv[2].split("/")[-1], "sha1": sha1, "slot": "rom"}],
     "inputs": {"columns": [g.split("|")[:-1] for g in logkey.split("#")[1:]], "entries": entries},
-}, open(sys.argv[3], "w"))
+})
 REOPENPY
 		}
 		make_project gridWalker.win "$rdir/first.chimeraProject"

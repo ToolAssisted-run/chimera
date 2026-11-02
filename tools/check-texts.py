@@ -24,7 +24,7 @@ WORDS = re.compile(r"[A-Za-z]{2,}[ ,.:;!?']\s*[A-Za-z]")
 CAPITALISED = re.compile(r"[A-Z][a-z]{2,}(\.\.\.|:)?")
 NOT_WORDS = re.compile(
     r"^(qrc:|:/|file:|https?:|[a-z]+://)"
-    r"|^[\w./\\ -]*\.(png|svg|ico|json|txt|lua|qml|js|log|zip|wch|sublime-completions|jpg|gif|bmp|tga|mp4|mkv|wav|dll|so|exe|chimera\w*)$"
+    r"|^[\w./\\ -]*\.(png|svg|ico|json|txt|lua|qml|js|log|zip|wch|input|sublime-completions|jpg|gif|bmp|tga|mp4|mkv|wav|dll|so|exe|chimera\w*)$"
     r"|^(Ctrl|Alt|Shift|Meta)\+"
     r"|^\[[a-z][a-z-]*\] "                  # a log line: "[history] ..."
     r"|^-[a-z]"                              # a command line's arguments: "-c:v libx264 ..."

@@ -27,6 +27,12 @@
 		"tool.no_output": "yazılacak dosya yok",
 		"tool.no_parts": "hiç parça verilmedi",
 		"tool.empty_part": "%1 parçası boş",
-		"tool.joined": "%1 parça birleştirildi, %2 bayt"
+		"tool.joined": "%1 parça birleştirildi, %2 bayt",
+		"tool.make_project": "Proje yap...",
+		"tool.make_project.about": "Bir çekirdeğin aracı gibi üç karelik bir proje yazar.",
+		"tool.make_project.broken": "Bir kareye ait olmayan bir satır",
+		"tool.make_project.broken.about": "Projenin girdisine bir kareye ait olmayan bir satır eklenir ve Chimera bunu reddeder.",
+		"tool.make_project.project": "Proje",
+		"tool.made_project": "%1 karelik bir proje yapıldı"
 	}
 }

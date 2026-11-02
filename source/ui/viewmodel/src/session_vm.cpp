@@ -2276,6 +2276,7 @@ void SessionViewModel::loop()
 			if (now - due_ > 4 * period_) due_ = now;
 		}
 	}
+	keepHistoryAtCloseOnMachine();
 	freeSessionOnMachine();
 	freeProjectOnMachine();
 	padsM_.reset(); /* SDL stops on the thread that started it */
@@ -3707,6 +3708,27 @@ void SessionViewModel::keepHistoryOnMachine()
 	}
 }
 
+void SessionViewModel::keepHistoryAtCloseOnMachine()
+{
+	if (s_ == nullptr || projectM_ == nullptr || projectPathM_.empty()) return;
+	/* the frames the project's file and the machine's movie agree on; the
+	 * states after them were made for input the file does not hold */
+	const std::string now = movieTextOnMachine();
+	if (now != savedLogM_)
+	{
+		ce_movie_log *saved = ce_movie_log_new(), *ran = ce_movie_log_new();
+		ce_movie_log_parse(saved, savedLogM_.data(), savedLogM_.size());
+		ce_movie_log_parse(ran, now.data(), now.size());
+		const int64_t a = ce_movie_log_count(saved), b = ce_movie_log_count(ran);
+		int64_t agree = 0;
+		while (agree < a && agree < b && std::strcmp(ce_movie_log_entry(saved, agree), ce_movie_log_entry(ran, agree)) == 0) agree++;
+		if (agree < a || agree < b) ce_session_greenzone_invalidate(s_, agree);
+		ce_movie_log_free(saved);
+		ce_movie_log_free(ran);
+	}
+	keepHistoryOnMachine();
+}
+
 void SessionViewModel::becameAnotherOnMachine(const std::filesystem::path &cacheWas, const std::filesystem::path &recoveryWas)
 {
 	namespace fs = std::filesystem;
@@ -3717,7 +3739,7 @@ void SessionViewModel::becameAnotherOnMachine(const std::filesystem::path &cache
 	if (dir.empty()) return;
 	fs::create_directories(dir, ec);
 	/* The branches' states and notes, and the budgets: the history is written
-	 * again by this save, and the rest says where the project is now. A state
+	 * when the project closes, and the rest says where the project is now. A state
 	 * is written whole to a file of its own and moved into place, so the two
 	 * folders can share one until either writes it again; the rest is copied. */
 	auto bring = [&](const fs::path &from, const fs::path &to, bool share) {
@@ -4292,6 +4314,8 @@ void SessionViewModel::openProjectOnMachine(const std::string &path, const std::
 {
 	const std::string kept = keepInputs && s_ != nullptr ? movieTextOnMachine() : std::string();
 	const uint64_t keptRerecords = keepInputs && s_ != nullptr ? ce_session_rerecords(s_) : 0;
+	/* another project, or the same one again from its file: this one closes */
+	if (!keepInputs) keepHistoryAtCloseOnMachine();
 	freeSessionOnMachine();
 	runningM_ = false;
 	/* nothing is open after a failed open: the machine went before it, and
@@ -4653,6 +4677,13 @@ void SessionViewModel::bootProjectOnMachine(ce_project *p, const std::string &pa
 	}
 	projectM_ = p;
 	projectPathM_ = path;
+	/* a restart keeps the movie it had, which the file may not hold yet */
+	if (!keepInputs)
+	{
+		uint64_t len = 0;
+		const char *saved = ce_project_log_text(p, &len);
+		savedLogM_ = saved != nullptr ? std::string(saved, static_cast<size_t>(len)) : std::string();
+	}
 	rememberLocalPathsOnMachine();
 	package_ = package;
 	forgetElsewhereCacheOnMachine(path);
@@ -4995,6 +5026,7 @@ void SessionViewModel::setHiddenColumns(const std::vector<std::string> &names)
 void SessionViewModel::openMadeProjectOnMachine(ce_project *p, const std::string &package)
 {
 	/* the project open before is done with: this one takes its place */
+	keepHistoryAtCloseOnMachine();
 	freeSessionOnMachine();
 	freeProjectOnMachine();
 	openProjectOnMachine("", package, false, p);
@@ -5163,7 +5195,7 @@ bool SessionViewModel::saveProjectOnMachine(const std::string &to, bool backup, 
 	if (another) becameAnotherOnMachine(cacheWas, recoveryWas);
 	const bool first = projectPathM_ != path;
 	projectPathM_ = path;
-	keepHistoryOnMachine();
+	savedLogM_ = log;
 	rememberAboutOnMachine(path);
 	rememberLocalPathsOnMachine();
 	const std::string id = ce_project_id(projectM_) != nullptr ? ce_project_id(projectM_) : "";
@@ -5552,6 +5584,7 @@ int32_t SessionViewModel::playerOf(const std::string &name) const
 void SessionViewModel::closeOnMachine()
 {
 	if (s_ == nullptr) return;
+	keepHistoryAtCloseOnMachine();
 	freeSessionOnMachine();
 	freeProjectOnMachine();
 	runningM_ = false;

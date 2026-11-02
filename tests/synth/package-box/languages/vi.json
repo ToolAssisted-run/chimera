@@ -25,6 +25,12 @@
 		"tool.no_output": "không có tệp để ghi",
 		"tool.no_parts": "không có phần nào được đưa vào",
 		"tool.empty_part": "phần %1 trống",
-		"tool.joined": "đã nối %1 phần, %2 byte"
+		"tool.joined": "đã nối %1 phần, %2 byte",
+		"tool.make_project": "Tạo dự án...",
+		"tool.make_project.about": "Ghi một dự án ba khung hình, như công cụ của một lõi.",
+		"tool.make_project.broken": "Một dòng không phải của khung hình",
+		"tool.make_project.broken.about": "Đầu vào của dự án có một dòng không phải của khung hình, và Chimera từ chối nó.",
+		"tool.make_project.project": "Dự án",
+		"tool.made_project": "đã tạo một dự án %1 khung hình"
 	}
 }

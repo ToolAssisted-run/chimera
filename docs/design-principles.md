@@ -12708,3 +12708,56 @@ Tested: the witness's tool run now also reads a file named `rom` (with the
 old engine it stopped at the mount); the contract tests' rule finds a tool's
 file named `settings` or `tool` and passes one named `rom`.
 
+## A project is a zip of its JSON and its input's lines; its greenzone is written when it closes (user-decided, 2026-11-02)
+
+The owner: make a `.chimeraProject` a zip, "inside, a single .json with all the
+settings and input columns. Separately, an .input file, with the raw inputs,
+exactly as what you get if you copied them from the input roll in tastudio
+directly", and "the greenzone should be dumped to the cache manager (the file
+system) only on closure of the project, not on every save".
+
+The file, as decided:
+
+- `project.json`: what the single JSON file held, but the input's entries.
+  `inputs` keeps the columns (`columns`, or `key`), and nothing else.
+- `input.input`: the entries, one frame a line, as TAStudio's Copy writes them
+  (with Copy's frame numbers off): no line before or after, no quotes, no
+  commas between lines. A line ended by `\r\n` reads the same.
+- `branches/<n>.input`: each branch's entries, numbered from 1 in the
+  branches' order (owner's choice, over keeping the branches' entries in
+  `project.json`). A branch's name, frame, time and markers stay in
+  `project.json`.
+- A part the format does not have, a branch input with no branch, or a line
+  that is not a frame's input is refused, saying which file and line.
+- A project saved before, one JSON file, is refused with a sentence saying it
+  is the old form (owner's choice, over opening it once, or a converter): no
+  reader for the old form is kept. With it goes the one exception the old form
+  had, `description`, which no project has now.
+
+A core's tool that writes a project (owner's choice, over each core writing
+the zip): an output declared `"project": true` is two files to the core,
+`<name>.json` and `<name>.input`, which the engine reads as a project's parts
+and saves as the project's zip when the tool is done. A part it would refuse at
+an open is refused there, file and line named, and nothing is left behind. A
+core never learns the zip.
+
+The greenzone: written to the project's cache when the project closes - Close,
+another project opened or made, the window quit - and no longer by a save or an
+autosave. Closed with edits not saved, the states after the first frame where
+the movie and the project's file differ are dropped first: they were made for
+input the file does not hold, and the next open would start from them. A
+project never saved keeps none, and a session that did not end keeps none, as
+before. Not measured: how long the saves this takes away took on a large
+greenzone.
+
+The website reads both forms, the zip and the old JSON, since its archive holds
+submissions made the old way. Every core's tests that wrote or read a project
+by hand were changed in the same round.
+
+Tested: the engine's project tests (each refusal, the old form refused with
+and without a byte-order mark, the lines exactly as Copy writes them, a
+branch's file, `\r\n`); a broken old-form check made them fail. The view
+models' tests: a save writes no greenzone, the close does, and an edit closed
+without saving leaves no state after its frame. The witness: a tool's project
+output made into a zip that opens, and one with a bad line refused.
+

@@ -25,6 +25,12 @@
 		"tool.no_output": "쓸 파일이 없습니다",
 		"tool.no_parts": "부분이 주어지지 않았습니다",
 		"tool.empty_part": "부분 %1이(가) 비어 있습니다",
-		"tool.joined": "%1개 부분을 합쳤습니다, %2바이트"
+		"tool.joined": "%1개 부분을 합쳤습니다, %2바이트",
+		"tool.make_project": "프로젝트 만들기...",
+		"tool.make_project.about": "코어의 도구처럼 세 프레임짜리 프로젝트를 씁니다.",
+		"tool.make_project.broken": "프레임의 것이 아닌 줄",
+		"tool.make_project.broken.about": "프로젝트의 입력에 프레임의 것이 아닌 줄이 들어가며, Chimera는 이를 거부합니다.",
+		"tool.make_project.project": "프로젝트",
+		"tool.made_project": "%1프레임짜리 프로젝트를 만들었습니다"
 	}
 }

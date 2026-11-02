@@ -25,6 +25,12 @@
 		"tool.no_output": "berkas yang akan ditulis tidak ada",
 		"tool.no_parts": "tidak ada bagian yang diberikan",
 		"tool.empty_part": "bagian %1 kosong",
-		"tool.joined": "%1 bagian digabung, %2 byte"
+		"tool.joined": "%1 bagian digabung, %2 byte",
+		"tool.make_project": "Buat proyek...",
+		"tool.make_project.about": "Menulis proyek tiga frame, seperti alat sebuah inti.",
+		"tool.make_project.broken": "Satu baris yang bukan milik frame",
+		"tool.make_project.broken.about": "Input proyek mendapat satu baris yang bukan milik frame, yang ditolak Chimera.",
+		"tool.make_project.project": "Proyek",
+		"tool.made_project": "proyek %1 frame dibuat"
 	}
 }

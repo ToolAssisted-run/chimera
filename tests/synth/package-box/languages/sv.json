@@ -27,6 +27,12 @@
 		"tool.no_output": "filen som ska skrivas finns inte",
 		"tool.no_parts": "inga delar angavs",
 		"tool.empty_part": "delen %1 är tom",
-		"tool.joined": "%1 delar sammanfogade, %2 byte"
+		"tool.joined": "%1 delar sammanfogade, %2 byte",
+		"tool.make_project": "Gör ett projekt...",
+		"tool.make_project.about": "Skriver ett projekt på tre bildrutor, som en kärnas verktyg gör.",
+		"tool.make_project.broken": "En rad som inte är en bildrutas",
+		"tool.make_project.broken.about": "Projektets indata får en rad som inte är en bildrutas, som Chimera avvisar.",
+		"tool.make_project.project": "Projekt",
+		"tool.made_project": "gjorde ett projekt på %1 bildrutor"
 	}
 }

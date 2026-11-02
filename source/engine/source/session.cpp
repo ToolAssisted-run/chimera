@@ -5119,7 +5119,9 @@ extern "C" const char *ce_package_run_tool(const char *package_path, const char 
 	cJSON *request = cJSON_CreateObject();
 	cJSON_AddStringToObject(request, "tool", tool_id);
 	/* the package's own hash and version, for a tool whose result names its
-	 * core (a project it writes pins the package, as New Project does) */
+	 * core (a project it writes pins the package, as New Project does); and
+	 * which of the tool's outputs are projects */
+	std::set<std::string> projectOutputs;
 	{
 		std::string sha1, version;
 		const char *packageError = nullptr;
@@ -5132,6 +5134,19 @@ extern "C" const char *ce_package_run_tool(const char *package_path, const char 
 				{
 					const cJSON *v = cJSON_GetObjectItemCaseSensitive(c, "version");
 					if (cJSON_IsString(v)) version = v->valuestring;
+					const cJSON *tools = cJSON_GetObjectItemCaseSensitive(c, "tools");
+					for (const cJSON *t = cJSON_IsArray(tools) ? tools->child : nullptr; t != nullptr; t = t->next)
+					{
+						const cJSON *id = cJSON_GetObjectItemCaseSensitive(t, "id");
+						if (!cJSON_IsString(id) || std::strcmp(id->valuestring, tool_id) != 0) continue;
+						const cJSON *outs = cJSON_GetObjectItemCaseSensitive(t, "outputs");
+						for (const cJSON *o = cJSON_IsArray(outs) ? outs->child : nullptr; o != nullptr; o = o->next)
+						{
+							const cJSON *name = cJSON_GetObjectItemCaseSensitive(o, "name");
+							if (cJSON_IsString(name) && cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(o, "project")))
+								projectOutputs.insert(name->valuestring);
+						}
+					}
 					cJSON_Delete(c);
 				}
 			ce_package_free(pkg);
@@ -5151,12 +5166,21 @@ extern "C" const char *ce_package_run_tool(const char *package_path, const char 
 	for (int32_t i = 0; i < input_count; i++) cJSON_AddStringToObject(inputs, input_names[i], baseName(input_paths[i]).c_str());
 	cJSON *outputs = cJSON_AddObjectToObject(request, "outputs");
 	/* each written as <path>.part, and put in its place only when the tool
-	 * says it is done: a refusal, a failure or a stop leaves what was there */
+	 * says it is done: a refusal, a failure or a stop leaves what was there.
+	 * A project is two files the core writes, <name>.json and <name>.input
+	 * (project.json and input.input), which are made into the project's zip
+	 * here when it is done (owner, 2026-11-02): a core never learns the zip. */
 	std::vector<ToolOutput> written;
 	for (int32_t i = 0; i < output_count; i++)
 	{
 		cJSON_AddStringToObject(outputs, output_names[i], baseName(output_paths[i]).c_str());
-		written.push_back({ output_names[i], std::string(output_paths[i]) + ".part" });
+		const std::string part = std::string(output_paths[i]) + ".part";
+		if (projectOutputs.count(output_names[i]) != 0)
+		{
+			written.push_back({ std::string(output_names[i]) + ".json", part + ".json" });
+			written.push_back({ std::string(output_names[i]) + ".input", part + ".input" });
+		}
+		else written.push_back({ output_names[i], part });
 	}
 	char *printed = cJSON_PrintUnformatted(request);
 	cJSON_Delete(request);
@@ -5203,7 +5227,7 @@ extern "C" const char *ce_package_run_tool(const char *package_path, const char 
 		if (!r.ok() && unfinished.empty() && std::strstr(r.errorMessage, "disk") != nullptr)
 		{
 			std::string shown = baseName(out.path.c_str());
-			shown.resize(shown.size() - 5);   /* without ".part" */
+			shown.resize(shown.rfind(".part"));   /* without ".part" and what follows */
 			unfinished = tr("engine.tool_output_unfinished", {shown, std::string(r.errorMessage)});
 		}
 	}
@@ -5216,8 +5240,25 @@ extern "C" const char *ce_package_run_tool(const char *package_path, const char 
 	}
 	for (int32_t i = 0; i < output_count; i++)
 	{
-		const std::filesystem::path part = std::filesystem::u8path(written[static_cast<size_t>(i)].path);
+		const std::string partPath = std::string(output_paths[i]) + ".part";
+		const std::filesystem::path part = std::filesystem::u8path(partPath);
 		std::error_code ec;
+		if (projectOutputs.count(output_names[i]) != 0)
+		{
+			/* the two parts made into the project, which is then put in place as any output is */
+			std::vector<uint8_t> json, lines;
+			const bool read = chimera::readFile((partPath + ".json").c_str(), json) && chimera::readFile((partPath + ".input").c_str(), lines);
+			std::filesystem::remove(std::filesystem::u8path(partPath + ".json"), ec);
+			std::filesystem::remove(std::filesystem::u8path(partPath + ".input"), ec);
+			if (!done || !unfinished.empty()) continue;
+			std::string why;
+			if (!read || ceProjectPack(std::string(json.begin(), json.end()), std::string(lines.begin(), lines.end()), partPath.c_str(), why) != 0)
+			{
+				unfinished = tr("engine.tool_project_refused", {baseName(output_paths[i]), why});
+				std::filesystem::remove(part, ec);
+				continue;
+			}
+		}
 		if (done && unfinished.empty())
 		{
 			std::filesystem::rename(part, std::filesystem::u8path(output_paths[i]), ec);

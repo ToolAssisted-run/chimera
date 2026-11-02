@@ -17,6 +17,10 @@ import subprocess
 import sys
 import time
 
+# a project is a zip (owner, 2026-11-02): read and written as the witness does
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "..", "tests", "synth"))
+import project_file  # noqa: E402
+
 chimera, work, package, game = sys.argv[1:5]
 here = os.path.dirname(os.path.abspath(__file__))
 shutil.rmtree(work, ignore_errors=True)
@@ -108,11 +112,9 @@ check(r is not None and r.returncode == 65 and "[headless] The core stopped:" in
 
 # a movie with an entry that does not read: the machine stops on it; 65, and why
 proj, _ = project("unplayable")
-with open(proj) as f:
-    doc = json.load(f)
+doc = project_file.read(proj)
 doc["inputs"] = {"columns": [[]], "entries": ["|zz|", "|zz|"]}
-with open(proj, "w") as f:
-    json.dump(doc, f)
+project_file.write(proj, doc)
 r = run(proj, script("unplayable", "emu.frameadvance()\nclient.exit()\n"), seconds=60)
 check(r is not None and r.returncode == 65 and "The movie could not be played: unparseable movie entry at frame 0" in r.stderr,
       "a movie that cannot be played ends the run with 65, saying why", said(r))
@@ -139,14 +141,21 @@ check(r is not None and r.returncode == 64 and "caption: Cannot open the project
 # a file the engine does not read as a project (here a key no project has): 64, and why. It
 # used to be said only over the picture for a moment, and the run waited for ever (issue 422)
 proj, _ = project("unread")
-with open(proj) as f:
-    unread = json.load(f)
+unread = project_file.read(proj)
 unread["notAProjectKey"] = 1
-with open(proj, "w") as f:
-    json.dump(unread, f)
+project_file.write(proj, unread)
 r = run(proj, script("unread", "client.exit()\n"), seconds=60)
 check(r is not None and r.returncode == 64 and "caption: Cannot open the project" in r.stderr and "notAProjectKey" in r.stderr,
       "a file that is no project ends the run with 64, saying why", said(r))
+
+# a project in the old form, one JSON file, is refused by name (owner, 2026-11-02): 64, and why
+proj, _ = project("old-form")
+old = project_file.read(proj)
+with open(proj, "w") as f:
+    json.dump(old, f)
+r = run(proj, script("old-form", "client.exit()\n"), seconds=60)
+check(r is not None and r.returncode == 64 and "caption: Cannot open the project" in r.stderr and "old form" in r.stderr,
+      "a project in the old form, one JSON file, ends the run with 64, saying so", said(r))
 
 # a script's file picker: nobody to pick, 64
 proj, _ = project("picker")

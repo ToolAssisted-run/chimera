@@ -27,6 +27,12 @@
 		"tool.no_output": "het te schrijven bestand is er niet",
 		"tool.no_parts": "er zijn geen delen gegeven",
 		"tool.empty_part": "het deel %1 is leeg",
-		"tool.joined": "%1 delen samengevoegd, %2 bytes"
+		"tool.joined": "%1 delen samengevoegd, %2 bytes",
+		"tool.make_project": "Een project maken...",
+		"tool.make_project.about": "Schrijft een project van drie frames, zoals het hulpmiddel van een core.",
+		"tool.make_project.broken": "Een regel die niet van een frame is",
+		"tool.make_project.broken.about": "De invoer van het project krijgt een regel die niet van een frame is, die Chimera weigert.",
+		"tool.make_project.project": "Project",
+		"tool.made_project": "een project van %1 frames gemaakt"
 	}
 }

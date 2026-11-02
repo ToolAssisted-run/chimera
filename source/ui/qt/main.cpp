@@ -965,7 +965,9 @@ int main(int argc, char **argv)
 			/* stopped: what it was writing (the engine's <file>.part) goes */
 			if (proc->property("stopped").toBool())
 			{
-				for (const auto &f : outputs) QFile::remove(QString::fromStdString(f.path + ".part"));
+				for (const auto &f : outputs)
+					for (const char *tail : {".part", ".part.json", ".part.input"})   /* a project's two parts too */
+						QFile::remove(QString::fromStdString(f.path + tail));
 				return;
 			}
 			if (code == 0 && !answer.isEmpty()) done(answer.toStdString(), {});

@@ -27,6 +27,12 @@
 		"tool.no_output": "o arquivo a escrever não está lá",
 		"tool.no_parts": "nenhuma parte foi dada",
 		"tool.empty_part": "a parte %1 está vazia",
-		"tool.joined": "%1 partes unidas, %2 bytes"
+		"tool.joined": "%1 partes unidas, %2 bytes",
+		"tool.make_project": "Fazer um projeto...",
+		"tool.make_project.about": "Escreve um projeto de três quadros, como a ferramenta de um núcleo.",
+		"tool.make_project.broken": "Uma linha que não é de um quadro",
+		"tool.make_project.broken.about": "A entrada do projeto recebe uma linha que não é de um quadro, que o Chimera recusa.",
+		"tool.make_project.project": "Projeto",
+		"tool.made_project": "foi feito um projeto de %1 quadros"
 	}
 }

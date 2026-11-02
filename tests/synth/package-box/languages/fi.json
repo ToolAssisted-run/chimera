@@ -27,6 +27,12 @@
 		"tool.no_output": "kirjoitettavaa tiedostoa ei ole",
 		"tool.no_parts": "osia ei annettu",
 		"tool.empty_part": "osa %1 on tyhjä",
-		"tool.joined": "yhdistettiin %1 osaa, %2 tavua"
+		"tool.joined": "yhdistettiin %1 osaa, %2 tavua",
+		"tool.make_project": "Tee projekti...",
+		"tool.make_project.about": "Kirjoittaa kolmen ruudun projektin, kuten ytimen työkalu.",
+		"tool.make_project.broken": "Rivi, joka ei ole ruudun",
+		"tool.make_project.broken.about": "Projektin syötteeseen tulee rivi, joka ei ole ruudun, ja Chimera hylkää sen.",
+		"tool.make_project.project": "Projekti",
+		"tool.made_project": "tehtiin %1 ruudun projekti"
 	}
 }

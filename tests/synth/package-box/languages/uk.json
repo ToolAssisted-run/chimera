@@ -29,6 +29,12 @@
 		"tool.no_output": "файлу для запису немає",
 		"tool.no_parts": "частини не вказано",
 		"tool.empty_part": "частина %1 порожня",
-		"tool.joined": "об'єднано частин: %1, байтів: %2"
+		"tool.joined": "об'єднано частин: %1, байтів: %2",
+		"tool.make_project": "Зробити проєкт...",
+		"tool.make_project.about": "Записує проєкт із трьох кадрів, як це робить інструмент ядра.",
+		"tool.make_project.broken": "Рядок, що не належить кадру",
+		"tool.make_project.broken.about": "До вводу проєкту потрапляє рядок, що не належить кадру, і Chimera його відхиляє.",
+		"tool.make_project.project": "Проєкт",
+		"tool.made_project": "зроблено проєкт із %1 кадрів"
 	}
 }

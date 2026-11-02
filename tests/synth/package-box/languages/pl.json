@@ -29,6 +29,12 @@
 		"tool.no_output": "pliku do zapisania nie ma",
 		"tool.no_parts": "nie podano żadnych części",
 		"tool.empty_part": "część %1 jest pusta",
-		"tool.joined": "połączono części: %1, bajtów: %2"
+		"tool.joined": "połączono części: %1, bajtów: %2",
+		"tool.make_project": "Utwórz projekt...",
+		"tool.make_project.about": "Zapisuje projekt z trzech klatek, tak jak narzędzie rdzenia.",
+		"tool.make_project.broken": "Wiersz, który nie należy do klatki",
+		"tool.make_project.broken.about": "Wejście projektu dostaje wiersz, który nie należy do klatki, a Chimera go odrzuca.",
+		"tool.make_project.project": "Projekt",
+		"tool.made_project": "utworzono projekt z %1 klatek"
 	}
 }

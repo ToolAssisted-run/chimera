@@ -29,6 +29,12 @@
 		"tool.no_output": "fișierul de scris nu este acolo",
 		"tool.no_parts": "nu s-au dat părți",
 		"tool.empty_part": "partea %1 este goală",
-		"tool.joined": "%1 părți unite, %2 octeți"
+		"tool.joined": "%1 părți unite, %2 octeți",
+		"tool.make_project": "Fă un proiect...",
+		"tool.make_project.about": "Scrie un proiect de trei cadre, ca unealta unui nucleu.",
+		"tool.make_project.broken": "O linie care nu este a unui cadru",
+		"tool.make_project.broken.about": "Intrarea proiectului primește o linie care nu este a unui cadru, pe care Chimera o refuză.",
+		"tool.make_project.project": "Proiect",
+		"tool.made_project": "s-a făcut un proiect de %1 cadre"
 	}
 }

@@ -27,6 +27,12 @@
 		"tool.no_output": "filen som skal skrives, er ikke der",
 		"tool.no_parts": "ingen deler ble gitt",
 		"tool.empty_part": "delen %1 er tom",
-		"tool.joined": "%1 deler satt sammen, %2 byte"
+		"tool.joined": "%1 deler satt sammen, %2 byte",
+		"tool.make_project": "Lag et prosjekt...",
+		"tool.make_project.about": "Skriver et prosjekt på tre rammer, slik en kjernes verktøy gjør.",
+		"tool.make_project.broken": "En linje som ikke er en rammes",
+		"tool.make_project.broken.about": "Prosjektets inndata får en linje som ikke er en rammes, som Chimera avviser.",
+		"tool.make_project.project": "Prosjekt",
+		"tool.made_project": "laget et prosjekt på %1 rammer"
 	}
 }

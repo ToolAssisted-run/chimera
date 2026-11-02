@@ -749,6 +749,39 @@ static void request_input_name(const char *req, const char *mount, char *out, si
 	out[len] = 0;
 }
 
+/* "make_project" writes a project as a core's tool does, for an output
+ * declared "project" (its waterbox.config): the two parts, project.json and
+ * the input's lines, as "project.json" and "project.input", which the engine
+ * makes into the project's zip. It pins the package by the hash and version
+ * the request gives. With the "broken" option ticked, one line of its input
+ * is not a frame's, which the engine refuses. */
+static void request_string(const char *req, const char *name, char *out, size_t cap)
+{
+	request_input_name(req, name, out, cap);
+}
+
+static const char *make_project(const char *req)
+{
+	const int broken = strstr(req, "\"broken\":true") != NULL;
+	char sha1[64], version[128];
+	request_string(req, "sha1", sha1, sizeof sha1);
+	request_string(req, "version", version, sizeof version);
+	FILE *json = fopen("project.json", "wb");
+	FILE *input = fopen("project.input", "wb");
+	if (!json || !input) {
+		if (json) fclose(json);
+		if (input) fclose(input);
+		return "{\"refused\": \"tool.no_output\"}";
+	}
+	fprintf(json, "{\"title\": \"made by a tool\", \"core\": {\"name\": \"Synth\", \"version\": \"%s\", \"sha1\": \"%s\"},"
+		" \"files\": [], \"settings\": {\"initFillByte\": 9}, \"inputs\": {\"columns\": [[\"P1 Up\", \"P1 Down\"]]}}\n",
+		version, sha1);
+	fputs(broken ? "|U.|\nnot a frame\n|UD|\n" : "|U.|\n|.D|\n|UD|\n", input);
+	fclose(json);
+	fclose(input);
+	return "{\"done\": \"tool.made_project\\u001f3\"}";
+}
+
 ECL_EXPORT const char *RunTool(void)
 {
 	static char req[4096];
@@ -756,6 +789,7 @@ ECL_EXPORT const char *RunTool(void)
 	size_t n = r ? fread(req, 1, sizeof req - 1, r) : 0;
 	if (r) fclose(r);
 	req[n] = 0;
+	if (strstr(req, "\"tool\":\"make_project\"")) return make_project(req);
 	if (!strstr(req, "\"tool\":\"join\"")) {
 		char id[64] = "";
 		const char *t = strstr(req, "\"tool\":\"");

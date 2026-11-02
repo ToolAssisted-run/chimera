@@ -27,6 +27,12 @@
 		"tool.no_output": "το αρχείο προς εγγραφή δεν υπάρχει",
 		"tool.no_parts": "δεν δόθηκαν μέρη",
 		"tool.empty_part": "το μέρος %1 είναι κενό",
-		"tool.joined": "ενώθηκαν %1 μέρη, %2 byte"
+		"tool.joined": "ενώθηκαν %1 μέρη, %2 byte",
+		"tool.make_project": "Δημιουργία έργου...",
+		"tool.make_project.about": "Γράφει ένα έργο τριών καρέ, όπως το εργαλείο ενός πυρήνα.",
+		"tool.make_project.broken": "Μια γραμμή που δεν είναι καρέ",
+		"tool.make_project.broken.about": "Η είσοδος του έργου παίρνει μια γραμμή που δεν είναι καρέ, την οποία το Chimera απορρίπτει.",
+		"tool.make_project.project": "Έργο",
+		"tool.made_project": "δημιουργήθηκε έργο %1 καρέ"
 	}
 }

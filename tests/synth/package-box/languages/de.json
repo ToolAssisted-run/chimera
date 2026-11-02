@@ -27,6 +27,12 @@
 		"tool.no_output": "die zu schreibende Datei ist nicht da",
 		"tool.no_parts": "es wurden keine Teile angegeben",
 		"tool.empty_part": "der Teil %1 ist leer",
-		"tool.joined": "%1 Teile zusammengefügt, %2 Bytes"
+		"tool.joined": "%1 Teile zusammengefügt, %2 Bytes",
+		"tool.make_project": "Projekt erstellen...",
+		"tool.make_project.about": "Schreibt ein Projekt mit drei Frames, wie es das Werkzeug eines Cores tut.",
+		"tool.make_project.broken": "Eine Zeile, die zu keinem Frame gehört",
+		"tool.make_project.broken.about": "Die Eingabe des Projekts bekommt eine Zeile, die zu keinem Frame gehört, und Chimera lehnt sie ab.",
+		"tool.make_project.project": "Projekt",
+		"tool.made_project": "ein Projekt mit %1 Frames erstellt"
 	}
 }

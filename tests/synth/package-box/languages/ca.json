@@ -27,6 +27,12 @@
 		"tool.no_output": "el fitxer que cal escriure no hi és",
 		"tool.no_parts": "no s'han donat parts",
 		"tool.empty_part": "la part %1 és buida",
-		"tool.joined": "%1 parts unides, %2 bytes"
+		"tool.joined": "%1 parts unides, %2 bytes",
+		"tool.make_project": "Fes un projecte...",
+		"tool.make_project.about": "Escriu un projecte de tres fotogrames, com ho fa l'eina d'un nucli.",
+		"tool.make_project.broken": "Una línia que no és d'un fotograma",
+		"tool.make_project.broken.about": "L'entrada del projecte rep una línia que no és d'un fotograma, que Chimera refusa.",
+		"tool.make_project.project": "Projecte",
+		"tool.made_project": "s'ha fet un projecte de %1 fotogrames"
 	}
 }

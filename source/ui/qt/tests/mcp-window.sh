@@ -15,18 +15,18 @@ rm -rf "$dir"
 mkdir -p "$dir"
 cp "$repo/tests/synth/roms/gridWalker.testrom" "$dir/"
 # the movie as a project of the synthetic core, as the witness makes it
-python3 - "$repo/tests/synth/movies/$name.txt" "$dir/gridWalker.testrom" "$dir/$name.chimeraProject" <<'MCPPY' || exit 1
-import hashlib, json, sys
+PYTHONPATH="$repo/tests/synth" python3 - "$repo/tests/synth/movies/$name.txt" "$dir/gridWalker.testrom" "$dir/$name.chimeraProject" <<'MCPPY' || exit 1
+import hashlib, json, sys, project_file
 entries = [l.rstrip("\r\n") for l in open(sys.argv[1]) if l.startswith("|")]
 logkey = "#P1 Up|P1 Down|P1 Left|P1 Right|P1 A|P1 B|P1 Select|P1 Start|"
 sha1 = hashlib.sha1(open(sys.argv[2], "rb").read()).hexdigest().upper()
-json.dump({
+project_file.write(sys.argv[3], {
     "title": "gridWalker.win",
     "core": {"name": "Synth", "version": "", "sha1": ""},
     "headers": {"MovieVersion": "Chimera Project File v1.1", "Platform": "Synth"},
     "files": [{"name": "gridWalker.testrom", "sha1": sha1, "slot": "rom"}],
     "inputs": {"columns": [g.split("|")[:-1] for g in logkey.split("#")[1:]], "entries": entries},
-}, open(sys.argv[3], "w"))
+})
 MCPPY
 printf 'ready=%s/ready\ndone=%s/done\n' "$dir" "$dir" > "$dir/job.txt"
 export CHIMERA_MCP_NAME="qtmcp$$" CHIMERA_JOB="$dir/job.txt" CHIMERA_CORES_DIR="$repo/build/Cores"

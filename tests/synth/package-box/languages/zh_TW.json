@@ -25,6 +25,12 @@
 		"tool.no_output": "要寫入的檔案不存在",
 		"tool.no_parts": "沒有給出任何部分",
 		"tool.empty_part": "部分 %1 是空的",
-		"tool.joined": "已合併 %1 個部分，%2 位元組"
+		"tool.joined": "已合併 %1 個部分，%2 位元組",
+		"tool.make_project": "製作專案...",
+		"tool.make_project.about": "像核心的工具那樣寫入一個三格的專案。",
+		"tool.make_project.broken": "一行不屬於任何一格",
+		"tool.make_project.broken.about": "專案的輸入中有一行不屬於任何一格，Chimera 會拒絕它。",
+		"tool.make_project.project": "專案",
+		"tool.made_project": "已製作一個 %1 格的專案"
 	}
 }

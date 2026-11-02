@@ -45,6 +45,7 @@ import sys
 import tempfile
 import time
 import zlib
+import project_file
 
 mcp, ram_path, vram_path, movie_path, tga_path = sys.argv[1:6]
 mode = sys.argv[6] if len(sys.argv) > 6 else "runner"
@@ -605,7 +606,7 @@ if window and changes:
     error, text, _ = call("save_project", path=other)
     check("a file that is there is not replaced", error and "overwrite: true" in text and open(other).read() == "theirs")
     check("unless overwrite is given", facts("save_project", path=other, overwrite=True).get("saved") == other
-          and open(other).read() != "theirs")
+          and open(other, "rb").read() != b"theirs")
     facts("seek", frame=10)
     check("resume lets the machine run", facts("resume") == {"paused": False, "frame": 10})
     ran = 10
@@ -645,7 +646,7 @@ if window and changes:
           and facts("status").get("machine_open") is False)
     error, text, _ = call("pause")
     check("with nothing open there is nothing to pause", error)
-    check("the project saved before is as it was saved", "added after saving" not in open(path).read())
+    check("the project saved before is as it was saved", "added after saving" not in json.dumps(project_file.read(path)))
     # a new project, as the New Project window would make it, opened with nothing asked (issue 355)
     error, text, _ = call("create_project", core="No Such Core", game=status["files"][0]["path"])
     check("create_project names a core that is not there", error and "list_cores" in text)
@@ -703,12 +704,12 @@ if local:
     # (made with an older package): a control it does not name joins the key
     # when the agent sets it, and every line gets its column. It used to be
     # left out of the line while the agent was told it was set.
-    short = json.load(open(saved))
+    short = project_file.read(saved)
     short["inputs"] = {"columns": [["P1 Up", "P1 Down"]], "entries": ["|.D|", "|..|", "|.D|"]}
     short["branches"] = []
     short["markers"] = []
     short_path = os.path.join(work, "short.chimeraProject")
-    json.dump(short, open(short_path, "w"))
+    project_file.write(short_path, short)
     facts("open_project", path="short.chimeraProject")
     check("a movie with a short LogKey opens", all_input() == ["|.D|", "|..|", "|.D|"])
     facts("set_buttons", frame=1, buttons={"P1 A": True})
@@ -749,7 +750,7 @@ if local:
     facts("save_project", path="pins.chimeraProject")
     pins_path = os.path.join(work, "pins.chimeraProject")
     rom_sha1 = hashlib.sha1(open(rom, "rb").read()).hexdigest().upper()
-    check("open_game pins the firmware it was given", json.load(open(pins_path)).get("firmware") == [{"id": "bios", "sha1": rom_sha1}])
+    check("open_game pins the firmware it was given", project_file.read(pins_path).get("firmware") == [{"id": "bios", "sha1": rom_sha1}])
     facts("close")
     other = os.path.join(work, "other.bin")
     open(other, "wb").write(b"not the firmware the project pins")

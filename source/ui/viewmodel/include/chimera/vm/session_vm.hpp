@@ -793,9 +793,15 @@ private:
 	 * movie may have been edited since the save), and the session is
 	 * marked as running until it ends. */
 	void startProjectSessionOnMachine(bool loadHistory);
-	/* the greenzone kept with the project as it is saved, when it may
-	 * outlive the session: written in the background */
+	/* the greenzone kept with the project, when it may outlive the session:
+	 * written in the background */
 	void keepHistoryOnMachine();
+	/* The same, as the project closes (owner, 2026-11-02: written when a
+	 * project closes, not on every save - a save no longer waits on gigabytes
+	 * going to the disk). A project never saved has no file to come back to,
+	 * and keeps none; states past the first frame where the movie differs
+	 * from the project's file (edits closed without saving) are not kept. */
+	void keepHistoryAtCloseOnMachine();
 	/* a project just saved under a name of its own, with an id of its own:
 	 * what its old id's cache held that a save does not write again comes
 	 * along, and the work kept against a crash under the old id goes */
@@ -1083,6 +1089,9 @@ private:
 	void freeSessionOnMachine();
 	ce_project *projectM_ = nullptr;
 	std::string projectPathM_;
+	/* the movie as the project's own file holds it: as opened, then as each
+	 * save to that file wrote it (a backup is another file) */
+	std::string savedLogM_;
 	std::vector<int32_t> axesBuf_;
 	std::vector<Marker> markersM_;
 	std::vector<int64_t> runMarkersM_;

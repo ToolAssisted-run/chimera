@@ -24,3 +24,10 @@ extern "C" int32_t ceProjectValidate(const ce_project *p, const char *slots_json
  * may desync on it, but the window is where a person is asked. */
 std::vector<std::string> ceFirmwarePinMismatches(const ce_project *p,
 	const char *const *ids, const uint8_t *const *data, const uint64_t *lens, int32_t count);
+
+/* A project made from its two parts, as a core's tool writes them for an
+ * output declared "project" (docs/project.md): project.json's text and the
+ * lines of input.input. It is read as an opened project is - a part that
+ * would be refused there is refused here, with why - given an id of its own,
+ * and saved to path. 0 when it was. */
+int32_t ceProjectPack(const std::string &json, const std::string &input, const char *path, std::string &why);

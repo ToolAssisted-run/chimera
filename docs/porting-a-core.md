@@ -501,7 +501,10 @@ Probed once after `Init`; absent exports simply mean the tool is not offered.
   `{"done": "<key>"}` or `{"refused": "<key>"}`, keys of the package's tables
   with their arguments after 0x1F. Close what you write before returning.
   The Eden core's Decompress NSZ is one; the DSDA core's demo import, which
-  writes a project, is another.
+  writes a project, is another. An output declared `"project": true` is
+  written as two files, `<name>.json` (a project's `project.json`, its
+  `inputs` holding `columns` only) and `<name>.input` (one frame's input a
+  line), which Chimera makes into the project's zip (docs/project.md).
 - **`GetGameSettings()`** - the settings THIS GAME has beyond the package's
   declaration, for a core whose games carry their own (an arcade game's dip
   switches differ game to game, so they cannot be declared once per package).

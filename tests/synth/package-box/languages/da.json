@@ -27,6 +27,12 @@
 		"tool.no_output": "filen, der skal skrives, er der ikke",
 		"tool.no_parts": "der blev ikke givet nogen dele",
 		"tool.empty_part": "delen %1 er tom",
-		"tool.joined": "%1 dele sat sammen, %2 byte"
+		"tool.joined": "%1 dele sat sammen, %2 byte",
+		"tool.make_project": "Lav et projekt...",
+		"tool.make_project.about": "Skriver et projekt på tre billeder, som en kernes værktøj gør.",
+		"tool.make_project.broken": "En linje, der ikke er et billedes",
+		"tool.make_project.broken.about": "Projektets input får en linje, der ikke er et billedes, som Chimera afviser.",
+		"tool.make_project.project": "Projekt",
+		"tool.made_project": "lavede et projekt på %1 billeder"
 	}
 }

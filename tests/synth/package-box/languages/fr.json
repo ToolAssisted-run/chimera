@@ -27,6 +27,12 @@
 		"tool.no_output": "le fichier à écrire n'est pas là",
 		"tool.no_parts": "aucune partie n'a été donnée",
 		"tool.empty_part": "la partie %1 est vide",
-		"tool.joined": "%1 parties jointes, %2 octets"
+		"tool.joined": "%1 parties jointes, %2 octets",
+		"tool.make_project": "Faire un projet...",
+		"tool.make_project.about": "Écrit un projet de trois images, comme l'outil d'un cœur.",
+		"tool.make_project.broken": "Une ligne qui n'est pas d'une image",
+		"tool.make_project.broken.about": "L'entrée du projet reçoit une ligne qui n'est pas d'une image, que Chimera refuse.",
+		"tool.make_project.project": "Projet",
+		"tool.made_project": "un projet de %1 images a été fait"
 	}
 }

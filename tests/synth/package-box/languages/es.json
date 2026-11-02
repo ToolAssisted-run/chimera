@@ -27,6 +27,12 @@
 		"tool.no_output": "el archivo que se debe escribir no está",
 		"tool.no_parts": "no se dieron partes",
 		"tool.empty_part": "la parte %1 está vacía",
-		"tool.joined": "%1 partes unidas, %2 bytes"
+		"tool.joined": "%1 partes unidas, %2 bytes",
+		"tool.make_project": "Hacer un proyecto...",
+		"tool.make_project.about": "Escribe un proyecto de tres fotogramas, como lo hace la herramienta de un núcleo.",
+		"tool.make_project.broken": "Una línea que no es de un fotograma",
+		"tool.make_project.broken.about": "La entrada del proyecto recibe una línea que no es de un fotograma, que Chimera rechaza.",
+		"tool.make_project.project": "Proyecto",
+		"tool.made_project": "se hizo un proyecto de %1 fotogramas"
 	}
 }

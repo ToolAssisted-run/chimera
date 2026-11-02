@@ -5,10 +5,13 @@
  * creation with cue auto-add, per-session resolution (by folder and by an
  * arbitrarily named path), mismatch statuses, save recording ACTUAL hashes,
  * cue closure at save, validation against a core's slot declaration, and
- * the structural rejections.
+ * the structural rejections, and the file itself: a zip of project.json and
+ * the input's lines (owner, 2026-11-02).
  */
 
 #include "chimera/engine.h"
+
+#include "../../../extern/miniz/miniz.h"
 
 #include <cassert>
 #include <csignal>
@@ -17,6 +20,8 @@
 #include <cstdlib>
 #include <cstring>
 #include <string>
+#include <utility>
+#include <vector>
 
 #ifndef _WIN32
 #include <sys/resource.h>
@@ -30,6 +35,53 @@ static void writeFile(const std::string &name, const std::string &content)
 	assert(f != nullptr);
 	std::fwrite(content.data(), 1, content.size(), f);
 	std::fclose(f);
+}
+
+/* A zip of the parts given, in their order, as a project file is one */
+static void writeZip(const std::string &name, const std::vector<std::pair<std::string, std::string>> &parts)
+{
+	mz_zip_archive zip{};
+	assert(mz_zip_writer_init_heap(&zip, 0, 0) == MZ_TRUE);
+	for (const auto &[part, bytes] : parts)
+		assert(mz_zip_writer_add_mem(&zip, part.c_str(), bytes.data(), bytes.size(), MZ_DEFAULT_LEVEL) == MZ_TRUE);
+	void *buf = nullptr;
+	size_t size = 0;
+	assert(mz_zip_writer_finalize_heap_archive(&zip, &buf, &size) == MZ_TRUE);
+	writeFile(name, std::string(static_cast<const char *>(buf), size));
+	mz_free(buf);
+	mz_zip_writer_end(&zip);
+}
+
+/* a project file of this project.json and input.input's lines */
+static void writeProject(const std::string &name, const std::string &json, const std::string &input = "")
+{
+	writeZip(name, {{"project.json", json}, {"input.input", input}});
+}
+
+/* one part of a project file at path ("" when it has no such part), and its parts' names */
+static std::string projectPart(const std::string &path, const char *part, std::vector<std::string> *names = nullptr)
+{
+	mz_zip_archive zip{};
+	if (mz_zip_reader_init_file(&zip, path.c_str(), 0) == MZ_FALSE) return {};
+	if (names != nullptr)
+	{
+		names->clear();
+		for (mz_uint i = 0; i < mz_zip_reader_get_num_files(&zip); i++)
+		{
+			char name[256] = {};
+			mz_zip_reader_get_filename(&zip, i, name, sizeof name);
+			names->push_back(name);
+		}
+	}
+	std::string out;
+	size_t len = 0;
+	if (void *data = mz_zip_reader_extract_file_to_heap(&zip, part, &len, 0))
+	{
+		out.assign(static_cast<const char *>(data), len);
+		mz_free(data);
+	}
+	mz_zip_reader_end(&zip);
+	return out;
 }
 
 /* A file bigger than a 32-bit length, made sparse so it costs no disk: the
@@ -303,7 +355,7 @@ int main(int argc, char **argv)
 	// ---- structural rejections at open ----
 	auto expectReject = [&](const char *tag, const std::string &json)
 	{
-		writeFile("bad.chimeraProject", json);
+		writeProject("bad.chimeraProject", json);
 		err = nullptr;
 		ce_project *p = ce_project_open((g_dir + "/bad.chimeraProject").c_str(), &err);
 		if (p != nullptr)
@@ -321,30 +373,9 @@ int main(int argc, char **argv)
 	expectReject("subtitles", "{\"subtitles\":[\"subtitle 100 10 10 300 FFFFFFFF hello\"]}");
 	expectReject("title type", "{\"title\":5}");
 
-	/* the description Edit Comments wrote is gone from the format, but a
-	 * project that has one still opens, and its next save leaves it out
-	 * (owner, 2026-11-02, issue 440) */
-	{
-		const std::string dpath = g_dir + "/described.chimeraProject";
-		writeFile("described.chimeraProject", "{\"title\":\"old\",\"description\":\"the funny cat game\"}");
-		err = nullptr;
-		ce_project *p = ce_project_open(dpath.c_str(), &err);
-		assert(p != nullptr);
-		assert(std::strcmp(ce_project_title(p), "old") == 0);
-		assert(ce_project_save(p, dpath.c_str(), &err) == 0);
-		ce_project_free(p);
-		std::string text;
-		if (FILE *f = std::fopen(dpath.c_str(), "rb"))
-		{
-			char buf[4096];
-			size_t n;
-			while ((n = std::fread(buf, 1, sizeof buf, f)) > 0) text.append(buf, n);
-			std::fclose(f);
-		}
-		assert(text.find("\"old\"") != std::string::npos);
-		assert(text.find("description") == std::string::npos);
-		std::remove(dpath.c_str());
-	}
+	/* the description Edit Comments wrote went with the old form (owner,
+	 * 2026-11-02): projects saved before are not opened, and a project has none */
+	expectReject("description", "{\"title\":\"old\",\"description\":\"the funny cat game\"}");
 	expectReject("core incomplete", "{\"core\":{\"name\":\"x\"}}");
 	expectReject("core sha malformed", "{\"core\":{\"name\":\"x\",\"version\":\"v\",\"sha1\":\"nope\"}}");
 	expectReject("file path name",
@@ -361,7 +392,7 @@ int main(int argc, char **argv)
 
 	// an empty project is structurally fine (validation is the core's say)
 	{
-		writeFile("empty.chimeraProject", "{}");
+		writeProject("empty.chimeraProject", "{}");
 		ce_project *p = ce_project_open((g_dir + "/empty.chimeraProject").c_str(), &err);
 		assert(p != nullptr);
 		assert(ce_project_file_count(p) == 0 && ce_project_rerecords(p) == 0);
@@ -430,14 +461,7 @@ int main(int argc, char **argv)
 		assert(ce_project_save(p, lpath.c_str(), &err) == 0);
 		ce_project_free(p);
 
-		std::string text;
-		if (FILE *f = std::fopen(lpath.c_str(), "rb"))
-		{
-			char buf[4096];
-			size_t n;
-			while ((n = std::fread(buf, 1, sizeof buf, f)) > 0) text.append(buf, n);
-			std::fclose(f);
-		}
+		const std::string text = projectPart(lpath, "project.json");
 		assert(!text.empty() && text.find("\"tastudio\"") == std::string::npos);
 		std::remove(lpath.c_str());
 	}
@@ -466,7 +490,17 @@ int main(int argc, char **argv)
 		const std::string before = readText(kpath);
 		assert(!before.empty() && before.size() < 64 * 1024);
 
-		ce_project_set_title(p, std::string(1 << 20, 'x').c_str());
+		/* a title the zip cannot squeeze: a megabyte of letters in no order */
+		std::string title(1 << 20, 'a');
+		uint32_t bits = 2463534242u;
+		for (char &c : title)
+		{
+			bits ^= bits << 13;
+			bits ^= bits >> 17;
+			bits ^= bits << 5;
+			c = static_cast<char>('a' + bits % 26);
+		}
+		ce_project_set_title(p, title.c_str());
 		struct rlimit old;
 		assert(getrlimit(RLIMIT_FSIZE, &old) == 0);
 		struct rlimit capped = old;
@@ -482,7 +516,7 @@ int main(int argc, char **argv)
 
 		// and with room again, the save goes through whole
 		assert(ce_project_save(p, kpath.c_str(), &err) == 0);
-		assert(readText(kpath).size() > (1u << 20));
+		assert(readText(kpath).size() > (512u << 10));
 		ce_project_free(p);
 		std::remove(kpath.c_str());
 	}
@@ -491,7 +525,7 @@ int main(int argc, char **argv)
 	{ // A project with no id (written before ids, or by hand) gets the same one
 	  // at every open until a save writes it in, so the work of a session that
 	  // crashed before its first save is found again (2026-10-18).
-		writeFile("idless.chimeraProject",
+		writeProject("idless.chimeraProject",
 			"{\"title\":\"no id\",\"core\":{\"name\":\"Synth\",\"version\":\"\",\"sha1\":\"\"},\"files\":[]}");
 		const std::string ipath = g_dir + "/idless.chimeraProject";
 		const char *err = nullptr;
@@ -569,14 +603,7 @@ int main(int argc, char **argv)
 	// ---- the clock's start (issue 366): kept, written only when it is not the
 	// sandbox's own, and refused when it is not a time ----
 	{
-		auto text = [](const std::string &file) {
-			std::string out;
-			FILE *f = std::fopen(file.c_str(), "rb");
-			assert(f != nullptr);
-			for (int c; (c = std::fgetc(f)) != EOF;) out.push_back(static_cast<char>(c));
-			std::fclose(f);
-			return out;
-		};
+		auto text = [](const std::string &file) { return projectPart(file, "project.json"); };
 		const std::string cpath = g_dir + "/clock.chimeraProject";
 		ce_project *p = ce_project_new();
 		assert(ce_project_clock_start(p) == -1);
@@ -594,14 +621,14 @@ int main(int argc, char **argv)
 		assert(ce_project_set_clock_start(p, 7258118400) == 0 && ce_project_save(p, cpath.c_str(), &err) == 0);
 		assert(text(cpath).find("2200-01-01T00:00:00Z") != std::string::npos);
 		ce_project_free(p);
-		writeFile("clock-leap.chimeraProject", "{\"clockStart\": \"2024-02-29T23:59:59Z\"}");
+		writeProject("clock-leap.chimeraProject", "{\"clockStart\": \"2024-02-29T23:59:59Z\"}");
 		p = ce_project_open((g_dir + "/clock-leap.chimeraProject").c_str(), &err);
 		assert(p != nullptr && ce_project_clock_start(p) == 1709251199);
 		ce_project_free(p);
 		for (const char *bad : { "2023-02-29T00:00:00Z", "1969-12-31T23:59:59Z", "2200-01-01T00:00:01Z",
 			"2030-01-02 03:04:05", "2030-01-02T03:04:05", "tomorrow" })
 		{
-			writeFile("clock-bad.chimeraProject", std::string("{\"clockStart\": \"") + bad + "\"}");
+			writeProject("clock-bad.chimeraProject", std::string("{\"clockStart\": \"") + bad + "\"}");
 			err = nullptr;
 			assert(ce_project_open((g_dir + "/clock-bad.chimeraProject").c_str(), &err) == nullptr);
 			assert(err != nullptr && std::strstr(err, "clockStart") != nullptr);
@@ -609,21 +636,11 @@ int main(int argc, char **argv)
 		std::remove(cpath.c_str());
 	}
 
-	{ // The input as the file holds it (owner, 2026-10-28): "inputs", its key's
-	  // groups of columns and one entry a line, not the movie's text block as a
-	  // string; the old string is refused; the key comes back byte for byte
-	  // even where a name holds the key's own separators
-		auto text = [](const std::string &path) {
-			std::string out;
-			if (FILE *f = std::fopen(path.c_str(), "rb"))
-			{
-				char buf[4096];
-				size_t n;
-				while ((n = std::fread(buf, 1, sizeof buf, f)) > 0) out.append(buf, n);
-				std::fclose(f);
-			}
-			return out;
-		};
+	{ // The input as the file holds it (owner, 2026-10-28 and 2026-11-02):
+	  // "inputs" in project.json, its key's groups of columns, and the entries
+	  // one a line in input.input (a branch's in branches/<n>.input), with
+	  // nothing else in those files; the key comes back byte for byte even
+	  // where a name holds the key's own separators
 		const std::string ipath = g_dir + "/inputs.chimeraProject";
 		ce_project *p = ce_project_new();
 		const char *lump = "[Input]\nLogKey:#Reset|Power|#P1 Up|P1 \"#|\n|..|.U|\n|.P|..|\n[/Input]\n";
@@ -632,10 +649,15 @@ int main(int argc, char **argv)
 		ce_project_branch_add(p, "odd names", 1, "", exotic, std::strlen(exotic));
 		assert(ce_project_save(p, ipath.c_str(), &err) == 0);
 		ce_project_free(p);
-		const std::string saved = text(ipath);
+		std::vector<std::string> names;
+		const std::string saved = projectPart(ipath, "project.json", &names);
+		assert((names == std::vector<std::string>{"project.json", "input.input", "branches/1.input"}));
 		assert(saved.find("\"input\"") == std::string::npos && saved.find("[Input]") == std::string::npos);
+		assert(saved.find("entries") == std::string::npos && saved.find("|..|") == std::string::npos);
 		assert(saved.find("\"columns\":\t[\n\t\t\t[\"Reset\", \"Power\"],\n\t\t\t[\"P1 Up\", \"P1 \\\"#\"]\n\t\t]") != std::string::npos);
-		assert(saved.find("\"entries\":\t[\n\t\t\t\"|..|.U|\",\n\t\t\t\"|.P|..|\"\n\t\t]") != std::string::npos);
+		/* the lines as TAStudio's Copy writes them: nothing before or after, no quotes, no commas */
+		assert(projectPart(ipath, "input.input") == "|..|.U|\n|.P|..|\n");
+		assert(projectPart(ipath, "branches/1.input") == "|.@|.|\n");
 		p = ce_project_open(ipath.c_str(), &err);
 		assert(p != nullptr);
 		uint64_t len = 0;
@@ -644,22 +666,68 @@ int main(int argc, char **argv)
 		got = ce_project_branch_log_text(p, 0, &len);
 		assert(std::string(got, len) == exotic);
 		ce_project_free(p);
+		// lines ended by "\r\n" (the file edited on Windows) are the same lines
+		writeProject("crlf.chimeraProject", "{\"inputs\": {\"columns\": [[\"P1 Up\"]]}}", "|U|\r\n|.|\r\n");
+		p = ce_project_open((g_dir + "/crlf.chimeraProject").c_str(), &err);
+		assert(p != nullptr);
+		got = ce_project_log_text(p, &len);
+		assert(std::string(got, len) == "[Input]\nLogKey:#P1 Up|\n|U|\n|.|\n[/Input]\n");
+		ce_project_free(p);
 		// the text block as builds before 2026-10-28 wrote it is not read: no
 		// old forms are kept (owner, 2026-10-28)
-		writeFile("old-input.chimeraProject", "{\"input\": \"[Input]\\nLogKey:#P1 Up|\\n|U|\\n[/Input]\\n\"}");
+		writeProject("old-input.chimeraProject", "{\"input\": \"[Input]\\nLogKey:#P1 Up|\\n|U|\\n[/Input]\\n\"}");
 		err = nullptr;
 		assert(ce_project_open((g_dir + "/old-input.chimeraProject").c_str(), &err) == nullptr);
 		assert(err != nullptr && std::strstr(err, "unknown project key \"input\"") != nullptr);
 		// what is not an input is refused, and says where
-		for (const char *bad : { "{\"inputs\": [], \"input\": \"\"}", "{\"inputs\": {\"entries\": [\"LogKey:#A|\"]}}",
+		for (const char *bad : { "{\"inputs\": [], \"input\": \"\"}", "{\"inputs\": {\"entries\": [\"|A|\"]}}",
 			"{\"inputs\": {\"columns\": [\"A\"]}}", "{\"inputs\": {\"keys\": []}}",
 			"{\"inputs\": {\"columns\": [], \"key\": \"#\"}}" })
 		{
-			writeFile("bad-input.chimeraProject", bad);
+			writeProject("bad-input.chimeraProject", bad);
 			err = nullptr;
 			assert(ce_project_open((g_dir + "/bad-input.chimeraProject").c_str(), &err) == nullptr);
 			assert(err != nullptr && std::strstr(err, "input") != nullptr);
 		}
+	}
+
+	{ // The file is a zip (owner, 2026-11-02); what is not one of its parts is refused, saying why
+		auto refused = [&](const char *file, const char *says) {
+			err = nullptr;
+			ce_project *p = ce_project_open((g_dir + "/" + file).c_str(), &err);
+			if (p != nullptr || err == nullptr || std::strstr(err, says) == nullptr)
+			{
+				std::fprintf(stderr, "%s: wanted a refusal saying \"%s\", got \"%s\"\n", file, says, err != nullptr ? err : "(opened)");
+				assert(false);
+			}
+		};
+		// the old form, one JSON file, is refused by name: no reader is kept (owner, 2026-11-02)
+		writeFile("old-form.chimeraProject", "{\"title\": \"from before\", \"inputs\": {\"entries\": [\"|U|\"]}}");
+		refused("old-form.chimeraProject", "old form");
+		writeFile("old-form-bom.chimeraProject", "\xEF\xBB\xBF  {}");
+		refused("old-form-bom.chimeraProject", "old form");
+		writeFile("not-zip.chimeraProject", "PK but no zip at all");
+		refused("not-zip.chimeraProject", "not a zip");
+		writeZip("no-json.chimeraProject", {{"input.input", "|U|\n"}});
+		refused("no-json.chimeraProject", "project.json");
+		writeZip("stranger.chimeraProject", {{"project.json", "{}"}, {"notes.txt", "hello"}});
+		refused("stranger.chimeraProject", "notes.txt");
+		writeZip("branch-gone.chimeraProject", {{"project.json", "{}"}, {"branches/1.input", "|U|\n"}});
+		refused("branch-gone.chimeraProject", "branches/1.input");
+		writeZip("branch-zero.chimeraProject", {{"project.json", "{\"branches\": [{\"name\": \"a\", \"frame\": 0}]}"}, {"branches/01.input", ""}});
+		refused("branch-zero.chimeraProject", "branches/01.input");
+		writeProject("line.chimeraProject", "{}", "|U|\nnot a frame\n");
+		refused("line.chimeraProject", "input.input: line 2");
+		writeZip("branch-line.chimeraProject", {{"project.json", "{\"branches\": [{\"name\": \"a\", \"frame\": 0}]}"},
+			{"branches/1.input", "\n"}});
+		refused("branch-line.chimeraProject", "branches/1.input: line 1");
+		// a project of no input has empty input files, and opens with none
+		writeZip("bare.chimeraProject", {{"project.json", "{\"title\": \"bare\"}"}});
+		ce_project *p = ce_project_open((g_dir + "/bare.chimeraProject").c_str(), &err);
+		assert(p != nullptr);
+		uint64_t len = 1;
+		assert(ce_project_log_text(p, &len) != nullptr && len == 0);
+		ce_project_free(p);
 	}
 
 	std::printf("project: all assertions passed\n");

@@ -4915,6 +4915,28 @@ std::string readFile(const std::filesystem::path &p)
 	return ss.str();
 }
 
+/* One part of a project file, a zip (owner, 2026-11-02): "" when it has none */
+static std::string projectPart(const std::filesystem::path &file, const char *part)
+{
+	mz_zip_archive zip{};
+	if (mz_zip_reader_init_file(&zip, file.string().c_str(), 0) == MZ_FALSE) return {};
+	std::string out;
+	size_t len = 0;
+	if (void *data = mz_zip_reader_extract_file_to_heap(&zip, part, &len, 0))
+	{
+		out.assign(static_cast<const char *>(data), len);
+		mz_free(data);
+	}
+	mz_zip_reader_end(&zip);
+	return out;
+}
+
+/* what a project file says, to look through: project.json and its input's lines */
+static std::string projectText(const std::filesystem::path &file)
+{
+	return projectPart(file, "project.json") + projectPart(file, "input.input");
+}
+
 /* A project: the synthetic game's winning movie, played to its end, leaves
  * the machine's memory exactly as the witness's recorded run does; saved and
  * opened again, it holds the same inputs, and an edit survives the trip. */
@@ -4941,16 +4963,20 @@ bool project(const char *package, const char *rom, const std::string &movies, co
 	char sha[41];
 	const std::string romBytes = readFile(rom);
 	ce_sha1_hex(reinterpret_cast<const uint8_t *>(romBytes.data()), romBytes.size(), sha);
-	std::string inputsJson = "{\"columns\": [[\"P1 Up\", \"P1 Down\", \"P1 Left\", \"P1 Right\", \"P1 A\", \"P1 B\", \"P1 Select\", \"P1 Start\"]], "
-		"\"entries\": [";
-	for (size_t i = 0; i < entries.size(); i++) inputsJson += (i ? ", \"" : "\"") + entries[i] + "\"";
-	inputsJson += "]}";
 	{
-		std::ofstream out(dir / "p.chimeraProject", std::ios::binary);
-		out << "{\"title\": \"gridWalker.win\", \"core\": {\"name\": \"Synth\", \"version\": \"\", \"sha1\": \"\"}, "
-			<< "\"headers\": {\"MovieVersion\": \"Chimera Project File v1.1\", \"Platform\": \"Synth\"}, "
-			<< "\"files\": [{\"name\": \"gridWalker.testrom\", \"sha1\": \"" << sha << "\", \"slot\": \"rom\"}], "
-			<< "\"inputs\": " << inputsJson << "}";
+		std::string log = "[Input]\nLogKey:#P1 Up|P1 Down|P1 Left|P1 Right|P1 A|P1 B|P1 Select|P1 Start|\n";
+		for (const std::string &e : entries) log += e + "\n";
+		log += "[/Input]\n";
+		ce_project *made = ce_project_new();
+		const char *err = nullptr;
+		ce_project_set_title(made, "gridWalker.win");
+		ce_project_set_core(made, "Synth", "", "");
+		ce_project_header_set(made, "MovieVersion", "Chimera Project File v1.1");
+		ce_project_header_set(made, "Platform", "Synth");
+		ce_project_file_add(made, "gridWalker.testrom", "rom", (dir / "gridWalker.testrom").string().c_str(), &err);
+		ce_project_set_log_text(made, log.data(), log.size());
+		ce_project_save(made, (dir / "p.chimeraProject").string().c_str(), &err);
+		ce_project_free(made);
 	}
 
 	ManualDispatcher d;
@@ -5001,7 +5027,7 @@ bool project(const char *package, const char *rom, const std::string &movies, co
 	CHECK(openIt(dir / "saved.chimeraProject"));
 	inputs.read(0, after);
 	CHECK(before == after && inputs.size() == end);
-	CHECK(readFile(dir / "saved.chimeraProject").find("|.D......|") != std::string::npos);
+	CHECK(projectText(dir / "saved.chimeraProject").find("|.D......|") != std::string::npos);
 
 	/* File > Restart on a project: frame 0 again, the movie as edited */
 	{
@@ -5044,7 +5070,7 @@ bool project(const char *package, const char *rom, const std::string &movies, co
 	fromValue(marks.cell(0, 1), firstText);
 	CHECK(marks.rowCount() == 5 && firstFrame == 0 && firstText == "Run start");
 	{
-		const std::string saved = readFile(dir / "saved.chimeraProject");
+		const std::string saved = projectText(dir / "saved.chimeraProject");
 		CHECK(saved.find("Run start") == std::string::npos && saved.find("Last input") == std::string::npos && saved.find("Run end") == std::string::npos);
 	}
 	roll.run("removeMarker", {int64_t{12}}, error);
@@ -5216,21 +5242,23 @@ bool project(const char *package, const char *rom, const std::string &movies, co
 	CHECK(d.until([&] { return session.projectPath.get() == (dir / "branched.chimeraProject").string(); }, 20));
 	json::Json branchedFile;
 	std::string branchedWhy;
-	CHECK(json::parse(readFile(dir / "branched.chimeraProject"), branchedFile, branchedWhy));
+	CHECK(json::parse(projectPart(dir / "branched.chimeraProject", "project.json"), branchedFile, branchedWhy));
 	const json::Json *idField = branchedFile.find("id");
 	const std::string ownId = idField != nullptr ? idField->text : std::string();
 	CHECK(!ownId.empty() && ownId != firstFolder.filename().string());
 	const fs::path ownStates = cache / ownId / "branches";
 	CHECK(readFile(ownStates / stateFile.filename()) == state && readFile(ownStates / noteFile.filename()) == note);
-	/* the greenzone this save keeps goes to the new folder: the first file,
-	 * opened again, finds the history its own save wrote */
-	CHECK(d.until([&] { return fs::exists(cache / ownId / "history.bin"); }, 20));
-	CHECK(readFile(firstFolder / "history.bin") == firstHistory);
+	/* A save writes no greenzone (owner, 2026-11-02): it is kept as the
+	 * project closes - here, as it is opened again - and goes to the new
+	 * folder, while the first file's folder keeps what it had */
+	CHECK(!fs::exists(cache / ownId / "history.bin"));
 	{
 		std::ofstream(ownStates / "0123456789abcdef.state") << "left behind";
 		std::ofstream(ownStates / "0123456789abcdef.note") << "left behind";
 	}
 	CHECK(openIt(dir / "branched.chimeraProject"));
+	CHECK(fs::exists(cache / ownId / "history.bin"));
+	CHECK(readFile(firstFolder / "history.bin") == firstHistory);
 	CHECK(branches.count.get() == 1);
 	auto filesIn = [&](const fs::path &folder, const char *extension) {
 		std::vector<fs::path> found;
@@ -5251,9 +5279,9 @@ bool project(const char *package, const char *rom, const std::string &movies, co
 	spoil();
 	loadIt(true);
 
-	/* The greenzone is kept with the project: saved, it is there when the
-	 * project opens again, and going to the end runs from its states
-	 * rather than from the start. */
+	/* The greenzone is kept with the project as it closes, not by a save:
+	 * it is there when the project opens again, and going to the end runs
+	 * from its states rather than from the start. */
 	const fs::path projectCache = cache / ownId, history = projectCache / "history.bin";
 	const std::string branched = (dir / "branched.chimeraProject").string();
 	/* played through from the start, so it holds the frames near the end */
@@ -5261,8 +5289,10 @@ bool project(const char *package, const char *rom, const std::string &movies, co
 	CHECK(d.until([&] { return session.frame.get() == 0; }, 30));
 	session.run("seek", {end}, error);
 	CHECK(d.until([&] { return session.frame.get() == end; }, 30));
+	const fs::file_time_type keptAt = fs::exists(history) ? fs::last_write_time(history) : fs::file_time_type{};
 	session.run("saveProject", {std::string()}, error);
 	CHECK(d.until([&] { return session.status.get().rfind("Saved " + branched, 0) == 0; }, 20));
+	CHECK(fs::exists(history) && fs::last_write_time(history) == keptAt);
 	CHECK(openIt(branched));
 	/* the machine says it is open a moment before the project's session marks itself running */
 	CHECK(d.until([&] { return fs::exists(history) && fs::exists(projectCache / "session.running"); }, 10));
@@ -5294,7 +5324,9 @@ bool project(const char *package, const char *rom, const std::string &movies, co
 	 * alone (user-decided, 2026-10-15). */
 	session.run("saveProject", {std::string()}, error);
 	CHECK(d.until([&] { return session.status.get().rfind("Saved " + branched, 0) == 0; }, 20));
-	CHECK(d.until([&] { return fs::exists(history); }, 20));
+	session.run("close", {}, error);
+	CHECK(d.until([&] { return !session.isOpen.get(); }, 20));
+	CHECK(fs::exists(history));
 	CHECK(!filesIn(ownStates, ".state").empty());
 	const std::string copied = (dir / "copied.chimeraProject").string();
 	fs::copy_file(branched, copied, fs::copy_options::overwrite_existing);
@@ -5309,12 +5341,28 @@ bool project(const char *package, const char *rom, const std::string &movies, co
 	CHECK(d.until([&] { return session.frame.get() == end; }, 30));
 	session.run("saveProject", {std::string()}, error);
 	CHECK(d.until([&] { return session.status.get().rfind("Saved " + copied, 0) == 0; }, 20));
-	CHECK(d.until([&] { return fs::exists(history); }, 20));
 	session.run("close", {}, error);
 	CHECK(d.until([&] { return !session.isOpen.get(); }, 20));
+	CHECK(fs::exists(history));
 	fs::remove(projectCache / "about.json");
 	CHECK(openIt(branched));
 	CHECK(d.until([&] { return session.greenEnd.get() > 0; }, 10));
+	/* closed with an edit not saved: the states after the edit were made for
+	 * input the project's file does not hold, and are not kept */
+	{
+		const int64_t at = 10;
+		session.run("seek", {end}, error);
+		CHECK(d.until([&] { return session.frame.get() == end; }, 30));
+		CHECK(d.until([&] { return session.greenEnd.get() > at; }, 10));
+		const auto fileHas = inputs.at(at);
+		roll.run("toggle", {at, int64_t{4}}, error);
+		CHECK(d.until([&] { return session.unsaved.get(); }, 10));
+		session.run("close", {}, error);
+		CHECK(d.until([&] { return !session.isOpen.get(); }, 20));
+		CHECK(openIt(branched));
+		d.until([] { return false; }, 0.2);
+		CHECK(inputs.at(at) == fileHas && session.greenEnd.get() <= at);
+	}
 	fs::remove(projectCache / "budgets.json");
 
 	/* opened with no package given: the installed core is found for it, and
@@ -5428,7 +5476,7 @@ bool newProject(const char *package, const char *rom)
 	inputs.read(0, made);
 	session.run("saveProject", {}, error);
 	CHECK(d.until([&] { return session.status.get().rfind("Saved", 0) == 0; }, 20));
-	const std::string text = readFile(project);
+	const std::string text = projectText(project);
 	CHECK(text.find("\"Platform\"") != std::string::npos && text.find("initFillByte") != std::string::npos &&
 		text.find("walker.testrom") != std::string::npos && text.find("Synth") != std::string::npos);
 	/* opened again in a new session (one machine at a time: the sandbox
@@ -7103,30 +7151,28 @@ bool greenzoneChoice(const char *package, const char *rom)
 	/* a part made here holds the window's settings and no type name */
 	{
 		json::Json p;
-		CHECK(json::parse(readFile(project), p, error));
+		CHECK(json::parse(projectPart(project, "project.json"), p, error));
 		const json::Json *o = p.find("tastudio") != nullptr ? p.find("tastudio")->find("o") : nullptr;
 		CHECK(o != nullptr && o->find("$type") == nullptr && o->find("GreenzonePeriod") != nullptr &&
 			  o->find("GreenzonePeriod")->number() == 1);
 	}
 	/* TAStudio's part as Chimera writes it, with a choice of 5 and another setting */
 	{
-		json::Json p;
-		CHECK(json::parse(readFile(project), p, error));
 		json::Json o, tastudio;
 		o.kind = tastudio.kind = json::Json::Kind::Object;
 		o.members.emplace_back("HorizontalOrientation", json::Json::boolean_(true));
 		o.members.emplace_back("GreenzonePeriod", json::Json::integer(5));
 		tastudio.members.emplace_back("o", o);
 		/* in place of the part the save wrote */
-		bool replaced = false;
-		for (auto &[k, v] : p.members)
-			if (k == "tastudio")
-			{
-				v = tastudio;
-				replaced = true;
-			}
-		if (!replaced) p.members.emplace_back("tastudio", tastudio);
-		std::ofstream(project, std::ios::binary | std::ios::trunc) << json::write(p);
+		const char *err = nullptr;
+		ce_project *p = ce_project_open(project.string().c_str(), &err);
+		CHECK(p != nullptr);
+		if (p != nullptr)
+		{
+			CHECK(ce_project_set_tastudio_text(p, json::write(tastudio).c_str(), &err) == 0);
+			CHECK(ce_project_save(p, project.string().c_str(), &err) == 0);
+			ce_project_free(p);
+		}
 	}
 	session.run("openProject", {project.string(), std::string(package)}, error);
 	CHECK(d.until([&] { return session.isOpen.get() && session.greenzonePeriod.get() == 5; }, 60));
@@ -7154,7 +7200,7 @@ bool greenzoneChoice(const char *package, const char *rom)
 	CHECK(d.until([&] { return session.status.get().rfind("Saved", 0) == 0; }, 20));
 	{
 		json::Json p;
-		CHECK(json::parse(readFile(project), p, error));
+		CHECK(json::parse(projectPart(project, "project.json"), p, error));
 		const json::Json *o = p.find("tastudio") != nullptr ? p.find("tastudio")->find("o") : nullptr;
 		CHECK(o != nullptr && o->find("GreenzonePeriod") != nullptr && o->find("GreenzonePeriod")->number() == 0 &&
 			  o->find("HorizontalOrientation") != nullptr && o->find("HorizontalOrientation")->boolean);
@@ -7277,7 +7323,7 @@ bool rerecordCount(const char *package, const char *rom)
 	session.run("saveProject", {project.string()}, error);
 	CHECK(d.until([&] { return session.projectPath.get() == project.string() && session.hasProject.get(); }, 20));
 	{
-		const std::string text = readFile(project);
+		const std::string text = projectPart(project, "project.json");
 		const size_t at = text.find("\"rerecords\"");
 		CHECK(at != std::string::npos && std::atoi(text.c_str() + text.find(':', at) + 1) == 5);
 	}
@@ -8151,7 +8197,7 @@ bool newProjectWizard(const char *package, const char *rom, const char *slotsPac
 	CHECK(d.until([&] { return session.isOpen.get() && session.projectPath.get() == plain.string(); }, 60));
 	CHECK(wizard.made.get() == madeBefore + 1 && !wizard.making.get() && !wizard.filesRefused.get());
 	{
-		const std::string project = readFile(plain);
+		const std::string project = projectText(plain);
 		CHECK(std::regex_search(project, std::regex("\"initFillByte\"\\s*:\\s*7[^0-9]")));
 		CHECK(project.find("down the corridor") != std::string::npos && project.find("walker.testrom") != std::string::npos);
 		CHECK(project.find("\"Platform\"") != std::string::npos);
@@ -8178,7 +8224,7 @@ bool newProjectWizard(const char *package, const char *rom, const char *slotsPac
 		wizard.clockStart.set("2030-01-02 03:04:05");
 		CHECK(wizard.run("create", {clocked.string()}, error).has_value());
 		CHECK(d.until([&] { return session.isOpen.get() && session.projectPath.get() == clocked.string(); }, 60));
-		CHECK(std::regex_search(readFile(clocked), std::regex("\"clockStart\"\\s*:\\s*\"2030-01-02T03:04:05Z\"")));
+		CHECK(std::regex_search(projectText(clocked), std::regex("\"clockStart\"\\s*:\\s*\"2030-01-02T03:04:05Z\"")));
 		session.run("frameAdvance", {}, error);
 		CHECK(d.until([&] { return session.frame.get() == 1; }, 20));
 		const std::vector<uint8_t> ram = session.readDomain("RAM");
@@ -8312,7 +8358,7 @@ bool newProjectWizard(const char *package, const char *rom, const char *slotsPac
 	CHECK(wizard.run("create", {boardB.string(), false}, error).has_value());
 	CHECK(d.until([&] { return wizard.status.get() == "Made " + boardB.string(); }, 30));
 	{
-		const std::string project = readFile(boardB);
+		const std::string project = projectText(boardB);
 		char sha[41];
 		uint64_t len = 0;
 		ce_sha1_file((dir / "mybios.bin").string().c_str(), sha, &len);
@@ -8392,9 +8438,9 @@ bool newProjectWizard(const char *package, const char *rom, const char *slotsPac
 	CHECK(session.run("saveProject", {boardA.string()}, error).has_value());
 	CHECK(d.until([&] { return session.projectPath.get() == boardA.string(); }, 20));
 	CHECK(suggested() == boardA.string());
-	CHECK(std::regex_search(readFile(boardA), std::regex("\"gameLogo\"\\s*:\\s*\"on\"")));
+	CHECK(std::regex_search(projectText(boardA), std::regex("\"gameLogo\"\\s*:\\s*\"on\"")));
 	/* the renderer, asked apart, is recorded like any setting */
-	CHECK(std::regex_search(readFile(boardA), std::regex("\"renderer\"\\s*:\\s*\"software\"")));
+	CHECK(std::regex_search(projectText(boardA), std::regex("\"renderer\"\\s*:\\s*\"software\"")));
 	CHECK(session.recentProjects.get().rfind(boardA.string(), 0) == 0);
 	session.run("close", {}, error);
 	CHECK(d.until([&] { return !session.isOpen.get(); }, 20));
@@ -8402,7 +8448,22 @@ bool newProjectWizard(const char *package, const char *rom, const char *slotsPac
 	 * the GPU bridge, as Chimera asks (a Ruffle project failed without it) */
 	CHECK(ce_gl_requested() == 0);
 	const fs::path boardHw = dir / "boardhw.chimeraProject";
-	std::ofstream(boardHw, std::ios::binary) << std::regex_replace(readFile(boardA), std::regex("\"renderer\"(\\s*:\\s*)\"software\""), "\"renderer\"$1\"opengl-hw\"");
+	{
+		/* the same project with a hardware renderer, saved as Chimera saves one */
+		const char *err = nullptr;
+		ce_project *hw = ce_project_open(boardA.string().c_str(), &err);
+		CHECK(hw != nullptr);
+		if (hw != nullptr)
+		{
+			uint64_t len = 0;
+			const char *was = ce_project_settings_text(hw, &len);
+			const std::string settings = std::regex_replace(std::string(was, static_cast<size_t>(len)),
+				std::regex("\"renderer\"(\\s*:\\s*)\"software\""), "\"renderer\"$1\"opengl-hw\"");
+			CHECK(ce_project_set_settings_text(hw, settings.c_str(), &err) == 0);
+			CHECK(ce_project_save(hw, boardHw.string().c_str(), &err) == 0);
+			ce_project_free(hw);
+		}
+	}
 	CHECK(session.run("openProject", {boardHw.string()}, error).has_value());
 	CHECK(d.until([&] { return session.isOpen.get() && session.projectPath.get() == boardHw.string(); }, 60));
 	CHECK(ce_gl_requested() == 1);
@@ -8448,8 +8509,8 @@ bool newProjectWizard(const char *package, const char *rom, const char *slotsPac
 		const fs::path boardSet = dir / "boardset.chimeraProject";
 		CHECK(session.run("saveProject", {boardSet.string()}, error).has_value());
 		CHECK(d.until([&] { return session.projectPath.get() == boardSet.string() && !session.unsaved.get(); }, 20));
-		CHECK(std::regex_search(readFile(boardSet), std::regex("\"initFillByte\"\\s*:\\s*3")));
-		CHECK(std::regex_search(readFile(boardSet), std::regex("\"clockStart\"\\s*:\\s*\"2001-02-03T04:05:06Z\"")));
+		CHECK(std::regex_search(projectText(boardSet), std::regex("\"initFillByte\"\\s*:\\s*3")));
+		CHECK(std::regex_search(projectText(boardSet), std::regex("\"clockStart\"\\s*:\\s*\"2001-02-03T04:05:06Z\"")));
 		/* board A the last project opened again, for what follows */
 		CHECK(session.run("openProject", {boardA.string()}, error).has_value());
 		CHECK(d.until([&] { return session.isOpen.get() && session.projectPath.get() == boardA.string(); }, 60));
@@ -8595,7 +8656,7 @@ bool customFirmware(const char *rom, const char *hashedPackage, const char *game
 	CHECK(wizard.run("create", {made.string()}, error).has_value());
 	CHECK(d.until([&] { return session.isOpen.get() && session.projectPath.get() == made.string(); }, 60));
 	{
-		const std::string project = readFile(made);
+		const std::string project = projectText(made);
 		CHECK(project.find(mySha) != std::string::npos || project.find(lower(mySha)) != std::string::npos);
 		CHECK(project.find(original) == std::string::npos && project.find(lower(original)) == std::string::npos);
 	}

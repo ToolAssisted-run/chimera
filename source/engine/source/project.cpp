@@ -1,7 +1,9 @@
 /* project.cpp - the .chimeraProject: chimera's entry point and its movie in
  * one file (docs/project.md).
  *
- * A JSON document holding everything required to reproduce the work except
+ * A zip (owner, 2026-11-02) of project.json, the input's lines (input.input)
+ * and each branch's (branches/<n>.input). Together they hold everything
+ * required to reproduce the work except
  * the data bytes, which are named by SHA1: identity, the pinned core, the
  * file manifest (canonical names + SHA1 + the core-defined slot each file
  * fills), firmware pins, sync settings, and the TAS work itself - input
@@ -25,6 +27,7 @@
 #include "language.hpp"
 
 #include "../../extern/cjson/cJSON.h"
+#include "../../extern/miniz/miniz.h"
 
 using chimera::lang::tr;
 
@@ -33,6 +36,7 @@ using chimera::lang::tr;
 #include <cstdio>
 #include <filesystem>
 #include <initializer_list>
+#include <map>
 #include <cstring>
 #include <ctime>
 #include <set>
@@ -280,24 +284,27 @@ ce_project *ce_project_new(void)
 
 void ce_project_free(ce_project *p) { delete p; }
 
-/* A movie's input as the project file holds it (owner, 2026-10-28): not the
- * movie's text block ("[Input]", "LogKey:...", the entries, "[/Input]") as one
- * string, but
+/* A movie's input as the project holds it (owner, 2026-10-28 and
+ * 2026-11-02): its columns in project.json, and its entries, a frame a line,
+ * in a file of their own beside it (input.input, a branch's
+ * branches/<n>.input):
  *
- *   "inputs": { "columns": [ ["Reset", "Power"], ["P1 Up", "P1 Down", ...] ],
- *               "entries": [ "|..|........|", ... ] }
+ *   project.json   "inputs": { "columns": [ ["Reset", "Power"], ["P1 Up", ...] ] }
+ *   input.input    |..|........|
+ *                  |.P|U.......|
  *
- * "columns" is the key's groups in order, each a list of its columns' names -
- * the groups an entry's '|' part - and "entries" one string a frame. In
- * memory the project keeps the text block, which every reader of a movie
- * takes; it is turned into this and back only here.
+ * The lines are what TAStudio's Copy puts on the clipboard: nothing before
+ * or after them, no quotes, no commas between them. "columns" is the key's
+ * groups in order, each a list of its columns' names - the groups an entry's
+ * '|' part. In memory the project keeps the text block, which every reader
+ * of a movie takes; it is turned into this and back only here.
  *
  * The key is split where a '#' begins a name (a group starts) and at each
  * '|' (a name ends), and joining the groups back gives the key byte for
  * byte whatever the names hold: a machine's "P1 #" or "| @" is read from the
  * key with the machine's own names, as before (EntryLayout::buildFromKey),
  * and only looks split here. A key that does not come back the same is kept
- * whole, as "key". A movie with no key has no "columns". */
+ * whole, as "key". A movie with no key has no "inputs". */
 static bool splitKey(const std::string &key, std::vector<std::vector<std::string>> &groups)
 {
 	groups.clear();
@@ -341,7 +348,7 @@ static std::string jsonString(const std::string &text)
 }
 
 /* a list one item a line, at the depth cJSON_Print indents the key it is the
- * value of (a frame's entry a line reads, and diffs, as one) */
+ * value of (a group of columns a line reads, and diffs, as one) */
 static cJSON *listOnLines(const std::vector<std::string> &items, int depth)
 {
 	if (items.empty()) return cJSON_CreateArray();
@@ -352,129 +359,224 @@ static cJSON *listOnLines(const std::vector<std::string> &items, int depth)
 	return cJSON_CreateRaw(text.c_str());
 }
 
-/* the text block as "inputs", or null for none (a project with no input yet) */
-static cJSON *inputsOf(const std::string &lump, int depth)
+/* the text block as "inputs" (null when the movie names no columns) and its
+ * entries as the lines of an .input file */
+static cJSON *inputsOf(const std::string &lump, int depth, std::string &lines)
 {
+	lines.clear();
 	if (lump.empty()) return nullptr;
 	ce_movie_log *log = ce_movie_log_new();
 	ce_movie_log_parse(log, lump.data(), lump.size());
-	cJSON *out = cJSON_CreateObject();
+	cJSON *out = nullptr;
 	if (const char *key = ce_movie_log_key(log))
 	{
+		out = cJSON_CreateObject();
 		std::vector<std::vector<std::string>> groups;
 		if (splitKey(key, groups) && joinKey(groups) == key)
 		{
-			std::vector<std::string> lines;
+			std::vector<std::string> names;
 			for (const auto &g : groups)
 			{
 				std::string line = "[";
 				for (size_t i = 0; i < g.size(); i++) line += (i ? ", " : "") + jsonString(g[i]);
-				lines.push_back(line + "]");
+				names.push_back(line + "]");
 			}
-			cJSON_AddItemToObject(out, "columns", listOnLines(lines, depth + 1));
+			cJSON_AddItemToObject(out, "columns", listOnLines(names, depth + 1));
 		}
 		else cJSON_AddStringToObject(out, "key", key);
 	}
-	std::vector<std::string> entries;
-	for (int64_t i = 0; i < ce_movie_log_count(log); i++) entries.push_back(jsonString(ce_movie_log_entry(log, i)));
-	cJSON_AddItemToObject(out, "entries", listOnLines(entries, depth + 1));
+	for (int64_t i = 0; i < ce_movie_log_count(log); i++) lines += std::string(ce_movie_log_entry(log, i)) + "\n";
 	ce_movie_log_free(log);
 	return out;
 }
 
-/* "inputs" back to the text block; false with why for one that is not one: the
- * key of a sentence whose %1 is the field, and its %2 an unknown key's name */
-static bool lumpOf(const cJSON *inputs, std::string &lump, std::string &why, std::string &unknown)
+/* "inputs" (null for none) and the lines of its .input file (named so a
+ * refusal can say which) back to the text block; false with why for a
+ * project that does not hold one: the key of a sentence and its arguments */
+static bool lumpOf(const cJSON *inputs, const std::string &lines, const std::string &field, const std::string &file,
+	std::string &lump, std::string &why, std::vector<std::string> &args)
 {
-	if (!cJSON_IsObject(inputs))
-	{
-		why = "project.inputs_not_object";
-		return false;
-	}
-	if (const char *k = unknownKey(inputs, { "columns", "key", "entries" }))
-	{
-		why = "project.inputs_unknown_key"; unknown = k;
-		return false;
-	}
-	const cJSON *columns = cJSON_GetObjectItemCaseSensitive(inputs, "columns");
-	const cJSON *key = cJSON_GetObjectItemCaseSensitive(inputs, "key");
-	const cJSON *entries = cJSON_GetObjectItemCaseSensitive(inputs, "entries");
-	if (columns != nullptr && key != nullptr)
-	{
-		why = "project.inputs_columns_and_key";
-		return false;
-	}
+	lump.clear();
+	args = { field };
+	if (inputs == nullptr && lines.empty()) return true;
 	lump = "[Input]\n";
-	if (columns != nullptr)
+	if (inputs != nullptr)
 	{
-		std::vector<std::vector<std::string>> groups;
-		if (!cJSON_IsArray(columns))
+		if (!cJSON_IsObject(inputs))
 		{
-			why = "project.inputs_columns_not_list";
+			why = "project.inputs_not_object";
 			return false;
 		}
-		for (const cJSON *g = columns->child; g != nullptr; g = g->next)
+		if (const char *k = unknownKey(inputs, { "columns", "key" }))
 		{
-			if (!cJSON_IsArray(g))
+			why = "project.inputs_unknown_key";
+			args.push_back(k);
+			return false;
+		}
+		const cJSON *columns = cJSON_GetObjectItemCaseSensitive(inputs, "columns");
+		const cJSON *key = cJSON_GetObjectItemCaseSensitive(inputs, "key");
+		if (columns != nullptr && key != nullptr)
+		{
+			why = "project.inputs_columns_and_key";
+			return false;
+		}
+		if (columns != nullptr)
+		{
+			std::vector<std::vector<std::string>> groups;
+			if (!cJSON_IsArray(columns))
 			{
-				why = "project.inputs_group_not_list";
+				why = "project.inputs_columns_not_list";
 				return false;
 			}
-			groups.emplace_back();
-			for (const cJSON *n = g->child; n != nullptr; n = n->next)
+			for (const cJSON *g = columns->child; g != nullptr; g = g->next)
 			{
-				if (!cJSON_IsString(n))
+				if (!cJSON_IsArray(g))
 				{
-					why = "project.inputs_name_not_string";
+					why = "project.inputs_group_not_list";
 					return false;
 				}
-				groups.back().push_back(n->valuestring);
+				groups.emplace_back();
+				for (const cJSON *n = g->child; n != nullptr; n = n->next)
+				{
+					if (!cJSON_IsString(n))
+					{
+						why = "project.inputs_name_not_string";
+						return false;
+					}
+					groups.back().push_back(n->valuestring);
+				}
 			}
+			lump += "LogKey:" + joinKey(groups) + "\n";
 		}
-		lump += "LogKey:" + joinKey(groups) + "\n";
-	}
-	else if (key != nullptr)
-	{
-		if (!cJSON_IsString(key))
+		else if (key != nullptr)
 		{
-			why = "project.inputs_key_not_string";
-			return false;
-		}
-		lump += std::string("LogKey:") + key->valuestring + "\n";
-	}
-	if (entries != nullptr)
-	{
-		if (!cJSON_IsArray(entries))
-		{
-			why = "project.inputs_entries_not_list";
-			return false;
-		}
-		for (const cJSON *e = entries->child; e != nullptr; e = e->next)
-		{
-			/* a line that is not an entry would be dropped when the movie is read */
-			if (!cJSON_IsString(e) || e->valuestring[0] != '|' || std::strchr(e->valuestring, '\n') != nullptr)
+			if (!cJSON_IsString(key))
 			{
-				why = "project.inputs_entry_not_input";
+				why = "project.inputs_key_not_string";
 				return false;
 			}
-			lump += std::string(e->valuestring) + "\n";
+			lump += std::string("LogKey:") + key->valuestring + "\n";
 		}
+	}
+	/* a line each, as Copy writes them; a line ended by "\r\n" (the file
+	 * edited on Windows) is the same line */
+	size_t at = 0;
+	int64_t number = 0;
+	while (at < lines.size())
+	{
+		size_t end = lines.find('\n', at);
+		if (end == std::string::npos) end = lines.size();
+		std::string line = lines.substr(at, end - at);
+		at = end + 1;
+		number++;
+		if (!line.empty() && line.back() == '\r') line.pop_back();
+		/* a line that is not an entry would be dropped when the movie is read */
+		if (line.empty() || line[0] != '|')
+		{
+			why = "project.input_line_not_input";
+			args = { file, std::to_string(number) };
+			return false;
+		}
+		lump += line + "\n";
 	}
 	lump += "[/Input]\n";
 	return true;
 }
 
-static ce_project *openProject(const char *path, const char **error_out)
+/* The project's parts, as its zip holds them (owner, 2026-11-02): project.json,
+ * the main input's lines (input.input) and each branch's (branches/<n>.input,
+ * numbered from 1 in the branches' order). */
+struct Parts
+{
+	std::string json, input;
+	std::map<int, std::string> branches;
+};
+
+/* a sentence from its key and up to two arguments */
+static std::string trArgs(const std::string &key, const std::vector<std::string> &args)
+{
+	if (args.empty()) return tr(key.c_str());
+	if (args.size() == 1) return tr(key.c_str(), {args[0]});
+	return tr(key.c_str(), {args[0], args[1]});
+}
+
+/* a branch's .input file, by its number, or -1 for a name that is not one */
+static int branchInputNumber(const std::string &name)
+{
+	static const std::string head = "branches/", tail = ".input";
+	if (name.size() <= head.size() + tail.size() || name.compare(0, head.size(), head) != 0
+		|| name.compare(name.size() - tail.size(), tail.size(), tail) != 0)
+		return -1;
+	const std::string digits = name.substr(head.size(), name.size() - head.size() - tail.size());
+	if (digits.empty() || digits.size() > 6 || digits[0] == '0') return -1;
+	for (char c : digits)
+		if (c < '0' || c > '9') return -1;
+	return std::stoi(digits);
+}
+
+/* The parts of a project file; false with why for one that is not a project.
+ * The form before 2026-11-02, one JSON file, is refused with a sentence of
+ * its own: this Chimera keeps no reader for it (owner, 2026-11-02). */
+static bool partsOf(const std::vector<uint8_t> &raw, Parts &parts, std::string &why)
+{
+	size_t first = raw.size() >= 3 && raw[0] == 0xEF && raw[1] == 0xBB && raw[2] == 0xBF ? 3 : 0;
+	while (first < raw.size() && std::isspace(raw[first])) first++;
+	if (first < raw.size() && raw[first] == '{')
+	{
+		why = tr("project.old_form");
+		return false;
+	}
+	mz_zip_archive zip{};
+	if (mz_zip_reader_init_mem(&zip, raw.data(), raw.size(), 0) == MZ_FALSE)
+	{
+		why = tr("project.not_zip");
+		return false;
+	}
+	bool haveJson = false;
+	const mz_uint count = mz_zip_reader_get_num_files(&zip);
+	for (mz_uint i = 0; i < count && why.empty(); i++)
+	{
+		if (mz_zip_reader_is_file_a_directory(&zip, i)) continue;
+		char nameBuf[512] = {};
+		mz_zip_reader_get_filename(&zip, i, nameBuf, sizeof nameBuf);
+		const std::string name = nameBuf;
+		std::string *into = nullptr;
+		if (name == "project.json")
+		{
+			into = &parts.json;
+			haveJson = true;
+		}
+		else if (name == "input.input") into = &parts.input;
+		else if (const int n = branchInputNumber(name); n > 0) into = &parts.branches[n];
+		else
+		{
+			why = tr("project.unknown_entry", {name});
+			break;
+		}
+		/* a part of a gigabyte or more is no project's */
+		mz_zip_archive_file_stat stat{};
+		size_t len = 0;
+		void *data = mz_zip_reader_file_stat(&zip, i, &stat) == MZ_TRUE && stat.m_uncomp_size < (uint64_t{1} << 30)
+			? mz_zip_reader_extract_to_heap(&zip, i, &len, 0) : nullptr;
+		if (data == nullptr)
+		{
+			why = tr("project.entry_unreadable", {name});
+			break;
+		}
+		into->assign(static_cast<const char *>(data), len);
+		mz_free(data);
+	}
+	mz_zip_reader_end(&zip);
+	if (why.empty() && !haveJson) why = tr("project.no_json");
+	return why.empty();
+}
+
+/* A project from its parts. pathForId is where the project is, for the id of
+ * one that has none; with none given it gets a new one. */
+static ce_project *parseProject(const Parts &parts, const char *pathForId, const char **error_out)
 {
 	if (error_out != nullptr) *error_out = nullptr;
-
-	std::vector<uint8_t> raw;
-	if (!chimera::readFile(path, raw))
-	{
-		fail(tr("new_project.cannot_read", {path}), error_out);
-		return nullptr;
-	}
-	cJSON *root = cJSON_ParseWithLength(reinterpret_cast<const char *>(raw.data()), raw.size());
+	cJSON *root = cJSON_ParseWithLength(parts.json.data(), parts.json.size());
 	if (root == nullptr)
 	{
 		fail(tr("project.not_json"), error_out);
@@ -495,11 +597,8 @@ static ce_project *openProject(const char *path, const char **error_out)
 	};
 
 	/* the format is strict: a key this build does not know is an error, not
-	 * something to drop silently on the next save. "description" is the one
-	 * exception: Edit Comments wrote it and is gone, every project written
-	 * before has one, and those still open; it is dropped at the next save
-	 * (owner, 2026-11-02, issue 440). */
-	static const char *known[] = { "id", "title", "description", "core", "rerecords", "clockStart",
+	 * something to drop silently on the next save */
+	static const char *known[] = { "id", "title", "core", "rerecords", "clockStart",
 		"files", "settings", "firmware", "coreCache", "inputs", "markers", "branches", "headers", "tastudio" };
 	for (cJSON *item = root->child; item != nullptr; item = item->next)
 	{
@@ -529,10 +628,11 @@ static ce_project *openProject(const char *path, const char **error_out)
 	 * in: a random one each time hid the work of a session that crashed
 	 * before its first save, which is looked for by id (engine analysis,
 	 * 2026-10-18). Where the path cannot be made whole, a random one. */
+	if (p->id.empty() && (pathForId == nullptr || pathForId[0] == '\0')) p->id = mintProjectId();
 	if (p->id.empty())
 	{
 		std::error_code ec;
-		const std::string whole = std::filesystem::weakly_canonical(std::filesystem::u8path(path), ec).u8string();
+		const std::string whole = std::filesystem::weakly_canonical(std::filesystem::u8path(pathForId), ec).u8string();
 		p->id = !ec && !whole.empty()
 			? chimera::sha1Hex(reinterpret_cast<const uint8_t *>(whole.data()), whole.size()).substr(0, 16)
 			: mintProjectId();
@@ -622,10 +722,11 @@ static ce_project *openProject(const char *path, const char **error_out)
 		if (!cJSON_IsObject(j)) return rejectP(tr("project.field_not_object", {"tastudio"}));
 		p->tastudio = cJSON_Duplicate(j, 1);
 	}
-	if ((j = cJSON_GetObjectItemCaseSensitive(root, "inputs")) != nullptr)
+	std::vector<std::string> args;
 	{
 		std::string why;
-		if (std::string unknown; !lumpOf(j, p->log, why, unknown)) return rejectP(tr(why.c_str(), {"\"inputs\"", unknown}));
+		if (!lumpOf(cJSON_GetObjectItemCaseSensitive(root, "inputs"), parts.input, "\"inputs\"", "input.input", p->log, why, args))
+			return rejectP(trArgs(why, args));
 	}
 	if ((j = cJSON_GetObjectItemCaseSensitive(root, "markers")) != nullptr)
 	{
@@ -675,14 +776,18 @@ static ce_project *openProject(const char *path, const char **error_out)
 			cJSON *inputs = cJSON_GetObjectItemCaseSensitive(item, "inputs");
 			cJSON *time = cJSON_GetObjectItemCaseSensitive(item, "time");
 			cJSON *markers = cJSON_GetObjectItemCaseSensitive(item, "markers");
-			if (!cJSON_IsString(name) || !cJSON_IsNumber(frame) || inputs == nullptr)
+			if (!cJSON_IsString(name) || !cJSON_IsNumber(frame))
 			{
 				return rejectP(tr("project.branch_fields"));
 			}
 			Branch b;
 			b.name = name->valuestring;
 			b.frame = static_cast<int64_t>(frame->valuedouble);
-			if (std::string why, unknown; !lumpOf(inputs, b.log, why, unknown)) return rejectP(tr(why.c_str(), {tr("project.branch_inputs"), unknown}));
+			const int number = static_cast<int>(p->branches.size()) + 1;
+			const auto lines = parts.branches.find(number);
+			if (std::string why; !lumpOf(inputs, lines != parts.branches.end() ? lines->second : std::string(), tr("project.branch_inputs"),
+					"branches/" + std::to_string(number) + ".input", b.log, why, args))
+				return rejectP(trArgs(why, args));
 			if (time != nullptr)
 			{
 				if (!cJSON_IsString(time)) return rejectP(tr("project.branch_time"));
@@ -716,6 +821,9 @@ static ce_project *openProject(const char *path, const char **error_out)
 			p->branches.push_back(std::move(b));
 		}
 	}
+	for (const auto &[number, lines] : parts.branches)
+		if (number > static_cast<int>(p->branches.size()))
+			return rejectP(tr("project.unknown_entry", {"branches/" + std::to_string(number) + ".input"}));
 	if ((j = cJSON_GetObjectItemCaseSensitive(root, "headers")) != nullptr)
 	{
 		if (!cJSON_IsObject(j)) return rejectP(tr("project.field_not_object", {"headers"}));
@@ -728,6 +836,25 @@ static ce_project *openProject(const char *path, const char **error_out)
 
 	cJSON_Delete(root);
 	return p;
+}
+
+static ce_project *openProject(const char *path, const char **error_out)
+{
+	if (error_out != nullptr) *error_out = nullptr;
+	std::vector<uint8_t> raw;
+	if (!chimera::readFile(path, raw))
+	{
+		fail(tr("new_project.cannot_read", {path}), error_out);
+		return nullptr;
+	}
+	Parts parts;
+	std::string why;
+	if (!partsOf(raw, parts, why))
+	{
+		fail(why, error_out);
+		return nullptr;
+	}
+	return parseProject(parts, path, error_out);
 }
 
 ce_project *ce_project_open(const char *path, const char **error_out)
@@ -797,7 +924,8 @@ int32_t ce_project_save(ce_project *p, const char *path, const char **error_out)
 	/* only when there is one: a project that never met TAStudio stays exactly
 	 * what an older build can open */
 	if (p->tastudio != nullptr) cJSON_AddItemToObject(root, "tastudio", cJSON_Duplicate(p->tastudio, 1));
-	if (cJSON *inputs = inputsOf(p->log, 1)) cJSON_AddItemToObject(root, "inputs", inputs);
+	Parts parts;
+	if (cJSON *inputs = inputsOf(p->log, 1, parts.input)) cJSON_AddItemToObject(root, "inputs", inputs);
 	cJSON *markers = cJSON_AddArrayToObject(root, "markers");
 	for (const Marker &m : p->markers)
 	{
@@ -814,14 +942,9 @@ int32_t ce_project_save(ce_project *p, const char *path, const char **error_out)
 		cJSON_AddStringToObject(item, "name", b.name.c_str());
 		cJSON_AddNumberToObject(item, "frame", static_cast<double>(b.frame));
 		if (!b.time.empty()) cJSON_AddStringToObject(item, "time", b.time.c_str());
-		/* a branch always has its input, if only an empty one */
-		cJSON *inputs = inputsOf(b.log, 3);
-		if (inputs == nullptr)
-		{
-			inputs = cJSON_CreateObject();
-			cJSON_AddItemToObject(inputs, "entries", cJSON_CreateArray());
-		}
-		cJSON_AddItemToObject(item, "inputs", inputs);
+		/* a branch always has its .input file, if only an empty one */
+		std::string &lines = parts.branches[static_cast<int>(parts.branches.size()) + 1];
+		if (cJSON *inputs = inputsOf(b.log, 3, lines)) cJSON_AddItemToObject(item, "inputs", inputs);
 		if (!b.markers.empty())
 		{
 			cJSON *bm = cJSON_AddArrayToObject(item, "markers");
@@ -848,16 +971,35 @@ int32_t ce_project_save(ce_project *p, const char *path, const char **error_out)
 	char *text = cJSON_Print(root);
 	cJSON_Delete(root);
 	if (text == nullptr) return failInt(tr("project.not_serialized"), error_out);
-	std::string out = text;
+	parts.json = text;
 	cJSON_free(text);
-	out += "\n";
+	parts.json += "\n";
 
-	if (!chimera::writeFile(path, reinterpret_cast<const uint8_t *>(out.data()), out.size()))
+	/* the zip: project.json, input.input, then the branches' in their order */
+	mz_zip_archive zip{};
+	bool zipped = mz_zip_writer_init_heap(&zip, 0, 0) == MZ_TRUE;
+	auto add = [&](const std::string &name, const std::string &bytes) {
+		zipped = zipped && mz_zip_writer_add_mem(&zip, name.c_str(), bytes.data(), bytes.size(), MZ_DEFAULT_LEVEL) == MZ_TRUE;
+	};
+	add("project.json", parts.json);
+	add("input.input", parts.input);
+	for (const auto &[number, lines] : parts.branches) add("branches/" + std::to_string(number) + ".input", lines);
+	void *buf = nullptr;
+	size_t size = 0;
+	zipped = zipped && mz_zip_writer_finalize_heap_archive(&zip, &buf, &size) == MZ_TRUE;
+	std::vector<uint8_t> out;
+	if (zipped) out.assign(static_cast<uint8_t *>(buf), static_cast<uint8_t *>(buf) + size);
+	mz_free(buf);
+	mz_zip_writer_end(&zip);
+	if (!zipped) return failInt(tr("project.not_serialized"), error_out);
+
+	if (!chimera::writeFile(path, out.data(), out.size()))
 	{
 		return failInt(tr("session.could_not_write", {path}), error_out);
 	}
 	return 0;
 }
+
 
 int32_t ce_project_save_as(ce_project *p, const char *path, const char **error_out)
 {
@@ -1670,4 +1812,23 @@ extern "C" void ce_project_machine_id(ce_project *p, const char *running_core_sh
 		id += "file=" + std::string(slot != nullptr ? slot : "") + ":" + upperHex(ce_project_file_sha1(p, i)) + "\n";
 	}
 	ce_sha1_hex(reinterpret_cast<const uint8_t *>(id.data()), id.size(), out41);
+}
+
+/* (project_check.hpp) */
+int32_t ceProjectPack(const std::string &json, const std::string &input, const char *path, std::string &why)
+{
+	Parts parts;
+	parts.json = json;
+	parts.input = input;
+	const char *error = nullptr;
+	ce_project *p = parseProject(parts, nullptr, &error);
+	if (p == nullptr)
+	{
+		why = error != nullptr ? error : "";
+		return 1;
+	}
+	const int32_t rc = ce_project_save(p, path, &error);
+	if (rc != 0) why = error != nullptr ? error : "";
+	ce_project_free(p);
+	return rc;
 }

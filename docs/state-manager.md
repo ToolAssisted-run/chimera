@@ -496,7 +496,7 @@ The budget then decides only what happens to the far band. The engine can send
 it to disk, oldest first, into a directory its caller names (the spill described
 below, which `chimera-run --spill` still uses). **Chimera does not** (user-decided,
 2026-09-15): a greenzone over its budget gives frames up toward its doubling
-bands (see "The policy"), and nothing is written to disk until the project is saved.
+bands (see "The policy"), and nothing is written to disk until the project closes.
 
 Every boundary in that table is a knob with a per-core default, in frames rather
 than seconds, because the engine does not know a core's frame rate and the
@@ -516,8 +516,8 @@ it by writing gigabytes to the drive continuously while somebody worked - a cost
 paid by the SSD, in wear, for a convenience. Chimera no longer turns spilling on,
 and the disk budget is gone (user-decided, 2026-09-15; docs/design-principles.md,
 "A greenzone lives in memory, and the disk is for saving"). The history file is
-still written when a project is saved, which is the one moment somebody asked for
-the disk. Spill files an earlier build left in a project's cache are deleted when
+still written, when the project closes (owner, 2026-11-02: it used to be written
+by every save, which then waited on it). Spill files an earlier build left in a project's cache are deleted when
 the project is next opened, because nothing else would ever remove them.
 
 The budget is set in Tools > Cache Manager, and can be set **per project**; a
@@ -536,8 +536,8 @@ Leaving that out held a light core, whose frames pack to 1 to 3 KB, 6 to 18%
 over the budget somebody set. With a capture period of N, a stretch is closed
 after its spacing in STORED frames, so a sparse greenzone stores deltas; with
 the period at 600 or more it closed after every delta, and every other stored
-frame was a whole machine. The history file a project save writes is written
-under a name of its own and moved over the old one when it is whole, so a save
+frame was a whole machine. The history file a project's close writes is written
+under a name of its own and moved over the old one when it is whole, so a write
 cut off by a crash or a full disk leaves the last good one.
 
 ### Running out of memory halves the budget

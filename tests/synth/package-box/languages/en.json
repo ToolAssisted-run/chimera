@@ -27,6 +27,12 @@
 		"tool.no_output": "the file to write is not there",
 		"tool.no_parts": "no parts were given",
 		"tool.empty_part": "the part %1 is empty",
-		"tool.joined": "joined %1 parts, %2 bytes"
+		"tool.joined": "joined %1 parts, %2 bytes",
+		"tool.make_project": "Make a Project...",
+		"tool.make_project.about": "Writes a project of three frames, as a core's tool writes one.",
+		"tool.make_project.broken": "A line that is not a frame's",
+		"tool.make_project.broken.about": "The project's input gets a line that is not a frame's, which Chimera refuses.",
+		"tool.make_project.project": "Project",
+		"tool.made_project": "made a project of %1 frames"
 	}
 }

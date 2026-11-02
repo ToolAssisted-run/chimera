@@ -27,6 +27,12 @@
 		"tool.no_output": "a megírandó fájl nincs ott",
 		"tool.no_parts": "nem adtak meg részeket",
 		"tool.empty_part": "a(z) %1 rész üres",
-		"tool.joined": "%1 rész összefűzve, %2 bájt"
+		"tool.joined": "%1 rész összefűzve, %2 bájt",
+		"tool.make_project": "Projekt készítése...",
+		"tool.make_project.about": "Három képkockás projektet ír, ahogy egy mag eszköze.",
+		"tool.make_project.broken": "Egy sor, amely nem képkockáé",
+		"tool.make_project.broken.about": "A projekt bemenete kap egy sort, amely nem képkockáé, és a Chimera elutasítja.",
+		"tool.make_project.project": "Projekt",
+		"tool.made_project": "elkészült egy %1 képkockás projekt"
 	}
 }
