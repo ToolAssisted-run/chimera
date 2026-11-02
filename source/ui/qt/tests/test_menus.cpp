@@ -2,8 +2,12 @@
  * menu is as wide as its widest row, stays below the menu bar in a short
  * window with its rows scrolled, and closes when its window loses the
  * keyboard to another. A menu bar's menu opened by a click, as a person
- * opens it. */
+ * opens it. And the main window's menu bar keeps its items' text whole
+ * after it was hidden, as full screen hides it (issue 451). */
+#include "../menu_letters.hpp"
+
 #include <QGuiApplication>
+#include <QQmlContext>
 #include <QQmlApplicationEngine>
 #include <QQuickItem>
 #include <QQuickStyle>
@@ -51,6 +55,31 @@ ApplicationWindow {
 }
 )QML";
 
+/* the main window's menu bar: hidden while full screen (Display's default),
+ * shown again when windowed; one item left out, as System is with no machine */
+const char *const kBar = R"QML(
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Layouts
+import "qrc:/chimera"
+ApplicationWindow {
+    width: 600; height: 200; visible: true
+    menuBar: RowLayout {
+        spacing: 0
+        MenuBar {
+            Layout.fillWidth: true
+            delegate: MenuBarEntry { objectName: "bar:" + menuLetters.plain(text) }
+            Menu { title: "&File"; Action { text: "Open" } }
+            Menu { title: "&System"; readonly property bool shown: false; Action { text: "Reboot" } }
+            Menu { title: "&View"; Action { text: "Zoom" } }
+            Menu { title: "&Config"; Action { text: "Paths" } }
+            Menu { title: "&Tools"; Action { text: "RAM Watch" } }
+            Menu { title: "&Help"; Action { text: "About" } }
+        }
+    }
+}
+)QML";
+
 const char *const kOther = R"QML(
 import QtQuick
 Window { width: 100; height: 100; visible: true }
@@ -62,6 +91,8 @@ int main(int argc, char **argv)
 {
 	QGuiApplication app(argc, argv);
 	QQuickStyle::setStyle(QStringLiteral("ChimeraStyle"));
+	chimera::qt::MenuLetters menuLetters;
+	app.installEventFilter(&menuLetters);
 	QQmlApplicationEngine engine;
 	engine.loadData(kWindow);
 	auto *window = qobject_cast<QQuickWindow *>(engine.rootObjects().value(0));
@@ -109,6 +140,61 @@ int main(int argc, char **argv)
 		other->requestActivate();
 		CHECK(QTest::qWaitForWindowActive(other));
 		CHECK(QTest::qWaitFor([&] { return !opened(); }, 2000));
+	}
+
+	/* the menu bar hidden and shown again, as full screen and back hide and
+	 * show it, then Alt pressed for the letters: every item as wide as its
+	 * whole text, which is not cut (issue 451) */
+	QQmlApplicationEngine barEngine;
+	barEngine.rootContext()->setContextProperty(QStringLiteral("menuLetters"), &menuLetters);
+	barEngine.loadData(kBar);
+	auto *barWindow = qobject_cast<QQuickWindow *>(barEngine.rootObjects().value(0));
+	CHECK(barWindow != nullptr);
+	if (barWindow != nullptr)
+	{
+		barWindow->requestActivate();
+		CHECK(QTest::qWaitForWindowActive(barWindow));
+		auto *chrome = qobject_cast<QQuickItem *>(barWindow->property("menuBar").value<QObject *>());
+		CHECK(chrome != nullptr);
+		auto whole = [&](const char *when) {
+			for (const char *title : {"File", "View", "Config", "Tools", "Help"})
+			{
+				auto *item = barWindow->findChild<QQuickItem *>(QStringLiteral("bar:") + QLatin1String(title));
+				auto *label = item != nullptr ? qobject_cast<QQuickItem *>(item->property("contentItem").value<QObject *>()) : nullptr;
+				QQuickItem *text = label != nullptr && !label->childItems().isEmpty() ? label->childItems().constLast() : nullptr;
+				CHECK(text != nullptr);
+				if (text == nullptr) continue;
+				if (item->width() + 0.5 < item->implicitWidth() || text->property("truncated").toBool())
+				{
+					std::fprintf(stderr, "%s, %s: %.1f wide of %.1f, text cut\n", when, title, item->width(), item->implicitWidth());
+					CHECK(false);
+				}
+			}
+			auto *system = barWindow->findChild<QQuickItem *>(QStringLiteral("bar:System"));
+			CHECK(system != nullptr && !system->isVisible() && system->width() == 0);
+		};
+		whole("at first");
+		if (chrome != nullptr)
+		{
+			/* Alt+Enter in and out, as Full Screen's key is: Alt shows and
+			 * hides the letters, so the text changes while the bar is hidden */
+			QTest::keyPress(barWindow, Qt::Key_Alt, Qt::AltModifier);
+			barWindow->showFullScreen();
+			chrome->setVisible(false);
+			QTest::keyRelease(barWindow, Qt::Key_Alt);
+			QTest::qWait(100);
+			QTest::keyPress(barWindow, Qt::Key_Alt, Qt::AltModifier);
+			barWindow->showNormal();
+			chrome->setVisible(true);
+			QTest::keyRelease(barWindow, Qt::Key_Alt);
+			QTest::qWait(100);
+			whole("shown again");
+			QTest::keyPress(barWindow, Qt::Key_Alt, Qt::AltModifier);
+			QTest::qWait(100);
+			CHECK(menuLetters.shown());
+			whole("with the letters");
+			QTest::keyRelease(barWindow, Qt::Key_Alt);
+		}
 	}
 
 	std::printf("%d checks, %d failed\n", checks, failures);

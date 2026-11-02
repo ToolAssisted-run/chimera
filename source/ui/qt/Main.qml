@@ -384,11 +384,7 @@ ApplicationWindow {
         // only while a machine runs, as Chimera's are
         MenuBar {
             Layout.fillWidth: true
-            delegate: MenuBarItem {
-                id: menuBarItem
-                visible: menuBarItem.menu !== null && menuBarItem.menu.shown !== false
-                width: visible ? implicitWidth : 0
-            }
+            delegate: MenuBarEntry {}
             Menu {
                 // Customize's "pause when a menu is open"
                 delegate: keyedMenuItem

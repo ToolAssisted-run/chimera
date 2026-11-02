@@ -183,7 +183,6 @@ struct ce_project
 	 * carried. */
 	std::string id;
 	std::string title;
-	std::string description;
 	std::string coreName, coreVersion, coreSha1;
 	uint64_t rerecords = 0;
 	int64_t clockStart = -1;   // the second the machine's clock starts at; -1: the sandbox's own
@@ -496,7 +495,10 @@ static ce_project *openProject(const char *path, const char **error_out)
 	};
 
 	/* the format is strict: a key this build does not know is an error, not
-	 * something to drop silently on the next save */
+	 * something to drop silently on the next save. "description" is the one
+	 * exception: Edit Comments wrote it and is gone, every project written
+	 * before has one, and those still open; it is dropped at the next save
+	 * (owner, 2026-11-02, issue 440). */
 	static const char *known[] = { "id", "title", "description", "core", "rerecords", "clockStart",
 		"files", "settings", "firmware", "coreCache", "inputs", "markers", "branches", "headers", "tastudio" };
 	for (cJSON *item = root->child; item != nullptr; item = item->next)
@@ -540,11 +542,6 @@ static ce_project *openProject(const char *path, const char **error_out)
 	{
 		if (!cJSON_IsString(j)) return rejectP(tr("project.not_string", {"title"}));
 		p->title = j->valuestring;
-	}
-	if ((j = cJSON_GetObjectItemCaseSensitive(root, "description")) != nullptr)
-	{
-		if (!cJSON_IsString(j)) return rejectP(tr("project.not_string", {"description"}));
-		p->description = j->valuestring;
 	}
 	if ((j = cJSON_GetObjectItemCaseSensitive(root, "core")) != nullptr)
 	{
@@ -774,7 +771,6 @@ int32_t ce_project_save(ce_project *p, const char *path, const char **error_out)
 	cJSON *root = cJSON_CreateObject();
 	cJSON_AddStringToObject(root, "id", p->id.c_str());
 	cJSON_AddStringToObject(root, "title", p->title.c_str());
-	cJSON_AddStringToObject(root, "description", p->description.c_str());
 	cJSON *core = cJSON_AddObjectToObject(root, "core");
 	cJSON_AddStringToObject(core, "name", p->coreName.c_str());
 	cJSON_AddStringToObject(core, "version", p->coreVersion.c_str());
@@ -877,8 +873,6 @@ int32_t ce_project_save_as(ce_project *p, const char *path, const char **error_o
 const char *ce_project_id(const ce_project *p) { return p->id.c_str(); }
 const char *ce_project_title(const ce_project *p) { return p->title.c_str(); }
 void ce_project_set_title(ce_project *p, const char *title) { p->title = title != nullptr ? title : ""; }
-const char *ce_project_description(const ce_project *p) { return p->description.c_str(); }
-void ce_project_set_description(ce_project *p, const char *description) { p->description = description != nullptr ? description : ""; }
 
 const char *ce_project_core_name(const ce_project *p) { return p->coreName.c_str(); }
 const char *ce_project_core_version(const ce_project *p) { return p->coreVersion.c_str(); }

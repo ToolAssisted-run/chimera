@@ -532,8 +532,6 @@ CE_API void ce_project_free(ce_project *p);
 CE_API const char *ce_project_id(const ce_project *p);
 CE_API const char *ce_project_title(const ce_project *p);
 CE_API void ce_project_set_title(ce_project *p, const char *title);
-CE_API const char *ce_project_description(const ce_project *p);
-CE_API void ce_project_set_description(ce_project *p, const char *description);
 
 /* the pinned core: package name, version, package zip SHA1 */
 CE_API const char *ce_project_core_name(const ce_project *p);

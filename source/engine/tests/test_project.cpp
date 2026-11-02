@@ -80,7 +80,6 @@ int main(int argc, char **argv)
 	{
 		ce_project *p = ce_project_new();
 		ce_project_set_title(p, "Alley Cat in 4:03");
-		ce_project_set_description(p, "the funny cat game");
 		ce_project_set_core(p, "dosbox-x", "abc123+local", sha1Of("a package").c_str());
 		ce_project_set_rerecords(p, 421);
 		assert(ce_project_set_settings_text(p, "{\"cpuCycles\":3000,\"machinePreset\":\"x\",\"seed\":18446744073709551615}", &err) == 0);
@@ -128,7 +127,6 @@ int main(int argc, char **argv)
 		ce_project *p = ce_project_open(path.c_str(), &err);
 		assert(p != nullptr);
 		assert(std::strcmp(ce_project_title(p), "Alley Cat in 4:03") == 0);
-		assert(std::strcmp(ce_project_description(p), "the funny cat game") == 0);
 		assert(std::strcmp(ce_project_core_name(p), "dosbox-x") == 0);
 		assert(std::strcmp(ce_project_core_version(p), "abc123+local") == 0);
 		assert(std::strcmp(ce_project_core_sha1(p), sha1Of("a package").c_str()) == 0);
@@ -322,6 +320,31 @@ int main(int argc, char **argv)
 	/* subtitles are gone from the format (owner, 2026-11-01, issue 440): a project with some is not opened */
 	expectReject("subtitles", "{\"subtitles\":[\"subtitle 100 10 10 300 FFFFFFFF hello\"]}");
 	expectReject("title type", "{\"title\":5}");
+
+	/* the description Edit Comments wrote is gone from the format, but a
+	 * project that has one still opens, and its next save leaves it out
+	 * (owner, 2026-11-02, issue 440) */
+	{
+		const std::string dpath = g_dir + "/described.chimeraProject";
+		writeFile("described.chimeraProject", "{\"title\":\"old\",\"description\":\"the funny cat game\"}");
+		err = nullptr;
+		ce_project *p = ce_project_open(dpath.c_str(), &err);
+		assert(p != nullptr);
+		assert(std::strcmp(ce_project_title(p), "old") == 0);
+		assert(ce_project_save(p, dpath.c_str(), &err) == 0);
+		ce_project_free(p);
+		std::string text;
+		if (FILE *f = std::fopen(dpath.c_str(), "rb"))
+		{
+			char buf[4096];
+			size_t n;
+			while ((n = std::fread(buf, 1, sizeof buf, f)) > 0) text.append(buf, n);
+			std::fclose(f);
+		}
+		assert(text.find("\"old\"") != std::string::npos);
+		assert(text.find("description") == std::string::npos);
+		std::remove(dpath.c_str());
+	}
 	expectReject("core incomplete", "{\"core\":{\"name\":\"x\"}}");
 	expectReject("core sha malformed", "{\"core\":{\"name\":\"x\",\"version\":\"v\",\"sha1\":\"nope\"}}");
 	expectReject("file path name",
@@ -443,7 +466,7 @@ int main(int argc, char **argv)
 		const std::string before = readText(kpath);
 		assert(!before.empty() && before.size() < 64 * 1024);
 
-		ce_project_set_description(p, std::string(1 << 20, 'x').c_str());
+		ce_project_set_title(p, std::string(1 << 20, 'x').c_str());
 		struct rlimit old;
 		assert(getrlimit(RLIMIT_FSIZE, &old) == 0);
 		struct rlimit capped = old;

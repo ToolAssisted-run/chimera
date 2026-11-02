@@ -12454,3 +12454,51 @@ unattended run is not held; with the setting unticked at first, 3 of its
 checks fail. Meson tests: every test passes but "installed packages" and
 "command line", which fail on this machine as before (old packages in
 build/Cores, a copied program that cannot find Qt); "headless" passes.
+
+## The project's description is gone, and a project that has one still opens (user-decided, 2026-11-02)
+
+The project's `description` was edited only by Edit Comments, which went
+with issue 440. Every project file written so far has one, and the format
+refuses a key it does not know, so removing it outright would have refused
+every project made until now. The owner decided to drop it but not to
+refuse a project that has it:
+
+- The engine no longer keeps a description, a save no longer writes one,
+  and `ce_project_description` and `ce_project_set_description` are gone.
+- `description` stays among the keys a project may have. Whatever it holds
+  is not read, and the next save leaves it out.
+
+This is the one key kept only so that older files open. It is not a reader
+for an old format: nothing reads its value.
+
+Tested: the engine's project test opens a project that has a description,
+saves it, and finds no description in the saved file. Broken on purpose
+(the key taken off the list), the test failed.
+
+## The menu bar keeps its words after full screen (2026-11-02)
+
+Issue 451: after full screen and back, the main window's menu bar lost its
+words, one at a time as the pointer went over them, and "Tools" showed as
+"To...". The owner reproduced it on Windows (full screen, back, then the
+pointer over the menus).
+
+The cause: an item of the menu bar had its width tied to its own
+visibility (`width: visible ? implicitWidth : 0`), so that System and
+Emulator take no room while no machine runs. But an item is also
+invisible while the whole bar is hidden, and full screen hides it
+(Display's default). Full Screen's key is Alt+Enter, and Alt shows and
+hides the menus' underlined letters, which changes each item's text while
+the bar is hidden at a width of 0. When the bar came back, the items came
+back at their old widths while their texts measured wider, and the texts
+were cut short (Tools 41.5 pixels wide for 43.6 pixels of text).
+
+The fix: the item's width follows its menu (`listed`: the menu is there
+and not hidden), not its visibility. The item is a file of its own,
+MenuBarEntry.qml, so the window test uses the main window's own.
+
+Tested: the menus window test hides and shows a bar as full screen does,
+with Alt+Enter's key presses, and checks that every item is as wide as its
+text and that no text is cut, then again with the letters shown. Broken on
+purpose (the width tied to visibility again) it failed for three items of
+five. Seen only in the test, on Linux with no display; not yet tried by
+hand on Windows.

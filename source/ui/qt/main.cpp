@@ -331,7 +331,7 @@ int main(int argc, char **argv)
 	QCommandLineOption mmfOpt(QStringLiteral("mmf"), QStringLiteral("the memory-mapped file Lua's comm.mmfScreenshot writes to, as Chimera's --mmf"),
 		QStringLiteral("name"));
 	QCommandLineOption schemeOpt(QStringLiteral("color-scheme"), QStringLiteral("light or dark: Chimera's built-in Light or Dark theme for this run (not remembered)"), QStringLiteral("scheme"));
-	QCommandLineOption showOpt(QStringLiteral("show"), QStringLiteral("open a tool window at the start: new-project, core-tool, ram-search, ram-watch, hex, controls, hotkeys, themes, lua, tastudio, undo-history, project-details, comments, subtitles, tastudio-settings, log, report, media, cache, customize, messages, sound, display, budgets, paths, firmware, data, precompiled, trace, registers, surfaces, macros, encode, cores"), QStringLiteral("tool"));
+	QCommandLineOption showOpt(QStringLiteral("show"), QStringLiteral("open a tool window at the start: new-project, core-tool, ram-search, ram-watch, hex, controls, hotkeys, themes, lua, tastudio, undo-history, tastudio-settings, log, report, media, cache, customize, messages, sound, display, budgets, paths, firmware, data, precompiled, trace, registers, surfaces, macros, encode, cores"), QStringLiteral("tool"));
 	QCommandLineOption describeOpt(QStringLiteral("describe"), QStringLiteral("print every view model's properties and commands as JSON, and quit"));
 	/* Chimera's --mcp-server and --mcp-allow-changes: the server started for a run nobody clicks in */
 	QCommandLineOption mcpServerOpt(QStringLiteral("mcp-server"), QStringLiteral("start the MCP server (Tools > MCP Server...) at once"));
@@ -1615,8 +1615,7 @@ int main(int argc, char **argv)
 			{"core-tool", "coreToolWindow"}, {"ram-search", "ramSearchWindow"}, {"ram-watch", "ramWatchWindow"},
 			{"hex", "hexEditorWindow"}, {"controls", "controllerConfigWindow"}, {"hotkeys", "hotkeyConfigWindow"},
 			{"themes", "themesWindow"}, {"lua", "luaConsoleWindow"}, {"tastudio", "tastudioWindow"},
-			{"undo-history", "undoHistoryWindow"}, {"project-details", "headerInfoWindow"}, {"comments", "editCommentsWindow"},
-			{"subtitles", "editSubtitlesWindow"}, {"tastudio-settings", "tastudioSettingsWindow"}, {"log", "logWindow"},
+			{"undo-history", "undoHistoryWindow"}, {"tastudio-settings", "tastudioSettingsWindow"}, {"log", "logWindow"},
 			{"report", "reportIssueWindow"}, {"media", "mediaMakerWindow"}, {"cache", "cacheManagerWindow"},
 			{"customize", "customizeWindow"}, {"messages", "messagesWindow"}, {"sound", "soundWindow"},
 			{"display", "displayWindow"}, {"budgets", "greenzoneBudgetsWindow"}, {"paths", "pathsWindow"},

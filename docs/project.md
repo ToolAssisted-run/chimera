@@ -128,8 +128,8 @@ Not in the project:
 
 ## Creation
 
-One wizard, everything at once. Step one asks project title, emulation
-core, and project description. Step two asks for the files - and it is
+One wizard, everything at once. Step one asks the project title and the
+emulation core. Step two asks for the files - and it is
 NOT a blind "add any files" dialog: it is a fully core-informed form.
 The core declares categories (CD-ROMs, floppy disks, hard disk,
 configuration files, save states, ...), each rendered as empty slots with
@@ -494,7 +494,7 @@ erase the greenzone and possibly desync your current inputs, are you
 sure?". On yes: the greenzone is cleared, the core restarts, and the
 frame selector returns to frame 0. The input log is kept (it may no
 longer sync; that is the user's informed call). Non-structural changes
-(title, description, markers, ...) apply freely.
+(title, markers, ...) apply freely.
 
 The settings are changed in File > Project Settings (issue 370,
 user-decided 2026-10-25). The window shows the settings the New Project

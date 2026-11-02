@@ -203,6 +203,10 @@ Chimera's window: Qt 6.12, QML views over C++ view models. The code is in
   loses the keyboard to another (issue 449). A menu stays inside its window
   (the owner kept menus there rather than in windows of their own). A tab
   is as wide as its name (TAStudio Settings' were cut short, issue 452).
+  The main window's menu bar items (MenuBarEntry.qml) take their width from
+  their menu, not from whether they are visible: full screen hides the bar,
+  and an item's width that went to 0 there came back narrower than its
+  text, which was cut or not drawn (issue 451).
   Check boxes and radio buttons are drawn as Chimera's, which leaves them to
   the system: a light box or circle with a dark edge whatever the theme
   (Fusion's own went dark with a dark theme and could not be seen). This is
