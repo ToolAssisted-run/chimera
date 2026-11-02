@@ -132,6 +132,12 @@ bundled=$(find "$out/Themes" -name '*.chimeraTheme.json' | wc -l)
 shipped=$(find "$root/languages" -name '*.json' | wc -l)
 bundled=$(find "$out/lib/languages" -name '*.json' | wc -l)
 [ "$shipped" -gt 0 ] && [ "$bundled" -eq "$shipped" ] || { echo "MISSING: lib/languages has $bundled of the $shipped language tables in the repository" >&2; bad=1; }
+# bin/chimera-run reads Chimera's texts from lib/languages: what it says is a
+# sentence, not the text's key (a tool's answer was "import.done" when it did not)
+if [ "$platform" = linux ]; then
+	said=$("$out/bin/chimera-run" --run-tool none "$out/no-such.chimeraCore" 2>&1 || true)
+	case "$said" in *engine.not_a_package*) echo "UNTRANSLATED: bin/chimera-run says \"$said\"" >&2; bad=1 ;; esac
+fi
 [ ! -e "$out/official-cores.json" ] || { echo "PRESENT: official-cores.json (the bundle carries no list of cores)" >&2; bad=1; }
 # Chimera reaches for nothing over the network: Qt's network module is not built
 if find "$out" -iname '*Qt6Network*' | grep -q .; then echo "PRESENT: Qt's network module" >&2; bad=1; fi

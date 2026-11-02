@@ -122,7 +122,20 @@ bool readTable(const char *json, size_t length, Table &out, std::string &error)
 
 std::string folder()
 {
-	return folderOfUs() + "languages/";
+	/* Beside the engine. A program in a bundle's bin/ folder (chimera-run,
+	 * which has the engine compiled in) finds them in lib/ beside it, as it
+	 * finds the libraries: looking only beside itself, it found none, and
+	 * every text it gave - a tool's answer, an error - was its key. */
+	static const std::string found = [] {
+		const std::string here = folderOfUs();
+		for (const char *where : {"languages/", "../lib/languages/"})
+		{
+			std::error_code ec;
+			if (std::filesystem::exists(std::filesystem::u8path(here + where + "en.json"), ec)) return here + where;
+		}
+		return here + "languages/";
+	}();
+	return found;
 }
 
 bool readTableFile(const std::string &code, Table &out, std::string &error)

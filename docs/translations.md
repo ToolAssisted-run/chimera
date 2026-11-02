@@ -64,7 +64,8 @@ the About box names the build in the window's language.
 
 The build copies the tables beside the engine (`languages/` in the build
 folder, `lib/languages/` in a bundle), and the engine reads them when the
-program runs. The window asks for a key with `qsTrId("key")`, which the
+program runs. A program in a bundle's `bin/` folder, such as `chimera-run`,
+which has the engine compiled in, reads them from `lib/languages/` beside it. The window asks for a key with `qsTrId("key")`, which the
 engine answers from the table in use; the engine and the view models ask
 through `ce_text`. A key that a table lacks shows as the key itself, so a
 missing one is seen.
