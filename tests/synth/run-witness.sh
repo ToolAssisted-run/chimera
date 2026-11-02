@@ -821,20 +821,22 @@ json.dump(d, open(p, 'w'))
 		# and a tool the core does not have is refused too; a refused run
 		# leaves no file (it writes <file>.part, put in place only when done) -
 		# the files and the answers both checked, so a tool that wrote nothing
-		# cannot pass.
+		# cannot pass. A tool run is given no game, so a file the tool reads
+		# may be named "rom" (user-decided, 2026-11-02): the run that joins is
+		# given one, which the synth does not read.
 		tdir="$work/tool"
 		rm -rf "$tdir" && mkdir -p "$tdir"
 		printf 'abc' > "$tdir/first.part"; printf 'de' > "$tdir/second.part"; : > "$tdir/empty.part"
 		printf 'stale contents' > "$tdir/joined.bin"
 		tdone="$("$chimera_run" --run-tool join "$epkg" --input part.0="$tdir/first.part" --input part.1="$tdir/second.part" \
-			--output joined="$tdir/joined.bin" --tool-options '{"backwards":true}' 2>"$tdir/run.err")"
+			--input rom="$tdir/empty.part" --output joined="$tdir/joined.bin" --tool-options '{"backwards":true}' 2>"$tdir/run.err")"
 		tempty="$("$chimera_run" --run-tool join "$epkg" --input part.0="$tdir/first.part" --input part.1="$tdir/empty.part" \
 			--output joined="$tdir/refused.bin" 2>>"$tdir/run.err")"
 		tunknown="$("$chimera_run" --run-tool shuffle "$epkg" --output joined="$tdir/unknown.bin" 2>>"$tdir/run.err")"
 		if [ "$tdone" = '{"done": "joined 2 parts, 5 bytes"}' ] && [ "$(cat "$tdir/joined.bin")" = "cbaed" ] \
 			&& [ "$tempty" = '{"refused": "the part empty.part is empty"}' ] && [ ! -e "$tdir/refused.bin" ] && [ ! -e "$tdir/refused.bin.part" ] \
 			&& [ "$tunknown" = '{"refused": "this core has no tool shuffle"}' ]; then
-			report "E:core-tool" PASS "a tool of the core's own wrote its file on the disk (5 bytes, parts in their order, turned around as asked, the old contents gone); an empty part and an unknown tool are refused in a sentence, and leave no file"
+			report "E:core-tool" PASS "a tool of the core's own wrote its file on the disk (5 bytes, parts in their order, turned around as asked, the old contents gone), with a file of its own named rom; an empty part and an unknown tool are refused in a sentence, and leave no file"
 		else
 			report "E:core-tool" FAIL "done=[$tdone] file=[$(cat "$tdir/joined.bin" 2>/dev/null)] empty=[$tempty] unknown=[$tunknown] (see work/tool/run.err)"
 		fi

@@ -495,7 +495,9 @@ Probed once after `Init`; absent exports simply mean the tool is not offered.
   <name>=<path> --output <name>=<path>` runs one from a shell). The file
   `tool` says which tool and which options, and the name each picked file
   had; each input is mounted under its name, and each output is a writable
-  file the core opens and writes, which goes straight to the disk. Return
+  file the core opens and writes, which goes straight to the disk. No game
+  is mounted, not even an empty `rom`: name the files anything but `tool`
+  and `settings`. Return
   `{"done": "<key>"}` or `{"refused": "<key>"}`, keys of the package's tables
   with their arguments after 0x1F. Close what you write before returning.
   The Eden core's Decompress NSZ is one; the DSDA core's demo import, which

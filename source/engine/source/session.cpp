@@ -2115,12 +2115,14 @@ static ce_session *openSession(
 
 	chimera::progress(tr("engine.progress_mounting").c_str(), 0, 0);
 	/* The game itself, which is the one most likely to be enormous: mounted
-	 * from where it lies when the caller said where that is. */
+	 * from where it lies when the caller said where that is. A core's tool
+	 * runs with no game and is given none (user-decided, 2026-11-02): an
+	 * empty "rom" took that name from the files the tool reads. */
 	if (romFromDisk)
 	{
 		host->wbx_mount_file_path(s->obj, s->cfg.romFile.c_str(), rom_path, &r);
 	}
-	else
+	else if (t_toolOutputs == nullptr)
 	{
 		s->streams.push_back({ rom, rom != nullptr ? rom_len : 0 });
 		host->wbx_mount_file(s->obj, s->cfg.romFile.c_str(), streamRead, reinterpret_cast<uintptr_t>(&s->streams.back()), 0, &r);

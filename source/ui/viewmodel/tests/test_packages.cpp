@@ -283,6 +283,28 @@ std::vector<std::string> labelsOfNoValue(const Json &cfg)
 	return out;
 }
 
+/* A core's tool finds each file it reads or writes under its name, beside two
+ * that Chimera gives every tool run: the request ("tool") and the settings
+ * ("settings"). A file of the tool's with one of those names could not be
+ * given to it (user-decided, 2026-11-02; docs/project.md). */
+std::vector<std::string> toolFilesNamedAsChimeras(const Json &cfg)
+{
+	static const std::set<std::string> taken = {"tool", "settings"};
+	std::vector<std::string> out;
+	if (const Json *tools = cfg.find("tools"))
+		for (const Json &t : tools->items)
+		{
+			const Json *id = t.find("id");
+			for (const char *list : {"inputs", "outputs"})
+				if (const Json *files = t.find(list))
+					for (const Json &f : files->items)
+						if (const Json *name = f.find("name"); name != nullptr && taken.count(name->text))
+							out.push_back("tool '" + (id != nullptr ? id->text : std::string("?")) + "' names a file '" + name->text
+								+ "', the name of a file Chimera gives every tool");
+		}
+	return out;
+}
+
 std::vector<std::string> unknownSettingTypes(const Json &cfg)
 {
 	static const std::set<std::string> known = {"bool", "int", "uint", "long", "ulong", "float", "string", "enum", "datetime"};
@@ -447,6 +469,12 @@ void checkPackages(const std::vector<Package> &all)
 		for (const Package *k : readable)
 			for (const std::string &w : labelsOfNoValue(k->cfg)) wrong.push_back(k->name + ": " + w);
 		report("every option label names a value of its setting", wrong);
+	}
+	{
+		std::vector<std::string> wrong;
+		for (const Package *k : readable)
+			for (const std::string &w : toolFilesNamedAsChimeras(k->cfg)) wrong.push_back(k->name + ": " + w);
+		report("every file a core's tool reads or writes has a name of its own", wrong);
 	}
 	{
 		std::vector<std::string> wrong;
@@ -852,6 +880,14 @@ void selfChecks()
 			{"name": "wide", "type": "ULong", "default": 1}, {"name": "guessed", "default": 3}]})");
 		expect(unknownSettingTypes(cfg) == std::vector<std::string>{"'seed' is of type 'unit', which Chimera does not know"},
 			"a setting type Chimera does not know is found");
+	}
+	{
+		const Json cfg = parsed(R"({"tools": [{"id": "join", "inputs": [{"name": "rom"}, {"name": "settings"}], "outputs": [{"name": "joined"}]},
+			{"id": "split", "inputs": [{"name": "joined"}], "outputs": [{"name": "tool"}]}]})");
+		expect(toolFilesNamedAsChimeras(cfg) == std::vector<std::string>{
+				"tool 'join' names a file 'settings', the name of a file Chimera gives every tool",
+				"tool 'split' names a file 'tool', the name of a file Chimera gives every tool"},
+			"a tool's file named as one Chimera gives every tool is found, and 'rom' is the tool's to use");
 	}
 	{
 		expect(CoresViewModel::abiRefusal(parsed(R"({"abi": 1})")).empty() && CoresViewModel::abiRefusal(parsed("{}")).empty(),

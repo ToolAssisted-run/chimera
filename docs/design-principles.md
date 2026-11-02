@@ -12687,3 +12687,24 @@ Tested: the view models' test starts a second script that adds the first
 one's column and one of its own: one column of the name, the new header;
 stopped, its own goes and the shared one stays; started again, one of each.
 With the old code five of those checks failed.
+
+## A core's tool is given no game file (user-decided, 2026-11-02)
+
+A core's tool runs with no game, but the engine still gave it an empty file
+under the package's game name (`rom`, as every machine gets one). So a tool
+could not read a file of its own named `rom`: the run stopped with "mount
+failed (already mounted?)". The Gens core's GMV import met it with its
+cartridge, and named it `cartridge` to get past it.
+
+The owner chose, over keeping the empty file and refusing the name:
+
+- A tool run is given no game file. The files it gets from Chimera are the
+  request (`tool`) and the settings (`settings`), which every tool run has.
+- A tool's file named `tool` or `settings` is refused by the package
+  contract tests (`test-packages`).
+- `docs/project.md` and `docs/porting-a-core.md` say so.
+
+Tested: the witness's tool run now also reads a file named `rom` (with the
+old engine it stopped at the mount); the contract tests' rule finds a tool's
+file named `settings` or `tool` and passes one named `rom`.
+

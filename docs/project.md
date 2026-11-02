@@ -462,6 +462,10 @@ tool's window from the declaration, the way it draws settings:
 - `inputs`: the files it reads. `required` must be given; `multiple` takes
   several, in an order the person sets (Up and Down), mounted as
   `<name>.0`, `<name>.1`, ...; one that takes one is mounted as `<name>`.
+  A file of the tool's may have any name but `tool` and `settings`, the two
+  files Chimera gives every tool run (user-decided, 2026-11-02; the package
+  contract tests refuse them). A tool run is given no game, so `rom` is
+  free.
 - `options`: boxes to tick, each sent as true or false (`default` is how it
   starts).
 - `outputs`: the files it writes, each where the person chooses; `nameFrom`
