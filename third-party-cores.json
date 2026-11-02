@@ -22,6 +22,15 @@
       "repo": "mayonnaisegoodfellas/chimera-core-eden"
     },
     {
+      "id": "gens",
+      "name": "Gens-Rerecording",
+      "author": "DmytroM1998",
+      "systems": [
+        { "id": "GEN", "name": "Mega Drive / Genesis" }
+      ],
+      "repo": "DmytroM1998/chimera-core-gens"
+    },
+    {
       "id": "srb2",
       "name": "SRB2",
       "author": "P-AS",
