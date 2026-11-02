@@ -1883,8 +1883,8 @@ CE_API void ce_session_rerecord_counting(ce_session *s, int32_t on);
  * project or a state: frozen values are for looking into a game, not for
  * making a movie (the owner, 2026-10-24). A freeze changes the machine, so
  * the states kept while one is on are of the machine with it.
- * _freeze: bytes of a memory domain that can be written (a bus too) - size 1, 2
- * or 4 at address, value in the byte order asked (big_endian 1 or 0). With
+ * _freeze: bytes of a memory domain that can be written (a bus too) - size 1, 2,
+ * 4 or 8 at address, value in the byte order asked (big_endian 1 or 0). With
  * compare_kind other than 0 the value is written only when `compare OP now`
  * holds, OP by kind: 1 ==, 2 !=, 3 >, 4 >=, 5 <, 6 <= (Chimera's conditional
  * cheats). A freeze already at that domain and address is replaced. Returns
@@ -1976,16 +1976,27 @@ CE_API void ce_ramsearch_destroy(ce_ramsearch *rs);
 CE_API int32_t ce_ramsearch_set_ranges(ce_ramsearch *rs, const int64_t *pairs, int64_t n);
 /* Bytes the running search covers: the domain's size, or its live part. */
 CE_API int64_t ce_ramsearch_searched_size(const ce_ramsearch *rs);
-/* Every address becomes a candidate. detailed keeps a current value and a
- * change count per candidate, fed by _update once a frame. */
+/* Every address becomes a candidate, of size 1, 2, 4 or 8 bytes. detailed
+ * keeps a current value and a change count per candidate, fed by _update
+ * once a frame. */
 CE_API int32_t ce_ramsearch_start(ce_ramsearch *rs, int32_t size, int32_t misaligned, int32_t big_endian, int32_t detailed);
 CE_API int64_t ce_ramsearch_count(const ce_ramsearch *rs);
-/* The index-th candidate as listed; 0 when there is no such row. */
+/* The index-th candidate as listed; 0 when there is no such row. A value is
+ * its bytes read in the search's byte order, so a float's or a double's bits;
+ * _row64 has the 8-byte candidates whole (issue 474), _row their low 32 bits. */
+CE_API int32_t ce_ramsearch_row64(const ce_ramsearch *rs, int64_t index, uint64_t *address, uint64_t *current, uint64_t *previous, uint32_t *changes);
 CE_API int32_t ce_ramsearch_row(const ce_ramsearch *rs, int64_t index, uint64_t *address, uint32_t *current, uint32_t *previous, uint32_t *changes);
 /* Where an address is listed, or -1. */
 CE_API int64_t ce_ramsearch_index_of(const ce_ramsearch *rs, uint64_t address);
+/* A search: value as a row's (a float's or a double's bits where display
+ * is floating point), or an address, a count of changes, or a difference as
+ * a 64-bit integer; different_by likewise. Sizes are 1, 2, 4 and 8 bytes;
+ * display 2 (floating point) is a float at 4 and a double at 8. _search
+ * takes 32 bits, a signed difference widened from them. */
+CE_API int64_t ce_ramsearch_search64(ce_ramsearch *rs, int32_t compare, int32_t op, int32_t display, uint64_t value, uint64_t different_by, int32_t previous_type);
 CE_API int64_t ce_ramsearch_search(ce_ramsearch *rs, int32_t compare, int32_t op, int32_t display, uint32_t value, uint32_t different_by, int32_t previous_type);
 /* Whether that search would remove this row (the preview colouring). */
+CE_API int32_t ce_ramsearch_would_remove64(const ce_ramsearch *rs, int64_t index, int32_t compare, int32_t op, int32_t display, uint64_t value, uint64_t different_by);
 CE_API int32_t ce_ramsearch_would_remove(const ce_ramsearch *rs, int64_t index, int32_t compare, int32_t op, int32_t display, uint32_t value, uint32_t different_by);
 CE_API int32_t ce_ramsearch_update(ce_ramsearch *rs, int32_t previous_type);
 CE_API int32_t ce_ramsearch_set_previous_to_current(ce_ramsearch *rs);

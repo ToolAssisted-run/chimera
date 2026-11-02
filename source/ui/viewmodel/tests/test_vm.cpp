@@ -2482,6 +2482,9 @@ local a = mainmemory.read_bytes_as_array(0x20, 2)
 console.log("tables", r[0], r[1], a[1], a[2], memory.getmemorydomainlist()[0] == mainmemory.getname(), memory.getmemorydomainsize() > 0)
 mainmemory.writefloat(0x40, 1.5, false)
 console.log("float", mainmemory.readfloat(0x40, false))
+mainmemory.write_s64_le(0x48, -3)
+mainmemory.writedouble(0x50, 440.0, true)
+console.log("eight", mainmemory.read_s64_le(0x48), mainmemory.read_u64_le(0x48) == -3, mainmemory.read_u32_le(0x48), mainmemory.readdouble(0x50, true), mainmemory.read_u8(0x50))
 local id = memorysavestate.savecorestate()
 mainmemory.write_u8(0x10, 0x55)
 memorysavestate.loadcorestate(id)
@@ -2548,6 +2551,8 @@ while true do emu.frameadvance() end
 	CHECK_TEXT(said("start "), "start 0 True");
 	CHECK_TEXT(said("u8 "), "u8 171 -85 171");
 	CHECK_TEXT(said("sized "), "sized 4660 13330 -2 4294967294 1192960");
+	/* 8 bytes and a double (issue 474): a Lua integer has 64 bits with a sign; 440.0's first byte, big-endian, is 0x40 */
+	CHECK_TEXT(said("eight "), "eight -3 True 4294967293 440 64");
 	CHECK_TEXT(said("tables "), "tables 18 52 18 52 True True");
 	CHECK_TEXT(said("float "), "float 1.5");
 	CHECK_TEXT(said("state "), "state string 171 False no state nothing in memory");
@@ -4614,13 +4619,14 @@ bool ramSearch(const char *package, const char *rom)
 	search.set("fast", false, error);
 	CHECK(search.hiddenColumns.get() == "Diff");
 	/* a bus is one of the domains, after the core's own (issue 456: Ruffle's memory is a bus alone, and the window
-	 * offered nothing to search). The synth's "Bus" says 6144 of its 196608 bytes are live and is searched there;
+	 * offered nothing to search). The synth's "Bus" says 6144 of its 196608 bytes are live, 6152 kept whole to
+	 * eights (the largest candidate, 8 bytes), and is searched there;
 	 * "Bus (peeks)" says nothing, so all of it is */
 	CHECK(search.domains.get() == "RAM,VRAM,Bus,Bus (peeks)");
 	search.set("size", int64_t{1}, error);
 	search.set("domain", std::string("Bus"), error);
 	search.run("newSearch", {}, error);
-	CHECK(d.until([&] { return search.searchedDomain.get() == "Bus" && search.count.get() == 6144; }, 20));
+	CHECK(d.until([&] { return search.searchedDomain.get() == "Bus" && search.count.get() == 6152; }, 20));
 	search.set("domain", std::string("Bus (peeks)"), error);
 	search.run("newSearch", {}, error);
 	CHECK(d.until([&] { return search.searchedDomain.get() == "Bus (peeks)" && search.count.get() == 0x30000; }, 20));
@@ -4629,7 +4635,7 @@ bool ramSearch(const char *package, const char *rom)
 	search.set("fast", true, error);
 	search.set("domain", std::string("Bus"), error);
 	search.run("newSearch", {}, error);
-	CHECK(d.until([&] { return search.searchedDomain.get() == "Bus" && search.count.get() == 6144 && search.fast.get(); }, 20));
+	CHECK(d.until([&] { return search.searchedDomain.get() == "Bus" && search.count.get() == 6152 && search.fast.get(); }, 20));
 	{
 		RowModel &busRows = *search.rowLists()[0].model;
 		std::string address, byte;
@@ -4665,6 +4671,60 @@ bool ramSearch(const char *package, const char *rom)
 		CHECK(d.until([&] { return session.frame.get() == was + 2; }, 20));
 		CHECK(session.run("readMemory", {std::string("Bus"), at, int64_t{1}}, error) == Value(std::string("\x77")));
 		session.unfreezeAll();
+	}
+	{
+		/* 8 bytes (issue 474), in RAM the walker leaves alone: a double found by its value typed as shown, a
+		 * signed difference below zero, and an 8-byte freeze */
+		search.set("domain", std::string("RAM"), error);
+		search.set("bigEndian", false, error);
+		search.set("checkMisaligned", false, error);
+		search.set("size", int64_t{8}, error);
+		CHECK(search.displays.get() == "Unsigned\nSigned\nHex\nDouble");
+		const std::string bits440("\x00\x00\x00\x00\x00\x80\x7B\x40", 8);
+		CHECK(session.run("writeMemory", {std::string("RAM"), int64_t{0xa08}, bits440}, error).has_value());
+		CHECK(search.run("newSearch", {}, error).has_value());
+		const int64_t qwords = static_cast<int64_t>(session.readDomain("RAM").size() / 8);
+		CHECK(d.until([&] { return search.searching.get() && search.count.get() == qwords; }, 20));
+		search.set("display", int64_t{3}, error);
+		search.set("compare", int64_t{1}, error);
+		search.set("op", int64_t{0}, error);
+		search.set("specificValue", std::string("440"), error);
+		CHECK(search.run("search", {}, error).has_value());
+		CHECK(d.until([&] { return search.count.get() == 1; }, 20));
+		std::string where, shown;
+		fromValue(rows.cell(0, 0), where);
+		fromValue(rows.cell(0, 1), shown);
+		CHECK(where == watch::hex(0xa08, digits) && shown == "440");
+		/* -5 since the last search: 10 then 5, as signed 8-byte numbers */
+		CHECK(session.run("writeMemory", {std::string("RAM"), int64_t{0xa08}, std::string("\x0a\0\0\0\0\0\0\0", 8)}, error).has_value());
+		search.set("display", int64_t{1}, error);
+		CHECK(search.run("newSearch", {}, error).has_value());
+		CHECK(d.until([&] { return search.searching.get() && search.count.get() == qwords; }, 20));
+		CHECK(session.run("writeMemory", {std::string("RAM"), int64_t{0xa08}, std::string("\x05\0\0\0\0\0\0\0", 8)}, error).has_value());
+		/* a detailed search's values are the last frame's */
+		const int64_t at5 = session.frame.get();
+		session.run("frameAdvance", {}, error);
+		CHECK(d.until([&] { return session.frame.get() == at5 + 1; }, 20));
+		search.set("compare", int64_t{4}, error);
+		search.set("difference", std::string("-5"), error);
+		CHECK(search.run("search", {}, error).has_value());
+		CHECK(d.until([&] { return search.count.get() == 1; }, 20));
+		fromValue(rows.cell(0, 0), where);
+		CHECK(where == watch::hex(0xa08, digits));
+		SessionViewModel::Freeze f;
+		f.domain = "RAM";
+		f.address = 0xa10;
+		f.size = 8;
+		f.value = 0x0123456789ABCDEFull;
+		CHECK(session.freeze(f, error));
+		const int64_t was = session.frame.get();
+		session.run("frameAdvance", {}, error);
+		CHECK(d.until([&] { return session.frame.get() == was + 1; }, 20));
+		CHECK(session.run("readMemory", {std::string("RAM"), int64_t{0xa10}, int64_t{8}}, error) == Value(std::string("\xef\xcd\xab\x89\x67\x45\x23\x01")));
+		session.unfreezeAll();
+		search.set("compare", int64_t{0}, error);
+		search.set("display", int64_t{0}, error);
+		search.set("size", int64_t{1}, error);
 	}
 	/* the window opened starts a search of the domain picked, and so does each machine opened while it is, as
 	 * Chimera's (issue 456: nothing was listed until New Search) */
@@ -5469,8 +5529,18 @@ void watchValues()
 	CHECK(format(0x12345678, 4, Display::Hex) == "12345678" && format(0x80000000, 4, Display::Signed) == "-2147483648");
 	CHECK(watch::addressDigits(0xFF) == 2 && watch::addressDigits(0x100) == 4 && watch::addressDigits(0x10000) == 6);
 	CHECK(watch::fits(2, Display::Fixed12_4) && !watch::fits(1, Display::Float) && !watch::fits(4, Display::Fixed12_4));
+	/* 8 bytes (issue 474): unsigned, signed and hex whole, and a double as the shortest digits that read back */
+	CHECK(format(0xFFFFFFFFFFFFFFFFull, 8, Display::Unsigned) == "18446744073709551615" && format(0xFFFFFFFFFFFFFFFFull, 8, Display::Signed) == "-1");
+	CHECK(format(0x0123456789ABCDEFull, 8, Display::Hex) == "0123456789ABCDEF" && format(0x407B800000000000ull, 8, Display::Double) == "440");
+	CHECK(format(0x3FB999999999999Aull, 8, Display::Double) == "0.1" && format(0x7FF0000000000000ull, 8, Display::Double) == "Infinity");
+	CHECK(watch::fits(8, Display::Double) && !watch::fits(8, Display::Float) && !watch::fits(4, Display::Double) && !watch::fits(8, Display::Binary));
+	CHECK(watch::sizeLetter(8) == 'q' && watch::sizeFromLetter('q') == 8 && watch::displayLetter(Display::Double) == 'F');
 	/* and typed back, as Chimera's value boxes read them */
-	uint32_t v = 0;
+	uint64_t v = 0;
+	CHECK(watch::parse("18446744073709551615", Display::Unsigned, v, 8) && v == 0xFFFFFFFFFFFFFFFFull && !watch::parse("18446744073709551616", Display::Unsigned, v, 8));
+	CHECK(watch::parse("-9223372036854775808", Display::Signed, v, 8) && v == 0x8000000000000000ull && watch::parse("-1", Display::Signed, v, 8) && v == ~0ull);
+	CHECK(watch::parse("FFFFFFFFFFFFFFFF", Display::Hex, v, 8) && v == ~0ull && !watch::parse("1FFFFFFFFFFFFFFFF", Display::Hex, v, 8));
+	CHECK(watch::parse("440", Display::Double, v, 8) && v == 0x407B800000000000ull && watch::parse("4294967296", Display::Unsigned, v, 8) && v == 0x100000000ull);
 	CHECK(watch::parse("FF", Display::Hex, v) && v == 0xFF && watch::parse(" 7fffffff ", Display::Hex, v) && v == 0x7FFFFFFF);
 	CHECK(!watch::parse("0x10", Display::Hex, v) && !watch::parse("123456789", Display::Hex, v) && !watch::parse("-1", Display::Hex, v));
 	CHECK(watch::parse("-1", Display::Signed, v) && v == 0xFFFFFFFF && !watch::parse("2147483648", Display::Signed, v));
@@ -5774,6 +5844,31 @@ bool ramWatch(const char *package, const char *rom)
 	watches.run("newList", {}, error);
 	CHECK(watches.run("open", {(dir / "props.wch").string()}, error).has_value() && watches.count.get() == 2);
 	CHECK(d.until([&] { return text(0, 1) == stepsNow() && text(1, 1) == "Playing"; }, 10));
+	/* 8 bytes (issue 474): a double, and the same bytes the other way round in hex; a float does not fit them;
+	 * saved with Chimera's own letters for them (q, F) and read back */
+	watches.run("newList", {}, error);
+	CHECK(watches.run("add", {std::string("RAM"), int64_t{8}, int64_t{8}, int64_t{8}, false, std::string("a double")}, error).has_value());
+	CHECK(watches.run("add", {std::string("RAM"), int64_t{8}, int64_t{8}, int64_t{2}, true, std::string("big-endian hex")}, error).has_value());
+	CHECK(!watches.run("add", {std::string("RAM"), int64_t{8}, int64_t{8}, int64_t{7}, false, std::string("")}, error));
+	auto qword = [&](bool big) {
+		const std::vector<uint8_t> r = session.readDomain("RAM");
+		uint64_t v = 0;
+		for (int k = 0; k < 8; k++) v |= uint64_t{r[static_cast<size_t>(8 + k)]} << (8 * (big ? 7 - k : k));
+		return v;
+	};
+	auto showsQword = [&] {
+		return text(0, 1) == watch::format(qword(false), 8, watch::Display::Double) && text(1, 1) == watch::format(qword(true), 8, watch::Display::Hex);
+	};
+	step();
+	CHECK(d.until(showsQword, 10));
+	CHECK(text(0, 8) == "Double" && text(1, 1).size() == 16);
+	CHECK(watches.run("save", {(dir / "eight.wch").string()}, error).has_value());
+	const std::string eight = readFile(dir / "eight.wch");
+	CHECK(eight.find("\tq\tF\t0\tRAM\ta double") != std::string::npos && eight.find("\tq\th\t1\tRAM\tbig-endian hex") != std::string::npos);
+	watches.run("newList", {}, error);
+	CHECK(watches.run("open", {(dir / "eight.wch").string()}, error).has_value() && watches.count.get() == 2);
+	step();
+	CHECK(d.until(showsQword, 10));
 	session.key("Down", false);
 	session.run("close", {}, error);
 	CHECK(d.until([&] { return !session.isOpen.get(); }, 20));
@@ -5802,8 +5897,15 @@ bool hexEditor(const char *package, const char *rom)
 	std::vector<uint8_t> ram = session.readDomain("RAM");
 	const int64_t size = static_cast<int64_t>(ram.size());
 	CHECK(size >= 256 && hex.lineCount.get() == (size + 15) / 16 && hex.writable.get());
-	hex.set("visibleLines", int64_t{8}, error);
 	RowModel &lines = *hex.rowLists()[0].model;
+	/* a view's count of the lines, as Qt's list keeps it: taken when it
+	 * starts and at each reset, grown by appends. The lines read after the
+	 * window's height was known were not announced as a new count, and the
+	 * editor stayed empty (issue 471) */
+	int64_t viewRows = lines.rowCount();
+	Connection viewReset = lines.reset.connect([&] { viewRows = lines.rowCount(); });
+	Connection viewAppend = lines.appended.connect([&](int64_t, int64_t) { viewRows = lines.rowCount(); });
+	hex.set("visibleLines", int64_t{8}, error);
 	auto text = [&](int64_t row, int32_t column) {
 		std::string t;
 		fromValue(lines.cell(row, column), t);
@@ -5828,6 +5930,7 @@ bool hexEditor(const char *package, const char *rom)
 		return true;
 	};
 	CHECK(d.until([&] { ram = session.readDomain("RAM"); return showsRam(0); }, 10));
+	CHECK(viewRows == 8);
 	/* the text the bytes spell */
 	{
 		std::string spelled;

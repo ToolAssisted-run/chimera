@@ -42,6 +42,11 @@ QString MenuLetters::plain(const QString &text)
 	return out;
 }
 
+void MenuLetters::underline(QObject *label, bool on)
+{
+	if (label != nullptr && label->property("mnemonicVisible").toBool() != on) label->setProperty("mnemonicVisible", on);
+}
+
 bool MenuLetters::inMenus(QObject *focus)
 {
 	for (QObject *o = focus; o != nullptr; o = o->parent())

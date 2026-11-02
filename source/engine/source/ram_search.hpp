@@ -34,6 +34,7 @@ public:
 	/* The numbering is the ABI's (engine.h) and the frontend's enums. */
 	enum Compare { CmpPrevious = 0, CmpSpecificValue, CmpSpecificAddress, CmpChanges, CmpDifference };
 	enum Op { OpEqual = 0, OpGreaterThan, OpGreaterThanEqual, OpLessThan, OpLessThanEqual, OpNotEqual, OpDifferentBy };
+	/* DispFloat is a float at size 4 and a double at size 8 */
 	enum Display { DispUnsigned = 0, DispSigned, DispFloat };
 	enum PreviousType { PrevOriginal = 0, PrevLastSearch, PrevLastFrame, PrevLastChange };
 	enum Column { ColAddress = 0, ColValue, ColPrev, ColChanges, ColDiff };
@@ -43,15 +44,17 @@ public:
 		int compare = CmpPrevious;
 		int op = OpEqual;
 		int display = DispUnsigned;
-		uint32_t value = 0;
-		uint32_t differentBy = 0;
+		/* a value as its bytes read in the search's byte order (a float's or a
+		 * double's bits); a difference as a 64-bit integer */
+		uint64_t value = 0;
+		uint64_t differentBy = 0;
 	};
 
 	struct Row
 	{
 		uint64_t address = 0;
-		uint32_t current = 0;
-		uint32_t previous = 0;
+		uint64_t current = 0;
+		uint64_t previous = 0;
 		uint32_t changes = 0;
 	};
 
@@ -132,8 +135,8 @@ private:
 		std::vector<uint32_t> changesBySlot; /* detailed */
 		/* sparse */
 		std::vector<uint64_t> addr;
-		std::vector<uint32_t> prev;
-		std::vector<uint32_t> cur;     /* detailed */
+		std::vector<uint64_t> prev;
+		std::vector<uint64_t> cur;     /* detailed */
 		std::vector<uint32_t> changes; /* detailed */
 	};
 
@@ -173,14 +176,13 @@ private:
 	bool toCompact(uint64_t real, uint64_t &address) const;
 	bool inOneRange(uint64_t address, int size) const;
 	const uint8_t *window(int64_t offset, int64_t len) const;
-	uint32_t load(const uint8_t *p, int size) const;
-	void store(uint8_t *p, int size, uint32_t v) const;
-	uint32_t peek(uint64_t address, int size) const;
-	void readValues(const std::vector<uint64_t> &addr, int size, std::vector<uint32_t> &out) const;
+	uint64_t load(const uint8_t *p, int size) const;
+	uint64_t peek(uint64_t address, int size) const;
+	void readValues(const std::vector<uint64_t> &addr, int size, std::vector<uint64_t> &out) const;
 	void previousFrom(const std::vector<uint8_t> &image);
 	static uint64_t bytesOf(const Set &s);
 
-	static bool matches(const Query &q, int size, uint64_t address, uint32_t cur, uint32_t prev, uint32_t changes);
+	static bool matches(const Query &q, int size, uint64_t address, uint64_t cur, uint64_t prev, uint32_t changes);
 	void rebuildRank();
 	uint64_t slotAt(int64_t index) const;
 	void snapshotImage(std::vector<uint8_t> &image) const;

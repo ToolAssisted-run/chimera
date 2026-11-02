@@ -104,13 +104,15 @@ int main(int argc, char **argv)
 	 * with no menu taken, not either */
 	QObject *viewItem = window->findChild<QObject *>(QStringLiteral("bar:&View"));
 	CHECK(viewItem != nullptr);
-	auto drawn = [&] {
-		QObject *label = viewItem != nullptr ? viewItem->property("contentItem").value<QObject *>() : nullptr;
-		return label != nullptr ? label->property("text").toString() : QString();
+	/* the text kept whole, its letter underlined by Qt's label or not (issue 471) */
+	auto underlined = [&] {
+		QObject *content = viewItem != nullptr ? viewItem->property("contentItem").value<QObject *>() : nullptr;
+		QObject *label = content != nullptr ? content->findChild<QObject *>(QStringLiteral("label")) : nullptr;
+		return label != nullptr && content->property("text").toString() == QStringLiteral("&View") && label->property("mnemonicVisible").toBool();
 	};
-	CHECK(!letters.shown() && drawn() == QStringLiteral("View"));
+	CHECK(!letters.shown() && !underlined());
 	QTest::keyPress(window, Qt::Key_Alt, Qt::AltModifier);
-	CHECK(letters.shown() && drawn() == QStringLiteral("&View"));
+	CHECK(letters.shown() && underlined());
 	QTest::keyRelease(window, Qt::Key_Alt, Qt::NoModifier);
 	CHECK(!letters.shown());
 	QTest::keyPress(window, Qt::Key_Alt, Qt::AltModifier);

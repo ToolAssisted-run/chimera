@@ -12597,3 +12597,75 @@ session's `hasGameTimer`); the window shows it.
 Tested: the view models' test checks the list without a game timer, with
 one (Game Time between Autohold and Real Time) and without again, the
 place kept; with the row always listed, the two checks without a timer failed.
+
+## Readable windows in Windows' dark mode, and the Hex Editor's rows and columns (2026-11-02)
+
+Issue 471 collected text that could not be read, with Windows in dark mode
+and Chimera's Light theme; issues 472 and 473 two of its windows.
+
+- **Menu text after Alt-Tab.** The window's style swapped a menu row's text
+  between "&Copy" and "Copy" as Alt came and went, to underline the letter
+  only while Alt is held (issue 405). Qt's label shows both as "Copy": it
+  changed its underline and, the text reading the same, never laid it out
+  again, and drew nothing. Every row with a letter vanished after Alt-Tab
+  (Alt pressed); the rows without one stayed. The label now keeps the text
+  whole and is told whether to underline through its own switch, which lays
+  it out again; QML cannot reach that switch (it made a script value of its
+  own), so the menu letters helper sets it. The menu bar's items the same.
+- **The Light theme stays light** (user-decided). It names the desktop's
+  colours ("system:Window") beside light ones of its own (a list's rows),
+  and with Windows in dark mode Qt gave the desktop's dark colours: dark
+  windows, white rows and white text on them. A theme now asks Qt for the
+  desktop's light colours when it is light and the dark ones when it is
+  dark, whatever the desktop is set to.
+- **The Hex Editor was empty** until something made its list again: the
+  lines read after the window's height was known were announced as as many
+  as before, so the list kept the none it had. It now remembers how many it
+  last announced.
+- **The Hex Editor's column numbers** were over the wrong columns on Windows
+  (issue 473): every fixed-width text names the family "monospace", which
+  is fontconfig's on Linux and no font on Windows, where Qt drew it in a
+  proportional one. There it is now Windows' fixed font. The other 35 such
+  texts (RAM Search, RAM Watch, the Lua Console...) are fixed-width too.
+- **Macro Input's controls scroll** (issue 472): a keyboard's (Ruffle's) did
+  not fit the window, and the rest of them could not be reached.
+
+Tested: a new window test, "menu text", opens a dark menu, presses Alt,
+goes to another window and back, and reads each row's pixels: with the old
+style the three rows with a letter had no light pixels (failed), now each
+has its text, underlined only while Alt is held. The view models' test
+counts the Hex Editor's rows as a view does (failed with the old count).
+On Windows 11 in dark mode, the Windows build staged in %TEMP% with the
+Light theme: RAM Watch's and RAM Search's rows, the Lua Console's script
+and the Hex Editor's rows readable, the column numbers over their columns,
+in screenshots. Not driven by a test: the colour scheme (the test machine
+cannot be put in dark mode) and Macro Input's scrolling.
+
+## 8-byte values in RAM Search and RAM Watch (user-decided, 2026-11-02)
+
+Issue 474 asked for 8-byte values, a Flash game's numbers being doubles.
+The owner chose them in RAM Search and RAM Watch, and in Lua's sized reads.
+
+- The engine's search holds values as 64 bits (a sparse candidate's values
+  take 8 bytes each instead of 4; the dense shape, by bytes, is unchanged).
+  Size 8 is shown
+  unsigned (ordered as unsigned past 2^63), signed, in hex or as a double,
+  a double being equal within a part in a billion of the larger, so 0.3 -
+  0.1 is 0.2 as typed. A difference is a 64-bit number.
+- engine.h stays additive: `ce_ramsearch_row64`, `_search64` and
+  `_would_remove64` beside the 32-bit calls, which still work.
+- Live ranges are kept whole to eights, not fours, the largest candidate
+  being 8 bytes: the synth's bus searches 6152 bytes where it was 6144.
+- A freeze takes 8 bytes. A .wch file names 8 bytes `q` and a double `F`,
+  letters of Chimera's own. Lua has read_u64_le/_be, read_s64_le/_be, their
+  writes, and readdouble and writedouble.
+- The MCP server's search keeps to 1, 2 and 4 bytes: it answers in JSON
+  numbers, exact only to 2^53. The Hex Editor keeps its 1, 2 and 4.
+
+Tested: the engine's test runs every random script at 8 bytes too, against
+its model, and finds a double, an unsigned value past 2^63, a signed one,
+a top byte changed (failed with the 8-byte lane mask the old one) and a
+byte order turned round; the view models' test searches a double typed as
+"440" and a signed difference of -5, freezes 8 bytes, shows a double and a
+big-endian hex watch, saves and reopens them (failed without the q letter),
+and reads and writes 8 bytes and a double from Lua.

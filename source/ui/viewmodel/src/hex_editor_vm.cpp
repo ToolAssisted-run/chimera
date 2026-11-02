@@ -99,7 +99,7 @@ HexEditorViewModel::HexEditorViewModel(Dispatcher &dispatcher, SessionViewModel 
 			std::string text;
 			if (!arg(a, 0, address, error) || !arg(a, 1, text, error)) return {};
 			const int sz = static_cast<int>(size.get());
-			uint32_t value = 0;
+			uint64_t value = 0;
 			if (text.size() > static_cast<size_t>(sz * 2) || !watch::parse(text, watch::Display::Hex, value))
 			{
 				error = tr("hex.not_value_of", sz, {text});
@@ -115,7 +115,7 @@ HexEditorViewModel::HexEditorViewModel(Dispatcher &dispatcher, SessionViewModel 
 				error = tr("hex.no_address", {watch::hex(address, 1)});
 				return {};
 			}
-			if (!writeValue(address, value, error)) return {};
+			if (!writeValue(address, static_cast<uint32_t>(value), error)) return {};
 			status.set(tr("hex.wrote_at", {watch::hex(address, digits())}));
 			return {};
 		});
@@ -525,14 +525,14 @@ HexEditorViewModel::HexEditorViewModel(Dispatcher &dispatcher, SessionViewModel 
 		[this](const Args &a, std::string &error) -> Value {
 			std::string text;
 			if (!arg(a, 0, text, error)) return {};
-			uint32_t v = 0;
+			uint64_t v = 0;
 			if (!watch::parse(text, watch::Display::Hex, v))
 			{
 				error = tr("ram_search.write_failed");
 				return false;
 			}
 			for (const int64_t at : highlightedAll())
-				if (!writeValue(at, v, error))
+				if (!writeValue(at, static_cast<uint32_t>(v), error))
 				{
 					error = tr("ram_search.write_failed");
 					return false;
@@ -588,6 +588,7 @@ HexEditorViewModel::HexEditorViewModel(Dispatcher &dispatcher, SessionViewModel 
 		reread();
 	};
 	topWatch_ = topLine.changed.connect(moved);
+	linesResetWatch_ = lines_.reset.connect([this] { linesAnnounced_ = lines_.rowCount(); });
 	watchingWatch_ = watching.changed.connect([this] {
 		watchingM_.store(watching.get());
 		if (watching.get()) reread();
@@ -720,7 +721,9 @@ void HexEditorViewModel::readOnMachine(ce_session *s)
 				changedShown_ = outChanged_;
 				shownFrom_ = outFrom_;
 			}
-			lines_.refreshed(lines_.rowCount());
+			const int64_t before = linesAnnounced_;
+			linesAnnounced_ = lines_.rowCount();
+			lines_.refreshed(before);
 		});
 }
 

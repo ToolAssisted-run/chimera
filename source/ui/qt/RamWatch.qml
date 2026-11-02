@@ -557,7 +557,7 @@ ApplicationWindow {
             domainBox.model = win.vm.domains === "" ? [] : win.vm.domains.split(",")
             domainBox.currentIndex = Math.max(0, domainBox.model.indexOf(info.domain))
             addressBox.text = info.address
-            sizeBox.currentIndex = info.size === 4 ? 2 : info.size - 1
+            sizeBox.currentIndex = [1, 2, 4, 8].indexOf(info.size)
             editor.fillDisplays(info.display)
             bigEndianBox.checkState = info.bigEndian === 2 ? Qt.PartiallyChecked : info.bigEndian === 1 ? Qt.Checked : Qt.Unchecked
             notesBox.text = info.note
@@ -566,13 +566,13 @@ ApplicationWindow {
             notesBox.forceActiveFocus()
         }
         function fillDisplays(keep) {
-            editor.displays = JSON.parse(win.vm.run("displays", [[1, 2, 4][sizeBox.currentIndex]]))
+            editor.displays = JSON.parse(win.vm.run("displays", [[1, 2, 4, 8][sizeBox.currentIndex]]))
             displayBox.model = editor.displays.map((d) => d.name)
             const at = editor.displays.findIndex((d) => d.display === keep)
             displayBox.currentIndex = at >= 0 ? at : 0
         }
         function accept() {
-            const size = [1, 2, 4][sizeBox.currentIndex]
+            const size = [1, 2, 4, 8][sizeBox.currentIndex]
             const display = editor.displays[displayBox.currentIndex].display
             const endian = bigEndianBox.checkState === Qt.PartiallyChecked ? 2 : bigEndianBox.checked ? 1 : 0
             const ok = editor.mode === "new"
@@ -595,7 +595,7 @@ ApplicationWindow {
             ComboBox {
                 id: sizeBox
                 Layout.fillWidth: true
-                model: [qsTrId("common.1_byte"), qsTrId("common.2_byte"), qsTrId("common.4_byte")]
+                model: [qsTrId("common.1_byte"), qsTrId("common.2_byte"), qsTrId("common.4_byte"), qsTrId("common.8_byte")]
                 onActivated: editor.fillDisplays(editor.displays.length > 0 ? editor.displays[displayBox.currentIndex].display : 0)
             }
             Item { width: 1 }

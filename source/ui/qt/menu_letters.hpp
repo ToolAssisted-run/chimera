@@ -22,6 +22,9 @@ public:
 	 * "&", and the "(&F)" a Chinese, Japanese or Korean text ends with goes
 	 * with the spaces before it, as Qt hides it */
 	Q_INVOKABLE static QString plain(const QString &text);
+	/* a menu's label (Qt's, holding the text with its "&") told whether to
+	 * underline its letter: its own switch, which QML cannot reach */
+	Q_INVOKABLE static void underline(QObject *label, bool on);
 
 protected:
 	bool eventFilter(QObject *watched, QEvent *e) override;

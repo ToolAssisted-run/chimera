@@ -102,7 +102,7 @@ RamSearchViewModel::RamSearchViewModel(Dispatcher &dispatcher, SessionViewModel 
 	expose("domains", "the machine's memory domains, comma-separated", domains);
 	expose("domain", "the domain the next search is of", domain, true);
 	expose("searchedDomain", "the domain the open search is of", searchedDomain);
-	expose("size", "bytes a value takes: 1, 2 or 4 (the open search is read again at a new size)", size, true);
+	expose("size", "bytes a value takes: 1, 2, 4 or 8 (the open search is read again at a new size)", size, true);
 	expose("bigEndian", "values are stored most significant byte first", bigEndian, true);
 	expose("displays", "the ways a value of this size can be shown, a line each", displays);
 	expose("display", "the way values are shown and typed, by its place in displays", display, true);
@@ -146,7 +146,7 @@ RamSearchViewModel::RamSearchViewModel(Dispatcher &dispatcher, SessionViewModel 
 
 	auto newSearch = [this](const Args &, std::string &error) -> Value {
 		const int32_t sz = static_cast<int32_t>(size.get());
-		if (sz != 1 && sz != 2 && sz != 4)
+		if (sz != 1 && sz != 2 && sz != 4 && sz != 8)
 		{
 			error = tr("ram_search.size_values");
 			return {};
@@ -326,10 +326,11 @@ RamSearchViewModel::RamSearchViewModel(Dispatcher &dispatcher, SessionViewModel 
 		for (const int64_t row : pickedRows())
 		{
 			uint64_t at = 0;
-			uint32_t cur = 0, prev = 0, changes = 0;
+			uint64_t cur = 0, prev = 0;
+			uint32_t changes = 0;
 			{
 				std::lock_guard<std::mutex> lock(rsM_);
-				if (rs_ == nullptr || ce_ramsearch_row(rs_, row, &at, &cur, &prev, &changes) == 0) continue;
+				if (rs_ == nullptr || ce_ramsearch_row64(rs_, row, &at, &cur, &prev, &changes) == 0) continue;
 			}
 			out += addressText(at) + "\t" + watch::sizeLetter(s) + "\t" + watch::displayLetter(way()) + "\t" + (bigEndian.get() ? "1" : "0") +
 				   "\t" + d + "\t" + kNewLine;
@@ -368,10 +369,11 @@ RamSearchViewModel::RamSearchViewModel(Dispatcher &dispatcher, SessionViewModel 
 			for (size_t i = 0; i < rows.size(); i++)
 			{
 				uint64_t at = 0;
-				uint32_t cur = 0, prev = 0, changes = 0;
+				uint64_t cur = 0, prev = 0;
+				uint32_t changes = 0;
 				{
 					std::lock_guard<std::mutex> lock(rsM_);
-					if (rs_ == nullptr || ce_ramsearch_row(rs_, rows[i], &at, &cur, &prev, &changes) == 0) continue;
+					if (rs_ == nullptr || ce_ramsearch_row64(rs_, rows[i], &at, &cur, &prev, &changes) == 0) continue;
 				}
 				list += (list.empty() ? "" : ",") + addressText(at);
 				if (i == 0)
@@ -383,7 +385,7 @@ RamSearchViewModel::RamSearchViewModel(Dispatcher &dispatcher, SessionViewModel 
 			const int s = static_cast<int>(size.get());
 			out.members.emplace_back("addresses", json::Json::string(list));
 			out.members.emplace_back("domain", json::Json::string(searchedDomain.get()));
-			out.members.emplace_back("size", json::Json::string(tr(s == 1 ? "watch.size_byte" : s == 2 ? "watch.size_word" : "watch.size_dword")));
+			out.members.emplace_back("size", json::Json::string(tr(s == 1 ? "watch.size_byte" : s == 2 ? "watch.size_word" : s == 4 ? "watch.size_dword" : "watch.size_qword")));
 			out.members.emplace_back("display", json::Json::string(watch::displayName(way())));
 			out.members.emplace_back("hex", json::Json::boolean_(way() == watch::Display::Hex));
 			out.members.emplace_back("endian", json::Json::string(tr(bigEndian.get() ? "watch.big_endian" : "watch.little_endian")));
@@ -400,10 +402,11 @@ RamSearchViewModel::RamSearchViewModel(Dispatcher &dispatcher, SessionViewModel 
 			for (const int64_t row : pickedRows())
 			{
 				uint64_t at = 0;
-				uint32_t cur = 0, prev = 0, changes = 0;
+				uint64_t cur = 0, prev = 0;
+				uint32_t changes = 0;
 				{
 					std::lock_guard<std::mutex> lock(rsM_);
-					if (rs_ == nullptr || ce_ramsearch_row(rs_, row, &at, &cur, &prev, &changes) == 0) continue;
+					if (rs_ == nullptr || ce_ramsearch_row64(rs_, row, &at, &cur, &prev, &changes) == 0) continue;
 				}
 				if (thaw)
 				{
@@ -438,8 +441,8 @@ RamSearchViewModel::RamSearchViewModel(Dispatcher &dispatcher, SessionViewModel 
 		[this](const Args &a, std::string &error) -> Value {
 			std::string text;
 			if (!arg(a, 0, text, error)) return {};
-			uint32_t v = 0;
-			if (!watch::parse(text, way(), v))
+			uint64_t v = 0;
+			if (!watch::parse(text, way(), v, static_cast<int>(size.get())))
 			{
 				error = tr("ram_search.write_failed");
 				return false;
@@ -451,10 +454,11 @@ RamSearchViewModel::RamSearchViewModel(Dispatcher &dispatcher, SessionViewModel 
 			for (const int64_t row : pickedRows())
 			{
 				uint64_t at = 0;
-				uint32_t cur = 0, prev = 0, changes = 0;
+				uint64_t cur = 0, prev = 0;
+				uint32_t changes = 0;
 				{
 					std::lock_guard<std::mutex> lock(rsM_);
-					if (rs_ == nullptr || ce_ramsearch_row(rs_, row, &at, &cur, &prev, &changes) == 0) continue;
+					if (rs_ == nullptr || ce_ramsearch_row64(rs_, row, &at, &cur, &prev, &changes) == 0) continue;
 				}
 				std::string why;
 				if (!session_.run("writeMemory", {searchedDomain.get(), static_cast<int64_t>(at), bytes}, why))
@@ -536,8 +540,9 @@ RamSearchViewModel::RamSearchViewModel(Dispatcher &dispatcher, SessionViewModel 
 				for (int64_t i = 0; i < n; i++)
 				{
 					uint64_t at = 0;
-					uint32_t cur = 0, prev = 0, changes = 0;
-					if (ce_ramsearch_row(rs_, i, &at, &cur, &prev, &changes) == 0) continue;
+					uint64_t cur = 0, prev = 0;
+					uint32_t changes = 0;
+					if (ce_ramsearch_row64(rs_, i, &at, &cur, &prev, &changes) == 0) continue;
 					text += addressText(at) + "\t" + watch::sizeLetter(s) + "\t" + watch::displayLetter(way()) + "\t" +
 							(bigEndian.get() ? "1" : "0") + "\t" + searchedDomain.get() + "\t" + kNewLine;
 				}
@@ -748,17 +753,22 @@ bool RamSearchViewModel::params(Params &p, std::string &error) const
 	p.compare = static_cast<int32_t>(compare.get());
 	p.op = static_cast<int32_t>(op.get());
 	p.previousType = static_cast<int32_t>(previousType.get());
-	/* the engine compares raw, signed or float; every other way is raw */
+	/* the engine compares raw, signed or floating point (a float, a double); every other way is raw */
 	const watch::Display w = way();
-	p.display = w == watch::Display::Signed ? 1 : w == watch::Display::Float ? 2 : 0;
-	/* what is read, named by the end of its key: value, address, changes, difference, different_by */
-	auto read = [&](const std::string &text, watch::Display as, const std::string &what, uint32_t &out) {
+	p.display = w == watch::Display::Signed ? 1 : w == watch::Display::Float || w == watch::Display::Double ? 2 : 0;
+	const int sz = static_cast<int>(size.get());
+	/* what is read, named by the end of its key: value, address, changes, difference, different_by. A value
+	 * is read at the search's size; an address, a difference and a different-by whole as 64-bit numbers, so
+	 * a signed difference below zero reaches the engine as one (issue 474) */
+	auto read = [&](const std::string &text, watch::Display as, const std::string &what, uint64_t &out) {
 		if (text.empty())
 		{
 			error = tr(("ram_search.type_" + what).c_str());
 			return false;
 		}
-		if (!watch::parse(text, as, out))
+		const bool whole = as != watch::Display::Float && as != watch::Display::Double;
+		const int bytes = what == "value" || what == "changes" || !whole ? sz : 8;
+		if (!watch::parse(text, as, out, bytes))
 		{
 			error = what == "address" ? tr("ram_search.not_hex_address", {text})
 				: what == "changes" ? tr("ram_search.not_changes", {text}) : tr("ram_search.not_shown_as", {text, watch::displayName(w)});
@@ -855,10 +865,11 @@ void RamSearchViewModel::freezesShown()
 		for (const int64_t row : pickedRows())
 		{
 			uint64_t at = 0;
-			uint32_t cur = 0, prev = 0, changes = 0;
+			uint64_t cur = 0, prev = 0;
+			uint32_t changes = 0;
 			{
 				std::lock_guard<std::mutex> lock(rsM_);
-				if (rs_ == nullptr || ce_ramsearch_row(rs_, row, &at, &cur, &prev, &changes) == 0) continue;
+				if (rs_ == nullptr || ce_ramsearch_row64(rs_, row, &at, &cur, &prev, &changes) == 0) continue;
 			}
 			if (!session_.frozen(searchedDomain.get(), static_cast<int64_t>(at)))
 			{
@@ -980,7 +991,7 @@ void RamSearchViewModel::searchOnMachine(const Params &p)
 	{
 		std::lock_guard<std::mutex> lock(rsM_);
 		if (rs_ == nullptr) return;
-		removed = ce_ramsearch_search(rs_, p.compare, p.op, p.display, p.value, p.differentBy, p.previousType);
+		removed = ce_ramsearch_search64(rs_, p.compare, p.op, p.display, p.value, p.differentBy, p.previousType);
 	}
 	reportOnMachine(removed < 0 ? tr("ram_search.no_memory") : tr("ram_search.removed", {addresses(removed)}));
 }
@@ -1110,7 +1121,7 @@ watch::Display RamSearchViewModel::way() const
 	return i >= 0 && i < static_cast<int64_t>(ways.size()) ? ways[static_cast<size_t>(i)] : watch::Display::Unsigned;
 }
 
-Value RamSearchViewModel::shown(uint32_t raw) const
+Value RamSearchViewModel::shown(uint64_t raw) const
 {
 	return watch::format(raw, static_cast<int>(size.get()), way());
 }
@@ -1129,16 +1140,16 @@ std::string RamSearchViewModel::Results::columnName(int32_t column) const
 Value RamSearchViewModel::Results::cell(int64_t row, int32_t column) const
 {
 	if (column == 5) return vm_.isPicked(row);
-	uint64_t address = 0;
-	uint32_t current = 0, previous = 0, changes = 0;
+	uint64_t address = 0, current = 0, previous = 0;
+	uint32_t changes = 0;
 	bool removed = false;
 	{
 		std::lock_guard<std::mutex> lock(vm_.rsM_);
-		if (vm_.rs_ == nullptr || ce_ramsearch_row(vm_.rs_, row, &address, &current, &previous, &changes) == 0) return {};
+		if (vm_.rs_ == nullptr || ce_ramsearch_row64(vm_.rs_, row, &address, &current, &previous, &changes) == 0) return {};
 		if (column == 6 && vm_.previewMode.get() && !vm_.previewCleared_ && vm_.preview_.ok)
 		{
 			const Params &p = vm_.preview_;
-			removed = ce_ramsearch_would_remove(vm_.rs_, row, p.compare, p.op, p.display, p.value, p.differentBy) != 0;
+			removed = ce_ramsearch_would_remove64(vm_.rs_, row, p.compare, p.op, p.display, p.value, p.differentBy) != 0;
 		}
 	}
 	switch (column)
@@ -1149,7 +1160,7 @@ Value RamSearchViewModel::Results::cell(int64_t row, int32_t column) const
 	case 3: return static_cast<int64_t>(changes);
 	case 4:
 	{
-		const int64_t d = static_cast<int64_t>(current) - static_cast<int64_t>(previous);
+		const int64_t d = static_cast<int64_t>(current - previous);
 		return d > 0 ? "+" + std::to_string(d) : std::to_string(d);
 	}
 	case 6: return removed;

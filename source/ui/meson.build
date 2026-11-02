@@ -530,6 +530,16 @@ if qt_dep.found()
       override_options: ['cpp_std=c++20'],
     )
     test('menus', test_menus, env: ['QT_QPA_PLATFORM=offscreen', 'QT_QUICK_BACKEND=software'], timeout: 60)
+    # a menu's rows keep their text after Alt has come and gone, as Alt-Tab
+    # presses it, and the letter is underlined only while Alt is held (issue 471)
+    test_menu_text = executable(
+      'test-menu-text',
+      ['qt/tests/test_menu_text.cpp', 'qt/menu_letters.cpp',
+        qt6.compile_moc(headers: ['qt/menu_letters.hpp'], dependencies: [qt_dep]), qt_rcc],
+      dependencies: [qt_test_dep],
+      override_options: ['cpp_std=c++20'],
+    )
+    test('menu text', test_menu_text, env: ['QT_QPA_PLATFORM=offscreen', 'QT_QUICK_BACKEND=software'], timeout: 60)
     # the Emulator menu: only what the core offers, nothing of Chimera's own (issue 428)
     test_emulator_menu = executable(
       'test-emulator-menu',

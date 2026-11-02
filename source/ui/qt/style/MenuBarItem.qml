@@ -31,7 +31,21 @@ T.MenuBarItem {
         alignment: Qt.AlignLeft
 
         icon: control.icon
-        text: typeof menuLetters === "undefined" || menuLetters.shown ? control.text : menuLetters.plain(control.text)
+        // the text whole, its letter underlined only while Alt took the keyboard to
+        // the menus: Qt's label is told whether to underline. Given the text without
+        // its letter instead, the label drew nothing once Alt had come and gone, as
+        // Alt-Tab does (issue 471): its underline changed and the text, read the
+        // same, was never laid out again
+        text: control.text
+        readonly property bool lettersShown: typeof menuLetters === "undefined" || menuLetters.shown
+        function underline() {
+            if (typeof menuLetters === "undefined") return
+            for (const c of children)
+                if (c.objectName === "label") menuLetters.underline(c, lettersShown)
+        }
+        onLettersShownChanged: underline()
+        onChildrenChanged: underline()
+        Component.onCompleted: underline()
         font: control.font
         defaultIconColor: control.down || control.highlighted ? Fusion.highlightedText(control.palette) : control.palette.text
         color: defaultIconColor

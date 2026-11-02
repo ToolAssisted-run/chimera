@@ -22,6 +22,8 @@
 #include <QDateTime>
 #include <QDir>
 #include <QFile>
+#include <QFont>
+#include <QFontDatabase>
 #include <QGuiApplication>
 #include <QIcon>
 #include <QLoggingCategory>
@@ -277,6 +279,12 @@ int main(int argc, char **argv)
 	 * 2026-10-26; what the window kept under its old name stays there) */
 	QGuiApplication::setApplicationName(QStringLiteral("Chimera"));
 #ifdef _WIN32
+	/* "monospace", the family every fixed-width text names (the Hex Editor,
+	 * RAM Search, the Lua Console...), is fontconfig's name for the fixed
+	 * font on Linux; Windows has no font by that name and drew those texts
+	 * in a proportional one, the Hex Editor's column numbers no longer over
+	 * their columns (issue 473). It is Windows' own fixed font there. */
+	QFont::insertSubstitution(QStringLiteral("monospace"), QFontDatabase::systemFont(QFontDatabase::FixedFont).family());
 	/* a crash no handler sees still leaves a note (docs/project.md, "Crash
 	 * notes"): armed before anything else is read, with the data folder's
 	 * place as it is at first, and pointed at the one in use once known */
@@ -1133,7 +1141,7 @@ int main(int argc, char **argv)
 		themes.current.set(args.value(schemeOpt) == QStringLiteral("light") ? "Light" : "Dark");
 	else
 		config.keep(themes, "current");
-	auto applyTheme = [&themes] { qt::applyTheme(QString::fromStdString(themes.colors.get())); };
+	auto applyTheme = [&themes] { qt::applyTheme(QString::fromStdString(themes.colors.get()), themes.dark.get()); };
 	themesWatch = themes.colors.changed.connect(applyTheme);
 	applyTheme();
 	config.keep(hotkeys, "saved");

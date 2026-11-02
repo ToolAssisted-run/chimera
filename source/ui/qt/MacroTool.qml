@@ -198,28 +198,38 @@ ApplicationWindow {
             CheckBox { text: qsTrId("macro_tool.overlay"); checked: win.pickedRow ? win.pickedRow.overlay : false; onToggled: win.vm.run("setOverlay", [win.vm.picked, checked]) }
             Button { text: qsTrId("macro_tool.current"); onClicked: placeAt.value = win.pianoRoll.currentFrame }
         }
-        Item { Layout.fillHeight: true }
         // the movie's controls, each ticked when the picked zone carries it: as Chimera places them, the last
-        // in the bottom row and the rows right-aligned (laid out from the end and turned over)
-        Flow {
+        // in the bottom row and the rows right-aligned (laid out from the end and turned over); more than the
+        // window holds (a keyboard's, as Ruffle's) scroll (issue 472)
+        ScrollView {
+            id: controlsScroll
             Layout.fillWidth: true
+            Layout.fillHeight: true
             Layout.preferredWidth: 1
-            rotation: 180
-            spacing: 4
-            enabled: win.pickedRow !== null
-            Repeater {
-                model: win.movieColumns.slice().reverse()
-                delegate: CheckBox {
-                    required property string modelData
-                    text: modelData
-                    padding: 1
-                    rotation: 180
-                    readonly property var carried: win.pickedRow && win.pickedRow.columns !== "" ? win.pickedRow.columns.split("|") : win.movieColumns
-                    checked: carried.indexOf(modelData) >= 0
-                    opacity: checked ? 1 : 0.6
-                    onToggled: {
-                        const now = win.movieColumns.filter(c => c === modelData ? checked : carried.indexOf(c) >= 0)
-                        win.vm.run("setColumns", [win.vm.picked, now.length === win.movieColumns.length ? "" : now.join("|")])
+            contentWidth: availableWidth
+            contentHeight: Math.max(availableHeight, controlsFlow.implicitHeight)
+            clip: true
+            Flow {
+                id: controlsFlow
+                width: controlsScroll.availableWidth
+                y: Math.max(0, controlsScroll.availableHeight - implicitHeight)
+                rotation: 180
+                spacing: 4
+                enabled: win.pickedRow !== null
+                Repeater {
+                    model: win.movieColumns.slice().reverse()
+                    delegate: CheckBox {
+                        required property string modelData
+                        text: modelData
+                        padding: 1
+                        rotation: 180
+                        readonly property var carried: win.pickedRow && win.pickedRow.columns !== "" ? win.pickedRow.columns.split("|") : win.movieColumns
+                        checked: carried.indexOf(modelData) >= 0
+                        opacity: checked ? 1 : 0.6
+                        onToggled: {
+                            const now = win.movieColumns.filter(c => c === modelData ? checked : carried.indexOf(c) >= 0)
+                            win.vm.run("setColumns", [win.vm.picked, now.length === win.movieColumns.length ? "" : now.join("|")])
+                        }
                     }
                 }
             }

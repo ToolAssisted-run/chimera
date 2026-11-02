@@ -923,11 +923,12 @@ json.dump(d, open(p, 'w'))
 			--ram-search-bench "Bus" > "$work/ranges.log" 2>&1
 		crun_game "$epkg" "$here/roms/gridWalker.testrom" "$here/movies/gridWalker.win.txt" \
 			--ram-search-bench "Bus (peeks)" > "$work/ranges-none.log" 2>&1
-		# 0x20001+0xff0 -> 0x20000..0x20ff4 (4084); 0x1000+0x801 -> 0x1000..0x1804 (2052);
-		# 0x2fffa+64 -> 0x2fff8..0x30000 (8): 6144 bytes of 196608
-		if grep -q "^ram-search-bench Bus: 3 live ranges, 6144 of 196608 bytes searched, every candidate live" "$work/ranges.log" \
+		# kept whole to eights, the largest candidate's size (issue 474):
+		# 0x20001+0xff0 -> 0x20000..0x20ff8 (4088); 0x1000+0x801 -> 0x1000..0x1808 (2056);
+		# 0x2fffa+64 -> 0x2fff8..0x30000 (8): 6152 bytes of 196608
+		if grep -q "^ram-search-bench Bus: 3 live ranges, 6152 of 196608 bytes searched, every candidate live" "$work/ranges.log" \
 			&& grep -q "^ram-search-bench Bus (peeks): no word on live ranges, all of it is searched" "$work/ranges-none.log"; then
-			report "E:bus-ranges" PASS "a search of a bus that says what is live is over that alone: 6144 of 196608 bytes, each reading what the bus peeks"
+			report "E:bus-ranges" PASS "a search of a bus that says what is live is over that alone: 6152 of 196608 bytes, each reading what the bus peeks"
 		else
 			report "E:bus-ranges" FAIL "$(grep -m1 -E 'live|ranges|word' "$work/ranges.log" "$work/ranges-none.log" | tail -1)"
 		fi

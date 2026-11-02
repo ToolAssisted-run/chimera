@@ -1930,7 +1930,7 @@ int main(int argc, char **argv)
 			/* A bus that says which of it is live (chimera#218): a search told
 			 * so covers those ranges and nothing else. Checked against the bus
 			 * itself - every candidate is an address the core called live (to
-			 * the four bytes a range is kept whole to), reads what the bus
+			 * the eight bytes a range is kept whole to), reads what the bus
 			 * peeks there, and there are as many as the ranges hold. */
 			const int32_t ranges = ce_session_bus_ranges(session, bus, nullptr, 0);
 			if (ranges < 0) std::fprintf(stderr, "ram-search-bench %s: no word on live ranges, all of it is searched\n", ramSearchBench.c_str());
@@ -1943,8 +1943,8 @@ int main(int argc, char **argv)
 				int64_t liveBytes = 0;
 				for (int32_t r = 0; r < ranges; r++)
 				{
-					const int64_t from = std::max<int64_t>(pairs[(size_t)r * 2], 0) & ~int64_t{ 3 };
-					const int64_t to = std::min<int64_t>(size, (pairs[(size_t)r * 2] + pairs[(size_t)r * 2 + 1] + 3) & ~int64_t{ 3 });
+					const int64_t from = std::max<int64_t>(pairs[(size_t)r * 2], 0) & ~int64_t{ 7 };
+					const int64_t to = std::min<int64_t>(size, (pairs[(size_t)r * 2] + pairs[(size_t)r * 2 + 1] + 7) & ~int64_t{ 7 });
 					for (int64_t a = from; a < to; a++) { liveBytes += live[(size_t)a] == 0; live[(size_t)a] = 1; }
 				}
 				ce_ramsearch *rs = ce_ramsearch_create(nullptr, inRuns, &user, size);

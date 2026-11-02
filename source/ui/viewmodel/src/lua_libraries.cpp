@@ -320,8 +320,9 @@ local function makeMemory(domainOf)
 	end
 	function m.write_bytes_as_dict(t, domain) m.writebyterange(t, domain) end
 	function m.write_bytes_as_binary_string(addr, s, domain) wr(addr, s, domain) end
-	-- the sized reads and writes, each sign and order Chimera has
-	for _, size in ipairs({1, 2, 3, 4}) do
+	-- the sized reads and writes, each sign and order Chimera has, and 8 bytes (issue 474: an unsigned
+	-- one past 2^63 reads below zero, as a Lua integer holds 64 bits with a sign)
+	for _, size in ipairs({1, 2, 3, 4, 8}) do
 		for _, signed in ipairs({false, true}) do
 			local letter = signed and "i" or "I"
 			local stem = (signed and "s" or "u") .. (size * 8)
@@ -331,7 +332,7 @@ local function makeMemory(domainOf)
 			else
 				for _, order in ipairs({{"_le", "<"}, {"_be", ">"}}) do
 					local fmt = order[2] .. letter .. size
-					local mask = (1 << (size * 8)) - 1
+					local mask = size == 8 and -1 or (1 << (size * 8)) - 1
 					m["read_" .. stem .. order[1]] = function(addr, domain) return (string.unpack(fmt, rd(addr, size, domain))) end
 					m["write_" .. stem .. order[1]] = function(addr, value, domain)
 						wr(addr, string.pack(order[2] .. "I" .. size, whole(value) & mask), domain)
@@ -342,6 +343,8 @@ local function makeMemory(domainOf)
 	end
 	function m.readfloat(addr, bigendian, domain) return (string.unpack(bigendian and ">f" or "<f", rd(addr, 4, domain))) end
 	function m.writefloat(addr, value, bigendian, domain) wr(addr, string.pack(bigendian and ">f" or "<f", value), domain) end
+	function m.readdouble(addr, bigendian, domain) return (string.unpack(bigendian and ">d" or "<d", rd(addr, 8, domain))) end
+	function m.writedouble(addr, value, bigendian, domain) wr(addr, string.pack(bigendian and ">d" or "<d", value), domain) end
 	return m
 end
 memory = makeMemory(currentDomain)

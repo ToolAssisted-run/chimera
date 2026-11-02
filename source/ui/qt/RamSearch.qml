@@ -178,6 +178,7 @@ ApplicationWindow {
                 MenuItem { text: qsTrId("ram_search.1_byte"); checkable: true; checked: win.vm.size === 1; onTriggered: win.vm.size = 1 }
                 MenuItem { text: qsTrId("ram_search.2_byte"); checkable: true; checked: win.vm.size === 2; onTriggered: win.vm.size = 2 }
                 MenuItem { text: qsTrId("ram_search.4_byte"); checkable: true; checked: win.vm.size === 4; onTriggered: win.vm.size = 4 }
+                MenuItem { text: qsTrId("ram_search.8_byte"); checkable: true; checked: win.vm.size === 8; onTriggered: win.vm.size = 8 }
             }
             MenuItem { text: qsTrId("ram_search.check_mis_aligned"); checkable: true; checked: win.vm.checkMisaligned; onTriggered: win.vm.checkMisaligned = checked }
             MenuDivider {}
@@ -548,9 +549,9 @@ ApplicationWindow {
                 Label { text: qsTrId("ram_search.display") }
                 ComboBox {
                     Layout.fillWidth: true
-                    model: [qsTrId("common.1_byte"), qsTrId("common.2_byte"), qsTrId("common.4_byte")]
-                    currentIndex: win.vm.size === 4 ? 2 : win.vm.size - 1
-                    onActivated: (i) => win.vm.size = [1, 2, 4][i]
+                    model: [qsTrId("common.1_byte"), qsTrId("common.2_byte"), qsTrId("common.4_byte"), qsTrId("common.8_byte")]
+                    currentIndex: [1, 2, 4, 8].indexOf(win.vm.size)
+                    onActivated: (i) => win.vm.size = [1, 2, 4, 8][i]
                 }
                 ComboBox {
                     Layout.fillWidth: true

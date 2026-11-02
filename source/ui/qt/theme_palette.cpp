@@ -9,6 +9,7 @@
 #include <QQmlProperty>
 #include <QQuickItem>
 #include <QQuickWindow>
+#include <QStyleHints>
 #include <QWindow>
 
 #include <functional>
@@ -24,10 +25,31 @@ QHash<QString, QColor> &current()
 }
 
 /* the platform's palette, as it was before any theme */
+QPalette &platformStore()
+{
+	static QPalette p = QGuiApplication::palette();
+	return p;
+}
 const QPalette &platform()
 {
-	static const QPalette p = QGuiApplication::palette();
-	return p;
+	return platformStore();
+}
+
+/* The desktop's light colours for a light theme and its dark ones for a
+ * dark theme, whatever the desktop is set to (issue 471): the Light theme
+ * names the desktop's colours ("system:Window") beside light ones of its
+ * own (the rows of a list), and with Windows in dark mode the two met as
+ * white text on white rows. The platform's palette is read again after. */
+void askScheme(bool dark)
+{
+	platform();
+	const Qt::ColorScheme want = dark ? Qt::ColorScheme::Dark : Qt::ColorScheme::Light;
+	QStyleHints *hints = QGuiApplication::styleHints();
+	if (hints->colorScheme() == want) return;
+	hints->setColorScheme(want);
+	/* the theme's palette taken off, the platform's for the scheme read */
+	QGuiApplication::setPalette(QPalette());
+	platformStore() = QGuiApplication::palette();
 }
 
 /* Qt Quick's controls take their colours from the platform's palette, not
@@ -165,11 +187,12 @@ QColor themeColor(const char *role)
 	return current().value(QString::fromLatin1(role));
 }
 
-void applyTheme(const QString &colorsJson)
+void applyTheme(const QString &colorsJson, bool dark)
 {
 	QHash<QString, QColor> &colours = current();
 	colours.clear();
 	const QJsonObject o = QJsonDocument::fromJson(colorsJson.toUtf8()).object();
+	if (!o.isEmpty()) askScheme(dark);
 	platform();
 	for (auto it = o.begin(); it != o.end(); ++it) colours.insert(it.key(), resolveColor(it.value().toString()));
 	if (colours.isEmpty()) return;

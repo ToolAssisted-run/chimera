@@ -121,6 +121,11 @@ private:
 	SessionViewModel &session_;
 	RamWatchViewModel *ramWatch_ = nullptr;
 	Lines lines_{*this};
+	/* how many lines the view was last told there are: the lines read again
+	 * are as many as that, or the whole list again (the window's height
+	 * known only after it opened left it empty, issue 471) */
+	int64_t linesAnnounced_ = 0;
+	Connection linesResetWatch_;
 	int hooks_ = 0;
 	Connection opensWatch_, domainWatch_, topWatch_, visibleWatch_, sizeWatch_, pickedWatch_, endianWatch_, freezesWatch_, pickedFrozenWatch_,
 		watchingWatch_;

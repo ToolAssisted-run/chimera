@@ -116,7 +116,7 @@ private:
 	struct Params
 	{
 		int32_t compare = 0, op = 0, display = 0;
-		uint32_t value = 0, differentBy = 0;
+		uint64_t value = 0, differentBy = 0;
 		int32_t previousType = 1;
 		/* the boxes read: a search can be made */
 		bool ok = true;
@@ -146,7 +146,7 @@ private:
 	/* the RAM Watch list's addresses in the searched domain */
 	std::vector<uint64_t> watchedAddresses() const;
 
-	Value shown(uint32_t raw) const;
+	Value shown(uint64_t raw) const;
 	/* the chosen way to show a value of the search's size */
 	watch::Display way() const;
 	void addRecent(const std::string &file);

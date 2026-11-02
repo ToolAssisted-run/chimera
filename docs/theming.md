@@ -77,7 +77,11 @@ A colour is `#RRGGBB`, or `#AARRGGBB` where it is meant to show through what is
 behind it - the frame-number wash and the alternate-player stripe in the piano
 roll are the two that are, and they are laid over the row colour. A colour can
 also be the desktop's own, by name: `system:ControlText`. The built-in Light
-theme is written that way.
+theme is written that way. A theme's `dark` says which of the desktop's
+colours it takes: a light theme the desktop's light ones and a dark theme its
+dark ones, whatever the desktop is set to, so the Light theme stays light with
+Windows in dark mode (issue 471: its white list rows were under the dark
+mode's white text).
 
 ```json
 {

@@ -17,8 +17,9 @@ const std::vector<Display> &displaysFor(int size)
 	static const std::vector<Display> two{Display::Unsigned, Display::Signed, Display::Hex, Display::Binary, Display::Fixed12_4};
 	static const std::vector<Display> four{Display::Unsigned, Display::Signed, Display::Hex, Display::Binary,
 		Display::Fixed20_12, Display::Fixed16_16, Display::Float};
+	static const std::vector<Display> eight{Display::Unsigned, Display::Signed, Display::Hex, Display::Double};
 	static const std::vector<Display> none;
-	return size == 1 ? one : size == 2 ? two : size == 4 ? four : none;
+	return size == 1 ? one : size == 2 ? two : size == 4 ? four : size == 8 ? eight : none;
 }
 
 bool fits(int size, Display display)
@@ -72,8 +73,9 @@ std::string fixedPoint(int64_t n, int shift, int decimals, bool trim)
 
 /* A float the way Chimera writes one: the shortest digits that read back as
  * the same float, written plainly unless its power of ten is 9 or more or
- * below -4, where it takes an exponent of at least two digits. */
-std::string shortestFloat(float f)
+ * below -4, where it takes an exponent of at least two digits. A double the
+ * same way, its shortest digits a double's. */
+template <typename T> std::string shortestFloat(T f)
 {
 	if (std::isnan(f)) return "NaN";
 	if (std::isinf(f)) return f < 0 ? "-Infinity" : "Infinity";
@@ -103,28 +105,37 @@ std::string shortestFloat(float f)
 
 } // namespace
 
-std::string format(uint32_t value, int size, Display display)
+std::string format(uint64_t value, int size, Display display)
 {
 	char buf[32];
+	const uint64_t mask = size == 1 ? 0xFFu : size == 2 ? 0xFFFFu : size == 4 ? 0xFFFFFFFFu : ~uint64_t{0};
 	switch (display)
 	{
-	case Display::Unsigned: return std::to_string(size == 1 ? value & 0xFFu : size == 2 ? value & 0xFFFFu : value);
+	case Display::Unsigned: return std::to_string(value & mask);
 	case Display::Signed:
-		return std::to_string(size == 1	  ? static_cast<int32_t>(static_cast<int8_t>(value))
-							  : size == 2 ? static_cast<int32_t>(static_cast<int16_t>(value))
-										  : static_cast<int32_t>(value));
+		return std::to_string(size == 1	  ? static_cast<int64_t>(static_cast<int8_t>(value))
+							  : size == 2 ? static_cast<int64_t>(static_cast<int16_t>(value))
+							  : size == 4 ? static_cast<int64_t>(static_cast<int32_t>(value))
+										  : static_cast<int64_t>(value));
 	case Display::Hex:
-		std::snprintf(buf, sizeof buf, "%0*X", size * 2, size == 1 ? value & 0xFFu : size == 2 ? value & 0xFFFFu : value);
+		std::snprintf(buf, sizeof buf, "%0*llX", size * 2, static_cast<unsigned long long>(value & mask));
 		return buf;
-	case Display::Binary: return binary(value, size * 8);
+	case Display::Binary: return binary(static_cast<uint32_t>(value), size * 8);
 	case Display::Fixed12_4: return fixedPoint(static_cast<int16_t>(value), 4, 4, false);
 	case Display::Fixed20_12: return fixedPoint(static_cast<int32_t>(value), 12, 6, true);
 	case Display::Fixed16_16: return fixedPoint(static_cast<int32_t>(value), 16, 6, true);
 	case Display::Float:
 	{
+		const uint32_t bits = static_cast<uint32_t>(value);
 		float f;
-		std::memcpy(&f, &value, sizeof f);
+		std::memcpy(&f, &bits, sizeof f);
 		return shortestFloat(f);
+	}
+	case Display::Double:
+	{
+		double d;
+		std::memcpy(&d, &value, sizeof d);
+		return shortestFloat(d);
 	}
 	}
 	return std::to_string(value);
@@ -153,6 +164,19 @@ bool wholeNumber(const std::string &t, int base, long long low, long long high, 
 	return true;
 }
 
+bool wholeUnsigned(const std::string &t, int base, unsigned long long &out)
+{
+	if (t.empty() || t[0] == '+' || t[0] == '-') return false;
+	if (base == 16 && t.find_first_not_of("0123456789abcdefABCDEF") != std::string::npos) return false;
+	if (base == 10 && t.find_first_not_of("0123456789") != std::string::npos) return false;
+	char *end = nullptr;
+	errno = 0;
+	const unsigned long long v = std::strtoull(t.c_str(), &end, base);
+	if (end == t.c_str() || *end != '\0' || errno == ERANGE) return false;
+	out = v;
+	return true;
+}
+
 bool decimal(const std::string &t, double &out)
 {
 	if (t.empty()) return false;
@@ -162,11 +186,30 @@ bool decimal(const std::string &t, double &out)
 }
 } // namespace
 
-bool parse(const std::string &text, Display display, uint32_t &out)
+bool parse(const std::string &text, Display display, uint64_t &out, int size)
 {
 	const std::string t = trimmed(text);
 	long long whole = 0;
+	unsigned long long wide = 0;
 	double d = 0;
+	/* 8 bytes: the whole 64 bits */
+	if (size == 8)
+		switch (display)
+		{
+		case Display::Unsigned:
+			if (!wholeUnsigned(t, 10, wide)) return false;
+			out = wide;
+			return true;
+		case Display::Signed:
+			if (!wholeNumber(t, 10, LLONG_MIN, LLONG_MAX, whole)) return false;
+			out = static_cast<uint64_t>(whole);
+			return true;
+		case Display::Hex:
+			if (t.size() > 16 || !wholeUnsigned(t, 16, wide)) return false;
+			out = wide;
+			return true;
+		default: break;
+		}
 	switch (display)
 	{
 	case Display::Unsigned:
@@ -200,9 +243,15 @@ bool parse(const std::string &text, Display display, uint32_t &out)
 	{
 		if (!decimal(t, d) || std::fabs(d) > 3.4028235677973366e38) return false;
 		const float f = static_cast<float>(d);
-		std::memcpy(&out, &f, sizeof out);
+		uint32_t bits = 0;
+		std::memcpy(&bits, &f, sizeof bits);
+		out = bits;
 		return true;
 	}
+	case Display::Double:
+		if (!decimal(t, d)) return false;
+		std::memcpy(&out, &d, sizeof out);
+		return true;
 	}
 	return false;
 }
@@ -226,7 +275,7 @@ std::string hex(int64_t number, int digits)
 
 char sizeLetter(int size)
 {
-	return size == 1 ? 'b' : size == 2 ? 'w' : size == 4 ? 'd' : 'S';
+	return size == 1 ? 'b' : size == 2 ? 'w' : size == 4 ? 'd' : size == 8 ? 'q' : 'S';
 }
 
 int sizeFromLetter(char c)
@@ -236,6 +285,7 @@ int sizeFromLetter(char c)
 	case 'b': return 1;
 	case 'w': return 2;
 	case 'd': return 4;
+	case 'q': return 8;
 	case 'S': return 0;
 	default: return -1;
 	}
@@ -253,6 +303,7 @@ char displayLetter(Display display)
 	case Display::Fixed20_12: return '2';
 	case Display::Fixed16_16: return '3';
 	case Display::Float: return 'f';
+	case Display::Double: return 'F';
 	}
 	return '_';
 }
@@ -269,6 +320,7 @@ bool displayFromLetter(char c, Display &out)
 	case '2': out = Display::Fixed20_12; return true;
 	case '3': out = Display::Fixed16_16; return true;
 	case 'f': out = Display::Float; return true;
+	case 'F': out = Display::Double; return true;
 	default: return false;
 	}
 }
@@ -296,6 +348,7 @@ std::string displayName(Display display)
 	case Display::Fixed20_12: return tr("watch.fixed_20_12");
 	case Display::Fixed16_16: return tr("watch.fixed_16_16");
 	case Display::Float: return tr("watch.float");
+	case Display::Double: return tr("watch.double");
 	}
 	return {};
 }

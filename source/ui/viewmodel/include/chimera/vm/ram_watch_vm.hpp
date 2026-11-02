@@ -43,7 +43,7 @@ public:
 		bool onScreen = false;
 		/* as last read: the value, the one before it, changes counted, and
 		 * whether the address is in its domain at all */
-		uint32_t value = 0, previous = 0;
+		uint64_t value = 0, previous = 0;
 		int64_t changes = 0;
 		bool readable = false, seen = false;
 		int64_t domainSize = 0;

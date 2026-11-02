@@ -57,7 +57,8 @@ namespace
 struct Rec
 {
 	uint64_t addr;
-	uint32_t prev, cur, changes;
+	uint64_t prev, cur;
+	uint32_t changes;
 };
 
 struct Model
@@ -67,7 +68,7 @@ struct Model
 	bool misaligned = false, bigEndian = false, detailed = false;
 	std::vector<Rec> list;
 	std::vector<std::vector<Rec>> undo, redo;
-	/* live ranges, as the search keeps them: a byte each, whole fours */
+	/* live ranges, as the search keeps them: a byte each, whole eights */
 	std::vector<uint8_t> liveMap;
 
 	void setLive(const std::vector<int64_t> &pairs)
@@ -75,8 +76,8 @@ struct Model
 		liveMap.assign(mem->size(), 0);
 		for (size_t i = 0; i + 1 < pairs.size(); i += 2)
 		{
-			const int64_t from = std::max<int64_t>(pairs[i], 0) & ~int64_t{ 3 };
-			const int64_t to = std::min<int64_t>((int64_t)mem->size(), (pairs[i] + pairs[i + 1] + 3) & ~int64_t{ 3 });
+			const int64_t from = std::max<int64_t>(pairs[i], 0) & ~int64_t{ 7 };
+			const int64_t to = std::min<int64_t>((int64_t)mem->size(), (pairs[i] + pairs[i + 1] + 7) & ~int64_t{ 7 });
 			for (int64_t a = from; a < to; a++) liveMap[(size_t)a] = 1;
 		}
 	}
@@ -89,15 +90,15 @@ struct Model
 		return true;
 	}
 
-	uint32_t peek(uint64_t a, int sz) const
+	uint64_t peek(uint64_t a, int sz) const
 	{
 		if (a + (uint64_t)sz > mem->size()) return 0;
-		uint32_t v = 0;
+		uint64_t v = 0;
 		for (int i = 0; i < sz; i++)
-			v |= (uint32_t)(*mem)[a + (uint64_t)i] << 8 * (bigEndian ? sz - 1 - i : i);
+			v |= (uint64_t)(*mem)[a + (uint64_t)i] << 8 * (bigEndian ? sz - 1 - i : i);
 		return v;
 	}
-	uint32_t value(const Rec &r) const { return detailed ? r.cur : peek(r.addr, size); }
+	uint64_t value(const Rec &r) const { return detailed ? r.cur : peek(r.addr, size); }
 
 	void start(int sz, bool mis, bool be, bool det)
 	{
@@ -113,31 +114,60 @@ struct Model
 		undo.push_back(list);
 		if (undo.size() > (size_t)RS::MaxUndoLevels) undo.erase(undo.begin());
 	}
-	static int64_t sx(uint32_t v, int sz, int display)
+	static int64_t sx(uint64_t v, int sz, int display)
 	{
-		if (display != RS::DispSigned) return v;
-		return sz == 1 ? (int64_t)(int8_t)v : sz == 2 ? (int64_t)(int16_t)v : (int64_t)(int32_t)v;
+		if (display != RS::DispSigned) return (int64_t)v;
+		return sz == 1 ? (int64_t)(int8_t)v : sz == 2 ? (int64_t)(int16_t)v : sz == 4 ? (int64_t)(int32_t)v : (int64_t)v;
 	}
-	static float f32(uint32_t v) { float f; std::memcpy(&f, &v, 4); return f; }
+	static float f32(uint64_t v) { const uint32_t b = (uint32_t)v; float f; std::memcpy(&f, &b, 4); return f; }
+	static double f64(uint64_t v) { double d; std::memcpy(&d, &v, 8); return d; }
 	static bool near(float a, float b) { return std::fabs(b - a) < 5.96046448E-08f; }
+	static bool near(double a, double b) { return a == b || std::fabs(b - a) <= 1e-9 * std::max(std::fabs(a), std::fabs(b)); }
+	template <typename T> static bool realKeep(int op, T a, T b, T by)
+	{
+		switch (op)
+		{
+		case RS::OpEqual: return near(a, b);
+		case RS::OpNotEqual: return !near(a, b);
+		case RS::OpGreaterThan: return a > b;
+		case RS::OpGreaterThanEqual: return a > b || near(a, b);
+		case RS::OpLessThan: return a < b;
+		case RS::OpLessThanEqual: return a < b || near(a, b);
+		default: return near(std::fabs(a - b), by);
+		}
+	}
 	bool keep(const Rec &r, const RS::Query &q) const
 	{
-		const uint32_t cur = value(r);
-		bool isFloat = q.display == RS::DispFloat && (q.compare == RS::CmpPrevious || q.compare == RS::CmpSpecificValue || q.compare == RS::CmpDifference);
+		const uint64_t cur = value(r);
+		bool isFloat = q.display == RS::DispFloat && (size == 4 || size == 8)
+			&& (q.compare == RS::CmpPrevious || q.compare == RS::CmpSpecificValue || q.compare == RS::CmpDifference);
+		if (isFloat && size == 8)
+		{
+			double a = f64(cur), b = f64(r.prev);
+			if (q.compare == RS::CmpSpecificValue) b = f64(q.value);
+			if (q.compare == RS::CmpDifference) { a = a - b; b = f64(q.value); }
+			return realKeep(q.op, a, b, f64(q.differentBy));
+		}
 		if (isFloat)
 		{
 			float a = f32(cur), b = f32(r.prev);
 			if (q.compare == RS::CmpSpecificValue) b = f32(q.value);
 			if (q.compare == RS::CmpDifference) { a = a - b; b = f32(q.value); }
+			return realKeep(q.op, a, b, f32(q.differentBy));
+		}
+		/* an 8-byte value shown unsigned is ordered as the unsigned number it is */
+		if (size == 8 && q.display != RS::DispSigned && (q.compare == RS::CmpPrevious || q.compare == RS::CmpSpecificValue))
+		{
+			const uint64_t a = cur, b = q.compare == RS::CmpSpecificValue ? q.value : r.prev;
 			switch (q.op)
 			{
-			case RS::OpEqual: return near(a, b);
-			case RS::OpNotEqual: return !near(a, b);
+			case RS::OpEqual: return a == b;
+			case RS::OpNotEqual: return a != b;
 			case RS::OpGreaterThan: return a > b;
-			case RS::OpGreaterThanEqual: return a > b || near(a, b);
+			case RS::OpGreaterThanEqual: return a >= b;
 			case RS::OpLessThan: return a < b;
-			case RS::OpLessThanEqual: return a < b || near(a, b);
-			default: return near(std::fabs(a - b), f32(q.differentBy));
+			case RS::OpLessThanEqual: return a <= b;
+			default: return q.differentBy == (a > b ? a - b : b - a);
 			}
 		}
 		int64_t a, b;
@@ -147,8 +177,8 @@ struct Model
 		case RS::CmpSpecificAddress: a = (int64_t)r.addr; b = q.value; break;
 		case RS::CmpChanges: a = r.changes; b = q.value; break;
 		case RS::CmpDifference:
-			a = sx(cur, size, q.display) - sx(r.prev, size, q.display);
-			b = q.display == RS::DispSigned ? (int64_t)(int32_t)q.value : (int64_t)q.value;
+			a = (int64_t)((uint64_t)sx(cur, size, q.display) - (uint64_t)sx(r.prev, size, q.display));
+			b = (int64_t)q.value;
 			break;
 		default: a = sx(cur, size, q.display); b = sx(r.prev, size, q.display); break;
 		}
@@ -180,7 +210,7 @@ struct Model
 		if (!detailed) return;
 		for (Rec &r : list)
 		{
-			const uint32_t now = peek(r.addr, size);
+			const uint64_t now = peek(r.addr, size);
 			if (now != r.cur)
 			{
 				r.changes++;
@@ -237,9 +267,9 @@ struct Harness
 			if (row.address != r.addr || row.previous != r.prev || row.current != model.value(r)
 				|| row.changes != (model.detailed ? r.changes : 0))
 			{
-				std::fprintf(stderr, "after %s: row %zu is %llx prev %x cur %x ch %u, model %llx prev %x cur %x ch %u\n",
-					after, i, (unsigned long long)row.address, row.previous, row.current, row.changes,
-					(unsigned long long)r.addr, r.prev, model.value(r), r.changes);
+				std::fprintf(stderr, "after %s: row %zu is %llx prev %llx cur %llx ch %u, model %llx prev %llx cur %llx ch %u\n",
+					after, i, (unsigned long long)row.address, (unsigned long long)row.previous, (unsigned long long)row.current,
+					row.changes, (unsigned long long)r.addr, (unsigned long long)r.prev, (unsigned long long)model.value(r), r.changes);
 				assert(false);
 			}
 			if (i % 997 == 0) assert(rs->indexOf(r.addr) == (int64_t)i);
@@ -376,10 +406,10 @@ void script(bool throughPointer, int size, bool misaligned, bool bigEndian, bool
 			q.compare = (int)(rng() % 5);
 			if (q.compare == RS::CmpChanges && !detailed) q.compare = RS::CmpPrevious;
 			q.op = (int)(rng() % 7);
-			q.display = (int)(rng() % (size == 4 ? 3 : 2));
-			q.value = q.compare == RS::CmpSpecificAddress ? (uint32_t)(rng() % h.mem.size()) : (uint32_t)(rng() % 7);
-			if (q.compare == RS::CmpDifference && rng() % 2) q.value = (uint32_t)-(int32_t)(rng() % 4);
-			q.differentBy = (uint32_t)(rng() % 3);
+			q.display = (int)(rng() % (size == 4 || size == 8 ? 3 : 2));
+			q.value = q.compare == RS::CmpSpecificAddress ? (uint64_t)(rng() % h.mem.size()) : (uint64_t)(rng() % 7);
+			if (q.compare == RS::CmpDifference && rng() % 2) q.value = (uint64_t)-(int64_t)(rng() % 4);
+			q.differentBy = (uint64_t)(rng() % 3);
 			/* never let one search empty it: the script has further to go */
 			size_t would = 0;
 			for (const Rec &r : h.model.list) would += h.model.keep(r, q);
@@ -396,11 +426,99 @@ void script(bool throughPointer, int size, bool misaligned, bool bigEndian, bool
 	}
 
 	/* a conversion, from whatever shape the script ended in */
-	const int other = size == 4 ? 2 : 4;
+	const int other = size == 4 ? 8 : size == 8 ? 2 : 4;
 	rs.convertTo(other);
 	h.model.convertTo(other);
 	h.agree("convert");
 	assert(!rs.canUndo());
+}
+
+/* 8-byte candidates (issue 474): a double found by its value, as Flash
+ * games keep a position (440.0 is 407B800000000000), a difference of
+ * doubles, an unsigned value past 2^63 ordered as unsigned, a signed one
+ * below zero, and the byte order */
+void eightBytes()
+{
+	std::vector<uint8_t> mem(64, 0);
+	auto put = [&](int at, uint64_t v, bool big) {
+		for (int k = 0; k < 8; k++) mem[(size_t)(at + k)] = (uint8_t)(v >> (8 * (big ? 7 - k : k)));
+	};
+	auto bits = [](double d) { uint64_t v; std::memcpy(&v, &d, 8); return v; };
+	put(0, bits(440.0), false);
+	put(8, 0xF000000000000000ull, false);
+	put(16, (uint64_t)-5, false);
+	put(24, bits(0.1), false);
+	auto search = [&](RS &rs, int compare, int op, int display, uint64_t value) {
+		RS::Query q;
+		q.compare = compare;
+		q.op = op;
+		q.display = display;
+		q.value = value;
+		rs.search(q, RS::PrevLastSearch);
+		std::vector<uint64_t> found;
+		RS::Row row;
+		for (int64_t i = 0; rs.row(i, row); i++) found.push_back(row.address);
+		return found;
+	};
+	{
+		RS rs(mem.data(), nullptr, nullptr, (int64_t)mem.size());
+		rs.start(8, false, false, false);
+		assert(rs.count() == 8);
+		RS::Row row;
+		assert(rs.row(0, row) && row.current == 0x407B800000000000ull);
+		assert(search(rs, RS::CmpSpecificValue, RS::OpEqual, RS::DispFloat, bits(440.0)) == std::vector<uint64_t>{ 0 });
+	}
+	{
+		RS rs(mem.data(), nullptr, nullptr, (int64_t)mem.size());
+		rs.start(8, false, false, false);
+		/* unsigned: past 2^63 is the largest; signed: -5 and that one are below zero */
+		assert(search(rs, RS::CmpSpecificValue, RS::OpGreaterThan, RS::DispUnsigned, 0x8000000000000000ull)
+			== (std::vector<uint64_t>{ 8, 16 }));
+		rs.start(8, false, false, false);
+		assert(search(rs, RS::CmpSpecificValue, RS::OpLessThan, RS::DispSigned, 0) == (std::vector<uint64_t>{ 8, 16 }));
+		rs.start(8, false, false, false);
+		assert(search(rs, RS::CmpSpecificValue, RS::OpEqual, RS::DispSigned, (uint64_t)-5) == std::vector<uint64_t>{ 16 });
+	}
+	{
+		/* a double that moved by 0.2: 0.1 to 0.3 is 0.2 as typed */
+		RS rs(mem.data(), nullptr, nullptr, (int64_t)mem.size());
+		rs.start(8, false, false, false);
+		put(24, bits(0.3), false);
+		RS::Query q;
+		q.compare = RS::CmpDifference;
+		q.op = RS::OpEqual;
+		q.display = RS::DispFloat;
+		q.value = bits(0.2);
+		rs.search(q, RS::PrevLastSearch);
+		RS::Row row;
+		assert(rs.count() == 1 && rs.row(0, row) && row.address == 24);
+		put(24, bits(0.1), false);
+	}
+	{
+		/* the whole domain at once, eight bytes at a time: a value whose top
+		 * byte alone changed has changed */
+		std::vector<uint8_t> wide(64 * 1024, 0);
+		RS rs(wide.data(), nullptr, nullptr, (int64_t)wide.size());
+		rs.start(8, false, false, false);
+		assert(rs.isDense());
+		wide[8 * 100 + 7] = 1;
+		assert(search(rs, RS::CmpPrevious, RS::OpNotEqual, RS::DispUnsigned, 0) == std::vector<uint64_t>{ 800 });
+	}
+	{
+		/* big-endian: the same double, its bytes the other way round */
+		std::vector<uint8_t> big(16, 0);
+		const uint64_t v = bits(440.0);
+		for (int k = 0; k < 8; k++) big[(size_t)k] = (uint8_t)(v >> (8 * (7 - k)));
+		RS rs(big.data(), nullptr, nullptr, (int64_t)big.size());
+		rs.start(8, false, true, false);
+		RS::Row row;
+		assert(rs.row(0, row) && row.current == v);
+		/* switched while sparse, the value turns round with it */
+		rs.removeIndices(std::vector<int64_t>{ 1 }.data(), 1);
+		assert(!rs.isDense());
+		rs.setBigEndian(false);
+		assert(rs.row(0, row) && row.previous == 0x0000000000807B40ull);
+	}
 }
 
 void sortsByWhatIsShown()
@@ -715,7 +833,7 @@ int main()
 	bool dense = false, sparse = false;
 	uint32_t seed = 1;
 	for (int pointer = 0; pointer < 2; pointer++)
-		for (int size : { 1, 2, 4 })
+		for (int size : { 1, 2, 4, 8 })
 			for (int misaligned = 0; misaligned < 2; misaligned++)
 				for (int detailed = 0; detailed < 2; detailed++)
 				{
@@ -730,7 +848,7 @@ int main()
 	/* the same, over the live third of the domain */
 	dense = sparse = false;
 	for (int pointer = 0; pointer < 2; pointer++)
-		for (int size : { 1, 2, 4 })
+		for (int size : { 1, 2, 4, 8 })
 			for (int misaligned = 0; misaligned < 2; misaligned++)
 				for (int detailed = 0; detailed < 2; detailed++)
 				{
@@ -742,6 +860,7 @@ int main()
 				}
 	assert(dense && sparse);
 
+	eightBytes();
 	sortsByWhatIsShown();
 	addedAddressesCanBeOutOfRange();
 	liveRangesAtTheirEdges();

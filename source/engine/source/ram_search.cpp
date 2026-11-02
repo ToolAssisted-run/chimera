@@ -17,24 +17,36 @@ namespace
 inline int popcount64(uint64_t v) { return __builtin_popcountll(v); }
 inline int ctz64(uint64_t v) { return __builtin_ctzll(v); }
 
-inline float asFloat(uint32_t v)
+inline float asFloat(uint64_t v)
 {
+	const uint32_t bits = (uint32_t)v;
 	float f;
-	std::memcpy(&f, &v, sizeof f);
+	std::memcpy(&f, &bits, sizeof f);
 	return f;
+}
+
+inline double asDouble(uint64_t v)
+{
+	double d;
+	std::memcpy(&d, &v, sizeof d);
+	return d;
 }
 
 /* The frontend's ApproxFloatEquality: within 2^-24. A NaN equals nothing. */
 inline bool approx(float a, float b) { return std::fabs(b - a) < 5.96046448E-08f; }
+/* A double (an 8-byte candidate shown as floating point, issue 474): within a
+ * part in a billion of the larger, so 0.3 - 0.1 is 0.2 as typed */
+inline bool approx(double a, double b) { return a == b || std::fabs(b - a) <= 1e-9 * std::max(std::fabs(a), std::fabs(b)); }
 
-inline int64_t signExtend(uint32_t v, int size, int display)
+inline int64_t signExtend(uint64_t v, int size, int display)
 {
-	if (display != CeRamSearch::DispSigned) return v;
+	if (display != CeRamSearch::DispSigned) return (int64_t)v;
 	switch (size)
 	{
 	case 1: return (int8_t)v;
 	case 2: return (int16_t)v;
-	default: return (int32_t)v;
+	case 4: return (int32_t)v;
+	default: return (int64_t)v;
 	}
 }
 
@@ -57,7 +69,19 @@ inline bool compareInts(const CeRamSearch::Query &q, int64_t a, int64_t b)
 	return ordered(q.op, a, b);
 }
 
-inline bool compareFloats(const CeRamSearch::Query &q, float a, float b)
+/* Two values of a candidate's size: an 8-byte one shown unsigned is ordered
+ * as the unsigned number it is, past 2^63 too */
+inline bool compareValues(const CeRamSearch::Query &q, int size, uint64_t a, uint64_t b)
+{
+	if (size == 8 && q.display != CeRamSearch::DispSigned)
+	{
+		if (q.op == CeRamSearch::OpDifferentBy) return q.differentBy == (a > b ? a - b : b - a);
+		return ordered(q.op, a, b);
+	}
+	return compareInts(q, signExtend(a, size, q.display), signExtend(b, size, q.display));
+}
+
+template <typename T> inline bool compareFloats(const CeRamSearch::Query &q, T a, T b, T differentBy)
 {
 	switch (q.op)
 	{
@@ -66,9 +90,16 @@ inline bool compareFloats(const CeRamSearch::Query &q, float a, float b)
 	case CeRamSearch::OpLessThan: return a < b;
 	case CeRamSearch::OpLessThanEqual: return a < b || approx(a, b);
 	case CeRamSearch::OpNotEqual: return !approx(a, b);
-	case CeRamSearch::OpDifferentBy: return approx(std::fabs(a - b), asFloat(q.differentBy));
+	case CeRamSearch::OpDifferentBy: return approx(std::fabs(a - b), differentBy);
 	default: return approx(a, b);
 	}
+}
+
+/* A float at size 4, a double at size 8 */
+inline bool compareReals(const CeRamSearch::Query &q, int size, uint64_t a, uint64_t b)
+{
+	if (size == 8) return compareFloats(q, asDouble(a), asDouble(b), asDouble(q.differentBy));
+	return compareFloats(q, asFloat(a), asFloat(b), asFloat(q.differentBy));
 }
 } // namespace
 
@@ -80,7 +111,7 @@ CeRamSearch::CeRamSearch(const uint8_t *base, CeRamSearchReadFn fn, void *user, 
 
 /* ---- live ranges ---- */
 
-/* Ranges are kept whole multiples of four bytes - the largest candidate - so
+/* Ranges are kept whole multiples of eight bytes - the largest candidate - so
  * that an aligned candidate is aligned in the compacted domain too and lies in
  * one range; a few bytes more than a core said are harmless, they read as the
  * core reads them. */
@@ -94,8 +125,8 @@ void CeRamSearch::setRanges(const int64_t *pairs, int64_t n)
 		int64_t from = pairs[2 * i], length = pairs[2 * i + 1];
 		if (length <= 0 || from >= m_realSize || from < 0 && length <= -from) continue;
 		int64_t to = length > m_realSize - std::max<int64_t>(from, 0) ? m_realSize : from + length;
-		from = std::max<int64_t>(from, 0) & ~int64_t{ 3 };
-		to = std::min(m_realSize, (to + 3) & ~int64_t{ 3 });
+		from = std::max<int64_t>(from, 0) & ~int64_t{ 7 };
+		to = std::min(m_realSize, (to + 7) & ~int64_t{ 7 });
 		Range r;
 		r.real = from;
 		r.length = to - from;
@@ -216,16 +247,22 @@ const uint8_t *CeRamSearch::window(int64_t offset, int64_t len) const
 	return m_scratch.data();
 }
 
-uint32_t CeRamSearch::load(const uint8_t *p, int size) const
+uint64_t CeRamSearch::load(const uint8_t *p, int size) const
 {
 	switch (size)
 	{
 	case 1: return p[0];
 	case 2: return m_bigEndian ? (uint32_t)(p[0] << 8 | p[1]) : (uint32_t)(p[1] << 8 | p[0]);
-	default:
+	case 4:
 		return m_bigEndian
 			? ((uint32_t)p[0] << 24 | (uint32_t)p[1] << 16 | (uint32_t)p[2] << 8 | p[3])
 			: ((uint32_t)p[3] << 24 | (uint32_t)p[2] << 16 | (uint32_t)p[1] << 8 | p[0]);
+	default:
+	{
+		uint64_t v = 0;
+		for (int k = 0; k < 8; k++) v |= (uint64_t)p[m_bigEndian ? k : 7 - k] << (8 * (7 - k));
+		return v;
+	}
 	}
 }
 
@@ -239,11 +276,11 @@ struct UndoOff
 	~UndoOff() { flag = was; }
 };
 
-uint32_t CeRamSearch::peek(uint64_t address, int size) const
+uint64_t CeRamSearch::peek(uint64_t address, int size) const
 {
 	if (address > (uint64_t)m_domainSize || (uint64_t)m_domainSize - address < (uint64_t)size) return 0;
 	if (m_base && m_ranges.empty()) return load(m_base + address, size);
-	uint8_t b[4];
+	uint8_t b[8];
 	readInto((int64_t)address, b, size);
 	return load(b, size);
 }
@@ -253,7 +290,7 @@ uint32_t CeRamSearch::peek(uint64_t address, int size) const
  * sparse set made one per candidate (engine analysis, 2026-10-18). So runs of
  * candidates with little between them are read together: a run ends at a gap
  * of more than 4 KiB, or at Chunk bytes. */
-void CeRamSearch::readValues(const std::vector<uint64_t> &addr, int size, std::vector<uint32_t> &out) const
+void CeRamSearch::readValues(const std::vector<uint64_t> &addr, int size, std::vector<uint64_t> &out) const
 {
 	out.resize(addr.size());
 	if (m_base && m_ranges.empty())
@@ -296,28 +333,32 @@ void CeRamSearch::snapshotImage(std::vector<uint8_t> &image) const
 
 /* ---- the predicate ---- */
 
-bool CeRamSearch::matches(const Query &q, int size, uint64_t address, uint32_t cur, uint32_t prev, uint32_t changes)
+bool CeRamSearch::matches(const Query &q, int size, uint64_t address, uint64_t cur, uint64_t prev, uint32_t changes)
 {
-	const bool isFloat = q.display == DispFloat;
+	const bool isFloat = q.display == DispFloat && (size == 4 || size == 8);
 	switch (q.compare)
 	{
 	case CmpSpecificValue:
-		if (isFloat) return compareFloats(q, asFloat(cur), asFloat(q.value));
-		return compareInts(q, signExtend(cur, size, q.display), signExtend(q.value, size, q.display));
+		if (isFloat) return compareReals(q, size, cur, q.value);
+		return compareValues(q, size, cur, q.value);
 	case CmpSpecificAddress:
 		return compareInts(q, (int64_t)address, (int64_t)q.value);
 	case CmpChanges:
 		return compareInts(q, (int64_t)changes, (int64_t)q.value);
 	case CmpDifference:
-		if (isFloat) return compareFloats(q, asFloat(cur) - asFloat(prev), asFloat(q.value));
+		if (isFloat)
+		{
+			if (size == 8) return compareFloats(q, asDouble(cur) - asDouble(prev), asDouble(q.value), asDouble(q.differentBy));
+			return compareFloats(q, asFloat(cur) - asFloat(prev), asFloat(q.value), asFloat(q.differentBy));
+		}
 		/* A difference is as wide as it needs to be whatever the watch size: a
-		 * byte can fall by 200. The box hands over a full-width int. */
-		return compareInts(q,
-			signExtend(cur, size, q.display) - signExtend(prev, size, q.display),
-			q.display == DispSigned ? (int64_t)(int32_t)q.value : (int64_t)q.value);
+		 * byte can fall by 200. The box hands over a 64-bit integer (an 8-byte
+		 * difference past what that holds wraps, as the values do). */
+		return compareInts(q, (int64_t)((uint64_t)signExtend(cur, size, q.display) - (uint64_t)signExtend(prev, size, q.display)),
+			(int64_t)q.value);
 	default:
-		if (isFloat) return compareFloats(q, asFloat(cur), asFloat(prev));
-		return compareInts(q, signExtend(cur, size, q.display), signExtend(prev, size, q.display));
+		if (isFloat) return compareReals(q, size, cur, prev);
+		return compareValues(q, size, cur, prev);
 	}
 }
 
@@ -401,7 +442,7 @@ void CeRamSearch::filterSameAsPrevious(bool keepSame)
 	const int size = m_set.size;
 	const int lanes = 8 / size;
 	const uint64_t laneBits = (uint64_t{ 1 } << lanes) - 1;
-	const uint64_t laneMask = size == 4 ? 0xFFFFFFFFull : size == 2 ? 0xFFFFull : 0xFFull;
+	const uint64_t laneMask = size == 8 ? ~0ull : size == 4 ? 0xFFFFFFFFull : size == 2 ? 0xFFFFull : 0xFFull;
 	const uint8_t *prev = m_set.prevImage.data();
 	const int64_t prevSize = (int64_t)m_set.prevImage.size();
 	for (int64_t chunkStart = 0; chunkStart < m_domainSize; chunkStart += Chunk)
@@ -434,7 +475,7 @@ void CeRamSearch::filterSameAsPrevious(bool keepSame)
 					const uint64_t x = a ^ b;
 					if (x == 0) continue;
 					for (int k = 0; k < lanes; k++)
-						if ((x >> (k * size * 8)) & laneMask) differ |= uint64_t{ 1 } << (g + k);
+						if ((size == 8 ? x : x >> (k * size * 8)) & laneMask) differ |= uint64_t{ 1 } << (g + k);
 					continue;
 				}
 				/* the domain's last bytes, or a chunk's edge: one candidate at a time */
@@ -520,7 +561,7 @@ uint64_t CeRamSearch::bytesOf(const Set &s)
 {
 	return s.bits.capacity() * 8 + s.rank.capacity() * 8 + s.prevImage.capacity() + s.curImage.capacity()
 		+ s.changesBySlot.capacity() * 4 + s.addr.capacity() * 8
-		+ (s.prev.capacity() + s.cur.capacity() + s.changes.capacity()) * 4;
+		+ (s.prev.capacity() + s.cur.capacity()) * 8 + s.changes.capacity() * 4;
 }
 
 /* A level is a whole copy of the set. Room is made BEFORE the copy, oldest
@@ -589,7 +630,7 @@ void CeRamSearch::startUnguarded(int size, bool misaligned, bool bigEndian, bool
 	m_bigEndian = bigEndian;
 	m_detailed = detailed;
 	m_misaligned = misaligned;
-	if (size != 1 && size != 2 && size != 4) size = 1;
+	if (size != 1 && size != 2 && size != 4 && size != 8) size = 1;
 
 	/* what is live now is what this search is over, until the next one starts */
 	m_ranges = m_pending;
@@ -714,8 +755,8 @@ int64_t CeRamSearch::filter(const Query &q, int previousType)
 		const bool needMemory = !m_detailed && q.compare != CmpSpecificAddress && q.compare != CmpChanges;
 		m_walkImage = takeImage ? &m_nextImage : nullptr;
 		forEachDense(needMemory, [&](uint64_t slot, uint64_t address, const uint8_t *mem) {
-			const uint32_t prev = load(m_set.prevImage.data() + address, size);
-			const uint32_t cur = m_detailed ? load(m_set.curImage.data() + address, size) : mem ? load(mem, size) : 0;
+			const uint64_t prev = load(m_set.prevImage.data() + address, size);
+			const uint64_t cur = m_detailed ? load(m_set.curImage.data() + address, size) : mem ? load(mem, size) : 0;
 			return matches(q, size, byAddress ? toReal(address) : address, cur, prev, m_detailed ? m_set.changesBySlot[(size_t)slot] : 0);
 		});
 		m_walkImage = nullptr;
@@ -723,12 +764,12 @@ int64_t CeRamSearch::filter(const Query &q, int previousType)
 	}
 	else
 	{
-		std::vector<uint32_t> now;
+		std::vector<uint64_t> now;
 		if (!m_detailed) readValues(m_set.addr, size, now);
 		size_t kept = 0;
 		for (size_t i = 0; i < m_set.addr.size(); i++)
 		{
-			const uint32_t cur = m_detailed ? m_set.cur[i] : now[i];
+			const uint64_t cur = m_detailed ? m_set.cur[i] : now[i];
 			if (!matches(q, size, byAddress ? toReal(m_set.addr[i]) : m_set.addr[i], cur, m_set.prev[i], m_detailed ? m_set.changes[i] : 0)) continue;
 			m_set.addr[kept] = m_set.addr[i];
 			m_set.prev[kept] = m_set.prev[i];
@@ -834,12 +875,12 @@ void CeRamSearch::update(int previousType)
 		std::swap(m_set.curImage, m_nextImage);
 		return;
 	}
-	std::vector<uint32_t> values;
+	std::vector<uint64_t> values;
 	readValues(m_set.addr, size, values);
 	m_walked = m_set.addr.size();
 	for (size_t i = 0; i < m_set.addr.size(); i++)
 	{
-		const uint32_t now = values[i];
+		const uint64_t now = values[i];
 		if (now != m_set.cur[i])
 		{
 			m_set.changes[i]++;
@@ -856,11 +897,11 @@ void CeRamSearch::update(int previousType)
  * size, in the set and in every undo and redo level. Left alone, a sparse
  * search dropped good candidates and detailed mode counted changes that were
  * not there (engine analysis, 2026-10-18). */
-static uint32_t swapWithin(uint32_t v, int size)
+static uint64_t swapWithin(uint64_t v, int size)
 {
-	if (size == 2) return ((v & 0xFF) << 8) | ((v >> 8) & 0xFF);
-	if (size == 4) return ((v & 0xFF) << 24) | ((v & 0xFF00) << 8) | ((v >> 8) & 0xFF00) | (v >> 24);
-	return v;
+	uint64_t out = 0;
+	for (int k = 0; k < size; k++) out |= ((v >> (8 * k)) & 0xFF) << (8 * (size - 1 - k));
+	return size == 1 ? v : out;
 }
 
 void CeRamSearch::setBigEndian(bool bigEndian)
@@ -869,8 +910,8 @@ void CeRamSearch::setBigEndian(bool bigEndian)
 	m_bigEndian = bigEndian;
 	auto turn = [](Set &s) {
 		if (s.dense || s.size == 1) return;
-		for (uint32_t &v : s.prev) v = swapWithin(v, s.size);
-		for (uint32_t &v : s.cur) v = swapWithin(v, s.size);
+		for (uint64_t &v : s.prev) v = swapWithin(v, s.size);
+		for (uint64_t &v : s.cur) v = swapWithin(v, s.size);
 	};
 	turn(m_set);
 	for (Set &s : m_undo) turn(s);
@@ -979,7 +1020,7 @@ void CeRamSearch::addAddresses(const uint64_t *addresses, int64_t n, bool append
 		/* an address outside what this search is over is not memory it has */
 		uint64_t address;
 		if (!toCompact(addresses[i], address) || !inOneRange(address, m_set.size)) continue;
-		const uint32_t now = peek(address, m_set.size);
+		const uint64_t now = peek(address, m_set.size);
 		m_set.addr.push_back(address);
 		m_set.prev.push_back(now);
 		if (m_detailed)
@@ -996,7 +1037,7 @@ void CeRamSearch::addAddresses(const uint64_t *addresses, int64_t n, bool append
  * holds now. */
 void CeRamSearch::convertTo(int size)
 {
-	if (size != 1 && size != 2 && size != 4) return;
+	if (size != 1 && size != 2 && size != 4 && size != 8) return;
 	clearHistory();
 	const int oldSize = m_set.size;
 	const int span = m_misaligned ? 1 : oldSize;
@@ -1042,7 +1083,7 @@ void CeRamSearch::convertTo(int size)
 			for (int k = 0; k < span; k++)
 				if (fits(address + (uint64_t)k))
 				{
-					const uint32_t now = peek(address + (uint64_t)k, size);
+					const uint64_t now = peek(address + (uint64_t)k, size);
 					s.addr.push_back(address + (uint64_t)k);
 					s.prev.push_back(now);
 					if (m_detailed)
@@ -1068,27 +1109,29 @@ void CeRamSearch::sort(int column, bool reverse, int display)
 	const size_t n = m_set.addr.size();
 	const int size = m_set.size;
 
-	/* every key fits a double exactly: 33 bits at most */
-	auto shown = [&](uint32_t v) -> double {
-		if (display == DispFloat)
+	/* every key is a long double: 64 bits of mantissa with the compilers
+	 * Chimera is built with, so an 8-byte value sorts exactly */
+	auto shown = [&](uint64_t v) -> long double {
+		if (display == DispFloat && (size == 4 || size == 8))
 		{
-			const float f = asFloat(v);
-			return std::isnan(f) ? -std::numeric_limits<double>::infinity() : (double)f;
+			const double f = size == 8 ? asDouble(v) : (double)asFloat(v);
+			return std::isnan(f) ? -std::numeric_limits<long double>::infinity() : (long double)f;
 		}
-		return (double)signExtend(v, size, display);
+		if (size == 8 && display != DispSigned) return (long double)v;
+		return (long double)signExtend(v, size, display);
 	};
-	std::vector<double> key(n);
+	std::vector<long double> key(n);
 	for (size_t i = 0; i < n; i++)
 	{
-		const uint32_t cur = column == ColValue || column == ColDiff
+		const uint64_t cur = column == ColValue || column == ColDiff
 			? (m_detailed ? m_set.cur[i] : peek(m_set.addr[i], size)) : 0;
 		switch (column)
 		{
 		case ColValue: key[i] = shown(cur); break;
 		case ColPrev: key[i] = shown(m_set.prev[i]); break;
-		case ColChanges: key[i] = (double)m_set.changes[i]; break;
+		case ColChanges: key[i] = (long double)m_set.changes[i]; break;
 		case ColDiff: key[i] = shown(cur) - shown(m_set.prev[i]); break;
-		default: key[i] = (double)m_set.addr[i]; break;
+		default: key[i] = (long double)m_set.addr[i]; break;
 		}
 	}
 	std::vector<size_t> order(n);
@@ -1185,7 +1228,7 @@ int64_t ce_ramsearch_searched_size(const ce_ramsearch *rs) { return rs->impl.sea
 
 int64_t ce_ramsearch_count(const ce_ramsearch *rs) { return rs->impl.count(); }
 
-int32_t ce_ramsearch_row(const ce_ramsearch *rs, int64_t index, uint64_t *address, uint32_t *current, uint32_t *previous, uint32_t *changes)
+int32_t ce_ramsearch_row64(const ce_ramsearch *rs, int64_t index, uint64_t *address, uint64_t *current, uint64_t *previous, uint32_t *changes)
 {
 	CeRamSearch::Row r;
 	if (!rs->impl.row(index, r)) return 0;
@@ -1196,9 +1239,18 @@ int32_t ce_ramsearch_row(const ce_ramsearch *rs, int64_t index, uint64_t *addres
 	return 1;
 }
 
+int32_t ce_ramsearch_row(const ce_ramsearch *rs, int64_t index, uint64_t *address, uint32_t *current, uint32_t *previous, uint32_t *changes)
+{
+	uint64_t cur = 0, prev = 0;
+	if (!ce_ramsearch_row64(rs, index, address, &cur, &prev, changes)) return 0;
+	*current = (uint32_t)cur;
+	*previous = (uint32_t)prev;
+	return 1;
+}
+
 int64_t ce_ramsearch_index_of(const ce_ramsearch *rs, uint64_t address) { return rs->impl.indexOf(address); }
 
-static CeRamSearch::Query queryOf(int32_t compare, int32_t op, int32_t display, uint32_t value, uint32_t different_by)
+static CeRamSearch::Query queryOf(int32_t compare, int32_t op, int32_t display, uint64_t value, uint64_t different_by)
 {
 	CeRamSearch::Query q;
 	q.compare = compare;
@@ -1209,14 +1261,31 @@ static CeRamSearch::Query queryOf(int32_t compare, int32_t op, int32_t display, 
 	return q;
 }
 
-int64_t ce_ramsearch_search(ce_ramsearch *rs, int32_t compare, int32_t op, int32_t display, uint32_t value, uint32_t different_by, int32_t previous_type)
+int64_t ce_ramsearch_search64(ce_ramsearch *rs, int32_t compare, int32_t op, int32_t display, uint64_t value, uint64_t different_by, int32_t previous_type)
 {
 	CE_RS_GUARD(return rs->impl.search(queryOf(compare, op, display, value, different_by), previous_type), -1)
 }
 
-int32_t ce_ramsearch_would_remove(const ce_ramsearch *rs, int64_t index, int32_t compare, int32_t op, int32_t display, uint32_t value, uint32_t different_by)
+int32_t ce_ramsearch_would_remove64(const ce_ramsearch *rs, int64_t index, int32_t compare, int32_t op, int32_t display, uint64_t value, uint64_t different_by)
 {
 	return rs->impl.wouldRemove(index, queryOf(compare, op, display, value, different_by)) ? 1 : 0;
+}
+
+/* The 32-bit calls: a value as 32 bits, a signed difference widened from
+ * them, as they were before 8-byte candidates (issue 474) */
+static uint64_t widened(int32_t display, int32_t compare, uint32_t v)
+{
+	return display == CeRamSearch::DispSigned && compare == CeRamSearch::CmpDifference ? (uint64_t)(int64_t)(int32_t)v : v;
+}
+
+int64_t ce_ramsearch_search(ce_ramsearch *rs, int32_t compare, int32_t op, int32_t display, uint32_t value, uint32_t different_by, int32_t previous_type)
+{
+	return ce_ramsearch_search64(rs, compare, op, display, widened(display, compare, value), different_by, previous_type);
+}
+
+int32_t ce_ramsearch_would_remove(const ce_ramsearch *rs, int64_t index, int32_t compare, int32_t op, int32_t display, uint32_t value, uint32_t different_by)
+{
+	return ce_ramsearch_would_remove64(rs, index, compare, op, display, widened(display, compare, value), different_by);
 }
 
 int32_t ce_ramsearch_update(ce_ramsearch *rs, int32_t previous_type)

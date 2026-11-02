@@ -34,15 +34,15 @@ std::string trimLineEnds(std::string s)
 /* value minus previous, as Chimera writes a difference: +5, -3, 0 */
 std::string difference(const RamWatchViewModel::Watch &w)
 {
-	const int64_t d = static_cast<int64_t>(w.value) - static_cast<int64_t>(w.previous);
+	const int64_t d = static_cast<int64_t>(w.value - w.previous);
 	return d > 0 ? "+" + std::to_string(d) : std::to_string(d);
 }
 
-uint32_t readValue(ce_session *s, int32_t index, int64_t address, int size, bool bigEndian, bool &ok)
+uint64_t readValue(ce_session *s, int32_t index, int64_t address, int size, bool bigEndian, bool &ok)
 {
-	uint8_t b[4] = {0, 0, 0, 0};
+	uint8_t b[8] = {};
 	ok = ce_session_domain_read(s, index, address, b, size) == size;
-	uint32_t v = 0;
+	uint64_t v = 0;
 	for (int i = 0; i < size; i++)
 	{
 		const int at = bigEndian ? i : size - 1 - i;
@@ -67,8 +67,8 @@ RamWatchViewModel::RamWatchViewModel(Dispatcher &dispatcher, SessionViewModel &s
 	expose("onScreenText", "what is shown over the picture: \"note: value\", a line each", onScreenText);
 	rows("watches", "one row a watch: address, value, previous value, changes, difference, domain, note, size, how it is shown, on screen", rows_);
 
-	command("add", "watches an address: domain, address, size (1, 2 or 4), display (0 unsigned, 1 signed, 2 hex, 3 binary, "
-		"4 fixed point 12.4, 5 fixed point 20.12, 6 fixed point 16.16, 7 float), big endian, note; its place in the list",
+	command("add", "watches an address: domain, address, size (1, 2, 4 or 8), display (0 unsigned, 1 signed, 2 hex, 3 binary, "
+		"4 fixed point 12.4, 5 fixed point 20.12, 6 fixed point 16.16, 7 float, 8 double), big endian, note; its place in the list",
 		{"domain", "address", "size", "display", "bigEndian", "note"},
 		[this](const Args &a, std::string &error) -> Value {
 			Watch w;
@@ -77,14 +77,14 @@ RamWatchViewModel::RamWatchViewModel(Dispatcher &dispatcher, SessionViewModel &s
 				return {};
 			if (a.size() > 4 && !arg(a, 4, w.bigEndian, error)) return {};
 			if (a.size() > 5 && !arg(a, 5, w.note, error)) return {};
-			if (size != 1 && size != 2 && size != 4)
+			if (size != 1 && size != 2 && size != 4 && size != 8)
 			{
 				error = tr("ram_watch.size_values");
 				return {};
 			}
 			w.size = static_cast<int>(size);
 			w.display = static_cast<watch::Display>(display);
-			if (display < 0 || display > 7 || !watch::fits(w.size, w.display))
+			if (display < 0 || display > 8 || !watch::fits(w.size, w.display))
 			{
 				error = tr("ram_watch.cannot_show_size", size);
 				return {};
@@ -140,7 +140,7 @@ RamWatchViewModel::RamWatchViewModel(Dispatcher &dispatcher, SessionViewModel &s
 		size_t i = 0;
 		int64_t display = 0;
 		if (!index(a, 0, i, error) || !arg(a, 1, display, error)) return {};
-		if (display < 0 || display > 7 || watches_[i].separator || !watches_[i].property.empty() || !watch::fits(watches_[i].size, static_cast<watch::Display>(display)))
+		if (display < 0 || display > 8 || watches_[i].separator || !watches_[i].property.empty() || !watch::fits(watches_[i].size, static_cast<watch::Display>(display)))
 		{
 			error = tr("ram_watch.cannot_show");
 			return {};
@@ -395,7 +395,7 @@ RamWatchViewModel::RamWatchViewModel(Dispatcher &dispatcher, SessionViewModel &s
 		if (!arg(a, 0, size, error) || !arg(a, 1, display, error) || !arg(a, 2, bigEndian, error) || !arg(a, 3, at, error) ||
 			!arg(a, 4, note, error))
 			return false;
-		if (size != 1 && size != 2 && size != 4)
+		if (size != 1 && size != 2 && size != 4 && size != 8)
 		{
 			error = tr("ram_watch.size_values");
 			return false;
@@ -511,7 +511,7 @@ RamWatchViewModel::RamWatchViewModel(Dispatcher &dispatcher, SessionViewModel &s
 			if (first.property.empty()) value.erase(std::remove(value.begin(), value.end(), ' '), value.end());
 			out.members.emplace_back("addresses", json::Json::string(addresses));
 			out.members.emplace_back("domain", json::Json::string(first.domain));
-			out.members.emplace_back("size", json::Json::string(tr(first.size == 1 ? "watch.size_byte" : first.size == 2 ? "watch.size_word" : "watch.size_dword")));
+			out.members.emplace_back("size", json::Json::string(tr(first.size == 1 ? "watch.size_byte" : first.size == 2 ? "watch.size_word" : first.size == 4 ? "watch.size_dword" : "watch.size_qword")));
 			out.members.emplace_back("display", json::Json::string(watch::displayName(first.display)));
 			out.members.emplace_back("hex", json::Json::boolean_(first.display == watch::Display::Hex));
 			out.members.emplace_back("endian", json::Json::string(tr(first.bigEndian ? "watch.big_endian" : "watch.little_endian")));
@@ -653,10 +653,13 @@ RamWatchViewModel::RamWatchViewModel(Dispatcher &dispatcher, SessionViewModel &s
 			std::string column;
 			if (!arg(a, 0, column, error)) return {};
 			if (column != sortedBy_) sortReverse_ = false;
-			auto signedOf = [](const Watch &w, uint32_t v) -> int64_t {
-				if (w.display != watch::Display::Signed) return v;
+			/* a value as its display orders it; a long double holds a 64-bit one exactly */
+			auto signedOf = [](const Watch &w, uint64_t v) -> long double {
+				if (w.display != watch::Display::Signed) return static_cast<long double>(v);
 				const int bits = 8 * w.size;
-				return bits >= 32 ? static_cast<int64_t>(static_cast<int32_t>(v)) : (static_cast<int64_t>(v) ^ (int64_t{1} << (bits - 1))) - (int64_t{1} << (bits - 1));
+				if (bits >= 64) return static_cast<long double>(static_cast<int64_t>(v));
+				if (bits == 32) return static_cast<long double>(static_cast<int32_t>(v));
+				return static_cast<long double>((static_cast<int64_t>(v) ^ (int64_t{1} << (bits - 1))) - (int64_t{1} << (bits - 1)));
 			};
 			auto byAddress = [](const Watch &x, const Watch &y) { return x.address != y.address ? x.address < y.address : x.size < y.size; };
 			std::function<bool(const Watch &, const Watch &)> less;
@@ -666,7 +669,7 @@ RamWatchViewModel::RamWatchViewModel(Dispatcher &dispatcher, SessionViewModel &s
 					return x.domain != y.domain ? x.domain < y.domain : x.size < y.size;
 				};
 			else if (column == "Value")
-				less = [&](const Watch &x, const Watch &y) { const int64_t a1 = signedOf(x, x.value), b1 = signedOf(y, y.value); return a1 != b1 ? a1 < b1 : byAddress(x, y); };
+				less = [&](const Watch &x, const Watch &y) { const long double a1 = signedOf(x, x.value), b1 = signedOf(y, y.value); return a1 != b1 ? a1 < b1 : byAddress(x, y); };
 			else if (column == "Prev")
 				less = [&](const Watch &x, const Watch &y) { return x.previous != y.previous ? x.previous < y.previous : byAddress(x, y); };
 			else if (column == "Changes")
@@ -906,7 +909,7 @@ void RamWatchViewModel::readOnMachine(ce_session *s, bool fresh)
 		}
 		const auto found = byName.find(w.domain);
 		bool ok = false;
-		uint32_t now = 0;
+		uint64_t now = 0;
 		if (found != byName.end())
 		{
 			w.domainSize = ce_session_domain_size(s, found->second);
@@ -1226,8 +1229,8 @@ void RamWatchViewModel::addRecent(const std::string &file)
 
 bool RamWatchViewModel::poke(const Watch &w, const std::string &text, std::string &error)
 {
-	uint32_t v = 0;
-	if (!watch::parse(text, w.display, v))
+	uint64_t v = 0;
+	if (!watch::parse(text, w.display, v, w.size))
 	{
 		error = tr("ram_watch.not_a_value", {text, watch::displayName(w.display)});
 		return false;

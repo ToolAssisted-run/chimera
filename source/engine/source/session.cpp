@@ -5302,7 +5302,7 @@ void ce_session::applyFreezes()
 		if (f.address < 0 || f.address + f.size > ce_session_domain_size(this, f.domain)) continue;
 		if (f.compareKind != 0)
 		{
-			uint8_t seen[4] = {};
+			uint8_t seen[8] = {};
 			if (ce_session_domain_read(this, f.domain, f.address, seen, f.size) != f.size) continue;
 			const uint64_t now = freezeRead(f, seen);
 			bool write = true;
@@ -5318,7 +5318,7 @@ void ce_session::applyFreezes()
 			}
 			if (!write) continue;
 		}
-		uint8_t bytes[4] = {};
+		uint8_t bytes[8] = {};
 		for (int32_t i = 0; i < f.size; i++) bytes[f.bigEndian ? f.size - 1 - i : i] = static_cast<uint8_t>(f.value >> (8 * i));
 		ce_session_domain_write(this, f.domain, f.address, bytes, f.size);
 	}
@@ -5339,7 +5339,7 @@ int32_t ce_session_freeze(ce_session *s, int32_t domain, int64_t address, int32_
 		s->error = tr("session.domain_read_only", {name != nullptr ? name : tr("engine.the_domain")});
 		return -1;
 	}
-	if ((size != 1 && size != 2 && size != 4) || address < 0 || address + size > ce_session_domain_size(s, domain))
+	if ((size != 1 && size != 2 && size != 4 && size != 8) || address < 0 || address + size > ce_session_domain_size(s, domain))
 	{
 		s->error = tr("engine.domain_short", {name != nullptr ? name : tr("engine.the_domain"), std::to_string(size), std::to_string(address)});
 		return -1;
@@ -5354,7 +5354,7 @@ int32_t ce_session_freeze(ce_session *s, int32_t domain, int64_t address, int32_
 	f.address = address;
 	f.size = size;
 	f.bigEndian = big_endian != 0;
-	f.value = value & ((uint64_t{1} << (8 * size)) - 1);
+	f.value = size == 8 ? value : value & ((uint64_t{1} << (8 * size)) - 1);
 	f.compareKind = compare_kind;
 	f.compare = compare;
 	for (size_t i = 0; i < s->freezes.size(); i++)
