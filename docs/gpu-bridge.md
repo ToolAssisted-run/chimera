@@ -88,7 +88,13 @@ Two things have to be true, and either may not be:
    `-hw` (PCSX2's are `opengl-hw` and `vulkan-hw`, shown in the wizard as
    "Hardware (OpenGL)" and "Hardware (Vulkan)"),
    and the project chose it. That suffix is the whole convention: the frontend
-   recognises any core's hardware renderer without knowing the core.
+   recognises any core's hardware renderer without knowing the core. A
+   project that does not name a renderer gets the package's default for its
+   machine: the machine's own (`settingOverrides`) before the setting's, and
+   none on a machine the renderer setting does not apply to (its `when`). The
+   ares core is why: its renderer is the Nintendo 64's alone (`vulkan-hw`,
+   paraLLEl-RDP), and a Game Boy project in the same package is not given a
+   GPU (2026-11-02).
 2. **This build has a bridge, and a driver gives it a context.** `-Dgl_bridge`
    is on by default and needs EGL on Linux (`libegl-dev`) and `opengl32` on
    Windows.

@@ -739,6 +739,33 @@ void firmware()
 /* Numbers as JSON writes them (review, 2026-10-26): its grammar, not only
  * its characters; a dot whatever the locale; no NaN; a whole number too big
  * for 64 bits read without ending the program */
+/* The renderer a project runs with, and so whether Chimera offers it the GPU:
+ * a package of several machines whose renderer is one machine's (the ares
+ * core's Nintendo 64) asks for none on its other machines, and a machine's own
+ * default comes before the setting's */
+void projectRendererChoice()
+{
+	auto parsed = [](const std::string &text) {
+		json::Json j;
+		std::string e;
+		json::parse(text, j, e);
+		return j;
+	};
+	const json::Json config = parsed(R"({"machineSetting": "machine",
+		"settings": [{"name": "machine", "type": "enum", "options": ["gb", "n64", "n64dd"], "default": "gb"},
+		             {"name": "renderer", "type": "enum", "options": ["vulkan-hw"], "default": "vulkan-hw", "when": ["n64", "n64dd"]}],
+		"machines": [{"id": "N64DD", "when": ["n64dd"], "settingOverrides": {"renderer": {"default": "other-hw"}}}]})");
+	CHECK(projectRenderer(config, parsed(R"({"machine": "n64"})")) == "vulkan-hw");
+	CHECK(projectRenderer(config, parsed(R"({"machine": "gb"})")).empty());
+	CHECK(projectRenderer(config, parsed("{}")).empty());
+	CHECK(projectRenderer(config, parsed(R"({"machine": "n64dd"})")) == "other-hw");
+	CHECK(projectRenderer(config, parsed(R"({"machine": "gb", "renderer": "software"})")) == "software");
+	/* a package of one machine, as before */
+	const json::Json single = parsed(R"({"settings": [{"name": "renderer", "type": "enum", "options": ["software", "opengl-hw"], "default": "opengl-hw"}]})");
+	CHECK(projectRenderer(single, parsed("{}")) == "opengl-hw");
+	CHECK(projectRenderer(parsed("{}"), parsed("{}")).empty());
+}
+
 void jsonNumbers()
 {
 	auto parses = [](const std::string &text) {
@@ -10335,6 +10362,7 @@ int main(int argc, char **argv)
 	luaConsole();
 	toolWindows();
 	jsonNumbers();
+	projectRendererChoice();
 	configStore();
 	configNamesList();
 	firmware();

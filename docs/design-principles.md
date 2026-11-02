@@ -12526,3 +12526,26 @@ Tested: the window-drawing test opens TAStudio with a second roll and a
 script column 1500 pixels wide painted green, and finds green in the
 rolls and none under the side's boxes. With the old rule it failed
 (30612 green pixels under the side).
+
+## A package's renderer counts only on the machines it is for (2026-11-02)
+
+The ares core's Nintendo 64 is now drawn by paraLLEl-RDP on a Vulkan device
+(the owner's decision, issue 446), so its package declares a renderer,
+`vulkan-hw`, for the Nintendo 64 and the 64DD only (`when`). Chimera asks for
+the GPU bridge when a project's renderer ends in `-hw`, and a project that
+does not name one was given the package's default whatever its machine: a
+Game Boy project in the ares package would have been offered a GPU, and its
+movie said a GPU drew.
+
+Now a project that names no renderer gets the package's default for its
+machine (`projectRenderer`, session_vm.cpp): the machine's own default
+(`settingOverrides`) before the setting's, and none when the setting's `when`
+leaves the machine out. A project that names one keeps it, and a package of
+one machine is as before. Nintendo 64 projects made before the change, which
+name no renderer, get `vulkan-hw`.
+
+Tested: the view models' test asks for the renderer of projects on the
+Nintendo 64, the 64DD (whose own default wins), a Game Boy, a project that
+names its renderer, and a package of one machine. With the `when` check taken
+out, two of its checks failed.
+

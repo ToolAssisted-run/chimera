@@ -35,6 +35,13 @@ namespace chimera::vm {
 /* the files given in a zip, each stored as it is */
 std::vector<uint8_t> storedZip(const std::vector<std::pair<std::string, std::vector<uint8_t>>> &files);
 
+/* The renderer a project runs with: its own "renderer" setting, or else the
+ * package's default for the project's machine - the machine's own
+ * (settingOverrides) before the setting's - and none when the setting does not
+ * apply to that machine (its "when"). config is the package's waterbox.config,
+ * settings the project's. */
+std::string projectRenderer(const json::Json &config, const json::Json &settings);
+
 /* A named frame of the movie: a place to come back to. keepState asks the
  * greenzone to keep that frame's state whatever it thins. */
 struct Marker

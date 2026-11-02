@@ -83,35 +83,74 @@ uint32_t crc32Of(const std::vector<uint8_t> &bytes)
 }
 
 /* Chimera asks for the GPU bridge when the core's renderer setting, as given
- * or the package's default, is a hardware one ("opengl-hw", "vulkan-hw"); the
- * request is for every session opened after it, so it is made every time */
+ * or the package's default for the project's machine, is a hardware one
+ * ("opengl-hw", "vulkan-hw"); the request is for every session opened after
+ * it, so it is made every time */
 void requestGpu(const std::string &package, const std::string &settings)
 {
-	std::string renderer;
 	json::Json given;
 	std::string error;
-	if (json::parse(settings.empty() ? "{}" : settings, given, error))
-		if (const json::Json *v = given.find("renderer"); v != nullptr && v->kind == json::Json::Kind::String) renderer = v->text;
-	if (renderer.empty())
+	if (!json::parse(settings.empty() ? "{}" : settings, given, error)) given = json::Json();
+	json::Json cfg;
+	if (given.find("renderer") == nullptr)
 	{
 		const char *perr = nullptr;
 		if (ce_package *pk = ce_package_open(package.c_str(), &perr))
 		{
 			uint64_t len = 0;
-			json::Json cfg;
 			if (const uint8_t *d = ce_package_entry_texts(pk, "waterbox.config", &len))
 				json::parse(std::string_view(reinterpret_cast<const char *>(d), static_cast<size_t>(len)), cfg, error);
 			ce_package_free(pk);
-			if (const json::Json *list = cfg.find("settings"))
-				for (const json::Json &item : list->items)
-					if (const json::Json *name = item.find("name"); name != nullptr && name->text == "renderer")
-						if (const json::Json *d = item.find("default"); d != nullptr && d->kind == json::Json::Kind::String) renderer = d->text;
 		}
 	}
+	const std::string renderer = projectRenderer(cfg, given);
 	ce_gl_request(renderer.size() >= 3 && renderer.compare(renderer.size() - 3, 3, "-hw") == 0 ? 1 : 0);
 }
 
 } // namespace
+
+std::string projectRenderer(const json::Json &config, const json::Json &settings)
+{
+	const auto text = [](const json::Json *v) { return v != nullptr && v->kind == json::Json::Kind::String ? v->text : std::string(); };
+	if (const json::Json *own = settings.find("renderer")) return text(own);
+	const json::Json *list = config.find("settings");
+	if (list == nullptr) return {};
+	/* the project's machine: its machine setting, given or at its default */
+	const std::string machineSetting = text(config.find("machineSetting"));
+	std::string machine;
+	if (!machineSetting.empty())
+	{
+		machine = text(settings.find(machineSetting));
+		if (machine.empty())
+			for (const json::Json &item : list->items)
+				if (text(item.find("name")) == machineSetting) machine = text(item.find("default"));
+	}
+	for (const json::Json &item : list->items)
+	{
+		if (text(item.find("name")) != "renderer") continue;
+		/* a renderer for some machines only: none for the others */
+		if (const json::Json *when = item.find("when"); when != nullptr && when->kind == json::Json::Kind::Array && !machine.empty())
+		{
+			bool applies = false;
+			for (const json::Json &m : when->items) applies = applies || m.text == machine;
+			if (!applies) continue;
+		}
+		/* the machine's own default before the setting's */
+		if (const json::Json *machines = config.find("machines"); machines != nullptr && !machine.empty())
+			for (const json::Json &m : machines->items)
+			{
+				const json::Json *when = m.find("when");
+				bool mine = false;
+				if (when != nullptr)
+					for (const json::Json &w : when->items) mine = mine || w.text == machine;
+				const json::Json *overrides = mine ? m.find("settingOverrides") : nullptr;
+				const json::Json *over = overrides != nullptr ? overrides->find("renderer") : nullptr;
+				if (over != nullptr && over->find("default") != nullptr) return text(over->find("default"));
+			}
+		return text(item.find("default"));
+	}
+	return {};
+}
 
 std::vector<uint8_t> storedZip(const std::vector<std::pair<std::string, std::vector<uint8_t>>> &files)
 {
