@@ -145,6 +145,18 @@ public:
 	/* a global function of the libraries' asked about a cell (row, column):
 	 * its answer as text, "" for none */
 	std::string query(const char *name, int64_t row, const std::string &column);
+	/* a cell a roll asks the scripts about as it is drawn: kind 0 its
+	 * colour, 1 its text, 2 its icon; the answer "" for none */
+	struct Cell
+	{
+		int kind = 0;
+		int64_t row = 0;
+		std::string column, answer;
+	};
+	/* every cell of one drawing asked at once, in one wait for the scripts'
+	 * thread (a wait for each cell held the roll and the machine back, issue
+	 * 476); a kind no script registered a function for is not asked */
+	void query(std::vector<Cell> &cells);
 	/* a global function of the libraries' called with these: its first answer
 	 * as text ("true" for true, "" for none or false) */
 	std::string ask(const char *name, const std::vector<Value> &args = {});

@@ -1526,6 +1526,17 @@ onRemoved[#onRemoved + 1] = function()
 	end
 	if C.pianoRoll.scriptQueries then C.pianoRoll.scriptQueries = false end
 end
+-- the kinds of question some script answers (b a cell's colour, t its text,
+-- i its icon): the roll asks no others
+function __chimera_query_kinds()
+	local bg, text, icon = "", "", ""
+	for _, f in ipairs(registered) do
+		if f.event == "OnQueryItemBg" then bg = "b"
+		elseif f.event == "OnQueryItemText" then text = "t"
+		elseif f.event == "OnQueryItemIcon" then icon = "i" end
+	end
+	return bg .. text .. icon
+end
 function __chimera_query_bg(row, column)
 	local v = firstAnswer("OnQueryItemBg", row, column)
 	if v ~= nil then return colour(v, "") end

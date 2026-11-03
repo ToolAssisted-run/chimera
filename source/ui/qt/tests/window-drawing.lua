@@ -1,7 +1,7 @@
 -- What the window draws, for "window drawing" (window-drawing.py): two
 -- lines of text through gui.drawText and gui.text, every frame; RAM Watch
 -- with three watches and RAM Search with a new search, for their lists; then three
--- frames encoded with Capture OSD, written as raw pixels to the file
+-- frames encoded with Capture OSD and the frame counter shown, written as raw pixels to the file
 -- CHIMERA_DRAW_VIDEO names, and the picture area's size and the encode's
 -- answer to the file CHIMERA_DRAW_META names; then TAStudio with two input
 -- rolls. The window goes on playing and drawing until the test's
@@ -17,6 +17,7 @@ end
 local watch = client.gettool("ramwatch")
 for address = 0, 2 do watch.add(memory.getcurrentmemorydomain(), address, 1, 0, false, "") end
 client.gettool("ramsearch").newSearch()
+chimera.session.showFrameCounter = true
 chimera.encoder.captureOsd = true
 chimera.encoder.resize = false
 chimera.encoder.audioSync = false

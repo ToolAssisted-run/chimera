@@ -99,10 +99,18 @@ public:
 	bool horizontal() const { return horizontal_; }
 	QString extraColumns() const { return extraJson_; }
 	void setExtraColumns(const QString &json);
-	/* what the script says of a cell while a roll is drawn: kind 0 its colour, 1 its text; "" nothing.
-	 * One for every roll, made now or later: TAStudio's window makes its
-	 * rolls itself, after the program has started */
-	using Query = std::function<QString(int kind, qint64 row, const QString &column)>;
+	/* what the scripts say of the cells while a roll is drawn: kind 0 a
+	 * cell's colour, 1 its text, 2 its icon; "" nothing. The cells of one
+	 * drawing are asked at once (issue 476). One for every roll, made now or
+	 * later: TAStudio's window makes its rolls itself, after the program has
+	 * started */
+	struct Asked
+	{
+		int kind = 0;
+		qint64 row = 0;
+		QString column, answer;
+	};
+	using Query = std::function<void(std::vector<Asked> &asked)>;
 	static void setQuery(Query query);
 	qint64 iconEpoch() const { return iconEpoch_; }
 	void setIconEpoch(qint64 epoch)

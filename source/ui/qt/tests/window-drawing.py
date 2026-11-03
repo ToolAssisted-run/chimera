@@ -3,7 +3,9 @@
 #
 # - Encode Video's Capture OSD writes the picture as the window shows it, at
 #   the size of its picture area, as Chimera's did: the window's 2x or 3x is
-#   the video's, not the machine's own pixels.
+#   the video's, not the machine's own pixels. The counters are in it too,
+#   with messages on the screen (issue 477): the frame counter's white text
+#   over the grey above the game's white square.
 # - A script's text breaks at each new line ("\n"), in the window and in the
 #   video: gui.drawText's two lines and gui.text's are two rows each.
 # - The lists of the Lua Console, RAM Watch and RAM Search have lines
@@ -125,6 +127,8 @@ else:
         rows = [b"".join(frame[(y * w + x) * 4:(y * w + x) * 4 + 3][::-1] for x in range(w)) for y in range(h)]
         check(len(bands(rows, MAGENTA)) == 2, "the video: gui.drawText's two lines are two rows", bands(rows, MAGENTA))
         check(len(bands(rows, CYAN)) == 2, "the video: gui.text's two lines are two rows", bands(rows, CYAN))
+        white = sum(1 for y in range(min(h, 30)) for i in range(0, len(rows[y]), 3) if min(rows[y][i:i + 3]) > 220)
+        check(white > 20, "the video has the frame counter over the picture (issue 477)", "%d white pixels in the top 30 rows" % white)
 
 # the window's own picture
 if os.path.exists(shot):

@@ -1855,11 +1855,15 @@ int main(int argc, char **argv)
 	clock.start();
 	std::vector<double> paints;
 	QPointer<qt::PianoRollItem> roll;
-	/* the script asked about each cell as a roll is drawn (Lua's tastudio.onqueryitem...):
-	 * the window's thread waits while the roll is drawn, so the script is not running */
-	qt::PianoRollItem::setQuery([&lua](int kind, qint64 row, const QString &column) {
-		static const char *const hooks[] = {"__chimera_query_bg", "__chimera_query_text", "__chimera_query_icon"};
-		return QString::fromStdString(lua.query(hooks[std::clamp(kind, 0, 2)], row, column.toStdString()));
+	/* the scripts asked about the cells as a roll is drawn (Lua's tastudio.onqueryitem...),
+	 * all of one drawing at once: the window's thread waits while they answer,
+	 * so the scripts are not running */
+	qt::PianoRollItem::setQuery([&lua](std::vector<qt::PianoRollItem::Asked> &asked) {
+		std::vector<vm::LuaBridge::Cell> cells;
+		cells.reserve(asked.size());
+		for (const qt::PianoRollItem::Asked &a : asked) cells.push_back({a.kind, a.row, a.column.toStdString(), {}});
+		lua.query(cells);
+		for (size_t i = 0; i < asked.size(); i++) asked[i].answer = QString::fromStdString(cells[i].answer);
 	});
 	auto *picture = window->findChild<qt::PictureItem *>(QStringLiteral("picture"));
 	int64_t framesAtStart = -1;

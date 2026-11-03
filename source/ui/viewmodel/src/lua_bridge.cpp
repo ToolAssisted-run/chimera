@@ -863,6 +863,20 @@ std::string LuaBridge::query(const char *name, int64_t row, const std::string &c
 	return onScripts([&] { return askHere(name, {Value(row), Value(column)}); });
 }
 
+void LuaBridge::query(std::vector<Cell> &cells)
+{
+	static const char *const hooks[] = {"__chimera_query_bg", "__chimera_query_text", "__chimera_query_icon"};
+	onScripts([&] {
+		/* the kinds some script answers: b its colour, t its text, i its icon */
+		const std::string kinds = askHere("__chimera_query_kinds", {});
+		for (Cell &cell : cells)
+		{
+			const int kind = std::clamp(cell.kind, 0, 2);
+			cell.answer = kinds.find("bti"[kind]) == std::string::npos ? std::string() : askHere(hooks[kind], {Value(cell.row), Value(cell.column)});
+		}
+	});
+}
+
 void LuaBridge::frameStart()
 {
 	onScripts([&] {

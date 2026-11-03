@@ -9506,6 +9506,15 @@ tastudio.clearIconCache()
 	CHECK(lua.query("__chimera_query_text", 7, "xp") == "70" && lua.query("__chimera_query_text", 7, "P1 A").empty());
 	CHECK(lua.query("__chimera_query_bg", 3, "P1 A") == "#FF102030" && lua.query("__chimera_query_bg", 3, "xp").empty());
 	CHECK(lua.query("__chimera_query_icon", 1, "P1 B") == "/icons/b.png" && lua.query("__chimera_query_icon", 2, "P1 B").empty());
+	/* a whole drawing's cells asked at once give the same answers (issue 476);
+	 * the colours' question counted, to see below that it is not asked once
+	 * no script answers it */
+	lua.execute("__bg_asked = 0 local bg = __chimera_query_bg __chimera_query_bg = function(...) __bg_asked = __bg_asked + 1 return bg(...) end "
+		"function __bg_count() return __bg_asked end");
+	std::vector<LuaBridge::Cell> cells = {{1, 7, "xp", {}}, {0, 3, "P1 A", {}}, {2, 1, "P1 B", {}}, {1, 7, "P1 A", {}}, {0, 3, "xp", {}}};
+	lua.query(cells);
+	CHECK(cells[0].answer == "70" && cells[1].answer == "#FF102030" && cells[2].answer == "/icons/b.png" && cells[3].answer.empty() && cells[4].answer.empty());
+	CHECK_TEXT(lua.ask("__bg_count"), "2");
 	CHECK(roll.iconEpoch.get() == 1);
 	{
 		/* the callbacks: the edits, the branch made once its state is kept, loaded, removed */
@@ -9542,6 +9551,10 @@ tastudio.clearIconCache()
 	/* the script stopped: what it registered goes with it */
 	lua.stopAll();
 	CHECK(!roll.scriptQueries.get() && roll.scriptColumns.get() == "[]" && lua.query("__chimera_query_text", 7, "xp").empty());
+	std::vector<LuaBridge::Cell> unanswered = {{0, 3, "P1 A", {}}, {1, 7, "xp", {}}};
+	lua.query(unanswered);
+	CHECK(unanswered[0].answer.empty() && unanswered[1].answer.empty());
+	CHECK_TEXT(lua.ask("__bg_count"), "2");
 	session.run("close", {}, error);
 	CHECK(d.until([&] { return !session.isOpen.get(); }, 20));
 	std::error_code ec;

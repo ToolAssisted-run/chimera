@@ -13,6 +13,8 @@
 #include <algorithm>
 #include <cctype>
 #include <cstdlib>
+#include <map>
+#include <tuple>
 
 #include "chimera/vm/piano_roll_vm.hpp"
 #include "qml_view_model.hpp"
@@ -501,8 +503,29 @@ void PianoRollItem::paint(QPainter *p)
 	};
 	thickLines(0, hs, k.columnBorder);
 
-	/* what the script says of a cell, when it says anything */
-	auto ask = [&](int kind, qint64 row, const QString &column) { return queries_ && query() ? query()(kind, row, column) : QString(); };
+	/* what the scripts say of the cells of the rows shown, when they say
+	 * anything: asked at once before the rows are drawn (issue 476) */
+	std::map<std::tuple<int, qint64, QString>, QString> said;
+	if (queries_ && query())
+	{
+		std::vector<Asked> asked;
+		qint64 at = rows.nextShown(top_ - 1);
+		for (int i = 0; i < shown && at < count; i++, at = rows.nextShown(at))
+		{
+			auto cell = [&](const QString &column) { for (int kind : {0, 1, 2}) asked.push_back({kind, at, column, {}}); };
+			asked.push_back({0, at, QStringLiteral("FrameColumn"), {}});
+			for (int c = 0; c < columns; c++)
+				if (colW(c) > 0) cell(QString::fromStdString(rows.columnName(c)));
+			for (const Extra &x : extras_) cell(x.name);
+		}
+		query()(asked);
+		for (Asked &a : asked)
+			if (!a.answer.isEmpty()) said.emplace(std::make_tuple(a.kind, a.row, std::move(a.column)), std::move(a.answer));
+	}
+	auto ask = [&](int kind, qint64 row, const QString &column) {
+		const auto it = said.find(std::make_tuple(kind, row, column));
+		return it == said.end() ? QString() : it->second;
+	};
 	/* an icon the script names for a cell, drawn in it */
 	auto icon = [&](qint64 row, const QString &column, const QRect &cell) {
 		const QString path = ask(2, row, column);

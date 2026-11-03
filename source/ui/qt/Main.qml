@@ -182,7 +182,10 @@ ApplicationWindow {
             const shown = root.messages.stackMessages ? all : all.slice(-1)
             const p = root.osdPositions["Messages"]
             const room = w - 2 * (p ? p.x : 0) * k
-            place("Messages", (p && p.anchor < 2 ? shown.reverse() : shown).flatMap(m => wrap(m, room)), root.osdMessageColor)
+            // each message's lines in turn (Qt's JavaScript has no flatMap: calling it threw, and the video lost every counter, issue 477)
+            const lines = []
+            for (const m of (p && p.anchor < 2 ? shown.reverse() : shown)) lines.push(...wrap(m, room))
+            place("Messages", lines, root.osdMessageColor)
         }
         if (root.session.showFrameCounter)
             place("Frame Counter", [root.session.frameCounterText], root.session.lagFrame ? root.osdAlertColor : root.osdMessageColor)
