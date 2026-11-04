@@ -12835,3 +12835,55 @@ with every preset (and fail when ffmpeg refuses one: tried with a stand-in
 that refuses x265), and CI builds ffmpeg before them, where they used to be
 skipped. A format typed by hand that needs an encoder or file type left out
 is now refused by ffmpeg; before, the full build would have taken it.
+
+## ScummVM and Cemu join the official cores (user-decided, 2026-11-04)
+
+Two core requests were built by agents in local repositories, checked
+here, and published at the owner's word ("push and publish everything").
+Each published package was run on Windows, on the GTX 1060 computer, with
+Chimera's published build fa499b9c, and each was played in Chimera's
+window there with TAStudio open.
+
+- **ScummVM** (issue 465), `chimera-core-scummvm`, ScummVM a60993f5 with
+  every engine it builds by default (GPL-3.0-or-later). A game is a zip of
+  the game's folder; ScummVM's own detector finds which game it is. The
+  mouse is two axes from 0 to 65535 across and down the screen and three
+  buttons, the keyboard a PC keyboard, and a Roland MT-32's ROMs are
+  firmware when the music setting asks for them. 3D games draw with
+  ScummVM's TinyGL or with an OpenGL built into the core (Mesa's softpipe),
+  never on a graphics card. ScummVM's test engines are in the test
+  packages only (owner, 2026-11-03). Tested on scummvm.org's freeware
+  games (Beneath a Steel Sky, Flight of the Amazon Queen, Lure of the
+  Temptress, Drascula, DreamWeb) and King's Quest II, each for its first
+  minute or so: the sandbox gives the same pictures and sound as a plain
+  native build. On Windows, Beneath a Steel Sky's 1500-frame project ends
+  on the same picture as on Linux. First build "Development build
+  548c01d8 (made 2026-11-04 15:07 CET)". Not proved: a game played
+  through, CD games with speech, games with video, any real 3D game (The
+  Colony and Thimbleweed Park have never been started), and anything else
+  on Windows.
+- **Cemu** (issue 459), `chimera-core-cemu`, Cemu (MPL-2.0) at a fixed
+  commit with its patches, the Wii U. It draws with Cemu's OpenGL renderer
+  on the computer's graphics card. A game is a .wua, a zip of its NUS
+  folder (with its add-on content's in a slot of its own), a .wuhb or an
+  .rpx. The core carries no Nintendo key: every key upstream holds is
+  taken out as it is built (the common key, SpotPass, amiibo and NFC, the
+  icon keys), and a test looks for each one in the package and the
+  history. The Wii U common key, which a NUS zip needs, is firmware the
+  user gives (owner, 2026-11-03). The local history held the NFC reader's
+  key in a patch, so the published history starts with one commit that
+  holds the final tree (owner, 2026-11-04). The console's Mii resource is
+  firmware, and the Mii Resource setting's default; the console's fonts
+  are a setting of three values, Cemu's free stand-in font (the default),
+  Cemu's copies, or the console's own. Tested on the repository's own Wii
+  U test programs, and on New Super Mario Bros. U from its NUS files:
+  played from boot into its first level on Linux with software OpenGL,
+  its history over that level sought into on Windows, and, with the
+  published package in Chimera's window on Windows, to the SpotPass notice
+  after the title screen (2000 frames). First build "Development build
+  9808cfa8 (made 2026-11-04 15:53 CET)"; the first CI run had stopped on a
+  package the runner lacked (libxrender-dev). Not proved: any other game,
+  any other level, AMD or Intel graphics cards, and macOS.
+
+Nothing in Chimera's own source changed: two roster rows and the README's
+rows.
