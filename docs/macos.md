@@ -1,9 +1,13 @@
-# macOS (x86-64)
+# macOS
 
 This is the state of the macOS port: what is built, what has been tested, and
-what has not. The port is for the x86-64 processor. On an Apple silicon Mac the
-x86-64 build runs under Rosetta 2. A native Apple silicon build is a separate
-piece of work and is not done here.
+what has not. It is built for both kinds of Mac, each on its own kind:
+x86-64 for an Intel Mac (an Apple silicon Mac can run it too, under Rosetta 2)
+and arm64 for Apple silicon. The cross file names the processor:
+`extern/meson/macos-x86_64.ini` or `extern/meson/macos-aarch64.ini`, and the
+build folders below are named after it. What this page says was measured on
+x86-64; the arm64 build is new (2026-11-04) and has so far been built and
+tested only by CI's macOS job, on GitHub's Apple silicon runner.
 
 ## Which macOS
 

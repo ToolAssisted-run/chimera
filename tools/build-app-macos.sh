@@ -1,8 +1,10 @@
 #!/bin/bash
-# Makes Chimera.app from an x86-64 macOS build: the window, its libraries, Qt
-# (the frameworks, plugins and QML the window uses) and ffmpeg, in one folder
-# that runs on its own, on an Intel Mac or, under Rosetta 2, on an Apple silicon
-# one. Like the other bundles it carries NO CORES (docs/core-manager.md): they
+# Makes Chimera.app from a macOS build, x86-64 or arm64: the window, its
+# libraries, Qt (the frameworks, plugins and QML the window uses) and ffmpeg,
+# in one folder that runs on its own. An x86-64 app runs on an Intel Mac or,
+# under Rosetta 2, on an Apple silicon one; an arm64 app on Apple silicon
+# only. The CPU is the build's (its chimera program's). Like the other
+# bundles it carries NO CORES (docs/core-manager.md): they
 # go in ~/Library/Application Support/Chimera/Cores, where Chimera looks.
 #
 #   tools/build-app-macos.sh --dll <installed dll dir> --qt <Qt prefix> --out <Chimera.app> [--icon <Chimera.icon>]
@@ -42,7 +44,12 @@ dll="$(cd "$dll" && pwd)"
 qt="$(cd "$qt" && pwd)"
 [ -x "$qt/bin/macdeployqt" ] || { echo "build-app-macos: $qt/bin/macdeployqt is not there" >&2; exit 1; }
 [ -x "$dll/chimera" ] || { echo "build-app-macos: $dll/chimera is not there (meson install first)" >&2; exit 1; }
-case "$(file -b "$dll/chimera")" in *x86_64*) ;; *) echo "build-app-macos: $dll/chimera is not an x86-64 program" >&2; exit 1 ;; esac
+# the CPU the app is for: the build's
+case "$(file -b "$dll/chimera")" in
+	*x86_64*) arch=x86_64 arch_name=x86-64 ;;
+	*arm64*) arch=arm64 arch_name=arm64 ;;
+	*) echo "build-app-macos: $dll/chimera is neither an x86-64 nor an arm64 program" >&2; exit 1 ;;
+esac
 
 say() { printf "\n== %s\n" "$1"; }
 
@@ -164,11 +171,11 @@ say "Qt (macdeployqt)"
 rm -rf "$app/PlugIns/sqldrivers"
 # Qt's frameworks are one build for both processors; only the half this app is
 # is kept
-say "keeping the x86-64 half of Qt"
+say "keeping the $arch_name half of Qt"
 before="$(du -sk "$out" | cut -f1)"
 while IFS= read -r f; do
 	if lipo -info "$f" 2> /dev/null | grep -q "Architectures in the fat file"; then
-		lipo -thin x86_64 "$f" -output "$f.thin" && mv "$f.thin" "$f"
+		lipo -thin "$arch" "$f" -output "$f.thin" && mv "$f.thin" "$f"
 	fi
 done < <(find "$app" -type f \( -name "*.dylib" -o -perm -u+x -o -path "*.framework/Versions/*/*" \) ! -name "*.plist" ! -name "*.sh" ! -name "*.py" ! -name "*.json" ! -name "*.qml" ! -name "*.txt" 2> /dev/null)
 echo "  $((before / 1024)) MiB -> $(($(du -sk "$out" | cut -f1) / 1024)) MiB"
@@ -176,11 +183,11 @@ echo "  $((before / 1024)) MiB -> $(($(du -sk "$out" | cut -f1) / 1024)) MiB"
 # ---- the licences and the stamp -------------------------------------------------
 say "licences and build stamp"
 {
-	printf "Chimera macOS (x86-64) app\n"
+	printf "Chimera macOS (%s) app\n" "$arch_name"
 	printf "chimera:   %s %s\n" "$(git -C "$root" rev-parse HEAD)" "$(git -C "$root" log -1 --format=%s | cut -c1-60)"
 	printf "\nguest kit:\n"
 	git -C "$root" submodule status extern/chimera-common-minibox 2> /dev/null | sed 's/^/  /'
-	printf "\nQt: %s (Qt's own download, one build for both processors; the x86-64 half kept)\n" "$(basename "$(dirname "$qt")")"
+	printf "\nQt: %s (Qt's own download, one build for both processors; the %s half kept)\n" "$(basename "$(dirname "$qt")")" "$arch_name"
 	printf "\ncores: none, and Chimera downloads none. Get a core's package from its\n"
 	printf "project and put it in ~/Library/Application Support/Chimera/Cores; a movie names the\n"
 	printf "exact package that recorded it.\n"
