@@ -12812,3 +12812,35 @@ synthetic test core (built with the Linux guest toolchain). Two GPU-bridge test
 sections skip what OpenGL 4.1 does not have, and the Alt-letter check of the key
 filter test is skipped on macOS, where Qt has no menu mnemonics. Not tested: a
 real Intel Mac, the window on a screen, a GPU renderer.
+
+## ffmpeg on macOS is the same 4.4.1, from the Internet Archive's copy (user-decided, 2026-11-03)
+
+Decided: a macOS (x86-64) build of Chimera gets the ffmpeg 4.4.1 the Linux and
+Windows bundles have, rather than a newer one, so that the three encode alike.
+
+The project's own ffmpeg source (TASEmulators/ffmpeg-binaries) has no macOS
+build. The owner chose evermeet.cx's static Intel build, which the ffmpeg site
+links to. evermeet.cx's list for 4.4.1 gives a 23,885,067 byte zip, but that
+file is no longer served: asked for, it was a 404, and the site's own link for it
+redirects to another host, which answers 403. The owner then named the Internet
+Archive's copy of the very file
+(web.archive.org/web/20211106005402/https://evermeet.cx/ffmpeg/ffmpeg-4.4.1.zip),
+which is 23,885,067 bytes, as listed.
+
+Pinned in tools/fetch-ffmpeg.sh as for the other platforms, the archive and the
+binary each by their sha256: archive d7f3ea44...cdb3, binary 996952e6...dbfb.
+The binary is a Mach-O x86-64 executable, `4.4.1-tessus`, built with
+--enable-gpl --enable-version3 and not --enable-nonfree. Every encoder the
+presets name is in it (libx264, libx264rgb, utvideo, ffv1, aac, flac, libmp3lame,
+libvpx, libxvid, libtheora, libvorbis, pcm_s16le). Its signature was not
+checked (evermeet.cx's detached signature was not fetched), so what vouches
+for it is the hashes of the copy that was looked at.
+
+The script was made to run on a Mac too: `shasum` where there is no `sha256sum`,
+no bash 4 syntax, and `unzip` for a .zip.
+
+Tested (Apple M1, macOS 27, the x86-64 build under Rosetta 2): the script
+downloads, checks both hashes and unpacks it; the window, run with a Lua script,
+encoded 120 frames of Super Mario Bros. through quickerNES to an H.264 and AAC
+Matroska file, which ffmpeg reads back as 2.04 s at 256x240. Not tried: the
+other presets, and an Intel Mac.

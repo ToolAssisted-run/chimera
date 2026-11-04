@@ -48,6 +48,8 @@ pkg_config_libdir = '<folder>/6.12.0/macos/lib/pkgconfig'
 ```
 
 Run it with `build/x86_64-macos/dll/chimera --project <project> --core <package>`.
+Encoding a video needs the ffmpeg beside the program:
+`tools/fetch-ffmpeg.sh macos build/x86_64-macos/dll` (docs/encode-video.md).
 The window finds Qt's frameworks where they were installed (an rpath). A bundle
 that carries its own (macdeployqt) is not made yet.
 

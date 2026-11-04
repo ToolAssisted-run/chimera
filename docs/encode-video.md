@@ -122,6 +122,13 @@ cached in `build/deps`, so it costs nothing after the first build.
 It is a separate GPL v3 program run over a pipe, and `dll/ffmpeg-LICENSE.txt`
 carries its licence, both hashes and the release it was built from.
 
+macOS (x86-64, which an Apple silicon Mac runs under Rosetta 2) has the same
+4.4.1, built by Helmut K. C. Tessarek for evermeet.cx with the same encoders
+and GPL v3. evermeet.cx no longer serves that release, so the script takes the
+Internet Archive's copy of the file, pinned by its hashes like the others.
+`tools/fetch-ffmpeg.sh macos <folder>` puts it there; a bundle for macOS
+is not made yet, so a build in `build/x86_64-macos/dll` is given it by hand.
+
 ## From a script
 
 The same job, without the window:
