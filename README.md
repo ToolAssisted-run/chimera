@@ -6,8 +6,8 @@
 
 <p align="center">
 	<picture>
-		<source media="(prefers-color-scheme: dark)" srcset="docs/icon-dark.svg">
-		<img src="docs/icon.svg" alt="Chimera - four pixel modules around the beast's eye" width="140" align="middle">
+		<source media="(prefers-color-scheme: dark)" srcset="docs/Chimera.icon/Assets/icon-dark.svg">
+		<img src="docs/Chimera.icon/Assets/icon.svg" alt="Chimera - four pixel modules around the beast's eye" width="140" align="middle">
 	</picture>
 	&nbsp;&nbsp;
 	<picture>

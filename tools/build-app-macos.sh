@@ -15,7 +15,7 @@
 #   --icon an Icon Composer icon (a Chimera.icon folder; docs/Chimera.icon is the
 #          default), compiled with actool into the app's light and dark icon. It
 #          needs Xcode 26 or later; with an older one, or none, the icon is drawn
-#          from docs/icon.svg instead, with no dark version
+#          from the icon's own icon.svg instead, with no dark version
 #
 # Layout, which the program finds its neighbours by (Contents/MacOS is the
 # program's own folder, as the Linux bundle's top folder is):
@@ -121,6 +121,7 @@ EOF
 icons="$(mktemp -d)"
 trap 'rm -rf "$icons"' EXIT
 icon_name=""
+[ -d "$icon" ] || echo "  (no icon at $icon; drawing one from the icon's icon.svg)" >&2
 if [ -d "$icon" ]; then
 	# the icon as Icon Composer made it: Assets.car (light and dark) and an .icns
 	# for what is older; the plist keys it wants come out of the compile
@@ -132,14 +133,14 @@ if [ -d "$icon" ]; then
 		icon_name="$(basename "$icon" .icon)"
 		echo "  icon: $icon"
 	else
-		echo "  (actool could not compile $icon - it needs Xcode 26 or later; drawing the icon from docs/icon.svg)" >&2
+		echo "  (actool could not compile $icon - it needs Xcode 26 or later; drawing the icon from its icon.svg)" >&2
 		sed 's/^/    /' "$icons/actool.log" | tail -n 5 >&2
 	fi
 fi
 if [ -z "$icon_name" ]; then
 	mkdir "$icons/Chimera.iconset"
 	# the mark, drawn at every size from the vector
-	qlmanage -t -s 1024 -o "$icons" "$root/docs/icon.svg" > /dev/null 2>&1
+	qlmanage -t -s 1024 -o "$icons" "$root/docs/Chimera.icon/Assets/icon.svg" > /dev/null 2>&1
 	if [ -f "$icons/icon.svg.png" ]; then
 		for size in 16 32 128 256 512; do
 			sips -z $size $size "$icons/icon.svg.png" --out "$icons/Chimera.iconset/icon_${size}x${size}.png" > /dev/null
