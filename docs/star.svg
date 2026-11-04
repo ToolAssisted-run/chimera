@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="560" height="84" viewBox="0 0 560 84" role="img" aria-label="Enjoying Chimera? Give it a star on GitHub. Stars help other players find the project.">
+	<rect x="2" y="2" width="556" height="80" rx="12" fill="#8A63E8" stroke="#2DB3A6" stroke-width="4"/>
+	<g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" fill="#FFFFFF" text-anchor="middle">
+		<text x="280" y="38" font-size="20" font-weight="700">Enjoying Chimera? Give it a <tspan fill="#F6A821">&#9733;</tspan> on GitHub</text>
+		<text x="280" y="62" font-size="14">Stars help other players find the project.</text>
+	</g>
+</svg>
