@@ -505,56 +505,6 @@ executable(
   install_dir: 'dll',
 )
 
-if cross_build_for_other_os
-  # The one unit test that is also built for Windows, by hand
-  # (meson compile -C build/meson-windows test_mcp): the pipe under the MCP
-  # server is different code on each system, and the Windows half can be run
-  # from Linux through WSL. The other tests are built for the host only.
-  executable(
-    'test_mcp',
-    ['source/engine/tests/test_mcp.cpp'],
-    include_directories: engine_inc,
-    cpp_args: engine_build_args + ['-UNDEBUG'],
-    c_args: engine_build_args,
-    dependencies: [engine_dep],
-    build_by_default: false,
-  )
-  # The same by hand for the files under a folder whose name is not plain
-  # ASCII (meson compile -C build/meson-windows test_utf8_paths): the C
-  # library reads such a path differently on Windows, so it is proved there.
-  # The same for the stubs a call into the guest takes on Windows
-  # (meson compile -C build/meson-windows test_guest_calls; run it with
-  # libminiboxhost.dll beside it): on Linux a guest call needs none.
-  executable(
-    'test_guest_calls',
-    ['source/engine/tests/test_guest_calls.cpp'],
-    include_directories: engine_inc,
-    cpp_args: engine_build_args + ['-UNDEBUG'],
-    c_args: engine_build_args,
-    dependencies: [engine_dep],
-    build_by_default: false,
-  )
-  # And for the GL bridge's context on Windows (WGL; run it on a machine with a
-  # GPU): a session's objects go with it.
-  executable(
-    'test_gl_session',
-    ['source/engine/tests/test_gl_session.cpp'],
-    include_directories: engine_inc,
-    cpp_args: engine_build_args + ['-UNDEBUG'],
-    c_args: engine_build_args,
-    dependencies: [engine_dep],
-    build_by_default: false,
-  )
-  executable(
-    'test_utf8_paths',
-    ['source/engine/tests/test_utf8_paths.cpp'],
-    include_directories: engine_inc,
-    cpp_args: engine_build_args + ['-UNDEBUG'],
-    c_args: engine_build_args,
-    dependencies: [engine_dep],
-    build_by_default: false,
-  )
-endif
 
 if not cross_build_for_other_os
   # Not a test: what a captured frame costs when the budget is full and
@@ -577,24 +527,30 @@ if not cross_build_for_other_os
   test('synth_texts', find_program('python3'),
     args: [files('tools/check-core-texts.py'), meson.project_source_root() / 'tests/synth/package-box'])
 
-  foreach engine_test : ['sha1', 'movie_log', 'movie_entry', 'control_names', 'state_container', 'state_format', 'package', 'multifile', 'project', 'firmware', 'state_history', 'media', 'gl_flight', 'gl_sync', 'gl_buffer_pool', 'stride_tuner', 'plain_numbers', 'greenzone_shape', 'ram_search', 'kept_pictures', 'game_properties', 'mcp', 'average_fps', 'compile_sessions', 'host_machine', 'utf8_paths', 'work_thread', 'guest_calls', 'gl_session', 'resampler', 'language']
-    test(
-      'engine_' + engine_test,
-      executable(
-        'test_' + engine_test,
-        ['source/engine/tests/test_' + engine_test + '.cpp'],
-        include_directories: engine_inc,
-        cpp_args: engine_build_args + ['-UNDEBUG'],  # these tests ARE asserts
-        c_args: engine_build_args,
-        dependencies: [engine_dep],
-      ),
-      # (the state container test finds libzstd the way the shipped library
-      # does: beside its own binary, which in the build dir it is)
-      # RAM search takes 9 s here and 28 to 30 s on a CI runner
-      timeout: engine_test == 'ram_search' ? 120 : 30,
-    )
-  endforeach
 endif
+
+# The engine's tests, for every system the engine is built for. A build for
+# another system than the one it is made on (Windows, from Linux) cannot run
+# them where it is made: tools/export-tests.py lists them with their files,
+# and tools/run-tests.py runs that list on a machine of that system (the
+# Windows CI jobs, x64 and arm64).
+foreach engine_test : ['sha1', 'movie_log', 'movie_entry', 'control_names', 'state_container', 'state_format', 'package', 'multifile', 'project', 'firmware', 'state_history', 'media', 'gl_flight', 'gl_sync', 'gl_buffer_pool', 'stride_tuner', 'plain_numbers', 'greenzone_shape', 'ram_search', 'kept_pictures', 'game_properties', 'mcp', 'average_fps', 'compile_sessions', 'host_machine', 'utf8_paths', 'work_thread', 'guest_calls', 'gl_session', 'resampler', 'language']
+  test(
+    'engine_' + engine_test,
+    executable(
+      'test_' + engine_test,
+      ['source/engine/tests/test_' + engine_test + '.cpp'],
+      include_directories: engine_inc,
+      cpp_args: engine_build_args + ['-UNDEBUG'],  # these tests ARE asserts
+      c_args: engine_build_args,
+      dependencies: [engine_dep],
+    ),
+    # (the state container test finds libzstd the way the shipped library
+    # does: beside its own binary, which in the build dir it is)
+    # RAM search takes 9 s here and 28 to 30 s on a CI runner
+    timeout: engine_test == 'ram_search' ? 120 : 30,
+  )
+endforeach
 
 # Chimera's window (Qt 6.12, issue 142): source/ui/meson.build
 if get_option('qt_ui').allowed()

@@ -13134,3 +13134,29 @@ None has a graphics card.
 library an arm64 Windows file that needs only Windows' own DLLs and the ones it
 carries (Qt, libc++, libunwind). It has not run anywhere yet: this computer's
 Windows is x64.
+
+## Chimera's tests run on Windows: built on Linux, run on a Windows machine (user-decided, 2026-11-04)
+
+**What was decided.** Until now no test of Chimera ran on Windows in CI, x64
+included: the engine's tests were built for the machine that builds them, and
+the Windows build is made on Linux. The owner chose to test what ships: the
+Windows build is made as the release makes it (on Linux, mingw-w64's GCC for
+x64, llvm-mingw's clang for arm64), and its tests are run on a Windows machine
+of its CPU, rather than a second build on Windows with other compilers.
+
+**How.** The engine's tests are built for every system now (meson.build), the
+Windows cross builds included. tools/export-tests.py packs a build's tests -
+meson's own list of them and every file they name - into one folder, with
+tools/run-tests.py, which runs them on Windows as meson test would (each
+program with its arguments, folder, environment and timeout) and fails if one
+fails. CI's windows job builds each CPU on Linux (arm64 on an arm runner, so
+that the synthetic test core it needs is arm64 too) and windows-test runs the
+pack on windows-2025 and windows-11-arm. The one engine test that cannot be
+written the same on Windows - a write failing because of the process's file
+size limit, which Windows has not got - is Linux's and macOS's only.
+
+**Measured, the first run on Windows** (x64, this computer's Windows 11, from
+a pack made here): 31 of the 34 tests pass. Three fail, and are open: the
+state history's disk accounting (test_state_history.cpp:842), the media
+folder's listing (test_media.cpp:506), and the view models' test, which dies
+of an access violation in host code. These were never run on Windows before.

@@ -165,3 +165,94 @@ jobs:
         with:
           name: witness-full-work-${{ matrix.arch }}
           path: tests/synth/work/
+
+  windows:
+    # Chimera for Windows, x64 and arm64, built the way the release builds it:
+    # on Linux, with mingw-w64's GCC (x64) or llvm-mingw's clang (arm64), and
+    # with the synthetic test core of the same CPU (built here, natively: the
+    # arm64 build is made on an arm64 runner for that). The tests are packed
+    # (tools/export-tests.py) for windows-test to run on Windows.
+    name: windows ${{ matrix.cpu }} (built on Linux)
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - cpu: x64
+            runner: ubuntu-latest
+            cross: mingw-w64.ini
+          - cpu: arm64
+            runner: ubuntu-26.04-arm
+            cross: mingw-w64-aarch64.ini
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Check out what the build needs
+        run: git submodule update --init --recursive extern
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends meson ninja-build build-essential cmake pkg-config python3
+          if [ "${{ matrix.cpu }}" = x64 ]; then sudo apt-get install -y --no-install-recommends mingw-w64; fi
+
+      - name: llvm-mingw (pinned, checked by its SHA256)
+        if: matrix.cpu == 'arm64'
+        run: tools/fetch-llvm-mingw.sh "$HOME/llvm-mingw" >> "$GITHUB_PATH"
+
+      - name: The synthetic test core, for this CPU
+        run: |
+          mb=extern/chimera-common-minibox
+          meson setup "$mb/build/meson-linux" "$mb"
+          meson compile -C "$mb/build/meson-linux"
+          sh tests/synth/package-box/build-box.sh
+          ./tests/synth/build-package.sh
+
+      - name: Build for Windows (${{ matrix.cpu }})
+        run: |
+          meson setup build/meson-windows --prefix "$PWD/build" --libdir dll --cross-file extern/meson/${{ matrix.cross }}
+          meson compile -C build/meson-windows
+
+      - name: Pack the tests
+        run: python3 tools/export-tests.py build/meson-windows build/windows-tests
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-tests-${{ matrix.cpu }}
+          path: build/windows-tests/
+          if-no-files-found: error
+          retention-days: 3
+
+  windows-test:
+    # The tests of each Windows build, on a Windows machine of its CPU: what
+    # Chimera's own engine and view models do on Windows, which no Linux job
+    # can show (the files, the threads, the guest calls, the fault handler)
+    name: windows ${{ matrix.cpu }} (tests on ${{ matrix.runner }})
+    needs: windows
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - cpu: x64
+            runner: windows-2025
+          - cpu: arm64
+            runner: windows-11-arm
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-tests-${{ matrix.cpu }}
+          path: windows-tests
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run the tests
+        working-directory: windows-tests
+        run: python run-tests.py .
+

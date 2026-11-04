@@ -22,7 +22,9 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <csignal>
+#ifndef _WIN32
 #include <sys/resource.h>
+#endif
 #include <map>
 #include <string>
 #include <new>
@@ -712,6 +714,9 @@ int main(void)
 		std::filesystem::remove_all("work-history-elsewhere");
 	}
 
+#ifndef _WIN32
+	// (POSIX only: Windows has no cap on a process's file size to make the
+	// write fail with)
 	{ // A spill whose WRITE fails - the file opened, then the disk filled - gives
 	  // its stretch back whole. The writer used to throw the stretch's bodies
 	  // away before saying the write had failed, so the stretch came back empty
@@ -759,6 +764,7 @@ int main(void)
 		assert(restored > 0);
 		std::filesystem::remove_all("work-history-capped");
 	}
+#endif
 
 	{ // Running out of memory halves the budget instead of ending the session.
 	  //
