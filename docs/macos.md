@@ -170,9 +170,13 @@ On an Apple M1, macOS 27, the x86-64 build under Rosetta 2:
 
 - miniBox's unit tests: all 13 pass.
 - The engine's tests: all 33 pass.
-- The window's tests that do not need the synthetic test core: pass (47 of 60
-  in all). The other 13 need `synth-box` and its test game, which are built
-  with miniBox's Linux guest toolchain, so they were not run.
+- All 59 of Chimera's tests, one at a time, with the synthetic test core
+  (`synth-box` and its test game) built on Linux and copied in: the window, the
+  view models, TAStudio, the MCP server and Lua, with the core run by miniBox
+  under the gs swap. The CI workflow (`.github/workflows/macos.yml`) does the
+  same on an Intel runner: a Linux job builds the core, the macOS job the rest.
+  Run side by side, three window tests that measure for one second spent it
+  starting up, so the workflow runs them one at a time.
 - Cores, published x86-64 packages with a game of the user's own: quickerNES
   (Super Mario Bros.), Mesen (the same), Snes9x (Plok) and Genesis Plus GX
   (Sonic, Master System) each ran 200 to 300 frames with a save and a load of

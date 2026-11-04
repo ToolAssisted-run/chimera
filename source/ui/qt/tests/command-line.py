@@ -92,15 +92,25 @@ def run_copy():
         return None
 
 
-r = run_copy()
-check(r is not None and r.returncode == 0 and "F7" in settings_in(program) and settings_in(own["XDG_CONFIG_HOME"]) == "",
-      "the settings file is beside the program", r and r.stderr.strip()[-300:])
-os.remove(os.path.join(program, "settings.json"))
-os.chmod(program, 0o555)
-r = run_copy()
-os.chmod(program, 0o755)
-check(r is not None and r.returncode == 0 and settings_in(program) == "" and "F7" in settings_in(own["XDG_CONFIG_HOME"]),
-      "a program folder that cannot be written keeps them in the person's own", r and r.stderr.strip()[-300:])
+if sys.platform == "darwin":
+    # on a Mac they are in the data folder, ~/Library/Application Support/Chimera
+    # (CHIMERA_DATA_HOME says another), and never beside the program: it is in a
+    # signed app (owner, 2026-11-03)
+    data = os.path.join(work, "data")
+    own["CHIMERA_DATA_HOME"] = data
+    r = run_copy()
+    check(r is not None and r.returncode == 0 and "F7" in settings_in(data) and settings_in(program) == "",
+          "the settings file is in the data folder, not beside the program", r and r.stderr.strip()[-300:])
+else:
+    r = run_copy()
+    check(r is not None and r.returncode == 0 and "F7" in settings_in(program) and settings_in(own["XDG_CONFIG_HOME"]) == "",
+          "the settings file is beside the program", r and r.stderr.strip()[-300:])
+    os.remove(os.path.join(program, "settings.json"))
+    os.chmod(program, 0o555)
+    r = run_copy()
+    os.chmod(program, 0o755)
+    check(r is not None and r.returncode == 0 and settings_in(program) == "" and "F7" in settings_in(own["XDG_CONFIG_HOME"]),
+          "a program folder that cannot be written keeps them in the person's own", r and r.stderr.strip()[-300:])
 
 shot = os.path.join(work, "chromeless.png")
 r = run("--chromeless", "--luaconsole", "--measure", "0.5", "--screenshot", shot)

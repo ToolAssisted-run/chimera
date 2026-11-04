@@ -219,7 +219,10 @@ private:
 static QString ownFolder()
 {
 #ifdef __APPLE__
-	const QString folder = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
+	/* CHIMERA_DATA_HOME, which decides the data folder wherever it is set, decides it here too */
+	const QString env = qEnvironmentVariable("CHIMERA_DATA_HOME");
+	const QString folder = !env.trimmed().isEmpty() ? QFileInfo(env).absoluteFilePath()
+		: QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
 	if (!folder.isEmpty())
 	{
 		QDir().mkpath(folder);

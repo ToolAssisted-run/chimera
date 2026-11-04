@@ -9,6 +9,7 @@
 #include <tuple>
 #include <cstdio>
 #include <filesystem>
+#include <limits>
 #include <fstream>
 #include <iterator>
 #include <map>
@@ -18,6 +19,13 @@
 #include "chimera/vm/process_stamp.hpp"
 
 namespace chimera::vm {
+
+namespace
+{
+/* a cache item no file of which was ever written: older than any, and no date */
+constexpr int64_t kNeverUsed = std::numeric_limits<int64_t>::min();
+} // namespace
+
 
 namespace {
 /* a project's id as a folder name: one name, never "." or ".." (which would put
@@ -560,8 +568,10 @@ void CacheManagerViewModel::survey()
 			}
 		ec.clear();
 		/* a folder with no files keeps the least time: older than any used (0 is not -
-		 * this clock counts today below it); not given to the clocks, which overflow on it */
-		item.lastUsed = static_cast<int64_t>(newest.time_since_epoch().count());
+		 * this clock counts today below it); not given to the clocks, which overflow on it.
+		 * The least of int64_t, not the clock's own: Apple's library counts this clock in
+		 * 128 bits, whose least cut to 64 bits is 0, a date */
+		item.lastUsed = newest == fs::file_time_type::min() ? kNeverUsed : static_cast<int64_t>(newest.time_since_epoch().count());
 		const auto lock = said.find(item.folder);
 		item.locked = lock != said.end() ? lock->second : lockedByDefault(item.kind);
 	};
@@ -665,7 +675,7 @@ Value CacheManagerViewModel::Rows::cell(int64_t row, int32_t column) const
 	case 16: return !i.projectPath.empty() ? (i.orphan ? tr("cache.path_not_found", {i.projectPath}) : i.projectPath) : i.unsavedWork ? std::string() : tr("cache.never_recorded");
 	case 17:
 	{
-		if (i.lastUsed == fs::file_time_type::min().time_since_epoch().count()) return std::string();
+		if (i.lastUsed == kNeverUsed) return std::string();
 		const auto sys = std::chrono::file_clock::to_sys(fs::file_time_type(fs::file_time_type::duration(i.lastUsed)));
 		const std::time_t t = std::chrono::system_clock::to_time_t(std::chrono::time_point_cast<std::chrono::system_clock::duration>(sys));
 		std::tm local{};

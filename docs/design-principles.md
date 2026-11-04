@@ -12893,3 +12893,36 @@ Tested (x86-64, Apple M1): every Mach-O in the rebuilt app asks for 14.4 at
 most; the engine's tests (test_plain_numbers among them) and the window's tests
 give the same 47 passes. Not tried: the app on a Mac older than macOS 27 (the
 only one at hand is 27.2), and an Intel Mac.
+
+## What the tests with the synthetic core found on macOS (2026-11-04)
+
+The macOS CI job ran the tests that need the synthetic test core (the package a
+Linux job builds), which had not run on a Mac before. What they found:
+
+- **A race in a test, not the port.** `view models` crashed about three runs in
+  five (SIGSEGV or SIGABRT in `lua_load`, a new closure with a garbage upvalue).
+  A Lua library built to abort when two threads are in one state at once showed
+  it: `luaParity` gave the machine thread a show-future turn that asks Lua, and
+  ran its own scripts on the test's thread, so both were in the state together.
+  The test now runs scripts on the machine's thread, as the window does. Linux
+  has the same race; timing hid it there. Five runs with the checking library
+  after the fix: no crash, no concurrent entry.
+- **macOS has no /proc.** `processStarted` (whether a recovery folder's writer
+  still runs) read `/proc/<pid>/stat`; on a Mac it now asks `proc_pidinfo`.
+- **A clock counted in 128 bits.** The cache manager kept "never used" as the
+  file clock's least time cut to 64 bits; Apple's library counts that clock in
+  128, whose least cut to 64 is 0, a date. It is now the least of int64_t.
+- **Names and limits.** A shared memory name may have 31 characters on a Mac (a
+  test's had 35); the gamepad test's stand-in SDL is `libSDL2.dylib`, found by
+  `DYLD_LIBRARY_PATH`; the settings test checks Application Support on a Mac,
+  whose folder `CHIMERA_DATA_HOME` now decides too.
+- **Timing.** A test slept a tenth of a second for a picture, which a Mac under
+  Rosetta 2 has later: it waits for it now. Window tests that measure for a
+  second spent it starting up when run side by side: CI runs them one at a time.
+- **miniBox (bce3c5a).** The escape's call into the gs swap wrote over the stack
+  bounds it then restores, and a thread with no gs block got one with no magic
+  word. Neither caused the crashes; both are fixed.
+
+Tested (x86-64 under Rosetta 2, Apple M1, macOS 27, the synthetic core from the
+CI's Linux job): all 59 tests pass, run one at a time; miniBox's 13 unit tests
+pass. Not tried yet: the CI run with these changes.

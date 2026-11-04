@@ -117,7 +117,11 @@ jobs:
           path: .
 
       - name: Unit tests (the engine, the view models, the window)
-        run: meson test -C build/meson-macos-x86_64 --no-rebuild --print-errorlogs
+        # without --no-rebuild: meson builds what the tests are given, the test
+        # projects made from the synthetic core among it
+        # one at a time: run side by side, the window tests that measure for a second
+        # spent it starting up (the first frame alone took near a second)
+        run: meson test -C build/meson-macos-x86_64 --print-errorlogs --num-processes 1
 
       - name: Upload test logs
         if: failure()
