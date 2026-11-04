@@ -69,6 +69,33 @@ the Command key (Chimera's Ctrl is Qt's Meta there), and a Mac's menus have
 no Alt letters. The file chooser of docs/file-picker.md is Qt's own dialog on a
 Mac, so the test of the Linux chooser is not built.
 
+## The app
+
+`tools/build-app-macos.sh` makes `Chimera.app` from an installed build: the
+window, Chimera's libraries, Qt's frameworks, plugins and QML (put in by Qt's
+`macdeployqt`, then cut to the x86-64 half, since Qt's download is one build
+for both processors), the helper programs and ffmpeg, signed ad hoc.
+
+```sh
+tools/fetch-ffmpeg.sh macos build/x86_64-macos/dll
+tools/build-app-macos.sh --dll build/x86_64-macos/dll --qt <qt folder>/6.12.0/macos --out build/Chimera.app
+```
+
+The program's own folder is `Contents/MacOS`, and what Chimera keeps "beside
+the program" is there: `Cores/` (empty but for a README.txt), `Themes/`, and the
+`settings.json` and `Movies/` it makes. The app carries no cores: put a core's
+package in `Contents/MacOS/Cores`, or give the Core Manager another folder.
+Sound and gamepads need no setup: OpenAL Soft and SDL2 are in `Contents/Frameworks`
+and found there.
+
+It is ad hoc signed, not notarised, so another Mac asks before opening it
+(right-click, Open). And because Chimera writes `settings.json` and `Movies/`
+into its own folder, which is inside the app, the app's signature no longer
+verifies strictly after its first run (`codesign --verify --deep --strict`: "a
+sealed resource is missing or invalid"). It still runs. Keeping those beside
+`Chimera.app`, or in `~/Library/Application Support/Chimera`, would stop that:
+not done, as where a Mac install keeps its data is for the owner to decide.
+
 ## miniBox on macOS
 
 miniBox is the sandbox every core runs in. Two things are different on macOS.

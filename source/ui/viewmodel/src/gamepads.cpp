@@ -82,6 +82,12 @@ Gamepads::Gamepads() : api_(std::make_unique<Api>())
 	Api &a = *api_;
 #ifdef _WIN32
 	a.lib = LoadLibraryW(L"SDL2.dll");
+#elif defined(__APPLE__)
+	/* the program's own folder (a build) and the bundle's Frameworks, then
+	 * wherever the loader looks by name */
+	for (const char *name : {"@executable_path/libSDL2.dylib", "@executable_path/../Frameworks/libSDL2.dylib",
+	                         "@rpath/libSDL2.dylib", "libSDL2.dylib"})
+		if (a.lib == nullptr) a.lib = dlopen(name, RTLD_NOW | RTLD_LOCAL);
 #else
 	a.lib = dlopen("libSDL2.so", RTLD_NOW | RTLD_LOCAL);
 	if (a.lib == nullptr) a.lib = dlopen("libSDL2-2.0.so.0", RTLD_NOW | RTLD_LOCAL);

@@ -69,6 +69,12 @@ Sound::Sound(const std::string &device, int32_t bufferMs) : api_(std::make_uniqu
 	Api &a = *api_;
 #ifdef _WIN32
 	a.lib = LoadLibraryW(L"OpenAL32.dll");
+#elif defined(__APPLE__)
+	/* the program's own folder (a build) and the bundle's Frameworks, then
+	 * wherever the loader looks by name */
+	for (const char *name : {"@executable_path/libopenal.dylib", "@executable_path/../Frameworks/libopenal.dylib",
+	                         "@rpath/libopenal.dylib", "libopenal.dylib"})
+		if (a.lib == nullptr) a.lib = dlopen(name, RTLD_NOW | RTLD_LOCAL);
 #else
 	a.lib = dlopen("libopenal.so", RTLD_NOW | RTLD_LOCAL);
 	if (a.lib == nullptr) a.lib = dlopen("libopenal.so.1", RTLD_NOW | RTLD_LOCAL);
