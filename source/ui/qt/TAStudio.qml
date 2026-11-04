@@ -152,9 +152,14 @@ ApplicationWindow {
         "Clone # Times": cloneTimesAction, "Reselect Clip.": reselectAction
     })
 
-    menuBar: RowLayout {
+    // the system's menu bar on macOS, as in Main.qml
+    readonly property bool systemMenuBar: Qt.platform.os === "osx"
+    menuBar: systemMenuBar ? tasMenus : menuRow
+    RowLayout {
+        id: menuRow
         spacing: 0
         MenuBar {
+            id: tasMenus
             Layout.fillWidth: true
             Menu {
                 id: editMenu
@@ -296,6 +301,7 @@ ApplicationWindow {
             objectName: "hideTAStudio"
             text: qsTrId("tastudio.hide")
             flat: true
+            visible: !tas.systemMenuBar
             onClicked: { tas.hiddenByPerson = true; tas.hide() }
         }
     }
@@ -319,6 +325,15 @@ ApplicationWindow {
             value: parent.seeking ? Math.max(0, Math.min(100, 100 * (tas.pianoRoll.currentFrame - tas.session.seekFrom) / (tas.session.seekingTo - tas.session.seekFrom))) : 0
         }
         Item { Layout.fillWidth: true }
+        // macOS: the button beside the menus, which are the system's there
+        ToolButton {
+            objectName: "hideTAStudioStatus"
+            text: qsTrId("tastudio.hide")
+            flat: true
+            implicitHeight: 20
+            visible: tas.systemMenuBar
+            onClicked: { tas.hiddenByPerson = true; tas.hide() }
+        }
         Label {
             objectName: "splicerStatus"
             padding: 4

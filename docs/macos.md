@@ -51,6 +51,17 @@ Run it with `build/x86_64-macos/dll/chimera --project <project> --core <package>
 The window finds Qt's frameworks where they were installed (an rpath). A bundle
 that carries its own (macdeployqt) is not made yet.
 
+The menus are in the menu bar at the top of the screen, as on every Mac
+program, and the windows have no bar of their own (a window's menu bar shows
+while that window is the one in front: the main window's or a tool's). Qt does
+this for a `MenuBar` that is the window's own menu bar, so the main window and
+TAStudio, whose bar shared a row with a button, use the bar itself on a Mac. The
+"Show TAStudio" button is at the right of the main window's status bar, and
+TAStudio's "Hide" at the right of its status strip. The system draws these
+menus: an item's hotkey is not written beside it (a key given to an item as its
+shortcut is), the System and Emulator menus are greyed rather than left out
+while no game runs, and a tool window's menu bar colour setting has no effect.
+
 Two things are different on a Mac and the tests know it: Qt's Control key is
 the Command key (Chimera's Ctrl is Qt's Meta there), and a Mac's menus have
 no Alt letters. The file chooser of docs/file-picker.md is Qt's own dialog on a
