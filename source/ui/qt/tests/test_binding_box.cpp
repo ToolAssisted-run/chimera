@@ -76,7 +76,12 @@ int main(int argc, char **argv)
 	/* a key is bound when it is let go; Escape at once; Ctrl+S as itself */
 	QTest::keyClick(window, Qt::Key_A);
 	QTest::keyClick(window, Qt::Key_Escape);
+#ifdef __APPLE__
+	/* the Control key is Qt's Meta there (Qt's Control is Command: key_names.cpp) */
+	QTest::keyClick(window, Qt::Key_S, Qt::MetaModifier);
+#else
 	QTest::keyClick(window, Qt::Key_S, Qt::ControlModifier);
+#endif
 	QTest::qWait(100);
 	const QString taken = window->property("taken").toString();
 	std::printf("taken: %s, shortcuts: %d\n", qPrintable(taken), window->property("shortcuts").toInt());

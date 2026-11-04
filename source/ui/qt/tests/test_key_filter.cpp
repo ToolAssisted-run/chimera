@@ -86,11 +86,14 @@ int main(int argc, char **argv)
 	if (view == nullptr) return 1;
 	auto opened = [&] { return view->property("opened").toBool(); };
 
-	/* nothing takes Alt+V: its letter opens the View menu */
+#ifndef __APPLE__
+	/* nothing takes Alt+V: its letter opens the View menu (a Mac's menus have
+	 * no Alt letters, and Qt turns the mnemonics off there) */
 	QTest::keyClick(window, Qt::Key_V, Qt::AltModifier);
 	CHECK(QTest::qWaitFor(opened, 2000));
 	QMetaObject::invokeMethod(view, "close");
 	CHECK(QTest::qWaitFor([&] { return !opened(); }, 2000));
+#endif
 
 	/* a hotkey bound to it runs, and the menu stays shut */
 	int ran = 0;

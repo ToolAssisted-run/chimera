@@ -12801,7 +12801,14 @@ macOS), a protection fault arrives as `SIGBUS`, the stop signal is `SIGUSR2`,
 and the engine's GPU bridge uses Apple's CGL (OpenGL 4.1, so the entry points of
 4.2 and later are refused).
 
-Tested: miniBox's 13 unit tests and the engine's 33 tests pass, built for
-x86-64 and run under Rosetta 2. Not tested: running any core (miniBox's guest
-tests are Linux programs), a real Intel Mac, and the window. Two of the engine's
-GPU-bridge tests skip what OpenGL 4.1 does not have.
+Tested (x86-64, under Rosetta 2, Apple M1, macOS 27): miniBox's 13 unit tests
+and the engine's 33 tests pass. Four published cores (quickerNES, Mesen, Snes9x,
+Genesis Plus GX) ran 200 to 300 frames each with the whole machine saved and
+loaded around every frame; two runs of quickerNES gave identical memory, and so
+did the run with the round trip. The window (Qt 6.12, from Qt's own download)
+plays Super Mario Bros. through quickerNES at 61.5 frames a second, drawn by Qt's
+software renderer, offscreen. The window's tests pass except the 13 that need the
+synthetic test core (built with the Linux guest toolchain). Two GPU-bridge test
+sections skip what OpenGL 4.1 does not have, and the Alt-letter check of the key
+filter test is skipped on macOS, where Qt has no menu mnemonics. Not tested: a
+real Intel Mac, the window on a screen, a GPU renderer.

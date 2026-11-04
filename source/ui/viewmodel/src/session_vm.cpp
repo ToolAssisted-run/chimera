@@ -3293,7 +3293,11 @@ int64_t writtenAt(const std::filesystem::path &file)
 	std::error_code ec;
 	const auto t = std::filesystem::last_write_time(file, ec);
 	if (ec) return 0;
-	return static_cast<int64_t>(std::chrono::system_clock::to_time_t(std::chrono::clock_cast<std::chrono::system_clock>(t)));
+	/* the file clock's reading as the system clock's, by the two clocks' difference now
+	 * (std::chrono::clock_cast, which Apple's C++ library does not have) */
+	const auto sinceThen = std::chrono::file_clock::now() - t;
+	return static_cast<int64_t>(std::chrono::system_clock::to_time_t(
+		std::chrono::time_point_cast<std::chrono::system_clock::duration>(std::chrono::system_clock::now() - sinceThen)));
 }
 } // namespace
 
