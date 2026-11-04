@@ -145,6 +145,11 @@ if host_macos
   cmake_platform_args = ['-DCMAKE_OSX_ARCHITECTURES=' + (host_arm64 ? 'arm64' : 'x86_64'), '-DCMAKE_OSX_DEPLOYMENT_TARGET=14.4']
 endif
 zstd_out = host_windows ? 'libzstd.dll' : 'libzstd.' + shlib_ext
+# zstd's build hides every symbol and marks its API for export only under
+# MSVC. GCC for Windows ignores "hidden" and exports everything; clang
+# (llvm-mingw, Windows on arm64) does not, and the library exported nothing.
+# zstd's own switch marks the API.
+zstd_extra = (host_windows and host_arm64) ? ['-Dc_args=-DZSTD_DLL_EXPORT=1'] : []
 custom_target(
   'zstd',
   output: zstd_out,
@@ -156,7 +161,7 @@ custom_target(
     '@OUTPUT@',
     cross_arg,
     '-Dbin_programs=false', '-Dbin_tests=false', '-Dbin_contrib=false',
-  ],
+  ] + zstd_extra,
   console: true,
   install: true,
   install_dir: 'dll',

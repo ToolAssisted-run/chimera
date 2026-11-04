@@ -3020,10 +3020,18 @@ static void mint_context_id()
 		^ (static_cast<uint64_t>(ts.tv_sec) * 1000000000ull + static_cast<uint64_t>(ts.tv_nsec));
 #endif
 
+	/* The count of ids made goes in spread over every bit (times an odd
+	 * constant), not as it is: XOR-ed in as a small number it could undo the
+	 * clock term's change between two ids - a counter that moved by one tick
+	 * flips the same low bit as `made` going from 2 to 3 - and the id did not
+	 * move (seen on Windows on arm64, whose counter ticks slowly). And an id
+	 * is never the one before it, whatever the terms did. */
+	const uint64_t previous = g_context_id;
 	g_context_id = (static_cast<uint64_t>(reinterpret_cast<uintptr_t>(&g_context_id)) << 16)
 		^ (static_cast<uint64_t>(time(nullptr)) << 8)
 		^ per_process
-		^ (++made);
+		^ ((++made) * 0x9E3779B97F4A7C15ull);
+	if (g_context_id == previous) g_context_id++;
 	if (g_context_id == 0) g_context_id = 1; /* 0 means "cannot tell" */
 }
 

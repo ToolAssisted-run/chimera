@@ -281,7 +281,10 @@ const HostApi *hostApi(const char **error)
 	return &g_api;
 }
 
-#if defined(_WIN32)
+// Windows on x86-64 only: there the host speaks win64 and a guest sysv64.
+// Windows on arm64 has one convention for both (AAPCS64), as Linux and macOS
+// do, and calls a guest directly (below).
+#if defined(_WIN32) && defined(__x86_64__)
 
 namespace {
 
@@ -360,7 +363,7 @@ uintptr_t bridgeGuestCall(uintptr_t guestEntry, int argCount)
 uintptr_t bridgeGuestCall(uintptr_t guestEntry, int argCount)
 {
 	(void)argCount;
-	return guestEntry; // host and guest are both sysv64
+	return guestEntry; // host and guest share one convention: sysv64, or AAPCS64 on arm64
 }
 
 #endif
