@@ -2507,7 +2507,8 @@ forms.drawLine(pic, 0, 0, 10, 10, "red")
 forms.refresh(pic)
 forms.setproperty(button, "Width", 90)
 console.log("forms", form > 0, forms.gettext(box), forms.gettext(pick), forms.getproperty(button, "Left"), forms.getproperty(button, "Width"), forms.ischecked(tick), forms.button(12345, "x"), forms.createcolor(1, 2, 3, 4))
-local shared = "chimera-test-" .. tostring(os.time()) .. "-" .. tostring(math.random(1, 1000000))
+-- short: a Mac allows 31 characters in a shared memory name, with the suffixes below and the slash
+local shared = "ct-" .. tostring(os.time()) .. "-" .. tostring(math.random(1, 1000000))
 comm.mmfSetFilename(shared .. "-shot")
 mainmemory.write_bytes_as_array(0x60, {9, 8, 7})
 comm.mmfCopyFromMemory(shared .. "-ram", 0x60, 3)
@@ -4300,7 +4301,9 @@ bool machine(const char *package, const char *rom)
 	CHECK(right < 8);
 	roll.run("paint", {int64_t{5}, int64_t{25}, static_cast<int64_t>(right), true}, error);
 	CHECK(d.until([&] { return session.frame.get() == stopped && session.greenEnd.get() == stopped && session.lastSeekFrames.get() > 0; }, 20));
-	d.until([] { return false; }, 0.1);
+	/* the picture of the replay comes after it: waited for, not slept for, as a slower
+	 * machine (macOS under Rosetta 2) has it later than a tenth of a second */
+	d.until([&] { return pictureNow() != atStop; }, 5);
 	const std::vector<uint32_t> walked = pictureNow();
 	CHECK(walked != atStop); /* the walker walked: the edit reached the machine */
 	/* and taking the edit back gives the first picture again */
@@ -9138,6 +9141,10 @@ bool luaParity(const char *package, const char *rom)
 	MessagesViewModel messages(d);
 	paths.programFolder.set(dir.string());
 	LuaBridge lua;
+	/* scripts run on the machine's thread, as the window has them: the show-future
+	 * turn below asks Lua from there, and with scripts run here as well two threads
+	 * were in the one Lua state at once (a crash on macOS, a race everywhere) */
+	lua.toScripts = [&session](const std::function<void()> &job) { return session.onMachineThreadWait(job); };
 	LuaConsoleViewModel console(d, lua);
 	for (ViewModel *vm : std::initializer_list<ViewModel *>{&session, &roll, &display, &tools, &overlay, &forms, &paths, &debugger,
 			 &console, &messages})
@@ -10384,7 +10391,13 @@ bool soundRate(const char *package, const char *rom)
 		CHECK(d.until([&] { return session.frame.get() >= f0 + 120; }, 20));
 		session.run("pause", {}, error);
 		CHECK(d.until([&] { return !session.running.get(); }, 5));
-		d.until([] { return false; }, 0.2);
+		/* the last frames' sound is sent after them: waited for until the count stops
+		 * moving, not slept for (a slower runner, an Intel Mac on CI, was a frame short) */
+		for (int64_t last = -1, i = 0; i < 25 && session.soundQueued.get() != last; i++)
+		{
+			last = session.soundQueued.get();
+			d.until([] { return false; }, 0.2);
+		}
 		const int64_t frames = session.frame.get() - f0, pairs = session.soundQueued.get() - q0;
 		const double each = frames > 0 ? static_cast<double>(pairs) / static_cast<double>(frames) : 0.0;
 		std::printf("a 48000 Hz core: %.1f sample pairs a frame reach the speakers (the core makes 735)\n", each);

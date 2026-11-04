@@ -113,8 +113,9 @@ a checksum and ask the person to go and fetch it the first time they wanted a
 video; there is nothing to ask any more.
 
 It is machine code, so each bundle has the ffmpeg of its CPU: a Linux
-bundle's is built on the kind of machine it is for (x86-64 or arm64), and
-Windows' is x86-64.
+bundle's and a Mac's are built on the kind of machine they are for (x86-64
+or arm64), and Windows' is x86-64. A Mac's links the system's own
+libraries, as every Mac program does, and runs on macOS 14.4 or later.
 
 Since 2026-11-04 it is our own build (owner's choice, issue 492): FFmpeg 7.1.1
 with only what Encode Video's formats use, linked statically with x264 and
@@ -143,6 +144,13 @@ needs a C and C++ compiler, make, cmake, nasm and pkg-config.
 It is a separate GPL program (version 2 or later, because of x264 and x265),
 run over a pipe, and `ffmpeg-LICENSE.txt` beside it carries the GPL, each
 source's address and hash, and FFmpeg's configuration.
+
+macOS (x86-64, which an Apple silicon Mac runs under Rosetta 2) has the same
+4.4.1, built by Helmut K. C. Tessarek for evermeet.cx with the same encoders
+and GPL v3. evermeet.cx no longer serves that release, so the script takes the
+Internet Archive's copy of the file, pinned by its hashes like the others.
+`tools/fetch-ffmpeg.sh macos <folder>` puts it there; a bundle for macOS
+is not made yet, so a build in `build/x86_64-macos/dll` is given it by hand.
 
 ## From a script
 

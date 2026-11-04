@@ -12900,3 +12900,193 @@ window there with TAStudio open.
 
 Nothing in Chimera's own source changed: two roster rows and the README's
 rows.
+
+## macOS on x86-64: the guest's gs is swapped at every boundary (user-decided, 2026-11-03)
+
+Decided: Chimera builds for macOS on x86-64 (on an Apple silicon Mac it runs
+under Rosetta 2), from the same meson build, given `extern/meson/macos-x86_64.ini`.
+Only x86-64 is built.
+
+Why it needed a decision. A miniBox guest reads its context at `gs:0x18`, and
+miniBox's entry code keeps the thread's stack limits at `gs:0x8` and `gs:0x10`.
+On Linux nothing else uses `gs`, so miniBox points it at a block of its own for
+the life of the thread. On macOS `gs` is the operating system's: libc finds the
+thread's data through it, and `gs:0x18` is the Mach thread port (measured:
+`gs:0` is the `pthread_t`, `gs:0x18` read 0x103). `rdgsbase` and `wrgsbase` are
+illegal instructions there, Rosetta 2 included. Changing where a guest looks
+would change miniBox's machine and rebuild every core, so it was not done.
+
+What was decided instead (the owner chose this over changing the guest's
+convention, and over a port with no guests): the thread's `gs` base is swapped
+at each boundary, to the guest's block while guest code runs and back to the
+operating system's whenever host code runs, with the system call libsystem makes
+for `_thread_set_tsd_base` (machine-dependent call 3). Measured under Rosetta 2
+on an M1 (macOS 27): setting the base works, the old base restores exactly, and a
+swap and its return cost 534 ns. The base the operating system gave a thread is
+`&pthread_self()->tsd[0]`; it is found by storing a value under a pthread key
+and looking for it, not by an offset.
+
+Where it swaps (miniBox, `guarded.S`, `host.c`, `context.c`, `tripguard.c`):
+the guest's entry and its landing; the syscall dispatcher; the wrapper around a
+callback from the guest to the host; the two fault trampolines; and a wrapper
+around every signal handler, which puts the handler on the operating system's
+`gs` and, on return, resumes with the `gs` the interrupted code had (or the
+guest's block, when the handler pointed it at a fault trampoline). `%fs` swapping
+stays off on macOS, so a guest with `%fs`-direct thread storage (a Rust guest)
+cannot run there.
+
+Also: the memory is built from `mach_vm_remap` views (no memory file on
+macOS), a protection fault arrives as `SIGBUS`, the stop signal is `SIGUSR2`,
+and the engine's GPU bridge uses Apple's CGL (OpenGL 4.1, so the entry points of
+4.2 and later are refused).
+
+Tested (x86-64, under Rosetta 2, Apple M1, macOS 27): miniBox's 13 unit tests
+and the engine's 33 tests pass. Four published cores (quickerNES, Mesen, Snes9x,
+Genesis Plus GX) ran 200 to 300 frames each with the whole machine saved and
+loaded around every frame; two runs of quickerNES gave identical memory, and so
+did the run with the round trip. The window (Qt 6.12, from Qt's own download)
+plays Super Mario Bros. through quickerNES at 61.5 frames a second, drawn by Qt's
+software renderer, offscreen. The window's tests pass except the 13 that need the
+synthetic test core (built with the Linux guest toolchain). Two GPU-bridge test
+sections skip what OpenGL 4.1 does not have, and the Alt-letter check of the key
+filter test is skipped on macOS, where Qt has no menu mnemonics. Not tested: a
+real Intel Mac, the window on a screen, a GPU renderer.
+
+## ffmpeg on macOS is the same 4.4.1, from the Internet Archive's copy (user-decided, 2026-11-03)
+
+Decided: a macOS (x86-64) build of Chimera gets the ffmpeg 4.4.1 the Linux and
+Windows bundles have, rather than a newer one, so that the three encode alike.
+
+The project's own ffmpeg source (TASEmulators/ffmpeg-binaries) has no macOS
+build. The owner chose evermeet.cx's static Intel build, which the ffmpeg site
+links to. evermeet.cx's list for 4.4.1 gives a 23,885,067 byte zip, but that
+file is no longer served: asked for, it was a 404, and the site's own link for it
+redirects to another host, which answers 403. The owner then named the Internet
+Archive's copy of the very file
+(web.archive.org/web/20211106005402/https://evermeet.cx/ffmpeg/ffmpeg-4.4.1.zip),
+which is 23,885,067 bytes, as listed.
+
+Pinned in tools/fetch-ffmpeg.sh as for the other platforms, the archive and the
+binary each by their sha256: archive d7f3ea44...cdb3, binary 996952e6...dbfb.
+The binary is a Mach-O x86-64 executable, `4.4.1-tessus`, built with
+--enable-gpl --enable-version3 and not --enable-nonfree. Every encoder the
+presets name is in it (libx264, libx264rgb, utvideo, ffv1, aac, flac, libmp3lame,
+libvpx, libxvid, libtheora, libvorbis, pcm_s16le). Its signature was not
+checked (evermeet.cx's detached signature was not fetched), so what vouches
+for it is the hashes of the copy that was looked at.
+
+The script was made to run on a Mac too: `shasum` where there is no `sha256sum`,
+no bash 4 syntax, and `unzip` for a .zip.
+
+Tested (Apple M1, macOS 27, the x86-64 build under Rosetta 2): the script
+downloads, checks both hashes and unpacks it; the window, run with a Lua script,
+encoded 120 frames of Super Mario Bros. through quickerNES to an H.264 and AAC
+Matroska file, which ffmpeg reads back as 2.04 s at 256x240. Not tried: the
+other presets, and an Intel Mac.
+
+## On macOS what a person keeps is in ~/Library/Application Support/Chimera (user-decided, 2026-11-03)
+
+Decided: on macOS the folder Chimera keeps "beside the program" on Linux and
+Windows - settings.json, Cores, Firmware, and the base of Config > Paths, which
+Movies, Tools, Lua, Themes, Reports and the rest are relative to - is
+~/Library/Application Support/Chimera, as other Mac programs keep theirs. Linux
+and Windows are as they were.
+
+Why. The app is one signed folder, and what was kept beside the program was
+inside it: after its first run (settings.json and Movies/ written there) the
+app's signature no longer verified strictly ("a sealed resource is missing or
+invalid"). It is also where a Mac person looks, and it is the folder that
+already held the projects and the recovery files.
+
+What stays in the app: the helper programs and ffmpeg (Contents/MacOS/bin), the
+libraries, and the themes that ship (Contents/MacOS/Themes). A themes folder
+with no theme in it - the person's, at first - shows the shipped ones. The
+window run from a build folder is the same, so there is one place for cores.
+
+Tested (x86-64 under Rosetta 2, Apple M1): the app, run with no --core, opened a
+project on the quickerNES package found in Application Support/Chimera/Cores,
+wrote settings.json and Movies/ there and nothing into itself, and its signature
+verified after the run. The window's tests give the same 47 passes as before. Not
+tried: a person's own themes folder, a Linux or Windows build after this change
+(the change is under `#ifdef __APPLE__`), and an Intel Mac.
+
+## The macOS build asks for 14.4, not for the Mac it was made on (2026-11-03)
+
+Found while making CI: no deployment target was set, so every binary asked for
+the version of the Mac that built it, macOS 27.2 here (otool: minos 27.2), and
+the app's Info.plist said 11.0. Such a build starts on no other Mac, and an Intel
+Mac stops at macOS 26. It is now 14.4, Qt 6.12's own minimum, in the cross file,
+the nested cmake builds and Info.plist.
+
+At 14.4 Apple's C++ library lacks the floating-point std::from_chars and
+std::to_chars (macOS 26 and later). The four places that use them (the
+engine's plain_numbers.hpp; json.cpp and watch_values.cpp in the view models)
+have a macOS path that uses strtod_l and snprintf_l in the "C" locale, so the
+text is the same and still follows no locale (issue 244). The shortest-digits
+writer was compared with std::to_chars over 801,056 values (random bit patterns
+of doubles and floats, short decimals, every power of ten, edge values) in plain
+and scientific form, and agrees on all. Linux and Windows still use the standard
+functions: the change is under __APPLE__.
+
+Tested (x86-64, Apple M1): every Mach-O in the rebuilt app asks for 14.4 at
+most; the engine's tests (test_plain_numbers among them) and the window's tests
+give the same 47 passes. Not tried: the app on a Mac older than macOS 27 (the
+only one at hand is 27.2), and an Intel Mac.
+
+## What the tests with the synthetic core found on macOS (2026-11-04)
+
+The macOS CI job ran the tests that need the synthetic test core (the package a
+Linux job builds), which had not run on a Mac before. What they found:
+
+- **A race in a test, not the port.** `view models` crashed about three runs in
+  five (SIGSEGV or SIGABRT in `lua_load`, a new closure with a garbage upvalue).
+  A Lua library built to abort when two threads are in one state at once showed
+  it: `luaParity` gave the machine thread a show-future turn that asks Lua, and
+  ran its own scripts on the test's thread, so both were in the state together.
+  The test now runs scripts on the machine's thread, as the window does. Linux
+  has the same race; timing hid it there. Five runs with the checking library
+  after the fix: no crash, no concurrent entry.
+- **macOS has no /proc.** `processStarted` (whether a recovery folder's writer
+  still runs) read `/proc/<pid>/stat`; on a Mac it now asks `proc_pidinfo`.
+- **A clock counted in 128 bits.** The cache manager kept "never used" as the
+  file clock's least time cut to 64 bits; Apple's library counts that clock in
+  128, whose least cut to 64 is 0, a date. It is now the least of int64_t.
+- **Names and limits.** A shared memory name may have 31 characters on a Mac (a
+  test's had 35); the gamepad test's stand-in SDL is `libSDL2.dylib`, found by
+  `DYLD_LIBRARY_PATH`; the settings test checks Application Support on a Mac,
+  whose folder `CHIMERA_DATA_HOME` now decides too.
+- **Timing.** A test slept a tenth of a second for a picture, which a Mac under
+  Rosetta 2 has later: it waits for it now. Window tests that measure for a
+  second spent it starting up when run side by side: CI runs them one at a time.
+- **miniBox (bce3c5a).** The escape's call into the gs swap wrote over the stack
+  bounds it then restores, and a thread with no gs block got one with no magic
+  word. Neither caused the crashes; both are fixed.
+
+Tested (x86-64 under Rosetta 2, Apple M1, macOS 27, the synthetic core from the
+CI's Linux job): all 59 tests pass, run one at a time; miniBox's 13 unit tests
+pass. Not tried yet: the CI run with these changes.
+
+## Recording mode is the window's alone, and two tests wait instead of sleeping (2026-11-04)
+
+Found by the macOS CI run on an Intel runner, after the round above:
+
+- **A project could record nothing with recording mode on.** The window turns
+  recording mode off as a project opens (projectSwitched, before the window says
+  the project is open), and the machine's thread turned its own copy off again
+  when it started the project's session. A person who turned recording mode on in
+  between had it on in the window and off in the machine, and the frames they
+  played were not recorded. The machine's thread no longer sets it: its copy
+  follows the window's. Seen as the view models' tests' recording-mode check
+  failing now and then on a slow Mac.
+- **The sound-rate test counted before the last frame's sound was sent** on the
+  slower runner (669.6 sample pairs a frame against 675.3): it waits until the
+  count stops moving.
+- **The tests' scripts use GNU timeout**, which macOS 15 does not have: the
+  workflow installs Homebrew's coreutils. (macOS 27 has its own.)
+
+Tested (x86-64 under Rosetta 2, Apple M1): the view models test nine times since,
+all 3,081 checks passing, four of them with the Lua library that aborts on two
+threads in one state. A fifth run with it stopped once on the main thread
+holding the state with no Lua running: that library counts Lua's lock calls, and
+a Lua error leaves one uncounted, so it was not taken as a race; five runs
+without it then passed.

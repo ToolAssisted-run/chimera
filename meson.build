@@ -24,7 +24,19 @@ project(
 
 fs = import('fs')
 host_windows = host_machine.system() == 'windows'
+host_macos = host_machine.system() == 'darwin'
+# what a shared library is called on the target: .dll, .dylib or .so
+shlib_ext = 'so'
+if host_windows
+  shlib_ext = 'dll'
+elif host_macos
+  shlib_ext = 'dylib'
+endif
 repo_root = meson.project_source_root()
+# A build for another system than the one it runs on (Windows, from Linux)
+# cannot run its tests. An x86-64 build for macOS, made on either kind of Mac,
+# can: Rosetta 2 runs it, so it is tested as a native one.
+cross_build_for_other_os = meson.is_cross_build() and not (host_macos and meson.can_run_host_binaries())
 
 cc = meson.get_compiler('c')
 m_dep = cc.find_library('m', required: false)
@@ -69,11 +81,17 @@ foreach f : [
 ]
   lua_src += files('extern/lua' / f + '.c')
 endforeach
+lua_args = ['-DLUA_USE_LINUX']
+if host_windows
+  lua_args = ['-DLUA_BUILD_AS_DLL']
+elif host_macos
+  lua_args = ['-DLUA_USE_MACOSX']
+endif
 lua54 = shared_library(
   'lua54',
   lua_src,
   name_prefix: host_windows ? '' : 'lib',
-  c_args: host_windows ? ['-DLUA_BUILD_AS_DLL'] : ['-DLUA_USE_LINUX'],
+  c_args: lua_args,
   dependencies: [m_dep, dl_dep],
   install: true,
   install_dir: 'dll',
@@ -110,8 +128,19 @@ nested_tool = files('extern/meson/nested-build.sh')
 # library in an existing build directory. Each sub-build is incremental and
 # reconfigures itself when its own build files change, so asking costs a
 # no-op there, and the library is copied out only when it changed.
-cross_arg = host_windows ? '--cross-file=' + repo_root / 'extern/meson/mingw-w64.ini' : ''
-zstd_out = host_windows ? 'libzstd.dll' : 'libzstd.so'
+cross_arg = ''
+if host_windows
+  cross_arg = '--cross-file=' + repo_root / 'extern/meson/mingw-w64.ini'
+elif host_macos
+  cross_arg = '--cross-file=' + repo_root / 'extern/meson/macos-x86_64.ini'
+endif
+# macOS: the nested cmake builds are told the processor, or they build the
+# machine's own (arm64 on an Apple silicon Mac) and Rosetta cannot load them
+cmake_platform_args = []
+if host_macos
+  cmake_platform_args = ['-DCMAKE_OSX_ARCHITECTURES=x86_64', '-DCMAKE_OSX_DEPLOYMENT_TARGET=14.4']
+endif
+zstd_out = host_windows ? 'libzstd.dll' : 'libzstd.' + shlib_ext
 custom_target(
   'zstd',
   output: zstd_out,
@@ -135,7 +164,7 @@ custom_target(
 cmake_toolchain = host_windows ? repo_root / 'extern/meson/mingw-toolchain.cmake' : ''
 custom_target(
   'sdl2',
-  output: host_windows ? 'SDL2.dll' : 'libSDL2.so',
+  output: host_windows ? 'SDL2.dll' : 'libSDL2.' + shlib_ext,
   build_always_stale: true,
   command: [
     nested_tool, 'cmake',
@@ -143,14 +172,24 @@ custom_target(
     '@OUTDIR@' / 'sdl2-build',
     '@OUTPUT@',
     cmake_toolchain,
-  ],
+  ] + cmake_platform_args,
   console: true,
   install: true,
   install_dir: 'dll',
 )
+# macOS: CoreAudio and nothing else - not the backends (and D-Bus, for rtkit)
+# a development machine's Homebrew offers, which would tie the library to
+# Homebrew and put Homebrew's headers ahead of OpenAL's own fmt
+openal_platform_args = []
+if host_macos
+  openal_platform_args = ['-DALSOFT_REQUIRE_COREAUDIO=ON', '-DALSOFT_RTKIT=OFF',
+    '-DALSOFT_BACKEND_PORTAUDIO=OFF', '-DALSOFT_BACKEND_PULSEAUDIO=OFF',
+    '-DALSOFT_BACKEND_PIPEWIRE=OFF', '-DALSOFT_BACKEND_JACK=OFF',
+    '-DALSOFT_BACKEND_SDL2=OFF', '-DALSOFT_BACKEND_SDL3=OFF']
+endif
 custom_target(
   'openal',
-  output: host_windows ? 'OpenAL32.dll' : 'libopenal.so',
+  output: host_windows ? 'OpenAL32.dll' : 'libopenal.' + shlib_ext,
   build_always_stale: true,
   command: [
     nested_tool, 'cmake',
@@ -160,7 +199,7 @@ custom_target(
     cmake_toolchain,
     '-DALSOFT_UTILS=OFF', '-DALSOFT_EXAMPLES=OFF', '-DALSOFT_TESTS=OFF',
     '-DLIBTYPE=SHARED',
-  ],
+  ] + cmake_platform_args + openal_platform_args,
   console: true,
   install: true,
   install_dir: 'dll',
@@ -185,8 +224,14 @@ minibox_host_src = files(
   minibox_host / 'host.c',
   minibox_host / 'threading.c',
   minibox_host / 'cinterface.c',
-  minibox_host / (host_windows ? 'pal_win.c' : 'pal_linux.c'),
 )
+if host_windows
+  minibox_host_src += files(minibox_host / 'pal_win.c')
+elif host_macos
+  minibox_host_src += files(minibox_host / 'pal_darwin.c')
+else
+  minibox_host_src += files(minibox_host / 'pal_linux.c')
+endif
 # The machine's own code - the interop area and the guarded call - is written
 # for the CPU the host runs on (as miniBox's source/host/meson.build selects it).
 if host_machine.cpu_family() == 'aarch64'
@@ -356,6 +401,10 @@ if gl_bridge
   if host_windows
     gl_bridge_src += files('extern/glad/src/wgl.c')
     gl_bridge_deps = [meson.get_compiler('cpp').find_library('opengl32', required: true)]
+  elif host_macos
+    # CGL, from the OpenGL framework (deprecated by Apple, still there)
+    gl_bridge_deps = [dependency('appleframeworks', modules: ['OpenGL'])]
+    engine_build_args += ['-DGL_SILENCE_DEPRECATION']
   else
     gl_bridge_deps = [meson.get_compiler('cpp').find_library('EGL', required: true)]
   endif
@@ -449,7 +498,7 @@ executable(
   install_dir: 'dll',
 )
 
-if meson.is_cross_build()
+if cross_build_for_other_os
   # The one unit test that is also built for Windows, by hand
   # (meson compile -C build/meson-windows test_mcp): the pipe under the MCP
   # server is different code on each system, and the Windows half can be run
@@ -500,7 +549,7 @@ if meson.is_cross_build()
   )
 endif
 
-if not meson.is_cross_build()
+if not cross_build_for_other_os
   # Not a test: what a captured frame costs when the budget is full and
   # stretches are going to disk, in line and on the writer. Built with the
   # tests because it needs the engine; run by tests/perf/run-spillbench.sh.

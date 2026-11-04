@@ -1,3 +1,6 @@
+#ifdef __APPLE__
+#include "charconv_apple.hpp"   /* floating-point charconv is macOS 26 and later there */
+#endif
 #include "chimera/vm/watch_values.hpp"
 #include "chimera/vm/tr.hpp"
 
@@ -79,9 +82,13 @@ template <typename T> std::string shortestFloat(T f)
 {
 	if (std::isnan(f)) return "NaN";
 	if (std::isinf(f)) return f < 0 ? "-Infinity" : "Infinity";
+#ifdef __APPLE__
+	const std::string sci = apple::shortestScientific(f);
+#else
 	char buf[64];
 	const auto r = std::to_chars(buf, buf + sizeof buf, f, std::chars_format::scientific);
 	const std::string sci(buf, r.ptr);
+#endif
 	const bool negative = sci[0] == '-';
 	const size_t e = sci.find('e');
 	std::string digits;

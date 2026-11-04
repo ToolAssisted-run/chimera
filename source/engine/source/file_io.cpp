@@ -283,8 +283,13 @@ bool fileIdentity(const char *utf8Path, FileIdentity &out)
 	out.size = (uint64_t)st.st_size;
 	out.volume = (uint64_t)st.st_dev;
 	out.index = (uint64_t)st.st_ino;
+#ifdef __APPLE__   /* the same times, under BSD's names */
+	out.modified = (int64_t)st.st_mtimespec.tv_sec * 1000000000 + st.st_mtimespec.tv_nsec;
+	out.changed = (int64_t)st.st_ctimespec.tv_sec * 1000000000 + st.st_ctimespec.tv_nsec;
+#else
 	out.modified = (int64_t)st.st_mtim.tv_sec * 1000000000 + st.st_mtim.tv_nsec;
 	out.changed = (int64_t)st.st_ctim.tv_sec * 1000000000 + st.st_ctim.tv_nsec;
+#endif
 #endif
 	return true;
 }

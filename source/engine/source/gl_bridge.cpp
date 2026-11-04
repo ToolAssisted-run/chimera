@@ -62,6 +62,11 @@
 #ifdef _WIN32
 #include <windows.h>
 #include <glad/wgl.h>
+#elif defined(__APPLE__)
+#include <OpenGL/OpenGL.h>
+#include <glad/egl.h>   /* only the types: Mesa's EGL is loaded when asked for */
+#include <dlfcn.h>
+#include <unistd.h>   /* getpid: per-process entropy for a context's identity */
 #else
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
@@ -260,6 +265,310 @@ void return_current()
 	wglMakeCurrent(s_lentDC, s_lentContext);
 	s_lentContext = nullptr;
 	s_lentDC = nullptr;
+}
+
+#elif defined(__APPLE__)
+
+/* ---------------------------------------------------------------------------
+ * macOS has two OpenGLs, and the bridge takes the first that makes a context:
+ *
+ * - Mesa's, when it is installed: zink, which draws through Vulkan, on
+ *   KosmicKrisp, Mesa's Vulkan on Metal. It is reached through Mesa's EGL,
+ *   surfaceless as on Linux, and loaded only when a core asks, so a Mac
+ *   without it loses nothing. KosmicKrisp has no geometry shaders and no
+ *   transform feedback, so zink calls itself OpenGL 2.1 there; everything
+ *   else of 4.6 it has, and is told to say so. A renderer that asks for one
+ *   of the two missing stages is refused when it compiles the shader.
+ * - Apple's own: a CGL context with no drawable. CGL, unlike WGL, needs no
+ *   window for a pixel format, and like EGL's surfaceless platform it leaves
+ *   no framebuffer 0, which the bridge never draws into anyway (see the Linux
+ *   half below). Its desktop OpenGL is 4.1 core - every 3.3 core call the
+ *   bridge answers - and is deprecated, not gone; Apple's translates to Metal.
+ *
+ * CHIMERA_GL_APPLE=1 keeps to Apple's.
+ */
+struct MesaEgl
+{
+	void *lib;
+	PFNEGLGETPROCADDRESSPROC GetProcAddress;
+	PFNEGLGETPLATFORMDISPLAYEXTPROC GetPlatformDisplayEXT;
+	PFNEGLINITIALIZEPROC Initialize;
+	PFNEGLBINDAPIPROC BindAPI;
+	PFNEGLCHOOSECONFIGPROC ChooseConfig;
+	PFNEGLCREATECONTEXTPROC CreateContext;
+	PFNEGLDESTROYCONTEXTPROC DestroyContext;
+	PFNEGLMAKECURRENTPROC MakeCurrent;
+	PFNEGLGETCURRENTCONTEXTPROC GetCurrentContext;
+	PFNEGLGETCURRENTSURFACEPROC GetCurrentSurface;
+	PFNEGLGETCURRENTDISPLAYPROC GetCurrentDisplay;
+};
+MesaEgl s_egl;
+bool s_mesa;   /* this session's context is Mesa's */
+EGLDisplay s_display = EGL_NO_DISPLAY;
+EGLContext s_eglContext = EGL_NO_CONTEXT;
+
+CGLContextObj s_context;
+/* how the context was made, for another like it (replace_context) */
+CGLPixelFormatObj s_format;
+EGLConfig s_eglConfig;
+void *s_opengl;   /* OpenGL.framework, where every entry point is exported */
+
+GLADapiproc loader(const char *name)
+{
+	if (s_mesa)
+		return (GLADapiproc)s_egl.GetProcAddress(name);
+	return (GLADapiproc)dlsym(s_opengl, name);
+}
+
+bool load_mesa()
+{
+	if (s_egl.lib != nullptr)
+		return true;
+	const char *env = getenv("CHIMERA_GL_APPLE");
+	if (env != nullptr && *env != 0 && strcmp(env, "0") != 0)
+		return false;
+	/* by name first, so DYLD_LIBRARY_PATH and DYLD_FALLBACK_LIBRARY_PATH
+	 * decide; then beside libchimera, inside an app bundle, and where a
+	 * Homebrew prefix keeps it */
+	static const char *const paths[] = {
+		"libEGL.1.dylib",
+		"@loader_path/libEGL.1.dylib",
+		"@executable_path/../Frameworks/libEGL.1.dylib",
+		"/opt/homebrew/lib/libEGL.1.dylib",
+		"/usr/local/lib/libEGL.1.dylib",
+	};
+	void *lib = nullptr;
+	for (const char *path : paths)
+		if ((lib = dlopen(path, RTLD_NOW | RTLD_LOCAL)) != nullptr)
+			break;
+	if (lib == nullptr)
+		return false;
+	MesaEgl e = {};
+	e.lib = lib;
+	e.GetProcAddress = (PFNEGLGETPROCADDRESSPROC)dlsym(lib, "eglGetProcAddress");
+	e.Initialize = (PFNEGLINITIALIZEPROC)dlsym(lib, "eglInitialize");
+	e.BindAPI = (PFNEGLBINDAPIPROC)dlsym(lib, "eglBindAPI");
+	e.ChooseConfig = (PFNEGLCHOOSECONFIGPROC)dlsym(lib, "eglChooseConfig");
+	e.CreateContext = (PFNEGLCREATECONTEXTPROC)dlsym(lib, "eglCreateContext");
+	e.DestroyContext = (PFNEGLDESTROYCONTEXTPROC)dlsym(lib, "eglDestroyContext");
+	e.MakeCurrent = (PFNEGLMAKECURRENTPROC)dlsym(lib, "eglMakeCurrent");
+	e.GetCurrentContext = (PFNEGLGETCURRENTCONTEXTPROC)dlsym(lib, "eglGetCurrentContext");
+	e.GetCurrentSurface = (PFNEGLGETCURRENTSURFACEPROC)dlsym(lib, "eglGetCurrentSurface");
+	e.GetCurrentDisplay = (PFNEGLGETCURRENTDISPLAYPROC)dlsym(lib, "eglGetCurrentDisplay");
+	if (e.GetProcAddress != nullptr)
+		e.GetPlatformDisplayEXT = (PFNEGLGETPLATFORMDISPLAYEXTPROC)
+			e.GetProcAddress("eglGetPlatformDisplayEXT");
+	if (!e.GetProcAddress || !e.GetPlatformDisplayEXT || !e.Initialize || !e.BindAPI
+		|| !e.ChooseConfig || !e.CreateContext || !e.DestroyContext || !e.MakeCurrent
+		|| !e.GetCurrentContext || !e.GetCurrentSurface || !e.GetCurrentDisplay)
+	{
+		dlclose(lib);
+		return false;
+	}
+	s_egl = e;
+	return true;
+}
+
+bool create_mesa_context(char *err, int errlen)
+{
+	if (s_display == EGL_NO_DISPLAY)
+	{
+		/* read once, when the driver starts; what a person set wins */
+		setenv("MESA_GL_VERSION_OVERRIDE", "4.6", 0);
+		setenv("MESA_GLSL_VERSION_OVERRIDE", "460", 0);
+		EGLDisplay display = s_egl.GetPlatformDisplayEXT(EGL_PLATFORM_SURFACELESS_MESA, nullptr, nullptr);
+		if (display == EGL_NO_DISPLAY || !s_egl.Initialize(display, nullptr, nullptr))
+		{
+			snprintf(err, errlen, "%s", chimera::lang::tr("gl.egl_not_started").c_str());
+			return false;
+		}
+		s_display = display;
+	}
+	static const EGLint configAttribs[] = {
+		EGL_SURFACE_TYPE, EGL_PBUFFER_BIT,
+		EGL_RENDERABLE_TYPE, EGL_OPENGL_BIT,
+		EGL_NONE
+	};
+	static const EGLint contextAttribs[] = {
+		EGL_CONTEXT_MAJOR_VERSION, 3,
+		EGL_CONTEXT_MINOR_VERSION, 3,
+		EGL_NONE
+	};
+	EGLConfig config;
+	EGLint configCount = 0;
+	if (!s_egl.BindAPI(EGL_OPENGL_API)
+		|| !s_egl.ChooseConfig(s_display, configAttribs, &config, 1, &configCount) || configCount == 0)
+	{
+		snprintf(err, errlen, "%s", chimera::lang::tr("gl.no_desktop_gl").c_str());
+		return false;
+	}
+	s_eglConfig = config;
+	s_eglContext = s_egl.CreateContext(s_display, config, EGL_NO_CONTEXT, contextAttribs);
+	if (s_eglContext == EGL_NO_CONTEXT
+		|| !s_egl.MakeCurrent(s_display, EGL_NO_SURFACE, EGL_NO_SURFACE, s_eglContext))
+	{
+		snprintf(err, errlen, "%s", chimera::lang::tr("gl.not_current").c_str());
+		return false;
+	}
+	return true;
+}
+
+bool create_apple_context(char *err, int errlen)
+{
+	s_opengl = dlopen("/System/Library/Frameworks/OpenGL.framework/OpenGL", RTLD_NOW | RTLD_LOCAL);
+	if (s_opengl == nullptr)
+	{
+		snprintf(err, errlen, "%s", chimera::lang::tr("gl.no_entry_points").c_str());
+		return false;
+	}
+	/* 3.2 core is the name CGL gives every core profile it has: 4.1 here */
+	const CGLPixelFormatAttribute attribs[] = {
+		kCGLPFAOpenGLProfile, (CGLPixelFormatAttribute)kCGLOGLPVersion_3_2_Core,
+		kCGLPFAAccelerated,
+		kCGLPFAAllowOfflineRenderers,
+		(CGLPixelFormatAttribute)0,
+	};
+	CGLPixelFormatObj format = nullptr;
+	GLint count = 0;
+	if (CGLChoosePixelFormat(attribs, &format, &count) != kCGLNoError || format == nullptr)
+	{
+		snprintf(err, errlen, "%s", chimera::lang::tr("gl.no_pixel_format").c_str());
+		return false;
+	}
+	s_format = format;   /* kept for replace_context; released with the context */
+	const CGLError made = CGLCreateContext(format, nullptr, &s_context);
+	if (made != kCGLNoError || s_context == nullptr || CGLSetCurrentContext(s_context) != kCGLNoError)
+	{
+		snprintf(err, errlen, "%s", chimera::lang::tr("gl.not_current_win").c_str());
+		return false;
+	}
+	return true;
+}
+
+void end_mesa_context()
+{
+	if (s_eglContext != EGL_NO_CONTEXT) s_egl.DestroyContext(s_display, s_eglContext);
+	s_eglContext = EGL_NO_CONTEXT;
+}
+
+bool create_context(char *err, int errlen)
+{
+	s_mesa = false;
+	if (load_mesa())
+	{
+		if (create_mesa_context(err, errlen))
+		{
+			s_mesa = true;
+			return true;
+		}
+		/* Apple's answers instead; why Mesa's did not is kept for the log */
+		fprintf(stderr, "chimera gl: %s; using Apple's OpenGL\n", err);
+		if (s_eglContext != EGL_NO_CONTEXT)
+			s_egl.MakeCurrent(s_display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
+		end_mesa_context();
+	}
+	return create_apple_context(err, errlen);
+}
+
+/* The display stays initialised for the next session, as on Linux. */
+void destroy_context()
+{
+	if (s_mesa)
+	{
+		s_egl.MakeCurrent(s_display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
+		end_mesa_context();
+		return;
+	}
+	if (s_context) { CGLSetCurrentContext(nullptr); CGLReleaseContext(s_context); s_context = nullptr; }
+	if (s_format) { CGLReleasePixelFormat(s_format); s_format = nullptr; }
+}
+
+/* the same at a session's end, without unbinding what the calling thread has */
+void end_context()
+{
+	if (s_mesa) { end_mesa_context(); return; }
+	if (s_context) { CGLReleaseContext(s_context); s_context = nullptr; }
+	if (s_format) { CGLReleasePixelFormat(s_format); s_format = nullptr; }
+}
+
+/* Another context made as the one above was, current in its place; the old
+ * one, and every object in it, goes. False leaves the old one as it was. */
+bool replace_context()
+{
+	if (s_mesa)
+	{
+		static const EGLint contextAttribs[] = {
+			EGL_CONTEXT_MAJOR_VERSION, 3,
+			EGL_CONTEXT_MINOR_VERSION, 3,
+			EGL_NONE
+		};
+		EGLContext fresh = s_egl.CreateContext(s_display, s_eglConfig, EGL_NO_CONTEXT, contextAttribs);
+		if (fresh == EGL_NO_CONTEXT) return false;
+		if (!s_egl.MakeCurrent(s_display, EGL_NO_SURFACE, EGL_NO_SURFACE, fresh))
+		{
+			s_egl.DestroyContext(s_display, fresh);
+			return false;
+		}
+		s_egl.DestroyContext(s_display, s_eglContext);
+		s_eglContext = fresh;
+		return true;
+	}
+	if (s_format == nullptr) return false;
+	CGLContextObj fresh = nullptr;
+	if (CGLCreateContext(s_format, nullptr, &fresh) != kCGLNoError || fresh == nullptr) return false;
+	if (CGLSetCurrentContext(fresh) != kCGLNoError)
+	{
+		CGLReleaseContext(fresh);
+		return false;
+	}
+	CGLReleaseContext(s_context);
+	s_context = fresh;
+	return true;
+}
+
+/* Whose context was current before we took the slot. Null is a legitimate
+ * answer and must be restored as faithfully as any other. Mesa's EGL and CGL
+ * keep a current context each, so binding one leaves the other's alone: only
+ * the one the bridge binds is saved. */
+CGLContextObj s_lentContext;
+EGLContext s_lentEglContext = EGL_NO_CONTEXT;
+EGLSurface s_lentDraw = EGL_NO_SURFACE;
+EGLSurface s_lentRead = EGL_NO_SURFACE;
+EGLDisplay s_lentDisplay = EGL_NO_DISPLAY;
+
+void save_current()
+{
+	if (s_egl.lib != nullptr)
+	{
+		s_lentEglContext = s_egl.GetCurrentContext();
+		s_lentDraw = s_egl.GetCurrentSurface(EGL_DRAW);
+		s_lentRead = s_egl.GetCurrentSurface(EGL_READ);
+		s_lentDisplay = s_egl.GetCurrentDisplay();
+	}
+	s_lentContext = CGLGetCurrentContext();
+}
+
+bool bind_ours()
+{
+	if (s_mesa)
+		return s_egl.MakeCurrent(s_display, EGL_NO_SURFACE, EGL_NO_SURFACE, s_eglContext) == EGL_TRUE;
+	return CGLSetCurrentContext(s_context) == kCGLNoError;
+}
+
+void return_current()
+{
+	if (s_mesa)
+	{
+		if (s_lentDisplay != EGL_NO_DISPLAY)
+			s_egl.MakeCurrent(s_lentDisplay, s_lentDraw, s_lentRead, s_lentEglContext);
+		else
+			s_egl.MakeCurrent(s_display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
+	}
+	else
+		CGLSetCurrentContext(s_lentContext);
+	s_lentContext = nullptr;
+	s_lentEglContext = EGL_NO_CONTEXT;
+	s_lentDisplay = EGL_NO_DISPLAY;
 }
 
 #else

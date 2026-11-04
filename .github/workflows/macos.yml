@@ -1,0 +1,169 @@
+name: macOS
+
+# Chimera for macOS on x86-64: the engine, the window on Qt 6.12, and Chimera.app.
+# It runs on an Intel runner, so the tests and the app are the real thing; on an
+# Apple silicon Mac the same build runs under Rosetta 2 (docs/macos.md).
+#
+# The tests that need the synthetic test core use a package built on Linux: a
+# package is a guest ELF and plain files, the same on every system, and only
+# miniBox's Linux guest toolchain can make one (docs/macos.md).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# a push supersedes an older run on the same ref, as CI's does
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+
+jobs:
+  synth-core:
+    # the synthetic test core and its test game, as the Linux jobs build them
+    name: the synthetic test core (built on Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Check out miniBox
+        run: git submodule update --init extern/chimera-common-minibox
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends meson ninja-build build-essential python3
+
+      - name: Build miniBox's host and guest toolchain
+        # the guest compiler and its runtime object are not in the default build
+        run: |
+          mb=extern/chimera-common-minibox
+          meson setup "$mb/build/meson-linux" "$mb"
+          ninja -C "$mb/build/meson-linux" musl-gcc source/guest/emulibc.c.o
+
+      - name: Build the package and the test game
+        run: ./tests/synth/build-package.sh
+
+      - name: Keep them for the macOS job
+        uses: actions/upload-artifact@v4
+        with:
+          name: synth-core
+          path: |
+            build/Cores/synth-box.chimeraCore
+            tests/synth/roms/gridWalker.testrom
+          if-no-files-found: error
+
+  macos:
+    name: Chimera for macOS (x86-64)
+    needs: synth-core
+    # Intel hardware: macos-15-intel. (macos-latest is Apple silicon, which runs
+    # the same build under Rosetta 2.)
+    runs-on: macos-15-intel
+    timeout-minutes: 120
+    env:
+      QT_VERSION: 6.12.0
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install build tools
+        # coreutils: the tests' scripts use GNU timeout, which macOS 15 does not have;
+        # nasm and pkg-config: the ffmpeg build (x264 and x265's x86-64 assembly)
+        run: brew install meson ninja cmake coreutils nasm pkg-config
+
+      - name: Cache Qt
+        uses: actions/cache@v4
+        with:
+          path: ~/qt
+          key: qt-6.12.0-macos-aqt-3.3.0
+
+      - name: Qt 6.12 (Qt's own download, one build for both processors)
+        run: |
+          if [ ! -d "$HOME/qt/$QT_VERSION/macos" ]; then
+            python3 -m venv "$HOME/qt/aqt-venv"
+            "$HOME/qt/aqt-venv/bin/pip" install --quiet aqtinstall==3.3.0
+            "$HOME/qt/aqt-venv/bin/aqt" install-qt mac desktop "$QT_VERSION" clang_64 -m qtshadertools -O "$HOME/qt"
+          fi
+          # meson finds this Qt and not Homebrew's (docs/macos.md)
+          mkdir -p build
+          {
+            echo "[binaries]"
+            echo "qmake6 = '$HOME/qt/$QT_VERSION/macos/bin/qmake'"
+            echo "[properties]"
+            echo "pkg_config_libdir = '$HOME/qt/$QT_VERSION/macos/lib/pkgconfig'"
+          } > build/qt-macos-x86_64.ini
+
+      - name: Configure
+        run: |
+          meson setup build/meson-macos-x86_64 --prefix "$PWD/build/x86_64-macos" --libdir dll \
+            --cross-file extern/meson/macos-x86_64.ini --cross-file build/qt-macos-x86_64.ini -Dqt_ui=enabled
+
+      - name: Build
+        run: meson compile -C build/meson-macos-x86_64
+
+      - name: Install
+        run: meson install -C build/meson-macos-x86_64
+
+      - name: Cache the ffmpeg the build ships
+        uses: actions/cache@v4
+        with:
+          # tools/build-ffmpeg.sh keeps what it built under a name made from its
+          # CPU and its own hash
+          path: build/deps/ffmpeg-macos-x64-*
+          key: ffmpeg-macos-x64-${{ hashFiles('tools/build-ffmpeg.sh') }}
+
+      - name: ffmpeg
+        run: tools/build-ffmpeg.sh macos build/x86_64-macos/dll
+
+      - name: The synthetic test core
+        uses: actions/download-artifact@v4
+        with:
+          name: synth-core
+          path: .
+
+      - name: Unit tests (the engine, the view models, the window)
+        # without --no-rebuild: meson builds what the tests are given, the test
+        # projects made from the synthetic core among it
+        # one at a time: run side by side, the window tests that measure for a second
+        # spent it starting up (the first frame alone took near a second)
+        run: meson test -C build/meson-macos-x86_64 --print-errorlogs --num-processes 1
+
+      - name: Upload test logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-meson-logs
+          path: build/meson-macos-x86_64/meson-logs/
+
+      - name: Chimera.app
+        run: |
+          # the app's icon (docs/Chimera.icon, from Icon Composer) is compiled by
+          # actool, which needs Xcode 26 or later; the runner's default is older
+          newest="$(ls -d /Applications/Xcode_26*.app 2> /dev/null | sort -V | tail -n 1)"
+          if [ -n "$newest" ]; then export DEVELOPER_DIR="$newest/Contents/Developer"; fi
+          echo "Xcode for the icon: $(xcode-select -p)"
+          tools/build-app-macos.sh --dll build/x86_64-macos/dll --qt "$HOME/qt/$QT_VERSION/macos" --out build/Chimera.app
+          # the light and dark icon is in the app: the script falls back to a plain
+          # one when it cannot compile it, which is for a person's Mac and not for here
+          test -f build/Chimera.app/Contents/Resources/Assets.car
+          grep -q CFBundleIconName build/Chimera.app/Contents/Info.plist
+          codesign --verify --deep --strict build/Chimera.app
+          # a zip that keeps the app's links and signature, as Finder's does
+          ditto -c -k --keepParent build/Chimera.app Chimera-macos-x86_64.zip
+
+      - name: The program starts (a runner has no display, so no window is opened)
+        run: |
+          build/x86_64-macos/dll/chimera --help > /dev/null
+          build/Chimera.app/Contents/MacOS/chimera --version
+
+      - name: Keep the app
+        uses: actions/upload-artifact@v4
+        with:
+          name: Chimera-macos-x86_64
+          path: Chimera-macos-x86_64.zip
+          if-no-files-found: error

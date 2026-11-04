@@ -87,6 +87,11 @@ int main(int argc, char **argv)
 	const quint32 ctrlKey = VK_CONTROL, shiftKey = VK_SHIFT, sKey = 'S';
 #elif defined(__APPLE__)
 	std::printf("SKIP: the places of a Mac's keys are its own events'\n");
+	/* (named so that what follows compiles; the test ends here) */
+	const quint32 rightCtrl = 0, leftShift = 0, rightShift = 0, keyS = 0, keyQ = 0, keyA = 0;
+	const quint32 ctrlKey = 0, shiftKey = 0, sKey = 0;
+	(void)rightCtrl; (void)leftShift; (void)rightShift; (void)keyS; (void)keyQ; (void)keyA;
+	(void)ctrlKey; (void)shiftKey; (void)sKey;
 	return 0;
 #else
 	/* Linux: the XKB key code, as X11 and Wayland give it */

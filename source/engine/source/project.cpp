@@ -44,7 +44,11 @@ using chimera::lang::tr;
 #include <vector>
 
 #ifndef _WIN32
+#ifdef __APPLE__
+#include <stdlib.h>   /* arc4random_buf */
+#else
 #include <sys/random.h>
+#endif
 #endif
 
 namespace {
@@ -241,7 +245,12 @@ static uint64_t systemRandom64()
 	return (static_cast<uint64_t>(hi) << 32) | lo;
 #else
 	uint64_t v = 0;
+#ifdef __APPLE__
+	arc4random_buf(&v, sizeof v);   /* the kernel's generator; it cannot fail */
+	return v;
+#else
 	return getrandom(&v, sizeof v, 0) == static_cast<ssize_t>(sizeof v) ? v : 0;
+#endif
 #endif
 }
 

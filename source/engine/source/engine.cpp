@@ -21,6 +21,8 @@ extern "C" uint32_t ce_abi_version(void) { return CE_ABI_VERSION; }
 
 #if defined(_WIN32)
 #define CE_TARGET_OS "windows"
+#elif defined(__APPLE__)
+#define CE_TARGET_OS "macos"
 #else
 #define CE_TARGET_OS "linux"
 #endif
