@@ -793,6 +793,10 @@ ApplicationWindow {
                             }
                         }
                         function pick(row) {
+                            if (row < 0) {
+                                markerList.current = -1; markerList.pickedFrame = -1; markerList.pickedText = ""; markerList.pickedPermanent = false
+                                return
+                            }
                             const roles = tas.markerRoles(row)
                             markerList.current = row
                             markerList.pickedFrame = roles.frame
@@ -841,8 +845,8 @@ ApplicationWindow {
                         IconButton {
                             icon.source: "qrc:/chimera/icons/Delete.png"
                             tip: tas.bindingName("Delete Marker") !== "" ? qsTrId("tastudio.remove_marker_on_marker_s_frame").arg(tas.bindingName("Delete Marker")) : qsTrId("tastudio.remove_marker")
-                            enabled: markerList.pickedEditable
-                            onClicked: tas.pianoRoll.run("removeMarker", [markerList.pickedFrame])
+                            enabled: tas.markersRemovable
+                            onClicked: tas.removePickedMarkers()
                         }
                     }
                 }
@@ -872,8 +876,11 @@ ApplicationWindow {
             radius: 2
         }
     }
+    // a click on one leaves the keyboard where it was, with the roll and the
+    // hotkeys: Space held on Add Branch made a branch at every repeat (issue 494)
     component PlayButton: Button {
         property string tip: ""
+        focusPolicy: Qt.TabFocus
         padding: 2
         implicitWidth: 38
         implicitHeight: 23
@@ -883,6 +890,7 @@ ApplicationWindow {
     }
     component IconButton: Button {
         property string tip: ""
+        focusPolicy: Qt.TabFocus
         padding: 3
         implicitWidth: 24
         implicitHeight: 24
@@ -898,6 +906,7 @@ ApplicationWindow {
     }
     component BoxCheck: CheckBox {
         property string tip: ""
+        focusPolicy: Qt.TabFocus
         padding: 1
         ToolTip.text: tip
         ToolTip.visible: hovered && tip !== ""
@@ -970,6 +979,10 @@ ApplicationWindow {
     }
     // a marker on each frame picked; more than 50 asks first, as Chimera does
     function setMarkers() { tas.pianoRoll.run("addMarkers", [tas.pianoRoll.selectFirst, tas.pianoRoll.selectLast]) }
+    // the branches or markers picked in their lists taken away, all of them at once (issue 494)
+    function removePickedBranches() { tas.branches.run("removeRows", [branchList.selection.join(",")]) }
+    readonly property bool markersRemovable: markerList.selection.length > 1 || markerList.pickedEditable
+    function removePickedMarkers() { tas.pianoRoll.run("removeMarkerRows", [markerList.selection.join(",")]) }
     function removeMarkers() { tas.pianoRoll.run("removeMarkers", [tas.pianoRoll.selectFirst, tas.pianoRoll.selectLast]) }
     Dialog {
         id: manyMarkersDialog
@@ -994,7 +1007,7 @@ ApplicationWindow {
         Action { text: qsTrId("tastudio.jump_to"); icon.source: "qrc:/chimera/icons/JumpTo.png"; enabled: branchMenu.picked; onTriggered: tas.branches.run("jumpTo", [tas.branches.selected]) }
         Action { text: tas.branches.undoText !== "" ? tas.branches.undoText : qsTrId("tastudio.undo"); icon.source: "qrc:/chimera/icons/undo.png"; enabled: tas.branches.undoText !== ""; onTriggered: tas.branches.run("undo") }
         MenuDivider {}
-        Action { text: qsTrId("common.remove"); icon.source: "qrc:/chimera/icons/Delete.png"; enabled: branchMenu.picked; onTriggered: tas.branches.run("remove", [tas.branches.selected]) }
+        Action { text: qsTrId("common.remove"); icon.source: "qrc:/chimera/icons/Delete.png"; enabled: branchMenu.picked; onTriggered: tas.removePickedBranches() }
     }
     TextPrompt {
         id: branchTextDialog
@@ -1025,7 +1038,7 @@ ApplicationWindow {
         Action { text: qsTrId("tastudio.edit_frame_alt_drag"); icon.source: "qrc:/chimera/icons/Clock.png"; enabled: markerList.pickedEditable; onTriggered: markerFrameDialog.openFor(markerList.pickedFrame) }
         Action { text: qsTrId("tastudio.add"); icon.source: "qrc:/chimera/icons/add.png"; enabled: tas.session.isOpen; onTriggered: tas.pianoRoll.run("addMarker", [tas.pianoRoll.currentFrame, ""]) }
         MenuDivider {}
-        Action { text: qsTrId("common.remove"); icon.source: "qrc:/chimera/icons/Delete.png"; enabled: markerList.pickedEditable; onTriggered: tas.pianoRoll.run("removeMarker", [markerList.pickedFrame]) }
+        Action { text: qsTrId("common.remove"); icon.source: "qrc:/chimera/icons/Delete.png"; enabled: tas.markersRemovable; onTriggered: tas.removePickedMarkers() }
     }
     Popup {
         id: preview

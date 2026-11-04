@@ -13,6 +13,12 @@ Rectangle {
     property var columns: []
     // the row picked, -1 for none
     property int current: -1
+    // every row picked: the row clicked, and others picked with Ctrl (one
+    // more or one less) or Shift (every row from the row clicked before),
+    // as a Windows list picks them (issue 494)
+    property var selection: []
+    // where a Shift click's rows start
+    property int anchor: -1
     // what a cell says and its background ("" leaves the roll's): (row's roles, row, column) => ...
     property var cellText: (roles, row, column) => ""
     property var cellColor: (roles, row, column) => ""
@@ -23,6 +29,7 @@ Rectangle {
     // a row pressed by its first cell can be dragged onto another (branches are put in order so)
     property bool dragFirstColumn: false
 
+    // a row clicked (-1: a Ctrl click let go of the last row picked)
     signal clicked(int row, int column)
     signal doubleClicked(int row)
     signal rightClicked(int row)
@@ -41,11 +48,23 @@ Rectangle {
         const room = list.height - list.bottomMargin
         if (item && item.y + item.height - list.contentY > room) list.contentY = item.y + item.height - room
     }
-    // the row picked stays in view, the list made again or not
-    onCurrentChanged: Qt.callLater(() => table.show(table.current))
+    // the row picked stays in view, the list made again or not; a row the
+    // window picks is the only one picked
+    onCurrentChanged: {
+        if (table.selection.indexOf(table.current) < 0) {
+            table.selection = table.current >= 0 ? [table.current] : []
+            table.anchor = table.current
+        }
+        Qt.callLater(() => table.show(table.current))
+    }
     Connections {
         target: table.model
-        function onModelReset() { Qt.callLater(() => table.show(table.current)) }
+        function onModelReset() {
+            // the rows are numbered again: only the row picked stays picked
+            table.selection = table.current >= 0 ? [table.current] : []
+            table.anchor = table.current
+            Qt.callLater(() => table.show(table.current))
+        }
     }
     function colour(role, fallback) { const c = table.rollColor(role); return c !== "" ? c : fallback }
     readonly property color background: colour("RollBackground", palette.base)
@@ -125,7 +144,7 @@ Rectangle {
             required property var model
             width: list.contentWidth
             height: table.rowHeight
-            readonly property bool isPicked: row.index === table.current
+            readonly property bool isPicked: table.selection.indexOf(row.index) >= 0
             Repeater {
                 model: table.columns.length
                 delegate: Rectangle {
@@ -151,8 +170,8 @@ Rectangle {
                 }
             }
         }
-        // the rows' mouse: a click picks, a double click is the window's, the right button its menu,
-        // a drag from a row's first cell another row's place
+        // the rows' mouse: a click picks (with Ctrl or Shift, more rows), a double click is the
+        // window's, the right button its menu, a drag from a row's first cell another row's place
         MouseArea {
             id: mouse
             parent: list.contentItem
@@ -168,8 +187,23 @@ Rectangle {
             onPressed: (m) => {
                 const r = rowAt(m.y)
                 if (m.button === Qt.RightButton) { table.rightClicked(r); return }
-                mouse.from = table.dragFirstColumn && r >= 0 && table.columnAt(m.x) === 0 ? r : -1
-                if (r >= 0) table.clicked(r, table.columnAt(m.x))
+                mouse.from = table.dragFirstColumn && r >= 0 && table.columnAt(m.x) === 0 && m.modifiers === Qt.NoModifier ? r : -1
+                if (r < 0) return
+                let picked = [r], anchor = r, told = r
+                if (m.modifiers & Qt.ShiftModifier) {
+                    anchor = table.anchor >= 0 && table.anchor < list.count ? table.anchor : r
+                    picked = []
+                    for (let i = Math.min(anchor, r); i <= Math.max(anchor, r); i++) picked.push(i)
+                } else if (m.modifiers & Qt.ControlModifier) {
+                    picked = table.selection.filter(i => i !== r)
+                    if (picked.length === table.selection.length) picked.push(r)
+                    // a row let go of: the window's row is the last one still picked
+                    else told = picked.length > 0 ? picked[picked.length - 1] : -1
+                }
+                // told first: the window's row changing would pick it alone
+                table.clicked(told, table.columnAt(m.x))
+                table.selection = picked
+                table.anchor = anchor
             }
             onReleased: (m) => {
                 const r = rowAt(m.y)

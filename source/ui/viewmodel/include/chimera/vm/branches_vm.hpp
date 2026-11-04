@@ -84,10 +84,15 @@ private:
 	Undo undo_ = Undo::None;
 	SessionViewModel::Branch backup_;
 	int64_t backupAt_ = -1;
+	/* the branches a removal took, each with the place it had, in the
+	 * list's order: Undo puts them all back (issue 494) */
+	std::vector<std::pair<int64_t, SessionViewModel::Branch>> removed_;
 	void keepBackup(Undo kind, SessionViewModel::Branch b, int64_t at);
 	void keepLoadBackup();
 	void dropBackup();
 	bool listed(uint64_t id) const;
+	/* the branches at these places taken out of the list, kept for Undo */
+	void remove(std::vector<size_t> places);
 
 	InputLog &inputs_;
 	SessionViewModel &session_;

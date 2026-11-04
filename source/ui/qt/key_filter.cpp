@@ -116,4 +116,12 @@ bool KeyFilter::eventFilter(QObject *watched, QEvent *e)
 	return QObject::eventFilter(watched, e);
 }
 
+bool HeldKeyClicksOnce::eventFilter(QObject *watched, QEvent *e)
+{
+	if ((e->type() == QEvent::KeyPress || e->type() == QEvent::KeyRelease) && static_cast<QKeyEvent *>(e)->isAutoRepeat()
+		&& watched->inherits("QQuickAbstractButton"))
+		return true;
+	return QObject::eventFilter(watched, e);
+}
+
 } // namespace chimera::qt

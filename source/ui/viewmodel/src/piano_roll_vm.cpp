@@ -725,6 +725,44 @@ PianoRollViewModel::PianoRollViewModel(Dispatcher &dispatcher, InputLog &inputs,
 			}
 			return removed;
 		});
+	command("removeMarkerRows", "the markers at these places in the markers list (\"1,4\") taken off, as one step; the run's own "
+		"stay; how many", {"rows"}, [this](const Args &a, std::string &error) -> Value {
+			std::string list;
+			if (!arg(a, 0, list, error)) return {};
+			std::vector<int64_t> frames;
+			int64_t fixed = -1;
+			std::stringstream in(list);
+			for (std::string one; std::getline(in, one, ',');)
+			{
+				if (one.empty()) continue;
+				char *end = nullptr;
+				const long row = std::strtol(one.c_str(), &end, 10);
+				if (end == nullptr || *end != '\0' || row < 0 || static_cast<size_t>(row) >= markerList_.size())
+				{
+					error = tr("piano_roll.no_marker_row", {one});
+					return {};
+				}
+				const ListedMarker &m = markerList_[static_cast<size_t>(row)];
+				/* the run's own are the movie speaking, and so is a marker on frame 0, as in Chimera */
+				if (m.permanent || m.frame == 0 || markers_.count(m.frame) == 0)
+				{
+					if (fixed < 0) fixed = m.frame;
+					continue;
+				}
+				frames.push_back(m.frame);
+			}
+			if (frames.empty())
+			{
+				if (fixed >= 0) error = tr("piano_roll.marker_fixed_remove", {std::to_string(fixed)});
+				return {};
+			}
+			auto before = markers_;
+			for (const int64_t f : frames) markers_.erase(f);
+			const int64_t first = *std::min_element(frames.begin(), frames.end());
+			markersEdited(first);
+			keepMarkers(std::move(before), tr("piano_roll.step_remove_marker", {std::to_string(first)}));
+			return static_cast<int64_t>(frames.size());
+		});
 	command("setMarkerAt", "TAStudio's double click on a frame number, as Chimera's: the person's own marker on the frame is to be "
 		"edited (its text back); with none, an unnamed marker is put there (nothing back)", {"frame"},
 		[this](const Args &a, std::string &error) -> Value {

@@ -58,4 +58,16 @@ private:
 	static bool typing(const QKeyEvent &k);
 };
 
+/* A key held on a button clicks it once, when it is let go, as a Windows
+ * button does. A held key comes again and again as a release and a press
+ * marked as repeats (on Windows and X11 alike), and Qt Quick's buttons click
+ * at every release, repeat or not: Space held on TAStudio's Add Branch made
+ * 20 to 30 branches (issue 494). The repeats are kept from every button and
+ * check box of the application. */
+class HeldKeyClicksOnce : public QObject
+{
+protected:
+	bool eventFilter(QObject *watched, QEvent *e) override;
+};
+
 } // namespace chimera::qt
