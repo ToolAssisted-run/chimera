@@ -9117,6 +9117,8 @@ bool throttles(const char *package, const char *rom)
 	session.throttle.set("");
 	CHECK(session.status.get() == "Throttled:(none)");
 	const int64_t none = ranIn(0.5);
+	std::printf("throttles: %lld frames in half a second by the clock, %lld with none\n",
+		static_cast<long long>(clock), static_cast<long long>(none));
 	CHECK(clock >= 20 && clock <= 40 && none > clock * 3);
 	session.throttle.set("vsync");
 	ranIn(0.1);
@@ -9139,6 +9141,8 @@ bool throttles(const char *package, const char *rom)
 	ranIn(0.1);
 	const int64_t fast = ranIn(0.5);
 	session.speedPercent.set(100);
+	std::printf("throttles at 400%%: %lld frames in half a second by the sound, %lld by the clock\n",
+		static_cast<long long>(heard), static_cast<long long>(fast));
 	CHECK(heard >= 20 && heard <= 40 && fast > heard * 2);
 	/* nothing else: a throttle by any other name is the clock */
 	session.throttle.set("sometimes");
@@ -10424,7 +10428,7 @@ bool soundRate(const char *package, const char *rom)
 	CHECK(d.until([&] { return session.isOpen.get(); }, 60));
 	if (session.sound.get() == "Sound on")
 	{
-		const int64_t f0 = session.frame.get(), q0 = session.soundQueued.get();
+		const int64_t f0 = session.frame.get(), q0 = session.soundQueued.get(), d0 = session.soundDropped.get();
 		session.run("play", {}, error);
 		CHECK(d.until([&] { return session.frame.get() >= f0 + 120; }, 20));
 		session.run("pause", {}, error);
@@ -10436,9 +10440,14 @@ bool soundRate(const char *package, const char *rom)
 			last = session.soundQueued.get();
 			d.until([] { return false; }, 0.2);
 		}
-		const int64_t frames = session.frame.get() - f0, pairs = session.soundQueued.get() - q0;
+		/* what the frames made at 44100 Hz: sent to the speakers, or dropped
+		 * because the device had fallen behind (a busy CI Mac's silent device
+		 * does, by a frame's worth: the conversion is what is measured here) */
+		const int64_t dropped = session.soundDropped.get() - d0;
+		const int64_t frames = session.frame.get() - f0, pairs = session.soundQueued.get() - q0 + dropped;
 		const double each = frames > 0 ? static_cast<double>(pairs) / static_cast<double>(frames) : 0.0;
-		std::printf("a 48000 Hz core: %.1f sample pairs a frame reach the speakers (the core makes 735)\n", each);
+		std::printf("a 48000 Hz core: %.1f sample pairs a frame reach the speakers (the core makes 735), %lld dropped\n",
+			each, static_cast<long long>(dropped));
 		CHECK(std::fabs(each - 735.0 * 44100.0 / 48000.0) < 4.0);
 	}
 	else
