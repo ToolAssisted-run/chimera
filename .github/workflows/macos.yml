@@ -149,6 +149,28 @@ jobs:
           name: synth-core-${{ matrix.arch }}
           path: .
 
+      - name: Timers as a Mac at a desk has them
+        # The view models' test measures the throttles in real time, and on a
+        # runner the clock throttle ran at 38 frames a second where it ran at
+        # 60 at 400% speed: as if waits of 16.7 ms woke tens of ms late (macOS
+        # coalesces the timers of background processes). Measured here, then
+        # coalescing is turned off for the tests, and measured again.
+        run: |
+          cat > timers.py <<'PY'
+          import time
+          late = []
+          for i in range(120):
+              t = time.perf_counter()
+              time.sleep(1 / 60)
+              late.append((time.perf_counter() - t) * 1000 - 1000 / 60)
+          late.sort()
+          print("a 16.7 ms sleep wakes late by %.2f ms (median), %.2f (95th), %.2f (worst)" % (late[60], late[114], late[-1]))
+          PY
+          sysctl kern.timer.coalescing_enabled || true
+          python3 timers.py
+          sudo sysctl -w kern.timer.coalescing_enabled=0 || true
+          python3 timers.py
+
       - name: Unit tests (the engine, the view models, the window)
         # without --no-rebuild: meson builds what the tests are given, the test
         # projects made from the synthetic core among it
