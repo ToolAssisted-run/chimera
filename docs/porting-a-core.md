@@ -383,6 +383,31 @@ Probed once after `Init`; absent exports simply mean the tool is not offered.
   a core without the export refuses it. The call costs nothing when no
   script listens: the engine returns at once. The synthetic core
   (`tests/synth/package-box/synth_wbx.c`) is the example.
+- **Calls during a frame: memory the machine runs, reads or writes** (issue
+  496) - four exports, all of them or none.
+  `const char *GetMemoryCallbackScopes(void)` names the address spaces the
+  core can watch, its "scopes" (a CPU's bus, a kind of memory), a line each,
+  its main one first. `void SetMemoryCallback(uint64_t fn)` is handed a
+  function in callback slot 4; keep it as the input poll's is
+  (`ECL_INVISIBLE`). `int32_t AddMemoryWatch(int32_t kind, int32_t scope,
+  uint64_t address)` and `void RemoveMemoryWatch(...)`, with the same
+  arguments, start and stop watching an address of a scope (`UINT64_MAX`:
+  every address) for a kind of access: 0 an instruction about to run, 1 a
+  read, 2 a write. Add gives 1 when the core watches it, and 0 when it cannot
+  (a kind or scope it lacks, or more places than it keeps); a script that asks
+  for it then gets an error. Keep what is watched in `ECL_INVISIBLE` memory
+  too, so a load leaves it as it is. At each watched access, call
+  `fn(kind, scope, address, value, 0, 0)` through the same six-argument
+  signature as the input poll: value is the byte or word read or written, 0
+  for an instruction; an instruction before it runs, a read or a write as it
+  happens. A Lua script's `event.on_bus_exec`, `on_bus_exec_any`,
+  `on_bus_read` and `on_bus_write` run there, part way through the frame;
+  a core without the exports refuses them. Look for a watched place only
+  while something is watched, since every access pays for the look. A core
+  whose CPU recompiles the game's code can watch only what its recompiler
+  lets it reach; offering reads and writes without instructions is fine. The
+  synthetic core is the example (`tests/synth/package-box/synth_wbx.c`:
+  scopes Code and RAM).
 - **Memory domains** - a pointer and a size, published once. The memory tools
   read a domain through a second view of the core's memory that never faults,
   so a core that watches pages by protecting them (`GuestFaultHandler`, as

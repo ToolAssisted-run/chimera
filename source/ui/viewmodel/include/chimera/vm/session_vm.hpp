@@ -10,6 +10,7 @@
 #include <condition_variable>
 #include <deque>
 #include <functional>
+#include <tuple>
 #include <optional>
 #include <map>
 #include <filesystem>
@@ -680,6 +681,11 @@ public:
 	 * reports, part way through a frame (event.oninputpoll, issue 344): on
 	 * the machine's thread, inside the frame */
 	void setInputPollTurn(std::function<void()> turn);
+	/* the scripts' functions called at memory the core watches, part way
+	 * through a frame (event.on_bus_exec, on_bus_read, on_bus_write; issue
+	 * 496), with the kind of access, the scope, the address and the value:
+	 * on the machine's thread, inside the frame */
+	void setMemoryTurn(std::function<void(int32_t kind, int32_t scope, uint64_t address, uint64_t value)> turn);
 	void scriptsDuringTurbo(bool on) { scriptsDuringTurboM_.store(on); }
 	/* the machine was opened by a script (client.reboot_core, or
 	 * client.openproject): the scripts go on, rather than start again as
@@ -1048,6 +1054,12 @@ private:
 	std::atomic<bool> inputPollsWantedM_{false};
 	static void inputPollCalled(void *ctx);
 	void applyInputPollsOnMachine();
+	/* the memory functions': what the core is asked to watch for them (kind,
+	 * scope, address), asked again of a core opened again; on the machine's thread */
+	std::function<void(int32_t, int32_t, uint64_t, uint64_t)> memoryTurnM_;
+	std::set<std::tuple<int32_t, int32_t, uint64_t>> memoryWatchesM_;
+	static void memoryCalled(void *ctx, int32_t kind, int32_t scope, uint64_t address, uint64_t value);
+	void applyMemoryWatchesOnMachine();
 	/* a turbo seek going in pieces: where to (-1 none), and the next piece's size in frames */
 	static constexpr int64_t kTurboPieceFrames = 60;
 	int64_t turboSeekToM_ = -1, turboPiece_ = kTurboPieceFrames;

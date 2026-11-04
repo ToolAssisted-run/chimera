@@ -12938,3 +12938,40 @@ or with link-time optimisation, which makes drawing and QML slower. The owner
 chose to keep Qt as it is built (over measuring both builds first, or
 switching to a size build unmeasured): the window's speed matters more than a
 few megabytes.
+
+## A core may call back at the memory a script watches (user-decided, 2026-11-04)
+
+On 2026-10-21 the owner let a core call back part way through a frame at each
+read of its controls (`event.oninputpoll`), and kept the memory events
+(`event.on_bus_exec`, `on_bus_read`, `on_bus_write`) refused. Issue 496 asked
+for them, for scripts that watch what a game does inside a frame (the
+reporter ported the Gens core and has such scripts). The owner chose to add
+them as a feature a core offers, over keeping them refused.
+
+A core offers them with four exports (docs/porting-a-core.md): the address
+spaces it can watch, by name (its "scopes"), the engine's function in
+miniBox's callback slot 4, and calls to start and stop watching an address,
+or every address, of a scope for one kind of access - an instruction about to
+run, a read or a write. It calls the function at each watched access with the
+kind, scope, address and value. The engine passes the call to the window's
+function, on the machine's thread, inside the frame, as it does an input
+poll; the call counts as the core's work. The window keeps what the scripts
+watch and asks it again of a core opened again. Lua asks the core to watch a
+place when the first function wants it and to stop when the last is removed;
+`event.availableScopes` lists the scopes; a core without the exports, or
+asked for what it cannot watch, refuses the function with Chimera's words.
+The function gets the address and the value, may read and write memory, and
+must not advance, save or load. Each core adds this to its own CPU, so cores
+offer it one by one; one whose CPU recompiles code may offer only part.
+
+The synthetic core offers it (scopes Code and RAM). Tested: the witness's
+`E:memory-calls` (`chimera-run --watch-memory`): the instruction at 0 called
+once in each of the 70 frames of the win movie, reads of the status byte
+twice a frame (140) with values summing to 91 (the game's status), a read in
+the Code scope refused, and the machine ending on the goldens; with the core
+calling at every instruction instead of the watched one it counted 186,975
+calls. `T:box:memoryCalls`: a script in the real window sees those calls,
+values matching memory, every write already in memory, refusals for a scope
+and a kind the core lacks, and no calls once its functions are removed; it
+failed when the window said a watch was taken without asking the core. Not
+yet offered by any emulator core.

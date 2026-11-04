@@ -1419,6 +1419,9 @@ int main(int argc, char **argv)
 		});
 	/* a script's event.oninputpoll: at each read of the controls a core reports, inside its frame */
 	session.setInputPollTurn([&lua] { lua.inputPoll(); });
+	session.setMemoryTurn([&lua](int32_t kind, int32_t scope, uint64_t address, uint64_t value) {
+		lua.memoryAccess(kind, scope, address, value);
+	});
 	/* a script's show_future: asked before each frame played ahead */
 	session.setFutureTurn([&lua](int64_t played) { return lua.ask("__chimera_future", {vm::Value(played)}) == "true"; });
 	/* a machine opened or closed: the running scripts start again, as Chimera's
@@ -1445,6 +1448,7 @@ int main(int argc, char **argv)
 			session.setScriptIdle({}, {});
 			session.setFutureTurn({});
 			session.setInputPollTurn({});
+			session.setMemoryTurn({});
 		}
 	} letGo{session};
 

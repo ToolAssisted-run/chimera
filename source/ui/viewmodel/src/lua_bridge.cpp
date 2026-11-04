@@ -912,6 +912,14 @@ void LuaBridge::inputPoll()
 	onScripts([&] { callHook("__chimera_input_poll_events"); });
 }
 
+void LuaBridge::memoryAccess(int32_t kind, int32_t scope, uint64_t address, uint64_t value)
+{
+	onScripts([&] {
+		askHere("__chimera_memory_events", {Value(int64_t{kind}), Value(int64_t{scope}), Value(static_cast<int64_t>(address)),
+										   Value(static_cast<int64_t>(value))});
+	});
+}
+
 bool LuaBridge::yieldTurn()
 {
 	return onScripts([&] { return resumeRunning(false); });

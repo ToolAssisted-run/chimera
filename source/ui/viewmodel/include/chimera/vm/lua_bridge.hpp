@@ -118,6 +118,9 @@ public:
 	/* a read of the controls the core reported, part way through a frame:
 	 * the scripts' event.oninputpoll functions, called there and then */
 	void inputPoll();
+	/* an access to memory a script watches, which the core reported part way
+	 * through a frame: the scripts' event.on_bus_* functions, called there and then */
+	void memoryAccess(int32_t kind, int32_t scope, uint64_t address, uint64_t value);
 	/* the window's turn when no frame is run (paused, or nothing open): the
 	 * running scripts that wait in emu.yield go on, each to its next wait, as
 	 * Chimera resumes them every pass of its loop; those waiting for a frame

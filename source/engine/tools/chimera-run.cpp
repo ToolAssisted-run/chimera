@@ -83,6 +83,13 @@
  * read of its controls (issue 344), and writes inputPolls=<count> into the
  * results, with lagFrames=<count>, the frames it did not read them in; a core
  * that does not report its reads writes inputPolls=none.
+ * --watch-memory <kind>:<scope>:<address> (any number) has the core stop at
+ * memory (issue 496): kind exec, read or write; the scope's place in the
+ * core's list (from 0); the address in hex, or any. The calls are counted and
+ * written as memoryCalls=<count> (memoryCalls=none for a core that watches no
+ * memory), with memoryScopes=<names, comma apart> and memorySum=<the sum of
+ * the addresses and values the calls gave, wrapping at 64 bits>. A watch the
+ * core refuses ends the run with the reason.
  * --record drives RECORD mode instead of playback: the given movie is only an
  * input source (each entry decoded to buttons/axes), the session generates the
  * log itself, and it is written to <out.txt>. Feeding that file back in as an
@@ -732,6 +739,17 @@ int main(int argc, char **argv)
 	bool recoverStops = false;
 	bool countInputPolls = false;
 	int64_t inputPolls = 0;
+	struct MemoryWatch
+	{
+		int32_t kind = 0, scope = 0;
+		uint64_t address = 0;
+	};
+	std::vector<MemoryWatch> memoryWatches;
+	struct MemoryCalls
+	{
+		int64_t count = 0;
+		uint64_t sum = 0;
+	} memoryCalls;
 	int64_t lagFrames = 0;   /* frames the core did not read its controls in (the play loop's) */
 	std::string bands;
 	std::string spillDir;
@@ -864,6 +882,20 @@ int main(int argc, char **argv)
 		else if (arg == "--stop-at-seek") stopAtSeek = true;
 		else if (arg == "--recover") recoverStops = true;
 		else if (arg == "--count-input-polls") countInputPolls = true;
+		else if (arg == "--watch-memory" && i + 1 < argc)
+		{
+			const std::string w = argv[++i];
+			const size_t a = w.find(':'), b = a == std::string::npos ? a : w.find(':', a + 1);
+			const std::string kind = a == std::string::npos ? std::string() : w.substr(0, a);
+			MemoryWatch m;
+			m.kind = kind == "exec" ? 0 : kind == "read" ? 1 : kind == "write" ? 2 : -1;
+			if (m.kind < 0 || b == std::string::npos)
+				return fail(metaPath, "--watch-memory wants exec|read|write:<scope>:<hex address or any>, not " + w);
+			m.scope = static_cast<int32_t>(wholeNumber(w.substr(a + 1, b - a - 1).c_str(), arg));
+			const std::string at = w.substr(b + 1);
+			m.address = at == "any" ? CE_ANY_ADDRESS : std::strtoull(at.c_str(), nullptr, 16);
+			memoryWatches.push_back(m);
+		}
 		else if (arg == "--record" && i + 1 < argc) recordPath = argv[++i];
 		else if (arg == "--record-key" && i + 1 < argc) recordKey = argv[++i];
 		else if (arg == "--suggest") suggest = true;
@@ -1158,6 +1190,17 @@ int main(int argc, char **argv)
 	if (drawEveryFrame) ce_session_draw_every_frame(session, 1);
 	if (countInputPolls)
 		ce_session_set_input_poll_callback(session, [](void *ctx) { ++*static_cast<int64_t *>(ctx); }, &inputPolls);
+	if (!memoryWatches.empty() && ce_session_memory_scopes(session)[0] != 0)
+	{
+		ce_session_set_memory_callback(session, [](void *ctx, int32_t, int32_t, uint64_t address, uint64_t value) {
+			auto *calls = static_cast<MemoryCalls *>(ctx);
+			calls->count++;
+			calls->sum += address + value;
+		}, &memoryCalls);
+		for (const MemoryWatch &m : memoryWatches)
+			if (ce_session_watch_memory(session, m.kind, m.scope, m.address, 1) == 0)
+				return fail(metaPath, "the core cannot watch kind " + std::to_string(m.kind) + " in scope " + std::to_string(m.scope));
+	}
 
 	int64_t frames = ce_movie_log_count(movie);
 
@@ -2242,6 +2285,14 @@ int main(int argc, char **argv)
 		{
 			meta += "inputPolls=" + (ce_session_input_polls_reported(session) ? std::to_string(inputPolls) : std::string("none")) + "\n";
 			meta += "lagFrames=" + std::to_string(lagFrames) + "\n";
+		}
+		if (!memoryWatches.empty())
+		{
+			std::string scopes = ce_session_memory_scopes(session);
+			for (char &c : scopes)
+				if (c == '\n') c = ',';
+			meta += "memoryCalls=" + (scopes.empty() ? std::string("none") : std::to_string(memoryCalls.count)) + "\n";
+			meta += "memoryScopes=" + scopes + "\nmemorySum=" + std::to_string(memoryCalls.sum) + "\n";
 		}
 		if (!shortDumps.empty()) meta += "shortdumps=" + shortDumps + "\n";
 		// the display aspect the core reports for the last picture, when it does
