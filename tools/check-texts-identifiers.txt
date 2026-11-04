@@ -394,3 +394,7 @@ Response
 # a Qt logging rule, read by Qt and never shown (main.cpp: the Wayland text-input warning muted)
 qt.qpa.wayland.textinput.warning=false
 /System/Library/Frameworks/OpenGL.framework/OpenGL
+*.chimeraTheme.json
+@executable_path/libopenal.dylib
+@executable_path/../Frameworks/libopenal.dylib
+@rpath/libopenal.dylib

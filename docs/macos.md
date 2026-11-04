@@ -81,20 +81,24 @@ tools/fetch-ffmpeg.sh macos build/x86_64-macos/dll
 tools/build-app-macos.sh --dll build/x86_64-macos/dll --qt <qt folder>/6.12.0/macos --out build/Chimera.app
 ```
 
-The program's own folder is `Contents/MacOS`, and what Chimera keeps "beside
-the program" is there: `Cores/` (empty but for a README.txt), `Themes/`, and the
-`settings.json` and `Movies/` it makes. The app carries no cores: put a core's
-package in `Contents/MacOS/Cores`, or give the Core Manager another folder.
-Sound and gamepads need no setup: OpenAL Soft and SDL2 are in `Contents/Frameworks`
-and found there.
+What a person keeps is in `~/Library/Application Support/Chimera`, as other
+Mac programs keep theirs (owner, 2026-11-03), and not beside the program as on
+Linux and Windows: `Cores/`, `Firmware/`, `settings.json`, and the folders of
+Config > Paths (`Movies/` and the rest, which are relative to it). That is the
+folder that already held the projects and the recovery files. It is the same
+for the window run from a build folder, so a core put in `Cores/` there is
+found by both. The app carries no cores: put a core's package in
+`~/Library/Application Support/Chimera/Cores`, or give the Core Manager another
+folder. What ships in the app stays in it: `Contents/MacOS/bin` (the helper
+programs and ffmpeg), the libraries, and `Themes/`, whose themes are shown
+until the person's own Themes folder has one.
+
+Sound and gamepads need no setup: OpenAL Soft and SDL2 are in
+`Contents/Frameworks` and found there.
 
 It is ad hoc signed, not notarised, so another Mac asks before opening it
-(right-click, Open). And because Chimera writes `settings.json` and `Movies/`
-into its own folder, which is inside the app, the app's signature no longer
-verifies strictly after its first run (`codesign --verify --deep --strict`: "a
-sealed resource is missing or invalid"). It still runs. Keeping those beside
-`Chimera.app`, or in `~/Library/Application Support/Chimera`, would stop that:
-not done, as where a Mac install keeps its data is for the owner to decide.
+(right-click, Open). Chimera writes nothing into the app, so its signature
+keeps verifying (`codesign --verify --deep --strict` passes after a run).
 
 ## miniBox on macOS
 

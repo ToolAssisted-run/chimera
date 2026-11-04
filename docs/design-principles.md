@@ -12844,3 +12844,29 @@ downloads, checks both hashes and unpacks it; the window, run with a Lua script,
 encoded 120 frames of Super Mario Bros. through quickerNES to an H.264 and AAC
 Matroska file, which ffmpeg reads back as 2.04 s at 256x240. Not tried: the
 other presets, and an Intel Mac.
+
+## On macOS what a person keeps is in ~/Library/Application Support/Chimera (user-decided, 2026-11-03)
+
+Decided: on macOS the folder Chimera keeps "beside the program" on Linux and
+Windows - settings.json, Cores, Firmware, and the base of Config > Paths, which
+Movies, Tools, Lua, Themes, Reports and the rest are relative to - is
+~/Library/Application Support/Chimera, as other Mac programs keep theirs. Linux
+and Windows are as they were.
+
+Why. The app is one signed folder, and what was kept beside the program was
+inside it: after its first run (settings.json and Movies/ written there) the
+app's signature no longer verified strictly ("a sealed resource is missing or
+invalid"). It is also where a Mac person looks, and it is the folder that
+already held the projects and the recovery files.
+
+What stays in the app: the helper programs and ffmpeg (Contents/MacOS/bin), the
+libraries, and the themes that ship (Contents/MacOS/Themes). A themes folder
+with no theme in it - the person's, at first - shows the shipped ones. The
+window run from a build folder is the same, so there is one place for cores.
+
+Tested (x86-64 under Rosetta 2, Apple M1): the app, run with no --core, opened a
+project on the quickerNES package found in Application Support/Chimera/Cores,
+wrote settings.json and Movies/ there and nothing into itself, and its signature
+verified after the run. The window's tests give the same 47 passes as before. Not
+tried: a person's own themes folder, a Linux or Windows build after this change
+(the change is under `#ifdef __APPLE__`), and an Intel Mac.
