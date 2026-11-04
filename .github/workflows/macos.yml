@@ -38,6 +38,13 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends meson ninja-build build-essential python3
 
+      - name: Build miniBox's host and guest toolchain
+        # the guest compiler and its runtime object are not in the default build
+        run: |
+          mb=extern/chimera-common-minibox
+          meson setup "$mb/build/meson-linux" "$mb"
+          ninja -C "$mb/build/meson-linux" musl-gcc source/guest/emulibc.c.o
+
       - name: Build the package and the test game
         run: ./tests/synth/build-package.sh
 
