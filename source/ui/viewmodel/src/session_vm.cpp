@@ -3040,8 +3040,11 @@ std::string SessionViewModel::machineIdOnMachine()
 
 void SessionViewModel::startProjectSessionOnMachine(bool loadHistory)
 {
-	/* read only until the window says otherwise, from this project's first frame */
-	recordingModeM_ = false;
+	/* read only until the window says otherwise: projectSwitched turns the window's
+	 * recording mode off as the project opens, and this copy follows it. Not set here
+	 * as well: a person who turned it on in between had it on in the window and off
+	 * here, and the frames they played were not recorded (seen on a slow Mac, the
+	 * view models' tests' recording mode) */
 	namespace fs = std::filesystem;
 	const fs::path dir = projectCacheOnMachine();
 	if (dir.empty() || s_ == nullptr) return;

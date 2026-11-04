@@ -72,7 +72,8 @@ jobs:
           submodules: recursive
 
       - name: Install build tools
-        run: brew install meson ninja cmake
+        # coreutils: the tests' scripts use GNU timeout, which macOS 15 does not have
+        run: brew install meson ninja cmake coreutils
 
       - name: Cache Qt
         uses: actions/cache@v4

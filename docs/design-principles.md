@@ -12926,3 +12926,28 @@ Linux job builds), which had not run on a Mac before. What they found:
 Tested (x86-64 under Rosetta 2, Apple M1, macOS 27, the synthetic core from the
 CI's Linux job): all 59 tests pass, run one at a time; miniBox's 13 unit tests
 pass. Not tried yet: the CI run with these changes.
+
+## Recording mode is the window's alone, and two tests wait instead of sleeping (2026-11-04)
+
+Found by the macOS CI run on an Intel runner, after the round above:
+
+- **A project could record nothing with recording mode on.** The window turns
+  recording mode off as a project opens (projectSwitched, before the window says
+  the project is open), and the machine's thread turned its own copy off again
+  when it started the project's session. A person who turned recording mode on in
+  between had it on in the window and off in the machine, and the frames they
+  played were not recorded. The machine's thread no longer sets it: its copy
+  follows the window's. Seen as the view models' tests' recording-mode check
+  failing now and then on a slow Mac.
+- **The sound-rate test counted before the last frame's sound was sent** on the
+  slower runner (669.6 sample pairs a frame against 675.3): it waits until the
+  count stops moving.
+- **The tests' scripts use GNU timeout**, which macOS 15 does not have: the
+  workflow installs Homebrew's coreutils. (macOS 27 has its own.)
+
+Tested (x86-64 under Rosetta 2, Apple M1): the view models test nine times since,
+all 3,081 checks passing, four of them with the Lua library that aborts on two
+threads in one state. A fifth run with it stopped once on the main thread
+holding the state with no Lua running: that library counts Lua's lock calls, and
+a Lua error leaves one uncounted, so it was not taken as a race; five runs
+without it then passed.

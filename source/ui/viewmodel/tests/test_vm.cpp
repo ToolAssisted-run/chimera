@@ -10360,7 +10360,13 @@ bool soundRate(const char *package, const char *rom)
 		CHECK(d.until([&] { return session.frame.get() >= f0 + 120; }, 20));
 		session.run("pause", {}, error);
 		CHECK(d.until([&] { return !session.running.get(); }, 5));
-		d.until([] { return false; }, 0.2);
+		/* the last frames' sound is sent after them: waited for until the count stops
+		 * moving, not slept for (a slower runner, an Intel Mac on CI, was a frame short) */
+		for (int64_t last = -1, i = 0; i < 25 && session.soundQueued.get() != last; i++)
+		{
+			last = session.soundQueued.get();
+			d.until([] { return false; }, 0.2);
+		}
 		const int64_t frames = session.frame.get() - f0, pairs = session.soundQueued.get() - q0;
 		const double each = frames > 0 ? static_cast<double>(pairs) / static_cast<double>(frames) : 0.0;
 		std::printf("a 48000 Hz core: %.1f sample pairs a frame reach the speakers (the core makes 735)\n", each);
