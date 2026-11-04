@@ -36,6 +36,10 @@ build, out = (os.path.abspath(a) for a in args[0:2])
 root = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 if os.path.exists(out):
     sys.exit(f"{out} exists: give a new folder")
+# what the build makes only for its tests (the extra synthetic packages the
+# view models' test is given): meson test makes them before it runs, and the
+# tests of a cross build are not run here, so they are made now
+subprocess.run(["ninja", "-C", build, "meson-test-prereq"], check=True, stdout=subprocess.DEVNULL)
 tests = json.loads(subprocess.run(["meson", "introspect", "--tests", build],
                                   capture_output=True, text=True, check=True).stdout)
 

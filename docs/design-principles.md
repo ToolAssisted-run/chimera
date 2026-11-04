@@ -13227,6 +13227,33 @@ the process's: the fault handler asked the thread's %gs whether it was in a
 guest call after the handler had already put the OS's %gs back (miniBox
 18df97c). Not yet tried: a real core on an Intel Mac.
 
+## What the first Apple silicon and Windows on arm64 test runs found (2026-11-04)
+
+- **A block's memory began inside a page on Apple silicon.** miniBox's macOS
+  memory layer keeps each block's size in a header in front of the block. The
+  header was 4 KiB (the machine's page); Apple silicon's pages are 16 KiB, so
+  a view of the block began 4 KiB early, with the header as the core's first
+  bytes. A write there changed the size, and closing the block unmapped
+  memory that was not its own, malloc's among it; macOS killed the process
+  for that at a random later moment ("vm_reclaim: Killing ... due to copy I/O
+  error"). The header is one OS page now (miniBox 045c73b). Intel Macs have
+  4 KiB pages and were not hit.
+- **A core that exports GuestFaultHandler does not run on Apple silicon.**
+  miniBox refuses it on a host whose pages are larger than 4 KiB, saying so:
+  the core waits for faults on single 4 KiB pages, which such a host cannot
+  give it. Of the 30 cores installed here, RPCS3 and Xenia export it. The
+  synthetic test core does too (for the test that memory tools never run a
+  core's code), so the macOS job builds it for Apple silicon without the
+  handler (SYNTH_NO_GUEST_FAULT_HANDLER); that one test runs on Linux.
+- **The view models' test was given packages that were never built.** The
+  extra synthetic packages it opens are made when meson test runs, and the
+  Windows tests are packed after a plain build, so each test that opens one
+  waited out its time and the whole test ran past its limit on Windows on
+  arm64. export-tests.py builds the tests' prerequisites first.
+- **On the Intel Mac runner a fault costs 26 to 44 us** (2.3 us on Linux
+  here, 1.8 us on Apple silicon), so miniBox's fault tests have 300 seconds
+  on macOS, and the concurrent one runs 300 rounds there instead of 1500.
+
 ## A held key clicks a button once; TAStudio's lists pick many rows (2026-11-04)
 
 Issue 494: Space pressed in TAStudio made 20 to 30 branches, and the Branches

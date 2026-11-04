@@ -32,6 +32,9 @@ jobs:
             runner: ubuntu-latest
           - arch: aarch64
             runner: ubuntu-26.04-arm
+            # Apple silicon's pages are 16 KiB, and miniBox refuses a core
+            # that exports GuestFaultHandler there (synth_wbx.c)
+            synth_cflags: -DSYNTH_NO_GUEST_FAULT_HANDLER
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -54,6 +57,8 @@ jobs:
           ninja -C "$mb/build/meson-linux" musl-gcc source/guest/emulibc.c.o
 
       - name: Build the package and the test game
+        env:
+          SYNTH_CFLAGS: ${{ matrix.synth_cflags }}
         run: ./tests/synth/build-package.sh
 
       - name: Keep them for the macOS job
