@@ -117,10 +117,10 @@ with only what Encode Video's formats use, linked statically with x264 and
 x265. It reads the NUT stream Chimera writes, encodes with libx264,
 libx264rgb, libx265, UT Video, FFV1, raw pictures, AAC, FLAC and 16-bit PCM
 (and AC-3, Matroska's own sound when a format names none),
-writes MP4, Matroska, NUT, raw and WAV files, and has the scale, setsar, crop,
+writes MP4, Matroska, AVI, NUT, raw and WAV files, and has the scale, setsar, crop,
 pad and fps filters and the ones ffmpeg adds by itself to change a format. It
 also reads back the files it writes (H.264, H.265, FFV1, UT Video, FLAC and
-PCM in Matroska or MP4), which is how the tests count the frames they encoded
+PCM in Matroska, MP4 or AVI), which is how the tests count the frames they encoded
 and check that a lossless format kept every pixel. A format typed by hand that needs
 anything else is refused by ffmpeg with its own message. Before, it was a
 ready-made static build of everything (4.4.1): 77 MB on Linux and 26 MB of the

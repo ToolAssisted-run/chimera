@@ -13,11 +13,11 @@
 #   video:   libx264, libx264rgb, libx265, utvideo, ffv1, rawvideo
 #   sound:   aac, flac, 16-bit PCM, and ac3, Matroska's own when a format names
 #            no sound encoder
-#   files:   MP4 (and MOV), Matroska, NUT, raw, WAV
+#   files:   MP4 (and MOV), Matroska, AVI, NUT, raw, WAV
 #   filters: scale, setsar, crop, pad, fps, and what ffmpeg puts in by itself
 #            to change a picture's or a sound's format
 #   back:    the files it writes read again (H.264, H.265, FFV1, UT Video,
-#            FLAC, 16-bit PCM in Matroska or MP4): how Chimera's tests count
+#            FLAC, 16-bit PCM in Matroska, MP4 or AVI): how Chimera's tests count
 #            the frames of a video and check a lossless one kept every pixel
 #
 # A format a person types that needs anything else is refused by this ffmpeg
@@ -183,10 +183,10 @@ configuration=(
 	--disable-everything --disable-autodetect --disable-doc --disable-debug --disable-network
 	--disable-ffplay --disable-ffprobe --disable-avdevice --disable-postproc --disable-shared --enable-static
 	--enable-protocol=file,pipe,fd
-	--enable-demuxer=nut,matroska,mov
+	--enable-demuxer=nut,matroska,mov,avi
 	--enable-decoder=rawvideo,pcm_s16le,ffv1,utvideo,flac,h264,hevc
 	--enable-encoder=libx264,libx264rgb,libx265,utvideo,ffv1,rawvideo,wrapped_avframe,aac,ac3,flac,pcm_s16le
-	--enable-muxer=mp4,mov,matroska,nut,rawvideo,wav,null
+	--enable-muxer=mp4,mov,matroska,avi,nut,rawvideo,wav,null
 	--enable-filter=scale,setsar,crop,pad,fps,format,aformat,aresample,null,anull,copy,acopy
 )
 (
