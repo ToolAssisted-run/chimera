@@ -325,7 +325,13 @@ int main(int argc, char **argv)
 	/* Fusion, with Chimera's check boxes and radio buttons and scroll bars always seen (style/, built in) */
 	QQuickStyle::setStyle(QStringLiteral("ChimeraStyle"));
 #ifndef _WIN32
-	/* Chimera's icon on every window; on Windows it is the program's own (chimera.rc), at every size */
+	/* Chimera's icon on every window; on Windows it is the program's own (chimera.rc), at every size.
+	 * On macOS it is the app's own too (Chimera.icns, by Info.plist), and setting one here would
+	 * replace the Dock's with this small picture the moment the program starts: only a program run
+	 * outside an app, which has none, is given it */
+#ifdef __APPLE__
+	if (!QCoreApplication::applicationDirPath().endsWith(QStringLiteral(".app/Contents/MacOS")))
+#endif
 	QGuiApplication::setWindowIcon(QIcon(QStringLiteral(":/chimera/chimera.png")));
 #endif
 
