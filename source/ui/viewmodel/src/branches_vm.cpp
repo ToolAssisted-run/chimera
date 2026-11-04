@@ -4,7 +4,9 @@
 #include <algorithm>
 
 #include <chrono>
+#include <cstdlib>
 #include <ctime>
+#include <sstream>
 #include <utility>
 
 #include "chimera/engine.h"
@@ -113,10 +115,17 @@ BranchesViewModel::BranchesViewModel(Dispatcher &dispatcher, InputLog &inputs, S
 			break;
 		case Undo::Remove:
 		{
-			const int64_t at = std::min<int64_t>(backupAt_, static_cast<int64_t>(branches_.size()));
-			branches_.insert(branches_.begin() + at, backup_);
-			/* the branch loaded is the one it was: it moved down with the removal */
-			if (current.get() >= at) current.set(current.get() + 1);
+			/* the branch loaded is the one it was, wherever the branches put back move it */
+			const uint64_t loaded = current.get() >= 0 ? branches_[static_cast<size_t>(current.get())].id : 0;
+			for (const auto &[place, b] : removed_)
+			{
+				const int64_t at = std::min<int64_t>(place, static_cast<int64_t>(branches_.size()));
+				branches_.insert(branches_.begin() + at, b);
+			}
+			removed_.clear();
+			if (loaded != 0)
+				for (size_t i = 0; i < branches_.size(); i++)
+					if (branches_[i].id == loaded) current.set(static_cast<int64_t>(i));
 			previewing.set(-1);
 			status.set(tr("branches.removal_canceled"));
 			break;
@@ -225,19 +234,31 @@ BranchesViewModel::BranchesViewModel(Dispatcher &dispatcher, InputLog &inputs, S
 	command("remove", "forgets a branch", {"index"}, [this](const Args &a, std::string &error) -> Value {
 		size_t i = 0;
 		if (!index(a, i, error)) return {};
-		status.set(tr("branches.removed", {branches_[i].name}));
-		const SessionViewModel::Branch gone = branches_[i];
-		branches_.erase(branches_.begin() + static_cast<long>(i));
-		if (current.get() == static_cast<int64_t>(i)) current.set(-1);
-		else if (current.get() > static_cast<int64_t>(i)) current.set(current.get() - 1);
-		previewing.set(-1);
-		/* kept, its state file too, for Undo */
-		keepBackup(Undo::Remove, gone, static_cast<int64_t>(i));
-		if (selected.get() >= static_cast<int64_t>(branches_.size())) selected.set(static_cast<int64_t>(branches_.size()) - 1);
-		changed();
-		branchRemoved.emit(static_cast<int64_t>(i));
+		remove({i});
 		return {};
 	});
+	command("removeRows", "forgets the branches at these places in the list (\"0,2\"); one Undo puts them all back",
+		{"rows"}, [this](const Args &a, std::string &error) -> Value {
+			std::string list;
+			if (!arg(a, 0, list, error)) return {};
+			std::vector<size_t> places;
+			std::stringstream in(list);
+			for (std::string one; std::getline(in, one, ',');)
+			{
+				if (one.empty()) continue;
+				char *end = nullptr;
+				const long i = std::strtol(one.c_str(), &end, 10);
+				if (end == nullptr || *end != '\0' || i < 0 || static_cast<size_t>(i) >= branches_.size())
+				{
+					error = tr("branches.no_branch", {one});
+					return {};
+				}
+				places.push_back(static_cast<size_t>(i));
+			}
+			if (places.empty()) return {};
+			remove(std::move(places));
+			return {};
+		});
 	command("swap", "Chimera's branch dragged by its number onto another: the two change places, the branch loaded "
 		"staying the one loaded", {"from", "to"}, [this](const Args &a, std::string &error) -> Value {
 		size_t from = 0, to = 0;
@@ -366,9 +387,42 @@ bool BranchesViewModel::listed(uint64_t id) const
 void BranchesViewModel::dropBackup()
 {
 	/* a branch kept only for Undo goes, its state file with it */
-	if (undo_ != Undo::None && undo_ != Undo::Text && !listed(backup_.id)) session_.forgetBranch(backup_);
+	if (undo_ == Undo::Remove)
+	{
+		for (const auto &[place, b] : removed_)
+			if (!listed(b.id)) session_.forgetBranch(b);
+		removed_.clear();
+	}
+	else if (undo_ != Undo::None && undo_ != Undo::Text && !listed(backup_.id)) session_.forgetBranch(backup_);
 	undo_ = Undo::None;
 	undoText.set("");
+}
+
+void BranchesViewModel::remove(std::vector<size_t> places)
+{
+	std::sort(places.begin(), places.end());
+	places.erase(std::unique(places.begin(), places.end()), places.end());
+	status.set(places.size() == 1 ? tr("branches.removed", {branches_[places[0]].name})
+								  : tr("branches.removed_many", {std::to_string(places.size())}));
+	/* kept, their state files too, for Undo */
+	std::vector<std::pair<int64_t, SessionViewModel::Branch>> gone;
+	for (const size_t i : places) gone.emplace_back(static_cast<int64_t>(i), branches_[i]);
+	dropBackup();
+	undo_ = Undo::Remove;
+	removed_ = gone;
+	undoText.set(tr("branches.undo_removal"));
+	/* from the last, so each place told is the branch's place as it goes */
+	for (auto it = places.rbegin(); it != places.rend(); ++it)
+	{
+		const int64_t i = static_cast<int64_t>(*it);
+		branches_.erase(branches_.begin() + static_cast<long>(i));
+		if (current.get() == i) current.set(-1);
+		else if (current.get() > i) current.set(current.get() - 1);
+	}
+	previewing.set(-1);
+	if (selected.get() >= static_cast<int64_t>(branches_.size())) selected.set(static_cast<int64_t>(branches_.size()) - 1);
+	changed();
+	for (auto it = places.rbegin(); it != places.rend(); ++it) branchRemoved.emit(static_cast<int64_t>(*it));
 }
 
 void BranchesViewModel::keepBackup(Undo kind, SessionViewModel::Branch b, int64_t at)

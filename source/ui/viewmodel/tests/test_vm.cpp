@@ -3133,6 +3133,27 @@ bool tastudioSettings(const char *package, const char *rom)
 	CHECK(roll.run("removeMarkers", {int64_t{6}, int64_t{7}}, error) == Value(int64_t{2}) && keeps(6) == -1 && keeps(7) == -1);
 	CHECK(keeps(5) == 0 && keeps(8) == 1 && roll.run("removeMarkers", {int64_t{8}, int64_t{9}}, error) == Value(int64_t{1}) && roll.markerCount.get() == 1);
 	CHECK(!roll.run("addMarkers", {int64_t{3}, int64_t{2}}, error).has_value());
+	/* several picked in the markers list taken off at once, as one step; the
+	 * run's own stay (issue 494) */
+	CHECK(roll.run("addMarkers", {int64_t{6}, int64_t{7}}, error) == Value(int64_t{2}) && roll.markerCount.get() == 3);
+	{
+		RowModel *rows = nullptr;
+		for (const auto &r : roll.rowLists())
+			if (r.name == "markers") rows = r.model;
+		auto rowOf = [&](int64_t frame) {
+			for (int64_t r = 0; r < rows->rowCount(); r++)
+				if (rows->cell(r, 0) == Value(frame)) return r;
+			return int64_t{-1};
+		};
+		const std::string picked = std::to_string(rowOf(0)) + "," + std::to_string(rowOf(7)) + "," + std::to_string(rowOf(5));
+		CHECK(roll.run("removeMarkerRows", {picked}, error) == Value(int64_t{2}) && roll.markerCount.get() == 1);
+		CHECK(keeps(5) == -1 && keeps(6) == 1 && keeps(7) == -1);
+		CHECK(roll.run("undo", {}, error).has_value() && roll.markerCount.get() == 3 && keeps(5) == 0 && keeps(7) == 1);
+		CHECK(!roll.run("removeMarkerRows", {std::to_string(rowOf(0))}, error).has_value() &&
+			error == "frame 0's marker is the run's own: it cannot be removed" && roll.markerCount.get() == 3);
+		CHECK(!roll.run("removeMarkerRows", {std::string("99")}, error).has_value() && error == "the markers list has no row 99");
+		CHECK(roll.run("removeMarkers", {int64_t{6}, int64_t{7}}, error) == Value(int64_t{2}) && roll.markerCount.get() == 1);
+	}
 	/* a double click on a frame number (issue 436): the person's marker there is edited, its text handed back;
 	 * a frame with none gets an unnamed one */
 	CHECK(roll.run("setMarkerAt", {int64_t{5}}, error) == Value(std::string("named again")) && roll.markerCount.get() == 1);
@@ -5226,6 +5247,22 @@ bool project(const char *package, const char *rom, const std::string &movies, co
 		branches.run("remove", {int64_t{0}}, error);
 		CHECK(branches.current.get() == 0);
 		CHECK(branches.run("undo", {}, error).has_value() && branches.count.get() == 2 && branches.current.get() == 1);
+		was = branches.loads.get();
+		/* several removed at once (picked in the list with Ctrl or Shift), and
+		 * one Undo puts them all back in their places, the branch loaded
+		 * still the one it was (issue 494) */
+		CHECK(branches.run("create", {std::string("third")}, error).has_value());
+		CHECK(d.until([&] { return branches.made.get() == 4; }, 30) && branches.count.get() == 3);
+		const auto listed = branches.run("list", {}, error);
+		was = branches.loads.get();
+		CHECK(branches.run("load", {int64_t{1}}, error).has_value() && loaded(was) && branches.current.get() == 1);
+		CHECK(branches.run("removeRows", {std::string("2,0")}, error).has_value() && branches.count.get() == 1 && branches.current.get() == 0);
+		CHECK(branches.status.get() == "Branches removed: 2");
+		CHECK(!branches.run("removeRows", {std::string("0,5")}, error) && error == "no branch 5" && branches.count.get() == 1);
+		CHECK(branches.run("undo", {}, error).has_value() && branches.count.get() == 3 && branches.current.get() == 1);
+		CHECK(branches.run("list", {}, error) == listed && branches.status.get() == "Branch Removal canceled");
+		branches.run("removeRows", {std::string("2")}, error);
+		CHECK(branches.count.get() == 2);
 		was = branches.loads.get();
 		CHECK(branches.run("load", {int64_t{0}}, error).has_value() && loaded(was) && branches.current.get() == 0);
 		branches.run("remove", {int64_t{1}}, error);

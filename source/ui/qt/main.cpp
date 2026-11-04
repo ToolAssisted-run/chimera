@@ -1211,6 +1211,9 @@ int main(int argc, char **argv)
 	/* the menus' letters, drawn while the keyboard works the menus (issue 405) */
 	qt::MenuLetters menuLetters;
 	app.installEventFilter(&menuLetters);
+	/* a key held on a button clicks it once (issue 494) */
+	qt::HeldKeyClicksOnce heldKeyClicksOnce;
+	app.installEventFilter(&heldKeyClicksOnce);
 	qt::ThemeColors themeColors;
 	qt::QmlViewModel helpQml(help);
 	/* Tools > MCP Server...: an AI agent working on the open project (docs/mcp-server.md) */

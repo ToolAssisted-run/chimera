@@ -3,11 +3,13 @@
  * Alt+V opens the View menu while nothing takes it, and runs the hotkey
  * bound to it without opening the menu. The menus' letters are drawn from
  * Alt pressed until a click, and a menu's text without its letter is as Qt
- * hides one. */
+ * hides one. A key held on a button clicks it once, its repeats kept from it
+ * (issue 494). */
 #include <cstdio>
 #include <functional>
 
 #include <QGuiApplication>
+#include <QKeyEvent>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QQuickStyle>
@@ -45,6 +47,17 @@ ApplicationWindow {
         delegate: MenuBarItem { objectName: "bar:" + text }
     }
     Item { anchors.fill: parent; focus: true }
+}
+)";
+
+const char *const kButton = R"(
+import QtQuick
+import QtQuick.Controls
+Window {
+    id: win
+    width: 200; height: 100; visible: true
+    property int clicks: 0
+    Button { text: "Add"; focus: true; onClicked: win.clicks++ }
 }
 )";
 
@@ -123,6 +136,33 @@ int main(int argc, char **argv)
 	QTest::mouseClick(window, Qt::LeftButton, Qt::AltModifier, QPoint(160, 150));
 	CHECK(!letters.shown());
 	QTest::keyRelease(window, Qt::Key_Alt, Qt::NoModifier);
+
+	/* Space held on a button: pressed, five repeats (each a release and a
+	 * press, as Windows and X11 send them), let go - one click */
+	chimera::qt::HeldKeyClicksOnce held;
+	app.installEventFilter(&held);
+	QQmlApplicationEngine buttonEngine;
+	buttonEngine.loadData(kButton);
+	auto *buttonWindow = qobject_cast<QQuickWindow *>(buttonEngine.rootObjects().value(0));
+	CHECK(buttonWindow != nullptr);
+	if (buttonWindow == nullptr) return 1;
+	buttonWindow->requestActivate();
+	CHECK(QTest::qWaitForWindowActive(buttonWindow));
+	auto send = [&](QEvent::Type type, bool repeat) {
+		QKeyEvent k(type, Qt::Key_Space, Qt::NoModifier, QStringLiteral(" "), repeat);
+		QCoreApplication::sendEvent(buttonWindow, &k);
+	};
+	send(QEvent::KeyPress, false);
+	for (int i = 0; i < 5; i++)
+	{
+		send(QEvent::KeyRelease, true);
+		send(QEvent::KeyPress, true);
+	}
+	send(QEvent::KeyRelease, false);
+	QTest::qWait(50);
+	const int clicks = buttonWindow->property("clicks").toInt();
+	if (clicks != 1) std::fprintf(stderr, "Space held on a button clicked it %d times\n", clicks);
+	CHECK(clicks == 1);
 
 	std::printf("%d checks, %d failed\n", checks, failures);
 	return failures == 0 ? 0 : 1;

@@ -18,6 +18,12 @@
 
 <p align="center">Chimera is a modular frontend for creating tool-assisted speedruns (TAS).</p>
 
+<p align="center">
+	<a href="https://github.com/ToolAssisted-run/chimera"><img src="docs/star.svg" alt="Enjoying Chimera? Give it a star on GitHub. Stars help other players find the project." width="560"></a>
+	<br>
+	<a href="https://github.com/ToolAssisted-run/chimera/stargazers"><img src="https://img.shields.io/github/stars/ToolAssisted-run/chimera?style=for-the-badge&logo=github&label=stars&labelColor=2DB3A6&color=8A63E8" alt="GitHub stars"></a>
+</p>
+
 ## Goals
 
 - **Modularity.** The frontend contains no emulation core and no system-specific knowledge. Cores are external, self-contained packages (`.chimeraCore`), each maintained in its own repository under its own license, loaded explicitly like a ROM. Chimera includes none and downloads none.

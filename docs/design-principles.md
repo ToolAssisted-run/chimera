@@ -13160,3 +13160,39 @@ a pack made here): 31 of the 34 tests pass. Three fail, and are open: the
 state history's disk accounting (test_state_history.cpp:842), the media
 folder's listing (test_media.cpp:506), and the view models' test, which dies
 of an access violation in host code. These were never run on Windows before.
+
+## A held key clicks a button once; TAStudio's lists pick many rows (2026-11-04)
+
+Issue 494: Space pressed in TAStudio made 20 to 30 branches, and the Branches
+and Markers lists picked one row at a time, so many branches could not be
+removed together.
+
+The branches came from the Add Branch button. A click on it gave it the
+keyboard, and Space on a button presses it. A held key arrives as a release
+and a press, again and again, each marked as a repeat (Qt's Windows key
+handling sends them so, as X11 does), and Qt Quick's buttons click at every
+release, repeat or not. Two changes: an event filter on the whole application
+keeps a key's repeats from every button and check box, so a held key clicks
+once, when it is let go, as a Windows button does; and TAStudio's own buttons
+and check boxes no longer take the keyboard when clicked (Tab still reaches
+them), so keys keep going to the roll and the hotkeys after a click there.
+Hotkeys already ran once a press.
+
+The two lists pick rows as a Windows list does: Ctrl+click picks one more or
+lets one go, Shift+click picks every row from the row clicked before. Remove
+(the branch menu; the Markers box's button and menu) takes every row picked.
+The rows go to the view models by their places in the list ("0,2"):
+branches' removeRows, whose one Undo puts every branch back in its place, the
+branch loaded still marked as it; and the piano roll's removeMarkerRows, one
+undo step, which leaves the run's own markers. The Delete Branch and Delete
+Marker hotkeys still act on the one row picked.
+
+Tested: the key filter test holds Space on a button through five repeats - one
+click with the filter, six without. The view models' tests remove three
+branches' first and last together and take it back (the list as it was, the
+branch loaded at its place again), and remove two markers and the run's own
+start together (two removed, the start kept, undone in one step); with Undo
+keeping no branches and the removal taking only the first marker, 13 checks
+failed. A new test clicks TAStudio's list with Ctrl and Shift (14 checks;
+with Shift counting from the row picked last instead of the row clicked
+before, 4 failed). Not tried on Windows by hand: the reporter's Space.

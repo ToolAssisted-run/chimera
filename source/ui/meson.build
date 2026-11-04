@@ -563,6 +563,16 @@ endif
       cpp_args: ['-DQT_NO_KEYWORDS'],
     )
     test('binding box', test_binding_box, env: ['QT_QPA_PLATFORM=offscreen'], timeout: 60)
+    # TAStudio's Branches and Markers lists pick many rows with Ctrl and
+    # Shift, to remove them at once (issue 494)
+    test_roll_table = executable(
+      'test-roll-table',
+      ['qt/tests/test_roll_table.cpp', qt_rcc],
+      dependencies: [qt_test_dep],
+      override_options: ['cpp_std=c++20'],
+      cpp_args: ['-DQT_NO_KEYWORDS'],
+    )
+    test('roll table', test_roll_table, env: ['QT_QPA_PLATFORM=offscreen'], timeout: 60)
     # the menus: as wide as their widest row, below the menu bar, closed
     # when their window loses the keyboard (issues 449, 450, 452, 463); the
     # menu bar's text whole after full screen (issue 451)
