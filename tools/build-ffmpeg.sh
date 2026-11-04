@@ -262,11 +262,14 @@ say "x264 $x264_version ($platform)"
 	make install
 ) > "$work/x264.log" 2>&1 || { tail -30 "$work/x264.log" >&2; exit 1; }
 
+# x265 4.1 asks for a CMake older than 3.5, which CMake 4 (Ubuntu 26.04's,
+# Homebrew's) refuses unless told the oldest policies it may assume
 say "x265 $x265_version ($platform)"
 (
 	cmake -S "$work/x265_$x265_version/source" -B "$work/x265-build" -G "Unix Makefiles" ${x265_cross[@]+"${x265_cross[@]}"} \
 		-DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$prefix" \
-		-DENABLE_SHARED=OFF -DENABLE_CLI=OFF -DENABLE_LIBNUMA=OFF -DSTATIC_LINK_CRT=ON
+		-DENABLE_SHARED=OFF -DENABLE_CLI=OFF -DENABLE_LIBNUMA=OFF -DSTATIC_LINK_CRT=ON \
+		-DCMAKE_POLICY_VERSION_MINIMUM=3.5
 	make -C "$work/x265-build" -j"$jobs"
 	make -C "$work/x265-build" install
 ) > "$work/x265.log" 2>&1 || { tail -30 "$work/x265.log" >&2; exit 1; }
