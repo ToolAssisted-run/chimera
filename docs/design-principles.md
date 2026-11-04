@@ -12923,3 +12923,18 @@ keeping no branches and the removal taking only the first marker, 13 checks
 failed. A new test clicks TAStudio's list with Ctrl and Shift (14 checks;
 with Shift counting from the row picked last instead of the row clicked
 before, 4 failed). Not tried on Windows by hand: the reporter's Space.
+
+## Qt stays as it is built (user-decided, 2026-11-04)
+
+Issue 492 asked for a smaller release. Two cuts shipped: the test program
+bin/test_vm.exe left the Windows bundle (Development build 60034261), and
+Chimera now builds its own smaller ffmpeg (Development build bf821013), which
+took the Windows download from 59.6 MB to 36.6 MB. Qt was the last part
+asked about: it is 20.3 MB of the 36.6 MB Windows zip (Qt6Gui 4.9 MB, Qt6Core
+4.1, Qt6Quick 3.0, Qt6Qml 2.3), and the bundle already ships only the QML
+modules the window imports (tools/stage-qt-windows.py); what is left unused
+there is about 0.1 MB. A real cut would need Qt built another way, for size
+or with link-time optimisation, which makes drawing and QML slower. The owner
+chose to keep Qt as it is built (over measuring both builds first, or
+switching to a size build unmeasured): the window's speed matters more than a
+few megabytes.
