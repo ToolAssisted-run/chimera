@@ -127,7 +127,10 @@ ready-made static build of everything (4.4.1): 77 MB on Linux and 26 MB of the
 60 MB Windows download; now 14 MB and 13 MB.
 
 Every source is pinned by its SHA256 (FFmpeg's release, Debian's copies of
-x264 and x265) and kept in `build/deps`, and the finished binary is kept there
+x264 and x265; when those cannot be had, the same commits from GitHub -
+FFmpeg's repository, a mirror of x264's, MulticoreWare's x265 - with the few
+files that name the version put back as the releases have them, which builds
+the same program but for its 20-byte build ID) and kept in `build/deps`, and the finished binary is kept there
 under a name made from the script's own hash, so it is built once until the
 script changes; CI caches it the same way. A build takes about a minute for
 Linux and a minute and a half for Windows (mingw-w64) on eight cores, and

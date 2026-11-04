@@ -12816,6 +12816,13 @@ only the readers, encoders, files and filters Encode Video's formats, a
 script's raw output and the tests use (docs/encode-video.md lists them).
 Each source is pinned by its SHA256; the binary is kept under a name made from
 the script's hash and cached in CI. It replaces `tools/fetch-ffmpeg.sh`.
+When ffmpeg.org or Debian cannot be had - ffmpeg.org did not answer one CI run
+on the first day, and Debian keeps only current versions - the same sources
+come from GitHub (owner's choice, 2026-11-04, over a release of our own or the
+sites alone): FFmpeg's own repository, a mirror of x264's, MulticoreWare's own
+x265, each archive pinned by its own SHA256 and the files that name the
+version put back. Built that way, the program is the same but for its 20-byte
+build ID.
 
 Measured: 14 MB on Linux (was 77 MB) and 13 MB on Windows (was about 26 MB in
 the zip). Every preset Encode Video offers, and the raw output a script asks

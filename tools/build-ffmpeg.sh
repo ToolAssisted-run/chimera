@@ -67,6 +67,18 @@ x264_sha256="41606cb8e788a7f8c4514290646d4ba5c7bc68d9e1ccd1a73f446a90546913eb"
 x265_version="4.1"
 x265_url="https://deb.debian.org/debian/pool/main/x/x265/x265_$x265_version.orig.tar.xz"
 x265_sha256="85abb8a850000bf693947459c42a666a3ecd6de10a2ac6b3c6647554b14d3270"
+# The same sources on GitHub, for when those sites do not answer or Debian has
+# moved on (owner's choice, 2026-11-04): FFmpeg's own repository, a mirror of
+# x264's, and MulticoreWare's own of x265, at the same commits. Archives made
+# from a repository differ from the releases in a few files that say the
+# version, which are put back as the releases have them (see unpack).
+ffmpeg_url2="https://github.com/FFmpeg/FFmpeg/archive/refs/tags/n$ffmpeg_version.tar.gz"
+ffmpeg_sha256_2="f117507dc501f2a6c11f9241d8d0c3213846cfad91764361af37befd6b6c523d"
+x264_commit="31e19f92f00c7003fa115047ce50978bc98c3a0d"
+x264_url2="https://github.com/mirror/x264/archive/$x264_commit.tar.gz"
+x264_sha256_2="d053c9d86988d6bc78237ca5205865c5ddf99c98ef4cd9927eec8f6d388f6dd9"
+x265_url2="https://github.com/Multicorewareinc/x265/archive/refs/tags/$x265_version.tar.gz"
+x265_sha256_2="631f593ee655cb9f0e440fda7b938f1d798b379834242193947b8240b021ec87"
 licence_url="https://raw.githubusercontent.com/FFmpeg/FFmpeg/n$ffmpeg_version/COPYING.GPLv2"
 licence_sha256="8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643"
 
@@ -81,7 +93,7 @@ fetch() { # <url> <path> <sha256> <what>
 	if verify "$2" "$3"; then return 0; fi
 	echo "  downloading $4"
 	rm -f "$2"
-	curl -sSL --fail --max-time 1800 -o "$2" "$1" || {
+	curl -sSL --fail --retry 3 --retry-delay 5 --connect-timeout 30 --max-time 1800 -o "$2" "$1" || {
 		echo "build-ffmpeg: could not download $1" >&2
 		echo "  Put it at $2 by hand, or point CHIMERA_FFMPEG_${platform^^} at an ffmpeg binary." >&2
 		return 1
@@ -125,18 +137,51 @@ if [ -f "$built/$binary" ] && [ -f "$built/ffmpeg-LICENSE.txt" ]; then
 	exit 0
 fi
 
-fetch "$ffmpeg_url" "$cache/ffmpeg-$ffmpeg_version.tar.xz" "$ffmpeg_sha256" "FFmpeg $ffmpeg_version"
-fetch "$x264_url" "$cache/x264_$x264_version.orig.tar.gz" "$x264_sha256" "x264 $x264_version"
-fetch "$x265_url" "$cache/x265_$x265_version.orig.tar.xz" "$x265_sha256" "x265 $x265_version"
+# each source from where it is published, else from GitHub: which one is said
+# in the licence file
+ffmpeg_from="$ffmpeg_url"
+fetch "$ffmpeg_url" "$cache/ffmpeg-$ffmpeg_version.tar.xz" "$ffmpeg_sha256" "FFmpeg $ffmpeg_version" ||
+	{ ffmpeg_from="$ffmpeg_url2"; fetch "$ffmpeg_url2" "$cache/FFmpeg-n$ffmpeg_version.tar.gz" "$ffmpeg_sha256_2" "FFmpeg $ffmpeg_version from GitHub"; }
+x264_from="$x264_url"
+fetch "$x264_url" "$cache/x264_$x264_version.orig.tar.gz" "$x264_sha256" "x264 $x264_version" ||
+	{ x264_from="$x264_url2"; fetch "$x264_url2" "$cache/x264-$x264_commit.tar.gz" "$x264_sha256_2" "x264 $x264_version from GitHub"; }
+x265_from="$x265_url"
+fetch "$x265_url" "$cache/x265_$x265_version.orig.tar.xz" "$x265_sha256" "x265 $x265_version" ||
+	{ x265_from="$x265_url2"; fetch "$x265_url2" "$cache/x265-$x265_version.tar.gz" "$x265_sha256_2" "x265 $x265_version from GitHub"; }
 fetch "$licence_url" "$cache/COPYING.GPLv2" "$licence_sha256" "the GPL v2 text"
 
 work="$(mktemp -d "$cache/ffmpeg-build-$platform.XXXX")"
 [ -n "${CHIMERA_FFMPEG_KEEP:-}" ] || trap 'rm -rf "$work"' EXIT
 prefix="$work/prefix"
 mkdir -p "$prefix"
-tar -xJf "$cache/ffmpeg-$ffmpeg_version.tar.xz" -C "$work"
-tar -xzf "$cache/x264_$x264_version.orig.tar.gz" -C "$work"
-tar -xJf "$cache/x265_$x265_version.orig.tar.xz" -C "$work"
+# Unpacked under the release's folder names. A copy from GitHub gets back the
+# files the releases have and a repository's archive does not, so that it
+# builds the very same program: FFmpeg's VERSION, x264's version.sh as
+# Debian's copy prints the version (there is no .git to ask), and x265's
+# x265Version.txt as its release has it (the repository's still says 4.0).
+if [ "$ffmpeg_from" = "$ffmpeg_url" ]; then
+	tar -xJf "$cache/ffmpeg-$ffmpeg_version.tar.xz" -C "$work"
+else
+	tar -xzf "$cache/FFmpeg-n$ffmpeg_version.tar.gz" -C "$work"
+	mv "$work/FFmpeg-n$ffmpeg_version" "$work/ffmpeg-$ffmpeg_version"
+	echo "$ffmpeg_version" > "$work/ffmpeg-$ffmpeg_version/VERSION"
+fi
+if [ "$x264_from" = "$x264_url" ]; then
+	tar -xzf "$cache/x264_$x264_version.orig.tar.gz" -C "$work"
+else
+	tar -xzf "$cache/x264-$x264_commit.tar.gz" -C "$work"
+	mv "$work/x264-$x264_commit" "$work/x264-$x264_version"
+	printf '#!/bin/sh\necho %s\necho %s\n' "'#define X264_VERSION \" r3108 31e19f9\"'" \
+		"'#define X264_POINTVER \"0.164.3108 31e19f9\"'" > "$work/x264-$x264_version/version.sh"
+fi
+if [ "$x265_from" = "$x265_url" ]; then
+	tar -xJf "$cache/x265_$x265_version.orig.tar.xz" -C "$work"
+else
+	tar -xzf "$cache/x265-$x265_version.tar.gz" -C "$work"
+	mv "$work/x265-$x265_version" "$work/x265_$x265_version"
+	printf '#Attribute: \t     Values\nrepositorychangeset: 1d117be\nreleasetagdistance: 1\nreleasetag: %s\n' "$x265_version" \
+		> "$work/x265_$x265_version/x265Version.txt"
+fi
 
 if [ "$platform" = windows ]; then
 	host=x86_64-w64-mingw32
@@ -200,9 +245,11 @@ mkdir -p "$built"
 cp "$work/ffmpeg-$ffmpeg_version/$binary" "$built/$binary"
 {
 	printf "ffmpeg (%s), built for Chimera by tools/build-ffmpeg.sh from these sources:\n\n" "$platform"
-	printf "  FFmpeg %s  %s\n    sha256 %s\n" "$ffmpeg_version" "$ffmpeg_url" "$ffmpeg_sha256"
-	printf "  x264 %s  %s\n    sha256 %s\n" "$x264_version" "$x264_url" "$x264_sha256"
-	printf "  x265 %s  %s\n    sha256 %s\n\n" "$x265_version" "$x265_url" "$x265_sha256"
+	printf "  FFmpeg %s  %s\n" "$ffmpeg_version" "$ffmpeg_from"
+	printf "  x264 %s  %s\n" "$x264_version" "$x264_from"
+	printf "  x265 %s  %s\n\n" "$x265_version" "$x265_from"
+	printf "Each is pinned by its SHA256 in build-ffmpeg.sh; the same sources are also at\n"
+	printf "  %s\n  %s\n  %s\n  %s\n  %s\n  %s\n\n" "$ffmpeg_url" "$ffmpeg_url2" "$x264_url" "$x264_url2" "$x265_url" "$x265_url2"
 	printf "Shipped as a separate program, which Chimera runs and talks to over a pipe.\n"
 	printf "It is not linked into Chimera. With x264 and x265 in it, the whole is under the\n"
 	printf "GNU General Public License, version 2 or (at your option) any later version,\n"
