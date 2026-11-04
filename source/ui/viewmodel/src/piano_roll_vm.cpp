@@ -602,6 +602,7 @@ PianoRollViewModel::PianoRollViewModel(Dispatcher &dispatcher, InputLog &inputs,
 			return {};
 		});
 	expose("markerCount", "how many markers people placed (the run's own three are not counted)", markerCount);
+	expose("markerAddedRow", "the row, in the markers' list, of the marker last put on a frame (-1 in between)", markerAddedRow);
 	expose("lastInputFrame", "the run's own Last input marker: the last frame anything is pressed on (0 when none is)", lastInputFrame);
 	expose("runEndFrame", "the run's own Run end marker: the movie's last frame", runEndFrame);
 	expose("canUndo", "an edit can be taken back", canUndo);
@@ -625,6 +626,7 @@ PianoRollViewModel::PianoRollViewModel(Dispatcher &dispatcher, InputLog &inputs,
 			markers_[f] = Marker{f, text, keep};
 			markersEdited(f);
 			keepMarkers(std::move(before), tr("piano_roll.step_set_marker", {std::to_string(f)}));
+			showMarker(f);
 			return {};
 		});
 	command("moveMarker", "Chimera's Edit Marker Frame: a marker moved to another frame, its text and state kept; "
@@ -703,6 +705,7 @@ PianoRollViewModel::PianoRollViewModel(Dispatcher &dispatcher, InputLog &inputs,
 			}
 			markersEdited(first);
 			keepMarkers(std::move(before), tr("piano_roll.step_set_marker", {std::to_string(first)}));
+			showMarker(first);
 			if (last != first && last < inputs_.size()) frames_.changed.emit(first, last);
 			return last - first + 1;
 		});
@@ -1256,6 +1259,8 @@ PianoRollViewModel::PianoRollViewModel(Dispatcher &dispatcher, InputLog &inputs,
 		follow();
 	});
 	topWatch_ = topFrame.changed.connect([this] { clampTop(); });
+	/* turned on, it goes to the current frame at once, running or not (issue 486) */
+	followWatch_ = followPlayback.changed.connect([this] { follow(); });
 	greenWatch_ = session_.greenEnd.changed.connect([this] {
 		const int64_t was = greenEnd.get(), now = session_.greenEnd.get();
 		greenEnd.set(now);
@@ -2799,6 +2804,17 @@ void PianoRollViewModel::listMarkers()
 	});
 	pickCurrentMarker();
 	markerRows_.refreshed(before);
+}
+
+void PianoRollViewModel::showMarker(int64_t frame)
+{
+	for (size_t i = 0; i < markerList_.size(); i++)
+		if (!markerList_[i].permanent && markerList_[i].frame == frame)
+		{
+			markerAddedRow.set(-1);
+			markerAddedRow.set(static_cast<int64_t>(i));
+			return;
+		}
 }
 
 void PianoRollViewModel::pickCurrentMarker()

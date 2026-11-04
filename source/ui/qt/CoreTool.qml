@@ -52,8 +52,9 @@ ApplicationWindow {
         }
     }
 
-    Shortcut { sequences: ["Return", "Enter"]; enabled: win.active && !win.vm.running; onActivated: win.runNow() }
-    Shortcut { sequence: "Escape"; enabled: win.active; onActivated: win.close() }
+    // only while it is shown (issue 484, as Locate Project Files)
+    Shortcut { sequences: ["Return", "Enter"]; enabled: win.visible && win.active && !win.vm.running; onActivated: win.runNow() }
+    Shortcut { sequence: "Escape"; enabled: win.visible && win.active; onActivated: win.close() }
 
     FileDialog {
         id: fileDialog

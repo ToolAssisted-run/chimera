@@ -9,7 +9,8 @@ The folder holds the program (chimera.exe, a launcher), the themes and an
 empty Cores/ with a README.txt that says what goes in it;
 every DLL, Qt's plugins and QML are in lib/ (Chimera's language tables in
 lib/languages), and the other programs
-(chimera-run, chimera-mcp, ffmpeg, the tests) in bin/.
+(chimera-run, chimera-mcp, ffmpeg) in bin/. The tests are not in it (issue
+492): nothing in a release runs them.
 
     tools/stage-qt-windows.py <meson build dir> <installed dll dir> <windows qt> <out> [ffmpeg.exe]
 
@@ -32,7 +33,6 @@ os.makedirs(lib)
 os.makedirs(bin)
 shutil.copy2(f"{build}/source/ui/chimera.exe", out)
 shutil.copy2(f"{build}/source/ui/chimera-qt-app.dll", lib)
-shutil.copy2(f"{build}/source/ui/test_vm.exe", bin)
 # a movie import asks the core in a process of its own: chimera-run
 shutil.copy2(f"{build}/chimera-run.exe", bin)
 # the program an AI agent's program starts to reach the window's MCP server

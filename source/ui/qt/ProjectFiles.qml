@@ -49,8 +49,10 @@ ApplicationWindow {
     onClosing: if (win.session.resolvingFiles) win.session.run("cancelOpen")
     onVisibleChanged: if (visible) { win.picked = -1; win.scanSaid = "" }
     function open() { if (!win.anyMissing) win.session.run("openWithFiles") }
-    Shortcut { sequences: ["Return", "Enter"]; enabled: win.active; onActivated: win.open() }
-    Shortcut { sequence: "Escape"; enabled: win.active; onActivated: win.session.run("cancelOpen") }
+    // only while it is shown: Qt counts a hidden window active with the window it belongs to, and its
+    // Enter took one pressed in another window's box (issue 484)
+    Shortcut { sequences: ["Return", "Enter"]; enabled: win.visible && win.active; onActivated: win.open() }
+    Shortcut { sequence: "Escape"; enabled: win.visible && win.active; onActivated: win.session.run("cancelOpen") }
     MessageDialog {
         id: unreadable
         title: qsTrId("project_files.cannot_use_that_file")

@@ -161,6 +161,10 @@ public:
 	Property<int64_t> visibleFrames{0};
 	/* the markers people placed (the run's own three not counted) */
 	Property<int64_t> markerCount{0};
+	/* the row, in the markers' list, of the marker last put on a frame, for
+	 * the list to show it (issue 487); -1 in between, so that the same row
+	 * twice is a change too */
+	Property<int64_t> markerAddedRow{-1};
 	/* the run's own markers, as Chimera gives every movie: Run start on frame
 	 * 0, Last input on the last frame anything is pressed on (0 when none
 	 * is), Run end on the movie's last frame. They follow every edit, are
@@ -417,6 +421,8 @@ private:
 	void undoOrRedo(bool back);
 	void edited(int64_t first, int64_t last, int64_t oldCount);
 	void markersEdited(int64_t frame);
+	/* markerAddedRow at the person's marker on a frame */
+	void showMarker(int64_t frame);
 	/* after an edit at a frame, the last
 	 * frame with anything pressed, walking back from the end no further than
 	 * the edit unless the edit could have erased it; then the run's own
@@ -465,7 +471,8 @@ private:
 	MarkerRows markerRows_{*this};
 	Connection markersWatch_;
 	std::vector<Connection> forgetWatches_;
-	Connection frameWatch_, buttonsWatch_, changedWatch_, appendedWatch_, topWatch_, greenWatch_, resetWatch_, recordedWatch_;
+	Connection frameWatch_, buttonsWatch_, changedWatch_, appendedWatch_, topWatch_, greenWatch_, resetWatch_, recordedWatch_,
+		followWatch_;
 	/* what a drag paints: the state the pressed cell was given */
 	bool dragHeld_ = false;
 	/* a press began a stroke that drags extend */

@@ -1968,5 +1968,11 @@ int main(int argc, char **argv)
 		std::fprintf(stderr, "%d QML warning(s), and CHIMERA_QT_STRICT_QML is set\n", qmlWarnings);
 		return 1;
 	}
+	if (rc == 0 && qt::QmlViewModel::argumentsRefused() > 0 && qEnvironmentVariableIsSet("CHIMERA_QT_STRICT_QML"))
+	{
+		std::fprintf(stderr, "%d of the window's calls given the wrong arguments, and CHIMERA_QT_STRICT_QML is set\n",
+			qt::QmlViewModel::argumentsRefused());
+		return 1;
+	}
 	return rc;
 }
