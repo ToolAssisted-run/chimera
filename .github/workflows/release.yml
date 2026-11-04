@@ -178,6 +178,14 @@ jobs:
         if: steps.qt-cache.outputs.cache-hit != 'true'
         run: ./tools/build-qt-linux.sh "$HOME/qt-src" "$HOME/qt-ship/linux"
 
+      - name: Cache the ffmpeg the bundle builds
+        uses: actions/cache@v4
+        with:
+          # tools/build-ffmpeg.sh keeps what it built under a name made from its
+          # CPU and its own hash
+          path: build/deps/ffmpeg-linux-arm64-*
+          key: ffmpeg-linux-arm64-${{ hashFiles('tools/build-ffmpeg.sh') }}
+
       - name: Build the Linux bundle
         run: ./tools/build-bundle.sh --platform linux --out build/bundle-linux --qt "$HOME/qt-ship/linux" --qt-source "$HOME/qt-src"
 
@@ -230,7 +238,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            meson ninja-build build-essential cmake pkg-config python3 python3-venv patchelf \
+            meson ninja-build build-essential cmake nasm pkg-config python3 python3-venv patchelf \
             mingw-w64 \
             libgl1-mesa-dev libegl-dev libx11-dev libxext-dev libasound2-dev \
             libfontconfig1-dev libfreetype-dev libx11-xcb-dev libxkbcommon-dev libxkbcommon-x11-dev \
@@ -251,6 +259,17 @@ jobs:
             ~/qt-ship/linux
             ~/qt-ship/mingw_64_posix
           key: qt-ship-6.12.0-${{ hashFiles('tools/build-qt-linux.sh', 'tools/build-qt-windows.sh', 'tools/qt-patches/*', 'tools/fetch-qt-source.sh') }}
+
+      - name: Cache the ffmpeg both bundles build
+        if: steps.moved.outputs.skip != 'true'
+        uses: actions/cache@v4
+        with:
+          # tools/build-ffmpeg.sh keeps what it built under a name made from its
+          # CPU and its own hash
+          path: |
+            build/deps/ffmpeg-linux-x64-*
+            build/deps/ffmpeg-windows-x64-*
+          key: ffmpeg-${{ hashFiles('tools/build-ffmpeg.sh') }}
 
       - name: Qt's source
         # its licence texts go in the bundle every time; the build below only when the cache had none

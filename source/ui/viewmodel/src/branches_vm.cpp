@@ -310,6 +310,9 @@ int64_t BranchesViewModel::keepRun(int64_t slot, std::string name)
 		changed();
 	}
 	current.set(at);
+	/* and picked, as TAStudio picks a branch it adds: Update and the other
+	 * buttons act on it at once, and the list shows it (issues 487, 490) */
+	selected.set(at);
 	status.set(tr("new_project.making_at", {b.name}));
 	session_.makeBranch(b.name, b.time, [this, id = b.id](SessionViewModel::Branch done, const std::string &why) {
 		for (SessionViewModel::Branch &x : branches_)

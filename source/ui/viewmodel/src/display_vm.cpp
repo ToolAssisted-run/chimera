@@ -149,6 +149,8 @@ DisplayViewModel::DisplayViewModel(Dispatcher &dispatcher) : ViewModel("display"
 		"100% on a scaled screen", scaleOsd, true);
 	expose("osdFollowsWindow", "what is drawn over the picture grows with the window: its 12 pixels are a 480-pixel-tall "
 		"picture area's, never smaller (issue 401)", osdFollowsWindow, true);
+	expose("osdTextSize", "the size of what is drawn over the picture while it does not grow with the window, in pixels "
+		"(8 to 64, 12 at first; issue 488)", osdTextSize, true);
 	for (auto &[name, p] : std::initializer_list<std::pair<const char *, Property<int64_t> *>>{{"padLeft", &padLeft}, {"padTop", &padTop},
 			 {"padRight", &padRight}, {"padBottom", &padBottom}, {"clientLeft", &clientLeft}, {"clientTop", &clientTop},
 			 {"clientRight", &clientRight}, {"clientBottom", &clientBottom}})

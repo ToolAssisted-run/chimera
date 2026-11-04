@@ -3112,6 +3112,17 @@ bool tastudioSettings(const char *package, const char *rom)
 	};
 	roll.markersKeepStates.set(false);
 	CHECK(roll.run("addMarker", {int64_t{5}, std::string("five")}, error).has_value() && keeps(5) == 0);
+	/* the list is told the row of the marker put, to show it (issue 487):
+	 * after the run's start, and its last input and end where they are */
+	{
+		RowModel *rows = nullptr;
+		for (const auto &r : roll.rowLists())
+			if (r.name == "markers") rows = r.model;
+		int64_t at = -1;
+		for (int64_t r = 0; r < rows->rowCount(); r++)
+			if (rows->cell(r, 0) == Value(int64_t{5}) && rows->cell(r, 1) == Value(std::string("five"))) at = r;
+		CHECK(at > 0 && roll.markerAddedRow.get() == at);
+	}
 	CHECK(session.unsaved.get());
 	roll.markersKeepStates.set(true);
 	CHECK(roll.run("addMarker", {int64_t{5}, std::string("named again")}, error).has_value() && keeps(5) == 0);
@@ -3207,6 +3218,13 @@ bool tastudioSettings(const char *package, const char *rom)
 		roll.followScroll.set("bottom");
 		CHECK(seekTo(20) && roll.topFrame.get() == 16);
 		roll.followScroll.set("near");
+		/* turned on with the machine paused, it goes to the current frame at
+		 * once, not at the next frame run (issue 486) */
+		roll.followPlayback.set(false);
+		roll.topFrame.set(0);
+		CHECK(seekTo(18) && roll.topFrame.get() == 0);
+		roll.followPlayback.set(true);
+		CHECK(roll.topFrame.get() == 14);
 		roll.visibleFrames.set(0);
 	}
 	/* Chimera's marker list colours: the marker the machine is at or past,
@@ -5109,6 +5127,8 @@ bool project(const char *package, const char *rom, const std::string &movies, co
 	d.until([] { return false; }, 0.1);
 	const std::vector<uint32_t> winPicture = shown();
 	CHECK(branches.run("create", {std::string("win")}, error).has_value() && branches.count.get() == 1);
+	/* the branch made is the one picked, so Update acts on it (issue 490) */
+	CHECK(branches.selected.get() == 0 && branches.current.get() == 0);
 	CHECK(d.until([&] { return branches.made.get() == 1; }, 30));
 	CHECK(filesNamed(".state").size() == 1 && filesNamed(".note").size() == 1);
 	roll.run("addMarker", {int64_t{20}, std::string("in the branch")}, error);
@@ -9792,6 +9812,17 @@ bool encodeVideo(const char *package, const char *rom)
 				same = (reinterpret_cast<const uint32_t *>(bytes.data())[i] | 0xFF000000u) == picture[i];
 			std::printf("%s: %s\n", p.key, same ? "every pixel kept" : "changed");
 			CHECK(same && described(out).find("Audio: flac") != std::string::npos);
+		}
+		/* every format Encode Video offers is one the ffmpeg the build ships
+		 * can write: it is built with only what they use (issue 492) */
+		for (const auto &p : presets)
+		{
+			const fs::path out = dir / ("preset." + EncoderViewModel::extensionOf(p.command));
+			std::error_code gone;
+			fs::remove(out, gone);
+			const bool written = encode(p.command, out) && fs::exists(out) && fs::file_size(out) > 0;
+			std::printf("%s: %s\n", p.key, written ? "written" : "refused");
+			CHECK(written);
 		}
 	}
 	std::error_code ec;

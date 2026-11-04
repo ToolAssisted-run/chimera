@@ -135,6 +135,17 @@ jobs:
           sh tests/synth/package-box/build-box.sh
           ./tests/synth/build-package.sh
 
+      - name: Cache the ffmpeg the build ships
+        uses: actions/cache@v4
+        with:
+          # tools/build-ffmpeg.sh keeps what it built under a name made from its
+          # CPU and its own hash
+          path: build/deps/ffmpeg-linux-${{ matrix.arch }}-*
+          key: ffmpeg-linux-${{ matrix.arch }}-${{ hashFiles('tools/build-ffmpeg.sh') }}
+
+      - name: The ffmpeg the build ships (the encode tests use it)
+        run: ./tools/build-ffmpeg.sh linux build/dll
+
       - name: Unit tests (the engine, the view models, the window)
         run: meson test -C build/meson-linux --print-errorlogs
 

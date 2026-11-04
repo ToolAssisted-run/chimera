@@ -122,8 +122,9 @@ ApplicationWindow {
         })
     }
 
-    Shortcut { sequences: ["Return", "Enter"]; enabled: win.active && nextButton.enabled; onActivated: win.advance() }
-    Shortcut { sequence: "Escape"; enabled: win.active && !win.vm.making; onActivated: win.close() }
+    // only while it is shown (issue 484, as Locate Project Files)
+    Shortcut { sequences: ["Return", "Enter"]; enabled: win.visible && win.active && nextButton.enabled; onActivated: win.advance() }
+    Shortcut { sequence: "Escape"; enabled: win.visible && win.active && !win.vm.making; onActivated: win.close() }
     // open until the project is made, so that a refusal is said here
     onClosing: (close) => { if (win.vm.making) close.accepted = false }
 

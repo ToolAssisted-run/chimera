@@ -74,6 +74,10 @@ public:
 
 	/* runs a command by name; a failure goes to the `error` property */
 	Q_INVOKABLE QVariant run(const QString &command, const QVariantList &args = {});
+	/* the window's calls refused for what they were given (an argument
+	 * missing or of the wrong kind): each is a mistake in the window, said on
+	 * standard error, and CHIMERA_QT_STRICT_QML fails the run on any (issue 483) */
+	static int argumentsRefused();
 	Q_INVOKABLE QObject *rows(const QString &name) const;
 	Q_INVOKABLE QObject *picture(const QString &name) const;
 

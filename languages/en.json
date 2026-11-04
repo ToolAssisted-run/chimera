@@ -482,6 +482,7 @@
 		"display_config.save_window_position": "Save Window Position",
 		"display_config.scale_osd_text_with_system_scale": "Scale OSD text with system scale",
 		"display_config.scale_osd_text_with_the_window": "Scale OSD text with the window",
+		"display_config.osd_text_size_in_pixels": "OSD text size, in pixels",
 		"display_config.scaling_and_filtering": "Scaling && Filtering",
 		"display_config.snowy_null_core": "Snowy null core",
 		"display_config.some_tools_put_filenames_status_etc": "Some tools put filenames, status, etc. in their window titles.\nChecking this disables those features.",

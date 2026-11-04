@@ -178,6 +178,7 @@ void StateHistory::flushWrites()
 void StateHistory::helpers(bool on)
 {
 	m_packer.setThreaded(on);
+	m_merger.setThreaded(on);
 	m_writer.setThreaded(on);
 	applyWrites();   /* setThreaded(false) finishes what was queued; take its word now */
 }
@@ -189,6 +190,8 @@ void StateHistory::clear()
 	 * (bounded by one stretch) and its result is thrown away with them */
 	m_packer.drain();
 	m_packJobs.clear();
+	m_merger.drain();
+	m_mergeJobs.clear();
 	m_segments.clear();
 	m_holes.clear();
 	m_loadedOutside = false;
@@ -807,6 +810,8 @@ StateHistory::~StateHistory()
 	finishPlan();
 	m_packer.drain();
 	m_packJobs.clear();
+	m_merger.drain();
+	m_mergeJobs.clear();
 	dropSpillFile();
 }
 
@@ -2338,39 +2343,44 @@ bool StateHistory::composePair(const Link &a, const Link &b, uint64_t anchorLen,
 	if (capped && together > kMergeCap) return false;
 	if (capped && anchorLen != 0 && together > anchorLen) return false;
 
+	return composeBodies(m_host, a.bytes, b.bytes, merged);
+}
+
+bool StateHistory::composeBodies(const HostApi *host, const Body &a, const Body &b, Bytes &merged)
+{
 	merged.clear();
 	/* a packed input is decoded whole for the merge: it is at most megabytes,
 	 * and a merge reads its inputs at random */
 	Bytes ua, ub;
-	const uint8_t *pa = a.bytes.data(), *pb = b.bytes.data();
-	if (a.bytes.packed)
+	const uint8_t *pa = a.data(), *pb = b.data();
+	if (a.packed)
 	{
-		if (!unpackBody(a.bytes, ua)) return false;
+		if (!unpackBody(a, ua)) return false;
 		pa = ua.data();
 	}
-	if (b.bytes.packed)
+	if (b.packed)
 	{
-		if (!unpackBody(b.bytes, ub)) return false;
+		if (!unpackBody(b, ub)) return false;
 		pb = ub.data();
 	}
 	/* The merge of two sorted lists is at most both of them, and asking for
 	 * that up front is one allocation instead of a dozen doublings with a
 	 * copy each - on a delta of megabytes that is most of the write. */
-	merged.reserve(a.bytes.size() + b.bytes.size());
+	merged.reserve(a.size() + b.size());
 	ByteSink sink{ &merged };
 	WbxReturn r{};
-	if (m_host->wbx_compose_delta_mem != nullptr)
+	if (host->wbx_compose_delta_mem != nullptr)
 	{
 		/* Both are already contiguous here, so the host has no reason to
 		 * copy them into buffers of its own to look at them. */
-		m_host->wbx_compose_delta_mem(pa, a.bytes.size(), pb, b.bytes.size(),
+		host->wbx_compose_delta_mem(pa, a.size(), pb, b.size(),
 			sinkWrite, reinterpret_cast<uintptr_t>(&sink), &r);
 	}
 	else
 	{
-		ByteSource sa{ pa, a.bytes.size(), 0 };
-		ByteSource sb{ pb, b.bytes.size(), 0 };
-		m_host->wbx_compose_delta(sourceRead, reinterpret_cast<uintptr_t>(&sa),
+		ByteSource sa{ pa, a.size(), 0 };
+		ByteSource sb{ pb, b.size(), 0 };
+		host->wbx_compose_delta(sourceRead, reinterpret_cast<uintptr_t>(&sa),
 			sourceRead, reinterpret_cast<uintptr_t>(&sb),
 			sinkWrite, reinterpret_cast<uintptr_t>(&sink), &r);
 	}
@@ -2410,6 +2420,86 @@ bool StateHistory::composeInto(Segment &seg, size_t i, bool capped)
 	b.bytes = std::move(result);
 	seg.links.erase(seg.links.begin() + static_cast<std::ptrdiff_t>(i));
 	return true;
+}
+
+bool StateHistory::postMerge(const Segment &seg, size_t i)
+{
+	if (i + 1 >= seg.links.size()) return false;
+	auto job = std::make_unique<MergeJob>();
+	job->anchorFrame = seg.anchorFrame;
+	job->aEnd = seg.links[i].endFrame;
+	job->bEnd = seg.links[i + 1].endFrame;
+	job->a = seg.links[i].bytes;
+	job->b = seg.links[i + 1].bytes;
+	MergeJob *const j = job.get();
+	const HostApi *const host = m_host;
+	m_mergeJobs.push_back(std::move(job));
+	m_merger.post([j, host]() {
+		const double t0 = nowSeconds();
+		try
+		{
+			Bytes merged;
+			if (composeBodies(host, j->a, j->b, merged))
+			{
+				/* a merge in a packed stretch stays packed, as composeInto has it */
+				Body result = Body::make(std::move(merged));
+				if (j->a.packed || j->b.packed) result = packBody(result);
+				j->result = std::move(result);
+				j->ok = true;
+			}
+		}
+		catch (const std::bad_alloc &)
+		{
+			j->ok = false;   /* no memory for the union: the two links stay */
+		}
+		j->seconds = nowSeconds() - t0;
+	});
+	return true;
+}
+
+void StateHistory::finishMerge()
+{
+	if (m_mergeJobs.empty()) return;
+	const double tWait = nowSeconds();
+	m_merger.drain();
+	const double waited = nowSeconds() - tWait;
+	m_costs.mergeWaitSeconds += waited;
+	std::vector<std::unique_ptr<MergeJob>> jobs = std::move(m_mergeJobs);
+	m_mergeJobs.clear();
+	for (const auto &job : jobs)
+	{
+		if (!job->ok) continue;
+		for (Segment &seg : m_segments)
+		{
+			if (seg.anchorFrame != job->anchorFrame) continue;
+			if (seg.spilled) break;
+			for (size_t i = 0; i + 1 < seg.links.size(); i++)
+			{
+				Link &a = seg.links[i];
+				Link &b = seg.links[i + 1];
+				if (a.bytes.p != job->a.p || b.bytes.p != job->b.p || a.endFrame != job->aEnd || b.endFrame != job->bEnd) continue;
+				/* taken as composeInto takes its own */
+				const uint64_t was = a.bytes.held() + b.bytes.held();
+				seg.bytes -= was;
+				releaseBytes(was, "tidy");
+				seg.bytes += job->result.held();
+				m_bytes += job->result.held();
+				if (historyTrace())
+				{
+					fprintf(stderr, "[history] merged the landing at %lld into %lld: %llu -> %zu bytes%s, %.1f ms on the merger,"
+						" this thread waited %.2f ms\n",
+						(long long)a.endFrame, (long long)b.endFrame, (unsigned long long)(a.bytes.size() + b.bytes.size()),
+						job->result.size(), job->result.packed ? " (packed)" : "", job->seconds * 1000, waited * 1000);
+					fflush(stderr);
+				}
+				b.bytes = std::move(job->result);
+				seg.links.erase(seg.links.begin() + static_cast<std::ptrdiff_t>(i));
+				m_costs.mergesOnMerger++;
+				break;
+			}
+			break;
+		}
+	}
 }
 
 /* ---- settling what was spilled too early ----
@@ -3070,11 +3160,14 @@ bool StateHistory::restoreSpilled(const Segment &seg, int64_t steps, std::string
  * and the frontier never go. If nothing may go, the budget is missed rather
  * than a band emptied - the promise pins already made.
  *
- * Once over the budget it thins a little further, to 95%, so a full greenzone
- * is not thinned again on every frame; that extra is bounded per call
- * (kThinExtraPerCall frames), and composition by kThinMergeBytes, so meeting
- * the budget is a little work each frame rather than a stall. Getting back
- * under the budget itself is not bounded - the budget is the promise. */
+ * From 95% of the budget it thins a little every frame, so that a full
+ * greenzone is not thinned in bursts: up to kThinExtraPerCall frames that go
+ * for nothing (a stretch's last link, a stretch alone), and up to
+ * kMergesPerCapture merges, worked out on the merger and taken at the next
+ * capture (issue 482: a heavy core's merges cost milliseconds each, and the
+ * bursts were stalls the player saw). Over the budget, everything it takes to
+ * be back under it, with merges here and now and their composition bounded by
+ * kThinMergeBytes after the first - the budget is the promise. */
 /* What the history holds against its budget: the bodies, and the bookkeeping
  * of every stored frame - its link, its note, the shared body's control block
  * and the allocator's headers, about 180 bytes measured. For a light core
@@ -3099,7 +3192,16 @@ void StateHistory::evict()
 	uint64_t mergeLeft = kThinMergeBytes;
 	int thinned = 0;
 	ThinIndex index;
-	while (heldAgainstBudget() > m_budget || (thinned > 0 && thinned < kThinExtraPerCall && heldAgainstBudget() > target))
+	static constexpr int kMergesPerCapture = 2;
+	/* last capture's merges first: what they gave back counts before anything is decided */
+	finishMerge();
+	/* Under the budget, from 95% of it, a little every frame: frames that go
+	 * for nothing, and merges worked out on the merger, kMergesPerCapture at
+	 * most. Over the budget, everything it takes to be back under it, merges
+	 * here and now - and no further, since the next capture starts below it. */
+	const bool under = heldAgainstBudget() <= m_budget;
+	int mergesLeft = kMergesPerCapture;
+	while (heldAgainstBudget() > m_budget || (under && thinned < kThinExtraPerCall && heldAgainstBudget() > target))
 	{
 		/* First choice: put the oldest stretch on disk, oldest to newest. It
 		 * costs reading it back rather than replaying to it, and the far end of
@@ -3146,7 +3248,7 @@ void StateHistory::evict()
 			continue;
 		}
 
-		if (!thinOne(mergeLeft, index)) return;
+		if (!thinOne(mergeLeft, index, under ? &mergesLeft : nullptr)) return;
 		thinned++;
 	}
 }
@@ -3189,7 +3291,7 @@ void StateHistory::buildThinIndex(ThinIndex &index) const
 	index.valid = true;
 }
 
-bool StateHistory::thinOne(uint64_t &mergeLeft, ThinIndex &index)
+bool StateHistory::thinOne(uint64_t &mergeLeft, ThinIndex &index, int *mergesLeft)
 {
 	static constexpr uint64_t kThinMergeBytesPerCall = 32u << 20;   /* evict's allowance, below */
 	if (m_segments.empty()) return false;
@@ -3232,6 +3334,7 @@ bool StateHistory::thinOne(uint64_t &mergeLeft, ThinIndex &index)
 			if (seg.spilled) continue;
 			if (keepNewest && e.seg + 1 == m_segments.size()) continue;
 			if (pinned(e.frame)) continue;
+			if (std::find(index.busy.begin(), index.busy.end(), seg.anchorFrame) != index.busy.end()) continue;
 			if (e.link < 0 && (e.seg == 0 || !seg.links.empty())) continue;   /* an anchor goes only alone */
 			candidates.emplace_back(entries[i + 1].frame - entries[i - 1].frame, i);
 		}
@@ -3281,8 +3384,18 @@ bool StateHistory::thinOne(uint64_t &mergeLeft, ThinIndex &index)
 			 * heavy core whose links outgrow the allowance could never thin at all;
 			 * after it, this call composes no more than the allowance. */
 			if (mergeLeft < kThinMergeBytesPerCall && input > mergeLeft) continue;
+			if (mergesLeft != nullptr)
+			{
+				/* the merger works it out; the frame goes when it is taken */
+				if (*mergesLeft <= 0) return false;
+				if (!postMerge(seg, li)) continue;
+				index.busy.push_back(seg.anchorFrame);
+				(*mergesLeft)--;
+				return true;
+			}
 			if (composeInto(seg, li, false))
 			{
+				m_costs.mergesHere++;
 				mergeLeft = input > mergeLeft ? 0 : mergeLeft - input;
 				if (historyTrace())
 				{

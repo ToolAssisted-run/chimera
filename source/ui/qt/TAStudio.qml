@@ -678,9 +678,11 @@ ApplicationWindow {
                             // a branch is put in another's place by its number, as Chimera's
                             dragFirstColumn: true
                             cellText: (roles, row, column) => column === 0 ? String(row + 1) : column === 1 ? String(roles.frame) : roles.name
-                            // as Chimera colours its list: the branch loaded, else its frame's greenzone or lag colour
+                            // as Chimera colours its list: the branch loaded, else its frame's greenzone or lag colour;
+                            // a row the list is still making has no frame yet, and nothing is asked for it (issue 483)
                             cellColor: (roles, row, column) => {
                                 if (row === tas.branches.current) return tas.rollColor("TasCurrentFrame")
+                                if (roles.frame === undefined) return ""
                                 const zone = tas.pianoRoll.greenEnd >= 0 ? tas.pianoRoll.run("zoneOf", [roles.frame]) : ""
                                 return zone === "lag" ? tas.rollColor("TasLagZoneInput") : zone === "green" ? tas.rollColor("TasGreenZoneInput") : ""
                             }
@@ -782,6 +784,14 @@ ApplicationWindow {
                             const lag = roles.zone === "lag"
                             return tas.rollColor(column === 0 ? (lag ? "TasLagZone" : "TasGreenZone") : (lag ? "TasLagZoneInput" : "TasGreenZoneInput"))
                         }
+                        // a marker put on a frame shows in the list (issue 487)
+                        Connections {
+                            target: tas.pianoRoll
+                            function onMarkerAddedRowChanged() {
+                                const row = tas.pianoRoll.markerAddedRow
+                                if (row >= 0) Qt.callLater(() => markerList.show(row))
+                            }
+                        }
                         function pick(row) {
                             const roles = tas.markerRoles(row)
                             markerList.current = row
@@ -880,6 +890,8 @@ ApplicationWindow {
         icon.width: 16
         icon.height: 16
         icon.color: "transparent"
+        // the picture is drawn as it is, so one that cannot be pressed is dimmed (issue 490)
+        opacity: enabled ? 1 : 0.35
         ToolTip.text: tip
         ToolTip.visible: hovered && tip !== ""
         ToolTip.delay: 500

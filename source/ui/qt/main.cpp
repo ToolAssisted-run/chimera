@@ -1281,7 +1281,7 @@ int main(int argc, char **argv)
 	vm::Connection messagesTimerWatch = session.hasGameTimer.changed.connect([&messages, &session] { messages.gameTimer.set(session.hasGameTimer.get()); });
 	vm::DisplayViewModel display(dispatcher);
 	for (const char *name : {"aspectMode", "customWidth", "customHeight", "ratioX", "ratioY", "letterbox", "integerScale", "cropLeft",
-			 "cropTop", "cropRight", "cropBottom", "finalFilter", "prescale", "autoPrescale", "scaleOsd", "osdFollowsWindow", "saveWindowPosition", "windowGeometry",
+			 "cropTop", "cropRight", "cropBottom", "finalFilter", "prescale", "autoPrescale", "scaleOsd", "osdFollowsWindow", "osdTextSize", "saveWindowPosition", "windowGeometry",
 			 "allowDoubleClickFullscreen", "menuWindowed", "captionWindowed", "frameWindowed", "menuFullscreen", "statusBarFullscreen",
 			 "autohideMouseFullscreen", "fullscreenHacks", "stayOnTop", "mouseCaptureForcesTop", "minimalDisplay", "staticWindowTitles", "titleSuffix", "resizeWithPicture",
 			 "windowScales"})
@@ -1966,6 +1966,12 @@ int main(int argc, char **argv)
 	if (rc == 0 && qmlWarnings > 0 && qEnvironmentVariableIsSet("CHIMERA_QT_STRICT_QML"))
 	{
 		std::fprintf(stderr, "%d QML warning(s), and CHIMERA_QT_STRICT_QML is set\n", qmlWarnings);
+		return 1;
+	}
+	if (rc == 0 && qt::QmlViewModel::argumentsRefused() > 0 && qEnvironmentVariableIsSet("CHIMERA_QT_STRICT_QML"))
+	{
+		std::fprintf(stderr, "%d of the window's calls given the wrong arguments, and CHIMERA_QT_STRICT_QML is set\n",
+			qt::QmlViewModel::argumentsRefused());
 		return 1;
 	}
 	return rc;

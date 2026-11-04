@@ -32,6 +32,21 @@ Rectangle {
 
     // a row's roles, while it is drawn (the row picked always is)
     function rolesAt(row) { const it = list.itemAtIndex(row); return it ? it.model : ({}) }
+    // a row scrolled into view, as TAStudio shows a branch or marker it adds (issue 487)
+    function show(row) {
+        if (row < 0 || row >= list.count) return
+        list.positionViewAtIndex(row, ListView.Contain)
+        // and not under the bar across the bottom
+        const item = list.itemAtIndex(row)
+        const room = list.height - list.bottomMargin
+        if (item && item.y + item.height - list.contentY > room) list.contentY = item.y + item.height - room
+    }
+    // the row picked stays in view, the list made again or not
+    onCurrentChanged: Qt.callLater(() => table.show(table.current))
+    Connections {
+        target: table.model
+        function onModelReset() { Qt.callLater(() => table.show(table.current)) }
+    }
     function colour(role, fallback) { const c = table.rollColor(role); return c !== "" ? c : fallback }
     readonly property color background: colour("RollBackground", palette.base)
     readonly property color textColour: colour("RollText", palette.text)
@@ -74,7 +89,9 @@ Rectangle {
         boundsBehavior: Flickable.StopAtBounds
         headerPositioning: ListView.OverlayHeader
         ScrollBar.vertical: ScrollBar { policy: ScrollBar.AlwaysOn }
-        ScrollBar.horizontal: ScrollBar { policy: table.columnsWidth > list.width ? ScrollBar.AlwaysOn : ScrollBar.AlwaysOff }
+        ScrollBar.horizontal: ScrollBar { id: across; policy: table.columnsWidth > list.width ? ScrollBar.AlwaysOn : ScrollBar.AlwaysOff }
+        // the bar across lies over the rows: the last can be scrolled above it
+        bottomMargin: across.policy === ScrollBar.AlwaysOn ? across.height : 0
         // the column titles, which stay put while the rows scroll
         header: Rectangle {
             z: 2

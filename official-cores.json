@@ -118,6 +118,15 @@
       "tested": ""
     },
     {
+      "id": "cemu",
+      "name": "Cemu",
+      "systems": [
+        { "id": "WIIU", "name": "Wii U" }
+      ],
+      "repo": "ToolAssisted-run/chimera-core-cemu",
+      "tested": ""
+    },
+    {
       "id": "ppsspp",
       "name": "PPSSPP",
       "systems": [
@@ -622,6 +631,15 @@
         { "id": "IkemenGO", "name": "Ikemen GO" }
       ],
       "repo": "ToolAssisted-run/chimera-core-ikemen",
+      "tested": ""
+    },
+    {
+      "id": "scummvm",
+      "name": "ScummVM",
+      "systems": [
+        { "id": "ScummVM", "name": "ScummVM" }
+      ],
+      "repo": "ToolAssisted-run/chimera-core-scummvm",
       "tested": ""
     },
     {

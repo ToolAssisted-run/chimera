@@ -467,6 +467,7 @@
 		"display_config.save_window_position": "창 위치 저장",
 		"display_config.scale_osd_text_with_system_scale": "OSD 텍스트를 시스템 배율에 맞춰 확대",
 		"display_config.scale_osd_text_with_the_window": "OSD 텍스트를 창 크기에 맞춰 확대",
+		"display_config.osd_text_size_in_pixels": "OSD 텍스트 크기 (픽셀)",
 		"display_config.scaling_and_filtering": "스케일링 && 필터링",
 		"display_config.snowy_null_core": "눈 화면 널 코어",
 		"display_config.some_tools_put_filenames_status_etc": "일부 도구는 창 제목에 파일 이름, 상태 등을 넣습니다.\n이 옵션을 켜면 그 기능이 꺼집니다.",

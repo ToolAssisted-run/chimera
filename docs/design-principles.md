@@ -12774,3 +12774,129 @@ core goes in the `Cores` folder, not both. The words are the SRB2 core's
 table of packages, only when the release has an arm64 package; Chimera's own
 release notes, above the table of bundles; the README's "Getting a build";
 `docs/core-manager.md`.
+
+## A full greenzone thins a little every frame, its merges on a helper (2026-11-04)
+
+Issue 482: on Pokemon Snap (ares) and a PC-98 game, play paused for a moment
+every couple of seconds once a few thousand frames had run. The greenzone was
+full: it waited until a capture crossed the budget, then thinned to 95% at
+once, and on a heavy core each of the merges that takes is milliseconds (an
+N64 delta of 3 to 5 MB; unpacking two, composing them and packing the union
+is 7 to 15 ms), so a capture made several and the frame took 35 to 47 ms.
+
+Now, from 95% of the budget, every capture thins a little: frames that go for
+nothing first, and up to two merges, which a helper thread of their own works
+out and the next capture takes. The next capture waits for them if they are
+not done, and only then decides anything, so the history keeps the same
+frames threaded as in line (the history's threaded-against-in-line test still
+compares every step). When the next frame the rule would give up needs a
+merge and the capture has used its two, thinning stops for that capture
+rather than taking cheaper frames from other bands, which bent the shape
+(tried first: the oldest stretch was left dense). Over the budget nothing
+changed: every merge it takes, made at once.
+
+Measured with ares on Banjo-Tooie, a movie of 4000 frames, a 4 GB budget full
+by frame 3400 (chimera-run, not held to 60 frames a second): thinning took 4.5
+ms a frame on average and 35 to 47 ms on 36 of the last 600 frames; now 1.7
+ms on average, at most 17 ms (the capture waiting for the merger), none over
+20 ms and no merge on the capturing thread. The history holds about 95% of
+the budget instead of 100%. Restores through a thinned history (600 MB
+budget, seeks to frames 401, 977 and 1333 after 1500) are exact with helpers
+on and off. Not measured: Pokemon Snap itself (no ROM here), the reporter's
+PC-98 game, and the window at 60 frames a second on Windows.
+
+## A size for the on-screen text when it does not grow with the window (user-decided, 2026-11-04)
+
+Issue 488 asked whether the on-screen text (the frame counter, the messages, a
+script's gui.text) should change size with the window. It does on purpose
+since issue 401, and Config > Display's "Scale OSD text with the window" turns
+that off; a commenter found the fixed size, 12 pixels, too small to read. The
+owner chose a setting for it (over keeping things as they were, or a bigger
+fixed size): Config > Display's OSD text size, in pixels, 8 to 64, 12 at first,
+used while the text does not grow with the window and greyed while it does.
+The distances of that text from the picture's corners grow with it, as they do
+with the window. Kept with the other display settings; its label is in every
+language table.
+
+## Chimera builds the ffmpeg it ships, with only what Encode Video uses (user-decided, 2026-11-04)
+
+Issue 492: the release had grown to about 60 MB compressed, 26 MB of it the
+ffmpeg Chimera ships for Encode Video - a ready-made static build of
+everything ffmpeg can do (4.4.1, from BizHawk's binaries repository). The
+owner chose to build our own (over keeping it and trimming only Qt):
+`tools/build-ffmpeg.sh` builds FFmpeg 7.1.1 statically with x264 and x265 and
+only the readers, encoders, files and filters Encode Video's formats, a
+script's raw output and the tests use (docs/encode-video.md lists them).
+Each source is pinned by its SHA256; the binary is kept under a name made from
+the script's hash and cached in CI. It replaces `tools/fetch-ffmpeg.sh`.
+When ffmpeg.org or Debian cannot be had - ffmpeg.org did not answer one CI run
+on the first day, and Debian keeps only current versions - the same sources
+come from GitHub (owner's choice, 2026-11-04, over a release of our own or the
+sites alone): FFmpeg's own repository, a mirror of x264's, MulticoreWare's own
+x265, each archive pinned by its own SHA256 and the files that name the
+version put back. Built that way, the program is the same but for its 20-byte
+build ID.
+
+Measured: 14 MB on Linux (was 77 MB) and 13 MB on Windows (was about 26 MB in
+the zip). Every preset Encode Video offers, and the raw output a script asks
+for, encoded a 3-second test stream (Chimera's NUT input: raw BGRA pictures,
+16-bit stereo sound) on Linux and natively on Windows, and each file decoded to
+all 180 frames with its sound. The Windows binary imports only Windows' own
+DLLs, and the binaries name no folder of the machine that built them (FFmpeg
+keeps its configuration in the program). The view models' tests now encode
+with every preset (and fail when ffmpeg refuses one: tried with a stand-in
+that refuses x265), and CI builds ffmpeg before them, where they used to be
+skipped. A format typed by hand that needs an encoder or file type left out
+is now refused by ffmpeg; before, the full build would have taken it.
+
+## ScummVM and Cemu join the official cores (user-decided, 2026-11-04)
+
+Two core requests were built by agents in local repositories, checked
+here, and published at the owner's word ("push and publish everything").
+Each published package was run on Windows, on the GTX 1060 computer, with
+Chimera's published build fa499b9c, and each was played in Chimera's
+window there with TAStudio open.
+
+- **ScummVM** (issue 465), `chimera-core-scummvm`, ScummVM a60993f5 with
+  every engine it builds by default (GPL-3.0-or-later). A game is a zip of
+  the game's folder; ScummVM's own detector finds which game it is. The
+  mouse is two axes from 0 to 65535 across and down the screen and three
+  buttons, the keyboard a PC keyboard, and a Roland MT-32's ROMs are
+  firmware when the music setting asks for them. 3D games draw with
+  ScummVM's TinyGL or with an OpenGL built into the core (Mesa's softpipe),
+  never on a graphics card. ScummVM's test engines are in the test
+  packages only (owner, 2026-11-03). Tested on scummvm.org's freeware
+  games (Beneath a Steel Sky, Flight of the Amazon Queen, Lure of the
+  Temptress, Drascula, DreamWeb) and King's Quest II, each for its first
+  minute or so: the sandbox gives the same pictures and sound as a plain
+  native build. On Windows, Beneath a Steel Sky's 1500-frame project ends
+  on the same picture as on Linux. First build "Development build
+  548c01d8 (made 2026-11-04 15:07 CET)". Not proved: a game played
+  through, CD games with speech, games with video, any real 3D game (The
+  Colony and Thimbleweed Park have never been started), and anything else
+  on Windows.
+- **Cemu** (issue 459), `chimera-core-cemu`, Cemu (MPL-2.0) at a fixed
+  commit with its patches, the Wii U. It draws with Cemu's OpenGL renderer
+  on the computer's graphics card. A game is a .wua, a zip of its NUS
+  folder (with its add-on content's in a slot of its own), a .wuhb or an
+  .rpx. The core carries no Nintendo key: every key upstream holds is
+  taken out as it is built (the common key, SpotPass, amiibo and NFC, the
+  icon keys), and a test looks for each one in the package and the
+  history. The Wii U common key, which a NUS zip needs, is firmware the
+  user gives (owner, 2026-11-03). The local history held the NFC reader's
+  key in a patch, so the published history starts with one commit that
+  holds the final tree (owner, 2026-11-04). The console's Mii resource is
+  firmware, and the Mii Resource setting's default; the console's fonts
+  are a setting of three values, Cemu's free stand-in font (the default),
+  Cemu's copies, or the console's own. Tested on the repository's own Wii
+  U test programs, and on New Super Mario Bros. U from its NUS files:
+  played from boot into its first level on Linux with software OpenGL,
+  its history over that level sought into on Windows, and, with the
+  published package in Chimera's window on Windows, to the SpotPass notice
+  after the title screen (2000 frames). First build "Development build
+  9808cfa8 (made 2026-11-04 15:53 CET)"; the first CI run had stopped on a
+  package the runner lacked (libxrender-dev). Not proved: any other game,
+  any other level, AMD or Intel graphics cards, and macOS.
+
+Nothing in Chimera's own source changed: two roster rows and the README's
+rows.

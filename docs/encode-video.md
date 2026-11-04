@@ -107,20 +107,42 @@ when to stop. `AvFrameAdvance` writes them out exactly as it always has.
 
 ## ffmpeg
 
-ffmpeg ships in the bundle, in `dll/`, put there at build time by
-`tools/fetch-ffmpeg.sh`. Chimera used to name a version, a URL and a checksum
-and ask the person to go and fetch it the first time they wanted a video; there
-is nothing to ask any more.
+ffmpeg ships in the bundle, in `dll/` (Linux) or `bin\` (Windows), put there at
+build time by `tools/build-ffmpeg.sh`. Chimera used to name a version, a URL and
+a checksum and ask the person to go and fetch it the first time they wanted a
+video; there is nothing to ask any more.
 
-It is the same static 4.4.1 build the frontend used to fetch on its own, pinned
-and checked twice: the archive by its own SHA256, and the binary inside it by
-the SHA256 the old code demanded before it would run one. The archive is a .7z,
-so the script bootstraps a static 7-Zip out of a .tar.xz when the machine has
-none - a build machine needs nothing installed for any of this. Downloads are
-cached in `build/deps`, so it costs nothing after the first build.
+It is machine code, so each bundle has the ffmpeg of its CPU: a Linux
+bundle's is built on the kind of machine it is for (x86-64 or arm64), and
+Windows' is x86-64.
 
-It is a separate GPL v3 program run over a pipe, and `dll/ffmpeg-LICENSE.txt`
-carries its licence, both hashes and the release it was built from.
+Since 2026-11-04 it is our own build (owner's choice, issue 492): FFmpeg 7.1.1
+with only what Encode Video's formats use, linked statically with x264 and
+x265. It reads the NUT stream Chimera writes, encodes with libx264,
+libx264rgb, libx265, UT Video, FFV1, raw pictures, AAC, FLAC and 16-bit PCM
+(and AC-3, Matroska's own sound when a format names none),
+writes MP4, Matroska, AVI, NUT, raw and WAV files, and has the scale, setsar, crop,
+pad and fps filters and the ones ffmpeg adds by itself to change a format. It
+also reads back the files it writes (H.264, H.265, FFV1, UT Video, FLAC and
+PCM in Matroska, MP4 or AVI), which is how the tests count the frames they encoded
+and check that a lossless format kept every pixel. A format typed by hand that needs
+anything else is refused by ffmpeg with its own message. Before, it was a
+ready-made static build of everything (4.4.1): 77 MB on Linux and 26 MB of the
+60 MB Windows download; now 14 MB and 13 MB.
+
+Every source is pinned by its SHA256 (FFmpeg's release, Debian's copies of
+x264 and x265; when those cannot be had, the same commits from GitHub -
+FFmpeg's repository, a mirror of x264's, MulticoreWare's x265 - with the few
+files that name the version put back as the releases have them, which builds
+the same program but for its 20-byte build ID) and kept in `build/deps`, and the finished binary is kept there
+under a name made from the script's own hash, so it is built once until the
+script changes; CI caches it the same way. A build takes about a minute for
+Linux and a minute and a half for Windows (mingw-w64) on eight cores, and
+needs a C and C++ compiler, make, cmake, nasm and pkg-config.
+
+It is a separate GPL program (version 2 or later, because of x264 and x265),
+run over a pipe, and `ffmpeg-LICENSE.txt` beside it carries the GPL, each
+source's address and hash, and FFmpeg's configuration.
 
 ## From a script
 

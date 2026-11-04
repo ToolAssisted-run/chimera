@@ -68,6 +68,10 @@ public:
 	ViewModel &operator=(const ViewModel &) = delete;
 
 	const std::string &name() const { return name_; }
+	/* how many times arg() refused, on this thread: the window tells a call
+	 * of its own given the wrong thing (its mistake, never the person's)
+	 * from any other refusal by it */
+	static inline thread_local int argumentsRefused = 0;
 	const std::vector<PropertyInfo> &properties() const { return properties_; }
 	const std::vector<CommandInfo> &commands() const { return commands_; }
 	const std::vector<RowsInfo> &rowLists() const { return rows_; }
@@ -116,11 +120,13 @@ protected:
 		if (i >= args.size())
 		{
 			error = tr("new_project.argument_missing", {std::to_string(i + 1)});
+			argumentsRefused++;
 			return false;
 		}
 		if (!fromValue(args[i], out))
 		{
 			error = tr("view_model.argument_cannot_be", {std::to_string(i + 1), describe(args[i])});
+			argumentsRefused++;
 			return false;
 		}
 		return true;

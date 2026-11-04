@@ -497,6 +497,7 @@
 		"display_config.save_window_position": "Zapisz położenie okna",
 		"display_config.scale_osd_text_with_system_scale": "Skaluj tekst OSD ze skalą systemu",
 		"display_config.scale_osd_text_with_the_window": "Skaluj tekst OSD z oknem",
+		"display_config.osd_text_size_in_pixels": "Rozmiar tekstu OSD w pikselach",
 		"display_config.scaling_and_filtering": "Skalowanie && filtrowanie",
 		"display_config.snowy_null_core": "Pusty rdzeń śnieżący",
 		"display_config.some_tools_put_filenames_status_etc": "Niektóre narzędzia umieszczają nazwy plików, stan itp. w tytułach swoich okien.\nZaznaczenie tego wyłącza te funkcje.",

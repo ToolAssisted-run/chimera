@@ -2,9 +2,12 @@
 
 #include <QUrl>
 
+#include <cstdio>
 #include <limits>
 
 namespace chimera::qt {
+
+static int g_argumentsRefused = 0;
 
 QVariant toVariant(const vm::Value &v)
 {
@@ -143,10 +146,19 @@ QVariant QmlViewModel::run(const QString &command, const QVariantList &args)
 	a.reserve(static_cast<size_t>(args.size()));
 	for (const QVariant &v : args) a.push_back(fromVariant(v));
 	std::string error;
+	const int before = vm::ViewModel::argumentsRefused;
 	const auto result = model_.run(command.toStdString(), a, error);
+	if (vm::ViewModel::argumentsRefused != before)
+	{
+		g_argumentsRefused++;
+		std::fprintf(stderr, "the window called %s.%s with the wrong arguments: %s\n", model_.name().c_str(),
+			command.toUtf8().constData(), error.c_str());
+	}
 	insert("error", QString::fromStdString(error));
 	return result ? toVariant(*result) : QVariant();
 }
+
+int QmlViewModel::argumentsRefused() { return g_argumentsRefused; }
 
 QObject *QmlViewModel::rows(const QString &name) const
 {

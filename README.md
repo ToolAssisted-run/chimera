@@ -48,6 +48,7 @@ Made, published and supported by this project. Report a problem with one in [Chi
 | [ares](https://github.com/ToolAssisted-run/chimera-core-ares) | Nintendo Entertainment System / Famicom, Super Nintendo, Satellaview, Sufami Turbo, Nintendo 64, Nintendo 64DD, Game Boy / Game Boy Color, Game Boy Advance, Mega Drive / Genesis, Mega Drive 32X, Sega CD / Mega CD, Sega CD 32X, Master System, Game Gear, SG-1000, PlayStation, Atari 2600, Atari 5200, ColecoVision, MSX / MSX2, PC Engine / TurboGrafx-16 / SuperGrafx, PC Engine CD / TurboDuo, Neo Geo AES, Neo Geo Pocket / Color, WonderSwan / WonderSwan Color |
 | [Snes9x](https://github.com/ToolAssisted-run/chimera-core-snes9x) | Super Nintendo |
 | [Dolphin](https://github.com/ToolAssisted-run/chimera-core-dolphin) | GameCube, Wii |
+| [Cemu](https://github.com/ToolAssisted-run/chimera-core-cemu) | Wii U |
 | [Azahar](https://github.com/ToolAssisted-run/chimera-core-azahar) | Nintendo 3DS / New Nintendo 3DS |
 | [melonDS](https://github.com/ToolAssisted-run/chimera-core-melonds) | Nintendo DS, Nintendo DSi |
 | [Gambatte](https://github.com/ToolAssisted-run/chimera-core-gambatte) | Game Boy / Game Boy Color, Super Game Boy, Game Boy Link (two to four Game Boys joined by cable) |
@@ -91,6 +92,7 @@ Made, published and supported by this project. Report a problem with one in [Chi
 | [Godot 4.4](https://github.com/ToolAssisted-run/chimera-core-godot44) | Godot 4.0 to 4.4 |
 | [OpenBOR](https://github.com/ToolAssisted-run/chimera-core-openbor) | OpenBOR (2D beat 'em up games) |
 | [Ikemen GO](https://github.com/ToolAssisted-run/chimera-core-ikemen) | Ikemen GO (fighting games made with it, and M.U.G.E.N characters and stages) |
+| [ScummVM](https://github.com/ToolAssisted-run/chimera-core-scummvm) | ScummVM (adventure games of LucasArts, Sierra and others, run from their own files) |
 
 #### Games
 
