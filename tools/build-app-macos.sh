@@ -106,7 +106,7 @@ cat > "$app/Info.plist" <<EOF
 	<key>CFBundlePackageType</key><string>APPL</string>
 	<key>CFBundleShortVersionString</key><string>${version:-0.1}</string>
 	<key>CFBundleVersion</key><string>${commit}</string>
-	<key>LSMinimumSystemVersion</key><string>11.0</string>
+	<key>LSMinimumSystemVersion</key><string>14.4</string>
 	<key>NSHighResolutionCapable</key><true/>
 	<key>NSPrincipalClass</key><string>NSApplication</string>
 	<key>LSApplicationCategoryType</key><string>public.app-category.games</string>

@@ -12870,3 +12870,26 @@ wrote settings.json and Movies/ there and nothing into itself, and its signature
 verified after the run. The window's tests give the same 47 passes as before. Not
 tried: a person's own themes folder, a Linux or Windows build after this change
 (the change is under `#ifdef __APPLE__`), and an Intel Mac.
+
+## The macOS build asks for 14.4, not for the Mac it was made on (2026-11-03)
+
+Found while making CI: no deployment target was set, so every binary asked for
+the version of the Mac that built it, macOS 27.2 here (otool: minos 27.2), and
+the app's Info.plist said 11.0. Such a build starts on no other Mac, and an Intel
+Mac stops at macOS 26. It is now 14.4, Qt 6.12's own minimum, in the cross file,
+the nested cmake builds and Info.plist.
+
+At 14.4 Apple's C++ library lacks the floating-point std::from_chars and
+std::to_chars (macOS 26 and later). The four places that use them (the
+engine's plain_numbers.hpp; json.cpp and watch_values.cpp in the view models)
+have a macOS path that uses strtod_l and snprintf_l in the "C" locale, so the
+text is the same and still follows no locale (issue 244). The shortest-digits
+writer was compared with std::to_chars over 801,056 values (random bit patterns
+of doubles and floats, short decimals, every power of ten, edge values) in plain
+and scientific form, and agrees on all. Linux and Windows still use the standard
+functions: the change is under __APPLE__.
+
+Tested (x86-64, Apple M1): every Mach-O in the rebuilt app asks for 14.4 at
+most; the engine's tests (test_plain_numbers among them) and the window's tests
+give the same 47 passes. Not tried: the app on a Mac older than macOS 27 (the
+only one at hand is 27.2), and an Intel Mac.

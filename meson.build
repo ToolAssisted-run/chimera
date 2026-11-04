@@ -138,7 +138,7 @@ endif
 # machine's own (arm64 on an Apple silicon Mac) and Rosetta cannot load them
 cmake_platform_args = []
 if host_macos
-  cmake_platform_args = ['-DCMAKE_OSX_ARCHITECTURES=x86_64']
+  cmake_platform_args = ['-DCMAKE_OSX_ARCHITECTURES=x86_64', '-DCMAKE_OSX_DEPLOYMENT_TARGET=14.4']
 endif
 zstd_out = host_windows ? 'libzstd.dll' : 'libzstd.' + shlib_ext
 custom_target(

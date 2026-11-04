@@ -5,6 +5,18 @@ what has not. The port is for the x86-64 processor. On an Apple silicon Mac the
 x86-64 build runs under Rosetta 2. A native Apple silicon build is a separate
 piece of work and is not done here.
 
+## Which macOS
+
+The build asks for macOS 14.4 or later, which is what Qt 6.12 asks (the cross
+file's `-mmacosx-version-min`). Without it the oldest version is the one of the
+Mac that builds, and a build made on macOS 27 starts on no other; an Intel Mac
+stops at macOS 26. Apple's C++ library has the floating-point `from_chars` and
+`to_chars` only from macOS 26, so the code that reads and writes numbers as
+text has a macOS path of its own (strtod_l and snprintf_l in the "C" locale:
+`plain_numbers.hpp` in the engine, `charconv_apple.hpp` in the view models). The
+latter was compared with `std::to_chars` over 801,056 values, floats and
+doubles, plain and scientific, with no difference.
+
 ## What builds and runs
 
 The engine, `chimera-run`, `chimera-mcp` and every native library the engine

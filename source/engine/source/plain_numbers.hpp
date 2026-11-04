@@ -12,6 +12,18 @@
 #include <string>
 #include <system_error>
 
+#ifdef __APPLE__
+/* Apple's C++ library has the floating-point from_chars and to_chars only from
+ * macOS 26, and Chimera runs on 14.4 and later (what Qt asks of it). There the
+ * C library's strtod_l and snprintf_l are used in the "C" locale, which read and
+ * write the same text. */
+#include <cerrno>
+#include <cstdio>
+#include <cstdlib>
+#include <cctype>
+#include <xlocale.h>
+#endif
+
 namespace chimera
 {
 /* Like strtod on the WHOLE of `text`, in no locale: an optional sign, then a
@@ -28,6 +40,9 @@ inline bool parsePlainDouble(const std::string &text, double &out)
 		first++;
 	}
 	if (first == last || *first == '+' || *first == '-') return false;
+#ifdef __APPLE__
+	const char *const numberStart = first;
+#endif
 	std::chars_format format = std::chars_format::general;
 	if (last - first > 2 && first[0] == '0' && (first[1] == 'x' || first[1] == 'X'))
 	{
@@ -41,8 +56,20 @@ inline bool parsePlainDouble(const std::string &text, double &out)
 		if (!hexStart) return false;
 	}
 	double value = 0;
+#ifdef __APPLE__
+	(void)format;
+	/* strtod skips white space first, as from_chars does not; and it sets ERANGE
+	 * where from_chars says out of range, an overflow or an underflow */
+	if (std::isspace(static_cast<unsigned char>(*numberStart))) return false;
+	static const locale_t plain = newlocale(LC_ALL_MASK, "C", nullptr);
+	char *end = nullptr;
+	errno = 0;
+	value = strtod_l(numberStart, &end, plain);
+	if (errno == ERANGE || end != last) return false;
+#else
 	const auto result = std::from_chars(first, last, value, format);
 	if (result.ec != std::errc() || result.ptr != last) return false;
+#endif
 	out = negative ? -value : value;
 	return true;
 }
@@ -51,8 +78,15 @@ inline bool parsePlainDouble(const std::string &text, double &out)
 inline std::string formatPlainDouble(double v, int digits)
 {
 	char buf[64];
+#ifdef __APPLE__
+	static const locale_t plain = newlocale(LC_ALL_MASK, "C", nullptr);
+	const int n = snprintf_l(buf, sizeof buf, plain, "%.*g", digits, v);
+	if (n < 0 || n >= static_cast<int>(sizeof buf)) return "0";
+	return std::string(buf, static_cast<size_t>(n));
+#else
 	const auto result = std::to_chars(buf, buf + sizeof buf, v, std::chars_format::general, digits);
 	if (result.ec != std::errc()) return "0";
 	return std::string(buf, result.ptr);
+#endif
 }
 } // namespace chimera
