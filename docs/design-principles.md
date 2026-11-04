@@ -12761,3 +12761,33 @@ models' tests: a save writes no greenzone, the close does, and an edit closed
 without saving leaves no state after its frame. The witness: a tool's project
 output made into a zip that opens, and one with a bad line refused.
 
+
+## A full greenzone thins a little every frame, its merges on a helper (2026-11-04)
+
+Issue 482: on Pokemon Snap (ares) and a PC-98 game, play paused for a moment
+every couple of seconds once a few thousand frames had run. The greenzone was
+full: it waited until a capture crossed the budget, then thinned to 95% at
+once, and on a heavy core each of the merges that takes is milliseconds (an
+N64 delta of 3 to 5 MB; unpacking two, composing them and packing the union
+is 7 to 15 ms), so a capture made several and the frame took 35 to 47 ms.
+
+Now, from 95% of the budget, every capture thins a little: frames that go for
+nothing first, and up to two merges, which a helper thread of their own works
+out and the next capture takes. The next capture waits for them if they are
+not done, and only then decides anything, so the history keeps the same
+frames threaded as in line (the history's threaded-against-in-line test still
+compares every step). When the next frame the rule would give up needs a
+merge and the capture has used its two, thinning stops for that capture
+rather than taking cheaper frames from other bands, which bent the shape
+(tried first: the oldest stretch was left dense). Over the budget nothing
+changed: every merge it takes, made at once.
+
+Measured with ares on Banjo-Tooie, a movie of 4000 frames, a 4 GB budget full
+by frame 3400 (chimera-run, not held to 60 frames a second): thinning took 4.5
+ms a frame on average and 35 to 47 ms on 36 of the last 600 frames; now 1.7
+ms on average, at most 17 ms (the capture waiting for the merger), none over
+20 ms and no merge on the capturing thread. The history holds about 95% of
+the budget instead of 100%. Restores through a thinned history (600 MB
+budget, seeks to frames 401, 977 and 1333 after 1500) are exact with helpers
+on and off. Not measured: Pokemon Snap itself (no ROM here), the reporter's
+PC-98 game, and the window at 60 frames a second on Windows.

@@ -485,6 +485,64 @@ int main(void)
 		assert(h.count() < kFrames / 2);            /* it really did thin */
 		assert(h.bytes() <= budget);                /* and the budget is met at the end */
 	}
+	{ // Under its budget, from 95% of it, the history thins a little every
+	  // frame, and the merges that takes are worked out on the merger and taken
+	  // at the next capture, not made on the capturing thread (issue 482: an N64
+	  // delta's merge is milliseconds, and several in one frame stalled the
+	  // game). Threaded and in line alike: what is kept, and that every frame it
+	  // offers is the frame it was.
+		const chimera::HostApi api = fakeHost();
+		const int64_t kFrames = 400;
+		g_machine = Machine{};
+		History probe;
+		probe.configure(&api, nullptr, 64ull << 20);
+		probe.bands(0, 0, 0, 0, 1000);
+		probe.capture(0);
+		for (int64_t f = 1; f <= kFrames; f++) { probe.beforeAdvance(); advance(f); probe.capture(f); }
+		const uint64_t whole = probe.heldAgainstBudget();
+
+		std::vector<int64_t> keptBy[2];
+		for (int pass = 0; pass < 2; pass++)
+		{
+			const bool threaded = pass == 0;
+			g_machine = Machine{};
+			History h;
+			const uint64_t budget = whole / 2;
+			h.configure(&api, nullptr, budget);
+			h.helpers(threaded);
+			h.bands(0, 0, 0, 0, 1000);
+			h.bandGoal(4);
+			std::vector<std::array<uint8_t, Machine::kCells>> truth(1);
+			std::memcpy(truth[0].data(), g_machine.cell, Machine::kCells);
+			h.capture(0);
+			for (int64_t f = 1; f <= kFrames; f++)
+			{
+				h.beforeAdvance();
+				advance(f);
+				h.capture(f);
+				std::array<uint8_t, Machine::kCells> at{};
+				std::memcpy(at.data(), g_machine.cell, Machine::kCells);
+				truth.push_back(at);
+				assert(h.heldAgainstBudget() <= budget);   /* the budget is met at every step */
+			}
+			const auto costs = h.costs();
+			if (costs.mergesHere != 0 || costs.mergesOnMerger < 20)
+				std::fprintf(stderr, "%s: %llu merges on the capturing thread, %llu taken from the merger\n",
+					threaded ? "threaded" : "in line", (unsigned long long)costs.mergesHere,
+					(unsigned long long)costs.mergesOnMerger);
+			assert(costs.mergesOnMerger >= 20);   /* it thinned by merging, on the merger */
+			assert(costs.mergesHere == 0);        /* and never on the capturing thread */
+			assert(h.count() < kFrames / 2);      /* it really did thin */
+			for (int64_t f = 0; f <= kFrames; f++)
+			{
+				if (h.nearest(f) != f) continue;
+				keptBy[pass].push_back(f);
+				assert(h.restore(f, error));
+				assert(std::memcmp(g_machine.cell, truth[static_cast<size_t>(f)].data(), Machine::kCells) == 0);
+			}
+		}
+		assert(keptBy[0] == keptBy[1]);   /* the same frames kept, threaded or not */
+	}
 
 	{ // A budget too small for even one snapshot in every band is MISSED rather
 	  // than a band emptied: whatever the budget, every band behind the frontier

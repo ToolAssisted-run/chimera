@@ -373,6 +373,7 @@ Greenzone
 MemAvailable: %llu kB
 MemTotal: %llu kB
 history drainer
+history merger
 history packer
 history writer
 # the bytes written into a floppy's or a disc's image, the same in every language: its label, boot message, maker

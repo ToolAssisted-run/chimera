@@ -208,6 +208,10 @@ public:
 		 * before it, and what that cost the emulation thread */
 		uint64_t packWaits = 0;
 		double packWaitSeconds = 0;
+		/* the merges thinning made on this thread (over the budget) and the ones
+		 * taken from the merger (under it), and what waiting for those cost */
+		uint64_t mergesHere = 0, mergesOnMerger = 0;
+		double mergeWaitSeconds = 0;
 	};
 	Costs costs() const { return m_costs; }
 
@@ -677,6 +681,10 @@ private:
 	/* The union of two links, if the caps allow: together they must fit the
 	 * merge cap and the anchor they walk from. True when `merged` holds it. */
 	bool composePair(const Link &a, const Link &b, uint64_t anchorLen, Bytes &merged, bool capped = true);
+	/* The union of two bodies, uncapped: what composePair does once the caps
+	 * allow, and what a merge on the merger thread does. Touches nothing of the
+	 * history's, so it may run on any thread. */
+	static bool composeBodies(const HostApi *host, const Body &a, const Body &b, Bytes &merged);
 
 	/* Composes the link at `i` into the one after it, if the caps allow. True
 	 * when it did. */
@@ -706,8 +714,16 @@ private:
 		std::vector<ThinEntry> entries;
 		std::vector<int64_t> counts;   /* per band, frame 0 and the frontier not counted */
 		bool valid = false;
+		/* stretches (by anchor frame) with a merge on the merger this call:
+		 * nothing more of theirs goes until it is taken */
+		std::vector<int64_t> busy;
 	};
-	bool thinOne(uint64_t &mergeLeft, ThinIndex &index);
+	/* With `mergesLeft`, a frame that can only go by a merge is not merged
+	 * here: the merge is handed to the merger (postMerge) and the frame goes
+	 * when it is taken (finishMerge). When none are left, the next frame that
+	 * would go by a merge ends the call (false), so that the frames that go
+	 * are still the shape's choice and not merely the cheap ones. */
+	bool thinOne(uint64_t &mergeLeft, ThinIndex &index, int *mergesLeft = nullptr);
 	void buildThinIndex(ThinIndex &index) const;
 
 	/* A stretch that was spilled before the far band reached it keeps the
@@ -854,6 +870,30 @@ private:
 	};
 	std::vector<std::unique_ptr<PackJob>> m_packJobs;
 	WorkThread m_packer{ "history packer" };
+
+	/* A merge thinning chose while the history was under its budget (issue
+	 * 482). Merging two of a heavy core's deltas - unpacking both, composing,
+	 * packing the union - is milliseconds each (an N64 delta of 4 MB: 7 to 15
+	 * ms), and several in one frame were a stall the player sees. So under
+	 * the budget it is worked out on a helper of its own (not the packer,
+	 * which may be busy with a whole stretch for a fifth of a second) and
+	 * TAKEN at the next capture, waited for if it has not finished, so that
+	 * the history holds the same frames threaded as in line. Matched back by
+	 * identity: a merge whose links have gone meanwhile is thrown away. At
+	 * most kMergesPerCapture a capture, each in a stretch of its own. */
+	struct MergeJob
+	{
+		int64_t anchorFrame = -1;
+		int64_t aEnd = 0, bEnd = 0;
+		Body a, b;      /* the two links' bodies as they were */
+		Body result;
+		bool ok = false;
+		double seconds = 0;
+	};
+	std::vector<std::unique_ptr<MergeJob>> m_mergeJobs;
+	WorkThread m_merger{ "history merger" };
+	bool postMerge(const Segment &seg, size_t i);
+	void finishMerge();
 	bool packingAvailable() const;
 	void packSegmentLater(size_t index);
 	void finishPacking();

@@ -411,11 +411,28 @@ band the frame that goes is the one whose going leaves the smallest gap: a link
 in the middle of a stretch is composed into the next, a stretch's last link is
 dropped, and an anchor only goes once its stretch holds nothing else.
 
-**When and how much.** Only when `m_bytes > m_budget`, and then down to 95% of
-it so a full greenzone is not thinned again on every frame; that extra is at
-most 16 frames a call, and composition 32 MB a call (the first merge of a call
-always happens, however big, so a heavy core can always make progress). Getting
-back under the budget itself is not bounded - the budget is the promise.
+**When and how much.** From 95% of the budget, a little every frame: up to
+16 frames that go for nothing (a stretch's last link, a stretch alone) and up
+to two merges, which are worked out on a helper thread of their own (the
+merger) and taken at the next capture, waited for there if they have not
+finished, so that the history keeps the same frames threaded as in line. When
+the next frame to go needs a merge and the capture has handed the merger its
+two, thinning stops there rather than taking cheaper frames from other bands,
+so the shape stays the rule's. Over the budget, everything it takes to be
+back under it, merges made here and now and their composition 32 MB a call
+after the first (which always happens, however big, so a heavy core can
+always make progress); getting back under the budget is not bounded - the
+budget is the promise.
+
+Until 2026-11-04 it waited for the budget to be crossed and then thinned to
+95% at once. On a heavy core that was a stall the player saw (issue 482): an
+N64 delta is 3 to 5 MB, a merge unpacks two of them, composes them and packs
+the union, 7 to 15 ms, and a capture after the budget was crossed made
+several. Measured with ares on Banjo-Tooie, 4000 frames, a 4 GB budget (full
+by frame 3400): thinning cost 4.5 ms a frame on average but came as 35 to 47
+ms on 36 of the last 600 frames; now 1.7 ms on average, at most 17 ms (the
+capture waiting for the merger, in a run not held to 60 frames a second), no
+merge on the capturing thread, and the history holds about 95% of the budget.
 
 **The merge caps are not thinning's.** composePair refuses a merge over 8 MB or
 bigger than the anchor; those caps were there for coarsening by distance, a
