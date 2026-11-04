@@ -12804,3 +12804,27 @@ used while the text does not grow with the window and greyed while it does.
 The distances of that text from the picture's corners grow with it, as they do
 with the window. Kept with the other display settings; its label is in every
 language table.
+
+## Chimera builds the ffmpeg it ships, with only what Encode Video uses (user-decided, 2026-11-04)
+
+Issue 492: the release had grown to about 60 MB compressed, 26 MB of it the
+ffmpeg Chimera ships for Encode Video - a ready-made static build of
+everything ffmpeg can do (4.4.1, from BizHawk's binaries repository). The
+owner chose to build our own (over keeping it and trimming only Qt):
+`tools/build-ffmpeg.sh` builds FFmpeg 7.1.1 statically with x264 and x265 and
+only the readers, encoders, files and filters Encode Video's formats, a
+script's raw output and the tests use (docs/encode-video.md lists them).
+Each source is pinned by its SHA256; the binary is kept under a name made from
+the script's hash and cached in CI. It replaces `tools/fetch-ffmpeg.sh`.
+
+Measured: 14 MB on Linux (was 77 MB) and 13 MB on Windows (was about 26 MB in
+the zip). Every preset Encode Video offers, and the raw output a script asks
+for, encoded a 3-second test stream (Chimera's NUT input: raw BGRA pictures,
+16-bit stereo sound) on Linux and natively on Windows, and each file decoded to
+all 180 frames with its sound. The Windows binary imports only Windows' own
+DLLs, and the binaries name no folder of the machine that built them (FFmpeg
+keeps its configuration in the program). The view models' tests now encode
+with every preset (and fail when ffmpeg refuses one: tried with a stand-in
+that refuses x265), and CI builds ffmpeg before them, where they used to be
+skipped. A format typed by hand that needs an encoder or file type left out
+is now refused by ffmpeg; before, the full build would have taken it.

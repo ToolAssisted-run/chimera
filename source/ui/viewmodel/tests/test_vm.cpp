@@ -9813,6 +9813,17 @@ bool encodeVideo(const char *package, const char *rom)
 			std::printf("%s: %s\n", p.key, same ? "every pixel kept" : "changed");
 			CHECK(same && described(out).find("Audio: flac") != std::string::npos);
 		}
+		/* every format Encode Video offers is one the ffmpeg the build ships
+		 * can write: it is built with only what they use (issue 492) */
+		for (const auto &p : presets)
+		{
+			const fs::path out = dir / ("preset." + EncoderViewModel::extensionOf(p.command));
+			std::error_code gone;
+			fs::remove(out, gone);
+			const bool written = encode(p.command, out) && fs::exists(out) && fs::file_size(out) > 0;
+			std::printf("%s: %s\n", p.key, written ? "written" : "refused");
+			CHECK(written);
+		}
 	}
 	std::error_code ec;
 	fs::remove_all(dir, ec);

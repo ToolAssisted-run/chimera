@@ -20,7 +20,7 @@ version=6.12.0
 
 sudo apt-get update
 sudo apt-get install -y --no-install-recommends \
-	meson ninja-build build-essential cmake pkg-config python3 python3-venv \
+	meson ninja-build build-essential cmake nasm pkg-config python3 python3-venv \
 	libgl1-mesa-dev libegl-dev libx11-dev libxext-dev libasound2-dev \
 	libxkbcommon0 libfontconfig1 libfreetype6 libdbus-1-3
 

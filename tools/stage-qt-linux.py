@@ -18,7 +18,7 @@ patchelf) and stripped of debug information, as it would ship.
 
 The installed dll dir is meson's install folder for the Linux build
 (build/dll): the window, chimera-run, chimera-mcp, Chimera's libraries and,
-when tools/fetch-ffmpeg.sh put it there, ffmpeg. Prints the folder's size and
+when tools/build-ffmpeg.sh put it there, ffmpeg. Prints the folder's size and
 Qt's share of it."""
 import os
 import shutil

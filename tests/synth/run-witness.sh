@@ -2263,8 +2263,9 @@ ENCPY
 		cp "$config" "$work/settings.encode.json"
 
 		# ffmpeg is part of a build now, not something a person is asked to fetch
-		# the first time they want a video - so the gate builds it in too.
-		if ! "$repo_root/tools/fetch-ffmpeg.sh" linux "$repo_root/build/dll" > "$work/ffmpeg.log" 2>&1; then
+		# the first time they want a video - so the gate builds it in too (once:
+		# tools/build-ffmpeg.sh keeps what it built under build/deps).
+		if ! "$repo_root/tools/build-ffmpeg.sh" linux "$repo_root/build/dll" > "$work/ffmpeg.log" 2>&1; then
 			report "V:box:encode" FAIL "no ffmpeg to encode with (see work/ffmpeg.log)"
 		else
 			( cd "$repo_root" && CHIMERA_JOB="$ejob" timeout 300 "$chimera_exe" --headless \

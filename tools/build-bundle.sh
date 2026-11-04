@@ -61,9 +61,10 @@ if [ "$platform" = linux ]; then
 	meson compile -C "$native_dir"
 	meson install -C "$native_dir"
 	# ffmpeg is part of the bundle, not something the frontend asks a person to
-	# go and find the first time they encode a video
+	# go and find the first time they encode a video; built here, with only
+	# what Encode Video uses (issue 492)
 	say "ffmpeg"
-	"$root/tools/fetch-ffmpeg.sh" linux "$prefix/dll"
+	"$root/tools/build-ffmpeg.sh" linux "$prefix/dll"
 	say "staging into $out"
 	python3 "$root/tools/stage-qt-linux.py" "$prefix/dll" "$qt" "$out"
 	program="chimera"
@@ -81,7 +82,7 @@ else
 	fi
 	meson compile -C "$native_dir"
 	say "ffmpeg"
-	"$root/tools/fetch-ffmpeg.sh" windows "$root/build/ffmpeg-windows"
+	"$root/tools/build-ffmpeg.sh" windows "$root/build/ffmpeg-windows"
 	say "staging into $out"
 	python3 "$root/tools/stage-qt-windows.py" "$native_dir" "$native_dir" "$qt" "$out" "$root/build/ffmpeg-windows/ffmpeg.exe"
 	cp "$root/build/ffmpeg-windows/ffmpeg-LICENSE.txt" "$out/bin/"
