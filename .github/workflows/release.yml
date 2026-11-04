@@ -210,10 +210,184 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
+  windows-arm64:
+    # The Windows bundle for arm64, cross-built on Linux with llvm-mingw (clang;
+    # mingw-w64's GCC has no arm64 Windows target), its Qt built from source
+    # with it, as the x64 bundle's is with GCC. Handed to the bundle job.
+    needs: what
+    if: needs.what.outputs.skip != 'true'
+    name: bundle (windows arm64)
+    runs-on: ubuntu-latest
+    # the first run builds Qt (then cached): hours, not minutes
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.what.outputs.sha }}
+          submodules: false
+          fetch-depth: 0
+
+      - name: Check out what the frontend is built from
+        run: git submodule update --init --recursive extern
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            meson ninja-build build-essential cmake pkg-config python3 python3-venv zip
+
+      - name: llvm-mingw (pinned, checked by its SHA256)
+        run: tools/fetch-llvm-mingw.sh "$HOME/llvm-mingw" >> "$GITHUB_PATH"
+
+      - name: Cache Qt
+        id: qt-cache
+        uses: actions/cache@v4
+        with:
+          # the Linux Qt (aqt) whose tools run during the build, and the
+          # Windows on arm64 Qt that ships, built here without the network module
+          path: |
+            ~/qt/6.12.0/gcc_64
+            ~/qt/aqt-venv
+            ~/qt-ship/llvm_mingw_arm64
+          key: qt-ship-6.12.0-windows-arm64-${{ hashFiles('tools/build-qt-windows.sh', 'tools/qt-patches/*', 'tools/fetch-qt-source.sh', 'tools/fetch-llvm-mingw.sh') }}
+
+      - name: Cache the ffmpeg the bundle builds
+        uses: actions/cache@v4
+        with:
+          # tools/build-ffmpeg.sh keeps what it built under a name made from its
+          # CPU and its own hash
+          path: build/deps/ffmpeg-windows-arm64-*
+          key: ffmpeg-windows-arm64-${{ hashFiles('tools/build-ffmpeg.sh', 'tools/fetch-llvm-mingw.sh') }}
+
+      - name: Qt's source
+        run: ./tools/fetch-qt-source.sh "$HOME/qt-src"
+
+      - name: Build Qt for Windows on arm64 (once; then cached)
+        if: steps.qt-cache.outputs.cache-hit != 'true'
+        run: |
+          if [ ! -d "$HOME/qt/6.12.0/gcc_64" ]; then
+            python3 -m venv "$HOME/qt/aqt-venv"
+            "$HOME/qt/aqt-venv/bin/pip" install --quiet aqtinstall==3.3.0
+            "$HOME/qt/aqt-venv/bin/aqt" install-qt linux desktop 6.12.0 linux_gcc_64 -m qtshadertools -O "$HOME/qt"
+          fi
+          ./tools/build-qt-windows.sh "$HOME/qt/6.12.0/gcc_64" "$HOME/qt-src" "$HOME/qt-ship/llvm_mingw_arm64" arm64
+
+      - name: Build the Windows arm64 bundle
+        run: |
+          ./tools/build-bundle.sh --platform windows --cpu arm64 --out build/bundle-windows-arm64 \
+            --qt "$HOME/qt-ship/llvm_mingw_arm64" --host-qt "$HOME/qt/6.12.0/gcc_64" --qt-source "$HOME/qt-src"
+
+      - name: Pack
+        run: |
+          short="${{ needs.what.outputs.short }}"
+          mkdir -p build/release
+          ( cd build/bundle-windows-arm64 && zip -qr "../release/chimera-win-arm64-$short.zip" . )
+          ls -la build/release
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bundle-windows-arm64
+          path: build/release/chimera-win-arm64-${{ needs.what.outputs.short }}.zip
+          if-no-files-found: error
+          retention-days: 1
+
+  macos:
+    # Chimera.app for each Mac, built on that kind of Mac (docs/macos.md):
+    # x86-64 on an Intel runner, arm64 on an Apple silicon one. Handed to the
+    # bundle job.
+    needs: what
+    if: needs.what.outputs.skip != 'true'
+    name: bundle (macos ${{ matrix.cpu }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            cpu: x64
+            runner: macos-15-intel
+          - arch: aarch64
+            cpu: arm64
+            runner: macos-15
+    env:
+      QT_VERSION: 6.12.0
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.what.outputs.sha }}
+          submodules: false
+          fetch-depth: 0
+
+      - name: Check out what the frontend is built from
+        run: git submodule update --init --recursive extern
+
+      - name: Install build tools
+        run: brew install meson ninja cmake nasm pkg-config
+
+      - name: Cache Qt
+        uses: actions/cache@v4
+        with:
+          path: ~/qt
+          key: qt-6.12.0-macos-aqt-3.3.0
+
+      - name: Qt 6.12 (Qt's own download, one build for both processors)
+        run: |
+          if [ ! -d "$HOME/qt/$QT_VERSION/macos" ]; then
+            python3 -m venv "$HOME/qt/aqt-venv"
+            "$HOME/qt/aqt-venv/bin/pip" install --quiet aqtinstall==3.3.0
+            "$HOME/qt/aqt-venv/bin/aqt" install-qt mac desktop "$QT_VERSION" clang_64 -m qtshadertools -O "$HOME/qt"
+          fi
+          mkdir -p build
+          {
+            echo "[binaries]"
+            echo "qmake6 = '$HOME/qt/$QT_VERSION/macos/bin/qmake'"
+            echo "[properties]"
+            echo "pkg_config_libdir = '$HOME/qt/$QT_VERSION/macos/lib/pkgconfig'"
+          } > build/qt-macos-${{ matrix.arch }}.ini
+
+      - name: Cache the ffmpeg the app ships
+        uses: actions/cache@v4
+        with:
+          path: build/deps/ffmpeg-macos-${{ matrix.cpu }}-*
+          key: ffmpeg-macos-${{ matrix.cpu }}-${{ hashFiles('tools/build-ffmpeg.sh') }}
+
+      - name: Build
+        run: |
+          meson setup build/meson-macos-${{ matrix.arch }} --prefix "$PWD/build/${{ matrix.arch }}-macos" --libdir dll \
+            --cross-file extern/meson/macos-${{ matrix.arch }}.ini --cross-file build/qt-macos-${{ matrix.arch }}.ini -Dqt_ui=enabled
+          meson compile -C build/meson-macos-${{ matrix.arch }}
+          meson install -C build/meson-macos-${{ matrix.arch }}
+          tools/build-ffmpeg.sh macos build/${{ matrix.arch }}-macos/dll
+
+      - name: Chimera.app
+        run: |
+          # the app's icon is compiled by actool, which needs Xcode 26 or later
+          newest="$(ls -d /Applications/Xcode_26*.app 2> /dev/null | sort -V | tail -n 1)"
+          if [ -n "$newest" ]; then export DEVELOPER_DIR="$newest/Contents/Developer"; fi
+          tools/build-app-macos.sh --dll build/${{ matrix.arch }}-macos/dll --qt "$HOME/qt/$QT_VERSION/macos" --out build/Chimera.app
+          codesign --verify --deep --strict build/Chimera.app
+          build/Chimera.app/Contents/MacOS/chimera --version
+
+      - name: Pack
+        run: |
+          short="${{ needs.what.outputs.short }}"
+          mkdir -p build/release
+          # a zip that keeps the app's links and signature, as Finder's does
+          ditto -c -k --keepParent build/Chimera.app "build/release/chimera-macos-${{ matrix.cpu }}-$short.zip"
+          ls -la build/release
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bundle-macos-${{ matrix.cpu }}
+          path: build/release/chimera-macos-${{ matrix.cpu }}-${{ needs.what.outputs.short }}.zip
+          if-no-files-found: error
+          retention-days: 1
+
   bundle:
-    # Builds the x64 bundles and publishes them with the arm64 one - only when
-    # that was built too, so a release never goes out a bundle short.
-    needs: [what, linux-arm64]
+    # Builds the x64 bundles and publishes them with the others - only when
+    # every one was built too, so a release never goes out a bundle short.
+    needs: [what, linux-arm64, windows-arm64, macos]
     name: bundle (windows + linux x64) and publish
     runs-on: ubuntu-latest
     # the first run builds Qt for both platforms (then cached): hours, not minutes
@@ -314,11 +488,12 @@ jobs:
           cp build/bundle-windows/BUILD.txt build/release/BUILD.txt
           ls -la build/release
 
-      - name: The arm64 Linux bundle
+      - name: The arm64 Linux bundle, the arm64 Windows bundle and the two Mac apps
         uses: actions/download-artifact@v4
         with:
-          name: bundle-linux-arm64
+          pattern: bundle-*
           path: build/release
+          merge-multiple: true
 
       - name: Release notes
         id: notes
@@ -350,14 +525,18 @@ jobs:
               echo "$changes"
               echo
             fi
-            echo "**You most likely want an x64 bundle** (Windows or Linux). Take the Linux"
-            echo "arm64 one only if you know you are using an arm64 device."
+            echo "**On Windows or Linux you most likely want the x64 bundle.** Take an arm64"
+            echo "one only if you know you are using an arm64 device. On a Mac, take arm64 for"
+            echo "Apple silicon (M1 and later) and x64 for an Intel Mac."
             echo
             echo "| what | file |"
             echo "| --- | --- |"
             echo "| Windows x64 | \`chimera-win-x64-$short.zip\` |"
+            echo "| Windows arm64 | \`chimera-win-arm64-$short.zip\` |"
             echo "| Linux x64 | \`chimera-linux-x64-$short.tar.gz\` |"
             echo "| Linux arm64 | \`chimera-linux-arm64-$short.tar.gz\` |"
+            echo "| macOS arm64 (Apple silicon) | \`chimera-macos-arm64-$short.zip\` |"
+            echo "| macOS x64 (Intel) | \`chimera-macos-x64-$short.zip\` |"
             echo
             echo "Each carries Chimera and the libraries it needs. They carry **no cores**, and"
             echo "Chimera downloads none: get a core's \`.chimeraCore\` package from the"

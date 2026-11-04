@@ -13090,3 +13090,47 @@ threads in one state. A fifth run with it stopped once on the main thread
 holding the state with no Lua running: that library counts Lua's lock calls, and
 a Lua error leaves one uncounted, so it was not taken as a race; five runs
 without it then passed.
+
+## Six platforms: x64 and arm64 on Windows, Linux and macOS (user-decided, 2026-11-04)
+
+**What was decided.** The owner widened pull request 309 (P-AS's "Chimera
+builds and runs on aarch64 Linux") into a three-by-two matrix: Chimera built,
+tested and shipped for x64 and arm64 on Windows, Linux and macOS. It stays one
+pull request, merged only when all six build and pass their tests in CI. The
+first step is the build for all six; the second, machines that run the tests.
+P-AS's macOS work is brought in, not redone (owner's choice): the x86-64 port
+merged whole, the Apple silicon miniBox commits applied onto current miniBox
+main with P-AS as their author (they were made on an earlier form of the
+aarch64 port). miniBox's half is on its matrix branch (draft PR 12), and this
+branch's submodule points there.
+
+**How each is built.**
+- Linux: on the machine it is for (x64 on ubuntu-latest, arm64 on an arm
+  runner), as before.
+- macOS: on the kind of Mac it is for, each with its cross file
+  (extern/meson/macos-x86_64.ini, macos-aarch64.ini); the app script keeps the
+  build's half of Qt's two-CPU frameworks.
+- Windows x64: cross-built on Linux with mingw-w64's GCC, as before.
+- Windows arm64: cross-built on Linux with llvm-mingw (clang and libc++;
+  mingw-w64's GCC has no arm64 Windows target), release 20261020, checked by
+  its SHA256 (tools/fetch-llvm-mingw.sh; the owner allowed running it here).
+  Qt is built from source with it, as the x64 Qt is with GCC
+  (tools/build-qt-windows.sh ... arm64), and so is ffmpeg
+  (tools/build-ffmpeg.sh windows <dir> arm64; x265 without its assembly, which
+  assumes an ELF or Mach-O assembler).
+- The nested builds (zstd, SDL2, OpenAL Soft) take the cross file of the OS
+  and the CPU being built; they took the OS's alone, which would have given
+  the Apple silicon build x86-64 libraries.
+- The release builds all six and publishes them together, or none: Windows
+  arm64 and the two Mac apps are jobs of their own beside the arm64 Linux one.
+  Its notes say which to take: on Windows and Linux most likely x64, on a Mac
+  arm64 for Apple silicon and x64 for an Intel Mac.
+
+**The GitHub runners** (public repositories, 2026-11-04): ubuntu-latest and
+ubuntu-26.04-arm, windows-2025 and windows-11-arm, macos-15-intel and macos-15.
+None has a graphics card.
+
+**Measured.** The Windows arm64 bundle (95 MB) builds here: every program and
+library an arm64 Windows file that needs only Windows' own DLLs and the ones it
+carries (Qt, libc++, libunwind). It has not run anywhere yet: this computer's
+Windows is x64.

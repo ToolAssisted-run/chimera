@@ -12,7 +12,11 @@ lib/languages), and the other programs
 (chimera-run, chimera-mcp, ffmpeg) in bin/. The tests are not in it (issue
 492): nothing in a release runs them.
 
-    tools/stage-qt-windows.py <meson build dir> <installed dll dir> <windows qt> <out> [ffmpeg.exe]
+    tools/stage-qt-windows.py [--cpu x64|arm64] <meson build dir> <installed dll dir> <windows qt> <out> [ffmpeg.exe]
+
+The CPU (x64 when none is given) says whose tools read and strip the files,
+and where the compiler's runtime DLLs are: mingw-w64's GCC for x64,
+llvm-mingw's clang for arm64 (its bin/ on PATH).
 
 Prints the folder's size and Qt's share of it."""
 import os
@@ -22,9 +26,23 @@ import sys
 
 import bundle_qml
 
-build, dlls, qt, out = sys.argv[1:5]
-ffmpeg = sys.argv[5] if len(sys.argv) > 5 else ""
-runtime = ["/usr/lib/gcc/x86_64-w64-mingw32/13-posix", "/usr/x86_64-w64-mingw32/lib"]
+args = sys.argv[1:]
+cpu = "x64"
+if args[:1] == ["--cpu"]:
+    cpu, args = args[1], args[2:]
+build, dlls, qt, out = args[0:4]
+ffmpeg = args[4] if len(args) > 4 else ""
+if cpu == "x64":
+    tool = "x86_64-w64-mingw32-"
+    runtime = ["/usr/lib/gcc/x86_64-w64-mingw32/13-posix", "/usr/x86_64-w64-mingw32/lib"]
+elif cpu == "arm64":
+    tool = "aarch64-w64-mingw32-"
+    cc = shutil.which("aarch64-w64-mingw32-clang")
+    if cc is None:
+        sys.exit("no aarch64-w64-mingw32-clang on PATH (llvm-mingw's bin/)")
+    runtime = [os.path.join(os.path.dirname(os.path.dirname(cc)), "aarch64-w64-mingw32", "bin")]
+else:
+    sys.exit(f"the CPU is x64 or arm64, not {cpu}")
 
 if os.path.exists(out):
     sys.exit(f"{out} exists: give a new folder")
@@ -86,7 +104,7 @@ if gone:
     sys.exit("the bundle lacks QML modules the window imports: " + ", ".join(gone))
 
 def imports(path):
-    o = subprocess.run(["x86_64-w64-mingw32-objdump", "-p", path], capture_output=True, text=True, check=True).stdout
+    o = subprocess.run([tool + "objdump", "-p", path], capture_output=True, text=True, check=True).stdout
     return [line.split()[-1] for line in o.splitlines() if "DLL Name:" in line]
 
 have = {f.lower() for f in os.listdir(lib)}
@@ -106,7 +124,7 @@ for r, _, fs in os.walk(out):
     for f in fs:
         # ffmpeg is copied as its own release ships it
         if f.lower().endswith((".dll", ".exe")) and f.lower() != "ffmpeg.exe":
-            subprocess.run(["x86_64-w64-mingw32-strip", "--strip-unneeded", os.path.join(r, f)], check=True)
+            subprocess.run([tool + "strip", "--strip-unneeded", os.path.join(r, f)], check=True)
 
 def size(pred):
     return sum(os.path.getsize(os.path.join(r, f)) for r, _, fs in os.walk(out) for f in fs if pred(os.path.join(r, f)))

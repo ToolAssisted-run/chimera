@@ -21,10 +21,12 @@
 #                licence texts Qt ships under go in the bundle from them
 #   --host-qt    Windows only: a Linux Qt of the same version, whose tools
 #                (moc, rcc) run during the build
+#   --cpu        Windows only: x64 (the default, mingw-w64's GCC) or arm64
+#                (llvm-mingw's clang, its bin/ on PATH); --qt is that CPU's Qt
 set -eu
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
-platform="" out="" qt="" qt_source="" host_qt=""
+platform="" out="" qt="" qt_source="" host_qt="" cpu="x64"
 while [ $# -gt 0 ]; do
 	case "$1" in
 		--platform) platform="$2"; shift 2 ;;
@@ -32,6 +34,7 @@ while [ $# -gt 0 ]; do
 		--qt) qt="$2"; shift 2 ;;
 		--qt-source) qt_source="$2"; shift 2 ;;
 		--host-qt) host_qt="$2"; shift 2 ;;
+		--cpu) cpu="$2"; shift 2 ;;
 		*) echo "unknown option: $1" >&2; exit 2 ;;
 	esac
 done
@@ -39,7 +42,10 @@ done
 	|| { echo "usage: build-bundle.sh --platform windows|linux --out <dir> --qt <qt> --qt-source <folder> [--host-qt <qt>]" >&2; exit 2; }
 case "$platform" in
 	linux) ;;
-	windows) [ -n "$host_qt" ] || { echo "--host-qt is needed for a Windows build" >&2; exit 2; } ;;
+	windows)
+		[ -n "$host_qt" ] || { echo "--host-qt is needed for a Windows build" >&2; exit 2; }
+		case "$cpu" in x64|arm64) ;; *) echo "--cpu is x64 or arm64, not $cpu" >&2; exit 2 ;; esac
+		;;
 	*) echo "platform must be windows or linux" >&2; exit 2 ;;
 esac
 
@@ -70,22 +76,27 @@ if [ "$platform" = linux ]; then
 	program="chimera"
 	suffix=""
 else
-	native_dir="$root/build/meson-windows-qt"
+	# each CPU's own build folder and cross file (the x64 ones keep their names)
+	if [ "$cpu" = arm64 ]; then
+		native_dir="$root/build/meson-windows-qt-arm64" cross="mingw-w64-qt-aarch64.ini" tag="-arm64"
+	else
+		native_dir="$root/build/meson-windows-qt" cross="mingw-w64-qt.ini" tag=""
+	fi
 	export PATH="$host_qt/libexec:$host_qt/bin:$PATH"
-	say "the engine and the window (windows)"
+	say "the engine and the window (windows $cpu)"
 	if [ ! -f "$native_dir/build.ninja" ]; then
 		# pkg-config is pointed at the Windows Qt by a second cross file
 		mkdir -p "$root/build"
-		printf "[properties]\npkg_config_libdir = ['%s/lib/pkgconfig']\n" "$qt" > "$root/build/qt-windows-pkgconfig.ini"
-		meson setup "$native_dir" --prefix "$root/build/qt-windows" --libdir dll \
-			--cross-file "$root/extern/meson/mingw-w64-qt.ini" --cross-file "$root/build/qt-windows-pkgconfig.ini" -Dqt_ui=enabled
+		printf "[properties]\npkg_config_libdir = ['%s/lib/pkgconfig']\n" "$qt" > "$root/build/qt-windows$tag-pkgconfig.ini"
+		meson setup "$native_dir" --prefix "$root/build/qt-windows$tag" --libdir dll \
+			--cross-file "$root/extern/meson/$cross" --cross-file "$root/build/qt-windows$tag-pkgconfig.ini" -Dqt_ui=enabled
 	fi
 	meson compile -C "$native_dir"
 	say "ffmpeg"
-	"$root/tools/build-ffmpeg.sh" windows "$root/build/ffmpeg-windows"
+	"$root/tools/build-ffmpeg.sh" windows "$root/build/ffmpeg-windows$tag" "$cpu"
 	say "staging into $out"
-	python3 "$root/tools/stage-qt-windows.py" "$native_dir" "$native_dir" "$qt" "$out" "$root/build/ffmpeg-windows/ffmpeg.exe"
-	cp "$root/build/ffmpeg-windows/ffmpeg-LICENSE.txt" "$out/bin/"
+	python3 "$root/tools/stage-qt-windows.py" --cpu "$cpu" "$native_dir" "$native_dir" "$qt" "$out" "$root/build/ffmpeg-windows$tag/ffmpeg.exe"
+	cp "$root/build/ffmpeg-windows$tag/ffmpeg-LICENSE.txt" "$out/bin/"
 	program="chimera.exe"
 	suffix=".exe"
 fi
@@ -104,7 +115,13 @@ say "build stamp"
 # Every "it failed" report is only as useful as knowing WHICH build failed. This
 # names the exact commits and the exact files' hashes.
 {
-	printf "Chimera %s bundle\n" "$platform"
+	# a Linux bundle is for the CPU it was built on; a Windows one for --cpu
+	if [ "$platform" = linux ]; then
+		case "$(uname -m)" in aarch64|arm64) bundle_cpu=arm64 ;; *) bundle_cpu=x64 ;; esac
+	else
+		bundle_cpu="$cpu"
+	fi
+	printf "Chimera %s bundle (%s)\n" "$platform" "$bundle_cpu"
 	printf "chimera:   %s %s\n" \
 		"$(git -C "$root" rev-parse HEAD)" \
 		"$(git -C "$root" log -1 --format=%s | cut -c1-60)"

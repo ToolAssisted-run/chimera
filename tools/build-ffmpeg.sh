@@ -24,17 +24,20 @@
 # with its own message. The build is GPL version 2 or later (x264 and x265 are
 # GPL), and ffmpeg-LICENSE.txt says so and where every source is.
 #
-# Usage: ./build-ffmpeg.sh <linux|windows|macos> <destination directory>
+# Usage: ./build-ffmpeg.sh <linux|windows|macos> <destination directory> [x64|arm64]
 #
 # A Linux or macOS ffmpeg is built on the machine it is for, for its CPU
-# (x86-64 or arm64); a Windows one is cross-built for x86-64. On macOS it
+# (x86-64 or arm64); a Windows one is cross-built, for the CPU given (x64 when
+# none is): x64 with mingw-w64's GCC, arm64 with llvm-mingw's clang, whose
+# bin/ folder must be on PATH. On macOS it
 # runs on macOS 14.4 or later, as Chimera does, and links only the system's
 # own libraries (a Mac has no fully static program).
 #
 # Every source is pinned by its SHA256 and kept under build/deps; the finished
 # binary is kept there too, under a name made from this script's own hash, so
 # a second run costs nothing until this script changes. Needs a C and C++
-# compiler (mingw-w64 for windows), make, cmake, nasm (x86-64) and pkg-config.
+# compiler (mingw-w64 or llvm-mingw for windows), make, cmake, nasm (x86-64) and
+# pkg-config.
 #
 # CHIMERA_FFMPEG_LINUX / CHIMERA_FFMPEG_WINDOWS / CHIMERA_FFMPEG_MACOS name a ready binary to use
 # instead, for a machine that cannot build or download. CHIMERA_FFMPEG_LICENSE
@@ -148,7 +151,10 @@ case "$platform" in
 			*) echo "build-ffmpeg: builds on x86-64 and aarch64 only, not $(uname -m)" >&2; exit 2 ;;
 		esac
 		;;
-	windows) cpu=x64 ;;
+	windows)
+		cpu="${3:-x64}"
+		case "$cpu" in x64|arm64) ;; *) echo "build-ffmpeg: a Windows ffmpeg is for x64 or arm64, not $cpu" >&2; exit 2 ;; esac
+		;;
 esac
 
 # ---- built before, by this very script --------------------------------------
@@ -208,7 +214,18 @@ else
 		> "$work/x265_$x265_version/x265Version.txt"
 fi
 
-if [ "$platform" = windows ]; then
+if [ "$platform" = windows ] && [ "$cpu" = arm64 ]; then
+	# llvm-mingw: clang, libc++. x265's arm64 assembly is not built for
+	# Windows (its sources assume an ELF or Mach-O assembler); x264's is.
+	host=aarch64-w64-mingw32
+	x264_cross=(--host=$host --cross-prefix=$host-)
+	export CC=$host-clang
+	x265_cross=(-DCMAKE_SYSTEM_NAME=Windows -DCMAKE_SYSTEM_PROCESSOR=ARM64 -DCMAKE_C_COMPILER=$host-clang
+		-DCMAKE_CXX_COMPILER=$host-clang++ -DCMAKE_RC_COMPILER=$host-windres -DENABLE_ASSEMBLY=OFF)
+	ffmpeg_cross=(--arch=aarch64 --target-os=mingw32 --cross-prefix=$host- --cc=$host-clang --cxx=$host-clang++
+		--pkg-config=pkg-config)
+	strip=$host-strip
+elif [ "$platform" = windows ]; then
 	host=x86_64-w64-mingw32
 	x264_cross=(--host=$host --cross-prefix=$host-)
 	x265_cross=(-DCMAKE_SYSTEM_NAME=Windows -DCMAKE_SYSTEM_PROCESSOR=x86_64 -DCMAKE_C_COMPILER=$host-gcc
@@ -231,6 +248,8 @@ fi
 # A fully static program: Linux's and Windows'. A Mac links the system's own
 # libraries (libSystem, libc++) dynamically, as every Mac program does.
 if [ "$platform" = macos ]; then static_exe=(); cxx_runtime=-lc++; else static_exe=(--extra-ldexeflags=-static); cxx_runtime=-lstdc++; fi
+# llvm-mingw's C++ library is libc++
+if [ "$platform" = windows ] && [ "$cpu" = arm64 ]; then cxx_runtime=-lc++; fi
 
 say() { echo "  $*"; }
 
