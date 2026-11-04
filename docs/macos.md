@@ -101,7 +101,10 @@ from the light one) and an `.icns` for the rest, and names it in `Info.plist`.
 `--icon` names another. Without an Xcode that can compile it, the app gets a plain
 icon drawn from `docs/icon.svg`, with no dark one, and says so. Icon Composer
 cannot be run from a terminal, so a change to the icon is made in the app and
-saved in `docs/Chimera.icon`.
+saved in `docs/Chimera.icon`. The two SVGs are kept once, inside it, in
+`Chimera.icon/Assets`: `docs/icon.svg` and `docs/icon-dark.svg` (which the README
+shows) are links to them. The other way round does not work: `actool` refuses an
+icon whose assets are links.
 
 What a person keeps is in `~/Library/Application Support/Chimera`, as other
 Mac programs keep theirs (owner, 2026-11-03), and not beside the program as on
