@@ -266,6 +266,16 @@ chimera::HostApi fakeHost()
 /* The spill file, whatever it is called: the name carries the process and the
  * instance now, so that two histories handed the same directory cannot open the
  * same file. Tests ask the directory, not the name. */
+/* A file's size as a handle opened now sees it. Windows' directory entry,
+ * which std::filesystem::file_size reads, lags behind a file another handle
+ * still has open for writing (the history's own spill file). */
+uint64_t sizeNow(const std::filesystem::path &path)
+{
+	std::ifstream in(path, std::ios::binary | std::ios::ate);
+	assert(in);
+	return static_cast<uint64_t>(in.tellg());
+}
+
 std::filesystem::path spillFileIn(const std::string &dir)
 {
 	std::error_code ec;
@@ -836,7 +846,7 @@ int main(void)
 		 * dropping the oldest without reclaiming the room it held would be a
 		 * limit on paper only */
 		h.flushWrites();
-		const uint64_t onDisk = std::filesystem::file_size(spillFileIn("work-history-disk"));
+		const uint64_t onDisk = sizeNow(spillFileIn("work-history-disk"));
 		assert(onDisk <= kDisk);   /* the number given, on the number `ls` shows */
 		/* and the budget counts the FILE: what is live in it is part of it */
 		assert(h.diskBytes() <= onDisk);
@@ -899,7 +909,7 @@ int main(void)
 		h.flushWrites();
 		assert(!spillFileIn("work-history-spill").empty());
 		assert(h.bytes() <= 512);
-		assert(std::filesystem::file_size(spillFileIn("work-history-spill")) > 512);
+		assert(sizeNow(spillFileIn("work-history-spill")) > 512);
 
 		/* an early frame, which can only be out on disk by now */
 		const int64_t old = h.nearest(12);

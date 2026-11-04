@@ -487,9 +487,12 @@ static void namesThatShortenAlikeStayApart()
 	assert(got.size() == 12);
 
 	const fs::path floppy = workRoot() / "alike-floppy";
+	// The file already called what the second would become is made first:
+	// on Windows NTFS gives longname2.txt that very short name of its own,
+	// and a file made after it under that name opened longname2.txt instead
+	put(floppy / "LONGNA~2.TXT", "3");
 	put(floppy / "longname1.txt", "1");
 	put(floppy / "longname2.txt", "2");
-	put(floppy / "LONGNA~2.TXT", "3");
 	const fs::path img = workRoot() / "alike.img";
 	assert(chimera::mediaMake(floppy.string(), img.string(), chimera::MediaFormat::Fat12, nullptr, sha, err));
 	const std::vector<uint8_t> disk = slurp(img);
@@ -516,9 +519,10 @@ static void aCounterIsNeverALaterFilesOwnName()
 	std::string sha, err;
 	const fs::path floppy = workRoot() / "counter-floppy";
 	fs::remove_all(floppy);
+	// (made first, as above: NTFS would give aaaaaaaa2.txt this short name)
+	put(floppy / "aaaaaa~2.txt", "3");
 	put(floppy / "aaaaaaaa1.txt", "1");
 	put(floppy / "aaaaaaaa2.txt", "2");
-	put(floppy / "aaaaaa~2.txt", "3");
 	const fs::path img = workRoot() / "counter.img";
 	assert(chimera::mediaMake(floppy.string(), img.string(), chimera::MediaFormat::Fat12, nullptr, sha, err));
 	const std::vector<uint8_t> disk = slurp(img);
