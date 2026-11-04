@@ -122,9 +122,11 @@ ApplicationWindow {
     // Config > Display's Scale OSD text with system scale: off, what is over
     // the picture keeps its size at 100% (the screen's pixels), as Chimera's;
     // and Scale OSD text with the window: its 12 pixels are a 480-pixel-tall
-    // picture area's, and it grows with the window, never smaller (issue 401)
+    // picture area's, and it grows with the window, never smaller (issue 401);
+    // without it, the size Config > Display gives, 12 pixels at first (issue 488)
     readonly property real osdScale: (root.display.scaleOsd || root.Screen.devicePixelRatio <= 0 ? 1 : 1 / root.Screen.devicePixelRatio)
-        * (root.display.osdFollowsWindow ? Math.max(1, pictureArea.height / 480) : 1)
+        * (root.display.osdFollowsWindow ? Math.max(1, pictureArea.height / 480)
+           : Math.min(64, Math.max(8, root.display.osdTextSize || 12)) / 12)
     function osdX(name, w) {
         const p = root.osdPositions[name]
         if (!p) return 0

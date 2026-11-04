@@ -92,6 +92,9 @@ public:
 	 * a 480-pixel-tall picture area's, never smaller (owner, 2026-10-29,
 	 * issue 401) */
 	Property<bool> osdFollowsWindow{true};
+	/* the size of what is drawn over the picture while it does not grow with
+	 * the window, in pixels, 8 to 64 (owner, 2026-11-04, issue 488) */
+	Property<int64_t> osdTextSize{12};
 	/* the window's place and size kept for the next start, and what was kept ("x,y,w,h") */
 	Property<bool> saveWindowPosition{false};
 	Property<std::string> windowGeometry;

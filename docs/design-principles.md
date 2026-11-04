@@ -12791,3 +12791,16 @@ the budget instead of 100%. Restores through a thinned history (600 MB
 budget, seeks to frames 401, 977 and 1333 after 1500) are exact with helpers
 on and off. Not measured: Pokemon Snap itself (no ROM here), the reporter's
 PC-98 game, and the window at 60 frames a second on Windows.
+
+## A size for the on-screen text when it does not grow with the window (user-decided, 2026-11-04)
+
+Issue 488 asked whether the on-screen text (the frame counter, the messages, a
+script's gui.text) should change size with the window. It does on purpose
+since issue 401, and Config > Display's "Scale OSD text with the window" turns
+that off; a commenter found the fixed size, 12 pixels, too small to read. The
+owner chose a setting for it (over keeping things as they were, or a bigger
+fixed size): Config > Display's OSD text size, in pixels, 8 to 64, 12 at first,
+used while the text does not grow with the window and greyed while it does.
+The distances of that text from the picture's corners grow with it, as they do
+with the window. Kept with the other display settings; its label is in every
+language table.

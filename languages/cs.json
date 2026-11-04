@@ -497,6 +497,7 @@
 		"display_config.save_window_position": "Uložit polohu okna",
 		"display_config.scale_osd_text_with_system_scale": "Měnit velikost textu OSD podle měřítka systému",
 		"display_config.scale_osd_text_with_the_window": "Měnit velikost textu OSD podle okna",
+		"display_config.osd_text_size_in_pixels": "Velikost textu OSD v pixelech",
 		"display_config.scaling_and_filtering": "Škálování && filtrování",
 		"display_config.snowy_null_core": "Sněžení (prázdné jádro)",
 		"display_config.some_tools_put_filenames_status_etc": "Některé nástroje do názvů oken zapisují názvy souborů, stav apod.\nZaškrtnutím se tyto funkce vypnou.",

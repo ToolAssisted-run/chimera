@@ -1281,7 +1281,7 @@ int main(int argc, char **argv)
 	vm::Connection messagesTimerWatch = session.hasGameTimer.changed.connect([&messages, &session] { messages.gameTimer.set(session.hasGameTimer.get()); });
 	vm::DisplayViewModel display(dispatcher);
 	for (const char *name : {"aspectMode", "customWidth", "customHeight", "ratioX", "ratioY", "letterbox", "integerScale", "cropLeft",
-			 "cropTop", "cropRight", "cropBottom", "finalFilter", "prescale", "autoPrescale", "scaleOsd", "osdFollowsWindow", "saveWindowPosition", "windowGeometry",
+			 "cropTop", "cropRight", "cropBottom", "finalFilter", "prescale", "autoPrescale", "scaleOsd", "osdFollowsWindow", "osdTextSize", "saveWindowPosition", "windowGeometry",
 			 "allowDoubleClickFullscreen", "menuWindowed", "captionWindowed", "frameWindowed", "menuFullscreen", "statusBarFullscreen",
 			 "autohideMouseFullscreen", "fullscreenHacks", "stayOnTop", "mouseCaptureForcesTop", "minimalDisplay", "staticWindowTitles", "titleSuffix", "resizeWithPicture",
 			 "windowScales"})

@@ -482,6 +482,7 @@
 		"display_config.save_window_position": "Enregistrer la position de la fenêtre",
 		"display_config.scale_osd_text_with_system_scale": "Adapter le texte à l'écran à l'échelle du système",
 		"display_config.scale_osd_text_with_the_window": "Adapter le texte à l'écran à la taille de la fenêtre",
+		"display_config.osd_text_size_in_pixels": "Taille du texte à l'écran, en pixels",
 		"display_config.scaling_and_filtering": "Mise à l'échelle && filtrage",
 		"display_config.snowy_null_core": "Cœur nul avec neige",
 		"display_config.some_tools_put_filenames_status_etc": "Certains outils mettent des noms de fichiers, un état, etc. dans le titre de leur fenêtre.\nCocher ceci désactive ces fonctions.",

@@ -386,6 +386,15 @@ if qt_dep.found()
       repo_root / 'build/Cores/synth-box.chimeraCore', '--play', '--lua', files('qt/tests/tastudio-queries.lua')],
     timeout: 60,
   )
+  # the on-screen text's size while it does not grow with the window (issue 488)
+  test(
+    'osd text size',
+    find_program('python3'),
+    args: [files('qt/tests/osd-text-size.py'), chimera_qt, meson.current_build_dir() / 'osd-text-size-test', window_game[0],
+      repo_root / 'build/Cores/synth-box.chimeraCore', files('qt/tests/osd-text-size.lua')],
+    env: ['CHIMERA_QT_STRICT_QML=1'],
+    timeout: 300,
+  )
   # TAStudio's branch list as branches are made and updated: no row asks
   # the piano roll anything with nothing for a frame (issue 483); strict,
   # any call of the window's given the wrong arguments fails the run

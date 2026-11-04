@@ -497,6 +497,7 @@
 		"display_config.save_window_position": "Зберігати положення вікна",
 		"display_config.scale_osd_text_with_system_scale": "Масштабувати текст OSD разом із системним масштабом",
 		"display_config.scale_osd_text_with_the_window": "Масштабувати текст OSD за розміром вікна",
+		"display_config.osd_text_size_in_pixels": "Розмір тексту OSD у пікселях",
 		"display_config.scaling_and_filtering": "Масштабування && фільтрація",
 		"display_config.snowy_null_core": "Порожнє ядро зі «снігом»",
 		"display_config.some_tools_put_filenames_status_etc": "Деякі інструменти вписують у заголовки вікон імена файлів, стан тощо.\nЯкщо це позначити, ці функції вимикаються.",
