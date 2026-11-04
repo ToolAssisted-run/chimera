@@ -141,6 +141,9 @@ if [ -d "$icon" ]; then
 		echo "  icon: $icon"
 	else
 		echo "  (actool could not compile $icon - it needs Xcode 26 or later; drawing the icon from its icon.svg)" >&2
+		# what it said was wrong, then how its log ends (a crash ends with a
+		# stack, the reason being above it)
+		grep -i -m 8 -E "error|exception|reason|fail" "$icons/actool.log" | sed 's/^/    /' >&2
 		sed 's/^/    /' "$icons/actool.log" | tail -n 5 >&2
 	fi
 fi

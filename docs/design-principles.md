@@ -13254,6 +13254,27 @@ guest call after the handler had already put the OS's %gs back (miniBox
   here, 1.8 us on Apple silicon), so miniBox's fault tests have 300 seconds
   on macOS, and the concurrent one runs 300 rounds there instead of 1500.
 
+## The Mac tests run with timer coalescing off (2026-11-05)
+
+The view models' test measures the throttles in real time: so many frames in
+half a second by the clock, by the sound. On GitHub's macOS runners those
+checks failed, and the numbers had a pattern: at 100% speed the clock
+throttle ran 19 frames in half a second on Apple silicon (27 on Intel) where
+it runs 30, yet exactly 121 at 400%. The throttle aims each frame at a fixed
+time and stops catching up when it falls more than four frames (67 ms)
+behind; at 400% those 67 ms are sixteen frames.
+
+Measured on the runners: a sleep of 16.7 ms woke 91 ms late (median) on
+Apple silicon and 58 ms late on Intel, because macOS coalesces the timers of
+a background process, which a CI job is. With coalescing turned off
+(`sysctl kern.timer.coalescing_enabled=0`, which the runners allow) it woke
+0.04 ms and 0.15 ms late, and every unit test passed on both Macs. So the
+macOS job turns it off before the tests: they measure Chimera, not a
+throttled runner. Linux here: 0.10 ms.
+
+Not decided: a Mac app in the background can be throttled the same way (App
+Nap), which would slow a run left playing behind another window.
+
 ## A held key clicks a button once; TAStudio's lists pick many rows (2026-11-04)
 
 Issue 494: Space pressed in TAStudio made 20 to 30 branches, and the Branches

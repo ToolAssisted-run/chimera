@@ -192,6 +192,9 @@ jobs:
           newest="$(ls -d /Applications/Xcode_26*.app 2> /dev/null | sort -V | tail -n 1)"
           if [ -n "$newest" ]; then export DEVELOPER_DIR="$newest/Contents/Developer"; fi
           echo "Xcode for the icon: $(xcode-select -p)"
+          # an image's Xcode that is not its default may not have had its first
+          # launch, and actool crashed on Apple silicon's (26.3) without it
+          sudo -E xcodebuild -runFirstLaunch || true
           tools/build-app-macos.sh --dll build/${{ matrix.arch }}-macos/dll --qt "$HOME/qt/$QT_VERSION/macos" --out build/Chimera.app
           # the light and dark icon is in the app: the script falls back to a plain
           # one when it cannot compile it, which is for a person's Mac and not for here
