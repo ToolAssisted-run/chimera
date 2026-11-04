@@ -5,13 +5,17 @@
 # one. Like the other bundles it carries NO CORES (docs/core-manager.md): they
 # go in ~/Library/Application Support/Chimera/Cores, where Chimera looks.
 #
-#   tools/build-app-macos.sh --dll <installed dll dir> --qt <Qt prefix> --out <Chimera.app>
+#   tools/build-app-macos.sh --dll <installed dll dir> --qt <Qt prefix> --out <Chimera.app> [--icon <Chimera.icon>]
 #
 #   --dll  meson's install folder for the macOS build (build/x86_64-macos/dll):
 #          the window, chimera-run, chimera-mcp, Chimera's libraries and, when
 #          `tools/fetch-ffmpeg.sh macos <that folder>` put it there, ffmpeg
 #   --qt   the Qt 6.12 the window was built with (a prefix holding lib/, bin/macdeployqt)
 #   --out  the app to make; it is replaced if it is there
+#   --icon an Icon Composer icon (a Chimera.icon folder; docs/Chimera.icon is the
+#          default), compiled with actool into the app's light and dark icon. It
+#          needs Xcode 26 or later; with an older one, or none, the icon is drawn
+#          from docs/icon.svg instead, with no dark version
 #
 # Layout, which the program finds its neighbours by (Contents/MacOS is the
 # program's own folder, as the Linux bundle's top folder is):
@@ -22,12 +26,13 @@
 set -eu
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
-dll="" qt="" out=""
+dll="" qt="" out="" icon="$root/docs/Chimera.icon"
 while [ $# -gt 0 ]; do
 	case "$1" in
 		--dll) dll="$2"; shift 2 ;;
 		--qt) qt="$2"; shift 2 ;;
 		--out) out="$2"; shift 2 ;;
+		--icon) icon="$2"; shift 2 ;;
 		*) echo "unknown option: $1" >&2; exit 2 ;;
 	esac
 done
@@ -115,17 +120,39 @@ cat > "$app/Info.plist" <<EOF
 EOF
 icons="$(mktemp -d)"
 trap 'rm -rf "$icons"' EXIT
-mkdir "$icons/Chimera.iconset"
-# the mark, drawn at every size from the vector
-qlmanage -t -s 1024 -o "$icons" "$root/docs/icon.svg" > /dev/null 2>&1
-if [ -f "$icons/icon.svg.png" ]; then
-	for size in 16 32 128 256 512; do
-		sips -z $size $size "$icons/icon.svg.png" --out "$icons/Chimera.iconset/icon_${size}x${size}.png" > /dev/null
-		sips -z $((size * 2)) $((size * 2)) "$icons/icon.svg.png" --out "$icons/Chimera.iconset/icon_${size}x${size}@2x.png" > /dev/null
-	done
-	iconutil -c icns "$icons/Chimera.iconset" -o "$app/Resources/Chimera.icns"
-else
-	echo "  (the icon could not be drawn; the app has the generic one)"
+icon_name=""
+if [ -d "$icon" ]; then
+	# the icon as Icon Composer made it: Assets.car (light and dark) and an .icns
+	# for what is older; the plist keys it wants come out of the compile
+	if xcrun actool "$icon" --compile "$app/Resources" --output-format human-readable-text \
+		--notices --warnings --errors --output-partial-info-plist "$icons/icon.plist" \
+		--app-icon "$(basename "$icon" .icon)" --include-all-app-icons --enable-on-demand-resources NO \
+		--development-region en --target-device mac --minimum-deployment-target 14.4 --platform macosx \
+		> "$icons/actool.log" 2>&1 && [ -f "$app/Resources/Assets.car" ]; then
+		icon_name="$(basename "$icon" .icon)"
+		echo "  icon: $icon"
+	else
+		echo "  (actool could not compile $icon - it needs Xcode 26 or later; drawing the icon from docs/icon.svg)" >&2
+		sed 's/^/    /' "$icons/actool.log" | tail -n 5 >&2
+	fi
+fi
+if [ -z "$icon_name" ]; then
+	mkdir "$icons/Chimera.iconset"
+	# the mark, drawn at every size from the vector
+	qlmanage -t -s 1024 -o "$icons" "$root/docs/icon.svg" > /dev/null 2>&1
+	if [ -f "$icons/icon.svg.png" ]; then
+		for size in 16 32 128 256 512; do
+			sips -z $size $size "$icons/icon.svg.png" --out "$icons/Chimera.iconset/icon_${size}x${size}.png" > /dev/null
+			sips -z $((size * 2)) $((size * 2)) "$icons/icon.svg.png" --out "$icons/Chimera.iconset/icon_${size}x${size}@2x.png" > /dev/null
+		done
+		iconutil -c icns "$icons/Chimera.iconset" -o "$app/Resources/Chimera.icns"
+	else
+		echo "  (the icon could not be drawn; the app has the generic one)"
+	fi
+fi
+# the plist keys: the name of the icon, when it is a compiled one
+if [ -n "$icon_name" ]; then
+	/usr/libexec/PlistBuddy -c "Add :CFBundleIconName string $icon_name" "$app/Info.plist"
 fi
 
 # ---- Qt ------------------------------------------------------------------------

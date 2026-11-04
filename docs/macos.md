@@ -93,6 +93,16 @@ tools/fetch-ffmpeg.sh macos build/x86_64-macos/dll
 tools/build-app-macos.sh --dll build/x86_64-macos/dll --qt <qt folder>/6.12.0/macos --out build/Chimera.app
 ```
 
+The icon is `docs/Chimera.icon`, made in Icon Composer (Xcode 26 or later): the
+mark in two layers, `icon.svg` for light and `icon-dark.svg` for dark, whose
+opacity is set per appearance, so each shows in its own. The script compiles it
+with `actool` into `Assets.car` (light, dark and tinted, which the system makes
+from the light one) and an `.icns` for the rest, and names it in `Info.plist`.
+`--icon` names another. Without an Xcode that can compile it, the app gets a plain
+icon drawn from `docs/icon.svg`, with no dark one, and says so. Icon Composer
+cannot be run from a terminal, so a change to the icon is made in the app and
+saved in `docs/Chimera.icon`.
+
 What a person keeps is in `~/Library/Application Support/Chimera`, as other
 Mac programs keep theirs (owner, 2026-11-03), and not beside the program as on
 Linux and Windows: `Cores/`, `Firmware/`, `settings.json`, and the folders of

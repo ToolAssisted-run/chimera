@@ -128,7 +128,16 @@ jobs:
 
       - name: Chimera.app
         run: |
+          # the app's icon (docs/Chimera.icon, from Icon Composer) is compiled by
+          # actool, which needs Xcode 26 or later; the runner's default is older
+          newest="$(ls -d /Applications/Xcode_26*.app 2> /dev/null | sort -V | tail -n 1)"
+          if [ -n "$newest" ]; then export DEVELOPER_DIR="$newest/Contents/Developer"; fi
+          echo "Xcode for the icon: $(xcode-select -p)"
           tools/build-app-macos.sh --dll build/x86_64-macos/dll --qt "$HOME/qt/$QT_VERSION/macos" --out build/Chimera.app
+          # the light and dark icon is in the app: the script falls back to a plain
+          # one when it cannot compile it, which is for a person's Mac and not for here
+          test -f build/Chimera.app/Contents/Resources/Assets.car
+          grep -q CFBundleIconName build/Chimera.app/Contents/Info.plist
           codesign --verify --deep --strict build/Chimera.app
           # a zip that keeps the app's links and signature, as Finder's does
           ditto -c -k --keepParent build/Chimera.app Chimera-macos-x86_64.zip
