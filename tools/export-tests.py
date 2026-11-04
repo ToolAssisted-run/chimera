@@ -4,7 +4,7 @@ Linux) for a machine of that system to run with tools/run-tests.py: the list
 meson keeps (meson introspect --tests), and every file those tests need, in one
 folder whose layout is the repository's.
 
-    tools/export-tests.py <meson build dir> <out folder>
+    tools/export-tests.py <meson build dir> <out folder> [--runtime <folder>]...
 
 Taken: the tests whose program is one of the build's own (an .exe); a test run
 by a Linux program (python3, bash) is left out and said. Copied: the build
@@ -14,14 +14,25 @@ repository it is (build/Cores/synth-box.chimeraCore, a test's data). In the
 list, a path inside the repository is written relative to it, from @ROOT@.
 
 The build folder's object files and meson's own files are not copied.
+--runtime names a folder of the compiler's runtime DLLs (libstdc++-6.dll and
+the rest for mingw-w64's GCC, libc++.dll for llvm-mingw): every DLL the
+programs import that is in none of the build's folders is copied from there
+beside them, as the release's bundle carries them.
 tools/run-tests.py is copied in beside the list: `python run-tests.py .`."""
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
 
-build, out = (os.path.abspath(a) for a in sys.argv[1:3])
+args = sys.argv[1:]
+runtime_dirs = []
+while "--runtime" in args:
+    i = args.index("--runtime")
+    runtime_dirs.append(args[i + 1])
+    del args[i:i + 2]
+build, out = (os.path.abspath(a) for a in args[0:2])
 root = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 if os.path.exists(out):
     sys.exit(f"{out} exists: give a new folder")
@@ -79,6 +90,35 @@ for f in sorted(files):
         shutil.copytree(f, dest, dirs_exist_ok=True)
     else:
         shutil.copy2(f, dest)
+
+# the compiler's runtime DLLs the programs import, found by reading their
+# import tables (objdump -p, as tools/stage-qt-windows.py does). The host's
+# objdump reads x64 programs; an arm64 one takes llvm-mingw's.
+def imports(path):
+    for tool in ("aarch64-w64-mingw32-objdump", "x86_64-w64-mingw32-objdump", "objdump"):
+        if shutil.which(tool):
+            o = subprocess.run([tool, "-p", path], capture_output=True, text=True).stdout
+            found = re.findall(r"DLL Name: (\S+)", o)
+            if found:
+                return found
+    return []
+
+
+if runtime_dirs:
+    build_out = os.path.join(out, os.path.relpath(build, root))
+    have = {f.lower() for d, _, fs in os.walk(out) for f in fs}
+    todo = [os.path.join(d, f) for d, _, fs in os.walk(out) for f in fs if f.lower().endswith((".exe", ".dll"))]
+    while todo:
+        for dll in imports(todo.pop()):
+            if dll.lower() in have:
+                continue
+            for d in runtime_dirs:
+                if os.path.exists(os.path.join(d, dll)):
+                    shutil.copy2(os.path.join(d, dll), build_out)
+                    have.add(dll.lower())
+                    todo.append(os.path.join(build_out, dll))
+                    print("runtime:", dll)
+                    break
 
 # and the program that runs them, so the machine that does needs nothing else
 shutil.copy2(os.path.join(root, "tools", "run-tests.py"), os.path.join(out, "run-tests.py"))

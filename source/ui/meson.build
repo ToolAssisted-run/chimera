@@ -248,7 +248,7 @@ test(
   # the ffmpeg the build ships, for the encode
   # and the headless runner, which compile sessions are
   env: ['ALSOFT_DRIVERS=null', 'CHIMERA_FFMPEG=' + (repo_root / 'build/dll/ffmpeg'),
-    'CHIMERA_RUN=' + (meson.project_build_root() / 'chimera-run')],
+    'CHIMERA_RUN=' + chimera_run.full_path()],
   timeout: 180,
 )
 

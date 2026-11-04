@@ -481,7 +481,7 @@ chimera_shared = shared_library(
   install: true,
   install_dir: 'dll',
 )
-executable(
+chimera_run = executable(
   'chimera-run',
   ['source/engine/tools/chimera-run.cpp'],
   include_directories: engine_inc,

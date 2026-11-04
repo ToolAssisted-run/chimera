@@ -168,10 +168,12 @@ jobs:
 
   windows:
     # Chimera for Windows, x64 and arm64, built the way the release builds it:
-    # on Linux, with mingw-w64's GCC (x64) or llvm-mingw's clang (arm64), and
-    # with the synthetic test core of the same CPU (built here, natively: the
-    # arm64 build is made on an arm64 runner for that). The tests are packed
-    # (tools/export-tests.py) for windows-test to run on Windows.
+    # on Linux, with mingw-w64's GCC (x64) or llvm-mingw's clang (arm64), with
+    # the release's cross files (the C++ runtime as DLLs, and GCC's "posix"
+    # thread model), and with the synthetic test core of the same CPU (built
+    # here, natively: the arm64 build is made on an arm64 runner for that).
+    # The tests are packed (tools/export-tests.py), with the compiler's
+    # runtime DLLs they load, for windows-test to run on Windows.
     name: windows ${{ matrix.cpu }} (built on Linux)
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 90
@@ -181,10 +183,10 @@ jobs:
         include:
           - cpu: x64
             runner: ubuntu-latest
-            cross: mingw-w64.ini
+            cross: mingw-w64-qt.ini
           - cpu: arm64
             runner: ubuntu-26.04-arm
-            cross: mingw-w64-aarch64.ini
+            cross: mingw-w64-qt-aarch64.ini
     steps:
       - uses: actions/checkout@v4
         with:
@@ -217,7 +219,13 @@ jobs:
           meson compile -C build/meson-windows
 
       - name: Pack the tests
-        run: python3 tools/export-tests.py build/meson-windows build/windows-tests
+        run: |
+          if [ "${{ matrix.cpu }}" = x64 ]; then
+            set -- --runtime "$(ls -d /usr/lib/gcc/x86_64-w64-mingw32/*-posix | sort -V | tail -1)" --runtime /usr/x86_64-w64-mingw32/lib
+          else
+            set -- --runtime "$(dirname "$(dirname "$(command -v aarch64-w64-mingw32-clang)")")/aarch64-w64-mingw32/bin"
+          fi
+          python3 tools/export-tests.py build/meson-windows build/windows-tests "$@"
 
       - uses: actions/upload-artifact@v4
         with:

@@ -13156,10 +13156,34 @@ written the same on Windows - a write failing because of the process's file
 size limit, which Windows has not got - is Linux's and macOS's only.
 
 **Measured, the first run on Windows** (x64, this computer's Windows 11, from
-a pack made here): 31 of the 34 tests pass. Three fail, and are open: the
-state history's disk accounting (test_state_history.cpp:842), the media
-folder's listing (test_media.cpp:506), and the view models' test, which dies
-of an access violation in host code. These were never run on Windows before.
+a pack made here): 31 of the 34 tests pass. Three failed, and none was a
+fault of Chimera's own on Windows:
+
+- the media folder's listing (test_media.cpp): the test made LONGNAME~1.TXT
+  beside a long name whose short name Windows had already made
+  LONGNA~1.TXT. The test now makes its short-looking names first.
+- the state history's tests (test_state_history.cpp): a file's size read
+  through std::filesystem lags behind writes still open on Windows, so the
+  test reads the size through the open file; and a test removed its spill
+  folder while the history still held a file in it, which Windows refuses.
+  The tests let go of the file first, and retry a removal for up to five
+  seconds while Windows finishes closing.
+- the view models' test passed all its checks and then crashed as the
+  process ended, in the C runtime freeing thread data inside libchimera.dll.
+  The tests had been built with the cross files of the engine-only build
+  (GCC's "win32" thread model, the C++ runtime linked into each DLL), not
+  the release's (the "posix" thread model, the C++ runtime as DLLs shared by
+  every module). Built as the release builds it, the crash is gone.
+
+So the windows job builds with the release's cross files
+(extern/meson/mingw-w64-qt.ini and mingw-w64-qt-aarch64.ini), and the pack
+carries the compiler's runtime DLLs the programs load (export-tests.py
+--runtime), as the release's bundle does. The view models' test also found
+the headless runner by a name without ".exe", so its compile step was
+skipped on Windows; meson now gives it the runner's real file name.
+
+Measured after these fixes, on this computer's Windows 11 (x64): 34 of 34
+pass, the view models' test 3038 checks with the compile step run.
 
 ## A held key clicks a button once; TAStudio's lists pick many rows (2026-11-04)
 
