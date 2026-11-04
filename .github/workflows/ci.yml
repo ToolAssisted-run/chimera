@@ -264,3 +264,11 @@ jobs:
         working-directory: windows-tests
         run: python run-tests.py .
 
+      - name: Keep the tests' output
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-test-logs-${{ matrix.cpu }}
+          path: windows-tests/logs/
+          retention-days: 7
+

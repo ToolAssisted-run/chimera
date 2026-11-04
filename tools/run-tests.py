@@ -9,7 +9,9 @@ meson test does, and ends with the counts; exits 1 if any did not pass.
 
 --skip leaves a test out by its name, and the summary says it was left out
 (a test that needs what the machine has not got, such as a graphics card).
-The test's output is printed when it does not pass."""
+The last 40 lines of a test's output are printed when it does not pass; the
+whole of every test's output is kept in <exported folder>/logs/<name>.txt.
+Its output and errors are one stream, in the order the program wrote them."""
 import json
 import os
 import subprocess
@@ -32,6 +34,8 @@ def real(value):
 
 
 build = real(plan["build"])
+logs = os.path.join(folder, "logs")
+os.makedirs(logs, exist_ok=True)
 env_base = dict(os.environ)
 env_base["PATH"] = build + os.pathsep + env_base.get("PATH", "")
 passed, failed, skipped = [], [], []
@@ -45,15 +49,16 @@ for t in plan["tests"]:
     env.update({k: real(v) for k, v in t["env"].items()})
     start = time.monotonic()
     try:
-        r = subprocess.run(cmd, cwd=real(t["workdir"]), env=env, capture_output=True, text=True,
-                           errors="replace", timeout=t["timeout"] or None)
+        r = subprocess.run(cmd, cwd=real(t["workdir"]), env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                           text=True, errors="replace", timeout=t["timeout"] or None)
         status = "PASS" if r.returncode == 0 else f"FAIL (exit {r.returncode:#x})" if r.returncode < 0 or r.returncode > 255 else f"FAIL (exit {r.returncode})"
-        output = (r.stdout or "") + (r.stderr or "")
+        output = r.stdout or ""
     except subprocess.TimeoutExpired as e:
         status = "TIMEOUT"
-        output = (e.stdout or b"").decode(errors="replace") + (e.stderr or b"").decode(errors="replace") \
-            if isinstance(e.stdout, bytes) else (e.stdout or "") + (e.stderr or "")
+        output = e.stdout.decode(errors="replace") if isinstance(e.stdout, bytes) else (e.stdout or "")
     took = time.monotonic() - start
+    with open(os.path.join(logs, name.replace(" ", "_") + ".txt"), "w", encoding="utf-8") as fh:
+        fh.write(output)
     print(f"{status:<24} {took:7.2f}s  {name}", flush=True)
     if status == "PASS":
         passed.append(name)
