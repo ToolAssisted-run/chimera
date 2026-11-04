@@ -412,33 +412,40 @@ int main()
 		packRowLength(0);
 		ce_gl_release();
 
-		/* the same through glReadnPixels and glGetTextureSubImage, which the
-		 * guard did not cover: the gaps keep the guest's bytes */
-		colourTarget(32, 32, 1.0f, 0.0f, 0.0f);
-		call(CHIMERA_GL_OP_glReadPixels, &first);
-		colourTarget(4, 4, 0.0f, 1.0f, 0.0f);
-		packRowLength(8);
-		std::vector<uint8_t> nGaps(32 * 4, 0xAB);
-		ChimeraGlArgs_glReadnPixels rn{ 0, 0, 4, 4, GL_RGBA, GL_UNSIGNED_BYTE, (GLsizei)nGaps.size(), nGaps.data() };
-		call(CHIMERA_GL_OP_glReadnPixels, &rn);
-		for (int r = 0; r < 4; r++)
+		/* (OpenGL 4.5's: Apple's stops at 4.1, and the bridge refuses what the
+		 * driver did not supply, as below) */
+		if (glad_glReadnPixels == nullptr || glad_glGetTextureSubImage == nullptr)
+			std::printf("glReadnPixels and glGetTextureSubImage: skipped, the driver has none\n");
+		else
 		{
-			for (int x = 0; x < 4; x++) assert(nGaps[r * 32 + x * 4 + 1] == 255 && nGaps[r * 32 + x * 4] == 0);   /* green */
-			if (r < 3) for (int k = 16; k < 32; k++) assert(nGaps[r * 32 + k] == 0xAB);
+			/* the same through glReadnPixels and glGetTextureSubImage, which the
+			 * guard did not cover: the gaps keep the guest's bytes */
+			colourTarget(32, 32, 1.0f, 0.0f, 0.0f);
+			call(CHIMERA_GL_OP_glReadPixels, &first);
+			colourTarget(4, 4, 0.0f, 1.0f, 0.0f);
+			packRowLength(8);
+			std::vector<uint8_t> nGaps(32 * 4, 0xAB);
+			ChimeraGlArgs_glReadnPixels rn{ 0, 0, 4, 4, GL_RGBA, GL_UNSIGNED_BYTE, (GLsizei)nGaps.size(), nGaps.data() };
+			call(CHIMERA_GL_OP_glReadnPixels, &rn);
+			for (int r = 0; r < 4; r++)
+			{
+				for (int x = 0; x < 4; x++) assert(nGaps[r * 32 + x * 4 + 1] == 255 && nGaps[r * 32 + x * 4] == 0);   /* green */
+				if (r < 3) for (int k = 16; k < 32; k++) assert(nGaps[r * 32 + k] == 0xAB);
+			}
+			GLint boundTex = 0;
+			glGetIntegerv(GL_TEXTURE_BINDING_2D, &boundTex);
+			std::vector<uint8_t> tGaps(32 * 4, 0xAB);
+			ChimeraGlArgs_glGetTextureSubImage ts{ (GLuint)boundTex, 0, 0, 0, 0, 4, 4, 1, GL_RGBA, GL_UNSIGNED_BYTE,
+				(GLsizei)tGaps.size(), tGaps.data() };
+			call(CHIMERA_GL_OP_glGetTextureSubImage, &ts);
+			for (int r = 0; r < 4; r++)
+			{
+				for (int x = 0; x < 4; x++) assert(tGaps[r * 32 + x * 4 + 1] == 255);
+				if (r < 3) for (int k = 16; k < 32; k++) assert(tGaps[r * 32 + k] == 0xAB);
+			}
+			packRowLength(0);
+			ce_gl_release();
 		}
-		GLint boundTex = 0;
-		glGetIntegerv(GL_TEXTURE_BINDING_2D, &boundTex);
-		std::vector<uint8_t> tGaps(32 * 4, 0xAB);
-		ChimeraGlArgs_glGetTextureSubImage ts{ (GLuint)boundTex, 0, 0, 0, 0, 4, 4, 1, GL_RGBA, GL_UNSIGNED_BYTE,
-			(GLsizei)tGaps.size(), tGaps.data() };
-		call(CHIMERA_GL_OP_glGetTextureSubImage, &ts);
-		for (int r = 0; r < 4; r++)
-		{
-			for (int x = 0; x < 4; x++) assert(tGaps[r * 32 + x * 4 + 1] == 255);
-			if (r < 3) for (int k = 16; k < 32; k++) assert(tGaps[r * 32 + k] == 0xAB);
-		}
-		packRowLength(0);
-		ce_gl_release();
 
 		/* a function the driver did not supply, hand-written case and generated:
 		 * refused with 0, where calling through the null pointer ended the process */
@@ -473,12 +480,15 @@ int main()
 		ChimeraGlArgs_glGetTextureSubImage intoT{ (GLuint)texNow, 0, 0, 0, 0, 4, 4, 1, GL_RGBA, GL_UNSIGNED_BYTE,
 			(GLsizei)untouched.size(), untouched.data() };
 		call(CHIMERA_GL_OP_glGetTextureSubImage, &intoT);
-		GLuint named = 0;
-		ChimeraGlArgs_glCreateBuffers cb{ 1, &named };
-		call(CHIMERA_GL_OP_glCreateBuffers, &cb);
-		glNamedBufferData(named, 16, "0123456789abcdef", GL_STATIC_DRAW);
-		ChimeraGlArgs_glGetNamedBufferSubData intoB{ named, 0, 16, untouched.data() };
-		call(CHIMERA_GL_OP_glGetNamedBufferSubData, &intoB);
+		if (glad_glCreateBuffers != nullptr && glad_glNamedBufferData != nullptr)   /* OpenGL 4.5's */
+		{
+			GLuint named = 0;
+			ChimeraGlArgs_glCreateBuffers cb{ 1, &named };
+			call(CHIMERA_GL_OP_glCreateBuffers, &cb);
+			glNamedBufferData(named, 16, "0123456789abcdef", GL_STATIC_DRAW);
+			ChimeraGlArgs_glGetNamedBufferSubData intoB{ named, 0, 16, untouched.data() };
+			call(CHIMERA_GL_OP_glGetNamedBufferSubData, &intoB);
+		}
 		ce_gl_guest_check(nullptr, nullptr);
 		GLint size = -1;
 		ChimeraGlArgs_glGetBufferParameteriv gp{ GL_ARRAY_BUFFER, GL_BUFFER_SIZE, &size };

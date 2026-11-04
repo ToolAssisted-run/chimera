@@ -474,6 +474,11 @@ bool writeAll(int fd, const std::string &line)
 	sigemptyset(&pipeSignal);
 	sigaddset(&pipeSignal, SIGPIPE);
 	pthread_sigmask(SIG_BLOCK, &pipeSignal, &before);
+#ifdef F_SETNOSIGPIPE
+	/* macOS: a write to a pipe nobody reads raises no SIGPIPE at all, only
+	 * EPIPE - so there is nothing to collect below */
+	fcntl(fd, F_SETNOSIGPIPE, 1);
+#endif
 	bool ok = true;
 	bool raised = false;
 	size_t at = 0;
@@ -494,14 +499,37 @@ bool writeAll(int fd, const std::string &line)
 	}
 	if (raised)
 	{
+#ifdef __APPLE__
+		/* (no sigtimedwait: take it only if it is there, which sigwait then
+		 * does at once) */
+		sigset_t pending;
+		int sig = 0;
+		if (sigpending(&pending) == 0 && sigismember(&pending, SIGPIPE)) sigwait(&pipeSignal, &sig);
+#else
 		const struct timespec now = { 0, 0 };
 		sigtimedwait(&pipeSignal, nullptr, &now);
+#endif
 	}
 	pthread_sigmask(SIG_SETMASK, &before, nullptr);
 	return ok;
 }
 
 int openFlags(int flags) { return flags | O_NONBLOCK | O_CLOEXEC; }
+
+/* Whether a poll that saw nothing may still have missed the other end going
+ * away, so that a read has to be asked. Linux reports a FIFO whose last writer
+ * closed as POLLHUP; macOS reports nothing at all (measured on macOS 27), and
+ * only a read says so, by returning 0. Only once there was a writer: before
+ * that, 0 from a read means no more than that nobody has come yet. */
+bool writerMayHaveLeft(bool hadWriter)
+{
+#ifdef __APPLE__
+	return hadWriter;
+#else
+	(void)hadWriter;
+	return false;
+#endif
+}
 
 } // namespace
 
@@ -612,7 +640,11 @@ PipeEvent PipeServer::wait(int timeout_ms, std::string &line)
 	}
 	if (impl->connected && takeLine(impl->buffer, line)) return PipeEvent::Line;
 	struct pollfd p = { impl->inFd, POLLIN, 0 };
-	if (poll(&p, 1, timeout_ms < 0 ? 0 : timeout_ms) <= 0) return PipeEvent::Nothing;
+	if (poll(&p, 1, timeout_ms < 0 ? 0 : timeout_ms) <= 0)
+	{
+		if (!writerMayHaveLeft(impl->connected)) return PipeEvent::Nothing;
+		p.revents = POLLIN;   /* the read below tells: 0 is gone, EAGAIN is not */
+	}
 	if ((p.revents & POLLIN) != 0)
 	{
 		char chunk[65536];
@@ -715,7 +747,11 @@ PipeEvent PipeClient::wait(int timeout_ms, std::string &line)
 	if (impl->readFd < 0) return PipeEvent::Disconnected;
 	if (takeLine(impl->buffer, line)) return PipeEvent::Line;
 	struct pollfd p = { impl->readFd, POLLIN, 0 };
-	if (poll(&p, 1, timeout_ms < 0 ? 0 : timeout_ms) <= 0) return PipeEvent::Nothing;
+	if (poll(&p, 1, timeout_ms < 0 ? 0 : timeout_ms) <= 0)
+	{
+		if (!writerMayHaveLeft(impl->heard)) return PipeEvent::Nothing;
+		p.revents = POLLIN;   /* the read below tells: 0 is gone, EAGAIN is not */
+	}
 	if ((p.revents & POLLIN) != 0)
 	{
 		char chunk[65536];

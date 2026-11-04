@@ -38,6 +38,8 @@ void loadOnce()
 	{
 #if defined(_WIN32)
 		void *lib = openLibraryBesideUs("libzstd.dll", false, g_error);
+#elif defined(__APPLE__)
+		void *lib = openLibraryBesideUs("libzstd.dylib", true, g_error);
 #else
 		void *lib = openLibraryBesideUs("libzstd.so", true, g_error);
 #endif

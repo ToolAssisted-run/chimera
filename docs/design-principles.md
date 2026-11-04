@@ -12761,3 +12761,47 @@ models' tests: a save writes no greenzone, the close does, and an edit closed
 without saving leaves no state after its frame. The witness: a tool's project
 output made into a zip that opens, and one with a bad line refused.
 
+
+## macOS on x86-64: the guest's gs is swapped at every boundary (user-decided, 2026-11-03)
+
+Decided: Chimera builds for macOS on x86-64 (on an Apple silicon Mac it runs
+under Rosetta 2), from the same meson build, given `extern/meson/macos-x86_64.ini`.
+Only x86-64 is built.
+
+Why it needed a decision. A miniBox guest reads its context at `gs:0x18`, and
+miniBox's entry code keeps the thread's stack limits at `gs:0x8` and `gs:0x10`.
+On Linux nothing else uses `gs`, so miniBox points it at a block of its own for
+the life of the thread. On macOS `gs` is the operating system's: libc finds the
+thread's data through it, and `gs:0x18` is the Mach thread port (measured:
+`gs:0` is the `pthread_t`, `gs:0x18` read 0x103). `rdgsbase` and `wrgsbase` are
+illegal instructions there, Rosetta 2 included. Changing where a guest looks
+would change miniBox's machine and rebuild every core, so it was not done.
+
+What was decided instead (the owner chose this over changing the guest's
+convention, and over a port with no guests): the thread's `gs` base is swapped
+at each boundary, to the guest's block while guest code runs and back to the
+operating system's whenever host code runs, with the system call libsystem makes
+for `_thread_set_tsd_base` (machine-dependent call 3). Measured under Rosetta 2
+on an M1 (macOS 27): setting the base works, the old base restores exactly, and a
+swap and its return cost 534 ns. The base the operating system gave a thread is
+`&pthread_self()->tsd[0]`; it is found by storing a value under a pthread key
+and looking for it, not by an offset.
+
+Where it swaps (miniBox, `guarded.S`, `host.c`, `context.c`, `tripguard.c`):
+the guest's entry and its landing; the syscall dispatcher; the wrapper around a
+callback from the guest to the host; the two fault trampolines; and a wrapper
+around every signal handler, which puts the handler on the operating system's
+`gs` and, on return, resumes with the `gs` the interrupted code had (or the
+guest's block, when the handler pointed it at a fault trampoline). `%fs` swapping
+stays off on macOS, so a guest with `%fs`-direct thread storage (a Rust guest)
+cannot run there.
+
+Also: the memory is built from `mach_vm_remap` views (no memory file on
+macOS), a protection fault arrives as `SIGBUS`, the stop signal is `SIGUSR2`,
+and the engine's GPU bridge uses Apple's CGL (OpenGL 4.1, so the entry points of
+4.2 and later are refused).
+
+Tested: miniBox's 13 unit tests and the engine's 33 tests pass, built for
+x86-64 and run under Rosetta 2. Not tested: running any core (miniBox's guest
+tests are Linux programs), a real Intel Mac, and the window. Two of the engine's
+GPU-bridge tests skip what OpenGL 4.1 does not have.

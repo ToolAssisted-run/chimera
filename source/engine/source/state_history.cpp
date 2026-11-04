@@ -2837,7 +2837,7 @@ static void forgetCachedPages(std::FILE *f)
 		return e != nullptr && e[0] != '\0' && e[0] != '0' ? 1 : 0;
 	}();
 	if (cold == 0) return;
-#ifndef _WIN32
+#ifdef __linux__
 	const int fd = fileno(f);
 	fdatasync(fd);
 	posix_fadvise(fd, 0, 0, POSIX_FADV_DONTNEED);

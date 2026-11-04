@@ -16,6 +16,9 @@
 #else
 #include <cstdio>
 #endif
+#ifdef __APPLE__
+#include <sys/sysctl.h>
+#endif
 
 namespace
 {
@@ -37,6 +40,14 @@ std::string readCpuName()
 		std::memcpy(brand + leaf * 16 + 12, &d, 4);
 	}
 	std::string name(brand);
+#elif defined(__APPLE__)
+	/* not an x86, but macOS names its processor all the same ("Apple M1") */
+	char brand[128] = {};
+	size_t size = sizeof brand - 1;
+	if (sysctlbyname("machdep.cpu.brand_string", brand, &size, nullptr, 0) != 0) return "";
+	std::string name(brand);
+#endif
+#if defined(__x86_64__) || defined(__i386__) || defined(__APPLE__)
 	const size_t first = name.find_first_not_of(' ');
 	if (first == std::string::npos) return "";
 	const size_t last = name.find_last_not_of(' ');
@@ -59,6 +70,10 @@ uint64_t ce_host_memory_total(void)
 	MEMORYSTATUSEX status;
 	status.dwLength = sizeof status;
 	return GlobalMemoryStatusEx(&status) ? status.ullTotalPhys : 0;
+#elif defined(__APPLE__)
+	uint64_t total = 0;
+	size_t size = sizeof total;
+	return sysctlbyname("hw.memsize", &total, &size, nullptr, 0) == 0 ? total : 0;
 #else
 	uint64_t total = 0;
 	if (FILE *f = std::fopen("/proc/meminfo", "r"))

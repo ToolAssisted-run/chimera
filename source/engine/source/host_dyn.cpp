@@ -46,7 +46,11 @@ void loadOnce()
 #if defined(_WIN32)
 	g_lib = openLibraryBesideUs("libminiboxhost.dll", false, g_error);
 #else
+#  if defined(__APPLE__)
+	g_lib = openLibraryBesideUs("libminiboxhost.dylib", false, g_error);
+#  else
 	g_lib = openLibraryBesideUs("libminiboxhost.so", false, g_error);
+#  endif
 #endif
 	if (g_lib == nullptr) return;
 	g_ok = bind(g_api.wbx_build_info, "wbx_build_info")
@@ -191,7 +195,15 @@ void *openLibraryBesideUs(const char *name, bool deepBind, std::string &why)
 	why = chimera::lang::tr("host.not_found_windows", {name, lastErrorText(GetLastError())});
 	return nullptr;
 #else
+#ifdef RTLD_DEEPBIND
 	const int flags = RTLD_NOW | RTLD_LOCAL | (deepBind ? RTLD_DEEPBIND : 0);
+#else
+	/* macOS has no RTLD_DEEPBIND, and needs none: a library's references are
+	 * bound to the library they were linked against (two-level namespaces),
+	 * never to whatever the process loaded first. */
+	(void)deepBind;
+	const int flags = RTLD_NOW | RTLD_LOCAL;
+#endif
 	Dl_info info;
 	if (dladdr(reinterpret_cast<void *>(&openLibraryBesideUs), &info) != 0 && info.dli_fname != nullptr)
 	{

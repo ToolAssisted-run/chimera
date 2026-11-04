@@ -10,6 +10,9 @@
 #else
 #include <cstdio>
 #include <cstring>
+#ifdef __APPLE__
+#include <mach/mach.h>
+#endif
 #endif
 
 CeHostMemory ceReadHostMemory()
@@ -25,6 +28,17 @@ CeHostMemory ceReadHostMemory()
 		 * may still promise, with the page file at its present size */
 		m.freeCommit = status.ullAvailPageFile;
 	}
+#elif defined(__APPLE__)
+	/* macOS, like Linux, promises more than it has, so there is one figure:
+	 * the pages free, plus those it would give a new program without
+	 * swapping - inactive, speculative and purgeable. */
+	vm_statistics64_data_t vm;
+	mach_msg_type_number_t count = HOST_VM_INFO64_COUNT;
+	vm_size_t page = 0;
+	if (host_page_size(mach_host_self(), &page) == KERN_SUCCESS
+	    && host_statistics64(mach_host_self(), HOST_VM_INFO64, reinterpret_cast<host_info64_t>(&vm), &count) == KERN_SUCCESS)
+		m.freePhysical = (static_cast<uint64_t>(vm.free_count) + vm.inactive_count + vm.speculative_count
+		                  + vm.purgeable_count) * page;
 #else
 	/* Linux promises more than it has, so there is one figure: what the
 	 * kernel reckons a new program could have without swapping. */
