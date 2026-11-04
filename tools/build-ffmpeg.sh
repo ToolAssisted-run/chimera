@@ -214,6 +214,16 @@ else
 		> "$work/x265_$x265_version/x265Version.txt"
 fi
 
+# CMake 4 no longer lets a project set a policy from before 3.5 to its OLD
+# behaviour, and x265 4.1 sets two: CMP0025 (Apple's clang named "Clang") and
+# CMP0054. Both lines go (written through a copy: BSD sed's -i is not GNU's),
+# and x265's one test for "Clang" takes AppleClang too.
+x265_cmake="$work/x265_$x265_version/source/CMakeLists.txt"
+sed -e '/cmake_policy(SET CMP0025 OLD)/d' -e '/cmake_policy(SET CMP0054 OLD)/d' \
+	-e 's/if(${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang")/if(${CMAKE_CXX_COMPILER_ID} MATCHES "Clang")/' \
+	"$x265_cmake" > "$x265_cmake.new"
+mv "$x265_cmake.new" "$x265_cmake"
+
 if [ "$platform" = windows ] && [ "$cpu" = arm64 ]; then
 	# llvm-mingw: clang, libc++. x265's arm64 assembly is not built for
 	# Windows (its sources assume an ELF or Mach-O assembler); x264's is.
