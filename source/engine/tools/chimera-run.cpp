@@ -150,6 +150,7 @@
 #include "../source/file_io.hpp"
 #include "../../extern/cjson/cJSON.h"
 
+#include <algorithm>
 #include <cctype>
 #include <cerrno>
 #include <chrono>

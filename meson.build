@@ -128,17 +128,21 @@ nested_tool = files('extern/meson/nested-build.sh')
 # library in an existing build directory. Each sub-build is incremental and
 # reconfigures itself when its own build files change, so asking costs a
 # no-op there, and the library is copied out only when it changed.
+# Each is built for the OS and the CPU this build is for: the cross file of the
+# same pair (a native Linux build needs none).
+host_arm64 = host_machine.cpu_family() == 'aarch64'
 cross_arg = ''
 if host_windows
-  cross_arg = '--cross-file=' + repo_root / 'extern/meson/mingw-w64.ini'
+  cross_arg = '--cross-file=' + repo_root / (host_arm64 ? 'extern/meson/mingw-w64-aarch64.ini' : 'extern/meson/mingw-w64.ini')
 elif host_macos
-  cross_arg = '--cross-file=' + repo_root / 'extern/meson/macos-x86_64.ini'
+  cross_arg = '--cross-file=' + repo_root / (host_arm64 ? 'extern/meson/macos-aarch64.ini' : 'extern/meson/macos-x86_64.ini')
 endif
 # macOS: the nested cmake builds are told the processor, or they build the
-# machine's own (arm64 on an Apple silicon Mac) and Rosetta cannot load them
+# machine's own, which may be the other one (an x86-64 build on an Apple
+# silicon Mac would get arm64 libraries Rosetta cannot load)
 cmake_platform_args = []
 if host_macos
-  cmake_platform_args = ['-DCMAKE_OSX_ARCHITECTURES=x86_64', '-DCMAKE_OSX_DEPLOYMENT_TARGET=14.4']
+  cmake_platform_args = ['-DCMAKE_OSX_ARCHITECTURES=' + (host_arm64 ? 'arm64' : 'x86_64'), '-DCMAKE_OSX_DEPLOYMENT_TARGET=14.4']
 endif
 zstd_out = host_windows ? 'libzstd.dll' : 'libzstd.' + shlib_ext
 custom_target(
@@ -161,7 +165,10 @@ custom_target(
 # ---------------------------------------------------------------------------
 # SDL2 + OpenAL Soft: cmake-driven, via the wrapper script
 # ---------------------------------------------------------------------------
-cmake_toolchain = host_windows ? repo_root / 'extern/meson/mingw-toolchain.cmake' : ''
+cmake_toolchain = ''
+if host_windows
+  cmake_toolchain = repo_root / (host_arm64 ? 'extern/meson/mingw-toolchain-aarch64.cmake' : 'extern/meson/mingw-toolchain.cmake')
+endif
 custom_target(
   'sdl2',
   output: host_windows ? 'SDL2.dll' : 'libSDL2.' + shlib_ext,
