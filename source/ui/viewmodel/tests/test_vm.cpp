@@ -4199,6 +4199,7 @@ bool machine(const char *package, const char *rom)
 		return true;
 	}
 	CHECK(session.isOpen.get());
+	if (!session.isOpen.get()) std::fprintf(stderr, "  the machine did not open: %s\n", session.status.get().c_str());
 	/* TAStudio's recording mode: what is held becomes the frame */
 	session.recordingMode.set(true);
 	CHECK(session.buttonCount.get() == 8);
@@ -10667,6 +10668,9 @@ void driveMediaText()
 
 int main(int argc, char **argv)
 {
+	/* unbuffered: a run stopped for its time (a CI runner's) still shows what
+	 * it printed before, as its errors already do */
+	std::setvbuf(stdout, nullptr, _IONBF, 0);
 	signalsAndProperties();
 	registry();
 	bindings();

@@ -13185,6 +13185,48 @@ skipped on Windows; meson now gives it the runner's real file name.
 Measured after these fixes, on this computer's Windows 11 (x64): 34 of 34
 pass, the view models' test 3038 checks with the compile step run.
 
+## Thread-local variables on an Intel Mac: patched as the core loads (user-decided, 2026-11-04)
+
+**The problem.** A core's code reaches its thread-local variables (C's
+`_Thread_local`, C++'s `thread_local`, Rust's, and the C++ runtime's own)
+through the x86-64 register %fs. On Linux and Windows miniBox gives a core its
+own %fs while it runs. macOS on Intel gives a program no way to set %fs at
+all, so a core with thread-local variables crashed at its first one. 17 of the
+30 cores installed on the development machine have them (DuckStation, PCSX2,
+Dolphin, ares, Godot, Ruffle, melonDS, Xenia and others).
+
+**What was decided.** The owner chose to patch them as the core loads, over
+refusing those cores on an Intel Mac or dropping Intel Macs from the six
+platforms. In miniBox (9a1e40f, MACHINE-SPEC "TLS"):
+
+- x86-64 cores are compiled with `-mno-tls-direct-seg-refs`, so their code
+  reaches a thread-local variable only by first loading the thread pointer
+  (`mov %fs:0x0, reg`), never at an offset from %fs;
+- the guest toolchain lists every such load in the linked core, in a section
+  the core never loads (`.wbx_fs_sites`); nothing else in the file changes,
+  so Linux and Windows run it as before;
+- on an Intel Mac miniBox checks the bytes at each listed address and turns
+  each load into `mov %gs:0x48, reg`. There %gs already belongs to the core
+  while it runs, and miniBox keeps the running guest thread's thread pointer
+  in that word;
+- an Intel Mac refuses, saying why, a core with thread-local variables that
+  has no list (built before this) or that reaches them some other way.
+
+**What it costs.** Cores must be built again with this miniBox to run on an
+Intel Mac. Some need more than that: Godot (2678 other accesses), melonDS (88)
+and Xenia were built without the flag; and every core that draws through the
+GPU bridge carries Mesa 24.0, whose hand-written x86-64 GL dispatch
+(`glapi_x86-64.S`) reads %fs at an offset. Mesa uses it whenever the guest's
+cross file says Linux, so those cores need it turned off in their Mesa setup.
+
+**Measured.** On GitHub's Intel Mac, miniBox's threads test (thread-local
+variables zeroed and initialised, in several guest threads) passes with the
+loads patched; before, every guest with thread locals crashed reading address
+0. A guest's call through a null pointer is now the guest's death there, not
+the process's: the fault handler asked the thread's %gs whether it was in a
+guest call after the handler had already put the OS's %gs back (miniBox
+18df97c). Not yet tried: a real core on an Intel Mac.
+
 ## A held key clicks a button once; TAStudio's lists pick many rows (2026-11-04)
 
 Issue 494: Space pressed in TAStudio made 20 to 30 branches, and the Branches
