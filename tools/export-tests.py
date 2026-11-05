@@ -4,10 +4,12 @@ Linux) for a machine of that system to run with tools/run-tests.py: the list
 meson keeps (meson introspect --tests), and every file those tests need, in one
 folder whose layout is the repository's.
 
-    tools/export-tests.py <meson build dir> <out folder> [--runtime <folder>]...
+    tools/export-tests.py <meson build dir> <out folder> [--runtime <folder>]... [--bundle <folder>]
 
-Taken: the tests whose program is one of the build's own (an .exe); a test run
-by a Linux program (python3, bash) is left out and said. Copied: the build
+Taken: the tests whose program is one of the build's own (an .exe), and those
+a Python script runs, which the machine's own Python runs there (with every
+module of the repository the script imports); a test run by another Linux
+program (bash) is left out and said. Copied: the build
 folder's programs, libraries and the folders beside them (the language tables),
 and every file a test names in its arguments or its folder, wherever in the
 repository it is (build/Cores/synth-box.chimeraCore, a test's data). In the
@@ -18,6 +20,11 @@ The build folder's object files and meson's own files are not copied.
 the rest for mingw-w64's GCC, libc++.dll for llvm-mingw): every DLL the
 programs import that is in none of the build's folders is copied from there
 beside them, as the release's bundle carries them.
+--bundle names the bundle tools/build-bundle.sh staged from this build (the
+window, with its Qt): it is copied too, a test given the build's chimera.exe
+is given the bundle's instead (the build's cannot start: its Qt is not beside
+it), and every test finds Qt's libraries, plugins and QML modules in the
+bundle's lib folder, as the window does.
 tools/run-tests.py is copied in beside the list: `python run-tests.py .`."""
 import json
 import os
@@ -32,16 +39,31 @@ while "--runtime" in args:
     i = args.index("--runtime")
     runtime_dirs.append(args[i + 1])
     del args[i:i + 2]
+bundle = None
+if "--bundle" in args:
+    i = args.index("--bundle")
+    bundle = os.path.abspath(args[i + 1])
+    del args[i:i + 2]
 build, out = (os.path.abspath(a) for a in args[0:2])
 root = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 if os.path.exists(out):
     sys.exit(f"{out} exists: give a new folder")
-# what the build makes only for its tests (the extra synthetic packages the
-# view models' test is given): meson test makes them before it runs, and the
-# tests of a cross build are not run here, so they are made now
-subprocess.run(["ninja", "-C", build, "meson-test-prereq"], check=True, stdout=subprocess.DEVNULL)
+if bundle and not bundle.startswith(root + os.sep):
+    sys.exit(f"{bundle}: give a bundle inside the repository (build/...)")
+# the bundle's programs, by name, which stand in for the build's
+bundle_programs = {f.lower(): os.path.join(bundle, f) for f in os.listdir(bundle)
+                   if f.lower().endswith(".exe")} if bundle else {}
 tests = json.loads(subprocess.run(["meson", "introspect", "--tests", build],
                                   capture_output=True, text=True, check=True).stdout)
+# what the build makes only for its tests (the extra synthetic packages the
+# view models' test is given, the window's test project): meson test makes
+# each test's own before it runs, and the tests of a cross build are not run
+# here, so they are made now
+depends = {d for t in tests for d in t.get("depends", [])}
+targets = json.loads(subprocess.run(["meson", "introspect", "--targets", build],
+                                    capture_output=True, text=True, check=True).stdout)
+outputs = [os.path.relpath(f, build) for t in targets if t["id"] in depends for f in t["filename"]]
+subprocess.run(["ninja", "-C", build, "meson-test-prereq"] + outputs, check=True, stdout=subprocess.DEVNULL)
 
 
 def inside(path):
@@ -56,15 +78,39 @@ def mapped(value):
     return value, None
 
 
+def imported(script, seen):
+    """The repository's modules a Python script imports (by a plain import of
+    a name that is a .py file in the repository's source or tests), and theirs."""
+    with open(script, encoding="utf-8") as fh:
+        names = set(re.findall(r"^\s*(?:import|from)\s+(\w+)", fh.read(), re.M))
+    for top in ("source", "tests"):
+        for d, dirs, fs in os.walk(os.path.join(root, top)):
+            for name in names:
+                f = os.path.join(d, name + ".py")
+                if name + ".py" in fs and f not in seen:
+                    seen.add(f)
+                    imported(f, seen)
+    return seen
+
+
 files = set()
 listed, left = [], []
 for t in tests:
     program = t["cmd"][0]
-    if not program.lower().endswith(".exe"):
+    # a script the machine's own Python runs: "@PYTHON@" in the list
+    python = (os.path.basename(program).lower().startswith("python") and len(t["cmd"]) > 1
+              and t["cmd"][1].endswith(".py"))
+    if not program.lower().endswith(".exe") and not python:
         left.append(f"{t['name']} ({os.path.basename(program)})")
         continue
-    cmd = []
-    for a in t["cmd"]:
+    if python:
+        files.update(imported(t["cmd"][1], set()))
+    cmd = ["@PYTHON@"] if python else []
+    for a in t["cmd"][1:] if python else t["cmd"]:
+        # meson names a program of the build relative to the build folder
+        in_build = os.path.abspath(os.path.join(build, a)).startswith(build + os.sep)
+        if bundle and in_build and os.path.basename(a).lower() in bundle_programs:
+            a = bundle_programs[os.path.basename(a).lower()]
         m, f = mapped(a)
         cmd.append(m)
         if f and os.path.exists(f) and not f.startswith(build + os.sep):
@@ -86,6 +132,8 @@ for d, dirs, fs in os.walk(build):
         if f.endswith((".obj", ".o", ".a", ".ninja", ".ninja_deps", ".ninja_log", ".d")) or f == "build.ninja":
             continue
         files.add(os.path.join(d, f))
+if bundle:
+    files.add(bundle)
 
 for f in sorted(files):
     dest = os.path.join(out, os.path.relpath(f, root))
@@ -126,8 +174,15 @@ if runtime_dirs:
 
 # and the program that runs them, so the machine that does needs nothing else
 shutil.copy2(os.path.join(root, "tools", "run-tests.py"), os.path.join(out, "run-tests.py"))
+plan = {"build": "@ROOT@/" + os.path.relpath(build, root).replace(os.sep, "/"), "tests": listed}
+if bundle:
+    # Qt where the window has it: its libraries on PATH after the build's,
+    # its plugins and QML modules where Qt looks
+    lib = mapped(os.path.join(bundle, "lib"))[0]
+    plan["path"] = [lib]
+    plan["env"] = {"QT_PLUGIN_PATH": lib, "QML_IMPORT_PATH": lib + "/qml"}
 with open(os.path.join(out, "tests.json"), "w") as fh:
-    json.dump({"build": "@ROOT@/" + os.path.relpath(build, root).replace(os.sep, "/"), "tests": listed}, fh, indent=1)
+    json.dump(plan, fh, indent=1)
 size = sum(os.path.getsize(os.path.join(d, f)) for d, _, fs in os.walk(out) for f in fs)
 print(f"{out}: {len(listed)} tests, {len(files)} files, {size / 1e6:.1f} MB")
 if left:

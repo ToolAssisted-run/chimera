@@ -3,7 +3,8 @@
 for (the Windows CI jobs, x64 and arm64): each test's program, with its
 arguments, folder and environment, the folder holding the build's libraries
 first on PATH, and its timeout. Says PASS, FAIL or TIMEOUT for each, as
-meson test does, and ends with the counts; exits 1 if any did not pass.
+meson test does, and ends with the counts; exits 1 if any did not pass. A
+test that is a Python script is run by the Python that runs this.
 
     python tools/run-tests.py <exported folder> [--skip <name>]... [--only <name>]...
 
@@ -30,14 +31,17 @@ with open(os.path.join(folder, "tests.json")) as fh:
 
 
 def real(value):
-    return value.replace("@ROOT@", folder) if isinstance(value, str) else value
+    if not isinstance(value, str):
+        return value
+    return sys.executable if value == "@PYTHON@" else value.replace("@ROOT@", folder)
 
 
 build = real(plan["build"])
 logs = os.path.join(folder, "logs")
 os.makedirs(logs, exist_ok=True)
 env_base = dict(os.environ)
-env_base["PATH"] = build + os.pathsep + env_base.get("PATH", "")
+env_base["PATH"] = os.pathsep.join([build] + [real(p) for p in plan.get("path", [])] + [env_base.get("PATH", "")])
+env_base.update({k: real(v) for k, v in plan.get("env", {}).items()})
 passed, failed, skipped = [], [], []
 for t in plan["tests"]:
     name = t["name"]

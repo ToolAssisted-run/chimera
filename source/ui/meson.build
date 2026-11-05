@@ -468,9 +468,8 @@ if qt_dep.found()
       qt6.compile_moc(headers: ['qt/theme_palette.hpp', 'qt/portal_file_chooser.hpp', 'qt/file_places.hpp'], dependencies: [qt_dep]), qt_dialogs_rcc],
     dependencies: [qt_dep, dl_dep],
     override_options: ['cpp_std=c++20'],
-    cpp_args: ['-DCHIMERA_QT_QML_DIR="' + meson.current_source_dir() / 'qt' + '"'],
   )
-  test('theme', test_theme, env: ['QT_QPA_PLATFORM=offscreen', 'QT_QUICK_BACKEND=software', 'CHIMERA_FILE_CHOOSER=builtin'], timeout: 60)
+  test('theme', test_theme, args: [meson.current_source_dir() / 'qt'], env: ['QT_QPA_PLATFORM=offscreen', 'QT_QUICK_BACKEND=software', 'CHIMERA_FILE_CHOOSER=builtin'], timeout: 60)
   # the file and folder dialogs on Linux: the desktop's chooser through its
   # portal (a stand-in one on a bus of the test's own), and Chimera's own
   # where there is none (docs/file-picker.md)

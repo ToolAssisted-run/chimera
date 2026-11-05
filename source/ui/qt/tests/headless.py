@@ -12,7 +12,6 @@ import hashlib
 import json
 import os
 import shutil
-import signal
 import subprocess
 import sys
 import time
@@ -172,7 +171,7 @@ while true do emu.frameadvance() end
 p = subprocess.Popen([chimera, "--headless", "--project", proj, "--core", package, "--lua", lua], env=env,
                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 time.sleep(8)
-p.send_signal(signal.SIGKILL)
+p.kill()  # SIGKILL, and on Windows TerminateProcess
 p.wait()
 out = os.path.join(work, "killed.txt")
 r = run(proj, script("after", f"""
