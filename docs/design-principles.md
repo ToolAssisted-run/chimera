@@ -13275,6 +13275,31 @@ throttled runner. Linux here: 0.10 ms.
 Not decided: a Mac app in the background can be throttled the same way (App
 Nap), which would slow a run left playing behind another window.
 
+## A pull request that changes how the bundles are made builds them as a trial (2026-11-05)
+
+The release workflow builds the six downloads, but only from main, on its
+schedule or by hand, and always to publish them. So a change to how they are
+made (a build script, a cross file, the workflow) was first tried by the
+release that shipped it: the Windows arm64 bundle and the two Mac apps of
+pull request 309 had never been built by GitHub before it would merge.
+
+Now a pull request that touches those files (the release workflow, the
+tools/build-*, stage-* and fetch-* scripts, Qt's patches, the meson cross
+files) runs the release workflow as a trial: every bundle is built as a
+release builds it, the six files are kept as the run's artifacts for a week,
+and nothing is published. A pull request's token could not publish anyway. A
+newer push to the pull request stops the trial before it, and trials never
+queue with real releases.
+
+The first trial of a branch builds Qt for Windows on arm64 from source,
+which takes hours; it is cached after that.
+
+Also: tools/build-app-macos.sh now tries each Xcode 26 in /Applications,
+newest first, until one compiles the app's icon. On the Apple silicon runner
+the newest (26.3) crashed on macOS 15, and the release would have shipped
+the plain fallback icon without saying so; the release now fails when the
+light and dark icon is missing, as CI does.
+
 ## A held key clicks a button once; TAStudio's lists pick many rows (2026-11-04)
 
 Issue 494: Space pressed in TAStudio made 20 to 30 branches, and the Branches

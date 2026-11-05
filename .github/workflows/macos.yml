@@ -188,23 +188,8 @@ jobs:
       - name: Chimera.app
         run: |
           # the app's icon (docs/Chimera.icon, from Icon Composer) is compiled by
-          # actool, which needs Xcode 26 or later; the runner's default is older
-          # The newest is not always the one: on the Apple silicon image Xcode 26.3's
-          # actool crashed (its asset agent wants newer system frameworks than
-          # macOS 15 has), so each Xcode 26 is tried on the icon, newest first,
-          # and the first that compiles it here is used.
-          probe="$RUNNER_TEMP/icon-probe"
-          for x in $(ls -d /Applications/Xcode_26*.app 2> /dev/null | sort -r -V); do
-            rm -rf "${probe:?}"; mkdir -p "$probe"
-            if DEVELOPER_DIR="$x/Contents/Developer" xcrun actool docs/Chimera.icon --compile "$probe" \
-                --app-icon Chimera --include-all-app-icons --target-device mac --platform macosx \
-                --minimum-deployment-target 14.4 --output-partial-info-plist "$probe/icon.plist" > /dev/null 2>&1 \
-               && [ -f "$probe/Assets.car" ]; then
-              export DEVELOPER_DIR="$x/Contents/Developer"; break
-            fi
-            echo "$x cannot compile the icon on this machine"
-          done
-          echo "Xcode for the icon: $(xcode-select -p)"
+          # actool, which needs Xcode 26 or later: the script tries each the
+          # runner has, as the runner's default is older
           tools/build-app-macos.sh --dll build/${{ matrix.arch }}-macos/dll --qt "$HOME/qt/$QT_VERSION/macos" --out build/Chimera.app
           # the light and dark icon is in the app: the script falls back to a plain
           # one when it cannot compile it, which is for a person's Mac and not for here

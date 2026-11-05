@@ -10,8 +10,10 @@ name: Release
 # archive; the `cores` release here is the OLD one, kept because movies recorded
 # before the split cite packages in it, and it no longer grows.
 #
-# It is built three times - Windows x64 and Linux x64 on an x86-64 runner,
-# Linux arm64 on an arm one - and a release carries all three or none.
+# It is built six times - Windows and Linux, x64 and arm64, on Linux runners
+# (Linux arm64 on an arm one; Windows cross-built), and each Mac's app on that
+# kind of Mac - and a release carries all six or none. A pull request that
+# changes how they are made builds all six as a trial (below), publishing none.
 #
 #   dev      a ROLLING prerelease, replaced on every green push to main. One
 #            link that is always the newest; the assets carry the short commit
@@ -44,10 +46,23 @@ on:
         default: dev
         type: choice
         options: [ dev, nightly ]
+  # A pull request that changes how the bundles are made builds them all, as a
+  # TRIAL: the six files are kept as the run's artifacts for a week and
+  # published nowhere (a pull request's token could not publish anyway).
+  pull_request:
+    paths:
+      - '.github/workflows/release.yml'
+      - 'tools/build-*.sh'
+      - 'tools/stage-*.py'
+      - 'tools/fetch-*.sh'
+      - 'tools/qt-patches/**'
+      - 'extern/meson/**'
 
 concurrency:
-  group: release
-  cancel-in-progress: false
+  # releases one after another; a trial per pull request, which a newer push
+  # supersedes
+  group: ${{ github.event_name == 'pull_request' && format('release-trial-{0}', github.event.pull_request.number) || 'release' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: write
@@ -76,6 +91,9 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_run" ]; then
             sha="${{ github.event.workflow_run.head_sha }}"
             kind=dev
+          elif [ "${{ github.event_name }}" = "pull_request" ]; then
+            sha="${{ github.event.pull_request.head.sha }}"
+            kind=trial
           else
             sha="${{ github.sha }}"
             kind="${{ github.event.inputs.kind || 'nightly' }}"
@@ -362,10 +380,11 @@ jobs:
 
       - name: Chimera.app
         run: |
-          # the app's icon is compiled by actool, which needs Xcode 26 or later
-          newest="$(ls -d /Applications/Xcode_26*.app 2> /dev/null | sort -V | tail -n 1)"
-          if [ -n "$newest" ]; then export DEVELOPER_DIR="$newest/Contents/Developer"; fi
+          # the app's icon is compiled by actool, which needs Xcode 26 or later:
+          # the script tries each the runner has
           tools/build-app-macos.sh --dll build/${{ matrix.arch }}-macos/dll --qt "$HOME/qt/$QT_VERSION/macos" --out build/Chimera.app
+          # the light and dark icon, not the plain one the script falls back to
+          test -f build/Chimera.app/Contents/Resources/Assets.car
           codesign --verify --deep --strict build/Chimera.app
           build/Chimera.app/Contents/MacOS/chimera --version
 
@@ -562,6 +581,15 @@ jobs:
               echo
             fi
           } > build/release/NOTES.md
+
+      - name: A trial's bundles, kept for a week and published nowhere
+        if: needs.what.outputs.kind == 'trial'
+        uses: actions/upload-artifact@v4
+        with:
+          name: trial-bundles-${{ needs.what.outputs.short }}
+          path: build/release/
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Publish the rolling dev release
         if: needs.what.outputs.kind == 'dev'

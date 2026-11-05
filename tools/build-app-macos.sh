@@ -131,15 +131,23 @@ icon_name=""
 [ -d "$icon" ] || echo "  (no icon at $icon; drawing one from the icon's icon.svg)" >&2
 if [ -d "$icon" ]; then
 	# the icon as Icon Composer made it: Assets.car (light and dark) and an .icns
-	# for what is older; the plist keys it wants come out of the compile
-	if xcrun actool "$icon" --compile "$app/Resources" --output-format human-readable-text \
-		--notices --warnings --errors --output-partial-info-plist "$icons/icon.plist" \
-		--app-icon "$(basename "$icon" .icon)" --include-all-app-icons --enable-on-demand-resources NO \
-		--development-region en --target-device mac --minimum-deployment-target 14.4 --platform macosx \
-		> "$icons/actool.log" 2>&1 && [ -f "$app/Resources/Assets.car" ]; then
-		icon_name="$(basename "$icon" .icon)"
-		echo "  icon: $icon"
-	else
+	# for what is older; the plist keys it wants come out of the compile.
+	# With the selected Xcode first, then each Xcode 26 in /Applications, newest
+	# first: the newest is not always one whose actool runs on this macOS (26.3's
+	# crashed on macOS 15: its asset agent wants newer system frameworks).
+	for xcode in "" $(ls -d /Applications/Xcode_26*.app 2> /dev/null | sort -r -V); do
+		if ( if [ -n "$xcode" ]; then export DEVELOPER_DIR="$xcode/Contents/Developer"; fi
+			xcrun actool "$icon" --compile "$app/Resources" --output-format human-readable-text \
+			--notices --warnings --errors --output-partial-info-plist "$icons/icon.plist" \
+			--app-icon "$(basename "$icon" .icon)" --include-all-app-icons --enable-on-demand-resources NO \
+			--development-region en --target-device mac --minimum-deployment-target 14.4 --platform macosx
+		) > "$icons/actool.log" 2>&1 && [ -f "$app/Resources/Assets.car" ]; then
+			icon_name="$(basename "$icon" .icon)"
+			echo "  icon: $icon (actool of ${xcode:-$(xcode-select -p)})"
+			break
+		fi
+	done
+	if [ -z "$icon_name" ]; then
 		echo "  (actool could not compile $icon - it needs Xcode 26 or later; drawing the icon from its icon.svg)" >&2
 		# what it said was wrong, then how its log ends (a crash ends with a
 		# stack, the reason being above it)
