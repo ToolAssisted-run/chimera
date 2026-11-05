@@ -122,7 +122,11 @@ One menu item, `Emulator > Export Save Data...` (`Game` for a game core),
 there when the running core keeps save data. On click:
 
 - zero files: a plain message, nothing written;
-- one file: a save dialog for that file under its own name;
+- one file: a save dialog for that file, named the game, the date and time
+  and the core's own name for it ("Pokemon Snap (USA) 2026-11-05 07.10.00
+  save.flash"), so the ending the core reads it by stays (issue 499);
+  it opens in Config > Paths' Save data folder (SaveData), in a folder named
+  for the core, made then (owner, 2026-11-05, issue 500);
 - several: a save dialog for a `.zip`, entries written streamed.
 
 The frontend never parses a byte of it. There is no import UI here and none

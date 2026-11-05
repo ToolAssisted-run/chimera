@@ -1095,7 +1095,7 @@ void messagesConfig()
 		return p->find("x")->text + "," + p->find("y")->text + "," + p->find("anchor")->text;
 	};
 	CHECK(at("Fps") == "0,0,0" && at("Lag Counter") == "0,42,0" && at("Messages") == "0,0,2" && at("Autohold") == "0,0,1" &&
-		at("Game Time") == "0,14,1" && at("Watches") == "0,70,0");
+		at("Game Time") == "0,14,1" && at("Real Time") == "0,70,0" && at("Watches") == "0,84,0");
 	CHECK(messages.run("setPosition", {std::string("Fps"), int64_t{4}, int64_t{6}, int64_t{3}}, error).has_value() && at("Fps") == "4,6,3");
 	CHECK(!messages.run("setPosition", {std::string("Clock"), int64_t{0}, int64_t{0}, int64_t{0}}, error) &&
 		error == "nothing called Clock is drawn over the picture");
@@ -1326,8 +1326,8 @@ void pathsConfig()
 	CHECK(folder == (dir / "runs").string() && !isDefault);
 	/* Chimera's global list, in its order, the base first and temporary files last */
 	fromValue(rows->cell(0, 1), name);
-	CHECK(name == "Base" && rows->rowCount() == 14);
-	fromValue(rows->cell(13, 1), name);
+	CHECK(name == "Base" && rows->rowCount() == 15);
+	fromValue(rows->cell(14, 1), name);
 	CHECK(name == "Temp Files" && paths.resolve("Temp Files") == (dir / "program").string());
 	/* Chimera's words in a path: the program's folder, the last game's, and anything else is the program's folder */
 	CHECK(paths.run("setPath", {std::string("Lua"), std::string("%exe%/Scripts")}, error).has_value() &&
@@ -1347,7 +1347,7 @@ void pathsConfig()
 	CHECK(paths.base.get().empty());
 	/* a system's own folders, made when a game for it is opened: under its base, which is under the global one */
 	paths.useSystem("NES");
-	CHECK(paths.systems.get() == "[\"NES\"]" && rows->rowCount() == 18);
+	CHECK(paths.systems.get() == "[\"NES\"]" && rows->rowCount() == 19);
 	CHECK(paths.resolveFor("NES", "Screenshots") == (dir / "program" / "NES" / "Screenshots").string() &&
 		paths.resolveFor("NES", "ROM") == (dir / "program" / "NES").string() &&
 		paths.resolveFor("NES", "Savestates") == (dir / "program" / "NES" / "State").string());
@@ -1374,6 +1374,9 @@ void pathsConfig()
 		got == (dir / "program" / "Reports").string() && fs::is_directory(dir / "program" / "Reports"));
 	/* ROMs: where the last game came from, while it is there and asked for */
 	paths.lastRomFolder.set((dir / "program" / "Lua").string());
+	/* Export Save Data's: Save data, a folder the core's inside it, its name made fit for a folder, both made (issue 500) */
+	CHECK(fromValue(paths.run("dialogFolder", {std::string("Save data"), true, std::string("A/B: C?. ")}, error).value_or(Value()), got) &&
+		got == (dir / "program" / "SaveData" / "A_B_ C_").string() && fs::is_directory(got));
 	CHECK(fromValue(paths.run("dialogFolder", {std::string("ROM")}, error).value_or(Value()), got) && got == (dir / "program" / "Lua").string());
 	paths.recentForRoms.set(false);
 	CHECK(fromValue(paths.run("dialogFolder", {std::string("ROM")}, error).value_or(Value()), got) && got == (dir / "program").string());
@@ -3477,8 +3480,19 @@ bool cacheManager(const char *package, const char *rom)
 		CHECK(r->rowCount() == 1 && fromValue(r->cell(0, 9), inUse) && inUse);
 		CHECK(!open.run("remove", {std::string("0")}, error) && error == "could not remove: Walker (in use)" && fs::is_directory(dir / "cache" / id));
 	}
-	session.run("close", {}, error);
-	CHECK(d.until([&] { return !session.isOpen.get() && session.projectId.get().empty(); }, 20));
+	/* a project never saved to a file (Stop Movie's new one) leaves no cache
+	 * behind when it closes; the saved one's stays (issue 504) */
+	{
+		const std::string saved = session.projectId.get();
+		session.run("stopMovie", {}, error);
+		CHECK(d.until([&] { return session.hasProject.get() && session.projectPath.get().empty() && session.projectId.get() != saved; }, 20));
+		const std::string unsaved = session.projectId.get();
+		for (int i = 0; i < 5; i++) session.run("frameAdvance", {}, error);
+		CHECK(d.until([&] { return fs::is_directory(dir / "cache" / unsaved); }, 20));
+		session.run("close", {}, error);
+		CHECK(d.until([&] { return !session.isOpen.get() && session.projectId.get().empty(); }, 20));
+		CHECK(!fs::exists(dir / "cache" / unsaved) && fs::is_directory(dir / "cache" / saved));
+	}
 	/* a cache that never said whose it is: named so, and not an orphan */
 	fs::create_directories(dir / "cache" / "00UNNAMED");
 	/* another project's cache, its project gone */
@@ -3815,6 +3829,19 @@ bool helpMenu(const char *package, const char *rom)
 		text.find("**OS and GPU:** <!-- type your operating system here -->, <!-- type your graphics card here -->") != std::string::npos);
 	CHECK(text.find("**CPU and memory:** ") != std::string::npos && text.find(" threads)") != std::string::npos &&
 		text.find(" GB of memory") != std::string::npos);
+	/* the card unnamed when the window drew: asked again as the report is
+	 * made, and kept (issue 516) */
+	{
+		int asked = 0;
+		help.gpuNow = [&asked] { asked++; return std::string("Test Card 9000"); };
+		CHECK(fromValue(help.run("makeReport", {}, error).value_or(Value()), text) &&
+			text.find("**OS and GPU:** <!-- type your operating system here -->, Test Card 9000") != std::string::npos &&
+			help.windowGpu.get() == "Test Card 9000" && asked == 1);
+		help.run("makeReport", {}, error);
+		CHECK(asked == 1);
+		help.gpuNow = nullptr;
+		help.windowGpu.set("");
+	}
 	/* nothing to attach: said, as Chimera's window says it */
 	if (help.reportFiles.get().empty())
 		CHECK(help.status.get() == "No saved project, crash note or log was found. The zip will hold the text.");
@@ -10204,7 +10231,13 @@ bool coreManager(const char *package, const char *slotsPackage, const char *game
 	ManualDispatcher d;
 	CoresViewModel cores(d);
 	std::string error;
+	/* an empty folder first: said so, and not said any longer once the
+	 * folder looked at has cores (issue 505) */
+	fs::create_directories(dir / "Empty", ec);
+	cores.set("coresFolder", (dir / "Empty").string(), error);
+	CHECK(cores.managerStatus.get() == "There are no cores in this folder yet.");
 	cores.set("coresFolder", (dir / "Cores").string(), error);
+	CHECK(cores.managerStatus.get() == "");
 	RowModel *manager = nullptr;
 	for (const auto &r : cores.rowLists())
 		if (r.name == "manager") manager = r.model;

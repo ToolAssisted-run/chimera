@@ -162,7 +162,7 @@ ApplicationWindow {
     }
 
     component Check: CheckBox { padding: 2 }
-    component Number: SpinBox { editable: true; Layout.preferredWidth: 100 }
+    component NumberBox: SpinBox { editable: true; Layout.preferredWidth: 100 }
 
     ColumnLayout {
         anchors.fill: parent
@@ -196,7 +196,7 @@ ApplicationWindow {
                 Check { text: qsTrId("tastudio_settings.rotate_input_roll"); checked: win.rotate; onToggled: win.rotate = checked }
                 RowLayout {
                     Label { text: qsTrId("tastudio_settings.lag_frames_to_hide") }
-                    Number { from: 0; to: 10; value: win.lagToHide; onValueModified: win.lagToHide = value }
+                    NumberBox { from: 0; to: 10; value: win.lagToHide; onValueModified: win.lagToHide = value }
                 }
                 Check { text: qsTrId("tastudio_settings.hide_was_lag_frames"); checked: win.hideWasLag; onToggled: win.hideWasLag = checked }
                 Item { Layout.fillHeight: true }
@@ -207,7 +207,7 @@ ApplicationWindow {
                 spacing: 4
                 RowLayout {
                     Label { text: qsTrId("tastudio_settings.autosave_frequency") }
-                    Number { from: 0; to: 10000000; value: win.autosaveSeconds; onValueModified: win.autosaveSeconds = value; Layout.preferredWidth: 120 }
+                    NumberBox { from: 0; to: 10000000; value: win.autosaveSeconds; onValueModified: win.autosaveSeconds = value; Layout.preferredWidth: 120 }
                     Label { text: qsTrId("tastudio_settings.seconds") }
                 }
                 Label { text: qsTrId("tastudio_settings.set_to_0_to_disable_autosave") }
@@ -297,6 +297,7 @@ ApplicationWindow {
                             color: palette.base
                             border.color: palette.mid
                             ListView {
+                                boundsBehavior: Flickable.StopAtBounds
                                 id: runList
                                 anchors.fill: parent
                                 anchors.margins: 1
@@ -416,7 +417,7 @@ ApplicationWindow {
                 }
                 RowLayout {
                     Label { text: qsTrId("tastudio_settings.wheel_scroll_speed") }
-                    Number { from: 0; to: 100; value: win.wheelRows; onValueModified: win.wheelRows = value }
+                    NumberBox { from: 0; to: 100; value: win.wheelRows; onValueModified: win.wheelRows = value }
                     Label { text: qsTrId("tastudio_settings.frames_per_tick") }
                 }
                 Check { text: qsTrId("tastudio_settings.sync_scroll_across_all_input_rolls"); checked: win.scrollSync; onToggled: win.scrollSync = checked; Layout.topMargin: 6 }
@@ -434,11 +435,11 @@ ApplicationWindow {
                 GridLayout {
                     columns: 2
                     Label { text: qsTrId("tastudio_settings.rewind_step"); Layout.preferredWidth: 110 }
-                    Number { from: 1; to: 100; value: win.rewindStep; onValueModified: win.rewindStep = value }
+                    NumberBox { from: 1; to: 100; value: win.rewindStep; onValueModified: win.rewindStep = value }
                     Label { text: qsTrId("tastudio_settings.fast_rewind_step") }
-                    Number { from: 1; to: 100; value: win.rewindStepFast; onValueModified: win.rewindStepFast = value }
+                    NumberBox { from: 1; to: 100; value: win.rewindStepFast; onValueModified: win.rewindStepFast = value }
                     Label { text: qsTrId("tastudio_settings.max_undo_count") }
-                    Number { from: 1; to: 10000; value: win.maxUndo; onValueModified: win.maxUndo = value }
+                    NumberBox { from: 1; to: 10000; value: win.maxUndo; onValueModified: win.maxUndo = value }
                 }
                 Check { text: qsTrId("tastudio_settings.bind_markers_to_input"); checked: win.bindMarkers; onToggled: win.bindMarkers = checked }
                 Check { text: qsTrId("tastudio_settings.include_frame_numbers_when_copying_input"); checked: win.copyFrameNumbers; onToggled: win.copyFrameNumbers = checked }
@@ -448,7 +449,7 @@ ApplicationWindow {
                 Check { text: qsTrId("tastudio_settings.markers_keep_states_by_default"); checked: win.markersKeepStates; onToggled: win.markersKeepStates = checked }
                 RowLayout {
                     Label { text: qsTrId("tastudio_settings.branch_screenshot_size_pixels") }
-                    Number {
+                    NumberBox {
                         from: 64
                         to: 4096
                         stepSize: 32

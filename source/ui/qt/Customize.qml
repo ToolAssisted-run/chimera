@@ -26,6 +26,8 @@ ApplicationWindow {
     // Chimera's is 418 wide for its 8-point font; wide enough here for the longest line
     width: 520
     height: 520
+    minimumWidth: 520
+    minimumHeight: 520
     modality: Qt.ApplicationModal
     transientParent: win.mainWindow
 

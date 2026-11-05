@@ -1804,6 +1804,38 @@ SessionViewModel::SessionViewModel(Dispatcher &dispatcher, InputLog &inputs)
 			onMachineWait([&](ce_session *s) { reported = s != nullptr && ce_session_input_polls_reported(s) != 0; });
 			return reported;
 		});
+	command("memoryScopes", "what the core open can watch for the scripts' memory functions (event.on_bus_exec, on_bus_read, "
+		"on_bus_write; issue 496): its scopes' names, a line each, its main one first; nothing when it watches none", {},
+		[this](const Args &, std::string &) -> Value {
+			std::string scopes;
+			onMachineWait([&](ce_session *s) { if (s != nullptr) scopes = ce_session_memory_scopes(s); });
+			return scopes;
+		});
+	command("watchMemory", "the core open asked to call the scripts' memory functions at an access (on true) or no longer "
+		"(false): kind 0 an instruction run, 1 a read, 2 a write; the scope's place in memoryScopes; the address, or -1 for "
+		"every address. True when the core watches it", {"kind", "scope", "address", "on"},
+		[this](const Args &a, std::string &error) -> Value {
+			int64_t kind = 0, scope = 0, address = 0;
+			bool on = false;
+			if (!arg(a, 0, kind, error) || !arg(a, 1, scope, error) || !arg(a, 2, address, error) || !arg(a, 3, on, error)) return {};
+			const auto key = std::make_tuple(static_cast<int32_t>(kind), static_cast<int32_t>(scope), static_cast<uint64_t>(address));
+			if (!on)
+			{
+				/* not waited for: a script stopped as Chimera closes takes its function off a core already gone */
+				submit([this, key] {
+					memoryWatchesM_.erase(key);
+					if (s_ != nullptr) ce_session_watch_memory(s_, std::get<0>(key), std::get<1>(key), std::get<2>(key), 0);
+				});
+				return true;
+			}
+			bool taken = false;
+			onMachineWait([&](ce_session *s) {
+				if (s == nullptr || ce_session_watch_memory(s, std::get<0>(key), std::get<1>(key), std::get<2>(key), 1) == 0) return;
+				memoryWatchesM_.insert(key);
+				taken = true;
+			});
+			return taken;
+		});
 	command("setInputPolls", "the core asked to call the scripts' event.oninputpoll functions at its reads (true) or not", {"on"},
 		[this](const Args &a, std::string &error) -> Value {
 			bool on = false;
@@ -4211,6 +4243,27 @@ void SessionViewModel::applyInputPollsOnMachine()
 	ce_session_set_input_poll_callback(s_, inputPollsWantedM_.load() ? &SessionViewModel::inputPollCalled : nullptr, this);
 }
 
+void SessionViewModel::setMemoryTurn(std::function<void(int32_t, int32_t, uint64_t, uint64_t)> turn)
+{
+	waitOnMachine([&] { memoryTurnM_ = std::move(turn); }, true);
+}
+
+void SessionViewModel::memoryCalled(void *ctx, int32_t kind, int32_t scope, uint64_t address, uint64_t value)
+{
+	auto *self = static_cast<SessionViewModel *>(ctx);
+	if (self->memoryTurnM_ && self->scriptsNowOnMachine()) self->memoryTurnM_(kind, scope, address, value);
+}
+
+void SessionViewModel::applyMemoryWatchesOnMachine()
+{
+	if (s_ == nullptr) return;
+	ce_session_set_memory_callback(s_, &SessionViewModel::memoryCalled, this);
+	/* what another core cannot watch is dropped: its script's call was refused when it was made */
+	for (auto it = memoryWatchesM_.begin(); it != memoryWatchesM_.end();)
+		it = ce_session_watch_memory(s_, std::get<0>(*it), std::get<1>(*it), std::get<2>(*it), 1) != 0 ? std::next(it)
+																									  : memoryWatchesM_.erase(it);
+}
+
 void SessionViewModel::setFutureTurn(std::function<bool(int64_t played)> turn)
 {
 	waitOnMachine([&] { futureTurnM_ = std::move(turn); }, true);
@@ -5333,8 +5386,9 @@ void SessionViewModel::adoptOnMachine(ce_session *s, const std::string &package,
 	/* the last machine's picture is not this one's: nothing is shown until it draws (issue 464) */
 	screen.clear();
 	later([this] { screenChanged.emit(); });
-	/* a script's input-poll functions go on with the machine opened again */
+	/* a script's input-poll and memory functions go on with the machine opened again */
 	applyInputPollsOnMachine();
+	applyMemoryWatchesOnMachine();
 	packageSha1M_.clear();
 	diedM_ = false;
 	inputs_.bind(s);
@@ -5591,9 +5645,27 @@ int32_t SessionViewModel::playerOf(const std::string &name) const
 void SessionViewModel::closeOnMachine()
 {
 	if (s_ == nullptr) return;
+	/* A project never saved to a file cannot be opened again: what the cache
+	 * kept for it (where its files are, its title) only sat in the Cache
+	 * Manager at 0 KB (issue 504), so it goes. A folder a project file has
+	 * named is another project's too (a copy keeps the id), and stays; so
+	 * does one whose work was kept to be recovered. */
+	namespace fs = std::filesystem;
+	const fs::path unsavedCache = projectPathM_.empty() && !keepWorkM_ ? projectCacheOnMachine() : fs::path();
 	keepHistoryAtCloseOnMachine();
 	freeSessionOnMachine();
 	freeProjectOnMachine();
+	if (!unsavedCache.empty())
+	{
+		std::ifstream in(unsavedCache / "about.json", std::ios::binary);
+		const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+		in.close();
+		json::Json about;
+		std::string err;
+		const json::Json *was = json::parse(text, about, err) ? about.find("projectPath") : nullptr;
+		std::error_code ec;
+		if (was == nullptr || was->text.empty()) fs::remove_all(unsavedCache, ec);
+	}
 	runningM_ = false;
 	/* the machine's picture goes with it (issue 432) */
 	screen.clear();

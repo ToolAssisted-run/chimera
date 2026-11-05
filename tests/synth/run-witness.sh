@@ -789,6 +789,44 @@ json.dump(d, open(p, 'w'))
 			report "E:input-polls" PASS "$polls calls part way through $pframes frames, one for each frame the core read its pad ($lags lag frames had none); the machine ends on the goldens"
 		fi
 
+		# CALLS AT MEMORY (issue 496). The synthetic core names two scopes, Code
+		# and RAM, and calls the engine at each access it is asked to watch,
+		# part way through the frame. gridWalker starts every frame at the
+		# instruction at 0 and reads its status byte (RAM 0) twice in every
+		# frame: 0 while it plays, and 1 once it is won - at the second read of
+		# the frame it is won in, and at both in each frame after (the frames
+		# that read no pad). chimera-run --watch-memory counts the calls and
+		# sums the values given; watching must not move the machine, and a
+		# read in the Code scope is refused.
+		rm -f "$work/memcalls.exec.meta.txt" "$work/memcalls.read.meta.txt" "$work/memcalls.ram.bin" "$work/memcalls.vram.bin"
+		crun_game "$epkg" "$here/roms/gridWalker.testrom" "$here/movies/gridWalker.win.txt" --watch-memory exec:0:0 \
+			--meta "$work/memcalls.exec.meta.txt" > "$work/memcalls.exec.log" 2>&1
+		crun_game "$epkg" "$here/roms/gridWalker.testrom" "$here/movies/gridWalker.win.txt" --watch-memory read:1:0 \
+			--count-input-polls --dump "RAM=$work/memcalls.ram.bin" --dump "VRAM=$work/memcalls.vram.bin" \
+			--meta "$work/memcalls.read.meta.txt" > "$work/memcalls.read.log" 2>&1
+		crun_game "$epkg" "$here/roms/gridWalker.testrom" "$here/movies/gridWalker.win.txt" --watch-memory read:0:0 \
+			--meta "$work/memcalls.refused.meta.txt" > "$work/memcalls.refused.log" 2>&1
+		mframes=$(sed -n 's/^frames=//p' "$work/memcalls.read.meta.txt" 2>/dev/null)
+		mlags=$(sed -n 's/^lagFrames=//p' "$work/memcalls.read.meta.txt" 2>/dev/null)
+		mexec=$(sed -n 's/^memoryCalls=//p' "$work/memcalls.exec.meta.txt" 2>/dev/null)
+		mread=$(sed -n 's/^memoryCalls=//p' "$work/memcalls.read.meta.txt" 2>/dev/null)
+		msum=$(sed -n 's/^memorySum=//p' "$work/memcalls.read.meta.txt" 2>/dev/null)
+		mscopes=$(sed -n 's/^memoryScopes=//p' "$work/memcalls.read.meta.txt" 2>/dev/null)
+		if [ "$mscopes" != "Code,RAM" ] || [ -z "$mexec" ] || [ "$mexec" = none ] || [ -z "$mread" ]; then
+			report "E:memory-calls" FAIL "the core's memory calls were not offered: scopes ${mscopes:-missing}, calls ${mexec:-missing}/${mread:-missing} (see work/memcalls.*.log)"
+		elif [ "$mexec" -ne "${mframes:-0}" ]; then
+			report "E:memory-calls" FAIL "the instruction at 0 made $mexec calls in ${mframes:-?} frames, not one a frame"
+		elif [ "$mread" -ne $(( 2 * ${mframes:-0} )) ] || [ "${msum:-x}" != $(( 2 * ${mlags:-0} + 1 )) ]; then
+			report "E:memory-calls" FAIL "reads of RAM 0 made $mread calls summing to ${msum:-?} in ${mframes:-?} frames with ${mlags:-?} lag frames: not two a frame, with the status the game had"
+		elif ! grep -q "^status=ERROR" "$work/memcalls.refused.meta.txt" 2>/dev/null; then
+			report "E:memory-calls" FAIL "a read in the Code scope was not refused (see work/memcalls.refused.log)"
+		elif ! cmp -s "$work/memcalls.ram.bin" "$golden_dir/gridWalker.win.ram.bin" \
+			|| ! cmp -s "$work/memcalls.vram.bin" "$golden_dir/gridWalker.win.vram.bin"; then
+			report "E:memory-calls" FAIL "watching memory moved the machine off the goldens"
+		else
+			report "E:memory-calls" PASS "the instruction at 0 called once in each of $mframes frames, reads of RAM 0 twice ($mread, the status values summing to $msum), a read in the Code scope refused; the machine ends on the goldens"
+		fi
+
 		# THE CORE LOG (ce_core_log, Tools > Export Core Log... in the frontend):
 		# asked for, it starts a file saying when and by which Chimera, notes
 		# the session's core package, and keeps everything the core writes - the
@@ -2064,6 +2102,33 @@ GZPY
 			report "T:box:inputPolls" PASS "event.oninputpoll is called once in a frame the game reads its pad in, reads memory there, and stops when removed; Chimera closes cleanly with one still registered"
 		else
 			report "T:box:inputPolls" FAIL "$(sed -n 's/^detail=//p' "$idir/meta.txt" 2>/dev/null || echo "run failed") (see $idir/run.log)"
+		fi
+	fi
+
+	# --- functions called at memory the machine runs, reads or writes (issue 496) ---
+	# The synth names the scopes Code and RAM and calls back at each access a
+	# script watches. A script sees the instruction at 0 called once a frame,
+	# reads of the status twice with the value memory holds, every write with
+	# the value already written; a scope or kind the core lacks refused; none
+	# called once removed. It leaves one registered, and Chimera must close
+	# without an error.
+	if [ "$record" -eq 0 ]; then
+		mdir="$work/memory-calls-leg"
+		rm -rf "$mdir" && mkdir -p "$mdir"
+		cp "$tdir/gridWalker.testrom" "$mdir/gridWalker.testrom"
+		cp "$tdir/$tname.chimeraProject" "$mdir/p.chimeraProject"
+		mjob="$work/job.memory-calls.txt"
+		echo "meta=$mdir/meta.txt" > "$mjob"
+		cp "$config" "$work/settings.memory-calls.json"
+		( cd "$repo_root" && CHIMERA_JOB="$mjob" timeout 300 "$chimera_exe" --headless \
+			"--config=$work/settings.memory-calls.json" "--core=$repo_root/build/Cores/synth-box.chimeraCore" \
+			"--project=$mdir/p.chimeraProject" "--lua=$here/synth-memory-calls.lua" ) > "$mdir/run.log" 2>&1
+		if grep -q "^status=OK" "$mdir/meta.txt" 2>/dev/null && grep -qi "fatal" "$mdir/run.log"; then
+			report "T:box:memoryCalls" FAIL "Chimera stopped with an error as it closed: $(grep -i -m1 "fatal" "$mdir/run.log") (see $mdir/run.log)"
+		elif grep -q "^status=OK" "$mdir/meta.txt" 2>/dev/null; then
+			report "T:box:memoryCalls" PASS "event.on_bus_exec, on_bus_read and on_bus_write are called at the accesses watched, with the values memory holds, refused where the core cannot watch, and stop when removed; Chimera closes cleanly with one still registered"
+		else
+			report "T:box:memoryCalls" FAIL "$(sed -n 's/^detail=//p' "$mdir/meta.txt" 2>/dev/null || echo "run failed") (see $mdir/run.log)"
 		fi
 	fi
 

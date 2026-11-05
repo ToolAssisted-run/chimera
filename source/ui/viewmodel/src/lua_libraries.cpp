@@ -1583,11 +1583,10 @@ function event.unregisterbyname(name)
 	local me = __chimera_script
 	return removeRegistered(function(f) return f.script == me and f.name == tostring(name) end, true)
 end
--- the events part way through a frame no core in a sandbox can call: refused
--- with Chimera's words, so that a script can guard them with pcall
+-- the events part way through a frame, which only a core that stops there can
+-- call: any other refuses them with Chimera's words, so that a script can
+-- guard them with pcall
 local function coreName() return C.session.coreName ~= "" and C.session.coreName or "This core" end
-local midFrame = "No Chimera core can: a core runs in a sandbox that Chimera calls once a frame, "
-	.. "and the core cannot stop part way through a frame to run a Lua function."
 -- each read of the controls, for a core that reports its reads (issue 344), as
 -- Chimera's: the core is asked first, and a function is kept only when it will
 -- be called; any other core refuses it, with Chimera's words
@@ -1610,23 +1609,87 @@ onRemoved[#onRemoved + 1] = function()
 	inputPollsAsked = false
 	C.session.setInputPolls(false)
 end
-local function memoryRefused(execute, anyAddress)
-	return function(fn, address)
+-- the memory the machine runs, reads or writes, for a core that stops there
+-- (issue 496): a function for one kind of access at an address of a scope
+-- (one of the core's address spaces, its main one when none is named), or at
+-- every address of it. The core is asked to watch a place while a function
+-- wants it; a core that cannot is refused with Chimera's words.
+local function memoryScopes() return lines(C.session.memoryScopes()) end
+local watchedMemory = {}
+local kindNames = {[0] = "instructions run", [1] = "reads", [2] = "writes"}
+local function memoryEvent(kind, anyAddress, eventName)
+	return function(fn, ...)
+		if type(fn) ~= "function" then error("a function is needed, not " .. type(fn), 2) end
+		-- every instruction run takes no address
+		local address, name, scope
+		if anyAddress then name, scope = ... else address, name, scope = ... end
 		local every = anyAddress or address == nil
-		error(coreName() .. " cannot call a Lua function on " .. (every and "every " or "a ") .. "memory "
-			.. (execute and "execute" or "access") .. ". " .. midFrame .. " Remove the registration, or guard it with pcall.", 2)
+		local scopes = memoryScopes()
+		if #scopes == 0 then
+			error(coreName() .. " cannot call a Lua function at " .. (every and "every " or "a ") .. "memory "
+				.. (kind == 0 and "instruction" or "access") .. ": a core runs in a sandbox that Chimera calls once a frame, "
+				.. "and only a core that watches memory stops part way through a frame to call back. "
+				.. "Remove the registration, or guard it with pcall.", 2)
+		end
+		local s = 0
+		if scope ~= nil then
+			s = nil
+			for i, n in ipairs(scopes) do if n == tostring(scope) then s = i - 1 end end
+			if s == nil then error(coreName() .. " has no memory scope " .. tostring(scope) .. "; its scopes are " .. table.concat(scopes, ", ") .. ".", 2) end
+		end
+		local at = -1
+		if not every then
+			at = math.tointeger(address)
+			if at == nil or at < 0 then error("the address must be a whole number of 0 or more, not " .. tostring(address), 2) end
+		end
+		local key = kind .. " " .. s .. " " .. at
+		if watchedMemory[key] == nil then
+			if not C.session.watchMemory(kind, s, at, true) then
+				error(coreName() .. " cannot watch the " .. kindNames[kind] .. " of " .. (every and "every address" or string.format("address 0x%X", at))
+					.. " in its scope " .. scopes[s + 1] .. ". Remove the registration, or guard it with pcall.", 2)
+			end
+			watchedMemory[key] = {kind = kind, scope = s, address = at}
+		end
+		local f = registerNamed(fn, eventName, name)
+		f.memory = {key = key, kind = kind, scope = s, address = at}
+		return f.guid
 	end
 end
-event.onmemoryexecute = memoryRefused(true, false)
+-- a place no function wants any more is the core's to forget
+onRemoved[#onRemoved + 1] = function()
+	local wanted = {}
+	for _, f in ipairs(registered) do if f.memory then wanted[f.memory.key] = true end end
+	for key, w in pairs(watchedMemory) do
+		if not wanted[key] then
+			watchedMemory[key] = nil
+			C.session.watchMemory(w.kind, w.scope, w.address, false)
+		end
+	end
+end
+event.onmemoryexecute = memoryEvent(0, false, "OnMemoryExecute")
 event.on_bus_exec = event.onmemoryexecute
-event.onmemoryexecuteany = memoryRefused(true, true)
+event.onmemoryexecuteany = memoryEvent(0, true, "OnMemoryExecuteAny")
 event.on_bus_exec_any = event.onmemoryexecuteany
-event.onmemoryread = memoryRefused(false, false)
+event.onmemoryread = memoryEvent(1, false, "OnMemoryRead")
 event.on_bus_read = event.onmemoryread
-event.onmemorywrite = memoryRefused(false, false)
+event.onmemorywrite = memoryEvent(2, false, "OnMemoryWrite")
 event.on_bus_write = event.onmemorywrite
-function event.availableScopes() return {} end
+function event.availableScopes() return zeroBased(memoryScopes()) end
 function event.can_use_callback_params(subset) return subset == "memory" end
+-- the bridge's: an access the core reported, inside its frame, to the
+-- functions that watch it, each given the address and the value; they may
+-- read memory, but not wait for a frame
+function __chimera_memory_events(kind, scope, address, value)
+	local was = __chimera_no_waits
+	__chimera_no_waits = true
+	local list = {}
+	for _, f in ipairs(registered) do
+		local m = f.memory
+		if m and m.kind == kind and m.scope == scope and (m.address == -1 or m.address == address) then list[#list + 1] = f end
+	end
+	for _, f in ipairs(list) do callNamed(f, address, value) end
+	__chimera_no_waits = was
+end
 
 -- the Lua Functions List's: each library's functions with their parameters'
 -- names, library by library, as JSON

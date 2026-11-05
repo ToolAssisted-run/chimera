@@ -17,6 +17,8 @@ ApplicationWindow {
     title: qsTrId("sound_config.sound_configuration")
     width: 500
     height: 320
+    minimumWidth: 500
+    minimumHeight: 320
     modality: Qt.ApplicationModal
     transientParent: win.mainWindow
     readonly property var devices: JSON.parse(win.session.soundDevices)
@@ -117,6 +119,7 @@ ApplicationWindow {
             }
             Label { text: qsTrId("sound_config.sound_device") }
             ListView {
+                boundsBehavior: Flickable.StopAtBounds
                 id: deviceList
                 Layout.fillWidth: true
                 Layout.fillHeight: true

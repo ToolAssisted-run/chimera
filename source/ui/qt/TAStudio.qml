@@ -82,8 +82,8 @@ ApplicationWindow {
          : qsTrId("tastudio.tastudio_2").arg(tas.session.projectTitle).arg(tas.session.unsaved ? "*" : "")
     width: 720
     height: 600
-    minimumWidth: 200
-    minimumHeight: 148
+    minimumWidth: 600
+    minimumHeight: 520
 
     // opened at the main window's right shoulder, tops aligned, on every
     // open, as far right as the screen allows; never off it
@@ -1157,6 +1157,7 @@ ApplicationWindow {
         currentFolder: tas.folderOf("Macros")
         fileMode: FileDialog.SaveFile
         defaultSuffix: "chimeraMacro"
+        gameFileEnding: ".chimeraMacro"
         nameFilters: [qsTrId("tastudio.movie_macros_chimeramacro")]
         onAccepted: tas.pianoRoll.run("saveMacro", [tas.pianoRoll.selectFirst, tas.pianoRoll.selectLast, selectedFile])
     }

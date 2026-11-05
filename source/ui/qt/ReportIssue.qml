@@ -95,6 +95,7 @@ ApplicationWindow {
             color: palette.base
             border.color: palette.mid
             ListView {
+                boundsBehavior: Flickable.StopAtBounds
                 id: files
                 objectName: "reportFiles"
                 anchors.fill: parent

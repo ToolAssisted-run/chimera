@@ -22,6 +22,8 @@ ApplicationWindow {
     title: qsTrId("surface_viewer.surface_viewer")
     width: 560
     height: 480
+    minimumWidth: 380
+    minimumHeight: 300
     onVisibleChanged: {
         win.vm.watching = visible
         if (visible) windowOptions.placeBack(false)
@@ -41,6 +43,7 @@ ApplicationWindow {
         title: qsTrId("surface_viewer.save_as_png")
         fileMode: FileDialog.SaveFile
         defaultSuffix: "png"
+        gameFileEnding: ".png"
         nameFilters: [qsTrId("surface_viewer.png_files_png")]
         onAccepted: { const path = win.localPath(selectedFile); win.grabbed((r) => r.saveToFile(path)) }
     }

@@ -1184,6 +1184,29 @@ typedef void (*ce_input_poll_fn)(void *ctx);
 CE_API int32_t ce_session_input_polls_reported(const ce_session *s);
 CE_API void ce_session_set_input_poll_callback(ce_session *s, ce_input_poll_fn fn, void *ctx);
 
+/* CALLS AT MEMORY (issue 496). A core that stops part way through a frame at
+ * memory its machine runs, reads or writes - its optional exports
+ * GetMemoryCallbackScopes, SetMemoryCallback, AddMemoryWatch and
+ * RemoveMemoryWatch - names the address spaces it can watch, its "scopes"
+ * (a CPU's bus, a kind of memory), and has the engine call
+ * fn(ctx, kind, scope, address, value) at each access the session watches:
+ * kind 0 an instruction about to run, 1 a read, 2 a write; value what was
+ * read or written (0 for an instruction). fn runs as the input poll callback
+ * above does: on the advancing thread, inside the frame.
+ * ce_session_memory_scopes is the scopes' names, a line each, the core's main
+ * one first; "" for a core that watches no memory (fn is never called).
+ * ce_session_watch_memory, between frames only, watches (on 1) or stops
+ * watching (on 0) an address of a scope for a kind of access, or every
+ * address of it (CE_ANY_ADDRESS): 1 when the core took it, 0 when it cannot
+ * watch that (a kind or scope it lacks, or more places than it keeps). The
+ * core keeps what it watches until the session ends, through loads. Null fn
+ * stops the calls. */
+#define CE_ANY_ADDRESS UINT64_MAX
+typedef void (*ce_memory_fn)(void *ctx, int32_t kind, int32_t scope, uint64_t address, uint64_t value);
+CE_API const char *ce_session_memory_scopes(const ce_session *s);
+CE_API int32_t ce_session_watch_memory(ce_session *s, int32_t kind, int32_t scope, uint64_t address, int32_t on);
+CE_API void ce_session_set_memory_callback(ce_session *s, ce_memory_fn fn, void *ctx);
+
 /* One frame: buttons is the bitmask (bit i = the config's buttons[i]);
  * buttons beyond 63 ride ce_session_set_button. Returns nonzero when the frame
  * was a lag frame (the guest never read input), per the config's lag export.

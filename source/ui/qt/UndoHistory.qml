@@ -85,6 +85,7 @@ ApplicationWindow {
                     }
                 }
                 ListView {
+                    boundsBehavior: Flickable.StopAtBounds
                     id: steps
                     objectName: "historyList"
                     Layout.fillWidth: true

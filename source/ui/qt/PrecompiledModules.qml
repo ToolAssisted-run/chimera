@@ -18,7 +18,8 @@ ApplicationWindow {
     title: qsTrId("precompiled_modules.pre_compiled_modules")
     width: 900
     height: 460
-    minimumWidth: 620
+    // as wide as its widest row of buttons and boxes needs, in any language (issue 507)
+    minimumWidth: Math.max(620, buttonRow.implicitWidth + 16)
     minimumHeight: 340
     readonly property var widths: [300, 180, 150, 80, 100]
     // the games ticked by their folders, and the one picked
@@ -73,6 +74,7 @@ ApplicationWindow {
                     }
                 }
                 ListView {
+                    boundsBehavior: Flickable.StopAtBounds
                     id: list
                     objectName: "precompiledList"
                     Layout.fillWidth: true
@@ -119,6 +121,7 @@ ApplicationWindow {
         }
         Label { id: detail; wrapMode: Text.WordWrap; Layout.fillWidth: true; Layout.preferredHeight: 34 }
         RowLayout {
+            id: buttonRow
             Layout.fillWidth: true
             Button {
                 text: win.tickedSize === "" ? qsTrId("common.remove_mnemonic") : qsTrId("precompiled_modules.remove").arg(win.tickedSize)

@@ -13448,3 +13448,213 @@ keeping no branches and the removal taking only the first marker, 13 checks
 failed. A new test clicks TAStudio's list with Ctrl and Shift (14 checks;
 with Shift counting from the row picked last instead of the row clicked
 before, 4 failed). Not tried on Windows by hand: the reporter's Space.
+
+## Qt stays as it is built (user-decided, 2026-11-04)
+
+Issue 492 asked for a smaller release. Two cuts shipped: the test program
+bin/test_vm.exe left the Windows bundle (Development build 60034261), and
+Chimera now builds its own smaller ffmpeg (Development build bf821013), which
+took the Windows download from 59.6 MB to 36.6 MB. Qt was the last part
+asked about: it is 20.3 MB of the 36.6 MB Windows zip (Qt6Gui 4.9 MB, Qt6Core
+4.1, Qt6Quick 3.0, Qt6Qml 2.3), and the bundle already ships only the QML
+modules the window imports (tools/stage-qt-windows.py); what is left unused
+there is about 0.1 MB. A real cut would need Qt built another way, for size
+or with link-time optimisation, which makes drawing and QML slower. The owner
+chose to keep Qt as it is built (over measuring both builds first, or
+switching to a size build unmeasured): the window's speed matters more than a
+few megabytes.
+
+## A core may call back at the memory a script watches (user-decided, 2026-11-04)
+
+On 2026-10-21 the owner let a core call back part way through a frame at each
+read of its controls (`event.oninputpoll`), and kept the memory events
+(`event.on_bus_exec`, `on_bus_read`, `on_bus_write`) refused. Issue 496 asked
+for them, for scripts that watch what a game does inside a frame (the
+reporter ported the Gens core and has such scripts). The owner chose to add
+them as a feature a core offers, over keeping them refused.
+
+A core offers them with four exports (docs/porting-a-core.md): the address
+spaces it can watch, by name (its "scopes"), the engine's function in
+miniBox's callback slot 4, and calls to start and stop watching an address,
+or every address, of a scope for one kind of access - an instruction about to
+run, a read or a write. It calls the function at each watched access with the
+kind, scope, address and value. The engine passes the call to the window's
+function, on the machine's thread, inside the frame, as it does an input
+poll; the call counts as the core's work. The window keeps what the scripts
+watch and asks it again of a core opened again. Lua asks the core to watch a
+place when the first function wants it and to stop when the last is removed;
+`event.availableScopes` lists the scopes; a core without the exports, or
+asked for what it cannot watch, refuses the function with Chimera's words.
+The function gets the address and the value, may read and write memory, and
+must not advance, save or load. Each core adds this to its own CPU, so cores
+offer it one by one; one whose CPU recompiles code may offer only part.
+
+The synthetic core offers it (scopes Code and RAM). Tested: the witness's
+`E:memory-calls` (`chimera-run --watch-memory`): the instruction at 0 called
+once in each of the 70 frames of the win movie, reads of the status byte
+twice a frame (140) with values summing to 91 (the game's status), a read in
+the Code scope refused, and the machine ending on the goldens; with the core
+calling at every instruction instead of the watched one it counted 186,975
+calls. `T:box:memoryCalls`: a script in the real window sees those calls,
+values matching memory, every write already in memory, refusals for a scope
+and a kind the core lacks, and no calls once its functions are removed; it
+failed when the window said a watch was taken without asking the core. Not
+yet offered by any emulator core.
+
+## The window's fixes from one tester's evening (2026-11-05)
+
+Nineteen reports came in on the night of 2026-11-04 (issues 498 to 516),
+from one tester on Windows. These are fixed here; three wait for the owner
+(issues 500, 502 and 511).
+
+- **Closing TAStudio while it played** (issue 501): Yes to "Save Chimera
+  Project?" saved, and the window stayed open. The close waits for the save
+  to be confirmed, and the confirmation is dropped when the project changed
+  after the save was asked for, as it should be. But a project that records
+  as it plays changes every frame, so a frame recorded while the save was
+  under way dropped it, and the close waited for ever. The machine is now
+  paused first and saved once it has stopped. Measured with the synthetic
+  core, TAStudio playing, closed and answered Yes: the published build stayed
+  open in 1 of 8 runs, this one closed and saved in 12 of 12.
+- **Windows too small for what they hold** (issues 505, 506, 507): most
+  tool windows had no smallest size, and could be dragged down until their
+  rows overlapped. Every window now has one: a settings window its opening
+  size, a tool window the size at which its rows still fit (each was looked
+  at there); Firmware, Pre-Compiled Modules and Cache Manager as wide as their
+  widest row of buttons, in whatever language. Core Manager's and Supported
+  Systems' lists fit their columns to the room, and are cut at their edge
+  rather than drawn under what is beside them. Core Manager's "There are no
+  cores in this folder yet." was said while the folder was first read and
+  stayed beside the cores found after it; it goes now.
+- **Scrolled text went out of sight** (issue 515): Qt lets a mouse wheel
+  carry a list or a text box past its ends, and it springs back. Every list
+  and scrolled box now stops at its ends.
+- **A message that could not be read whole** (issue 514): New Project's
+  compile line and its status line wrap, and can be selected and copied.
+- **Export Core Log** (issue 498) says what the log is before asking where
+  to save it, starts in Config > Paths' Debug Logs folder, and brings the main
+  window up, so its questions are not hidden behind TAStudio.
+- **Save dialogs name the game** (issues 499, 510): RAM Watch, RAM Search,
+  Hex Editor, Lua sessions, Surface Viewer and TAStudio's macros start at the
+  game's name with their ending ("gridWalker.wch"); Export Save Data names a
+  single file after the game, the date and time and the core's own name for
+  it, so the ending the core reads it by stays.
+- **Unsaved projects in the cache** (issue 504): every project keeps a
+  folder in the cache with where its files are; one never saved to a file can
+  never be opened again, so its folder goes when it closes, unless its work
+  was kept to be recovered. A folder some project file named stays.
+- **RAM Watch kept unsaved watches** (issue 509): No to "Save watch file?"
+  when closing now lets the changes go; the window opens again on the list as
+  it was saved (or empty).
+- **RAM Search** (issue 508): a double click puts the address in RAM Watch.
+- **Reproducible Media Maker** (issue 503) asks before closing while a file
+  is being made.
+- **Report an Issue** (issue 516) asks for the graphics card again when a
+  report is made and none was named, and on Windows takes the system's name
+  for the display adapter when Qt has none. Not reproduced on the GTX 1060
+  here: both the published build and this one named it.
+- A label showed its menu letter as "&" (issue 512).
+
+Tested: the view models' test checks the core list's status, a report naming
+the card asked for late, and an unsaved project's cache gone with the saved
+one's kept; with each fix taken out, its check failed (3 checks, plus 6 that
+follow from the unsaved one). The window was looked at on Xvfb: RAM Search's
+double click, RAM Watch's No, the save dialog's name, every window at its
+smallest size. Window tests 61 passed, 2 failed as they did before
+(installed packages and command line, which fail on this machine); witness
+125 passed. Not tried on Windows except Report an Issue.
+
+## Core-Specific Tools is one list (user-decided, 2026-11-05)
+
+Tools > Core-Specific Tools held a submenu a core, and each tool under it, a
+third level. A menu cannot leave its window (owner, 2026-11-01), so in a
+window with no room to the right of the second level, Qt put the third to its
+left, over Tools itself: the tool's name covered "Core-Specific Tools", and
+it looked as if the item had been replaced (issue 502, ares running, the
+DSDA-Doom core's tool offered). The owner chose one list, each tool named
+after its core ("DSDA-Doom: Import Demo (LMP)..."), over putting the running
+core's tools first or listing only the running core's. Every installed
+core's tools are still offered whatever runs.
+
+Tested: the core tools menu test now reads the list's rows, by their names,
+and checks none is a submenu; it failed with the menu of submenus.
+
+## Save data has a folder of its own, a folder a core (user-decided, 2026-11-05)
+
+Export Save Data opened its save dialog in whatever folder a dialog had used
+last, often Movies (issue 500). The owner chose a folder of its own in Config
+> Paths' global list, Save data (`./SaveData`), with a folder in it for each
+core, made when that core's save data is first exported; over a Save RAM
+folder for each system, as BizHawk has, or keeping the last folder. The core's
+name is made fit for a folder (the characters Windows refuses become "_").
+
+Tested: the view models' test asks for the folder with a core named
+"A/B: C?. " and gets SaveData/A_B_ C_, made; it failed with the core's folder
+left out. The Paths list's row counts in the test grew by one.
+
+## Macro Input is a step-by-step wizard (user-decided, 2026-11-05)
+
+Macro Input was laid out as Chimera's window: two numbers and Set Macro, a
+list of zones, a name, a frame, Place Zone, Replace and Overlay, and the
+movie's controls ticked along the bottom, with nothing saying what any of it
+is for. A tester found it "nearly completely inscrutable" (issue 511). The
+owner chose a step-by-step wizard over explaining and tidying the old layout
+or only writing a page about it.
+
+The wizard says what a macro is - a stretch of the movie's input, some frames
+and some controls, placed again elsewhere or saved as a .chimeraMacro file to
+place in another movie - and offers two ways through. Making one: its first
+and last frame (or TAStudio's selection), the controls it carries, its name,
+then Save as File..., Place It..., or both. Placing one: a zone of this
+session or one loaded from a file, then where it goes (a frame, or the
+current one), written over the frames there or inserted before them, its
+buttons pressed on top of what is there or not, and Place. Each choice is
+worded as what it does ("Insert it before them, moving them later") rather
+than as the old one-word options. The view model is the one the old window
+used; nothing in the engine changed. The File menu, Recent and the question
+on closing with macros not saved stay. Five texts of the old layout went from
+the 26 language tables, nineteen came in.
+
+Tested: on Xvfb with the synthetic core and a 1,567-frame movie, both ways
+through: frames 0 to 9 with P1 Start left out, named Walk and placed at frame
+100 ("Placed Walk at frame 100"); then the place way's list showed the entire
+movie and Walk. The strict window tests load it with no QML warning, and the
+language test checks the new texts keep "TAStudio" and "Chimera" as they are.
+
+## Real Time is at the left (user-decided, 2026-11-05)
+
+Display Real Time was drawn at the top right, under Game Time (owner,
+2026-10-31). A tester expected it at the left with the other counters (issue
+519), and the owner moved its first place there: under Rerecords, 70 down. The
+on-screen watches, which were 70 down, start a line lower, 84 down. A place
+already changed in Config > Messages stays where it was put.
+
+## More fixes from the same tester (2026-11-05)
+
+Issues 517 to 524, from the same evening.
+
+- **About** opens centred on the main window (issue 517); the system put it
+  off centre.
+- **Display Configuration's snow boxes** showed "TypeError: Property 'Number'
+  of object [null] is not a function" (issue 518): the window declared a box
+  of its own called Number, which hid JavaScript's Number() inside it, so the
+  snow's two number boxes could not write their text, and the custom aspect
+  ratio's two fields never saved what was typed. They use parseFloat now,
+  and the boxes are called NumberBox, here and in TAStudio Settings.
+- **RAM Search and RAM Watch's headings** are at the left of their columns,
+  as the other lists' are (issue 520), and a heading's right edge dragged
+  makes its column wider or narrower (issue 523); the widths are remembered
+  (`columnWidths`, as `hiddenColumns` is).
+- **The watches over the picture** are drawn only while RAM Watch is open
+  (issue 524), as Chimera's were, and go on in a further column where the
+  picture is too short for them (issue 521), on the screen and in Encode
+  Video's Capture OSD.
+- **Saving a watch list** opens in the Watch folder of Config > Paths, made
+  first (issue 522): it is Tools by default, and when Tools was not there yet
+  the dialog went to the folder above it, the base.
+
+Tested on Xvfb with the synthetic core: About's centre on the main window's;
+the snow boxes reading 1.0 and -2.00; 60 watches on the screen in three
+columns; a saved list's watches gone from the screen when RAM Watch closed;
+the Domain column dragged to 184 pixels and remembered. The view models' test
+checks the new default places.

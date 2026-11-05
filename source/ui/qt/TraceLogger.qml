@@ -23,6 +23,8 @@ ApplicationWindow {
     title: qsTrId("trace_logger.trace_logger")
     width: 620
     height: 520
+    minimumWidth: 440
+    minimumHeight: 300
     onVisibleChanged: {
         if (visible) windowOptions.placeBack(false)
         else if (win.vm.logging) win.vm.logging = false
@@ -118,6 +120,7 @@ ApplicationWindow {
             Label { text: qsTrId("trace_logger.registers"); padding: 3; font.bold: true }
         }
         ListView {
+            boundsBehavior: Flickable.StopAtBounds
             id: list
             objectName: "traceLines"
             Layout.fillWidth: true

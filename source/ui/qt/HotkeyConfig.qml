@@ -20,6 +20,8 @@ ApplicationWindow {
     title: qsTrId("hotkey_config.configure_hotkeys")
     width: 783
     height: 463
+    minimumWidth: 783
+    minimumHeight: 463
     modality: Qt.ApplicationModal
     transientParent: win.mainWindow
 
@@ -160,6 +162,7 @@ ApplicationWindow {
                     width: Math.max(search.width, 200)
                     padding: 1
                     contentItem: ListView {
+                        boundsBehavior: Flickable.StopAtBounds
                         implicitHeight: Math.min(contentHeight, 200)
                         clip: true
                         model: search.suggestions

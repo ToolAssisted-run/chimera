@@ -26,6 +26,8 @@ ApplicationWindow {
     title: qsTrId("lua_console.lua_console")
     width: 760
     height: 460
+    minimumWidth: 560
+    minimumHeight: 300
 
     function editFiles(paths) {
         for (const p of paths.split("\n")) if (p !== "") Qt.openUrlExternally(win.fileUrl(p))
@@ -118,6 +120,7 @@ ApplicationWindow {
         title: qsTrId("lua_console.save_session_as")
         fileMode: FileDialog.SaveFile
         defaultSuffix: "luases"
+        gameFileEnding: ".luases"
         currentFolder: win.folderOf ? win.folderOf("Lua") : ""
         nameFilters: [qsTrId("lua_console.lua_session_files_luases")]
         onAccepted: win.vm.run("saveSessionAs", [selectedFile])
@@ -375,6 +378,7 @@ ApplicationWindow {
                 }
             }
             ListView {
+                boundsBehavior: Flickable.StopAtBounds
                 id: scriptList
                 objectName: "luaScriptList"
                 Layout.fillWidth: true
@@ -462,6 +466,7 @@ ApplicationWindow {
                 anchors.fill: parent
                 spacing: 4
                 ListView {
+                    boundsBehavior: Flickable.StopAtBounds
                     id: output
                     objectName: "luaOutput"
                     Layout.fillWidth: true
@@ -547,6 +552,7 @@ ApplicationWindow {
                 Label { text: qsTrId("lua_console.guid"); Layout.fillWidth: true; font.bold: true }
             }
             ListView {
+                boundsBehavior: Flickable.StopAtBounds
                 id: functionList
                 Layout.fillWidth: true
                 Layout.fillHeight: true
@@ -684,6 +690,7 @@ ApplicationWindow {
                         }
                     }
                     ListView {
+                        boundsBehavior: Flickable.StopAtBounds
                         id: docList
                         objectName: "luaFunctionsList"
                         Layout.fillWidth: true

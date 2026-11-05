@@ -21,6 +21,8 @@ ApplicationWindow {
     title: qsTrId("messages_config.configure_on_screen_messages")
     width: 560
     height: 470
+    minimumWidth: 560
+    minimumHeight: 470
     modality: Qt.ApplicationModal
     transientParent: win.mainWindow
     // the types listed: Game Time only while the open core has a game timer (issue 470)

@@ -101,6 +101,7 @@ HelpViewModel::HelpViewModel(Dispatcher &dispatcher, SessionViewModel &session, 
 			/* the card a core drew on in this session, in its driver's words; else the window's */
 			facts.glRenderer = ce_gl_renderer() != nullptr ? ce_gl_renderer() : "";
 			facts.glVersion = ce_gl_version() != nullptr ? ce_gl_version() : "";
+			if (windowGpu.get().empty() && gpuNow) windowGpu.set(gpuNow());
 			facts.windowGpu = windowGpu.get();
 			facts.cpu = ce_host_cpu_name() != nullptr ? ce_host_cpu_name() : "";
 			facts.threads = std::thread::hardware_concurrency();

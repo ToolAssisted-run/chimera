@@ -18,6 +18,12 @@ T.ScrollView {
     readonly property bool wrapsText: contentChildren.length === 1 && contentChildren[0] instanceof T.TextArea
         && contentChildren[0].wrapMode !== TextEdit.NoWrap
 
+    // the content stops at its ends: Qt's own let a mouse wheel carry it past
+    // them, out of sight, until it sprang back (issue 515)
+    function stopAtEnds() { if (control.contentItem instanceof Flickable) control.contentItem.boundsBehavior = Flickable.StopAtBounds }
+    onContentItemChanged: stopAtEnds()
+    Component.onCompleted: stopAtEnds()
+
     rightPadding: control.mirrored ? 0 : effectiveScrollBarWidth
     leftPadding: control.mirrored ? effectiveScrollBarWidth : 0
     bottomPadding: effectiveScrollBarHeight

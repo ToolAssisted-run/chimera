@@ -20,7 +20,8 @@ ApplicationWindow {
     title: qsTrId("firmware_config.firmware")
     width: 860
     height: 440
-    minimumWidth: 640
+    // as wide as its widest row of buttons and boxes needs, in any language (issue 507)
+    minimumWidth: Math.max(640, findRow.implicitWidth + 16, buttonRow.implicitWidth + 16)
     minimumHeight: 300
     onVisibleChanged: if (visible) { win.vm.picked = -1; win.vm.run("refresh") }
     // a command that fills the list again, the list left where it was scrolled to, as Chimera's
@@ -90,6 +91,7 @@ ApplicationWindow {
             Layout.fillWidth: true
         }
         RowLayout {
+            id: findRow
             // Chimera's Find box (issue 368): the lines whose core, firmware, release, file asked for or file found holds it
             Label { text: qsTrId("firmware_config.find") }
             TextField {
@@ -130,6 +132,7 @@ ApplicationWindow {
                     }
                 }
                 ListView {
+                    boundsBehavior: Flickable.StopAtBounds
                     id: list
                     objectName: "firmwareList"
                     Layout.fillWidth: true
@@ -216,6 +219,7 @@ ApplicationWindow {
             wrapMode: Text.NoWrap
         }
         RowLayout {
+            id: buttonRow
             Button { text: qsTrId("firmware_config.set_file"); enabled: win.vm.canSet; onClicked: win.browse() }
             Button { text: qsTrId("common.clear"); enabled: win.vm.canClear; onClicked: win.keepingPlace("clearFile", [win.vm.picked]) }
             Button { text: qsTrId("common.scan_folder"); onClicked: folderDialog.open() }

@@ -21,6 +21,8 @@ ApplicationWindow {
     title: qsTrId("cpu_registers.cpu_registers")
     width: 320
     height: 420
+    minimumWidth: 260
+    minimumHeight: 240
     onVisibleChanged: {
         if (visible) { windowOptions.placeBack(false); win.vm.run("refresh") }
     }

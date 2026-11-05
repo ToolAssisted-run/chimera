@@ -86,6 +86,7 @@ ApplicationWindow {
                     }
                 }
                 ListView {
+                    boundsBehavior: Flickable.StopAtBounds
                     id: files
                     objectName: "projectFileList"
                     Layout.fillWidth: true

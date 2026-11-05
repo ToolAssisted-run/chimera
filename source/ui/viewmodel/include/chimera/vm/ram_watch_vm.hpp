@@ -89,6 +89,8 @@ public:
 	Property<std::string> recentFiles;
 	/* the columns not shown, by Chimera's names, comma-separated, remembered */
 	Property<std::string> hiddenColumns{"Prev,Diff,Type"};
+	/* the columns a person made wider or narrower, "Domain:120,Notes:200", remembered (issue 523) */
+	Property<std::string> columnWidths;
 
 	/* the watches as the window shows them (the view's thread) */
 	const std::vector<Watch> &watches() const { return watches_; }

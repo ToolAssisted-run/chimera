@@ -164,12 +164,13 @@ ApplicationWindow {
             lines.push(line)
             return lines
         }
-        function place(name, lines, color) {
+        // dx: how far from its place across, for a further column of the same thing
+        function place(name, lines, color, dx) {
             const p = root.osdPositions[name]
             lines = lines.filter(t => t !== "")
             if (!p || lines.length === 0) return
             const bw = Math.max(...lines.map(widthOf)), bh = lines.length * lh
-            const x = p.anchor === 0 || p.anchor === 2 ? p.x * k : w - p.x * k - bw
+            const x = p.anchor === 0 || p.anchor === 2 ? p.x * k + (dx || 0) : w - p.x * k - bw - (dx || 0)
             const y = p.anchor < 2 ? p.y * k : h - p.y * k - bh
             lines.forEach((t, i) => out.push({text: t, x: Math.round(x), y: Math.round(y + i * lh), color: String(color)}))
         }
@@ -194,7 +195,17 @@ ApplicationWindow {
         if (root.session.showInput) place("Input Display", [root.session.inputText], root.osdMovieInputColor)
         if (root.session.showLagCounter) place("Lag Counter", [String(root.session.lagCount)], root.osdAlertColor)
         if (root.session.stickyArmed) place("Autohold", [root.session.stickyText], root.osdColor("OsdAutoHold", "#FFFFFF"))
-        if (root.ramWatch.onScreenText !== "") place("Watches", root.ramWatch.onScreenText.split("\n"), "white")
+        // the watches while RAM Watch is open (issue 524), in as many columns as the height needs (issue 521)
+        if (root.ramWatch.onScreenText !== "" && ramWatchWindow.visible) {
+            const all = root.ramWatch.onScreenText.split("\n"), p = root.osdPositions["Watches"]
+            const rows = Math.max(1, Math.floor((h - (p ? p.y : 0) * k) / lh))
+            let dx = 0
+            for (let at = 0; at < all.length; at += rows) {
+                const part = all.slice(at, at + rows)
+                place("Watches", part, "white", dx)
+                dx += Math.max(...part.map(widthOf)) + 12 * k
+            }
+        }
         return out
     }
     // the keys of every hotkey, for the menus to show beside their actions
@@ -324,6 +335,25 @@ ApplicationWindow {
                 then()
             }
         }
+        function onRunningChanged() {
+            if (root.session.running || !root.saveWhenPaused) return
+            root.saveWhenPaused = false
+            root.saveToLeave()
+        }
+    }
+    // the project saved before it is left. A running machine is paused first
+    // and saved once it has stopped: a movie that records as it plays changed
+    // the project after every save, so the save never caught up and what
+    // waited for it (closing TAStudio) never came (issue 501)
+    property bool saveWhenPaused: false
+    function saveToLeave() {
+        if (root.session.running) {
+            root.saveWhenPaused = true
+            root.session.run("pause")
+            return
+        }
+        if (root.session.projectPath === "") root.askSaveAs()
+        else root.session.run("saveProject")
     }
     // what a hotkey does when it is the window's: a menu's action, a dialog, a
     // window; TAStudio's editing is TAStudio's
@@ -691,9 +721,17 @@ ApplicationWindow {
                     if (names === "") { root.note(qsTrId("main.this_machine_holds_no_save_data")); return }
                     const list = names.split("\n")
                     saveDataDialog.files = list.length
-                    // one file under its own name; more in a zip named for the game
-                    saveDataDialog.selectedFile = "file:///" + (list.length === 1 ? list[0].replace(/^.*[\\/]/, "")
-                                                                                   : qsTrId("main.save_data_file").arg(root.session.gameName))
+                    // one file under its own name, after the game's and the time (issue 499:
+                    // "save.flash" alone said nothing); more in a zip named for the game
+                    const game = root.session.gameName.replace(/[<>:"\/\\|?*]/g, "_")
+                    const own = list[0].replace(/^.*[\\/]/, "")
+                    const name = list.length === 1
+                        ? (game !== "" ? game + " " + Qt.formatDateTime(new Date(), "yyyy-MM-dd HH.mm.ss") + " " : "") + own
+                        : qsTrId("main.save_data_file").arg(root.session.gameName)
+                    // in Paths' Save data folder, a folder the core's, made now (owner, 2026-11-05, issue 500)
+                    const folder = root.paths.run("dialogFolder", ["Save data", true, root.session.coreName]) || ""
+                    saveDataDialog.currentFolder = root.pictureFiles.folderUrl(folder)
+                    saveDataDialog.selectedFile = folder !== "" ? root.pictureFiles.folderUrl(folder + "/" + name) : "file:///" + name
                     saveDataDialog.open()
                 }
             }
@@ -711,17 +749,26 @@ ApplicationWindow {
                 Action {
                     text: qsTrId("main.export_core_log_dialog")
                     icon.source: root.session.coreLogPath !== "" ? "qrc:/chimera/menu/CoreLogOn.png" : "qrc:/chimera/menu/CoreLog.png"
+                    // the main window brought up first: its questions are in it, and
+                    // TAStudio beside it could hide them (issue 498)
                     onTriggered: {
+                        root.raise()
+                        root.requestActivate()
                         if (root.session.coreLogPath !== "") {
                             coreLogOffDialog.size = root.session.run("coreLogSize")
                             coreLogOffDialog.open()
-                        } else {
-                            coreLogFileDialog.selectedFile = "file:///" + root.session.run("coreLogName")
-                            coreLogFileDialog.open()
-                        }
+                        } else coreLogAboutDialog.open()
                     }
                 }
-                Action { text: qsTrId("main.about"); icon.source: "qrc:/chimera/menu/About.png"; onTriggered: aboutWindow.show() }
+                // centred on the main window: left to the system, it opened off centre (issue 517)
+                Action {
+                    text: qsTrId("main.about"); icon.source: "qrc:/chimera/menu/About.png"
+                    onTriggered: {
+                        aboutWindow.x = root.x + Math.round((root.width - aboutWindow.width) / 2)
+                        aboutWindow.y = root.y + Math.round((root.height - aboutWindow.height) / 2)
+                        aboutWindow.show()
+                    }
+                }
             }
         }
         // at the right of the menus while TAStudio is hidden, as Chimera's
@@ -1046,6 +1093,27 @@ ApplicationWindow {
         // over another window only for the one question (leaveProject)
         onVisibleChanged: if (!visible) parentWindow = root
     }
+    // what the core log is, before where it goes (issue 498)
+    Dialog {
+        id: coreLogAboutDialog
+        title: qsTrId("main.export_core_log")
+        anchors.centerIn: parent
+        modal: true
+        standardButtons: Dialog.Ok | Dialog.Cancel
+        Label {
+            text: qsTrId("main.the_core_log_is_a_text_file")
+            wrapMode: Text.WordWrap
+            width: 420
+        }
+        // saved in Paths' Debug Logs folder unless another is chosen (issue 498)
+        onAccepted: {
+            const folder = root.paths.run("dialogFolder", ["Debug Logs", true]) || ""
+            coreLogFileDialog.currentFolder = root.pictureFiles.folderUrl(folder)
+            const name = root.session.run("coreLogName")
+            coreLogFileDialog.selectedFile = folder !== "" ? root.pictureFiles.folderUrl(folder + "/" + name) : "file:///" + name
+            coreLogFileDialog.open()
+        }
+    }
     FileDialog {
         id: coreLogFileDialog
         title: qsTrId("main.export_core_log")
@@ -1122,8 +1190,7 @@ ApplicationWindow {
                 onClicked: {
                     askSaveDialog.close()
                     root.afterSave = root.afterAsk
-                    if (root.session.projectPath === "") root.askSaveAs()
-                    else root.session.run("saveProject")
+                    root.saveToLeave()
                 }
             }
             Button {
@@ -1518,12 +1585,17 @@ ApplicationWindow {
             color: root.osdColor("OsdAutoHold", "#FFFFFF")
         }
         // RAM Watch's on-screen watches, a line every 14, where Config >
-        // Messages puts them (Chimera's place: the top left, 70 down)
-        Column {
+        // Messages puts them (at first the top left, 84 down); only
+        // while RAM Watch is open (issue 524), and in further columns where
+        // the picture is too short for them (issue 521)
+        Grid {
             objectName: "onScreenWatches"
             x: root.osdX("Watches", width)
             y: root.osdY("Watches", height)
-            visible: root.session.isOpen
+            visible: root.session.isOpen && ramWatchWindow.visible
+            flow: Grid.TopToBottom
+            columnSpacing: 12 * root.osdScale
+            rows: Math.max(1, Math.floor((pictureArea.height - (root.osdPositions["Watches"] ? root.osdPositions["Watches"].y : 0) * root.osdScale) / (14 * root.osdScale)))
             Repeater {
                 model: root.ramWatch.onScreenText === "" ? [] : root.ramWatch.onScreenText.split("\n")
                 delegate: Text {

@@ -13,7 +13,8 @@ TASEmulators/iso_maker, which drives xorriso to the same end.
 
 **Tools > Reproducible Media Maker**, next to the cache manager. Choose the
 folder, the shape, and where to write it; the bar and the current file name show
-the work; Cancel stops it and leaves nothing behind.
+the work; Cancel stops it and leaves nothing behind. Closing the window while a
+file is being made asks first, and stops it only on Yes (issue 503).
 
 ## What is deliberately left out
 

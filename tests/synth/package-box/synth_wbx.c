@@ -34,6 +34,7 @@ extern void synth_get_video_bgra(synth_t *s, uint32_t *out);  /* palette-resolve
 extern int32_t *synth_get_registers(synth_t *s);
 extern uint32_t synth_get_frame_counter(synth_t *s);
 extern void (*synth_on_step)(uint32_t pc, const uint8_t *insn, const int32_t *r);
+extern void (*synth_on_access)(int write, uint32_t addr, uint32_t value);
 
 #define FB_W 128
 #define FB_H 120
@@ -189,6 +190,7 @@ static void precompile_step(void)
 }
 
 static int moving(void); /* the movingProperties setting, read once here */
+static void memory_stepped(uint32_t pc); /* calls at memory, below */
 /* The trace group (a trace logger): a line for each instruction run while
  * tracing is on - where, its bytes, then the registers after a tab - kept in
  * a buffer the host drains each frame. Invisible: the buffer and the flag are
@@ -198,6 +200,7 @@ ECL_INVISIBLE static char g_trace[TRACE_BYTES];
 ECL_INVISIBLE static int32_t g_traceUsed, g_traceLines, g_traceOverflow, g_traceOn;
 static void traced(uint32_t pc, const uint8_t *insn, const int32_t *r)
 {
+	memory_stepped(pc);
 	if (!g_traceOn) return;
 	char line[192];
 	const uint32_t imm = (uint32_t)insn[4] | ((uint32_t)insn[5] << 8) | ((uint32_t)insn[6] << 16) | ((uint32_t)insn[7] << 24);
@@ -421,6 +424,73 @@ ECL_EXPORT void SetInputPollCallback(uint64_t fn)
 {
 	g_inputPoll = (uintptr_t (*)(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t))(uintptr_t)fn;
 	synth_on_input = g_inputPoll != 0 ? input_polled : 0;
+}
+
+/* Calls at memory (issue 496): the host's function, in callback slot 4,
+ * called as fn(kind, scope, address, value) part way through the advance at
+ * each access the host watches - kind 0 an instruction about to run (scope 0,
+ * "Code": where it is, value 0), 1 a read and 2 a write of RAM (scope 1,
+ * "RAM": the first byte's place and the byte or word). The host watches an
+ * address, or every address of a kind. Invisible, as the input poll's: the
+ * same slot in every session, and no state carries it or what is watched, so
+ * a load leaves the watches as they are. */
+#define WATCHES 64
+ECL_INVISIBLE static uintptr_t (*g_memoryCall)(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t);
+ECL_INVISIBLE static uint64_t g_watched[3][WATCHES];
+ECL_INVISIBLE static int32_t g_watchedCount[3], g_watchedAll[3];
+static int watching(int kind, uint64_t address)
+{
+	if (g_watchedAll[kind]) return 1;
+	for (int i = 0; i < g_watchedCount[kind]; i++)
+		if (g_watched[kind][i] == address) return 1;
+	return 0;
+}
+static void memory_stepped(uint32_t pc)
+{
+	if (g_memoryCall != 0 && watching(0, pc)) g_memoryCall(0, 0, pc, 0, 0, 0);
+}
+static void memory_accessed(int write, uint32_t addr, uint32_t value)
+{
+	if (g_memoryCall != 0 && watching(write ? 2 : 1, addr)) g_memoryCall(write ? 2 : 1, 1, addr, value, 0, 0);
+}
+/* only a machine that watches a read or a write pays for the hook */
+static void memory_hook(void)
+{
+	const int any = g_watchedAll[1] || g_watchedAll[2] || g_watchedCount[1] > 0 || g_watchedCount[2] > 0;
+	synth_on_access = any ? memory_accessed : 0;
+}
+ECL_EXPORT const char *GetMemoryCallbackScopes(void) { return "Code\nRAM"; }
+ECL_EXPORT void SetMemoryCallback(uint64_t fn)
+{
+	g_memoryCall = (uintptr_t (*)(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t))(uintptr_t)fn;
+}
+ECL_EXPORT int32_t AddMemoryWatch(int32_t kind, int32_t scope, uint64_t address)
+{
+	/* instructions run from the code, and reads and writes go to the RAM */
+	if (kind < 0 || kind > 2 || scope != (kind == 0 ? 0 : 1)) return 0;
+	if (address == UINT64_MAX)
+		g_watchedAll[kind] = 1;
+	else if (!watching(kind, address))
+	{
+		if (g_watchedCount[kind] >= WATCHES) return 0;
+		g_watched[kind][g_watchedCount[kind]++] = address;
+	}
+	memory_hook();
+	return 1;
+}
+ECL_EXPORT void RemoveMemoryWatch(int32_t kind, int32_t scope, uint64_t address)
+{
+	if (kind < 0 || kind > 2 || scope != (kind == 0 ? 0 : 1)) return;
+	if (address == UINT64_MAX)
+		g_watchedAll[kind] = 0;
+	else
+		for (int i = 0; i < g_watchedCount[kind]; i++)
+			if (g_watched[kind][i] == address)
+			{
+				g_watched[kind][i] = g_watched[kind][--g_watchedCount[kind]];
+				break;
+			}
+	memory_hook();
 }
 
 /* An analog control's value, set before each frame. The synthetic game reads

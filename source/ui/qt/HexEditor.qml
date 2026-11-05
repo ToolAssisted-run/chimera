@@ -26,6 +26,8 @@ ApplicationWindow {
     title: win.vm.title
     width: 720
     height: 420
+    minimumWidth: 600
+    minimumHeight: 260
 
     WindowOptions { id: windowOptions; window: win; tool: "hexEditor"; vm: win.toolWindows; mainWindow: win.mainWindow }
     onVisibleChanged: {
@@ -60,6 +62,7 @@ ApplicationWindow {
         title: qsTrId("hex_editor.save_as_binary")
         fileMode: FileDialog.SaveFile
         defaultSuffix: "bin"
+        gameFileEnding: ".bin"
         nameFilters: [qsTrId("hex_editor.binary_files_bin"), qsTrId("common.all_files")]
         onAccepted: win.vm.run("saveBinary", [selectedFile])
     }
@@ -68,6 +71,7 @@ ApplicationWindow {
         title: qsTrId("hex_editor.save_as_text")
         fileMode: FileDialog.SaveFile
         defaultSuffix: "txt"
+        gameFileEnding: ".txt"
         nameFilters: [qsTrId("hex_editor.text_files_txt"), qsTrId("common.all_files")]
         onAccepted: win.vm.run("saveText", [selectedFile])
     }

@@ -526,7 +526,10 @@ void CoresViewModel::sayManager()
 		n = managed_.size();
 	}
 	managerHeader.set(tr("cores.manager_header", static_cast<int64_t>(n), {coresFolder.get()}));
+	/* said while the folder was first read, it went on being said beside the
+	 * cores found after it (issue 505) */
 	if (n == 0) managerStatus.set(tr("cores.none_yet"));
+	else if (managerStatus.get() == tr("cores.none_yet")) managerStatus.set("");
 	managerRows_.reset.emit();
 }
 

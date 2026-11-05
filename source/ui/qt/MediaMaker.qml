@@ -4,7 +4,8 @@
 // folder as, Save as with its own Save as...; the bar, the file being
 // written, what came of it (the file, its SHA1 and size, or why not), and
 // Make (Cancel while packing) and Close. A dialog of the main window, as
-// Chimera's; Escape closes it, and closing stops a pack under way. Layout
+// Chimera's; Escape closes it, and closing during a pack asks first, then
+// stops it. Layout
 // and bindings only, over the mediaMaker view model.
 import QtQuick
 import QtQuick.Controls
@@ -26,7 +27,25 @@ ApplicationWindow {
     modality: Qt.ApplicationModal
     transientParent: win.mainWindow
     flags: Qt.Dialog
-    onClosing: if (win.vm.running) win.vm.run("cancel")
+    // closed while a file is being made: asked first, and the file is only
+    // given up on Yes (issue 503)
+    property bool closingAsked: false
+    onClosing: (close) => {
+        if (!win.vm.running || win.closingAsked) { win.closingAsked = false; if (win.vm.running) win.vm.run("cancel"); return }
+        close.accepted = false
+        stopAsk.open()
+    }
+    MessageDialog {
+        id: stopAsk
+        title: qsTrId("media_maker.reproducible_media_maker")
+        text: qsTrId("media_maker.stop_making_and_close")
+        buttons: MessageDialog.Yes | MessageDialog.No
+        onButtonClicked: (button) => {
+            if (button !== MessageDialog.Yes) return
+            win.closingAsked = true
+            win.close()
+        }
+    }
     // a path as a file dialog takes it
     function urlOf(path) { return localFiles.folderUrl(path) }
     readonly property var extensions: [".zip", ".iso", ".img"]

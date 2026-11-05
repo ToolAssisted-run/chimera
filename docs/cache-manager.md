@@ -41,6 +41,12 @@ The other exception the window enforces itself: **what is open cannot be
 removed**. Pulling a greenzone out from under a running session costs work, not
 time, so the tick is refused rather than the removal being attempted.
 
+A project's folder holds little more than where its files are when its
+greenzone was not kept, and is listed at 0 KB: those of saved projects let
+them open again without asking for their files. A project never saved to a
+file can never be opened again, so its folder goes when it closes (issue
+504), unless its work was kept to be recovered.
+
 ## Where it all is
 
 Everything the window lists is under the user's data directory -
@@ -49,7 +55,7 @@ Everything the window lists is under the user's data directory -
 
 | | |
 | --- | --- |
-| `Projects/<id>/` | one run's greenzone and what its project is called |
+| `Projects/<id>/` | one run's greenzone, what its project is called and where its files are on this computer |
 | `UnpackedCores/<name>-<sha1>/` | a `.chimeraCore` unzipped so it can be loaded |
 | `Cache/PrecompiledCode/<game sha1>/` | what a core compiled for one game (not the manager's: `Tools > Pre-Compiled Modules...`) |
 | `Recovery/<id>/` | unsaved work: one project's recovery journal, snapshot and session |

@@ -21,7 +21,7 @@
 <p align="center">
 	<a href="https://github.com/ToolAssisted-run/chimera"><img src="docs/star.svg" alt="Enjoying Chimera? Give it a star on GitHub. Stars help other players find the project." width="560"></a>
 	<br>
-	<a href="https://github.com/ToolAssisted-run/chimera/stargazers"><img src="https://img.shields.io/github/stars/ToolAssisted-run/chimera?style=for-the-badge&logo=github&label=stars&labelColor=2DB3A6&color=8A63E8" alt="GitHub stars"></a>
+	<a href="https://github.com/ToolAssisted-run/chimera"><img src="https://img.shields.io/github/stars/ToolAssisted-run/chimera?style=for-the-badge&logo=github&label=stars&labelColor=2DB3A6&color=8A63E8" alt="GitHub stars"></a>
 </p>
 
 ## Goals

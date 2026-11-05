@@ -18,6 +18,8 @@ ApplicationWindow {
     title: qsTrId("log_window.log_window")
     width: 640
     height: 400
+    minimumWidth: 440
+    minimumHeight: 220
 
     WindowOptions { id: windowOptions; window: win; tool: "logWindow"; vm: win.toolWindows; mainWindow: win.mainWindow }
     onVisibleChanged: if (visible) windowOptions.placeBack(false)
@@ -61,6 +63,7 @@ ApplicationWindow {
         anchors.fill: parent
         anchors.margins: 8
         ListView {
+            boundsBehavior: Flickable.StopAtBounds
             id: list
             objectName: "logLines"
             Layout.fillWidth: true

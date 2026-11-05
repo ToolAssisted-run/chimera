@@ -21,6 +21,8 @@ ApplicationWindow {
     title: qsTrId("paths_config.path_configuration")
     width: 784
     height: 540
+    minimumWidth: 784
+    minimumHeight: 540
     modality: Qt.ApplicationModal
     transientParent: win.mainWindow
 
@@ -60,7 +62,7 @@ ApplicationWindow {
     // Chimera's defaults for every global folder (the by System tab keeps what it has)
     readonly property var chimeraGlobals: ({
         "Base": ".", "ROM": ".", "Firmware": "./Firmware", "Movies": "./Movies", "Movie backups": "./Movies/backup", "A/V Dumps": ".",
-        "Tools": "./Tools", "Lua": "./Lua", "Themes": "./Themes", "Watch (.wch)": ".", "Debug Logs": ".", "Bug reports": "./Reports",
+        "Tools": "./Tools", "Lua": "./Lua", "Themes": "./Themes", "Watch (.wch)": ".", "Debug Logs": ".", "Bug reports": "./Reports", "Save data": "./SaveData",
         "Macros": "./Movies/Macros", "Temp Files": ""
     })
 
