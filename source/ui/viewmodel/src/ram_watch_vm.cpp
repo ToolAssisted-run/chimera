@@ -212,6 +212,7 @@ RamWatchViewModel::RamWatchViewModel(Dispatcher &dispatcher, SessionViewModel &s
 	expose("recentFiles", ".wch files opened or saved, newest first, a line each", recentFiles, true);
 	expose("hiddenColumns", "the columns not shown, by Chimera's names (OSD, Address, Value, Prev, Changes, Diff, Type, Domain, "
 		"Notes), comma-separated", hiddenColumns, true);
+	expose("columnWidths", "the columns a person resized and their widths, \"Domain:120,Notes:200\"", columnWidths, true);
 	command("select", "a row picked: mode \"only\" (a click), \"toggle\" (Ctrl), \"range\" (Shift, from the last clicked) or "
 		"\"none\" (every row let go)", {"row", "mode"}, [this](const Args &a, std::string &error) -> Value {
 			int64_t r = 0;

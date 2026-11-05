@@ -13095,3 +13095,41 @@ through: frames 0 to 9 with P1 Start left out, named Walk and placed at frame
 100 ("Placed Walk at frame 100"); then the place way's list showed the entire
 movie and Walk. The strict window tests load it with no QML warning, and the
 language test checks the new texts keep "TAStudio" and "Chimera" as they are.
+
+## Real Time is at the left (user-decided, 2026-11-05)
+
+Display Real Time was drawn at the top right, under Game Time (owner,
+2026-10-31). A tester expected it at the left with the other counters (issue
+519), and the owner moved its first place there: under Rerecords, 70 down. The
+on-screen watches, which were 70 down, start a line lower, 84 down. A place
+already changed in Config > Messages stays where it was put.
+
+## More fixes from the same tester (2026-11-05)
+
+Issues 517 to 524, from the same evening.
+
+- **About** opens centred on the main window (issue 517); the system put it
+  off centre.
+- **Display Configuration's snow boxes** showed "TypeError: Property 'Number'
+  of object [null] is not a function" (issue 518): the window declared a box
+  of its own called Number, which hid JavaScript's Number() inside it, so the
+  snow's two number boxes could not write their text, and the custom aspect
+  ratio's two fields never saved what was typed. They use parseFloat now,
+  and the boxes are called NumberBox, here and in TAStudio Settings.
+- **RAM Search and RAM Watch's headings** are at the left of their columns,
+  as the other lists' are (issue 520), and a heading's right edge dragged
+  makes its column wider or narrower (issue 523); the widths are remembered
+  (`columnWidths`, as `hiddenColumns` is).
+- **The watches over the picture** are drawn only while RAM Watch is open
+  (issue 524), as Chimera's were, and go on in a further column where the
+  picture is too short for them (issue 521), on the screen and in Encode
+  Video's Capture OSD.
+- **Saving a watch list** opens in the Watch folder of Config > Paths, made
+  first (issue 522): it is Tools by default, and when Tools was not there yet
+  the dialog went to the folder above it, the base.
+
+Tested on Xvfb with the synthetic core: About's centre on the main window's;
+the snow boxes reading 1.0 and -2.00; 60 watches on the screen in three
+columns; a saved list's watches gone from the screen when RAM Watch closed;
+the Domain column dragged to 184 pixels and remembered. The view models' test
+checks the new default places.

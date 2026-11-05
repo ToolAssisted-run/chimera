@@ -69,12 +69,13 @@ ApplicationWindow {
         editable: true
         value: Math.round((win.picked[setting] || 0) / unit)
         onValueModified: win.pick(setting, value * unit)
-        textFromValue: (v, locale) => Number(v * tenths.unit).toFixed(tenths.places)
-        valueFromText: (text, locale) => Math.round(Number(text) / tenths.unit)
+        // parseFloat, not Number(): a component named Number here once took that name (issue 518)
+        textFromValue: (v, locale) => (v * tenths.unit).toFixed(tenths.places)
+        valueFromText: (text, locale) => Math.round(parseFloat(text) / tenths.unit)
         validator: DoubleValidator { decimals: tenths.places }
         Layout.preferredWidth: 90
     }
-    component Number: SpinBox {
+    component NumberBox: SpinBox {
         required property string setting
         from: 0
         to: 10000
@@ -109,7 +110,7 @@ ApplicationWindow {
                         // Chimera's prescaling: grown pixel by pixel by whole steps before the final filter
                         RowLayout {
                             Label { text: qsTrId("display_config.user_prescale") }
-                            Number { setting: "prescale"; from: 1; to: 16 }
+                            NumberBox { setting: "prescale"; from: 1; to: 16 }
                         }
                         Box { setting: "autoPrescale"; text: qsTrId("display_config.auto_prescale") }
                         GroupBox {
@@ -125,13 +126,13 @@ ApplicationWindow {
                             GridLayout {
                                 columns: 2
                                 Label { text: qsTrId("display_config.left") }
-                                Number { setting: "cropLeft"; to: 4000 }
+                                NumberBox { setting: "cropLeft"; to: 4000 }
                                 Label { text: qsTrId("display_config.top") }
-                                Number { setting: "cropTop"; to: 4000 }
+                                NumberBox { setting: "cropTop"; to: 4000 }
                                 Label { text: qsTrId("display_config.right") }
-                                Number { setting: "cropRight"; to: 4000 }
+                                NumberBox { setting: "cropRight"; to: 4000 }
                                 Label { text: qsTrId("display_config.bottom") }
-                                Number { setting: "cropBottom"; to: 4000 }
+                                NumberBox { setting: "cropBottom"; to: 4000 }
                             }
                         }
                         // Chimera's Defaults: no user prescale, Auto Prescale, bilinear, letterboxed, the system's ratio, nothing cropped
@@ -162,23 +163,23 @@ ApplicationWindow {
                                 Label { text: qsTrId("display_config.allow_pixel_distortion_e_g_2x1"); topPadding: 6 }
                                 RowLayout {
                                     RadioButton { text: qsTrId("display_config.use_custom_size"); checked: win.picked.aspectMode === 2; onClicked: win.pick("aspectMode", 2); padding: 2 }
-                                    Number { setting: "customWidth" }
+                                    NumberBox { setting: "customWidth" }
                                     Label { text: "x" }
-                                    Number { setting: "customHeight" }
+                                    NumberBox { setting: "customHeight" }
                                 }
                                 RowLayout {
                                     RadioButton { text: qsTrId("display_config.use_custom_ar"); checked: win.picked.aspectMode === 3; onClicked: win.pick("aspectMode", 3); padding: 2 }
                                     TextField {
                                         text: win.picked.ratioX !== undefined ? String(win.picked.ratioX) : ""
                                         validator: DoubleValidator { bottom: 0.01 }
-                                        onEditingFinished: win.pick("ratioX", Number(text))
+                                        onEditingFinished: win.pick("ratioX", parseFloat(text))
                                         Layout.preferredWidth: 64
                                     }
                                     Label { text: ":" }
                                     TextField {
                                         text: win.picked.ratioY !== undefined ? String(win.picked.ratioY) : ""
                                         validator: DoubleValidator { bottom: 0.01 }
-                                        onEditingFinished: win.pick("ratioY", Number(text))
+                                        onEditingFinished: win.pick("ratioY", parseFloat(text))
                                         Layout.preferredWidth: 64
                                     }
                                 }

@@ -1095,7 +1095,7 @@ void messagesConfig()
 		return p->find("x")->text + "," + p->find("y")->text + "," + p->find("anchor")->text;
 	};
 	CHECK(at("Fps") == "0,0,0" && at("Lag Counter") == "0,42,0" && at("Messages") == "0,0,2" && at("Autohold") == "0,0,1" &&
-		at("Game Time") == "0,14,1" && at("Watches") == "0,70,0");
+		at("Game Time") == "0,14,1" && at("Real Time") == "0,70,0" && at("Watches") == "0,84,0");
 	CHECK(messages.run("setPosition", {std::string("Fps"), int64_t{4}, int64_t{6}, int64_t{3}}, error).has_value() && at("Fps") == "4,6,3");
 	CHECK(!messages.run("setPosition", {std::string("Clock"), int64_t{0}, int64_t{0}, int64_t{0}}, error) &&
 		error == "nothing called Clock is drawn over the picture");

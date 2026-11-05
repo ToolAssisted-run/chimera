@@ -14,9 +14,11 @@ using json::Json;
 
 const char *const kNames[] = {"Fps", "Frame Counter", "Lag Counter", "Input Display", "Watches", "Messages", "Rerecords",
 	"Autohold", "Game Time", "Real Time"};
-/* Chimera's default message positions; Real Time under Game Time */
-const int kDefaults[][3] = {{0, 0, 0}, {0, 14, 0}, {0, 42, 0}, {0, 28, 0}, {0, 70, 0}, {0, 0, 2}, {0, 56, 0}, {0, 0, 1},
-	{0, 14, 1}, {0, 28, 1}};
+/* Chimera's default message positions; Real Time at the left, under the
+ * other counters, and the watches a line lower for it (owner, 2026-11-05,
+ * issue 519; it was under Game Time at the right) */
+const int kDefaults[][3] = {{0, 0, 0}, {0, 14, 0}, {0, 42, 0}, {0, 28, 0}, {0, 84, 0}, {0, 0, 2}, {0, 56, 0}, {0, 0, 1},
+	{0, 14, 1}, {0, 70, 0}};
 static_assert(std::size(kNames) == std::size(kDefaults));
 
 Json place(int64_t x, int64_t y, int64_t anchor)

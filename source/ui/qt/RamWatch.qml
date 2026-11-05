@@ -49,7 +49,7 @@ ApplicationWindow {
             win.afterAsk = null
             if (button === MessageDialog.Cancel) return
             if (button === MessageDialog.Yes) {
-                if (win.vm.path === "") { saveDialog.afterSave = then; saveDialog.open(); return }
+                if (win.vm.path === "") { saveDialog.afterSave = then; win.openSave(); return }
                 win.vm.run("save")
             }
             if (then) then()
@@ -70,6 +70,12 @@ ApplicationWindow {
         }
     }
 
+    // the save dialog in Paths' Watch folder, made first: Tools, where it is by
+    // default, may not be there yet, and the dialog went to the folder above (issue 522)
+    function openSave() {
+        if (win.folderOf) saveDialog.currentFolder = win.folderOf("Watch (.wch)", true)
+        saveDialog.open()
+    }
     FileDialog {
         id: openDialog
         title: qsTrId("ram_watch.open_a_watch_list")
@@ -158,7 +164,7 @@ ApplicationWindow {
     Action { id: openAction; text: qsTrId("ram_watch.open_dialog"); icon.source: "qrc:/chimera/icons/OpenFile.png"; shortcut: "Ctrl+O"; onTriggered: win.leaveList(() => { openDialog.append = false; openDialog.open() }) }
     Action {
         id: saveAction; text: qsTrId("common.save"); icon.source: "qrc:/chimera/icons/SaveAs.png"; shortcut: "Ctrl+S"
-        onTriggered: win.vm.path === "" ? saveDialog.open() : win.vm.run("save")
+        onTriggered: win.vm.path === "" ? win.openSave() : win.vm.run("save")
     }
     Action { id: newWatchAction; text: qsTrId("ram_watch.new_watch_mnemonic"); icon.source: "qrc:/chimera/icons/addWatch.ico"; shortcut: "Ctrl+W"; onTriggered: editor.start("new", JSON.parse(win.vm.run("editInfo", ["new"]))) }
     Action { id: editAction; text: qsTrId("ram_watch.edit_watch_mnemonic"); icon.source: "qrc:/chimera/icons/Cut.png"; shortcut: "Ctrl+E"; enabled: win.anyRow; onTriggered: win.editWatch(false) }
@@ -183,7 +189,7 @@ ApplicationWindow {
             MenuItem { action: newListAction }
             MenuItem { action: openAction }
             MenuItem { action: saveAction; enabled: win.vm.changed }
-            Action { text: qsTrId("ram_watch.save_as"); shortcut: "Ctrl+Shift+S"; onTriggered: saveDialog.open() }
+            Action { text: qsTrId("ram_watch.save_as"); shortcut: "Ctrl+Shift+S"; onTriggered: win.openSave() }
             Action { text: qsTrId("ram_watch.append_file"); onTriggered: { openDialog.append = true; openDialog.open() } }
             Menu {
                 delegate: MenuEntry {}
@@ -323,7 +329,25 @@ ApplicationWindow {
         if (!on) now.push(key)
         win.vm.hiddenColumns = now.join(",")
     }
-    readonly property var visibleColumns: win.columns.filter((c) => win.shown(c.key))
+    // the widths a person dragged the columns to, by key, remembered when let go (issue 523)
+    property var widths: ({})
+    Component.onCompleted: {
+        const o = {}
+        for (const p of win.vm.columnWidths.split(",")) {
+            const at = p.lastIndexOf(":")
+            if (at > 0 && parseInt(p.substring(at + 1)) > 0) o[p.substring(0, at)] = parseInt(p.substring(at + 1))
+        }
+        win.widths = o
+    }
+    function resizeColumn(key, width, done) {
+        const o = Object.assign({}, win.widths)
+        o[key] = Math.round(width)
+        win.widths = o
+        if (done) win.vm.columnWidths = Object.keys(o).map((k) => k + ":" + o[k]).join(",")
+    }
+    readonly property var visibleColumns: win.columns.filter((c) => win.shown(c.key)).map((c) => win.widths[c.key] ? Object.assign({}, c, {width: win.widths[c.key]}) : c)
+    // the headings' model: changed only when a column is shown or hidden, so a heading being dragged stays
+    readonly property var visibleKeys: win.columns.filter((c) => win.shown(c.key)).map((c) => c.key)
     // the grid, as Chimera's list draws it, in the theme's colour: a line at the left of every column but the first
     readonly property color gridColour: win.themeColor("RollGridLines", String(Qt.darker(palette.base, 1.25)))
     readonly property var columnLines: {
@@ -433,15 +457,16 @@ ApplicationWindow {
         Row {
             Layout.fillWidth: true
             Repeater {
-                model: win.visibleColumns
-                delegate: Button {
-                    required property var modelData
+                model: win.visibleKeys
+                delegate: ColumnHeading {
+                    required property string modelData
                     required property int index
-                    text: modelData.text
-                    flat: true
-                    padding: 2
-                    width: index === win.visibleColumns.length - 1 ? Math.max(modelData.width, list.width - x) : modelData.width
-                    onClicked: win.vm.run("sort", [modelData.key])
+                    readonly property var column: win.visibleColumns[index] || {text: "", width: 0}
+                    text: column.text
+                    width: index === win.visibleKeys.length - 1 ? Math.max(column.width, list.width - x) : column.width
+                    onClicked: win.vm.run("sort", [modelData])
+                    onResizing: (w) => win.resizeColumn(modelData, w, false)
+                    onResized: (w) => win.resizeColumn(modelData, w, true)
                 }
             }
         }

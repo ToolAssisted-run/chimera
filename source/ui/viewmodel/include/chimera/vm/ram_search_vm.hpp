@@ -95,6 +95,8 @@ public:
 	Property<std::string> recentFiles;
 	/* the columns not shown, by Chimera's names (Address, Value, Prev, Changes, Diff) */
 	Property<std::string> hiddenColumns{"Diff"};
+	/* the columns a person made wider or narrower, "Value:100", remembered (issue 523) */
+	Property<std::string> columnWidths;
 
 private:
 	/* then: run on the window's thread once Mode is settled */

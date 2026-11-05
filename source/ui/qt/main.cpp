@@ -1313,8 +1313,8 @@ int main(int argc, char **argv)
 	/* each tool window's Save Window Position, Stay on Top and Float From Main Window, and its place */
 	vm::ToolWindowsViewModel toolWindows(dispatcher);
 	config.keep(toolWindows, "settings");
-	for (const char *name : {"doubleClickToPoke", "recentFiles", "hiddenColumns", "previousType"}) config.keep(ramWatch, name);
-	for (const char *name : {"previewMode", "autoSearchAccountForLag", "alwaysExcludeRamWatch", "useUndoHistory", "recentFiles", "hiddenColumns"})
+	for (const char *name : {"doubleClickToPoke", "recentFiles", "hiddenColumns", "columnWidths", "previousType"}) config.keep(ramWatch, name);
+	for (const char *name : {"previewMode", "autoSearchAccountForLag", "alwaysExcludeRamWatch", "useUndoHistory", "recentFiles", "hiddenColumns", "columnWidths"})
 		config.keep(ramSearch, name);
 	for (const char *name : {"domain", "size", "bigEndian", "recentTables", "colors"}) config.keep(hexEditor, name);
 	qt::QmlViewModel toolWindowsQml(toolWindows);

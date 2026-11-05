@@ -141,6 +141,7 @@ RamSearchViewModel::RamSearchViewModel(Dispatcher &dispatcher, SessionViewModel 
 	expose("useUndoHistory", "Use Undo History: searches can be taken back", useUndoHistory, true);
 	expose("recentFiles", ".wch files opened or saved, newest first, a line each", recentFiles, true);
 	expose("hiddenColumns", "the columns not shown, by Chimera's names (Address, Value, Prev, Changes, Diff), comma-separated", hiddenColumns, true);
+	expose("columnWidths", "the columns a person resized and their widths, \"Value:100\"", columnWidths, true);
 	rows("results", "the candidates: address, value, previous value, changes, difference; picked, whether the next search "
 		"would remove it (the preview), and whether it is past the domain's end", results_);
 

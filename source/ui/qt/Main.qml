@@ -164,12 +164,13 @@ ApplicationWindow {
             lines.push(line)
             return lines
         }
-        function place(name, lines, color) {
+        // dx: how far from its place across, for a further column of the same thing
+        function place(name, lines, color, dx) {
             const p = root.osdPositions[name]
             lines = lines.filter(t => t !== "")
             if (!p || lines.length === 0) return
             const bw = Math.max(...lines.map(widthOf)), bh = lines.length * lh
-            const x = p.anchor === 0 || p.anchor === 2 ? p.x * k : w - p.x * k - bw
+            const x = p.anchor === 0 || p.anchor === 2 ? p.x * k + (dx || 0) : w - p.x * k - bw - (dx || 0)
             const y = p.anchor < 2 ? p.y * k : h - p.y * k - bh
             lines.forEach((t, i) => out.push({text: t, x: Math.round(x), y: Math.round(y + i * lh), color: String(color)}))
         }
@@ -194,7 +195,17 @@ ApplicationWindow {
         if (root.session.showInput) place("Input Display", [root.session.inputText], root.osdMovieInputColor)
         if (root.session.showLagCounter) place("Lag Counter", [String(root.session.lagCount)], root.osdAlertColor)
         if (root.session.stickyArmed) place("Autohold", [root.session.stickyText], root.osdColor("OsdAutoHold", "#FFFFFF"))
-        if (root.ramWatch.onScreenText !== "") place("Watches", root.ramWatch.onScreenText.split("\n"), "white")
+        // the watches while RAM Watch is open (issue 524), in as many columns as the height needs (issue 521)
+        if (root.ramWatch.onScreenText !== "" && ramWatchWindow.visible) {
+            const all = root.ramWatch.onScreenText.split("\n"), p = root.osdPositions["Watches"]
+            const rows = Math.max(1, Math.floor((h - (p ? p.y : 0) * k) / lh))
+            let dx = 0
+            for (let at = 0; at < all.length; at += rows) {
+                const part = all.slice(at, at + rows)
+                place("Watches", part, "white", dx)
+                dx += Math.max(...part.map(widthOf)) + 12 * k
+            }
+        }
         return out
     }
     // the keys of every hotkey, for the menus to show beside their actions
@@ -741,7 +752,15 @@ ApplicationWindow {
                         } else coreLogAboutDialog.open()
                     }
                 }
-                Action { text: qsTrId("main.about"); icon.source: "qrc:/chimera/menu/About.png"; onTriggered: aboutWindow.show() }
+                // centred on the main window: left to the system, it opened off centre (issue 517)
+                Action {
+                    text: qsTrId("main.about"); icon.source: "qrc:/chimera/menu/About.png"
+                    onTriggered: {
+                        aboutWindow.x = root.x + Math.round((root.width - aboutWindow.width) / 2)
+                        aboutWindow.y = root.y + Math.round((root.height - aboutWindow.height) / 2)
+                        aboutWindow.show()
+                    }
+                }
             }
         }
         // at the right of the menus while TAStudio is hidden, as Chimera's
@@ -1558,12 +1577,17 @@ ApplicationWindow {
             color: root.osdColor("OsdAutoHold", "#FFFFFF")
         }
         // RAM Watch's on-screen watches, a line every 14, where Config >
-        // Messages puts them (Chimera's place: the top left, 70 down)
-        Column {
+        // Messages puts them (at first the top left, 84 down); only
+        // while RAM Watch is open (issue 524), and in further columns where
+        // the picture is too short for them (issue 521)
+        Grid {
             objectName: "onScreenWatches"
             x: root.osdX("Watches", width)
             y: root.osdY("Watches", height)
-            visible: root.session.isOpen
+            visible: root.session.isOpen && ramWatchWindow.visible
+            flow: Grid.TopToBottom
+            columnSpacing: 12 * root.osdScale
+            rows: Math.max(1, Math.floor((pictureArea.height - (root.osdPositions["Watches"] ? root.osdPositions["Watches"].y : 0) * root.osdScale) / (14 * root.osdScale)))
             Repeater {
                 model: root.ramWatch.onScreenText === "" ? [] : root.ramWatch.onScreenText.split("\n")
                 delegate: Text {
