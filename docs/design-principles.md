@@ -13300,6 +13300,33 @@ the newest (26.3) crashed on macOS 15, and the release would have shipped
 the plain fallback icon without saying so; the release now fails when the
 light and dark icon is missing, as CI does.
 
+## The Mac icon is compiled by Apple's actool; Apple silicon builds on macOS 26 (user-decided, 2026-11-05)
+
+On GitHub's macOS 15 Apple silicon image, the actool of every Xcode 26 it has
+(26.0 to 26.3) died while compiling the app's icon: its asset agent wants a
+MediaToolbox symbol only macOS 26 has. Two fixes came at once:
+
+- P-AS's: the macOS workflow builds P-AS/actool, a clean-room rewrite of
+  actool in Rust (a fork of viraptor/actool), at a fixed commit and compiles
+  the icon with it. It passed in CI.
+- Ours: the Apple silicon jobs, in the macOS workflow and the release, run on
+  GitHub's macos-26 runner, where Apple's own actool can run.
+
+Together, CI would have compiled the icon with one tool and the release with
+another. The owner chose Apple's actool on macOS 26 for both, so CI tests the
+icon the release ships, made by the tool whose format it is. The app still runs
+on macOS 14.4 and later. tools/build-app-macos.sh keeps P-AS's `ACTOOL=<path>`,
+to use another actool; no workflow sets it.
+
+Found on the way: the release's icon check passed on an app without the icon.
+In the trial at 69b90628 every actool failed and the Apple silicon app got the
+plain icon drawn from icon.svg, but a failed actool had left an Assets.car in
+the app, and the check only looked for that file. The script now removes
+Assets.car before each actool and when it falls back, and the release also
+checks that Info.plist names the icon, as CI does. The trial before it said
+Xcode 26.0 compiled the icon on the same image; whether it did, or exited
+without an error beside a leftover file, is not known.
+
 ## A held key clicks a button once; TAStudio's lists pick many rows (2026-11-04)
 
 Issue 494: Space pressed in TAStudio made 20 to 30 branches, and the Branches

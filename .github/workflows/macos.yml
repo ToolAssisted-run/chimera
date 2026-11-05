@@ -73,7 +73,7 @@ jobs:
   macos:
     name: Chimera for macOS (${{ matrix.arch }})
     needs: synth-core
-    # each on its own hardware: macos-15-intel is an Intel Mac, macos-15 Apple
+    # each on its own hardware: macos-15-intel is an Intel Mac, macos-26 Apple
     # silicon (which could also run the x86-64 build, under Rosetta 2)
     runs-on: ${{ matrix.runner }}
     strategy:
@@ -85,10 +85,9 @@ jobs:
             runner: macos-15-intel
           - arch: aarch64
             cpu: arm64
-            # macOS 26: Xcode 26's actool, which compiles the app's icon, failed
-            # on GitHub's macOS 15 Apple silicon image in every Xcode 26 it has
-            # (its asset agent wants macOS 26's MediaToolbox), and got through
-            # once with 26.0. The app still asks for macOS 14.4 and later.
+            # macOS 26: on GitHub's macOS 15 Apple silicon image every Xcode 26's
+            # actool, which compiles the app's icon, died (its asset agent wants
+            # macOS 26's MediaToolbox). The app still asks for macOS 14.4 and later
             runner: macos-26
     timeout-minutes: 120
     env:
@@ -183,9 +182,7 @@ jobs:
         run: meson test -C build/meson-macos-${{ matrix.arch }} --print-errorlogs --num-processes 1
 
       - name: Timers as the runner had them
-        # only the tests asked for them: in the same job, with coalescing still
-        # off, every Xcode's actool on Apple silicon failed to compile the icon,
-        # where the release's job on the same image compiled it with Xcode 26.0
+        # only the tests asked for them
         if: always()
         run: sudo sysctl -w kern.timer.coalescing_enabled=1 || true
 
@@ -196,25 +193,11 @@ jobs:
           name: macos-meson-logs-${{ matrix.arch }}
           path: build/meson-macos-${{ matrix.arch }}/meson-logs/
 
-      - name: actool for the icon (Apple silicon)
-        # Apple's actool does not run on the Apple silicon runner: every Xcode's
-        # asset agent dies on a MediaToolbox symbol the runner's macOS lacks
-        # (the Intel runner's is fine). A clean-room actool compiles the icon
-        # instead; pinned, as it is a compiler of what the app ships
-        if: matrix.arch == 'aarch64'
-        run: |
-          git clone --quiet https://github.com/P-AS/actool.git "$RUNNER_TEMP/actool"
-          git -C "$RUNNER_TEMP/actool" checkout --quiet 6216c3bef8eaaadb100c93a224ce99502bc0b97c
-          cargo build --release --manifest-path "$RUNNER_TEMP/actool/Cargo.toml"
-          echo "ACTOOL=$RUNNER_TEMP/actool/target/release/actool" >> "$GITHUB_ENV"
-          # the catalog layout of Xcode 26's, which the app is made for
-          echo "ACTOOL_COREUI_VERSION=1011" >> "$GITHUB_ENV"
-
       - name: Chimera.app
         run: |
           # the app's icon (docs/Chimera.icon, from Icon Composer) is compiled by
-          # actool, which needs Xcode 26 or later: the script tries each the
-          # runner has, as the runner's default is older
+          # Apple's actool, which needs Xcode 26 or later (owner, 2026-11-05): the
+          # script tries each the runner has, as the runner's default is older
           tools/build-app-macos.sh --dll build/${{ matrix.arch }}-macos/dll --qt "$HOME/qt/$QT_VERSION/macos" --out build/Chimera.app
           # the light and dark icon is in the app: the script falls back to a plain
           # one when it cannot compile it, which is for a person's Mac and not for here

@@ -102,8 +102,11 @@ mark in two layers, `icon.svg` for light and `icon-dark.svg` for dark, whose
 opacity is set per appearance, so each shows in its own. The script compiles it
 with `actool` into `Assets.car` (light, dark and tinted, which the system makes
 from the light one) and an `.icns` for the rest, and names it in `Info.plist`.
-`--icon` names another. Without an Xcode that can compile it, the app gets a plain
-icon drawn from its `icon.svg`, with no dark one, and says so. Icon Composer
+`--icon` names another. `ACTOOL=<path>` uses another actool in place of an
+Xcode's, such as the clean-room [P-AS/actool](https://github.com/P-AS/actool);
+the workflows use Apple's (owner, 2026-11-05). Without an actool that can
+compile it, the app gets a plain icon drawn from its `icon.svg`, with no dark
+one, and says so. Icon Composer
 cannot be run from a terminal, so a change to the icon is made in the app and
 saved in `docs/Chimera.icon`. The two SVGs are kept once, inside it, in
 `Chimera.icon/Assets`, and the README shows them from there. They are not links
@@ -210,9 +213,9 @@ bundle for others to run.
 
 ## On GitHub's runners
 
-- The Apple silicon app is built on macOS 26: on the macOS 15 image every
-  Xcode 26's `actool` failed to compile the icon (its asset agent wants
-  macOS 26's system frameworks). The Intel one is built on macOS 15.
+- The Apple silicon app is built on macOS 26 (owner, 2026-11-05): on the
+  macOS 15 image every Xcode 26's `actool` died compiling the icon (its asset
+  agent wants macOS 26's system frameworks). The Intel one is built on macOS 15.
 - The tests run with timer coalescing off: a runner's timers woke a 16.7 ms
   wait 58 to 91 ms late, which made the throttle checks fail; with coalescing
   off they wake within a fraction of a millisecond, and every test passes.
