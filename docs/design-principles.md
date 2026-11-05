@@ -13345,6 +13345,41 @@ on Windows: the five other tests a Python script drives (on-screen text
 size, command line, headless, New Project's window, window drawing), the ten
 QtTest programs, and everything on arm64; CI runs them.
 
+**CI at 552d998a**: 50 of the 57 tests passed on both CPUs (windows-2025
+and windows-11-arm), the same seven failing on both. Each was run again on
+this computer's Windows from CI's own pack, with Qt's warnings shown:
+
+- Four QtTest programs (binding box, roll table, Emulator menu, Core-Specific
+  Tools menu) could not load their window: "module QtQuick.Controls.Windows
+  is not installed". They set no style, and Qt's default on Windows is its
+  Windows style, which the bundle does not carry (only Fusion and Basic; the
+  window's own style is built on Fusion). They now set the window's style, as
+  the other tests of its controls already did.
+- The menus test and the window drawing test (TAStudio's input rolls) drew
+  every letter as a box: on Windows, Qt's offscreen platform, which the
+  window's tests use, reads fonts from one folder, Qt's own fonts folder, and
+  Qt ships none. With no text to measure, the menu was 514 pixels wide in a
+  400-pixel window, and TAStudio's columns pushed the script's green column
+  out of sight. Pointed at Windows' own fonts, it drew in a narrow one (Qt's
+  default, Helvetica, is not there), and the menu's longest row stayed under
+  the 200 pixels the test needs it to pass; at all of DejaVu's, in DejaVu
+  Serif. The pack now carries DejaVu Sans and DejaVu Sans Mono, the fonts
+  the Linux tests draw with, and nothing else, and the tests use that folder:
+  the menu was 287 pixels wide on Windows (286 on Linux), TAStudio's picture
+  was Linux's, and both passed. The pack also has Qt send its warnings
+  to the test's output: on Windows they went to a debugger, so CI's log said
+  only "window != nullptr".
+- The command line test copied chimera.exe alone to see the settings file
+  written beside it; Windows' chimera.exe starts the window from its lib
+  folder, so the copy did not start. The whole bundle is copied there now.
+  Its next check, a program folder that cannot be written, is skipped on
+  Windows, and says so: the settings would go to the person's own folder,
+  which Qt asks Windows for and no variable moves, so a run would write the
+  settings of whoever runs the test.
+
+Not yet tested on Windows: the encode of window drawing, skipped (said) as
+the pack's bundle has no ffmpeg.
+
 ## The Mac icon is compiled by Apple's actool; Apple silicon builds on macOS 26 (user-decided, 2026-11-05)
 
 On GitHub's macOS 15 Apple silicon image, the actool of every Xcode 26 it has
@@ -13371,6 +13406,12 @@ Assets.car before each actool and when it falls back, and the release also
 checks that Info.plist names the icon, as CI does. The trial before it said
 Xcode 26.0 compiled the icon on the same image; whether it did, or exited
 without an error beside a leftover file, is not known.
+
+**Measured** at 552d998a, in the macOS workflow and the release trial: on
+macos-26, Apple's actool of Xcode 26.6 (the image's own) compiled the icon at
+the first try; on Intel (macos-15), Xcode 16.4's failed and Xcode 26.3's
+compiled it, the Assets.car of the one that failed removed in between. Both
+apps passed the icon checks, and every test passed on both Macs.
 
 ## A held key clicks a button once; TAStudio's lists pick many rows (2026-11-04)
 

@@ -248,11 +248,12 @@ jobs:
 
       - name: Install build dependencies
         # and the libraries the Linux Qt's tools load as they run during a
-        # build of Qt (qsb, the shader baker, is a Qt GUI program)
+        # build of Qt (qsb, the shader baker, is a Qt GUI program), and the
+        # fonts the window's tests draw with on Linux, for the pack
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends meson ninja-build build-essential cmake pkg-config \
-            python3 python3-venv libegl1 libgl1 libfontconfig1 libxkbcommon0
+            python3 python3-venv libegl1 libgl1 libfontconfig1 libxkbcommon0 fonts-dejavu-core
           if [ "${{ matrix.cpu }}" = x64 ]; then sudo apt-get install -y --no-install-recommends mingw-w64; fi
 
       - name: llvm-mingw (pinned, checked by its SHA256)
@@ -318,10 +319,14 @@ jobs:
           else
             set -- --runtime "$(dirname "$(dirname "$(command -v aarch64-w64-mingw32-clang)")")/aarch64-w64-mingw32/bin"
           fi
-          # and Qt's own folder, for its test library, which the bundle does not carry
-          host="$HOME/qt/6.12.0/gcc_64"
+          # and Qt's own folder, for its test library, which the bundle does not carry;
+          # and the fonts the window's tests draw with on Linux, so that on
+          # Windows they measure the same text
+          host="$HOME/qt/6.12.0/gcc_64" fonts=/usr/share/fonts/truetype/dejavu
           PATH="$host/libexec:$host/bin:$PATH" python3 tools/export-tests.py build/meson-windows build/windows-tests "$@" \
-            --runtime "$HOME/qt-ship/${{ matrix.qt }}/bin" --bundle build/bundle-windows
+            --runtime "$HOME/qt-ship/${{ matrix.qt }}/bin" --bundle build/bundle-windows \
+            --font $fonts/DejaVuSans.ttf --font $fonts/DejaVuSans-Bold.ttf \
+            --font $fonts/DejaVuSansMono.ttf --font $fonts/DejaVuSansMono-Bold.ttf
 
       - uses: actions/upload-artifact@v4
         with:

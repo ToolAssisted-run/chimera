@@ -6,6 +6,7 @@
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
 #include <QQuickItem>
+#include <QQuickStyle>
 #include <QQuickWindow>
 #include <QStringList>
 #include <QTest>
@@ -57,6 +58,8 @@ ApplicationWindow {
 int main(int argc, char **argv)
 {
 	QGuiApplication app(argc, argv);
+	/* the window's own style: the system's default one (Windows') is not in the bundle */
+	QQuickStyle::setStyle(QStringLiteral("ChimeraStyle"));
 	QQmlApplicationEngine engine;
 	engine.loadData(kWindow);
 	auto *window = qobject_cast<QQuickWindow *>(engine.rootObjects().value(0));

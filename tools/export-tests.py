@@ -5,6 +5,7 @@ meson keeps (meson introspect --tests), and every file those tests need, in one
 folder whose layout is the repository's.
 
     tools/export-tests.py <meson build dir> <out folder> [--runtime <folder>]... [--bundle <folder>]
+        [--font <file>]...
 
 Taken: the tests whose program is one of the build's own (an .exe), and those
 a Python script runs, which the machine's own Python runs there (with every
@@ -24,7 +25,15 @@ beside them, as the release's bundle carries them.
 window, with its Qt): it is copied too, a test given the build's chimera.exe
 is given the bundle's instead (the build's cannot start: its Qt is not beside
 it), and every test finds Qt's libraries, plugins and QML modules in the
-bundle's lib folder, as the window does.
+bundle's lib folder, as the window does. Qt's warnings go to the test's output
+(on Windows they go to a debugger otherwise).
+--font names a font file the tests draw their text with, copied into the
+pack's fonts folder. On Windows, Qt's offscreen platform, which the window's
+tests use, reads fonts from one folder only, and Qt ships none; pointed at
+Windows' own, or at all of DejaVu's, it drew in whichever it fell back to
+(Qt's default, Helvetica, is in neither): a narrow one, a serif. Given only the
+fonts the Linux tests draw with (DejaVu Sans and DejaVu Sans Mono), the
+window's tests measure the same text on both.
 tools/run-tests.py is copied in beside the list: `python run-tests.py .`."""
 import json
 import os
@@ -43,6 +52,11 @@ bundle = None
 if "--bundle" in args:
     i = args.index("--bundle")
     bundle = os.path.abspath(args[i + 1])
+    del args[i:i + 2]
+fonts = []
+while "--font" in args:
+    i = args.index("--font")
+    fonts.append(args[i + 1])
     del args[i:i + 2]
 build, out = (os.path.abspath(a) for a in args[0:2])
 root = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
@@ -180,7 +194,12 @@ if bundle:
     # its plugins and QML modules where Qt looks
     lib = mapped(os.path.join(bundle, "lib"))[0]
     plan["path"] = [lib]
-    plan["env"] = {"QT_PLUGIN_PATH": lib, "QML_IMPORT_PATH": lib + "/qml"}
+    plan["env"] = {"QT_PLUGIN_PATH": lib, "QML_IMPORT_PATH": lib + "/qml", "QT_FORCE_STDERR_LOGGING": "1"}
+if fonts:
+    os.makedirs(os.path.join(out, "fonts"))
+    for f in fonts:
+        shutil.copy2(f, os.path.join(out, "fonts"))
+    plan.setdefault("env", {})["QT_QPA_FONTDIR"] = "@ROOT@/fonts"
 with open(os.path.join(out, "tests.json"), "w") as fh:
     json.dump(plan, fh, indent=1)
 size = sum(os.path.getsize(os.path.join(d, f)) for d, _, fs in os.walk(out) for f in fs)

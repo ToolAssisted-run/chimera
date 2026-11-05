@@ -66,9 +66,13 @@ check(r is not None and r.returncode == 0 and os.path.exists(own + ".unreadable"
 # folder keeps its own (owner, 2026-10-29, issue 403); a folder that cannot
 # be written leaves them in the system's folder for the person's settings
 program = os.path.join(work, "program")
-os.makedirs(program)
+if sys.platform == "win32":
+    # Windows' chimera.exe starts the window from its lib folder: the whole bundle is copied
+    shutil.copytree(os.path.dirname(os.path.abspath(qt)), program)
+else:
+    os.makedirs(program)
+    shutil.copy2(qt, program)
 copy = os.path.join(program, os.path.basename(qt))
-shutil.copy2(qt, copy)
 setting = os.path.join(work, "set-a-hotkey.lua")
 with open(setting, "w") as f:
     f.write("chimera.hotkeys.saved = '{\"Pause\":\"F7\"}'\n")
@@ -105,12 +109,19 @@ else:
     r = run_copy()
     check(r is not None and r.returncode == 0 and "F7" in settings_in(program) and settings_in(own["XDG_CONFIG_HOME"]) == "",
           "the settings file is beside the program", r and r.stderr.strip()[-300:])
-    os.remove(os.path.join(program, "settings.json"))
-    os.chmod(program, 0o555)
-    r = run_copy()
-    os.chmod(program, 0o755)
-    check(r is not None and r.returncode == 0 and settings_in(program) == "" and "F7" in settings_in(own["XDG_CONFIG_HOME"]),
-          "a program folder that cannot be written keeps them in the person's own", r and r.stderr.strip()[-300:])
+    if sys.platform == "win32":
+        # Qt asks Windows for the person's own folder, which no variable
+        # moves: the run would write the settings of whoever runs the test
+        print("SKIP  a program folder that cannot be written keeps them in the person's own: "
+              "on Windows that is the real person's folder")
+    else:
+        if os.path.exists(os.path.join(program, "settings.json")):
+            os.remove(os.path.join(program, "settings.json"))
+        os.chmod(program, 0o555)
+        r = run_copy()
+        os.chmod(program, 0o755)
+        check(r is not None and r.returncode == 0 and settings_in(program) == "" and "F7" in settings_in(own["XDG_CONFIG_HOME"]),
+              "a program folder that cannot be written keeps them in the person's own", r and r.stderr.strip()[-300:])
 
 shot = os.path.join(work, "chromeless.png")
 r = run("--chromeless", "--luaconsole", "--measure", "0.5", "--screenshot", shot)
