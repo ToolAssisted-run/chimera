@@ -146,6 +146,7 @@ if [ -d "$icon" ]; then
 			echo "  icon: $icon (actool of ${xcode:-$(xcode-select -p)})"
 			break
 		fi
+		echo "  (actool of ${xcode:-$(xcode-select -p)} did not compile it: $(grep -i -m 1 -E "error|exception|reason" "$icons/actool.log" | cut -c1-160))" >&2
 	done
 	if [ -z "$icon_name" ]; then
 		echo "  (actool could not compile $icon - it needs Xcode 26 or later; drawing the icon from its icon.svg)" >&2

@@ -178,6 +178,13 @@ jobs:
         # spent it starting up (the first frame alone took near a second)
         run: meson test -C build/meson-macos-${{ matrix.arch }} --print-errorlogs --num-processes 1
 
+      - name: Timers as the runner had them
+        # only the tests asked for them: in the same job, with coalescing still
+        # off, every Xcode's actool on Apple silicon failed to compile the icon,
+        # where the release's job on the same image compiled it with Xcode 26.0
+        if: always()
+        run: sudo sysctl -w kern.timer.coalescing_enabled=1 || true
+
       - name: Upload test logs
         if: failure()
         uses: actions/upload-artifact@v4
