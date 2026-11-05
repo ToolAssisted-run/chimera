@@ -7,7 +7,7 @@ and arm64 for Apple silicon. The cross file names the processor:
 `extern/meson/macos-x86_64.ini` or `extern/meson/macos-aarch64.ini`, and the
 build folders below are named after it. What this page says was measured on
 x86-64; the arm64 build is new (2026-11-04) and has so far been built and
-tested only by CI's macOS job, on GitHub's Apple silicon runner.
+tested only by CI's macOS job, on GitHub's Apple silicon runner (macOS 26).
 
 ## Which macOS
 
@@ -192,4 +192,27 @@ On an Apple M1, macOS 27, the x86-64 build under Rosetta 2:
 
 Not tried: a real Intel Mac, the window on the screen (Cocoa) and with a GPU
 renderer, a core that uses threads heavily or a GPU, the Mesa path, and a
-bundle for others to run. A guest with `%fs`-direct thread storage cannot run.
+bundle for others to run.
+
+## What a core needs on each Mac
+
+- **Intel: thread-local variables.** A core reaches them through `%fs`, which
+  macOS on Intel lets no program set. The guest toolchain lists where a core
+  loads its thread pointer, and miniBox patches those loads as the core loads
+  (MACHINE-SPEC, "TLS"). A core built before that, or one that reaches its
+  thread-local variables some other way (built without
+  `-mno-tls-direct-seg-refs`, or Mesa's hand-written x86-64 GL dispatch), is
+  refused with the reason. Cores need building again with the new miniBox.
+- **Apple silicon: no GuestFaultHandler.** Its pages are 16 KiB, and a core
+  that asks for the faults of single 4 KiB pages (RPCS3 and Xenia do) is
+  refused with the reason. The synthetic test core is built without its
+  handler for that Mac (`SYNTH_NO_GUEST_FAULT_HANDLER`).
+
+## On GitHub's runners
+
+- The Apple silicon app is built on macOS 26: on the macOS 15 image every
+  Xcode 26's `actool` failed to compile the icon (its asset agent wants
+  macOS 26's system frameworks). The Intel one is built on macOS 15.
+- The tests run with timer coalescing off: a runner's timers woke a 16.7 ms
+  wait 58 to 91 ms late, which made the throttle checks fail; with coalescing
+  off they wake within a fraction of a millisecond, and every test passes.

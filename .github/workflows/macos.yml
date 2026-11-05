@@ -85,7 +85,11 @@ jobs:
             runner: macos-15-intel
           - arch: aarch64
             cpu: arm64
-            runner: macos-15
+            # macOS 26: Xcode 26's actool, which compiles the app's icon, failed
+            # on GitHub's macOS 15 Apple silicon image in every Xcode 26 it has
+            # (its asset agent wants macOS 26's MediaToolbox), and got through
+            # once with 26.0. The app still asks for macOS 14.4 and later.
+            runner: macos-26
     timeout-minutes: 120
     env:
       QT_VERSION: 6.12.0
