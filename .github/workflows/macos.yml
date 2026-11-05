@@ -192,6 +192,20 @@ jobs:
           name: macos-meson-logs-${{ matrix.arch }}
           path: build/meson-macos-${{ matrix.arch }}/meson-logs/
 
+      - name: actool for the icon (Apple silicon)
+        # Apple's actool does not run on the Apple silicon runner: every Xcode's
+        # asset agent dies on a MediaToolbox symbol the runner's macOS lacks
+        # (the Intel runner's is fine). A clean-room actool compiles the icon
+        # instead; pinned, as it is a compiler of what the app ships
+        if: matrix.arch == 'aarch64'
+        run: |
+          git clone --quiet https://github.com/P-AS/actool.git "$RUNNER_TEMP/actool"
+          git -C "$RUNNER_TEMP/actool" checkout --quiet 6216c3bef8eaaadb100c93a224ce99502bc0b97c
+          cargo build --release --manifest-path "$RUNNER_TEMP/actool/Cargo.toml"
+          echo "ACTOOL=$RUNNER_TEMP/actool/target/release/actool" >> "$GITHUB_ENV"
+          # the catalog layout of Xcode 26's, which the app is made for
+          echo "ACTOOL_COREUI_VERSION=1011" >> "$GITHUB_ENV"
+
       - name: Chimera.app
         run: |
           # the app's icon (docs/Chimera.icon, from Icon Composer) is compiled by
