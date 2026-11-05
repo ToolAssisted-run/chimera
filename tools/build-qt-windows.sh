@@ -12,7 +12,9 @@
 # The source folder holds qtbase.tar.xz, qtshadertools.tar.xz,
 # qtdeclarative.tar.xz and qtsvg.tar.xz (the "submodules" archives of the
 # release). Qt is built without its network module: Chimera has no network
-# code, and QML without it cannot load anything from the network.
+# code, and QML without it cannot load anything from the network. It has its
+# test library, for the window's tests on Windows (CI); no program the bundle
+# carries uses it, so the bundle does not carry it.
 #
 # Qt needs the compiler's "posix" thread model (x86_64-w64-mingw32-g++-posix):
 # built with the "win32" one, which the rest of Chimera's Windows build uses,
@@ -82,7 +84,7 @@ cmake -G Ninja -S "$work/qtbase-src" -B "$work/qtbase" \
 	-DCMAKE_INSTALL_PREFIX="$prefix" -DCMAKE_BUILD_TYPE=Release \
 	-DQT_BUILD_EXAMPLES=OFF -DQT_BUILD_TESTS=OFF -DQT_BUILD_BENCHMARKS=OFF \
 	-DFEATURE_network=OFF -DFEATURE_dbus=OFF -DFEATURE_sql=OFF \
-	-DFEATURE_printsupport=OFF -DFEATURE_widgets=OFF -DFEATURE_testlib=OFF
+	-DFEATURE_printsupport=OFF -DFEATURE_widgets=OFF
 cmake --build "$work/qtbase" --parallel ${QT_JOBS:-}
 cmake --install "$work/qtbase"
 

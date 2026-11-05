@@ -182,7 +182,7 @@ jobs:
 
       - name: Cache Qt
         id: qt-cache
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           # the Linux Qt that ships, built here without the network module
           path: ~/qt-ship/linux
@@ -195,6 +195,13 @@ jobs:
       - name: Build Qt (once; then cached)
         if: steps.qt-cache.outputs.cache-hit != 'true'
         run: ./tools/build-qt-linux.sh "$HOME/qt-src" "$HOME/qt-ship/linux"
+
+      - name: Keep the Qt just built, even if a later step fails
+        if: steps.qt-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/qt-ship/linux
+          key: ${{ steps.qt-cache.outputs.cache-primary-key }}
 
       - name: Cache the ffmpeg the bundle builds
         uses: actions/cache@v4
@@ -262,10 +269,11 @@ jobs:
 
       - name: Cache Qt
         id: qt-cache
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           # the Linux Qt (aqt) whose tools run during the build, and the
-          # Windows on arm64 Qt that ships, built here without the network module
+          # Windows on arm64 Qt that ships, built here without the network
+          # module; CI's Windows arm64 job uses the same (ci.yml)
           path: |
             ~/qt/6.12.0/gcc_64
             ~/qt/aqt-venv
@@ -292,6 +300,16 @@ jobs:
             "$HOME/qt/aqt-venv/bin/aqt" install-qt linux desktop 6.12.0 linux_gcc_64 -m qtshadertools -O "$HOME/qt"
           fi
           ./tools/build-qt-windows.sh "$HOME/qt/6.12.0/gcc_64" "$HOME/qt-src" "$HOME/qt-ship/llvm_mingw_arm64" arm64
+
+      - name: Keep the Qt just built, even if a later step fails
+        if: steps.qt-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/qt/6.12.0/gcc_64
+            ~/qt/aqt-venv
+            ~/qt-ship/llvm_mingw_arm64
+          key: ${{ steps.qt-cache.outputs.cache-primary-key }}
 
       - name: Build the Windows arm64 bundle
         run: |
@@ -440,7 +458,7 @@ jobs:
     needs: [what, linux-arm64, windows-arm64, windows-arm64-starts, macos]
     name: bundle (windows + linux x64) and publish
     runs-on: ubuntu-latest
-    # the first run builds Qt for both platforms (then cached): hours, not minutes
+    # the first run builds Qt for both platforms (each then cached): hours, not minutes
     timeout-minutes: 360
     steps:
       - uses: actions/checkout@v4
@@ -471,18 +489,26 @@ jobs:
             libxcb-shm0-dev libxcb-sync-dev libxcb-util-dev libxcb-xfixes0-dev libxcb-xinerama0-dev \
             libxcb-xkb-dev libxcb-render0-dev
 
-      - name: Cache Qt
-        id: qt-cache
-        uses: actions/cache@v4
+      - name: Cache the Linux Qt
+        id: qt-linux-cache
+        uses: actions/cache/restore@v4
+        with:
+          # the Qt the Linux bundle ships, built here without the network module
+          path: ~/qt-ship/linux
+          key: qt-ship-6.12.0-linux-x64-${{ hashFiles('tools/build-qt-linux.sh', 'tools/qt-patches/*', 'tools/fetch-qt-source.sh') }}
+
+      - name: Cache the Windows Qt
+        id: qt-windows-cache
+        uses: actions/cache/restore@v4
         with:
           # the Linux Qt with its tools (aqt) for the Windows build's moc and
-          # rcc; the two Qts that ship, built here without the network module
+          # rcc, and the Qt the Windows bundle ships, built here without the
+          # network module; CI's Windows x64 job uses the same (ci.yml)
           path: |
             ~/qt/6.12.0/gcc_64
             ~/qt/aqt-venv
-            ~/qt-ship/linux
             ~/qt-ship/mingw_64_posix
-          key: qt-ship-6.12.0-${{ hashFiles('tools/build-qt-linux.sh', 'tools/build-qt-windows.sh', 'tools/qt-patches/*', 'tools/fetch-qt-source.sh') }}
+          key: qt-ship-6.12.0-windows-x64-${{ hashFiles('tools/build-qt-windows.sh', 'tools/qt-patches/*', 'tools/fetch-qt-source.sh', 'tools/fetch-llvm-mingw.sh') }}
 
       - name: Cache the ffmpeg both bundles build
         if: steps.moved.outputs.skip != 'true'
@@ -499,16 +525,36 @@ jobs:
         # its licence texts go in the bundle every time; the build below only when the cache had none
         run: ./tools/fetch-qt-source.sh "$HOME/qt-src"
 
-      - name: Build Qt for both platforms (once; then cached)
-        if: steps.qt-cache.outputs.cache-hit != 'true'
+      - name: Build the Linux Qt (once; then cached)
+        if: steps.qt-linux-cache.outputs.cache-hit != 'true'
+        run: ./tools/build-qt-linux.sh "$HOME/qt-src" "$HOME/qt-ship/linux"
+
+      - name: Keep the Qt just built, even if a later step fails
+        if: steps.qt-linux-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/qt-ship/linux
+          key: ${{ steps.qt-linux-cache.outputs.cache-primary-key }}
+
+      - name: Build the Windows Qt (once; then cached)
+        if: steps.qt-windows-cache.outputs.cache-hit != 'true'
         run: |
           if [ ! -d "$HOME/qt/6.12.0/gcc_64" ]; then
             python3 -m venv "$HOME/qt/aqt-venv"
             "$HOME/qt/aqt-venv/bin/pip" install --quiet aqtinstall==3.3.0
             "$HOME/qt/aqt-venv/bin/aqt" install-qt linux desktop 6.12.0 linux_gcc_64 -m qtshadertools -O "$HOME/qt"
           fi
-          ./tools/build-qt-linux.sh "$HOME/qt-src" "$HOME/qt-ship/linux"
           ./tools/build-qt-windows.sh "$HOME/qt/6.12.0/gcc_64" "$HOME/qt-src" "$HOME/qt-ship/mingw_64_posix"
+
+      - name: Keep the Qt just built, even if a later step fails
+        if: steps.qt-windows-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/qt/6.12.0/gcc_64
+            ~/qt/aqt-venv
+            ~/qt-ship/mingw_64_posix
+          key: ${{ steps.qt-windows-cache.outputs.cache-primary-key }}
 
       - name: Build the Linux bundle
         run: ./tools/build-bundle.sh --platform linux --out build/bundle-linux --qt "$HOME/qt-ship/linux" --qt-source "$HOME/qt-src"

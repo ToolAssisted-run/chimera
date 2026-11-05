@@ -13149,9 +13149,10 @@ Windows cross builds included. tools/export-tests.py packs a build's tests -
 meson's own list of them and every file they name - into one folder, with
 tools/run-tests.py, which runs them on Windows as meson test would (each
 program with its arguments, folder, environment and timeout) and fails if one
-fails. CI's windows job builds each CPU on Linux (arm64 on an arm runner, so
-that the synthetic test core it needs is arm64 too) and windows-test runs the
-pack on windows-2025 and windows-11-arm. The one engine test that cannot be
+fails. CI's windows job builds each CPU on Linux (since 2026-11-05 both on
+an x64 runner, with the synthetic test core of its CPU built by a job of its
+own on a Linux runner of that CPU) and windows-test runs the pack on
+windows-2025 and windows-11-arm. The one engine test that cannot be
 written the same on Windows - a write failing because of the process's file
 size limit, which Windows has not got - is Linux's and macOS's only.
 
@@ -13299,6 +13300,50 @@ newest first, until one compiles the app's icon. On the Apple silicon runner
 the newest (26.3) crashed on macOS 15, and the release would have shipped
 the plain fallback icon without saying so; the release now fails when the
 light and dark icon is missing, as CI does.
+
+## The window's tests run on Windows too (2026-11-05)
+
+Until now CI ran the engine's and the view models' tests on Windows, but not
+the window's: CI's Windows build had no Qt, and the window's tests that a
+Python script drives were left out of the pack. So nothing showed whether
+the window starts on Windows, on either CPU, before a release; the arm64
+bundle's Qt, built from source, had never run anywhere.
+
+Now:
+
+- CI's Windows build has the window, built against the Qt the release ships
+  for that CPU. CI and the release share that Qt's cache (the same key and
+  folders): whichever runs first after Qt's build changes builds it, which
+  takes hours, and the other finds it. For this the release's x64 cache is
+  two now, the Linux Qt and the Windows Qt, as they change with different
+  scripts. Both Windows builds run on x64 Linux runners, as the release's
+  do; the arm64 one takes the synthetic test core from a job on an arm64
+  Linux runner, as the macOS workflow does.
+- The window is staged as the release's bundle is, and the pack carries it:
+  a test given the build's chimera.exe is given the bundle's (the build's
+  cannot start without its Qt beside it), and every test finds Qt where the
+  window does, in the bundle's lib folder. So the window's tests run the
+  program a person downloads.
+- The tests a Python script drives are packed, and run by the Windows
+  machine's own Python; the repository's modules a script imports go with
+  it. headless.py kills a run with Popen.kill, as Windows has no SIGKILL.
+- The theme test takes the window's QML folder as an argument, not a path
+  built into it: the build machine's path is not there on Windows.
+- Qt for Windows is built with its test library now (it was switched off):
+  ten of the window's tests are QtTest programs and could not be built for
+  Windows without it. No program the bundle carries uses it, so the bundle
+  does not carry it.
+
+**Measured** on this computer's Windows 11 (x64), from a pack made here
+against the Qt built 2026-10-22 (without the test library): the 31 engine
+tests, the package tests, the view models' test, theme (24 of 24; 12 failed
+before it was given the QML folder), translations, key names, single
+instance, and the four tests that run the whole window (window loads, Lua
+config names, TAStudio queries, TAStudio branches) pass. The window tests
+were started by hand, as this computer's Windows has no Python. Not yet run
+on Windows: the five other tests a Python script drives (on-screen text
+size, command line, headless, New Project's window, window drawing), the ten
+QtTest programs, and everything on arm64; CI runs them.
 
 ## The Mac icon is compiled by Apple's actool; Apple silicon builds on macOS 26 (user-decided, 2026-11-05)
 

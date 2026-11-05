@@ -166,27 +166,78 @@ jobs:
           name: witness-full-work-${{ matrix.arch }}
           path: tests/synth/work/
 
+  synth-core:
+    # the synthetic test core and its test game, for the Windows tests of each
+    # CPU: a package is machine code for one CPU, and only miniBox's Linux
+    # guest toolchain makes one, so each is built on a Linux runner of its CPU
+    name: the synthetic test core for ${{ matrix.arch }} (built on Linux)
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-latest
+          - arch: aarch64
+            runner: ubuntu-26.04-arm
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Check out miniBox
+        run: git submodule update --init extern/chimera-common-minibox
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends meson ninja-build build-essential python3
+
+      - name: Build miniBox's host and guest toolchain
+        # the guest compiler and its runtime object are not in the default build
+        run: |
+          mb=extern/chimera-common-minibox
+          meson setup "$mb/build/meson-linux" "$mb"
+          ninja -C "$mb/build/meson-linux" musl-gcc source/guest/emulibc.c.o
+
+      - name: Build the package and the test game
+        run: ./tests/synth/build-package.sh
+
+      - name: Keep them for the Windows job
+        uses: actions/upload-artifact@v4
+        with:
+          name: synth-core-${{ matrix.arch }}
+          path: |
+            build/Cores/synth-box.chimeraCore
+            tests/synth/roms/gridWalker.testrom
+          retention-days: 1
+
   windows:
     # Chimera for Windows, x64 and arm64, built the way the release builds it:
     # on Linux, with mingw-w64's GCC (x64) or llvm-mingw's clang (arm64), with
     # the release's cross files (the C++ runtime as DLLs, and GCC's "posix"
-    # thread model), and with the synthetic test core of the same CPU (built
-    # here, natively: the arm64 build is made on an arm64 runner for that).
-    # The tests are packed (tools/export-tests.py), with the compiler's
-    # runtime DLLs they load, for windows-test to run on Windows.
+    # thread model), against the Qt the release ships (the same cache: built
+    # here when neither has built it yet, which takes hours), with the
+    # synthetic test core of the same CPU. The window is staged as the
+    # release's bundle is, and the tests are packed with it
+    # (tools/export-tests.py), and with the compiler's runtime DLLs they load,
+    # for windows-test to run on Windows.
     name: windows ${{ matrix.cpu }} (built on Linux)
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 90
+    needs: synth-core
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
     strategy:
       fail-fast: false
       matrix:
         include:
           - cpu: x64
-            runner: ubuntu-latest
+            arch: x86_64
             cross: mingw-w64-qt.ini
+            qt: mingw_64_posix
           - cpu: arm64
-            runner: ubuntu-26.04-arm
+            arch: aarch64
             cross: mingw-w64-qt-aarch64.ini
+            qt: llvm_mingw_arm64
     steps:
       - uses: actions/checkout@v4
         with:
@@ -196,27 +247,69 @@ jobs:
         run: git submodule update --init --recursive extern
 
       - name: Install build dependencies
+        # and the libraries the Linux Qt's tools load as they run during a
+        # build of Qt (qsb, the shader baker, is a Qt GUI program)
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends meson ninja-build build-essential cmake pkg-config python3
+          sudo apt-get install -y --no-install-recommends meson ninja-build build-essential cmake pkg-config \
+            python3 python3-venv libegl1 libgl1 libfontconfig1 libxkbcommon0
           if [ "${{ matrix.cpu }}" = x64 ]; then sudo apt-get install -y --no-install-recommends mingw-w64; fi
 
       - name: llvm-mingw (pinned, checked by its SHA256)
         if: matrix.cpu == 'arm64'
         run: tools/fetch-llvm-mingw.sh "$HOME/llvm-mingw" >> "$GITHUB_PATH"
 
-      - name: The synthetic test core, for this CPU
+      - name: Cache Qt
+        id: qt-cache
+        uses: actions/cache/restore@v4
+        with:
+          # the release's (release.yml): the Linux Qt (aqt) whose tools run
+          # during the build, and the Windows Qt that ships
+          path: |
+            ~/qt/6.12.0/gcc_64
+            ~/qt/aqt-venv
+            ~/qt-ship/${{ matrix.qt }}
+          key: qt-ship-6.12.0-windows-${{ matrix.cpu }}-${{ hashFiles('tools/build-qt-windows.sh', 'tools/qt-patches/*', 'tools/fetch-qt-source.sh', 'tools/fetch-llvm-mingw.sh') }}
+
+      - name: Build Qt for Windows (once; then cached)
+        if: steps.qt-cache.outputs.cache-hit != 'true'
         run: |
-          mb=extern/chimera-common-minibox
-          meson setup "$mb/build/meson-linux" "$mb"
-          meson compile -C "$mb/build/meson-linux"
-          sh tests/synth/package-box/build-box.sh
-          ./tests/synth/build-package.sh
+          ./tools/fetch-qt-source.sh "$HOME/qt-src"
+          if [ ! -d "$HOME/qt/6.12.0/gcc_64" ]; then
+            python3 -m venv "$HOME/qt/aqt-venv"
+            "$HOME/qt/aqt-venv/bin/pip" install --quiet aqtinstall==3.3.0
+            "$HOME/qt/aqt-venv/bin/aqt" install-qt linux desktop 6.12.0 linux_gcc_64 -m qtshadertools -O "$HOME/qt"
+          fi
+          ./tools/build-qt-windows.sh "$HOME/qt/6.12.0/gcc_64" "$HOME/qt-src" "$HOME/qt-ship/${{ matrix.qt }}" ${{ matrix.cpu }}
+
+      - name: Keep the Qt just built, even if a later step fails
+        if: steps.qt-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/qt/6.12.0/gcc_64
+            ~/qt/aqt-venv
+            ~/qt-ship/${{ matrix.qt }}
+          key: ${{ steps.qt-cache.outputs.cache-primary-key }}
+
+      - name: The synthetic test core, for this CPU
+        uses: actions/download-artifact@v4
+        with:
+          name: synth-core-${{ matrix.arch }}
+          path: .
 
       - name: Build for Windows (${{ matrix.cpu }})
         run: |
-          meson setup build/meson-windows --prefix "$PWD/build" --libdir dll --cross-file extern/meson/${{ matrix.cross }}
+          host="$HOME/qt/6.12.0/gcc_64"
+          export PATH="$host/libexec:$host/bin:$PATH"
+          # pkg-config is pointed at the Windows Qt by a second cross file
+          printf "[properties]\npkg_config_libdir = ['%s/lib/pkgconfig']\n" "$HOME/qt-ship/${{ matrix.qt }}" > qt-pkgconfig.ini
+          meson setup build/meson-windows --prefix "$PWD/build" --libdir dll -Dqt_ui=enabled \
+            --cross-file extern/meson/${{ matrix.cross }} --cross-file qt-pkgconfig.ini
           meson compile -C build/meson-windows
+
+      - name: The window, staged as the release's bundle is
+        run: python3 tools/stage-qt-windows.py --cpu ${{ matrix.cpu }} build/meson-windows build/meson-windows "$HOME/qt-ship/${{ matrix.qt }}" build/bundle-windows
 
       - name: Pack the tests
         run: |
@@ -225,7 +318,10 @@ jobs:
           else
             set -- --runtime "$(dirname "$(dirname "$(command -v aarch64-w64-mingw32-clang)")")/aarch64-w64-mingw32/bin"
           fi
-          python3 tools/export-tests.py build/meson-windows build/windows-tests "$@"
+          # and Qt's own folder, for its test library, which the bundle does not carry
+          host="$HOME/qt/6.12.0/gcc_64"
+          PATH="$host/libexec:$host/bin:$PATH" python3 tools/export-tests.py build/meson-windows build/windows-tests "$@" \
+            --runtime "$HOME/qt-ship/${{ matrix.qt }}/bin" --bundle build/bundle-windows
 
       - uses: actions/upload-artifact@v4
         with:
@@ -236,12 +332,13 @@ jobs:
 
   windows-test:
     # The tests of each Windows build, on a Windows machine of its CPU: what
-    # Chimera's own engine and view models do on Windows, which no Linux job
-    # can show (the files, the threads, the guest calls, the fault handler)
+    # Chimera's own engine, view models and window do on Windows, which no
+    # Linux job can show (the files, the threads, the guest calls, the fault
+    # handler, the window's Qt as the bundle carries it)
     name: windows ${{ matrix.cpu }} (tests on ${{ matrix.runner }})
     needs: windows
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 30
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
