@@ -312,6 +312,30 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
+  windows-arm64-starts:
+    # The Windows arm64 bundle, unpacked on a Windows machine on arm64, starts:
+    # --version returns before Qt opens anything, but the program does not
+    # start at all unless every library it carries loads there. Before the
+    # publishing job, which waits for it.
+    needs: [what, windows-arm64]
+    name: the windows arm64 bundle starts (windows-11-arm)
+    runs-on: windows-11-arm
+    timeout-minutes: 15
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: bundle-windows-arm64
+          path: .
+
+      - name: Unpack and start it
+        shell: pwsh
+        run: |
+          Expand-Archive -Path "chimera-win-arm64-${{ needs.what.outputs.short }}.zip" -DestinationPath bundle
+          # piped, so PowerShell waits for a program built for the Windows subsystem
+          $out = & .\bundle\chimera.exe --version | Out-String
+          Write-Output $out
+          if ($LASTEXITCODE -ne 0 -or $out -notmatch "^Commit ${{ needs.what.outputs.short }}") { exit 1 }
+
   macos:
     # Chimera.app for each Mac, built on that kind of Mac (docs/macos.md):
     # x86-64 on an Intel runner, arm64 on an Apple silicon one. Handed to the
@@ -409,7 +433,7 @@ jobs:
   bundle:
     # Builds the x64 bundles and publishes them with the others - only when
     # every one was built too, so a release never goes out a bundle short.
-    needs: [what, linux-arm64, windows-arm64, macos]
+    needs: [what, linux-arm64, windows-arm64, windows-arm64-starts, macos]
     name: bundle (windows + linux x64) and publish
     runs-on: ubuntu-latest
     # the first run builds Qt for both platforms (then cached): hours, not minutes
@@ -509,6 +533,14 @@ jobs:
           cp build/bundle-windows/LICENSES.md build/release/LICENSES.md
           cp build/bundle-windows/BUILD.txt build/release/BUILD.txt
           ls -la build/release
+
+      - name: The x64 Windows bundle, for the check that it starts on Windows
+        uses: actions/upload-artifact@v4
+        with:
+          name: check-windows-x64
+          path: build/release/chimera-win-x64-${{ needs.what.outputs.short }}.zip
+          if-no-files-found: error
+          retention-days: 1
 
       - name: The arm64 Linux bundle, the arm64 Windows bundle and the two Mac apps
         uses: actions/download-artifact@v4
@@ -644,3 +676,26 @@ jobs:
             "Nightly ${{ needs.what.outputs.date }} (${{ needs.what.outputs.short }}, made $made)" build/release/NOTES.md
           retry gh release upload "$tag" build/release/chimera-*.zip build/release/chimera-*.tar.gz \
             build/release/LICENSES.md build/release/BUILD.txt --clobber
+
+  windows-x64-starts:
+    # The x64 Windows bundle, unpacked on a Windows machine, starts (as the
+    # arm64 one's check above). It is built in the publishing job, so this
+    # comes after it: a failure here says a published bundle does not start.
+    needs: [what, bundle]
+    name: the windows x64 bundle starts (windows-2025)
+    runs-on: windows-2025
+    timeout-minutes: 15
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: check-windows-x64
+          path: .
+
+      - name: Unpack and start it
+        shell: pwsh
+        run: |
+          Expand-Archive -Path "chimera-win-x64-${{ needs.what.outputs.short }}.zip" -DestinationPath bundle
+          # piped, so PowerShell waits for a program built for the Windows subsystem
+          $out = & .\bundle\chimera.exe --version | Out-String
+          Write-Output $out
+          if ($LASTEXITCODE -ne 0 -or $out -notmatch "^Commit ${{ needs.what.outputs.short }}") { exit 1 }
