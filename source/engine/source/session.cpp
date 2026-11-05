@@ -2041,6 +2041,10 @@ static ce_session *openSession(
 		return fail(std::move(message));
 	};
 
+	/* a package runs where it says it does, and nowhere else (2026-11-05);
+	 * asked first, since it reads the declarations through the package's
+	 * one buffer */
+	if (const char *elsewhere = ce_package_runs_here(pkg)) return abort(elsewhere);
 	uint64_t len = 0;
 	const uint8_t *entry = ce_package_entry(pkg, "waterbox.config", &len);
 	if (entry == nullptr) return abort(tr("engine.no_config"));

@@ -19,6 +19,7 @@
 #include <cstring>
 #include <algorithm>
 #include <filesystem>
+#include <iterator>
 #include <map>
 #include <new>
 #include <string>
@@ -284,6 +285,58 @@ const char *ce_package_language_problems(ce_package *p)
 			 [p](const std::string &name, std::string &bytes) { return entryCopy(p, name, bytes); }))
 		out += line + "\n";
 	*g_problems = out;
+	return g_problems->c_str();
+}
+
+const char *ce_host_platform(void)
+{
+#if defined(_WIN32)
+#define CE_HOST_SYSTEM "windows"
+#elif defined(__APPLE__)
+#define CE_HOST_SYSTEM "macos"
+#else
+#define CE_HOST_SYSTEM "linux"
+#endif
+#if defined(__aarch64__) || defined(_M_ARM64)
+	return CE_HOST_SYSTEM "-aarch64";
+#else
+	return CE_HOST_SYSTEM "-x86_64";
+#endif
+#undef CE_HOST_SYSTEM
+}
+
+const char *ce_package_runs_here(ce_package *p)
+{
+	static const char *const known[] = { "windows-x86_64", "windows-aarch64", "linux-x86_64",
+		                                  "linux-aarch64", "macos-x86_64", "macos-aarch64" };
+	const std::string here = ce_host_platform();
+	std::string config;
+	cJSON *root = entryCopy(p, CONFIG_FILE, config) ? cJSON_ParseWithLength(config.data(), config.size()) : nullptr;
+	const cJSON *runsOn = root != nullptr ? cJSON_GetObjectItemCaseSensitive(root, "runsOn") : nullptr;
+	std::string why;
+	if (!cJSON_IsArray(runsOn) || cJSON_GetArraySize(runsOn) == 0)
+		why = chimera::lang::tr("package.runs_on_missing");
+	else
+	{
+		bool listed = false;
+		std::string names;
+		const cJSON *entry = nullptr;
+		cJSON_ArrayForEach(entry, runsOn)
+		{
+			const char *name = cJSON_GetStringValue(entry);
+			if (name == nullptr || std::find_if(std::begin(known), std::end(known), [name](const char *k) { return std::strcmp(k, name) == 0; }) == std::end(known))
+			{
+				why = chimera::lang::tr("package.runs_on_unknown", {name != nullptr ? std::string(name) : std::string("?")});
+				break;
+			}
+			listed = listed || here == name;
+			names += (names.empty() ? "" : ", ") + std::string(name);
+		}
+		if (why.empty() && !listed) why = chimera::lang::tr("package.runs_elsewhere", {names, here});
+	}
+	cJSON_Delete(root);
+	if (why.empty()) return nullptr;
+	*g_problems = why;
 	return g_problems->c_str();
 }
 

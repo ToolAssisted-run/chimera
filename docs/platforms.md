@@ -34,9 +34,13 @@ opening one the first time; see [macos.md](macos.md).
 
 ## Cores on each
 
-A core's package is machine code for one CPU, and runs on every system of that
-CPU: one x64 package runs on Windows, Linux and an Intel Mac, one arm64 package
-on the three arm64 builds.
+A core's package is machine code for one CPU. It says itself which of the six
+systems it runs on, in `runsOn` in its `waterbox.config` (for example
+`"runsOn": ["windows-x86_64", "linux-x86_64"]`), and Chimera runs it only
+there: elsewhere the core is listed with the reason and not opened. A package
+that does not say is refused. Chimera keeps no list of which core runs where
+(user-decided, 2026-11-05); a core that cannot run on one of the six leaves it
+out, as Ikemen GO leaves out the Intel Mac.
 
 - **Most cores have no arm64 package yet.** On 2026-11-05 every official core
   published x64 only; of the third-party cores, SRB2 published both. An arm64
@@ -46,8 +50,11 @@ on the three arm64 builds.
   Windows on arm64 also runs x64 programs, but the x64 build has not been
   tried there.
 - **Intel Mac (and the Intel build on Apple silicon): thread-local variables.**
-  A core that has them is refused, with the reason, until it is built again
-  with the miniBox this build carries; 17 of the 30 cores tried have them.
+  A core that has them must be built with the miniBox this build carries, which
+  lists where its code reads them ([porting-a-core.md](porting-a-core.md)). One
+  that is not, or whose code reads them in a way the list cannot hold (the Go
+  code of Ikemen GO), is refused with the reason, and should not list
+  `macos-x86_64`.
 - **Apple silicon: no GuestFaultHandler.** A core that asks for the faults of
   single 4 KiB pages (RPCS3, Xenia) is refused, with the reason, on a machine
   whose memory pages are larger: every Apple silicon Mac (16 KiB), and Linux

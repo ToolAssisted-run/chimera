@@ -262,6 +262,8 @@ void CoresViewModel::scan()
 				c.systems = systemsOf(cfg);
 				c.systemList = systemPairs(cfg);
 				c.refused = abiRefusal(cfg);
+				/* where it runs is the package's to say (2026-11-05) */
+				if (const char *elsewhere = ce_package_runs_here(p); c.refused.empty() && elsewhere != nullptr) c.refused = elsewhere;
 				c.path = path;
 				c.size = static_cast<int64_t>(fs::file_size(entry.path(), ec));
 				if (ec) c.size = 0;

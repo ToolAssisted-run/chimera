@@ -13786,3 +13786,33 @@ threads their own.
 Tested: main with miniBox 3848e4e, on Linux: the meson tests passed 64 of 64
 and the witness 125 of 125; the Windows build (mingw-w64, x64) compiled.
 
+
+## Each package says where it runs (user-decided, 2026-11-05)
+
+A core's package now lists the systems it runs on, in `runsOn` in its
+`waterbox.config`: each one of `windows`, `linux` or `macos`, a dash, and
+`x86_64` or `aarch64`. Chimera runs a package only on a system it lists. It
+refuses a package that lists none, or that lists a name outside the six.
+
+- **Why.** Ikemen GO cannot run on an Intel Mac. Its Go code reads its
+  thread-local variables in 2,320 places the Intel Mac loader cannot rewrite
+  (`mov %fs:(%r14),%r14`, written by Go's own compiler). The owner's answer
+  was not to special-case it: "Every core distributable establishes which
+  compatibilities in the 2x3 matrix they support. Chimera offers an interface
+  for core distros to explicit this. Chimera holds zero information of any
+  particular core."
+- **Required, not assumed.** A package that says nothing is refused rather
+  than taken to run everywhere (the owner's choice). Every core is built
+  again with the list before the platform matrix is merged.
+- **Where it is checked.** The engine, `ce_package_runs_here`, so the window,
+  the headless runner and the tests refuse alike: a session will not open
+  such a package, and Tools > Core Manager lists it with the reason. The
+  contract tests (`test-packages`) fail a package that does not say, or names
+  something else. One `waterbox.config` serves both CPUs' packages of a core,
+  so the list may name the other CPU's systems too. `publish-core.sh` refuses
+  a package that lists none for its own CPU.
+- **Tested.** `engine_package` checks this machine's own name, a package for
+  another system (refused, this system named), none, an empty list and a
+  misspelt name. `test-packages` checks its rule on three declarations. Each
+  was broken once and seen to fail: three tests failed. Then all 64 tests
+  passed, the witness 125/0, and both Windows builds compiled.

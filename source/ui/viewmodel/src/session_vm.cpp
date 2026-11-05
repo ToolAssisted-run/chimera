@@ -4525,7 +4525,8 @@ void SessionViewModel::bootProjectOnMachine(ce_project *p, const std::string &pa
 		}
 		if (!found.empty()) note = "; " + found;
 	}
-	/* a package built for a guest ABI this Chimera does not run is not run, a given one too */
+	/* a package built for a guest ABI this Chimera does not run, or for
+	 * another system, is not run, a given one too */
 	{
 		const char *perr = nullptr;
 		if (ce_package *pk = ce_package_open(package.c_str(), &perr))
@@ -4534,8 +4535,9 @@ void SessionViewModel::bootProjectOnMachine(ce_project *p, const std::string &pa
 			const uint8_t *d = ce_package_entry_texts(pk, "waterbox.config", &len);
 			json::Json cfg;
 			std::string jerr;
-			const std::string refused = d != nullptr && json::parse(std::string_view(reinterpret_cast<const char *>(d), static_cast<size_t>(len)), cfg, jerr)
+			std::string refused = d != nullptr && json::parse(std::string_view(reinterpret_cast<const char *>(d), static_cast<size_t>(len)), cfg, jerr)
 				? CoresViewModel::abiRefusal(cfg) : std::string();
+			if (const char *elsewhere = ce_package_runs_here(pk); refused.empty() && elsewhere != nullptr) refused = elsewhere;
 			ce_package_free(pk);
 			if (!refused.empty())
 			{

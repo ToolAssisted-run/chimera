@@ -135,6 +135,36 @@ int main(void)
 		std::remove("work.test_package.dir");
 	}
 
+	{ // where a package runs: only where its runsOn says (2026-11-05)
+#if defined(_WIN32)
+		_mkdir("work.test_package.dir");
+#else
+		mkdir("work.test_package.dir", 0755);
+#endif
+		writeTemp("dir/core.wbx", "x", 1);
+		const std::string here = ce_host_platform();
+		assert(here == "windows-x86_64" || here == "windows-aarch64" || here == "linux-x86_64" || here == "linux-aarch64"
+		       || here == "macos-x86_64" || here == "macos-aarch64");
+		const auto runsHere = [](const std::string &cfg) {
+			writeTemp("dir/waterbox.config", cfg.data(), cfg.size());
+			ce_package *p = ce_package_open("work.test_package.dir", nullptr);
+			assert(p != nullptr);
+			const char *why = ce_package_runs_here(p);
+			const std::string out = why != nullptr ? why : "";
+			ce_package_free(p);
+			return out;
+		};
+		assert(runsHere("{ \"runsOn\": [ \"" + here + "\" ] }").empty());
+		const std::string other = here.rfind("linux", 0) == 0 ? "windows-x86_64" : "linux-x86_64";
+		assert(runsHere("{ \"runsOn\": [ \"" + other + "\" ] }").find(here) != std::string::npos);
+		assert(!runsHere("{ \"systemId\": \"NES\" }").empty());
+		assert(!runsHere("{ \"runsOn\": [] }").empty());
+		assert(runsHere("{ \"runsOn\": [ \"" + here + "\", \"linux-x64\" ] }").find("linux-x64") != std::string::npos);
+		std::remove("work.test_package.dir/core.wbx");
+		std::remove("work.test_package.dir/waterbox.config");
+		std::remove("work.test_package.dir");
+	}
+
 	std::puts("test_package: all ok");
 	return 0;
 }
