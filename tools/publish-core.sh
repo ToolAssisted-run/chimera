@@ -165,8 +165,10 @@ if [ -z "$notes" ]; then
 		echo
 		case " ${arches[*]} " in
 			*" arm64 "*)
-				echo "**You most likely want the x64 package.** Take the arm64 one only if you"
-				echo "know you are using an arm64 device. Put only one of them in the folder."
+				echo "**On Windows or Linux you most likely want the x64 package.** Take the"
+				echo "arm64 one only if you know you are using an arm64 device. On a Mac, take"
+				echo "arm64 for Apple silicon and x64 for an Intel Mac. Put only one of them in"
+				echo "the folder."
 				echo ;;
 		esac
 		echo "| | |"

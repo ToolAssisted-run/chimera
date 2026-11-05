@@ -13418,6 +13418,37 @@ the first try; on Intel (macos-15), Xcode 16.4's failed and Xcode 26.3's
 compiled it, the Assets.car of the one that failed removed in between. Both
 apps passed the icon checks, and every test passed on both Macs.
 
+## The six builds in the README, and a page of their own (2026-11-05)
+
+The README, the release's notes and the documents said Chimera was built for
+Linux and Windows. With all six builds passing (504dc89d), they say what the
+six are, and docs/platforms.md has the detail: which to download, how each
+is built, what is tested on which GitHub machine, which cores run on each,
+and what has been tried on a person's machine.
+
+- Which to take, everywhere it is offered (the README, the release's notes,
+  the notes publish-core.sh writes for every core, docs/core-manager.md): on
+  Windows or Linux most likely x64, arm64 only on a device known to be arm64;
+  on a Mac, arm64 for Apple silicon and x64 for an Intel Mac, as the
+  release's notes already said of the bundles (2026-11-04).
+- Where cores go on a Mac (`~/Library/Application Support/Chimera/Cores`),
+  and that macOS asks before opening an app signed by no developer.
+- What runs where, said plainly: on 2026-11-05 none of the 62 official
+  cores' dev releases had an arm64 package (SRB2, a third-party core, has
+  both), so an arm64 build runs almost no cores yet; an Intel Mac refuses a
+  core with thread-local variables until it is built again with this
+  miniBox; Apple silicon refuses one that exports GuestFaultHandler.
+- Older text corrected on the way: Encode Video's ffmpeg section still
+  described the macOS ffmpeg fetched from the Internet Archive (it is built
+  by tools/build-ffmpeg.sh now) and a Windows ffmpeg for x64 only; the MCP
+  server's page put chimera-mcp in `dll/` on Windows (it is in `bin\`); the
+  README's crash files are Windows' alone (Windows Error Reporting).
+
+Found on the way, not fixed here: the Mac app carries no LICENSES.md, only
+Chimera's licence and ffmpeg's; and the sandbox's log (minibox-diag.log)
+is written to the working folder, which for an app Finder starts is the
+disk's root, where it cannot be written (not tried).
+
 ## A held key clicks a button once; TAStudio's lists pick many rows (2026-11-04)
 
 Issue 494: Space pressed in TAStudio made 20 to 30 branches, and the Branches

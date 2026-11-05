@@ -650,7 +650,11 @@ jobs:
             echo
             echo "Each carries Chimera and the libraries it needs. They carry **no cores**, and"
             echo "Chimera downloads none: get a core's \`.chimeraCore\` package from the"
-            echo "project that builds it and put it in the \`cores\` folder beside Chimera."
+            echo "project that builds it and put it in the \`Cores\` folder beside Chimera"
+            echo "(on a Mac, \`~/Library/Application Support/Chimera/Cores\`). Most cores have"
+            echo "no arm64 package yet: [docs/platforms.md](https://github.com/ToolAssisted-run/chimera/blob/main/docs/platforms.md)"
+            echo "says what runs on each build. A Mac asks before opening the app the first"
+            echo "time, as it is signed by no developer."
             echo "\`BUILD.txt\` names the exact commit this was built from and"
             echo "\`LICENSES.md\` states its terms."
             echo

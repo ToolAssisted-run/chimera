@@ -237,11 +237,19 @@ legs say SKIP with the reason where it is absent, and a SKIP is never read as
 a pass. A core proved on one real game says which; one proved on none says
 that.
 
-**Windows is the same package.** The guest is one file for both systems, and
-the host under it is not: run the frontend gate's scenario on Windows before
-calling a core done. What has failed only there so far was stacks - an
-emulator's own coroutine stacks need `MAP_STACK`, and a fault on the page the
-stack pointer is in cannot be delivered.
+**Windows is the same package.** The guest is one file for every system of
+its CPU, and the host under it is not: run the frontend gate's scenario on
+Windows before calling a core done. What has failed only there so far was
+stacks - an emulator's own coroutine stacks need `MAP_STACK`, and a fault on
+the page the stack pointer is in cannot be delivered.
+
+**So is a Mac, with two refusals.** An Intel Mac runs the x64 package only if
+the core reaches its thread-local variables in the way miniBox can patch as it
+loads: the guest toolchain builds C and C++ so (`-mno-tls-direct-seg-refs`),
+but a core's own build flags or hand-written assembly may not, and the core is
+then refused with the reason. An Apple silicon Mac refuses a core that exports
+`GuestFaultHandler`. An arm64 package is a build of its own; see
+[platforms.md](platforms.md).
 
 ## 9. Publishing
 

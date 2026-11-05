@@ -31,16 +31,18 @@ kinds of build the frontend already uses (see `.github/workflows/release.yml`):
 One asset per CPU the core is built for: `<coreid>-<version>-<arch>.chimeraCore`,
 `<arch>` being `x64` or `arm64`, the names Chimera's own release bundles use. A
 package is machine code for one CPU - miniBox runs `core.wbx` directly, and
-refuses one built for another CPU - but not for one OS: the same package runs on Linux and Windows. The version is the
+refuses one built for another CPU - but not for one OS: the same package runs on Windows, Linux and macOS
+([platforms.md](platforms.md) says what each build runs). The version is the
 commit the build was made from, which is what the package already stamps into
 `waterbox.config` and what a movie already cites (`CoreVersion`). Releases from
 before packages carried their CPU name one asset `<coreid>-<version>.chimeraCore`,
 which is x64.
 
-Most users want the x64 package, and the notes `publish-core.sh` writes say so
-above the table whenever a release also has an arm64 one: take the arm64 one
-only if you know you are using an arm64 device, and put only one of them in the
-folder. Chimera's own release notes say the same of its bundles.
+Most users of Windows and Linux want the x64 package, and the notes
+`publish-core.sh` writes say so above the table whenever a release also has an
+arm64 one: take the arm64 one only if you know you are using an arm64 device;
+on a Mac, arm64 for Apple silicon and x64 for an Intel Mac; and put only one of
+them in the folder. Chimera's own release notes say the same of its bundles.
 
 Fifteen repositories publishing identically is fifteen copies of one job that
 will drift, so the logic lives once, here, in two files:
@@ -186,7 +188,9 @@ before this change do, which is the reason it is still written.
     <the cores folder>/        one folder; a package is a file in it
 
 The cores folder is `Cores/` beside the executable. It comes with the bundle,
-empty, and a package dropped into it is found. A user who wants it somewhere
+empty, and a package dropped into it is found. On a Mac it is
+`~/Library/Application Support/Chimera/Cores`, as the app is not written to
+([macos.md](macos.md)). A user who wants it somewhere
 else - one set of cores shared by any number of unpacked Chimeras, or a faster
 disk - names another folder in File > Core Manager (**Change folder...**), kept
 as `CoresFolder` in the config - written the moment it is chosen, so it is
@@ -202,7 +206,8 @@ only ever adds, has no window, and the manager removes nothing from them.
 
 **The data directory's `Cores` is not searched.** That is where versions that
 downloaded cores put them (`%LOCALAPPDATA%\Chimera\Cores` on Windows,
-`~/.local/share/chimera/Cores` elsewhere, or under a moved data directory).
+`~/.local/share/chimera/Cores` on Linux, or under a moved data directory; on a
+Mac that folder is the cores folder itself).
 Somebody updating from one would otherwise open Chimera to find every core
 apparently gone, so the manager says when packages are still there and how
 many, and **Change folder...** opens on that folder, so making it the cores

@@ -8,6 +8,8 @@ and arm64 for Apple silicon. The cross file names the processor:
 build folders below are named after it. What this page says was measured on
 x86-64; the arm64 build is new (2026-11-04) and has so far been built and
 tested only by CI's macOS job, on GitHub's Apple silicon runner (macOS 26).
+The release publishes both as apps; [platforms.md](platforms.md) compares
+them with the Windows and Linux builds.
 
 ## Which macOS
 
@@ -66,8 +68,8 @@ pkg_config_libdir = '<folder>/6.12.0/macos/lib/pkgconfig'
 Run it with `build/x86_64-macos/dll/chimera --project <project> --core <package>`.
 Encoding a video needs the ffmpeg beside the program:
 `tools/build-ffmpeg.sh macos build/x86_64-macos/dll` (docs/encode-video.md).
-The window finds Qt's frameworks where they were installed (an rpath). A bundle
-that carries its own (macdeployqt) is not made yet.
+The window finds Qt's frameworks where they were installed (an rpath); the app
+below carries its own.
 
 The menus are in the menu bar at the top of the screen, as on every Mac
 program, and the windows have no bar of their own (a window's menu bar shows
@@ -128,8 +130,11 @@ until the person's own Themes folder has one.
 Sound and gamepads need no setup: OpenAL Soft and SDL2 are in
 `Contents/Frameworks` and found there.
 
-It is ad hoc signed, not notarised, so another Mac asks before opening it
-(right-click, Open). Chimera writes nothing into the app, so its signature
+It is ad hoc signed, not notarised, so another Mac asks before opening it the
+first time: on macOS 15 and later it is allowed in System Settings > Privacy &
+Security (Open Anyway), before that with right-click, Open. The release
+publishes both apps, `chimera-macos-x64-<commit>.zip` and
+`chimera-macos-arm64-<commit>.zip`. Chimera writes nothing into the app, so its signature
 keeps verifying (`codesign --verify --deep --strict` passes after a run).
 
 ## miniBox on macOS
@@ -181,7 +186,8 @@ On an Apple M1, macOS 27, the x86-64 build under Rosetta 2:
   (`synth-box` and its test game) built on Linux and copied in: the window, the
   view models, TAStudio, the MCP server and Lua, with the core run by miniBox
   under the gs swap. The CI workflow (`.github/workflows/macos.yml`) does the
-  same on an Intel runner: a Linux job builds the core, the macOS job the rest.
+  same on an Intel runner and an Apple silicon one: a Linux job builds the core
+  for each CPU, the macOS jobs the rest.
   Run side by side, three window tests that measure for one second spent it
   starting up, so the workflow runs them one at a time.
 - Cores, published x86-64 packages with a game of the user's own: quickerNES
@@ -194,8 +200,8 @@ On an Apple M1, macOS 27, the x86-64 build under Rosetta 2:
   (offscreen).
 
 Not tried: a real Intel Mac, the window on the screen (Cocoa) and with a GPU
-renderer, a core that uses threads heavily or a GPU, the Mesa path, and a
-bundle for others to run.
+renderer, a core that uses threads heavily or a GPU, the Mesa path, and the
+published apps on a person's Mac (the release only starts each one).
 
 ## What a core needs on each Mac
 

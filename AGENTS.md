@@ -64,7 +64,10 @@ third-party tables, with its author.
 
 ## Build
 
-Linux hosts both builds. Requirements are in the README ("Building").
+Chimera ships for x64 and arm64 on Windows, Linux and macOS
+([docs/platforms.md](docs/platforms.md)). Linux hosts the Linux and Windows
+builds; macOS is built on a Mac ([docs/macos.md](docs/macos.md)).
+Requirements are in the README ("Building").
 
 ```sh
 git submodule update --init --recursive
@@ -81,8 +84,9 @@ meson compile -C build/meson-linux && meson install -C build/meson-linux
 
 The window is `build/meson-linux/source/ui/chimera`; `--headless` runs it with
 no display. The Windows build needs Qt for Windows built with Chimera's
-mingw (`tools/build-qt-windows.sh`); `tools/build-bundle.sh` makes both
-bundles as a release does.
+compiler (`tools/build-qt-windows.sh`: mingw-w64 for x64, llvm-mingw for
+arm64); `tools/build-bundle.sh` makes the Linux and Windows bundles as a
+release does.
 
 A core repository also needs miniBox's host library and guest toolchain:
 
@@ -108,7 +112,8 @@ env -u DISPLAY sh tests/synth/run-witness.sh     # the witness: the product, end
   `tests/synth/package-box/build-box.sh` and then `tests/synth/build-package.sh`,
   or the witness runs the old package.
 - A change to the engine or to miniBox must also compile for Windows
-  (`meson compile -C build/meson-windows`).
+  (`meson compile -C build/meson-windows`). CI builds and tests all six
+  builds; a pull request's CI must pass on each.
 - The contract tests run against any package:
   `build/meson-linux/source/ui/test-packages <folder>`.
 - A new test is broken on purpose once and seen to fail ([docs/gates.md](docs/gates.md)).

@@ -97,9 +97,10 @@ Two things have to be true, and either may not be:
    GPU (2026-11-02).
 2. **This build has a bridge, and a driver gives it a context.** `-Dgl_bridge`
    is on by default and needs EGL on Linux (`libegl-dev`) and `opengl32` on
-   Windows.
+   Windows. On a Mac it is Apple's OpenGL, through CGL, which stops at 4.1
+   ([macos.md](macos.md)).
 
-The context is the same kind on both systems: the newest OpenGL the driver
+The context is the same kind on Linux and Windows: the newest OpenGL the driver
 has, 3.3 at the least, with the core profile, which leaves out the old
 fixed-function calls (owner, 2026-10-19; Windows had the compatibility
 profile before, so a call a renderer still made from the old OpenGL worked on
