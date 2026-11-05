@@ -165,6 +165,7 @@
 		"common.cancel": "Annulla",
 		"common.cancel_mnemonic": "&Annulla",
 		"common.clear": "Cancella",
+		"common.clipboard_busy": "Non è stato possibile mettere il testo negli appunti: un altro programma li ha aperti. Riprova.",
 		"common.close": "Chiudi",
 		"common.close_mnemonic": "&Chiudi",
 		"common.closing_with_unsaved_changes": "Chiusura con modifiche non salvate",

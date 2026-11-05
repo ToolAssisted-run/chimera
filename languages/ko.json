@@ -157,6 +157,7 @@
 		"common.cancel": "취소",
 		"common.cancel_mnemonic": "취소(&C)",
 		"common.clear": "지우기",
+		"common.clipboard_busy": "텍스트를 클립보드에 넣을 수 없습니다. 다른 프로그램이 클립보드를 열고 있습니다. 다시 시도하세요.",
 		"common.close": "닫기",
 		"common.close_mnemonic": "닫기(&C)",
 		"common.closing_with_unsaved_changes": "저장되지 않은 변경이 있는 채로 닫기",

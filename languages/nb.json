@@ -165,6 +165,7 @@
 		"common.cancel": "Avbryt",
 		"common.cancel_mnemonic": "&Avbryt",
 		"common.clear": "Tøm",
+		"common.clipboard_busy": "Teksten kunne ikke legges på utklippstavlen: et annet program har utklippstavlen åpen. Prøv igjen.",
 		"common.close": "Lukk",
 		"common.close_mnemonic": "&Lukk",
 		"common.closing_with_unsaved_changes": "Lukke med ikke-lagrede endringer",

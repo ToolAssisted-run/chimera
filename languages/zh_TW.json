@@ -157,6 +157,7 @@
 		"common.cancel": "取消",
 		"common.cancel_mnemonic": "取消(&C)",
 		"common.clear": "清除",
+		"common.clipboard_busy": "無法把文字放到剪貼簿：另一個程式正佔用著剪貼簿。請再試一次。",
 		"common.close": "關閉",
 		"common.close_mnemonic": "關閉(&C)",
 		"common.closing_with_unsaved_changes": "關閉時有未儲存的變更",

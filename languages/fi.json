@@ -165,6 +165,7 @@
 		"common.cancel": "Peruuta",
 		"common.cancel_mnemonic": "&Peruuta",
 		"common.clear": "Tyhjennä",
+		"common.clipboard_busy": "Tekstiä ei voitu laittaa leikepöydälle: toinen ohjelma pitää leikepöytää auki. Yritä uudelleen.",
 		"common.close": "Sulje",
 		"common.close_mnemonic": "&Sulje",
 		"common.closing_with_unsaved_changes": "Suljetaan tallentamattomin muutoksin",

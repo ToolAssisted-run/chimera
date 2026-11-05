@@ -157,6 +157,7 @@
 		"common.cancel": "Batal",
 		"common.cancel_mnemonic": "&Batal",
 		"common.clear": "Kosongkan",
+		"common.clipboard_busy": "Teks tidak dapat ditempatkan di papan klip: program lain sedang membukanya. Coba lagi.",
 		"common.close": "Tutup",
 		"common.close_mnemonic": "&Tutup",
 		"common.closing_with_unsaved_changes": "Menutup dengan Perubahan yang Belum Disimpan",

@@ -13731,3 +13731,35 @@ the snow boxes reading 1.0 and -2.00; 60 watches on the screen in three
 columns; a saved list's watches gone from the screen when RAM Watch closed;
 the Domain column dragged to 184 pixels and remembered. The view models' test
 checks the new default places.
+
+## The clipboard is set once, read back, and said when it fails (2026-11-05)
+
+Issue 485: the first Copy of a whole movie in TAStudio hung the window for
+about ten seconds and pasted nothing, in TAStudio or in a text editor; the
+second Copy worked.
+
+- **What happened.** Copy put the text on the clipboard twice, one right
+  after the other: TAStudio's menu action, and the main window's connection
+  that sends every copy a tool, a hotkey or a script makes. Windows lets one
+  program have the clipboard open at a time, and a program that watches the
+  clipboard opens it after every change. When that program had it open for
+  the second set, Qt tried three times 100 ms apart, gave up with no message
+  on the screen, and took back the data object of the first set as well - so
+  the clipboard held nothing a paste could get. The second Copy found the
+  clipboard free.
+- **What was decided.** `ClipboardRelay::setText` does not set text that is
+  already there, reads the text back after setting it, sets it again every
+  250 ms (up to eight times) when it did not take, lets a newer copy take
+  over from one still waiting, and says "The text could not be put on the
+  clipboard: another program has the clipboard open. Try again." in the
+  status line (TAStudio's, and the main window's) when it never took
+  (`common.clipboard_busy`).
+- **What was not proved.** The cause on the reporter's computer: which
+  program held the clipboard, and what made the window hang for ten seconds,
+  are not known. The hang was not reproduced; on Linux, copying 7000 frames
+  from TAStudio took no time the window noticed, and the 35,000-frame copy in
+  the view model took 9 ms. The test uses a clipboard that refuses writes.
+
+Tested: `test-clipboard-relay` (11 checks) with a clipboard that refuses
+the first writes; broken three ways (no retry, no skip of the same text, no
+take-over by a newer copy) it fails 6, 4 and 1 of its checks.

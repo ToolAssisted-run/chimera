@@ -165,6 +165,7 @@
 		"common.cancel": "Cancelar",
 		"common.cancel_mnemonic": "&Cancelar",
 		"common.clear": "Limpar",
+		"common.clipboard_busy": "Não foi possível pôr o texto na área de transferência: outro programa a tem aberta. Tente de novo.",
 		"common.close": "Fechar",
 		"common.close_mnemonic": "&Fechar",
 		"common.closing_with_unsaved_changes": "Fechando com alterações não salvas",

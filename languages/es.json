@@ -165,6 +165,7 @@
 		"common.cancel": "Cancelar",
 		"common.cancel_mnemonic": "&Cancelar",
 		"common.clear": "Borrar",
+		"common.clipboard_busy": "No se pudo poner el texto en el portapapeles: otro programa lo tiene abierto. Inténtalo de nuevo.",
 		"common.close": "Cerrar",
 		"common.close_mnemonic": "&Cerrar",
 		"common.closing_with_unsaved_changes": "Cerrando con cambios sin guardar",

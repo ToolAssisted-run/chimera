@@ -157,6 +157,7 @@
 		"common.cancel": "Hủy",
 		"common.cancel_mnemonic": "&Hủy",
 		"common.clear": "Xóa",
+		"common.clipboard_busy": "Không thể đặt văn bản vào bộ nhớ tạm: một chương trình khác đang mở bộ nhớ tạm. Hãy thử lại.",
 		"common.close": "Đóng",
 		"common.close_mnemonic": "&Đóng",
 		"common.closing_with_unsaved_changes": "Đóng khi còn thay đổi chưa lưu",

@@ -173,6 +173,7 @@
 		"common.cancel": "Anuluj",
 		"common.cancel_mnemonic": "&Anuluj",
 		"common.clear": "Wyczyść",
+		"common.clipboard_busy": "Nie udało się umieścić tekstu w schowku: inny program ma otwarty schowek. Spróbuj ponownie.",
 		"common.close": "Zamknij",
 		"common.close_mnemonic": "&Zamknij",
 		"common.closing_with_unsaved_changes": "Zamykanie z niezapisanymi zmianami",

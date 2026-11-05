@@ -157,6 +157,7 @@
 		"common.cancel": "キャンセル",
 		"common.cancel_mnemonic": "キャンセル(&C)",
 		"common.clear": "消去",
+		"common.clipboard_busy": "テキストをクリップボードに入れられませんでした。別のプログラムがクリップボードを開いています。もう一度お試しください。",
 		"common.close": "閉じる",
 		"common.close_mnemonic": "閉じる(&C)",
 		"common.closing_with_unsaved_changes": "未保存の変更があるまま閉じます",

@@ -173,6 +173,7 @@
 		"common.cancel": "Отмена",
 		"common.cancel_mnemonic": "&Отмена",
 		"common.clear": "Очистить",
+		"common.clipboard_busy": "Не удалось поместить текст в буфер обмена: другая программа держит буфер обмена открытым. Попробуйте ещё раз.",
 		"common.close": "Закрыть",
 		"common.close_mnemonic": "&Закрыть",
 		"common.closing_with_unsaved_changes": "Закрытие с несохранёнными изменениями",

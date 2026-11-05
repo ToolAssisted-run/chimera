@@ -173,6 +173,7 @@
 		"common.cancel": "Скасувати",
 		"common.cancel_mnemonic": "&Скасувати",
 		"common.clear": "Очистити",
+		"common.clipboard_busy": "Не вдалося помістити текст у буфер обміну: інша програма тримає буфер обміну відкритим. Спробуйте ще раз.",
 		"common.close": "Закрити",
 		"common.close_mnemonic": "&Закрити",
 		"common.closing_with_unsaved_changes": "Закриття з незбереженими змінами",
