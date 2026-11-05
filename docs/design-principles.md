@@ -13066,3 +13066,32 @@ name is made fit for a folder (the characters Windows refuses become "_").
 Tested: the view models' test asks for the folder with a core named
 "A/B: C?. " and gets SaveData/A_B_ C_, made; it failed with the core's folder
 left out. The Paths list's row counts in the test grew by one.
+
+## Macro Input is a step-by-step wizard (user-decided, 2026-11-05)
+
+Macro Input was laid out as Chimera's window: two numbers and Set Macro, a
+list of zones, a name, a frame, Place Zone, Replace and Overlay, and the
+movie's controls ticked along the bottom, with nothing saying what any of it
+is for. A tester found it "nearly completely inscrutable" (issue 511). The
+owner chose a step-by-step wizard over explaining and tidying the old layout
+or only writing a page about it.
+
+The wizard says what a macro is - a stretch of the movie's input, some frames
+and some controls, placed again elsewhere or saved as a .chimeraMacro file to
+place in another movie - and offers two ways through. Making one: its first
+and last frame (or TAStudio's selection), the controls it carries, its name,
+then Save as File..., Place It..., or both. Placing one: a zone of this
+session or one loaded from a file, then where it goes (a frame, or the
+current one), written over the frames there or inserted before them, its
+buttons pressed on top of what is there or not, and Place. Each choice is
+worded as what it does ("Insert it before them, moving them later") rather
+than as the old one-word options. The view model is the one the old window
+used; nothing in the engine changed. The File menu, Recent and the question
+on closing with macros not saved stay. Five texts of the old layout went from
+the 26 language tables, nineteen came in.
+
+Tested: on Xvfb with the synthetic core and a 1,567-frame movie, both ways
+through: frames 0 to 9 with P1 Start left out, named Walk and placed at frame
+100 ("Placed Walk at frame 100"); then the place way's list showed the entire
+movie and Walk. The strict window tests load it with no QML warning, and the
+language test checks the new texts keep "TAStudio" and "Chimera" as they are.
