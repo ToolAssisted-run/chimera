@@ -64,7 +64,11 @@ int sleepFor(lua_State *L)
 	const auto until = std::chrono::steady_clock::now() + std::chrono::milliseconds(ms);
 	if (!exact)
 	{
-		std::this_thread::sleep_for(std::chrono::milliseconds(ms));
+		/* at least that long: on Windows a sleep of between one and two of the
+		 * system clock's ticks (15.6 ms) may end after one, so what is left is
+		 * slept again */
+		for (auto now = std::chrono::steady_clock::now(); now < until; now = std::chrono::steady_clock::now())
+			std::this_thread::sleep_for(until - now);
 		return 0;
 	}
 	while (until - std::chrono::steady_clock::now() > std::chrono::milliseconds(100)) std::this_thread::sleep_for(std::chrono::milliseconds(50));

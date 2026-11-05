@@ -13385,6 +13385,17 @@ in the bundle. Measured on this computer's Windows, with the release
 trial's x64 ffmpeg put in CI's pack: the encode wrote three frames of the
 picture area's 512x480, and all twelve of window drawing's checks passed.
 
+**client.sleep slept short on Windows.** CI at cd2b6739 failed one check of
+the view models' 3046 on windows-2025: `client.sleep(30)` then
+`client.exactsleep(20)` took under 50 ms. The plain sleep was
+std::this_thread::sleep_for, which with mingw's thread library is Windows'
+Sleep, and Windows documents that a sleep of between one and two ticks of its
+system clock (15.6 ms unless a program asks for finer) may end after one. It
+now sleeps again until the time has passed by the steady clock, as the exact
+one already waited it out. On this computer's Windows, 40 sleeps of 30 ms
+built the same way: the shortest was 29.91 ms before, 30.00 ms after; the
+runner's clock is coarser, and the earlier passing runs were luck.
+
 ## The Mac icon is compiled by Apple's actool; Apple silicon builds on macOS 26 (user-decided, 2026-11-05)
 
 On GitHub's macOS 15 Apple silicon image, the actool of every Xcode 26 it has
