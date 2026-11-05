@@ -165,6 +165,7 @@
 		"common.cancel": "Annuleren",
 		"common.cancel_mnemonic": "&Annuleren",
 		"common.clear": "Wissen",
+		"common.clipboard_busy": "De tekst kon niet op het klembord worden gezet: een ander programma heeft het klembord open. Probeer het opnieuw.",
 		"common.close": "Sluiten",
 		"common.close_mnemonic": "&Sluiten",
 		"common.closing_with_unsaved_changes": "Afsluiten met niet-opgeslagen wijzigingen",

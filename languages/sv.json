@@ -165,6 +165,7 @@
 		"common.cancel": "Avbryt",
 		"common.cancel_mnemonic": "&Avbryt",
 		"common.clear": "Rensa",
+		"common.clipboard_busy": "Texten kunde inte läggas i urklipp: ett annat program har urklipp öppet. Försök igen.",
 		"common.close": "Stäng",
 		"common.close_mnemonic": "&Stäng",
 		"common.closing_with_unsaved_changes": "Stänger med osparade ändringar",

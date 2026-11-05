@@ -165,6 +165,7 @@
 		"common.cancel": "Abbrechen",
 		"common.cancel_mnemonic": "&Abbrechen",
 		"common.clear": "Leeren",
+		"common.clipboard_busy": "Der Text konnte nicht in die Zwischenablage gelegt werden: ein anderes Programm hat die Zwischenablage geöffnet. Versuchen Sie es noch einmal.",
 		"common.close": "Schließen",
 		"common.close_mnemonic": "&Schließen",
 		"common.closing_with_unsaved_changes": "Schließen mit ungespeicherten Änderungen",

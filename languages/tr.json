@@ -165,6 +165,7 @@
 		"common.cancel": "İptal",
 		"common.cancel_mnemonic": "&İptal",
 		"common.clear": "Temizle",
+		"common.clipboard_busy": "Metin panoya konamadı: başka bir program panoyu açık tutuyor. Yeniden deneyin.",
 		"common.close": "Kapat",
 		"common.close_mnemonic": "&Kapat",
 		"common.closing_with_unsaved_changes": "Kaydedilmemiş Değişikliklerle Kapatma",

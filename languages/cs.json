@@ -173,6 +173,7 @@
 		"common.cancel": "Zrušit",
 		"common.cancel_mnemonic": "&Zrušit",
 		"common.clear": "Vymazat",
+		"common.clipboard_busy": "Text se nepodařilo vložit do schránky: jiný program má schránku otevřenou. Zkuste to znovu.",
 		"common.close": "Zavřít",
 		"common.close_mnemonic": "&Zavřít",
 		"common.closing_with_unsaved_changes": "Zavírání s neuloženými změnami",

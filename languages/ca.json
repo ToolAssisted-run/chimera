@@ -165,6 +165,7 @@
 		"common.cancel": "Cancel·la",
 		"common.cancel_mnemonic": "&Cancel·la",
 		"common.clear": "Esborra",
+		"common.clipboard_busy": "No s'ha pogut posar el text al porta-retalls: un altre programa el té obert. Torna-ho a provar.",
 		"common.close": "Tanca",
 		"common.close_mnemonic": "&Tanca",
 		"common.closing_with_unsaved_changes": "Tancament amb canvis no desats",

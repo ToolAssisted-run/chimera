@@ -165,6 +165,7 @@
 		"common.cancel": "Cancel",
 		"common.cancel_mnemonic": "&Cancel",
 		"common.clear": "Clear",
+		"common.clipboard_busy": "The text could not be put on the clipboard: another program has the clipboard open. Try again.",
 		"common.close": "Close",
 		"common.close_mnemonic": "&Close",
 		"common.closing_with_unsaved_changes": "Closing with Unsaved Changes",

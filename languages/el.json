@@ -165,6 +165,7 @@
 		"common.cancel": "Ακύρωση",
 		"common.cancel_mnemonic": "&Ακύρωση",
 		"common.clear": "Εκκαθάριση",
+		"common.clipboard_busy": "Το κείμενο δεν μπόρεσε να μπει στο πρόχειρο: ένα άλλο πρόγραμμα το έχει ανοιχτό. Δοκιμάστε ξανά.",
 		"common.close": "Κλείσιμο",
 		"common.close_mnemonic": "&Κλείσιμο",
 		"common.closing_with_unsaved_changes": "Κλείσιμο με μη αποθηκευμένες αλλαγές",

@@ -173,6 +173,7 @@
 		"common.cancel": "Anulează",
 		"common.cancel_mnemonic": "&Anulează",
 		"common.clear": "Golește",
+		"common.clipboard_busy": "Textul nu a putut fi pus în clipboard: un alt program îl ține deschis. Încercați din nou.",
 		"common.close": "Închide",
 		"common.close_mnemonic": "În&chide",
 		"common.closing_with_unsaved_changes": "Închidere cu modificări nesalvate",

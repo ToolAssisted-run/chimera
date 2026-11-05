@@ -165,6 +165,7 @@
 		"common.cancel": "Annuler",
 		"common.cancel_mnemonic": "&Annuler",
 		"common.clear": "Effacer",
+		"common.clipboard_busy": "Le texte n'a pas pu être mis dans le presse-papiers : un autre programme l'a ouvert. Réessayez.",
 		"common.close": "Fermer",
 		"common.close_mnemonic": "&Fermer",
 		"common.closing_with_unsaved_changes": "Fermeture avec des modifications non enregistrées",

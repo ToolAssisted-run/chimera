@@ -165,6 +165,7 @@
 		"common.cancel": "Mégse",
 		"common.cancel_mnemonic": "&Mégse",
 		"common.clear": "Törlés",
+		"common.clipboard_busy": "A szöveget nem sikerült a vágólapra tenni: egy másik program nyitva tartja a vágólapot. Próbálja újra.",
 		"common.close": "Bezárás",
 		"common.close_mnemonic": "&Bezárás",
 		"common.closing_with_unsaved_changes": "Bezárás mentetlen módosításokkal",

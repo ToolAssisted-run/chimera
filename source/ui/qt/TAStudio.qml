@@ -332,6 +332,7 @@ ApplicationWindow {
     // the status line: what was last said here
     property string status: qsTrId("tastudio.tastudio_engaged")
     Connections { target: tas.branches; function onStatusChanged() { if (tas.branches.status !== "") tas.status = tas.branches.status } }
+    Connections { target: tas.clipboard; function onFailed() { tas.status = qsTrId("common.clipboard_busy") } }
 
     SplitView {
         anchors.fill: parent

@@ -549,6 +549,16 @@ if qt_dep.found()
       cpp_args: ['-DQT_NO_KEYWORDS'],
     )
     test('roll table', test_roll_table, env: ['QT_QPA_PLATFORM=offscreen'], timeout: 60)
+    # the clipboard on a busy system: set once, read back, set again until it
+    # takes, said when it never does (issue 485)
+    test_clipboard_relay = executable(
+      'test-clipboard-relay',
+      ['qt/tests/test_clipboard_relay.cpp', qt6.compile_moc(headers: ['qt/clipboard_relay.hpp'], dependencies: [qt_dep])],
+      dependencies: [qt_test_dep],
+      override_options: ['cpp_std=c++20'],
+      cpp_args: ['-DQT_NO_KEYWORDS'],
+    )
+    test('clipboard relay', test_clipboard_relay, env: ['QT_QPA_PLATFORM=offscreen'], timeout: 60)
     # the menus: as wide as their widest row, below the menu bar, closed
     # when their window loses the keyboard (issues 449, 450, 452, 463); the
     # menu bar's text whole after full screen (issue 451)

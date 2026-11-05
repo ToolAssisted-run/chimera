@@ -325,6 +325,11 @@ ApplicationWindow {
         target: root.pianoRoll
         function onClipboardTextChanged() { root.clipboard.setText(root.pianoRoll.clipboardText) }
     }
+    // the system's clipboard was held by another program every time it was tried
+    Connections {
+        target: root.clipboard
+        function onFailed() { root.note(qsTrId("common.clipboard_busy")) }
+    }
     Connections {
         target: root.session
         // what waited for the save goes on once it is written

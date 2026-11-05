@@ -165,6 +165,7 @@
 		"common.cancel": "Annuller",
 		"common.cancel_mnemonic": "&Annuller",
 		"common.clear": "Ryd",
+		"common.clipboard_busy": "Teksten kunne ikke lægges på udklipsholderen: et andet program har udklipsholderen åben. Prøv igen.",
 		"common.close": "Luk",
 		"common.close_mnemonic": "&Luk",
 		"common.closing_with_unsaved_changes": "Lukning med ikke-gemte ændringer",
