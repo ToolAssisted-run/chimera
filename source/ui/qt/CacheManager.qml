@@ -22,7 +22,8 @@ ApplicationWindow {
     title: qsTrId("cache_manager.cache_manager")
     width: 1460
     height: 500
-    minimumWidth: 900
+    // as wide as its widest row of buttons and boxes needs, in any language (issue 507)
+    minimumWidth: Math.max(900, optionsRow.implicitWidth + 16, buttonRow.implicitWidth + 16)
     minimumHeight: 380
     // Chimera's Greenzone budgets button: the window is the main window's
     // the project row picked, when it is one, for its own budgets: (id, name), or ("", "")
@@ -87,6 +88,7 @@ ApplicationWindow {
         spacing: 4
         Label { text: win.vm.header; wrapMode: Text.WordWrap; Layout.fillWidth: true; Layout.preferredHeight: 50 }
         RowLayout {
+            id: optionsRow
             Layout.fillWidth: true
             CheckBox {
                 text: !win.tickedCost ? qsTrId("cache_manager.select_all") : qsTrId("cache_manager.select_all_ticked").arg(win.tickedCost.count).arg(win.tickedCost.size)
@@ -138,6 +140,7 @@ ApplicationWindow {
                         }
                     }
                     ListView {
+                        boundsBehavior: Flickable.StopAtBounds
                         id: list
                         objectName: "cacheList"
                         Layout.fillWidth: true
@@ -212,6 +215,7 @@ ApplicationWindow {
         }
         Label { text: win.vm.status; elide: Text.ElideRight; Layout.fillWidth: true }
         RowLayout {
+            id: buttonRow
             Layout.fillWidth: true
             Button {
                 text: qsTrId("cache_manager.remove_ticked"); Layout.preferredWidth: 160

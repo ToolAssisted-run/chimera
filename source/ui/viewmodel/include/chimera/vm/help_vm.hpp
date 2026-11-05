@@ -5,6 +5,7 @@
  * of them all (Report an Issue, chimera issue 243). Nothing is sent: the
  * person files the report in their browser. */
 
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -37,6 +38,9 @@ public:
 	 * it (the window says once it has drawn; "" when it cannot tell). A
 	 * report names the card a core drew on first (issue 427) */
 	Property<std::string> windowGpu;
+	/* asked for the card when a report is made and windowGpu has no name
+	 * (the window sets it: no toolkit here) */
+	std::function<std::string()> gpuNow;
 	/* the report made last: its text, and the files to attach, a line each */
 	Property<std::string> reportText, reportFiles;
 	Property<std::string> status;

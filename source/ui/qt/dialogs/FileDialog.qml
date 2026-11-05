@@ -17,6 +17,9 @@ PickerBase {
     property url selectedFile
     property list<url> selectedFiles
     property string defaultSuffix
+    // a save with no file yet starts at the game's name with this ending
+    // (".wch"), as Chimera's tools name their files; "" for none (issue 510)
+    property string gameFileEnding
     // Qt's dialog is drawn inside its window (#389)
     readonly property int popupType: qtDialog.popupType
 
@@ -37,6 +40,8 @@ PickerBase {
         return s.substring(0, s.lastIndexOf("/"))
     }
     function open() {
+        if (fileMode === FileDialog.SaveFile && selectedFile.toString() === "" && gameFileEnding !== "" && typeof localFiles !== "undefined")
+            selectedFile = localFiles.gameFile(currentFolder, gameFileEnding)
         const asked = {
             mode: fileMode === FileDialog.SaveFile ? "save" : fileMode === FileDialog.OpenFiles ? "openMany" : "open",
             folder: currentFolder.toString() !== "" ? currentFolder.toString() : "",

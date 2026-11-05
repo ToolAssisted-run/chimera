@@ -92,6 +92,7 @@ ApplicationWindow {
                         Label { text: qsTrId("themes.look"); width: 98; leftPadding: 4; topPadding: 2; bottomPadding: 2; background: Rectangle { color: palette.button; border.color: palette.mid } }
                     }
                     ListView {
+                        boundsBehavior: Flickable.StopAtBounds
                         id: list
                         objectName: "themeList"
                         Layout.fillWidth: true

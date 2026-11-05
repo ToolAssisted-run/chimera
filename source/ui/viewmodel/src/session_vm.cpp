@@ -5638,9 +5638,27 @@ int32_t SessionViewModel::playerOf(const std::string &name) const
 void SessionViewModel::closeOnMachine()
 {
 	if (s_ == nullptr) return;
+	/* A project never saved to a file cannot be opened again: what the cache
+	 * kept for it (where its files are, its title) only sat in the Cache
+	 * Manager at 0 KB (issue 504), so it goes. A folder a project file has
+	 * named is another project's too (a copy keeps the id), and stays; so
+	 * does one whose work was kept to be recovered. */
+	namespace fs = std::filesystem;
+	const fs::path unsavedCache = projectPathM_.empty() && !keepWorkM_ ? projectCacheOnMachine() : fs::path();
 	keepHistoryAtCloseOnMachine();
 	freeSessionOnMachine();
 	freeProjectOnMachine();
+	if (!unsavedCache.empty())
+	{
+		std::ifstream in(unsavedCache / "about.json", std::ios::binary);
+		const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+		in.close();
+		json::Json about;
+		std::string err;
+		const json::Json *was = json::parse(text, about, err) ? about.find("projectPath") : nullptr;
+		std::error_code ec;
+		if (was == nullptr || was->text.empty()) fs::remove_all(unsavedCache, ec);
+	}
 	runningM_ = false;
 	/* the machine's picture goes with it (issue 432) */
 	screen.clear();

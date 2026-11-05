@@ -17,6 +17,8 @@ ApplicationWindow {
     title: qsTrId("project_settings.project_settings")
     width: 600
     height: 520
+    minimumWidth: 600
+    minimumHeight: 520
     modality: Qt.ApplicationModal
     transientParent: win.mainWindow
     // opened again: what the machine was made with, not what was left last time

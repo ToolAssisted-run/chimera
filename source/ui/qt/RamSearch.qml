@@ -26,6 +26,8 @@ ApplicationWindow {
     title: qsTrId("ram_search.ram_search")
     width: 700
     height: 600
+    minimumWidth: 620
+    minimumHeight: 560
 
     WindowOptions { id: windowOptions; window: win; tool: "ramSearch"; vm: win.toolWindows; mainWindow: win.mainWindow }
     onVisibleChanged: {
@@ -73,6 +75,7 @@ ApplicationWindow {
         title: qsTrId("ram_search.save_the_search_as")
         fileMode: FileDialog.SaveFile
         defaultSuffix: "wch"
+        gameFileEnding: ".wch"
         currentFolder: win.folderOf ? win.folderOf("Watch (.wch)") : ""
         nameFilters: [qsTrId("ram_search.watch_files_wch")]
         onAccepted: win.vm.run("save", [selectedFile])
@@ -416,6 +419,7 @@ ApplicationWindow {
                 }
             }
             ListView {
+                boundsBehavior: Flickable.StopAtBounds
                 id: list
                 objectName: "ramSearchList"
                 Layout.fillWidth: true
@@ -476,6 +480,8 @@ ApplicationWindow {
                             win.vm.run("select", [row.index, (mouse.modifiers & Qt.ShiftModifier) ? "range"
                                 : (mouse.modifiers & Qt.ControlModifier) ? "toggle" : "only"])
                         }
+                        // a double click puts the address in RAM Watch (issue 508)
+                        onDoubleClicked: (mouse) => { if (mouse.button === Qt.LeftButton && row.model.selected) win.addToRamWatch() }
                     }
                 }
                 MouseArea {

@@ -3476,8 +3476,19 @@ bool cacheManager(const char *package, const char *rom)
 		CHECK(r->rowCount() == 1 && fromValue(r->cell(0, 9), inUse) && inUse);
 		CHECK(!open.run("remove", {std::string("0")}, error) && error == "could not remove: Walker (in use)" && fs::is_directory(dir / "cache" / id));
 	}
-	session.run("close", {}, error);
-	CHECK(d.until([&] { return !session.isOpen.get() && session.projectId.get().empty(); }, 20));
+	/* a project never saved to a file (Stop Movie's new one) leaves no cache
+	 * behind when it closes; the saved one's stays (issue 504) */
+	{
+		const std::string saved = session.projectId.get();
+		session.run("stopMovie", {}, error);
+		CHECK(d.until([&] { return session.hasProject.get() && session.projectPath.get().empty() && session.projectId.get() != saved; }, 20));
+		const std::string unsaved = session.projectId.get();
+		for (int i = 0; i < 5; i++) session.run("frameAdvance", {}, error);
+		CHECK(d.until([&] { return fs::is_directory(dir / "cache" / unsaved); }, 20));
+		session.run("close", {}, error);
+		CHECK(d.until([&] { return !session.isOpen.get() && session.projectId.get().empty(); }, 20));
+		CHECK(!fs::exists(dir / "cache" / unsaved) && fs::is_directory(dir / "cache" / saved));
+	}
 	/* a cache that never said whose it is: named so, and not an orphan */
 	fs::create_directories(dir / "cache" / "00UNNAMED");
 	/* another project's cache, its project gone */
@@ -3814,6 +3825,19 @@ bool helpMenu(const char *package, const char *rom)
 		text.find("**OS and GPU:** <!-- type your operating system here -->, <!-- type your graphics card here -->") != std::string::npos);
 	CHECK(text.find("**CPU and memory:** ") != std::string::npos && text.find(" threads)") != std::string::npos &&
 		text.find(" GB of memory") != std::string::npos);
+	/* the card unnamed when the window drew: asked again as the report is
+	 * made, and kept (issue 516) */
+	{
+		int asked = 0;
+		help.gpuNow = [&asked] { asked++; return std::string("Test Card 9000"); };
+		CHECK(fromValue(help.run("makeReport", {}, error).value_or(Value()), text) &&
+			text.find("**OS and GPU:** <!-- type your operating system here -->, Test Card 9000") != std::string::npos &&
+			help.windowGpu.get() == "Test Card 9000" && asked == 1);
+		help.run("makeReport", {}, error);
+		CHECK(asked == 1);
+		help.gpuNow = nullptr;
+		help.windowGpu.set("");
+	}
 	/* nothing to attach: said, as Chimera's window says it */
 	if (help.reportFiles.get().empty())
 		CHECK(help.status.get() == "No saved project, crash note or log was found. The zip will hold the text.");
@@ -10192,7 +10216,13 @@ bool coreManager(const char *package, const char *slotsPackage, const char *game
 	ManualDispatcher d;
 	CoresViewModel cores(d);
 	std::string error;
+	/* an empty folder first: said so, and not said any longer once the
+	 * folder looked at has cores (issue 505) */
+	fs::create_directories(dir / "Empty", ec);
+	cores.set("coresFolder", (dir / "Empty").string(), error);
+	CHECK(cores.managerStatus.get() == "There are no cores in this folder yet.");
 	cores.set("coresFolder", (dir / "Cores").string(), error);
+	CHECK(cores.managerStatus.get() == "");
 	RowModel *manager = nullptr;
 	for (const auto &r : cores.rowLists())
 		if (r.name == "manager") manager = r.model;

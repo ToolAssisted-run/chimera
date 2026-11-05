@@ -156,6 +156,14 @@ ApplicationWindow {
 
     component Heading: Label { Layout.fillWidth: true; Layout.bottomMargin: 10; elide: Text.ElideRight }
     component Caption: Label { Layout.preferredWidth: 96 }
+    // a message that may be long: wrapped, and selectable so it can be copied (issue 514)
+    component Said: TextArea {
+        readOnly: true
+        wrapMode: TextEdit.Wrap
+        background: null
+        padding: 0
+        activeFocusOnTab: false
+    }
 
     ColumnLayout {
         anchors.fill: parent
@@ -304,6 +312,7 @@ ApplicationWindow {
                                             color: palette.base
                                             border.color: slotDrop.containsDrag ? palette.highlight : palette.mid
                                             ListView {
+                                                boundsBehavior: Flickable.StopAtBounds
                                                 id: fileList
                                                 anchors.fill: parent
                                                 anchors.margins: 1
@@ -455,6 +464,7 @@ ApplicationWindow {
                             }
                         }
                         ListView {
+                            boundsBehavior: Flickable.StopAtBounds
                             id: firmwareList
                             objectName: "firmwareList"
                             Layout.fillWidth: true
@@ -542,6 +552,7 @@ ApplicationWindow {
                     color: palette.base
                     border.color: palette.mid
                     ListView {
+                        boundsBehavior: Flickable.StopAtBounds
                         id: moduleList
                         objectName: "compiledModules"
                         anchors.fill: parent
@@ -586,21 +597,21 @@ ApplicationWindow {
                         enabled: win.vm.compiling || !win.vm.compileReady
                         onClicked: win.run(win.vm.compiling ? "stopCompile" : "compile")
                     }
-                    Label { text: win.vm.compileStatus; Layout.fillWidth: true; elide: Text.ElideRight }
+                    ScrollView {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: Math.min(compileSaid.implicitHeight, 80)
+                        Said { id: compileSaid; objectName: "compileStatus"; text: win.vm.compileStatus }
+                    }
                 }
             }
         }
 
         RowLayout {
             Layout.fillWidth: true
-            Label {
-                objectName: "wizardStatus"
-                text: win.said
-                color: win.errorColor
-                wrapMode: Text.Wrap
-                maximumLineCount: 3
-                elide: Text.ElideRight
+            ScrollView {
                 Layout.fillWidth: true
+                Layout.preferredHeight: Math.min(wizardSaid.implicitHeight, 64)
+                Said { id: wizardSaid; objectName: "wizardStatus"; text: win.said; color: win.errorColor }
             }
             Button { text: qsTrId("new_project.back"); Layout.preferredWidth: 84; enabled: win.page > 0 && !win.vm.making; onClicked: win.back() }
             Button {

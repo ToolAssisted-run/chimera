@@ -19,6 +19,8 @@ ApplicationWindow {
     title: qsTrId("data_folder_config.data_directory")
     width: 640
     height: 300
+    minimumWidth: 640
+    minimumHeight: 300
     modality: Qt.ApplicationModal
     transientParent: win.mainWindow
     onVisibleChanged: if (visible) { win.said = ""; win.vm.run("refresh") }

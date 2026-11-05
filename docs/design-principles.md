@@ -12975,3 +12975,66 @@ values matching memory, every write already in memory, refusals for a scope
 and a kind the core lacks, and no calls once its functions are removed; it
 failed when the window said a watch was taken without asking the core. Not
 yet offered by any emulator core.
+
+## The window's fixes from one tester's evening (2026-11-05)
+
+Nineteen reports came in on the night of 2026-11-04 (issues 498 to 516),
+from one tester on Windows. These are fixed here; three wait for the owner
+(issues 500, 502 and 511).
+
+- **Closing TAStudio while it played** (issue 501): Yes to "Save Chimera
+  Project?" saved, and the window stayed open. The close waits for the save
+  to be confirmed, and the confirmation is dropped when the project changed
+  after the save was asked for, as it should be. But a project that records
+  as it plays changes every frame, so a frame recorded while the save was
+  under way dropped it, and the close waited for ever. The machine is now
+  paused first and saved once it has stopped. Measured with the synthetic
+  core, TAStudio playing, closed and answered Yes: the published build stayed
+  open in 1 of 8 runs, this one closed and saved in 12 of 12.
+- **Windows too small for what they hold** (issues 505, 506, 507): most
+  tool windows had no smallest size, and could be dragged down until their
+  rows overlapped. Every window now has one: a settings window its opening
+  size, a tool window the size at which its rows still fit (each was looked
+  at there); Firmware, Pre-Compiled Modules and Cache Manager as wide as their
+  widest row of buttons, in whatever language. Core Manager's and Supported
+  Systems' lists fit their columns to the room, and are cut at their edge
+  rather than drawn under what is beside them. Core Manager's "There are no
+  cores in this folder yet." was said while the folder was first read and
+  stayed beside the cores found after it; it goes now.
+- **Scrolled text went out of sight** (issue 515): Qt lets a mouse wheel
+  carry a list or a text box past its ends, and it springs back. Every list
+  and scrolled box now stops at its ends.
+- **A message that could not be read whole** (issue 514): New Project's
+  compile line and its status line wrap, and can be selected and copied.
+- **Export Core Log** (issue 498) says what the log is before asking where
+  to save it, starts in Config > Paths' Debug Logs folder, and brings the main
+  window up, so its questions are not hidden behind TAStudio.
+- **Save dialogs name the game** (issues 499, 510): RAM Watch, RAM Search,
+  Hex Editor, Lua sessions, Surface Viewer and TAStudio's macros start at the
+  game's name with their ending ("gridWalker.wch"); Export Save Data names a
+  single file after the game, the date and time and the core's own name for
+  it, so the ending the core reads it by stays.
+- **Unsaved projects in the cache** (issue 504): every project keeps a
+  folder in the cache with where its files are; one never saved to a file can
+  never be opened again, so its folder goes when it closes, unless its work
+  was kept to be recovered. A folder some project file named stays.
+- **RAM Watch kept unsaved watches** (issue 509): No to "Save watch file?"
+  when closing now lets the changes go; the window opens again on the list as
+  it was saved (or empty).
+- **RAM Search** (issue 508): a double click puts the address in RAM Watch.
+- **Reproducible Media Maker** (issue 503) asks before closing while a file
+  is being made.
+- **Report an Issue** (issue 516) asks for the graphics card again when a
+  report is made and none was named, and on Windows takes the system's name
+  for the display adapter when Qt has none. Not reproduced on the GTX 1060
+  here: both the published build and this one named it.
+- A label showed its menu letter as "&" (issue 512).
+
+Tested: the view models' test checks the core list's status, a report naming
+the card asked for late, and an unsaved project's cache gone with the saved
+one's kept; with each fix taken out, its check failed (3 checks, plus 6 that
+follow from the unsaved one). The window was looked at on Xvfb: RAM Search's
+double click, RAM Watch's No, the save dialog's name, every window at its
+smallest size. Window tests 61 passed, 2 failed as they did before
+(installed packages and command line, which fail on this machine); witness
+125 passed. Not tried on Windows except Report an Issue.

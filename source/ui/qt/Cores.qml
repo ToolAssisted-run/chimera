@@ -22,7 +22,14 @@ ApplicationWindow {
     minimumWidth: 900
     minimumHeight: 420
 
-    readonly property var widths: [150, 70, 200, 250, 70]
+    // the columns: Systems takes the room the others leave, and Version gives
+    // some up when the window is narrow, so the list never runs under the
+    // versions beside it (issue 505)
+    readonly property var widths: {
+        const room = coreListBox.width - 24 - 12
+        const version = Math.min(250, Math.max(150, room - 150 - 70 - 70 - 80))
+        return [150, 70, Math.max(80, room - 150 - 70 - version - 70), version, 70]
+    }
     // the cores ticked, by name, and the one picked
     property var ticked: ({})
     readonly property int tickedCount: Object.keys(win.ticked).length
@@ -96,10 +103,12 @@ ApplicationWindow {
             Layout.fillHeight: true
             spacing: 8
             Rectangle {
+                id: coreListBox
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 color: palette.base
                 border.color: palette.mid
+                clip: true
                 ColumnLayout {
                     anchors.fill: parent
                     anchors.margins: 1
@@ -120,6 +129,7 @@ ApplicationWindow {
                         }
                     }
                     ListView {
+                        boundsBehavior: Flickable.StopAtBounds
                         id: list
                         objectName: "coreList"
                         Layout.fillWidth: true
@@ -254,17 +264,23 @@ ApplicationWindow {
                 }
             }
             Rectangle {
+                id: systemsBox
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 color: palette.base
                 border.color: palette.mid
+                clip: true
+                // the columns: Cores takes the room the others leave, and
+                // System gives some up in a narrow window (issue 506)
+                readonly property real systemWidth: Math.min(260, Math.max(140, systemsBox.width - 2 - 110 - 120 - 14))
+                readonly property real coresWidth: Math.max(120, systemsBox.width - 2 - systemWidth - 110 - 14)
                 ColumnLayout {
                     anchors.fill: parent
                     anchors.margins: 1
                     spacing: 0
                     Row {
                         Repeater {
-                            model: [[qsTrId("cores.system"), 260], [qsTrId("cores.id"), 110], [qsTrId("cores.cores"), 300]]
+                            model: [[qsTrId("cores.system"), systemsBox.systemWidth], [qsTrId("cores.id"), 110], [qsTrId("cores.cores"), systemsBox.coresWidth]]
                             delegate: Label {
                                 required property var modelData
                                 text: modelData[0]; width: modelData[1]
@@ -274,6 +290,7 @@ ApplicationWindow {
                         }
                     }
                     ListView {
+                        boundsBehavior: Flickable.StopAtBounds
                         Layout.fillWidth: true
                         Layout.fillHeight: true
                         clip: true
@@ -282,9 +299,9 @@ ApplicationWindow {
                         delegate: Row {
                             required property var modelData
                             height: 20
-                            Label { text: modelData.name; width: 260; leftPadding: 4; elide: Text.ElideRight }
-                            Label { text: modelData.id; width: 110; leftPadding: 4 }
-                            Label { text: modelData.cores; width: 300; leftPadding: 4; elide: Text.ElideRight }
+                            Label { text: modelData.name; width: systemsBox.systemWidth; leftPadding: 4; elide: Text.ElideRight }
+                            Label { text: modelData.id; width: 110; leftPadding: 4; elide: Text.ElideRight }
+                            Label { text: modelData.cores; width: systemsBox.coresWidth; leftPadding: 4; elide: Text.ElideRight }
                         }
                     }
                 }

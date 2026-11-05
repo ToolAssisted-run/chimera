@@ -1081,6 +1081,7 @@ int main(int argc, char **argv)
 	});
 	/* screenshots go to the system's own folder, as Chimera does; a system opened gets its folders */
 	qt::PictureFiles::folderFor() = [&paths, &session] { return QString::fromStdString(paths.resolveFor(session.systemId.get(), "Screenshots")); };
+	qt::PictureFiles::gameFor() = [&session] { return QString::fromStdString(session.gameName.get()); };
 	vm::Connection systemFolders = session.opens.changed.connect([&paths, &session] { paths.useSystem(session.systemId.get()); });
 	qt::QmlViewModel pathsQml(paths);
 	vm::FirmwareViewModel firmware(dispatcher, cores);
@@ -1555,6 +1556,20 @@ int main(int argc, char **argv)
 	QObject::connect(window, &QQuickWindow::sceneGraphInitialized, &app, [window, &help] {
 		if (QRhi *rhi = window->rhi()) help.windowGpu.set(rhi->driverInfo().deviceName.toStdString());
 	}, Qt::QueuedConnection);
+	/* ...and asked again when a report is made with no name yet (issue 516:
+	 * a report from Windows had none). Qt's name for it, else, on Windows,
+	 * the system's name for the display adapter the desktop is on */
+	help.gpuNow = [window]() -> std::string {
+		if (QRhi *rhi = window->rhi())
+			if (const QByteArray name = rhi->driverInfo().deviceName; !name.isEmpty()) return name.toStdString();
+#ifdef _WIN32
+		DISPLAY_DEVICEW device{};
+		device.cb = sizeof device;
+		for (DWORD i = 0; EnumDisplayDevicesW(nullptr, i, &device, 0); i++)
+			if (device.StateFlags & DISPLAY_DEVICE_PRIMARY_DEVICE) return QString::fromWCharArray(device.DeviceString).toStdString();
+#endif
+		return {};
+	};
 	/* Encode Video's Capture Lua and Capture OSD, as Chimera's. Capture Lua:
 	 * the shapes scripts draw, painted into each frame at the machine's own
 	 * size. Capture OSD: the frame as the picture area shows it, at that

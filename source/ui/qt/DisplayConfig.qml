@@ -20,6 +20,8 @@ ApplicationWindow {
     title: qsTrId("display_config.display_configuration")
     width: 690
     height: 440
+    minimumWidth: 690
+    minimumHeight: 440
     modality: Qt.ApplicationModal
     transientParent: win.mainWindow
 

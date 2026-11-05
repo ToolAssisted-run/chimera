@@ -25,6 +25,8 @@ ApplicationWindow {
     title: qsTrId("ram_watch.ram_watch")
     width: 560
     height: 480
+    minimumWidth: 400
+    minimumHeight: 240
 
     WindowOptions { id: windowOptions; window: win; tool: "ramWatch"; vm: win.toolWindows; mainWindow: win.mainWindow }
     onVisibleChanged: if (visible) windowOptions.placeBack(false)
@@ -57,7 +59,14 @@ ApplicationWindow {
         if (win.closingAsked) { win.closingAsked = false; return }
         if (win.vm.changed) {
             close.accepted = false
-            win.leaveList(() => { win.closingAsked = true; win.close() })
+            win.leaveList(() => {
+                // No: the changes go with the window, so it opens again on the
+                // list as it was saved (issue 509)
+                if (win.vm.changed && win.vm.path !== "") win.vm.run("open", [win.vm.path, false])
+                if (win.vm.changed) win.vm.run("newList")
+                win.closingAsked = true
+                win.close()
+            })
         }
     }
 
@@ -75,6 +84,7 @@ ApplicationWindow {
         property var afterSave: null
         fileMode: FileDialog.SaveFile
         defaultSuffix: "wch"
+        gameFileEnding: ".wch"
         currentFolder: win.folderOf ? win.folderOf("Watch (.wch)") : ""
         nameFilters: [qsTrId("ram_watch.watch_files_wch")]
         onAccepted: {
@@ -436,6 +446,7 @@ ApplicationWindow {
             }
         }
         ListView {
+            boundsBehavior: Flickable.StopAtBounds
             id: list
             objectName: "ramWatchList"
             Layout.fillWidth: true
@@ -657,6 +668,7 @@ ApplicationWindow {
             anchors.fill: parent
             anchors.margins: 10
             ListView {
+                boundsBehavior: Flickable.StopAtBounds
                 id: pickList
                 Layout.fillWidth: true
                 Layout.fillHeight: true

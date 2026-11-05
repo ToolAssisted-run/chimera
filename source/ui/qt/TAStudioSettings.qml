@@ -297,6 +297,7 @@ ApplicationWindow {
                             color: palette.base
                             border.color: palette.mid
                             ListView {
+                                boundsBehavior: Flickable.StopAtBounds
                                 id: runList
                                 anchors.fill: parent
                                 anchors.margins: 1

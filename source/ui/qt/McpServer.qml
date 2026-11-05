@@ -18,6 +18,8 @@ ApplicationWindow {
     title: qsTrId("mcp_server.mcp_server")
     width: 620
     height: 480
+    minimumWidth: 620
+    minimumHeight: 480
     transientParent: win.mainWindow
     // brought up to date with the engine four times a second while it is open
     Timer { interval: 250; running: win.visible; repeat: true; onTriggered: win.vm.run("refresh") }

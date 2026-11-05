@@ -26,6 +26,8 @@ ApplicationWindow {
     title: win.hasProject && win.projectLabel !== "" ? qsTrId("greenzone_budgets.greenzone_budgets").arg(win.projectLabel) : qsTrId("greenzone_budgets.greenzone_budgets_2")
     width: 470
     height: win.hasProject ? 470 : 300
+    minimumWidth: 470
+    minimumHeight: win.hasProject ? 470 : 300
     modality: Qt.ApplicationModal
     transientParent: win.mainWindow
 

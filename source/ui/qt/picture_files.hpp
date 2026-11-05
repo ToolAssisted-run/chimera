@@ -99,6 +99,23 @@ public:
 		QDir().mkpath(screenshotFolder());
 		return QUrl::fromLocalFile(screenshotBase(game) + QStringLiteral(".png"));
 	}
+	/* the game open, as the window names it ("" for none) */
+	static std::function<QString()> &gameFor()
+	{
+		static std::function<QString()> f;
+		return f;
+	}
+	/* a save dialog's first answer: the game's name with the dialog's
+	 * ending, in the folder it opens in, as Chimera's tools name their files
+	 * (issue 510); nothing when no game is open */
+	Q_INVOKABLE QUrl gameFile(const QUrl &folder, const QString &ending) const
+	{
+		QString game = gameFor() ? gameFor()() : QString();
+		for (const QChar c : QStringLiteral("<>:\"/\\|?*")) game.replace(c, QLatin1Char('_'));
+		if (game.trimmed().isEmpty()) return {};
+		const QString name = game + ending;
+		return folder.isLocalFile() ? QUrl::fromLocalFile(QDir(folder.toLocalFile()).filePath(name)) : QUrl::fromLocalFile(name);
+	}
 	/* a file in the system's place for passing files, for one written and read straight away */
 	Q_INVOKABLE QString temporaryFile(const QString &name) const
 	{

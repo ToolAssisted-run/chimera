@@ -16,6 +16,8 @@ ApplicationWindow {
     title: qsTrId("ram_poke.ram_poke").arg(poke.info.domain || "")
     width: 300
     height: 250
+    minimumWidth: 300
+    minimumHeight: 250
     modality: Qt.ApplicationModal
     property string said: qsTrId("ram_poke.enter_an_address_to_poke")
     function start(info) {

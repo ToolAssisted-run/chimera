@@ -21,6 +21,8 @@ ApplicationWindow {
     title: qsTrId("paths_config.path_configuration")
     width: 784
     height: 540
+    minimumWidth: 784
+    minimumHeight: 540
     modality: Qt.ApplicationModal
     transientParent: win.mainWindow
 

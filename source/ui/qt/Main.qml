@@ -324,6 +324,25 @@ ApplicationWindow {
                 then()
             }
         }
+        function onRunningChanged() {
+            if (root.session.running || !root.saveWhenPaused) return
+            root.saveWhenPaused = false
+            root.saveToLeave()
+        }
+    }
+    // the project saved before it is left. A running machine is paused first
+    // and saved once it has stopped: a movie that records as it plays changed
+    // the project after every save, so the save never caught up and what
+    // waited for it (closing TAStudio) never came (issue 501)
+    property bool saveWhenPaused: false
+    function saveToLeave() {
+        if (root.session.running) {
+            root.saveWhenPaused = true
+            root.session.run("pause")
+            return
+        }
+        if (root.session.projectPath === "") root.askSaveAs()
+        else root.session.run("saveProject")
     }
     // what a hotkey does when it is the window's: a menu's action, a dialog, a
     // window; TAStudio's editing is TAStudio's
@@ -683,9 +702,13 @@ ApplicationWindow {
                     if (names === "") { root.note(qsTrId("main.this_machine_holds_no_save_data")); return }
                     const list = names.split("\n")
                     saveDataDialog.files = list.length
-                    // one file under its own name; more in a zip named for the game
-                    saveDataDialog.selectedFile = "file:///" + (list.length === 1 ? list[0].replace(/^.*[\\/]/, "")
-                                                                                   : qsTrId("main.save_data_file").arg(root.session.gameName))
+                    // one file under its own name, after the game's and the time (issue 499:
+                    // "save.flash" alone said nothing); more in a zip named for the game
+                    const game = root.session.gameName.replace(/[<>:"\/\\|?*]/g, "_")
+                    const own = list[0].replace(/^.*[\\/]/, "")
+                    saveDataDialog.selectedFile = "file:///" + (list.length === 1
+                        ? (game !== "" ? game + " " + Qt.formatDateTime(new Date(), "yyyy-MM-dd HH.mm.ss") + " " : "") + own
+                        : qsTrId("main.save_data_file").arg(root.session.gameName))
                     saveDataDialog.open()
                 }
             }
@@ -703,14 +726,15 @@ ApplicationWindow {
                 Action {
                     text: qsTrId("main.export_core_log_dialog")
                     icon.source: root.session.coreLogPath !== "" ? "qrc:/chimera/menu/CoreLogOn.png" : "qrc:/chimera/menu/CoreLog.png"
+                    // the main window brought up first: its questions are in it, and
+                    // TAStudio beside it could hide them (issue 498)
                     onTriggered: {
+                        root.raise()
+                        root.requestActivate()
                         if (root.session.coreLogPath !== "") {
                             coreLogOffDialog.size = root.session.run("coreLogSize")
                             coreLogOffDialog.open()
-                        } else {
-                            coreLogFileDialog.selectedFile = "file:///" + root.session.run("coreLogName")
-                            coreLogFileDialog.open()
-                        }
+                        } else coreLogAboutDialog.open()
                     }
                 }
                 Action { text: qsTrId("main.about"); icon.source: "qrc:/chimera/menu/About.png"; onTriggered: aboutWindow.show() }
@@ -1038,6 +1062,27 @@ ApplicationWindow {
         // over another window only for the one question (leaveProject)
         onVisibleChanged: if (!visible) parentWindow = root
     }
+    // what the core log is, before where it goes (issue 498)
+    Dialog {
+        id: coreLogAboutDialog
+        title: qsTrId("main.export_core_log")
+        anchors.centerIn: parent
+        modal: true
+        standardButtons: Dialog.Ok | Dialog.Cancel
+        Label {
+            text: qsTrId("main.the_core_log_is_a_text_file")
+            wrapMode: Text.WordWrap
+            width: 420
+        }
+        // saved in Paths' Debug Logs folder unless another is chosen (issue 498)
+        onAccepted: {
+            const folder = root.paths.run("dialogFolder", ["Debug Logs", true]) || ""
+            coreLogFileDialog.currentFolder = root.pictureFiles.folderUrl(folder)
+            const name = root.session.run("coreLogName")
+            coreLogFileDialog.selectedFile = folder !== "" ? root.pictureFiles.folderUrl(folder + "/" + name) : "file:///" + name
+            coreLogFileDialog.open()
+        }
+    }
     FileDialog {
         id: coreLogFileDialog
         title: qsTrId("main.export_core_log")
@@ -1114,8 +1159,7 @@ ApplicationWindow {
                 onClicked: {
                     askSaveDialog.close()
                     root.afterSave = root.afterAsk
-                    if (root.session.projectPath === "") root.askSaveAs()
-                    else root.session.run("saveProject")
+                    root.saveToLeave()
                 }
             }
             Button {

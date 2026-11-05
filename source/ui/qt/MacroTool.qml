@@ -23,6 +23,8 @@ ApplicationWindow {
     title: qsTrId("macro_tool.macro_input")
     width: 420
     height: 460
+    minimumWidth: 420
+    minimumHeight: 460
 
     WindowOptions { id: windowOptions; window: win; tool: "macroInput"; vm: win.toolWindows; mainWindow: win.mainWindow }
     onVisibleChanged: if (visible) windowOptions.placeBack(false)
@@ -155,6 +157,7 @@ ApplicationWindow {
             Button { text: qsTrId("macro_tool.set_macro"); onClicked: win.vm.run("setZone", [zoneStart.value, zoneEnd.value]) }
         }
         ListView {
+            boundsBehavior: Flickable.StopAtBounds
             id: zones
             objectName: "macroZones"
             Layout.fillWidth: true
