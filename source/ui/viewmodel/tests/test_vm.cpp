@@ -3861,6 +3861,26 @@ bool helpMenu(const char *package, const char *rom)
 			files.find("pid1") == std::string::npos);
 		help.crashFolder.set("");
 	}
+	/* the sandbox's log where MINIBOX_LOG names it, as a Mac's window names
+	 * it in the data folder: that one goes with a report */
+	{
+		const fs::path log = dir / "named-diag.log";
+		std::ofstream(log) << "miniBox: the guest died\n";
+#ifdef _WIN32
+		_putenv_s("MINIBOX_LOG", log.string().c_str());
+#else
+		setenv("MINIBOX_LOG", log.string().c_str(), 1);
+#endif
+		CHECK(fromValue(help.run("makeReport", {}, error).value_or(Value()), text));
+		CHECK(help.reportFiles.get().find(log.string()) != std::string::npos);
+#ifdef _WIN32
+		_putenv_s("MINIBOX_LOG", "");
+#else
+		unsetenv("MINIBOX_LOG");
+#endif
+		std::error_code ec;
+		fs::remove(log, ec);
+	}
 	/* a project open: its core, its game, its settings off their defaults */
 	openGame(session, package, (dir / "walker.testrom").string(), error);
 	CHECK(d.until([&] { return session.isOpen.get() && settings.shown.get() > 0; }, 60));

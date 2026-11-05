@@ -235,9 +235,10 @@ reports before anybody opens a debugger:
   note and a minidump, `<date> pid<N>.txt` and `.dmp`, into the `Crashes`
   folder of the data directory (Config > Data Directory... opens it;
   `%LOCALAPPDATA%\Chimera` by default on Windows), and the sandbox writes
-  `minibox-diag.log` next to Chimera's program. Attach all three: the note
-  carries the faulting instruction and the machine's last words, and two of
-  three crashes in one recent report were fixed off those files alone.
+  `minibox-diag.log` next to Chimera's program (on a Mac, in the data
+  folder). Attach all three: the note carries the faulting instruction and
+  the machine's last words, and two of three crashes in one recent report
+  were fixed off those files alone.
 - **The core's log.** Help > Export Core Log... keeps everything the core
   says in a file you choose; it is off until asked for, and reboots the core
   so the log starts at boot. Use it again to turn it off, and attach the file.

@@ -121,8 +121,11 @@ serves a link's target path instead of the picture, which broke the README's ima
 
 What a person keeps is in `~/Library/Application Support/Chimera`, as other
 Mac programs keep theirs (owner, 2026-11-03), and not beside the program as on
-Linux and Windows: `Cores/`, `Firmware/`, `settings.json`, and the folders of
-Config > Paths (`Movies/` and the rest, which are relative to it). That is the
+Linux and Windows: `Cores/`, `Firmware/`, `settings.json`, the folders of
+Config > Paths (`Movies/` and the rest, which are relative to it), and the
+sandbox's log, `minibox-diag.log`, written when a core dies (elsewhere it is
+written in the folder Chimera runs in; the `MINIBOX_LOG` environment variable
+names another file on every system). That is the
 folder that already held the projects and the recovery files. It is the same
 for the window run from a build folder, so a core put in `Cores/` there is
 found by both. The app carries no cores: put a core's package in

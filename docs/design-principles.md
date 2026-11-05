@@ -13473,9 +13473,18 @@ Found on the way:
   LICENSES.md, where it is in `dll/`; the path is now the file's own.
 - **The Core Manager is in the Tools menu** of the Qt window; the documents
   and the notes every core's release carries said File.
-- Not fixed: the sandbox's log (minibox-diag.log) is written to the working
-  folder, which for an app Finder starts is the disk's root, where it cannot
-  be written (not tried).
+- **The sandbox's log on a Mac.** miniBox writes `minibox-diag.log` when a
+  core dies, in the folder the program runs in unless `MINIBOX_LOG` names
+  another file. For an app Finder starts that folder is the disk's root,
+  where nothing can be written, so the log was lost. The Mac window now sets
+  `MINIBOX_LOG` to the log in the data folder when the environment has not
+  set it (the helper programs it starts inherit it), and Help > Report an
+  Issue looks for the file `MINIBOX_LOG` names before the folders it looked
+  in. Linux and Windows are unchanged. Tested: the view models' test sets
+  `MINIBOX_LOG` and checks the report lists that file (it failed with the
+  report's change taken out); on Linux the meson tests passed 63 of 63 and
+  the witness 125 of 125. The Mac part is checked by the Mac builds
+  compiling it; no core was made to die on a Mac.
 
 ## A held key clicks a button once; TAStudio's lists pick many rows (2026-11-04)
 

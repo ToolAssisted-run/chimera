@@ -798,6 +798,14 @@ int main(int argc, char **argv)
 	/* the system, for a bug report: as Qt names it */
 	help.osName.set((QSysInfo::prettyProductName() + QStringLiteral(" (") + QSysInfo::currentCpuArchitecture() + QStringLiteral(")")).toStdString());
 	help.exeFolder.set(QCoreApplication::applicationDirPath().toStdString());
+#ifdef __APPLE__
+	/* the sandbox's log (minibox-diag.log) is written in the folder the program
+	 * runs in, which for an app Finder starts is the disk's root, where nothing
+	 * can be written: on a Mac it is in the data folder, unless the
+	 * environment names another, and the report looks for it there */
+	if (qEnvironmentVariable("MINIBOX_LOG").isEmpty())
+		qputenv("MINIBOX_LOG", QFile::encodeName(ownFolder() + QStringLiteral("/minibox-diag.log")));
+#endif
 	/* the cores and the firmware: beside the program, as Chimera keeps them,
 	 * unless the environment names others */
 	vm::CoresViewModel cores(dispatcher);
