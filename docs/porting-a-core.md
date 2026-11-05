@@ -85,10 +85,20 @@ say nothing. Compare `rev-parse --show-toplevel` with the path you meant.
 
 ## The guest toolchain, and what it refuses
 
-- **No thread-local storage.** `check-wbx.sh` fails a core with TLS symbols or
-  `%fs` accesses, and it is right to: a TLS write with no thread pointer does
-  not fault, it lands wherever `%fs` happens to point. Build with
-  `-Dthread_local= -D_Thread_local= -D__thread=` and fix what breaks.
+- **Thread-local variables need an image that declares them.** A linked image
+  with thread-local variables has a TLS segment, and miniBox gives each guest
+  thread its own. `check-wbx.sh` fails an image that uses `%fs` without one,
+  and it is right to: a write there does not fault, it lands wherever `%fs`
+  happens to point. An Intel Mac needs two more things, as macOS gives a
+  program no way to set `%fs`. Compile with the guest toolchain's flags, which
+  carry `-mno-tls-direct-seg-refs`, so the code always loads the thread pointer
+  first. After the link, run
+  `python3 <miniBox>/source/guest/wbx-tp-rewrite.py core.wbx`: it lists in the
+  image where the code loads the thread pointer, and an Intel Mac rewrites
+  those loads as the core loads. An Intel Mac refuses an image with
+  thread-local variables and no list, or with any other use of `%fs`, such as
+  hand-written assembly (Mesa's x86-64 GL dispatch: turn Mesa's x86-64
+  assembly off).
 - **One thread.** The machine's scheduler is the only scheduler. Thread pools,
   lazy background workers and "spawn a thread to do the IO" all have to go or
   become synchronous.

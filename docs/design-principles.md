@@ -13165,3 +13165,26 @@ second Copy worked.
 Tested: `test-clipboard-relay` (11 checks) with a clipboard that refuses
 the first writes; broken three ways (no retry, no skip of the same text, no
 take-over by a newer copy) it fails 6, 4 and 1 of its checks.
+
+## miniBox for all six systems on main, ahead of the matrix (user-decided, 2026-11-05)
+
+Each core's CI builds with the miniBox that this repository's main points to.
+Cores that use thread-local variables (24 of the 62 official cores) can run
+on an Intel Mac only when built with a miniBox that lists where their code
+loads the thread pointer (miniBox pull request 12). That miniBox was waiting
+for pull request 309, the six builds. The owner chose to move main's miniBox
+now, so the cores can be built again and published for an Intel Mac before
+309 merges.
+
+What changes on Linux and Windows: x86-64 guests are compiled with one more
+flag, `-mno-tls-direct-seg-refs`, so code loads the thread pointer before it
+reaches a thread-local variable, instead of using an offset from `%fs`.
+Nothing else in what main builds or runs changes: the rest of the new miniBox
+is macOS and Windows on arm64. docs/porting-a-core.md now says what a core
+with thread-local variables needs for an Intel Mac. The old text there said
+a core could not have any, which has not been true since miniBox gave guest
+threads their own.
+
+Tested: main with miniBox 3848e4e, on Linux: the meson tests passed 64 of 64
+and the witness 125 of 125; the Windows build (mingw-w64, x64) compiled.
+
