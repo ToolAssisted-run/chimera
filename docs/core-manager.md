@@ -153,7 +153,7 @@ with a browser.
 the bundle does not carry it; CI fetches the published packages by it, see
 *Keeping the frontend honest*, and a test holds it to what the packages say.)
 
-The manager is **File > Core Manager**. When there is no core at all - a fresh
+The manager is **Tools > Core Manager**. When there is no core at all - a fresh
 install - Chimera says so once, in a sentence that names the cores folder, and
 offers to open the manager. That is the one moment where it cannot do anything
 useful without help, so it is the one moment worth interrupting; once a core
@@ -192,7 +192,7 @@ empty, and a package dropped into it is found. On a Mac it is
 `~/Library/Application Support/Chimera/Cores`, as the app is not written to
 ([macos.md](macos.md)). A user who wants it somewhere
 else - one set of cores shared by any number of unpacked Chimeras, or a faster
-disk - names another folder in File > Core Manager (**Change folder...**), kept
+disk - names another folder in Tools > Core Manager (**Change folder...**), kept
 as `CoresFolder` in the config - written the moment it is chosen, so it is
 remembered next time however the session ends: an absolute path, or one
 relative to the executable. Empty means the default, and choosing the default keeps nothing, so
@@ -256,7 +256,7 @@ put it in.
 
 ## The window
 
-**File > Core Manager.** Two lines at the top: the cores folder and how many
+**Tools > Core Manager.** Two lines at the top: the cores folder and how many
 cores are in it, and that Chimera downloads nothing - get a package from its
 project, or build it, and put it in this folder. Then one list of cores on the
 left, one core's versions on the right.

@@ -39,7 +39,7 @@ meson test -C build/meson-macos-x86_64
 ```
 
 Requirements: Xcode's command line tools, and Homebrew's meson, ninja and
-cmake. The cross file works on an Intel Mac as well. On either kind of Mac the
+cmake (and coreutils, nasm and pkg-config for the app and its ffmpeg). The cross file works on an Intel Mac as well. On either kind of Mac the
 tests run, because the result can be run (on Apple silicon through Rosetta 2).
 
 ## The window (Qt)
@@ -92,11 +92,15 @@ Mac, so the test of the Linux chooser is not built.
 `tools/build-app-macos.sh` makes `Chimera.app` from an installed build: the
 window, Chimera's libraries, Qt's frameworks, plugins and QML (put in by Qt's
 `macdeployqt`, then cut to the x86-64 half, since Qt's download is one build
-for both processors), the helper programs and ffmpeg, signed ad hoc.
+for both processors), the helper programs and ffmpeg, and `LICENSES.md` with
+the licence texts, as every bundle has (Qt's from its source archives, which
+`tools/fetch-qt-source.sh` downloads), signed ad hoc.
 
 ```sh
 tools/build-ffmpeg.sh macos build/x86_64-macos/dll
-tools/build-app-macos.sh --dll build/x86_64-macos/dll --qt <qt folder>/6.12.0/macos --out build/Chimera.app
+PATH="$(brew --prefix coreutils)/libexec/gnubin:$PATH" tools/fetch-qt-source.sh build/qt-src
+tools/build-app-macos.sh --dll build/x86_64-macos/dll --qt <qt folder>/6.12.0/macos \
+  --qt-source build/qt-src --out build/Chimera.app
 ```
 
 The icon is `docs/Chimera.icon`, made in Icon Composer (Xcode 26 or later): the

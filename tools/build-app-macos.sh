@@ -7,12 +7,15 @@
 # bundles it carries NO CORES (docs/core-manager.md): they
 # go in ~/Library/Application Support/Chimera/Cores, where Chimera looks.
 #
-#   tools/build-app-macos.sh --dll <installed dll dir> --qt <Qt prefix> --out <Chimera.app> [--icon <Chimera.icon>]
+#   tools/build-app-macos.sh --dll <installed dll dir> --qt <Qt prefix> --qt-source <folder>
+#                            --out <Chimera.app> [--icon <Chimera.icon>]
 #
 #   --dll  meson's install folder for the macOS build (build/x86_64-macos/dll):
 #          the window, chimera-run, chimera-mcp, Chimera's libraries and, when
 #          `tools/build-ffmpeg.sh macos <that folder>` put it there, ffmpeg
 #   --qt   the Qt 6.12 the window was built with (a prefix holding lib/, bin/macdeployqt)
+#   --qt-source  Qt's source archives (tools/fetch-qt-source.sh), whose licence
+#          texts go in the app's LICENSES.md, as in every bundle
 #   --out  the app to make; it is replaced if it is there
 #   --icon an Icon Composer icon (a Chimera.icon folder; docs/Chimera.icon is the
 #          default), compiled with actool into the app's light and dark icon. It
@@ -30,18 +33,19 @@
 set -eu
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
-dll="" qt="" out="" icon="$root/docs/Chimera.icon"
+dll="" qt="" qt_source="" out="" icon="$root/docs/Chimera.icon"
 while [ $# -gt 0 ]; do
 	case "$1" in
 		--dll) dll="$2"; shift 2 ;;
 		--qt) qt="$2"; shift 2 ;;
+		--qt-source) qt_source="$2"; shift 2 ;;
 		--out) out="$2"; shift 2 ;;
 		--icon) icon="$2"; shift 2 ;;
 		*) echo "unknown option: $1" >&2; exit 2 ;;
 	esac
 done
-[ -n "$dll" ] && [ -n "$qt" ] && [ -n "$out" ] \
-	|| { echo "usage: build-app-macos.sh --dll <dll dir> --qt <qt prefix> --out <Chimera.app>" >&2; exit 2; }
+[ -n "$dll" ] && [ -n "$qt" ] && [ -n "$qt_source" ] && [ -n "$out" ] \
+	|| { echo "usage: build-app-macos.sh --dll <dll dir> --qt <qt prefix> --qt-source <folder> --out <Chimera.app>" >&2; exit 2; }
 dll="$(cd "$dll" && pwd)"
 qt="$(cd "$qt" && pwd)"
 [ -x "$qt/bin/macdeployqt" ] || { echo "build-app-macos: $qt/bin/macdeployqt is not there" >&2; exit 1; }
@@ -219,6 +223,10 @@ say "licences and build stamp"
 	printf "exact package that recorded it.\n"
 } > "$app/Resources/BUILD.txt"
 cp "$root/LICENSE" "$app/Resources/LICENSE.txt"
+# what every bundle states: Chimera's terms, Qt's (LGPL 3, from its source),
+# ffmpeg's, and that cores bring their own
+python3 "$root/tools/bundle-licenses.py" "$app/Resources" --chimera-root "$root" --qt-source "$qt_source" \
+	--qt-from-qt --ffmpeg-licence "$app/MacOS/bin/ffmpeg-LICENSE.txt"
 
 # ---- signing and checking --------------------------------------------------------
 # ad hoc: no developer identity, so the app is not notarised; it runs on the
@@ -237,6 +245,8 @@ done < <(find "$app" -type f \( -name "*.dylib" -o -perm -u+x \) -exec sh -c 'fi
 [ -s "$app/Frameworks/libchimera.dylib" ] || { echo "MISSING: libchimera.dylib" >&2; bad=1; }
 [ -d "$app/Frameworks/languages" ] || { echo "MISSING: languages" >&2; bad=1; }
 [ -d "$app/PlugIns/platforms" ] || { echo "MISSING: Qt's platform plugin" >&2; bad=1; }
+[ -s "$app/Resources/LICENSES.md" ] && [ -s "$app/Resources/licenses/qt/LGPL-3.0-only.txt" ] \
+	|| { echo "MISSING: LICENSES.md and Qt's licence" >&2; bad=1; }
 [ "$bad" -eq 0 ] || exit 1
 du -sh "$out" | sed 's/^/size: /'
 echo "$out"

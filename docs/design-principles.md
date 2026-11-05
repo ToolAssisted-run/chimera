@@ -13444,10 +13444,27 @@ and what has been tried on a person's machine.
   server's page put chimera-mcp in `dll/` on Windows (it is in `bin\`); the
   README's crash files are Windows' alone (Windows Error Reporting).
 
-Found on the way, not fixed here: the Mac app carries no LICENSES.md, only
-Chimera's licence and ffmpeg's; and the sandbox's log (minibox-diag.log)
-is written to the working folder, which for an app Finder starts is the
-disk's root, where it cannot be written (not tried).
+Found on the way:
+
+- **The Mac app carried no LICENSES.md**, only Chimera's licence and
+  ffmpeg's, though it ships Qt (LGPL 3), SDL2, OpenAL Soft and the rest, as
+  the other bundles do. tools/build-app-macos.sh now writes it with
+  tools/bundle-licenses.py, as tools/build-bundle.sh does, into
+  `Contents/Resources`, and refuses to finish without it and Qt's LGPL text.
+  Qt's texts come from Qt's source archives, so both Mac workflows fetch them
+  (tools/fetch-qt-source.sh, cached, its hashes checked with Homebrew's GNU
+  sha256sum; the script is unchanged, as its hash is in the key of every Qt
+  cache, and a change would build all four Qts again). The Qt paragraph says the Mac's Qt is Qt's own
+  build, unchanged but for the other CPU's half, as the app does not use
+  Qt built here. Checked on Linux with a stand-in app folder: the texts and
+  the paragraph are written; the Mac workflows have not run it yet.
+- **ffmpeg's licence was said to be in `bin/`** in the Linux bundle's
+  LICENSES.md, where it is in `dll/`; the path is now the file's own.
+- **The Core Manager is in the Tools menu** of the Qt window; the documents
+  and the notes every core's release carries said File.
+- Not fixed: the sandbox's log (minibox-diag.log) is written to the working
+  folder, which for an app Finder starts is the disk's root, where it cannot
+  be written (not tried).
 
 ## A held key clicks a button once; TAStudio's lists pick many rows (2026-11-04)
 

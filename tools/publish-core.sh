@@ -159,7 +159,7 @@ if [ -z "$notes" ]; then
 		echo "Core package for [Chimera](https://github.com/ToolAssisted-run/chimera)."
 		echo
 		echo "Download the \`.chimeraCore\` file below for your machine's CPU and put"
-		echo "it in Chimera's \`Cores\` folder (**File > Core Manager** shows where"
+		echo "it in Chimera's \`Cores\` folder (**Tools > Core Manager** shows where"
 		echo "that is). A package runs only on the CPU it is built for. Chimera"
 		echo "downloads nothing itself."
 		echo

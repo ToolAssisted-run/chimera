@@ -389,7 +389,7 @@ jobs:
         run: git submodule update --init --recursive extern
 
       - name: Install build tools
-        run: brew install meson ninja cmake nasm pkg-config
+        run: brew install meson ninja cmake coreutils nasm pkg-config
 
       - name: Cache Qt
         uses: actions/cache@v4
@@ -426,11 +426,23 @@ jobs:
           meson install -C build/meson-macos-${{ matrix.arch }}
           tools/build-ffmpeg.sh macos build/${{ matrix.arch }}-macos/dll
 
+      - name: Cache Qt's source
+        uses: actions/cache@v4
+        with:
+          # its licence texts go in the app's LICENSES.md
+          path: ~/qt-src
+          key: qt-src-6.12.0-${{ hashFiles('tools/fetch-qt-source.sh') }}
+
+      - name: Qt's source
+        # checked with GNU's sha256sum (coreutils), as on Linux
+        run: PATH="$(brew --prefix coreutils)/libexec/gnubin:$PATH" ./tools/fetch-qt-source.sh "$HOME/qt-src"
+
       - name: Chimera.app
         run: |
           # the app's icon is compiled by actool, which needs Xcode 26 or later:
           # the script tries each the runner has
-          tools/build-app-macos.sh --dll build/${{ matrix.arch }}-macos/dll --qt "$HOME/qt/$QT_VERSION/macos" --out build/Chimera.app
+          tools/build-app-macos.sh --dll build/${{ matrix.arch }}-macos/dll --qt "$HOME/qt/$QT_VERSION/macos" \
+            --qt-source "$HOME/qt-src" --out build/Chimera.app
           # the light and dark icon, not the plain one the script falls back to
           test -f build/Chimera.app/Contents/Resources/Assets.car
           grep -q CFBundleIconName build/Chimera.app/Contents/Info.plist
