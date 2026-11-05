@@ -19,37 +19,38 @@ The Core Manager shows what is in that folder.
 
 ## What a core release is
 
-Each core repository publishes to its own GitHub releases, on the same two
-kinds of build the frontend already uses (see `.github/workflows/release.yml`):
-
-* **dev** - a rolling prerelease, replaced on every green push to main. One
-  link that is always newest.
-* **nightly** - an immutable dated prerelease, `nightly-YYYY-MM-DD`, published
-  only when main moved. Never deleted. This is the archive a movie replays
-  against in five years.
+Each core repository publishes to its own GitHub releases, the one kind of
+build the frontend also publishes (see `.github/workflows/release.yml`): a
+**nightly**, an immutable dated release, `nightly-YYYY-MM-DD`, published only
+when main moved. Never deleted. This is the archive a movie replays against in
+five years. There is no rolling development build (user-decided, 2026-11-05):
+one that is replaced cannot be cited by a movie.
 
 One asset per CPU the core is built for: `<coreid>-<version>-<arch>.chimeraCore`,
-`<arch>` being `x64` or `arm64`, the names Chimera's own release bundles use. A
-package is machine code for one CPU - miniBox runs `core.wbx` directly, and
-refuses one built for another CPU - but not for one OS: the same package runs on Windows, Linux and macOS
-([platforms.md](platforms.md) says what each build runs). The version is the
-commit the build was made from, which is what the package already stamps into
+`<arch>` being `x86_64` or `aarch64`, the names Chimera's own release bundles
+use. A package is machine code for one CPU - miniBox runs `core.wbx` directly,
+and refuses one built for another CPU. Which systems of that CPU it runs on,
+the package says itself, in `runsOn` ([porting-a-core.md](porting-a-core.md));
+the release notes list them beside each file. The version is the commit the
+build was made from, which is what the package already stamps into
 `waterbox.config` and what a movie already cites (`CoreVersion`). Releases from
-before packages carried their CPU name one asset `<coreid>-<version>.chimeraCore`,
-which is x64.
+before packages carried their CPU name one asset `<coreid>-<version>.chimeraCore`:
+those packages say nothing of where they run, so Chimera refuses them.
 
-Most users of Windows and Linux want the x64 package, and the notes
+Most users of Windows and Linux want the x86_64 package, and the notes
 `publish-core.sh` writes say so above the table whenever a release also has an
-arm64 one: take the arm64 one only if you know you are using an arm64 device;
-on a Mac, arm64 for Apple silicon and x64 for an Intel Mac; and put only one of
-them in the folder. Chimera's own release notes say the same of its bundles.
+aarch64 one: take the aarch64 one only if you know you are using an ARM device;
+on a Mac, aarch64 for Apple silicon and x86_64 for an Intel Mac; and put only
+one of them in the folder. Chimera's own release notes say the same of its
+bundles.
 
 Fifteen repositories publishing identically is fifteen copies of one job that
 will drift, so the logic lives once, here, in two files:
 
 * `tools/publish-core.sh` - reads the version **out of each package**, refuses a
   hand-built one or two of different versions, checks a `core.wbx` is built for
-  the CPU it is given as, names the assets, and creates or moves the release.
+  the CPU it is given as and that the package lists a system of that CPU in
+  `runsOn`, names the assets, and creates the nightly.
 * `.github/workflows/publish-core.yml` - a `workflow_call` wrapper that
   downloads the gated artifacts and runs that script.
 
@@ -64,7 +65,7 @@ A core's own workflow adds one job:
 ```yaml
   publish:
     needs: [ core-gate, frontend-gate ]
-    if: github.event_name != 'pull_request'
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     permissions: { contents: write }
     uses: ToolAssisted-run/chimera/.github/workflows/publish-core.yml@main
     with:
@@ -73,16 +74,16 @@ A core's own workflow adds one job:
       package: gpgx.chimeraCore
 ```
 
-That publishes the one package, as x64. A core built on more than one CPU
+That publishes the one package, as x86_64. A core built on more than one CPU
 gates on each (a matrix, one leg per CPU on a runner of that CPU), uploads each
 leg's package as `<artifact>-<arch>`, and names them with
-`arches: x64 arm64`; the release then carries both.
+`arches: x86_64 aarch64`; the release then carries both.
 
-plus a daily `schedule:` trigger, which is what makes a nightly. A push to main
-publishes `dev`; a scheduled run publishes `nightly-YYYY-MM-DD`, and only if
-main moved since the last one. Nothing publishes from a pull request, and
-nothing publishes that the gates did not pass, because `needs:` is what got it
-there.
+plus a daily `schedule:` trigger, which is what makes a nightly. A scheduled
+run, or one started by hand, publishes `nightly-YYYY-MM-DD`, and only if main
+moved since the last one. A push to main and a pull request publish nothing
+(the shared workflow's job does not run for them), and nothing publishes that
+the gates did not pass, because `needs:` is what got it there.
 
 **The version is read out of the package, never passed in.** It is what the
 build stamped into `waterbox.config`, and it is what a movie cites; anything
@@ -90,11 +91,10 @@ else is a way for a release and its package to disagree. A version carrying `+lo
 outright - a hand-built package is nobody else's build, and publishing one would
 put a version nothing can reproduce into somebody's movie header.
 
-The `dev` tag is moved by **deleting and recreating the release through the
-API**, never by pushing a tag. A workflow's token may not create or update
-workflow files, and pushing a tag at a commit whose `.github/workflows` differ
-from the default branch's counts as exactly that. The frontend's own pipeline
-learned this the hard way; the same comment is in `publish-core.sh`.
+A nightly's tag is made **through the releases API**, never by pushing a tag. A
+workflow's token may not create or update workflow files, and pushing a tag at
+a commit whose `.github/workflows` differ from the default branch's counts as
+exactly that.
 
 ### Which cores publish
 

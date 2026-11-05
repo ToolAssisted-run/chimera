@@ -10,42 +10,28 @@ name: Release
 # archive; the `cores` release here is the OLD one, kept because movies recorded
 # before the split cite packages in it, and it no longer grows.
 #
-# It is built six times - Windows and Linux, x64 and arm64, on Linux runners
+# It is built six times - Windows and Linux, x86_64 and aarch64, on Linux runners
 # (Linux arm64 on an arm one; Windows cross-built), and each Mac's app on that
 # kind of Mac - and a release carries all six or none. A pull request that
 # changes how they are made builds all six as a trial (below), publishing none.
 #
-#   dev      a ROLLING prerelease, replaced on every green push to main. One
-#            link that is always the newest; the assets carry the short commit
-#            in their names, so a downloaded file still says what it is.
-#   nightly  an IMMUTABLE dated release, once a day and only when main moved;
-#            the newest is the one GitHub shows as Latest.
-#            The point is not freshness (dev has that) but PERMANENCE. A movie
-#            cites the build that recorded it, and someone replaying that run in
-#            five years needs THAT build - not a rebuild, because a package's
-#            identity is a function of its toolchain, so the same sources
-#            through a later gcc are different bytes and a different hash.
-#            Nightlies are therefore NEVER deleted. They are the archive.
+# One kind of release: a nightly, an IMMUTABLE dated release, once a day and
+# only when main moved; the newest is the one GitHub shows as Latest. Its point
+# is PERMANENCE. A movie cites the build that recorded it, and someone
+# replaying that run in five years needs THAT build - not a rebuild, because a
+# package's identity is a function of its toolchain, so the same sources
+# through a later gcc are different bytes and a different hash. Nightlies are
+# therefore NEVER deleted. They are the archive. There is no rolling
+# development build, which could not be cited (user-decided, 2026-11-05).
 #
-# Nothing is published that did not pass CI. The release job is triggered by the
-# CI workflow FINISHING SUCCESSFULLY, and builds that same commit.
+# Nothing is published that did not pass CI: the scheduled run publishes only a
+# commit CI passed, and one started by hand is checked the same way.
 
 on:
-  workflow_run:
-    workflows: [ CI ]
-    types: [ completed ]
-    branches: [ main ]
   schedule:
     # 05:00 UTC, an hour after CI's own nightly, so it releases a gated commit
     - cron: '0 5 * * *'
   workflow_dispatch:
-    inputs:
-      kind:
-        description: 'dev (rolling) or nightly (dated)'
-        required: true
-        default: dev
-        type: choice
-        options: [ dev, nightly ]
   # A pull request that changes how the bundles are made builds them all, as a
   # TRIAL: the six files are kept as the run's artifacts for a week and
   # published nowhere (a pull request's token could not publish anyway).
@@ -72,10 +58,8 @@ jobs:
     # What is released, and whether anything is. The bundles are built by the
     # jobs below, on the CPU each is for, only when this says so.
     #
-    # A push-triggered run only publishes when CI was green. A scheduled or
-    # manual run has no CI run attached and is gated by the commit's own status
-    # check below.
-    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    # A scheduled or manual run is gated by the commit's own CI run, checked
+    # below.
     name: what is released
     runs-on: ubuntu-latest
     outputs:
@@ -88,15 +72,12 @@ jobs:
       - name: What is being released
         id: what
         run: |
-          if [ "${{ github.event_name }}" = "workflow_run" ]; then
-            sha="${{ github.event.workflow_run.head_sha }}"
-            kind=dev
-          elif [ "${{ github.event_name }}" = "pull_request" ]; then
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
             sha="${{ github.event.pull_request.head.sha }}"
             kind=trial
           else
             sha="${{ github.sha }}"
-            kind="${{ github.event.inputs.kind || 'nightly' }}"
+            kind=nightly
           fi
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
           echo "kind=$kind" >> "$GITHUB_OUTPUT"
@@ -131,11 +112,11 @@ jobs:
           fi
 
       - name: Was this commit gated?
-        if: github.event_name == 'schedule' && steps.moved.outputs.skip != 'true'
+        if: github.event_name != 'pull_request' && steps.moved.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # the scheduled build publishes only a commit CI has passed
+          # a nightly, scheduled or started by hand, is only of a commit CI has passed
           conclusion=$(gh run list --workflow CI --branch main --limit 20 \
             --json headSha,conclusion --jq \
             "[.[] | select(.headSha == \"$(git rev-parse HEAD)\")] | first | .conclusion")
@@ -225,13 +206,13 @@ jobs:
           short="${{ needs.what.outputs.short }}"
           mkdir -p build/release
           # under one folder named for the archive, as the x64 tarball is (issue 394)
-          tar -C build --transform "s,^bundle-linux,chimera-linux-arm64-$short," -czf "build/release/chimera-linux-arm64-$short.tar.gz" bundle-linux
+          tar -C build --transform "s,^bundle-linux,chimera-linux-aarch64-$short," -czf "build/release/chimera-linux-aarch64-$short.tar.gz" bundle-linux
           ls -la build/release
 
       - uses: actions/upload-artifact@v4
         with:
           name: bundle-linux-arm64
-          path: build/release/chimera-linux-arm64-${{ needs.what.outputs.short }}.tar.gz
+          path: build/release/chimera-linux-aarch64-${{ needs.what.outputs.short }}.tar.gz
           if-no-files-found: error
           retention-days: 1
 
@@ -320,13 +301,13 @@ jobs:
         run: |
           short="${{ needs.what.outputs.short }}"
           mkdir -p build/release
-          ( cd build/bundle-windows-arm64 && zip -qr "../release/chimera-win-arm64-$short.zip" . )
+          ( cd build/bundle-windows-arm64 && zip -qr "../release/chimera-win-aarch64-$short.zip" . )
           ls -la build/release
 
       - uses: actions/upload-artifact@v4
         with:
           name: bundle-windows-arm64
-          path: build/release/chimera-win-arm64-${{ needs.what.outputs.short }}.zip
+          path: build/release/chimera-win-aarch64-${{ needs.what.outputs.short }}.zip
           if-no-files-found: error
           retention-days: 1
 
@@ -348,7 +329,7 @@ jobs:
       - name: Unpack and start it
         shell: pwsh
         run: |
-          Expand-Archive -Path "chimera-win-arm64-${{ needs.what.outputs.short }}.zip" -DestinationPath bundle
+          Expand-Archive -Path "chimera-win-aarch64-${{ needs.what.outputs.short }}.zip" -DestinationPath bundle
           # piped, so PowerShell waits for a program built for the Windows subsystem
           $out = & .\bundle\chimera.exe --version | Out-String
           Write-Output $out
@@ -360,7 +341,7 @@ jobs:
     # bundle job.
     needs: what
     if: needs.what.outputs.skip != 'true'
-    name: bundle (macos ${{ matrix.cpu }})
+    name: bundle (macos ${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 120
     strategy:
@@ -454,13 +435,13 @@ jobs:
           short="${{ needs.what.outputs.short }}"
           mkdir -p build/release
           # a zip that keeps the app's links and signature, as Finder's does
-          ditto -c -k --keepParent build/Chimera.app "build/release/chimera-macos-${{ matrix.cpu }}-$short.zip"
+          ditto -c -k --keepParent build/Chimera.app "build/release/chimera-macos-${{ matrix.arch }}-$short.zip"
           ls -la build/release
 
       - uses: actions/upload-artifact@v4
         with:
-          name: bundle-macos-${{ matrix.cpu }}
-          path: build/release/chimera-macos-${{ matrix.cpu }}-${{ needs.what.outputs.short }}.zip
+          name: bundle-macos-${{ matrix.arch }}
+          path: build/release/chimera-macos-${{ matrix.arch }}-${{ needs.what.outputs.short }}.zip
           if-no-files-found: error
           retention-days: 1
 
@@ -593,11 +574,11 @@ jobs:
         run: |
           short="${{ needs.what.outputs.short }}"
           mkdir -p build/release
-          ( cd build/bundle-windows && zip -qr "../release/chimera-win-x64-$short.zip" . )
+          ( cd build/bundle-windows && zip -qr "../release/chimera-win-x86_64-$short.zip" . )
           # every file under one folder named for the archive, as a tarball is
           # expected to unpack (issue 394); the Windows zip stays flat, as
           # Windows' Extract All already makes the folder
-          tar -C build --transform "s,^bundle-linux,chimera-linux-x64-$short," -czf "build/release/chimera-linux-x64-$short.tar.gz" bundle-linux
+          tar -C build --transform "s,^bundle-linux,chimera-linux-x86_64-$short," -czf "build/release/chimera-linux-x86_64-$short.tar.gz" bundle-linux
           cp build/bundle-windows/LICENSES.md build/release/LICENSES.md
           cp build/bundle-windows/BUILD.txt build/release/BUILD.txt
           ls -la build/release
@@ -606,7 +587,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: check-windows-x64
-          path: build/release/chimera-win-x64-${{ needs.what.outputs.short }}.zip
+          path: build/release/chimera-win-x86_64-${{ needs.what.outputs.short }}.zip
           if-no-files-found: error
           retention-days: 1
 
@@ -623,15 +604,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           short="${{ needs.what.outputs.short }}"
-          # Everything that landed since the previous build of this kind, not
-          # just the top commit (issue #76): the last nightly tag for a
-          # nightly, the dev release's commit for dev. With nothing to measure
-          # from (the first build, a shallow clone) the top commit alone.
-          if [ "${{ needs.what.outputs.kind }}" = "dev" ]; then
-            since=$(gh release view dev --json targetCommitish --jq .targetCommitish 2>/dev/null || true)
-          else
-            since=$(git tag -l 'nightly-*' --sort=-creatordate | head -1)
-          fi
+          # Everything that landed since the last nightly, not just the top
+          # commit (issue #76). With nothing to measure from (the first build,
+          # a shallow clone) the top commit alone.
+          since=$(git tag -l 'nightly-*' --sort=-creatordate | head -1)
           if [ -n "$since" ] && git rev-parse -q --verify "$since^{commit}" >/dev/null 2>&1 \
              && [ "$(git rev-parse "$since^{commit}")" != "$(git rev-parse HEAD)" ]; then
             changes=$(git log --no-merges --format='- %s (`%h`)' "$since..HEAD")
@@ -647,24 +623,25 @@ jobs:
               echo "$changes"
               echo
             fi
-            echo "**On Windows or Linux you most likely want the x64 bundle.** Take an arm64"
-            echo "one only if you know you are using an arm64 device. On a Mac, take arm64 for"
-            echo "Apple silicon (M1 and later) and x64 for an Intel Mac."
+            echo "**On Windows or Linux you most likely want the x86_64 bundle.** Take an"
+            echo "aarch64 one only if you know you are using an ARM device. On a Mac, take"
+            echo "aarch64 for Apple silicon (M1 and later) and x86_64 for an Intel Mac."
             echo
             echo "| what | file |"
             echo "| --- | --- |"
-            echo "| Windows x64 | \`chimera-win-x64-$short.zip\` |"
-            echo "| Windows arm64 | \`chimera-win-arm64-$short.zip\` |"
-            echo "| Linux x64 | \`chimera-linux-x64-$short.tar.gz\` |"
-            echo "| Linux arm64 | \`chimera-linux-arm64-$short.tar.gz\` |"
-            echo "| macOS arm64 (Apple silicon) | \`chimera-macos-arm64-$short.zip\` |"
-            echo "| macOS x64 (Intel) | \`chimera-macos-x64-$short.zip\` |"
+            echo "| Windows x86_64 | \`chimera-win-x86_64-$short.zip\` |"
+            echo "| Windows aarch64 | \`chimera-win-aarch64-$short.zip\` |"
+            echo "| Linux x86_64 | \`chimera-linux-x86_64-$short.tar.gz\` |"
+            echo "| Linux aarch64 | \`chimera-linux-aarch64-$short.tar.gz\` |"
+            echo "| macOS aarch64 (Apple silicon) | \`chimera-macos-aarch64-$short.zip\` |"
+            echo "| macOS x86_64 (Intel) | \`chimera-macos-x86_64-$short.zip\` |"
             echo
             echo "Each carries Chimera and the libraries it needs. They carry **no cores**, and"
             echo "Chimera downloads none: get a core's \`.chimeraCore\` package from the"
             echo "project that builds it and put it in the \`Cores\` folder beside Chimera"
-            echo "(on a Mac, \`~/Library/Application Support/Chimera/Cores\`). Most cores have"
-            echo "no arm64 package yet: [docs/platforms.md](https://github.com/ToolAssisted-run/chimera/blob/main/docs/platforms.md)"
+            echo "(on a Mac, \`~/Library/Application Support/Chimera/Cores\`). A core's package"
+            echo "says which of these it runs on, and most cores have no aarch64 package yet:"
+            echo "[docs/platforms.md](https://github.com/ToolAssisted-run/chimera/blob/main/docs/platforms.md)"
             echo "says what runs on each build. A Mac asks before opening the app the first"
             echo "time, as it is signed by no developer."
             echo "\`BUILD.txt\` names the exact commit this was built from and"
@@ -678,15 +655,6 @@ jobs:
             echo "publisher; it is not signed, and there is no way around that warning"
             echo "short of buying a certificate."
             echo
-            if [ "${{ needs.what.outputs.kind }}" = "dev" ]; then
-              echo "> **Not for submissions.** A development build is replaced on every"
-              echo "> change, so it may stop being downloadable - which means a movie made"
-              echo "> on it can stop being replayable. Do **not** use a dev build to"
-              echo "> produce a TAS for submission to toolAssisted.run; use a"
-              echo "> [nightly](https://github.com/ToolAssisted-run/chimera/releases),"
-              echo "> which is dated and kept forever."
-              echo
-            fi
           } > build/release/NOTES.md
 
       - name: A trial's bundles, kept for a week and published nowhere
@@ -697,38 +665,6 @@ jobs:
           path: build/release/
           if-no-files-found: error
           retention-days: 7
-
-      - name: Publish the rolling dev release
-        if: needs.what.outputs.kind == 'dev'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          # ONE TAG, MOVED - through the API, never `git push`. A workflow's
-          # token may not create or update workflow FILES, and pushing a tag at
-          # a commit whose .github/workflows differ from the default branch's
-          # counts as exactly that: the first release of this pipeline died on
-          # "refusing to allow a GitHub App to create or update workflow" while
-          # publishing a commit main had already moved past. Deleting the
-          # release with its tag and recreating it at the built commit goes
-          # through the releases API, which has no such restriction, and keeps
-          # the tag honest about which build the assets came from.
-          #
-          # Every call is retried and the release is ENSURED, not created: the
-          # API answers 5xx now and then, and on 2026-09-13 a 500 on this create
-          # cost the day's dev build. A create whose answer was lost may still
-          # have happened, so it looks before it tries again.
-          source tools/release-retry.sh
-          # when the commit was made, on the clock Chimera's build line shows
-          # it in (issue 331), so the two can be matched by eye
-          made="$(python3 tools/european-time.py "$(git log -1 --format=%ct "${{ needs.what.outputs.sha }}")")"
-          gh release delete dev --yes --cleanup-tag 2>/dev/null || true
-          ensure_release dev "${{ needs.what.outputs.sha }}" \
-            "Development build ${{ needs.what.outputs.short }} (made $made)" build/release/NOTES.md
-
-          # straight away, so the window in which /releases/tag/dev has nothing
-          # to download is as short as an upload
-          retry gh release upload dev build/release/chimera-*.zip build/release/chimera-*.tar.gz \
-            build/release/LICENSES.md build/release/BUILD.txt --clobber
 
       - name: Publish the nightly
         if: needs.what.outputs.kind == 'nightly'
@@ -766,7 +702,7 @@ jobs:
       - name: Unpack and start it
         shell: pwsh
         run: |
-          Expand-Archive -Path "chimera-win-x64-${{ needs.what.outputs.short }}.zip" -DestinationPath bundle
+          Expand-Archive -Path "chimera-win-x86_64-${{ needs.what.outputs.short }}.zip" -DestinationPath bundle
           # piped, so PowerShell waits for a program built for the Windows subsystem
           $out = & .\bundle\chimera.exe --version | Out-String
           Write-Output $out

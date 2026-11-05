@@ -3,10 +3,10 @@
 This is the state of the macOS port: what is built, what has been tested, and
 what has not. It is built for both kinds of Mac, each on its own kind:
 x86-64 for an Intel Mac (an Apple silicon Mac can run it too, under Rosetta 2)
-and arm64 for Apple silicon. The cross file names the processor:
+and aarch64 for Apple silicon. The cross file names the processor:
 `extern/meson/macos-x86_64.ini` or `extern/meson/macos-aarch64.ini`, and the
 build folders below are named after it. What this page says was measured on
-x86-64; the arm64 build is new (2026-11-04) and has so far been built and
+x86-64; the aarch64 build is new (2026-11-04) and has so far been built and
 tested only by CI's macOS job, on GitHub's Apple silicon runner (macOS 26).
 The release publishes both as apps; [platforms.md](platforms.md) compares
 them with the Windows and Linux builds.
@@ -45,7 +45,7 @@ tests run, because the result can be run (on Apple silicon through Rosetta 2).
 ## The window (Qt)
 
 The window needs Qt 6.12 with an x86-64 part. Qt's own macOS download is one
-build for both processors (Homebrew's is the machine's own, arm64 on an Apple
+build for both processors (Homebrew's is the machine's own, aarch64 on an Apple
 silicon Mac, and cannot be linked into an x86-64 program). Get it the way
 tools/ci-chimera.sh does for Linux:
 
@@ -140,8 +140,8 @@ Sound and gamepads need no setup: OpenAL Soft and SDL2 are in
 It is ad hoc signed, not notarised, so another Mac asks before opening it the
 first time: on macOS 15 and later it is allowed in System Settings > Privacy &
 Security (Open Anyway), before that with right-click, Open. The release
-publishes both apps, `chimera-macos-x64-<commit>.zip` and
-`chimera-macos-arm64-<commit>.zip`. Chimera writes nothing into the app, so its signature
+publishes both apps, `chimera-macos-x86_64-<commit>.zip` and
+`chimera-macos-aarch64-<commit>.zip`. Chimera writes nothing into the app, so its signature
 keeps verifying (`codesign --verify --deep --strict` passes after a run).
 
 ## miniBox on macOS

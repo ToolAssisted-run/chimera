@@ -14,8 +14,8 @@ retry() {
 }
 
 # release_kind_flags <tag>: a dated nightly is a full release and the one
-# GitHub shows as Latest; anything else (the rolling dev build) is a
-# pre-release and never Latest (user-decided, 2026-09-25)
+# GitHub shows as Latest; anything else is a pre-release and never Latest
+# (user-decided, 2026-09-25)
 release_kind_flags() {
 	case "$1" in
 		nightly-*) echo "--latest" ;;

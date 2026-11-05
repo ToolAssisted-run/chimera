@@ -64,7 +64,7 @@ third-party tables, with its author.
 
 ## Build
 
-Chimera ships for x64 and arm64 on Windows, Linux and macOS
+Chimera ships for x86_64 and aarch64 on Windows, Linux and macOS
 ([docs/platforms.md](docs/platforms.md)). Linux hosts the Linux and Windows
 builds; macOS is built on a Mac ([docs/macos.md](docs/macos.md)).
 Requirements are in the README ("Building").
@@ -84,8 +84,8 @@ meson compile -C build/meson-linux && meson install -C build/meson-linux
 
 The window is `build/meson-linux/source/ui/chimera`; `--headless` runs it with
 no display. The Windows build needs Qt for Windows built with Chimera's
-compiler (`tools/build-qt-windows.sh`: mingw-w64 for x64, llvm-mingw for
-arm64); `tools/build-bundle.sh` makes the Linux and Windows bundles as a
+compiler (`tools/build-qt-windows.sh`: mingw-w64 for x86_64, llvm-mingw for
+aarch64); `tools/build-bundle.sh` makes the Linux and Windows bundles as a
 release does.
 
 A core repository also needs miniBox's host library and guest toolchain:

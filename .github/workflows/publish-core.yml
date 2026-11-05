@@ -8,7 +8,7 @@ name: Publish a core package
 #   jobs:
 #     publish:
 #       needs: [ core-gate, frontend-gate ]
-#       if: github.event_name != 'pull_request'
+#       if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
 #       permissions: { contents: write }
 #       uses: ToolAssisted-run/chimera/.github/workflows/publish-core.yml@main
 #       with:
@@ -25,14 +25,16 @@ name: Publish a core package
 #         core-id: pcsx2
 #         artifact: pcsx2-${{ github.sha }}
 #         package: pcsx2.chimeraCore
-#         arches: x64 arm64
+#         arches: x86_64 aarch64
 #
-# Without `arches`, the one artifact is the x64 package.
+# Without `arches`, the one artifact is the x86_64 package.
 #
-# A push to main publishes the rolling `dev`; a scheduled run publishes an
-# immutable `nightly-YYYY-MM-DD`. Nothing is published from a pull request, and
-# nothing is published that the calling workflow's gates did not pass, because
-# `needs:` is what got us here.
+# Only nightlies are published (user-decided, 2026-11-05): a scheduled run, or
+# one started by hand, publishes an immutable `nightly-YYYY-MM-DD` when main
+# moved. A push to main or a pull request publishes nothing: the job below does
+# not run for them, whatever the caller's `if:` says. Nothing is published that
+# the calling workflow's gates did not pass, because `needs:` is what got us
+# here.
 
 on:
   workflow_call:
@@ -50,12 +52,7 @@ on:
         required: true
         type: string
       arches:
-        description: 'The CPUs the core is built for, space-separated (x64, arm64): the package for each is in artifact <artifact>-<arch>. Blank: the one artifact <artifact>, x64'
-        required: false
-        type: string
-        default: ''
-      kind:
-        description: 'dev (rolling) or nightly (dated). Default: nightly for a scheduled run, dev otherwise'
+        description: 'The CPUs the core is built for, space-separated (x86_64, aarch64): the package for each is in artifact <artifact>-<arch>. Blank: the one artifact <artifact>, x86_64'
         required: false
         type: string
         default: ''
@@ -73,20 +70,12 @@ on:
 jobs:
   publish:
     name: publish (${{ inputs.core-id }})
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
       contents: write
     steps:
-      - name: What is being published
-        id: what
-        run: |
-          kind="${{ inputs.kind }}"
-          if [ -z "$kind" ]; then
-            if [ "${{ github.event_name }}" = "schedule" ]; then kind=nightly; else kind=dev; fi
-          fi
-          echo "kind=$kind" >> "$GITHUB_OUTPUT"
-
       - name: Check out the core (for its commit, which is what the release points at)
         uses: actions/checkout@v6
         with:
@@ -140,7 +129,6 @@ jobs:
           ./chimera-checkout/tools/publish-core.sh \
             "${args[@]}" \
             --core-id '${{ inputs.core-id }}' \
-            --kind '${{ steps.what.outputs.kind }}' \
             --sha '${{ github.sha }}'
 
       # Chimera reads this file instead of asking the API, which it can only do

@@ -37,7 +37,7 @@ Chimera's own by default (issue 340).
 
 - *Chimera build: what Help > Copy Version Info copies (it copies the core's
   line too), the string from Help > About, or the release name
-  (`Nightly 2026-09-19 (cd4b89cd)` / `Development build (5c6a32af)`).
+  (`Nightly 2026-09-19 (cd4b89cd)`).
 - *Core and version: as the Core Manager shows it (`RPCS3 2026-09-19 (4e678a9)`).
   Note: frontend and core must be from the same day or later; a report
   mixing days is answered "retest matched" first.

@@ -138,31 +138,28 @@ Made and published by other people from their own repositories, and listed here 
 
 ## Getting a build
 
-The frontend is built for Windows, Linux and macOS, each for x64 and arm64, and published here:
-
-- [**Latest development build**](https://github.com/ToolAssisted-run/chimera/releases/tag/dev) - rebuilt on every change to `main` that passes the gates, and replaced each time. Nothing is published that did not pass them. **Not for submissions:** a dev build is replaced on every change, so it may stop being downloadable and a movie made on it can stop being replayable. Do not use one to produce a TAS for submission to toolAssisted.run - use a nightly.
-- [**Nightly builds**](https://github.com/ToolAssisted-run/chimera/releases) - dated, immutable, and kept forever. Cite one of these in a bug report or beside a movie: a run is only reproducible while the build that recorded it still exists, and this is what a TAS submitted to toolAssisted.run should be made on.
+The frontend is built for Windows, Linux and macOS, each for x86_64 and aarch64, and published as [**nightly builds**](https://github.com/ToolAssisted-run/chimera/releases): one a day when `main` changed and passed its tests, dated, immutable, and kept forever. Cite one in a bug report or beside a movie: a run is only reproducible while the build that recorded it still exists.
 
 A bundle carries no cores, and Chimera never reaches the network - it downloads
 nothing, not a core and not a list of them. To set one up:
 
 1. Download a build above and unpack it. **On Windows or Linux you most likely
-   want x64**; take arm64 only if you know you are using an arm64 device. On a
-   Mac, take arm64 for Apple silicon (M1 and later) and x64 for an Intel Mac;
+   want x86_64**; take aarch64 only if you know you are using an ARM device. On
+   a Mac, take aarch64 for Apple silicon (M1 and later) and x86_64 for an Intel Mac;
    macOS asks before opening it the first time, as it is signed by no
    developer.
 2. Download the `.chimeraCore` package of each core you want from that core's
    releases page (the [Cores](#cores) tables link them), or build it. A release
-   with packages for both CPUs names them `<core>-<version>-x64.chimeraCore` and
-   `<core>-<version>-arm64.chimeraCore`: take the one for the CPU of your build
-   (most likely x64), and only one of them. Most cores have no arm64 package
-   yet; [docs/platforms.md](docs/platforms.md) says what runs on each build.
+   names each package for its CPU, `<core>-<version>-x86_64.chimeraCore` or
+   `<core>-<version>-aarch64.chimeraCore`, and says which systems it runs on:
+   take the one for the CPU of your build (most likely x86_64), and only one.
+   Most cores have no aarch64 package yet; [docs/platforms.md](docs/platforms.md)
+   says what runs on each build.
 3. Put the packages in the `Cores` folder beside Chimera (`chimera.exe` on
    Windows, `chimera` on Linux; on a Mac,
    `~/Library/Application Support/Chimera/Cores`), and start Chimera.
 
-Each core publishes a `dev` build and nightly releases the same way, and its
-nightlies are never deleted - which is what lets a movie name the exact package
+Each core publishes nightlies the same way, and they are never deleted - which is what lets a movie name the exact package
 that recorded it and still be replayable years later.
 
 Every bundle carries `BUILD.txt`, naming the exact commit it was built from, and
@@ -182,7 +179,7 @@ An AI agent (Claude Code, or any program that speaks MCP) can look at the projec
 
 ## Building
 
-Chimera is built with meson: the engine, its libraries and the window (Qt 6.12). Linux builds it for Linux, for the machine's own CPU, and cross-builds it for Windows, with mingw-w64 for x64 and llvm-mingw for arm64; macOS is built on a Mac ([docs/macos.md](docs/macos.md)). How each of the six is built and tested is in [docs/platforms.md](docs/platforms.md). Clone with `--recursive`; the repository contains no precompiled binaries, and
+Chimera is built with meson: the engine, its libraries and the window (Qt 6.12). Linux builds it for Linux, for the machine's own CPU, and cross-builds it for Windows, with mingw-w64 for x86_64 and llvm-mingw for aarch64; macOS is built on a Mac ([docs/macos.md](docs/macos.md)). How each of the six is built and tested is in [docs/platforms.md](docs/platforms.md). Clone with `--recursive`; the repository contains no precompiled binaries, and
 no cores - `tools/fetch-cores.sh` puts the published ones in `build/Cores` if
 you want a working set without opening the frontend.
 
@@ -198,7 +195,7 @@ PATH="$QT/libexec:$QT/bin:$PATH" PKG_CONFIG_PATH="$QT/lib/pkgconfig" \
 meson compile -C build/meson-linux && meson install -C build/meson-linux
 ```
 
-Linux requirements: meson, ninja, cmake, gcc, and Qt 6.12 (Core, Gui, Qml, Quick, QuickControls2); mingw-w64 for the Windows x64 build, llvm-mingw (`tools/fetch-llvm-mingw.sh`) for Windows arm64. The release builds Qt itself for Linux and Windows, without its network module (`tools/build-qt-linux.sh`, `tools/build-qt-windows.sh`); `tools/build-bundle.sh` makes the Linux and Windows bundles from it, and `tools/build-app-macos.sh` the Mac app.
+Linux requirements: meson, ninja, cmake, gcc, and Qt 6.12 (Core, Gui, Qml, Quick, QuickControls2); mingw-w64 for the Windows x86_64 build, llvm-mingw (`tools/fetch-llvm-mingw.sh`) for Windows aarch64. The release builds Qt itself for Linux and Windows, without its network module (`tools/build-qt-linux.sh`, `tools/build-qt-windows.sh`); `tools/build-bundle.sh` makes the Linux and Windows bundles from it, and `tools/build-app-macos.sh` the Mac app.
 
 The frontend ships no cores, so get at least one before running it - either the
 published packages, or a core repository cloned wherever you like:

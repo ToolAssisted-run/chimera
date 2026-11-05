@@ -117,9 +117,9 @@ say "build stamp"
 {
 	# a Linux bundle is for the CPU it was built on; a Windows one for --cpu
 	if [ "$platform" = linux ]; then
-		case "$(uname -m)" in aarch64|arm64) bundle_cpu=arm64 ;; *) bundle_cpu=x64 ;; esac
+		case "$(uname -m)" in aarch64|arm64) bundle_cpu=aarch64 ;; *) bundle_cpu=x86_64 ;; esac
 	else
-		bundle_cpu="$cpu"
+		case "$cpu" in arm64) bundle_cpu=aarch64 ;; *) bundle_cpu=x86_64 ;; esac
 	fi
 	printf "Chimera %s bundle (%s)\n" "$platform" "$bundle_cpu"
 	printf "chimera:   %s %s\n" \

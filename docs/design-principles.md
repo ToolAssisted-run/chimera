@@ -13816,3 +13816,46 @@ refuses a package that lists none, or that lists a name outside the six.
   misspelt name. `test-packages` checks its rule on three declarations. Each
   was broken once and seen to fail: three tests failed. Then all 64 tests
   passed, the witness 125/0, and both Windows builds compiled.
+
+## File names say x86_64 or aarch64 (user-decided, 2026-11-05)
+
+A core's package is published as `<id>-<version>-x86_64.chimeraCore` or
+`<id>-<version>-aarch64.chimeraCore`, and Chimera's own downloads as
+`chimera-<win|linux|macos>-<x86_64|aarch64>-<commit>`. Before, the platform
+matrix branch wrote `x64` and `arm64`; no release had used those names yet, so
+nothing published is renamed. The owner chose the longer names: they are the
+names the compilers and the ELF files use, and an underscore keeps a file name
+splitting cleanly at its dashes.
+
+`publish-core.sh` takes `--arch x86_64|aarch64`, refuses the old names, and
+lists beside each package the systems of its CPU that its `runsOn` names. It
+refuses a package whose `runsOn` lists none for its CPU. `fetch-cores.sh` takes
+only a package named for this machine's CPU: a package from before CPU names
+says nothing of where it runs, and Chimera refuses it now. Build folders,
+cache keys and job names inside the workflows keep the short names; they are
+not seen by anyone downloading.
+
+Tested: `publish-core.sh --dry-run` on made-up packages. Two packages, one per
+CPU, were named and listed as above. A package with no `runsOn`, one listing
+only another CPU's system, `--arch x64`, and `--kind` were each refused.
+
+## Nightlies only (user-decided, 2026-11-05)
+
+There are no development builds any more, of Chimera or of a core. The owner:
+"id like to get rid of dev releases everywhere. Nightlies only". A
+development build was replaced on every push to main, so a movie made on one
+could stop being replayable, which is what Chimera's releases exist to
+prevent.
+
+- **Chimera** (`release.yml`): the run after every passing CI is gone. The
+  daily schedule publishes a nightly when main moved and CI passed it; a run
+  started by hand publishes one too, now also only for a commit CI passed.
+  A pull request still builds the six as a trial and publishes nothing.
+- **A core** (`publish-core.yml`, `publish-core.sh`): only a scheduled run or
+  one started by hand publishes, and only a nightly. A push to main publishes
+  nothing, whatever the caller's `if:` says. The `kind` input is gone, so each
+  core's workflow stops passing one before this is merged.
+- **What a fix waits for.** A fix is published by the next night's build, or
+  at once by starting the workflow by hand. An issue is still closed only on
+  a published build named from its release.
+- The `dev` releases already on GitHub are not removed by this change.
