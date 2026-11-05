@@ -18,6 +18,8 @@
 #          default), compiled with actool into the app's light and dark icon. It
 #          needs Xcode 26 or later; with an older one, or none, the icon is drawn
 #          from the icon's own icon.svg instead, with no dark version
+#          ACTOOL=<path> uses that actool (a compatible one, such as
+#          https://github.com/P-AS/actool) rather than an Xcode's
 #
 # Layout, which the program finds its neighbours by (Contents/MacOS is the
 # program's own folder, as the Linux bundle's top folder is):
@@ -135,9 +137,17 @@ if [ -d "$icon" ]; then
 	# With the selected Xcode first, then each Xcode 26 in /Applications, newest
 	# first: the newest is not always one whose actool runs on this macOS (26.3's
 	# crashed on macOS 15: its asset agent wants newer system frameworks).
-	for xcode in "" $(ls -d /Applications/Xcode_26*.app 2> /dev/null | sort -r -V); do
+	# An ACTOOL, a path to a compatible actool, is used instead of any Xcode's.
+	if [ -n "${ACTOOL:-}" ]; then
+		xcodes=("")
+		actool=("$ACTOOL")
+	else
+		xcodes=("" $(ls -d /Applications/Xcode_26*.app 2> /dev/null | sort -r -V))
+		actool=(xcrun actool)
+	fi
+	for xcode in "${xcodes[@]}"; do
 		if ( if [ -n "$xcode" ]; then export DEVELOPER_DIR="$xcode/Contents/Developer"; fi
-			xcrun actool "$icon" --compile "$app/Resources" --output-format human-readable-text \
+			"${actool[@]}" "$icon" --compile "$app/Resources" --output-format human-readable-text \
 			--notices --warnings --errors --output-partial-info-plist "$icons/icon.plist" \
 			--app-icon "$(basename "$icon" .icon)" --include-all-app-icons --enable-on-demand-resources NO \
 			--development-region en --target-device mac --minimum-deployment-target 14.4 --platform macosx
@@ -146,7 +156,7 @@ if [ -d "$icon" ]; then
 			echo "  icon: $icon (actool of ${xcode:-$(xcode-select -p)})"
 			break
 		fi
-		echo "  (actool of ${xcode:-$(xcode-select -p)} did not compile it: $(grep -i -m 1 -E "error|exception|reason" "$icons/actool.log" | cut -c1-160))" >&2
+		echo "  (${ACTOOL:+$ACTOOL, }actool of ${xcode:-$(xcode-select -p)} did not compile it: $(grep -i -m 1 -E "error|exception|reason" "$icons/actool.log" | cut -c1-160))" >&2
 	done
 	if [ -z "$icon_name" ]; then
 		echo "  (actool could not compile $icon - it needs Xcode 26 or later; drawing the icon from its icon.svg)" >&2
