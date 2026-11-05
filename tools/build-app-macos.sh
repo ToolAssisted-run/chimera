@@ -146,6 +146,9 @@ if [ -d "$icon" ]; then
 		actool=(xcrun actool)
 	fi
 	for xcode in "${xcodes[@]}"; do
+		# an actool that failed can leave an Assets.car behind, which would
+		# pass for the next one's
+		rm -f "${app:?}/Resources/Assets.car"
 		if ( if [ -n "$xcode" ]; then export DEVELOPER_DIR="$xcode/Contents/Developer"; fi
 			"${actool[@]}" "$icon" --compile "$app/Resources" --output-format human-readable-text \
 			--notices --warnings --errors --output-partial-info-plist "$icons/icon.plist" \
@@ -153,13 +156,14 @@ if [ -d "$icon" ]; then
 			--development-region en --target-device mac --minimum-deployment-target 14.4 --platform macosx
 		) > "$icons/actool.log" 2>&1 && [ -f "$app/Resources/Assets.car" ]; then
 			icon_name="$(basename "$icon" .icon)"
-			echo "  icon: $icon (actool of ${xcode:-$(xcode-select -p)})"
+			echo "  icon: $icon (${ACTOOL:-actool of ${xcode:-$(xcode-select -p)}})"
 			break
 		fi
 		echo "  (${ACTOOL:+$ACTOOL, }actool of ${xcode:-$(xcode-select -p)} did not compile it: $(grep -i -m 1 -E "error|exception|reason" "$icons/actool.log" | cut -c1-160))" >&2
 	done
 	if [ -z "$icon_name" ]; then
 		echo "  (actool could not compile $icon - it needs Xcode 26 or later; drawing the icon from its icon.svg)" >&2
+		rm -f "${app:?}/Resources/Assets.car"
 		# what it said was wrong, then how its log ends (a crash ends with a
 		# stack, the reason being above it)
 		grep -i -m 8 -E "error|exception|reason|fail" "$icons/actool.log" | sed 's/^/    /' >&2

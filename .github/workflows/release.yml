@@ -416,6 +416,7 @@ jobs:
           tools/build-app-macos.sh --dll build/${{ matrix.arch }}-macos/dll --qt "$HOME/qt/$QT_VERSION/macos" --out build/Chimera.app
           # the light and dark icon, not the plain one the script falls back to
           test -f build/Chimera.app/Contents/Resources/Assets.car
+          grep -q CFBundleIconName build/Chimera.app/Contents/Info.plist
           codesign --verify --deep --strict build/Chimera.app
           build/Chimera.app/Contents/MacOS/chimera --version
 
