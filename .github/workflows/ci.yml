@@ -219,7 +219,8 @@ jobs:
     # thread model), against the Qt the release ships (the same cache: built
     # here when neither has built it yet, which takes hours), with the
     # synthetic test core of the same CPU. The window is staged as the
-    # release's bundle is, and the tests are packed with it
+    # release's bundle is, with the ffmpeg it ships (the release's cache too),
+    # and the tests are packed with it
     # (tools/export-tests.py), and with the compiler's runtime DLLs they load,
     # for windows-test to run on Windows.
     name: windows ${{ matrix.cpu }} (built on Linux)
@@ -253,7 +254,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends meson ninja-build build-essential cmake pkg-config \
-            python3 python3-venv libegl1 libgl1 libfontconfig1 libxkbcommon0 fonts-dejavu-core
+            python3 python3-venv libegl1 libgl1 libfontconfig1 libxkbcommon0 fonts-dejavu-core nasm
           if [ "${{ matrix.cpu }}" = x64 ]; then sudo apt-get install -y --no-install-recommends mingw-w64; fi
 
       - name: llvm-mingw (pinned, checked by its SHA256)
@@ -293,6 +294,25 @@ jobs:
             ~/qt-ship/${{ matrix.qt }}
           key: ${{ steps.qt-cache.outputs.cache-primary-key }}
 
+      - name: Cache the ffmpeg the bundle ships (x64)
+        if: matrix.cpu == 'x64'
+        uses: actions/cache@v4
+        with:
+          # the release's (release.yml): tools/build-ffmpeg.sh keeps what it
+          # built under a name made from its CPU and its own hash
+          path: build/deps/ffmpeg-windows-x64-*
+          key: ffmpeg-windows-x64-${{ hashFiles('tools/build-ffmpeg.sh') }}
+
+      - name: Cache the ffmpeg the bundle ships (arm64)
+        if: matrix.cpu == 'arm64'
+        uses: actions/cache@v4
+        with:
+          path: build/deps/ffmpeg-windows-arm64-*
+          key: ffmpeg-windows-arm64-${{ hashFiles('tools/build-ffmpeg.sh', 'tools/fetch-llvm-mingw.sh') }}
+
+      - name: ffmpeg, for Encode Video's tests (once; then cached)
+        run: tools/build-ffmpeg.sh windows build/ffmpeg-windows ${{ matrix.cpu }}
+
       - name: The synthetic test core, for this CPU
         uses: actions/download-artifact@v4
         with:
@@ -310,7 +330,9 @@ jobs:
           meson compile -C build/meson-windows
 
       - name: The window, staged as the release's bundle is
-        run: python3 tools/stage-qt-windows.py --cpu ${{ matrix.cpu }} build/meson-windows build/meson-windows "$HOME/qt-ship/${{ matrix.qt }}" build/bundle-windows
+        run: |
+          python3 tools/stage-qt-windows.py --cpu ${{ matrix.cpu }} build/meson-windows build/meson-windows \
+            "$HOME/qt-ship/${{ matrix.qt }}" build/bundle-windows build/ffmpeg-windows/ffmpeg.exe
 
       - name: Pack the tests
         run: |

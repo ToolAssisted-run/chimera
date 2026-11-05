@@ -284,7 +284,7 @@ jobs:
         uses: actions/cache@v4
         with:
           # tools/build-ffmpeg.sh keeps what it built under a name made from its
-          # CPU and its own hash
+          # CPU and its own hash; CI's Windows arm64 job uses the same (ci.yml)
           path: build/deps/ffmpeg-windows-arm64-*
           key: ffmpeg-windows-arm64-${{ hashFiles('tools/build-ffmpeg.sh', 'tools/fetch-llvm-mingw.sh') }}
 
@@ -510,16 +510,22 @@ jobs:
             ~/qt-ship/mingw_64_posix
           key: qt-ship-6.12.0-windows-x64-${{ hashFiles('tools/build-qt-windows.sh', 'tools/qt-patches/*', 'tools/fetch-qt-source.sh', 'tools/fetch-llvm-mingw.sh') }}
 
-      - name: Cache the ffmpeg both bundles build
+      - name: Cache the ffmpeg the Linux bundle builds
         if: steps.moved.outputs.skip != 'true'
         uses: actions/cache@v4
         with:
           # tools/build-ffmpeg.sh keeps what it built under a name made from its
           # CPU and its own hash
-          path: |
-            build/deps/ffmpeg-linux-x64-*
-            build/deps/ffmpeg-windows-x64-*
-          key: ffmpeg-${{ hashFiles('tools/build-ffmpeg.sh') }}
+          path: build/deps/ffmpeg-linux-x64-*
+          key: ffmpeg-linux-x64-${{ hashFiles('tools/build-ffmpeg.sh') }}
+
+      - name: Cache the ffmpeg the Windows bundle builds
+        if: steps.moved.outputs.skip != 'true'
+        uses: actions/cache@v4
+        with:
+          # CI's Windows x64 job uses the same (ci.yml)
+          path: build/deps/ffmpeg-windows-x64-*
+          key: ffmpeg-windows-x64-${{ hashFiles('tools/build-ffmpeg.sh') }}
 
       - name: Qt's source
         # its licence texts go in the bundle every time; the build below only when the cache had none

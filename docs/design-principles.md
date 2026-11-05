@@ -13377,8 +13377,13 @@ this computer's Windows from CI's own pack, with Qt's warnings shown:
   which Qt asks Windows for and no variable moves, so a run would write the
   settings of whoever runs the test.
 
-Not yet tested on Windows: the encode of window drawing, skipped (said) as
-the pack's bundle has no ffmpeg.
+The encode of window drawing (Encode Video, three frames through ffmpeg)
+was skipped, and said so, as the pack's bundle had no ffmpeg. CI's Windows
+jobs now build the ffmpeg the release ships, sharing the release's cache
+(whose x64 one is two now, the Linux and the Windows ffmpeg), and stage it
+in the bundle. Measured on this computer's Windows, with the release
+trial's x64 ffmpeg put in CI's pack: the encode wrote three frames of the
+picture area's 512x480, and all twelve of window drawing's checks passed.
 
 ## The Mac icon is compiled by Apple's actool; Apple silicon builds on macOS 26 (user-decided, 2026-11-05)
 
