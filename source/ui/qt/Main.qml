@@ -706,9 +706,13 @@ ApplicationWindow {
                     // "save.flash" alone said nothing); more in a zip named for the game
                     const game = root.session.gameName.replace(/[<>:"\/\\|?*]/g, "_")
                     const own = list[0].replace(/^.*[\\/]/, "")
-                    saveDataDialog.selectedFile = "file:///" + (list.length === 1
+                    const name = list.length === 1
                         ? (game !== "" ? game + " " + Qt.formatDateTime(new Date(), "yyyy-MM-dd HH.mm.ss") + " " : "") + own
-                        : qsTrId("main.save_data_file").arg(root.session.gameName))
+                        : qsTrId("main.save_data_file").arg(root.session.gameName)
+                    // in Paths' Save data folder, a folder the core's, made now (owner, 2026-11-05, issue 500)
+                    const folder = root.paths.run("dialogFolder", ["Save data", true, root.session.coreName]) || ""
+                    saveDataDialog.currentFolder = root.pictureFiles.folderUrl(folder)
+                    saveDataDialog.selectedFile = folder !== "" ? root.pictureFiles.folderUrl(folder + "/" + name) : "file:///" + name
                     saveDataDialog.open()
                 }
             }

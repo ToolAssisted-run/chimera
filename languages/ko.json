@@ -1569,6 +1569,7 @@
 		"paths.folder_movie_backups": "무비 백업",
 		"paths.folder_movies": "무비",
 		"paths.folder_rom": "ROM",
+		"paths.folder_save_data": "세이브 데이터",
 		"paths.folder_savestates": "세이브 스테이트",
 		"paths.folder_screenshots": "스크린샷",
 		"paths.folder_temp_files": "임시 파일",

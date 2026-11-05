@@ -13038,3 +13038,31 @@ double click, RAM Watch's No, the save dialog's name, every window at its
 smallest size. Window tests 61 passed, 2 failed as they did before
 (installed packages and command line, which fail on this machine); witness
 125 passed. Not tried on Windows except Report an Issue.
+
+## Core-Specific Tools is one list (user-decided, 2026-11-05)
+
+Tools > Core-Specific Tools held a submenu a core, and each tool under it, a
+third level. A menu cannot leave its window (owner, 2026-11-01), so in a
+window with no room to the right of the second level, Qt put the third to its
+left, over Tools itself: the tool's name covered "Core-Specific Tools", and
+it looked as if the item had been replaced (issue 502, ares running, the
+DSDA-Doom core's tool offered). The owner chose one list, each tool named
+after its core ("DSDA-Doom: Import Demo (LMP)..."), over putting the running
+core's tools first or listing only the running core's. Every installed
+core's tools are still offered whatever runs.
+
+Tested: the core tools menu test now reads the list's rows, by their names,
+and checks none is a submenu; it failed with the menu of submenus.
+
+## Save data has a folder of its own, a folder a core (user-decided, 2026-11-05)
+
+Export Save Data opened its save dialog in whatever folder a dialog had used
+last, often Movies (issue 500). The owner chose a folder of its own in Config
+> Paths' global list, Save data (`./SaveData`), with a folder in it for each
+core, made when that core's save data is first exported; over a Save RAM
+folder for each system, as BizHawk has, or keeping the last folder. The core's
+name is made fit for a folder (the characters Windows refuses become "_").
+
+Tested: the view models' test asks for the folder with a core named
+"A/B: C?. " and gets SaveData/A_B_ C_, made; it failed with the core's folder
+left out. The Paths list's row counts in the test grew by one.

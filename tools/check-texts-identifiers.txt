@@ -188,6 +188,7 @@ A/V Dumps
 Watch (.wch)
 Debug Logs
 Bug reports
+Save data
 Macros
 Temp Files
 Microsoft

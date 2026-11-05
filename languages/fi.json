@@ -1595,6 +1595,7 @@
 		"paths.folder_movie_backups": "Elokuvien varmuuskopiot",
 		"paths.folder_movies": "Elokuvat",
 		"paths.folder_rom": "ROM",
+		"paths.folder_save_data": "Tallennustiedot",
 		"paths.folder_savestates": "Tilatiedostot",
 		"paths.folder_screenshots": "Kuvakaappaukset",
 		"paths.folder_temp_files": "Väliaikaiset tiedostot",

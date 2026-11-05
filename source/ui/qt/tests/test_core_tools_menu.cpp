@@ -1,8 +1,9 @@
 /* Tools > Core-Specific Tools offers every installed core's own tools,
- * grouped by core, whatever is open (owner, 2026-11-01): a submenu a core,
- * its tools in its package's words and order, greyed out while no core has
- * any. CoreToolsMenu.qml over a stand-in for the installed cores, and what
- * it holds read, a picked tool's core and id among it. */
+ * whatever is open (owner, 2026-11-01), in one list, each named after its
+ * core (owner, 2026-11-05, issue 502), in its package's words and order,
+ * greyed out while no core has any. CoreToolsMenu.qml over a stand-in for
+ * the installed cores, and what it holds read, a picked tool's core and id
+ * among it. */
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
 #include <QQuickItem>
@@ -36,19 +37,13 @@ ApplicationWindow {
         property string coreTools: "[]"
     }
     CoreToolsMenu { id: menu; cores: stub; onOpenCoreTool: (core, id) => picked = core + "/" + id }
-    // each core's submenu and the items in it: "Core: Item, Item"
+    // the rows it holds, and whether any is a submenu (none should be)
     function held() {
         let out = []
-        for (let i = 0; i < menu.count; i++) {
-            const sub = menu.menuAt(i)
-            if (!sub) continue
-            let items = []
-            for (let j = 0; j < sub.count; j++) items.push(sub.itemAt(j).text)
-            out.push(sub.title + ": " + items.join(", "))
-        }
+        for (let i = 0; i < menu.count; i++) out.push(menu.menuAt(i) ? "submenu " + menu.menuAt(i).title : menu.itemAt(i).text)
         return out
     }
-    function pick(i, j) { menu.menuAt(i).itemAt(j).triggered() }
+    function pick(i) { menu.itemAt(i).triggered() }
 }
 )";
 
@@ -78,16 +73,16 @@ int main(int argc, char **argv)
 	CHECK(menu->property("title").toString() == QLatin1String("main.core_specific_tools"));
 	CHECK(!menu->property("enabled").toBool());
 	CHECK(held().isEmpty());
-	/* two cores, one with two tools: a submenu each, in the list's order */
+	/* two cores, one with two tools: a row a tool, named after its core, in the list's order */
 	stub->setProperty("coreTools", QStringLiteral(
 		"[{\"core\":\"DSDA-Doom\",\"package\":\"a\",\"tools\":[{\"id\":\"import_demo\",\"menu\":\"Import Demo (LMP)...\"}]},"
 		"{\"core\":\"Eden\",\"package\":\"b\",\"tools\":[{\"id\":\"nsz\",\"menu\":\"Decompress NSZ...\"},{\"id\":\"xcz\",\"menu\":\"Decompress XCZ...\"}]}]"));
 	CHECK(menu->property("enabled").toBool());
-	CHECK(held() == QStringList({"DSDA-Doom: Import Demo (LMP)...", "Eden: Decompress NSZ..., Decompress XCZ..."}));
+	CHECK(held() == QStringList({"DSDA-Doom: Import Demo (LMP)...", "Eden: Decompress NSZ...", "Eden: Decompress XCZ..."}));
 	/* a tool picked says its core and id */
-	QMetaObject::invokeMethod(window, "pick", Q_ARG(QVariant, 1), Q_ARG(QVariant, 1));
+	QMetaObject::invokeMethod(window, "pick", Q_ARG(QVariant, 2));
 	CHECK(window->property("picked").toString() == QLatin1String("Eden/xcz"));
-	/* the cores folder looked at again, one core gone: its submenu goes */
+	/* the cores folder looked at again, one core gone: its rows go */
 	stub->setProperty("coreTools", QStringLiteral(
 		"[{\"core\":\"Eden\",\"package\":\"b\",\"tools\":[{\"id\":\"nsz\",\"menu\":\"Decompress NSZ...\"}]}]"));
 	CHECK(held() == QStringList({"Eden: Decompress NSZ..."}));

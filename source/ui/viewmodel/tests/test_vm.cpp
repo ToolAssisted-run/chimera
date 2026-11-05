@@ -1326,8 +1326,8 @@ void pathsConfig()
 	CHECK(folder == (dir / "runs").string() && !isDefault);
 	/* Chimera's global list, in its order, the base first and temporary files last */
 	fromValue(rows->cell(0, 1), name);
-	CHECK(name == "Base" && rows->rowCount() == 14);
-	fromValue(rows->cell(13, 1), name);
+	CHECK(name == "Base" && rows->rowCount() == 15);
+	fromValue(rows->cell(14, 1), name);
 	CHECK(name == "Temp Files" && paths.resolve("Temp Files") == (dir / "program").string());
 	/* Chimera's words in a path: the program's folder, the last game's, and anything else is the program's folder */
 	CHECK(paths.run("setPath", {std::string("Lua"), std::string("%exe%/Scripts")}, error).has_value() &&
@@ -1347,7 +1347,7 @@ void pathsConfig()
 	CHECK(paths.base.get().empty());
 	/* a system's own folders, made when a game for it is opened: under its base, which is under the global one */
 	paths.useSystem("NES");
-	CHECK(paths.systems.get() == "[\"NES\"]" && rows->rowCount() == 18);
+	CHECK(paths.systems.get() == "[\"NES\"]" && rows->rowCount() == 19);
 	CHECK(paths.resolveFor("NES", "Screenshots") == (dir / "program" / "NES" / "Screenshots").string() &&
 		paths.resolveFor("NES", "ROM") == (dir / "program" / "NES").string() &&
 		paths.resolveFor("NES", "Savestates") == (dir / "program" / "NES" / "State").string());
@@ -1374,6 +1374,9 @@ void pathsConfig()
 		got == (dir / "program" / "Reports").string() && fs::is_directory(dir / "program" / "Reports"));
 	/* ROMs: where the last game came from, while it is there and asked for */
 	paths.lastRomFolder.set((dir / "program" / "Lua").string());
+	/* Export Save Data's: Save data, a folder the core's inside it, its name made fit for a folder, both made (issue 500) */
+	CHECK(fromValue(paths.run("dialogFolder", {std::string("Save data"), true, std::string("A/B: C?. ")}, error).value_or(Value()), got) &&
+		got == (dir / "program" / "SaveData" / "A_B_ C_").string() && fs::is_directory(got));
 	CHECK(fromValue(paths.run("dialogFolder", {std::string("ROM")}, error).value_or(Value()), got) && got == (dir / "program" / "Lua").string());
 	paths.recentForRoms.set(false);
 	CHECK(fromValue(paths.run("dialogFolder", {std::string("ROM")}, error).value_or(Value()), got) && got == (dir / "program").string());

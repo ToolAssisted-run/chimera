@@ -5,6 +5,7 @@
 #include <cctype>
 #include <cstdlib>
 #include <filesystem>
+#include <string_view>
 
 #include "chimera/vm/json.hpp"
 
@@ -81,6 +82,9 @@ const std::vector<std::pair<std::string, std::string>> &PathsViewModel::defaults
 		{"Watch (.wch)", "."},
 		{"Debug Logs", "."},
 		{"Bug reports", "./Reports"},
+		/* where Export Save Data saves, a folder a core in it, made as it saves
+		 * (owner, 2026-11-05, issue 500) */
+		{"Save data", "./SaveData"},
 		{"Macros", "./Movies/Macros"},
 		{"Temp Files", ""},
 	};
@@ -185,18 +189,23 @@ PathsViewModel::PathsViewModel(Dispatcher &dispatcher) : ViewModel("paths", disp
 		});
 	command("dialogFolder", "where a file dialog for this folder opens: the folder, or the nearest one above it that is "
 		"there; for ROM, where the last game came from when recentForRoms. With make, the folder is made first, for a "
-		"file about to be saved there (Save as Zip's report, issue 435)", {"name", "make"},
+		"file about to be saved there (Save as Zip's report, issue 435). With a sub, that folder inside it, its name "
+		"made fit for a folder (a core's, for Export Save Data: issue 500)", {"name", "make", "sub"},
 		[this](const Args &a, std::string &error) -> Value {
-			std::string name;
+			std::string name, sub;
 			bool make = false;
-			if (!arg(a, 0, name, error) || (a.size() > 1 && !arg(a, 1, make, error))) return {};
+			if (!arg(a, 0, name, error) || (a.size() > 1 && !arg(a, 1, make, error)) || (a.size() > 2 && !arg(a, 2, sub, error))) return {};
 			if (name == "ROM" && recentForRoms.get() && !lastRomFolder.get().empty() && fs::is_directory(lastRomFolder.get())) return lastRomFolder.get();
-			const std::string r = resolve(name);
+			std::string r = resolve(name);
 			if (r.empty())
 			{
 				error = tr("paths.no_folder", {name});
 				return {};
 			}
+			for (char &c : sub)
+				if (std::string_view("<>:\"/\\|?*").find(c) != std::string_view::npos || static_cast<unsigned char>(c) < 32) c = '_';
+			while (!sub.empty() && (sub.back() == '.' || sub.back() == ' ')) sub.pop_back();
+			if (!sub.empty()) r = (fs::path(r) / sub).string();
 			std::error_code ec;
 			if (make) fs::create_directories(r, ec);
 			fs::path at(r);
