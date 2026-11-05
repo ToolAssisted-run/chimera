@@ -37,7 +37,7 @@ on:
         required: true
         type: string
       kind:
-        description: 'dev (rolling) or nightly (dated). Default: nightly for a scheduled run, dev otherwise'
+        description: 'Not read: only nightlies are published (owner, 2026-11-05). Kept until every core stops passing it; pull request 309 removes it'
         required: false
         type: string
         default: ''
@@ -45,6 +45,9 @@ on:
 jobs:
   publish:
     name: publish (${{ inputs.core-id }})
+    # only the scheduled run or one started by hand publishes, and only a
+    # nightly (owner, 2026-11-05): a push to main publishes nothing
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -53,11 +56,7 @@ jobs:
       - name: What is being published
         id: what
         run: |
-          kind="${{ inputs.kind }}"
-          if [ -z "$kind" ]; then
-            if [ "${{ github.event_name }}" = "schedule" ]; then kind=nightly; else kind=dev; fi
-          fi
-          echo "kind=$kind" >> "$GITHUB_OUTPUT"
+          echo "kind=nightly" >> "$GITHUB_OUTPUT"
 
       - name: Check out the core (for its commit, which is what the release points at)
         uses: actions/checkout@v6

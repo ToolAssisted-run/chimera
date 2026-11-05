@@ -13188,3 +13188,21 @@ threads their own.
 Tested: main with miniBox 3848e4e, on Linux: the meson tests passed 64 of 64
 and the witness 125 of 125; the Windows build (mingw-w64, x64) compiled.
 
+
+## No development builds (user-decided, 2026-11-05)
+
+Chimera and every core publish nightlies only. The owner: "id like to get
+rid of dev releases everywhere. Nightlies only", and then, on when to delete
+the dev releases already published: "delete now, lest we forget to do so
+after the merge". A development build was replaced on every push to main,
+so a movie made on one could stop being replayable.
+
+- The 63 `dev` releases and their tags (Chimera's and the 62 official
+  cores') were deleted on 2026-11-05.
+- `release.yml` no longer runs after every passing CI; the daily schedule,
+  or a run started by hand, makes a nightly.
+- `publish-core.yml` publishes only from a scheduled run or one started by
+  hand, and only a nightly. It still accepts a `kind` and ignores it, until
+  every core's workflow stops passing one; the platform matrix (pull request
+  309) removes the input and the dev paths left in both workflows, and
+  rewrites the documents that still describe dev builds.

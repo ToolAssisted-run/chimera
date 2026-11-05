@@ -25,22 +25,15 @@ name: Release
 # Nothing is published that did not pass CI. The release job is triggered by the
 # CI workflow FINISHING SUCCESSFULLY, and builds that same commit.
 
+# Nightlies only (owner, 2026-11-05): the run after every passing CI, which
+# published the rolling dev build, is gone, and a run started by hand makes a
+# nightly. The dev branches below are no longer reached; the platform matrix
+# (pull request 309) takes them out.
 on:
-  workflow_run:
-    workflows: [ CI ]
-    types: [ completed ]
-    branches: [ main ]
   schedule:
     # 05:00 UTC, an hour after CI's own nightly, so it releases a gated commit
     - cron: '0 5 * * *'
   workflow_dispatch:
-    inputs:
-      kind:
-        description: 'dev (rolling) or nightly (dated)'
-        required: true
-        default: dev
-        type: choice
-        options: [ dev, nightly ]
 
 concurrency:
   group: release
@@ -68,7 +61,7 @@ jobs:
             kind=dev
           else
             sha="${{ github.sha }}"
-            kind="${{ github.event.inputs.kind || 'nightly' }}"
+            kind=nightly
           fi
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
           echo "kind=$kind" >> "$GITHUB_OUTPUT"
