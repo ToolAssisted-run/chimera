@@ -24,8 +24,9 @@ name: Release
 # therefore NEVER deleted. They are the archive. There is no rolling
 # development build, which could not be cited (user-decided, 2026-11-05).
 #
-# Nothing is published that did not pass CI: the scheduled run publishes only a
-# commit CI passed, and one started by hand is checked the same way.
+# Nothing is published that did not pass CI: a scheduled run, or one started by
+# hand, releases the newest commit of main that CI passed. A commit pushed just
+# before the run, still in CI, waits for the next night instead of stopping it.
 
 on:
   schedule:
@@ -58,8 +59,8 @@ jobs:
     # What is released, and whether anything is. The bundles are built by the
     # jobs below, on the CPU each is for, only when this says so.
     #
-    # A scheduled or manual run is gated by the commit's own CI run, checked
-    # below.
+    # A scheduled or manual run releases the newest commit of main that CI
+    # passed, chosen below.
     name: what is released
     runs-on: ubuntu-latest
     outputs:
@@ -69,28 +70,47 @@ jobs:
       date: ${{ steps.what.outputs.date }}
       skip: ${{ steps.moved.outputs.skip == 'true' }}
     steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          # no submodules: nothing is built here. The whole history, for the
+          # nightly tags and the commits of main the steps below read.
+          submodules: false
+          fetch-depth: 0
+
       - name: What is being released
         id: what
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             sha="${{ github.event.pull_request.head.sha }}"
             kind=trial
           else
-            sha="${{ github.sha }}"
+            # a nightly, scheduled or started by hand, is of the newest commit
+            # of main that CI has passed - not necessarily main's head. A commit
+            # pushed shortly before this run has not finished CI yet; releasing
+            # only the head would publish nothing that day.
             kind=nightly
+            passed=$(gh run list --workflow CI --branch main --status success \
+              --limit 200 --json headSha --jq '.[].headSha')
+            sha=""
+            for c in $(git rev-list --first-parent -n 200 HEAD); do
+              if echo "$passed" | grep -qx "$c"; then sha=$c; break; fi
+            done
+            if [ -z "$sha" ]; then
+              echo "::error::none of main's last 200 commits has passed CI; nothing to release"
+              exit 1
+            fi
+            if [ "$sha" != "$(git rev-parse HEAD)" ]; then
+              echo "main's head $(git rev-parse --short=8 HEAD) has not passed CI (yet); releasing $(git rev-parse --short=8 "$sha"), the newest commit of main that has"
+            fi
+            git checkout -q "$sha"
           fi
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
           echo "kind=$kind" >> "$GITHUB_OUTPUT"
           echo "short=$(echo "$sha" | cut -c1-8)" >> "$GITHUB_OUTPUT"
           echo "date=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
-
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ steps.what.outputs.sha }}
-          # no submodules: nothing is built here. The whole history, for the
-          # nightly tags the checks below read.
-          submodules: false
-          fetch-depth: 0
 
       - name: Has main moved since the last nightly?
         id: moved
@@ -101,28 +121,15 @@ jobs:
           # a nightly of an unchanged commit is a second copy of yesterday's -
           # but only a nightly that HOLDS its bundles counts: a publish that died
           # between create and upload leaves a tag at this very commit, and
-          # counting it would make every later run skip the repair
+          # counting it would make every later run skip the repair. HEAD is the
+          # commit chosen above: the newest that passed CI.
           last=$(git tag -l 'nightly-*' --sort=-creatordate | head -1)
           if [ -n "$last" ] && [ "$(git rev-list -n1 "$last")" = "$(git rev-parse HEAD)" ] \
              && gh release view "$last" --json assets --jq '.assets[].name' 2>/dev/null | grep -q '^chimera-.*\.zip$'; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
-            echo "main has not moved since $last; nothing to release"
+            echo "nothing newer than $last has passed CI; nothing to release"
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Was this commit gated?
-        if: github.event_name != 'pull_request' && steps.moved.outputs.skip != 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          # a nightly, scheduled or started by hand, is only of a commit CI has passed
-          conclusion=$(gh run list --workflow CI --branch main --limit 20 \
-            --json headSha,conclusion --jq \
-            "[.[] | select(.headSha == \"$(git rev-parse HEAD)\")] | first | .conclusion")
-          if [ "$conclusion" != "success" ]; then
-            echo "CI has not passed for $(git rev-parse --short HEAD) (conclusion: ${conclusion:-none})" >&2
-            exit 1
           fi
 
   linux-arm64:

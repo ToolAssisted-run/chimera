@@ -136,7 +136,7 @@ Made and published by other people from their own repositories, and listed here 
 
 Chimera is published as [**nightly builds**](https://github.com/ToolAssisted-run/chimera/releases) for Windows, Linux and macOS, each for x86_64 and aarch64.
 
-A nightly is made each day `main` changed and passed its tests. It is dated and never changed or deleted, so a movie or a bug report can name the build it used.
+A nightly is made each day `main` changed: it is the newest commit of `main` that passed its tests. It is dated and never changed or deleted, so a movie or a bug report can name the build it used.
 
 A build carries no cores, and Chimera never uses the network. To set it up:
 

@@ -13969,3 +13969,30 @@ longer waits for a published nightly to name. What was not proved is still
 said plainly, and the reporter is asked to reopen if the problem remains.
 Deferred work still leaves an issue open. AGENTS.md and
 docs/issue-intake.md say the same.
+
+## A nightly is the newest commit that passed CI (user-decided, 2026-11-06)
+
+The release used to build only main's newest commit, and only if CI had
+passed it. On 2026-11-06 main got a new commit a few hours before the
+05:00 UTC release, its CI had not finished, and no nightly was published that
+day. Another commit pushed before the next run would have done it again. The
+owner: "fix the release gate so main moving doesn't skip nightlies".
+
+- **Now.** A scheduled run, or one started by hand, releases the newest
+  commit on main's own line (`git rev-list --first-parent`) that has a passing
+  CI run. A commit still in CI is not skipped for good: it is released by
+  the next night's run, once its CI has passed. Nothing is published that did
+  not pass CI, as before.
+- **A second bug the same check had.** It read the CI conclusion of the first
+  run it found for the commit. A commit has two CI runs, the one after the
+  push and CI's own nightly, and on 2026-11-06 the first one found was the
+  nightly, still running, so a commit whose push run had passed read as "no
+  conclusion". The release now looks only at runs that passed.
+- **Skipping.** A scheduled run still publishes nothing when the commit it
+  would release is the one the last nightly holds.
+
+Tested: the selection run by hand against main as it was picks `c33d4809`,
+the newest commit CI passed. Above it were `1fa74b95` and `1a708b57`, still in
+CI, and `cfc7e46a` and `d8a2c68e`, which had no CI run of their own (pushed
+together with a later commit). The workflow's YAML parses. The release itself runs
+only on GitHub; the next nightly is its test.
