@@ -24,23 +24,33 @@
 # with its own message. The build is GPL version 2 or later (x264 and x265 are
 # GPL), and ffmpeg-LICENSE.txt says so and where every source is.
 #
-# Usage: ./build-ffmpeg.sh <linux|windows> <destination directory>
+# Usage: ./build-ffmpeg.sh <linux|windows|macos> <destination directory> [x64|arm64]
+#
+# A Linux or macOS ffmpeg is built on the machine it is for, for its CPU
+# (x86-64 or arm64); a Windows one is cross-built, for the CPU given (x64 when
+# none is): x64 with mingw-w64's GCC, arm64 with llvm-mingw's clang, whose
+# bin/ folder must be on PATH. On macOS it
+# runs on macOS 14.4 or later, as Chimera does, and links only the system's
+# own libraries (a Mac has no fully static program).
 #
 # Every source is pinned by its SHA256 and kept under build/deps; the finished
 # binary is kept there too, under a name made from this script's own hash, so
 # a second run costs nothing until this script changes. Needs a C and C++
-# compiler (mingw-w64 for windows), make, cmake, nasm and pkg-config.
+# compiler (mingw-w64 or llvm-mingw for windows), make, cmake, nasm (x86-64) and
+# pkg-config.
 #
-# CHIMERA_FFMPEG_LINUX / CHIMERA_FFMPEG_WINDOWS name a ready binary to use
+# CHIMERA_FFMPEG_LINUX / CHIMERA_FFMPEG_WINDOWS / CHIMERA_FFMPEG_MACOS name a ready binary to use
 # instead, for a machine that cannot build or download. CHIMERA_FFMPEG_LICENSE
 # must then name a text file with that binary's licence and where its source
 # is: the bundle ships it as ffmpeg-LICENSE.txt.
 set -eu
-platform="${1:?usage: build-ffmpeg.sh <linux|windows> <dest dir>}"
-dest="${2:?usage: build-ffmpeg.sh <linux|windows> <dest dir>}"
+platform="${1:?usage: build-ffmpeg.sh <linux|windows|macos> <dest dir>}"
+dest="${2:?usage: build-ffmpeg.sh <linux|windows|macos> <dest dir>}"
 root="$(cd "$(dirname "$0")/.." && pwd)"
 cache="${CHIMERA_DEPS_DIR:-$root/build/deps}"
-jobs="${CHIMERA_FFMPEG_JOBS:-$(nproc)}"
+# (a Mac has no nproc or sha256sum: sysctl and shasum say the same)
+jobs="${CHIMERA_FFMPEG_JOBS:-$(nproc 2>/dev/null || sysctl -n hw.ncpu)}"
+sha256() { if command -v sha256sum > /dev/null; then sha256sum "$1"; else shasum -a 256 "$1"; fi | cut -d' ' -f1; }
 
 case "$platform" in
 	linux)
@@ -50,6 +60,10 @@ case "$platform" in
 	windows)
 		binary="ffmpeg.exe"
 		override="${CHIMERA_FFMPEG_WINDOWS:-}"
+		;;
+	macos)
+		binary="ffmpeg"
+		override="${CHIMERA_FFMPEG_MACOS:-}"
 		;;
 	*)
 		echo "build-ffmpeg: unknown platform '$platform'" >&2
@@ -86,7 +100,7 @@ mkdir -p "$dest" "$cache"
 
 verify() { # <file> <sha256>
 	[ -f "$1" ] || return 1
-	echo "$2  $1" | sha256sum --check --status
+	[ "$(sha256 "$1")" = "$2" ]
 }
 
 fetch() { # <url> <path> <sha256> <what>
@@ -95,7 +109,7 @@ fetch() { # <url> <path> <sha256> <what>
 	rm -f "$2"
 	curl -sSL --fail --retry 3 --retry-delay 5 --connect-timeout 30 --max-time 1800 -o "$2" "$1" || {
 		echo "build-ffmpeg: could not download $1" >&2
-		echo "  Put it at $2 by hand, or point CHIMERA_FFMPEG_${platform^^} at an ffmpeg binary." >&2
+		echo "  Put it at $2 by hand, or point CHIMERA_FFMPEG_$(echo "$platform" | tr a-z A-Z) at an ffmpeg binary." >&2
 		return 1
 	}
 	verify "$2" "$3" || {
@@ -118,7 +132,7 @@ if [ -n "$override" ]; then
 	{
 		printf "ffmpeg (%s), given by whoever built this bundle - not the build Chimera pins.\n\n" "$platform"
 		printf "Shipped as a separate program, which Chimera runs and talks to over a pipe.\n"
-		printf "It is not linked into Chimera. sha256 of this binary: %s\n\n" "$(sha256sum "$override" | cut -d' ' -f1)"
+		printf "It is not linked into Chimera. sha256 of this binary: %s\n\n" "$(sha256 "$override")"
 		printf "Its licence, and where its source is, as the builder gave them:\n\n"
 		cat "$licence"
 	} > "$dest/ffmpeg-LICENSE.txt"
@@ -126,14 +140,31 @@ if [ -n "$override" ]; then
 	exit 0
 fi
 
+# The CPU the binary is for: a Linux or macOS build is for the machine that
+# builds it, a Windows one for x86-64. It is in the cached binary's name, since
+# one cache can serve builds on both CPUs.
+case "$platform" in
+	linux|macos)
+		case "$(uname -m)" in
+			x86_64) cpu=x64 ;;
+			aarch64|arm64) cpu=arm64 ;;
+			*) echo "build-ffmpeg: builds on x86-64 and aarch64 only, not $(uname -m)" >&2; exit 2 ;;
+		esac
+		;;
+	windows)
+		cpu="${3:-x64}"
+		case "$cpu" in x64|arm64) ;; *) echo "build-ffmpeg: a Windows ffmpeg is for x64 or arm64, not $cpu" >&2; exit 2 ;; esac
+		;;
+esac
+
 # ---- built before, by this very script --------------------------------------
-key="$(sha256sum "$0" | cut -c1-16)"
-built="$cache/ffmpeg-$platform-$key"
+key="$(sha256 "$0" | cut -c1-16)"
+built="$cache/ffmpeg-$platform-$cpu-$key"
 if [ -f "$built/$binary" ] && [ -f "$built/ffmpeg-LICENSE.txt" ]; then
 	cp "$built/$binary" "$dest/$binary"
 	cp "$built/ffmpeg-LICENSE.txt" "$dest/ffmpeg-LICENSE.txt"
 	chmod +x "$dest/$binary"
-	echo "  ffmpeg $ffmpeg_version ($platform), built before"
+	echo "  ffmpeg $ffmpeg_version ($platform, $cpu), built before"
 	exit 0
 fi
 
@@ -183,47 +214,85 @@ else
 		> "$work/x265_$x265_version/x265Version.txt"
 fi
 
-if [ "$platform" = windows ]; then
+# CMake 4 no longer lets a project set a policy from before 3.5 to its OLD
+# behaviour, and x265 4.1 sets two: CMP0025 (Apple's clang named "Clang") and
+# CMP0054. Both lines go (written through a copy: BSD sed's -i is not GNU's),
+# and x265's one test for "Clang" takes AppleClang too.
+x265_cmake="$work/x265_$x265_version/source/CMakeLists.txt"
+sed -e '/cmake_policy(SET CMP0025 OLD)/d' -e '/cmake_policy(SET CMP0054 OLD)/d' \
+	-e 's/if(${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang")/if(${CMAKE_CXX_COMPILER_ID} MATCHES "Clang")/' \
+	"$x265_cmake" > "$x265_cmake.new"
+mv "$x265_cmake.new" "$x265_cmake"
+
+if [ "$platform" = windows ] && [ "$cpu" = arm64 ]; then
+	# llvm-mingw: clang, libc++. x265's arm64 assembly is not built for
+	# Windows (its sources assume an ELF or Mach-O assembler); x264's is.
+	host=aarch64-w64-mingw32
+	x264_cross=(--host=$host --cross-prefix=$host-)
+	export CC=$host-clang
+	x265_cross=(-DCMAKE_SYSTEM_NAME=Windows -DCMAKE_SYSTEM_PROCESSOR=ARM64 -DCMAKE_C_COMPILER=$host-clang
+		-DCMAKE_CXX_COMPILER=$host-clang++ -DCMAKE_RC_COMPILER=$host-windres -DENABLE_ASSEMBLY=OFF)
+	ffmpeg_cross=(--arch=aarch64 --target-os=mingw32 --cross-prefix=$host- --cc=$host-clang --cxx=$host-clang++
+		--pkg-config=pkg-config)
+	strip=$host-strip
+elif [ "$platform" = windows ]; then
 	host=x86_64-w64-mingw32
 	x264_cross=(--host=$host --cross-prefix=$host-)
 	x265_cross=(-DCMAKE_SYSTEM_NAME=Windows -DCMAKE_SYSTEM_PROCESSOR=x86_64 -DCMAKE_C_COMPILER=$host-gcc
 		-DCMAKE_CXX_COMPILER=$host-g++ -DCMAKE_RC_COMPILER=$host-windres -DCMAKE_ASM_NASM_COMPILER=nasm)
 	ffmpeg_cross=(--arch=x86_64 --target-os=mingw32 --cross-prefix=$host- --pkg-config=pkg-config)
 	strip=$host-strip
+elif [ "$platform" = macos ]; then
+	# the oldest macOS Chimera runs on, for every part
+	export MACOSX_DEPLOYMENT_TARGET=14.4
+	x264_cross=()
+	x265_cross=(-DCMAKE_OSX_DEPLOYMENT_TARGET=14.4)
+	ffmpeg_cross=(--cc=clang --cxx=clang++ --extra-cflags=-mmacosx-version-min=14.4 --extra-ldflags=-mmacosx-version-min=14.4)
+	strip=strip
 else
 	x264_cross=()
 	x265_cross=()
 	ffmpeg_cross=()
 	strip=strip
 fi
+# A fully static program: Linux's and Windows'. A Mac links the system's own
+# libraries (libSystem, libc++) dynamically, as every Mac program does.
+if [ "$platform" = macos ]; then static_exe=(); cxx_runtime=-lc++; else static_exe=(--extra-ldexeflags=-static); cxx_runtime=-lstdc++; fi
+# llvm-mingw's C++ library is libc++
+if [ "$platform" = windows ] && [ "$cpu" = arm64 ]; then cxx_runtime=-lc++; fi
 
 say() { echo "  $*"; }
 
 say "x264 $x264_version ($platform)"
 (
 	cd "$work/x264-$x264_version"
-	./configure --prefix="$prefix" "${x264_cross[@]}" --enable-static --disable-cli --bit-depth=8 \
+	./configure --prefix="$prefix" ${x264_cross[@]+"${x264_cross[@]}"} --enable-static --disable-cli --bit-depth=8 \
 		--disable-opencl --disable-lavf --disable-swscale --disable-ffms --disable-gpac --disable-lsmash
 	make -j"$jobs"
 	make install
 ) > "$work/x264.log" 2>&1 || { tail -30 "$work/x264.log" >&2; exit 1; }
 
+# x265 4.1 asks for a CMake older than 3.5, which CMake 4 (Ubuntu 26.04's,
+# Homebrew's) refuses unless told the oldest policies it may assume
 say "x265 $x265_version ($platform)"
 (
-	cmake -S "$work/x265_$x265_version/source" -B "$work/x265-build" -G "Unix Makefiles" "${x265_cross[@]}" \
+	cmake -S "$work/x265_$x265_version/source" -B "$work/x265-build" -G "Unix Makefiles" ${x265_cross[@]+"${x265_cross[@]}"} \
 		-DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$prefix" \
-		-DENABLE_SHARED=OFF -DENABLE_CLI=OFF -DENABLE_LIBNUMA=OFF -DSTATIC_LINK_CRT=ON
+		-DENABLE_SHARED=OFF -DENABLE_CLI=OFF -DENABLE_LIBNUMA=OFF -DSTATIC_LINK_CRT=ON \
+		-DCMAKE_POLICY_VERSION_MINIMUM=3.5
 	make -C "$work/x265-build" -j"$jobs"
 	make -C "$work/x265-build" install
 ) > "$work/x265.log" 2>&1 || { tail -30 "$work/x265.log" >&2; exit 1; }
 # x265 is C++: a static ffmpeg links its runtime itself
-sed -i 's/^Libs.private:.*/Libs.private: -lstdc++ -lm/' "$prefix/lib/pkgconfig/x265.pc"
+# (written through a copy: BSD sed's -i is not GNU's)
+sed "s/^Libs.private:.*/Libs.private: $cxx_runtime -lm/" "$prefix/lib/pkgconfig/x265.pc" > "$prefix/x265.pc.new"
+mv "$prefix/x265.pc.new" "$prefix/lib/pkgconfig/x265.pc"
 
 say "FFmpeg $ffmpeg_version ($platform)"
 configuration=(
 	# never installed: a prefix that names no folder of this machine, since the
 	# binary carries its configuration; x264 and x265 are found by pkg-config
-	--prefix=/usr/local "${ffmpeg_cross[@]}" --pkg-config-flags=--static --extra-ldexeflags=-static
+	--prefix=/usr/local ${ffmpeg_cross[@]+"${ffmpeg_cross[@]}"} --pkg-config-flags=--static ${static_exe[@]+"${static_exe[@]}"}
 	--enable-gpl --enable-libx264 --enable-libx265
 	--disable-everything --disable-autodetect --disable-doc --disable-debug --disable-network
 	--disable-ffplay --disable-ffprobe --disable-avdevice --disable-postproc --disable-shared --enable-static
@@ -244,7 +313,7 @@ configuration=(
 mkdir -p "$built"
 cp "$work/ffmpeg-$ffmpeg_version/$binary" "$built/$binary"
 {
-	printf "ffmpeg (%s), built for Chimera by tools/build-ffmpeg.sh from these sources:\n\n" "$platform"
+	printf "ffmpeg (%s, %s), built for Chimera by tools/build-ffmpeg.sh from these sources:\n\n" "$platform" "$cpu"
 	printf "  FFmpeg %s  %s\n" "$ffmpeg_version" "$ffmpeg_from"
 	printf "  x264 %s  %s\n" "$x264_version" "$x264_from"
 	printf "  x265 %s  %s\n\n" "$x265_version" "$x265_from"
@@ -253,11 +322,11 @@ cp "$work/ffmpeg-$ffmpeg_version/$binary" "$built/$binary"
 	printf "Shipped as a separate program, which Chimera runs and talks to over a pipe.\n"
 	printf "It is not linked into Chimera. With x264 and x265 in it, the whole is under the\n"
 	printf "GNU General Public License, version 2 or (at your option) any later version,\n"
-	printf "whose text follows. sha256 of this binary: %s\n\n" "$(sha256sum "$built/$binary" | cut -d' ' -f1)"
+	printf "whose text follows. sha256 of this binary: %s\n\n" "$(sha256 "$built/$binary")"
 	printf "FFmpeg's configuration:\n  %s\n\n" "${configuration[*]}"
 	cat "$cache/COPYING.GPLv2"
 } > "$built/ffmpeg-LICENSE.txt"
 cp "$built/$binary" "$dest/$binary"
 cp "$built/ffmpeg-LICENSE.txt" "$dest/ffmpeg-LICENSE.txt"
 chmod +x "$dest/$binary"
-echo "  ffmpeg $ffmpeg_version ($platform): $(du -h "$dest/$binary" | cut -f1)"
+echo "  ffmpeg $ffmpeg_version ($platform, $cpu): $(du -h "$dest/$binary" | cut -f1)"

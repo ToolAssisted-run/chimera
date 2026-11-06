@@ -9,8 +9,10 @@ set -e
 kind="$1"; src="$2"; bld="$3"; out="$4"; aux="$5"
 shift 5 || true
 # meson passes builddir-relative paths; tools below cd elsewhere, so absolutize
-bld="$(realpath -m "$bld")"
-out="$(realpath -m "$out")"
+# (by hand: macOS's realpath has no -m, and neither path need exist yet)
+abspath() { case "$1" in /*) echo "$1" ;; *) echo "$PWD/$1" ;; esac; }
+bld="$(abspath "$bld")"
+out="$(abspath "$out")"
 
 case "$kind" in
 meson)
@@ -26,8 +28,10 @@ meson)
 	# linux: libzstd.so.1.5.7). Never import libs or defs.
 	base="$(basename "$out")"
 	stem="$(basename "$out" | sed 's/\.[^.]*$//')"
-	lib="$(find "$bld" -maxdepth 2 -type f \
-		\( -name "$base" -o -name "$stem-*.dll" -o -name "$stem.so.*" -o -name "$stem-*.so.*" \) \
+	# macOS: libzstd.1.5.7.dylib, with libzstd.dylib a link to it (-L: a link
+	# to a file counts as the file)
+	lib="$(find -L "$bld" -maxdepth 2 -type f \
+		\( -name "$base" -o -name "$stem-*.dll" -o -name "$stem.so.*" -o -name "$stem-*.so.*" -o -name "$stem.*.dylib" \) \
 		! -name '*.a' ! -name '*.d' ! -name '*.def' | head -1)"
 	;;
 cmake)
@@ -40,7 +44,7 @@ cmake)
 	fi
 	cmake --build "$bld"
 	base="$(basename "$out")"
-	lib="$(find "$bld" -name "$base" -type f | head -1)"
+	lib="$(find -L "$bld" -name "$base" -type f | head -1)"
 	if [ -z "$lib" ]; then
 		# versioned .so (e.g. libopenal.so.1.24.3) or lib-prefixed variant
 		stem="$(basename "$out" | sed 's/\.[^.]*$//')"

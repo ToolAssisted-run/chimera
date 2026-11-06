@@ -6,8 +6,8 @@
 
 <p align="center">
 	<picture>
-		<source media="(prefers-color-scheme: dark)" srcset="docs/icon-dark.svg">
-		<img src="docs/icon.svg" alt="Chimera - four pixel modules around the beast's eye" width="140" align="middle">
+		<source media="(prefers-color-scheme: dark)" srcset="docs/Chimera.icon/Assets/icon-dark.svg">
+		<img src="docs/Chimera.icon/Assets/icon.svg" alt="Chimera - four pixel modules around the beast's eye" width="140" align="middle">
 	</picture>
 	&nbsp;&nbsp;
 	<picture>
@@ -138,22 +138,29 @@ Made and published by other people from their own repositories, and listed here 
 
 ## Getting a build
 
-The frontend is built for Linux and Windows and published here:
-
-- [**Nightly builds**](https://github.com/ToolAssisted-run/chimera/releases) - one a day when `main` changed and passed its tests: dated, immutable, and kept forever. Cite one in a bug report or beside a movie: a run is only reproducible while the build that recorded it still exists.
+The frontend is built for Windows, Linux and macOS, each for x86_64 and aarch64, and published as [**nightly builds**](https://github.com/ToolAssisted-run/chimera/releases): one a day when `main` changed and passed its tests, dated, immutable, and kept forever. Cite one in a bug report or beside a movie: a run is only reproducible while the build that recorded it still exists.
 
 A bundle carries no cores, and Chimera never reaches the network - it downloads
 nothing, not a core and not a list of them. To set one up:
 
-1. Download a build above and unpack it.
+1. Download a build above and unpack it. **On Windows or Linux you most likely
+   want x86_64**; take aarch64 only if you know you are using an ARM device. On
+   a Mac, take aarch64 for Apple silicon (M1 and later) and x86_64 for an Intel Mac;
+   macOS asks before opening it the first time, as it is signed by no
+   developer.
 2. Download the `.chimeraCore` package of each core you want from that core's
-   releases page (the [Cores](#cores) tables link them), or build it.
+   releases page (the [Cores](#cores) tables link them), or build it. A release
+   names each package for its CPU, `<core>-<version>-x86_64.chimeraCore` or
+   `<core>-<version>-aarch64.chimeraCore`, and says which systems it runs on:
+   take the one for the CPU of your build (most likely x86_64), and only one.
+   Most cores have no aarch64 package yet; [docs/platforms.md](docs/platforms.md)
+   says what runs on each build.
 3. Put the packages in the `Cores` folder beside Chimera (`chimera.exe` on
-   Windows, `chimera` on Linux), and start Chimera.
+   Windows, `chimera` on Linux; on a Mac,
+   `~/Library/Application Support/Chimera/Cores`), and start Chimera.
 
-Each core publishes nightlies the same way, and they are never deleted - which
-is what lets a movie name the exact package that recorded it and still be
-replayable years later.
+Each core publishes nightlies the same way, and they are never deleted - which is what lets a movie name the exact package
+that recorded it and still be replayable years later.
 
 Every bundle carries `BUILD.txt`, naming the exact commit it was built from, and
 `LICENSES.md`, stating its terms. **Adding a core adds that core's terms**,
@@ -172,7 +179,7 @@ An AI agent (Claude Code, or any program that speaks MCP) can look at the projec
 
 ## Building
 
-The canonical build is Linux-hosted and meson-mediated, and produces Chimera for both operating systems: the engine, its libraries and the window (Qt 6.12), built with gcc for Linux and cross-built with mingw-w64 for Windows. Clone with `--recursive`; the repository contains no precompiled binaries, and
+Chimera is built with meson: the engine, its libraries and the window (Qt 6.12). Linux builds it for Linux, for the machine's own CPU, and cross-builds it for Windows, with mingw-w64 for x86_64 and llvm-mingw for aarch64; macOS is built on a Mac ([docs/macos.md](docs/macos.md)). How each of the six is built and tested is in [docs/platforms.md](docs/platforms.md). Clone with `--recursive`; the repository contains no precompiled binaries, and
 no cores - `tools/fetch-cores.sh` puts the published ones in `build/Cores` if
 you want a working set without opening the frontend.
 
@@ -188,7 +195,7 @@ PATH="$QT/libexec:$QT/bin:$PATH" PKG_CONFIG_PATH="$QT/lib/pkgconfig" \
 meson compile -C build/meson-linux && meson install -C build/meson-linux
 ```
 
-Linux requirements: meson, ninja, cmake, gcc, and Qt 6.12 (Core, Gui, Qml, Quick, QuickControls2); mingw-w64 for the Windows build. The release builds Qt itself, for both systems, without its network module (`tools/build-qt-linux.sh`, `tools/build-qt-windows.sh`), and `tools/build-bundle.sh` makes the two bundles from it.
+Linux requirements: meson, ninja, cmake, gcc, and Qt 6.12 (Core, Gui, Qml, Quick, QuickControls2); mingw-w64 for the Windows x86_64 build, llvm-mingw (`tools/fetch-llvm-mingw.sh`) for Windows aarch64. The release builds Qt itself for Linux and Windows, without its network module (`tools/build-qt-linux.sh`, `tools/build-qt-windows.sh`); `tools/build-bundle.sh` makes the Linux and Windows bundles from it, and `tools/build-app-macos.sh` the Mac app.
 
 The frontend ships no cores, so get at least one before running it - either the
 published packages, or a core repository cloned wherever you like:
@@ -221,13 +228,14 @@ reports before anybody opens a debugger:
   match them.
 - **The project file.** A `.chimeraProject` is small and names every file
   by hash, so attach it rather than describing it.
-- **The three crash files.** When Chimera or a core dies it writes a crash
+- **The three crash files** (Windows). When Chimera or a core dies it writes a crash
   note and a minidump, `<date> pid<N>.txt` and `.dmp`, into the `Crashes`
   folder of the data directory (Config > Data Directory... opens it;
   `%LOCALAPPDATA%\Chimera` by default on Windows), and the sandbox writes
-  `minibox-diag.log` next to Chimera's program. Attach all three: the note
-  carries the faulting instruction and the machine's last words, and two of
-  three crashes in one recent report were fixed off those files alone.
+  `minibox-diag.log` next to Chimera's program (on a Mac, in the data
+  folder). Attach all three: the note carries the faulting instruction and
+  the machine's last words, and two of three crashes in one recent report
+  were fixed off those files alone.
 - **The core's log.** Help > Export Core Log... keeps everything the core
   says in a file you choose; it is off until asked for, and reboots the core
   so the log starts at boot. Use it again to turn it off, and attach the file.

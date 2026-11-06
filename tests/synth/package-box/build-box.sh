@@ -17,14 +17,20 @@ musl_gcc="$mbuild/musl-gcc"
 emulibc_o="$mbuild/source/guest/emulibc.c.o"
 [ -f "$emulibc_o" ] || { echo "emulibc.c.o missing; run: ninja -C $mbuild" >&2; exit 1; }
 
+# SYNTH_CFLAGS adds to them: -DSYNTH_NO_GUEST_FAULT_HANDLER builds the core
+# for a host with pages over 4 KiB (Apple silicon), which refuses the handler
 cflags="-fvisibility=hidden -I$mb/extern/emulibc -I$mb/source/guest/include -I$mb/extern/jsmn \
-	-Wall -mcmodel=large -mstack-protector-guard=global -fno-pic -fno-pie -fcf-protection=none -O2 -DNDEBUG -std=c11"
+	-Wall -mcmodel=large -mstack-protector-guard=global -fno-pic -fno-pie -fcf-protection=none -O2 -DNDEBUG -std=c11 \
+	${SYNTH_CFLAGS:-}"
 
 # guest: the machine (synthcore.c, identical to flavors a/b) + the wbx wrapper
 $musl_gcc -c $cflags -o "$here/synthcore.o" "$here/../native/synthcore.c"
 $musl_gcc -c $cflags -o "$here/synth_wbx.o" "$here/synth_wbx.c"
 $musl_gcc -o "$here/synth.wbx" $cflags -static -no-pie -Wl,--eh-frame-hdr,-O2 \
 	-T "$mb/source/guest/linkscript.T" "$here/synth_wbx.o" "$here/synthcore.o" "$emulibc_o" -lgcc
+# finished as every guest is: on aarch64 the machine keeps the thread pointer
+# in a word of memory, and miniBox refuses an image that still reads TPIDR_EL0
+python3 "$mb/source/guest/wbx-tp-rewrite.py" "$here/synth.wbx"
 echo "built synth.wbx"
 
 # tester: links the miniBox host (headers live in source/host after the flatten)

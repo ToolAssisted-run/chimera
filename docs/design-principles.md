@@ -12761,6 +12761,19 @@ models' tests: a save writes no greenzone, the close does, and an edit closed
 without saving leaves no state after its frame. The witness: a tool's project
 output made into a zip that opens, and one with a bad line refused.
 
+## Most users want the x64 package (user-decided, 2026-10-18)
+
+**What was decided.** Now that a core release can carry an x64 and an arm64
+package, and Chimera's release an arm64 Linux bundle beside the x64 ones,
+every place that offers both says which to take: most likely x64, and arm64
+only for someone who knows they are using an arm64 device. One package of a
+core goes in the `Cores` folder, not both. The words are the SRB2 core's
+(P-AS/chimera-core-srb2 b3f6dcc, 2026-10-10), which said it first.
+
+**Where.** The notes `tools/publish-core.sh` writes for every core, above the
+table of packages, only when the release has an arm64 package; Chimera's own
+release notes, above the table of bundles; the README's "Getting a build";
+`docs/core-manager.md`.
 
 ## A full greenzone thins a little every frame, its merges on a helper (2026-11-04)
 
@@ -12887,6 +12900,591 @@ window there with TAStudio open.
 
 Nothing in Chimera's own source changed: two roster rows and the README's
 rows.
+
+## macOS on x86-64: the guest's gs is swapped at every boundary (user-decided, 2026-11-03)
+
+Decided: Chimera builds for macOS on x86-64 (on an Apple silicon Mac it runs
+under Rosetta 2), from the same meson build, given `extern/meson/macos-x86_64.ini`.
+Only x86-64 is built.
+
+Why it needed a decision. A miniBox guest reads its context at `gs:0x18`, and
+miniBox's entry code keeps the thread's stack limits at `gs:0x8` and `gs:0x10`.
+On Linux nothing else uses `gs`, so miniBox points it at a block of its own for
+the life of the thread. On macOS `gs` is the operating system's: libc finds the
+thread's data through it, and `gs:0x18` is the Mach thread port (measured:
+`gs:0` is the `pthread_t`, `gs:0x18` read 0x103). `rdgsbase` and `wrgsbase` are
+illegal instructions there, Rosetta 2 included. Changing where a guest looks
+would change miniBox's machine and rebuild every core, so it was not done.
+
+What was decided instead (the owner chose this over changing the guest's
+convention, and over a port with no guests): the thread's `gs` base is swapped
+at each boundary, to the guest's block while guest code runs and back to the
+operating system's whenever host code runs, with the system call libsystem makes
+for `_thread_set_tsd_base` (machine-dependent call 3). Measured under Rosetta 2
+on an M1 (macOS 27): setting the base works, the old base restores exactly, and a
+swap and its return cost 534 ns. The base the operating system gave a thread is
+`&pthread_self()->tsd[0]`; it is found by storing a value under a pthread key
+and looking for it, not by an offset.
+
+Where it swaps (miniBox, `guarded.S`, `host.c`, `context.c`, `tripguard.c`):
+the guest's entry and its landing; the syscall dispatcher; the wrapper around a
+callback from the guest to the host; the two fault trampolines; and a wrapper
+around every signal handler, which puts the handler on the operating system's
+`gs` and, on return, resumes with the `gs` the interrupted code had (or the
+guest's block, when the handler pointed it at a fault trampoline). `%fs` swapping
+stays off on macOS, so a guest with `%fs`-direct thread storage (a Rust guest)
+cannot run there.
+
+Also: the memory is built from `mach_vm_remap` views (no memory file on
+macOS), a protection fault arrives as `SIGBUS`, the stop signal is `SIGUSR2`,
+and the engine's GPU bridge uses Apple's CGL (OpenGL 4.1, so the entry points of
+4.2 and later are refused).
+
+Tested (x86-64, under Rosetta 2, Apple M1, macOS 27): miniBox's 13 unit tests
+and the engine's 33 tests pass. Four published cores (quickerNES, Mesen, Snes9x,
+Genesis Plus GX) ran 200 to 300 frames each with the whole machine saved and
+loaded around every frame; two runs of quickerNES gave identical memory, and so
+did the run with the round trip. The window (Qt 6.12, from Qt's own download)
+plays Super Mario Bros. through quickerNES at 61.5 frames a second, drawn by Qt's
+software renderer, offscreen. The window's tests pass except the 13 that need the
+synthetic test core (built with the Linux guest toolchain). Two GPU-bridge test
+sections skip what OpenGL 4.1 does not have, and the Alt-letter check of the key
+filter test is skipped on macOS, where Qt has no menu mnemonics. Not tested: a
+real Intel Mac, the window on a screen, a GPU renderer.
+
+## ffmpeg on macOS is the same 4.4.1, from the Internet Archive's copy (user-decided, 2026-11-03)
+
+Decided: a macOS (x86-64) build of Chimera gets the ffmpeg 4.4.1 the Linux and
+Windows bundles have, rather than a newer one, so that the three encode alike.
+
+The project's own ffmpeg source (TASEmulators/ffmpeg-binaries) has no macOS
+build. The owner chose evermeet.cx's static Intel build, which the ffmpeg site
+links to. evermeet.cx's list for 4.4.1 gives a 23,885,067 byte zip, but that
+file is no longer served: asked for, it was a 404, and the site's own link for it
+redirects to another host, which answers 403. The owner then named the Internet
+Archive's copy of the very file
+(web.archive.org/web/20211106005402/https://evermeet.cx/ffmpeg/ffmpeg-4.4.1.zip),
+which is 23,885,067 bytes, as listed.
+
+Pinned in tools/fetch-ffmpeg.sh as for the other platforms, the archive and the
+binary each by their sha256: archive d7f3ea44...cdb3, binary 996952e6...dbfb.
+The binary is a Mach-O x86-64 executable, `4.4.1-tessus`, built with
+--enable-gpl --enable-version3 and not --enable-nonfree. Every encoder the
+presets name is in it (libx264, libx264rgb, utvideo, ffv1, aac, flac, libmp3lame,
+libvpx, libxvid, libtheora, libvorbis, pcm_s16le). Its signature was not
+checked (evermeet.cx's detached signature was not fetched), so what vouches
+for it is the hashes of the copy that was looked at.
+
+The script was made to run on a Mac too: `shasum` where there is no `sha256sum`,
+no bash 4 syntax, and `unzip` for a .zip.
+
+Tested (Apple M1, macOS 27, the x86-64 build under Rosetta 2): the script
+downloads, checks both hashes and unpacks it; the window, run with a Lua script,
+encoded 120 frames of Super Mario Bros. through quickerNES to an H.264 and AAC
+Matroska file, which ffmpeg reads back as 2.04 s at 256x240. Not tried: the
+other presets, and an Intel Mac.
+
+## On macOS what a person keeps is in ~/Library/Application Support/Chimera (user-decided, 2026-11-03)
+
+Decided: on macOS the folder Chimera keeps "beside the program" on Linux and
+Windows - settings.json, Cores, Firmware, and the base of Config > Paths, which
+Movies, Tools, Lua, Themes, Reports and the rest are relative to - is
+~/Library/Application Support/Chimera, as other Mac programs keep theirs. Linux
+and Windows are as they were.
+
+Why. The app is one signed folder, and what was kept beside the program was
+inside it: after its first run (settings.json and Movies/ written there) the
+app's signature no longer verified strictly ("a sealed resource is missing or
+invalid"). It is also where a Mac person looks, and it is the folder that
+already held the projects and the recovery files.
+
+What stays in the app: the helper programs and ffmpeg (Contents/MacOS/bin), the
+libraries, and the themes that ship (Contents/MacOS/Themes). A themes folder
+with no theme in it - the person's, at first - shows the shipped ones. The
+window run from a build folder is the same, so there is one place for cores.
+
+Tested (x86-64 under Rosetta 2, Apple M1): the app, run with no --core, opened a
+project on the quickerNES package found in Application Support/Chimera/Cores,
+wrote settings.json and Movies/ there and nothing into itself, and its signature
+verified after the run. The window's tests give the same 47 passes as before. Not
+tried: a person's own themes folder, a Linux or Windows build after this change
+(the change is under `#ifdef __APPLE__`), and an Intel Mac.
+
+## The macOS build asks for 14.4, not for the Mac it was made on (2026-11-03)
+
+Found while making CI: no deployment target was set, so every binary asked for
+the version of the Mac that built it, macOS 27.2 here (otool: minos 27.2), and
+the app's Info.plist said 11.0. Such a build starts on no other Mac, and an Intel
+Mac stops at macOS 26. It is now 14.4, Qt 6.12's own minimum, in the cross file,
+the nested cmake builds and Info.plist.
+
+At 14.4 Apple's C++ library lacks the floating-point std::from_chars and
+std::to_chars (macOS 26 and later). The four places that use them (the
+engine's plain_numbers.hpp; json.cpp and watch_values.cpp in the view models)
+have a macOS path that uses strtod_l and snprintf_l in the "C" locale, so the
+text is the same and still follows no locale (issue 244). The shortest-digits
+writer was compared with std::to_chars over 801,056 values (random bit patterns
+of doubles and floats, short decimals, every power of ten, edge values) in plain
+and scientific form, and agrees on all. Linux and Windows still use the standard
+functions: the change is under __APPLE__.
+
+Tested (x86-64, Apple M1): every Mach-O in the rebuilt app asks for 14.4 at
+most; the engine's tests (test_plain_numbers among them) and the window's tests
+give the same 47 passes. Not tried: the app on a Mac older than macOS 27 (the
+only one at hand is 27.2), and an Intel Mac.
+
+## What the tests with the synthetic core found on macOS (2026-11-04)
+
+The macOS CI job ran the tests that need the synthetic test core (the package a
+Linux job builds), which had not run on a Mac before. What they found:
+
+- **A race in a test, not the port.** `view models` crashed about three runs in
+  five (SIGSEGV or SIGABRT in `lua_load`, a new closure with a garbage upvalue).
+  A Lua library built to abort when two threads are in one state at once showed
+  it: `luaParity` gave the machine thread a show-future turn that asks Lua, and
+  ran its own scripts on the test's thread, so both were in the state together.
+  The test now runs scripts on the machine's thread, as the window does. Linux
+  has the same race; timing hid it there. Five runs with the checking library
+  after the fix: no crash, no concurrent entry.
+- **macOS has no /proc.** `processStarted` (whether a recovery folder's writer
+  still runs) read `/proc/<pid>/stat`; on a Mac it now asks `proc_pidinfo`.
+- **A clock counted in 128 bits.** The cache manager kept "never used" as the
+  file clock's least time cut to 64 bits; Apple's library counts that clock in
+  128, whose least cut to 64 is 0, a date. It is now the least of int64_t.
+- **Names and limits.** A shared memory name may have 31 characters on a Mac (a
+  test's had 35); the gamepad test's stand-in SDL is `libSDL2.dylib`, found by
+  `DYLD_LIBRARY_PATH`; the settings test checks Application Support on a Mac,
+  whose folder `CHIMERA_DATA_HOME` now decides too.
+- **Timing.** A test slept a tenth of a second for a picture, which a Mac under
+  Rosetta 2 has later: it waits for it now. Window tests that measure for a
+  second spent it starting up when run side by side: CI runs them one at a time.
+- **miniBox (bce3c5a).** The escape's call into the gs swap wrote over the stack
+  bounds it then restores, and a thread with no gs block got one with no magic
+  word. Neither caused the crashes; both are fixed.
+
+Tested (x86-64 under Rosetta 2, Apple M1, macOS 27, the synthetic core from the
+CI's Linux job): all 59 tests pass, run one at a time; miniBox's 13 unit tests
+pass. Not tried yet: the CI run with these changes.
+
+## Recording mode is the window's alone, and two tests wait instead of sleeping (2026-11-04)
+
+Found by the macOS CI run on an Intel runner, after the round above:
+
+- **A project could record nothing with recording mode on.** The window turns
+  recording mode off as a project opens (projectSwitched, before the window says
+  the project is open), and the machine's thread turned its own copy off again
+  when it started the project's session. A person who turned recording mode on in
+  between had it on in the window and off in the machine, and the frames they
+  played were not recorded. The machine's thread no longer sets it: its copy
+  follows the window's. Seen as the view models' tests' recording-mode check
+  failing now and then on a slow Mac.
+- **The sound-rate test counted before the last frame's sound was sent** on the
+  slower runner (669.6 sample pairs a frame against 675.3): it waits until the
+  count stops moving.
+- **The tests' scripts use GNU timeout**, which macOS 15 does not have: the
+  workflow installs Homebrew's coreutils. (macOS 27 has its own.)
+
+Tested (x86-64 under Rosetta 2, Apple M1): the view models test nine times since,
+all 3,081 checks passing, four of them with the Lua library that aborts on two
+threads in one state. A fifth run with it stopped once on the main thread
+holding the state with no Lua running: that library counts Lua's lock calls, and
+a Lua error leaves one uncounted, so it was not taken as a race; five runs
+without it then passed.
+
+## Six platforms: x64 and arm64 on Windows, Linux and macOS (user-decided, 2026-11-04)
+
+**What was decided.** The owner widened pull request 309 (P-AS's "Chimera
+builds and runs on aarch64 Linux") into a three-by-two matrix: Chimera built,
+tested and shipped for x64 and arm64 on Windows, Linux and macOS. It stays one
+pull request, merged only when all six build and pass their tests in CI. The
+first step is the build for all six; the second, machines that run the tests.
+P-AS's macOS work is brought in, not redone (owner's choice): the x86-64 port
+merged whole, the Apple silicon miniBox commits applied onto current miniBox
+main with P-AS as their author (they were made on an earlier form of the
+aarch64 port). miniBox's half is on its matrix branch (draft PR 12), and this
+branch's submodule points there.
+
+**How each is built.**
+- Linux: on the machine it is for (x64 on ubuntu-latest, arm64 on an arm
+  runner), as before.
+- macOS: on the kind of Mac it is for, each with its cross file
+  (extern/meson/macos-x86_64.ini, macos-aarch64.ini); the app script keeps the
+  build's half of Qt's two-CPU frameworks.
+- Windows x64: cross-built on Linux with mingw-w64's GCC, as before.
+- Windows arm64: cross-built on Linux with llvm-mingw (clang and libc++;
+  mingw-w64's GCC has no arm64 Windows target), release 20261020, checked by
+  its SHA256 (tools/fetch-llvm-mingw.sh; the owner allowed running it here).
+  Qt is built from source with it, as the x64 Qt is with GCC
+  (tools/build-qt-windows.sh ... arm64), and so is ffmpeg
+  (tools/build-ffmpeg.sh windows <dir> arm64; x265 without its assembly, which
+  assumes an ELF or Mach-O assembler).
+- The nested builds (zstd, SDL2, OpenAL Soft) take the cross file of the OS
+  and the CPU being built; they took the OS's alone, which would have given
+  the Apple silicon build x86-64 libraries.
+- The release builds all six and publishes them together, or none: Windows
+  arm64 and the two Mac apps are jobs of their own beside the arm64 Linux one.
+  Its notes say which to take: on Windows and Linux most likely x64, on a Mac
+  arm64 for Apple silicon and x64 for an Intel Mac.
+
+**The GitHub runners** (public repositories, 2026-11-04): ubuntu-latest and
+ubuntu-26.04-arm, windows-2025 and windows-11-arm, macos-15-intel and macos-15.
+None has a graphics card.
+
+**Measured.** The Windows arm64 bundle (95 MB) builds here: every program and
+library an arm64 Windows file that needs only Windows' own DLLs and the ones it
+carries (Qt, libc++, libunwind). It has not run anywhere yet: this computer's
+Windows is x64.
+
+## Chimera's tests run on Windows: built on Linux, run on a Windows machine (user-decided, 2026-11-04)
+
+**What was decided.** Until now no test of Chimera ran on Windows in CI, x64
+included: the engine's tests were built for the machine that builds them, and
+the Windows build is made on Linux. The owner chose to test what ships: the
+Windows build is made as the release makes it (on Linux, mingw-w64's GCC for
+x64, llvm-mingw's clang for arm64), and its tests are run on a Windows machine
+of its CPU, rather than a second build on Windows with other compilers.
+
+**How.** The engine's tests are built for every system now (meson.build), the
+Windows cross builds included. tools/export-tests.py packs a build's tests -
+meson's own list of them and every file they name - into one folder, with
+tools/run-tests.py, which runs them on Windows as meson test would (each
+program with its arguments, folder, environment and timeout) and fails if one
+fails. CI's windows job builds each CPU on Linux (since 2026-11-05 both on
+an x64 runner, with the synthetic test core of its CPU built by a job of its
+own on a Linux runner of that CPU) and windows-test runs the pack on
+windows-2025 and windows-11-arm. The one engine test that cannot be
+written the same on Windows - a write failing because of the process's file
+size limit, which Windows has not got - is Linux's and macOS's only.
+
+**Measured, the first run on Windows** (x64, this computer's Windows 11, from
+a pack made here): 31 of the 34 tests pass. Three failed, and none was a
+fault of Chimera's own on Windows:
+
+- the media folder's listing (test_media.cpp): the test made LONGNAME~1.TXT
+  beside a long name whose short name Windows had already made
+  LONGNA~1.TXT. The test now makes its short-looking names first.
+- the state history's tests (test_state_history.cpp): a file's size read
+  through std::filesystem lags behind writes still open on Windows, so the
+  test reads the size through the open file; and a test removed its spill
+  folder while the history still held a file in it, which Windows refuses.
+  The tests let go of the file first, and retry a removal for up to five
+  seconds while Windows finishes closing.
+- the view models' test passed all its checks and then crashed as the
+  process ended, in the C runtime freeing thread data inside libchimera.dll.
+  The tests had been built with the cross files of the engine-only build
+  (GCC's "win32" thread model, the C++ runtime linked into each DLL), not
+  the release's (the "posix" thread model, the C++ runtime as DLLs shared by
+  every module). Built as the release builds it, the crash is gone.
+
+So the windows job builds with the release's cross files
+(extern/meson/mingw-w64-qt.ini and mingw-w64-qt-aarch64.ini), and the pack
+carries the compiler's runtime DLLs the programs load (export-tests.py
+--runtime), as the release's bundle does. The view models' test also found
+the headless runner by a name without ".exe", so its compile step was
+skipped on Windows; meson now gives it the runner's real file name.
+
+Measured after these fixes, on this computer's Windows 11 (x64): 34 of 34
+pass, the view models' test 3038 checks with the compile step run.
+
+## Thread-local variables on an Intel Mac: patched as the core loads (user-decided, 2026-11-04)
+
+**The problem.** A core's code reaches its thread-local variables (C's
+`_Thread_local`, C++'s `thread_local`, Rust's, and the C++ runtime's own)
+through the x86-64 register %fs. On Linux and Windows miniBox gives a core its
+own %fs while it runs. macOS on Intel gives a program no way to set %fs at
+all, so a core with thread-local variables crashed at its first one. 17 of the
+30 cores installed on the development machine have them (DuckStation, PCSX2,
+Dolphin, ares, Godot, Ruffle, melonDS, Xenia and others).
+
+**What was decided.** The owner chose to patch them as the core loads, over
+refusing those cores on an Intel Mac or dropping Intel Macs from the six
+platforms. In miniBox (9a1e40f, MACHINE-SPEC "TLS"):
+
+- x86-64 cores are compiled with `-mno-tls-direct-seg-refs`, so their code
+  reaches a thread-local variable only by first loading the thread pointer
+  (`mov %fs:0x0, reg`), never at an offset from %fs;
+- the guest toolchain lists every such load in the linked core, in a section
+  the core never loads (`.wbx_fs_sites`); nothing else in the file changes,
+  so Linux and Windows run it as before;
+- on an Intel Mac miniBox checks the bytes at each listed address and turns
+  each load into `mov %gs:0x48, reg`. There %gs already belongs to the core
+  while it runs, and miniBox keeps the running guest thread's thread pointer
+  in that word;
+- an Intel Mac refuses, saying why, a core with thread-local variables that
+  has no list (built before this) or that reaches them some other way.
+
+**What it costs.** Cores must be built again with this miniBox to run on an
+Intel Mac. Some need more than that: Godot (2678 other accesses), melonDS (88)
+and Xenia were built without the flag; and every core that draws through the
+GPU bridge carries Mesa 24.0, whose hand-written x86-64 GL dispatch
+(`glapi_x86-64.S`) reads %fs at an offset. Mesa uses it whenever the guest's
+cross file says Linux, so those cores need it turned off in their Mesa setup.
+
+**Measured.** On GitHub's Intel Mac, miniBox's threads test (thread-local
+variables zeroed and initialised, in several guest threads) passes with the
+loads patched; before, every guest with thread locals crashed reading address
+0. A guest's call through a null pointer is now the guest's death there, not
+the process's: the fault handler asked the thread's %gs whether it was in a
+guest call after the handler had already put the OS's %gs back (miniBox
+18df97c). Not yet tried: a real core on an Intel Mac.
+
+## What the first Apple silicon and Windows on arm64 test runs found (2026-11-04)
+
+- **A block's memory began inside a page on Apple silicon.** miniBox's macOS
+  memory layer keeps each block's size in a header in front of the block. The
+  header was 4 KiB (the machine's page); Apple silicon's pages are 16 KiB, so
+  a view of the block began 4 KiB early, with the header as the core's first
+  bytes. A write there changed the size, and closing the block unmapped
+  memory that was not its own, malloc's among it; macOS killed the process
+  for that at a random later moment ("vm_reclaim: Killing ... due to copy I/O
+  error"). The header is one OS page now (miniBox 045c73b). Intel Macs have
+  4 KiB pages and were not hit.
+- **A core that exports GuestFaultHandler does not run on Apple silicon.**
+  miniBox refuses it on a host whose pages are larger than 4 KiB, saying so:
+  the core waits for faults on single 4 KiB pages, which such a host cannot
+  give it. Of the 30 cores installed here, RPCS3 and Xenia export it. The
+  synthetic test core does too (for the test that memory tools never run a
+  core's code), so the macOS job builds it for Apple silicon without the
+  handler (SYNTH_NO_GUEST_FAULT_HANDLER); that one test runs on Linux.
+- **The view models' test was given packages that were never built.** The
+  extra synthetic packages it opens are made when meson test runs, and the
+  Windows tests are packed after a plain build, so each test that opens one
+  waited out its time and the whole test ran past its limit on Windows on
+  arm64. export-tests.py builds the tests' prerequisites first.
+- **On the Intel Mac runner a fault costs 26 to 44 us** (2.3 us on Linux
+  here, 1.8 us on Apple silicon), so miniBox's fault tests have 300 seconds
+  on macOS, and the concurrent one runs 300 rounds there instead of 1500.
+
+## The Mac tests run with timer coalescing off (2026-11-05)
+
+The view models' test measures the throttles in real time: so many frames in
+half a second by the clock, by the sound. On GitHub's macOS runners those
+checks failed, and the numbers had a pattern: at 100% speed the clock
+throttle ran 19 frames in half a second on Apple silicon (27 on Intel) where
+it runs 30, yet exactly 121 at 400%. The throttle aims each frame at a fixed
+time and stops catching up when it falls more than four frames (67 ms)
+behind; at 400% those 67 ms are sixteen frames.
+
+Measured on the runners: a sleep of 16.7 ms woke 91 ms late (median) on
+Apple silicon and 58 ms late on Intel, because macOS coalesces the timers of
+a background process, which a CI job is. With coalescing turned off
+(`sysctl kern.timer.coalescing_enabled=0`, which the runners allow) it woke
+0.04 ms and 0.15 ms late, and every unit test passed on both Macs. So the
+macOS job turns it off before the tests: they measure Chimera, not a
+throttled runner. Linux here: 0.10 ms.
+
+Not decided: a Mac app in the background can be throttled the same way (App
+Nap), which would slow a run left playing behind another window.
+
+## A pull request that changes how the bundles are made builds them as a trial (2026-11-05)
+
+The release workflow builds the six downloads, but only from main, on its
+schedule or by hand, and always to publish them. So a change to how they are
+made (a build script, a cross file, the workflow) was first tried by the
+release that shipped it: the Windows arm64 bundle and the two Mac apps of
+pull request 309 had never been built by GitHub before it would merge.
+
+Now a pull request that touches those files (the release workflow, the
+tools/build-*, stage-* and fetch-* scripts, Qt's patches, the meson cross
+files) runs the release workflow as a trial: every bundle is built as a
+release builds it, the six files are kept as the run's artifacts for a week,
+and nothing is published. A pull request's token could not publish anyway. A
+newer push to the pull request stops the trial before it, and trials never
+queue with real releases.
+
+The first trial of a branch builds Qt for Windows on arm64 from source,
+which takes hours; it is cached after that.
+
+Also: tools/build-app-macos.sh now tries each Xcode 26 in /Applications,
+newest first, until one compiles the app's icon. On the Apple silicon runner
+the newest (26.3) crashed on macOS 15, and the release would have shipped
+the plain fallback icon without saying so; the release now fails when the
+light and dark icon is missing, as CI does.
+
+## The window's tests run on Windows too (2026-11-05)
+
+Until now CI ran the engine's and the view models' tests on Windows, but not
+the window's: CI's Windows build had no Qt, and the window's tests that a
+Python script drives were left out of the pack. So nothing showed whether
+the window starts on Windows, on either CPU, before a release; the arm64
+bundle's Qt, built from source, had never run anywhere.
+
+Now:
+
+- CI's Windows build has the window, built against the Qt the release ships
+  for that CPU. CI and the release share that Qt's cache (the same key and
+  folders): whichever runs first after Qt's build changes builds it, which
+  takes hours, and the other finds it. For this the release's x64 cache is
+  two now, the Linux Qt and the Windows Qt, as they change with different
+  scripts. Both Windows builds run on x64 Linux runners, as the release's
+  do; the arm64 one takes the synthetic test core from a job on an arm64
+  Linux runner, as the macOS workflow does.
+- The window is staged as the release's bundle is, and the pack carries it:
+  a test given the build's chimera.exe is given the bundle's (the build's
+  cannot start without its Qt beside it), and every test finds Qt where the
+  window does, in the bundle's lib folder. So the window's tests run the
+  program a person downloads.
+- The tests a Python script drives are packed, and run by the Windows
+  machine's own Python; the repository's modules a script imports go with
+  it. headless.py kills a run with Popen.kill, as Windows has no SIGKILL.
+- The theme test takes the window's QML folder as an argument, not a path
+  built into it: the build machine's path is not there on Windows.
+- Qt for Windows is built with its test library now (it was switched off):
+  ten of the window's tests are QtTest programs and could not be built for
+  Windows without it. No program the bundle carries uses it, so the bundle
+  does not carry it.
+
+**Measured** on this computer's Windows 11 (x64), from a pack made here
+against the Qt built 2026-10-22 (without the test library): the 31 engine
+tests, the package tests, the view models' test, theme (24 of 24; 12 failed
+before it was given the QML folder), translations, key names, single
+instance, and the four tests that run the whole window (window loads, Lua
+config names, TAStudio queries, TAStudio branches) pass. The window tests
+were started by hand, as this computer's Windows has no Python. Not yet run
+on Windows: the five other tests a Python script drives (on-screen text
+size, command line, headless, New Project's window, window drawing), the ten
+QtTest programs, and everything on arm64; CI runs them.
+
+**CI at 552d998a**: 50 of the 57 tests passed on both CPUs (windows-2025
+and windows-11-arm), the same seven failing on both. Each was run again on
+this computer's Windows from CI's own pack, with Qt's warnings shown:
+
+- Four QtTest programs (binding box, roll table, Emulator menu, Core-Specific
+  Tools menu) could not load their window: "module QtQuick.Controls.Windows
+  is not installed". They set no style, and Qt's default on Windows is its
+  Windows style, which the bundle does not carry (only Fusion and Basic; the
+  window's own style is built on Fusion). They now set the window's style, as
+  the other tests of its controls already did.
+- The menus test and the window drawing test (TAStudio's input rolls) drew
+  every letter as a box: on Windows, Qt's offscreen platform, which the
+  window's tests use, reads fonts from one folder, Qt's own fonts folder, and
+  Qt ships none. With no text to measure, the menu was 514 pixels wide in a
+  400-pixel window, and TAStudio's columns pushed the script's green column
+  out of sight. Pointed at Windows' own fonts, it drew in a narrow one (Qt's
+  default, Helvetica, is not there), and the menu's longest row stayed under
+  the 200 pixels the test needs it to pass; at all of DejaVu's, in DejaVu
+  Serif. The pack now carries DejaVu Sans and DejaVu Sans Mono, the fonts
+  the Linux tests draw with, and nothing else, and the tests use that folder:
+  the menu was 287 pixels wide on Windows (286 on Linux), TAStudio's picture
+  was Linux's, and both passed. The pack also has Qt send its warnings
+  to the test's output: on Windows they went to a debugger, so CI's log said
+  only "window != nullptr".
+- The command line test copied chimera.exe alone to see the settings file
+  written beside it; Windows' chimera.exe starts the window from its lib
+  folder, so the copy did not start. The whole bundle is copied there now.
+  Its next check, a program folder that cannot be written, is skipped on
+  Windows, and says so: the settings would go to the person's own folder,
+  which Qt asks Windows for and no variable moves, so a run would write the
+  settings of whoever runs the test.
+
+The encode of window drawing (Encode Video, three frames through ffmpeg)
+was skipped, and said so, as the pack's bundle had no ffmpeg. CI's Windows
+jobs now build the ffmpeg the release ships, sharing the release's cache
+(whose x64 one is two now, the Linux and the Windows ffmpeg), and stage it
+in the bundle. Measured on this computer's Windows, with the release
+trial's x64 ffmpeg put in CI's pack: the encode wrote three frames of the
+picture area's 512x480, and all twelve of window drawing's checks passed.
+
+**client.sleep slept short on Windows.** CI at cd2b6739 failed one check of
+the view models' 3046 on windows-2025: `client.sleep(30)` then
+`client.exactsleep(20)` took under 50 ms. The plain sleep was
+std::this_thread::sleep_for, which with mingw's thread library is Windows'
+Sleep, and Windows documents that a sleep of between one and two ticks of its
+system clock (15.6 ms unless a program asks for finer) may end after one. It
+now sleeps again until the time has passed by the steady clock, as the exact
+one already waited it out. On this computer's Windows, 40 sleeps of 30 ms
+built the same way: the shortest was 29.91 ms before, 30.00 ms after; the
+runner's clock is coarser, and the earlier passing runs were luck.
+
+## The Mac icon is compiled by Apple's actool; Apple silicon builds on macOS 26 (user-decided, 2026-11-05)
+
+On GitHub's macOS 15 Apple silicon image, the actool of every Xcode 26 it has
+(26.0 to 26.3) died while compiling the app's icon: its asset agent wants a
+MediaToolbox symbol only macOS 26 has. Two fixes came at once:
+
+- P-AS's: the macOS workflow builds P-AS/actool, a clean-room rewrite of
+  actool in Rust (a fork of viraptor/actool), at a fixed commit and compiles
+  the icon with it. It passed in CI.
+- Ours: the Apple silicon jobs, in the macOS workflow and the release, run on
+  GitHub's macos-26 runner, where Apple's own actool can run.
+
+Together, CI would have compiled the icon with one tool and the release with
+another. The owner chose Apple's actool on macOS 26 for both, so CI tests the
+icon the release ships, made by the tool whose format it is. The app still runs
+on macOS 14.4 and later. tools/build-app-macos.sh keeps P-AS's `ACTOOL=<path>`,
+to use another actool; no workflow sets it.
+
+Found on the way: the release's icon check passed on an app without the icon.
+In the trial at 69b90628 every actool failed and the Apple silicon app got the
+plain icon drawn from icon.svg, but a failed actool had left an Assets.car in
+the app, and the check only looked for that file. The script now removes
+Assets.car before each actool and when it falls back, and the release also
+checks that Info.plist names the icon, as CI does. The trial before it said
+Xcode 26.0 compiled the icon on the same image; whether it did, or exited
+without an error beside a leftover file, is not known.
+
+**Measured** at 552d998a, in the macOS workflow and the release trial: on
+macos-26, Apple's actool of Xcode 26.6 (the image's own) compiled the icon at
+the first try; on Intel (macos-15), Xcode 16.4's failed and Xcode 26.3's
+compiled it, the Assets.car of the one that failed removed in between. Both
+apps passed the icon checks, and every test passed on both Macs.
+
+## The six builds in the README, and a page of their own (2026-11-05)
+
+The README, the release's notes and the documents said Chimera was built for
+Linux and Windows. With all six builds passing (504dc89d), they say what the
+six are, and docs/platforms.md has the detail: which to download, how each
+is built, what is tested on which GitHub machine, which cores run on each,
+and what has been tried on a person's machine.
+
+- Which to take, everywhere it is offered (the README, the release's notes,
+  the notes publish-core.sh writes for every core, docs/core-manager.md): on
+  Windows or Linux most likely x64, arm64 only on a device known to be arm64;
+  on a Mac, arm64 for Apple silicon and x64 for an Intel Mac, as the
+  release's notes already said of the bundles (2026-11-04).
+- Where cores go on a Mac (`~/Library/Application Support/Chimera/Cores`),
+  and that macOS asks before opening an app signed by no developer.
+- What runs where, said plainly: on 2026-11-05 none of the 62 official
+  cores' dev releases had an arm64 package (SRB2, a third-party core, has
+  both), so an arm64 build runs almost no cores yet; an Intel Mac refuses a
+  core with thread-local variables until it is built again with this
+  miniBox; Apple silicon refuses one that exports GuestFaultHandler.
+- Older text corrected on the way: Encode Video's ffmpeg section still
+  described the macOS ffmpeg fetched from the Internet Archive (it is built
+  by tools/build-ffmpeg.sh now) and a Windows ffmpeg for x64 only; the MCP
+  server's page put chimera-mcp in `dll/` on Windows (it is in `bin\`); the
+  README's crash files are Windows' alone (Windows Error Reporting).
+
+Found on the way:
+
+- **The Mac app carried no LICENSES.md**, only Chimera's licence and
+  ffmpeg's, though it ships Qt (LGPL 3), SDL2, OpenAL Soft and the rest, as
+  the other bundles do. tools/build-app-macos.sh now writes it with
+  tools/bundle-licenses.py, as tools/build-bundle.sh does, into
+  `Contents/Resources`, and refuses to finish without it and Qt's LGPL text.
+  Qt's texts come from Qt's source archives, so both Mac workflows fetch them
+  (tools/fetch-qt-source.sh, cached, its hashes checked with Homebrew's GNU
+  sha256sum; the script is unchanged, as its hash is in the key of every Qt
+  cache, and a change would build all four Qts again). The Qt paragraph says the Mac's Qt is Qt's own
+  build, unchanged but for the other CPU's half, as the app does not use
+  Qt built here. Checked on Linux with a stand-in app folder: the texts and
+  the paragraph are written; the Mac workflows have not run it yet.
+- **ffmpeg's licence was said to be in `bin/`** in the Linux bundle's
+  LICENSES.md, where it is in `dll/`; the path is now the file's own.
+- **The Core Manager is in the Tools menu** of the Qt window; the documents
+  and the notes every core's release carries said File.
+- **The sandbox's log on a Mac.** miniBox writes `minibox-diag.log` when a
+  core dies, in the folder the program runs in unless `MINIBOX_LOG` names
+  another file. For an app Finder starts that folder is the disk's root,
+  where nothing can be written, so the log was lost. The Mac window now sets
+  `MINIBOX_LOG` to the log in the data folder when the environment has not
+  set it (the helper programs it starts inherit it), and Help > Report an
+  Issue looks for the file `MINIBOX_LOG` names before the folders it looked
+  in. Linux and Windows are unchanged. Tested: the view models' test sets
+  `MINIBOX_LOG` and checks the report lists that file (it failed with the
+  report's change taken out); on Linux the meson tests passed 63 of 63 and
+  the witness 125 of 125. The Mac part is checked by the Mac builds
+  compiling it; no core was made to die on a Mac.
 
 ## A held key clicks a button once; TAStudio's lists pick many rows (2026-11-04)
 
@@ -13188,6 +13786,80 @@ threads their own.
 Tested: main with miniBox 3848e4e, on Linux: the meson tests passed 64 of 64
 and the witness 125 of 125; the Windows build (mingw-w64, x64) compiled.
 
+
+## Each package says where it runs (user-decided, 2026-11-05)
+
+A core's package now lists the systems it runs on, in `runsOn` in its
+`waterbox.config`: each one of `windows`, `linux` or `macos`, a dash, and
+`x86_64` or `aarch64`. Chimera runs a package only on a system it lists. It
+refuses a package that lists none, or that lists a name outside the six.
+
+- **Why.** Ikemen GO cannot run on an Intel Mac. Its Go code reads its
+  thread-local variables in 2,320 places the Intel Mac loader cannot rewrite
+  (`mov %fs:(%r14),%r14`, written by Go's own compiler). The owner's answer
+  was not to special-case it: "Every core distributable establishes which
+  compatibilities in the 2x3 matrix they support. Chimera offers an interface
+  for core distros to explicit this. Chimera holds zero information of any
+  particular core."
+- **Required, not assumed.** A package that says nothing is refused rather
+  than taken to run everywhere (the owner's choice). Every core is built
+  again with the list before the platform matrix is merged.
+- **Where it is checked.** The engine, `ce_package_runs_here`, so the window,
+  the headless runner and the tests refuse alike: a session will not open
+  such a package, and Tools > Core Manager lists it with the reason. The
+  contract tests (`test-packages`) fail a package that does not say, or names
+  something else. One `waterbox.config` serves both CPUs' packages of a core,
+  so the list may name the other CPU's systems too. `publish-core.sh` refuses
+  a package that lists none for its own CPU.
+- **Tested.** `engine_package` checks this machine's own name, a package for
+  another system (refused, this system named), none, an empty list and a
+  misspelt name. `test-packages` checks its rule on three declarations. Each
+  was broken once and seen to fail: three tests failed. Then all 64 tests
+  passed, the witness 125/0, and both Windows builds compiled.
+
+## File names say x86_64 or aarch64 (user-decided, 2026-11-05)
+
+A core's package is published as `<id>-<version>-x86_64.chimeraCore` or
+`<id>-<version>-aarch64.chimeraCore`, and Chimera's own downloads as
+`chimera-<win|linux|macos>-<x86_64|aarch64>-<commit>`. Before, the platform
+matrix branch wrote `x64` and `arm64`; no release had used those names yet, so
+nothing published is renamed. The owner chose the longer names: they are the
+names the compilers and the ELF files use, and an underscore keeps a file name
+splitting cleanly at its dashes.
+
+`publish-core.sh` takes `--arch x86_64|aarch64`, refuses the old names, and
+lists beside each package the systems of its CPU that its `runsOn` names. It
+refuses a package whose `runsOn` lists none for its CPU. `fetch-cores.sh` takes
+only a package named for this machine's CPU: a package from before CPU names
+says nothing of where it runs, and Chimera refuses it now. Build folders,
+cache keys and job names inside the workflows keep the short names; they are
+not seen by anyone downloading.
+
+Tested: `publish-core.sh --dry-run` on made-up packages. Two packages, one per
+CPU, were named and listed as above. A package with no `runsOn`, one listing
+only another CPU's system, `--arch x64`, and `--kind` were each refused.
+
+## Nightlies only (user-decided, 2026-11-05)
+
+There are no development builds any more, of Chimera or of a core. The owner:
+"id like to get rid of dev releases everywhere. Nightlies only". A
+development build was replaced on every push to main, so a movie made on one
+could stop being replayable, which is what Chimera's releases exist to
+prevent.
+
+- **Chimera** (`release.yml`): the run after every passing CI is gone. The
+  daily schedule publishes a nightly when main moved and CI passed it; a run
+  started by hand publishes one too, now also only for a commit CI passed.
+  A pull request still builds the six as a trial and publishes nothing.
+- **A core** (`publish-core.yml`, `publish-core.sh`): only a scheduled run or
+  one started by hand publishes, and only a nightly. A push to main publishes
+  nothing, whatever the caller's `if:` says. The `kind` input is gone, so each
+  core's workflow stops passing one before this is merged.
+- **What a fix waits for.** A fix is published by the next night's build, or
+  at once by starting the workflow by hand. An issue is still closed only on
+  a published build named from its release.
+- The `dev` releases already on GitHub were deleted before this was merged
+  (next section).
 
 ## No development builds (user-decided, 2026-11-05)
 

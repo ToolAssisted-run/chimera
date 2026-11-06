@@ -97,11 +97,15 @@ ApplicationWindow {
 }
 )";
 
+/* the window's QML folder, the test's argument: a path built into the test
+ * would be the build machine's, which a Windows run (built on Linux) has not */
+QString qmlDir;
+
 std::unique_ptr<QObject> make(QQmlEngine &engine, const char *qml)
 {
 	QQmlComponent component(&engine);
 	/* beside the window's own files, for their types (MenuDivider) */
-	component.setData(qml, QUrl::fromLocalFile(QStringLiteral(CHIMERA_QT_QML_DIR "/test.qml")));
+	component.setData(qml, QUrl::fromLocalFile(qmlDir + QStringLiteral("/test.qml")));
 	std::unique_ptr<QObject> o(component.create());
 	if (!o) std::printf("%s\n", qPrintable(component.errorString()));
 	for (int i = 0; i < 5; i++) QCoreApplication::processEvents();
@@ -117,6 +121,7 @@ QColor colour(const std::unique_ptr<QObject> &o, const char *name)
 int main(int argc, char **argv)
 {
 	QGuiApplication app(argc, argv);
+	qmlDir = app.arguments().value(1);
 	/* after the application, as the window sets its own (main.cpp): KDE's
 	 * platform theme sets Breeze's style as the application is made */
 	QQuickStyle::setStyle(QStringLiteral("Fusion"));

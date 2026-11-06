@@ -2,6 +2,7 @@
 #include "chimera/vm/tr.hpp"
 
 #include <algorithm>
+#include <cstdlib>
 
 namespace chimera::vm {
 

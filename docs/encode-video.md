@@ -107,10 +107,18 @@ when to stop. `AvFrameAdvance` writes them out exactly as it always has.
 
 ## ffmpeg
 
-ffmpeg ships in the bundle, in `dll/` (Linux) or `bin\` (Windows), put there at
-build time by `tools/build-ffmpeg.sh`. Chimera used to name a version, a URL and
+ffmpeg ships in the bundle, in `dll/` (Linux), `bin\` (Windows) or
+`Contents/MacOS/bin` (the Mac app), put there at build time by
+`tools/build-ffmpeg.sh`. Chimera used to name a version, a URL and
 a checksum and ask the person to go and fetch it the first time they wanted a
 video; there is nothing to ask any more.
+
+It is machine code, so each bundle has the ffmpeg of its CPU: a Linux
+bundle's and a Mac's are built on the kind of machine they are for (x86-64
+or arm64), and Windows' are cross-built on Linux for x64 (mingw-w64) and
+arm64 (llvm-mingw; x265 without its assembly there). A Mac's links the
+system's own libraries, as every Mac program does, and runs on macOS 14.4 or
+later.
 
 Since 2026-11-04 it is our own build (owner's choice, issue 492): FFmpeg 7.1.1
 with only what Encode Video's formats use, linked statically with x264 and
@@ -139,6 +147,9 @@ needs a C and C++ compiler, make, cmake, nasm and pkg-config.
 It is a separate GPL program (version 2 or later, because of x264 and x265),
 run over a pipe, and `ffmpeg-LICENSE.txt` beside it carries the GPL, each
 source's address and hash, and FFmpeg's configuration.
+
+On macOS it is the same build, made on the Mac (`tools/build-ffmpeg.sh macos
+<dll folder>`), and `tools/build-app-macos.sh` puts it in the app.
 
 ## From a script
 

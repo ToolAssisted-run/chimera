@@ -24,7 +24,19 @@ project(
 
 fs = import('fs')
 host_windows = host_machine.system() == 'windows'
+host_macos = host_machine.system() == 'darwin'
+# what a shared library is called on the target: .dll, .dylib or .so
+shlib_ext = 'so'
+if host_windows
+  shlib_ext = 'dll'
+elif host_macos
+  shlib_ext = 'dylib'
+endif
 repo_root = meson.project_source_root()
+# A build for another system than the one it runs on (Windows, from Linux)
+# cannot run its tests. An x86-64 build for macOS, made on either kind of Mac,
+# can: Rosetta 2 runs it, so it is tested as a native one.
+cross_build_for_other_os = meson.is_cross_build() and not (host_macos and meson.can_run_host_binaries())
 
 cc = meson.get_compiler('c')
 m_dep = cc.find_library('m', required: false)
@@ -69,11 +81,17 @@ foreach f : [
 ]
   lua_src += files('extern/lua' / f + '.c')
 endforeach
+lua_args = ['-DLUA_USE_LINUX']
+if host_windows
+  lua_args = ['-DLUA_BUILD_AS_DLL']
+elif host_macos
+  lua_args = ['-DLUA_USE_MACOSX']
+endif
 lua54 = shared_library(
   'lua54',
   lua_src,
   name_prefix: host_windows ? '' : 'lib',
-  c_args: host_windows ? ['-DLUA_BUILD_AS_DLL'] : ['-DLUA_USE_LINUX'],
+  c_args: lua_args,
   dependencies: [m_dep, dl_dep],
   install: true,
   install_dir: 'dll',
@@ -110,8 +128,28 @@ nested_tool = files('extern/meson/nested-build.sh')
 # library in an existing build directory. Each sub-build is incremental and
 # reconfigures itself when its own build files change, so asking costs a
 # no-op there, and the library is copied out only when it changed.
-cross_arg = host_windows ? '--cross-file=' + repo_root / 'extern/meson/mingw-w64.ini' : ''
-zstd_out = host_windows ? 'libzstd.dll' : 'libzstd.so'
+# Each is built for the OS and the CPU this build is for: the cross file of the
+# same pair (a native Linux build needs none).
+host_arm64 = host_machine.cpu_family() == 'aarch64'
+cross_arg = ''
+if host_windows
+  cross_arg = '--cross-file=' + repo_root / (host_arm64 ? 'extern/meson/mingw-w64-aarch64.ini' : 'extern/meson/mingw-w64.ini')
+elif host_macos
+  cross_arg = '--cross-file=' + repo_root / (host_arm64 ? 'extern/meson/macos-aarch64.ini' : 'extern/meson/macos-x86_64.ini')
+endif
+# macOS: the nested cmake builds are told the processor, or they build the
+# machine's own, which may be the other one (an x86-64 build on an Apple
+# silicon Mac would get arm64 libraries Rosetta cannot load)
+cmake_platform_args = []
+if host_macos
+  cmake_platform_args = ['-DCMAKE_OSX_ARCHITECTURES=' + (host_arm64 ? 'arm64' : 'x86_64'), '-DCMAKE_OSX_DEPLOYMENT_TARGET=14.4']
+endif
+zstd_out = host_windows ? 'libzstd.dll' : 'libzstd.' + shlib_ext
+# zstd's build hides every symbol and marks its API for export only under
+# MSVC. GCC for Windows ignores "hidden" and exports everything; clang
+# (llvm-mingw, Windows on arm64) does not, and the library exported nothing.
+# zstd's own switch marks the API.
+zstd_extra = (host_windows and host_arm64) ? ['-Dc_args=-DZSTD_DLL_EXPORT=1'] : []
 custom_target(
   'zstd',
   output: zstd_out,
@@ -123,7 +161,7 @@ custom_target(
     '@OUTPUT@',
     cross_arg,
     '-Dbin_programs=false', '-Dbin_tests=false', '-Dbin_contrib=false',
-  ],
+  ] + zstd_extra,
   console: true,
   install: true,
   install_dir: 'dll',
@@ -132,10 +170,13 @@ custom_target(
 # ---------------------------------------------------------------------------
 # SDL2 + OpenAL Soft: cmake-driven, via the wrapper script
 # ---------------------------------------------------------------------------
-cmake_toolchain = host_windows ? repo_root / 'extern/meson/mingw-toolchain.cmake' : ''
+cmake_toolchain = ''
+if host_windows
+  cmake_toolchain = repo_root / (host_arm64 ? 'extern/meson/mingw-toolchain-aarch64.cmake' : 'extern/meson/mingw-toolchain.cmake')
+endif
 custom_target(
   'sdl2',
-  output: host_windows ? 'SDL2.dll' : 'libSDL2.so',
+  output: host_windows ? 'SDL2.dll' : 'libSDL2.' + shlib_ext,
   build_always_stale: true,
   command: [
     nested_tool, 'cmake',
@@ -143,14 +184,24 @@ custom_target(
     '@OUTDIR@' / 'sdl2-build',
     '@OUTPUT@',
     cmake_toolchain,
-  ],
+  ] + cmake_platform_args,
   console: true,
   install: true,
   install_dir: 'dll',
 )
+# macOS: CoreAudio and nothing else - not the backends (and D-Bus, for rtkit)
+# a development machine's Homebrew offers, which would tie the library to
+# Homebrew and put Homebrew's headers ahead of OpenAL's own fmt
+openal_platform_args = []
+if host_macos
+  openal_platform_args = ['-DALSOFT_REQUIRE_COREAUDIO=ON', '-DALSOFT_RTKIT=OFF',
+    '-DALSOFT_BACKEND_PORTAUDIO=OFF', '-DALSOFT_BACKEND_PULSEAUDIO=OFF',
+    '-DALSOFT_BACKEND_PIPEWIRE=OFF', '-DALSOFT_BACKEND_JACK=OFF',
+    '-DALSOFT_BACKEND_SDL2=OFF', '-DALSOFT_BACKEND_SDL3=OFF']
+endif
 custom_target(
   'openal',
-  output: host_windows ? 'OpenAL32.dll' : 'libopenal.so',
+  output: host_windows ? 'OpenAL32.dll' : 'libopenal.' + shlib_ext,
   build_always_stale: true,
   command: [
     nested_tool, 'cmake',
@@ -160,7 +211,7 @@ custom_target(
     cmake_toolchain,
     '-DALSOFT_UTILS=OFF', '-DALSOFT_EXAMPLES=OFF', '-DALSOFT_TESTS=OFF',
     '-DLIBTYPE=SHARED',
-  ],
+  ] + cmake_platform_args + openal_platform_args,
   console: true,
   install: true,
   install_dir: 'dll',
@@ -179,17 +230,30 @@ minibox_host_src = files(
   minibox_host / 'sha256.c',
   minibox_host / 'memblock.c',
   minibox_host / 'tripguard.c',
-  minibox_host / 'interop_bin.c',
   minibox_host / 'context.c',
-  minibox_host / 'guarded.S',
   minibox_host / 'elf.c',
   minibox_host / 'fs.c',
   minibox_host / 'host.c',
   minibox_host / 'threading.c',
   minibox_host / 'cinterface.c',
-  minibox_host / 'calling_convention_adapters.c',
-  minibox_host / (host_windows ? 'pal_win.c' : 'pal_linux.c'),
 )
+if host_windows
+  minibox_host_src += files(minibox_host / 'pal_win.c')
+elif host_macos
+  minibox_host_src += files(minibox_host / 'pal_darwin.c')
+else
+  minibox_host_src += files(minibox_host / 'pal_linux.c')
+endif
+# The machine's own code - the interop area and the guarded call - is written
+# for the CPU the host runs on (as miniBox's source/host/meson.build selects it).
+if host_machine.cpu_family() == 'aarch64'
+  minibox_host_src += files(minibox_host / 'interop_aarch64.S', minibox_host / 'guarded_aarch64.S')
+elif host_machine.cpu_family() == 'x86_64'
+  minibox_host_src += files(minibox_host / 'interop_bin.c', minibox_host / 'guarded.S',
+                            minibox_host / 'calling_convention_adapters.c')
+else
+  error('miniBox runs on x86-64 and aarch64 only, not ' + host_machine.cpu_family())
+endif
 # Provenance compiled into the host, matching what miniBox's own build stamps: the
 # frontend shows it and a movie records it, so every binary in the emulation path can
 # say where it came from. Inputs only, never a timestamp.
@@ -349,6 +413,10 @@ if gl_bridge
   if host_windows
     gl_bridge_src += files('extern/glad/src/wgl.c')
     gl_bridge_deps = [meson.get_compiler('cpp').find_library('opengl32', required: true)]
+  elif host_macos
+    # CGL, from the OpenGL framework (deprecated by Apple, still there)
+    gl_bridge_deps = [dependency('appleframeworks', modules: ['OpenGL'])]
+    engine_build_args += ['-DGL_SILENCE_DEPRECATION']
   else
     gl_bridge_deps = [meson.get_compiler('cpp').find_library('EGL', required: true)]
   endif
@@ -413,7 +481,7 @@ chimera_shared = shared_library(
   install: true,
   install_dir: 'dll',
 )
-executable(
+chimera_run = executable(
   'chimera-run',
   ['source/engine/tools/chimera-run.cpp'],
   include_directories: engine_inc,
@@ -442,58 +510,8 @@ executable(
   install_dir: 'dll',
 )
 
-if meson.is_cross_build()
-  # The one unit test that is also built for Windows, by hand
-  # (meson compile -C build/meson-windows test_mcp): the pipe under the MCP
-  # server is different code on each system, and the Windows half can be run
-  # from Linux through WSL. The other tests are built for the host only.
-  executable(
-    'test_mcp',
-    ['source/engine/tests/test_mcp.cpp'],
-    include_directories: engine_inc,
-    cpp_args: engine_build_args + ['-UNDEBUG'],
-    c_args: engine_build_args,
-    dependencies: [engine_dep],
-    build_by_default: false,
-  )
-  # The same by hand for the files under a folder whose name is not plain
-  # ASCII (meson compile -C build/meson-windows test_utf8_paths): the C
-  # library reads such a path differently on Windows, so it is proved there.
-  # The same for the stubs a call into the guest takes on Windows
-  # (meson compile -C build/meson-windows test_guest_calls; run it with
-  # libminiboxhost.dll beside it): on Linux a guest call needs none.
-  executable(
-    'test_guest_calls',
-    ['source/engine/tests/test_guest_calls.cpp'],
-    include_directories: engine_inc,
-    cpp_args: engine_build_args + ['-UNDEBUG'],
-    c_args: engine_build_args,
-    dependencies: [engine_dep],
-    build_by_default: false,
-  )
-  # And for the GL bridge's context on Windows (WGL; run it on a machine with a
-  # GPU): a session's objects go with it.
-  executable(
-    'test_gl_session',
-    ['source/engine/tests/test_gl_session.cpp'],
-    include_directories: engine_inc,
-    cpp_args: engine_build_args + ['-UNDEBUG'],
-    c_args: engine_build_args,
-    dependencies: [engine_dep],
-    build_by_default: false,
-  )
-  executable(
-    'test_utf8_paths',
-    ['source/engine/tests/test_utf8_paths.cpp'],
-    include_directories: engine_inc,
-    cpp_args: engine_build_args + ['-UNDEBUG'],
-    c_args: engine_build_args,
-    dependencies: [engine_dep],
-    build_by_default: false,
-  )
-endif
 
-if not meson.is_cross_build()
+if not cross_build_for_other_os
   # Not a test: what a captured frame costs when the budget is full and
   # stretches are going to disk, in line and on the writer. Built with the
   # tests because it needs the engine; run by tests/perf/run-spillbench.sh.
@@ -514,24 +532,30 @@ if not meson.is_cross_build()
   test('synth_texts', find_program('python3'),
     args: [files('tools/check-core-texts.py'), meson.project_source_root() / 'tests/synth/package-box'])
 
-  foreach engine_test : ['sha1', 'movie_log', 'movie_entry', 'control_names', 'state_container', 'state_format', 'package', 'multifile', 'project', 'firmware', 'state_history', 'media', 'gl_flight', 'gl_sync', 'gl_buffer_pool', 'stride_tuner', 'plain_numbers', 'greenzone_shape', 'ram_search', 'kept_pictures', 'game_properties', 'mcp', 'average_fps', 'compile_sessions', 'host_machine', 'utf8_paths', 'work_thread', 'guest_calls', 'gl_session', 'resampler', 'language']
-    test(
-      'engine_' + engine_test,
-      executable(
-        'test_' + engine_test,
-        ['source/engine/tests/test_' + engine_test + '.cpp'],
-        include_directories: engine_inc,
-        cpp_args: engine_build_args + ['-UNDEBUG'],  # these tests ARE asserts
-        c_args: engine_build_args,
-        dependencies: [engine_dep],
-      ),
-      # (the state container test finds libzstd the way the shipped library
-      # does: beside its own binary, which in the build dir it is)
-      # RAM search takes 9 s here and 28 to 30 s on a CI runner
-      timeout: engine_test == 'ram_search' ? 120 : 30,
-    )
-  endforeach
 endif
+
+# The engine's tests, for every system the engine is built for. A build for
+# another system than the one it is made on (Windows, from Linux) cannot run
+# them where it is made: tools/export-tests.py lists them with their files,
+# and tools/run-tests.py runs that list on a machine of that system (the
+# Windows CI jobs, x64 and arm64).
+foreach engine_test : ['sha1', 'movie_log', 'movie_entry', 'control_names', 'state_container', 'state_format', 'package', 'multifile', 'project', 'firmware', 'state_history', 'media', 'gl_flight', 'gl_sync', 'gl_buffer_pool', 'stride_tuner', 'plain_numbers', 'greenzone_shape', 'ram_search', 'kept_pictures', 'game_properties', 'mcp', 'average_fps', 'compile_sessions', 'host_machine', 'utf8_paths', 'work_thread', 'guest_calls', 'gl_session', 'resampler', 'language']
+  test(
+    'engine_' + engine_test,
+    executable(
+      'test_' + engine_test,
+      ['source/engine/tests/test_' + engine_test + '.cpp'],
+      include_directories: engine_inc,
+      cpp_args: engine_build_args + ['-UNDEBUG'],  # these tests ARE asserts
+      c_args: engine_build_args,
+      dependencies: [engine_dep],
+    ),
+    # (the state container test finds libzstd the way the shipped library
+    # does: beside its own binary, which in the build dir it is)
+    # RAM search takes 9 s here and 28 to 30 s on a CI runner
+    timeout: engine_test == 'ram_search' ? 120 : 30,
+  )
+endforeach
 
 # Chimera's window (Qt 6.12, issue 142): source/ui/meson.build
 if get_option('qt_ui').allowed()

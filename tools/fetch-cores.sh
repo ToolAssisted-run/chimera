@@ -16,28 +16,41 @@
 # their release pipeline one at a time, and a frontend checkout is not broken by
 # a core that has not caught up.
 #
-# Usage: fetch-cores.sh [--kind nightly|dev] [--out <dir>] [--core <id>]... [--list]
+# Each core's newest nightly is taken: there are no other releases.
+#
+# Usage: fetch-cores.sh [--out <dir>] [--core <id>]... [--list]
 set -eu
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
-kind=nightly
 out="$root/build/Cores"
 only=""
 list=0
 while [ $# -gt 0 ]; do
 	case "$1" in
-		--kind) kind="$2"; shift 2 ;;
 		--out) out="$2"; shift 2 ;;
 		--core) only="$only $2"; shift 2 ;;
 		--list) list=1; shift ;;
 		*) echo "unknown option: $1" >&2; exit 2 ;;
 	esac
 done
-case "$kind" in
-	nightly|dev) ;;
-	*) echo "kind must be nightly or dev" >&2; exit 2 ;;
-esac
 command -v gh >/dev/null || { echo "gh is not installed" >&2; exit 1; }
+
+# A package is machine code for one CPU, published as
+# <id>-<version>-<arch>.chimeraCore (tools/publish-core.sh); the one fetched is
+# this machine's. A release from before packages carried their CPU is passed
+# over: its package says nowhere where it runs, so Chimera refuses it.
+case "$(uname -m)" in
+	x86_64|amd64) cpu=x86_64 ;;
+	aarch64|arm64) cpu=aarch64 ;;
+	*) echo "no core is built for $(uname -m)" >&2; exit 1 ;;
+esac
+# the package for this CPU among a release's asset names (stdin), if any
+pick_package() { # <id>
+	awk -v id="$1" -v cpu="$cpu" '
+		index($0, id "-") != 1 || $0 !~ /\.chimeraCore$/ { next }
+		$0 ~ ("-" cpu "\\.chimeraCore$") { mine = $0 }
+		END { if (mine != "") print mine }'
+}
 
 roster="$root/official-cores.json"
 [ -f "$roster" ] || { echo "no $roster" >&2; exit 1; }
@@ -51,26 +64,22 @@ while IFS='|' read -r id repo; do
 	[ -n "$id" ] || continue
 	if [ -n "$only" ] && ! printf '%s\n' $only | grep -qx "$id"; then continue; fi
 
-	# The newest release of the chosen kind. `dev` is one moving tag; a nightly
-	# is dated, and the tags sort lexically because the date does.
-	if [ "$kind" = dev ]; then
-		tag=$(gh release list --repo "$repo" --limit 30 --json tagName --jq '.[].tagName' 2>/dev/null | grep -x dev || true)
-	else
-		# The newest nightly that actually HOLDS a package. A publish can die
-		# between creating the release and uploading into it, and an empty
-		# newest nightly used to fail this whole script - so one core's bad
-		# morning on GitHub's API failed the frontend's CI (2026-09-13, flycast
-		# and ares). The one before it is still that core's latest real build.
-		tag=""
-		for t in $(gh release list --repo "$repo" --limit 30 --json tagName --jq '.[].tagName' 2>/dev/null | grep '^nightly-' | sort -r || true); do
-			if gh release view "$t" --repo "$repo" --json assets --jq '.assets[].name' 2>/dev/null | grep -q "^$id-.*\.chimeraCore$"; then
-				tag="$t"
-				break
-			fi
-			echo "$id: $t has no package, using an older nightly" >&2
-		done
-	fi
-	if [ -z "$tag" ]; then
+	# The newest nightly that actually HOLDS a package for this CPU. A publish can die
+	# between creating the release and uploading into it, and an empty
+	# newest nightly used to fail this whole script - so one core's bad
+	# morning on GitHub's API failed the frontend's CI (2026-09-13, flycast
+	# and ares). The one before it is still that core's latest real build.
+	tag=""
+	for t in $(gh release list --repo "$repo" --limit 30 --json tagName --jq '.[].tagName' 2>/dev/null | grep '^nightly-' | sort -r || true); do
+		if [ -n "$(gh release view "$t" --repo "$repo" --json assets --jq '.assets[].name' 2>/dev/null | pick_package "$id")" ]; then
+			tag="$t"
+			break
+		fi
+		echo "$id: $t has no package, using an older nightly" >&2
+	done
+	asset=""
+	[ -z "$tag" ] || asset=$(gh release view "$tag" --repo "$repo" --json assets --jq '.assets[].name' 2>/dev/null | pick_package "$id")
+	if [ -z "$asset" ]; then
 		skipped="$skipped $id"
 		continue
 	fi
@@ -79,23 +88,19 @@ while IFS='|' read -r id repo; do
 		continue
 	fi
 
-	# published as <id>-<version>.chimeraCore; the frontend finds packages by
+	# published as <id>-<version>-<arch>.chimeraCore; the frontend finds packages by
 	# extension, so the name it lands under is the name it keeps. Three tries:
 	# a download that GitHub drops once failed the frontend's CI on 2026-09-30
 	# (rawgl, whose release was sitting there unchanged the whole time)
 	got=0
 	for attempt in 1 2 3; do
-		if gh release download "$tag" --repo "$repo" --pattern "$id-*.chimeraCore" --dir "$out" --clobber 2>/dev/null; then
+		if gh release download "$tag" --repo "$repo" --pattern "$asset" --dir "$out" --clobber 2>/dev/null; then
 			got=1
 			break
 		fi
 		[ "$attempt" -lt 3 ] && { echo "$id: the download failed, trying again" >&2; sleep $((attempt * 5)); }
 	done
 	if [ "$got" -eq 1 ]; then
-		# a core may also publish a package for another processor, named
-		# <id>-<version>-arm64.chimeraCore. This Chimera runs x64 guests only,
-		# and two packages of one core in a folder is a core listed twice.
-		rm -f "$out/$id"-*-arm64.chimeraCore
 		fetched=$((fetched + 1))
 		echo "$id: $tag"
 	else
@@ -112,6 +117,6 @@ EOF
 [ "$list" -eq 1 ] && exit 0
 echo
 echo "fetched $fetched core packages into $out"
-[ -n "$skipped" ] && echo "no release yet:$skipped"
+[ -n "$skipped" ] && echo "no release for $cpu yet:$skipped"
 [ -n "$failed" ] && { echo "failed to download:$failed" >&2; exit 1; }
 exit 0

@@ -1,3 +1,6 @@
+#ifdef __APPLE__
+#include "charconv_apple.hpp"   /* floating-point charconv is macOS 26 and later there */
+#endif
 #include "chimera/vm/json.hpp"
 #include "chimera/vm/tr.hpp"
 
@@ -227,7 +230,11 @@ double Json::number() const
 	if (kind != Kind::Number) return 0.0;
 	/* a dot whatever the locale (strtod stopped at the dot under a decimal comma) */
 	double d = 0.0;
+#ifdef __APPLE__
+	apple::parsePrefix(text.data(), text.data() + text.size(), d);
+#else
 	std::from_chars(text.data(), text.data() + text.size(), d);
+#endif
 	return d;
 }
 
@@ -247,9 +254,13 @@ Json Json::number(double d)
 	j.kind = Kind::Number;
 	/* the shortest text that reads back as the same double, with a dot
 	 * whatever the locale: snprintf wrote "0,5" under a decimal comma */
+#ifdef __APPLE__
+	j.text = apple::shortest(d);
+#else
 	char buf[40];
 	const auto [end, ec] = std::to_chars(buf, buf + sizeof buf, d);
 	j.text.assign(buf, ec == std::errc() ? end : buf);
+#endif
 	return j;
 }
 

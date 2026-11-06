@@ -237,11 +237,19 @@ legs say SKIP with the reason where it is absent, and a SKIP is never read as
 a pass. A core proved on one real game says which; one proved on none says
 that.
 
-**Windows is the same package.** The guest is one file for both systems, and
-the host under it is not: run the frontend gate's scenario on Windows before
-calling a core done. What has failed only there so far was stacks - an
-emulator's own coroutine stacks need `MAP_STACK`, and a fault on the page the
-stack pointer is in cannot be delivered.
+**Windows is the same package.** The guest is one file for every system of
+its CPU, and the host under it is not: run the frontend gate's scenario on
+Windows before calling a core done. What has failed only there so far was
+stacks - an emulator's own coroutine stacks need `MAP_STACK`, and a fault on
+the page the stack pointer is in cannot be delivered.
+
+**So is a Mac, with two refusals.** An Intel Mac runs the x86_64 package only if
+the core reaches its thread-local variables in the way miniBox can patch as it
+loads: the guest toolchain builds C and C++ so (`-mno-tls-direct-seg-refs`),
+but a core's own build flags or hand-written assembly may not, and the core is
+then refused with the reason. An Apple silicon Mac refuses a core that exports
+`GuestFaultHandler`. An aarch64 package is a build of its own; see
+[platforms.md](platforms.md).
 
 ## 9. Publishing
 
@@ -256,9 +264,10 @@ are the owner's to approve. With that:
    `<id>-${{ github.sha }}`, and calls
    `ToolAssisted-run/chimera/.github/workflows/publish-core.yml@main`. Its
    header says which legs a runner cannot run. Triggers: push, pull request,
-   `workflow_dispatch` with a `kind` input, and a daily schedule.
-3. **The first releases.** A green push publishes the rolling `dev`; cut the
-   first dated one by hand, `gh workflow run chimera.yml -f kind=nightly`.
+   `workflow_dispatch`, and a daily schedule.
+3. **The first releases.** Only nightlies are published: the daily schedule
+   makes one when main moved. Cut the first by hand, `gh workflow run
+   chimera.yml`; a push or a pull request publishes nothing.
    If the very first publish fails on an "empty index", run it again: the
    index was written a second before the asset existed.
 4. **The roster and the README.** A row in `official-cores.json` - `id`,
@@ -270,7 +279,8 @@ are the owner's to approve. With that:
    `third-party-cores.json` (the same fields and its `author`) and in the
    README's third-party tables, and this project does not support it.
 5. **The issue.** Say what was built and which published build has it - the
-   name read from the release (`gh release view dev --json name`), never
+   name read from the release (`gh release view --json name`, the newest
+   nightly), never
    guessed - what the user must bring, and what was not proved. Then close it.
 
 Release notifications for a new repository use a credential that lives in the

@@ -332,6 +332,16 @@ Advice earned the hard way:
     "at": 0, "u32be": 1 }, { "at": 12, "u32be": "lastSector" } ] }`. The
     recipe is offered when the folder has the root file; the engine writes
     the patches into the image's system area.
+- **`runsOn`** - the systems the package runs on, from the six
+  `windows-x86_64`, `windows-aarch64`, `linux-x86_64`, `linux-aarch64`,
+  `macos-x86_64` and `macos-aarch64`. Chimera runs a package only on a system
+  it lists and refuses one that lists none; it keeps no list of its own. List
+  only what the core has been built for and is meant to run on: one
+  `waterbox.config` serves both CPUs' packages, so it names both CPUs if the
+  core is built for both. Leave a system out when the core cannot run there
+  (Ikemen GO has no `macos-x86_64`: its Go code reads thread-local variables
+  in a way an Intel Mac cannot rewrite). `publish-core.sh` refuses a package
+  that lists no system for its own CPU.
 - **`version` and `versionDate`** are not yours to write: `build-package.sh`
   stamps both into the packaged `waterbox.config` - the commit, and the date of
   that commit in UTC (never the build's date, which would make one commit two

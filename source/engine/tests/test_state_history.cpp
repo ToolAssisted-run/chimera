@@ -22,11 +22,15 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <csignal>
+#ifndef _WIN32
 #include <sys/resource.h>
+#endif
 #include <map>
 #include <string>
 #include <new>
 #include <vector>
+#include <thread>
+#include <chrono>
 
 namespace
 {
@@ -264,6 +268,31 @@ chimera::HostApi fakeHost()
 /* The spill file, whatever it is called: the name carries the process and the
  * instance now, so that two histories handed the same directory cannot open the
  * same file. Tests ask the directory, not the name. */
+/* A folder taken away, tried again for a while: on Windows a scanner (the
+ * antivirus) may hold a file that was just written for a moment, and the
+ * removal fails while it does - "used by another process", in CI. */
+void removeTree(const std::filesystem::path &path)
+{
+	for (int i = 0; i < 50; i++)
+	{
+		std::error_code ec;
+		std::filesystem::remove_all(path, ec);
+		if (!ec) return;
+		std::this_thread::sleep_for(std::chrono::milliseconds(100));
+	}
+	std::filesystem::remove_all(path);   /* the last try says why it failed */
+}
+
+/* A file's size as a handle opened now sees it. Windows' directory entry,
+ * which std::filesystem::file_size reads, lags behind a file another handle
+ * still has open for writing (the history's own spill file). */
+uint64_t sizeNow(const std::filesystem::path &path)
+{
+	std::ifstream in(path, std::ios::binary | std::ios::ate);
+	assert(in);
+	return static_cast<uint64_t>(in.tellg());
+}
+
 std::filesystem::path spillFileIn(const std::string &dir)
 {
 	std::error_code ec;
@@ -709,9 +738,14 @@ int main(void)
 		std::filesystem::create_directories("work-history-elsewhere");
 		h.spillTo("work-history-elsewhere");
 		assert(!h.spillFailed());
-		std::filesystem::remove_all("work-history-elsewhere");
+		/* its spill file let go first: Windows will not remove a file held open */
+		h.spillTo(nullptr);
+		removeTree("work-history-elsewhere");
 	}
 
+#ifndef _WIN32
+	// (POSIX only: Windows has no cap on a process's file size to make the
+	// write fail with)
 	{ // A spill whose WRITE fails - the file opened, then the disk filled - gives
 	  // its stretch back whole. The writer used to throw the stretch's bodies
 	  // away before saying the write had failed, so the stretch came back empty
@@ -757,8 +791,9 @@ int main(void)
 			restored++;
 		}
 		assert(restored > 0);
-		std::filesystem::remove_all("work-history-capped");
+		removeTree("work-history-capped");
 	}
+#endif
 
 	{ // Running out of memory halves the budget instead of ending the session.
 	  //
@@ -808,7 +843,7 @@ int main(void)
 		const chimera::HostApi api = fakeHost();
 		g_machine = Machine{};
 
-		std::filesystem::remove_all("work-history-disk");
+		removeTree("work-history-disk");
 		std::filesystem::create_directories("work-history-disk");
 		History h;
 		h.configure(&api, nullptr, 512);
@@ -830,7 +865,7 @@ int main(void)
 		 * dropping the oldest without reclaiming the room it held would be a
 		 * limit on paper only */
 		h.flushWrites();
-		const uint64_t onDisk = std::filesystem::file_size(spillFileIn("work-history-disk"));
+		const uint64_t onDisk = sizeNow(spillFileIn("work-history-disk"));
 		assert(onDisk <= kDisk);   /* the number given, on the number `ls` shows */
 		/* and the budget counts the FILE: what is live in it is part of it */
 		assert(h.diskBytes() <= onDisk);
@@ -844,7 +879,7 @@ int main(void)
 		History u;
 		u.configure(&api, nullptr, 512);
 		u.bands(2, 6, 3, 12, 8);
-		std::filesystem::remove_all("work-history-nolimit");
+		removeTree("work-history-nolimit");
 		std::filesystem::create_directories("work-history-nolimit");
 		u.spillTo("work-history-nolimit");
 		u.capture(0);
@@ -856,8 +891,8 @@ int main(void)
 			(unsigned long long)h.diskBytes(), (unsigned long long)u.diskBytes());
 		assert(u.diskBytes() > h.diskBytes());
 	}
-	std::filesystem::remove_all("work-history-disk");
-	std::filesystem::remove_all("work-history-nolimit");
+	removeTree("work-history-disk");
+	removeTree("work-history-nolimit");
 
 	{ // A budget too small to hold the run: the far end goes to disk, and the
 	  // frames out there are still frames the history can produce.
@@ -893,7 +928,7 @@ int main(void)
 		h.flushWrites();
 		assert(!spillFileIn("work-history-spill").empty());
 		assert(h.bytes() <= 512);
-		assert(std::filesystem::file_size(spillFileIn("work-history-spill")) > 512);
+		assert(sizeNow(spillFileIn("work-history-spill")) > 512);
 
 		/* an early frame, which can only be out on disk by now */
 		const int64_t old = h.nearest(12);
@@ -941,7 +976,7 @@ int main(void)
 			std::vector<std::array<uint8_t, Machine::kCells>> &truth, uint64_t budget = 512)
 		{
 			g_machine = Machine{};
-			std::filesystem::remove_all(dir);
+			removeTree(dir);
 			std::filesystem::create_directories(dir);
 			h.configure(&api, nullptr, budget);
 			h.bands(2, 6, 3, farStride, 8);
@@ -1005,17 +1040,17 @@ int main(void)
 		tightDense.flushWrites();
 		for (int64_t f = 0; f <= 160; f++) assert(tight.nearest(f) == tightDense.nearest(f));
 	}
-	std::filesystem::remove_all("work-history-settle");
-	std::filesystem::remove_all("work-history-settle-control");
-	std::filesystem::remove_all("work-history-settle-tight");
-	std::filesystem::remove_all("work-history-settle-tight-control");
+	removeTree("work-history-settle");
+	removeTree("work-history-settle-control");
+	removeTree("work-history-settle-tight");
+	removeTree("work-history-settle-tight-control");
 
 	{ // An edit that lands on the last frame of a spilled stretch starts a new
 	  // stretch. A delta pushed onto the spilled one would sit in memory while
 	  // every restore reads the file, where the old timeline's links still are.
 		const chimera::HostApi api = fakeHost();
 		g_machine = Machine{};
-		std::filesystem::remove_all("work-history-edit");
+		removeTree("work-history-edit");
 		std::filesystem::create_directories("work-history-edit");
 		History h;
 		h.configure(&api, nullptr, 512);
@@ -1066,7 +1101,7 @@ int main(void)
 		assert(back.restore(cut, error));
 		assert(std::memcmp(g_machine.cell, truth[static_cast<size_t>(cut)].data(), Machine::kCells) == 0);
 	}
-	std::filesystem::remove_all("work-history-edit");
+	removeTree("work-history-edit");
 
 	{ // A chain that will not walk leaves the machine on a frame that DID exist,
 	  // says which, and gives up the stretch - rather than leaving a machine
@@ -1163,7 +1198,7 @@ int main(void)
 	  // included, and then nothing could reach the early movie at all.
 		const chimera::HostApi api = fakeHost();
 		g_machine = Machine{};
-		std::filesystem::remove_all("work-history-zero");
+		removeTree("work-history-zero");
 		std::filesystem::create_directories("work-history-zero");
 		History h;
 		h.configure(&api, nullptr, 256);            /* tiny: it must spill at once */
@@ -1193,14 +1228,14 @@ int main(void)
 		}
 		assert(covered >= 12);
 	}
-	std::filesystem::remove_all("work-history-zero");
+	removeTree("work-history-zero");
 
 	{ // Spill files a dead session left behind are swept when a history is
 	  // pointed at the directory: they are named for the process that made
 	  // them, so nothing else would ever remove them, and they are gigabytes.
 		const chimera::HostApi api = fakeHost();
 		g_machine = Machine{};
-		std::filesystem::remove_all("work-history-stale");
+		removeTree("work-history-stale");
 		std::filesystem::create_directories("work-history-stale");
 		{
 			std::ofstream dead("work-history-stale/history-spill-999999-1.bin");
@@ -1226,7 +1261,7 @@ int main(void)
 		assert(std::filesystem::exists(mine));
 		assert(h.nearest(0) == 0 && h.restore(0, error));
 	}
-	std::filesystem::remove_all("work-history-stale");
+	removeTree("work-history-stale");
 
 	{ // Turning the greenzone on again - a budget changed, a project reattached -
 	  // starts from nothing, the spill file included. It used to keep the file
@@ -1234,7 +1269,7 @@ int main(void)
 	  // stretches that no longer existed and the room was never given back.
 		const chimera::HostApi api = fakeHost();
 		g_machine = Machine{};
-		std::filesystem::remove_all("work-history-again");
+		removeTree("work-history-again");
 		std::filesystem::create_directories("work-history-again");
 		History h;
 		h.configure(&api, nullptr, 512);
@@ -1276,7 +1311,7 @@ int main(void)
 			assert(std::memcmp(g_machine.cell, truth[static_cast<size_t>(f)].data(), Machine::kCells) == 0);
 		}
 	}
-	std::filesystem::remove_all("work-history-again");
+	removeTree("work-history-again");
 
 	{ // The history under random use, against the truth. Every other block asks
 	  // one question of one path; this asks the only one that matters of all
@@ -1298,8 +1333,8 @@ int main(void)
 			uint64_t rng = 0x9E3779B97F4A7C15ull * static_cast<uint64_t>(seed + 1);
 			auto rnd = [&]() { rng ^= rng << 13; rng ^= rng >> 7; rng ^= rng << 17; return static_cast<uint32_t>(rng >> 11); };
 			g_machine = Machine{};
-			std::filesystem::remove_all("work-history-fuzz");
-			std::filesystem::remove_all("work-history-fuzz-b");
+			removeTree("work-history-fuzz");
+			removeTree("work-history-fuzz-b");
 			std::filesystem::create_directories("work-history-fuzz");
 			std::filesystem::create_directories("work-history-fuzz-b");
 			History h;
@@ -1454,8 +1489,8 @@ int main(void)
 			}
 		}
 		std::filesystem::remove("work-history-fuzz.err");
-		std::filesystem::remove_all("work-history-fuzz");
-		std::filesystem::remove_all("work-history-fuzz-b");
+		removeTree("work-history-fuzz");
+		removeTree("work-history-fuzz-b");
 	}
 
 
@@ -1495,7 +1530,7 @@ int main(void)
 			{
 				const bool threaded = pass == 0;
 				const char *dir = threaded ? "work-history-diff-t" : "work-history-diff-s";
-				std::filesystem::remove_all(dir);
+				removeTree(dir);
 				std::filesystem::create_directories(dir);
 
 				uint64_t rng = 0x27BB2EE687B0B0FDull * static_cast<uint64_t>(seed + 1);
@@ -1598,8 +1633,9 @@ int main(void)
 				h.flushWrites();
 				sig += " disk " + std::to_string(h.diskBytes());
 				signature[pass] = std::move(sig);
-
-				std::filesystem::remove_all(dir);
+				/* (the folder is taken away by the next pass and after the
+				 * last, once h is gone: removed here, with h still holding its
+				 * spill file open, Windows refuses where Linux lets go) */
 			}
 			if (signature[0] != signature[1])
 			{
@@ -1625,8 +1661,8 @@ int main(void)
 		assert(spilledIn[0] >= 6 && spilledIn[1] >= 6);
 		assert(spilledIn[0] == spilledIn[1]);
 		assert(queuedWrites >= 6);
-		std::filesystem::remove_all("work-history-diff-t");
-		std::filesystem::remove_all("work-history-diff-s");
+		removeTree("work-history-diff-t");
+		removeTree("work-history-diff-s");
 	}
 
 	{ // Every offset in the spill file is one the reservation chose.
@@ -1639,7 +1675,7 @@ int main(void)
 	  // frame the history still offers read back off it and compared.
 		const chimera::HostApi api = fakeHost();
 		g_machine = Machine{};
-		std::filesystem::remove_all("work-history-reserve");
+		removeTree("work-history-reserve");
 		std::filesystem::create_directories("work-history-reserve");
 		History h;
 		h.configure(&api, nullptr, 512);      /* smaller than the run: it must spill */
@@ -1669,7 +1705,8 @@ int main(void)
 			read++;
 		}
 		assert(read > 4);
-		std::filesystem::remove_all("work-history-reserve");
+		h.spillTo(nullptr);
+		removeTree("work-history-reserve");
 	}
 
 
@@ -1683,7 +1720,7 @@ int main(void)
 	  // including the part that has to be read back out of the spill file.
 		const chimera::HostApi api = fakeHost();
 		g_machine = Machine{};
-		std::filesystem::remove_all("work-history-save");
+		removeTree("work-history-save");
 		std::filesystem::create_directories("work-history-save");
 
 		History h;
@@ -1765,7 +1802,10 @@ int main(void)
 		assert(std::filesystem::exists("work-history-save/after.bin"));
 
 		(void)sawPending;   /* a fast enough writer may have finished already */
-		std::filesystem::remove_all("work-history-save");
+		h.spillTo(nullptr);
+		back.spillTo(nullptr);
+		during.spillTo(nullptr);
+		removeTree("work-history-save");
 	}
 
 	{ // A save asked for while a spill is still being written is a whole save.
@@ -1781,7 +1821,7 @@ int main(void)
 			g_machine = Machine{};
 			std::vector<std::array<uint8_t, Machine::kCells>> truth(1);
 			std::memcpy(truth[0].data(), g_machine.cell, Machine::kCells);
-			std::filesystem::remove_all("work-history-inflight");
+			removeTree("work-history-inflight");
 			std::filesystem::create_directories("work-history-inflight");
 			History h;
 			h.helpers(true);
@@ -1832,7 +1872,7 @@ int main(void)
 		assert(failed == 0);
 		assert(checked > 0);
 		assert(wrong == 0);
-		std::filesystem::remove_all("work-history-inflight");
+		removeTree("work-history-inflight");
 	}
 
 	{ // Nothing is spilled behind a save that is being written.
@@ -1844,7 +1884,7 @@ int main(void)
 	  // is kept by thinning instead, and that is neither a failure nor a wait.
 		const chimera::HostApi api = fakeHost();
 		g_machine = Machine{};
-		std::filesystem::remove_all("work-history-saving");
+		removeTree("work-history-saving");
 		std::filesystem::create_directories("work-history-saving");
 		History h;
 		h.helpers(true);
@@ -1901,7 +1941,8 @@ int main(void)
 			restored++;
 		}
 		assert(restored > 8);
-		std::filesystem::remove_all("work-history-saving");
+		h.spillTo(nullptr);
+		removeTree("work-history-saving");
 	}
 
 	{ // Going back and playing forward over the same input keeps what is ahead.
@@ -1917,7 +1958,7 @@ int main(void)
 			const bool threaded = pass == 0;
 			g_machine = Machine{};
 			const char *dir = threaded ? "work-history-replay-t" : "work-history-replay-s";
-			std::filesystem::remove_all(dir);
+			removeTree(dir);
 			std::filesystem::create_directories(dir);
 			History h;
 			h.helpers(threaded);
@@ -1993,7 +2034,8 @@ int main(void)
 			assert(h.restore(h.nearest(60), error));
 			h.invalidateAfter(60);
 			assert(h.nearest(INT64_MAX) <= 60);
-			std::filesystem::remove_all(dir);
+			h.spillTo(nullptr);
+			removeTree(dir);
 		}
 	}
 
@@ -2216,7 +2258,7 @@ int main(void)
 		for (const Config &cfg : configs)
 		{
 			const std::string dir = "work-history-fuzz";
-			std::filesystem::remove_all(dir);
+			removeTree(dir);
 			std::filesystem::create_directories(dir);
 			g_machine = Machine{};
 			std::vector<uint8_t> input(4096, 0);
@@ -2350,7 +2392,8 @@ int main(void)
 				if (h.nearest(f) != f) continue;
 				checkRestore(f);
 			}
-			std::filesystem::remove_all(dir);
+			h.spillTo(nullptr);
+			removeTree(dir);
 		}
 	}
 
@@ -2776,7 +2819,7 @@ int main(void)
 
 	/* the spill file belongs to the history and goes with it */
 	assert(spillFileIn("work-history-spill").empty());
-	std::filesystem::remove_all("work-history-spill");
+	removeTree("work-history-spill");
 
 	std::remove(kPath);
 	std::printf("test_state_history: ok\n");

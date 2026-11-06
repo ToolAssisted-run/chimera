@@ -124,15 +124,21 @@ HelpViewModel::HelpViewModel(Dispatcher &dispatcher, SessionViewModel &session, 
 				for (const auto &c : settings_.changedSettings()) facts.changed.push_back({c.label, c.value, c.standard});
 			const std::string text = issue_report::firstLines(facts);
 			reportText.set(text);
-			/* the files: the project, and the sandbox's log, beside the program
-			 * first and then where it runs, as Chimera looks */
+			/* the files: the project, and the sandbox's log - the file MINIBOX_LOG
+			 * names, when it is set, else beside the program first and then where
+			 * it runs, as Chimera looks */
 			std::string list;
 			std::error_code ec;
 			if (session_.hasProject.get() && std::filesystem::is_regular_file(session_.projectPath.get(), ec)) list = session_.projectPath.get();
-			for (const std::filesystem::path &folder : {std::filesystem::path(exeFolder.get()), std::filesystem::current_path(ec)})
+			std::vector<std::filesystem::path> logs;
+			if (const char *named = std::getenv("MINIBOX_LOG"); named != nullptr && *named != '\0') logs.emplace_back(named);
+			else
 			{
-				if (folder.empty()) continue;
-				const std::filesystem::path log = folder / "minibox-diag.log";
+				if (!exeFolder.get().empty()) logs.push_back(std::filesystem::path(exeFolder.get()) / "minibox-diag.log");
+				logs.push_back(std::filesystem::current_path(ec) / "minibox-diag.log");
+			}
+			for (const std::filesystem::path &log : logs)
+			{
 				if (!std::filesystem::is_regular_file(log, ec) || list.find(log.string()) != std::string::npos) continue;
 				list += (list.empty() ? "" : "\n") + log.string();
 				break;

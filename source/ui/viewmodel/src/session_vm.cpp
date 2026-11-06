@@ -3072,8 +3072,11 @@ std::string SessionViewModel::machineIdOnMachine()
 
 void SessionViewModel::startProjectSessionOnMachine(bool loadHistory)
 {
-	/* read only until the window says otherwise, from this project's first frame */
-	recordingModeM_ = false;
+	/* read only until the window says otherwise: projectSwitched turns the window's
+	 * recording mode off as the project opens, and this copy follows it. Not set here
+	 * as well: a person who turned it on in between had it on in the window and off
+	 * here, and the frames they played were not recorded (seen on a slow Mac, the
+	 * view models' tests' recording mode) */
 	namespace fs = std::filesystem;
 	const fs::path dir = projectCacheOnMachine();
 	if (dir.empty() || s_ == nullptr) return;
@@ -3325,7 +3328,11 @@ int64_t writtenAt(const std::filesystem::path &file)
 	std::error_code ec;
 	const auto t = std::filesystem::last_write_time(file, ec);
 	if (ec) return 0;
-	return static_cast<int64_t>(std::chrono::system_clock::to_time_t(std::chrono::clock_cast<std::chrono::system_clock>(t)));
+	/* the file clock's reading as the system clock's, by the two clocks' difference now
+	 * (std::chrono::clock_cast, which Apple's C++ library does not have) */
+	const auto sinceThen = std::chrono::file_clock::now() - t;
+	return static_cast<int64_t>(std::chrono::system_clock::to_time_t(
+		std::chrono::time_point_cast<std::chrono::system_clock::duration>(std::chrono::system_clock::now() - sinceThen)));
 }
 } // namespace
 
@@ -4518,7 +4525,8 @@ void SessionViewModel::bootProjectOnMachine(ce_project *p, const std::string &pa
 		}
 		if (!found.empty()) note = "; " + found;
 	}
-	/* a package built for a guest ABI this Chimera does not run is not run, a given one too */
+	/* a package built for a guest ABI this Chimera does not run, or for
+	 * another system, is not run, a given one too */
 	{
 		const char *perr = nullptr;
 		if (ce_package *pk = ce_package_open(package.c_str(), &perr))
@@ -4527,8 +4535,9 @@ void SessionViewModel::bootProjectOnMachine(ce_project *p, const std::string &pa
 			const uint8_t *d = ce_package_entry_texts(pk, "waterbox.config", &len);
 			json::Json cfg;
 			std::string jerr;
-			const std::string refused = d != nullptr && json::parse(std::string_view(reinterpret_cast<const char *>(d), static_cast<size_t>(len)), cfg, jerr)
+			std::string refused = d != nullptr && json::parse(std::string_view(reinterpret_cast<const char *>(d), static_cast<size_t>(len)), cfg, jerr)
 				? CoresViewModel::abiRefusal(cfg) : std::string();
+			if (const char *elsewhere = ce_package_runs_here(pk); refused.empty() && elsewhere != nullptr) refused = elsewhere;
 			ce_package_free(pk);
 			if (!refused.empty())
 			{

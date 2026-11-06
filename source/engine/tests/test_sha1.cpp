@@ -28,6 +28,10 @@
 
 #ifndef _WIN32
 #include <fcntl.h>
+#ifdef __APPLE__   /* BSD's names for the stat times */
+#define st_atim st_atimespec
+#define st_mtim st_mtimespec
+#endif
 #include <sys/stat.h>
 #endif
 

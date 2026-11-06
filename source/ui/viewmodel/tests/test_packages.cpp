@@ -320,6 +320,23 @@ std::vector<std::string> unknownSettingTypes(const Json &cfg)
 	return out;
 }
 
+/* where a package runs: "runsOn" lists at least one of the six, and
+ * nothing else (2026-11-05). Which of them its own CPU is, publish-core.sh
+ * checks against its core.wbx. */
+std::vector<std::string> runsOnProblems(const Json &cfg)
+{
+	static const std::set<std::string> known = {"windows-x86_64", "windows-aarch64", "linux-x86_64", "linux-aarch64",
+		"macos-x86_64", "macos-aarch64"};
+	const Json *runsOn = cfg.find("runsOn");
+	if (runsOn == nullptr || runsOn->kind != Json::Kind::Array || runsOn->items.empty())
+		return {"it does not say where it runs ('runsOn')"};
+	std::vector<std::string> out;
+	for (const Json &e : runsOn->items)
+		if (e.kind != Json::Kind::String || !known.count(e.text))
+			out.push_back("'runsOn' lists '" + e.text + "', which is not one of the six");
+	return out;
+}
+
 /* ---- the input names the window sends ---- */
 
 const std::set<std::string> controllerButtons = {"A", "B", "X", "Y", "Back", "Guide", "Start", "LeftThumb", "RightThumb",
@@ -401,6 +418,12 @@ void checkPackages(const std::vector<Package> &all)
 		for (const Package *k : readable)
 			if (const std::string why = CoresViewModel::abiRefusal(k->cfg); !why.empty()) wrong.push_back(k->name + ": " + why);
 		report("every package is built for a guest ABI this Chimera runs", wrong);
+	}
+	{
+		std::vector<std::string> wrong;
+		for (const Package *k : readable)
+			for (const std::string &w : runsOnProblems(k->cfg)) wrong.push_back(k->name + ": " + w);
+		report("every package says where it runs", wrong);
 	}
 	{
 		/* the package's texts are keys of its own language tables, one for
@@ -894,6 +917,14 @@ void selfChecks()
 			"guest ABI 1, said or not, runs");
 		expect(CoresViewModel::abiRefusal(parsed(R"({"abi": 2})")).find("Update Chimera") != std::string::npos, "a newer guest ABI is refused, Chimera named");
 		expect(CoresViewModel::abiRefusal(parsed(R"({"abi": 0})")).find("Update the core") != std::string::npos, "a retired guest ABI is refused, the core named");
+	}
+	{
+		expect(runsOnProblems(parsed(R"({"runsOn": ["linux-x86_64", "macos-aarch64"]})")).empty(), "a package that lists two of the six runs on them");
+		expect(runsOnProblems(parsed("{}")).size() == 1 && runsOnProblems(parsed(R"({"runsOn": []})")).size() == 1,
+			"a package that does not say where it runs is found");
+		expect(runsOnProblems(parsed(R"({"runsOn": ["linux-x64", "macos-aarch64"]})"))
+				== std::vector<std::string>{"'runsOn' lists 'linux-x64', which is not one of the six"},
+			"a name that is not one of the six is found");
 	}
 	{
 		/* the key and gamepad names a binding is checked against */

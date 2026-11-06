@@ -7,7 +7,7 @@ Built so far:
 
 - One engine call opens a project (step 1 of the order of work).
 - The engine's part of the server: the local pipe, the protocol, the log, and
-  `chimera-mcp`, the program an agent starts, on Linux and Windows.
+  `chimera-mcp`, the program an agent starts, on Windows, Linux and macOS.
 - In the window: Tools > MCP Server... with start, stop, the state, the tick
   box, the set-up command and the log; the title bar says "MCP server
   started" while it is.
@@ -43,8 +43,9 @@ Built so far:
   for. `list_cores` (with the kinds of file each core opens) and
   `describe_core` work in the window too.
 
-- `chimera-mcp` is in the Linux and Windows release bundles, in `dll/`, where
-  the dialog's set-up command points.
+- `chimera-mcp` is in every release bundle, where the dialog's set-up command
+  points: `dll/` on Linux, `bin\` on Windows, `Contents/MacOS/bin` in the Mac
+  app.
 
 - The windowless mode: `chimera-mcp --cores <dir> --work <dir>` opens a
   machine of its own, with `list_cores`, `describe_core`, `open_game`,

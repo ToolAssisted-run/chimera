@@ -2,7 +2,7 @@
 """What changed in a core since its last nightly, for the release page
 (chimera issue 357). Run inside the core's checkout, with its history:
 
-    release-changes.py --repo <owner/name> --since <tag> --to <commit> [--kind dev|nightly]
+    release-changes.py --repo <owner/name> --since <tag> --to <commit>
 
 prints a Markdown section listing every commit after <tag> up to <commit>,
 each linked, with the Chimera issues its subject names ("chimera#352",
@@ -33,12 +33,11 @@ def line(repo, sha, subject):
     return f"- [`{sha[:7]}`](https://github.com/{repo}/commit/{sha}) {text}"
 
 
-def section(repo, since, to, commits, kind="nightly"):
+def section(repo, since, to, commits):
     """commits: (sha, subject), newest first"""
     out = ["### What changed", ""]
     if since is None:
-        out.append("This is the first nightly of this core." if kind == "nightly"
-                   else "There is no nightly of this core yet to compare with.")
+        out.append("This is the first nightly of this core.")
         return "\n".join(out) + "\n"
     since_link = f"[{since}](https://github.com/{repo}/releases/tag/{since})"
     if not commits:
@@ -85,8 +84,6 @@ def self_test():
           line(repo, sha, "notchimera#5"),
           f"- [`151d92a`](https://github.com/{repo}/commit/{sha}) notchimera#5")
     check("no earlier nightly", section(repo, None, sha, []), "### What changed\n\nThis is the first nightly of this core.\n")
-    check("a development build with no nightly yet", section(repo, None, sha, [], "dev"),
-          "### What changed\n\nThere is no nightly of this core yet to compare with.\n")
     check("the same commit", section(repo, "nightly-2026-10-21", sha, []),
           f"### What changed\n\nNothing since [nightly-2026-10-21](https://github.com/{repo}/releases/tag/nightly-2026-10-21): this is the same commit.\n")
     many = section(repo, "nightly-2026-10-21", sha, [(sha, f"c{i}") for i in range(MOST + 3)])
@@ -107,7 +104,7 @@ def main(argv):
         return 2
     since = args.get("--since") or None
     commits = commits_between(since, args["--to"]) if since else []
-    sys.stdout.write(section(args["--repo"], since, args["--to"], commits, args.get("--kind", "nightly")))
+    sys.stdout.write(section(args["--repo"], since, args["--to"], commits))
     return 0
 
 

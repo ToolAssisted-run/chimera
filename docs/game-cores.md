@@ -31,7 +31,7 @@ frontend does not read that file - docs/core-manager.md.)
 A list of cores is one list, the emulators first, with a choice above it
 (user-decided, 2026-09-29):
 
-- File > Core Manager: a Type column (Emulator or Game) and Show: All /
+- Tools > Core Manager: a Type column (Emulator or Game) and Show: All /
   Emulators / Games. Select all and Remove act on the rows shown: a row the
   filter hides is unticked.
 - Config > Firmware: Show: All / Emulators / Games, over the cores' groups.

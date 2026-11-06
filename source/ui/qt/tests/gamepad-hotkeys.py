@@ -14,13 +14,16 @@ import sys
 chimera, work, project, package, sdl, script = sys.argv[1:7]
 shutil.rmtree(work, ignore_errors=True)
 os.makedirs(os.path.join(work, "lib"))
-shutil.copy(sdl, os.path.join(work, "lib", "libSDL2.so"))
+# the library's name and the variable the system's loader reads, on a Mac as on Linux
+mac = sys.platform == "darwin"
+shutil.copy(sdl, os.path.join(work, "lib", "libSDL2.dylib" if mac else "libSDL2.so"))
+path_var = "DYLD_LIBRARY_PATH" if mac else "LD_LIBRARY_PATH"
 seconds = 6
 env = dict(os.environ, QT_QPA_PLATFORM="offscreen", QT_QUICK_BACKEND="software", ALSOFT_DRIVERS="null",
            CHIMERA_QT_CONFIG=os.path.join(work, "settings.json"), CHIMERA_QT_CACHE=os.path.join(work, "cache"),
            CHIMERA_QT_RECOVERY=os.path.join(work, "recovery"), CHIMERA_QT_HASHES=os.path.join(work, "file-hashes.txt"),
-           LD_LIBRARY_PATH=os.path.join(work, "lib") + os.pathsep + os.environ.get("LD_LIBRARY_PATH", ""),
            STAND_IN_PAD_FROM="2000", STAND_IN_PAD_TO="2300")
+env[path_var] = os.path.join(work, "lib") + os.pathsep + os.environ.get(path_var, "")
 try:
     run = subprocess.run([chimera, project, package, "--lua", script, "--measure", str(seconds)], env=env,
                          capture_output=True, text=True, timeout=90)

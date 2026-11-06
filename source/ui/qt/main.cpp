@@ -211,6 +211,26 @@ private:
 #else
 #define EXE_SUFFIX ""
 #endif
+/* where Chimera keeps what is the person's own - settings, cores, firmware, the
+ * folders of Config > Paths - which elsewhere is beside the program. A Mac
+ * program lives in an app that is signed and not written to, so there it is
+ * the folder Mac programs keep their data in, ~/Library/Application Support/
+ * Chimera (owner, 2026-11-03); what ships with the app stays in it */
+static QString ownFolder()
+{
+#ifdef __APPLE__
+	/* CHIMERA_DATA_HOME, which decides the data folder wherever it is set, decides it here too */
+	const QString env = qEnvironmentVariable("CHIMERA_DATA_HOME");
+	const QString folder = !env.trimmed().isEmpty() ? QFileInfo(env).absoluteFilePath()
+		: QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
+	if (!folder.isEmpty())
+	{
+		QDir().mkpath(folder);
+		return folder;
+	}
+#endif
+	return QCoreApplication::applicationDirPath();
+}
 /* a program that ships with the window: in the bundle's bin folder, beside
  * the window, or, in a build, where the build puts it; "" when none is */
 static QString besideProgram(const QString &name)
@@ -308,7 +328,13 @@ int main(int argc, char **argv)
 	/* Fusion, with Chimera's check boxes and radio buttons and scroll bars always seen (style/, built in) */
 	QQuickStyle::setStyle(QStringLiteral("ChimeraStyle"));
 #ifndef _WIN32
-	/* Chimera's icon on every window; on Windows it is the program's own (chimera.rc), at every size */
+	/* Chimera's icon on every window; on Windows it is the program's own (chimera.rc), at every size.
+	 * On macOS it is the app's own too (Chimera.icns, by Info.plist), and setting one here would
+	 * replace the Dock's with this small picture the moment the program starts: only a program run
+	 * outside an app, which has none, is given it */
+#ifdef __APPLE__
+	if (!QCoreApplication::applicationDirPath().endsWith(QStringLiteral(".app/Contents/MacOS")))
+#endif
 	QGuiApplication::setWindowIcon(QIcon(QStringLiteral(":/chimera/chimera.png")));
 #endif
 
@@ -389,7 +415,7 @@ int main(int argc, char **argv)
 	 * when the program's folder cannot be written, in the system's folder
 	 * for this person's settings */
 	auto settingsBesideProgram = [] {
-		const QString folder = QCoreApplication::applicationDirPath();
+		const QString folder = ownFolder();
 		const QString path = folder + QStringLiteral("/settings.json");
 		if (QFileInfo::exists(path)) return path;
 		QTemporaryFile probe(QDir(folder).filePath(QStringLiteral("XXXXXX")));
@@ -772,13 +798,21 @@ int main(int argc, char **argv)
 	/* the system, for a bug report: as Qt names it */
 	help.osName.set((QSysInfo::prettyProductName() + QStringLiteral(" (") + QSysInfo::currentCpuArchitecture() + QStringLiteral(")")).toStdString());
 	help.exeFolder.set(QCoreApplication::applicationDirPath().toStdString());
+#ifdef __APPLE__
+	/* the sandbox's log (minibox-diag.log) is written in the folder the program
+	 * runs in, which for an app Finder starts is the disk's root, where nothing
+	 * can be written: on a Mac it is in the data folder, unless the
+	 * environment names another, and the report looks for it there */
+	if (qEnvironmentVariable("MINIBOX_LOG").isEmpty())
+		qputenv("MINIBOX_LOG", QFile::encodeName(ownFolder() + QStringLiteral("/minibox-diag.log")));
+#endif
 	/* the cores and the firmware: beside the program, as Chimera keeps them,
 	 * unless the environment names others */
 	vm::CoresViewModel cores(dispatcher);
 	if (cores.coresFolder.get().empty())
-		cores.coresFolder.set((QCoreApplication::applicationDirPath() + QStringLiteral("/Cores")).toStdString());
+		cores.coresFolder.set((ownFolder() + QStringLiteral("/Cores")).toStdString());
 	if (cores.firmwareFolder.get().empty())
-		cores.firmwareFolder.set((QCoreApplication::applicationDirPath() + QStringLiteral("/Firmware")).toStdString());
+		cores.firmwareFolder.set((ownFolder() + QStringLiteral("/Firmware")).toStdString());
 	vm::NewProjectViewModel newProject(dispatcher, session, cores);
 	/* the core's suggested settings for a game, asked in a process of its own */
 	/* Chimera's compile step: its sessions are the headless runner, and what
@@ -1041,7 +1075,7 @@ int main(int argc, char **argv)
 	/* Config > Paths: the folders, relative to the program's own at first;
 	 * the backups and the firmware follow them */
 	vm::PathsViewModel paths(dispatcher);
-	paths.programFolder.set(QCoreApplication::applicationDirPath().toStdString());
+	paths.programFolder.set(ownFolder().toStdString());
 	for (const char *name : {"base", "changed", "systems", "systemChanged", "recentForRoms", "lastRomFolder"}) config.keep(paths, name);
 	/* the temporary folder the system gave, put back when Temp Files is emptied */
 	struct TempWas
@@ -1135,8 +1169,16 @@ int main(int argc, char **argv)
 	}
 	/* the Paths window's Themes folder (CHIMERA_THEMES_DIR for a test) */
 	auto themesFollow = [&themes, &paths] {
-		themes.folder.set(qEnvironmentVariableIsSet("CHIMERA_THEMES_DIR") ? qEnvironmentVariable("CHIMERA_THEMES_DIR").toStdString()
-			: paths.resolve("Themes"));
+		std::string folder = qEnvironmentVariableIsSet("CHIMERA_THEMES_DIR") ? qEnvironmentVariable("CHIMERA_THEMES_DIR").toStdString()
+			: paths.resolve("Themes");
+#ifdef __APPLE__
+		/* the themes that ship are in the app, and the person's folder has none
+		 * until they put one there: the shipped ones are shown meanwhile */
+		if (!qEnvironmentVariableIsSet("CHIMERA_THEMES_DIR") && QDir(QString::fromStdString(folder))
+			.entryList({QStringLiteral("*.chimeraTheme.json")}, QDir::Files).isEmpty())
+			folder = (QCoreApplication::applicationDirPath() + QStringLiteral("/Themes")).toStdString();
+#endif
+		themes.folder.set(folder);
 	};
 	themesFollow();
 	vm::Connection themesFollowPaths = paths.moved.connect(themesFollow);

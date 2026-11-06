@@ -19,26 +19,40 @@ The Core Manager shows what is in that folder.
 
 ## What a core release is
 
-Each core repository publishes to its own GitHub releases, on the same two
-kinds of build the frontend already uses (see `.github/workflows/release.yml`):
+Each core repository publishes to its own GitHub releases, the one kind of
+build the frontend also publishes (see `.github/workflows/release.yml`): a
+**nightly**, an immutable dated release, `nightly-YYYY-MM-DD`, published only
+when main moved. Never deleted. This is the archive a movie replays against in
+five years. There is no rolling development build (user-decided, 2026-11-05):
+one that is replaced cannot be cited by a movie.
 
-* **dev** - a rolling prerelease, replaced on every green push to main. One
-  link that is always newest.
-* **nightly** - an immutable dated prerelease, `nightly-YYYY-MM-DD`, published
-  only when main moved. Never deleted. This is the archive a movie replays
-  against in five years.
+One asset per CPU the core is built for: `<coreid>-<version>-<arch>.chimeraCore`,
+`<arch>` being `x86_64` or `aarch64`, the names Chimera's own release bundles
+use. A package is machine code for one CPU - miniBox runs `core.wbx` directly,
+and refuses one built for another CPU. Which systems of that CPU it runs on,
+the package says itself, in `runsOn` ([porting-a-core.md](porting-a-core.md));
+the release notes list them beside each file. The version is the commit the
+build was made from, which is what the package already stamps into
+`waterbox.config` and what a movie already cites (`CoreVersion`). Releases from
+before packages carried their CPU name one asset `<coreid>-<version>.chimeraCore`:
+those packages say nothing of where they run, so Chimera refuses them.
 
-One asset per release: `<coreid>-<version>.chimeraCore`. The version is the
-commit the build was made from, which is what the package already stamps into
-`waterbox.config` and what a movie already cites (`CoreVersion`).
+Most users of Windows and Linux want the x86_64 package, and the notes
+`publish-core.sh` writes say so above the table whenever a release also has an
+aarch64 one: take the aarch64 one only if you know you are using an ARM device;
+on a Mac, aarch64 for Apple silicon and x86_64 for an Intel Mac; and put only
+one of them in the folder. Chimera's own release notes say the same of its
+bundles.
 
 Fifteen repositories publishing identically is fifteen copies of one job that
 will drift, so the logic lives once, here, in two files:
 
-* `tools/publish-core.sh` - reads the version **out of the package**, refuses a
-  hand-built one, names the asset, and creates or moves the release.
+* `tools/publish-core.sh` - reads the version **out of each package**, refuses a
+  hand-built one or two of different versions, checks a `core.wbx` is built for
+  the CPU it is given as and that the package lists a system of that CPU in
+  `runsOn`, names the assets, and creates the nightly.
 * `.github/workflows/publish-core.yml` - a `workflow_call` wrapper that
-  downloads the gated artifact and runs that script.
+  downloads the gated artifacts and runs that script.
 
 A release page ends with **What changed**: every commit since the core's last
 nightly, each linked, with the Chimera issues its subject names
@@ -51,7 +65,7 @@ A core's own workflow adds one job:
 ```yaml
   publish:
     needs: [ core-gate, frontend-gate ]
-    if: github.event_name != 'pull_request'
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     permissions: { contents: write }
     uses: ToolAssisted-run/chimera/.github/workflows/publish-core.yml@main
     with:
@@ -60,11 +74,16 @@ A core's own workflow adds one job:
       package: gpgx.chimeraCore
 ```
 
-plus a daily `schedule:` trigger, which is what makes a nightly. A push to main
-publishes `dev`; a scheduled run publishes `nightly-YYYY-MM-DD`, and only if
-main moved since the last one. Nothing publishes from a pull request, and
-nothing publishes that the gates did not pass, because `needs:` is what got it
-there.
+That publishes the one package, as x86_64. A core built on more than one CPU
+gates on each (a matrix, one leg per CPU on a runner of that CPU), uploads each
+leg's package as `<artifact>-<arch>`, and names them with
+`arches: x86_64 aarch64`; the release then carries both.
+
+plus a daily `schedule:` trigger, which is what makes a nightly. A scheduled
+run, or one started by hand, publishes `nightly-YYYY-MM-DD`, and only if main
+moved since the last one. A push to main and a pull request publish nothing
+(the shared workflow's job does not run for them), and nothing publishes that
+the gates did not pass, because `needs:` is what got it there.
 
 **The version is read out of the package, never passed in.** It is what the
 build stamped into `waterbox.config`, and it is what a movie cites; anything
@@ -72,11 +91,10 @@ else is a way for a release and its package to disagree. A version carrying `+lo
 outright - a hand-built package is nobody else's build, and publishing one would
 put a version nothing can reproduce into somebody's movie header.
 
-The `dev` tag is moved by **deleting and recreating the release through the
-API**, never by pushing a tag. A workflow's token may not create or update
-workflow files, and pushing a tag at a commit whose `.github/workflows` differ
-from the default branch's counts as exactly that. The frontend's own pipeline
-learned this the hard way; the same comment is in `publish-core.sh`.
+A nightly's tag is made **through the releases API**, never by pushing a tag. A
+workflow's token may not create or update workflow files, and pushing a tag at
+a commit whose `.github/workflows` differ from the default branch's counts as
+exactly that.
 
 ### Which cores publish
 
@@ -135,7 +153,7 @@ with a browser.
 the bundle does not carry it; CI fetches the published packages by it, see
 *Keeping the frontend honest*, and a test holds it to what the packages say.)
 
-The manager is **File > Core Manager**. When there is no core at all - a fresh
+The manager is **Tools > Core Manager**. When there is no core at all - a fresh
 install - Chimera says so once, in a sentence that names the cores folder, and
 offers to open the manager. That is the one moment where it cannot do anything
 useful without help, so it is the one moment worth interrupting; once a core
@@ -170,9 +188,11 @@ before this change do, which is the reason it is still written.
     <the cores folder>/        one folder; a package is a file in it
 
 The cores folder is `Cores/` beside the executable. It comes with the bundle,
-empty, and a package dropped into it is found. A user who wants it somewhere
+empty, and a package dropped into it is found. On a Mac it is
+`~/Library/Application Support/Chimera/Cores`, as the app is not written to
+([macos.md](macos.md)). A user who wants it somewhere
 else - one set of cores shared by any number of unpacked Chimeras, or a faster
-disk - names another folder in File > Core Manager (**Change folder...**), kept
+disk - names another folder in Tools > Core Manager (**Change folder...**), kept
 as `CoresFolder` in the config - written the moment it is chosen, so it is
 remembered next time however the session ends: an absolute path, or one
 relative to the executable. Empty means the default, and choosing the default keeps nothing, so
@@ -186,7 +206,8 @@ only ever adds, has no window, and the manager removes nothing from them.
 
 **The data directory's `Cores` is not searched.** That is where versions that
 downloaded cores put them (`%LOCALAPPDATA%\Chimera\Cores` on Windows,
-`~/.local/share/chimera/Cores` elsewhere, or under a moved data directory).
+`~/.local/share/chimera/Cores` on Linux, or under a moved data directory; on a
+Mac that folder is the cores folder itself).
 Somebody updating from one would otherwise open Chimera to find every core
 apparently gone, so the manager says when packages are still there and how
 many, and **Change folder...** opens on that folder, so making it the cores
@@ -194,7 +215,7 @@ folder is choosing it. Nothing is moved or copied for them.
 
 ### One file per version, and no version is ever replaced
 
-A published package is named `<coreid>-<version>.chimeraCore`. Two versions of
+A published package is named `<coreid>-<version>-<arch>.chimeraCore`. Two versions of
 one core are two files sitting side by side, and nothing Chimera does removes
 an older one: an old build is the only way to replay a movie recorded on it,
 and Chimera cannot fetch it again. Versions go only when the user removes them.
@@ -235,7 +256,7 @@ put it in.
 
 ## The window
 
-**File > Core Manager.** Two lines at the top: the cores folder and how many
+**Tools > Core Manager.** Two lines at the top: the cores folder and how many
 cores are in it, and that Chimera downloads nothing - get a package from its
 project, or build it, and put it in this folder. Then one list of cores on the
 left, one core's versions on the right.

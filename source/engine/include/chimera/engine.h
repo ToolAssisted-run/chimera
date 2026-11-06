@@ -756,6 +756,21 @@ CE_API const char *ce_package_last_error(ce_package *p);
 CE_API const uint8_t *ce_package_entry_texts(ce_package *p, const char *name, uint64_t *len_out);
 CE_API const char *ce_package_language_problems(ce_package *p);
 
+/* Where a package runs. Each package lists, in its waterbox.config, the
+ * systems and CPUs it is made for: "runsOn": ["windows-x86_64",
+ * "linux-aarch64", ...], each one of windows, linux or macos, a dash, and
+ * x86_64 or aarch64 (user-decided, 2026-11-05). Chimera holds nothing about
+ * any core: this list is the only thing that says where one runs.
+ *
+ * ce_host_platform: this Chimera's own entry, e.g. "linux-x86_64".
+ * ce_package_runs_here: NULL when the package lists this Chimera's entry;
+ * otherwise the reason it does not run here, a sentence - it lists none, it
+ * lists a name that is not one of the six, or it is made for others. A
+ * session refuses such a package with that reason. Per-thread, until the
+ * next call on the thread. */
+CE_API const char *ce_host_platform(void);
+CE_API const char *ce_package_runs_here(ce_package *p);
+
 /* ---- the session ----
  *
  * A running waterboxed machine: a core package's guest, loaded through the

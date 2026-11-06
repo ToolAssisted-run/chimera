@@ -417,12 +417,20 @@ ApplicationWindow {
         }
     }
 
-    menuBar: RowLayout {
+    // On macOS the menus are the system's own, in the bar at the top of the
+    // screen (Qt does that for a MenuBar that is the window's menuBar itself),
+    // and the window has no bar of its own. Everywhere else they are in the
+    // window, with the Show TAStudio button at their right.
+    readonly property bool systemMenuBar: Qt.platform.os === "osx"
+    menuBar: systemMenuBar ? mainMenus : menuRow
+    RowLayout {
+        id: menuRow
         spacing: 0
         // Chimera's menus, in its order: File, System, View, Config, Tools,
         // Emulator (Game for a game core), Help. System and Emulator are there
         // only while a machine runs, as Chimera's are
         MenuBar {
+            id: mainMenus
             Layout.fillWidth: true
             delegate: MenuBarEntry {}
             Menu {
@@ -773,7 +781,7 @@ ApplicationWindow {
             objectName: "showTAStudio"
             text: qsTrId("main.show_tastudio")
             flat: true
-            visible: tastudioWindow.hiddenByPerson && root.session.hasProject
+            visible: !root.systemMenuBar && tastudioWindow.hiddenByPerson && root.session.hasProject
             onClicked: tastudioWindow.engage()
         }
     }
@@ -1906,6 +1914,16 @@ ApplicationWindow {
                 ToolTip.delay: 500
             }
             Item { Layout.fillWidth: true }
+            // macOS has no room beside its menus (they are the system's): the
+            // button that brings TAStudio back is here
+            ToolButton {
+                objectName: "showTAStudioStatus"
+                text: qsTrId("main.show_tastudio")
+                flat: true
+                implicitHeight: 20
+                visible: root.systemMenuBar && tastudioWindow.hiddenByPerson && root.session.hasProject
+                onClicked: tastudioWindow.engage()
+            }
         }
     }
     // what went wrong is said over the picture, as Chimera's messages say it

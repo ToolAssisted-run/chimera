@@ -69,6 +69,12 @@ static uint8_t *g_watchedPage;
 static uint32_t g_handlerRuns;
 static int g_watchedOpen;
 
+/* A host whose pages are larger than the machine's 4 KiB (Apple silicon's are
+ * 16 KiB) cannot give a core the faults this handler waits for, and refuses a
+ * core that exports it (MACHINE-SPEC, guest fault forwarding). For that Mac
+ * the core is built with SYNTH_NO_GUEST_FAULT_HANDLER: no handler, and the
+ * page left readable, so everything else the core does is tested there. */
+#ifndef SYNTH_NO_GUEST_FAULT_HANDLER
 ECL_EXPORT int GuestFaultHandler(uint64_t addr, uint64_t is_write)
 {
 	(void)is_write;
@@ -77,6 +83,7 @@ ECL_EXPORT int GuestFaultHandler(uint64_t addr, uint64_t is_write)
 	g_watchedOpen = 1;
 	return mprotect(g_watchedPage, 4096, PROT_READ) == 0;
 }
+#endif
 
 static volatile uint64_t g_spun;
 static uint32_t g_spinFrame;   /* SPINFRAME: the frame that never ends, or 0 */
@@ -291,7 +298,9 @@ ECL_EXPORT int Init(void) {
 	g_watchedPage = mmap(0, 4096, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 	if (g_watchedPage == MAP_FAILED) return 0;
 	for (int i = 0; i < 4096; i++) g_watchedPage[i] = (uint8_t)(i * 7 + 3);
+#ifndef SYNTH_NO_GUEST_FAULT_HANDLER
 	if (mprotect(g_watchedPage, 4096, PROT_NONE) != 0) return 0;
+#endif
 	/* one line on standard output, as real cores print: without a window the
 	 * MCP server runs the core in its own process, and this line must not
 	 * reach the agent's protocol stream */

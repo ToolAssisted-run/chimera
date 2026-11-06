@@ -200,15 +200,23 @@ static void write_stack(FILE *f, HANDLE process, HANDLE thread, CONTEXT ctx)
 	const BOOL symbols = SymInitializeW(process, NULL, TRUE);
 	STACKFRAME64 frame;
 	memset(&frame, 0, sizeof frame);
+#if defined(__aarch64__)
+	const DWORD machine = IMAGE_FILE_MACHINE_ARM64;
+	frame.AddrPC.Offset = ctx.Pc;
+	frame.AddrFrame.Offset = ctx.Fp;
+	frame.AddrStack.Offset = ctx.Sp;
+#else
+	const DWORD machine = IMAGE_FILE_MACHINE_AMD64;
 	frame.AddrPC.Offset = ctx.Rip;
-	frame.AddrPC.Mode = AddrModeFlat;
 	frame.AddrFrame.Offset = ctx.Rbp;
-	frame.AddrFrame.Mode = AddrModeFlat;
 	frame.AddrStack.Offset = ctx.Rsp;
+#endif
+	frame.AddrPC.Mode = AddrModeFlat;
+	frame.AddrFrame.Mode = AddrModeFlat;
 	frame.AddrStack.Mode = AddrModeFlat;
 	fprintf(f, "\nstack (faulting thread%s):\n", symbols ? "" : ", no symbols");
 	for (int i = 0; i < 64; i++) {
-		if (!StackWalk64(IMAGE_FILE_MACHINE_AMD64, process, thread, &frame, &ctx, NULL,
+		if (!StackWalk64(machine, process, thread, &frame, &ctx, NULL,
 				SymFunctionTableAccess64, SymGetModuleBase64, NULL)) break;
 		DWORD64 pc = frame.AddrPC.Offset;
 		if (pc == 0) break;

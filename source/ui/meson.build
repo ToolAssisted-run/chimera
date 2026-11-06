@@ -100,7 +100,8 @@ vm_lib = static_library(
 vm_dep = declare_dependency(
   link_with: [vm_lib, vm_miniz, chimera_shared, lua54, e_sqlite3_lib],
   include_directories: [vm_inc, engine_inc],
-  dependencies: [thread_dep],
+  # iconv is a library of its own on macOS (in libc on Linux and mingw's static one)
+  dependencies: [thread_dep] + (host_macos ? [cc.find_library('iconv')] : []),
 )
 
 test_vm = executable(
@@ -247,12 +248,28 @@ test(
   # the ffmpeg the build ships, for the encode
   # and the headless runner, which compile sessions are
   env: ['ALSOFT_DRIVERS=null', 'CHIMERA_FFMPEG=' + (repo_root / 'build/dll/ffmpeg'),
-    'CHIMERA_RUN=' + (meson.project_build_root() / 'chimera-run')],
+    'CHIMERA_RUN=' + chimera_run.full_path()],
   timeout: 180,
 )
 
 qt6 = import('qt6')
+# macOS: Qt is a set of frameworks, and the private headers (main.cpp asks for
+# the graphics card's) are in the framework's folder for the version, which
+# the dependency does not add
+qt_private_args = []
+qt_gui_pc = disabler()
+if host_machine.system() == 'darwin'
+  qt_gui_pc = dependency('qt6', modules: ['Gui'], required: get_option('qt_ui'))
+endif
+if host_machine.system() == 'darwin' and qt_gui_pc.found()
+  qt_private_args = ['-I' + qt_gui_pc.get_variable(pkgconfig: 'libdir') / 'QtGui.framework/Headers' / qt_gui_pc.version() / 'QtGui']
+endif
 qt_dep = dependency('qt6', modules: ['Core', 'Gui', 'Qml', 'Quick', 'QuickControls2'], required: get_option('qt_ui'))
+if host_machine.system() == 'darwin' and qt_dep.found() and qt_gui_pc.found()
+  # the frameworks are found where Qt is (a bundle carries its own: macdeployqt)
+  qt_dep = declare_dependency(dependencies: [qt_dep],
+    link_args: ['-Wl,-rpath,' + qt_gui_pc.get_variable(pkgconfig: 'libdir')])
+endif
 if qt_dep.found()
   qt_moc = qt6.compile_moc(
     headers: ['qt/qml_view_model.hpp', 'qt/picture_item.hpp', 'qt/piano_roll_item.hpp', 'qt/key_names.hpp', 'qt/menu_letters.hpp', 'qt/theme_palette.hpp', 'qt/clipboard_relay.hpp', 'qt/picture_files.hpp', 'qt/pointer_capture.hpp', 'qt/button_router.hpp', 'qt/headless_run.hpp', 'qt/portal_file_chooser.hpp', 'qt/file_places.hpp', 'qt/system_file_dialog.hpp'],
@@ -341,7 +358,7 @@ if qt_dep.found()
       # Qt's private headers for the graphics card the window draws on (main.cpp)
       dependencies: [vm_dep, qt_dep, dl_dep, dependency('qt6', modules: ['Core', 'Gui'], private_headers: true)],
       # the view models have a Signal::emit; Qt's "emit" keyword would eat it
-      cpp_args: ['-DQT_NO_KEYWORDS'],
+      cpp_args: ['-DQT_NO_KEYWORDS'] + qt_private_args,
       override_options: ['cpp_std=c++20'],
       install: true,
       install_dir: 'dll',
@@ -451,21 +468,23 @@ if qt_dep.found()
       qt6.compile_moc(headers: ['qt/theme_palette.hpp', 'qt/portal_file_chooser.hpp', 'qt/file_places.hpp'], dependencies: [qt_dep]), qt_dialogs_rcc],
     dependencies: [qt_dep, dl_dep],
     override_options: ['cpp_std=c++20'],
-    cpp_args: ['-DCHIMERA_QT_QML_DIR="' + meson.current_source_dir() / 'qt' + '"'],
   )
-  test('theme', test_theme, env: ['QT_QPA_PLATFORM=offscreen', 'QT_QUICK_BACKEND=software', 'CHIMERA_FILE_CHOOSER=builtin'], timeout: 60)
+  test('theme', test_theme, args: [meson.current_source_dir() / 'qt'], env: ['QT_QPA_PLATFORM=offscreen', 'QT_QUICK_BACKEND=software', 'CHIMERA_FILE_CHOOSER=builtin'], timeout: 60)
   # the file and folder dialogs on Linux: the desktop's chooser through its
   # portal (a stand-in one on a bus of the test's own), and Chimera's own
   # where there is none (docs/file-picker.md)
   if host_machine.system() != 'windows'
-    test_file_chooser = executable(
-      'test-file-chooser',
-      ['qt/tests/test_file_chooser.cpp', 'qt/portal_file_chooser.cpp', 'qt/file_places.cpp',
-        qt6.compile_moc(headers: ['qt/portal_file_chooser.hpp', 'qt/file_places.hpp'], dependencies: [qt_dep]), qt_dialogs_rcc],
-      dependencies: [qt_dep, dl_dep],
-      override_options: ['cpp_std=c++20'],
-    )
-    test('file chooser', find_program('python3'), args: [files('qt/tests/file-chooser.py'), test_file_chooser], timeout: 180)
+    # (macOS has the system's own, through Qt, as Windows does: this chooser is Linux's)
+    if host_machine.system() == 'linux'
+      test_file_chooser = executable(
+        'test-file-chooser',
+        ['qt/tests/test_file_chooser.cpp', 'qt/portal_file_chooser.cpp', 'qt/file_places.cpp',
+          qt6.compile_moc(headers: ['qt/portal_file_chooser.hpp', 'qt/file_places.hpp'], dependencies: [qt_dep]), qt_dialogs_rcc],
+        dependencies: [qt_dep, dl_dep],
+        override_options: ['cpp_std=c++20'],
+      )
+      test('file chooser', find_program('python3'), args: [files('qt/tests/file-chooser.py'), test_file_chooser], timeout: 180)
+    endif
     # a gamepad input bound to a hotkey runs it as a key does (issue 466): a
     # stand-in SDL2's pad presses Pause, and a project opened paused runs
     stand_in_sdl = shared_library('stand-in-sdl', 'qt/tests/stand_in_sdl.c', build_by_default: false)
@@ -501,6 +520,10 @@ if qt_dep.found()
   # while the keyboard works them (issue 405); Qt's test module drives the
   # keys, and the Windows Qt is built without it
   qt_test_dep = dependency('qt6', modules: ['Core', 'Gui', 'Qml', 'Quick', 'QuickControls2', 'Test'], required: false)
+if host_machine.system() == 'darwin' and qt_test_dep.found() and qt_gui_pc.found()
+  qt_test_dep = declare_dependency(dependencies: [qt_test_dep],
+    link_args: ['-Wl,-rpath,' + qt_gui_pc.get_variable(pkgconfig: 'libdir')])
+endif
   if qt_test_dep.found()
     test_key_filter = executable(
       'test-key-filter',
@@ -527,7 +550,7 @@ if qt_dep.found()
       dependencies: [qt_test_dep],
       override_options: ['cpp_std=c++20'],
     )
-    test('text prompt', test_text_prompt, env: ['QT_QPA_PLATFORM=offscreen', 'QT_QUICK_BACKEND=software'], timeout: 60)
+    test('text prompt', test_text_prompt, env: ['QT_QPA_PLATFORM=offscreen', 'QT_QUICK_BACKEND=software', 'QT_QUICK_CONTROLS_STYLE=Basic'], timeout: 60)
     # the box a key is bound in takes every key, a window's shortcut on it
     # notwithstanding: Escape empties it again (issue 431)
     test_binding_box = executable(
