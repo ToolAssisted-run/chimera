@@ -157,9 +157,11 @@ env -u DISPLAY sh tests/synth/run-witness.sh     # the witness: the product, end
 - **Content.** No commercial game, firmware or key is committed, uploaded to
   CI or attached to an issue. Test content that may not be distributed stays
   outside the repository and its legs SKIP where it is absent.
-- **Issues.** Deferred is not closed. An issue is closed when the fix is
-  published, with the published build named from the release and not from
-  memory, and with what was not proved said plainly.
+- **Issues.** Deferred is not closed. An issue is closed as soon as its fix
+  is pushed to `main`, naming the commit, without waiting for a nightly
+  (user-decided, 2026-11-06), and with what was not proved said plainly.
+  An issue that the upstream emulator has too is confirmed by running
+  upstream itself, said so, and closed.
 
 ## What is the owner's to decide
 

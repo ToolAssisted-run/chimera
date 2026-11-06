@@ -129,9 +129,11 @@ bursts around nightlies.
 
 ## 6. What the reporter sees (comment conventions, already in use)
 
-- Fixed: "Fixed in <repo> <hash>; in the next nightly (or: in nightly
-  <date> onwards). Please reopen if <date>+ still shows it." Issue closed
-  by the commit message (`Closes #N`) or by the comment.
+- Fixed: "Fixed in <repo> <hash>; in the next nightly. Please reopen if
+  it still happens with that build or a newer one." The issue is closed as
+  soon as the fix is pushed to main, without waiting for the nightly
+  (user-decided, 2026-11-06), by the commit message (`Closes #N`) or by
+  the comment.
 - Already fixed: same line, plus which build the reporter was on and why
   it predates the fix.
 - Needs info: checklist of the missing items, and the one sentence of why

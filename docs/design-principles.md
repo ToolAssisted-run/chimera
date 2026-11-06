@@ -13960,3 +13960,12 @@ a real console, and Tusk's own screen in upstream ares.
 The same commit makes the README from "Getting a build" down shorter: smaller
 sentences, fewer paragraphs, and a blank line between every paragraph and
 list item (user-asked, 2026-11-06).
+
+## Issues close when the fix is pushed (user-decided, 2026-11-06)
+
+An issue is closed as soon as its fix is pushed to `main`. The closing
+comment names the commit and says the fix will be in the next nightly. It no
+longer waits for a published nightly to name. What was not proved is still
+said plainly, and the reporter is asked to reopen if the problem remains.
+Deferred work still leaves an issue open. AGENTS.md and
+docs/issue-intake.md say the same.
