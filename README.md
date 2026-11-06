@@ -38,8 +38,6 @@ Chimera is not designed for casual play. For that, use the original emulators di
 
 Chimera does not include cores and does not download them. To use a core, download its `.chimeraCore` package from the core's own project (linked below) or build it yourself, and put it in the `Cores` folder beside Chimera.
 
-**Tools > Core Manager...** lists the cores in that folder and lets you point Chimera at a different one ([docs/core-manager.md](docs/core-manager.md)).
-
 ### Official cores
 
 Made, published and supported by this project. Report a problem with one in [Chimera's issues](https://github.com/ToolAssisted-run/chimera/issues).
