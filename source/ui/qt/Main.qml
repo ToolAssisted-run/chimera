@@ -787,8 +787,8 @@ ApplicationWindow {
     }
 
     // Chimera's context menu on the picture: the project's items while one is
-    // open, Config while full screen, the screenshot and closing while a game runs, and the menu
-    // bar back while it is hidden. Its Restart, Stop and Save items do here what their hotkeys do.
+    // open, Config while full screen, the screenshot and closing while a game runs, and always
+    // the item that hides or shows the menu bar. Its Restart, Stop and Save items do here what their hotkeys do.
     readonly property bool fullScreen: root.visibility === Window.FullScreen
     property bool cursorHidden: false
     property point cursorAt: Qt.point(-100, -100)
@@ -841,10 +841,10 @@ ApplicationWindow {
         ShownSeparator { visible: root.session.isOpen }
         Shown { text: qsTrId("main.screenshot"); icon.source: "qrc:/chimera/menu/Screenshot.png"; visible: root.session.isOpen; onTriggered: root.hotkeys.run("run", ["Screenshot"]) }
         Shown { text: qsTrId("main.close_project"); icon.source: "qrc:/chimera/menu/CloseProject.png"; visible: root.session.isOpen; onTriggered: closeAction.trigger() }
-        ShownSeparator { visible: root.fullScreen || !root.menuBar.visible }
-        Shown {
+        // always there, so the menu is never empty and a hidden menu bar always has a way back (issue 526)
+        ShownSeparator { visible: root.session.isOpen }
+        MenuItem {
             text: root.menuBar.visible ? qsTrId("main.hide_menu") : qsTrId("main.show_menu")
-            visible: root.fullScreen || !root.menuBar.visible
             onTriggered: root.menuBar.visible = !root.menuBar.visible
         }
     }
