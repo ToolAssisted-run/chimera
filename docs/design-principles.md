@@ -13990,6 +13990,16 @@ owner: "fix the release gate so main moving doesn't skip nightlies".
   conclusion". The release now looks only at runs that passed.
 - **Skipping.** A scheduled run still publishes nothing when the commit it
   would release is the one the last nightly holds.
+- **Not past a change to the workflows.** The first release made this way
+  (2026-11-06, of `c33d4809` while main was `0b091461`) failed to publish:
+  GitHub refused the run's token the tag, HTTP 403 "Resource not accessible by
+  integration". The commit's `.github/workflows` differed from main's, because
+  `0b091461` itself changed `release.yml`; a token a workflow is given may not
+  create a ref that would change workflow files. cemu's nightly of 2026-11-05
+  failed the same way, released from a commit older than main's Intel Mac
+  change to its workflow. So the search stops at the newest commit that
+  changed the workflows: on a day a workflow changes, the nightly waits for
+  that commit's CI.
 
 Tested: the selection run by hand against main as it was picks `c33d4809`,
 the newest commit CI passed. Above it were `1fa74b95` and `1a708b57`, still in

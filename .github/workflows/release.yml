@@ -95,11 +95,16 @@ jobs:
             passed=$(gh run list --workflow CI --branch main --status success \
               --limit 200 --json headSha --jq '.[].headSha')
             sha=""
+            # Only a commit whose workflows are main's own: GitHub refuses this
+            # run's token a tag at a commit whose .github/workflows differs from
+            # main's (HTTP 403, "Resource not accessible by integration"), so the
+            # walk stops at a commit that changed them.
             for c in $(git rev-list --first-parent -n 200 HEAD); do
               if echo "$passed" | grep -qx "$c"; then sha=$c; break; fi
+              if ! git diff --quiet "$c^" "$c" -- .github/workflows; then break; fi
             done
             if [ -z "$sha" ]; then
-              echo "::error::none of main's last 200 commits has passed CI; nothing to release"
+              echo "::error::no commit of main since its workflows last changed has passed CI; nothing to release"
               exit 1
             fi
             if [ "$sha" != "$(git rev-parse HEAD)" ]; then
