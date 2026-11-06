@@ -86,53 +86,6 @@ LuaConsoleViewModel::LuaConsoleViewModel(Dispatcher &dispatcher, LuaBridge &lua,
 	expose("toggleAllIfNoneSelected", "Toggle All if None Selected: Toggle and Refresh work on every script when none is selected",
 		toggleAllIfNoneSelected, true);
 	expose("reloadOnChange", "Reload When Script File Changes: a running script whose file is written is started again", reloadOnChange, true);
-	expose("duplicateToStdout", "what scripts print goes to the program's standard output too", duplicateToStdout, true);
-	{
-		/* the user's application data folder */
-		const char *appdata = std::getenv("APPDATA");
-		const char *xdg = std::getenv("XDG_CONFIG_HOME");
-		const char *home = std::getenv("HOME");
-		appDataFolder.set(appdata != nullptr && *appdata != '\0' ? std::string(appdata)
-						  : xdg != nullptr && *xdg != '\0'      ? std::string(xdg)
-						  : home != nullptr                       ? std::string(home) + "/.config"
-																  : std::string());
-	}
-	expose("appDataFolder", "the user's application data, where Sublime Text 2 keeps its packages", appDataFolder, true);
-	expose("sublimeState", "how Register To Text Editors says Sublime Text 2: \"\" not found, \"detected\", \"installed\"", sublimeState);
-	command("textEditors", "looks for Sublime Text 2 and Chimera's completions in it, for Register To Text Editors", {},
-		[this](const Args &, std::string &) -> Value {
-			namespace fs = std::filesystem;
-			std::error_code ec;
-			/* where Chimera looks for it: its usual place on Windows */
-			const bool there = fs::exists("C:\\Program Files\\Sublime Text 2\\sublime_text.exe", ec);
-			const bool registered = fs::exists(fs::path(appDataFolder.get()) / "Sublime Text 2" / "Packages" / "Lua" / "chimera.lua.sublime-completions", ec);
-			sublimeState.set(!there ? "" : registered ? "installed" : "detected");
-			return sublimeState.get();
-		});
-	command("registerSublime", "writes Chimera's Lua completions into Sublime Text 2's Lua package (Register To Text Editors)", {},
-		[this](const Args &, std::string &error) -> Value {
-			namespace fs = std::filesystem;
-			const fs::path folder = fs::path(appDataFolder.get()) / "Sublime Text 2" / "Packages" / "Lua";
-			std::error_code ec;
-			/* Sublime Text makes its Lua package folder only when the package is
-			 * first changed, so a fresh install has none: it is made here, as Chimera's */
-			fs::create_directories(folder, ec);
-			if (!fs::is_directory(folder, ec))
-			{
-				error = tr("lua_console.could_not_make", {folder.string()});
-				return {};
-			}
-			const fs::path file = folder / "chimera.lua.sublime-completions";
-			std::ofstream out(file, std::ios::binary);
-			out << sublimeCompletions();
-			if (!out)
-			{
-				error = tr("session.could_not_write", {file.string()});
-				return {};
-			}
-			status.set(tr("lua_console.completions_written", {file.string()}));
-			return file.string();
-		});
 	expose("recentSessions", "sessions opened or saved, newest first, a line each", recentSessions, true);
 	expose("recentScripts", "scripts opened, newest first, a line each", recentScripts, true);
 	expose("luaFolder", "the Paths' Lua folder, where New Script's template is", luaFolder, true);
@@ -553,16 +506,11 @@ LuaConsoleViewModel::LuaConsoleViewModel(Dispatcher &dispatcher, LuaBridge &lua,
 	});
 
 	command("restoreDefaults", "the console's settings back to Chimera's: scripts start on load, Toggle works on every "
-		"script when none is selected, files are not watched, and Duplicate to Stdout as the platform has it", {},
+		"script when none is selected, and files are not watched", {},
 		[this](const Args &, std::string &) -> Value {
 			disableOnLoad.set(false);
 			toggleAllIfNoneSelected.set(true);
 			reloadOnChange.set(false);
-#ifdef _WIN32
-			duplicateToStdout.set(false);
-#else
-			duplicateToStdout.set(true);
-#endif
 			return {};
 		});
 	command("functionsList", "Help > Lua Functions List, as Chimera's: every function Chimera documents, in its words "
@@ -621,76 +569,6 @@ LuaConsoleViewModel::LuaConsoleViewModel(Dispatcher &dispatcher, LuaBridge &lua,
 		refresh();
 		return {};
 	});
-}
-
-std::string LuaConsoleViewModel::sublimeCompletions()
-{
-	json::Json docs;
-	std::string why;
-	if (!json::parse(std::string_view(kChimeraLuaDocs), docs, why)) return {};
-	auto text = [](const json::Json &o, const char *k) {
-		const json::Json *j = o.find(k);
-		return j != nullptr ? j->text : std::string();
-	};
-	/* a string as Newtonsoft writes it */
-	auto quoted = [](const std::string &s) {
-		std::string out = "\"";
-		for (const char c : s)
-		{
-			switch (c)
-			{
-			case '"': out += "\\\""; break;
-			case '\\': out += "\\\\"; break;
-			case '\n': out += "\\n"; break;
-			case '\r': out += "\\r"; break;
-			case '\t': out += "\\t"; break;
-			case '\b': out += "\\b"; break;
-			case '\f': out += "\\f"; break;
-			default:
-				if (static_cast<unsigned char>(c) < 0x20)
-				{
-					char u[8];
-					std::snprintf(u, sizeof u, "\\u%04x", static_cast<unsigned char>(c));
-					out += u;
-				}
-				else
-					out += c;
-			}
-		}
-		return out + "\"";
-	};
-	auto folded = [](std::string s) {
-		for (char &c : s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-		return s;
-	};
-	std::vector<const json::Json *> ordered;
-	for (const json::Json &d : docs.items) ordered.push_back(&d);
-	/* Chimera's order: by library, then by name */
-	std::stable_sort(ordered.begin(), ordered.end(), [&](const json::Json *a, const json::Json *b) {
-		const std::string la = folded(text(*a, "library")), lb = folded(text(*b, "library"));
-		if (la != lb) return la < lb;
-		return folded(text(*a, "name")) < folded(text(*b, "name"));
-	});
-	std::string out = "{\"scope\":\"source.lua - string\",\"completions\":[";
-	bool first = true;
-	for (const json::Json *d : ordered)
-	{
-		const std::string call = text(*d, "library") + "." + text(*d, "name");
-		std::string contents = call + "(";
-		if (const json::Json *args = d->find("args"))
-			for (size_t i = 0; i < args->items.size(); i++)
-			{
-				const json::Json &arg = args->items[i];
-				const json::Json *optional = arg.find("optional");
-				const std::string name = text(arg, "name");
-				contents += "${" + std::to_string(i + 1) + ":" + (optional != nullptr && optional->boolean ? "[" + name + "]" : name) + "}";
-				if (i + 1 < args->items.size()) contents += ",";
-			}
-		contents += ")";
-		out += std::string(first ? "" : ",") + "{\"trigger\":" + quoted(call) + ",\"contents\":" + quoted(contents) + "}";
-		first = false;
-	}
-	return out + "]}";
 }
 
 std::string LuaConsoleViewModel::functionsList(const std::string &windowList)
@@ -1104,7 +982,7 @@ void LuaConsoleViewModel::append(const std::string &written)
 		else if (ended || !piece.empty())
 			output_.push_back(piece);
 		open_ = !ended && (open_ || !piece.empty());
-		if (ended && echo_ && duplicateToStdout.get() && !output_.empty()) echo_(output_.back());
+		if (ended && echo_ && !output_.empty()) echo_(output_.back());
 		if (!ended) break;
 		at = nl + 1;
 	}

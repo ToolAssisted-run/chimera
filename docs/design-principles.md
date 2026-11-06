@@ -13878,3 +13878,30 @@ so a movie made on one could stop being replayable.
   every core's workflow stops passing one; the platform matrix (pull request
   309) removes the input and the dev paths left in both workflows, and
   rewrites the documents that still describe dev builds.
+
+## Two Lua Console items go (user-decided, 2026-11-06)
+
+A tester asked whether two items in the Lua Console's Settings menu were
+invented (issues 529, 530, and 531 for every window). Neither was: both came
+over unchanged from the window before Qt, which had them from the program it
+started from. Every item in the Qt window's menus was compared with the old
+window's: all but a few came from it, and those few were added on purpose
+since (the firmware list's Collapse and Expand, RAM Search's 8 Byte, Display
+Real Time, TAStudio's Columns).
+
+The owner removed the two:
+
+- Register To Text Editors wrote Chimera's Lua completions into Sublime Text
+  2, an editor last updated in 2013. It is gone, with its texts.
+- Duplicate to Stdout copied what scripts print to the program's standard
+  output, which nobody sees unless Chimera was started from a terminal. It is
+  gone from the menu, and the copy is made exactly when Chimera runs
+  --headless, where standard output is all anybody sees. The setting is no
+  longer remembered.
+
+Tested: the headless test has a new check, a script's print on standard
+output under --headless (it fails with the copy turned off); meson tests 62
+passed, 2 failed for reasons unrelated to this change (other cores'
+packages in build/Cores predate runsOn, and the copied program of the
+command-line test cannot find Qt on this machine); witness 125/125.
+

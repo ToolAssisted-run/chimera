@@ -248,25 +248,6 @@ ApplicationWindow {
             MenuItem { text: qsTrId("lua_console.disable_scripts_on_load"); checkable: true; checked: win.vm.disableOnLoad; onTriggered: win.vm.disableOnLoad = checked }
             MenuItem { text: qsTrId("lua_console.toggle_all_if_none_selected"); checkable: true; checked: win.vm.toggleAllIfNoneSelected; onTriggered: win.vm.toggleAllIfNoneSelected = checked }
             MenuItem { text: qsTrId("lua_console.reload_when_script_file_changes"); checkable: true; checked: win.vm.reloadOnChange; onTriggered: win.vm.reloadOnChange = checked }
-            MenuItem { text: qsTrId("lua_console.duplicate_to_stdout"); checkable: true; checked: win.vm.duplicateToStdout; onTriggered: win.vm.duplicateToStdout = checked }
-            MenuDivider {}
-            // Chimera's: Sublime Text 2's Lua completions written for it; said as found ("detected") or written ("installed")
-            Menu {
-                delegate: MenuEntry {}
-                title: qsTrId("lua_console.register_to_text_editors")
-                onAboutToShow: win.vm.run("textEditors")
-                MenuItem {
-                    text: win.vm.sublimeState === "installed" ? qsTrId("lua_console.sublime_text_2_installed")
-                        : win.vm.sublimeState === "detected" ? qsTrId("lua_console.sublime_text_2_detected") : qsTrId("lua_console.sublime_text_2")
-                    font.italic: win.vm.sublimeState === "detected"
-                    checkable: true
-                    checked: win.vm.sublimeState === "installed"
-                    onTriggered: {
-                        win.vm.run("registerSublime")
-                        checked = Qt.binding(() => win.vm.sublimeState === "installed")
-                    }
-                }
-            }
             MenuDivider {}
             MenuItem { text: qsTrId("common.save_window_position"); checkable: true; checked: windowOptions.savePosition; onTriggered: windowOptions.set("save", checked) }
             MenuItem {

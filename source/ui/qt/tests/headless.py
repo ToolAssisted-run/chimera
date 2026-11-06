@@ -2,7 +2,7 @@
 # Chimera's --headless, taken by the window that replaces it, for runs nobody
 # watches such as the cores' tests: it runs with no display at all; a
 # script's client.exit leaves without asking, its unsaved changes let go and
-# said; a core that stops, or a movie that cannot be played, ends the run
+# said; what a script prints is on standard output; a core that stops, or a movie that cannot be played, ends the run
 # with 65 and says why; a project whose
 # files are not found ends it with 64 and names them, and one that cannot
 # open says why; a file picker ends it
@@ -92,6 +92,12 @@ if os.path.exists(out):
         words = f.read().split()
     check(len(words) == 3 and int(words[1]) >= 30 and words[2] == "true", "the script saw the machine run, and TAStudio has the project",
           " ".join(words))
+
+# what a script prints is on standard output too, where a run nobody watches is read (issue 529)
+proj, _ = project("printed")
+r = run(proj, script("printed", 'print("said by the script, 529")\nemu.frameadvance()\nclient.exit()\n'))
+check(r is not None and r.returncode == 0 and "lua: said by the script, 529" in r.stdout,
+      "what a script prints is on standard output", said(r))
 
 # client.exit with unsaved changes: nobody asked, the project on disk as it was
 proj, _ = project("unsaved")

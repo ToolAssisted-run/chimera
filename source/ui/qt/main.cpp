@@ -1338,15 +1338,16 @@ int main(int argc, char **argv)
 
 	/* scripts reach the same view models, by the same names */
 	vm::LuaBridge lua;
-	/* what scripts print goes to the console window, and to stdout too */
-	vm::LuaConsoleViewModel luaConsole(dispatcher, lua, [](const std::string &line) {
+	/* what scripts print goes to the console window, and with --headless to
+	 * stdout too, where a run nobody watches is read (issue 529) */
+	vm::LuaConsoleViewModel luaConsole(dispatcher, lua, headless ? std::function<void(const std::string &)>([](const std::string &line) {
 		std::printf("lua: %s\n", line.c_str());
 		std::fflush(stdout);
-	});
+	}) : std::function<void(const std::string &)>());
 	luaConsoleOf = &luaConsole;
 	mcp.lua = &luaConsole;
 	mcp.newProject = &agentProject;
-	for (const char *name : {"disableOnLoad", "toggleAllIfNoneSelected", "reloadOnChange", "duplicateToStdout", "recentSessions", "recentScripts"})
+	for (const char *name : {"disableOnLoad", "toggleAllIfNoneSelected", "reloadOnChange", "recentSessions", "recentScripts"})
 		config.keep(luaConsole, name);
 	/* New Script's template is in the Paths' Lua folder */
 	luaConsole.luaFolder.set(paths.resolve("Lua"));

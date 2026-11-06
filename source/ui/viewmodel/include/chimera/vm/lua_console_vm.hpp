@@ -19,7 +19,8 @@ class LuaConsoleViewModel : public ViewModel
 {
 public:
 	/* takes over the bridge's output: everything it prints comes here (and to
-	 * `echo` a line at a time, when given and Duplicate to Stdout is on) */
+	 * `echo` a line at a time, when given: Chimera gives it for --headless,
+	 * where the program's standard output is all anybody sees, issue 529) */
 	LuaConsoleViewModel(Dispatcher &dispatcher, LuaBridge &lua, std::function<void(const std::string &)> echo = {});
 	/* Chimera's Lua Functions List made from its documentation and the
 	 * window's own list ([{"library", "name", "params"}]), as JSON */
@@ -46,14 +47,6 @@ public:
 	Property<int64_t> functionCount{0};
 	/* the script Toggle Last Lua Script toggles: the last one toggled */
 	Property<std::string> lastScript;
-	/* Settings > Register To Text Editors (Sublime Text 2): where Sublime's
-	 * Lua package keeps completions (under the user's application data: on
-	 * Windows %APPDATA%, else the configuration folder), and how the menu
-	 * says it ("" Sublime not found, "detected", "installed") */
-	Property<std::string> appDataFolder;
-	Property<std::string> sublimeState;
-	/* Chimera's completions for Sublime Text 2 */
-	static std::string sublimeCompletions();
 	/* the output lines selected (for Copy), first..last; -1 for none */
 	Property<int64_t> outputFirst{-1};
 	Property<int64_t> outputLast{-1};
@@ -62,11 +55,6 @@ public:
 	Property<bool> disableOnLoad{false};
 	Property<bool> toggleAllIfNoneSelected{true};
 	Property<bool> reloadOnChange{false};
-#ifdef _WIN32
-	Property<bool> duplicateToStdout{false};
-#else
-	Property<bool> duplicateToStdout{true};
-#endif
 	/* newest first, a line each, remembered */
 	Property<std::string> recentSessions;
 	Property<std::string> recentScripts;
