@@ -13905,3 +13905,32 @@ passed, 2 failed for reasons unrelated to this change (other cores'
 packages in build/Cores predate runsOn, and the copied program of the
 command-line test cannot find Qt on this machine); witness 125/125.
 
+## Config > Display is a grid with descriptions (user-decided, 2026-11-06)
+
+A tester found Display's options unclear, crowded side by side with nothing
+saying what each does (issue 527), and asked for the layout a core's
+settings have. The owner chose the full redesign.
+
+- Each of the three tabs is a grid: a row an option, its name on the left
+  and its box, list or number on the right, under headings (Scaling, Aspect
+  ratio, Cropping, Text over the picture; Replays, Window titles, Snowy null
+  core; Windowed, Fullscreen).
+- A box under the grid says what the row under the pointer does, or else
+  the row last clicked or given the keyboard, with its range where it has
+  one. 31 descriptions, in all 26 languages.
+- Radio buttons became lists. Rows that do not apply are greyed (a custom
+  size unless Custom size is chosen); rows that work only on Windows are
+  shown only there, as before.
+- The labels written for the old layout (with colons, or long sentences
+  that were really descriptions) were removed: 18 texts in every language.
+- Enable Windows Fullscreen Hacks stays (issue 528): it is Qt's own switch
+  for a border round a full-screen window on Windows, which Qt documents as
+  the way to keep pop-up windows such as menus showing over a full-screen
+  window. Its description now says this.
+
+Tested: on a private X display, the three tabs drawn and a description
+shown for a row pointed at; the language tests (a Turkish "%150" read as a
+placeholder was caught and reworded); meson tests 62 passed, 2 failed for
+reasons unrelated to this change; witness 125/125. Not tried: the window on
+Windows, where the Windows-only rows show.
+
