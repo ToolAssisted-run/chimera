@@ -88,8 +88,10 @@
  * core's list (from 0); the address in hex, or any. The calls are counted and
  * written as memoryCalls=<count> (memoryCalls=none for a core that watches no
  * memory), with memoryScopes=<names, comma apart> and memorySum=<the sum of
- * the addresses and values the calls gave, wrapping at 64 bits>. A watch the
- * core refuses ends the run with the reason.
+ * the addresses and values the calls gave, wrapping at 64 bits>,
+ * memoryBytes=<the sum of the sizes the calls gave> and
+ * memoryReplaceable=<which kinds' values the core lets a call change, bit
+ * 1 << kind each>. A watch the core refuses ends the run with the reason.
  * --record drives RECORD mode instead of playback: the given movie is only an
  * input source (each entry decoded to buttons/axes), the session generates the
  * log itself, and it is written to <out.txt>. Feeding that file back in as an
@@ -750,6 +752,7 @@ int main(int argc, char **argv)
 	{
 		int64_t count = 0;
 		uint64_t sum = 0;
+		int64_t bytes = 0;
 	} memoryCalls;
 	int64_t lagFrames = 0;   /* frames the core did not read its controls in (the play loop's) */
 	std::string bands;
@@ -1193,10 +1196,12 @@ int main(int argc, char **argv)
 		ce_session_set_input_poll_callback(session, [](void *ctx) { ++*static_cast<int64_t *>(ctx); }, &inputPolls);
 	if (!memoryWatches.empty() && ce_session_memory_scopes(session)[0] != 0)
 	{
-		ce_session_set_memory_callback(session, [](void *ctx, int32_t, int32_t, uint64_t address, uint64_t value) {
+		ce_session_set_memory_callback(session, [](void *ctx, int32_t, int32_t, uint64_t address, uint64_t value, int32_t size, uint64_t *) {
 			auto *calls = static_cast<MemoryCalls *>(ctx);
 			calls->count++;
 			calls->sum += address + value;
+			calls->bytes += size;
+			return 0;
 		}, &memoryCalls);
 		for (const MemoryWatch &m : memoryWatches)
 			if (ce_session_watch_memory(session, m.kind, m.scope, m.address, 1) == 0)
@@ -2293,7 +2298,8 @@ int main(int argc, char **argv)
 			for (char &c : scopes)
 				if (c == '\n') c = ',';
 			meta += "memoryCalls=" + (scopes.empty() ? std::string("none") : std::to_string(memoryCalls.count)) + "\n";
-			meta += "memoryScopes=" + scopes + "\nmemorySum=" + std::to_string(memoryCalls.sum) + "\n";
+			meta += "memoryScopes=" + scopes + "\nmemorySum=" + std::to_string(memoryCalls.sum) + "\nmemoryBytes=" +
+					std::to_string(memoryCalls.bytes) + "\nmemoryReplaceable=" + std::to_string(ce_session_memory_replaceable(session)) + "\n";
 		}
 		if (!shortDumps.empty()) meta += "shortdumps=" + shortDumps + "\n";
 		// the display aspect the core reports for the last picture, when it does

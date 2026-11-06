@@ -1828,6 +1828,7 @@
 		"project.branch_marker_keep_state": "\"keepState\" znacznika gałęzi nie jest wartością logiczną",
 		"project.branch_markers": "\"markers\" gałęzi nie jest tablicą",
 		"project.branch_time": "\"time\" gałęzi nie jest tekstem",
+		"project.branch_userdata": "\"userdata\" gałęzi nie jest tekstem",
 		"project.cannot_read_from": "nie można odczytać '%1' z %2",
 		"project.clock_start": "\"clockStart\" nie jest czasem zapisanym jako 2017-05-27T12:44:28Z, między 1970 a 2200",
 		"project.core_fields": "\"core\" potrzebuje tekstowych pól \"name\", \"version\" i \"sha1\"",

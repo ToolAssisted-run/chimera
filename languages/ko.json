@@ -1764,6 +1764,7 @@
 		"project.branch_marker_keep_state": "브랜치 표시의 \"keepState\"가 참/거짓 값이 아닙니다",
 		"project.branch_markers": "브랜치의 \"markers\"가 배열이 아닙니다",
 		"project.branch_time": "브랜치의 \"time\"이 문자열이 아닙니다",
+		"project.branch_userdata": "브랜치의 \"userdata\"가 문자열이 아닙니다",
 		"project.cannot_read_from": "%2에서 '%1'을(를) 읽을 수 없습니다",
 		"project.clock_start": "\"clockStart\"는 1970년부터 2200년 사이의 2017-05-27T12:44:28Z 형식 시각이어야 합니다",
 		"project.core_fields": "\"core\"에는 문자열 \"name\", \"version\", \"sha1\"이 필요합니다",

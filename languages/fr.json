@@ -1796,6 +1796,7 @@
 		"project.branch_marker_keep_state": "le « keepState » d'un marqueur de branche n'est pas un booléen",
 		"project.branch_markers": "les « markers » d'une branche ne sont pas un tableau",
 		"project.branch_time": "le « time » d'une branche n'est pas un texte",
+		"project.branch_userdata": "le « userdata » d'une branche n'est pas un texte",
 		"project.cannot_read_from": "impossible de lire « %1 » depuis %2",
 		"project.clock_start": "« clockStart » n'est pas une heure écrite comme 2017-05-27T12:44:28Z, entre 1970 et 2200",
 		"project.core_fields": "« core » doit avoir un « name », un « version » et un « sha1 » en texte",

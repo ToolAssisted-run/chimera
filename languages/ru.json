@@ -1828,6 +1828,7 @@
 		"project.branch_marker_keep_state": "\"keepState\" метки ветки не логического типа",
 		"project.branch_markers": "\"markers\" ветки не является массивом",
 		"project.branch_time": "\"time\" ветки не является строкой",
+		"project.branch_userdata": "\"userdata\" ветки не является строкой",
 		"project.cannot_read_from": "не удалось прочитать '%1' из %2",
 		"project.clock_start": "\"clockStart\" записано не как время 2017-05-27T12:44:28Z между 1970 и 2200 годами",
 		"project.core_fields": "\"core\" требует строковые поля \"name\", \"version\" и \"sha1\"",

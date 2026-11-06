@@ -71,13 +71,23 @@ end
 function __chimera_frame_start_events() callEvent("OnFrameStart") end
 function __chimera_frame_end_events() callEvent("OnFrameEnd") end
 function __chimera_console_closed() callEvent("OnConsoleClose") end
+-- a function called part way through a frame (a read of the controls, a
+-- memory access) may read and write memory, but do nothing that needs the
+-- frame to have ended: save or load a state, close the core or start it again
+-- (issue 534)
+local insideFrame = false
+local function notInsideFrame(what)
+	if insideFrame then
+		error(what .. " is not allowed in a function called part way through a frame (event.oninputpoll, event.on_bus_*)", 3)
+	end
+end
 -- a read of the controls the core reported, inside its frame: the functions
 -- may read memory, but not wait for a frame
 function __chimera_input_poll_events()
-	local was = __chimera_no_waits
-	__chimera_no_waits = true
+	local was, inside = __chimera_no_waits, insideFrame
+	__chimera_no_waits, insideFrame = true, true
 	callEvent("OnInputPoll")
-	__chimera_no_waits = was
+	__chimera_no_waits, insideFrame = was, inside
 end
 function __chimera_script_stopped(id)
 	local exits = {}
@@ -375,8 +385,14 @@ function mainmemory.getcurrentmemorydomainsize() return memory.getmemorydomainsi
 
 -- memorysavestate: the core's own state in memory, by an id ----------------
 memorysavestate = {}
-function memorysavestate.savecorestate() return C.session.saveCoreState() end
-function memorysavestate.loadcorestate(id) C.session.loadCoreState(tostring(id)) end
+function memorysavestate.savecorestate()
+	notInsideFrame("memorysavestate.savecorestate()")
+	return C.session.saveCoreState()
+end
+function memorysavestate.loadcorestate(id)
+	notInsideFrame("memorysavestate.loadcorestate()")
+	C.session.loadCoreState(tostring(id))
+end
 function memorysavestate.removestate(id) C.session.removeState(tostring(id)) end
 function memorysavestate.clearstatesfrommemory() C.session.clearStates() end
 
@@ -413,6 +429,62 @@ function userdata.get_keys()
 	for k in pairs(bag) do keys[#keys + 1] = k end
 	table.sort(keys)
 	return keys
+end
+-- the bag as text, kept with each branch made and put back when the branch
+-- is loaded (issue 534): a line a value, by name - its kind (b a boolean, i a
+-- whole number, f a number with a fraction, s text), its name and its value,
+-- the name and text with every byte but a letter, a digit or . _ - written
+-- %XX, and a fraction exactly, as %a writes it
+local function escaped(t) return (t:gsub("[^%w%._%-]", function(c) return string.format("%%%02X", c:byte()) end)) end
+local function unescaped(t) return (t:gsub("%%(%x%x)", function(h) return string.char(tonumber(h, 16)) end)) end
+function __chimera_userdata_text()
+	local out = {}
+	for _, k in ipairs(userdata.get_keys()) do
+		local v = bag[k]
+		local kind, text
+		if type(v) == "boolean" then kind, text = "b", v and "true" or "false"
+		elseif type(v) == "string" then kind, text = "s", escaped(v)
+		elseif math.type(v) == "integer" then kind, text = "i", string.format("%d", v)
+		else
+			kind = "f"
+			if v ~= v then text = "nan"
+			elseif v == math.huge then text = "inf"
+			elseif v == -math.huge then text = "-inf"
+			else text = string.format("%a", v) end
+		end
+		out[#out + 1] = kind .. " " .. escaped(k) .. " " .. text
+	end
+	return table.concat(out, "\n")
+end
+local function userdataOf(text)
+	local b = {}
+	for line in (text .. "\n"):gmatch("([^\n]*)\n") do
+		local kind, k, v = line:match("^(%a) (%S*) (%S*)$")
+		if kind ~= nil then
+			k = unescaped(k)
+			local n = tonumber(v)
+			if kind == "b" then b[k] = v == "true"
+			elseif kind == "s" then b[k] = unescaped(v)
+			elseif kind == "i" then b[k] = n and math.tointeger(n)
+			elseif kind == "f" then
+				if v == "nan" then b[k] = 0 / 0
+				elseif v == "inf" then b[k] = math.huge
+				elseif v == "-inf" then b[k] = -math.huge
+				elseif n ~= nil then b[k] = n * 1.0 end -- a float, its sign kept (-0.0 + 0.0 is 0.0)
+			end
+		end
+	end
+	return b
+end
+-- a branch loaded, the machine on its frame: the userdata it kept put back
+-- (a branch that kept none leaves it as it is), then the event.onloadstate
+-- functions called with its name; they may not wait for a frame
+function __chimera_branch_state_loaded(text, name)
+	if text ~= nil then bag = userdataOf(text) end
+	local was = __chimera_no_waits
+	__chimera_no_waits = true
+	callEvent("OnLoadState", name)
+	__chimera_no_waits = was
 end
 
 -- game: a game core's properties by name (docs/game-cores.md) -------------
@@ -617,7 +689,10 @@ function tastudio.getbranchinput(id, frame)
 	end
 	return t
 end
-function tastudio.loadbranch(index) if engaged() then C.branches.load(index) end end
+function tastudio.loadbranch(index)
+	notInsideFrame("tastudio.loadbranch()")
+	if engaged() then C.branches.load(index) end
+end
 -- the main movie's markers (a branch's are not asked for here)
 function tastudio.getmarker(frame, branch)
 	if not engaged() or branch ~= nil then return nil end
@@ -821,10 +896,19 @@ function client.isseeking() return C.session.seekingTo >= 0 end
 function client.is_rewinding() return C.session.rewinding end
 function client.speedmode(percent) C.session.speedPercent = percent end
 -- at once, as Chimera's: the next line sees frame 0, and the script goes on
-function client.reboot_core() C.session.rebootForScript() end
-function client.closerom() C.session.close() end
+function client.reboot_core()
+	notInsideFrame("client.reboot_core()")
+	C.session.rebootForScript()
+end
+function client.closerom()
+	notInsideFrame("client.closerom()")
+	C.session.close()
+end
 -- at once, as Chimera's: the next line sees the project open, and the script goes on with it
-function client.openproject(path) return C.session.openProjectForScript(path) == true end
+function client.openproject(path)
+	notInsideFrame("client.openproject()")
+	return C.session.openProjectForScript(path) == true
+end
 function client.getversion() return C.help and C.help.commit or "" end
 function client.get_approx_framerate() return C.session.fps end
 function client.SetSoundOn(on) C.session.soundOn = on end
@@ -1573,6 +1657,9 @@ function event.onframeend(fn, name) return registerNamed(fn, "OnFrameEnd", name)
 function event.onframestart(fn, name) return registerNamed(fn, "OnFrameStart", name).guid end
 -- after the script that registered it stops
 function event.onexit(fn, name) return registerNamed(fn, "OnExit", name).guid end
+-- a branch loaded, once the machine is on its frame and the userdata it kept
+-- is back: the function gets the branch's name (issue 534)
+function event.onloadstate(fn, name) return registerNamed(fn, "OnLoadState", name).guid end
 function event.onconsoleclose(fn, name) return registerNamed(fn, "OnConsoleClose", name).guid end
 -- the calling script's own, by id or by name, as Chimera's
 function event.unregisterbyid(guid)
@@ -1675,20 +1762,57 @@ event.on_bus_read = event.onmemoryread
 event.onmemorywrite = memoryEvent(2, false, "OnMemoryWrite")
 event.on_bus_write = event.onmemorywrite
 function event.availableScopes() return zeroBased(memoryScopes()) end
+-- whether the core lets a function change the value of a "read" or a "write"
+-- by giving back a number (issue 534); an instruction ("exec") never
+function event.can_replace_value(kind)
+	local bit = ({read = 1 << 1, write = 1 << 2, exec = 0})[kind]
+	if bit == nil then error("the kind is \"read\", \"write\" or \"exec\", not " .. tostring(kind), 2) end
+	return bit ~= 0 and #memoryScopes() > 0 and (C.session.memoryReplaceable() & bit) ~= 0
+end
 function event.can_use_callback_params(subset) return subset == "memory" end
 -- the bridge's: an access the core reported, inside its frame, to the
 -- functions that watch it, each given the address and the value; they may
 -- read memory, but not wait for a frame
-function __chimera_memory_events(kind, scope, address, value)
-	local was = __chimera_no_waits
-	__chimera_no_waits = true
+-- Each function gets the address, the value and the access's flags, as
+-- Chimera's (issue 534): its kind (0x1000 a read, 0x2000 a write, 0x4000 an
+-- instruction) and its size (0x10000 a byte, 0x20000 two, 0x30000 four; 0 when
+-- the core does not say, or eight), the processor and the memory not given
+-- (0). A read's or a write's function may give back a whole number, which
+-- the machine reads or writes instead, where the core lets it: each function
+-- gets the value the machine had, the last number given is the one used, and
+-- one that gives back nothing leaves it. A number where the core does not
+-- let it change is said once, and not used.
+local accessFlags = {[0] = 0x4000, [1] = 0x1000, [2] = 0x2000}
+local sizeFlags = {[1] = 0x10000, [2] = 0x20000, [4] = 0x30000}
+local unchangeableSaid = {}
+function __chimera_memory_events(kind, scope, address, value, size, replaceable)
+	local was, inside = __chimera_no_waits, insideFrame
+	__chimera_no_waits, insideFrame = true, true
+	local flags = accessFlags[kind] | (sizeFlags[size] or 0)
 	local list = {}
 	for _, f in ipairs(registered) do
 		local m = f.memory
 		if m and m.kind == kind and m.scope == scope and (m.address == -1 or m.address == address) then list[#list + 1] = f end
 	end
-	for _, f in ipairs(list) do callNamed(f, address, value) end
-	__chimera_no_waits = was
+	local now
+	for _, f in ipairs(list) do
+		local given = callNamed(f, address, value, flags)
+		if type(given) == "number" and kind ~= 0 then
+			local n = math.tointeger(given)
+			if n == nil then
+				print("error running function attached by the event " .. f.event .. "\nError message: it gave back "
+					.. tostring(given) .. ", not a whole number: the value is left as it is")
+			elseif replaceable then
+				now = n
+			elseif not unchangeableSaid[kind] then
+				unchangeableSaid[kind] = true
+				print(coreName() .. " does not let a function change the value of its " .. kindNames[kind]
+					.. ": the number a function gives back is not used")
+			end
+		end
+	end
+	__chimera_no_waits, insideFrame = was, inside
+	return now
 end
 
 -- the Lua Functions List's: each library's functions with their parameters'

@@ -797,7 +797,9 @@ json.dump(d, open(p, 'w'))
 		# the frame it is won in, and at both in each frame after (the frames
 		# that read no pad). chimera-run --watch-memory counts the calls and
 		# sums the values given; watching must not move the machine, and a
-		# read in the Code scope is refused.
+		# read in the Code scope is refused. Each read is said to be a byte,
+		# and the core says it lets a read's and a write's value be changed
+		# (issue 534: 6, bits 1 << 1 and 1 << 2).
 		rm -f "$work/memcalls.exec.meta.txt" "$work/memcalls.read.meta.txt" "$work/memcalls.ram.bin" "$work/memcalls.vram.bin"
 		crun_game "$epkg" "$here/roms/gridWalker.testrom" "$here/movies/gridWalker.win.txt" --watch-memory exec:0:0 \
 			--meta "$work/memcalls.exec.meta.txt" > "$work/memcalls.exec.log" 2>&1
@@ -812,19 +814,23 @@ json.dump(d, open(p, 'w'))
 		mread=$(sed -n 's/^memoryCalls=//p' "$work/memcalls.read.meta.txt" 2>/dev/null)
 		msum=$(sed -n 's/^memorySum=//p' "$work/memcalls.read.meta.txt" 2>/dev/null)
 		mscopes=$(sed -n 's/^memoryScopes=//p' "$work/memcalls.read.meta.txt" 2>/dev/null)
+		mbytes=$(sed -n 's/^memoryBytes=//p' "$work/memcalls.read.meta.txt" 2>/dev/null)
+		mchange=$(sed -n 's/^memoryReplaceable=//p' "$work/memcalls.read.meta.txt" 2>/dev/null)
 		if [ "$mscopes" != "Code,RAM" ] || [ -z "$mexec" ] || [ "$mexec" = none ] || [ -z "$mread" ]; then
 			report "E:memory-calls" FAIL "the core's memory calls were not offered: scopes ${mscopes:-missing}, calls ${mexec:-missing}/${mread:-missing} (see work/memcalls.*.log)"
 		elif [ "$mexec" -ne "${mframes:-0}" ]; then
 			report "E:memory-calls" FAIL "the instruction at 0 made $mexec calls in ${mframes:-?} frames, not one a frame"
 		elif [ "$mread" -ne $(( 2 * ${mframes:-0} )) ] || [ "${msum:-x}" != $(( 2 * ${mlags:-0} + 1 )) ]; then
 			report "E:memory-calls" FAIL "reads of RAM 0 made $mread calls summing to ${msum:-?} in ${mframes:-?} frames with ${mlags:-?} lag frames: not two a frame, with the status the game had"
+		elif [ "${mbytes:-x}" != "$mread" ] || [ "${mchange:-x}" != 6 ]; then
+			report "E:memory-calls" FAIL "the reads gave sizes summing to ${mbytes:-?} for $mread one-byte reads, and the kinds that can be changed were ${mchange:-?}, not 6"
 		elif ! grep -q "^status=ERROR" "$work/memcalls.refused.meta.txt" 2>/dev/null; then
 			report "E:memory-calls" FAIL "a read in the Code scope was not refused (see work/memcalls.refused.log)"
 		elif ! cmp -s "$work/memcalls.ram.bin" "$golden_dir/gridWalker.win.ram.bin" \
 			|| ! cmp -s "$work/memcalls.vram.bin" "$golden_dir/gridWalker.win.vram.bin"; then
 			report "E:memory-calls" FAIL "watching memory moved the machine off the goldens"
 		else
-			report "E:memory-calls" PASS "the instruction at 0 called once in each of $mframes frames, reads of RAM 0 twice ($mread, the status values summing to $msum), a read in the Code scope refused; the machine ends on the goldens"
+			report "E:memory-calls" PASS "the instruction at 0 called once in each of $mframes frames, reads of RAM 0 twice ($mread, the status values summing to $msum, each a byte), reads and writes said to be changeable, a read in the Code scope refused; the machine ends on the goldens"
 		fi
 
 		# THE CORE LOG (ce_core_log, Tools > Export Core Log... in the frontend):
@@ -2109,9 +2115,11 @@ GZPY
 	# The synth names the scopes Code and RAM and calls back at each access a
 	# script watches. A script sees the instruction at 0 called once a frame,
 	# reads of the status twice with the value memory holds, every write with
-	# the value already written; a scope or kind the core lacks refused; none
-	# called once removed. It leaves one registered, and Chimera must close
-	# without an error.
+	# the value memory holds once the frame ends, each with its flags; a scope
+	# or kind the core lacks refused; none called once removed. Functions that
+	# give back a number change the value read or written: the last number
+	# given is used, and one giving nothing after it leaves it (issue 534).
+	# It leaves one registered, and Chimera must close without an error.
 	if [ "$record" -eq 0 ]; then
 		mdir="$work/memory-calls-leg"
 		rm -rf "$mdir" && mkdir -p "$mdir"
@@ -2126,9 +2134,33 @@ GZPY
 		if grep -q "^status=OK" "$mdir/meta.txt" 2>/dev/null && grep -qi "fatal" "$mdir/run.log"; then
 			report "T:box:memoryCalls" FAIL "Chimera stopped with an error as it closed: $(grep -i -m1 "fatal" "$mdir/run.log") (see $mdir/run.log)"
 		elif grep -q "^status=OK" "$mdir/meta.txt" 2>/dev/null; then
-			report "T:box:memoryCalls" PASS "event.on_bus_exec, on_bus_read and on_bus_write are called at the accesses watched, with the values memory holds, refused where the core cannot watch, and stop when removed; Chimera closes cleanly with one still registered"
+			report "T:box:memoryCalls" PASS "event.on_bus_exec, on_bus_read and on_bus_write are called at the accesses watched, with the values memory holds and their flags, refused where the core cannot watch, and stop when removed; a number given back changes a read and a write, the last one given used; Chimera closes cleanly with one still registered"
 		else
 			report "T:box:memoryCalls" FAIL "$(sed -n 's/^detail=//p' "$mdir/meta.txt" 2>/dev/null || echo "run failed") (see $mdir/run.log)"
+		fi
+	fi
+
+	# --- userdata kept with a branch, and event.onloadstate (issue 534) ---
+	# A script sets one userdata value of each kind, makes a branch, changes
+	# them and loads the branch: event.onloadstate is called once, with the
+	# branch's name, on its frame, after every value came back with its own
+	# type, and may not wait for a frame. A load that only moves the machine
+	# (the old control scheme) and a core state loaded call nothing.
+	if [ "$record" -eq 0 ]; then
+		ldir="$work/load-state-leg"
+		rm -rf "$ldir" && mkdir -p "$ldir"
+		cp "$tdir/gridWalker.testrom" "$ldir/gridWalker.testrom"
+		cp "$tdir/$tname.chimeraProject" "$ldir/p.chimeraProject"
+		ljob="$work/job.load-state.txt"
+		echo "meta=$ldir/meta.txt" > "$ljob"
+		cp "$config" "$work/settings.load-state.json"
+		( cd "$repo_root" && CHIMERA_JOB="$ljob" timeout 300 "$chimera_exe" --headless \
+			"--config=$work/settings.load-state.json" "--core=$repo_root/build/Cores/synth-box.chimeraCore" \
+			"--project=$ldir/p.chimeraProject" "--lua=$here/synth-load-state.lua" ) > "$ldir/run.log" 2>&1
+		if grep -q "^status=OK" "$ldir/meta.txt" 2>/dev/null; then
+			report "T:box:loadState" PASS "a branch keeps the userdata of its time and its load puts it back, each value with its own type, before event.onloadstate is called with the branch's name; a load that only moves the machine, and a core state, call none"
+		else
+			report "T:box:loadState" FAIL "$(sed -n 's/^detail=//p' "$ldir/meta.txt" 2>/dev/null || echo "run failed") (see $ldir/run.log)"
 		fi
 	fi
 

@@ -1796,6 +1796,7 @@
 		"project.branch_marker_keep_state": "de \"keepState\" van een markering van een vertakking is geen boolean",
 		"project.branch_markers": "de \"markers\" van een vertakking is geen array",
 		"project.branch_time": "de \"time\" van een vertakking is geen tekst",
+		"project.branch_userdata": "de \"userdata\" van een vertakking is geen tekst",
 		"project.cannot_read_from": "kan '%1' niet lezen uit %2",
 		"project.clock_start": "\"clockStart\" is geen tijd geschreven als 2017-05-27T12:44:28Z, tussen 1970 en 2200",
 		"project.core_fields": "\"core\" heeft tekst \"name\", \"version\" en \"sha1\" nodig",

@@ -1796,6 +1796,7 @@
 		"project.branch_marker_keep_state": "το \"keepState\" μιας σήμανσης κλάδου δεν είναι boolean",
 		"project.branch_markers": "το \"markers\" ενός κλάδου δεν είναι πίνακας",
 		"project.branch_time": "το \"time\" ενός κλάδου δεν είναι κείμενο",
+		"project.branch_userdata": "το \"userdata\" ενός κλάδου δεν είναι κείμενο",
 		"project.cannot_read_from": "δεν είναι δυνατή η ανάγνωση του '%1' από το %2",
 		"project.clock_start": "Το \"clockStart\" δεν είναι ώρα γραμμένη ως 2017-05-27T12:44:28Z μεταξύ 1970 και 2200",
 		"project.core_fields": "Το \"core\" θέλει τα κείμενα \"name\", \"version\" και \"sha1\"",

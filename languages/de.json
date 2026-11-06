@@ -1796,6 +1796,7 @@
 		"project.branch_marker_keep_state": "das \"keepState\" eines Zweigmarkers ist kein Wahrheitswert",
 		"project.branch_markers": "die \"markers\" eines Zweigs sind kein Array",
 		"project.branch_time": "die \"time\" eines Zweigs ist kein Text",
+		"project.branch_userdata": "die \"userdata\" eines Zweigs ist kein Text",
 		"project.cannot_read_from": "'%1' kann nicht aus %2 gelesen werden",
 		"project.clock_start": "\"clockStart\" ist keine Zeit im Format 2017-05-27T12:44:28Z zwischen 1970 und 2200",
 		"project.core_fields": "\"core\" braucht Text \"name\", \"version\" und \"sha1\"",

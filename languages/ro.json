@@ -1828,6 +1828,7 @@
 		"project.branch_marker_keep_state": "\"keepState\" al unui marcaj de ramură nu este o valoare booleană",
 		"project.branch_markers": "\"markers\" al unei ramuri nu este un tablou",
 		"project.branch_time": "\"time\" al unei ramuri nu este un șir",
+		"project.branch_userdata": "\"userdata\" al unei ramuri nu este un șir",
 		"project.cannot_read_from": "nu se poate citi '%1' din %2",
 		"project.clock_start": "\"clockStart\" nu este o oră scrisă ca 2017-05-27T12:44:28Z, între 1970 și 2200",
 		"project.core_fields": "\"core\" are nevoie de șir \"name\", \"version\" și \"sha1\"",

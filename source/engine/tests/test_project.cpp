@@ -163,6 +163,16 @@ int main(int argc, char **argv)
 		ce_project_branch_add(p, "risky route", 400, "2026-08-26 21:00:00", "|..|\n", 5);
 		ce_project_branch_marker_add(p, 0, 350, "the setup", 1);
 		ce_project_branch_marker_add(p, 0, 360, "no state here", 0);
+		/* the scripts' userdata kept with a branch, carried as it is; "" is
+		 * kept, and is not the same as none (issue 534) */
+		ce_project_branch_set_userdata(p, 0, "i hits 5\ns text a%20b");
+		assert(std::strcmp(ce_project_branch_userdata(p, 0), "i hits 5\ns text a%20b") == 0);
+		ce_project_branch_add(p, "kept empty", 401, "", "", 0);
+		ce_project_branch_set_userdata(p, 1, "");
+		ce_project_branch_add(p, "kept none", 402, "", "", 0);
+		ce_project_branch_set_userdata(p, 2, "x");
+		ce_project_branch_set_userdata(p, 2, nullptr);
+		assert(ce_project_branch_userdata(p, 2) == nullptr);
 		ce_project_header_set(p, "Author", "sergio");
 		ce_project_header_set(p, "Platform", "DOS");
 		ce_project_header_set(p, "Platform", "DOSBox");
@@ -192,8 +202,11 @@ int main(int argc, char **argv)
 		const char *logText = ce_project_log_text(p, &len);
 		assert(std::string(logText, len) == "[Input]\nLogKey:#P1 Up|\n|..|\n|U.|\n[/Input]\n");
 		assert(ce_project_marker_count(p) == 3 && ce_project_marker_frame(p, 2) == 500);
-		assert(ce_project_branch_count(p) == 1);
+		assert(ce_project_branch_count(p) == 3);
 		assert(std::strcmp(ce_project_branch_name(p, 0), "risky route") == 0);
+		assert(std::strcmp(ce_project_branch_userdata(p, 0), "i hits 5\ns text a%20b") == 0);
+		assert(ce_project_branch_userdata(p, 1) != nullptr && ce_project_branch_userdata(p, 1)[0] == '\0');
+		assert(ce_project_branch_userdata(p, 2) == nullptr);
 		assert(ce_project_branch_frame(p, 0) == 400);
 		assert(std::strcmp(ce_project_branch_time(p, 0), "2026-08-26 21:00:00") == 0);
 		const char *branchLog = ce_project_branch_log_text(p, 0, &len);
@@ -389,6 +402,8 @@ int main(int argc, char **argv)
 		"{\"files\":[{\"name\":\"a.iso\",\"sha1\":\"" + goodSha + "\",\"slot\":\"CD ROM\"}]}");
 	expectReject("settings type", "{\"settings\":[]}");
 	expectReject("branch incomplete", "{\"branches\":[{\"name\":\"x\"}]}");
+	expectReject("branch userdata not text", "{\"branches\":[{\"name\":\"x\",\"frame\":1,\"userdata\":5}]}");
+	assert(std::strstr(err, "userdata") != nullptr);
 
 	// an empty project is structurally fine (validation is the core's say)
 	{

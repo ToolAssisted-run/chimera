@@ -63,11 +63,14 @@ SYNTH_EXPORT void (*synth_on_input)(void) = 0;
  * it unset. */
 SYNTH_EXPORT void (*synth_on_step)(uint32_t pc, const uint8_t* insn, const int32_t* r) = 0;
 
-/* Called after each read (write 0) or write (write 1) of RAM the machine
- * makes, when set: a host that watches memory (issue 496) hears the place of
- * the first byte and the byte or 32-bit word read or written. Not machine
- * state, and it changes none; the native builds leave it unset. */
-SYNTH_EXPORT void (*synth_on_access)(int write, uint32_t addr, uint32_t value) = 0;
+/* Called at each read (write 0) or write (write 1) of RAM the machine makes,
+ * when set: a host that watches memory (issue 496) hears the place of the
+ * first byte, the byte or 32-bit word read or about to be written, and its
+ * size in bytes, and answers with the value the machine goes on with - the
+ * one it was given, or another (issue 534): a read is called once the value
+ * is fetched and before the instruction takes it, a write before memory
+ * changes. Not machine state; the native builds leave it unset. */
+SYNTH_EXPORT uint32_t (*synth_on_access)(int write, uint32_t addr, uint32_t value, int size) = 0;
 
 static uint16_t rd16(const uint8_t* p) { return (uint16_t)(p[0] | (p[1] << 8)); }
 static uint32_t rd32(const uint8_t* p) { return (uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24); }
@@ -191,29 +194,33 @@ static void run_frame_code(synth_t* s, uint8_t pad)
 			case 0x10:
 			{
 				const uint32_t a = (uint32_t)*Rb % RAM_SIZE;
-				*Ra = s->ram[a];
-				if (synth_on_access) synth_on_access(0, a, (uint32_t)*Ra);
+				uint32_t v = s->ram[a];
+				if (synth_on_access) v = synth_on_access(0, a, v, 1) & 0xFF;
+				*Ra = (int32_t)v;
 				break;
 			}
 			case 0x11:
 			{
 				const uint32_t a = (uint32_t)*Rb % RAM_SIZE;
-				s->ram[a] = (uint8_t)*Ra;
-				if (synth_on_access) synth_on_access(1, a, s->ram[a]);
+				uint32_t v = (uint8_t)*Ra;
+				if (synth_on_access) v = synth_on_access(1, a, v, 1);
+				s->ram[a] = (uint8_t)v;
 				break;
 			}
 			case 0x12:
 			{
 				const uint32_t a = (uint32_t)*Rb % (RAM_SIZE - 3);
-				*Ra = (int32_t)rd32(&s->ram[a]);
-				if (synth_on_access) synth_on_access(0, a, (uint32_t)*Ra);
+				uint32_t v = rd32(&s->ram[a]);
+				if (synth_on_access) v = synth_on_access(0, a, v, 4);
+				*Ra = (int32_t)v;
 				break;
 			}
 			case 0x13:
 			{
 				const uint32_t a = (uint32_t)*Rb % (RAM_SIZE - 3);
-				wr32(&s->ram[a], (uint32_t)*Ra);
-				if (synth_on_access) synth_on_access(1, a, (uint32_t)*Ra);
+				uint32_t v = (uint32_t)*Ra;
+				if (synth_on_access) v = synth_on_access(1, a, v, 4);
+				wr32(&s->ram[a], v);
 				break;
 			}
 			case 0x14: *Ra = s->dataSize ? s->data[(uint32_t)*Rb % s->dataSize] : 0; break;

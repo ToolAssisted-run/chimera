@@ -1828,6 +1828,7 @@
 		"project.branch_marker_keep_state": "\"keepState\" позначки гілки не є логічним значенням",
 		"project.branch_markers": "\"markers\" гілки не є масивом",
 		"project.branch_time": "\"time\" гілки не є рядком",
+		"project.branch_userdata": "\"userdata\" гілки не є рядком",
 		"project.cannot_read_from": "не вдалося прочитати '%1' з %2",
 		"project.clock_start": "\"clockStart\" не є часом у вигляді 2017-05-27T12:44:28Z між 1970 і 2200 роками",
 		"project.core_fields": "\"core\" потребує рядкових \"name\", \"version\" і \"sha1\"",

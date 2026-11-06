@@ -1764,6 +1764,7 @@
 		"project.branch_marker_keep_state": "分支標記的「keepState」不是布林值",
 		"project.branch_markers": "分支的「markers」不是陣列",
 		"project.branch_time": "分支的「time」不是字串",
+		"project.branch_userdata": "分支的「userdata」不是字串",
 		"project.cannot_read_from": "無法從 %2 讀取「%1」",
 		"project.clock_start": "「clockStart」不是 2017-05-27T12:44:28Z 這種寫法的時間（介於 1970 與 2200 年之間）",
 		"project.core_fields": "「core」需要字串「name」、「version」與「sha1」",

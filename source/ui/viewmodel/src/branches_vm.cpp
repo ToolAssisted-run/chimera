@@ -344,6 +344,7 @@ int64_t BranchesViewModel::keepRun(int64_t slot, std::string name)
 				x.frames = done.frames;
 				x.state = done.state;
 				x.picture = done.picture;
+				x.userdata = std::move(done.userdata);
 				changed();
 				status.set(!why.empty() ? tr("branches.made_no_state", {x.name, std::to_string(x.frame), why})
 						   : x.state.empty() ? tr("branches.made", {x.name, std::to_string(x.frame)})

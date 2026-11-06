@@ -1796,6 +1796,7 @@
 		"project.branch_marker_keep_state": "haaran merkin \"keepState\" ei ole totuusarvo",
 		"project.branch_markers": "haaran \"markers\" ei ole taulukko",
 		"project.branch_time": "haaran \"time\" ei ole merkkijono",
+		"project.branch_userdata": "haaran \"userdata\" ei ole merkkijono",
 		"project.cannot_read_from": "'%1' ei ole luettavissa kohteesta %2",
 		"project.clock_start": "\"clockStart\" ei ole aika, joka on kirjoitettu muodossa 2017-05-27T12:44:28Z ja väliltä 1970-2200",
 		"project.core_fields": "\"core\" tarvitsee merkkijonot \"name\", \"version\" ja \"sha1\"",

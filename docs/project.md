@@ -89,7 +89,10 @@ Chimera refuses it with a sentence saying so and keeps no reader for it
   columns in order (the console's first, then each player's), each a list
   of the columns' names. Its frames are the lines of `input.input`, one a
   frame, `|..|........|`, in the same groups (owner, 2026-11-02). A branch
-  has its own `inputs` and its own `branches/<n>.input`. A movie with no
+  has its own `inputs` and its own `branches/<n>.input`, and `userdata`: the
+  Lua scripts' userdata when it was made, as text (issue 534), which loading
+  the branch puts back. A branch without it leaves the scripts' userdata as
+  it is. A movie with no
   columns named has no `inputs`, and its lines are in the machine's own
   order. A build from before cannot open a project saved after.
   The groups and names are split from the movie's key, and joined back to

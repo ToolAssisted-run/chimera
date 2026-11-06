@@ -14006,3 +14006,63 @@ the newest commit CI passed. Above it were `1fa74b95` and `1a708b57`, still in
 CI, and `cfc7e46a` and `d8a2c68e`, which had no CI run of their own (pushed
 together with a later commit). The workflow's YAML parses. The release itself runs
 only on GitHub; the next nightly is its test.
+
+## Scripts can change memory values, and keep userdata with branches (user-decided, 2026-11-06)
+
+Issue 534 asked for four things scripts written for other emulators need,
+building on the memory events of issue 496. The owner chose all four, over
+building only the parts that need no change to the core's side, or none.
+
+1. **The flags.** Each `on_bus_*` function gets a third value, the flags:
+   the kind of access (0x1000 a read, 0x2000 a write, 0x4000 an
+   instruction) and its size (0x10000 a byte, 0x20000 two, 0x30000 four).
+   The processor and memory parts are 0, "not said": Chimera does not know
+   them and does not guess. A core now passes the size as the fifth
+   argument of its call; an older core passes 0, read as "not said".
+2. **Changing a value.** A read's or a write's function may give back a
+   whole number, which the machine uses instead. A core lets it with an
+   optional fifth export, `GetMemoryCallbackReplaceable` (the kinds it
+   lets change), and by passing, as the sixth argument of its call, the
+   place of a word holding the value; the engine writes a new value there,
+   cut to the access's size. A core that does neither still only reports,
+   and `event.can_replace_value` says so. Each function gets the value the
+   machine had; the last number given is used, and a function giving
+   nothing after it does not undo it, as scripts written for other
+   emulators expect. A number where the core does not allow it is said
+   once in the console and not used. docs/porting-a-core.md now says when
+   each call comes (an instruction before it runs, a read before the CPU
+   takes the value, a write before memory changes), what the address and
+   value are, and what a core must say it does not cover.
+3. **`event.onloadstate`.** Chimera has no savestate slots: a branch is the
+   state a person saves and loads. So the event is called when a branch is
+   loaded (by a person, or by `tastudio.loadbranch`) once the machine is on
+   its frame, with the branch's name. It is not called for TAStudio's old
+   control scheme (which only moves the machine), a load that did not reach
+   the frame, a seek, a rewind, or `memorysavestate.loadcorestate`, whose
+   script knows what it loaded.
+4. **Userdata with branches.** A branch made keeps the scripts' userdata as
+   it is then, in the project (`userdata` in a branch of `project.json`,
+   docs/project.md), and loading it puts it back before `event.onloadstate`
+   is called. Every value comes back with its kind: a whole number stays
+   whole, a fraction comes back exactly (written as `%a` writes it). A
+   branch from before has none, and leaves the userdata as it is.
+
+Functions called part way through a frame (`event.oninputpoll` and the
+memory events) now get an error from `memorysavestate`'s save and load,
+`tastudio.loadbranch`, `client.reboot_core`, `client.closerom` and
+`client.openproject`, which need the frame to have ended. The request's
+tests compared against a pinned BizHawk were not made: Chimera uses
+nothing from BizHawk.
+
+The synthetic core reports sizes and lets reads and writes change. Tested:
+the witness's `E:memory-calls` (each read a byte, reads and writes said to
+be changeable), `T:box:memoryCalls` (the flags of each access; three
+functions on one read giving back 0, 1 and nothing leave the game seeing 1,
+and without the 1 it sees 0, so the write that follows happens and is
+changed to 7; a state cannot be saved there), `T:box:loadState` (ten
+userdata values of every kind come back with their kinds once a branch is
+loaded, before `event.onloadstate` sees them with the branch's name, on the
+branch's frame; the old control scheme and a core state call nothing), and
+the engine's project test (a branch's userdata, empty and none told apart,
+kept through a save; a userdata that is not text refused). No emulator core
+offers memory events yet.

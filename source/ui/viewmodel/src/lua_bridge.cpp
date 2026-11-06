@@ -7,6 +7,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <optional>
@@ -916,12 +917,28 @@ void LuaBridge::inputPoll()
 	onScripts([&] { callHook("__chimera_input_poll_events"); });
 }
 
-void LuaBridge::memoryAccess(int32_t kind, int32_t scope, uint64_t address, uint64_t value)
+std::optional<uint64_t> LuaBridge::memoryAccess(int32_t kind, int32_t scope, uint64_t address, uint64_t value, int32_t size, bool replaceable)
 {
-	onScripts([&] {
-		askHere("__chimera_memory_events", {Value(int64_t{kind}), Value(int64_t{scope}), Value(static_cast<int64_t>(address)),
-										   Value(static_cast<int64_t>(value))});
+	const std::string now = onScripts([&] {
+		return askHere("__chimera_memory_events", {Value(int64_t{kind}), Value(int64_t{scope}), Value(static_cast<int64_t>(address)),
+													  Value(static_cast<int64_t>(value)), Value(int64_t{size}), Value(replaceable)});
 	});
+	/* a whole number, as Lua's 64 bits; "" when no function gave one */
+	if (now.empty()) return std::nullopt;
+	char *end = nullptr;
+	const long long n = std::strtoll(now.c_str(), &end, 10);
+	if (end == now.c_str() || *end != 0) return std::nullopt;
+	return static_cast<uint64_t>(n);
+}
+
+std::string LuaBridge::userdataText()
+{
+	return ask("__chimera_userdata_text", {});
+}
+
+void LuaBridge::branchLoaded(const std::optional<std::string> &userdata, const std::string &name)
+{
+	onScripts([&] { askHere("__chimera_branch_state_loaded", {userdata ? Value(*userdata) : Value(), Value(name)}); });
 }
 
 bool LuaBridge::yieldTurn()

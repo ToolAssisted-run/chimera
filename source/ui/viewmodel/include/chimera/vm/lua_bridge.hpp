@@ -23,6 +23,7 @@
 
 #include <functional>
 #include <map>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -119,8 +120,16 @@ public:
 	 * the scripts' event.oninputpoll functions, called there and then */
 	void inputPoll();
 	/* an access to memory a script watches, which the core reported part way
-	 * through a frame: the scripts' event.on_bus_* functions, called there and then */
-	void memoryAccess(int32_t kind, int32_t scope, uint64_t address, uint64_t value);
+	 * through a frame: the scripts' event.on_bus_* functions, called there and
+	 * then, with its size in bytes (0 unknown) and whether the core lets its
+	 * value be changed. The value the last function to give a number gave,
+	 * when one did (issue 534) */
+	std::optional<uint64_t> memoryAccess(int32_t kind, int32_t scope, uint64_t address, uint64_t value, int32_t size, bool replaceable);
+	/* the scripts' userdata as text, kept with a branch; and a branch loaded:
+	 * its userdata put back (none: left as it is), then the scripts'
+	 * event.onloadstate functions called with its name (issue 534) */
+	std::string userdataText();
+	void branchLoaded(const std::optional<std::string> &userdata, const std::string &name);
 	/* the window's turn when no frame is run (paused, or nothing open): the
 	 * running scripts that wait in emu.yield go on, each to its next wait, as
 	 * Chimera resumes them every pass of its loop; those waiting for a frame

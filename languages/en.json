@@ -1796,6 +1796,7 @@
 		"project.branch_marker_keep_state": "a branch marker's \"keepState\" is not a boolean",
 		"project.branch_markers": "a branch's \"markers\" is not an array",
 		"project.branch_time": "a branch's \"time\" is not a string",
+		"project.branch_userdata": "a branch's \"userdata\" is not a string",
 		"project.cannot_read_from": "cannot read '%1' from %2",
 		"project.clock_start": "\"clockStart\" is not a time written as 2017-05-27T12:44:28Z between 1970 and 2200",
 		"project.core_fields": "\"core\" needs string \"name\", \"version\" and \"sha1\"",

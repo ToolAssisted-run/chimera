@@ -1796,6 +1796,7 @@
 		"project.branch_marker_keep_state": "bir dal işaretçisinin \"keepState\" değeri bir mantıksal değer değil",
 		"project.branch_markers": "bir dalın \"markers\" alanı bir dizi değil",
 		"project.branch_time": "bir dalın \"time\" alanı bir metin değil",
+		"project.branch_userdata": "bir dalın \"userdata\" alanı bir metin değil",
 		"project.cannot_read_from": "'%1' dosyası %2 içinden okunamıyor",
 		"project.clock_start": "\"clockStart\" 1970 ile 2200 arasında, 2017-05-27T12:44:28Z gibi yazılmış bir zaman değil",
 		"project.core_fields": "\"core\" metin \"name\", \"version\" ve \"sha1\" içermeli",

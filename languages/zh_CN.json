@@ -1764,6 +1764,7 @@
 		"project.branch_marker_keep_state": "分支标记的 \"keepState\" 不是布尔值",
 		"project.branch_markers": "分支的 \"markers\" 不是数组",
 		"project.branch_time": "分支的 \"time\" 不是字符串",
+		"project.branch_userdata": "分支的 \"userdata\" 不是字符串",
 		"project.cannot_read_from": "无法从 %2 读取 '%1'",
 		"project.clock_start": "\"clockStart\" 不是 1970 至 2200 之间 2017-05-27T12:44:28Z 这样的时间",
 		"project.core_fields": "\"core\" 需要字符串 \"name\"、\"version\" 和 \"sha1\"",

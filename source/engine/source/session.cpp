@@ -582,7 +582,8 @@ static thread_local ce_session *t_framing = nullptr;
  * function runs now, inside the frame; the read counts as the core's work. */
 static uintptr_t CE_GUEST_CALLBACK_ABI inputPollDispatch(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t);
 /* A core reached memory the session watches (its call through callback slot
- * 4: kind, scope, address, value). The same, with what the core said. */
+ * 4: kind, scope, address, value, size, and where a new value may go). The
+ * same, with what the core said. */
 static uintptr_t CE_GUEST_CALLBACK_ABI memoryDispatch(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t);
 
 #ifdef CE_VK_BRIDGE
@@ -762,6 +763,9 @@ struct ce_session
 	 * for a core without the exports), its exports that watch and stop
 	 * watching, and the caller's function, called at each watched access. */
 	std::string memoryScopes;
+	/* the kinds of access whose value the caller's function may change, bit
+	 * (1 << kind) each (issue 534) */
+	int32_t memoryReplaceable = 0;
 	int32_t (*addMemoryWatch)(int32_t, int32_t, uint64_t) = nullptr;
 	void (*removeMemoryWatch)(int32_t, int32_t, uint64_t) = nullptr;
 	ce_memory_fn memoryFn = nullptr;
@@ -2435,6 +2439,10 @@ static ce_session *openSession(
 			{
 				setMemoryCallback(static_cast<uint64_t>(r.data));
 				s->memoryScopes = names;
+				/* the one optional fifth: the reads and writes whose value
+				 * the caller may change (issue 534); an instruction has none */
+				if (auto replaceable = reinterpret_cast<int32_t (*)()>(s->proc("GetMemoryCallbackReplaceable", 0, false, ignored)))
+					s->memoryReplaceable = replaceable() & ((1 << 1) | (1 << 2));
 				s->addMemoryWatch = add;
 				s->removeMemoryWatch = remove;
 			}
@@ -5362,12 +5370,22 @@ void ce_session_set_input_poll_callback(ce_session *s, ce_input_poll_fn fn, void
 	s->inputPollCtx = ctx;
 }
 
-static uintptr_t CE_GUEST_CALLBACK_ABI memoryDispatch(uintptr_t kind, uintptr_t scope, uintptr_t address, uintptr_t value, uintptr_t, uintptr_t)
+static uintptr_t CE_GUEST_CALLBACK_ABI memoryDispatch(uintptr_t kind, uintptr_t scope, uintptr_t address, uintptr_t value, uintptr_t size,
+	uintptr_t replacement)
 {
 	ce_session *s = t_framing;
 	if (s != nullptr && s->memoryFn != nullptr)
-		s->memoryFn(s->memoryCtx, static_cast<int32_t>(kind), static_cast<int32_t>(scope), static_cast<uint64_t>(address),
-			static_cast<uint64_t>(value));
+	{
+		/* the core's own word for the value, in its memory, which the machine
+		 * reads or writes once the call returns: a new value goes there only
+		 * for a kind the core said it lets change */
+		const bool replaceable = replacement != 0 && kind <= 2 && (s->memoryReplaceable & (1 << kind)) != 0;
+		uint64_t now = 0;
+		if (s->memoryFn(s->memoryCtx, static_cast<int32_t>(kind), static_cast<int32_t>(scope), static_cast<uint64_t>(address),
+				static_cast<uint64_t>(value), size <= 8 ? static_cast<int32_t>(size) : 0, replaceable ? &now : nullptr) != 0 &&
+			replaceable)
+			*reinterpret_cast<uint64_t *>(replacement) = now;
+	}
 	guestWorked();
 	return 0;
 }
@@ -5375,6 +5393,11 @@ static uintptr_t CE_GUEST_CALLBACK_ABI memoryDispatch(uintptr_t kind, uintptr_t 
 const char *ce_session_memory_scopes(const ce_session *s)
 {
 	return s != nullptr ? s->memoryScopes.c_str() : "";
+}
+
+int32_t ce_session_memory_replaceable(const ce_session *s)
+{
+	return s != nullptr ? s->memoryReplaceable : 0;
 }
 
 int32_t ce_session_watch_memory(ce_session *s, int32_t kind, int32_t scope, uint64_t address, int32_t on)

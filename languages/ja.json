@@ -1764,6 +1764,7 @@
 		"project.branch_marker_keep_state": "ブランチのマーカーの \"keepState\" が真偽値ではありません",
 		"project.branch_markers": "ブランチの \"markers\" が配列ではありません",
 		"project.branch_time": "ブランチの \"time\" が文字列ではありません",
+		"project.branch_userdata": "ブランチの \"userdata\" が文字列ではありません",
 		"project.cannot_read_from": "%2 から '%1' を読み取れません",
 		"project.clock_start": "\"clockStart\" は、1970 年から 2200 年までの間の 2017-05-27T12:44:28Z の形式の時刻ではありません",
 		"project.core_fields": "\"core\" には、文字列の \"name\"、\"version\"、\"sha1\" が必要です",

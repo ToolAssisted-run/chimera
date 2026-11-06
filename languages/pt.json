@@ -1796,6 +1796,7 @@
 		"project.branch_marker_keep_state": "o \"keepState\" de um marcador de ramificação não é um booleano",
 		"project.branch_markers": "os \"markers\" de uma ramificação não são uma matriz",
 		"project.branch_time": "o \"time\" de uma ramificação não é um texto",
+		"project.branch_userdata": "o \"userdata\" de uma ramificação não é um texto",
 		"project.cannot_read_from": "não é possível ler '%1' de %2",
 		"project.clock_start": "\"clockStart\" não é uma hora escrita como 2017-05-27T12:44:28Z entre 1970 e 2200",
 		"project.core_fields": "\"core\" precisa de \"name\", \"version\" e \"sha1\" em texto",

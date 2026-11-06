@@ -548,6 +548,9 @@ public:
 		std::string text;
 		int64_t frames = 0;
 		std::vector<Marker> markers;
+		/* the scripts' userdata when it was made, as their text; none for a
+		 * branch made with no scripts to ask, or before Chimera kept it */
+		std::optional<std::string> userdata;
 		/* its state's file name in the project's cache folder, "" when it
 		 * has none (it is then replayed to), and the picture it had */
 		std::string state;
@@ -683,9 +686,21 @@ public:
 	void setInputPollTurn(std::function<void()> turn);
 	/* the scripts' functions called at memory the core watches, part way
 	 * through a frame (event.on_bus_exec, on_bus_read, on_bus_write; issue
-	 * 496), with the kind of access, the scope, the address and the value:
-	 * on the machine's thread, inside the frame */
-	void setMemoryTurn(std::function<void(int32_t kind, int32_t scope, uint64_t address, uint64_t value)> turn);
+	 * 496), with the kind of access, the scope, the address, the value, its
+	 * size in bytes (0 unknown) and whether the core lets the value be
+	 * changed: on the machine's thread, inside the frame. What it gives back
+	 * is the value the machine goes on with, when one of the functions
+	 * changed it (issue 534) */
+	using MemoryTurn = std::function<std::optional<uint64_t>(int32_t kind, int32_t scope, uint64_t address, uint64_t value, int32_t size,
+		bool replaceable)>;
+	void setMemoryTurn(MemoryTurn turn);
+	/* the scripts' userdata kept with a branch made (issue 534): asked on the
+	 * machine's thread as the branch is made, as text the scripts read back */
+	void setUserdataTurn(std::function<std::string()> turn);
+	/* a branch loaded (issue 534), on the machine's thread once the machine
+	 * is on its frame: the userdata it kept (none for a branch that kept
+	 * none), and its name, for the scripts' event.onloadstate */
+	void setBranchLoadedTurn(std::function<void(const std::optional<std::string> &userdata, const std::string &name)> turn);
 	void scriptsDuringTurbo(bool on) { scriptsDuringTurboM_.store(on); }
 	/* the machine was opened by a script (client.reboot_core, or
 	 * client.openproject): the scripts go on, rather than start again as
@@ -1056,9 +1071,13 @@ private:
 	void applyInputPollsOnMachine();
 	/* the memory functions': what the core is asked to watch for them (kind,
 	 * scope, address), asked again of a core opened again; on the machine's thread */
-	std::function<void(int32_t, int32_t, uint64_t, uint64_t)> memoryTurnM_;
+	MemoryTurn memoryTurnM_;
 	std::set<std::tuple<int32_t, int32_t, uint64_t>> memoryWatchesM_;
-	static void memoryCalled(void *ctx, int32_t kind, int32_t scope, uint64_t address, uint64_t value);
+	static int32_t memoryCalled(void *ctx, int32_t kind, int32_t scope, uint64_t address, uint64_t value, int32_t size, uint64_t *replacement);
+	/* the scripts' userdata asked of them as a branch is made, and a branch
+	 * loaded told to them (issue 534); on the machine's thread */
+	std::function<std::string()> userdataTurnM_;
+	std::function<void(const std::optional<std::string> &, const std::string &)> branchLoadedTurnM_;
 	void applyMemoryWatchesOnMachine();
 	/* a turbo seek going in pieces: where to (-1 none), and the next piece's size in frames */
 	static constexpr int64_t kTurboPieceFrames = 60;

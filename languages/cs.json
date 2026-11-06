@@ -1828,6 +1828,7 @@
 		"project.branch_marker_keep_state": "\"keepState\" značky větve není logická hodnota",
 		"project.branch_markers": "\"markers\" větve není pole",
 		"project.branch_time": "\"time\" větve není řetězec",
+		"project.branch_userdata": "\"userdata\" větve není řetězec",
 		"project.cannot_read_from": "'%1' nelze přečíst z %2",
 		"project.clock_start": "\"clockStart\" není čas zapsaný jako 2017-05-27T12:44:28Z mezi lety 1970 a 2200",
 		"project.core_fields": "\"core\" potřebuje řetězce \"name\", \"version\" a \"sha1\"",

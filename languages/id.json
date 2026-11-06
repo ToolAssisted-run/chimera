@@ -1764,6 +1764,7 @@
 		"project.branch_marker_keep_state": "\"keepState\" penanda cabang bukan boolean",
 		"project.branch_markers": "\"markers\" sebuah cabang bukan array",
 		"project.branch_time": "\"time\" sebuah cabang bukan string",
+		"project.branch_userdata": "\"userdata\" sebuah cabang bukan string",
 		"project.cannot_read_from": "tidak dapat membaca '%1' dari %2",
 		"project.clock_start": "\"clockStart\" bukan waktu yang ditulis sebagai 2017-05-27T12:44:28Z antara 1970 dan 2200",
 		"project.core_fields": "\"core\" membutuhkan string \"name\", \"version\", dan \"sha1\"",

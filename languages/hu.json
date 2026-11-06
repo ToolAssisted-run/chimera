@@ -1796,6 +1796,7 @@
 		"project.branch_marker_keep_state": "egy ágjelölő \"keepState\" mezője nem logikai érték",
 		"project.branch_markers": "egy ág \"markers\" mezője nem tömb",
 		"project.branch_time": "egy ág \"time\" mezője nem szöveg",
+		"project.branch_userdata": "egy ág \"userdata\" mezője nem szöveg",
 		"project.cannot_read_from": "a(z) '%1' nem olvasható innen: %2",
 		"project.clock_start": "a \"clockStart\" nem olyan időpont, mint 2017-05-27T12:44:28Z, 1970 és 2200 között",
 		"project.core_fields": "a \"core\"-nak szöveges \"name\", \"version\" és \"sha1\" mezőre van szüksége",

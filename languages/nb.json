@@ -1796,6 +1796,7 @@
 		"project.branch_marker_keep_state": "en grenmarkørs \"keepState\" er ikke en sann/usann-verdi",
 		"project.branch_markers": "en grens \"markers\" er ikke en liste",
 		"project.branch_time": "en grens \"time\" er ikke en tekst",
+		"project.branch_userdata": "en grens \"userdata\" er ikke en tekst",
 		"project.cannot_read_from": "kan ikke lese '%1' fra %2",
 		"project.clock_start": "\"clockStart\" er ikke et tidspunkt skrevet som 2017-05-27T12:44:28Z mellom 1970 og 2200",
 		"project.core_fields": "\"core\" trenger tekst \"name\", \"version\" og \"sha1\"",

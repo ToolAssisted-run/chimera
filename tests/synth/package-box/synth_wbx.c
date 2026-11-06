@@ -34,7 +34,7 @@ extern void synth_get_video_bgra(synth_t *s, uint32_t *out);  /* palette-resolve
 extern int32_t *synth_get_registers(synth_t *s);
 extern uint32_t synth_get_frame_counter(synth_t *s);
 extern void (*synth_on_step)(uint32_t pc, const uint8_t *insn, const int32_t *r);
-extern void (*synth_on_access)(int write, uint32_t addr, uint32_t value);
+extern uint32_t (*synth_on_access)(int write, uint32_t addr, uint32_t value, int size);
 
 #define FB_W 128
 #define FB_H 120
@@ -427,13 +427,16 @@ ECL_EXPORT void SetInputPollCallback(uint64_t fn)
 }
 
 /* Calls at memory (issue 496): the host's function, in callback slot 4,
- * called as fn(kind, scope, address, value) part way through the advance at
- * each access the host watches - kind 0 an instruction about to run (scope 0,
- * "Code": where it is, value 0), 1 a read and 2 a write of RAM (scope 1,
- * "RAM": the first byte's place and the byte or word). The host watches an
- * address, or every address of a kind. Invisible, as the input poll's: the
- * same slot in every session, and no state carries it or what is watched, so
- * a load leaves the watches as they are. */
+ * called as fn(kind, scope, address, value, size, replacement) part way
+ * through the advance at each access the host watches - kind 0 an
+ * instruction about to run (scope 0, "Code": where it is, value 0, size 0,
+ * no replacement), 1 a read and 2 a write of RAM (scope 1, "RAM": the first
+ * byte's place, the byte or word, its size, and the place of a word holding
+ * it, which the host may change: the machine goes on with what the word
+ * holds once the call returns, issue 534). The host watches an address, or
+ * every address of a kind. Invisible, as the input poll's: the same slot in
+ * every session, and no state carries it or what is watched, so a load
+ * leaves the watches as they are. */
 #define WATCHES 64
 ECL_INVISIBLE static uintptr_t (*g_memoryCall)(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t);
 ECL_INVISIBLE static uint64_t g_watched[3][WATCHES];
@@ -449,9 +452,12 @@ static void memory_stepped(uint32_t pc)
 {
 	if (g_memoryCall != 0 && watching(0, pc)) g_memoryCall(0, 0, pc, 0, 0, 0);
 }
-static void memory_accessed(int write, uint32_t addr, uint32_t value)
+static uint32_t memory_accessed(int write, uint32_t addr, uint32_t value, int size)
 {
-	if (g_memoryCall != 0 && watching(write ? 2 : 1, addr)) g_memoryCall(write ? 2 : 1, 1, addr, value, 0, 0);
+	if (g_memoryCall == 0 || !watching(write ? 2 : 1, addr)) return value;
+	uint64_t now = value;
+	g_memoryCall(write ? 2 : 1, 1, addr, value, (uintptr_t)size, (uintptr_t)&now);
+	return (uint32_t)now;
 }
 /* only a machine that watches a read or a write pays for the hook */
 static void memory_hook(void)
@@ -460,6 +466,8 @@ static void memory_hook(void)
 	synth_on_access = any ? memory_accessed : 0;
 }
 ECL_EXPORT const char *GetMemoryCallbackScopes(void) { return "Code\nRAM"; }
+/* the reads and writes may be given another value; an instruction may not */
+ECL_EXPORT int32_t GetMemoryCallbackReplaceable(void) { return (1 << 1) | (1 << 2); }
 ECL_EXPORT void SetMemoryCallback(uint64_t fn)
 {
 	g_memoryCall = (uintptr_t (*)(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t))(uintptr_t)fn;

@@ -621,6 +621,12 @@ CE_API int64_t ce_project_branch_marker_frame(const ce_project *p, int32_t branc
 CE_API const char *ce_project_branch_marker_text(const ce_project *p, int32_t branch, int32_t index);
 CE_API int32_t ce_project_branch_marker_keep_state(const ce_project *p, int32_t branch, int32_t index);
 CE_API void ce_project_branch_marker_add(ce_project *p, int32_t branch, int64_t frame, const char *text, int32_t keep_state);
+/* What the frontend keeps with a branch for the scripts (their userdata,
+ * issue 534), as text the engine carries verbatim: null for a branch that
+ * keeps none (one made before, or by something with no scripts), which is not
+ * the same as "" (kept, and empty). Set to null to keep none. */
+CE_API const char *ce_project_branch_userdata(const ce_project *p, int32_t index);
+CE_API void ce_project_branch_set_userdata(ce_project *p, int32_t index, const char *text);
 
 /* The headers map: movie metadata the format does not first-class (Author,
  * emulator version, platform facts) as ordered verbatim key/value pairs.
@@ -1204,12 +1210,20 @@ CE_API void ce_session_set_input_poll_callback(ce_session *s, ce_input_poll_fn f
  * GetMemoryCallbackScopes, SetMemoryCallback, AddMemoryWatch and
  * RemoveMemoryWatch - names the address spaces it can watch, its "scopes"
  * (a CPU's bus, a kind of memory), and has the engine call
- * fn(ctx, kind, scope, address, value) at each access the session watches:
- * kind 0 an instruction about to run, 1 a read, 2 a write; value what was
- * read or written (0 for an instruction). fn runs as the input poll callback
- * above does: on the advancing thread, inside the frame.
+ * fn(ctx, kind, scope, address, value, size, replacement) at each access the
+ * session watches: kind 0 an instruction about to run, 1 a read, 2 a write;
+ * value what was read or is being written (0 for an instruction); size the
+ * access's width in bytes, 0 when the core does not say. replacement is
+ * null unless the core lets this access's value be changed (issue 534):
+ * then fn may put another value there and return 1, and the machine reads
+ * or writes that value instead; it returns 0 to leave the access as it is.
+ * fn runs as the input poll callback above does: on the advancing thread,
+ * inside the frame.
  * ce_session_memory_scopes is the scopes' names, a line each, the core's main
  * one first; "" for a core that watches no memory (fn is never called).
+ * ce_session_memory_replaceable says which kinds' values the core lets fn
+ * change, bit (1 << kind) for each (its optional export
+ * GetMemoryCallbackReplaceable); 0 for a core that only reports.
  * ce_session_watch_memory, between frames only, watches (on 1) or stops
  * watching (on 0) an address of a scope for a kind of access, or every
  * address of it (CE_ANY_ADDRESS): 1 when the core took it, 0 when it cannot
@@ -1217,8 +1231,10 @@ CE_API void ce_session_set_input_poll_callback(ce_session *s, ce_input_poll_fn f
  * core keeps what it watches until the session ends, through loads. Null fn
  * stops the calls. */
 #define CE_ANY_ADDRESS UINT64_MAX
-typedef void (*ce_memory_fn)(void *ctx, int32_t kind, int32_t scope, uint64_t address, uint64_t value);
+typedef int32_t (*ce_memory_fn)(void *ctx, int32_t kind, int32_t scope, uint64_t address, uint64_t value, int32_t size,
+	uint64_t *replacement);
 CE_API const char *ce_session_memory_scopes(const ce_session *s);
+CE_API int32_t ce_session_memory_replaceable(const ce_session *s);
 CE_API int32_t ce_session_watch_memory(ce_session *s, int32_t kind, int32_t scope, uint64_t address, int32_t on);
 CE_API void ce_session_set_memory_callback(ce_session *s, ce_memory_fn fn, void *ctx);
 

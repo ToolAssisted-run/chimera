@@ -403,31 +403,63 @@ Probed once after `Init`; absent exports simply mean the tool is not offered.
   a core without the export refuses it. The call costs nothing when no
   script listens: the engine returns at once. The synthetic core
   (`tests/synth/package-box/synth_wbx.c`) is the example.
-- **Calls during a frame: memory the machine runs, reads or writes** (issue
-  496) - four exports, all of them or none.
-  `const char *GetMemoryCallbackScopes(void)` names the address spaces the
-  core can watch, its "scopes" (a CPU's bus, a kind of memory), a line each,
-  its main one first. `void SetMemoryCallback(uint64_t fn)` is handed a
-  function in callback slot 4; keep it as the input poll's is
-  (`ECL_INVISIBLE`). `int32_t AddMemoryWatch(int32_t kind, int32_t scope,
-  uint64_t address)` and `void RemoveMemoryWatch(...)`, with the same
-  arguments, start and stop watching an address of a scope (`UINT64_MAX`:
-  every address) for a kind of access: 0 an instruction about to run, 1 a
-  read, 2 a write. Add gives 1 when the core watches it, and 0 when it cannot
-  (a kind or scope it lacks, or more places than it keeps); a script that asks
-  for it then gets an error. Keep what is watched in `ECL_INVISIBLE` memory
-  too, so a load leaves it as it is. At each watched access, call
-  `fn(kind, scope, address, value, 0, 0)` through the same six-argument
-  signature as the input poll: value is the byte or word read or written, 0
-  for an instruction; an instruction before it runs, a read or a write as it
-  happens. A Lua script's `event.on_bus_exec`, `on_bus_exec_any`,
-  `on_bus_read` and `on_bus_write` run there, part way through the frame;
-  a core without the exports refuses them. Look for a watched place only
-  while something is watched, since every access pays for the look. A core
-  whose CPU recompiles the game's code can watch only what its recompiler
-  lets it reach; offering reads and writes without instructions is fine. The
-  synthetic core is the example (`tests/synth/package-box/synth_wbx.c`:
-  scopes Code and RAM).
+- **Calls during a frame: memory the machine runs, reads or writes** (issues
+  496 and 534) - four exports, all of them or none, and a fifth that is
+  optional.
+  - `const char *GetMemoryCallbackScopes(void)` names the address spaces the
+    core can watch, its "scopes" (a CPU's bus, a kind of memory), a line each,
+    its main one first.
+  - `void SetMemoryCallback(uint64_t fn)` is handed a function in callback
+    slot 4; keep it as the input poll's is (`ECL_INVISIBLE`).
+  - `int32_t AddMemoryWatch(int32_t kind, int32_t scope, uint64_t address)`
+    and `void RemoveMemoryWatch(...)`, with the same arguments, start and
+    stop watching an address of a scope (`UINT64_MAX`: every address) for a
+    kind of access: 0 an instruction about to run, 1 a read, 2 a write. Add
+    gives 1 when the core watches it, and 0 when it cannot (a kind or scope
+    it lacks, or more places than it keeps); a script that asks for it then
+    gets an error. The engine adds a place once however many scripts watch
+    it, and removes it when the last one stops. Keep what is watched in
+    `ECL_INVISIBLE` memory too, so a load leaves it as it is.
+  - `int32_t GetMemoryCallbackReplaceable(void)`, optional: the kinds of
+    access whose value a script may change, bit `1 << kind` each (2 reads, 4
+    writes, 6 both). Without it, or with 0, the core only reports.
+
+  At each watched access, call `fn(kind, scope, address, value, size,
+  replacement)` through the same six-argument signature as the input poll:
+  - **address**: the place the program used, in the scope's own numbering,
+    as the bus sees it after any mirroring the core does. A watch on an
+    address matches an access whose first byte is there; a wider access over
+    it does not.
+  - **value**: the number read or about to be written, as the CPU holds it
+    (not as its bytes lie in memory), 0 for an instruction.
+  - **size**: the access's width in bytes (1, 2, 4 or 8), 0 when the core
+    does not know it. An older core passes 0.
+  - **replacement**: 0 when this access's value cannot be changed (always for
+    an instruction, and for a kind the core did not name in
+    `GetMemoryCallbackReplaceable`). Otherwise the address of a `uint64_t` in
+    the core's memory holding the value; after the call the machine goes on
+    with what it holds, which a script may have changed. The engine cuts a
+    new value to `size` bytes.
+  - **when**: an instruction before it runs, with every register as it is
+    then (the program counter and flags too, where an interpreter keeps them
+    in locals: write them back first). A read once its value is fetched and
+    before the CPU uses it; a write before memory changes. A core that offers
+    no replacement may report a write after memory changed.
+  - **order**: calls come in the order the machine makes the accesses. Say in
+    the core's notes what is not covered: another processor, a DMA copy, an
+    instruction fetch.
+
+  A Lua script's `event.on_bus_exec`, `on_bus_exec_any`, `on_bus_read` and
+  `on_bus_write` run there, part way through the frame, given the address,
+  the value and flags made from the kind and size; a core without the
+  exports refuses them. A function there may read and write memory, but
+  cannot advance, save or load a state, or close the core: Chimera refuses
+  that with an error. Look for a watched place only while something is
+  watched, since every access pays for the look. A core whose CPU recompiles
+  the game's code can watch only what its recompiler lets it reach; offering
+  reads and writes without instructions is fine. The synthetic core is the
+  example (`tests/synth/package-box/synth_wbx.c`: scopes Code and RAM, sizes,
+  reads and writes changeable).
 - **Memory domains** - a pointer and a size, published once. The memory tools
   read a domain through a second view of the core's memory that never faults,
   so a core that watches pages by protecting them (`GuestFaultHandler`, as

@@ -1764,6 +1764,7 @@
 		"project.branch_marker_keep_state": "\"keepState\" của dấu nhánh không phải là giá trị đúng/sai",
 		"project.branch_markers": "\"markers\" của một nhánh không phải là một mảng",
 		"project.branch_time": "\"time\" của một nhánh không phải là chuỗi",
+		"project.branch_userdata": "\"userdata\" của một nhánh không phải là chuỗi",
 		"project.cannot_read_from": "không thể đọc '%1' từ %2",
 		"project.clock_start": "\"clockStart\" không phải là thời điểm được viết dạng 2017-05-27T12:44:28Z, từ năm 1970 đến 2200",
 		"project.core_fields": "\"core\" cần có \"name\", \"version\" và \"sha1\" là chuỗi",

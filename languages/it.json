@@ -1796,6 +1796,7 @@
 		"project.branch_marker_keep_state": "il \"keepState\" di un marcatore di ramo non è un booleano",
 		"project.branch_markers": "i \"markers\" di un ramo non sono un array",
 		"project.branch_time": "il \"time\" di un ramo non è una stringa",
+		"project.branch_userdata": "il \"userdata\" di un ramo non è una stringa",
 		"project.cannot_read_from": "impossibile leggere '%1' da %2",
 		"project.clock_start": "\"clockStart\" non è un orario scritto come 2017-05-27T12:44:28Z tra il 1970 e il 2200",
 		"project.core_fields": "\"core\" richiede \"name\", \"version\" e \"sha1\" di tipo stringa",

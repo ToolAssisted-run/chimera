@@ -1796,6 +1796,7 @@
 		"project.branch_marker_keep_state": "el \"keepState\" d'un marcador de branca no és un booleà",
 		"project.branch_markers": "els \"markers\" d'una branca no són una matriu",
 		"project.branch_time": "el \"time\" d'una branca no és un text",
+		"project.branch_userdata": "el \"userdata\" d'una branca no és un text",
 		"project.cannot_read_from": "no es pot llegir '%1' des de %2",
 		"project.clock_start": "\"clockStart\" no és una hora escrita com 2017-05-27T12:44:28Z, entre 1970 i 2200",
 		"project.core_fields": "\"core\" necessita un text \"name\", \"version\" i \"sha1\"",

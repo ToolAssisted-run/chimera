@@ -1463,9 +1463,12 @@ int main(int argc, char **argv)
 		});
 	/* a script's event.oninputpoll: at each read of the controls a core reports, inside its frame */
 	session.setInputPollTurn([&lua] { lua.inputPoll(); });
-	session.setMemoryTurn([&lua](int32_t kind, int32_t scope, uint64_t address, uint64_t value) {
-		lua.memoryAccess(kind, scope, address, value);
+	session.setMemoryTurn([&lua](int32_t kind, int32_t scope, uint64_t address, uint64_t value, int32_t size, bool replaceable) {
+		return lua.memoryAccess(kind, scope, address, value, size, replaceable);
 	});
+	/* the scripts' userdata kept with each branch, and put back when one is loaded (issue 534) */
+	session.setUserdataTurn([&lua] { return lua.userdataText(); });
+	session.setBranchLoadedTurn([&lua](const std::optional<std::string> &userdata, const std::string &name) { lua.branchLoaded(userdata, name); });
 	/* a script's show_future: asked before each frame played ahead */
 	session.setFutureTurn([&lua](int64_t played) { return lua.ask("__chimera_future", {vm::Value(played)}) == "true"; });
 	/* a machine opened or closed: the running scripts start again, as Chimera's
@@ -1493,6 +1496,8 @@ int main(int argc, char **argv)
 			session.setFutureTurn({});
 			session.setInputPollTurn({});
 			session.setMemoryTurn({});
+			session.setUserdataTurn({});
+			session.setBranchLoadedTurn({});
 		}
 	} letGo{session};
 

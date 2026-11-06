@@ -1811,6 +1811,13 @@ SessionViewModel::SessionViewModel(Dispatcher &dispatcher, InputLog &inputs)
 			onMachineWait([&](ce_session *s) { if (s != nullptr) scopes = ce_session_memory_scopes(s); });
 			return scopes;
 		});
+	command("memoryReplaceable", "which kinds of access the core open lets the scripts' memory functions change the value "
+		"of (issue 534): bit 1 << kind each, kind 1 a read, 2 a write; 0 for a core that only reports them", {},
+		[this](const Args &, std::string &) -> Value {
+			int64_t kinds = 0;
+			onMachineWait([&](ce_session *s) { if (s != nullptr) kinds = ce_session_memory_replaceable(s); });
+			return kinds;
+		});
 	command("watchMemory", "the core open asked to call the scripts' memory functions at an access (on true) or no longer "
 		"(false): kind 0 an instruction run, 1 a read, 2 a write; the scope's place in memoryScopes; the address, or -1 for "
 		"every address. True when the core watches it", {"kind", "scope", "address", "on"},
@@ -3223,6 +3230,7 @@ std::string branchRecord(const SessionViewModel::Branch &b, const std::string &i
 	r.members.emplace_back("time", json::Json::string(b.time));
 	r.members.emplace_back("log", json::Json::string(b.text));
 	r.members.emplace_back("markers", markersJson(b.markers));
+	if (b.userdata) r.members.emplace_back("userdata", json::Json::string(*b.userdata));
 	return "B " + json::write(r);
 }
 
@@ -3296,6 +3304,8 @@ void applyMarkRecords(ce_project *p, const ce_movie_log *log)
 		const std::string movie = text("log");
 		ce_project_branch_add(p, text("text").c_str(), frame != nullptr ? wholeOf(*frame) : 0, text("time").c_str(), movie.data(), movie.size());
 		const int32_t at = ce_project_branch_count(p) - 1;
+		if (const json::Json *u = b.find("userdata"); u != nullptr && u->kind == json::Json::Kind::String)
+			ce_project_branch_set_userdata(p, at, u->text.c_str());
 		if (const json::Json *ms = b.find("markers"); ms != nullptr && ms->kind == json::Json::Kind::Array)
 			for (const json::Json &m : ms->items)
 				marker(m, [p, at](int64_t f, const std::string &t, bool keep) { ce_project_branch_marker_add(p, at, f, t.c_str(), keep ? 1 : 0); });
@@ -3816,6 +3826,8 @@ void SessionViewModel::makeBranch(std::string name, std::string time, std::funct
 		b.frame = ce_session_frame(s_);
 		b.text = movieTextOnMachine();
 		b.frames = ce_session_movie_length(s_);
+		/* the scripts' userdata as it is now, which loading the branch puts back */
+		if (userdataTurnM_) b.userdata = userdataTurnM_();
 		/* the picture shown now, which a state load will not draw */
 		auto picture = std::make_shared<Picture::Frame>();
 		screen.takeIfNewer(~uint64_t{0}, *picture);
@@ -3882,6 +3894,10 @@ void SessionViewModel::loadBranch(Branch b, std::function<void(bool, std::string
 			}
 		}
 		if (!fromState) seekOnMachine(b.frame);
+		/* the scripts told of a load that put the machine on the branch's
+		 * frame, their userdata the branch's first (issue 534); a seek that
+		 * stopped short is no load */
+		if (branchLoadedTurnM_ && s_ != nullptr && ce_session_frame(s_) == b.frame) branchLoadedTurnM_(b.userdata, b.name);
 		later([this, done, fromState, why] {
 			inputsReset.emit();
 			done(fromState, why);
@@ -4243,15 +4259,31 @@ void SessionViewModel::applyInputPollsOnMachine()
 	ce_session_set_input_poll_callback(s_, inputPollsWantedM_.load() ? &SessionViewModel::inputPollCalled : nullptr, this);
 }
 
-void SessionViewModel::setMemoryTurn(std::function<void(int32_t, int32_t, uint64_t, uint64_t)> turn)
+void SessionViewModel::setMemoryTurn(MemoryTurn turn)
 {
 	waitOnMachine([&] { memoryTurnM_ = std::move(turn); }, true);
 }
 
-void SessionViewModel::memoryCalled(void *ctx, int32_t kind, int32_t scope, uint64_t address, uint64_t value)
+int32_t SessionViewModel::memoryCalled(void *ctx, int32_t kind, int32_t scope, uint64_t address, uint64_t value, int32_t size,
+	uint64_t *replacement)
 {
 	auto *self = static_cast<SessionViewModel *>(ctx);
-	if (self->memoryTurnM_ && self->scriptsNowOnMachine()) self->memoryTurnM_(kind, scope, address, value);
+	if (!self->memoryTurnM_ || !self->scriptsNowOnMachine()) return 0;
+	const std::optional<uint64_t> now = self->memoryTurnM_(kind, scope, address, value, size, replacement != nullptr);
+	if (!now || replacement == nullptr) return 0;
+	/* no wider than the access, when the core said how wide it is */
+	*replacement = size > 0 && size < 8 ? *now & ((uint64_t{1} << (size * 8)) - 1) : *now;
+	return 1;
+}
+
+void SessionViewModel::setUserdataTurn(std::function<std::string()> turn)
+{
+	waitOnMachine([&] { userdataTurnM_ = std::move(turn); }, true);
+}
+
+void SessionViewModel::setBranchLoadedTurn(std::function<void(const std::optional<std::string> &, const std::string &)> turn)
+{
+	waitOnMachine([&] { branchLoadedTurnM_ = std::move(turn); }, true);
 }
 
 void SessionViewModel::applyMemoryWatchesOnMachine()
@@ -4713,6 +4745,7 @@ void SessionViewModel::bootProjectOnMachine(ce_project *p, const std::string &pa
 			b.name = ce_project_branch_name(p, i) != nullptr ? ce_project_branch_name(p, i) : "";
 			b.time = ce_project_branch_time(p, i) != nullptr ? ce_project_branch_time(p, i) : "";
 			b.frame = ce_project_branch_frame(p, i);
+			if (const char *u = ce_project_branch_userdata(p, i)) b.userdata = std::string(u);
 			uint64_t blen = 0;
 			const char *btext = ce_project_branch_log_text(p, i, &blen);
 			b.text.assign(btext != nullptr ? btext : "", static_cast<size_t>(blen));
@@ -5229,6 +5262,7 @@ bool SessionViewModel::saveProjectOnMachine(const std::string &to, bool backup, 
 	{
 		ce_project_branch_add(projectM_, b.name.c_str(), b.frame, b.time.c_str(), b.text.data(), b.text.size());
 		const int32_t at = ce_project_branch_count(projectM_) - 1;
+		if (b.userdata) ce_project_branch_set_userdata(projectM_, at, b.userdata->c_str());
 		for (const Marker &m : b.markers) ce_project_branch_marker_add(projectM_, at, m.frame, m.text.c_str(), m.keepState ? 1 : 0);
 	}
 	gameTimeHeadersOnMachine(projectM_, n);
