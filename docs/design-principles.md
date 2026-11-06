@@ -13934,3 +13934,29 @@ placeholder was caught and reworded); meson tests 62 passed, 2 failed for
 reasons unrelated to this change; witness 125/125. Not tried: the window on
 Windows, where the Windows-only rows show.
 
+
+## Issues also present upstream are not ours (user-decided, 2026-11-06)
+
+In general, Chimera does not fix nor report issues that are also present in
+the upstream emulator a core builds. When a report may be such an issue, the
+upstream emulator itself is run to confirm it. The issue is then told so and
+closed. The README's "Reporting a problem" says this to reporters.
+
+The first case was issue 491: thin vertical lines through the fighters on
+Killer Instinct Gold's profile screens, in the ares core. The game draws each
+fighter as a picture enlarged about 2.4 times, sent to the N64's drawing chip
+in strips (for Tusk, 16 texture pixels drawn 39 screen pixels wide). Each
+strip is set to repeat as a mirror image every 16 columns. So the chip blends
+a strip's edge with a copy of itself, not with the next strip, and the
+picture steps at every strip edge. All drawing commands of the frame were
+recorded to find this. Both of the core's renderers draw it the same, pixel
+for pixel.
+
+Upstream ares master (0523217, 2026-11-04) was built on Linux and run with
+its default settings. Its attract mode never reached Tusk in 9 minutes, but
+Glacius's profile screen shows the same evenly spaced lines. Not checked:
+a real console, and Tusk's own screen in upstream ares.
+
+The same commit makes the README from "Getting a build" down shorter: smaller
+sentences, fewer paragraphs, and a blank line between every paragraph and
+list item (user-asked, 2026-11-06).

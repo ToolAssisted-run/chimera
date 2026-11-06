@@ -141,6 +141,10 @@ bursts around nightlies.
 - Decision: "This is a design choice; noted for Sergio" + label, no promise.
 - Upstream: link to the upstream emulator's issue/commit, label, keep open
   only if we carry a patch for it.
+- Also in upstream (user-decided, 2026-11-06): when the upstream emulator
+  shows the same problem, run upstream itself to confirm it, say so on the
+  issue, and close it. In general we neither fix nor report issues that are
+  also present in the upstream cores.
 - Tone: plain, one paragraph, no apologies, no emoji.
 
 ## 7. Duplicates and feature requests

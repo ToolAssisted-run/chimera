@@ -138,50 +138,47 @@ Made and published by other people from their own repositories, and listed here 
 
 ## Getting a build
 
-The frontend is built for Windows, Linux and macOS, each for x86_64 and aarch64, and published as [**nightly builds**](https://github.com/ToolAssisted-run/chimera/releases): one a day when `main` changed and passed its tests, dated, immutable, and kept forever. Cite one in a bug report or beside a movie: a run is only reproducible while the build that recorded it still exists.
+Chimera is published as [**nightly builds**](https://github.com/ToolAssisted-run/chimera/releases) for Windows, Linux and macOS, each for x86_64 and aarch64.
 
-A bundle carries no cores, and Chimera never reaches the network - it downloads
-nothing, not a core and not a list of them. To set one up:
+A nightly is made each day `main` changed and passed its tests. It is dated and never changed or deleted, so a movie or a bug report can name the build it used.
 
-1. Download a build above and unpack it. **On Windows or Linux you most likely
-   want x86_64**; take aarch64 only if you know you are using an ARM device. On
-   a Mac, take aarch64 for Apple silicon (M1 and later) and x86_64 for an Intel Mac;
-   macOS asks before opening it the first time, as it is signed by no
-   developer.
-2. Download the `.chimeraCore` package of each core you want from that core's
-   releases page (the [Cores](#cores) tables link them), or build it. A release
-   names each package for its CPU, `<core>-<version>-x86_64.chimeraCore` or
-   `<core>-<version>-aarch64.chimeraCore`, and says which systems it runs on:
-   take the one for the CPU of your build (most likely x86_64), and only one.
-   Most cores have no aarch64 package yet; [docs/platforms.md](docs/platforms.md)
-   says what runs on each build.
-3. Put the packages in the `Cores` folder beside Chimera (`chimera.exe` on
-   Windows, `chimera` on Linux; on a Mac,
-   `~/Library/Application Support/Chimera/Cores`), and start Chimera.
+A build carries no cores, and Chimera never uses the network. To set it up:
 
-Each core publishes nightlies the same way, and they are never deleted - which is what lets a movie name the exact package
-that recorded it and still be replayable years later.
+1. Download a build and unpack it.
 
-Every bundle carries `BUILD.txt`, naming the exact commit it was built from, and
-`LICENSES.md`, stating its terms. **Adding a core adds that core's terms**,
-and some of them (Genesis Plus GX, Opera, Snes9x) forbid commercial use, which
-binds whatever they are installed into; Chimera shows a core's licence once it
-is in the folder.
+   On Windows or Linux, take x86_64 unless you know your device is ARM.
 
-Core packages published before the split are kept in the
-[`cores`](https://github.com/ToolAssisted-run/chimera/releases/tag/cores)
-release, named by SHA1. It no longer grows - each core archives its own now -
-but movies recorded then still cite packages in it.
+   On a Mac, take aarch64 for Apple silicon (M1 and later) and x86_64 for an Intel Mac. macOS asks before opening it the first time, because it is not signed.
+
+2. Download the `.chimeraCore` package of each core you want, from that core's releases page (the [Cores](#cores) tables link them).
+
+   Packages are named `<core>-<version>-x86_64.chimeraCore` or `<core>-<version>-aarch64.chimeraCore`. Take the one that matches your build, and only one.
+
+   Most cores have no aarch64 package yet; [docs/platforms.md](docs/platforms.md) says what runs where.
+
+3. Put the packages in the `Cores` folder beside the program (on a Mac, `~/Library/Application Support/Chimera/Cores`), and start Chimera.
+
+Cores publish nightlies the same way, and never delete them. So a movie can name the exact package that recorded it and still be replayed years later.
+
+Every build carries `BUILD.txt`, naming the commit it was built from, and `LICENSES.md`, with its terms.
+
+**A core adds its own terms.** Some (Genesis Plus GX, Opera, Snes9x) forbid commercial use. Chimera shows a core's licence once it is in the folder.
+
+Core packages from before each core had its own repository are kept in the [`cores`](https://github.com/ToolAssisted-run/chimera/releases/tag/cores) release, named by SHA1. Nothing is added to it any more.
 
 ## Working with an AI agent
 
-An AI agent (Claude Code, or any program that speaks MCP) can look at the project you have open and, if you allow it, edit it. Start the server from **Tools > MCP Server...**, which also shows the command that sets the agent up; it is off until you start it, and nothing leaves your machine. An agent can also work with no window at all, on a machine of its own. See [docs/mcp-server.md](docs/mcp-server.md).
+An AI agent (Claude Code, or any program that speaks MCP) can look at your open project and, if you allow it, edit it.
+
+Start the server from **Tools > MCP Server...**, which also shows the command that sets the agent up. It is off until you start it, and nothing leaves your machine.
+
+An agent can also work with no window, on a machine of its own. See [docs/mcp-server.md](docs/mcp-server.md).
 
 ## Building
 
-Chimera is built with meson: the engine, its libraries and the window (Qt 6.12). Linux builds it for Linux, for the machine's own CPU, and cross-builds it for Windows, with mingw-w64 for x86_64 and llvm-mingw for aarch64; macOS is built on a Mac ([docs/macos.md](docs/macos.md)). How each of the six is built and tested is in [docs/platforms.md](docs/platforms.md). Clone with `--recursive`; the repository contains no precompiled binaries, and
-no cores - `tools/fetch-cores.sh` puts the published ones in `build/Cores` if
-you want a working set without opening the frontend.
+Chimera is built with meson and Qt 6.12. Clone with `--recursive`. The repository holds no prebuilt programs and no cores.
+
+Linux builds for Linux and cross-builds for Windows. macOS is built on a Mac ([docs/macos.md](docs/macos.md)). [docs/platforms.md](docs/platforms.md) says how each of the six builds is made and tested.
 
 ```
 tools/ci-chimera.sh      # Qt 6.12 for Linux into ~/qt (aqt), then the Linux build
@@ -195,55 +192,57 @@ PATH="$QT/libexec:$QT/bin:$PATH" PKG_CONFIG_PATH="$QT/lib/pkgconfig" \
 meson compile -C build/meson-linux && meson install -C build/meson-linux
 ```
 
-Linux requirements: meson, ninja, cmake, gcc, and Qt 6.12 (Core, Gui, Qml, Quick, QuickControls2); mingw-w64 for the Windows x86_64 build, llvm-mingw (`tools/fetch-llvm-mingw.sh`) for Windows aarch64. The release builds Qt itself for Linux and Windows, without its network module (`tools/build-qt-linux.sh`, `tools/build-qt-windows.sh`); `tools/build-bundle.sh` makes the Linux and Windows bundles from it, and `tools/build-app-macos.sh` the Mac app.
+Linux needs meson, ninja, cmake, gcc and Qt 6.12 (Core, Gui, Qml, Quick, QuickControls2).
 
-The frontend ships no cores, so get at least one before running it - either the
-published packages, or a core repository cloned wherever you like:
+The Windows builds also need mingw-w64 (x86_64) or llvm-mingw (aarch64, `tools/fetch-llvm-mingw.sh`).
+
+Releases build Qt themselves, without its network module (`tools/build-qt-linux.sh`, `tools/build-qt-windows.sh`). `tools/build-bundle.sh` makes the Linux and Windows bundles, and `tools/build-app-macos.sh` the Mac app.
+
+Get at least one core before running:
 
 ```
 tools/fetch-cores.sh                                # every published core -> build/Cores
 <core checkout>/waterbox/build-package.sh -r $PWD   # or build one yourself
 ```
 
-To run: `build/meson-linux/source/ui/chimera` (with `CHIMERA_CORES_DIR=build/Cores`
-for the cores a checkout holds), then `File > New Chimera Project...` and pick a
-core. `--headless` runs it with no window and no display, for a script or a test.
+Run `build/meson-linux/source/ui/chimera` (with `CHIMERA_CORES_DIR=build/Cores`), then **File > New Chimera Project...** and pick a core. `--headless` runs it with no window, for a script or a test.
 
-The witness gate runs with `tests/synth/run-witness.sh`. The engineering log (objectives, procedure, and the sharp edges found along the way) is in [docs/design-principles.md](docs/design-principles.md). Building a new core, and joining it to this bundle, is [docs/porting-a-core.md](docs/porting-a-core.md).
+The end-to-end test runs with `tests/synth/run-witness.sh`.
+
+The design log is [docs/design-principles.md](docs/design-principles.md). Building a new core is [docs/porting-a-core.md](docs/porting-a-core.md).
 
 ## Reporting a problem
 
-Open an issue on this repository, whichever core it concerns - one inbox,
-and the issue template asks for what a fix needs. What settles most
-reports before anybody opens a debugger:
+Open an issue on this repository, whichever core it concerns. The issue form asks for what a fix needs.
 
-- **Help > Report an Issue** shows the link to the report form and fills in
-  its first lines for you: build, core, system, processor and memory, files
-  and changed settings.
-  It can also save the files worth attaching as one zip.
-- **The build strings.** Help > Copy Version Info puts the frontend's build
-  and the running core's version on the clipboard, in the template's words.
-  A frontend and a core from different days may not
-  understand each other's states, so before reporting a save/load problem,
-  match them.
-- **The project file.** A `.chimeraProject` is small and names every file
-  by hash, so attach it rather than describing it.
-- **The three crash files** (Windows). When Chimera or a core dies it writes a crash
-  note and a minidump, `<date> pid<N>.txt` and `.dmp`, into the `Crashes`
-  folder of the data directory (Config > Data Directory... opens it;
-  `%LOCALAPPDATA%\Chimera` by default on Windows), and the sandbox writes
-  `minibox-diag.log` next to Chimera's program (on a Mac, in the data
-  folder). Attach all three: the note carries the faulting instruction and
-  the machine's last words, and two of three crashes in one recent report
-  were fixed off those files alone.
-- **The core's log.** Help > Export Core Log... keeps everything the core
-  says in a file you choose; it is off until asked for, and reboots the core
-  so the log starts at boot. Use it again to turn it off, and attach the file.
+In general, we do not fix nor report issues that are also present in the upstream cores.
+
+What helps most:
+
+- **Help > Report an Issue** opens the form and fills in its first lines: build, core, system, processor, memory, files and changed settings. It can also save the files worth attaching as one zip.
+
+- **The build strings.** Help > Copy Version Info copies the frontend's and the core's versions. A frontend and a core from different days may not read each other's states, so match them before reporting a save or load problem.
+
+- **The project file.** A `.chimeraProject` is small and names every file by hash. Attach it instead of describing it.
+
+- **The crash files** (Windows). When Chimera or a core dies, it writes a note and a minidump (`<date> pid<N>.txt` and `.dmp`) into the `Crashes` folder of the data directory. Config > Data Directory... opens it (`%LOCALAPPDATA%\Chimera` by default).
+
+  The sandbox also writes `minibox-diag.log` next to the program (on a Mac, in the data folder). Attach all three.
+
+- **The core's log.** Help > Export Core Log... saves everything the core says to a file. It restarts the core so the log starts at boot. Use it again to stop, and attach the file.
 
 ## Contributing
 
-Pull requests are welcome, from people and from people working with AI assistants alike. A contribution is judged on its merits: it should build, pass the witness gate, and keep to the project's scope. The one firm requirement is legal cleanliness: you must have the right to submit the code under this repository's MIT license, and anything derived from other works must respect their licenses and carry the attribution they require.
+Pull requests are welcome, from people and from people working with AI assistants.
+
+A contribution should build, pass the end-to-end test, and stay within the project's scope.
+
+You must have the right to submit the code under the MIT license. Anything derived from other works must respect their licenses and carry the attribution they require.
 
 ## Credits and license
 
-**Chimera began as a fork of [BizHawk](https://github.com/TASEmulators/BizHawk).** It is provided under the MIT License, keeping the BizHawk team's copyright on the parts that come from BizHawk; see [LICENSE](LICENSE) for the terms and [NOTICE](NOTICE) for whose work it is and what the terms do not cover: the native libraries built from `extern/`, and why core packages carry their own licenses. The people behind Chimera itself are in [CREDITS.md](CREDITS.md).
+**Chimera began as a fork of [BizHawk](https://github.com/TASEmulators/BizHawk).** It is under the MIT License, keeping the BizHawk team's copyright on the parts that come from BizHawk.
+
+[LICENSE](LICENSE) has the terms. [NOTICE](NOTICE) says whose work it is and what the terms do not cover: the native libraries built from `extern/`, and why core packages carry their own licenses.
+
+The people behind Chimera itself are in [CREDITS.md](CREDITS.md).
