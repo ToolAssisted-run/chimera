@@ -630,6 +630,16 @@ endif
       override_options: ['cpp_std=c++20'],
     )
     test('core tools menu', test_core_tools_menu, env: ['QT_QPA_PLATFORM=offscreen', 'QT_QUICK_BACKEND=software'], timeout: 60)
+    # the piano roll scrolled by a trackpad's small steps (issue 542)
+    test_roll_wheel = executable(
+      'test-roll-wheel',
+      ['qt/tests/test_roll_wheel.cpp', 'qt/piano_roll_item.cpp', 'qt/qml_view_model.cpp', 'qt/theme_palette.cpp',
+        qt6.compile_moc(headers: ['qt/piano_roll_item.hpp', 'qt/qml_view_model.hpp', 'qt/theme_palette.hpp'], dependencies: [qt_dep])],
+      dependencies: [qt_test_dep, vm_dep, dl_dep],
+      override_options: ['cpp_std=c++20'],
+      cpp_args: ['-DQT_NO_KEYWORDS'],
+    )
+    test('roll wheel', test_roll_wheel, env: ['QT_QPA_PLATFORM=offscreen', 'QT_QUICK_BACKEND=software'], timeout: 60)
     # files dropped on a slot of New Project, every one of them, not only
     # the first (issue 425): the window over the program's view model
     test_new_project_drop = executable(

@@ -54,6 +54,9 @@ private:
 	 * application to an object of no consequence */
 	QObject forgetter_;
 	void forgetAltForMenus();
+	/* a key nothing is bound to, given to the piano roll that has the
+	 * keyboard to move its picked frame (issue 542); true when it did */
+	bool navigates(const QKeyEvent &k);
 	/* the key went to a text field being typed in */
 	static bool typing(const QKeyEvent &k);
 };

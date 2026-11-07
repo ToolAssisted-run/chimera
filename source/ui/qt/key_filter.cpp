@@ -72,6 +72,11 @@ bool KeyFilter::eventFilter(QObject *watched, QEvent *e)
 		auto *k = static_cast<QKeyEvent *>(e);
 		const bool down = e->type() == QEvent::KeyPress;
 		if (down && typing(*k)) return QObject::eventFilter(watched, e);
+		/* the arrows, Page Up and Down, Home and End move TAStudio's picked
+		 * frame while its roll has the keyboard, when nothing is bound to them
+		 * (owner, 2026-11-07, issue 542); bound, they are the game's and the
+		 * hotkeys' as before. Held, they repeat */
+		if (down && navigates(*k)) return true;
 		if (!k->isAutoRepeat())
 		{
 			const QString name = qt::keyName(*k);
@@ -114,6 +119,24 @@ bool KeyFilter::eventFilter(QObject *watched, QEvent *e)
 		input_.releaseKeys();
 	}
 	return QObject::eventFilter(watched, e);
+}
+
+bool KeyFilter::navigates(const QKeyEvent &k)
+{
+	switch (k.key())
+	{
+	case Qt::Key_Up: case Qt::Key_Down: case Qt::Key_PageUp: case Qt::Key_PageDown: case Qt::Key_Home: case Qt::Key_End: break;
+	default: return false;
+	}
+	QObject *focus = QGuiApplication::focusObject();
+	if (focus == nullptr || focus->metaObject()->indexOfMethod("navigate(int,bool)") < 0) return false;
+	const QString name = qt::keyName(k);
+	if (name.isEmpty() || session_.keyIsBound(name.toStdString())
+		|| hotkeys_.boundTo(qt::keyCombination(name, k.modifiers()).toStdString()))
+		return false;
+	bool moved = false;
+	QMetaObject::invokeMethod(focus, "navigate", Q_RETURN_ARG(bool, moved), Q_ARG(int, k.key()), Q_ARG(bool, k.modifiers().testFlag(Qt::ShiftModifier)));
+	return moved;
 }
 
 bool HeldKeyClicksOnce::eventFilter(QObject *watched, QEvent *e)

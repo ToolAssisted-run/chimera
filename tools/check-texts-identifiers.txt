@@ -400,3 +400,6 @@ qt.qpa.wayland.textinput.warning=false
 @executable_path/libopenal.dylib
 @executable_path/../Frameworks/libopenal.dylib
 @rpath/libopenal.dylib
+
+# a method of the piano roll the key filter asks for by its signature (key_filter.cpp)
+navigate(int,bool)

@@ -902,9 +902,43 @@ void PianoRollItem::mouseReleaseEvent(QMouseEvent *e)
 	dragRow_ = -1;
 }
 
+bool PianoRollItem::navigate(int key, bool extend)
+{
+	const qint64 count = rowCount();
+	if (count <= 0) return false;
+	/* from the end of the frames picked that moved last, or the top of the view */
+	const qint64 from = selectLast_ < 0 ? top_ : (selectAnchor_ == selectLast_ ? selectFirst_ : selectLast_);
+	const qint64 page = std::max(1, visibleRows() - 1);
+	qint64 to = from;
+	switch (key)
+	{
+	case Qt::Key_Up: to = from - 1; break;
+	case Qt::Key_Down: to = from + 1; break;
+	case Qt::Key_PageUp: to = from - page; break;
+	case Qt::Key_PageDown: to = from + page; break;
+	case Qt::Key_Home: to = 0; break;
+	case Qt::Key_End: to = count - 1; break;
+	default: return false;
+	}
+	to = std::clamp<qint64>(to, 0, count - 1);
+	if (!extend || selectAnchor_ < 0) selectAnchor_ = to;
+	Q_EMIT selectionRequested(std::min(selectAnchor_, to), std::max(selectAnchor_, to));
+	/* kept in view: at the top going up, at the bottom going down */
+	const qint64 shown = std::max(1, visibleRows());
+	if (to < top_) Q_EMIT topRowRequested(to);
+	else if (to >= top_ + shown) Q_EMIT topRowRequested(to - shown + 1);
+	return true;
+}
+
 void PianoRollItem::wheelEvent(QWheelEvent *e)
 {
-	const int notches = e->angleDelta().y() / 120;
+	/* a notch is 120; what is short of one is kept for the next step, as a
+	 * trackpad turns a little at a time (each step alone was 0, issue 542) */
+	const int angle = e->angleDelta().y();
+	if ((angle > 0) != (wheelAngle_ > 0)) wheelAngle_ = 0;
+	wheelAngle_ += angle;
+	const int notches = wheelAngle_ / 120;
+	wheelAngle_ -= notches * 120;
 	if (rightHeld_)
 	{
 		rightWheeled_ = true;
@@ -913,6 +947,19 @@ void PianoRollItem::wheelEvent(QWheelEvent *e)
 			Q_EMIT wheelSeekRequested(notches, !rightSeeked_);
 			rightSeeked_ = true;
 		}
+		e->accept();
+		return;
+	}
+	/* a trackpad says how far it moved in pixels: the roll follows it row by
+	 * row, as other lists do; a wheel moves its rows a notch */
+	if (!e->pixelDelta().isNull())
+	{
+		const int pixels = e->pixelDelta().y();
+		if ((pixels > 0) != (wheelPixels_ > 0)) wheelPixels_ = 0;
+		wheelPixels_ += pixels;
+		const int rows = wheelPixels_ / std::max(1, rowHeight_);
+		wheelPixels_ -= rows * std::max(1, rowHeight_);
+		if (rows != 0) Q_EMIT topRowRequested(std::max<qint64>(0, top_ - rows));
 		e->accept();
 		return;
 	}

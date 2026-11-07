@@ -375,7 +375,14 @@ paste insert, cut, clear, delete, insert, clone, truncate, and branch.
 Keys pressed in TAStudio reach the machine and the hotkeys, as Chimera's
 TAStudio passes them on, except a key with Ctrl held: that is a menu's
 shortcut unless a hotkey is bound to it, so Ctrl+C copies where C is a
-button (issue 453). A click in the roll takes the keyboard back from a
+button (issue 453). Up, Down, Page Up, Page Down, Home and End that no
+button or hotkey has move the frames picked while the roll has the
+keyboard: the frame above or below, a page away, the first or the last,
+Shift reaching there from where picking began, the frame kept in view
+(owner, 2026-11-07, issue 542); bound, they are the game's and the
+hotkeys' as before. The wheel and a trackpad keep what they turned short
+of a notch or a row for the next step, so a trackpad's small steps scroll
+the roll as they add up (issue 542). A click in the roll takes the keyboard back from a
 field such as the greenzone's period, so the hotkeys work again (issue
 462). A double click on a frame number opens the person's marker there
 to edit its text, or sets a marker with no text where there is none

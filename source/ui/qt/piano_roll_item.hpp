@@ -84,6 +84,12 @@ public:
 	int visibleRows() const;
 	int rowHeight() const { return rowHeight_; }
 	double lastPaintMs() const { return lastPaintMs_; }
+	/* a key no control or hotkey has, pressed while the roll has the keyboard
+	 * (issue 542): Up and Down pick the frame above or below, Page Up and Page
+	 * Down a page away, Home and End the first and the last; with Shift the
+	 * frames picked reach there from where picking began. The frame is
+	 * scrolled into view. False for any other key */
+	Q_INVOKABLE bool navigate(int key, bool extend);
 
 	void paint(QPainter *painter) override;
 
@@ -206,6 +212,9 @@ private:
 	int pickedColumn_ = -1;
 	int view_ = 0;
 	int wheelRows_ = 6;
+	/* what a wheel or trackpad turned that is not yet a notch or a row: a
+	 * trackpad sends many small steps, each less than one (issue 542) */
+	int wheelAngle_ = 0, wheelPixels_ = 0;
 	bool denoteStatesColor_ = true, denoteStatesIcons_ = false, denoteMarkersColor_ = true, denoteMarkersIcons_ = false;
 	QString colors_, rollFont_;
 	QFont font_;

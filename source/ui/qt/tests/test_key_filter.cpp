@@ -4,7 +4,7 @@
  * bound to it without opening the menu. The menus' letters are drawn from
  * Alt pressed until a click, and a menu's text without its letter is as Qt
  * hides one. A key held on a button clicks it once, its repeats kept from it
- * (issue 494). */
+ * (issue 494). Unbound arrows move TAStudio's roll (issue 542). */
 #include <cstdio>
 #include <functional>
 
@@ -58,6 +58,21 @@ Window {
     width: 200; height: 100; visible: true
     property int clicks: 0
     Button { text: "Add"; focus: true; onClicked: win.clicks++ }
+}
+)";
+
+// a stand-in for TAStudio's piano roll, which has the keyboard (issue 542)
+const char *const kRoll = R"(
+import QtQuick
+Window {
+    width: 200; height: 100; visible: true
+    property int moves: 0
+    property bool extended: false
+    Item {
+        anchors.fill: parent
+        focus: true
+        function navigate(key: int, extend: bool): bool { moves++; extended = extend; return true }
+    }
 }
 )";
 
@@ -136,6 +151,30 @@ int main(int argc, char **argv)
 	QTest::mouseClick(window, Qt::LeftButton, Qt::AltModifier, QPoint(160, 150));
 	CHECK(!letters.shown());
 	QTest::keyRelease(window, Qt::Key_Alt, Qt::NoModifier);
+
+	/* the roll's keys (issue 542): Down that nothing is bound to moves the
+	 * roll's picked frame, Shift+Down extends it; a hotkey bound to Down
+	 * takes it as before, and the roll is not moved */
+	{
+		QQmlApplicationEngine rollEngine;
+		rollEngine.loadData(kRoll);
+		auto *rollWindow = qobject_cast<QQuickWindow *>(rollEngine.rootObjects().value(0));
+		CHECK(rollWindow != nullptr);
+		if (rollWindow == nullptr) return 1;
+		chimera::qt::KeyFilter rollKeys(session, hotkeys, input);
+		rollWindow->installEventFilter(&rollKeys);
+		rollWindow->requestActivate();
+		CHECK(QTest::qWaitForWindowActive(rollWindow));
+		QTest::keyClick(rollWindow, Qt::Key_Down);
+		CHECK(rollWindow->property("moves").toInt() == 1 && !rollWindow->property("extended").toBool());
+		QTest::keyClick(rollWindow, Qt::Key_Down, Qt::ShiftModifier);
+		CHECK(rollWindow->property("moves").toInt() == 2 && rollWindow->property("extended").toBool());
+		int downs = 0;
+		hotkeys.add("General", "Roll Key Test", "Down", [&](bool down) { downs += down ? 1 : 0; });
+		QTest::keyClick(rollWindow, Qt::Key_Down);
+		QTest::qWait(100);
+		CHECK(rollWindow->property("moves").toInt() == 2 && downs == 1);
+	}
 
 	/* Space held on a button: pressed, five repeats (each a release and a
 	 * press, as Windows and X11 send them), let go - one click */

@@ -14161,3 +14161,28 @@ ported is in [porting-a-core.md](porting-a-core.md), "An aarch64 package".
   miniBox's own tests pass on every host it is built for, a new one with 200
   MiB of zeroed data among them. Not tried: any of these packages on a
   person's aarch64 machine, or with a commercial game on aarch64.
+
+## The piano roll takes unbound arrow keys, and a trackpad scrolls it (user-decided, 2026-11-07)
+
+Issue 542, from a Mac with a trackpad:
+
+- **The trackpad hardly scrolled the roll.** The roll counted a wheel's
+  notches (120 each) step by step, and a trackpad's steps are each far less
+  than one, so each was nothing; only a fast, wide swipe moved it. What is
+  short of a notch is kept for the next step now, and a trackpad's own
+  pixels move the roll a row for each row's height.
+- **Up and Down did nothing in the roll.** Keys pressed in TAStudio go to
+  the game and the hotkeys, as the old TAStudio passed them on. The owner
+  chose that the roll takes Up, Down, Page Up, Page Down, Home and End
+  while it has the keyboard, only when no button or hotkey is bound to the
+  key (the other choices were always, and not at all). They move the
+  frames picked (Shift extends them) and keep the frame in view. The
+  window's key filter, which knows what is bound, hands such a key to the
+  roll.
+- **Tested.** "roll wheel": 15 steps of 8 scroll a notch's 6 rows, a
+  trackpad's 2 pixels at a time scroll a row a row's height, and the keys
+  over a thousand frames (Up, Down, Shift, Home, End, Page Down) pick and
+  scroll as above; without the steps kept, 4 checks failed. "key filter":
+  Down unbound moves a stand-in roll, Shift+Down extends, Down bound to a
+  hotkey runs the hotkey and not the roll; without the hand-over, 3
+  failed. Not tried on a Mac with a trackpad: the build here is Linux.
