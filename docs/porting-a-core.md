@@ -335,6 +335,16 @@ Advice earned the hard way:
     the console. Declaring it differently from the names changes the groups
     new movies are written with; a movie made before is still read by the
     columns its own header names.
+  - `"tastudioColumns": ["Key ESC", "Key RETURN", "Reset"]` in an input
+    declaration (the package's, and each machine's) - the controls
+    TAStudio's piano roll shows when a project has no piano roll of its own
+    yet; every other button and axis starts hidden, and a person shows it
+    from the Columns menu (owner, 2026-11-07, issue 544). Without it,
+    Chimera's rule decides: it hides power, reset, disk and tape controls
+    and every control whose name starts with `Key `, which on a computer
+    hides nearly every key a game uses. A project's saved piano roll wins
+    over both. The contract tests refuse a name that is not one of that
+    input's buttons or axes.
   - `"picture": "pictures/pad.png"` in an input declaration (the package's,
     and each machine's) - a PNG of the controller inside the package, shown
     beside the bindings in Config > Controls (issue 338). Draw it yourself or

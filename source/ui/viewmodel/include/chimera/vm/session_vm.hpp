@@ -1005,6 +1005,9 @@ private:
 	std::vector<std::string> buttonNames_;
 	std::vector<int32_t> buttonPlayers_;
 	std::vector<Axis> axes_;
+	/* the package's "tastudioColumns": declared, and the controls it lists (issue 544) */
+	bool shownDeclared_ = false;
+	std::set<std::string> shownColumns_;
 	std::string controllerName_, controllerPicture_, packagePath_;
 	std::vector<ProjectFile> projectFiles_;
 	class ProjectFileRows : public RowModel

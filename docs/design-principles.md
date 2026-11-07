@@ -14210,3 +14210,24 @@ The other choices were only a larger one at once, and leaving it as it was.
   failed. The view models' test changes the project's own budgets and every
   project's with a game open and sees each applied without reopening;
   without the calls, 4 checks failed. Not tried with the reporter's game.
+
+## A core names the controls TAStudio shows at first (user-decided, 2026-11-07)
+
+Issue 544, from the NP2kai (PC-98) core: a project with no piano roll of its
+own hid its columns by a fixed rule in Chimera (power, reset, disk and tape
+controls, and every name starting with "Key "), which hid nearly every key a
+computer game uses, project after project. The owner chose a declaration in
+each input declaration (the package's and each machine's), as the issue
+asked: `"tastudioColumns"`, the controls shown at first, every other hidden.
+A package without it keeps the rule, so no other core changes; a project's
+saved piano roll still wins. The other choices were to drop the rule as well
+(every core without the list would show every control), and not now.
+
+- The window's view model reads the list where it reads the input's name
+  and picture; the contract tests refuse a name that is none of that
+  input's controls. docs/porting-a-core.md says how to declare it.
+- **Tested.** The view models' test opens a copy of the synthetic core that
+  lists "P1 A" and "P1 Start": every other control starts hidden, and the
+  plain core hides none; with the list ignored it failed. test-packages on
+  a copy that lists "P1 Strat" failed, and on one that lists "P1 Start"
+  passed.

@@ -239,11 +239,20 @@ synth_wide = custom_target(
   build_always_stale: true,
   build_by_default: false,
 )
+# a package that names the controls TAStudio shows at first (issue 544)
+synth_shown = custom_target(
+  'synth-shown',
+  output: 'synth-shown.chimeraCore',
+  command: [find_program('python3'), files('viewmodel/tests/renamed-package.py'),
+    repo_root / 'build/Cores/synth-box.chimeraCore', 'Synth Shown', '@OUTPUT@', '', '', '', '', '', '', '', '', '["P1 A", "P1 Start"]'],
+  build_always_stale: true,
+  build_by_default: false,
+)
 test(
   'view models',
   test_vm,
   args: [repo_root / 'build/Cores/synth-box.chimeraCore', repo_root / 'tests/synth/roms/gridWalker.testrom',
-    repo_root / 'tests/synth/movies', repo_root / 'tests/synth/goldens', synth_again, synth_slots, synth_hashed, synth_game, synth_keys, synth_plain_game, synth_bios, synth_compile, synth_square, synth_48k, synth_wide],
+    repo_root / 'tests/synth/movies', repo_root / 'tests/synth/goldens', synth_again, synth_slots, synth_hashed, synth_game, synth_keys, synth_plain_game, synth_bios, synth_compile, synth_square, synth_48k, synth_wide, synth_shown],
   # OpenAL's device that plays to nowhere: the sound check runs with no speakers;
   # the ffmpeg the build ships, for the encode
   # and the headless runner, which compile sessions are

@@ -10342,6 +10342,41 @@ bool coreManager(const char *package, const char *slotsPackage, const char *game
  * to a button past the 64th is recorded into the movie, the piano roll shows
  * its cell and edits it, the movie's line has it, and a script's hold and
  * autohold reach it, as for any other button. All of it stopped at the 64th. */
+/* A package that names the controls TAStudio shows at first (issue 544):
+ * a project with no piano roll of its own hides every other control, and a
+ * package that names none keeps Chimera's rule, which hides none of the
+ * synthetic pad's */
+bool shownColumns(const char *package, const char *plainPackage, const char *rom)
+{
+	namespace fs = std::filesystem;
+	std::error_code ec;
+	if (fs::file_size(package, ec) == 0 || ec)
+	{
+		std::printf("SKIP the shown columns: no package naming them\n");
+		return true;
+	}
+	const int before = failures;
+	for (const char *p : {package, plainPackage})
+	{
+		ManualDispatcher d;
+		InputLog inputs;
+		SessionViewModel session(d, inputs);
+		PianoRollViewModel roll(d, inputs, session);
+		std::string error;
+		openGame(session, p, std::string(rom), error);
+		CHECK(d.until([&] { return session.isOpen.get() && roll.frames().columnCount() > 0; }, 60));
+		d.until([] { return false; }, 0.5);
+		const std::string hidden = roll.hiddenColumns.get();
+		if (p == package)
+			CHECK(hidden == "P1 B\nP1 Down\nP1 Left\nP1 Right\nP1 Select\nP1 Up");   /* every control but P1 A and P1 Start */
+		else
+			CHECK(hidden.empty());
+		session.run("close", {}, error);
+		CHECK(d.until([&] { return !session.isOpen.get(); }, 20));
+	}
+	return failures == before;
+}
+
 bool wideButtons(const char *package, const char *rom)
 {
 	namespace fs = std::filesystem;
@@ -10854,6 +10889,7 @@ int main(int argc, char **argv)
 			if (argc >= 14) ranMachine = squarePixels(argv[1], argv[13], argv[2]) && ranMachine;
 			if (argc >= 15) ranMachine = soundRate(argv[14], argv[2]) && ranMachine;
 			if (argc >= 16) ranMachine = wideButtons(argv[15], argv[2]) && ranMachine;
+			if (argc >= 17) ranMachine = shownColumns(argv[16], argv[1], argv[2]) && ranMachine;
 			ranMachine = listsWhilePlaying(argv[1], argv[2]) && ranMachine;
 			if (argc >= 9) ranMachine = coreManager(argv[1], argv[6], argv[8]) && ranMachine;
 		}

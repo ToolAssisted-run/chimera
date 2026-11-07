@@ -664,6 +664,8 @@ struct Controller
 	std::vector<bool> axisHeaded;
 	bool declares = false;
 	std::map<std::string, std::string> declared, headers;
+	/* "tastudioColumns": what TAStudio shows by default (issue 544) */
+	std::vector<std::string> shown;
 };
 
 /* "P2 Start" -> "Start"; "Reset" stays */
@@ -721,6 +723,8 @@ std::vector<Controller> controllers(const std::vector<Package> &all)
 		}
 		if (const Json *h = input->find("headers"); h != nullptr && h->kind == Json::Kind::Object)
 			for (const auto &[k, v] : h->members) c.headers[k] = v.text;
+		if (const Json *t = input->find("tastudioColumns"); t != nullptr)
+			for (const Json &n : t->items) c.shown.push_back(n.kind == Json::Kind::String ? n.text : std::string("(not a name)"));
 		out.push_back(std::move(c));
 	};
 	for (const Package &k : all)
@@ -740,6 +744,19 @@ std::vector<Controller> controllers(const std::vector<Package> &all)
 void checkLetters(const std::vector<Package> &all)
 {
 	const std::vector<Controller> every = controllers(all);
+	{
+		/* the controls TAStudio shows by default are controls of that input
+		 * (issue 544): a name misspelt would hide the control it meant */
+		std::vector<std::string> wrong;
+		for (const Controller &c : every)
+			for (const std::string &n : c.shown)
+			{
+				bool known = std::find(c.buttons.begin(), c.buttons.end(), n) != c.buttons.end();
+				for (const auto &a : c.axes) known = known || a.first == n;
+				if (!known) wrong.push_back(c.core + " (" + c.where + "): " + n);
+			}
+		report("every control a core shows in TAStudio by default is one of its controls", wrong);
+	}
 	std::vector<const Controller *> declaring;
 	for (const Controller &c : every)
 		if (c.declares || std::find(c.axisHeaded.begin(), c.axisHeaded.end(), true) != c.axisHeaded.end()) declaring.push_back(&c);

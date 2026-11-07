@@ -5083,11 +5083,13 @@ bool SessionViewModel::hiddenByDefault(const std::string &n)
 
 void SessionViewModel::loadDefaultColumns()
 {
+	/* the package's list when it has one: every control not in it hidden */
+	auto hide = [this](const std::string &n) { return shownDeclared_ ? shownColumns_.count(n) == 0 : hiddenByDefault(n); };
 	std::vector<std::string> hidden;
 	for (const std::string &n : buttonNames_)
-		if (hiddenByDefault(n)) hidden.push_back(n);
+		if (hide(n)) hidden.push_back(n);
 	for (const Axis &a : axes_)
-		if (hiddenByDefault(a.name)) hidden.push_back(a.name);
+		if (hide(a.name)) hidden.push_back(a.name);
 	hiddenColumnsLoaded.emit(hidden);
 }
 
@@ -5504,6 +5506,11 @@ void SessionViewModel::adoptOnMachine(ce_session *s, const std::string &package,
 	 * ranges as the package declares them (its own input, or a machine's) */
 	std::vector<Axis> axes;
 	std::string controller = "Waterbox Controller", picture;
+	/* the controls TAStudio shows when a project has no piano roll of its
+	 * own, as the package (or the machine) lists them in "tastudioColumns";
+	 * none listed, Chimera's rule decides (owner, 2026-11-07, issue 544) */
+	bool shownDeclared = false;
+	std::set<std::string> shownColumns;
 	bool gameCore = false;
 	int64_t ms = 0;
 	gameTimerM_ = ce_session_game_time_ms(s, &ms) == 1;
@@ -5543,6 +5550,12 @@ void SessionViewModel::adoptOnMachine(ce_session *s, const std::string &package,
 			if (input != nullptr)
 			{
 				if (const json::Json *n = input->find("name"); n != nullptr && !n->text.empty()) controller = n->text;
+				if (const json::Json *shown = input->find("tastudioColumns"); shown != nullptr && shown->kind == json::Json::Kind::Array)
+				{
+					shownDeclared = true;
+					for (const json::Json &c : shown->items)
+						if (c.kind == json::Json::Kind::String) shownColumns.insert(c.text);
+				}
 				if (const json::Json *pic = input->find("picture"); pic != nullptr && !pic->text.empty())
 					if (ce_package *p = ce_package_open(package.c_str(), &perr))
 					{
@@ -5628,13 +5641,15 @@ void SessionViewModel::adoptOnMachine(ce_session *s, const std::string &package,
 	/* another game, or the same started again: another average, as Chimera's */
 	averageResetM_.store(true);
 	later([this, names, players, headers, axes, mnemonics, keybinds, coreText, systemText, systemIdText, rate, label, inputsReplaced, frames, controller,
-			   picture, gameCore, timer, saveData, package, traces, registers, traceHead, surfaceText, withOpen] {
+			   picture, shownDeclared, shownColumns, gameCore, timer, saveData, package, traces, registers, traceHead, surfaceText, withOpen] {
 		surfaces.set(surfaceText);
 		hasTrace.set(traces);
 		hasRegisters.set(registers);
 		traceHeader.set(traceHead);
 		controllerName_ = controller;
 		controllerPicture_ = picture;
+		shownDeclared_ = shownDeclared;
+		shownColumns_ = shownColumns;
 		packagePath_ = package;
 		isGameCore.set(gameCore);
 		hasGameTimer.set(timer);
