@@ -551,6 +551,15 @@ endif
       override_options: ['cpp_std=c++20'],
     )
     test('text prompt', test_text_prompt, env: ['QT_QPA_PLATFORM=offscreen', 'QT_QUICK_BACKEND=software', 'QT_QUICK_CONTROLS_STYLE=Basic'], timeout: 60)
+    # a button clicked ends the editing of a box: a number typed is its value
+    # when OK reads it, on a Mac too (issue 540)
+    test_button_focus = executable(
+      'test-button-focus',
+      ['qt/tests/test_button_focus.cpp', qt_rcc],
+      dependencies: [qt_test_dep],
+      override_options: ['cpp_std=c++20'],
+    )
+    test('button focus', test_button_focus, env: ['QT_QPA_PLATFORM=offscreen'], timeout: 60)
     # the box a key is bound in takes every key, a window's shortcut on it
     # notwithstanding: Escape empties it again (issue 431)
     test_binding_box = executable(

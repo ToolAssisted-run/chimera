@@ -1,4 +1,5 @@
 module ChimeraStyle
+Button 6.0 Button.qml
 CheckBox 6.0 CheckBox.qml
 Dialog 6.0 Dialog.qml
 MenuBarItem 6.0 MenuBarItem.qml

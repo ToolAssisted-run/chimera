@@ -3,6 +3,7 @@
  * the row clicked before, as a Windows list does, so many branches or
  * markers can be removed at once (issue 494). The window is told the row
  * clicked, and a row the window picks is the only one picked. */
+#include <QFont>
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
 #include <QQuickItem>
@@ -70,6 +71,9 @@ int main(int argc, char **argv)
 	if (table == nullptr) return 1;
 	const int h = table->property("rowHeight").toInt();
 	CHECK(h > 5);
+	/* the lists' text is 11 pixels on every system, not points, which a Mac
+	 * counts at 72 an inch and Windows at 96 (issue 539) */
+	CHECK(table->property("cellFont").value<QFont>().pixelSize() == 11);
 	/* the middle of a row: below the list's edge and the column titles */
 	auto click = [&](int row, Qt::KeyboardModifiers mods) {
 		QTest::mouseClick(window, Qt::LeftButton, mods, QPoint(60, 1 + h + row * h + h / 2));

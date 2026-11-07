@@ -24,8 +24,10 @@ Rectangle {
     property var cellColor: (roles, row, column) => ""
     // a roll colour by Chimera's role name ("RollGridLines"), "" when there is none
     property var rollColor: (role) => ""
-    // Chimera's input roll font in these lists: Arial 8.25 bold
-    property font cellFont: Qt.font({ family: "Arial", pointSize: 8.25, bold: true })
+    // Chimera's input roll font in these lists: Arial 8.25 bold, in pixels (11,
+    // 8.25 points at Windows' 96 dots an inch): in points it was a quarter
+    // smaller on a Mac, which counts 72 (issue 539)
+    property font cellFont: Qt.font({ family: "Arial", pixelSize: 11, bold: true })
     // a row pressed by its first cell can be dragged onto another (branches are put in order so)
     property bool dragFirstColumn: false
 

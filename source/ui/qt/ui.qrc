@@ -178,6 +178,7 @@
   <!-- Chimera's style: Fusion, with the system's check boxes and radio buttons, as Chimera's, scroll bars always seen, and dialogs that end a headless run -->
   <qresource prefix="/qt/qml/ChimeraStyle">
     <file alias="qmldir">style/qmldir</file>
+    <file alias="Button.qml">style/Button.qml</file>
     <file alias="CheckBox.qml">style/CheckBox.qml</file>
     <file alias="Dialog.qml">style/Dialog.qml</file>
     <file alias="Menu.qml">style/Menu.qml</file>

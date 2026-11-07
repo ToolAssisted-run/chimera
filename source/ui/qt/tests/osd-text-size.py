@@ -3,7 +3,8 @@
 # 2026-11-04, issue 488): Config > Display's OSD text size. The window opens
 # the project paused, so its picture is the same every time, and is shot with
 # the frame counter and without it: the pixels that differ are the counter's.
-# At 36 pixels they stand about three times as tall as at 12.
+# At 36 pixels they stand about three times as tall as at 12. And with
+# nothing open, a message is drawn over the idle picture (issue 535).
 #   osd-text-size.py <chimera> <work folder> <project> <package> <script>
 import os
 import shutil
@@ -99,4 +100,35 @@ small, large = counter_height(12), counter_height(36)
 check(small > 0, "at 12 pixels the frame counter is drawn", small)
 check(small > 0 and large >= small * 2.5, "at 36 pixels it stands about three times as tall as at 12 (%d rows against %d)"
       % (large, small), "%d rows against %d" % (large, small))
+
+
+def idle_message_pixels():
+    """with nothing open, a message shown: how many white pixels the bottom
+    of the window's picture area has (the idle picture is a faint grey)"""
+    folder = os.path.join(work, "idle-message")
+    os.makedirs(folder)
+    lua, path = os.path.join(folder, "message.lua"), os.path.join(folder, "window.png")
+    with open(lua, "w") as f:
+        f.write('chimera.customize.neverAskSave = true\nchimera.messages.messageSeconds = 10\ngui.addmessage("A message with nothing open, over the idle picture")\n')
+    env = dict(os.environ, QT_QPA_PLATFORM="offscreen", QT_QUICK_BACKEND="software", ALSOFT_DRIVERS="null",
+               CHIMERA_QT_CONFIG=os.path.join(folder, "settings.json"), CHIMERA_QT_CACHE=os.path.join(folder, "cache"),
+               CHIMERA_QT_RECOVERY=os.path.join(folder, "recovery"), CHIMERA_QT_HASHES=os.path.join(folder, "file-hashes.txt"))
+    try:
+        out = subprocess.run([chimera, "--lua", lua, "--measure", "2", "--screenshot", path],
+                             env=env, capture_output=True, text=True, timeout=120)
+        out = out.stdout + out.stderr
+    except subprocess.TimeoutExpired:
+        out = "the window was still running after 120 seconds"
+    if "screenshot: saved" not in out or not os.path.exists(path):
+        check(False, "the idle window ran and was shot", out[-400:])
+        return 0
+    w, h, rows = png(path)
+    # the messages' corner: the bottom left, above the status bar
+    return sum(1 for y in range(h - 90, h - 25) for x in range(min(w, 300))
+               if min(rows[y][3 * x:3 * x + 3]) > 200)
+
+
+# with nothing open, a message is over the idle picture, not under it (issue 535)
+lit = idle_message_pixels()
+check(lit > 50, "with nothing open, a message is drawn over the idle picture", "%d white pixels" % lit)
 sys.exit(1 if failures else 0)

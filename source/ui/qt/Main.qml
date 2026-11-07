@@ -1541,6 +1541,8 @@ ApplicationWindow {
         // ones away from it, as Chimera stacks them (or only the newest)
         Column {
             objectName: "osdMessages"
+            // over the idle picture (z 1), which hid them while nothing was open (issue 535)
+            z: 2
             x: root.osdX("Messages", width)
             y: root.osdY("Messages", height)
             visible: root.session.showMessages
