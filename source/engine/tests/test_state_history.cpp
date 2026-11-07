@@ -514,6 +514,45 @@ int main(void)
 		assert(h.count() < kFrames / 2);            /* it really did thin */
 		assert(h.bytes() <= budget);                /* and the budget is met at the end */
 	}
+	{ // A budget changed while the history runs (issue 543): it keeps what
+	  // it holds, a smaller one thins it down to the new budget at once
+	  // (frame 0 and the frontier kept), and a larger one lets it keep every
+	  // frame from then on.
+		const chimera::HostApi api = fakeHost();
+		const int64_t kFrames = 240;
+		g_machine = Machine{};
+		History probe;
+		probe.configure(&api, nullptr, 64ull << 20);
+		probe.bands(0, 0, 0, 0, 1000);
+		probe.capture(0);
+		for (int64_t f = 1; f <= kFrames; f++) { probe.beforeAdvance(); advance(f); probe.capture(f); }
+		const uint64_t whole = probe.bytes();
+
+		g_machine = Machine{};
+		History h;
+		h.configure(&api, nullptr, 64ull << 20);
+		h.bands(0, 0, 0, 0, 1000);
+		h.bandGoal(2);
+		h.capture(0);
+		for (int64_t f = 1; f <= kFrames; f++) { h.beforeAdvance(); advance(f); h.capture(f); }
+		const int64_t all = h.count();
+		assert(all == kFrames + 1);                 /* room for every frame */
+		/* a third of what it holds: thinned now, with no frame captured */
+		h.setBudget(whole / 3);
+		assert(h.budget() == whole / 3);
+		assert(h.bytes() <= whole / 3);   /* as the thinning test above holds it */
+		assert(h.count() < all);
+		assert(h.nearest(0) == 0 && h.nearest(kFrames) == kFrames);
+		/* larger again: nothing goes, and the frames that follow are all kept */
+		const int64_t thinned = h.count();
+		h.setBudget(64ull << 20);
+		assert(h.count() == thinned);
+		for (int64_t f = kFrames + 1; f <= kFrames + 40; f++) { h.beforeAdvance(); advance(f); h.capture(f); }
+		assert(h.count() == thinned + 40);
+		/* 0 changes nothing */
+		h.setBudget(0);
+		assert(h.budget() == (64ull << 20));
+	}
 	{ // Under its budget, from 95% of it, the history thins a little every
 	  // frame, and the merges that takes are worked out on the merger and taken
 	  // at the next capture, not made on the capturing thread (issue 482: an N64

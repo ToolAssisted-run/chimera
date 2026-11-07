@@ -14186,3 +14186,27 @@ Issue 542, from a Mac with a trackpad:
   Down unbound moves a stand-in roll, Shift+Down extends, Down bound to a
   hotkey runs the hotkey and not the roll; without the hand-over, 3
   failed. Not tried on a Mac with a trackpad: the build here is Linux.
+
+## A greenzone budget changed applies at once (user-decided, 2026-11-07)
+
+Issue 543: a person raised the memory budget to 22 GB with a project open,
+and the history went on with only a few states. A budget reached the history
+only when a project opened (the budget window said so), so the old budget held
+all session; and a Switch state is hundreds of megabytes (one Ultra Street
+Fighter II state through Eden, measured here: 569 MB), so a few gigabytes hold
+only a handful. The owner chose that any change applies at once: a larger
+budget gives the history room, a smaller one thins what it holds right away.
+The other choices were only a larger one at once, and leaving it as it was.
+
+- A new engine call, `ce_session_greenzone_budget`, changes a running
+  history's budget and keeps what it holds (`StateHistory::setBudget`: set,
+  then the eviction a capture over the budget does). The session calls it,
+  and the closeness behind the playhead, whenever every project's budgets or
+  the project's own change. The budget window's sentence says so, in every
+  language.
+- **Tested.** The engine test fills a history, gives it a third of what it
+  holds (thinned at once, frame 0 and the newest kept), then a larger one
+  (nothing goes, the next 40 frames all kept); without the eviction it
+  failed. The view models' test changes the project's own budgets and every
+  project's with a game open and sees each applied without reopening;
+  without the calls, 4 checks failed. Not tried with the reporter's game.

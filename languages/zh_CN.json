@@ -785,7 +785,7 @@
 		"greenzone_budgets.keep_in_memory": "在内存中保留",
 		"greenzone_budgets.mb": "MB",
 		"greenzone_budgets.on_a_gpu_core_the_picture": "在 GPU 核心上，载入后画面可能立即出错。在这么多帧内，看过的帧会显示它原来的画面。0 表示总是显示核心绘制的内容。",
-		"greenzone_budgets.takes_effect_when_the_project_is": "在下次打开项目时生效：已有状态的历史不会为了刚改过的数字而丢弃。",
+		"greenzone_budgets.applies_to_the_open_project_at": "立即应用于打开的项目：更大的预算给历史留出空间，更小的预算会立即精简已保存的内容。",
 		"greenzone_budgets.this_project": "此项目",
 		"help.build": "提交 %1",
 		"help.build_dated": "提交 %1（%2）",

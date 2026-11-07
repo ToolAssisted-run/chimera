@@ -804,7 +804,7 @@
 		"greenzone_budgets.keep_in_memory": "Manter na memória",
 		"greenzone_budgets.mb": "MB",
 		"greenzone_budgets.on_a_gpu_core_the_picture": "Em um núcleo com GPU a imagem pode ficar errada logo depois de carregar. Durante essa quantidade de quadros, um quadro já visto mostra a imagem que tinha. 0 sempre mostra o que o núcleo desenha.",
-		"greenzone_budgets.takes_effect_when_the_project_is": "Vale na próxima vez que o projeto for aberto: um histórico que já tem estados não é descartado para obedecer a um número que acabou de mudar.",
+		"greenzone_budgets.applies_to_the_open_project_at": "Aplica-se de imediato ao projeto aberto: um orçamento maior dá espaço ao seu histórico, um menor reduz já o que ele guarda.",
 		"greenzone_budgets.this_project": "Este projeto",
 		"help.build": "Commit %1",
 		"help.build_dated": "Commit %1 (%2)",

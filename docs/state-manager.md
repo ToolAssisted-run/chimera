@@ -368,6 +368,14 @@ every frame it captures until its memory budget is full, and only then gives
 frames up - toward a shape that stays dense where the work is and gets
 exponentially sparser behind it.
 
+The budget can change while the history runs (owner, 2026-11-07, issue 543):
+`ce_session_greenzone_budget` keeps what is held, so a larger budget is room
+from the next frame on, and a smaller one spills and thins what is over it at
+once, as a capture over the budget would. The window calls it whenever the
+budget (every project's, or the project's own) is changed; before, a new
+budget waited for the project's next opening, and a person who raised it went
+on with the old one all session.
+
 Until 2026-09-15 the history thinned by DISTANCE whatever the budget: every
 frame for 120 frames behind the newest, one in 3 for 1800 behind that, one in
 1200 beyond. Reported on New Star Soccer: a 16 GB budget sat at 3 GB used,

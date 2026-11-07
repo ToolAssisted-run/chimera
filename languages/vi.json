@@ -785,7 +785,7 @@
 		"greenzone_budgets.keep_in_memory": "Giữ trong bộ nhớ",
 		"greenzone_budgets.mb": "MB",
 		"greenzone_budgets.on_a_gpu_core_the_picture": "Trên core dùng GPU, hình có thể sai ngay sau khi tải. Trong bấy nhiêu khung hình, một khung hình đã thấy trước đó sẽ hiện hình mà nó đã có. 0 luôn hiện những gì core vẽ.",
-		"greenzone_budgets.takes_effect_when_the_project_is": "Có hiệu lực khi dự án được mở lần sau: một lịch sử đang chứa trạng thái sẽ không bị bỏ đi chỉ để làm theo một con số vừa mới đổi.",
+		"greenzone_budgets.applies_to_the_open_project_at": "Áp dụng ngay cho dự án đang mở: ngân sách lớn hơn cho lịch sử thêm chỗ, nhỏ hơn sẽ lược bớt ngay những gì đang giữ.",
 		"greenzone_budgets.this_project": "Dự án này",
 		"help.build": "Commit %1",
 		"help.build_dated": "Commit %1 (%2)",

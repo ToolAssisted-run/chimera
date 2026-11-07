@@ -804,7 +804,7 @@
 		"greenzone_budgets.keep_in_memory": "Garder en mémoire",
 		"greenzone_budgets.mb": "Mo",
 		"greenzone_budgets.on_a_gpu_core_the_picture": "Sur un cœur GPU, l'image peut être fausse juste après un chargement. Pendant ce nombre d'images, une image déjà vue montre l'image qu'elle avait. 0 montre toujours ce que dessine le cœur.",
-		"greenzone_budgets.takes_effect_when_the_project_is": "Prend effet à la prochaine ouverture du projet : un historique qui contient déjà des états n'est pas jeté pour obéir à un nombre qui vient de changer.",
+		"greenzone_budgets.applies_to_the_open_project_at": "S'applique tout de suite au projet ouvert : un budget plus grand donne de la place à son historique, un plus petit allège aussitôt ce qu'il garde.",
 		"greenzone_budgets.this_project": "Ce projet",
 		"help.build": "Commit %1",
 		"help.build_dated": "Commit %1 (%2)",

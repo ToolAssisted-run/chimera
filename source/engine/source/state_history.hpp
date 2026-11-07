@@ -218,6 +218,10 @@ public:
 	/* What it may hold now, which is not what it was configured with if the
 	 * machine has run out of memory since. */
 	uint64_t budget() const { return m_budget; }
+	/* What it may hold from now on, keeping what it holds: what is over a
+	 * smaller budget is spilled or thinned away now, as a frame's capture
+	 * would (issue 543). 0, or a disabled history, changes nothing. */
+	void setBudget(uint64_t budgetBytes);
 	uint64_t bytes() const { return m_bytes; }
 	/* bytes() and the bookkeeping of every stored frame: what the budget holds */
 	uint64_t heldAgainstBudget() const;

@@ -804,7 +804,7 @@
 		"greenzone_budgets.keep_in_memory": "Memóriában tartás",
 		"greenzone_budgets.mb": "MB",
 		"greenzone_budgets.on_a_gpu_core_the_picture": "GPU-magon a kép betöltés után hibás lehet. Ennyi képkockáig egy már látott képkocka azt a képet mutatja, amelyet akkor rajzolt. A 0 mindig azt mutatja, amit a mag rajzol.",
-		"greenzone_budgets.takes_effect_when_the_project_is": "A projekt következő megnyitásakor lép érvénybe: a már állapotokat tartalmazó előzményeket nem dobjuk ki egy most megváltoztatott szám kedvéért.",
+		"greenzone_budgets.applies_to_the_open_project_at": "Azonnal érvényes a nyitott projektre: a nagyobb keret helyet ad az előzményeinek, a kisebb azonnal megritkítja, amit tárol.",
 		"greenzone_budgets.this_project": "Ez a projekt",
 		"help.build": "Revízió %1",
 		"help.build_dated": "Revízió %1 (%2)",

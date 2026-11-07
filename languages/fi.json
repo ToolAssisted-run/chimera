@@ -804,7 +804,7 @@
 		"greenzone_budgets.keep_in_memory": "Pidä muistissa",
 		"greenzone_budgets.mb": "Mt",
 		"greenzone_budgets.on_a_gpu_core_the_picture": "GPU-ytimellä kuva voi olla väärin heti latauksen jälkeen. Näin monta kuvaa ajan kuva näyttää kuvan, jonka se sai aiemmin. 0 näyttää aina sen, minkä ydin piirtää.",
-		"greenzone_budgets.takes_effect_when_the_project_is": "Tulee voimaan, kun projekti avataan seuraavan kerran: jo tiloja sisältävää historiaa ei heitetä pois, jotta noudatettaisiin juuri muutettua lukua.",
+		"greenzone_budgets.applies_to_the_open_project_at": "Koskee avointa projektia heti: suurempi raja antaa sen historialle tilaa, pienempi harventaa heti sen, mitä se pitää.",
 		"greenzone_budgets.this_project": "Tämä projekti",
 		"help.build": "Versio %1",
 		"help.build_dated": "Versio %1 (%2)",

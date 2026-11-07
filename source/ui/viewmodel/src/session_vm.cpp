@@ -435,20 +435,26 @@ SessionViewModel::SessionViewModel(Dispatcher &dispatcher, InputLog &inputs)
 	expose("projectNearStride", "the open project's own closeness behind the playhead; 0 for every project's", projectNearStride);
 	expose("budgetMbApplied", "the memory budget the machine open was given, MB", budgetMbApplied);
 	expose("nearStrideApplied", "the closeness behind the playhead the machine open was given", nearStrideApplied);
+	/* a budget changed applies to the machine open at once, keeping what its
+	 * history holds: more room, or what is over a smaller budget thinned
+	 * now (owner, 2026-11-07, issue 543; it waited for the project's next
+	 * opening, and a larger budget went unused all session) */
 	budgetWatch_ = greenzoneBudgetMb.changed.connect([this] {
 		if (greenzoneBudgetMb.get() < 64) greenzoneBudgetMb.set(64);
 		budgetMbM_ = greenzoneBudgetMb.get();
+		submit([this] { if (s_ != nullptr) applyBudgetsOnMachine(s_, false); });
 	});
 	strideWatch_ = greenzoneNearStride.changed.connect([this] {
 		if (greenzoneNearStride.get() < 1 || greenzoneNearStride.get() > 32) greenzoneNearStride.set(std::clamp<int64_t>(greenzoneNearStride.get(), 1, 32));
 		nearStrideM_ = greenzoneNearStride.get();
+		submit([this] { if (s_ != nullptr) applyBudgetsOnMachine(s_, false); });
 	});
 	settleWatch_ = pictureSettleFrames.changed.connect([this] {
 		if (pictureSettleFrames.get() < 0 || pictureSettleFrames.get() > 10) pictureSettleFrames.set(std::clamp<int64_t>(pictureSettleFrames.get(), 0, 10));
 		pictureSettleM_ = pictureSettleFrames.get();
 	});
 	command("setProjectBudgets", "the open project's own budgets (memory in MB, 64 at least; closeness 1 to 32), or none "
-		"(0 and 0): kept beside its cache, as Chimera's; they take effect when it next opens", {"memoryMb", "nearStride"},
+		"(0 and 0): kept beside its cache, as Chimera's, and applied to it at once", {"memoryMb", "nearStride"},
 		[this](const Args &a, std::string &error) -> Value {
 			int64_t mb = 0, stride = 0;
 			if (!arg(a, 0, mb, error) || !arg(a, 1, stride, error)) return {};
@@ -477,6 +483,7 @@ SessionViewModel::SessionViewModel(Dispatcher &dispatcher, InputLog &inputs)
 				fs::create_directories(dir, ec);
 				std::ofstream(dir / "budgets.json", std::ios::binary | std::ios::trunc) << json::write(b);
 			});
+			submit([this] { if (s_ != nullptr) applyBudgetsOnMachine(s_, false); });
 			if (!open)
 			{
 				error = tr("session.no_project");
@@ -3107,6 +3114,26 @@ void SessionViewModel::startProjectSessionOnMachine(bool loadHistory)
 	runningMarkM_ = mark;
 }
 
+/* the budgets the machine open is held to: the project's own, else every
+ * project's. Opening, they make its history; after, they change it, keeping
+ * what it holds (issue 543). On the machine's thread. */
+void SessionViewModel::applyBudgetsOnMachine(ce_session *s, bool opening)
+{
+	int64_t ownMb = 0, ownStride = 0;
+	readBudgetsOnMachine(projectM_, ownMb, ownStride);
+	const int64_t mb = std::max<int64_t>(ownMb != 0 ? ownMb : budgetMbM_.load(), 64);
+	const int64_t stride = std::clamp<int64_t>(ownStride != 0 ? ownStride : nearStrideM_.load(), 1, 32);
+	ce_session_greenzone_max_near_stride(s, stride);
+	if (opening) ce_session_greenzone_enable(s, static_cast<uint64_t>(mb) * 1024 * 1024);
+	else ce_session_greenzone_budget(s, static_cast<uint64_t>(mb) * 1024 * 1024);
+	later([this, ownMb, ownStride, mb, stride] {
+		projectBudgetMb.set(ownMb);
+		projectNearStride.set(ownStride);
+		budgetMbApplied.set(mb);
+		nearStrideApplied.set(stride);
+	});
+}
+
 void SessionViewModel::readBudgetsOnMachine(ce_project *p, int64_t &memoryMb, int64_t &nearStride) const
 {
 	memoryMb = nearStride = 0;
@@ -5436,19 +5463,8 @@ void SessionViewModel::adoptOnMachine(ce_session *s, const std::string &package,
 	 * one rather than from power-on: as Chimera's, every project's budgets
 	 * unless the project asks for its own; the closeness before enabling,
 	 * so the first stretch is held to it */
-	int64_t ownMb = 0, ownStride = 0;
-	readBudgetsOnMachine(projectM_, ownMb, ownStride);
-	const int64_t mb = std::max<int64_t>(ownMb != 0 ? ownMb : budgetMbM_.load(), 64);
-	const int64_t stride = std::clamp<int64_t>(ownStride != 0 ? ownStride : nearStrideM_.load(), 1, 32);
-	ce_session_greenzone_max_near_stride(s, stride);
 	ce_session_greenzone_picture_settle(s, static_cast<int32_t>(std::clamp<int64_t>(pictureSettleM_.load(), 0, 10)));
-	ce_session_greenzone_enable(s, static_cast<uint64_t>(mb) * 1024 * 1024);
-	later([this, ownMb, ownStride, mb, stride] {
-		projectBudgetMb.set(ownMb);
-		projectNearStride.set(ownStride);
-		budgetMbApplied.set(mb);
-		nearStrideApplied.set(stride);
-	});
+	applyBudgetsOnMachine(s, true);
 	ce_session_greenzone_capture_period(s, periodM_.load());
 	pinMarkersOnMachine();
 

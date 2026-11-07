@@ -804,7 +804,7 @@
 		"greenzone_budgets.keep_in_memory": "In het geheugen bewaren",
 		"greenzone_budgets.mb": "MB",
 		"greenzone_budgets.on_a_gpu_core_the_picture": "Bij een GPU-core kan het beeld direct na een laadactie fout zijn. Voor zoveel frames toont een frame dat eerder al is gezien het beeld dat het toen had. 0 toont altijd wat de core tekent.",
-		"greenzone_budgets.takes_effect_when_the_project_is": "Werkt wanneer het project de volgende keer wordt geopend: een geschiedenis die al toestanden bevat, wordt niet weggegooid om een getal te volgen dat net is gewijzigd.",
+		"greenzone_budgets.applies_to_the_open_project_at": "Geldt meteen voor het open project: een groter budget geeft de geschiedenis ruimte, een kleiner dunt meteen uit wat ze bewaart.",
 		"greenzone_budgets.this_project": "Dit project",
 		"help.build": "Commit %1",
 		"help.build_dated": "Commit %1 (%2)",

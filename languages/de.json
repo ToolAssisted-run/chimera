@@ -804,7 +804,7 @@
 		"greenzone_budgets.keep_in_memory": "Im Speicher halten",
 		"greenzone_budgets.mb": "MB",
 		"greenzone_budgets.on_a_gpu_core_the_picture": "Bei einem GPU-Core kann das Bild direkt nach dem Laden falsch sein. So viele Frames lang zeigt ein schon gesehener Frame das Bild, das er hatte. 0 zeigt immer, was der Core zeichnet.",
-		"greenzone_budgets.takes_effect_when_the_project_is": "Gilt beim nächsten Öffnen des Projekts: Ein Verlauf, der schon Zustände enthält, wird nicht verworfen, um einer gerade geänderten Zahl zu folgen.",
+		"greenzone_budgets.applies_to_the_open_project_at": "Gilt sofort für das offene Projekt: Ein größeres Budget gibt seinem Verlauf Platz, ein kleineres dünnt das Gehaltene sofort aus.",
 		"greenzone_budgets.this_project": "Dieses Projekt",
 		"help.build": "Commit %1",
 		"help.build_dated": "Commit %1 (%2)",

@@ -823,7 +823,7 @@
 		"greenzone_budgets.keep_in_memory": "Držet v paměti",
 		"greenzone_budgets.mb": "MB",
 		"greenzone_budgets.on_a_gpu_core_the_picture": "U jádra s GPU může být obraz po načtení špatný. Po tento počet snímků se snímek viděný dříve zobrazí s obrazem, který měl. 0 vždy zobrazuje to, co jádro vykreslí.",
-		"greenzone_budgets.takes_effect_when_the_project_is": "Projeví se při příštím otevření projektu: historie, která už drží stavy, se nezahazuje kvůli číslu, které se právě změnilo.",
+		"greenzone_budgets.applies_to_the_open_project_at": "Platí pro otevřený projekt hned: větší limit dá jeho historii místo, menší hned prořídí, co drží.",
 		"greenzone_budgets.this_project": "Tento projekt",
 		"help.build": "Revize %1",
 		"help.build_dated": "Revize %1 (%2)",

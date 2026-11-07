@@ -804,7 +804,7 @@
 		"greenzone_budgets.keep_in_memory": "Tieni in memoria",
 		"greenzone_budgets.mb": "MB",
 		"greenzone_budgets.on_a_gpu_core_the_picture": "Su un core GPU l'immagine può essere sbagliata subito dopo un caricamento. Per questo numero di fotogrammi, un fotogramma già visto mostra l'immagine che aveva. 0 mostra sempre ciò che disegna il core.",
-		"greenzone_budgets.takes_effect_when_the_project_is": "Vale alla prossima apertura del progetto: una cronologia che contiene già stati non viene buttata per obbedire a un numero appena cambiato.",
+		"greenzone_budgets.applies_to_the_open_project_at": "Si applica subito al progetto aperto: un budget più grande dà spazio alla sua cronologia, uno più piccolo sfoltisce subito ciò che conserva.",
 		"greenzone_budgets.this_project": "Questo progetto",
 		"help.build": "Commit %1",
 		"help.build_dated": "Commit %1 (%2)",

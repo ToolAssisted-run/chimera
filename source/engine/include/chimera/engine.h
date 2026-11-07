@@ -1720,6 +1720,10 @@ CE_API int32_t ce_session_movie_advance(ce_session *s, uint64_t buttons, const i
 /* Enables with a byte budget (captures the current frame immediately as the
  * anchor), or disables and drops everything with budget 0. */
 CE_API void ce_session_greenzone_enable(ce_session *s, uint64_t budget_bytes);
+/* Changes an enabled history's byte budget while it runs, keeping what it
+ * holds: a larger one gives it room at once, a smaller one thins and spills
+ * what is over it now (issue 543). Nothing while it is disabled, or for 0. */
+CE_API void ce_session_greenzone_budget(ce_session *s, uint64_t budget_bytes);
 CE_API int64_t ce_session_greenzone_count(const ce_session *s);
 
 /* Anchor spacing, and the density of what is SPILLED to disk, all in FRAMES

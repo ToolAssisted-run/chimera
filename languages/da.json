@@ -804,7 +804,7 @@
 		"greenzone_budgets.keep_in_memory": "Behold i hukommelsen",
 		"greenzone_budgets.mb": "MB",
 		"greenzone_budgets.on_a_gpu_core_the_picture": "På en GPU-kerne kan billedet være forkert lige efter en indlæsning. I så mange billeder vises et billede, der er set før, med det billede, det havde. 0 viser altid det, kernen tegner.",
-		"greenzone_budgets.takes_effect_when_the_project_is": "Træder i kraft, når projektet næste gang åbnes: en historik, der allerede har tilstande, kasseres ikke for at adlyde et tal, der lige er ændret.",
+		"greenzone_budgets.applies_to_the_open_project_at": "Gælder straks for det åbne projekt: et større budget giver dets historik plads, et mindre udtynder straks det, den holder.",
 		"greenzone_budgets.this_project": "Dette projekt",
 		"help.build": "Revision %1",
 		"help.build_dated": "Revision %1 (%2)",

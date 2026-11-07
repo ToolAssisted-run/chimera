@@ -2725,6 +2725,19 @@ bool greenzoneBudgets(const char *package, const char *rom)
 	/* the closeness alone: the memory stays every project's */
 	CHECK(session.run("setProjectBudgets", {int64_t{0}, int64_t{8}}, error).has_value());
 	CHECK(reopen() && session.budgetMbApplied.get() == 512 && session.nearStrideApplied.get() == 8);
+	/* changed while the project is open, applied at once, not at the next
+	 * opening (owner, 2026-11-07, issue 543): the project's own, none again,
+	 * and every project's */
+	CHECK(session.run("setProjectBudgets", {int64_t{256}, int64_t{2}}, error).has_value());
+	CHECK(d.until([&] { return session.budgetMbApplied.get() == 256 && session.nearStrideApplied.get() == 2; }, 10));
+	CHECK(session.run("setProjectBudgets", {int64_t{0}, int64_t{0}}, error).has_value());
+	CHECK(d.until([&] { return session.budgetMbApplied.get() == 512 && session.nearStrideApplied.get() == 3; }, 10));
+	session.greenzoneBudgetMb.set(1024);
+	session.greenzoneNearStride.set(5);
+	CHECK(d.until([&] { return session.budgetMbApplied.get() == 1024 && session.nearStrideApplied.get() == 5; }, 10));
+	session.greenzoneBudgetMb.set(512);
+	session.greenzoneNearStride.set(3);
+	CHECK(d.until([&] { return session.budgetMbApplied.get() == 512 && session.nearStrideApplied.get() == 3; }, 10));
 	/* Chimera's Stop Movie under TAStudio: a new project of the same game and
 	 * settings with an empty movie, written nowhere until its first save (a
 	 * game never runs alone: owner, 2026-10-26) */

@@ -804,7 +804,7 @@
 		"greenzone_budgets.keep_in_memory": "Mantén a la memòria",
 		"greenzone_budgets.mb": "MB",
 		"greenzone_budgets.on_a_gpu_core_the_picture": "En un nucli amb GPU la imatge pot ser incorrecta just després de carregar. Durant aquests fotogrames, un fotograma vist abans mostra la imatge que tenia. 0 mostra sempre el que dibuixa el nucli.",
-		"greenzone_budgets.takes_effect_when_the_project_is": "Té efecte quan el projecte s'obre la pròxima vegada: un historial que ja té estats no s'esborra per obeir un número que acaba de canviar.",
+		"greenzone_budgets.applies_to_the_open_project_at": "S'aplica al projecte obert de seguida: un pressupost més gran dona espai al seu historial, un de més petit aprima ara mateix el que conserva.",
 		"greenzone_budgets.this_project": "Aquest projecte",
 		"help.build": "Commit %1",
 		"help.build_dated": "Commit %1 (%2)",

@@ -1518,6 +1518,15 @@ void StateHistory::capture(int64_t frame, const uint8_t *note, size_t noteLen)
 	}
 }
 
+void StateHistory::setBudget(uint64_t budgetBytes)
+{
+	if (m_budget == 0 || budgetBytes == 0) return;
+	finishPlan();
+	m_budget = budgetBytes;
+	evict();
+	evictDisk();
+}
+
 /* Halves what the history may hold and gives back what that frees. False when
  * it is already at the floor - below which it could not hold one anchor, and
  * would be spending allocations to store nothing. */

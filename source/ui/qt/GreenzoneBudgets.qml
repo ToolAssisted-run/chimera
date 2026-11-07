@@ -90,7 +90,7 @@ ApplicationWindow {
             Name { text: qsTrId("greenzone_budgets.behind_the_playhead_1_frame_in") }
             SpinBox { id: ownStride; enabled: own.checked; from: 1; to: 32; editable: true; Layout.preferredWidth: 110 }
             Item { width: 1 }
-            Note { text: qsTrId("greenzone_budgets.takes_effect_when_the_project_is") }
+            Note { text: qsTrId("greenzone_budgets.applies_to_the_open_project_at") }
         }
         Item { Layout.fillHeight: true }
         RowLayout {

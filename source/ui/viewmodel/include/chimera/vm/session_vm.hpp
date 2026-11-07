@@ -1198,6 +1198,8 @@ private:
 	std::atomic<int64_t> fastVolumeM_{50}, budgetMbM_{4096}, nearStrideM_{4}, pictureSettleM_{3};
 	/* a project's own budgets, from budgets.json in its cache folder: 0 for none */
 	void readBudgetsOnMachine(ce_project *p, int64_t &memoryMb, int64_t &nearStride) const;
+	/* the budgets applied to the machine open: making its history when opening, else changing it (issue 543) */
+	void applyBudgetsOnMachine(ce_session *s, bool opening);
 	Connection budgetWatch_, strideWatch_, settleWatch_;
 	std::string soundDeviceM_, compileRootM_;
 	bool traceOnM_ = false;
