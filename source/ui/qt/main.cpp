@@ -810,7 +810,7 @@ int main(int argc, char **argv)
 	 * unless the environment names others */
 	vm::CoresViewModel cores(dispatcher);
 	if (cores.coresFolder.get().empty())
-		cores.coresFolder.set((ownFolder() + QStringLiteral("/Cores")).toStdString());
+		cores.coresFolder.set((ownFolder() + QStringLiteral("/cores")).toStdString());
 	if (cores.firmwareFolder.get().empty())
 		cores.firmwareFolder.set((ownFolder() + QStringLiteral("/Firmware")).toStdString());
 	vm::NewProjectViewModel newProject(dispatcher, session, cores);
@@ -1176,7 +1176,7 @@ int main(int argc, char **argv)
 		 * until they put one there: the shipped ones are shown meanwhile */
 		if (!qEnvironmentVariableIsSet("CHIMERA_THEMES_DIR") && QDir(QString::fromStdString(folder))
 			.entryList({QStringLiteral("*.chimeraTheme.json")}, QDir::Files).isEmpty())
-			folder = (QCoreApplication::applicationDirPath() + QStringLiteral("/Themes")).toStdString();
+			folder = (QCoreApplication::applicationDirPath() + QStringLiteral("/themes")).toStdString();
 #endif
 		themes.folder.set(folder);
 	};

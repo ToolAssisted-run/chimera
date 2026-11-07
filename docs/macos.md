@@ -128,17 +128,17 @@ serves a link's target path instead of the picture, which broke the README's ima
 
 What a person keeps is in `~/Library/Application Support/Chimera`, as other
 Mac programs keep theirs (owner, 2026-11-03), and not beside the program as on
-Linux and Windows: `Cores/`, `Firmware/`, `settings.json`, the folders of
+Linux and Windows: `cores/`, `Firmware/`, `settings.json`, the folders of
 Config > Paths (`Movies/` and the rest, which are relative to it), and the
 sandbox's log, `minibox-diag.log`, written when a core dies (elsewhere it is
 written in the folder Chimera runs in; the `MINIBOX_LOG` environment variable
 names another file on every system). That is the
 folder that already held the projects and the recovery files. It is the same
-for the window run from a build folder, so a core put in `Cores/` there is
+for the window run from a build folder, so a core put in `cores/` there is
 found by both. The app carries no cores: put a core's package in
-`~/Library/Application Support/Chimera/Cores`, or give the Core Manager another
+`~/Library/Application Support/Chimera/cores`, or give the Core Manager another
 folder. What ships in the app stays in it: `Contents/MacOS/bin` (the helper
-programs and ffmpeg), the libraries, and `Themes/`, whose themes are shown
+programs and ffmpeg), the libraries, and `themes/`, whose themes are shown
 until the person's own Themes folder has one.
 
 Sound and gamepads need no setup: OpenAL Soft and SDL2 are in

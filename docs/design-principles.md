@@ -14084,3 +14084,22 @@ every font or reader knows.
   each side and a name that only starts like one (AltGr), and that other
   systems keep Chimera's. Broken once, four checks failed. Not seen on a Mac:
   the build here is Linux.
+
+## The bundle's folders are lower case (user-decided, 2026-11-07)
+
+The owner: "all folders in the distributable should be lower case". The
+bundles shipped `Cores/` and `Themes/`; they ship `cores/` and `themes/` now,
+and the window looks for its cores in `cores/` beside the program (on a Mac,
+`~/Library/Application Support/Chimera/cores`) and for its themes in Paths'
+`./themes`. This reverses, for these two folders, the capitalised names of
+2026-11-01 (issue 435). The folders Chimera makes as it runs and that the
+bundle does not carry (Firmware, Movies, Lua, Reports and the others) keep
+their names. The QML modules under `qml/` keep the names Qt imports them by.
+
+On Linux, where case matters, cores in an older `Cores/` are not found:
+move them to `cores/`, or name the folder in the Core Manager. On Windows and
+a Mac the case makes no difference to finding them.
+
+- **Tested.** The bundle check now fails on any folder at the bundle's top
+  level with a capital letter; the view models' test checks the Themes
+  default.

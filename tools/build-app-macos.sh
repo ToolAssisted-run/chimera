@@ -5,7 +5,7 @@
 # under Rosetta 2, on an Apple silicon one; an arm64 app on Apple silicon
 # only. The CPU is the build's (its chimera program's). Like the other
 # bundles it carries NO CORES (docs/core-manager.md): they
-# go in ~/Library/Application Support/Chimera/Cores, where Chimera looks.
+# go in ~/Library/Application Support/Chimera/cores, where Chimera looks.
 #
 #   tools/build-app-macos.sh --dll <installed dll dir> --qt <Qt prefix> --qt-source <folder>
 #                            --out <Chimera.app> [--icon <Chimera.icon>]
@@ -27,7 +27,7 @@
 # Layout, which the program finds its neighbours by (Contents/MacOS is the
 # program's own folder, as the Linux bundle's top folder is):
 #
-#   Contents/MacOS/chimera  bin/  Themes/
+#   Contents/MacOS/chimera  bin/  themes/
 #   Contents/Frameworks/    Chimera's libraries, languages/, and Qt's frameworks
 #   Contents/PlugIns/  Contents/Resources/qml  Contents/Resources/Chimera.icns
 set -eu
@@ -77,8 +77,8 @@ done
 # Chimera's libraries, with the language tables the engine reads beside itself
 for f in "$dll"/*.dylib; do cp "$f" "$app/Frameworks/"; done
 cp -R "$dll/languages" "$app/Frameworks/languages"
-cp -R "$root/Themes" "$app/MacOS/Themes"
-# the folders a person fills - Cores, Firmware, Movies, settings.json - are in
+cp -R "$root/Themes" "$app/MacOS/themes"
+# the folders a person fills - cores, Firmware, Movies, settings.json - are in
 # ~/Library/Application Support/Chimera, not in the app, which is signed
 cp "$root/tools/cores-README.txt" "$app/Resources/Cores-README.txt"
 
@@ -219,7 +219,7 @@ say "licences and build stamp"
 	git -C "$root" submodule status extern/chimera-common-minibox 2> /dev/null | sed 's/^/  /'
 	printf "\nQt: %s (Qt's own download, one build for both processors; the %s half kept)\n" "$(basename "$(dirname "$qt")")" "$arch_name"
 	printf "\ncores: none, and Chimera downloads none. Get a core's package from its\n"
-	printf "project and put it in ~/Library/Application Support/Chimera/Cores; a movie names the\n"
+	printf "project and put it in ~/Library/Application Support/Chimera/cores; a movie names the\n"
 	printf "exact package that recorded it.\n"
 } > "$app/Resources/BUILD.txt"
 cp "$root/LICENSE" "$app/Resources/LICENSE.txt"

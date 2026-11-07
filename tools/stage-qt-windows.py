@@ -6,7 +6,7 @@ the themes Chimera ships.
 Everything is stripped of debug information, as it would ship.
 
 The folder holds the program (chimera.exe, a launcher), the themes and an
-empty Cores/ with a README.txt that says what goes in it;
+empty cores/ with a README.txt that says what goes in it;
 every DLL, Qt's plugins and QML are in lib/ (Chimera's language tables in
 lib/languages), and the other programs
 (chimera-run, chimera-mcp, ffmpeg) in bin/. The tests are not in it (issue
@@ -76,12 +76,12 @@ for p in ("qico.dll", "qjpeg.dll", "qgif.dll"):
     shutil.copy2(f"{qt}/plugins/imageformats/{p}", f"{lib}/imageformats")
 # the themes Chimera ships, in the place Chimera keeps them: beside the program
 here = os.path.dirname(os.path.abspath(__file__))
-shutil.copytree(os.path.join(here, "..", "Themes"), f"{out}/Themes")
+shutil.copytree(os.path.join(here, "..", "Themes"), f"{out}/themes")
 # the folder the window reads core packages from, empty but for what it is for:
 # Chimera ships no core and downloads none (docs/core-manager.md); the words are
 # the Linux folder's too (cores-README.txt), with Windows' line ends
-os.makedirs(f"{out}/Cores")
-with open(os.path.join(here, "cores-README.txt")) as src, open(f"{out}/Cores/README.txt", "w", newline="\r\n") as dst:
+os.makedirs(f"{out}/cores")
+with open(os.path.join(here, "cores-README.txt")) as src, open(f"{out}/cores/README.txt", "w", newline="\r\n") as dst:
     dst.write(src.read())
 
 # QML: QtQml, QtCore and the QtQuick modules the window imports, and the

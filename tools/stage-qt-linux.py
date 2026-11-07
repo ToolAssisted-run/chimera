@@ -3,13 +3,13 @@
 tools/stage-qt-windows.py does for Windows: the window, Chimera's libraries,
 the Qt libraries, plugins and QML modules the window uses, and the few
 libraries those need that a desktop may not have; Chimera's language tables
-(lib/languages); the other programs in bin/; the themes Chimera ships; and an empty Cores/ with a README.txt that says
+(lib/languages); the other programs in bin/; the themes Chimera ships; and an empty cores/ with a README.txt that says
 what goes in it.
 
 The folder is laid out as Qt installs itself, so a relocatable Qt finds its
 plugins and QML from where its own libraries are, with no qt.conf:
 
-    chimera   lib/   plugins/   qml/   bin/   Themes/   Cores/
+    chimera   lib/   plugins/   qml/   bin/   themes/   cores/
 
 Each program and library is told where its neighbours are ($ORIGIN, with
 patchelf) and stripped of debug information, as it would ship.
@@ -150,10 +150,10 @@ for p in elves():
     run("strip", "--strip-unneeded", p)
 
 # the themes Chimera ships, in the place Chimera keeps them: beside the program
-shutil.copytree(os.path.join(here, "..", "Themes"), f"{out}/Themes")
+shutil.copytree(os.path.join(here, "..", "Themes"), f"{out}/themes")
 # the folder the window reads core packages from, empty but for what it is for
-os.makedirs(f"{out}/Cores")
-shutil.copy2(os.path.join(here, "cores-README.txt"), f"{out}/Cores/README.txt")
+os.makedirs(f"{out}/cores")
+shutil.copy2(os.path.join(here, "cores-README.txt"), f"{out}/cores/README.txt")
 
 def size(pred):
     return sum(os.path.getsize(os.path.join(r, f)) for r, _, fs in os.walk(out) for f in fs if pred(os.path.join(r, f)))

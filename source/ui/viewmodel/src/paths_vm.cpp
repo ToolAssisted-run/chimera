@@ -77,7 +77,7 @@ const std::vector<std::pair<std::string, std::string>> &PathsViewModel::defaults
 		{"A/V Dumps", "."},
 		{"Tools", "./Tools"},
 		{"Lua", "./Lua"},
-		{"Themes", "./Themes"},
+		{"Themes", "./themes"},
 		/* Watch and Debug Logs are under Tools when relative, as Chimera resolves them */
 		{"Watch (.wch)", "."},
 		{"Debug Logs", "."},

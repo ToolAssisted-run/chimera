@@ -142,7 +142,7 @@ first run.
 ## What Chimera ships
 
 **No cores, and no list of cores.** A bundle is the frontend, its natives and
-an empty `Cores/` folder. There is no roster beside the executable: a Chimera
+an empty `cores/` folder. There is no roster beside the executable: a Chimera
 that is not going to fetch anything has no use for a list of what could be
 fetched, and a list that is not refreshed is wrong the day after it is made.
 Which cores exist and where each is published is in the README, on the
@@ -187,16 +187,16 @@ before this change do, which is the reason it is still written.
 
     <the cores folder>/        one folder; a package is a file in it
 
-The cores folder is `Cores/` beside the executable. It comes with the bundle,
+The cores folder is `cores/` beside the executable. It comes with the bundle,
 empty, and a package dropped into it is found. On a Mac it is
-`~/Library/Application Support/Chimera/Cores`, as the app is not written to
+`~/Library/Application Support/Chimera/cores`, as the app is not written to
 ([macos.md](macos.md)). A user who wants it somewhere
 else - one set of cores shared by any number of unpacked Chimeras, or a faster
 disk - names another folder in Tools > Core Manager (**Change folder...**), kept
 as `CoresFolder` in the config - written the moment it is chosen, so it is
 remembered next time however the session ends: an absolute path, or one
 relative to the executable. Empty means the default, and choosing the default keeps nothing, so
-a bundle that is moved keeps finding the `Cores/` that moved with it.
+a bundle that is moved keeps finding the `cores/` that moved with it.
 (`CoresFolder` the class resolves it; a setting that is no path at all is the
 default too.)
 
@@ -452,7 +452,7 @@ the manager shows what a core in the folder demands - commercial use first when 
 is forbidden, because that is the part that binds everything around it - rather
 than leaving somebody to open the zip.
 
-`bundle-licenses.py` still reads `Cores/`, because a bundle assembled WITH
+`bundle-licenses.py` still reads `cores/`, because a bundle assembled WITH
 packages (a developer's, a downstream packager's) must still state their terms.
 
 ## What the frontend no longer carries

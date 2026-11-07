@@ -1281,6 +1281,8 @@ void pathsConfig()
 	paths.programFolder.set((dir / "program").string());
 	CHECK(paths.resolve("Movie backups") == (dir / "program" / "Movies" / "backup").string());
 	CHECK(paths.resolve("ROM") == (dir / "program").string());
+	/* the themes the bundle ships are in its lower-case themes/ (owner, 2026-11-07) */
+	CHECK(paths.resolve("Themes") == (dir / "program" / "themes").string());
 	CHECK(paths.resolve("Nothing").empty());
 	/* Watch and Debug Logs under Tools, as Chimera resolves them */
 	CHECK(paths.resolve("Tools") == (dir / "program" / "Tools").string() && paths.resolve("Watch (.wch)") == (dir / "program" / "Tools").string() &&

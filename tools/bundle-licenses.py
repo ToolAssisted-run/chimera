@@ -74,10 +74,7 @@ def main():
     if "--ffmpeg-licence" in sys.argv:
         ffmpeg_licence = sys.argv[sys.argv.index("--ffmpeg-licence") + 1]
 
-    # the window's bundle has cores/; Chimera's earlier ones had Cores/
     cores_dir = os.path.join(bundle, "cores")
-    if not os.path.isdir(cores_dir):
-        cores_dir = os.path.join(bundle, "Cores")
     out_dir = os.path.join(bundle, "licenses")
     os.makedirs(out_dir, exist_ok=True)
 

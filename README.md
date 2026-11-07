@@ -34,7 +34,7 @@
 
 ## Cores
 
-Chimera does not include cores and does not download them. To use a core, download its `.chimeraCore` package from the core's own project (linked below) or build it yourself, and put it in the `Cores` folder beside Chimera.
+Chimera does not include cores and does not download them. To use a core, download its `.chimeraCore` package from the core's own project (linked below) or build it yourself, and put it in the `cores` folder beside Chimera.
 
 ### Official cores
 
@@ -152,7 +152,7 @@ A build carries no cores, and Chimera never uses the network. To set it up:
 
    Most cores have no aarch64 package yet; [docs/platforms.md](docs/platforms.md) says what runs where.
 
-3. Put the packages in the `Cores` folder beside the program (on a Mac, `~/Library/Application Support/Chimera/Cores`), and start Chimera.
+3. Put the packages in the `cores` folder beside the program (on a Mac, `~/Library/Application Support/Chimera/cores`), and start Chimera.
 
 Cores publish nightlies the same way, and never delete them. So a movie can name the exact package that recorded it and still be replayed years later.
 
