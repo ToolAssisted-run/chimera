@@ -605,7 +605,7 @@ ApplicationWindow {
         title: qsTrId("ram_search.go_to_address")
         width: 280
         height: 120
-        modality: Qt.ApplicationModal
+        modality: Qt.platform.os === "osx" ? Qt.WindowModal : Qt.ApplicationModal // a sheet on a Mac, which keeps an application-modal window over other apps (#541)
         function open() { goToText.text = ""; goTo.show(); goTo.raise(); goToText.forceActiveFocus() }
         function accept() {
             const row = win.vm.run("goTo", [goToText.text])

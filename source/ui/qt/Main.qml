@@ -1785,7 +1785,7 @@ ApplicationWindow {
         minimumWidth: 320; maximumWidth: 320
         minimumHeight: 234; maximumHeight: 234
         flags: Qt.Dialog | Qt.MSWindowsFixedSizeDialogHint
-        modality: Qt.ApplicationModal
+        modality: Qt.platform.os === "osx" ? Qt.WindowModal : Qt.ApplicationModal // a sheet on a Mac, which keeps an application-modal window over other apps (#541)
         transientParent: root
         Image {
             x: (parent.width - width) / 2; y: 14

@@ -586,7 +586,7 @@ ApplicationWindow {
              : editor.info.many ? qsTrId("ram_watch.edit_watches") : qsTrId("ram_watch.edit_watch")
         width: 300
         height: 260
-        modality: Qt.ApplicationModal
+        modality: Qt.platform.os === "osx" ? Qt.WindowModal : Qt.ApplicationModal // a sheet on a Mac, which keeps an application-modal window over other apps (#541)
         function start(mode, info) {
             editor.mode = mode
             editor.info = info
@@ -659,7 +659,7 @@ ApplicationWindow {
         title: qsTrId("ram_watch.edit_separator")
         width: 300
         height: 120
-        modality: Qt.ApplicationModal
+        modality: Qt.platform.os === "osx" ? Qt.WindowModal : Qt.ApplicationModal // a sheet on a Mac, which keeps an application-modal window over other apps (#541)
         function open() { separatorText.text = ""; separatorPrompt.show(); separatorPrompt.raise(); separatorText.forceActiveFocus() }
         ColumnLayout {
             anchors.fill: parent
@@ -680,7 +680,7 @@ ApplicationWindow {
         title: qsTrId("ram_watch.add_game_properties")
         width: 320
         height: 400
-        modality: Qt.ApplicationModal
+        modality: Qt.platform.os === "osx" ? Qt.WindowModal : Qt.ApplicationModal // a sheet on a Mac, which keeps an application-modal window over other apps (#541)
         property var names: []
         property var ticked: ({})
         Connections {

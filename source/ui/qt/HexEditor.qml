@@ -410,7 +410,7 @@ ApplicationWindow {
         title: qsTrId("hex_editor.go_to_address")
         width: 280
         height: 120
-        modality: Qt.ApplicationModal
+        modality: Qt.platform.os === "osx" ? Qt.WindowModal : Qt.ApplicationModal // a sheet on a Mac, which keeps an application-modal window over other apps (#541)
         function open() { goToText.text = ""; goTo.show(); goTo.raise(); goToText.forceActiveFocus() }
         function accept() {
             if (/^[0-9a-fA-F]+$/.test(goToText.text)) win.vm.run("goTo", [parseInt(goToText.text, 16)])
@@ -473,7 +473,7 @@ ApplicationWindow {
         title: qsTrId("hex_editor.colors")
         width: 280
         height: 260
-        modality: Qt.ApplicationModal
+        modality: Qt.platform.os === "osx" ? Qt.WindowModal : Qt.ApplicationModal // a sheet on a Mac, which keeps an application-modal window over other apps (#541)
         property string role: ""
         ColorDialog {
             id: colorDialog

@@ -19,7 +19,7 @@ ApplicationWindow {
     height: 320
     minimumWidth: 500
     minimumHeight: 320
-    modality: Qt.ApplicationModal
+    modality: Qt.platform.os === "osx" ? Qt.WindowModal : Qt.ApplicationModal // a sheet on a Mac, which keeps an application-modal window over other apps (#541)
     transientParent: win.mainWindow
     readonly property var devices: JSON.parse(win.session.soundDevices)
 

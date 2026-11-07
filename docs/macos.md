@@ -94,6 +94,14 @@ settings, projects and movies keep Chimera's names, which are the same on
 every system, so a binding made on a Mac is the same binding elsewhere. The file chooser of docs/file-picker.md is Qt's own dialog on a
 Mac, so the test of the Linux chooser is not built.
 
+A window that blocks the rest of Chimera while it is open (Config's windows,
+New Project, the RAM tools' small prompts) is a sheet on a Mac (issue 541):
+it hangs from the window it belongs to and blocks only that window. macOS
+keeps an application-modal window over every other app's windows while
+Chimera is the active app, so on a Mac they are window-modal instead. Windows
+and Linux keep them application-modal. The "mac sheets" test reads every QML
+file and fails on a modal window that would not be a sheet on a Mac.
+
 ## The app
 
 `tools/build-app-macos.sh` makes `Chimera.app` from an installed build: the

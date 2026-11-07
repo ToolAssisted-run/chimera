@@ -24,7 +24,7 @@ ApplicationWindow {
     maximumWidth: 600
     minimumHeight: 380
     maximumHeight: 380
-    modality: Qt.ApplicationModal
+    modality: Qt.platform.os === "osx" ? Qt.WindowModal : Qt.ApplicationModal // a sheet on a Mac, which keeps an application-modal window over other apps (#541)
     transientParent: win.mainWindow
     flags: Qt.Dialog
     // closed while a file is being made: asked first, and the file is only

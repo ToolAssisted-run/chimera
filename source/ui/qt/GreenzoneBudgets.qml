@@ -28,7 +28,7 @@ ApplicationWindow {
     height: win.hasProject ? 470 : 300
     minimumWidth: 470
     minimumHeight: win.hasProject ? 470 : 300
-    modality: Qt.ApplicationModal
+    modality: Qt.platform.os === "osx" ? Qt.WindowModal : Qt.ApplicationModal // a sheet on a Mac, which keeps an application-modal window over other apps (#541)
     transientParent: win.mainWindow
 
     // the boxes, read when the window opens

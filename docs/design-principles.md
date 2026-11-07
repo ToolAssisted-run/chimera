@@ -14117,3 +14117,20 @@ before the first picture, as before. What a frame is written at without
 - **Tested.** The view models' test checks 256 x 224 at 3x (768 x 672) and
   the size before a picture; with the scale left out it failed. The button
   itself was not pressed by a test.
+
+## Modal windows are sheets on a Mac (user-decided, 2026-11-07)
+
+Issue 541: on a Mac, Chimera's settings windows stayed above other apps'
+windows, the screenshot preview among them. They are application-modal, and
+Qt shows an application-modal window on a Mac through an AppKit modal
+session, which keeps it over every other app's windows while Chimera is the
+active app; Qt has no setting against it. The owner chose sheets: on a Mac
+each of the 25 modal windows is window-modal, which Qt shows as a sheet on
+the window it belongs to, blocking only that window. Windows and Linux keep
+them application-modal. The other choices were ordinary windows on a Mac
+(nothing blocked) and leaving it as macOS does.
+
+- **Tested.** A new test ("mac sheets") reads every QML file and fails on a
+  modal window that is not window-modal on a Mac; with one window put back
+  it failed. Not seen on a Mac: the build here is Linux, and offscreen Qt
+  has no sheets.

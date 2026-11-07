@@ -26,7 +26,7 @@ ApplicationWindow {
     height: 540
     minimumWidth: 440
     minimumHeight: 520
-    modality: Qt.ApplicationModal
+    modality: Qt.platform.os === "osx" ? Qt.WindowModal : Qt.ApplicationModal // a sheet on a Mac, which keeps an application-modal window over other apps (#541)
     transientParent: win.ownerWindow
 
     // ---- the copies the window edits, read when it opens ----
@@ -484,7 +484,7 @@ ApplicationWindow {
         title: qsTrId("tastudio_settings.edit_tastudio_colors")
         width: 300
         height: 400
-        modality: Qt.ApplicationModal
+        modality: Qt.platform.os === "osx" ? Qt.WindowModal : Qt.ApplicationModal // a sheet on a Mac, which keeps an application-modal window over other apps (#541)
         transientParent: win
         // the colours being chosen ({} is the theme's), and the theme's
         property var own: ({})

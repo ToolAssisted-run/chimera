@@ -18,7 +18,7 @@ ApplicationWindow {
     height: 250
     minimumWidth: 300
     minimumHeight: 250
-    modality: Qt.ApplicationModal
+    modality: Qt.platform.os === "osx" ? Qt.WindowModal : Qt.ApplicationModal // a sheet on a Mac, which keeps an application-modal window over other apps (#541)
     property string said: qsTrId("ram_poke.enter_an_address_to_poke")
     function start(info) {
         poke.info = info
