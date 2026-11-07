@@ -193,6 +193,46 @@ QString keyCombination(const QString &name, Qt::KeyboardModifiers modifiers)
 	return before + name;
 }
 
+QString shownKeys(const QString &keys, bool mac)
+{
+	if (!mac) return keys;
+	static const struct { const char *name, *shown; } macNames[] = {
+		{"LeftCtrl", "Left Control"}, {"RightCtrl", "Right Control"}, {"Ctrl", "Control"},
+		{"LeftAlt", "Left Option"}, {"RightAlt", "Right Option"}, {"Alt", "Option"},
+		{"LeftWin", "Left Command"}, {"RightWin", "Right Command"},
+	};
+	/* a whole name only, between the separators of a binding ("Ctrl+Shift+S, F1") */
+	QString out;
+	qsizetype at = 0;
+	while (at < keys.size())
+	{
+		qsizetype end = at;
+		while (end < keys.size() && keys[end] != QLatin1Char('+') && keys[end] != QLatin1Char(',')) end++;
+		const QString part = keys.mid(at, end - at);
+		const QString name = part.trimmed();
+		QString shown = part;
+		for (const auto &m : macNames)
+			if (name == QLatin1String(m.name))
+			{
+				shown = part.left(part.indexOf(name)) + QLatin1String(m.shown) + part.mid(part.indexOf(name) + name.size());
+				break;
+			}
+		out += shown;
+		if (end < keys.size()) out += keys[end];
+		at = end + 1;
+	}
+	return out;
+}
+
+QString KeyNamer::shown(const QString &keys) const
+{
+#ifdef __APPLE__
+	return shownKeys(keys, true);
+#else
+	return shownKeys(keys, false);
+#endif
+}
+
 QString KeyNamer::name(int key, int modifiers, bool combination) const
 {
 	const auto mods = Qt::KeyboardModifiers(modifiers);

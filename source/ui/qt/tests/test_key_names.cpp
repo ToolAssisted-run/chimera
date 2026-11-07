@@ -144,6 +144,14 @@ int main(int argc, char **argv)
 	CHECK(namer.name(Qt::Key_A, none, false) == "Q");
 	CHECK(namer.name(Qt::Key_B, none, false) == "B");
 
+	/* keys as a Mac shows them (issue 538): its own names for the modifier
+	 * keys, whole names only; elsewhere, and in what is kept, Chimera's */
+	CHECK(chimera::qt::shownKeys("Ctrl+Shift+S", true) == "Control+Shift+S");
+	CHECK(chimera::qt::shownKeys("LeftWin+Alt+F1, RightCtrl+Z", true) == "Left Command+Option+F1, Right Control+Z");
+	CHECK(chimera::qt::shownKeys("RightWin", true) == "Right Command");
+	CHECK(chimera::qt::shownKeys("LeftAlt+RightAlt+AltGr", true) == "Left Option+Right Option+AltGr");
+	CHECK(chimera::qt::shownKeys("LeftWin+Ctrl+S", false) == "LeftWin+Ctrl+S");
+	CHECK(chimera::qt::shownKeys("", true).isEmpty());
 	std::printf("%s: %d checks, %d failed\n", failed == 0 ? "PASS" : "FAIL", checks, failed);
 	return failed == 0 ? 0 : 1;
 }

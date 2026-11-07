@@ -47,7 +47,8 @@ RowLayout {
         // shortcut on Escape or Ctrl+S took the key from the box (issue 431)
         focusPolicy: Qt.NoFocus
         activeFocusOnPress: false
-        text: box.keys
+        // as this system names the keys (a Mac's Command, issue 538)
+        text: box.keyNamer.shown(box.keys)
         padding: 2
         // the start of the keys shown, as a text box shows them
         onTextChanged: cursorPosition = 0
@@ -58,7 +59,7 @@ RowLayout {
         }
         ToolTip.visible: hovered
         ToolTip.delay: 500
-        ToolTip.text: qsTrId("binding_box.current_binding").arg(box.keys) + "\n---\n" + box.tips
+        ToolTip.text: qsTrId("binding_box.current_binding").arg(box.keyNamer.shown(box.keys)) + "\n---\n" + box.tips
         Item {
             id: catcher
             objectName: "bindingBox"

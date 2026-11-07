@@ -26,6 +26,13 @@ inline QString keyName(const QKeyEvent &e) { return keyName(e.key(), e.modifiers
  * held ("Ctrl+Shift" for Shift pressed while Ctrl is held) */
 QString keyCombination(const QString &name, Qt::KeyboardModifiers modifiers);
 
+/* keys as they are shown: on a Mac the modifier keys by the names on its
+ * keyboard (issue 538) - Ctrl is Control, Alt is Option, and the keys
+ * Chimera names LeftWin and RightWin are Command - and everywhere else the
+ * names as they are. Only what is shown: settings and movies keep
+ * Chimera's names, the same on every system. */
+QString shownKeys(const QString &keys, bool mac);
+
 /* A key's name for QML, as the window's key filter names it: bare for a
  * machine's button, with the modifiers held for a hotkey. Installed on the
  * application, it sees every key event first: it follows which modifier
@@ -37,6 +44,8 @@ class KeyNamer : public QObject
 public:
 	using QObject::QObject;
 	Q_INVOKABLE QString name(int key, int modifiers, bool combination) const;
+	/* keys as this system shows them (shownKeys) */
+	Q_INVOKABLE QString shown(const QString &keys) const;
 	/* Shift held now, whichever window has the keyboard */
 	Q_INVOKABLE bool shiftHeld() const { return QGuiApplication::queryKeyboardModifiers().testFlag(Qt::ShiftModifier); }
 

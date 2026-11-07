@@ -14066,3 +14066,21 @@ branch's frame; the old control scheme and a core state call nothing), and
 the engine's project test (a branch's userdata, empty and none told apart,
 kept through a save; a userdata that is not text refused). No emulator core
 offers memory events yet.
+
+## A Mac shows its own key names (user-decided, 2026-11-07)
+
+On a Mac the binding boxes and the menus showed Chimera's key names, Ctrl,
+Alt, LeftWin and RightWin, which are a PC keyboard's (issue 538). They now
+show the Mac's: Control, Option, Left Command and Right Command. The owner
+chose words over the Mac's symbols (the Command and Option marks), which not
+every font or reader knows.
+
+- **Only what is shown.** Settings, projects and movies keep Chimera's names,
+  which are the same on every system, so a binding carries over between a
+  Mac and a PC. One function, `shownKeys`, turns the names into the shown
+  ones, whole names only; the binding boxes and the window's table of hotkey
+  keys (the menus, TAStudio's tips, the notes) go through it.
+- **Tested.** test-key-names checks the Mac's names in a combination, a list,
+  each side and a name that only starts like one (AltGr), and that other
+  systems keep Chimera's. Broken once, four checks failed. Not seen on a Mac:
+  the build here is Linux.

@@ -84,7 +84,14 @@ while no game runs, and a tool window's menu bar colour setting has no effect.
 
 Two things are different on a Mac and the tests know it: Qt's Control key is
 the Command key (Chimera's Ctrl is Qt's Meta there), and a Mac's menus have
-no Alt letters. The file chooser of docs/file-picker.md is Qt's own dialog on a
+no Alt letters.
+
+Keys are shown by a Mac's own names (issue 538): Ctrl is Control, Alt is
+Option, and the keys Chimera names LeftWin and RightWin are Left Command and
+Right Command, in the binding boxes and beside the menus' actions
+(`shownKeys` in source/ui/qt/key_names.cpp). Only the shown text changes:
+settings, projects and movies keep Chimera's names, which are the same on
+every system, so a binding made on a Mac is the same binding elsewhere. The file chooser of docs/file-picker.md is Qt's own dialog on a
 Mac, so the test of the Linux chooser is not built.
 
 ## The app

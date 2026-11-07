@@ -209,7 +209,12 @@ ApplicationWindow {
         return out
     }
     // the keys of every hotkey, for the menus to show beside their actions
-    readonly property var hotkeyKeys: JSON.parse(root.hotkeys.bound)
+    // as this system names the keys (a Mac's Command, issue 538)
+    readonly property var hotkeyKeys: {
+        const bound = JSON.parse(root.hotkeys.bound), out = {}
+        for (const hotkey in bound) out[hotkey] = root.keyNamer.shown(bound[hotkey])
+        return out
+    }
     // Chimera's Capture Mouse: while the window is active the pointer is hidden and kept over the picture
     readonly property bool capturing: root.session.captureMouse && root.active
     onCapturingChanged: root.capturing ? root.pointerCapture.confine(pictureArea) : root.pointerCapture.release()
