@@ -14134,3 +14134,30 @@ them application-modal. The other choices were ordinary windows on a Mac
   modal window that is not window-modal on a Mac; with one window put back
   it failed. Not seen on a Mac: the build here is Linux, and offscreen Qt
   has no sheets.
+
+## aarch64 packages for emulator cores, not game cores (user-decided, 2026-11-07)
+
+After FreeJ2ME (issue 536), the owner asked which cores could most easily get
+an aarch64 package, and then for them to be made. The owner then decided that
+only emulator cores are ported, not game cores (a `waterbox.config` with
+`"kind": "game"`). Four game cores (dsda, RSDKv3, RSDKv5, RSDKv5U) were
+merged before that was said, and the owner chose to keep them. 86Box ships
+an aarch64 package without its recompiler, which is x86-64 code, and without
+the setting (user-decided, 2026-11-07, recorded in that core's docs/PLAN.md);
+PCem stays x86_64 only.
+
+miniBox changed for it (miniBox pull request 13, here as its submodule): an
+aarch64 branch reaches 128 MiB, and 86Box's image is 188 MiB, most of it
+zeroed data, so the thread-pointer trampolines no longer fit after the
+image. emulibc now keeps a 4 KiB room for them in the code. How a core is
+ported is in [porting-a-core.md](porting-a-core.md), "An aarch64 package".
+
+- **Tested.** Each core's own tests ran on an aarch64 runner and an x86_64
+  one in its pull request, and passed on both before the merge. When each
+  pull request was opened, its x86_64 `core.wbx` was the same file as before
+  (PUAE's differed only in a line number and the build time its upstream
+  compiles in); the fixes made after that were not checked so. With this
+  miniBox, Chimera's meson tests pass (66) and so does the witness (126 ok).
+  miniBox's own tests pass on every host it is built for, a new one with 200
+  MiB of zeroed data among them. Not tried: any of these packages on a
+  person's aarch64 machine, or with a commercial game on aarch64.

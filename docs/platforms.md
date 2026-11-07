@@ -42,11 +42,16 @@ that does not say is refused. Chimera keeps no list of which core runs where
 (user-decided, 2026-11-05); a core that cannot run on one of the six leaves it
 out, as Ikemen GO leaves out the Intel Mac.
 
-- **Most cores have no aarch64 package yet.** On 2026-11-07 FreeJ2ME was the one
-  official core that published both (its Nightly 2026-11-07, issue 536); every
-  other official core published x86_64 only. Of the third-party cores, SRB2
-  published both. An aarch64 build runs only the cores that have an aarch64
-  package.
+- **Some cores have an aarch64 package.** FreeJ2ME was the first official
+  core to publish both (its Nightly 2026-11-07, issue 536). Since 2026-11-07
+  these emulator cores are built and tested on an aarch64 runner too, and
+  their nightlies carry both packages: AppleWin, Cadmium, DOSBox-X,
+  FBNeo, Fuse, Gambatte, Genesis Plus GX, Mednafen, Mesen, NesHawk, Opera,
+  PUAE, QuickerNES, Snes9x, Stella, TIC-80, Uzem, VICE, Virtual Jaguar,
+  ZEsarUX and OpenBOR, and the game cores dsda, RSDKv3, RSDKv5 and RSDKv5U.
+  Game cores are not ported otherwise (user-decided, 2026-11-07). The other
+  cores publish x86_64 only. Of the third-party cores, SRB2 publishes both. An
+  aarch64 build runs only the cores that have an aarch64 package.
 - **An Apple silicon Mac can run the Intel build** under Rosetta 2, Apple's
   translator, with x86_64 packages (measured on an M1, [macos.md](macos.md)).
   Windows on aarch64 also runs x86_64 programs, but the x86_64 build has not been

@@ -99,6 +99,21 @@ say nothing. Compare `rev-parse --show-toplevel` with the path you meant.
   thread-local variables and no list, or with any other use of `%fs`, such as
   hand-written assembly (Mesa's x86-64 GL dispatch: turn Mesa's x86-64
   assembly off).
+- **An aarch64 package.** A core is built for aarch64 on an aarch64 machine
+  (CI: ubuntu-24.04-arm), never cross-built, with miniBox's flags for that
+  CPU (miniBox's meson.build, `waterbox_cpu_flags`: among them
+  `-ffixed-x18` and `-ffp-contract=off`). After the link,
+  `wbx-tp-rewrite.py` must run on `core.wbx`: on aarch64 it points the code's
+  thread-pointer reads at the machine's slot, and the host refuses an image it
+  has not rewritten ("reads its thread pointer from TPIDR_EL0"). Run it
+  wherever `core.wbx` is built, a CI step that calls ninja directly included.
+  The native reference build on aarch64 needs `-ffp-contract=off` too: GCC
+  fuses multiply-adds there by default, and the two builds' sound then
+  differ. x86-only code goes per CPU: `-msse2` and other x86 flags, a
+  `config.h`'s ARCH defines, a hand-written stack switch (a coroutine or
+  libco's `amd64.c`), a recompiler that only emits x86 code. A
+  `waterbox.config` written by a generator needs `runsOn` in the generator.
+  The x86_64 `core.wbx` should be the same file before and after; check it.
 - **One thread.** The machine's scheduler is the only scheduler. Thread pools,
   lazy background workers and "spawn a thread to do the IO" all have to go or
   become synchronous.
