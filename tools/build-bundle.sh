@@ -156,6 +156,11 @@ if [ "$platform" = linux ]; then
 	said=$("$out/bin/chimera-run" --run-tool none "$out/no-such.chimeraCore" 2>&1 || true)
 	case "$said" in *engine.not_a_package*) echo "UNTRANSLATED: bin/chimera-run says \"$said\"" >&2; bad=1 ;; esac
 fi
+# libxkbcommon-x11 works only with the libxkbcommon of its own version: one
+# without the other crashed the window at start on newer systems (#533)
+if [ "$platform" = linux ] && [ -e "$out/lib/libxkbcommon-x11.so.0" ] && [ ! -e "$out/lib/libxkbcommon.so.0" ]; then
+	echo "MISSING: lib/libxkbcommon.so.0 (lib/libxkbcommon-x11.so.0 needs the one of its own version)" >&2; bad=1
+fi
 [ ! -e "$out/official-cores.json" ] || { echo "PRESENT: official-cores.json (the bundle carries no list of cores)" >&2; bad=1; }
 # Chimera reaches for nothing over the network: Qt's network module is not built
 if find "$out" -iname '*Qt6Network*' | grep -q .; then echo "PRESENT: Qt's network module" >&2; bad=1; fi

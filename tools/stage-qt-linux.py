@@ -92,9 +92,13 @@ if gone:
 
 # the libraries everything here needs, from Qt's, read from their dynamic
 # sections; and of the system's, the few a desktop may lack (X11's cursor,
-# image and key helpers since Qt 6.5 asks for them), so the window starts
+# image and key helpers since Qt 6.5 asks for them), so the window starts.
+# libxkbcommon-x11 reaches inside libxkbcommon's private structures, so the two
+# must be the same version: shipping only the first crashed the window at
+# start on systems with a newer libxkbcommon (Ubuntu 26.04, Debian 14; #533).
+# So both are shipped, as a pair.
 desktop_may_lack = {"libxcb-cursor.so.0", "libxcb-icccm.so.4", "libxcb-image.so.0", "libxcb-keysyms.so.1",
-                    "libxcb-render-util.so.0", "libxcb-util.so.1", "libxkbcommon-x11.so.0"}
+                    "libxcb-render-util.so.0", "libxcb-util.so.1", "libxkbcommon-x11.so.0", "libxkbcommon.so.0"}
 def needed(path):
     o = subprocess.run(["readelf", "-d", path], capture_output=True, text=True).stdout
     return [line.split("[")[1].split("]")[0] for line in o.splitlines() if "(NEEDED)" in line]
