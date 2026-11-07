@@ -1882,11 +1882,25 @@ ApplicationWindow {
             // a light for each drive, with what is in it
             Repeater {
                 model: root.session.isOpen ? JSON.parse(root.session.drives) : []
+                // what is in it, whole while the bar has room, else cut in the
+                // middle to its share, keeping the end where a game's disks differ (issue 545)
                 delegate: RowLayout {
                     required property var modelData
                     spacing: 2
+                    Layout.fillWidth: true
+                    Layout.minimumWidth: 16
                     StatusIcon { source: modelData.on ? "qrc:/chimera/status/LightOn.png" : "qrc:/chimera/status/LightOff.png"; tip: modelData.long }
-                    Label { visible: modelData.short !== ""; text: modelData.short }
+                    Label {
+                        objectName: "driveText"
+                        visible: modelData.short !== ""
+                        text: modelData.short
+                        elide: Text.ElideMiddle
+                        Layout.fillWidth: true
+                        Layout.minimumWidth: 0
+                        // a whole pixel over: a layout rounding a fraction down cut a name that fitted
+                        Layout.preferredWidth: Math.ceil(implicitWidth) + 1
+                        Layout.maximumWidth: Math.ceil(implicitWidth) + 1
+                    }
                 }
             }
             // some address is frozen

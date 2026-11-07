@@ -10731,7 +10731,8 @@ void driveMediaText()
 	CHECK(SessionViewModel::driveMediaLong("CD-ROM", two, 1, 0) == "CD-ROM - in the drive: 1/2 Disc 1.iso; selected, not inserted: 2/2 Disc 2.iso");
 	CHECK(SessionViewModel::driveMediaShort(two, 1, -1) == "empty | selected 2/2 Disc 2.iso");
 	CHECK(SessionViewModel::driveMediaLong("CD", two, 1, -1).rfind("CD - the drive is empty", 0) == 0);
-	/* long names cut in the middle: four disks of one game still read as four */
+	/* long names whole: the status bar cuts them only for want of room, in
+	 * the middle (issue 545); four disks of one game read as four */
 	const std::vector<std::string> hayate{"Zikusousakan Hayate (1994)(Altacia)(Disk 1 of 4)(Disk A).fdi",
 		"Zikusousakan Hayate (1994)(Altacia)(Disk 2 of 4)(Disk B).fdi", "Zikusousakan Hayate (1994)(Altacia)(Disk 3 of 4)(Disk C).fdi",
 		"Zikusousakan Hayate (1994)(Altacia)(Disk 4 of 4)(Disk D).fdi"};
@@ -10739,7 +10740,7 @@ void driveMediaText()
 	for (int32_t i = 0; i < 4; i++)
 	{
 		const std::string text = SessionViewModel::driveMediaShort(hayate, i, i);
-		CHECK(text.size() <= 28 + 4);
+		CHECK(text == std::to_string(i + 1) + "/4 " + hayate[static_cast<size_t>(i)]);
 		CHECK(text.size() >= 12 && text.compare(text.size() - 12, 12, std::string("(Disk ") + static_cast<char>('A' + i) + ").fdi") == 0);
 		shown.insert(text);
 	}

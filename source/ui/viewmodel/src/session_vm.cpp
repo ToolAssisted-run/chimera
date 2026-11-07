@@ -6384,9 +6384,9 @@ void SessionViewModel::edited(int64_t first)
 	});
 }
 
-/* a drive's media text: an image's name cut in the middle, keeping its end
- * (the disks of one game differ at the end), the image in a drive and the one
- * its selector is on said once when they are the same */
+/* a drive's media text: an image's file name, cut in the middle to the room
+ * given (keeping its end: the disks of one game differ at the end), the image
+ * in a drive and the one its selector is on said once when they are the same */
 static std::string driveFit(std::string name, size_t room)
 {
 	const size_t slash = name.find_last_of("/\\");
@@ -6402,10 +6402,13 @@ static std::string driveEntry(const std::vector<std::string> &names, int32_t ind
 	return std::to_string(index + 1) + "/" + std::to_string(names.size()) + " " + driveFit(names[static_cast<size_t>(index)], room);
 }
 
+/* the names whole: the status bar cuts them in the middle only when it has no
+ * room, keeping their ends (issue 545: cut here to 28 letters, they left most
+ * of a wide window's bar empty) */
 std::string SessionViewModel::driveMediaShort(const std::vector<std::string> &names, int32_t selected, int32_t inserted)
 {
-	const std::string in = inserted >= 0 ? driveEntry(names, inserted, 28) : tr("session.drive_empty_short");
-	return inserted == selected ? in : tr("session.drive_selected_short", {in, driveEntry(names, selected, 28)});
+	const std::string in = inserted >= 0 ? driveEntry(names, inserted, std::string::npos) : tr("session.drive_empty_short");
+	return inserted == selected ? in : tr("session.drive_selected_short", {in, driveEntry(names, selected, std::string::npos)});
 }
 
 std::string SessionViewModel::driveMediaLong(const std::string &drive, const std::vector<std::string> &names, int32_t selected, int32_t inserted)
