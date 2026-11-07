@@ -10295,6 +10295,17 @@ bool coreManager(const char *package, const char *slotsPackage, const char *game
 		  cores.managerStatus.get() == "Removed 2 packages." && listed() == "Synth|");
 	cores.run("refreshList", {}, error);
 	CHECK(cores.managerStatus.get() == "1 core in " + (dir / "Cores").string() + ".");
+	/* Open Cores Folder makes a cores folder that is not there yet (issue 537:
+	 * a Mac's, in Application Support, could not be opened) */
+	const fs::path fresh = dir / "Not yet" / "Cores";
+	cores.coresFolder.set(fresh.string());
+	CHECK(fromValue(cores.run("makeCoresFolder", {}, error).value_or(Value()), got) && got == fresh.string() && fs::is_directory(fresh));
+	/* and one that cannot be made says so: a file is where the folder would be */
+	fs::create_directories(dir / "blocked", ec);
+	{ std::ofstream(dir / "blocked" / "file") << "x"; }
+	cores.coresFolder.set((dir / "blocked" / "file" / "Cores").string());
+	CHECK(fromValue(cores.run("makeCoresFolder", {}, error).value_or(Value()), got) && got.empty() &&
+		  cores.managerStatus.get() == (dir / "blocked" / "file" / "Cores").string() + " could not be opened");
 	fs::remove_all(dir, ec);
 	return true;
 }

@@ -37,6 +37,21 @@ CoresViewModel::CoresViewModel(Dispatcher &dispatcher) : ViewModel("cores", disp
 			managerStatus.set(tr("cores.count_in", static_cast<int64_t>(managed_.size()), {coresFolder.get()}));
 			return {};
 		});
+	command("makeCoresFolder", "makes the cores folder if it is not there yet, and gives it, for Open Cores Folder; "
+		"blank, with the reason in the manager's status line, when it cannot be made", {},
+		[this](const Args &, std::string &) -> Value {
+			/* a Mac's cores folder is in Application Support, which nothing
+			 * ships: it is made the first time it is opened (issue 537) */
+			const std::string folder = coresFolder.get();
+			std::error_code ec;
+			if (!std::filesystem::is_directory(std::filesystem::u8path(folder), ec)) std::filesystem::create_directories(std::filesystem::u8path(folder), ec);
+			if (!std::filesystem::is_directory(std::filesystem::u8path(folder), ec))
+			{
+				managerStatus.set(tr("cores.could_not_be_opened", {folder}));
+				return std::string();
+			}
+			return folder;
+		});
 	command("versionsOf", "a core's versions here, newest first, as [{\"label\", \"path\"}]", {"core"},
 		[this](const Args &a, std::string &error) -> Value {
 			std::string name;

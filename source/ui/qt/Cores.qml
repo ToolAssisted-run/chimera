@@ -212,7 +212,10 @@ ApplicationWindow {
             Layout.fillWidth: true
             Button {
                 text: qsTrId("cores.open_cores_folder"); Layout.preferredWidth: 140
-                onClicked: if (!Qt.openUrlExternally(localFiles.folderUrl(win.vm.coresFolder))) win.vm.managerStatus = qsTrId("cores.could_not_be_opened").arg(win.vm.coresFolder)
+                onClicked: {
+                    const folder = win.vm.run("makeCoresFolder") || ""
+                    if (folder !== "" && !Qt.openUrlExternally(localFiles.folderUrl(folder))) win.vm.managerStatus = qsTrId("cores.could_not_be_opened").arg(folder)
+                }
             }
             Button { text: qsTrId("cores.change_folder"); Layout.preferredWidth: 140; onClicked: folderDialog.open() }
             Button { text: qsTrId("cores.refresh_list"); Layout.preferredWidth: 140; onClicked: win.vm.run("refreshList") }
