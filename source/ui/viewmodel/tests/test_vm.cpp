@@ -9680,6 +9680,15 @@ bool encodeVideo(const char *package, const char *rom)
 	SessionViewModel session(d, inputs);
 	session.turboSeek.set(true);
 	EncoderViewModel encoder(d, session, ".");
+	{
+		/* Current size: the machine's picture times the window's scale, and
+		 * 640 x 480 before the first picture */
+		std::string why;
+		encoder.run("currentSize", {int64_t{256}, int64_t{224}, int64_t{3}}, why);
+		CHECK(why.empty() && encoder.width.get() == 768 && encoder.height.get() == 672);
+		encoder.run("currentSize", {int64_t{0}, int64_t{0}, int64_t{2}}, why);
+		CHECK(encoder.width.get() == 640 && encoder.height.get() == 480);
+	}
 	const std::string ffmpeg = encoder.ffmpegPath();
 	if (ffmpeg.empty())
 	{

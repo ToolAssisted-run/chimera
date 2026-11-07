@@ -361,6 +361,23 @@ EncoderViewModel::EncoderViewModel(Dispatcher &dispatcher, SessionViewModel &ses
 		commandLine.set(presets()[static_cast<size_t>(i)].command);
 		return {};
 	});
+	command("currentSize", "the size boxes to the machine's picture times the window's scale (Current size): "
+		"the picture's width and height at 1x, as Config > Display shows it, and the scale",
+		{"width", "height", "scale"}, [this](const Args &a, std::string &error) -> Value {
+			int64_t w = 0, h = 0, k = 0;
+			if (!arg(a, 0, w, error) || !arg(a, 1, h, error) || !arg(a, 2, k, error)) return {};
+			/* before the first picture: 640 x 480, as before */
+			if (w <= 0 || h <= 0)
+			{
+				width.set(640);
+				height.set(480);
+				return {};
+			}
+			k = std::clamp<int64_t>(k, 1, 10);
+			width.set(std::min<int64_t>(w * k, 8192));
+			height.set(std::min<int64_t>(h * k, 8192));
+			return {};
+		});
 	command("restoreDefaults", "the command, sync and size back to a fresh install's (the file and markers stay)", {},
 		[this](const Args &, std::string &) -> Value {
 			commandLine.set(kDefaultCommand);

@@ -1026,6 +1026,7 @@ ApplicationWindow {
         id: encodeWindow
         vm: root.encoder; session: root.session; pianoRoll: root.pianoRoll; paths: root.paths; files: root.pictureFiles
         picture: picture
+        pictureScale: root.windowScale
         mainWindow: root
         themeColor: root.osdColor
         visible: false

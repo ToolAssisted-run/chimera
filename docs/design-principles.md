@@ -14103,3 +14103,17 @@ a Mac the case makes no difference to finding them.
 - **Tested.** The bundle check now fails on any folder at the bundle's top
   level with a capital letter; the view models' test checks the Themes
   default.
+
+## Encode Video's Current size is the machine's picture times the scale (user-decided, 2026-11-07)
+
+The owner: "current size" should be the size of the core's picture times
+its multiplier (1x, 2x, 3x...), not that of the whole window. With Capture
+OSD it took the main window's picture area, black bars and all. Current size
+now asks the encoder's view model (`currentSize`) for the picture's size at
+1x, as Config > Display shows it, times View > Window Size's scale; 640 x 480
+before the first picture, as before. What a frame is written at without
+"Resize to" is unchanged, and the "now" beside the button still says it.
+
+- **Tested.** The view models' test checks 256 x 224 at 3x (768 x 672) and
+  the size before a picture; with the scale left out it failed. The button
+  itself was not pressed by a test.

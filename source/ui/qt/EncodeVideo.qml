@@ -63,8 +63,9 @@ ApplicationWindow {
         win.vm.width = win.writtenWidth > 0 ? win.writtenWidth : 640
         win.vm.height = win.writtenHeight > 0 ? win.writtenHeight : 480
     }
-    // the main window's picture
+    // the main window's picture, and the scale it is shown at (View > Window Size)
     property Item picture: null
+    property int pictureScale: 1
     // the size a frame is written at now, unless resized, as Chimera's: with
     // Capture OSD the picture area's, as the window shows it (its 2x or 3x),
     // else the machine's own pixels; 0 before the first picture
@@ -162,7 +163,9 @@ ApplicationWindow {
             SpinBox { from: 1; to: 8192; editable: true; value: win.vm.width; enabled: win.vm.resize; onValueModified: win.vm.width = value; Layout.preferredWidth: 100 }
             Label { text: "x" }
             SpinBox { from: 1; to: 8192; editable: true; value: win.vm.height; enabled: win.vm.resize; onValueModified: win.vm.height = value; Layout.preferredWidth: 100 }
-            Button { text: qsTrId("encode_video.current_size"); enabled: win.vm.resize; onClicked: win.useCurrentSize() }
+            // the machine's picture times the window's scale (1x, 2x, 3x...), not the window's whole picture area
+            Button { text: qsTrId("encode_video.current_size"); enabled: win.vm.resize
+                     onClicked: win.vm.run("currentSize", [win.picture ? win.picture.pictureWidth : 0, win.picture ? win.picture.pictureHeight : 0, win.pictureScale]) }
             Label { text: win.writtenWidth > 0 ? qsTrId("encode_video.now_x").arg(win.writtenWidth).arg(win.writtenHeight) : "" }
             CheckBox { text: qsTrId("encode_video.pad"); checked: win.vm.pad; enabled: win.vm.resize; onToggled: win.vm.pad = checked }
         }
