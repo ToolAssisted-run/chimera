@@ -42,9 +42,11 @@ that does not say is refused. Chimera keeps no list of which core runs where
 (user-decided, 2026-11-05); a core that cannot run on one of the six leaves it
 out, as Ikemen GO leaves out the Intel Mac.
 
-- **Most cores have no aarch64 package yet.** On 2026-11-05 every official core
-  published x86_64 only; of the third-party cores, SRB2 published both. An aarch64
-  build runs only the cores that have an aarch64 package.
+- **Most cores have no aarch64 package yet.** On 2026-11-07 FreeJ2ME was the one
+  official core that published both (its Nightly 2026-11-07, issue 536); every
+  other official core published x86_64 only. Of the third-party cores, SRB2
+  published both. An aarch64 build runs only the cores that have an aarch64
+  package.
 - **An Apple silicon Mac can run the Intel build** under Rosetta 2, Apple's
   translator, with x86_64 packages (measured on an M1, [macos.md](macos.md)).
   Windows on aarch64 also runs x86_64 programs, but the x86_64 build has not been
