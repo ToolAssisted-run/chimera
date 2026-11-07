@@ -48,7 +48,7 @@ A file whose theme has the name of a built-in one, or of a file read before it
 
 ## The themes Chimera ships
 
-The sixty themes in the repository's `Themes` folder were made by
+The sixty themes in the repository's `themes` folder were made by
 Nelson/Geferulf and are shipped under Chimera's licence (user-decided,
 2026-10-19). The release bundle carries them in `themes` beside the program
 (`tools/build-bundle.sh` takes them from the repository, so a theme renamed or

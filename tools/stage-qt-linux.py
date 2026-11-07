@@ -150,7 +150,7 @@ for p in elves():
     run("strip", "--strip-unneeded", p)
 
 # the themes Chimera ships, in the place Chimera keeps them: beside the program
-shutil.copytree(os.path.join(here, "..", "Themes"), f"{out}/themes")
+shutil.copytree(os.path.join(here, "..", "themes"), f"{out}/themes")
 # the folder the window reads core packages from, empty but for what it is for
 os.makedirs(f"{out}/cores")
 shutil.copy2(os.path.join(here, "cores-README.txt"), f"{out}/cores/README.txt")

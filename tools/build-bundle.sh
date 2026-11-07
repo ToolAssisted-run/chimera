@@ -144,7 +144,7 @@ done
 [ -s "$out/bin/chimera-run$suffix" ] || { echo "MISSING: bin/chimera-run$suffix" >&2; bad=1; }
 [ -s "$out/bin/chimera-mcp$suffix" ] || { echo "MISSING: bin/chimera-mcp$suffix (Tools > MCP Server... names it)" >&2; bad=1; }
 [ -s "$out/cores/README.txt" ] || { echo "MISSING: cores/README.txt (the folder a user puts core packages in)" >&2; bad=1; }
-shipped=$(find "$root/Themes" -name '*.chimeraTheme.json' | wc -l)
+shipped=$(find "$root/themes" -name '*.chimeraTheme.json' | wc -l)
 bundled=$(find "$out/themes" -name '*.chimeraTheme.json' | wc -l)
 [ "$shipped" -gt 0 ] && [ "$bundled" -eq "$shipped" ] || { echo "MISSING: themes/ has $bundled of the $shipped themes in the repository" >&2; bad=1; }
 shipped=$(find "$root/languages" -name '*.json' | wc -l)

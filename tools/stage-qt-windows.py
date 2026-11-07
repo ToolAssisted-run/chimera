@@ -76,7 +76,7 @@ for p in ("qico.dll", "qjpeg.dll", "qgif.dll"):
     shutil.copy2(f"{qt}/plugins/imageformats/{p}", f"{lib}/imageformats")
 # the themes Chimera ships, in the place Chimera keeps them: beside the program
 here = os.path.dirname(os.path.abspath(__file__))
-shutil.copytree(os.path.join(here, "..", "Themes"), f"{out}/themes")
+shutil.copytree(os.path.join(here, "..", "themes"), f"{out}/themes")
 # the folder the window reads core packages from, empty but for what it is for:
 # Chimera ships no core and downloads none (docs/core-manager.md); the words are
 # the Linux folder's too (cores-README.txt), with Windows' line ends

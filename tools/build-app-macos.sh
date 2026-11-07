@@ -77,7 +77,7 @@ done
 # Chimera's libraries, with the language tables the engine reads beside itself
 for f in "$dll"/*.dylib; do cp "$f" "$app/Frameworks/"; done
 cp -R "$dll/languages" "$app/Frameworks/languages"
-cp -R "$root/Themes" "$app/MacOS/themes"
+cp -R "$root/themes" "$app/MacOS/themes"
 # the folders a person fills - cores, Firmware, Movies, settings.json - are in
 # ~/Library/Application Support/Chimera, not in the app, which is signed
 cp "$root/tools/cores-README.txt" "$app/Resources/Cores-README.txt"

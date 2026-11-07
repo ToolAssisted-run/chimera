@@ -9,7 +9,7 @@ Emulation cores are separate projects with their own authors and licenses; each 
 
 ## Themes
 
-The sixty colour themes in [Themes](Themes) were made by **Nelson/Geferulf**, who gave them to the project to ship with Chimera.
+The sixty colour themes in [themes](themes) were made by **Nelson/Geferulf**, who gave them to the project to ship with Chimera.
 
 ## BizHawk
 
