@@ -45,7 +45,8 @@ out, as Ikemen GO leaves out the Intel Mac.
 - **Some cores have an aarch64 package.** FreeJ2ME was the first official
   core to publish both (its Nightly 2026-11-07, issue 536). Since 2026-11-07
   these emulator cores are built and tested on an aarch64 runner too, and
-  their nightlies carry both packages: AppleWin, Cadmium, DOSBox-X,
+  their nightlies carry both packages: 86Box (without its recompiler on
+  aarch64), AppleWin, Cadmium, DOSBox-X,
   FBNeo, Fuse, Gambatte, Genesis Plus GX, Mednafen, Mesen, NesHawk, Opera,
   PUAE, QuickerNES, Snes9x, Stella, TIC-80, Uzem, VICE, Virtual Jaguar,
   ZEsarUX and OpenBOR, and the game cores dsda, RSDKv3, RSDKv5 and RSDKv5U.
