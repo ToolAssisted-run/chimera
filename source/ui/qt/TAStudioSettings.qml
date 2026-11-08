@@ -57,6 +57,7 @@ ApplicationWindow {
     property int rewindStep
     property int rewindStepFast
     property bool markersKeepStates
+    property bool markerFramesInGreenzone
     property string patternMode
     property string patternKind
     // each control's pattern: {name: {runs: [{v, n}], loop, skipLag, button, min, max, neutral, text}}
@@ -75,6 +76,7 @@ ApplicationWindow {
         win.branchPreviewSide = b.previewSide; win.oldBranches = b.oldControlScheme; win.copyFrameNumbers = r.copyFrameNumbers
         win.maxUndo = r.maxUndoSteps; win.rewindStep = s.rewindStep; win.rewindStepFast = s.rewindStepFast
         win.markersKeepStates = r.markersKeepStates; win.patternMode = r.patternMode; win.patternKind = r.patternKind
+        win.markerFramesInGreenzone = s.markerFramesInGreenzone
         win.patterns = {}
         win.readPatterns()
         tabs.currentIndex = 0
@@ -132,6 +134,7 @@ ApplicationWindow {
         b.loadOnDoubleClick = win.branchDoubleClick; b.previewSide = win.branchPreviewSide; b.oldControlScheme = win.oldBranches
         r.copyFrameNumbers = win.copyFrameNumbers; r.maxUndoSteps = win.maxUndo
         s.rewindStep = win.rewindStep; s.rewindStepFast = win.rewindStepFast; r.markersKeepStates = win.markersKeepStates
+        s.markerFramesInGreenzone = win.markerFramesInGreenzone
         r.patternMode = win.patternMode; r.patternKind = win.patternKind
         win.close()
     }
@@ -447,6 +450,8 @@ ApplicationWindow {
                 Check { text: qsTrId("tastudio_settings.load_branch_by_double_clicking"); checked: win.branchDoubleClick; onToggled: win.branchDoubleClick = checked }
                 Check { text: qsTrId("tastudio_settings.old_control_scheme_for_branches"); checked: win.oldBranches; onToggled: win.oldBranches = checked }
                 Check { text: qsTrId("tastudio_settings.markers_keep_states_by_default"); checked: win.markersKeepStates; onToggled: win.markersKeepStates = checked }
+                // every marker's frame in the greenzone, whatever its period (owner, 2026-11-08)
+                Check { objectName: "markerFramesInGreenzone"; text: qsTrId("tastudio_settings.keep_every_marker_s_frame_in_the"); checked: win.markerFramesInGreenzone; onToggled: win.markerFramesInGreenzone = checked }
                 RowLayout {
                     Label { text: qsTrId("tastudio_settings.branch_screenshot_size_pixels") }
                     NumberBox {

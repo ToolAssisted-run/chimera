@@ -14244,3 +14244,22 @@ could already type a filter into the command; this puts it beside the size.
 - **Tested.** The view models' encode test writes the synthetic core's 30
   frames (60 a second) at 120: the file holds between 58 and 62 frames;
   without `-r` it held 30 and failed. A rate over 240 is taken as 240.
+
+## A marker's frame is always kept in the greenzone (user-decided, 2026-11-08)
+
+The owner: marker frames should always be saved into the greenzone unless
+the greenzone is off, as a setting on by default. A marker's state was only
+kept if the greenzone happened to store that frame: with "Every 20 frames" a
+marker at frame 33 had no state, and a seek there replayed from 20.
+
+- The engine stores a pinned frame whatever the period or the near band's
+  stride (`StateHistory::capture`); eviction already never removed one.
+- TAStudio Settings has "Keep every marker's frame in the greenzone" (the
+  session's `markerFramesInGreenzone`, on at first, remembered): every
+  marker is pinned; off, each marker's own "keeps its state" decides.
+- **Tested.** The engine test stores every 20th frame with frame 33 pinned:
+  33 is stored and restores to 33's machine, and unpinned it is not; with
+  the change taken out it failed. The view models' test plays 60 frames at
+  every 20 with a marker at 33 that keeps no state of its own: a seek to 34
+  replays 1 frame with the setting on (5 states held) and 20 with it off (4);
+  with the setting ignored, both replayed 20 and it failed.

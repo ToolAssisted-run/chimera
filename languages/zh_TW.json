@@ -2515,6 +2515,7 @@
 		"tastudio_settings.loop_to": "循環至：%1",
 		"tastudio_settings.marker": "標記",
 		"tastudio_settings.marker_run_start_last_input_end": "標記（執行開始 / 最後輸入 / 結束）",
+		"tastudio_settings.keep_every_marker_s_frame_in_the": "在綠區中保留每個標記的影格",
 		"tastudio_settings.markers_keep_states_by_default": "標記預設保留狀態",
 		"tastudio_settings.max_undo_count": "最大復原次數：",
 		"tastudio_settings.misc": "其他",

@@ -2041,8 +2041,10 @@ void StateHistory::captureOnce(int64_t frame, const uint8_t *note, size_t noteLe
 	 * stays open and the delta at the next multiple describes them all. An
 	 * epoch that cannot continue the stretch is left to the multiple as well,
 	 * which then stores an anchor. The first frame after the history was off
-	 * is stored wherever it falls. */
-	if (m_capturePeriod > 1 && !m_storeNext && frame % m_capturePeriod != 0) return;
+	 * is stored wherever it falls, and so is a pinned frame (a marker's): it
+	 * is kept in the greenzone whatever the period (owner, 2026-11-08). */
+	const bool pinnedHere = m_pinned.count(frame) != 0;
+	if (m_capturePeriod > 1 && !m_storeNext && !pinnedHere && frame % m_capturePeriod != 0) return;
 	m_storeNext = false;
 
 	/* A frame the near band's stride skips is not stored at all: the epoch
@@ -2050,7 +2052,7 @@ void StateHistory::captureOnce(int64_t frame, const uint8_t *note, size_t noteLe
 	 * invalidation above has already happened, which is what matters - a
 	 * timeline that no longer happens must go whether or not this frame is
 	 * kept. */
-	if (m_epochOpen && m_capturePeriod == 1 && m_nearStride > 1 && !m_segments.empty()
+	if (m_epochOpen && m_capturePeriod == 1 && m_nearStride > 1 && !pinnedHere && !m_segments.empty()
 		&& !m_segments.back().spilled
 		&& m_epochFrame == m_segments.back().lastFrame()
 		&& m_segments.back().lastFrame() < frame

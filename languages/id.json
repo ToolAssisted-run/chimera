@@ -2515,6 +2515,7 @@
 		"tastudio_settings.loop_to": "Ulang ke: %1",
 		"tastudio_settings.marker": "Penanda",
 		"tastudio_settings.marker_run_start_last_input_end": "Penanda (awal jalan / input terakhir / akhir)",
+		"tastudio_settings.keep_every_marker_s_frame_in_the": "Simpan bingkai setiap penanda di greenzone",
 		"tastudio_settings.markers_keep_states_by_default": "Penanda menyimpan state secara bawaan",
 		"tastudio_settings.max_undo_count": "Jumlah Batalkan Maks.:",
 		"tastudio_settings.misc": "Lain-lain",

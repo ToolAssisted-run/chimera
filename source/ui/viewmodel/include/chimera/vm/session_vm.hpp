@@ -268,6 +268,10 @@ public:
 	 * holds is gone to at once and the rest is played at the machine's own
 	 * speed, every frame drawn, stopping on the frame */
 	Property<bool> turboSeek{false};
+	/* every marker's frame kept in the greenzone, whatever the greenzone's
+	 * period, unless it is off; off, each marker's own "keeps its state"
+	 * decides (owner, 2026-11-08) */
+	Property<bool> markerFramesInGreenzone{true};
 	/* rewind or turbo held */
 	Property<bool> rewinding{false}, turbo{false};
 	/* the machine's drives, for the status bar's lights, as Chimera's: a JSON array
@@ -1198,12 +1202,13 @@ private:
 	std::atomic<int64_t> speedM_{100}, volumeM_{100}, fastSpeedM_{400}, fastDrawM_{3};
 	std::atomic<bool> soundNormalOnM_{true}, soundFastOnM_{true}, muteAdvanceM_{true}, steppingM_{false};
 	std::atomic<bool> recordingM_{false};
+	std::atomic<bool> markerFramesM_{true};
 	std::atomic<int64_t> fastVolumeM_{50}, budgetMbM_{4096}, nearStrideM_{4}, pictureSettleM_{3};
 	/* a project's own budgets, from budgets.json in its cache folder: 0 for none */
 	void readBudgetsOnMachine(ce_project *p, int64_t &memoryMb, int64_t &nearStride) const;
 	/* the budgets applied to the machine open: making its history when opening, else changing it (issue 543) */
 	void applyBudgetsOnMachine(ce_session *s, bool opening);
-	Connection budgetWatch_, strideWatch_, settleWatch_;
+	Connection budgetWatch_, strideWatch_, settleWatch_, markerFramesWatch_;
 	std::string soundDeviceM_, compileRootM_;
 	bool traceOnM_ = false;
 	TraceSink traceSink_;

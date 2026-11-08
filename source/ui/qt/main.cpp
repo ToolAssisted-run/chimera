@@ -1033,6 +1033,7 @@ int main(int argc, char **argv)
 	qt::QmlViewModel hostInputQml(hostInput);
 	config.keep(session, "autoRestore");
 	config.keep(session, "turboSeek");
+	config.keep(session, "markerFramesInGreenzone");
 	config.keep(pianoRoll, "mainSplit");
 	config.keep(pianoRoll, "sideSplit");
 	config.keep(session, "throttle");

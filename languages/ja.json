@@ -2515,6 +2515,7 @@
 		"tastudio_settings.loop_to": "ループ先: %1",
 		"tastudio_settings.marker": "マーカー",
 		"tastudio_settings.marker_run_start_last_input_end": "マーカー (プレイ開始 / 最後の入力 / 終了)",
+		"tastudio_settings.keep_every_marker_s_frame_in_the": "すべてのマーカーのフレームをグリーンゾーンに保持する",
 		"tastudio_settings.markers_keep_states_by_default": "マーカーは既定でステートを保持する",
 		"tastudio_settings.max_undo_count": "元に戻すの最大回数:",
 		"tastudio_settings.misc": "その他",

@@ -2558,6 +2558,7 @@
 		"tastudio_settings.loop_to": "Løkke til: %1",
 		"tastudio_settings.marker": "Markør",
 		"tastudio_settings.marker_run_start_last_input_end": "Markør (kørslens start / sidste input / slut)",
+		"tastudio_settings.keep_every_marker_s_frame_in_the": "Behold hver markørs billede i greenzone",
 		"tastudio_settings.markers_keep_states_by_default": "Markører gemmer tilstande som standard",
 		"tastudio_settings.max_undo_count": "Højeste antal fortrydelser:",
 		"tastudio_settings.misc": "Diverse",

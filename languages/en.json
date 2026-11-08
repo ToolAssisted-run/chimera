@@ -2558,6 +2558,7 @@
 		"tastudio_settings.loop_to": "Loop to: %1",
 		"tastudio_settings.marker": "Marker",
 		"tastudio_settings.marker_run_start_last_input_end": "Marker (run start / last input / end)",
+		"tastudio_settings.keep_every_marker_s_frame_in_the": "Keep every marker's frame in the greenzone",
 		"tastudio_settings.markers_keep_states_by_default": "Markers keep states by default",
 		"tastudio_settings.max_undo_count": "Max Undo Count:",
 		"tastudio_settings.misc": "Misc",

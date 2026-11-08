@@ -796,6 +796,12 @@ SessionViewModel::SessionViewModel(Dispatcher &dispatcher, InputLog &inputs)
 	expose("autoRestore", "after an edit before the current frame, run on to where the machine was", autoRestore, true);
 	expose("rewinding", "rewind is held: the machine goes back (Chimera's client.is_rewinding)", rewinding);
 	expose("turbo", "turbo is held (Chimera's client.isturbo)", turbo);
+	expose("markerFramesInGreenzone", "every marker's frame is kept in the greenzone, whatever its period (unless it is off); "
+		"off, each marker's own keep-its-state decides", markerFramesInGreenzone, true);
+	markerFramesWatch_ = markerFramesInGreenzone.changed.connect([this] {
+		markerFramesM_ = markerFramesInGreenzone.get();
+		submit([this] { pinMarkersOnMachine(); });
+	});
 	expose("turboSeek", "TAStudio's Turbo seek: a seek goes to its frame at once; off, past what the greenzone holds it "
 		"plays there at the machine's own speed", turboSeek, true);
 	expose("seekingTo", "the frame a seek that plays is going to, -1 when none is", seekingTo);
@@ -4015,7 +4021,7 @@ void SessionViewModel::pinMarkersOnMachine()
 	if (s_ == nullptr) return;
 	ce_session_greenzone_unpin_all(s_);
 	for (const Marker &m : markersM_)
-		if (m.keepState) ce_session_greenzone_pin(s_, m.frame, 1);
+		if (m.keepState || markerFramesM_) ce_session_greenzone_pin(s_, m.frame, 1);
 	/* the run's own want their states, as Chimera's markers do unless told not to */
 	for (int64_t f : runMarkersM_) ce_session_greenzone_pin(s_, f, 1);
 }

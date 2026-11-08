@@ -2601,6 +2601,7 @@
 		"tastudio_settings.loop_to": "Зациклити до: %1",
 		"tastudio_settings.marker": "Позначка",
 		"tastudio_settings.marker_run_start_last_input_end": "Позначка (початок ходу / останнє введення / кінець)",
+		"tastudio_settings.keep_every_marker_s_frame_in_the": "Зберігати кадр кожного маркера в Greenzone",
 		"tastudio_settings.markers_keep_states_by_default": "Позначки типово зберігають стани",
 		"tastudio_settings.max_undo_count": "Максимальна кількість скасувань:",
 		"tastudio_settings.misc": "Різне",

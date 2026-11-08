@@ -2601,6 +2601,7 @@
 		"tastudio_settings.loop_to": "Buclă până la: %1",
 		"tastudio_settings.marker": "Marcaj",
 		"tastudio_settings.marker_run_start_last_input_end": "Marcaj (început de rulare / ultima intrare / sfârșit)",
+		"tastudio_settings.keep_every_marker_s_frame_in_the": "Păstrează cadrul fiecărui marcaj în greenzone",
 		"tastudio_settings.markers_keep_states_by_default": "Marcajele păstrează stările implicit",
 		"tastudio_settings.max_undo_count": "Număr maxim de anulări:",
 		"tastudio_settings.misc": "Diverse",

@@ -2558,6 +2558,7 @@
 		"tastudio_settings.loop_to": "Silmukka kohtaan: %1",
 		"tastudio_settings.marker": "Merkki",
 		"tastudio_settings.marker_run_start_last_input_end": "Merkki (ajon alku / viimeinen syöte / loppu)",
+		"tastudio_settings.keep_every_marker_s_frame_in_the": "Säilytä jokaisen merkin ruutu vihreällä vyöhykkeellä",
 		"tastudio_settings.markers_keep_states_by_default": "Merkit säilyttävät tilat oletuksena",
 		"tastudio_settings.max_undo_count": "Kumoamisten enimmäismäärä:",
 		"tastudio_settings.misc": "Muut",

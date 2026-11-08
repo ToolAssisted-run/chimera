@@ -2515,6 +2515,7 @@
 		"tastudio_settings.loop_to": "반복 위치: %1",
 		"tastudio_settings.marker": "마커",
 		"tastudio_settings.marker_run_start_last_input_end": "마커 (실행 시작 / 마지막 입력 / 끝)",
+		"tastudio_settings.keep_every_marker_s_frame_in_the": "모든 마커의 프레임을 그린존에 유지",
 		"tastudio_settings.markers_keep_states_by_default": "마커는 기본적으로 상태를 보관",
 		"tastudio_settings.max_undo_count": "실행 취소 최대 횟수:",
 		"tastudio_settings.misc": "기타",

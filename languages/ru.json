@@ -2601,6 +2601,7 @@
 		"tastudio_settings.loop_to": "Зациклить до: %1",
 		"tastudio_settings.marker": "Маркер",
 		"tastudio_settings.marker_run_start_last_input_end": "Маркер (начало прогона / последний ввод / конец)",
+		"tastudio_settings.keep_every_marker_s_frame_in_the": "Хранить кадр каждого маркера в зелёной зоне",
 		"tastudio_settings.markers_keep_states_by_default": "Маркеры по умолчанию сохраняют состояния",
 		"tastudio_settings.max_undo_count": "Максимум отмен:",
 		"tastudio_settings.misc": "Прочее",

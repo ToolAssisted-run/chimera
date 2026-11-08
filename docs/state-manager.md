@@ -359,6 +359,16 @@ from 59 ms to 3 on the N64 and from 54 ms to 2 on the Game Boy. That the two
 were the same number before, with deltas four times apart in size, was the
 whole diagnosis.
 
+## A marker's frame is always in the greenzone (user-decided, 2026-11-08)
+
+A pinned frame (a marker's) is stored whatever the greenzone's period ("every
+N frames") or the near band's stride; before, a pin only kept a state that
+happened to be stored, and with the greenzone every 20 frames a marker at 33
+had none. Off (period 0) nothing is stored, pins included. TAStudio
+Settings' "Keep every marker's frame in the greenzone" (on at first,
+remembered) pins every marker; off, each marker's own "keeps its state"
+decides, as before.
+
 ## The policy: everything until the budget is full, then a doubling shape (user-decided, 2026-09-15)
 
 Editing a movie is local, and rewinds are not: somebody working near the end

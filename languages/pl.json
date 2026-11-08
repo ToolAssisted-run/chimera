@@ -2601,6 +2601,7 @@
 		"tastudio_settings.loop_to": "Zapętl do: %1",
 		"tastudio_settings.marker": "Znacznik",
 		"tastudio_settings.marker_run_start_last_input_end": "Znacznik (start przebiegu / ostatnie wejście / koniec)",
+		"tastudio_settings.keep_every_marker_s_frame_in_the": "Zachowuj klatkę każdego znacznika w greenzone",
 		"tastudio_settings.markers_keep_states_by_default": "Znaczniki domyślnie zachowują stany",
 		"tastudio_settings.max_undo_count": "Maks. liczba cofnięć:",
 		"tastudio_settings.misc": "Różne",

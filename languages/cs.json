@@ -2601,6 +2601,7 @@
 		"tastudio_settings.loop_to": "Smyčka na: %1",
 		"tastudio_settings.marker": "Značka",
 		"tastudio_settings.marker_run_start_last_input_end": "Značka (začátek běhu / poslední vstup / konec)",
+		"tastudio_settings.keep_every_marker_s_frame_in_the": "Uchovávat snímek každé značky v greenzone",
 		"tastudio_settings.markers_keep_states_by_default": "Značky ve výchozím stavu ponechávají stavy",
 		"tastudio_settings.max_undo_count": "Maximální počet kroků zpět:",
 		"tastudio_settings.misc": "Různé",

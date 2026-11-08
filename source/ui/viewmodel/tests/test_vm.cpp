@@ -10356,6 +10356,44 @@ bool coreManager(const char *package, const char *slotsPackage, const char *game
  * to a button past the 64th is recorded into the movie, the piano roll shows
  * its cell and edits it, the movie's line has it, and a script's hold and
  * autohold reach it, as for any other button. All of it stopped at the 64th. */
+/* Every marker's frame is kept in the greenzone, whatever its period, while
+ * the setting is on (owner, 2026-11-08): with the greenzone storing every
+ * 20th frame and a marker at 33 that keeps no state of its own, a seek back
+ * to 33 replays from 33's own state with the setting on, and from 20's with
+ * it off */
+bool markerFrames(const char *package, const char *rom)
+{
+	const int before = failures;
+	int64_t replayed[2] = {-1, -1};
+	for (int on = 0; on < 2; on++)
+	{
+		ManualDispatcher d;
+		InputLog inputs;
+		SessionViewModel session(d, inputs);
+		PianoRollViewModel roll(d, inputs, session);
+		std::string error;
+		session.markerFramesInGreenzone.set(on == 1);
+		roll.markersKeepStates.set(false);
+		openGame(session, package, std::string(rom), error);
+		CHECK(d.until([&] { return session.isOpen.get(); }, 60));
+		/* after the open: a project opens on its own period (1 when it has none) */
+		session.greenzonePeriod.set(20);
+		d.until([] { return false; }, 0.1);
+		CHECK(roll.run("addMarker", {int64_t{33}, std::string("kept")}, error).has_value());
+		for (int i = 0; i < 60; i++) session.run("frameAdvance", {}, error);
+		CHECK(d.until([&] { return session.frame.get() == 60; }, 30));
+		session.run("seek", {int64_t{34}}, error);
+		CHECK(d.until([&] { return session.frame.get() == 34; }, 30));
+		d.until([] { return false; }, 0.1);
+		replayed[on] = session.lastSeekFrames.get();
+		std::printf("marker frames %s: a seek to 34 replayed %lld frames\n", on ? "kept" : "not kept", static_cast<long long>(replayed[on]));
+		session.run("close", {}, error);
+		CHECK(d.until([&] { return !session.isOpen.get(); }, 20));
+	}
+	CHECK(replayed[0] >= 10 && replayed[1] >= 0 && replayed[1] <= 2);   /* measured: 20 and 1 */
+	return failures == before;
+}
+
 /* A package that names the controls TAStudio shows at first (issue 544):
  * a project with no piano roll of its own hides every other control, and a
  * package that names none keeps Chimera's rule, which hides none of the
@@ -10904,6 +10942,7 @@ int main(int argc, char **argv)
 			if (argc >= 15) ranMachine = soundRate(argv[14], argv[2]) && ranMachine;
 			if (argc >= 16) ranMachine = wideButtons(argv[15], argv[2]) && ranMachine;
 			if (argc >= 17) ranMachine = shownColumns(argv[16], argv[1], argv[2]) && ranMachine;
+			ranMachine = markerFrames(argv[1], argv[2]) && ranMachine;
 			ranMachine = listsWhilePlaying(argv[1], argv[2]) && ranMachine;
 			if (argc >= 9) ranMachine = coreManager(argv[1], argv[6], argv[8]) && ranMachine;
 		}

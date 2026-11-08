@@ -514,6 +514,42 @@ int main(void)
 		assert(h.count() < kFrames / 2);            /* it really did thin */
 		assert(h.bytes() <= budget);                /* and the budget is met at the end */
 	}
+	{ // A pinned frame (a marker's) is stored whatever the period or the near
+	  // band's stride (owner, 2026-11-08): a history storing every 20th frame
+	  // stores frame 33 because it is pinned, and the machine restored there
+	  // is frame 33's; with no pin, 33 is not stored. Off (period 0), nothing.
+		const chimera::HostApi api = fakeHost();
+		for (int pass = 0; pass < 3; pass++)
+		{
+			g_machine = Machine{};
+			History h;
+			h.helpers(false);
+			h.configure(&api, nullptr, 64ull << 20);
+			if (pass == 2) { h.capturePeriod(1); h.maxNearStride(8); }
+			else h.capturePeriod(20);
+			if (pass != 1) h.pin(33, true);
+			std::vector<std::array<uint8_t, Machine::kCells>> truth(1);
+			std::memcpy(truth[0].data(), g_machine.cell, Machine::kCells);
+			h.capture(0);
+			for (int64_t f = 1; f <= 60; f++)
+			{
+				h.beforeAdvance();
+				advance(f);
+				std::array<uint8_t, Machine::kCells> at{};
+				std::memcpy(at.data(), g_machine.cell, Machine::kCells);
+				truth.push_back(at);
+				h.capture(f);
+			}
+			if (pass == 1)
+			{
+				assert(h.nearest(33) == 20);
+				continue;
+			}
+			assert(h.nearest(33) == 33);
+			assert(h.restore(33, error));
+			assert(std::memcmp(g_machine.cell, truth[33].data(), Machine::kCells) == 0);
+		}
+	}
 	{ // A budget changed while the history runs (issue 543): it keeps what
 	  // it holds, a smaller one thins it down to the new budget at once
 	  // (frame 0 and the frontier kept), and a larger one lets it keep every
