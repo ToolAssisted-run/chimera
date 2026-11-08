@@ -552,8 +552,10 @@ foreach engine_test : ['sha1', 'movie_log', 'movie_entry', 'control_names', 'sta
     ),
     # (the state container test finds libzstd the way the shipped library
     # does: beside its own binary, which in the build dir it is)
-    # RAM search takes 9 s here and 28 to 30 s on a CI runner
-    timeout: engine_test == 'ram_search' ? 120 : 30,
+    # RAM search takes 9 s here and 28 to 30 s on a CI runner; the state
+    # history, which writes and removes many spill files, 5 s here and 13 s
+    # on GitHub's Windows runner, where it once ran past 30 s (2026-11-08)
+    timeout: engine_test in ['ram_search', 'state_history'] ? 120 : 30,
   )
 endforeach
 
