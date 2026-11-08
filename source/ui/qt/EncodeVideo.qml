@@ -24,9 +24,9 @@ ApplicationWindow {
     property var themeColor: (role, fallback) => fallback
     title: qsTrId("encode_video.encode_video")
     width: 600
-    height: 440
+    height: 470
     minimumWidth: 600
-    minimumHeight: 420
+    minimumHeight: 450
     flags: Qt.Window | Qt.WindowTitleHint | Qt.WindowSystemMenuHint | Qt.WindowMinimizeButtonHint | Qt.WindowCloseButtonHint
     property Window mainWindow: null
     transientParent: win.mainWindow
@@ -168,6 +168,14 @@ ApplicationWindow {
                      onClicked: win.vm.run("currentSize", [win.picture ? win.picture.pictureWidth : 0, win.picture ? win.picture.pictureHeight : 0, win.pictureScale]) }
             Label { text: win.writtenWidth > 0 ? qsTrId("encode_video.now_x").arg(win.writtenWidth).arg(win.writtenHeight) : "" }
             CheckBox { text: qsTrId("encode_video.pad"); checked: win.vm.pad; enabled: win.vm.resize; onToggled: win.vm.pad = checked }
+        }
+        // the video at a frame rate of its own: the game's frames repeated to
+        // keep to it, so a 35 frames-a-second game at 60 keeps every frame (issue 547)
+        RowLayout {
+            enabled: !win.running
+            CheckBox { objectName: "frameRateBox"; text: qsTrId("encode_video.frame_rate_to"); checked: win.vm.changeFrameRate; onToggled: win.vm.changeFrameRate = checked }
+            SpinBox { from: 1; to: 240; editable: true; value: win.vm.frameRate; enabled: win.vm.changeFrameRate; onValueModified: win.vm.frameRate = value; Layout.preferredWidth: 100 }
+            Label { text: qsTrId("encode_video.frames_a_second") }
         }
         RowLayout {
             CheckBox { text: qsTrId("encode_video.sync_to_audio"); enabled: !win.running; checked: win.vm.audioSync; onToggled: win.vm.audioSync = checked }

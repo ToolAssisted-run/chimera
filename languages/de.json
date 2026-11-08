@@ -545,6 +545,8 @@
 		"encode_video.current_size": "Aktuelle Größe",
 		"encode_video.encode_video": "Video kodieren",
 		"encode_video.ffmpeg_command": "FFmpeg-Befehl:",
+		"encode_video.frame_rate_to": "Bildrate auf",
+		"encode_video.frames_a_second": "Bilder pro Sekunde",
 		"encode_video.frames_to_frames": "Frames %1 bis %2 (%3 Frames)",
 		"encode_video.from_marker": "Ab Marker:",
 		"encode_video.is_no_longer_there": "%1 ist nicht mehr da.",

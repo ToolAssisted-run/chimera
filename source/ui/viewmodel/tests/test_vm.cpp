@@ -9768,8 +9768,22 @@ bool encodeVideo(const char *package, const char *rom)
 	CHECK(encoder.run("start", {}, error).has_value());
 	CHECK(d.until([&] { return encoder.phase.get() != "encoding"; }, 120));
 	CHECK(encoder.phase.get() == "done" && framesIn(dir / "sized.mkv") == 30);
-	/* Capture OSD takes Capture Lua with it, and Capture Lua off takes the OSD, as Chimera's boxes */
+	/* a frame rate of its own (issue 547): the 30 frames of the 60 a second
+	 * game at 120 are half a second of 120, each frame there twice */
 	encoder.resize.set(false);
+	encoder.frameRate.set(500);
+	CHECK(encoder.frameRate.get() == 240);
+	encoder.frameRate.set(120);
+	encoder.changeFrameRate.set(true);
+	encoder.output.set((dir / "rate.mkv").string());
+	CHECK(encoder.run("start", {}, error).has_value());
+	CHECK(d.until([&] { return encoder.phase.get() != "encoding"; }, 120));
+	{
+		const int64_t n = framesIn(dir / "rate.mkv");
+		CHECK(encoder.phase.get() == "done" && n >= 58 && n <= 62);
+	}
+	encoder.changeFrameRate.set(false);
+	/* Capture OSD takes Capture Lua with it, and Capture Lua off takes the OSD, as Chimera's boxes */
 	encoder.captureOsd.set(true);
 	CHECK(encoder.captureLua.get());
 	encoder.captureLua.set(false);

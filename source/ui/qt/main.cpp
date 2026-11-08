@@ -1026,7 +1026,7 @@ int main(int argc, char **argv)
 	/* Chimera's Encode Video, with the ffmpeg the bundle keeps beside the program;
 	 * its choices kept, as Chimera keeps them in its config */
 	vm::EncoderViewModel encoder(dispatcher, session, QCoreApplication::applicationDirPath().toStdString());
-	for (const char *name : {"command", "audioSync", "resize", "width", "height", "pad", "captureOsd", "captureLua"}) config.keep(encoder, name);
+	for (const char *name : {"command", "audioSync", "resize", "width", "height", "pad", "changeFrameRate", "frameRate", "captureOsd", "captureLua"}) config.keep(encoder, name);
 	qt::QmlViewModel encoderQml(encoder);
 	/* the person's own keys, pads and pointer, for Lua's input library */
 	vm::HostInputViewModel hostInput(dispatcher, session);

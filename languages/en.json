@@ -545,6 +545,8 @@
 		"encode_video.current_size": "Current size",
 		"encode_video.encode_video": "Encode Video",
 		"encode_video.ffmpeg_command": "FFmpeg Command:",
+		"encode_video.frame_rate_to": "Frame rate to",
+		"encode_video.frames_a_second": "frames a second",
 		"encode_video.frames_to_frames": "frames %1 to %2 (%3 frames)",
 		"encode_video.from_marker": "From marker:",
 		"encode_video.is_no_longer_there": "%1 is no longer there.",

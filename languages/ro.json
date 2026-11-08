@@ -560,6 +560,8 @@
 		"encode_video.current_size": "Dimensiunea actuală",
 		"encode_video.encode_video": "Codifică video",
 		"encode_video.ffmpeg_command": "Comanda FFmpeg:",
+		"encode_video.frame_rate_to": "Frecvența cadrelor la",
+		"encode_video.frames_a_second": "cadre pe secundă",
 		"encode_video.frames_to_frames": "cadrele %1 până la %2 (%3 cadre)",
 		"encode_video.from_marker": "De la marcaj:",
 		"encode_video.is_no_longer_there": "%1 nu mai există acolo.",

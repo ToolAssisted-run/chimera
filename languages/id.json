@@ -530,6 +530,8 @@
 		"encode_video.current_size": "Ukuran sekarang",
 		"encode_video.encode_video": "Encode Video",
 		"encode_video.ffmpeg_command": "Perintah FFmpeg:",
+		"encode_video.frame_rate_to": "Laju bingkai ke",
+		"encode_video.frames_a_second": "bingkai per detik",
 		"encode_video.frames_to_frames": "frame %1 sampai %2 (%3 frame)",
 		"encode_video.from_marker": "Dari penanda:",
 		"encode_video.is_no_longer_there": "%1 sudah tidak ada di sana.",

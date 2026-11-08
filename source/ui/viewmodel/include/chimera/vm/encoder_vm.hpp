@@ -51,6 +51,10 @@ public:
 	Property<std::string> output, commandLine{kDefaultCommand}, preset;
 	Property<int64_t> fromFrame{0}, toFrame{0};
 	Property<bool> resize{false}, pad{false}, audioSync{true};
+	/* the video's frame rate set by hand (issue 547): frames
+	 * repeated to reach it, every frame of the game kept */
+	Property<bool> changeFrameRate{false};
+	Property<int64_t> frameRate{60};
 	Property<int64_t> width{0}, height{0};
 	/* Chimera's Capture OSD and Capture Lua: what is drawn over the picture
 	 * is in the video too - the counters and messages with what scripts draw
@@ -76,7 +80,7 @@ public:
 
 private:
 	/* the OSD is drawn over what scripts draw, so it is not had without it (Chimera's two boxes) */
-	Connection osdTakesLua_, luaOffTakesOsd_;
+	Connection osdTakesLua_, luaOffTakesOsd_, rateWatch_;
 	class PresetRows : public RowModel
 	{
 	public:

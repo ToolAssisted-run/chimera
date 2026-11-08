@@ -31,6 +31,10 @@ wrongly was a file that looked plausible and was not what you asked for.
   or scale to it, whether to sync to audio, and whether the OSD and the Lua
   layer are in shot - the same settings the A/V writer has always read out of
   the config, written to the same place
+- **the frame rate**: the game's own, or one set by hand ("Frame rate to",
+  1 to 240 frames a second; issue 547). ffmpeg is given `-r` and repeats
+  frames to keep to it, so a 35 frames-a-second game written at 60 keeps
+  every frame where a 30 frames-a-second site would drop some
 
 Start Encode winds the run to the first marker, reproduces it as fast as the
 machine will go, writes each frame out, closes the file, and puts the emulator

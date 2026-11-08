@@ -560,6 +560,8 @@
 		"encode_video.current_size": "Obecny rozmiar",
 		"encode_video.encode_video": "Koduj wideo",
 		"encode_video.ffmpeg_command": "Polecenie FFmpeg:",
+		"encode_video.frame_rate_to": "Liczba klatek na",
+		"encode_video.frames_a_second": "klatek na sekundę",
 		"encode_video.frames_to_frames": "klatki %1 do %2 (%3 klatek)",
 		"encode_video.from_marker": "Od znacznika:",
 		"encode_video.is_no_longer_there": "%1 już tam nie ma.",

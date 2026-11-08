@@ -545,6 +545,8 @@
 		"encode_video.current_size": "Mida actual",
 		"encode_video.encode_video": "Codifica el vídeo",
 		"encode_video.ffmpeg_command": "Ordre de FFmpeg:",
+		"encode_video.frame_rate_to": "Freqüència d'imatges a",
+		"encode_video.frames_a_second": "imatges per segon",
 		"encode_video.frames_to_frames": "fotogrames del %1 al %2 (%3 fotogrames)",
 		"encode_video.from_marker": "Des del marcador:",
 		"encode_video.is_no_longer_there": "%1 ja no hi és.",

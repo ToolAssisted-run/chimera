@@ -545,6 +545,8 @@
 		"encode_video.current_size": "Nuvarande storlek",
 		"encode_video.encode_video": "Koda video",
 		"encode_video.ffmpeg_command": "FFmpeg-kommando:",
+		"encode_video.frame_rate_to": "Bildfrekvens till",
+		"encode_video.frames_a_second": "bilder per sekund",
 		"encode_video.frames_to_frames": "bildrutor %1 till %2 (%3 bildrutor)",
 		"encode_video.from_marker": "Från markering:",
 		"encode_video.is_no_longer_there": "%1 finns inte längre kvar.",

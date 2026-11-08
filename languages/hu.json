@@ -545,6 +545,8 @@
 		"encode_video.current_size": "Jelenlegi méret",
 		"encode_video.encode_video": "Videó kódolása",
 		"encode_video.ffmpeg_command": "FFmpeg-parancs:",
+		"encode_video.frame_rate_to": "Képkockasebesség",
+		"encode_video.frames_a_second": "képkocka másodpercenként",
 		"encode_video.frames_to_frames": "képkockák %1-től %2-ig (%3 képkocka)",
 		"encode_video.from_marker": "Jelölőtől:",
 		"encode_video.is_no_longer_there": "A(z) %1 már nincs ott.",

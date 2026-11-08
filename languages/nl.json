@@ -545,6 +545,8 @@
 		"encode_video.current_size": "Huidige grootte",
 		"encode_video.encode_video": "Video coderen",
 		"encode_video.ffmpeg_command": "FFmpeg-opdracht:",
+		"encode_video.frame_rate_to": "Beeldsnelheid naar",
+		"encode_video.frames_a_second": "beelden per seconde",
 		"encode_video.frames_to_frames": "frames %1 tot %2 (%3 frames)",
 		"encode_video.from_marker": "Vanaf markering:",
 		"encode_video.is_no_longer_there": "%1 is er niet meer.",

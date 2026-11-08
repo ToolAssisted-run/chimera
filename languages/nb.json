@@ -545,6 +545,8 @@
 		"encode_video.current_size": "Nåværende størrelse",
 		"encode_video.encode_video": "Kode video",
 		"encode_video.ffmpeg_command": "FFmpeg-kommando:",
+		"encode_video.frame_rate_to": "Bildefrekvens til",
+		"encode_video.frames_a_second": "bilder i sekundet",
 		"encode_video.frames_to_frames": "bilde %1 til %2 (%3 bilder)",
 		"encode_video.from_marker": "Fra markør:",
 		"encode_video.is_no_longer_there": "%1 finnes ikke lenger.",

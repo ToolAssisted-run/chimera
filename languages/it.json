@@ -545,6 +545,8 @@
 		"encode_video.current_size": "Dimensione attuale",
 		"encode_video.encode_video": "Codifica video",
 		"encode_video.ffmpeg_command": "Comando FFmpeg:",
+		"encode_video.frame_rate_to": "Frequenza dei fotogrammi a",
+		"encode_video.frames_a_second": "fotogrammi al secondo",
 		"encode_video.frames_to_frames": "fotogrammi da %1 a %2 (%3 fotogrammi)",
 		"encode_video.from_marker": "Dal marcatore:",
 		"encode_video.is_no_longer_there": "%1 non c'è più.",

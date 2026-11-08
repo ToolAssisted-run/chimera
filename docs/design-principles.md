@@ -14231,3 +14231,16 @@ saved piano roll still wins. The other choices were to drop the rule as well
   plain core hides none; with the list ignored it failed. test-packages on
   a copy that lists "P1 Strat" failed, and on one that lists "P1 Start"
   passed.
+
+## Encode Video can write a frame rate of its own (2026-11-08)
+
+Issue 547: a game at an uncommon rate (Doom's 35 frames a second) loses
+frames on a video site that converts it to 30. Encode Video has "Frame rate
+to [N] frames a second" (1 to 240, off at first, remembered, Restore Defaults
+turns it off): ffmpeg is given `-r N` after the input, and repeats frames to
+keep to that rate, so every frame of the game is in the video. The person
+could already type a filter into the command; this puts it beside the size.
+
+- **Tested.** The view models' encode test writes the synthetic core's 30
+  frames (60 a second) at 120: the file holds between 58 and 62 frames;
+  without `-r` it held 30 and failed. A rate over 240 is taken as 240.

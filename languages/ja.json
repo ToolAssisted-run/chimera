@@ -530,6 +530,8 @@
 		"encode_video.current_size": "現在のサイズ",
 		"encode_video.encode_video": "ビデオをエンコード",
 		"encode_video.ffmpeg_command": "FFmpeg コマンド:",
+		"encode_video.frame_rate_to": "フレームレート",
+		"encode_video.frames_a_second": "フレーム/秒",
 		"encode_video.frames_to_frames": "フレーム %1 から %2 (%3 フレーム)",
 		"encode_video.from_marker": "開始マーカー:",
 		"encode_video.is_no_longer_there": "%1 はもうありません。",

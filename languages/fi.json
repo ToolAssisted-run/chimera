@@ -545,6 +545,8 @@
 		"encode_video.current_size": "Nykyinen koko",
 		"encode_video.encode_video": "Koodaa video",
 		"encode_video.ffmpeg_command": "FFmpeg-komento:",
+		"encode_video.frame_rate_to": "Kuvataajuus",
+		"encode_video.frames_a_second": "kuvaa sekunnissa",
 		"encode_video.frames_to_frames": "kuvat %1 - %2 (%3 kuvaa)",
 		"encode_video.from_marker": "Merkistä:",
 		"encode_video.is_no_longer_there": "%1 ei ole enää siellä.",

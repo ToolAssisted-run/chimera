@@ -530,6 +530,8 @@
 		"encode_video.current_size": "当前大小",
 		"encode_video.encode_video": "编码视频",
 		"encode_video.ffmpeg_command": "FFmpeg 命令：",
+		"encode_video.frame_rate_to": "帧率改为",
+		"encode_video.frames_a_second": "帧/秒",
 		"encode_video.frames_to_frames": "第 %1 至 %2 帧（共 %3 帧）",
 		"encode_video.from_marker": "起始标记：",
 		"encode_video.is_no_longer_there": "%1 已经不在了。",

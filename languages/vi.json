@@ -530,6 +530,8 @@
 		"encode_video.current_size": "Kích thước hiện tại",
 		"encode_video.encode_video": "Mã hóa video",
 		"encode_video.ffmpeg_command": "Lệnh FFmpeg:",
+		"encode_video.frame_rate_to": "Tốc độ khung hình",
+		"encode_video.frames_a_second": "khung hình mỗi giây",
 		"encode_video.frames_to_frames": "khung hình từ %1 đến %2 (%3 khung hình)",
 		"encode_video.from_marker": "Từ dấu:",
 		"encode_video.is_no_longer_there": "%1 không còn ở đó nữa.",

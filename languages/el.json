@@ -545,6 +545,8 @@
 		"encode_video.current_size": "Τρέχον μέγεθος",
 		"encode_video.encode_video": "Κωδικοποίηση βίντεο",
 		"encode_video.ffmpeg_command": "Εντολή FFmpeg:",
+		"encode_video.frame_rate_to": "Ρυθμός καρέ σε",
+		"encode_video.frames_a_second": "καρέ ανά δευτερόλεπτο",
 		"encode_video.frames_to_frames": "καρέ %1 έως %2 (%3 καρέ)",
 		"encode_video.from_marker": "Από σήμανση:",
 		"encode_video.is_no_longer_there": "Το %1 δεν υπάρχει πια.",

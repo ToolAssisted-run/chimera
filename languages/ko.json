@@ -530,6 +530,8 @@
 		"encode_video.current_size": "현재 크기",
 		"encode_video.encode_video": "비디오 인코딩",
 		"encode_video.ffmpeg_command": "FFmpeg 명령:",
+		"encode_video.frame_rate_to": "프레임 속도",
+		"encode_video.frames_a_second": "초당 프레임",
 		"encode_video.frames_to_frames": "프레임 %1~%2 (%3프레임)",
 		"encode_video.from_marker": "시작 표시:",
 		"encode_video.is_no_longer_there": "%1이(가) 더 이상 없습니다.",

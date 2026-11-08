@@ -560,6 +560,8 @@
 		"encode_video.current_size": "Текущий размер",
 		"encode_video.encode_video": "Кодирование видео",
 		"encode_video.ffmpeg_command": "Команда FFmpeg:",
+		"encode_video.frame_rate_to": "Частота кадров",
+		"encode_video.frames_a_second": "кадров в секунду",
 		"encode_video.frames_to_frames": "кадры с %1 по %2 (%3 кадров)",
 		"encode_video.from_marker": "От метки:",
 		"encode_video.is_no_longer_there": "%1 больше нет.",

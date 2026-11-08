@@ -560,6 +560,8 @@
 		"encode_video.current_size": "Současná velikost",
 		"encode_video.encode_video": "Zakódovat video",
 		"encode_video.ffmpeg_command": "Příkaz FFmpeg:",
+		"encode_video.frame_rate_to": "Snímková frekvence na",
+		"encode_video.frames_a_second": "snímků za sekundu",
 		"encode_video.frames_to_frames": "snímky %1 až %2 (%3 snímků)",
 		"encode_video.from_marker": "Od značky:",
 		"encode_video.is_no_longer_there": "%1 už tam není.",

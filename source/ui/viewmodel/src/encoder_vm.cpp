@@ -87,6 +87,8 @@ struct EncoderViewModel::Job
 	std::string ffmpeg, base, ext, command;
 	int32_t outW = 0, outH = 0;
 	bool resize = false, pad = false, audioSync = true;
+	/* the frame rate asked for, 0 for the game's own */
+	int64_t rate = 0;
 	/* what is drawn over the picture, put in by the window (Capture OSD, Capture Lua) */
 	bool osd = false, lua = false;
 	std::function<void(std::vector<uint32_t> &, int32_t &, int32_t &, double, double, bool)> compose;
@@ -119,6 +121,9 @@ struct EncoderViewModel::Job
 	{
 		process = std::make_unique<Subprocess>();
 		std::vector<std::string> args = {"-y", "-f", "nut", "-i", "-"};
+		/* a rate asked for: ffmpeg repeats frames to keep to it, so a 35
+		 * frames-a-second game at 60 keeps every frame (issue 547) */
+		if (rate > 0) args.insert(args.end(), {"-r", std::to_string(rate)});
 		for (const std::string &word : splitCommandLine(command)) args.push_back(word);
 		args.push_back(fileName());
 		if (!process->start(ffmpeg, args, why)) return false;
@@ -309,6 +314,11 @@ EncoderViewModel::EncoderViewModel(Dispatcher &dispatcher, SessionViewModel &ses
 	expose("width", "that size's width", width, true);
 	expose("height", "that size's height", height, true);
 	expose("pad", "kept in shape with black bars, not stretched", pad, true);
+	expose("changeFrameRate", "the video written at frameRate frames a second, the game's frames repeated to keep to it", changeFrameRate, true);
+	expose("frameRate", "that rate, 1 to 240 frames a second", frameRate, true);
+	rateWatch_ = frameRate.changed.connect([this] {
+		if (frameRate.get() < 1 || frameRate.get() > 240) frameRate.set(std::clamp<int64_t>(frameRate.get(), 1, 240));
+	});
 	expose("audioSync", "the sound kept whole, the picture's frames dropped or doubled to match it", audioSync, true);
 	expose("captureOsd", "the counters, messages and what scripts draw are in the video (Chimera's Capture OSD)", captureOsd, true);
 	expose("captureLua", "what scripts draw is in the video (Chimera's Capture Lua)", captureLua, true);
@@ -378,12 +388,13 @@ EncoderViewModel::EncoderViewModel(Dispatcher &dispatcher, SessionViewModel &ses
 			height.set(std::min<int64_t>(h * k, 8192));
 			return {};
 		});
-	command("restoreDefaults", "the command, sync and size back to a fresh install's (the file and markers stay)", {},
+	command("restoreDefaults", "the command, sync, size and frame rate back to a fresh install's (the file and markers stay)", {},
 		[this](const Args &, std::string &) -> Value {
 			commandLine.set(kDefaultCommand);
 			audioSync.set(true);
 			pad.set(false);
 			resize.set(false);
+			changeFrameRate.set(false);
 			return {};
 		});
 	command("suggest", "the file to write: the folder and name given, the command's extension", {"folder", "name"},
@@ -445,6 +456,7 @@ EncoderViewModel::EncoderViewModel(Dispatcher &dispatcher, SessionViewModel &ses
 			job->outW = static_cast<int32_t>(width.get());
 			job->outH = static_cast<int32_t>(height.get());
 			job->pad = pad.get();
+			job->rate = changeFrameRate.get() ? frameRate.get() : 0;
 			job->audioSync = audioSync.get();
 			/* as Chimera's: the OSD takes what scripts draw with it */
 			job->osd = captureOsd.get();

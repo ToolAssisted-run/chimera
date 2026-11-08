@@ -545,6 +545,8 @@
 		"encode_video.current_size": "Tamanho atual",
 		"encode_video.encode_video": "Codificar vídeo",
 		"encode_video.ffmpeg_command": "Comando do FFmpeg:",
+		"encode_video.frame_rate_to": "Taxa de quadros para",
+		"encode_video.frames_a_second": "quadros por segundo",
 		"encode_video.frames_to_frames": "quadros %1 a %2 (%3 quadros)",
 		"encode_video.from_marker": "Do marcador:",
 		"encode_video.is_no_longer_there": "%1 não está mais lá.",

@@ -545,6 +545,8 @@
 		"encode_video.current_size": "Geçerli boyut",
 		"encode_video.encode_video": "Video Kodla",
 		"encode_video.ffmpeg_command": "FFmpeg komutu:",
+		"encode_video.frame_rate_to": "Kare hızı",
+		"encode_video.frames_a_second": "saniyede kare",
 		"encode_video.frames_to_frames": "%1 ile %2 arasındaki kareler (%3 kare)",
 		"encode_video.from_marker": "İşaretçiden:",
 		"encode_video.is_no_longer_there": "%1 artık orada değil.",
