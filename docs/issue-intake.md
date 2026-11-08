@@ -147,6 +147,9 @@ bursts around nightlies.
   shows the same problem, run upstream itself to confirm it, say so on the
   issue, and close it. In general we neither fix nor report issues that are
   also present in the upstream cores.
+  The bug report template asks the reporter the same question ("Does this
+  issue happen in the upstream core? (Yes, No, N/A)", user-decided,
+  2026-11-08): a Yes is not an issue to submit here.
 - Tone: plain, one paragraph, no apologies, no emoji.
 
 ## 7. Duplicates and feature requests

@@ -31,6 +31,8 @@ labels: bug
 
 **Happened:**
 
+**Does this issue happen in the upstream core? (Yes, No, N/A):** <!-- the emulator the core is made from, run on its own (Supermodel, PCSX2, RPCS3...). If it does, it is not an issue to submit here: Chimera does not fix upstream issues, so report it to that project. N/A when there is no upstream program to try. -->
+
 **Attach:**
 - [ ] the `.chimeraProject` (it names every file by hash, and carries the inputs)
 - [ ] a screenshot
