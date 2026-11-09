@@ -74,9 +74,12 @@ ApplicationWindow {
             Menu { title: "&View"; Action { text: "Zoom" } }
             Menu { title: "&Config"; Action { text: "Paths" } }
             Menu { title: "&Tools"; Action { text: "RAM Watch" } }
-            Menu { title: "&Help"; Action { text: "About" } }
+            Menu { objectName: "helpMenu"; title: "&Help"; Action { text: "About" } }
         }
     }
+    // the game: it has the keyboard, and counts the Spaces it is given
+    property int spaces: 0
+    Item { objectName: "game"; anchors.fill: parent; focus: true; Keys.onSpacePressed: spaces++ }
 }
 )QML";
 
@@ -194,6 +197,32 @@ int main(int argc, char **argv)
 			CHECK(menuLetters.shown());
 			whole("with the letters");
 			QTest::keyRelease(barWindow, Qt::Key_Alt);
+			QTest::qWait(100);
+		}
+		/* a menu opened with the mouse and closed gives the keyboard back to
+		 * what had it (issue 552): Space then goes to the game, not to the
+		 * menu bar, which opened the menu again */
+		auto *game = barWindow->findChild<QQuickItem *>(QStringLiteral("game"));
+		auto *help = barWindow->findChild<QQuickItem *>(QStringLiteral("bar:Help"));
+		auto *helpMenu = barWindow->findChild<QObject *>(QStringLiteral("helpMenu"));
+		CHECK(game != nullptr && help != nullptr && helpMenu != nullptr);
+		if (game != nullptr && help != nullptr && helpMenu != nullptr)
+		{
+			game->forceActiveFocus();
+			QTest::mouseClick(barWindow, Qt::LeftButton, Qt::NoModifier, help->mapToScene(QPointF(help->width() / 2, help->height() / 2)).toPoint());
+			CHECK(QTest::qWaitFor([&] { return helpMenu->property("opened").toBool(); }, 2000));
+			/* closed by clicking its name again, as a person does */
+			QTest::mouseClick(barWindow, Qt::LeftButton, Qt::NoModifier, help->mapToScene(QPointF(help->width() / 2, help->height() / 2)).toPoint());
+			CHECK(QTest::qWaitFor([&] { return !helpMenu->property("visible").toBool(); }, 2000));
+			QTest::qWait(100);
+			const int before = barWindow->property("spaces").toInt();
+			QTest::keyClick(barWindow, Qt::Key_Space);
+			QTest::qWait(200);
+			if (!game->hasActiveFocus())
+				std::fprintf(stderr, "the keyboard is %s's\n", barWindow->activeFocusItem() != nullptr ? barWindow->activeFocusItem()->metaObject()->className() : "nobody");
+			CHECK(game->hasActiveFocus());
+			CHECK(barWindow->property("spaces").toInt() == before + 1);
+			CHECK(!helpMenu->property("visible").toBool());
 		}
 	}
 

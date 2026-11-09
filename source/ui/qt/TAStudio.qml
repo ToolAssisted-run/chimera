@@ -161,6 +161,8 @@ ApplicationWindow {
         MenuBar {
             id: tasMenus
             Layout.fillWidth: true
+            // a menu closed gives the keyboard back to the roll (issue 552)
+            delegate: MenuBarEntry {}
             Menu {
                 id: editMenu
                 // Customize's "pause when a menu is open"
