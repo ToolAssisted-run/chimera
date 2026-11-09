@@ -465,8 +465,10 @@ std::vector<std::pair<std::string, std::string>> CoresViewModel::installed() con
 {
 	std::vector<std::pair<std::string, std::string>> out;
 	std::lock_guard<std::mutex> lock(m_);
+	/* a package for another system or CPU (an aarch64 one on an x86-64
+	 * computer) is not one to start a project with: passed over (issue 549) */
 	for (const Core &c : cores_)
-		if (out.empty() || out.back().first != c.coreName) out.emplace_back(c.coreName, c.path);
+		if (c.refused.empty() && (out.empty() || out.back().first != c.coreName)) out.emplace_back(c.coreName, c.path);
 	return out;
 }
 
@@ -611,7 +613,7 @@ std::vector<CoresViewModel::Package> CoresViewModel::packages() const
 {
 	std::vector<Package> out;
 	std::lock_guard<std::mutex> lock(m_);
-	for (const Core &c : cores_) out.push_back({c.coreName, c.line, c.path, c.gameCore});
+	for (const Core &c : cores_) out.push_back({c.coreName, c.line, c.path, c.gameCore, c.refused.empty()});
 	return out;
 }
 

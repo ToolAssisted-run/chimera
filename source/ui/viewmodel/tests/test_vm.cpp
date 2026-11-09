@@ -10257,6 +10257,68 @@ bool firmwareWindow(const char *package, const char *slotsPackage, const char *b
  * emulators before the games, Show, a core's versions newest first and
  * what each says, one version or whole cores removed (only files in the
  * cores folder), and the systems they add up to */
+/* A package made for other systems or CPUs (an aarch64 one on an x86-64
+ * computer) is not offered by New Project (issue 549): with the synthetic
+ * core beside a newer copy that runs everywhere but here, New Project lists
+ * the core once, by the copy that runs, and the Core Manager still lists both */
+bool elsewherePackages(const char *package)
+{
+	namespace fs = std::filesystem;
+	const int before = failures;
+	const fs::path dir = fs::temp_directory_path() / ("chimera-test-elsewhere-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+	fs::create_directories(dir / "Cores");
+	const fs::path good = dir / "Cores" / "synth-box.chimeraCore", elsewhere = dir / "Cores" / "synth-box-elsewhere.chimeraCore";
+	fs::copy_file(package, good);
+	/* the copy: its runsOn every one of the six but this Chimera's own */
+	{
+		const std::string here = ce_host_platform();
+		std::string list;
+		for (const char *p : {"windows-x86_64", "windows-aarch64", "linux-x86_64", "linux-aarch64", "macos-x86_64", "macos-aarch64"})
+			if (here != p) list += std::string(list.empty() ? "" : ", ") + "\"" + p + "\"";
+		mz_zip_archive in{}, out{};
+		CHECK(mz_zip_reader_init_file(&in, package, 0));
+		CHECK(mz_zip_writer_init_file(&out, elsewhere.string().c_str(), 0));
+		for (mz_uint i = 0; i < mz_zip_reader_get_num_files(&in); i++)
+		{
+			char name[512];
+			mz_zip_reader_get_filename(&in, i, name, sizeof name);
+			size_t size = 0;
+			void *data = mz_zip_reader_extract_to_heap(&in, i, &size, 0);
+			std::string body(static_cast<const char *>(data), size);
+			mz_free(data);
+			if (std::string(name) == "waterbox.config")
+			{
+				const size_t at = body.find("\"runsOn\""), open = body.find('[', at), close = body.find(']', open);
+				CHECK(at != std::string::npos && open != std::string::npos && close != std::string::npos);
+				if (close != std::string::npos) body = body.substr(0, open + 1) + list + body.substr(close);
+			}
+			CHECK(mz_zip_writer_add_mem(&out, name, body.data(), body.size(), MZ_DEFAULT_COMPRESSION));
+		}
+		mz_zip_writer_finalize_archive(&out);
+		mz_zip_writer_end(&out);
+		mz_zip_reader_end(&in);
+	}
+	/* the copy is the newer: it would be the core's package if it ran here */
+	fs::last_write_time(good, fs::last_write_time(elsewhere) - std::chrono::hours(1));
+	ManualDispatcher d;
+	InputLog inputs;
+	SessionViewModel session(d, inputs);
+	CoresViewModel cores(d);
+	std::string error;
+	cores.set("coresFolder", (dir / "Cores").string(), error);
+	int runs = 0, refused = 0;
+	for (const auto &p : cores.packages()) (p.runsHere ? runs : refused)++;
+	CHECK(runs == 1 && refused == 1);
+	const auto inst = cores.installed();
+	CHECK(inst.size() == 1 && inst[0].first == "Synth" && fs::path(inst[0].second).filename() == "synth-box.chimeraCore");
+	NewProjectViewModel wizard(d, session, cores);
+	CHECK(wizard.coreNames.get() == "Synth");
+	CHECK(wizard.coreLines.get().find('\n') == std::string::npos && !wizard.coreLines.get().empty());
+	std::error_code ec;
+	fs::remove_all(dir, ec);
+	return failures == before;
+}
+
 bool coreManager(const char *package, const char *slotsPackage, const char *gamePackage)
 {
 	namespace fs = std::filesystem;
@@ -10945,6 +11007,7 @@ int main(int argc, char **argv)
 			ranMachine = markerFrames(argv[1], argv[2]) && ranMachine;
 			ranMachine = listsWhilePlaying(argv[1], argv[2]) && ranMachine;
 			if (argc >= 9) ranMachine = coreManager(argv[1], argv[6], argv[8]) && ranMachine;
+			ranMachine = elsewherePackages(argv[1]) && ranMachine;
 		}
 		else
 			std::printf("SKIP the machine tests: %s or %s is missing\n", argv[1], argv[2]);

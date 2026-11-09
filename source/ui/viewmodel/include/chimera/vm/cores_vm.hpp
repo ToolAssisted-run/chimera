@@ -45,8 +45,8 @@ public:
 	/* any thread: the newest package of each core whose files include this
 	 * extension (lower case, no dot), as {core name, package} */
 	std::vector<std::pair<std::string, std::string>> coresFor(const std::string &extension) const;
-	/* any thread: the newest package of each installed core, by name, as
-	 * {core name, package} */
+	/* any thread: the newest package of each installed core that this
+	 * Chimera can run, by name, as {core name, package} (issue 549) */
 	std::vector<std::pair<std::string, std::string>> installed() const;
 	/* Any thread: every package, as Chimera's New Project lists them - by
 	 * core, newest first - each with its line: the core, its version dated
@@ -57,6 +57,8 @@ public:
 	{
 		std::string name, line, path;
 		bool gameCore = false;
+		/* this Chimera can run it (its systems and CPUs, its guest ABI) */
+		bool runsHere = true;
 	};
 	std::vector<Package> packages() const;
 	/* what the installed cores say their media needs (each package's

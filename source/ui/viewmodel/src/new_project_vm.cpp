@@ -1077,6 +1077,7 @@ void NewProjectViewModel::completeForAgent(const AgentRequest &request, std::fun
 	cores_.run("refresh", {}, looked);
 	const std::vector<CoresViewModel::Package> all = cores_.packages();
 	const auto named = std::find_if(all.begin(), all.end(), [&](const CoresViewModel::Package &p) {
+		if (!p.runsHere) return false;
 		const fs::path file(p.path);
 		return lower(p.name) == lower(request.core) || lower(file.filename().string()) == lower(request.core) ||
 			lower(file.stem().string()) == lower(request.core);
@@ -1306,8 +1307,8 @@ void NewProjectViewModel::listCores()
 	coreNames.set(names);
 	/* a kind with nothing installed lists the other, as Chimera's does */
 	const std::vector<CoresViewModel::Package> all = cores_.packages();
-	const bool anyGame = std::any_of(all.begin(), all.end(), [](const auto &p) { return p.gameCore; });
-	const bool anyEmulator = std::any_of(all.begin(), all.end(), [](const auto &p) { return !p.gameCore; });
+	const bool anyGame = std::any_of(all.begin(), all.end(), [](const auto &p) { return p.gameCore && p.runsHere; });
+	const bool anyEmulator = std::any_of(all.begin(), all.end(), [](const auto &p) { return !p.gameCore && p.runsHere; });
 	const bool games = (kind.get() == "games" && anyGame) || !anyEmulator;
 	shown_.clear();
 	std::string lines;
@@ -1315,6 +1316,8 @@ void NewProjectViewModel::listCores()
 	for (const auto &p : all)
 	{
 		if (p.gameCore != games) continue;
+		/* only what this Chimera can run: the Core Manager lists the rest, with why (issue 549) */
+		if (!p.runsHere) continue;
 		if (p.path == package_) at = static_cast<int64_t>(shown_.size());
 		lines += (lines.empty() ? "" : "\n") + p.line;
 		shown_.push_back(p);

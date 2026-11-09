@@ -36,6 +36,11 @@ build was made from, which is what the package already stamps into
 `waterbox.config` and what a movie already cites (`CoreVersion`). Releases from
 before packages carried their CPU name one asset `<coreid>-<version>.chimeraCore`:
 those packages say nothing of where they run, so Chimera refuses them.
+A package this Chimera cannot run is not offered by New Project (issue 549):
+its list holds only the packages that run here, and a core whose newest
+package is for another CPU is offered by its newest one that runs. The Core
+Manager still lists every package, with the reason one does not run, so it
+can be removed.
 
 Most users of Windows and Linux want the x86_64 package, and the notes
 `publish-core.sh` writes say so above the table whenever a release also has an
