@@ -125,6 +125,7 @@ Made and published by other people from their own repositories, and listed here 
 | [UnrealSpeccyP](https://github.com/CloakTheLurker/chimera-core-unrealspeccyp) | [CloakTheLurker](https://github.com/CloakTheLurker) | ZX Spectrum 128K (Pentagon), ZX Spectrum 48K |
 | [Eden](https://github.com/mayonnaisegoodfellas/chimera-core-eden) | [mayonnaisegoodfellas](https://github.com/mayonnaisegoodfellas) | Nintendo Switch |
 | [Gens-Rerecording](https://github.com/DmytroM1998/chimera-core-gens) | [DmytroM1998](https://github.com/DmytroM1998) | Mega Drive / Genesis |
+| [NP2kai](https://github.com/ShinobiWannabe/chimera-core-np2kai) | [ShinobiWannabe](https://github.com/ShinobiWannabe) | NEC PC-9801 / PC-9821 (IA-32 CPU), NEC PC-9801 (286 CPU) |
 
 #### Games
 

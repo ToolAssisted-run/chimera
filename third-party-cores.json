@@ -31,6 +31,16 @@
       "repo": "DmytroM1998/chimera-core-gens"
     },
     {
+      "id": "np2kai",
+      "name": "NP2kai",
+      "author": "ShinobiWannabe",
+      "systems": [
+        { "id": "PC9821", "name": "NEC PC-9801 / PC-9821, IA-32 CPU" },
+        { "id": "PC98", "name": "NEC PC-9801, 286 CPU" }
+      ],
+      "repo": "ShinobiWannabe/chimera-core-np2kai"
+    },
+    {
       "id": "srb2",
       "name": "SRB2",
       "author": "P-AS",
