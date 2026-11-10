@@ -130,6 +130,10 @@ struct HostApi
 	void (*wbx_set_output_file)(const char *path, WbxReturn *ret);
 	/* optional: a host older than the clock's start (issue 366) has none */
 	void (*wbx_set_clock_start)(void *obj, uint64_t unix_seconds, WbxReturn *ret);
+	/* For the hosts made from now on: on Windows, the guest's writes found by
+	 * comparing pages instead of by faults (a package's readsDeadStack, issue
+	 * 555). Process-wide. Optional: an older host faults for every core. */
+	void (*wbx_set_compare_writes)(bool on);
 	/* A core's tool writes its files on the disk as it goes, and they are
 	 * closed (and a failed close said) by unmounting them. Optional: a host
 	 * older than tools (2026-11-01) runs none. */

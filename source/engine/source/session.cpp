@@ -124,6 +124,11 @@ struct SessionConfig
 	std::string mnemonics;
 	std::string systemName;
 	bool deterministic = false;
+	/* "readsDeadStack": the guest reads stack it has not written since (a
+	 * conservative garbage collector, an uninitialised local). On Windows its
+	 * writes are then found by comparing pages, not by faults, whose frames
+	 * Windows leaves in that stack (issue 555) */
+	bool readsDeadStack = false;
 	bool drawEveryFrame = false; // video.drawEveryFrame - see ce_session_draw_every_frame
 	/* video.rebuildOnStateLoad - whether a SAME-SESSION load should look like a
 	 * new context to this core's renderer (issue #43). Absent means true, which
@@ -252,6 +257,7 @@ bool parseConfig(const char *json, uint64_t len, const char *overrides, SessionC
 	}
 	cfg.romFile = strOf(root, "romFile", "rom");
 	cfg.deterministic = cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(root, "deterministic"));
+	cfg.readsDeadStack = cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(root, "readsDeadStack"));
 
 	const cJSON *layout = cJSON_GetObjectItemCaseSensitive(root, "memoryLayoutMiB");
 	if (!cJSON_IsArray(layout) || cJSON_GetArraySize(layout) != 5)
@@ -2092,7 +2098,10 @@ static ce_session *openSession(
 	entry = ce_package_entry(pkg, "core.wbx", &len);
 	if (entry == nullptr) return abort(tr("engine.no_wbx"));
 	s->streams.push_back({ entry, len });
+	/* for this host alone: the setting is the process's, read as it is made */
+	if (host->wbx_set_compare_writes != nullptr) host->wbx_set_compare_writes(s->cfg.readsDeadStack);
 	host->wbx_create_host(&layout, "core.wbx", streamRead, reinterpret_cast<uintptr_t>(&s->streams.back()), &r);
+	if (host->wbx_set_compare_writes != nullptr) host->wbx_set_compare_writes(false);
 	doneWith(s->streams.back());
 	if (!r.ok()) return abort(r.errorMessage);
 	s->obj = reinterpret_cast<void *>(r.data);

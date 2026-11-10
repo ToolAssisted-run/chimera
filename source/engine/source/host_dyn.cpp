@@ -100,6 +100,7 @@ void loadOnce()
 	/* the core log, which an older host cannot keep */
 	if (!g_ok || !bind(g_api.wbx_set_output_file, "wbx_set_output_file")) g_api.wbx_set_output_file = nullptr;
 	if (!g_ok || !bind(g_api.wbx_set_clock_start, "wbx_set_clock_start")) g_api.wbx_set_clock_start = nullptr;
+	if (!g_ok || !bind(g_api.wbx_set_compare_writes, "wbx_set_compare_writes")) g_api.wbx_set_compare_writes = nullptr;
 	/* a core's tools, as a pair: writing without closing is no use */
 	if (!g_ok || !(bind(g_api.wbx_mount_file_path_writable, "wbx_mount_file_path_writable")
 			&& bind(g_api.wbx_unmount_file, "wbx_unmount_file")))

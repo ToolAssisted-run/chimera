@@ -14314,3 +14314,36 @@ they did.
   rows 1 to 4, back to 2, then held below the bottom for 0.6 s, which
   scrolled the list 242 pixels and picked rows 3 to 20. With the drag taken
   out, 5 of its 16 checks failed.
+
+## A core whose guest reads its dead stack says so (user-decided, 2026-11-10, issue 555)
+
+On Windows, the sandbox learns that a page was written by letting the write
+fault, and Windows delivers a fault on the faulting thread's own stack: about
+2 KB of exception data lands below the guest's stack pointer before any
+handler runs (238 of 2016 words in the reporter's test, on the GTX 1060 PC).
+Linux writes nothing there. A guest that reads its dead stack (the
+reporter's core has a conservative garbage collector) then plays a movie
+differently depending on the greenzone's settings and the helper threads'
+timing, which decide where faults fall.
+
+The owner chose, from measurements, a declaration a core makes over a change
+for every core: `"readsDeadStack": true` in `waterbox.config`. Chimera then
+asks miniBox (`wbx_set_compare_writes`, miniBox pull request 14) to find that
+core's writes on Windows by comparing pages, as it already did for guest
+stacks, so nothing faults to report a write.
+
+- **Measured first**, on the GTX 1060 PC. Comparing every page each frame
+  costs 0.24 ms for 4 MB of guest memory, 1.7 ms for 16 MB, 11 ms for
+  96 MB, 60 ms for 512 MB, plus a copy of it. The alternative, protecting
+  every page at every frame start, would make Windows runs repeat each
+  other but not Linux's.
+- **Tested.** miniBox's `test_fault_stack`: compared, the write changes 0
+  stack words and is still in the frame's delta. In Chimera on Windows,
+  Mesen marked to ask: a greenzone seek restores the exact state, and the
+  final state after 1,500 frames is the same with the greenzone off, every
+  frame and every 8th. It differs from Linux's state only in which pages it
+  carries (a page written back to what it held counts as unchanged); the
+  machine it restores is the same.
+- **The cost**, Mesen on that PC: every frame captured, 644 frames a second
+  without the declaration and 140 with it; every 8th, 876 and 241; greenzone
+  off, the same (929 and 918).
