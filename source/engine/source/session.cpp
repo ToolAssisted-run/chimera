@@ -4487,6 +4487,15 @@ const char *ce_session_movie_text(ce_session *s, uint64_t *len_out)
 	return text.c_str();
 }
 
+const char *ce_session_movie_key(ce_session *s)
+{
+	static thread_local std::string key;
+	std::lock_guard<std::mutex> movieLocked(s->movieLock);
+	const char *k = s->movie != nullptr ? ce_movie_log_key(s->movie) : nullptr;
+	key.assign(k != nullptr ? k : "");
+	return key.c_str();
+}
+
 /* The session's movie journaled (engine.h): the log's own journal, under the
  * movie's lock, as every change to the log is made under it. */
 int32_t ce_session_movie_journal_open(ce_session *s, const char *path, const char *frontend_image)

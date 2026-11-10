@@ -14263,3 +14263,32 @@ marker at frame 33 had no state, and a seek there replayed from 20.
   every 20 with a marker at 33 that keeps no state of its own: a seek to 34
   replays 1 frame with the setting on (5 states held) and 20 with it off (4);
   with the setting ignored, both replayed 20 and it failed.
+
+## Nothing done each frame may cost more as the movie grows (2026-11-10, issue 548)
+
+Reporters saw the window get slower the longer a movie ran: from about 60
+to 45 or 36 frames a second in Mesen, and an unthrottled run falling from
+250 to under 200 frames a second. Two things the window does after every
+frame read the whole movie:
+
+- The piano roll looks for the movie's last input (its "Last input"
+  marker) again whenever frames change, and the machine changes every frame
+  it plays the first time (it writes down whether the frame lagged and how
+  long it lasted). The search walked back from the movie's end, so its cost
+  was the number of empty frames after the frame played. It now starts at
+  the last frame that changed: frames after it hold no input, or the last
+  input is after it and still there.
+- The Macro tool reads the movie's columns every time the movie gets longer,
+  which is every frame recorded. It wrote out the whole movie as text and
+  parsed it back for one line. The engine now gives the columns alone
+  (`ce_session_movie_key`), under the movie's lock.
+
+Measured in the window without a display, Mesen with Super Mario Bros. 3,
+unthrottled: recording from nothing went from 312 frames a second at the
+start to 161 after 75,000 frames; now it holds 312 to 357 through 120,000.
+Playing a 300,000-frame movie went from 11 to 364 frames a second. The view
+models' test plays 100 frames one at a time in a 1,000-frame and a
+400,000-frame movie and needs the long one to take less than four times as
+long (0.21 s each now; 0.22 s and 2.20 s with the piano roll's change taken
+out, and it failed). The Macro tool's change has no speed test: the test
+checks that the engine's columns are the ones the movie's text has.

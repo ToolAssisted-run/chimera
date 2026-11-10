@@ -1338,7 +1338,7 @@ PianoRollViewModel::PianoRollViewModel(Dispatcher &dispatcher, InputLog &inputs,
 	/* what the machine recorded, or another movie in its place: the run's own markers follow */
 	changedWatch_ = session_.inputsChanged.connect([this](int64_t a, int64_t b) {
 		frames_.changed.emit(a, b);
-		refreshRun(a);
+		refreshRun(a, b);
 	});
 	recordedWatch_ = session_.framesRecorded.connect([this](const std::vector<SessionViewModel::RecordedFrame> &frames) {
 		framesRecorded(frames);
@@ -1346,7 +1346,7 @@ PianoRollViewModel::PianoRollViewModel(Dispatcher &dispatcher, InputLog &inputs,
 	appendedWatch_ = session_.inputsAppended.connect([this](int64_t a, int64_t b) {
 		frameCount.set(inputs_.size());
 		frames_.appended.emit(a, b);
-		refreshRun(a);
+		refreshRun(a, b);
 	});
 	listMarkers();
 }
@@ -2187,14 +2187,9 @@ bool PianoRollViewModel::placeMacroLines(int64_t at, std::vector<std::string> li
 
 std::string PianoRollViewModel::movieKeyRaw() const
 {
-	/* the movie's LogKey, as its text has it ("#P1 Up|P1 Down|...|") */
-	const std::string all = inputs_.text();
-	ce_movie_log *log = ce_movie_log_new();
-	std::string key;
-	if (ce_movie_log_parse(log, all.data(), all.size()) == 0)
-		if (const char *k = ce_movie_log_key(log)) key = k;
-	ce_movie_log_free(log);
-	return key;
+	/* the movie's LogKey, as its text has it ("#P1 Up|P1 Down|...|"); read
+	 * on every frame recorded, so never through the whole movie (issue 548) */
+	return inputs_.key();
 }
 
 std::string PianoRollViewModel::movieKey() const
@@ -2795,19 +2790,26 @@ bool PianoRollViewModel::frameEmpty(int64_t frame) const
 	return axes == neutral;
 }
 
-void PianoRollViewModel::refreshRun(int64_t frame)
+void PianoRollViewModel::refreshRun(int64_t frame, int64_t through)
 {
 	const int64_t size = inputs_.size();
 	const int64_t wasLast = lastInputFrame.get(), wasEnd = runEndFrame.get();
 	int64_t last = wasLast;
 	if (size == 0)
 		last = 0;
+	else if (wasLast > through && wasLast < size)
+	{
+		/* only frames before the last input changed: it is still the last */
+	}
 	else
 	{
-		/* an edit after the answer cannot have erased it: the walk back stops there */
+		/* an edit after the answer cannot have erased it: the walk back stops
+		 * there. After the frames changed there is no input, so the walk starts
+		 * at the last of them: while the machine plays or records it is one
+		 * frame, not the movie (issue 548) */
 		const int64_t floor = wasLast < frame ? frame : 0;
 		bool found = false;
-		for (int64_t i = size - 1; i >= floor; i--)
+		for (int64_t i = std::min(through, size - 1); i >= floor; i--)
 			if (!frameEmpty(i))
 			{
 				last = i;

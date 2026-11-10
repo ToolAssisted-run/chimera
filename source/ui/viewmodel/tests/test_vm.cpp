@@ -10456,6 +10456,61 @@ bool markerFrames(const char *package, const char *rom)
 	return failures == before;
 }
 
+/* A long movie plays as fast as a short one (issue 548): each frame the
+ * machine plays, the piano roll finds the movie's last input again and the
+ * Macro tool reads the movie's columns; both walked or wrote out the whole
+ * movie, so a 400,000-frame movie played at a fraction of a 1,000-frame
+ * one's speed. The columns read through the engine are the ones the movie's
+ * text has */
+bool longMovie(const char *package, const char *rom)
+{
+	const int before = failures;
+	double seconds[2] = {0, 0};
+	const int64_t lengths[2] = {1000, 400000};
+	for (int i = 0; i < 2; i++)
+	{
+		ManualDispatcher d;
+		InputLog inputs;
+		SessionViewModel session(d, inputs);
+		PianoRollViewModel roll(d, inputs, session);
+		MacroToolViewModel macros(d, roll, session);
+		std::string error;
+		openGame(session, package, std::string(rom), error);
+		CHECK(d.until([&] { return session.isOpen.get(); }, 60));
+		session.unthrottled.set(true);
+		roll.run("insertFrames", {int64_t{0}, lengths[i]}, error);
+		roll.run("toggle", {int64_t{10}, int64_t{0}}, error);
+		d.until([] { return false; }, 0.2);
+		CHECK(inputs.size() == lengths[i] && roll.lastInputFrame.get() == 10);
+		{
+			const std::string all = inputs.text();
+			ce_movie_log *log = ce_movie_log_new();
+			std::string key;
+			if (ce_movie_log_parse(log, all.data(), all.size()) == 0)
+				if (const char *k = ce_movie_log_key(log)) key = k;
+			ce_movie_log_free(log);
+			CHECK(!key.empty() && inputs.key() == key);
+		}
+		/* a frame at a time, each one's news taken in before the next, as a
+		 * window showing every frame does */
+		const int64_t from = session.frame.get();
+		const auto start = std::chrono::steady_clock::now();
+		for (int64_t f = from + 1; f <= from + 100; f++)
+		{
+			session.run("frameAdvance", {}, error);
+			if (!d.until([&] { return session.frame.get() == f && roll.currentFrame.get() == f; }, 30)) break;
+		}
+		seconds[i] = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
+		CHECK(session.frame.get() == from + 100);
+		CHECK(roll.lastInputFrame.get() == 10 && roll.runEndFrame.get() == lengths[i] - 1);
+		std::printf("a %lld-frame movie: 100 frames played in %.2f s\n", static_cast<long long>(lengths[i]), seconds[i]);
+		session.run("close", {}, error);
+		CHECK(d.until([&] { return !session.isOpen.get(); }, 20));
+	}
+	CHECK(seconds[1] < seconds[0] * 4 + 0.5);
+	return failures == before;
+}
+
 /* A package that names the controls TAStudio shows at first (issue 544):
  * a project with no piano roll of its own hides every other control, and a
  * package that names none keeps Chimera's rule, which hides none of the
@@ -11006,6 +11061,7 @@ int main(int argc, char **argv)
 			if (argc >= 17) ranMachine = shownColumns(argv[16], argv[1], argv[2]) && ranMachine;
 			ranMachine = markerFrames(argv[1], argv[2]) && ranMachine;
 			ranMachine = listsWhilePlaying(argv[1], argv[2]) && ranMachine;
+			ranMachine = longMovie(argv[1], argv[2]) && ranMachine;
 			if (argc >= 9) ranMachine = coreManager(argv[1], argv[6], argv[8]) && ranMachine;
 			ranMachine = elsewherePackages(argv[1]) && ranMachine;
 		}

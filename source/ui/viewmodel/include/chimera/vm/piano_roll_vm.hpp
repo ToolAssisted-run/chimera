@@ -427,7 +427,9 @@ private:
 	 * frame with anything pressed, walking back from the end no further than
 	 * the edit unless the edit could have erased it; then the run's own
 	 * markers moved where the movie says, and the marker list made again */
-	void refreshRun(int64_t frame);
+	/* the run's own markers worked out again after frames `frame` to `through`
+	 * changed (to the movie's end when not said) */
+	void refreshRun(int64_t frame, int64_t through = INT64_MAX);
 	bool frameEmpty(int64_t frame) const;
 	bool permanentAt(int64_t frame) const { return frame == 0 || frame == lastInputFrame.get() || frame == runEndFrame.get(); }
 	void listMarkers();

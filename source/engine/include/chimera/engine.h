@@ -1678,6 +1678,12 @@ CE_API void ce_session_movie_remove(ce_session *s, int64_t frame, int64_t count)
  * save or to keep as a branch; ce_session_movie_load takes it back. Belongs to
  * the calling thread until its next call of this. */
 CE_API const char *ce_session_movie_text(ce_session *s, uint64_t *len_out);
+/* The movie's columns (its LogKey, "#P1 Up|P1 Down|...|"), "" when it has
+ * none: what ce_movie_log_key gives for ce_session_movie_text parsed back,
+ * without writing out the whole movie, so it costs the same however long the
+ * movie is (issue 548). Any thread; belongs to the calling thread until its
+ * next call of this. */
+CE_API const char *ce_session_movie_key(ce_session *s);
 
 /* The input journal of the session's own movie (owner, 2026-10-24): what
  * ce_movie_log_journal_open_with does for a log a frontend holds, done on the

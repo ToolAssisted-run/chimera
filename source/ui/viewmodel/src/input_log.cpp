@@ -170,6 +170,12 @@ std::string InputLog::text() const
 	return std::string(t != nullptr ? t : "", static_cast<size_t>(len));
 }
 
+std::string InputLog::key() const
+{
+	std::shared_lock lock(m_);
+	return s_ != nullptr ? std::string(ce_session_movie_key(s_)) : std::string();
+}
+
 std::vector<std::string> InputLog::lines(int64_t first, int64_t last) const
 {
 	std::vector<std::string> out;
