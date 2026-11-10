@@ -8,6 +8,7 @@
     <file>PicturePointer.qml</file>
     <file>ProjectSettings.qml</file>
     <file>RollTable.qml</file>
+    <file>ListRowsMouse.qml</file>
     <file>ColumnHeading.qml</file>
     <file>McpServer.qml</file>
     <file alias="chimera.png">images/chimera.png</file>

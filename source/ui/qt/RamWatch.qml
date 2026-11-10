@@ -543,34 +543,15 @@ ApplicationWindow {
                     font.bold: true
                     color: row.model.selected ? palette.highlightedText : palette.text
                 }
-                MouseArea {
-                    anchors.fill: parent
-                    // the OSD box takes its own clicks
-                    anchors.leftMargin: win.shown("OSD") ? 34 : 0
-                    acceptedButtons: Qt.LeftButton | Qt.RightButton
-                    onPressed: (mouse) => {
-                        list.forceActiveFocus()
-                        if (mouse.button === Qt.RightButton) {
-                            if (!row.model.selected) win.vm.run("select", [row.index, "only"])
-                            listMenu.popup()
-                            return
-                        }
-                        win.vm.run("select", [row.index, (mouse.modifiers & Qt.ShiftModifier) ? "range"
-                            : (mouse.modifiers & Qt.ControlModifier) ? "toggle" : "only"])
-                    }
-                    onDoubleClicked: (mouse) => { if (mouse.button === Qt.LeftButton) win.openWatch() }
-                }
             }
-            // a click below the rows lets every row go; a right click there opens the menu
-            MouseArea {
-                z: -1
-                anchors.fill: parent
-                acceptedButtons: Qt.LeftButton | Qt.RightButton
-                onPressed: (mouse) => {
-                    list.forceActiveFocus()
-                    win.vm.run("select", [-1, "none"])
-                    if (mouse.button === Qt.RightButton) listMenu.popup()
-                }
+            // presses, drags and double clicks over the rows (issue 554)
+            ListRowsMouse {
+                list: list
+                anchors.leftMargin: win.shown("OSD") ? 34 : 0   // the OSD box takes its own clicks
+                isPicked: (r) => { const item = list.itemAtIndex(r); return item !== null && item.model.selected === true }
+                onPick: (row, mode) => win.vm.run("select", [row, mode])
+                onMenu: listMenu.popup()
+                onActivated: win.openWatch()
             }
         }
     }

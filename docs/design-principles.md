@@ -14292,3 +14292,25 @@ models' test plays 100 frames one at a time in a 1,000-frame and a
 long (0.21 s each now; 0.22 s and 2.20 s with the piano roll's change taken
 out, and it failed). The Macro tool's change has no speed test: the test
 checks that the engine's columns are the ones the movie's text has.
+
+## RAM Search and RAM Watch pick rows with a drag (2026-11-10, issue 554)
+
+A request: in RAM Search and RAM Watch, press on a row and move down to pick
+more, as a Windows list does. Both lists now take a drag: every row from
+where it began to the one under the pointer is picked, and held past the
+list's top or bottom, the list scrolls a row every 50 ms and the drag picks
+on. Click, Ctrl+click, Shift+click, right click and double click do what
+they did.
+
+- The mouse is one area over the whole list (`ListRowsMouse.qml`), shared
+  by the two windows, not one in each row: a row scrolled out of view is
+  destroyed, and the drag it held would end with it. The area tells the
+  window the row and how it is picked; the view models keep the rows
+  picked, as before. In RAM Watch it starts after the OSD column, whose
+  boxes take their own clicks.
+- The list no longer scrolls when dragged with the mouse (the area keeps
+  the drag); the wheel and the scroll bar scroll it.
+- **Tested.** The "list mouse" test drags in a 40-row list showing 10:
+  rows 1 to 4, back to 2, then held below the bottom for 0.6 s, which
+  scrolled the list 242 pixels and picked rows 3 to 20. With the drag taken
+  out, 5 of its 16 checks failed.

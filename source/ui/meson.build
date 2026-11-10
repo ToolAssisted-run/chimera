@@ -592,6 +592,16 @@ endif
       cpp_args: ['-DQT_NO_KEYWORDS'],
     )
     test('roll table', test_roll_table, env: ['QT_QPA_PLATFORM=offscreen'], timeout: 60)
+    # RAM Search's and RAM Watch's rows picked by a drag, the list scrolling
+    # under it when held past the bottom (issue 554)
+    test_list_mouse = executable(
+      'test-list-mouse',
+      ['qt/tests/test_list_mouse.cpp', qt_rcc],
+      dependencies: [qt_test_dep],
+      override_options: ['cpp_std=c++20'],
+      cpp_args: ['-DQT_NO_KEYWORDS'],
+    )
+    test('list mouse', test_list_mouse, env: ['QT_QPA_PLATFORM=offscreen'], timeout: 60)
     # the clipboard on a busy system: set once, read back, set again until it
     # takes, said when it never does (issue 485)
     test_clipboard_relay = executable(
