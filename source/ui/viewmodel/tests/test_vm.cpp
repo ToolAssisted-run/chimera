@@ -5152,6 +5152,10 @@ bool project(const char *package, const char *rom, const std::string &movies, co
 	CHECK(roll.markerCount.get() == 0); /* the other project has none */
 	/* the newest first, each once */
 	CHECK(session.recentProjects.get() == (dir / "p.chimeraProject").string() + "\n" + (dir / "saved.chimeraProject").string());
+	/* the same project spelt another way ('/' on Windows, a "./" in it) is
+	 * still one line, written the system's way (issue 556) */
+	CHECK(openIt(fs::path(dir.generic_string() + "/./saved.chimeraProject")));
+	CHECK(session.recentProjects.get() == (dir / "saved.chimeraProject").string() + "\n" + (dir / "p.chimeraProject").string());
 	CHECK(openIt(dir / "saved.chimeraProject"));
 	CHECK(roll.markerCount.get() == 2 && roll.rowLists()[0].model->rowNote(12) == "turn");
 	RowModel &marks = *roll.rowLists()[1].model;

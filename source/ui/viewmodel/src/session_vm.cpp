@@ -5162,20 +5162,27 @@ void SessionViewModel::openMadeProjectOnMachine(ce_project *p, const std::string
 	openProjectOnMachine("", package, false, p);
 }
 
-void SessionViewModel::addRecent(const std::string &path)
+void SessionViewModel::addRecent(const std::string &given)
 {
-	/* newest first, each once, ten at most */
-	std::string list = path, rest = recentProjects.get();
-	int kept = 1;
+	/* newest first, each once, ten at most. One project is one line however
+	 * its path was spelt: "C:/a/b" and "C:\a\b" on Windows, or with a "./"
+	 * in it, are written the system's way and are the same file (issue 556) */
+	const auto spelt = [](const std::string &p) {
+		const std::u8string s = std::filesystem::u8path(p).lexically_normal().u8string();
+		return std::string(reinterpret_cast<const char *>(s.data()), s.size());
+	};
+	const std::string path = spelt(given), rest = recentProjects.get();
+	std::string list = path;
+	std::vector<std::string> kept{path};
 	size_t at = 0;
-	while (at <= rest.size() && kept < 10)
+	while (at <= rest.size() && kept.size() < 10)
 	{
 		const size_t end = rest.find('\n', at);
-		const std::string line = rest.substr(at, end == std::string::npos ? std::string::npos : end - at);
-		if (!line.empty() && line != path)
+		const std::string line = spelt(rest.substr(at, end == std::string::npos ? std::string::npos : end - at));
+		if (!line.empty() && std::none_of(kept.begin(), kept.end(), [&](const std::string &k) { return samePlace(k, line); }))
 		{
 			list += "\n" + line;
-			kept++;
+			kept.push_back(line);
 		}
 		if (end == std::string::npos) break;
 		at = end + 1;

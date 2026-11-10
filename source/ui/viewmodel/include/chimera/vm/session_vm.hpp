@@ -898,7 +898,7 @@ private:
 	void rememberLocalPathsOnMachine();
 	std::filesystem::path cacheDirOf(ce_project *p) const;
 	/* the project's file, first in the recent projects */
-	void addRecent(const std::string &path);
+	void addRecent(const std::string &given);
 	/* a backup: written there, the project's own file and greenzone left as they are */
 	/* true when written */
 	bool saveProjectOnMachine(const std::string &path, bool backup = false, bool quiet = false);
