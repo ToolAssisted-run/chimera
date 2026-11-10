@@ -9480,6 +9480,29 @@ bool luaParity(const char *package, const char *rom)
 		CHECK(lua1("table.concat(seen, ','), client.show_future(print, 0)") == "[\"0,1,2\", \"00000000-0000-0000-0000-000000000000\"]");
 		CHECK(console.run("removeAllFunctions", {}, error).has_value());
 	}
+	/* a script's padding stays while it runs, a script started and ended
+	 * beside it notwithstanding, and goes once no script runs (issue 562) */
+	{
+		/* the scripts above kept running by their functions stopped first */
+		lua.stopAll();
+		CHECK(!lua.running());
+		console.run("openScript", {scriptFile("client.SetGameExtraPadding(0, 0, 30, 0)\nclient.SetClientExtraPadding(5, 0, 0, 0)\n"
+			"for i = 1, 3 do emu.frameadvance() end\n", "padded")}, error);
+		CHECK(d.until([&] { return display.padRight.get() == 30 && display.clientLeft.get() == 5; }, 10));
+		CHECK(lua1("return 1") == "[1]");
+		CHECK(display.padRight.get() == 30 && display.clientLeft.get() == 5);
+		/* the scripts' turns after each frame, as the window gives them */
+		session.setScriptTurns([&lua] { lua.frameStart(); }, [&lua] { lua.frameDone(); });
+		for (int i = 0; i < 4; i++)
+		{
+			const int64_t at = session.frame.get();
+			session.run("frameAdvance", {}, error);
+			d.until([&] { return session.frame.get() == at + 1; }, 20);
+		}
+		CHECK(d.until([&] { return display.padRight.get() == 0 && display.clientLeft.get() == 0; }, 10));
+		CHECK(!lua.running());
+		session.setScriptTurns({}, {});
+	}
 	/* sleep: the scripts' thread waits */
 	const auto before = std::chrono::steady_clock::now();
 	CHECK(lua1("client.sleep(30) client.exactsleep(20)") == "[]");

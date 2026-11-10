@@ -1002,8 +1002,15 @@ function client.borderwidth() return client.transformPoint(0, 0).x end
 function client.borderheight() return client.transformPoint(0, 0).y end
 -- black around the picture in its pixels, the surface scripts draw on grown
 -- with it; and room left free around everything in the window's
-function client.SetGameExtraPadding(left, top, right, bottom) C.display.setPadding("game", left or 0, top or 0, right or 0, bottom or 0) end
-function client.SetClientExtraPadding(left, top, right, bottom) C.display.setPadding("client", left or 0, top or 0, right or 0, bottom or 0) end
+-- a script's padding stays while any script runs, and goes once none does (issue 562)
+function client.SetGameExtraPadding(left, top, right, bottom)
+	C.display.setPadding("game", left or 0, top or 0, right or 0, bottom or 0)
+	__chimera_padded = true
+end
+function client.SetClientExtraPadding(left, top, right, bottom)
+	C.display.setPadding("client", left or 0, top or 0, right or 0, bottom or 0)
+	__chimera_padded = true
+end
 function client.xpos() return math.tointeger(tonumber(string.match(C.toolWindows.windowPosition(), "^(%-?%d+)"))) end
 function client.ypos() return math.tointeger(tonumber(string.match(C.toolWindows.windowPosition(), " (%-?%d+)$"))) end
 function client.openhexeditor() C.toolWindows.show("hex") end
@@ -1644,9 +1651,14 @@ function tastudio.onqueryitemtext(fn, name) return queryRegister("OnQueryItemTex
 function tastudio.addcolumn(name, text, width)
 	if C.session.hasProject then C.pianoRoll.addScriptColumn(tostring(name), tostring(text), width or 30, __chimera_script or 0) end
 end
--- every script stopped: their own columns go too
+-- every script stopped: their own columns go too, and the padding they set
 function __chimera_scripts_stopped()
 	if C.pianoRoll then C.pianoRoll.clearScriptColumns() end
+	if __chimera_padded and C.display then
+		C.display.setPadding("game", 0, 0, 0, 0)
+		C.display.setPadding("client", 0, 0, 0, 0)
+	end
+	__chimera_padded = nil
 end
 
 -- event --------------------------------------------------------------------

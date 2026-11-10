@@ -540,6 +540,8 @@ void LuaBridge::stopHere(int64_t id)
 	if (s == nullptr) return;
 	if (s->thread != LUA_NOREF) luaL_unref(L_, LUA_REGISTRYINDEX, s->thread);
 	scripts_.erase(scripts_.begin() + (s - scripts_.data()));
+	/* the last one: what the scripts left with the libraries goes too */
+	if (scripts_.empty()) callHook("__chimera_scripts_stopped");
 	if (onStopped) atWindow([&] { onStopped(id); });
 }
 
@@ -569,7 +571,8 @@ void LuaBridge::stopAllHere()
 	std::vector<int64_t> ids;
 	for (const Script &s : scripts_) ids.push_back(s.id);
 	for (const int64_t id : ids) stopHere(id);
-	/* what the scripts left with the libraries goes with them */
+	/* what the scripts left with the libraries goes with them (said again
+	 * when there were none, or one's OnExit started another) */
 	callHook("__chimera_scripts_stopped");
 }
 

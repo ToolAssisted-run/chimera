@@ -14367,3 +14367,19 @@ Tested: the view models test plays the synthetic core to frame 200,000 with
 the greenzone off, holds rewind and lets go after 0.3 s. The step stopped on
 frame 14,380 at 0.30 s; with the window's call taken out it ran on to frame
 199,999 in 4.1 s and the test failed.
+
+## A script's padding goes once no script runs (2026-11-10, issue 562)
+
+`client.SetGameExtraPadding` and `client.SetClientExtraPadding` widen the
+picture's surroundings for a script to draw in. Nothing ever took the
+padding away: closing TAStudio stopped the reporter's script, but the
+window kept the empty strip it had asked for. Now, as with a script's own
+TAStudio columns, what the scripts set goes with them: once the last
+running script stops - ended, failed, stopped by hand or by the machine
+closing - both paddings go back to none. While any script runs the padding
+stays, so a script that sets it and ends while another runs leaves it for
+that one.
+
+Tested: the Lua test starts a script that sets both paddings and ends after
+three frames; a script run and ended beside it leaves them, and they are
+gone once it ends. With the call taken out the test fails.
