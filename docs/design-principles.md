@@ -14347,3 +14347,23 @@ stacks, so nothing faults to report a write.
 - **The cost**, Mesen on that PC: every frame captured, 644 frames a second
   without the declaration and 140 with it; every 8th, 876 and 241; greenzone
   off, the same (929 and 918).
+
+## A replay going back can be stopped (user-decided, 2026-11-10, issue 559)
+
+With the greenzone (the states kept for going back) set to Off, nothing is
+stored, so each step of rewind replays the movie from the last state stored
+before it, usually frame 0. In a Sonic Mania movie of 17,000 frames each step
+took seconds, Chimera looked frozen, and closing it waited for the replay.
+
+Of three choices - refuse to rewind while Off, keep a small rewind buffer
+while Off, or keep the replay but let it be stopped - the owner chose the
+last: Off keeps meaning nothing is stored. The engine has a new call,
+`ce_session_seek_stop`, safe from any thread, which stops the seek under way
+before its next frame; the seek then returns 2 with the machine on the frame
+it reached. The window calls it when rewind is let go and when it closes.
+Where the replay stopped, one more frame is run so its picture is shown.
+
+Tested: the view models test plays the synthetic core to frame 200,000 with
+the greenzone off, holds rewind and lets go after 0.3 s. The step stopped on
+frame 14,380 at 0.30 s; with the window's call taken out it ran on to frame
+199,999 in 4.1 s and the test failed.

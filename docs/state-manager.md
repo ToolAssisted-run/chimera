@@ -1134,6 +1134,11 @@ same code whatever the period.
   `ce_session_greenzone_capture_period`, so the frontend only names the period.
 - **Edits made while Off are still honoured**: a frame after an edit the
   machine has not gone back to is refused when storing resumes.
+- **Going back while Off replays from the last state stored before it**,
+  often frame 0, so a step of rewind in a long movie can take minutes. Such a
+  replay can be stopped (`ce_session_seek_stop`, issue 559): letting go of
+  rewind stops it on the frame it has reached, and closing the window does
+  not wait for it.
 
 Measured with `chimera-run --record --frames 11000` on snes9x (The Last
 Super), seconds, two runs each:

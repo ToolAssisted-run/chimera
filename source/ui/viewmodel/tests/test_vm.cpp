@@ -10515,6 +10515,49 @@ bool longMovie(const char *package, const char *rom)
 	return failures == before;
 }
 
+/* A seek stopped on the way (issue 559): with the greenzone off, a step of
+ * rewind replays the movie from frame 0, which in a long movie takes
+ * minutes. Letting go of rewind stops the replay where it has got to, the
+ * machine on that frame with its picture, and closing does not wait for the
+ * replay to end. */
+bool seekStopped(const char *package, const char *rom)
+{
+	const int before = failures;
+	ManualDispatcher d;
+	InputLog inputs;
+	SessionViewModel session(d, inputs);
+	PianoRollViewModel roll(d, inputs, session);
+	std::string error;
+	openGame(session, package, std::string(rom), error);
+	CHECK(d.until([&] { return session.isOpen.get(); }, 60));
+	session.unthrottled.set(true);
+	session.greenzonePeriod.set(0);
+	const int64_t far = 200000;
+	roll.run("insertFrames", {int64_t{0}, far + 10}, error);
+	session.run("seek", {far}, error);
+	CHECK(d.until([&] { return session.frame.get() == far; }, 120));
+	/* a step of rewind from there replays from frame 0; let go at once */
+	const int64_t opens = session.opens.get();
+	const auto start = std::chrono::steady_clock::now();
+	session.holdRewind(true);
+	d.until([] { return false; }, 0.3);
+	session.holdRewind(false);
+	/* the frame is told once the step is over, stopped or not */
+	d.until([&] { return session.frame.get() != far; }, 120);
+	const int64_t landed = session.frame.get();
+	const double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
+	std::printf("a step of rewind from frame %lld, let go after 0.3 s, stopped on frame %lld after %.2f s\n",
+		static_cast<long long>(far), static_cast<long long>(landed), seconds);
+	CHECK(landed > 0 && landed < far / 2);
+	CHECK(session.isOpen.get() && session.opens.get() == opens);
+	/* the machine goes on from there: a frame advance is the next frame */
+	session.run("frameAdvance", {}, error);
+	CHECK(d.until([&] { return session.frame.get() == landed + 1; }, 30));
+	session.run("close", {}, error);
+	CHECK(d.until([&] { return !session.isOpen.get(); }, 20));
+	return failures == before;
+}
+
 /* A package that names the controls TAStudio shows at first (issue 544):
  * a project with no piano roll of its own hides every other control, and a
  * package that names none keeps Chimera's rule, which hides none of the
@@ -11066,6 +11109,7 @@ int main(int argc, char **argv)
 			ranMachine = markerFrames(argv[1], argv[2]) && ranMachine;
 			ranMachine = listsWhilePlaying(argv[1], argv[2]) && ranMachine;
 			ranMachine = longMovie(argv[1], argv[2]) && ranMachine;
+			ranMachine = seekStopped(argv[1], argv[2]) && ranMachine;
 			if (argc >= 9) ranMachine = coreManager(argv[1], argv[6], argv[8]) && ranMachine;
 			ranMachine = elsewherePackages(argv[1]) && ranMachine;
 		}

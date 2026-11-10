@@ -1900,7 +1900,15 @@ SessionViewModel::~SessionViewModel()
 		quit_ = true;
 	}
 	cv_.notify_all();
+	/* a seek under way (minutes, with the greenzone off) is not waited for */
+	stopSeek();
 	thread_.join();
+}
+
+void SessionViewModel::stopSeek()
+{
+	std::lock_guard<std::mutex> lock(seekStopLock_);
+	if (seekStopS_ != nullptr) ce_session_seek_stop(seekStopS_);
 }
 
 void SessionViewModel::armAutohold(bool down)
@@ -2045,6 +2053,8 @@ void SessionViewModel::holdRewind(bool down)
 {
 	rewindHeld_ = down;
 	rewinding.set(down);
+	/* let go: the step back under way stops where it is (issue 559) */
+	if (!down) stopSeek();
 	submit([this, down] {
 		if (s_ == nullptr) return;
 		if (down)
@@ -2345,6 +2355,10 @@ void SessionViewModel::freeSessionOnMachine()
 	for (const Hooks &h : hooksM_)
 		if (h.closing) h.closing(s_);
 	inputs_.bind(nullptr);
+	{
+		std::lock_guard<std::mutex> lock(seekStopLock_);
+		seekStopS_ = nullptr;
+	}
 	/* a greenzone being written is finished before its session goes */
 	ce_session_history_save_wait(s_);
 	ce_session_free(s_);
@@ -5470,6 +5484,10 @@ void SessionViewModel::adoptOnMachine(ce_session *s, const std::string &package,
 	packageSha1M_.clear();
 	diedM_ = false;
 	inputs_.bind(s);
+	{
+		std::lock_guard<std::mutex> lock(seekStopLock_);
+		seekStopS_ = s;
+	}
 	inputs_.forgetRuns();
 	frameM_ = ce_session_frame(s);
 	greenEndM_ = 0;
@@ -6292,7 +6310,17 @@ void SessionViewModel::seekOnMachine(int64_t target, bool grow)
 	 * the machine back before it */
 	const int64_t stored = ce_session_greenzone_nearest(s_, greenEndM_ < from ? std::min(want, greenEndM_) : want);
 	const int64_t ran = (stored >= 0 && (stored > from || from > want) ? want - stored : want - from) + (target > 0 ? 1 : 0);
-	if (ce_session_seek(s_, want) != 0)
+	const int32_t sought = ce_session_seek(s_, want);
+	if (sought == 2)
+	{
+		/* stopped on the way (rewind let go, the window closing): the
+		 * machine stays where the replay had got to, its picture drawn */
+		frameM_ = ce_session_frame(s_);
+		if (frameM_ < ce_session_movie_length(s_)) stepOnMachine(false, true, false);
+		report(-1, -1, -1, -1, -1);
+		return;
+	}
+	if (sought != 0)
 	{
 		/* the window edited the movie while the machine went through it
 		 * (frames taken out, and maybe put back by an undo since): that

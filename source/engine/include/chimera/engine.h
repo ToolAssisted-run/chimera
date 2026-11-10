@@ -1918,8 +1918,15 @@ CE_API void ce_session_greenzone_picture_settle(ce_session *s, int32_t settle_fr
 CE_API int64_t ce_session_greenzone_picture_count(const ce_session *s);
 CE_API uint64_t ce_session_greenzone_picture_bytes(const ce_session *s);
 /* Restores the nearest stored state at or before frame, then replays the
- * movie to frame. Needs the movie's entries up to frame. 0 on success. */
+ * movie to frame. Needs the movie's entries up to frame. 0 on success; 2
+ * when ce_session_seek_stop stopped it, the machine on the frame it had
+ * reached (ce_session_frame says which), between the state it restored and
+ * the frame asked for. */
 CE_API int32_t ce_session_seek(ce_session *s, int64_t frame);
+/* Stops the ce_session_seek under way, before the next frame it would run.
+ * Any thread, while the session lives. A seek that begins after the call is
+ * not stopped by it (issue 559). */
+CE_API void ce_session_seek_stop(ce_session *s);
 
 /* The machine was put on `frame` of the session's movie by a state the
  * caller loaded itself - a branch's, kept in a file (ce_session_state_load_file)

@@ -758,6 +758,8 @@ struct ce_session
 	/* the core took the Vulkan bridge: a load is a new device to it */
 	bool vulkanBridge = false;
 	bool glBridge = false;   /* this session started the GL bridge: it ends it (ce_gl_session_end) */
+	/* ce_session_seek_stop: the seek under way stops on the frame it has reached */
+	std::atomic<bool> seekStop{ false };
 	/* The core reports each read of its controls during a frame (issue 344):
 	 * its SetInputPollCallback export took the engine's callback. fn is the
 	 * caller's, called at each read. */
@@ -5052,9 +5054,17 @@ int32_t ce_session_seek(ce_session *s, int64_t frame)
 		return 1;
 	}
 
-	/* replay the log to the target - a seek is a replay, never a guess */
+	/* replay the log to the target - a seek is a replay, never a guess.
+	 * Asked to stop, it stops where it is (issue 559): with the greenzone off
+	 * a step back replays from frame 0, which can take minutes */
+	s->seekStop.store(false);
 	while (s->frame < frame)
 	{
+		if (s->seekStop.exchange(false))
+		{
+			if (s->movieMode == 3 && s->frame < ce_session_movie_length(s)) s->movieMode = 1;
+			return 2;
+		}
 		std::vector<int32_t> movieAxes;
 		if (!s->movieEntry(s->frame, movieAxes)) return 1;
 		for (size_t i = 0; i < movieAxes.size(); i++)
@@ -5067,6 +5077,11 @@ int32_t ce_session_seek(ce_session *s, int64_t frame)
 	}
 	if (s->movieMode == 3 && s->frame < ce_session_movie_length(s)) s->movieMode = 1;
 	return 0;
+}
+
+void ce_session_seek_stop(ce_session *s)
+{
+	if (s != nullptr) s->seekStop.store(true);
 }
 
 int32_t ce_session_movie_at(ce_session *s, int64_t frame)

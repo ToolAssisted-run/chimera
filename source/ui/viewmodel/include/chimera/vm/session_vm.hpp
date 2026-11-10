@@ -1276,6 +1276,10 @@ private:
 	/* what a script's emu.setlagcount added to the count, from which frame */
 	int64_t lagOffset_ = 0, lagOffsetFrom_ = INT64_MAX;
 	bool fastHeld_ = false, rewindHeld_ = false;
+	/* the session a seek can be stopped on from the window's thread (stopSeek) */
+	std::mutex seekStopLock_;
+	ce_session *seekStopS_ = nullptr;
+	void stopSeek();
 	std::vector<Connection> overlayWatches_;
 	uint64_t editRunningM_ = 0;
 	bool runningM_ = false;
