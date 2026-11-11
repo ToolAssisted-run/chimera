@@ -3,6 +3,8 @@
  * in each frame; the window copies out the newest one when it next draws. */
 
 #include <cstdint>
+#include <cstring>
+#include <functional>
 #include <mutex>
 #include <vector>
 
@@ -68,6 +70,26 @@ public:
 		out.shownHeight = frame_.shownHeight;
 		out.serial = frame_.serial;
 		out.pixels.assign(frame_.pixels.begin(), frame_.pixels.end());
+		return true;
+	}
+
+	/* any thread: the newest frame's pixels copied straight to where `into`
+	 * says for its size (rows of `width` pixels, one after another), when it
+	 * is newer than `have`; its size and serial in `out`, whose own pixels are
+	 * left as they are. The window's picture: copied once, into an image it
+	 * keeps, rather than out and then again into a new image (issue 568) */
+	bool takeIfNewer(uint64_t have, Frame &out, const std::function<uint32_t *(int32_t width, int32_t height)> &into) const
+	{
+		std::lock_guard<std::mutex> lock(m_);
+		if (frame_.serial == have) return false;
+		out.width = frame_.width;
+		out.height = frame_.height;
+		out.shownWidth = frame_.shownWidth;
+		out.shownHeight = frame_.shownHeight;
+		out.serial = frame_.serial;
+		if (frame_.width > 0 && frame_.height > 0)
+			if (uint32_t *to = into(frame_.width, frame_.height))
+				std::memcpy(to, frame_.pixels.data(), frame_.pixels.size() * sizeof(uint32_t));
 		return true;
 	}
 

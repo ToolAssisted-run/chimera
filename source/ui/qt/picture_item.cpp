@@ -120,7 +120,12 @@ PictureItem::Drawn PictureItem::drawnAs(const uint32_t *pixels, int width, int h
 QSGNode *PictureItem::updatePaintNode(QSGNode *old, UpdatePaintNodeData *)
 {
 	auto *node = static_cast<QSGSimpleTextureNode *>(old);
-	const bool fresh = source_ != nullptr && source_->picture().takeIfNewer(frame_.serial, frame_);
+	/* copied once, into the image kept for it; a new one only when the size changed or the last texture still
+	 * holds it (it may be uploaded after the next frame came) */
+	const bool fresh = source_ != nullptr && source_->picture().takeIfNewer(frame_.serial, frame_, [this](int32_t w, int32_t h) {
+		if (image_.width() != w || image_.height() != h || !image_.isDetached()) image_ = QImage(w, h, QImage::Format_RGB32);
+		return reinterpret_cast<uint32_t *>(image_.bits());
+	});
 	if (frame_.width <= 0 || frame_.height <= 0)
 	{
 		delete node;
@@ -147,12 +152,8 @@ QSGNode *PictureItem::updatePaintNode(QSGNode *old, UpdatePaintNodeData *)
 	fit_.prescaleSteps(frame_.width, frame_.height, frame_.shownWidth, frame_.shownHeight, width(), height(), smooth_, kLargestSide, stepX, stepY);
 	if (fresh || node->texture() == nullptr || stepX != stepX_ || stepY != stepY_)
 	{
-		/* the image owns its pixels: the texture may be uploaded after this
-		 * copy of the frame has been overwritten by the next one */
-		QImage image(frame_.width, frame_.height, QImage::Format_RGB32);
-		const size_t row = static_cast<size_t>(frame_.width) * sizeof(uint32_t);
-		for (int y = 0; y < frame_.height; y++)
-			std::memcpy(image.scanLine(y), frame_.pixels.data() + static_cast<size_t>(y) * frame_.width, row);
+		/* shared with the texture, not copied: the next frame goes into a new image while the texture holds this one */
+		QImage image = image_;
 		if (stepX != 1 || stepY != 1) image = image.scaled(frame_.width * stepX, frame_.height * stepY, Qt::IgnoreAspectRatio, Qt::FastTransformation);
 		node->setTexture(window()->createTextureFromImage(image));
 		stepX_ = stepX;

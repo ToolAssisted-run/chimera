@@ -4327,6 +4327,17 @@ bool machine(const char *package, const char *rom)
 		const std::vector<uint32_t> opaque = {0xFF102030u, 0xFF405060u, 0xFF708090u, 0xFFA0B0C0u};
 		Picture::Frame shown;
 		CHECK(picture.takeIfNewer(0, shown) && shown.pixels == opaque);
+		/* the window's: copied straight to where it keeps it, once a frame, its own pixels left alone (issue 568) */
+		std::vector<uint32_t> kept;
+		Picture::Frame window;
+		window.pixels = {1};
+		const auto into = [&](int32_t w, int32_t h) {
+			kept.resize(static_cast<size_t>(w) * static_cast<size_t>(h));
+			return kept.data();
+		};
+		CHECK(picture.takeIfNewer(0, window, into) && kept == opaque && window.width == 2 && window.height == 2);
+		CHECK(window.serial == shown.serial && window.pixels == std::vector<uint32_t>{1});
+		CHECK(!picture.takeIfNewer(window.serial, window, into));
 	}
 	/* and it saves as chimera-run writes one: a TGA, rows bottom-up */
 	{

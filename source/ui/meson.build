@@ -707,6 +707,16 @@ endif
     override_options: ['cpp_std=c++20'],
   )
   test('single instance', test_single_instance, timeout: 60)
+  # Not a test: what each step of the window's picture costs on a real
+  # screen and GPU (tests/perf/picturebench.cpp, issue 568)
+  executable(
+    'picturebench',
+    ['../../tests/perf/picturebench.cpp'],
+    dependencies: [qt_dep, vm_dep],
+    override_options: ['cpp_std=c++20'],
+    cpp_args: ['-DQT_NO_KEYWORDS'],
+    build_by_default: false,
+  )
   # the MCP server in the window: the witness's agent, reading and then
   # changing the open project through chimera-mcp; the window quits by itself
   if host_machine.system() != 'windows'
