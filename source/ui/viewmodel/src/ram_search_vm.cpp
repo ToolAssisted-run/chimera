@@ -14,6 +14,7 @@
 
 #include "chimera/engine.h"
 #include "chimera/vm/json.hpp"
+#include "chimera/vm/page_cache.hpp"
 #include "chimera/vm/ram_watch_vm.hpp"
 
 namespace chimera::vm {
@@ -31,49 +32,21 @@ struct DomainReader
 	int32_t index = -1;
 	std::thread::id machine;
 	std::function<void()> asked;
-	std::mutex pagesM;
-	std::map<int64_t, std::vector<uint8_t>> pages;
-	std::set<int64_t> wanted;
+	PageCache pages;
 };
-constexpr int64_t kPage = 4096;
-/* 4 MiB: more than the rows any list shows */
-constexpr size_t kMostPages = 1024;
 
 int64_t readDomainRange(void *user, int64_t offset, uint8_t *buf, int64_t len)
 {
 	auto *r = static_cast<DomainReader *>(user);
 	if (std::this_thread::get_id() == r->machine) return ce_session_domain_read(r->s, r->index, offset, buf, len);
-	bool missing = false;
-	{
-		std::lock_guard<std::mutex> lock(r->pagesM);
-		for (int64_t done = 0; done < len;)
-		{
-			const int64_t at = offset + done, page = at / kPage, in = at % kPage, n = std::min(len - done, kPage - in);
-			if (const auto it = r->pages.find(page); it != r->pages.end())
-				std::memcpy(buf + done, it->second.data() + in, static_cast<size_t>(n));
-			else
-			{
-				std::memset(buf + done, 0, static_cast<size_t>(n));
-				missing = r->wanted.insert(page).second || missing;
-			}
-			done += n;
-		}
-	}
-	if (missing && r->asked) r->asked();
+	if (r->pages.read(offset, buf, len) && r->asked) r->asked();
 	return len;
 }
 
-/* the machine's thread: every copy made again, and the pages asked for made; true when some were asked for */
+/* the machine's thread: the copies made again, and the pages asked for made; true when some were asked for */
 bool copyPages(DomainReader &r)
 {
-	std::lock_guard<std::mutex> lock(r.pagesM);
-	if (r.pages.size() + r.wanted.size() > kMostPages) r.pages.clear();
-	const bool wanted = !r.wanted.empty();
-	for (const int64_t page : r.wanted) r.pages[page].resize(kPage);
-	r.wanted.clear();
-	for (auto &[page, bytes] : r.pages)
-		if (ce_session_domain_read(r.s, r.index, page * kPage, bytes.data(), kPage) < kPage) std::fill(bytes.begin(), bytes.end(), 0);
-	return wanted;
+	return r.pages.copy([&r](int64_t offset, uint8_t *buf, int64_t len) { return ce_session_domain_read(r.s, r.index, offset, buf, len); });
 }
 
 DomainReader g_reader; /* one search at a time */
@@ -936,13 +909,11 @@ void RamSearchViewModel::startOnMachine(ce_session *s, const std::string &name, 
 	else
 	{
 		{
-			std::lock_guard<std::mutex> lock(g_reader.pagesM);
 			g_reader.s = s;
 			g_reader.index = index;
 			g_reader.machine = std::this_thread::get_id();
 			g_reader.asked = [this] { pagesAsked(); };
 			g_reader.pages.clear();
-			g_reader.wanted.clear();
 		}
 		rs = ce_ramsearch_create(nullptr, &readDomainRange, &g_reader, bytes);
 	}

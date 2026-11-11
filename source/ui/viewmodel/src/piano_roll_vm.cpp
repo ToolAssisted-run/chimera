@@ -2823,7 +2823,7 @@ void PianoRollViewModel::refreshRun(int64_t frame, int64_t through)
 	lastInputFrame.set(last);
 	runEndFrame.set(end);
 	session_.setRunMarkers({0, last, end});
-	listMarkers();
+	moveRunMarkers();
 	for (int64_t f : {wasLast, wasEnd, last, end})
 		if (f < size) frames_.changed.emit(f, f);
 }
@@ -2833,9 +2833,9 @@ void PianoRollViewModel::listMarkers()
 	/* the run's end moves on every frame recorded: as many markers, one moved */
 	const auto before = static_cast<int64_t>(markerList_.size());
 	markerList_.clear();
-	markerList_.push_back({0, tr("piano_roll.marker_run_start"), true, true});
-	markerList_.push_back({lastInputFrame.get(), tr("piano_roll.marker_last_input"), true, true});
-	markerList_.push_back({runEndFrame.get(), tr("piano_roll.marker_run_end"), true, true});
+	markerList_.push_back({0, tr("piano_roll.marker_run_start"), true, true, 0});
+	markerList_.push_back({lastInputFrame.get(), tr("piano_roll.marker_last_input"), true, true, 1});
+	markerList_.push_back({runEndFrame.get(), tr("piano_roll.marker_run_end"), true, true, 2});
 	for (const auto &[f, m] : markers_) markerList_.push_back({f, m.text, m.keepState, false});
 	/* by frame; on a shared frame the run's own first, in run order, then the person's */
 	std::stable_sort(markerList_.begin(), markerList_.end(), [](const ListedMarker &a, const ListedMarker &b) {
@@ -2844,6 +2844,33 @@ void PianoRollViewModel::listMarkers()
 	});
 	pickCurrentMarker();
 	markerRows_.refreshed(before);
+}
+
+/* The run's last input and end moved to where they now belong in the list, kept as listMarkers sorts it.
+ * While recording they move on every frame, and the list made again copied and sorted every marker each
+ * time (issue 568) */
+void PianoRollViewModel::moveRunMarkers()
+{
+	const auto before = [](const ListedMarker &a, const ListedMarker &b) {
+		if (a.frame != b.frame) return a.frame < b.frame;
+		if (a.permanent != b.permanent) return a.permanent;
+		return a.run < b.run;
+	};
+	for (const int run : {1, 2})
+	{
+		const auto at = std::find_if(markerList_.begin(), markerList_.end(), [run](const ListedMarker &m) { return m.run == run; });
+		if (at == markerList_.end())
+		{
+			listMarkers();
+			return;
+		}
+		ListedMarker m = std::move(*at);
+		m.frame = run == 1 ? lastInputFrame.get() : runEndFrame.get();
+		markerList_.erase(at);
+		markerList_.insert(std::upper_bound(markerList_.begin(), markerList_.end(), m, before), std::move(m));
+	}
+	pickCurrentMarker();
+	markerRows_.refreshed(static_cast<int64_t>(markerList_.size()));
 }
 
 void PianoRollViewModel::showMarker(int64_t frame)

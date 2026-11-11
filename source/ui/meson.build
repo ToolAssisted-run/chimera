@@ -659,6 +659,17 @@ endif
       cpp_args: ['-DQT_NO_KEYWORDS'],
     )
     test('roll wheel', test_roll_wheel, env: ['QT_QPA_PLATFORM=offscreen', 'QT_QUICK_BACKEND=software'], timeout: 60)
+    # the piano roll with more columns than it has room for: those past its
+    # edge neither read nor asked of the scripts, the picture the same (issue 568)
+    test_roll_paint = executable(
+      'test-roll-paint',
+      ['qt/tests/test_roll_paint.cpp', 'qt/piano_roll_item.cpp', 'qt/qml_view_model.cpp', 'qt/theme_palette.cpp',
+        qt6.compile_moc(headers: ['qt/piano_roll_item.hpp', 'qt/qml_view_model.hpp', 'qt/theme_palette.hpp'], dependencies: [qt_dep])],
+      dependencies: [qt_test_dep, vm_dep, dl_dep],
+      override_options: ['cpp_std=c++20'],
+      cpp_args: ['-DQT_NO_KEYWORDS'],
+    )
+    test('roll paint', test_roll_paint, env: ['QT_QPA_PLATFORM=offscreen', 'QT_QUICK_BACKEND=software'], timeout: 60)
     # scripts dropped on the Lua Console opened and run, a session read,
     # other files left alone (issue 561)
     test_lua_console_drop = executable(

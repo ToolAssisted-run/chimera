@@ -433,6 +433,7 @@ private:
 	bool frameEmpty(int64_t frame) const;
 	bool permanentAt(int64_t frame) const { return frame == 0 || frame == lastInputFrame.get() || frame == runEndFrame.get(); }
 	void listMarkers();
+	void moveRunMarkers();
 	void pickCurrentMarker();
 	/* the marker list as shown: the run's own first on a shared frame, in run order */
 	struct ListedMarker
@@ -440,6 +441,8 @@ private:
 		int64_t frame;
 		std::string text;
 		bool keepState, permanent;
+		/* the run's own: 0 its start, 1 its last input, 2 its end; -1 the person's */
+		int run = -1;
 	};
 	std::vector<ListedMarker> markerList_;
 	Connection runOpensWatch_;

@@ -456,6 +456,12 @@ void PianoRollItem::paint(QPainter *p)
 	auto colX = [&](int c) { return xs[static_cast<size_t>(c)]; };
 	auto colW = [&](int c) { return ws[static_cast<size_t>(c)]; };
 	const int right = colX(columns + extraCount);
+	/* the columns that start inside the roll, its own and then the script's:
+	 * one that starts past its edge is not seen, so it is not read, nor asked
+	 * of the scripts, nor drawn (issue 568). The places stay as they are */
+	int seen = 0;
+	while (seen < columns + extraCount && colX(seen) < w) seen++;
+	const int seenColumns = std::min(columns, seen), seenExtras = seen - seenColumns;
 	const qint64 count = rows.rowCount();
 	const int shown = visibleRows() + 1;
 	const QFontMetrics fm(font_);
@@ -468,21 +474,21 @@ void PianoRollItem::paint(QPainter *p)
 	 * colour, an Auto-hold column's in the emphasis colour, the one under the
 	 * pointer lit; the frame numbers' headed Frame# */
 	p->fillRect(0, 0, w, hs, header);
-	for (int c = 0; c < columns; c++)
+	for (int c = 0; c < seenColumns; c++)
 		if (colW(c) > 0 && rows.columnEmphasized(c)) p->fillRect(colX(c) + 1, 1, colW(c) - 1, hs - 1, k.emphasis);
 	const bool titleLit = hoverTitles_ && hoverColumn_ >= -1 && hoverColumn_ < columns && (hoverColumn_ < 0 || colW(hoverColumn_) > 0);
 	if (titleLit)
 		p->fillRect(hoverColumn_ < 0 ? QRect(cx0 + 1, 1, fx - cx0 - 1, hs - 1) : QRect(colX(hoverColumn_) + 1, 1, colW(hoverColumn_) - 1, hs - 1), picked);
 	p->setPen(titleLit && hoverColumn_ == -1 ? pickedText : headerText);
 	label(QRect(cx0 + 4, 0, fx - cx0 - 4, hs), left, QStringLiteral("Frame#"), false);
-	for (int c = 0; c < columns; c++)
+	for (int c = 0; c < seenColumns; c++)
 	{
 		if (colW(c) == 0) continue; /* hidden */
 		p->setPen(titleLit && hoverColumn_ == c ? pickedText : headerText);
 		label(QRect(colX(c) + 4, 0, colW(c) - 4, hs), left, horizontal_ ? title(c) : fm.elidedText(title(c), Qt::ElideRight, colW(c) - 4), false);
 	}
 	p->setPen(headerText);
-	for (int e = 0; e < extraCount; e++)
+	for (int e = 0; e < seenExtras; e++)
 		label(QRect(colX(columns + e) + 4, 0, extras_[static_cast<size_t>(e)].width - 4, hs), left, extras_[static_cast<size_t>(e)].text, false);
 	/* the lines, one screen pixel wide at any display scale (a pen one unit
 	 * wide drew some lines one pixel and some two on a scaled screen), end
@@ -492,13 +498,13 @@ void PianoRollItem::paint(QPainter *p)
 	auto down = [&](int x, int y0, int y1, const QColor &color) { p->fillRect(QRectF(x, y0, px, y1 - y0 + px), color); };
 	across(0, 0, w, k.columnBorder);
 	down(cx0, 0, hs, k.columnBorder);
-	for (int c = 0; c <= columns + extraCount; c++)
+	for (int c = 0; c <= seen; c++)
 		if (c == columns + extraCount || c >= columns || colW(c) > 0) down(colX(c), 0, hs, k.columnBorder);
 	/* a thick line where a player's columns start and end, the players as
 	 * the core declares them (the console's a group too) */
 	const std::vector<bool> playerEdge = chimera::vm::PianoRollViewModel::playerEdges(players, shownColumns);
 	auto thickLines = [&](int top, int bottom, const QColor &color) {
-		for (int c = 0; c <= columns; c++)
+		for (int c = 0; c <= seenColumns; c++)
 			if (playerEdge[static_cast<size_t>(c)]) p->fillRect(QRectF(colX(c) - 1.0, top, 2.0, bottom - top), color);
 	};
 	thickLines(0, hs, k.columnBorder);
@@ -514,9 +520,9 @@ void PianoRollItem::paint(QPainter *p)
 		{
 			auto cell = [&](const QString &column) { for (int kind : {0, 1, 2}) asked.push_back({kind, at, column, {}}); };
 			asked.push_back({0, at, QStringLiteral("FrameColumn"), {}});
-			for (int c = 0; c < columns; c++)
+			for (int c = 0; c < seenColumns; c++)
 				if (colW(c) > 0) cell(QString::fromStdString(rows.columnName(c)));
-			for (const Extra &x : extras_) cell(x.name);
+			for (int e = 0; e < seenExtras; e++) cell(extras_[static_cast<size_t>(e)].name);
 		}
 		query()(asked);
 		for (Asked &a : asked)
@@ -582,7 +588,7 @@ void PianoRollItem::paint(QPainter *p)
 		p->fillRect(0, y, right, rowHeight_, back);
 		if (k.cursorColumn.isValid()) p->fillRect(0, y, cx0, rowHeight_, k.cursorColumn);
 		/* every second player's columns */
-		for (int c = 0; c < columns; c++)
+		for (int c = 0; c < seenColumns; c++)
 		{
 			const int cw = colW(c);
 			if (cw == 0) continue;
@@ -603,7 +609,7 @@ void PianoRollItem::paint(QPainter *p)
 		}
 		/* the frame number's cell: the script's colour over it, when it gives one */
 		if (const QColor c(ask(0, row, QStringLiteral("FrameColumn"))); c.isValid()) p->fillRect(cx0, y, fx - cx0, rowHeight_, c);
-		for (int c = 0; c < columns; c++)
+		for (int c = 0; c < seenColumns; c++)
 		{
 			const int cw = colW(c);
 			if (cw == 0) continue;
@@ -611,7 +617,7 @@ void PianoRollItem::paint(QPainter *p)
 			if (queries_)
 				if (const QColor b(ask(0, row, QString::fromStdString(rows.columnName(c)))); b.isValid()) p->fillRect(colX(c), y, cw, rowHeight_, b);
 		}
-		for (int e = 0; e < extraCount; e++)
+		for (int e = 0; e < seenExtras; e++)
 			if (const QColor b(ask(0, row, extras_[static_cast<size_t>(e)].name)); b.isValid())
 				p->fillRect(colX(columns + e), y, extras_[static_cast<size_t>(e)].width, rowHeight_, b);
 		/* the frames picked, the whole row a third of the way to the selection colour, as Chimera's */
@@ -630,7 +636,7 @@ void PianoRollItem::paint(QPainter *p)
 		if (const auto at = std::find(branchFrames_.begin(), branchFrames_.end(), row); at != branchFrames_.end())
 			label(QRect(1, y, cx0 + 6, rowHeight_), left, QString::number(at - branchFrames_.begin() + 1), true);
 		label(QRect(cx0 + 4 + 7, y, fx - cx0 - 11, rowHeight_), left, QString::number(row).rightJustified(digits, QLatin1Char('0')), true);
-		for (int c = 0; c < columns; c++)
+		for (int c = 0; c < seenColumns; c++)
 		{
 			const int cx = colX(c), cw = colW(c);
 			if (cw == 0) continue; /* hidden */
@@ -673,7 +679,7 @@ void PianoRollItem::paint(QPainter *p)
 			}
 		}
 		/* the script's own columns: what it says, nothing else */
-		for (int e = 0; e < extraCount; e++)
+		for (int e = 0; e < seenExtras; e++)
 		{
 			const Extra &x = extras_[static_cast<size_t>(e)];
 			const int cx = colX(columns + e);
@@ -690,7 +696,7 @@ void PianoRollItem::paint(QPainter *p)
 	 * screen pixel wide; a thick one where a player's columns start and end */
 	const int bottom = std::min(h, hs + rowHeight_ * shown);
 	down(cx0, hs + 1, bottom, grid);
-	for (int c = 0; c <= columns + extraCount; c++)
+	for (int c = 0; c <= seen; c++)
 		if (c >= columns || colW(c) > 0) down(colX(c), hs + 1, bottom, grid);
 	for (int i = 1; i < shown; i++) across(hs + rowHeight_ * i, 0, w, grid);
 	/* the titles' bottom line over the first row, which would cover it */

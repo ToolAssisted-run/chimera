@@ -65,6 +65,7 @@
 #include "chimera/vm/customize_vm.hpp"
 #include "chimera/vm/messages_vm.hpp"
 #include "chimera/vm/display_vm.hpp"
+#include "chimera/vm/page_cache.hpp"
 #include "chimera/vm/paths_vm.hpp"
 #include "chimera/vm/firmware_vm.hpp"
 #include "chimera/vm/config_files_vm.hpp"
@@ -3209,6 +3210,33 @@ bool tastudioSettings(const char *package, const char *rom)
 		/* a marker of the person's may share their frame, beside them */
 		roll.run("addMarker", {end, std::string("mine")}, error);
 		CHECK(roll.markerCount.get() == 3 && frames.rowNote(end) == "mine");
+		/* the run's own markers moved as frames are added are where a list made afresh puts them: Run end
+		 * past the person's marker on its old frame (issue 568: they are moved, the list is not made again) */
+		{
+			auto listed = [&] {
+				std::vector<std::tuple<int64_t, std::string, bool>> l;
+				for (int64_t i = 0; i < markerRows->rowCount(); i++)
+				{
+					int64_t f = -1;
+					std::string text;
+					bool permanent = false;
+					fromValue(markerRows->cell(i, 0), f);
+					fromValue(markerRows->cell(i, 1), text);
+					fromValue(markerRows->cell(i, 3), permanent);
+					l.emplace_back(f, text, permanent);
+				}
+				return l;
+			};
+			roll.run("insertFrames", {end + 1, int64_t{2}}, error);
+			const auto moved = listed();
+			CHECK(roll.runEndFrame.get() == end + 2 && std::get<0>(moved.back()) == end + 2 && std::get<2>(moved.back()));
+			/* a marker set and taken off makes the list afresh */
+			roll.run("addMarker", {int64_t{1}, std::string("x")}, error);
+			roll.run("removeMarker", {int64_t{1}}, error);
+			CHECK(listed() == moved);
+			for (int i = 0; i < 3; i++) roll.run("undo", {}, error);
+			CHECK(roll.runEndFrame.get() == end && inputs.size() == end + 1 && roll.markerCount.get() == 3);
+		}
 		CHECK(roll.run("removeMarker", {end}, error).has_value() && roll.markerCount.get() == 2);
 	}
 	/* Copy: a line a frame, as the movie has them; with their numbers when asked */
@@ -7603,6 +7631,53 @@ bool recordingMode(const char *package, const char *rom)
  * shown and ends after its last; the console's columns are a group too;
  * hidden columns are passed over. Each column's player is the core's to say
  * (ce_session_player_of); here they are given. */
+/* RAM Search's copies of a domain with no pointer (issue 568): only the pages
+ * a list still reads are copied again after each frame, those side by side
+ * in one read of the core */
+void pageCache()
+{
+	PageCache cache;
+	int64_t calls = 0, bytes = 0;
+	/* a domain of 8 MiB whose every byte is its page's number */
+	const PageCache::Read core = [&](int64_t offset, uint8_t *buf, int64_t len) {
+		calls++;
+		bytes += len;
+		if (offset + len > 8 * 1024 * 1024) return int64_t{-1};
+		for (int64_t i = 0; i < len; i++) buf[i] = static_cast<uint8_t>((offset + i) / PageCache::kPage);
+		return len;
+	};
+	auto copy = [&] {
+		calls = bytes = 0;
+		return cache.copy(core);
+	};
+	uint8_t b[8] = {};
+	/* a list scrolled through a thousand pages: each asked for once, read as zeros until copied */
+	for (int64_t page = 0; page < 1000; page++) CHECK(cache.read(page * PageCache::kPage + 5, b, 1) && b[0] == 0);
+	CHECK(!cache.read(5, b, 1));
+	CHECK(copy() && cache.kept() == 1000);
+	/* side by side: one read of the core for all of them */
+	CHECK(calls == 1 && bytes == 1000 * PageCache::kPage);
+	CHECK(!cache.read(7 * PageCache::kPage, b, 2) && b[0] == 7 && b[1] == 7);
+	/* the list comes back to the start and shows one page: the others stop being read from the core after a second's frames */
+	for (uint64_t i = 0; i <= PageCache::kKeptCopies; i++)
+	{
+		cache.read(2 * PageCache::kPage, b, 4);
+		copy();
+	}
+	std::printf("page cache: %lld bytes read from the core a frame once a list shows one page of a thousand\n", static_cast<long long>(bytes));
+	CHECK(cache.kept() == 1 && calls == 1 && bytes == PageCache::kPage);
+	CHECK(!cache.read(2 * PageCache::kPage + 1, b, 1) && b[0] == 2);
+	/* a page past the domain's end in a run: the others are still read, it reads as zeros */
+	cache.clear();
+	const int64_t last = 8 * 1024 * 1024 / PageCache::kPage - 1;
+	cache.read(last * PageCache::kPage, b, 1);
+	cache.read((last + 1) * PageCache::kPage, b, 1);
+	CHECK(copy());
+	CHECK(!cache.read(last * PageCache::kPage, b, 1) && b[0] == static_cast<uint8_t>(last));
+	b[0] = 1;
+	CHECK(!cache.read((last + 1) * PageCache::kPage, b, 1) && b[0] == 0);
+}
+
 void playerEdges()
 {
 	using P = PianoRollViewModel;
@@ -11055,6 +11130,7 @@ int main(int argc, char **argv)
 	lua();
 	frameColumnColours();
 	playerEdges();
+	pageCache();
 	driveMediaText();
 	luaConsole();
 	toolWindows();
