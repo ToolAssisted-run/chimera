@@ -511,6 +511,23 @@ ApplicationWindow {
             }
         }
     }
+    // scripts dropped on the window are opened and started as Open Script's
+    // are, a session (.luases) as Open Session's; other files are left alone
+    // (issue 561)
+    DropArea {
+        anchors.fill: parent
+        onEntered: (drag) => { drag.accepted = drag.hasUrls }
+        onDropped: (drop) => {
+            if (!drop.hasUrls) return
+            for (const url of drop.urls) {
+                const path = win.localPath(url)
+                const name = path.toLowerCase()
+                if (name.endsWith(".luases")) win.vm.run("openSession", [path])
+                else if (name.endsWith(".lua")) win.vm.run("openScript", [path])
+            }
+            drop.accept()
+        }
+    }
 
     // Active Registered Functions, as Chimera's: by event and name, each to
     // call or remove

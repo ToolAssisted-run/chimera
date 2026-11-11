@@ -659,6 +659,18 @@ endif
       cpp_args: ['-DQT_NO_KEYWORDS'],
     )
     test('roll wheel', test_roll_wheel, env: ['QT_QPA_PLATFORM=offscreen', 'QT_QUICK_BACKEND=software'], timeout: 60)
+    # scripts dropped on the Lua Console opened and run, a session read,
+    # other files left alone (issue 561)
+    test_lua_console_drop = executable(
+      'test-lua-console-drop',
+      ['qt/tests/test_lua_console_drop.cpp', 'qt/qml_view_model.cpp',
+        qt6.compile_moc(headers: ['qt/qml_view_model.hpp'], dependencies: [qt_dep]), qt_rcc, qt_dialogs_rcc],
+      dependencies: [qt_test_dep, vm_dep, dl_dep],
+      override_options: ['cpp_std=c++20'],
+      cpp_args: ['-DQT_NO_KEYWORDS'],
+    )
+    test('lua console drop', test_lua_console_drop, args: [meson.current_build_dir() / 'lua-console-drop-test'],
+      env: ['QT_QPA_PLATFORM=offscreen', 'QT_QUICK_BACKEND=software', 'ALSOFT_DRIVERS=null'], timeout: 60)
     # files dropped on a slot of New Project, every one of them, not only
     # the first (issue 425): the window over the program's view model
     test_new_project_drop = executable(

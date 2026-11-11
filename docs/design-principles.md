@@ -14383,3 +14383,15 @@ that one.
 Tested: the Lua test starts a script that sets both paddings and ends after
 three frames; a script run and ended beside it leaves them, and they are
 gone once it ends. With the call taken out the test fails.
+
+## Scripts dropped on the Lua Console are opened (2026-11-10, issue 561)
+
+A `.lua` file dropped on the Lua Console is opened and started as Open
+Script opens one, and a `.luases` session is read as Open Session reads
+it. Other files dropped there are left alone: the main window is where a
+game or a project is dropped, and the console opening New Project for a
+game would surprise the person who dropped it.
+
+Tested: a window test drops one.lua, a text file and Two.LUA on the
+console (two scripts listed, the text file not), then a session (its one
+script listed). With the drop handling taken out, 3 of its 5 checks fail.
