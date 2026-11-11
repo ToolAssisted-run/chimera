@@ -488,8 +488,10 @@ chimera_run = executable(
   cpp_args: engine_build_args,
   c_args: engine_build_args,
   dependencies: [engine_dep],
-  # CommandLineToArgvW: the tool takes its arguments from the wide command line on Windows
-  link_args: host_machine.system() == 'windows' ? ['-lshell32'] : [],
+  # CommandLineToArgvW: the tool takes its arguments from the wide command line on Windows.
+  # The compiler's runtime is linked in: in a bundle the program is in bin\, and
+  # Windows does not look for its DLLs in lib\ (issue 565)
+  link_args: host_machine.system() == 'windows' ? ['-lshell32', '-static'] : [],
   install: true,
   install_dir: 'dll',  # beside libminiboxhost + libzstd, which it loads from its own directory
 )

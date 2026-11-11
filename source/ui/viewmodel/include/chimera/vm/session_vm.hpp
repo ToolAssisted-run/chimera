@@ -1080,6 +1080,8 @@ private:
 	 * scope, address), asked again of a core opened again; on the machine's thread */
 	MemoryTurn memoryTurnM_;
 	std::set<std::tuple<int32_t, int32_t, uint64_t>> memoryWatchesM_;
+	/* the places asked to be forgotten whose job has not run yet (under m_) */
+	std::set<std::tuple<int32_t, int32_t, uint64_t>> removingMemoryWatches_;
 	static int32_t memoryCalled(void *ctx, int32_t kind, int32_t scope, uint64_t address, uint64_t value, int32_t size, uint64_t *replacement);
 	/* the scripts' userdata asked of them as a branch is made, and a branch
 	 * loaded told to them (issue 534); on the machine's thread */
@@ -1373,6 +1375,8 @@ private:
 	ce_average_fps *averageM_ = nullptr;
 	Clock::time_point passAt_{};
 	bool pausedSincePassM_ = true;
+	/* the average speed shown and the one waiting to be shown, gone (the UI thread) */
+	void forgetAverage();
 	void passOnMachine(int64_t frames, bool stepping, bool goingBack);
 	double pendingAverage_ = 0;
 	std::atomic<bool> averageResetM_{false};

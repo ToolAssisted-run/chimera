@@ -9,7 +9,8 @@
 -- of RAM 0 twice, each with the value memory holds and the flags of the
 -- access; one on every write is given the value memory holds once the frame
 -- ends. A scope the core does not have, or a kind of access a scope does not
--- take, is refused; removed, the functions are called no more.
+-- take, is refused; removed, the functions are called no more, and one
+-- registered on the same address at once, before a frame, is (issue 570).
 --
 -- The synth lets a function change a read's or a write's value (issue 534).
 -- gridWalker reads its init flag (RAM 8) once a playing frame and puts the
@@ -113,9 +114,16 @@ check(#wrongFlags == 0, "calls had other flags: " .. table.concat(wrongFlags, ",
 event.unregisterbyid(execId)
 event.unregisterbyid(readId)
 event.unregisterbyid(writeId)
+-- one put back on the same address at once, before a frame has run, is
+-- called: the core still watches it (issue 570)
+local againStarts = 0
+local againId = event.on_bus_exec(function() againStarts = againStarts + 1 end, 0, "the frame's start again", "Code")
 local s1, r1, w1 = starts, reads, writes
 emu.frameadvance()
 check(starts == s1 and reads == r1 and writes == w1, "the functions were still called after they were removed")
+check(againStarts == 1, "a function registered on an address right after one there was removed was called "
+	.. againStarts .. " times in a frame, not once")
+event.unregisterbyid(againId)
 
 -- the init flag's read given 0, then 1, then nothing: the 1 is used
 local flagReads, flagWrites, givenFlag = 0, 0, {}
@@ -140,6 +148,7 @@ local sevenId = event.on_bus_write(function(addr, val)
 	return 7
 end, 8, "init flag 7", "RAM")
 emu.frameadvance()
+check(againStarts == 1, "the function put back was still called after it was removed")
 check(flagReads == 1, "the init flag was read " .. flagReads .. " times in a frame, not once")
 check(stateRefused == true, "a function called inside the frame could save a state there")
 check(givenFlag[1] == 1 and givenFlag[2] == 1 and givenFlag[3] == 1, "the functions on one read were not each given the value read: "

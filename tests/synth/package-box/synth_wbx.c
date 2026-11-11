@@ -598,6 +598,15 @@ ECL_EXPORT uint32_t *GetVideoBgra(void)
  * the picture differently; it is here so a package can declare more room than
  * the core draws, as a core with an internal resolution does (leg
  * B:box:picture-room). */
+/* The frame rate: 60 a second, or as many as RAM's last byte says when it is
+ * not 0, so a test can make the machine change its rate as it runs, as a
+ * machine does with its video mode (issue 569). Asked after every frame. */
+ECL_EXPORT int32_t GetVsyncNumerator(void)
+{
+	const uint8_t r = g_synth ? synth_get_ram(g_synth)[4095] : 0;
+	return r != 0 ? r : 60;
+}
+ECL_EXPORT int32_t GetVsyncDenominator(void) { return 1; }
 ECL_EXPORT int GetVideoWidth(void)  { return FB_W; }
 ECL_EXPORT int GetVideoHeight(void) { return FB_H; }
 

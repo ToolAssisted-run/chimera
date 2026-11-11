@@ -1729,6 +1729,14 @@ bool speedAndSound(const char *package, const char *rom)
 	CHECK(quarter >= 8 && quarter <= 25);
 	CHECK(four >= 120 && four <= 260);
 	CHECK(free > 260);
+	/* a machine that changes its rate as it runs is played at its new rate
+	 * (issue 569): the synth runs at as many frames a second as RAM's last
+	 * byte says, when it is not 0 */
+	CHECK(session.run("writeMemory", {std::string("RAM"), int64_t{4095}, std::string("\x1e")}, error).has_value());
+	const int64_t thirty = framesIn(1.0);
+	CHECK(session.run("writeMemory", {std::string("RAM"), int64_t{4095}, std::string(1, '\0')}, error).has_value());
+	std::printf("speed: %lld frames a second with the machine at 30\n", static_cast<long long>(thirty));
+	CHECK(thirty >= 22 && thirty <= 38);
 	/* the average speed: frames run freely over their time, counted from
 	 * when it is turned on; time paused and frames advanced by hand are not */
 	{

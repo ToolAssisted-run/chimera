@@ -2134,7 +2134,7 @@ GZPY
 		if grep -q "^status=OK" "$mdir/meta.txt" 2>/dev/null && grep -qi "fatal" "$mdir/run.log"; then
 			report "T:box:memoryCalls" FAIL "Chimera stopped with an error as it closed: $(grep -i -m1 "fatal" "$mdir/run.log") (see $mdir/run.log)"
 		elif grep -q "^status=OK" "$mdir/meta.txt" 2>/dev/null; then
-			report "T:box:memoryCalls" PASS "event.on_bus_exec, on_bus_read and on_bus_write are called at the accesses watched, with the values memory holds and their flags, refused where the core cannot watch, and stop when removed; a number given back changes a read and a write, the last one given used; Chimera closes cleanly with one still registered"
+			report "T:box:memoryCalls" PASS "event.on_bus_exec, on_bus_read and on_bus_write are called at the accesses watched, with the values memory holds and their flags, refused where the core cannot watch, and stop when removed (one registered again on the same address at once still called); a number given back changes a read and a write, the last one given used; Chimera closes cleanly with one still registered"
 		else
 			report "T:box:memoryCalls" FAIL "$(sed -n 's/^detail=//p' "$mdir/meta.txt" 2>/dev/null || echo "run failed") (see $mdir/run.log)"
 		fi

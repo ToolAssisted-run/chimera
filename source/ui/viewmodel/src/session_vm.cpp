@@ -720,14 +720,14 @@ SessionViewModel::SessionViewModel(Dispatcher &dispatcher, InputLog &inputs)
 		}, &hasSaveData);
 	command("resetAverageFps", "the average speed counted afresh from now", {}, [this](const Args &, std::string &) -> Value {
 		averageResetM_.store(true);
-		averageFpsText.set("");
+		forgetAverage();
 		return {};
 	});
 	/* turned on, it counts from then: what ran while nobody looked is not part of it */
 	overlayWatches_.push_back(showAverageFps.changed.connect([this] {
 		if (!showAverageFps.get()) return;
 		averageResetM_.store(true);
-		averageFpsText.set("");
+		forgetAverage();
 	}));
 	/* turned on, a counter says at once what it has to say, counted afresh:
 	 * off, it heard of no change */
@@ -1844,7 +1844,16 @@ SessionViewModel::SessionViewModel(Dispatcher &dispatcher, InputLog &inputs)
 			if (!on)
 			{
 				/* not waited for: a script stopped as Chimera closes takes its function off a core already gone */
+				{
+					std::lock_guard<std::mutex> lock(m_);
+					removingMemoryWatches_.insert(key);
+				}
 				submit([this, key] {
+					{
+						std::lock_guard<std::mutex> lock(m_);
+						/* an add of the same place came first and took it back */
+						if (removingMemoryWatches_.erase(key) == 0) return;
+					}
 					memoryWatchesM_.erase(key);
 					if (s_ != nullptr) ce_session_watch_memory(s_, std::get<0>(key), std::get<1>(key), std::get<2>(key), 0);
 				});
@@ -1852,6 +1861,19 @@ SessionViewModel::SessionViewModel(Dispatcher &dispatcher, InputLog &inputs)
 			}
 			bool taken = false;
 			onMachineWait([&](ce_session *s) {
+				/* An add can run before a remove asked for earlier: while the machine waits on a script's turn it does
+				   only what is waited for (issue 570). A remove of the same place still to come is taken back, and
+				   the core, which never stopped watching it, is not asked again */
+				bool stillWatched = false;
+				{
+					std::lock_guard<std::mutex> lock(m_);
+					stillWatched = removingMemoryWatches_.erase(key) != 0;
+				}
+				if (stillWatched && memoryWatchesM_.count(key) != 0)
+				{
+					taken = true;
+					return;
+				}
 				if (s == nullptr || ce_session_watch_memory(s, std::get<0>(key), std::get<1>(key), std::get<2>(key), 1) == 0) return;
 				memoryWatchesM_.insert(key);
 				taken = true;
@@ -5362,6 +5384,17 @@ bool SessionViewModel::saveProjectOnMachine(const std::string &to, bool backup, 
 	return true;
 }
 
+void SessionViewModel::forgetAverage()
+{
+	/* and the one counted before that is still on its way: shown, it would
+	   bring the old average back */
+	{
+		std::lock_guard<std::mutex> lock(pendingM_);
+		pendingAverage_ = 0;
+	}
+	averageFpsText.set("");
+}
+
 void SessionViewModel::passOnMachine(int64_t frames, bool stepping, bool goingBack)
 {
 	/* as Chimera does: the engine is told of each pass,
@@ -6264,6 +6297,8 @@ int32_t SessionViewModel::stepOnMachine(bool live, bool render, bool grow)
 	{
 		const int64_t length = (static_cast<int64_t>(den) * 1'000'000'000'000 + num / 2) / num;
 		frameLengthM_.store(length);
+		/* the window plays at the core's rate now, not the one it had when it was opened (issue 569) */
+		period_ = std::chrono::duration_cast<Clock::duration>(std::chrono::duration<double>(static_cast<double>(den) / num));
 		if (inputs_.setLength(f, length)) changed = true;
 	}
 	if (traceOnM_) drainTraceOnMachine();

@@ -166,7 +166,22 @@ fi
 for f in "$out"/*/; do
 	case "$(basename "$f")" in *[A-Z]*) echo "UPPER CASE: $(basename "$f")/ (the bundle's folders are lower case)" >&2; bad=1 ;; esac
 done
-[ ! -e "$out/official-cores.json" ] || { echo "PRESENT: official-cores.json (the bundle carries no list of cores)" >&2; bad=1; }
+# Windows looks for a program's DLLs beside it and in its own folders, never in
+# lib\: a program in bin\ that imports one of lib\'s DLLs, or the compiler's
+# runtime, does not start (#565)
+if [ "$platform" = windows ]; then
+	case "$cpu" in arm64) objdump=aarch64-w64-mingw32-objdump ;; *) objdump=x86_64-w64-mingw32-objdump ;; esac
+	for f in "$out"/bin/*.exe; do
+		for dll in $("$objdump" -p "$f" | sed -n 's/^[[:space:]]*DLL Name: //p'); do
+			shipped=$(find "$out/lib" -maxdepth 1 -iname "$dll" | head -n 1)
+			case "$(printf '%s' "$dll" | tr 'A-Z' 'a-z')" in
+				libstdc++*|libgcc*|libwinpthread*|libc++*|libunwind*) shipped=yes ;;
+			esac
+			[ -z "$shipped" ] || { echo "NOT FOUND AT START: bin/$(basename "$f") imports $dll, which Windows does not look for in lib/" >&2; bad=1; }
+		done
+	done
+fi
+[ ! -e "$out/official-cores.json" ] ||{ echo "PRESENT: official-cores.json (the bundle carries no list of cores)" >&2; bad=1; }
 # Chimera reaches for nothing over the network: Qt's network module is not built
 if find "$out" -iname '*Qt6Network*' | grep -q .; then echo "PRESENT: Qt's network module" >&2; bad=1; fi
 [ "$bad" -eq 0 ] || { echo "  the bundle is NOT clean" >&2; exit 1; }
