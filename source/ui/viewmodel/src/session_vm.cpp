@@ -1007,13 +1007,15 @@ SessionViewModel::SessionViewModel(Dispatcher &dispatcher, InputLog &inputs)
 			submit([this, path] { saveProjectOnMachine(path, true); });
 			return path;
 		}, &hasProject);
-	command("clearGreenzone", "every stored state but the first frame's thrown away, and the machine back to frame 0, "
-		"as Chimera's Clear Greenzone", {}, [this](const Args &, std::string &) -> Value {
+	/* memory given back, nothing else changed: the markers' states, the
+	 * frame the machine is on and the frames run with their inputs stay
+	 * (owner, 2026-11-10, issue 564: it sent the machine back to frame 0 and
+	 * dropped the markers' states too) */
+	command("clearGreenzone", "the stored states given back but frame 0's, the markers' and the frame the machine is "
+		"on; the machine stays where it is", {}, [this](const Args &, std::string &) -> Value {
 			submit([this] {
 				if (s_ == nullptr) return;
-				ce_session_greenzone_invalidate(s_, 0);
-				greenEndM_ = 0;
-				seekOnMachine(0, false);
+				ce_session_greenzone_clear(s_);
 				report(-1, -1, -1, -1, -1);
 			});
 			return {};

@@ -1134,6 +1134,13 @@ same code whatever the period.
   `ce_session_greenzone_capture_period`, so the frontend only names the period.
 - **Edits made while Off are still honoured**: a frame after an edit the
   machine has not gone back to is refused when storing resumes.
+- **Clear Greenzone gives memory back and moves nothing** (owner,
+  2026-11-10, issue 564): `ce_session_greenzone_clear` keeps frame 0's
+  state, each pinned frame's (the markers') and the one of the frame the
+  machine is on. A stretch holding none of them goes whole; in one that
+  holds one, the frames between are merged into the kept frame after them,
+  so it stays reachable. The machine stays where it is. It used to keep
+  frame 0 alone and send the machine back there.
 - **Going back while Off replays from the last state stored before it**,
   often frame 0, so a step of rewind in a long movie can take minutes. Such a
   replay can be stopped (`ce_session_seek_stop`, issue 559): letting go of

@@ -2280,6 +2280,62 @@ void StateHistory::invalidateAfter(int64_t frame)
 	}
 }
 
+void StateHistory::clearKeeping(int64_t keep)
+{
+	/* nothing in flight may hold a stretch that goes */
+	finishPlan();
+	finishMerge();
+	finishPacking();
+	const auto wanted = [&](int64_t frame) { return frame == 0 || frame == keep || m_pinned.count(frame) != 0; };
+	for (size_t i = m_segments.size(); i-- > 0;)
+	{
+		Segment &seg = m_segments[i];
+		/* the last frame of the stretch that has to stay reachable, -1 none */
+		int64_t last = wanted(seg.anchorFrame) ? seg.anchorFrame : -1;
+		for (const Link &l : seg.links)
+			if (wanted(l.endFrame)) last = l.endFrame;
+		if (last < 0)
+		{
+			forgetSegment(i);
+			continue;
+		}
+		while (seg.lastFrame() > last && !seg.links.empty())
+		{
+			/* as invalidateAfter: a spilled stretch's links hold nothing here */
+			if (!seg.spilled)
+			{
+				const uint64_t n = seg.links.back().bytes.held();
+				seg.bytes -= n;
+				releaseBytes(n, "clearKeeping");
+			}
+			seg.links.pop_back();
+		}
+		/* the frames before a kept one go into it: a link is the change
+		 * since the one before, so merging keeps the kept one reachable.
+		 * On disk (spilled) the stretch costs no memory and is left whole. */
+		if (seg.spilled || !composeAvailable()) continue;
+		for (size_t li = 0; li + 1 < seg.links.size();)
+		{
+			if (!wanted(seg.links[li].endFrame) && composeInto(seg, li, false)) continue;
+			li++;
+		}
+	}
+	/* the machine's own frame gone (it was not stored): nothing to measure the next frame from */
+	if (nearest(m_machineFrame) != m_machineFrame)
+	{
+		m_epochOpen = false;
+		m_machineStored = false;
+	}
+	if (historyVerify())
+	{
+		for (auto it = m_verify.begin(); it != m_verify.end();)
+		{
+			if (nearest(it->first) != it->first) it = m_verify.erase(it);
+			else ++it;
+		}
+	}
+}
+
 /* ---- the bands ----
  *
  * A landing survives in a band if it sits on that band's grid - the multiples

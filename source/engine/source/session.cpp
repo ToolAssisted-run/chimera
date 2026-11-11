@@ -4892,6 +4892,12 @@ void ce_session_greenzone_invalidate(ce_session *s, int64_t after_frame)
 	s->pictures.dropAfter(after_frame); /* drawn for input that is no longer the movie's */
 }
 
+void ce_session_greenzone_clear(ce_session *s)
+{
+	if (s == nullptr) return;
+	s->history.clearKeeping(s->frame);
+}
+
 void ce_session_greenzone_pictures(ce_session *s, uint64_t budget_bytes, int32_t settle_frames)
 {
 	if (s == nullptr) return;

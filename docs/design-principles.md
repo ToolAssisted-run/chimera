@@ -14395,3 +14395,30 @@ game would surprise the person who dropped it.
 Tested: a window test drops one.lua, a text file and Two.LUA on the
 console (two scripts listed, the text file not), then a session (its one
 script listed). With the drop handling taken out, 3 of its 5 checks fail.
+
+## Clear Greenzone gives memory back and moves nothing (user-decided, 2026-11-10, issue 564)
+
+TAStudio's Clear Greenzone threw away every stored state but frame 0's,
+markers' included, and sent the machine back to frame 0. The reporter used
+it to free memory when the greenzone budget was full, and lost their place
+and their markers' states each time. The owner chose that it free memory
+only: frame 0's state, every marker's and the one of the frame the machine
+is on are kept, and the machine stays where it is.
+
+The history stores a stretch as a whole state and then each frame's
+changes, so a kept frame needs the frames before it in its stretch. Kept
+as they were, one marker late in a stretch would keep the whole stretch.
+So the frames between kept ones are merged into the kept frame after them
+(merging two stored changes needs no machine), and a stretch with nothing
+kept goes whole. A stretch already on disk costs no memory and is left as
+it is up to its last kept frame.
+
+Tested: the view models test runs 30 frames with a marker on 10, then
+clears: 31 states became 3, the machine stayed on frame 30, the state
+history check passed (every state left puts the machine back exactly),
+and going to frame 11 ran one frame. With the merge taken out, nothing was
+given back and the test failed; with markers not kept, going to frame 11
+ran 11 frames and it failed. The engine's state history test clears a
+history with stretches on disk and three pinned frames (39 frames held, 8
+after), restores each kept frame exactly, and stores on from the
+machine's frame afterwards.

@@ -2217,12 +2217,23 @@ bool backupAndHistory(const char *package, const char *rom)
 	CHECK(d.until([&] { return session.status.get().rfind("The state history check passed", 0) == 0; }, 60));
 	std::printf("history: %s\n", session.status.get().c_str());
 	CHECK(!fs::exists(dir / "integrity"));
-	/* the greenzone cleared: the first frame's state kept, the machine at frame 0 */
-	CHECK(session.greenzoneStates.get() > 1);
+	/* the greenzone cleared (issue 564): memory given back, but frame 0's
+	 * state, the marker's and the machine's frame's kept, the machine where
+	 * it was, and every state left still puts the machine back exactly */
+	session.setMarkers({Marker{10, "kept", true}});
+	const int64_t statesBefore = session.greenzoneStates.get();
+	CHECK(statesBefore >= 30);
 	CHECK(session.run("clearGreenzone", {}, error).has_value());
-	CHECK(d.until([&] { return session.frame.get() == 0 && session.greenzoneStates.get() <= 1; }, 20));
-	CHECK(session.run("checkStateHistory", {}, error).has_value());
-	CHECK(d.until([&] { return session.status.get() == "The state history holds nothing to check yet"; }, 20));
+	CHECK(d.until([&] { return session.greenzoneStates.get() < statesBefore; }, 20));
+	std::printf("Clear Greenzone: %lld states before, %lld after, the machine on frame %lld\n", static_cast<long long>(statesBefore),
+		static_cast<long long>(session.greenzoneStates.get()), static_cast<long long>(session.frame.get()));
+	CHECK(session.frame.get() == 30 && session.greenzoneStates.get() <= 4);
+	CHECK(session.run("checkStateHistory", {(dir / "integrity").string()}, error).has_value());
+	CHECK(d.until([&] { return session.status.get().rfind("The state history check passed", 0) == 0; }, 60));
+	/* the marker's frame is a restore away: to frame 11, one frame run from it */
+	session.run("seek", {int64_t{11}}, error);
+	CHECK(d.until([&] { return session.frame.get() == 11; }, 20));
+	CHECK(session.lastSeekFrames.get() == 1);
 	session.run("close", {}, error);
 	CHECK(d.until([&] { return !session.isOpen.get(); }, 20));
 	removeTree(dir);

@@ -287,6 +287,16 @@ public:
 	 * later state a lie, while the state AT it still holds. */
 	void invalidateAfter(int64_t frame);
 
+	/* TAStudio's Clear Greenzone (user-decided, 2026-11-10, issue 564): gives
+	 * back what the history holds, but frame 0, every pinned frame (the
+	 * markers') and `keep` (the machine's frame) stay reachable, with what
+	 * they are reached through. A stretch none of them is in goes whole; one
+	 * holding one keeps its anchor and the kept frames, the links between
+	 * merged into the kept one after them (a stretch on disk is left whole
+	 * up to its last kept frame). Frames played again afterwards are stored
+	 * only past the history's end, as ever. */
+	void clearKeeping(int64_t keep);
+
 	/* Frames to keep reachable whatever the bands would otherwise do: a landing
 	 * that is pinned is never merged away, and a stretch holding one is spilled
 	 * rather than dropped.

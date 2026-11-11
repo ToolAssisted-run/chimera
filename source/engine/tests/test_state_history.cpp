@@ -1120,6 +1120,64 @@ int main(void)
 	removeTree("work-history-settle-tight");
 	removeTree("work-history-settle-tight-control");
 
+	{ // Clear Greenzone (issue 564): what the history holds is given back, but
+	  // frame 0, the pinned frames and the machine's frame each still restore
+	  // exactly - one of them in a stretch on disk - and the history goes on
+	  // storing from the machine's frame afterwards.
+		const chimera::HostApi api = fakeHost();
+		g_machine = Machine{};
+		removeTree("work-history-clear");
+		std::filesystem::create_directories("work-history-clear");
+		History h;
+		h.configure(&api, nullptr, 64ull << 20);
+		h.bands(2, 6, 3, 12, 8);
+		h.spillTo("work-history-clear");
+		h.capture(0);
+		std::vector<std::array<uint8_t, Machine::kCells>> truth(1);
+		std::memcpy(truth[0].data(), g_machine.cell, Machine::kCells);
+		auto run = [&](int64_t to) {
+			for (int64_t f = static_cast<int64_t>(truth.size()); f <= to; f++)
+			{
+				h.beforeAdvance();
+				advance(f);
+				h.capture(f);
+				std::array<uint8_t, Machine::kCells> at{};
+				std::memcpy(at.data(), g_machine.cell, Machine::kCells);
+				truth.push_back(at);
+			}
+		};
+		/* the markers' frames, pinned as TAStudio pins them */
+		h.pin(5, true);
+		h.pin(37, true);
+		h.pin(70, true);
+		run(100);
+		/* the first stretches to disk, as a full budget would put them */
+		h.setBudget(512);
+		h.setBudget(64ull << 20);
+		const int64_t countBefore = h.count();
+		const uint64_t bytesBefore = h.bytes();
+		h.clearKeeping(100);
+		std::fprintf(stderr, "clear: %lld frames and %llu bytes before, %lld and %llu after\n", static_cast<long long>(countBefore),
+			static_cast<unsigned long long>(bytesBefore), static_cast<long long>(h.count()), static_cast<unsigned long long>(h.bytes()));
+		assert(h.count() < countBefore / 3 && h.bytes() <= bytesBefore);
+		for (const int64_t f : {int64_t{0}, int64_t{5}, int64_t{37}, int64_t{70}, int64_t{100}})
+		{
+			assert(h.nearest(f) == f);
+		}
+		/* the rest gone: what is left is the kept frames and the starts of their stretches */
+		assert(h.count() <= 5 + h.anchors());
+		/* from the machine's frame the history stores on, and every kept frame and a new one restore exactly */
+		run(110);
+		assert(h.nearest(110) == 110);
+		for (const int64_t f : {int64_t{110}, int64_t{0}, int64_t{5}, int64_t{37}, int64_t{70}, int64_t{100}, int64_t{105}})
+		{
+			const int64_t at = h.nearest(f);
+			assert(at >= 0 && h.restore(at, error));
+			assert(std::memcmp(g_machine.cell, truth[static_cast<size_t>(at)].data(), Machine::kCells) == 0);
+		}
+	}
+	removeTree("work-history-clear");
+
 	{ // An edit that lands on the last frame of a spilled stretch starts a new
 	  // stretch. A delta pushed onto the spilled one would sit in memory while
 	  // every restore reads the file, where the old timeline's links still are.

@@ -1874,6 +1874,11 @@ CE_API int64_t ce_session_greenzone_nearest(const ce_session *s, int64_t frame);
 /* Drops stored states AFTER frame - an input edit at frame N makes every
  * later state a lie, while the state at N itself (inputs 0..N-1) still holds. */
 CE_API void ce_session_greenzone_invalidate(ce_session *s, int64_t after_frame);
+/* TAStudio's Clear Greenzone (user-decided, 2026-11-10, issue 564): gives
+ * back the stored states, keeping frame 0's, each pinned frame's (the
+ * markers') and the one of the frame the machine is on, with what each is
+ * reached through. The machine stays where it is. */
+CE_API void ce_session_greenzone_clear(ce_session *s);
 
 /* The pictures of frames already drawn, kept beside the greenzone and shown
  * again (chimera#190).
