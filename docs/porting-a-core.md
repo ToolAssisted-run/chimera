@@ -376,16 +376,22 @@ Advice earned the hard way:
     "at": 0, "u32be": 1 }, { "at": 12, "u32be": "lastSector" } ] }`. The
     recipe is offered when the folder has the root file; the engine writes
     the patches into the image's system area.
-- **`runsOn`** - the systems the package runs on, from the six
+- **`runsOn` is required.** In the top level of the packaged `waterbox.config`,
+  declare a nonempty array of host systems, for example
+  `"runsOn": ["windows-x86_64", "linux-x86_64"]`. The only accepted names are
   `windows-x86_64`, `windows-aarch64`, `linux-x86_64`, `linux-aarch64`,
-  `macos-x86_64` and `macos-aarch64`. Chimera runs a package only on a system
-  it lists and refuses one that lists none; it keeps no list of its own. List
-  only what the core has been built for and is meant to run on: one
-  `waterbox.config` serves both CPUs' packages, so it names both CPUs if the
-  core is built for both. Leave a system out when the core cannot run there
-  (Ikemen GO has no `macos-x86_64`: its Go code reads thread-local variables
-  in a way an Intel Mac cannot rewrite). `publish-core.sh` refuses a package
-  that lists no system for its own CPU.
+  `macos-x86_64` and `macos-aarch64`. Chimera refuses a package when the array
+  is missing, empty, or contains an unknown name, and opens it only on a host
+  it lists. The Linux container used to build a package is not necessarily the
+  host it runs on, and the package's filename does not declare its systems.
+  List only what the core has been built for and is meant to run on: one
+  `waterbox.config` can serve both CPUs' packages, so it names both CPUs if
+  the core is built for both. Leave a system out when the core cannot run
+  there (Ikemen GO has no `macos-x86_64`: its Go code reads thread-local
+  variables in a way an Intel Mac cannot rewrite). If the config is generated,
+  add `runsOn` to the generator, and check the `waterbox.config` inside the
+  finished `.chimeraCore` archive. `publish-core.sh` refuses a package that
+  lists no system for its own CPU.
 - **`version` and `versionDate`** are not yours to write: `build-package.sh`
   stamps both into the packaged `waterbox.config` - the commit, and the date of
   that commit in UTC (never the build's date, which would make one commit two
