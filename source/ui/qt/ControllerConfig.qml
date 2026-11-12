@@ -37,6 +37,8 @@ ApplicationWindow {
     property int axisCatch: -1
 
     onVisibleChanged: {
+        // the pads looked at while it is open, so a binding shows what the pad in use prints
+        win.session.run("watchPads", [visible])
         if (visible) {
             win.controls.run("edit")
             kinds.currentIndex = 0
