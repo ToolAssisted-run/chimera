@@ -37,6 +37,7 @@ ApplicationWindow {
     QtObject {
         id: session
         property string caughtPad: ""
+        property string padFaces: ""
         function run(name) { return undefined }
     }
     // a shortcut of the window's own on the keys the box is to take

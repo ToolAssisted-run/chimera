@@ -320,6 +320,11 @@ RightThumbY Axis
 LeftTrigger Axis
 RightTrigger Axis
  Axis
+# a PlayStation pad's face buttons, as the window shows a binding of them (Gamepads::shown)
+Cross
+Circle
+Square
+Triangle
 Axis
 WMouse 
 RMouse 
