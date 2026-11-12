@@ -16,10 +16,17 @@ later) and x86_64 for an Intel Mac.
 | --- | --- | --- | --- |
 | Windows x86_64 | `chimera-win-x86_64-<commit>.zip` | Linux, with mingw-w64's GCC | windows-2025 |
 | Windows aarch64 | `chimera-win-aarch64-<commit>.zip` | Linux, with llvm-mingw's clang | windows-11-arm |
-| Linux x86_64 | `chimera-linux-x86_64-<commit>.tar.gz` | ubuntu-latest | ubuntu-latest |
+| Linux x86_64 | `chimera-linux-x86_64-<commit>.tar.gz` | ubuntu-24.04 | ubuntu-24.04 |
 | Linux aarch64 | `chimera-linux-aarch64-<commit>.tar.gz` | ubuntu-26.04-arm | ubuntu-26.04-arm |
 | macOS x86_64 (Intel) | `chimera-macos-x86_64-<commit>.zip` | macos-15-intel | macos-15-intel |
 | macOS aarch64 (Apple silicon) | `chimera-macos-aarch64-<commit>.zip` | macos-26 | macos-26 |
+
+The Linux x86_64 build is made on Ubuntu 24.04 on purpose, and so is every
+core. On GitHub's Ubuntu 26.04 machines GCC builds for x86-64-v3 by default
+(AVX2, FMA, BMI2): a build made there does not start on a processor without
+them, and fused multiply-adds round floating point differently (owner,
+2026-11-12). The Linux x86_64 nightlies of 2026-11-10, -11 and -12 were made
+there before that was noticed, and need such a processor.
 
 The names in the last two columns are GitHub's machines (runners). The release
 builds all six and publishes them together, or none. Each is started once
@@ -95,7 +102,7 @@ the GPU bridge and the real cores are not run there.
 
 | Build | Tests | On |
 | --- | --- | --- |
-| Linux x86_64, aarch64 | every meson test (engine, view models, window), the witness at both levels | ubuntu-latest, ubuntu-26.04-arm |
+| Linux x86_64, aarch64 | every meson test (engine, view models, window), the witness at both levels | ubuntu-24.04, ubuntu-26.04-arm |
 | Windows x86_64, aarch64 | 57 of those 63 tests, built on Linux, packed with the bundle (`tools/export-tests.py`) and run against it (`tools/run-tests.py`) | windows-2025, windows-11-arm |
 | macOS x86_64, aarch64 | every meson test built for macOS | macos-15-intel, macos-26 |
 

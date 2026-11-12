@@ -38,7 +38,10 @@ jobs:
         # Ubuntu 26.04, which ubuntu-latest is moving to, with 4 KiB pages)
         include:
           - arch: x64
-            runner: ubuntu-latest
+            # Ubuntu 24.04, not ubuntu-latest: on GitHub's 26.04 image GCC builds for
+            # x86-64-v3 (AVX2, FMA) by default, and the build would not start on an
+            # older processor (owner, 2026-11-12; docs/platforms.md)
+            runner: ubuntu-24.04
           - arch: arm64
             runner: ubuntu-26.04-arm
     steps:
@@ -108,7 +111,10 @@ jobs:
         # Ubuntu 26.04, which ubuntu-latest is moving to, with 4 KiB pages)
         include:
           - arch: x64
-            runner: ubuntu-latest
+            # Ubuntu 24.04, not ubuntu-latest: on GitHub's 26.04 image GCC builds for
+            # x86-64-v3 (AVX2, FMA) by default, and the build would not start on an
+            # older processor (owner, 2026-11-12; docs/platforms.md)
+            runner: ubuntu-24.04
           - arch: arm64
             runner: ubuntu-26.04-arm
     steps:
@@ -176,7 +182,10 @@ jobs:
       matrix:
         include:
           - arch: x86_64
-            runner: ubuntu-latest
+            # Ubuntu 24.04, not ubuntu-latest: on GitHub's 26.04 image GCC builds for
+            # x86-64-v3 (AVX2, FMA) by default, and the build would not start on an
+            # older processor (owner, 2026-11-12; docs/platforms.md)
+            runner: ubuntu-24.04
           - arch: aarch64
             runner: ubuntu-26.04-arm
     timeout-minutes: 30
@@ -225,7 +234,10 @@ jobs:
     # for windows-test to run on Windows.
     name: windows ${{ matrix.cpu }} (built on Linux)
     needs: synth-core
-    runs-on: ubuntu-latest
+    # Ubuntu 24.04, not ubuntu-latest: on GitHub's 26.04 image GCC builds for
+    # x86-64-v3 (AVX2, FMA) by default, and the build would not start on an
+    # older processor (owner, 2026-11-12; docs/platforms.md)
+    runs-on: ubuntu-24.04
     timeout-minutes: 360
     strategy:
       fail-fast: false

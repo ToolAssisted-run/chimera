@@ -62,7 +62,10 @@ jobs:
     # A scheduled or manual run releases the newest commit of main that CI
     # passed, chosen below.
     name: what is released
-    runs-on: ubuntu-latest
+    # Ubuntu 24.04, not ubuntu-latest: on GitHub's 26.04 image GCC builds for
+    # x86-64-v3 (AVX2, FMA) by default, and the build would not start on an
+    # older processor (owner, 2026-11-12; docs/platforms.md)
+    runs-on: ubuntu-24.04
     outputs:
       sha: ${{ steps.what.outputs.sha }}
       kind: ${{ steps.what.outputs.kind }}
@@ -235,7 +238,10 @@ jobs:
     needs: what
     if: needs.what.outputs.skip != 'true'
     name: bundle (windows arm64)
-    runs-on: ubuntu-latest
+    # Ubuntu 24.04, not ubuntu-latest: on GitHub's 26.04 image GCC builds for
+    # x86-64-v3 (AVX2, FMA) by default, and the build would not start on an
+    # older processor (owner, 2026-11-12; docs/platforms.md)
+    runs-on: ubuntu-24.04
     # the first run builds Qt (then cached): hours, not minutes
     timeout-minutes: 360
     steps:
@@ -462,7 +468,10 @@ jobs:
     # every one was built too, so a release never goes out a bundle short.
     needs: [what, linux-arm64, windows-arm64, windows-arm64-starts, macos]
     name: bundle (windows + linux x64) and publish
-    runs-on: ubuntu-latest
+    # Ubuntu 24.04, not ubuntu-latest: on GitHub's 26.04 image GCC builds for
+    # x86-64-v3 (AVX2, FMA) by default, and the build would not start on an
+    # older processor (owner, 2026-11-12; docs/platforms.md)
+    runs-on: ubuntu-24.04
     # the first run builds Qt for both platforms (each then cached): hours, not minutes
     timeout-minutes: 360
     steps:

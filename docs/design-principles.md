@@ -14815,3 +14815,36 @@ passes on x86_64 and aarch64; the first build is "Nightly 2026-11-12
 aarch64 package on a computer, and whether a movie made on another
 frontend's bsnes v115 plays the same here. The Satellaview and the Sufami
 Turbo are not offered.
+
+## x86_64 Linux builds stay on Ubuntu 24.04 (user-decided, 2026-11-12)
+
+GitHub's `ubuntu-latest` became Ubuntu 26.04, and on that image GCC 15
+builds for x86-64-v3 by default: AVX2, FMA and BMI2, which processors older
+than about 2013 do not have. Nothing in Chimera or miniBox names a CPU
+level, so a build made there takes the compiler's. Measured: the PCSX2 core
+built there says `-march=x86-64-v3` in its own debug information and has
+84,486 AVX register uses and 1,514 fused multiply-adds, against 15 and 0 in
+its 2026-11-06 nightly built on 24.04 (GCC 13.3, `-march=x86-64`). Chimera's
+Linux x86_64 nightlies of 2026-11-10, -11 and -12 were built there too: no
+SSE instruction of theirs is in the old encoding. The plain Ubuntu 26.04
+image's own GCC builds for `x86-64`; it is GitHub's image that differs.
+
+A build that needs those instructions does not start on an older processor,
+and for a core it is worse: a fused multiply-add rounds once where a
+multiply and an add round twice, so a core built that way computes some
+floating point differently from the builds before it, and a movie made with
+one can desync on the other.
+
+The owner chose to build on 24.04 again now and move to 26.04 later as a
+change of its own, with the baseline named explicitly. Chimera's CI and
+release jobs for x86_64 Linux run on `ubuntu-24.04`, and so do the 34
+official cores that ran on `ubuntu-latest` (the other 28 already did). No
+core had published a nightly from 26.04. The aarch64 builds stay on
+`ubuntu-26.04-arm`: the x86-64-v3 default is about x86 only.
+
+That day's other 26.04 changes stay: a miniBox build cache keyed by the
+Meson version (a Meson cannot read a build folder another set up), Dolphin's
+build cache keyed by the GCC version, GCC 13 for RPCS3's and EKA2L1's guest
+libstdc++, CMake 4's minimum version for touchHLE's openal-soft, and xemu's
+curl warnings kept as warnings. They do nothing on 24.04 and are needed on
+26.04.
