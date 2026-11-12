@@ -78,6 +78,16 @@ int SDL_GetGamepadButtonLabel(void *p, int button)
 	(void)button;
 	return 0;
 }
+uint16_t SDL_GetGamepadVendor(void *p)
+{
+	(void)p;
+	return 0;
+}
+uint16_t SDL_GetGamepadProduct(void *p)
+{
+	(void)p;
+	return 0;
+}
 /* SDL_GAMEPAD_AXIS_RIGHT_TRIGGER is 5 */
 int16_t SDL_GetGamepadAxis(void *p, int axis)
 {
