@@ -1057,6 +1057,7 @@
 		"lua.too_deep": "(en tabell, for dypt nøstet til å vises)",
 		"lua.unknown_error": "ukjent feil",
 		"lua.waited_for_frame": "koden ventet på et bilde, og her er det ingenting som fortsetter etter det: et skript som venter på bilder, startes med lua_script",
+		"lua.agent_out_of_time": "run_lua stoppet koden etter %1 sekunder fordi den ikke var ferdig (en løkke uten slutt?): oppgi 'seconds' for mer tid, eller start den som skript med lua_script",
 		"lua.window_closing": "%1: vinduet lukkes",
 		"lua_console.active_registered_functions": "Aktive registrerte funksjoner",
 		"lua_console.call": "&Kall",

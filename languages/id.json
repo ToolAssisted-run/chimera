@@ -1037,6 +1037,7 @@
 		"lua.too_deep": "(tabel, terlalu dalam untuk ditampilkan)",
 		"lua.unknown_error": "galat tidak diketahui",
 		"lua.waited_for_frame": "kode menunggu sebuah frame, yang tidak ada yang meneruskan di sini: skrip yang menunggu frame dimulai dengan lua_script",
+		"lua.agent_out_of_time": "run_lua menghentikan kode setelah %1 detik karena belum selesai (perulangan tanpa akhir?): berikan 'seconds' untuk waktu lebih lama, atau jalankan sebagai skrip dengan lua_script",
 		"lua.window_closing": "%1: jendela sedang ditutup",
 		"lua_console.active_registered_functions": "Fungsi Terdaftar yang Aktif",
 		"lua_console.call": "&Panggil",

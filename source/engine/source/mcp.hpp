@@ -160,6 +160,17 @@ private:
 	PipeClient pipe;
 	std::string client;
 	uint64_t nextId = 1;
+	/* what the running Chimera said of itself when it answered the greeting:
+	 * a warning added to every answer when its build is not this program's */
+	std::string mismatch;
 };
+
+/* What chimera-mcp and the running Chimera say of each other (issue 571): a
+ * sentence for the agent when their builds differ, naming the tools one has
+ * and the other does not and the chimera-mcp to point at; "" when they match.
+ * otherTools is nullptr when the other side did not list its tools (a build
+ * from before 2026-11-12); program is the window's own chimera-mcp, or "". */
+std::string mcpBuildMismatch(bool fromWindow, const std::string &otherBuild, const std::vector<std::string> *otherTools,
+	const std::string &program);
 
 } // namespace chimera

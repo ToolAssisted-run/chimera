@@ -1077,6 +1077,7 @@
 		"lua.too_deep": "(un tabel, prea adânc ca să fie arătat)",
 		"lua.unknown_error": "eroare necunoscută",
 		"lua.waited_for_frame": "codul a așteptat un cadru, lucru cu care nimic de aici nu lucrează: un script care așteaptă cadre se pornește cu lua_script",
+		"lua.agent_out_of_time": "run_lua a oprit codul după %1 secunde, deoarece nu se terminase (o buclă fără sfârșit?): dați 'seconds' pentru mai mult timp sau porniți-l ca script cu lua_script",
 		"lua.window_closing": "%1: fereastra se închide",
 		"lua_console.active_registered_functions": "Funcții înregistrate active",
 		"lua_console.call": "&Apelează",

@@ -91,7 +91,7 @@ small program in between:
 agent's program  <-- standard input/output -->  chimera-mcp  <-- local pipe -->  Chimera window
 ```
 
-- `chimera-mcp` is a small C++ program installed in `dll/` beside
+- `chimera-mcp` is a small C++ program in the `bin` folder beside
   `chimera-run`. The agent's program starts it. It passes each request to the
   window and each answer back.
 - The local pipe is a named pipe on Windows and a pair of FIFO files in the
@@ -115,8 +115,32 @@ A user sets it up once in their agent. The dialog shows the line to copy, for
 example for Claude Code:
 
 ```sh
-claude mcp add chimera -- /path/to/chimera/dll/chimera-mcp
+claude mcp add chimera -- /path/to/chimera/bin/chimera-mcp
 ```
+
+### After an update
+
+Each nightly is a new folder, so the agent's set-up keeps naming the
+`chimera-mcp` of the Chimera that was current when it was made. Its tools are
+compiled into it: an old one does not offer the tools added since, whatever
+window it reaches. An agent once spent a session working round tools it did
+not know were there (issue 571). So the two programs say their builds to each
+other when they connect (2026-11-12):
+
+- `chimera-mcp` sends its build and the names of its tools in its greeting;
+  the window answers with its own, and the path of its own `chimera-mcp`.
+- When the builds differ, every answer the agent gets ends with a warning:
+  both builds, the tools one side has and the other does not, and the
+  `chimera-mcp` to point the set-up at. A `chimera-mcp` from before
+  2026-11-12 says no build; the window then adds the warning itself, so even
+  an old one is told.
+- `server_info` reports `chimera_mcp_build` ("older" for one from before
+  2026-11-12) and `chimera_mcp_up_to_date`.
+- `chimera-mcp --version` prints its build without a window running.
+
+After an update, run the set-up line again from Tools > MCP Server... (with
+`claude mcp remove chimera` first for Claude Code) and restart the agent's
+program.
 
 ## Tools > MCP Server...
 
@@ -232,7 +256,7 @@ Changes:
 | `resume` | Lets the machine run, as unpausing does; past the movie's end each frame played is added to it. Window only. |
 | `save_project` | Saves the project where it was saved, or at a path (a relative one is in the Movies folder; without a window, the path must be inside the work folder). A file already there is replaced only with `overwrite`. |
 | `create_project` | Makes a project and opens it, as the New Project window does: the agent gives the core, the machine, the game's files (by slot, or each put where its kind of file goes), settings and firmware. The core's suggested settings for the game are applied first, as on that window's settings page. Firmware is looked for where that window looks and in a folder the agent names; when some is missing nothing is made, and the answer lists each file missing, the files that would do, and where it looked. A project with unsaved changes is replaced only with `discard_unsaved`. Window only; without a window, `open_game`. |
-| `run_lua` | Runs Lua in the Lua Console, where the person sees it, and answers what it returned (a table as a list or an object) and what it printed. Every Lua function is there. It runs as a script does, in a coroutine of its own; the functions that wait for a frame are refused, as on the console's input line. Window only. |
+| `run_lua` | Runs Lua in the Lua Console, where the person sees it, and answers what it returned (a table as a list or an object) and what it printed. Every Lua function is there. It runs as a script does, in a coroutine of its own; the functions that wait for a frame are refused, as on the console's input line. Code still running after `seconds` (10 when not given, at most 300) is stopped with an error, so a loop that never ends cannot hold the window (issue 571). Window only. |
 | `lua_script` | Starts a script file in the Lua Console, as File > Open Script does, or stops it; answers whether it runs and what the console printed since the agent last asked. Window only. |
 | `close_tastudio` | Closes the project and its machine. Unsaved changes are lost only with `discard_unsaved`. Window only; without a window, `close`. |
 

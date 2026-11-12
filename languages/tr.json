@@ -1057,6 +1057,7 @@
 		"lua.too_deep": "(bir tablo, göstermek için fazla derin)",
 		"lua.unknown_error": "bilinmeyen hata",
 		"lua.waited_for_frame": "kod, burada hiçbir şeyin devam ettirmediği bir kareyi bekledi: kare bekleyen bir betik lua_script ile başlatılır",
+		"lua.agent_out_of_time": "run_lua kodu %1 saniye sonra durdurdu, çünkü bitmemişti (sonsuz bir döngü mü?): daha fazla süre için 'seconds' verin ya da lua_script ile betik olarak başlatın",
 		"lua.window_closing": "%1: pencere kapanıyor",
 		"lua_console.active_registered_functions": "Etkin Kayıtlı İşlevler",
 		"lua_console.call": "&Çağır",

@@ -916,10 +916,10 @@ std::string LuaConsoleViewModel::takeOutputForAgent()
 	return out;
 }
 
-bool LuaConsoleViewModel::runForAgent(const std::string &code, std::string &results, std::string &error)
+bool LuaConsoleViewModel::runForAgent(const std::string &code, std::string &results, std::string &error, double seconds)
 {
 	line("[agent] " + code);
-	const bool ran = lua_.runForAgent(code, luaFolder.get(), results, error);
+	const bool ran = lua_.runForAgent(code, luaFolder.get(), results, error, seconds);
 	if (!ran) line(error);
 	messages_ = 0;
 	refresh();

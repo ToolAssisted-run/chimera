@@ -1057,6 +1057,7 @@
 		"lua.too_deep": "(egy tábla, túl mélyen ahhoz, hogy megjelenjen)",
 		"lua.unknown_error": "ismeretlen hiba",
 		"lua.waited_for_frame": "A kód egy képkockára várt, amivel itt semmi nem foglalkozik: a képkockára váró szkriptet a lua_script indítja",
+		"lua.agent_out_of_time": "a run_lua %1 másodperc után leállította a kódot, mert nem ért véget (végtelen ciklus?): adja meg a 'seconds' értéket több időért, vagy indítsa szkriptként a lua_script segítségével",
 		"lua.window_closing": "%1: az ablak bezáródik",
 		"lua_console.active_registered_functions": "Aktív regisztrált függvények",
 		"lua_console.call": "&Hívás",

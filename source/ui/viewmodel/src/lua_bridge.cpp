@@ -442,6 +442,21 @@ int64_t LuaBridge::startCode(const std::string &code, const std::string &chunkNa
 	return onScripts([&] { return startCodeHere(code, chunkName, directory, error); });
 }
 
+namespace
+{
+/* run_lua's clock, on the scripts' thread: when its code must have ended */
+thread_local std::chrono::steady_clock::time_point tAgentDeadline;
+/* what it says when it stops the code, made beforehand: luaL_error does not return */
+thread_local std::string tAgentOutOfTime;
+
+/* every 10,000 instructions of run_lua's code: past its time, it is stopped */
+void agentClock(lua_State *L, lua_Debug *)
+{
+	if (std::chrono::steady_clock::now() < tAgentDeadline) return;
+	luaL_error(L, "%s", tAgentOutOfTime.c_str());
+}
+} // namespace
+
 int64_t LuaBridge::startCodeHere(const std::string &code, const std::string &chunkName, const std::string &directory, std::string &error)
 {
 	if (luaL_loadbuffer(L_, code.data(), code.size(), ("@" + chunkName).c_str()) != LUA_OK)
@@ -454,6 +469,14 @@ int64_t LuaBridge::startCodeHere(const std::string &code, const std::string &chu
 	lua_State *co = lua_newthread(L_);
 	lua_insert(L_, -2);
 	lua_xmove(L_, co, 1);
+	if (agentSeconds_ > 0)
+	{
+		char seconds[32];
+		std::snprintf(seconds, sizeof seconds, "%g", agentSeconds_);
+		tAgentOutOfTime = tr("lua.agent_out_of_time", {seconds});
+		tAgentDeadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(static_cast<int64_t>(agentSeconds_ * 1000));
+		lua_sethook(co, agentClock, LUA_MASKCOUNT, 10000);
+	}
 	Script s;
 	s.id = nextId_++;
 	s.directory = directory;
@@ -744,12 +767,12 @@ json::Json luaValue(lua_State *L, int at, int depth)
 }
 } // namespace
 
-bool LuaBridge::runForAgent(const std::string &code, const std::string &directory, std::string &results, std::string &error)
+bool LuaBridge::runForAgent(const std::string &code, const std::string &directory, std::string &results, std::string &error, double seconds)
 {
-	return onScripts([&] { return runForAgentHere(code, directory, results, error); });
+	return onScripts([&] { return runForAgentHere(code, directory, results, error, seconds); });
 }
 
-bool LuaBridge::runForAgentHere(const std::string &code, const std::string &directory, std::string &results, std::string &error)
+bool LuaBridge::runForAgentHere(const std::string &code, const std::string &directory, std::string &results, std::string &error, double seconds)
 {
 	/* the code as a Lua long string, whose brackets it does not contain; whether it is
 	 * an expression is asked of Lua's own load, as Chimera asks */
@@ -763,7 +786,9 @@ bool LuaBridge::runForAgentHere(const std::string &code, const std::string &dire
 		"__chimera_run_results = table.pack(run())\n";
 	lua_pushboolean(L_, 1);
 	lua_setglobal(L_, "__chimera_no_waits");
+	agentSeconds_ = seconds;
 	const int64_t id = startCodeHere(chunk, "run_lua", directory, error);
+	agentSeconds_ = 0;
 	lua_pushnil(L_);
 	lua_setglobal(L_, "__chimera_no_waits");
 	/* waited all the same (coroutine.yield): nothing would go on with it */

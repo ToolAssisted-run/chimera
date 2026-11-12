@@ -1057,6 +1057,7 @@
 		"lua.too_deep": "(en tabell, för djup för att visas)",
 		"lua.unknown_error": "okänt fel",
 		"lua.waited_for_frame": "koden väntade på en bildruta, vilket ingenting här går vidare med: ett skript som väntar på bildrutor startas med lua_script",
+		"lua.agent_out_of_time": "run_lua stoppade koden efter %1 sekunder eftersom den inte hade avslutats (en loop utan slut?): ange 'seconds' för mer tid, eller starta den som skript med lua_script",
 		"lua.window_closing": "%1: fönstret stängs",
 		"lua_console.active_registered_functions": "Aktiva registrerade funktioner",
 		"lua_console.call": "&Anropa",

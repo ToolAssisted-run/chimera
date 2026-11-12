@@ -2158,6 +2158,13 @@ CE_API int32_t ce_mcp_state(void);
 /* The name and version the agent's program gave, "" when none is connected.
  * Borrowed until this thread's next call of it. */
 CE_API const char *ce_mcp_client(void);
+/* The connected chimera-mcp's build: "" when none is connected, "older" when
+ * it did not say (a build from before 2026-11-12). Borrowed until this
+ * thread's next call of it. */
+CE_API const char *ce_mcp_client_build(void);
+/* Where this Chimera's own chimera-mcp is, named to an agent whose
+ * chimera-mcp is from another build. */
+CE_API void ce_mcp_program(const char *path);
 /* The pipe's name (Windows) or folder (Linux), for a person to read. */
 CE_API const char *ce_mcp_endpoint(void);
 CE_API void ce_mcp_allow_changes(int32_t on);

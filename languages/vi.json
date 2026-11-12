@@ -1037,6 +1037,7 @@
 		"lua.too_deep": "(một bảng, quá sâu để hiển thị)",
 		"lua.unknown_error": "lỗi không rõ",
 		"lua.waited_for_frame": "mã đã chờ một khung hình, mà không có gì ở đây tiếp tục được; một script chờ khung hình được khởi động bằng lua_script",
+		"lua.agent_out_of_time": "run_lua đã dừng mã sau %1 giây vì mã chưa kết thúc (vòng lặp vô tận?): hãy đặt 'seconds' để có thêm thời gian, hoặc chạy nó như một script bằng lua_script",
 		"lua.window_closing": "%1: cửa sổ đang đóng",
 		"lua_console.active_registered_functions": "Các hàm đã đăng ký đang hoạt động",
 		"lua_console.call": "&Gọi",

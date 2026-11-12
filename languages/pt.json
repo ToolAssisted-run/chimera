@@ -1057,6 +1057,7 @@
 		"lua.too_deep": "(uma tabela, profunda demais para mostrar)",
 		"lua.unknown_error": "erro desconhecido",
 		"lua.waited_for_frame": "o código esperou por um quadro, que nada aqui continua: um script que espera quadros é iniciado com lua_script",
+		"lua.agent_out_of_time": "run_lua parou o código após %1 segundos, pois não tinha terminado (um laço sem fim?): indique 'seconds' para mais tempo ou inicie-o como script com lua_script",
 		"lua.window_closing": "%1: a janela está sendo fechada",
 		"lua_console.active_registered_functions": "Funções registradas ativas",
 		"lua_console.call": "&Chamar",

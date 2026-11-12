@@ -53,6 +53,15 @@
 
 int main(int argc, char **argv)
 {
+	if (argc > 1 && std::strcmp(argv[1], "--version") == 0)
+	{
+		/* the build, and how many tools it offers with a window */
+		size_t count = 0, window = 0;
+		const chimera::McpTool *tools = chimera::mcpTools(count);
+		for (size_t i = 0; i < count; i++) window += tools[i].local ? 0 : 1;
+		std::printf("chimera-mcp %s: %zu tools with a window\n", CE_BUILD_COMMIT, window);
+		return 0;
+	}
 	if (argc > 1 && std::strcmp(argv[1], "--tools") == 0)
 	{
 		size_t count = 0;
@@ -84,7 +93,8 @@ int main(int argc, char **argv)
 			"                              and works on the project open in a running Chimera)\n"
 			"       chimera-mcp --cores <dir> --work <dir> [--files <dir>]... [--gpu] [--history <MiB>]\n"
 			"                              (no window: opens a machine of its own; writes only inside --work)\n"
-			"       chimera-mcp --tools    (print the tools)\n");
+			"       chimera-mcp --tools    (print the tools)\n"
+			"       chimera-mcp --version  (print the build)\n");
 		return 2;
 	}
 

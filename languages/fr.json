@@ -1057,6 +1057,7 @@
 		"lua.too_deep": "(une table, trop profonde pour être affichée)",
 		"lua.unknown_error": "erreur inconnue",
 		"lua.waited_for_frame": "le code a attendu une image, que rien ici ne fait avancer : un script qui attend des images se lance avec lua_script",
+		"lua.agent_out_of_time": "run_lua a arrêté le code après %1 secondes, car il ne s'était pas terminé (une boucle sans fin ?) : donnez 'seconds' pour plus de temps, ou lancez-le comme script avec lua_script",
 		"lua.window_closing": "%1 : la fenêtre se ferme",
 		"lua_console.active_registered_functions": "Fonctions enregistrées actives",
 		"lua_console.call": "&Appeler",

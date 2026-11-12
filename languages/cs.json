@@ -1077,6 +1077,7 @@
 		"lua.too_deep": "(tabulka, příliš hluboká na zobrazení)",
 		"lua.unknown_error": "neznámá chyba",
 		"lua.waited_for_frame": "kód čekal na snímek, který tu nic nedělá: skript, který čeká na snímky, se spouští přes lua_script",
+		"lua.agent_out_of_time": "run_lua zastavil kód po %1 s, protože neskončil (nekonečná smyčka?): zadejte 'seconds' pro více času, nebo jej spusťte jako skript pomocí lua_script",
 		"lua.window_closing": "%1: okno se zavírá",
 		"lua_console.active_registered_functions": "Aktivní registrované funkce",
 		"lua_console.call": "&Volat",

@@ -1077,6 +1077,7 @@
 		"lua.too_deep": "(tabela, zbyt zagnieżdżona, by ją pokazać)",
 		"lua.unknown_error": "nieznany błąd",
 		"lua.waited_for_frame": "kod czekał na klatkę, a nic tutaj na nią nie czeka: skrypt, który czeka na klatki, uruchamia się przez lua_script",
+		"lua.agent_out_of_time": "run_lua zatrzymał kod po %1 s, bo się nie zakończył (pętla bez końca?): podaj 'seconds', aby dać więcej czasu, albo uruchom go jako skrypt przez lua_script",
 		"lua.window_closing": "%1: okno się zamyka",
 		"lua_console.active_registered_functions": "Aktywne zarejestrowane funkcje",
 		"lua_console.call": "&Wywołaj",

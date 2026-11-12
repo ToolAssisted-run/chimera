@@ -1,4 +1,5 @@
 #include "chimera/vm/mcp_vm.hpp"
+#include "chimera/vm/lua_bridge.hpp"
 #include "chimera/vm/tr.hpp"
 
 #include <algorithm>
@@ -312,7 +313,9 @@ void McpViewModel::luaTool(const std::string &tool, const Json &arguments, const
 		if (trimmed(code).empty()) return refuse(tr("mcp.give_code"));
 		if (showLuaConsole) showLuaConsole();
 		std::string results, error;
-		const bool ran = lua->runForAgent(code, results, error);
+		double seconds = LuaBridge::kAgentSeconds;
+		if (const Json *t = arguments.find("seconds"); t != nullptr && t->kind == Json::Kind::Number) seconds = std::clamp(t->number(), 1.0, 300.0);
+		const bool ran = lua->runForAgent(code, results, error, seconds);
 		Json out = object();
 		if (!ran)
 		{

@@ -82,7 +82,7 @@ public:
 	std::string takeOutputForAgent();
 	/* run_lua: the agent's code shown, then run (LuaBridge::runForAgent);
 	 * what it returned as a JSON array, or false with what it raised */
-	bool runForAgent(const std::string &code, std::string &results, std::string &error);
+	bool runForAgent(const std::string &code, std::string &results, std::string &error, double seconds = LuaBridge::kAgentSeconds);
 	/* lua_script: a script file started, as Open Script starts one, or
 	 * stopped and taken out of the list; whether it runs now */
 	bool scriptForAgent(const std::string &path, bool stop);

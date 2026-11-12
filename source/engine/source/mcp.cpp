@@ -324,10 +324,12 @@ const McpTool kTools[] = {
 	{ "run_lua",
 	  "Runs Lua as a line typed into the Lua Console runs, where the person sees it: every Lua function is there "
 	  "(lua_functions lists them), and what it returns and prints comes back. A function that waits for a frame "
-	  "(emu.frameadvance, emu.yield) is for scripts, as in the Lua Console: lua_script runs one. It can do anything a "
-	  "script can, so it is refused until changes are allowed.",
+	  "(emu.frameadvance, emu.yield) is for scripts, as in the Lua Console: lua_script runs one. Code still running after "
+	  "'seconds' (10 when left out) is stopped with an error, so a loop that never ends cannot hold Chimera. It can do "
+	  "anything a script can, so it is refused until changes are allowed.",
 	  "{\"type\":\"object\",\"properties\":{"
-	  "\"code\":{\"type\":\"string\",\"description\":\"Lua, such as \\\"return emu.framecount()\\\".\"}"
+	  "\"code\":{\"type\":\"string\",\"description\":\"Lua, such as \\\"return emu.framecount()\\\".\"},"
+	  "\"seconds\":{\"type\":\"number\",\"minimum\":1,\"maximum\":300,\"description\":\"How long the code may run. 10 when left out.\"}"
 	  "},\"required\":[\"code\"],\"additionalProperties\":false}",
 	  true, true, false, true },
 	{ "lua_script",
@@ -458,6 +460,35 @@ std::string base64(const uint8_t *data, size_t len)
 } // namespace
 
 void mcpSetLocal(bool local) { g_local = local; }
+
+std::string mcpBuildMismatch(bool fromWindow, const std::string &otherBuild, const std::vector<std::string> *otherTools,
+	const std::string &program)
+{
+	if (!otherBuild.empty() && otherBuild == CE_BUILD_COMMIT) return "";
+	std::vector<std::string> mine;
+	for (const McpTool &t : kTools) if (!t.local) mine.emplace_back(t.name);
+	const std::string windowBuild = fromWindow ? CE_BUILD_COMMIT : otherBuild.empty() ? "older than 2026-11-12" : otherBuild;
+	const std::string mcpBuild = fromWindow ? (otherBuild.empty() ? "older than 2026-11-12" : otherBuild) : CE_BUILD_COMMIT;
+	std::string out = "WARNING: this chimera-mcp (build " + mcpBuild + ") is not from the same build as the Chimera it works with "
+		"(build " + windowBuild + "), so some of its tools may be missing or work differently. ";
+	if (otherTools != nullptr)
+	{
+		const std::vector<std::string> &windowTools = fromWindow ? mine : *otherTools, &mcpTools = fromWindow ? *otherTools : mine;
+		std::string missing, gone;
+		for (const std::string &t : windowTools)
+			if (std::find(mcpTools.begin(), mcpTools.end(), t) == mcpTools.end()) missing += (missing.empty() ? "" : ", ") + t;
+		for (const std::string &t : mcpTools)
+			if (std::find(windowTools.begin(), windowTools.end(), t) == windowTools.end()) gone += (gone.empty() ? "" : ", ") + t;
+		if (!missing.empty()) out += "Chimera has tools this chimera-mcp does not offer: " + missing + ". ";
+		if (!gone.empty()) out += "This chimera-mcp offers tools Chimera does not have: " + gone + ". ";
+	}
+	else if (fromWindow)
+		out += "It is older than this Chimera, so it does not offer the tools added since. ";
+	out += "Ask the person to point the agent's MCP set-up at the chimera-mcp of the Chimera they run";
+	out += program.empty() ? " (in its bin folder; Tools > MCP Server... shows the line), then restart the agent's program."
+						   : ": " + program + " (Tools > MCP Server... shows the line), then restart the agent's program.";
+	return out;
+}
 
 const McpTool *mcpTools(size_t &count)
 {
@@ -730,6 +761,11 @@ McpResult McpLink::call(const std::string &tool, const std::string &argumentsJso
 			if (!pipe.connect(error)) return mcpError(error + "." + howToStart);
 			cJSON *hello = cJSON_CreateObject();
 			cJSON_AddStringToObject(hello, "hello", client.empty() ? "an agent" : client.c_str());
+			/* which build this is and its tools, so the window can tell an agent whose chimera-mcp is old */
+			cJSON_AddStringToObject(hello, "build", CE_BUILD_COMMIT);
+			cJSON *names = cJSON_CreateArray();
+			for (const McpTool &t : kTools) if (!t.local) cJSON_AddItemToArray(names, cJSON_CreateString(t.name));
+			cJSON_AddItemToObject(hello, "tools", names);
 			const bool greeted = pipe.send(printJson(hello));
 			cJSON_Delete(hello);
 			/* Chimera answers the greeting from its own thread, at once */
@@ -751,6 +787,20 @@ McpResult McpLink::call(const std::string &tool, const std::string &argumentsJso
 				pipe.close();
 				return mcpError(std::string("Chimera's MCP server did not answer.") + howToStart);
 			}
+			/* the window's build and tools; one from before 2026-11-12 says neither */
+			cJSON *greeting = cJSON_ParseWithLength(line.data(), line.size());
+			const cJSON *build = cJSON_GetObjectItemCaseSensitive(greeting, "build");
+			const cJSON *tools = cJSON_GetObjectItemCaseSensitive(greeting, "tools");
+			std::vector<std::string> theirs;
+			if (cJSON_IsArray(tools))
+			{
+				const cJSON *t = nullptr;
+				cJSON_ArrayForEach(t, tools) if (cJSON_IsString(t)) theirs.emplace_back(t->valuestring);
+			}
+			const cJSON *program = cJSON_GetObjectItemCaseSensitive(greeting, "program");
+			mismatch = mcpBuildMismatch(false, cJSON_IsString(build) ? build->valuestring : "", cJSON_IsArray(tools) ? &theirs : nullptr,
+				cJSON_IsString(program) ? program->valuestring : "");
+			cJSON_Delete(greeting);
 		}
 		if (pipe.send(requestLine)) break;
 		pipe.close();
@@ -779,6 +829,13 @@ McpResult McpLink::call(const std::string &tool, const std::string &argumentsJso
 				cJSON *content = cJSON_GetObjectItemCaseSensitive(reply, "content");
 				if (content != nullptr)
 				{
+					if (!mismatch.empty() && cJSON_IsArray(content))
+					{
+						cJSON *note = cJSON_CreateObject();
+						cJSON_AddStringToObject(note, "type", "text");
+						cJSON_AddStringToObject(note, "text", mismatch.c_str());
+						cJSON_AddItemToArray(content, note);
+					}
 					McpResult result;
 					result.content = printJson(content);
 					result.isError = cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(reply, "isError"));
@@ -849,6 +906,10 @@ struct Service
 	std::string endpoint;
 	int state = CE_MCP_STOPPED;
 	std::string client;
+	/* the connected chimera-mcp's build ("" when it did not say: older than
+	 * 2026-11-12), the warning every answer then carries ("" when none), and
+	 * the window's own chimera-mcp, which that warning names */
+	std::string clientBuild, mismatch, program;
 	std::deque<WaitingCall> waiting;   /* read by the thread, run by the caller of ce_mcp_service */
 	std::deque<std::string> outgoing;  /* lines for the thread to send */
 	std::atomic<int> pending{ 0 };
@@ -948,7 +1009,15 @@ void finish(Service &sv, const WaitingCall &call, const McpResult &result)
 	cJSON *reply = cJSON_CreateObject();
 	cJSON_AddNumberToObject(reply, "id", static_cast<double>(call.id));
 	cJSON *content = cJSON_Parse(result.content.c_str());
-	cJSON_AddItemToObject(reply, "content", content != nullptr ? content : cJSON_CreateArray());
+	if (content == nullptr) content = cJSON_CreateArray();
+	if (!sv.mismatch.empty() && cJSON_IsArray(content))
+	{
+		cJSON *note = cJSON_CreateObject();
+		cJSON_AddStringToObject(note, "type", "text");
+		cJSON_AddStringToObject(note, "text", sv.mismatch.c_str());
+		cJSON_AddItemToArray(content, note);
+	}
+	cJSON_AddItemToObject(reply, "content", content);
 	cJSON_AddBoolToObject(reply, "isError", result.isError);
 	sv.outgoing.push_back(printJson(reply));
 	cJSON_Delete(reply);
@@ -990,6 +1059,8 @@ void pipeThread(Service *sv)
 				sv->shots.clear();
 				addLog(*sv, sv->client + " disconnected");
 				sv->client.clear();
+				sv->clientBuild.clear();
+				sv->mismatch.clear();
 			}
 			else if (event == PipeEvent::Line)
 			{
@@ -1012,7 +1083,26 @@ void pipeThread(Service *sv)
 				sv->shots.clear();
 					sv->client = hello->valuestring;
 					addLog(*sv, "the agent's program is " + sv->client);
-					sv->outgoing.push_back("{\"hello\":\"chimera\"}");
+					/* A chimera-mcp that names its build compares it with this
+					 * one's itself and warns the agent; one that does not is from
+					 * before that, and the warning is added here (issue 571: an
+					 * agent spent a session working round tools it did not know
+					 * its chimera-mcp was too old to offer) */
+					const cJSON *build = cJSON_GetObjectItemCaseSensitive(message, "build");
+					sv->clientBuild = cJSON_IsString(build) ? build->valuestring : "";
+					sv->mismatch = cJSON_IsString(build) ? "" : mcpBuildMismatch(true, "", nullptr, sv->program);
+					if (!sv->mismatch.empty()) addLog(*sv, "its chimera-mcp is older than this Chimera: every answer says so");
+					else if (sv->clientBuild != CE_BUILD_COMMIT)
+						addLog(*sv, "its chimera-mcp is build " + sv->clientBuild + ", this Chimera " + CE_BUILD_COMMIT);
+					cJSON *answer = cJSON_CreateObject();
+					cJSON_AddStringToObject(answer, "hello", "chimera");
+					cJSON_AddStringToObject(answer, "build", CE_BUILD_COMMIT);
+					cJSON *names = cJSON_CreateArray();
+					for (const McpTool &t : kTools) if (!t.local) cJSON_AddItemToArray(names, cJSON_CreateString(t.name));
+					cJSON_AddItemToObject(answer, "tools", names);
+					if (!sv->program.empty()) cJSON_AddStringToObject(answer, "program", sv->program.c_str());
+					sv->outgoing.push_back(printJson(answer));
+					cJSON_Delete(answer);
 				}
 				else if (cJSON_IsNumber(id) && cJSON_IsString(tool))
 				{
@@ -2645,6 +2735,22 @@ const char *ce_mcp_client(void)
 	std::lock_guard<std::mutex> hold(sv.lock);
 	*held = sv.client;
 	return held->c_str();
+}
+
+const char *ce_mcp_client_build(void)
+{
+	static thread_local chimera::ThreadString held;
+	Service &sv = service();
+	std::lock_guard<std::mutex> hold(sv.lock);
+	*held = sv.client.empty() ? "" : sv.clientBuild.empty() ? "older" : sv.clientBuild;
+	return held->c_str();
+}
+
+void ce_mcp_program(const char *path)
+{
+	Service &sv = service();
+	std::lock_guard<std::mutex> hold(sv.lock);
+	sv.program = path != nullptr ? path : "";
 }
 
 const char *ce_mcp_endpoint(void)

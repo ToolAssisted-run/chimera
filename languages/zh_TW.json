@@ -1037,6 +1037,7 @@
 		"lua.too_deep": "（表格，層級太深，無法顯示）",
 		"lua.unknown_error": "未知錯誤",
 		"lua.waited_for_frame": "程式在等待影格，但這裡沒有任何東西會繼續執行：等待影格的腳本要用 lua_script 啟動",
+		"lua.agent_out_of_time": "程式碼在 %1 秒後仍未結束（無限迴圈？），run_lua 已將其停止：如需更長時間請指定 'seconds'，或用 lua_script 作為腳本啟動",
 		"lua.window_closing": "%1：視窗正在關閉",
 		"lua_console.active_registered_functions": "已啟用的已註冊函式",
 		"lua_console.call": "呼叫(&C)",

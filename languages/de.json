@@ -1057,6 +1057,7 @@
 		"lua.too_deep": "(eine Tabelle, zu tief zum Anzeigen)",
 		"lua.unknown_error": "unbekannter Fehler",
 		"lua.waited_for_frame": "der Code hat auf einen Frame gewartet, und hier läuft nichts weiter: Ein Skript, das auf Frames wartet, wird mit lua_script gestartet",
+		"lua.agent_out_of_time": "run_lua hat den Code nach %1 Sekunden angehalten, weil er nicht zu Ende kam (eine Schleife ohne Ende?): Gib mit 'seconds' mehr Zeit oder starte ihn als Skript mit lua_script",
 		"lua.window_closing": "%1: das Fenster wird geschlossen",
 		"lua_console.active_registered_functions": "Aktive registrierte Funktionen",
 		"lua_console.call": "&Aufrufen",

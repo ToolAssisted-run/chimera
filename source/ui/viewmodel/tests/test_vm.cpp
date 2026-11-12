@@ -8048,6 +8048,16 @@ void luaForAgent()
 	CHECK(!console.runForAgent("emu.frameadvance()", results, error) && error.find("emu.frameadvance() is not allowed during any callbacks") != std::string::npos);
 	CHECK(!console.runForAgent("emu.yield()", results, error) && error.find("emu.yield() is not allowed") != std::string::npos);
 	CHECK(!console.runForAgent("coroutine.yield()", results, error) && error.find("lua_script") != std::string::npos && !lua.running());
+	/* code that never ends is stopped after its seconds, and the console goes on (issue 571: it held the window) */
+	{
+		const auto start = std::chrono::steady_clock::now();
+		CHECK(!console.runForAgent("local n = 0 while true do n = n + 1 end", results, error, 1) &&
+			error.find("run_lua stopped the code after 1 seconds, as it had not ended") != std::string::npos);
+		const double took = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
+		std::printf("run_lua: a loop that never ends stopped after %.2f s: %s\n", took, error.c_str());
+		CHECK(took >= 0.9 && took < 3);
+		CHECK(console.runForAgent("return 40 + 2", results, error) && results == "[42]");
+	}
 	/* a function it registers keeps it, and runs on each frame */
 	CHECK(console.runForAgent("agentSeen = 0 event.onframeend(function() agentSeen = agentSeen + 1 end)", results, error) && results == "[]");
 	CHECK(lua.running());

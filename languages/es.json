@@ -1057,6 +1057,7 @@
 		"lua.too_deep": "(una tabla, demasiado profunda para mostrarla)",
 		"lua.unknown_error": "error desconocido",
 		"lua.waited_for_frame": "el código esperó un fotograma, y aquí nada continúa tras esperar: un script que espera fotogramas se inicia con lua_script",
+		"lua.agent_out_of_time": "run_lua detuvo el código tras %1 segundos porque no había terminado (¿un bucle sin fin?): indica 'seconds' para darle más tiempo o inícialo como script con lua_script",
 		"lua.window_closing": "%1: la ventana se está cerrando",
 		"lua_console.active_registered_functions": "Funciones registradas activas",
 		"lua_console.call": "&Llamar",

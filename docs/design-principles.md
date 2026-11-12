@@ -14457,3 +14457,42 @@ kept. An input set past the last makes the counter say `1/4`, and every
 input cleared makes it say `0/0`; without the fix it said `1/2` and `0/2`
 and both checks failed. 100 lag changes by a script on a 200,000-frame movie
 with no input took 0.789 s before and 0.008 s after.
+
+## chimera-mcp and the window say their builds to each other (2026-11-12, issue 571)
+
+An agent's set-up named the `chimera-mcp` of a nightly two weeks older than
+the window the person ran. Its tool list is compiled into it, so it offered
+none of the tools added since, and nothing said why: the agent spent a
+session working round tools that existed. Now `chimera-mcp` sends its build
+and its tools' names when it connects, and the window answers with its own
+and the path of its own `chimera-mcp`. When the builds differ, every answer
+ends with a warning naming both builds, the tools one side has and the other
+not, and the `chimera-mcp` to use. A `chimera-mcp` from before this sends no
+build; the window adds the warning itself, so old ones are told too, as they
+pass an answer's content through unchanged. `server_info` reports the
+connected `chimera-mcp`'s build, and `chimera-mcp --version` prints its own.
+
+Not done from the request: the warning in the instructions sent at
+connection (`chimera-mcp` reaches the window only at the first call, so it
+does not know yet), MCP's `tools/list_changed` notice, and the build in
+Tools > MCP Server... .
+
+Tested: the engine's MCP test connects as a `chimera-mcp` of this build (no
+warning) and as one that names no build (the answer to `status` carries the
+warning with the window's `chimera-mcp` path), and checks the comparison
+names the tools each side lacks. With the window's warning taken out, it
+fails.
+
+## run_lua stops code that does not end (2026-11-12, issue 571)
+
+`run_lua` ran the agent's code to its end on the thread the scripts run on,
+and nothing stopped it: a loop that never ends held the window. Now a count
+hook looks at the clock every 10,000 Lua instructions of that code and
+stops it with an error after `seconds` (10 when not given, 1 to 300), saying
+to give more or to start it as a script with `lua_script`. The console goes
+on afterwards. A C function that itself never returns is not stopped; none
+of Chimera's Lua functions waits without end.
+
+Tested: the view models test runs `while true do end` with 1 second: it is
+stopped after 1.00 s with the error, and `return 40 + 2` runs right after.
+Without the hook the test hangs until meson kills it at 180 s.

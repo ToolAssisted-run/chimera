@@ -1234,6 +1234,8 @@ int main(int argc, char **argv)
 		QString program = besideProgram(QStringLiteral("chimera-mcp"));
 		if (program.isEmpty()) program = QCoreApplication::applicationDirPath() + QStringLiteral("/bin/chimera-mcp") + QStringLiteral(EXE_SUFFIX);
 		mcp.setupCommand.set(("claude mcp add chimera -- \"" + QDir::toNativeSeparators(program) + "\"").toStdString());
+		/* named to an agent whose chimera-mcp is from another build */
+		ce_mcp_program(QDir::toNativeSeparators(program).toStdString().c_str());
 	}
 	mcp.projectsFolder = [&paths] { return paths.resolve("Movies"); };
 	mcp.serverInfo = [&paths, &cores, &help, configPath] {
@@ -1263,6 +1265,12 @@ int main(int argc, char **argv)
 		add("folders", folders);
 		const char *endpoint = ce_mcp_endpoint();
 		add("mcp_name", text(endpoint != nullptr ? endpoint : ""));
+		/* the connected chimera-mcp's build beside this one's: "older" is one from before 2026-11-12 */
+		const char *clientBuild = ce_mcp_client_build();
+		const std::string theirs = clientBuild != nullptr ? clientBuild : "";
+		add("chimera_mcp_build", text(theirs));
+		const vm::json::Json *commit = engine.find("commit");
+		add("chimera_mcp_up_to_date", vm::json::Json::boolean_(commit != nullptr && theirs == commit->text));
 		return vm::json::write(info);
 	};
 	/* list_cores and describe_core read the cores folder */

@@ -1057,6 +1057,7 @@
 		"lua.too_deep": "(una taula, massa profunda per mostrar-la)",
 		"lua.unknown_error": "error desconegut",
 		"lua.waited_for_frame": "el codi ha esperat un fotograma, i aquí no hi ha res que en faci cas; un script que espera fotogrames s'inicia amb lua_script",
+		"lua.agent_out_of_time": "run_lua ha aturat el codi després de %1 segons perquè no havia acabat (un bucle sense fi?): indiqueu 'seconds' per a més temps o inicieu-lo com a script amb lua_script",
 		"lua.window_closing": "%1: la finestra es tanca",
 		"lua_console.active_registered_functions": "Funcions registrades actives",
 		"lua_console.call": "&Crida",

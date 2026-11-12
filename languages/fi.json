@@ -1057,6 +1057,7 @@
 		"lua.too_deep": "(taulukko, liian syvä näytettäväksi)",
 		"lua.unknown_error": "tuntematon virhe",
 		"lua.waited_for_frame": "koodi odotti kuvaa, jota mikään täällä ei jatka: skripti, joka odottaa kuvia, käynnistetään lua_scriptillä",
+		"lua.agent_out_of_time": "run_lua pysäytti koodin %1 sekunnin jälkeen, koska se ei ollut päättynyt (loputon silmukka?): anna 'seconds', jos tarvitset enemmän aikaa, tai käynnistä se skriptinä lua_scriptillä",
 		"lua.window_closing": "%1: ikkuna sulkeutuu",
 		"lua_console.active_registered_functions": "Aktiiviset rekisteröidyt funktiot",
 		"lua_console.call": "&Kutsu",

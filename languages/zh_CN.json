@@ -1037,6 +1037,7 @@
 		"lua.too_deep": "（表，嵌套过深，无法显示）",
 		"lua.unknown_error": "未知错误",
 		"lua.waited_for_frame": "代码在等待一帧，但此处没有任何东西会让它继续执行：等待帧的脚本需要用 lua_script 启动",
+		"lua.agent_out_of_time": "代码在 %1 秒后仍未结束（无限循环？），run_lua 已将其停止：如需更长时间请指定 'seconds'，或用 lua_script 作为脚本启动",
 		"lua.window_closing": "%1：窗口正在关闭",
 		"lua_console.active_registered_functions": "活动的已注册函数",
 		"lua_console.call": "调用(&C)",

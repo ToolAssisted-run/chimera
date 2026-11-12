@@ -103,8 +103,12 @@ public:
 	 * value, as on the console's line. What it returned, as a JSON array
 	 * (a table an object, or a list when its keys are 1 to n), or false with
 	 * what it raised in `error`. A function it registers keeps it, as a
-	 * script's do; waiting for a frame is refused, as Chimera's refuses it */
-	bool runForAgent(const std::string &code, const std::string &directory, std::string &results, std::string &error);
+	 * script's do; waiting for a frame is refused, as Chimera's refuses it.
+	 * Code still running after `seconds` is stopped with an error, so a loop
+	 * that never ends cannot hold the window (issue 571) */
+	bool runForAgent(const std::string &code, const std::string &directory, std::string &results, std::string &error,
+		double seconds = kAgentSeconds);
+	static constexpr double kAgentSeconds = 10;
 
 	/* called before every frame: what the scripts drew for the last frame
 	 * goes, and the OnFrameStart functions are called (a joypad.set there is
@@ -209,7 +213,9 @@ private:
 	void stopHere(int64_t script);
 	void stopAllHere();
 	void executeHere(const std::string &command);
-	bool runForAgentHere(const std::string &code, const std::string &directory, std::string &results, std::string &error);
+	bool runForAgentHere(const std::string &code, const std::string &directory, std::string &results, std::string &error, double seconds);
+	/* run_lua's limit while its code starts, 0 otherwise: startCodeHere gives the new script a clock */
+	double agentSeconds_ = 0;
 	void frameDoneHere();
 	/* the running scripts go on, those waiting for a frame only when `frames` */
 	bool resumeRunning(bool frames);

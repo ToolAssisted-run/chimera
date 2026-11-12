@@ -472,6 +472,63 @@ void theServer()
 	ce_mcp_stop();
 }
 
+/* chimera-mcp and the window say their builds to each other (issue 571): an
+ * agent whose chimera-mcp is from another build is told so in every answer,
+ * with the tools one side has and the other not, and which chimera-mcp to
+ * use instead. */
+void theBuilds()
+{
+	/* from this build: no warning, and the window knows its build */
+	ce_mcp_program("/opt/chimera/bin/chimera-mcp");
+	const char *error = nullptr;
+	assert(ce_mcp_start(&error) == 1);
+	{
+		chimera::McpLink link;
+		link.setClient("Test Agent 3.1");
+		chimera::McpResult result = callThroughServer(link, "status", "{}");
+		assert(!result.isError && !has(result.content, "WARNING"));
+		assert(std::string(ce_mcp_client_build()) == CE_BUILD_COMMIT);
+	}
+	ce_mcp_stop();
+
+	/* a chimera-mcp from before builds were said: its greeting names none,
+	 * and every answer carries the warning, the window's own chimera-mcp in it */
+	assert(ce_mcp_start(&error) == 1);
+	chimera::PipeClient old;
+	std::string connectError, line;
+	assert(old.connect(connectError));
+	assert(old.send("{\"hello\":\"Old Agent 1.0\"}"));
+	std::string greeting;
+	const auto until = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+	while (greeting.empty() && std::chrono::steady_clock::now() < until)
+		if (old.wait(20, line) == PipeEvent::Line) greeting = line;
+	assert(has(greeting, "\"build\":\"" CE_BUILD_COMMIT "\"") && has(greeting, "\"status\""));
+	assert(std::string(ce_mcp_client_build()) == "older");
+	assert(old.send("{\"id\":1,\"tool\":\"status\",\"arguments\":{}}"));
+	std::string answer;
+	while (answer.empty() && std::chrono::steady_clock::now() < until)
+	{
+		uint64_t id = 0;
+		const char *name = nullptr, *args = nullptr;
+		if (ce_mcp_pending() != 0) ce_mcp_service(nullptr, nullptr, -1, "{}", &id, &name, &args);
+		if (old.wait(5, line) == PipeEvent::Line && has(line, "\"id\":1") && has(line, "\"content\"")) answer = line;
+	}
+	std::printf("an old chimera-mcp is told: %s\n", answer.c_str());
+	std::fflush(stdout);
+	assert(has(answer, "machine_open") && has(answer, "WARNING") && has(answer, "older than 2026-11-12")
+		&& has(answer, "/opt/chimera/bin/chimera-mcp"));
+	old.close();
+	ce_mcp_stop();
+
+	/* chimera-mcp's own comparison: the tools each side lacks are named */
+	const std::vector<std::string> windowTools = { "status", "a_new_tool" };
+	const std::string said = chimera::mcpBuildMismatch(false, "0123456789ab", &windowTools, "C:\\Chimera\\bin\\chimera-mcp.exe");
+	assert(has(said, "0123456789ab") && has(said, "Chimera has tools this chimera-mcp does not offer: a_new_tool")
+		&& has(said, "This chimera-mcp offers tools Chimera does not have: controls") && has(said, "C:\\Chimera\\bin\\chimera-mcp.exe"));
+	assert(chimera::mcpBuildMismatch(false, CE_BUILD_COMMIT, &windowTools, "").empty());
+	ce_mcp_program(nullptr);
+}
+
 } // namespace
 
 /* Replies are valid UTF-8 (2026-10-18): valid text passes untouched, and each
@@ -505,6 +562,7 @@ int main()
 	thePipe();
 	theProtocol();
 	theServer();
+	theBuilds();
 	std::printf("test_mcp: ok\n");
 	return 0;
 }

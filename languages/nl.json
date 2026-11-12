@@ -1057,6 +1057,7 @@
 		"lua.too_deep": "(een tabel, te diep om te tonen)",
 		"lua.unknown_error": "onbekende fout",
 		"lua.waited_for_frame": "de code wachtte op een frame, en daar gaat hier niets mee verder: een script dat op frames wacht, wordt gestart met lua_script",
+		"lua.agent_out_of_time": "run_lua heeft de code na %1 seconden gestopt, omdat die niet klaar was (een lus zonder einde?): geef 'seconds' op voor meer tijd, of start hem als script met lua_script",
 		"lua.window_closing": "%1: het venster wordt gesloten",
 		"lua_console.active_registered_functions": "Actieve geregistreerde functies",
 		"lua_console.call": "&Aanroepen",

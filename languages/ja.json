@@ -1037,6 +1037,7 @@
 		"lua.too_deep": "(テーブル。深すぎるため表示できません)",
 		"lua.unknown_error": "不明なエラー",
 		"lua.waited_for_frame": "コードはフレームを待ちましたが、ここにはフレームを進める処理がありません。フレームを待つスクリプトは lua_script で開始してください",
+		"lua.agent_out_of_time": "コードが %1 秒たっても終わらなかったため、run_lua が止めました（終わらないループ？）。時間を延ばすには 'seconds' を指定するか、lua_script でスクリプトとして開始してください",
 		"lua.window_closing": "%1: ウィンドウを閉じています",
 		"lua_console.active_registered_functions": "有効な登録関数",
 		"lua_console.call": "呼び出す(&C)",
