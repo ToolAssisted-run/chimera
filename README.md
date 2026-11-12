@@ -49,6 +49,7 @@ Made, published and supported by this project. Report a problem with one in [Chi
 | [Mesen](https://github.com/ToolAssisted-run/chimera-core-mesen) | Nintendo Entertainment System / Famicom, Famicom Disk System (with the EPSM sound expansion), Super Nintendo, Super Game Boy, Game Boy / Game Boy Color, Game Boy Advance, PC Engine / TurboGrafx-16, SuperGrafx, PC Engine CD, Master System, Game Gear, SG-1000, ColecoVision, WonderSwan / WonderSwan Color, Pocket Challenge V2 |
 | [ares](https://github.com/ToolAssisted-run/chimera-core-ares) | Nintendo Entertainment System / Famicom, Super Nintendo, Satellaview, Sufami Turbo, Nintendo 64, Nintendo 64DD, Game Boy / Game Boy Color, Game Boy Advance, Mega Drive / Genesis, Mega Drive 32X, Sega CD / Mega CD, Sega CD 32X, Master System, Game Gear, SG-1000, PlayStation, Atari 2600, Atari 5200, ColecoVision, MSX / MSX2, PC Engine / TurboGrafx-16 / SuperGrafx, PC Engine CD / TurboDuo, Neo Geo AES, Neo Geo Pocket / Color, WonderSwan / WonderSwan Color |
 | [Snes9x](https://github.com/ToolAssisted-run/chimera-core-snes9x) | Super Nintendo |
+| [bsnes v115](https://github.com/ToolAssisted-run/chimera-core-bsnes115) | Super Nintendo, Super Game Boy |
 | [Dolphin](https://github.com/ToolAssisted-run/chimera-core-dolphin) | GameCube, Wii |
 | [Cemu](https://github.com/ToolAssisted-run/chimera-core-cemu) | Wii U |
 | [Azahar](https://github.com/ToolAssisted-run/chimera-core-azahar) | Nintendo 3DS / New Nintendo 3DS |

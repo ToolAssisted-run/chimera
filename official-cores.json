@@ -69,6 +69,15 @@
       "tested": ""
     },
     {
+      "id": "bsnes115",
+      "name": "bsnes v115",
+      "systems": [
+        { "id": "SNES", "name": "Super Nintendo" }
+      ],
+      "repo": "ToolAssisted-run/chimera-core-bsnes115",
+      "tested": ""
+    },
+    {
       "id": "stella",
       "name": "Stella",
       "systems": [

@@ -14779,3 +14779,39 @@ it forgotten for the menus five times, and its hotkey run once; without the
 change, once. The menu bar's own waiting cannot be shown here: Linux and the
 offscreen tests have no theme that turns it on, so it was read in Qt's
 source (qquickmenubar.cpp) and not seen on Windows.
+
+## bsnes v115 joins the official cores (user-decided, 2026-11-12)
+
+Issue 572 asked for bsnes v115, to finish a movie begun on another
+frontend's bsnes v115 core. The owner asked for it to be built and then
+published. `chimera-core-bsnes115` is upstream bsnes at its v115 tag
+(GPL-3.0-only), kept at that version as the Godot cores are kept one per
+version, because a movie plays the same only on the same emulator. It plays
+Super Nintendo cartridges, and Game Boy games in a Super Game Boy or Super
+Game Boy 2. Nothing was taken from another frontend's bsnes port: its
+adapter follows upstream's own desktop and libretro frontends.
+
+- bsnes v115 compiles in Nintendo's two Super Game Boy boot ROMs (their
+  SHA-1s match Nintendo's dumps). The core's patch 0003 leaves them out of
+  the build, and a project of a Game Boy game asks for the boot ROM and the
+  Super Game Boy cartridge as firmware.
+- A cartridge's coprocessor firmware (DSP-1 to 4, ST010, ST011, ST018, Cx4)
+  is asked for by the game ("gameFirmware"); for the chips bsnes has its
+  own versions of, only while "Prefer Coprocessor HLE" is off.
+- Its power-on randomness is seeded with 0 instead of the host's processor
+  clock (patch 0002), so a movie plays the same on every machine.
+
+Tested: the core's gate 33/0 (the sandbox the same as a native build, also
+with a save and load around every frame and with turbo, every controller
+device, a save in and out, MSU-1, a DSP-1 cartridge with and without
+firmware, and chimera-run's input polls and firmware question), its
+frontend gate 4/0, the package tests 25/0, and eight games owned here the
+same in both builds and with a save and load every frame, among them Super
+Mario World, Prince of Persia (a 117181-frame movie) and Kirby's
+Hoshinoka-Bi in both Super Game Boys. On Windows (Chimera's chimera-run,
+run from WSL) the work RAM and the picture were the same as on Linux. CI
+passes on x86_64 and aarch64; the first build is "Nightly 2026-11-12
+(f24ce1cf)", with both packages. Not proved: a game on a coprocessor, the
+aarch64 package on a computer, and whether a movie made on another
+frontend's bsnes v115 plays the same here. The Satellaview and the Sufami
+Turbo are not offered.
