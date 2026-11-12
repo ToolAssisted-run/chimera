@@ -1,10 +1,10 @@
-[submodule "extern/SDL2/SDL"]
-	path = extern/SDL2/SDL
+[submodule "extern/SDL3/SDL"]
+	path = extern/SDL3/SDL
 	url = https://github.com/libsdl-org/SDL.git
-	branch = SDL2
+	branch = release-3.4.x
 	ignore = untracked
-[submodule "extern/SDL2/libusb"]
-	path = extern/SDL2/libusb
+[submodule "extern/SDL3/libusb"]
+	path = extern/SDL3/libusb
 	url = https://github.com/libusb/libusb.git
 	ignore = untracked
 [submodule "extern/lua"]

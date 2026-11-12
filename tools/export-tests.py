@@ -137,7 +137,7 @@ for t in tests:
                    "timeout": t["timeout"], "suite": t.get("suite", [])})
 
 # the build folder, without what only the build itself uses (object files,
-# meson's own, and the nested builds of zstd, SDL2 and OpenAL Soft, whose
+# meson's own, and the nested builds of zstd, SDL3 and OpenAL Soft, whose
 # libraries are copied beside the programs)
 skip_dirs = {"meson-info", "meson-logs", "meson-private"}
 for d, dirs, fs in os.walk(build):
