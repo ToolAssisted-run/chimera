@@ -112,6 +112,13 @@ public:
 	bool runForAgent(const std::string &code, const std::string &directory, std::string &results, std::string &error,
 		double seconds = kAgentSeconds);
 	static constexpr double kAgentSeconds = 10;
+	/* run_lua with frames (issue 571): the agent's code started as a script
+	 * of its own that may wait for frames (emu.frameadvance), for the window
+	 * to play; its id, or 0 with what it raised. finishForAgent afterwards:
+	 * what it returned when it ended (ended true), or it is stopped (ended
+	 * false); the error it stopped on, if it did */
+	int64_t startForAgent(const std::string &code, const std::string &directory, std::string &error, double seconds);
+	void finishForAgent(int64_t id, bool &ended, std::string &results, std::string &error);
 
 	/* called before every frame: what the scripts drew for the last frame
 	 * goes, and the OnFrameStart functions are called (a joypad.set there is
@@ -219,6 +226,8 @@ private:
 	bool runForAgentHere(const std::string &code, const std::string &directory, std::string &results, std::string &error, double seconds);
 	/* run_lua's limit while its code starts, 0 otherwise: startCodeHere gives the new script a clock */
 	double agentSeconds_ = 0;
+	/* run_lua with frames: the error its script stopped on, by id, until finishForAgent */
+	std::map<int64_t, std::string> agentFailed_;
 	void frameDoneHere();
 	/* the running scripts go on, those waiting for a frame only when `frames` */
 	bool resumeRunning(bool frames);

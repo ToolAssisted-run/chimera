@@ -459,12 +459,14 @@ const McpTool kTools[] = {
 	{ "run_lua",
 	  "Runs Lua as a line typed into the Lua Console runs, where the person sees it: every Lua function is there "
 	  "(lua_functions lists them), and what it returns and prints comes back. A function that waits for a frame "
-	  "(emu.frameadvance, emu.yield) is for scripts, as in the Lua Console: lua_script runs one. Code still running after "
+	  "(emu.frameadvance, emu.yield) needs 'frames': the code then runs across that many frames of the movie, played "
+	  "for it; without, it is for scripts, as in the Lua Console (lua_script runs one). Code still running after "
 	  "'seconds' (10 when left out) is stopped with an error, so a loop that never ends cannot hold Chimera. It can do "
 	  "anything a script can, so it is refused until changes are allowed.",
 	  "{\"type\":\"object\",\"properties\":{"
 	  "\"code\":{\"type\":\"string\",\"description\":\"Lua, such as \\\"return emu.framecount()\\\".\"},"
-	  "\"seconds\":{\"type\":\"number\",\"minimum\":1,\"maximum\":300,\"description\":\"How long the code may run. 10 when left out.\"}"
+	  "\"seconds\":{\"type\":\"number\",\"minimum\":1,\"maximum\":300,\"description\":\"How long the code may run. 10 when left out (with frames, a second more a frame).\"},"
+	  "\"frames\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":600,\"description\":\"Let the code wait for frames (emu.frameadvance): the movie is played up to this many frames from the frame the machine is on, as advance_until plays it, and the answer comes after them, with what the code returned if it ended (it is stopped if it still waits) and what it printed. The playback position moves on.\"}"
 	  "},\"required\":[\"code\"],\"additionalProperties\":false}",
 	  true, true, false, true },
 	{ "lua_script",

@@ -2787,6 +2787,32 @@ void SessionViewModel::mcpPlayUntil(uint64_t id, std::string arguments, int64_t 
 	});
 }
 
+void SessionViewModel::mcpPlayFrames(int64_t frames, std::function<void(int64_t)> done)
+{
+	submit([this, frames, done = std::move(done)] {
+		if (s_ == nullptr)
+		{
+			later([done] { done(-1); });
+			return;
+		}
+		const int64_t start = ce_session_frame(s_), length = ce_session_movie_length(s_);
+		const int64_t target = std::min(length, start + frames);
+		if (target <= start)
+		{
+			later([done] { done(0); });
+			return;
+		}
+		pauseOnFrameM_ = target;
+		mcpFastM_ = false;
+		runningM_ = true;
+		due_ = fpsSince_ = Clock::now();
+		fpsFrames_ = 0;
+		later([this, start, target] { seekFrom.set(start); seekingTo.set(target); running.set(true); });
+		mcpMoveM_ = McpMove{0, start, target, McpMove::Play, {}};
+		mcpMoveM_->played = done;
+	});
+}
+
 void SessionViewModel::mcpPictures(uint64_t id, std::vector<int64_t> frames)
 {
 	submit([this, id, frames] {
@@ -2840,6 +2866,15 @@ bool SessionViewModel::mcpMoveOnMachine()
 	if ((runningM_ && pauseOnFrameM_ >= 0) || turboSeekToM_ >= 0) return false;
 	McpMove &move = *mcpMoveM_;
 	const int64_t at = s_ != nullptr ? ce_session_frame(s_) : -1;
+	if (move.kind == McpMove::Play)
+	{
+		/* not answered here: the window answers once the agent's Lua is finished */
+		auto done = std::move(move.played);
+		const int64_t played = at >= move.start ? at - move.start : -1;
+		mcpMoveM_.reset();
+		later([done, played] { done(played); });
+		return true;
+	}
 	const int64_t length = s_ != nullptr ? ce_session_movie_length(s_) : 0;
 	std::string text;
 	bool failed = false;

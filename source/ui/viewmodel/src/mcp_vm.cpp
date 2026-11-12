@@ -320,7 +320,40 @@ void McpViewModel::luaTool(const std::string &tool, const Json &arguments, const
 		if (showLuaConsole) showLuaConsole();
 		std::string results, error;
 		double seconds = LuaBridge::kAgentSeconds;
-		if (const Json *t = arguments.find("seconds"); t != nullptr && t->kind == Json::Kind::Number) seconds = std::clamp(t->number(), 1.0, 300.0);
+		const Json *given = arguments.find("seconds");
+		if (given != nullptr && given->kind == Json::Kind::Number) seconds = std::clamp(given->number(), 1.0, 300.0);
+		/* with frames (issue 571): the code may wait for frames, the movie is played that
+		 * many, and the answer comes once they are; a second a frame more, unless given */
+		if (const Json *f = arguments.find("frames"); f != nullptr && f->kind == Json::Kind::Number)
+		{
+			const int64_t frames = std::clamp<int64_t>(static_cast<int64_t>(f->number()), 1, 600);
+			if (given == nullptr) seconds = std::min(300.0, seconds + static_cast<double>(frames));
+			const int64_t script = lua->startForAgent(code, error, seconds);
+			if (script == 0)
+			{
+				Json out = object();
+				add(out, "error", Json::string(error));
+				add(out, "output", Json::string(lua->takeOutputForAgent()));
+				return answer(json::write(out), true);
+			}
+			session_.mcpPlayFrames(frames, [this, script, answer](int64_t played) {
+				bool ended = false;
+				std::string results, failed;
+				lua->finishForAgent(script, ended, results, failed);
+				Json out = object();
+				Json values;
+				std::string why;
+				if (!json::parse(results, values, why)) values.kind = Json::Kind::Array;
+				add(out, "frames_played", Json::integer(std::max<int64_t>(played, 0)));
+				add(out, "ended", Json::boolean_(ended));
+				if (ended && failed.empty()) add(out, "results", values);
+				if (!failed.empty()) add(out, "error", Json::string(failed));
+				add(out, "frame", Json::integer(session_.frame.get()));
+				add(out, "output", Json::string(lua->takeOutputForAgent()));
+				answer(json::write(out), !failed.empty());
+			});
+			return;
+		}
 		const bool ran = lua->runForAgent(code, results, error, seconds);
 		Json out = object();
 		if (!ran)

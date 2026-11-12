@@ -291,6 +291,7 @@ local run, failed = load('return ' .. code, '=input')\n
 if not run then run, failed = load(code, '=input') end\n
 if not run then error(failed, 0) end\n
 __chimera_run_results = table.pack(run())\n
+__chimera_agent_results = table.pack(run())\n
 
 # a theme's origin, a crash note's first line, the registry key Windows reads crash helpers from
 built in

@@ -817,6 +817,11 @@ public:
 	/* screenshot with layers with_lua: the window's picture as a PNG and its
 	 * facts, or none (no window shown) */
 	void mcpAnswerPicture(uint64_t id, std::string png, std::string facts);
+	/* run_lua with frames (issue 571): the movie played up to `frames` frames
+	 * from where the machine is, as advance_until plays it (not past its end),
+	 * then `done` on the view's thread with how many were played (-1: no
+	 * machine). The call stays the window's until it is answered. */
+	void mcpPlayFrames(int64_t frames, std::function<void(int64_t)> done);
 	/* the machine's thread: the start of the open project's clock */
 	int64_t clockOnMachine() const;
 
@@ -972,7 +977,7 @@ private:
 	{
 		uint64_t id = 0;
 		int64_t start = 0, target = 0;
-		enum Kind { Seek, Until, Pictures, Steps, Diff } kind = Seek;
+		enum Kind { Seek, Until, Pictures, Steps, Diff, Play } kind = Seek;
 		std::deque<int64_t> pictures;
 		/* search_steps: the steps left (frame, filter), how many are done, and their answers */
 		std::deque<std::pair<int64_t, std::string>> steps;
@@ -983,6 +988,8 @@ private:
 		int64_t then = -1;
 		/* seek with extend: the movie's length before the frames were added, -1 when none were */
 		int64_t lengthBefore = -1;
+		/* run_lua with frames: told how many were played, instead of an answer */
+		std::function<void(int64_t)> played;
 	};
 	std::optional<McpMove> mcpMoveM_;
 	/* playing for advance_until with Turbo seek on: as fast as it goes */

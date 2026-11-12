@@ -932,6 +932,22 @@ bool LuaConsoleViewModel::runForAgent(const std::string &code, std::string &resu
 	return ran;
 }
 
+int64_t LuaConsoleViewModel::startForAgent(const std::string &code, std::string &error, double seconds)
+{
+	line("[agent] " + code);
+	const int64_t id = lua_.startForAgent(code, luaFolder.get(), error, seconds);
+	if (id == 0) line(error);
+	messages_ = 0;
+	refresh();
+	return id;
+}
+
+void LuaConsoleViewModel::finishForAgent(int64_t id, bool &ended, std::string &results, std::string &error)
+{
+	lua_.finishForAgent(id, ended, results, error);
+	refresh();
+}
+
 bool LuaConsoleViewModel::scriptForAgent(const std::string &path, bool stop, std::string *error)
 {
 	std::error_code ec;

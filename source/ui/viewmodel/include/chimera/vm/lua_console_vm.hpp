@@ -84,6 +84,11 @@ public:
 	/* run_lua: the agent's code shown, then run (LuaBridge::runForAgent);
 	 * what it returned as a JSON array, or false with what it raised */
 	bool runForAgent(const std::string &code, std::string &results, std::string &error, double seconds = LuaBridge::kAgentSeconds);
+	/* run_lua with frames: the agent's code shown and started as a script
+	 * that may wait for frames, and finished once they are played
+	 * (LuaBridge::startForAgent, finishForAgent) */
+	int64_t startForAgent(const std::string &code, std::string &error, double seconds);
+	void finishForAgent(int64_t id, bool &ended, std::string &results, std::string &error);
 	/* lua_script: a script file started, as Open Script starts one, or
 	 * stopped and taken out of the list; whether it runs now, and when it
 	 * does not, the error it stopped on, if it did (issue 571) */

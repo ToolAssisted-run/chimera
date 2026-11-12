@@ -14741,3 +14741,19 @@ window's, list_changed is due once, and a call to the new tool is answered
 by the window; the window learns the path and whether the builds match.
 With each of the listing, the warning at initialize, the change notice, the
 passing on and the path taken out, the test fails.
+
+## MCP: run_lua across frames (2026-11-12, issue 571)
+
+The last of the request's Lua part: "play 30 frames and print X each frame"
+needed a script file. `run_lua` with `frames` starts the agent's code as a
+script that may wait for frames (`LuaBridge::startForAgent`), the window
+plays the movie up to that many frames for it as advance_until does, never
+past the end, and the answer comes after them: what the code returned when
+it ended, or that it was stopped still waiting (`finishForAgent`), and what
+it printed. Its time limit grows by a second a frame unless one is given.
+
+Tested: in the window from frame 10, code that waits three frames returns
+the frame numbers 11, 12 and 13, printed each, and the machine is on 13;
+code that waits for ever is stopped after its 2 frames and says it did not
+end. With the frames not played, or every run said to have ended, the test
+fails.

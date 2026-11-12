@@ -874,6 +874,14 @@ if window and changes:
     check("an error Lua raises is the answer", error and "on purpose" in text)
     error, text, _ = call("run_lua", code="emu.frameadvance()")
     check("a function that waits for a frame is for scripts", error)
+    # with frames, the code may wait for them, and the movie is played for it (issue 571)
+    facts("seek", frame=10)
+    framed = facts("run_lua", code="local f = {} for i = 1, 3 do emu.frameadvance() f[#f + 1] = emu.framecount() print('frame', emu.framecount()) end return f", frames=3)
+    check("run_lua with frames runs the code across them and answers what it returned",
+          framed.get("ended") is True and framed.get("frames_played") == 3 and framed.get("results") == [[11, 12, 13]]
+          and framed.get("frame") == 13 and "frame\t13" in framed.get("output", ""))
+    waiting = facts("run_lua", code="while true do emu.frameadvance() end", frames=2)
+    check("code still waiting after its frames is stopped, and says so", waiting.get("ended") is False and waiting.get("frames_played") == 2)
     script = os.path.join(folder, "agent.lua")
     open(script, "w").write("print('the script started')\nwhile true do emu.frameadvance() end\n")
     started = facts("lua_script", path=script)

@@ -767,6 +767,62 @@ json::Json luaValue(lua_State *L, int at, int depth)
 }
 } // namespace
 
+int64_t LuaBridge::startForAgent(const std::string &code, const std::string &directory, std::string &error, double seconds)
+{
+	return onScripts([&]() -> int64_t {
+		std::string level;
+		while (code.find("]" + level + "]") != std::string::npos) level += '=';
+		/* as run_lua's, but the code may wait for frames, and what it returns is kept for finishForAgent */
+		const std::string chunk = "local code = [" + level + "[\n" + code + "\n]" + level + "]\n"
+			"local run, failed = load('return ' .. code, '=input')\n"
+			"if not run then run, failed = load(code, '=input') end\n"
+			"if not run then error(failed, 0) end\n"
+			"__chimera_agent_results = table.pack(run())\n";
+		lua_pushnil(L_);
+		lua_setglobal(L_, "__chimera_agent_results");
+		agentSeconds_ = seconds;
+		const int64_t id = startCodeHere(chunk, "run_lua", directory, error);
+		agentSeconds_ = 0;
+		return id;
+	});
+}
+
+void LuaBridge::finishForAgent(int64_t id, bool &ended, std::string &results, std::string &error)
+{
+	onScripts([&] {
+		/* still waiting for a frame after the frames played: stopped */
+		const Script *s = find(id);
+		ended = s == nullptr || s->thread == LUA_NOREF;
+		if (s != nullptr) stopHere(id);
+		if (const auto failed = agentFailed_.find(id); failed != agentFailed_.end())
+		{
+			error = failed->second;
+			agentFailed_.erase(failed);
+		}
+		json::Json out;
+		out.kind = json::Json::Kind::Array;
+		const int base = lua_gettop(L_);
+		lua_getglobal(L_, "__chimera_agent_results");
+		if (lua_istable(L_, -1))
+		{
+			lua_getfield(L_, -1, "n");
+			const auto n = static_cast<int64_t>(lua_tointeger(L_, -1));
+			lua_pop(L_, 1);
+			for (int64_t i = 1; i <= n; i++)
+			{
+				lua_rawgeti(L_, -1, static_cast<lua_Integer>(i));
+				out.items.push_back(luaValue(L_, -1, 0));
+				lua_pop(L_, 1);
+			}
+		}
+		lua_settop(L_, base);
+		lua_pushnil(L_);
+		lua_setglobal(L_, "__chimera_agent_results");
+		results = json::write(out);
+		return 0;
+	});
+}
+
 bool LuaBridge::runForAgent(const std::string &code, const std::string &directory, std::string &results, std::string &error, double seconds)
 {
 	return onScripts([&] { return runForAgentHere(code, directory, results, error, seconds); });
@@ -990,6 +1046,7 @@ bool LuaBridge::resumeRunning(bool frames)
 		if (!resume(id, error))
 		{
 			log("script stopped: " + error);
+			agentFailed_[id] = error;
 			if (onFailed) atWindow([&] { onFailed(id, error); });
 			stopHere(id);
 			stopped = true;
