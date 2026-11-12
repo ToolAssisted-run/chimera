@@ -59,7 +59,7 @@ shutil.copy2(f"{build}/chimera-mcp.exe", bin)
 # Encode Video's
 if ffmpeg:
     shutil.copy2(ffmpeg, bin)
-for d in ("libchimera.dll", "libminiboxhost.dll", "libzstd.dll", "lua54.dll", "SDL2.dll", "OpenAL32.dll",
+for d in ("libchimera.dll", "libminiboxhost.dll", "libzstd.dll", "lua54.dll", "SDL3.dll", "OpenAL32.dll",
           "chimera_crash.dll", "e_sqlite3.dll"):
     shutil.copy2(f"{dlls}/{d}", lib)
 # Chimera's language tables, one file per language, beside the engine that reads them

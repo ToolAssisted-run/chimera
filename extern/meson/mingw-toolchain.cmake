@@ -1,4 +1,4 @@
-# CMake toolchain for the cmake-driven native deps (SDL2, openal-soft) when
+# CMake toolchain for the cmake-driven native deps (SDL3, openal-soft) when
 # cross-building Windows artifacts from Linux. Mirrors extern/meson/mingw-w64.ini.
 set(CMAKE_SYSTEM_NAME Windows)
 set(CMAKE_SYSTEM_PROCESSOR x86_64)

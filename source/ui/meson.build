@@ -495,7 +495,7 @@ if qt_dep.found()
       test('file chooser', find_program('python3'), args: [files('qt/tests/file-chooser.py'), test_file_chooser], timeout: 180)
     endif
     # a gamepad input bound to a hotkey runs it as a key does (issue 466): a
-    # stand-in SDL2's pad presses Pause, and a project opened paused runs
+    # stand-in SDL3's pad presses Pause, and a project opened paused runs
     stand_in_sdl = shared_library('stand-in-sdl', 'qt/tests/stand_in_sdl.c', build_by_default: false)
     test(
       'gamepad hotkeys',

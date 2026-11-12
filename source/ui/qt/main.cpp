@@ -442,9 +442,10 @@ int main(int argc, char **argv)
 			return 0;
 	}
 	/* Chimera's GameCube adapter support: off, SDL is told before it starts
-	 * to leave USB devices alone (SDL2 reads it only from the environment) */
+	 * to leave USB devices alone. SDL reads its settings from the
+	 * environment as it starts; SDL 3 names this one SDL_HIDAPI_LIBUSB */
 	if (!vm::ConfigStore::switchIn(configPath.toStdString(), "customize.gameCubeAdapter", false))
-		qputenv("SDL_HIDAPI_DISABLE_LIBUSB", "1");
+		qputenv("SDL_HIDAPI_LIBUSB", "0");
 	/* the language first: the view models' first words are in it (docs/translations.md) */
 	qt::useLanguage(app, qt::startLanguage(QString::fromStdString(vm::ConfigStore::textIn(configPath.toStdString(), "customize.language", ""))));
 	QtDispatcher dispatcher(&app);

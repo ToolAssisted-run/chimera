@@ -2,8 +2,8 @@
 # A gamepad input bound to a hotkey runs it as a key does (issue 466). With
 # Pause on a pad's right trigger (gamepad-hotkeys.lua), a project opened
 # paused runs once the pad presses the trigger, and not before. The pad is
-# a stand-in for SDL2 (stand_in_sdl.c), put in a folder of its own as
-# libSDL2.so, whose trigger is held from 2.0 to 2.3 seconds after it starts.
+# a stand-in for SDL3 (stand_in_sdl.c), put in a folder of its own as
+# libSDL3.so, whose trigger is held from 2.0 to 2.3 seconds after it starts.
 #   gamepad-hotkeys.py <chimera> <work folder> <project> <package> <stand-in SDL> <script>
 import os
 import re
@@ -16,7 +16,7 @@ shutil.rmtree(work, ignore_errors=True)
 os.makedirs(os.path.join(work, "lib"))
 # the library's name and the variable the system's loader reads, on a Mac as on Linux
 mac = sys.platform == "darwin"
-shutil.copy(sdl, os.path.join(work, "lib", "libSDL2.dylib" if mac else "libSDL2.so"))
+shutil.copy(sdl, os.path.join(work, "lib", "libSDL3.dylib" if mac else "libSDL3.so"))
 path_var = "DYLD_LIBRARY_PATH" if mac else "LD_LIBRARY_PATH"
 seconds = 6
 env = dict(os.environ, QT_QPA_PLATFORM="offscreen", QT_QUICK_BACKEND="software", ALSOFT_DRIVERS="null",

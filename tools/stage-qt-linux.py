@@ -46,7 +46,7 @@ shutil.copy2(f"{dlls}/chimera-mcp", bin_)
 for f in ("ffmpeg", "ffmpeg-LICENSE.txt"):
     if os.path.exists(f"{dlls}/{f}"):
         shutil.copy2(f"{dlls}/{f}", bin_)
-# Chimera's libraries; SDL2 and OpenAL Soft are opened by name when they are there
+# Chimera's libraries; SDL3 and OpenAL Soft are opened by name when they are there
 for f in sorted(os.listdir(dlls)):
     if ".so" in f:
         shutil.copy2(f"{dlls}/{f}", lib)

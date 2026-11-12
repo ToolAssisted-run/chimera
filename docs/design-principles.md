@@ -14848,3 +14848,46 @@ build cache keyed by the GCC version, GCC 13 for RPCS3's and EKA2L1's guest
 libstdc++, CMake 4's minimum version for touchHLE's openal-soft, and xemu's
 curl warnings kept as warnings. They do nothing on 24.04 and are needed on
 26.04.
+
+## Gamepads through SDL 3 (2026-11-12)
+
+The window read gamepads and joysticks through SDL 2. It now uses SDL 3
+(release 3.4.20), which is the SDL version still being developed. The
+library is built from `extern/SDL3` (the old `extern/SDL2`, with libusb
+beside it as before) and loaded the same way: by name when the window starts
+(`SDL3.dll`, `libSDL3.so`, `libSDL3.dylib`), and with no SDL there are no
+gamepads and nothing else changes.
+
+- Inputs keep their names. A binding saved before ("X1 A", "X1 DpadUp",
+  "J1 B3", "J1 POV0U") means the same button. SDL 3 names a gamepad's face
+  buttons by where they are (bottom, right, left, top), while SDL 2 named
+  them by the letter printed on them, so a Nintendo pad's A (on the right)
+  was "A". The window asks SDL 3 for each face button's printed letter and
+  names the button by it when it is A, B, X or Y, and by its place, as on
+  an Xbox pad, otherwise (a PlayStation pad's cross is "A", as before).
+- SDL is built with only its joystick parts. SDL 3 stops the build on Linux
+  when a part of X11 it was asked to use is missing, where SDL 2 left that
+  part out; Chimera's window never used SDL's video, so video, rendering and
+  SDL 3's new parts (GPU, camera, dialogs, tray) are off. The library is
+  smaller (2.4 MB on Linux aarch64) and needs no X11 or Wayland library.
+- The GameCube adapter setting (Enable Wii U/Switch GameCube Adapter
+  Support) turns SDL's USB reading off with `SDL_HIDAPI_LIBUSB=0`: SDL 3 no
+  longer reads SDL 2's `SDL_HIDAPI_DISABLE_LIBUSB`.
+- On Windows libusb is still built from its source and linked into
+  `SDL3.dll`. SDL 3 looks for libusb with its own search (FindLibUSB), so
+  the build hands that search Chimera's libusb. On Linux and macOS SDL 3
+  opens the system's libusb when the program runs, if one was there when it
+  was built.
+- The tests follow: the view models' test attaches SDL 3's virtual
+  joystick, and the window's "gamepad hotkeys" test puts a stand-in SDL 3
+  (`stand_in_sdl.c`) beside the window as `libSDL3.so`.
+
+Tested on Linux aarch64 (a 16 KiB page kernel): the view models' gamepad
+and gamepad-catch tests pass against SDL 3's virtual joystick, and failed
+when their expected button was changed on purpose; the stand-in SDL 3 loads
+and starts (the view models' test reports only "no virtual joysticks" with
+it). `SDL3.dll` for Windows on arm64 builds with llvm-mingw, with libusb in
+it, and `gamepads.cpp` compiles for it. Not proved: the "gamepad hotkeys"
+test and the witness, which need the test core to run, and it does not run
+on a 16 KiB page kernel; Windows on x86_64 and macOS builds; and a real pad
+on any system.

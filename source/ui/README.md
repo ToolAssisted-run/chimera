@@ -30,7 +30,7 @@ made from. The tests drive the view models the same way, with no window.
 
 The machine runs on a thread of its own and is paced by the clock at its
 own frame rate; what it learns is posted to the window's thread. Gamepads
-(SDL2) are read on the machine's thread just before each frame and named as
+(SDL3) are read on the machine's thread just before each frame and named as
 Chimera has always named them, so a package's default bindings apply. Sound
 goes to OpenAL Soft as each frame finishes.
 

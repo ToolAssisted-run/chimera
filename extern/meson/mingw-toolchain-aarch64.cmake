@@ -1,4 +1,4 @@
-# CMake toolchain for the cmake-driven native deps (SDL2, openal-soft) when
+# CMake toolchain for the cmake-driven native deps (SDL3, openal-soft) when
 # cross-building Windows on arm64 artifacts from Linux with llvm-mingw, whose
 # bin/ folder is on PATH. Mirrors extern/meson/mingw-w64-aarch64.ini.
 set(CMAKE_SYSTEM_NAME Windows)

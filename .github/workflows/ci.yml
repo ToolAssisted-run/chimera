@@ -48,7 +48,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           # only the waterbox host/toolchain is needed here, not the frontend's
-          # native dependencies (SDL2, OpenAL, ...)
+          # native dependencies (SDL3, OpenAL, ...)
           submodules: false
 
       - name: No network code
@@ -95,7 +95,7 @@ jobs:
     # byte-identical to the Level A goldens - in both simple and rerecord
     # (per-frame whole-machine savestate) modes.
     #
-    # This builds the entire frontend: every native dependency (SDL2, OpenAL,
+    # This builds the entire frontend: every native dependency (SDL3, OpenAL,
     # zstd, lua, sqlite3) and the window on Qt 6.12, so it takes
     # minutes rather than seconds. It still runs per push - the level A job
     # above gives fast feedback meanwhile - and on a daily schedule, which
