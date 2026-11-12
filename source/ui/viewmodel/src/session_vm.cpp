@@ -352,6 +352,8 @@ SessionViewModel::SessionViewModel(Dispatcher &dispatcher, InputLog &inputs)
 	expose("systemId", "the machine's id, as the core names it", systemId);
 	expose("buttonCount", "how many buttons the machine has", buttonCount);
 	expose("gamepads", "the gamepads in use, or why there are none", gamepads);
+	expose("padFaces", "what the open gamepads print on their face buttons, bottom, right, left and top "
+		"(\"X1:Cross,Circle,Square,Triangle\"); a binding names them by place, as on an Xbox pad", padFaces);
 	expose("speedPercent", "how fast the machine runs, a percent of its own rate (1 to 6400)", speedPercent, true);
 	expose("unthrottled", "the machine runs as fast as it can", unthrottled, true);
 	expose("fastDrawOneIn", "Turbo and unthrottled draw every frame (1), or one in 2 to 10 (3 at first, as Chimera's)", fastDrawOneIn, true);
@@ -1606,6 +1608,7 @@ SessionViewModel::SessionViewModel(Dispatcher &dispatcher, InputLog &inputs)
 				/* what is held already is not what is pressed */
 				catchHeldM_.clear();
 				padsM_->poll(catchHeldM_);
+				padFacesOnMachine();
 				catchingAxisM_ = false;
 				catchingM_ = true;
 				catchDue_ = Clock::now() + std::chrono::milliseconds(16);
@@ -1621,6 +1624,7 @@ SessionViewModel::SessionViewModel(Dispatcher &dispatcher, InputLog &inputs)
 				std::vector<std::string> held;
 				catchAxesFromM_.clear();
 				padsM_->poll(held, &catchAxesFromM_);
+				padFacesOnMachine();
 				catchMovedM_.clear();
 				catchingAxisM_ = true;
 				catchingM_ = true;
@@ -2310,6 +2314,7 @@ void SessionViewModel::loop()
 			if (!padsM_) padsM_ = std::make_unique<Gamepads>();
 			std::vector<std::string> held;
 			padsM_->poll(held);
+			padFacesOnMachine();
 			padHotkeysOnMachine(held);
 			continue;
 		}
@@ -5229,6 +5234,15 @@ void SessionViewModel::checkHistoryOnMachine(const std::string &keepIn)
 	say(tr("session.check_passed", checked));
 }
 
+void SessionViewModel::padFacesOnMachine()
+{
+	if (!padsM_) return;
+	std::string faces = padsM_->faces();
+	if (faces == padFacesM_) return;
+	padFacesM_ = faces;
+	later([this, faces] { padFaces.set(faces); });
+}
+
 void SessionViewModel::catchPollOnMachine()
 {
 	catchDue_ = Clock::now() + std::chrono::milliseconds(16);
@@ -5240,6 +5254,7 @@ void SessionViewModel::catchPollOnMachine()
 	{
 		std::vector<std::pair<std::string, int>> axes;
 		padsM_->poll(held, &axes);
+		padFacesOnMachine();
 		for (const auto &[name, v] : axes)
 		{
 			int was = v;
@@ -5260,6 +5275,7 @@ void SessionViewModel::catchPollOnMachine()
 		return;
 	}
 	padsM_->poll(held);
+	padFacesOnMachine();
 	for (const std::string &name : held)
 		if (std::find(catchHeldM_.begin(), catchHeldM_.end(), name) == catchHeldM_.end())
 		{
@@ -6287,6 +6303,7 @@ int32_t SessionViewModel::stepOnMachine(bool live, bool render, bool grow)
 			for (const std::string &name : padForMachine_)
 				for (int b : bindingsM_.buttonsOf(name))
 					if (b >= 0) padHeld.set(static_cast<size_t>(b));
+			padFacesOnMachine();
 			const std::vector<std::string> open = padsM_->names();
 			if (open.size() != padCount_)
 			{

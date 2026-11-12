@@ -2,6 +2,7 @@
 #include "chimera/vm/tr.hpp"
 
 #include <cstdint>
+#include <map>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -18,13 +19,13 @@ constexpr uint32_t SDL_INIT_JOYSTICK = 0x00000200u, SDL_INIT_GAMEPAD = 0x0000200
 constexpr uint8_t SDL_HAT_UP = 1, SDL_HAT_RIGHT = 2, SDL_HAT_DOWN = 4, SDL_HAT_LEFT = 8;
 /* SDL_GamepadButton and SDL_GamepadAxis, in their order. The first four are
  * the face buttons by place (bottom, right, left, top), named as on an Xbox
- * pad; reopen() names them by their label where the pad prints A, B, X and Y
- * on them, as SDL2 did */
+ * pad whatever the pad: a binding means the same button on every pad, and
+ * shown() gives the letter or shape the pad in use prints on it */
 const char *const kButtons[] = {"A", "B", "X", "Y", "Back", "Guide", "Start", "LeftThumb", "RightThumb",
 	"LeftShoulder", "RightShoulder", "DpadUp", "DpadDown", "DpadLeft", "DpadRight", "Misc",
 	"Paddle1", "Paddle2", "Paddle3", "Paddle4"};
-/* SDL_GamepadButtonLabel: SDL_GAMEPAD_BUTTON_LABEL_A to _Y */
-constexpr int LABEL_A = 1, LABEL_Y = 4;
+/* SDL_GamepadButtonLabel, from SDL_GAMEPAD_BUTTON_LABEL_A (1); 0 is unknown */
+const char *const kLabels[] = {"A", "B", "X", "Y", "Cross", "Circle", "Square", "Triangle"};
 enum { AXIS_LEFTX, AXIS_LEFTY, AXIS_RIGHTX, AXIS_RIGHTY, AXIS_TRIGGERLEFT, AXIS_TRIGGERRIGHT };
 /* a stick counts as pressed past 40%, a trigger past about 15% */
 constexpr int kStick = static_cast<int>(32768 / 2.5), kTrigger = static_cast<int>(32768 / 6.5);
@@ -92,8 +93,9 @@ struct Gamepads::Pad
 	void *handle = nullptr;
 	bool controller = false;
 	std::string prefix, name;
-	/* the names of the four face buttons, bottom, right, left and top */
-	const char *face[4] = {"A", "B", "X", "Y"};
+	/* what the pad prints on its face buttons, bottom, right, left and
+	 * top; null where SDL does not know */
+	const char *face[4] = {nullptr, nullptr, nullptr, nullptr};
 	int buttons = 0, hats = 0, axes = 0;
 };
 
@@ -185,6 +187,77 @@ std::vector<std::string> Gamepads::names() const
 	return out;
 }
 
+std::string Gamepads::faces() const
+{
+	std::string out;
+	for (const Pad &p : pads_)
+	{
+		if (!p.controller || p.face[0] == nullptr || p.face[1] == nullptr || p.face[2] == nullptr || p.face[3] == nullptr)
+			continue;
+		if (!out.empty()) out += ";";
+		out += p.prefix.substr(0, p.prefix.size() - 1) + ":" + p.face[0] + "," + p.face[1] + "," + p.face[2] + "," + p.face[3];
+	}
+	return out;
+}
+
+std::string Gamepads::shown(const std::string &keys, const std::string &faces)
+{
+	if (faces.empty()) return keys;
+	/* faces: "X1:Cross,Circle,Square,Triangle;X2:B,A,Y,X" */
+	std::map<std::string, std::vector<std::string>> labels;
+	size_t at = 0;
+	while (at < faces.size())
+	{
+		size_t end = faces.find(';', at);
+		if (end == std::string::npos) end = faces.size();
+		const std::string pad = faces.substr(at, end - at);
+		const size_t colon = pad.find(':');
+		if (colon != std::string::npos)
+		{
+			std::vector<std::string> four;
+			size_t from = colon + 1;
+			while (from <= pad.size())
+			{
+				size_t comma = pad.find(',', from);
+				if (comma == std::string::npos) comma = pad.size();
+				four.push_back(pad.substr(from, comma - from));
+				from = comma + 1;
+			}
+			if (four.size() == 4) labels[pad.substr(0, colon)] = std::move(four);
+		}
+		at = end + 1;
+	}
+	/* a whole name only, between the separators of a binding ("X1 A, Z") */
+	std::string out;
+	at = 0;
+	while (at < keys.size())
+	{
+		size_t end = keys.find_first_of("+,", at);
+		if (end == std::string::npos) end = keys.size();
+		std::string part = keys.substr(at, end - at);
+		const size_t first = part.find_first_not_of(' '), last = part.find_last_not_of(' ');
+		if (first != std::string::npos)
+		{
+			const std::string name = part.substr(first, last - first + 1);
+			const size_t space = name.find(' ');
+			if (space != std::string::npos && name[0] == 'X')
+			{
+				const auto pad = labels.find(name.substr(0, space));
+				const std::string button = name.substr(space + 1);
+				if (pad != labels.end())
+					for (int b = 0; b < 4; b++)
+						if (button == kButtons[b])
+							part = part.substr(0, first) + pad->first + " " + pad->second[static_cast<size_t>(b)] +
+								part.substr(last + 1);
+			}
+		}
+		out += part;
+		if (end < keys.size()) out += keys[end];
+		at = end + 1;
+	}
+	return out;
+}
+
 void Gamepads::reopen()
 {
 	Api &a = *api_;
@@ -205,12 +278,11 @@ void Gamepads::reopen()
 		p.name = name != nullptr ? name : "";
 		if (p.controller)
 		{
-			/* a face button printed A, B, X or Y is named by its print (a
-			 * Nintendo pad's A is on the right); any other by its place */
+			/* what it prints on them: a Nintendo pad's bottom button is B */
 			for (int b = 0; b < 4; b++)
 			{
 				const int label = a.GetGamepadButtonLabel(p.handle, b);
-				if (label >= LABEL_A && label <= LABEL_Y) p.face[b] = kButtons[label - LABEL_A];
+				if (label >= 1 && label <= 8) p.face[b] = kLabels[label - 1];
 			}
 		}
 		else
@@ -250,7 +322,7 @@ void Gamepads::poll(std::vector<std::string> &held, std::vector<std::pair<std::s
 		if (p.controller)
 		{
 			for (int b = 0; b < static_cast<int>(sizeof kButtons / sizeof kButtons[0]); b++)
-				if (a.GetGamepadButton(p.handle, b)) held.push_back(p.prefix + (b < 4 ? p.face[b] : kButtons[b]));
+				if (a.GetGamepadButton(p.handle, b)) held.push_back(p.prefix + kButtons[b]);
 			/* SDL's y axes are negative upwards */
 			const int lx = a.GetGamepadAxis(p.handle, AXIS_LEFTX), ly = a.GetGamepadAxis(p.handle, AXIS_LEFTY);
 			const int rx = a.GetGamepadAxis(p.handle, AXIS_RIGHTX), ry = a.GetGamepadAxis(p.handle, AXIS_RIGHTY);
