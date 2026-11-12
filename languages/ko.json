@@ -1364,6 +1364,8 @@
 		"mcp.branch_range": "'number'는 1과 %1 사이여야 합니다. list_branches가 알려 주는 브랜치 목록을 보세요.",
 		"mcp.changes_lost": "저장하지 않은 변경은 잃습니다.",
 		"mcp.connected": "시작했습니다. 연결됨: %1.",
+		"mcp.connected_build": "시작했습니다. 연결됨: %1 (%2, 빌드 %3).",
+		"mcp.connected_other_build": "시작했습니다. 연결됨: %1 (%2, 빌드 %3). 이 Chimera의 빌드가 아닙니다. 아래 명령으로 에이전트를 설정한 다음 에이전트 프로그램을 다시 시작하세요.",
 		"mcp.file_exists": "'%1'에 이미 파일이 있어서 프로젝트를 저장하지 않았습니다. 바꾸려면 overwrite: true를 주세요.",
 		"mcp.files_shape": "'files'는 슬롯에서 경로 목록으로 가는 객체입니다. 예: {\"rom\": [\"game.nes\"]}.",
 		"mcp.firmware_shape": "'firmware'는 펌웨어 id에서 경로로 가는 객체입니다.",

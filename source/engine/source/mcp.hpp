@@ -24,6 +24,7 @@
 #include <string>
 #include <vector>
 
+struct cJSON;
 struct ce_session;
 struct ce_movie_log;
 
@@ -159,6 +160,14 @@ using McpExecutor = std::function<McpResult(const std::string &tool, const std::
  * when the line needs no answer. `client`, when given, receives the name and
  * version the agent's program gave when it introduced itself. */
 std::string mcpHandleLine(const std::string &line, const McpExecutor &execute, std::string *client);
+/* chimera-mcp's link to the window, for mcpHandleLine (issue 571): `tools`
+ * gives the window's tools as a JSON array while one is connected ("" when
+ * not), listed in place of this program's; `greet` reaches the window at
+ * initialize and gives the warning for a window of another build ("" for
+ * none), added to the instructions. */
+void mcpSetWindowListing(std::function<std::string()> tools, std::function<std::string()> greet);
+/* a tool as tools/list gives it */
+::cJSON *mcpToolDefinition(const McpTool &tool);
 
 /* Runs one tool call at once, on the calling thread, where there is no
  * frontend to hand anything to: the engine's own tools on `s` and `log`, and
@@ -178,7 +187,17 @@ class McpLink
 public:
 	/* The name the running Chimera shows in Tools > MCP Server... */
 	void setClient(const std::string &nameAndVersion) { client = nameAndVersion; }
+	/* this program's own path, which the window shows (issue 571) */
+	void setProgramPath(const std::string &path) { programPath = path; }
 	McpResult call(const std::string &tool, const std::string &argumentsJson);
+	/* reaches the window now when it is not reached yet, and says what call's
+	 * answers would: the warning for a window of another build, or "" */
+	std::string greet();
+	/* the window's tools as tools/list gives them, "" until a window that
+	 * sends them was reached (issue 571) */
+	const std::string &windowTools() const { return windowDefinitions; }
+	/* the window's tools differ from what was listed before: once */
+	bool takeToolsChanged();
 
 	/* how long a call may wait for Chimera to take it up, and (in Chimera) how
 	 * old a waiting call may be and still be run. The second is the shorter,
@@ -193,6 +212,9 @@ private:
 	/* what the running Chimera said of itself when it answered the greeting:
 	 * a warning added to every answer when its build is not this program's */
 	std::string mismatch;
+	std::string windowDefinitions, programPath;
+	bool toolsChanged = false;
+	bool greetWindow(std::string &error);
 };
 
 /* What chimera-mcp and the running Chimera say of each other (issue 571): a

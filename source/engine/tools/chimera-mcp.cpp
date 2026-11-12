@@ -40,6 +40,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
 #include <iostream>
 #include <memory>
 #include <string>
@@ -122,6 +123,12 @@ int main(int argc, char **argv)
 	if (protocol == nullptr) protocol = stdout;
 
 	chimera::McpLink link;
+	{
+		/* where this program is, as the window shows it (issue 571) */
+		std::error_code ec;
+		const std::filesystem::path self = std::filesystem::absolute(argv[0], ec);
+		if (!ec) link.setProgramPath(self.lexically_normal().string());
+	}
 	std::unique_ptr<chimera::McpLocal> machine;
 	if (windowless)
 	{
@@ -136,15 +143,27 @@ int main(int argc, char **argv)
 		return link.call(tool, arguments);
 	};
 
+	/* the window's tools listed while it is reached, and a window of another
+	 * build said at initialize (issue 571) */
+	if (!windowless)
+		chimera::mcpSetWindowListing([&link] { return link.windowTools(); }, [&link, &client] {
+			link.setClient(client);
+			return link.greet();
+		});
 	std::string line;
 	while (std::getline(std::cin, line))
 	{
 		if (!line.empty() && line.back() == '\r') line.pop_back();
 		if (line.empty()) continue;
 		const std::string reply = chimera::mcpHandleLine(line, execute, &client);
-		if (reply.empty()) continue;
-		std::fwrite(reply.data(), 1, reply.size(), protocol);
-		std::fputc('\n', protocol);
+		if (!reply.empty())
+		{
+			std::fwrite(reply.data(), 1, reply.size(), protocol);
+			std::fputc('\n', protocol);
+		}
+		/* a window reached with other tools than were listed: the agent's program asks again */
+		if (!windowless && link.takeToolsChanged())
+			std::fputs("{\"jsonrpc\":\"2.0\",\"method\":\"notifications/tools/list_changed\"}\n", protocol);
 		std::fflush(protocol);
 	}
 	return 0;

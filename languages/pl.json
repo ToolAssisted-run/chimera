@@ -1406,6 +1406,8 @@
 		"mcp.branch_range": "'number' musi mieścić się między 1 a %1, czyli liczbą gałęzi, jaką podaje list_branches.",
 		"mcp.changes_lost": "Niezapisane zmiany przepadną.",
 		"mcp.connected": "Uruchomiono. Połączono: %1.",
+		"mcp.connected_build": "Uruchomiono. Połączono: %1 (%2, kompilacja %3).",
+		"mcp.connected_other_build": "Uruchomiono. Połączono: %1 (%2, kompilacja %3). To nie jest kompilacja tego programu Chimera: skonfiguruj agenta poleceniem poniżej, a potem uruchom ponownie program agenta.",
 		"mcp.file_exists": "W '%1' już jest plik, więc projekt nie został zapisany. Podaj overwrite: true, aby go zastąpić.",
 		"mcp.files_shape": "'files' to obiekt, który od gniazd prowadzi do list ścieżek, np. {\"rom\": [\"game.nes\"]}.",
 		"mcp.firmware_shape": "'firmware' to obiekt, który od identyfikatorów firmware prowadzi do ścieżek.",

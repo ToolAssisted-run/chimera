@@ -137,6 +137,18 @@ other when they connect (2026-11-12):
 - `server_info` reports `chimera_mcp_build` ("older" for one from before
   2026-11-12) and `chimera_mcp_up_to_date`.
 - `chimera-mcp --version` prints its build without a window running.
+- The warning is in the instructions `chimera-mcp` gives at `initialize`
+  too: it reaches the window then, when one is serving, so the agent knows
+  before its first call.
+- The window sends its tools whole in its greeting, and `chimera-mcp` lists
+  those in place of its own while it is connected, passes on a call to a
+  tool only the window has, declares that its list can change, and sends
+  `notifications/tools/list_changed` when the window's tools differ from
+  what it listed. An older `chimera-mcp` than the window can then still use
+  the window's newer tools (once it is from 2026-11-12 or later).
+- Tools > MCP Server... says where the connected `chimera-mcp` is and its
+  build, and when that is not this Chimera's build, to set the agent up
+  with the command shown and restart the agent's program.
 
 After an update, run the set-up line again from Tools > MCP Server... (with
 `claude mcp remove chimera` first for Claude Code) and restart the agent's

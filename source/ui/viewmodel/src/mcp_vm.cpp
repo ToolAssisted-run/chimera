@@ -140,7 +140,13 @@ void McpViewModel::refresh()
 	const int32_t s = ce_mcp_state();
 	const char *client = ce_mcp_client();
 	state.set(s == CE_MCP_CONNECTED ? "connected" : s == CE_MCP_WAITING ? "waiting" : "stopped");
-	stateText.set(s == CE_MCP_CONNECTED ? tr("mcp.connected", {client != nullptr ? client : ""})
+	/* the connected chimera-mcp's place and build, and whether it is this Chimera's (issue 571) */
+	const std::string build = s == CE_MCP_CONNECTED ? ce_mcp_client_build() : "";
+	const std::string program = s == CE_MCP_CONNECTED ? ce_mcp_client_program() : "";
+	const std::string named = client != nullptr ? client : "";
+	stateText.set(s == CE_MCP_CONNECTED && !program.empty()
+			? tr(ce_mcp_client_same_build() != 0 ? "mcp.connected_build" : "mcp.connected_other_build", {named, program, build})
+		: s == CE_MCP_CONNECTED ? tr("mcp.connected", {named})
 		: s == CE_MCP_WAITING ? tr("mcp.waiting")
 		: startError_.empty() ? tr("mcp.stopped") : tr("mcp.start_failed", {startError_}));
 	started.set(s != CE_MCP_STOPPED);

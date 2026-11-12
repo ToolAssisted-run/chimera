@@ -1385,6 +1385,8 @@
 		"mcp.branch_range": "« number » doit être compris entre 1 et %1, comme le donne list_branches.",
 		"mcp.changes_lost": "Les modifications non enregistrées sont perdues.",
 		"mcp.connected": "Démarré. Connecté : %1.",
+		"mcp.connected_build": "Démarré. Connecté : %1 (%2, version %3).",
+		"mcp.connected_other_build": "Démarré. Connecté : %1 (%2, version %3). Ce n'est pas la version de ce Chimera : configurez l'agent avec la commande ci-dessous, puis redémarrez le programme de l'agent.",
 		"mcp.file_exists": "Un fichier existe déjà à « %1 », le projet n'a donc pas été enregistré. Donnez overwrite: true pour le remplacer.",
 		"mcp.files_shape": "« files » est un objet qui va des emplacements à des listes de chemins, par exemple {\"rom\": [\"game.nes\"]}.",
 		"mcp.firmware_shape": "« firmware » est un objet qui va des identifiants de firmware à des chemins.",

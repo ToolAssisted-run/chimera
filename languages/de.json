@@ -1385,6 +1385,8 @@
 		"mcp.branch_range": "'number' muss zwischen 1 und %1 liegen, wie list_branches die Zweige angibt.",
 		"mcp.changes_lost": "Die nicht gespeicherten Änderungen gehen verloren.",
 		"mcp.connected": "Gestartet. Verbunden: %1.",
+		"mcp.connected_build": "Gestartet. Verbunden: %1 (%2, Build %3).",
+		"mcp.connected_other_build": "Gestartet. Verbunden: %1 (%2, Build %3). Das ist nicht der Build dieses Chimera: Richten Sie den Agenten mit dem Befehl unten ein und starten Sie dann das Programm des Agenten neu.",
 		"mcp.file_exists": "Unter '%1' liegt bereits eine Datei, daher wurde das Projekt nicht gespeichert. Geben Sie overwrite: true an, um sie zu ersetzen.",
 		"mcp.files_shape": "'files' ist ein Objekt von Steckplätzen zu Listen von Pfaden, zum Beispiel {\"rom\": [\"game.nes\"]}.",
 		"mcp.firmware_shape": "'firmware' ist ein Objekt von Firmware-Kennungen zu Pfaden.",

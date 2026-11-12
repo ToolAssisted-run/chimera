@@ -1385,6 +1385,8 @@
 		"mcp.branch_range": "'number' må være mellom 1 og %1, som list_branches gir.",
 		"mcp.changes_lost": "Endringene som ikke ble lagret, er tapt.",
 		"mcp.connected": "Startet. Tilkoblet: %1.",
+		"mcp.connected_build": "Startet. Tilkoblet: %1 (%2, bygg %3).",
+		"mcp.connected_other_build": "Startet. Tilkoblet: %1 (%2, bygg %3). Det er ikke bygget til denne Chimera-versjonen: sett opp agenten med kommandoen nedenfor, og start deretter agentens program på nytt.",
 		"mcp.file_exists": "Det finnes allerede en fil på '%1', så prosjektet ble ikke lagret. Oppgi overwrite: true for å erstatte den.",
 		"mcp.files_shape": "'files' er et objekt fra plasser til lister med stier, for eksempel {\"rom\": [\"game.nes\"]}.",
 		"mcp.firmware_shape": "'firmware' er et objekt fra fastvare-id-er til stier.",

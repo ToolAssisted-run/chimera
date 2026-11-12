@@ -1364,6 +1364,8 @@
 		"mcp.branch_range": "'number' は 1 から %1 の間でなければなりません。list_branches が返すブランチの一覧に従ってください。",
 		"mcp.changes_lost": "保存されなかった変更は失われます。",
 		"mcp.connected": "開始しました。接続先: %1。",
+		"mcp.connected_build": "開始しました。接続先: %1（%2、ビルド %3）。",
+		"mcp.connected_other_build": "開始しました。接続先: %1（%2、ビルド %3）。この Chimera のビルドではありません。下のコマンドでエージェントを設定し、エージェントのプログラムを再起動してください。",
 		"mcp.file_exists": "'%1' にすでにファイルがあるため、プロジェクトは保存されませんでした。置き換えるには overwrite: true を指定してください。",
 		"mcp.files_shape": "'files' は、スロットからパスの一覧への対応を示すオブジェクトです。例: {\"rom\": [\"game.nes\"]}",
 		"mcp.firmware_shape": "'firmware' は、ファームウェア ID からパスへの対応を示すオブジェクトです。",

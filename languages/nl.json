@@ -1385,6 +1385,8 @@
 		"mcp.branch_range": "'number' moet tussen 1 en %1 liggen, de vertakkingen die list_branches geeft.",
 		"mcp.changes_lost": "De wijzigingen die niet zijn opgeslagen, zijn verloren.",
 		"mcp.connected": "Gestart. Verbonden: %1.",
+		"mcp.connected_build": "Gestart. Verbonden: %1 (%2, build %3).",
+		"mcp.connected_other_build": "Gestart. Verbonden: %1 (%2, build %3). Dat is niet de build van deze Chimera: stel de agent in met de opdracht hieronder en start daarna het programma van de agent opnieuw.",
 		"mcp.file_exists": "Er staat al een bestand op '%1', dus het project is niet opgeslagen. Geef overwrite: true om het te vervangen.",
 		"mcp.files_shape": "'files' is een object van slots naar lijsten met paden, zoals {\"rom\": [\"game.nes\"]}.",
 		"mcp.firmware_shape": "'firmware' is een object van firmware-id's naar paden.",

@@ -1385,6 +1385,8 @@
 		"mcp.branch_range": "'number' måste ligga mellan 1 och %1, det som list_branches ger.",
 		"mcp.changes_lost": "Ändringarna som inte sparades är förlorade.",
 		"mcp.connected": "Startad. Ansluten: %1.",
+		"mcp.connected_build": "Startad. Ansluten: %1 (%2, bygge %3).",
+		"mcp.connected_other_build": "Startad. Ansluten: %1 (%2, bygge %3). Det är inte bygget för den här Chimera: ställ in agenten med kommandot nedan och starta sedan om agentens program.",
 		"mcp.file_exists": "Det finns redan en fil på '%1', så projektet sparades inte. Ange overwrite: true för att ersätta den.",
 		"mcp.files_shape": "'files' är ett objekt från platser till listor med sökvägar, till exempel {\"rom\": [\"game.nes\"]}.",
 		"mcp.firmware_shape": "'firmware' är ett objekt från firmware-id till sökvägar.",

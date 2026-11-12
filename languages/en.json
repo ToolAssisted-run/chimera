@@ -1385,6 +1385,8 @@
 		"mcp.branch_range": "'number' must be between 1 and %1, the branches list_branches gives.",
 		"mcp.changes_lost": "The changes that were not saved are lost.",
 		"mcp.connected": "Started. Connected: %1.",
+		"mcp.connected_build": "Started. Connected: %1 (%2, build %3).",
+		"mcp.connected_other_build": "Started. Connected: %1 (%2, build %3). That is not this Chimera's build: set the agent up with the command below, then restart the agent's program.",
 		"mcp.file_exists": "A file is already at '%1', so the project was not saved. Give overwrite: true to replace it.",
 		"mcp.files_shape": "'files' is an object from slots to lists of paths, such as {\"rom\": [\"game.nes\"]}.",
 		"mcp.firmware_shape": "'firmware' is an object from firmware ids to paths.",

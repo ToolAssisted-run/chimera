@@ -1385,6 +1385,8 @@
 		"mcp.branch_range": "'number' skal ligge mellem 1 og %1, som list_branches giver.",
 		"mcp.changes_lost": "De ændringer, der ikke blev gemt, er tabt.",
 		"mcp.connected": "Startet. Forbundet: %1.",
+		"mcp.connected_build": "Startet. Forbundet: %1 (%2, build %3).",
+		"mcp.connected_other_build": "Startet. Forbundet: %1 (%2, build %3). Det er ikke det build, denne Chimera er: sæt agenten op med kommandoen nedenfor, og genstart derefter agentens program.",
 		"mcp.file_exists": "Der er allerede en fil på '%1', så projektet blev ikke gemt. Angiv overwrite: true for at erstatte den.",
 		"mcp.files_shape": "'files' er et objekt fra pladser til lister af stier, f.eks. {\"rom\": [\"game.nes\"]}.",
 		"mcp.firmware_shape": "'firmware' er et objekt fra firmware-id'er til stier.",

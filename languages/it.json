@@ -1385,6 +1385,8 @@
 		"mcp.branch_range": "«number» deve essere compreso tra 1 e %1, come elencano i rami di list_branches.",
 		"mcp.changes_lost": "Le modifiche non salvate sono perse.",
 		"mcp.connected": "Avviato. Connesso: %1.",
+		"mcp.connected_build": "Avviato. Connesso: %1 (%2, build %3).",
+		"mcp.connected_other_build": "Avviato. Connesso: %1 (%2, build %3). Non è la build di questo Chimera: configura l'agente con il comando qui sotto, poi riavvia il programma dell'agente.",
 		"mcp.file_exists": "C'è già un file in '%1', quindi il progetto non è stato salvato. Indica overwrite: true per sostituirlo.",
 		"mcp.files_shape": "'files' è un oggetto che va dagli slot a elenchi di percorsi, come {\"rom\": [\"game.nes\"]}.",
 		"mcp.firmware_shape": "'firmware' è un oggetto che va dagli id del firmware ai percorsi.",

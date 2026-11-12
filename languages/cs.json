@@ -1406,6 +1406,8 @@
 		"mcp.branch_range": "'number' musí být mezi 1 a %1, což jsou větve, které vypíše list_branches.",
 		"mcp.changes_lost": "Neuložené změny jsou ztraceny.",
 		"mcp.connected": "Spuštěno. Připojeno: %1.",
+		"mcp.connected_build": "Spuštěno. Připojeno: %1 (%2, sestavení %3).",
+		"mcp.connected_other_build": "Spuštěno. Připojeno: %1 (%2, sestavení %3). Není to sestavení tohoto programu Chimera: nastavte agenta příkazem níže a pak program agenta spusťte znovu.",
 		"mcp.file_exists": "Na místě '%1' už je soubor, takže projekt nebyl uložen. Nastavte overwrite: true, aby se soubor nahradil.",
 		"mcp.files_shape": "'files' je objekt od slotů k seznamům cest, například {\"rom\": [\"game.nes\"]}.",
 		"mcp.firmware_shape": "'firmware' je objekt od identifikátorů firmwaru k cestám.",

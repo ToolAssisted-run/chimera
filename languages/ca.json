@@ -1385,6 +1385,8 @@
 		"mcp.branch_range": "'number' ha d'estar entre 1 i %1, que són les branques que dona list_branches.",
 		"mcp.changes_lost": "Els canvis que no s'han desat es perden.",
 		"mcp.connected": "Iniciat. Connectat: %1.",
+		"mcp.connected_build": "Iniciat. Connectat: %1 (%2, compilació %3).",
+		"mcp.connected_other_build": "Iniciat. Connectat: %1 (%2, compilació %3). No és la compilació d'aquest Chimera: configureu l'agent amb l'ordre de sota i després reinicieu el programa de l'agent.",
 		"mcp.file_exists": "Ja hi ha un fitxer a '%1', així que el projecte no s'ha desat. Useu overwrite: true per substituir-lo.",
 		"mcp.files_shape": "'files' és un objecte que va de les ranures a llistes de camins, com {\"rom\": [\"joc.nes\"]}.",
 		"mcp.firmware_shape": "'firmware' és un objecte que va dels identificadors de microprogramari als camins.",

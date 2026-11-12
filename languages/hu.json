@@ -1385,6 +1385,8 @@
 		"mcp.branch_range": "A 'number' 1 és %1 közötti szám legyen, a list_branches által adott ágak száma szerint.",
 		"mcp.changes_lost": "A nem mentett változtatások elvesznek.",
 		"mcp.connected": "Elindult. Csatlakoztatva: %1.",
+		"mcp.connected_build": "Elindult. Csatlakoztatva: %1 (%2, %3 build).",
+		"mcp.connected_other_build": "Elindult. Csatlakoztatva: %1 (%2, %3 build). Ez nem ennek a Chimera-példánynak a buildje: állítsa be az ügynököt az alábbi paranccsal, majd indítsa újra az ügynök programját.",
 		"mcp.file_exists": "A(z) '%1' helyén már van fájl, ezért a projektet nem mentettük. Az overwrite: true megadásával felülírhatja.",
 		"mcp.files_shape": "A 'files' olyan objektum, amely helyekből elérési utak listáihoz jut, például {\"rom\": [\"game.nes\"]}.",
 		"mcp.firmware_shape": "A 'firmware' olyan objektum, amely firmware-azonosítókból elérési utakhoz jut.",

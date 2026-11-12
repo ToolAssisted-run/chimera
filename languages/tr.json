@@ -1385,6 +1385,8 @@
 		"mcp.branch_range": "'number' 1 ile %1 arasında olmalı; list_branches dalların listesini verir.",
 		"mcp.changes_lost": "Kaydedilmeyen değişiklikler kaybolur.",
 		"mcp.connected": "Başlatıldı. Bağlanan: %1.",
+		"mcp.connected_build": "Başlatıldı. Bağlanan: %1 (%2, derleme %3).",
+		"mcp.connected_other_build": "Başlatıldı. Bağlanan: %1 (%2, derleme %3). Bu, bu Chimera'nın derlemesi değil: ajanı aşağıdaki komutla kurun, ardından ajanın programını yeniden başlatın.",
 		"mcp.file_exists": "'%1' konumunda zaten bir dosya var, bu yüzden proje kaydedilmedi. Değiştirmek için overwrite: true verin.",
 		"mcp.files_shape": "'files', yollardan oluşan listelere eşlenen bir nesnedir, ör. {\"rom\": [\"game.nes\"]}.",
 		"mcp.firmware_shape": "'firmware', firmware kimliklerinden yollara eşlenen bir nesnedir.",

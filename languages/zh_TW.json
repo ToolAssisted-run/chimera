@@ -1364,6 +1364,8 @@
 		"mcp.branch_range": "「number」必須介於 1 與 %1 之間，即 list_branches 列出的分支數。",
 		"mcp.changes_lost": "未儲存的變更已遺失。",
 		"mcp.connected": "已啟動。已連線：%1。",
+		"mcp.connected_build": "已啟動。已連線：%1（%2，組建 %3）。",
+		"mcp.connected_other_build": "已啟動。已連線：%1（%2，組建 %3）。這不是此 Chimera 的組建：請用下面的指令設定代理程式，然後重新啟動代理程式。",
 		"mcp.file_exists": "'%1' 處已有檔案，因此未儲存專案。請給予 overwrite: true 以取代它。",
 		"mcp.files_shape": "「files」是一個物件，從插槽對應到路徑清單，例如 {\"rom\": [\"game.nes\"]}。",
 		"mcp.firmware_shape": "「firmware」是一個物件，從韌體 id 對應到路徑。",

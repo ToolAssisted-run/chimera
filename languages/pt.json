@@ -1385,6 +1385,8 @@
 		"mcp.branch_range": "'number' deve estar entre 1 e %1, as ramificações que list_branches informa.",
 		"mcp.changes_lost": "As alterações que não foram salvas se perdem.",
 		"mcp.connected": "Iniciado. Conectado: %1.",
+		"mcp.connected_build": "Iniciado. Conectado: %1 (%2, compilação %3).",
+		"mcp.connected_other_build": "Iniciado. Conectado: %1 (%2, compilação %3). Não é a compilação deste Chimera: configure o agente com o comando abaixo e depois reinicie o programa do agente.",
 		"mcp.file_exists": "Já existe um arquivo em '%1', então o projeto não foi salvo. Informe overwrite: true para substituí-lo.",
 		"mcp.files_shape": "'files' é um objeto de slots para listas de caminhos, como {\"rom\": [\"jogo.nes\"]}.",
 		"mcp.firmware_shape": "'firmware' é um objeto de ids de firmware para caminhos.",

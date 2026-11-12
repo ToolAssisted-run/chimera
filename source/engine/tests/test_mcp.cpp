@@ -485,9 +485,12 @@ void theBuilds()
 	{
 		chimera::McpLink link;
 		link.setClient("Test Agent 3.1");
+		link.setProgramPath("/home/someone/chimera/bin/chimera-mcp");
 		chimera::McpResult result = callThroughServer(link, "status", "{}");
 		assert(!result.isError && !has(result.content, "WARNING"));
 		assert(std::string(ce_mcp_client_build()) == CE_BUILD_COMMIT);
+		/* Tools > MCP Server... says where it is and that it is this build (issue 571) */
+		assert(std::string(ce_mcp_client_program()) == "/home/someone/chimera/bin/chimera-mcp" && ce_mcp_client_same_build() == 1);
 	}
 	ce_mcp_stop();
 
@@ -503,7 +506,7 @@ void theBuilds()
 	while (greeting.empty() && std::chrono::steady_clock::now() < until)
 		if (old.wait(20, line) == PipeEvent::Line) greeting = line;
 	assert(has(greeting, "\"build\":\"" CE_BUILD_COMMIT "\"") && has(greeting, "\"status\""));
-	assert(std::string(ce_mcp_client_build()) == "older");
+	assert(std::string(ce_mcp_client_build()) == "older" && ce_mcp_client_same_build() == 0 && std::string(ce_mcp_client_program()).empty());
 	assert(old.send("{\"id\":1,\"tool\":\"status\",\"arguments\":{}}"));
 	std::string answer;
 	while (answer.empty() && std::chrono::steady_clock::now() < until)
@@ -527,6 +530,68 @@ void theBuilds()
 		&& has(said, "This chimera-mcp offers tools Chimera does not have: controls") && has(said, "C:\\Chimera\\bin\\chimera-mcp.exe"));
 	assert(chimera::mcpBuildMismatch(false, CE_BUILD_COMMIT, &windowTools, "").empty());
 	ce_mcp_program(nullptr);
+}
+
+/* chimera-mcp lists the window's tools while one is reached, says a window of
+ * another build at initialize, tells the agent's program the list changed,
+ * and passes on a call to a tool only the window has (issue 571) */
+void theListing()
+{
+	const char *error = nullptr;
+	std::string client, said;
+	{
+		/* this build's window: no warning, its list is this program's, nothing changed */
+		chimera::McpLink link;
+		chimera::mcpSetWindowListing([&link] { return link.windowTools(); }, [&link] { return link.greet(); });
+		const chimera::McpExecutor execute = [&](const std::string &tool, const std::string &arguments) { return link.call(tool, arguments); };
+		assert(ce_mcp_start(&error) == 1);
+		said = chimera::mcpHandleLine(
+			"{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-06-18\"}}", execute, &client);
+		assert(has(said, "\"listChanged\":true") && !has(said, "WARNING"));
+		assert(has(link.windowTools(), "\"trace_memory\"") && !link.takeToolsChanged());
+		chimera::mcpSetWindowListing(nullptr, nullptr);
+		ce_mcp_stop();
+	}
+
+	/* a window of another build, with a tool this program has not */
+	chimera::McpLink other;
+	chimera::mcpSetWindowListing([&other] { return other.windowTools(); }, [&other] { return other.greet(); });
+	const chimera::McpExecutor viaOther = [&](const std::string &tool, const std::string &arguments) { return other.call(tool, arguments); };
+	chimera::PipeServer window;
+	std::string openError;
+	assert(window.open(openError));
+	std::atomic<bool> done{ false };
+	std::thread answering([&] {
+		std::string line;
+		while (!done.load())
+		{
+			if (window.wait(20, line) != PipeEvent::Line) continue;
+			if (has(line, "\"hello\""))
+				window.send("{\"hello\":\"chimera\",\"build\":\"fakebuild0001\",\"tools\":[\"status\",\"a_new_tool\"],"
+					"\"definitions\":[{\"name\":\"status\",\"description\":\"s\",\"inputSchema\":{\"type\":\"object\"}},"
+					"{\"name\":\"a_new_tool\",\"description\":\"new\",\"inputSchema\":{\"type\":\"object\"}}]}");
+			else if (has(line, "\"a_new_tool\""))
+			{
+				const size_t at = line.find("\"id\":");
+				const std::string id = line.substr(at + 5, line.find_first_of(",}", at) - at - 5);
+				window.send("{\"id\":" + id + ",\"content\":[{\"type\":\"text\",\"text\":\"ran the new tool\"}],\"isError\":false}");
+			}
+		}
+	});
+	said = chimera::mcpHandleLine(
+		"{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-06-18\"}}", viaOther, &client);
+	std::fprintf(stderr, "a window of another build, at initialize: %s\n", said.c_str());
+	assert(has(said, "fakebuild0001") && has(said, "a_new_tool"));
+	assert(other.takeToolsChanged() && !other.takeToolsChanged());
+	said = chimera::mcpHandleLine("{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/list\"}", viaOther, &client);
+	assert(has(said, "\"a_new_tool\"") && !has(said, "\"trace_memory\""));
+	said = chimera::mcpHandleLine(
+		"{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"a_new_tool\",\"arguments\":{}}}", viaOther, &client);
+	assert(has(said, "ran the new tool"));
+	done.store(true);
+	answering.join();
+	window.close();
+	chimera::mcpSetWindowListing(nullptr, nullptr);
 }
 
 } // namespace
@@ -563,6 +628,7 @@ int main()
 	theProtocol();
 	theServer();
 	theBuilds();
+	theListing();
 	std::printf("test_mcp: ok\n");
 	return 0;
 }

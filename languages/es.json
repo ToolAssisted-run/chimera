@@ -1385,6 +1385,8 @@
 		"mcp.branch_range": "'number' debe estar entre 1 y %1, las ramas que da list_branches.",
 		"mcp.changes_lost": "Se pierden los cambios que no se guardaron.",
 		"mcp.connected": "Iniciado. Conectado: %1.",
+		"mcp.connected_build": "Iniciado. Conectado: %1 (%2, compilación %3).",
+		"mcp.connected_other_build": "Iniciado. Conectado: %1 (%2, compilación %3). No es la compilación de este Chimera: configura el agente con la orden de abajo y luego reinicia el programa del agente.",
 		"mcp.file_exists": "Ya hay un archivo en '%1', así que el proyecto no se guardó. Dé overwrite: true para reemplazarlo.",
 		"mcp.files_shape": "'files' es un objeto que va de las ranuras a listas de rutas, como {\"rom\": [\"game.nes\"]}.",
 		"mcp.firmware_shape": "'firmware' es un objeto que va de los id de firmware a rutas.",

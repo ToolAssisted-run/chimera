@@ -1364,6 +1364,8 @@
 		"mcp.branch_range": "'number' harus antara 1 dan %1, yaitu daftar cabang yang diberikan list_branches.",
 		"mcp.changes_lost": "Perubahan yang belum disimpan hilang.",
 		"mcp.connected": "Dimulai. Terhubung: %1.",
+		"mcp.connected_build": "Dimulai. Terhubung: %1 (%2, build %3).",
+		"mcp.connected_other_build": "Dimulai. Terhubung: %1 (%2, build %3). Itu bukan build Chimera ini: atur agen dengan perintah di bawah, lalu mulai ulang program agen.",
 		"mcp.file_exists": "Sudah ada berkas di '%1', jadi proyek tidak disimpan. Beri overwrite: true untuk menggantinya.",
 		"mcp.files_shape": "'files' adalah objek dari slot ke daftar jalur, seperti {\"rom\": [\"game.nes\"]}.",
 		"mcp.firmware_shape": "'firmware' adalah objek dari id firmware ke jalur.",

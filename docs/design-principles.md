@@ -14720,3 +14720,24 @@ back; a script watching address 1 hears nothing of the trace's frames and
 keeps its watch after it; `emu.getregister("pc")` reads PC. Taken out one
 at a time - the instruction's address, the counting of watches, the roles,
 the machine put back, the hold - each fails a check.
+
+## MCP: the window's own tool list, and the build said at once (2026-11-12, issue 571)
+
+The rest of the request's first part. `chimera-mcp` greets the window when
+an agent's program initializes, and puts the build warning in the
+instructions, before the first call. The window's greeting carries its tools
+whole; `chimera-mcp` lists those while it is connected (declaring
+`listChanged`, and sending `notifications/tools/list_changed` when they
+differ from what it listed) and passes on calls to tools only the window
+has, so a `chimera-mcp` older than the window still reaches the window's
+newer tools. It also sends its own path, and Tools > MCP Server... shows it
+and the build, with a line saying to set the agent up again when the build
+is not the window's (two new texts, in every language).
+
+Tested: the engine's MCP test connects to a window of this build (no
+warning, nothing changed) and to a stand-in window of another build with a
+tool this program lacks: initialize names that build, tools/list is the
+window's, list_changed is due once, and a call to the new tool is answered
+by the window; the window learns the path and whether the builds match.
+With each of the listing, the warning at initialize, the change notice, the
+passing on and the path taken out, the test fails.

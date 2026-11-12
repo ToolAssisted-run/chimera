@@ -1406,6 +1406,8 @@
 		"mcp.branch_range": "'number' trebuie să fie între 1 și %1, cele pe care le dă list_branches.",
 		"mcp.changes_lost": "Schimbările nesalvate se pierd.",
 		"mcp.connected": "Pornit. Conectat: %1.",
+		"mcp.connected_build": "Pornit. Conectat: %1 (%2, versiunea %3).",
+		"mcp.connected_other_build": "Pornit. Conectat: %1 (%2, versiunea %3). Nu este versiunea acestui Chimera: configurați agentul cu comanda de mai jos, apoi reporniți programul agentului.",
 		"mcp.file_exists": "Există deja un fișier la '%1', deci proiectul nu a fost salvat. Dă overwrite: true ca să îl înlocuiești.",
 		"mcp.files_shape": "'files' este un obiect de la sloturi la liste de căi, cum este {\"rom\": [\"joc.nes\"]}.",
 		"mcp.firmware_shape": "'firmware' este un obiect de la identificatorii firmware la căi.",

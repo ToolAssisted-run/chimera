@@ -1364,6 +1364,8 @@
 		"mcp.branch_range": "'number' phải nằm trong khoảng từ 1 đến %1, là số nhánh mà list_branches đưa ra.",
 		"mcp.changes_lost": "Các thay đổi chưa lưu sẽ bị mất.",
 		"mcp.connected": "Đã khởi động. Đã kết nối: %1.",
+		"mcp.connected_build": "Đã khởi động. Đã kết nối: %1 (%2, bản dựng %3).",
+		"mcp.connected_other_build": "Đã khởi động. Đã kết nối: %1 (%2, bản dựng %3). Đây không phải bản dựng của Chimera này: hãy thiết lập tác nhân bằng lệnh bên dưới, rồi khởi động lại chương trình của tác nhân.",
 		"mcp.file_exists": "Đã có một tệp tại '%1', nên dự án chưa được lưu. Hãy đưa overwrite: true để thay thế nó.",
 		"mcp.files_shape": "'files' là một đối tượng từ các ô đến danh sách đường dẫn, ví dụ {\"rom\": [\"game.nes\"]}.",
 		"mcp.firmware_shape": "'firmware' là một đối tượng từ mã firmware đến đường dẫn.",

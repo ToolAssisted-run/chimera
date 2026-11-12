@@ -2225,6 +2225,11 @@ CE_API const char *ce_mcp_client(void);
  * it did not say (a build from before 2026-11-12). Borrowed until this
  * thread's next call of it. */
 CE_API const char *ce_mcp_client_build(void);
+/* Where the connected chimera-mcp says it is (issue 571), "" when it did not
+ * say or none is connected. Borrowed until this thread's next call of it. */
+CE_API const char *ce_mcp_client_program(void);
+/* 1 when the connected chimera-mcp is this Chimera's build, 0 otherwise */
+CE_API int32_t ce_mcp_client_same_build(void);
 /* Where this Chimera's own chimera-mcp is, named to an agent whose
  * chimera-mcp is from another build. */
 CE_API void ce_mcp_program(const char *path);

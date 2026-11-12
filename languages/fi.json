@@ -1385,6 +1385,8 @@
 		"mcp.branch_range": "'number' on oltava välillä 1 ja %1, eli list_branches-komennon antamien haarojen määrä.",
 		"mcp.changes_lost": "Tallentamattomat muutokset menevät hukkaan.",
 		"mcp.connected": "Käynnistetty. Yhdistetty: %1.",
+		"mcp.connected_build": "Käynnistetty. Yhdistetty: %1 (%2, koontiversio %3).",
+		"mcp.connected_other_build": "Käynnistetty. Yhdistetty: %1 (%2, koontiversio %3). Se ei ole tämän Chimera-ohjelman koontiversio: määritä agentti alla olevalla komennolla ja käynnistä sitten agentin ohjelma uudelleen.",
 		"mcp.file_exists": "Tiedosto on jo kohdassa '%1', joten projektia ei tallennettu. Anna overwrite: true korvataksesi sen.",
 		"mcp.files_shape": "'files' on olio, jossa paikoista on luettelot tiedostopoluista, kuten {\"rom\": [\"game.nes\"]}.",
 		"mcp.firmware_shape": "'firmware' on olio, jossa laiteohjelmiston tunnuksista on polut.",
