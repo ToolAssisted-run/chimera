@@ -11,7 +11,9 @@
  * One thread only: the one that made it polls it. */
 
 #include <cstdint>
+#include <map>
 #include <memory>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -40,8 +42,26 @@ public:
 
 	/* what the open gamepads print on their face buttons, bottom, right,
 	 * left and top, for shown(): "X1:Cross,Circle,Square,Triangle;X2:B,A,Y,X".
-	 * A pad SDL knows no labels for is left out */
+	 * A pad's model with a layout chosen (setLayouts) prints that layout's;
+	 * any other what SDL says, and a pad SDL knows no labels for is left out */
 	std::string faces() const;
+
+	/* the layout chosen for each pad model ("2dc8:5112" -> "nintendo"; "xbox",
+	 * "nintendo" or "playstation"), for a pad SDL labels wrongly; a model not
+	 * there is labelled as SDL says */
+	void setLayouts(const std::map<std::string, std::string> &byModel);
+	static bool isLayout(const std::string &name);
+
+	/* the pad models ("2dc8:5112") that report their face buttons by their
+	 * printed letters rather than their places, as SDL has some wrong: A and
+	 * B, and X and Y, are taken the other way round, in what is held and in
+	 * what SDL says is printed there */
+	void setSwapped(const std::set<std::string> &models);
+
+	/* the open gamepads, as JSON: [{"pad": "X1", "name": "8BitDo Lite 2",
+	 * "model": "2dc8:5112", "detected": "xbox"}], "detected" being the layout
+	 * SDL's own labels make ("xbox", "nintendo", "playstation" or "unknown") */
+	std::string models() const;
 
 	/* keys as the window shows them ("X1 A, Z" as "X1 Cross, Z"): each
 	 * face button of a pad in `faces` by what that pad prints on it */
@@ -58,6 +78,8 @@ private:
 	std::unique_ptr<Api> api_;
 	std::vector<Pad> pads_;
 	std::vector<uint32_t> ids_;
+	std::map<std::string, std::string> layouts_;
+	std::set<std::string> swapped_;
 	std::string problem_;
 };
 
