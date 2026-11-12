@@ -1663,6 +1663,29 @@ bool gamepads()
 	pads.poll(held);
 	CHECK(!has(j + "B3") && !has(j + "POV0U") && !has(j + "Y-"));
 
+	/* a pad plugged in reads as pushed to the end before its first report (the
+	 * 8BitDo Lite 2's sticks): not held, until the pad reports something */
+	const uint32_t us = v.add("Chimera Test Unsettled", 2, 2, 0);
+	CHECK(us != 0);
+	void *usJoy = us != 0 ? v.open(us) : nullptr;
+	CHECK(usJoy != nullptr);
+	if (usJoy == nullptr) return true;
+	v.setAxis(usJoy, 1, -32768);
+	pads.poll(held);
+	const std::string u = padPrefix(pads, "Chimera Test Unsettled");
+	CHECK(u.size() > 1);
+	CHECK(!has(u + "Y-"));
+	pads.poll(held);
+	CHECK(!has(u + "Y-"));
+	/* a button pressed: the pad has reported, and its axes are read as they are */
+	v.setButton(usJoy, 0, true);
+	pads.poll(held);
+	CHECK(has(u + "B1") && has(u + "Y-"));
+	v.setButton(usJoy, 0, false);
+	v.setAxis(usJoy, 1, 0);
+	pads.poll(held);
+	CHECK(!has(u + "B1") && !has(u + "Y-"));
+
 	/* gamepads: the bottom face button is "A" on every pad, and shown as the
 	 * pad prints it - a DualSense's Cross, a Switch Pro pad's B */
 	const uint32_t ps = v.add("Chimera Test DualSense", 6, 15, 0, 0x054C, 0x0CE6);
