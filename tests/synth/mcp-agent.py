@@ -200,8 +200,10 @@ check("status gives the movie's length", status.get("movie_length") == len(movie
 check("status says whether changes are allowed", status.get("changes_allowed") is changes)
 check("status says the core has not stopped", status.get("core_stopped") is False)
 check("status gives the picture's size", status.get("picture", {}).get("width", 0) > 0)
-check("status names the buttons a press takes", status.get("buttons", [])[:4] == ["P1 Up", "P1 Down", "P1 Left", "P1 Right"])
-check("and the axes", isinstance(status.get("axes"), list))
+check("status leaves the controls' names out unless asked (issue 571)", "buttons" not in status and "axes" not in status)
+named = facts("status", controls=True)
+check("status names the buttons a press takes", named.get("buttons", [])[:4] == ["P1 Up", "P1 Down", "P1 Left", "P1 Right"])
+check("and the axes", isinstance(named.get("axes"), list))
 if window:
     # what only the window knows: the files the machine runs, the firmware it was given, how fast it runs
     files = status.get("files", [])
@@ -284,6 +286,23 @@ if images:
         check("screenshot is the last frame's picture", (width, height, pixels) == tga_pixels(tga_path))
     half = facts("screenshot", max_width=width // 2)
     check("screenshot scales a picture down to max_width", half.get("width") == width // 2 and half.get("picture_width") == width)
+    # a part of the picture, and colours without one (issue 571)
+    error, text, content = call("screenshot", region={"x": 3, "y": 5, "width": 10, "height": 7})
+    crop = [c for c in content if c["type"] == "image"]
+    if crop:
+        cw, ch, cpixels = png_pixels(base64.b64decode(crop[0]["data"]))
+        expect = b"".join(pixels[((5 + y) * width + 3) * 3:((5 + y) * width + 13) * 3] for y in range(7))
+        check("screenshot crops a region, pixel for pixel", (cw, ch) == (10, 7) and cpixels == expect)
+    else:
+        check("screenshot crops a region: %s" % text[:120], False)
+    spots = [[0, 0], [width - 1, height - 1], [7, 9]]
+    error, text, content = call("screenshot", pixels=spots, image=False)
+    said = json.loads(next((c["text"] for c in content if c["type"] == "text"), "{}"))
+    expect = ["#%02X%02X%02X" % tuple(pixels[(y * width + x) * 3:(y * width + x) * 3 + 3]) for x, y in spots]
+    check("screenshot answers the colours of the pixels asked for, with no picture",
+          not error and not [c for c in content if c["type"] == "image"] and [p.get("colour") for p in said.get("pixels", [])] == expect)
+    error, text, _ = call("screenshot", region={"x": width - 2, "y": 0, "width": 5, "height": 1})
+    check("a region past the picture's edge is refused", error and "'region'" in text)
     # whether the picture is blank, by its commonest colour (issue 355)
     colours = {}
     for i in range(0, len(pixels), 3):
@@ -687,6 +706,23 @@ if changes:
         check("and search_results gives each one's count", counts == expect_counts)
         error, text, _ = call("search_steps", steps=[{"frame": 3, "op": "equal", "value": "nonsense"}])
         check("search_steps says which step could not be done", error and "Step 1" in text and "'value'" in text)
+        # what changed in a range between two frames, in one call (issue 571)
+        diff = facts("diff_memory", domain="RAM", address=0, length="0x1000", frame_a=10, frame_b=30)
+        runs = {}
+        for run in diff.get("runs", []):
+            before, after = bytes.fromhex(run["before_hex"]), bytes.fromhex(run["after_hex"])
+            for k in range(len(before)):
+                runs[run["address"] + k] = (before[k], after[k])
+        expect = {a: (r10[a], r30[a]) for a in range(4096) if r10[a] != r30[a]}
+        check("diff_memory lists the bytes that changed, what they were and became",
+              runs == expect and diff.get("changed_bytes") == len(expect) and expect and facts("status").get("frame") == 30)
+        # stopping on the first frame any byte of a range changes
+        first = next(f for f in range(1, 13) if frames[f] != frames[f - 1])
+        facts("seek", frame=0)
+        moved = facts("advance_until", domain="RAM", address=0, length=4096, op="changed", max_frames=12)
+        check("advance_until stops when any byte of a range changes", moved.get("met") is True and moved.get("frame") == first)
+        error, text, _ = call("advance_until", domain="RAM", address=0, length=4, op="equal", value=1)
+        check("a range is for 'changed' only", error and "'length'" in text)
     # a game's named value
     check("set_property sets a value from text", facts("set_property", name="Steps", value="7").get("value") == "7")
     check("the value set is read back", facts("get_property", name="Steps").get("value") == "7")

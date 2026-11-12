@@ -112,6 +112,10 @@ struct McpResult
 McpResult mcpFreezeTool(ce_session *s, const std::string &tool, const std::string &argumentsJson);
 /* one search_filter on the agent's search, for search_steps between its seeks */
 McpResult mcpSearchFilter(ce_session *s, const std::string &argumentsJson);
+/* diff_memory (issue 571): phase 0 keeps the range as it is on frame_a, phase
+ * 1 compares it with frame_b's; the frontend or the windowless server moves
+ * the machine between them */
+McpResult mcpDiffMemoryNow(ce_session *s, int phase, const std::string &argumentsJson);
 
 /* [{"type":"text","text":<text>}] */
 std::string mcpTextContent(const std::string &text);

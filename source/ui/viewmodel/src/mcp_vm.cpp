@@ -563,6 +563,13 @@ void McpViewModel::host(uint64_t id, const std::string &tool, const std::string 
 		}
 		return session_.mcpSeek(id, frame);
 	}
+	if (tool == "diff_memory")
+	{
+		int64_t frameA = 0, frameB = 0;
+		if (!number(arguments, "frame_a", 0, length, nullptr, frameA) || !number(arguments, "frame_b", 0, length, nullptr, frameB))
+			return refuse(tr("mcp.frame_range", {std::to_string(length)}));
+		return session_.mcpDiffMemory(id, frameA, frameB, argumentsJson);
+	}
 	if (tool == "search_steps")
 	{
 		/* each step's frame here; the rest of it is the engine's search_filter's to read */

@@ -810,6 +810,8 @@ public:
 	/* search_steps (issue 571): to each step's frame, as seek goes, and the
 	 * engine's search_filter there with the step's other arguments */
 	void mcpSearchSteps(uint64_t id, std::vector<std::pair<int64_t, std::string>> steps);
+	/* diff_memory (issue 571): to frame_a, the engine keeps the range; to frame_b, it answers what changed */
+	void mcpDiffMemory(uint64_t id, int64_t frameA, int64_t frameB, std::string arguments);
 	/* the machine's thread: the start of the open project's clock */
 	int64_t clockOnMachine() const;
 
@@ -965,12 +967,15 @@ private:
 	{
 		uint64_t id = 0;
 		int64_t start = 0, target = 0;
-		enum Kind { Seek, Until, Pictures, Steps } kind = Seek;
+		enum Kind { Seek, Until, Pictures, Steps, Diff } kind = Seek;
 		std::deque<int64_t> pictures;
 		/* search_steps: the steps left (frame, filter), how many are done, and their answers */
 		std::deque<std::pair<int64_t, std::string>> steps;
 		int32_t stepsDone = 0;
 		std::string stepAnswers;
+		/* diff_memory: its arguments, and frame_b once frame_a is done (-1 after) */
+		std::string arguments;
+		int64_t then = -1;
 	};
 	std::optional<McpMove> mcpMoveM_;
 	/* playing for advance_until with Turbo seek on: as fast as it goes */

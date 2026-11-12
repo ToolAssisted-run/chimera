@@ -857,6 +857,29 @@ McpResult McpLocal::runHost(const std::string &tool, const std::string &argument
 		if (!numberOf(arguments, "frame", 0, length, frame)) why = "'frame' must be between 0 and the movie's length, " + std::to_string(length) + ".";
 		else if (landOn(frame, why)) cJSON_AddNumberToObject(out, "frame", static_cast<double>(ce_session_frame(session)));
 	}
+	else if (tool == "diff_memory")
+	{
+		/* frame_a's bytes kept, then frame_b's compared with them (issue 571) */
+		int64_t frameB = 0;
+		if (!numberOf(arguments, "frame_a", 0, length, frame) || !numberOf(arguments, "frame_b", 0, length, frameB))
+			why = "'frame_a' and 'frame_b' must be between 0 and the movie's length, " + std::to_string(length) + ".";
+		for (int phase = 0; why.empty() && phase < 2; phase++)
+		{
+			if (!landOn(phase == 0 ? frame : frameB, why)) break;
+			const McpResult step = mcpDiffMemoryNow(session, phase, argumentsJson);
+			cJSON *content = cJSON_Parse(step.content.c_str());
+			const cJSON *text = cJSON_GetObjectItemCaseSensitive(cJSON_GetArrayItem(content, 0), "text");
+			const std::string said = cJSON_IsString(text) ? text->valuestring : "";
+			cJSON_Delete(content);
+			if (step.isError) why = said;
+			else if (phase == 1)
+			{
+				cJSON_Delete(out);
+				out = cJSON_Parse(said.c_str());
+				if (out == nullptr) out = cJSON_CreateObject();
+			}
+		}
+	}
 	else if (tool == "search_steps")
 	{
 		/* each step: the machine to its frame, then the filter there (issue 571) */

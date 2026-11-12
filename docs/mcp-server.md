@@ -217,10 +217,10 @@ Looking:
 
 | Tool | What it does |
 | --- | --- |
-| `status` | Core, game, frame, movie length, picture size, frame rate, whether changes are allowed, whether the core has stopped, and the names of the controls plugged in. In the window also: the project's file and whether it is saved, whether the machine is paused, the speed measured, the project's files with their paths, and each firmware file in use with its path and where it was found (the project's own, a file chosen for the core before, or the Firmware folder). |
+| `status` | Core, game, frame, movie length, picture size, frame rate, whether changes are allowed, whether the core has stopped, and with `controls` the names of the controls plugged in (left out unless asked since issue 571: the call an agent makes most is shorter without them). In the window also: the project's file and whether it is saved, whether the machine is paused, the speed measured, the project's files with their paths, and each firmware file in use with its path and where it was found (the project's own, a file chosen for the core before, or the Firmware folder). |
 | `controls` | The machine's buttons and axes by name, with each axis's rest value. |
 | `get_input` | The movie's input over a range of frames. |
-| `screenshot` | The picture of the current frame as a PNG, optionally scaled down, with whether it is blank: its commonest colour and how much of it that colour covers (one colour over 99% or more is blank). |
+| `screenshot` | The picture of the current frame as a PNG, optionally scaled down, with whether it is blank: its commonest colour and how much of it that colour covers (one colour over 99% or more is blank). `region` crops it first; `pixels` answers the colours of the pixels named, as #RRGGBB, and with `image` false no picture is sent (issue 571). |
 | `list_memory` | The memory domains and address buses, with sizes. |
 | `read_memory` | Bytes or typed values at an address. |
 | `registers` | The CPU registers, where the core gives them. |
@@ -264,7 +264,8 @@ Changes:
 | Tool | What it does |
 | --- | --- |
 | `seek` | Moves the playback position to a frame, back or forward, and answers when the machine is there. |
-| `advance_until` | Plays the movie forward until a memory value or a property meets a condition (equal, greater, changed, ...) and stops on that frame. It stops at the movie's end or after `max_frames` otherwise, and says which. |
+| `advance_until` | Plays the movie forward until a memory value or a property meets a condition (equal, greater, changed, ...) and stops on that frame. With `length`, "changed" watches that many bytes and stops when any of them changes: the frame something starts to move, with no byte known yet (issue 571). It stops at the movie's end or after `max_frames` otherwise, and says which. |
+| `diff_memory` | Goes to frame_a, then to frame_b, as `seek` does, and lists each run of bytes of a range that changed between them, what it was and what it became; up to 16 MiB, the first 200 runs. It leaves the machine on frame_b. |
 | `set_input` | Replaces the input from a frame on, one line a frame as `get_input` returns them, in printable ASCII. Past the movie's end it adds frames, starting at most 100000 frames past it. |
 | `set_buttons` | Presses or releases buttons, and sets axes, by name over a range of frames. Controls not named keep what they had. Like `set_input` it starts at most 100000 frames past the movie's end. A movie made with an older package may not have a column for a control (its LogKey does not name it): without a window the control is added to the movie, a column on every line; with the window the call is refused and says which control. |
 | `press_buttons` | Presses buttons on a schedule: each press its buttons, its frame (or so many frames from the frame the machine is on) and how long it is held. All of it is written into the input as one step; buttons not named keep what they had. |

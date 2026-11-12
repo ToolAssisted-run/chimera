@@ -2231,6 +2231,11 @@ CE_API void ce_mcp_answer(ce_session *s, uint64_t id, const char *text, int32_t 
  * and the frame (valid until the next call on this thread). The machine's
  * thread. */
 CE_API int32_t ce_mcp_search_step(ce_session *s, int32_t step, const char *arguments_json, const char **answer_out);
+/* diff_memory in the frontend (issue 571): phase 0 on frame_a keeps the range
+ * the arguments name, phase 1 on frame_b answers the bytes that changed. 1
+ * done, 0 refused; answer_out the answer's text or why (valid until the next
+ * call on this thread). The machine's thread. */
+CE_API int32_t ce_mcp_diff_memory(ce_session *s, int32_t phase, const char *arguments_json, const char **answer_out);
 /* capture_series (issue 355): the frontend plays the movie to each frame of
  * the plan it was handed (its arguments' "frames") and, on each, has the
  * engine take the picture with this, saying the frame it is on as it counts

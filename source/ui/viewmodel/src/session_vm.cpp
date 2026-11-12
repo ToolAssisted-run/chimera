@@ -2808,6 +2808,22 @@ void SessionViewModel::mcpSearchSteps(uint64_t id, std::vector<std::pair<int64_t
 	});
 }
 
+void SessionViewModel::mcpDiffMemory(uint64_t id, int64_t frameA, int64_t frameB, std::string arguments)
+{
+	submit([this, id, frameA, frameB, arguments = std::move(arguments)] {
+		if (s_ == nullptr)
+		{
+			mcpAnswerOnMachine(id, tr("session.no_project_in_chimera"), true);
+			return;
+		}
+		McpMove move{id, ce_session_frame(s_), frameA, McpMove::Diff, {}};
+		move.arguments = arguments;
+		move.then = frameB;
+		seekAsAskedOnMachine(frameA);
+		mcpMoveM_ = std::move(move);
+	});
+}
+
 bool SessionViewModel::mcpMoveOnMachine()
 {
 	if (!mcpMoveM_) return true;
@@ -2848,6 +2864,31 @@ bool SessionViewModel::mcpMoveOnMachine()
 			}
 			text = "{\"frame\": " + std::to_string(at) + ", \"movie_length\": " + std::to_string(length) + "}";
 		}
+	}
+	else if (move.kind == McpMove::Diff)
+	{
+		/* frame_a: the range kept; frame_b: what changed in it */
+		const char *said = nullptr;
+		const bool first = move.then >= 0;
+		if (at != move.target)
+		{
+			text = tr("session.seek_interrupted", {std::to_string(at), std::to_string(move.target)});
+			failed = true;
+		}
+		else if (ce_mcp_diff_memory(s_, first ? 0 : 1, move.arguments.c_str(), &said) != 1)
+		{
+			text = said != nullptr ? said : "";
+			failed = true;
+		}
+		else if (first)
+		{
+			move.target = move.then;
+			move.then = -1;
+			seekAsAskedOnMachine(move.target);
+			return false;
+		}
+		else
+			text = said != nullptr ? said : "{}";
 	}
 	else if (move.kind == McpMove::Steps)
 	{

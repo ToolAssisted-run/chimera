@@ -14590,3 +14590,27 @@ one cluster; search_steps to 20 then 30 leaves what comparing the reads
 leaves; "original" compares with the start; 12 frames played count each
 address's changes exactly. With the frame watch, the catch-up or the step's
 filter taken out, those checks fail.
+
+## MCP: smaller things an agent asked for (2026-11-12, issue 571)
+
+From the request's list of small, frequent costs: `status` leaves the
+controls' names out unless `controls` is asked for (they are in `controls`,
+and status is the call an agent makes most); `screenshot` takes a `region`
+to crop and `pixels` to answer colours as #RRGGBB, with `image` false
+sending no picture; `advance_until` with `length` stops on the first frame
+any byte of a range changes; and `diff_memory` goes to two frames and lists
+the runs of bytes that changed between them (read_memory stops at 4096
+bytes). In the window `diff_memory` moves the machine as `search_steps`
+does, and the engine reads the bytes (`ce_mcp_diff_memory`).
+
+Not done: `inputs_read`, which controls a game read. A core says that it
+read its input (its input poll callback), not which control, so Chimera
+cannot tell; it would need a new declaration from the cores.
+
+Tested: in the window, a 10 by 7 crop is those pixels of the whole picture,
+three pixels' colours are theirs and no picture is sent; diff_memory of
+RAM between frames 10 and 30 lists exactly the bytes two reads differ in;
+advance_until with length 4096 stops on the first frame RAM differs from the
+one before; status has no names unless asked. With each taken out (the
+crop's offset, the diff's comparison, the range, the default), the test
+fails.

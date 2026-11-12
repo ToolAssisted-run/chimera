@@ -60,8 +60,12 @@ const char kNoArguments[] = "{\"type\":\"object\",\"properties\":{},\"additional
 const McpTool kTools[] = {
 	{ "status",
 	  "What is open in Chimera right now: the core and the system, the frame the machine is on, the movie's length, "
-	  "the size of the picture, the frame rate, whether the person has allowed changes, and whether the core has stopped.",
-	  kNoArguments, false, false },
+	  "the size of the picture, the frame rate, whether the person has allowed changes, and whether the core has stopped. "
+	  "With 'controls' true, also the names of the buttons and axes plugged in (which 'controls' tells more of).",
+	  "{\"type\":\"object\",\"properties\":{"
+	  "\"controls\":{\"type\":\"boolean\",\"description\":\"Name the buttons and axes too. false when left out.\"}"
+	  "},\"additionalProperties\":false}",
+	  false, false },
 	{ "controls",
 	  "The machine's buttons and axes by name, in the order of the columns of a movie's input lines, "
 	  "with each axis's rest value. 'active' is false for a control this machine does not have plugged in.",
@@ -76,9 +80,17 @@ const McpTool kTools[] = {
 	  "},\"additionalProperties\":false}",
 	  false, false },
 	{ "screenshot",
-	  "The picture of the frame the machine is on, as a PNG. A large picture is scaled down to max_width.",
+	  "The picture of the frame the machine is on, as a PNG. A large picture is scaled down to max_width. 'region' crops "
+	  "it first, and 'pixels' answers the colour of each pixel asked for, as #RRGGBB, so a colour needs no picture: with "
+	  "'image' false, none is sent.",
 	  "{\"type\":\"object\",\"properties\":{"
-	  "\"max_width\":{\"type\":\"integer\",\"minimum\":32,\"maximum\":4096,\"description\":\"The widest picture wanted, in pixels. 800 when left out.\"}"
+	  "\"max_width\":{\"type\":\"integer\",\"minimum\":32,\"maximum\":4096,\"description\":\"The widest picture wanted, in pixels. 800 when left out.\"},"
+	  "\"region\":{\"type\":\"object\",\"properties\":{\"x\":{\"type\":\"integer\",\"minimum\":0},\"y\":{\"type\":\"integer\",\"minimum\":0},"
+	  "\"width\":{\"type\":\"integer\",\"minimum\":1},\"height\":{\"type\":\"integer\",\"minimum\":1}},"
+	  "\"required\":[\"x\",\"y\",\"width\",\"height\"],\"additionalProperties\":false,\"description\":\"Only this part of the picture, in its own pixels.\"},"
+	  "\"pixels\":{\"type\":\"array\",\"maxItems\":256,\"items\":{\"type\":\"array\",\"items\":{\"type\":\"integer\",\"minimum\":0},\"minItems\":2,\"maxItems\":2},"
+	  "\"description\":\"[x, y] pixels of the whole picture whose colours to answer.\"},"
+	  "\"image\":{\"type\":\"boolean\",\"description\":\"Send the picture. true when left out.\"}"
 	  "},\"additionalProperties\":false}",
 	  false, false },
 	{ "list_memory",
@@ -224,6 +236,18 @@ const McpTool kTools[] = {
 	  "},\"required\":[\"frame\",\"op\"],\"additionalProperties\":false}}"
 	  "},\"required\":[\"steps\"],\"additionalProperties\":false}",
 	  true, true },
+	{ "diff_memory",
+	  "Which bytes of a range differ between two frames: the machine goes to frame_a, as seek does, then to frame_b, and "
+	  "the answer lists each run of bytes that changed, with what it was and what it became. It leaves the machine on "
+	  "frame_b. Up to 16 MiB of memory, and the first 200 runs.",
+	  "{\"type\":\"object\",\"properties\":{"
+	  "\"domain\":{\"type\":\"string\",\"description\":\"A domain or bus from list_memory.\"},"
+	  MCP_ADDRESS ","
+	  "\"length\":{\"type\":[\"integer\",\"string\"],\"description\":\"How many bytes: a number, or hex text.\"},"
+	  "\"frame_a\":{\"type\":\"integer\",\"minimum\":0},"
+	  "\"frame_b\":{\"type\":\"integer\",\"minimum\":0}"
+	  "},\"required\":[\"domain\",\"address\",\"length\",\"frame_a\",\"frame_b\"],\"additionalProperties\":false}",
+	  true, true },
 	{ "advance_until",
 	  "Plays the movie forward from the frame the machine is on until a value meets a condition, and stops there. "
 	  "The value is a memory value (domain, address, type) or a game core's property. 'op' compares it with 'value'; "
@@ -237,6 +261,7 @@ const McpTool kTools[] = {
 	  "\"property\":{\"type\":\"string\",\"description\":\"A game core's named value, in place of domain and address.\"},"
 	  "\"op\":{\"type\":\"string\",\"enum\":[\"equal\",\"not_equal\",\"greater\",\"greater_or_equal\",\"less\",\"less_or_equal\",\"changed\"]},"
 	  "\"value\":{\"type\":\"number\",\"description\":\"What to compare with. Not needed for 'changed'.\"},"
+	  "\"length\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":65536,\"description\":\"With 'changed': watch this many bytes from 'address', and stop when any of them changes.\"},"
 	  "\"max_frames\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":100000,\"description\":\"The most frames to play. 600 when left out.\"}"
 	  "},\"required\":[\"op\"],\"additionalProperties\":false}",
 	  true, true },
@@ -987,6 +1012,9 @@ struct Source
 	int width = 1;
 	bool isSigned = false;
 	bool bigEndian = false;
+	/* advance_until's 'length': this many bytes from the address, watched
+	 * for any of them changing (issue 571); 0 for one value */
+	int64_t length = 0;
 };
 
 struct WaitingCall
@@ -1070,6 +1098,9 @@ struct Service
 	 * 1 last search, 2 last frame, 3 last change), which every frame's count
 	 * of changes keeps to (searchFrame) */
 	int searchPreviousType = 1;
+	/* diff_memory's range as frame_a had it, until frame_b is reached */
+	std::vector<uint8_t> diffBefore;
+	int64_t diffFrame = -1;
 };
 
 Service &service()
@@ -1261,7 +1292,8 @@ McpResult textResult(cJSON *object)
 	return result;
 }
 
-McpResult toolStatus(ce_session *s, const ce_movie_log *log, int64_t frame, const char *hostStatus, bool allowChanges, int64_t wroteMemoryAt)
+McpResult toolStatus(ce_session *s, const ce_movie_log *log, int64_t frame, const char *hostStatus, bool allowChanges, int64_t wroteMemoryAt,
+	bool names)
 {
 	/* what the frontend knows (the project's name, whether it is paused)
 	 * comes first, and the engine's own facts are added to it */
@@ -1284,13 +1316,17 @@ McpResult toolStatus(ce_session *s, const ce_movie_log *log, int64_t frame, cons
 		cJSON_AddNumberToObject(picture, "height", ce_session_video_height(s));
 		cJSON_AddItemToObject(out, "picture", picture);
 		/* the names set_buttons and press_buttons take, for the controls this
-		 * machine has plugged in; 'controls' says more of each */
-		cJSON *buttons = cJSON_AddArrayToObject(out, "buttons");
-		for (int64_t i = 0; i < ce_session_button_count(s); i++)
-			if (ce_session_button_active(s, i) != 0) cJSON_AddItemToArray(buttons, cJSON_CreateString(ce_session_button_name(s, i)));
-		cJSON *axes = cJSON_AddArrayToObject(out, "axes");
-		for (int64_t i = 0; i < ce_session_axis_count(s); i++)
-			if (ce_session_axis_active(s, i) != 0) cJSON_AddItemToArray(axes, cJSON_CreateString(ce_session_axis_name(s, i)));
+		 * machine has plugged in, when asked: the call an agent makes most is
+		 * short without them (issue 571); 'controls' says more of each */
+		if (names)
+		{
+			cJSON *buttons = cJSON_AddArrayToObject(out, "buttons");
+			for (int64_t i = 0; i < ce_session_button_count(s); i++)
+				if (ce_session_button_active(s, i) != 0) cJSON_AddItemToArray(buttons, cJSON_CreateString(ce_session_button_name(s, i)));
+			cJSON *axes = cJSON_AddArrayToObject(out, "axes");
+			for (int64_t i = 0; i < ce_session_axis_count(s); i++)
+				if (ce_session_axis_active(s, i) != 0) cJSON_AddItemToArray(axes, cJSON_CreateString(ce_session_axis_name(s, i)));
+		}
 		const int32_t numerator = ce_session_vsync_numerator(s);
 		const int32_t denominator = ce_session_vsync_denominator(s);
 		if (denominator > 0) cJSON_AddNumberToObject(out, "frames_per_second", static_cast<double>(numerator) / denominator);
@@ -1443,27 +1479,106 @@ McpResult toolScreenshot(ce_session *s, int64_t frame, const cJSON *arguments)
 {
 	int64_t maxWidth = 0;
 	if (!integerArgument(arguments, "max_width", 32, 4096, 800, maxWidth)) return mcpError("'max_width' must be between 32 and 4096.");
-	const uint32_t *bgra = ce_session_video(s);
-	const int32_t width = ce_session_video_width(s);
-	const int32_t height = ce_session_video_height(s);
-	if (bgra == nullptr || width <= 0 || height <= 0) return mcpError("The machine has not drawn a picture yet.");
-	std::string png;
-	int32_t outWidth = 0, outHeight = 0;
-	if (!pngOf(bgra, width, height, maxWidth, png, outWidth, outHeight)) return mcpError("The picture could not be made into a PNG.");
-	const std::string encoded = base64(reinterpret_cast<const uint8_t *>(png.data()), png.size());
-
+	const uint32_t *whole = ce_session_video(s);
+	const int32_t wholeWidth = ce_session_video_width(s);
+	const int32_t wholeHeight = ce_session_video_height(s);
+	if (whole == nullptr || wholeWidth <= 0 || wholeHeight <= 0) return mcpError("The machine has not drawn a picture yet.");
+	/* the colours asked for, of the whole picture (issue 571) */
+	cJSON *colours = nullptr;
+	const cJSON *pixels = cJSON_GetObjectItemCaseSensitive(arguments, "pixels");
+	if (pixels != nullptr)
+	{
+		colours = cJSON_CreateArray();
+		const cJSON *pixel = nullptr;
+		cJSON_ArrayForEach(pixel, pixels)
+		{
+			const cJSON *xi = cJSON_GetArrayItem(pixel, 0), *yi = cJSON_GetArrayItem(pixel, 1);
+			const int64_t x = cJSON_IsNumber(xi) ? static_cast<int64_t>(xi->valuedouble) : -1;
+			const int64_t y = cJSON_IsNumber(yi) ? static_cast<int64_t>(yi->valuedouble) : -1;
+			if (x < 0 || y < 0 || x >= wholeWidth || y >= wholeHeight)
+			{
+				cJSON_Delete(colours);
+				return mcpError("Each of 'pixels' is [x, y] inside the picture, which is " + std::to_string(wholeWidth) + " by "
+					+ std::to_string(wholeHeight) + ".");
+			}
+			const uint32_t c = whole[static_cast<size_t>(y) * static_cast<size_t>(wholeWidth) + static_cast<size_t>(x)];
+			char text[8];
+			std::snprintf(text, sizeof text, "#%02X%02X%02X", (c >> 16) & 0xFF, (c >> 8) & 0xFF, c & 0xFF);
+			cJSON *item = cJSON_CreateObject();
+			cJSON_AddNumberToObject(item, "x", static_cast<double>(x));
+			cJSON_AddNumberToObject(item, "y", static_cast<double>(y));
+			cJSON_AddStringToObject(item, "colour", text);
+			cJSON_AddItemToArray(colours, item);
+		}
+	}
+	/* a part of it only, cropped before it is scaled */
+	int32_t x0 = 0, y0 = 0, width = wholeWidth, height = wholeHeight;
+	const cJSON *region = cJSON_GetObjectItemCaseSensitive(arguments, "region");
+	if (region != nullptr)
+	{
+		int64_t rx = 0, ry = 0, rw = 0, rh = 0;
+		if (!integerArgument(region, "x", 0, wholeWidth - 1, -1, rx) || !integerArgument(region, "y", 0, wholeHeight - 1, -1, ry)
+			|| !integerArgument(region, "width", 1, wholeWidth, -1, rw) || !integerArgument(region, "height", 1, wholeHeight, -1, rh)
+			|| rx < 0 || ry < 0 || rw < 1 || rh < 1 || rx + rw > wholeWidth || ry + rh > wholeHeight)
+		{
+			cJSON_Delete(colours);
+			return mcpError("'region' must lie inside the picture, which is " + std::to_string(wholeWidth) + " by "
+				+ std::to_string(wholeHeight) + ".");
+		}
+		x0 = static_cast<int32_t>(rx);
+		y0 = static_cast<int32_t>(ry);
+		width = static_cast<int32_t>(rw);
+		height = static_cast<int32_t>(rh);
+	}
+	std::vector<uint32_t> cropped;
+	const uint32_t *bgra = whole;
+	if (region != nullptr)
+	{
+		cropped.resize(static_cast<size_t>(width) * static_cast<size_t>(height));
+		for (int32_t y = 0; y < height; y++)
+			std::memcpy(&cropped[static_cast<size_t>(y) * static_cast<size_t>(width)],
+				whole + static_cast<size_t>(y0 + y) * static_cast<size_t>(wholeWidth) + static_cast<size_t>(x0), static_cast<size_t>(width) * 4);
+		bgra = cropped.data();
+	}
+	const cJSON *imageItem = cJSON_GetObjectItemCaseSensitive(arguments, "image");
+	const bool sendImage = imageItem == nullptr || !cJSON_IsFalse(imageItem);
 	cJSON *content = cJSON_CreateArray();
-	cJSON *image = cJSON_CreateObject();
-	cJSON_AddStringToObject(image, "type", "image");
-	cJSON_AddStringToObject(image, "data", encoded.c_str());
-	cJSON_AddStringToObject(image, "mimeType", "image/png");
-	cJSON_AddItemToArray(content, image);
+	int32_t outWidth = 0, outHeight = 0;
+	if (sendImage)
+	{
+		std::string png;
+		if (!pngOf(bgra, width, height, maxWidth, png, outWidth, outHeight))
+		{
+			cJSON_Delete(colours);
+			cJSON_Delete(content);
+			return mcpError("The picture could not be made into a PNG.");
+		}
+		const std::string encoded = base64(reinterpret_cast<const uint8_t *>(png.data()), png.size());
+		cJSON *image = cJSON_CreateObject();
+		cJSON_AddStringToObject(image, "type", "image");
+		cJSON_AddStringToObject(image, "data", encoded.c_str());
+		cJSON_AddStringToObject(image, "mimeType", "image/png");
+		cJSON_AddItemToArray(content, image);
+	}
 	cJSON *facts = cJSON_CreateObject();
 	cJSON_AddNumberToObject(facts, "frame", static_cast<double>(frame >= 0 ? frame : ce_session_frame(s)));
-	cJSON_AddNumberToObject(facts, "width", outWidth);
-	cJSON_AddNumberToObject(facts, "height", outHeight);
-	cJSON_AddNumberToObject(facts, "picture_width", width);
-	cJSON_AddNumberToObject(facts, "picture_height", height);
+	if (sendImage)
+	{
+		cJSON_AddNumberToObject(facts, "width", outWidth);
+		cJSON_AddNumberToObject(facts, "height", outHeight);
+	}
+	cJSON_AddNumberToObject(facts, "picture_width", wholeWidth);
+	cJSON_AddNumberToObject(facts, "picture_height", wholeHeight);
+	if (region != nullptr)
+	{
+		cJSON *r = cJSON_CreateObject();
+		cJSON_AddNumberToObject(r, "x", x0);
+		cJSON_AddNumberToObject(r, "y", y0);
+		cJSON_AddNumberToObject(r, "width", width);
+		cJSON_AddNumberToObject(r, "height", height);
+		cJSON_AddItemToObject(facts, "region", r);
+	}
+	if (colours != nullptr) cJSON_AddItemToObject(facts, "pixels", colours);
 	addLook(facts, bgra, width, height);
 	cJSON *text = cJSON_CreateObject();
 	cJSON_AddStringToObject(text, "type", "text");
@@ -2057,6 +2172,24 @@ bool readSource(ce_session *s, const Source &source, std::string &text, bool &is
 	{
 		why = "there is no domain or bus called '" + source.domain + "'";
 		return false;
+	}
+	if (source.length > 0)
+	{
+		/* a range of bytes, as hex text: what 'changed' compares */
+		const int64_t limit = domainIndex >= 0 ? ce_session_domain_size(s, domainIndex) : ce_session_bus_size(s, busIndex);
+		std::vector<uint8_t> range(static_cast<size_t>(source.length));
+		const int64_t got = source.address < 0 || source.address > limit - source.length ? 0
+			: domainIndex >= 0 ? ce_session_domain_read(s, domainIndex, source.address, range.data(), source.length)
+			: ce_session_bus_read(s, busIndex, source.address, range.data(), source.length);
+		if (got != source.length)
+		{
+			why = "'" + source.domain + "' has no such range";
+			return false;
+		}
+		static const char hex[] = "0123456789ABCDEF";
+		text.clear();
+		for (uint8_t b : range) { text += hex[b >> 4]; text += hex[b & 15]; }
+		return true;
 	}
 	uint8_t bytes[4] = { 0, 0, 0, 0 };
 	/* a bus reads what is past its end as zeros, so its size is asked: a watch
@@ -3031,7 +3164,8 @@ McpResult runEngineTool(Service &sv, const std::string &tool, ce_session *s, con
 	if (tool == "status")
 	{
 		/* where there is no window the machine is the agent's own to change */
-		McpResult result = toolStatus(s, log, frame, hostStatus, sv.allowChanges.load() || g_local, sv.wroteMemoryAt);
+		McpResult result = toolStatus(s, log, frame, hostStatus, sv.allowChanges.load() || g_local, sv.wroteMemoryAt,
+			cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(arguments, "controls")));
 		if (s != nullptr && !sv.watches.empty())
 		{
 			cJSON *content = cJSON_Parse(result.content.c_str());
@@ -3191,6 +3325,81 @@ McpResult mcpSearchFilter(ce_session *s, const std::string &argumentsJson)
 	McpResult result = runSearchFilter(sv, arguments);
 	cJSON_Delete(arguments);
 	return result;
+}
+
+McpResult mcpDiffMemory(Service &sv, ce_session *s, int phase, const std::string &argumentsJson)
+{
+	if (s == nullptr) return mcpError(kNoMachine);
+	cJSON *arguments = cJSON_Parse(argumentsJson.c_str());
+	const cJSON *domainItem = cJSON_GetObjectItemCaseSensitive(arguments, "domain");
+	const std::string domain = cJSON_IsString(domainItem) ? domainItem->valuestring : "";
+	int64_t address = 0, length = 0, frameA = 0, frameB = 0;
+	const bool ok = integerArgument(arguments, "address", 0, INT64_MAX / 8, -1, address) && address >= 0
+		&& integerArgument(arguments, "length", 1, 16 << 20, -1, length) && length >= 1
+		&& integerArgument(arguments, "frame_a", 0, INT32_MAX, 0, frameA) && integerArgument(arguments, "frame_b", 0, INT32_MAX, 0, frameB);
+	cJSON_Delete(arguments);
+	if (!ok) return mcpError("'address' must be 0 or more, and 'length' between 1 and 16 MiB.");
+	int32_t domainIndex = -1, busIndex = -1;
+	if (!findMemory(s, domain, domainIndex, busIndex)) return mcpError("There is no domain or bus called '" + domain + "' (list_memory lists them).");
+	const int64_t limit = domainIndex >= 0 ? ce_session_domain_size(s, domainIndex) : ce_session_bus_size(s, busIndex);
+	if (address > limit - length) return mcpError("The range goes past the end of '" + domain + "', which is " + std::to_string(limit) + " bytes.");
+	std::vector<uint8_t> now(static_cast<size_t>(length));
+	const int64_t got = domainIndex >= 0 ? ce_session_domain_read(s, domainIndex, address, now.data(), length)
+		: ce_session_bus_read(s, busIndex, address, now.data(), length);
+	if (got != length) return mcpError("'" + domain + "' could not be read there.");
+	if (phase == 0)
+	{
+		sv.diffBefore = std::move(now);
+		sv.diffFrame = ce_session_frame(s);
+		cJSON *out = cJSON_CreateObject();
+		cJSON_AddNumberToObject(out, "frame_a", static_cast<double>(sv.diffFrame));
+		return textResult(out);
+	}
+	if (sv.diffBefore.size() != now.size()) return mcpError("diff_memory lost the bytes of frame_a.");
+	static const char hex[] = "0123456789ABCDEF";
+	auto hexOf = [&](const std::vector<uint8_t> &v, int64_t from, int64_t to) {
+		std::string t;
+		for (int64_t i = from; i < to; i++) { t += hex[v[static_cast<size_t>(i)] >> 4]; t += hex[v[static_cast<size_t>(i)] & 15]; }
+		return t;
+	};
+	cJSON *out = cJSON_CreateObject();
+	cJSON_AddStringToObject(out, "domain", domain.c_str());
+	cJSON_AddStringToObject(out, "address_hex", mcpHex(static_cast<uint64_t>(address)).c_str());
+	cJSON_AddNumberToObject(out, "length", static_cast<double>(length));
+	cJSON_AddNumberToObject(out, "frame_a", static_cast<double>(sv.diffFrame));
+	cJSON_AddNumberToObject(out, "frame_b", static_cast<double>(ce_session_frame(s)));
+	cJSON *runs = cJSON_CreateArray();
+	int64_t changed = 0, runCount = 0;
+	for (int64_t i = 0; i < length;)
+	{
+		if (sv.diffBefore[static_cast<size_t>(i)] == now[static_cast<size_t>(i)]) { i++; continue; }
+		int64_t end = i;
+		while (end < length && sv.diffBefore[static_cast<size_t>(end)] != now[static_cast<size_t>(end)]) end++;
+		changed += end - i;
+		if (runCount++ < 200)
+		{
+			cJSON *run = cJSON_CreateObject();
+			cJSON_AddNumberToObject(run, "address", static_cast<double>(address + i));
+			cJSON_AddStringToObject(run, "address_hex", mcpHex(static_cast<uint64_t>(address + i)).c_str());
+			cJSON_AddStringToObject(run, "before_hex", hexOf(sv.diffBefore, i, std::min(end, i + 256)).c_str());
+			cJSON_AddStringToObject(run, "after_hex", hexOf(now, i, std::min(end, i + 256)).c_str());
+			if (end - i > 256) cJSON_AddNumberToObject(run, "length", static_cast<double>(end - i));
+			cJSON_AddItemToArray(runs, run);
+		}
+		i = end;
+	}
+	cJSON_AddNumberToObject(out, "changed_bytes", static_cast<double>(changed));
+	cJSON_AddNumberToObject(out, "runs_count", static_cast<double>(runCount));
+	cJSON_AddItemToObject(out, "runs", runs);
+	sv.diffBefore.clear();
+	return textResult(out);
+}
+
+McpResult mcpDiffMemoryNow(ce_session *s, int phase, const std::string &argumentsJson)
+{
+	Service &sv = service();
+	onMachine(sv, s);
+	return mcpDiffMemory(sv, s, phase, argumentsJson);
 }
 
 McpResult mcpRunDirect(const std::string &tool, const std::string &argumentsJson, ce_session *s, const ce_movie_log *log,
@@ -3520,6 +3729,20 @@ int32_t ce_mcp_search_step(ce_session *s, int32_t step, const char *arguments_js
 	return result.isError ? 0 : 1;
 }
 
+int32_t ce_mcp_diff_memory(ce_session *s, int32_t phase, const char *arguments_json, const char **answer_out)
+{
+	static thread_local chimera::ThreadString held;
+	Service &sv = service();
+	chimera::onMachine(sv, s);
+	const chimera::McpResult result = chimera::mcpDiffMemory(sv, s, phase, arguments_json != nullptr ? arguments_json : "{}");
+	cJSON *content = cJSON_Parse(result.content.c_str());
+	const cJSON *text = cJSON_GetObjectItemCaseSensitive(cJSON_GetArrayItem(content, 0), "text");
+	*held = cJSON_IsString(text) ? text->valuestring : "";
+	cJSON_Delete(content);
+	if (answer_out != nullptr) *answer_out = held->c_str();
+	return result.isError ? 0 : 1;
+}
+
 void ce_mcp_cores_folders(const char *folders_json)
 {
 	Service &sv = service();
@@ -3585,10 +3808,13 @@ int32_t ce_mcp_condition_set(ce_session *s, const char *arguments_json, const ch
 	std::string text;
 	bool isNumber = false;
 	double number = 0;
+	int64_t length = 0;
 	if (!cJSON_IsObject(arguments) || !chimera::parseSource(arguments, source, why)) why = why.empty() ? "The arguments are not a JSON object." : why;
 	else if (op < 0) why = "'op' must be one of equal, not_equal, greater, greater_or_equal, less, less_or_equal, changed.";
+	else if (!chimera::integerArgument(arguments, "length", 1, 65536, 0, length)) why = "'length' must be between 1 and 65536 bytes.";
+	else if (length > 0 && (op != 6 || source.isProperty)) why = "'length' watches a range of memory for 'changed' only.";
 	else if (op != 6 && !cJSON_IsNumber(valueItem)) why = "'value' must be a number, for every op but 'changed'.";
-	else if (!chimera::readSource(s, source, text, isNumber, number, why)) why = "The value cannot be read: " + why + ".";
+	else if (source.length = length; !chimera::readSource(s, source, text, isNumber, number, why)) why = "The value cannot be read: " + why + ".";
 	else if (op != 6 && !isNumber) why = "'" + source.name + "' is not a number, so it can only be watched for 'changed'.";
 	const double value = cJSON_IsNumber(valueItem) ? valueItem->valuedouble : 0;
 	cJSON_Delete(arguments);
