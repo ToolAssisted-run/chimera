@@ -78,8 +78,20 @@ struct Gamepads::Api
 	int16_t (*GetJoystickAxis)(void *, int) = nullptr;
 	bool (*GetJoystickButton)(void *, int) = nullptr;
 	uint8_t (*GetJoystickHat)(void *, int) = nullptr;
-	void (*UpdateJoysticks)() = nullptr;
+	void (*PumpEvents)() = nullptr;
+	void (*FlushEvents)(uint32_t, uint32_t) = nullptr;
 	bool started = false;
+
+	/* a pad's axes as they read now: a gamepad's six, a joystick's own */
+	std::vector<int> axesNow(void *pad, bool controller, int count)
+	{
+		std::vector<int> out;
+		if (controller)
+			for (int x = 0; x <= AXIS_TRIGGERRIGHT; x++) out.push_back(GetGamepadAxis(pad, x));
+		else
+			for (int x = 0; x < count; x++) out.push_back(GetJoystickAxis(pad, x));
+		return out;
+	}
 
 	/* the joysticks plugged in now, by SDL's instance numbers, in SDL's order */
 	std::vector<uint32_t> joysticks()
@@ -121,6 +133,12 @@ struct Gamepads::Pad
 	/* its model, by USB vendor and product ("2dc8:5112"), for a layout chosen for it */
 	std::string model;
 	int buttons = 0, hats = 0, axes = 0;
+	/* its axes as they read when it was opened, and whether it has reported
+	 * since: until then they read as centred. A pad just plugged in can read
+	 * as pushed to the end before its first report (the 8BitDo Lite 2's
+	 * sticks: 0 of 0..255, up and to the left), and that is not held */
+	std::vector<int> firstAxes;
+	bool settled = false;
 };
 
 Gamepads::Gamepads() : api_(std::make_unique<Api>())
@@ -160,7 +178,8 @@ Gamepads::Gamepads() : api_(std::make_unique<Api>())
 		a.bind(a.GetNumJoystickAxes, "SDL_GetNumJoystickAxes") &&
 		a.bind(a.GetJoystickAxis, "SDL_GetJoystickAxis") &&
 		a.bind(a.GetJoystickButton, "SDL_GetJoystickButton") &&
-		a.bind(a.GetJoystickHat, "SDL_GetJoystickHat") && a.bind(a.UpdateJoysticks, "SDL_UpdateJoysticks");
+		a.bind(a.GetJoystickHat, "SDL_GetJoystickHat") &&
+		a.bind(a.PumpEvents, "SDL_PumpEvents") && a.bind(a.FlushEvents, "SDL_FlushEvents");
 	if (!all)
 	{
 		problem_ = tr("gamepads.sdl_incomplete");
@@ -384,6 +403,8 @@ void Gamepads::reopen()
 			p.hats = a.GetNumJoystickHats(p.handle);
 			p.axes = a.GetNumJoystickAxes(p.handle);
 		}
+		p.firstAxes = a.axesNow(p.handle, p.controller, p.axes);
+		p.settled = p.firstAxes.empty();
 		pads_.push_back(std::move(p));
 	}
 }
@@ -405,21 +426,32 @@ void Gamepads::poll(std::vector<std::string> &held, std::vector<std::pair<std::s
 		DispatchMessageW(&msg);
 	}
 #endif
-	a.UpdateJoysticks();
+	/* SDL's event loop, though nobody reads its events: on Linux SDL 3 hears
+	 * of a pad plugged in (udev) only there, not in SDL_UpdateJoysticks as
+	 * SDL 2 did, so without it a pad unplugged never came back. It updates
+	 * the joysticks too (SDL_HINT_AUTO_UPDATE_JOYSTICKS, on unless asked);
+	 * its events are let go, or its queue would fill */
+	a.PumpEvents();
+	a.FlushEvents(0, 0xFFFFFFFFu);
 
 	/* a pad plugged in or out: open them all again, in SDL's new order */
 	if (a.joysticks() != ids_) reopen();
 
-	for (const Pad &p : pads_)
+	for (Pad &p : pads_)
 	{
+		const size_t heldBefore = held.size();
+		const std::vector<int> now = a.axesNow(p.handle, p.controller, p.axes);
+		/* an axis as it reads, or centred while the pad has not reported since it was opened */
+		auto axisAt = [&](int x) { return p.settled && x < static_cast<int>(now.size()) ? now[static_cast<size_t>(x)] : 0; };
 		if (p.controller)
 		{
 			const bool swapped = swapped_.count(p.model) != 0;
 			for (int b = 0; b < static_cast<int>(sizeof kButtons / sizeof kButtons[0]); b++)
 				if (a.GetGamepadButton(p.handle, sdlButton(swapped, b))) held.push_back(p.prefix + kButtons[b]);
+			if (!p.settled && (now != p.firstAxes || held.size() > heldBefore)) p.settled = true;
 			/* SDL's y axes are negative upwards */
-			const int lx = a.GetGamepadAxis(p.handle, AXIS_LEFTX), ly = a.GetGamepadAxis(p.handle, AXIS_LEFTY);
-			const int rx = a.GetGamepadAxis(p.handle, AXIS_RIGHTX), ry = a.GetGamepadAxis(p.handle, AXIS_RIGHTY);
+			const int lx = axisAt(AXIS_LEFTX), ly = axisAt(AXIS_LEFTY);
+			const int rx = axisAt(AXIS_RIGHTX), ry = axisAt(AXIS_RIGHTY);
 			if (ly <= -kStick) held.push_back(p.prefix + "LStickUp");
 			if (ly >= kStick) held.push_back(p.prefix + "LStickDown");
 			if (lx <= -kStick) held.push_back(p.prefix + "LStickLeft");
@@ -428,8 +460,8 @@ void Gamepads::poll(std::vector<std::string> &held, std::vector<std::pair<std::s
 			if (ry >= kStick) held.push_back(p.prefix + "RStickDown");
 			if (rx <= -kStick) held.push_back(p.prefix + "RStickLeft");
 			if (rx >= kStick) held.push_back(p.prefix + "RStickRight");
-			if (a.GetGamepadAxis(p.handle, AXIS_TRIGGERLEFT) > kTrigger) held.push_back(p.prefix + "LeftTrigger");
-			if (a.GetGamepadAxis(p.handle, AXIS_TRIGGERRIGHT) > kTrigger) held.push_back(p.prefix + "RightTrigger");
+			if (axisAt(AXIS_TRIGGERLEFT) > kTrigger) held.push_back(p.prefix + "LeftTrigger");
+			if (axisAt(AXIS_TRIGGERRIGHT) > kTrigger) held.push_back(p.prefix + "RightTrigger");
 			if (axes != nullptr)
 			{
 				/* as Chimera's gamepads have always named them, the y axes as SDL gives them */
@@ -437,22 +469,14 @@ void Gamepads::poll(std::vector<std::string> &held, std::vector<std::pair<std::s
 				axes->emplace_back(p.prefix + "LeftThumbY Axis", conv(ly));
 				axes->emplace_back(p.prefix + "RightThumbX Axis", conv(rx));
 				axes->emplace_back(p.prefix + "RightThumbY Axis", conv(ry));
-				axes->emplace_back(p.prefix + "LeftTrigger Axis", conv(a.GetGamepadAxis(p.handle, AXIS_TRIGGERLEFT)));
-				axes->emplace_back(p.prefix + "RightTrigger Axis", conv(a.GetGamepadAxis(p.handle, AXIS_TRIGGERRIGHT)));
+				axes->emplace_back(p.prefix + "LeftTrigger Axis", conv(axisAt(AXIS_TRIGGERLEFT)));
+				axes->emplace_back(p.prefix + "RightTrigger Axis", conv(axisAt(AXIS_TRIGGERRIGHT)));
 			}
 		}
 		else
 		{
 			/* the first nine axes by DirectInput's letters, the rest by number */
 			static const char *const letters[] = {"X", "Y", "Z", "W", "V", "S", "Q", "P", "N"};
-			for (int x = 0; x < p.axes; x++)
-			{
-				const int v = a.GetJoystickAxis(p.handle, x);
-				const std::string axis = p.prefix + (x < 9 ? std::string(letters[x]) : "Axis" + std::to_string(x));
-				if (axes != nullptr) axes->emplace_back(axis + " Axis", conv(v));
-				if (v >= kStick) held.push_back(axis + "+");
-				if (v <= -kStick) held.push_back(axis + "-");
-			}
 			for (int b = 0; b < p.buttons; b++)
 				if (a.GetJoystickButton(p.handle, b)) held.push_back(p.prefix + "B" + std::to_string(b + 1));
 			for (int h = 0; h < p.hats; h++)
@@ -463,6 +487,15 @@ void Gamepads::poll(std::vector<std::string> &held, std::vector<std::pair<std::s
 				if (v & SDL_HAT_DOWN) held.push_back(pov + "D");
 				if (v & SDL_HAT_LEFT) held.push_back(pov + "L");
 				if (v & SDL_HAT_RIGHT) held.push_back(pov + "R");
+			}
+			if (!p.settled && (now != p.firstAxes || held.size() > heldBefore)) p.settled = true;
+			for (int x = 0; x < p.axes; x++)
+			{
+				const int v = axisAt(x);
+				const std::string axis = p.prefix + (x < 9 ? std::string(letters[x]) : "Axis" + std::to_string(x));
+				if (axes != nullptr) axes->emplace_back(axis + " Axis", conv(v));
+				if (v >= kStick) held.push_back(axis + "+");
+				if (v <= -kStick) held.push_back(axis + "-");
 			}
 		}
 	}
