@@ -1684,6 +1684,54 @@ bool gamepads()
 	CHECK(has(x + "A") && !has(x + "Cross") && has(n + "A") && !has(n + "B"));
 	CHECK(Gamepads::shown(x + "A, Z", faces) == x + "Cross, Z");
 	CHECK(Gamepads::shown(n + "A+" + n + "Y", faces) == n + "B+" + n + "X");
+	/* each pad's model and the layout SDL's labels make */
+	const std::string models = pads.models();
+	CHECK(models.find("\"model\":\"054c:0ce6\",\"detected\":\"playstation\"") != std::string::npos ||
+		models.find("\"model\": \"054c:0ce6\", \"detected\": \"playstation\"") != std::string::npos);
+	CHECK(models.find("057e:2009") != std::string::npos && models.find("nintendo") != std::string::npos);
+	/* a layout chosen for a model takes the place of SDL's labels, for that model only */
+	pads.setLayouts({{"057e:2009", "playstation"}, {"054c:0ce6", "no such layout"}});
+	const std::string chosen = pads.faces();
+	CHECK(chosen.find(np + ":Cross,Circle,Square,Triangle") != std::string::npos);
+	CHECK(chosen.find(xp + ":Cross,Circle,Square,Triangle") != std::string::npos);
+	pads.setLayouts({{"057e:2009", "xbox"}});
+	CHECK(pads.faces().find(np + ":A,B,X,Y") != std::string::npos);
+	pads.setLayouts({});
+	CHECK(pads.faces() == faces);
+	v.setButton(psJoy, 0, false);
+	v.setButton(nsJoy, 0, false);
+
+	/* a pad that reports its face buttons by their letters, as the 8BitDo
+	 * Lite 2 does in one mode: SDL takes it for a standard pad, its button 0
+	 * (printed A, on the right) for the bottom one. Swapped, SDL's right button
+	 * is the bottom one ("A"), and SDL's Xbox labels, swapped too, are Nintendo's */
+	const uint32_t lt = v.add("Chimera Test Lettered Pad", 6, 15, 0, 0x1234, 0x5678);
+	CHECK(lt != 0);
+	pads.poll(held);
+	const std::string l = padPrefix(pads, "Chimera Test Lettered Pad"), lp = l.substr(0, l.size() > 0 ? l.size() - 1 : 0);
+	CHECK(l.size() > 1 && l[0] == 'X');
+	CHECK(pads.faces().find(lp + ":A,B,X,Y") != std::string::npos);
+	void *ltJoy = v.open(lt);
+	CHECK(ltJoy != nullptr);
+	if (ltJoy == nullptr) return true;
+	pads.setSwapped({"1234:5678"});
+	v.setButton(ltJoy, 1, true); /* SDL's right face button: the one printed B, at the bottom */
+	pads.poll(held);
+	CHECK(has(l + "A") && !has(l + "B"));
+	v.setButton(ltJoy, 1, false);
+	v.setButton(ltJoy, 3, true); /* SDL's top face button, taken as the left one ("X") */
+	pads.poll(held);
+	CHECK(has(l + "X") && !has(l + "Y"));
+	v.setButton(ltJoy, 3, false);
+	CHECK(pads.faces().find(lp + ":B,A,Y,X") != std::string::npos);
+	CHECK(pads.models().find("nintendo") != std::string::npos);
+	/* the other models as they were */
+	CHECK(pads.faces().find(xp + ":Cross,Circle,Square,Triangle") != std::string::npos);
+	pads.setSwapped({});
+	v.setButton(ltJoy, 1, true);
+	pads.poll(held);
+	CHECK(has(l + "B"));
+	v.setButton(ltJoy, 1, false);
 	v.setButton(psJoy, 0, false);
 	v.setButton(nsJoy, 0, false);
 	return true;
@@ -1713,6 +1761,25 @@ bool padCatch()
 	CHECK(session.padFaces.get().empty());
 	CHECK(session.run("watchPads", {true}, error).has_value());
 	CHECK(v.add("Chimera Watch DualSense", 6, 15, 0, 0x054C, 0x0CE6) != 0);
+	CHECK(d.until([&] { return session.padFaces.get().find(":Cross,Circle,Square,Triangle") != std::string::npos; }, 10));
+	CHECK(session.padModels.get().find("054c:0ce6") != std::string::npos);
+	/* a layout chosen for the DualSense's model: its labels follow, and it is kept in padLayouts */
+	CHECK(session.run("setPadLayout", {std::string("054c:0ce6"), std::string("nintendo")}, error).has_value());
+	CHECK(session.padLayouts.get().find("\"054c:0ce6\"") != std::string::npos && session.padLayouts.get().find("nintendo") != std::string::npos);
+	CHECK(d.until([&] { return session.padFaces.get().find(":B,A,Y,X") != std::string::npos &&
+		session.padFaces.get().find("Cross") == std::string::npos; }, 10));
+	CHECK(!session.run("setPadLayout", {std::string("054c:0ce6"), std::string("sega")}, error).has_value() && !error.empty());
+	error.clear();
+	/* back to what SDL says, and nothing kept */
+	CHECK(session.run("setPadLayout", {std::string("054c:0ce6"), std::string("auto")}, error).has_value());
+	CHECK(session.padLayouts.get().find("054c:0ce6") == std::string::npos);
+	CHECK(d.until([&] { return session.padFaces.get().find(":Cross,Circle,Square,Triangle") != std::string::npos; }, 10));
+	/* the DualSense's model swapped: kept in padSwapped, and its labels follow */
+	CHECK(session.run("setPadSwap", {std::string("054c:0ce6"), true}, error).has_value());
+	CHECK(session.padSwapped.get().find("054c:0ce6") != std::string::npos);
+	CHECK(d.until([&] { return session.padFaces.get().find(":Circle,Cross,Triangle,Square") != std::string::npos; }, 10));
+	CHECK(session.run("setPadSwap", {std::string("054c:0ce6"), false}, error).has_value());
+	CHECK(session.padSwapped.get().find("054c:0ce6") == std::string::npos);
 	CHECK(d.until([&] { return session.padFaces.get().find(":Cross,Circle,Square,Triangle") != std::string::npos; }, 10));
 	CHECK(session.run("watchPads", {false}, error).has_value());
 	const uint32_t id = v.add("Chimera Catch Stick", 0, 4, 0);

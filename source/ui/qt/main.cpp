@@ -1060,6 +1060,8 @@ int main(int argc, char **argv)
 		config.keep(session, name);
 	config.keep(session, "displayNothing");
 	config.keep(session, "acceptBackgroundInput");
+	config.keep(session, "padLayouts");
+	config.keep(session, "padSwapped");
 	/* the window in front or not: a gamepad is heard behind other windows only when asked */
 	session.windowActive.set(QGuiApplication::applicationState() == Qt::ApplicationActive);
 	QObject::connect(qApp, &QGuiApplication::applicationStateChanged, [&session](Qt::ApplicationState state) {

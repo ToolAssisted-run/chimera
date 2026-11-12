@@ -1,7 +1,9 @@
 #include "chimera/vm/gamepads.hpp"
+#include "chimera/vm/json.hpp"
 #include "chimera/vm/tr.hpp"
 
 #include <cstdint>
+#include <cstdio>
 #include <map>
 
 #ifdef _WIN32
@@ -26,6 +28,24 @@ const char *const kButtons[] = {"A", "B", "X", "Y", "Back", "Guide", "Start", "L
 	"Paddle1", "Paddle2", "Paddle3", "Paddle4"};
 /* SDL_GamepadButtonLabel, from SDL_GAMEPAD_BUTTON_LABEL_A (1); 0 is unknown */
 const char *const kLabels[] = {"A", "B", "X", "Y", "Cross", "Circle", "Square", "Triangle"};
+/* the layouts a person can choose for a pad model (setLayouts), and what each
+ * prints on the face buttons, bottom, right, left and top */
+struct Layout
+{
+	const char *name;
+	const char *face[4];
+};
+const Layout kLayouts[] = {
+	{"xbox", {"A", "B", "X", "Y"}},
+	{"nintendo", {"B", "A", "Y", "X"}},
+	{"playstation", {"Cross", "Circle", "Square", "Triangle"}},
+};
+const Layout *layoutNamed(const std::string &name)
+{
+	for (const Layout &l : kLayouts)
+		if (name == l.name) return &l;
+	return nullptr;
+}
 enum { AXIS_LEFTX, AXIS_LEFTY, AXIS_RIGHTX, AXIS_RIGHTY, AXIS_TRIGGERLEFT, AXIS_TRIGGERRIGHT };
 /* a stick counts as pressed past 40%, a trigger past about 15% */
 constexpr int kStick = static_cast<int>(32768 / 2.5), kTrigger = static_cast<int>(32768 / 6.5);
@@ -46,6 +66,8 @@ struct Gamepads::Api
 	const char *(*GetGamepadName)(void *) = nullptr;
 	bool (*GetGamepadButton)(void *, int) = nullptr;
 	int (*GetGamepadButtonLabel)(void *, int) = nullptr;
+	uint16_t (*GetGamepadVendor)(void *) = nullptr;
+	uint16_t (*GetGamepadProduct)(void *) = nullptr;
 	int16_t (*GetGamepadAxis)(void *, int) = nullptr;
 	void *(*OpenJoystick)(uint32_t) = nullptr;
 	void (*CloseJoystick)(void *) = nullptr;
@@ -96,6 +118,8 @@ struct Gamepads::Pad
 	/* what the pad prints on its face buttons, bottom, right, left and
 	 * top; null where SDL does not know */
 	const char *face[4] = {nullptr, nullptr, nullptr, nullptr};
+	/* its model, by USB vendor and product ("2dc8:5112"), for a layout chosen for it */
+	std::string model;
 	int buttons = 0, hats = 0, axes = 0;
 };
 
@@ -127,6 +151,7 @@ Gamepads::Gamepads() : api_(std::make_unique<Api>())
 		a.bind(a.GetGamepadName, "SDL_GetGamepadName") &&
 		a.bind(a.GetGamepadButton, "SDL_GetGamepadButton") &&
 		a.bind(a.GetGamepadButtonLabel, "SDL_GetGamepadButtonLabel") &&
+		a.bind(a.GetGamepadVendor, "SDL_GetGamepadVendor") && a.bind(a.GetGamepadProduct, "SDL_GetGamepadProduct") &&
 		a.bind(a.GetGamepadAxis, "SDL_GetGamepadAxis") &&
 		a.bind(a.OpenJoystick, "SDL_OpenJoystick") && a.bind(a.CloseJoystick, "SDL_CloseJoystick") &&
 		a.bind(a.GetJoystickName, "SDL_GetJoystickName") &&
@@ -187,18 +212,83 @@ std::vector<std::string> Gamepads::names() const
 	return out;
 }
 
+void Gamepads::setLayouts(const std::map<std::string, std::string> &byModel) { layouts_ = byModel; }
+
+void Gamepads::setSwapped(const std::set<std::string> &models) { swapped_ = models; }
+
+/* the SDL button at a face button's place: a pad model that reports its face
+ * buttons by their letters (setSwapped) has A and B, and X and Y, the other
+ * way round (bottom 0 and right 1, left 2 and top 3) */
+static int sdlButton(bool swapped, int b) { return swapped && b < 4 ? b ^ 1 : b; }
+
+/* what SDL says a pad prints, place by place, the swap taken into account */
+static void sdlFace(const char *const face[4], bool swapped, const char *out[4])
+{
+	for (int b = 0; b < 4; b++) out[b] = face[sdlButton(swapped, b)];
+}
+
+/* what a pad prints on its face buttons: the layout chosen for its model, else SDL's; false when not known */
+static bool padFace(const std::map<std::string, std::string> &layouts, const std::string &model, const char *const sdl[4],
+	const char *out[4])
+{
+	const auto chosen = layouts.find(model);
+	if (const Layout *l = chosen != layouts.end() ? layoutNamed(chosen->second) : nullptr)
+	{
+		for (int b = 0; b < 4; b++) out[b] = l->face[b];
+		return true;
+	}
+	for (int b = 0; b < 4; b++)
+	{
+		out[b] = sdl[b];
+		if (out[b] == nullptr) return false;
+	}
+	return true;
+}
+
 std::string Gamepads::faces() const
 {
 	std::string out;
 	for (const Pad &p : pads_)
 	{
-		if (!p.controller || p.face[0] == nullptr || p.face[1] == nullptr || p.face[2] == nullptr || p.face[3] == nullptr)
-			continue;
+		const char *face[4];
+		const char *sdl[4];
+		sdlFace(p.face, swapped_.count(p.model) != 0, sdl);
+		if (!p.controller || !padFace(layouts_, p.model, sdl, face)) continue;
 		if (!out.empty()) out += ";";
-		out += p.prefix.substr(0, p.prefix.size() - 1) + ":" + p.face[0] + "," + p.face[1] + "," + p.face[2] + "," + p.face[3];
+		out += p.prefix.substr(0, p.prefix.size() - 1) + ":" + face[0] + "," + face[1] + "," + face[2] + "," + face[3];
 	}
 	return out;
 }
+
+std::string Gamepads::models() const
+{
+	json::Json list;
+	list.kind = json::Json::Kind::Array;
+	for (const Pad &p : pads_)
+	{
+		if (!p.controller) continue;
+		/* the layout SDL's own labels make, whatever is chosen */
+		std::string detected = "unknown";
+		for (const Layout &l : kLayouts)
+		{
+			bool same = true;
+			const char *sdl[4];
+			sdlFace(p.face, swapped_.count(p.model) != 0, sdl);
+			for (int b = 0; b < 4; b++) same = same && sdl[b] != nullptr && std::string(sdl[b]) == l.face[b];
+			if (same) detected = l.name;
+		}
+		json::Json pad;
+		pad.kind = json::Json::Kind::Object;
+		pad.members.emplace_back("pad", json::Json::string(p.prefix.substr(0, p.prefix.size() - 1)));
+		pad.members.emplace_back("name", json::Json::string(p.name));
+		pad.members.emplace_back("model", json::Json::string(p.model));
+		pad.members.emplace_back("detected", json::Json::string(detected));
+		list.items.push_back(std::move(pad));
+	}
+	return json::write(list);
+}
+
+bool Gamepads::isLayout(const std::string &name) { return layoutNamed(name) != nullptr; }
 
 std::string Gamepads::shown(const std::string &keys, const std::string &faces)
 {
@@ -284,6 +374,9 @@ void Gamepads::reopen()
 				const int label = a.GetGamepadButtonLabel(p.handle, b);
 				if (label >= 1 && label <= 8) p.face[b] = kLabels[label - 1];
 			}
+			char model[10];
+			std::snprintf(model, sizeof model, "%04x:%04x", a.GetGamepadVendor(p.handle), a.GetGamepadProduct(p.handle));
+			p.model = model;
 		}
 		else
 		{
@@ -321,8 +414,9 @@ void Gamepads::poll(std::vector<std::string> &held, std::vector<std::pair<std::s
 	{
 		if (p.controller)
 		{
+			const bool swapped = swapped_.count(p.model) != 0;
 			for (int b = 0; b < static_cast<int>(sizeof kButtons / sizeof kButtons[0]); b++)
-				if (a.GetGamepadButton(p.handle, b)) held.push_back(p.prefix + kButtons[b]);
+				if (a.GetGamepadButton(p.handle, sdlButton(swapped, b))) held.push_back(p.prefix + kButtons[b]);
 			/* SDL's y axes are negative upwards */
 			const int lx = a.GetGamepadAxis(p.handle, AXIS_LEFTX), ly = a.GetGamepadAxis(p.handle, AXIS_LEFTY);
 			const int rx = a.GetGamepadAxis(p.handle, AXIS_RIGHTX), ry = a.GetGamepadAxis(p.handle, AXIS_RIGHTY);

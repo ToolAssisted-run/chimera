@@ -325,6 +325,9 @@ Cross
 Circle
 Square
 Triangle
+# the makers whose button layouts a pad can be shown in (ControllerConfig.qml)
+Xbox
+Nintendo
 Axis
 WMouse 
 RMouse 

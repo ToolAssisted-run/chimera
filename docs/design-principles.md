@@ -14946,3 +14946,55 @@ DualSense's Cross, Circle, Square and Triangle once `watchPads` is on; with
 the watching taken out of the machine's thread, that check failed. A real DualSense in the window
 was seen by the owner before this change (labels shown only after a click);
 the change itself was not tried in the window.
+
+## A pad's button labels chosen by hand (user-decided, 2026-11-12)
+
+SDL 3 decides what a pad prints on its face buttons from what it
+recognises the pad as. Its controller list has some pads wrong: the 8BitDo
+Lite 2 (USB id 2dc8:5112) prints B on its bottom button, but SDL 3 calls it
+a standard pad with Xbox labels, so the window showed "X1 A" there. Its
+places are wrong too: in that mode the pad reports its face buttons by
+their printed letters, so the button printed B, at the bottom, reaches the
+kernel as BTN_EAST and SDL 3 as the right face button, and a game bound to
+the bottom button got the right one (seen with a press, 2026-11-12). Chimera
+cannot tell such a pad from one built that way, so the owner asked for a way
+to set both by hand.
+
+- Controller Config shows each gamepad open in a "Gamepads" group under the
+  controller's picture: its number and name, a "Swap A/B and X/Y" box and a
+  "Button labels" list. (A first try put them in a row above the tabs, where
+  the name was cut to a few letters and the bindings lost height.)
+- The box is for a pad that reports its face buttons by their letters. A
+  and B, and X and Y, are taken the other way round, in what is pressed and
+  in what SDL says is printed there. For the Lite 2 that is all it needs:
+  SDL's right button becomes the bottom one ("X1 A"), and SDL's Xbox labels,
+  swapped, are Nintendo's (B, A, Y, X). The owner chose a box of its own over
+  a calibration step (pressing the bottom and left buttons) and over a
+  second Nintendo choice in the list.
+- The list is for a pad whose places SDL has right but whose printing it
+  has wrong. Automatic (at first) shows what SDL says,
+  with the layout SDL's labels make in brackets ("Automatic (Xbox)"); Xbox
+  (A, B, X, Y), Nintendo (B, A, Y, X) and PlayStation (Cross, Circle, Square,
+  Triangle) take its place.
+- Both are kept per pad model, by its USB vendor and product id, in two new
+  settings, `padSwapped` (for example ["2dc8:5112"]) and `padLayouts` (for
+  example {"057e:2009": "nintendo"}). The
+  owner chose this over one choice for every pad, which would relabel a
+  DualSense plugged in beside the Lite 2. Two pads of one model share it.
+- A binding still keeps the button's place ("X1 A" is the bottom button):
+  the layout changes only the names shown, and the swap which of the pad's
+  buttons is at which place. Both take effect at once, outside the window's
+  Save and Cancel, as they describe the pad and not a binding.
+- The session gives the window the pads open (`padModels`, with each one's
+  model and the layout SDL's labels make, the swap counted) and two
+  commands, `setPadSwap` and `setPadLayout` ("auto" lets a layout go).
+
+Tested on Linux aarch64: the view models' test (1633 checks, 0 failed)
+chooses layouts for virtual SDL 3 gamepads (a DualSense's and a Switch Pro
+pad's ids) and sees their labels follow, for that model only, and go back
+with "auto"; with the chosen layout ignored, three of those checks failed.
+A virtual pad of an unknown maker (SDL's standard pad, as the Lite 2 is),
+swapped, gives "A" from SDL's right button and "X" from its top, and shows
+B, A, Y, X; with the swap taken out, four checks failed. The owner saw the
+rows in the window with a real Switch Pro-type pad (the list showed nothing
+until picked, since fixed). The swap was not tried with the real Lite 2.
