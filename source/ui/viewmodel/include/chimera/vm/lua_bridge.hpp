@@ -94,6 +94,9 @@ public:
 	Seen seen();
 	/* told when a script stops, whatever stopped it (its end, its error, stop()) */
 	std::function<void(int64_t)> onStopped;
+	/* told, before onStopped, when a running script stops on an error, with
+	 * the error (the MCP server's lua_scripts says it, issue 571) */
+	std::function<void(int64_t, const std::string &)> onFailed;
 
 	/* the console's line: an expression's values, or a statement run, as the
 	 * console's own (script 0); what it gives back is printed, as Chimera's */

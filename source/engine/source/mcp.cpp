@@ -90,7 +90,10 @@ const McpTool kTools[] = {
 	  "\"required\":[\"x\",\"y\",\"width\",\"height\"],\"additionalProperties\":false,\"description\":\"Only this part of the picture, in its own pixels.\"},"
 	  "\"pixels\":{\"type\":\"array\",\"maxItems\":256,\"items\":{\"type\":\"array\",\"items\":{\"type\":\"integer\",\"minimum\":0},\"minItems\":2,\"maxItems\":2},"
 	  "\"description\":\"[x, y] pixels of the whole picture whose colours to answer.\"},"
-	  "\"image\":{\"type\":\"boolean\",\"description\":\"Send the picture. true when left out.\"}"
+	  "\"image\":{\"type\":\"boolean\",\"description\":\"Send the picture. true when left out.\"},"
+	  "\"layers\":{\"type\":\"string\",\"enum\":[\"game\",\"with_lua\"],\"description\":\"game (the usual): the machine's picture. with_lua: "
+	  "the picture as the window shows it, with the padding and everything Lua scripts draw, at the game's own scale; the answer gives the "
+	  "padding on each side, so a pixel can be turned back into the game's. With the window only; region, pixels and image are for game.\"}"
 	  "},\"additionalProperties\":false}",
 	  false, false },
 	{ "list_memory",
@@ -396,12 +399,25 @@ const McpTool kTools[] = {
 	{ "lua_script",
 	  "Starts a Lua script file in the Lua Console, as File > Open Script does; it then runs frame after frame. With "
 	  "'stop' it is stopped and taken out. Answers whether it runs, and what the console printed since the agent last "
-	  "asked.",
+	  "asked; a script that failed to start, or stopped on an error, has 'error': the message, with the line.",
 	  "{\"type\":\"object\",\"properties\":{"
 	  "\"path\":{\"type\":\"string\",\"description\":\"The .lua file.\"},"
 	  "\"stop\":{\"type\":\"boolean\",\"description\":\"Stop it instead. false when left out.\"}"
 	  "},\"required\":[\"path\"],\"additionalProperties\":false}",
 	  true, true, false, true },
+	{ "lua_console",
+	  "What the Lua Console printed, whoever wrote it - the person's scripts too - from line 'since' on: the lines are "
+	  "numbered from the window's start, and the last 2000 are kept. Answers the lines, the number of the first, and "
+	  "'next', the 'since' to ask with next time. Window only.",
+	  "{\"type\":\"object\",\"properties\":{"
+	  "\"since\":{\"type\":\"integer\",\"minimum\":0,\"description\":\"The first line wanted. The oldest kept when left out.\"},"
+	  "\"limit\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":1000,\"description\":\"200 when left out.\"}"
+	  "},\"additionalProperties\":false}",
+	  false, true, false, true },
+	{ "lua_scripts",
+	  "The scripts in the Lua Console's list, the person's and the agent's: each one's name, file, whether it runs, is "
+	  "paused or is stopped, and the error it last stopped on. Window only.",
+	  kNoArguments, false, true, false, true },
 	{ "close_tastudio",
 	  "Closes the open project: TAStudio and the machine, as closing TAStudio does. A project with changes that are not "
 	  "saved is not closed unless 'discard_unsaved' is true; nothing asks. Without a window, 'close' does this.",
@@ -3192,7 +3208,14 @@ McpResult runEngineTool(Service &sv, const std::string &tool, ce_session *s, con
 	searchStands(sv, s);
 	if (s == nullptr) return mcpError(kNoMachine);
 	if (tool == "controls") return toolControls(s, log);
-	if (tool == "screenshot") return toolScreenshot(s, frame, arguments);
+	if (tool == "screenshot")
+	{
+		const cJSON *layers = cJSON_GetObjectItemCaseSensitive(arguments, "layers");
+		if (cJSON_IsString(layers) && std::strcmp(layers->valuestring, "with_lua") == 0)
+			return mcpError("The picture as the window shows it needs the window: without one there is no Lua drawing. "
+				"Without 'layers', screenshot gives the machine's picture.");
+		return toolScreenshot(s, frame, arguments);
+	}
 	if (tool == "list_memory") return toolListMemory(s);
 	if (tool == "read_memory") return toolReadMemory(s, arguments);
 	if (tool == "registers") return toolRegisters(s);
@@ -3633,7 +3656,9 @@ int32_t ce_mcp_service(ce_session *s, const ce_movie_log *log, int64_t frame, co
 					+ sv.keepError + "). Stop and start the server to try again."));
 				continue;
 			}
-			if (tool->host)
+			/* the picture as the window shows it is the window's to take (issue 571) */
+			const bool shown = call.tool == "screenshot" && call.arguments.find("\"with_lua\"") != std::string::npos;
+			if (tool->host || shown)
 			{
 				*heldTool = call.tool;
 				*heldArguments = call.arguments;
@@ -3668,6 +3693,35 @@ int32_t ce_mcp_service(ce_session *s, const ce_movie_log *log, int64_t frame, co
 		chimera::addLostNote(sv, result);
 		chimera::finish(sv, call, result);
 	}
+}
+
+void ce_mcp_answer_picture(uint64_t id, const uint8_t *png, uint64_t png_len, const char *facts_json)
+{
+	Service &sv = service();
+	std::lock_guard<std::mutex> hold(sv.lock);
+	const auto found = sv.withHost.find(id);
+	if (found == sv.withHost.end()) return;
+	chimera::McpResult result;
+	if (png == nullptr || png_len == 0)
+		result = chimera::mcpError("The picture as the window shows it needs the window, and this Chimera shows none (--headless). "
+			"Without 'layers', screenshot gives the machine's picture.");
+	else
+	{
+		cJSON *content = cJSON_CreateArray();
+		cJSON *image = cJSON_CreateObject();
+		cJSON_AddStringToObject(image, "type", "image");
+		cJSON_AddStringToObject(image, "data", chimera::base64(png, static_cast<size_t>(png_len)).c_str());
+		cJSON_AddStringToObject(image, "mimeType", "image/png");
+		cJSON_AddItemToArray(content, image);
+		cJSON *text = cJSON_CreateObject();
+		cJSON_AddStringToObject(text, "type", "text");
+		cJSON_AddStringToObject(text, "text", facts_json != nullptr ? facts_json : "{}");
+		cJSON_AddItemToArray(content, text);
+		result.content = chimera::printJson(content);
+		cJSON_Delete(content);
+	}
+	chimera::finish(sv, found->second, result);
+	sv.withHost.erase(found);
 }
 
 void ce_mcp_answer(ce_session *s, uint64_t id, const char *text, int32_t is_error)

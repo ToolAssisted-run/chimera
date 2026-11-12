@@ -14614,3 +14614,31 @@ advance_until with length 4096 stops on the first frame RAM differs from the
 one before; status has no names unless asked. With each taken out (the
 crop's offset, the diff's comparison, the range, the default), the test
 fails.
+
+## MCP: the Lua Console read, and the picture as the window shows it (2026-11-12, issue 571)
+
+An agent building a Lua overlay could not see it: `screenshot` gave the
+core's picture, and the boxes its script drew are the window's. Now
+`screenshot` with `layers: "with_lua"` is answered by the window: it grabs
+the picture area as the person sees it, cuts it to the game's picture and
+the padding a script asked for, and brings it back to the game's own pixels
+(the window's placement says how), so a pixel of it is a game pixel shifted
+by the padding, which the answer gives side by side. The engine answers it
+with a picture (`ce_mcp_answer_picture`); with no window (--headless, or no
+window at all) it is refused, saying so.
+
+The Lua Console is read too: `lua_console` gives what it printed, whoever
+wrote it (the person's scripts as well), by numbered lines with the number
+to ask from next; `lua_scripts` lists the console's scripts with their
+state and the error each last stopped on; and `lua_script` says the error
+and its line when a script fails to start. The bridge tells the console
+the error a running script stopped on (`onFailed`).
+
+Tested: in the window with changes, a script that prints is in lua_console,
+and asking from 'next' gives nothing new; a script that errors on line 2
+says so when started; one that errors after a frame is listed stopped with
+its error; with a script that pads 4 pixels on the left and draws a red box,
+screenshot with_lua is the game's width plus 4, says the padding, and has
+red where the game's own picture has not. With the console's lines, the
+errors kept at start and later, and the window's grab of what is drawn
+over the picture each taken out, the test fails.

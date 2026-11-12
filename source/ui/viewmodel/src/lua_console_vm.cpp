@@ -96,6 +96,10 @@ LuaConsoleViewModel::LuaConsoleViewModel(Dispatcher &dispatcher, LuaBridge &lua,
 			if (e.script == id) e.script = 0;
 		refresh();
 	};
+	lua_.onFailed = [this](int64_t id, const std::string &error) {
+		for (Entry &e : entries_)
+			if (e.script == id) e.lastError = error;
+	};
 	changesWatch_ = changes.changed.connect([this] {
 		status.set((changes.get() ? "* " : "") + fileName(sessionPath.get()));
 	});
@@ -627,6 +631,7 @@ LuaConsoleViewModel::~LuaConsoleViewModel()
 {
 	lua_.onWrite = nullptr;
 	lua_.onStopped = nullptr;
+	lua_.onFailed = nullptr;
 }
 
 void LuaConsoleViewModel::openScript(const std::string &path, bool start)
@@ -665,6 +670,7 @@ void LuaConsoleViewModel::enable(Entry &entry)
 		{
 			e.script = alive ? id : 0;
 			e.written = writtenAt(path);
+			e.lastError = id == 0 ? error : std::string();
 		}
 }
 
@@ -926,7 +932,7 @@ bool LuaConsoleViewModel::runForAgent(const std::string &code, std::string &resu
 	return ran;
 }
 
-bool LuaConsoleViewModel::scriptForAgent(const std::string &path, bool stop)
+bool LuaConsoleViewModel::scriptForAgent(const std::string &path, bool stop, std::string *error)
 {
 	std::error_code ec;
 	const std::string abs = text(fs::absolute(pathOf(path), ec).lexically_normal());
@@ -953,8 +959,52 @@ bool LuaConsoleViewModel::scriptForAgent(const std::string &path, bool stop)
 			}
 	}
 	for (const Entry &e : entries_)
-		if (!e.separator && e.path == abs) return e.script != 0;
+		if (!e.separator && e.path == abs)
+		{
+			if (error != nullptr && e.script == 0) *error = e.lastError;
+			return e.script != 0;
+		}
 	return false;
+}
+
+std::string LuaConsoleViewModel::consoleForAgent(int64_t since, int64_t limit) const
+{
+	const int64_t next = logFirst_ + static_cast<int64_t>(log_.size());
+	const int64_t from = std::clamp(since, logFirst_, next);
+	json::Json out, lines;
+	out.kind = json::Json::Kind::Object;
+	lines.kind = json::Json::Kind::Array;
+	for (int64_t i = from; i < next && i < from + limit; i++) lines.items.push_back(json::Json::string(log_[static_cast<size_t>(i - logFirst_)]));
+	const int64_t shown = static_cast<int64_t>(lines.items.size());
+	out.members.emplace_back("first", json::Json::integer(from));
+	out.members.emplace_back("lines", std::move(lines));
+	out.members.emplace_back("next", json::Json::integer(from + shown));
+	out.members.emplace_back("total", json::Json::integer(next));
+	if (since < logFirst_) out.members.emplace_back("dropped", json::Json::integer(logFirst_ - std::max<int64_t>(since, 0)));
+	return json::write(out);
+}
+
+std::string LuaConsoleViewModel::scriptsForAgent() const
+{
+	json::Json list;
+	list.kind = json::Json::Kind::Array;
+	for (const Entry &e : entries_)
+	{
+		if (e.separator) continue;
+		json::Json row;
+		row.kind = json::Json::Kind::Object;
+		const auto state = e.script == 0 ? seen_.states.end() : seen_.states.find(e.script);
+		row.members.emplace_back("name", json::Json::string(stem(e.path)));
+		row.members.emplace_back("path", json::Json::string(e.path));
+		row.members.emplace_back("state", json::Json::string(e.script == 0 ? "stopped"
+			: state != seen_.states.end() && state->second == LuaBridge::State::Paused ? "paused" : "running"));
+		if (!e.lastError.empty()) row.members.emplace_back("last_error", json::Json::string(e.lastError));
+		list.items.push_back(std::move(row));
+	}
+	json::Json out;
+	out.kind = json::Json::Kind::Object;
+	out.members.emplace_back("scripts", std::move(list));
+	return json::write(out);
 }
 
 void LuaConsoleViewModel::append(const std::string &written)
@@ -962,6 +1012,23 @@ void LuaConsoleViewModel::append(const std::string &written)
 	/* the agent's copy, before the window's cap */
 	constexpr size_t kMostForAgent = 64 * 1024;
 	forAgent_ += written;
+	/* lua_console's numbered lines, whoever wrote them, the window's cap or not */
+	constexpr size_t kLogKept = 2000;
+	for (size_t at = 0;;)
+	{
+		const size_t nl = written.find('\n', at);
+		const std::string piece = written.substr(at, nl == std::string::npos ? std::string::npos : nl - at);
+		if (logOpen_ && !log_.empty()) log_.back() += piece;
+		else if (nl != std::string::npos || !piece.empty()) log_.push_back(piece);
+		logOpen_ = nl == std::string::npos && (logOpen_ || !piece.empty());
+		if (nl == std::string::npos) break;
+		at = nl + 1;
+	}
+	while (log_.size() > kLogKept)
+	{
+		log_.pop_front();
+		logFirst_++;
+	}
 	if (forAgent_.size() > kMostForAgent) forAgent_.erase(0, forAgent_.size() - kMostForAgent);
 	if (++messages_ > kMostMessages) return;
 	std::string t = written;

@@ -812,6 +812,9 @@ public:
 	void mcpSearchSteps(uint64_t id, std::vector<std::pair<int64_t, std::string>> steps);
 	/* diff_memory (issue 571): to frame_a, the engine keeps the range; to frame_b, it answers what changed */
 	void mcpDiffMemory(uint64_t id, int64_t frameA, int64_t frameB, std::string arguments);
+	/* screenshot with layers with_lua: the window's picture as a PNG and its
+	 * facts, or none (no window shown) */
+	void mcpAnswerPicture(uint64_t id, std::string png, std::string facts);
 	/* the machine's thread: the start of the open project's clock */
 	int64_t clockOnMachine() const;
 

@@ -782,6 +782,51 @@ if window and changes:
     check("lua_script starts a script, and stops it",
           started.get("running") is True and stopped.get("running") is False
           and "the script started" in started.get("output", "") + stopped.get("output", ""))
+    # the console and its scripts, whoever started them (issue 571)
+    console = facts("lua_console")
+    check("lua_console has what the scripts printed",
+          "the script started" in console.get("lines", []) and console.get("next") == console.get("first", -1) + len(console.get("lines", [])))
+    check("and from 'next' on, only what came after", facts("lua_console", since=console.get("next", 0)).get("lines") == [])
+    broken = os.path.join(folder, "broken.lua")
+    open(broken, "w").write("print('about to fail')\nerror('broken on purpose')\n")
+    failed = facts("lua_script", path=broken)
+    check("a script that fails to start says why, with its line",
+          failed.get("running") is False and "broken on purpose" in failed.get("error", "") and ":2:" in failed.get("error", ""))
+    def play(frames):
+        facts("advance_until", domain="RAM", address=0xFFF, op="equal", value=999, max_frames=frames)
+    facts("seek", frame=10)
+    later = os.path.join(folder, "later.lua")
+    open(later, "w").write("emu.frameadvance()\nerror('failed after a frame')\n")
+    facts("lua_script", path=later)
+    play(2)
+    rows = {r.get("name"): r for r in facts("lua_scripts").get("scripts", [])}
+    check("lua_scripts lists the scripts, and the error each last stopped on",
+          rows.get("later", {}).get("state") == "stopped" and "failed after a frame" in rows.get("later", {}).get("last_error", "")
+          and rows.get("broken", {}).get("state") == "stopped" and "broken on purpose" in rows.get("broken", {}).get("last_error", ""))
+    # the picture as the window shows it, with what Lua draws and its padding (issue 571)
+    box = os.path.join(folder, "box.lua")
+    open(box, "w").write("client.SetGameExtraPadding(4, 0, 0, 0)\n"
+                         "while true do gui.drawBox(2, 2, 9, 9, 0xFFFF0000, 0xFFFF0000) emu.frameadvance() end\n")
+    facts("lua_script", path=box)
+    play(2)
+    error, text, content = call("screenshot", layers="with_lua")
+    if os.environ.get("MCP_TEST_HEADLESS") == "1":
+        # the witness runs the window --headless: there is no picture area to grab
+        check("with no window shown, screenshot with_lua says why", error and "--headless" in text)
+        content = []
+    shown = [c for c in content if c["type"] == "image"]
+    said = json.loads(next((c["text"] for c in content if c["type"] == "text"), "{}") or "{}") if not error else {}
+    plain = facts("screenshot", pixels=[[7, 5]], image=False)
+    if shown:
+        sw, sh, spixels = png_pixels(base64.b64decode(shown[0]["data"]))
+        check("screenshot with_lua is at the game's scale, its padding included and said",
+              (sw, sh) == (plain.get("picture_width", 0) + 4, plain.get("picture_height", 0)) and said.get("padding", {}).get("left") == 4)
+        check("and it has what Lua drew, which the game's picture has not",
+              spixels[(5 * sw + 7) * 3:(5 * sw + 7) * 3 + 3] == b"\xff\x00\x00" and plain.get("pixels", [{}])[0].get("colour") != "#FF0000")
+    elif os.environ.get("MCP_TEST_HEADLESS") != "1":
+        check("screenshot with_lua gives a picture: %s" % text[:160], False)
+    facts("lua_script", path=box, stop=True)
+    facts("run_lua", code="client.SetGameExtraPadding(0, 0, 0, 0)")
     facts("add_marker", frame=3, text="added after saving")
     error, text, _ = call("close_tastudio")
     check("a project with unsaved changes is not closed", error and "discard_unsaved" in text and facts("status").get("machine_open") is True)

@@ -2691,6 +2691,14 @@ void SessionViewModel::mcpAnswer(uint64_t id, std::string text, bool isError)
 	submit([this, id, text, isError] { mcpAnswerOnMachine(id, text, isError); });
 }
 
+void SessionViewModel::mcpAnswerPicture(uint64_t id, std::string png, std::string facts)
+{
+	submit([this, id, png = std::move(png), facts = std::move(facts)] {
+		ce_mcp_answer_picture(id, png.empty() ? nullptr : reinterpret_cast<const uint8_t *>(png.data()), png.size(), facts.c_str());
+		mcpBusyM_ = false;
+	});
+}
+
 void SessionViewModel::mcpAnswerRunState(uint64_t id)
 {
 	submit([this, id] {

@@ -6,6 +6,7 @@
  * the scripts print; a line to type Lua into; and the functions the scripts
  * registered, to call or remove. The scripts run in the bridge. */
 
+#include <deque>
 #include <filesystem>
 #include <string>
 #include <vector>
@@ -84,8 +85,17 @@ public:
 	 * what it returned as a JSON array, or false with what it raised */
 	bool runForAgent(const std::string &code, std::string &results, std::string &error, double seconds = LuaBridge::kAgentSeconds);
 	/* lua_script: a script file started, as Open Script starts one, or
-	 * stopped and taken out of the list; whether it runs now */
-	bool scriptForAgent(const std::string &path, bool stop);
+	 * stopped and taken out of the list; whether it runs now, and when it
+	 * does not, the error it stopped on, if it did (issue 571) */
+	bool scriptForAgent(const std::string &path, bool stop, std::string *error = nullptr);
+	/* lua_console (issue 571): the lines the console was written, whoever
+	 * wrote them, from line `since` on (numbered from the window's start; the
+	 * last 2000 are kept), at most `limit`; a JSON object with the lines,
+	 * the number of the first, and the one to ask from next */
+	std::string consoleForAgent(int64_t since, int64_t limit) const;
+	/* lua_scripts (issue 571): the list's scripts, each with its file, whether
+	 * it runs, is paused or is stopped, and the error it last stopped on */
+	std::string scriptsForAgent() const;
 
 private:
 	struct Entry
@@ -96,6 +106,8 @@ private:
 		int64_t script = 0;
 		bool selected = false;
 		std::filesystem::file_time_type written{};
+		/* the error it last stopped on, "" for none */
+		std::string lastError;
 	};
 	struct Function
 	{
@@ -173,6 +185,11 @@ private:
 	int64_t historyAt_ = -1;
 	/* what was printed since the agent last asked, its end kept */
 	std::string forAgent_;
+	/* lua_console's lines: the last kLogKept, the first numbered logFirst_,
+	 * the last still open when no line end has come */
+	std::deque<std::string> log_;
+	int64_t logFirst_ = 0;
+	bool logOpen_ = false;
 	/* the last line has no line end yet (console.write) */
 	bool open_ = false;
 	/* what was written since the last frame: past 100 the rest is not shown, as Chimera's */

@@ -330,6 +330,16 @@ void McpViewModel::luaTool(const std::string &tool, const Json &arguments, const
 		add(out, "output", Json::string(lua->takeOutputForAgent()));
 		return answer(json::write(out), false);
 	}
+	if (tool == "lua_console")
+	{
+		const int64_t usual = 200, oldest = 0;
+		int64_t since = 0, limit = 0;
+		if (!number(arguments, "limit", 1, 1000, &usual, limit)) return refuse(tr("mcp.limit_range"));
+		/* a line before the oldest kept is the oldest kept */
+		if (!number(arguments, "since", 0, INT64_MAX, &oldest, since)) since = 0;
+		return answer(lua->consoleForAgent(since, limit), false);
+	}
+	if (tool == "lua_scripts") return answer(lua->scriptsForAgent(), false);
 	/* lua_script */
 	const std::string path = textOf(arguments, "path");
 	if (trimmed(path).empty()) return refuse(tr("mcp.give_path"));
@@ -337,10 +347,12 @@ void McpViewModel::luaTool(const std::string &tool, const Json &arguments, const
 	std::error_code ec;
 	if (!stop && !std::filesystem::is_regular_file(pathOf(path), ec)) return refuse(tr("agent.no_file", {path}));
 	if (showLuaConsole) showLuaConsole();
-	const bool running = lua->scriptForAgent(path, stop);
+	std::string failed;
+	const bool running = lua->scriptForAgent(path, stop, &failed);
 	Json out = object();
 	add(out, "script", Json::string(path));
 	add(out, "running", Json::boolean_(running));
+	if (!running && !stop && !failed.empty()) add(out, "error", Json::string(failed));
 	add(out, "output", Json::string(lua->takeOutputForAgent()));
 	answer(json::write(out), false);
 }
@@ -378,6 +390,12 @@ void McpViewModel::host(uint64_t id, const std::string &tool, const std::string 
 
 	/* the tools of the main window: they need no project, or only the project as a file */
 	if (tool == "server_info") return serverInfo ? answer(serverInfo(), false) : refuse(tr("mcp.window_cannot_be_asked"));
+	/* the picture as the window shows it: the engine handed it here (layers with_lua) */
+	if (tool == "screenshot")
+	{
+		if (shownPicture) return shownPicture(id);
+		return session_.mcpAnswerPicture(id, {}, {});
+	}
 	if (tool == "pause" || tool == "resume")
 	{
 		if (!session_.isOpen.get()) return refuse(tr("session.no_project_in_chimera"));
@@ -436,7 +454,8 @@ void McpViewModel::host(uint64_t id, const std::string &tool, const std::string 
 		});
 	}
 	if (tool == "create_project") return createProject(id, arguments);
-	if (tool == "lua_functions" || tool == "run_lua" || tool == "lua_script") return luaTool(tool, arguments, answer);
+	if (tool == "lua_functions" || tool == "run_lua" || tool == "lua_script" || tool == "lua_console" || tool == "lua_scripts")
+		return luaTool(tool, arguments, answer);
 	if (!movie) return refuse(tr("session.no_project_in_chimera"));
 
 	if (tool == "list_markers")

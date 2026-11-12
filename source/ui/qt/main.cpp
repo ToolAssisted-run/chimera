@@ -1768,6 +1768,46 @@ int main(int argc, char **argv)
 	toolWindows.resizeWindow = [window] { QMetaObject::invokeMethod(window, "frameBufferResized", Q_ARG(QVariant, QVariant(true))); };
 	toolWindows.windowPosition = [window] { return std::pair<int64_t, int64_t>{window->x(), window->y()}; };
 	/* the agent's Lua runs where the person sees it: the Lua Console opened, as a person opens it */
+	/* screenshot with layers with_lua (issue 571): the picture area as the
+	 * person sees it, cut to the game's picture and its padding, and brought
+	 * back to the game's own pixels, so a pixel of it is one of the game's */
+	if (!headless)
+		mcp.shownPicture = [window, &display, &session](uint64_t id) {
+			auto *area = window->findChild<QQuickItem *>(QStringLiteral("pictureArea"));
+			const QSharedPointer<QQuickItemGrabResult> grab = area != nullptr && area->width() > 0 ? area->grabToImage() : nullptr;
+			if (grab.isNull())
+			{
+				session.mcpAnswerPicture(id, {}, {});
+				return;
+			}
+			QObject::connect(grab.data(), &QQuickItemGrabResult::ready, grab.data(), [grab, id, area, &display, &session] {
+				QImage shown = grab->image().convertToFormat(QImage::Format_RGB32);
+				/* "w h x y w h x y w h": the area, the picture's place in it, the machine's part shown */
+				std::vector<double> p;
+				for (const QString &n : QString::fromStdString(display.placement.get()).split(QLatin1Char(' '), Qt::SkipEmptyParts)) p.push_back(n.toDouble());
+				const double ratio = area->width() > 0 ? shown.width() / area->width() : 1;
+				const int64_t pl = display.padLeft.get(), pt = display.padTop.get(), pr = display.padRight.get(), pb = display.padBottom.get();
+				QImage out = shown;
+				int64_t gameW = shown.width(), gameH = shown.height();
+				if (p.size() >= 10 && p[8] > 0 && p[9] > 0)
+				{
+					const double sx = p[4] / p[8], sy = p[5] / p[9];
+					const QRect cut(qRound((p[2] - pl * sx) * ratio), qRound((p[3] - pt * sy) * ratio),
+						qRound((p[4] + (pl + pr) * sx) * ratio), qRound((p[5] + (pt + pb) * sy) * ratio));
+					gameW = static_cast<int64_t>(p[8]) + pl + pr;
+					gameH = static_cast<int64_t>(p[9]) + pt + pb;
+					out = shown.copy(cut).scaled(static_cast<int>(gameW), static_cast<int>(gameH), Qt::IgnoreAspectRatio, Qt::FastTransformation);
+				}
+				QByteArray png;
+				QBuffer buffer(&png);
+				buffer.open(QIODevice::WriteOnly);
+				out.save(&buffer, "PNG");
+				const std::string facts = "{\"layers\": \"with_lua\", \"width\": " + std::to_string(out.width()) + ", \"height\": " + std::to_string(out.height())
+					+ ", \"padding\": {\"left\": " + std::to_string(pl) + ", \"top\": " + std::to_string(pt) + ", \"right\": " + std::to_string(pr)
+					+ ", \"bottom\": " + std::to_string(pb) + "}}";
+				session.mcpAnswerPicture(id, png.toStdString(), facts);
+			});
+		};
 	mcp.showLuaConsole = [window, headless] {
 		if (headless) return;
 		if (auto *tool = window->findChild<QQuickWindow *>(QStringLiteral("luaConsoleWindow")); tool != nullptr && !tool->isVisible()) tool->show();

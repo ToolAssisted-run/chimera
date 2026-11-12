@@ -39,6 +39,10 @@ public:
 	LuaConsoleViewModel *lua = nullptr;
 	NewProjectViewModel *newProject = nullptr;
 	std::function<void()> showLuaConsole;
+	/* screenshot with layers "with_lua" (issue 571): the picture as the
+	 * window shows it, answered to this call by the window's program; none
+	 * where no window is shown */
+	std::function<void(uint64_t)> shownPicture;
 
 	/* "stopped", "waiting" (no agent connected) or "connected" */
 	Property<std::string> state{"stopped"};

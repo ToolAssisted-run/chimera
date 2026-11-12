@@ -990,6 +990,7 @@ bool LuaBridge::resumeRunning(bool frames)
 		if (!resume(id, error))
 		{
 			log("script stopped: " + error);
+			if (onFailed) atWindow([&] { onFailed(id, error); });
 			stopHere(id);
 			stopped = true;
 			continue;

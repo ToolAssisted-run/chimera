@@ -1864,7 +1864,7 @@ MCPPY
 				done
 				wrc=99
 				if [ -f "$wsub/ready" ]; then
-					timeout 180 python3 "$here/mcp-agent.py" "$wmcp" "$golden_dir/$wname.ram.bin" "$golden_dir/$wname.vram.bin" \
+					MCP_TEST_HEADLESS=1 timeout 180 python3 "$here/mcp-agent.py" "$wmcp" "$golden_dir/$wname.ram.bin" "$golden_dir/$wname.vram.bin" \
 						"$here/movies/$wname.txt" - "window${wallow:+-$wallow}" > "$wsub/agent.log" 2>&1
 					wrc=$?
 				fi

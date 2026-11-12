@@ -2223,6 +2223,11 @@ CE_API int32_t ce_mcp_service(ce_session *s, const ce_movie_log *log, int64_t fr
  * load_branch) has the values the agent asked to watch read from it and
  * added. */
 CE_API void ce_mcp_answer(ce_session *s, uint64_t id, const char *text, int32_t is_error);
+/* screenshot with layers "with_lua" (issue 571): the frontend's answer is the
+ * picture as the window shows it, a PNG, with facts_json (its size, the
+ * padding on each side); a null png refuses, saying the window cannot be
+ * asked for its picture (no window is shown). */
+CE_API void ce_mcp_answer_picture(uint64_t id, const uint8_t *png, uint64_t png_len, const char *facts_json);
 
 /* search_steps in the frontend (issue 571): step `step` (from 1), one
  * search_filter on the agent's search with the step's arguments, on the frame
