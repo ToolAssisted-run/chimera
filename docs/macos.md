@@ -26,7 +26,7 @@ doubles, plain and scientific, with no difference.
 ## What builds and runs
 
 The engine, `chimera-run`, `chimera-mcp` and every native library the engine
-loads (Lua, SQLite, zstd, SDL2, OpenAL Soft, miniBox) build with the same
+loads (Lua, SQLite, zstd, SDL3, OpenAL Soft, miniBox) build with the same
 meson build as Linux, given a cross file that names the processor:
 
 ```sh
@@ -149,7 +149,7 @@ folder. What ships in the app stays in it: `Contents/MacOS/bin` (the helper
 programs and ffmpeg), the libraries, and `themes/`, whose themes are shown
 until the person's own Themes folder has one.
 
-Sound and gamepads need no setup: OpenAL Soft and SDL2 are in
+Sound and gamepads need no setup: OpenAL Soft and SDL3 are in
 `Contents/Frameworks` and found there.
 
 It is ad hoc signed, not notarised, so another Mac asks before opening it the

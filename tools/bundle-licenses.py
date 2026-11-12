@@ -165,7 +165,7 @@ def main():
     lines.append("Chimera's terms are in `licenses/chimera-LICENSE` (the MIT License), whose")
     lines.append("work it is - the parts that come from BizHawk included - and what those")
     lines.append("terms do not cover in `licenses/chimera-NOTICE`, and the people behind")
-    lines.append("it in `licenses/chimera-CREDITS.md`. The native libraries it links (SDL2, OpenAL")
+    lines.append("it in `licenses/chimera-CREDITS.md`. The native libraries it links (SDL3, OpenAL")
     lines.append("Soft, Lua, zstd, SQLite and others) remain their authors'")
     lines.append("under their own licences.")
     lines.append("")
