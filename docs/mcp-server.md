@@ -241,10 +241,17 @@ RAM search (the agent's own search, separate from the RAM Search window):
 
 | Tool | What it does |
 | --- | --- |
-| `search_start` | Starts a search over a domain with a value size of 1, 2 or 4 bytes. Every address is a candidate and its value is remembered. |
-| `search_filter` | Keeps the candidates whose value now is equal to, different from, greater or less than a given value, or than the value remembered. Then remembers the value now. |
-| `search_results` | The candidates left, lowest address first, with the value now and the one remembered, up to a limit. |
+| `search_start` | Starts a search over a domain with a value size of 1, 2, 4 or 8 bytes, aligned or at every address (`misaligned`), over the whole domain or parts of it (`ranges`, widened to whole 8-byte blocks). Every address is a candidate; its value is remembered, and every frame the machine runs counts its changes. |
+| `search_filter` | Keeps the candidates that compare as asked: the value now, the previous value, the address, the number of changes, or the difference, with a value or with each one's previous value; equal, different, greater, less, or different by so much. Values unsigned, signed or float. `previous` sets what a previous value is from then on: the last search's (the usual), the original, the last frame's, or the one before the last change. |
+| `search_results` | The candidates left, lowest address first, with the value now, the previous one, the difference and the count of changes, up to a limit; where they lie (`clusters`), and the distance that most often separates one from the next (`stride`), a table's record size when they are a field of each record. |
 | `search_undo` | Takes the last filter back. |
+| `search_steps` | Several rounds in one call: each step goes to its frame, as `seek` does, and filters there. Changes, since it moves the playback position. |
+
+The search is the engine's own, the one the RAM Search window uses (issue
+571 asked for all of it): before each filter it catches up with what was
+written or loaded since the last frame, which counts as one change, and a
+seek forward over kept states loads one rather than running the frames, so
+the frames it skips are not counted one by one.
 
 The way it is used: start a search, have the game change the thing looked for
 (`seek` to another frame, or the person plays), filter for "different" or

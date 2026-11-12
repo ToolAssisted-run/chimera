@@ -857,6 +857,41 @@ McpResult McpLocal::runHost(const std::string &tool, const std::string &argument
 		if (!numberOf(arguments, "frame", 0, length, frame)) why = "'frame' must be between 0 and the movie's length, " + std::to_string(length) + ".";
 		else if (landOn(frame, why)) cJSON_AddNumberToObject(out, "frame", static_cast<double>(ce_session_frame(session)));
 	}
+	else if (tool == "search_steps")
+	{
+		/* each step: the machine to its frame, then the filter there (issue 571) */
+		cJSON *done = cJSON_CreateArray();
+		const cJSON *step = nullptr;
+		int n = 0;
+		cJSON_ArrayForEach(step, cJSON_GetObjectItemCaseSensitive(arguments, "steps"))
+		{
+			n++;
+			if (!numberOf(step, "frame", 0, length, frame))
+				why = "Step " + std::to_string(n) + ": 'frame' must be between 0 and the movie's length, " + std::to_string(length) + ".";
+			else if (!landOn(frame, why))
+				why = "Step " + std::to_string(n) + ": " + why;
+			if (!why.empty()) break;
+			cJSON *filter = cJSON_Duplicate(step, 1);
+			cJSON_DeleteItemFromObjectCaseSensitive(filter, "frame");
+			const McpResult filtered = mcpSearchFilter(session, printed(filter));
+			cJSON_Delete(filter);
+			cJSON *content = cJSON_Parse(filtered.content.c_str());
+			const cJSON *text = cJSON_GetObjectItemCaseSensitive(cJSON_GetArrayItem(content, 0), "text");
+			const std::string said = cJSON_IsString(text) ? text->valuestring : "";
+			cJSON_Delete(content);
+			if (filtered.isError)
+			{
+				why = "Step " + std::to_string(n) + " (frame " + std::to_string(frame) + "): " + said;
+				break;
+			}
+			cJSON *row = cJSON_Parse(said.c_str());
+			if (row == nullptr) row = cJSON_CreateObject();
+			cJSON_AddNumberToObject(row, "frame", static_cast<double>(frame));
+			cJSON_AddItemToArray(done, row);
+		}
+		if (why.empty()) cJSON_AddItemToObject(out, "steps", done);
+		else cJSON_Delete(done);
+	}
 	else if (tool == "advance_until")
 	{
 		const char *refusal = nullptr;

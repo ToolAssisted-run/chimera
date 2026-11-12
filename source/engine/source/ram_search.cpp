@@ -892,6 +892,26 @@ void CeRamSearch::update(int previousType)
 	}
 }
 
+bool CeRamSearch::catchUp(int previousType)
+{
+	if (!m_detailed) return false;
+	bool differs = false;
+	if (m_set.dense)
+	{
+		snapshotImage(m_nextImage);
+		differs = m_nextImage.size() != m_set.curImage.size()
+			|| std::memcmp(m_nextImage.data(), m_set.curImage.data(), m_nextImage.size()) != 0;
+	}
+	else
+	{
+		std::vector<uint64_t> values;
+		readValues(m_set.addr, m_set.size, values);
+		differs = values != m_set.cur;
+	}
+	if (differs) update(previousType);
+	return differs;
+}
+
 /* Switching the byte order mid-search: a dense set's previous and current
  * values are bytes, read in the new order from now on. A sparse set holds them
  * as numbers decoded in the old order, so each is turned round within its
@@ -1292,6 +1312,11 @@ int32_t ce_ramsearch_would_remove(const ce_ramsearch *rs, int64_t index, int32_t
 int32_t ce_ramsearch_update(ce_ramsearch *rs, int32_t previous_type)
 {
 	CE_RS_GUARD(rs->impl.update(previous_type); return 0, -1)
+}
+
+int32_t ce_ramsearch_catch_up(ce_ramsearch *rs, int32_t previous_type)
+{
+	CE_RS_GUARD(return rs->impl.catchUp(previous_type) ? 1 : 0, -1)
 }
 
 int32_t ce_ramsearch_set_previous_to_current(ce_ramsearch *rs)

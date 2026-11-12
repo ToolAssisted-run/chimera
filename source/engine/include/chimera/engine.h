@@ -1939,6 +1939,14 @@ CE_API void ce_session_seek_stop(ce_session *s);
  * agent whose memory writes went so, issue 571). A state loaded with no frame
  * said for it counts as the frame the session is on. The machine's thread. */
 CE_API int64_t ce_session_take_loaded_low(ce_session *s);
+/* fn(ctx, s) after every frame the machine runs - a frame advance, a movie's,
+ * a seek's replay - on the advancing thread, between frames: it may read the
+ * machine's memory, and must not advance, save, load or end the session. Several
+ * may be added; the same fn and ctx twice is one. The MCP server's RAM search
+ * counts each candidate's changes so (issue 571). */
+typedef void (*ce_frame_fn)(void *ctx, ce_session *s);
+CE_API void ce_session_add_frame_watch(ce_session *s, ce_frame_fn fn, void *ctx);
+CE_API void ce_session_remove_frame_watch(ce_session *s, ce_frame_fn fn, void *ctx);
 
 /* The machine was put on `frame` of the session's movie by a state the
  * caller loaded itself - a branch's, kept in a file (ce_session_state_load_file)
@@ -2094,6 +2102,12 @@ CE_API int64_t ce_ramsearch_search(ce_ramsearch *rs, int32_t compare, int32_t op
 CE_API int32_t ce_ramsearch_would_remove64(const ce_ramsearch *rs, int64_t index, int32_t compare, int32_t op, int32_t display, uint64_t value, uint64_t different_by);
 CE_API int32_t ce_ramsearch_would_remove(const ce_ramsearch *rs, int64_t index, int32_t compare, int32_t op, int32_t display, uint32_t value, uint32_t different_by);
 CE_API int32_t ce_ramsearch_update(ce_ramsearch *rs, int32_t previous_type);
+/* _update, only when the memory is not what the last update saw - a write, or
+ * a state loaded between frames - so that a detailed search's values are the
+ * memory's now before it is filtered (issue 571). Each value that differs is
+ * counted as one change. 1 when it updated, 0 when nothing differed, -1 out
+ * of memory. */
+CE_API int32_t ce_ramsearch_catch_up(ce_ramsearch *rs, int32_t previous_type);
 CE_API int32_t ce_ramsearch_set_previous_to_current(ce_ramsearch *rs);
 CE_API void ce_ramsearch_clear_change_counts(ce_ramsearch *rs);
 CE_API void ce_ramsearch_set_big_endian(ce_ramsearch *rs, int32_t big_endian);
@@ -2210,6 +2224,13 @@ CE_API int32_t ce_mcp_service(ce_session *s, const ce_movie_log *log, int64_t fr
  * added. */
 CE_API void ce_mcp_answer(ce_session *s, uint64_t id, const char *text, int32_t is_error);
 
+/* search_steps in the frontend (issue 571): step `step` (from 1), one
+ * search_filter on the agent's search with the step's arguments, on the frame
+ * the frontend has put the machine on. 1 done, answer_out that step's answer
+ * (a JSON object with its frame); 0 refused, answer_out why, naming the step
+ * and the frame (valid until the next call on this thread). The machine's
+ * thread. */
+CE_API int32_t ce_mcp_search_step(ce_session *s, int32_t step, const char *arguments_json, const char **answer_out);
 /* capture_series (issue 355): the frontend plays the movie to each frame of
  * the plan it was handed (its arguments' "frames") and, on each, has the
  * engine take the picture with this, saying the frame it is on as it counts

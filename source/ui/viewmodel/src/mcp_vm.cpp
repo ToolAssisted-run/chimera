@@ -563,6 +563,23 @@ void McpViewModel::host(uint64_t id, const std::string &tool, const std::string 
 		}
 		return session_.mcpSeek(id, frame);
 	}
+	if (tool == "search_steps")
+	{
+		/* each step's frame here; the rest of it is the engine's search_filter's to read */
+		const Json *list = arguments.find("steps");
+		std::vector<std::pair<int64_t, std::string>> steps;
+		for (const Json &step : list != nullptr && list->kind == Json::Kind::Array ? list->items : std::vector<Json>{})
+		{
+			int64_t frame = 0;
+			if (!number(step, "frame", 0, length, nullptr, frame)) return refuse(tr("mcp.frame_range", {std::to_string(length)}));
+			Json filter = object();
+			for (const auto &[name, value] : step.members)
+				if (name != "frame") filter.members.emplace_back(name, value);
+			steps.emplace_back(frame, json::write(filter));
+		}
+		if (steps.empty()) return refuse(tr("piano_roll.unknown_step"));
+		return session_.mcpSearchSteps(id, std::move(steps));
+	}
 	if (tool == "advance_until")
 	{
 		const int64_t usual = 600;

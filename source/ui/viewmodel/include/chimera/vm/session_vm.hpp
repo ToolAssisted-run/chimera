@@ -807,6 +807,9 @@ public:
 	void mcpPlayUntil(uint64_t id, std::string arguments, int64_t most);
 	/* capture_series: each frame gone to in turn and its picture taken */
 	void mcpPictures(uint64_t id, std::vector<int64_t> frames);
+	/* search_steps (issue 571): to each step's frame, as seek goes, and the
+	 * engine's search_filter there with the step's other arguments */
+	void mcpSearchSteps(uint64_t id, std::vector<std::pair<int64_t, std::string>> steps);
 	/* the machine's thread: the start of the open project's clock */
 	int64_t clockOnMachine() const;
 
@@ -962,8 +965,12 @@ private:
 	{
 		uint64_t id = 0;
 		int64_t start = 0, target = 0;
-		enum Kind { Seek, Until, Pictures } kind = Seek;
+		enum Kind { Seek, Until, Pictures, Steps } kind = Seek;
 		std::deque<int64_t> pictures;
+		/* search_steps: the steps left (frame, filter), how many are done, and their answers */
+		std::deque<std::pair<int64_t, std::string>> steps;
+		int32_t stepsDone = 0;
+		std::string stepAnswers;
 	};
 	std::optional<McpMove> mcpMoveM_;
 	/* playing for advance_until with Turbo seek on: as fast as it goes */

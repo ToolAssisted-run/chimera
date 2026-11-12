@@ -14558,3 +14558,35 @@ condition is listed as given; after `client.reboot_core()` both freezes are
 still on; unfreeze by index and all; hex addresses read the same bytes. With
 the warning taken out of the server, and with the window's read-back taken
 out, the test fails on those checks.
+
+## MCP: the whole RAM search, and several rounds in one call (2026-11-12, issue 571)
+
+The agent's RAM search offered sizes 1, 2 and 4, aligned addresses only, and
+two kinds of comparison; every round took three or four calls. Now it passes
+on what the engine's search (the RAM Search window's) does: sizes up to 8,
+misaligned addresses, ranges of the domain, comparing the address, the count
+of changes or the difference, "different by", the previous value as the
+original, the last search's, the last frame's or the one before the last
+change, and floats. `search_results` gives each candidate's difference and
+count of changes, where the candidates lie and the distance that most often
+separates them (a table's record size). `search_steps` runs several seek and
+filter rounds in one call, in the window as its moves are made and without a
+window in the engine.
+
+To count changes the search must see every frame: the engine now calls
+watchers after each frame the machine runs (`ce_session_add_frame_watch`),
+and the search is detailed. A detailed search compares the values the last
+frame saw, so a write or a state load between frames went unseen: before
+each filter or list it now catches up with the memory as it is
+(`ce_ramsearch_catch_up`), counting a value that differs as one change. A
+seek forward over kept states loads a state rather than running the frames,
+so those frames are not counted one by one; the tool's documentation says
+so.
+
+Tested: in the window with changes, against memory read with read_memory on
+the same frames: a 2-byte search has 2048 candidates and 4095 misaligned;
+two ranges give 24 bytes; four bytes written 16 apart give a stride of 16 and
+one cluster; search_steps to 20 then 30 leaves what comparing the reads
+leaves; "original" compares with the start; 12 frames played count each
+address's changes exactly. With the frame watch, the catch-up or the step's
+filter taken out, those checks fail.

@@ -2793,6 +2793,21 @@ void SessionViewModel::mcpPictures(uint64_t id, std::vector<int64_t> frames)
 	});
 }
 
+void SessionViewModel::mcpSearchSteps(uint64_t id, std::vector<std::pair<int64_t, std::string>> steps)
+{
+	submit([this, id, steps = std::move(steps)] {
+		if (s_ == nullptr || steps.empty())
+		{
+			mcpAnswerOnMachine(id, tr("session.no_project_in_chimera"), true);
+			return;
+		}
+		McpMove move{id, ce_session_frame(s_), steps.front().first, McpMove::Steps, {}};
+		move.steps.assign(steps.begin(), steps.end());
+		seekAsAskedOnMachine(move.target);
+		mcpMoveM_ = std::move(move);
+	});
+}
+
 bool SessionViewModel::mcpMoveOnMachine()
 {
 	if (!mcpMoveM_) return true;
@@ -2832,6 +2847,33 @@ bool SessionViewModel::mcpMoveOnMachine()
 				return false;
 			}
 			text = "{\"frame\": " + std::to_string(at) + ", \"movie_length\": " + std::to_string(length) + "}";
+		}
+	}
+	else if (move.kind == McpMove::Steps)
+	{
+		/* on a step's frame: its filter, then on to the next step */
+		const char *said = nullptr;
+		if (at != move.target)
+		{
+			text = tr("session.seek_interrupted", {std::to_string(at), std::to_string(move.target)});
+			failed = true;
+		}
+		else if (ce_mcp_search_step(s_, ++move.stepsDone, move.steps.front().second.c_str(), &said) != 1)
+		{
+			text = said != nullptr ? said : "";
+			failed = true;
+		}
+		else
+		{
+			move.stepAnswers += (move.stepAnswers.empty() ? "" : ",") + std::string(said != nullptr ? said : "{}");
+			move.steps.pop_front();
+			if (!move.steps.empty())
+			{
+				move.target = move.steps.front().first;
+				seekAsAskedOnMachine(move.target);
+				return false;
+			}
+			text = "{\"steps\": [" + move.stepAnswers + "]}";
 		}
 	}
 	else if (move.kind == McpMove::Until)

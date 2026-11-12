@@ -572,7 +572,8 @@ if changes:
     facts("write_memory", domain="RAM", address=0x900, values=[(old + 5) & 255])
     check("after one byte was written, 'not equal to before' leaves that byte alone", facts("search_filter", op="not_equal").get("candidates") == 1)
     check("and after the filter its value now is the one remembered",
-          facts("search_results").get("results") == [{"address": 0x900, "address_hex": "0x900", "value": (old + 5) & 255, "previous": (old + 5) & 255}])
+          [{k: r.get(k) for k in ("address", "address_hex", "value", "previous", "difference")} for r in facts("search_results").get("results", [])]
+          == [{"address": 0x900, "address_hex": "0x900", "value": (old + 5) & 255, "previous": (old + 5) & 255, "difference": 0}])
     check("so 'equal to before' keeps it", facts("search_filter", op="equal").get("candidates") == 1)
     error, text, _ = call("write_memory", domain="RAM", address=0, values=[300])
     check("write_memory refuses a value that does not fit", error and "fits in u8" in text)
@@ -627,6 +628,65 @@ if changes:
     check("and of all of them", facts("unfreeze", all=True).get("freezes") == [])
     error, text, _ = call("unfreeze", index=0)
     check("unfreeze says when there is nothing there", error and "list_freezes" in text)
+    # RAM search: the rest of what the engine does (issue 571)
+    check("a 2-byte search takes every other address", facts("search_start", domain="RAM", size=2).get("candidates") == 2048)
+    check("and every address but the last when misaligned",
+          facts("search_start", domain="RAM", size=2, misaligned=True).get("candidates") == 4095)
+    ranged = facts("search_start", domain="RAM", ranges=[["0x100", 16], [0x203, 2]])
+    check("ranges keep a search to parts of the domain, each widened to whole 8-byte blocks",
+          ranged.get("candidates") == 24 and ranged.get("searched_bytes") == 24)
+    error, text, _ = call("search_start", domain="RAM", ranges=[[4090, 16]])
+    check("a range past the domain's end is refused", error and "'ranges'" in text)
+    for at in (0x400, 0x410, 0x420, 0x430):
+        facts("write_memory", domain="RAM", address=at, values=[0x42])
+    facts("search_start", domain="RAM")
+    facts("search_filter", op="equal", value="0x42")
+    shape = facts("search_results")
+    check("a table's records show as a stride, and where they lie as a cluster",
+          shape.get("candidates") == 4 and shape.get("stride") == 16
+          and shape.get("clusters") == [{"from_hex": "0x400", "to_hex": "0x430", "count": 4}])
+    facts("search_start", domain="RAM", size=4)
+    error, text, _ = call("search_filter", op="equal", value=1.5, display="float")
+    check("a float search compares as floats", not error)
+    error, text, _ = call("search_start", domain="RAM", size=2)
+    error, text, _ = call("search_filter", op="equal", value=1, display="float")
+    check("a float search of 2-byte values is refused", error and "float" in text)
+    error, text, _ = call("search_filter", op="different_by")
+    check("different_by needs 'by'", error and "'by'" in text)
+    if holder:
+        def ram_at(frame):
+            facts("seek", frame=frame)
+            return bytes.fromhex(facts("read_memory", domain="RAM", address=0, count=4096)["bytes_hex"])
+        r10, r20, r30 = ram_at(10), ram_at(20), ram_at(30)
+        facts("seek", frame=10)
+        facts("search_start", domain="RAM")
+        stepped = facts("search_steps", steps=[{"frame": 20, "op": "not_equal"}, {"frame": 30, "op": "not_equal"}])
+        expect = sum(1 for a in range(4096) if r10[a] != r20[a] and r20[a] != r30[a])
+        steps = stepped.get("steps", [])
+        check("search_steps seeks and filters each step, as by hand",
+              [x.get("frame") for x in steps] == [20, 30] and steps[-1].get("candidates") == expect)
+        facts("seek", frame=10)
+        facts("search_start", domain="RAM")
+        facts("seek", frame=20)
+        facts("search_filter", op="not_equal", previous="original")
+        facts("seek", frame=30)
+        left = facts("search_filter", op="not_equal").get("candidates")
+        expect = sum(1 for a in range(4096) if r20[a] != r10[a] and r30[a] != r10[a])
+        check("previous 'original' compares with the value when the search started", left == expect)
+        # the changes counted every frame, against what each frame's memory says
+        frames = [ram_at(f) for f in range(0, 13)]
+        facts("seek", frame=0)
+        facts("search_start", domain="RAM")
+        # played, not seeked: a seek forward over kept states loads one instead of running the frames
+        facts("advance_until", domain="RAM", address=0xFFF, op="equal", value=999, max_frames=12)
+        changed = facts("search_filter", op="greater", compare="changes", value=0).get("candidates")
+        expect = sum(1 for a in range(4096) if any(frames[f][a] != frames[f + 1][a] for f in range(12)))
+        counts = {r["address"]: r["changes"] for r in facts("search_results", limit=500).get("results", [])}
+        expect_counts = {a: sum(1 for f in range(12) if frames[f][a] != frames[f + 1][a]) for a in counts}
+        check("each frame's changes are counted: compare 'changes'", changed == expect and expect > 0)
+        check("and search_results gives each one's count", counts == expect_counts)
+        error, text, _ = call("search_steps", steps=[{"frame": 3, "op": "equal", "value": "nonsense"}])
+        check("search_steps says which step could not be done", error and "Step 1" in text and "'value'" in text)
     # a game's named value
     check("set_property sets a value from text", facts("set_property", name="Steps", value="7").get("value") == "7")
     check("the value set is read back", facts("get_property", name="Steps").get("value") == "7")

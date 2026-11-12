@@ -806,6 +806,8 @@ struct ce_session
 	 * had still to say (ce_session_movie_at says it) */
 	int64_t loadedLow = -1;
 	bool loadedUnsaid = false;
+	/* ce_session_add_frame_watch: called after every frame the machine runs */
+	std::vector<std::pair<ce_frame_fn, void *>> frameWatches;
 	void afterFrame(bool rendered, int64_t known);
 	void afterLoad(int64_t landedOn);
 	/* the compile cache and precompile sessions (optional exports) */
@@ -1638,6 +1640,7 @@ void ce_session::afterFrame(bool rendered, int64_t known)
 	if (known >= 0) machineFrame = known;
 	else if (machineFrame >= 0) machineFrame++;
 	lastKept = -1;
+	for (size_t i = 0; i < frameWatches.size(); i++) frameWatches[i].first(frameWatches[i].second, this);
 	if (pictureTrace() && tracedSinceLoad < 8)
 	{
 		tracedSinceLoad++;
@@ -4606,6 +4609,21 @@ bool ce_session::catchUp(int64_t to, int64_t render)
 }
 
 int64_t ce_session_frame(const ce_session *s) { return s->frame; }
+
+void ce_session_add_frame_watch(ce_session *s, ce_frame_fn fn, void *ctx)
+{
+	if (s == nullptr || fn == nullptr) return;
+	for (const auto &w : s->frameWatches)
+		if (w.first == fn && w.second == ctx) return;
+	s->frameWatches.emplace_back(fn, ctx);
+}
+
+void ce_session_remove_frame_watch(ce_session *s, ce_frame_fn fn, void *ctx)
+{
+	if (s == nullptr) return;
+	s->frameWatches.erase(std::remove_if(s->frameWatches.begin(), s->frameWatches.end(),
+		[&](const std::pair<ce_frame_fn, void *> &w) { return w.first == fn && w.second == ctx; }), s->frameWatches.end());
+}
 
 int64_t ce_session_take_loaded_low(ce_session *s)
 {

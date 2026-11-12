@@ -81,6 +81,9 @@ public:
 
 	/* Detailed mode's per-frame poll: counts changes and moves "previous". */
 	void update(int previousType);
+	/* update(), when the memory is not what the last update saw: a write or a
+	 * state loaded between frames. True when it did. */
+	bool catchUp(int previousType);
 	void setPreviousToCurrent();
 	void clearChangeCounts();
 	/* A sparse set keeps its values as numbers read in the old byte order, so

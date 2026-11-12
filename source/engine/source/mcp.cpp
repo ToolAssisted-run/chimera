@@ -44,6 +44,16 @@ const char kNoArguments[] = "{\"type\":\"object\",\"properties\":{},\"additional
 /* An address, as a number or as hex text ("0x2E329"): a slip between decimal
  * and hex sent a person to the wrong place once (issue 571). Every tool's
  * address reads both (integerArgument). */
+/* What a search_filter takes, and each of search_steps' steps */
+#define MCP_FILTER_PROPERTIES \
+	"\"op\":{\"type\":\"string\",\"enum\":[\"equal\",\"not_equal\",\"greater\",\"greater_or_equal\",\"less\",\"less_or_equal\",\"different_by\"]}," \
+	"\"compare\":{\"type\":\"string\",\"enum\":[\"value\",\"previous\",\"address\",\"changes\",\"difference\"],\"description\":\"What is compared: see the tool. value when 'value' is given, previous when it is not.\"}," \
+	"\"value\":{\"type\":[\"number\",\"string\"],\"description\":\"What to compare with: a number, or hex text. A float search's is a number with a point.\"}," \
+	"\"by\":{\"type\":[\"number\",\"string\"],\"description\":\"For different_by: how far apart.\"}," \
+	"\"previous\":{\"type\":\"string\",\"enum\":[\"last_search\",\"original\",\"last_frame\",\"last_change\"],\"description\":\"What a previous value is from now on. last_search when left out.\"}," \
+	"\"display\":{\"type\":\"string\",\"enum\":[\"unsigned\",\"signed\",\"float\"],\"description\":\"How the values are read: unsigned when left out; float for a 4- or 8-byte search.\"}," \
+	"\"signed\":{\"type\":\"boolean\",\"description\":\"The same as display signed.\"}"
+
 #define MCP_ADDRESS "\"address\":{\"type\":[\"integer\",\"string\"],\"description\":\"A number, or hex text such as \\\"0x2E329\\\".\"}"
 
 
@@ -120,29 +130,38 @@ const McpTool kTools[] = {
 	  false, false },
 	{ "search_start",
 	  "Starts a RAM search over a memory domain: every address becomes a candidate, and its value now is remembered as its "
-	  "'previous' value. Then change something in the game (seek, or let the person play) and narrow the candidates with "
-	  "search_filter. One search at a time; starting a new one drops the old.",
+	  "'previous' value and its original one. Then change something in the game (seek, or let the person play) and narrow "
+	  "the candidates with search_filter. Every frame the machine runs counts each candidate's changes. One search at a "
+	  "time; starting a new one drops the old.",
 	  "{\"type\":\"object\",\"properties\":{"
 	  "\"domain\":{\"type\":\"string\",\"description\":\"A domain from list_memory (not a bus).\"},"
-	  "\"size\":{\"type\":\"integer\",\"enum\":[1,2,4],\"description\":\"Bytes a value. 1 when left out.\"},"
-	  "\"big_endian\":{\"type\":\"boolean\",\"description\":\"false when left out.\"}"
+	  "\"size\":{\"type\":\"integer\",\"enum\":[1,2,4,8],\"description\":\"Bytes a value. 1 when left out.\"},"
+	  "\"big_endian\":{\"type\":\"boolean\",\"description\":\"false when left out.\"},"
+	  "\"misaligned\":{\"type\":\"boolean\",\"description\":\"Every address a candidate, not only multiples of the size (a 2-byte value at an odd address). false when left out.\"},"
+	  "\"ranges\":{\"type\":\"array\",\"maxItems\":64,\"items\":{\"type\":\"array\",\"items\":{\"type\":[\"integer\",\"string\"]},\"minItems\":2,\"maxItems\":2},"
+	  "\"description\":\"Search only these parts of the domain: [start, length] pairs, numbers or hex text, each widened to whole 8-byte blocks. The whole domain when left out.\"}"
 	  "},\"required\":[\"domain\"],\"additionalProperties\":false}",
 	  false, false },
 	{ "search_filter",
-	  "Keeps the candidates whose value now compares as asked, to 'value' when it is given and to their previous value when "
-	  "it is not. Afterwards each candidate's previous value is its value now. Answers how many are left.",
+	  "Keeps the candidates that compare as asked, and answers how many are left. What is compared with 'value' is chosen "
+	  "by 'compare': the value now ('value', the usual when 'value' is given), the previous value ('previous', the usual "
+	  "when it is not: then each candidate's value now is compared with its own previous one), the address, the number of "
+	  "changes counted since the search started ('changes'), or the value now less the previous one ('difference'). "
+	  "'previous' says what a candidate's previous value is from now on: its value at the last search (the usual), its "
+	  "original value, its value on the last frame, or its value before its last change.",
 	  "{\"type\":\"object\",\"properties\":{"
-	  "\"op\":{\"type\":\"string\",\"enum\":[\"equal\",\"not_equal\",\"greater\",\"greater_or_equal\",\"less\",\"less_or_equal\"]},"
-	  "\"value\":{\"type\":\"integer\",\"description\":\"Compare to this number instead of to the previous value.\"},"
-	  "\"signed\":{\"type\":\"boolean\",\"description\":\"Compare the values as signed numbers. false when left out.\"}"
+	  MCP_FILTER_PROPERTIES
 	  "},\"required\":[\"op\"],\"additionalProperties\":false}",
 	  false, false },
 	{ "search_results",
-	  "The candidates left, lowest address first: each with its value now and its previous value. "
-	  "At most 'limit' are returned; 'candidates' says how many there are.",
+	  "The candidates left, lowest address first: each with its value now, its previous value, the difference, and how "
+	  "many times it changed. At most 'limit' are returned; 'candidates' says how many there are. With more than one, "
+	  "'clusters' says where they lie (runs of candidates close together), and 'stride' is the distance that most often "
+	  "separates one from the next when one does: the size of a record in a table, as game objects often are.",
 	  "{\"type\":\"object\",\"properties\":{"
 	  "\"limit\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":500,\"description\":\"50 when left out.\"},"
-	  "\"signed\":{\"type\":\"boolean\",\"description\":\"Show the values as signed numbers. false when left out.\"}"
+	  "\"display\":{\"type\":\"string\",\"enum\":[\"unsigned\",\"signed\",\"float\"],\"description\":\"How values are shown. unsigned when left out; float is a 4- or 8-byte search's.\"},"
+	  "\"signed\":{\"type\":\"boolean\",\"description\":\"The same as display signed.\"}"
 	  "},\"additionalProperties\":false}",
 	  false, false },
 	{ "search_undo",
@@ -193,6 +212,17 @@ const McpTool kTools[] = {
 	  "{\"type\":\"object\",\"properties\":{"
 	  "\"frame\":{\"type\":\"integer\",\"minimum\":0}"
 	  "},\"required\":[\"frame\"],\"additionalProperties\":false}",
+	  true, true },
+	{ "search_steps",
+	  "Several rounds of a RAM search in one call: for each step the machine goes to the step's 'frame', as seek does, and "
+	  "search_filter runs there with the step's other arguments. It stops at the first step that cannot be done, and says "
+	  "which. Answers each step's frame and how many candidates were left after it. search_start begins the search first.",
+	  "{\"type\":\"object\",\"properties\":{"
+	  "\"steps\":{\"type\":\"array\",\"minItems\":1,\"maxItems\":50,\"items\":{\"type\":\"object\",\"properties\":{"
+	  "\"frame\":{\"type\":\"integer\",\"minimum\":0},"
+	  MCP_FILTER_PROPERTIES
+	  "},\"required\":[\"frame\",\"op\"],\"additionalProperties\":false}}"
+	  "},\"required\":[\"steps\"],\"additionalProperties\":false}",
 	  true, true },
 	{ "advance_until",
 	  "Plays the movie forward from the frame the machine is on until a value meets a condition, and stops there. "
@@ -1036,6 +1066,10 @@ struct Service
 	uint64_t machineSession = 0; /* the session the notes above are about (onMachine) */
 	int searchSize = 1;
 	bool searchBigEndian = false;
+	/* what a candidate's previous value is (engine.h, RAM Search: 0 original,
+	 * 1 last search, 2 last frame, 3 last change), which every frame's count
+	 * of changes keeps to (searchFrame) */
+	int searchPreviousType = 1;
 };
 
 Service &service()
@@ -2629,12 +2663,22 @@ void onMachine(Service &sv, ce_session *s)
 
 const char kNoSearch[] = "No search is running. search_start begins one (a search ends when the project is closed).";
 
+/* Every frame the machine runs, the agent's search counts its candidates'
+ * changes, as the RAM Search window's does, and keeps their previous values
+ * as asked. On the machine's thread, like every use of the search. */
+void searchFrame(void *ctx, ce_session *s)
+{
+	Service &sv = *static_cast<Service *>(ctx);
+	if (sv.search != nullptr && ce_session_serial(s) == sv.searchSession) ce_ramsearch_update(sv.search, sv.searchPreviousType);
+}
+
 McpResult toolSearchStart(Service &sv, ce_session *s, const cJSON *arguments)
 {
 	const cJSON *domainItem = cJSON_GetObjectItemCaseSensitive(arguments, "domain");
 	if (!cJSON_IsString(domainItem)) return mcpError("'domain' must be a domain from list_memory.");
 	int64_t size = 1;
-	if (!integerArgument(arguments, "size", 1, 4, 1, size) || size == 3) return mcpError("'size' must be 1, 2 or 4.");
+	if (!integerArgument(arguments, "size", 1, 8, 1, size) || (size != 1 && size != 2 && size != 4 && size != 8))
+		return mcpError("'size' must be 1, 2, 4 or 8.");
 	int32_t domainIndex = -1, busIndex = -1;
 	findMemory(s, domainItem->valuestring, domainIndex, busIndex);
 	if (domainIndex < 0)
@@ -2645,45 +2689,158 @@ McpResult toolSearchStart(Service &sv, ce_session *s, const cJSON *arguments)
 	 * the whole domain at every step) */
 	const uint8_t *base = reinterpret_cast<const uint8_t *>(ce_session_domain_read_ptr(s, domainIndex));
 	if (base == nullptr) return mcpError(std::string("'") + domainItem->valuestring + "' cannot be searched: the core gives it no memory of its own.");
+	const int64_t bytes = ce_session_domain_size(s, domainIndex);
+	/* parts of the domain only, as [start, length] pairs */
+	std::vector<int64_t> pairs;
+	const cJSON *ranges = cJSON_GetObjectItemCaseSensitive(arguments, "ranges");
+	const cJSON *range = nullptr;
+	cJSON_ArrayForEach(range, ranges)
+	{
+		int64_t at[2] = { -1, -1 };
+		for (int i = 0; i < 2; i++)
+		{
+			const cJSON *v = cJSON_GetArrayItem(range, i);
+			uint64_t parsed = 0;
+			if (cJSON_IsNumber(v) && v->valuedouble >= 0) at[i] = static_cast<int64_t>(v->valuedouble);
+			else if (cJSON_IsString(v) && mcpParseInteger(v->valuestring, parsed) && parsed < static_cast<uint64_t>(INT64_MAX)) at[i] = static_cast<int64_t>(parsed);
+		}
+		if (at[0] < 0 || at[1] <= 0 || at[0] + at[1] > bytes)
+			return mcpError("Each of 'ranges' is [start, length] inside the domain, which is " + std::to_string(bytes) + " bytes.");
+		pairs.push_back(at[0]);
+		pairs.push_back(at[1]);
+	}
 	dropSearch(sv);
-	sv.searchBytes = ce_session_domain_size(s, domainIndex);
+	sv.searchBytes = bytes;
 	sv.search = ce_ramsearch_create(base, nullptr, nullptr, sv.searchBytes);
 	sv.searchDomain = domainItem->valuestring;
 	sv.searchSession = ce_session_serial(s);
 	sv.searchBase = base;
 	sv.searchSize = static_cast<int>(size);
 	sv.searchBigEndian = cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(arguments, "big_endian"));
-	if (sv.search != nullptr) ce_ramsearch_set_undo_enabled(sv.search, 1);
-	if (sv.search == nullptr || ce_ramsearch_start(sv.search, sv.searchSize, 0, sv.searchBigEndian ? 1 : 0, 0) != 0)
+	sv.searchPreviousType = 1;
+	const bool misaligned = cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(arguments, "misaligned"));
+	if (sv.search != nullptr)
+	{
+		ce_ramsearch_set_undo_enabled(sv.search, 1);
+		if (!pairs.empty()) ce_ramsearch_set_ranges(sv.search, pairs.data(), static_cast<int64_t>(pairs.size() / 2));
+	}
+	/* detailed: a value now and a count of changes for each, kept up every frame */
+	if (sv.search == nullptr || ce_ramsearch_start(sv.search, sv.searchSize, misaligned ? 1 : 0, sv.searchBigEndian ? 1 : 0, 1) != 0)
 	{
 		dropSearch(sv);
 		return mcpError("There is not enough memory to search that domain.");
 	}
+	ce_session_add_frame_watch(s, searchFrame, &sv);
 	cJSON *out = cJSON_CreateObject();
 	cJSON_AddStringToObject(out, "domain", sv.searchDomain.c_str());
 	cJSON_AddNumberToObject(out, "size", sv.searchSize);
+	cJSON_AddBoolToObject(out, "misaligned", misaligned);
+	cJSON_AddNumberToObject(out, "searched_bytes", static_cast<double>(ce_ramsearch_searched_size(sv.search)));
 	cJSON_AddNumberToObject(out, "candidates", static_cast<double>(ce_ramsearch_count(sv.search)));
 	return textResult(out);
 }
 
-McpResult toolSearchFilter(Service &sv, ce_session *s, const cJSON *arguments)
+/* how a search's values are read: 0 unsigned, 1 signed, 2 float (engine.h) */
+bool searchDisplay(const cJSON *arguments, int size, int &display, std::string &why)
 {
-	if (!searchStands(sv, s)) return mcpError(kNoSearch);
+	const cJSON *item = cJSON_GetObjectItemCaseSensitive(arguments, "display");
+	const std::string name = cJSON_IsString(item) ? item->valuestring : "";
+	display = name == "signed" || cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(arguments, "signed")) ? 1 : name == "float" ? 2 : 0;
+	if (!name.empty() && name != "signed" && name != "unsigned" && name != "float") why = "'display' must be unsigned, signed or float.";
+	else if (display == 2 && size != 4 && size != 8) why = "A float is 4 or 8 bytes; this search's values are " + std::to_string(size) + ".";
+	return why.empty();
+}
+
+/* a value of the search's as its 64 bits: a float's or a double's bits, a
+ * negative number's two's complement, hex text as it is */
+bool searchBits(const cJSON *item, int display, int size, uint64_t &bits)
+{
+	uint64_t parsed = 0;
+	if (cJSON_IsString(item))
+	{
+		if (!mcpParseInteger(item->valuestring, parsed)) return false;
+		bits = parsed;
+		return true;
+	}
+	if (!cJSON_IsNumber(item)) return false;
+	const double v = item->valuedouble;
+	if (display == 2 && size == 4)
+	{
+		const float f = static_cast<float>(v);
+		uint32_t b = 0;
+		std::memcpy(&b, &f, 4);
+		bits = b;
+		return true;
+	}
+	if (display == 2)
+	{
+		std::memcpy(&bits, &v, 8);
+		return true;
+	}
+	if (v != std::floor(v) || v < -9.3e18 || v > 1.85e19) return false;
+	bits = v < 0 ? static_cast<uint64_t>(static_cast<int64_t>(v)) : static_cast<uint64_t>(v);
+	return true;
+}
+
+/* a value's 64 bits as the number they are, read as asked */
+double searchShown(uint64_t raw, int size, int display)
+{
+	if (display == 2 && size == 4)
+	{
+		float f = 0;
+		const uint32_t b = static_cast<uint32_t>(raw);
+		std::memcpy(&f, &b, 4);
+		return f;
+	}
+	if (display == 2)
+	{
+		double d = 0;
+		std::memcpy(&d, &raw, 8);
+		return d;
+	}
+	if (display == 1)
+		return size == 1 ? static_cast<int8_t>(raw) : size == 2 ? static_cast<int16_t>(raw)
+			: size == 4 ? static_cast<int32_t>(raw) : static_cast<double>(static_cast<int64_t>(raw));
+	return static_cast<double>(raw);
+}
+
+McpResult runSearchFilter(Service &sv, const cJSON *arguments)
+{
 	const cJSON *opItem = cJSON_GetObjectItemCaseSensitive(arguments, "op");
 	const std::string opName = cJSON_IsString(opItem) ? opItem->valuestring : "";
-	/* the engine's numbering (engine.h, RAM Search): 0 ==, 1 >, 2 >=, 3 <, 4 <=, 5 != */
+	/* the engine's numbering (engine.h, RAM Search): 0 ==, 1 >, 2 >=, 3 <, 4 <=, 5 !=, 6 different by */
 	const int op = opName == "equal" ? 0 : opName == "greater" ? 1 : opName == "greater_or_equal" ? 2
-		: opName == "less" ? 3 : opName == "less_or_equal" ? 4 : opName == "not_equal" ? 5 : -1;
-	if (op < 0) return mcpError("'op' must be one of equal, not_equal, greater, greater_or_equal, less, less_or_equal.");
-	const bool isSigned = cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(arguments, "signed"));
+		: opName == "less" ? 3 : opName == "less_or_equal" ? 4 : opName == "not_equal" ? 5 : opName == "different_by" ? 6 : -1;
+	if (op < 0) return mcpError("'op' must be one of equal, not_equal, greater, greater_or_equal, less, less_or_equal, different_by.");
+	int display = 0;
+	std::string why;
+	if (!searchDisplay(arguments, sv.searchSize, display, why)) return mcpError(why);
 	const cJSON *valueItem = cJSON_GetObjectItemCaseSensitive(arguments, "value");
-	const bool toValue = valueItem != nullptr && !cJSON_IsNull(valueItem);
-	int64_t value = 0;
-	if (toValue && !integerArgument(arguments, "value", INT32_MIN, UINT32_MAX, 0, value)) return mcpError("'value' must be a whole number.");
-	/* compare: 0 to the previous value, 1 to a given value; previous type 1:
-	 * after the search, a candidate's previous value is its value now */
-	const int64_t removed = ce_ramsearch_search(sv.search, toValue ? 1 : 0, op, isSigned ? 1 : 0,
-		static_cast<uint32_t>(value), 0, 1);
+	const bool hasValue = valueItem != nullptr && !cJSON_IsNull(valueItem);
+	const cJSON *compareItem = cJSON_GetObjectItemCaseSensitive(arguments, "compare");
+	const std::string compareName = cJSON_IsString(compareItem) ? compareItem->valuestring : hasValue ? "value" : "previous";
+	/* 0 previous value, 1 specific value, 2 specific address, 3 number of changes, 4 difference */
+	const int compare = compareName == "previous" ? 0 : compareName == "value" ? 1 : compareName == "address" ? 2
+		: compareName == "changes" ? 3 : compareName == "difference" ? 4 : -1;
+	if (compare < 0) return mcpError("'compare' must be one of value, previous, address, changes, difference.");
+	if (compare != 0 && !hasValue) return mcpError("Comparing by " + compareName + " needs a 'value'.");
+	/* a count of changes and an address are whole numbers whatever the values are */
+	const int valueDisplay = compare == 2 || compare == 3 ? 0 : display;
+	uint64_t value = 0, by = 0;
+	if (hasValue && !searchBits(valueItem, valueDisplay, sv.searchSize, value))
+		return mcpError(valueDisplay == 2 ? "'value' must be a number." : "'value' must be a whole number, or hex text.");
+	const cJSON *byItem = cJSON_GetObjectItemCaseSensitive(arguments, "by");
+	if (op == 6 && (byItem == nullptr || !searchBits(byItem, display, sv.searchSize, by)))
+		return mcpError("different_by needs 'by': how far apart, a number.");
+	const cJSON *previousItem = cJSON_GetObjectItemCaseSensitive(arguments, "previous");
+	const std::string previousName = cJSON_IsString(previousItem) ? previousItem->valuestring : "last_search";
+	const int previous = previousName == "original" ? 0 : previousName == "last_search" ? 1 : previousName == "last_frame" ? 2
+		: previousName == "last_change" ? 3 : -1;
+	if (previous < 0) return mcpError("'previous' must be one of last_search, original, last_frame, last_change.");
+	/* what was written, or loaded, since the last frame is what is compared */
+	ce_ramsearch_catch_up(sv.search, sv.searchPreviousType);
+	sv.searchPreviousType = previous;
+	const int64_t removed = ce_ramsearch_search64(sv.search, compare, op, display, value, by, previous);
 	if (removed < 0) return mcpError("There is not enough memory to run that search.");
 	cJSON *out = cJSON_CreateObject();
 	cJSON_AddNumberToObject(out, "removed", static_cast<double>(removed));
@@ -2691,12 +2848,75 @@ McpResult toolSearchFilter(Service &sv, ce_session *s, const cJSON *arguments)
 	return textResult(out);
 }
 
+McpResult toolSearchFilter(Service &sv, ce_session *s, const cJSON *arguments)
+{
+	if (!searchStands(sv, s)) return mcpError(kNoSearch);
+	return runSearchFilter(sv, arguments);
+}
+
+/* Where the candidates lie: runs of them close together, the biggest first,
+ * and the distance that most often separates one from the next - a table's
+ * record size, when the candidates are a field of each record. */
+void addSearchShape(Service &sv, cJSON *out, int64_t count)
+{
+	const int64_t most = std::min<int64_t>(count, 200000);
+	std::vector<uint64_t> at;
+	at.reserve(static_cast<size_t>(most));
+	for (int64_t i = 0; i < most; i++)
+	{
+		uint64_t address = 0, current = 0, previous = 0;
+		uint32_t changes = 0;
+		if (ce_ramsearch_row64(sv.search, i, &address, &current, &previous, &changes) == 0) break;
+		at.push_back(address);
+	}
+	std::sort(at.begin(), at.end());
+	struct Run { uint64_t from, to; int64_t count; };
+	std::vector<Run> runs;
+	std::map<uint64_t, int64_t> gaps;
+	const uint64_t near = 256;
+	for (size_t i = 0; i < at.size(); i++)
+	{
+		if (i > 0) gaps[at[i] - at[i - 1]]++;
+		if (runs.empty() || at[i] - runs.back().to > near) runs.push_back({ at[i], at[i], 1 });
+		else
+		{
+			runs.back().to = at[i];
+			runs.back().count++;
+		}
+	}
+	std::stable_sort(runs.begin(), runs.end(), [](const Run &a, const Run &b) { return a.count > b.count; });
+	cJSON *clusters = cJSON_CreateArray();
+	for (size_t i = 0; i < runs.size() && i < 8; i++)
+	{
+		cJSON *c = cJSON_CreateObject();
+		cJSON_AddStringToObject(c, "from_hex", mcpHex(runs[i].from).c_str());
+		cJSON_AddStringToObject(c, "to_hex", mcpHex(runs[i].to).c_str());
+		cJSON_AddNumberToObject(c, "count", static_cast<double>(runs[i].count));
+		cJSON_AddItemToArray(clusters, c);
+	}
+	cJSON_AddItemToObject(out, "clusters", clusters);
+	if (runs.size() > 8) cJSON_AddNumberToObject(out, "more_clusters", static_cast<double>(runs.size() - 8));
+	/* a stride is worth saying when it is most of the gaps, and more than one value's width */
+	uint64_t stride = 0;
+	int64_t seen = 0;
+	for (const auto &[gap, n] : gaps)
+		if (n > seen) { stride = gap; seen = n; }
+	if (seen >= 3 && seen * 2 >= static_cast<int64_t>(at.size()) - 1 && stride > static_cast<uint64_t>(sv.searchSize))
+	{
+		cJSON_AddNumberToObject(out, "stride", static_cast<double>(stride));
+		cJSON_AddStringToObject(out, "stride_hex", mcpHex(stride).c_str());
+	}
+}
+
 McpResult toolSearchResults(Service &sv, ce_session *s, const cJSON *arguments)
 {
 	if (!searchStands(sv, s)) return mcpError(kNoSearch);
 	int64_t limit = 0;
 	if (!integerArgument(arguments, "limit", 1, 500, 50, limit)) return mcpError("'limit' must be between 1 and 500.");
-	const bool isSigned = cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(arguments, "signed"));
+	int display = 0;
+	std::string why;
+	if (!searchDisplay(arguments, sv.searchSize, display, why)) return mcpError(why);
+	ce_ramsearch_catch_up(sv.search, sv.searchPreviousType);
 	cJSON *out = cJSON_CreateObject();
 	cJSON_AddStringToObject(out, "domain", sv.searchDomain.c_str());
 	cJSON_AddNumberToObject(out, "size", sv.searchSize);
@@ -2705,25 +2925,29 @@ McpResult toolSearchResults(Service &sv, ce_session *s, const cJSON *arguments)
 	cJSON *results = cJSON_CreateArray();
 	for (int64_t i = 0; i < count && i < limit; i++)
 	{
-		uint64_t address = 0;
-		uint32_t current = 0, previous = 0, changes = 0;
-		if (ce_ramsearch_row(sv.search, i, &address, &current, &previous, &changes) == 0) break;
+		uint64_t address = 0, current = 0, previous = 0;
+		uint32_t changes = 0;
+		if (ce_ramsearch_row64(sv.search, i, &address, &current, &previous, &changes) == 0) break;
 		/* the value now is read from the machine itself: the search keeps
 		 * only what it needs to compare with */
-		uint32_t now = 0;
+		uint64_t now = 0;
 		for (int b = 0; b < sv.searchSize; b++)
 		{
-			now |= static_cast<uint32_t>(sv.searchBase[address + static_cast<uint64_t>(b)])
+			now |= static_cast<uint64_t>(sv.searchBase[address + static_cast<uint64_t>(b)])
 				<< (8 * (sv.searchBigEndian ? sv.searchSize - 1 - b : b));
 		}
 		cJSON *row = cJSON_CreateObject();
 		cJSON_AddNumberToObject(row, "address", static_cast<double>(address));
 		cJSON_AddStringToObject(row, "address_hex", mcpHex(static_cast<uint64_t>(address)).c_str());
-		cJSON_AddNumberToObject(row, "value", searchNumber(now, sv.searchSize, isSigned));
-		cJSON_AddNumberToObject(row, "previous", searchNumber(previous, sv.searchSize, isSigned));
+		const double shownNow = searchShown(now, sv.searchSize, display), shownBefore = searchShown(previous, sv.searchSize, display);
+		cJSON_AddNumberToObject(row, "value", shownNow);
+		cJSON_AddNumberToObject(row, "previous", shownBefore);
+		cJSON_AddNumberToObject(row, "difference", shownNow - shownBefore);
+		cJSON_AddNumberToObject(row, "changes", changes);
 		cJSON_AddItemToArray(results, row);
 	}
 	cJSON_AddItemToObject(out, "results", results);
+	if (count > 1) addSearchShape(sv, out, count);
 	return textResult(out);
 }
 
@@ -2956,6 +3180,17 @@ std::string mcpShotsContent(const std::string &answerJson, const std::vector<std
 	const std::string out = printJson(content);
 	cJSON_Delete(content);
 	return out;
+}
+
+McpResult mcpSearchFilter(ce_session *s, const std::string &argumentsJson)
+{
+	Service &sv = service();
+	onMachine(sv, s);
+	if (!searchStands(sv, s)) return mcpError(kNoSearch);
+	cJSON *arguments = cJSON_Parse(argumentsJson.c_str());
+	McpResult result = runSearchFilter(sv, arguments);
+	cJSON_Delete(arguments);
+	return result;
 }
 
 McpResult mcpRunDirect(const std::string &tool, const std::string &argumentsJson, ce_session *s, const ce_movie_log *log,
@@ -3260,6 +3495,29 @@ void ce_mcp_answer(ce_session *s, uint64_t id, const char *text, int32_t is_erro
 	chimera::addLostNote(sv, result);
 	chimera::finish(sv, found->second, result);
 	sv.withHost.erase(found);
+}
+
+int32_t ce_mcp_search_step(ce_session *s, int32_t step, const char *arguments_json, const char **answer_out)
+{
+	static thread_local chimera::ThreadString held;
+	const chimera::McpResult result = chimera::mcpSearchFilter(s, arguments_json != nullptr ? arguments_json : "{}");
+	/* the answer's text, not the content list it is wrapped in */
+	cJSON *content = cJSON_Parse(result.content.c_str());
+	const cJSON *text = cJSON_GetObjectItemCaseSensitive(cJSON_GetArrayItem(content, 0), "text");
+	const std::string said = cJSON_IsString(text) ? text->valuestring : "";
+	cJSON_Delete(content);
+	const int64_t frame = s != nullptr ? ce_session_frame(s) : -1;
+	if (result.isError) *held = "Step " + std::to_string(step) + " (frame " + std::to_string(frame) + "): " + said;
+	else
+	{
+		cJSON *row = cJSON_Parse(said.c_str());
+		if (row == nullptr) row = cJSON_CreateObject();
+		cJSON_AddNumberToObject(row, "frame", static_cast<double>(frame));
+		*held = chimera::printJson(row);
+		cJSON_Delete(row);
+	}
+	if (answer_out != nullptr) *answer_out = held->c_str();
+	return result.isError ? 0 : 1;
 }
 
 void ce_mcp_cores_folders(const char *folders_json)

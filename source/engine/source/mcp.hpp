@@ -110,6 +110,8 @@ struct McpResult
 /* freeze and unfreeze, on the engine's list (a window reads it back into its
  * Cheats list, ce_session_freeze_changes): answers the list as list_freezes does */
 McpResult mcpFreezeTool(ce_session *s, const std::string &tool, const std::string &argumentsJson);
+/* one search_filter on the agent's search, for search_steps between its seeks */
+McpResult mcpSearchFilter(ce_session *s, const std::string &argumentsJson);
 
 /* [{"type":"text","text":<text>}] */
 std::string mcpTextContent(const std::string &text);
