@@ -1566,11 +1566,19 @@ struct VirtualPads
 		return attach && setButton && setHat && setAxis && open;
 	}
 
-	/* a plain joystick (not a gamepad), by name; SDL's number for it, 0 when refused */
-	uint32_t add(const char *name, int axes, int buttons, int hats)
+	/* a plain joystick (not a gamepad), by name; SDL's number for it, 0 when refused.
+	 * With a USB vendor and product, a gamepad (SDL_JOYSTICK_TYPE_GAMEPAD), which
+	 * SDL takes for that maker's pad */
+	uint32_t add(const char *name, int axes, int buttons, int hats, uint16_t vendor = 0, uint16_t product = 0)
 	{
 		VirtualJoystickDesc desc{};
 		desc.version = sizeof desc;
+		if (vendor != 0)
+		{
+			desc.type = 1;
+			desc.vendor_id = vendor;
+			desc.product_id = product;
+		}
 		desc.naxes = static_cast<uint16_t>(axes);
 		desc.nbuttons = static_cast<uint16_t>(buttons);
 		desc.nhats = static_cast<uint16_t>(hats);
@@ -1591,6 +1599,23 @@ std::string padPrefix(const Gamepads &pads, const std::string &name)
 }
 } // namespace
 #endif
+
+/* A binding shown by the pad in use: each face button as the pad prints it,
+ * the saved names untouched */
+bool padFacesShown()
+{
+	const std::string faces = "X1:Cross,Circle,Square,Triangle;X2:B,A,Y,X";
+	CHECK(Gamepads::shown("X1 A", faces) == "X1 Cross");
+	CHECK(Gamepads::shown("X1 A, X2 A", faces) == "X1 Cross, X2 B");
+	CHECK(Gamepads::shown("Ctrl+X1 Y,X2 X", faces) == "Ctrl+X1 Triangle,X2 Y");
+	/* not a face button, not a gamepad, a pad not open, no pads: as saved */
+	CHECK(Gamepads::shown("X1 DpadUp, X1 LeftShoulder", faces) == "X1 DpadUp, X1 LeftShoulder");
+	CHECK(Gamepads::shown("J1 B1, A, X", faces) == "J1 B1, A, X");
+	CHECK(Gamepads::shown("X3 A", faces) == "X3 A");
+	CHECK(Gamepads::shown("X1 A", "") == "X1 A");
+	CHECK(Gamepads::shown("", faces).empty());
+	return true;
+}
 
 /* SDL's virtual joystick stands in for a real pad: it is held, and the
  * names Chimera's bindings use come out */
@@ -1637,6 +1662,30 @@ bool gamepads()
 	v.setAxis(joy, 1, 0);
 	pads.poll(held);
 	CHECK(!has(j + "B3") && !has(j + "POV0U") && !has(j + "Y-"));
+
+	/* gamepads: the bottom face button is "A" on every pad, and shown as the
+	 * pad prints it - a DualSense's Cross, a Switch Pro pad's B */
+	const uint32_t ps = v.add("Chimera Test DualSense", 6, 15, 0, 0x054C, 0x0CE6);
+	const uint32_t ns = v.add("Chimera Test Switch Pad", 6, 15, 0, 0x057E, 0x2009);
+	CHECK(ps != 0 && ns != 0);
+	pads.poll(held);
+	const std::string x = padPrefix(pads, "Chimera Test DualSense"), n = padPrefix(pads, "Chimera Test Switch Pad");
+	CHECK(x.size() > 1 && x[0] == 'X' && n.size() > 1 && n[0] == 'X');
+	const std::string xp = x.substr(0, x.size() - 1), np = n.substr(0, n.size() - 1);
+	const std::string faces = pads.faces();
+	CHECK(faces.find(xp + ":Cross,Circle,Square,Triangle") != std::string::npos);
+	CHECK(faces.find(np + ":B,A,Y,X") != std::string::npos);
+	void *psJoy = v.open(ps), *nsJoy = v.open(ns);
+	CHECK(psJoy != nullptr && nsJoy != nullptr);
+	if (psJoy == nullptr || nsJoy == nullptr) return true;
+	v.setButton(psJoy, 0, true); /* SDL_GAMEPAD_BUTTON_SOUTH */
+	v.setButton(nsJoy, 0, true);
+	pads.poll(held);
+	CHECK(has(x + "A") && !has(x + "Cross") && has(n + "A") && !has(n + "B"));
+	CHECK(Gamepads::shown(x + "A, Z", faces) == x + "Cross, Z");
+	CHECK(Gamepads::shown(n + "A+" + n + "Y", faces) == n + "B+" + n + "X");
+	v.setButton(psJoy, 0, false);
+	v.setButton(nsJoy, 0, false);
 	return true;
 #endif
 }
@@ -11266,6 +11315,7 @@ int main(int argc, char **argv)
 	crashNotes();
 	idleEye();
 	nutMuxer();
+	padFacesShown();
 	const bool ranPads = gamepads();
 	if (ranPads) padCatch();
 	bool ranMachine = false;

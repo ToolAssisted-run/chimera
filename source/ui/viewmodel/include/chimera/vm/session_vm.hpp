@@ -88,6 +88,9 @@ public:
 	Property<int64_t> buttonCount{0};
 	/* the gamepads in use, or why there are none */
 	Property<std::string> gamepads{tr("session.no_gamepads_yet")};
+	/* what the open gamepads print on their face buttons (Gamepads::faces),
+	 * for showing a binding by the pad in use (Gamepads::shown) */
+	Property<std::string> padFaces;
 	/* How fast the machine runs, as Chimera has it: a percent of its own
 	 * rate (1 to 6400, in Chimera's steps), or as fast as it can
 	 * (unthrottled); and its sound, on or off and its volume (0 to 100) */
@@ -1351,6 +1354,8 @@ private:
 	Clock::time_point catchDue_{};
 	std::vector<std::string> catchHeldM_;
 	void catchPollOnMachine();
+	/* padFaces, told when the pads open now print other faces */
+	void padFacesOnMachine();
 	Bindings bindingsM_;
 	Bindings autofireBindingsM_;
 	std::vector<AnalogBind> analogBindsM_;
@@ -1370,6 +1375,7 @@ private:
 	mutable std::mutex padHeldCopyM_;
 	std::vector<std::string> padHeldCopy_;
 	size_t padCount_ = 0;
+	std::string padFacesM_;
 	/* the hotkeys' keys and Key Priority (setPadHotkeys), and whether any key is a gamepad's */
 	std::mutex padHotkeysLock_;
 	std::set<std::string> padHotkeyKeys_;

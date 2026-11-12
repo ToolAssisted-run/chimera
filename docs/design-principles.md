@@ -14891,3 +14891,37 @@ it, and `gamepads.cpp` compiles for it. Not proved: the "gamepad hotkeys"
 test and the witness, which need the test core to run, and it does not run
 on a 16 KiB page kernel; Windows on x86_64 and macOS builds; and a real pad
 on any system.
+
+## Gamepad face buttons: kept by place, shown by the pad's print (user-decided, 2026-11-12)
+
+The SDL 3 change above named a face button by the letter printed on it when
+the pad printed A, B, X or Y, as SDL 2 did. The owner prefers SDL 3's way:
+a face button is kept by where it is, and the window shows what the pad in
+use prints there.
+
+- What is saved does not change with the pad. A binding, a core's default
+  bindings and a hotkey name the face buttons as on an Xbox pad: "X1 A" is
+  the bottom one, "X1 B" the right, "X1 X" the left and "X1 Y" the top, on
+  every pad. A binding made with one pad works with any other.
+- What is shown follows the pad. SDL 3 says what each open gamepad prints
+  on its face buttons; the session passes it to the window (`padFaces`, for
+  example "X1:Cross,Circle,Square,Triangle"), and the binding boxes and the
+  menus' hotkey text show "X1 A" as "X1 A" with an Xbox pad, "X1 B" with a
+  Nintendo pad and "X1 Cross" with a PlayStation pad. A pad SDL knows no
+  labels for, or none open, shows the saved name. `Gamepads::shown` does
+  this in the view models, and the window's `KeyNamer::shown` calls it.
+- The owner chose this over saving the printed label itself, which would
+  have tied a binding to one brand of pad: a core's "X1 A" would do nothing
+  on a PlayStation pad until bound again.
+- A binding made with a Nintendo pad under SDL 2 named its buttons by their
+  print, so its A and B, and its X and Y, swap places once. Bindings made
+  with Xbox and PlayStation pads mean what they did.
+
+Tested on Linux aarch64: the view models' test 1598 checks, 0 failed. Two
+virtual SDL 3 gamepads with a DualSense's and a Switch Pro pad's USB ids
+are reported as printing Cross, Circle, Square, Triangle and B, A, Y, X;
+the bottom button of each is still "A", and is shown as "Cross" and "B".
+These checks failed when their expected values were changed on purpose.
+The key names, binding box and key filter tests pass. Not tried: a real
+pad, and the window showing a label (the window's tests that open a game do
+not run on this machine's 16 KiB page kernel).

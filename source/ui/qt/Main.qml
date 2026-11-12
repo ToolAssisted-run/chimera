@@ -209,10 +209,11 @@ ApplicationWindow {
         return out
     }
     // the keys of every hotkey, for the menus to show beside their actions
-    // as this system names the keys (a Mac's Command, issue 538)
+    // as this system names the keys (a Mac's Command, issue 538), and a
+    // gamepad's face buttons as the pad in use prints them
     readonly property var hotkeyKeys: {
         const bound = JSON.parse(root.hotkeys.bound), out = {}
-        for (const hotkey in bound) out[hotkey] = root.keyNamer.shown(bound[hotkey])
+        for (const hotkey in bound) out[hotkey] = root.keyNamer.shown(bound[hotkey], root.session.padFaces)
         return out
     }
     // Chimera's Capture Mouse: while the window is active the pointer is hidden and kept over the picture
