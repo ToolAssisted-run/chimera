@@ -14496,3 +14496,29 @@ of Chimera's Lua functions waits without end.
 Tested: the view models test runs `while true do end` with 1 second: it is
 stopped after 1.00 s with the error, and `return 40 + 2` runs right after.
 Without the hook the test hangs until meson kills it at 180 s.
+
+## The window says a project is opening while its core loads (2026-11-12, issue 566)
+
+A core may take a long while to start a project's machine: OpenBOR loads a
+whole game before the first frame, and a 2.8 GB mod (Final Fight LNS
+Ultimate) took about 90 seconds here. All that time the window showed only
+the idle picture. "Opening ..." was a message for a few seconds, and the
+"Cannot open the project" box came only at the end, so the person who
+reported it thought nothing had happened.
+
+Now the session has `starting`: "Opening <project>..." while the core starts
+the machine, "" once it is up or refused. The window shows it with a busy
+spinner in the middle of the idle picture. The text is the one the status
+already used, so no new translation was needed.
+
+The mod itself is not ours to run. It is made for its author's own fork of
+OpenBOR (a 2018 base, v6330, and 65 commits of their own), and its scripts
+use properties upstream OpenBOR never had (`nextforcedirection` among them),
+so the upstream version our OpenBOR core builds refuses it with "Can't
+compile script 'cknife'" (owner, 2026-11-12: not ours, reply and close).
+
+Tested: the view models test watches `starting` while a project opens: it
+says "Opening <title>..." once and is "" again when the machine is up. With
+the line that clears it taken out, the test fails. The window was looked at
+20 seconds into opening the mod, with the spinner and the line showing (on
+Linux, with Qt's offscreen platform; not on Windows).

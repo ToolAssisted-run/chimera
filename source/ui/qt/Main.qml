@@ -1411,6 +1411,18 @@ ApplicationWindow {
                 }
             }
         }
+        // a core starting a project's machine, which may load its game for a
+        // minute or more: said over the idle picture until it is up or refused
+        // (issue 566)
+        Column {
+            objectName: "startingNote"
+            z: 2
+            anchors.centerIn: parent
+            spacing: 8
+            visible: root.session.starting !== ""
+            BusyIndicator { anchors.horizontalCenter: parent.horizontalCenter; running: parent.visible }
+            Label { anchors.horizontalCenter: parent.horizontalCenter; text: root.session.starting; color: root.osdMessageColor }
+        }
         PictureItem {
             id: picture
             objectName: "picture"

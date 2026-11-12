@@ -1704,8 +1704,15 @@ bool speedAndSound(const char *package, const char *rom)
 	CHECK(session.unthrottled.get() && session.status.get() == "Unthrottled");
 	session.run("toggleThrottle", {}, error);
 
+	/* while the core starts the machine the window says so, and stops saying
+	 * it once the machine is up (issue 566: a game that loads for a minute) */
+	std::vector<std::string> startingSaid;
+	Connection startingWatch = session.starting.changed.connect([&] { startingSaid.push_back(session.starting.get()); });
 	openGame(session, package, std::string(rom), error);
 	CHECK(d.until([&] { return session.isOpen.get(); }, 60));
+	CHECK(d.until([&] { return session.starting.get().empty(); }, 5));
+	CHECK(startingSaid.size() == 2 && startingSaid[0] == "Opening " + std::filesystem::path(rom).stem().string() + "..." && startingSaid[1].empty());
+	startingWatch.disconnect();
 	/* TAStudio's recording mode: what is held becomes the frame */
 	session.recordingMode.set(true);
 	/* frames run in a stretch of time, at a speed (the machine runs at 60 a second) */

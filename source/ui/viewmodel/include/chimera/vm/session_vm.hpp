@@ -70,6 +70,10 @@ public:
 	Property<bool> restarted{false};
 	/* how many opens failed; the status says why (a run nobody watches ends on one) */
 	Property<int64_t> openFailures{0};
+	/* while a core starts a project's machine, what the window says about it
+	 * ("Opening <project>..."); "" otherwise. A core may load its game for a
+	 * minute or more before the first frame (issue 566) */
+	Property<std::string> starting{""};
 	/* how many times the movie could not be played (an entry that does not read); the status says why */
 	Property<int64_t> unplayableMovies{0};
 	Property<bool> running{false};

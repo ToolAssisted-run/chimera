@@ -185,6 +185,7 @@ SessionViewModel::SessionViewModel(Dispatcher &dispatcher, InputLog &inputs)
 	expose("restarted", "the machine opened last is the same project started again (Restart, a change that restarts it, a "
 		"script's reboot), not a project opened or made", restarted);
 	expose("openFailures", "how many opens failed, a file that is no project among them; the status says why", openFailures);
+	expose("starting", "while a core starts a project's machine, what the window says about it; \"\" otherwise", starting);
 	expose("unplayableMovies", "how many times the movie could not be played; the status says why", unplayableMovies);
 	expose("projectId", "the open project's id (its cache folder's name), \"\" for none", projectId);
 	expose("resolvingFiles", "a project is waiting for its files to be found (the projectFiles rows)", resolvingFiles);
@@ -4723,8 +4724,17 @@ void SessionViewModel::bootProjectOnMachine(ce_project *p, const std::string &pa
 		const char *settings = ce_project_settings_text(p, &len);
 		requestGpu(package, settings != nullptr ? std::string(settings, static_cast<size_t>(len)) : std::string());
 	}
+	/* the core may take a long while here, loading its game: the window says
+	 * so until the machine is up or refused */
+	{
+		const char *title = ce_project_title(p);
+		const size_t slash = path.find_last_of("/\\");
+		const std::string named = title != nullptr && *title != '\0' ? title : path.substr(slash == std::string::npos ? 0 : slash + 1);
+		later([this, named] { starting.set(tr("session.opening_project", {named})); });
+	}
 	ce_session *s = ce_session_open_project(package.c_str(), p, nullptr, fwIds.data(), fwData.data(), fwLens.data(),
 		static_cast<int32_t>(fwIds.size()), flags, &error);
+	later([this] { starting.set(""); });
 	/* what was mounted is what the project records, as always: by the bytes */
 	if (s != nullptr && !fw.ids.empty())
 	{
