@@ -801,6 +801,11 @@ struct ce_session
 	int32_t pictureSettle = 3;
 	int32_t tracedSinceLoad = 8;   /* CHIMERA_PICTURE_TRACE: frames reported since the last load */
 	int64_t lastKept = -1;
+	/* ce_session_take_loaded_low: the lowest frame a state was loaded onto
+	 * since it was last asked (-1 none), and a load whose frame the caller
+	 * had still to say (ce_session_movie_at says it) */
+	int64_t loadedLow = -1;
+	bool loadedUnsaid = false;
 	void afterFrame(bool rendered, int64_t known);
 	void afterLoad(int64_t landedOn);
 	/* the compile cache and precompile sessions (optional exports) */
@@ -842,6 +847,7 @@ struct ce_session
 		std::string text;
 	};
 	std::vector<Freeze> freezes;
+	uint64_t freezeChanges = 0;   /* ce_session_freeze_changes */
 	void applyFreezes();
 	std::unique_ptr<struct GuestWatchdog> watchdog;
 	/* the next frame is the first after starting or a state load: it has the
@@ -1663,6 +1669,8 @@ void ce_session::afterFrame(bool rendered, int64_t known)
  * from before the load. */
 void ce_session::afterLoad(int64_t landedOn)
 {
+	if (landedOn < 0) loadedUnsaid = true;
+	else if (loadedLow < 0 || landedOn < loadedLow) loadedLow = landedOn;
 	machineFrame = landedOn;
 	sinceLoad = 0;
 	firstFrame = true;
@@ -4599,6 +4607,17 @@ bool ce_session::catchUp(int64_t to, int64_t render)
 
 int64_t ce_session_frame(const ce_session *s) { return s->frame; }
 
+int64_t ce_session_take_loaded_low(ce_session *s)
+{
+	if (s == nullptr) return -1;
+	int64_t low = s->loadedLow;
+	/* a state loaded with no frame said for it: the machine is where the session counts it now */
+	if (s->loadedUnsaid && (low < 0 || s->frame < low)) low = s->frame;
+	s->loadedLow = -1;
+	s->loadedUnsaid = false;
+	return low;
+}
+
 void ce_session::rerecordIfDropping(int64_t after)
 {
 	if (ce_session_greenzone_nearest(this, INT64_MAX) > after)
@@ -5108,6 +5127,8 @@ int32_t ce_session_movie_at(ce_session *s, int64_t frame)
 	s->staleFrom = -1;
 	s->frame = frame;
 	s->machineFrame = frame;
+	if (s->loadedUnsaid && (s->loadedLow < 0 || frame < s->loadedLow)) s->loadedLow = frame;
+	s->loadedUnsaid = false;
 	s->greenzoneCapture();
 	if (s->movieMode == 3 && s->frame < ce_session_movie_length(s)) s->movieMode = 1;
 	return 0;
@@ -5543,6 +5564,7 @@ int32_t ce_session_freeze(ce_session *s, int32_t domain, int64_t address, int32_
 	f.value = size == 8 ? value : value & ((uint64_t{1} << (8 * size)) - 1);
 	f.compareKind = compare_kind;
 	f.compare = compare;
+	s->freezeChanges++;
 	for (size_t i = 0; i < s->freezes.size(); i++)
 		if (s->freezes[i].property < 0 && s->freezes[i].domain == domain && s->freezes[i].address == address)
 		{
@@ -5562,6 +5584,7 @@ int32_t ce_session_freeze_property(ce_session *s, int32_t index, uint32_t elemen
 	f.property = index;
 	f.element = element;
 	f.text = text != nullptr ? text : "";
+	s->freezeChanges++;
 	for (size_t i = 0; i < s->freezes.size(); i++)
 		if (s->freezes[i].property == index && s->freezes[i].element == element)
 		{
@@ -5577,14 +5600,22 @@ int32_t ce_session_freeze_count(const ce_session *s) { return static_cast<int32_
 void ce_session_unfreeze(ce_session *s, int32_t index)
 {
 	if (index >= 0 && static_cast<size_t>(index) < s->freezes.size()) s->freezes.erase(s->freezes.begin() + index);
+	s->freezeChanges++;
 }
 
-void ce_session_unfreeze_all(ce_session *s) { s->freezes.clear(); }
+void ce_session_unfreeze_all(ce_session *s)
+{
+	s->freezes.clear();
+	s->freezeChanges++;
+}
 
 void ce_session_freeze_enable(ce_session *s, int32_t index, int32_t on)
 {
 	if (index >= 0 && static_cast<size_t>(index) < s->freezes.size()) s->freezes[static_cast<size_t>(index)].enabled = on != 0;
+	s->freezeChanges++;
 }
+
+uint64_t ce_session_freeze_changes(const ce_session *s) { return s != nullptr ? s->freezeChanges : 0; }
 
 int32_t ce_session_freeze_enabled(const ce_session *s, int32_t index)
 {
@@ -5601,4 +5632,23 @@ int32_t ce_session_frozen(const ce_session *s, int32_t domain, int64_t address)
 			return static_cast<int32_t>(i);
 	}
 	return -1;
+}
+
+int32_t ce_session_freeze_info(const ce_session *s, int32_t index, int32_t *domain, int64_t *address, int32_t *size,
+	int32_t *big_endian, uint64_t *value, int32_t *compare_kind, uint64_t *compare, int32_t *property, uint32_t *element,
+	const char **text)
+{
+	if (s == nullptr || index < 0 || static_cast<size_t>(index) >= s->freezes.size()) return 0;
+	const ce_session::Freeze &f = s->freezes[static_cast<size_t>(index)];
+	if (domain != nullptr) *domain = f.property >= 0 ? -1 : f.domain;
+	if (address != nullptr) *address = f.address;
+	if (size != nullptr) *size = f.size;
+	if (big_endian != nullptr) *big_endian = f.bigEndian ? 1 : 0;
+	if (value != nullptr) *value = f.value;
+	if (compare_kind != nullptr) *compare_kind = f.compareKind;
+	if (compare != nullptr) *compare = f.compare;
+	if (property != nullptr) *property = f.property;
+	if (element != nullptr) *element = f.element;
+	if (text != nullptr) *text = f.text.c_str();
+	return 1;
 }

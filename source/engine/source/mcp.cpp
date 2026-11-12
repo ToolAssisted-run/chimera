@@ -41,6 +41,12 @@ namespace
 
 const char kNoArguments[] = "{\"type\":\"object\",\"properties\":{},\"additionalProperties\":false}";
 
+/* An address, as a number or as hex text ("0x2E329"): a slip between decimal
+ * and hex sent a person to the wrong place once (issue 571). Every tool's
+ * address reads both (integerArgument). */
+#define MCP_ADDRESS "\"address\":{\"type\":[\"integer\",\"string\"],\"description\":\"A number, or hex text such as \\\"0x2E329\\\".\"}"
+
+
 const McpTool kTools[] = {
 	{ "status",
 	  "What is open in Chimera right now: the core and the system, the frame the machine is on, the movie's length, "
@@ -73,7 +79,7 @@ const McpTool kTools[] = {
 	  "Reads values from a memory domain or a bus at the frame the machine is on. At most 4096 bytes a call.",
 	  "{\"type\":\"object\",\"properties\":{"
 	  "\"domain\":{\"type\":\"string\",\"description\":\"A name from list_memory.\"},"
-	  "\"address\":{\"type\":\"integer\",\"minimum\":0},"
+	  MCP_ADDRESS ","
 	  "\"count\":{\"type\":\"integer\",\"minimum\":1,\"description\":\"How many values. 1 when left out.\"},"
 	  "\"type\":{\"type\":\"string\",\"enum\":[\"u8\",\"s8\",\"u16\",\"s16\",\"u32\",\"s32\"],\"description\":\"u8 when left out.\"},"
 	  "\"big_endian\":{\"type\":\"boolean\",\"description\":\"The byte order of values wider than a byte. false when left out.\"}"
@@ -105,7 +111,7 @@ const McpTool kTools[] = {
 	  "\"watches\":{\"type\":\"array\",\"maxItems\":32,\"items\":{\"type\":\"object\",\"properties\":{"
 	  "\"name\":{\"type\":\"string\",\"description\":\"What to call it in the answers. Made up from the rest when left out.\"},"
 	  "\"domain\":{\"type\":\"string\",\"description\":\"A domain or bus from list_memory. Give this with 'address', or give 'property'.\"},"
-	  "\"address\":{\"type\":\"integer\",\"minimum\":0},"
+	  MCP_ADDRESS ","
 	  "\"type\":{\"type\":\"string\",\"enum\":[\"u8\",\"s8\",\"u16\",\"s16\",\"u32\",\"s32\"],\"description\":\"u8 when left out.\"},"
 	  "\"big_endian\":{\"type\":\"boolean\",\"description\":\"false when left out.\"},"
 	  "\"property\":{\"type\":\"string\",\"description\":\"A game core's named value, in place of domain and address.\"}"
@@ -195,7 +201,7 @@ const McpTool kTools[] = {
 	  "end or after max_frames if the condition is never met, and says which.",
 	  "{\"type\":\"object\",\"properties\":{"
 	  "\"domain\":{\"type\":\"string\",\"description\":\"A domain or bus from list_memory. Give this with 'address', or give 'property'.\"},"
-	  "\"address\":{\"type\":\"integer\",\"minimum\":0},"
+	  MCP_ADDRESS ","
 	  "\"type\":{\"type\":\"string\",\"enum\":[\"u8\",\"s8\",\"u16\",\"s16\",\"u32\",\"s32\"],\"description\":\"u8 when left out.\"},"
 	  "\"big_endian\":{\"type\":\"boolean\",\"description\":\"false when left out.\"},"
 	  "\"property\":{\"type\":\"string\",\"description\":\"A game core's named value, in place of domain and address.\"},"
@@ -350,10 +356,13 @@ const McpTool kTools[] = {
 	  true, true, false, true },
 	{ "write_memory",
 	  "Writes values to a memory domain or a bus at the frame the machine is on. A movie cannot reproduce a memory write: "
-	  "it is for testing a guess, and 'status' says from then on that memory was written. At most 4096 bytes a call.",
+	  "it is for testing a guess, and 'status' says from then on that memory was written. A write lasts only until the "
+	  "machine goes back before it: a seek back, a branch or a rewind loads a state from before the write, the movie then "
+	  "plays without it, and the answer of that call says so. To hold a value through seeks, use 'freeze'. At most 4096 "
+	  "bytes a call.",
 	  "{\"type\":\"object\",\"properties\":{"
 	  "\"domain\":{\"type\":\"string\",\"description\":\"A name from list_memory.\"},"
-	  "\"address\":{\"type\":\"integer\",\"minimum\":0},"
+	  MCP_ADDRESS ","
 	  "\"values\":{\"type\":\"array\",\"items\":{\"type\":\"integer\"},\"minItems\":1},"
 	  "\"type\":{\"type\":\"string\",\"enum\":[\"u8\",\"s8\",\"u16\",\"s16\",\"u32\",\"s32\"],\"description\":\"u8 when left out.\"},"
 	  "\"big_endian\":{\"type\":\"boolean\",\"description\":\"false when left out.\"}"
@@ -374,6 +383,42 @@ const McpTool kTools[] = {
 	  "\"value\":{\"type\":\"integer\"}"
 	  "},\"required\":[\"name\",\"value\"],\"additionalProperties\":false}",
 	  true, false },
+	{ "freeze",
+	  "Holds a value: it is written into the machine before every frame that runs, a seek's replay included, so unlike "
+	  "write_memory it survives going back. A memory value (domain, address, size, value), or a game core's property "
+	  "(property, text). With 'when' it is written only while the value now compares so. A freeze already on that place "
+	  "is replaced. Freezes are for looking into a game: they are never saved, never in the movie, and the person sees "
+	  "them in the Cheats window. Answers the list, as list_freezes does.",
+	  "{\"type\":\"object\",\"properties\":{"
+	  "\"domain\":{\"type\":\"string\",\"description\":\"A name from list_memory. Give this with 'address', or give 'property'.\"},"
+	  MCP_ADDRESS ","
+	  "\"size\":{\"type\":\"integer\",\"enum\":[1,2,4,8],\"description\":\"Bytes. 1 when left out.\"},"
+	  "\"value\":{\"type\":[\"integer\",\"string\"],\"description\":\"The value to hold: a number, or hex text.\"},"
+	  "\"big_endian\":{\"type\":\"boolean\",\"description\":\"false when left out.\"},"
+	  "\"property\":{\"type\":\"string\",\"description\":\"A game core's named value, in place of domain and address.\"},"
+	  "\"text\":{\"type\":\"string\",\"description\":\"The property's value as text: a number, a name it can take, true or false.\"},"
+	  "\"when\":{\"type\":\"object\",\"properties\":{"
+	  "\"op\":{\"type\":\"string\",\"enum\":[\"equal\",\"not_equal\",\"greater\",\"greater_or_equal\",\"less\",\"less_or_equal\"]},"
+	  "\"value\":{\"type\":[\"integer\",\"string\"]}"
+	  "},\"required\":[\"op\",\"value\"],\"additionalProperties\":false,"
+	  "\"description\":\"Write it only while the value now compares so with 'value' (a memory freeze only).\"}"
+	  "},\"additionalProperties\":false}",
+	  true, false },
+	{ "unfreeze",
+	  "Lets go of freezes: one by its index in list_freezes, the one on a place (domain and address, or property), or "
+	  "all of them. Answers the list left.",
+	  "{\"type\":\"object\",\"properties\":{"
+	  "\"index\":{\"type\":\"integer\",\"minimum\":0},"
+	  "\"domain\":{\"type\":\"string\"},"
+	  MCP_ADDRESS ","
+	  "\"property\":{\"type\":\"string\"},"
+	  "\"all\":{\"type\":\"boolean\"}"
+	  "},\"additionalProperties\":false}",
+	  true, false },
+	{ "list_freezes",
+	  "The values held now, the person's own from the Cheats window among them: for each, its index, its place, its "
+	  "value, whether it is on, and its condition.",
+	  kNoArguments, false, false },
 
 	/* The tools that exist only where there is no window: there the agent
 	 * opens a machine of its own, and saves what it made. */
@@ -425,6 +470,14 @@ bool integerArgument(const cJSON *arguments, const char *name, int64_t low, int6
 {
 	const cJSON *item = cJSON_GetObjectItemCaseSensitive(arguments, name);
 	if (item == nullptr || cJSON_IsNull(item)) { out = fallback; return true; }
+	/* hex text ("0x2E329"), or decimal text, as well as a number (issue 571) */
+	if (cJSON_IsString(item))
+	{
+		uint64_t value = 0;
+		if (!mcpParseInteger(item->valuestring, value) || value > static_cast<uint64_t>(INT64_MAX)) return false;
+		out = static_cast<int64_t>(value);
+		return out >= low && out <= high;
+	}
 	if (!cJSON_IsNumber(item)) return false;
 	const double value = item->valuedouble;
 	if (value != static_cast<double>(static_cast<int64_t>(value))) return false;
@@ -458,6 +511,38 @@ std::string base64(const uint8_t *data, size_t len)
 }
 
 } // namespace
+
+bool mcpParseInteger(const std::string &text, uint64_t &value)
+{
+	size_t at = 0;
+	int base = 10;
+	if (text.size() > 2 && text[0] == '0' && (text[1] == 'x' || text[1] == 'X'))
+	{
+		at = 2;
+		base = 16;
+	}
+	if (at == text.size()) return false;
+	value = 0;
+	for (; at < text.size(); at++)
+	{
+		const char c = text[at];
+		int digit = -1;
+		if (c >= '0' && c <= '9') digit = c - '0';
+		else if (base == 16 && c >= 'a' && c <= 'f') digit = c - 'a' + 10;
+		else if (base == 16 && c >= 'A' && c <= 'F') digit = c - 'A' + 10;
+		if (digit < 0) return false;
+		if (value > (UINT64_MAX - static_cast<uint64_t>(digit)) / static_cast<uint64_t>(base)) return false;
+		value = value * static_cast<uint64_t>(base) + static_cast<uint64_t>(digit);
+	}
+	return true;
+}
+
+std::string mcpHex(uint64_t value)
+{
+	char text[24];
+	std::snprintf(text, sizeof text, "0x%llX", static_cast<unsigned long long>(value));
+	return text;
+}
 
 void mcpSetLocal(bool local) { g_local = local; }
 
@@ -921,6 +1006,11 @@ struct Service
 	std::deque<std::string> log;
 	uint64_t logTotal = 0;
 	int64_t wroteMemoryAt = -1;        /* the frame of the agent's first write to the machine, -1 for none */
+	/* the frames the agent wrote the machine on that no state load has undone
+	 * yet, lowest first, and what the call being answered is to say of the
+	 * ones that were (lostWrites) */
+	std::vector<int64_t> writeFrames;
+	std::string lostNote;
 	/* Before the agent's first change the frontend is asked to keep the
 	 * person's work as it was (a branch). 0 not asked yet, 1 asked and
 	 * waiting, 2 kept, 3 could not be kept - and then nothing is changed. */
@@ -1430,6 +1520,7 @@ McpResult toolReadMemory(ce_session *s, const cJSON *arguments)
 	cJSON *out = cJSON_CreateObject();
 	cJSON_AddStringToObject(out, "domain", domain.c_str());
 	cJSON_AddNumberToObject(out, "address", static_cast<double>(address));
+	cJSON_AddStringToObject(out, "address_hex", mcpHex(static_cast<uint64_t>(address)).c_str());
 	cJSON_AddStringToObject(out, "type", type.c_str());
 	cJSON *values = cJSON_CreateArray();
 	for (int64_t i = 0; i < count; i++)
@@ -1613,9 +1704,199 @@ McpResult toolWriteMemory(ce_session *s, const cJSON *arguments)
 	cJSON *out = cJSON_CreateObject();
 	cJSON_AddStringToObject(out, "domain", domain.c_str());
 	cJSON_AddNumberToObject(out, "address", static_cast<double>(address));
+	cJSON_AddStringToObject(out, "address_hex", mcpHex(static_cast<uint64_t>(address)).c_str());
 	cJSON_AddNumberToObject(out, "bytes_written", static_cast<double>(bytes.size()));
 	return textResult(out);
 }
+
+/* ---- freezes (issue 571) ---- */
+
+/* An agent's condition reads "the value now OP value"; the engine's reads
+ * "compare OP now". */
+const struct { const char *op; int32_t kind; } kFreezeOps[] = {
+	{ "equal", 1 }, { "not_equal", 2 }, { "greater", 5 }, { "greater_or_equal", 6 }, { "less", 3 }, { "less_or_equal", 4 },
+};
+
+/* the property's name in the table, an array's element with its [n] */
+std::string propertyName(ce_session *s, int32_t index, uint32_t element)
+{
+	cJSON *table = cJSON_Parse(ce_session_property_table(s));
+	const cJSON *name = cJSON_GetObjectItemCaseSensitive(
+		cJSON_GetArrayItem(cJSON_GetObjectItemCaseSensitive(table, "properties"), index), "name");
+	std::string out = cJSON_IsString(name) ? name->valuestring : "#" + std::to_string(index);
+	cJSON_Delete(table);
+	if (element > 0) out += "[" + std::to_string(element) + "]";
+	return out;
+}
+
+McpResult toolListFreezes(ce_session *s)
+{
+	cJSON *out = cJSON_CreateObject();
+	cJSON *list = cJSON_CreateArray();
+	for (int32_t i = 0; i < ce_session_freeze_count(s); i++)
+	{
+		int32_t domain = -1, size = 1, bigEndian = 0, kind = 0, property = -1;
+		int64_t address = 0;
+		uint64_t value = 0, compare = 0;
+		uint32_t element = 0;
+		const char *text = nullptr;
+		if (ce_session_freeze_info(s, i, &domain, &address, &size, &bigEndian, &value, &kind, &compare, &property, &element, &text) == 0)
+			continue;
+		cJSON *item = cJSON_CreateObject();
+		cJSON_AddNumberToObject(item, "index", i);
+		cJSON_AddBoolToObject(item, "on", ce_session_freeze_enabled(s, i) == 1);
+		if (property >= 0)
+		{
+			cJSON_AddStringToObject(item, "property", propertyName(s, property, element).c_str());
+			cJSON_AddStringToObject(item, "text", text != nullptr ? text : "");
+		}
+		else
+		{
+			const char *name = ce_session_domain_name(s, domain);
+			cJSON_AddStringToObject(item, "domain", name != nullptr ? name : "");
+			cJSON_AddNumberToObject(item, "address", static_cast<double>(address));
+			cJSON_AddStringToObject(item, "address_hex", mcpHex(static_cast<uint64_t>(address)).c_str());
+			cJSON_AddNumberToObject(item, "size", size);
+			cJSON_AddNumberToObject(item, "value", static_cast<double>(value));
+			cJSON_AddStringToObject(item, "value_hex", mcpHex(value).c_str());
+			if (size > 1) cJSON_AddBoolToObject(item, "big_endian", bigEndian != 0);
+			for (const auto &op : kFreezeOps)
+				if (op.kind == kind)
+				{
+					cJSON *when = cJSON_CreateObject();
+					cJSON_AddStringToObject(when, "op", op.op);
+					cJSON_AddNumberToObject(when, "value", static_cast<double>(compare));
+					cJSON_AddItemToObject(item, "when", when);
+				}
+		}
+		cJSON_AddItemToArray(list, item);
+	}
+	cJSON_AddItemToObject(out, "freezes", list);
+	return textResult(out);
+}
+
+int32_t domainNamed(ce_session *s, const std::string &name)
+{
+	for (int32_t d = 0; d < ce_session_domain_count(s); d++)
+	{
+		const char *n = ce_session_domain_name(s, d);
+		if (n != nullptr && name == n) return d;
+	}
+	return -1;
+}
+
+} // namespace
+
+bool mcpReadFreeze(const std::string &tool, const std::string &argumentsJson, McpFreezeAsk &ask, std::string &why)
+{
+	cJSON *arguments = cJSON_Parse(argumentsJson.c_str());
+	const auto text = [&](const char *name) {
+		const cJSON *t = cJSON_GetObjectItemCaseSensitive(arguments, name);
+		return cJSON_IsString(t) ? std::string(t->valuestring) : std::string();
+	};
+	ask = McpFreezeAsk{};
+	ask.domain = text("domain");
+	ask.property = text("property");
+	ask.text = text("text");
+	ask.all = cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(arguments, "all"));
+	ask.bigEndian = cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(arguments, "big_endian"));
+	const bool hasAddress = cJSON_GetObjectItemCaseSensitive(arguments, "address") != nullptr;
+	int64_t size = 1, value = 0;
+	bool ok = true;
+	if (!integerArgument(arguments, "address", 0, INT64_MAX / 8, 0, ask.address)) { why = "'address' must be 0 or more."; ok = false; }
+	else if (!integerArgument(arguments, "size", 1, 8, 1, size) || (size != 1 && size != 2 && size != 4 && size != 8)) { why = "'size' must be 1, 2, 4 or 8."; ok = false; }
+	else if (!integerArgument(arguments, "index", 0, INT32_MAX, -1, ask.index)) { why = "'index' must be 0 or more."; ok = false; }
+	else if (!integerArgument(arguments, "value", INT64_MIN, INT64_MAX, 0, value)) { why = "'value' must be a whole number."; ok = false; }
+	ask.size = static_cast<int32_t>(size);
+	ask.value = static_cast<uint64_t>(value);
+	const cJSON *when = cJSON_GetObjectItemCaseSensitive(arguments, "when");
+	if (ok && when != nullptr)
+	{
+		const cJSON *op = cJSON_GetObjectItemCaseSensitive(when, "op");
+		int64_t compare = 0;
+		for (const auto &o : kFreezeOps)
+			if (cJSON_IsString(op) && std::strcmp(op->valuestring, o.op) == 0) ask.compareKind = o.kind;
+		if (ask.compareKind == 0 || !integerArgument(when, "value", INT64_MIN, INT64_MAX, 0, compare))
+		{
+			why = "'when' needs an 'op' (equal, not_equal, greater, greater_or_equal, less, less_or_equal) and a whole-number 'value'.";
+			ok = false;
+		}
+		ask.compare = static_cast<uint64_t>(compare);
+	}
+	cJSON_Delete(arguments);
+	if (!ok) return false;
+	if (tool == "freeze")
+	{
+		if (ask.property.empty() == ask.domain.empty())
+			why = "Give either 'domain' with 'address' and 'value', or 'property' with 'text'.";
+		else if (!ask.property.empty() && ask.compareKind != 0)
+			why = "'when' is for a memory freeze, not a property's.";
+		else if (ask.property.empty() && !hasAddress)
+			why = "'address' must be given with 'domain'.";
+		return why.empty();
+	}
+	const int given = (ask.index >= 0 ? 1 : 0) + (ask.all ? 1 : 0) + (!ask.property.empty() ? 1 : 0) + (!ask.domain.empty() ? 1 : 0);
+	if (given != 1 || (!ask.domain.empty() && !hasAddress))
+		why = "Give one of: 'index', 'all', 'property', or 'domain' with 'address'.";
+	return why.empty();
+}
+
+McpResult mcpFreezeTool(ce_session *s, const std::string &tool, const std::string &argumentsJson)
+{
+	if (s == nullptr) return mcpError(kNoMachine);
+	McpFreezeAsk ask;
+	std::string why;
+	if (!mcpReadFreeze(tool, argumentsJson, ask, why)) return mcpError(why);
+	int32_t index = -1;
+	if (tool == "freeze")
+	{
+		if (!ask.property.empty())
+		{
+			uint32_t element = 0;
+			const int32_t p = ce_session_property_find(s, ask.property.c_str(), &element);
+			if (p < 0) return mcpError("There is no property called '" + ask.property + "' (list_properties lists them).");
+			index = ce_session_freeze_property(s, p, element, ask.text.c_str());
+		}
+		else
+		{
+			const int32_t d = domainNamed(s, ask.domain);
+			if (d < 0) return mcpError("There is no memory domain called '" + ask.domain + "' (list_memory lists them).");
+			index = ce_session_freeze(s, d, ask.address, ask.size, ask.bigEndian ? 1 : 0, ask.value, ask.compareKind, ask.compare);
+		}
+		if (index < 0)
+		{
+			const char *e = ce_session_last_error(s);
+			return mcpError(e != nullptr && *e != '\0' ? e : "The freeze was refused.");
+		}
+	}
+	else if (ask.all)
+		ce_session_unfreeze_all(s);
+	else
+	{
+		/* by index, or every freeze on the place named */
+		for (int32_t i = ce_session_freeze_count(s) - 1; i >= 0; i--)
+		{
+			int32_t domain = -1, size = 1, property = -1;
+			int64_t address = 0;
+			uint32_t element = 0;
+			ce_session_freeze_info(s, i, &domain, &address, &size, nullptr, nullptr, nullptr, nullptr, &property, &element, nullptr);
+			bool goes = ask.index >= 0 ? i == ask.index : false;
+			if (ask.index < 0 && !ask.property.empty()) goes = property >= 0 && propertyName(s, property, element) == ask.property;
+			if (ask.index < 0 && ask.property.empty())
+				goes = property < 0 && domain == domainNamed(s, ask.domain) && ask.address >= address && ask.address < address + size;
+			if (goes)
+			{
+				ce_session_unfreeze(s, i);
+				index = i;
+			}
+		}
+		if (index < 0) return mcpError("No freeze is there (list_freezes lists them).");
+	}
+	return toolListFreezes(s);
+}
+
+namespace
+{
 
 McpResult toolSetProperty(ce_session *s, const cJSON *arguments)
 {
@@ -2332,6 +2613,8 @@ void onMachine(Service &sv, ce_session *s)
 	if (sv.machineSession != 0)
 	{
 		sv.wroteMemoryAt = -1;
+		sv.writeFrames.clear();
+		sv.lostNote.clear();
 		sv.watches.clear();
 		sv.conditionSet = false;
 		dropSearch(sv);
@@ -2435,6 +2718,7 @@ McpResult toolSearchResults(Service &sv, ce_session *s, const cJSON *arguments)
 		}
 		cJSON *row = cJSON_CreateObject();
 		cJSON_AddNumberToObject(row, "address", static_cast<double>(address));
+		cJSON_AddStringToObject(row, "address_hex", mcpHex(static_cast<uint64_t>(address)).c_str());
 		cJSON_AddNumberToObject(row, "value", searchNumber(now, sv.searchSize, isSigned));
 		cJSON_AddNumberToObject(row, "previous", searchNumber(previous, sv.searchSize, isSigned));
 		cJSON_AddItemToArray(results, row);
@@ -2454,15 +2738,64 @@ McpResult toolSearchUndo(Service &sv, ce_session *s)
 }
 
 /* A tool that writes to the machine, and the note that it did. */
+/* The agent's memory writes that a state load has thrown away (issue 571).
+ * A write lasts only until the machine goes back before it: a seek back, a
+ * branch or a rewind loads a state from before the write, and the movie
+ * replays without it. An agent not told so takes the write for having done
+ * nothing. A load onto the frame of a write undoes it too: that frame's state
+ * was kept when the machine arrived there, before the write. Called with the
+ * lock held, on the machine's thread; what it finds goes into lostNote, for
+ * the answer of the call being run. */
+void lostWrites(Service &sv, ce_session *s)
+{
+	if (s == nullptr) return;
+	const int64_t low = ce_session_take_loaded_low(s);
+	if (low < 0 || sv.writeFrames.empty() || sv.writeFrames.back() < low) return;
+	const auto from = std::lower_bound(sv.writeFrames.begin(), sv.writeFrames.end(), low);
+	const int64_t first = *from, last = sv.writeFrames.back();
+	sv.writeFrames.erase(from, sv.writeFrames.end());
+	const std::string frames = first == last ? "frame " + std::to_string(first)
+		: "frames " + std::to_string(first) + "-" + std::to_string(last);
+	if (!sv.lostNote.empty()) sv.lostNote += " ";
+	sv.lostNote += "Warning: the memory writes made on " + frames + " were thrown away: the machine was put back on frame "
+		+ std::to_string(low) + " by loading the state kept there, from before them, and what is played from there runs "
+		"without them. A write lasts only until the machine goes back before it; 'freeze' holds a value through seeks.";
+}
+
+/* The note lostWrites left for this call, added to its answer as a text of its own. */
+void addLostNote(Service &sv, McpResult &result)
+{
+	if (sv.lostNote.empty()) return;
+	cJSON *content = cJSON_Parse(result.content.c_str());
+	if (cJSON_IsArray(content))
+	{
+		cJSON *note = cJSON_CreateObject();
+		cJSON_AddStringToObject(note, "type", "text");
+		cJSON_AddStringToObject(note, "text", sv.lostNote.c_str());
+		cJSON_AddItemToArray(content, note);
+		result.content = printJson(content);
+	}
+	cJSON_Delete(content);
+	sv.lostNote.clear();
+}
+
 McpResult runWriteTool(Service &sv, const std::string &tool, ce_session *s, int64_t frame, const cJSON *arguments)
 {
+	{
+		/* loads before this write are not about it */
+		std::lock_guard<std::mutex> hold(sv.lock);
+		lostWrites(sv, s);
+	}
 	const McpResult result = tool == "write_memory" ? toolWriteMemory(s, arguments)
 		: tool == "set_property" ? toolSetProperty(s, arguments)
 		: toolSetRegister(s, arguments);
 	if (!result.isError)
 	{
 		std::lock_guard<std::mutex> hold(sv.lock);
-		if (sv.wroteMemoryAt < 0) sv.wroteMemoryAt = frame >= 0 ? frame : ce_session_frame(s);
+		const int64_t at = frame >= 0 ? frame : ce_session_frame(s);
+		if (sv.wroteMemoryAt < 0) sv.wroteMemoryAt = at;
+		const auto place = std::lower_bound(sv.writeFrames.begin(), sv.writeFrames.end(), at);
+		if (place == sv.writeFrames.end() || *place != at) sv.writeFrames.insert(place, at);
 	}
 	return result;
 }
@@ -2509,6 +2842,8 @@ McpResult runEngineTool(Service &sv, const std::string &tool, ce_session *s, con
 	if (tool == "get_property") return toolGetProperty(s, arguments);
 	if (tool == "write_memory" || tool == "set_property" || tool == "set_register") return runWriteTool(sv, tool, s, frame, arguments);
 	if (tool == "watch") return toolWatch(sv, s, arguments);
+	if (tool == "list_freezes") return toolListFreezes(s);
+	if (tool == "freeze" || tool == "unfreeze") return mcpFreezeTool(s, tool, printJson(const_cast<cJSON *>(arguments)));
 	if (tool == "search_start") return toolSearchStart(sv, s, arguments);
 	if (tool == "search_filter") return toolSearchFilter(sv, s, arguments);
 	if (tool == "search_results") return toolSearchResults(sv, s, arguments);
@@ -2633,8 +2968,11 @@ McpResult mcpRunDirect(const std::string &tool, const std::string &argumentsJson
 	if (!found->host)
 	{
 		cJSON *arguments = cJSON_Parse(argumentsJson.c_str());
-		const McpResult result = runEngineTool(sv, tool, s, log, -1, hostStatusJson.c_str(), arguments);
+		McpResult result = runEngineTool(sv, tool, s, log, -1, hostStatusJson.c_str(), arguments);
 		cJSON_Delete(arguments);
+		std::lock_guard<std::mutex> hold(sv.lock);
+		lostWrites(sv, s);
+		addLostNote(sv, result);
 		return result;
 	}
 	std::string hostTool = tool, hostArguments = argumentsJson;
@@ -2649,6 +2987,9 @@ McpResult mcpRunDirect(const std::string &tool, const std::string &argumentsJson
 		if (cJSON_IsString(text)) result.content = mcpTextContent(withWatches(sv, s, text->valuestring));
 		cJSON_Delete(content);
 	}
+	std::lock_guard<std::mutex> hold(sv.lock);
+	lostWrites(sv, s);
+	addLostNote(sv, result);
 	return result;
 }
 
@@ -2876,9 +3217,11 @@ int32_t ce_mcp_service(ce_session *s, const ce_movie_log *log, int64_t frame, co
 		/* the engine's own tools run without the lock: they only touch the
 		 * machine, which is this thread's */
 		cJSON *arguments = cJSON_Parse(call.arguments.c_str());
-		const chimera::McpResult result = chimera::runEngineTool(sv, call.tool, s, log, frame, host_status_json, arguments);
+		chimera::McpResult result = chimera::runEngineTool(sv, call.tool, s, log, frame, host_status_json, arguments);
 		cJSON_Delete(arguments);
 		std::lock_guard<std::mutex> hold(sv.lock);
+		chimera::lostWrites(sv, s);
+		chimera::addLostNote(sv, result);
 		chimera::finish(sv, call, result);
 	}
 }
@@ -2913,6 +3256,8 @@ void ce_mcp_answer(ce_session *s, uint64_t id, const char *text, int32_t is_erro
 		if (is_error == 0) result.content = chimera::mcpShotsContent(answer, taken->second.facts, taken->second.pictures);
 		sv.shots.erase(taken);
 	}
+	chimera::lostWrites(sv, s);
+	chimera::addLostNote(sv, result);
 	chimera::finish(sv, found->second, result);
 	sv.withHost.erase(found);
 }

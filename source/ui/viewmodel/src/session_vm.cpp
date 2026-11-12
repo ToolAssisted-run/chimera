@@ -2909,7 +2909,12 @@ void SessionViewModel::mcpOnMachine()
 	const std::string status = mcpStatusOnMachine();
 	uint64_t id = 0;
 	const char *tool = nullptr, *arguments = nullptr;
-	if (ce_mcp_service(s_, s_ != nullptr ? ce_session_movie_log(s_) : nullptr, -1, status.c_str(), &id, &tool, &arguments) != 1) return;
+	const uint64_t frozeBefore = s_ != nullptr ? ce_session_freeze_changes(s_) : 0;
+	const int32_t served = ce_mcp_service(s_, s_ != nullptr ? ce_session_movie_log(s_) : nullptr, -1, status.c_str(), &id, &tool, &arguments);
+	/* the agent's freeze and unfreeze change the engine's list: the Cheats
+	 * window's is read back from it, so the person sees them (issue 571) */
+	if (s_ != nullptr && ce_session_freeze_changes(s_) != frozeBefore) readFreezesOnMachine();
+	if (served != 1) return;
 	/* a call only the window can answer: nothing else runs until it does */
 	mcpBusyM_ = true;
 	later([this, id, t = std::string(tool != nullptr ? tool : ""), a = std::string(arguments != nullptr ? arguments : "{}")] {
@@ -6859,7 +6864,7 @@ int32_t SessionViewModel::addFreezeOnMachine(const Freeze &f)
 			const char *n = ce_session_domain_name(s_, d);
 			if (n != nullptr && f.domain == n)
 			{
-				i = ce_session_freeze(s_, d, f.address, f.size, f.bigEndian ? 1 : 0, f.value, 0, 0);
+				i = ce_session_freeze(s_, d, f.address, f.size, f.bigEndian ? 1 : 0, f.value, f.compareKind, f.compare);
 				break;
 			}
 		}
@@ -6886,6 +6891,49 @@ void SessionViewModel::carryFreezesOnMachine(const std::string &game)
 	freezesM_ = syncFreezesOnMachine(freezesM_);
 	if (had == 0 && freezesM_.empty()) return;
 	later([this, list = freezesM_] {
+		freezes_ = list;
+		freezesUpdated();
+	});
+}
+
+void SessionViewModel::readFreezesOnMachine()
+{
+	json::Json table;
+	std::string error;
+	const char *tableText = ce_session_property_table(s_);
+	if (tableText == nullptr || !json::parse(tableText, table, error)) table = json::Json();
+	const json::Json *properties = table.find("properties");
+	std::vector<Freeze> list;
+	for (int32_t i = 0; i < ce_session_freeze_count(s_); i++)
+	{
+		int32_t domain = -1, size = 1, bigEndian = 0, property = -1;
+		uint32_t element = 0;
+		const char *text = nullptr;
+		Freeze f;
+		if (ce_session_freeze_info(s_, i, &domain, &f.address, &size, &bigEndian, &f.value, &f.compareKind, &f.compare, &property,
+				&element, &text) == 0)
+			continue;
+		f.size = size;
+		f.bigEndian = bigEndian != 0;
+		f.enabled = ce_session_freeze_enabled(s_, i) == 1;
+		if (property >= 0)
+		{
+			const json::Json *row = properties != nullptr && static_cast<size_t>(property) < properties->items.size()
+				? &properties->items[static_cast<size_t>(property)] : nullptr;
+			const json::Json *name = row != nullptr ? row->find("name") : nullptr;
+			f.property = name != nullptr ? name->text : std::to_string(property);
+			if (element > 0) f.property += "[" + std::to_string(element) + "]";
+			f.text = text != nullptr ? text : "";
+		}
+		else
+		{
+			const char *name = ce_session_domain_name(s_, domain);
+			f.domain = name != nullptr ? name : "";
+		}
+		list.push_back(std::move(f));
+	}
+	freezesM_ = list;
+	later([this, list = std::move(list)] {
 		freezes_ = list;
 		freezesUpdated();
 	});

@@ -190,7 +190,16 @@ remembered.
   before these two, since they change no input: one would itself have been
   an unsaved change.
 - A memory write is not input: a movie cannot reproduce it. It is reported in
-  the log and in `status` from the first write on, with the frame.
+  the log and in `status` from the first write on, with the frame. It also
+  lasts only until the machine goes back before it: a seek back, a branch or
+  a rewind loads a state from before the write, and the movie replays
+  without it. The answer of the call during which that happened says so
+  ("the memory writes made on frames 1200-1260 were thrown away: the machine
+  was put back on frame 1100"), once, so the agent does not take a write
+  that is gone for one that did nothing (issue 571). A load onto the frame of
+  a write undoes it too: that frame's state was kept when the machine
+  arrived there, before the write. `freeze` holds a value through all of
+  this instead.
 - What the agent was told about one machine stays with that machine: when a
   project is closed and another opened (in the window or without one), the
   first write, the watches, the condition `advance_until` waits for and the
@@ -222,6 +231,11 @@ Looking:
 | `lua_functions` | Chimera's Lua functions as the Lua Console documents them: name, parameters, what each returns and does. By library, or by words. Window only. |
 | `list_cores` / `describe_core` | The core packages in the cores folder, with the machines each is and the kinds of file it opens; and what one declares: settings, firmware, file slots. |
 | `watch` | Names up to 32 memory values or properties; `status`, `seek`, `advance_until` and `load_branch` then carry their values every time. An empty list ends it. |
+| `list_freezes` | The values held now (Chimera's freezes, the person's own from the Cheats window among them): each one's index, place, value, whether it is on, and its condition. |
+
+Every address a tool takes can be a number or hex text (`"0x2E329"`), and
+the answers that give an address give it in hex too (`address_hex`): a slip
+between decimal and hex sent a person to the wrong place once (issue 571).
 
 RAM search (the agent's own search, separate from the RAM Search window):
 
@@ -253,6 +267,7 @@ Changes:
 | `save_branch` / `load_branch` | Keeps or restores a branch. |
 | `add_marker` | Places a marker with a text. |
 | `write_memory` / `set_property` / `set_register` | Writes to the machine. Reported as said above. |
+| `freeze` / `unfreeze` | Holds a memory value (with a condition if asked: only while the value now compares so) or a property, written before every frame the machine runs, a seek's replay included, so it survives going back; or lets go of one by its index, its place, or all. These are Chimera's freezes (Cheats): never saved, never in the movie. In the window the person sees them in the Cheats window: the engine's list is read back into the window's after every call that changed it, so the window keeps them when it puts its list back on the machine (a restart). |
 | `resume` | Lets the machine run, as unpausing does; past the movie's end each frame played is added to it. Window only. |
 | `save_project` | Saves the project where it was saved, or at a path (a relative one is in the Movies folder; without a window, the path must be inside the work folder). A file already there is replaced only with `overwrite`. |
 | `create_project` | Makes a project and opens it, as the New Project window does: the agent gives the core, the machine, the game's files (by slot, or each put where its kind of file goes), settings and firmware. The core's suggested settings for the game are applied first, as on that window's settings page. Firmware is looked for where that window looks and in a folder the agent names; when some is missing nothing is made, and the answer lists each file missing, the files that would do, and where it looked. A project with unsaved changes is replaced only with `discard_unsaved`. Window only; without a window, `open_game`. |

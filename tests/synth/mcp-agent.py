@@ -83,10 +83,12 @@ def call(tool, **arguments):
 
 
 def facts(tool, **arguments):
-    """The tool's answer as the JSON object its text holds, or {} for an error."""
-    error, text, _ = call(tool, **arguments)
+    """The tool's answer as the JSON object its first text holds, or {} for an error. A warning
+    (memory writes thrown away, another build of chimera-mcp) comes as a text of its own after it."""
+    error, text, content = call(tool, **arguments)
     check("%s %s is answered: %s" % (tool, arguments, text[:120]), not error)
-    return {} if error else json.loads(text)
+    first = next((c["text"] for c in content if c["type"] == "text"), "{}")
+    return {} if error else json.loads(first)
 
 
 def png_pixels(data):
@@ -570,7 +572,7 @@ if changes:
     facts("write_memory", domain="RAM", address=0x900, values=[(old + 5) & 255])
     check("after one byte was written, 'not equal to before' leaves that byte alone", facts("search_filter", op="not_equal").get("candidates") == 1)
     check("and after the filter its value now is the one remembered",
-          facts("search_results").get("results") == [{"address": 0x900, "value": (old + 5) & 255, "previous": (old + 5) & 255}])
+          facts("search_results").get("results") == [{"address": 0x900, "address_hex": "0x900", "value": (old + 5) & 255, "previous": (old + 5) & 255}])
     check("so 'equal to before' keeps it", facts("search_filter", op="equal").get("candidates") == 1)
     error, text, _ = call("write_memory", domain="RAM", address=0, values=[300])
     check("write_memory refuses a value that does not fit", error and "fits in u8" in text)
@@ -579,6 +581,52 @@ if changes:
     error, text, _ = call("write_memory", domain="RAM", address=4095, values=[1, 2])
     check("write_memory refuses a write past the end", error and "past its end" in text)
     check("the refused writes wrote nothing", facts("read_memory", domain="RAM", address=4095, count=1).get("values") == [ram[4095]])
+    # addresses as hex text, and in hex in the answers (issue 571)
+    hexed = facts("read_memory", domain="RAM", address="0x800", count=2)
+    check("an address is taken as hex text, and answered in hex too",
+          hexed.get("bytes_hex") == "ABCD" and hexed.get("address") == 0x800 and hexed.get("address_hex") == "0x800")
+    error, text, _ = call("read_memory", domain="RAM", address="0x80G")
+    check("an address that is not a number is refused", error and "'address'" in text)
+    # a write lasts until the machine goes back before it, and the agent is told when it went (issue 571)
+    if holder:
+        facts("seek", frame=5)
+        facts("write_memory", domain="RAM", address=0x820, values=[0x5A])
+        error, text, _ = call("seek", frame=8)
+        check("playing on from a write keeps it, and says nothing of it", not error and "thrown away" not in text)
+        error, text, _ = call("seek", frame=3)
+        check("going back before a write says it was thrown away, and on which frame",
+              not error and "5 were thrown away" in text)
+        error, text, _ = call("seek", frame=4)
+        check("and it is said once", not error and "thrown away" not in text)
+    # freeze: a value held through going back, listed, and let go (issue 571)
+    held = facts("freeze", domain="RAM", address="0x830", value=0x77)
+    mine = [f for f in held.get("freezes", []) if f.get("address_hex") == "0x830"]
+    check("freeze answers the list with the new freeze in it",
+          len(mine) == 1 and mine[0].get("value") == 0x77 and mine[0].get("size") == 1 and mine[0].get("on") is True)
+    if holder:
+        facts("seek", frame=2)
+        facts("seek", frame=6)
+        check("a frozen byte is held through going back and playing on",
+              facts("read_memory", domain="RAM", address=0x830).get("values") == [0x77])
+    facts("freeze", domain="RAM", address=0x831, size=2, value=1, when={"op": "greater", "value": 9})
+    when = [f.get("when") for f in facts("list_freezes").get("freezes", []) if f.get("address_hex") == "0x831"]
+    check("a freeze's condition is listed as it was given", when == [{"op": "greater", "value": 9}])
+    error, text, _ = call("freeze", domain="RAM", value=1)
+    check("freeze refuses a domain with no address", error and "'address'" in text)
+    error, text, _ = call("freeze", domain="RAM", address=1, value=1, when={"op": "sideways", "value": 1})
+    check("freeze refuses a condition it does not know", error and "'when'" in text)
+    if window:
+        # the window keeps its own list (the Cheats window) and puts it back on the machine
+        # when it restarts: the agent's freezes must be in it
+        facts("run_lua", code="client.reboot_core()")
+        kept = [f.get("address_hex") for f in facts("list_freezes").get("freezes", [])]
+        check("the window's list has the agent's freezes: a restart keeps them", "0x830" in kept and "0x831" in kept)
+    index = [f["index"] for f in facts("list_freezes").get("freezes", []) if f.get("address_hex") == "0x830"]
+    left = facts("unfreeze", index=index[0] if index else 99).get("freezes", [])
+    check("unfreeze lets go of one by its index", [f.get("address_hex") for f in left] == ["0x831"])
+    check("and of all of them", facts("unfreeze", all=True).get("freezes") == [])
+    error, text, _ = call("unfreeze", index=0)
+    check("unfreeze says when there is nothing there", error and "list_freezes" in text)
     # a game's named value
     check("set_property sets a value from text", facts("set_property", name="Steps", value="7").get("value") == "7")
     check("the value set is read back", facts("get_property", name="Steps").get("value") == "7")

@@ -319,6 +319,11 @@ public:
 		std::string property;
 		std::string text;
 		bool enabled = true;
+		/* written only while `compare OP the value now` holds, OP by kind as
+		 * ce_session_freeze has it (1 ==, 2 !=, 3 >, 4 >=, 5 <, 6 <=); 0 always.
+		 * The MCP server's freezes can have one (issue 571) */
+		int32_t compareKind = 0;
+		uint64_t compare = 0;
 	};
 	const std::vector<Freeze> &freezes() const { return freezes_; }
 	/* an enabled freeze writes this address of the domain */
@@ -1414,6 +1419,8 @@ private:
 	void syncFreezes();
 	/* the engine given the list again; those it refuses are left out */
 	std::vector<Freeze> syncFreezesOnMachine(const std::vector<Freeze> &list);
+	/* the engine's freezes, read back into the window's list (the MCP server changed them) */
+	void readFreezesOnMachine();
 	int32_t addFreezeOnMachine(const Freeze &f);
 	/* a new machine: the freezes stay for the same game, else go */
 	void carryFreezesOnMachine(const std::string &game);

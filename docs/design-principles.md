@@ -14522,3 +14522,39 @@ says "Opening <title>..." once and is "" again when the machine is up. With
 the line that clears it taken out, the test fails. The window was looked at
 20 seconds into opening the mod, with the spinner and the line showing (on
 Linux, with Qt's offscreen platform; not on Windows).
+
+## MCP: memory writes said when they are undone, freezes, hex addresses (2026-11-12, issue 571)
+
+An agent reverse engineering a PC-98 game wrote a character's position, saw
+nothing change, and concluded it was the wrong address: a later seek back
+had loaded a state from before the write, and the movie replayed without
+it. Nothing said so. Now the engine counts the lowest frame a state was
+loaded onto (`ce_session_take_loaded_low`: seeks and rewinds going back,
+branches, savestates), and the MCP server keeps the frames the agent wrote
+on. When a load reaches back to one of them, the answer of that call
+carries a second text: "the memory writes made on frames A-B were thrown
+away: the machine was put back on frame L". A load onto a write's own frame
+counts, since that frame's state was kept before the write. Loads before a
+write are not held against it: they are taken when the write is made.
+
+To hold a value through all that, the engine's freezes (the Cheats window's)
+are now tools: `freeze` (a memory value with an optional condition, or a
+property), `unfreeze` (by index, place, or all) and `list_freezes`, and
+`write_memory`'s description points to them. They run in the engine with
+and without a window. The window keeps its own list and puts it back on the
+machine on a restart, so it reads the engine's list back after every MCP
+call that changed it (`ce_session_freeze_changes`, `ce_session_freeze_info`):
+the person sees the agent's freezes in the Cheats window, and a restart
+keeps them. Window freezes carry a condition now too.
+
+Every address a tool takes can also be hex text ("0x2E329"), and answers
+that give an address add it in hex.
+
+Tested: the agent test (tests/synth/mcp-agent.py) in the window with changes
+allowed: a write on frame 5 then a seek to 8 says nothing, a seek to 3 says
+the write on frame 5 was thrown away, and the next seek says nothing again;
+a byte frozen at 0x830 reads 0x77 after going back to 2 and playing to 6; a
+condition is listed as given; after `client.reboot_core()` both freezes are
+still on; unfreeze by index and all; hex addresses read the same bytes. With
+the warning taken out of the server, and with the window's read-back taken
+out, the test fails on those checks.

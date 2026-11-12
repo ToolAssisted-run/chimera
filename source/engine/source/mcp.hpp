@@ -68,6 +68,26 @@ struct McpTool
 	bool window = false; /* it exists only where there is a window */
 };
 
+/* A whole number given as text: decimal, or hex with 0x ("0x2E329"); and a
+ * number written as such hex, as answers give addresses beside the number
+ * (issue 571). */
+bool mcpParseInteger(const std::string &text, uint64_t &value);
+std::string mcpHex(uint64_t value);
+
+/* freeze and unfreeze, read (issue 571): a memory freeze (domain, address,
+ * size, value, its condition as ce_session_freeze takes one), a property's
+ * (property, text), or what unfreeze lets go of (index, all, a place). False
+ * with why for arguments that do not make one. */
+struct McpFreezeAsk
+{
+	std::string domain, property, text;
+	int64_t address = 0, index = -1;
+	int32_t size = 1, compareKind = 0;
+	uint64_t value = 0, compare = 0;
+	bool bigEndian = false, all = false;
+};
+bool mcpReadFreeze(const std::string &tool, const std::string &argumentsJson, McpFreezeAsk &ask, std::string &why);
+
 /* Whether a tool is offered by this program: a tool of one kind of server is
  * not listed, or run, by the other. */
 bool mcpOffered(const McpTool &tool);
@@ -86,6 +106,10 @@ struct McpResult
 	std::string content;
 	bool isError = false;
 };
+
+/* freeze and unfreeze, on the engine's list (a window reads it back into its
+ * Cheats list, ce_session_freeze_changes): answers the list as list_freezes does */
+McpResult mcpFreezeTool(ce_session *s, const std::string &tool, const std::string &argumentsJson);
 
 /* [{"type":"text","text":<text>}] */
 std::string mcpTextContent(const std::string &text);

@@ -1932,6 +1932,13 @@ CE_API int32_t ce_session_seek(ce_session *s, int64_t frame);
  * Any thread, while the session lives. A seek that begins after the call is
  * not stopped by it (issue 559). */
 CE_API void ce_session_seek_stop(ce_session *s);
+/* The lowest frame the machine was put on by loading a state - a seek or a
+ * rewind going back, a branch, a savestate - since the last call, which
+ * starts the count again; -1 when none was loaded. Whatever was written into
+ * the machine on that frame or after it is gone (the MCP server warns an
+ * agent whose memory writes went so, issue 571). A state loaded with no frame
+ * said for it counts as the frame the session is on. The machine's thread. */
+CE_API int64_t ce_session_take_loaded_low(ce_session *s);
 
 /* The machine was put on `frame` of the session's movie by a state the
  * caller loaded itself - a branch's, kept in a file (ce_session_state_load_file)
@@ -1980,6 +1987,18 @@ CE_API void ce_session_unfreeze_all(ce_session *s);
 CE_API void ce_session_freeze_enable(ce_session *s, int32_t index, int32_t on);
 CE_API int32_t ce_session_freeze_enabled(const ce_session *s, int32_t index);
 CE_API int32_t ce_session_frozen(const ce_session *s, int32_t domain, int64_t address);
+/* What freeze `index` holds, for a list of them (the MCP server's
+ * list_freezes, issue 571): a memory freeze's domain (-1 for a property's),
+ * address, size, byte order, value and condition, or a property freeze's
+ * property index, element and text (valid until the freezes next change).
+ * Any pointer may be null. 1, or 0 for no such freeze. */
+/* A count that moves on with every change to the freezes, whoever made it:
+ * a window that shows them reads them again when it moves (the MCP server's
+ * freeze and unfreeze change them on the machine's thread, issue 571). */
+CE_API uint64_t ce_session_freeze_changes(const ce_session *s);
+CE_API int32_t ce_session_freeze_info(const ce_session *s, int32_t index, int32_t *domain, int64_t *address, int32_t *size,
+	int32_t *big_endian, uint64_t *value, int32_t *compare_kind, uint64_t *compare, int32_t *property, uint32_t *element,
+	const char **text);
 
 /* The history, kept between sessions. It is written to one file, streamed a
  * segment at a time - nothing about it is ever assembled in memory, which is
