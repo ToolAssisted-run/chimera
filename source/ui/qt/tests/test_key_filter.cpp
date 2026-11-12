@@ -17,6 +17,7 @@
 #include <QTest>
 
 #include "../key_filter.hpp"
+#include "../key_names.hpp"
 #include "../menu_letters.hpp"
 #include "chimera/vm/input_log.hpp"
 
@@ -174,6 +175,45 @@ int main(int argc, char **argv)
 		QTest::keyClick(rollWindow, Qt::Key_Down);
 		QTest::qWait(100);
 		CHECK(rollWindow->property("moves").toInt() == 2 && downs == 1);
+	}
+
+	/* Alt held while it is bound (issue 573): each repeat (a release and a
+	 * press, as Windows sends them) is forgotten for the menus, as the first
+	 * press is - Qt's menu bar on Windows waits for Alt to be let go again with
+	 * each, and took the keyboard when it was, so plain letters opened menus */
+	{
+		struct Forgets : QObject
+		{
+			int count = 0;
+			bool eventFilter(QObject *o, QEvent *e) override
+			{
+				if (e->type() == QEvent::ActivationChange && !o->isWindowType()) count++;
+				return false;
+			}
+		} forgets;
+		const QKeyEvent probe(QEvent::KeyPress, Qt::Key_Alt, Qt::AltModifier);
+		const QString alt = chimera::qt::keyCombination(chimera::qt::keyName(probe), Qt::AltModifier);
+		int alts = 0;
+		hotkeys.add("General", "Alt Held Test", alt.toStdString(), [&](bool down) { alts += down ? 1 : 0; });
+		app.installEventFilter(&forgets);
+		window->requestActivate();
+		CHECK(QTest::qWaitForWindowActive(window));
+		auto altEvent = [&](QEvent::Type type, Qt::KeyboardModifiers mods, bool repeat) {
+			QKeyEvent k(type, Qt::Key_Alt, mods, QString(), repeat);
+			QCoreApplication::sendEvent(window, &k);
+		};
+		altEvent(QEvent::KeyPress, Qt::AltModifier, false);
+		const int first = forgets.count;
+		for (int i = 0; i < 4; i++)
+		{
+			altEvent(QEvent::KeyRelease, Qt::NoModifier, true);
+			altEvent(QEvent::KeyPress, Qt::AltModifier, true);
+		}
+		altEvent(QEvent::KeyRelease, Qt::NoModifier, false);
+		std::printf("bound %s held with 4 repeats: forgotten %d times for the menus, the hotkey ran %d times\n",
+			alt.toUtf8().constData(), forgets.count, alts);
+		CHECK(first == 1 && forgets.count == 5 && alts == 1);
+		app.removeEventFilter(&forgets);
 	}
 
 	/* Space held on a button: pressed, five repeats (each a release and a

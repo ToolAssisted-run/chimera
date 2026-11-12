@@ -14757,3 +14757,25 @@ the frame numbers 11, 12 and 13, printed each, and the machine is on 13;
 code that waits for ever is stopped after its 2 frames and says it did not
 end. With the frames not played, or every run said to have ended, the test
 fails.
+
+## A held Alt does not hand the menus the keyboard (user-decided, 2026-11-12, issue 573)
+
+A person reported that plain letters sometimes open menus (F the File menu)
+without Alt. Qt's menu bar on Windows (its theme's "focus on Alt press and
+release") arms itself whenever Alt goes down and, if nothing else happens
+before Alt is let go, takes the keyboard: then a letter is a menu's. The
+window's key filter already undid that for Alt that is bound and for Alt
+with another key (issue 405), but only on Alt's first press: a held key
+repeats, Windows sends each repeat as a release and a press, and each press
+armed the menu bar again, so a bound Alt held as a game button gave it the
+keyboard. Now each repeat of a bound Alt is forgotten too.
+
+The owner decided what Alt alone does: nothing while Alt is bound to a game
+control or a hotkey, and Windows' own behavior (the keyboard to the menus)
+while it is not.
+
+Tested: the key filter test holds a bound Alt through four repeats and sees
+it forgotten for the menus five times, and its hotkey run once; without the
+change, once. The menu bar's own waiting cannot be shown here: Linux and the
+offscreen tests have no theme that turns it on, so it was read in Qt's
+source (qquickmenubar.cpp) and not seen on Windows.

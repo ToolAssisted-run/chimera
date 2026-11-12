@@ -77,6 +77,16 @@ bool KeyFilter::eventFilter(QObject *watched, QEvent *e)
 		 * (owner, 2026-11-07, issue 542); bound, they are the game's and the
 		 * hotkeys' as before. Held, they repeat */
 		if (down && navigates(*k)) return true;
+		/* Alt held comes again and again, and with each Qt's menu bar waits for
+		 * it to be let go again (issue 573): bound Alt is forgotten each time,
+		 * or a game button held would hand the menus the keyboard */
+		if (down && k->isAutoRepeat() && k->key() == Qt::Key_Alt)
+		{
+			const QString name = qt::keyName(*k);
+			bool taken = false;
+			if (!name.isEmpty()) routeOf(name, qt::keyCombination(name, k->modifiers()), taken);
+			if (taken) forgetAltForMenus();
+		}
 		if (!k->isAutoRepeat())
 		{
 			const QString name = qt::keyName(*k);
