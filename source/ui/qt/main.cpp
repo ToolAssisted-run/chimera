@@ -442,9 +442,10 @@ int main(int argc, char **argv)
 			return 0;
 	}
 	/* Chimera's GameCube adapter support: off, SDL is told before it starts
-	 * to leave USB devices alone (SDL2 reads it only from the environment) */
+	 * to leave USB devices alone. SDL reads its settings from the
+	 * environment as it starts; SDL 3 names this one SDL_HIDAPI_LIBUSB */
 	if (!vm::ConfigStore::switchIn(configPath.toStdString(), "customize.gameCubeAdapter", false))
-		qputenv("SDL_HIDAPI_DISABLE_LIBUSB", "1");
+		qputenv("SDL_HIDAPI_LIBUSB", "0");
 	/* the language first: the view models' first words are in it (docs/translations.md) */
 	qt::useLanguage(app, qt::startLanguage(QString::fromStdString(vm::ConfigStore::textIn(configPath.toStdString(), "customize.language", ""))));
 	QtDispatcher dispatcher(&app);
@@ -1059,6 +1060,8 @@ int main(int argc, char **argv)
 		config.keep(session, name);
 	config.keep(session, "displayNothing");
 	config.keep(session, "acceptBackgroundInput");
+	config.keep(session, "padLayouts");
+	config.keep(session, "padSwapped");
 	/* the window in front or not: a gamepad is heard behind other windows only when asked */
 	session.windowActive.set(QGuiApplication::applicationState() == Qt::ApplicationActive);
 	QObject::connect(qApp, &QGuiApplication::applicationStateChanged, [&session](Qt::ApplicationState state) {

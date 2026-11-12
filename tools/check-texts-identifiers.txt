@@ -320,6 +320,14 @@ RightThumbY Axis
 LeftTrigger Axis
 RightTrigger Axis
  Axis
+# a PlayStation pad's face buttons, as the window shows a binding of them (Gamepads::shown)
+Cross
+Circle
+Square
+Triangle
+# the makers whose button layouts a pad can be shown in (ControllerConfig.qml)
+Xbox
+Nintendo
 Axis
 WMouse 
 RMouse 

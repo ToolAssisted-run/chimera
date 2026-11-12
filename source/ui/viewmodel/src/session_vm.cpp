@@ -352,6 +352,8 @@ SessionViewModel::SessionViewModel(Dispatcher &dispatcher, InputLog &inputs)
 	expose("systemId", "the machine's id, as the core names it", systemId);
 	expose("buttonCount", "how many buttons the machine has", buttonCount);
 	expose("gamepads", "the gamepads in use, or why there are none", gamepads);
+	expose("padFaces", "what the open gamepads print on their face buttons, bottom, right, left and top "
+		"(\"X1:Cross,Circle,Square,Triangle\"); a binding names them by place, as on an Xbox pad", padFaces);
 	expose("speedPercent", "how fast the machine runs, a percent of its own rate (1 to 6400)", speedPercent, true);
 	expose("unthrottled", "the machine runs as fast as it can", unthrottled, true);
 	expose("fastDrawOneIn", "Turbo and unthrottled draw every frame (1), or one in 2 to 10 (3 at first, as Chimera's)", fastDrawOneIn, true);
@@ -511,6 +513,41 @@ SessionViewModel::SessionViewModel(Dispatcher &dispatcher, InputLog &inputs)
 	displayNothingWatch_ = displayNothing.changed.connect([this] { displayNothingM_ = displayNothing.get(); });
 	auto heard = [this] { padsHeardM_ = acceptBackgroundInput.get() || windowActive.get(); };
 	backgroundWatch_ = acceptBackgroundInput.changed.connect(heard);
+	expose("padModels", "the gamepads open, as JSON: [{\"pad\": \"X1\", \"name\", \"model\": \"2dc8:5112\", \"detected\": "
+		"\"xbox\"}], detected being the layout SDL's labels make (xbox, nintendo, playstation or unknown)", padModels);
+	expose("padLayouts", "the button layout chosen for each pad model, as JSON ({\"2dc8:5112\": \"nintendo\"}; xbox, "
+		"nintendo or playstation): the labels shown for its face buttons in place of SDL's. Bindings keep the button's place",
+		padLayouts, true);
+	padLayoutsWatch_ = padLayouts.changed.connect([this] {
+		std::map<std::string, std::string> byModel;
+		json::Json all;
+		std::string error;
+		if (json::parse(padLayouts.get(), all, error) && all.kind == json::Json::Kind::Object)
+			for (const auto &[model, layout] : all.members)
+				if (layout.kind == json::Json::Kind::String && Gamepads::isLayout(layout.text)) byModel[model] = layout.text;
+		{
+			std::lock_guard<std::mutex> lock(padLayoutsLock_);
+			padLayoutsCopy_ = std::move(byModel);
+		}
+		/* shown at the next look at the pads; one now, in case none is due */
+		submit([this] { padFacesOnMachine(); });
+	});
+	expose("padSwapped", "the pad models that report their face buttons by their printed letters, as JSON "
+		"([\"2dc8:5112\"]): A and B, and X and Y, taken the other way round, in what is pressed and in the labels SDL gives",
+		padSwapped, true);
+	padSwappedWatch_ = padSwapped.changed.connect([this] {
+		std::set<std::string> models;
+		json::Json all;
+		std::string error;
+		if (json::parse(padSwapped.get(), all, error) && all.kind == json::Json::Kind::Array)
+			for (const json::Json &m : all.items)
+				if (m.kind == json::Json::Kind::String) models.insert(m.text);
+		{
+			std::lock_guard<std::mutex> lock(padLayoutsLock_);
+			padSwappedCopy_ = std::move(models);
+		}
+		submit([this] { padFacesOnMachine(); });
+	});
 	activeWatch_ = windowActive.changed.connect(heard);
 	volumeWatch_ = volume.changed.connect([this] { volumeM_ = std::clamp<int64_t>(volume.get(), 0, 100); });
 	/* Chimera's speeds, a step at a time */
@@ -1580,6 +1617,7 @@ SessionViewModel::SessionViewModel(Dispatcher &dispatcher, InputLog &inputs)
 				/* what is held already is not what is pressed */
 				catchHeldM_.clear();
 				padsM_->poll(catchHeldM_);
+				padFacesOnMachine();
 				catchingAxisM_ = false;
 				catchingM_ = true;
 				catchDue_ = Clock::now() + std::chrono::milliseconds(16);
@@ -1595,6 +1633,7 @@ SessionViewModel::SessionViewModel(Dispatcher &dispatcher, InputLog &inputs)
 				std::vector<std::string> held;
 				catchAxesFromM_.clear();
 				padsM_->poll(held, &catchAxesFromM_);
+				padFacesOnMachine();
 				catchMovedM_.clear();
 				catchingAxisM_ = true;
 				catchingM_ = true;
@@ -1881,6 +1920,59 @@ SessionViewModel::SessionViewModel(Dispatcher &dispatcher, InputLog &inputs)
 				taken = true;
 			});
 			return taken;
+		});
+	command("setPadLayout", "the button layout of a pad model (\"2dc8:5112\"): xbox, nintendo, playstation, or auto for "
+		"what SDL says; kept in padLayouts", {"model", "layout"}, [this](const Args &a, std::string &error) -> Value {
+			std::string model, layout;
+			if (!arg(a, 0, model, error) || !arg(a, 1, layout, error)) return {};
+			if (layout != "auto" && !Gamepads::isLayout(layout))
+			{
+				error = tr("session.no_pad_layout", {layout});
+				return {};
+			}
+			json::Json all;
+			std::string ignored;
+			if (!json::parse(padLayouts.get(), all, ignored) || all.kind != json::Json::Kind::Object)
+			{
+				all = json::Json{};
+				all.kind = json::Json::Kind::Object;
+			}
+			std::erase_if(all.members, [&](const auto &m) { return m.first == model; });
+			if (layout != "auto") all.members.emplace_back(model, json::Json::string(layout));
+			padLayouts.set(json::write(all));
+			return {};
+		});
+	command("setPadSwap", "whether a pad model (\"2dc8:5112\") reports its face buttons by their printed letters: A and "
+		"B, and X and Y, taken the other way round; kept in padSwapped", {"model", "on"},
+		[this](const Args &a, std::string &error) -> Value {
+			std::string model;
+			bool on = false;
+			if (!arg(a, 0, model, error) || !arg(a, 1, on, error)) return {};
+			json::Json all;
+			std::string ignored;
+			if (!json::parse(padSwapped.get(), all, ignored) || all.kind != json::Json::Kind::Array)
+			{
+				all = json::Json{};
+				all.kind = json::Json::Kind::Array;
+			}
+			std::erase_if(all.items, [&](const json::Json &m) { return m.text == model; });
+			if (on) all.items.push_back(json::Json::string(model));
+			padSwapped.set(json::write(all));
+			return {};
+		});
+	command("watchPads", "while a window shows bindings (true), the gamepads are looked at sixty times a second, a game "
+		"running or not, so padFaces and gamepads follow the pads plugged in; false when it closes", {"on"},
+		[this](const Args &a, std::string &error) -> Value {
+			bool on = false;
+			if (!arg(a, 0, on, error)) return {};
+			padWatchers_ = std::max(0, padWatchers_ + (on ? 1 : -1));
+			padWatchM_.store(padWatchers_ > 0);
+			/* the machine's thread waiting looks again, at its lock, so the change is not missed */
+			{
+				std::lock_guard<std::mutex> lock(m_);
+			}
+			cv_.notify_all();
+			return {};
 		});
 	command("setInputPolls", "the core asked to call the scripts' event.oninputpoll functions at its reads (true) or not", {"on"},
 		[this](const Args &a, std::string &error) -> Value {
@@ -2199,7 +2291,7 @@ void SessionViewModel::loop()
 				}
 				/* a hotkey on a gamepad input: the pads looked at sixty times a
 				 * second, when no frame run has looked at them since */
-				const bool padsOn = padHotkeysOnM_.load() || !padSentM_.empty();
+				const bool padsOn = padHotkeysOnM_.load() || !padSentM_.empty() || padWatchM_.load();
 				if (padsOn && Clock::now() >= padDue_)
 				{
 					padTick = true;
@@ -2282,8 +2374,10 @@ void SessionViewModel::loop()
 		if (padTick)
 		{
 			if (!padsM_) padsM_ = std::make_unique<Gamepads>();
+			padDue_ = Clock::now() + std::chrono::milliseconds(16);
 			std::vector<std::string> held;
 			padsM_->poll(held);
+			padFacesOnMachine();
 			padHotkeysOnMachine(held);
 			continue;
 		}
@@ -5154,6 +5248,27 @@ void SessionViewModel::checkHistoryOnMachine(const std::string &keepIn)
 	say(tr("session.check_passed", checked));
 }
 
+void SessionViewModel::padFacesOnMachine()
+{
+	if (!padsM_) return;
+	{
+		std::lock_guard<std::mutex> lock(padLayoutsLock_);
+		padsM_->setLayouts(padLayoutsCopy_);
+		padsM_->setSwapped(padSwappedCopy_);
+	}
+	std::string faces = padsM_->faces(), models = padsM_->models();
+	if (faces != padFacesM_)
+	{
+		padFacesM_ = faces;
+		later([this, faces] { padFaces.set(faces); });
+	}
+	if (models != padModelsM_)
+	{
+		padModelsM_ = models;
+		later([this, models] { padModels.set(models); });
+	}
+}
+
 void SessionViewModel::catchPollOnMachine()
 {
 	catchDue_ = Clock::now() + std::chrono::milliseconds(16);
@@ -5165,6 +5280,7 @@ void SessionViewModel::catchPollOnMachine()
 	{
 		std::vector<std::pair<std::string, int>> axes;
 		padsM_->poll(held, &axes);
+		padFacesOnMachine();
 		for (const auto &[name, v] : axes)
 		{
 			int was = v;
@@ -5185,6 +5301,7 @@ void SessionViewModel::catchPollOnMachine()
 		return;
 	}
 	padsM_->poll(held);
+	padFacesOnMachine();
 	for (const std::string &name : held)
 		if (std::find(catchHeldM_.begin(), catchHeldM_.end(), name) == catchHeldM_.end())
 		{
@@ -6211,6 +6328,7 @@ int32_t SessionViewModel::stepOnMachine(bool live, bool render, bool grow)
 			for (const std::string &name : padForMachine_)
 				for (int b : bindingsM_.buttonsOf(name))
 					if (b >= 0) padHeld.set(static_cast<size_t>(b));
+			padFacesOnMachine();
 			const std::vector<std::string> open = padsM_->names();
 			if (open.size() != padCount_)
 			{

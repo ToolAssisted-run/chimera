@@ -152,6 +152,9 @@ int main(int argc, char **argv)
 	CHECK(chimera::qt::shownKeys("LeftAlt+RightAlt+AltGr", true) == "Left Option+Right Option+AltGr");
 	CHECK(chimera::qt::shownKeys("LeftWin+Ctrl+S", false) == "LeftWin+Ctrl+S");
 	CHECK(chimera::qt::shownKeys("", true).isEmpty());
+	/* a gamepad's face buttons as the pad in use prints them, the rest as before */
+	CHECK(namer.shown("X1 A, F5", "X1:Cross,Circle,Square,Triangle") == "X1 Cross, F5");
+	CHECK(namer.shown("X1 A, F5") == "X1 A, F5");
 	std::printf("%s: %d checks, %d failed\n", failed == 0 ? "PASS" : "FAIL", checks, failed);
 	return failed == 0 ? 0 : 1;
 }

@@ -495,7 +495,7 @@ if qt_dep.found()
       test('file chooser', find_program('python3'), args: [files('qt/tests/file-chooser.py'), test_file_chooser], timeout: 180)
     endif
     # a gamepad input bound to a hotkey runs it as a key does (issue 466): a
-    # stand-in SDL2's pad presses Pause, and a project opened paused runs
+    # stand-in SDL3's pad presses Pause, and a project opened paused runs
     stand_in_sdl = shared_library('stand-in-sdl', 'qt/tests/stand_in_sdl.c', build_by_default: false)
     test(
       'gamepad hotkeys',
@@ -521,7 +521,7 @@ if qt_dep.found()
   test_key_names = executable(
     'test-key-names',
     ['qt/tests/test_key_names.cpp', 'qt/key_names.cpp', qt6.compile_moc(headers: ['qt/key_names.hpp'], dependencies: [qt_dep])],
-    dependencies: [qt_dep],
+    dependencies: [qt_dep, vm_dep],
     override_options: ['cpp_std=c++20'],
   )
   test('key names', test_key_names, env: ['QT_QPA_PLATFORM=offscreen'], timeout: 60)
@@ -577,7 +577,7 @@ endif
       'test-binding-box',
       ['qt/tests/test_binding_box.cpp', 'qt/key_names.cpp',
         qt6.compile_moc(headers: ['qt/key_names.hpp'], dependencies: [qt_dep]), qt_rcc],
-      dependencies: [qt_test_dep],
+      dependencies: [qt_test_dep, vm_dep],
       override_options: ['cpp_std=c++20'],
       cpp_args: ['-DQT_NO_KEYWORDS'],
     )

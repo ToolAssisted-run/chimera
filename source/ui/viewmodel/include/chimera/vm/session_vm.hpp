@@ -88,6 +88,18 @@ public:
 	Property<int64_t> buttonCount{0};
 	/* the gamepads in use, or why there are none */
 	Property<std::string> gamepads{tr("session.no_gamepads_yet")};
+	/* what the open gamepads print on their face buttons (Gamepads::faces),
+	 * for showing a binding by the pad in use (Gamepads::shown) */
+	Property<std::string> padFaces;
+	/* the gamepads open, as JSON (Gamepads::models), for choosing a layout */
+	Property<std::string> padModels{"[]"};
+	/* the button layout chosen for each pad model, as JSON ({"2dc8:5112":
+	 * "nintendo"}): the labels shown for a pad SDL labels wrongly. A setting */
+	Property<std::string> padLayouts{"{}"};
+	/* the pad models that report their face buttons by their printed
+	 * letters, as JSON (["2dc8:5112"]): A and B, and X and Y, taken the other
+	 * way round, so a binding gets the button at its place. A setting */
+	Property<std::string> padSwapped{"[]"};
 	/* How fast the machine runs, as Chimera has it: a percent of its own
 	 * rate (1 to 6400, in Chimera's steps), or as fast as it can
 	 * (unthrottled); and its sound, on or off and its volume (0 to 100) */
@@ -1265,7 +1277,7 @@ private:
 	std::atomic<bool> unthrottledM_{false}, soundOnM_{true}, turboM_{false}, skipLagM_{false}, displayNothingM_{false},
 		padsHeardM_{true};
 	bool turboHeld_ = false;
-	Connection skipLagWatch_, displayNothingWatch_, backgroundWatch_, activeWatch_;
+	Connection skipLagWatch_, displayNothingWatch_, backgroundWatch_, activeWatch_, padLayoutsWatch_, padSwappedWatch_;
 	Connection speedWatch_, unthrottledWatch_, soundOnWatch_, volumeWatch_, throttleWatch_;
 	/* 0 clock, 1 audio, 2 vsync, 3 none */
 	std::atomic<int> throttleM_{0};
@@ -1351,6 +1363,8 @@ private:
 	Clock::time_point catchDue_{};
 	std::vector<std::string> catchHeldM_;
 	void catchPollOnMachine();
+	/* padFaces, told when the pads open now print other faces */
+	void padFacesOnMachine();
 	Bindings bindingsM_;
 	Bindings autofireBindingsM_;
 	std::vector<AnalogBind> analogBindsM_;
@@ -1370,11 +1384,20 @@ private:
 	mutable std::mutex padHeldCopyM_;
 	std::vector<std::string> padHeldCopy_;
 	size_t padCount_ = 0;
+	std::string padFacesM_, padModelsM_;
+	/* padLayouts read, for the machine's thread */
+	std::mutex padLayoutsLock_;
+	std::map<std::string, std::string> padLayoutsCopy_;
+	std::set<std::string> padSwappedCopy_;
 	/* the hotkeys' keys and Key Priority (setPadHotkeys), and whether any key is a gamepad's */
 	std::mutex padHotkeysLock_;
 	std::set<std::string> padHotkeyKeys_;
 	int64_t padPriority_ = 0;
 	std::atomic<bool> padHotkeysOnM_{false};
+	/* a window showing bindings is open (watchPads): the pads looked at with no game running */
+	std::atomic<bool> padWatchM_{false};
+	/* how many such windows are open (the window's thread) */
+	int padWatchers_ = 0;
 	/* the inputs whose press went to the hotkeys, and when the pads are looked
 	 * at next for them while no frame is run (sixty times a second) */
 	std::set<std::string> padSentM_;

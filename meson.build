@@ -168,20 +168,20 @@ custom_target(
 )
 
 # ---------------------------------------------------------------------------
-# SDL2 + OpenAL Soft: cmake-driven, via the wrapper script
+# SDL3 + OpenAL Soft: cmake-driven, via the wrapper script
 # ---------------------------------------------------------------------------
 cmake_toolchain = ''
 if host_windows
   cmake_toolchain = repo_root / (host_arm64 ? 'extern/meson/mingw-toolchain-aarch64.cmake' : 'extern/meson/mingw-toolchain.cmake')
 endif
 custom_target(
-  'sdl2',
-  output: host_windows ? 'SDL2.dll' : 'libSDL2.' + shlib_ext,
+  'sdl3',
+  output: host_windows ? 'SDL3.dll' : 'libSDL3.' + shlib_ext,
   build_always_stale: true,
   command: [
     nested_tool, 'cmake',
-    repo_root / 'extern/SDL2',
-    '@OUTDIR@' / 'sdl2-build',
+    repo_root / 'extern/SDL3',
+    '@OUTDIR@' / 'sdl3-build',
     '@OUTPUT@',
     cmake_toolchain,
   ] + cmake_platform_args,

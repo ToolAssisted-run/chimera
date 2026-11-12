@@ -14848,3 +14848,191 @@ build cache keyed by the GCC version, GCC 13 for RPCS3's and EKA2L1's guest
 libstdc++, CMake 4's minimum version for touchHLE's openal-soft, and xemu's
 curl warnings kept as warnings. They do nothing on 24.04 and are needed on
 26.04.
+
+## Gamepads through SDL 3 (2026-11-12)
+
+The window read gamepads and joysticks through SDL 2. It now uses SDL 3
+(release 3.4.20), which is the SDL version still being developed. The
+library is built from `extern/SDL3` (the old `extern/SDL2`, with libusb
+beside it as before) and loaded the same way: by name when the window starts
+(`SDL3.dll`, `libSDL3.so`, `libSDL3.dylib`), and with no SDL there are no
+gamepads and nothing else changes.
+
+- Inputs keep their names. A binding saved before ("X1 A", "X1 DpadUp",
+  "J1 B3", "J1 POV0U") means the same button. SDL 3 names a gamepad's face
+  buttons by where they are (bottom, right, left, top), while SDL 2 named
+  them by the letter printed on them, so a Nintendo pad's A (on the right)
+  was "A". The window asks SDL 3 for each face button's printed letter and
+  names the button by it when it is A, B, X or Y, and by its place, as on
+  an Xbox pad, otherwise (a PlayStation pad's cross is "A", as before).
+- SDL is built with only its joystick parts. SDL 3 stops the build on Linux
+  when a part of X11 it was asked to use is missing, where SDL 2 left that
+  part out; Chimera's window never used SDL's video, so video, rendering and
+  SDL 3's new parts (GPU, camera, dialogs, tray) are off. The library is
+  smaller (2.4 MB on Linux aarch64) and needs no X11 or Wayland library.
+- The GameCube adapter setting (Enable Wii U/Switch GameCube Adapter
+  Support) turns SDL's USB reading off with `SDL_HIDAPI_LIBUSB=0`: SDL 3 no
+  longer reads SDL 2's `SDL_HIDAPI_DISABLE_LIBUSB`.
+- On Windows libusb is still built from its source and linked into
+  `SDL3.dll`. SDL 3 looks for libusb with its own search (FindLibUSB), so
+  the build hands that search Chimera's libusb. On Linux and macOS SDL 3
+  opens the system's libusb when the program runs, if one was there when it
+  was built.
+- The tests follow: the view models' test attaches SDL 3's virtual
+  joystick, and the window's "gamepad hotkeys" test puts a stand-in SDL 3
+  (`stand_in_sdl.c`) beside the window as `libSDL3.so`.
+
+Tested on Linux aarch64 (a 16 KiB page kernel): the view models' gamepad
+and gamepad-catch tests pass against SDL 3's virtual joystick, and failed
+when their expected button was changed on purpose; the stand-in SDL 3 loads
+and starts (the view models' test reports only "no virtual joysticks" with
+it). `SDL3.dll` for Windows on arm64 builds with llvm-mingw, with libusb in
+it, and `gamepads.cpp` compiles for it. Not proved: the "gamepad hotkeys"
+test and the witness, which need the test core to run, and it does not run
+on a 16 KiB page kernel; Windows on x86_64 and macOS builds; and a real pad
+on any system.
+
+## Gamepad face buttons: kept by place, shown by the pad's print (2026-11-12)
+
+The SDL 3 change above named a face button by the letter printed on it when
+the pad printed A, B, X or Y, as SDL 2 did. A contributor preferred SDL 3's
+way: a face button is kept by where it is, and the window shows what the pad
+in use prints there.
+
+- What is saved does not change with the pad. A binding, a core's default
+  bindings and a hotkey name the face buttons as on an Xbox pad: "X1 A" is
+  the bottom one, "X1 B" the right, "X1 X" the left and "X1 Y" the top, on
+  every pad. A binding made with one pad works with any other.
+- What is shown follows the pad. SDL 3 says what each open gamepad prints
+  on its face buttons; the session passes it to the window (`padFaces`, for
+  example "X1:Cross,Circle,Square,Triangle"), and the binding boxes and the
+  menus' hotkey text show "X1 A" as "X1 A" with an Xbox pad, "X1 B" with a
+  Nintendo pad and "X1 Cross" with a PlayStation pad. A pad SDL knows no
+  labels for, or none open, shows the saved name. `Gamepads::shown` does
+  this in the view models, and the window's `KeyNamer::shown` calls it.
+- The contributor chose this over saving the printed label itself, which
+  would have tied a binding to one brand of pad: a core's "X1 A" would do
+  nothing on a PlayStation pad until bound again.
+- Not yet the owner's decision: what a saved face button means is a change
+  to what Chimera is, so it is put to the owner in the pull request.
+- A binding made with a Nintendo pad under SDL 2 named its buttons by their
+  print, so its A and B, and its X and Y, swap places once. Bindings made
+  with Xbox and PlayStation pads mean what they did.
+
+Tested on Linux aarch64: the view models' test 1598 checks, 0 failed. Two
+virtual SDL 3 gamepads with a DualSense's and a Switch Pro pad's USB ids
+are reported as printing Cross, Circle, Square, Triangle and B, A, Y, X;
+the bottom button of each is still "A", and is shown as "Cross" and "B".
+These checks failed when their expected values were changed on purpose.
+The key names, binding box and key filter tests pass. Not tried: a real
+pad, and the window showing a label (the window's tests that open a game do
+not run on this machine's 16 KiB page kernel).
+
+## The pads' labels shown as soon as a bindings window opens (2026-11-12)
+
+The window started SDL and looked at the pads only while a game ran or a
+binding box waited for a press. A project opens paused, so with Controller
+Config or Configure Hotkeys open the boxes showed the saved names ("X1 A")
+until a box was clicked, and only then the pad's own ("X1 Cross").
+
+- A new session command, `watchPads`, is turned on while either window is
+  open and off when it closes (counted, so closing one of the two leaves the
+  other watching). While it is on, the machine's thread looks at the pads
+  sixty times a second, a game running or not, as it does for a hotkey on a
+  gamepad, and `padFaces` and `gamepads` follow the pads plugged in.
+- Nothing more runs while neither window is open.
+
+Tested on Linux aarch64: the view models' test (1603 checks, 0 failed)
+checks that, with no game and nothing caught, `padFaces` names a virtual
+DualSense's Cross, Circle, Square and Triangle once `watchPads` is on; with
+the watching taken out of the machine's thread, that check failed. A real
+DualSense in the window was seen by a contributor before this change (labels
+shown only after a click); the change itself was not tried in the window.
+
+## A pad's button labels chosen by hand (2026-11-12)
+
+SDL 3 decides what a pad prints on its face buttons from what it
+recognises the pad as. Its controller list has some pads wrong: the 8BitDo
+Lite 2 (USB id 2dc8:5112) prints B on its bottom button, but SDL 3 calls it
+a standard pad with Xbox labels, so the window showed "X1 A" there. Its
+places are wrong too: in that mode the pad reports its face buttons by
+their printed letters, so the button printed B, at the bottom, reaches the
+kernel as BTN_EAST and SDL 3 as the right face button, and a game bound to
+the bottom button got the right one (seen with a press, 2026-11-12). Chimera
+cannot tell such a pad from one built that way, so a contributor asked for
+a way to set both by hand.
+
+- Controller Config shows each gamepad open in a "Gamepads" group under the
+  controller's picture: its number and name, a "Swap A/B and X/Y" box and a
+  "Button labels" list. (A first try put them in a row above the tabs, where
+  the name was cut to a few letters and the bindings lost height.)
+- The box is for a pad that reports its face buttons by their letters. A
+  and B, and X and Y, are taken the other way round, in what is pressed and
+  in what SDL says is printed there. For the Lite 2 that is all it needs:
+  SDL's right button becomes the bottom one ("X1 A"), and SDL's Xbox labels,
+  swapped, are Nintendo's (B, A, Y, X). The contributor chose a box of its
+  own over a calibration step (pressing the bottom and left buttons) and
+  over a second Nintendo choice in the list.
+- The list is for a pad whose places SDL has right but whose printing it has
+  wrong. Automatic (at first) shows what SDL says, with the layout SDL's
+  labels make in brackets ("Automatic (Xbox)"); Xbox (A, B, X, Y), Nintendo
+  (B, A, Y, X) and PlayStation (Cross, Circle, Square, Triangle) take its
+  place.
+- Both are kept per pad model, by its USB vendor and product id, in two new
+  settings, `padSwapped` (for example ["2dc8:5112"]) and `padLayouts` (for
+  example {"057e:2009": "nintendo"}). The contributor chose this over one
+  choice for every pad, which would relabel a DualSense plugged in beside
+  the Lite 2. Two pads of one model share it.
+- A binding still keeps the button's place ("X1 A" is the bottom button):
+  the layout changes only the names shown, and the swap which of the pad's
+  buttons is at which place. Both take effect at once, outside the window's
+  Save and Cancel, as they describe the pad and not a binding.
+- The session gives the window the pads open (`padModels`, with each one's
+  model and the layout SDL's labels make, the swap counted) and two
+  commands, `setPadSwap` and `setPadLayout` ("auto" lets a layout go).
+- Not yet the owner's decision: the two settings are new, so they are put
+  to the owner in the pull request.
+
+Tested on Linux aarch64: the view models' test (1633 checks, 0 failed)
+chooses layouts for virtual SDL 3 gamepads (a DualSense's and a Switch Pro
+pad's ids) and sees their labels follow, for that model only, and go back
+with "auto"; with the chosen layout ignored, three of those checks failed. A
+virtual pad of an unknown maker (SDL's standard pad, as the Lite 2 is),
+swapped, gives "A" from SDL's right button and "X" from its top, and shows
+B, A, Y, X; with the swap taken out, four checks failed. The contributor saw
+the rows in the window with a real Switch Pro-type pad (the list showed
+nothing until picked, since fixed). The swap was not tried with the real
+Lite 2.
+
+## Pads plugged in and out are followed again (2026-11-12)
+
+A contributor found that a pad unplugged did not come back when plugged in
+again, and that another pad plugged in in its place was not seen.
+
+- On Linux SDL 3 hears of a pad plugged in (from udev) only in its event
+  loop, `SDL_PumpEvents`, and no longer in `SDL_UpdateJoysticks`, which is
+  all the window called (SDL 2 heard of it there). The window takes only
+  gamepads from SDL and never ran SDL's event loop, so after the move to
+  SDL 3 a pad plugged in was never added. The gamepads now run
+  `SDL_PumpEvents` at every look at the pads, which also updates the
+  joysticks, and let its events go (`SDL_FlushEvents`), as nothing reads
+  them and SDL's queue would otherwise fill.
+- A pad just plugged in can read as pushed to the end before it sends its
+  first report: the kernel gives the 8BitDo Lite 2's sticks 0 of 0..255
+  until then, so they read as held up and to the left, and a game running
+  would have been given Up and Left until the first press. Each pad's
+  axes now read as centred until it reports something after it is opened
+  (an axis moving from where it read, or a button); then they are read as
+  they are, so a stick really held still counts once the pad has reported.
+  A pad that reads centred from the start shows no difference.
+
+Tested on Linux aarch64 with the window's own gamepad code in a small
+program (a contributor's pads): the 8BitDo Lite 2 unplugged went, came back
+when plugged in again, and a DualSense plugged in its place was seen, each
+pad's presses heard. Before the change the contributor saw neither. The view
+models' test (1640 checks, 0 failed) gives a virtual joystick whose axis
+reads at its end when it is first seen: it is not held until a button is
+pressed, then read as it is; with the waiting taken out, two checks failed.
+The real Lite 2, just plugged in and not touched, read nothing held with
+the change and both sticks held up and to the left without it. None of
+this was tried in the window itself.

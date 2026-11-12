@@ -44,8 +44,10 @@ class KeyNamer : public QObject
 public:
 	using QObject::QObject;
 	Q_INVOKABLE QString name(int key, int modifiers, bool combination) const;
-	/* keys as this system shows them (shownKeys) */
-	Q_INVOKABLE QString shown(const QString &keys) const;
+	/* keys as this system shows them (shownKeys), and each gamepad face
+	 * button as the pad in use prints it, by the session's padFaces
+	 * (vm::Gamepads::shown: "X1 A" is "X1 Cross" on a PlayStation pad) */
+	Q_INVOKABLE QString shown(const QString &keys, const QString &padFaces = QString()) const;
 	/* Shift held now, whichever window has the keyboard */
 	Q_INVOKABLE bool shiftHeld() const { return QGuiApplication::queryKeyboardModifiers().testFlag(Qt::ShiftModifier); }
 

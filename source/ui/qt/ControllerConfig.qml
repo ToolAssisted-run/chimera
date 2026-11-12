@@ -37,6 +37,8 @@ ApplicationWindow {
     property int axisCatch: -1
 
     onVisibleChanged: {
+        // the pads looked at while it is open, so a binding shows what the pad in use prints
+        win.session.run("watchPads", [visible])
         if (visible) {
             win.controls.run("edit")
             kinds.currentIndex = 0
@@ -371,16 +373,93 @@ ApplicationWindow {
                     }
                 }
             }
-            // the package's picture of the controller; without one the column is gone
-            Image {
-                objectName: "controllerPicture"
-                visible: win.controls.pictureShown > 0
-                source: visible ? "image://controller/" + win.controls.pictureShown : ""
-                fillMode: Image.PreserveAspectFit
+            // the package's picture of the controller, and the gamepads open under it;
+            // with neither the column is gone
+            ColumnLayout {
+                id: sideColumn
+                readonly property var pads: JSON.parse(win.session.padModels)
+                visible: win.controls.pictureShown > 0 || pads.length > 0
                 Layout.preferredWidth: visible ? 334 : 0
+                Layout.maximumWidth: 334
                 Layout.fillHeight: true
-                Layout.topMargin: 20
-                cache: false
+                spacing: 6
+                Image {
+                    objectName: "controllerPicture"
+                    visible: win.controls.pictureShown > 0
+                    source: visible ? "image://controller/" + win.controls.pictureShown : ""
+                    fillMode: Image.PreserveAspectFit
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    Layout.topMargin: 20
+                    cache: false
+                }
+                Item { visible: win.controls.pictureShown <= 0; Layout.fillHeight: true }
+                // each gamepad open: its face buttons swapped when its model reports them by
+                // their letters, and the labels shown for them - what SDL says, or a layout
+                // chosen for its model when SDL is wrong
+                GroupBox {
+                    title: qsTrId("controller_config.gamepads")
+                    visible: sideColumn.pads.length > 0
+                    Layout.fillWidth: true
+                    ColumnLayout {
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        spacing: 10
+                        Repeater {
+                            model: sideColumn.pads
+                            delegate: ColumnLayout {
+                                id: padRow
+                                required property var modelData
+                                readonly property string chosen: JSON.parse(win.session.padLayouts)[padRow.modelData.model] || "auto"
+                                readonly property bool swapped: JSON.parse(win.session.padSwapped).indexOf(padRow.modelData.model) >= 0
+                                Layout.fillWidth: true
+                                spacing: 2
+                                Label {
+                                    text: padRow.modelData.pad + "  " + padRow.modelData.name
+                                    font.bold: true
+                                    elide: Text.ElideRight
+                                    Layout.fillWidth: true
+                                }
+                                // a pad that reports its face buttons by their letters, so SDL has their places wrong
+                                CheckBox {
+                                    objectName: "padSwap"
+                                    text: qsTrId("controller_config.swap_face_buttons")
+                                    checked: padRow.swapped
+                                    onToggled: win.session.run("setPadSwap", [padRow.modelData.model, checked])
+                                    ToolTip.visible: hovered
+                                    ToolTip.delay: 500
+                                    ToolTip.text: qsTrId("controller_config.swap_face_buttons_tip")
+                                }
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 6
+                                    Label { text: qsTrId("controller_config.button_labels") }
+                                    ComboBox {
+                                        objectName: "padLayout"
+                                        textRole: "text"
+                                        valueRole: "value"
+                                        Layout.fillWidth: true
+                                        readonly property var brands: ({ xbox: "Xbox", nintendo: "Nintendo", playstation: "PlayStation" })
+                                        model: [
+                                            { value: "auto", text: padRow.modelData.detected in brands
+                                                ? qsTrId("controller_config.layout_automatic").arg(brands[padRow.modelData.detected])
+                                                : qsTrId("controller_config.layout_automatic_unknown") },
+                                            { value: "xbox", text: qsTrId("controller_config.layout_xbox") },
+                                            { value: "nintendo", text: qsTrId("controller_config.layout_nintendo") },
+                                            { value: "playstation", text: qsTrId("controller_config.layout_playstation") }
+                                        ]
+                                        // by the options' order: indexOfValue() is asked before the options are there, and gave none
+                                        currentIndex: Math.max(0, ["auto", "xbox", "nintendo", "playstation"].indexOf(padRow.chosen))
+                                        onActivated: win.session.run("setPadLayout", [padRow.modelData.model, currentValue])
+                                        ToolTip.visible: hovered
+                                        ToolTip.delay: 500
+                                        ToolTip.text: qsTrId("controller_config.button_labels_tip")
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
         RowLayout {

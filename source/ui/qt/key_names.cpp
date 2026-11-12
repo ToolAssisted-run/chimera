@@ -1,5 +1,7 @@
 #include "key_names.hpp"
 
+#include "chimera/vm/gamepads.hpp"
+
 #include <algorithm>
 #include <cstdint>
 #include <iterator>
@@ -224,12 +226,13 @@ QString shownKeys(const QString &keys, bool mac)
 	return out;
 }
 
-QString KeyNamer::shown(const QString &keys) const
+QString KeyNamer::shown(const QString &keys, const QString &padFaces) const
 {
+	const QString pads = QString::fromStdString(vm::Gamepads::shown(keys.toStdString(), padFaces.toStdString()));
 #ifdef __APPLE__
-	return shownKeys(keys, true);
+	return shownKeys(pads, true);
 #else
-	return shownKeys(keys, false);
+	return shownKeys(pads, false);
 #endif
 }
 
