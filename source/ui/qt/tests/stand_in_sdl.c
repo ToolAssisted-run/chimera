@@ -138,4 +138,9 @@ uint8_t SDL_GetJoystickHat(void *p, int hat)
 	(void)hat;
 	return 0;
 }
-void SDL_UpdateJoysticks(void) {}
+void SDL_PumpEvents(void) {}
+void SDL_FlushEvents(uint32_t min, uint32_t max)
+{
+	(void)min;
+	(void)max;
+}
