@@ -38,6 +38,8 @@ using chimera::lang::tr;
 #include <cstring>
 #include <filesystem>
 #include <map>
+#include <sstream>
+#include <tuple>
 #include <memory>
 #include <mutex>
 #include <set>
@@ -774,10 +776,20 @@ struct ce_session
 	/* the kinds of access whose value the caller's function may change, bit
 	 * (1 << kind) each (issue 534) */
 	int32_t memoryReplaceable = 0;
+	/* GetMemoryCallbackPc (issue 571): where the core keeps the address of the
+	 * instruction making the access being reported; null when it does not say */
+	const uint64_t *memoryPc = nullptr;
 	int32_t (*addMemoryWatch)(int32_t, int32_t, uint64_t) = nullptr;
 	void (*removeMemoryWatch)(int32_t, int32_t, uint64_t) = nullptr;
 	ce_memory_fn memoryFn = nullptr;
 	void *memoryCtx = nullptr;
+	/* ce_session_add_memory_observer: told of every watched access after
+	 * memoryFn, changing nothing (the MCP server's trace_memory, issue 571);
+	 * and how many callers watch each place, the core asked once */
+	std::vector<std::pair<ce_memory_fn, void *>> memoryObservers;
+	/* ce_session_hold_callbacks: frames played aside call neither memoryFn nor inputPollFn */
+	bool callbacksHeld = false;
+	std::map<std::tuple<int32_t, int32_t, uint64_t>, int32_t> memoryWatchCount;
 	/* The pictures of frames already drawn, shown again when the machine is put
 	 * back on one (kept_pictures.hpp; chimera#190). On by itself for a session
 	 * whose pictures a GPU draws and whose greenzone is on; a caller may say
@@ -1019,6 +1031,11 @@ struct ce_session
 	void (*regSet)(int32_t, int64_t) = nullptr;
 	int64_t (*executedCycles)() = nullptr;
 	std::vector<std::string> regNames;
+	/* GetRegisterRoles (issue 571): by role ("pc", "sp", "flags"), the
+	 * register, the segment register paired with it and the register that
+	 * holds that segment's linear base, -1 each when not said */
+	struct RegisterRole { int32_t reg = -1, segment = -1, base = -1; };
+	std::map<std::string, RegisterRole> regRoles;
 	std::vector<int32_t> regBits;
 	// buses
 	int32_t (*busPeek)(int32_t, int32_t) = nullptr;
@@ -1364,6 +1381,29 @@ void ce_session::probeOptionalGroups()
 				regValue = value;
 				regSet = reinterpret_cast<void (*)(int32_t, int64_t)>(opt("SetRegisterValue", 2));
 				executedCycles = reinterpret_cast<int64_t (*)()>(opt("GetExecutedCycles", 0));
+				/* the optional roles (issue 571): "role register [segment [base]]" a
+				 * line; a name the core does not list makes the line say nothing */
+				if (auto roles = reinterpret_cast<uintptr_t (*)()>(opt("GetRegisterRoles", 0)))
+				{
+					auto indexOf = [&](const std::string &n) {
+						for (size_t i = 0; i < regNames.size(); i++)
+							if (regNames[i] == n) return static_cast<int32_t>(i);
+						return -1;
+					};
+					std::istringstream lines(cstr(roles()) != nullptr ? cstr(roles()) : "");
+					std::string line;
+					while (std::getline(lines, line))
+					{
+						std::istringstream words(line);
+						std::string role, reg, segment, base;
+						words >> role >> reg >> segment >> base;
+						RegisterRole r;
+						r.reg = indexOf(reg);
+						r.segment = segment.empty() ? -1 : indexOf(segment);
+						r.base = base.empty() ? -1 : indexOf(base);
+						if (!role.empty() && r.reg >= 0) regRoles[role] = r;
+					}
+				}
 			}
 		}
 	}
@@ -2465,6 +2505,9 @@ static ce_session *openSession(
 				 * the caller may change (issue 534); an instruction has none */
 				if (auto replaceable = reinterpret_cast<int32_t (*)()>(s->proc("GetMemoryCallbackReplaceable", 0, false, ignored)))
 					s->memoryReplaceable = replaceable() & ((1 << 1) | (1 << 2));
+				/* and the optional sixth: the accessing instruction's address (issue 571) */
+				if (auto pc = reinterpret_cast<uintptr_t (*)()>(s->proc("GetMemoryCallbackPc", 0, false, ignored)))
+					s->memoryPc = reinterpret_cast<const uint64_t *>(pc());
 				s->addMemoryWatch = add;
 				s->removeMemoryWatch = remove;
 			}
@@ -4003,6 +4046,21 @@ const uint32_t *ce_session_surface_render(ce_session *s, int32_t index)
 	return buf.data();
 }
 
+int32_t ce_session_register_role(const ce_session *s, const char *role, int32_t *segment_out, int32_t *base_out)
+{
+	const auto found = role != nullptr ? s->regRoles.find(role) : s->regRoles.end();
+	if (segment_out != nullptr) *segment_out = found != s->regRoles.end() ? found->second.segment : -1;
+	if (base_out != nullptr) *base_out = found != s->regRoles.end() ? found->second.base : -1;
+	return found != s->regRoles.end() ? found->second.reg : -1;
+}
+
+int32_t ce_session_memory_pc(const ce_session *s, uint64_t *pc_out)
+{
+	if (s == nullptr || s->memoryPc == nullptr) return 0;
+	if (pc_out != nullptr) *pc_out = *s->memoryPc;
+	return 1;
+}
+
 int32_t ce_session_register_count(const ce_session *s)
 {
 	return static_cast<int32_t>(s->regNames.size());
@@ -4232,6 +4290,8 @@ int64_t ce_session_savedata_read(ce_session *s, int32_t index, int64_t offset, u
 int32_t ce_session_trace_available(const ce_session *s) { return s->traceSetEnabled != nullptr ? 1 : 0; }
 
 const char *ce_session_trace_header(const ce_session *s) { return s->traceHeader.c_str(); }
+
+int32_t ce_session_trace_enabled(const ce_session *s) { return s != nullptr && s->traceDesired ? 1 : 0; }
 
 void ce_session_trace_enable(ce_session *s, int32_t on)
 {
@@ -5438,7 +5498,7 @@ extern "C" int32_t ce_session_precompile_progress(const ce_session *s, uint32_t 
 static uintptr_t CE_GUEST_CALLBACK_ABI inputPollDispatch(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t)
 {
 	ce_session *s = t_framing;
-	if (s != nullptr && s->inputPollFn != nullptr) s->inputPollFn(s->inputPollCtx);
+	if (s != nullptr && s->inputPollFn != nullptr && !s->callbacksHeld) s->inputPollFn(s->inputPollCtx);
 	guestWorked();
 	return 0;
 }
@@ -5459,7 +5519,11 @@ static uintptr_t CE_GUEST_CALLBACK_ABI memoryDispatch(uintptr_t kind, uintptr_t 
 	uintptr_t replacement)
 {
 	ce_session *s = t_framing;
-	if (s != nullptr && s->memoryFn != nullptr)
+	if (s != nullptr)
+		for (size_t i = 0; i < s->memoryObservers.size(); i++)
+			s->memoryObservers[i].first(s->memoryObservers[i].second, static_cast<int32_t>(kind), static_cast<int32_t>(scope),
+				static_cast<uint64_t>(address), static_cast<uint64_t>(value), size <= 8 ? static_cast<int32_t>(size) : 0, nullptr);
+	if (s != nullptr && s->memoryFn != nullptr && !s->callbacksHeld)
 	{
 		/* the core's own word for the value, in its memory, which the machine
 		 * reads or writes once the call returns: a new value goes there only
@@ -5488,12 +5552,42 @@ int32_t ce_session_memory_replaceable(const ce_session *s)
 int32_t ce_session_watch_memory(ce_session *s, int32_t kind, int32_t scope, uint64_t address, int32_t on)
 {
 	if (s == nullptr || s->addMemoryWatch == nullptr || kind < 0 || kind > 2 || scope < 0) return 0;
+	/* counted: the Lua scripts and the MCP server may watch the same place,
+	 * and the first to stop must not stop the other's (issue 571) */
+	int32_t &count = s->memoryWatchCount[{ kind, scope, address }];
 	if (on == 0)
 	{
-		s->removeMemoryWatch(kind, scope, address);
+		if (count > 0 && --count == 0) s->removeMemoryWatch(kind, scope, address);
 		return 1;
 	}
-	return s->addMemoryWatch(kind, scope, address) != 0 ? 1 : 0;
+	if (count > 0)
+	{
+		count++;
+		return 1;
+	}
+	if (s->addMemoryWatch(kind, scope, address) == 0) return 0;
+	count = 1;
+	return 1;
+}
+
+void ce_session_hold_callbacks(ce_session *s, int32_t held)
+{
+	if (s != nullptr) s->callbacksHeld = held != 0;
+}
+
+void ce_session_add_memory_observer(ce_session *s, ce_memory_fn fn, void *ctx)
+{
+	if (s == nullptr || fn == nullptr) return;
+	for (const auto &o : s->memoryObservers)
+		if (o.first == fn && o.second == ctx) return;
+	s->memoryObservers.emplace_back(fn, ctx);
+}
+
+void ce_session_remove_memory_observer(ce_session *s, ce_memory_fn fn, void *ctx)
+{
+	if (s == nullptr) return;
+	s->memoryObservers.erase(std::remove_if(s->memoryObservers.begin(), s->memoryObservers.end(),
+		[&](const std::pair<ce_memory_fn, void *> &o) { return o.first == fn && o.second == ctx; }), s->memoryObservers.end());
 }
 
 void ce_session_set_memory_callback(ce_session *s, ce_memory_fn fn, void *ctx)

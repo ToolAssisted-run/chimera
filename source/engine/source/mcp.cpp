@@ -22,7 +22,9 @@
 #include <ctime>
 #include <deque>
 #include <filesystem>
+#include <functional>
 #include <map>
+#include <sstream>
 #include <mutex>
 #include <thread>
 #include <unordered_map>
@@ -111,8 +113,14 @@ const McpTool kTools[] = {
 	  "},\"required\":[\"domain\",\"address\"],\"additionalProperties\":false}",
 	  false, false },
 	{ "registers",
-	  "The processor's registers, for a core that gives them.",
-	  kNoArguments, false, false },
+	  "The processor's registers, for a core that gives them. A core that names its registers' roles adds 'roles': the "
+	  "program counter (pc), the stack pointer (sp) and the flags, each with its register, and on a segmented processor "
+	  "the segment register paired with it and the linear address. 'names' reads only those; a name the core does not "
+	  "have is refused with the names it has.",
+	  "{\"type\":\"object\",\"properties\":{"
+	  "\"names\":{\"type\":\"array\",\"items\":{\"type\":\"string\"},\"description\":\"Only these registers, or roles (pc, sp, flags).\"}"
+	  "},\"additionalProperties\":false}",
+	  false, false },
 	{ "list_properties",
 	  "A game core's named values (a player's position, a score), each with its type and what it reads as now. "
 	  "Emulator cores have none. At most 'limit' are returned; 'total' says how many matched.",
@@ -286,6 +294,32 @@ const McpTool kTools[] = {
 	  "\"picture\":{\"type\":\"boolean\",\"description\":\"Add the last frame's picture. false when left out.\"},"
 	  "\"max_width\":{\"type\":\"integer\",\"minimum\":32,\"maximum\":4096,\"description\":\"The widest picture. 320 when left out.\"}"
 	  "},\"required\":[\"frames\"],\"additionalProperties\":false}",
+	  true, false },
+	{ "trace_memory",
+	  "Who touches an address: watches it (or 'length' addresses from it) for reads, writes or instructions run, plays "
+	  "'frames' frames of the movie's own input from the frame the machine is on, or until 'max_hits', then puts the "
+	  "machine back where it was. Each hit has its frame, the address, the value and its size, and - for a core that says "
+	  "which instruction made the access - its address (pc); with 'registers', every register at the access. For a core "
+	  "that reports memory accesses (list them with 'scope' names from the core).",
+	  "{\"type\":\"object\",\"properties\":{"
+	  "\"kind\":{\"type\":\"string\",\"enum\":[\"read\",\"write\",\"exec\"]},"
+	  MCP_ADDRESS ","
+	  "\"length\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":64,\"description\":\"How many addresses from 'address'. 1 when left out.\"},"
+	  "\"scope\":{\"type\":\"string\",\"description\":\"The address space, as the core names it. The first that takes the watch when left out.\"},"
+	  "\"frames\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":3600,\"description\":\"60 when left out.\"},"
+	  "\"max_hits\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":1000,\"description\":\"100 when left out.\"},"
+	  "\"registers\":{\"type\":\"boolean\",\"description\":\"Every register at each hit. false when left out.\"}"
+	  "},\"required\":[\"kind\",\"address\"],\"additionalProperties\":false}",
+	  true, false },
+	{ "trace_cpu",
+	  "The core's own trace of the instructions it runs, for a core that keeps one: plays 'frames' frames of the movie's "
+	  "own input from the frame the machine is on, then puts the machine back, and answers the lines traced, those holding "
+	  "'filter' only when it is given, up to 'max_lines' ('lines_total' says how many there were).",
+	  "{\"type\":\"object\",\"properties\":{"
+	  "\"frames\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":600,\"description\":\"1 when left out.\"},"
+	  "\"filter\":{\"type\":\"string\",\"description\":\"Only lines holding this text.\"},"
+	  "\"max_lines\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":5000,\"description\":\"500 when left out.\"}"
+	  "},\"additionalProperties\":false}",
 	  true, false },
 	{ "advance_until",
 	  "Plays the movie forward from the frame the machine is on until a value meets a condition, and stops there. "
@@ -1752,23 +1786,78 @@ McpResult toolReadMemory(ce_session *s, const cJSON *arguments)
 	return textResult(out);
 }
 
-McpResult toolRegisters(ce_session *s)
+McpResult toolRegisters(ce_session *s, const cJSON *arguments)
 {
+	auto hexOf = [&](int32_t i) {
+		const int32_t bits = ce_session_register_bits(s, i);
+		char hex[32];
+		std::snprintf(hex, sizeof(hex), "0x%0*llX", std::max(1, (bits + 3) / 4),
+			static_cast<unsigned long long>(static_cast<uint64_t>(ce_session_register_value(s, i))));
+		return std::string(hex);
+	};
+	const int32_t count = ce_session_register_count(s);
+	auto named = [&](const std::string &name) {
+		for (int32_t i = 0; i < count; i++)
+			if (name == ce_session_register_name(s, i)) return i;
+		/* a role the core named: pc, sp, flags */
+		return ce_session_register_role(s, name.c_str(), nullptr, nullptr);
+	};
+	/* only those asked for: a name the core does not have says which it has (issue 571) */
+	std::vector<int32_t> shown;
+	const cJSON *names = cJSON_GetObjectItemCaseSensitive(arguments, "names");
+	const cJSON *name = nullptr;
+	cJSON_ArrayForEach(name, names)
+	{
+		const int32_t i = cJSON_IsString(name) ? named(name->valuestring) : -1;
+		if (i < 0)
+		{
+			std::string all;
+			for (int32_t r = 0; r < count; r++) all += (r == 0 ? "" : ", ") + std::string(ce_session_register_name(s, r));
+			return mcpError(std::string("This core has no register called '") + (cJSON_IsString(name) ? name->valuestring : "?")
+				+ "'. Its registers are: " + (all.empty() ? "none" : all) + ".");
+		}
+		shown.push_back(i);
+	}
+	if (names == nullptr)
+		for (int32_t i = 0; i < count; i++) shown.push_back(i);
 	cJSON *out = cJSON_CreateObject();
 	cJSON *registers = cJSON_CreateArray();
-	for (int32_t i = 0; i < ce_session_register_count(s); i++)
+	for (const int32_t i : shown)
 	{
 		cJSON *item = cJSON_CreateObject();
 		cJSON_AddStringToObject(item, "name", ce_session_register_name(s, i));
-		const int32_t bits = ce_session_register_bits(s, i);
-		const uint64_t value = static_cast<uint64_t>(ce_session_register_value(s, i));
-		cJSON_AddNumberToObject(item, "bits", bits);
-		char hex[32];
-		std::snprintf(hex, sizeof(hex), "0x%0*llX", std::max(1, (bits + 3) / 4), static_cast<unsigned long long>(value));
-		cJSON_AddStringToObject(item, "value", hex);
+		cJSON_AddNumberToObject(item, "bits", ce_session_register_bits(s, i));
+		cJSON_AddStringToObject(item, "value", hexOf(i).c_str());
 		cJSON_AddItemToArray(registers, item);
 	}
 	cJSON_AddItemToObject(out, "registers", registers);
+	/* the roles the core named (issue 571): which register is the program
+	 * counter, the stack pointer, the flags, and on a segmented processor the
+	 * segment paired with each and the linear address it makes */
+	cJSON *roles = cJSON_CreateObject();
+	for (const char *role : { "pc", "sp", "flags" })
+	{
+		int32_t segment = -1, base = -1;
+		const int32_t i = ce_session_register_role(s, role, &segment, &base);
+		if (i < 0) continue;
+		cJSON *r = cJSON_CreateObject();
+		cJSON_AddStringToObject(r, "register", ce_session_register_name(s, i));
+		cJSON_AddStringToObject(r, "value", hexOf(i).c_str());
+		if (segment >= 0)
+		{
+			cJSON_AddStringToObject(r, "segment", ce_session_register_name(s, segment));
+			cJSON_AddStringToObject(r, "segment_value", hexOf(segment).c_str());
+		}
+		if (base >= 0)
+		{
+			cJSON_AddStringToObject(r, "segment_base", hexOf(base).c_str());
+			cJSON_AddStringToObject(r, "linear", mcpHex(static_cast<uint64_t>(ce_session_register_value(s, base)) +
+				static_cast<uint64_t>(ce_session_register_value(s, i))).c_str());
+		}
+		cJSON_AddItemToObject(roles, role, r);
+	}
+	if (cJSON_GetArraySize(roles) > 0) cJSON_AddItemToObject(out, "roles", roles);
+	else cJSON_Delete(roles);
 	if (ce_session_has_executed_cycles(s) != 0)
 		cJSON_AddNumberToObject(out, "executed_cycles", static_cast<double>(ce_session_executed_cycles(s)));
 	return textResult(out);
@@ -3212,6 +3301,230 @@ McpResult runWriteTool(Service &sv, const std::string &tool, ce_session *s, int6
 	return result;
 }
 
+/* Frames played aside: the movie's own input from the frame the machine is on
+ * (nothing pressed past its end), each followed by `after` (false stops),
+ * and the machine put back as it was - the movie, its states and the
+ * playback position untouched. trace_memory's and trace_cpu's (issue 571). */
+bool playAside(Service &sv, ce_session *s, int64_t frames, const std::function<bool(int64_t)> &after, int64_t &played, std::string &why)
+{
+	{
+		std::lock_guard<std::mutex> hold(sv.lock);
+		lostWrites(sv, s);
+	}
+	uint64_t len = 0;
+	const uint8_t *saved = ce_session_save_state(s, &len);
+	if (saved == nullptr || len == 0)
+	{
+		why = std::string("The machine could not be kept to put back: ") + ce_session_last_error(s);
+		return false;
+	}
+	const std::vector<uint8_t> kept(saved, saved + len);
+	const int64_t from = ce_session_frame(s);
+	const size_t buttonCount = static_cast<size_t>(ce_session_button_count(s)), axisCount = static_cast<size_t>(ce_session_axis_count(s));
+	std::vector<uint8_t> states(buttonCount);
+	std::vector<int32_t> axes(axisCount);
+	played = 0;
+	sv.trying = true;
+	ce_session_hold_callbacks(s, 1);
+	for (int64_t f = 0; f < frames; f++)
+	{
+		if (ce_session_movie_get(s, from + f, states.data(), axisCount != 0 ? axes.data() : nullptr) != 0)
+		{
+			std::fill(states.begin(), states.end(), uint8_t{ 0 });
+			for (size_t i = 0; i < axisCount; i++) axes[i] = ce_session_axis_neutral(s, static_cast<int64_t>(i));
+		}
+		for (size_t i = 0; i < axisCount; i++) ce_session_set_axis(s, static_cast<int32_t>(i), axes[i]);
+		uint64_t first64 = 0;
+		for (size_t b = 0; b < buttonCount; b++)
+		{
+			if (b < 64) first64 |= uint64_t{ states[b] != 0 } << b;
+			else ce_session_set_button(s, static_cast<int32_t>(b), states[b]);
+		}
+		if (ce_session_frame_advance(s, first64, 0) < 0)
+		{
+			const char *death = ce_session_guest_death(s);
+			why = std::string("The core stopped: ") + (death != nullptr ? death : "no reason was given");
+			break;
+		}
+		played++;
+		if (!after(from + f + 1)) break;
+	}
+	sv.trying = false;
+	ce_session_hold_callbacks(s, 0);
+	for (size_t b = 64; b < buttonCount; b++) ce_session_set_button(s, static_cast<int32_t>(b), 0);
+	if (ce_session_load_state(s, kept.data(), kept.size()) != 0)
+	{
+		why = std::string("The machine could not be put back: ") + ce_session_last_error(s);
+		return false;
+	}
+	ce_session_take_loaded_low(s);
+	return why.empty();
+}
+
+/* trace_memory's watch: the hits on the places asked, whoever else watches */
+struct MemoryTrace
+{
+	ce_session *s = nullptr;
+	int32_t kind = 0;
+	uint64_t from = 0, to = 0;
+	int64_t frame = 0, maxHits = 0;
+	bool registers = false;
+	cJSON *hits = nullptr;
+	int64_t count = 0;
+};
+
+int32_t traceHit(void *ctx, int32_t kind, int32_t, uint64_t address, uint64_t value, int32_t size, uint64_t *)
+{
+	MemoryTrace &t = *static_cast<MemoryTrace *>(ctx);
+	if (kind != t.kind || address < t.from || address >= t.to || t.count >= t.maxHits) return 0;
+	t.count++;
+	cJSON *hit = cJSON_CreateObject();
+	cJSON_AddNumberToObject(hit, "frame", static_cast<double>(t.frame));
+	cJSON_AddStringToObject(hit, "address_hex", mcpHex(address).c_str());
+	cJSON_AddNumberToObject(hit, "value", static_cast<double>(value));
+	cJSON_AddStringToObject(hit, "value_hex", mcpHex(value).c_str());
+	if (size > 0) cJSON_AddNumberToObject(hit, "size", size);
+	uint64_t pc = 0;
+	if (ce_session_memory_pc(t.s, &pc) != 0) cJSON_AddStringToObject(hit, "pc_hex", mcpHex(pc).c_str());
+	if (t.registers)
+	{
+		cJSON *regs = cJSON_CreateObject();
+		for (int32_t i = 0; i < ce_session_register_count(t.s); i++)
+			cJSON_AddStringToObject(regs, ce_session_register_name(t.s, i), mcpHex(static_cast<uint64_t>(ce_session_register_value(t.s, i))).c_str());
+		cJSON_AddItemToObject(hit, "registers", regs);
+	}
+	cJSON_AddItemToArray(t.hits, hit);
+	return 0;
+}
+
+McpResult toolTraceMemory(Service &sv, ce_session *s, const cJSON *arguments)
+{
+	const cJSON *kindItem = cJSON_GetObjectItemCaseSensitive(arguments, "kind");
+	const std::string kindName = cJSON_IsString(kindItem) ? kindItem->valuestring : "";
+	const int32_t kind = kindName == "exec" ? 0 : kindName == "read" ? 1 : kindName == "write" ? 2 : -1;
+	if (kind < 0) return mcpError("'kind' must be read, write or exec.");
+	int64_t address = 0, length = 0, frames = 0, maxHits = 0;
+	if (!integerArgument(arguments, "address", 0, INT64_MAX / 8, -1, address) || address < 0) return mcpError("'address' must be 0 or more.");
+	if (!integerArgument(arguments, "length", 1, 64, 1, length)) return mcpError("'length' must be between 1 and 64.");
+	if (!integerArgument(arguments, "frames", 1, 3600, 60, frames)) return mcpError("'frames' must be between 1 and 3600.");
+	if (!integerArgument(arguments, "max_hits", 1, 1000, 100, maxHits)) return mcpError("'max_hits' must be between 1 and 1000.");
+	std::vector<std::string> scopes;
+	{
+		std::istringstream lines(ce_session_memory_scopes(s));
+		std::string line;
+		while (std::getline(lines, line)) if (!line.empty()) scopes.push_back(line);
+	}
+	if (scopes.empty()) return mcpError("This core does not report the machine's memory accesses, so nothing can be traced in it.");
+	const cJSON *scopeItem = cJSON_GetObjectItemCaseSensitive(arguments, "scope");
+	int32_t scope = -1;
+	if (cJSON_IsString(scopeItem))
+	{
+		for (size_t i = 0; i < scopes.size(); i++) if (scopes[i] == scopeItem->valuestring) scope = static_cast<int32_t>(i);
+		if (scope < 0) return mcpError(std::string("The core has no scope called '") + scopeItem->valuestring + "'.");
+	}
+	/* the first scope that takes the watch, when none was named */
+	std::vector<int32_t> tried = scope >= 0 ? std::vector<int32_t>{ scope } : std::vector<int32_t>{};
+	if (scope < 0) for (size_t i = 0; i < scopes.size(); i++) tried.push_back(static_cast<int32_t>(i));
+	int32_t watching = -1;
+	int64_t watched = 0;
+	for (const int32_t sc : tried)
+	{
+		watched = 0;
+		for (int64_t a = 0; a < length; a++)
+			if (ce_session_watch_memory(s, kind, sc, static_cast<uint64_t>(address + a), 1) != 0) watched++;
+			else break;
+		if (watched == length) { watching = sc; break; }
+		for (int64_t a = 0; a < watched; a++) ce_session_watch_memory(s, kind, sc, static_cast<uint64_t>(address + a), 0);
+	}
+	if (watching < 0) return mcpError("The core cannot watch that: no scope of it (" + std::string(ce_session_memory_scopes(s)) + ") takes a " + kindName + " watch there.");
+	MemoryTrace trace;
+	trace.s = s;
+	trace.kind = kind;
+	trace.from = static_cast<uint64_t>(address);
+	trace.to = static_cast<uint64_t>(address + length);
+	trace.maxHits = maxHits;
+	trace.registers = cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(arguments, "registers"));
+	trace.hits = cJSON_CreateArray();
+	trace.frame = ce_session_frame(s) + 1;
+	ce_session_add_memory_observer(s, traceHit, &trace);
+	int64_t played = 0;
+	std::string why;
+	const bool ok = playAside(sv, s, frames, [&](int64_t done) {
+		trace.frame = done + 1;
+		return trace.count < maxHits;
+	}, played, why);
+	ce_session_remove_memory_observer(s, traceHit, &trace);
+	for (int64_t a = 0; a < length; a++) ce_session_watch_memory(s, kind, watching, static_cast<uint64_t>(address + a), 0);
+	if (!ok && played == 0)
+	{
+		cJSON_Delete(trace.hits);
+		return mcpError(why);
+	}
+	cJSON *out = cJSON_CreateObject();
+	cJSON_AddStringToObject(out, "scope", scopes[static_cast<size_t>(watching)].c_str());
+	cJSON_AddNumberToObject(out, "frames_played", static_cast<double>(played));
+	cJSON_AddNumberToObject(out, "hit_count", static_cast<double>(trace.count));
+	cJSON_AddStringToObject(out, "stopped_at", trace.count >= maxHits ? "max_hits" : !why.empty() ? "core_stopped" : "frames");
+	cJSON_AddBoolToObject(out, "pc_reported", ce_session_memory_pc(s, nullptr) != 0);
+	if (ce_session_memory_pc(s, nullptr) == 0)
+		cJSON_AddStringToObject(out, "note", "This core does not say which instruction made each access; registers read at it may already be past it.");
+	if (!why.empty()) cJSON_AddStringToObject(out, "core_stopped", why.c_str());
+	cJSON_AddItemToObject(out, "hits", trace.hits);
+	return textResult(out);
+}
+
+McpResult toolTraceCpu(Service &sv, ce_session *s, const cJSON *arguments)
+{
+	if (ce_session_trace_available(s) == 0) return mcpError("This core keeps no trace of the instructions it runs.");
+	int64_t frames = 0, maxLines = 0;
+	if (!integerArgument(arguments, "frames", 1, 600, 1, frames)) return mcpError("'frames' must be between 1 and 600.");
+	if (!integerArgument(arguments, "max_lines", 1, 5000, 500, maxLines)) return mcpError("'max_lines' must be between 1 and 5000.");
+	const cJSON *filterItem = cJSON_GetObjectItemCaseSensitive(arguments, "filter");
+	const std::string filter = cJSON_IsString(filterItem) ? filterItem->valuestring : "";
+	const int32_t was = ce_session_trace_enabled(s);
+	/* what was traced before is the window's Trace Logger's, not this call's */
+	uint64_t len = 0;
+	int32_t count = 0, overflow = 0;
+	ce_session_trace_enable(s, 1);
+	ce_session_trace_drain(s, &len, &count, &overflow);
+	cJSON *lines = cJSON_CreateArray();
+	int64_t total = 0, kept = 0;
+	bool cut = false;
+	int64_t played = 0;
+	std::string why;
+	playAside(sv, s, frames, [&](int64_t frame) {
+		const uint8_t *text = ce_session_trace_drain(s, &len, &count, &overflow);
+		cut = cut || overflow != 0;
+		const char *at = reinterpret_cast<const char *>(text);
+		for (int32_t i = 0; text != nullptr && i < count; i++)
+		{
+			const std::string line = at;
+			at += line.size() + 1;
+			if (!filter.empty() && line.find(filter) == std::string::npos) continue;
+			total++;
+			if (kept < maxLines)
+			{
+				cJSON *row = cJSON_CreateObject();
+				cJSON_AddNumberToObject(row, "frame", static_cast<double>(frame));
+				cJSON_AddStringToObject(row, "line", line.c_str());
+				cJSON_AddItemToArray(lines, row);
+				kept++;
+			}
+		}
+		return true;
+	}, played, why);
+	ce_session_trace_enable(s, was);
+	cJSON *out = cJSON_CreateObject();
+	const char *header = ce_session_trace_header(s);
+	if (header != nullptr) cJSON_AddStringToObject(out, "header", header);
+	cJSON_AddNumberToObject(out, "frames_played", static_cast<double>(played));
+	cJSON_AddNumberToObject(out, "lines_total", static_cast<double>(total));
+	if (cut) cJSON_AddBoolToObject(out, "core_buffer_overflowed", true);
+	if (!why.empty()) cJSON_AddStringToObject(out, "core_stopped", why.c_str());
+	cJSON_AddItemToObject(out, "lines", lines);
+	return textResult(out);
+}
+
 /* try_input (issue 571): frames run with input that is not the movie's, the
  * values asked for read, and the machine put back as it was, as a script's
  * show_future does. The engine's own frame advance runs them: the movie,
@@ -3303,6 +3616,7 @@ McpResult toolTryInput(Service &sv, ce_session *s, const cJSON *arguments)
 	int64_t played = 0, lag = 0;
 	std::string died;
 	sv.trying = true;
+	ce_session_hold_callbacks(s, 1);
 	for (int64_t f = 0; f < frames; f++)
 	{
 		const size_t at = std::min(static_cast<size_t>(f), states.size() - 1);
@@ -3331,6 +3645,7 @@ McpResult toolTryInput(Service &sv, ce_session *s, const cJSON *arguments)
 		}
 	}
 	sv.trying = false;
+	ce_session_hold_callbacks(s, 0);
 	cJSON_AddNumberToObject(out, "from_frame", static_cast<double>(from));
 	cJSON_AddNumberToObject(out, "frames_played", static_cast<double>(played));
 	cJSON_AddNumberToObject(out, "lag_frames", static_cast<double>(lag));
@@ -3407,13 +3722,15 @@ McpResult runEngineTool(Service &sv, const std::string &tool, ce_session *s, con
 	}
 	if (tool == "list_memory") return toolListMemory(s);
 	if (tool == "read_memory") return toolReadMemory(s, arguments);
-	if (tool == "registers") return toolRegisters(s);
+	if (tool == "registers") return toolRegisters(s, arguments);
 	if (tool == "list_properties") return toolListProperties(s, arguments);
 	if (tool == "get_property") return toolGetProperty(s, arguments);
 	if (tool == "write_memory" || tool == "set_property" || tool == "set_register") return runWriteTool(sv, tool, s, frame, arguments);
 	if (tool == "watch") return toolWatch(sv, s, arguments);
 	if (tool == "list_freezes") return toolListFreezes(s);
 	if (tool == "try_input") return toolTryInput(sv, s, arguments);
+	if (tool == "trace_memory") return toolTraceMemory(sv, s, arguments);
+	if (tool == "trace_cpu") return toolTraceCpu(sv, s, arguments);
 	if (tool == "freeze" || tool == "unfreeze") return mcpFreezeTool(s, tool, printJson(const_cast<cJSON *>(arguments)));
 	if (tool == "search_start") return toolSearchStart(sv, s, arguments);
 	if (tool == "search_filter") return toolSearchFilter(sv, s, arguments);

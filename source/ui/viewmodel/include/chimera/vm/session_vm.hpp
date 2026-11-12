@@ -210,6 +210,8 @@ public:
 		int32_t bits = 32;
 	};
 	std::vector<Register> readRegisters(int64_t &cycles, bool &hasCycles);
+	/* the register the core names for a role (pc, sp, flags: issue 571), "" for none */
+	std::string registerForRole(const std::string &role);
 	/* a register set, by its place; false when the core does not take it */
 	bool writeRegister(int32_t index, int64_t value);
 	/* the pictures the core draws for itself (the Surface Viewer): their

@@ -6017,6 +6017,17 @@ void SessionViewModel::drainTraceOnMachine()
 	});
 }
 
+std::string SessionViewModel::registerForRole(const std::string &role)
+{
+	std::string name;
+	onMachineWait([&](ce_session *s) {
+		const int32_t i = s != nullptr ? ce_session_register_role(s, role.c_str(), nullptr, nullptr) : -1;
+		const char *n = i >= 0 ? ce_session_register_name(s, i) : nullptr;
+		if (n != nullptr) name = n;
+	});
+	return name;
+}
+
 std::vector<SessionViewModel::Register> SessionViewModel::readRegisters(int64_t &cycles, bool &hasCycles)
 {
 	std::vector<Register> out;

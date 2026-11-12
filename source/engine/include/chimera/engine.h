@@ -1237,6 +1237,25 @@ CE_API const char *ce_session_memory_scopes(const ce_session *s);
 CE_API int32_t ce_session_memory_replaceable(const ce_session *s);
 CE_API int32_t ce_session_watch_memory(ce_session *s, int32_t kind, int32_t scope, uint64_t address, int32_t on);
 CE_API void ce_session_set_memory_callback(ce_session *s, ce_memory_fn fn, void *ctx);
+/* Inside fn: the address of the instruction making the access being reported
+ * (issue 571), for a core that keeps it with the optional sixth export
+ * const uint64_t *GetMemoryCallbackPc(void) - the address of a value it sets
+ * before each call (for an instruction, the instruction's own). 1 with pc_out
+ * set, or 0 for a core that does not say. Registers read in fn may already
+ * be past the instruction; this is where it was. */
+CE_API int32_t ce_session_memory_pc(const ce_session *s, uint64_t *pc_out);
+/* Told of every watched access too, after the callback above and with no
+ * replacement, for a second listener beside it (the MCP server's
+ * trace_memory, issue 571). The machine's thread. ce_session_watch_memory
+ * counts its callers: a place stays watched until each caller that watched
+ * it has stopped. */
+CE_API void ce_session_add_memory_observer(ce_session *s, ce_memory_fn fn, void *ctx);
+CE_API void ce_session_remove_memory_observer(ce_session *s, ce_memory_fn fn, void *ctx);
+/* Frames played aside and undone (the MCP server's try_input and traces,
+ * issue 571) call neither the memory callback nor the input poll callback
+ * while held: a frontend's scripts do not hear frames the machine is then
+ * put back from. Observers are still told. */
+CE_API void ce_session_hold_callbacks(ce_session *s, int32_t held);
 
 /* One frame: buttons is the bitmask (bit i = the config's buttons[i]);
  * buttons beyond 63 ride ce_session_set_button. Returns nonzero when the frame
@@ -1516,6 +1535,15 @@ CE_API int32_t ce_session_register_bits(const ce_session *s, int32_t index);
 CE_API int64_t ce_session_register_value(const ce_session *s, int32_t index);
 /* 0 = written; 1 = this core does not support writing registers */
 CE_API int32_t ce_session_register_set(ce_session *s, int32_t index, int64_t value);
+/* Registers by role (issue 571), for a core that names them with the optional
+ * export const char *GetRegisterRoles(void): a line each, "role register
+ * [segment [base]]" - pc, sp and flags are the roles read; the segment is
+ * the register paired with it on a segmented processor, and the base the
+ * register holding that segment's linear base, so the linear address is
+ * base + value without Chimera knowing any processor's rule. The register's
+ * index, or -1 when the core does not say; segment_out and base_out (either
+ * may be null) -1 when not said. */
+CE_API int32_t ce_session_register_role(const ce_session *s, const char *role, int32_t *segment_out, int32_t *base_out);
 CE_API int32_t ce_session_has_executed_cycles(const ce_session *s);
 CE_API int64_t ce_session_executed_cycles(const ce_session *s);
 
@@ -1584,6 +1612,8 @@ CE_API const char *ce_session_trace_header(const ce_session *s);
  * buffer - its lines were traced before the load and would appear out of
  * order). */
 CE_API void ce_session_trace_enable(ce_session *s, int32_t on);
+/* what _enable last asked: 1 on, 0 off */
+CE_API int32_t ce_session_trace_enabled(const ce_session *s);
 /* The lines the guest traced since the last drain, as consecutive
  * NUL-terminated strings (line_count of them), cleared on the way out.
  * overflow_out reports the guest's raw truncation flag for this window.

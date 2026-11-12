@@ -2339,8 +2339,10 @@ bool traceAndRegisters(const char *package, const char *rom)
 	CHECK(trace.run("clear", {}, error).has_value() && trace.lines().empty());
 	CHECK(advance(2) && trace.lines().empty());
 	/* the registers: read, and R0 set by hand (hex as text, or a number) */
-	CHECK(debugger.run("refresh", {}, error) == Value(int64_t{9}));
+	CHECK(debugger.run("refresh", {}, error) == Value(int64_t{10}));
 	CHECK(debugger.registers()[0].name == "R0" && debugger.registers()[8].name == "Frame" && debugger.registers()[8].value == session.frame.get());
+	/* the last instruction run, named as the program counter (issue 571) */
+	CHECK(debugger.registers()[9].name == "PC" && debugger.run("roleRegister", {std::string("pc")}, error) == Value(std::string("PC")));
 	CHECK(debugger.run("setRegister", {int64_t{0}, std::string("0x1F")}, error).has_value() && debugger.registers()[0].value == 31);
 	CHECK(debugger.run("setRegister", {int64_t{0}, int64_t{7}}, error).has_value() && debugger.registers()[0].value == 7);
 	std::string hex;

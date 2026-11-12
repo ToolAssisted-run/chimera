@@ -179,6 +179,12 @@ RegistersViewModel::RegistersViewModel(Dispatcher &dispatcher, SessionViewModel 
 		for (const SessionViewModel::Register &r : registers_) out += r.name + "=" + std::to_string(r.value) + "\n";
 		return out;
 	});
+	command("roleRegister", "the register the core names for a role (pc, sp or flags), \"\" when it names none", {"role"},
+		[this](const Args &a, std::string &error) -> Value {
+			std::string role;
+			if (!arg(a, 0, role, error)) return {};
+			return session_.registerForRole(role);
+		});
 	command("setRegisterNamed", "a register set by its name", {"name", "value"}, [this](const Args &a, std::string &error) -> Value {
 		std::string name;
 		int64_t value = 0;

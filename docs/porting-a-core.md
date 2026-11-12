@@ -473,6 +473,13 @@ Probed once after `Init`; absent exports simply mean the tool is not offered.
   - `int32_t GetMemoryCallbackReplaceable(void)`, optional: the kinds of
     access whose value a script may change, bit `1 << kind` each (2 reads, 4
     writes, 6 both). Without it, or with 0, the core only reports.
+  - `const uint64_t *GetMemoryCallbackPc(void)`, optional (issue 571): the
+    address of a `uint64_t` in the core's memory that holds, at each call,
+    the address of the instruction making the access (for an instruction,
+    its own), in the address space the core's traces and registers use.
+    Keep it `ECL_INVISIBLE`. The MCP server's `trace_memory` then says which
+    instruction wrote a value; registers read during the call may already
+    be past it. The synthetic core sets it in its step hook.
 
   At each watched access, call `fn(kind, scope, address, value, size,
   replacement)` through the same six-argument signature as the input poll:
@@ -510,6 +517,19 @@ Probed once after `Init`; absent exports simply mean the tool is not offered.
   reads and writes without instructions is fine. The synthetic core is the
   example (`tests/synth/package-box/synth_wbx.c`: scopes Code and RAM, sizes,
   reads and writes changeable).
+- **Registers** - `int32_t GetRegisterCount(void)`, `const char
+  *GetRegisterName(int32_t)` and `int64_t GetRegisterValue(int32_t)`, with
+  `GetRegisterBits` and `SetRegisterValue` optional: the debugger's register
+  box, Lua's `emu.getregister` and the MCP server's `registers`. And
+  optionally (issue 571) `const char *GetRegisterRoles(void)`, a line each,
+  `role register [segment [base]]`: which register is the program counter
+  (`pc`), the stack pointer (`sp`) and the flags (`flags`), by the names
+  `GetRegisterName` gives; on a segmented processor the segment register
+  paired with it, and a register holding that segment's linear base, so the
+  linear address is base plus value without Chimera knowing the processor's
+  rule (give the base as a register the core works out, real mode or not).
+  `pc EIP CS CSBASE` is a line of a PC-98's. An agent and a script then ask
+  for "pc" on any core that says. The synthetic core says `pc PC`.
 - **Memory domains** - a pointer and a size, published once. The memory tools
   read a domain through a second view of the core's memory that never faults,
   so a core that watches pages by protecting them (`GuestFaultHandler`, as

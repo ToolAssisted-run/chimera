@@ -448,8 +448,13 @@ static int watching(int kind, uint64_t address)
 		if (g_watched[kind][i] == address) return 1;
 	return 0;
 }
+/* the instruction running now, which every access it makes is reported
+ * with (GetMemoryCallbackPc, issue 571) and the PC register shows; not
+ * machine state, so invisible like the callback */
+ECL_INVISIBLE static uint64_t g_accessPc;
 static void memory_stepped(uint32_t pc)
 {
+	g_accessPc = pc;
 	if (g_memoryCall != 0 && watching(0, pc)) g_memoryCall(0, 0, pc, 0, 0, 0);
 }
 static uint32_t memory_accessed(int write, uint32_t addr, uint32_t value, int size)
@@ -468,6 +473,8 @@ static void memory_hook(void)
 ECL_EXPORT const char *GetMemoryCallbackScopes(void) { return "Code\nRAM"; }
 /* the reads and writes may be given another value; an instruction may not */
 ECL_EXPORT int32_t GetMemoryCallbackReplaceable(void) { return (1 << 1) | (1 << 2); }
+/* where the address of the instruction making each reported access is kept */
+ECL_EXPORT const uint64_t *GetMemoryCallbackPc(void) { return &g_accessPc; }
 ECL_EXPORT void SetMemoryCallback(uint64_t fn)
 {
 	g_memoryCall = (uintptr_t (*)(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t))(uintptr_t)fn;
@@ -523,14 +530,17 @@ ECL_EXPORT void SetButton(int32_t index, int32_t pressed)
 }
 
 /* The registers group (the debugger's register box): R0-R7, which a debugger
- * may set, and the frame counter, which it may only read. */
-static const char *const g_registerNames[9] = {"R0", "R1", "R2", "R3", "R4", "R5", "R6", "R7", "Frame"};
-ECL_EXPORT int32_t GetRegisterCount(void) { return g_synth ? 9 : 0; }
-ECL_EXPORT const char *GetRegisterName(int32_t i) { return i >= 0 && i < 9 ? g_registerNames[i] : 0; }
+ * may set, the frame counter, and the last instruction run (PC), which it
+ * may only read. PC is named as the program counter (issue 571). */
+static const char *const g_registerNames[10] = {"R0", "R1", "R2", "R3", "R4", "R5", "R6", "R7", "Frame", "PC"};
+ECL_EXPORT int32_t GetRegisterCount(void) { return g_synth ? 10 : 0; }
+ECL_EXPORT const char *GetRegisterName(int32_t i) { return i >= 0 && i < 10 ? g_registerNames[i] : 0; }
 ECL_EXPORT int32_t GetRegisterBits(int32_t i) { (void)i; return 32; }
+ECL_EXPORT const char *GetRegisterRoles(void) { return "pc PC\n"; }
 ECL_EXPORT int64_t GetRegisterValue(int32_t i)
 {
-	if (!g_synth || i < 0 || i > 8) return 0;
+	if (!g_synth || i < 0 || i > 9) return 0;
+	if (i == 9) return (int64_t)g_accessPc;
 	return i == 8 ? (int64_t)synth_get_frame_counter(g_synth) : (int64_t)(uint32_t)synth_get_registers(g_synth)[i];
 }
 ECL_EXPORT void SetRegisterValue(int32_t i, int64_t v)

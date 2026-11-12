@@ -14671,3 +14671,52 @@ snapshot comes back with restore; seek with extend adds three frames, says
 so, and one undo takes them back; insert_frames says the length before and
 after. Without the load back, the lines decoded, the extension, the restore
 or the report, those checks fail.
+
+## Two optional core declarations, and traces through MCP (user-decided, 2026-11-12, issue 571)
+
+"Which instruction writes the player's X?" took an agent a person running a
+Lua tracer by hand, and the first tracer read registers named IP and AX on
+a core that calls them EIP and EAX, and printed nothing. The owner approved
+two new optional declarations any core may make, and the CPU trace through
+MCP, which docs/mcp-server.md had as "not planned":
+
+- `GetMemoryCallbackPc`, a sixth, optional memory-callback export: the
+  address of a value the core keeps, at each reported access, as the
+  address of the instruction making it (`ce_session_memory_pc`). Registers
+  read in the callback may already be past the instruction; this is where
+  it was. The callback's six arguments were all taken, so the value is
+  read from the core's memory, as the scopes' names are.
+- `GetRegisterRoles`, a line each, `role register [segment [base]]`: the
+  program counter, stack pointer and flags by the core's own names, and on
+  a segmented processor the segment paired with each and a register with
+  that segment's linear base (`ce_session_register_role`). Chimera knows no
+  processor's rule: a core that wants a linear address says where its base
+  is. `registers` then has `roles`, `names` refuses an unknown name with the
+  names there are, and Lua's `emu.getregister("pc")` works on such a core
+  (an unknown name still reads 0 there, as the original Lua API has it).
+
+The tools: `trace_memory` watches an address (or up to 64), plays frames of
+the movie's own input aside and puts the machine back, and lists each hit
+with the instruction that made it where the core says; `trace_cpu` gives
+the core's own trace over frames played aside, filtered. To share the
+memory callback with the window's scripts, the engine now counts who
+watches a place (`ce_session_watch_memory`: a place stays watched until
+every caller has stopped) and tells observers of every watched access
+beside the one callback (`ce_session_add_memory_observer`). Scripts hear
+none of the frames played aside and undone (`ce_session_hold_callbacks`,
+used by `try_input` too).
+
+The synthetic core makes both declarations: its step hook keeps the
+instruction running, a new read-only register PC shows it, and its roles
+are `pc PC`. Not done: `disassemble`, since no core offers a disassembler
+and a core would have to declare one first.
+
+Tested: in the window with changes, registers names PC as the program
+counter and reads `pc` by name, and an unknown name is refused with the
+real ones; every write trace_memory finds in RAM 0-15 over 30 frames has an
+instruction that trace_cpu's own trace shows as a store (0x11 or 0x13); an
+instruction traced as run is found at its address; both put the machine
+back; a script watching address 1 hears nothing of the trace's frames and
+keeps its watch after it; `emu.getregister("pc")` reads PC. Taken out one
+at a time - the instruction's address, the counting of watches, the roles,
+the machine put back, the hold - each fails a check.

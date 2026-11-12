@@ -266,8 +266,14 @@ function emu.getregisters()
 	end
 	return out
 end
--- 0 for a register the machine does not have, as Chimera's
-function emu.getregister(name) return emu.getregisters()[name] or 0 end
+-- 0 for a register the machine does not have, as Chimera's; a role the core
+-- names (pc, sp, flags) reads its register (issue 571)
+function emu.getregister(name)
+	local registers = emu.getregisters()
+	if registers[name] then return registers[name] end
+	local named = C.registers.roleRegister(tostring(name))
+	return named ~= "" and registers[named] or 0
+end
 function emu.setregister(name, value) C.registers.setRegisterNamed(name, value) end
 function emu.totalexecutedcycles() C.registers.refresh() return C.registers.cycles end
 function emu.limitframerate(on) C.session.unthrottled = not on end

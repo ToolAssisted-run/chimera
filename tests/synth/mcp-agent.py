@@ -266,6 +266,13 @@ error, text, _ = call("read_memory", domain="RAM", address=len(ram) - 2, count=8
 check("read_memory refuses a read past the end", error and "past its end" in text)
 error, text, _ = call("read_memory", domain="RAM", address=0, count=5000)
 check("read_memory refuses more than 4096 bytes", error and "4096" in text)
+# registers by role, and a name the core lacks refused with the names it has (issue 571)
+regs = facts("registers")
+check("registers names the program counter, as the core declares it", regs.get("roles", {}).get("pc", {}).get("register") == "PC")
+picked = facts("registers", names=["R0", "pc"])
+check("registers reads the ones asked for, a role among them", [r.get("name") for r in picked.get("registers", [])] == ["R0", "PC"])
+error, text, _ = call("registers", names=["IP"])
+check("a register the core has not is refused, naming the ones it has", error and "'IP'" in text and "R0, R1" in text and "PC" in text)
 
 # the game's named values: the movie wins the game
 properties = facts("list_properties", filter="stat")
@@ -748,6 +755,31 @@ if changes:
           len(each.get("each_frame", [])) == 3 and [c for c in content if c["type"] == "image"])
     error, text, _ = call("try_input", frames=2, buttons=["No Such Button"])
     check("try_input names a button that is not there", error and "No Such Button" in text)
+    # who writes an address, and which instruction did (issue 571)
+    if holder:
+        facts("seek", frame=10)
+    here = facts("status")
+    ram_before = bytes.fromhex(facts("read_memory", domain="RAM", address=0, count=4096)["bytes_hex"])
+    traced = facts("trace_memory", kind="write", address=0, length=16, frames=30, max_hits=200)
+    hits = traced.get("hits", [])
+    # each instruction's own line, from the CPU trace of the same frames
+    ops = {}
+    for pc_hex in sorted({h["pc_hex"] for h in hits if "pc_hex" in h}):
+        lines = facts("trace_cpu", frames=30, filter="%04X:" % int(pc_hex, 16), max_lines=1).get("lines", [])
+        ops[pc_hex] = lines[0]["line"].split(":", 1)[1].split()[0] if lines else None
+    check("trace_memory says which instruction made each write, and trace_cpu traced that one as a store",
+          traced.get("pc_reported") is True and (not holder or hits) and all(op in ("11", "13") for op in ops.values()))
+    check("both put the machine back where it was",
+          facts("status").get("frame") == here.get("frame")
+          and bytes.fromhex(facts("read_memory", domain="RAM", address=0, count=4096)["bytes_hex"]) == ram_before)
+    if hits and "pc_hex" in hits[0]:
+        pc = int(hits[0]["pc_hex"], 16)
+        ran = facts("trace_memory", kind="exec", address=pc, frames=30, max_hits=3)
+        check("an instruction run is traced too", ran.get("hit_count", 0) >= 1 and ran.get("hits", [{}])[0].get("pc_hex") == hits[0]["pc_hex"])
+        filtered = facts("trace_cpu", frames=2, filter="%04X:" % pc)
+        check("trace_cpu keeps only the lines holding 'filter'", filtered.get("lines") and all(r["line"].startswith("%04X:" % pc) for r in filtered["lines"]))
+    error, text, _ = call("trace_memory", kind="write", address=0, scope="No Such Scope")
+    check("trace_memory names a scope that is not there", error and "No Such Scope" in text)
     if holder:
         facts("seek", frame=10)
         lines = facts("get_input", **{"from": 10, "count": 6}).get("entries", [])
@@ -784,8 +816,8 @@ if changes:
     check("the value set is read back", facts("get_property", name="Steps").get("value") == "7")
     error, text, _ = call("set_property", name="No Such Value", value="1")
     check("set_property names a value that does not exist", error and "No Such Value" in text)
-    error, text, _ = call("set_register", name="PC", value=0)
-    check("set_register names a register that does not exist", error and "PC" in text)
+    error, text, _ = call("set_register", name="IP", value=0)
+    check("set_register names a register that does not exist", error and "IP" in text)
     if not holder:
         error, text, _ = call("add_marker", frame=1, text="x")
         check("a change the window makes is handed to the frontend", error and "window" in text)
@@ -826,6 +858,18 @@ if window and changes:
     check("and what it printed", ran.get("results") == [[1, 2], 2] and "hello from the agent" in ran.get("output", ""))
     facts("run_lua", code="agent_said = 41")
     check("a statement runs, and what it set is there for the next call", facts("run_lua", code="agent_said + 1").get("results") == [42])
+    # a script watching the place a trace watches keeps its watch when the trace ends (issue 571)
+    facts("seek", frame=10)
+    facts("run_lua", code="agent_writes = 0 event.on_bus_write(function() agent_writes = agent_writes + 1 end, 1, 'agent watch', 'RAM')")
+    facts("trace_memory", kind="write", address=1, frames=5)
+    check("a script does not hear the frames a trace plays and undoes",
+          (facts("run_lua", code="return agent_writes").get("results") or [-1])[0] == 0)
+    facts("advance_until", domain="RAM", address=0xFFF, op="equal", value=999, max_frames=3)
+    check("a script's memory watch outlives a trace of the same place",
+          (facts("run_lua", code="return agent_writes").get("results") or [0])[0] > 0)
+    facts("run_lua", code="event.unregisterbyname('agent watch')")
+    check("emu.getregister reads a register by the role the core names (issue 571)",
+          facts("run_lua", code="return emu.getregister('pc') == emu.getregister('PC'), emu.getregister('pc')").get("results", [False])[0] is True)
     error, text, _ = call("run_lua", code="error('on purpose')")
     check("an error Lua raises is the answer", error and "on purpose" in text)
     error, text, _ = call("run_lua", code="emu.frameadvance()")

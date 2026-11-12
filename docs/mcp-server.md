@@ -223,7 +223,9 @@ Looking:
 | `screenshot` | With `layers` `with_lua`, the picture as the window shows it: the game, the padding a script asked for and everything Lua draws, brought back to the game's own pixels, with the padding on each side said, so the agent can see its own overlay (issue 571; window only, the window grabs it). Otherwise the picture of the current frame as a PNG, optionally scaled down, with whether it is blank: its commonest colour and how much of it that colour covers (one colour over 99% or more is blank). `region` crops it first; `pixels` answers the colours of the pixels named, as #RRGGBB, and with `image` false no picture is sent (issue 571). |
 | `list_memory` | The memory domains and address buses, with sizes. |
 | `read_memory` | Bytes or typed values at an address. |
-| `registers` | The CPU registers, where the core gives them. |
+| `registers` | The CPU registers, where the core gives them; `names` reads only those, and a name the core has not is refused with the names it has. A core that names its registers' roles (`GetRegisterRoles`, issue 571) adds them: the program counter, the stack pointer and the flags, with the segment paired with each and the linear address on a segmented processor. |
+| `trace_memory` | Who reads, writes or runs an address (or up to 64 from it): watches it, plays some frames of the movie's own input aside and puts the machine back, and lists each hit with its frame, value, size and - for a core that says (`GetMemoryCallbackPc`) - the instruction that made it, and every register if asked. A script watching the same place keeps its watch: the engine counts who watches what. Scripts hear none of the frames played aside (issue 571). |
+| `trace_cpu` | The core's own trace of the instructions it runs over some frames played aside, filtered by text, for a core that keeps one (issue 571; it was "not planned" before). |
 | `list_properties` / `get_property` | A game core's named values (docs/game-cores.md). |
 | `list_branches` / `list_markers` | The project's branches and markers. |
 | `server_info` | This build, the folder it runs from, and the folders for projects, cores, firmware and Lua scripts. Without a window: the build and the folders it was started with. |
@@ -450,7 +452,10 @@ and the convenience tools and the windowless mode follow.
 
 ## Not planned
 
-- Sound, video encoding, CPU traces.
+- Sound, video encoding. (CPU traces were here until 2026-11-12: the owner
+  had `trace_cpu` added for issue 571.)
+- A disassembler: no core here offers one (Lua's `emu.disassemble` says so),
+  and a core would have to declare one first.
 - More than one agent connected at once, or one agent on several Chimera
   windows.
 - Any connection that is not local to the machine and the user.
