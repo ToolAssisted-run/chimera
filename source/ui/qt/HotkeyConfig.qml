@@ -29,6 +29,8 @@ ApplicationWindow {
     readonly property var groupKeys: JSON.parse(win.hotkeys.groupKeys)
 
     onVisibleChanged: {
+        // the pads looked at while it is open, so a binding shows what the pad in use prints
+        win.session.run("watchPads", [visible])
         if (visible) {
             win.hotkeys.run("edit")
             tabs.currentIndex = 0

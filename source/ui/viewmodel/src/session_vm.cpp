@@ -1886,6 +1886,20 @@ SessionViewModel::SessionViewModel(Dispatcher &dispatcher, InputLog &inputs)
 			});
 			return taken;
 		});
+	command("watchPads", "while a window shows bindings (true), the gamepads are looked at sixty times a second, a game "
+		"running or not, so padFaces and gamepads follow the pads plugged in; false when it closes", {"on"},
+		[this](const Args &a, std::string &error) -> Value {
+			bool on = false;
+			if (!arg(a, 0, on, error)) return {};
+			padWatchers_ = std::max(0, padWatchers_ + (on ? 1 : -1));
+			padWatchM_.store(padWatchers_ > 0);
+			/* the machine's thread waiting looks again, at its lock, so the change is not missed */
+			{
+				std::lock_guard<std::mutex> lock(m_);
+			}
+			cv_.notify_all();
+			return {};
+		});
 	command("setInputPolls", "the core asked to call the scripts' event.oninputpoll functions at its reads (true) or not", {"on"},
 		[this](const Args &a, std::string &error) -> Value {
 			bool on = false;
@@ -2203,7 +2217,7 @@ void SessionViewModel::loop()
 				}
 				/* a hotkey on a gamepad input: the pads looked at sixty times a
 				 * second, when no frame run has looked at them since */
-				const bool padsOn = padHotkeysOnM_.load() || !padSentM_.empty();
+				const bool padsOn = padHotkeysOnM_.load() || !padSentM_.empty() || padWatchM_.load();
 				if (padsOn && Clock::now() >= padDue_)
 				{
 					padTick = true;
@@ -2286,6 +2300,7 @@ void SessionViewModel::loop()
 		if (padTick)
 		{
 			if (!padsM_) padsM_ = std::make_unique<Gamepads>();
+			padDue_ = Clock::now() + std::chrono::milliseconds(16);
 			std::vector<std::string> held;
 			padsM_->poll(held);
 			padFacesOnMachine();

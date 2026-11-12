@@ -14925,3 +14925,24 @@ These checks failed when their expected values were changed on purpose.
 The key names, binding box and key filter tests pass. Not tried: a real
 pad, and the window showing a label (the window's tests that open a game do
 not run on this machine's 16 KiB page kernel).
+
+## The pads' labels shown as soon as a bindings window opens (2026-11-12)
+
+The window started SDL and looked at the pads only while a game ran or a
+binding box waited for a press. A project opens paused, so with Controller
+Config or Configure Hotkeys open the boxes showed the saved names ("X1 A")
+until a box was clicked, and only then the pad's own ("X1 Cross").
+
+- A new session command, `watchPads`, is turned on while either window is
+  open and off when it closes (counted, so closing one of the two leaves the
+  other watching). While it is on, the machine's thread looks at the pads
+  sixty times a second, a game running or not, as it does for a hotkey on a
+  gamepad, and `padFaces` and `gamepads` follow the pads plugged in.
+- Nothing more runs while neither window is open.
+
+Tested on Linux aarch64: the view models' test (1603 checks, 0 failed)
+checks that, with no game and nothing caught, `padFaces` names a virtual
+DualSense's Cross, Circle, Square and Triangle once `watchPads` is on; with
+the watching taken out of the machine's thread, that check failed. A real DualSense in the window
+was seen by the owner before this change (labels shown only after a click);
+the change itself was not tried in the window.

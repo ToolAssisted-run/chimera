@@ -1381,6 +1381,10 @@ private:
 	std::set<std::string> padHotkeyKeys_;
 	int64_t padPriority_ = 0;
 	std::atomic<bool> padHotkeysOnM_{false};
+	/* a window showing bindings is open (watchPads): the pads looked at with no game running */
+	std::atomic<bool> padWatchM_{false};
+	/* how many such windows are open (the window's thread) */
+	int padWatchers_ = 0;
 	/* the inputs whose press went to the hotkeys, and when the pads are looked
 	 * at next for them while no frame is run (sixty times a second) */
 	std::set<std::string> padSentM_;

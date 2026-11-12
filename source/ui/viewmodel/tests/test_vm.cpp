@@ -1708,6 +1708,13 @@ bool padCatch()
 	SessionViewModel session(d, inputs);
 	session.turboSeek.set(true);
 	std::string error;
+	/* a window showing bindings open: the pads are looked at with no game and
+	 * nothing caught, so what a pad plugged in prints is known at once */
+	CHECK(session.padFaces.get().empty());
+	CHECK(session.run("watchPads", {true}, error).has_value());
+	CHECK(v.add("Chimera Watch DualSense", 6, 15, 0, 0x054C, 0x0CE6) != 0);
+	CHECK(d.until([&] { return session.padFaces.get().find(":Cross,Circle,Square,Triangle") != std::string::npos; }, 10));
+	CHECK(session.run("watchPads", {false}, error).has_value());
 	const uint32_t id = v.add("Chimera Catch Stick", 0, 4, 0);
 	void *joy = id != 0 ? v.open(id) : nullptr;
 	CHECK(joy != nullptr);
