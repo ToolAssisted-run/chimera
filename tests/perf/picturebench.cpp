@@ -17,6 +17,10 @@
  *   picturebench <frame w> <frame h> <window w> <window h> [--prescale N] [--auto] [--smooth] [--seconds S] [--cpu]
  *
  * --cpu times the copies and the prescaling alone, 300 frames, with no window.
+ * --compare N draws one frame in the window, grown first by N on the CPU and
+ * not grown, and counts the pixels that differ. Sharp, none differ on
+ * Direct3D 11 and OpenGL, so the window grows a sharp picture only on Qt's
+ * software renderer, where they do.
  *
  * Built with the window (build_by_default false):
  *   meson compile -C <build> picturebench
@@ -26,6 +30,7 @@
 #include <QQuickItem>
 #include <QQuickWindow>
 #include <QSGSimpleTextureNode>
+#include <QThread>
 #include <QTimer>
 
 #include <algorithm>
@@ -58,6 +63,8 @@ public:
 		setFlag(ItemHasContents, true);
 	}
 	int shown = 0;
+	/* a step forced, the fit's not asked (--compare) */
+	int forced = 0;
 
 protected:
 	/* as PictureItem::updatePaintNode, timed */
@@ -83,7 +90,8 @@ protected:
 		}
 		int stepX = 1, stepY = 1;
 		fit_.prescaleSteps(frame_.width, frame_.height, frame_.shownWidth, frame_.shownHeight, width(), height(), smooth_, 8192, stepX, stepY);
-		if (fresh || node->texture() == nullptr)
+		if (forced > 0) stepX = stepY = forced;
+		if (fresh || node->texture() == nullptr || forced > 0)
 		{
 			times_.take.push_back(take);
 			t.restart();
@@ -200,6 +208,41 @@ int main(int argc, char **argv)
 		say("take", times.take);
 		say("prescale", times.prescale);
 		return 0;
+	}
+	int compare = 0;
+	for (int i = 5; i + 1 < argc; i++)
+		if (std::string(argv[i]) == "--compare") compare = std::atoi(argv[i + 1]);
+	if (compare > 0)
+	{
+		/* a frame of pixels each unlike its neighbours, drawn grown by N and not, the window's own pixels compared */
+		std::vector<uint32_t> pixels(static_cast<size_t>(fw) * fh);
+		for (size_t i = 0; i < pixels.size(); i++) pixels[i] = 0xff000000u | (static_cast<uint32_t>(i) * 2654435761u >> 8);
+		picture.publish(pixels.data(), fw, fh, 0, 0);
+		QQuickWindow window;
+		window.resize(ww, wh);
+		Item item(picture, fit, smooth, times);
+		item.setParentItem(window.contentItem());
+		item.setSize(QSizeF(ww, wh));
+		window.show();
+		QImage grown, plain;
+		item.forced = compare;
+		item.update();
+		for (int i = 0; i < 20; i++) QCoreApplication::processEvents(), QThread::msleep(10);
+		grown = window.grabWindow();
+		item.forced = 1;
+		item.update();
+		for (int i = 0; i < 20; i++) QCoreApplication::processEvents(), QThread::msleep(10);
+		plain = window.grabWindow();
+		int64_t differ = 0;
+		const bool sized = grown.size() == plain.size() && !grown.isNull();
+		if (sized)
+			for (int y = 0; y < grown.height(); y++)
+				for (int x = 0; x < grown.width(); x++)
+					differ += (grown.pixel(x, y) & 0xffffff) != (plain.pixel(x, y) & 0xffffff);
+		std::printf("frame %dx%d in a window of %dx%d (%dx%d grabbed), %s, %s: grown by %d and not differ in %lld pixels%s\n", fw, fh, ww, wh,
+			plain.width(), plain.height(), smooth ? "smoothed" : "sharp", api(window.rendererInterface()->graphicsApi()), compare,
+			static_cast<long long>(differ), sized ? "" : " (the grabs are not the same size)");
+		return differ == 0 && sized ? 0 : 1;
 	}
 	QQuickWindow window;
 	window.resize(ww, wh);

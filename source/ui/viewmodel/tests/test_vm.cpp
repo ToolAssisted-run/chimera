@@ -1959,6 +1959,38 @@ bool overlay(const char *package, const char *rom)
 	CHECK(d.until([&] { return session.frame.get() == 1; }, 20));
 	CHECK(session.frameCounterText.get() == "1/2" && session.inputText.get() == std::string(" ") + session.mnemonics()[1] + "      ");
 	CHECK(session.lagCount.get() == (inputs.lagAt(0) ? 1 : 0));
+	/* edits as TAStudio makes them, the movie's length kept: an input past
+	 * the last makes it the last, and the last ones cleared leave none
+	 * (issue 568: it said 1/2 until the counter was turned off and on) */
+	const Buttons down = inputs.at(0);
+	CHECK(down.any() && inputs.size() >= 5);
+	inputs.set(4, down);
+	session.edited(4);
+	CHECK(d.until([&] { return session.frameCounterText.get() == "1/4"; }, 20));
+	for (int64_t f = 0; f < inputs.size(); f++) inputs.set(f, Buttons());
+	session.edited(0);
+	/* the machine goes back to the edit, frame 0 */
+	CHECK(d.until([&] { return session.frameCounterText.get() == "0/0"; }, 20));
+	std::printf("overlay after edits: [%s]\n", session.frameCounterText.get().c_str());
+	/* a script's lag changes on a long movie with no input: the counter
+	 * does not look through the movie for its last input each time */
+	{
+		session.run("seek", {int64_t{3}}, error);
+		CHECK(d.until([&] { return session.frameCounterText.get() == "3/0"; }, 20));
+		const int64_t was = inputs.size();
+		inputs.resize(200000);
+		session.edited(was);
+		CHECK(d.until([&] { return inputs.size() == 200000 && session.frameCounterText.get() == "3/0"; }, 20));
+		const auto start = std::chrono::steady_clock::now();
+		for (int i = 0; i < 100; i++) session.run("setIsLagged", {i % 2 == 0}, error);
+		std::printf("overlay: 100 lag changes on a 200,000-frame movie took %.3f s\n",
+			std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count());
+		inputs.resize(was);
+		session.edited(was);
+		CHECK(d.until([&] { return session.frameCounterText.get() == "3/0"; }, 20));
+		session.run("seek", {int64_t{1}}, error);
+		CHECK(d.until([&] { return session.frame.get() == 1; }, 20));
+	}
 	/* the picture goes with the machine (issue 432), and a machine opened shows nothing of the last one's
 	 * until it draws (issue 464) */
 	Picture::Frame shown;

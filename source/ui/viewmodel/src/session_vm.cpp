@@ -734,6 +734,7 @@ SessionViewModel::SessionViewModel(Dispatcher &dispatcher, InputLog &inputs)
 	for (Property<bool> *shown : {&showFps, &showFrameCounter, &showLagCounter, &showInput, &showRealTime})
 		overlayWatches_.push_back(shown->changed.connect([this] {
 			lastInputFor_ = -1;
+			inputsFrom_ = -1;
 			lagsTo_ = lags_ = 0;
 			realTo_ = realPs_ = 0;
 			updateOverlay(frame.get(), -1);
@@ -6427,6 +6428,7 @@ void SessionViewModel::gameTimeHeadersOnMachine(ce_project *p, int64_t length)
 void SessionViewModel::edited(int64_t first)
 {
 	greenzoneInvalidated.emit(first);
+	inputsChangedFrom(first);
 	const uint64_t sent = ++editsSent_;
 	/* the setting in force when the edit was made: one changed while the
 	 * machine still has edits to get to does not change what they do */
@@ -6651,6 +6653,8 @@ void SessionViewModel::tick()
 	greenEnd.set(green);
 	greenzoneStates.set(states);
 	rerecords.set(rr);
+	if (cf >= 0) inputsChangedFrom(cf);
+	if (af >= 0) inputsChangedFrom(af);
 	updateOverlay(f, cf >= 0 ? cf : af);
 	if (!recorded.empty()) framesRecorded.emit(recorded);
 	if (cf >= 0) inputsChanged.emit(cf, cl);
@@ -6684,13 +6688,19 @@ void SessionViewModel::updateOverlay(int64_t f, int64_t changedFrom)
 	const int64_t size = inputs_.size();
 	if (showFrameCounter.get())
 	{
-		/* the last frame with input: zero for a movie with none */
-		if (changedFrom >= 0 || lastInputFor_ != size)
+		/* the last frame with input: zero for a movie with none. Worked out
+		 * again when an input changed (an edit that cleared the last input
+		 * left it as it was, issue 568) or the length did; looked for only in
+		 * the frames from the first change on when every change is past the
+		 * last input, so a frame recorded does not read the whole movie */
+		const int64_t from = lastInputFor_ < 0 ? 0 : std::min(lastInputFor_, inputsFrom_ < 0 ? INT64_MAX : inputsFrom_);
+		if (lastInputFor_ != size || inputsFrom_ >= 0)
 		{
-			lastInput_ = 0;
+			const int64_t down = from > lastInput_ && lastInput_ < size ? from : 0;
+			if (down == 0) lastInput_ = 0;
 			std::vector<int32_t> axes(inputs_.axisCount()), neutral(inputs_.axisCount());
 			if (!neutral.empty()) inputs_.neutralAxes(neutral.data());
-			for (int64_t at = size - 1; at >= 0; at--)
+			for (int64_t at = size - 1; at >= down; at--)
 			{
 				bool pressed = inputs_.at(at).any();
 				if (!pressed && !axes.empty())
@@ -6705,6 +6715,7 @@ void SessionViewModel::updateOverlay(int64_t f, int64_t changedFrom)
 				}
 			}
 			lastInputFor_ = size;
+			inputsFrom_ = -1;
 		}
 		/* past the last input the movie is finished, but not while recording, where every frame is the
 		 * movie's new end (issue 433) */

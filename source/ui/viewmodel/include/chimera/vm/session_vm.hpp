@@ -1273,6 +1273,10 @@ private:
 	 * length), and the lag frames counted up to a frame */
 	void updateOverlay(int64_t frame, int64_t changedFrom);
 	int64_t lastInputFor_ = -1, lastInput_ = 0, lagsTo_ = 0, lags_ = 0;
+	/* the first frame whose input changed since the last frame with input
+	 * was worked out, -1 for none: an edit, or a frame recorded */
+	int64_t inputsFrom_ = -1;
+	void inputsChangedFrom(int64_t first) { inputsFrom_ = inputsFrom_ < 0 ? first : std::min(inputsFrom_, first); }
 	/* the frames' lengths added up to a frame, in picoseconds */
 	int64_t realTo_ = 0, realPs_ = 0;
 	/* what a script's emu.setlagcount added to the count, from which frame */

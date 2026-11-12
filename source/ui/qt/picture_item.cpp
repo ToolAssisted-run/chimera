@@ -150,6 +150,12 @@ QSGNode *PictureItem::updatePaintNode(QSGNode *old, UpdatePaintNodeData *)
 	 * is drawn (and smoothed only from there) */
 	int stepX = 1, stepY = 1;
 	fit_.prescaleSteps(frame_.width, frame_.height, frame_.shownWidth, frame_.shownHeight, width(), height(), smooth_, kLargestSide, stepX, stepY);
+	/* Drawn sharp by a graphics card, the picture grown is the picture: each
+	 * point drawn takes the texel it falls in, grown or not (the same pixels,
+	 * measured on Direct3D 11 and OpenGL). So it is not grown, which cost a
+	 * millisecond a frame and more (issue 568). Qt's software renderer
+	 * samples otherwise and keeps the step */
+	if (!smooth_ && window()->rendererInterface()->graphicsApi() != QSGRendererInterface::Software) stepX = stepY = 1;
 	if (fresh || node->texture() == nullptr || stepX != stepX_ || stepY != stepY_)
 	{
 		/* shared with the texture, not copied: the next frame goes into a new image while the texture holds this one */

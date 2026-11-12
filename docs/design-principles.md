@@ -14422,3 +14422,38 @@ ran 11 frames and it failed. The engine's state history test clears a
 history with stretches on disk and three pinned frames (39 frames held, 8
 after), restores each kept frame exactly, and stores on from the
 machine's frame afterwards.
+
+## The frame counter after edits, and a sharp picture not grown (2026-11-12, issue 568)
+
+The reporter of issue 568 found two more things. Editing inputs without
+changing the movie's length (clearing a movie of 13,427 frames) left the
+frame counter's last frame with input as it was, `0/13426`, until the
+counter was turned off and on: the counter worked its last input out again
+only when the length changed. An edit now says from which frame inputs
+changed, and the counter works it out again. It also looks only through the
+frames from the first change on when every change is past the last input,
+so a frame recorded does not read the whole movie; a script's lag change no
+longer makes it look at all, as lag is not input.
+
+User Prescale grows the picture by whole steps on the CPU before it is
+drawn. Drawn sharp, each point on the screen takes the pixel it falls in,
+grown or not, so growing it costs time (about 1.2 ms a frame at 4x) and
+changes nothing. The window now skips it when the picture is sharp and drawn
+by a graphics card. Measured with `picturebench --compare` on the GTX 1060:
+the window's pixels grown by 2, 3 or 4 and not grown are the same in 6 sizes
+of picture and window on Direct3D 11 (at 125% screen scaling, so the scales
+were not whole numbers) and on OpenGL; smoothed, 1,400,222 pixels differ.
+Qt's software renderer (the headless mode's) differs sharp too, in 20,086
+pixels, so it keeps the step. Metal (macOS) was not tried; Vulkan was not
+either, as the benchmark's window grab hung there.
+
+Not done, measured as too small to matter: keeping the texture from frame
+to frame instead of making one per frame. Making it and the render pass
+take under 0.1 ms a frame together on the 1060 at every size.
+
+
+Tested: the view models test edits a movie as TAStudio does, its length
+kept. An input set past the last makes the counter say `1/4`, and every
+input cleared makes it say `0/0`; without the fix it said `1/2` and `0/2`
+and both checks failed. 100 lag changes by a script on a 200,000-frame movie
+with no input took 0.789 s before and 0.008 s after.
