@@ -370,7 +370,10 @@ void McpViewModel::host(uint64_t id, const std::string &tool, const std::string 
 	const bool movie = session_.hasProject.get() && session_.isOpen.get();
 	const int64_t length = roll_.frameCount.get();
 	auto done = [&](Json facts) {
+		/* a step that changed the movie's length says so, and that it is unsaved now (issue 571) */
+		if (roll_.frameCount.get() != length) add(facts, "movie_length_before", Json::integer(length));
 		add(facts, "movie_length", Json::integer(roll_.frameCount.get()));
+		add(facts, "unsaved_changes", Json::boolean_(true));
 		answer(json::write(facts), false);
 	};
 	/* before the agent's first change: a branch of the movie as it is now */
@@ -569,11 +572,37 @@ void McpViewModel::host(uint64_t id, const std::string &tool, const std::string 
 		add(facts, "text", Json::string(text));
 		return answer(json::write(facts), false);
 	}
+	if (tool == "snapshot")
+	{
+		Value made = session_.run("saveCoreState", {}, error).value_or(Value());
+		std::string kept;
+		if (!fromValue(made, kept) || kept.empty()) return refuse(error);
+		Json out = object();
+		add(out, "id", Json::string(kept));
+		add(out, "frame", Json::integer(session_.frame.get()));
+		return answer(json::write(out), false);
+	}
+	if (tool == "restore")
+	{
+		if (!session_.run("loadCoreState", {textOf(arguments, "id")}, error)) return refuse(error);
+		return answerAfter([this, answer] {
+			Json out = object();
+			add(out, "frame", Json::integer(session_.frame.get()));
+			answer(json::write(out), false);
+		});
+	}
 	if (tool == "seek")
 	{
 		int64_t frame = 0;
-		if (!number(arguments, "frame", 0, length, nullptr, frame))
+		const bool extend = flagOf(arguments, "extend");
+		if (!number(arguments, "frame", 0, extend ? length + kMostFrames : length, nullptr, frame))
 			return refuse(tr("mcp.frame_range", {std::to_string(length)}));
+		if (frame > length)
+		{
+			/* empty frames up to it first, one step (issue 571) */
+			if (!roll_.run("agentInsert", {length, frame - length, label}, error)) return refuse(tr("piano_roll.unknown_step"));
+			return session_.mcpSeek(id, frame, length);
+		}
 		if (session_.frame.get() == frame && !session_.running.get())
 		{
 			Json at = object();
@@ -646,10 +675,11 @@ void McpViewModel::host(uint64_t id, const std::string &tool, const std::string 
 		if (!number(arguments, "number", 1, count, nullptr, n))
 			return refuse(count == 0 ? tr("mcp.no_branches") : tr("mcp.branch_range", {std::to_string(count)}));
 		if (!branches_.run("load", {n - 1}, error)) return refuse(tr("mcp.branch_not_loaded", {error}));
-		return answerAfter([this, answer, n] {
+		return answerAfter([this, answer, n, length] {
 			Json out = object();
 			add(out, "number", Json::integer(n));
 			add(out, "frame", Json::integer(session_.frame.get()));
+			add(out, "movie_length_before", Json::integer(length));
 			add(out, "movie_length", Json::integer(roll_.frameCount.get()));
 			answer(json::write(out), false);
 		});

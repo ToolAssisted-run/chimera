@@ -723,6 +723,62 @@ if changes:
         check("advance_until stops when any byte of a range changes", moved.get("met") is True and moved.get("frame") == first)
         error, text, _ = call("advance_until", domain="RAM", address=0, length=4, op="equal", value=1)
         check("a range is for 'changed' only", error and "'length'" in text)
+    # trying input without touching the movie (issue 571)
+    first16 = [{"domain": "RAM", "address": a} for a in range(16)]
+    if holder:
+        facts("seek", frame=10)  # the movie's last frame is a won game, which reads no input
+    here = facts("status")
+    movie_before = all_input() if holder else None
+    ram_before = bytes.fromhex(facts("read_memory", domain="RAM", address=0, count=4096)["bytes_hex"])
+    walked = facts("try_input", frames=10, buttons=["P1 Right"], read=first16)
+    again = facts("try_input", frames=10, buttons=["P1 Right"], read=first16)
+    still = facts("try_input", frames=10, read=first16)
+    check("try_input plays its frames and reads what was asked",
+          walked.get("frames_played") == 10 and len(walked.get("values", [])) == 16 and walked.get("restored") is True)
+    check("the same try twice gives the same values: the machine was put back each time", walked.get("values") == again.get("values"))
+    if holder:
+        check("and the input given is the input played", walked.get("values") != still.get("values"))
+    check("the machine, the frame and the movie are as they were",
+          bytes.fromhex(facts("read_memory", domain="RAM", address=0, count=4096)["bytes_hex"]) == ram_before
+          and facts("status").get("frame") == here.get("frame") and facts("status").get("movie_length") == here.get("movie_length")
+          and (not holder or all_input() == movie_before))
+    error, text, content = call("try_input", frames=3, each_frame=True, picture=True, read=first16[:1])
+    each = json.loads(next((c["text"] for c in content if c["type"] == "text"), "{}")) if not error else {}
+    check("each_frame reads after every frame, and picture adds the last one's",
+          len(each.get("each_frame", [])) == 3 and [c for c in content if c["type"] == "image"])
+    error, text, _ = call("try_input", frames=2, buttons=["No Such Button"])
+    check("try_input names a button that is not there", error and "No Such Button" in text)
+    if holder:
+        facts("seek", frame=10)
+        lines = facts("get_input", **{"from": 10, "count": 6}).get("entries", [])
+        tried = facts("try_input", frames=6, entries=lines, read=first16)
+        facts("seek", frame=16)
+        check("the movie's own input tried gives what the movie makes",
+              len(lines) == 6 and [v.get("value") for v in tried.get("values", [])]
+              == list(bytes.fromhex(facts("read_memory", domain="RAM", address=0, count=16)["bytes_hex"])))
+        # a snapshot keeps the machine, writes and all, and restore puts it back without the movie
+        facts("seek", frame=10)
+        facts("write_memory", domain="RAM", address=0x850, values=[0x99])
+        snap = facts("snapshot")
+        facts("seek", frame=20)
+        back = facts("restore", id=snap.get("id", ""))
+        check("restore puts the machine back as the snapshot kept it, on its frame",
+              back.get("frame") == 10 and facts("read_memory", domain="RAM", address=0x850).get("values") == [0x99])
+        error, text, _ = call("restore", id="no such snapshot")
+        check("restore says when there is no such snapshot", error)
+        # going past the movie's end, said
+        length = facts("status").get("movie_length")
+        error, text, _ = call("seek", frame=length + 3)
+        check("a seek past the end is refused without extend", error)
+        extended = facts("seek", frame=length + 3, extend=True)
+        check("seek with extend adds the frames, and says the length before and after",
+              extended.get("frame") == length + 3 and extended.get("movie_length_before") == length and extended.get("movie_length") == length + 3)
+        facts("undo")
+        check("as one step that undo takes back", facts("status").get("movie_length") == length)
+        inserted = facts("insert_frames", frame=1, count=2)
+        check("a step that changes the length says it before and after",
+              inserted.get("movie_length_before") == length and inserted.get("movie_length") == length + 2)
+        facts("undo")
     # a game's named value
     check("set_property sets a value from text", facts("set_property", name="Steps", value="7").get("value") == "7")
     check("the value set is read back", facts("get_property", name="Steps").get("value") == "7")

@@ -263,7 +263,9 @@ Changes:
 
 | Tool | What it does |
 | --- | --- |
-| `seek` | Moves the playback position to a frame, back or forward, and answers when the machine is there. |
+| `seek` | Moves the playback position to a frame, back or forward, and answers when the machine is there. With `extend`, a frame past the movie's end is reached by adding empty frames first, one step in the undo history (issue 571). |
+| `try_input` | Plays some frames from where the machine is with input given in the call (input lines, or buttons and axes held), never written into the movie, reads the values asked for (after every frame if asked) and the picture, then puts the machine back exactly as it was: the movie, its length, its saved states and the playback position are not touched (issue 571). The engine runs the frames as a script's show_future does. |
+| `snapshot` / `restore` | Keeps the machine as it is, memory writes and all, by an id, and puts it back on that frame later, without changing the movie: the Lua Console's memorysavestate, for an agent (issue 571). |
 | `advance_until` | Plays the movie forward until a memory value or a property meets a condition (equal, greater, changed, ...) and stops on that frame. With `length`, "changed" watches that many bytes and stops when any of them changes: the frame something starts to move, with no byte known yet (issue 571). It stops at the movie's end or after `max_frames` otherwise, and says which. |
 | `diff_memory` | Goes to frame_a, then to frame_b, as `seek` does, and lists each run of bytes of a range that changed between them, what it was and what it became; up to 16 MiB, the first 200 runs. It leaves the machine on frame_b. |
 | `set_input` | Replaces the input from a frame on, one line a frame as `get_input` returns them, in printable ASCII. Past the movie's end it adds frames, starting at most 100000 frames past it. |
@@ -287,6 +289,8 @@ Changes:
 
 Each call that edits the input is one step in TAStudio's undo history, named
 "Agent: ...", so a person can undo an agent's edit as they undo their own.
+Every step that changes the movie's length says the length before and after,
+and that the project now has unsaved changes (issue 571).
 
 `advance_until` plays the movie's own input and never past its end, so it
 adds no frames. With `watch` it answers "on which frame does this value first

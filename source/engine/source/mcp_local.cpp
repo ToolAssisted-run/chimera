@@ -210,6 +210,7 @@ void McpLocal::dropMachine()
 	unsaved = false;
 	currentBranch = -1;
 	undoSteps.clear();
+	snapshots.clear();
 }
 
 McpLocal::Previous McpLocal::setAside()
@@ -217,6 +218,7 @@ McpLocal::Previous McpLocal::setAside()
 	Previous previous;
 	if (session != nullptr) ce_session_free(session);
 	session = nullptr;
+	snapshots.clear();
 	previous.project = project;
 	previous.movie = movie;
 	previous.projectPath = projectPath;
@@ -854,8 +856,42 @@ McpResult McpLocal::runHost(const std::string &tool, const std::string &argument
 	}
 	else if (tool == "seek")
 	{
-		if (!numberOf(arguments, "frame", 0, length, frame)) why = "'frame' must be between 0 and the movie's length, " + std::to_string(length) + ".";
+		const bool extend = cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(arguments, "extend"));
+		if (!numberOf(arguments, "frame", 0, extend ? length + 100000 : length, frame))
+			why = "'frame' must be between 0 and the movie's length, " + std::to_string(length) + (extend ? " (and at most 100000 past it with extend)." : "; give extend: true to add frames up to one past it.");
+		else if (frame > length)
+		{
+			/* empty frames up to it first, one step (issue 571) */
+			rememberForUndo();
+			const std::string blank = sessionEntryIn(session, sessionLayoutOf(session, movie), nullptr, nullptr);
+			ce_movie_log_insert_n(movie, length, blank.c_str(), frame - length);
+			if (movieChanged(length, why) && landOn(frame, why)) cJSON_AddNumberToObject(out, "frame", static_cast<double>(ce_session_frame(session)));
+		}
 		else if (landOn(frame, why)) cJSON_AddNumberToObject(out, "frame", static_cast<double>(ce_session_frame(session)));
+	}
+	else if (tool == "snapshot")
+	{
+		uint64_t len = 0;
+		const uint8_t *data = ce_session_save_state(session, &len);
+		if (data == nullptr || len == 0) why = std::string("The machine could not be kept: ") + ce_session_last_error(session);
+		else
+		{
+			const std::string id = "s" + std::to_string(++snapshotCount);
+			snapshots[id] = { std::vector<uint8_t>(data, data + len), ce_session_frame(session) };
+			cJSON_AddStringToObject(out, "id", id.c_str());
+			cJSON_AddNumberToObject(out, "frame", static_cast<double>(ce_session_frame(session)));
+		}
+	}
+	else if (tool == "restore")
+	{
+		const cJSON *idItem = cJSON_GetObjectItemCaseSensitive(arguments, "id");
+		const auto kept = cJSON_IsString(idItem) ? snapshots.find(idItem->valuestring) : snapshots.end();
+		if (kept == snapshots.end()) why = "There is no snapshot with that id.";
+		else if (ce_session_load_state(session, kept->second.bytes.data(), kept->second.bytes.size()) != 0)
+			why = std::string("The snapshot could not be loaded: ") + ce_session_last_error(session);
+		else if (kept->second.frame > ce_movie_log_count(movie)) why = "The movie is shorter than the snapshot's frame now.";
+		else if (ce_session_movie_at(session, kept->second.frame) != 0) why = ce_session_last_error(session);
+		else cJSON_AddNumberToObject(out, "frame", static_cast<double>(ce_session_frame(session)));
 	}
 	else if (tool == "diff_memory")
 	{
@@ -1068,6 +1104,13 @@ McpResult McpLocal::runHost(const std::string &tool, const std::string &argument
 	{
 		cJSON_Delete(out);
 		return mcpError(why);
+	}
+	/* a step that changed the movie's length says so (issue 571) */
+	if (movie != nullptr && ce_movie_log_count(movie) != length && cJSON_IsObject(out))
+	{
+		cJSON_DeleteItemFromObjectCaseSensitive(out, "movie_length");
+		cJSON_AddNumberToObject(out, "movie_length_before", static_cast<double>(length));
+		cJSON_AddNumberToObject(out, "movie_length", static_cast<double>(ce_movie_log_count(movie)));
 	}
 	return answered(out);
 }

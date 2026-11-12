@@ -14642,3 +14642,32 @@ screenshot with_lua is the game's width plus 4, says the padding, and has
 red where the game's own picture has not. With the console's lines, the
 errors kept at start and later, and the window's grab of what is drawn
 over the picture each taken out, the test fails.
+
+## MCP: trying input without changing the movie (2026-11-12, issue 571)
+
+An agent testing a jump wrote presses into the movie and played past its
+end, leaving the person's project with frames nobody asked for, and
+load_branch to get back cut input it wanted. Now `try_input` plays frames
+with input given in the call and puts the machine back: the engine keeps
+the machine, runs the frames with its own frame advance (as a script's
+show_future does), reads the values asked for, and loads the machine back.
+The movie, its length, its saved states and the playback position are not
+touched, and the RAM search does not count those frames. `snapshot` and
+`restore` keep and put back the machine by an id, as the Lua Console's
+memorysavestate does. Every step that changes the movie's length says the
+length before and after and that the project is unsaved; `seek` with
+`extend` reaches past the end by adding empty frames as one undoable step;
+load_branch's description says it sets the length.
+
+Not done: try_input's "stay" (keeping the tried machine). A machine left
+on input the movie does not hold is not what the movie makes, and nothing
+would say so; press_buttons and seek do it in the movie, where it is seen.
+
+Tested: in the window, without one and in the runner: the same try twice
+gives the same values and the machine, the frame and the movie are as
+before; Right held gives other values than nothing held; the movie's own
+six lines tried from frame 10 give what seeking to 16 shows; a write kept by
+snapshot comes back with restore; seek with extend adds three frames, says
+so, and one undo takes them back; insert_frames says the length before and
+after. Without the load back, the lines decoded, the extension, the restore
+or the report, those checks fail.

@@ -801,7 +801,7 @@ public:
 	 * frame and the movie's length; or that its machine did not start */
 	void mcpAnswerOpened(uint64_t id);
 	/* seek: the machine goes to the frame as TAStudio sends it; answered when it stops */
-	void mcpSeek(uint64_t id, int64_t frame);
+	void mcpSeek(uint64_t id, int64_t frame, int64_t lengthBefore = -1);
 	/* advance_until: the condition the engine reads from the arguments; played
 	 * forward until it is met, or for at most this many frames, or to the movie's end */
 	void mcpPlayUntil(uint64_t id, std::string arguments, int64_t most);
@@ -979,6 +979,8 @@ private:
 		/* diff_memory: its arguments, and frame_b once frame_a is done (-1 after) */
 		std::string arguments;
 		int64_t then = -1;
+		/* seek with extend: the movie's length before the frames were added, -1 when none were */
+		int64_t lengthBefore = -1;
 	};
 	std::optional<McpMove> mcpMoveM_;
 	/* playing for advance_until with Turbo seek on: as fast as it goes */

@@ -223,10 +223,25 @@ const McpTool kTools[] = {
 	 * the movie as it was is saved. */
 	{ "seek",
 	  "Moves the playback position to a frame, back or forward, and answers when the machine is there. "
-	  "Going back uses the saved states; going forward plays the movie's input.",
+	  "Going back uses the saved states; going forward plays the movie's input. A frame past the movie's end is refused, "
+	  "unless 'extend' is true: then frames with no button pressed are added up to it first, as one step in the undo "
+	  "history, and the answer says the movie's length before and after.",
 	  "{\"type\":\"object\",\"properties\":{"
-	  "\"frame\":{\"type\":\"integer\",\"minimum\":0}"
+	  "\"frame\":{\"type\":\"integer\",\"minimum\":0},"
+	  "\"extend\":{\"type\":\"boolean\",\"description\":\"Add empty frames to reach a frame past the movie's end. false when left out.\"}"
 	  "},\"required\":[\"frame\"],\"additionalProperties\":false}",
+	  true, true },
+	{ "snapshot",
+	  "Keeps the machine as it is now, memory writes and all, in memory, and answers its id: restore goes back to it. "
+	  "The movie is not touched. Snapshots last while the project is open.",
+	  kNoArguments, false, true },
+	{ "restore",
+	  "Puts the machine back as a snapshot kept it, on the frame it was taken on, without changing the movie. If the "
+	  "movie was edited before that frame since, the machine is not what the movie makes there any more: seek goes back "
+	  "to what the movie makes.",
+	  "{\"type\":\"object\",\"properties\":{"
+	  "\"id\":{\"type\":\"string\",\"description\":\"What snapshot answered.\"}"
+	  "},\"required\":[\"id\"],\"additionalProperties\":false}",
 	  true, true },
 	{ "search_steps",
 	  "Several rounds of a RAM search in one call: for each step the machine goes to the step's 'frame', as seek does, and "
@@ -251,6 +266,27 @@ const McpTool kTools[] = {
 	  "\"frame_b\":{\"type\":\"integer\",\"minimum\":0}"
 	  "},\"required\":[\"domain\",\"address\",\"length\",\"frame_a\",\"frame_b\"],\"additionalProperties\":false}",
 	  true, true },
+	{ "try_input",
+	  "Tries input without changing the movie: plays 'frames' frames from the frame the machine is on with input given "
+	  "here, which is never written into the movie, reads what is asked for, then puts the machine back exactly where it "
+	  "was. The movie, its length, its saved states and the playback position are not touched. Input: 'entries' (lines as "
+	  "get_input gives them, one a frame, the last one held for the rest), or 'buttons' held every frame and 'axes'; none "
+	  "is no button pressed. 'read' names memory values or properties as watch does, read after the last frame (and "
+	  "after every frame with 'each_frame'); 'picture' adds the last frame's picture.",
+	  "{\"type\":\"object\",\"properties\":{"
+	  "\"frames\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":3600},"
+	  "\"entries\":{\"type\":\"array\",\"items\":{\"type\":\"string\"},\"minItems\":1,\"maxItems\":3600},"
+	  "\"buttons\":{\"type\":\"array\",\"items\":{\"type\":\"string\"},\"description\":\"Buttons held every frame, by the names controls gives.\"},"
+	  "\"axes\":{\"type\":\"object\",\"additionalProperties\":{\"type\":\"integer\"},\"description\":\"Axis name to value, every frame.\"},"
+	  "\"read\":{\"type\":\"array\",\"maxItems\":32,\"items\":{\"type\":\"object\",\"properties\":{"
+	  "\"name\":{\"type\":\"string\"},\"domain\":{\"type\":\"string\"}," MCP_ADDRESS ","
+	  "\"type\":{\"type\":\"string\",\"enum\":[\"u8\",\"s8\",\"u16\",\"s16\",\"u32\",\"s32\"]},"
+	  "\"big_endian\":{\"type\":\"boolean\"},\"property\":{\"type\":\"string\"}},\"additionalProperties\":false}},"
+	  "\"each_frame\":{\"type\":\"boolean\",\"description\":\"Read after every frame, not only the last. false when left out.\"},"
+	  "\"picture\":{\"type\":\"boolean\",\"description\":\"Add the last frame's picture. false when left out.\"},"
+	  "\"max_width\":{\"type\":\"integer\",\"minimum\":32,\"maximum\":4096,\"description\":\"The widest picture. 320 when left out.\"}"
+	  "},\"required\":[\"frames\"],\"additionalProperties\":false}",
+	  true, false },
 	{ "advance_until",
 	  "Plays the movie forward from the frame the machine is on until a value meets a condition, and stops there. "
 	  "The value is a memory value (domain, address, type) or a game core's property. 'op' compares it with 'value'; "
@@ -342,7 +378,8 @@ const McpTool kTools[] = {
 	  "},\"additionalProperties\":false}",
 	  true, true },
 	{ "load_branch",
-	  "Loads a branch by its number in list_branches: the movie's input and the machine become what the branch saved.",
+	  "Loads a branch by its number in list_branches: the movie's input and the machine become what the branch saved, "
+	  "and so does the movie's length, which the answer gives before and after.",
 	  "{\"type\":\"object\",\"properties\":{"
 	  "\"number\":{\"type\":\"integer\",\"minimum\":1}"
 	  "},\"required\":[\"number\"],\"additionalProperties\":false}",
@@ -1117,6 +1154,8 @@ struct Service
 	/* diff_memory's range as frame_a had it, until frame_b is reached */
 	std::vector<uint8_t> diffBefore;
 	int64_t diffFrame = -1;
+	/* try_input is running frames that are not the movie's: not counted by the search */
+	bool trying = false;
 };
 
 Service &service()
@@ -2818,7 +2857,7 @@ const char kNoSearch[] = "No search is running. search_start begins one (a searc
 void searchFrame(void *ctx, ce_session *s)
 {
 	Service &sv = *static_cast<Service *>(ctx);
-	if (sv.search != nullptr && ce_session_serial(s) == sv.searchSession) ce_ramsearch_update(sv.search, sv.searchPreviousType);
+	if (sv.search != nullptr && !sv.trying && ce_session_serial(s) == sv.searchSession) ce_ramsearch_update(sv.search, sv.searchPreviousType);
 }
 
 McpResult toolSearchStart(Service &sv, ce_session *s, const cJSON *arguments)
@@ -3173,6 +3212,156 @@ McpResult runWriteTool(Service &sv, const std::string &tool, ce_session *s, int6
 	return result;
 }
 
+/* try_input (issue 571): frames run with input that is not the movie's, the
+ * values asked for read, and the machine put back as it was, as a script's
+ * show_future does. The engine's own frame advance runs them: the movie,
+ * its saved states and the playback position are not touched. */
+McpResult toolTryInput(Service &sv, ce_session *s, const cJSON *arguments)
+{
+	int64_t frames = 0, maxWidth = 0;
+	if (!integerArgument(arguments, "frames", 1, 3600, 0, frames) || frames < 1) return mcpError("'frames' must be between 1 and 3600.");
+	if (!integerArgument(arguments, "max_width", 32, 4096, 320, maxWidth)) return mcpError("'max_width' must be between 32 and 4096.");
+	const size_t buttonCount = static_cast<size_t>(ce_session_button_count(s));
+	const size_t axisCount = static_cast<size_t>(ce_session_axis_count(s));
+	/* each frame's input: the lines given, or the buttons and axes held */
+	std::vector<std::vector<uint8_t>> states;
+	std::vector<std::vector<int32_t>> axes;
+	const cJSON *entries = cJSON_GetObjectItemCaseSensitive(arguments, "entries");
+	const cJSON *entry = nullptr;
+	cJSON_ArrayForEach(entry, entries)
+	{
+		std::vector<uint8_t> st(buttonCount);
+		std::vector<int32_t> ax(axisCount);
+		if (!cJSON_IsString(entry) || ce_session_movie_entry_decode(s, entry->valuestring, st.data(), ax.data()) != 0)
+			return mcpError("Entry " + std::to_string(states.size() + 1) + " is not an input line of this machine: get_input shows the form.");
+		states.push_back(std::move(st));
+		axes.push_back(std::move(ax));
+	}
+	if (states.empty())
+	{
+		std::vector<uint8_t> st(buttonCount);
+		std::vector<int32_t> ax(axisCount);
+		for (size_t i = 0; i < axisCount; i++) ax[i] = ce_session_axis_neutral(s, static_cast<int64_t>(i));
+		const cJSON *name = nullptr;
+		cJSON_ArrayForEach(name, cJSON_GetObjectItemCaseSensitive(arguments, "buttons"))
+		{
+			const size_t b = cJSON_IsString(name) ? buttonNamed(s, name->valuestring) : buttonCount;
+			if (b >= buttonCount) return mcpError(std::string("There is no button called '") + (cJSON_IsString(name) ? name->valuestring : "?") + "' (controls lists them).");
+			st[b] = 1;
+		}
+		const cJSON *axis = nullptr;
+		cJSON_ArrayForEach(axis, cJSON_GetObjectItemCaseSensitive(arguments, "axes"))
+		{
+			size_t a = axisCount;
+			for (size_t i = 0; i < axisCount; i++)
+				if (axis->string != nullptr && std::strcmp(axis->string, ce_session_axis_name(s, static_cast<int64_t>(i))) == 0) a = i;
+			if (a >= axisCount || !cJSON_IsNumber(axis)) return mcpError(std::string("There is no axis called '") + (axis->string != nullptr ? axis->string : "?") + "' (controls lists them).");
+			ax[a] = static_cast<int32_t>(axis->valuedouble);
+		}
+		states.push_back(std::move(st));
+		axes.push_back(std::move(ax));
+	}
+	std::vector<Source> reads;
+	const cJSON *item = nullptr;
+	cJSON_ArrayForEach(item, cJSON_GetObjectItemCaseSensitive(arguments, "read"))
+	{
+		Source source;
+		std::string why;
+		if (!parseSource(item, source, why)) return mcpError("'read': " + why);
+		reads.push_back(source);
+	}
+	const bool eachFrame = cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(arguments, "each_frame"));
+	const bool picture = cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(arguments, "picture"));
+	auto readAll = [&]() {
+		cJSON *values = cJSON_CreateArray();
+		for (const Source &source : reads)
+		{
+			cJSON *v = cJSON_CreateObject();
+			cJSON_AddStringToObject(v, "name", source.name.c_str());
+			std::string text, why;
+			bool isNumber = false;
+			double number = 0;
+			if (!readSource(s, source, text, isNumber, number, why)) cJSON_AddStringToObject(v, "error", why.c_str());
+			else if (isNumber && !source.isProperty) cJSON_AddNumberToObject(v, "value", number);
+			else cJSON_AddStringToObject(v, "value", text.c_str());
+			cJSON_AddItemToArray(values, v);
+		}
+		return values;
+	};
+	/* loads before this call are about writes before it */
+	{
+		std::lock_guard<std::mutex> hold(sv.lock);
+		lostWrites(sv, s);
+	}
+	uint64_t len = 0;
+	const uint8_t *saved = ce_session_save_state(s, &len);
+	if (saved == nullptr || len == 0) return mcpError(std::string("The machine could not be kept to put back: ") + ce_session_last_error(s));
+	const std::vector<uint8_t> kept(saved, saved + len);
+	const int64_t from = ce_session_frame(s);
+	cJSON *out = cJSON_CreateObject();
+	cJSON *each = eachFrame ? cJSON_CreateArray() : nullptr;
+	int64_t played = 0, lag = 0;
+	std::string died;
+	sv.trying = true;
+	for (int64_t f = 0; f < frames; f++)
+	{
+		const size_t at = std::min(static_cast<size_t>(f), states.size() - 1);
+		for (size_t i = 0; i < axisCount; i++) ce_session_set_axis(s, static_cast<int32_t>(i), axes[at][i]);
+		uint64_t first64 = 0;
+		for (size_t b = 0; b < buttonCount; b++)
+		{
+			if (b < 64) first64 |= uint64_t{ states[at][b] != 0 } << b;
+			else ce_session_set_button(s, static_cast<int32_t>(b), states[at][b]);
+		}
+		const int32_t ran = ce_session_frame_advance(s, first64, picture && f == frames - 1 ? 1 : 0);
+		if (ran < 0)
+		{
+			const char *death = ce_session_guest_death(s);
+			died = death != nullptr ? death : "the core stopped";
+			break;
+		}
+		played++;
+		lag += ran != 0 ? 1 : 0;
+		if (each != nullptr)
+		{
+			cJSON *row = cJSON_CreateObject();
+			cJSON_AddNumberToObject(row, "frame", static_cast<double>(from + f + 1));
+			cJSON_AddItemToObject(row, "values", readAll());
+			cJSON_AddItemToArray(each, row);
+		}
+	}
+	sv.trying = false;
+	cJSON_AddNumberToObject(out, "from_frame", static_cast<double>(from));
+	cJSON_AddNumberToObject(out, "frames_played", static_cast<double>(played));
+	cJSON_AddNumberToObject(out, "lag_frames", static_cast<double>(lag));
+	if (!died.empty()) cJSON_AddStringToObject(out, "core_stopped", died.c_str());
+	if (died.empty()) cJSON_AddItemToObject(out, "values", readAll());
+	if (each != nullptr) cJSON_AddItemToObject(out, "each_frame", each);
+	std::string png;
+	int32_t outWidth = 0, outHeight = 0;
+	if (picture && died.empty() && ce_session_video(s) != nullptr)
+		pngOf(ce_session_video(s), ce_session_video_width(s), ce_session_video_height(s), maxWidth, png, outWidth, outHeight);
+	for (size_t b = 64; b < buttonCount; b++) ce_session_set_button(s, static_cast<int32_t>(b), 0);
+	/* the machine back as it was: the agent's writes before the try are in that state too */
+	const bool back = ce_session_load_state(s, kept.data(), kept.size()) == 0;
+	ce_session_take_loaded_low(s);
+	cJSON_AddBoolToObject(out, "restored", back);
+	McpResult result = textResult(out);
+	if (!png.empty())
+	{
+		cJSON *content = cJSON_Parse(result.content.c_str());
+		cJSON *image = cJSON_CreateObject();
+		cJSON_AddStringToObject(image, "type", "image");
+		cJSON_AddStringToObject(image, "data", base64(reinterpret_cast<const uint8_t *>(png.data()), png.size()).c_str());
+		cJSON_AddStringToObject(image, "mimeType", "image/png");
+		cJSON_InsertItemInArray(content, 0, image);
+		result.content = printJson(content);
+		cJSON_Delete(content);
+	}
+	if (!back) return mcpError(std::string("The machine could not be put back: ") + ce_session_last_error(s));
+	return result;
+}
+
 McpResult runEngineTool(Service &sv, const std::string &tool, ce_session *s, const ce_movie_log *log,
 	int64_t frame, const char *hostStatus, const cJSON *arguments)
 {
@@ -3224,6 +3413,7 @@ McpResult runEngineTool(Service &sv, const std::string &tool, ce_session *s, con
 	if (tool == "write_memory" || tool == "set_property" || tool == "set_register") return runWriteTool(sv, tool, s, frame, arguments);
 	if (tool == "watch") return toolWatch(sv, s, arguments);
 	if (tool == "list_freezes") return toolListFreezes(s);
+	if (tool == "try_input") return toolTryInput(sv, s, arguments);
 	if (tool == "freeze" || tool == "unfreeze") return mcpFreezeTool(s, tool, printJson(const_cast<cJSON *>(arguments)));
 	if (tool == "search_start") return toolSearchStart(sv, s, arguments);
 	if (tool == "search_filter") return toolSearchFilter(sv, s, arguments);

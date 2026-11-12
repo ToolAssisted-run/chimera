@@ -19,6 +19,7 @@
 
 #include "mcp.hpp"
 
+#include <map>
 #include <string>
 #include <vector>
 
@@ -52,6 +53,10 @@ private:
 	McpLocalOptions options;
 	ce_project *project = nullptr;
 	ce_session *session = nullptr;
+	/* snapshot's states, by id, with the frame each was taken on (issue 571) */
+	struct Kept { std::vector<uint8_t> bytes; int64_t frame = 0; };
+	std::map<std::string, Kept> snapshots;
+	int64_t snapshotCount = 0;
 	ce_movie_log *movie = nullptr;      /* the movie being worked on; the session plays a copy of it */
 	std::string projectPath;            /* where the project was opened from or last saved to, "" for neither */
 	std::string firmwarePins;           /* [{"id", "sha1"}] of what the last start was given */

@@ -2732,9 +2732,9 @@ void SessionViewModel::mcpAnswerOpened(uint64_t id)
 	});
 }
 
-void SessionViewModel::mcpSeek(uint64_t id, int64_t frame)
+void SessionViewModel::mcpSeek(uint64_t id, int64_t frame, int64_t lengthBefore)
 {
-	submit([this, id, frame] {
+	submit([this, id, frame, lengthBefore] {
 		if (s_ == nullptr)
 		{
 			mcpAnswerOnMachine(id, tr("session.no_project_in_chimera"), true);
@@ -2743,6 +2743,7 @@ void SessionViewModel::mcpSeek(uint64_t id, int64_t frame)
 		const int64_t start = ce_session_frame(s_);
 		seekAsAskedOnMachine(frame);
 		mcpMoveM_ = McpMove{id, start, frame, McpMove::Seek, {}};
+		mcpMoveM_->lengthBefore = lengthBefore;
 	});
 }
 
@@ -2937,6 +2938,9 @@ bool SessionViewModel::mcpMoveOnMachine()
 		text = tr("session.seek_interrupted", {std::to_string(at), std::to_string(move.target)});
 		failed = true;
 	}
+	else if (move.lengthBefore >= 0)
+		text = "{\"frame\": " + std::to_string(at) + ", \"movie_length_before\": " + std::to_string(move.lengthBefore) + ", \"movie_length\": "
+			+ std::to_string(length) + ", \"unsaved_changes\": true}";
 	else
 		text = "{\"frame\": " + std::to_string(at) + "}";
 	const uint64_t id = move.id;
