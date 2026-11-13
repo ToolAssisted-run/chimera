@@ -523,7 +523,8 @@ if holder and changes:
     # pictures taken on a schedule of the machine's own frames (issue 355)
     facts("seek", frame=0)
     error, text, content = call("capture_series", every=10, count=3, first=5)
-    answer = json.loads(text) if not error else {}
+    # the first text is the answer; a warning may follow it (another build of chimera-mcp)
+    answer = json.loads(next(c["text"] for c in content if c["type"] == "text")) if not error else {}
     shots = answer.get("shots", [])
     check("capture_series takes a picture on each frame of the schedule",
           not error and [shot.get("frame") for shot in shots] == [5, 15, 25] and [shot.get("n") for shot in shots] == [1, 2, 3]

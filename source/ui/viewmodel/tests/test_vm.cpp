@@ -1792,7 +1792,12 @@ bool speedAndSound(const char *package, const char *rom)
 		const int64_t ran = session.frame.get() - from;
 		const int64_t shown = static_cast<int64_t>(serial() - drawn);
 		std::printf("turbo: %lld frames in half a second, %lld drawn\n", static_cast<long long>(ran), static_cast<long long>(shown));
-		CHECK(ran > 60 && std::llabs(shown * 3 - ran) <= 6);
+		/* the frame count and the picture's serial are read one after the
+		 * other, and a fast machine runs a few frames in between: 4243 frames
+		 * and 1412 drawn on a Windows arm64 runner. So a margin that grows
+		 * with the frames, 1 in 100; every frame drawn, or one in two, is
+		 * still far outside it. */
+		CHECK(ran > 60 && std::llabs(shown * 3 - ran) <= 6 + ran / 100);
 		CHECK(session.fpsText.get().find(" >>>>") != std::string::npos);
 		session.holdTurbo(false);
 		CHECK(d.until([&] { return serial() != drawn; }, 5));
