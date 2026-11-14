@@ -4978,6 +4978,14 @@ int64_t ce_session_greenzone_count(const ce_session *s)
 	return s->history.count();
 }
 
+uint64_t ce_session_greenzone_budget_now(const ce_session *s, uint64_t *set_bytes)
+{
+	if (set_bytes != nullptr) *set_bytes = 0;
+	if (s == nullptr || !s->history.enabled()) return 0;
+	if (set_bytes != nullptr) *set_bytes = s->history.budgetSet();
+	return s->history.budget();
+}
+
 int64_t ce_session_greenzone_nearest(const ce_session *s, int64_t frame)
 {
 	return s->history.nearest(frame);

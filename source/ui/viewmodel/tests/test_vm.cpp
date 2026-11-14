@@ -2768,6 +2768,11 @@ bool greenzoneBudgets(const char *package, const char *rom)
 	CHECK(!session.run("setProjectBudgets", {int64_t{256}, int64_t{2}}, error));
 	openGame(session, package, (dir / "walker.testrom").string(), error);
 	CHECK(d.until([&] { return session.isOpen.get() && session.budgetMbApplied.get() == 512 && session.nearStrideApplied.get() == 3; }, 60));
+	/* the budget the greenzone works to now is the one applied, as long as
+	 * memory never ran out (issue 577: a halved one is said in the status line);
+	 * it is read after each frame */
+	session.run("frameAdvance", {}, error);
+	CHECK(d.until([&] { return session.greenzoneBudgetNowMb.get() == 512; }, 10));
 	/* a core that compiles nothing keeps no compiled code */
 	CHECK(session.compileCacheDir.get().empty() && (ce_cache_dir_get() == nullptr || *ce_cache_dir_get() == '\0') && !fs::exists(dir / "code"));
 	const fs::path project = dir / "walker.chimeraProject";
@@ -2801,9 +2806,16 @@ bool greenzoneBudgets(const char *package, const char *rom)
 	session.greenzoneBudgetMb.set(1024);
 	session.greenzoneNearStride.set(5);
 	CHECK(d.until([&] { return session.budgetMbApplied.get() == 1024 && session.nearStrideApplied.get() == 5; }, 10));
+	/* a budget raised by hand is the one worked to, and a lowered one is not
+	 * taken for memory running out */
+	session.run("frameAdvance", {}, error);
+	CHECK(d.until([&] { return session.greenzoneBudgetNowMb.get() == 1024; }, 10));
 	session.greenzoneBudgetMb.set(512);
 	session.greenzoneNearStride.set(3);
 	CHECK(d.until([&] { return session.budgetMbApplied.get() == 512 && session.nearStrideApplied.get() == 3; }, 10));
+	session.run("frameAdvance", {}, error);
+	CHECK(d.until([&] { return session.greenzoneBudgetNowMb.get() == 512; }, 10));
+	CHECK(session.status.get().find("memory") == std::string::npos);
 	/* Chimera's Stop Movie under TAStudio: a new project of the same game and
 	 * settings with an empty movie, written nowhere until its first save (a
 	 * game never runs alone: owner, 2026-10-26) */

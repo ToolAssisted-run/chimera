@@ -2194,6 +2194,7 @@
 		"session.gamepads": {
 			"other": "ゲームパッド %n 台:"
 		},
+		"session.greenzone_out_of_memory": "コンピューターのメモリが足りなくなったため、グリーンゾーンは設定された %2 MB のうち最大 %1 MB だけを保持し、収まるようにフレームを間引いています。「グリーンゾーンを消去」で予算全体が戻ります。",
 		"session.held": "保持中: %1",
 		"session.machine_not_opened": "プロジェクトのマシンを開けませんでした: %1",
 		"session.machine_stopped": "マシンが停止しました。",

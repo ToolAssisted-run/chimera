@@ -2235,6 +2235,7 @@
 			"one": "%n Gamepad:",
 			"other": "%n Gamepads:"
 		},
+		"session.greenzone_out_of_memory": "Der Arbeitsspeicher des Computers ist voll, darum hält die Greenzone jetzt höchstens %1 MB der eingestellten %2 MB und dünnt ihre Frames aus, damit sie hineinpasst. „Greenzone leeren“ gibt ihr das ganze Budget zurück.",
 		"session.held": "Gehalten: %1",
 		"session.machine_not_opened": "Die Maschine des Projekts konnte nicht geöffnet werden: %1",
 		"session.machine_stopped": "Die Maschine wurde angehalten.",

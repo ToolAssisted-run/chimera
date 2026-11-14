@@ -794,6 +794,7 @@ SessionViewModel::SessionViewModel(Dispatcher &dispatcher, InputLog &inputs)
 	expose("soundDropped", "sample pairs dropped because the machine ran ahead of the speakers", soundDropped);
 	expose("greenEnd", "frames before this one were run with the inputs they have now", greenEnd);
 	expose("greenzoneStates", "machine states the greenzone holds", greenzoneStates);
+	expose("greenzoneBudgetNowMb", "the memory budget the greenzone works to now, MB: the one applied, or less once the computer ran out of memory and it was halved (Clear Greenzone gives the one applied back)", greenzoneBudgetNowMb);
 	expose("rerecords", "how many times the movie was changed over work already done (saved with the project)", rerecords);
 	expose("autoRestore", "after an edit before the current frame, run on to where the machine was", autoRestore, true);
 	expose("rewinding", "rewind is held: the machine goes back (Chimera's client.is_rewinding)", rewinding);
@@ -6738,6 +6739,8 @@ void SessionViewModel::report(int64_t cf, int64_t cl, int64_t af, int64_t al, do
 		pendingFrame_ = frameM_;
 		pendingGreenEnd_ = greenEndM_;
 		pendingStates_ = s_ != nullptr ? ce_session_greenzone_count(s_) : 0;
+		pendingBudgetSet_ = 0;
+		pendingBudgetNow_ = s_ != nullptr ? ce_session_greenzone_budget_now(s_, &pendingBudgetSet_) : 0;
 		pendingRerecords_ = s_ != nullptr ? static_cast<int64_t>(ce_session_rerecords(s_)) : 0;
 		if (fpsNow >= 0) pendingFps_ = fpsNow;
 		if (soundM_)
@@ -6763,6 +6766,7 @@ void SessionViewModel::report(int64_t cf, int64_t cl, int64_t af, int64_t al, do
 void SessionViewModel::tick()
 {
 	int64_t f, cf, cl, af, al, green, states, rr;
+	uint64_t budgetNow, budgetSet;
 	double measured, average;
 	int64_t gameMs;
 	int64_t queued, dropped;
@@ -6783,6 +6787,7 @@ void SessionViewModel::tick()
 		cf = changedFirst_, cl = changedLast_, af = appendedFirst_, al = appendedLast_;
 		queued = pendingQueued_, dropped = pendingDropped_;
 		green = pendingGreenEnd_, states = pendingStates_;
+		budgetNow = pendingBudgetNow_, budgetSet = pendingBudgetSet_;
 		rr = pendingRerecords_;
 		average = pendingAverage_;
 		gameMs = pendingGameMs_;
@@ -6808,6 +6813,20 @@ void SessionViewModel::tick()
 	soundDropped.set(dropped);
 	greenEnd.set(green);
 	greenzoneStates.set(states);
+	{
+		/* The greenzone halves its budget when the computer runs out of
+		 * memory, and thins its frames to fit; nothing said so, and the
+		 * budgets window still showed the one set (issue 577). Said once
+		 * per drop, in the status line. */
+		const int64_t nowMb = static_cast<int64_t>(budgetNow / (1024 * 1024));
+		const int64_t setMb = static_cast<int64_t>(budgetSet / (1024 * 1024));
+		const int64_t wasMb = greenzoneBudgetNowMb.get();
+		greenzoneBudgetNowMb.set(nowMb);
+		/* (both read together on the machine's thread: a budget the person
+		 * lowered is never taken for one the memory halved) */
+		if (nowMb > 0 && wasMb > 0 && nowMb < wasMb && budgetNow < budgetSet)
+			status.set(tr("session.greenzone_out_of_memory", {std::to_string(nowMb), std::to_string(setMb)}));
+	}
 	rerecords.set(rr);
 	if (cf >= 0) inputsChangedFrom(cf);
 	if (af >= 0) inputsChangedFrom(af);

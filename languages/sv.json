@@ -2235,6 +2235,7 @@
 			"one": "%n gamepad:",
 			"other": "%n gamepads:"
 		},
+		"session.greenzone_out_of_memory": "Datorn fick slut på minne, så grönzonen håller nu högst %1 MB av de %2 MB som är inställda och glesar ut sina bildrutor för att få plats. ”Rensa grönzonen” ger den hela budgeten igen.",
 		"session.held": "Hålls: %1",
 		"session.machine_not_opened": "Projektets maskin kunde inte öppnas: %1",
 		"session.machine_stopped": "Maskinen stannade.",

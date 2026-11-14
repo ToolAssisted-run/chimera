@@ -591,6 +591,15 @@ The halved figure is **not written back to the settings**. What a machine can
 spare this afternoon is not a decision somebody made, and it must not silently
 become one.
 
+Nor is it kept for good (issue 577). A halving used to last until the project
+was opened again, so after Clear Greenzone had given the memory back the
+greenzone still thinned its frames to fit half the budget, while the budgets
+window showed the whole one. Now a clear gives back the budget that was set;
+if memory runs out again, it is halved again. Each halving is said in the
+status line ("the greenzone now keeps at most N MB of the M MB set"), as well
+as in the core log, and `ce_session_greenzone_budget_now` gives both figures
+(the session's `greenzoneBudgetNowMb`).
+
 While a project's history is being saved in the background, the save holds
 everything the history gave up since it began, out of the budget's sight;
 halving then freed nothing and halved again, to the floor, for the rest of the

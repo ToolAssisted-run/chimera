@@ -907,6 +907,27 @@ int main(void)
 		assert(h.budget() >= 1);
 		assert(g_outOfMemoryFor > 0);         /* it gave up rather than spin */
 		g_outOfMemoryFor = 0;
+
+		/* Clear Greenzone gives memory back, and with it the budget that was
+		 * set. A halved budget used to stay halved until the project was
+		 * opened again, so the greenzone kept thinning after a clear (issue
+		 * 577). */
+		h.clearKeeping(2);
+		assert(h.budget() == before);
+		h.beforeAdvance();
+		advance(3);
+		h.capture(3);
+		assert(h.nearest(3) == 3);
+		/* and a budget set while it is halved is the one a clear gives back */
+		g_outOfMemoryFor = 1;
+		h.beforeAdvance();
+		advance(4);
+		h.capture(4);
+		assert(h.budget() == before / 2);
+		h.setBudget(before / 4);
+		assert(h.budget() == before / 4);
+		h.clearKeeping(4);
+		assert(h.budget() == before / 4);
 	}
 
 	{ // The spill file has a budget of its own, and the oldest goes first.

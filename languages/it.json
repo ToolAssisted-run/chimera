@@ -2235,6 +2235,7 @@
 			"one": "%n gamepad:",
 			"other": "%n gamepad:"
 		},
+		"session.greenzone_out_of_memory": "Il computer ha esaurito la memoria, quindi la greenzone ora tiene al massimo %1 MB dei %2 MB impostati e dirada i suoi fotogrammi per starci. «Cancella greenzone» le restituisce tutto il budget.",
 		"session.held": "Tenuto: %1",
 		"session.machine_not_opened": "Impossibile aprire la macchina del progetto: %1",
 		"session.machine_stopped": "La macchina si è fermata.",

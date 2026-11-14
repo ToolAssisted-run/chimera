@@ -14884,3 +14884,40 @@ the fix it counted 3 presses on the cell and 2 of its 6 checks failed; now
 it counts 2 presses on the cell and one marker on the frame number. This
 also closes the gap the 2026-11-01 entry left: the double click itself was
 not driven by a test then.
+
+## A clear gives the greenzone its whole budget back (2026-11-14, issue 577)
+
+A greenzone (the kept savestates) kept only a few frames, with gaps that
+doubled from one to the next, while its budget was 20 GB and the whole
+Chimera process used 13.8 GB. Frames are thinned only from 95% of the budget,
+and the only thing that lowers the budget by itself is running out of memory:
+a capture that cannot allocate halves the budget and tries again. That halving
+lasted until the project was opened again, and nothing in the window said it
+had happened: the budgets window still showed 20 GB, and Clear Greenzone gave
+the memory back without giving the budget back, which is what the report's
+title says.
+
+Now a clear gives back the budget that was set (it is halved again if memory
+runs out again), and each halving is said in the status line with both figures.
+The engine call `ce_session_greenzone_budget_now` returns the budget in force
+and the one set, read together, so a budget the person lowered is never taken
+for one the memory halved.
+
+Not shown: that the report's machine did run out of memory. Its core log was
+not in the attachments, so this is the cause the numbers point to, not one seen
+in its log. The run in the report was on a third-party core; nothing about the
+core is assumed here.
+
+Tested: the engine's out-of-memory test now clears after the halvings and
+checks the budget set is back, and that a budget set while halved is the one a
+clear restores. Before the change it failed on the first of those checks. The
+view models' test checks that `greenzoneBudgetNowMb` follows the budget applied
+(512, 1024, 512 MB) and that no out-of-memory message appears when the person
+changes it; with the property not carrying the budget, those 3 checks failed.
+The status message itself was not driven by a test, since that needs a real
+allocation failure inside the sandbox.
+
+Found while looking, not changed: with a period ("every N frames"), Clear
+Greenzone keeps the frame the machine is on only if it is a multiple of N,
+since only those are stored, so the next step back replays from the nearest
+kept frame.

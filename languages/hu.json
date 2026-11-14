@@ -2235,6 +2235,7 @@
 			"one": "%n gamepad:",
 			"other": "%n gamepad:"
 		},
+		"session.greenzone_out_of_memory": "A számítógép memóriája elfogyott, ezért a zöld zóna most legfeljebb %1 MB-ot tart meg a beállított %2 MB-ból, és ritkítja a képkockáit, hogy elférjen. A „Zöld zóna törlése” visszaadja neki a teljes keretet.",
 		"session.held": "Tartva: %1",
 		"session.machine_not_opened": "A projekt gépét nem sikerült megnyitni: %1",
 		"session.machine_stopped": "A gép leállt.",

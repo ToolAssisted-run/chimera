@@ -2276,6 +2276,7 @@
 			"few": "%n gamepaduri:",
 			"other": "%n de gamepaduri:"
 		},
+		"session.greenzone_out_of_memory": "Calculatorul a rămas fără memorie, așa că Greenzone păstrează acum cel mult %1 MB din cei %2 MB setați și își rărește cadrele ca să încapă. „Golește Greenzone” îi dă din nou tot bugetul.",
 		"session.held": "Ținut: %1",
 		"session.machine_not_opened": "Nu s-a putut deschide mașina proiectului: %1",
 		"session.machine_stopped": "Mașina s-a oprit.",

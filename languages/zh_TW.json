@@ -2194,6 +2194,7 @@
 		"session.gamepads": {
 			"other": "%n 個遊戲手把："
 		},
+		"session.greenzone_out_of_memory": "電腦記憶體不足，綠區現在最多只保留設定的 %2 MB 中的 %1 MB，並稀疏其畫格以容納。「清除綠區」會讓它重新取得全部預算。",
 		"session.held": "按住：%1",
 		"session.machine_not_opened": "無法開啟專案的機器：%1",
 		"session.machine_stopped": "機器已停止。",

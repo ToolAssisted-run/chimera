@@ -2194,6 +2194,7 @@
 		"session.gamepads": {
 			"other": "게임패드 %n개:"
 		},
+		"session.greenzone_out_of_memory": "컴퓨터의 메모리가 부족해져 그린존이 이제 설정된 %2 MB 중 최대 %1 MB만 보관하고, 그 안에 맞도록 프레임을 솎아 냅니다. '그린존 지우기'를 하면 예산 전체가 돌아옵니다.",
 		"session.held": "누른 상태: %1",
 		"session.machine_not_opened": "프로젝트의 기계를 열 수 없습니다: %1",
 		"session.machine_stopped": "기계가 멈췄습니다.",

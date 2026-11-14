@@ -2276,6 +2276,7 @@
 			"few": "%n gamepady:",
 			"other": "%n gamepadů:"
 		},
+		"session.greenzone_out_of_memory": "Počítači došla paměť, a tak zelená zóna teď drží nejvýš %1 MB z nastavených %2 MB a prořeďuje snímky, aby se vešla. „Vymazat zelenou zónu“ jí vrátí celý rozpočet.",
 		"session.held": "Drženo: %1",
 		"session.machine_not_opened": "Nelze otevřít stroj projektu: %1",
 		"session.machine_stopped": "Stroj se zastavil.",

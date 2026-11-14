@@ -2235,6 +2235,7 @@
 			"one": "%n gamepad:",
 			"other": "%n gamepads:"
 		},
+		"session.greenzone_out_of_memory": "The computer ran out of memory, so the greenzone now keeps at most %1 MB of the %2 MB set and thins its frames to fit. Clear Greenzone gives it the whole budget again.",
 		"session.held": "Held: %1",
 		"session.machine_not_opened": "Could not open the project's machine: %1",
 		"session.machine_stopped": "The machine stopped.",
