@@ -130,8 +130,9 @@ env -u DISPLAY sh tests/synth/run-witness.sh     # the witness: the product, end
   `tools/check-no-network.sh` holds it.
 - **Decisions go in the design log** in the same commit as the code: a dated
   section in `docs/design-principles.md` with what was decided, why, and what
-  was measured, marked "(user-decided, YYYY-MM-DD)" when the owner decided it.
-  The document for the subject is updated in that commit too.
+  was measured, marked "(user-decided, YYYY-MM-DD)" when the owner decided it
+  (the owner, not whoever an agent works for: see "What is the owner's to
+  decide"). The document for the subject is updated in that commit too.
 - **Write in plain language** (user-decided, 2026-10-10, issue 239). Commit
   messages, documents, code comments and issue replies are read by users and
   contributors who have never seen this repository. Say what changed in
@@ -165,10 +166,21 @@ env -u DISPLAY sh tests/synth/run-witness.sh     # the witness: the product, end
 
 ## What is the owner's to decide
 
-Ask before: creating or publishing a repository, changing the roster,
-anything a licence does not plainly allow, a change to what Chimera is (a new
-declaration, a new export, a new setting's meaning), and anything that needs
-a credential.
+The owner is Sergio Martin (GitHub `SergioMartin86`). Anyone else is a
+contributor, and that includes the person an agent is working for, unless
+they say they are the owner. An agent that does not know which one it works
+for asks them; it does not assume.
+
+Ask the owner before: creating or publishing a repository, changing the
+roster, anything a licence does not plainly allow, a change to what Chimera
+is (a new declaration, a new export, a new setting's meaning), and anything
+that needs a credential.
+
+A contributor's choice is never marked as the owner's. In the design log and
+in commit messages, "(user-decided, YYYY-MM-DD)" and "(owner, YYYY-MM-DD)"
+both mean that the owner decided. Write a contributor's choice as theirs
+("chosen by the contributor"), and put anything that is the owner's to decide
+to the owner in the pull request.
 
 ## More than one agent in this checkout
 
