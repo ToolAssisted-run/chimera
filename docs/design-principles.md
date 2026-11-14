@@ -14934,3 +14934,25 @@ it a rule: docs/project.md says it, and the engine's project test checks that a
 file of any extension, and one with no extension, is taken by a slot with an
 empty list and by one with no list. With the engine changed to refuse them,
 that check failed.
+
+## A long menu shows that it has more rows (user-decided, 2026-11-14, issue 588)
+
+In a short window a long menu, such as TAStudio's right-click menu, showed
+only the rows that fit and scrolled the rest, but nothing said rows were
+hidden: the menu's scroll indicator appears only while the rows move. The
+owner chose arrows at the ends, as a desktop's long menus have, for every
+menu: when the rows do not all fit, the menu has a strip at the top and the
+bottom with an arrow, bright while there are rows past that end and dim at
+it, and the rows scroll 160 pixels a second while the pointer rests on a
+strip. The strips have room of their own, so they cover no row, and an
+opened menu starts from its first row. That room is made only once the menu
+finds its rows do not fit, after they were placed, so the first row sat
+under the top strip until the position was set again then.
+
+Tested: the menus test opens the Tools menu in a short window and checks
+that both strips show, the top one dim and the bottom one bright; that the
+pointer on the bottom strip scrolls the rows to their end (0 to 142 pixels)
+and dims it; and that the top strip scrolls them back to the first row.
+With the strips never shown, 3 of those checks failed; before the position
+was set again, the first row's check failed. Not tried on a real screen:
+the window tests run offscreen with Qt's software drawing.

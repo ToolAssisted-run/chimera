@@ -200,7 +200,10 @@ Chimera's window: Qt 6.12, QML views over C++ view models. The code is in
   menu is as wide as its widest row (Fusion's were always 200 pixels and
   cut a longer row short, issue 452), stays below the menu bar in a short
   window and scrolls its rows (issues 450, 463), and closes when its window
-  loses the keyboard to another (issue 449). A menu stays inside its window
+  loses the keyboard to another (issue 449). When its rows do not all fit,
+  a strip at the top and the bottom has an arrow, bright while there are
+  rows past that end, and the rows scroll while the pointer rests on it;
+  the menu opens at its first row (issue 588). A menu stays inside its window
   (the owner kept menus there rather than in windows of their own). A tab
   is as wide as its name (TAStudio Settings' were cut short, issue 452).
   The main window's menu bar items (MenuBarEntry.qml) take their width from

@@ -132,6 +132,27 @@ int main(int argc, char **argv)
 		const double y = tools->property("y").toDouble(), height = tools->property("height").toDouble();
 		std::printf("bar %.1f high, menu at %.1f, %.1f high, window %d\n", bar->height(), y, height, window->height());
 		CHECK(y >= bar->height() - 0.5 && y + height <= window->height() + 0.5);
+		/* rows hidden below (issue 588): a strip at each end, the bottom
+		 * one bright and the top one dim; the pointer resting on the
+		 * bottom strip scrolls the rows to their end, and on the top strip
+		 * back to their start */
+		auto *up = popupItem->findChild<QQuickItem *>(QStringLiteral("menuScrollUp"));
+		auto *down = popupItem->findChild<QQuickItem *>(QStringLiteral("menuScrollDown"));
+		CHECK(up != nullptr && down != nullptr);
+		if (up != nullptr && down != nullptr)
+		{
+			CHECK(up->isVisible() && down->isVisible());
+			CHECK(!up->isEnabled() && down->isEnabled());
+			const double top = popupItem->property("contentY").toDouble();
+			QTest::mouseMove(window, down->mapToScene(QPointF(down->width() / 2, down->height() / 2)).toPoint());
+			CHECK(QTest::qWaitFor([&] { return !down->isEnabled(); }, 5000));
+			const double bottom = popupItem->property("contentY").toDouble();
+			std::printf("rows scrolled from %.1f to %.1f\n", top, bottom);
+			CHECK(bottom > top && up->isEnabled());
+			QTest::mouseMove(window, up->mapToScene(QPointF(up->width() / 2, up->height() / 2)).toPoint());
+			CHECK(QTest::qWaitFor([&] { return !up->isEnabled(); }, 5000));
+			CHECK(popupItem->property("contentY").toDouble() == top && down->isEnabled());
+		}
 	}
 	/* another window takes the keyboard: the menu closes */
 	QQmlApplicationEngine otherEngine;
