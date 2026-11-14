@@ -51,11 +51,16 @@ ApplicationWindow {
         win.close()
     }
     // a theme's colours with the desktop's own painted, for a copy that has colours of its own
+    // a theme light or dark
+    function darkOf(name) {
+        const about = JSON.parse(win.vm.run("about", [name]) || "null")
+        return about ? about.dark : false
+    }
     function painted(name) {
         const raw = JSON.parse(win.vm.run("colorsOf", [name]) || "{}")
         const out = {}
         for (const role of Object.keys(raw)) {
-            const c = win.colors.resolve(raw[role])
+            const c = win.colors.resolveFor(raw[role], win.darkOf(name))
             const hex = (v) => ("0" + Math.round(v * 255).toString(16)).slice(-2).toUpperCase()
             out[role] = "#" + (c.a < 1 ? hex(c.a) : "") + hex(c.r) + hex(c.g) + hex(c.b)
         }
@@ -148,7 +153,21 @@ ApplicationWindow {
                     readonly property real originY: (height - 400 * zoom) / 2
                     function c(role) {
                         const v = (preview.theme && preview.theme[role]) || win.fallback[role] || "#FF00FF"
-                        return win.colors.resolve(v)
+                        return win.colors.resolveFor(v, preview.dark)
+                    }
+                    // the picked theme light or dark: its desktop colours are a
+                    // light or dark desktop's, whatever theme is on
+                    readonly property bool dark: win.pickedRow ? win.pickedRow.dark : false
+                    onDarkChanged: requestPaint()
+                    // drawn again when the window opens and when the theme on
+                    // changes: the desktop's colours may be others then
+                    Connections {
+                        target: win
+                        function onVisibleChanged() { if (win.visible) preview.requestPaint() }
+                    }
+                    Connections {
+                        target: win.vm
+                        function onColorsChanged() { preview.requestPaint() }
                     }
                     onPaint: {
                         const g = getContext("2d")
