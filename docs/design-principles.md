@@ -15131,7 +15131,7 @@ test and the witness, which need the test core to run, and it does not run
 on a 16 KiB page kernel; Windows on x86_64 and macOS builds; and a real pad
 on any system.
 
-## Gamepad face buttons: kept by place, shown by the pad's print (2026-11-12)
+## Gamepad face buttons: kept by place, shown by the pad's print (user-decided, 2026-11-14)
 
 The SDL 3 change above named a face button by the letter printed on it when
 the pad printed A, B, X or Y, as SDL 2 did. A contributor preferred SDL 3's
@@ -15152,8 +15152,8 @@ in use prints there.
 - The contributor chose this over saving the printed label itself, which
   would have tied a binding to one brand of pad: a core's "X1 A" would do
   nothing on a PlayStation pad until bound again.
-- Not yet the owner's decision: what a saved face button means is a change
-  to what Chimera is, so it is put to the owner in the pull request.
+- The owner decided it in pull request 579 (2026-11-14): a saved face
+  button means its place, and is shown with the label the pad prints.
 - A binding made with a Nintendo pad under SDL 2 named its buttons by their
   print, so its A and B, and its X and Y, swap places once. Bindings made
   with Xbox and PlayStation pads mean what they did.
@@ -15188,7 +15188,7 @@ the watching taken out of the machine's thread, that check failed. A real
 DualSense in the window was seen by a contributor before this change (labels
 shown only after a click); the change itself was not tried in the window.
 
-## A pad's button labels chosen by hand (2026-11-12)
+## A pad's button labels chosen by hand (user-decided, 2026-11-14)
 
 SDL 3 decides what a pad prints on its face buttons from what it
 recognises the pad as. Its controller list has some pads wrong: the 8BitDo
@@ -15229,8 +15229,8 @@ a way to set both by hand.
 - The session gives the window the pads open (`padModels`, with each one's
   model and the layout SDL's labels make, the swap counted) and two
   commands, `setPadSwap` and `setPadLayout` ("auto" lets a layout go).
-- Not yet the owner's decision: the two settings are new, so they are put
-  to the owner in the pull request.
+- The owner decided in pull request 579 (2026-11-14) that both settings
+  stay, kept per pad model by USB id.
 
 Tested on Linux aarch64: the view models' test (1633 checks, 0 failed)
 chooses layouts for virtual SDL 3 gamepads (a DualSense's and a Switch Pro
