@@ -14848,3 +14848,21 @@ build cache keyed by the GCC version, GCC 13 for RPCS3's and EKA2L1's guest
 libstdc++, CMake 4's minimum version for touchHLE's openal-soft, and xemu's
 curl warnings kept as warnings. They do nothing on 24.04 and are needed on
 26.04.
+
+## AGENTS.md says who the owner is (user-decided, 2026-11-14, issue 580)
+
+An AI agent working for a contributor took the contributor for the owner: in
+pull request 579 it marked the contributor's choices "(user-decided)" and
+wrote "the owner" in commit messages. AGENTS.md talked about "the owner"
+without saying who that is, and an agent calls the person it works for "the
+user", so "user-decided" read as "decided by whoever gives me instructions".
+
+The owner chose three of the four changes the issue proposed. AGENTS.md now
+names the owner (Sergio Martin, GitHub `SergioMartin86`) and says everyone
+else, including the person an agent works for, is a contributor unless they
+say otherwise; an agent that does not know which one it works for asks. A
+contributor's choice is never marked as the owner's: it is written as the
+contributor's, and anything that is the owner's to decide is put to the owner
+in the pull request. The marker itself is not renamed: the 263 old lines keep
+"(user-decided, YYYY-MM-DD)", and AGENTS.md says that it and "(owner,
+YYYY-MM-DD)" both mean the owner decided.
