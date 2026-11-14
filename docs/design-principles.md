@@ -14848,3 +14848,37 @@ build cache keyed by the GCC version, GCC 13 for RPCS3's and EKA2L1's guest
 libstdc++, CMake 4's minimum version for touchHLE's openal-soft, and xemu's
 curl warnings kept as warnings. They do nothing on 24.04 and are needed on
 26.04.
+
+## A light theme stays light on KDE, and the Theme window draws it so (2026-11-14)
+
+A build on Linux made against the system's Qt loads KDE's desktop
+integration when KDE's is the desktop's. The Light theme names desktop
+colours, and before reading them Chimera asks Qt for the desktop's light
+colours (issue 471). KDE's integration gives its own colour scheme
+whatever is asked, so under a dark KDE scheme Light came out with dark
+lists and fields and text that could not be read. The release bundles
+carry no desktop integration (no platform theme plugin) and were not
+affected: they always have Qt's own light colours.
+
+- When a light theme is on and the desktop still gives dark colours,
+  Chimera now uses Qt's own light palette, the one the release bundles
+  have (its colours as Qt 6.12 gives them with no desktop integration; Qt
+  has no public way to ask for it). A dark theme, and a desktop that gives
+  what was asked, are as before.
+- A theme's palette is now built on that desktop palette rather than on the
+  theme that was on before it, so colours a theme does not set no longer
+  carry over when the theme is changed while Chimera runs. A theme put on
+  while Chimera runs now looks as it does at the start.
+- The drawing in Config > Theme worked out a theme's desktop colours from
+  the palette of the theme that was on, and was not drawn again when the
+  window opened, so the drawing of Light was dark even with Light on. The
+  drawing and Write a Copy to Edit now take a theme's desktop colours from
+  the palette that theme would have, and the drawing is made again when the
+  window opens and when the theme on changes.
+
+Tested: captured from the real program with KDE's integration and a dark
+KDE scheme, the Cores window and the Theme window in Light were dark before
+and are light after, and Dark is unchanged. `test-theme` checks the light
+fallback (it failed with the fallback taken out) and the colours of a
+theme that is not on; the second cannot tell the palettes apart without a
+desktop of its own, so for the drawing the captures are what show it.
