@@ -750,8 +750,11 @@ void PianoRollItem::mouseDoubleClickEvent(QMouseEvent *e)
 		const qint64 row = rowOnLine(static_cast<qint64>((at.y() - hs) / rowHeight_));
 		if (row < rowCount()) Q_EMIT frameDoubleClicked(row);
 	}
-	/* the second press of the double click is a press as well */
-	mousePressEvent(e);
+	/* Qt has already delivered the second click as a press of its own, just
+	 * before this. Pressing again here made a double click on a button's
+	 * cell three presses, so the button changed once instead of twice
+	 * (issue 582). */
+	e->accept();
 }
 
 void PianoRollItem::mousePressEvent(QMouseEvent *e)
