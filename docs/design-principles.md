@@ -15024,3 +15024,32 @@ everything and gives back a layout: the windows it names are shown and the
 script not yet listed is opened, the listed one not twice; with the windows
 not shown again, it failed. Not driven by a test: the File menu item in the
 main window, and the real tool windows' object names, which the code lists.
+
+## A greenzone anchor no longer stalls a frame on Windows (2026-11-14, issue 548)
+
+With the greenzone on, a Mesen run on Windows dipped from 60 to 45 frames a
+second now and then, and not with it off. Measured on Windows 11 Home in a
+KVM virtual machine on the Linux test machine (the same processor, 8 of its
+cores), with a Mesen NES game, 40,000 frames of chimera-run and the
+greenzone's trace: each frame's change stored cost 0.32 ms on average, never
+over 2.4 ms; but each anchor, the whole machine kept once every 216 frames
+or so, cost the machine's thread 8.9 ms on average and up to 16.7 ms (106 of
+189 over 8 ms). On Linux, on the same machine, anchors cost 0.37 ms. A
+temporary trace line showed where: taking the stretch packed on the helper
+took 0.1 ms, and letting the raw copies it replaced go took 9 to 12 ms. The
+finished packing jobs held the last references to those copies, about 200
+buffers and 68 MB, and freeing them is cheap on Linux and slow in Windows'
+heap. A frame of 16.7 ms that also pays 9 to 17 ms is late, once every 3.6
+seconds.
+
+The jobs are now let go on the packer's own thread. On the same Windows
+machine anchors cost 0.45 ms on average and 1.2 ms at most, none over 8 ms;
+the whole run's speed is the same (314 frames a second before, 317 after),
+since the same memory is freed, only not on the machine's thread.
+
+Measured, not changed: the greenzone costs 0.8 to 1.0 ms a frame on average
+on Windows against 0.6 ms on Linux (Mesen running unthrottled: 448 against
+314 frames a second on Windows, 502 against 386 on Linux), much of it in
+storing each frame's change; that cannot by itself make a frame late. Not
+shown: that this was the dip the reporter saw; their machine was not
+measured, and a virtual machine's Windows is not theirs.
