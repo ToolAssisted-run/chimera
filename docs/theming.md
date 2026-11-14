@@ -81,7 +81,12 @@ theme is written that way. A theme's `dark` says which of the desktop's
 colours it takes: a light theme the desktop's light ones and a dark theme its
 dark ones, whatever the desktop is set to, so the Light theme stays light with
 Windows in dark mode (issue 471: its white list rows were under the dark
-mode's white text).
+mode's white text). A desktop that gives its own colours whatever is
+asked, as KDE's does, gives a light theme Qt's own light colours instead of
+its dark ones: they are what Chimera's release bundles, which carry no
+desktop integration, always have. The drawing in the Theme window takes a
+theme's desktop colours the same way, from the palette that theme would
+have, whatever theme is on.
 
 ```json
 {
