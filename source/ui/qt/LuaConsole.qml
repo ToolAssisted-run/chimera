@@ -147,6 +147,10 @@ ApplicationWindow {
 
     // the actions, shared by the menus, the toolbar and the list's menu
     readonly property bool anyFile: win.vm.selectedScripts > 0
+    // the Script column's width: while its heading's edge is dragged, the
+    // width dragged to; else the one kept, 40 pixels at least (issue 586)
+    property real draggedScriptWidth: -1
+    readonly property real scriptWidth: Math.max(40, draggedScriptWidth >= 0 ? draggedScriptWidth : win.vm.scriptColumnWidth)
     readonly property bool anyRow: win.vm.selectedCount > 0
     Action { id: newScriptAction; text: qsTrId("lua_console.new_script"); icon.source: "qrc:/chimera/icons/NewFile.png"; shortcut: "Ctrl+N"; onTriggered: newScriptDialog.open() }
     Action { id: openScriptAction; text: qsTrId("lua_console.open_script_dialog"); icon.source: "qrc:/chimera/icons/OpenFile.png"; shortcut: "Ctrl+O"; onTriggered: openScriptDialog.open() }
@@ -341,21 +345,33 @@ ApplicationWindow {
             spacing: 0
             Label { objectName: "luaScriptCount"; text: win.vm.summary; padding: 4 }
             // the columns: the state's icon, the script's name, its path;
-            // a click on a heading sorts by it
+            // a click on a heading sorts by it. The Script column's right
+            // edge is dragged to widen it, and its width kept (issue 586).
             RowLayout {
                 spacing: 0
                 Layout.fillWidth: true
-                Repeater {
-                    model: [{key: "Path", text: " ", width: 24}, {key: "Script", text: qsTrId("lua_console.script"), width: 92}, {key: "Path", text: qsTrId("lua_console.path"), width: -1}]
-                    delegate: Button {
-                        required property var modelData
-                        text: modelData.text
-                        flat: true
-                        padding: 2
-                        Layout.preferredWidth: modelData.width > 0 ? modelData.width : -1
-                        Layout.fillWidth: modelData.width < 0
-                        onClicked: win.vm.run("sort", [modelData.key])
-                    }
+                Button {
+                    text: " "
+                    flat: true
+                    padding: 2
+                    Layout.preferredWidth: 24
+                    onClicked: win.vm.run("sort", ["Path"])
+                }
+                ColumnHeading {
+                    objectName: "luaScriptHeading"
+                    text: qsTrId("lua_console.script")
+                    minimum: 40
+                    Layout.preferredWidth: win.scriptWidth
+                    onClicked: win.vm.run("sort", ["Script"])
+                    onResizing: (w) => win.draggedScriptWidth = w
+                    onResized: (w) => { win.vm.scriptColumnWidth = Math.round(w); win.draggedScriptWidth = -1 }
+                }
+                Button {
+                    text: qsTrId("lua_console.path")
+                    flat: true
+                    padding: 2
+                    Layout.fillWidth: true
+                    onClicked: win.vm.run("sort", ["Path"])
                 }
             }
             ListView {
@@ -385,7 +401,7 @@ ApplicationWindow {
                          : palette.base
                     // the grid, as Chimera's list draws it: a line under every row and between the columns
                     Repeater {
-                        model: [24, 116]
+                        model: [24, 24 + win.scriptWidth]
                         delegate: Rectangle { required property int modelData; x: modelData; width: 1; height: row.height; color: win.gridColour }
                     }
                     Rectangle { y: row.height - 1; width: row.width; height: 1; color: win.gridColour }
@@ -397,14 +413,15 @@ ApplicationWindow {
                               : row.model.state === "paused" ? "qrc:/chimera/icons/Pause.png" : "qrc:/chimera/icons/Stop.png"
                     }
                     Label {
-                        x: 26; width: 88
+                        objectName: "luaScriptName"
+                        x: 26; width: win.scriptWidth - 4
                         anchors.verticalCenter: parent.verticalCenter
                         text: row.model.name
                         elide: Text.ElideRight
                         color: row.ink
                     }
                     Label {
-                        x: 118; width: parent.width - 120
+                        x: 26 + win.scriptWidth; width: parent.width - 28 - win.scriptWidth
                         anchors.verticalCenter: parent.verticalCenter
                         text: row.model.path
                         elide: Text.ElideLeft

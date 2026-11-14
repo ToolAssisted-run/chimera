@@ -1356,7 +1356,7 @@ int main(int argc, char **argv)
 	luaConsoleOf = &luaConsole;
 	mcp.lua = &luaConsole;
 	mcp.newProject = &agentProject;
-	for (const char *name : {"disableOnLoad", "toggleAllIfNoneSelected", "reloadOnChange", "recentSessions", "recentScripts"})
+	for (const char *name : {"disableOnLoad", "toggleAllIfNoneSelected", "reloadOnChange", "recentSessions", "recentScripts", "scriptColumnWidth"})
 		config.keep(luaConsole, name);
 	/* New Script's template is in the Paths' Lua folder */
 	luaConsole.luaFolder.set(paths.resolve("Lua"));
