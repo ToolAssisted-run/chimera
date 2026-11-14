@@ -1283,6 +1283,7 @@
 		"main.reboot_core": "重启核心(&R)",
 		"main.recent_projects": "最近的项目(&R)",
 		"main.recover_unsaved_work": "恢复未保存的工作？",
+		"main.reopen_tools_with_project": "随此项目重新打开工具",
 		"main.report_an_issue": "报告问题(&R)...",
 		"main.reproducible_media_maker": "可重现介质制作器...",
 		"main.reset_average_fps": "重置平均 FPS",

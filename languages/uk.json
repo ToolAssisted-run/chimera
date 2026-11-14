@@ -1325,6 +1325,7 @@
 		"main.reboot_core": "&Перезавантажити ядро",
 		"main.recent_projects": "&Недавні проєкти",
 		"main.recover_unsaved_work": "Відновити незбережену роботу?",
+		"main.reopen_tools_with_project": "Знову відкривати інструменти з цим проєктом",
 		"main.report_an_issue": "&Повідомити про проблему...",
 		"main.reproducible_media_maker": "Створювач відтворюваних медіа...",
 		"main.reset_average_fps": "Скинути середній FPS",

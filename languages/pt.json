@@ -1304,6 +1304,7 @@
 		"main.reboot_core": "&Reiniciar núcleo",
 		"main.recent_projects": "Projetos &recentes",
 		"main.recover_unsaved_work": "Recuperar trabalho não salvo?",
+		"main.reopen_tools_with_project": "Reabrir as ferramentas com este projeto",
 		"main.report_an_issue": "&Relatar um problema...",
 		"main.reproducible_media_maker": "Criador de mídia reproduzível...",
 		"main.reset_average_fps": "Zerar FPS médio",

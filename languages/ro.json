@@ -1325,6 +1325,7 @@
 		"main.reboot_core": "&Repornește core-ul",
 		"main.recent_projects": "Proiecte &recente",
 		"main.recover_unsaved_work": "Recuperezi lucrul nesalvat?",
+		"main.reopen_tools_with_project": "Redeschide uneltele cu acest proiect",
 		"main.report_an_issue": "&Raportează o problemă...",
 		"main.reproducible_media_maker": "Generator de suporturi reproductibile...",
 		"main.reset_average_fps": "Resetează media cadrelor pe secundă",

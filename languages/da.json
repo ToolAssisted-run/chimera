@@ -1304,6 +1304,7 @@
 		"main.reboot_core": "&Genstart kerne",
 		"main.recent_projects": "&Seneste projekter",
 		"main.recover_unsaved_work": "Gendan ikke-gemt arbejde?",
+		"main.reopen_tools_with_project": "Genåbn værktøjer med dette projekt",
 		"main.report_an_issue": "&Indberet et problem...",
 		"main.reproducible_media_maker": "Værktøj til reproducerbare medier...",
 		"main.reset_average_fps": "Nulstil gennemsnitlig FPS",

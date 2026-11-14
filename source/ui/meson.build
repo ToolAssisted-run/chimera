@@ -327,6 +327,7 @@ if qt_dep.found()
     'qt/file_places.cpp',
     'qt/system_file_dialog.cpp',
     'qt/win32_file_dialog.cpp',
+    'qt/project_windows.cpp',
     qt_moc,
     qt_rcc,
     qt_dialogs_rcc,
@@ -692,6 +693,17 @@ endif
       cpp_args: ['-DQT_NO_KEYWORDS'],
     )
     test('lua console drop', test_lua_console_drop, args: [meson.current_build_dir() / 'lua-console-drop-test'],
+      env: ['QT_QPA_PLATFORM=offscreen', 'QT_QUICK_BACKEND=software', 'ALSOFT_DRIVERS=null'], timeout: 60)
+    # a project's tool windows and their files said to the session as they
+    # change, and opened again from what it gives back (issue 587)
+    test_project_windows = executable(
+      'test-project-windows',
+      ['qt/tests/test_project_windows.cpp', 'qt/project_windows.cpp'],
+      dependencies: [qt_test_dep, vm_dep, dl_dep],
+      override_options: ['cpp_std=c++20'],
+      cpp_args: ['-DQT_NO_KEYWORDS'],
+    )
+    test('project windows', test_project_windows, args: [meson.current_build_dir() / 'project-windows-test'],
       env: ['QT_QPA_PLATFORM=offscreen', 'QT_QUICK_BACKEND=software', 'ALSOFT_DRIVERS=null'], timeout: 60)
     # files dropped on a slot of New Project, every one of them, not only
     # the first (issue 425): the window over the program's view model

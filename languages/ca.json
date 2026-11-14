@@ -1304,6 +1304,7 @@
 		"main.reboot_core": "&Reinicia el nucli",
 		"main.recent_projects": "Projectes &recents",
 		"main.recover_unsaved_work": "Voleu recuperar la feina no desada?",
+		"main.reopen_tools_with_project": "Torna a obrir les eines amb aquest projecte",
 		"main.report_an_issue": "&Informa d'un problema...",
 		"main.reproducible_media_maker": "Creador de suports reproduïbles...",
 		"main.reset_average_fps": "Restableix els FPS mitjans",

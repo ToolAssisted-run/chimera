@@ -14992,3 +14992,35 @@ stores nothing; with the period off, nothing. The view models' test sets a
 marker on the machine's frame with a period of 5 and finds its state at
 once. Without the change both failed (the engine's on its first check of
 frame 45, the view models' on the marker's state).
+
+## A project can reopen its tool windows (user-decided, 2026-11-14, issue 587)
+
+A person working on one project with the same tool windows every time (a
+watch list in RAM Watch, scripts in the Lua Console) opened them again by
+hand each time the project opened. The owner chose a switch per project,
+kept on this computer rather than in the project, so a project passed on
+carries no local paths: File > Reopen Tools With This Project.
+
+While it is on, the window tells the session which tool windows are open
+(TAStudio, RAM Watch, RAM Search, the Lua Console, the Hex Editor and the
+Macro Tool, the Tools menu's windows every core has), RAM Watch's file and
+the Lua Console's scripts, as they change, and the session writes them to
+windows.json beside the project's cache, as a project's own budgets are kept.
+When the project opens again, the session gives them back: the windows are
+shown, the watch file is opened, and each script not already listed is
+opened (and started unless Disable Scripts on Load is on). Off, the file is
+removed. Windows open from before are left open; nothing is closed. The
+part that finds the windows by their object names and opens the files is
+the window's own (project_windows.cpp); the switch, the file and when it is
+read are the session view model's.
+
+Tested: the view models' test turns the switch on in a project, checks the
+file is written with what the window said was open, and that it comes back
+when the project opens again, then that turning it off removes the file and
+gives back nothing; with the file never written, 4 of those checks failed.
+A new window test, "project windows", shows stand-in tool windows and opens
+a watch file and a script, checks what is said to be open, then hides
+everything and gives back a layout: the windows it names are shown and the
+script not yet listed is opened, the listed one not twice; with the windows
+not shown again, it failed. Not driven by a test: the File menu item in the
+main window, and the real tool windows' object names, which the code lists.

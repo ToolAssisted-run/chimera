@@ -1304,6 +1304,7 @@
 		"main.reboot_core": "Core &neu starten",
 		"main.recent_projects": "&Zuletzt geöffnete Projekte",
 		"main.recover_unsaved_work": "Ungespeicherte Arbeit wiederherstellen?",
+		"main.reopen_tools_with_project": "Werkzeuge mit diesem Projekt wieder öffnen",
 		"main.report_an_issue": "Ein Problem &melden...",
 		"main.reproducible_media_maker": "Reproduzierbare Medien erstellen...",
 		"main.reset_average_fps": "Durchschnittliche FPS zurücksetzen",

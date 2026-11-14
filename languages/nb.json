@@ -1304,6 +1304,7 @@
 		"main.reboot_core": "&Start kjernen på nytt",
 		"main.recent_projects": "&Nylige prosjekter",
 		"main.recover_unsaved_work": "Gjenopprette arbeid som ikke er lagret?",
+		"main.reopen_tools_with_project": "Åpne verktøyene igjen med dette prosjektet",
 		"main.report_an_issue": "&Meld et problem...",
 		"main.reproducible_media_maker": "Lager av reproduserbare medier...",
 		"main.reset_average_fps": "Nullstill gjennomsnittlig bilder per sekund",

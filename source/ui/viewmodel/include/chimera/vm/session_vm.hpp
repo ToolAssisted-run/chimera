@@ -366,6 +366,13 @@ public:
 	Property<bool> hasProject{false};
 	/* the open project's id (its cache folder's name), "" for none */
 	Property<std::string> projectId;
+	/* the open project reopens its tool windows, and their files, when it is
+	 * opened again (issue 587): kept on this computer beside the project's
+	 * cache, never in the project; setReopenWindows changes it */
+	Property<bool> reopenWindows{false};
+	/* what the project just opened reopens: its tool windows and their files,
+	 * as windowsNow was given them (JSON); "" for none */
+	Property<std::string> windowsKept;
 	/* a project waiting for its files to be found: its files are the
 	 * "projectFiles" rows, located one by one or by scanning a folder */
 	Property<bool> resolvingFiles{false};
@@ -1246,6 +1253,12 @@ private:
 	std::atomic<int64_t> fastVolumeM_{50}, budgetMbM_{4096}, nearStrideM_{4}, pictureSettleM_{3};
 	/* a project's own budgets, from budgets.json in its cache folder: 0 for none */
 	void readBudgetsOnMachine(ce_project *p, int64_t &memoryMb, int64_t &nearStride) const;
+	/* the open project's windows.json (issue 587): read when it opens, written
+	 * or removed as its windows or its switch change. The machine's thread */
+	void readWindowsOnMachine();
+	void writeWindowsOnMachine(bool reopen, const std::string &layout);
+	/* the tool windows open now, as windowsNow last gave them (window's thread) */
+	std::string windowsNow_;
 	/* the budgets applied to the machine open: making its history when opening, else changing it (issue 543) */
 	void applyBudgetsOnMachine(ce_session *s, bool opening);
 	Connection budgetWatch_, strideWatch_, settleWatch_, markerFramesWatch_;

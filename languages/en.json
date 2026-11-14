@@ -1304,6 +1304,7 @@
 		"main.reboot_core": "&Reboot Core",
 		"main.recent_projects": "&Recent Projects",
 		"main.recover_unsaved_work": "Recover unsaved work?",
+		"main.reopen_tools_with_project": "Reopen Tools With This Project",
 		"main.report_an_issue": "&Report an Issue...",
 		"main.reproducible_media_maker": "Reproducible Media Maker...",
 		"main.reset_average_fps": "Reset Average FPS",

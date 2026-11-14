@@ -1283,6 +1283,7 @@
 		"main.reboot_core": "&Khởi động lại core",
 		"main.recent_projects": "Dự án &gần đây",
 		"main.recover_unsaved_work": "Khôi phục công việc chưa lưu?",
+		"main.reopen_tools_with_project": "Mở lại các công cụ cùng dự án này",
 		"main.report_an_issue": "&Báo cáo vấn đề...",
 		"main.reproducible_media_maker": "Trình tạo phương tiện có thể tái lập...",
 		"main.reset_average_fps": "Đặt lại FPS trung bình",

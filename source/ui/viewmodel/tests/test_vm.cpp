@@ -2813,6 +2813,31 @@ bool greenzoneBudgets(const char *package, const char *rom)
 	session.greenzoneBudgetMb.set(512);
 	session.greenzoneNearStride.set(3);
 	CHECK(d.until([&] { return session.budgetMbApplied.get() == 512 && session.nearStrideApplied.get() == 3; }, 10));
+	/* a project that reopens its tool windows (issue 587): what the window says
+	 * is open is kept beside the project's cache while the switch is on, and
+	 * given back when the project opens again; off, the file goes and nothing
+	 * is given back */
+	{
+		const fs::path windows = dir / "cache" / session.projectId.get() / "windows.json";
+		const std::string layout = R"({"tools": ["ramWatch", "luaConsole"], "ramWatchFile": "/watches/a.wch", "luaScripts": ["/scripts/b.lua"]})";
+		json::Json parsed;
+		CHECK(json::parse(layout, parsed, error));
+		const std::string written = json::write(parsed);
+		CHECK(session.run("windowsNow", {layout}, error).has_value() && !fs::exists(windows));
+		CHECK(session.run("setReopenWindows", {true}, error).has_value() && session.reopenWindows.get());
+		CHECK(d.until([&] { return fs::exists(windows); }, 10));
+		CHECK(reopen() && session.reopenWindows.get() && session.windowsKept.get() == written);
+		/* a window opened since is kept too */
+		const std::string more = R"({"tools": ["ramWatch", "luaConsole", "hexEditor"], "ramWatchFile": "", "luaScripts": []})";
+		json::Json moreParsed;
+		CHECK(json::parse(more, moreParsed, error));
+		CHECK(session.run("windowsNow", {more}, error).has_value());
+		CHECK(d.until([&] { return readFile(windows).find("hexEditor") != std::string::npos; }, 10));
+		CHECK(reopen() && session.windowsKept.get() == json::write(moreParsed));
+		CHECK(session.run("setReopenWindows", {false}, error).has_value() && !session.reopenWindows.get());
+		CHECK(d.until([&] { return !fs::exists(windows); }, 10));
+		CHECK(reopen() && !session.reopenWindows.get() && session.windowsKept.get().empty());
+	}
 	session.run("frameAdvance", {}, error);
 	CHECK(d.until([&] { return session.greenzoneBudgetNowMb.get() == 512; }, 10));
 	CHECK(session.status.get().find("memory") == std::string::npos);

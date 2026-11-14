@@ -454,6 +454,31 @@ SessionViewModel::SessionViewModel(Dispatcher &dispatcher, InputLog &inputs)
 		if (pictureSettleFrames.get() < 0 || pictureSettleFrames.get() > 10) pictureSettleFrames.set(std::clamp<int64_t>(pictureSettleFrames.get(), 0, 10));
 		pictureSettleM_ = pictureSettleFrames.get();
 	});
+	expose("reopenWindows", "the open project reopens its tool windows and their files when it is opened again (kept on "
+		"this computer beside its cache, never in the project; setReopenWindows changes it)", reopenWindows);
+	expose("windowsKept", "what the project just opened reopens: its tool windows and their files as JSON, as windowsNow "
+		"gave them; \"\" for none", windowsKept);
+	command("setReopenWindows", "whether the open project reopens its tool windows and their files when it is opened "
+		"again, kept on this computer beside its cache (issue 587)", {"on"}, [this](const Args &a, std::string &error) -> Value {
+			bool on = false;
+			if (!arg(a, 0, on, error)) return {};
+			if (!hasProject.get())
+			{
+				error = tr("session.no_project");
+				return {};
+			}
+			reopenWindows.set(on);
+			submit([this, on, layout = windowsNow_] { writeWindowsOnMachine(on, layout); });
+			return {};
+		});
+	command("windowsNow", "the tool windows open now and their files, as JSON: what a project that reopens its windows "
+		"keeps (the window says it as they change)", {"layout"}, [this](const Args &a, std::string &error) -> Value {
+			std::string layout;
+			if (!arg(a, 0, layout, error)) return {};
+			windowsNow_ = layout;
+			if (reopenWindows.get() && hasProject.get()) submit([this, layout] { writeWindowsOnMachine(true, layout); });
+			return {};
+		});
 	command("setProjectBudgets", "the open project's own budgets (memory in MB, 64 at least; closeness 1 to 32), or none "
 		"(0 and 0): kept beside its cache, as Chimera's, and applied to it at once", {"memoryMb", "nearStride"},
 		[this](const Args &a, std::string &error) -> Value {
@@ -3316,6 +3341,55 @@ void SessionViewModel::applyBudgetsOnMachine(ce_session *s, bool opening)
 	});
 }
 
+void SessionViewModel::readWindowsOnMachine()
+{
+	bool reopen = false;
+	std::string layout;
+	const std::filesystem::path dir = cacheDirOf(projectM_);
+	if (!dir.empty())
+	{
+		std::ifstream in(dir / "windows.json", std::ios::binary);
+		const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+		json::Json w;
+		std::string err;
+		/* unreadable is the same as absent: nothing is reopened */
+		if (!text.empty() && json::parse(text, w, err) && w.kind == json::Json::Kind::Object)
+		{
+			if (const json::Json *r = w.find("reopen"); r != nullptr && r->kind == json::Json::Kind::Bool) reopen = r->boolean;
+			if (const json::Json *l = w.find("windows"); l != nullptr) layout = json::write(*l);
+		}
+	}
+	later([this, reopen, layout] {
+		reopenWindows.set(reopen);
+		/* set again even when it is the same: the same project opened twice
+		 * reopens its windows twice */
+		windowsKept.set("");
+		windowsKept.set(reopen ? layout : "");
+	});
+}
+
+void SessionViewModel::writeWindowsOnMachine(bool reopen, const std::string &layout)
+{
+	namespace fs = std::filesystem;
+	const fs::path dir = cacheDirOf(projectM_);
+	if (dir.empty()) return;
+	std::error_code ec;
+	/* off leaves no file to explain later */
+	if (!reopen)
+	{
+		fs::remove(dir / "windows.json", ec);
+		return;
+	}
+	json::Json w;
+	w.kind = json::Json::Kind::Object;
+	w.members.emplace_back("reopen", json::Json::boolean_(true));
+	json::Json l;
+	std::string err;
+	if (!layout.empty() && json::parse(layout, l, err)) w.members.emplace_back("windows", std::move(l));
+	fs::create_directories(dir, ec);
+	std::ofstream(dir / "windows.json", std::ios::binary | std::ios::trunc) << json::write(w);
+}
+
 void SessionViewModel::readBudgetsOnMachine(ce_project *p, int64_t &memoryMb, int64_t &nearStride) const
 {
 	memoryMb = nearStride = 0;
@@ -5682,6 +5756,7 @@ void SessionViewModel::adoptOnMachine(ce_session *s, const std::string &package,
 	applyBudgetsOnMachine(s, true);
 	ce_session_greenzone_capture_period(s, periodM_.load());
 	pinMarkersOnMachine();
+	readWindowsOnMachine();
 
 	std::vector<std::string> names;
 	std::vector<int32_t> players;

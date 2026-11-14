@@ -1325,6 +1325,7 @@
 		"main.reboot_core": "&Restartovat jádro",
 		"main.recent_projects": "&Nedávné projekty",
 		"main.recover_unsaved_work": "Obnovit neuloženou práci?",
+		"main.reopen_tools_with_project": "Znovu otevřít nástroje s tímto projektem",
 		"main.report_an_issue": "&Nahlásit problém...",
 		"main.reproducible_media_maker": "Tvůrce reprodukovatelných médií...",
 		"main.reset_average_fps": "Obnovit průměrné FPS",

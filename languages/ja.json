@@ -1283,6 +1283,7 @@
 		"main.reboot_core": "コアを再起動(&R)",
 		"main.recent_projects": "最近のプロジェクト(&R)",
 		"main.recover_unsaved_work": "未保存の作業を復旧しますか?",
+		"main.reopen_tools_with_project": "このプロジェクトでツールを開き直す",
 		"main.report_an_issue": "問題を報告(&R)...",
 		"main.reproducible_media_maker": "再現可能メディア作成...",
 		"main.reset_average_fps": "平均 FPS をリセット",

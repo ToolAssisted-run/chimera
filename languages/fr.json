@@ -1304,6 +1304,7 @@
 		"main.reboot_core": "&Redémarrer le cœur",
 		"main.recent_projects": "Projets &récents",
 		"main.recover_unsaved_work": "Récupérer le travail non enregistré ?",
+		"main.reopen_tools_with_project": "Rouvrir les outils avec ce projet",
 		"main.report_an_issue": "Si&gnaler un problème...",
 		"main.reproducible_media_maker": "Créateur de médias reproductibles...",
 		"main.reset_average_fps": "Réinitialiser les FPS moyens",

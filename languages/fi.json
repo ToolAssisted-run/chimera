@@ -1304,6 +1304,7 @@
 		"main.reboot_core": "&Käynnistä ydin uudelleen",
 		"main.recent_projects": "&Viimeisimmät projektit",
 		"main.recover_unsaved_work": "Palautetaanko tallentamaton työ?",
+		"main.reopen_tools_with_project": "Avaa työkalut uudelleen tämän projektin kanssa",
 		"main.report_an_issue": "&Ilmoita ongelmasta...",
 		"main.reproducible_media_maker": "Toistettavan median tekijä...",
 		"main.reset_average_fps": "Nollaa keskimääräinen FPS",
