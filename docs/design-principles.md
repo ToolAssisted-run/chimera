@@ -14972,3 +14972,23 @@ Tested: the Lua Console's window test drags the edge 60 pixels to the right
 and checks the kept width is 152, the heading 152 wide and a row's name 148;
 then 400 to the left, which stops at 40. With the drag not reaching the view
 model, 5 of those checks failed.
+
+## A marker on the machine's frame keeps its state at once (user-decided, 2026-11-14, issue 578)
+
+A marker's frame is kept in the greenzone whatever its period (2026-11-08),
+but only once the machine plays that frame: with "every 60 frames", a marker
+set on the frame the machine stood on, between multiples of 60, had no state
+until the frame was played again. The owner chose to store it at once when
+the marker is on the machine's own frame, and to leave markers on other
+frames as they were, since storing those would mean seeking there and back.
+Pinning a frame now stores it when the machine stands on it and the
+greenzone is on (StateHistory::pin), the same way a branch stores the frame
+it is made on; off (period 0) still stores nothing.
+
+Tested: the engine's history test, with a period of 20 and the machine on
+frame 45, pins 45 and finds it stored, the machine restored there being frame
+45's, and frame 60 after it too; a pin of frame 33, where the machine is not,
+stores nothing; with the period off, nothing. The view models' test sets a
+marker on the machine's frame with a period of 5 and finds its state at
+once. Without the change both failed (the engine's on its first check of
+frame 45, the view models' on the marker's state).

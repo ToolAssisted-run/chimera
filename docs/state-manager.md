@@ -369,6 +369,14 @@ Settings' "Keep every marker's frame in the greenzone" (on at first,
 remembered) pins every marker; off, each marker's own "keeps its state"
 decides, as before.
 
+A marker set on the frame the machine stands on is stored at once
+(user-decided, 2026-11-14, issue 578). Before, its frame was stored only when
+the machine played it again, so between the period's multiples the new
+marker had no state until then. Pinning the machine's own frame now stores
+it, as a branch made stores the frame it is made on; a marker set on any
+other frame still waits for that frame to be played, since going there would
+need a seek.
+
 ## The policy: everything until the budget is full, then a doubling shape (user-decided, 2026-09-15)
 
 Editing a movie is local, and rewinds are not: somebody working near the end
