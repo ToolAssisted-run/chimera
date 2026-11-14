@@ -1834,7 +1834,8 @@ CE_API uint32_t ce_session_greenzone_note(
  * than dropped. What deserves pinning is the caller's business - a marker
  * somebody wants to jump to instantly is the case this exists for, and nothing
  * the engine could work out for itself. Pinning a frame the history does not
- * hold is not an error; it takes effect if that frame is ever stored.
+ * hold is not an error: the frame the machine stands on is stored at once
+ * (issue 578), and any other takes effect if that frame is ever stored.
  * _unpin_all forgets the lot, for a caller rebuilding its set. */
 CE_API void ce_session_greenzone_pin(ce_session *s, int64_t frame, int32_t pinned);
 CE_API void ce_session_greenzone_unpin_all(ce_session *s);

@@ -2362,6 +2362,12 @@ void StateHistory::pin(int64_t frame, bool isPinned)
 {
 	if (isPinned) m_pinned.insert(frame);
 	else m_pinned.erase(frame);
+	/* A marker set on the frame the machine stands on had no state until the
+	 * machine played that frame again, with a period ("every N frames")
+	 * between its multiples (issue 578): the machine is there now, so the
+	 * frame is stored now, as a capture with no frame run stores one (a
+	 * branch made). Off, nothing is stored, pins included. */
+	if (isPinned && enabled() && m_capturePeriod != 0 && frame == m_machineFrame && nearest(frame) != frame) capture(frame);
 }
 
 bool StateHistory::pinned(int64_t frame) const

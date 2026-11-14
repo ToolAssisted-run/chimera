@@ -306,8 +306,9 @@ public:
 	 *
 	 * What deserves pinning is the caller's business - a marker somebody wants
 	 * to jump to instantly, and nothing the engine could work out for itself.
-	 * Pinning a frame the history does not hold is not an error; it takes
-	 * effect if that frame is ever stored. */
+	 * Pinning a frame the history does not hold is not an error: the frame
+	 * the machine stands on is stored at once (issue 578), and any other takes
+	 * effect if it is ever stored. */
 	void pin(int64_t frame, bool pinned);
 	bool pinned(int64_t frame) const;
 	void unpinAll();

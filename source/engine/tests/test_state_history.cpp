@@ -550,6 +550,58 @@ int main(void)
 			assert(std::memcmp(g_machine.cell, truth[33].data(), Machine::kCells) == 0);
 		}
 	}
+	{ // A marker set on the frame the machine stands on (issue 578): with a
+	  // period of 20 the machine on frame 45 has no state there, and pinning
+	  // 45 stores it at once, the machine restored there being frame 45's.
+	  // A pin of a frame the machine is not on stores nothing now, and
+	  // nothing is stored while the history is off (period 0).
+		const chimera::HostApi api = fakeHost();
+		for (int pass = 0; pass < 2; pass++)
+		{
+			g_machine = Machine{};
+			History h;
+			h.helpers(false);
+			h.configure(&api, nullptr, 64ull << 20);
+			h.capturePeriod(pass == 0 ? 20 : 0);
+			std::vector<std::array<uint8_t, Machine::kCells>> truth(1);
+			std::memcpy(truth[0].data(), g_machine.cell, Machine::kCells);
+			h.capture(0);
+			for (int64_t f = 1; f <= 45; f++)
+			{
+				h.beforeAdvance();
+				advance(f);
+				std::array<uint8_t, Machine::kCells> at{};
+				std::memcpy(at.data(), g_machine.cell, Machine::kCells);
+				truth.push_back(at);
+				h.capture(f);
+			}
+			assert(h.nearest(45) != 45);
+			h.pin(33, true);
+			assert(h.nearest(33) != 33);
+			h.pin(45, true);
+			if (pass == 1)
+			{
+				assert(h.nearest(45) != 45);
+				continue;
+			}
+			assert(h.nearest(45) == 45);
+			/* the machine runs on from there as before, and 45 comes back as itself */
+			for (int64_t f = 46; f <= 60; f++)
+			{
+				h.beforeAdvance();
+				advance(f);
+				std::array<uint8_t, Machine::kCells> at{};
+				std::memcpy(at.data(), g_machine.cell, Machine::kCells);
+				truth.push_back(at);
+				h.capture(f);
+			}
+			assert(h.nearest(60) == 60);
+			assert(h.restore(45, error));
+			assert(std::memcmp(g_machine.cell, truth[45].data(), Machine::kCells) == 0);
+			assert(h.restore(60, error));
+			assert(std::memcmp(g_machine.cell, truth[60].data(), Machine::kCells) == 0);
+		}
+	}
 	{ // A budget changed while the history runs (issue 543): it keeps what
 	  // it holds, a smaller one thins it down to the new budget at once
 	  // (frame 0 and the frontier kept), and a larger one lets it keep every

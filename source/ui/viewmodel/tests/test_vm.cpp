@@ -7412,6 +7412,19 @@ bool greenzoneChoice(const char *package, const char *rom)
 		CHECK(d.until([&] { return session.frame.get() == to; }, 30));
 		d.until([] { return false; }, 0.1);
 	};
+	/* a marker set on the frame the machine stands on, between the
+	 * multiples of five, has its state at once, not once the frame is
+	 * played again (issue 578) */
+	{
+		advance(static_cast<int>((5 - session.frame.get() % 5) % 5) + 2);
+		const int64_t here = session.frame.get();
+		session.watchStates(here, 1);
+		d.until([] { return false; }, 0.2);
+		CHECK(here % 5 != 0 && !session.hasState(here));
+		session.setMarkers({Marker{here, "here", true}});
+		session.watchStates(here - 1, 2);
+		CHECK(d.until([&] { return session.hasState(here); }, 10));
+	}
 	/* one in five: twenty frames store few states; every frame: many more */
 	const int64_t s0 = session.greenzoneStates.get();
 	advance(20);
