@@ -2235,6 +2235,7 @@
 			"one": "%n manette :",
 			"other": "%n manettes :"
 		},
+		"session.greenzone_out_of_memory": "L'ordinateur a manqué de mémoire : la greenzone garde maintenant au plus %1 Mo des %2 Mo fixés et espace ses images pour tenir. « Effacer la greenzone » lui rend tout son budget.",
 		"session.held": "Maintenu : %1",
 		"session.machine_not_opened": "Impossible d'ouvrir la machine du projet : %1",
 		"session.machine_stopped": "La machine s'est arrêtée.",

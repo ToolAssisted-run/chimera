@@ -2235,6 +2235,7 @@
 			"one": "%n gamepad:",
 			"other": "%n gamepads:"
 		},
+		"session.greenzone_out_of_memory": "Computeren løb tør for hukommelse, så Greenzone gemmer nu højst %1 MB af de %2 MB, der er sat, og tynder sine billeder ud for at være der. \"Ryd Greenzone\" giver den hele budgettet igen.",
 		"session.held": "Holdt: %1",
 		"session.machine_not_opened": "Kunne ikke åbne projektets maskine: %1",
 		"session.machine_stopped": "Maskinen stoppede.",

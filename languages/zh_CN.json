@@ -2194,6 +2194,7 @@
 		"session.gamepads": {
 			"other": "%n 个游戏手柄："
 		},
+		"session.greenzone_out_of_memory": "电脑内存不足，绿区现在最多只保留设定的 %2 MB 中的 %1 MB，并稀疏其帧以容纳。“清除绿区”会让它重新获得全部预算。",
 		"session.held": "按住：%1",
 		"session.machine_not_opened": "无法打开项目的机器：%1",
 		"session.machine_stopped": "机器已停止。",

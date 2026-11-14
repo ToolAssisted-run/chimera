@@ -2235,6 +2235,7 @@
 			"one": "%n spillkontroll:",
 			"other": "%n spillkontroller:"
 		},
+		"session.greenzone_out_of_memory": "Datamaskinen gikk tom for minne, så greenzonen holder nå høyst %1 MB av de %2 MB som er satt, og tynner ut rutene sine for å få plass. «Tøm greenzone» gir den hele budsjettet igjen.",
 		"session.held": "Holdt: %1",
 		"session.machine_not_opened": "Kunne ikke åpne prosjektets maskin: %1",
 		"session.machine_stopped": "Maskinen stoppet.",

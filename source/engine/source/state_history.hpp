@@ -216,8 +216,11 @@ public:
 	Costs costs() const { return m_costs; }
 
 	/* What it may hold now, which is not what it was configured with if the
-	 * machine has run out of memory since. */
+	 * machine has run out of memory since. clearKeeping gives back the budget
+	 * that was set. */
 	uint64_t budget() const { return m_budget; }
+	/* the budget as it was set: configure's or setBudget's, never halved */
+	uint64_t budgetSet() const { return m_budgetSet; }
 	/* What it may hold from now on, keeping what it holds: what is over a
 	 * smaller budget is spilled or thinned away now, as a frame's capture
 	 * would (issue 543). 0, or a disabled history, changes nothing. */
@@ -760,6 +763,9 @@ private:
 	const HostApi *m_host = nullptr;
 	void *m_obj = nullptr;
 	uint64_t m_budget = 0;
+	/* The budget as it was set. m_budget is halved below it when the machine
+	 * runs out of memory, and a clear gives it back (issue 577). */
+	uint64_t m_budgetSet = 0;
 	uint64_t m_bytes = 0;
 	std::vector<Segment> m_segments;   /* ordered by anchorFrame, never overlapping */
 	bool m_epochOpen = false;          /* an epoch is marked and a delta is wanted */

@@ -2194,6 +2194,7 @@
 		"session.gamepads": {
 			"other": "%n tay cầm:"
 		},
+		"session.greenzone_out_of_memory": "Máy tính đã hết bộ nhớ, nên vùng xanh giờ chỉ giữ tối đa %1 MB trong %2 MB đã đặt và lược bớt khung hình cho vừa. \"Xóa vùng xanh\" trả lại cho nó toàn bộ ngân sách.",
 		"session.held": "Đang giữ: %1",
 		"session.machine_not_opened": "Không thể mở máy của dự án: %1",
 		"session.machine_stopped": "Máy đã dừng.",

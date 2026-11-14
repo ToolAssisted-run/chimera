@@ -2235,6 +2235,7 @@
 			"one": "%n gamepad:",
 			"other": "%n gamepads:"
 		},
+		"session.greenzone_out_of_memory": "De computer had geen geheugen meer, dus de groene zone houdt nu hoogstens %1 MB van de ingestelde %2 MB vast en dunt haar frames uit om erin te passen. 'Groene zone wissen' geeft haar het hele budget terug.",
 		"session.held": "Ingedrukt: %1",
 		"session.machine_not_opened": "De machine van het project kon niet worden geopend: %1",
 		"session.machine_stopped": "De machine is gestopt.",

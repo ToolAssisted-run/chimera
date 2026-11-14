@@ -2194,6 +2194,7 @@
 		"session.gamepads": {
 			"other": "%n gamepad:"
 		},
+		"session.greenzone_out_of_memory": "Memori komputer habis, jadi Greenzone kini menyimpan paling banyak %1 MB dari %2 MB yang diatur dan menjarangkan frame-nya agar muat. \"Kosongkan Greenzone\" mengembalikan seluruh anggarannya.",
 		"session.held": "Ditahan: %1",
 		"session.machine_not_opened": "Tidak dapat membuka mesin proyek: %1",
 		"session.machine_stopped": "Mesin berhenti.",

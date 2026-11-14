@@ -2235,6 +2235,7 @@
 			"one": "%n comandament:",
 			"other": "%n comandaments:"
 		},
+		"session.greenzone_out_of_memory": "L'ordinador s'ha quedat sense memòria: la zona verda ara guarda com a màxim %1 MB dels %2 MB fixats i n'aprima els fotogrames per cabre-hi. «Esborra la zona verda» li torna tot el pressupost.",
 		"session.held": "Mantingut: %1",
 		"session.machine_not_opened": "No s'ha pogut obrir la màquina del projecte: %1",
 		"session.machine_stopped": "La màquina s'ha aturat.",

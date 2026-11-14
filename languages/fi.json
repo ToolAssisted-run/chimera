@@ -2235,6 +2235,7 @@
 			"one": "%n peliohjain:",
 			"other": "%n peliohjainta:"
 		},
+		"session.greenzone_out_of_memory": "Tietokoneen muisti loppui, joten Greenzone pitää nyt enintään %1 Mt asetetuista %2 Mt:stä ja harventaa ruutujaan mahtuakseen. ”Tyhjennä Greenzone” antaa sille koko budjetin takaisin.",
 		"session.held": "Pidossa: %1",
 		"session.machine_not_opened": "Projektin konetta ei voitu avata: %1",
 		"session.machine_stopped": "Kone pysähtyi.",

@@ -262,6 +262,9 @@ public:
 	Property<int64_t> greenEnd{0};
 	/* machine states the greenzone holds */
 	Property<int64_t> greenzoneStates{0};
+	/* the memory budget the greenzone works to now, MB: budgetMbApplied, or
+	 * less once the computer ran out of memory and it was halved (issue 577) */
+	Property<int64_t> greenzoneBudgetNowMb{0};
 	/* how many times the movie was changed over work already done, saved
 	 * with the project */
 	Property<int64_t> rerecords{0};
@@ -1435,6 +1438,7 @@ private:
 	int64_t pendingGameMs_ = -1;
 	int64_t pendingQueued_ = 0, pendingDropped_ = 0;
 	int64_t pendingGreenEnd_ = 0, pendingStates_ = 0, pendingRerecords_ = 0;
+	uint64_t pendingBudgetNow_ = 0, pendingBudgetSet_ = 0;
 	int64_t changedFirst_ = -1, changedLast_ = -1;
 	int64_t appendedFirst_ = -1, appendedLast_ = -1;
 	std::vector<RecordedFrame> recordedM_;

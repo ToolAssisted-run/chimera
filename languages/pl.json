@@ -2276,6 +2276,7 @@
 			"few": "%n gamepady:",
 			"many": "%n gamepadów:"
 		},
+		"session.greenzone_out_of_memory": "Komputerowi zabrakło pamięci, więc greenzone trzyma teraz najwyżej %1 MB z ustawionych %2 MB i przerzedza klatki, żeby się zmieścić. „Wyczyść greenzone” oddaje jej cały budżet.",
 		"session.held": "Przytrzymane: %1",
 		"session.machine_not_opened": "Nie można otworzyć maszyny projektu: %1",
 		"session.machine_stopped": "Maszyna się zatrzymała.",

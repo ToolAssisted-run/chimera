@@ -2235,6 +2235,7 @@
 			"one": "%n controle:",
 			"other": "%n controles:"
 		},
+		"session.greenzone_out_of_memory": "O computador ficou sem memória, então a greenzone agora guarda no máximo %1 MB dos %2 MB definidos e espaça seus quadros para caber. \"Limpar greenzone\" devolve a ela todo o orçamento.",
 		"session.held": "Mantido: %1",
 		"session.machine_not_opened": "Não foi possível abrir a máquina do projeto: %1",
 		"session.machine_stopped": "A máquina parou.",

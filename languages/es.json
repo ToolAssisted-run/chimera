@@ -2235,6 +2235,7 @@
 			"one": "%n mando:",
 			"other": "%n mandos:"
 		},
+		"session.greenzone_out_of_memory": "El ordenador se quedó sin memoria, así que la greenzone guarda ahora como mucho %1 MB de los %2 MB fijados y espacia sus fotogramas para caber. «Borrar greenzone» le devuelve todo el presupuesto.",
 		"session.held": "Mantenido: %1",
 		"session.machine_not_opened": "No se pudo abrir la máquina del proyecto: %1",
 		"session.machine_stopped": "La máquina se detuvo.",

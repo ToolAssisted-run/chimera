@@ -2235,6 +2235,7 @@
 			"one": "%n oyun kumandası:",
 			"other": "%n oyun kumandası:"
 		},
+		"session.greenzone_out_of_memory": "Bilgisayarın belleği tükendi; bu yüzden Greenzone artık ayarlanan %2 MB'lık bütçenin en fazla %1 MB'ını tutuyor ve sığmak için karelerini seyreltiyor. \"Greenzone'u Temizle\" ona bütçenin tamamını geri verir.",
 		"session.held": "Basılı: %1",
 		"session.machine_not_opened": "Projenin makinesi açılamadı: %1",
 		"session.machine_stopped": "Makine durdu.",

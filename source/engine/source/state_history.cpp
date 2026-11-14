@@ -161,7 +161,7 @@ void StateHistory::configure(const HostApi *host, void *obj, uint64_t budgetByte
 	finishPlan();
 	m_host = host;
 	m_obj = obj;
-	m_budget = budgetBytes;
+	m_budget = m_budgetSet = budgetBytes;
 	/* Everything stored goes, the spill file with it: a history configured
 	 * over one that had spilled kept the file open and its live count, and
 	 * then held the disk budget against stretches that no longer existed. The
@@ -1522,7 +1522,7 @@ void StateHistory::setBudget(uint64_t budgetBytes)
 {
 	if (m_budget == 0 || budgetBytes == 0) return;
 	finishPlan();
-	m_budget = budgetBytes;
+	m_budget = m_budgetSet = budgetBytes;
 	evict();
 	evictDisk();
 }
@@ -2325,6 +2325,17 @@ void StateHistory::clearKeeping(int64_t keep)
 	{
 		m_epochOpen = false;
 		m_machineStored = false;
+	}
+	/* A budget halved when the machine ran out of memory stayed halved until
+	 * the project was opened again, so the greenzone went on thinning after a
+	 * clear that had given the memory back (issue 577). The clear gives back
+	 * the budget that was set; if memory runs out again, it is halved again. */
+	if (m_budgetSet > m_budget)
+	{
+		fprintf(stderr, "[history] cleared: the budget goes back from %llu to the %llu set\n",
+			(unsigned long long)m_budget, (unsigned long long)m_budgetSet);
+		fflush(stderr);
+		m_budget = m_budgetSet;
 	}
 	if (historyVerify())
 	{
