@@ -428,6 +428,11 @@ to build the form, and by `ce_project_*` to validate a manifest:
   game as one file with a long name and nothing after it: without it such a
   file is refused when the project is made. The wizard shows it as "no
   extension".
+  An empty list, or no `formats` at all, takes any file: the wizard's
+  file picker shows every file and validation checks none. It is for a
+  slot whose files the core cannot name in advance, such as the files a
+  game engine's game reads from beside itself (owner, 2026-11-14, issue
+  567).
   An extension may legitimately appear in several slots (`.img` is a
   floppy or a hard disk - the user's slot choice resolves what
   sniffing had to guess).
