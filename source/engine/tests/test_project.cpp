@@ -311,6 +311,17 @@ int main(int argc, char **argv)
 		assert(ce_project_file_add(p, "save.hdd", "game", (g_dir + "/save.hdd").c_str(), &err) == 0);
 		assert(ce_project_validate(p, bare, std::strlen(bare), &err) != 0);
 		ce_project_file_remove(p, 0);
+		// a slot with an empty formats list, or none, takes any file: a game
+		// engine's slot for the files beside the game, whose names the core
+		// cannot know (owner, 2026-11-14, issue 567)
+		const char *anyListed = "{\"slots\":[{\"id\":\"files\",\"min\":0,\"max\":-1,\"formats\":[]}]}";
+		const char *anyUnlisted = "{\"slots\":[{\"id\":\"files\",\"min\":0,\"max\":-1}]}";
+		assert(ce_project_file_add(p, "save.hdd", "files", (g_dir + "/save.hdd").c_str(), &err) == 0);
+		assert(ce_project_file_add(p, "0123456789ABCDEF", "files", (g_dir + "/disc2.iso").c_str(), &err) == 0);
+		assert(ce_project_validate(p, anyListed, std::strlen(anyListed), &err) == 0);
+		assert(ce_project_validate(p, anyUnlisted, std::strlen(anyUnlisted), &err) == 0);
+		ce_project_file_remove(p, 1);
+		ce_project_file_remove(p, 0);
 		// a min is enforced
 		const char *needOne = "{\"slots\":[{\"id\":\"rom\",\"min\":1,\"max\":1}]}";
 		assert(ce_project_validate(p, needOne, std::strlen(needOne), &err) != 0);

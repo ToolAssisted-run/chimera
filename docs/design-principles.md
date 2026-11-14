@@ -14921,3 +14921,16 @@ Found while looking, not changed: with a period ("every N frames"), Clear
 Greenzone keeps the frame the machine is on only if it is a multiple of N,
 since only those are stored, so the next step back replays from the nearest
 kept frame.
+
+## A slot with no formats takes any file (user-decided, 2026-11-14, issue 567)
+
+Chimera already treated a project slot whose `formats` list is empty, or
+missing, as one that takes any file: the engine checks no extension, and the
+New Project window's file picker shows every file. Nothing said so, and
+nothing tested it. The Godot cores need it to carry a file a game reads from
+beside itself, whose name the core cannot know in advance: Super Mario Bros.
+Remastered looks for the player's own NES ROM there. The owner decided to make
+it a rule: docs/project.md says it, and the engine's project test checks that a
+file of any extension, and one with no extension, is taken by a slot with an
+empty list and by one with no list. With the engine changed to refuse them,
+that check failed.
