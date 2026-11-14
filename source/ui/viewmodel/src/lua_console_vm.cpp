@@ -86,6 +86,7 @@ LuaConsoleViewModel::LuaConsoleViewModel(Dispatcher &dispatcher, LuaBridge &lua,
 	expose("toggleAllIfNoneSelected", "Toggle All if None Selected: Toggle and Refresh work on every script when none is selected",
 		toggleAllIfNoneSelected, true);
 	expose("reloadOnChange", "Reload When Script File Changes: a running script whose file is written is started again", reloadOnChange, true);
+	expose("scriptColumnWidth", "the script list's Script column, in pixels, as its heading's edge was dragged (40 at least)", scriptColumnWidth, true);
 	expose("recentSessions", "sessions opened or saved, newest first, a line each", recentSessions, true);
 	expose("recentScripts", "scripts opened, newest first, a line each", recentScripts, true);
 	expose("luaFolder", "the Paths' Lua folder, where New Script's template is", luaFolder, true);

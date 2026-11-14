@@ -1,7 +1,9 @@
 /* Files dropped on the Lua Console (issue 561): a script is opened and run as
  * Open Script opens one, a session as Open Session does, and any other file
- * is left alone. The window over the view model the program uses; the drop
- * is a real one, through Qt's test module.
+ * is left alone. And the script list's Script column widened and narrowed by
+ * dragging its heading's right edge, its width kept in the view model, which
+ * the settings keep (issue 586). The window over the view model the program
+ * uses; the drop and the drag are real ones, through Qt's test module.
  *   test-lua-console-drop <work folder> */
 #include <QGuiApplication>
 #include <QMimeData>
@@ -73,6 +75,26 @@ void dropOn(QQuickWindow *window, const QList<QUrl> &urls)
 
 QUrl urlOf(const fs::path &p) { return QUrl::fromLocalFile(QString::fromStdString(p.string())); }
 
+/* an item by its objectName anywhere under `item`, a list's rows too (they
+ * are its children as items, not always as objects) */
+QQuickItem *itemNamed(QQuickItem *item, const QString &name)
+{
+	if (item == nullptr) return nullptr;
+	if (item->objectName() == name) return item;
+	for (QQuickItem *child : item->childItems())
+		if (QQuickItem *found = itemNamed(child, name)) return found;
+	return nullptr;
+}
+
+/* the left button pressed on `at`, moved by dx, and let go, as a person drags */
+void drag(QQuickWindow *window, QPoint at, int dx)
+{
+	QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, at);
+	for (int step = 1; step <= 4; step++) QTest::mouseMove(window, at + QPoint(dx * step / 4, 0));
+	QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, at + QPoint(dx, 0));
+	QCoreApplication::processEvents();
+}
+
 } // namespace
 
 int main(int argc, char **argv)
@@ -130,6 +152,28 @@ int main(int argc, char **argv)
 	dropOn(window, {urlOf(session)});
 	CHECK(QTest::qWaitFor([&] { return names() == "three"; }, 3000));
 	std::printf("dropped kept.luases: listed [%s]\n", names().c_str());
+
+	/* the Script column: 92 pixels at first; its heading's right edge dragged
+	 * 60 to the right makes it 152, kept in the view model, and the rows'
+	 * names as wide; dragged far to the left, it stops at 40 */
+	QQuickItem *heading = itemNamed(window->contentItem(), QStringLiteral("luaScriptHeading"));
+	QQuickItem *edge = itemNamed(heading, QStringLiteral("columnEdge"));
+	CHECK(heading != nullptr && edge != nullptr);
+	if (heading != nullptr && edge != nullptr)
+	{
+		CHECK(console.scriptColumnWidth.get() == 92 && qRound(heading->width()) == 92);
+		const QPoint edgeAt = edge->mapToScene(QPointF(edge->width() / 2, edge->height() / 2)).toPoint();
+		drag(window, edgeAt, 60);
+		CHECK(QTest::qWaitFor([&] { return console.scriptColumnWidth.get() == 152; }, 2000));
+		CHECK(QTest::qWaitFor([&] { return qRound(heading->width()) == 152; }, 2000));   /* (the heading row lays itself out at the next frame) */
+		QQuickItem *name = itemNamed(window->contentItem(), QStringLiteral("luaScriptName"));
+		CHECK(name != nullptr && qRound(name->width()) == 148);
+		std::printf("Script column dragged 60 to the right: %lld wide\n", static_cast<long long>(console.scriptColumnWidth.get()));
+		const QPoint widerEdge = edge->mapToScene(QPointF(edge->width() / 2, edge->height() / 2)).toPoint();
+		drag(window, widerEdge, -400);
+		CHECK(QTest::qWaitFor([&] { return console.scriptColumnWidth.get() == 40; }, 2000));
+		CHECK(QTest::qWaitFor([&] { return qRound(heading->width()) == 40; }, 2000));   /* (the heading row lays itself out at the next frame) */
+	}
 
 	std::printf("%d checks, %d failed\n", checks, failures);
 	return failures == 0 ? 0 : 1;

@@ -56,6 +56,9 @@ public:
 	Property<bool> disableOnLoad{false};
 	Property<bool> toggleAllIfNoneSelected{true};
 	Property<bool> reloadOnChange{false};
+	/* the script list's Script column, in pixels: its heading's right edge
+	 * dragged (issue 586) */
+	Property<int64_t> scriptColumnWidth{92};
 	/* newest first, a line each, remembered */
 	Property<std::string> recentSessions;
 	Property<std::string> recentScripts;

@@ -14956,3 +14956,19 @@ and dims it; and that the top strip scrolls them back to the first row.
 With the strips never shown, 3 of those checks failed; before the position
 was set again, the first row's check failed. Not tried on a real screen:
 the window tests run offscreen with Qt's software drawing.
+
+## The Lua Console's Script column can be widened (user-decided, 2026-11-14, issue 586)
+
+The Lua Console's Script column was fixed at 92 pixels, so a long script
+name was cut short with no way to read it. RAM Watch and RAM Search already
+had column headings whose right edge can be dragged (ColumnHeading.qml,
+issue 523), and the owner chose the same here. The Script heading is now one
+of those: dragging its right edge widens or narrows the column, 40 pixels at
+least, and the rows' names and paths follow. The width is the view model's
+`scriptColumnWidth`, kept in the window's settings when the drag is let go,
+so it is there the next time the window opens.
+
+Tested: the Lua Console's window test drags the edge 60 pixels to the right
+and checks the kept width is 152, the heading 152 wide and a row's name 148;
+then 400 to the left, which stops at 40. With the drag not reaching the view
+model, 5 of those checks failed.
