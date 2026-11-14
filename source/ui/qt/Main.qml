@@ -481,6 +481,8 @@ ApplicationWindow {
                 Action { text: qsTrId("main.save_project_backup"); icon.source: "qrc:/chimera/menu/SaveProjectBackup.png"; enabled: root.session.projectPath !== ""; onTriggered: root.session.run("saveBackup") }
                 // the open project's settings, changed: its machine starts again with them (issue 370)
                 Action { text: qsTrId("main.project_settings"); icon.source: "qrc:/chimera/menu/Customize.png"; enabled: root.session.hasProject && root.session.isOpen; onTriggered: { root.bring(projectSettingsWindow) } }
+                // this project's tool windows and their files opened again with it, on this computer (issue 587)
+                Action { text: qsTrId("main.reopen_tools_with_project"); checkable: true; checked: root.session.reopenWindows; enabled: root.session.hasProject; onTriggered: root.session.run("setReopenWindows", [checked]) }
                 Action { id: closeAction; property string hotkey: "Close Project"; text: qsTrId("main.close_project_mnemonic"); icon.source: "qrc:/chimera/menu/CloseProject.png"; enabled: root.session.closeEnabled; onTriggered: root.leaveProject(() => root.session.run("close")) }
                 MenuDivider {}
                 Action {

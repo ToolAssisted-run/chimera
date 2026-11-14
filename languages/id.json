@@ -1283,6 +1283,7 @@
 		"main.reboot_core": "&Mulai Ulang Core",
 		"main.recent_projects": "Proyek &Terbaru",
 		"main.recover_unsaved_work": "Pulihkan pekerjaan yang belum disimpan?",
+		"main.reopen_tools_with_project": "Buka kembali alat bersama proyek ini",
 		"main.report_an_issue": "&Laporkan Masalah...",
 		"main.reproducible_media_maker": "Pembuat Media Dapat Direproduksi...",
 		"main.reset_average_fps": "Atur Ulang FPS Rata-rata",

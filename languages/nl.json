@@ -1304,6 +1304,7 @@
 		"main.reboot_core": "Core &opnieuw starten",
 		"main.recent_projects": "&Recente projecten",
 		"main.recover_unsaved_work": "Niet-opgeslagen werk herstellen?",
+		"main.reopen_tools_with_project": "Extra opnieuw openen met dit project",
 		"main.report_an_issue": "Een &probleem melden...",
 		"main.reproducible_media_maker": "Maker van reproduceerbare media...",
 		"main.reset_average_fps": "Gemiddelde FPS herstellen",

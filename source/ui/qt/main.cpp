@@ -39,6 +39,8 @@
 #include <QQuickItem>
 #include <QQuickItemGrabResult>
 #include <QQuickWindow>
+
+#include <memory>
 /* the graphics card the window draws on: Qt's rendering layer, which Qt
  * gives with its private headers */
 #include <rhi/qrhi.h>
@@ -99,6 +101,7 @@
 #include "chimera/vm/cores_vm.hpp"
 #include "chimera/vm/lua_bridge.hpp"
 #include "chimera/vm/lua_console_vm.hpp"
+#include "project_windows.hpp"
 #include "chimera/vm/tool_windows_vm.hpp"
 #include "chimera/vm/piano_roll_vm.hpp"
 #include "chimera/vm/ram_search_vm.hpp"
@@ -1827,6 +1830,11 @@ int main(int argc, char **argv)
 			tool->raise();
 		}
 	});
+	/* the tool windows a project reopens, and their files (issue 587): said
+	 * to the session as they change, opened again when such a project opens;
+	 * a run nobody watches shows no windows */
+	std::unique_ptr<qt::ProjectWindows> projectWindows;
+	if (!headless) projectWindows = std::make_unique<qt::ProjectWindows>(window, session, ramWatch, luaConsole);
 
 	std::string error;
 	/* Chimera's --userdata pairs, in the scripts' userdata before any script runs */

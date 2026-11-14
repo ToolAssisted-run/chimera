@@ -1304,6 +1304,7 @@
 		"main.reboot_core": "Çekirdeği &Yeniden Başlat",
 		"main.recent_projects": "&Son Projeler",
 		"main.recover_unsaved_work": "Kaydedilmemiş iş kurtarılsın mı?",
+		"main.reopen_tools_with_project": "Araçları bu projeyle yeniden aç",
 		"main.report_an_issue": "Sorun &Bildir...",
 		"main.reproducible_media_maker": "Yeniden Üretilebilir Medya Oluşturucu...",
 		"main.reset_average_fps": "Ortalama FPS'yi sıfırla",

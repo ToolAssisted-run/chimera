@@ -1304,6 +1304,7 @@
 		"main.reboot_core": "&Επανεκκίνηση πυρήνα",
 		"main.recent_projects": "&Πρόσφατα έργα",
 		"main.recover_unsaved_work": "Ανάκτηση μη αποθηκευμένης εργασίας;",
+		"main.reopen_tools_with_project": "Επαναφορά εργαλείων με αυτό το έργο",
 		"main.report_an_issue": "&Αναφορά προβλήματος...",
 		"main.reproducible_media_maker": "Δημιουργός αναπαραγώγιμων μέσων...",
 		"main.reset_average_fps": "Επαναφορά μέσου FPS",

@@ -1304,6 +1304,7 @@
 		"main.reboot_core": "&Starta om kärnan",
 		"main.recent_projects": "&Senaste projekt",
 		"main.recover_unsaved_work": "Återställa osparat arbete?",
+		"main.reopen_tools_with_project": "Öppna verktygen igen med det här projektet",
 		"main.report_an_issue": "&Rapportera ett problem...",
 		"main.reproducible_media_maker": "Skapare av reproducerbara medier...",
 		"main.reset_average_fps": "Nollställ genomsnittlig fps",

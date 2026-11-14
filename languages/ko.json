@@ -1283,6 +1283,7 @@
 		"main.reboot_core": "코어 재부팅(&R)",
 		"main.recent_projects": "최근 프로젝트(&R)",
 		"main.recover_unsaved_work": "저장되지 않은 작업을 복구할까요?",
+		"main.reopen_tools_with_project": "이 프로젝트와 함께 도구 다시 열기",
 		"main.report_an_issue": "문제 보고(&R)...",
 		"main.reproducible_media_maker": "재현 가능한 미디어 만들기...",
 		"main.reset_average_fps": "평균 FPS 초기화",

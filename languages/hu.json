@@ -1304,6 +1304,7 @@
 		"main.reboot_core": "Mag új&raindítása",
 		"main.recent_projects": "&Legutóbbi projektek",
 		"main.recover_unsaved_work": "Visszaállítja a mentetlen munkát?",
+		"main.reopen_tools_with_project": "Eszközök újranyitása ezzel a projekttel",
 		"main.report_an_issue": "Hiba &jelentése...",
 		"main.reproducible_media_maker": "Reprodukálható média-készítő...",
 		"main.reset_average_fps": "Átlagos FPS nullázása",
