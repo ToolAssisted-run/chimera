@@ -38,6 +38,16 @@ std::vector<std::string> scriptPaths(vm::LuaConsoleViewModel &console)
 	return out;
 }
 
+/* the same file, whichever separators a path was written with: on Windows
+ * the Lua Console keeps a path in its own form, which may not be the one a
+ * layout or a person wrote */
+bool samePath(std::string a, std::string b)
+{
+	std::replace(a.begin(), a.end(), '\\', '/');
+	std::replace(b.begin(), b.end(), '\\', '/');
+	return a == b;
+}
+
 } // namespace
 
 const std::vector<std::string> &ProjectWindows::tools()
@@ -124,7 +134,7 @@ void ProjectWindows::reopen(const std::string &layout)
 	{
 		const std::vector<std::string> listed = scriptPaths(luaConsole_);
 		for (const json::Json &s : scripts->items)
-			if (!s.text.empty() && std::find(listed.begin(), listed.end(), s.text) == listed.end())
+			if (!s.text.empty() && std::none_of(listed.begin(), listed.end(), [&](const std::string &l) { return samePath(l, s.text); }))
 				luaConsole_.run("openScript", {s.text}, error);
 	}
 	reopening_ = false;
