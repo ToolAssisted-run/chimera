@@ -14866,3 +14866,21 @@ contributor's, and anything that is the owner's to decide is put to the owner
 in the pull request. The marker itself is not renamed: the 263 old lines keep
 "(user-decided, YYYY-MM-DD)", and AGENTS.md says that it and "(owner,
 YYYY-MM-DD)" both mean the owner decided.
+
+## A double click on a button's cell changes it twice (2026-11-14, issue 582)
+
+Two quick clicks on a button's cell in TAStudio's piano roll changed the
+button once instead of twice, so it did not end as it was. Qt delivers a
+double click as a press, a release, a second press, and then a double-click
+event of its own. The roll's double-click handler also pressed the cell
+again (it took the second press to be missing, which is how Qt's widgets
+work, not Qt Quick), so a double click was three presses on the cell. It now
+only sets the marker on a frame number (issue 436) and leaves the presses to
+the press handler.
+
+Tested: a new window test, "roll double click", double-clicks a cell and a
+frame number through a real window, as Qt delivers a double click. Before
+the fix it counted 3 presses on the cell and 2 of its 6 checks failed; now
+it counts 2 presses on the cell and one marker on the frame number. This
+also closes the gap the 2026-11-01 entry left: the double click itself was
+not driven by a test then.
