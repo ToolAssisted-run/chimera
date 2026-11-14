@@ -58,6 +58,19 @@ std::string member(const std::string &layout, const char *name)
 	return m != nullptr ? vm::json::write(*m) : "?";
 }
 
+/* the file names of a layout's scripts, a comma between: the Lua Console
+ * keeps a path in its own form (on Windows its separators may not be the
+ * ones a test wrote), so the names are compared */
+std::string scriptNames(const std::string &layout)
+{
+	vm::json::Json l;
+	std::string error, out;
+	if (!vm::json::parse(layout, l, error)) return "?";
+	if (const vm::json::Json *s = l.find("luaScripts"))
+		for (const vm::json::Json &p : s->items) out += (out.empty() ? "" : ",") + fs::path(p.text).filename().string();
+	return out;
+}
+
 } // namespace
 
 int main(int argc, char **argv)
@@ -110,7 +123,7 @@ int main(int argc, char **argv)
 	CHECK(ramWatch.run("open", {watches, false}, error).has_value());
 	CHECK(member(projectWindows.now(), "ramWatchFile") == vm::json::quote(watches));
 	CHECK(console.run("openScript", {one}, error).has_value());
-	CHECK(QTest::qWaitFor([&] { return member(projectWindows.now(), "luaScripts") == "[" + vm::json::quote(one) + "]"; }, 2000));
+	CHECK(QTest::qWaitFor([&] { return scriptNames(projectWindows.now()) == "one.lua"; }, 2000));
 	std::printf("open: %s\n", projectWindows.now().c_str());
 
 	/* everything hidden; the session gives back a layout as a project opens:
@@ -121,9 +134,7 @@ int main(int argc, char **argv)
 							   vm::json::quote(two) + "]}";
 	session.windowsKept.set(layout);
 	CHECK(windows["hexEditor"]->isVisible() && windows["luaConsole"]->isVisible() && !windows["ramWatch"]->isVisible());
-	CHECK(QTest::qWaitFor([&] {
-		return member(projectWindows.now(), "luaScripts") == "[" + vm::json::quote(one) + ", " + vm::json::quote(two) + "]";
-	}, 2000));
+	CHECK(QTest::qWaitFor([&] { return scriptNames(projectWindows.now()) == "one.lua,two.lua"; }, 2000));
 	std::printf("reopened: %s\n", projectWindows.now().c_str());
 
 	std::printf("%d checks, %d failed\n", checks, failures);
