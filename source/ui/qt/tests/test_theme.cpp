@@ -210,6 +210,37 @@ int main(int argc, char **argv)
 		CHECK(dialogs && dialogs->property("enums").toString() == QStringLiteral("2 1024"));
 	}
 
+	/* a light theme on a desktop that gives its dark colours whatever is
+	 * asked (KDE's): Qt's own light palette, as the release bundles have,
+	 * and not the desktop's dark one. A desktop of the kind asked for, or a
+	 * dark theme, keeps the desktop's */
+	{
+		QPalette darkDesktop;
+		darkDesktop.setColor(QPalette::Window, QColor(0x20, 0x20, 0x20));
+		darkDesktop.setColor(QPalette::Base, QColor(0x10, 0x10, 0x10));
+		darkDesktop.setColor(QPalette::Text, QColor(0xF0, 0xF0, 0xF0));
+		const QPalette light = chimera::qt::paletteFor(darkDesktop, false);
+		CHECK(light.color(QPalette::Window) == QColor(0xEF, 0xEF, 0xEF) && light.color(QPalette::Base) == QColor(Qt::white) &&
+			  light.color(QPalette::Text) == QColor(Qt::black) && light.color(QPalette::Highlight) == QColor(0x30, 0x8C, 0xC6));
+		CHECK(light.color(QPalette::Disabled, QPalette::Text) == QColor(0xBE, 0xBE, 0xBE));
+		CHECK(chimera::qt::paletteFor(darkDesktop, true).color(QPalette::Window) == QColor(0x20, 0x20, 0x20));
+		QPalette lightDesktop;
+		lightDesktop.setColor(QPalette::Window, QColor(0xFA, 0xF0, 0xE6));
+		CHECK(chimera::qt::paletteFor(lightDesktop, false).color(QPalette::Window) == QColor(0xFA, 0xF0, 0xE6));
+	}
+
+	/* the Theme window's drawing of a theme that is not on: its desktop
+	 * colours are those that theme would have, not the theme on's. A dark
+	 * theme on, a light one drawn: the light palette's (here Qt's own, as
+	 * this test has no desktop); the dark one drawn: the palette in use */
+	{
+		chimera::qt::applyTheme(QStringLiteral(R"({"WindowBackground": "#101010", "InputBackground": "#202020"})"), true);
+		const QPalette light = chimera::qt::paletteFor(chimera::qt::platformPalette(), false);
+		CHECK(chimera::qt::resolveColorFor(QStringLiteral("system:Window"), false) == light.color(QPalette::Base));
+		CHECK(chimera::qt::resolveColorFor(QStringLiteral("system:Highlight"), true) == chimera::qt::resolveColor(QStringLiteral("system:Highlight")));
+		CHECK(chimera::qt::resolveColorFor(QStringLiteral("#123456"), false) == QColor(0x12, 0x34, 0x56));
+	}
+
 	std::printf("%d checks, %d failed\n", checks, failed);
 	return failed == 0 ? 0 : 1;
 }

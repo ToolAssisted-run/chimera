@@ -35,6 +35,21 @@ const QPalette &platform()
 	return platformStore();
 }
 
+/* the desktop's own palette, no theme's and nothing asked of it: as it was
+ * at the start */
+QPalette &desktopStore()
+{
+	static QPalette p = QGuiApplication::palette();
+	return p;
+}
+
+/* the theme on is a dark one */
+bool &themeDark()
+{
+	static bool d = false;
+	return d;
+}
+
 /* The desktop's light colours for a light theme and its dark ones for a
  * dark theme, whatever the desktop is set to (issue 471): the Light theme
  * names the desktop's colours ("system:Window") beside light ones of its
@@ -43,13 +58,18 @@ const QPalette &platform()
 void askScheme(bool dark)
 {
 	platform();
+	desktopStore();
 	const Qt::ColorScheme want = dark ? Qt::ColorScheme::Dark : Qt::ColorScheme::Light;
 	QStyleHints *hints = QGuiApplication::styleHints();
-	if (hints->colorScheme() == want) return;
+	if (hints->colorScheme() == want)
+	{
+		platformStore() = paletteFor(platformStore(), dark);
+		return;
+	}
 	hints->setColorScheme(want);
 	/* the theme's palette taken off, the platform's for the scheme read */
 	QGuiApplication::setPalette(QPalette());
-	platformStore() = QGuiApplication::palette();
+	platformStore() = paletteFor(QGuiApplication::palette(), dark);
 }
 
 /* Qt Quick's controls take their colours from the platform's palette, not
@@ -138,11 +158,60 @@ const QPalette &platformPalette()
 	return platform();
 }
 
+QPalette paletteFor(const QPalette &desktop, bool dark)
+{
+	if (dark || desktop.color(QPalette::Window).lightness() >= 128) return desktop;
+	/* Qt's own light palette, as Qt 6.12 has it with no desktop's: the active
+	 * colours, then the disabled ones that differ, the inactive being the active */
+	static const QPalette qt = [] {
+		QPalette p;
+		const struct { QPalette::ColorRole role; QRgb active, disabled; } colours[] = {
+			{QPalette::WindowText, 0xff000000, 0xffbebebe}, {QPalette::Button, 0xffefefef, 0xffefefef},
+			{QPalette::Light, 0xffffffff, 0xffffffff}, {QPalette::Midlight, 0xffcacaca, 0xffcacaca},
+			{QPalette::Dark, 0xff9f9f9f, 0xffbebebe}, {QPalette::Mid, 0xffb8b8b8, 0xffb8b8b8},
+			{QPalette::Text, 0xff000000, 0xffbebebe}, {QPalette::BrightText, 0xffffffff, 0xffffffff},
+			{QPalette::ButtonText, 0xff000000, 0xffbebebe}, {QPalette::Base, 0xffffffff, 0xffefefef},
+			{QPalette::Window, 0xffefefef, 0xffefefef}, {QPalette::Shadow, 0xff767676, 0xffb1b1b1},
+			{QPalette::Highlight, 0xff308cc6, 0xff919191}, {QPalette::HighlightedText, 0xffffffff, 0xffffffff},
+			{QPalette::Link, 0xff0000ff, 0xff0000ff}, {QPalette::LinkVisited, 0xffff00ff, 0xffff00ff},
+			{QPalette::AlternateBase, 0xfff7f7f7, 0xfff7f7f7}, {QPalette::ToolTipBase, 0xffffffdc, 0xffffffdc},
+			{QPalette::ToolTipText, 0xff000000, 0xff000000}, {QPalette::PlaceholderText, 0x80000000, 0x80000000},
+			{QPalette::Accent, 0xff308cc6, 0xff919191}};
+		for (const auto &c : colours)
+		{
+			p.setColor(QPalette::Active, c.role, QColor::fromRgba(c.active));
+			p.setColor(QPalette::Inactive, c.role, QColor::fromRgba(c.active));
+			p.setColor(QPalette::Disabled, c.role, QColor::fromRgba(c.disabled));
+		}
+		return p;
+	}();
+	return qt;
+}
+
+namespace {
+QColor resolveIn(const QString &value, const QPalette &palette);
+}
+
 QColor resolveColor(const QString &value)
+{
+	return resolveIn(value, platform());
+}
+
+QColor resolveColorFor(const QString &value, bool dark)
+{
+	/* the theme on is of that kind: its palette; else the palette a theme of
+	 * that kind would be given (a dark one on a light desktop: the desktop's,
+	 * which a desktop that honours the ask would give dark; the drawing can
+	 * only guess) */
+	if (dark == themeDark()) return resolveIn(value, platform());
+	return resolveIn(value, paletteFor(desktopStore(), dark));
+}
+
+namespace {
+QColor resolveIn(const QString &value, const QPalette &p)
 {
 	if (!value.startsWith(QStringLiteral("system:"))) return QColor(value);
 	const QString name = value.mid(7).trimmed().toLower();
-	const QPalette &p = platform();
 	/* the desktop colours Chimera's themes name, on Qt's; Control is white
 	 * smoke off Windows */
 	if (name == QStringLiteral("control") || name == QStringLiteral("menu") || name == QStringLiteral("activeborder"))
@@ -169,6 +238,7 @@ QColor resolveColor(const QString &value)
 	if (name == QStringLiteral("buttonface")) return p.color(QPalette::Button);
 	return QColor();
 }
+} // namespace
 
 QColor ThemeColors::platform(const QString &role) const
 {
@@ -192,7 +262,11 @@ void applyTheme(const QString &colorsJson, bool dark)
 	QHash<QString, QColor> &colours = current();
 	colours.clear();
 	const QJsonObject o = QJsonDocument::fromJson(colorsJson.toUtf8()).object();
-	if (!o.isEmpty()) askScheme(dark);
+	if (!o.isEmpty())
+	{
+		askScheme(dark);
+		themeDark() = dark;
+	}
 	platform();
 	for (auto it = o.begin(); it != o.end(); ++it) colours.insert(it.key(), resolveColor(it.value().toString()));
 	if (colours.isEmpty()) return;
@@ -202,7 +276,7 @@ void applyTheme(const QString &colorsJson, bool dark)
 	};
 	/* Chimera's roles on Qt's: windows, fields, buttons, the selection,
 	 * tooltips (the menus' colours), and what is disabled */
-	QPalette p;
+	QPalette p = platform();
 	const QColor window = c("WindowBackground", p.color(QPalette::Window)), text = c("WindowText", p.color(QPalette::WindowText));
 	p.setColor(QPalette::Window, window);
 	p.setColor(QPalette::WindowText, text);
@@ -220,7 +294,7 @@ void applyTheme(const QString &colorsJson, bool dark)
 	p.setColor(QPalette::Mid, c("Border", window));
 	p.setColor(QPalette::Dark, c("ButtonBorder", window));
 	/* the menus' dividers (MenuDivider.qml); Fusion draws only a split handle under the pointer in midlight */
-	p.setColor(QPalette::Midlight, c("MenuSeparator", QPalette().color(QPalette::Mid)));
+	p.setColor(QPalette::Midlight, c("MenuSeparator", platform().color(QPalette::Mid)));
 	p.setColor(QPalette::Shadow, c("GlyphShadow", Qt::black));
 	/* only Qt's own dialogs use it: the folder bar, the places beside the
 	 * list and the tint under a picked line, all fields of a kind (#389) */
