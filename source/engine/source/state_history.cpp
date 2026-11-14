@@ -638,7 +638,16 @@ void StateHistory::finishPacking()
 			fflush(stderr);
 		}
 	}
+	/* The raw copies the packed ones replaced are let go on the packer's
+	 * thread, not here: the jobs hold their last references, and a stretch
+	 * is about 200 buffers and 68 MB of a Mesen game. Windows' heap took 9 to
+	 * 12 ms to free them, on the machine's thread once every anchor (about
+	 * 216 frames), which is a frame late at 60 a second (issue 548); Linux
+	 * took 0.4. The next finishPacking drains the packer, so they are gone
+	 * long before the memory is wanted again. */
+	auto done = std::make_shared<std::vector<std::unique_ptr<PackJob>>>(std::move(m_packJobs));
 	m_packJobs.clear();
+	m_packer.post([done]() { done->clear(); });
 }
 
 bool StateHistory::writeSegmentBodyPacked(std::FILE *f, const Segment &seg, bool &packed)

@@ -2359,6 +2359,13 @@ nothing. `CHIMERA_HISTORY_TRACE=1` prints each stretch as it is packed and any
 wait for the packer; `CHIMERA_HISTORY_PACK=0` keeps everything raw, for the A
 against the B.
 
+The raw copies the packed bodies replace are let go on the packer's thread,
+not on the emulation thread (2026-11-14, issue 548). The finished jobs hold
+their last references, and a Mesen stretch is about 200 buffers and 68 MB:
+Windows' heap took 9 to 12 ms to free them, once every anchor (about 216
+frames) on the machine's thread, a frame late at 60 a second. Freed on the
+packer, an anchor costs the machine's thread 0.45 ms on average there.
+
 **What reads a packed body.** A restore streams it into the sandbox through a
 `MemBodyReader` - the in-memory twin of `SpillBodyReader`, a megabyte at a
 time, never the body decoded whole. A save writes it as it is (see "A saved
