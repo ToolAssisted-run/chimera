@@ -15136,3 +15136,39 @@ Gearcoleco's BIOS with Carnival and Oil's Well, Geargrafx's eight games, and
 Gearlynx's boot ROM with California Games, Gauntlet and Klax. The first
 builds are "Nightly 2026-11-15" for each: Gearboy 7aaf5a77, Gearsystem
 fbd5a45f, Gearcoleco c5c30de8, Geargrafx 040d7547 and Gearlynx 0c7ad05d.
+
+## Pokket joins the official cores (user-decided, 2026-11-15, issue 575)
+
+Issue 575 asked for the Sony PocketStation, the memory card with a screen
+and an ARM processor. The owner asked for a core to be built from Pokket
+v1.24 (Darien Liu's emulator; its emulation core is MIT-licensed), decided
+its questions, and asked for it to be published once it had run Sony's own
+BIOS and real programs. It is `chimera-core-pokket`.
+
+- The user brings Sony's BIOS (16 KiB). It is pinned to the retail dump,
+  revision J110 (SHA-1 b29a77bd..., CRC32 5b91d3e4), as the owner decided.
+  The tests and CI boot a free stand-in BIOS of the repository's own,
+  written in ARM assembly (owner, 2026-11-14). The pin does not stop them,
+  because a file of the right size that is not the pinned dump is used and
+  shown as not recognised.
+- A program is a memory card file, started from the BIOS's own menu.
+- Sony's BIOS sets its clock to 1999-01-01 00:00 at every power-on, as a
+  unit with a new battery does, so a project's clock start has no effect
+  with it. The user sets the date with the buttons, and a movie records
+  those presses. The owner chose to leave it so, over setting the clock
+  again after the BIOS or making the BIOS see a good battery (2026-11-15).
+
+Measured in the core's repository on jaffanator01 (docs/PLAN.md there has
+the details): with Sony's BIOS, all 110 of the owner's programs were started
+from the BIOS menu. 106 load, none faults, and 105 reach their own screen
+(the 106th is game data, not a program). In 93 of them the button presses
+changed the picture. Eight replay the same natively, in the sandbox and
+with a savestate saved and loaded before every frame, over 1600 frames, and
+six replay the same twice as Chimera projects through chimera-run. Running
+the BIOS found one bug: a frame ran slightly long when a program slowed the
+processor's clock, and the core now carries the extra time into the next
+frame. The core's test script passes 24 of 24 with the BIOS and 17 with 3
+skipped without it (as on CI), the frontend test script 4 of 4, and
+Chimera's package checks 24 of 24. CI passes on x86_64 and aarch64, and the
+first build is "Nightly 2026-11-15 (d1d44136)". Not proved: Chimera's window
+with Sony's BIOS, docking with a PlayStation, and infra-red between units.

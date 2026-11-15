@@ -715,6 +715,15 @@
       ],
       "repo": "ToolAssisted-run/chimera-core-gearlynx",
       "tested": ""
+    },
+    {
+      "id": "pokket",
+      "name": "Pokket",
+      "systems": [
+        { "id": "POCKETSTATION", "name": "Sony PocketStation" }
+      ],
+      "repo": "ToolAssisted-run/chimera-core-pokket",
+      "tested": ""
     }
   ]
 }
