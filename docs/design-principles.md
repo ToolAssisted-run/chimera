@@ -15464,3 +15464,41 @@ within the window, its rows scrolled. Its long menu has 60 rows, not 120,
 so that scrolling to the end and back fits a slow runner's time; the
 aarch64 Mac took more than 20 seconds for 3137 pixels. It passes 55 of 55
 offscreen and on X11, and 54 of 54 with the menu drawn inside the window.
+
+## blueMSX joins the official cores (user-decided, 2026-11-15, issue 591)
+
+Issue 591 asked for blueMSX. Our ares core already plays the MSX and MSX2;
+blueMSX adds the MSX2+ and the MSX turbo R. The owner asked for it to be
+built and decided its questions. `chimera-core-bluemsx` builds the libretro
+port of blueMSX at one commit, and plays the MSX, MSX2, MSX2+ and turbo R
+from blueMSX's own machine descriptions, with cartridges, two disk drives
+and a tape. The ColecoVision, SG-1000 and Spectravideo, which blueMSX also
+emulates, are left out: other cores cover the first two (owner).
+
+- The user brings the machines' BIOS files, each pinned to one SHA-1. The
+  MSX, MSX2 and MSX2+ are also offered with C-BIOS, the free BIOS the
+  package carries, for cartridges only. A new project is an MSX2 with the
+  user's BIOS (owner).
+- Licences: blueMSX's own code is GPL-2.0-or-later. The MSX2 video chip's
+  command engine (V9938.c) has terms of its own: any MSX emulator may use
+  it, under any terms, and nothing else may. That limit does not sit with
+  the GPL, and the owner accepted it as libretro ships it; the package's
+  LICENSE quotes it and says so. Four sound files taken from MAME's code
+  carry no header; their authors released that code in MAME under the
+  GPL-2.0-or-later or BSD-3-Clause, and the LICENSE names where (owner).
+
+Measured in the core's repository on jaffanator01 (docs/PLAN.md there has
+the details): the core's test script passes 33 of 33, the frontend test
+script 6 of 6, and Chimera's package checks with none failed. With the
+owner's BIOS files, 15 runs give the same machine natively, in the sandbox
+and with a savestate saved and loaded every frame: Arkanoid on the MSX,
+Arkanoid 2 on the MSX2 and turbo R, Lode Runner+ on the MSX2+ and turbo R,
+a tape game on the MSX and MSX2, and a disk written by BASIC and read back.
+Running the cores found two pieces of upstream's memory nobody had written
+(the YM2413 sound chip's filter and the first frame's picture), fixed in
+the core. Not proved: Shattered Decks (MSX2+) shows only a blue screen,
+untried in upstream; three turbo R games need a V9990 video cartridge,
+which blueMSX does not emulate; the turbo R's own fast processor was not
+exercised by a game of its own (owner: not needed); no disk game. CI passes
+on x86_64 and aarch64, and the first build is "Nightly 2026-11-15
+(72c20df7)".

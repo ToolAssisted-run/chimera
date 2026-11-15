@@ -87,6 +87,7 @@ Made, published and supported by this project. Report a problem with one in [Chi
 | [VICE](https://github.com/ToolAssisted-run/chimera-core-vice) | Commodore 64 |
 | [Fuse](https://github.com/ToolAssisted-run/chimera-core-fuse) | ZX Spectrum 16K / 48K / 128K / +2 / +3, Timex, Pentagon, Scorpion |
 | [ZEsarUX](https://github.com/ToolAssisted-run/chimera-core-zesarux) | ZX Spectrum Next |
+| [blueMSX](https://github.com/ToolAssisted-run/chimera-core-bluemsx) | MSX, MSX2, MSX2+, MSX turbo R |
 | [MAME X68000](https://github.com/ToolAssisted-run/chimera-core-x68k) | Sharp X68000 |
 | [Geartowns](https://github.com/ToolAssisted-run/chimera-core-geartowns) | Fujitsu FM Towns, FM Towns II and FM Towns Marty |
 | [DOSBox-X](https://github.com/ToolAssisted-run/chimera-core-dosbox-x) | MS-DOS, Windows 3.1 / 95 / 98 |

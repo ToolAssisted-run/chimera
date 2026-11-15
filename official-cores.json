@@ -733,6 +733,18 @@
       ],
       "repo": "ToolAssisted-run/chimera-core-geartowns",
       "tested": ""
+    },
+    {
+      "id": "bluemsx",
+      "name": "blueMSX",
+      "systems": [
+        { "id": "MSX", "name": "MSX" },
+        { "id": "MSX2", "name": "MSX2" },
+        { "id": "MSX2P", "name": "MSX2+" },
+        { "id": "MSXTR", "name": "MSX turbo R" }
+      ],
+      "repo": "ToolAssisted-run/chimera-core-bluemsx",
+      "tested": ""
     }
   ]
 }
