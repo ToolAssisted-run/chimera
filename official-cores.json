@@ -745,6 +745,16 @@
       ],
       "repo": "ToolAssisted-run/chimera-core-bluemsx",
       "tested": ""
+    },
+    {
+      "id": "sonic3air",
+      "name": "Sonic 3 A.I.R.",
+      "systems": [
+        { "id": "S3AIR", "name": "Sonic 3 A.I.R." }
+      ],
+      "kind": "game",
+      "repo": "ToolAssisted-run/chimera-core-sonic3air",
+      "tested": ""
     }
   ]
 }

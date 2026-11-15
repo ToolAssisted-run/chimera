@@ -120,6 +120,7 @@ One game each, run from the game's own files ([docs/game-cores.md](docs/game-cor
 | [RSDKv4](https://github.com/ToolAssisted-run/chimera-core-rsdkv4) | Sonic the Hedgehog and Sonic the Hedgehog 2 (the 2013 remasters) |
 | [RSDKv5](https://github.com/ToolAssisted-run/chimera-core-rsdkv5) | Sonic Mania |
 | [RSDKv5U](https://github.com/ToolAssisted-run/chimera-core-rsdkv5u) | Sonic Origins (Sonic 1, Sonic 2, Sonic CD) |
+| [Sonic 3 A.I.R.](https://github.com/ToolAssisted-run/chimera-core-sonic3air) | Sonic 3 & Knuckles (the A.I.R. remaster, from your own Sonic & Knuckles + Sonic 3 ROM) |
 | [DSDA-Doom](https://github.com/ToolAssisted-run/chimera-core-dsda) | Doom, Doom II, Final Doom, Heretic, Hexen, Chex Quest, Freedoom |
 | [Open4DBoxing](https://github.com/ToolAssisted-run/chimera-core-open4dboxing) | 4D Sports Boxing (DOS) |
 

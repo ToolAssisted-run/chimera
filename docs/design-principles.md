@@ -15653,3 +15653,45 @@ side); it was not built for Windows on ARM, and nothing was run on Windows.
   dialog's cancel taken out, 3 of its checks failed.
 - Not proved: a real game; a seek of an hour; the dialog in the real window
   with a person (only offscreen, with a stand-in session); Windows itself.
+
+## Sonic 3 A.I.R. joins the official cores (user-decided, 2026-11-15, issue 594)
+
+Issue 594 asked for Sonic 3 A.I.R. (Angel Island Revisited, GPL-3.0), a
+remaster of Sonic 3 & Knuckles that runs the game from its ROM. The owner
+asked for it to be built with mods, decided its questions and asked for it
+to be published. `chimera-core-sonic3air` is a game core: upstream's engine
+at one commit, drawn with its software renderer.
+
+- The user brings the Sonic & Knuckles + Sonic 3 ROM as the core's
+  firmware; upstream accepts that one file only, and the core checks it the
+  way upstream does before the game starts.
+- Its two Mega Drive sound chips come from Genesis Plus GX and carry its
+  non-commercial terms, which the GPL does not allow on top of it. Upstream
+  ships them so, and the owner accepted the combination as upstream ships
+  it; the package is declared non-commercial, as the gpgx core is (owner).
+- A.I.R.'s own data (sprites, fonts, scripts) is in the package, as upstream
+  publishes it. Its remastered soundtrack is not; a project can take the
+  user's own copy in a slot of its own, and without it the game plays the
+  original music from the ROM (owner).
+- Mods are a project slot of zips, loaded at power-on in the slot's order by
+  upstream's own mod manager and recorded by checksum, as Cemu's graphic
+  packs are. Its options stay in the game's own menu, recorded as presses.
+  It counts no lag frames, since its engine reads the controls every frame
+  (owner).
+- x86_64 only, as game cores are (user-decided, 2026-11-07). Its first
+  nightly failed to publish because the core named its one CPU: the publish
+  step then looks for a folder the download does not make. It now names
+  none, as other x86_64-only cores do.
+
+Measured in the core's repository on jaffanator01 (docs/PLAN.md there has
+the details): with the owner's ROM it plays from the menus into Angel Island
+act 1, where input moves Sonic; native and sandbox give the same pictures,
+sound and memory over 4000 frames, and so do a savestate saved and loaded
+every frame and states carried into a new process. Two test mods change the
+game in the slot's order and a movie made with them replays the same, also
+on Windows in the virtual machine. The core's test script passes 26 of 26
+with the ROM, the frontend test script 10 of 10, and Chimera's package
+checks 24 of 24. Not proved: anything past Angel Island act 1, other
+people's mods, and Chimera's window on Windows. CI passes, and the first
+build is "Nightly 2026-11-15 (24e19755)".
+
