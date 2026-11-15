@@ -2205,6 +2205,8 @@
 		"session.gamepads": {
 			"other": "%n 個遊戲手把："
 		},
+		"session.greenzone_not_kept": "已關閉。綠區沒有保留：此遊戲由顯示卡繪製，而其核心沒有宣告專案關閉後仍可載入其狀態。專案再次開啟時，跳到某個影格會從影格 0 重新播放影片。",
+		"session.greenzone_not_kept_last_time": "此專案上次關閉時綠區沒有保留：遊戲由顯示卡繪製，而其核心沒有宣告專案關閉後仍可載入其狀態。跳到某個影格會從影格 0 重新播放影片。",
 		"session.greenzone_out_of_memory": "電腦記憶體不足，綠區現在最多只保留設定的 %2 MB 中的 %1 MB，並稀疏其畫格以容納。「清除綠區」會讓它重新取得全部預算。",
 		"session.held": "按住：%1",
 		"session.long_branch_question": {

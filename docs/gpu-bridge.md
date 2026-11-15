@@ -760,7 +760,9 @@ the cached states are opened - by which time there is no core to ask. Since
 2026-09-13 the declaration is recorded but NOT honored: a machine a GPU drew
 keeps its states for its own session whatever it declares. The project writes
 none into its greenzone and uses none from an older one, branch states
-included, and says so when it opens. What changed it: a Ruffle greenzone saved
+included. (It said nothing about it until 2026-11-16; since then the status
+line says so as the project closes and when it opens again, see "Keeping the
+greenzone across sessions" below.) What changed it: a Ruffle greenzone saved
 by one process and restored twenty-one frames deep in the next crashed inside
 the NVIDIA driver (0xc0000409), reproducibly - a path the old
 drop-everything-ahead capture had kept anyone from reaching (see
@@ -785,12 +787,19 @@ declares it only on evidence, measured in its own repository: a project's
 greenzone saved by one process, loaded by another, and the frame after it drawn
 the same, pixel for pixel, with no guest death and a control frame that really
 differs. `gpuStatesSurviveTheContext` is not that evidence and is not enough on
-its own. Each save writes what the running core declares into the project
-(header `GreenzoneSurvivesReload`), because a project is read before its core is
-booted; a core that stops declaring it stops having its greenzone kept from the
-next save on. A project saved before 2026-10-18 has no such header, so its
-greenzone starts empty the first time it is opened, and is kept after its next
-save.
+its own. The window reads the declaration from the package of the core that
+ran, as the project closes, which is when the greenzone is kept (not by a save,
+since 2026-11-02); nothing about it is written into the project. A core that
+stops declaring it stops having its greenzone kept from the next close on.
+
+When the greenzone of a GPU-drawn machine is not kept for this reason, the
+status line says so as the project closes, and again the next time the project
+opens (user-decided, 2026-11-16). Before that it went without a word: TAStudio
+showed nothing green past frame 0, the first seek replayed the whole movie, and
+the person took it for a greenzone that did not work. The note is a file,
+`history-not-kept.txt`, in the project's cache folder, written at the close that
+threw the greenzone away and removed at the next close that did not. A
+greenzone with nothing past frame 0 is not worth a word, and gets none.
 
 Every core that draws on the host's GPU now says yes. Saying it is not the same
 as doing it, so `tests/gpu/run-reopen.sh` asks: open, play, save, close, open

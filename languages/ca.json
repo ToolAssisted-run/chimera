@@ -2246,6 +2246,8 @@
 			"one": "%n comandament:",
 			"other": "%n comandaments:"
 		},
+		"session.greenzone_not_kept": "Tancat. La zona verda no s'ha guardat: una targeta gràfica ha dibuixat aquest joc i el seu nucli no diu que els seus estats es puguin carregar després de tancar el projecte. Quan el projecte es torni a obrir, anar a un fotograma tornarà a reproduir la pel·lícula des del fotograma 0.",
+		"session.greenzone_not_kept_last_time": "La zona verda no es va guardar quan aquest projecte es va tancar per última vegada: una targeta gràfica va dibuixar el joc i el seu nucli no diu que els seus estats es puguin carregar després de tancar el projecte. Anar a un fotograma torna a reproduir la pel·lícula des del fotograma 0.",
 		"session.greenzone_out_of_memory": "L'ordinador s'ha quedat sense memòria: la zona verda ara guarda com a màxim %1 MB dels %2 MB fixats i n'aprima els fotogrames per cabre-hi. «Esborra la zona verda» li torna tot el pressupost.",
 		"session.held": "Mantingut: %1",
 		"session.long_branch_question": {

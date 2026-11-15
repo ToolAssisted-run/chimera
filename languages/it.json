@@ -2246,6 +2246,8 @@
 			"one": "%n gamepad:",
 			"other": "%n gamepad:"
 		},
+		"session.greenzone_not_kept": "Chiuso. La greenzone non è stata conservata: una scheda grafica ha disegnato questo gioco e il suo core non dichiara che i suoi stati si possono caricare dopo la chiusura del progetto. Quando il progetto verrà riaperto, andare a un fotogramma riprodurrà di nuovo il filmato dal fotogramma 0.",
+		"session.greenzone_not_kept_last_time": "La greenzone non è stata conservata all'ultima chiusura di questo progetto: una scheda grafica ha disegnato il gioco e il suo core non dichiara che i suoi stati si possono caricare dopo la chiusura del progetto. Andare a un fotogramma riproduce di nuovo il filmato dal fotogramma 0.",
 		"session.greenzone_out_of_memory": "Il computer ha esaurito la memoria, quindi la greenzone ora tiene al massimo %1 MB dei %2 MB impostati e dirada i suoi fotogrammi per starci. «Cancella greenzone» le restituisce tutto il budget.",
 		"session.held": "Tenuto: %1",
 		"session.long_branch_question": {

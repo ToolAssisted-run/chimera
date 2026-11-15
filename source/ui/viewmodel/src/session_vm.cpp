@@ -3875,6 +3875,8 @@ void SessionViewModel::startProjectSessionOnMachine(bool loadHistory)
 		greenEndM_ = std::max<int64_t>(0, newest);
 		report(-1, -1, -1, -1, -1);
 	}
+	else if (loadHistory && fs::exists(dir / "history-not-kept.txt", ec))
+		later([this] { status.set(tr("session.greenzone_not_kept_last_time")); });
 	std::ofstream(mark) << "a session of this project is running\n";
 	runningMarkM_ = mark;
 }
@@ -4562,11 +4564,11 @@ void SessionViewModel::rememberAboutOnMachine(const std::string &projectPath)
 	std::ofstream(dir / "about.json", std::ios::binary) << json::write(about);
 }
 
-void SessionViewModel::keepHistoryOnMachine()
+bool SessionViewModel::keepHistoryOnMachine()
 {
 	namespace fs = std::filesystem;
 	const fs::path dir = projectCacheOnMachine();
-	if (dir.empty() || s_ == nullptr) return;
+	if (dir.empty() || s_ == nullptr) return false;
 	/* A machine a GPU drew makes states good only in the session that
 	 * made them, unless its core says they outlive it; a machine that died
 	 * cannot vouch for anything it stored. */
@@ -4588,7 +4590,15 @@ void SessionViewModel::keepHistoryOnMachine()
 	}
 	std::error_code ec;
 	fs::create_directories(dir, ec);
-	const fs::path history = dir / "history.bin";
+	const fs::path history = dir / "history.bin", notKept = dir / "history-not-kept.txt";
+	/* Thrown away without a word, a greenzone looked like a project that
+	 * opens at frame 0 with its budget unused: said as it closes and when it
+	 * opens again (user-decided, 2026-11-16) */
+	const bool lost = !survives && !diedM_ && ce_session_greenzone_count(s_) > 1;
+	if (lost)
+		std::ofstream{notKept}; /* empty: being there is what it says */
+	else
+		fs::remove(notKept, ec);
 	if (survives && !diedM_)
 		ce_session_history_save_later(s_, branch_state::utf8(history).c_str(), machineIdOnMachine().c_str());
 	else
@@ -4596,11 +4606,12 @@ void SessionViewModel::keepHistoryOnMachine()
 		ce_session_history_save_wait(s_);
 		fs::remove(history, ec);
 	}
+	return lost;
 }
 
-void SessionViewModel::keepHistoryAtCloseOnMachine()
+bool SessionViewModel::keepHistoryAtCloseOnMachine()
 {
-	if (s_ == nullptr || projectM_ == nullptr || projectPathM_.empty()) return;
+	if (s_ == nullptr || projectM_ == nullptr || projectPathM_.empty()) return false;
 	/* the frames the project's file and the machine's movie agree on; the
 	 * states after them were made for input the file does not hold */
 	const std::string now = movieTextOnMachine();
@@ -4616,7 +4627,7 @@ void SessionViewModel::keepHistoryAtCloseOnMachine()
 		ce_movie_log_free(saved);
 		ce_movie_log_free(ran);
 	}
-	keepHistoryOnMachine();
+	return keepHistoryOnMachine();
 }
 
 void SessionViewModel::becameAnotherOnMachine(const std::filesystem::path &cacheWas, const std::filesystem::path &recoveryWas)
@@ -6672,7 +6683,7 @@ void SessionViewModel::closeOnMachine()
 	 * does one whose work was kept to be recovered. */
 	namespace fs = std::filesystem;
 	const fs::path unsavedCache = projectPathM_.empty() && !keepWorkM_ ? projectCacheOnMachine() : fs::path();
-	keepHistoryAtCloseOnMachine();
+	const bool notKept = keepHistoryAtCloseOnMachine();
 	freeSessionOnMachine();
 	freeProjectOnMachine();
 	if (!unsavedCache.empty())
@@ -6689,7 +6700,7 @@ void SessionViewModel::closeOnMachine()
 	runningM_ = false;
 	/* the machine's picture goes with it (issue 432) */
 	screen.clear();
-	later([this] {
+	later([this, notKept] {
 		screenChanged.emit();
 		stoppedAt.set(-1);
 		isOpen.set(false);
@@ -6700,7 +6711,7 @@ void SessionViewModel::closeOnMachine()
 		projectId.set("");
 		hasProject.set(false);
 		projectSwitched();
-		status.set(tr("session.closed"));
+		status.set(tr(notKept ? "session.greenzone_not_kept" : "session.closed"));
 	});
 }
 

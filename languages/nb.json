@@ -2246,6 +2246,8 @@
 			"one": "%n spillkontroll:",
 			"other": "%n spillkontroller:"
 		},
+		"session.greenzone_not_kept": "Lukket. Greenzonen ble ikke tatt vare på: et grafikkort tegnet dette spillet, og kjernen sier ikke at tilstandene kan lastes etter at prosjektet er lukket. Når prosjektet åpnes igjen, spiller et hopp til et bilde av filmen på nytt fra bilde 0.",
+		"session.greenzone_not_kept_last_time": "Greenzonen ble ikke tatt vare på da dette prosjektet sist ble lukket: et grafikkort tegnet spillet, og kjernen sier ikke at tilstandene kan lastes etter at prosjektet er lukket. Et hopp til et bilde spiller av filmen på nytt fra bilde 0.",
 		"session.greenzone_out_of_memory": "Datamaskinen gikk tom for minne, så greenzonen holder nå høyst %1 MB av de %2 MB som er satt, og tynner ut rutene sine for å få plass. «Tøm greenzone» gir den hele budsjettet igjen.",
 		"session.held": "Holdt: %1",
 		"session.long_branch_question": {

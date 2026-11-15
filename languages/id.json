@@ -2205,6 +2205,8 @@
 		"session.gamepads": {
 			"other": "%n gamepad:"
 		},
+		"session.greenzone_not_kept": "Ditutup. Greenzone tidak disimpan: kartu grafis menggambar game ini, dan core-nya tidak menyatakan bahwa statusnya dapat dimuat setelah proyek ditutup. Saat proyek dibuka lagi, menuju sebuah frame akan memutar ulang film dari frame 0.",
+		"session.greenzone_not_kept_last_time": "Greenzone tidak disimpan saat proyek ini terakhir ditutup: kartu grafis menggambar game ini, dan core-nya tidak menyatakan bahwa statusnya dapat dimuat setelah proyek ditutup. Menuju sebuah frame memutar ulang film dari frame 0.",
 		"session.greenzone_out_of_memory": "Memori komputer habis, jadi Greenzone kini menyimpan paling banyak %1 MB dari %2 MB yang diatur dan menjarangkan frame-nya agar muat. \"Kosongkan Greenzone\" mengembalikan seluruh anggarannya.",
 		"session.held": "Ditahan: %1",
 		"session.long_branch_question": {

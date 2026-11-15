@@ -2246,6 +2246,8 @@
 			"one": "%n peliohjain:",
 			"other": "%n peliohjainta:"
 		},
+		"session.greenzone_not_kept": "Suljettu. Greenzonea ei säilytetty: näytönohjain piirsi tämän pelin, eikä sen ydin kerro, että sen tiloja voi ladata projektin sulkemisen jälkeen. Kun projekti avataan uudelleen, siirtyminen johonkin kuvaan toistaa elokuvan uudelleen kuvasta 0.",
+		"session.greenzone_not_kept_last_time": "Greenzonea ei säilytetty, kun tämä projekti viimeksi suljettiin: näytönohjain piirsi pelin, eikä sen ydin kerro, että sen tiloja voi ladata projektin sulkemisen jälkeen. Siirtyminen johonkin kuvaan toistaa elokuvan uudelleen kuvasta 0.",
 		"session.greenzone_out_of_memory": "Tietokoneen muisti loppui, joten Greenzone pitää nyt enintään %1 Mt asetetuista %2 Mt:stä ja harventaa ruutujaan mahtuakseen. ”Tyhjennä Greenzone” antaa sille koko budjetin takaisin.",
 		"session.held": "Pidossa: %1",
 		"session.long_branch_question": {

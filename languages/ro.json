@@ -2287,6 +2287,8 @@
 			"few": "%n gamepaduri:",
 			"other": "%n de gamepaduri:"
 		},
+		"session.greenzone_not_kept": "Închis. Greenzone nu a fost păstrată: o placă video a desenat acest joc, iar core-ul lui nu declară că stările lui pot fi încărcate după ce proiectul se închide. Când proiectul se deschide din nou, mersul la un cadru rulează din nou filmul de la cadrul 0.",
+		"session.greenzone_not_kept_last_time": "Greenzone nu a fost păstrată ultima dată când s-a închis acest proiect: o placă video a desenat jocul, iar core-ul lui nu declară că stările lui pot fi încărcate după ce proiectul se închide. Mersul la un cadru rulează din nou filmul de la cadrul 0.",
 		"session.greenzone_out_of_memory": "Calculatorul a rămas fără memorie, așa că Greenzone păstrează acum cel mult %1 MB din cei %2 MB setați și își rărește cadrele ca să încapă. „Golește Greenzone” îi dă din nou tot bugetul.",
 		"session.held": "Ținut: %1",
 		"session.long_branch_question": {

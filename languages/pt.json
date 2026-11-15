@@ -2246,6 +2246,8 @@
 			"one": "%n controle:",
 			"other": "%n controles:"
 		},
+		"session.greenzone_not_kept": "Fechado. A greenzone não foi guardada: uma placa de vídeo desenhou este jogo, e o núcleo dele não diz que seus estados podem ser carregados depois que o projeto é fechado. Quando o projeto for aberto de novo, ir a um quadro reproduzirá o filme de novo a partir do quadro 0.",
+		"session.greenzone_not_kept_last_time": "A greenzone não foi guardada da última vez que este projeto foi fechado: uma placa de vídeo desenhou o jogo, e o núcleo dele não diz que seus estados podem ser carregados depois que o projeto é fechado. Ir a um quadro reproduz o filme de novo a partir do quadro 0.",
 		"session.greenzone_out_of_memory": "O computador ficou sem memória, então a greenzone agora guarda no máximo %1 MB dos %2 MB definidos e espaça seus quadros para caber. \"Limpar greenzone\" devolve a ela todo o orçamento.",
 		"session.held": "Mantido: %1",
 		"session.long_branch_question": {

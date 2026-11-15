@@ -150,6 +150,14 @@ static void stop_once(void) {
 	for (;;) g_spun++;
 }
 ECL_EXPORT void SetCacheBridge(uint64_t fn) { g_cache = (cache_bridge_fn)(uintptr_t)fn; }
+/* --- the GPU bridge, taken and never used ---
+ * Offered the bridge (a project whose renderer setting ends in "-hw", on a
+ * computer that gives Chimera a GL context), the synth takes it, so the
+ * session is one a GPU drew, and it goes on drawing in software. For the
+ * tests of what Chimera does with such a session: its greenzone is not kept
+ * when the project closes unless the package says its states outlive it. */
+ECL_INVISIBLE static uint64_t g_gpuBridge;
+ECL_EXPORT void SetGpuBridge(uint64_t dispatch) { g_gpuBridge = dispatch; }
 static void cache_work(void) {
 	static const char name[] = "synth/never-stored";
 	struct { uint64_t name, name_len, dst, cap; } fetch = { (uintptr_t)name, sizeof name - 1, 0, 0 };

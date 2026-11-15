@@ -2246,6 +2246,8 @@
 			"one": "%n gamepad:",
 			"other": "%n gamepads:"
 		},
+		"session.greenzone_not_kept": "Gesloten. De groene zone is niet bewaard: een grafische kaart tekende dit spel, en de core ervan zegt niet dat de toestanden te laden zijn nadat het project is gesloten. Wanneer het project weer opent, speelt naar een frame gaan de film opnieuw af vanaf frame 0.",
+		"session.greenzone_not_kept_last_time": "De groene zone is niet bewaard toen dit project de laatste keer sloot: een grafische kaart tekende het spel, en de core ervan zegt niet dat de toestanden te laden zijn nadat het project is gesloten. Naar een frame gaan speelt de film opnieuw af vanaf frame 0.",
 		"session.greenzone_out_of_memory": "De computer had geen geheugen meer, dus de groene zone houdt nu hoogstens %1 MB van de ingestelde %2 MB vast en dunt haar frames uit om erin te passen. 'Groene zone wissen' geeft haar het hele budget terug.",
 		"session.held": "Ingedrukt: %1",
 		"session.long_branch_question": {

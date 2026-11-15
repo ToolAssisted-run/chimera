@@ -2287,6 +2287,8 @@
 			"few": "%n gamepady:",
 			"many": "%n gamepadów:"
 		},
+		"session.greenzone_not_kept": "Zamknięto. Greenzone nie została zachowana: tę grę rysowała karta graficzna, a jej rdzeń nie deklaruje, że jej stany można wczytać po zamknięciu projektu. Gdy projekt zostanie ponownie otwarty, przejście do klatki odtworzy film ponownie od klatki 0.",
+		"session.greenzone_not_kept_last_time": "Greenzone nie została zachowana, gdy ten projekt był ostatnio zamykany: grę rysowała karta graficzna, a jej rdzeń nie deklaruje, że jej stany można wczytać po zamknięciu projektu. Przejście do klatki odtwarza film ponownie od klatki 0.",
 		"session.greenzone_out_of_memory": "Komputerowi zabrakło pamięci, więc greenzone trzyma teraz najwyżej %1 MB z ustawionych %2 MB i przerzedza klatki, żeby się zmieścić. „Wyczyść greenzone” oddaje jej cały budżet.",
 		"session.held": "Przytrzymane: %1",
 		"session.long_branch_question": {

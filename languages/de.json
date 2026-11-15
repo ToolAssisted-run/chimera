@@ -2246,6 +2246,8 @@
 			"one": "%n Gamepad:",
 			"other": "%n Gamepads:"
 		},
+		"session.greenzone_not_kept": "Geschlossen. Die Greenzone wurde nicht behalten: Eine Grafikkarte hat dieses Spiel gezeichnet, und sein Core gibt nicht an, dass sich seine Zustände nach dem Schließen des Projekts laden lassen. Wird das Projekt wieder geöffnet, spielt ein Sprung zu einem Frame den Film ab Frame 0 erneut ab.",
+		"session.greenzone_not_kept_last_time": "Die Greenzone wurde beim letzten Schließen dieses Projekts nicht behalten: Eine Grafikkarte hat das Spiel gezeichnet, und sein Core gibt nicht an, dass sich seine Zustände nach dem Schließen des Projekts laden lassen. Ein Sprung zu einem Frame spielt den Film ab Frame 0 erneut ab.",
 		"session.greenzone_out_of_memory": "Der Arbeitsspeicher des Computers ist voll, darum hält die Greenzone jetzt höchstens %1 MB der eingestellten %2 MB und dünnt ihre Frames aus, damit sie hineinpasst. „Greenzone leeren“ gibt ihr das ganze Budget zurück.",
 		"session.held": "Gehalten: %1",
 		"session.long_branch_question": {

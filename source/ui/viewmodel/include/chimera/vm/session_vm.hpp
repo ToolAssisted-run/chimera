@@ -930,14 +930,17 @@ private:
 	 * marked as running until it ends. */
 	void startProjectSessionOnMachine(bool loadHistory);
 	/* the greenzone kept with the project, when it may outlive the session:
-	 * written in the background */
-	void keepHistoryOnMachine();
+	 * written in the background. True when a GPU drew the machine and its
+	 * core does not say its states load in a later session, so a greenzone
+	 * past frame 0 was thrown away (the file "history-not-kept.txt" in the
+	 * project's cache says so until the next close). */
+	bool keepHistoryOnMachine();
 	/* The same, as the project closes (owner, 2026-11-02: written when a
 	 * project closes, not on every save - a save no longer waits on gigabytes
 	 * going to the disk). A project never saved has no file to come back to,
 	 * and keeps none; states past the first frame where the movie differs
 	 * from the project's file (edits closed without saving) are not kept. */
-	void keepHistoryAtCloseOnMachine();
+	bool keepHistoryAtCloseOnMachine();
 	/* a project just saved under a name of its own, with an id of its own:
 	 * what its old id's cache held that a save does not write again comes
 	 * along, and the work kept against a crash under the old id goes */

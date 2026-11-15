@@ -15695,3 +15695,41 @@ checks 24 of 24. Not proved: anything past Angel Island act 1, other
 people's mods, and Chimera's window on Windows. CI passes, and the first
 build is "Nightly 2026-11-15 (24e19755)".
 
+
+## A greenzone thrown away at close is said (user-decided, 2026-11-16)
+
+A machine a GPU drew keeps its greenzone (the store of past states TAStudio
+seeks from) past its session only when its core declares
+`video.greenzoneSurvivesReload`. Without the declaration the greenzone was
+thrown away as the project closed, and nothing said so. A person reported a
+project that "opens at frame 0": TAStudio showed nothing green past frame 0
+when the project opened again, and the first seek replayed the whole movie,
+so it looked like a greenzone that did not work. `docs/gpu-bridge.md` said the
+window "says so when it opens"; it did not, and it also described a project
+header for the declaration that the code no longer writes.
+
+The owner chose a message and a corrected document:
+
+- As the project closes, the status line says "Closed. The greenzone was not
+  kept: ..." in place of "Closed", with the reason and what it means the next
+  time.
+- When the project opens again, the status line says the greenzone was not
+  kept when it last closed, and that going to a frame replays from frame 0.
+- The note between the two is a file, `history-not-kept.txt`, in the project's
+  cache folder: written at the close that threw a greenzone away, removed at
+  the next close that did not. A greenzone with nothing past frame 0 is not
+  worth a word, and gets none; a machine that died keeps nothing for a
+  reason of its own and is not this message.
+- Nothing changes in what is kept. The rule (a core's own declaration, on
+  evidence measured in its repository) stays as it was decided on
+  2026-10-18.
+
+To test it, the synthetic core now takes the GPU bridge when it is offered
+(a project whose renderer setting ends in "-hw", on a computer that gives
+Chimera a GL context) and never uses it, so its session is one a GPU drew.
+The view models test opens such a project, plays 300 frames and closes it:
+the status line says the greenzone was not kept and no history is written;
+opened again, it says why and nothing is green past frame 0; closed with
+nothing to lose, it says "Closed". The same with a copy of the package that
+declares the greenzone survives keeps its history, opens green and says
+nothing. Without a GL context the test says SKIP.

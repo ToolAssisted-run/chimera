@@ -2246,6 +2246,8 @@
 			"one": "%n manette :",
 			"other": "%n manettes :"
 		},
+		"session.greenzone_not_kept": "Fermé. La greenzone n'a pas été gardée : une carte graphique a dessiné ce jeu, et son cœur n'indique pas que ses états peuvent être chargés après la fermeture du projet. Quand le projet sera rouvert, aller à une image rejouera le film depuis l'image 0.",
+		"session.greenzone_not_kept_last_time": "La greenzone n'a pas été gardée à la dernière fermeture de ce projet : une carte graphique a dessiné le jeu, et son cœur n'indique pas que ses états peuvent être chargés après la fermeture du projet. Aller à une image rejoue le film depuis l'image 0.",
 		"session.greenzone_out_of_memory": "L'ordinateur a manqué de mémoire : la greenzone garde maintenant au plus %1 Mo des %2 Mo fixés et espace ses images pour tenir. « Effacer la greenzone » lui rend tout son budget.",
 		"session.held": "Maintenu : %1",
 		"session.long_branch_question": {

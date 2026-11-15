@@ -11718,6 +11718,134 @@ bool longSeek(const char *package, const char *rom)
 	return failures == before;
 }
 
+/* A machine a GPU drew keeps no greenzone past its session unless its package
+ * says its states load in a later one, and it went without a word: the
+ * project opened at frame 0 with its budget unused, as if it kept nothing. It
+ * is said as the project closes and when it opens again (user-decided,
+ * 2026-11-16). The synthetic core takes the GPU bridge only when the computer
+ * gives Chimera a GL context; without one this says SKIP. */
+bool greenzoneNotKept(const char *package, const char *rom, const char *keptPackage)
+{
+	namespace fs = std::filesystem;
+	const int before = failures;
+	std::error_code ec;
+	if (fs::file_size(keptPackage, ec) == 0 || ec)
+	{
+		std::printf("SKIP greenzoneNotKept: no %s\n", keptPackage);
+		return true;
+	}
+	const fs::path dir = fs::temp_directory_path() / ("chimera-test-not-kept-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+	fs::create_directories(dir);
+	fs::copy_file(rom, dir / "walker.testrom");
+	ManualDispatcher d;
+	InputLog inputs;
+	SessionViewModel session(d, inputs);
+	PianoRollViewModel roll(d, inputs, session);
+	std::string error;
+	const fs::path cache = dir / "cache";
+	session.cacheFolder.set(cache.string());
+	/* a project of the game with a hardware renderer, as Chimera saves one */
+	auto gpuProject = [&](const char *pkg, const fs::path &file) {
+		gameProject(pkg, (dir / "walker.testrom").string(), file);
+		const char *err = nullptr;
+		ce_project *p = ce_project_open(file.string().c_str(), &err);
+		CHECK(p != nullptr);
+		if (p == nullptr) return;
+		uint64_t len = 0;
+		const char *was = ce_project_settings_text(p, &len);
+		json::Json settings;
+		std::string why;
+		if (was == nullptr || !json::parse(std::string_view(was, static_cast<size_t>(len)), settings, why) || settings.kind != json::Json::Kind::Object)
+		{
+			settings = json::Json();
+			settings.kind = json::Json::Kind::Object;
+		}
+		settings.members.emplace_back("renderer", json::Json::string("opengl-hw"));
+		CHECK(ce_project_set_settings_text(p, json::write(settings).c_str(), &err) == 0);
+		CHECK(ce_project_save(p, file.string().c_str(), &err) == 0);
+		ce_project_free(p);
+	};
+	auto openIt = [&](const fs::path &file, const char *pkg) {
+		session.run("openProject", {file.string(), std::string(pkg)}, error);
+		return d.until([&] { return session.isOpen.get() && session.projectPath.get() == file.string(); }, 60);
+	};
+	auto gpuDrew = [&] {
+		bool drew = false;
+		session.onMachineWait([&](ce_session *s) { drew = s != nullptr && ce_session_gpu_drew(s) != 0; });
+		return drew;
+	};
+	/* played to a frame and saved (a close keeps no states for input the
+	 * project's file does not hold) */
+	auto playTo = [&](int64_t end, const fs::path &file) {
+		CHECK(roll.run("fill", {end}, error).has_value());
+		CHECK(d.until([&] { return roll.frameCount.get() >= end; }, 20));
+		session.run("seek", {end}, error);
+		CHECK(d.until([&] { return session.frame.get() == end; }, 60));
+		session.run("saveProject", {std::string()}, error);
+		CHECK(d.until([&] { return session.status.get().rfind("Saved " + file.string(), 0) == 0; }, 20));
+		int64_t states = 0;
+		session.onMachineWait([&](ce_session *s) { states = s != nullptr ? ce_session_greenzone_count(s) : 0; });
+		CHECK(states > 1);
+	};
+	auto closeIt = [&] {
+		session.run("close", {}, error);
+		return d.until([&] { return !session.isOpen.get(); }, 30);
+	};
+	const std::string closedNotKept = "Closed. The greenzone was not kept: a graphics card drew this game";
+	const std::string openedNotKept = "The greenzone was not kept when this project last closed: a graphics card drew the game";
+	auto says = [&](const std::string &start) { return session.status.get().rfind(start, 0) == 0; };
+
+	const fs::path drawn = dir / "drawn" / "walker.chimeraProject";
+	gpuProject(package, drawn);
+	CHECK(openIt(drawn, package));
+	if (!gpuDrew())
+	{
+		std::printf("SKIP greenzoneNotKept: no GL context here, so no GPU drew the synthetic core\n");
+		closeIt();
+		ce_gl_request(0);
+		fs::remove_all(dir, ec);
+		return failures == before;
+	}
+	const fs::path drawnCache = cache / session.projectId.get();
+	CHECK(!session.projectId.get().empty());
+	playTo(300, drawn);
+	/* closed: the greenzone goes, and the status line says why */
+	CHECK(closeIt());
+	CHECK(d.until([&] { return says(closedNotKept); }, 10));
+	CHECK(!fs::exists(drawnCache / "history.bin") && fs::exists(drawnCache / "history-not-kept.txt"));
+	/* opened again: nothing past frame 0, and the status line says why */
+	CHECK(openIt(drawn, package));
+	CHECK(d.until([&] { return says(openedNotKept); }, 10));
+	CHECK(session.greenEnd.get() == 0);
+	/* closed with nothing past frame 0 to lose: closed, and no more said */
+	CHECK(closeIt());
+	CHECK(d.until([&] { return session.status.get() == "Closed"; }, 10));
+	CHECK(!fs::exists(drawnCache / "history-not-kept.txt"));
+	CHECK(openIt(drawn, package));
+	d.until([] { return false; }, 0.2);
+	CHECK(!says(openedNotKept));
+	CHECK(closeIt());
+
+	/* a package that says its states outlive the session: kept, and not a word */
+	const fs::path kept = dir / "kept" / "walker.chimeraProject";
+	gpuProject(keptPackage, kept);
+	CHECK(openIt(kept, keptPackage));
+	CHECK(gpuDrew());
+	const fs::path keptCache = cache / session.projectId.get();
+	playTo(300, kept);
+	CHECK(closeIt());
+	CHECK(d.until([&] { return session.status.get() == "Closed"; }, 10));
+	CHECK(d.until([&] { return fs::exists(keptCache / "history.bin"); }, 30));
+	CHECK(!fs::exists(keptCache / "history-not-kept.txt"));
+	CHECK(openIt(kept, keptPackage));
+	CHECK(d.until([&] { return session.greenEnd.get() > 0; }, 20));
+	CHECK(!says(openedNotKept));
+	CHECK(closeIt());
+	ce_gl_request(0);
+	fs::remove_all(dir, ec);
+	return failures == before;
+}
+
 /* what the status bar says beside a drive that swaps */
 void driveMediaText()
 {
@@ -11859,6 +11987,7 @@ int main(int argc, char **argv)
 			ranMachine = longMovie(argv[1], argv[2]) && ranMachine;
 			ranMachine = seekStopped(argv[1], argv[2]) && ranMachine;
 			ranMachine = longSeek(argv[1], argv[2]) && ranMachine;
+			if (argc >= 18) ranMachine = greenzoneNotKept(argv[1], argv[2], argv[17]) && ranMachine;
 			if (argc >= 9) ranMachine = coreManager(argv[1], argv[6], argv[8]) && ranMachine;
 			ranMachine = elsewherePackages(argv[1]) && ranMachine;
 		}

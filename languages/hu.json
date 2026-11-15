@@ -2246,6 +2246,8 @@
 			"one": "%n gamepad:",
 			"other": "%n gamepad:"
 		},
+		"session.greenzone_not_kept": "Bezárva. A zöld zóna nem maradt meg: ezt a játékot videokártya rajzolta, és a magja nem jelzi, hogy az állapotai a projekt bezárása után is betölthetők. Amikor a projekt újra megnyílik, egy képkockára ugrás a 0. képkockától újra lejátssza a filmet.",
+		"session.greenzone_not_kept_last_time": "A zöld zóna nem maradt meg, amikor ez a projekt legutóbb bezárult: a játékot videokártya rajzolta, és a magja nem jelzi, hogy az állapotai a projekt bezárása után is betölthetők. Egy képkockára ugrás a 0. képkockától újra lejátssza a filmet.",
 		"session.greenzone_out_of_memory": "A számítógép memóriája elfogyott, ezért a zöld zóna most legfeljebb %1 MB-ot tart meg a beállított %2 MB-ból, és ritkítja a képkockáit, hogy elférjen. A „Zöld zóna törlése” visszaadja neki a teljes keretet.",
 		"session.held": "Tartva: %1",
 		"session.long_branch_question": {

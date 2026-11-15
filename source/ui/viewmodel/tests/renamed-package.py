@@ -27,6 +27,9 @@ rate = int(sys.argv[10]) if len(sys.argv) > 10 and sys.argv[10] else 0
 players_over = json.loads(sys.argv[11]) if len(sys.argv) > 11 and sys.argv[11] else None
 # and the controls TAStudio shows by default (input.tastudioColumns), as JSON
 shown = json.loads(sys.argv[12]) if len(sys.argv) > 12 and sys.argv[12] else None
+# and declarations added to the package's video section, as JSON
+# ({"greenzoneSurvivesReload": true})
+video = json.loads(sys.argv[13]) if len(sys.argv) > 13 and sys.argv[13] else None
 try:
     zin = zipfile.ZipFile(src)
 except OSError:
@@ -56,6 +59,8 @@ with zin, zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zout:
                 cfg["audio"]["rate"] = rate
             if shown is not None:
                 cfg["input"]["tastudioColumns"] = shown
+            if video is not None:
+                cfg["video"].update(video)
             if players_over is not None:
                 controls = cfg["input"]["buttons"] + [a["name"] for a in cfg["input"].get("axes", [])]
                 def player(n):

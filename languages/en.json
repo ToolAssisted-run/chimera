@@ -2246,6 +2246,8 @@
 			"one": "%n gamepad:",
 			"other": "%n gamepads:"
 		},
+		"session.greenzone_not_kept": "Closed. The greenzone was not kept: a graphics card drew this game, and its core does not say its states can be loaded after the project closes. When the project opens again, going to a frame replays the movie from frame 0.",
+		"session.greenzone_not_kept_last_time": "The greenzone was not kept when this project last closed: a graphics card drew the game, and its core does not say its states can be loaded after the project closes. Going to a frame replays the movie from frame 0.",
 		"session.greenzone_out_of_memory": "The computer ran out of memory, so the greenzone now keeps at most %1 MB of the %2 MB set and thins its frames to fit. Clear Greenzone gives it the whole budget again.",
 		"session.held": "Held: %1",
 		"session.long_branch_question": {

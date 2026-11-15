@@ -2205,6 +2205,8 @@
 		"session.gamepads": {
 			"other": "%n 个游戏手柄："
 		},
+		"session.greenzone_not_kept": "已关闭。绿区没有保留：此游戏由显卡绘制，而其核心没有声明项目关闭后仍可加载其状态。项目再次打开时，跳到某一帧会从第 0 帧重新播放影片。",
+		"session.greenzone_not_kept_last_time": "此项目上次关闭时绿区没有保留：游戏由显卡绘制，而其核心没有声明项目关闭后仍可加载其状态。跳到某一帧会从第 0 帧重新播放影片。",
 		"session.greenzone_out_of_memory": "电脑内存不足，绿区现在最多只保留设定的 %2 MB 中的 %1 MB，并稀疏其帧以容纳。“清除绿区”会让它重新获得全部预算。",
 		"session.held": "按住：%1",
 		"session.long_branch_question": {

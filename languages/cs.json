@@ -2287,6 +2287,8 @@
 			"few": "%n gamepady:",
 			"other": "%n gamepadů:"
 		},
+		"session.greenzone_not_kept": "Zavřeno. Zelená zóna nebyla uložena: tuto hru vykreslovala grafická karta a její jádro neuvádí, že lze její stavy načíst i po zavření projektu. Až se projekt znovu otevře, přechod na snímek znovu přehraje film od snímku 0.",
+		"session.greenzone_not_kept_last_time": "Zelená zóna nebyla uložena, když se tento projekt naposledy zavřel: hru vykreslovala grafická karta a její jádro neuvádí, že lze její stavy načíst i po zavření projektu. Přechod na snímek znovu přehraje film od snímku 0.",
 		"session.greenzone_out_of_memory": "Počítači došla paměť, a tak zelená zóna teď drží nejvýš %1 MB z nastavených %2 MB a prořeďuje snímky, aby se vešla. „Vymazat zelenou zónu“ jí vrátí celý rozpočet.",
 		"session.held": "Drženo: %1",
 		"session.long_branch_question": {
