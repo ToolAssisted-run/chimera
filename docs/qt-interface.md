@@ -159,13 +159,17 @@ Chimera's window: Qt 6.12, QML views over C++ view models. The code is in
   2026-11-15, issue 595: a seek the person asks for - a row, a marker,
   Go to Frame, the frame back button, the seek hotkeys, the wheel, a
   branch's Jump To or a Load of a branch whose state cannot be used -
-  that would replay for more than ten seconds, estimated from where the
-  replay sets off and the speed the session has measured, asks first,
-  then shows a dialog with a progress bar, the frames remaining, the
-  speed and the time remaining, whose Cancel or Escape puts the machine,
-  the movie and the piano roll back as they were before it began; in
-  TAStudio, or in the main window while TAStudio is hidden; a script's
-  or an agent's seek never asks),
+  that would replay for longer than TAStudio Settings' "Ask before a seek
+  longer than" (user-decided, 2026-11-15: 10 seconds at first, 0 never
+  asks, kept in the person's config), estimated from where the replay
+  sets off and the speed the session has measured, asks first, then shows
+  a dialog with a progress bar, the frames remaining, the speed and the
+  time remaining, whose Cancel or Escape puts the machine, the movie and
+  the piano roll back as they were before it began; in TAStudio, or in
+  the main window while TAStudio is hidden. It asks only when the
+  machine's state fits in memory to go back to, and otherwise goes as
+  before; Pause and Cancel Seek stop it where it has got to, as before; a
+  script's or an agent's seek never asks),
   and the status line (what was said, a seek's progress, the frames picked,
   states held and frames copied). The main window's status bar is Chimera's:
   icons for the movie (played back or recorded), paused or playing to a

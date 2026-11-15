@@ -1152,6 +1152,7 @@ int main(int argc, char **argv)
 	config.keep(session, "pauseAtEnd");
 	config.keep(session, "rewindStep");
 	config.keep(session, "rewindStepFast");
+	config.keep(session, "longSeekAskSeconds");
 	config.keep(session, "autosaveSeconds");
 	config.keep(session, "autosaveAsBackup");
 	config.keep(session, "backupOnSave");

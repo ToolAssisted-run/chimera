@@ -11429,6 +11429,8 @@ void longSeekEstimate()
 	CHECK(S::seekRate(false, 5000, 900, 60, 100, true) == 900);
 	/* more than ten seconds asks */
 	CHECK(S::kLongSeekSeconds == 10.0 && !S::isLongSeek(10.0) && S::isLongSeek(10.01) && !S::isLongSeek(0));
+	/* the setting at 0 never asks */
+	CHECK(S::isLongSeek(3, 2) && !S::isLongSeek(1e9, 0));
 	/* the dialog's numbers */
 	CHECK(S::countText(0) == "0" && S::countText(999) == "999" && S::countText(1000) == "1,000" && S::countText(1234567) == "1,234,567");
 	CHECK(S::durationText(7.4) == "7s" && S::durationText(65) == "1m 5s" && S::durationText(3725) == "1h 2m");
@@ -11498,13 +11500,6 @@ bool longSeek(const char *package, const char *rom)
 		});
 		return out;
 	};
-	/* the state kept to go back to, in the project's cache folder while it runs */
-	auto keptFiles = [&] {
-		int n = 0;
-		for (const auto &e : fs::recursive_directory_iterator(dir / "cache", ec))
-			if (e.path().filename().string().rfind("seek-start-", 0) == 0) n++;
-		return n;
-	};
 
 	/* a script's or an agent's seek never asks, however far: as it was */
 	CHECK(session.run("seek", {int64_t{3000}}, error).has_value());
@@ -11521,6 +11516,36 @@ bool longSeek(const char *package, const char *rom)
 	CHECK(session.run("seekAsking", {int64_t{3100}}, error).has_value());
 	CHECK(d.until([&] { return session.frame.get() == 3100 && roll.currentFrame.get() == 3100; }, 30));
 	CHECK(!asked());
+
+	/* TAStudio's setting at 0 (user-decided, 2026-11-15): none asks, and a
+	 * far seek goes as before; Pause (Cancel Seek) stops it where it has got
+	 * to, as it always did */
+	session.longSeekAskSeconds.set(0);
+	CHECK(session.run("seekAsking", {int64_t{100000}}, error).has_value());
+	CHECK(d.until([&] { return session.seekingTo.get() == 100000 && session.frame.get() > 3200; }, 20));
+	CHECK(!asked() && session.longSeekTo.get() == -1);
+	CHECK(session.run("pause", {}, error).has_value());
+	CHECK(d.until([&] { return session.seekingTo.get() == -1; }, 20));
+	quiet(0.3);
+	const int64_t pausedAt = session.frame.get();
+	CHECK(pausedAt > 3200 && pausedAt < 100000 && !asked() && session.longSeekTo.get() == -1);
+	session.longSeekSecondsForTests(0.5);
+	/* The machine's state not fitting in memory (a stand-in that takes no
+	 * more than a byte): a long seek goes as before issue 595, no question,
+	 * no dialog, its progress in the status line, Pause stopping it (owner,
+	 * 2026-11-15: "memory only, if it fits, otherwise behave as before") */
+	session.longSeekMemoryForTests(1);
+	CHECK(session.run("seekAsking", {int64_t{100000}}, error).has_value());
+	CHECK(d.until([&] { return session.seekingTo.get() == 100000 && session.frame.get() > pausedAt + 100; }, 20));
+	CHECK(!asked() && session.longSeekTo.get() == -1 && session.seekFrom.get() == pausedAt);
+	CHECK(session.run("pause", {}, error).has_value());
+	CHECK(d.until([&] { return session.seekingTo.get() == -1; }, 20));
+	quiet(0.3);
+	CHECK(!asked() && session.longSeekTo.get() == -1 && session.frame.get() > pausedAt + 100 && session.frame.get() < 100000);
+	session.longSeekMemoryForTests(-1);
+	CHECK(session.run("seek", {int64_t{3100}}, error).has_value());
+	CHECK(d.until([&] { return session.frame.get() == 3100 && session.seekingTo.get() == -1; }, 30));
+
 	/* the machine a frame on from there, to see it plays on the same after a cancel */
 	session.run("frameAdvance", {}, error);
 	CHECK(d.until([&] { return session.frame.get() == 3101; }, 20));
@@ -11547,7 +11572,7 @@ bool longSeek(const char *package, const char *rom)
 	CHECK(session.run("answerLongSeek", {false}, error).has_value());
 	quiet(0.5);
 	CHECK(!asked() && session.frame.get() == 3100 && session.longSeekTo.get() == -1 && session.seekingTo.get() == -1);
-	CHECK(stateNow() == startState && keptFiles() == 0);
+	CHECK(stateNow() == startState);
 
 	/* yes: it goes, the dialog told how far */
 	CHECK(session.run("seekAsking", {far}, error).has_value());
@@ -11559,7 +11584,6 @@ bool longSeek(const char *package, const char *rom)
 		session.longSeekRemainingText.get().c_str(), session.longSeekSpeedText.get().c_str(), session.longSeekTimeText.get().c_str());
 	CHECK(session.longSeekProgress.get() > 0 && session.longSeekProgress.get() < 1 && session.longSeekFps.get() > 0);
 	CHECK(session.longSeekRemaining.get() == far - session.longSeekAt.get() && !session.longSeekTimeText.get().empty());
-	CHECK(keptFiles() == 1);
 	/* the project saved while it runs: the machine's thread is answered between its pieces */
 	session.status.set("");
 	CHECK(session.run("saveProject", {}, error).has_value());
@@ -11577,7 +11601,7 @@ bool longSeek(const char *package, const char *rom)
 	CHECK(session.frame.get() == 3100 && roll.currentFrame.get() == 3100 && roll.topFrame.get() == 3090);
 	CHECK(inputs.text() == startMovie);
 	CHECK(stateNow() == startState);
-	CHECK(!session.running.get() && session.seekingTo.get() == -1 && keptFiles() == 0);
+	CHECK(!session.running.get() && session.seekingTo.get() == -1);
 	CHECK(session.status.get() == "Seek to frame 100,000 cancelled: back on frame 3,100");
 	/* and on from there as before */
 	session.run("frameAdvance", {}, error);
@@ -11591,7 +11615,7 @@ bool longSeek(const char *package, const char *rom)
 	CHECK(d.until([&] { return session.longSeekTo.get() == far; }, 10));
 	CHECK(d.until([&] { return session.longSeekTo.get() == -1 && session.frame.get() == far; }, 120));
 	quiet(0.2);
-	CHECK(session.frame.get() == far && cancels == 1 && keptFiles() == 0);
+	CHECK(session.frame.get() == far && cancels == 1);
 
 	/* A script's seek going back with Turbo seek, never asked: in pieces from
 	 * the state it restores, so the window is told of frames on the way and

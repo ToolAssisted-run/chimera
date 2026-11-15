@@ -56,6 +56,7 @@ ApplicationWindow {
     property int maxUndo
     property int rewindStep
     property int rewindStepFast
+    property int longSeekAskSeconds
     property bool markersKeepStates
     property bool markerFramesInGreenzone
     property string patternMode
@@ -75,6 +76,7 @@ ApplicationWindow {
         win.bindMarkers = r.bindMarkers; win.pauseAtEnd = s.pauseAtEnd; win.branchDoubleClick = b.loadOnDoubleClick
         win.branchPreviewSide = b.previewSide; win.oldBranches = b.oldControlScheme; win.copyFrameNumbers = r.copyFrameNumbers
         win.maxUndo = r.maxUndoSteps; win.rewindStep = s.rewindStep; win.rewindStepFast = s.rewindStepFast
+        win.longSeekAskSeconds = s.longSeekAskSeconds
         win.markersKeepStates = r.markersKeepStates; win.patternMode = r.patternMode; win.patternKind = r.patternKind
         win.markerFramesInGreenzone = s.markerFramesInGreenzone
         win.patterns = {}
@@ -135,6 +137,7 @@ ApplicationWindow {
         r.copyFrameNumbers = win.copyFrameNumbers; r.maxUndoSteps = win.maxUndo
         s.rewindStep = win.rewindStep; s.rewindStepFast = win.rewindStepFast; r.markersKeepStates = win.markersKeepStates
         s.markerFramesInGreenzone = win.markerFramesInGreenzone
+        s.longSeekAskSeconds = win.longSeekAskSeconds
         r.patternMode = win.patternMode; r.patternKind = win.patternKind
         win.close()
     }
@@ -444,6 +447,13 @@ ApplicationWindow {
                     Label { text: qsTrId("tastudio_settings.max_undo_count") }
                     NumberBox { from: 1; to: 10000; value: win.maxUndo; onValueModified: win.maxUndo = value }
                 }
+                // a seek estimated to take longer asks first; 0 never asks (user-decided, 2026-11-15, issue 595)
+                RowLayout {
+                    Label { text: qsTrId("tastudio_settings.ask_before_a_seek_longer_than") }
+                    NumberBox { objectName: "longSeekAskSeconds"; from: 0; to: 86400; value: win.longSeekAskSeconds; onValueModified: win.longSeekAskSeconds = value }
+                    Label { text: qsTrId("tastudio_settings.seconds") }
+                }
+                Label { text: qsTrId("tastudio_settings.a_seek_that_would_replay_for"); wrapMode: Text.Wrap; Layout.fillWidth: true; Layout.bottomMargin: 4 }
                 Check { text: qsTrId("tastudio_settings.bind_markers_to_input"); checked: win.bindMarkers; onToggled: win.bindMarkers = checked }
                 Check { text: qsTrId("tastudio_settings.include_frame_numbers_when_copying_input"); checked: win.copyFrameNumbers; onToggled: win.copyFrameNumbers = checked }
                 Check { text: qsTrId("tastudio_settings.automatically_pause_at_end_of_movie"); checked: win.pauseAtEnd; onToggled: win.pauseAtEnd = checked }

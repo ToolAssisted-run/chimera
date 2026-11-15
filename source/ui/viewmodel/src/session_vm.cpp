@@ -871,6 +871,12 @@ SessionViewModel::SessionViewModel(Dispatcher &dispatcher, InputLog &inputs)
 		"plays there at the machine's own speed", turboSeek, true);
 	expose("seekingTo", "the frame a seek that plays is going to, -1 when none is", seekingTo);
 	expose("seekFrom", "the frame a seek that plays set off from", seekFrom);
+	expose("longSeekAskSeconds", "TAStudio's setting: a seek the window asks for that is estimated to take more than this "
+		"many seconds asks first (issue 595); 0 never asks", longSeekAskSeconds, true);
+	longSeekAskWatch_ = longSeekAskSeconds.changed.connect([this] {
+		if (longSeekAskSeconds.get() < 0) longSeekAskSeconds.set(0);
+		longSeekSecondsM_.store(static_cast<double>(longSeekAskSeconds.get()));
+	});
 	expose("longSeekQuestion", "a seek the window asked for that would replay for long asks first (issue 595): the "
 		"question, \"\" while none is asked; answerLongSeek answers it", longSeekQuestion);
 	expose("askedSeekTo", "the frame the long seek asked about goes to, -1 for none", askedSeekTo);
@@ -1865,9 +1871,10 @@ SessionViewModel::SessionViewModel(Dispatcher &dispatcher, InputLog &inputs)
 			return {};
 		}, &isOpen);
 	/* the person's seeks, in the window (issue 595); a script's and an agent's go as seek does */
-	command("seekAsking", "the window's seek: as seek, but one whose replay is estimated to take more than ten seconds asks "
-		"first (longSeekQuestion), and once the person says yes goes with its dialog (longSeekTo), which can put "
-		"everything back as it was (cancelLongSeek)", {"frame"},
+	command("seekAsking", "the window's seek: as seek, but one whose replay is estimated to take more than "
+		"longSeekAskSeconds asks first (longSeekQuestion), and once the person says yes goes with its dialog (longSeekTo), "
+		"which can put everything back as it was (cancelLongSeek); when the machine's state does not fit in memory, as "
+		"seek", {"frame"},
 		[this](const Args &a, std::string &error) -> Value {
 			int64_t target = 0;
 			if (!arg(a, 0, target, error)) return {};
@@ -2952,11 +2959,18 @@ void SessionViewModel::seekAskingOnMachine(int64_t target)
 	/* a question about another seek is let go: the person has asked for this one */
 	dropQuestionOnMachine();
 	const SeekPlan plan = planSeekOnMachine(target, turboSeekM_.load());
-	if (!isLongSeek(plan.seconds, longSeekSecondsM_.load()))
+	/* Long, it asks only when the machine as it is fits in memory to go back
+	 * to: tried now, by keeping it and letting it go (it is kept again when
+	 * the seek begins). One that does not goes as a seek did before issue 595:
+	 * no question, no dialog, its progress in the status line, Cancel Seek
+	 * stopping it where it has got to (owner, 2026-11-15) */
+	std::vector<uint8_t> probe;
+	if (!isLongSeek(plan.seconds, longSeekSecondsM_.load()) || !stateInMemoryOnMachine(probe))
 	{
 		seekAsAskedOnMachine(target);
 		return;
 	}
+	probe = {};
 	/* asked, and nothing moves until it is answered: the machine runs on if it was running */
 	Asked asked;
 	asked.target = target;
@@ -3005,51 +3019,51 @@ void SessionViewModel::longSeekOnMachine(int64_t target)
 	if (s_ == nullptr) return;
 	const bool turbo = turboSeekM_.load();
 	const SeekPlan plan = planSeekOnMachine(target, turbo);
-	/* no longer long (the machine went on while the person was asked): a seek as any */
-	if (!isLongSeek(plan.seconds, longSeekSecondsM_.load()))
+	/* no longer long (the machine went on while the person was asked), or
+	 * its state no longer fits in memory: a seek as before */
+	LongSeek ls;
+	if (!isLongSeek(plan.seconds, longSeekSecondsM_.load()) || !keepStartOnMachine(ls))
 	{
 		seekAsAskedOnMachine(target);
 		return;
 	}
-	LongSeek ls;
-	keepStartOnMachine(ls);
 	ls.target = target;
 	ls.turbo = turbo;
 	beginLongSeekOnMachine(std::move(ls), plan);
 }
 
-void SessionViewModel::keepStartOnMachine(LongSeek &ls)
+bool SessionViewModel::stateInMemoryOnMachine(std::vector<uint8_t> &out)
 {
-	namespace fs = std::filesystem;
+	out.clear();
+	uint64_t len = 0;
+	const uint8_t *data = s_ != nullptr ? ce_session_save_state(s_, &len) : nullptr;
+	if (data == nullptr || len == 0) return false;
+	/* the copy, as large as the machine's state: a state can be bigger than
+	 * the memory there is (a PS3's is past 2 GiB, issue 84) */
+	try
+	{
+		const int64_t most = longSeekMemoryM_.load();
+		if (most >= 0 && len > static_cast<uint64_t>(most)) throw std::bad_alloc();
+		out.assign(data, data + len);
+	}
+	catch (const std::bad_alloc &)
+	{
+		std::vector<uint8_t>().swap(out);
+		return false;
+	}
+	return true;
+}
+
+bool SessionViewModel::keepStartOnMachine(LongSeek &ls)
+{
+	if (!stateInMemoryOnMachine(ls.state)) return false;
 	ls.startFrame = ce_session_frame(s_);
 	ls.moves = movesM_;
 	ls.rerecords = ce_session_rerecords(s_);
 	/* running by itself, not on its way somewhere: it runs on once back */
 	ls.wasRunning = runningM_ && pauseOnFrameM_ < 0 && turboSeekToM_ < 0 && restoreToM_ < 0;
 	screen.takeIfNewer(UINT64_MAX, ls.picture);
-	/* The machine's state, written to a file as an encode keeps where the
-	 * person was: the engine streams it there without holding it whole, and a
-	 * machine's state can be bigger than memory holds at once (a PS3's is past
-	 * 2 GiB, issue 84). In memory when no file can be written. */
-	fs::path folder = projectCacheOnMachine();
-	std::error_code ec;
-	if (folder.empty()) folder = fs::temp_directory_path(ec);
-	fs::create_directories(folder, ec);
-	char name[48];
-	std::snprintf(name, sizeof name, "seek-start-%08x-%llu.state", static_cast<unsigned>(std::random_device{}()),
-		static_cast<unsigned long long>(++longSeekCount_));
-	ls.stateFile = folder / name;
-	if (ce_session_state_save_file(s_, branch_state::utf8(ls.stateFile).c_str(), nullptr, 0) == 0) return;
-	const std::string fileWhy = ce_session_last_error(s_);
-	fs::remove(ls.stateFile, ec);
-	ls.stateFile.clear();
-	uint64_t len = 0;
-	if (const uint8_t *data = ce_session_save_state(s_, &len); data != nullptr && len > 0)
-	{
-		ls.state.assign(data, data + len);
-		return;
-	}
-	ls.notKept = fileWhy;
+	return true;
 }
 
 void SessionViewModel::beginLongSeekOnMachine(LongSeek ls, const SeekPlan &plan)
@@ -3169,10 +3183,9 @@ void SessionViewModel::clearLongSeek()
 void SessionViewModel::endLongSeekOnMachine()
 {
 	if (!longSeekM_) return;
+	/* the state kept to go back to goes with it */
 	LongSeek ls = std::move(*longSeekM_);
 	longSeekM_.reset();
-	std::error_code ec;
-	if (!ls.stateFile.empty()) std::filesystem::remove(ls.stateFile, ec);
 	later([this] { clearLongSeek(); });
 	if (ls.landed) ls.landed();
 }
@@ -3195,17 +3208,12 @@ void SessionViewModel::cancelLongSeekOnMachine()
 		replaceMovieOnMachine(*ls.movie);
 		later([this] { inputsReset.emit(); });
 	}
-	/* the machine as it was, from what was kept: its state, its frame, its
-	 * picture, running or not, and the moves and rerecords counted */
-	const bool kept = !ls.stateFile.empty() || !ls.state.empty();
-	bool back = false;
-	std::string why = ls.notKept;
-	if (!ls.stateFile.empty()) back = ce_session_state_load_file(s_, branch_state::utf8(ls.stateFile).c_str(), nullptr, 0, nullptr) == 0;
-	else if (!ls.state.empty()) back = ce_session_load_state(s_, ls.state.data(), ls.state.size()) == 0;
+	/* the machine as it was, from what was kept in memory: its state, its
+	 * frame, its picture, running or not, and the moves and rerecords counted */
+	bool back = ce_session_load_state(s_, ls.state.data(), ls.state.size()) == 0;
 	if (back) back = ce_session_movie_at(s_, ls.startFrame) == 0;
-	if (kept && !back) why = ce_session_last_error(s_);
-	std::error_code ec;
-	if (!ls.stateFile.empty()) std::filesystem::remove(ls.stateFile, ec);
+	const std::string why = back ? std::string() : ce_session_last_error(s_);
+	std::vector<uint8_t>().swap(ls.state);
 	if (back)
 	{
 		frameM_ = ls.startFrame;
@@ -3225,11 +3233,8 @@ void SessionViewModel::cancelLongSeekOnMachine()
 		/* not put back: a state that was tried and refused leaves the machine
 		 * on no frame at all, so first to a state kept before where it reached;
 		 * then where it is, its picture drawn */
-		if (kept)
-		{
-			const int64_t base = ce_session_greenzone_nearest(s_, reached);
-			if (base >= 0) ce_session_greenzone_restore(s_, base);
-		}
+		const int64_t base = ce_session_greenzone_nearest(s_, reached);
+		if (base >= 0) ce_session_greenzone_restore(s_, base);
 		landHereOnMachine();
 	}
 	const std::string said = back ? tr("session.long_seek_cancelled", {countText(ls.target), countText(ls.startFrame)})
@@ -4714,11 +4719,14 @@ void SessionViewModel::askBranchLoad(Branch b, std::function<void()> go)
 		const bool usable = !b.state.empty() && !dir.empty() && branch_state::readNote(dir / (b.state + ".note"), note) &&
 							note.frame == b.frame && note.machine == machineIdOnMachine() && fs::exists(dir / (b.state + ".state"), ec);
 		const SeekPlan plan = usable ? SeekPlan{} : planSeekOnMachine(b.frame, true, partsAt(movieTextOnMachine(), b.text));
-		if (!isLongSeek(plan.seconds, longSeekSecondsM_.load()))
+		/* long, it asks only when the machine as it is fits in memory to go back to; else it loads as before */
+		std::vector<uint8_t> probe;
+		if (!isLongSeek(plan.seconds, longSeekSecondsM_.load()) || !stateInMemoryOnMachine(probe))
 		{
 			later(go);
 			return;
 		}
+		probe = {};
 		Asked asked;
 		asked.target = b.frame;
 		asked.go = go;
@@ -4766,7 +4774,8 @@ void SessionViewModel::loadBranchOnMachine(const Branch &b, const std::function<
 		{
 			back.emplace();
 			back->movie = before;
-			keepStartOnMachine(*back);
+			/* its state not fitting in memory, the load goes as before */
+			if (!keepStartOnMachine(*back)) back.reset();
 		}
 	}
 	replaceMovieOnMachine(b.text);

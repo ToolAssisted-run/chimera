@@ -15530,14 +15530,18 @@ What was built:
   marker (the buttons, the list, the hotkeys), the frame back button, Go to
   Frame and Seek To, Seek To Selected Frame, the wheel, a branch's Jump To,
   and the Load of a branch whose state cannot be used - asks first when its
-  replay is estimated to take more than 10 seconds. Yes goes; No does
-  nothing. Scripts, the MCP server and the tests seek with the command
-  `seek`, which never asks; the window uses `seekAsking`, and a branch it
-  loads asks through `askBranchLoad`.
-- **The threshold** is 10 seconds and is not a setting: a new setting is
-  the owner's to decide. A seek of a few seconds goes as before, unasked;
-  one of minutes or an hour always asks. With Turbo seek off, ten seconds
-  is 600 frames played at 60 frames a second.
+  replay is estimated to take longer than TAStudio's setting allows (10
+  seconds at first), and when the machine's state fits in memory to go
+  back to (below). Yes goes; No does nothing. Scripts, the MCP server and
+  the tests seek with the command `seek`, which never asks; the window
+  uses `seekAsking`, and a branch it loads asks through `askBranchLoad`.
+- **The threshold is a setting** (user-decided, 2026-11-15): TAStudio
+  Settings, Misc, "Ask before a seek longer than ... seconds", kept in the
+  person's config (`longSeekAskSeconds`), not in the project. It is 10 at
+  first, and 0 never asks: asking before every seek would ask at every row
+  clicked, so 0 is the way to turn the question off. A seek of a few
+  seconds goes as before, unasked; one of minutes or an hour asks. With
+  Turbo seek off, ten seconds is 600 frames played at 60 frames a second.
 - **The estimate.** The frames are those between where the replay sets off
   and the frame: the nearest state kept at or before the frame before it
   (before any edit the machine has not gone back for, and for a branch
@@ -15554,19 +15558,24 @@ What was built:
 - **The dialog** shows a progress bar, the frames remaining, the speed in
   frames a second (measured four times a second, steadied) and the time
   remaining, with a Cancel button; Escape cancels too. It is in TAStudio,
-  or in the main window while TAStudio is hidden. Pause and Cancel Seek
-  still stop a seek where it has got to, as before.
+  or in the main window while TAStudio is hidden. Pause and the Cancel
+  Seek hotkey stay as they were (owner, 2026-11-15): they stop a seek
+  where the replay has got to, and do not go back.
 - **Cancel** puts the machine back on the frame it was on, in the state it
   was in, with its picture, running if it was running, with the moves and
   rerecords counted as they were (so the green arrow stays where it was);
   the movie is untouched (a branch's load puts the movie before it back),
-  and the piano roll scrolls back to where it was. The state is kept before
-  the seek begins in a state file in the project's cache folder, as an
-  encode keeps where the person was, and in memory only when no file can be
-  written. Memory was asked for, but a machine's state can be bigger
-  than memory holds at once (a PS3's is past 2 GiB, issue 84), and the
-  engine writes a file without ever holding it whole. The file goes when
-  the seek ends.
+  and the piano roll scrolls back to where it was. The machine's state is
+  kept in memory, and only there (owner, 2026-11-15: "memory only, if it
+  fits, otherwise behave as before"). It fits when it can be saved and its
+  copy can be had (a failed allocation is caught): a state can be bigger
+  than the memory there is (a PS3's is past 2 GiB, issue 84). Whether it
+  fits is tried before asking, by keeping the state and letting it go,
+  and the state is kept for good when the seek begins. When it does not
+  fit, at either moment, the seek goes as it did before issue 595: no
+  question, no dialog, its progress in TAStudio's status line, Cancel Seek
+  stopping it where it has got to. A first version wrote the state to a
+  file in the project's cache folder; the owner chose memory instead.
 - **The states gathered on the way are kept** when a long seek is
   cancelled. They are states of the movie as it is, so they are correct,
   and the next seek there is faster for them. A replay behind the newest
@@ -15603,26 +15612,34 @@ written and removes it, and offers the first one's work kept against a
 crash. None of this was reproduced on Windows.
 
 Tested on jaffanator01 (Linux x86_64, in Docker, under heavy load from
-other jobs), on main 63bd69b0: meson test 73 of 73 (one more than before:
-the window test below), the end-to-end witness test 125 ok, 0 failed, 1
-known. The engine was also built for Windows x86_64 with mingw-w64; it was
-not built for Windows on ARM, and nothing was run on Windows.
+other jobs), on main 63bd69b0, with the owner's answers in: meson test 73
+of 73 (one more than before: the window test below), the view models test
+4471 checks, 0 failed, in 127 seconds of its 180, the end-to-end witness
+test 125 ok, 0 failed, 1 known. The engine was built for Windows x86_64
+with mingw-w64 when it changed (the answers changed only the window's
+side); it was not built for Windows on ARM, and nothing was run on Windows.
 
-- The view models test's new part (122 checks; the whole test 4457 checks,
-  0 failed, in 151 seconds of its 180) uses the synthetic core, a movie of
-  150,000 frames and only frame 0 kept, with the threshold lowered to half
-  a second, since the synthetic core replays about 19,000 frames a second
-  here. The question named 96,900 frames from frame 3,100 at the speed
-  measured; No left everything as it was; Yes went, the dialog told how
-  far; a save was written while it ran; Cancel put back the frame, every
-  memory domain of the machine, the movie and the piano roll's first frame
-  in view, and the next frame played as it had before. Left alone, it
-  landed on its frame. A script's seek from frame 100,000 back to 60,000
-  was seen on frame 57,540 on the way, its progress counted from frame 0.
-  With Turbo seek off, 100 frames were asked about at 1.67 seconds and
-  played at 61 frames a second. A branch with no state asked from frame 500,
-  where the two movies part; its Cancel put the movie, the machine and the
-  branch list back; left alone, it loaded.
+- The view models test's new part (136 checks) uses the synthetic core, a
+  movie of 150,000 frames and only frame 0 kept, with the threshold
+  lowered to half a second, since the synthetic core replays about 19,000
+  frames a second here. The question named 96,900 frames from frame 3,100
+  at the speed measured; No left everything as it was; Yes went, the
+  dialog told how far; a save was written while it ran; Cancel put back
+  the frame, every memory domain of the machine, the movie and the piano
+  roll's first frame in view, and the next frame played as it had before.
+  Left alone, it landed on its frame. A script's seek from frame 100,000
+  back to 60,000 was seen on frame 57,540 on the way, its progress counted
+  from frame 0. With Turbo seek off, 100 frames were asked about at 1.67
+  seconds and played at 61 frames a second. A branch with no state asked
+  from frame 500, where the two movies part; its Cancel put the movie, the
+  machine and the branch list back; left alone, it loaded.
+- The owner's answers: with the setting at 0 a far seek asked nothing and
+  went as before, and Pause stopped it where it had got to; with the
+  machine's state not fitting in memory (a stand-in that takes no more
+  than a byte), a far seek asked nothing, showed no dialog, counted its
+  progress in the status line from where it set off, and Pause stopped it.
+  Broken on purpose: the stand-in's refusal ignored (5 checks failed); the
+  setting at 0 asking before every seek (4 failed).
 - The machine is compared by its memory domains, not by a state saved
   again: after a load the sandbox keeps the pages the replay touched, so
   the same machine's state comes out 4,096 bytes longer.

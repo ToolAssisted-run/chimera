@@ -311,10 +311,16 @@ public:
 	Property<int64_t> seekFrom{-1};
 	/* A long seek (user-decided, 2026-11-15, issue 595). A seek the person
 	 * asks for in the window (seekAsking, a branch loaded by hand) whose
-	 * replay is estimated to take more than kLongSeekSeconds asks first. The
-	 * question: its words ("" while none is asked), the frame, where the
-	 * replay would set off, how many frames it runs and the seconds that
-	 * would take. Answered with answerLongSeek; no does nothing. */
+	 * replay is estimated to take more than longSeekAskSeconds asks first,
+	 * when the machine's state as it is fits in memory to go back to (else it
+	 * goes as a seek did before: no question, no dialog). The question: its
+	 * words ("" while none is asked), the frame, where the replay would set
+	 * off, how many frames it runs and the seconds that would take. Answered
+	 * with answerLongSeek; no does nothing. */
+	/* TAStudio's setting (user-decided, 2026-11-15), in the person's config:
+	 * the seconds a seek must be estimated to take before it asks, 10 at
+	 * first; 0 never asks */
+	Property<int64_t> longSeekAskSeconds{10};
 	Property<std::string> longSeekQuestion;
 	Property<int64_t> askedSeekTo{-1}, askedSeekFrom{0}, askedSeekFrames{0};
 	Property<double> askedSeekSeconds{0.0};
@@ -328,12 +334,16 @@ public:
 	Property<double> longSeekProgress{0.0}, longSeekFps{0.0}, longSeekSecondsLeft{0.0};
 	Property<std::string> longSeekRemainingText, longSeekSpeedText, longSeekTimeText;
 	Signal<> longSeekCancelled;
-	/* longer than this, in seconds, a seek asks first: not a setting (a new
-	 * one is the owner's to decide); the tests lower it, as the synthetic
-	 * core replays faster than any real one */
+	/* longSeekAskSeconds at first; a seek estimated at more than the
+	 * threshold is long, and with a threshold of 0 none is */
 	static constexpr double kLongSeekSeconds = 10.0;
-	static bool isLongSeek(double seconds, double threshold = kLongSeekSeconds) { return seconds > threshold; }
+	static bool isLongSeek(double seconds, double threshold = kLongSeekSeconds) { return threshold > 0 && seconds > threshold; }
+	/* For the tests: a threshold below a second, as the synthetic core
+	 * replays faster than any real one; and the most bytes a long seek may
+	 * keep the machine's state in (-1: no limit), a stand-in for memory
+	 * that refuses it */
 	void longSeekSecondsForTests(double seconds) { longSeekSecondsM_.store(seconds); }
+	void longSeekMemoryForTests(int64_t bytes) { longSeekMemoryM_.store(bytes); }
 	/* What a seek costs: from the frame the machine is on (`at`) to `target`,
 	 * with `stored` the nearest state kept at or before the frame before it
 	 * (and before any edit the machine has not gone back for) and `onTheWay`
@@ -1107,19 +1117,17 @@ private:
 	void answerOnMachine(bool go);
 	/* The long seek under way: where it goes, how (in pieces, or played),
 	 * and what puts everything back as it was when it is cancelled - the
-	 * machine's state (a file, as an encode keeps it: a state can be bigger
-	 * than memory holds; in memory when no file can be written), its frame
-	 * and picture, whether it ran, the moves and rerecords counted, and for a
-	 * branch's load the movie before it. `landed` runs on the machine's
-	 * thread when it ends any way but cancelled (a branch's load said done),
-	 * `cancelled` on the view's thread when it is. */
+	 * machine's state, in memory (owner, 2026-11-15: "memory only, if it
+	 * fits, otherwise behave as before"), its frame and picture, whether it
+	 * ran, the moves and rerecords counted, and for a branch's load the movie
+	 * before it. `landed` runs on the machine's thread when it ends any way
+	 * but cancelled (a branch's load said done), `cancelled` on the view's
+	 * thread when it is. */
 	struct LongSeek
 	{
 		int64_t target = -1, from = 0, startFrame = 0;
 		bool turbo = true, wasRunning = false;
-		std::filesystem::path stateFile;
 		std::vector<uint8_t> state;
-		std::string notKept;
 		Picture::Frame picture;
 		uint64_t moves = 0, rerecords = 0;
 		std::optional<std::string> movie;
@@ -1131,12 +1139,16 @@ private:
 		bool measured = false;
 	};
 	std::optional<LongSeek> longSeekM_;
-	uint64_t longSeekCount_ = 0;
 	std::atomic<double> longSeekSecondsM_{kLongSeekSeconds};
+	std::atomic<int64_t> longSeekMemoryM_{-1};
+	Connection longSeekAskWatch_;
 	/* the person said yes to a seek: asked again, then gone as a long seek */
 	void longSeekOnMachine(int64_t target);
-	/* what puts everything back, kept now */
-	void keepStartOnMachine(LongSeek &ls);
+	/* the machine's state, copied into memory: false when it does not fit
+	 * (it cannot be saved, or its copy cannot be had) */
+	bool stateInMemoryOnMachine(std::vector<uint8_t> &out);
+	/* what puts everything back, kept now; false when the state does not fit */
+	bool keepStartOnMachine(LongSeek &ls);
 	/* the long seek begins: from the state the plan sets off from, at once */
 	void beginLongSeekOnMachine(LongSeek ls, const SeekPlan &plan);
 	/* each pass of the machine's loop: the dialog told how far it is, or the
