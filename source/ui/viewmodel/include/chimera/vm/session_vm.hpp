@@ -309,6 +309,51 @@ public:
 	/* a seek that plays: the frame it goes to (-1 when none is) and where it set off */
 	Property<int64_t> seekingTo{-1};
 	Property<int64_t> seekFrom{-1};
+	/* A long seek (user-decided, 2026-11-15, issue 595). A seek the person
+	 * asks for in the window (seekAsking, a branch loaded by hand) whose
+	 * replay is estimated to take more than kLongSeekSeconds asks first. The
+	 * question: its words ("" while none is asked), the frame, where the
+	 * replay would set off, how many frames it runs and the seconds that
+	 * would take. Answered with answerLongSeek; no does nothing. */
+	Property<std::string> longSeekQuestion;
+	Property<int64_t> askedSeekTo{-1}, askedSeekFrom{0}, askedSeekFrames{0};
+	Property<double> askedSeekSeconds{0.0};
+	/* Then, while it runs (its dialog): the frame it goes to (-1 while none
+	 * runs), where its replay set off, the frame reached, the share done (0
+	 * to 1), frames left, frames a second and seconds left, and the last
+	 * three as the dialog shows them. cancelLongSeek puts everything back as
+	 * it was before it began; longSeekCancelled is said once it has (the
+	 * piano roll scrolls back where it was). */
+	Property<int64_t> longSeekTo{-1}, longSeekFrom{0}, longSeekAt{0}, longSeekRemaining{0};
+	Property<double> longSeekProgress{0.0}, longSeekFps{0.0}, longSeekSecondsLeft{0.0};
+	Property<std::string> longSeekRemainingText, longSeekSpeedText, longSeekTimeText;
+	Signal<> longSeekCancelled;
+	/* longer than this, in seconds, a seek asks first: not a setting (a new
+	 * one is the owner's to decide); the tests lower it, as the synthetic
+	 * core replays faster than any real one */
+	static constexpr double kLongSeekSeconds = 10.0;
+	static bool isLongSeek(double seconds, double threshold = kLongSeekSeconds) { return seconds > threshold; }
+	void longSeekSecondsForTests(double seconds) { longSeekSecondsM_.store(seconds); }
+	/* What a seek costs: from the frame the machine is on (`at`) to `target`,
+	 * with `stored` the nearest state kept at or before the frame before it
+	 * (and before any edit the machine has not gone back for) and `onTheWay`
+	 * whether the machine itself may be played on from. The frame the replay
+	 * sets off from, the frames it runs, and the seconds at `fps`. */
+	struct SeekCost
+	{
+		int64_t from = 0, frames = 0;
+		double seconds = 0;
+	};
+	static SeekCost seekCost(int64_t target, int64_t at, int64_t stored, bool onTheWay, double fps);
+	/* the frames a second a seek is estimated at: with Turbo seek the
+	 * replay's as measured (without pictures, else with them, else the
+	 * machine's own rate); without it, played, the machine's own rate at the
+	 * speed asked for, no faster than frames with pictures have run
+	 * (unthrottled: as fast as they have run) */
+	static double seekRate(bool turbo, double replayFps, double drawnFps, double ownFps, int64_t speedPercent, bool unthrottled);
+	/* a duration as the window says it ("2m 05s"), and a count ("12,345") */
+	static std::string durationText(double seconds);
+	static std::string countText(int64_t n);
 	/* TAStudio's recording mode (Chimera's "Recording mode" box and its
 	 * "Toggle read-only" hotkey). Off, the machine plays the movie as it
 	 * is, and past its end only autohold, autofire and the Auto-hold columns
@@ -613,6 +658,16 @@ public:
 	 * from where the two movies differ. done says which, on the view's
 	 * thread, with why a state it had could not be loaded. */
 	void loadBranch(Branch branch, std::function<void(bool fromState, std::string why)> done);
+	/* A branch the person loads (issue 595): asked first when its state
+	 * cannot be used and replaying to it would be long; `go` runs on the
+	 * view's thread when it is not, or once the person says yes, and never
+	 * when they say no. */
+	void askBranchLoad(Branch branch, std::function<void()> go);
+	/* loadBranch, for the load the person agreed to: a long replay to it goes
+	 * as a long seek, with its dialog, and that seek's Cancel puts the movie
+	 * and the machine back as they were and calls `cancelled` on the view's
+	 * thread instead of `done` */
+	void loadBranch(Branch branch, std::function<void(bool fromState, std::string why)> done, std::function<void()> cancelled);
 	/* a branch is gone, and its state file with it */
 	void forgetBranch(Branch branch);
 
@@ -1025,6 +1080,81 @@ private:
 	std::string mcpStatusOnMachine() const;
 	/* TAStudio's seek: what greenzone holds at once, the rest played unless Turbo seek */
 	void seekAsAskedOnMachine(int64_t target);
+	/* A long seek (issue 595). What a seek to `target` would cost now, with
+	 * Turbo seek or played; a branch's movie parting from this one at
+	 * `parts` keeps only the states up to there. Nothing for frame 0, the
+	 * frame the machine is on, or a frame past the movie's end (a seek there
+	 * lengthens the movie, an edit rather than a replay) */
+	struct SeekPlan
+	{
+		int64_t target = -1, from = 0, frames = 0;
+		double fps = 0, seconds = 0;
+	};
+	SeekPlan planSeekOnMachine(int64_t target, bool turbo, int64_t parts = -1) const;
+	/* the window's seek: asked first when long, else as seekAsAskedOnMachine */
+	void seekAskingOnMachine(int64_t target);
+	/* the question waiting for the person: a seek's frame, or a branch's load
+	 * (its `go`, run on the view's thread on a yes) */
+	struct Asked
+	{
+		int64_t target = -1;
+		std::function<void()> go;
+	};
+	std::optional<Asked> askedM_;
+	void askOnMachine(Asked asked, const std::string &question, const SeekPlan &plan);
+	/* the question let go unanswered (a new one, the machine closing) */
+	void dropQuestionOnMachine();
+	void answerOnMachine(bool go);
+	/* The long seek under way: where it goes, how (in pieces, or played),
+	 * and what puts everything back as it was when it is cancelled - the
+	 * machine's state (a file, as an encode keeps it: a state can be bigger
+	 * than memory holds; in memory when no file can be written), its frame
+	 * and picture, whether it ran, the moves and rerecords counted, and for a
+	 * branch's load the movie before it. `landed` runs on the machine's
+	 * thread when it ends any way but cancelled (a branch's load said done),
+	 * `cancelled` on the view's thread when it is. */
+	struct LongSeek
+	{
+		int64_t target = -1, from = 0, startFrame = 0;
+		bool turbo = true, wasRunning = false;
+		std::filesystem::path stateFile;
+		std::vector<uint8_t> state;
+		std::string notKept;
+		Picture::Frame picture;
+		uint64_t moves = 0, rerecords = 0;
+		std::optional<std::string> movie;
+		std::function<void()> landed, cancelled;
+		/* what the dialog was last told: when, at which frame, the speed */
+		Clock::time_point saidAt{};
+		int64_t saidFrame = 0;
+		double fps = 0;
+		bool measured = false;
+	};
+	std::optional<LongSeek> longSeekM_;
+	uint64_t longSeekCount_ = 0;
+	std::atomic<double> longSeekSecondsM_{kLongSeekSeconds};
+	/* the person said yes to a seek: asked again, then gone as a long seek */
+	void longSeekOnMachine(int64_t target);
+	/* what puts everything back, kept now */
+	void keepStartOnMachine(LongSeek &ls);
+	/* the long seek begins: from the state the plan sets off from, at once */
+	void beginLongSeekOnMachine(LongSeek ls, const SeekPlan &plan);
+	/* each pass of the machine's loop: the dialog told how far it is, or the
+	 * seek's end seen (landed, or ended another way: a pause, an edit,
+	 * another seek, the machine closing) */
+	void longSeekWatchOnMachine();
+	void endLongSeekOnMachine();
+	void cancelLongSeekOnMachine();
+	void sayLongSeekOnMachine(const LongSeek &ls, int64_t at);
+	/* the window's long seek properties back to none */
+	void clearLongSeek();
+	/* a branch's load on the machine's thread; `cancelled` given: the
+	 * person's, which may go as a long seek */
+	void loadBranchOnMachine(const Branch &b, const std::function<void(bool, std::string)> &done, const std::function<void()> &cancelled);
+	/* where two movies part (ce_movie_log_divergent_point), -1 for nowhere */
+	static int64_t partsAt(const std::string &now, const std::string &next);
+	/* a turbo seek's frame when it began, to know whether it moved */
+	int64_t turboStartAt_ = -1;
 	/* the frame a seek that plays (Turbo seek off) goes to (-1 none): its
 	 * frames are the movie's, as Chimera's TAStudio plays them with
 	 * recording off, and none of them takes what the person holds */
@@ -1155,6 +1285,8 @@ private:
 	Clock::time_point turboBegan_{};
 	void turboSeekPieceOnMachine();
 	void endTurboSeekOnMachine();
+	/* a seek stopped on the way lands where it is: one frame more run for its picture */
+	void landHereOnMachine();
 	std::atomic<int64_t> futureMaxM_{0};
 	void showFutureOnMachine();
 	/* the machine's last picture, to the window */

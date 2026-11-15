@@ -762,6 +762,29 @@ struct ce_session
 	bool glBridge = false;   /* this session started the GL bridge: it ends it (ce_gl_session_end) */
 	/* ce_session_seek_stop: the seek under way stops on the frame it has reached */
 	std::atomic<bool> seekStop{ false };
+	/* ce_session_measured_fps (issue 595): the frames run lately and the
+	 * seconds they took, [0] those run without their picture (a seek's
+	 * replay), [1] those run with it. Each counts about the last two seconds
+	 * of such frames, the older ones weighing less as newer come in. */
+	struct FrameTimes
+	{
+		double frames = 0, seconds = 0;
+		void add(int64_t n, std::chrono::steady_clock::time_point since)
+		{
+			const double secs = std::chrono::duration<double>(std::chrono::steady_clock::now() - since).count();
+			if (n <= 0 && secs <= 0) return;
+			frames += static_cast<double>(std::max<int64_t>(n, 0));
+			seconds += std::max(secs, 0.0);
+			constexpr double kWindow = 2.0;
+			if (seconds > kWindow)
+			{
+				frames *= kWindow / seconds;
+				seconds = kWindow;
+			}
+		}
+		double fps() const { return frames >= 1 && seconds > 0 ? frames / seconds : 0; }
+	};
+	FrameTimes frameTimes[2];
 	/* The core reports each read of its controls during a frame (issue 344):
 	 * its SetInputPollCallback export took the engine's callback. fn is the
 	 * caller's, called at each read. */
@@ -4653,6 +4676,9 @@ bool ce_session::catchUp(int64_t to, int64_t render)
 		return false;
 	}
 	if (!greenzoneRestore(base)) return false;
+	/* the frames replayed, and the time they took, for ce_session_measured_fps */
+	const auto began = std::chrono::steady_clock::now();
+	const int64_t first = frame;
 	while (frame < to)
 	{
 		std::vector<int32_t> movieAxes;
@@ -4665,6 +4691,7 @@ bool ce_session::catchUp(int64_t to, int64_t render)
 		if (advanceCore(movieButtons.data(), render) < 0) return false;
 		greenzoneCapture();
 	}
+	frameTimes[render != 0 ? 1 : 0].add(frame - first, began);
 	return true;
 }
 
@@ -4770,6 +4797,8 @@ int32_t ce_session_movie_advance(ce_session *s, uint64_t buttons, const int32_t 
 	/* a movie that ran out and has since grown plays again */
 	if (s->movieMode == 3 && s->frame < ce_session_movie_length(s)) s->movieMode = 1;
 
+	/* the frame's time, from here, for ce_session_measured_fps */
+	const auto began = std::chrono::steady_clock::now();
 	/* the epoch the coming frame's delta is measured against, marked while the
 	 * machine is still where it starts */
 	s->greenzoneBeforeAdvance();
@@ -4831,6 +4860,7 @@ int32_t ce_session_movie_advance(ce_session *s, uint64_t buttons, const int32_t 
 		}
 	}
 	s->greenzoneCapture();
+	s->frameTimes[render != 0 ? 1 : 0].add(1, began);
 	return lag;
 }
 
@@ -5167,8 +5197,18 @@ int32_t ce_session_seek(ce_session *s, int64_t frame)
 
 	/* replay the log to the target - a seek is a replay, never a guess.
 	 * Asked to stop, it stops where it is (issue 559): with the greenzone off
-	 * a step back replays from frame 0, which can take minutes */
+	 * a step back replays from frame 0, which can take minutes. The frames
+	 * replayed and their time are counted, however it ends (issue 595) */
 	s->seekStop.store(false);
+	const auto began = std::chrono::steady_clock::now();
+	const int64_t first = s->frame;
+	struct Counted
+	{
+		ce_session *s;
+		std::chrono::steady_clock::time_point began;
+		int64_t first;
+		~Counted() { s->frameTimes[0].add(s->frame - first, began); }
+	} counted{ s, began, first };
 	while (s->frame < frame)
 	{
 		if (s->seekStop.exchange(false))
@@ -5193,6 +5233,12 @@ int32_t ce_session_seek(ce_session *s, int64_t frame)
 void ce_session_seek_stop(ce_session *s)
 {
 	if (s != nullptr) s->seekStop.store(true);
+}
+
+double ce_session_measured_fps(const ce_session *s, int32_t drawn)
+{
+	if (s == nullptr) return 0;
+	return s->frameTimes[drawn != 0 ? 1 : 0].fps();
 }
 
 int32_t ce_session_movie_at(ce_session *s, int64_t frame)

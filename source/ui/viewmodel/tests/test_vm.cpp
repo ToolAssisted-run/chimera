@@ -11400,6 +11400,300 @@ bool tastudioPanel(const char *package, const char *rom)
 	return failures == before;
 }
 
+/* A long seek's estimate (issue 595): where the replay sets off, how many
+ * frames it runs, at what speed, and when that is long enough to ask */
+void longSeekEstimate()
+{
+	using S = SessionViewModel;
+	/* the machine between the state kept and the frame plays on from where it is */
+	S::SeekCost c = S::seekCost(1000, 400, 100, true, 100.0);
+	CHECK(c.from == 400 && c.frames == 600 && std::fabs(c.seconds - 6.0) < 1e-9);
+	/* past the frame, before the state, or past an edit not gone back for: from the state */
+	c = S::seekCost(1000, 2000, 100, true, 100.0);
+	CHECK(c.from == 100 && c.frames == 900 && std::fabs(c.seconds - 9.0) < 1e-9);
+	CHECK(S::seekCost(1000, 50, 100, true, 100.0).from == 100);
+	CHECK(S::seekCost(1000, 400, 100, false, 100.0).from == 100);
+	/* nothing kept: from frame 0; no speed known: no time */
+	c = S::seekCost(1000, 400, -1, false, 0);
+	CHECK(c.from == 0 && c.frames == 1000 && c.seconds == 0);
+	/* the speed: with Turbo seek the replay's as measured, else the frames with
+	 * pictures, else the machine's own rate; played, the machine's own rate at
+	 * the speed asked for, no faster than its frames with pictures have run */
+	CHECK(S::seekRate(true, 5000, 900, 60, 100, false) == 5000);
+	CHECK(S::seekRate(true, 0, 900, 60, 100, false) == 900);
+	CHECK(S::seekRate(true, 0, 0, 60, 100, false) == 60);
+	CHECK(S::seekRate(true, 0, 0, 0, 100, false) == 60);
+	CHECK(S::seekRate(false, 5000, 900, 60, 100, false) == 60);
+	CHECK(S::seekRate(false, 5000, 900, 60, 200, false) == 120);
+	CHECK(S::seekRate(false, 5000, 40, 60, 100, false) == 40);
+	CHECK(S::seekRate(false, 5000, 900, 60, 100, true) == 900);
+	/* more than ten seconds asks */
+	CHECK(S::kLongSeekSeconds == 10.0 && !S::isLongSeek(10.0) && S::isLongSeek(10.01) && !S::isLongSeek(0));
+	/* the dialog's numbers */
+	CHECK(S::countText(0) == "0" && S::countText(999) == "999" && S::countText(1000) == "1,000" && S::countText(1234567) == "1,234,567");
+	CHECK(S::durationText(7.4) == "7s" && S::durationText(65) == "1m 5s" && S::durationText(3725) == "1h 2m");
+}
+
+/* A long seek (user-decided, 2026-11-15, issue 595: "Warning first. Then a
+ * dialog with a progress bar and, frames remaining, fps, and an estimate time
+ * remaining. A cancel button to go back to where it started, as if nothing
+ * had happened"). With nothing kept but frame 0, a seek the window asks for
+ * far away asks first, with the estimate; no does nothing; yes goes, the
+ * dialog told how far, a save made on the way; Cancel puts the machine (its
+ * state byte for byte), the movie and the piano roll back. A script's seek
+ * never asks. Going back with Turbo seek replays in pieces from frame 0;
+ * played (Turbo seek off) it is estimated at the machine's own speed. A
+ * branch with no state to load asks too, and its cancel puts the movie back. */
+bool longSeek(const char *package, const char *rom)
+{
+	namespace fs = std::filesystem;
+	const int before = failures;
+	std::error_code ec;
+	const fs::path dir = fs::temp_directory_path() / ("chimera-test-long-seek-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+	fs::create_directories(dir);
+	fs::copy_file(rom, dir / "walker.testrom");
+	ManualDispatcher d;
+	InputLog inputs;
+	SessionViewModel session(d, inputs);
+	PianoRollViewModel roll(d, inputs, session);
+	BranchesViewModel branches(d, inputs, session, roll);
+	std::string error;
+	session.cacheFolder.set((dir / "cache").string());
+	/* the synthetic core replays tens of thousands of frames a second: here
+	 * more than half a second is long */
+	session.longSeekSecondsForTests(0.5);
+	openGame(session, package, (dir / "walker.testrom").string(), error);
+	CHECK(d.until([&] { return session.isOpen.get(); }, 60));
+	const fs::path projectFile = dir / "walker.chimeraProject";
+	CHECK(session.run("saveProject", {projectFile.string()}, error).has_value());
+	CHECK(d.until([&] { return session.hasProject.get() && session.projectPath.get() == projectFile.string(); }, 20));
+	const int64_t length = 150000;
+	CHECK(roll.run("fill", {length}, error).has_value());
+	CHECK(d.until([&] { return roll.frameCount.get() >= length; }, 20));
+	/* the walker moves right now and then, so the machine differs from frame to frame there */
+	for (const int64_t at : {int64_t{3100}, int64_t{20000}, int64_t{70000}, int64_t{100005}})
+		CHECK(roll.run("paint", {at, at + 10, int64_t{3}, true}, error).has_value());
+	/* nothing kept but frame 0: a far seek replays from there */
+	session.greenzonePeriod.set(0);
+	session.turboSeek.set(true);
+	int cancels = 0;
+	Connection cancelWatch = session.longSeekCancelled.connect([&] { cancels++; });
+	auto quiet = [&](double seconds) { d.until([] { return false; }, seconds); };
+	auto asked = [&] { return !session.longSeekQuestion.get().empty(); };
+	/* The machine as a game reads it: every memory domain's bytes but the
+	 * synthetic core's Mailbox, which counts what this session told the core
+	 * and is in no state. (Not a state saved again: the sandbox keeps the
+	 * pages the replay touched after a load, so the same machine saves a page
+	 * longer, and the guest's dead stack holds the calls since.) */
+	auto stateNow = [&] {
+		std::vector<std::vector<uint8_t>> out;
+		session.onMachineWait([&](ce_session *s) {
+			for (int32_t i = 0; s != nullptr && i < ce_session_domain_count(s); i++)
+			{
+				if (std::string(ce_session_domain_name(s, i)) == "Mailbox") continue;
+				std::vector<uint8_t> bytes(static_cast<size_t>(ce_session_domain_size(s, i)));
+				ce_session_domain_read(s, i, 0, bytes.data(), static_cast<int64_t>(bytes.size()));
+				out.push_back(std::move(bytes));
+			}
+		});
+		return out;
+	};
+	/* the state kept to go back to, in the project's cache folder while it runs */
+	auto keptFiles = [&] {
+		int n = 0;
+		for (const auto &e : fs::recursive_directory_iterator(dir / "cache", ec))
+			if (e.path().filename().string().rfind("seek-start-", 0) == 0) n++;
+		return n;
+	};
+
+	/* a script's or an agent's seek never asks, however far: as it was */
+	CHECK(session.run("seek", {int64_t{3000}}, error).has_value());
+	CHECK(d.until([&] { return session.frame.get() == 3000 && session.seekingTo.get() == -1; }, 60));
+	CHECK(!asked());
+	/* the engine measured that replay */
+	double replayFps = 0;
+	session.onMachineWait([&](ce_session *s) {
+		if (s != nullptr) replayFps = ce_session_measured_fps(s, 0);
+	});
+	std::printf("long seek: the synthetic core replays %.0f frames a second\n", replayFps);
+	CHECK(replayFps > 1000);
+	/* a short one the window asks for goes at once, unasked */
+	CHECK(session.run("seekAsking", {int64_t{3100}}, error).has_value());
+	CHECK(d.until([&] { return session.frame.get() == 3100 && roll.currentFrame.get() == 3100; }, 30));
+	CHECK(!asked());
+	/* the machine a frame on from there, to see it plays on the same after a cancel */
+	session.run("frameAdvance", {}, error);
+	CHECK(d.until([&] { return session.frame.get() == 3101; }, 20));
+	const auto nextState = stateNow();
+	CHECK(session.run("seek", {int64_t{3100}}, error).has_value());
+	CHECK(d.until([&] { return session.frame.get() == 3100 && session.seekingTo.get() == -1; }, 30));
+	/* the roll as a window shows it: twenty frames in view, which follow the machine */
+	roll.visibleFrames.set(20);
+	roll.topFrame.set(3090);
+	const auto startState = stateNow();
+	const std::string startMovie = inputs.text();
+	CHECK(!startState.empty() && !startState.front().empty() && startState != nextState);
+
+	/* far: asked first, with the estimate, and nothing moves meanwhile */
+	const int64_t far = 100000;
+	CHECK(session.run("seekAsking", {far}, error).has_value());
+	CHECK(d.until(asked, 30));
+	std::printf("long seek: asked \"%s\"\n", session.longSeekQuestion.get().c_str());
+	CHECK(session.askedSeekTo.get() == far && session.askedSeekFrom.get() == 3100 && session.askedSeekFrames.get() == far - 3100);
+	CHECK(session.askedSeekSeconds.get() > 0.5 && session.longSeekQuestion.get().find("96,900 frames from frame 3,100") != std::string::npos);
+	quiet(0.3);
+	CHECK(session.frame.get() == 3100 && session.longSeekTo.get() == -1 && session.seekingTo.get() == -1);
+	/* no: nothing happens */
+	CHECK(session.run("answerLongSeek", {false}, error).has_value());
+	quiet(0.5);
+	CHECK(!asked() && session.frame.get() == 3100 && session.longSeekTo.get() == -1 && session.seekingTo.get() == -1);
+	CHECK(stateNow() == startState && keptFiles() == 0);
+
+	/* yes: it goes, the dialog told how far */
+	CHECK(session.run("seekAsking", {far}, error).has_value());
+	CHECK(d.until(asked, 30));
+	CHECK(session.run("answerLongSeek", {true}, error).has_value());
+	CHECK(d.until([&] { return session.longSeekTo.get() == far && !asked(); }, 10));
+	CHECK(d.until([&] { return session.longSeekAt.get() > 13100; }, 30));
+	std::printf("long seek: at frame %lld, %s to go, %s, %s left\n", static_cast<long long>(session.longSeekAt.get()),
+		session.longSeekRemainingText.get().c_str(), session.longSeekSpeedText.get().c_str(), session.longSeekTimeText.get().c_str());
+	CHECK(session.longSeekProgress.get() > 0 && session.longSeekProgress.get() < 1 && session.longSeekFps.get() > 0);
+	CHECK(session.longSeekRemaining.get() == far - session.longSeekAt.get() && !session.longSeekTimeText.get().empty());
+	CHECK(keptFiles() == 1);
+	/* the project saved while it runs: the machine's thread is answered between its pieces */
+	session.status.set("");
+	CHECK(session.run("saveProject", {}, error).has_value());
+	int64_t runningWhenSaved = -2;
+	CHECK(d.until([&] {
+		if (session.status.get().rfind("Saved ", 0) != 0) return false;
+		runningWhenSaved = session.longSeekTo.get();
+		return true;
+	}, 10));
+	CHECK(runningWhenSaved == far);
+	/* Cancel: as if nothing had happened */
+	CHECK(session.run("cancelLongSeek", {}, error).has_value());
+	CHECK(d.until([&] { return session.longSeekTo.get() == -1 && cancels == 1; }, 20));
+	quiet(0.2);
+	CHECK(session.frame.get() == 3100 && roll.currentFrame.get() == 3100 && roll.topFrame.get() == 3090);
+	CHECK(inputs.text() == startMovie);
+	CHECK(stateNow() == startState);
+	CHECK(!session.running.get() && session.seekingTo.get() == -1 && keptFiles() == 0);
+	CHECK(session.status.get() == "Seek to frame 100,000 cancelled: back on frame 3,100");
+	/* and on from there as before */
+	session.run("frameAdvance", {}, error);
+	CHECK(d.until([&] { return session.frame.get() == 3101; }, 20));
+	CHECK(stateNow() == nextState);
+
+	/* left alone, it lands, as a seek does */
+	CHECK(session.run("seekAsking", {far}, error).has_value());
+	CHECK(d.until(asked, 30));
+	CHECK(session.run("answerLongSeek", {true}, error).has_value());
+	CHECK(d.until([&] { return session.longSeekTo.get() == far; }, 10));
+	CHECK(d.until([&] { return session.longSeekTo.get() == -1 && session.frame.get() == far; }, 120));
+	quiet(0.2);
+	CHECK(session.frame.get() == far && cancels == 1 && keptFiles() == 0);
+
+	/* A script's seek going back with Turbo seek, never asked: in pieces from
+	 * the state it restores, so the window is told of frames on the way and
+	 * its progress counts from there. It set off from the frame the machine
+	 * was on, past the target, and went the whole way in one call. */
+	CHECK(session.run("seek", {int64_t{60000}}, error).has_value());
+	int64_t onTheWay = -1, progressFrom = -1;
+	CHECK(d.until([&] {
+		const int64_t f = session.frame.get();
+		if (f > 0 && f < 60000) onTheWay = f;
+		if (session.seekingTo.get() == 60000) progressFrom = session.seekFrom.get();
+		return f == 60000 && session.seekingTo.get() == -1;
+	}, 60));
+	std::printf("long seek: a seek back from %lld to 60000 was seen on frame %lld, its progress from frame %lld\n",
+		static_cast<long long>(far), static_cast<long long>(onTheWay), static_cast<long long>(progressFrom));
+	CHECK(onTheWay > 0 && progressFrom == 0 && !asked());
+	CHECK(session.run("seek", {far}, error).has_value());
+	CHECK(d.until([&] { return session.frame.get() == far && session.seekingTo.get() == -1; }, 60));
+
+	/* Going back with Turbo seek, nothing kept on the way (the issue's own
+	 * case): from frame 0, in pieces, its progress counted from there */
+	const auto farState = stateNow();
+	const int64_t back = 60000;
+	CHECK(session.run("seekAsking", {back}, error).has_value());
+	CHECK(d.until(asked, 30));
+	CHECK(session.askedSeekFrom.get() == 0 && session.askedSeekFrames.get() == back);
+	CHECK(session.run("answerLongSeek", {true}, error).has_value());
+	CHECK(d.until([&] { return session.longSeekTo.get() == back && session.longSeekAt.get() > 10000; }, 30));
+	CHECK(session.frame.get() < back && session.seekFrom.get() == 0 && session.seekingTo.get() == back);
+	CHECK(session.run("cancelLongSeek", {}, error).has_value());
+	CHECK(d.until([&] { return session.longSeekTo.get() == -1 && cancels == 2; }, 20));
+	quiet(0.2);
+	CHECK(session.frame.get() == far && stateNow() == farState);
+
+	/* Turbo seek off: played at the machine's own speed, and estimated so */
+	session.turboSeek.set(false);
+	CHECK(session.run("seekAsking", {far + 100}, error).has_value());
+	CHECK(d.until(asked, 30));
+	std::printf("long seek: played, %lld frames asked about at %.2f s\n", static_cast<long long>(session.askedSeekFrames.get()),
+		session.askedSeekSeconds.get());
+	CHECK(session.askedSeekFrom.get() == far && session.askedSeekFrames.get() == 100);
+	CHECK(session.askedSeekSeconds.get() > 1.5 && session.askedSeekSeconds.get() < 1.8);
+	CHECK(session.run("answerLongSeek", {true}, error).has_value());
+	CHECK(d.until([&] { return session.longSeekTo.get() == far + 100 && session.running.get(); }, 10));
+	CHECK(d.until([&] { return session.longSeekAt.get() > far + 20; }, 10));
+	quiet(0.3);
+	std::printf("long seek: played at %.1f frames a second\n", session.longSeekFps.get());
+	CHECK(session.longSeekFps.get() > 20 && session.longSeekFps.get() < 100);
+	CHECK(session.run("cancelLongSeek", {}, error).has_value());
+	CHECK(d.until([&] { return session.longSeekTo.get() == -1 && cancels == 3; }, 20));
+	quiet(0.2);
+	CHECK(session.frame.get() == far && !session.running.get() && stateNow() == farState);
+	session.turboSeek.set(true);
+
+	/* a branch with no state to load: the person's load asks first, and cancelled puts the run back */
+	const int64_t madeBefore = branches.made.get();
+	CHECK(branches.run("create", {std::string("far")}, error).has_value());
+	CHECK(d.until([&] { return branches.count.get() == 1 && branches.made.get() == madeBefore + 1; }, 20));
+	quiet(0.2);
+	for (const auto &e : fs::recursive_directory_iterator(dir / "cache", ec))
+		if (e.path().extension() == ".state") fs::remove(e.path(), ec);
+	CHECK(session.run("seek", {int64_t{1000}}, error).has_value());
+	CHECK(d.until([&] { return session.frame.get() == 1000; }, 30));
+	/* an input changed at frame 500: the branch's movie parts from this one there */
+	roll.run("toggle", {int64_t{500}, int64_t{0}}, error);
+	CHECK(d.until([&] { return session.frame.get() == 500; }, 30));
+	quiet(0.2);
+	const std::string movieBefore = inputs.text();
+	const auto stateBefore = stateNow();
+	const int64_t currentBefore = branches.current.get(), loadsBefore = branches.loads.get();
+	const std::string undoBefore = branches.undoText.get();
+	CHECK(branches.run("loadWithWarning", {int64_t{0}}, error).has_value());
+	CHECK(d.until(asked, 30));
+	std::printf("long seek: asked \"%s\"\n", session.longSeekQuestion.get().c_str());
+	CHECK(session.askedSeekTo.get() == far && session.askedSeekFrom.get() == 500);
+	CHECK(session.run("answerLongSeek", {false}, error).has_value());
+	quiet(0.5);
+	CHECK(inputs.text() == movieBefore && session.frame.get() == 500 && branches.current.get() == currentBefore && branches.loads.get() == loadsBefore);
+	CHECK(branches.undoText.get() == undoBefore && stateNow() == stateBefore);
+	CHECK(branches.run("loadWithWarning", {int64_t{0}}, error).has_value());
+	CHECK(d.until(asked, 30));
+	CHECK(session.run("answerLongSeek", {true}, error).has_value());
+	CHECK(d.until([&] { return session.longSeekTo.get() == far && session.longSeekAt.get() > 10500; }, 30));
+	CHECK(inputs.text() != movieBefore);
+	CHECK(session.run("cancelLongSeek", {}, error).has_value());
+	CHECK(d.until([&] { return session.longSeekTo.get() == -1 && cancels == 4; }, 20));
+	quiet(0.3);
+	CHECK(inputs.text() == movieBefore && session.frame.get() == 500 && stateNow() == stateBefore);
+	CHECK(branches.current.get() == currentBefore && branches.loads.get() == loadsBefore && branches.undoText.get() == undoBefore);
+	CHECK(branches.status.get() == "Branch Load canceled");
+	/* yes, left alone: loaded */
+	CHECK(branches.run("loadWithWarning", {int64_t{0}}, error).has_value());
+	CHECK(d.until(asked, 30));
+	CHECK(session.run("answerLongSeek", {true}, error).has_value());
+	CHECK(d.until([&] { return branches.loads.get() == loadsBefore + 1; }, 120));
+	CHECK(session.frame.get() == far && branches.current.get() == 0 && inputs.text() != movieBefore && cancels == 4);
+	session.run("close", {}, error);
+	CHECK(d.until([&] { return !session.isOpen.get(); }, 20));
+	fs::remove_all(dir, ec);
+	return failures == before;
+}
+
 /* what the status bar says beside a drive that swaps */
 void driveMediaText()
 {
@@ -11442,6 +11736,7 @@ int main(int argc, char **argv)
 	playerEdges();
 	pageCache();
 	driveMediaText();
+	longSeekEstimate();
 	luaConsole();
 	toolWindows();
 	jsonNumbers();
@@ -11539,6 +11834,7 @@ int main(int argc, char **argv)
 			ranMachine = listsWhilePlaying(argv[1], argv[2]) && ranMachine;
 			ranMachine = longMovie(argv[1], argv[2]) && ranMachine;
 			ranMachine = seekStopped(argv[1], argv[2]) && ranMachine;
+			ranMachine = longSeek(argv[1], argv[2]) && ranMachine;
 			if (argc >= 9) ranMachine = coreManager(argv[1], argv[6], argv[8]) && ranMachine;
 			ranMachine = elsewherePackages(argv[1]) && ranMachine;
 		}

@@ -460,7 +460,7 @@ ApplicationWindow {
                         // Chimera's menu for the frames picked; nothing picked, no menu
                         onRowMenuRequested: (row) => { oneRoll.use(); if (tas.pianoRoll.selectFirst >= 0 && tas.pianoRoll.selectLast < tas.pianoRoll.frameCount) { rowMenu.row = row; rowMenu.popup() } }
                         onCellDragged: (row, column) => tas.pianoRoll.run("drag", [row, column])
-                        onFrameClicked: (row) => { oneRoll.use(); tas.session.run("seek", [row]) }
+                        onFrameClicked: (row) => { oneRoll.use(); tas.session.run("seekAsking", [row]) }
                         // a double click on a frame number sets a marker there, or edits the person's own (issue 436)
                         onFrameDoubleClicked: (row) => {
                             const text = tas.pianoRoll.run("setMarkerAt", [row])
@@ -560,7 +560,7 @@ ApplicationWindow {
                                 text: "<<"
                                 tip: tas.bindingText("Seek To Prev Marker") + "\n" + qsTrId("tastudio.seek_to_previous_marker")
                                 enabled: tas.session.isOpen
-                                onClicked: tas.session.run("seek", [Math.max(0, tas.pianoRoll.run("previousMarker", [tas.pianoRoll.currentFrame]))])
+                                onClicked: tas.session.run("seekAsking", [Math.max(0, tas.pianoRoll.run("previousMarker", [tas.pianoRoll.currentFrame]))])
                             }
                             PlayButton {
                                 text: "<"
@@ -570,7 +570,7 @@ ApplicationWindow {
                                 autoRepeat: true
                                 autoRepeatDelay: 1000
                                 autoRepeatInterval: 100
-                                onClicked: tas.session.run("seek", [tas.pianoRoll.currentFrame - 1])
+                                onClicked: tas.session.run("seekAsking", [tas.pianoRoll.currentFrame - 1])
                             }
                             PlayButton {
                                 text: "> ||"
@@ -593,7 +593,7 @@ ApplicationWindow {
                                 enabled: tas.session.isOpen
                                 onClicked: {
                                     const next = tas.pianoRoll.run("nextMarker", [tas.pianoRoll.currentFrame])
-                                    if (next >= 0) tas.session.run("seek", [next])
+                                    if (next >= 0) tas.session.run("seekAsking", [next])
                                 }
                             }
                         }
@@ -823,7 +823,7 @@ ApplicationWindow {
                         }
                         onClicked: (row, column) => markerList.pick(row)
                         // Jump To, as a double click in Chimera's list
-                        onDoubleClicked: (row) => tas.session.run("seek", [tas.markerRoles(row).frame])
+                        onDoubleClicked: (row) => tas.session.run("seekAsking", [tas.markerRoles(row).frame])
                         onRightClicked: (row) => { if (row >= 0) markerList.pick(row); markerMenu.popup() }
                     }
                     RowLayout {
@@ -843,7 +843,7 @@ ApplicationWindow {
                         IconButton {
                             icon.source: "qrc:/chimera/icons/JumpTo.png"; tip: qsTrId("tastudio.jump_to_marker_frame")
                             enabled: markerList.pickedFrame >= 0
-                            onClicked: tas.session.run("seek", [markerList.pickedFrame])
+                            onClicked: tas.session.run("seekAsking", [markerList.pickedFrame])
                         }
                         IconButton {
                             icon.source: "qrc:/chimera/icons/ScrollTo.png"; tip: qsTrId("tastudio.scroll_view_to_marker_frame")
@@ -1050,7 +1050,7 @@ ApplicationWindow {
     Menu {
         delegate: MenuEntry {}
         id: markerMenu
-        Action { text: qsTrId("tastudio.jump_to"); icon.source: "qrc:/chimera/icons/JumpTo.png"; onTriggered: tas.session.run("seek", [markerList.pickedFrame]) }
+        Action { text: qsTrId("tastudio.jump_to"); icon.source: "qrc:/chimera/icons/JumpTo.png"; onTriggered: tas.session.run("seekAsking", [markerList.pickedFrame]) }
         Action { text: qsTrId("tastudio.scroll_to"); icon.source: "qrc:/chimera/icons/ScrollTo.png"; onTriggered: tas.pianoRoll.topFrame = Math.max(0, markerList.pickedFrame - 2) }
         Action { text: qsTrId("tastudio.edit_text"); icon.source: "qrc:/chimera/icons/pencil.png"; enabled: markerList.pickedEditable; onTriggered: markerDialog.openFor(markerList.pickedFrame, markerList.pickedText) }
         Action { text: qsTrId("tastudio.edit_frame_alt_drag"); icon.source: "qrc:/chimera/icons/Clock.png"; enabled: markerList.pickedEditable; onTriggered: markerFrameDialog.openFor(markerList.pickedFrame) }
@@ -1107,7 +1107,7 @@ ApplicationWindow {
                 onAccepted: seekDialog.accept()
             }
         }
-        onAccepted: if (seekTo.text !== "") tas.session.run("seek", [parseInt(seekTo.text)])
+        onAccepted: if (seekTo.text !== "") tas.session.run("seekAsking", [parseInt(seekTo.text)])
     }
     TextPrompt {
         id: markerDialog
@@ -1188,4 +1188,7 @@ ApplicationWindow {
         return tas.themeRollColors[role] || ""
     }
     TAStudioSettings { id: tastudioSettingsWindow; session: tas.session; pianoRoll: tas.pianoRoll; branches: tas.branches; themeColorsOf: () => tas.mainRoll ? tas.mainRoll.themeColors() : "{}"; ownerWindow: tas; visible: false }
+    // a long seek asked about first, then its progress and Cancel (issue 595);
+    // the main window shows them while this one is hidden
+    LongSeek { anchors.fill: parent; session: tas.session; shown: tas.visible }
 }

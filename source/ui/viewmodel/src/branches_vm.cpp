@@ -78,8 +78,9 @@ BranchesViewModel::BranchesViewModel(Dispatcher &dispatcher, InputLog &inputs, S
 		[this](const Args &a, std::string &error) -> Value {
 			size_t i = 0;
 			if (!index(a, i, error)) return {};
+			/* the person's (the window's Jump To): a long one asks first (issue 595) */
 			std::string e;
-			session_.run("seek", {branches_[i].frame}, e);
+			session_.run("seekAsking", {branches_[i].frame}, e);
 			return {};
 		}, &session_.isOpen);
 	command("undo", "takes back the last branch load, update, text edit or removal", {}, [this](const Args &, std::string &error) -> Value {
@@ -192,43 +193,36 @@ BranchesViewModel::BranchesViewModel(Dispatcher &dispatcher, InputLog &inputs, S
 		[this](const Args &a, std::string &error) -> Value {
 			size_t i = 0;
 			if (!index(a, i, error)) return {};
-			if (oldControlScheme.get())
-			{
-				loadWarning_.clear();
-				std::string e;
-				session_.run("seek", {branches_[i].frame}, e);
-				return {};
-			}
-			const SessionViewModel::Branch &b = branches_[i];
-			current.set(static_cast<int64_t>(i));
-			/* its state when it has one, else the engine takes the branch's
-			 * movie, keeps the states before the first frame where the two
-			 * differ, and replays from there */
-			status.set(tr("branches.loading", {b.name}));
-			/* the run as it is now, kept so Undo can put it back */
-			keepLoadBackup();
-			session_.loadBranch(b, [this, name = b.name, i](bool fromState, const std::string &why) {
-				status.set(tr(fromState ? "branches.loaded_from_state" : "branches.loaded_replayed", {name}) +
-					(why.empty() ? "" : " " + tr("branches.state_not_loaded", {why})) + std::exchange(loadWarning_, std::string()));
-				loadedFromState.set(fromState);
-				loads.set(loads.get() + 1);
-				branchLoaded.emit(static_cast<int64_t>(i));
-			});
-			roll_.replaceAll(b.markers);
+			loadAt(i, false);
 			return {};
 		}, &session_.isOpen);
 	expose("current", "the current branch: the one last loaded, made or updated (-1 none)", current);
 	command("loadWithWarning", "a person loads a branch (a button, a menu, a double click, a hotkey): as load, and when "
 		"the current branch is another and the movie holds inputs or markers it does not, the message after the load "
-		"says so; Undo Branch Load brings them back (owner, 2026-10-28, issue 395). A script loads with load", {"index"},
-		[this](const Args &a, std::string &error) -> Value {
+		"says so; Undo Branch Load brings them back (owner, 2026-10-28, issue 395). A load that would replay for long "
+		"asks first, and its replay can be cancelled, the run put back as it was (issue 595). A script loads with load",
+		{"index"}, [this](const Args &a, std::string &error) -> Value {
 			size_t i = 0;
 			if (!index(a, i, error)) return {};
-			const int64_t was = current.get();
-			if (was >= 0 && was < static_cast<int64_t>(branches_.size()) && was != static_cast<int64_t>(i) &&
-				differsFrom(static_cast<size_t>(was)))
-				loadWarning_ = tr("branches.load_warning", {std::to_string(was + 1)});
-			run("load", {static_cast<int64_t>(i)}, error);
+			/* the old scheme only seeks, and a seek of the person's asks for itself */
+			if (oldControlScheme.get())
+			{
+				loadAt(i, true);
+				return {};
+			}
+			/* asked first when long; loaded, and said, only once it is to go */
+			session_.askBranchLoad(branches_[i], [this, id = branches_[i].id] {
+				for (size_t j = 0; j < branches_.size(); j++)
+					if (branches_[j].id == id)
+					{
+						const int64_t was = current.get();
+						if (was >= 0 && was < static_cast<int64_t>(branches_.size()) && was != static_cast<int64_t>(j) &&
+							differsFrom(static_cast<size_t>(was)))
+							loadWarning_ = tr("branches.load_warning", {std::to_string(was + 1)});
+						loadAt(j, true);
+						return;
+					}
+			});
 			return {};
 		}, &session_.isOpen);
 	command("remove", "forgets a branch", {"index"}, [this](const Args &a, std::string &error) -> Value {
@@ -434,6 +428,54 @@ void BranchesViewModel::keepBackup(Undo kind, SessionViewModel::Branch b, int64_
 	backupAt_ = at;
 	undoText.set(tr(kind == Undo::Load ? "branches.undo_load" : kind == Undo::Update ? "branches.undo_update"
 					: kind == Undo::Text ? "branches.undo_text_edit" : "branches.undo_removal"));
+}
+
+void BranchesViewModel::loadAt(size_t i, bool person)
+{
+	if (oldControlScheme.get())
+	{
+		loadWarning_.clear();
+		std::string e;
+		session_.run(person ? "seekAsking" : "seek", {branches_[i].frame}, e);
+		return;
+	}
+	const SessionViewModel::Branch &b = branches_[i];
+	const int64_t was = current.get();
+	current.set(static_cast<int64_t>(i));
+	/* its state when it has one, else the engine takes the branch's
+	 * movie, keeps the states before the first frame where the two
+	 * differ, and replays from there */
+	status.set(tr("branches.loading", {b.name}));
+	/* the run as it is now, kept so Undo can put it back */
+	keepLoadBackup();
+	/* A person's load takes the branch's markers once it is done: replacing
+	 * them empties the piano roll's undo history, which a load cancelled on
+	 * its way leaves as it was (issue 595). A script's takes them at once. */
+	std::optional<std::vector<Marker>> markersOnceDone;
+	if (person) markersOnceDone = b.markers;
+	auto done = [this, name = b.name, i, markersOnceDone](bool fromState, const std::string &why) {
+		if (markersOnceDone) roll_.replaceAll(*markersOnceDone);
+		status.set(tr(fromState ? "branches.loaded_from_state" : "branches.loaded_replayed", {name}) +
+			(why.empty() ? "" : " " + tr("branches.state_not_loaded", {why})) + std::exchange(loadWarning_, std::string()));
+		loadedFromState.set(fromState);
+		loads.set(loads.get() + 1);
+		branchLoaded.emit(static_cast<int64_t>(i));
+	};
+	if (!person)
+	{
+		session_.loadBranch(b, done);
+		roll_.replaceAll(b.markers);
+		return;
+	}
+	/* its long replay cancelled, the session has put the movie and the
+	 * machine back; the current branch comes back here, with no load left
+	 * to undo */
+	session_.loadBranch(b, done, [this, was, id = backup_.id] {
+		if (undo_ == Undo::Load && backup_.id == id) dropBackup();
+		current.set(was);
+		loadWarning_.clear();
+		status.set(tr("branches.load_canceled"));
+	});
 }
 
 void BranchesViewModel::keepLoadBackup()

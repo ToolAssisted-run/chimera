@@ -478,6 +478,11 @@ private:
 	std::vector<Connection> forgetWatches_;
 	Connection frameWatch_, buttonsWatch_, changedWatch_, appendedWatch_, topWatch_, greenWatch_, resetWatch_, recordedWatch_,
 		followWatch_;
+	/* a long seek (issue 595): the first frame in view when it began, put
+	 * back when it is cancelled (-1 while none runs) */
+	int64_t topBeforeLongSeek_ = -1;
+	bool longSeekOn_ = false;
+	Connection longSeekWatch_, longSeekCancelWatch_;
 	/* what a drag paints: the state the pressed cell was given */
 	bool dragHeld_ = false;
 	/* a press began a stroke that drags extend */

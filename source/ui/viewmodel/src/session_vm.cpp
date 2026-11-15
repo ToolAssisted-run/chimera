@@ -871,6 +871,22 @@ SessionViewModel::SessionViewModel(Dispatcher &dispatcher, InputLog &inputs)
 		"plays there at the machine's own speed", turboSeek, true);
 	expose("seekingTo", "the frame a seek that plays is going to, -1 when none is", seekingTo);
 	expose("seekFrom", "the frame a seek that plays set off from", seekFrom);
+	expose("longSeekQuestion", "a seek the window asked for that would replay for long asks first (issue 595): the "
+		"question, \"\" while none is asked; answerLongSeek answers it", longSeekQuestion);
+	expose("askedSeekTo", "the frame the long seek asked about goes to, -1 for none", askedSeekTo);
+	expose("askedSeekFrom", "the frame its replay would set off from", askedSeekFrom);
+	expose("askedSeekFrames", "the frames its replay would run", askedSeekFrames);
+	expose("askedSeekSeconds", "the seconds its replay is estimated to take", askedSeekSeconds);
+	expose("longSeekTo", "the frame a long seek under way goes to (its dialog), -1 while none runs", longSeekTo);
+	expose("longSeekFrom", "the frame the long seek's replay set off from", longSeekFrom);
+	expose("longSeekAt", "the frame the long seek has reached", longSeekAt);
+	expose("longSeekRemaining", "the frames the long seek has left to run", longSeekRemaining);
+	expose("longSeekProgress", "the share of the long seek done, 0 to 1", longSeekProgress);
+	expose("longSeekFps", "the frames a second the long seek runs at", longSeekFps);
+	expose("longSeekSecondsLeft", "the seconds the long seek is estimated to have left", longSeekSecondsLeft);
+	expose("longSeekRemainingText", "the frames left, as the dialog shows them", longSeekRemainingText);
+	expose("longSeekSpeedText", "the speed, as the dialog shows it", longSeekSpeedText);
+	expose("longSeekTimeText", "the time left, as the dialog shows it", longSeekTimeText);
 	expose("restoreFrame", "the frame the machine goes back to after edits (Chimera's green arrow), -1 for none", restoreFrame);
 	expose("drives", "the machine's drives for the status bar's lights: [{name, on, short, long}], what is in each and "
 		"what its selector is on", drives);
@@ -1848,6 +1864,35 @@ SessionViewModel::SessionViewModel(Dispatcher &dispatcher, InputLog &inputs)
 			submit([this, target] { seekAsAskedOnMachine(target); });
 			return {};
 		}, &isOpen);
+	/* the person's seeks, in the window (issue 595); a script's and an agent's go as seek does */
+	command("seekAsking", "the window's seek: as seek, but one whose replay is estimated to take more than ten seconds asks "
+		"first (longSeekQuestion), and once the person says yes goes with its dialog (longSeekTo), which can put "
+		"everything back as it was (cancelLongSeek)", {"frame"},
+		[this](const Args &a, std::string &error) -> Value {
+			int64_t target = 0;
+			if (!arg(a, 0, target, error)) return {};
+			if (target < 0)
+			{
+				error = tr("session.no_frame_before_0");
+				return {};
+			}
+			submit([this, target] { seekAskingOnMachine(target); });
+			return {};
+		}, &isOpen);
+	command("answerLongSeek", "answers longSeekQuestion: true goes there, false does nothing", {"go"},
+		[this](const Args &a, std::string &error) -> Value {
+			bool go = false;
+			if (!arg(a, 0, go, error)) return {};
+			longSeekQuestion.set("");
+			askedSeekTo.set(-1);
+			submit([this, go] { answerOnMachine(go); });
+			return {};
+		});
+	command("cancelLongSeek", "the long seek under way stops, and the machine, the movie and the piano roll go back to "
+		"where they were before it began", {}, [this](const Args &, std::string &) -> Value {
+			submit([this] { cancelLongSeekOnMachine(); });
+			return {};
+		});
 	/* the first notch from the frame the machine is on: a target kept from an
 	 * earlier hold took the person back there after they had moved on */
 	command("wheelSeek", "the wheel turned with the right button held over TAStudio, as Chimera's: a frame back a notch "
@@ -1860,7 +1905,8 @@ SessionViewModel::SessionViewModel(Dispatcher &dispatcher, InputLog &inputs)
 			const int64_t from = first || wheelTarget_ < 0 ? frame.get() : wheelTarget_;
 			const int64_t target = std::max<int64_t>(0, from - notches);
 			wheelTarget_ = target;
-			submit([this, target] { seekAsAskedOnMachine(target); });
+			/* the person's: a long one asks first (issue 595) */
+			submit([this, target] { seekAskingOnMachine(target); });
 			return target;
 		}, &isOpen);
 	command("seekToRestore", "goes back to the frame the first of a run of edits found the machine on (Chimera's green arrow)",
@@ -2262,6 +2308,8 @@ void SessionViewModel::loop()
 {
 	for (;;)
 	{
+		/* a long seek's dialog told how far it is, or its end seen (issue 595) */
+		longSeekWatchOnMachine();
 		/* the MCP server's calls, between frames */
 		mcpOnMachine();
 		std::function<void()> job;
@@ -2496,8 +2544,10 @@ void SessionViewModel::loop()
 void SessionViewModel::freeSessionOnMachine()
 {
 	if (s_ == nullptr) return;
-	/* a turbo seek under way was this machine's */
+	/* a turbo seek under way was this machine's, and so were a long seek and a question about one */
 	turboSeekToM_ = -1;
+	if (longSeekM_) endLongSeekOnMachine();
+	dropQuestionOnMachine();
 	for (const Hooks &h : hooksM_)
 		if (h.closing) h.closing(s_);
 	inputs_.bind(nullptr);
@@ -2661,8 +2711,11 @@ void SessionViewModel::seekAsAskedOnMachine(int64_t target)
 			turboSeekToM_ = target;
 			turboPiece_ = kTurboPieceFrames;
 			turboFrom_ = start;
+			turboStartAt_ = from;
 			turboBegan_ = Clock::now();
-			later([this, from, target] { seekFrom.set(from); seekingTo.set(target); });
+			/* its progress counted from where the replay sets off: going back, the frame it
+			 * was on is past the target, and the status line showed none (issue 595) */
+			later([this, start, target] { seekFrom.set(start); seekingTo.set(target); });
 			return;
 		}
 	}
@@ -2710,7 +2763,7 @@ void SessionViewModel::restoreOnMachine(int64_t target)
 			/* Turbo seek on: in pieces, between which the window is answered */
 			restoreToM_ = turboSeekToM_ = target;
 			turboPiece_ = kTurboPieceFrames;
-			turboFrom_ = at;
+			turboFrom_ = turboStartAt_ = at;
 			turboBegan_ = Clock::now();
 			later([this, at, target] { seekFrom.set(at); seekingTo.set(target); });
 			return;
@@ -2741,8 +2794,14 @@ void SessionViewModel::turboSeekPieceOnMachine()
 {
 	const int64_t target = turboSeekToM_;
 	const int64_t at = ce_session_frame(s_);
-	const int64_t next = std::min(target - 1, std::max<int64_t>(at, 0) + turboPiece_);
-	if (next <= at || at >= target - 1)
+	/* A seek going back sets off from the state it restores, in pieces like
+	 * any other. From the machine past the target, the first piece was the
+	 * whole way in one call, which kept the machine's thread, and every save
+	 * and the window's progress with it, for as long as the replay took
+	 * (issue 595). */
+	const int64_t base = at >= turboFrom_ && at < target ? at : turboFrom_;
+	const int64_t next = std::min(target - 1, std::max<int64_t>(base, 0) + turboPiece_);
+	if (next <= base || base >= target - 1)
 	{
 		/* there: the last frame run with its picture, the scripts' turn, as any seek lands;
 		 * what it ran and how long it took, the whole seek's. A way back after
@@ -2761,7 +2820,19 @@ void SessionViewModel::turboSeekPieceOnMachine()
 		return;
 	}
 	const auto began = Clock::now();
-	if (ce_session_seek(s_, next) != 0)
+	const int32_t sought = ce_session_seek(s_, next);
+	if (sought == 2)
+	{
+		/* stopped (rewind let go, the window closing): where it reached, with
+		 * one frame more for its picture, as any replay stopped (issue 559) */
+		const bool restoring = restoringOnMachine();
+		turboSeekToM_ = -1;
+		landHereOnMachine();
+		if (restoring) restoredOnMachine();
+		later([this] { seekingTo.set(-1); });
+		return;
+	}
+	if (sought != 0)
 	{
 		/* the window edited the movie under it, or it cannot go on: it lands where it is
 		 * (a way back after an edit as if there, so the edit's turn goes on to its frame) */
@@ -2783,9 +2854,397 @@ void SessionViewModel::turboSeekPieceOnMachine()
 void SessionViewModel::endTurboSeekOnMachine()
 {
 	if (turboSeekToM_ < 0 || s_ == nullptr) return;
-	/* stopped part way: on the frame it reached, with its picture */
+	/* stopped part way: on the frame it reached, with its picture. It was a
+	 * seek to that frame, which restores the state kept before it and
+	 * replays from there: going back with nothing kept on the way, that was
+	 * the whole replay a second time (issue 595). Now, as a replay stopped
+	 * (issue 559), one frame more is run for its picture; a seek that has not
+	 * moved yet is left where it is. */
 	turboSeekToM_ = -1;
-	seekOnMachine(ce_session_frame(s_));
+	if (ce_session_frame(s_) == turboStartAt_) return;
+	landHereOnMachine();
+}
+
+void SessionViewModel::landHereOnMachine()
+{
+	movesM_++;
+	frameM_ = ce_session_frame(s_);
+	if (frameM_ < ce_session_movie_length(s_)) stepOnMachine(false, true, false);
+	report(-1, -1, -1, -1, -1);
+	/* the scripts' turn on the frame the machine landed on, as a seek's */
+	scriptTurnOnMachine(scriptsAfterM_);
+}
+
+/* ---- a long seek (user-decided, 2026-11-15, issue 595): "Warning first.
+ * Then a dialog with a progress bar and, frames remaining, fps, and an
+ * estimate time remaining. A cancel button to go back to where it started,
+ * as if nothing had happened" */
+
+SessionViewModel::SeekCost SessionViewModel::seekCost(int64_t target, int64_t at, int64_t stored, bool onTheWay, double fps)
+{
+	SeekCost c;
+	/* from the machine itself when it is between the state kept and the
+	 * frame (and may be played on from), else from that state */
+	c.from = onTheWay && at >= stored && at < target ? at : std::max<int64_t>(stored, 0);
+	c.frames = std::max<int64_t>(0, target - c.from);
+	c.seconds = fps > 0 ? static_cast<double>(c.frames) / fps : 0;
+	return c;
+}
+
+double SessionViewModel::seekRate(bool turbo, double replayFps, double drawnFps, double ownFps, int64_t speedPercent, bool unthrottled)
+{
+	if (ownFps <= 0) ownFps = 60;
+	if (turbo) return replayFps > 0 ? replayFps : drawnFps > 0 ? drawnFps : ownFps;
+	if (unthrottled) return drawnFps > 0 ? drawnFps : replayFps > 0 ? replayFps : ownFps;
+	const double asked = ownFps * static_cast<double>(std::clamp<int64_t>(speedPercent, 1, 6400)) / 100.0;
+	return drawnFps > 0 ? std::min(asked, drawnFps) : asked;
+}
+
+std::string SessionViewModel::durationText(double seconds)
+{
+	/* as an encode says its time left */
+	const int64_t left = std::max<int64_t>(0, std::llround(seconds));
+	const int64_t h = left / 3600, m = left / 60 % 60, s = left % 60;
+	if (h >= 1) return tr("encoder.hours_minutes", {std::to_string(h), std::to_string(m)});
+	if (left >= 60) return tr("encoder.minutes_seconds", {std::to_string(left / 60), std::to_string(s)});
+	return tr("encoder.seconds", {std::to_string(s)});
+}
+
+std::string SessionViewModel::countText(int64_t n)
+{
+	/* as Chimera's N0 writes it: 1,234 */
+	std::string text = std::to_string(n < 0 ? -n : n);
+	for (int at = static_cast<int>(text.size()) - 3; at > 0; at -= 3) text.insert(static_cast<size_t>(at), ",");
+	return n < 0 ? "-" + text : text;
+}
+
+SessionViewModel::SeekPlan SessionViewModel::planSeekOnMachine(int64_t target, bool turbo, int64_t parts) const
+{
+	SeekPlan p;
+	p.target = target;
+	if (s_ == nullptr) return p;
+	const int64_t at = ce_session_frame(s_);
+	if (target <= 0 || target > ce_session_movie_length(s_) || (target == at && parts < 0)) return p;
+	/* the states that hold: those before an edit the machine has not gone
+	 * back for yet, and before where another movie parts from this one */
+	int64_t keptTo = target - 1;
+	bool onTheWay = greenEndM_ >= at;
+	if (greenEndM_ < at) keptTo = std::min(keptTo, greenEndM_);
+	if (parts >= 0)
+	{
+		keptTo = std::min(keptTo, parts);
+		onTheWay = onTheWay && at <= parts;
+	}
+	const int64_t stored = ce_session_greenzone_nearest(s_, keptTo);
+	const double own = 1.0 / std::max(std::chrono::duration<double>(period_).count(), 1e-6);
+	p.fps = seekRate(turbo, ce_session_measured_fps(s_, 0), ce_session_measured_fps(s_, 1), own, speedM_.load(),
+		unthrottledM_.load() || throttleM_.load() == 3);
+	const SeekCost c = seekCost(target, at, stored, onTheWay, p.fps);
+	p.from = c.from;
+	p.frames = c.frames;
+	p.seconds = c.seconds;
+	return p;
+}
+
+void SessionViewModel::seekAskingOnMachine(int64_t target)
+{
+	if (s_ == nullptr) return;
+	/* a question about another seek is let go: the person has asked for this one */
+	dropQuestionOnMachine();
+	const SeekPlan plan = planSeekOnMachine(target, turboSeekM_.load());
+	if (!isLongSeek(plan.seconds, longSeekSecondsM_.load()))
+	{
+		seekAsAskedOnMachine(target);
+		return;
+	}
+	/* asked, and nothing moves until it is answered: the machine runs on if it was running */
+	Asked asked;
+	asked.target = target;
+	askOnMachine(std::move(asked), tr("session.long_seek_question", plan.frames, {countText(plan.frames), countText(target),
+		countText(plan.from), countText(std::llround(plan.fps)), durationText(plan.seconds)}), plan);
+}
+
+void SessionViewModel::askOnMachine(Asked asked, const std::string &question, const SeekPlan &plan)
+{
+	/* a question not answered yet gives way to this one: what it asked about does not happen */
+	askedM_ = std::move(asked);
+	later([this, question, plan] {
+		askedSeekTo.set(plan.target);
+		askedSeekFrom.set(plan.from);
+		askedSeekFrames.set(plan.frames);
+		askedSeekSeconds.set(plan.seconds);
+		/* asked again in the same words, the window is told again */
+		longSeekQuestion.set("");
+		longSeekQuestion.set(question);
+	});
+}
+
+void SessionViewModel::dropQuestionOnMachine()
+{
+	if (!askedM_) return;
+	askedM_.reset();
+	later([this] {
+		longSeekQuestion.set("");
+		askedSeekTo.set(-1);
+	});
+}
+
+void SessionViewModel::answerOnMachine(bool go)
+{
+	if (!askedM_) return;
+	const Asked asked = std::move(*askedM_);
+	askedM_.reset();
+	if (!go || s_ == nullptr) return;
+	/* a branch's load: the person's, which the branches go on with */
+	if (asked.go) later(asked.go);
+	else longSeekOnMachine(asked.target);
+}
+
+void SessionViewModel::longSeekOnMachine(int64_t target)
+{
+	if (s_ == nullptr) return;
+	const bool turbo = turboSeekM_.load();
+	const SeekPlan plan = planSeekOnMachine(target, turbo);
+	/* no longer long (the machine went on while the person was asked): a seek as any */
+	if (!isLongSeek(plan.seconds, longSeekSecondsM_.load()))
+	{
+		seekAsAskedOnMachine(target);
+		return;
+	}
+	LongSeek ls;
+	keepStartOnMachine(ls);
+	ls.target = target;
+	ls.turbo = turbo;
+	beginLongSeekOnMachine(std::move(ls), plan);
+}
+
+void SessionViewModel::keepStartOnMachine(LongSeek &ls)
+{
+	namespace fs = std::filesystem;
+	ls.startFrame = ce_session_frame(s_);
+	ls.moves = movesM_;
+	ls.rerecords = ce_session_rerecords(s_);
+	/* running by itself, not on its way somewhere: it runs on once back */
+	ls.wasRunning = runningM_ && pauseOnFrameM_ < 0 && turboSeekToM_ < 0 && restoreToM_ < 0;
+	screen.takeIfNewer(UINT64_MAX, ls.picture);
+	/* The machine's state, written to a file as an encode keeps where the
+	 * person was: the engine streams it there without holding it whole, and a
+	 * machine's state can be bigger than memory holds at once (a PS3's is past
+	 * 2 GiB, issue 84). In memory when no file can be written. */
+	fs::path folder = projectCacheOnMachine();
+	std::error_code ec;
+	if (folder.empty()) folder = fs::temp_directory_path(ec);
+	fs::create_directories(folder, ec);
+	char name[48];
+	std::snprintf(name, sizeof name, "seek-start-%08x-%llu.state", static_cast<unsigned>(std::random_device{}()),
+		static_cast<unsigned long long>(++longSeekCount_));
+	ls.stateFile = folder / name;
+	if (ce_session_state_save_file(s_, branch_state::utf8(ls.stateFile).c_str(), nullptr, 0) == 0) return;
+	const std::string fileWhy = ce_session_last_error(s_);
+	fs::remove(ls.stateFile, ec);
+	ls.stateFile.clear();
+	uint64_t len = 0;
+	if (const uint8_t *data = ce_session_save_state(s_, &len); data != nullptr && len > 0)
+	{
+		ls.state.assign(data, data + len);
+		return;
+	}
+	ls.notKept = fileWhy;
+}
+
+void SessionViewModel::beginLongSeekOnMachine(LongSeek ls, const SeekPlan &plan)
+{
+	/* what a seek asked for ends: a seek or a way back under way, the machine running, a long seek before it */
+	restoreToM_ = -1;
+	runOnAfterRestoreM_ = false;
+	turboSeekToM_ = -1;
+	runningM_ = false;
+	pauseOnFrameM_ = -1;
+	mcpFastM_ = false;
+	if (longSeekM_) endLongSeekOnMachine();
+	const int64_t target = ls.target, from = plan.from;
+	const bool turbo = ls.turbo;
+	ls.from = from;
+	ls.fps = plan.fps;
+	/* the dialog first: told before the machine moves, the piano roll keeps where it was */
+	sayLongSeekOnMachine(ls, from);
+	later([this, target, from, turbo] {
+		longSeekFrom.set(from);
+		seekFrom.set(from);
+		seekingTo.set(target);
+		running.set(!turbo);
+		longSeekTo.set(target);
+	});
+	longSeekM_ = std::move(ls);
+	/* back to the state the replay sets off from, at once: a restore, nothing replayed */
+	if (from != ce_session_frame(s_))
+	{
+		movesM_++;
+		if (ce_session_seek(s_, from) != 0)
+		{
+			const std::string why = tr("session.could_not_seek", {std::to_string(from), ce_session_last_error(s_)});
+			later([this, why] { status.set(why); });
+			frameM_ = ce_session_frame(s_);
+			endLongSeekOnMachine();
+			later([this] { seekingTo.set(-1); running.set(false); });
+			report(-1, -1, -1, -1, -1);
+			return;
+		}
+		frameM_ = ce_session_frame(s_);
+		report(-1, -1, -1, -1, -1);
+	}
+	longSeekM_->saidAt = Clock::now();
+	longSeekM_->saidFrame = frameM_;
+	if (turbo)
+	{
+		/* in pieces, between which the window is answered (and a save is made) */
+		turboSeekToM_ = target;
+		turboPiece_ = kTurboPieceFrames;
+		turboFrom_ = turboStartAt_ = frameM_;
+		turboBegan_ = Clock::now();
+	}
+	else
+	{
+		/* played at the machine's own speed, every frame drawn, as Turbo seek off plays */
+		pauseOnFrameM_ = playedSeekToM_ = target;
+		runningM_ = true;
+		due_ = fpsSince_ = Clock::now();
+		fpsFrames_ = 0;
+	}
+}
+
+void SessionViewModel::longSeekWatchOnMachine()
+{
+	if (!longSeekM_) return;
+	LongSeek &ls = *longSeekM_;
+	const bool under = s_ != nullptr &&
+		(ls.turbo ? turboSeekToM_ == ls.target : runningM_ && pauseOnFrameM_ == ls.target && playedSeekToM_ == ls.target);
+	if (!under)
+	{
+		endLongSeekOnMachine();
+		return;
+	}
+	/* four times a second: the speed over that stretch, steadied */
+	const auto now = Clock::now();
+	const double secs = std::chrono::duration<double>(now - ls.saidAt).count();
+	if (secs < 0.25) return;
+	const int64_t at = ce_session_frame(s_);
+	const double fps = static_cast<double>(at - ls.saidFrame) / secs;
+	ls.fps = ls.measured ? ls.fps * 0.6 + fps * 0.4 : fps;
+	ls.measured = true;
+	ls.saidAt = now;
+	ls.saidFrame = at;
+	sayLongSeekOnMachine(ls, at);
+}
+
+void SessionViewModel::sayLongSeekOnMachine(const LongSeek &ls, int64_t at)
+{
+	const int64_t remaining = std::max<int64_t>(0, ls.target - at);
+	const double span = static_cast<double>(std::max<int64_t>(1, ls.target - ls.from));
+	const double progress = std::clamp(static_cast<double>(at - ls.from) / span, 0.0, 1.0);
+	const double fps = std::max(ls.fps, 0.0);
+	const double left = fps > 0 ? static_cast<double>(remaining) / fps : 0;
+	const std::string remainingText = countText(remaining), speedText = tr("session.fps", {countText(std::llround(fps))}),
+					  timeText = fps > 0 ? durationText(left) : std::string("-");
+	later([this, at, remaining, progress, fps, left, remainingText, speedText, timeText] {
+		longSeekAt.set(at);
+		longSeekRemaining.set(remaining);
+		longSeekProgress.set(progress);
+		longSeekFps.set(fps);
+		longSeekSecondsLeft.set(left);
+		longSeekRemainingText.set(remainingText);
+		longSeekSpeedText.set(speedText);
+		longSeekTimeText.set(timeText);
+	});
+}
+
+void SessionViewModel::clearLongSeek()
+{
+	longSeekTo.set(-1);
+	longSeekRemaining.set(0);
+	longSeekProgress.set(0.0);
+	longSeekSecondsLeft.set(0.0);
+}
+
+void SessionViewModel::endLongSeekOnMachine()
+{
+	if (!longSeekM_) return;
+	LongSeek ls = std::move(*longSeekM_);
+	longSeekM_.reset();
+	std::error_code ec;
+	if (!ls.stateFile.empty()) std::filesystem::remove(ls.stateFile, ec);
+	later([this] { clearLongSeek(); });
+	if (ls.landed) ls.landed();
+}
+
+void SessionViewModel::cancelLongSeekOnMachine()
+{
+	if (!longSeekM_ || s_ == nullptr) return;
+	LongSeek ls = std::move(*longSeekM_);
+	longSeekM_.reset();
+	/* the seek stops where it is */
+	turboSeekToM_ = -1;
+	pauseOnFrameM_ = playedSeekToM_ = -1;
+	runningM_ = false;
+	restoreToM_ = -1;
+	runOnAfterRestoreM_ = false;
+	const int64_t reached = ce_session_frame(s_);
+	/* a branch's load: the movie before it, back */
+	if (ls.movie)
+	{
+		replaceMovieOnMachine(*ls.movie);
+		later([this] { inputsReset.emit(); });
+	}
+	/* the machine as it was, from what was kept: its state, its frame, its
+	 * picture, running or not, and the moves and rerecords counted */
+	const bool kept = !ls.stateFile.empty() || !ls.state.empty();
+	bool back = false;
+	std::string why = ls.notKept;
+	if (!ls.stateFile.empty()) back = ce_session_state_load_file(s_, branch_state::utf8(ls.stateFile).c_str(), nullptr, 0, nullptr) == 0;
+	else if (!ls.state.empty()) back = ce_session_load_state(s_, ls.state.data(), ls.state.size()) == 0;
+	if (back) back = ce_session_movie_at(s_, ls.startFrame) == 0;
+	if (kept && !back) why = ce_session_last_error(s_);
+	std::error_code ec;
+	if (!ls.stateFile.empty()) std::filesystem::remove(ls.stateFile, ec);
+	if (back)
+	{
+		frameM_ = ls.startFrame;
+		movesM_ = ls.moves;
+		ce_session_set_rerecords(s_, ls.rerecords);
+		const Picture::Frame &shown = ls.picture;
+		if (shown.width > 0 && shown.height > 0) screen.publish(shown.pixels.data(), shown.width, shown.height, shown.shownWidth, shown.shownHeight);
+		for (const Hooks &h : hooksM_)
+			if (h.frame) h.frame(s_);
+		runningM_ = ls.wasRunning;
+		due_ = fpsSince_ = Clock::now();
+		fpsFrames_ = 0;
+		report(-1, -1, -1, -1, -1);
+	}
+	else
+	{
+		/* not put back: a state that was tried and refused leaves the machine
+		 * on no frame at all, so first to a state kept before where it reached;
+		 * then where it is, its picture drawn */
+		if (kept)
+		{
+			const int64_t base = ce_session_greenzone_nearest(s_, reached);
+			if (base >= 0) ce_session_greenzone_restore(s_, base);
+		}
+		landHereOnMachine();
+	}
+	const std::string said = back ? tr("session.long_seek_cancelled", {countText(ls.target), countText(ls.startFrame)})
+								  : tr("session.long_seek_not_back", {countText(ls.target), countText(frameM_), why});
+	const bool run = runningM_;
+	/* after the frame is told: the piano roll goes back where it was once it has followed the frame */
+	later([this, said, run, cancelled = ls.cancelled] {
+		clearLongSeek();
+		running.set(run);
+		seekingTo.set(-1);
+		status.set(said);
+		longSeekCancelled.emit();
+		if (cancelled) cancelled();
+	});
+	if (back) scriptTurnOnMachine(scriptsAfterM_);
 }
 
 void SessionViewModel::mcpServing(bool on)
@@ -4233,54 +4692,134 @@ void SessionViewModel::makeBranch(std::string name, std::string time, std::funct
 
 void SessionViewModel::loadBranch(Branch b, std::function<void(bool, std::string)> done)
 {
-	submit([this, b = std::move(b), done = std::move(done)] {
+	submit([this, b = std::move(b), done = std::move(done)] { loadBranchOnMachine(b, done, {}); });
+}
+
+void SessionViewModel::loadBranch(Branch b, std::function<void(bool, std::string)> done, std::function<void()> cancelled)
+{
+	/* a branch's load is the person's when it can be cancelled */
+	if (!cancelled) cancelled = [] {};
+	submit([this, b = std::move(b), done = std::move(done), cancelled = std::move(cancelled)] { loadBranchOnMachine(b, done, cancelled); });
+}
+
+void SessionViewModel::askBranchLoad(Branch b, std::function<void()> go)
+{
+	submit([this, b = std::move(b), go = std::move(go)] {
 		if (s_ == nullptr) return;
 		namespace fs = std::filesystem;
-		runningM_ = false;
-		later([this] { running.set(false); });
-		bool fromState = false;
-		std::string why;
+		/* a state it can load costs no replay */
 		const fs::path dir = branchDirOnMachine();
 		branch_state::Note note;
-		const bool fits = !b.state.empty() && !dir.empty() && branch_state::readNote(dir / (b.state + ".note"), note) &&
-						  note.frame == b.frame && note.machine == machineIdOnMachine();
-		const int64_t was = ce_session_frame(s_);
-		replaceMovieOnMachine(b.text);
-		if (fits)
+		std::error_code ec;
+		const bool usable = !b.state.empty() && !dir.empty() && branch_state::readNote(dir / (b.state + ".note"), note) &&
+							note.frame == b.frame && note.machine == machineIdOnMachine() && fs::exists(dir / (b.state + ".state"), ec);
+		const SeekPlan plan = usable ? SeekPlan{} : planSeekOnMachine(b.frame, true, partsAt(movieTextOnMachine(), b.text));
+		if (!isLongSeek(plan.seconds, longSeekSecondsM_.load()))
 		{
-			const int32_t loaded = ce_session_state_load_file(s_, branch_state::utf8(dir / (b.state + ".state")).c_str(), nullptr, 0, nullptr);
-			if (loaded == 0 && ce_session_movie_at(s_, b.frame) == 0)
+			later(go);
+			return;
+		}
+		Asked asked;
+		asked.target = b.frame;
+		asked.go = go;
+		askOnMachine(std::move(asked), tr("session.long_branch_question", plan.frames, {countText(plan.frames), countText(plan.target),
+			countText(plan.from), countText(std::llround(plan.fps)), durationText(plan.seconds)}), plan);
+	});
+}
+
+int64_t SessionViewModel::partsAt(const std::string &now, const std::string &next)
+{
+	ce_movie_log *a = ce_movie_log_new(), *b = ce_movie_log_new();
+	if (!now.empty()) ce_movie_log_parse(a, now.data(), now.size());
+	if (!next.empty()) ce_movie_log_parse(b, next.data(), next.size());
+	const int64_t at = ce_movie_log_divergent_point(a, b);
+	ce_movie_log_free(a);
+	ce_movie_log_free(b);
+	return at;
+}
+
+void SessionViewModel::loadBranchOnMachine(const Branch &b, const std::function<void(bool, std::string)> &done,
+	const std::function<void()> &cancelled)
+{
+	if (s_ == nullptr) return;
+	namespace fs = std::filesystem;
+	runningM_ = false;
+	later([this] { running.set(false); });
+	bool fromState = false;
+	std::string why;
+	const fs::path dir = branchDirOnMachine();
+	branch_state::Note note;
+	const bool fits = !b.state.empty() && !dir.empty() && branch_state::readNote(dir / (b.state + ".note"), note) &&
+					  note.frame == b.frame && note.machine == machineIdOnMachine();
+	const int64_t was = ce_session_frame(s_);
+	/* The person's load, replaying for long (issue 595): what puts the run
+	 * back as it was is kept before the branch's movie takes its place, and
+	 * the replay goes as a long seek, in pieces, with its dialog */
+	std::optional<LongSeek> back;
+	SeekPlan plan;
+	std::error_code ec;
+	if (cancelled && !(fits && fs::exists(dir / (b.state + ".state"), ec)))
+	{
+		const std::string before = movieTextOnMachine();
+		plan = planSeekOnMachine(b.frame, true, partsAt(before, b.text));
+		if (isLongSeek(plan.seconds, longSeekSecondsM_.load()))
+		{
+			back.emplace();
+			back->movie = before;
+			keepStartOnMachine(*back);
+		}
+	}
+	replaceMovieOnMachine(b.text);
+	if (back)
+	{
+		LongSeek ls = std::move(*back);
+		ls.target = b.frame;
+		ls.turbo = true;
+		ls.cancelled = cancelled;
+		/* landed (or ended another way): as a load that replayed */
+		ls.landed = [this, b, done] {
+			if (branchLoadedTurnM_ && s_ != nullptr && ce_session_frame(s_) == b.frame) branchLoadedTurnM_(b.userdata, b.name);
+			later([done] { done(false, ""); });
+			report(-1, -1, -1, -1, -1);
+		};
+		later([this] { inputsReset.emit(); });
+		beginLongSeekOnMachine(std::move(ls), plan);
+		return;
+	}
+	if (fits)
+	{
+		const int32_t loaded = ce_session_state_load_file(s_, branch_state::utf8(dir / (b.state + ".state")).c_str(), nullptr, 0, nullptr);
+		if (loaded == 0 && ce_session_movie_at(s_, b.frame) == 0)
+		{
+			fromState = true;
+			frameM_ = b.frame;
+			const Picture::Frame &shown = b.picture ? *b.picture : note.picture;
+			if (shown.width > 0 && shown.height > 0) screen.publish(shown.pixels.data(), shown.width, shown.height, shown.shownWidth, shown.shownHeight);
+			for (const Hooks &h : hooksM_)
+				if (h.frame) h.frame(s_);
+		}
+		else
+		{
+			why = ce_session_last_error(s_);
+			/* a state the machine took and could not use leaves it on no
+			 * frame at all: back to a stored one first */
+			if (loaded == 1)
 			{
-				fromState = true;
-				frameM_ = b.frame;
-				const Picture::Frame &shown = b.picture ? *b.picture : note.picture;
-				if (shown.width > 0 && shown.height > 0) screen.publish(shown.pixels.data(), shown.width, shown.height, shown.shownWidth, shown.shownHeight);
-				for (const Hooks &h : hooksM_)
-					if (h.frame) h.frame(s_);
-			}
-			else
-			{
-				why = ce_session_last_error(s_);
-				/* a state the machine took and could not use leaves it on no
-				 * frame at all: back to a stored one first */
-				if (loaded == 1)
-				{
-					const int64_t base = ce_session_greenzone_nearest(s_, std::min(was, b.frame));
-					if (base >= 0 && ce_session_greenzone_restore(s_, base) == 0) frameM_ = ce_session_frame(s_);
-				}
+				const int64_t base = ce_session_greenzone_nearest(s_, std::min(was, b.frame));
+				if (base >= 0 && ce_session_greenzone_restore(s_, base) == 0) frameM_ = ce_session_frame(s_);
 			}
 		}
-		if (!fromState) seekOnMachine(b.frame);
-		/* the scripts told of a load that put the machine on the branch's
-		 * frame, their userdata the branch's first (issue 534); a seek that
-		 * stopped short is no load */
-		if (branchLoadedTurnM_ && s_ != nullptr && ce_session_frame(s_) == b.frame) branchLoadedTurnM_(b.userdata, b.name);
-		later([this, done, fromState, why] {
-			inputsReset.emit();
-			done(fromState, why);
-		});
-		report(-1, -1, -1, -1, -1);
+	}
+	if (!fromState) seekOnMachine(b.frame);
+	/* the scripts told of a load that put the machine on the branch's
+	 * frame, their userdata the branch's first (issue 534); a seek that
+	 * stopped short is no load */
+	if (branchLoadedTurnM_ && s_ != nullptr && ce_session_frame(s_) == b.frame) branchLoadedTurnM_(b.userdata, b.name);
+	later([this, done, fromState, why] {
+		inputsReset.emit();
+		done(fromState, why);
 	});
+	report(-1, -1, -1, -1, -1);
 }
 
 void SessionViewModel::forgetBranch(Branch b)

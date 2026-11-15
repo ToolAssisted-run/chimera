@@ -1969,6 +1969,14 @@ CE_API int32_t ce_session_seek(ce_session *s, int64_t frame);
  * Any thread, while the session lives. A seek that begins after the call is
  * not stopped by it (issue 559). */
 CE_API void ce_session_seek_stop(ce_session *s);
+/* How fast the session has been running frames lately, in frames a second,
+ * counting only the time the frames took, not the time waited between them.
+ * drawn 0: the frames run without their picture - a seek's replay, a movie
+ * played with nothing drawn; drawn 1: those run with it. Measured over about
+ * the last two seconds of such frames; 0 while none has run. The window
+ * estimates from it how long a seek will take (issue 595). The machine's
+ * thread. */
+CE_API double ce_session_measured_fps(const ce_session *s, int32_t drawn);
 /* The lowest frame the machine was put on by loading a state - a seek or a
  * rewind going back, a branch, a savestate - since the last call, which
  * starts the count again; -1 when none was loaded. Whatever was written into

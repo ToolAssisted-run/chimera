@@ -1163,6 +1163,17 @@ same code whatever the period.
   replay can be stopped (`ce_session_seek_stop`, issue 559): letting go of
   rewind stops it on the frame it has reached, and closing the window does
   not wait for it.
+- **A seek the person asks for that would replay for long asks first**
+  (user-decided, 2026-11-15, issue 595). The window estimates it from the
+  frames between where the replay sets off (the nearest state kept, or the
+  machine itself when it is on the way) and the frame, and from
+  `ce_session_measured_fps`: the frames a second the session has run
+  lately without their picture (a seek's replay) or with it, counting only
+  the time the frames took. A seek going back with Turbo seek now replays
+  in pieces from the state it restores, as one going forward does; it used
+  to set off from the machine's own frame, past the target, so its first
+  piece was the whole replay in one call. A long seek cancelled keeps the
+  states it stored on the way: they are states of the movie as it is.
 
 Measured with `chimera-run --record --frames 11000` on snes9x (The Last
 Super), seconds, two runs each:

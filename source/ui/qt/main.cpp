@@ -732,7 +732,7 @@ int main(int argc, char **argv)
 			if (down) run(pianoRoll, "select", {pianoRoll.currentFrame.get(), pianoRoll.currentFrame.get()});
 		});
 		hotkeys.add("TAStudio", "Seek To Selected Frame", "", [&pianoRoll, &session, run](bool down) {
-			if (down && pianoRoll.selectFirst.get() >= 0) run(session, "seek", {pianoRoll.selectFirst.get()});
+			if (down && pianoRoll.selectFirst.get() >= 0) run(session, "seekAsking", {pianoRoll.selectFirst.get()});
 		});
 		window("TAStudio", "Seek To...", "Ctrl+G");
 		hotkeys.add("TAStudio", "Toggle Follow Cursor", "Shift+F", [&pianoRoll](bool down) {
@@ -756,7 +756,7 @@ int main(int argc, char **argv)
 			std::string e;
 			const auto to = pianoRoll.run(which, {pianoRoll.currentFrame.get()}, e);
 			int64_t frame = -1;
-			if (to && vm::fromValue(*to, frame) && frame >= 0) run(session, "seek", {frame});
+			if (to && vm::fromValue(*to, frame) && frame >= 0) run(session, "seekAsking", {frame});
 		};
 		hotkeys.add("TAStudio", "Seek To Prev Marker", "Shift+PageUp", [seekMarker](bool down) {
 			if (down) seekMarker("previousMarker");

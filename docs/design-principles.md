@@ -15502,3 +15502,137 @@ which blueMSX does not emulate; the turbo R's own fast processor was not
 exercised by a game of its own (owner: not needed); no disk game. CI passes
 on x86_64 and aarch64, and the first build is "Nightly 2026-11-15
 (72c20df7)".
+
+## A long seek asks first, shows its progress and can be cancelled (user-decided, 2026-11-15, issue 595)
+
+A user ran out of greenzone (the store of past machine states that makes
+going to a frame fast) and clicked an earlier frame in TAStudio. Nothing was
+kept near it, so Chimera replayed the movie from its start, which was going
+to take an hour. TAStudio showed no progress, the project could not be
+saved, and there was no way to stop it. They asked for a way to cancel, or a
+warning first. The owner decided: "Warning first. Then a dialog with a
+progress bar and, frames remaining, fps, and an estimate time remaining. A
+cancel button to go back to where it started, as if nothing had happened".
+
+Why it held everything: with Turbo seek on, a seek is gone in pieces of
+about a tenth of a second, and between them the machine's thread does what
+it is asked - a save is one of those jobs. A seek going back set off from
+the frame the machine was on, which is past the target, so its first piece
+was the whole replay in one call, and every job waited behind it. Its
+progress in TAStudio's status line was counted from that frame too, past the
+target, so none was shown. A seek going back now replays in pieces from the
+state it restores, like one going forward, and its progress is counted from
+there.
+
+What was built:
+
+- **The warning.** A seek the person asks for in the window - a row, a
+  marker (the buttons, the list, the hotkeys), the frame back button, Go to
+  Frame and Seek To, Seek To Selected Frame, the wheel, a branch's Jump To,
+  and the Load of a branch whose state cannot be used - asks first when its
+  replay is estimated to take more than 10 seconds. Yes goes; No does
+  nothing. Scripts, the MCP server and the tests seek with the command
+  `seek`, which never asks; the window uses `seekAsking`, and a branch it
+  loads asks through `askBranchLoad`.
+- **The threshold** is 10 seconds and is not a setting: a new setting is
+  the owner's to decide. A seek of a few seconds goes as before, unasked;
+  one of minutes or an hour always asks. With Turbo seek off, ten seconds
+  is 600 frames played at 60 frames a second.
+- **The estimate.** The frames are those between where the replay sets off
+  and the frame: the nearest state kept at or before the frame before it
+  (before any edit the machine has not gone back for, and for a branch
+  before where its movie parts from this one), or the machine itself when
+  it is already on the way. The speed, with Turbo seek on, is the replay
+  speed the engine measured: `ce_session_measured_fps`, new, gives the
+  frames a second over about the last two seconds of frames run without
+  their picture (a seek's replay), counting only the time the frames took;
+  before any replay, the frames run with their picture, then the machine's
+  own rate. With Turbo seek off a seek past the greenzone plays at the
+  machine's own speed, so it is estimated at that rate times the speed
+  asked for, no faster than frames with pictures have run. A branch's
+  replay is always estimated as a Turbo seek, as it always replays that way.
+- **The dialog** shows a progress bar, the frames remaining, the speed in
+  frames a second (measured four times a second, steadied) and the time
+  remaining, with a Cancel button; Escape cancels too. It is in TAStudio,
+  or in the main window while TAStudio is hidden. Pause and Cancel Seek
+  still stop a seek where it has got to, as before.
+- **Cancel** puts the machine back on the frame it was on, in the state it
+  was in, with its picture, running if it was running, with the moves and
+  rerecords counted as they were (so the green arrow stays where it was);
+  the movie is untouched (a branch's load puts the movie before it back),
+  and the piano roll scrolls back to where it was. The state is kept before
+  the seek begins in a state file in the project's cache folder, as an
+  encode keeps where the person was, and in memory only when no file can be
+  written. Memory was asked for, but a machine's state can be bigger
+  than memory holds at once (a PS3's is past 2 GiB, issue 84), and the
+  engine writes a file without ever holding it whole. The file goes when
+  the seek ends.
+- **The states gathered on the way are kept** when a long seek is
+  cancelled. They are states of the movie as it is, so they are correct,
+  and the next seek there is faster for them. A replay behind the newest
+  state kept stores nothing anyway (user-decided, 2026-09-13), so most
+  cancelled replays gathered none. A branch's load cancelled is different:
+  loading its movie dropped the states past where the two movies part, and
+  putting the old movie back drops those made for the branch's.
+- **A person's branch load takes the branch's markers once it is done.**
+  Replacing the markers empties the piano roll's undo history, which a
+  load cancelled on the way now leaves as it was. A script's load takes
+  them at once, as before.
+- **Stopping a Turbo seek part way** (Pause, Cancel Seek) used to land by
+  seeking to the frame it had reached, which restores the state kept before
+  it and replays from there: with nothing kept on the way, the whole replay
+  a second time. It now runs one frame more for its picture, as a replay
+  stopped does (issue 559).
+
+Saving: the project could not be saved because the save waited for the
+machine's thread, which was in that one long call. A long seek now goes in
+pieces (Turbo seek) or frame by frame (played), and a save made while it
+runs is written between them. Saving is safe there: it writes the movie,
+markers, branches and settings, and none of them depends on the frame the
+machine is on.
+
+The second Chimera that hung was looked at and not changed. A window that
+waits for the machine's thread (pasting in the piano roll, the Hex Editor,
+RAM Watch, the Emulator menu's tools, Help's report) hung for as long as
+the one long call ran, which the pieces now end. With single instance mode
+on (Windows), a second Chimera hands its files to the first and ends; the
+first could not open them until its machine's thread was free. A second
+Chimera opening the same project shares its cache folder: it finds the
+first one's "session running" mark, takes the greenzone file for half
+written and removes it, and offers the first one's work kept against a
+crash. None of this was reproduced on Windows.
+
+Tested on jaffanator01 (Linux x86_64, in Docker, under heavy load from
+other jobs), on main 63bd69b0: meson test 73 of 73 (one more than before:
+the window test below), the end-to-end witness test 125 ok, 0 failed, 1
+known. The engine was also built for Windows x86_64 with mingw-w64; it was
+not built for Windows on ARM, and nothing was run on Windows.
+
+- The view models test's new part (122 checks; the whole test 4457 checks,
+  0 failed, in 151 seconds of its 180) uses the synthetic core, a movie of
+  150,000 frames and only frame 0 kept, with the threshold lowered to half
+  a second, since the synthetic core replays about 19,000 frames a second
+  here. The question named 96,900 frames from frame 3,100 at the speed
+  measured; No left everything as it was; Yes went, the dialog told how
+  far; a save was written while it ran; Cancel put back the frame, every
+  memory domain of the machine, the movie and the piano roll's first frame
+  in view, and the next frame played as it had before. Left alone, it
+  landed on its frame. A script's seek from frame 100,000 back to 60,000
+  was seen on frame 57,540 on the way, its progress counted from frame 0.
+  With Turbo seek off, 100 frames were asked about at 1.67 seconds and
+  played at 61 frames a second. A branch with no state asked from frame 500,
+  where the two movies part; its Cancel put the movie, the machine and the
+  branch list back; left alone, it loaded.
+- The machine is compared by its memory domains, not by a state saved
+  again: after a load the sandbox keeps the pages the replay touched, so
+  the same machine's state comes out 4,096 bytes longer.
+- Broken on purpose, each seen to fail: the machine on the way never played
+  on from (the estimate; 7 checks failed); Cancel not loading the kept
+  state (4 failed); the window's seek never asking (more than 20 failed);
+  the piano roll not scrolled back together with a seek going back from the
+  machine's own frame (2 failed); the engine measuring nothing (8 failed).
+- A window test (long seek, 28 checks) answers the question with Yes, No
+  and Escape, and cancels the progress with Cancel and Escape; with the
+  dialog's cancel taken out, 3 of its checks failed.
+- Not proved: a real game; a seek of an hour; the dialog in the real window
+  with a person (only offscreen, with a stand-in session); Windows itself.

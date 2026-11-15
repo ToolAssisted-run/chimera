@@ -911,7 +911,7 @@ ApplicationWindow {
                 onAccepted: seekDialog.accept()
             }
         }
-        onAccepted: if (seekTo.text !== "") root.session.run("seek", [parseInt(seekTo.text)])
+        onAccepted: if (seekTo.text !== "") root.session.run("seekAsking", [parseInt(seekTo.text)])
     }
     // RAM Search's and RAM Watch's View in Hex Editor: a hidden domain (a
     // game's own variables, say) is not one the Hex Editor shows
@@ -1217,6 +1217,9 @@ ApplicationWindow {
             }
         }
     }
+    // a long seek asked about first, then its progress and Cancel (issue 595):
+    // here while TAStudio is hidden, else in TAStudio
+    LongSeek { anchors.fill: parent; session: root.session; shown: !tastudioWindow.visible }
     // the core stopped: emulation paused, the
     // work kept, and four ways on; closed without a choice, nothing is done
     Connections {

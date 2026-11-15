@@ -89,6 +89,10 @@ private:
 	std::vector<std::pair<int64_t, SessionViewModel::Branch>> removed_;
 	void keepBackup(Undo kind, SessionViewModel::Branch b, int64_t at);
 	void keepLoadBackup();
+	/* the branch at `i` loaded; `person`: a person's load (loadWithWarning),
+	 * whose long replay can be cancelled, putting the run back as it was
+	 * (issue 595) */
+	void loadAt(size_t i, bool person);
 	void dropBackup();
 	bool listed(uint64_t id) const;
 	/* the branches at these places taken out of the list, kept for Undo */

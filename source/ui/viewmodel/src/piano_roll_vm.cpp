@@ -1297,6 +1297,18 @@ PianoRollViewModel::PianoRollViewModel(Dispatcher &dispatcher, InputLog &inputs,
 		follow();
 	});
 	topWatch_ = topFrame.changed.connect([this] { clampTop(); });
+	/* a long seek cancelled leaves the roll where it was when the seek began,
+	 * as if nothing had happened (issue 595): told the seek before the machine
+	 * moves, and the cancel after the frame it went back to */
+	longSeekWatch_ = session_.longSeekTo.changed.connect([this] {
+		const bool on = session_.longSeekTo.get() >= 0;
+		if (on && !longSeekOn_) topBeforeLongSeek_ = topFrame.get();
+		longSeekOn_ = on;
+	});
+	longSeekCancelWatch_ = session_.longSeekCancelled.connect([this] {
+		if (topBeforeLongSeek_ >= 0) topFrame.set(topBeforeLongSeek_);
+		topBeforeLongSeek_ = -1;
+	});
 	/* turned on, it goes to the current frame at once, running or not (issue 486) */
 	followWatch_ = followPlayback.changed.connect([this] { follow(); });
 	greenWatch_ = session_.greenEnd.changed.connect([this] {

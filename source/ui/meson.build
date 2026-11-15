@@ -561,6 +561,15 @@ endif
       override_options: ['cpp_std=c++20'],
     )
     test('text prompt', test_text_prompt, env: ['QT_QPA_PLATFORM=offscreen', 'QT_QUICK_BACKEND=software', 'QT_QUICK_CONTROLS_STYLE=Basic'], timeout: 60)
+    # a long seek's dialogs: the question answered by Yes, No or Escape, the
+    # progress shown and cancelled by Cancel or Escape (issue 595)
+    test_long_seek = executable(
+      'test-long-seek',
+      ['qt/tests/test_long_seek.cpp', qt_rcc],
+      dependencies: [qt_test_dep],
+      override_options: ['cpp_std=c++20'],
+    )
+    test('long seek', test_long_seek, env: ['QT_QPA_PLATFORM=offscreen', 'QT_QUICK_BACKEND=software', 'QT_QUICK_CONTROLS_STYLE=Basic'], timeout: 60)
     # every modal window is a sheet on a Mac, not over other apps (issue 541)
     test('mac sheets', find_program('python3'), args: [files('qt/tests/mac-sheets.py'), meson.current_source_dir() / 'qt'])
     # a button clicked ends the editing of a box: a number typed is its value
