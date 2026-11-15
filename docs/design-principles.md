@@ -15454,3 +15454,13 @@ back with the window before it presses Alt, as a person's next key comes;
 it passes, 11 of 11, offscreen and on X11. Not
 proved here: Windows and macOS (CI runs the test there), Wayland, a person's
 mouse, and submenus and right-click menus, which no test drives.
+
+On macOS's runners in CI, Qt's offscreen platform drew the menu inside the
+window rather than as a window of its own; on Linux and Windows the same
+platform showed it as a window. How a Mac's own screen shows it was not
+seen. The menus test now checks a menu the way Qt showed it: as a window,
+past the window's bottom with no strips; drawn inside, below the bar,
+within the window, its rows scrolled. Its long menu has 60 rows, not 120,
+so that scrolling to the end and back fits a slow runner's time; the
+aarch64 Mac took more than 20 seconds for 3137 pixels. It passes 55 of 55
+offscreen and on X11, and 54 of 54 with the menu drawn inside the window.

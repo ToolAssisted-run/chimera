@@ -60,7 +60,7 @@ ApplicationWindow {
             delegate: MenuEntry {}
             // more rows than any screen holds
             Instantiator {
-                model: 120
+                model: 60
                 delegate: Action { text: "Row " + index }
                 onObjectAdded: (index, object) => longMenu.insertAction(index, object)
             }
@@ -144,30 +144,42 @@ int main(int argc, char **argv)
 	CHECK(opened());
 	/* a window of its own, below the bar, not over it, and reaching past
 	 * the bottom of the window too short for it (issue 593); all its rows
-	 * fit on the screen, so no scroll strips (issue 588) */
+	 * fit on the screen, so no scroll strips (issue 588). Where Qt cannot
+	 * show a menu as a window (macOS's offscreen platform in CI), it is drawn
+	 * inside the window: below the bar, no taller than the room, its rows
+	 * scrolled (issues 450, 463, 588) */
 	auto *bar = qobject_cast<QQuickItem *>(window->property("menuBar").value<QObject *>());
 	auto *popupItem = qobject_cast<QQuickItem *>(tools->property("contentItem").value<QObject *>());
 	CHECK(bar != nullptr && popupItem != nullptr);
 	if (bar != nullptr && popupItem != nullptr)
 	{
 		QQuickWindow *menuWindow = popupItem->window();
-		CHECK(menuWindow != nullptr && menuWindow != window);
-		if (menuWindow != nullptr)
-		{
-			const QRect menu = menuWindow->geometry(), parent = window->geometry();
-			std::printf("window %d,%d %dx%d, bar %.1f high; menu window %d,%d %dx%d\n", parent.x(), parent.y(), parent.width(), parent.height(),
-			            bar->height(), menu.x(), menu.y(), menu.width(), menu.height());
-			CHECK(menu.top() >= parent.top() + bar->height() - 1);
-			CHECK(menu.bottom() > parent.bottom());
-		}
+		CHECK(menuWindow != nullptr);
 		auto *up = popupItem->findChild<QQuickItem *>(QStringLiteral("menuScrollUp"));
 		auto *down = popupItem->findChild<QQuickItem *>(QStringLiteral("menuScrollDown"));
-		CHECK(up != nullptr && down != nullptr && !up->isVisible() && !down->isVisible());
+		CHECK(up != nullptr && down != nullptr);
+		if (menuWindow != nullptr && menuWindow != window && up != nullptr && down != nullptr)
+		{
+			const QRect menu = menuWindow->geometry(), parent = window->geometry();
+			std::printf("a window of its own: window %d,%d %dx%d, bar %.1f high; menu window %d,%d %dx%d\n", parent.x(), parent.y(), parent.width(),
+			            parent.height(), bar->height(), menu.x(), menu.y(), menu.width(), menu.height());
+			CHECK(menu.top() >= parent.top() + bar->height() - 1);
+			CHECK(menu.bottom() > parent.bottom());
+			CHECK(!up->isVisible() && !down->isVisible());
+		}
+		else if (menuWindow == window && up != nullptr && down != nullptr)
+		{
+			const double y = tools->property("y").toDouble(), height = tools->property("height").toDouble();
+			std::printf("drawn inside the window: bar %.1f high, menu at %.1f, %.1f high, window %d\n", bar->height(), y, height, window->height());
+			CHECK(y >= bar->height() - 0.5 && y + height <= window->height() + 0.5);
+			CHECK(up->isVisible() && down->isVisible());
+		}
 	}
 	QMetaObject::invokeMethod(tools, "close");
 	CHECK(QTest::qWaitFor([&] { return !opened(); }, 2000));
 
-	/* a menu taller than the screen (issue 588): a strip at each end, the
+	/* a menu taller than the screen (issue 588), or than the window where it
+	 * is drawn inside the window: a strip at each end, the
 	 * bottom one bright and the top one dim; the pointer resting on the
 	 * bottom strip scrolls the rows to their end, and on the top strip back
 	 * to their start */
@@ -191,12 +203,12 @@ int main(int argc, char **argv)
 			CHECK(!up->isEnabled() && down->isEnabled());
 			const double top = rows->property("contentY").toDouble();
 			QTest::mouseMove(menuWindow, down->mapToScene(QPointF(down->width() / 2, down->height() / 2)).toPoint());
-			CHECK(QTest::qWaitFor([&] { return !down->isEnabled(); }, 20000));
+			CHECK(QTest::qWaitFor([&] { return !down->isEnabled(); }, 30000));
 			const double bottom = rows->property("contentY").toDouble();
 			std::printf("rows scrolled from %.1f to %.1f\n", top, bottom);
 			CHECK(bottom > top && up->isEnabled());
 			QTest::mouseMove(menuWindow, up->mapToScene(QPointF(up->width() / 2, up->height() / 2)).toPoint());
-			CHECK(QTest::qWaitFor([&] { return !up->isEnabled(); }, 20000));
+			CHECK(QTest::qWaitFor([&] { return !up->isEnabled(); }, 30000));
 			CHECK(rows->property("contentY").toDouble() == top && down->isEnabled());
 		}
 	}
