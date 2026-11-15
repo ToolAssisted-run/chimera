@@ -198,13 +198,17 @@ Chimera's window: Qt 6.12, QML views over C++ view models. The code is in
   menu of special bindings is made when its arrow is clicked.
   The menus are the window's own style's (source/ui/qt/style/Menu.qml): a
   menu is as wide as its widest row (Fusion's were always 200 pixels and
-  cut a longer row short, issue 452), stays below the menu bar in a short
-  window and scrolls its rows (issues 450, 463), and closes when its window
-  loses the keyboard to another (issue 449). When its rows do not all fit,
-  a strip at the top and the bottom has an arrow, bright while there are
-  rows past that end, and the rows scroll while the pointer rests on it;
-  the menu opens at its first row (issue 588). A menu stays inside its window
-  (the owner kept menus there rather than in windows of their own). A tab
+  cut a longer row short, issue 452). Each menu is a window of its own, so
+  it reaches past the edges of a short window, as the old WinForms menus
+  did (user-decided, 2026-11-15, issue 593). It opens below the menu bar
+  (issues 450, 463), is no taller than its screen, closes when its window
+  loses the keyboard to another (issue 449) and when its name in the menu
+  bar is clicked again. When its rows do not all fit on the screen, a strip
+  at the top and the bottom has an arrow, bright while there are rows past
+  that end, and the rows scroll while the pointer rests on it; the menu
+  opens at its first row (issue 588). Where the system cannot show a menu as
+  a window, Qt draws it inside the window, below the bar, its rows scrolled
+  when they do not fit. A tab
   is as wide as its name (TAStudio Settings' were cut short, issue 452).
   The main window's menu bar items (MenuBarEntry.qml) take their width from
   their menu, not from whether they are visible: full screen hides the bar,

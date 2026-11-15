@@ -2,8 +2,8 @@
  * presses it (issue 471): a row whose text has a letter to underline
  * ("&Copy") drew nothing afterwards, in a dark window plainly so. And the
  * letter is underlined only while Alt is held (issue 405). The rows are
- * read in the window's picture: each must hold light pixels, its text's,
- * on the dark menu. */
+ * read in the picture of the window they are drawn in, the menu's own
+ * (issue 593): each must hold light pixels, its text's, on the dark menu. */
 #include "../menu_letters.hpp"
 
 #include <QGuiApplication>
@@ -86,13 +86,21 @@ int main(int argc, char **argv)
 	auto close = [&] {
 		QMetaObject::invokeMethod(menu, "close");
 		QTest::qWaitFor([&] { return !menu->property("opened").toBool(); }, 2000);
+		/* the keyboard back with the window, as it is by the time a person
+		 * presses a key: where the menu's own window had it, it returns once
+		 * the menu is closed (issue 593) */
+		QTest::qWaitFor([&] { return QGuiApplication::focusWindow() == window; }, 2000);
 	};
 	/* each row: its light pixels when the menu is open, and whether its
 	 * letter is underlined ("-" for a row without one); whether every
 	 * row's text is drawn */
 	auto rows = [&](const char *when, bool look) {
 		QTest::qWait(100);
-		const QImage picture = window->grabWindow();
+		/* the window the rows are drawn in: the menu's own, or this one */
+		QQuickItem *firstRow = nullptr;
+		QMetaObject::invokeMethod(menu, "itemAt", Q_RETURN_ARG(QQuickItem *, firstRow), Q_ARG(int, 0));
+		QQuickWindow *drawnIn = firstRow != nullptr && firstRow->window() != nullptr ? firstRow->window() : window;
+		const QImage picture = drawnIn->grabWindow();
 		QString seen;
 		bool allDrawn = true;
 		for (int i = 0; i < menu->property("count").toInt(); i++)

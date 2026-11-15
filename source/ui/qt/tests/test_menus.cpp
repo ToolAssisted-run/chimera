@@ -1,7 +1,8 @@
-/* The window's menus, in its own style (issues 449, 450, 452, 463): a
- * menu is as wide as its widest row, stays below the menu bar in a short
- * window with its rows scrolled, and closes when its window loses the
- * keyboard to another. A menu bar's menu opened by a click, as a person
+/* The window's menus, in its own style (issues 449, 450, 452, 463, 593): a
+ * menu is as wide as its widest row, is a window of its own that reaches
+ * past the bottom of a short window while staying below its menu bar, has
+ * its rows scrolled only when it is taller than the screen, and closes when
+ * its window loses the keyboard to another. A menu bar's menu opened by a click, as a person
  * opens it. And the main window's menu bar keeps its items' text whole
  * after it was hidden, as full screen hides it (issue 451). */
 #include "../menu_letters.hpp"
@@ -12,6 +13,7 @@
 #include <QQuickItem>
 #include <QQuickStyle>
 #include <QQuickWindow>
+#include <QScreen>
 #include <QTest>
 
 #include <algorithm>
@@ -33,6 +35,7 @@ import "qrc:/chimera"
 ApplicationWindow {
     width: 400; height: 160; visible: true
     property alias tools: tools
+    property alias longMenu: longMenu
     menuBar: MenuBar {
         Menu {
             id: tools
@@ -49,6 +52,18 @@ ApplicationWindow {
             Action { text: "Trace Logger" }
             Action { text: "Surface Viewer" }
             Action { text: "CPU Registers" }
+        }
+        Menu {
+            id: longMenu
+            objectName: "long"
+            title: "Long"
+            delegate: MenuEntry {}
+            // more rows than any screen holds
+            Instantiator {
+                model: 120
+                delegate: Action { text: "Row " + index }
+                onObjectAdded: (index, object) => longMenu.insertAction(index, object)
+            }
         }
         delegate: MenuBarItem { objectName: "bar:" + text }
     }
@@ -123,37 +138,76 @@ int main(int argc, char **argv)
 	}
 	std::printf("widest row %.1f, rows %.1f wide\n", widest, rowWidth);
 	CHECK(widest > 200 && rowWidth >= widest);
-	/* in a window too short for it: below the bar, not over it, and no taller than the room */
+	/* opened, it stays open: being a window of its own does not count as
+	 * its parent window losing the keyboard (issue 449's closing) */
+	QTest::qWait(300);
+	CHECK(opened());
+	/* a window of its own, below the bar, not over it, and reaching past
+	 * the bottom of the window too short for it (issue 593); all its rows
+	 * fit on the screen, so no scroll strips (issue 588) */
 	auto *bar = qobject_cast<QQuickItem *>(window->property("menuBar").value<QObject *>());
 	auto *popupItem = qobject_cast<QQuickItem *>(tools->property("contentItem").value<QObject *>());
 	CHECK(bar != nullptr && popupItem != nullptr);
 	if (bar != nullptr && popupItem != nullptr)
 	{
-		const double y = tools->property("y").toDouble(), height = tools->property("height").toDouble();
-		std::printf("bar %.1f high, menu at %.1f, %.1f high, window %d\n", bar->height(), y, height, window->height());
-		CHECK(y >= bar->height() - 0.5 && y + height <= window->height() + 0.5);
-		/* rows hidden below (issue 588): a strip at each end, the bottom
-		 * one bright and the top one dim; the pointer resting on the
-		 * bottom strip scrolls the rows to their end, and on the top strip
-		 * back to their start */
+		QQuickWindow *menuWindow = popupItem->window();
+		CHECK(menuWindow != nullptr && menuWindow != window);
+		if (menuWindow != nullptr)
+		{
+			const QRect menu = menuWindow->geometry(), parent = window->geometry();
+			std::printf("window %d,%d %dx%d, bar %.1f high; menu window %d,%d %dx%d\n", parent.x(), parent.y(), parent.width(), parent.height(),
+			            bar->height(), menu.x(), menu.y(), menu.width(), menu.height());
+			CHECK(menu.top() >= parent.top() + bar->height() - 1);
+			CHECK(menu.bottom() > parent.bottom());
+		}
 		auto *up = popupItem->findChild<QQuickItem *>(QStringLiteral("menuScrollUp"));
 		auto *down = popupItem->findChild<QQuickItem *>(QStringLiteral("menuScrollDown"));
+		CHECK(up != nullptr && down != nullptr && !up->isVisible() && !down->isVisible());
+	}
+	QMetaObject::invokeMethod(tools, "close");
+	CHECK(QTest::qWaitFor([&] { return !opened(); }, 2000));
+
+	/* a menu taller than the screen (issue 588): a strip at each end, the
+	 * bottom one bright and the top one dim; the pointer resting on the
+	 * bottom strip scrolls the rows to their end, and on the top strip back
+	 * to their start */
+	QObject *longMenu = window->property("longMenu").value<QObject *>();
+	auto *longItem = window->findChild<QQuickItem *>(QStringLiteral("bar:Long"));
+	CHECK(longMenu != nullptr && longItem != nullptr);
+	if (longMenu != nullptr && longItem != nullptr)
+	{
+		QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, longItem->mapToScene(QPointF(longItem->width() / 2, longItem->height() / 2)).toPoint());
+		CHECK(QTest::qWaitFor([&] { return longMenu->property("opened").toBool(); }, 2000));
+		auto *rows = qobject_cast<QQuickItem *>(longMenu->property("contentItem").value<QObject *>());
+		auto *up = rows != nullptr ? rows->findChild<QQuickItem *>(QStringLiteral("menuScrollUp")) : nullptr;
+		auto *down = rows != nullptr ? rows->findChild<QQuickItem *>(QStringLiteral("menuScrollDown")) : nullptr;
 		CHECK(up != nullptr && down != nullptr);
 		if (up != nullptr && down != nullptr)
 		{
+			QQuickWindow *menuWindow = rows->window();
+			std::printf("long menu: %d rows, window %dx%d on a screen %d high\n", longMenu->property("count").toInt(),
+			            menuWindow->width(), menuWindow->height(), menuWindow->screen() != nullptr ? menuWindow->screen()->availableGeometry().height() : -1);
 			CHECK(up->isVisible() && down->isVisible());
 			CHECK(!up->isEnabled() && down->isEnabled());
-			const double top = popupItem->property("contentY").toDouble();
-			QTest::mouseMove(window, down->mapToScene(QPointF(down->width() / 2, down->height() / 2)).toPoint());
-			CHECK(QTest::qWaitFor([&] { return !down->isEnabled(); }, 5000));
-			const double bottom = popupItem->property("contentY").toDouble();
+			const double top = rows->property("contentY").toDouble();
+			QTest::mouseMove(menuWindow, down->mapToScene(QPointF(down->width() / 2, down->height() / 2)).toPoint());
+			CHECK(QTest::qWaitFor([&] { return !down->isEnabled(); }, 20000));
+			const double bottom = rows->property("contentY").toDouble();
 			std::printf("rows scrolled from %.1f to %.1f\n", top, bottom);
 			CHECK(bottom > top && up->isEnabled());
-			QTest::mouseMove(window, up->mapToScene(QPointF(up->width() / 2, up->height() / 2)).toPoint());
-			CHECK(QTest::qWaitFor([&] { return !up->isEnabled(); }, 5000));
-			CHECK(popupItem->property("contentY").toDouble() == top && down->isEnabled());
+			QTest::mouseMove(menuWindow, up->mapToScene(QPointF(up->width() / 2, up->height() / 2)).toPoint());
+			CHECK(QTest::qWaitFor([&] { return !up->isEnabled(); }, 20000));
+			CHECK(rows->property("contentY").toDouble() == top && down->isEnabled());
 		}
 	}
+	if (longMenu != nullptr)
+	{
+		QMetaObject::invokeMethod(longMenu, "close");
+		CHECK(QTest::qWaitFor([&] { return !longMenu->property("opened").toBool(); }, 2000));
+	}
+	/* the first menu again, for the next check */
+	QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, barItem->mapToScene(QPointF(barItem->width() / 2, barItem->height() / 2)).toPoint());
+	CHECK(QTest::qWaitFor(opened, 2000));
 	/* another window takes the keyboard: the menu closes */
 	QQmlApplicationEngine otherEngine;
 	otherEngine.loadData(kOther);
@@ -232,8 +286,13 @@ int main(int argc, char **argv)
 			game->forceActiveFocus();
 			QTest::mouseClick(barWindow, Qt::LeftButton, Qt::NoModifier, help->mapToScene(QPointF(help->width() / 2, help->height() / 2)).toPoint());
 			CHECK(QTest::qWaitFor([&] { return helpMenu->property("opened").toBool(); }, 2000));
-			/* closed by clicking its name again, as a person does */
-			QTest::mouseClick(barWindow, Qt::LeftButton, Qt::NoModifier, help->mapToScene(QPointF(help->width() / 2, help->height() / 2)).toPoint());
+			/* closed by clicking its name again, as a person does. While a menu
+			 * that is a window of its own is open, the system gives every click
+			 * to it (issue 593), so the click goes there, where the bar is */
+			auto *helpRows = qobject_cast<QQuickItem *>(helpMenu->property("contentItem").value<QObject *>());
+			QWindow *clickWindow = helpRows != nullptr && helpRows->window() != nullptr ? static_cast<QWindow *>(helpRows->window()) : barWindow;
+			const QPoint name = help->mapToGlobal(QPointF(help->width() / 2, help->height() / 2)).toPoint();
+			QTest::mouseClick(clickWindow, Qt::LeftButton, Qt::NoModifier, clickWindow->mapFromGlobal(name));
 			CHECK(QTest::qWaitFor([&] { return !helpMenu->property("visible").toBool(); }, 2000));
 			QTest::qWait(100);
 			const int before = barWindow->property("spaces").toInt();

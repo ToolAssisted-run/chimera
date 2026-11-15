@@ -15400,3 +15400,57 @@ pressed, then read as it is; with the waiting taken out, two checks failed.
 The real Lite 2, just plugged in and not touched, read nothing held with
 the change and both sticks held up and to the left without it. None of
 this was tried in the window itself.
+
+## Menus are windows of their own (user-decided, 2026-11-15, issue 593)
+
+A menu could not reach past the edges of the window it opened from: in a
+short window its rows were cut, then scrolled (issues 450, 463, 588), which
+was what the owner had chosen then. Issue 593 asked for menus that reach
+past the window, as the old WinForms interface's did, and the owner chose
+that over keeping the scroll arrows alone. The window's style now shows
+each menu as a window of its own (Qt's `popupType: Popup.Window`), so a menu
+opened from a short window or from TAStudio's menu bar goes on below it.
+Four things had to follow:
+
+- **No taller than the screen.** Qt does not hold a popup window to the
+  screen: a menu of 120 rows came out 3122 pixels high on a screen 800
+  high. A menu is now at most the screen's height, and the scroll strips of
+  issue 588 appear only when its rows do not fit on the screen (774 pixels
+  there, the rows scrolling to their end and back).
+- **Closed when the keyboard goes to another window (issue 449).** Where the
+  system gives the menu's own window the keyboard, as the offscreen test
+  platform does, Qt tells only the window losing it, so the menu never
+  heard that the window it opened from had lost it. Both are watched now:
+  the menu closes once neither has the keyboard.
+- **The keyboard back where it was (issue 552).** Where the system leaves
+  the keyboard with the hidden menu window, nothing had it after the menu
+  closed, and Space reached nothing. The window the menu opened from takes
+  it back then, unless the menu closed because another window took it.
+  Windows and X11 leave the keyboard with the window all along.
+- **Closed by a click on its name.** Qt gives a menu bar's menu the rule
+  "close on a press outside the bar item", so that a press on the item does
+  not close a menu the item's click would open again. As a window, the menu
+  gets every press while open, and Qt keeps a press on the bar from the bar;
+  under that rule the menu stayed open when its name was clicked again. As
+  a window it closes on any press outside it, its name included. Drawn
+  inside the window, where the system cannot show a menu as a window, it
+  keeps Qt's rule, and so does a submenu, whose rule is another.
+
+Tested: the "menus" window test now checks that the menu is a window of its
+own, starts below the 26-pixel bar and reaches past the bottom of a window
+160 pixels high (the menu 262 pixels high), that it stays open once opened,
+that a menu taller than the screen scrolls, that it closes when another
+window is activated, and that a click on its name closes it and gives the
+keyboard back to the game. It passes, 54 of 54 checks, on the offscreen
+platform the test suite uses and on X11 (Xvfb). With the menu drawn inside
+the window again, the four checks that are about it being a window failed;
+before each of the four fixes above, its checks failed (the long menu 3122
+pixels high, the menu left open by the click on its name, Space reaching
+nothing). The test sends its click on the menu's name to the menu's window,
+as Windows and X11 deliver a real click while a menu window is open. The
+"menu text" test (issue 471) now reads the rows in the picture of the
+menu's own window, and after closing a menu waits for the keyboard to be
+back with the window before it presses Alt, as a person's next key comes;
+it passes, 11 of 11, offscreen and on X11. Not
+proved here: Windows and macOS (CI runs the test there), Wayland, a person's
+mouse, and submenus and right-click menus, which no test drives.
