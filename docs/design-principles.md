@@ -15087,3 +15087,52 @@ and are light after, and Dark is unchanged. `test-theme` checks the light
 fallback (it failed with the fallback taken out) and the colours of a
 theme that is not on; the second cannot tell the palettes apart without a
 desktop of its own, so for the drawing the captures are what show it.
+
+## Five Gear cores join the official cores (user-decided, 2026-11-15, issue 581)
+
+Issue 581 asked for the Gear family of emulators by Ignacio Sanchez
+(drhelius): Gearboy, Gearsystem, Gearcoleco, Geargrafx, Gearlynx and
+Geartowns. The owner asked for them to be built, decided the questions they
+raised one by one (2026-11-14), and asked for five of them to be published.
+Each is its own repository, `chimera-core-<id>`, with the upstream release it
+builds kept at one version:
+
+- **Gearboy 3.8.20** plays the Game Boy, Game Boy Color and Super Game Boy,
+  and two Game Boys joined by a link cable. The boot ROM is on by default,
+  as in the Gambatte core, which is not Gearboy's own default (owner).
+- **Gearsystem** plays the Master System, Game Gear and SG-1000, and two Game
+  Gears or two Mark IIIs joined by their cable. The FM sound chip is kept,
+  and its code is declared non-commercial, as Genesis Plus GX declares it
+  (owner).
+- **Gearcoleco 1.7.6** plays the ColecoVision and the Coleco ADAM. The ADAM
+  boots the way upstream does: a cartridge alone starts the game, anything
+  else starts the computer (owner). The ADAM has run only on the
+  repository's own stand-in ROMs; the owner's EOS and SmartWriter ROMs
+  arrived on 2026-11-15, and their checksums are to be pinned once they are
+  tested.
+- **Geargrafx 1.8.7** plays the PC Engine / TurboGrafx-16, the SuperGrafx and
+  the PC Engine CD, including .chd discs. The LaserActive was left out,
+  because it could not be booted here: the 512 KiB BIOS it needs and a
+  LaserActive disc were not on hand. The .hes music files were left out
+  because upstream has no player for them (owner).
+- **Gearlynx 1.2.38** plays the Atari Lynx, and two to four Lynxes joined by
+  their ComLynx cable. The cartridge key is read from the user's boot ROM,
+  not shipped, and a setting, off by default, allows Up and Down together
+  (owner).
+
+A link cable is made inside the core: the core runs both machines and shows
+Chimera one machine, as the Gambatte core does with its Game Boy Link. No
+change to Chimera was needed for that, or for any of the five (owner).
+Geartowns (FM Towns) stays unpublished until it has run Fujitsu's own ROMs
+and some games.
+
+Measured in each core's repository (its docs/PLAN.md has the details): the
+core's test script, the frontend test script and Chimera's 25 package checks
+pass for all five, on x86_64 and aarch64 in CI. The owner's firmware and
+games were played, and the core built natively and the core in the sandbox
+gave the same machine: Gearboy's boot ROMs and Game Boy games, Gearsystem's
+seven games and its boot ROMs,
+Gearcoleco's BIOS with Carnival and Oil's Well, Geargrafx's eight games, and
+Gearlynx's boot ROM with California Games, Gauntlet and Klax. The first
+builds are "Nightly 2026-11-15" for each: Gearboy 7aaf5a77, Gearsystem
+fbd5a45f, Gearcoleco c5c30de8, Geargrafx 040d7547 and Gearlynx 0c7ad05d.

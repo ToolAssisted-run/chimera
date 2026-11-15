@@ -55,10 +55,14 @@ Made, published and supported by this project. Report a problem with one in [Chi
 | [Azahar](https://github.com/ToolAssisted-run/chimera-core-azahar) | Nintendo 3DS / New Nintendo 3DS |
 | [melonDS](https://github.com/ToolAssisted-run/chimera-core-melonds) | Nintendo DS, Nintendo DSi |
 | [Gambatte](https://github.com/ToolAssisted-run/chimera-core-gambatte) | Game Boy / Game Boy Color, Super Game Boy, Game Boy Link (two to four Game Boys joined by cable) |
+| [Gearboy](https://github.com/ToolAssisted-run/chimera-core-gearboy) | Game Boy / Game Boy Color, Super Game Boy, Game Boy Link (two Game Boys joined by cable) |
 | [Genesis Plus GX](https://github.com/ToolAssisted-run/chimera-core-gpgx) | Mega Drive / Genesis, Sega CD / Mega CD, Master System, Game Gear, SG-1000, Sega Pico |
+| [Gearsystem](https://github.com/ToolAssisted-run/chimera-core-gearsystem) | Master System, Game Gear, SG-1000, Gear-to-Gear and Mark III links (two consoles joined by cable) |
 | [Flycast](https://github.com/ToolAssisted-run/chimera-core-flycast) | Dreamcast, Sega NAOMI / NAOMI 2 (arcade), Sammy Atomiswave (arcade) |
 | [Supermodel](https://github.com/ToolAssisted-run/chimera-core-supermodel) | Sega Model 3 (arcade) |
 | [Mednafen](https://github.com/ToolAssisted-run/chimera-core-mednafen) | Sega Saturn, Sega ST-V (arcade), Virtual Boy, PC-FX, Atari Lynx |
+| [Geargrafx](https://github.com/ToolAssisted-run/chimera-core-geargrafx) | PC Engine / TurboGrafx-16, SuperGrafx, PC Engine CD |
+| [Gearlynx](https://github.com/ToolAssisted-run/chimera-core-gearlynx) | Atari Lynx, ComLynx (two to four Lynxes joined by cable) |
 | [FBNeo](https://github.com/ToolAssisted-run/chimera-core-fbneo) | Capcom CPS-1 / CPS-2 / CPS-3 (arcade), Neo Geo MVS (arcade), Neo Geo CD, Sega System 16 (arcade) |
 | [MAME](https://github.com/ToolAssisted-run/chimera-core-mame) | Arcade (the arcade machines of MAME) |
 | [MAME Home Systems](https://github.com/ToolAssisted-run/chimera-core-mamehome) | Atari 7800, Intellivision, Vectrex, Odyssey 2 / Videopac, Channel F, Amstrad CPC / CPC+ / GX4000, TI-83, BBC Micro |
@@ -72,6 +76,7 @@ Made, published and supported by this project. Report a problem with one in [Chi
 | [Opera](https://github.com/ToolAssisted-run/chimera-core-opera) | 3DO Interactive Multiplayer |
 | [Zeebx](https://github.com/ToolAssisted-run/chimera-core-zeebx) | Zeebo |
 | [Stella](https://github.com/ToolAssisted-run/chimera-core-stella) | Atari 2600 |
+| [Gearcoleco](https://github.com/ToolAssisted-run/chimera-core-gearcoleco) | ColecoVision, Coleco ADAM |
 | [Virtual Jaguar](https://github.com/ToolAssisted-run/chimera-core-virtualjaguar) | Atari Jaguar, Atari Jaguar CD |
 | [Cadmium](https://github.com/ToolAssisted-run/chimera-core-cadmium) | CHIP-8, SUPER-CHIP, XO-CHIP and their relatives |
 | [TIC-80](https://github.com/ToolAssisted-run/chimera-core-tic80) | TIC-80 (fantasy computer) |
