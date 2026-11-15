@@ -724,6 +724,15 @@
       ],
       "repo": "ToolAssisted-run/chimera-core-pokket",
       "tested": ""
+    },
+    {
+      "id": "geartowns",
+      "name": "Geartowns",
+      "systems": [
+        { "id": "FMTowns", "name": "FM Towns" }
+      ],
+      "repo": "ToolAssisted-run/chimera-core-geartowns",
+      "tested": ""
     }
   ]
 }

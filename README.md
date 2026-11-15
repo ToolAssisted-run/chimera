@@ -88,6 +88,7 @@ Made, published and supported by this project. Report a problem with one in [Chi
 | [Fuse](https://github.com/ToolAssisted-run/chimera-core-fuse) | ZX Spectrum 16K / 48K / 128K / +2 / +3, Timex, Pentagon, Scorpion |
 | [ZEsarUX](https://github.com/ToolAssisted-run/chimera-core-zesarux) | ZX Spectrum Next |
 | [MAME X68000](https://github.com/ToolAssisted-run/chimera-core-x68k) | Sharp X68000 |
+| [Geartowns](https://github.com/ToolAssisted-run/chimera-core-geartowns) | Fujitsu FM Towns, FM Towns II and FM Towns Marty |
 | [DOSBox-X](https://github.com/ToolAssisted-run/chimera-core-dosbox-x) | MS-DOS, Windows 3.1 / 95 / 98 |
 | [PCem](https://github.com/ToolAssisted-run/chimera-core-pcem) | MS-DOS, Windows 3.1 / 95 / 98, Windows XP, Linux (x86) |
 | [86Box](https://github.com/ToolAssisted-run/chimera-core-86box) | IBM PC compatibles: IBM PC, XT and AT, a 486 and a Pentium board (MS-DOS) |

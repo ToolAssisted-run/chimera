@@ -15172,3 +15172,43 @@ skipped without it (as on CI), the frontend test script 4 of 4, and
 Chimera's package checks 24 of 24. CI passes on x86_64 and aarch64, and the
 first build is "Nightly 2026-11-15 (d1d44136)". Not proved: Chimera's window
 with Sony's BIOS, docking with a PlayStation, and infra-red between units.
+
+## Geartowns joins the official cores (user-decided, 2026-11-15, issue 581)
+
+The last of the Gear family asked for in issue 581: `chimera-core-geartowns`
+plays the Fujitsu FM Towns, from the first model to the FM Towns II and the
+FM Towns Marty, with Geartowns 1.0.6 (GPL-3.0-or-later) kept at that
+version. The owner's decisions:
+
+- The user brings the ROMs of the model they choose; each file is pinned
+  to one SHA-1. A free, compatible set of ROMs (CaptainYS's TOWNSROM) is
+  offered too, through the freeTownsRoms setting, from either of its two
+  releases, forTsugaru and forUNZ (owner, 2026-11-15). CI builds that free
+  set from TOWNSROM's source at one commit (owner, 2026-11-14). No hard
+  disks for now (owner, 2026-11-14).
+- The Marty is offered but has not been booted: the system and OS ROMs its
+  set pins were not on hand, and MAME's other Marty set holds another
+  revision. The core's README and its firmware text say so (owner,
+  2026-11-15).
+- Games that want a blank floppy, as both games tried here do, get one
+  built into the machine, as upstream's libretro core makes one: a
+  formatted disk kept in the core's save data, after the project's own
+  floppies, which Next Floppy Disk puts in drive 1. It is part of
+  savestates, Export Save Data gives it out as a .d88 file inside a zip,
+  and nothing is written on the host. It is on by default, where
+  upstream's libretro option is off (owner, 2026-11-15). This replaced a
+  tool that wrote a blank floppy file for the user to add.
+
+Measured in the core's repository on jaffanator01 (docs/PLAN.md there has
+the details): every one of the owner's Fujitsu ROM dumps matches its pin.
+4D Boxing (Model 1/2) reaches a fight in which the pad moves the player's
+boxer, and writes its user disk to the save disk; given back, the disk is
+read without the game asking again. Gokuraku Mandala (FM Towns II MX)
+makes its save disk and reaches its first scene. Each replays the same
+twice through chimera-run, after a seek back, and with a savestate saved
+and loaded before every frame, and natively and in the sandbox. On the
+Model 1/2, Mandala cannot make its save disk; upstream Geartowns' own
+program fails the same way, so it is not this core's, and its cause is not
+known. The core's test script passes 50 of 50, the frontend test script 5
+of 5, and Chimera's package checks 24 of 24. Not proved: the Marty, most of
+the fourteen models, floppy games, and these games in Chimera's window.

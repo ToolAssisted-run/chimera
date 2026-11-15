@@ -57,9 +57,9 @@ out, as Ikemen GO leaves out the Intel Mac.
   DOSBox-X,
   FBNeo, Fuse, Gambatte, Genesis Plus GX, Mednafen, Mesen, NesHawk, Opera,
   PUAE, QuickerNES, Snes9x, Stella, TIC-80, Uzem, VICE, Virtual Jaguar,
-  ZEsarUX and OpenBOR, Gearboy, Gearcoleco, Geargrafx, Gearlynx, Gearsystem
-  and Pokket (since they joined, 2026-11-15), and the game cores dsda, RSDKv3,
-  RSDKv5 and RSDKv5U.
+  ZEsarUX and OpenBOR, Gearboy, Gearcoleco, Geargrafx, Gearlynx, Gearsystem,
+  Geartowns and Pokket (since they joined, 2026-11-15), and the game cores
+  dsda, RSDKv3, RSDKv5 and RSDKv5U.
   Game cores are not ported otherwise (user-decided, 2026-11-07). The other
   cores publish x86_64 only. Of the third-party cores, SRB2 publishes both. An
   aarch64 build runs only the cores that have an aarch64 package.
