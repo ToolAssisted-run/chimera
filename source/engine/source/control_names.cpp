@@ -3,6 +3,7 @@
 
 #include "movie_entry.hpp"
 
+#include <cstdint>
 #include <vector>
 
 namespace chimera {
@@ -18,15 +19,62 @@ bool usableMnemonic(char c)
 	return c > ' ' && c < 0x7F && c != '.' && c != '|';
 }
 
+/* Reads the UTF-8 character at s[i] and moves i past it. The whole of it must
+ * be there, in its shortest form, no surrogate, nothing past U+10FFFF.
+ * Returns its code point, or -1. */
+static int64_t nextCodePoint(const std::string &s, size_t &i)
+{
+	const unsigned char c = static_cast<unsigned char>(s[i]);
+	size_t extra = 0;
+	uint32_t cp = 0, least = 0;
+	if (c < 0x80) { i++; return c; }
+	else if (c >= 0xC2 && c < 0xE0) { extra = 1; cp = c & 0x1Fu; least = 0x80; }
+	else if (c >= 0xE0 && c < 0xF0) { extra = 2; cp = c & 0x0Fu; least = 0x800; }
+	else if (c >= 0xF0 && c < 0xF5) { extra = 3; cp = c & 0x07u; least = 0x10000; }
+	else return -1;
+	if (i + extra >= s.size()) return -1;
+	for (size_t k = 1; k <= extra; k++)
+	{
+		const unsigned char d = static_cast<unsigned char>(s[i + k]);
+		if ((d & 0xC0) != 0x80) return -1;
+		cp = (cp << 6) | (d & 0x3Fu);
+	}
+	if (cp < least || cp > 0x10FFFF || (cp >= 0xD800 && cp < 0xE000)) return -1;
+	i += extra + 1;
+	return cp;
+}
+
+/* A character a header may hold: not a control character, not a space of any
+ * width, not one that only steers text (a joiner, a direction mark), not a
+ * code point Unicode keeps out of text. */
+static bool printableCodePoint(int64_t cp)
+{
+	if (cp <= ' ' || cp == 0x7F) return false;                 /* controls, space, DEL */
+	if (cp >= 0x80 && cp < 0xA0) return false;                 /* C1 controls */
+	if (cp == 0xA0 || cp == 0xAD || cp == 0x1680) return false; /* no-break space, soft hyphen, ogham space */
+	if (cp >= 0x2000 && cp <= 0x200F) return false;            /* spaces, zero-width and direction marks */
+	if (cp >= 0x2028 && cp <= 0x202F) return false;            /* separators, direction embeddings, narrow space */
+	if (cp >= 0x205F && cp <= 0x206F) return false;            /* medium space, invisible operators, isolates */
+	if (cp == 0x3000 || cp == 0xFEFF) return false;            /* ideographic space, byte order mark */
+	if (cp >= 0xFDD0 && cp <= 0xFDEF) return false;            /* noncharacters */
+	if ((cp & 0xFFFE) == 0xFFFE) return false;                 /* U+FFFE and U+FFFF of every plane */
+	if (cp >= 0xE000 && cp <= 0xF8FF) return false;            /* private use */
+	return true;
+}
+
 bool usableButtonHeader(const std::string &header)
 {
-	if (header.empty() || header.size() > 8) return false;
-	if (header.front() == ' ' || header.back() == ' ') return false;
-	for (char c : header)
+	size_t characters = 0, at = 0;
+	while (at < header.size())
 	{
-		if (c < ' ' || c >= 0x7F) return false;
+		const size_t start = at;
+		const int64_t cp = nextCodePoint(header, at);
+		/* a space between two characters is allowed ("F 1"), at either end it is not */
+		const bool inner = cp == ' ' && start > 0 && at < header.size();
+		if (cp < 0 || (!inner && !printableCodePoint(cp))) return false;
+		if (++characters > 8) return false;
 	}
-	return true;
+	return characters > 0;
 }
 
 namespace {

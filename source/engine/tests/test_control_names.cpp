@@ -104,7 +104,27 @@ static void whatAPackageDeclares()
 	assert(!chimera::usableButtonHeader(" CS"));
 	assert(!chimera::usableButtonHeader("CS "));
 	assert(!chimera::usableButtonHeader("C\tS"));
-	assert(!chimera::usableButtonHeader("\xC3\x89"));
+	/* any printable character, counted as characters and not bytes (issue 607) */
+	assert(chimera::usableButtonHeader("\xC3\x89"));                                       /* E acute */
+	assert(chimera::usableButtonHeader("\xE2\x96\xB3"));                                   /* U+25B3 triangle */
+	assert(chimera::usableButtonHeader("\xE2\x97\x8B"));                                   /* U+25CB circle */
+	assert(chimera::usableButtonHeader("\xE2\x9C\x95"));                                   /* U+2715 cross */
+	assert(chimera::usableButtonHeader("\xE2\x96\xA1"));                                   /* U+25A1 square */
+	assert(chimera::usableButtonHeader("\xF0\x9F\x8E\xAE"));                               /* U+1F3AE, four bytes, one character */
+	assert(chimera::usableButtonHeader("\xE2\x96\xB3\xE2\x96\xB3\xE2\x96\xB3\xE2\x96\xB3\xE2\x96\xB3\xE2\x96\xB3\xE2\x96\xB3\xE2\x96\xB3")); /* eight, 24 bytes */
+	assert(!chimera::usableButtonHeader("\xE2\x96\xB3\xE2\x96\xB3\xE2\x96\xB3\xE2\x96\xB3\xE2\x96\xB3\xE2\x96\xB3\xE2\x96\xB3\xE2\x96\xB3\xE2\x96\xB3")); /* nine */
+	assert(chimera::usableButtonHeader("\xE2\x96\xB3 1"));                                /* a space between */
+	assert(!chimera::usableButtonHeader("\xE2\x96\xB3 "));                                /* a space at the end */
+	assert(!chimera::usableButtonHeader("\xC2\x85"));                                      /* U+0085, a control */
+	assert(!chimera::usableButtonHeader("\x7F"));
+	assert(!chimera::usableButtonHeader("\xE2\x96\xB3\n"));
+	assert(!chimera::usableButtonHeader("\xC2\xA0"));                                      /* no-break space */
+	assert(!chimera::usableButtonHeader("\xE2\x80\xAE"));                                  /* right-to-left override */
+	assert(!chimera::usableButtonHeader("\xE2\x96"));                                      /* cut short */
+	assert(!chimera::usableButtonHeader("\xC3"));                                          /* cut short */
+	assert(!chimera::usableButtonHeader("\xC0\xAF"));                                      /* overlong */
+	assert(!chimera::usableButtonHeader("\xED\xA0\x80"));                                  /* a surrogate */
+	assert(!chimera::usableButtonHeader("\xFF"));
 
 	/* a package that declares nothing: the rule everywhere */
 	const ControlNames none;

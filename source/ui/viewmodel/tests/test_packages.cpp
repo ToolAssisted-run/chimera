@@ -727,6 +727,38 @@ const std::string *letterOf(const Controller &c, const std::string &button)
 	return nullptr;
 }
 
+/* issue 607: one to eight printable characters (UTF-8 code points, not bytes),
+ * no space at either end. The engine's own rule is chimera::usableButtonHeader;
+ * this suite reads packages through the C API only, so it states the rule itself. */
+bool usableHeader(const std::string &h)
+{
+	size_t characters = 0, i = 0;
+	while (i < h.size())
+	{
+		const unsigned char c = static_cast<unsigned char>(h[i]);
+		size_t len = c < 0x80 ? 1 : c >= 0xC2 && c < 0xE0 ? 2 : c >= 0xE0 && c < 0xF0 ? 3 : c >= 0xF0 && c < 0xF5 ? 4 : 0;
+		if (len == 0 || i + len > h.size()) return false;
+		uint32_t cp = len == 1 ? c : c & (0xFFu >> (len + 1));
+		for (size_t k = 1; k < len; k++)
+		{
+			const unsigned char d = static_cast<unsigned char>(h[i + k]);
+			if ((d & 0xC0) != 0x80) return false;
+			cp = (cp << 6) | (d & 0x3Fu);
+		}
+		const uint32_t least[] = {0, 0, 0x80, 0x800, 0x10000};
+		if (len > 1 && cp < least[len]) return false;
+		if (cp > 0x10FFFF || (cp >= 0xD800 && cp < 0xE000)) return false;
+		const bool edge = i == 0 || i + len == h.size();
+		if (cp < 0x20 || cp == 0x7F || (cp >= 0x80 && cp < 0xA0) || (cp == ' ' && edge)) return false;
+		if (cp == 0xA0 || cp == 0xAD || (cp >= 0x2000 && cp <= 0x200F) || (cp >= 0x2028 && cp <= 0x202F) ||
+			(cp >= 0x205F && cp <= 0x206F) || cp == 0x3000 || cp == 0xFEFF || (cp & 0xFFFE) == 0xFFFE || (cp >= 0xE000 && cp <= 0xF8FF))
+			return false;
+		i += len;
+		if (++characters > 8) return false;
+	}
+	return characters > 0;
+}
+
 std::string headerOf(const Controller &c, const std::string &button)
 {
 	if (auto it = c.headers.find(button); it != c.headers.end()) return it->second;
@@ -875,8 +907,7 @@ void checkLetters(const std::vector<Package> &all)
 			for (const std::string &b : c.buttons) names.insert(bare(b));
 			for (const auto &[name, h] : c.headers)
 			{
-				const bool printable = std::all_of(h.begin(), h.end(), [](char ch) { return ch >= ' ' && ch < 0x7F; });
-				if (h.empty() || h.size() > 8 || h.front() == ' ' || h.back() == ' ' || !printable)
+				if (!usableHeader(h))
 					wrong.push_back(c.core + " (" + c.where + "): " + name + " = \"" + h + "\" is not a header");
 				if (!names.count(name)) wrong.push_back(c.core + " (" + c.where + "): a header for " + name + ", which is not a button");
 			}

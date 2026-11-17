@@ -15889,3 +15889,36 @@ which tool was read from each core's newest core.wbx, by the exports the
 kit needs: save data 60 of 72 official cores, registers 8, trace and
 surfaces 2 (quickernes and quickerneshawk); 12 offer none of the four. Each
 of the 60 includes the kit and calls add-windows.py in its package build.
+
+## A button's header may be any printable characters (user-decided, 2026-11-17, issue 607)
+
+TAStudio's piano roll heads each button's column with the button's header,
+and a cell the button is pressed in shows the same text. A core could only
+declare a header of one to eight characters of printable ASCII, so the
+PlayStation's four face buttons were heads "T", "O", "X" and "Q" for
+Triangle, Circle, Cross and Square, which looks poor next to the real
+symbols.
+
+- **Decided.** A header in a core's `headers` declaration may be any
+  printable characters, not only ASCII. The count stays one to eight, but it
+  is now counted in characters (UTF-8 code points), not bytes, so one symbol
+  is one character however many bytes it takes. A header still has no space
+  at either end, and is still not the header of another column of the same
+  player. Refused: control characters (including U+0080 to U+009F), spaces of
+  any width (no-break, ideographic, the U+2000 range), marks that draw
+  nothing (zero-width joiners, direction marks and overrides, the byte order
+  mark), private-use and noncharacter code points, and bytes that are not
+  valid UTF-8 (cut short, overlong, surrogates, past U+10FFFF). A declaration
+  that fails the rule is ignored, as before, and the column keeps its
+  letter.
+- **What does not change.** The mnemonic stays one printable ASCII character,
+  and it is all a movie's text ever carries, so a header can change without
+  harming a movie made before. No images, no editing of headers by the
+  person, no reordering of columns: the owner kept them out of this change.
+- **Where the rule is.** `usableButtonHeader` in
+  `source/engine/source/control_names.cpp`, read by the engine when it reads
+  a package. `test-packages` states the same rule for the packages it checks.
+  The piano roll gets the text as UTF-8 and draws it as a Qt string.
+- **The three PlayStation cores** (duckstation for the PlayStation, pcsx2,
+  rpcs3) declare the console's own shapes for the four face buttons:
+  Triangle U+25B3, Circle U+25CB, Cross U+2715, Square U+25A1.

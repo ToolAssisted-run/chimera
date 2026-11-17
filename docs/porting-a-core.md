@@ -337,10 +337,16 @@ Advice earned the hard way:
     machine whose buttons one character cannot tell apart - a keyboard. It
     is what heads the button's column in TAStudio and fills its pressed
     cells; the movie's text still carries the mnemonic and nothing else.
-    Keyed as a mnemonic is. One to eight characters of printable ASCII, no
-    space at either end, and not the header of another column of the same
-    player. A button given none is headed by its letter, so a pad needs
-    none of this.
+    Keyed as a mnemonic is. One to eight printable characters, counted as
+    characters and not bytes, so a symbol such as the PlayStation's triangle
+    (U+25B3) is one (owner, 2026-11-17, issue 607). Any script or symbol is
+    welcome; control characters, spaces of any width, invisible marks and
+    text that is not valid UTF-8 are refused. No space at either end, and not
+    the header of another column of the same player. A button given none is
+    headed by its letter, so a pad needs none of this. The movie's text
+    still carries the ASCII mnemonic, so a header may change without harming
+    a movie. Pick symbols a common font has (Geometric Shapes, Dingbats):
+    Chimera draws with the system's font and its fallback fonts.
   - `"header": "LX"` on each axis - its column's header, five characters at
     most.
   - `"players": [ ["P1 Up", "P1 A"], ["P2 Up", "P2 A"] ]` in each input

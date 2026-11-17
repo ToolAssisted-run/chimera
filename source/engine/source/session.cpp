@@ -389,7 +389,7 @@ bool parseConfig(const char *json, uint64_t len, const char *overrides, SessionC
 	}
 	for (const auto &b : cfg.buttons) cfg.mnemonics.push_back(cfg.names.mnemonicOf(b));
 	/* What heads a button's column where a letter is not enough. One that is
-	 * not a header (empty, long, not ASCII) is not taken, and the column is
+	 * not a header (empty, longer than eight characters, a control character, not valid UTF-8) is not taken, and the column is
 	 * headed by the letter as it always was. */
 	const cJSON *headers = cJSON_GetObjectItemCaseSensitive(input, "headers");
 	if (cJSON_IsObject(headers))

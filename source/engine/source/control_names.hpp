@@ -61,8 +61,10 @@ std::string bareControlName(const std::string &name);
  * byte, because an entry is walked a byte at a time. */
 bool usableMnemonic(char c);
 
-/* A header a button's column may carry: one to eight characters of printable
- * ASCII that neither begin nor end with a space. */
+/* A header a button's column may carry: one to eight printable characters,
+ * counted as characters (UTF-8 code points), not bytes, that neither begin
+ * nor end with a space. Any script or symbol is welcome; control characters,
+ * spaces of other widths, invisible marks and invalid UTF-8 are not. */
 bool usableButtonHeader(const std::string &header);
 
 /* The rule: the first character of the last word that begins with a usable
