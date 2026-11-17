@@ -33,6 +33,15 @@
 		"tool.make_project.broken": "Una línea que no es de un fotograma",
 		"tool.make_project.broken.about": "La entrada del proyecto recibe una línea que no es de un fotograma, que Chimera rechaza.",
 		"tool.make_project.project": "Proyecto",
-		"tool.made_project": "se hizo un proyecto de %1 fotogramas"
+		"tool.made_project": "se hizo un proyecto de %1 fotogramas",
+		"window.monitor.menu": "Monitor de Synth",
+		"window.monitor.held": "El fotograma está detenido",
+		"window.monitor.running": "En marcha",
+		"window.monitor.stop_at": "Detener en la instrucción",
+		"window.monitor.step": "Paso",
+		"window.monitor.continue": "Continuar",
+		"window.no_such": "este núcleo no tiene esa ventana",
+		"window.not_settable": "eso no se puede cambiar",
+		"window.no_command": "esta ventana no tiene esa orden"
 	}
 }

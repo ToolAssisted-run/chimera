@@ -739,6 +739,10 @@ CE_API int32_t ce_package_has_entry(ce_package *p, const char *name);
  * The names stay valid until the package is freed. */
 CE_API int32_t ce_package_asset_count(ce_package *p);
 CE_API const char *ce_package_asset_name(ce_package *p, int32_t i);
+/* Every entry whose name starts with prefix (a folder of the package:
+ * "windows/", where a core's own windows are, issue 610), a name a line,
+ * sorted; "" for none. Valid until the next call on the package. */
+CE_API const char *ce_package_entry_names(ce_package *p, const char *prefix);
 
 /* The entry's bytes (decompressed from the zip, or the file in the directory
  * form). NULL when absent or unreadable (see _last_error to tell which;
@@ -1256,6 +1260,40 @@ CE_API void ce_session_remove_memory_observer(ce_session *s, ce_memory_fn fn, vo
  * while held: a frontend's scripts do not hear frames the machine is then
  * put back from. Observers are still told. */
 CE_API void ce_session_hold_callbacks(ce_session *s, int32_t held);
+
+/* A CORE'S OWN WINDOWS (issue 610, user-decided 2026-11-17). A core may
+ * extend the window with windows of its own: their design is QML in its
+ * package (waterbox.config's "windows"), and the core itself is their view
+ * model. Chimera knows nothing of what any of them is for. The core answers
+ * requests in JSON through its optional exports
+ *   uintptr_t WindowRequestBuffer(int32_t size)   where to write a request of
+ *                                                 size bytes (0: none that big)
+ *   uintptr_t WindowRequest(int32_t length)       the request written there;
+ *                                                 the answer, NUL-terminated,
+ *                                                 kept until the next call
+ * (docs/porting-a-core.md, "A core's own windows").
+ * ce_session_windows_answered is 1 for a core with both exports.
+ * ce_session_window_request writes the request and returns the answer,
+ * *len_out its length; null for a core without them, or one that gave none.
+ * The machine's thread, between frames or while the core holds its frame. */
+CE_API int32_t ce_session_windows_answered(const ce_session *s);
+CE_API const char *ce_session_window_request(ce_session *s, const char *request, uint64_t len, uint64_t *len_out);
+/* A core may hold its own frame part way through (its windows' stepping, a
+ * breakpoint of its own): its optional export SetStopCallback(uintptr_t fn)
+ * is handed a function the core calls, as uintptr_t fn(void), each time it
+ * waits there. fn calls the caller's stop function on the advancing thread,
+ * inside the frame, which does one thing the core's windows (or a reading of
+ * memory) ask and returns: 0, the core may wait again; 1, the frame must go
+ * on to its end (the project is closing, Chimera is replaying frames). Once
+ * 1 is returned the core's waits in that frame return 1 at once, the
+ * caller's function not called. The frame watchdog does not count the
+ * waiting. While held, a state is neither saved nor loaded and no frame is
+ * run (refused). ce_session_stops_reported is 1 for a core with the export;
+ * ce_session_held is 1 while a core waits in its frame. */
+typedef int32_t (*ce_stop_fn)(void *ctx);
+CE_API int32_t ce_session_stops_reported(const ce_session *s);
+CE_API void ce_session_set_stop_callback(ce_session *s, ce_stop_fn fn, void *ctx);
+CE_API int32_t ce_session_held(const ce_session *s);
 
 /* One frame: buttons is the bitmask (bit i = the config's buttons[i]);
  * buttons beyond 63 ride ce_session_set_button. Returns nonzero when the frame

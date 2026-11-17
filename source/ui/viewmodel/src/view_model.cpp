@@ -76,6 +76,12 @@ void ViewModel::scriptSideCommand(std::string_view name)
 		if (c.name == name) c.scriptSide = true;
 }
 
+void ViewModel::property(std::string name, std::string help, std::function<Value()> get,
+	std::function<bool(const Value &)> set, Signal<> &changed)
+{
+	properties_.push_back({std::move(name), std::move(help), std::move(get), std::move(set), &changed});
+}
+
 void ViewModel::rows(std::string name, std::string help, RowModel &model)
 {
 	rows_.push_back({std::move(name), std::move(help), &model});

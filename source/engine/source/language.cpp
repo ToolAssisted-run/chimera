@@ -409,6 +409,7 @@ const char *const kTextFields[] = {
 	"waterbox.config:tools[].inputs[].label", "waterbox.config:tools[].outputs[].label",
 	"waterbox.config:tools[].options[].display", "waterbox.config:tools[].options[].description",
 	"waterbox.config:tools[].options[].optionLabels.*",
+	"waterbox.config:windows[].menu",
 	"file_slots.json:slots[].title", "file_slots.json:slots[].help", "file_slots.json:slots[].nameHelp",
 };
 

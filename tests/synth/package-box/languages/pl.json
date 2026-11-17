@@ -35,6 +35,15 @@
 		"tool.make_project.broken": "Wiersz, który nie należy do klatki",
 		"tool.make_project.broken.about": "Wejście projektu dostaje wiersz, który nie należy do klatki, a Chimera go odrzuca.",
 		"tool.make_project.project": "Projekt",
-		"tool.made_project": "utworzono projekt z %1 klatek"
+		"tool.made_project": "utworzono projekt z %1 klatek",
+		"window.monitor.menu": "Monitor Synth",
+		"window.monitor.held": "Klatka jest wstrzymana",
+		"window.monitor.running": "Działa",
+		"window.monitor.stop_at": "Zatrzymaj na instrukcji",
+		"window.monitor.step": "Krok",
+		"window.monitor.continue": "Kontynuuj",
+		"window.no_such": "ten rdzeń nie ma takiego okna",
+		"window.not_settable": "tego nie można ustawić",
+		"window.no_command": "to okno nie ma takiego polecenia"
 	}
 }

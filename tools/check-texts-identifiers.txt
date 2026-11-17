@@ -190,6 +190,7 @@ Debug Logs
 Bug reports
 Save data
 Macros
+Core output
 Temp Files
 Microsoft
 Windows
@@ -412,3 +413,6 @@ qt.qpa.wayland.textinput.warning=false
 
 # a method of the piano roll the key filter asks for by its signature (key_filter.cpp)
 navigate(int,bool)
+
+# where Qt keeps its own QML modules built into a program: a core window may load them (qt/core_windows.cpp, issue 610)
+/qt-project.org/imports/

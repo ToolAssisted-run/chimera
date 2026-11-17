@@ -35,6 +35,15 @@
 		"tool.make_project.broken": "Рядок, що не належить кадру",
 		"tool.make_project.broken.about": "До вводу проєкту потрапляє рядок, що не належить кадру, і Chimera його відхиляє.",
 		"tool.make_project.project": "Проєкт",
-		"tool.made_project": "зроблено проєкт із %1 кадрів"
+		"tool.made_project": "зроблено проєкт із %1 кадрів",
+		"window.monitor.menu": "Монітор Synth",
+		"window.monitor.held": "Кадр зупинено",
+		"window.monitor.running": "Працює",
+		"window.monitor.stop_at": "Зупинитися на інструкції",
+		"window.monitor.step": "Крок",
+		"window.monitor.continue": "Продовжити",
+		"window.no_such": "у цього ядра немає такого вікна",
+		"window.not_settable": "це не можна змінити",
+		"window.no_command": "у цього вікна немає такої команди"
 	}
 }

@@ -1316,9 +1316,12 @@ void pathsConfig()
 	CHECK(folder == (dir / "runs").string() && !isDefault);
 	/* Chimera's global list, in its order, the base first and temporary files last */
 	fromValue(rows->cell(0, 1), name);
-	CHECK(name == "Base" && rows->rowCount() == 15);
-	fromValue(rows->cell(14, 1), name);
+	CHECK(name == "Base" && rows->rowCount() == 16);
+	fromValue(rows->cell(15, 1), name);
 	CHECK(name == "Temp Files" && paths.resolve("Temp Files") == (dir / "program").string());
+	/* where a core's own windows may write: ./output, a folder a core in it (issue 610) */
+	fromValue(rows->cell(14, 1), name);
+	CHECK(name == "Core output" && paths.resolve("Core output") == (dir / "program" / "output").string());
 	/* Chimera's words in a path: the program's folder, the last game's, and anything else is the program's folder */
 	CHECK(paths.run("setPath", {std::string("Lua"), std::string("%exe%/Scripts")}, error).has_value() &&
 		paths.resolve("Lua") == (dir / "program" / "Scripts").string());
@@ -1337,7 +1340,7 @@ void pathsConfig()
 	CHECK(paths.base.get().empty());
 	/* a system's own folders, made when a game for it is opened: under its base, which is under the global one */
 	paths.useSystem("NES");
-	CHECK(paths.systems.get() == "[\"NES\"]" && rows->rowCount() == 19);
+	CHECK(paths.systems.get() == "[\"NES\"]" && rows->rowCount() == 20);
 	CHECK(paths.resolveFor("NES", "Screenshots") == (dir / "program" / "NES" / "Screenshots").string() &&
 		paths.resolveFor("NES", "ROM") == (dir / "program" / "NES").string() &&
 		paths.resolveFor("NES", "Savestates") == (dir / "program" / "NES" / "State").string());
@@ -11724,6 +11727,125 @@ bool longSeek(const char *package, const char *rom)
  * is said as the project closes and when it opens again (user-decided,
  * 2026-11-16). The synthetic core takes the GPU bridge only when the computer
  * gives Chimera a GL context; without one this says SKIP. */
+/* A core's own window (issue 610): the synthetic core's "monitor", whose
+ * design is QML in its package and whose view model is the core. The window
+ * reads what the core answers after each frame, a change goes to the core,
+ * and the core holds its frame at an instruction until Step or Continue -
+ * Chimera's own windows still reading the machine meanwhile, no state saved,
+ * and a close going through the hold. */
+bool coreWindows(const char *package, const char *rom)
+{
+	namespace fs = std::filesystem;
+	const int before = failures;
+	const fs::path dir = fs::temp_directory_path() / ("chimera-test-core-windows-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+	fs::create_directories(dir);
+	fs::copy_file(rom, dir / "walker.testrom");
+	ManualDispatcher d;
+	InputLog inputs;
+	SessionViewModel session(d, inputs);
+	std::string error;
+	session.cacheFolder.set((dir / "cache").string());
+	const fs::path file = dir / "walker.chimeraProject";
+	gameProject(package, (dir / "walker.testrom").string(), file);
+	session.run("openProject", {file.string(), std::string(package)}, error);
+	CHECK(d.until([&] { return session.isOpen.get(); }, 60));
+	/* the package's window, named in the language in use, for the core that answers for it */
+	CHECK(d.until([&] { return session.coreWindows.get() != "[]"; }, 10));
+	{
+		json::Json list;
+		std::string why;
+		CHECK(json::parse(session.coreWindows.get(), list, why) && list.items.size() == 1);
+		const json::Json *id = list.items.empty() ? nullptr : list.items[0].find("id");
+		const json::Json *menu = list.items.empty() ? nullptr : list.items[0].find("menu");
+		const json::Json *qml = list.items.empty() ? nullptr : list.items[0].find("qml");
+		CHECK(id != nullptr && id->text == "monitor");
+		CHECK(menu != nullptr && menu->text == "Synth Monitor");
+		CHECK(qml != nullptr && qml->text == "windows/Monitor.qml");
+	}
+	/* one the package does not declare is refused, said */
+	CHECK(session.openCoreWindow("nothing", error) == nullptr && !error.empty());
+	error.clear();
+	auto vm = session.openCoreWindow("monitor", error);
+	CHECK(vm != nullptr && error.empty());
+	if (vm == nullptr)
+	{
+		std::printf("coreWindows: %s\n", error.c_str());
+		return false;
+	}
+	auto value = [&](const char *name) { return vm->get(name).value_or(Value{}); };
+	auto number = [&](const char *name) {
+		const Value v = value(name);
+		const int64_t *i = std::get_if<int64_t>(&v);
+		return i != nullptr ? *i : INT64_MIN;
+	};
+	auto text = [&](const char *name) {
+		const Value v = value(name);
+		const std::string *t = std::get_if<std::string>(&v);
+		return t != nullptr ? *t : std::string();
+	};
+	auto isHeld = [&] { const Value v = value("held"); return std::get_if<bool>(&v) != nullptr && std::get<bool>(v); };
+	/* what the core described, filled from its first answer */
+	CHECK(d.until([&] { return text("registers").rfind("R0=", 0) == 0; }, 10));
+	CHECK(number("stopAt") == -1 && !isHeld());
+	const auto &lists = vm->rowLists();
+	CHECK(lists.size() == 1 && lists[0].name == "ram" && lists[0].model->columnCount() == 2);
+	CHECK(lists.size() == 1 && lists[0].model->rowCount() == 16);
+	/* asked again after a frame: the registers move */
+	const std::string atStart = text("registers");
+	session.run("frameAdvance", {}, error);
+	CHECK(d.until([&] { return session.frame.get() == 1 && text("registers") != atStart; }, 20));
+	CHECK(!session.held.get());
+	/* a change goes to the core, and comes back in its answer */
+	std::string setError;
+	CHECK(vm->set("stopAt", int64_t{0}, setError));
+	CHECK(d.until([&] { return number("stopAt") == 0; }, 10));
+	/* the next frame played holds at the instruction at 0, the core's window
+	 * and Chimera's status say so, and the frame is not over */
+	session.run("frameAdvance", {}, error);
+	CHECK(d.until([&] { return session.held.get() && isHeld(); }, 20));
+	CHECK(number("pc") == 0 && number("heldCount") == 1);
+	CHECK(session.status.get().find("Synth holds the frame") != std::string::npos);
+	int64_t engineFrame = -1;
+	int32_t heldThere = 0;
+	const uint8_t *state = reinterpret_cast<const uint8_t *>(1);
+	std::string stateError;
+	/* Chimera's own windows still read the machine, and no state is taken part way through */
+	int64_t cycles = 0;
+	bool hasCycles = false;
+	CHECK(!session.readRegisters(cycles, hasCycles).empty());
+	session.onMachineWait([&](ce_session *s) {
+		engineFrame = ce_session_frame(s);
+		heldThere = ce_session_held(s);
+		uint64_t len = 0;
+		state = ce_session_save_state(s, &len);
+		const char *e = ce_session_last_error(s);
+		stateError = e != nullptr ? e : "";
+	});
+	CHECK(heldThere == 1 && state == nullptr);
+	CHECK(stateError.find("holds its frame") != std::string::npos);
+	/* Step: one instruction on, held again there */
+	CHECK(vm->run("step", {}, error).has_value());
+	CHECK(d.until([&] { return isHeld() && number("heldCount") == 2; }, 20));
+	CHECK(number("pc") != 0);
+	CHECK(session.held.get());
+	/* Continue: the frame goes on to its end */
+	CHECK(vm->run("continue", {}, error).has_value());
+	CHECK(d.until([&] { return !session.held.get() && !isHeld() && session.frame.get() == 2; }, 20));
+	CHECK(engineFrame == 1);
+	/* held again, and the project closed through the hold: the frame ends,
+	 * the machine goes, and the window with it */
+	bool closedSaid = false;
+	auto watch = session.coreWindowsClosed.connect([&] { closedSaid = true; });
+	session.run("frameAdvance", {}, error);
+	CHECK(d.until([&] { return session.held.get(); }, 20));
+	session.run("close", {}, error);
+	CHECK(d.until([&] { return !session.isOpen.get(); }, 30));
+	CHECK(d.until([&] { return closedSaid && session.coreWindows.get() == "[]" && !session.held.get(); }, 10));
+	std::error_code ec;
+	fs::remove_all(dir, ec);
+	return failures == before;
+}
+
 bool greenzoneNotKept(const char *package, const char *rom, const char *keptPackage)
 {
 	namespace fs = std::filesystem;
@@ -11880,6 +12002,18 @@ int main(int argc, char **argv)
 	/* unbuffered: a run stopped for its time (a CI runner's) still shows what
 	 * it printed before, as its errors already do */
 	std::setvbuf(stdout, nullptr, _IONBF, 0);
+	/* one test of a machine alone, by its name, while working on it (the
+	 * whole run is minutes): CHIMERA_TEST_ONLY=coreWindows */
+	if (const char *only = std::getenv("CHIMERA_TEST_ONLY"); only != nullptr && argc >= 3)
+	{
+		const std::string name = only;
+		bool ran = false;
+		if (name == "coreWindows") ran = coreWindows(argv[1], argv[2]);
+		else if (name == "longSeek") ran = longSeek(argv[1], argv[2]);
+		else std::printf("CHIMERA_TEST_ONLY: no test %s here\n", only);
+		std::printf("%s: %d checks failed\n", only, failures);
+		return ran && failures == 0 ? 0 : 1;
+	}
 	signalsAndProperties();
 	registry();
 	bindings();
@@ -11988,6 +12122,7 @@ int main(int argc, char **argv)
 			ranMachine = seekStopped(argv[1], argv[2]) && ranMachine;
 			ranMachine = longSeek(argv[1], argv[2]) && ranMachine;
 			if (argc >= 18) ranMachine = greenzoneNotKept(argv[1], argv[2], argv[17]) && ranMachine;
+			ranMachine = coreWindows(argv[1], argv[2]) && ranMachine;
 			if (argc >= 9) ranMachine = coreManager(argv[1], argv[6], argv[8]) && ranMachine;
 			ranMachine = elsewherePackages(argv[1]) && ranMachine;
 		}

@@ -75,6 +75,7 @@ vm_lib = static_library(
     'viewmodel/src/sql_vm.cpp',
     'viewmodel/src/surface_viewer_vm.cpp',
     'viewmodel/src/core_tool_vm.cpp',
+    'viewmodel/src/core_window_vm.cpp',
     'viewmodel/src/macro_tool_vm.cpp',
     'viewmodel/src/cores_vm.cpp',
     'viewmodel/src/branch_state.cpp',
@@ -283,6 +284,20 @@ if host_machine.system() == 'darwin' and qt_gui_pc.found()
   qt_private_args = ['-I' + qt_gui_pc.get_variable(pkgconfig: 'libdir') / 'QtGui.framework/Headers' / qt_gui_pc.version() / 'QtGui']
 endif
 qt_dep = dependency('qt6', modules: ['Core', 'Gui', 'Qml', 'Quick', 'QuickControls2'], required: get_option('qt_ui'))
+# A core's own windows reach nothing (issue 610). A Qt built without its
+# network module (Chimera's own, for the Linux and Windows releases) gives
+# QML no way to reach anything; a Qt with it (Qt's download: development,
+# the tests, macOS) has a core window's QML engine send every request to a
+# manager that refuses it, Chimera's one network class (qt/core_windows.cpp,
+# which will not build with such a Qt and without this; tools/check-no-network.sh)
+qt_network_dep = dependency('qt6', modules: ['Network'], required: false) # refuses, never sends
+qt_refusing = declare_dependency()
+if qt_network_dep.found()
+  qt_refusing = declare_dependency(dependencies: [qt_network_dep], compile_args: ['-DCHIMERA_QML_REFUSER=1'])
+endif
+if qt_dep.found()
+  qt_dep = declare_dependency(dependencies: [qt_dep, qt_refusing])
+endif
 if host_machine.system() == 'darwin' and qt_dep.found() and qt_gui_pc.found()
   # the frameworks are found where Qt is (a bundle carries its own: macdeployqt)
   qt_dep = declare_dependency(dependencies: [qt_dep],
@@ -290,7 +305,7 @@ if host_machine.system() == 'darwin' and qt_dep.found() and qt_gui_pc.found()
 endif
 if qt_dep.found()
   qt_moc = qt6.compile_moc(
-    headers: ['qt/qml_view_model.hpp', 'qt/picture_item.hpp', 'qt/piano_roll_item.hpp', 'qt/key_names.hpp', 'qt/menu_letters.hpp', 'qt/theme_palette.hpp', 'qt/clipboard_relay.hpp', 'qt/picture_files.hpp', 'qt/pointer_capture.hpp', 'qt/button_router.hpp', 'qt/headless_run.hpp', 'qt/portal_file_chooser.hpp', 'qt/file_places.hpp', 'qt/system_file_dialog.hpp'],
+    headers: ['qt/qml_view_model.hpp', 'qt/picture_item.hpp', 'qt/piano_roll_item.hpp', 'qt/key_names.hpp', 'qt/menu_letters.hpp', 'qt/theme_palette.hpp', 'qt/clipboard_relay.hpp', 'qt/picture_files.hpp', 'qt/pointer_capture.hpp', 'qt/button_router.hpp', 'qt/headless_run.hpp', 'qt/portal_file_chooser.hpp', 'qt/file_places.hpp', 'qt/system_file_dialog.hpp', 'qt/core_windows.hpp'],
     include_directories: [vm_inc, engine_inc],
     dependencies: [qt_dep],
   )
@@ -337,6 +352,7 @@ if qt_dep.found()
     'qt/system_file_dialog.cpp',
     'qt/win32_file_dialog.cpp',
     'qt/project_windows.cpp',
+    'qt/core_windows.cpp',
     qt_moc,
     qt_rcc,
     qt_dialogs_rcc,
@@ -712,6 +728,21 @@ endif
     )
     test('lua console drop', test_lua_console_drop, args: [meson.current_build_dir() / 'lua-console-drop-test'],
       env: ['QT_QPA_PLATFORM=offscreen', 'QT_QUICK_BACKEND=software', 'ALSOFT_DRIVERS=null'], timeout: 60)
+    # a core's own windows (issue 610): what their locked-down QML engine
+    # lets a core's QML reach (core-windows.py writes the cases, listens for
+    # anything that gets out), and the synthetic core's window over its view model
+    test_core_windows = executable(
+      'test-core-windows',
+      ['qt/tests/test_core_windows.cpp', 'qt/core_windows.cpp', 'qt/qml_view_model.cpp',
+        qt6.compile_moc(headers: ['qt/qml_view_model.hpp', 'qt/core_windows.hpp'], dependencies: [qt_dep]),
+        qt6.compile_moc(sources: ['qt/tests/test_core_windows.cpp'], dependencies: [qt_dep])],
+      dependencies: [qt_test_dep, qt_refusing, vm_dep, dl_dep],
+      override_options: ['cpp_std=c++20'],
+      cpp_args: ['-DQT_NO_KEYWORDS'],
+    )
+    test('core windows', find_program('python3'), args: [files('qt/tests/core-windows.py'), test_core_windows,
+      repo_root / 'tests/synth/package-box/windows/Monitor.qml'],
+      env: ['QT_QPA_PLATFORM=offscreen', 'QT_QUICK_BACKEND=software'], timeout: 120)
     # a project's tool windows and their files said to the session as they
     # change, and opened again from what it gives back (issue 587)
     test_project_windows = executable(

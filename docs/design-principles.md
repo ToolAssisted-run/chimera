@@ -15733,3 +15733,91 @@ opened again, it says why and nothing is green past frame 0; closed with
 nothing to lose, it says "Closed". The same with a copy of the package that
 declares the greenzone survives keeps its history, opens green and says
 nothing. Without a GL context the test says SKIP.
+
+## A core extends the window with windows of its own (user-decided, 2026-11-17, issue 610)
+
+Issue 610 asked for a debugger for a third-party core (np2kai, NEC PC-8801)
+that already had the Trace Logger and CPU Registers. Nothing let a core add
+one: a core's tools are file jobs with no game (2026-11-01), the Emulator
+menu holds only Chimera's items, and the engine runs a whole frame per call,
+so nothing could stop part way through. The owner's words: "Chimera knows
+nothing about disassembler or any tools whatsoever. It simply provides enough
+interface tools for the cores to define their own tool however it may look
+like and whatever it may need to do", and, for the windows: "Full QT model
+view viewmodel. Just like Chimera creates windows, the cores extend Chimera's
+UI with their own window design. Chimera knows nothing about the cores
+windows".
+
+What was decided, and built:
+
+- **A core's window is QML in its package** (`windows/`, declared under
+  `"windows"` in `waterbox.config`), and **the core is its view model**. Two
+  optional exports answer JSON requests: what the window has (`describe`),
+  what it shows now (`get`), a change (`set`) and a command (`run`). On
+  Chimera's side a `CoreWindowViewModel` holds what the core described as
+  properties, commands and lists, so the window binds to it through the same
+  generic adapter as Chimera's own windows. It is asked again after every
+  frame, every change and every wait while held. Each window is an item of
+  the Emulator menu while a project of its core is open.
+- **A core may hold its own frame.** The optional export `SetStopCallback`
+  hands it a function to call part way through a frame, in a loop, until its
+  own window's command lets it go on. Each call does one thing a window asks,
+  or a reading Chimera's own windows make (CPU Registers reads the machine
+  by waiting on its thread; without this the window would freeze), and
+  returns 0; it returns 1 when the frame must end (the project closing,
+  frames replayed by a seek or a rewind). While held, no frame runs and no
+  state is saved or loaded, the frame watchdog does not count the wait, and
+  the status bar says so. Close, Open Project and Restart end a hold first.
+  Breakpoints, stepping and disassembly are the core's own logic: Chimera
+  only lets it wait.
+- **The core's QML runs locked down** (the owner's choice between that and
+  trusting packages). It runs in Chimera's process, outside the sandbox, and
+  third-party cores would ship it too. Each core's windows get an engine of
+  their own: a URL filter lets it load only its own files under `windows/`
+  and Qt Quick's modules (Controls, Layouts, QtQml and Chimera's style of the
+  Controls), and every network request goes to a manager that sends it to a
+  scheme nothing serves. Measured first in a stand-alone probe: with no
+  filter, an `Image`, a `Loader`, a `FontLoader`, a `WorkerScript` and a
+  remote import all reached a local listener, and `QtQuick.Dialogs` and
+  `QtQuick.LocalStorage` imported; the URL filter alone stopped all of those
+  but not `XMLHttpRequest`, which Qt sends without asking the filter, and
+  which cannot be deleted from the JavaScript globals. The refusing manager
+  stops it, a worker script's included. A refused import first sent to the
+  unknown scheme made Qt's loader ask for it again for ever, so a refused QML,
+  script or module file is now a file of the core's folder that is not there.
+  `tools/check-no-network.sh` lets this one file (`qt/core_windows.cpp`)
+  through, and checks it still refuses. Chimera's own Qt for the Linux and
+  Windows releases is built without its network module, so there QML has no
+  network to refuse and the manager is not built in; a Qt whose QML has
+  network and no such manager does not build Chimera.
+- **Files: read anything, write in one folder** (the owner, the same day:
+  "read only file access is allowed. Write is only allowed within a
+  core-specific path, configurable, initially chimera/output/corename").
+  The window's QML is given `files`: it reads any file (text, bytes, a
+  folder's names; a picture or a font from any file), and writes only in
+  its core's output folder, Config > Paths' new "Core output" (`./output` at
+  first, not in the distribution), in a folder named after the core, made at
+  the first write. A name that is absolute, climbs out with "..", or goes
+  through a link that leads out is refused. Its code, QML and scripts, still
+  comes only from its own files, and requests by address still go nowhere:
+  `files` is the same in every build, where XMLHttpRequest is not.
+
+Tested: the synthetic core has a window, "monitor" (registers, the
+instruction running, the first bytes of RAM as a list, and a stop place),
+and holds its frame there. The view models test opens it, sees the core's
+answers move after a frame, sets the stop place through the core, plays a
+frame and finds it held at the instruction (status said, CPU Registers still
+read, a state refused with the reason), steps one instruction (held again,
+elsewhere), continues to the frame's end, and closes the project while held.
+A new window test writes a core's QML that tries every way out (requests by
+address, a POST, a file read by address, a picture, a component, a font, the
+system's browser, a worker script's request, `Dialogs`, `LocalStorage`,
+`Qt.labs`, `QtCore`, a module from an address) and listens on a local port:
+nothing reached it, and Controls and Layouts still load. It reads a file
+outside the core's folders as text and as bytes, lists its folder and shows a
+picture from it; writes, appends and writes bytes in the output folder; and
+is refused, with nothing written, a name climbing out, an absolute one, one
+through a link leading out, and none. It then loads the
+synthetic core's real window over a view model and finds what the core
+answered shown, the buttons following the hold, and Step and a typed stop
+place sent to the core as requests.

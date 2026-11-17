@@ -50,6 +50,8 @@ cp "$here/package-box/file_slots.json" "$staging"
 cp -r "$here/package-box/languages" "$staging/languages"
 # the bindings the package declares for its controller (Chimera ships none of its own)
 cp "$here/package-box/default_keybinds.json" "$staging"
+# the design of the core's own window (issue 610), drawn by Chimera with the core as its view model
+cp -r "$here/package-box/windows" "$staging/windows"
 
 # The version a real package stamps, so the test core behaves like one: the
 # manager files packages by version, a movie cites it, and a package with none

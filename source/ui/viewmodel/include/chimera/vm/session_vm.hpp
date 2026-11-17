@@ -26,6 +26,7 @@
 #include "chimera/vm/sound.hpp"
 #include "chimera/vm/input_log.hpp"
 #include "chimera/vm/json.hpp"
+#include "chimera/vm/core_window_vm.hpp"
 #include "chimera/vm/view_model.hpp"
 
 struct ce_session;
@@ -231,6 +232,21 @@ public:
 	 * into a picture; false when there is none */
 	Property<std::string> surfaces{"[]"};
 	bool renderSurface(int32_t index, Picture &into);
+	/* The core's own windows (issue 610, user-decided 2026-11-17): their
+	 * design QML in its package, the core their view model. Those the open
+	 * core has, as [{"id", "menu", "qml"}] (the menu in the language in use),
+	 * "[]" with none or no machine. */
+	Property<std::string> coreWindows{"[]"};
+	/* the core holds the frame it is in, part way through (its windows'
+	 * stepping): no frame runs and no state is saved or loaded until it goes on */
+	Property<bool> held{false};
+	/* one of them opened: its view model, which the core described; null with
+	 * error said when the core gave nothing usable. Asked again after every
+	 * frame, every change and every wait while held. The window's thread */
+	std::shared_ptr<CoreWindowViewModel> openCoreWindow(const std::string &id, std::string &error);
+	void closeCoreWindow(const std::string &id);
+	/* the machine went, and with it every core window open */
+	Signal<> coreWindowsClosed;
 	Property<bool> showGameTime{false};
 	Property<std::string> gameTimeText;
 	/* View > Display Real Time (owner, 2026-10-31): the time from the
@@ -1256,7 +1272,28 @@ private:
 		bool waited;
 		std::function<void()> run;
 		bool betweenTurns = false;
+		/* it may run while the core holds its frame (a core window's
+		 * request): only it and the jobs a thread waits on run then */
+		bool midFrame = false;
 	};
+	/* The core's own windows, on the machine's thread: those open, asked
+	 * again after every frame and every wait while held; a request sent */
+	std::vector<std::string> openWindowsM_;
+	void refreshCoreWindowsOnMachine();
+	std::string windowRequestOnMachine(const std::string &request);
+	void submitMidFrame(std::function<void()> job);
+	/* the core waits in its frame (issue 610): one job served, or the word
+	 * to go on (a frame replayed, the machine closing) */
+	static int32_t stopCalled(void *self);
+	int32_t stopOnMachine();
+	/* the frame being run is one played, which the core may hold (not one
+	 * replayed by a seek); the hold shown; the word to go on at once */
+	bool playingM_ = false, heldShownM_ = false;
+	/* the frame the core windows were last asked at */
+	int64_t windowsFrameM_ = -1;
+	std::atomic<bool> endHoldM_{false};
+	/* the window's thread: the core windows open, by id */
+	std::map<std::string, std::weak_ptr<CoreWindowViewModel>> coreWindowsOpen_;
 	std::deque<Job> jobs_;
 	/* behind m_ too: the jobs the machine's thread waits on the window for */
 	struct WindowJob

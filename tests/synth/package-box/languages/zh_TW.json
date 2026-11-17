@@ -31,6 +31,15 @@
 		"tool.make_project.broken": "一行不屬於任何一格",
 		"tool.make_project.broken.about": "專案的輸入中有一行不屬於任何一格，Chimera 會拒絕它。",
 		"tool.make_project.project": "專案",
-		"tool.made_project": "已製作一個 %1 格的專案"
+		"tool.made_project": "已製作一個 %1 格的專案",
+		"window.monitor.menu": "Synth 監視器",
+		"window.monitor.held": "畫格已暫停",
+		"window.monitor.running": "執行中",
+		"window.monitor.stop_at": "在指令處停止",
+		"window.monitor.step": "單步",
+		"window.monitor.continue": "繼續",
+		"window.no_such": "此核心沒有這樣的視窗",
+		"window.not_settable": "無法設定該項",
+		"window.no_command": "此視窗沒有這樣的指令"
 	}
 }

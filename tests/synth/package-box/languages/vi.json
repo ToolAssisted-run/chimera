@@ -31,6 +31,15 @@
 		"tool.make_project.broken": "Một dòng không phải của khung hình",
 		"tool.make_project.broken.about": "Đầu vào của dự án có một dòng không phải của khung hình, và Chimera từ chối nó.",
 		"tool.make_project.project": "Dự án",
-		"tool.made_project": "đã tạo một dự án %1 khung hình"
+		"tool.made_project": "đã tạo một dự án %1 khung hình",
+		"window.monitor.menu": "Màn hình Synth",
+		"window.monitor.held": "Khung hình đang được giữ",
+		"window.monitor.running": "Đang chạy",
+		"window.monitor.stop_at": "Dừng ở lệnh",
+		"window.monitor.step": "Bước",
+		"window.monitor.continue": "Tiếp tục",
+		"window.no_such": "lõi này không có cửa sổ đó",
+		"window.not_settable": "không thể đặt giá trị đó",
+		"window.no_command": "cửa sổ này không có lệnh đó"
 	}
 }

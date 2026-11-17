@@ -33,6 +33,15 @@
 		"tool.make_project.broken": "En linje, der ikke er et billedes",
 		"tool.make_project.broken.about": "Projektets input får en linje, der ikke er et billedes, som Chimera afviser.",
 		"tool.make_project.project": "Projekt",
-		"tool.made_project": "lavede et projekt på %1 billeder"
+		"tool.made_project": "lavede et projekt på %1 billeder",
+		"window.monitor.menu": "Synth-monitor",
+		"window.monitor.held": "Billedet holdes",
+		"window.monitor.running": "Kører",
+		"window.monitor.stop_at": "Stop ved instruktion",
+		"window.monitor.step": "Trin",
+		"window.monitor.continue": "Fortsæt",
+		"window.no_such": "denne kerne har ikke sådan et vindue",
+		"window.not_settable": "det kan ikke ændres",
+		"window.no_command": "dette vindue har ikke sådan en kommando"
 	}
 }

@@ -86,6 +86,9 @@ const std::vector<std::pair<std::string, std::string>> &PathsViewModel::defaults
 		 * (owner, 2026-11-05, issue 500) */
 		{"Save data", "./SaveData"},
 		{"Macros", "./Movies/Macros"},
+		/* where a core's own windows may write, a folder a core in it, made at
+		 * its first write (owner, 2026-11-17, issue 610) */
+		{"Core output", "./output"},
 		{"Temp Files", ""},
 	};
 	return list;

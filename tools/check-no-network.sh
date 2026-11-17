@@ -34,10 +34,19 @@ if [ -d "$root/source/ui" ]; then
 	if grep -rnE --include='*.c' --include='*.cpp' --include='*.h' --include='*.hpp' "$native" "$root/source/ui"; then
 		found=1
 	fi
-	if grep -rnE --include='*.cpp' --include='*.hpp' --include='*.qml' --include='*.js' "$qt" "$root/source/ui"; then
+	# One file is let through, and checked instead: qt/core_windows.cpp, whose
+	# manager turns every request a core's own window would make into one to
+	# a scheme nothing serves (issue 610). It must still refuse, and its build
+	# line says so.
+	refuser="$root/source/ui/qt/core_windows.cpp"
+	if grep -rnE --include='*.cpp' --include='*.hpp' --include='*.qml' --include='*.js' "$qt" "$root/source/ui" | grep -v "^$refuser:"; then
 		found=1
 	fi
-	if grep -nE "'Network'|'WebSockets'|'WebEngine" "$root/source/ui/meson.build"; then
+	if [ -f "$refuser" ] && ! { grep -q 'createRequest' "$refuser" && grep -q 'kRefused' "$refuser"; }; then
+		echo "$refuser: its network manager no longer refuses every request" >&2
+		found=1
+	fi
+	if grep -nE "'Network'|'WebSockets'|'WebEngine" "$root/source/ui/meson.build" | grep -v 'refuses, never sends'; then
 		found=1
 	fi
 fi

@@ -593,6 +593,9 @@ static uintptr_t CE_GUEST_CALLBACK_ABI inputPollDispatch(uintptr_t, uintptr_t, u
  * 4: kind, scope, address, value, size, and where a new value may go). The
  * same, with what the core said. */
 static uintptr_t CE_GUEST_CALLBACK_ABI memoryDispatch(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t);
+/* A core waits in its own frame (its call through callback slot 5, issue
+ * 610): the caller's stop function runs now, inside the frame. */
+static uintptr_t CE_GUEST_CALLBACK_ABI stopDispatch(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t);
 
 #ifdef CE_VK_BRIDGE
 /* The Vulkan bridge's dispatcher, each call counted as work once the driver
@@ -812,6 +815,18 @@ struct ce_session
 	std::vector<std::pair<ce_memory_fn, void *>> memoryObservers;
 	/* ce_session_hold_callbacks: frames played aside call neither memoryFn nor inputPollFn */
 	bool callbacksHeld = false;
+	/* The core's own windows (issue 610): where it takes a request and where
+	 * it answers; null for a core without them. */
+	uintptr_t (*windowRequestBuffer)(int32_t) = nullptr;
+	uintptr_t (*windowRequest)(int32_t) = nullptr;
+	std::string windowAnswer;
+	/* The core holds its own frame (issue 610): the caller's function, called
+	 * at each wait; whether the core takes the engine's; whether it waits now;
+	 * and whether the caller said this frame must go on to its end. */
+	bool stopsReported = false;
+	ce_stop_fn stopFn = nullptr;
+	void *stopCtx = nullptr;
+	bool held = false, goOnThisFrame = false;
 	std::map<std::tuple<int32_t, int32_t, uint64_t>, int32_t> memoryWatchCount;
 	/* The pictures of frames already drawn, shown again when the machine is put
 	 * back on one (kept_pictures.hpp; chimera#190). On by itself for a session
@@ -1808,6 +1823,14 @@ void ce_session::wantRendering(int32_t on)
 
 void ce_session::runFrame(uint64_t pad)
 {
+	/* a frame asked for while the core holds this one (issue 610) is not run:
+	 * the machine is part way through the frame it is in */
+	if (held)
+	{
+		fprintf(stderr, "chimera stops: a frame was asked for while the core holds its frame; not run\n");
+		return;
+	}
+	goOnThisFrame = false;
 	if (watchdog && !precompile)
 	{
 		if (firstFrame)
@@ -2533,6 +2556,31 @@ static ce_session *openSession(
 					s->memoryPc = reinterpret_cast<const uint64_t *>(pc());
 				s->addMemoryWatch = add;
 				s->removeMemoryWatch = remove;
+			}
+		}
+	}
+	/* The core's own windows (issue 610): both exports or neither. And a core
+	 * that holds its own frame is handed the engine's function for it. */
+	{
+		std::string ignored;
+		auto buffer = reinterpret_cast<uintptr_t (*)(int32_t)>(s->proc("WindowRequestBuffer", 1, false, ignored));
+		auto request = reinterpret_cast<uintptr_t (*)(int32_t)>(s->proc("WindowRequest", 1, false, ignored));
+		if (buffer != nullptr && request != nullptr)
+		{
+			s->windowRequestBuffer = buffer;
+			s->windowRequest = request;
+		}
+		auto setStop = reinterpret_cast<void (*)(uint64_t)>(s->proc("SetStopCallback", 1, false, ignored));
+		if (setStop != nullptr)
+		{
+			chimera::WbxReturn r;
+			host->wbx_get_callback_addr(s->obj, reinterpret_cast<void *>(&stopDispatch), 5, &r);
+			if (!r.ok() || r.data == 0)
+				fprintf(stderr, "chimera stops: the sandbox would not take the callback\n");
+			else
+			{
+				setStop(static_cast<uint64_t>(r.data));
+				s->stopsReported = true;
 			}
 		}
 	}
@@ -3369,6 +3417,13 @@ const uint8_t *ce_session_save_state(ce_session *s, uint64_t *len_out)
 {
 	s->error.clear();
 	s->stateBuf.clear();
+	/* part way through a frame the core holds (issue 610): not a state to keep */
+	if (s->held)
+	{
+		s->error = tr("engine.core_holds_frame", {s->cfg.coreName});
+		if (len_out != nullptr) *len_out = 0;
+		return nullptr;
+	}
 	/* A machine that died is part way through the frame it died in. Saved, it
 	 * came back from the state as a live machine (a load clears the death). */
 	if (s->guestDied())
@@ -3461,6 +3516,11 @@ static int32_t loadState(ce_session *s, const uint8_t *data, uint64_t len)
 
 int32_t ce_session_load_state(ce_session *s, const uint8_t *data, uint64_t len)
 {
+	if (s->held)
+	{
+		s->error = tr("engine.core_holds_frame", {s->cfg.coreName});
+		return 1;
+	}
 	try
 	{
 		return loadState(s, data, len);
@@ -5591,6 +5651,83 @@ static uintptr_t CE_GUEST_CALLBACK_ABI memoryDispatch(uintptr_t kind, uintptr_t 
 	}
 	guestWorked();
 	return 0;
+}
+
+/* The wait itself, in the host's own calling convention: done in the
+ * guest's (stopDispatch) with its strings and the watchdog's, it stopped
+ * MinGW's GCC 13 with an internal error (2026-11-17) */
+#if defined(__GNUC__)
+__attribute__((noinline))
+#endif
+static int32_t stopWait(ce_session *s)
+{
+	/* no frame of a session here, no one to wait for, frames played aside or
+	 * a frame already told to go on: on at once */
+	if (s == nullptr || s->stopFn == nullptr || s->callbacksHeld || s->goOnThisFrame)
+	{
+		guestWorked();
+		return 1;
+	}
+	/* the wait is not the core looping: the watchdog counts from its end */
+	const bool watched = s->watchdog && !s->precompile;
+	if (watched) s->watchdog->disarm();
+	s->held = true;
+	const int32_t r = s->stopFn(s->stopCtx);
+	s->held = false;
+	if (r != 0) s->goOnThisFrame = true;
+	if (watched)
+	{
+		const int64_t limit = frameLimitMs();
+		s->watchdog->arm(limit, tr("engine.watchdog_frame", {secondsText(limit)}));
+	}
+	guestWorked();
+	return r != 0 ? 1 : 0;
+}
+
+static uintptr_t CE_GUEST_CALLBACK_ABI stopDispatch(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t)
+{
+	return static_cast<uintptr_t>(stopWait(t_framing));
+}
+
+int32_t ce_session_windows_answered(const ce_session *s)
+{
+	return s != nullptr && s->windowRequest != nullptr ? 1 : 0;
+}
+
+const char *ce_session_window_request(ce_session *s, const char *request, uint64_t len, uint64_t *len_out)
+{
+	if (len_out != nullptr) *len_out = 0;
+	if (s == nullptr || s->windowRequest == nullptr || request == nullptr || len > INT32_MAX || s->guestDied()) return nullptr;
+	const uintptr_t at = s->windowRequestBuffer(static_cast<int32_t>(len));
+	if (at == 0) return nullptr;
+	std::memcpy(reinterpret_cast<void *>(at), request, static_cast<size_t>(len));
+	const uintptr_t answer = s->windowRequest(static_cast<int32_t>(len));
+	/* the core's code ran, and may have drawn; part way through a frame the
+	 * frame's own context stays where the core left it */
+	if (!s->held) ce_gl_release();
+	if (answer == 0 || s->guestDied()) return nullptr;
+	/* every string in it that is a key of the package's tables, its text in
+	 * the language in use, as the core's other answers are */
+	s->windowAnswer = s->texts.texts(reinterpret_cast<const char *>(answer));
+	if (len_out != nullptr) *len_out = s->windowAnswer.size();
+	return s->windowAnswer.c_str();
+}
+
+int32_t ce_session_stops_reported(const ce_session *s)
+{
+	return s != nullptr && s->stopsReported ? 1 : 0;
+}
+
+void ce_session_set_stop_callback(ce_session *s, ce_stop_fn fn, void *ctx)
+{
+	if (s == nullptr) return;
+	s->stopFn = fn;
+	s->stopCtx = ctx;
+}
+
+int32_t ce_session_held(const ce_session *s)
+{
+	return s != nullptr && s->held ? 1 : 0;
 }
 
 const char *ce_session_memory_scopes(const ce_session *s)

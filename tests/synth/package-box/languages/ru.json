@@ -35,6 +35,15 @@
 		"tool.make_project.broken": "Строка, не относящаяся к кадру",
 		"tool.make_project.broken.about": "Во ввод проекта попадает строка, не относящаяся к кадру, и Chimera её отвергает.",
 		"tool.make_project.project": "Проект",
-		"tool.made_project": "сделан проект из %1 кадров"
+		"tool.made_project": "сделан проект из %1 кадров",
+		"window.monitor.menu": "Монитор Synth",
+		"window.monitor.held": "Кадр остановлен",
+		"window.monitor.running": "Работает",
+		"window.monitor.stop_at": "Остановиться на инструкции",
+		"window.monitor.step": "Шаг",
+		"window.monitor.continue": "Продолжить",
+		"window.no_such": "у этого ядра нет такого окна",
+		"window.not_settable": "это нельзя изменить",
+		"window.no_command": "у этого окна нет такой команды"
 	}
 }

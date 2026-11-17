@@ -35,6 +35,15 @@
 		"tool.make_project.broken": "O linie care nu este a unui cadru",
 		"tool.make_project.broken.about": "Intrarea proiectului primește o linie care nu este a unui cadru, pe care Chimera o refuză.",
 		"tool.make_project.project": "Proiect",
-		"tool.made_project": "s-a făcut un proiect de %1 cadre"
+		"tool.made_project": "s-a făcut un proiect de %1 cadre",
+		"window.monitor.menu": "Monitor Synth",
+		"window.monitor.held": "Cadrul este oprit",
+		"window.monitor.running": "Rulează",
+		"window.monitor.stop_at": "Oprește la instrucțiune",
+		"window.monitor.step": "Pas",
+		"window.monitor.continue": "Continuă",
+		"window.no_such": "acest nucleu nu are o astfel de fereastră",
+		"window.not_settable": "asta nu se poate seta",
+		"window.no_command": "această fereastră nu are o astfel de comandă"
 	}
 }

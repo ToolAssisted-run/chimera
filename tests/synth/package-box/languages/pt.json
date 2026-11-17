@@ -33,6 +33,15 @@
 		"tool.make_project.broken": "Uma linha que não é de um quadro",
 		"tool.make_project.broken.about": "A entrada do projeto recebe uma linha que não é de um quadro, que o Chimera recusa.",
 		"tool.make_project.project": "Projeto",
-		"tool.made_project": "foi feito um projeto de %1 quadros"
+		"tool.made_project": "foi feito um projeto de %1 quadros",
+		"window.monitor.menu": "Monitor do Synth",
+		"window.monitor.held": "O quadro está retido",
+		"window.monitor.running": "Em execução",
+		"window.monitor.stop_at": "Parar na instrução",
+		"window.monitor.step": "Passo",
+		"window.monitor.continue": "Continuar",
+		"window.no_such": "este núcleo não tem essa janela",
+		"window.not_settable": "isso não pode ser definido",
+		"window.no_command": "esta janela não tem esse comando"
 	}
 }

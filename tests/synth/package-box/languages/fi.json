@@ -33,6 +33,15 @@
 		"tool.make_project.broken": "Rivi, joka ei ole ruudun",
 		"tool.make_project.broken.about": "Projektin syötteeseen tulee rivi, joka ei ole ruudun, ja Chimera hylkää sen.",
 		"tool.make_project.project": "Projekti",
-		"tool.made_project": "tehtiin %1 ruudun projekti"
+		"tool.made_project": "tehtiin %1 ruudun projekti",
+		"window.monitor.menu": "Synth-valvonta",
+		"window.monitor.held": "Ruutu on pysäytetty",
+		"window.monitor.running": "Käynnissä",
+		"window.monitor.stop_at": "Pysähdy käskyyn",
+		"window.monitor.step": "Askel",
+		"window.monitor.continue": "Jatka",
+		"window.no_such": "tällä ytimellä ei ole sellaista ikkunaa",
+		"window.not_settable": "sitä ei voi asettaa",
+		"window.no_command": "tällä ikkunalla ei ole sellaista komentoa"
 	}
 }

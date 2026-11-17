@@ -521,6 +521,22 @@ sentence>"}` or `{"refused": "<a sentence>"}`, keys of its tables with their
 arguments; the window shows the sentence, a refusal in the error colour.
 Cancel stops the process, and what it wrote is left as it was.
 
+### A core's own windows
+
+A tool's job is files in and files out, with no game. A core that wants a
+window over the running game (a debugger, a memory map) declares one under
+`"windows"` in `waterbox.config` (issue 610, user-decided 2026-11-17): its
+design is QML in the package, under `windows/`, and the core itself is its
+view model, answering Chimera's requests while the game runs. Each is an
+item of the Emulator menu while a project of the core is open. The core may
+also hold its own frame part way through, for a breakpoint or a step of its
+own. Chimera knows nothing of what any such window is for, and runs its QML
+locked down: its code only from the core's own window files, no network, any
+file read, and files written only in the core's own output folder (Config >
+Paths, "Core output").
+docs/porting-a-core.md ("A core's own windows") has the declaration, the
+requests and the rules.
+
 ## Editing
 
 Anything in a project can be changed after it is opened, with one

@@ -52,6 +52,8 @@ ApplicationWindow {
     required property QtObject registersTool
     required property QtObject surfaceViewer
     required property QtObject coreTool
+    // the core's own windows, its design and the core as their view model (issue 610)
+    required property QtObject coreWindows
     required property QtObject guiOverlay
     required property QtObject idleEye
     required property QtObject macroTool
@@ -728,6 +730,10 @@ ApplicationWindow {
                     else if (tool === "surfaces") root.bring(surfaceViewerWindow)
                     else if (tool === "trace") root.bring(traceLoggerWindow)
                 }
+                onOpenCoreWindow: (id) => {
+                    const why = root.coreWindows.open(id)
+                    if (why !== "") { coreWindowRefused.text = why; coreWindowRefused.open() }
+                }
                 onExportSaveData: {
                     const names = root.session.run("saveDataFiles")
                     if (names === undefined) return
@@ -1039,6 +1045,11 @@ ApplicationWindow {
         if (!root.session.hasProject) { encodeRefused.open(); return }
         encodeWindow.show()
         encodeWindow.raise()
+    }
+    // a core's own window that would not open says why (issue 610)
+    MessageDialog {
+        id: coreWindowRefused
+        buttons: MessageDialog.Ok
     }
     MessageDialog {
         id: encodeRefused

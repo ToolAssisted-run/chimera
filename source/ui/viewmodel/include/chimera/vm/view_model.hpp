@@ -107,6 +107,12 @@ protected:
 	 * whole work is the machine's (it takes nothing of the window's). */
 	void scriptSideProperty(std::string_view name, std::function<Value()> get);
 	void scriptSideCommand(std::string_view name);
+	/* a property held elsewhere than in a Property: read with get, set with
+	 * set (empty for one only the view model changes), its change said by
+	 * changed (a core's own window, whose properties the core names when it
+	 * opens, issue 610) */
+	void property(std::string name, std::string help, std::function<Value()> get,
+		std::function<bool(const Value &)> set, Signal<> &changed);
 	void rows(std::string name, std::string help, RowModel &model);
 	void picture(std::string name, std::string help, Picture &picture, Signal<> &changed);
 

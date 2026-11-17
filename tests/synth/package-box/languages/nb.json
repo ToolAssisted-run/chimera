@@ -33,6 +33,15 @@
 		"tool.make_project.broken": "En linje som ikke er en rammes",
 		"tool.make_project.broken.about": "Prosjektets inndata får en linje som ikke er en rammes, som Chimera avviser.",
 		"tool.make_project.project": "Prosjekt",
-		"tool.made_project": "laget et prosjekt på %1 rammer"
+		"tool.made_project": "laget et prosjekt på %1 rammer",
+		"window.monitor.menu": "Synth-monitor",
+		"window.monitor.held": "Bildet holdes",
+		"window.monitor.running": "Kjører",
+		"window.monitor.stop_at": "Stopp ved instruksjon",
+		"window.monitor.step": "Steg",
+		"window.monitor.continue": "Fortsett",
+		"window.no_such": "denne kjernen har ikke et slikt vindu",
+		"window.not_settable": "det kan ikke settes",
+		"window.no_command": "dette vinduet har ikke en slik kommando"
 	}
 }

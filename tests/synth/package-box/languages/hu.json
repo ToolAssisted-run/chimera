@@ -33,6 +33,15 @@
 		"tool.make_project.broken": "Egy sor, amely nem képkockáé",
 		"tool.make_project.broken.about": "A projekt bemenete kap egy sort, amely nem képkockáé, és a Chimera elutasítja.",
 		"tool.make_project.project": "Projekt",
-		"tool.made_project": "elkészült egy %1 képkockás projekt"
+		"tool.made_project": "elkészült egy %1 képkockás projekt",
+		"window.monitor.menu": "Synth-figyelő",
+		"window.monitor.held": "A képkocka meg van állítva",
+		"window.monitor.running": "Fut",
+		"window.monitor.stop_at": "Megállás az utasításnál",
+		"window.monitor.step": "Lépés",
+		"window.monitor.continue": "Folytatás",
+		"window.no_such": "ennek a magnak nincs ilyen ablaka",
+		"window.not_settable": "ez nem állítható",
+		"window.no_command": "ennek az ablaknak nincs ilyen parancsa"
 	}
 }

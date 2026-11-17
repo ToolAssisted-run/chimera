@@ -33,6 +33,15 @@
 		"tool.make_project.broken": "Una riga che non è di un fotogramma",
 		"tool.make_project.broken.about": "L'input del progetto riceve una riga che non è di un fotogramma, che Chimera rifiuta.",
 		"tool.make_project.project": "Progetto",
-		"tool.made_project": "creato un progetto di %1 fotogrammi"
+		"tool.made_project": "creato un progetto di %1 fotogrammi",
+		"window.monitor.menu": "Monitor di Synth",
+		"window.monitor.held": "Il fotogramma è fermo",
+		"window.monitor.running": "In esecuzione",
+		"window.monitor.stop_at": "Fermati all'istruzione",
+		"window.monitor.step": "Passo",
+		"window.monitor.continue": "Continua",
+		"window.no_such": "questo core non ha questa finestra",
+		"window.not_settable": "questo non si può impostare",
+		"window.no_command": "questa finestra non ha questo comando"
 	}
 }

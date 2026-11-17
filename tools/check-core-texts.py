@@ -7,8 +7,8 @@ A core's texts are keys of its package's tables, languages/<code>.json
 (docs/translations.md). Chimera's tests check the keys its declarations hold
 (waterbox.config, file_slots.json); this checks the ones its own code
 returns while it runs - a load error, a suggestion's note, an import's notes,
-its game's settings, its properties' descriptions - which only the code
-knows. It reads the core's own sources (not extern/, build/ or a folder of
+its game's settings, its properties' descriptions, its own windows' labels
+(their QML) - which only the code knows. It reads the core's own sources (not extern/, build/ or a folder of
 upstream code) and says:
 
 - each string in them that looks like a key of a family the table has (its
@@ -26,7 +26,9 @@ import os
 import re
 import sys
 
-SOURCES = (".c", ".cc", ".cpp", ".cxx", ".h", ".hpp", ".inc", ".rs", ".go", ".java", ".py", ".sh", ".gd", ".lua", ".js", ".patch")
+# .qml and .mjs: a core's own windows (issue 610), whose labels are keys of its tables
+SOURCES = (".c", ".cc", ".cpp", ".cxx", ".h", ".hpp", ".inc", ".rs", ".go", ".java", ".py", ".sh", ".gd", ".lua", ".js", ".patch",
+           ".qml", ".mjs")
 SKIP_DIRS = {".git", "extern", "build", "upstream", "third_party", "node_modules", "target", "languages"}
 KEY = re.compile(r"^[a-z][a-z0-9_]*(\.[a-z0-9_]+)+$")
 # a file's name is not a key: "firmware.bin"

@@ -31,6 +31,15 @@
 		"tool.make_project.broken": "一行不属于任何帧",
 		"tool.make_project.broken.about": "项目的输入中有一行不属于任何帧，Chimera 会拒绝它。",
 		"tool.make_project.project": "项目",
-		"tool.made_project": "已制作一个 %1 帧的项目"
+		"tool.made_project": "已制作一个 %1 帧的项目",
+		"window.monitor.menu": "Synth 监视器",
+		"window.monitor.held": "帧已暂停",
+		"window.monitor.running": "运行中",
+		"window.monitor.stop_at": "在指令处停止",
+		"window.monitor.step": "单步",
+		"window.monitor.continue": "继续",
+		"window.no_such": "此核心没有这样的窗口",
+		"window.not_settable": "无法设置该项",
+		"window.no_command": "此窗口没有这样的命令"
 	}
 }

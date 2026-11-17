@@ -517,6 +517,105 @@ Probed once after `Init`; absent exports simply mean the tool is not offered.
   reads and writes without instructions is fine. The synthetic core is the
   example (`tests/synth/package-box/synth_wbx.c`: scopes Code and RAM, sizes,
   reads and writes changeable).
+- **A core's own windows** (issue 610, user-decided 2026-11-17) - a core may
+  add windows of its own to Chimera's: a debugger, a memory map, a sprite
+  list, anything. Chimera knows nothing of what they are for. Their design is
+  QML in the package, and the core itself is their view model, as each of
+  Chimera's own windows is QML over a view model.
+  - **The declaration**: `"windows": [{"id": "monitor", "menu":
+    "window.monitor.menu", "qml": "windows/Monitor.qml"}]` in
+    `waterbox.config`. `menu` is a key of the package's tables: the window's
+    item in the Emulator menu (Game for a game core), shown while a project
+    of the core is open. `qml` is a file under `windows/`; every file the
+    window uses (other QML files, pictures) goes in that folder too. The
+    package contract tests check each window has an id of its own and its
+    file under `windows/`.
+  - **The QML**: its root is an `Item` (Chimera puts it in a window titled
+    with the core's name and the menu item). Two objects are given to it:
+    `core`, the view model (`core.<property>` to read, an assignment to a
+    writable one to change it, `core.run("<command>", [args])`,
+    `core.rows("<list>")` as a model whose roles are the list's columns,
+    `core.coreError` for what the core refused), `texts`, the package's
+    texts in the language in use (`texts["window.monitor.step"]`), and
+    `files`, the computer's files for it. It runs locked down (owner,
+    2026-11-17):
+    - Its code, QML and scripts, comes only from its own files under
+      `windows/`, and it may import Qt Quick, its Controls and Layouts (and
+      the styles they are made of), and nothing else.
+    - It reads any file: `files.read(path)` (the text), `files.readBytes(path)`
+      (an ArrayBuffer), `files.list(folder)` (the names, folders first, each
+      ending in "/"), `files.exists(path)`, and an `Image` or a font from any
+      file. A relative path is under its output folder.
+    - It writes only in its core's output folder: Config > Paths' "Core
+      output" (`./output` under Chimera's folder at first), in a folder named
+      after the core, made at the first write. `files.write(name, text)`,
+      `files.writeBytes(name, bytes)` and `files.append(name, text)` take a
+      name under it (folders in it are made); an absolute name, one climbing
+      out with "..", or one through a link that leads out is refused, and
+      nothing is written. `files.outputFolder` says where it is, and
+      `files.error` why the last call failed.
+    - It reaches nothing over the network: every request by address
+      (XMLHttpRequest, an `Image` or `Loader` with a web address, a link for
+      the browser) goes nowhere. Read files with `files`, not
+      XMLHttpRequest, which a released Chimera does not have.
+    - A module that reads or writes files on its own (`QtQuick.Dialogs`,
+      `QtQuick.LocalStorage`, `QtCore`, `Qt.labs`) does not load.
+
+    Chimera says on standard error what it refused.
+  - **The view model**, two exports, both or neither:
+    `uintptr_t WindowRequestBuffer(int32_t size)` gives the address of a
+    buffer in the core's memory that can take a request of `size` bytes (0
+    when none that big), and `uintptr_t WindowRequest(int32_t length)` reads
+    the request written there and returns the address of its answer, a JSON
+    text ending in a zero byte, kept until the next call. The requests are
+    JSON objects with `"op"` and `"window"` (the id):
+    - `describe`, once when the window opens: answer `{"properties":
+      [{"name": "pc"}, {"name": "stopAt", "writable": true}], "commands":
+      [{"name": "step"}], "lists": [{"name": "ram", "columns": ["address",
+      "value"]}]}`. `help` may be given for each.
+    - `get`, after every frame run, after every change or command, and at
+      every wait while the core holds its frame: answer `{"properties":
+      {"pc": 4660, ...}, "lists": {"ram": [["00", "7F"], ...]}}`. Numbers,
+      strings, true and false are given to the QML as they are; an array or
+      an object as its JSON text.
+    - `set` (`"name"`, `"value"`) and `run` (`"command"`, `"args"`): answer
+      `{}`, or `{"error": "<key>"}` for one the core refuses.
+    - `opened` and `closed`, as the window opens and closes: answer `{}`.
+
+    Every string in an answer that is a key of the package's tables is put
+    into the language in use, as the core's other answers are; arguments
+    follow a key after 0x1F bytes. Keep what the windows hold (a stop place,
+    a list of breakpoints, the request buffer) in `ECL_INVISIBLE` memory: a
+    savestate does not carry it, and loading one leaves the windows as they
+    were.
+  - **Holding the frame** - `void SetStopCallback(uint64_t fn)` is handed a
+    function in callback slot 5. Part way through a frame (at a breakpoint of
+    the core's own, or after one instruction for its Step), the core calls it
+    as `((uintptr_t (*)(uintptr_t, uintptr_t, uintptr_t, uintptr_t,
+    uintptr_t, uintptr_t))fn)(0, 0, 0, 0, 0, 0)` in a loop, until its own
+    window's command lets it go on:
+
+    ```c
+    holding = 1;
+    while (holding)
+        if (stop(0, 0, 0, 0, 0, 0) != 0) holding = 0; /* Chimera: go on */
+    ```
+
+    Each call does one thing a window asked (the core's `WindowRequest` is
+    called then, inside the frame, so a "continue" command can clear
+    `holding`) or a reading of the machine Chimera's own windows make (CPU
+    Registers, the Hex Editor), and returns 0. It returns 1 when the frame
+    must go on to its end: the project is closing, or Chimera is replaying
+    frames (a seek, a rewind, frames played aside), where nothing is held.
+    After a 1, every call in that frame returns 1 at once. While held, no
+    frame runs and no state is saved or loaded (the engine refuses both),
+    the frame watchdog does not count the wait, and Chimera's status bar says
+    the core holds the frame.
+  - The synthetic core is the example: its window "monitor"
+    (`tests/synth/package-box/windows/Monitor.qml` and the `WindowRequest`
+    code in `synth_wbx.c`) shows the registers, the instruction running and
+    the first bytes of RAM, and holds the frame at an instruction until Step
+    or Continue.
 - **Registers** - `int32_t GetRegisterCount(void)`, `const char
   *GetRegisterName(int32_t)` and `int64_t GetRegisterValue(int32_t)`, with
   `GetRegisterBits` and `SetRegisterValue` optional: the debugger's register

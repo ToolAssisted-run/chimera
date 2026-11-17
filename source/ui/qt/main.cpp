@@ -102,6 +102,7 @@
 #include "chimera/vm/lua_bridge.hpp"
 #include "chimera/vm/lua_console_vm.hpp"
 #include "project_windows.hpp"
+#include "core_windows.hpp"
 #include "chimera/vm/tool_windows_vm.hpp"
 #include "chimera/vm/piano_roll_vm.hpp"
 #include "chimera/vm/ram_search_vm.hpp"
@@ -1208,6 +1209,13 @@ int main(int argc, char **argv)
 	/* what the start did with a data folder change asked for */
 	if (!dataFolder.status.get().empty()) session.status.set(dataFolder.status.get());
 	qt::QmlViewModel sessionQml(session);
+	/* the core's own windows, its design over it as their view model, locked down (issue 610) */
+	qt::CoreWindows coreWindows(session);
+	/* where they may write: Paths' "Core output", a folder a core in it */
+	coreWindows.setOutputBase(QString::fromStdString(paths.resolve("Core output")));
+	vm::Connection coreOutputFollowed = paths.moved.connect([&coreWindows, &paths] {
+		coreWindows.setOutputBase(QString::fromStdString(paths.resolve("Core output")));
+	});
 	qt::QmlViewModel pianoRollQml(pianoRoll);
 	qt::QmlViewModel ramSearchQml(ramSearch);
 	qt::QmlViewModel ramWatchQml(ramWatch);
@@ -1581,6 +1589,7 @@ int main(int argc, char **argv)
 		{QStringLiteral("idleEye"), QVariant::fromValue<QObject *>(&idleEyeQml)},
 		{QStringLiteral("surfaceViewer"), QVariant::fromValue<QObject *>(&surfaceViewerQml)},
 		{QStringLiteral("coreTool"), QVariant::fromValue<QObject *>(&coreToolQml)},
+		{QStringLiteral("coreWindows"), QVariant::fromValue<QObject *>(&coreWindows)},
 		{QStringLiteral("macroTool"), QVariant::fromValue<QObject *>(&macroToolQml)},
 		{QStringLiteral("encoder"), QVariant::fromValue<QObject *>(&encoderQml)},
 		{QStringLiteral("hostInput"), QVariant::fromValue<QObject *>(&hostInputQml)},

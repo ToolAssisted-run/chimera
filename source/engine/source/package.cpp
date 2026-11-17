@@ -44,6 +44,7 @@ struct ce_package
 	bool zipOpen = false;
 	std::map<std::string, mz_uint> entries;
 	std::vector<std::string> assetNames;
+	std::string entryNames;
 	bool assetsBuilt = false;
 	std::string sha1;
 
@@ -198,6 +199,32 @@ int32_t ce_package_asset_count(ce_package *p)
 {
 	buildAssetList(p);
 	return static_cast<int32_t>(p->assetNames.size());
+}
+
+const char *ce_package_entry_names(ce_package *p, const char *prefix)
+{
+	const std::string want = prefix != nullptr ? prefix : "";
+	std::vector<std::string> names;
+	if (!p->dir.empty())
+	{
+		std::error_code ec;
+		const std::filesystem::path base(p->dir);
+		for (auto it = std::filesystem::recursive_directory_iterator(base, ec);
+			 !ec && it != std::filesystem::recursive_directory_iterator(); it.increment(ec))
+		{
+			if (!it->is_regular_file(ec)) continue;
+			std::error_code rec;
+			std::string rel = std::filesystem::relative(it->path(), base, rec).generic_string();
+			if (!rec && rel.rfind(want, 0) == 0) names.push_back(std::move(rel));
+		}
+	}
+	else
+		for (const auto &e : p->entries)
+			if (e.first.rfind(want, 0) == 0 && !e.first.empty() && e.first.back() != '/') names.push_back(e.first);
+	std::sort(names.begin(), names.end());
+	p->entryNames.clear();
+	for (const std::string &n : names) p->entryNames += n + "\n";
+	return p->entryNames.c_str();
 }
 
 const char *ce_package_asset_name(ce_package *p, int32_t i)

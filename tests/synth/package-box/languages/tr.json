@@ -33,6 +33,15 @@
 		"tool.make_project.broken": "Bir kareye ait olmayan bir satır",
 		"tool.make_project.broken.about": "Projenin girdisine bir kareye ait olmayan bir satır eklenir ve Chimera bunu reddeder.",
 		"tool.make_project.project": "Proje",
-		"tool.made_project": "%1 karelik bir proje yapıldı"
+		"tool.made_project": "%1 karelik bir proje yapıldı",
+		"window.monitor.menu": "Synth İzleyici",
+		"window.monitor.held": "Kare bekletiliyor",
+		"window.monitor.running": "Çalışıyor",
+		"window.monitor.stop_at": "Komutta dur",
+		"window.monitor.step": "Adım",
+		"window.monitor.continue": "Devam",
+		"window.no_such": "bu çekirdeğin böyle bir penceresi yok",
+		"window.not_settable": "bu ayarlanamaz",
+		"window.no_command": "bu pencerenin böyle bir komutu yok"
 	}
 }

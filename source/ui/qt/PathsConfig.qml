@@ -63,7 +63,7 @@ ApplicationWindow {
     readonly property var chimeraGlobals: ({
         "Base": ".", "ROM": ".", "Firmware": "./Firmware", "Movies": "./Movies", "Movie backups": "./Movies/backup", "A/V Dumps": ".",
         "Tools": "./Tools", "Lua": "./Lua", "Themes": "./themes", "Watch (.wch)": ".", "Debug Logs": ".", "Bug reports": "./Reports", "Save data": "./SaveData",
-        "Macros": "./Movies/Macros", "Temp Files": ""
+        "Macros": "./Movies/Macros", "Core output": "./output", "Temp Files": ""
     })
 
     // one tab's rows: the path, Browse, the name

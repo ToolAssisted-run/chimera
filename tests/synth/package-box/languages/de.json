@@ -33,6 +33,15 @@
 		"tool.make_project.broken": "Eine Zeile, die zu keinem Frame gehört",
 		"tool.make_project.broken.about": "Die Eingabe des Projekts bekommt eine Zeile, die zu keinem Frame gehört, und Chimera lehnt sie ab.",
 		"tool.make_project.project": "Projekt",
-		"tool.made_project": "ein Projekt mit %1 Frames erstellt"
+		"tool.made_project": "ein Projekt mit %1 Frames erstellt",
+		"window.monitor.menu": "Synth-Monitor",
+		"window.monitor.held": "Das Bild wird angehalten",
+		"window.monitor.running": "Läuft",
+		"window.monitor.stop_at": "Bei Befehl anhalten",
+		"window.monitor.step": "Schritt",
+		"window.monitor.continue": "Weiter",
+		"window.no_such": "dieser Kern hat kein solches Fenster",
+		"window.not_settable": "das lässt sich nicht einstellen",
+		"window.no_command": "dieses Fenster hat keinen solchen Befehl"
 	}
 }

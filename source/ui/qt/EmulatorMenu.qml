@@ -15,6 +15,8 @@ Menu {
     property var keysOf: (hotkey) => ""
     // a tool window asked for: "registers", "surfaces", "trace"
     signal openTool(string tool)
+    // one of the core's own windows asked for, by its id (issue 610)
+    signal openCoreWindow(string id)
     signal exportSaveData()
 
     readonly property bool gameTime: session.isOpen && session.hasGameTimer
@@ -22,7 +24,10 @@ Menu {
     readonly property bool registers: session.isOpen && session.hasRegisters
     readonly property bool surfaces: session.isOpen && session.surfaces !== "[]"
     readonly property bool trace: session.isOpen && session.hasTrace
-    readonly property bool shown: gameTime || saveData || registers || surfaces || trace
+    // the core's own windows, as its package names them (issue 610)
+    readonly property var coreWindowList: session.isOpen ? JSON.parse(session.coreWindows) : []
+    readonly property bool coreWindowsShown: coreWindowList.length > 0
+    readonly property bool shown: gameTime || saveData || registers || surfaces || trace || coreWindowsShown
     title: session.isGameCore ? qsTrId("main.game") : qsTrId("main.emulator")
 
     component Entry: KeyedMenuEntry { height: visible ? implicitHeight : 0 }
@@ -42,4 +47,19 @@ Menu {
     }
     Entry { text: qsTrId("main.surface_viewer"); visible: menu.surfaces; onTriggered: menu.openTool("surfaces") }
     Entry { text: qsTrId("main.trace_logger"); visible: menu.trace; keys: menu.keysOf("Trace Logger"); onTriggered: menu.openTool("trace") }
+    // the core's own windows, after Chimera's, in the package's order
+    MenuDivider {
+        visible: menu.coreWindowsShown && (menu.gameTime || menu.saveData || menu.registers || menu.surfaces || menu.trace)
+        height: visible ? implicitHeight : 0
+    }
+    Instantiator {
+        model: menu.coreWindowList
+        delegate: Entry {
+            required property var modelData
+            text: modelData.menu
+            onTriggered: menu.openCoreWindow(modelData.id)
+        }
+        onObjectAdded: (index, object) => menu.insertItem(menu.count, object)
+        onObjectRemoved: (index, object) => menu.removeItem(object)
+    }
 }

@@ -31,6 +31,15 @@
 		"tool.make_project.broken": "Satu baris yang bukan milik frame",
 		"tool.make_project.broken.about": "Input proyek mendapat satu baris yang bukan milik frame, yang ditolak Chimera.",
 		"tool.make_project.project": "Proyek",
-		"tool.made_project": "proyek %1 frame dibuat"
+		"tool.made_project": "proyek %1 frame dibuat",
+		"window.monitor.menu": "Monitor Synth",
+		"window.monitor.held": "Bingkai ditahan",
+		"window.monitor.running": "Berjalan",
+		"window.monitor.stop_at": "Berhenti di instruksi",
+		"window.monitor.step": "Langkah",
+		"window.monitor.continue": "Lanjutkan",
+		"window.no_such": "inti ini tidak punya jendela itu",
+		"window.not_settable": "itu tidak bisa diatur",
+		"window.no_command": "jendela ini tidak punya perintah itu"
 	}
 }

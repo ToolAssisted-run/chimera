@@ -460,10 +460,12 @@ static int watching(int kind, uint64_t address)
  * with (GetMemoryCallbackPc, issue 571) and the PC register shows; not
  * machine state, so invisible like the callback */
 ECL_INVISIBLE static uint64_t g_accessPc;
+static void held_here(uint32_t pc); /* the core's own window, below */
 static void memory_stepped(uint32_t pc)
 {
 	g_accessPc = pc;
 	if (g_memoryCall != 0 && watching(0, pc)) g_memoryCall(0, 0, pc, 0, 0, 0);
+	held_here(pc);
 }
 static uint32_t memory_accessed(int write, uint32_t addr, uint32_t value, int size)
 {
@@ -514,6 +516,113 @@ ECL_EXPORT void RemoveMemoryWatch(int32_t kind, int32_t scope, uint64_t address)
 				break;
 			}
 	memory_hook();
+}
+
+/* The core's own window (issue 610): "monitor", whose design is
+ * windows/Monitor.qml in the package and whose view model is here. It shows
+ * the registers, the instruction running, the first bytes of RAM as a list,
+ * and holds the frame at an instruction ("stopAt") until Continue, or for
+ * one instruction more with Step. Nothing of it is the machine's: all
+ * invisible, in no state, so a load leaves the window as it was. */
+ECL_INVISIBLE static uintptr_t (*g_stopCall)(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t);
+ECL_INVISIBLE static int64_t g_stopAt = -1;
+ECL_INVISIBLE static int32_t g_holding, g_stepping, g_heldCount;
+ECL_INVISIBLE static char g_windowIn[4096];
+ECL_INVISIBLE static char g_windowOut[8192];
+ECL_EXPORT void SetStopCallback(uint64_t fn)
+{
+	g_stopCall = (uintptr_t (*)(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t))(uintptr_t)fn;
+}
+static void held_here(uint32_t pc)
+{
+	if (g_stopCall == 0 || !(g_stepping || (g_stopAt >= 0 && (uint64_t)g_stopAt == pc))) return;
+	g_stepping = 0;
+	g_holding = 1;
+	g_heldCount++;
+	/* each wait does one thing the window asked; Continue or Step (run
+	 * inside a wait) end the hold, and so does Chimera's word to go on */
+	while (g_holding)
+		if (g_stopCall(0, 0, 0, 0, 0, 0) != 0) g_holding = g_stepping = 0;
+}
+/* the value of a field of the request: a string's text or a number's digits */
+static int request_field(const char *req, const char *key, char *out, int cap)
+{
+	char pat[64];
+	snprintf(pat, sizeof pat, "\"%s\"", key);
+	const char *p = strstr(req, pat);
+	if (!p) return 0;
+	p += strlen(pat);
+	while (*p == ' ' || *p == ':') p++;
+	int n = 0;
+	if (*p == '"')
+	{
+		for (p++; *p && *p != '"' && n < cap - 1; p++) out[n++] = *p;
+	}
+	else
+		for (; *p && *p != ',' && *p != '}' && *p != ']' && *p != ' ' && n < cap - 1; p++) out[n++] = *p;
+	out[n] = 0;
+	return 1;
+}
+ECL_EXPORT uintptr_t WindowRequestBuffer(int32_t size) { return size >= 0 && size < (int32_t)sizeof g_windowIn ? (uintptr_t)g_windowIn : 0; }
+ECL_EXPORT uintptr_t WindowRequest(int32_t length)
+{
+	if (length < 0 || length >= (int32_t)sizeof g_windowIn) return 0;
+	g_windowIn[length] = 0;
+	char op[16], window[32], name[32], value[32], command[32];
+	if (!request_field(g_windowIn, "op", op, sizeof op)) return 0;
+	request_field(g_windowIn, "window", window, sizeof window);
+	if (strcmp(window, "monitor") != 0)
+	{
+		snprintf(g_windowOut, sizeof g_windowOut, "{\"error\":\"window.no_such\"}");
+		return (uintptr_t)g_windowOut;
+	}
+	if (!strcmp(op, "describe"))
+		snprintf(g_windowOut, sizeof g_windowOut,
+			"{\"properties\":[{\"name\":\"pc\"},{\"name\":\"registers\"},{\"name\":\"held\"},{\"name\":\"heldCount\"},"
+			"{\"name\":\"stopAt\",\"writable\":true}],"
+			"\"commands\":[{\"name\":\"continue\"},{\"name\":\"step\"}],"
+			"\"lists\":[{\"name\":\"ram\",\"columns\":[\"address\",\"value\"]}]}");
+	else if (!strcmp(op, "get"))
+	{
+		const int32_t *r = g_synth ? synth_get_registers(g_synth) : 0;
+		const uint8_t *ram = g_synth ? synth_get_ram(g_synth) : 0;
+		int n = snprintf(g_windowOut, sizeof g_windowOut,
+			"{\"properties\":{\"pc\":%u,\"registers\":\"R0=%d R1=%d R2=%d R3=%d R4=%d R5=%d R6=%d R7=%d\",\"held\":%s,\"heldCount\":%d,"
+			"\"stopAt\":%lld},\"lists\":{\"ram\":[",
+			(unsigned)g_accessPc, r ? r[0] : 0, r ? r[1] : 0, r ? r[2] : 0, r ? r[3] : 0, r ? r[4] : 0, r ? r[5] : 0,
+			r ? r[6] : 0, r ? r[7] : 0, g_holding ? "true" : "false", g_heldCount, (long long)g_stopAt);
+		for (int i = 0; i < 16 && ram; i++)
+			n += snprintf(g_windowOut + n, sizeof g_windowOut - n, "%s[\"%02X\",\"%02X\"]", i ? "," : "", i, ram[i]);
+		snprintf(g_windowOut + n, sizeof g_windowOut - n, "]}}");
+	}
+	else if (!strcmp(op, "set"))
+	{
+		if (!request_field(g_windowIn, "name", name, sizeof name) || strcmp(name, "stopAt") != 0 ||
+			!request_field(g_windowIn, "value", value, sizeof value))
+			snprintf(g_windowOut, sizeof g_windowOut, "{\"error\":\"window.not_settable\"}");
+		else
+		{
+			g_stopAt = strtoll(value, 0, 10);
+			snprintf(g_windowOut, sizeof g_windowOut, "{}");
+		}
+	}
+	else if (!strcmp(op, "run"))
+	{
+		request_field(g_windowIn, "command", command, sizeof command);
+		if (!strcmp(command, "continue"))
+			g_holding = 0;
+		else if (!strcmp(command, "step"))
+			g_holding = 0, g_stepping = 1;
+		else
+		{
+			snprintf(g_windowOut, sizeof g_windowOut, "{\"error\":\"window.no_command\"}");
+			return (uintptr_t)g_windowOut;
+		}
+		snprintf(g_windowOut, sizeof g_windowOut, "{}");
+	}
+	else
+		snprintf(g_windowOut, sizeof g_windowOut, "{}"); /* opened, closed: nothing to do */
+	return (uintptr_t)g_windowOut;
 }
 
 /* An analog control's value, set before each frame. The synthetic game reads

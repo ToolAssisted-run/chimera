@@ -33,6 +33,15 @@
 		"tool.make_project.broken": "Une ligne qui n'est pas d'une image",
 		"tool.make_project.broken.about": "L'entrée du projet reçoit une ligne qui n'est pas d'une image, que Chimera refuse.",
 		"tool.make_project.project": "Projet",
-		"tool.made_project": "un projet de %1 images a été fait"
+		"tool.made_project": "un projet de %1 images a été fait",
+		"window.monitor.menu": "Moniteur Synth",
+		"window.monitor.held": "L'image est retenue",
+		"window.monitor.running": "En marche",
+		"window.monitor.stop_at": "S'arrêter à l'instruction",
+		"window.monitor.step": "Pas",
+		"window.monitor.continue": "Continuer",
+		"window.no_such": "ce cœur n'a pas cette fenêtre",
+		"window.not_settable": "cela ne se règle pas",
+		"window.no_command": "cette fenêtre n'a pas cette commande"
 	}
 }

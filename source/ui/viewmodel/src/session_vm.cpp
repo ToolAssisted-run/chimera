@@ -657,6 +657,8 @@ SessionViewModel::SessionViewModel(Dispatcher &dispatcher, InputLog &inputs)
 	expose("hasRegisters", "the core shows its registers (CPU Registers)", hasRegisters);
 	expose("traceHeader", "the core's words for its trace lines' columns", traceHeader);
 	expose("surfaces", "the pictures the core draws for itself, as [{\"name\", \"width\", \"height\"}]", surfaces);
+	expose("coreWindows", "the core's own windows (issue 610), as [{\"id\", \"menu\", \"qml\"}]; \"[]\" for none", coreWindows);
+	expose("held", "the core holds the frame it is in, part way through, until its window lets it go on", held);
 	expose("showGameTime", "a game's own timer is shown over the picture", showGameTime, true);
 	expose("gameTimeText", "the game's timer as shown: \"IGT 01:02.345\"", gameTimeText);
 	expose("showRealTime", "the time from the movie's start to the current frame is shown over the picture", showRealTime, true);
@@ -1593,6 +1595,7 @@ SessionViewModel::SessionViewModel(Dispatcher &dispatcher, InputLog &inputs)
 			std::string project, package;
 			if (!arg(a, 0, project, error)) return {};
 			if (a.size() > 1 && !arg(a, 1, package, error)) return {};
+			endHoldM_ = true;
 			/* false at once for a file that is no project, as Chimera's
 			 * client.openproject says; the open itself goes on after */
 			const char *unreadable = nullptr;
@@ -1722,6 +1725,8 @@ SessionViewModel::SessionViewModel(Dispatcher &dispatcher, InputLog &inputs)
 			freezes_.clear();
 			freezesUpdated();
 		}
+		/* a frame the core holds goes on to its end first (issue 610) */
+		endHoldM_ = true;
 		submit([this] {
 			freezesM_.clear();
 			freezeGameM_.clear();
@@ -1926,6 +1931,7 @@ SessionViewModel::SessionViewModel(Dispatcher &dispatcher, InputLog &inputs)
 		}, &isOpen);
 	command("restart", "opens the same core and game again at frame 0; the inputs stay", {},
 		[this](const Args &, std::string &) -> Value {
+			endHoldM_ = true;
 			submit([this] {
 				/* the project opens again as it is in memory, its movie and
 				 * markers as they are now */
@@ -2311,6 +2317,15 @@ void SessionViewModel::submit(std::function<void()> job)
 	cv_.notify_all();
 }
 
+void SessionViewModel::submitMidFrame(std::function<void()> job)
+{
+	{
+		std::lock_guard<std::mutex> lock(m_);
+		jobs_.push_back({false, std::move(job), false, true});
+	}
+	cv_.notify_all();
+}
+
 void SessionViewModel::loop()
 {
 	for (;;)
@@ -2319,6 +2334,8 @@ void SessionViewModel::loop()
 		longSeekWatchOnMachine();
 		/* the MCP server's calls, between frames */
 		mcpOnMachine();
+		/* the core's own windows asked again when the machine moved (a seek, a load) */
+		if (s_ != nullptr && !openWindowsM_.empty() && ce_session_frame(s_) != windowsFrameM_) refreshCoreWindowsOnMachine();
 		std::function<void()> job;
 		bool advance = false, runOn = false, back = false, catchPoll = false, autosaveTick = false, keepTick = false,
 			journalTick = false, idleTick = false, turboPiece = false, padTick = false;
@@ -2550,6 +2567,24 @@ void SessionViewModel::loop()
 
 void SessionViewModel::freeSessionOnMachine()
 {
+	/* the core is part way through a frame it holds: its code is on this
+	 * thread's stack, and the machine cannot go now (issue 610) */
+	if (s_ != nullptr && ce_session_held(s_))
+	{
+		fprintf(stderr, "chimera: the machine was to close while its core holds a frame; kept\n");
+		return;
+	}
+	if (!openWindowsM_.empty() || heldShownM_)
+	{
+		openWindowsM_.clear();
+		heldShownM_ = false;
+		later([this] {
+			held.set(false);
+			coreWindowsOpen_.clear();
+			coreWindowsClosed.emit();
+		});
+	}
+	later([this] { coreWindows.set("[]"); });
 	if (s_ == nullptr) return;
 	/* a turbo seek under way was this machine's, and so were a long seek and a question about one */
 	turboSeekToM_ = -1;
@@ -5222,10 +5257,131 @@ void SessionViewModel::setBranchLoadedTurn(std::function<void(const std::optiona
 	waitOnMachine([&] { branchLoadedTurnM_ = std::move(turn); }, true);
 }
 
+std::string SessionViewModel::windowRequestOnMachine(const std::string &request)
+{
+	if (s_ == nullptr) return {};
+	uint64_t len = 0;
+	const char *a = ce_session_window_request(s_, request.data(), request.size(), &len);
+	return a != nullptr ? std::string(a, static_cast<size_t>(len)) : std::string();
+}
+
+void SessionViewModel::refreshCoreWindowsOnMachine()
+{
+	if (s_ == nullptr) return;
+	windowsFrameM_ = ce_session_frame(s_);
+	for (const std::string &id : openWindowsM_)
+	{
+		std::string answer = windowRequestOnMachine("{\"op\":\"get\",\"window\":" + json::quote(id) + "}");
+		later([this, id, answer = std::move(answer)] {
+			const auto it = coreWindowsOpen_.find(id);
+			if (it == coreWindowsOpen_.end()) return;
+			if (auto vm = it->second.lock()) vm->show(answer);
+		});
+	}
+}
+
+std::shared_ptr<CoreWindowViewModel> SessionViewModel::openCoreWindow(const std::string &id, std::string &error)
+{
+	if (const auto it = coreWindowsOpen_.find(id); it != coreWindowsOpen_.end())
+		if (auto open = it->second.lock()) return open;
+	json::Json list;
+	std::string err;
+	bool declared = false;
+	if (json::parse(coreWindows.get(), list, err))
+		for (const json::Json &w : list.items)
+			if (const json::Json *i = w.find("id"); i != nullptr && i->text == id) declared = true;
+	if (!declared)
+	{
+		error = tr("core_window.not_declared", {id});
+		return nullptr;
+	}
+	std::string description;
+	waitOnMachine([&] { description = windowRequestOnMachine("{\"op\":\"describe\",\"window\":" + json::quote(id) + "}"); });
+	/* a change or a command, sent to the core where it may run (while it
+	 * holds its frame too), and the windows asked again after it */
+	auto self = std::make_shared<std::weak_ptr<CoreWindowViewModel>>();
+	auto send = [this, self](std::string request, std::function<void(const std::string &)> answered) {
+		submitMidFrame([this, self, request = std::move(request), answered = std::move(answered)] {
+			std::string answer = windowRequestOnMachine(request);
+			refreshCoreWindowsOnMachine();
+			later([self, answered, answer = std::move(answer)] {
+				if (self->lock()) answered(answer);
+			});
+		});
+	};
+	auto vm = std::make_shared<CoreWindowViewModel>(id, description, dispatcher_, send);
+	if (!vm->problem().empty())
+	{
+		error = vm->problem();
+		return nullptr;
+	}
+	*self = vm;
+	coreWindowsOpen_[id] = vm;
+	waitOnMachine([&] {
+		if (std::find(openWindowsM_.begin(), openWindowsM_.end(), id) == openWindowsM_.end()) openWindowsM_.push_back(id);
+		windowRequestOnMachine("{\"op\":\"opened\",\"window\":" + json::quote(id) + "}");
+		refreshCoreWindowsOnMachine();
+	});
+	return vm;
+}
+
+void SessionViewModel::closeCoreWindow(const std::string &id)
+{
+	coreWindowsOpen_.erase(id);
+	submitMidFrame([this, id] {
+		const auto at = std::find(openWindowsM_.begin(), openWindowsM_.end(), id);
+		if (at == openWindowsM_.end()) return;
+		openWindowsM_.erase(at);
+		windowRequestOnMachine("{\"op\":\"closed\",\"window\":" + json::quote(id) + "}");
+	});
+}
+
+int32_t SessionViewModel::stopCalled(void *self)
+{
+	return static_cast<SessionViewModel *>(self)->stopOnMachine();
+}
+
+int32_t SessionViewModel::stopOnMachine()
+{
+	/* only a frame played is held: a seek, a rewind or frames played aside
+	 * replay frames the person has seen, and a closing machine ends it */
+	if (!playingM_ || endHoldM_.load() || s_ == nullptr) return 1;
+	if (!heldShownM_)
+	{
+		heldShownM_ = true;
+		const char *core = ce_session_core_name(s_);
+		later([this, name = std::string(core != nullptr ? core : "")] {
+			held.set(true);
+			status.set(tr("session.core_holds_frame", {name}));
+		});
+	}
+	/* the windows asked at every wait: the core may have moved since the
+	 * last (a Step runs on to the next place it holds) */
+	refreshCoreWindowsOnMachine();
+	/* one thing done: a core window's request, or what a thread waits on
+	 * (Chimera's own windows read the machine so); the rest - a frame, a
+	 * seek, a project opened - waits until the frame has gone on */
+	std::function<void()> job;
+	{
+		std::unique_lock<std::mutex> lock(m_);
+		auto served = [this] {
+			return std::find_if(jobs_.begin(), jobs_.end(), [](const Job &j) { return j.midFrame || (j.waited && !j.betweenTurns); });
+		};
+		cv_.wait(lock, [&] { return quit_ || endHoldM_.load() || served() != jobs_.end(); });
+		if (quit_ || endHoldM_.load()) return 1;
+		const auto at = served();
+		job = std::move(at->run);
+		jobs_.erase(at);
+	}
+	job();
+	return 0;
+}
+
 void SessionViewModel::applyMemoryWatchesOnMachine()
 {
 	if (s_ == nullptr) return;
 	ce_session_set_memory_callback(s_, &SessionViewModel::memoryCalled, this);
+	ce_session_set_stop_callback(s_, &SessionViewModel::stopCalled, this);
 	/* what another core cannot watch is dropped: its script's call was refused when it was made */
 	for (auto it = memoryWatchesM_.begin(); it != memoryWatchesM_.end();)
 		it = ce_session_watch_memory(s_, std::get<0>(*it), std::get<1>(*it), std::get<2>(*it), 1) != 0 ? std::next(it)
@@ -6466,6 +6622,27 @@ void SessionViewModel::adoptOnMachine(ce_session *s, const std::string &package,
 			config.assign(reinterpret_cast<const char *>(d), static_cast<size_t>(len));
 		ce_package_free(p);
 	}
+	/* the core's own windows (issue 610): those its package declares, when
+	 * the core answers for them, each with its menu item in the language in use */
+	{
+		json::Json windowsCfg, list;
+		std::string windowsErr;
+		list.kind = json::Json::Kind::Array;
+		if (ce_session_windows_answered(s) != 0 && json::parse(config, windowsCfg, windowsErr))
+			if (const json::Json *ws = windowsCfg.find("windows"))
+				for (const json::Json &w : ws->items)
+				{
+					const json::Json *id = w.find("id"), *menu = w.find("menu"), *qml = w.find("qml");
+					if (id == nullptr || id->text.empty() || qml == nullptr || qml->text.empty()) continue;
+					json::Json one;
+					one.kind = json::Json::Kind::Object;
+					one.members.emplace_back("id", json::Json::string(id->text));
+					one.members.emplace_back("menu", json::Json::string(menu != nullptr && !menu->text.empty() ? menu->text : id->text));
+					one.members.emplace_back("qml", json::Json::string(qml->text));
+					list.items.push_back(std::move(one));
+				}
+		later([this, text = json::write(list)] { coreWindows.set(text); });
+	}
 	/* the analog controls: the engine's names, headers and rest values, the
 	 * ranges as the package declares them (its own input, or a machine's) */
 	std::vector<Axis> axes;
@@ -6886,7 +7063,17 @@ int32_t SessionViewModel::advanceOnMachine()
 	}
 	else
 		fastUndrawn_ = 0;
+	/* a frame played, not one a seek replays, is one the core may hold (issue 610) */
+	playingM_ = !playedSeekOnMachine();
+	endHoldM_ = false;
 	const int32_t lag = stepOnMachine(!playedSeekOnMachine(), recordingM_.load() || draw);
+	playingM_ = false;
+	if (heldShownM_)
+	{
+		heldShownM_ = false;
+		later([this] { held.set(false); });
+	}
+	if (!openWindowsM_.empty() && s_ != nullptr) refreshCoreWindowsOnMachine();
 	/* past the end the movie grew: the project has a change */
 	if (f >= size && !unsavedM_.exchange(true)) later([this] { markChanged(); });
 	/* TAStudio's "automatically pause at end of movie": the frame the movie

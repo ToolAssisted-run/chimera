@@ -31,6 +31,15 @@
 		"tool.make_project.broken": "프레임의 것이 아닌 줄",
 		"tool.make_project.broken.about": "프로젝트의 입력에 프레임의 것이 아닌 줄이 들어가며, Chimera는 이를 거부합니다.",
 		"tool.make_project.project": "프로젝트",
-		"tool.made_project": "%1프레임짜리 프로젝트를 만들었습니다"
+		"tool.made_project": "%1프레임짜리 프로젝트를 만들었습니다",
+		"window.monitor.menu": "Synth 모니터",
+		"window.monitor.held": "프레임이 멈춰 있습니다",
+		"window.monitor.running": "실행 중",
+		"window.monitor.stop_at": "명령어에서 멈춤",
+		"window.monitor.step": "한 단계",
+		"window.monitor.continue": "계속",
+		"window.no_such": "이 코어에는 그런 창이 없습니다",
+		"window.not_settable": "그것은 설정할 수 없습니다",
+		"window.no_command": "이 창에는 그런 명령이 없습니다"
 	}
 }

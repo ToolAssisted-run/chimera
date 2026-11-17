@@ -138,6 +138,11 @@ Package readPackage(const std::string &path)
 	if (const Json *machines = k.cfg.find("machines"))
 		for (const Json &m : machines->items) keep(m.find("input"));
 	k.entries["licenses/licenses.json"] = entryText(p, "licenses/licenses.json");
+	/* the core's own windows' files (issue 610), by name: whether each is there */
+	if (const Json *windows = k.cfg.find("windows"))
+		for (const Json &w : windows->items)
+			if (const Json *qml = w.find("qml"); qml != nullptr && !qml->text.empty() && ce_package_has_entry(p, qml->text.c_str()))
+				k.entries[qml->text] = "there";
 	ce_package_free(p);
 	return k;
 }
@@ -301,6 +306,30 @@ std::vector<std::string> toolFilesNamedAsChimeras(const Json &cfg)
 						if (const Json *name = f.find("name"); name != nullptr && taken.count(name->text))
 							out.push_back("tool '" + (id != nullptr ? id->text : std::string("?")) + "' names a file '" + name->text
 								+ "', the name of a file Chimera gives every tool");
+		}
+	return out;
+}
+
+/* A core's own windows (issue 610): each has an id of its own, and its
+ * design is a .qml file of the package under windows/, the folder Chimera
+ * unpacks for its engine and lets it load from (docs/porting-a-core.md) */
+std::vector<std::string> windowProblems(const Json &cfg, const std::function<bool(const std::string &)> &there)
+{
+	std::vector<std::string> out;
+	std::set<std::string> ids;
+	if (const Json *windows = cfg.find("windows"))
+		for (const Json &w : windows->items)
+		{
+			const Json *id = w.find("id"), *qml = w.find("qml"), *menu = w.find("menu");
+			const std::string name = id != nullptr ? id->text : std::string();
+			if (name.empty()) out.push_back("a window has no id");
+			else if (!ids.insert(name).second) out.push_back("window '" + name + "' is declared twice");
+			if (menu == nullptr || menu->text.empty()) out.push_back("window '" + name + "' has no menu item");
+			const std::string file = qml != nullptr ? qml->text : std::string();
+			if (file.rfind("windows/", 0) != 0 || file.size() < 13 || file.compare(file.size() - 4, 4, ".qml") != 0)
+				out.push_back("window '" + name + "' is drawn by '" + file + "', which is no .qml file under windows/");
+			else if (!there(file))
+				out.push_back("window '" + name + "' is drawn by '" + file + "', which the package does not have");
 		}
 	return out;
 }
@@ -498,6 +527,13 @@ void checkPackages(const std::vector<Package> &all)
 		for (const Package *k : readable)
 			for (const std::string &w : toolFilesNamedAsChimeras(k->cfg)) wrong.push_back(k->name + ": " + w);
 		report("every file a core's tool reads or writes has a name of its own", wrong);
+	}
+	{
+		std::vector<std::string> wrong;
+		for (const Package *k : readable)
+			for (const std::string &w : windowProblems(k->cfg, [k](const std::string &f) { return k->entries.count(f) > 0; }))
+				wrong.push_back(k->name + ": " + w);
+		report("every window a core declares has an id of its own and its .qml under windows/", wrong);
 	}
 	{
 		std::vector<std::string> wrong;
@@ -928,6 +964,21 @@ void selfChecks()
 				"tool 'join' names a file 'settings', the name of a file Chimera gives every tool",
 				"tool 'split' names a file 'tool', the name of a file Chimera gives every tool"},
 			"a tool's file named as one Chimera gives every tool is found, and 'rom' is the tool's to use");
+	}
+	{
+		const Json cfg = parsed(R"({"windows": [{"id": "monitor", "menu": "window.monitor", "qml": "windows/Monitor.qml"},
+			{"id": "monitor", "menu": "m", "qml": "windows/Gone.qml"}, {"id": "outside", "menu": "m", "qml": "ui/Outside.qml"},
+			{"id": "bare", "qml": "windows/Bare.txt"}]})");
+		auto there = [](const std::string &f) { return f == "windows/Monitor.qml" || f == "ui/Outside.qml"; };
+		expect(windowProblems(cfg, there) == std::vector<std::string>{
+				"window 'monitor' is declared twice",
+				"window 'monitor' is drawn by 'windows/Gone.qml', which the package does not have",
+				"window 'outside' is drawn by 'ui/Outside.qml', which is no .qml file under windows/",
+				"window 'bare' has no menu item",
+				"window 'bare' is drawn by 'windows/Bare.txt', which is no .qml file under windows/"},
+			"a core's windows declared twice, missing their file, outside windows/ or with no menu item are found");
+		expect(windowProblems(parsed(R"({"windows": [{"id": "monitor", "menu": "window.monitor", "qml": "windows/Monitor.qml"}]})"), there).empty(),
+			"a window declared once, its .qml under windows/, passes");
 	}
 	{
 		expect(CoresViewModel::abiRefusal(parsed(R"({"abi": 1})")).empty() && CoresViewModel::abiRefusal(parsed("{}")).empty(),

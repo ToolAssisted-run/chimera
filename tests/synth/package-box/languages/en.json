@@ -33,6 +33,15 @@
 		"tool.make_project.broken": "A line that is not a frame's",
 		"tool.make_project.broken.about": "The project's input gets a line that is not a frame's, which Chimera refuses.",
 		"tool.make_project.project": "Project",
-		"tool.made_project": "made a project of %1 frames"
+		"tool.made_project": "made a project of %1 frames",
+		"window.monitor.menu": "Synth Monitor",
+		"window.monitor.held": "The frame is held",
+		"window.monitor.running": "Running",
+		"window.monitor.stop_at": "Stop at instruction",
+		"window.monitor.step": "Step",
+		"window.monitor.continue": "Continue",
+		"window.no_such": "this core has no such window",
+		"window.not_settable": "that cannot be set",
+		"window.no_command": "this window has no such command"
 	}
 }

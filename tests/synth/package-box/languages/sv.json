@@ -33,6 +33,15 @@
 		"tool.make_project.broken": "En rad som inte är en bildrutas",
 		"tool.make_project.broken.about": "Projektets indata får en rad som inte är en bildrutas, som Chimera avvisar.",
 		"tool.make_project.project": "Projekt",
-		"tool.made_project": "gjorde ett projekt på %1 bildrutor"
+		"tool.made_project": "gjorde ett projekt på %1 bildrutor",
+		"window.monitor.menu": "Synth-monitor",
+		"window.monitor.held": "Bildrutan hålls",
+		"window.monitor.running": "Kör",
+		"window.monitor.stop_at": "Stanna vid instruktion",
+		"window.monitor.step": "Steg",
+		"window.monitor.continue": "Fortsätt",
+		"window.no_such": "den här kärnan har inget sådant fönster",
+		"window.not_settable": "det går inte att ställa in",
+		"window.no_command": "det här fönstret har inget sådant kommando"
 	}
 }

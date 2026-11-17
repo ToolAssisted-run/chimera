@@ -31,6 +31,15 @@
 		"tool.make_project.broken": "フレームのものではない行",
 		"tool.make_project.broken.about": "プロジェクトの入力にフレームのものではない行が入り、Chimera はそれを拒否します。",
 		"tool.make_project.project": "プロジェクト",
-		"tool.made_project": "%1 フレームのプロジェクトを作りました"
+		"tool.made_project": "%1 フレームのプロジェクトを作りました",
+		"window.monitor.menu": "Synth モニター",
+		"window.monitor.held": "フレームを停止中",
+		"window.monitor.running": "実行中",
+		"window.monitor.stop_at": "この命令で停止",
+		"window.monitor.step": "ステップ",
+		"window.monitor.continue": "続行",
+		"window.no_such": "このコアにそのウィンドウはありません",
+		"window.not_settable": "それは設定できません",
+		"window.no_command": "このウィンドウにそのコマンドはありません"
 	}
 }
