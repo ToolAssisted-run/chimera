@@ -2276,6 +2276,9 @@ bool pianoRollColumns(const char *package, const char *rom)
 			CHECK(cs.items[0].find("Name")->text == "CursorColumn" && cs.items[1].find("Text")->text == "Frame#");
 			CHECK(cs.items[2].find("Name")->text == "P1 Up" && cs.items[2].find("Text")->text == "U" && cs.items[2].find("Visible")->boolean);
 			CHECK(cs.items[7].find("Name")->text == "P1 B" && !cs.items[7].find("Visible")->boolean);
+			/* a script sees the package's header as the column's text (issue 607), else the mnemonic */
+			CHECK(cs.items[8].find("Name")->text == "P1 Select" && cs.items[8].find("Text")->text == "SEL");
+			CHECK(cs.items[9].find("Name")->text == "P1 Start" && cs.items[9].find("Text")->text == "S");
 		}
 	}
 	/* a project with Chimera's own columns (widths and all): its hidden ones

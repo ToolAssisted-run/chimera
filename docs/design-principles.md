@@ -15922,3 +15922,10 @@ symbols.
 - **The three PlayStation cores** (duckstation for the PlayStation, pcsx2,
   rpcs3) declare the console's own shapes for the four face buttons:
   Triangle U+25B3, Circle U+25CB, Cross U+2715, Square U+25A1.
+- **What a script sees** (owner, 2026-11-17). The names of a new piano
+  roll's columns that Lua's TAStudio functions give are the header the package
+  declares for the button, and its one-character mnemonic when the package
+  declares none. Before, they were always the mnemonic. No document
+  described those names, so no other document changed.
+- **Outline shapes kept** (owner, 2026-11-17): U+25B3, U+25CB, U+2715 and
+  U+25A1 stay as chosen for the three PlayStation cores.

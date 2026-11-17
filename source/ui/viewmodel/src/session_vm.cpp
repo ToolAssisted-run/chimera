@@ -6168,7 +6168,7 @@ void SessionViewModel::setTastudioMember(const std::string &name, const std::str
 void SessionViewModel::setHiddenColumns(const std::vector<std::string> &names)
 {
 	/* a roll of Chimera's shape: its cursor and frame columns, then a column
-	 * a control, named, its mnemonic for a label, as a new piano roll makes */
+	 * a control, named, its header (else mnemonic) for a label, as a new piano roll makes */
 	json::Json roll;
 	roll.kind = json::Json::Kind::Array;
 	auto column = [&](const std::string &name, const std::string &text, bool visible, bool rotatable) {
@@ -6190,7 +6190,9 @@ void SessionViewModel::setHiddenColumns(const std::vector<std::string> &names)
 	column("FrameColumn", "Frame#", true, true);
 	for (size_t b = 0; b < buttonNames_.size(); b++)
 	{
-		const std::string mn = b < mnemonics_.size() && mnemonics_[b] != '.' ? std::string(1, mnemonics_[b]) : buttonNames_[b];
+		/* the package's header for it, else its mnemonic (what the roll heads it with) */
+		const std::string mn = b < buttonHeaders_.size() && !buttonHeaders_[b].empty() ? buttonHeaders_[b]
+			: b < mnemonics_.size() && mnemonics_[b] != '.' ? std::string(1, mnemonics_[b]) : buttonNames_[b];
 		column(buttonNames_[b], mn, shown(buttonNames_[b]), false);
 	}
 	for (const Axis &a : axes_) column(a.name, a.header.empty() ? a.name : a.header, shown(a.name), true);
