@@ -199,6 +199,16 @@ if host_macos
     '-DALSOFT_BACKEND_PIPEWIRE=OFF', '-DALSOFT_BACKEND_JACK=OFF',
     '-DALSOFT_BACKEND_SDL2=OFF', '-DALSOFT_BACKEND_SDL3=OFF']
 endif
+# Windows: its own backends (WASAPI, DirectSound, WinMM) and nothing else. A
+# Windows build made on Linux would otherwise find the Linux machine's
+# PipeWire, PulseAudio or JACK headers and fail to compile them with mingw
+if host_windows
+  openal_platform_args = ['-DALSOFT_RTKIT=OFF',
+    '-DALSOFT_BACKEND_PORTAUDIO=OFF', '-DALSOFT_BACKEND_PULSEAUDIO=OFF',
+    '-DALSOFT_BACKEND_PIPEWIRE=OFF', '-DALSOFT_BACKEND_JACK=OFF',
+    '-DALSOFT_BACKEND_ALSA=OFF', '-DALSOFT_BACKEND_OSS=OFF',
+    '-DALSOFT_BACKEND_SDL2=OFF', '-DALSOFT_BACKEND_SDL3=OFF']
+endif
 custom_target(
   'openal',
   output: host_windows ? 'OpenAL32.dll' : 'libopenal.' + shlib_ext,
