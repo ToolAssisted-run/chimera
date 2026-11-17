@@ -42,6 +42,9 @@
 		"window.monitor.continue": "Συνέχεια",
 		"window.no_such": "αυτός ο πυρήνας δεν έχει τέτοιο παράθυρο",
 		"window.not_settable": "αυτό δεν μπορεί να οριστεί",
-		"window.no_command": "αυτό το παράθυρο δεν έχει τέτοια εντολή"
+		"window.no_command": "αυτό το παράθυρο δεν έχει τέτοια εντολή",
+		"window.monitor.load": "Φόρτωση...",
+		"window.monitor.save": "Αποθήκευση...",
+		"window.file_unopened": "το αρχείο που δόθηκε δεν άνοιξε"
 	}
 }

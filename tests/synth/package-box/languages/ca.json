@@ -42,6 +42,9 @@
 		"window.monitor.continue": "Continua",
 		"window.no_such": "aquest nucli no té aquesta finestra",
 		"window.not_settable": "això no es pot canviar",
-		"window.no_command": "aquesta finestra no té aquesta ordre"
+		"window.no_command": "aquesta finestra no té aquesta ordre",
+		"window.monitor.load": "Carrega...",
+		"window.monitor.save": "Desa...",
+		"window.file_unopened": "no s'ha pogut obrir el fitxer donat"
 	}
 }

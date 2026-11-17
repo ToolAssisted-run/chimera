@@ -27,10 +27,17 @@ public:
 	/* sends a request to the core on the machine's thread; answered is
 	 * called on the view's thread with the core's answer ("" for none) */
 	using Send = std::function<void(std::string request, std::function<void(const std::string &)> answered)>;
+	/* the same with a file the person picked in Chimera's own dialog, given
+	 * to the core for that one request (mounted under kFileName, to read or
+	 * to write): the core never opens a file of the computer on its own */
+	using SendFile = std::function<void(std::string request, std::string path, bool write,
+		std::function<void(const std::string &)> answered)>;
+	/* the name a file given to the core has in its sandbox */
+	static constexpr const char *kFileName = "window-file";
 
 	/* id: the window's, in the package; description: the core's answer to
 	 * "describe" */
-	CoreWindowViewModel(std::string id, const std::string &description, Dispatcher &dispatcher, Send send);
+	CoreWindowViewModel(std::string id, const std::string &description, Dispatcher &dispatcher, Send send, SendFile sendFile = {});
 
 	const std::string &id() const { return id_; }
 	/* "" when the description could be used; else why not, said to the person */
@@ -41,6 +48,11 @@ public:
 
 	/* the request for what the window shows, as the session sends it */
 	std::string getRequest() const;
+
+	/* a file the person picked for the window (what the window asked it for:
+	 * purpose, "read" or "write"), handed to the core: the core is told its
+	 * own name, never where it is */
+	void giveFile(const std::string &purpose, bool write, const std::string &path);
 
 	/* the last error the core gave for a change or a command, "" for none */
 	Property<std::string> coreError{""};
@@ -67,6 +79,7 @@ private:
 
 	std::string id_, problem_;
 	Send send_;
+	SendFile sendFile_;
 	std::deque<Prop> props_;
 	std::deque<std::pair<std::string, List>> lists_;
 };

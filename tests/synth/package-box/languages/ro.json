@@ -44,6 +44,9 @@
 		"window.monitor.continue": "Continuă",
 		"window.no_such": "acest nucleu nu are o astfel de fereastră",
 		"window.not_settable": "asta nu se poate seta",
-		"window.no_command": "această fereastră nu are o astfel de comandă"
+		"window.no_command": "această fereastră nu are o astfel de comandă",
+		"window.monitor.load": "Încarcă...",
+		"window.monitor.save": "Salvează...",
+		"window.file_unopened": "fișierul dat nu a putut fi deschis"
 	}
 }

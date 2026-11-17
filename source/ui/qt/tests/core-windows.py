@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """A core's own windows (issue 610): their QML runs in Chimera's process,
-outside the sandbox, so it runs locked down (owner, 2026-11-17): it reads any
-file, writes only in its core's output folder, and reaches nothing over the
-network. This writes a core's QML that reads and writes through `files`, and
+outside the sandbox, so it runs locked down (owner, 2026-11-17): a file of
+the computer reaches the core only as the person picks it in Chimera's
+dialog, and nothing goes over the network. This writes a core's QML that
 tries every way out it can - a request by address, a picture,
 a component or a font from the network, a file outside its own, the
 system's browser, a module that reads or writes files - runs each in a core's
@@ -85,22 +85,13 @@ CASES = {
                     ' probe.report("remoteimport", "CREATED") } catch (e) { probe.report("remoteimport", "refused") } }',
     "worker": 'WorkerScript { source: "worker.mjs"; onMessage: (m) => probe.report("worker", m.r);'
               ' Component.onCompleted: sendMessage({}) }',
-    # reading is allowed: a file anywhere, its text and its bytes, a folder's names, a picture
-    "read": 'Component.onCompleted: { probe.report("read", files.read("OUTSIDE/data.txt"));'
-            ' probe.report("read", "bytes " + files.readBytes("OUTSIDE/data.txt").byteLength);'
-            ' probe.report("read", "list " + files.list("OUTSIDE").join(","));'
-            ' probe.report("read", "missing [" + files.read("OUTSIDE/none.txt") + "] " + (files.error !== "")) }',
+    # a file of the computer only through Chimera's dialog: no call reads or
+    # writes one by its path, a picture from outside is not shown, and what is
+    # asked of the dialog carries a name, never a place
+    "nopath": 'Component.onCompleted: probe.report("nopath", [typeof files.read, typeof files.write, typeof files.readBytes,'
+              ' typeof files.list].join(","))',
     "picture": 'Image { source: "file://OUTSIDE/dot.png"; onStatusChanged: probe.report("picture", "status " + status) }',
-    # writing only inside the core's output folder, its folders made
-    "write": 'Component.onCompleted: { probe.report("write", "" + files.write("notes/a.txt", "hi"));'
-             ' probe.report("write", "" + files.append("notes/a.txt", "!"));'
-             ' probe.report("write", "" + files.writeBytes("b.bin", files.readBytes("OUTSIDE/data.txt")));'
-             ' probe.report("write", files.read("notes/a.txt")) }',
-    "escape": 'Component.onCompleted: { probe.report("escape", "" + files.write("../escaped.txt", "x"));'
-              ' probe.report("escape", "" + files.write("OUTSIDE/absolute.txt", "x"));'
-              ' probe.report("escape", "" + files.write("link/through.txt", "x"));'
-              ' probe.report("escape", "" + files.write("", "x"));'
-              ' probe.report("escape", "said " + (files.error !== "")) }',
+    "choose": 'Component.onCompleted: files.choose("dump", "write", "Save the dump", ["Dumps (*.bin)"], "OUTSIDE/../../dump.bin")',
 }
 WORKER = ('WorkerScript.onMessage = function() { try { var x = new XMLHttpRequest();'
           ' x.onreadystatechange = function() { if (x.readyState === 4) WorkerScript.sendMessage({r: "status " + x.status}) };'
@@ -113,22 +104,17 @@ DOT = bytes.fromhex("89504e470d0a1a0a0000000d49484452000000010000000108020000009
 with tempfile.TemporaryDirectory() as top:
     folder = os.path.join(top, "windows")
     outside = os.path.join(top, "outside")
-    output = os.path.join(top, "output", "Synth")
-    for d in (folder, outside, output):
+    for d in (folder, outside):
         os.makedirs(d)
-    with open(os.path.join(outside, "data.txt"), "w") as f:
-        f.write("hello")
     with open(os.path.join(outside, "dot.png"), "wb") as f:
         f.write(DOT)
-    # a link inside the output folder that leads out of it
-    os.symlink(outside, os.path.join(output, "link"))
     for name, body in CASES.items():
         with open(os.path.join(folder, name + ".qml"), "w") as f:
             f.write("import QtQuick\nimport QtQuick.Controls\nimport QtQuick.Layouts\nItem {\n"
                     + body.replace("BASE", base).replace("OUTSIDE", outside) + "\n}\n")
     with open(os.path.join(folder, "worker.mjs"), "w") as f:
         f.write(WORKER.replace("BASE", base))
-    run = subprocess.run([program, "cases", folder, output] + list(CASES), capture_output=True, text=True, timeout=120)
+    run = subprocess.run([program, "cases", folder] + list(CASES), capture_output=True, text=True, timeout=120)
     out = run.stdout
     print(out)
     print(run.stderr[-3000:])
@@ -162,18 +148,11 @@ with tempfile.TemporaryDirectory() as top:
     check(reports.get("remoteimport", ["refused"]) == ["refused"] or "CREATED" not in str(reports.get("remoteimport")),
           "a module from the network is refused: %s" % reports.get("remoteimport"))
     check(f"REFUSED browser {base}/browser" in out, "the browser's address is among the refused")
-    # reading: any file, its bytes, a folder's names, a picture; a missing one is said
-    check(reports.get("read") == ["hello", "bytes 5", "list data.txt,dot.png", "missing [] true"],
-          "a file anywhere is read: %s" % reports.get("read"))
-    check(reports.get("picture", [""])[-1] == "status 1", "a picture from a file is shown: %s" % reports.get("picture"))
-    # writing: inside the output folder, its folders made, appended to, bytes too
-    check(reports.get("write") == ["true", "true", "true", "hi!"], "written in the output folder: %s" % reports.get("write"))
-    check(open(os.path.join(output, "notes", "a.txt")).read() == "hi!" and open(os.path.join(output, "b.bin"), "rb").read() == b"hello",
-          "the files are there")
-    # and nowhere else: up and out, an absolute path, through a link, no name
-    check(reports.get("escape") == ["false", "false", "false", "false", "said true"], "nothing written outside: %s" % reports.get("escape"))
-    check(not os.path.exists(os.path.join(top, "output", "escaped.txt")) and not os.path.exists(os.path.join(outside, "absolute.txt"))
-          and not os.path.exists(os.path.join(outside, "through.txt")), "no file outside the output folder")
+    # no file by its path, and a picture from outside the core's files is not shown
+    check(reports.get("nopath") == ["undefined,undefined,undefined,undefined"], "no call takes a path: %s" % reports.get("nopath"))
+    check(reports.get("picture", [""])[-1] == "status 3", "a picture from outside is refused: %s" % reports.get("picture"))
+    # what Chimera's dialog is asked for: the purpose, write, the title, the filters, and a name only
+    check("WANTED choose :: dump|write|Save the dump|Dumps (*.bin)|dump.bin" in out, "the dialog is asked for a name, never a place")
 
 window = subprocess.run([program, "window", monitor], capture_output=True, text=True, timeout=60)
 print(window.stdout)

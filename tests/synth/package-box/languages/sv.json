@@ -42,6 +42,9 @@
 		"window.monitor.continue": "Fortsätt",
 		"window.no_such": "den här kärnan har inget sådant fönster",
 		"window.not_settable": "det går inte att ställa in",
-		"window.no_command": "det här fönstret har inget sådant kommando"
+		"window.no_command": "det här fönstret har inget sådant kommando",
+		"window.monitor.load": "Läs in...",
+		"window.monitor.save": "Spara...",
+		"window.file_unopened": "den givna filen kunde inte öppnas"
 	}
 }

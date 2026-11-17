@@ -531,9 +531,9 @@ view model, answering Chimera's requests while the game runs. Each is an
 item of the Emulator menu while a project of the core is open. The core may
 also hold its own frame part way through, for a breakpoint or a step of its
 own. Chimera knows nothing of what any such window is for, and runs its QML
-locked down: its code only from the core's own window files, no network, any
-file read, and files written only in the core's own output folder (Config >
-Paths, "Core output").
+locked down: its code only from the core's own window files, no network, and
+a file of the computer only as the person picks it in Chimera's own dialog,
+which Chimera opens and gives to the core.
 docs/porting-a-core.md ("A core's own windows") has the declaration, the
 requests and the rules.
 

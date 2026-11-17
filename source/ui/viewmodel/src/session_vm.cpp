@@ -5309,7 +5309,30 @@ std::shared_ptr<CoreWindowViewModel> SessionViewModel::openCoreWindow(const std:
 			});
 		});
 	};
-	auto vm = std::make_shared<CoreWindowViewModel>(id, description, dispatcher_, send);
+	/* a file the person picked, given to the core for one request */
+	auto sendFile = [this, self](std::string request, std::string path, bool write, std::function<void(const std::string &)> answered) {
+		submitMidFrame([this, self, request = std::move(request), path = std::move(path), write, answered = std::move(answered)] {
+			std::string answer;
+			if (s_ != nullptr)
+			{
+				uint64_t len = 0;
+				const char *a = ce_session_window_file(s_, request.data(), request.size(), CoreWindowViewModel::kFileName, path.c_str(),
+					write ? 1 : 0, &len);
+				if (a != nullptr) answer.assign(a, static_cast<size_t>(len));
+				else
+				{
+					const char *why = ce_session_last_error(s_);
+					answer = "{\"error\":" + json::quote(tr(write ? "core_window.file_not_written" : "core_window.file_not_read",
+						{path, why != nullptr && *why != '\0' ? why : tr("core_window.no_answer")})) + "}";
+				}
+			}
+			refreshCoreWindowsOnMachine();
+			later([self, answered, answer = std::move(answer)] {
+				if (self->lock()) answered(answer);
+			});
+		});
+	};
+	auto vm = std::make_shared<CoreWindowViewModel>(id, description, dispatcher_, send, sendFile);
 	if (!vm->problem().empty())
 	{
 		error = vm->problem();

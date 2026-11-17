@@ -40,6 +40,9 @@
 		"window.monitor.continue": "繼續",
 		"window.no_such": "此核心沒有這樣的視窗",
 		"window.not_settable": "無法設定該項",
-		"window.no_command": "此視窗沒有這樣的指令"
+		"window.no_command": "此視窗沒有這樣的指令",
+		"window.monitor.load": "載入...",
+		"window.monitor.save": "儲存...",
+		"window.file_unopened": "無法開啟給定的檔案"
 	}
 }

@@ -42,6 +42,9 @@
 		"window.monitor.continue": "Devam",
 		"window.no_such": "bu çekirdeğin böyle bir penceresi yok",
 		"window.not_settable": "bu ayarlanamaz",
-		"window.no_command": "bu pencerenin böyle bir komutu yok"
+		"window.no_command": "bu pencerenin böyle bir komutu yok",
+		"window.monitor.load": "Yükle...",
+		"window.monitor.save": "Kaydet...",
+		"window.file_unopened": "verilen dosya açılamadı"
 	}
 }

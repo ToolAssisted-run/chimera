@@ -44,6 +44,9 @@
 		"window.monitor.continue": "Продолжить",
 		"window.no_such": "у этого ядра нет такого окна",
 		"window.not_settable": "это нельзя изменить",
-		"window.no_command": "у этого окна нет такой команды"
+		"window.no_command": "у этого окна нет такой команды",
+		"window.monitor.load": "Загрузить...",
+		"window.monitor.save": "Сохранить...",
+		"window.file_unopened": "не удалось открыть переданный файл"
 	}
 }

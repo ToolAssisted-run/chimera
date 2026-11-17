@@ -42,6 +42,9 @@
 		"window.monitor.continue": "Continuer",
 		"window.no_such": "ce cœur n'a pas cette fenêtre",
 		"window.not_settable": "cela ne se règle pas",
-		"window.no_command": "cette fenêtre n'a pas cette commande"
+		"window.no_command": "cette fenêtre n'a pas cette commande",
+		"window.monitor.load": "Charger...",
+		"window.monitor.save": "Enregistrer...",
+		"window.file_unopened": "le fichier donné n'a pas pu être ouvert"
 	}
 }

@@ -6,10 +6,11 @@
  * what any of them is for.
  *
  * The QML runs in Chimera's process, outside the sandbox, so it runs locked
- * down (the owner's choice, 2026-11-17): it reads any file and writes only in
- * its core's output folder (CoreFiles, below), and each core's windows have an
- * engine of their own that loads code from nothing but the core's own window
- * files and Qt Quick's modules (Controls, Layouts and what they use), and sends nothing
+ * down (the owner's choice, 2026-11-17): a file of the computer reaches the core
+ * only when the person picks it in Chimera's own dialog (CoreFiles, below), and
+ * each core's windows have an engine of their own that loads nothing but the
+ * core's own window files and Qt Quick's modules (Controls, Layouts and what
+ * they use), and sends nothing
  * anywhere - every request its scripts, an Image or a Loader would
  * make goes to a scheme nothing serves. What is refused is said once each on
  * standard error and kept for the tests. */
@@ -22,6 +23,8 @@
 #include <QQmlPropertyMap>
 #include <QStringList>
 #include <QUrl>
+
+#include <utility>
 
 #include <memory>
 #include <vector>
@@ -58,46 +61,33 @@ private:
 	QStringList refused_;
 };
 
-/* A core's window and the files of the computer (owner, 2026-11-17): it
- * reads any file, and writes only inside its core's own output folder (Paths:
- * "Core output", ./output at first, a folder a core named after it, made at
- * the first write). Given to its QML as `files`. A name to write is under that
- * folder: an absolute one, one climbing out with "..", or one through a link
- * that leads outside is refused, and nothing is written. A relative name to
- * read is under it too; an absolute one is anywhere */
+/* A core's window and the files of the computer (owner, 2026-11-17): any
+ * file may be read or written, but only one the person picks in Chimera's own
+ * file dialog, and it goes to the core, not to the QML: Chimera opens it and
+ * hands it to the core, in its sandbox, for one request ("file"). Neither the
+ * core nor its window ever opens a file of the computer on its own. Given to
+ * each window's QML as `files` */
 class CoreFiles : public QObject
 {
 	Q_OBJECT
-	Q_PROPERTY(QString outputFolder READ outputFolder CONSTANT)
-	Q_PROPERTY(QString error READ error NOTIFY errorChanged)
 public:
-	explicit CoreFiles(QString outputFolder, QObject *parent = nullptr);
-	QString outputFolder() const { return output_; }
-	/* why the last call failed, "" when it did not */
-	QString error() const { return error_; }
+	explicit CoreFiles(QString window, QObject *parent = nullptr) : QObject(parent), window_(std::move(window)) {}
+	const QString &window() const { return window_; }
 
-	/* a file's text (UTF-8), "" with error said when it cannot be read */
-	Q_INVOKABLE QString read(const QString &path);
-	/* a file's bytes, as an ArrayBuffer */
-	Q_INVOKABLE QByteArray readBytes(const QString &path);
-	Q_INVOKABLE bool exists(const QString &path);
-	/* the names in a folder, folders first, each ending in "/" */
-	Q_INVOKABLE QStringList list(const QString &folder);
-	/* written under the output folder, its folders made; false with error said */
-	Q_INVOKABLE bool write(const QString &name, const QString &text);
-	Q_INVOKABLE bool writeBytes(const QString &name, const QByteArray &bytes);
-	Q_INVOKABLE bool append(const QString &name, const QString &text);
+	/* asks Chimera to show its dialog: mode "read" (open a file) or "write"
+	 * (save one, name suggested); the file picked is given to the core with
+	 * this purpose, and `chosen` says so, with the file's own name */
+	Q_INVOKABLE void choose(const QString &purpose, const QString &mode, const QString &title,
+		const QStringList &nameFilters = {}, const QString &name = {});
 
 Q_SIGNALS:
-	void errorChanged();
+	void wanted(const QString &purpose, const QString &mode, const QString &title, const QStringList &nameFilters,
+		const QString &name);
+	void chosen(const QString &purpose, const QString &name);
+	void cancelled(const QString &purpose);
 
 private:
-	QString readable(const QString &path) const;
-	/* where a name to write is, "" when it is not under the output folder */
-	QString writable(const QString &name);
-	bool put(const QString &name, const QByteArray &bytes, bool add);
-	void say(const QString &why);
-	QString output_, error_;
+	QString window_;
 };
 
 /* The windows of the core open: opened from the Emulator menu, each a window
@@ -116,9 +106,17 @@ public:
 	 * of the core open (null before a window opened) */
 	QQuickWindow *window(const QString &id) const;
 	CoreQmlEngine *engine() const { return engine_.get(); }
-	/* where every core's output folder is (Paths: "Core output"); a core's is
-	 * a folder inside it named after the core */
-	void setOutputBase(const QString &folder) { outputBase_ = folder; }
+	/* the person picked a file in the dialog a window asked for, or did not:
+	 * given to the core, or the window told */
+	Q_INVOKABLE void fileChosen(const QString &id, const QString &purpose, const QString &mode, const QString &path);
+	Q_INVOKABLE void fileCancelled(const QString &id, const QString &purpose);
+
+Q_SIGNALS:
+	/* a window asks for a file: the main window shows Chimera's dialog */
+	void fileWanted(const QString &id, const QString &purpose, const QString &mode, const QString &title,
+		const QStringList &nameFilters, const QString &name);
+
+public:
 	/* a refused link, given to no one */
 	Q_INVOKABLE void ignoreUrl(const QUrl &) {}
 
@@ -127,6 +125,7 @@ private:
 	{
 		std::shared_ptr<vm::CoreWindowViewModel> vm;
 		QmlViewModel *qml = nullptr;
+		CoreFiles *files = nullptr;
 		QQmlContext *context = nullptr;
 		QPointer<QQuickWindow> window;
 	};
@@ -139,8 +138,6 @@ private:
 	std::unique_ptr<CoreQmlEngine> engine_;
 	QString enginePackage_, engineFolder_;
 	QQmlPropertyMap *texts_ = nullptr;
-	QString outputBase_;
-	CoreFiles *files_ = nullptr;
 	QHash<QString, Open> open_;
 	std::vector<vm::Connection> watches_;
 };

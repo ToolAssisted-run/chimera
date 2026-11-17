@@ -44,6 +44,9 @@
 		"window.monitor.continue": "Pokračovat",
 		"window.no_such": "toto jádro takové okno nemá",
 		"window.not_settable": "to nelze nastavit",
-		"window.no_command": "toto okno takový příkaz nemá"
+		"window.no_command": "toto okno takový příkaz nemá",
+		"window.monitor.load": "Načíst...",
+		"window.monitor.save": "Uložit...",
+		"window.file_unopened": "daný soubor nelze otevřít"
 	}
 }

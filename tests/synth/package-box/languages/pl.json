@@ -44,6 +44,9 @@
 		"window.monitor.continue": "Kontynuuj",
 		"window.no_such": "ten rdzeń nie ma takiego okna",
 		"window.not_settable": "tego nie można ustawić",
-		"window.no_command": "to okno nie ma takiego polecenia"
+		"window.no_command": "to okno nie ma takiego polecenia",
+		"window.monitor.load": "Wczytaj...",
+		"window.monitor.save": "Zapisz...",
+		"window.file_unopened": "nie można otworzyć podanego pliku"
 	}
 }

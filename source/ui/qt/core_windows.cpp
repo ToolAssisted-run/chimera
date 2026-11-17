@@ -1,7 +1,6 @@
 #include "core_windows.hpp"
 
 #include <QDesktopServices>
-#include <QCoreApplication>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -71,14 +70,20 @@ class CoreQmlEngine::Gate : public QQmlAbstractUrlInterceptor
 public:
 	Gate(CoreQmlEngine &engine, QString folder) : engine_(engine), folder_(std::move(folder))
 	{
-		qtModules_ = QDir(QLibraryInfo::path(QLibraryInfo::QmlImportsPath)).canonicalPath() + QLatin1Char('/');
+		/* where Qt keeps its modules: where Qt says, and every folder the
+		 * engine looks in for modules (a program with no qt.conf, as on
+		 * Windows, finds them beside it, lib/qml, where Qt does not say) */
+		QStringList roots = engine.importPathList();
+		roots << QLibraryInfo::path(QLibraryInfo::QmlImportsPath);
+		for (const QString &r : roots)
+		{
+			const QString real = QDir(r).canonicalPath();
+			if (!real.isEmpty() && !sameOrUnder(real + QLatin1Char('/'), folder_)) moduleRoots_ << real + QLatin1Char('/');
+		}
 	}
 	QUrl intercept(const QUrl &url, DataType type) override
 	{
 		if (allowed(url)) return url;
-		/* reading is allowed (owner, 2026-11-17): a picture or a font from any
-		 * file. Code - QML, a script, a module - still only from the core's own */
-		if (type == UrlString && url.isLocalFile()) return url;
 		const QString said = url.toString();
 		/* Qt looks for a module in places that are not there (versioned
 		 * folders, the program's own): refused without a word; what is said
@@ -109,10 +114,12 @@ private:
 		{
 			const QString path = QFileInfo(url.toLocalFile()).absoluteFilePath();
 			const QString clean = QDir::cleanPath(path);
-			if (clean.startsWith(folder_)) return true;
+			if (sameOrUnder(clean, folder_)) return true;
 			/* Qt's own modules, where Qt keeps them */
 			const QString real = QFileInfo(clean).canonicalFilePath();
-			if (!real.isEmpty() && real.startsWith(qtModules_)) return allowedModule(real.mid(qtModules_.size()));
+			if (!real.isEmpty())
+				for (const QString &root : moduleRoots_)
+					if (sameOrUnder(real, root)) return allowedModule(real.mid(root.size()));
 			return false;
 		}
 		/* Qt's and Chimera's modules built into the program */
@@ -124,8 +131,18 @@ private:
 		}
 		return false;
 	}
+	/* a path under a folder (ending in /): letters' case as the system has it */
+	static bool sameOrUnder(const QString &path, const QString &folder)
+	{
+#ifdef _WIN32
+		return path.startsWith(folder, Qt::CaseInsensitive);
+#else
+		return path.startsWith(folder);
+#endif
+	}
 	CoreQmlEngine &engine_;
-	QString folder_, qtModules_;
+	QString folder_;
+	QStringList moduleRoots_;
 };
 
 /* Every request the engine would make - an XMLHttpRequest, a picture or a
@@ -182,94 +199,13 @@ CoreQmlEngine::~CoreQmlEngine()
 	removeUrlInterceptor(gate_.get());
 }
 
-CoreFiles::CoreFiles(QString outputFolder, QObject *parent)
-	: QObject(parent), output_(QDir::cleanPath(QFileInfo(outputFolder).absoluteFilePath()))
+void CoreFiles::choose(const QString &purpose, const QString &mode, const QString &title, const QStringList &nameFilters,
+	const QString &name)
 {
+	/* a suggested name is a name, never a place */
+	const QString own = QFileInfo(QString(name).replace(QLatin1Char('\\'), QLatin1Char('/'))).fileName();
+	Q_EMIT wanted(purpose, mode == QLatin1String("write") ? QStringLiteral("write") : QStringLiteral("read"), title, nameFilters, own);
 }
-
-void CoreFiles::say(const QString &why)
-{
-	if (why == error_) return;
-	error_ = why;
-	Q_EMIT errorChanged();
-}
-
-QString CoreFiles::readable(const QString &path) const
-{
-	return QDir::isAbsolutePath(path) ? QDir::cleanPath(path) : QDir::cleanPath(QDir(output_).filePath(path));
-}
-
-QString CoreFiles::read(const QString &path)
-{
-	return QString::fromUtf8(readBytes(path));
-}
-
-QByteArray CoreFiles::readBytes(const QString &path)
-{
-	QFile f(readable(path));
-	if (!f.open(QIODevice::ReadOnly))
-	{
-		say(QString::fromStdString(vm::tr("core_window.file_not_read", {f.fileName().toStdString(), f.errorString().toStdString()})));
-		return {};
-	}
-	say({});
-	return f.readAll();
-}
-
-bool CoreFiles::exists(const QString &path)
-{
-	return QFileInfo::exists(readable(path));
-}
-
-QStringList CoreFiles::list(const QString &folder)
-{
-	QDir d(readable(folder));
-	QStringList out;
-	for (const QFileInfo &i : d.entryInfoList(QDir::AllEntries | QDir::NoDotAndDotDot | QDir::Hidden, QDir::DirsFirst | QDir::Name))
-		out << (i.isDir() ? i.fileName() + QLatin1Char('/') : i.fileName());
-	return out;
-}
-
-QString CoreFiles::writable(const QString &name)
-{
-	const QString to = QDir::cleanPath(QDir(output_).filePath(name));
-	const QString root = output_ + QLatin1Char('/');
-	auto refuse = [&] {
-		say(QString::fromStdString(vm::tr("core_window.file_outside", {name.toStdString(), output_.toStdString()})));
-		return QString();
-	};
-	if (name.isEmpty() || QDir::isAbsolutePath(name) || !to.startsWith(root)) return refuse();
-	/* its folders made, and none of them (nor the file) a link that leads
-	 * out of the output folder */
-	const QString parent = QFileInfo(to).absolutePath();
-	if (!QDir().mkpath(parent))
-	{
-		say(QString::fromStdString(vm::tr("core_window.folder_not_made", {parent.toStdString()})));
-		return {};
-	}
-	const QString realRoot = QFileInfo(output_).canonicalFilePath() + QLatin1Char('/');
-	const QString realParent = QFileInfo(parent).canonicalFilePath() + QLatin1Char('/');
-	if (!realParent.startsWith(realRoot) || QFileInfo(to).isSymLink()) return refuse();
-	return to;
-}
-
-bool CoreFiles::put(const QString &name, const QByteArray &bytes, bool add)
-{
-	const QString to = writable(name);
-	if (to.isEmpty()) return false;
-	QFile f(to);
-	if (!f.open(add ? QIODevice::Append : QIODevice::WriteOnly | QIODevice::Truncate) || f.write(bytes) != bytes.size())
-	{
-		say(QString::fromStdString(vm::tr("core_window.file_not_written", {to.toStdString(), f.errorString().toStdString()})));
-		return false;
-	}
-	say({});
-	return true;
-}
-
-bool CoreFiles::write(const QString &name, const QString &text) { return put(name, text.toUtf8(), false); }
-bool CoreFiles::writeBytes(const QString &name, const QByteArray &bytes) { return put(name, bytes, false); }
-bool CoreFiles::append(const QString &name, const QString &text) { return put(name, text.toUtf8(), true); }
 
 CoreWindows::CoreWindows(vm::SessionViewModel &session, QObject *parent) : QObject(parent), session_(session)
 {
@@ -297,7 +233,22 @@ void CoreWindows::closeAll()
 		}
 		delete o.context;
 		delete o.qml;
+		delete o.files;
 	}
+}
+
+void CoreWindows::fileChosen(const QString &id, const QString &purpose, const QString &mode, const QString &path)
+{
+	const auto it = open_.find(id);
+	if (it == open_.end() || !it->vm) return;
+	it->vm->giveFile(purpose.toStdString(), mode == QLatin1String("write"), path.toStdString());
+	if (it->files) Q_EMIT it->files->chosen(purpose, QFileInfo(path).fileName());
+}
+
+void CoreWindows::fileCancelled(const QString &id, const QString &purpose)
+{
+	const auto it = open_.find(id);
+	if (it != open_.end() && it->files) Q_EMIT it->files->cancelled(purpose);
 }
 
 QQuickWindow *CoreWindows::window(const QString &id) const
@@ -399,24 +350,18 @@ QString CoreWindows::open(const QString &id)
 		engine_ = std::make_unique<CoreQmlEngine>(folder);
 		enginePackage_ = package;
 		engineFolder_ = folder;
-		/* the core's output folder, a folder named after it (made fit for any system) */
-		QString name = QString::fromStdString(session_.coreName.get());
-		for (QChar &c : name)
-			if (QStringLiteral("<>:\"/\\|?*").contains(c) || c.unicode() < 32) c = QLatin1Char('_');
-		while (name.endsWith(QLatin1Char('.')) || name.endsWith(QLatin1Char(' '))) name.chop(1);
-		if (name.isEmpty()) name = QStringLiteral("core");
-		const QString base = outputBase_.isEmpty() ? QDir(QCoreApplication::applicationDirPath()).filePath(QStringLiteral("output")) : outputBase_;
-		delete files_;
-		files_ = new CoreFiles(QDir(base).filePath(name), this);
-		engine_->rootContext()->setContextProperty(QStringLiteral("files"), files_);
 	}
 	const QString folder = engineFolder_;
 	Open o;
 	o.vm = vm;
 	o.qml = new QmlViewModel(*vm, this);
+	o.files = new CoreFiles(id, this);
+	connect(o.files, &CoreFiles::wanted, this, [this, id](const QString &purpose, const QString &mode, const QString &title,
+		const QStringList &nameFilters, const QString &name) { Q_EMIT fileWanted(id, purpose, mode, title, nameFilters, name); });
 	o.context = new QQmlContext(engine_->rootContext(), this);
 	o.context->setContextProperty(QStringLiteral("core"), o.qml);
 	o.context->setContextProperty(QStringLiteral("texts"), texts_);
+	o.context->setContextProperty(QStringLiteral("files"), o.files);
 	QQmlComponent component(engine_.get(), QUrl::fromLocalFile(QDir(folder).filePath(qmlFile.mid(QStringLiteral("windows/").size()))));
 	QObject *made = component.create(o.context);
 	auto *item = qobject_cast<QQuickItem *>(made);
@@ -425,6 +370,7 @@ QString CoreWindows::open(const QString &id)
 		delete made;
 		delete o.context;
 		delete o.qml;
+		delete o.files;
 		session_.closeCoreWindow(id.toStdString());
 		return refused(component.isError() ? component.errorString().trimmed() : qmlFile);
 	}
@@ -446,10 +392,12 @@ QString CoreWindows::open(const QString &id)
 		session_.closeCoreWindow(id.toStdString());
 		QQmlContext *context = it->context;
 		QmlViewModel *qml = it->qml;
+		CoreFiles *files = it->files;
 		open_.erase(it);
 		window->deleteLater();
 		context->deleteLater();
 		qml->deleteLater();
+		files->deleteLater();
 	});
 	o.window = window;
 	open_.insert(id, o);

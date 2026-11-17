@@ -40,6 +40,9 @@
 		"window.monitor.continue": "Tiếp tục",
 		"window.no_such": "lõi này không có cửa sổ đó",
 		"window.not_settable": "không thể đặt giá trị đó",
-		"window.no_command": "cửa sổ này không có lệnh đó"
+		"window.no_command": "cửa sổ này không có lệnh đó",
+		"window.monitor.load": "Tải...",
+		"window.monitor.save": "Lưu...",
+		"window.file_unopened": "không thể mở tệp được đưa"
 	}
 }

@@ -1051,6 +1051,30 @@ ApplicationWindow {
         id: coreWindowRefused
         buttons: MessageDialog.Ok
     }
+    // A file a core's own window asks for: picked here, in Chimera's own
+    // dialog, and given to the core; neither the core nor its window opens a
+    // file of the computer by itself (owner, 2026-11-17, issue 610)
+    FileDialog {
+        id: coreFileDialog
+        property string windowId
+        property string purpose
+        property string mode
+        onAccepted: root.coreWindows.fileChosen(windowId, purpose, mode, localFiles.localPath(selectedFile))
+        onRejected: root.coreWindows.fileCancelled(windowId, purpose)
+    }
+    Connections {
+        target: root.coreWindows
+        function onFileWanted(id, purpose, mode, title, nameFilters, name) {
+            coreFileDialog.windowId = id
+            coreFileDialog.purpose = purpose
+            coreFileDialog.mode = mode
+            coreFileDialog.title = title
+            coreFileDialog.nameFilters = nameFilters.length > 0 ? nameFilters : [qsTrId("common.all_files")]
+            coreFileDialog.fileMode = mode === "write" ? FileDialog.SaveFile : FileDialog.OpenFile
+            coreFileDialog.selectedFile = mode === "write" && name !== "" ? localFiles.folderUrl(name) : ""
+            coreFileDialog.open()
+        }
+    }
     MessageDialog {
         id: encodeRefused
         text: qsTrId("main.open_a_project_first_a_video")

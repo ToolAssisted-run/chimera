@@ -1211,11 +1211,6 @@ int main(int argc, char **argv)
 	qt::QmlViewModel sessionQml(session);
 	/* the core's own windows, its design over it as their view model, locked down (issue 610) */
 	qt::CoreWindows coreWindows(session);
-	/* where they may write: Paths' "Core output", a folder a core in it */
-	coreWindows.setOutputBase(QString::fromStdString(paths.resolve("Core output")));
-	vm::Connection coreOutputFollowed = paths.moved.connect([&coreWindows, &paths] {
-		coreWindows.setOutputBase(QString::fromStdString(paths.resolve("Core output")));
-	});
 	qt::QmlViewModel pianoRollQml(pianoRoll);
 	qt::QmlViewModel ramSearchQml(ramSearch);
 	qt::QmlViewModel ramWatchQml(ramWatch);

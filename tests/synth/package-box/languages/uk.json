@@ -44,6 +44,9 @@
 		"window.monitor.continue": "Продовжити",
 		"window.no_such": "у цього ядра немає такого вікна",
 		"window.not_settable": "це не можна змінити",
-		"window.no_command": "у цього вікна немає такої команди"
+		"window.no_command": "у цього вікна немає такої команди",
+		"window.monitor.load": "Завантажити...",
+		"window.monitor.save": "Зберегти...",
+		"window.file_unopened": "не вдалося відкрити переданий файл"
 	}
 }

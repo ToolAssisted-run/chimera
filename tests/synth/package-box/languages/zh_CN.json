@@ -40,6 +40,9 @@
 		"window.monitor.continue": "继续",
 		"window.no_such": "此核心没有这样的窗口",
 		"window.not_settable": "无法设置该项",
-		"window.no_command": "此窗口没有这样的命令"
+		"window.no_command": "此窗口没有这样的命令",
+		"window.monitor.load": "载入...",
+		"window.monitor.save": "保存...",
+		"window.file_unopened": "无法打开给出的文件"
 	}
 }

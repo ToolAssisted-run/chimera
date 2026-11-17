@@ -42,6 +42,9 @@
 		"window.monitor.continue": "Folytatás",
 		"window.no_such": "ennek a magnak nincs ilyen ablaka",
 		"window.not_settable": "ez nem állítható",
-		"window.no_command": "ennek az ablaknak nincs ilyen parancsa"
+		"window.no_command": "ennek az ablaknak nincs ilyen parancsa",
+		"window.monitor.load": "Betöltés...",
+		"window.monitor.save": "Mentés...",
+		"window.file_unopened": "a megadott fájl nem nyitható meg"
 	}
 }

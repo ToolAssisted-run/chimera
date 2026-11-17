@@ -1316,12 +1316,9 @@ void pathsConfig()
 	CHECK(folder == (dir / "runs").string() && !isDefault);
 	/* Chimera's global list, in its order, the base first and temporary files last */
 	fromValue(rows->cell(0, 1), name);
-	CHECK(name == "Base" && rows->rowCount() == 16);
-	fromValue(rows->cell(15, 1), name);
-	CHECK(name == "Temp Files" && paths.resolve("Temp Files") == (dir / "program").string());
-	/* where a core's own windows may write: ./output, a folder a core in it (issue 610) */
+	CHECK(name == "Base" && rows->rowCount() == 15);
 	fromValue(rows->cell(14, 1), name);
-	CHECK(name == "Core output" && paths.resolve("Core output") == (dir / "program" / "output").string());
+	CHECK(name == "Temp Files" && paths.resolve("Temp Files") == (dir / "program").string());
 	/* Chimera's words in a path: the program's folder, the last game's, and anything else is the program's folder */
 	CHECK(paths.run("setPath", {std::string("Lua"), std::string("%exe%/Scripts")}, error).has_value() &&
 		paths.resolve("Lua") == (dir / "program" / "Scripts").string());
@@ -1340,7 +1337,7 @@ void pathsConfig()
 	CHECK(paths.base.get().empty());
 	/* a system's own folders, made when a game for it is opened: under its base, which is under the global one */
 	paths.useSystem("NES");
-	CHECK(paths.systems.get() == "[\"NES\"]" && rows->rowCount() == 20);
+	CHECK(paths.systems.get() == "[\"NES\"]" && rows->rowCount() == 19);
 	CHECK(paths.resolveFor("NES", "Screenshots") == (dir / "program" / "NES" / "Screenshots").string() &&
 		paths.resolveFor("NES", "ROM") == (dir / "program" / "NES").string() &&
 		paths.resolveFor("NES", "Savestates") == (dir / "program" / "NES" / "State").string());
@@ -11799,6 +11796,25 @@ bool coreWindows(const char *package, const char *rom)
 	std::string setError;
 	CHECK(vm->set("stopAt", int64_t{0}, setError));
 	CHECK(d.until([&] { return number("stopAt") == 0; }, 10));
+	/* a file of the computer only as the person picked it in Chimera's
+	 * dialog: given to the core for one request, which reads it or writes
+	 * it, and knows its name but not where it is (owner, 2026-11-17) */
+	{
+		const fs::path given = dir / "symbols.txt", written = dir / "out" / "regs.txt";
+		fs::create_directories(written.parent_path());
+		std::ofstream(given, std::ios::binary) << "FIRST LINE\nsecond\n";
+		vm->giveFile("load", false, given.string());
+		CHECK(d.until([&] { return text("lastFile") == "read symbols.txt: 18 bytes, FIRST LINE"; }, 10));
+		vm->giveFile("save", true, written.string());
+		CHECK(d.until([&] { return text("lastFile") == "wrote regs.txt"; }, 10));
+		std::ifstream back(written, std::ios::binary);
+		const std::string got((std::istreambuf_iterator<char>(back)), std::istreambuf_iterator<char>());
+		CHECK(got.rfind("PC ", 0) == 0 && got.find("\nR7 ") != std::string::npos);
+		/* one that is not there is said, and nothing else changes */
+		vm->giveFile("load", false, (dir / "none.txt").string());
+		CHECK(d.until([&] { return !vm->coreError.get().empty(); }, 10));
+		CHECK(text("lastFile") == "wrote regs.txt");
+	}
 	/* the next frame played holds at the instruction at 0, the core's window
 	 * and Chimera's status say so, and the frame is not over */
 	session.run("frameAdvance", {}, error);

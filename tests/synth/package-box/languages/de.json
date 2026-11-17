@@ -42,6 +42,9 @@
 		"window.monitor.continue": "Weiter",
 		"window.no_such": "dieser Kern hat kein solches Fenster",
 		"window.not_settable": "das lässt sich nicht einstellen",
-		"window.no_command": "dieses Fenster hat keinen solchen Befehl"
+		"window.no_command": "dieses Fenster hat keinen solchen Befehl",
+		"window.monitor.load": "Laden...",
+		"window.monitor.save": "Speichern...",
+		"window.file_unopened": "die übergebene Datei ließ sich nicht öffnen"
 	}
 }

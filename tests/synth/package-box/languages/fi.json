@@ -42,6 +42,9 @@
 		"window.monitor.continue": "Jatka",
 		"window.no_such": "tällä ytimellä ei ole sellaista ikkunaa",
 		"window.not_settable": "sitä ei voi asettaa",
-		"window.no_command": "tällä ikkunalla ei ole sellaista komentoa"
+		"window.no_command": "tällä ikkunalla ei ole sellaista komentoa",
+		"window.monitor.load": "Lataa...",
+		"window.monitor.save": "Tallenna...",
+		"window.file_unopened": "annettua tiedostoa ei voitu avata"
 	}
 }

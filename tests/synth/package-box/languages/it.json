@@ -42,6 +42,9 @@
 		"window.monitor.continue": "Continua",
 		"window.no_such": "questo core non ha questa finestra",
 		"window.not_settable": "questo non si può impostare",
-		"window.no_command": "questa finestra non ha questo comando"
+		"window.no_command": "questa finestra non ha questo comando",
+		"window.monitor.load": "Carica...",
+		"window.monitor.save": "Salva...",
+		"window.file_unopened": "impossibile aprire il file dato"
 	}
 }

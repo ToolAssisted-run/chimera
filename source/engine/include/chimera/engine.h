@@ -1278,6 +1278,16 @@ CE_API void ce_session_hold_callbacks(ce_session *s, int32_t held);
  * The machine's thread, between frames or while the core holds its frame. */
 CE_API int32_t ce_session_windows_answered(const ce_session *s);
 CE_API const char *ce_session_window_request(ce_session *s, const char *request, uint64_t len, uint64_t *len_out);
+/* A file the person picked in Chimera's own file dialog, handed to the core
+ * (owner, 2026-11-17: a core never opens a file of the computer on its own).
+ * host_path is mounted in the core's sandbox under mount_name, to read
+ * (writable 0) or created empty to write (writable 1, the core's writes
+ * going to the disk as it makes them), for the length of one request - the
+ * window's "file" request - and unmounted after it. The answer as
+ * ce_session_window_request's; null with ce_session_last_error saying why
+ * when the file could not be given. */
+CE_API const char *ce_session_window_file(ce_session *s, const char *request, uint64_t len, const char *mount_name,
+	const char *host_path, int32_t writable, uint64_t *len_out);
 /* A core may hold its own frame part way through (its windows' stepping, a
  * breakpoint of its own): its optional export SetStopCallback(uintptr_t fn)
  * is handed a function the core calls, as uintptr_t fn(void), each time it

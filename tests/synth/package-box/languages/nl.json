@@ -42,6 +42,9 @@
 		"window.monitor.continue": "Doorgaan",
 		"window.no_such": "deze kern heeft zo'n venster niet",
 		"window.not_settable": "dat kan niet worden ingesteld",
-		"window.no_command": "dit venster heeft zo'n opdracht niet"
+		"window.no_command": "dit venster heeft zo'n opdracht niet",
+		"window.monitor.load": "Laden...",
+		"window.monitor.save": "Opslaan...",
+		"window.file_unopened": "het gegeven bestand kon niet worden geopend"
 	}
 }

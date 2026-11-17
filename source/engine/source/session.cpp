@@ -5713,6 +5713,43 @@ const char *ce_session_window_request(ce_session *s, const char *request, uint64
 	return s->windowAnswer.c_str();
 }
 
+const char *ce_session_window_file(ce_session *s, const char *request, uint64_t len, const char *mount_name,
+	const char *host_path, int32_t writable, uint64_t *len_out)
+{
+	if (len_out != nullptr) *len_out = 0;
+	if (s == nullptr || s->windowRequest == nullptr || mount_name == nullptr || host_path == nullptr) return nullptr;
+	s->error.clear();
+	const chimera::HostApi *host = s->host;
+	chimera::WbxReturn r;
+	if (writable != 0)
+	{
+		if (host->wbx_mount_file_path_writable == nullptr)
+		{
+			s->error = tr("engine.tool_host_too_old");
+			return nullptr;
+		}
+		host->wbx_mount_file_path_writable(s->obj, mount_name, host_path, &r);
+	}
+	else
+		host->wbx_mount_file_path(s->obj, mount_name, host_path, &r);
+	if (!r.ok())
+	{
+		s->error = r.errorMessage;
+		return nullptr;
+	}
+	const char *answer = ce_session_window_request(s, request, len, len_out);
+	/* given for this one request: closed, a writable one's last bytes on the disk */
+	chimera::WbxReturn u;
+	host->wbx_unmount_file(s->obj, mount_name, nullptr, 0, &u);
+	if (!u.ok() && answer != nullptr)
+	{
+		s->error = u.errorMessage;
+		if (len_out != nullptr) *len_out = 0;
+		return nullptr;
+	}
+	return answer;
+}
+
 int32_t ce_session_stops_reported(const ce_session *s)
 {
 	return s != nullptr && s->stopsReported ? 1 : 0;

@@ -537,27 +537,22 @@ Probed once after `Init`; absent exports simply mean the tool is not offered.
     `core.rows("<list>")` as a model whose roles are the list's columns,
     `core.coreError` for what the core refused), `texts`, the package's
     texts in the language in use (`texts["window.monitor.step"]`), and
-    `files`, the computer's files for it. It runs locked down (owner,
-    2026-11-17):
-    - Its code, QML and scripts, comes only from its own files under
-      `windows/`, and it may import Qt Quick, its Controls and Layouts (and
-      the styles they are made of), and nothing else.
-    - It reads any file: `files.read(path)` (the text), `files.readBytes(path)`
-      (an ArrayBuffer), `files.list(folder)` (the names, folders first, each
-      ending in "/"), `files.exists(path)`, and an `Image` or a font from any
-      file. A relative path is under its output folder.
-    - It writes only in its core's output folder: Config > Paths' "Core
-      output" (`./output` under Chimera's folder at first), in a folder named
-      after the core, made at the first write. `files.write(name, text)`,
-      `files.writeBytes(name, bytes)` and `files.append(name, text)` take a
-      name under it (folders in it are made); an absolute name, one climbing
-      out with "..", or one through a link that leads out is refused, and
-      nothing is written. `files.outputFolder` says where it is, and
-      `files.error` why the last call failed.
+    `files`, the one way to a file of the computer. It runs locked down
+    (owner, 2026-11-17):
+    - Its code, QML and scripts, and its pictures come only from its own
+      files under `windows/`, and it may import Qt Quick, its Controls and
+      Layouts (and the styles they are made of), and nothing else.
+    - Neither the window nor the core ever opens a file of the computer on
+      its own. Any file may be read or written, but only one the person picks
+      in Chimera's own file dialog: `files.choose(purpose, mode, title,
+      nameFilters, name)` asks for it (mode `"read"` to open one, `"write"` to
+      save one, `name` a name to suggest, never a place). Chimera opens the
+      file picked and gives it to the core, not to the QML (see "file"
+      below); `files` then says `chosen(purpose, name)` with the file's own
+      name, or `cancelled(purpose)`.
     - It reaches nothing over the network: every request by address
       (XMLHttpRequest, an `Image` or `Loader` with a web address, a link for
-      the browser) goes nowhere. Read files with `files`, not
-      XMLHttpRequest, which a released Chimera does not have.
+      the browser) goes nowhere.
     - A module that reads or writes files on its own (`QtQuick.Dialogs`,
       `QtQuick.LocalStorage`, `QtCore`, `Qt.labs`) does not load.
 
@@ -581,6 +576,13 @@ Probed once after `Init`; absent exports simply mean the tool is not offered.
     - `set` (`"name"`, `"value"`) and `run` (`"command"`, `"args"`): answer
       `{}`, or `{"error": "<key>"}` for one the core refuses.
     - `opened` and `closed`, as the window opens and closes: answer `{}`.
+    - `file` (`"purpose"`, `"mode"` `read` or `write`, `"file"`, `"name"`): a
+      file the person picked in Chimera's dialog for the window's
+      `files.choose`. It is open in the sandbox under the name `"file"` gives
+      (`window-file`) for this request only: read it, or write it (it starts
+      empty, and what is written goes to the disk), with the C library's own
+      calls, before answering. `"name"` is the file's own name, for the
+      window to show; where it is, the core is never told.
 
     Every string in an answer that is a key of the package's tables is put
     into the language in use, as the core's other answers are; arguments

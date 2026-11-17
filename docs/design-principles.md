@@ -15790,17 +15790,23 @@ What was decided, and built:
   Windows releases is built without its network module, so there QML has no
   network to refuse and the manager is not built in; a Qt whose QML has
   network and no such manager does not build Chimera.
-- **Files: read anything, write in one folder** (the owner, the same day:
-  "read only file access is allowed. Write is only allowed within a
-  core-specific path, configurable, initially chimera/output/corename").
-  The window's QML is given `files`: it reads any file (text, bytes, a
-  folder's names; a picture or a font from any file), and writes only in
-  its core's output folder, Config > Paths' new "Core output" (`./output` at
-  first, not in the distribution), in a folder named after the core, made at
-  the first write. A name that is absolute, climbs out with "..", or goes
-  through a link that leads out is refused. Its code, QML and scripts, still
-  comes only from its own files, and requests by address still go nowhere:
-  `files` is the same in every build, where XMLHttpRequest is not.
+- **Files only through Chimera's dialog** (the owner, the same day, in two
+  steps). First: "read only file access is allowed. Write is only allowed
+  within a core-specific path, configurable, initially
+  chimera/output/corename"; then, before that was released: "All file opens
+  for read and write are allowed, but only if the write is mediated through
+  a file open dialog, running at the chimera side. Chimera passes the file
+  descriptor to the core. Internally, the core can never open a file on its
+  own", and the output folder "is no longer necessary". So the window's QML
+  has no call that takes a path: `files.choose` asks the main window to show
+  Chimera's own dialog, and the file picked is mounted in the core's sandbox
+  under one name, read-only or created empty to write, for one request
+  (`file`), then unmounted (`ce_session_window_file`). The core is told the
+  file's own name, never where it is, and the QML is told the same. Its
+  pictures come only from its own files again. Chimera's own exports that
+  carry a core's content (Export Save Data, Export Core Log, a core tool's
+  outputs) already work this way: the person picks the place in Chimera's
+  dialog, and the core never names a path.
 
 Tested: the synthetic core has a window, "monitor" (registers, the
 instruction running, the first bytes of RAM as a list, and a stop place),
@@ -15813,11 +15819,18 @@ A new window test writes a core's QML that tries every way out (requests by
 address, a POST, a file read by address, a picture, a component, a font, the
 system's browser, a worker script's request, `Dialogs`, `LocalStorage`,
 `Qt.labs`, `QtCore`, a module from an address) and listens on a local port:
-nothing reached it, and Controls and Layouts still load. It reads a file
-outside the core's folders as text and as bytes, lists its folder and shows a
-picture from it; writes, appends and writes bytes in the output folder; and
-is refused, with nothing written, a name climbing out, an absolute one, one
-through a link leading out, and none. It then loads the
+nothing reached it, and Controls and Layouts still load. The QML has no call
+that takes a path, a picture from outside the core's files is not shown, and
+what it asks Chimera's dialog for carries a name and never a place. The view
+models test gives the synthetic core a file to read (it says the name, the
+size and the first line) and one to write (the registers land on the disk),
+and a file that is not there is said. It then loads the
 synthetic core's real window over a view model and finds what the core
-answered shown, the buttons following the hold, and Step and a typed stop
-place sent to the core as requests.
+answered shown, the buttons following the hold, Step and a typed stop place
+sent to the core as requests, and Save... asking Chimera's dialog for a file
+that then goes to the core as a "file" request with its name only.
+
+Windows: on CI the test program found Qt's modules beside it (lib/qml) and
+not where Qt says they are (it has no qt.conf), so the URL filter refused Qt
+Quick itself. The filter now takes Qt's modules from every folder the engine
+looks in, comparing paths as the system does (letters' case on Windows).

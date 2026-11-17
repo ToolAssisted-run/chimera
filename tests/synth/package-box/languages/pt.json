@@ -42,6 +42,9 @@
 		"window.monitor.continue": "Continuar",
 		"window.no_such": "este núcleo não tem essa janela",
 		"window.not_settable": "isso não pode ser definido",
-		"window.no_command": "esta janela não tem esse comando"
+		"window.no_command": "esta janela não tem esse comando",
+		"window.monitor.load": "Carregar...",
+		"window.monitor.save": "Salvar...",
+		"window.file_unopened": "não foi possível abrir o arquivo dado"
 	}
 }

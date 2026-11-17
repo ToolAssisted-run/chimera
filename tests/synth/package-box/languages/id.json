@@ -40,6 +40,9 @@
 		"window.monitor.continue": "Lanjutkan",
 		"window.no_such": "inti ini tidak punya jendela itu",
 		"window.not_settable": "itu tidak bisa diatur",
-		"window.no_command": "jendela ini tidak punya perintah itu"
+		"window.no_command": "jendela ini tidak punya perintah itu",
+		"window.monitor.load": "Muat...",
+		"window.monitor.save": "Simpan...",
+		"window.file_unopened": "berkas yang diberikan tidak dapat dibuka"
 	}
 }

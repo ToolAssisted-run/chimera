@@ -190,7 +190,6 @@ Debug Logs
 Bug reports
 Save data
 Macros
-Core output
 Temp Files
 Microsoft
 Windows

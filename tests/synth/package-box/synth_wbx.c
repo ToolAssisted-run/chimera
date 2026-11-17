@@ -529,6 +529,9 @@ ECL_INVISIBLE static int64_t g_stopAt = -1;
 ECL_INVISIBLE static int32_t g_holding, g_stepping, g_heldCount;
 ECL_INVISIBLE static char g_windowIn[4096];
 ECL_INVISIBLE static char g_windowOut[8192];
+/* what the last file the person gave the window was: read, its name and
+ * size and first line; written, the registers put in it */
+ECL_INVISIBLE static char g_lastFile[256];
 ECL_EXPORT void SetStopCallback(uint64_t fn)
 {
 	g_stopCall = (uintptr_t (*)(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t))(uintptr_t)fn;
@@ -544,11 +547,12 @@ static void held_here(uint32_t pc)
 	while (g_holding)
 		if (g_stopCall(0, 0, 0, 0, 0, 0) != 0) g_holding = g_stepping = 0;
 }
-/* the value of a field of the request: a string's text or a number's digits */
+/* the value of a field of the request: a string's text or a number's digits
+ * (the key with its colon: "op":"file" holds "file" as a value too) */
 static int request_field(const char *req, const char *key, char *out, int cap)
 {
 	char pat[64];
-	snprintf(pat, sizeof pat, "\"%s\"", key);
+	snprintf(pat, sizeof pat, "\"%s\":", key);
 	const char *p = strstr(req, pat);
 	if (!p) return 0;
 	p += strlen(pat);
@@ -579,7 +583,7 @@ ECL_EXPORT uintptr_t WindowRequest(int32_t length)
 	if (!strcmp(op, "describe"))
 		snprintf(g_windowOut, sizeof g_windowOut,
 			"{\"properties\":[{\"name\":\"pc\"},{\"name\":\"registers\"},{\"name\":\"held\"},{\"name\":\"heldCount\"},"
-			"{\"name\":\"stopAt\",\"writable\":true}],"
+			"{\"name\":\"stopAt\",\"writable\":true},{\"name\":\"lastFile\"}],"
 			"\"commands\":[{\"name\":\"continue\"},{\"name\":\"step\"}],"
 			"\"lists\":[{\"name\":\"ram\",\"columns\":[\"address\",\"value\"]}]}");
 	else if (!strcmp(op, "get"))
@@ -588,9 +592,9 @@ ECL_EXPORT uintptr_t WindowRequest(int32_t length)
 		const uint8_t *ram = g_synth ? synth_get_ram(g_synth) : 0;
 		int n = snprintf(g_windowOut, sizeof g_windowOut,
 			"{\"properties\":{\"pc\":%u,\"registers\":\"R0=%d R1=%d R2=%d R3=%d R4=%d R5=%d R6=%d R7=%d\",\"held\":%s,\"heldCount\":%d,"
-			"\"stopAt\":%lld},\"lists\":{\"ram\":[",
+			"\"stopAt\":%lld,\"lastFile\":\"%s\"},\"lists\":{\"ram\":[",
 			(unsigned)g_accessPc, r ? r[0] : 0, r ? r[1] : 0, r ? r[2] : 0, r ? r[3] : 0, r ? r[4] : 0, r ? r[5] : 0,
-			r ? r[6] : 0, r ? r[7] : 0, g_holding ? "true" : "false", g_heldCount, (long long)g_stopAt);
+			r ? r[6] : 0, r ? r[7] : 0, g_holding ? "true" : "false", g_heldCount, (long long)g_stopAt, g_lastFile);
 		for (int i = 0; i < 16 && ram; i++)
 			n += snprintf(g_windowOut + n, sizeof g_windowOut - n, "%s[\"%02X\",\"%02X\"]", i ? "," : "", i, ram[i]);
 		snprintf(g_windowOut + n, sizeof g_windowOut - n, "]}}");
@@ -618,6 +622,41 @@ ECL_EXPORT uintptr_t WindowRequest(int32_t length)
 			snprintf(g_windowOut, sizeof g_windowOut, "{\"error\":\"window.no_command\"}");
 			return (uintptr_t)g_windowOut;
 		}
+		snprintf(g_windowOut, sizeof g_windowOut, "{}");
+	}
+	else if (!strcmp(op, "file"))
+	{
+		/* a file the person picked in Chimera's dialog, open here under the
+		 * name given, for this request only: the core knows no path */
+		char mode[8], file[64], own[96];
+		request_field(g_windowIn, "mode", mode, sizeof mode);
+		request_field(g_windowIn, "file", file, sizeof file);
+		request_field(g_windowIn, "name", own, sizeof own);
+		FILE *f = fopen(file, strcmp(mode, "write") ? "rb" : "wb");
+		if (!f)
+		{
+			snprintf(g_windowOut, sizeof g_windowOut, "{\"error\":\"window.file_unopened\"}");
+			return (uintptr_t)g_windowOut;
+		}
+		if (!strcmp(mode, "write"))
+		{
+			const int32_t *r = g_synth ? synth_get_registers(g_synth) : 0;
+			fprintf(f, "PC %u\n", (unsigned)g_accessPc);
+			for (int i = 0; i < 8; i++) fprintf(f, "R%d %d\n", i, r ? r[i] : 0);
+			snprintf(g_lastFile, sizeof g_lastFile, "wrote %s", own);
+		}
+		else
+		{
+			/* its first line (kept fit for JSON) and its size */
+			char line[64] = {0};
+			if (fgets(line, sizeof line, f)) line[strcspn(line, "\r\n")] = 0;
+			for (char *p = line; *p; p++)
+				if (*p == '"' || *p == '\\' || (unsigned char)*p < 32) *p = '_';
+			fseek(f, 0, SEEK_END);
+			const long size = ftell(f);
+			snprintf(g_lastFile, sizeof g_lastFile, "read %s: %ld bytes, %s", own, size, line);
+		}
+		fclose(f);
 		snprintf(g_windowOut, sizeof g_windowOut, "{}");
 	}
 	else

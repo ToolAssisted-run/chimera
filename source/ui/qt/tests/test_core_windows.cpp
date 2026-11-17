@@ -1,10 +1,10 @@
 /* A core's own windows (issue 610): what their locked-down QML engine lets a
  * core's QML reach, and a real core window's QML over its view model.
  *
- *   test_core_windows cases <folder> <output> <case>...   each
- *       <folder>/<case>.qml loaded in a core's engine, with <output> its
- *       core's output folder: what it reports and what was refused printed
- *       (core-windows.py writes the cases and listens for anything that gets out)
+ *   test_core_windows cases <folder> <case>...   each <folder>/<case>.qml
+ *       loaded in a core's engine: what it reports, what it asked Chimera's
+ *       file dialog for and what was refused printed (core-windows.py writes
+ *       the cases and listens for anything that gets out)
  *   test_core_windows window <Monitor.qml>   the synthetic core's window over
  *       a core window view model whose core is a stand-in here: what it
  *       shows, a change and a command sent to the core
@@ -60,13 +60,19 @@ static void wait(int ms)
 	loop.exec();
 }
 
-static int cases(const QString &folder, const QString &output, const QStringList &names)
+static int cases(const QString &folder, const QStringList &names)
 {
 	for (const QString &name : names)
 	{
 		qt::CoreQmlEngine engine(folder);
 		Probe probe;
-		qt::CoreFiles files(output);
+		qt::CoreFiles files(name);
+		QObject::connect(&files, &qt::CoreFiles::wanted, [name](const QString &purpose, const QString &mode, const QString &title,
+			const QStringList &filters, const QString &suggested) {
+			std::printf("WANTED %s :: %s|%s|%s|%s|%s\n", name.toUtf8().constData(), purpose.toUtf8().constData(), mode.toUtf8().constData(),
+				title.toUtf8().constData(), filters.join(QLatin1Char(',')).toUtf8().constData(), suggested.toUtf8().constData());
+			std::fflush(stdout);
+		});
 		engine.rootContext()->setContextProperty(QStringLiteral("probe"), &probe);
 		engine.rootContext()->setContextProperty(QStringLiteral("files"), &files);
 		QQmlComponent component(&engine, QUrl::fromLocalFile(QDir(folder).filePath(name + QStringLiteral(".qml"))));
@@ -106,11 +112,17 @@ static int window(const QString &qmlFile)
 	StandInCore core;
 	const std::string description =
 		"{\"properties\":[{\"name\":\"pc\"},{\"name\":\"registers\"},{\"name\":\"held\"},{\"name\":\"heldCount\"},"
-		"{\"name\":\"stopAt\",\"writable\":true}],\"commands\":[{\"name\":\"continue\"},{\"name\":\"step\"}],"
+		"{\"name\":\"stopAt\",\"writable\":true},{\"name\":\"lastFile\"}],\"commands\":[{\"name\":\"continue\"},{\"name\":\"step\"}],"
 		"\"lists\":[{\"name\":\"ram\",\"columns\":[\"address\",\"value\"]}]}";
+	std::string givenPath;
 	vm::CoreWindowViewModel model("monitor", description, dispatcher,
 		[&core](std::string request, std::function<void(const std::string &)> answered) {
 			core.asked.push_back(request);
+			answered("{}");
+		},
+		[&core, &givenPath](std::string request, std::string path, bool, std::function<void(const std::string &)> answered) {
+			core.asked.push_back(request);
+			givenPath = path;
 			answered("{}");
 		});
 	CHECK(model.problem().empty());
@@ -123,6 +135,12 @@ static int window(const QString &qmlFile)
 	texts.insert(QStringLiteral("window.monitor.stop_at"), QStringLiteral("Stop at instruction"));
 	texts.insert(QStringLiteral("window.monitor.step"), QStringLiteral("Step"));
 	texts.insert(QStringLiteral("window.monitor.continue"), QStringLiteral("Continue"));
+	texts.insert(QStringLiteral("window.monitor.load"), QStringLiteral("Load..."));
+	texts.insert(QStringLiteral("window.monitor.save"), QStringLiteral("Save..."));
+	qt::CoreFiles files(QStringLiteral("monitor"));
+	QStringList wanted;
+	QObject::connect(&files, &qt::CoreFiles::wanted, [&wanted](const QString &purpose, const QString &mode, const QString &title,
+		const QStringList &, const QString &name) { wanted = {purpose, mode, title, name}; });
 	/* the window's files where a package's are unpacked, and only those */
 	QTemporaryDir dir;
 	QFile::copy(qmlFile, dir.filePath(QStringLiteral("Monitor.qml")));
@@ -130,6 +148,7 @@ static int window(const QString &qmlFile)
 	QQmlContext context(engine.rootContext());
 	context.setContextProperty(QStringLiteral("core"), &qml);
 	context.setContextProperty(QStringLiteral("texts"), &texts);
+	context.setContextProperty(QStringLiteral("files"), &files);
 	QQmlComponent component(&engine, QUrl::fromLocalFile(dir.filePath(QStringLiteral("Monitor.qml"))));
 	QObject *made = component.create(&context);
 	if (made == nullptr) std::printf("ERROR %s\n", component.errorString().simplified().toUtf8().constData());
@@ -161,6 +180,16 @@ static int window(const QString &qmlFile)
 		QMetaObject::invokeMethod(field, "editingFinished");
 		CHECK(!core.asked.empty() && core.asked.back() == "{\"op\":\"set\",\"window\":\"monitor\",\"name\":\"stopAt\",\"value\":12}");
 	}
+	/* Save...: Chimera's dialog asked for, a name suggested; the file the
+	 * person picks goes to the core, which is told its name and nothing more */
+	QMetaObject::invokeMethod(child(root, "save"), "clicked");
+	CHECK(wanted == QStringList({QStringLiteral("save"), QStringLiteral("write"), QStringLiteral("Save..."), QStringLiteral("registers.txt")}));
+	model.giveFile("save", true, "/somewhere/else/regs.txt");
+	CHECK(givenPath == "/somewhere/else/regs.txt");
+	CHECK(!core.asked.empty() && core.asked.back() ==
+		"{\"op\":\"file\",\"window\":\"monitor\",\"purpose\":\"save\",\"mode\":\"write\",\"file\":\"window-file\",\"name\":\"regs.txt\"}");
+	QMetaObject::invokeMethod(child(root, "load"), "clicked");
+	CHECK(wanted.size() == 4 && wanted[0] == QStringLiteral("load") && wanted[1] == QStringLiteral("read"));
 	for (const std::string &a : core.asked) std::printf("asked: %s\n", a.c_str());
 	delete made;
 	return 0;
@@ -171,14 +200,14 @@ int main(int argc, char **argv)
 	qputenv("QT_QUICK_CONTROLS_STYLE", "Basic");
 	QGuiApplication app(argc, argv);
 	const QStringList args = app.arguments();
-	if (args.size() >= 4 && args[1] == QStringLiteral("cases")) return cases(args[2], args[3], args.mid(4));
+	if (args.size() >= 3 && args[1] == QStringLiteral("cases")) return cases(args[2], args.mid(3));
 	if (args.size() >= 3 && args[1] == QStringLiteral("window"))
 	{
 		window(args[2]);
 		std::printf("%d failed\n", failures);
 		return failures == 0 ? 0 : 1;
 	}
-	std::fprintf(stderr, "usage: test_core_windows cases <folder> <output> <case>... | window <Monitor.qml>\n");
+	std::fprintf(stderr, "usage: test_core_windows cases <folder> <case>... | window <Monitor.qml>\n");
 	return 2;
 }
 

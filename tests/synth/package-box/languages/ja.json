@@ -40,6 +40,9 @@
 		"window.monitor.continue": "続行",
 		"window.no_such": "このコアにそのウィンドウはありません",
 		"window.not_settable": "それは設定できません",
-		"window.no_command": "このウィンドウにそのコマンドはありません"
+		"window.no_command": "このウィンドウにそのコマンドはありません",
+		"window.monitor.load": "読み込み...",
+		"window.monitor.save": "保存...",
+		"window.file_unopened": "渡されたファイルを開けませんでした"
 	}
 }

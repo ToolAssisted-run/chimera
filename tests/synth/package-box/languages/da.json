@@ -42,6 +42,9 @@
 		"window.monitor.continue": "Fortsæt",
 		"window.no_such": "denne kerne har ikke sådan et vindue",
 		"window.not_settable": "det kan ikke ændres",
-		"window.no_command": "dette vindue har ikke sådan en kommando"
+		"window.no_command": "dette vindue har ikke sådan en kommando",
+		"window.monitor.load": "Indlæs...",
+		"window.monitor.save": "Gem...",
+		"window.file_unopened": "den givne fil kunne ikke åbnes"
 	}
 }

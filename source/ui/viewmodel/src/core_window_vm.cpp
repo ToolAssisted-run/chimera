@@ -56,8 +56,9 @@ std::string CoreWindowViewModel::request(const std::string &op, const std::strin
 
 std::string CoreWindowViewModel::getRequest() const { return request("get", ""); }
 
-CoreWindowViewModel::CoreWindowViewModel(std::string id, const std::string &description, Dispatcher &dispatcher, Send send)
-	: ViewModel("coreWindow." + id, dispatcher), id_(std::move(id)), send_(std::move(send))
+CoreWindowViewModel::CoreWindowViewModel(std::string id, const std::string &description, Dispatcher &dispatcher, Send send,
+	SendFile sendFile)
+	: ViewModel("coreWindow." + id, dispatcher), id_(std::move(id)), send_(std::move(send)), sendFile_(std::move(sendFile))
 {
 	expose("coreError", "what the core said of the last change or command it refused, \"\" for none", coreError);
 	json::Json d;
@@ -117,6 +118,17 @@ CoreWindowViewModel::CoreWindowViewModel(std::string id, const std::string &desc
 				for (const json::Json &c : cols->items) list.columns.push_back(c.text);
 			rows(name, "", list);
 		}
+}
+
+void CoreWindowViewModel::giveFile(const std::string &purpose, bool write, const std::string &path)
+{
+	if (!sendFile_) return;
+	/* its own name only: what is after the last separator of either kind */
+	const size_t cut = path.find_last_of("/\\");
+	const std::string name = cut == std::string::npos ? path : path.substr(cut + 1);
+	sendFile_(request("file", ",\"purpose\":" + json::quote(purpose) + ",\"mode\":" + json::quote(write ? "write" : "read") +
+				  ",\"file\":" + json::quote(kFileName) + ",\"name\":" + json::quote(name)),
+		path, write, [this](const std::string &answer) { answered(answer); });
 }
 
 void CoreWindowViewModel::answered(const std::string &answer)
