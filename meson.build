@@ -575,3 +575,9 @@ endforeach
 if get_option('qt_ui').allowed()
   subdir('source/ui')
 endif
+
+# Every test plays its sound to OpenAL's device that plays to nowhere, as
+# the witness does (run-witness.sh) and as the sound tests already ask: no
+# test listens, and no test should depend on the sound devices, or the sound
+# server, of the machine it runs on
+add_test_setup('default', env: ['ALSOFT_DRIVERS=null'], is_default: true)

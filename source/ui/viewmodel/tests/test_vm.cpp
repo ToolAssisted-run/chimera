@@ -11768,6 +11768,9 @@ bool coreWindows(const char *package, const char *rom)
 			const std::string bytes((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
 			CHECK(bytes.rfind("PK\x03\x04", 0) == 0 && bytes.find("card/slot1.sav") != std::string::npos &&
 				bytes.find("notes.txt") != std::string::npos && bytes.find("PK\x05\x06") != std::string::npos);
+			/* the core serves its files 7 bytes at a time: the note, 20 bytes,
+			 * is whole in the zip (its entries are stored as they are) */
+			CHECK(bytes.find("gridWalker was here\n") != std::string::npos);
 		}
 		/* Trace Logger: lines as frames run, and a log file added to after every frame until let go */
 		auto trace = session.openCoreWindow("kit.trace", error);

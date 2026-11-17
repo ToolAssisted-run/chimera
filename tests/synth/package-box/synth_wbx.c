@@ -692,14 +692,27 @@ ECL_EXPORT int      InputWasRead(void)   { die_if_armed(3, "InputWasRead"); retu
 
 /* Save data (docs/save-data.md, the savedata group): two files the window's
  * Export Save Data writes out - the first 16 bytes of RAM as a card's slot,
- * and a note - so a frontend can take the whole export path. */
+ * and a note - so a frontend can take the whole export path. They are served
+ * a window of 7 bytes at a time (ReadSaveDataFile and GetSaveDataScratch),
+ * and the whole-file pointer answers null, as the 86box, PCem and DOSBox-X
+ * cores do, so the reading in windows is what every export here takes. */
 static const char g_saveNote[] = "gridWalker was here\n";
+static uint8_t g_saveWindow[7];
+static const uint8_t *save_bytes(int32_t i) { return i == 0 ? synth_get_ram(g_synth) : i == 1 ? (const uint8_t *)g_saveNote : 0; }
 ECL_EXPORT int32_t GetSaveDataFileCount(void) { return g_synth ? 2 : 0; }
 ECL_EXPORT const char *GetSaveDataFileName(int32_t i) { return i == 0 ? "card/slot1.sav" : i == 1 ? "notes.txt" : 0; }
 ECL_EXPORT int64_t GetSaveDataFileSize(int32_t i) { return i == 0 ? 16 : i == 1 ? (int64_t)(sizeof g_saveNote - 1) : 0; }
-ECL_EXPORT const uint8_t *GetSaveDataFileBuffer(int32_t i)
+ECL_EXPORT const uint8_t *GetSaveDataFileBuffer(int32_t i) { (void)i; return 0; }
+ECL_EXPORT const uint8_t *GetSaveDataScratch(void) { return g_saveWindow; }
+ECL_EXPORT int64_t ReadSaveDataFile(int32_t i, int64_t offset, int64_t len)
 {
-	return i == 0 ? synth_get_ram(g_synth) : i == 1 ? (const uint8_t *)g_saveNote : 0;
+	const uint8_t *from = save_bytes(i);
+	const int64_t size = GetSaveDataFileSize(i);
+	if (!from || offset < 0 || offset >= size || len <= 0) return 0;
+	int64_t n = size - offset < len ? size - offset : len;
+	if (n > (int64_t)sizeof g_saveWindow) n = (int64_t)sizeof g_saveWindow;
+	memcpy(g_saveWindow, from + offset, (size_t)n);
+	return n;
 }
 
 /* Turbo (optional guest ABI group): the host says nobody will look at the next
