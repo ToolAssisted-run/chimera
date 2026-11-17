@@ -121,7 +121,8 @@
       "name": "Dolphin",
       "systems": [
         { "id": "GC", "name": "GameCube" },
-        { "id": "Wii", "name": "Wii" }
+        { "id": "Wii", "name": "Wii" },
+        { "id": "Triforce", "name": "Triforce" }
       ],
       "repo": "ToolAssisted-run/chimera-core-dolphin",
       "tested": ""
