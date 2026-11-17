@@ -42,7 +42,6 @@
 		"window.monitor.stop_at": "Зупинитися на інструкції",
 		"window.monitor.step": "Крок",
 		"window.monitor.continue": "Продовжити",
-		"window.no_such": "у цього ядра немає такого вікна",
 		"window.not_settable": "це не можна змінити",
 		"window.no_command": "у цього вікна немає такої команди",
 		"window.monitor.load": "Завантажити...",

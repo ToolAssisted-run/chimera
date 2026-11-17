@@ -139,6 +139,9 @@ struct HostApi
 	 * older than tools (2026-11-01) runs none. */
 	void (*wbx_mount_file_path_writable)(void *obj, const char *name, const char *host_path, WbxReturn *ret);
 	void (*wbx_unmount_file)(void *obj, const char *name, WbxWriteCb cb, uintptr_t userdata, WbxReturn *ret);
+	/* A file kept as it is and written at its end, for one call (a core's
+	 * window's log, issue 610). Optional: an older host cannot. */
+	void (*wbx_mount_file_path_appending)(void *obj, const char *name, const char *host_path, WbxReturn *ret);
 };
 
 /* The loaded host, or nullptr with *error set. Loads once, then cached. */

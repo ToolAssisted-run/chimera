@@ -35,8 +35,6 @@ struct ce_average_fps;
 
 namespace chimera::vm {
 
-/* the files given in a zip, each stored as it is */
-std::vector<uint8_t> storedZip(const std::vector<std::pair<std::string, std::vector<uint8_t>>> &files);
 
 /* The renderer a project runs with: its own "renderer" setting, or else the
  * package's default for the project's machine - the machine's own
@@ -204,17 +202,10 @@ public:
 	/* Chimera's Emulator menu ("Game" for a game core) and what it offers
 	 * for the core open: a game core's own timer, shown at the top right 14
 	 * down ("IGT 01:02.345"); the user's save data, written out */
-	Property<bool> isGameCore{false}, hasGameTimer{false}, hasSaveData{false};
-	/* the core's tooling groups (the engine's): a trace of what its CPU runs,
-	 * and registers a debugger shows; the trace's own header */
-	Property<bool> hasTrace{false}, hasRegisters{false};
-	Property<std::string> traceHeader;
-	/* Tracing, as Chimera's trace logger asks it: on, the core's lines of
-	 * each frame run are handed to `sink` on the window's thread ("[core:
-	 * trace buffer full, lines dropped]" when it overflowed); off, the core
-	 * traces nothing. Kept across machines and state loads */
-	using TraceSink = std::function<void(std::vector<std::string> lines)>;
-	void setTracing(bool on, TraceSink sink);
+	Property<bool> isGameCore{false}, hasGameTimer{false};
+	/* the core shows its registers: Lua's emu.getregisters and the like (a
+	 * core's CPU Registers window is its own, issue 610) */
+	Property<bool> hasRegisters{false};
 	/* the registers now, by the machine (the debugger's box): name, value, bits */
 	struct Register
 	{
@@ -227,11 +218,6 @@ public:
 	std::string registerForRole(const std::string &role);
 	/* a register set, by its place; false when the core does not take it */
 	bool writeRegister(int32_t index, int64_t value);
-	/* the pictures the core draws for itself (the Surface Viewer): their
-	 * names and sizes, as [{"name", "width", "height"}], and one drawn now
-	 * into a picture; false when there is none */
-	Property<std::string> surfaces{"[]"};
-	bool renderSurface(int32_t index, Picture &into);
 	/* The core's own windows (issue 610, user-decided 2026-11-17): their
 	 * design QML in its package, the core their view model. Those the open
 	 * core has, as [{"id", "menu", "qml"}] (the menu in the language in use),
@@ -1279,6 +1265,9 @@ private:
 	/* The core's own windows, on the machine's thread: those open, asked
 	 * again after every frame and every wait while held; a request sent */
 	std::vector<std::string> openWindowsM_;
+	/* files kept for them (a log), given again after every frame to add to:
+	 * window, then purpose: where, and its own name */
+	std::map<std::string, std::map<std::string, std::pair<std::string, std::string>>> keptFilesM_;
 	void refreshCoreWindowsOnMachine();
 	std::string windowRequestOnMachine(const std::string &request);
 	void submitMidFrame(std::function<void()> job);
@@ -1459,10 +1448,7 @@ private:
 	void applyBudgetsOnMachine(ce_session *s, bool opening);
 	Connection budgetWatch_, strideWatch_, settleWatch_, markerFramesWatch_;
 	std::string soundDeviceM_, compileRootM_;
-	bool traceOnM_ = false;
-	TraceSink traceSink_;
 	/* the lines the core traced since the last drain, to the sink */
-	void drainTraceOnMachine();
 	/* the compile cache folder for the session about to open: the engine's
 	 * (ce_cache_dir) is the whole process's, so it is set before each open */
 	void compileCacheOnMachine(const std::string &package, const std::string &gamePath, const std::string &knownSha1);

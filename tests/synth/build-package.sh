@@ -52,6 +52,9 @@ cp -r "$here/package-box/languages" "$staging/languages"
 cp "$here/package-box/default_keybinds.json" "$staging"
 # the design of the core's own window (issue 610), drawn by Chimera with the core as its view model
 cp -r "$here/package-box/windows" "$staging/windows"
+# and miniBox's ready-made windows for what this core exports (Export Save
+# Data, CPU Registers, Trace Logger, Surface Viewer): Chimera has none of its own
+python3 "$chimera_root/extern/chimera-common-minibox/source/guest/windows/add-windows.py" "$staging"
 
 # The version a real package stamps, so the test core behaves like one: the
 # manager files packages by version, a movie cites it, and a package with none

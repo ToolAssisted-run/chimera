@@ -40,7 +40,6 @@
 		"window.monitor.stop_at": "Atura't a la instrucció",
 		"window.monitor.step": "Pas",
 		"window.monitor.continue": "Continua",
-		"window.no_such": "aquest nucli no té aquesta finestra",
 		"window.not_settable": "això no es pot canviar",
 		"window.no_command": "aquesta finestra no té aquesta ordre",
 		"window.monitor.load": "Carrega...",

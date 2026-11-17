@@ -108,6 +108,8 @@ void loadOnce()
 		g_api.wbx_mount_file_path_writable = nullptr;
 		g_api.wbx_unmount_file = nullptr;
 	}
+	/* a log a core's window keeps adding to (issue 610), which an older host cannot mount */
+	if (!g_ok || !bind(g_api.wbx_mount_file_path_appending, "wbx_mount_file_path_appending")) g_api.wbx_mount_file_path_appending = nullptr;
 	/* and the in-memory form of it, which an older host does not have */
 	if (!g_ok || !bind(g_api.wbx_compose_delta_mem, "wbx_compose_delta_mem")) g_api.wbx_compose_delta_mem = nullptr;
 

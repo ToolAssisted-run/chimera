@@ -152,6 +152,13 @@ declaration every core could use, which is a change to Chimera's design: put
 it to the owner, and write it in [design-principles.md](design-principles.md)
 when it is decided. It is never a special case.
 
+Chimera has no tool of its own for a core either (owner, 2026-11-17): a
+core's Export Save Data, CPU Registers, Trace Logger and Surface Viewer, and
+any window of its own, are its own windows. Include miniBox's kit
+(`waterbox_windows.h`, and `add-windows.py` in the package build) and the
+ready-made ones come with the exports the core has; porting-a-core.md, "A
+core's own windows", says how.
+
 ## 6. Where determinism has leaked before
 
 Each of these was a real divergence between two runs of the same movie:

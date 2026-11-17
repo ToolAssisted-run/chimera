@@ -1023,20 +1023,17 @@ function client.openhexeditor() C.toolWindows.show("hex") end
 function client.openramwatch() C.toolWindows.show("ram-watch") end
 function client.openramsearch() C.toolWindows.show("ram-search") end
 -- Chimera's tools, by the names its getavailabletools gives them: the
--- window each is, whether the machine open has what it needs (as Chimera
--- asks the core for the tool's services), and what gettool gives a script
--- for it: the window's own object in chimera (owner, 2026-10-26; the Log
--- Window has none)
+-- window each is, whether the machine open has what it needs, and what
+-- gettool gives a script for it: the window's own object in chimera (owner,
+-- 2026-10-26; the Log Window has none). A core's tools (its Trace Logger,
+-- CPU Registers, Surface Viewer) are its own windows and not here (issue 610)
 local toolList = {
 	{"tastudio", "tastudio", function() return C.session.isOpen end, "pianoRoll"},
 	{"luaconsole", "lua", nil, "luaConsole"},
 	{"ramwatch", "ram-watch", function() return C.session.isOpen end, "ramWatch"},
 	{"ramsearch", "ram-search", function() return C.session.isOpen end, "ramSearch"},
 	{"hexeditor", "hex", function() return C.session.isOpen end, "hexEditor"},
-	{"tracelogger", "traceLoggerWindow", function() return C.session.hasTrace end, "traceLogger"},
-	{"genericdebugger", "cpuRegistersWindow", function() return C.session.hasRegisters end, "registers"},
 	{"macroinputtool", "macroToolWindow", function() return C.session.isOpen end, "macroTool"},
-	{"surfaceviewer", "surfaceViewerWindow", function() return C.session.surfaces ~= "[]" end, "surfaceViewer"},
 	{"logwindow", "logWindow", nil, nil},
 }
 local function toolUsable(t) return t[3] == nil or t[3]() end

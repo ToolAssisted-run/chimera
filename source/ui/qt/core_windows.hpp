@@ -74,17 +74,22 @@ public:
 	explicit CoreFiles(QString window, QObject *parent = nullptr) : QObject(parent), window_(std::move(window)) {}
 	const QString &window() const { return window_; }
 
-	/* asks Chimera to show its dialog: mode "read" (open a file) or "write"
-	 * (save one, name suggested); the file picked is given to the core with
-	 * this purpose, and `chosen` says so, with the file's own name */
+	/* asks Chimera to show its dialog: mode "read" (open a file), "write"
+	 * (save one, name suggested) or "log" (save one that is kept: given to the
+	 * core emptied now, then again after every frame to add to, until
+	 * release); the file picked is given to the core with this purpose, and
+	 * `chosen` says so, with the file's own name */
 	Q_INVOKABLE void choose(const QString &purpose, const QString &mode, const QString &title,
 		const QStringList &nameFilters = {}, const QString &name = {});
+	/* a kept file let go: no longer given to the core */
+	Q_INVOKABLE void release(const QString &purpose) { Q_EMIT released(purpose); }
 
 Q_SIGNALS:
 	void wanted(const QString &purpose, const QString &mode, const QString &title, const QStringList &nameFilters,
 		const QString &name);
 	void chosen(const QString &purpose, const QString &name);
 	void cancelled(const QString &purpose);
+	void released(const QString &purpose);
 
 private:
 	QString window_;

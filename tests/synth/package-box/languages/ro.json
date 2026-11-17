@@ -42,7 +42,6 @@
 		"window.monitor.stop_at": "Oprește la instrucțiune",
 		"window.monitor.step": "Pas",
 		"window.monitor.continue": "Continuă",
-		"window.no_such": "acest nucleu nu are o astfel de fereastră",
 		"window.not_settable": "asta nu se poate seta",
 		"window.no_command": "această fereastră nu are o astfel de comandă",
 		"window.monitor.load": "Încarcă...",

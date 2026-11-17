@@ -115,7 +115,7 @@ const std::vector<std::string> &chimeraOrder()
 			"Reboot Core", "Toggle Sound", "Exit Program", "Screen Raw to Clipboard", "Screen Client to Clipboard",
 			"Toggle Skip Lag Frame", "Toggle Key Priority", "Frame Inch", "Toggle Messages", "Toggle Display Nothing",
 			"Accept Background Input", "Capture Mouse", "Toggle Stay on Top", "Toggle read-only", "Play Movie", "Record Movie",
-			"Stop Movie", "Play from beginning", "Save Movie", "RAM Watch", "RAM Search", "Hex Editor", "Trace Logger",
+			"Stop Movie", "Play from beginning", "Save Movie", "RAM Watch", "RAM Search", "Hex Editor",
 			"Lua Console", "TAStudio", "New Search", "Do Search", "Previous Compare To", "Next Compare To", "Previous Operator",
 			"Next Operator", "Add Branch", "Delete Branch"};
 		for (int slot = 1; slot <= 10; slot++)

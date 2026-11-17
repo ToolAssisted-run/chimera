@@ -40,7 +40,6 @@
 		"window.monitor.stop_at": "Komutta dur",
 		"window.monitor.step": "Adım",
 		"window.monitor.continue": "Devam",
-		"window.no_such": "bu çekirdeğin böyle bir penceresi yok",
 		"window.not_settable": "bu ayarlanamaz",
 		"window.no_command": "bu pencerenin böyle bir komutu yok",
 		"window.monitor.load": "Yükle...",

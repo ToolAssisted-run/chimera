@@ -40,7 +40,6 @@
 		"window.monitor.stop_at": "S'arrêter à l'instruction",
 		"window.monitor.step": "Pas",
 		"window.monitor.continue": "Continuer",
-		"window.no_such": "ce cœur n'a pas cette fenêtre",
 		"window.not_settable": "cela ne se règle pas",
 		"window.no_command": "cette fenêtre n'a pas cette commande",
 		"window.monitor.load": "Charger...",

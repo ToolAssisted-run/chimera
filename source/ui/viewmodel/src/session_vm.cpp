@@ -153,30 +153,6 @@ std::string projectRenderer(const json::Json &config, const json::Json &settings
 	return {};
 }
 
-std::vector<uint8_t> storedZip(const std::vector<std::pair<std::string, std::vector<uint8_t>>> &files)
-{
-	std::vector<uint8_t> out, central;
-	auto u16 = [](std::vector<uint8_t> &v, uint32_t x) { v.push_back(x & 0xFF), v.push_back((x >> 8) & 0xFF); };
-	auto u32 = [&](std::vector<uint8_t> &v, uint32_t x) { u16(v, x & 0xFFFF), u16(v, x >> 16); };
-	for (const auto &[name, bytes] : files)
-	{
-		const uint32_t crc = crc32Of(bytes), size = static_cast<uint32_t>(bytes.size()), at = static_cast<uint32_t>(out.size());
-		u32(out, 0x04034b50), u16(out, 20), u16(out, 0x0800), u16(out, 0), u16(out, 0), u16(out, 0x21);
-		u32(out, crc), u32(out, size), u32(out, size), u16(out, static_cast<uint32_t>(name.size())), u16(out, 0);
-		out.insert(out.end(), name.begin(), name.end());
-		out.insert(out.end(), bytes.begin(), bytes.end());
-		u32(central, 0x02014b50), u16(central, 20), u16(central, 20), u16(central, 0x0800), u16(central, 0), u16(central, 0);
-		u16(central, 0x21), u32(central, crc), u32(central, size), u32(central, size), u16(central, static_cast<uint32_t>(name.size()));
-		u16(central, 0), u16(central, 0), u16(central, 0), u16(central, 0), u32(central, 0), u32(central, at);
-		central.insert(central.end(), name.begin(), name.end());
-	}
-	const uint32_t centralAt = static_cast<uint32_t>(out.size()), centralSize = static_cast<uint32_t>(central.size());
-	out.insert(out.end(), central.begin(), central.end());
-	u32(out, 0x06054b50), u16(out, 0), u16(out, 0), u16(out, static_cast<uint32_t>(files.size()));
-	u16(out, static_cast<uint32_t>(files.size())), u32(out, centralSize), u32(out, centralAt), u16(out, 0);
-	return out;
-}
-
 SessionViewModel::SessionViewModel(Dispatcher &dispatcher, InputLog &inputs)
 	: ViewModel("session", dispatcher), inputs_(inputs)
 {
@@ -652,11 +628,7 @@ SessionViewModel::SessionViewModel(Dispatcher &dispatcher, InputLog &inputs)
 	expose("mouseBound", "an analog control is bound to the pointer (WMouse or RMouse X or Y), as Capture Mouse asks", mouseBound);
 	expose("isGameCore", "the core open is a game (its menu is Game, not Emulator)", isGameCore);
 	expose("hasGameTimer", "the game open has a timer of its own", hasGameTimer);
-	expose("hasSaveData", "the core open writes out the user's save data", hasSaveData);
-	expose("hasTrace", "the core traces what its CPU runs (the Trace Logger)", hasTrace);
-	expose("hasRegisters", "the core shows its registers (CPU Registers)", hasRegisters);
-	expose("traceHeader", "the core's words for its trace lines' columns", traceHeader);
-	expose("surfaces", "the pictures the core draws for itself, as [{\"name\", \"width\", \"height\"}]", surfaces);
+	expose("hasRegisters", "the core shows its registers (Lua's emu.getregisters and the like)", hasRegisters);
 	expose("coreWindows", "the core's own windows (issue 610), as [{\"id\", \"menu\", \"qml\"}]; \"[]\" for none", coreWindows);
 	expose("held", "the core holds the frame it is in, part way through, until its window lets it go on", held);
 	expose("showGameTime", "a game's own timer is shown over the picture", showGameTime, true);
@@ -702,87 +674,6 @@ SessionViewModel::SessionViewModel(Dispatcher &dispatcher, InputLog &inputs)
 		showGameTimeM_.store(showGameTime.get());
 		submit([this] { report(-1, -1, -1, -1, -1); });
 	}));
-	command("saveDataFiles", "the save files the machine holds now, a line each", {}, [this](const Args &, std::string &error) -> Value {
-		std::string names;
-		bool open = false;
-		onMachineWait([&](ce_session *s) {
-			if (s == nullptr || !ce_session_savedata_available(s)) return;
-			open = true;
-			const int32_t n = ce_session_savedata_count(s);
-			for (int32_t i = 0; i < n; i++)
-				if (const char *name = ce_session_savedata_name(s, i)) names += (names.empty() ? "" : "\n") + std::string(name);
-		});
-		if (!open)
-		{
-			error = tr("session.no_save_data_kept");
-			return {};
-		}
-		return names;
-	}, &hasSaveData);
-	command("exportSaveData", "writes the save data out, as Chimera's Export Save Data: one file as it is, more in a zip; "
-		"says how many files", {"path"}, [this](const Args &a, std::string &error) -> Value {
-			std::string path;
-			if (!arg(a, 0, path, error)) return {};
-			std::string why;
-			int64_t written = -1;
-			onMachineWait([&](ce_session *s) {
-				if (s == nullptr || !ce_session_savedata_available(s))
-				{
-					why = tr("session.no_save_data_kept");
-					return;
-				}
-				const int32_t n = ce_session_savedata_count(s);
-				if (n == 0)
-				{
-					why = tr("session.no_save_data_yet");
-					return;
-				}
-				/* each file read in pieces, as the engine streams it */
-				auto contents = [&](int32_t i) {
-					std::vector<uint8_t> bytes(static_cast<size_t>(std::max<int64_t>(0, ce_session_savedata_size(s, i))));
-					int64_t at = 0;
-					while (at < static_cast<int64_t>(bytes.size()))
-					{
-						const int64_t got = ce_session_savedata_read(s, i, at, bytes.data() + at,
-							std::min<int64_t>(1 << 20, static_cast<int64_t>(bytes.size()) - at));
-						if (got <= 0) break;
-						at += got;
-					}
-					bytes.resize(static_cast<size_t>(at));
-					return bytes;
-				};
-				std::ofstream out(path, std::ios::binary);
-				if (n == 1)
-				{
-					const std::vector<uint8_t> one = contents(0);
-					out.write(reinterpret_cast<const char *>(one.data()), static_cast<std::streamsize>(one.size()));
-				}
-				else
-				{
-					std::vector<std::pair<std::string, std::vector<uint8_t>>> files;
-					for (int32_t i = 0; i < n; i++)
-					{
-						const char *name = ce_session_savedata_name(s, i);
-						files.emplace_back(name != nullptr ? name : "file" + std::to_string(i), contents(i));
-					}
-					const std::vector<uint8_t> zip = storedZip(files);
-					out.write(reinterpret_cast<const char *>(zip.data()), static_cast<std::streamsize>(zip.size()));
-				}
-				if (!out)
-				{
-					why = tr("session.could_not_write", {path});
-					return;
-				}
-				written = n;
-			});
-			if (written < 0)
-			{
-				error = why;
-				return {};
-			}
-			status.set(tr("session.save_data_written", {path}));
-			return written;
-		}, &hasSaveData);
 	command("resetAverageFps", "the average speed counted afresh from now", {}, [this](const Args &, std::string &) -> Value {
 		averageResetM_.store(true);
 		forgetAverage();
@@ -2574,6 +2465,7 @@ void SessionViewModel::freeSessionOnMachine()
 		fprintf(stderr, "chimera: the machine was to close while its core holds a frame; kept\n");
 		return;
 	}
+	keptFilesM_.clear();
 	if (!openWindowsM_.empty() || heldShownM_)
 	{
 		openWindowsM_.clear();
@@ -5268,14 +5160,43 @@ std::string SessionViewModel::windowRequestOnMachine(const std::string &request)
 void SessionViewModel::refreshCoreWindowsOnMachine()
 {
 	if (s_ == nullptr) return;
-	windowsFrameM_ = ce_session_frame(s_);
+	const int64_t frame = ce_session_frame(s_);
+	const bool moved = frame != windowsFrameM_;
+	windowsFrameM_ = frame;
 	for (const std::string &id : openWindowsM_)
 	{
+		/* a file kept for the window (a log) given again, to add to, once a
+		 * frame the machine moved */
+		if (moved)
+			if (const auto kept = keptFilesM_.find(id); kept != keptFilesM_.end())
+				for (const auto &[purpose, file] : kept->second)
+				{
+					const std::string request = "{\"op\":\"file\",\"window\":" + json::quote(id) + ",\"purpose\":" + json::quote(purpose) +
+						",\"mode\":\"append\",\"file\":" + json::quote(CoreWindowViewModel::kFileName) + ",\"name\":" + json::quote(file.second) + "}";
+					uint64_t len = 0;
+					ce_session_window_file(s_, request.data(), request.size(), CoreWindowViewModel::kFileName, file.first.c_str(), 2, &len);
+				}
 		std::string answer = windowRequestOnMachine("{\"op\":\"get\",\"window\":" + json::quote(id) + "}");
-		later([this, id, answer = std::move(answer)] {
+		/* its pictures, copied out of the core's memory now, while the
+		 * answer's addresses hold */
+		std::map<std::string, CoreWindowViewModel::Pixels> pictures;
+		json::Json a;
+		std::string err;
+		if (answer.find("\"pictures\"") != std::string::npos && json::parse(answer, a, err))
+			if (const json::Json *ps = a.find("pictures"))
+				for (const auto &[name, p] : ps->members)
+				{
+					const json::Json *w = p.find("width"), *h = p.find("height"), *at = p.find("pixels");
+					if (w == nullptr || h == nullptr || at == nullptr) continue;
+					const int32_t width = static_cast<int32_t>(w->number()), height = static_cast<int32_t>(h->number());
+					const uint64_t address = std::strtoull(at->text.c_str(), nullptr, 10);
+					if (const uint32_t *px = ce_session_window_picture(s_, address, width, height))
+						pictures[name] = {width, height, std::vector<uint32_t>(px, px + static_cast<size_t>(width) * static_cast<size_t>(height))};
+				}
+		later([this, id, answer = std::move(answer), pictures = std::move(pictures)] {
 			const auto it = coreWindowsOpen_.find(id);
 			if (it == coreWindowsOpen_.end()) return;
-			if (auto vm = it->second.lock()) vm->show(answer);
+			if (auto vm = it->second.lock()) vm->show(answer, pictures);
 		});
 	}
 }
@@ -5310,14 +5231,15 @@ std::shared_ptr<CoreWindowViewModel> SessionViewModel::openCoreWindow(const std:
 		});
 	};
 	/* a file the person picked, given to the core for one request */
-	auto sendFile = [this, self](std::string request, std::string path, bool write, std::function<void(const std::string &)> answered) {
-		submitMidFrame([this, self, request = std::move(request), path = std::move(path), write, answered = std::move(answered)] {
+	auto sendFile = [this, self](std::string request, std::string path, int mode, std::function<void(const std::string &)> answered) {
+		submitMidFrame([this, self, request = std::move(request), path = std::move(path), mode, answered = std::move(answered)] {
 			std::string answer;
+			const bool write = mode != CoreWindowViewModel::Read;
 			if (s_ != nullptr)
 			{
 				uint64_t len = 0;
 				const char *a = ce_session_window_file(s_, request.data(), request.size(), CoreWindowViewModel::kFileName, path.c_str(),
-					write ? 1 : 0, &len);
+					mode, &len);
 				if (a != nullptr) answer.assign(a, static_cast<size_t>(len));
 				else
 				{
@@ -5332,7 +5254,18 @@ std::shared_ptr<CoreWindowViewModel> SessionViewModel::openCoreWindow(const std:
 			});
 		});
 	};
-	auto vm = std::make_shared<CoreWindowViewModel>(id, description, dispatcher_, send, sendFile);
+	/* a file kept for the window (a log), or let go */
+	auto keepFile = [this, id](std::string purpose, std::string path, std::string name) {
+		submitMidFrame([this, id, purpose = std::move(purpose), path = std::move(path), name = std::move(name)] {
+			if (path.empty())
+			{
+				if (const auto kept = keptFilesM_.find(id); kept != keptFilesM_.end()) kept->second.erase(purpose);
+			}
+			else
+				keptFilesM_[id][purpose] = {path, name};
+		});
+	};
+	auto vm = std::make_shared<CoreWindowViewModel>(id, description, dispatcher_, send, sendFile, keepFile);
 	if (!vm->problem().empty())
 	{
 		error = vm->problem();
@@ -5352,6 +5285,7 @@ void SessionViewModel::closeCoreWindow(const std::string &id)
 {
 	coreWindowsOpen_.erase(id);
 	submitMidFrame([this, id] {
+		keptFilesM_.erase(id);
 		const auto at = std::find(openWindowsM_.begin(), openWindowsM_.end(), id);
 		if (at == openWindowsM_.end()) return;
 		openWindowsM_.erase(at);
@@ -6678,24 +6612,8 @@ void SessionViewModel::adoptOnMachine(ce_session *s, const std::string &package,
 	bool gameCore = false;
 	int64_t ms = 0;
 	gameTimerM_ = ce_session_game_time_ms(s, &ms) == 1;
-	const bool timer = gameTimerM_, saveData = ce_session_savedata_available(s) != 0;
-	const bool traces = ce_session_trace_available(s) != 0, registers = ce_session_register_count(s) > 0;
-	json::Json surfaceList;
-	surfaceList.kind = json::Json::Kind::Array;
-	for (int32_t i = 0; i < ce_session_surface_count(s); i++)
-	{
-		json::Json one;
-		one.kind = json::Json::Kind::Object;
-		const char *n = ce_session_surface_name(s, i);
-		one.members.emplace_back("name", json::Json::string(n != nullptr ? n : ""));
-		one.members.emplace_back("width", json::Json::integer(ce_session_surface_width(s, i)));
-		one.members.emplace_back("height", json::Json::integer(ce_session_surface_height(s, i)));
-		surfaceList.items.push_back(one);
-	}
-	const std::string surfaceText = json::write(surfaceList);
-	const std::string traceHead = traces && ce_session_trace_header(s) != nullptr ? ce_session_trace_header(s) : "";
-	/* a trace asked for goes on with the next machine */
-	if (traces && traceOnM_) ce_session_trace_enable(s, 1);
+	const bool timer = gameTimerM_;
+	const bool registers = ce_session_register_count(s) > 0;
 	{
 		json::Json cfg;
 		std::string jerr;
@@ -6805,11 +6723,8 @@ void SessionViewModel::adoptOnMachine(ce_session *s, const std::string &package,
 	/* another game, or the same started again: another average, as Chimera's */
 	averageResetM_.store(true);
 	later([this, names, players, headers, axes, mnemonics, keybinds, coreText, systemText, systemIdText, rate, label, inputsReplaced, frames, controller,
-			   picture, shownDeclared, shownColumns, gameCore, timer, saveData, package, traces, registers, traceHead, surfaceText, withOpen] {
-		surfaces.set(surfaceText);
-		hasTrace.set(traces);
+			   picture, shownDeclared, shownColumns, gameCore, timer, package, registers, withOpen] {
 		hasRegisters.set(registers);
-		traceHeader.set(traceHead);
 		controllerName_ = controller;
 		controllerPicture_ = picture;
 		shownDeclared_ = shownDeclared;
@@ -6817,7 +6732,6 @@ void SessionViewModel::adoptOnMachine(ce_session *s, const std::string &package,
 		packagePath_ = package;
 		isGameCore.set(gameCore);
 		hasGameTimer.set(timer);
-		hasSaveData.set(saveData);
 		gameTimeText.set("");
 		averageFpsText.set("");
 		buttonNames_ = names;
@@ -6965,44 +6879,6 @@ void SessionViewModel::compileCacheOnMachine(const std::string &package, const s
 	later([this, dir] { compileCacheDir.set(dir); });
 }
 
-void SessionViewModel::setTracing(bool on, TraceSink sink)
-{
-	traceSink_ = std::move(sink);
-	submit([this, on] {
-		traceOnM_ = on;
-		if (s_ == nullptr || ce_session_trace_available(s_) == 0) return;
-		/* what was traced before is let go with the switch */
-		if (!on) drainTraceOnMachine();
-		ce_session_trace_enable(s_, on ? 1 : 0);
-	});
-}
-
-void SessionViewModel::drainTraceOnMachine()
-{
-	if (s_ == nullptr || ce_session_trace_available(s_) == 0) return;
-	uint64_t len = 0;
-	int32_t count = 0, overflow = 0;
-	const uint8_t *bytes = ce_session_trace_drain(s_, &len, &count, &overflow);
-	if (!traceOnM_ || (count == 0 && overflow == 0)) return;
-	std::vector<std::string> lines;
-	lines.reserve(static_cast<size_t>(count) + 1);
-	for (uint64_t at = 0; bytes != nullptr && at < len;)
-	{
-		const char *line = reinterpret_cast<const char *>(bytes + at);
-		const size_t n = strnlen(line, static_cast<size_t>(len - at));
-		lines.emplace_back(line, n);
-		at += n + 1;
-	}
-	/* as Chimera's: a full buffer is said where the lines stop */
-	if (overflow != 0)
-	{
-		const char *core = ce_session_core_name(s_);
-		lines.push_back(tr("session.trace_buffer_full", {core != nullptr ? core : tr("session.the_core")}));
-	}
-	later([this, lines = std::move(lines)]() mutable {
-		if (traceSink_) traceSink_(std::move(lines));
-	});
-}
 
 std::string SessionViewModel::registerForRole(const std::string &role)
 {
@@ -7033,19 +6909,6 @@ std::vector<SessionViewModel::Register> SessionViewModel::readRegisters(int64_t 
 	return out;
 }
 
-bool SessionViewModel::renderSurface(int32_t index, Picture &into)
-{
-	bool drawn = false;
-	onMachineWait([&](ce_session *s) {
-		if (s == nullptr || index < 0 || index >= ce_session_surface_count(s)) return;
-		const int32_t w = ce_session_surface_width(s, index), h = ce_session_surface_height(s, index);
-		const uint32_t *px = w > 0 && h > 0 ? ce_session_surface_render(s, index) : nullptr;
-		if (px == nullptr) return;
-		into.publish(px, w, h, w, h);
-		drawn = true;
-	});
-	return drawn;
-}
 
 bool SessionViewModel::writeRegister(int32_t index, int64_t value)
 {
@@ -7421,7 +7284,6 @@ int32_t SessionViewModel::stepOnMachine(bool live, bool render, bool grow)
 		period_ = std::chrono::duration_cast<Clock::duration>(std::chrono::duration<double>(static_cast<double>(den) / num));
 		if (inputs_.setLength(f, length)) changed = true;
 	}
-	if (traceOnM_) drainTraceOnMachine();
 
 	if (live && soundM_ && !turboM_.load())
 	{

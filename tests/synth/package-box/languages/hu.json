@@ -40,7 +40,6 @@
 		"window.monitor.stop_at": "Megállás az utasításnál",
 		"window.monitor.step": "Lépés",
 		"window.monitor.continue": "Folytatás",
-		"window.no_such": "ennek a magnak nincs ilyen ablaka",
 		"window.not_settable": "ez nem állítható",
 		"window.no_command": "ennek az ablaknak nincs ilyen parancsa",
 		"window.monitor.load": "Betöltés...",

@@ -40,7 +40,6 @@
 		"window.monitor.stop_at": "Stoppen bij instructie",
 		"window.monitor.step": "Stap",
 		"window.monitor.continue": "Doorgaan",
-		"window.no_such": "deze kern heeft zo'n venster niet",
 		"window.not_settable": "dat kan niet worden ingesteld",
 		"window.no_command": "dit venster heeft zo'n opdracht niet",
 		"window.monitor.load": "Laden...",

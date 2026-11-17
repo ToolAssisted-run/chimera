@@ -613,6 +613,37 @@ Probed once after `Init`; absent exports simply mean the tool is not offered.
     frame runs and no state is saved or loaded (the engine refuses both),
     the frame watchdog does not count the wait, and Chimera's status bar says
     the core holds the frame.
+  - **miniBox's ready-made windows.** Chimera has no tool of its own for a
+    core (owner, 2026-11-17): Export Save Data, CPU Registers, the Trace
+    Logger and the Surface Viewer are the core's own windows. miniBox's guest
+    kit has them ready, built on exports a core may already have:
+    `waterbox_windows.h` answers Chimera's requests for them (and for the
+    core's own windows, added with `wbx_windows_add`), and
+    `source/guest/windows/add-windows.py` puts their QML and texts in the
+    package. In one C or C++ file of the core:
+
+    ```c
+    #define WBX_WINDOWS_IMPLEMENTATION
+    #include <waterbox_windows.h>
+    ```
+
+    and, in `build-package.sh`, once `core.wbx`, `waterbox.config` and
+    `languages/` are staged:
+
+    ```sh
+    python3 "$mb/source/guest/windows/add-windows.py" "$staging"
+    ```
+
+    It reads the core.wbx and adds the windows its exports allow: Export
+    Save Data (`GetSaveDataFile*`, or `ReadSaveDataFile` with
+    `GetSaveDataScratch`), CPU Registers (`GetRegister*`, `SetRegisterValue`
+    to set one), the Trace Logger (`TraceSetEnabled`, `TraceGetLineCount`,
+    `TraceGetBuffer`, `TraceClear`; it logs live to a file the person picks
+    once, which Chimera hands to the core again after every frame) and the
+    Surface Viewer (`GetSurface*`, `RenderSurface`; the picture is drawn by
+    Chimera's picture item). The kit keeps its state in invisible memory.
+    Its exports are found through weak references (`weakref`), so the
+    core's own definitions stay global, as the host needs them.
   - The synthetic core is the example: its window "monitor"
     (`tests/synth/package-box/windows/Monitor.qml` and the `WindowRequest`
     code in `synth_wbx.c`) shows the registers, the instruction running and
@@ -620,8 +651,9 @@ Probed once after `Init`; absent exports simply mean the tool is not offered.
     or Continue.
 - **Registers** - `int32_t GetRegisterCount(void)`, `const char
   *GetRegisterName(int32_t)` and `int64_t GetRegisterValue(int32_t)`, with
-  `GetRegisterBits` and `SetRegisterValue` optional: the debugger's register
-  box, Lua's `emu.getregister` and the MCP server's `registers`. And
+  `GetRegisterBits` and `SetRegisterValue` optional: the core's CPU
+  Registers window (miniBox's ready-made one, below), Lua's `emu.getregister`
+  and the MCP server's `registers`. And
   optionally (issue 571) `const char *GetRegisterRoles(void)`, a line each,
   `role register [segment [base]]`: which register is the program counter
   (`pc`), the stack pointer (`sp`) and the flags (`flags`), by the names

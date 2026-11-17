@@ -820,6 +820,7 @@ struct ce_session
 	uintptr_t (*windowRequestBuffer)(int32_t) = nullptr;
 	uintptr_t (*windowRequest)(int32_t) = nullptr;
 	std::string windowAnswer;
+	std::vector<uint32_t> windowPicture;
 	/* The core holds its own frame (issue 610): the caller's function, called
 	 * at each wait; whether the core takes the engine's; whether it waits now;
 	 * and whether the caller said this frame must go on to its end. */
@@ -5720,8 +5721,22 @@ const char *ce_session_window_file(ce_session *s, const char *request, uint64_t 
 	if (s == nullptr || s->windowRequest == nullptr || mount_name == nullptr || host_path == nullptr) return nullptr;
 	s->error.clear();
 	const chimera::HostApi *host = s->host;
+	if (host->wbx_unmount_file == nullptr)
+	{
+		s->error = tr("engine.tool_host_too_old");
+		return nullptr;
+	}
 	chimera::WbxReturn r;
-	if (writable != 0)
+	if (writable == 2)
+	{
+		if (host->wbx_mount_file_path_appending == nullptr || host->wbx_unmount_file == nullptr)
+		{
+			s->error = tr("engine.tool_host_too_old");
+			return nullptr;
+		}
+		host->wbx_mount_file_path_appending(s->obj, mount_name, host_path, &r);
+	}
+	else if (writable != 0)
 	{
 		if (host->wbx_mount_file_path_writable == nullptr)
 		{
@@ -5748,6 +5763,14 @@ const char *ce_session_window_file(ce_session *s, const char *request, uint64_t 
 		return nullptr;
 	}
 	return answer;
+}
+
+const uint32_t *ce_session_window_picture(ce_session *s, uint64_t address, int32_t width, int32_t height)
+{
+	if (s == nullptr || address == 0 || width <= 0 || height <= 0 || width > 8192 || height > 8192 || s->guestDied()) return nullptr;
+	s->windowPicture.resize(static_cast<size_t>(width) * static_cast<size_t>(height));
+	std::memcpy(s->windowPicture.data(), reinterpret_cast<const void *>(static_cast<uintptr_t>(address)), s->windowPicture.size() * sizeof(uint32_t));
+	return s->windowPicture.data();
 }
 
 int32_t ce_session_stops_reported(const ce_session *s)

@@ -40,7 +40,6 @@
 		"window.monitor.stop_at": "Stop ved instruktion",
 		"window.monitor.step": "Trin",
 		"window.monitor.continue": "Fortsæt",
-		"window.no_such": "denne kerne har ikke sådan et vindue",
 		"window.not_settable": "det kan ikke ændres",
 		"window.no_command": "dette vindue har ikke sådan en kommando",
 		"window.monitor.load": "Indlæs...",

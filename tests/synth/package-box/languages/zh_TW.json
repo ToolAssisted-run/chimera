@@ -38,7 +38,6 @@
 		"window.monitor.stop_at": "在指令處停止",
 		"window.monitor.step": "單步",
 		"window.monitor.continue": "繼續",
-		"window.no_such": "此核心沒有這樣的視窗",
 		"window.not_settable": "無法設定該項",
 		"window.no_command": "此視窗沒有這樣的指令",
 		"window.monitor.load": "載入...",

@@ -240,7 +240,9 @@ ECL_EXPORT const char *TraceGetHeader(void) { return "Where: opcode a b c immedi
 static char g_loadError[256];
 ECL_EXPORT const char *GetLoadError(void) { return g_loadError; }
 
+static void add_windows(void); /* the core's own window, below */
 ECL_EXPORT int Init(void) {
+	add_windows();
 	g_loadError[0] = 0;
 	/* A game's own firmware (SuggestSettings answers it, with the game's own
 	 * setting that calls for it): with that setting on, the game does not
@@ -518,151 +520,113 @@ ECL_EXPORT void RemoveMemoryWatch(int32_t kind, int32_t scope, uint64_t address)
 	memory_hook();
 }
 
-/* The core's own window (issue 610): "monitor", whose design is
- * windows/Monitor.qml in the package and whose view model is here. It shows
- * the registers, the instruction running, the first bytes of RAM as a list,
- * and holds the frame at an instruction ("stopAt") until Continue, or for
- * one instruction more with Step. Nothing of it is the machine's: all
- * invisible, in no state, so a load leaves the window as it was. */
-ECL_INVISIBLE static uintptr_t (*g_stopCall)(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t);
+/* The core's own windows (issue 610), through miniBox's kit
+ * (waterbox_windows.h): the four ready-made ones it brings for this core's
+ * exports (Export Save Data, CPU Registers, Trace Logger, Surface Viewer),
+ * and one of its own, "monitor", whose design is windows/Monitor.qml in the
+ * package. It shows the registers, the instruction running and the first
+ * bytes of RAM, holds the frame at an instruction until Step or Continue,
+ * reads a file the person picks and writes the registers into another.
+ * Nothing of it is the machine's: all invisible, in no state, so a load
+ * leaves the window as it was. */
+#define WBX_WINDOWS_IMPLEMENTATION
+#include <waterbox_windows.h>
+
 ECL_INVISIBLE static int64_t g_stopAt = -1;
 ECL_INVISIBLE static int32_t g_holding, g_stepping, g_heldCount;
-ECL_INVISIBLE static char g_windowIn[4096];
-ECL_INVISIBLE static char g_windowOut[8192];
 /* what the last file the person gave the window was: read, its name and
  * size and first line; written, the registers put in it */
 ECL_INVISIBLE static char g_lastFile[256];
-ECL_EXPORT void SetStopCallback(uint64_t fn)
-{
-	g_stopCall = (uintptr_t (*)(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t))(uintptr_t)fn;
-}
 static void held_here(uint32_t pc)
 {
-	if (g_stopCall == 0 || !(g_stepping || (g_stopAt >= 0 && (uint64_t)g_stopAt == pc))) return;
+	if (!(g_stepping || (g_stopAt >= 0 && (uint64_t)g_stopAt == pc))) return;
 	g_stepping = 0;
 	g_holding = 1;
 	g_heldCount++;
 	/* each wait does one thing the window asked; Continue or Step (run
 	 * inside a wait) end the hold, and so does Chimera's word to go on */
-	while (g_holding)
-		if (g_stopCall(0, 0, 0, 0, 0, 0) != 0) g_holding = g_stepping = 0;
+	if (wbx_windows_hold()) g_stepping = 0;
+	g_holding = 0;
 }
-/* the value of a field of the request: a string's text or a number's digits
- * (the key with its colon: "op":"file" holds "file" as a value too) */
-static int request_field(const char *req, const char *key, char *out, int cap)
+static int monitor_describe(wbx_json *o)
 {
-	char pat[64];
-	snprintf(pat, sizeof pat, "\"%s\":", key);
-	const char *p = strstr(req, pat);
-	if (!p) return 0;
-	p += strlen(pat);
-	while (*p == ' ' || *p == ':') p++;
-	int n = 0;
-	if (*p == '"')
-	{
-		for (p++; *p && *p != '"' && n < cap - 1; p++) out[n++] = *p;
-	}
-	else
-		for (; *p && *p != ',' && *p != '}' && *p != ']' && *p != ' ' && n < cap - 1; p++) out[n++] = *p;
-	out[n] = 0;
-	return 1;
+	wbx_json_raw(o, "\"properties\":[{\"name\":\"pc\"},{\"name\":\"registers\"},{\"name\":\"held\"},{\"name\":\"heldCount\"},"
+		"{\"name\":\"stopAt\",\"writable\":true},{\"name\":\"lastFile\"}],"
+		"\"commands\":[{\"name\":\"continue\"},{\"name\":\"step\"}],"
+		"\"lists\":[{\"name\":\"ram\",\"columns\":[\"address\",\"value\"]}]");
+	return 0;
 }
-ECL_EXPORT uintptr_t WindowRequestBuffer(int32_t size) { return size >= 0 && size < (int32_t)sizeof g_windowIn ? (uintptr_t)g_windowIn : 0; }
-ECL_EXPORT uintptr_t WindowRequest(int32_t length)
+static int monitor_get(wbx_json *o)
 {
-	if (length < 0 || length >= (int32_t)sizeof g_windowIn) return 0;
-	g_windowIn[length] = 0;
-	char op[16], window[32], name[32], value[32], command[32];
-	if (!request_field(g_windowIn, "op", op, sizeof op)) return 0;
-	request_field(g_windowIn, "window", window, sizeof window);
-	if (strcmp(window, "monitor") != 0)
+	const int32_t *r = g_synth ? synth_get_registers(g_synth) : 0;
+	const uint8_t *ram = g_synth ? synth_get_ram(g_synth) : 0;
+	char regs[160];
+	snprintf(regs, sizeof regs, "R0=%d R1=%d R2=%d R3=%d R4=%d R5=%d R6=%d R7=%d", r ? r[0] : 0, r ? r[1] : 0, r ? r[2] : 0,
+		r ? r[3] : 0, r ? r[4] : 0, r ? r[5] : 0, r ? r[6] : 0, r ? r[7] : 0);
+	wbx_json_raw(o, "\"properties\":{\"pc\":");
+	wbx_json_int(o, (int64_t)g_accessPc);
+	wbx_json_raw(o, ",\"registers\":");
+	wbx_json_str(o, regs);
+	wbx_json_raw(o, g_holding ? ",\"held\":true" : ",\"held\":false");
+	wbx_json_raw(o, ",\"heldCount\":");
+	wbx_json_int(o, g_heldCount);
+	wbx_json_raw(o, ",\"stopAt\":");
+	wbx_json_int(o, g_stopAt);
+	wbx_json_raw(o, ",\"lastFile\":");
+	wbx_json_str(o, g_lastFile);
+	wbx_json_raw(o, "},\"lists\":{\"ram\":[");
+	for (int i = 0; i < 16 && ram; i++)
 	{
-		snprintf(g_windowOut, sizeof g_windowOut, "{\"error\":\"window.no_such\"}");
-		return (uintptr_t)g_windowOut;
+		char row[32];
+		snprintf(row, sizeof row, "%s[\"%02X\",\"%02X\"]", i ? "," : "", i, ram[i]);
+		wbx_json_raw(o, row);
 	}
-	if (!strcmp(op, "describe"))
-		snprintf(g_windowOut, sizeof g_windowOut,
-			"{\"properties\":[{\"name\":\"pc\"},{\"name\":\"registers\"},{\"name\":\"held\"},{\"name\":\"heldCount\"},"
-			"{\"name\":\"stopAt\",\"writable\":true},{\"name\":\"lastFile\"}],"
-			"\"commands\":[{\"name\":\"continue\"},{\"name\":\"step\"}],"
-			"\"lists\":[{\"name\":\"ram\",\"columns\":[\"address\",\"value\"]}]}");
-	else if (!strcmp(op, "get"))
+	wbx_json_raw(o, "]}");
+	return 0;
+}
+static int monitor_set(const char *name, const char *value, wbx_json *o)
+{
+	(void)o;
+	if (strcmp(name, "stopAt") != 0) { wbx_window_error("window.not_settable"); return -1; }
+	g_stopAt = strtoll(value, 0, 10);
+	return 0;
+}
+static int monitor_run(const char *command, const char *args, wbx_json *o)
+{
+	(void)args; (void)o;
+	if (!strcmp(command, "continue")) wbx_windows_release();
+	else if (!strcmp(command, "step")) g_stepping = 1, wbx_windows_release();
+	else { wbx_window_error("window.no_command"); return -1; }
+	return 0;
+}
+/* a file the person picked in Chimera's dialog, open here under the name
+ * given, for this request only: the core knows no path */
+static int monitor_file(const char *purpose, const char *mode, const char *file, const char *own, wbx_json *o)
+{
+	(void)purpose; (void)o;
+	FILE *f = fopen(file, strcmp(mode, "write") ? "rb" : "wb");
+	if (!f) { wbx_window_error("window.file_unopened"); return -1; }
+	if (!strcmp(mode, "write"))
 	{
 		const int32_t *r = g_synth ? synth_get_registers(g_synth) : 0;
-		const uint8_t *ram = g_synth ? synth_get_ram(g_synth) : 0;
-		int n = snprintf(g_windowOut, sizeof g_windowOut,
-			"{\"properties\":{\"pc\":%u,\"registers\":\"R0=%d R1=%d R2=%d R3=%d R4=%d R5=%d R6=%d R7=%d\",\"held\":%s,\"heldCount\":%d,"
-			"\"stopAt\":%lld,\"lastFile\":\"%s\"},\"lists\":{\"ram\":[",
-			(unsigned)g_accessPc, r ? r[0] : 0, r ? r[1] : 0, r ? r[2] : 0, r ? r[3] : 0, r ? r[4] : 0, r ? r[5] : 0,
-			r ? r[6] : 0, r ? r[7] : 0, g_holding ? "true" : "false", g_heldCount, (long long)g_stopAt, g_lastFile);
-		for (int i = 0; i < 16 && ram; i++)
-			n += snprintf(g_windowOut + n, sizeof g_windowOut - n, "%s[\"%02X\",\"%02X\"]", i ? "," : "", i, ram[i]);
-		snprintf(g_windowOut + n, sizeof g_windowOut - n, "]}}");
-	}
-	else if (!strcmp(op, "set"))
-	{
-		if (!request_field(g_windowIn, "name", name, sizeof name) || strcmp(name, "stopAt") != 0 ||
-			!request_field(g_windowIn, "value", value, sizeof value))
-			snprintf(g_windowOut, sizeof g_windowOut, "{\"error\":\"window.not_settable\"}");
-		else
-		{
-			g_stopAt = strtoll(value, 0, 10);
-			snprintf(g_windowOut, sizeof g_windowOut, "{}");
-		}
-	}
-	else if (!strcmp(op, "run"))
-	{
-		request_field(g_windowIn, "command", command, sizeof command);
-		if (!strcmp(command, "continue"))
-			g_holding = 0;
-		else if (!strcmp(command, "step"))
-			g_holding = 0, g_stepping = 1;
-		else
-		{
-			snprintf(g_windowOut, sizeof g_windowOut, "{\"error\":\"window.no_command\"}");
-			return (uintptr_t)g_windowOut;
-		}
-		snprintf(g_windowOut, sizeof g_windowOut, "{}");
-	}
-	else if (!strcmp(op, "file"))
-	{
-		/* a file the person picked in Chimera's dialog, open here under the
-		 * name given, for this request only: the core knows no path */
-		char mode[8], file[64], own[96];
-		request_field(g_windowIn, "mode", mode, sizeof mode);
-		request_field(g_windowIn, "file", file, sizeof file);
-		request_field(g_windowIn, "name", own, sizeof own);
-		FILE *f = fopen(file, strcmp(mode, "write") ? "rb" : "wb");
-		if (!f)
-		{
-			snprintf(g_windowOut, sizeof g_windowOut, "{\"error\":\"window.file_unopened\"}");
-			return (uintptr_t)g_windowOut;
-		}
-		if (!strcmp(mode, "write"))
-		{
-			const int32_t *r = g_synth ? synth_get_registers(g_synth) : 0;
-			fprintf(f, "PC %u\n", (unsigned)g_accessPc);
-			for (int i = 0; i < 8; i++) fprintf(f, "R%d %d\n", i, r ? r[i] : 0);
-			snprintf(g_lastFile, sizeof g_lastFile, "wrote %s", own);
-		}
-		else
-		{
-			/* its first line (kept fit for JSON) and its size */
-			char line[64] = {0};
-			if (fgets(line, sizeof line, f)) line[strcspn(line, "\r\n")] = 0;
-			for (char *p = line; *p; p++)
-				if (*p == '"' || *p == '\\' || (unsigned char)*p < 32) *p = '_';
-			fseek(f, 0, SEEK_END);
-			const long size = ftell(f);
-			snprintf(g_lastFile, sizeof g_lastFile, "read %s: %ld bytes, %s", own, size, line);
-		}
-		fclose(f);
-		snprintf(g_windowOut, sizeof g_windowOut, "{}");
+		fprintf(f, "PC %u\n", (unsigned)g_accessPc);
+		for (int i = 0; i < 8; i++) fprintf(f, "R%d %d\n", i, r ? r[i] : 0);
+		snprintf(g_lastFile, sizeof g_lastFile, "wrote %s", own);
 	}
 	else
-		snprintf(g_windowOut, sizeof g_windowOut, "{}"); /* opened, closed: nothing to do */
-	return (uintptr_t)g_windowOut;
+	{
+		/* its first line and its size */
+		char line[64] = {0};
+		if (fgets(line, sizeof line, f)) line[strcspn(line, "\r\n")] = 0;
+		fseek(f, 0, SEEK_END);
+		const long size = ftell(f);
+		snprintf(g_lastFile, sizeof g_lastFile, "read %s: %ld bytes, %s", own, size, line);
+	}
+	fclose(f);
+	return 0;
 }
+static const wbx_window g_monitor = {"monitor", monitor_describe, monitor_get, monitor_set, monitor_run, monitor_file};
+static void add_windows(void) { wbx_windows_add(&g_monitor); }
 
 /* An analog control's value, set before each frame. The synthetic game reads
  * none, so the values are only kept: the export is here so that a package

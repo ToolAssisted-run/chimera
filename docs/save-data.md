@@ -10,11 +10,12 @@ A core that has save data (memory card files, a hard disk image, SRAM the
 machine writes) keeps it **inside the guest machine**, in ordinary guest
 memory. The frontend never touches it, never writes it to disc on its own,
 and never learns what it means. When the user wants their progress out, they
-pick `Emulator > Export Save Data...`, which is enabled whenever the loaded
-core exposes the capability - no change detection, no automation, no timer:
-the user knows when their progress is worth exporting. The export is the
-core's own enumeration of `(relative path, bytes)`, written by the frontend
-as a zip (or, for a single file, as that file). Taking the exported files
+pick `Emulator > Export Save Data...`, the core's own window (miniBox's
+ready-made one, issue 610), there whenever the core exposes the capability -
+no change detection, no automation, no timer: the user knows when their
+progress is worth exporting. The export is the core's own enumeration of
+`(relative path, bytes)`, written by the core into the file the user picks
+in Chimera's dialog, as a zip (or, for a single file, as that file). Taking the exported files
 back in happens through game inputs - mounted, hash-bound files the movie
 header cites - so a movie's starting save data is reproducible by hash,
 exactly like its rom and firmware.
@@ -116,21 +117,23 @@ materialized whole on either side of the boundary.
 which is how gates compare an export against goldens and against the native
 reference build.
 
-## The frontend
+## The export: the core's own window (2026-11-17)
 
-One menu item, `Emulator > Export Save Data...` (`Game` for a game core),
-there when the running core keeps save data. On click:
+Chimera knows no core tool (owner, 2026-11-17, issue 610), so Export Save
+Data is no longer Chimera's menu item: it is the core's own window, miniBox's
+ready-made `kit.savedata` (`waterbox_windows.h`), offered for every core that
+has the exports below and listed in the Emulator menu (`Game` for a game
+core) as `Export Save Data...`. It shows the files the machine holds now;
+Export... asks Chimera's own file dialog for the file to write (one file is
+suggested under its own name, more as `savedata.zip`), and the core writes it
+there itself: one file as it is, more as a zip of them stored as they are -
+the same as Chimera's own export wrote, so a project's save data slot takes
+it back. Chimera never sees a byte of it; the core never sees a path. The
+earlier Chimera-side export (issue 499's names after the game and the time,
+issue 500's Paths "Save data" folder) went with it.
 
-- zero files: a plain message, nothing written;
-- one file: a save dialog for that file, named the game, the date and time
-  and the core's own name for it ("Pokemon Snap (USA) 2026-11-05 07.10.00
-  save.flash"), so the ending the core reads it by stays (issue 499);
-  it opens in Config > Paths' Save data folder (SaveData), in a folder named
-  for the core, made then (owner, 2026-11-05, issue 500);
-- several: a save dialog for a `.zip`, entries written streamed.
-
-The frontend never parses a byte of it. There is no import UI here and none
-is planned: files go back in as game inputs.
+There is no import UI here and none is planned: files go back in as game
+inputs.
 
 ## Taking it back in (BUILT, 2026-08-28)
 

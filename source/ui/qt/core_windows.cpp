@@ -204,7 +204,8 @@ void CoreFiles::choose(const QString &purpose, const QString &mode, const QStrin
 {
 	/* a suggested name is a name, never a place */
 	const QString own = QFileInfo(QString(name).replace(QLatin1Char('\\'), QLatin1Char('/'))).fileName();
-	Q_EMIT wanted(purpose, mode == QLatin1String("write") ? QStringLiteral("write") : QStringLiteral("read"), title, nameFilters, own);
+	const QString as = mode == QLatin1String("write") || mode == QLatin1String("log") ? mode : QStringLiteral("read");
+	Q_EMIT wanted(purpose, as, title, nameFilters, own);
 }
 
 CoreWindows::CoreWindows(vm::SessionViewModel &session, QObject *parent) : QObject(parent), session_(session)
@@ -241,7 +242,10 @@ void CoreWindows::fileChosen(const QString &id, const QString &purpose, const QS
 {
 	const auto it = open_.find(id);
 	if (it == open_.end() || !it->vm) return;
-	it->vm->giveFile(purpose.toStdString(), mode == QLatin1String("write"), path.toStdString());
+	if (mode == QLatin1String("log")) it->vm->keepFile(purpose.toStdString(), path.toStdString());
+	else
+		it->vm->giveFile(purpose.toStdString(), mode == QLatin1String("write") ? vm::CoreWindowViewModel::Write : vm::CoreWindowViewModel::Read,
+			path.toStdString());
 	if (it->files) Q_EMIT it->files->chosen(purpose, QFileInfo(path).fileName());
 }
 
@@ -358,6 +362,9 @@ QString CoreWindows::open(const QString &id)
 	o.files = new CoreFiles(id, this);
 	connect(o.files, &CoreFiles::wanted, this, [this, id](const QString &purpose, const QString &mode, const QString &title,
 		const QStringList &nameFilters, const QString &name) { Q_EMIT fileWanted(id, purpose, mode, title, nameFilters, name); });
+	connect(o.files, &CoreFiles::released, this, [this, id](const QString &purpose) {
+		if (const auto it = open_.find(id); it != open_.end() && it->vm) it->vm->releaseFile(purpose.toStdString());
+	});
 	o.context = new QQmlContext(engine_->rootContext(), this);
 	o.context->setContextProperty(QStringLiteral("core"), o.qml);
 	o.context->setContextProperty(QStringLiteral("texts"), texts_);

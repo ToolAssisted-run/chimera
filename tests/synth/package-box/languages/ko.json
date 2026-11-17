@@ -38,7 +38,6 @@
 		"window.monitor.stop_at": "명령어에서 멈춤",
 		"window.monitor.step": "한 단계",
 		"window.monitor.continue": "계속",
-		"window.no_such": "이 코어에는 그런 창이 없습니다",
 		"window.not_settable": "그것은 설정할 수 없습니다",
 		"window.no_command": "이 창에는 그런 명령이 없습니다",
 		"window.monitor.load": "불러오기...",

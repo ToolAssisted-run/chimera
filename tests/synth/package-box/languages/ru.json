@@ -42,7 +42,6 @@
 		"window.monitor.stop_at": "Остановиться на инструкции",
 		"window.monitor.step": "Шаг",
 		"window.monitor.continue": "Продолжить",
-		"window.no_such": "у этого ядра нет такого окна",
 		"window.not_settable": "это нельзя изменить",
 		"window.no_command": "у этого окна нет такой команды",
 		"window.monitor.load": "Загрузить...",

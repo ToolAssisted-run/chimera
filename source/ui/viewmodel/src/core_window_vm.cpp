@@ -57,8 +57,9 @@ std::string CoreWindowViewModel::request(const std::string &op, const std::strin
 std::string CoreWindowViewModel::getRequest() const { return request("get", ""); }
 
 CoreWindowViewModel::CoreWindowViewModel(std::string id, const std::string &description, Dispatcher &dispatcher, Send send,
-	SendFile sendFile)
-	: ViewModel("coreWindow." + id, dispatcher), id_(std::move(id)), send_(std::move(send)), sendFile_(std::move(sendFile))
+	SendFile sendFile, KeepFile keepFile)
+	: ViewModel("coreWindow." + id, dispatcher), id_(std::move(id)), send_(std::move(send)), sendFile_(std::move(sendFile)),
+	  keepFile_(std::move(keepFile))
 {
 	expose("coreError", "what the core said of the last change or command it refused, \"\" for none", coreError);
 	json::Json d;
@@ -107,6 +108,15 @@ CoreWindowViewModel::CoreWindowViewModel(std::string id, const std::string &desc
 				return {};
 			});
 		}
+	if (const json::Json *ps = d.find("pictures"))
+		for (const json::Json &p : ps->items)
+		{
+			const json::Json *n = p.find("name");
+			if (n == nullptr || n->text.empty()) continue;
+			Pic &pic = pictures_.emplace_back();
+			pic.name = n->text;
+			picture(pic.name, p.find("help") != nullptr ? p.find("help")->text : std::string(), pic.picture, pic.changed);
+		}
 	if (const json::Json *ls = d.find("lists"))
 		for (const json::Json &l : ls->items)
 		{
@@ -120,15 +130,48 @@ CoreWindowViewModel::CoreWindowViewModel(std::string id, const std::string &desc
 		}
 }
 
-void CoreWindowViewModel::giveFile(const std::string &purpose, bool write, const std::string &path)
+namespace {
+std::string ownName(const std::string &path)
 {
-	if (!sendFile_) return;
 	/* its own name only: what is after the last separator of either kind */
 	const size_t cut = path.find_last_of("/\\");
-	const std::string name = cut == std::string::npos ? path : path.substr(cut + 1);
-	sendFile_(request("file", ",\"purpose\":" + json::quote(purpose) + ",\"mode\":" + json::quote(write ? "write" : "read") +
-				  ",\"file\":" + json::quote(kFileName) + ",\"name\":" + json::quote(name)),
-		path, write, [this](const std::string &answer) { answered(answer); });
+	return cut == std::string::npos ? path : path.substr(cut + 1);
+}
+const char *modeName(CoreWindowViewModel::FileMode mode)
+{
+	return mode == CoreWindowViewModel::Write ? "write" : mode == CoreWindowViewModel::Append ? "append" : "read";
+}
+} // namespace
+
+std::string CoreWindowViewModel::fileRequest(const std::string &purpose, FileMode mode, const std::string &path) const
+{
+	return request("file", ",\"purpose\":" + json::quote(purpose) + ",\"mode\":" + json::quote(modeName(mode)) +
+		",\"file\":" + json::quote(kFileName) + ",\"name\":" + json::quote(ownName(path)));
+}
+
+void CoreWindowViewModel::giveFile(const std::string &purpose, FileMode mode, const std::string &path)
+{
+	if (!sendFile_) return;
+	sendFile_(fileRequest(purpose, mode, path), path, mode, [this](const std::string &answer) { answered(answer); });
+}
+
+void CoreWindowViewModel::keepFile(const std::string &purpose, const std::string &path)
+{
+	/* emptied and given now; the session gives it again after every frame */
+	giveFile(purpose, Write, path);
+	if (keepFile_) keepFile_(purpose, path, ownName(path));
+}
+
+void CoreWindowViewModel::releaseFile(const std::string &purpose)
+{
+	if (keepFile_) keepFile_(purpose, std::string(), std::string());
+}
+
+std::vector<std::string> CoreWindowViewModel::pictureNames() const
+{
+	std::vector<std::string> out;
+	for (const Pic &p : pictures_) out.push_back(p.name);
+	return out;
 }
 
 void CoreWindowViewModel::answered(const std::string &answer)
@@ -144,8 +187,14 @@ void CoreWindowViewModel::answered(const std::string &answer)
 	coreError.set(e != nullptr ? (e->text.empty() ? tr("core_window.no_answer") : e->text) : std::string());
 }
 
-void CoreWindowViewModel::show(const std::string &answer)
+void CoreWindowViewModel::show(const std::string &answer, const std::map<std::string, Pixels> &pictures)
 {
+	for (Pic &p : pictures_)
+		if (const auto it = pictures.find(p.name); it != pictures.end() && !it->second.pixels.empty())
+		{
+			p.picture.publish(it->second.pixels.data(), it->second.width, it->second.height, 0, 0);
+			p.changed.emit();
+		}
 	json::Json a;
 	std::string err;
 	if (answer.empty() || !json::parse(answer, a, err) || a.kind != json::Json::Kind::Object) return;
@@ -164,15 +213,31 @@ void CoreWindowViewModel::show(const std::string &answer)
 		for (auto &[name, list] : lists_)
 			if (const json::Json *rowsNow = ls->find(name))
 			{
-				const int64_t before = list.rowCount();
-				list.cells.clear();
-				for (const json::Json &r : rowsNow->items)
-				{
+				auto rowOf = [](const json::Json &r) {
 					std::vector<Value> row;
 					for (const json::Json &c : r.items) row.push_back(valueOf(c));
-					list.cells.push_back(std::move(row));
+					return row;
+				};
+				const int64_t before = list.rowCount();
+				if (rowsNow->kind == json::Json::Kind::Object)
+				{
+					/* only the rows new since the last answer, added at the end,
+					 * the oldest let go past "keep" (a trace's lines) */
+					const json::Json *add = rowsNow->find("append");
+					const json::Json *keep = rowsNow->find("keep");
+					for (const json::Json &r : add != nullptr ? add->items : std::vector<json::Json>{}) list.cells.push_back(rowOf(r));
+					const size_t most = keep != nullptr && keep->number() >= 1 ? static_cast<size_t>(keep->number()) : list.cells.size();
+					const bool trimmed = list.cells.size() > most;
+					if (trimmed) list.cells.erase(list.cells.begin(), list.cells.begin() + static_cast<std::ptrdiff_t>(list.cells.size() - most));
+					if (trimmed) list.refreshed(before);
+					else if (list.rowCount() > before) list.appended.emit(before, list.rowCount() - 1);
 				}
-				list.refreshed(before);
+				else
+				{
+					list.cells.clear();
+					for (const json::Json &r : rowsNow->items) list.cells.push_back(rowOf(r));
+					list.refreshed(before);
+				}
 			}
 }
 

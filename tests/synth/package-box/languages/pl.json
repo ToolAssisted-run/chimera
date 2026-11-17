@@ -42,7 +42,6 @@
 		"window.monitor.stop_at": "Zatrzymaj na instrukcji",
 		"window.monitor.step": "Krok",
 		"window.monitor.continue": "Kontynuuj",
-		"window.no_such": "ten rdzeń nie ma takiego okna",
 		"window.not_settable": "tego nie można ustawić",
 		"window.no_command": "to okno nie ma takiego polecenia",
 		"window.monitor.load": "Wczytaj...",

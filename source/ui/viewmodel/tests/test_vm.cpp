@@ -71,7 +71,7 @@
 #include "chimera/vm/config_files_vm.hpp"
 #include "chimera/vm/data_folder_vm.hpp"
 #include "chimera/vm/precompiled_vm.hpp"
-#include "chimera/vm/trace_logger_vm.hpp"
+#include "chimera/vm/script_vm.hpp"
 #include "chimera/vm/idle_eye.hpp"
 #include "chimera/vm/encoder_vm.hpp"
 #include "chimera/vm/host_input_vm.hpp"
@@ -84,7 +84,6 @@
 #endif
 #include "chimera/vm/nut_muxer.hpp"
 #include "chimera/vm/subprocess.hpp"
-#include "chimera/vm/surface_viewer_vm.hpp"
 #include "chimera/vm/macro_tool_vm.hpp"
 #include "chimera/vm/ram_search_vm.hpp"
 #include "chimera/vm/ram_watch_vm.hpp"
@@ -1316,8 +1315,8 @@ void pathsConfig()
 	CHECK(folder == (dir / "runs").string() && !isDefault);
 	/* Chimera's global list, in its order, the base first and temporary files last */
 	fromValue(rows->cell(0, 1), name);
-	CHECK(name == "Base" && rows->rowCount() == 15);
-	fromValue(rows->cell(14, 1), name);
+	CHECK(name == "Base" && rows->rowCount() == 14);
+	fromValue(rows->cell(13, 1), name);
 	CHECK(name == "Temp Files" && paths.resolve("Temp Files") == (dir / "program").string());
 	/* Chimera's words in a path: the program's folder, the last game's, and anything else is the program's folder */
 	CHECK(paths.run("setPath", {std::string("Lua"), std::string("%exe%/Scripts")}, error).has_value() &&
@@ -1337,7 +1336,7 @@ void pathsConfig()
 	CHECK(paths.base.get().empty());
 	/* a system's own folders, made when a game for it is opened: under its base, which is under the global one */
 	paths.useSystem("NES");
-	CHECK(paths.systems.get() == "[\"NES\"]" && rows->rowCount() == 19);
+	CHECK(paths.systems.get() == "[\"NES\"]" && rows->rowCount() == 18);
 	CHECK(paths.resolveFor("NES", "Screenshots") == (dir / "program" / "NES" / "Screenshots").string() &&
 		paths.resolveFor("NES", "ROM") == (dir / "program" / "NES").string() &&
 		paths.resolveFor("NES", "Savestates") == (dir / "program" / "NES" / "State").string());
@@ -1364,9 +1363,6 @@ void pathsConfig()
 		got == (dir / "program" / "Reports").string() && fs::is_directory(dir / "program" / "Reports"));
 	/* ROMs: where the last game came from, while it is there and asked for */
 	paths.lastRomFolder.set((dir / "program" / "Lua").string());
-	/* Export Save Data's: Save data, a folder the core's inside it, its name made fit for a folder, both made (issue 500) */
-	CHECK(fromValue(paths.run("dialogFolder", {std::string("Save data"), true, std::string("A/B: C?. ")}, error).value_or(Value()), got) &&
-		got == (dir / "program" / "SaveData" / "A_B_ C_").string() && fs::is_directory(got));
 	CHECK(fromValue(paths.run("dialogFolder", {std::string("ROM")}, error).value_or(Value()), got) && got == (dir / "program" / "Lua").string());
 	paths.recentForRoms.set(false);
 	CHECK(fromValue(paths.run("dialogFolder", {std::string("ROM")}, error).value_or(Value()), got) && got == (dir / "program").string());
@@ -2486,56 +2482,25 @@ bool backupAndHistory(const char *package, const char *rom)
 	return true;
 }
 
-/* Chimera's Trace Logger and the Debugger's registers, with the synthetic
- * core's trace (a line an instruction: what ran, a tab, the registers) and
- * its eight registers and frame counter */
-bool traceAndRegisters(const char *package, const char *rom)
+/* The registers Lua's emu library reads and sets (a core's CPU Registers
+ * window is its own now, issue 610): the synthetic core's eight registers,
+ * frame counter and program counter */
+bool scriptRegisters(const char *package, const char *rom)
 {
-	namespace fs = std::filesystem;
-	const fs::path dir = fs::temp_directory_path() / ("chimera-test-trace-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
-	fs::create_directories(dir);
 	ManualDispatcher d;
 	InputLog inputs;
 	SessionViewModel session(d, inputs);
 	session.turboSeek.set(true);
-	TraceLoggerViewModel trace(d, session);
 	RegistersViewModel debugger(d, session);
 	std::string error;
 	openGame(session, package, std::string(rom), error);
-	CHECK(d.until([&] { return session.isOpen.get() && session.hasTrace.get() && session.hasRegisters.get(); }, 60));
-	CHECK(session.traceHeader.get() == "Where: opcode a b c immediate\tthe registers");
+	CHECK(d.until([&] { return session.isOpen.get() && session.hasRegisters.get(); }, 60));
 	auto advance = [&](int64_t n) {
 		const int64_t to = session.frame.get() + n;
 		for (int64_t i = 0; i < n; i++) session.run("frameAdvance", {}, error);
 		return d.until([&] { return session.frame.get() == to; }, 20) && (d.until([] { return false; }, 0.1), true);
 	};
-	/* nothing traced while nobody logs */
-	CHECK(advance(2) && trace.lines().empty());
-	trace.logging.set(true);
-	CHECK(trace.run("logToFile", {(dir / "trace.log").string()}, error).has_value());
-	CHECK(advance(1));
-	CHECK(d.until([&] { return !trace.lines().empty(); }, 10));
-	const size_t oneFrame = trace.lines().size();
-	std::printf("trace: %zu lines a frame; first: %s | %s\n", oneFrame, trace.lines().front().disassembly.c_str(),
-		trace.lines().front().registers.c_str());
-	CHECK(oneFrame > 10 && std::regex_match(trace.lines().front().disassembly, std::regex("[0-9A-F]{4}: [0-9A-F]{2} \\d \\d \\d [0-9A-F]{8}")));
-	CHECK(trace.lines().front().registers.rfind("R0:", 0) == 0 && trace.lines().front().registers.find("R7:") != std::string::npos);
-	CHECK(trace.linesToFile.get() == static_cast<int64_t>(oneFrame));
-	/* a bounded tail: the latest kept */
-	trace.capacity.set(100);
-	CHECK(advance(1) && d.until([&] { return trace.lines().size() == 100; }, 10));
-	CHECK(trace.linesToFile.get() > 100);
-	CHECK(trace.run("stopFile", {}, error).has_value() && trace.file.get().empty());
-	{
-		std::ifstream in(dir / "trace.log");
-		int64_t n = 0;
-		for (std::string line; std::getline(in, line);) n++;
-		CHECK(n == trace.linesToFile.get());
-	}
-	/* stopped: the core traces no more */
-	trace.logging.set(false);
-	CHECK(trace.run("clear", {}, error).has_value() && trace.lines().empty());
-	CHECK(advance(2) && trace.lines().empty());
+	CHECK(advance(3));
 	/* the registers: read, and R0 set by hand (hex as text, or a number) */
 	CHECK(debugger.run("refresh", {}, error) == Value(int64_t{10}));
 	CHECK(debugger.registers()[0].name == "R0" && debugger.registers()[8].name == "Frame" && debugger.registers()[8].value == session.frame.get());
@@ -2547,27 +2512,8 @@ bool traceAndRegisters(const char *package, const char *rom)
 	CHECK(fromValue(debugger.rowLists()[0].model->cell(0, 2), hex) && hex == "00000007");
 	CHECK(!debugger.run("setRegister", {int64_t{0}, std::string("seven")}, error) && error == "seven is not a number");
 	CHECK(!debugger.run("setRegister", {int64_t{20}, int64_t{1}}, error));
-	/* the Surface Viewer: the synthetic core's RAM drawn as 64x64 greys */
-	{
-		SurfaceViewerViewModel viewer(d, session);
-		CHECK(session.surfaces.get() == R"([{"name": "RAM", "width": 64, "height": 64}])");
-		viewer.watching.set(true);
-		CHECK(viewer.status.get() == "RAM - 64x64");
-		Picture::Frame f;
-		CHECK(viewer.surface.takeIfNewer(UINT64_MAX, f) && f.width == 64 && f.height == 64);
-		const std::vector<uint8_t> ram = session.readDomain("RAM");
-		bool same = ram.size() >= 4096 && f.pixels.size() == 4096;
-		for (size_t i = 0; same && i < 4096; i++) same = f.pixels[i] == (0xFF000000u | ram[i] * 0x010101u);
-		CHECK(same);
-		/* drawn again as the machine moves */
-		const uint64_t was = f.serial;
-		CHECK(advance(1) && viewer.surface.takeIfNewer(was, f));
-		viewer.picked.set(3);
-		CHECK(viewer.status.get() == "No surface 3");
-	}
 	session.run("close", {}, error);
 	CHECK(d.until([&] { return !session.isOpen.get(); }, 20));
-	removeTree(dir);
 	return true;
 }
 
@@ -4321,8 +4267,8 @@ bool helpMenu(const char *package, const char *rom)
 }
 
 /* Chimera's Emulator menu (Game for a game core) and what it offers for the
- * core open: a game's own timer over the picture, the save data written out
- * (one file as it is, more in a zip) */
+ * core open: a game's own timer over the picture (the save data written out
+ * is the core's own window now, issue 610) */
 bool coreMenu(const char *package, const char *rom, const char *slotsPackage, const char *gamePackage)
 {
 	namespace fs = std::filesystem;
@@ -4335,19 +4281,7 @@ bool coreMenu(const char *package, const char *rom, const char *slotsPackage, co
 	std::string error;
 	openGame(session, package, std::string(rom), error);
 	CHECK(d.until([&] { return session.isOpen.get(); }, 60));
-	CHECK(session.hasSaveData.get() && session.hasGameTimer.get() && !session.isGameCore.get());
-	/* the save files, and written out */
-	std::string names;
-	CHECK(fromValue(session.run("saveDataFiles", {}, error).value_or(Value()), names) && names == "card/slot1.sav\nnotes.txt");
-	const fs::path zip = dir / "save.zip";
-	CHECK(session.run("exportSaveData", {zip.string()}, error) == Value(int64_t{2}));
-	const std::string bytes = readFile(zip);
-	CHECK(bytes.size() > 22 && bytes.compare(0, 4, std::string("PK\x03\x04", 4)) == 0);
-	CHECK(bytes.find("card/slot1.sav") != std::string::npos && bytes.find("gridWalker was here\n") != std::string::npos);
-	/* the end record says two files */
-	CHECK(bytes.size() > 22 && static_cast<uint8_t>(bytes[bytes.size() - 22 + 8]) == 2 && static_cast<uint8_t>(bytes[bytes.size() - 22 + 10]) == 2 &&
-		bytes.compare(bytes.size() - 22, 4, std::string("PK\x05\x06", 4)) == 0);
-	CHECK(session.status.get() == "Save data written: " + zip.string());
+	CHECK(session.hasGameTimer.get() && !session.isGameCore.get());
 	/* the game's own timer, when shown */
 	CHECK(session.gameTimeText.get().empty());
 	session.showGameTime.set(true);
@@ -9797,15 +9731,10 @@ bool luaParity(const char *package, const char *rom)
 		std::string labels;
 		CHECK(fromValue(session.run("controlLabels", {}, error).value_or(Value()), labels) && labels == "P1 A\tJump\n");
 	}
-	/* a machine open: the tools that need one, the debugger's and the trace
-	 * logger's as the core has registers and a trace */
+	/* a machine open: the tools that need one (a core's own tools are its
+	 * windows, not Chimera's: no trace logger, debugger or surface viewer, issue 610) */
 	{
-		std::string expected = "tastudio luaconsole ramwatch ramsearch hexeditor ";
-		if (session.hasTrace.get()) expected += "tracelogger ";
-		if (session.hasRegisters.get()) expected += "genericdebugger ";
-		expected += "macroinputtool ";
-		if (session.surfaces.get() != "[]") expected += "surfaceviewer ";
-		expected += "logwindow ";
+		const std::string expected = "tastudio luaconsole ramwatch ramsearch hexeditor macroinputtool logwindow ";
 		CHECK(lua1("local t, out = client.getavailabletools(), '' for i = 0, #t do out = out .. t[i] .. ' ' end return out") == "[\"" + expected + "\"]");
 		CHECK(lua1("client.gettool('TAStudio') == chimera.pianoRoll") == "[true]" && tools.showAsked.get() == "tastudio");
 	}
@@ -11751,7 +11680,8 @@ bool coreWindows(const char *package, const char *rom)
 	{
 		json::Json list;
 		std::string why;
-		CHECK(json::parse(session.coreWindows.get(), list, why) && list.items.size() == 1);
+		/* its own, then miniBox's ready-made ones for what it exports */
+		CHECK(json::parse(session.coreWindows.get(), list, why) && list.items.size() == 5);
 		const json::Json *id = list.items.empty() ? nullptr : list.items[0].find("id");
 		const json::Json *menu = list.items.empty() ? nullptr : list.items[0].find("menu");
 		const json::Json *qml = list.items.empty() ? nullptr : list.items[0].find("qml");
@@ -11792,6 +11722,99 @@ bool coreWindows(const char *package, const char *rom)
 	session.run("frameAdvance", {}, error);
 	CHECK(d.until([&] { return session.frame.get() == 1 && text("registers") != atStart; }, 20));
 	CHECK(!session.held.get());
+	/* miniBox's ready-made windows, the core's now (Chimera has none of its
+	 * own): built on the exports the synthetic core has */
+	{
+		auto pump = [&](int frames) {
+			const int64_t to = session.frame.get() + frames;
+			for (int i = 0; i < frames; i++) session.run("frameAdvance", {}, error);
+			return d.until([&] { return session.frame.get() == to; }, 20);
+		};
+		auto cellText = [](const RowModel &m, int64_t row, int32_t column) {
+			const Value v = m.cell(row, column);
+			const std::string *t = std::get_if<std::string>(&v);
+			return t != nullptr ? *t : std::string();
+		};
+		/* CPU Registers: the registers as a list, one set by name in hexadecimal */
+		auto regs = session.openCoreWindow("kit.registers", error);
+		CHECK(regs != nullptr);
+		if (regs != nullptr)
+		{
+			const RowModel &rows = *regs->rowLists().at(0).model;
+			CHECK(d.until([&] { return rows.rowCount() == 10; }, 10));
+			CHECK(regs->run("set", {std::string("R1"), std::string("1F")}, error).has_value());
+			CHECK(d.until([&] {
+				for (int64_t r = 0; r < rows.rowCount(); r++)
+					if (cellText(rows, r, 0) == "R1") return cellText(rows, r, 1) == "0000001F";
+				return false;
+			}, 10));
+			int64_t cycles = 0;
+			bool hasCycles = false;
+			bool seen = false;
+			for (const auto &r : session.readRegisters(cycles, hasCycles)) seen = seen || (r.name == "R1" && r.value == 0x1F);
+			CHECK(seen);
+		}
+		/* Export Save Data: the two save files the core holds, as one zip */
+		auto saves = session.openCoreWindow("kit.savedata", error);
+		CHECK(saves != nullptr);
+		if (saves != nullptr)
+		{
+			auto prop = [&](const char *name) { return saves->get(name).value_or(Value{}); };
+			CHECK(d.until([&] { const Value v = prop("count"); return std::get_if<int64_t>(&v) != nullptr && std::get<int64_t>(v) == 2; }, 10));
+			const fs::path zip = dir / "saves.zip";
+			saves->giveFile("export", CoreWindowViewModel::Write, zip.string());
+			CHECK(d.until([&] { const Value v = prop("last"); return std::get_if<std::string>(&v) != nullptr && std::get<std::string>(v) == "saves.zip"; }, 10));
+			std::ifstream in(zip, std::ios::binary);
+			const std::string bytes((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+			CHECK(bytes.rfind("PK\x03\x04", 0) == 0 && bytes.find("card/slot1.sav") != std::string::npos &&
+				bytes.find("notes.txt") != std::string::npos && bytes.find("PK\x05\x06") != std::string::npos);
+		}
+		/* Trace Logger: lines as frames run, and a log file added to after every frame until let go */
+		auto trace = session.openCoreWindow("kit.trace", error);
+		CHECK(trace != nullptr);
+		if (trace != nullptr)
+		{
+			const RowModel &lines = *trace->rowLists().at(0).model;
+			CHECK(trace->run("start", {}, error).has_value());
+			CHECK(pump(2));
+			CHECK(d.until([&] { return lines.rowCount() > 10; }, 10));
+			const fs::path log = dir / "trace.log";
+			trace->keepFile("log", log.string());
+			CHECK(pump(2));
+			std::error_code ec;
+			CHECK(d.until([&] { return fs::file_size(log, ec) > 1000; }, 10));
+			const auto grown = fs::file_size(log, ec);
+			CHECK(pump(1));
+			CHECK(d.until([&] { return fs::file_size(log, ec) > grown; }, 10));
+			trace->releaseFile("log");
+			CHECK(trace->run("stopLog", {}, error).has_value());
+			CHECK(trace->run("stop", {}, error).has_value());
+			d.until([] { return false; }, 0.2);
+			const auto stopped = fs::file_size(log, ec);
+			CHECK(pump(2));
+			d.until([] { return false; }, 0.2);
+			CHECK(fs::file_size(log, ec) == stopped);
+			std::ifstream in(log);
+			std::string first;
+			std::getline(in, first);
+			CHECK(first.rfind("Where:", 0) == 0);
+		}
+		/* Surface Viewer: the core's own picture, drawn as it is */
+		auto surfaces = session.openCoreWindow("kit.surfaces", error);
+		CHECK(surfaces != nullptr);
+		if (surfaces != nullptr)
+		{
+			CHECK(pump(1));
+			CHECK(surfaces->pictures().size() == 1);
+			if (surfaces->pictures().size() == 1)
+			{
+				const Picture &pic = *surfaces->pictures()[0].picture;
+				Picture::Frame got;
+				CHECK(d.until([&] { return pic.takeIfNewer(0, got) && got.width == 64 && got.height == 64; }, 10));
+			}
+		}
+		for (const char *w : {"kit.registers", "kit.savedata", "kit.trace", "kit.surfaces"}) session.closeCoreWindow(w);
+	}
 	/* a change goes to the core, and comes back in its answer */
 	std::string setError;
 	CHECK(vm->set("stopAt", int64_t{0}, setError));
@@ -11803,20 +11826,21 @@ bool coreWindows(const char *package, const char *rom)
 		const fs::path given = dir / "symbols.txt", written = dir / "out" / "regs.txt";
 		fs::create_directories(written.parent_path());
 		std::ofstream(given, std::ios::binary) << "FIRST LINE\nsecond\n";
-		vm->giveFile("load", false, given.string());
+		vm->giveFile("load", CoreWindowViewModel::Read, given.string());
 		CHECK(d.until([&] { return text("lastFile") == "read symbols.txt: 18 bytes, FIRST LINE"; }, 10));
-		vm->giveFile("save", true, written.string());
+		vm->giveFile("save", CoreWindowViewModel::Write, written.string());
 		CHECK(d.until([&] { return text("lastFile") == "wrote regs.txt"; }, 10));
 		std::ifstream back(written, std::ios::binary);
 		const std::string got((std::istreambuf_iterator<char>(back)), std::istreambuf_iterator<char>());
 		CHECK(got.rfind("PC ", 0) == 0 && got.find("\nR7 ") != std::string::npos);
 		/* one that is not there is said, and nothing else changes */
-		vm->giveFile("load", false, (dir / "none.txt").string());
+		vm->giveFile("load", CoreWindowViewModel::Read, (dir / "none.txt").string());
 		CHECK(d.until([&] { return !vm->coreError.get().empty(); }, 10));
 		CHECK(text("lastFile") == "wrote regs.txt");
 	}
 	/* the next frame played holds at the instruction at 0, the core's window
 	 * and Chimera's status say so, and the frame is not over */
+	const int64_t heldAt = session.frame.get();
 	session.run("frameAdvance", {}, error);
 	CHECK(d.until([&] { return session.held.get() && isHeld(); }, 20));
 	CHECK(number("pc") == 0 && number("heldCount") == 1);
@@ -11846,8 +11870,8 @@ bool coreWindows(const char *package, const char *rom)
 	CHECK(session.held.get());
 	/* Continue: the frame goes on to its end */
 	CHECK(vm->run("continue", {}, error).has_value());
-	CHECK(d.until([&] { return !session.held.get() && !isHeld() && session.frame.get() == 2; }, 20));
-	CHECK(engineFrame == 1);
+	CHECK(d.until([&] { return !session.held.get() && !isHeld() && session.frame.get() == heldAt + 1; }, 20));
+	CHECK(engineFrame == heldAt);
 	/* held again, and the project closed through the hold: the frame ends,
 	 * the machine goes, and the window with it */
 	bool closedSaid = false;
@@ -12096,7 +12120,7 @@ int main(int argc, char **argv)
 			ranMachine = crashRecovery(argv[1], argv[2]) && ranMachine;
 			ranMachine = customizeOptions(argv[1], argv[2]) && ranMachine;
 			ranMachine = greenzoneBudgets(argv[1], argv[2]) && ranMachine;
-			ranMachine = traceAndRegisters(argv[1], argv[2]) && ranMachine;
+			ranMachine = scriptRegisters(argv[1], argv[2]) && ranMachine;
 			ranMachine = macroTool(argv[1], argv[2]) && ranMachine;
 			ranMachine = luaLibraries(argv[1], argv[2]) && ranMachine;
 			ranMachine = luaParity(argv[1], argv[2]) && ranMachine;

@@ -40,7 +40,6 @@
 		"window.monitor.stop_at": "Parar na instrução",
 		"window.monitor.step": "Passo",
 		"window.monitor.continue": "Continuar",
-		"window.no_such": "este núcleo não tem essa janela",
 		"window.not_settable": "isso não pode ser definido",
 		"window.no_command": "esta janela não tem esse comando",
 		"window.monitor.load": "Carregar...",

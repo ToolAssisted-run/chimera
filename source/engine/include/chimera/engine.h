@@ -1281,13 +1281,20 @@ CE_API const char *ce_session_window_request(ce_session *s, const char *request,
 /* A file the person picked in Chimera's own file dialog, handed to the core
  * (owner, 2026-11-17: a core never opens a file of the computer on its own).
  * host_path is mounted in the core's sandbox under mount_name, to read
- * (writable 0) or created empty to write (writable 1, the core's writes
- * going to the disk as it makes them), for the length of one request - the
- * window's "file" request - and unmounted after it. The answer as
+ * (writable 0), created empty to write (writable 1), or kept as it is and
+ * written at its end (writable 2, a log the core adds to after every frame);
+ * the core's writes go to the disk as it makes them. For the length of one
+ * request - the window's "file" request - and unmounted after it. The answer as
  * ce_session_window_request's; null with ce_session_last_error saying why
  * when the file could not be given. */
 CE_API const char *ce_session_window_file(ce_session *s, const char *request, uint64_t len, const char *mount_name,
 	const char *host_path, int32_t writable, uint64_t *len_out);
+/* A picture a core's window shows: its "get" answer names, for each, its
+ * width, height and the address of its pixels in the core's memory (BGRA, a
+ * row after another), kept until the next request. Copied out here, at once,
+ * on the machine's thread; null for none, no address, or a side past 8192.
+ * Valid until the next call. */
+CE_API const uint32_t *ce_session_window_picture(ce_session *s, uint64_t address, int32_t width, int32_t height);
 /* A core may hold its own frame part way through (its windows' stepping, a
  * breakpoint of its own): its optional export SetStopCallback(uintptr_t fn)
  * is handed a function the core calls, as uintptr_t fn(void), each time it

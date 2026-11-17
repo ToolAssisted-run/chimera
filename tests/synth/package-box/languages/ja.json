@@ -38,7 +38,6 @@
 		"window.monitor.stop_at": "この命令で停止",
 		"window.monitor.step": "ステップ",
 		"window.monitor.continue": "続行",
-		"window.no_such": "このコアにそのウィンドウはありません",
 		"window.not_settable": "それは設定できません",
 		"window.no_command": "このウィンドウにそのコマンドはありません",
 		"window.monitor.load": "読み込み...",

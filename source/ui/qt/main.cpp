@@ -87,9 +87,8 @@
 #include "chimera/vm/config_files_vm.hpp"
 #include "chimera/vm/data_folder_vm.hpp"
 #include "chimera/vm/precompiled_vm.hpp"
-#include "chimera/vm/trace_logger_vm.hpp"
+#include "chimera/vm/script_vm.hpp"
 #include "chimera/vm/idle_eye.hpp"
-#include "chimera/vm/surface_viewer_vm.hpp"
 #include "chimera/vm/core_tool_vm.hpp"
 #include "chimera/vm/macro_tool_vm.hpp"
 #include "chimera/vm/encoder_vm.hpp"
@@ -369,7 +368,7 @@ int main(int argc, char **argv)
 	QCommandLineOption mmfOpt(QStringLiteral("mmf"), QStringLiteral("the memory-mapped file Lua's comm.mmfScreenshot writes to, as Chimera's --mmf"),
 		QStringLiteral("name"));
 	QCommandLineOption schemeOpt(QStringLiteral("color-scheme"), QStringLiteral("light or dark: Chimera's built-in Light or Dark theme for this run (not remembered)"), QStringLiteral("scheme"));
-	QCommandLineOption showOpt(QStringLiteral("show"), QStringLiteral("open a tool window at the start: new-project, core-tool, ram-search, ram-watch, hex, controls, hotkeys, themes, lua, tastudio, undo-history, tastudio-settings, log, report, media, cache, customize, messages, sound, display, budgets, paths, firmware, data, precompiled, trace, registers, surfaces, macros, encode, cores"), QStringLiteral("tool"));
+	QCommandLineOption showOpt(QStringLiteral("show"), QStringLiteral("open a tool window at the start: new-project, core-tool, ram-search, ram-watch, hex, controls, hotkeys, themes, lua, tastudio, undo-history, tastudio-settings, log, report, media, cache, customize, messages, sound, display, budgets, paths, firmware, data, precompiled, macros, encode, cores"), QStringLiteral("tool"));
 	QCommandLineOption describeOpt(QStringLiteral("describe"), QStringLiteral("print every view model's properties and commands as JSON, and quit"));
 	/* Chimera's --mcp-server and --mcp-allow-changes: the server started for a run nobody clicks in */
 	QCommandLineOption mcpServerOpt(QStringLiteral("mcp-server"), QStringLiteral("start the MCP server (Tools > MCP Server...) at once"));
@@ -953,10 +952,9 @@ int main(int argc, char **argv)
 	vm::Connection precompiledInUse = session.compileCacheDir.changed.connect([&] { precompiled.inUse.set(session.compileCacheDir.get()); });
 	vm::Connection precompiledCompiling = newProject.compileFolder.changed.connect([&] { precompiled.compiling.set(newProject.compileFolder.get()); });
 	qt::QmlViewModel precompiledQml(precompiled);
-	vm::TraceLoggerViewModel traceLogger(dispatcher, session);
-	qt::QmlViewModel traceLoggerQml(traceLogger);
+	/* the registers Lua's emu library reads and sets (no window of Chimera's:
+	 * a core's CPU Registers is its own, issue 610) */
 	vm::RegistersViewModel registers(dispatcher, session);
-	qt::QmlViewModel registersQml(registers);
 	vm::GuiOverlayViewModel guiOverlay(dispatcher);
 	qt::QmlViewModel guiOverlayQml(guiOverlay);
 	/* the picture while nothing is open: Chimera's mark, read here and handed in */
@@ -972,8 +970,6 @@ int main(int argc, char **argv)
 	for (const char *name : {"snowWhen", "snowIntensity", "snowBias", "snowFramerate"})
 		config.keep(idleEye, name);
 	qt::QmlViewModel idleEyeQml(idleEye);
-	vm::SurfaceViewerViewModel surfaceViewer(dispatcher, session);
-	qt::QmlViewModel surfaceViewerQml(surfaceViewer);
 	/* every installed core's own tools (Tools > Core-Specific Tools): each
 	 * run in a process of its own (one machine to a process), chimera-run
 	 * beside the program or, in the build tree, where it is built
@@ -1405,10 +1401,8 @@ int main(int argc, char **argv)
 	lua.add(configFiles);
 	lua.add(dataFolder);
 	lua.add(precompiled);
-	lua.add(traceLogger);
 	lua.add(registers);
 	lua.add(guiOverlay);
-	lua.add(surfaceViewer);
 	lua.add(coreTool);
 	lua.add(macroTool);
 	lua.add(encoder);
@@ -1578,11 +1572,8 @@ int main(int argc, char **argv)
 		{QStringLiteral("dataFolder"), QVariant::fromValue<QObject *>(&dataFolderQml)},
 		{QStringLiteral("settings"), QVariant::fromValue<QObject *>(&settingsQml)},
 		{QStringLiteral("precompiled"), QVariant::fromValue<QObject *>(&precompiledQml)},
-		{QStringLiteral("traceLogger"), QVariant::fromValue<QObject *>(&traceLoggerQml)},
-		{QStringLiteral("registersTool"), QVariant::fromValue<QObject *>(&registersQml)},
 		{QStringLiteral("guiOverlay"), QVariant::fromValue<QObject *>(&guiOverlayQml)},
 		{QStringLiteral("idleEye"), QVariant::fromValue<QObject *>(&idleEyeQml)},
-		{QStringLiteral("surfaceViewer"), QVariant::fromValue<QObject *>(&surfaceViewerQml)},
 		{QStringLiteral("coreTool"), QVariant::fromValue<QObject *>(&coreToolQml)},
 		{QStringLiteral("coreWindows"), QVariant::fromValue<QObject *>(&coreWindows)},
 		{QStringLiteral("macroTool"), QVariant::fromValue<QObject *>(&macroToolQml)},
@@ -1730,7 +1721,6 @@ int main(int argc, char **argv)
 			{"customize", "customizeWindow"}, {"messages", "messagesWindow"}, {"sound", "soundWindow"},
 			{"display", "displayWindow"}, {"budgets", "greenzoneBudgetsWindow"}, {"paths", "pathsWindow"},
 			{"firmware", "firmwareWindow"}, {"data", "dataFolderWindow"}, {"precompiled", "precompiledWindow"},
-			{"trace", "traceLoggerWindow"}, {"registers", "cpuRegistersWindow"}, {"surfaces", "surfaceViewerWindow"},
 			{"macros", "macroToolWindow"}, {"encode", "encodeVideoWindow"}, {"cores", "coresWindow"}};
 		auto show = [window, headless](const char *objectName) {
 			if (headless) return;

@@ -40,7 +40,6 @@
 		"window.monitor.stop_at": "Stopp ved instruksjon",
 		"window.monitor.step": "Steg",
 		"window.monitor.continue": "Fortsett",
-		"window.no_such": "denne kjernen har ikke et slikt vindu",
 		"window.not_settable": "det kan ikke settes",
 		"window.no_command": "dette vinduet har ikke en slik kommando",
 		"window.monitor.load": "Last inn...",

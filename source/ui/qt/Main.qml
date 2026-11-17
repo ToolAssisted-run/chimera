@@ -48,9 +48,6 @@ ApplicationWindow {
     // the machine's settings, for File > Project Settings
     required property QtObject settings
     required property QtObject precompiled
-    required property QtObject traceLogger
-    required property QtObject registersTool
-    required property QtObject surfaceViewer
     required property QtObject coreTool
     // the core's own windows, its design and the core as their view model (issue 610)
     required property QtObject coreWindows
@@ -370,10 +367,9 @@ ApplicationWindow {
     }
     // what a hotkey does when it is the window's: a menu's action, a dialog, a
     // window; TAStudio's editing is TAStudio's
-    Action { id: traceLoggerAction; enabled: root.session.hasTrace; onTriggered: root.bring(traceLoggerWindow) }
     readonly property var hotkeyActions: ({
         "RAM Search": ramSearchAction, "RAM Watch": ramWatchAction, "Hex Editor": hexEditorAction, "Lua Console": luaConsoleAction,
-        "Open Project": openProjectAction, "Close Project": closeAction, "Trace Logger": traceLoggerAction
+        "Open Project": openProjectAction, "Close Project": closeAction
     })
     Connections {
         target: root.hotkeyRelay
@@ -725,33 +721,9 @@ ApplicationWindow {
             EmulatorMenu {
                 session: root.session
                 keysOf: (hotkey) => root.hotkeyKeys[hotkey] || ""
-                onOpenTool: (tool) => {
-                    if (tool === "registers") root.bring(cpuRegistersWindow)
-                    else if (tool === "surfaces") root.bring(surfaceViewerWindow)
-                    else if (tool === "trace") root.bring(traceLoggerWindow)
-                }
                 onOpenCoreWindow: (id) => {
                     const why = root.coreWindows.open(id)
                     if (why !== "") { coreWindowRefused.text = why; coreWindowRefused.open() }
-                }
-                onExportSaveData: {
-                    const names = root.session.run("saveDataFiles")
-                    if (names === undefined) return
-                    if (names === "") { root.note(qsTrId("main.this_machine_holds_no_save_data")); return }
-                    const list = names.split("\n")
-                    saveDataDialog.files = list.length
-                    // one file under its own name, after the game's and the time (issue 499:
-                    // "save.flash" alone said nothing); more in a zip named for the game
-                    const game = root.session.gameName.replace(/[<>:"\/\\|?*]/g, "_")
-                    const own = list[0].replace(/^.*[\\/]/, "")
-                    const name = list.length === 1
-                        ? (game !== "" ? game + " " + Qt.formatDateTime(new Date(), "yyyy-MM-dd HH.mm.ss") + " " : "") + own
-                        : qsTrId("main.save_data_file").arg(root.session.gameName)
-                    // in Paths' Save data folder, a folder the core's, made now (owner, 2026-11-05, issue 500)
-                    const folder = root.paths.run("dialogFolder", ["Save data", true, root.session.coreName]) || ""
-                    saveDataDialog.currentFolder = root.pictureFiles.folderUrl(folder)
-                    saveDataDialog.selectedFile = folder !== "" ? root.pictureFiles.folderUrl(folder + "/" + name) : "file:///" + name
-                    saveDataDialog.open()
                 }
             }
             Menu {
@@ -1070,8 +1042,8 @@ ApplicationWindow {
             coreFileDialog.mode = mode
             coreFileDialog.title = title
             coreFileDialog.nameFilters = nameFilters.length > 0 ? nameFilters : [qsTrId("common.all_files")]
-            coreFileDialog.fileMode = mode === "write" ? FileDialog.SaveFile : FileDialog.OpenFile
-            coreFileDialog.selectedFile = mode === "write" && name !== "" ? localFiles.folderUrl(name) : ""
+            coreFileDialog.fileMode = mode === "read" ? FileDialog.OpenFile : FileDialog.SaveFile
+            coreFileDialog.selectedFile = mode !== "read" && name !== "" ? localFiles.folderUrl(name) : ""
             coreFileDialog.open()
         }
     }
@@ -1213,16 +1185,6 @@ ApplicationWindow {
             width: 420
         }
         onAccepted: root.session.run("stopCoreLog")
-    }
-    FileDialog {
-        id: saveDataDialog
-        property int files: 1
-        title: qsTrId("main.export_save_data")
-        fileMode: FileDialog.SaveFile
-        // one file is saved as the core names it; several go in a zip
-        defaultSuffix: files === 1 ? "" : "zip"
-        nameFilters: files === 1 ? [qsTrId("common.all_files")] : [qsTrId("main.zip_archives_zip")]
-        onAccepted: root.session.run("exportSaveData", [selectedFile])
     }
     Dialog {
         id: askSaveDialog
@@ -1809,19 +1771,6 @@ ApplicationWindow {
     ProjectSettings { id: projectSettingsWindow; vm: root.settings; themeColor: root.osdColor; mainWindow: root; visible: false }
     DataFolderConfig { id: dataFolderWindow; vm: root.dataFolder; themeColor: root.osdColor; mainWindow: root; visible: false }
     PrecompiledModules { id: precompiledWindow; vm: root.precompiled; themeColor: root.osdColor; visible: false }
-    TraceLogger {
-        id: traceLoggerWindow; vm: root.traceLogger; session: root.session; visible: false
-        folderOf: root.folderOf; customize: root.customize; toolWindows: root.toolWindows; mainWindow: root; themeColor: root.osdColor
-    }
-    CpuRegisters {
-        id: cpuRegistersWindow; vm: root.registersTool; session: root.session; visible: false
-        customize: root.customize; toolWindows: root.toolWindows; mainWindow: root; themeColor: root.osdColor
-    }
-    SurfaceViewer {
-        id: surfaceViewerWindow; vm: root.surfaceViewer; session: root.session; visible: false
-        clipboard: root.clipboard; localPath: (url) => root.pictureFiles.localPath(url); themeColor: root.osdColor
-        customize: root.customize; toolWindows: root.toolWindows; mainWindow: root
-    }
     MacroTool {
         id: macroToolWindow; vm: root.macroTool; pianoRoll: root.pianoRoll; folderOf: root.folderOf; visible: false
         customize: root.customize; toolWindows: root.toolWindows; mainWindow: root; themeColor: root.osdColor

@@ -42,7 +42,6 @@
 		"window.monitor.stop_at": "Zastavit na instrukci",
 		"window.monitor.step": "Krok",
 		"window.monitor.continue": "Pokračovat",
-		"window.no_such": "toto jádro takové okno nemá",
 		"window.not_settable": "to nelze nastavit",
 		"window.no_command": "toto okno takový příkaz nemá",
 		"window.monitor.load": "Načíst...",

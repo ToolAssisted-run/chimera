@@ -120,7 +120,7 @@ static int window(const QString &qmlFile)
 			core.asked.push_back(request);
 			answered("{}");
 		},
-		[&core, &givenPath](std::string request, std::string path, bool, std::function<void(const std::string &)> answered) {
+		[&core, &givenPath](std::string request, std::string path, int, std::function<void(const std::string &)> answered) {
 			core.asked.push_back(request);
 			givenPath = path;
 			answered("{}");
@@ -184,7 +184,7 @@ static int window(const QString &qmlFile)
 	 * person picks goes to the core, which is told its name and nothing more */
 	QMetaObject::invokeMethod(child(root, "save"), "clicked");
 	CHECK(wanted == QStringList({QStringLiteral("save"), QStringLiteral("write"), QStringLiteral("Save..."), QStringLiteral("registers.txt")}));
-	model.giveFile("save", true, "/somewhere/else/regs.txt");
+	model.giveFile("save", vm::CoreWindowViewModel::Write, "/somewhere/else/regs.txt");
 	CHECK(givenPath == "/somewhere/else/regs.txt");
 	CHECK(!core.asked.empty() && core.asked.back() ==
 		"{\"op\":\"file\",\"window\":\"monitor\",\"purpose\":\"save\",\"mode\":\"write\",\"file\":\"window-file\",\"name\":\"regs.txt\"}");

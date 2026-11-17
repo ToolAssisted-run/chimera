@@ -40,7 +40,6 @@
 		"window.monitor.stop_at": "Stop at instruction",
 		"window.monitor.step": "Step",
 		"window.monitor.continue": "Continue",
-		"window.no_such": "this core has no such window",
 		"window.not_settable": "that cannot be set",
 		"window.no_command": "this window has no such command",
 		"window.monitor.load": "Load...",

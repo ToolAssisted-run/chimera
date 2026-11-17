@@ -1,7 +1,8 @@
-/* The Emulator menu holds only what the core open offers (owner,
- * 2026-10-31, issue 428): an item the core does not offer is not in it, not
- * greyed out, and the menu is gone when the core offers nothing. A core's
- * own tools are under Tools instead (owner, 2026-11-01; test_core_tools_menu).
+/* The Emulator menu holds only what applies to the project open (owner,
+ * 2026-10-31, issue 428): Chimera's Display Game Time when the game has a
+ * timer, then the core's own windows, as its package names them (issue 610:
+ * Chimera knows no core tool), and nothing greyed out; the menu is gone when
+ * there is nothing. A core's file tools are under Tools (test_core_tools_menu).
  * EmulatorMenu.qml over a stand-in for the session, opened, and the items
  * it shows read. */
 #include <QGuiApplication>
@@ -28,6 +29,7 @@ import QtQuick
 import QtQuick.Controls
 import "qrc:/chimera"
 ApplicationWindow {
+    id: root
     width: 400; height: 400; visible: true
     property alias stub: stub
     property alias menu: menu
@@ -38,12 +40,10 @@ ApplicationWindow {
         property bool isGameCore: false
         property bool hasGameTimer: false
         property bool showGameTime: false
-        property bool hasSaveData: false
-        property bool hasRegisters: false
-        property string surfaces: "[]"
-        property bool hasTrace: false
+        property string coreWindows: "[]"
     }
-    EmulatorMenu { id: menu; session: stub }
+    property string asked: ""
+    EmulatorMenu { id: menu; session: stub; onOpenCoreWindow: (id) => root.asked = id }
 }
 )";
 
@@ -84,24 +84,29 @@ int main(int argc, char **argv)
 
 	/* a core that offers nothing: no menu */
 	CHECK(!menu->property("shown").toBool());
-	/* registers alone: CPU Registers, and nothing greyed beside it */
-	set("hasRegisters", true);
+	/* the core's own windows, by its package's words, in its order */
+	set("coreWindows", QStringLiteral("[{\"id\":\"kit.registers\",\"menu\":\"CPU Registers\",\"qml\":\"windows/kit/Registers.qml\"},"
+		"{\"id\":\"kit.trace\",\"menu\":\"Trace Logger\",\"qml\":\"windows/kit/TraceLogger.qml\"}]"));
 	CHECK(menu->property("shown").toBool());
-	CHECK(shown() == QStringList({"main.cpu_registers"}));
-	/* a game's timer and the trace: the two groups parted */
-	set("hasRegisters", false);
+	CHECK(shown() == QStringList({"CPU Registers", "Trace Logger"}));
+	/* a game's timer, Chimera's own, parted from the core's windows */
 	set("hasGameTimer", true);
-	set("hasTrace", true);
-	CHECK(shown() == QStringList({"main.display_game_time", "-", "main.trace_logger"}));
-	/* save data and the surfaces, no divider with one group only */
+	CHECK(shown() == QStringList({"main.display_game_time", "-", "CPU Registers", "Trace Logger"}));
+	/* one picked: its id is asked for */
+	{
+		QQuickItem *item = nullptr;
+		QMetaObject::invokeMethod(menu, "itemAt", Q_RETURN_ARG(QQuickItem *, item), Q_ARG(int, menu->property("count").toInt() - 1));
+		CHECK(item != nullptr);
+		if (item != nullptr) QMetaObject::invokeMethod(item, "triggered");
+		CHECK(window->property("asked").toString() == QLatin1String("kit.trace"));
+	}
+	/* picking an item closed the menu: open it again */
+	QMetaObject::invokeMethod(menu, "popup");
+	CHECK(QTest::qWaitFor([&] { return menu->property("opened").toBool(); }));
+	/* the timer alone, no divider */
+	set("coreWindows", QStringLiteral("[]"));
+	CHECK(shown() == QStringList({"main.display_game_time"}));
 	set("hasGameTimer", false);
-	set("hasTrace", false);
-	set("hasTrace", false);
-	set("hasSaveData", true);
-	CHECK(shown() == QStringList({"main.export_save_data_dialog"}));
-	set("hasSaveData", false);
-	set("surfaces", QStringLiteral("[{\"name\":\"VRAM\"}]"));
-	CHECK(shown() == QStringList({"main.surface_viewer"}));
 	/* no machine open: no menu, whatever was offered */
 	set("isOpen", false);
 	CHECK(!menu->property("shown").toBool());

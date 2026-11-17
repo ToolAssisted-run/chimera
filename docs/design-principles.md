@@ -15834,3 +15834,58 @@ Windows: on CI the test program found Qt's modules beside it (lib/qml) and
 not where Qt says they are (it has no qt.conf), so the URL filter refused Qt
 Quick itself. The filter now takes Qt's modules from every folder the engine
 looks in, comparing paths as the system does (letters' case on Windows).
+
+## Chimera knows no core tool (user-decided, 2026-11-17, issue 610)
+
+Once a core could draw windows of its own, the owner asked that "Chimera ends
+with zero knowledge of any core tool whatsoever (export, trace logger,
+debugger, etc)". Asked which of Chimera's pieces that meant, the owner chose
+the Emulator menu's tools; scripts and the MCP server keep their access to a
+core's registers, trace and memory, and Export Core Log stays. And for the
+cores that offered them: "Remove now, but then fix every core to add the
+required logic. Push everything once everything works correctly with the new
+architecture."
+
+- **Gone from Chimera**: Export Save Data, CPU Registers, the Trace Logger and
+  the Surface Viewer - their windows, menu items and view models, the
+  session's save data commands, its trace sink and its surface reading, Lua's
+  `gettool` entries that opened them (tracelogger, genericdebugger,
+  surfaceviewer), the Trace Logger hotkey, and the Paths folder Save data
+  (issue 500), which only the export used. The Emulator menu holds Display
+  Game Time and then the core's own windows.
+- **Kept in Chimera**: Display Game Time (the owner's choice: a game core's
+  timer is a declared game property, not a tool), the registers Lua's emu
+  library reads (now beside the gui overlay's view model, script_vm), the
+  engine's trace for the MCP server's `trace_cpu`, and `chimera-run`'s save
+  data output, a headless test facility.
+- **In the cores, through miniBox's kit**: `waterbox_windows.h` (header-only,
+  C and C++) answers Chimera's window requests and brings the four tools as
+  ready-made windows, built on the exports a core already has (Trace*,
+  GetRegister*, GetSurface*, GetSaveDataFile*); `add-windows.py` reads the
+  core.wbx and puts their QML, their texts (Chimera's own translations of
+  these windows, and twelve new ones) and their declarations in the package.
+  A core includes the header once and calls the script in its package build.
+- **What the tools needed of the windows**: the Trace Logger logs live to a
+  file the person picks once, which Chimera hands to the core again after
+  every frame to append (the owner's choice over saving the kept lines;
+  miniBox mounts a file to append to for one call); the Surface Viewer's
+  picture is a window picture, its pixels copied out of the core's memory
+  after each answer and drawn by Chimera's picture item (the owner's choice
+  over dropping the viewer); a list may be sent as only its new rows, the
+  oldest let go past a number kept, so ten thousand trace lines are not sent
+  again every frame.
+- Two traps found on the way: a weak declaration of an export's name in the
+  file that defines it made the definition weak, and the host takes only
+  global exports, so CPU registers read as none - the kit uses `weakref`; and
+  the synthetic core's request reader took `"file"` from `"op":"file"`.
+
+Measured: miniBox's kit added to the synthetic core gives it all four
+windows besides its own. The view models test sets a register through CPU
+Registers (Lua's registers read it back), exports the two save files as a
+zip, starts the Trace Logger (lines arrive), keeps a log file (it grows every
+frame, and stops growing once let go; its first line is the trace's header),
+and receives the Surface Viewer's 64x64 picture. Which official cores offer
+which tool was read from each core's newest core.wbx, by the exports the
+kit needs: save data 60 of 72 official cores, registers 8, trace and
+surfaces 2 (quickernes and quickerneshawk); 12 offer none of the four. Each
+of the 60 includes the kit and calls add-windows.py in its package build.
