@@ -2,6 +2,7 @@
 #include "chimera/vm/tr.hpp"
 
 #include "chimera/vm/compiled_code.hpp"
+#include "chimera/vm/cache_manager_vm.hpp"
 
 #include <algorithm>
 #include <chrono>
@@ -304,6 +305,14 @@ struct NewProjectViewModel::CompileJob
 	}
 };
 
+struct NewProjectViewModel::HashRun
+{
+	std::string path;
+	/* stop: asked to stop; ended: the thread has done all it does (the view
+	 * model waits for it before it goes) */
+	std::atomic<bool> stop{false}, ended{false};
+};
+
 NewProjectViewModel::NewProjectViewModel(Dispatcher &dispatcher, SessionViewModel &session, CoresViewModel &cores)
 	: ViewModel("newProject", dispatcher), session_(session), cores_(cores)
 {
@@ -387,7 +396,13 @@ NewProjectViewModel::NewProjectViewModel(Dispatcher &dispatcher, SessionViewMode
 				error = tr("compile.already");
 				return {};
 			}
-			const std::string game = compileGame(), dir = compileDirOf(game);
+			const std::string game = compileGame();
+			if (std::string known; hashOf(game, known) == Hashed::Pending)
+			{
+				error = tr("new_project.still_reading", {baseName(game)});
+				return {};
+			}
+			const std::string dir = compileDirOf(game);
 			if (dir.empty() || compileRunner.get().empty())
 			{
 				error = tr(dir.empty() ? "compile.no_folder" : "compile.no_runner");
@@ -477,6 +492,16 @@ NewProjectViewModel::NewProjectViewModel(Dispatcher &dispatcher, SessionViewMode
 	expose("clockWrong", "the last create was refused for the clock's start, which is not a time Chimera reads", clockWrong);
 	expose("making", "a project is being made: Create read and hashes its files away from the view", making);
 	expose("made", "how many projects were made; goes up once each is made, when it opens", made);
+	expose("hashing", "a large file is being read to take its hash, away from the view (a game of twelve gigabytes)", hashing);
+	expose("hashFile", "the name of the file being read, \"\" while none is", hashFile);
+	expose("hashDone", "bytes of it read so far", hashDone);
+	expose("hashTotal", "its length in bytes (0 when the system does not say)", hashTotal);
+	expose("hashStatus", "what the reading says, in Chimera's words", hashStatus);
+	command("cancelHash", "stops reading the large file: it goes out of its slot, and a firmware chosen by hand is not taken", {},
+		[this](const Args &, std::string &) -> Value {
+			cancelHashing();
+			return {};
+		});
 	expose("filesRefused", "the last making was refused for its files (the reason is the status)", filesRefused);
 	command("refresh", "looks at the cores folder again and lists its cores: a package put in or taken out while the program "
 		"runs (issue 423)", {}, [this](const Args &, std::string &) -> Value {
@@ -589,6 +614,8 @@ NewProjectViewModel::NewProjectViewModel(Dispatcher &dispatcher, SessionViewMode
 				return {};
 			}
 		}
+		hashDeclined_.erase(std::remove(hashDeclined_.begin(), hashDeclined_.end(), path), hashDeclined_.end());
+		hashUnreadable_.erase(std::remove(hashUnreadable_.begin(), hashUnreadable_.end(), path), hashUnreadable_.end());
 		/* the same file in the same slot again: nothing to do, as Chimera's */
 		std::vector<Picked> &list = files_[id];
 		if (std::any_of(list.begin(), list.end(), [&](const Picked &f) { return f.name == name; })) return {};
@@ -688,31 +715,24 @@ NewProjectViewModel::NewProjectViewModel(Dispatcher &dispatcher, SessionViewMode
 				error = tr("new_project.no_firmware_need", {id});
 				return {};
 			}
-			char sha[41];
-			uint64_t len = 0;
-			if (ce_sha1_file(path.c_str(), sha, &len) != 1)
+			hashDeclined_.erase(std::remove(hashDeclined_.begin(), hashDeclined_.end(), path), hashDeclined_.end());
+			hashUnreadable_.erase(std::remove(hashUnreadable_.begin(), hashUnreadable_.end(), path), hashUnreadable_.end());
+			std::string sha;
+			switch (hashOf(path, sha))
 			{
-				error = tr("new_project.cannot_read", {path});
+			case Hashed::Pending:
+				/* a large file is read away from the view: what choosing it does is done when it is known */
+				hashWaiting_[path].push_back([this, id, path](bool ok, const std::string &known) {
+					std::string why;
+					if (!ok) why = tr("new_project.cannot_read", {path});
+					else applyChosenFirmware(id, path, known, why);
+					if (!why.empty()) status.set(why);
+				});
 				return {};
+			case Hashed::Ready: break;
+			default: error = tr("new_project.cannot_read", {path}); return {};
 			}
-			/* an entry with a hash names one exact file; a game core takes a
-			 * file of the person's own instead and the project pins its hash,
-			 * as Chimera's New Project does */
-			std::string declared;
-			if (const Json decls = firmwareDecls(); need->declIndex < decls.items.size())
-				if (const Json *h = decls.items[need->declIndex].find("sha1")) declared = h->text;
-			const bool custom = !declared.empty() && lower(declared) != lower(sha);
-			const Json *kind = cfg_.find("kind");
-			const bool gameCore = kind != nullptr && lower(kind->text) == "game";
-			if (custom && !gameCore)
-			{
-				error = tr("new_project.not_this_file", {baseName(path), sha, declared});
-				return {};
-			}
-			chosenFirmware_[id] = {path, sha};
-			clearedFirmware_.erase(std::remove(clearedFirmware_.begin(), clearedFirmware_.end(), id), clearedFirmware_.end());
-			status.set(custom ? tr("new_project.own_firmware", {baseName(path), id, sha}) : std::string());
-			evaluate();
+			applyChosenFirmware(id, path, sha, error);
 			return {};
 		});
 	command("scanFolder", "looks through a folder (and its subfolders, unless recurse is false; ten thousand files at most) "
@@ -1340,6 +1360,12 @@ void NewProjectViewModel::listCores()
 
 NewProjectViewModel::~NewProjectViewModel()
 {
+	if (hashRun_) hashRetired_.push_back(hashRun_);
+	for (const auto &run : hashRetired_)
+	{
+		run->stop = true;
+		while (!run->ended) std::this_thread::sleep_for(std::chrono::milliseconds(10));
+	}
 	if (compileJob_)
 	{
 		compileJob_->stop = true;
@@ -1363,6 +1389,179 @@ Value NewProjectViewModel::ModuleRows::cell(int64_t row, int32_t column) const
 	return {};
 }
 
+bool NewProjectViewModel::applyChosenFirmware(const std::string &id, const std::string &path, const std::string &sha, std::string &error)
+{
+	const auto need = std::find_if(needs_.begin(), needs_.end(), [&](const Need &n) { return n.id == id; });
+	if (need == needs_.end())
+	{
+		error = tr("new_project.no_firmware_need", {id});
+		return false;
+	}
+	/* an entry with a hash names one exact file; a game core takes a
+	 * file of the person's own instead and the project pins its hash,
+	 * as Chimera's New Project does */
+	std::string declared;
+	if (const Json decls = firmwareDecls(); need->declIndex < decls.items.size())
+		if (const Json *h = decls.items[need->declIndex].find("sha1")) declared = h->text;
+	const bool custom = !declared.empty() && lower(declared) != lower(sha);
+	const Json *kind = cfg_.find("kind");
+	const bool gameCore = kind != nullptr && lower(kind->text) == "game";
+	if (custom && !gameCore)
+	{
+		error = tr("new_project.not_this_file", {baseName(path), sha, declared});
+		return false;
+	}
+	chosenFirmware_[id] = {path, sha};
+	clearedFirmware_.erase(std::remove(clearedFirmware_.begin(), clearedFirmware_.end(), id), clearedFirmware_.end());
+	status.set(custom ? tr("new_project.own_firmware", {baseName(path), id, sha}) : std::string());
+	evaluate();
+	return true;
+}
+
+/* A file's hash is read away from the view when the file is large (issue 611):
+ * a game of twelve gigabytes was read by the window's own thread, and the
+ * window did not answer until it was done. Under this size the read costs a
+ * blink and is taken at once, as it always was. */
+namespace {
+constexpr uint64_t kHashAtOnce = 16ull << 20;
+}
+
+NewProjectViewModel::Hashed NewProjectViewModel::hashOf(const std::string &path, std::string &sha)
+{
+	char hex[41] = {};
+	if (path.empty()) return Hashed::Unreadable;
+	if (ce_sha1_file_known(path.c_str(), hex, nullptr) == 1)
+	{
+		sha = hex;
+		return Hashed::Ready;
+	}
+	if (std::find(hashDeclined_.begin(), hashDeclined_.end(), path) != hashDeclined_.end()) return Hashed::Declined;
+	if (std::find(hashUnreadable_.begin(), hashUnreadable_.end(), path) != hashUnreadable_.end()) return Hashed::Unreadable;
+	std::error_code ec;
+	const uint64_t size = fs::is_regular_file(path, ec) ? static_cast<uint64_t>(fs::file_size(path, ec)) : 0;
+	if (ec) return Hashed::Unreadable;
+	if (size < kHashAtOnce)
+	{
+		if (ce_sha1_file(path.c_str(), hex, nullptr) != 1) return Hashed::Unreadable;
+		sha = hex;
+		return Hashed::Ready;
+	}
+	if ((!hashRun_ || hashRun_->path != path) && std::find(hashQueue_.begin(), hashQueue_.end(), path) == hashQueue_.end())
+	{
+		hashQueue_.push_back(path);
+		startNextHash();
+	}
+	return Hashed::Pending;
+}
+
+void NewProjectViewModel::startNextHash()
+{
+	if (hashRun_ || hashQueue_.empty()) return;
+	auto run = std::make_shared<HashRun>();
+	run->path = hashQueue_.front();
+	hashQueue_.erase(hashQueue_.begin());
+	hashRun_ = run;
+	std::error_code ec;
+	const std::string name = baseName(run->path);
+	hashing.set(true);
+	hashFile.set(name);
+	hashDone.set(0);
+	hashTotal.set(static_cast<int64_t>(fs::file_size(run->path, ec)));
+	hashStatus.set(tr("new_project.reading_start", {name}));
+	std::thread([this, run, name] {
+		struct Ctx
+		{
+			HashRun *run;
+			std::function<void(uint64_t, uint64_t)> report;
+			std::chrono::steady_clock::time_point last;
+		} ctx{run.get(), [this, run, name](uint64_t done, uint64_t total) {
+				later([this, run, name, done, total] {
+					if (run != hashRun_) return;
+					hashDone.set(static_cast<int64_t>(done));
+					hashTotal.set(static_cast<int64_t>(total));
+					hashStatus.set(tr("new_project.reading", {name, CacheManagerViewModel::sizeText(done), CacheManagerViewModel::sizeText(total)}));
+				});
+			}, std::chrono::steady_clock::now()};
+		auto tick = [](uint64_t done, uint64_t total, void *user) -> int {
+			Ctx *c = static_cast<Ctx *>(user);
+			if (c->run->stop) return 1;
+			/* told to the view a few times a second: not a message a megabyte */
+			const auto now = std::chrono::steady_clock::now();
+			if (now - c->last >= std::chrono::milliseconds(100))
+			{
+				c->last = now;
+				c->report(done, total);
+			}
+			return 0;
+		};
+		char sha[41] = {};
+		uint64_t len = 0;
+		const int result = ce_sha1_file_progress(run->path.c_str(), sha, &len, tick, &ctx);
+		later([this, run, result, hex = std::string(result == 1 ? sha : "")] { hashFinished(run, result, hex); });
+		run->ended = true;
+	}).detach();
+}
+
+void NewProjectViewModel::hashFinished(const std::shared_ptr<HashRun> &run, int result, const std::string &sha)
+{
+	/* a reading the person stopped, or one a new project started over, is no answer */
+	if (run != hashRun_) return;
+	hashRun_.reset();
+	hashing.set(false);
+	hashFile.set("");
+	hashStatus.set("");
+	hashDone.set(0);
+	hashTotal.set(0);
+	const std::string path = run->path;
+	std::vector<std::function<void(bool, const std::string &)>> waiting;
+	if (auto it = hashWaiting_.find(path); it != hashWaiting_.end())
+	{
+		waiting = std::move(it->second);
+		hashWaiting_.erase(it);
+	}
+	if (result != 1)
+	{
+		hashUnreadable_.push_back(path);
+		status.set(tr("new_project.cannot_read", {path}));
+	}
+	for (auto &w : waiting) w(result == 1, sha);
+	startNextHash();
+	evaluate();
+}
+
+void NewProjectViewModel::cancelHashing(bool say)
+{
+	if (!hashRun_ && hashQueue_.empty()) return;
+	std::vector<std::string> paths = hashQueue_;
+	std::string first;
+	if (hashRun_)
+	{
+		hashRun_->stop = true;
+		first = hashRun_->path;
+		paths.insert(paths.begin(), first);
+		hashRetired_.erase(std::remove_if(hashRetired_.begin(), hashRetired_.end(), [](const auto &r) { return r->ended.load(); }), hashRetired_.end());
+		hashRetired_.push_back(hashRun_);
+		hashRun_.reset();
+	}
+	if (first.empty()) first = paths.front();
+	hashQueue_.clear();
+	hashing.set(false);
+	hashFile.set("");
+	hashStatus.set("");
+	hashDone.set(0);
+	hashTotal.set(0);
+	for (const std::string &path : paths)
+	{
+		hashDeclined_.push_back(path);
+		hashWaiting_.erase(path);
+		/* the game picked goes out of its slot: nothing half read stays in the form */
+		for (auto &[slotId, list] : files_)
+			list.erase(std::remove_if(list.begin(), list.end(), [&](const Picked &f) { return f.path == path; }), list.end());
+	}
+	evaluate();
+	if (say) status.set(tr("new_project.read_stopped", {baseName(first)}));
+}
+
 std::string NewProjectViewModel::compileGame() const
 {
 	for (const Slot &sl : slots_)
@@ -1370,11 +1569,12 @@ std::string NewProjectViewModel::compileGame() const
 	return {};
 }
 
-std::string NewProjectViewModel::compileDirOf(const std::string &game) const
+std::string NewProjectViewModel::compileDirOf(const std::string &game)
 {
 	if (game.empty() || compileRoot.get().empty()) return {};
-	char sha[41] = {};
-	if (ce_sha1_file(game.c_str(), sha, nullptr) != 1) return {};
+	/* a large game is read away from the view: no folder until its hash is known */
+	std::string sha;
+	if (hashOf(game, sha) != Hashed::Ready) return {};
 	return (fs::path(compileRoot.get()) / sha).string();
 }
 
@@ -1383,6 +1583,17 @@ void NewProjectViewModel::refreshCompile()
 	if (compiling.get()) return;
 	const std::string game = compileAsked.get() ? compileGame() : std::string();
 	if (game == compileSeen_ && !game.empty()) return;
+	/* a large game is still being read: nothing is known of its code yet, and
+	 * this looks again when its hash is */
+	if (std::string known; !game.empty() && hashOf(game, known) == Hashed::Pending)
+	{
+		compileSeen_.clear();
+		modules_.clear();
+		moduleRows_.reset.emit();
+		compileReady.set(false);
+		compileStatus.set(tr("new_project.reading_start", {baseName(game)}));
+		return;
+	}
 	compileSeen_ = game;
 	modules_.clear();
 	bool ready = false;
@@ -1621,6 +1832,9 @@ bool NewProjectViewModel::chooseCore(const std::string &name, std::string &error
 	ownFor_.clear();
 	firmwareIndex_ = indexFirmware(cores_.firmwareFolders(), true, 10000);
 	rememberedSha_.clear();
+	cancelHashing(false);
+	hashDeclined_.clear();
+	hashUnreadable_.clear();
 	core.set(name);
 	title.set("");
 	status.set(tr("new_project.a_new", {name}));
@@ -2036,20 +2250,26 @@ void NewProjectViewModel::evaluate()
 			if (!remembered.empty() && fs::is_regular_file(remembered, ec))
 			{
 				auto known = rememberedSha_.find(remembered);
+				bool pending = false;
 				if (known == rememberedSha_.end())
 				{
-					char sha[41];
-					uint64_t len = 0;
-					known = rememberedSha_.emplace(remembered, ce_sha1_file(remembered.c_str(), sha, &len) == 1 ? std::string(sha) : std::string()).first;
+					/* a large file is read away from the view: it is looked at again when its hash is known */
+					std::string sha;
+					const Hashed h = hashOf(remembered, sha);
+					pending = h == Hashed::Pending;
+					if (!pending) known = rememberedSha_.emplace(remembered, h == Hashed::Ready ? sha : std::string()).first;
 				}
-				const Json *kind = cfg_.find("kind");
-				const bool gameCore = kind != nullptr && lower(kind->text) == "game";
-				const bool other = !declared.empty() && lower(declared) != lower(known->second);
-				if (!known->second.empty() && (!other || gameCore))
+				if (!pending)
 				{
-					need.path = remembered;
-					need.sha1 = known->second;
-					need.how = other ? "your own" : "remembered";
+					const Json *kind = cfg_.find("kind");
+					const bool gameCore = kind != nullptr && lower(kind->text) == "game";
+					const bool other = !declared.empty() && lower(declared) != lower(known->second);
+					if (!known->second.empty() && (!other || gameCore))
+					{
+						need.path = remembered;
+						need.sha1 = known->second;
+						need.how = other ? "your own" : "remembered";
+					}
 				}
 			}
 		}

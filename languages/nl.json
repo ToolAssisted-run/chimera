@@ -1606,6 +1606,9 @@
 			"one": "\"%1\" toegepast: %n instelling; deze machine heeft geen instelling met de naam %2.",
 			"other": "\"%1\" toegepast: %n instellingen; deze machine heeft geen instelling met de naam %2."
 		},
+		"new_project.read_stopped": "Het lezen van %1 is gestopt. Kies het bestand opnieuw om het te gebruiken.",
+		"new_project.reading": "%1 wordt gelezen: %2 van %3",
+		"new_project.reading_start": "%1 wordt gelezen...",
 		"new_project.ready": "klaar",
 		"new_project.renderer": "Renderer:",
 		"new_project.scan_a_folder_for_firmware": "Een map doorzoeken op firmware",
@@ -1625,6 +1628,7 @@
 		"new_project.slot_not_with_choice": "%1 past niet bij de gekozen bestanden of machine",
 		"new_project.slot_takes": "%1: neemt %2, heeft %3",
 		"new_project.state": "Toestand",
+		"new_project.still_reading": "%1 wordt nog gelezen. Probeer het opnieuw als het klaar is.",
 		"new_project.system": "Systeem:",
 		"new_project.take_files_out": "%1 past niet bij de gekozen bestanden of machine: haal de bestanden eruit",
 		"new_project.tas_project_files_chimeraproject": "TAS-projectbestanden (*.chimeraProject)",

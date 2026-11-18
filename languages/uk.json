@@ -1630,6 +1630,9 @@
 			"few": "Застосовано \"%1\": %n параметри; у цій машині немає параметра з назвою %2.",
 			"many": "Застосовано \"%1\": %n параметрів; у цій машині немає параметра з назвою %2."
 		},
+		"new_project.read_stopped": "Читання %1 зупинено. Виберіть файл знову, щоб використати його.",
+		"new_project.reading": "Читання %1: %2 з %3",
+		"new_project.reading_start": "Читання %1...",
 		"new_project.ready": "готово",
 		"new_project.renderer": "Рендерер:",
 		"new_project.scan_a_folder_for_firmware": "Сканувати теку на прошивку",
@@ -1651,6 +1654,7 @@
 		"new_project.slot_not_with_choice": "%1 не пасує до обраних файлів або машини",
 		"new_project.slot_takes": "%1: приймає %2, є %3",
 		"new_project.state": "Стан",
+		"new_project.still_reading": "Файл %1 ще читається. Спробуйте ще раз, коли читання завершиться.",
 		"new_project.system": "Система:",
 		"new_project.take_files_out": "%1 не пасує до обраних файлів або машини: приберіть його файли",
 		"new_project.tas_project_files_chimeraproject": "Файли проєктів TAS (*.chimeraProject)",

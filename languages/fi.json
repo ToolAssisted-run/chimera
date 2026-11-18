@@ -1606,6 +1606,9 @@
 			"one": "Käytetty \"%1\": %n asetus; tässä koneessa ei ole asetusta nimeltä %2.",
 			"other": "Käytetty \"%1\": %n asetusta; tässä koneessa ei ole asetusta nimeltä %2."
 		},
+		"new_project.read_stopped": "Tiedoston %1 lukeminen keskeytettiin. Valitse se uudelleen, jos haluat käyttää sitä.",
+		"new_project.reading": "Luetaan tiedostoa %1: %2 / %3",
+		"new_project.reading_start": "Luetaan tiedostoa %1...",
 		"new_project.ready": "valmis",
 		"new_project.renderer": "Piirrin:",
 		"new_project.scan_a_folder_for_firmware": "Etsi laiteohjelmistoa kansiosta",
@@ -1625,6 +1628,7 @@
 		"new_project.slot_not_with_choice": "%1 ei sovi valittuihin tiedostoihin tai koneeseen",
 		"new_project.slot_takes": "%1: ottaa %2, on %3",
 		"new_project.state": "Tila",
+		"new_project.still_reading": "Tiedostoa %1 luetaan vielä. Yritä uudelleen, kun lukeminen on valmis.",
 		"new_project.system": "Järjestelmä:",
 		"new_project.take_files_out": "%1 ei sovi valittuihin tiedostoihin tai koneeseen: poista sen tiedostot",
 		"new_project.tas_project_files_chimeraproject": "TAS-projektitiedostot (*.chimeraProject)",

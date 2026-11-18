@@ -1582,6 +1582,9 @@
 		"new_project.preset_applied_skipped": {
 			"other": "Menerapkan \"%1\": %n pengaturan; mesin ini tidak punya pengaturan bernama %2."
 		},
+		"new_project.read_stopped": "Pembacaan %1 dihentikan. Pilih lagi untuk menggunakannya.",
+		"new_project.reading": "Membaca %1: %2 dari %3",
+		"new_project.reading_start": "Membaca %1...",
 		"new_project.ready": "siap",
 		"new_project.renderer": "Renderer:",
 		"new_project.scan_a_folder_for_firmware": "Pindai folder untuk firmware",
@@ -1599,6 +1602,7 @@
 		"new_project.slot_not_with_choice": "%1 tidak cocok dengan berkas atau mesin yang dipilih",
 		"new_project.slot_takes": "%1: menerima %2, punya %3",
 		"new_project.state": "Status",
+		"new_project.still_reading": "%1 masih dibaca. Coba lagi setelah selesai.",
 		"new_project.system": "Sistem:",
 		"new_project.take_files_out": "%1 tidak cocok dengan berkas atau mesin yang dipilih: keluarkan berkasnya",
 		"new_project.tas_project_files_chimeraproject": "Berkas Proyek TAS (*.chimeraProject)",

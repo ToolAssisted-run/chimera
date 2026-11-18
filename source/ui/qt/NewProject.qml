@@ -46,7 +46,10 @@ ApplicationWindow {
     readonly property color errorColor: win.themeColor("AccentError", "#c62828")
     readonly property color goodColor: win.themeColor("AccentGood", "#2e7d32")
 
-    onVisibleChanged: if (visible) {
+    onVisibleChanged: if (!visible) {
+        // a window put away stops reading a large file: nothing goes on unseen
+        if (win.vm.hashing) win.vm.run("cancelHash", [])
+    } else {
         win.madeProject = false
         // the cores folder as it is now: a package may have been put in or taken out since (issue 423)
         win.vm.run("refresh")
@@ -604,6 +607,22 @@ ApplicationWindow {
                     }
                 }
             }
+        }
+
+        // a large file being read away from the window (issue 611): how far, and Cancel
+        RowLayout {
+            Layout.fillWidth: true
+            visible: win.vm.hashing
+            ProgressBar {
+                objectName: "hashProgress"
+                Layout.fillWidth: true
+                from: 0
+                to: Math.max(1, win.vm.hashTotal)
+                value: win.vm.hashDone
+                indeterminate: win.vm.hashing && win.vm.hashTotal === 0
+            }
+            Label { objectName: "hashStatus"; text: win.vm.hashStatus; Layout.preferredWidth: 360; elide: Text.ElideMiddle }
+            Button { objectName: "cancelHash"; text: qsTrId("common.cancel"); Layout.preferredWidth: 84; onClicked: win.run("cancelHash") }
         }
 
         RowLayout {

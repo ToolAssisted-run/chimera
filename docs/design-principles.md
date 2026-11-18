@@ -15929,3 +15929,45 @@ symbols.
   described those names, so no other document changed.
 - **Outline shapes kept** (owner, 2026-11-17): U+25B3, U+25CB, U+2715 and
   U+25A1 stay as chosen for the three PlayStation cores.
+
+## A large file is read away from the New Project window (user-decided, 2026-11-17, issue 611)
+
+A person picked a 12 GB PlayStation 3 game in New Project and the window stopped
+answering until its hash was taken, so there was no way to tell whether Chimera
+had frozen. The view model took that hash on the window's own thread (to name
+the folder of the game's compiled code), and again for a firmware chosen by
+hand or remembered.
+
+Decided: the hash of a large file is taken away from the window, the window
+shows how much has been read with a progress bar, and the person may cancel.
+
+- The engine gained `ce_sha1_file_progress` (the same hash, told the bytes read
+  and the length after every megabyte, and stopped by the caller's answer; a
+  stopped read caches nothing) and `ce_sha1_file_known` (answers from the cache
+  alone, never reads). `ce_progress_set` was not used: it is one setting for
+  the whole process and cannot stop a read.
+- The view model reads one large file at a time on a thread of its own and posts
+  progress to the window a few times a second (`hashing`, `hashFile`,
+  `hashDone`, `hashTotal`, `hashStatus`; command `cancelHash`). A file under
+  16 MB, or one whose hash is already known, is taken at once, so a small game
+  behaves as before. 16 MB reads in a blink; it is the line between "wait" and
+  "show a bar".
+- What needed the hash waits for it: the compile page shows "Reading <file>..."
+  and looks again when the hash is known, Compile says the file is still being
+  read, and a firmware chosen by hand is taken when its hash is known. Cancel
+  takes the game out of its slot (nothing half read stays in the form) and says
+  "Stopped reading <file>. Choose it again to use it."; a reading that cannot
+  open the file says so. The window being put away stops it.
+- Left as they were, and said: the hashes of a scanned firmware folder's files
+  (each is read where the scan looks at it, and only files of the size the
+  package declares are read when it declares one), and the files Create reads,
+  which already run on the machine's thread while the window says "Making the
+  project...".
+
+Tested: the view models test picks a 48 MB file (the window is back at once,
+the bytes read only go up, the game's code is looked at when it is known) and
+a 6 GB sparse file that is stopped part way (it leaves its slot, no hash is
+kept, nothing more is said after the reading ends); the engine test reads a
+9 MB file with a callback (reports after every megabyte, a stop at the third
+is honoured and caches nothing, the finished read is known afterwards and a
+second one never calls back). The measurements are in the commit.

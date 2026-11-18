@@ -5,6 +5,7 @@
 #define CHIMERA_SHA1_HPP
 
 #include <cstdint>
+#include <functional>
 #include <string>
 
 namespace chimera {
@@ -16,6 +17,14 @@ std::string sha1Hex(const uint8_t *data, uint64_t len);
  * image, the difference between four gigabytes and none. lenOut, when given,
  * receives the length that was hashed. */
 bool sha1HexOfFile(const char *utf8Path, uint64_t *lenOut, std::string &out);
+
+/* The same, for a caller that shows how far it is and may stop it. tick gets
+ * the bytes read so far and the file's length (0 when it is not known) after
+ * every megabyte, on the calling thread, and answers true to stop. cacheOnly
+ * answers only from what is already known, and never reads. */
+enum class Sha1FileResult { Done, Unreadable, Stopped, Unknown };
+using Sha1Tick = std::function<bool(uint64_t done, uint64_t total)>;
+Sha1FileResult sha1HexOfFileEx(const char *utf8Path, uint64_t *lenOut, std::string &out, const Sha1Tick &tick, bool cacheOnly);
 
 /* The same digest taken as the bytes go PAST, for something being written. A
  * reproducible image is hashed on the way out: hashing it afterwards means

@@ -1582,6 +1582,9 @@
 		"new_project.preset_applied_skipped": {
 			"other": "已套用「%1」：%n 項設定；此機器沒有名為 %2 的設定。"
 		},
+		"new_project.read_stopped": "已停止讀取 %1。若要使用，請重新選擇。",
+		"new_project.reading": "正在讀取 %1：%2 / %3",
+		"new_project.reading_start": "正在讀取 %1...",
 		"new_project.ready": "就緒",
 		"new_project.renderer": "轉譯器：",
 		"new_project.scan_a_folder_for_firmware": "掃描資料夾以尋找韌體",
@@ -1599,6 +1602,7 @@
 		"new_project.slot_not_with_choice": "%1 與所選的檔案或機器不相容",
 		"new_project.slot_takes": "%1：可容納 %2，但有 %3",
 		"new_project.state": "狀態",
+		"new_project.still_reading": "%1 仍在讀取中。請在完成後重試。",
 		"new_project.system": "系統：",
 		"new_project.take_files_out": "%1 與所選的檔案或機器不相容：請將其檔案移除",
 		"new_project.tas_project_files_chimeraproject": "TAS 專案檔案 (*.chimeraProject)",

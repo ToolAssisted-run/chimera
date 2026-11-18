@@ -1606,6 +1606,9 @@
 			"one": "Brukte \"%1\": %n innstilling; denne maskinen har ingen innstilling som heter %2.",
 			"other": "Brukte \"%1\": %n innstillinger; denne maskinen har ingen innstilling som heter %2."
 		},
+		"new_project.read_stopped": "Lesingen av %1 ble stoppet. Velg den på nytt for å bruke den.",
+		"new_project.reading": "Leser %1: %2 av %3",
+		"new_project.reading_start": "Leser %1...",
 		"new_project.ready": "klar",
 		"new_project.renderer": "Renderer:",
 		"new_project.scan_a_folder_for_firmware": "Skann en mappe etter fastvare",
@@ -1625,6 +1628,7 @@
 		"new_project.slot_not_with_choice": "%1 passer ikke med filene eller maskinen som er valgt",
 		"new_project.slot_takes": "%1: tar %2, har %3",
 		"new_project.state": "Tilstand",
+		"new_project.still_reading": "%1 leses fortsatt. Prøv igjen når den er ferdig.",
 		"new_project.system": "System:",
 		"new_project.take_files_out": "%1 passer ikke med filene eller maskinen som er valgt: ta filene ut",
 		"new_project.tas_project_files_chimeraproject": "TAS-prosjektfiler (*.chimeraProject)",

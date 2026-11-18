@@ -1606,6 +1606,9 @@
 			"one": "\"%1\" uygulandı: %n ayar; bu makinede %2 adında ayar yok.",
 			"other": "\"%1\" uygulandı: %n ayar; bu makinede %2 adında ayar yok."
 		},
+		"new_project.read_stopped": "%1 dosyasının okunması durduruldu. Kullanmak için yeniden seçin.",
+		"new_project.reading": "%1 okunuyor: %2 / %3",
+		"new_project.reading_start": "%1 okunuyor...",
 		"new_project.ready": "hazır",
 		"new_project.renderer": "Render:",
 		"new_project.scan_a_folder_for_firmware": "Firmware için bir klasörü tara",
@@ -1625,6 +1628,7 @@
 		"new_project.slot_not_with_choice": "%1, seçilen dosyalar ya da makineyle uyuşmuyor",
 		"new_project.slot_takes": "%1: %2 alır, %3 var",
 		"new_project.state": "Durum",
+		"new_project.still_reading": "%1 hâlâ okunuyor. Bittiğinde yeniden deneyin.",
 		"new_project.system": "Sistem:",
 		"new_project.take_files_out": "%1, seçilen dosyalar ya da makineyle uyuşmuyor: dosyalarını çıkarın",
 		"new_project.tas_project_files_chimeraproject": "TAS proje dosyaları (*.chimeraProject)",

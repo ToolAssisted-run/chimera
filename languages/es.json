@@ -1606,6 +1606,9 @@
 			"one": "Aplicado \"%1\": %n ajuste; esta máquina no tiene ningún ajuste llamado %2.",
 			"other": "Aplicado \"%1\": %n ajustes; esta máquina no tiene ningún ajuste llamado %2."
 		},
+		"new_project.read_stopped": "Se detuvo la lectura de %1. Elíjalo de nuevo para usarlo.",
+		"new_project.reading": "Leyendo %1: %2 de %3",
+		"new_project.reading_start": "Leyendo %1...",
 		"new_project.ready": "listo",
 		"new_project.renderer": "Renderizador:",
 		"new_project.scan_a_folder_for_firmware": "Buscar firmware en una carpeta",
@@ -1625,6 +1628,7 @@
 		"new_project.slot_not_with_choice": "%1 no es compatible con los archivos o la máquina elegidos",
 		"new_project.slot_takes": "%1: admite %2, tiene %3",
 		"new_project.state": "Estado",
+		"new_project.still_reading": "%1 todavía se está leyendo. Inténtelo de nuevo cuando termine.",
 		"new_project.system": "Sistema:",
 		"new_project.take_files_out": "%1 no es compatible con los archivos o la máquina elegidos: quite sus archivos",
 		"new_project.tas_project_files_chimeraproject": "Archivos de proyecto TAS (*.chimeraProject)",

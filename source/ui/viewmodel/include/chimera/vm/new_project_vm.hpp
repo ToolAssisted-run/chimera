@@ -88,6 +88,18 @@ public:
 	Property<int64_t> made{0};
 	Property<bool> filesRefused{false};
 
+	/* A large file is read away from the view (issue 611): a game of twelve
+	 * gigabytes took the window with it while its hash was taken. While one is
+	 * read, hashing is true, hashFile names it, hashDone and hashTotal are the
+	 * bytes read and the file's length (0 when the system does not say), and
+	 * hashStatus says so in words. cancelHash stops it: the file goes out of
+	 * its slot (or is not taken as firmware) and the person is told. A file
+	 * that is quick to read (under 16 MB), or whose hash is already known, is
+	 * taken at once, as before. */
+	Property<bool> hashing{false};
+	Property<std::string> hashFile, hashStatus;
+	Property<int64_t> hashDone{0}, hashTotal{0};
+
 	/* What the core suggests for the game chosen, for a core that says it
 	 * suggests (its "suggestSettings"): where the values come from, and which
 	 * were applied ("" when nothing was asked). Asked once a game, away from
@@ -298,7 +310,7 @@ private:
 	/* the game a compile session compiles: the first file picked */
 	std::string compileGame() const;
 	/* the game's folder of compiled code, "" without a game or a root */
-	std::string compileDirOf(const std::string &game) const;
+	std::string compileDirOf(const std::string &game);
 	/* the game's manifest read again, and whether its modules are there */
 	void refreshCompile();
 	std::string compileSeen_;
@@ -311,6 +323,23 @@ private:
 	/* firmware Clear took away on the firmware page, until the page is shown again */
 	std::vector<std::string> clearedFirmware_;
 	std::vector<FirmwareFile> firmwareIndex_;
+	/* How a file's hash is had without waiting for a large one: Ready (sha is
+	 * it), Unreadable, Pending (it is being read, and evaluate() runs again
+	 * when it is known), or Declined (the person stopped it). */
+	enum class Hashed { Ready, Unreadable, Pending, Declined };
+	Hashed hashOf(const std::string &path, std::string &sha);
+	struct HashRun;
+	void startNextHash();
+	void hashFinished(const std::shared_ptr<HashRun> &run, int result, const std::string &sha);
+	void cancelHashing(bool say = true);
+	/* what a chosen firmware does once its hash is known */
+	bool applyChosenFirmware(const std::string &id, const std::string &path, const std::string &sha, std::string &error);
+	std::shared_ptr<HashRun> hashRun_;
+	/* readings stopped but not yet ended: the view model waits for them when it goes */
+	std::vector<std::shared_ptr<HashRun>> hashRetired_;
+	std::vector<std::string> hashQueue_;
+	std::vector<std::string> hashDeclined_, hashUnreadable_;
+	std::map<std::string, std::vector<std::function<void(bool, const std::string &)>>> hashWaiting_;
 	/* the hashes of files remembered for this core's firmware, read once */
 	std::map<std::string, std::string> rememberedSha_;
 	Connection coresWatch_, kindWatch_;

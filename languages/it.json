@@ -1606,6 +1606,9 @@
 			"one": "Applicato \"%1\": %n impostazione; questa macchina non ha un'impostazione chiamata %2.",
 			"other": "Applicato \"%1\": %n impostazioni; questa macchina non ha un'impostazione chiamata %2."
 		},
+		"new_project.read_stopped": "La lettura di %1 è stata interrotta. Sceglilo di nuovo per usarlo.",
+		"new_project.reading": "Lettura di %1: %2 di %3",
+		"new_project.reading_start": "Lettura di %1...",
 		"new_project.ready": "pronto",
 		"new_project.renderer": "Renderer:",
 		"new_project.scan_a_folder_for_firmware": "Cerca firmware in una cartella",
@@ -1625,6 +1628,7 @@
 		"new_project.slot_not_with_choice": "%1 non va con i file o la macchina scelti",
 		"new_project.slot_takes": "%1: accetta %2, ne ha %3",
 		"new_project.state": "Stato",
+		"new_project.still_reading": "%1 è ancora in lettura. Riprova quando ha finito.",
 		"new_project.system": "Sistema:",
 		"new_project.take_files_out": "%1 non va con i file o la macchina scelti: togline i file",
 		"new_project.tas_project_files_chimeraproject": "File di progetto TAS (*.chimeraProject)",

@@ -1582,6 +1582,9 @@
 		"new_project.preset_applied_skipped": {
 			"other": "\"%1\" を適用しました: 設定 %n 件。このマシンには %2 という名前の設定がありません。"
 		},
+		"new_project.read_stopped": "%1 の読み込みを中止しました。使うには、もう一度選んでください。",
+		"new_project.reading": "%1 を読み込み中: %2 / %3",
+		"new_project.reading_start": "%1 を読み込んでいます...",
 		"new_project.ready": "準備完了",
 		"new_project.renderer": "レンダラー:",
 		"new_project.scan_a_folder_for_firmware": "フォルダーからファームウェアを探す",
@@ -1599,6 +1602,7 @@
 		"new_project.slot_not_with_choice": "%1 は、選んだファイルまたはマシンと合いません",
 		"new_project.slot_takes": "%1: %2 を受け付けますが、%3 があります",
 		"new_project.state": "状態",
+		"new_project.still_reading": "%1 はまだ読み込み中です。完了してからもう一度お試しください。",
 		"new_project.system": "システム:",
 		"new_project.take_files_out": "%1 は、選んだファイルまたはマシンと合いません: そのファイルを外してください",
 		"new_project.tas_project_files_chimeraproject": "TAS プロジェクトファイル (*.chimeraProject)",

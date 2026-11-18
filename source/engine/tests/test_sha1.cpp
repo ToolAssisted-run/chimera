@@ -96,6 +96,51 @@ void testProgressOfAFileHash()
 	printf("progress: a file hash reports its way to the end\n");
 }
 
+/* A hash taken away from a window: how far it is is told after every
+ * megabyte, a stop is honoured and caches nothing, a finished one is known
+ * afterwards without reading, and one that was never read is not known. */
+void writeFill(const char *path, uint8_t fill);
+
+struct Watch
+{
+	int calls = 0;
+	uint64_t lastDone = 0, lastTotal = 0;
+	int stopAfter = -1;
+};
+
+int onHashProgress(uint64_t done, uint64_t total, void *user)
+{
+	Watch *w = static_cast<Watch *>(user);
+	w->calls++;
+	w->lastDone = done;
+	w->lastTotal = total;
+	return w->stopAfter >= 0 && w->calls >= w->stopAfter ? 1 : 0;
+}
+
+void testHashWithProgressAndStop()
+{
+	const char *path = "test_sha1_watched.bin";
+	remove(path);
+	writeFill(path, 0x71);
+	char hex[41], again[41];
+	uint64_t len = 0;
+	assert(ce_sha1_file_known(path, hex, &len) == 0);
+	Watch stopped;
+	stopped.stopAfter = 3;
+	assert(ce_sha1_file_progress(path, hex, &len, &onHashProgress, &stopped) == -1);
+	assert(stopped.calls == 3);
+	assert(ce_sha1_file_known(path, hex, &len) == 0);
+	Watch whole;
+	assert(ce_sha1_file_progress(path, hex, &len, &onHashProgress, &whole) == 1);
+	assert(len == 9u << 20 && whole.calls >= 9 && whole.lastDone == len && whole.lastTotal == len);
+	assert(ce_sha1_file_known(path, again, &len) == 1 && std::string(again) == hex);
+	Watch cached;
+	assert(ce_sha1_file_progress(path, again, &len, &onHashProgress, &cached) == 1 && cached.calls == 0);
+	assert(ce_sha1_file_progress("test_sha1_there_is_no_such_file.bin", again, &len, &onHashProgress, &cached) == 0);
+	remove(path);
+	printf("hash: progress after every megabyte, a stop honoured and not kept\n");
+}
+
 /* The hashes kept between sessions (owner, 2026-10-24, issue 368). A hash
  * taken after ce_sha1_keep_in is read back by the next process, which then
  * does not read the file; a file written since is read again; a line that is
@@ -234,6 +279,7 @@ void testSameSizeSameDateIsHashedAgain()
 int main(void)
 {
 	testProgressOfAFileHash();
+	testHashWithProgressAndStop();
 	testKeptBetweenSessions();
 #ifndef _WIN32
 	testSameSizeSameDateIsHashedAgain();

@@ -1606,6 +1606,9 @@
 			"one": "Applied \"%1\": %n setting; this machine has no setting named %2.",
 			"other": "Applied \"%1\": %n settings; this machine has no setting named %2."
 		},
+		"new_project.read_stopped": "Stopped reading %1. Choose it again to use it.",
+		"new_project.reading": "Reading %1: %2 of %3",
+		"new_project.reading_start": "Reading %1...",
 		"new_project.ready": "ready",
 		"new_project.renderer": "Renderer:",
 		"new_project.scan_a_folder_for_firmware": "Scan a folder for firmware",
@@ -1625,6 +1628,7 @@
 		"new_project.slot_not_with_choice": "%1 does not go with the files or the machine chosen",
 		"new_project.slot_takes": "%1: takes %2, has %3",
 		"new_project.state": "State",
+		"new_project.still_reading": "%1 is still being read. Try again when it is done.",
 		"new_project.system": "System:",
 		"new_project.take_files_out": "%1 does not go with the files or the machine chosen: take its files out",
 		"new_project.tas_project_files_chimeraproject": "TAS Project Files (*.chimeraProject)",

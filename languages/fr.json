@@ -1606,6 +1606,9 @@
 			"one": "Appliqué « %1 » : %n paramètre ; cette machine n'a aucun paramètre nommé %2.",
 			"other": "Appliqué « %1 » : %n paramètres ; cette machine n'a aucun paramètre nommé %2."
 		},
+		"new_project.read_stopped": "La lecture de %1 a été arrêtée. Choisissez-le à nouveau pour l'utiliser.",
+		"new_project.reading": "Lecture de %1 : %2 sur %3",
+		"new_project.reading_start": "Lecture de %1...",
 		"new_project.ready": "prêt",
 		"new_project.renderer": "Moteur de rendu :",
 		"new_project.scan_a_folder_for_firmware": "Chercher du firmware dans un dossier",
@@ -1625,6 +1628,7 @@
 		"new_project.slot_not_with_choice": "%1 ne va pas avec les fichiers ni avec la machine choisis",
 		"new_project.slot_takes": "%1 : prend %2, en a %3",
 		"new_project.state": "État",
+		"new_project.still_reading": "%1 est encore en cours de lecture. Réessayez quand ce sera terminé.",
 		"new_project.system": "Système :",
 		"new_project.take_files_out": "%1 ne va pas avec les fichiers ni avec la machine choisis : retirez ses fichiers",
 		"new_project.tas_project_files_chimeraproject": "Fichiers de projet TAS (*.chimeraProject)",

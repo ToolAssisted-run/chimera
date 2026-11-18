@@ -8379,6 +8379,103 @@ bool createForAgent(const char *package, const char *rom, const char *hashedPack
 	return true;
 }
 
+/* A large file is read away from the window (issue 611): the window's thread
+ * is back at once, the bytes read so far are told, a stop is honoured, and a
+ * file that was read to its end is the game's. */
+bool largeFileStep(const char *compilePackage)
+{
+	namespace fs = std::filesystem;
+	std::error_code ec;
+	if (fs::file_size(compilePackage, ec) == 0 || ec)
+	{
+		std::printf("SKIP the large file step: no compiling package\n");
+		return true;
+	}
+	const fs::path dir = fs::temp_directory_path() / ("chimera-test-large-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+	fs::create_directories(dir / "Cores");
+	fs::copy_file(compilePackage, dir / "Cores" / "synth-compile.chimeraCore");
+	/* 48 MB of something: more than the size read at once, and a few reports long */
+	const std::string big = (dir / "big.testrom").string();
+	{
+		std::ofstream out(big, std::ios::binary);
+		const std::string block(1 << 20, 'q');
+		for (int i = 0; i < 48; i++) out << block;
+	}
+	/* 40 GB of nothing, a sparse file: long enough to be stopped half way */
+	const std::string huge = (dir / "huge.testrom").string();
+	{
+		std::ofstream out(huge, std::ios::binary);
+		out << "x";
+	}
+	fs::resize_file(huge, 40ull << 30, ec);
+	CHECK(!ec);
+	ManualDispatcher d;
+	InputLog inputs;
+	SessionViewModel session(d, inputs);
+	CoresViewModel installed(d);
+	std::string error;
+	installed.set("coresFolder", (dir / "Cores").string(), error);
+	auto owned = std::make_unique<NewProjectViewModel>(d, session, installed);
+	NewProjectViewModel &wizard = *owned;
+	wizard.compileRoot.set((dir / "compiled").string());
+	CHECK(wizard.run("chooseCore", {std::string("Synth Compile")}, error).has_value());
+	int64_t most = 0;
+	int64_t lastDone = 0;
+	bool steady = true;
+	/* the call returns with the file still being read, and the view told so */
+	CHECK(wizard.run("addFile", {std::string("rom"), big}, error).has_value());
+	CHECK(wizard.hashing.get() && wizard.hashFile.get() == "big.testrom" && wizard.hashTotal.get() == 48ll << 20);
+	CHECK(wizard.hashStatus.get() == "Reading big.testrom...");
+	CHECK(!wizard.compileReady.get() && wizard.compileStatus.get() == "Reading big.testrom...");
+	CHECK(d.until([&] {
+		/* the count only goes up while the reading goes on (it is put back to 0 when it ends) */
+		if (wizard.hashing.get())
+		{
+			steady = steady && wizard.hashDone.get() >= lastDone;
+			lastDone = wizard.hashDone.get();
+			most = std::max(most, lastDone);
+		}
+		return !wizard.hashing.get();
+	}, 60));
+	/* done: its hash is known, and what the game's code is is looked at now */
+	char sha[41] = {};
+	CHECK(ce_sha1_file_known(big.c_str(), sha, nullptr) == 1);
+	CHECK(wizard.hashFile.get().empty() && wizard.hashDone.get() == 0 && wizard.hashStatus.get().empty());
+	CHECK(steady && wizard.compileAsked.get());
+	CHECK(wizard.compileStatus.get() == "This game's code is not compiled yet: Compile does it.");
+	std::printf("large file: read in the background, %lld of %lld bytes seen last\n", static_cast<long long>(most), 48ll << 20);
+
+	/* another, stopped half way: it is out of its slot, and nothing is kept of it */
+	CHECK(wizard.run("removeFile", {std::string("rom"), int64_t{0}}, error).has_value());
+	CHECK(wizard.run("addFile", {std::string("rom"), huge}, error).has_value());
+	CHECK(wizard.hashing.get());
+	CHECK(wizard.run("compile", {}, error).has_value() == false && error == "huge.testrom is still being read. Try again when it is done.");
+	CHECK(d.until([&] { return wizard.hashDone.get() > 0 && wizard.hashStatus.get().rfind("Reading huge.testrom: ", 0) == 0; }, 60));
+	const int64_t seen = wizard.hashDone.get();
+	CHECK(seen > 0 && seen < 40ll << 30 && wizard.hashTotal.get() == 40ll << 30);
+	CHECK(wizard.run("cancelHash", {}, error).has_value());
+	CHECK(!wizard.hashing.get() && wizard.hashFile.get().empty());
+	CHECK(wizard.status.get() == "Stopped reading huge.testrom. Choose it again to use it.");
+	RowModel *slots = nullptr;
+	for (const auto &r : wizard.rowLists())
+		if (r.name == "slots") slots = r.model;
+	CHECK(slots != nullptr && std::get<int64_t>(slots->cell(0, 8)) == 0);
+	/* the reading ends soon after, and says nothing more */
+	std::this_thread::sleep_for(std::chrono::milliseconds(300));
+	d.pump();
+	CHECK(!wizard.hashing.get() && ce_sha1_file_known(huge.c_str(), sha, nullptr) == 0);
+	CHECK(wizard.status.get() == "Stopped reading huge.testrom. Choose it again to use it.");
+	/* the reading itself has stopped, not only been forgotten: the view model
+	 * waits for it to end when it goes, and 40 GB would take longer than this */
+	const auto before = std::chrono::steady_clock::now();
+	owned.reset();
+	const double waited = std::chrono::duration<double>(std::chrono::steady_clock::now() - before).count();
+	CHECK(waited < 5.0);
+	std::printf("large file: stopped at %lld of %lld bytes, the reading ended within %.2f s\n", static_cast<long long>(seen), 40ll << 30, waited);
+	fs::remove_all(dir, ec);
+	return true;
+}
+
 bool compileStep(const char *compilePackage, const char *rom)
 {
 	namespace fs = std::filesystem;
@@ -12158,6 +12255,7 @@ int main(int argc, char **argv)
 			if (argc >= 9) ranMachine = createForAgent(argv[1], argv[2], argv[7]) && ranMachine;
 			if (argc >= 13) ranMachine = compileStep(argv[12], argv[2]) && ranMachine;
 			else std::printf("SKIP the compile step: no compiling package given\n");
+			if (argc >= 13) ranMachine = largeFileStep(argv[12]) && ranMachine;
 			if (argc >= 14) ranMachine = squarePixels(argv[1], argv[13], argv[2]) && ranMachine;
 			if (argc >= 15) ranMachine = soundRate(argv[14], argv[2]) && ranMachine;
 			if (argc >= 16) ranMachine = wideButtons(argv[15], argv[2]) && ranMachine;

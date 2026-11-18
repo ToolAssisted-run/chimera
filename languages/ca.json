@@ -1606,6 +1606,9 @@
 			"one": "S'ha aplicat «%1»: %n configuració; aquesta màquina no té cap configuració que es digui %2.",
 			"other": "S'han aplicat «%1»: %n configuracions; aquesta màquina no té cap configuració que es digui %2."
 		},
+		"new_project.read_stopped": "S'ha aturat la lectura de %1. Torna a triar-lo per usar-lo.",
+		"new_project.reading": "Llegint %1: %2 de %3",
+		"new_project.reading_start": "Llegint %1...",
 		"new_project.ready": "a punt",
 		"new_project.renderer": "Renderitzador:",
 		"new_project.scan_a_folder_for_firmware": "Explora una carpeta per trobar microprogramari",
@@ -1625,6 +1628,7 @@
 		"new_project.slot_not_with_choice": "%1 no encaixa amb els fitxers ni amb la màquina triats",
 		"new_project.slot_takes": "%1: accepta %2, en té %3",
 		"new_project.state": "Estat",
+		"new_project.still_reading": "%1 encara s'està llegint. Torna-ho a provar quan hagi acabat.",
 		"new_project.system": "Sistema:",
 		"new_project.take_files_out": "%1 no encaixa amb els fitxers ni amb la màquina triats: traieu-ne els fitxers",
 		"new_project.tas_project_files_chimeraproject": "Fitxers de projecte TAS (*.chimeraProject)",

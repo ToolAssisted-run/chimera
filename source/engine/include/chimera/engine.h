@@ -278,6 +278,19 @@ CE_API void ce_sha1_hex(const uint8_t *data, uint64_t len, char *out41);
  * changed times, volume, file index), so hashing the same file twice costs one
  * read. Returns 1 when the file was read, 0 when it was not. */
 CE_API int ce_sha1_file(const char *utf8Path, char *out41, uint64_t *lenOut);
+/* The same hash, for a frontend that reads a large file away from its window
+ * and shows how far it is. fn is called on the calling thread after every
+ * megabyte read with the bytes read so far and the file's length (0 when the
+ * system does not say), and returns non-zero to stop. Returns 1 when the file
+ * was hashed (out41 and lenOut are written), 0 when it could not be read, -1
+ * when fn stopped it (nothing is cached). A file already hashed is answered
+ * from the cache without calling fn. */
+typedef int (*ce_hash_progress_fn)(uint64_t done, uint64_t total, void *user);
+CE_API int ce_sha1_file_progress(const char *utf8Path, char *out41, uint64_t *lenOut, ce_hash_progress_fn fn, void *user);
+/* Answers from the cache alone: 1 and the hash (out41 may be NULL) when the
+ * file's hash is already known, 0 when taking it would mean reading the file.
+ * Never reads, so it is cheap to ask on a window's own thread. */
+CE_API int ce_sha1_file_known(const char *utf8Path, char *out41, uint64_t *lenOut);
 /* Keeps that cache between sessions in the file named (UTF-8; NULL keeps it
  * for this process only, as before the first call): the hashes the file holds
  * are read back now, and every hash taken from now on of a file whose

@@ -1606,6 +1606,9 @@
 			"one": "Anvendte \"%1\": %n indstilling; denne maskine har ingen indstilling ved navn %2.",
 			"other": "Anvendte \"%1\": %n indstillinger; denne maskine har ingen indstilling ved navn %2."
 		},
+		"new_project.read_stopped": "Læsningen af %1 blev stoppet. Vælg den igen for at bruge den.",
+		"new_project.reading": "Læser %1: %2 af %3",
+		"new_project.reading_start": "Læser %1...",
 		"new_project.ready": "klar",
 		"new_project.renderer": "Renderer:",
 		"new_project.scan_a_folder_for_firmware": "Søg i en mappe efter firmware",
@@ -1625,6 +1628,7 @@
 		"new_project.slot_not_with_choice": "%1 passer ikke med de valgte filer eller maskinen",
 		"new_project.slot_takes": "%1: tager %2, har %3",
 		"new_project.state": "Tilstand",
+		"new_project.still_reading": "%1 bliver stadig læst. Prøv igen, når den er færdig.",
 		"new_project.system": "System:",
 		"new_project.take_files_out": "%1 passer ikke med de valgte filer eller maskinen: fjern dens filer",
 		"new_project.tas_project_files_chimeraproject": "TAS-projektfiler (*.chimeraProject)",

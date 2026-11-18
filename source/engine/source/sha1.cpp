@@ -355,7 +355,7 @@ static void keepHash(const CacheKey &key, const std::string &hex, uint64_t len)
 	std::fclose(f);
 }
 
-bool sha1HexOfFile(const char *utf8Path, uint64_t *lenOut, std::string &out)
+Sha1FileResult sha1HexOfFileEx(const char *utf8Path, uint64_t *lenOut, std::string &out, const Sha1Tick &tick, bool cacheOnly)
 {
 	CacheKey key;
 	bool stamped = utf8Path != nullptr
@@ -369,12 +369,13 @@ bool sha1HexOfFile(const char *utf8Path, uint64_t *lenOut, std::string &out)
 		{
 			out = it->second.first;
 			if (lenOut != nullptr) *lenOut = it->second.second;
-			return true;
+			return Sha1FileResult::Done;
 		}
 	}
+	if (cacheOnly) return Sha1FileResult::Unknown;
 
 	FileReader reader;
-	if (!reader.open(utf8Path)) return false;
+	if (!reader.open(utf8Path)) return Sha1FileResult::Unreadable;
 	Sha1 sha;
 	std::vector<uint8_t> chunk(1 << 20);
 	uint64_t total = 0;
@@ -403,9 +404,12 @@ bool sha1HexOfFile(const char *utf8Path, uint64_t *lenOut, std::string &out)
 			sinceReport = 0;
 			progress(stage.c_str(), total, expected);
 		}
+		/* asked after every chunk, so a stop is honoured within a megabyte */
+		if (tick && tick(total, expected)) return Sha1FileResult::Stopped;
 	}
 	if (expected != 0) progress(stage.c_str(), total, expected);
-	if (!reader.ok()) return false;
+	if (tick) tick(total, expected != 0 ? expected : total); /* the last step, whole */
+	if (!reader.ok()) return Sha1FileResult::Unreadable;
 	uint8_t digest[20];
 	sha.finish(digest);
 	static const char *hex = "0123456789ABCDEF";
@@ -427,7 +431,12 @@ bool sha1HexOfFile(const char *utf8Path, uint64_t *lenOut, std::string &out)
 		}
 		keepHash(key, out, total);
 	}
-	return true;
+	return Sha1FileResult::Done;
+}
+
+bool sha1HexOfFile(const char *utf8Path, uint64_t *lenOut, std::string &out)
+{
+	return sha1HexOfFileEx(utf8Path, lenOut, out, nullptr, false) == Sha1FileResult::Done;
 }
 
 int32_t sha1KeepIn(const char *utf8Path)
@@ -522,6 +531,34 @@ extern "C" void ce_sha1_hex(const uint8_t *data, uint64_t len, char *out41)
 	std::string hex = chimera::sha1Hex(data, len);
 	std::memcpy(out41, hex.data(), 40);
 	out41[40] = '\0';
+}
+
+extern "C" int ce_sha1_file_known(const char *utf8Path, char *out41, uint64_t *lenOut)
+{
+	std::string hex;
+	if (chimera::sha1HexOfFileEx(utf8Path, lenOut, hex, nullptr, true) != chimera::Sha1FileResult::Done) return 0;
+	if (out41 != nullptr)
+	{
+		std::memcpy(out41, hex.data(), 40);
+		out41[40] = '\0';
+	}
+	return 1;
+}
+
+extern "C" int ce_sha1_file_progress(const char *utf8Path, char *out41, uint64_t *lenOut, ce_hash_progress_fn fn, void *user)
+{
+	std::string hex;
+	chimera::Sha1Tick tick;
+	if (fn != nullptr) tick = [fn, user](uint64_t done, uint64_t total) { return fn(done, total, user) != 0; };
+	switch (chimera::sha1HexOfFileEx(utf8Path, lenOut, hex, tick, false))
+	{
+	case chimera::Sha1FileResult::Done:
+		std::memcpy(out41, hex.data(), 40);
+		out41[40] = '\0';
+		return 1;
+	case chimera::Sha1FileResult::Stopped: return -1;
+	default: return 0;
+	}
 }
 
 extern "C" int32_t ce_sha1_keep_in(const char *utf8Path)
