@@ -1561,6 +1561,7 @@
 		"new_project.not_a_folder": "%1 bukan folder",
 		"new_project.not_added": "tidak dapat ditambahkan",
 		"new_project.not_made": "Tidak dibuat: %1",
+		"new_project.not_read": "belum dibaca",
 		"new_project.not_this_file": "%1 bukan berkas ini: hash-nya %2, yang dibutuhkan %3",
 		"new_project.not_yet": "belum: %1",
 		"new_project.one_across": "setidaknya satu berkas dibutuhkan di seluruh: %1",
@@ -1582,7 +1583,7 @@
 		"new_project.preset_applied_skipped": {
 			"other": "Menerapkan \"%1\": %n pengaturan; mesin ini tidak punya pengaturan bernama %2."
 		},
-		"new_project.read_stopped": "Pembacaan %1 dihentikan. Pilih lagi untuk menggunakannya.",
+		"new_project.read_stopped": "Pembacaan %1 dihentikan. File tetap dipilih, ditandai belum dibaca; Buat atau Kompilasi akan membacanya lagi.",
 		"new_project.reading": "Membaca %1: %2 dari %3",
 		"new_project.reading_start": "Membaca %1...",
 		"new_project.ready": "siap",
@@ -1592,6 +1593,7 @@
 		"new_project.scan_resolved": {
 			"other": "%1; %n kebutuhan terselesaikan"
 		},
+		"new_project.scan_stopped": "Pembacaan %1 dihentikan. %2",
 		"new_project.scanned": {
 			"other": "memindai %n berkas"
 		},
@@ -1602,7 +1604,6 @@
 		"new_project.slot_not_with_choice": "%1 tidak cocok dengan berkas atau mesin yang dipilih",
 		"new_project.slot_takes": "%1: menerima %2, punya %3",
 		"new_project.state": "Status",
-		"new_project.still_reading": "%1 masih dibaca. Coba lagi setelah selesai.",
 		"new_project.system": "Sistem:",
 		"new_project.take_files_out": "%1 tidak cocok dengan berkas atau mesin yang dipilih: keluarkan berkasnya",
 		"new_project.tas_project_files_chimeraproject": "Berkas Proyek TAS (*.chimeraProject)",

@@ -15953,21 +15953,33 @@ shows how much has been read with a progress bar, and the person may cancel.
   behaves as before. 16 MB reads in a blink; it is the line between "wait" and
   "show a bar".
 - What needed the hash waits for it: the compile page shows "Reading <file>..."
-  and looks again when the hash is known, Compile says the file is still being
-  read, and a firmware chosen by hand is taken when its hash is known. Cancel
-  takes the game out of its slot (nothing half read stays in the form) and says
-  "Stopped reading <file>. Choose it again to use it."; a reading that cannot
-  open the file says so. The window being put away stops it.
-- Left as they were, and said: the hashes of a scanned firmware folder's files
-  (each is read where the scan looks at it, and only files of the size the
-  package declares are read when it declares one), and the files Create reads,
-  which already run on the machine's thread while the window says "Making the
-  project...".
+  and looks again when the hash is known, and a firmware chosen by hand is
+  taken when its hash is known. Cancel keeps the file where it was picked,
+  marked "(not read)" in its slot, and says "Stopped reading <file>. It stays
+  picked, marked not read; Create or Compile reads it again." (user-decided,
+  2026-11-17: the first version took the file out of its slot). Compile and
+  Create then read it again with the same bar and go on when it is known;
+  picking the file again does the same. The window being put away stops it.
+- The firmware folder scan is read the same way (user-decided, 2026-11-17).
+  Looking for firmware calls the hash of every file in the folder that could
+  match; while a page is evaluated, a file of 16 MB or more whose hash is not
+  known is not read there: it is noted, counted as not found yet, read away
+  from the window, and the page is evaluated again when it is known. Scan
+  Folder does the same and says its result when the last file is read; Cancel
+  keeps what the files read so far matched ("Stopped reading <file>. scanned N
+  files; ...") and a file stopped is not read again by the next look. The
+  engine only indexes firmware files under 2 GB, so that is the largest a scan
+  reads.
+- The 16 MB line stays (user-decided, 2026-11-17).
+- Left as they were, and said: the files Create reads, which already run on
+  the machine's thread while the window says "Making the project...".
 
 Tested: the view models test picks a 48 MB file (the window is back at once,
 the bytes read only go up, the game's code is looked at when it is known) and
-a 6 GB sparse file that is stopped part way (it leaves its slot, no hash is
-kept, nothing more is said after the reading ends); the engine test reads a
+a 40 GB sparse file that is stopped part way (it stays in its slot marked not
+read, no hash is kept, nothing more is said after the reading ends), and read
+again by Compile and by Create; a firmware folder with a 2 GB sparse file is
+scanned, stopped, and scanned to its end; the engine test reads a
 9 MB file with a callback (reports after every megabyte, a stop at the third
 is honoured and caches nothing, the finished read is known afterwards and a
 second one never calls back). The measurements are in the commit.

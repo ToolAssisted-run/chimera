@@ -1605,6 +1605,7 @@
 		"new_project.not_a_folder": "%1 — не папка",
 		"new_project.not_added": "его не удалось добавить",
 		"new_project.not_made": "Не создано: %1",
+		"new_project.not_read": "не прочитан",
 		"new_project.not_this_file": "%1 — не этот файл: его хэш %2, а требуется %3",
 		"new_project.not_yet": "пока нет: %1",
 		"new_project.one_across": "нужен хотя бы один файл из: %1",
@@ -1630,7 +1631,7 @@
 			"few": "Применён «%1»: %n настройки; у этой машины нет настройки с именем %2.",
 			"many": "Применён «%1»: %n настроек; у этой машины нет настройки с именем %2."
 		},
-		"new_project.read_stopped": "Чтение %1 остановлено. Выберите файл снова, чтобы использовать его.",
+		"new_project.read_stopped": "Чтение %1 остановлено. Файл остаётся выбранным и помечен как непрочитанный; «Создать» или «Скомпилировать» прочитает его снова.",
 		"new_project.reading": "Чтение %1: %2 из %3",
 		"new_project.reading_start": "Чтение %1...",
 		"new_project.ready": "готово",
@@ -1642,6 +1643,7 @@
 			"few": "%1; %n требования выполнены",
 			"many": "%1; %n требований выполнено"
 		},
+		"new_project.scan_stopped": "Чтение %1 остановлено. %2",
 		"new_project.scanned": {
 			"one": "просмотрен %n файл",
 			"few": "просмотрено %n файла",
@@ -1654,7 +1656,6 @@
 		"new_project.slot_not_with_choice": "%1 не подходит к выбранным файлам или машине",
 		"new_project.slot_takes": "%1: принимает %2, есть %3",
 		"new_project.state": "Состояние",
-		"new_project.still_reading": "Файл %1 ещё читается. Повторите попытку, когда чтение закончится.",
 		"new_project.system": "Система:",
 		"new_project.take_files_out": "%1 не подходит к выбранным файлам или машине: уберите его файлы",
 		"new_project.tas_project_files_chimeraproject": "Файлы проектов TAS (*.chimeraProject)",

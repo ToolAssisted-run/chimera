@@ -26,6 +26,30 @@ struct FirmwareFile
 	const std::string &hash() const;
 };
 
+/* The size from which a file's hash is read away from the window (issue 611):
+ * under it, the read is a blink. */
+constexpr int64_t kLargeFile = 16ll << 20;
+
+/* While one of these lives on a thread, FirmwareFile::hash() does not read a
+ * file of kLargeFile or more whose hash is not yet known: it notes the path
+ * (paths()) and answers a text beginning "?" that matches nothing, and
+ * neededFirmware() leaves a file it could only answer so out. The caller reads
+ * the noted files away from the window and asks again when they are known. */
+class DeferLargeHashes
+{
+public:
+	DeferLargeHashes();
+	~DeferLargeHashes();
+	DeferLargeHashes(const DeferLargeHashes &) = delete;
+	DeferLargeHashes &operator=(const DeferLargeHashes &) = delete;
+	const std::vector<std::string> &paths() const { return paths_; }
+	void note(const std::string &path) { paths_.push_back(path); }
+
+private:
+	std::vector<std::string> paths_;
+	DeferLargeHashes *outer_;
+};
+
 /* every file in these folders (and below, unless recurse is false), names
  * and sizes, nothing read, at most `most` of them; a path that is a file is
  * that file */

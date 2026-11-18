@@ -71,8 +71,23 @@ std::vector<FirmwareFile> indexFirmware(const std::vector<std::string> &folders,
 	return index;
 }
 
+namespace {
+thread_local DeferLargeHashes *g_defer = nullptr;
+}
+
+DeferLargeHashes::DeferLargeHashes() : outer_(g_defer) { g_defer = this; }
+DeferLargeHashes::~DeferLargeHashes() { g_defer = outer_; }
+
 const std::string &FirmwareFile::hash() const
 {
+	if (sha1.empty() && g_defer != nullptr && size >= kLargeFile && ce_sha1_file_known(path.c_str(), nullptr, nullptr) != 1)
+	{
+		/* not read here: the path is noted, and the answer matches nothing */
+		g_defer->note(path);
+		static thread_local std::string unknown;
+		unknown = "?" + path;
+		return unknown;
+	}
 	if (sha1.empty())
 	{
 		char sha[41] = {};
@@ -180,9 +195,14 @@ std::vector<FirmwareNeed> neededFirmware(const Json &firmwareDecl, const Json &s
 		std::string how;
 		if (const FirmwareFile *f = findFirmware(decl, pinned, index, how))
 		{
-			need.path = f->path;
-			need.how = how;
-			need.sha1 = f->hash();
+			const std::string &h = f->hash();
+			/* a file not read yet (DeferLargeHashes) is not found yet */
+			if (h.empty() || h[0] != '?')
+			{
+				need.path = f->path;
+				need.how = how;
+				need.sha1 = h;
+			}
 		}
 		needs.push_back(std::move(need));
 	}

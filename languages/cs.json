@@ -1605,6 +1605,7 @@
 		"new_project.not_a_folder": "%1 není složka",
 		"new_project.not_added": "nešlo to přidat",
 		"new_project.not_made": "Nevytvořeno: %1",
+		"new_project.not_read": "nepřečteno",
 		"new_project.not_this_file": "%1 není tento soubor: jeho kontrolní součet je %2, požadavek je %3",
 		"new_project.not_yet": "zatím ne: %1",
 		"new_project.one_across": "napříč je potřeba alespoň jeden soubor: %1",
@@ -1630,7 +1631,7 @@
 			"few": "Použito \"%1\": %n nastavení; tento stroj nemá nastavení jménem %2.",
 			"other": "Použito \"%1\": %n nastavení; tento stroj nemá nastavení jménem %2."
 		},
-		"new_project.read_stopped": "Čtení souboru %1 bylo zastaveno. Vyberte ho znovu, chcete-li ho použít.",
+		"new_project.read_stopped": "Čtení souboru %1 bylo zastaveno. Zůstává vybraný a označený jako nepřečtený; Vytvořit nebo Kompilovat ho přečte znovu.",
 		"new_project.reading": "Čtu %1: %2 z %3",
 		"new_project.reading_start": "Čtu %1...",
 		"new_project.ready": "připraveno",
@@ -1642,6 +1643,7 @@
 			"few": "%1; %n požadavky vyřešeny",
 			"other": "%1; %n požadavků vyřešeno"
 		},
+		"new_project.scan_stopped": "Čtení souboru %1 bylo zastaveno. %2",
 		"new_project.scanned": {
 			"one": "prohledán %n soubor",
 			"few": "prohledány %n soubory",
@@ -1654,7 +1656,6 @@
 		"new_project.slot_not_with_choice": "%1 se nehodí k vybraným souborům nebo stroji",
 		"new_project.slot_takes": "%1: přijímá %2, má %3",
 		"new_project.state": "Stav",
-		"new_project.still_reading": "Soubor %1 se ještě čte. Zkuste to znovu, až bude hotovo.",
 		"new_project.system": "Systém:",
 		"new_project.take_files_out": "%1 se nehodí k vybraným souborům nebo stroji: vyjměte jeho soubory",
 		"new_project.tas_project_files_chimeraproject": "Soubory projektu TAS (*.chimeraProject)",

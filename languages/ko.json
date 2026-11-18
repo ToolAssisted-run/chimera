@@ -1561,6 +1561,7 @@
 		"new_project.not_a_folder": "%1은(는) 폴더가 아닙니다",
 		"new_project.not_added": "추가할 수 없었습니다",
 		"new_project.not_made": "만들지 않음: %1",
+		"new_project.not_read": "읽지 않음",
 		"new_project.not_this_file": "%1은(는) 이 파일이 아닙니다: 해시는 %2이고, 요구 사항은 %3입니다",
 		"new_project.not_yet": "아직 아님: %1",
 		"new_project.one_across": "다음에 걸쳐 파일이 최소 하나 필요합니다: %1",
@@ -1582,7 +1583,7 @@
 		"new_project.preset_applied_skipped": {
 			"other": "\"%1\"을(를) 적용했습니다: 설정 %n개. 이 머신에는 %2라는 설정이 없습니다."
 		},
-		"new_project.read_stopped": "%1 읽기를 중단했습니다. 사용하려면 다시 선택하세요.",
+		"new_project.read_stopped": "%1 읽기를 중단했습니다. 파일은 선택된 채로 '읽지 않음'으로 표시되며, 만들기나 컴파일할 때 다시 읽습니다.",
 		"new_project.reading": "%1 읽는 중: %2 / %3",
 		"new_project.reading_start": "%1 읽는 중...",
 		"new_project.ready": "준비됨",
@@ -1592,6 +1593,7 @@
 		"new_project.scan_resolved": {
 			"other": "%1; 요구 사항 %n개를 해결했습니다"
 		},
+		"new_project.scan_stopped": "%1 읽기를 중단했습니다. %2",
 		"new_project.scanned": {
 			"other": "파일 %n개를 검색했습니다"
 		},
@@ -1602,7 +1604,6 @@
 		"new_project.slot_not_with_choice": "%1은(는) 고른 파일이나 머신과 맞지 않습니다",
 		"new_project.slot_takes": "%1: %2을(를) 받는데 %3이(가) 있습니다",
 		"new_project.state": "상태",
-		"new_project.still_reading": "%1 파일을 아직 읽고 있습니다. 끝난 뒤에 다시 시도하세요.",
 		"new_project.system": "시스템:",
 		"new_project.take_files_out": "%1은(는) 고른 파일이나 머신과 맞지 않습니다: 그 파일을 빼세요",
 		"new_project.tas_project_files_chimeraproject": "TAS 프로젝트 파일 (*.chimeraProject)",

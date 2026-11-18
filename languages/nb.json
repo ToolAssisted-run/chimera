@@ -1583,6 +1583,7 @@
 		"new_project.not_a_folder": "%1 er ikke en mappe",
 		"new_project.not_added": "den kunne ikke legges til",
 		"new_project.not_made": "Ikke laget: %1",
+		"new_project.not_read": "ikke lest",
 		"new_project.not_this_file": "%1 er ikke denne filen: hashen er %2, kravet er %3",
 		"new_project.not_yet": "ikke ennå: %1",
 		"new_project.one_across": "minst én fil trengs på tvers av: %1",
@@ -1606,7 +1607,7 @@
 			"one": "Brukte \"%1\": %n innstilling; denne maskinen har ingen innstilling som heter %2.",
 			"other": "Brukte \"%1\": %n innstillinger; denne maskinen har ingen innstilling som heter %2."
 		},
-		"new_project.read_stopped": "Lesingen av %1 ble stoppet. Velg den på nytt for å bruke den.",
+		"new_project.read_stopped": "Lesingen av %1 ble stoppet. Filen forblir valgt, merket som ikke lest; Opprett eller Kompiler leser den på nytt.",
 		"new_project.reading": "Leser %1: %2 av %3",
 		"new_project.reading_start": "Leser %1...",
 		"new_project.ready": "klar",
@@ -1617,6 +1618,7 @@
 			"one": "%1; %n krav løst",
 			"other": "%1; %n krav løst"
 		},
+		"new_project.scan_stopped": "Lesingen av %1 ble stoppet. %2",
 		"new_project.scanned": {
 			"one": "skannet %n fil",
 			"other": "skannet %n filer"
@@ -1628,7 +1630,6 @@
 		"new_project.slot_not_with_choice": "%1 passer ikke med filene eller maskinen som er valgt",
 		"new_project.slot_takes": "%1: tar %2, har %3",
 		"new_project.state": "Tilstand",
-		"new_project.still_reading": "%1 leses fortsatt. Prøv igjen når den er ferdig.",
 		"new_project.system": "System:",
 		"new_project.take_files_out": "%1 passer ikke med filene eller maskinen som er valgt: ta filene ut",
 		"new_project.tas_project_files_chimeraproject": "TAS-prosjektfiler (*.chimeraProject)",

@@ -1605,6 +1605,7 @@
 		"new_project.not_a_folder": "%1 nie jest folderem",
 		"new_project.not_added": "nie udało się go dodać",
 		"new_project.not_made": "Nie utworzono: %1",
+		"new_project.not_read": "nieodczytany",
 		"new_project.not_this_file": "%1 to nie ten plik: jego suma to %2, a wymagana jest %3",
 		"new_project.not_yet": "jeszcze nie: %1",
 		"new_project.one_across": "potrzebny jest co najmniej jeden plik w: %1",
@@ -1630,7 +1631,7 @@
 			"few": "Zastosowano \"%1\": %n ustawienia; ta maszyna nie ma ustawienia o nazwie %2.",
 			"many": "Zastosowano \"%1\": %n ustawień; ta maszyna nie ma ustawienia o nazwie %2."
 		},
-		"new_project.read_stopped": "Zatrzymano odczyt pliku %1. Wybierz go ponownie, aby go użyć.",
+		"new_project.read_stopped": "Zatrzymano odczyt pliku %1. Plik pozostaje wybrany i oznaczony jako nieodczytany; Utwórz lub Skompiluj odczyta go ponownie.",
 		"new_project.reading": "Odczytywanie pliku %1: %2 z %3",
 		"new_project.reading_start": "Odczytywanie pliku %1...",
 		"new_project.ready": "gotowe",
@@ -1642,6 +1643,7 @@
 			"few": "%1; rozwiązano %n wymagania",
 			"many": "%1; rozwiązano %n wymagań"
 		},
+		"new_project.scan_stopped": "Zatrzymano odczyt pliku %1. %2",
 		"new_project.scanned": {
 			"one": "przeszukano %n plik",
 			"few": "przeszukano %n pliki",
@@ -1654,7 +1656,6 @@
 		"new_project.slot_not_with_choice": "%1 nie pasuje do wybranych plików ani maszyny",
 		"new_project.slot_takes": "%1: przyjmuje %2, ma %3",
 		"new_project.state": "Stan",
-		"new_project.still_reading": "Plik %1 jest nadal odczytywany. Spróbuj ponownie, gdy odczyt się zakończy.",
 		"new_project.system": "System:",
 		"new_project.take_files_out": "%1 nie pasuje do wybranych plików ani maszyny: wyjmij jego pliki",
 		"new_project.tas_project_files_chimeraproject": "Pliki projektów TAS (*.chimeraProject)",

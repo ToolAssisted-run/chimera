@@ -1583,6 +1583,7 @@
 		"new_project.not_a_folder": "%1 n'est pas un dossier",
 		"new_project.not_added": "il n'a pas pu être ajouté",
 		"new_project.not_made": "Non créé : %1",
+		"new_project.not_read": "non lu",
 		"new_project.not_this_file": "%1 n'est pas ce fichier : son empreinte est %2, l'exigence est %3",
 		"new_project.not_yet": "pas encore : %1",
 		"new_project.one_across": "au moins un fichier est nécessaire parmi : %1",
@@ -1606,7 +1607,7 @@
 			"one": "Appliqué « %1 » : %n paramètre ; cette machine n'a aucun paramètre nommé %2.",
 			"other": "Appliqué « %1 » : %n paramètres ; cette machine n'a aucun paramètre nommé %2."
 		},
-		"new_project.read_stopped": "La lecture de %1 a été arrêtée. Choisissez-le à nouveau pour l'utiliser.",
+		"new_project.read_stopped": "La lecture de %1 a été arrêtée. Le fichier reste choisi, marqué comme non lu ; Créer ou Compiler le lit à nouveau.",
 		"new_project.reading": "Lecture de %1 : %2 sur %3",
 		"new_project.reading_start": "Lecture de %1...",
 		"new_project.ready": "prêt",
@@ -1617,6 +1618,7 @@
 			"one": "%1 ; %n exigence résolue",
 			"other": "%1 ; %n exigences résolues"
 		},
+		"new_project.scan_stopped": "La lecture de %1 a été arrêtée. %2",
 		"new_project.scanned": {
 			"one": "%n fichier analysé",
 			"other": "%n fichiers analysés"
@@ -1628,7 +1630,6 @@
 		"new_project.slot_not_with_choice": "%1 ne va pas avec les fichiers ni avec la machine choisis",
 		"new_project.slot_takes": "%1 : prend %2, en a %3",
 		"new_project.state": "État",
-		"new_project.still_reading": "%1 est encore en cours de lecture. Réessayez quand ce sera terminé.",
 		"new_project.system": "Système :",
 		"new_project.take_files_out": "%1 ne va pas avec les fichiers ni avec la machine choisis : retirez ses fichiers",
 		"new_project.tas_project_files_chimeraproject": "Fichiers de projet TAS (*.chimeraProject)",

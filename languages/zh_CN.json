@@ -1561,6 +1561,7 @@
 		"new_project.not_a_folder": "%1 不是文件夹",
 		"new_project.not_added": "无法添加",
 		"new_project.not_made": "未创建：%1",
+		"new_project.not_read": "未读取",
 		"new_project.not_this_file": "%1 不是此文件：其哈希值为 %2，要求为 %3",
 		"new_project.not_yet": "尚未：%1",
 		"new_project.one_across": "各处至少需要一个文件：%1",
@@ -1582,7 +1583,7 @@
 		"new_project.preset_applied_skipped": {
 			"other": "已应用 \"%1\"：%n 项设置；此机器没有名为 %2 的设置。"
 		},
-		"new_project.read_stopped": "已停止读取 %1。要使用它，请重新选择。",
+		"new_project.read_stopped": "已停止读取 %1。文件仍保持选中，标记为未读取；创建或编译时会再次读取。",
 		"new_project.reading": "正在读取 %1：%2 / %3",
 		"new_project.reading_start": "正在读取 %1...",
 		"new_project.ready": "就绪",
@@ -1592,6 +1593,7 @@
 		"new_project.scan_resolved": {
 			"other": "%1；已解决 %n 项要求"
 		},
+		"new_project.scan_stopped": "已停止读取 %1。%2",
 		"new_project.scanned": {
 			"other": "已扫描 %n 个文件"
 		},
@@ -1602,7 +1604,6 @@
 		"new_project.slot_not_with_choice": "%1 与所选文件或机器不符",
 		"new_project.slot_takes": "%1：最多接受 %2，实有 %3",
 		"new_project.state": "状态",
-		"new_project.still_reading": "%1 仍在读取中。请在完成后重试。",
 		"new_project.system": "系统：",
 		"new_project.take_files_out": "%1 与所选文件或机器不符：请将其文件移除",
 		"new_project.tas_project_files_chimeraproject": "TAS 项目文件 (*.chimeraProject)",

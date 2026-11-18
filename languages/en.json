@@ -1583,6 +1583,7 @@
 		"new_project.not_a_folder": "%1 is not a folder",
 		"new_project.not_added": "it could not be added",
 		"new_project.not_made": "Not made: %1",
+		"new_project.not_read": "not read",
 		"new_project.not_this_file": "%1 is not this file: its hash is %2, the requirement is %3",
 		"new_project.not_yet": "not yet: %1",
 		"new_project.one_across": "at least one file is needed across: %1",
@@ -1606,7 +1607,7 @@
 			"one": "Applied \"%1\": %n setting; this machine has no setting named %2.",
 			"other": "Applied \"%1\": %n settings; this machine has no setting named %2."
 		},
-		"new_project.read_stopped": "Stopped reading %1. Choose it again to use it.",
+		"new_project.read_stopped": "Stopped reading %1. It stays picked, marked not read; Create or Compile reads it again.",
 		"new_project.reading": "Reading %1: %2 of %3",
 		"new_project.reading_start": "Reading %1...",
 		"new_project.ready": "ready",
@@ -1617,6 +1618,7 @@
 			"one": "%1; %n requirement resolved",
 			"other": "%1; %n requirements resolved"
 		},
+		"new_project.scan_stopped": "Stopped reading %1. %2",
 		"new_project.scanned": {
 			"one": "scanned %n file",
 			"other": "scanned %n files"
@@ -1628,7 +1630,6 @@
 		"new_project.slot_not_with_choice": "%1 does not go with the files or the machine chosen",
 		"new_project.slot_takes": "%1: takes %2, has %3",
 		"new_project.state": "State",
-		"new_project.still_reading": "%1 is still being read. Try again when it is done.",
 		"new_project.system": "System:",
 		"new_project.take_files_out": "%1 does not go with the files or the machine chosen: take its files out",
 		"new_project.tas_project_files_chimeraproject": "TAS Project Files (*.chimeraProject)",

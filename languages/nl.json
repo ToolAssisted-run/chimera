@@ -1583,6 +1583,7 @@
 		"new_project.not_a_folder": "%1 is geen map",
 		"new_project.not_added": "het kon niet worden toegevoegd",
 		"new_project.not_made": "Niet gemaakt: %1",
+		"new_project.not_read": "niet gelezen",
 		"new_project.not_this_file": "%1 is niet dit bestand: de hash is %2, de eis is %3",
 		"new_project.not_yet": "nog niet: %1",
 		"new_project.one_across": "er is minstens één bestand nodig over: %1",
@@ -1606,7 +1607,7 @@
 			"one": "\"%1\" toegepast: %n instelling; deze machine heeft geen instelling met de naam %2.",
 			"other": "\"%1\" toegepast: %n instellingen; deze machine heeft geen instelling met de naam %2."
 		},
-		"new_project.read_stopped": "Het lezen van %1 is gestopt. Kies het bestand opnieuw om het te gebruiken.",
+		"new_project.read_stopped": "Het lezen van %1 is gestopt. Het bestand blijft gekozen, gemarkeerd als niet gelezen; Aanmaken of Compileren leest het opnieuw.",
 		"new_project.reading": "%1 wordt gelezen: %2 van %3",
 		"new_project.reading_start": "%1 wordt gelezen...",
 		"new_project.ready": "klaar",
@@ -1617,6 +1618,7 @@
 			"one": "%1; %n vereiste opgelost",
 			"other": "%1; %n vereisten opgelost"
 		},
+		"new_project.scan_stopped": "Het lezen van %1 is gestopt. %2",
 		"new_project.scanned": {
 			"one": "%n bestand doorzocht",
 			"other": "%n bestanden doorzocht"
@@ -1628,7 +1630,6 @@
 		"new_project.slot_not_with_choice": "%1 past niet bij de gekozen bestanden of machine",
 		"new_project.slot_takes": "%1: neemt %2, heeft %3",
 		"new_project.state": "Toestand",
-		"new_project.still_reading": "%1 wordt nog gelezen. Probeer het opnieuw als het klaar is.",
 		"new_project.system": "Systeem:",
 		"new_project.take_files_out": "%1 past niet bij de gekozen bestanden of machine: haal de bestanden eruit",
 		"new_project.tas_project_files_chimeraproject": "TAS-projectbestanden (*.chimeraProject)",

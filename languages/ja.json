@@ -1561,6 +1561,7 @@
 		"new_project.not_a_folder": "%1 はフォルダーではありません",
 		"new_project.not_added": "追加できませんでした",
 		"new_project.not_made": "作成されませんでした: %1",
+		"new_project.not_read": "未読み込み",
 		"new_project.not_this_file": "%1 はこのファイルではありません: ハッシュは %2 ですが、必要なのは %3 です",
 		"new_project.not_yet": "まだです: %1",
 		"new_project.one_across": "次のどこかに、少なくとも 1 つのファイルが必要です: %1",
@@ -1582,7 +1583,7 @@
 		"new_project.preset_applied_skipped": {
 			"other": "\"%1\" を適用しました: 設定 %n 件。このマシンには %2 という名前の設定がありません。"
 		},
-		"new_project.read_stopped": "%1 の読み込みを中止しました。使うには、もう一度選んでください。",
+		"new_project.read_stopped": "%1 の読み込みを中止しました。ファイルは選択されたまま「未読み込み」と表示され、作成またはコンパイルのときにもう一度読み込まれます。",
 		"new_project.reading": "%1 を読み込み中: %2 / %3",
 		"new_project.reading_start": "%1 を読み込んでいます...",
 		"new_project.ready": "準備完了",
@@ -1592,6 +1593,7 @@
 		"new_project.scan_resolved": {
 			"other": "%1。要件 %n 件を解決しました"
 		},
+		"new_project.scan_stopped": "%1 の読み込みを中止しました。%2",
 		"new_project.scanned": {
 			"other": "ファイル %n 件を走査しました"
 		},
@@ -1602,7 +1604,6 @@
 		"new_project.slot_not_with_choice": "%1 は、選んだファイルまたはマシンと合いません",
 		"new_project.slot_takes": "%1: %2 を受け付けますが、%3 があります",
 		"new_project.state": "状態",
-		"new_project.still_reading": "%1 はまだ読み込み中です。完了してからもう一度お試しください。",
 		"new_project.system": "システム:",
 		"new_project.take_files_out": "%1 は、選んだファイルまたはマシンと合いません: そのファイルを外してください",
 		"new_project.tas_project_files_chimeraproject": "TAS プロジェクトファイル (*.chimeraProject)",

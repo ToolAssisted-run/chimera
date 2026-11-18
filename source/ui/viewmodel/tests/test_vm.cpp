@@ -8382,7 +8382,7 @@ bool createForAgent(const char *package, const char *rom, const char *hashedPack
 /* A large file is read away from the window (issue 611): the window's thread
  * is back at once, the bytes read so far are told, a stop is honoured, and a
  * file that was read to its end is the game's. */
-bool largeFileStep(const char *compilePackage)
+bool largeFileStep(const char *compilePackage, const char *hashedPackage)
 {
 	namespace fs = std::filesystem;
 	std::error_code ec;
@@ -8394,6 +8394,7 @@ bool largeFileStep(const char *compilePackage)
 	const fs::path dir = fs::temp_directory_path() / ("chimera-test-large-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
 	fs::create_directories(dir / "Cores");
 	fs::copy_file(compilePackage, dir / "Cores" / "synth-compile.chimeraCore");
+	if (hashedPackage != nullptr) fs::copy_file(hashedPackage, dir / "Cores" / "synth-hashed.chimeraCore");
 	/* 48 MB of something: more than the size read at once, and a few reports long */
 	const std::string big = (dir / "big.testrom").string();
 	{
@@ -8445,26 +8446,78 @@ bool largeFileStep(const char *compilePackage)
 	CHECK(wizard.compileStatus.get() == "This game's code is not compiled yet: Compile does it.");
 	std::printf("large file: read in the background, %lld of %lld bytes seen last\n", static_cast<long long>(most), 48ll << 20);
 
-	/* another, stopped half way: it is out of its slot, and nothing is kept of it */
+	/* another, stopped half way: it stays in its slot, marked not read, and nothing is kept of it */
 	CHECK(wizard.run("removeFile", {std::string("rom"), int64_t{0}}, error).has_value());
 	CHECK(wizard.run("addFile", {std::string("rom"), huge}, error).has_value());
 	CHECK(wizard.hashing.get());
-	CHECK(wizard.run("compile", {}, error).has_value() == false && error == "huge.testrom is still being read. Try again when it is done.");
 	CHECK(d.until([&] { return wizard.hashDone.get() > 0 && wizard.hashStatus.get().rfind("Reading huge.testrom: ", 0) == 0; }, 60));
 	const int64_t seen = wizard.hashDone.get();
 	CHECK(seen > 0 && seen < 40ll << 30 && wizard.hashTotal.get() == 40ll << 30);
 	CHECK(wizard.run("cancelHash", {}, error).has_value());
 	CHECK(!wizard.hashing.get() && wizard.hashFile.get().empty());
-	CHECK(wizard.status.get() == "Stopped reading huge.testrom. Choose it again to use it.");
+	const std::string stopped = "Stopped reading huge.testrom. It stays picked, marked not read; Create or Compile reads it again.";
+	CHECK(wizard.status.get() == stopped);
 	RowModel *slots = nullptr;
 	for (const auto &r : wizard.rowLists())
 		if (r.name == "slots") slots = r.model;
-	CHECK(slots != nullptr && std::get<int64_t>(slots->cell(0, 8)) == 0);
+	CHECK(slots != nullptr && std::get<int64_t>(slots->cell(0, 8)) == 1 && std::get<std::string>(slots->cell(0, 7)) == "huge.testrom (not read)");
+	CHECK(!wizard.compileReady.get() && wizard.compileStatus.get() == stopped);
 	/* the reading ends soon after, and says nothing more */
 	std::this_thread::sleep_for(std::chrono::milliseconds(300));
 	d.pump();
 	CHECK(!wizard.hashing.get() && ce_sha1_file_known(huge.c_str(), sha, nullptr) == 0);
-	CHECK(wizard.status.get() == "Stopped reading huge.testrom. Choose it again to use it.");
+	CHECK(wizard.status.get() == stopped);
+	/* Compile reads a file stopped again, with the same bar, and goes on when it is known (2 GB of nothing) */
+	const std::string two1 = (dir / "two1.testrom").string(), two2 = (dir / "two2.testrom").string();
+	for (const std::string &f : {two1, two2})
+	{
+		std::ofstream(f, std::ios::binary) << "x";
+		fs::resize_file(f, 2ull << 30, ec);
+	}
+	CHECK(wizard.run("removeFile", {std::string("rom"), int64_t{0}}, error).has_value());
+	CHECK(wizard.run("addFile", {std::string("rom"), two1}, error).has_value() && wizard.hashing.get());
+	CHECK(wizard.run("cancelHash", {}, error).has_value() && !wizard.hashing.get());
+	CHECK(std::get<std::string>(slots->cell(0, 7)) == "two1.testrom (not read)");
+	CHECK(wizard.run("compile", {}, error).has_value() && error.empty() && wizard.hashing.get() && wizard.hashFile.get() == "two1.testrom");
+	CHECK(std::get<std::string>(slots->cell(0, 7)) == "two1.testrom");
+	CHECK(d.until([&] { return !wizard.hashing.get(); }, 120));
+	/* known now, and Compile went on (no runner here, so it said so) */
+	CHECK(ce_sha1_file_known(two1.c_str(), sha, nullptr) == 1 && wizard.status.get() != stopped);
+	/* and Create does the same */
+	CHECK(wizard.run("removeFile", {std::string("rom"), int64_t{0}}, error).has_value());
+	CHECK(wizard.run("addFile", {std::string("rom"), two2}, error).has_value() && wizard.hashing.get());
+	CHECK(wizard.run("cancelHash", {}, error).has_value() && std::get<std::string>(slots->cell(0, 7)) == "two2.testrom (not read)");
+	const fs::path made = dir / "made.chimeraProject";
+	CHECK(wizard.run("create", {made.string()}, error).has_value() && error.empty() && wizard.hashing.get() && wizard.hashFile.get() == "two2.testrom");
+	CHECK(d.until([&] { return !wizard.hashing.get(); }, 120));
+	CHECK(ce_sha1_file_known(two2.c_str(), sha, nullptr) == 1 && wizard.status.get() == "Compile this game's code first.");
+	std::printf("large file: stopped at %lld of %lld bytes, kept and marked not read, read again by Compile and by Create\n",
+		static_cast<long long>(seen), 40ll << 30);
+
+	/* a firmware folder scanned: a large file in it is read away from the window, with the same bar */
+	if (hashedPackage != nullptr)
+	{
+		CHECK(wizard.run("chooseCore", {std::string("Synth Hashed")}, error).has_value());
+		installed.set("firmwareFolder", (dir / "nowhere").string(), error);
+		fs::create_directories(dir / "scanA");
+		std::ofstream(dir / "scanA" / "huge.bin", std::ios::binary) << "x";
+		fs::resize_file(dir / "scanA" / "huge.bin", 2000000000ull, ec); /* a firmware file is under 2 GB */
+		CHECK(wizard.run("scanFolder", {(dir / "scanA").string(), false}, error).has_value());
+		CHECK(wizard.hashing.get() && wizard.hashFile.get() == "huge.bin");
+		CHECK(d.until([&] { return wizard.hashDone.get() > 0; }, 60));
+		CHECK(wizard.run("cancelHash", {}, error).has_value() && !wizard.hashing.get());
+		CHECK(wizard.status.get() == "Stopped reading huge.bin. scanned 1 file; nothing new matched");
+		/* a folder with a large file and the real one: both read, the scan completes */
+		fs::create_directories(dir / "scanB");
+		std::ofstream(dir / "scanB" / "two.bin", std::ios::binary) << "x";
+		fs::resize_file(dir / "scanB" / "two.bin", 1ull << 30, ec);
+		std::ofstream(dir / "scanB" / "logo.bin", std::ios::binary) << "the original logo";
+		CHECK(wizard.run("scanFolder", {(dir / "scanB").string(), false}, error).has_value());
+		CHECK(d.until([&] { return !wizard.hashing.get() && wizard.status.get().rfind("scanned", 0) == 0; }, 120));
+		CHECK_TEXT(wizard.status.get(), "scanned 2 files; 1 requirement resolved");
+		CHECK(wizard.firmwareMissing.get().empty());
+		std::printf("large file: a folder scan reads a large file in the background and can be stopped\n");
+	}
 	/* the reading itself has stopped, not only been forgotten: the view model
 	 * waits for it to end when it goes, and 40 GB would take longer than this */
 	const auto before = std::chrono::steady_clock::now();
@@ -12255,7 +12308,7 @@ int main(int argc, char **argv)
 			if (argc >= 9) ranMachine = createForAgent(argv[1], argv[2], argv[7]) && ranMachine;
 			if (argc >= 13) ranMachine = compileStep(argv[12], argv[2]) && ranMachine;
 			else std::printf("SKIP the compile step: no compiling package given\n");
-			if (argc >= 13) ranMachine = largeFileStep(argv[12]) && ranMachine;
+			if (argc >= 13) ranMachine = largeFileStep(argv[12], argc >= 9 ? argv[7] : nullptr) && ranMachine;
 			if (argc >= 14) ranMachine = squarePixels(argv[1], argv[13], argv[2]) && ranMachine;
 			if (argc >= 15) ranMachine = soundRate(argv[14], argv[2]) && ranMachine;
 			if (argc >= 16) ranMachine = wideButtons(argv[15], argv[2]) && ranMachine;

@@ -397,9 +397,22 @@ NewProjectViewModel::NewProjectViewModel(Dispatcher &dispatcher, SessionViewMode
 				return {};
 			}
 			const std::string game = compileGame();
-			if (std::string known; hashOf(game, known) == Hashed::Pending)
+			/* a game the person stopped reading is read again here, with the same bar,
+			 * and Compile goes on when it is known */
+			hashDeclined_.erase(std::remove(hashDeclined_.begin(), hashDeclined_.end(), game), hashDeclined_.end());
+			if (std::string known; !game.empty() && hashOf(game, known) == Hashed::Pending)
 			{
-				error = tr("new_project.still_reading", {baseName(game)});
+				if (!compileAfterHash_)
+				{
+					compileAfterHash_ = true;
+					hashWaiting_[game].push_back([this](bool ok, const std::string &) {
+						if (!compileAfterHash_) return;
+						compileAfterHash_ = false;
+						std::string why;
+						if (ok && !run("compile", {}, why) && !why.empty()) status.set(why);
+					});
+				}
+				evaluate();
 				return {};
 			}
 			const std::string dir = compileDirOf(game);
@@ -749,61 +762,16 @@ NewProjectViewModel::NewProjectViewModel(Dispatcher &dispatcher, SessionViewMode
 				error = tr("new_project.not_a_folder", {folder});
 				return {};
 			}
-			const std::vector<FirmwareFile> found = indexFirmware({folder}, recurse, 10000);
-			firmwareIndex_.insert(firmwareIndex_.end(), found.begin(), found.end());
-			const Json decls = firmwareDecls();
-			/* the entry the page asks for, not another with its id (#390) */
-			auto declOf = [&](const Need &n) -> const Json * {
-				return n.declIndex < decls.items.size() ? &decls.items[n.declIndex] : nullptr;
-			};
-			auto named = [&](const Json &d) -> const FirmwareFile * {
-				const Json *n = d.find("name");
-				if (n == nullptr || n->text.empty()) return nullptr;
-				/* and its size, where the package gives one (issue 379) */
-				const Json *sz = d.find("size");
-				const int64_t size = sz != nullptr ? static_cast<int64_t>(sz->number()) : 0;
-				for (const FirmwareFile &f : found)
-					if (lower(f.name) == lower(n->text) && (size == 0 || f.size == size)) return &f;
-				return nullptr;
-			};
-			/* a file this page asks for is in that folder: it is where the
-			 * person keeps firmware, if the folder set is not there (#293) */
-			bool any = false;
-			for (const Need &n : needs_)
-				if (const Json *d = declOf(n))
-				{
-					std::string how;
-					any = any || findFirmware(*d, "", found, how) != nullptr || named(*d) != nullptr;
-				}
-			if (any && !fs::is_directory(cores_.firmwareFolder.get(), ec)) cores_.firmwareFolder.set(fs::absolute(folder, ec).string());
-			int64_t filled = 0;
-			const std::vector<Need> needs = needs_;
-			for (const Need &n : needs)
-			{
-				const Json *d = declOf(n);
-				if (!n.path.empty() || d == nullptr) continue;
-				if (const Json *sha = d->find("sha1"); sha != nullptr && !sha->text.empty())
-				{
-					std::string how;
-					if (const FirmwareFile *f = findFirmware(*d, "", found, how))
-					{
-						chosenFirmware_[n.id] = {f->path, f->hash()};
-						filled++;
-					}
-					continue;
-				}
-				/* no hash: the declared name is the only lead */
-				if (const FirmwareFile *f = named(*d))
-				{
-					std::string e;
-					if (run("chooseFirmware", {n.id, f->path}, e)) filled++;
-				}
-			}
-			evaluate();
-			/* in Chimera's words */
-			const std::string scanned = tr("new_project.scanned", static_cast<int64_t>(found.size()));
-			status.set(filled == 0 ? tr("new_project.scan_nothing", {scanned}) : tr("new_project.scan_resolved", filled, {scanned}));
-			return filled;
+			scanFound_ = indexFirmware({folder}, recurse, 10000);
+			firmwareIndex_.insert(firmwareIndex_.end(), scanFound_.begin(), scanFound_.end());
+			scanFolder_ = folder;
+			scanStopped_.clear();
+			scanChosen_.clear();
+			scanning_ = true;
+			/* the files too large to read at once are read away from the window,
+			 * and the scan goes on when they are known (the count answered is
+			 * then 0; the status says the rest) */
+			return runScan();
 		});
 	command("forgetFirmware", "a firmware chosen by hand goes back to the one found", {"id"},
 		[this](const Args &a, std::string &error) -> Value {
@@ -929,6 +897,28 @@ NewProjectViewModel::NewProjectViewModel(Dispatcher &dispatcher, SessionViewMode
 			{
 				error = tr("new_project.not_yet", {problems.get()});
 				return {};
+			}
+			/* a file not read yet (one the person stopped reading, or a large one)
+			 * is read first, with the bar, and Create goes on when it is known */
+			{
+				bool waits = false;
+				for (const Slot &sl : slots_)
+					if (const auto it = files_.find(sl.id); it != files_.end())
+						for (const Picked &f : it->second)
+						{
+							hashDeclined_.erase(std::remove(hashDeclined_.begin(), hashDeclined_.end(), f.path), hashDeclined_.end());
+							std::string known;
+							if (hashOf(f.path, known) != Hashed::Pending) continue;
+							waits = true;
+							createAfterHash_ = true;
+							hashWaiting_[f.path].push_back([this, a](bool, const std::string &) {
+								if (!createAfterHash_) return;
+								createAfterHash_ = false;
+								std::string why;
+								if (!run("create", a, why) && !why.empty()) status.set(why);
+							});
+						}
+				if (waits) return {};
 			}
 			if (compileAsked.get() && !compileReady.get())
 			{
@@ -1526,7 +1516,8 @@ void NewProjectViewModel::hashFinished(const std::shared_ptr<HashRun> &run, int 
 	}
 	for (auto &w : waiting) w(result == 1, sha);
 	startNextHash();
-	evaluate();
+	if (scanning_ && !hashRun_ && hashQueue_.empty()) runScan();
+	else evaluate();
 }
 
 void NewProjectViewModel::cancelHashing(bool say)
@@ -1550,16 +1541,98 @@ void NewProjectViewModel::cancelHashing(bool say)
 	hashStatus.set("");
 	hashDone.set(0);
 	hashTotal.set(0);
+	/* what was to follow the reading does not; a file stays where it was picked, marked not read */
+	compileAfterHash_ = createAfterHash_ = false;
 	for (const std::string &path : paths)
 	{
 		hashDeclined_.push_back(path);
 		hashWaiting_.erase(path);
-		/* the game picked goes out of its slot: nothing half read stays in the form */
-		for (auto &[slotId, list] : files_)
-			list.erase(std::remove_if(list.begin(), list.end(), [&](const Picked &f) { return f.path == path; }), list.end());
+	}
+	if (!say) scanning_ = false;
+	if (scanning_)
+	{
+		/* a folder scan keeps what it found of the files read so far */
+		scanStopped_ = baseName(first);
+		runScan();
+		return;
 	}
 	evaluate();
 	if (say) status.set(tr("new_project.read_stopped", {baseName(first)}));
+}
+
+/* what a scanned folder's files answer for the firmware still missing: by hash
+ * where the package gives one, else by the name it declares. A large file not
+ * read yet is left to the reading away from the window (DeferLargeHashes), and
+ * this is run again when it is known. */
+void NewProjectViewModel::matchScan(std::vector<std::string> &unread)
+{
+	const Json decls = firmwareDecls();
+	/* the entry the page asks for, not another with its id (#390) */
+	auto declOf = [&](const Need &n) -> const Json * { return n.declIndex < decls.items.size() ? &decls.items[n.declIndex] : nullptr; };
+	auto named = [&](const Json &d) -> const FirmwareFile * {
+		const Json *n = d.find("name");
+		if (n == nullptr || n->text.empty()) return nullptr;
+		/* and its size, where the package gives one (issue 379) */
+		const Json *sz = d.find("size");
+		const int64_t size = sz != nullptr ? static_cast<int64_t>(sz->number()) : 0;
+		for (const FirmwareFile &f : scanFound_)
+			if (lower(f.name) == lower(n->text) && (size == 0 || f.size == size)) return &f;
+		return nullptr;
+	};
+	DeferLargeHashes defer;
+	/* a file this page asks for is in that folder: it is where the person
+	 * keeps firmware, if the folder set is not there (#293) */
+	bool any = false;
+	std::error_code ec;
+	for (const Need &n : needs_)
+		if (const Json *d = declOf(n))
+		{
+			std::string how;
+			any = any || findFirmware(*d, "", scanFound_, how) != nullptr || named(*d) != nullptr;
+		}
+	if (any && !fs::is_directory(cores_.firmwareFolder.get(), ec)) cores_.firmwareFolder.set(fs::absolute(scanFolder_, ec).string());
+	const std::vector<Need> needs = needs_;
+	for (const Need &n : needs)
+	{
+		const Json *d = declOf(n);
+		if (!n.path.empty() || d == nullptr) continue;
+		if (const Json *sha = d->find("sha1"); sha != nullptr && !sha->text.empty())
+		{
+			std::string how;
+			if (const FirmwareFile *f = findFirmware(*d, "", scanFound_, how))
+			{
+				chosenFirmware_[n.id] = {f->path, f->hash()};
+				scanChosen_.insert(n.id);
+			}
+			continue;
+		}
+		/* no hash: the declared name is the only lead */
+		if (const FirmwareFile *f = named(*d))
+		{
+			std::string e;
+			if (run("chooseFirmware", {n.id, f->path}, e)) scanChosen_.insert(n.id);
+		}
+	}
+	unread = defer.paths();
+}
+
+int64_t NewProjectViewModel::runScan()
+{
+	std::vector<std::string> unread;
+	matchScan(unread);
+	bool waiting = false;
+	for (const std::string &path : unread)
+		if (std::string known; hashOf(path, known) == Hashed::Pending) waiting = true;
+	if (waiting) return 0;
+	/* all read, or stopped: said in Chimera's words */
+	const int64_t filled = static_cast<int64_t>(scanChosen_.size());
+	scanning_ = false;
+	evaluate();
+	const std::string scanned = tr("new_project.scanned", static_cast<int64_t>(scanFound_.size()));
+	const std::string result = filled == 0 ? tr("new_project.scan_nothing", {scanned}) : tr("new_project.scan_resolved", filled, {scanned});
+	status.set(scanStopped_.empty() ? result : tr("new_project.scan_stopped", {scanStopped_, result}));
+	scanStopped_.clear();
+	return filled;
 }
 
 std::string NewProjectViewModel::compileGame() const
@@ -1585,14 +1658,20 @@ void NewProjectViewModel::refreshCompile()
 	if (game == compileSeen_ && !game.empty()) return;
 	/* a large game is still being read: nothing is known of its code yet, and
 	 * this looks again when its hash is */
-	if (std::string known; !game.empty() && hashOf(game, known) == Hashed::Pending)
+	if (!game.empty())
 	{
-		compileSeen_.clear();
-		modules_.clear();
-		moduleRows_.reset.emit();
-		compileReady.set(false);
-		compileStatus.set(tr("new_project.reading_start", {baseName(game)}));
-		return;
+		std::string known;
+		const Hashed h = hashOf(game, known);
+		if (h == Hashed::Pending || h == Hashed::Declined)
+		{
+			compileSeen_.clear();
+			modules_.clear();
+			moduleRows_.reset.emit();
+			compileReady.set(false);
+			compileStatus.set(h == Hashed::Pending ? tr("new_project.reading_start", {baseName(game)})
+												   : tr("new_project.read_stopped", {baseName(game)}));
+			return;
+		}
 	}
 	compileSeen_ = game;
 	modules_.clear();
@@ -2217,7 +2296,18 @@ void NewProjectViewModel::evaluate()
 	firmwareDecl = firmwareDecls();
 	settingsDecl.kind = Json::Kind::Array;
 	settingsDecl.items = form_.declarations();
-	for (const FirmwareNeed &n : neededFirmware(firmwareDecl, settingsDecl, map, recorded, none, firmwareIndex_))
+	std::vector<FirmwareNeed> found;
+	{
+		/* a large file in the firmware folder is read away from the window: it is looked at again when it is known */
+		DeferLargeHashes defer;
+		found = neededFirmware(firmwareDecl, settingsDecl, map, recorded, none, firmwareIndex_);
+		for (const std::string &path : defer.paths())
+		{
+			std::string known;
+			(void)hashOf(path, known);
+		}
+	}
+	for (const FirmwareNeed &n : found)
 	{
 		Need need{n.id, n.display.empty() ? n.id : n.display, n.path, n.how, n.sha1};
 		need.declIndex = n.declIndex;
@@ -2391,7 +2481,11 @@ Value NewProjectViewModel::SlotRows::cell(int64_t row, int32_t column) const
 	{
 		std::string out;
 		if (it != vm_.files_.end())
-			for (const Picked &f : it->second) out += (out.empty() ? "" : "\n") + f.name;
+			for (const Picked &f : it->second)
+			{
+				const bool unread = std::find(vm_.hashDeclined_.begin(), vm_.hashDeclined_.end(), f.path) != vm_.hashDeclined_.end();
+				out += (out.empty() ? "" : "\n") + f.name + (unread ? " (" + tr("new_project.not_read") + ")" : std::string());
+			}
 		return out;
 	}
 	case 8: return it == vm_.files_.end() ? int64_t{0} : static_cast<int64_t>(it->second.size());

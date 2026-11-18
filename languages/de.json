@@ -1583,6 +1583,7 @@
 		"new_project.not_a_folder": "%1 ist kein Ordner",
 		"new_project.not_added": "sie konnte nicht hinzugefügt werden",
 		"new_project.not_made": "Nicht angelegt: %1",
+		"new_project.not_read": "nicht gelesen",
 		"new_project.not_this_file": "%1 ist nicht diese Datei: Ihre Prüfsumme ist %2, gefordert ist %3",
 		"new_project.not_yet": "noch nicht: %1",
 		"new_project.one_across": "mindestens eine Datei wird gebraucht über: %1",
@@ -1606,7 +1607,7 @@
 			"one": "„%1“ angewendet: %n Einstellung; diese Maschine hat keine Einstellung namens %2.",
 			"other": "„%1“ angewendet: %n Einstellungen; diese Maschine hat keine Einstellung namens %2."
 		},
-		"new_project.read_stopped": "Das Lesen von %1 wurde abgebrochen. Wählen Sie die Datei erneut aus, um sie zu verwenden.",
+		"new_project.read_stopped": "Das Lesen von %1 wurde abgebrochen. Die Datei bleibt gewählt, als nicht gelesen markiert; Erstellen oder Kompilieren liest sie erneut.",
 		"new_project.reading": "%1 wird gelesen: %2 von %3",
 		"new_project.reading_start": "%1 wird gelesen...",
 		"new_project.ready": "bereit",
@@ -1617,6 +1618,7 @@
 			"one": "%1; %n Anforderung erfüllt",
 			"other": "%1; %n Anforderungen erfüllt"
 		},
+		"new_project.scan_stopped": "Das Lesen von %1 wurde abgebrochen. %2",
 		"new_project.scanned": {
 			"one": "%n Datei durchsucht",
 			"other": "%n Dateien durchsucht"
@@ -1628,7 +1630,6 @@
 		"new_project.slot_not_with_choice": "%1 passt nicht zu den gewählten Dateien oder der gewählten Maschine",
 		"new_project.slot_takes": "%1: nimmt %2 auf, hat %3",
 		"new_project.state": "Zustand",
-		"new_project.still_reading": "%1 wird noch gelesen. Versuchen Sie es erneut, wenn der Vorgang beendet ist.",
 		"new_project.system": "System:",
 		"new_project.take_files_out": "%1 passt nicht zu den gewählten Dateien oder der gewählten Maschine: Nehmen Sie seine Dateien heraus",
 		"new_project.tas_project_files_chimeraproject": "TAS-Projektdateien (*.chimeraProject)",

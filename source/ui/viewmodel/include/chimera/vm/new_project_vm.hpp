@@ -12,6 +12,7 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -332,6 +333,16 @@ private:
 	void startNextHash();
 	void hashFinished(const std::shared_ptr<HashRun> &run, int result, const std::string &sha);
 	void cancelHashing(bool say = true);
+	/* the firmware folder scan: files found, the folder, the ids chosen, whether
+	 * one waits for a large file's hash, and where the person stopped it */
+	void matchScan(std::vector<std::string> &unread);
+	int64_t runScan();
+	std::vector<FirmwareFile> scanFound_;
+	std::string scanFolder_, scanStopped_;
+	std::set<std::string> scanChosen_;
+	bool scanning_ = false;
+	/* Compile or Create asked while a file was read: goes on when it is known */
+	bool compileAfterHash_ = false, createAfterHash_ = false;
 	/* what a chosen firmware does once its hash is known */
 	bool applyChosenFirmware(const std::string &id, const std::string &path, const std::string &sha, std::string &error);
 	std::shared_ptr<HashRun> hashRun_;

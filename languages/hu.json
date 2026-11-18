@@ -1583,6 +1583,7 @@
 		"new_project.not_a_folder": "A(z) %1 nem mappa",
 		"new_project.not_added": "nem lehetett hozzáadni",
 		"new_project.not_made": "Nem készült el: %1",
+		"new_project.not_read": "nincs beolvasva",
 		"new_project.not_this_file": "A(z) %1 nem ez a fájl: az ellenőrzőösszege %2, a követelmény %3",
 		"new_project.not_yet": "még nem: %1",
 		"new_project.one_across": "legalább egy fájlra van szükség itt: %1",
@@ -1606,7 +1607,7 @@
 			"one": "Alkalmazva a(z) \"%1\" előbeállítás: %n beállítás; ennek a gépnek nincs %2 nevű beállítása.",
 			"other": "Alkalmazva a(z) \"%1\" előbeállítás: %n beállítás; ennek a gépnek nincs %2 nevű beállítása."
 		},
-		"new_project.read_stopped": "A(z) %1 olvasása leállt. Válassza ki újra, ha használni szeretné.",
+		"new_project.read_stopped": "A(z) %1 olvasása leállt. A fájl kiválasztva marad, olvasatlanként megjelölve; a Létrehozás vagy a Fordítás újra beolvassa.",
 		"new_project.reading": "%1 olvasása: %2 / %3",
 		"new_project.reading_start": "%1 olvasása...",
 		"new_project.ready": "kész",
@@ -1617,6 +1618,7 @@
 			"one": "%1; %n követelmény teljesítve",
 			"other": "%1; %n követelmény teljesítve"
 		},
+		"new_project.scan_stopped": "A(z) %1 olvasása leállt. %2",
 		"new_project.scanned": {
 			"one": "%n fájl átvizsgálva",
 			"other": "%n fájl átvizsgálva"
@@ -1628,7 +1630,6 @@
 		"new_project.slot_not_with_choice": "A(z) %1 nem illik a kiválasztott fájlokhoz vagy géphez",
 		"new_project.slot_takes": "%1: %2-t fogad, %3 van",
 		"new_project.state": "Állapot",
-		"new_project.still_reading": "A(z) %1 olvasása még folyamatban van. Próbálja újra, ha elkészült.",
 		"new_project.system": "Rendszer:",
 		"new_project.take_files_out": "A(z) %1 nem illik a kiválasztott fájlokhoz vagy géphez: vegye ki a fájljait",
 		"new_project.tas_project_files_chimeraproject": "TAS-projektfájlok (*.chimeraProject)",

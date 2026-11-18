@@ -1583,6 +1583,7 @@
 		"new_project.not_a_folder": "%1 non è una cartella",
 		"new_project.not_added": "non è stato possibile aggiungerlo",
 		"new_project.not_made": "Non creato: %1",
+		"new_project.not_read": "non letto",
 		"new_project.not_this_file": "%1 non è questo file: il suo hash è %2, il requisito è %3",
 		"new_project.not_yet": "non ancora: %1",
 		"new_project.one_across": "serve almeno un file tra: %1",
@@ -1606,7 +1607,7 @@
 			"one": "Applicato \"%1\": %n impostazione; questa macchina non ha un'impostazione chiamata %2.",
 			"other": "Applicato \"%1\": %n impostazioni; questa macchina non ha un'impostazione chiamata %2."
 		},
-		"new_project.read_stopped": "La lettura di %1 è stata interrotta. Sceglilo di nuovo per usarlo.",
+		"new_project.read_stopped": "La lettura di %1 è stata interrotta. Il file resta scelto, segnato come non letto; Crea o Compila lo legge di nuovo.",
 		"new_project.reading": "Lettura di %1: %2 di %3",
 		"new_project.reading_start": "Lettura di %1...",
 		"new_project.ready": "pronto",
@@ -1617,6 +1618,7 @@
 			"one": "%1; %n requisito risolto",
 			"other": "%1; %n requisiti risolti"
 		},
+		"new_project.scan_stopped": "La lettura di %1 è stata interrotta. %2",
 		"new_project.scanned": {
 			"one": "analizzato %n file",
 			"other": "analizzati %n file"
@@ -1628,7 +1630,6 @@
 		"new_project.slot_not_with_choice": "%1 non va con i file o la macchina scelti",
 		"new_project.slot_takes": "%1: accetta %2, ne ha %3",
 		"new_project.state": "Stato",
-		"new_project.still_reading": "%1 è ancora in lettura. Riprova quando ha finito.",
 		"new_project.system": "Sistema:",
 		"new_project.take_files_out": "%1 non va con i file o la macchina scelti: togline i file",
 		"new_project.tas_project_files_chimeraproject": "File di progetto TAS (*.chimeraProject)",

@@ -1561,6 +1561,7 @@
 		"new_project.not_a_folder": "%1 không phải là thư mục",
 		"new_project.not_added": "không thể thêm nó",
 		"new_project.not_made": "Chưa tạo: %1",
+		"new_project.not_read": "chưa đọc",
 		"new_project.not_this_file": "%1 không phải là tệp này: mã băm của nó là %2, yêu cầu là %3",
 		"new_project.not_yet": "chưa: %1",
 		"new_project.one_across": "cần ít nhất một tệp trong: %1",
@@ -1582,7 +1583,7 @@
 		"new_project.preset_applied_skipped": {
 			"other": "Đã áp dụng \"%1\": %n thiết lập; máy này không có thiết lập nào tên %2."
 		},
-		"new_project.read_stopped": "Đã dừng đọc %1. Hãy chọn lại để dùng.",
+		"new_project.read_stopped": "Đã dừng đọc %1. Tệp vẫn được chọn, đánh dấu là chưa đọc; Tạo hoặc Biên dịch sẽ đọc lại.",
 		"new_project.reading": "Đang đọc %1: %2 / %3",
 		"new_project.reading_start": "Đang đọc %1...",
 		"new_project.ready": "sẵn sàng",
@@ -1592,6 +1593,7 @@
 		"new_project.scan_resolved": {
 			"other": "%1; đã giải quyết %n yêu cầu"
 		},
+		"new_project.scan_stopped": "Đã dừng đọc %1. %2",
 		"new_project.scanned": {
 			"other": "đã quét %n tệp"
 		},
@@ -1602,7 +1604,6 @@
 		"new_project.slot_not_with_choice": "%1 không đi cùng các tệp hoặc máy đã chọn",
 		"new_project.slot_takes": "%1: nhận %2, có %3",
 		"new_project.state": "Trạng thái",
-		"new_project.still_reading": "%1 vẫn đang được đọc. Hãy thử lại khi xong.",
 		"new_project.system": "Hệ thống:",
 		"new_project.take_files_out": "%1 không đi cùng các tệp hoặc máy đã chọn: hãy bỏ các tệp của nó ra",
 		"new_project.tas_project_files_chimeraproject": "Tệp dự án TAS (*.chimeraProject)",

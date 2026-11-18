@@ -1583,6 +1583,7 @@
 		"new_project.not_a_folder": "%1 ei ole kansio",
 		"new_project.not_added": "sitä ei voitu lisätä",
 		"new_project.not_made": "Ei tehty: %1",
+		"new_project.not_read": "lukematta",
 		"new_project.not_this_file": "%1 ei ole tämä tiedosto: sen tiiviste on %2, vaatimus on %3",
 		"new_project.not_yet": "ei vielä: %1",
 		"new_project.one_across": "vähintään yksi tiedosto tarvitaan: %1",
@@ -1606,7 +1607,7 @@
 			"one": "Käytetty \"%1\": %n asetus; tässä koneessa ei ole asetusta nimeltä %2.",
 			"other": "Käytetty \"%1\": %n asetusta; tässä koneessa ei ole asetusta nimeltä %2."
 		},
-		"new_project.read_stopped": "Tiedoston %1 lukeminen keskeytettiin. Valitse se uudelleen, jos haluat käyttää sitä.",
+		"new_project.read_stopped": "Tiedoston %1 lukeminen keskeytettiin. Se pysyy valittuna merkittynä lukemattomaksi; Luo tai Käännä lukee sen uudelleen.",
 		"new_project.reading": "Luetaan tiedostoa %1: %2 / %3",
 		"new_project.reading_start": "Luetaan tiedostoa %1...",
 		"new_project.ready": "valmis",
@@ -1617,6 +1618,7 @@
 			"one": "%1; %n vaatimus ratkaistu",
 			"other": "%1; %n vaatimusta ratkaistu"
 		},
+		"new_project.scan_stopped": "Tiedoston %1 lukeminen keskeytettiin. %2",
 		"new_project.scanned": {
 			"one": "tarkistettiin %n tiedosto",
 			"other": "tarkistettiin %n tiedostoa"
@@ -1628,7 +1630,6 @@
 		"new_project.slot_not_with_choice": "%1 ei sovi valittuihin tiedostoihin tai koneeseen",
 		"new_project.slot_takes": "%1: ottaa %2, on %3",
 		"new_project.state": "Tila",
-		"new_project.still_reading": "Tiedostoa %1 luetaan vielä. Yritä uudelleen, kun lukeminen on valmis.",
 		"new_project.system": "Järjestelmä:",
 		"new_project.take_files_out": "%1 ei sovi valittuihin tiedostoihin tai koneeseen: poista sen tiedostot",
 		"new_project.tas_project_files_chimeraproject": "TAS-projektitiedostot (*.chimeraProject)",

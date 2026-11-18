@@ -1605,6 +1605,7 @@
 		"new_project.not_a_folder": "%1 nu este un folder",
 		"new_project.not_added": "nu a putut fi adăugat",
 		"new_project.not_made": "Nu a fost creat: %1",
+		"new_project.not_read": "necitit",
 		"new_project.not_this_file": "%1 nu este acest fișier: suma sa este %2, iar cerința este %3",
 		"new_project.not_yet": "încă nu: %1",
 		"new_project.one_across": "este nevoie de cel puțin un fișier în: %1",
@@ -1630,7 +1631,7 @@
 			"few": "Aplicat \"%1\": %n setări; această mașină nu are o setare numită %2.",
 			"other": "Aplicat \"%1\": %n de setări; această mașină nu are o setare numită %2."
 		},
-		"new_project.read_stopped": "Citirea fișierului %1 a fost oprită. Alegeți-l din nou pentru a-l folosi.",
+		"new_project.read_stopped": "Citirea fișierului %1 a fost oprită. Fișierul rămâne ales, marcat ca necitit; Creare sau Compilare îl citește din nou.",
 		"new_project.reading": "Se citește %1: %2 din %3",
 		"new_project.reading_start": "Se citește %1...",
 		"new_project.ready": "gata",
@@ -1642,6 +1643,7 @@
 			"few": "%1; %n cerințe rezolvate",
 			"other": "%1; %n de cerințe rezolvate"
 		},
+		"new_project.scan_stopped": "Citirea fișierului %1 a fost oprită. %2",
 		"new_project.scanned": {
 			"one": "a fost scanat %n fișier",
 			"few": "au fost scanate %n fișiere",
@@ -1654,7 +1656,6 @@
 		"new_project.slot_not_with_choice": "%1 nu merge cu fișierele sau mașina alese",
 		"new_project.slot_takes": "%1: acceptă %2, are %3",
 		"new_project.state": "Starea",
-		"new_project.still_reading": "Fișierul %1 încă se citește. Încercați din nou când s-a terminat.",
 		"new_project.system": "Sistem:",
 		"new_project.take_files_out": "%1 nu merge cu fișierele sau mașina alese: scoate-i fișierele",
 		"new_project.tas_project_files_chimeraproject": "Fișiere de proiect TAS (*.chimeraProject)",
