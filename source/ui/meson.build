@@ -267,7 +267,9 @@ test(
   # and the headless runner, which compile sessions are
   env: ['ALSOFT_DRIVERS=null', 'CHIMERA_FFMPEG=' + (repo_root / 'build/dll/ffmpeg'),
     'CHIMERA_RUN=' + chimera_run.full_path()],
-  timeout: 180,
+  # CI's slowest runners took most of three minutes for it, and macOS on
+  # Intel more (2026-11-19: 166 s on Windows x64, past 180 s on macOS x86_64)
+  timeout: 300,
 )
 
 qt6 = import('qt6')

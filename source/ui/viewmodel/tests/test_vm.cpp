@@ -8379,6 +8379,11 @@ bool createForAgent(const char *package, const char *rom, const char *hashedPack
 	return true;
 }
 
+/* A file of the given size holding nothing, made at once: sparse where the
+ * system can, so it takes no room on the disk (defined at the end of this
+ * file, beside the only system header it needs) */
+bool makeLargeFile(const std::string &path, uint64_t size);
+
 /* A large file is read away from the window (issue 611): the window's thread
  * is back at once, the bytes read so far are told, a stop is honoured, and a
  * file that was read to its end is the game's. */
@@ -8404,12 +8409,7 @@ bool largeFileStep(const char *compilePackage, const char *hashedPackage)
 	}
 	/* 40 GB of nothing, a sparse file: long enough to be stopped half way */
 	const std::string huge = (dir / "huge.testrom").string();
-	{
-		std::ofstream out(huge, std::ios::binary);
-		out << "x";
-	}
-	fs::resize_file(huge, 40ull << 30, ec);
-	CHECK(!ec);
+	CHECK(makeLargeFile(huge, 40ull << 30) && fs::file_size(huge, ec) == 40ull << 30);
 	ManualDispatcher d;
 	InputLog inputs;
 	SessionViewModel session(d, inputs);
@@ -8467,12 +8467,13 @@ bool largeFileStep(const char *compilePackage, const char *hashedPackage)
 	d.pump();
 	CHECK(!wizard.hashing.get() && ce_sha1_file_known(huge.c_str(), sha, nullptr) == 0);
 	CHECK(wizard.status.get() == stopped);
-	/* Compile reads a file stopped again, with the same bar, and goes on when it is known (2 GB of nothing) */
+	/* Compile reads a file stopped again, with the same bar, and goes on when
+	 * it is known (256 MB of nothing: over the size read at once, and quick to
+	 * read to its end on every system CI has) */
 	const std::string two1 = (dir / "two1.testrom").string(), two2 = (dir / "two2.testrom").string();
 	for (const std::string &f : {two1, two2})
 	{
-		std::ofstream(f, std::ios::binary) << "x";
-		fs::resize_file(f, 2ull << 30, ec);
+		CHECK(makeLargeFile(f, 256ull << 20));
 	}
 	CHECK(wizard.run("removeFile", {std::string("rom"), int64_t{0}}, error).has_value());
 	CHECK(wizard.run("addFile", {std::string("rom"), two1}, error).has_value() && wizard.hashing.get());
@@ -8500,8 +8501,7 @@ bool largeFileStep(const char *compilePackage, const char *hashedPackage)
 		CHECK(wizard.run("chooseCore", {std::string("Synth Hashed")}, error).has_value());
 		installed.set("firmwareFolder", (dir / "nowhere").string(), error);
 		fs::create_directories(dir / "scanA");
-		std::ofstream(dir / "scanA" / "huge.bin", std::ios::binary) << "x";
-		fs::resize_file(dir / "scanA" / "huge.bin", 2000000000ull, ec); /* a firmware file is under 2 GB */
+		CHECK(makeLargeFile((dir / "scanA" / "huge.bin").string(), 2000000000ull)); /* a firmware file is under 2 GB */
 		CHECK(wizard.run("scanFolder", {(dir / "scanA").string(), false}, error).has_value());
 		CHECK(wizard.hashing.get() && wizard.hashFile.get() == "huge.bin");
 		CHECK(d.until([&] { return wizard.hashDone.get() > 0; }, 60));
@@ -8509,8 +8509,7 @@ bool largeFileStep(const char *compilePackage, const char *hashedPackage)
 		CHECK(wizard.status.get() == "Stopped reading huge.bin. scanned 1 file; nothing new matched");
 		/* a folder with a large file and the real one: both read, the scan completes */
 		fs::create_directories(dir / "scanB");
-		std::ofstream(dir / "scanB" / "two.bin", std::ios::binary) << "x";
-		fs::resize_file(dir / "scanB" / "two.bin", 1ull << 30, ec);
+		CHECK(makeLargeFile((dir / "scanB" / "two.bin").string(), 64ull << 20));
 		std::ofstream(dir / "scanB" / "logo.bin", std::ios::binary) << "the original logo";
 		CHECK(wizard.run("scanFolder", {(dir / "scanB").string(), false}, error).has_value());
 		CHECK(d.until([&] { return !wizard.hashing.get() && wizard.status.get().rfind("scanned", 0) == 0; }, 120));
@@ -12336,3 +12335,41 @@ int main(int argc, char **argv)
 		ranPads ? "" : " (gamepad tests skipped)");
 	return failures == 0 ? 0 : 1;
 }
+
+/* A file of the given size holding nothing (see its declaration). On Windows
+ * the file is marked sparse and its end set by the system's own calls: a
+ * plain one would take its whole size on the disk, and the C++ library of
+ * the aarch64 build (llvm-mingw's libc++) sets a size of 2 GB or more wrong.
+ * Here at the end, so that windows.h's names reach nothing else in this file */
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+#include <winioctl.h>
+#endif
+
+namespace {
+bool makeLargeFile(const std::string &path, uint64_t size)
+{
+#ifdef _WIN32
+	HANDLE h = CreateFileW(std::filesystem::path(path).wstring().c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+	if (h == INVALID_HANDLE_VALUE) return false;
+	DWORD got = 0;
+	const bool sparse = DeviceIoControl(h, FSCTL_SET_SPARSE, nullptr, 0, nullptr, 0, &got, nullptr) != 0;
+	LARGE_INTEGER end;
+	end.QuadPart = static_cast<LONGLONG>(size);
+	const bool sized = SetFilePointerEx(h, end, nullptr, FILE_BEGIN) != 0 && SetEndOfFile(h) != 0;
+	CloseHandle(h);
+	return sparse && sized;
+#else
+	std::ofstream(path, std::ios::binary).close();
+	std::error_code ec;
+	std::filesystem::resize_file(path, size, ec);
+	return !ec;
+#endif
+}
+} // namespace
