@@ -9,7 +9,9 @@
  * --measure runs for that long and prints what it measured, then quits:
  * frames the machine ran, pictures drawn, the window's frame intervals and
  * TAStudio's, and how long each piano roll paint took (with --scroll, while
- * it scrolled). */
+ * it scrolled). With --play the time starts when the machine does, and a
+ * machine that has not started within 30 seconds ends the run, having run
+ * nothing. */
 
 #include <QSysInfo>
 #include <QCommandLineParser>
@@ -1994,7 +1996,7 @@ int main(int argc, char **argv)
 	int64_t framesAtStart = -1;
 	qint64 shownAtStart = 0;
 	QElapsedTimer runClock;
-	vm::Connection startWatch;
+	vm::Connection startWatch, measureWatch;
 	int exitCode = 0;
 	if (args.isSet(measureOpt))
 	{
@@ -2033,7 +2035,7 @@ int main(int argc, char **argv)
 				}
 			}
 		});
-		QTimer::singleShot(static_cast<int>(seconds * 1000), &app, [&] {
+		auto finish = [&] {
 			std::vector<double> intervals, rollIntervals;
 			{
 				std::lock_guard<std::mutex> lock(swapM);
@@ -2078,7 +2080,28 @@ int main(int argc, char **argv)
 			}
 			std::fflush(stdout);
 			app.exit(exitCode);
-		});
+		};
+		const int measureMs = static_cast<int>(seconds * 1000);
+		if (args.isSet(playOpt))
+		{
+			/* the time measured is the machine's: opening the project before it
+			 * takes what the system makes it take (over a second on CI's macOS
+			 * on Intel, 2026-11-19), and a machine that never starts ends the
+			 * run after 30 seconds, having run nothing */
+			auto armed = std::make_shared<bool>(false);
+			measureWatch = session.running.changed.connect([&session, &app, armed, measureMs, finish] {
+				if (!session.running.get() || *armed) return;
+				*armed = true;
+				QTimer::singleShot(measureMs, &app, finish);
+			});
+			QTimer::singleShot(30000, &app, [armed, finish] {
+				if (*armed) return;
+				*armed = true;
+				finish();
+			});
+		}
+		else
+			QTimer::singleShot(measureMs, &app, finish);
 	}
 
 	int rc = app.exec();
