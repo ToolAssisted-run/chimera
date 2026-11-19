@@ -19,6 +19,7 @@
 #include <QQuickItem>
 #include <QTemporaryDir>
 #include <QTimer>
+#include <QtQml/qtqmlglobal.h>
 
 #include <cstdio>
 #include <deque>
@@ -62,6 +63,14 @@ static void wait(int ms)
 
 static int cases(const QString &folder, const QStringList &names)
 {
+	/* whether this Qt's QML has a network module at all: without one (Chimera's
+	 * releases, and the Windows builds CI tests) an address that is not a file
+	 * is never fetched, so what was refused stays Loading rather than failing */
+#if QT_CONFIG(qml_network)
+	std::printf("QML_NETWORK 1\n");
+#else
+	std::printf("QML_NETWORK 0\n");
+#endif
 	for (const QString &name : names)
 	{
 		qt::CoreQmlEngine engine(folder);

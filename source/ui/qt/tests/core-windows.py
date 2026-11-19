@@ -18,6 +18,7 @@ usage: core-windows.py <test-core-windows> <Monitor.qml>
 """
 import http.server
 import os
+import pathlib
 import subprocess
 import sys
 import tempfile
@@ -90,7 +91,7 @@ CASES = {
     # asked of the dialog carries a name, never a place
     "nopath": 'Component.onCompleted: probe.report("nopath", [typeof files.read, typeof files.write, typeof files.readBytes,'
               ' typeof files.list].join(","))',
-    "picture": 'Image { source: "file://OUTSIDE/dot.png"; onStatusChanged: probe.report("picture", "status " + status) }',
+    "picture": 'Image { source: "PICTURE"; onStatusChanged: probe.report("picture", "status " + status) }',
     "choose": 'Component.onCompleted: files.choose("dump", "write", "Save the dump", ["Dumps (*.bin)"], "OUTSIDE/../../dump.bin")',
 }
 WORKER = ('WorkerScript.onMessage = function() { try { var x = new XMLHttpRequest();'
@@ -108,10 +109,15 @@ with tempfile.TemporaryDirectory() as top:
         os.makedirs(d)
     with open(os.path.join(outside, "dot.png"), "wb") as f:
         f.write(DOT)
+    # the picture's address as a file address of this system (file:///C:/... on
+    # Windows), and the folder with forward slashes: a backslash in a QML
+    # string starts an escape
+    picture = pathlib.Path(outside, "dot.png").as_uri()
+    outside_qml = outside.replace("\\", "/")
     for name, body in CASES.items():
         with open(os.path.join(folder, name + ".qml"), "w") as f:
             f.write("import QtQuick\nimport QtQuick.Controls\nimport QtQuick.Layouts\nItem {\n"
-                    + body.replace("BASE", base).replace("OUTSIDE", outside) + "\n}\n")
+                    + body.replace("BASE", base).replace("PICTURE", picture).replace("OUTSIDE", outside_qml) + "\n}\n")
     with open(os.path.join(folder, "worker.mjs"), "w") as f:
         f.write(WORKER.replace("BASE", base))
     run = subprocess.run([program, "cases", folder] + list(CASES), capture_output=True, text=True, timeout=120)
@@ -119,7 +125,11 @@ with tempfile.TemporaryDirectory() as top:
     print(out)
     print(run.stderr[-3000:])
     reports = {}
+    refused = {}
     for line in out.splitlines():
+        if line.startswith("REFUSED "):
+            what, _, address = line[len("REFUSED "):].partition(" ")
+            refused.setdefault(what, []).append(address)
         if line.startswith("REPORT "):
             what, _, result = line[len("REPORT "):].partition(" :: ")
             reports.setdefault(what, []).append(result)
@@ -137,9 +147,20 @@ with tempfile.TemporaryDirectory() as top:
         check(len(got) == 1 and (got[0].startswith("status 0") or got[0] == "absent") and "leaked" not in got[0],
               "%s ends with nothing: %s" % (name, got))
     check(reports.get("xhrfile", ["length 0"])[0] in ("length 0", "absent"), "a file read by address reads nothing: %s" % reports.get("xhrfile"))
-    # pictures, components and fonts from anywhere but the core's files fail
+    # pictures, components and fonts from anywhere but the core's files are
+    # not loaded. A Qt with a network module ends them in an error (the
+    # request is refused); one without (Chimera's releases, the Windows
+    # builds) never fetches an address that is not a file, so they stay
+    # Loading, and are never Ready
+    network = "QML_NETWORK 1" in out
+    check(network or "QML_NETWORK 0" in out, "the cases said whether QML has a network module")
+    def not_loaded(name):
+        got = reports.get(name, [])
+        return got[-1:] == ["status 3"] if network else "status 1" not in got
     for name in ("image", "loader", "outside", "font"):
-        check(reports.get(name, [""])[-1] == "status 3", "%s ends in an error: %s" % (name, reports.get(name)))
+        check(not_loaded(name), "%s is not loaded: %s" % (name, reports.get(name)))
+    for name, address in (("image", base + "/image.png"), ("loader", base + "/remote.qml"), ("font", base + "/font.ttf")):
+        check(address in refused.get(name, []), "%s's address is among the refused: %s" % (name, refused.get(name)))
     # the system's browser is given nothing
     check(reports.get("browser") == ["returned false"], "no browser opened: %s" % reports.get("browser"))
     # modules that read or write files, or are not Qt Quick's, are refused
@@ -150,7 +171,7 @@ with tempfile.TemporaryDirectory() as top:
     check(f"REFUSED browser {base}/browser" in out, "the browser's address is among the refused")
     # no file by its path, and a picture from outside the core's files is not shown
     check(reports.get("nopath") == ["undefined,undefined,undefined,undefined"], "no call takes a path: %s" % reports.get("nopath"))
-    check(reports.get("picture", [""])[-1] == "status 3", "a picture from outside is refused: %s" % reports.get("picture"))
+    check(not_loaded("picture") and picture in refused.get("picture", []), "a picture from outside is refused: %s %s" % (reports.get("picture"), refused.get("picture")))
     # what Chimera's dialog is asked for: the purpose, write, the title, the filters, and a name only
     check("WANTED choose :: dump|write|Save the dump|Dumps (*.bin)|dump.bin" in out, "the dialog is asked for a name, never a place")
 
