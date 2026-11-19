@@ -123,6 +123,8 @@ One game each, run from the game's own files ([docs/game-cores.md](docs/game-cor
 | [Sonic 3 A.I.R.](https://github.com/ToolAssisted-run/chimera-core-sonic3air) | Sonic 3 & Knuckles (the A.I.R. remaster, from your own Sonic & Knuckles + Sonic 3 ROM) |
 | [DSDA-Doom](https://github.com/ToolAssisted-run/chimera-core-dsda) | Doom, Doom II, Final Doom, Heretic, Hexen, Chex Quest, Freedoom |
 | [Open4DBoxing](https://github.com/ToolAssisted-run/chimera-core-open4dboxing) | 4D Sports Boxing (DOS) |
+| [fheroes2](https://github.com/ToolAssisted-run/chimera-core-fheroes2) | Heroes of Might and Magic II (from your own game's data file, or its free demo's) |
+| [TheXTech](https://github.com/ToolAssisted-run/chimera-core-thextech) | Super Mario Bros. X (SMBX 1.3) and its episodes, with an asset pack you bring |
 
 ### Third-party cores
 

@@ -15983,3 +15983,61 @@ scanned, stopped, and scanned to its end; the engine test reads a
 9 MB file with a callback (reports after every megabyte, a stop at the third
 is honoured and caches nothing, the finished read is known afterwards and a
 second one never calls back). The measurements are in the commit.
+
+## fheroes2 and TheXTech join the official cores (user-decided, 2026-11-19, issues 601 and 608)
+
+Issue 601 asked for the open engines of Heroes of Might and Magic II and III,
+and issue 608 for Super Mario Bros. X. The owner decided to make game cores
+of fheroes2 (Heroes II) and TheXTech (the C++ port of SMBX 1.3), to leave
+VCMI (Heroes III) for later, and, once Chimera's core tools had moved into
+the cores, to publish both (2026-11-17 and 2026-11-19). They are game cores
+(`"kind": "game"`) and publish x86_64 only, as game cores do, so
+docs/platforms.md does not change.
+
+- `chimera-core-fheroes2` runs fheroes2 at one upstream commit. The user
+  brings HEROES2.AGG, the game's data file, from the original game or from
+  its free demonstration version; the expansion's file, maps and saved games
+  are optional. The music plays through a software synthesizer built into the
+  core, TinySoundFont with fheroes2's own SoundFont, so it is the same in
+  every run (owner). Its CI downloads the free demonstration version from the
+  Internet Archive, checks it by its SHA-256, and plays it in every test;
+  nothing of it is committed (owner).
+- `chimera-core-thextech` runs TheXTech at one upstream commit. The engine
+  has no pictures, sounds or music of its own: the user brings an asset pack,
+  as a zip or in the engine's own ISO form, and the episodes to play, in two
+  project slots (owner). Its sound is the engine's own mixer with its codecs
+  built in, including MIDI and the console music formats (owner). TheXTech
+  does not take contributions written with AI, so the core's patches stay in
+  the core's repository and were not sent upstream (owner). On a CI runner it
+  plays the engine's own test levels with a stand-in pack made there.
+- Each has Export Save Data as a window of its own, miniBox's ready-made one,
+  and nothing else of Chimera's former core tools. Their texts are in all 26
+  languages, written by an AI model and not yet read by native speakers.
+- Their first CI workflows uploaded the package as `<id>-<commit>-x86_64` and
+  named the one CPU to the publish step, which Sonic 3 A.I.R.'s first nightly
+  showed fails: the download that matches one artifact makes no folder for it.
+  They now upload `<id>-<commit>` and name no CPU, as other x86_64-only cores
+  do.
+
+Measured in the cores' repositories on jaffanator01 (each core's
+docs/PLAN.md has the details), against this main:
+- fheroes2, on the free demonstration version's data file and its one map:
+  from power-on through a turn of every player to a quick save, 2200 steps,
+  native and sandbox give the same pictures, sound, memory and saved games,
+  and so do a state saved and loaded every step and states carried into a new
+  process. The core's test script 30 passed, 0 failed, 0 skipped; its frontend
+  test 4 of 4 (the project in chimera-run and in the window ends on the
+  reference's picture); package checks 26 passed. Export Save Data, driven as
+  the window drives it, wrote the route's two saved games.
+- TheXTech, on a stand-in pack made by its tests and the engine's own test
+  levels: native = sandbox over 700 steps, a state every step and in a new
+  process, the sound and four music formats, the ISO form of a pack playing as
+  its zip does; its test script 27 passed, 0 failed, 1 skipped (a real pack);
+  its frontend test 6 of 6; package checks 26 passed. Export Save Data wrote
+  the save a project gave it.
+- CI passes in both repositories on GitHub, and their first builds are
+  "Nightly 2026-11-19 (0645d327)" (fheroes2) and "Nightly 2026-11-19
+  (5372b92b)" (TheXTech).
+- Not proved: a real asset pack for TheXTech, and any part of Heroes II
+  beyond the demo's map; Windows and macOS, where the packages are the same
+  but were not run.

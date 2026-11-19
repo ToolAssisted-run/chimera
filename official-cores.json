@@ -756,6 +756,26 @@
       "kind": "game",
       "repo": "ToolAssisted-run/chimera-core-sonic3air",
       "tested": ""
+    },
+    {
+      "id": "fheroes2",
+      "name": "fheroes2",
+      "systems": [
+        { "id": "HoMM2", "name": "Heroes of Might and Magic II" }
+      ],
+      "kind": "game",
+      "repo": "ToolAssisted-run/chimera-core-fheroes2",
+      "tested": ""
+    },
+    {
+      "id": "thextech",
+      "name": "TheXTech",
+      "systems": [
+        { "id": "SMBX", "name": "Super Mario Bros. X" }
+      ],
+      "kind": "game",
+      "repo": "ToolAssisted-run/chimera-core-thextech",
+      "tested": ""
     }
   ]
 }
