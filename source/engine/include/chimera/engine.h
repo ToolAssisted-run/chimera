@@ -741,6 +741,11 @@ CE_API void ce_package_free(ce_package *p);
  * directory form, which has no file to hash. */
 CE_API const char *ce_package_sha1(const ce_package *p);
 
+/* The package's core version: the "version" of its waterbox.config, "" when
+ * it has none. The one place that rule lives; what a project pins and what
+ * the New Project window shows come from the same field (issue 614). */
+CE_API const char *ce_package_core_version(ce_package *p);
+
 /* Nonzero for the data-driven waterbox form (core.wbx + waterbox.config). */
 CE_API int32_t ce_package_is_waterbox(const ce_package *p);
 

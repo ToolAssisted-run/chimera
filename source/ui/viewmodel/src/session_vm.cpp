@@ -1450,6 +1450,8 @@ SessionViewModel::SessionViewModel(Dispatcher &dispatcher, InputLog &inputs)
 				if (projectM_ == nullptr) return;
 				ce_project *p = ce_project_new();
 				ce_project_set_core(p, ce_project_core_name(projectM_), ce_project_core_version(projectM_), ce_project_core_sha1(projectM_));
+				/* a new movie runs on the package this one runs on */
+				pinRunningPackageOnMachine(p);
 				if (const char *platform = ce_project_header_get(projectM_, "Platform"); platform != nullptr && *platform != '\0')
 					ce_project_header_set(p, "Platform", platform);
 				const char *error = nullptr;
@@ -3754,6 +3756,13 @@ std::filesystem::path SessionViewModel::branchDirOnMachine() const
 	return dir.empty() ? dir : dir / "branches";
 }
 
+void SessionViewModel::pinRunningPackageOnMachine(ce_project *p)
+{
+	/* a folder package, or one that could not be read, leaves the pin as it was */
+	if (packageSha1M_.empty()) return;
+	ce_project_set_core(p, ce_project_core_name(p), packageVersionM_.c_str(), packageSha1M_.c_str());
+}
+
 std::string SessionViewModel::machineIdOnMachine()
 {
 	if (packageSha1M_.empty())
@@ -4726,6 +4735,8 @@ void SessionViewModel::loadBranchOnMachine(const Branch &b, const std::function<
 		/* landed (or ended another way): as a load that replayed */
 		ls.landed = [this, b, done] {
 			if (branchLoadedTurnM_ && s_ != nullptr && ce_session_frame(s_) == b.frame) branchLoadedTurnM_(b.userdata, b.name);
+			/* a replay that landed on the branch's frame leaves a state for the next load (a cancelled one does not come here) */
+			refreshBranchStateOnMachine(b, {});
 			later([done] { done(false, ""); });
 			report(-1, -1, -1, -1, -1);
 		};
@@ -4757,7 +4768,11 @@ void SessionViewModel::loadBranchOnMachine(const Branch &b, const std::function<
 			}
 		}
 	}
-	if (!fromState) seekOnMachine(b.frame);
+	if (!fromState)
+	{
+		seekOnMachine(b.frame);
+		refreshBranchStateOnMachine(b, note.picture);
+	}
 	/* the scripts told of a load that put the machine on the branch's
 	 * frame, their userdata the branch's first (issue 534); a seek that
 	 * stopped short is no load */
@@ -4767,6 +4782,29 @@ void SessionViewModel::loadBranchOnMachine(const Branch &b, const std::function<
 		done(fromState, why);
 	});
 	report(-1, -1, -1, -1, -1);
+}
+
+void SessionViewModel::refreshBranchStateOnMachine(const Branch &b, const Picture::Frame &fallback)
+{
+	namespace fs = std::filesystem;
+	if (s_ == nullptr || b.state.empty() || ce_session_frame(s_) != b.frame) return;
+	const fs::path dir = branchDirOnMachine();
+	if (dir.empty()) return;
+	/* the picture shown now, else the one the branch kept */
+	Picture::Frame picture;
+	screen.takeIfNewer(~uint64_t{0}, picture);
+	if (picture.width <= 0 || picture.height <= 0) picture = b.picture ? *b.picture : fallback;
+	std::error_code ec;
+	fs::create_directories(dir, ec);
+	const fs::path state = dir / (b.state + ".state"), note = dir / (b.state + ".note");
+	/* a state that did not write, or a note that did not, leaves neither: the
+	 * old pair is for another machine and is not used again */
+	if (ce_session_state_save_file(s_, branch_state::utf8(state).c_str(), nullptr, 0) != 0 ||
+		!branch_state::writeNote(note, {machineIdOnMachine(), b.frame, picture}))
+	{
+		fs::remove(state, ec);
+		fs::remove(note, ec);
+	}
 }
 
 void SessionViewModel::forgetBranch(Branch b)
@@ -6254,6 +6292,11 @@ bool SessionViewModel::saveProjectOnMachine(const std::string &to, bool backup, 
 	const std::string log = movieTextOnMachine();
 	ce_project_set_log_text(projectM_, log.data(), log.size());
 	ce_project_set_rerecords(projectM_, ce_session_rerecords(s_));
+	/* The file names the package the project runs on, not the one it was
+	 * opened away from (issue 614): a project opened on a newer build of its
+	 * core and saved opens on that build with no note next time. A package that
+	 * cannot be read again leaves the pin as it was. */
+	pinRunningPackageOnMachine(projectM_);
 	/* the Greenzone box's choice, into TAStudio's part, whatever else is there */
 	{
 		uint64_t tlen = 0;
@@ -6528,7 +6571,19 @@ void SessionViewModel::adoptOnMachine(ce_session *s, const std::string &package,
 	/* a script's input-poll and memory functions go on with the machine opened again */
 	applyInputPollsOnMachine();
 	applyMemoryWatchesOnMachine();
+	/* the package this machine runs, read now: a file put in its place later
+	 * does not change what a save names (issue 614) */
 	packageSha1M_.clear();
+	packageVersionM_.clear();
+	{
+		const char *perr = nullptr;
+		if (ce_package *pk = ce_package_open(package.c_str(), &perr))
+		{
+			if (const char *sha = ce_package_sha1(pk)) packageSha1M_ = sha;
+			packageVersionM_ = ce_package_core_version(pk);
+			ce_package_free(pk);
+		}
+	}
 	diedM_ = false;
 	inputs_.bind(s);
 	{

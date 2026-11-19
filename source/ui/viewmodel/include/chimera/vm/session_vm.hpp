@@ -1167,6 +1167,11 @@ private:
 	void clearLongSeek();
 	/* a branch's load on the machine's thread; `cancelled` given: the
 	 * person's, which may go as a long seek */
+	/* A branch loaded by replaying, now on its frame with its movie, gets a state of this machine
+	 * to load from next time (issue 614): its .state and .note are written over, as making the
+	 * branch wrote them. Nothing when the machine is not on the branch's frame or the branch
+	 * has no state name. */
+	void refreshBranchStateOnMachine(const Branch &b, const Picture::Frame &fallback);
 	void loadBranchOnMachine(const Branch &b, const std::function<void(bool, std::string)> &done, const std::function<void()> &cancelled);
 	/* where two movies part (ce_movie_log_divergent_point), -1 for nowhere */
 	static int64_t partsAt(const std::string &now, const std::string &next);
@@ -1419,6 +1424,9 @@ private:
 	std::string cacheFolderM_;
 	Connection cacheFolderWatch_;
 	std::string packageSha1M_;
+	/* its waterbox.config "version", read with the SHA-1 when the machine opened */
+	std::string packageVersionM_;
+	void pinRunningPackageOnMachine(ce_project *p);
 	/* the mark that a project's session is running, removed when it ends */
 	std::filesystem::path runningMarkM_;
 	/* the machine died in this session: what it stored is not kept */

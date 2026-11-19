@@ -62,6 +62,10 @@ private:
 	std::string firmwarePins;           /* [{"id", "sha1"}] of what the last start was given */
 	std::vector<std::string> firmwareWarnings; /* its firmware against the project's pins */
 	std::string packagePath;
+	/* the package the machine started on (SHA-1 and version), read when it
+	 * started, so a file put in its place later does not change what a save names */
+	std::string runSha1;
+	std::string runVersion;
 	bool unsaved = false;
 	int currentBranch = -1;
 	std::vector<std::string> undoSteps; /* the movie's text before each edit, newest last */

@@ -207,6 +207,8 @@ void McpLocal::dropMachine()
 	project = nullptr;
 	projectPath.clear();
 	packagePath.clear();
+	runSha1.clear();
+	runVersion.clear();
 	unsaved = false;
 	currentBranch = -1;
 	undoSteps.clear();
@@ -322,6 +324,15 @@ bool McpLocal::startMachine(const std::string &firmwareJson, bool otherBuildAllo
 	{
 		why = error != nullptr ? error : "the machine could not be started";
 		return false;
+	}
+	{
+		const char *ignored = nullptr;
+		if (ce_package *pk = ce_package_open(packagePath.c_str(), &ignored))
+		{
+			if (const char *sha = ce_package_sha1(pk)) runSha1 = sha;
+			runVersion = ce_package_core_version(pk);
+			ce_package_free(pk);
+		}
 	}
 	movie = ce_movie_log_new();
 	uint64_t length = 0;
@@ -557,7 +568,7 @@ McpResult McpLocal::openGame(const std::string &argumentsJson)
 	ce_package *opened = ce_package_open(package.c_str(), &ignored);
 	cJSON *config = opened != nullptr ? configOf(opened) : nullptr;
 	const char *sha1 = opened != nullptr ? ce_package_sha1(opened) : nullptr;
-	ce_project_set_core(project, textOf(config, "coreName").c_str(), textOf(config, "version").c_str(), sha1 != nullptr ? sha1 : "");
+	ce_project_set_core(project, textOf(config, "coreName").c_str(), opened != nullptr ? ce_package_core_version(opened) : "", sha1 != nullptr ? sha1 : "");
 	cJSON_Delete(config);
 	if (opened != nullptr) ce_package_free(opened);
 
@@ -695,6 +706,8 @@ McpResult McpLocal::saveProject(const std::string &argumentsJson)
 	const std::string text = movieText();
 	ce_project_set_log_text(project, text.data(), text.size());
 	const char *error = nullptr;
+	/* the project names the package it runs on (issue 614) */
+	if (!runSha1.empty()) ce_project_set_core(project, ce_project_core_name(project), runVersion.c_str(), runSha1.c_str());
 	if (ce_project_save(project, path.c_str(), &error) != 0)
 		return mcpError(std::string("The project was not saved: ") + (error != nullptr ? error : "the file could not be written"));
 	projectPath = path;

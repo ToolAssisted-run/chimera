@@ -5300,6 +5300,184 @@ static std::string projectText(const std::filesystem::path &file)
 	return projectPart(file, "project.json") + projectPart(file, "input.input");
 }
 
+/* A project made with one build of a core and opened with another (issue 614).
+ * The other build is the same package with one more file in it: the same core
+ * and version, another SHA1. Saving the project names the build it runs on,
+ * so the next open says nothing; a branch made on the first build is replayed
+ * once on the second, and loaded from its own state after that. */
+bool otherBuild(const char *package, const char *rom, const std::string &movies)
+{
+	namespace fs = std::filesystem;
+	const std::string movie = readFile(movies + "/gridWalker.win.txt");
+	if (movie.empty())
+	{
+		std::printf("SKIP the other-build tests: the witness's movie is missing\n");
+		return false;
+	}
+	std::string log = "[Input]\nLogKey:#P1 Up|P1 Down|P1 Left|P1 Right|P1 A|P1 B|P1 Select|P1 Start|\n";
+	int64_t end = 0;
+	std::istringstream lines(movie);
+	for (std::string l; std::getline(lines, l);)
+	{
+		if (!l.empty() && l.back() == '\r') l.pop_back();
+		if (!l.empty() && l[0] == '|')
+		{
+			log += l + "\n";
+			end++;
+		}
+	}
+	log += "[/Input]\n";
+	const fs::path dir = fs::temp_directory_path() / ("chimera-test-build-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+	fs::create_directories(dir);
+	fs::copy_file(rom, dir / "gridWalker.testrom");
+	const std::string a = (dir / "a.chimeraCore").string(), b = (dir / "b.chimeraCore").string();
+	fs::copy_file(package, a);
+	fs::copy_file(package, b);
+	{
+		const char *extra = "a later build of the same core\n";
+		CHECK(mz_zip_add_mem_to_archive_file_in_place(b.c_str(), "build-note.txt", extra, std::strlen(extra), nullptr, 0, MZ_DEFAULT_LEVEL));
+	}
+	/* a third build, to be put in the second one's place while it runs */
+	const std::string c = (dir / "c.chimeraCore").string();
+	fs::copy_file(package, c);
+	{
+		const char *extra = "a third build of the same core\n";
+		CHECK(mz_zip_add_mem_to_archive_file_in_place(c.c_str(), "build-note.txt", extra, std::strlen(extra), nullptr, 0, MZ_DEFAULT_LEVEL));
+	}
+	std::string shaA, shaB, version;
+	for (const auto &[path, sha] : {std::pair<std::string, std::string *>{a, &shaA}, {b, &shaB}})
+		if (ce_package *pk = ce_package_open(path.c_str(), nullptr))
+		{
+			*sha = ce_package_sha1(pk) != nullptr ? ce_package_sha1(pk) : "";
+			if (sha == &shaA)
+			{
+				uint64_t len = 0;
+				const uint8_t *cfg = ce_package_entry(pk, "waterbox.config", &len);
+				json::Json j;
+				std::string why;
+				if (cfg != nullptr && json::parse(std::string_view(reinterpret_cast<const char *>(cfg), static_cast<size_t>(len)), j, why))
+					if (const json::Json *v = j.find("version")) version = v->text;
+			}
+			ce_package_free(pk);
+		}
+	CHECK(!shaA.empty() && !shaB.empty() && shaA != shaB);
+	{
+		ce_project *made = ce_project_new();
+		const char *err = nullptr;
+		ce_project_set_title(made, "gridWalker.win");
+		/* made with an older version name, to see the version change too */
+		ce_project_set_core(made, "Synth", "an older build", shaA.c_str());
+		ce_project_header_set(made, "MovieVersion", "Chimera Project File v1.1");
+		ce_project_header_set(made, "Platform", "Synth");
+		ce_project_file_add(made, "gridWalker.testrom", "rom", (dir / "gridWalker.testrom").string().c_str(), &err);
+		ce_project_set_log_text(made, log.data(), log.size());
+		ce_project_save(made, (dir / "p.chimeraProject").string().c_str(), &err);
+		ce_project_free(made);
+	}
+	auto pinOf = [&](const fs::path &file) {
+		ce_project *p = ce_project_open(file.string().c_str(), nullptr);
+		std::string sha, v;
+		if (p != nullptr)
+		{
+			sha = ce_project_core_sha1(p);
+			v = ce_project_core_version(p);
+			ce_project_free(p);
+		}
+		return std::make_pair(sha, v);
+	};
+	ManualDispatcher d;
+	InputLog inputs;
+	SessionViewModel session(d, inputs);
+	session.autoRestore.set(true);
+	session.turboSeek.set(true);
+	PianoRollViewModel roll(d, inputs, session);
+	BranchesViewModel branches(d, inputs, session, roll);
+	std::string error;
+	const fs::path file = dir / "p.chimeraProject";
+	const fs::path cache = dir / "cache";
+	session.cacheFolder.set(cache.string());
+	auto openWith = [&](const std::string &pkg) {
+		const int64_t was = session.opens.get();
+		session.run("openProject", {file.string(), pkg}, error);
+		const bool ok = d.until([&] { return session.opens.get() > was && session.projectPath.get() == file.string(); }, 60);
+		d.until([] { return false; }, 0.1);
+		return ok;
+	};
+	const std::string note = "not the package the project was made with";
+	auto saveIt = [&] {
+		const std::string before = readFile(file);
+		session.run("saveProject", {std::string()}, error);
+		return d.until([&] { return readFile(file) != before; }, 20);
+	};
+	/* a branch made on the first build, which the project keeps no state of in its file */
+	CHECK(openWith(a));
+	CHECK(session.status.get().find(note) == std::string::npos);
+	session.run("seek", {end}, error);
+	CHECK(d.until([&] { return session.frame.get() == end; }, 30));
+	CHECK(branches.run("create", {std::string("win")}, error).has_value());
+	CHECK(d.until([&] { return branches.made.get() == 1; }, 30));
+	/* the branch's own state file and its note (loading a branch also keeps the movie it replaces, for Undo, in another) */
+	auto stemOf = [&] {
+		std::string t;
+		fromValue(branches.rowLists()[0].model->cell(0, 4), t);
+		return t;
+	};
+	auto branchFile = [&](const char *extension) {
+		std::error_code ec;
+		for (const auto &e : fs::recursive_directory_iterator(cache, ec))
+			if (e.path().filename() == stemOf() + extension) return e.path();
+		return fs::path();
+	};
+	CHECK(!stemOf().empty() && !branchFile(".state").empty() && !branchFile(".note").empty());
+	const std::string firstNote = readFile(branchFile(".note"));
+	CHECK(saveIt());
+	CHECK(pinOf(file).first == shaA);
+	/* on the other build: said, and a save changes what the file says */
+	CHECK(openWith(b));
+	CHECK(session.status.get().find(note) != std::string::npos);
+	CHECK(pinOf(file).first == shaA);
+	/* the machine away from the branch's frame, as a person leaves it */
+	auto spoil = [&] {
+		session.run("seek", {int64_t{5}}, error);
+		CHECK(d.until([&] { return session.frame.get() == 5; }, 30));
+	};
+	auto loadIt = [&](bool fromState) {
+		const int64_t was = branches.loads.get();
+		CHECK(branches.run("load", {int64_t{0}}, error).has_value());
+		CHECK(d.until([&] { return branches.loads.get() > was && session.frame.get() == end; }, 30));
+		d.until([] { return false; }, 0.1);
+		CHECK(branches.loadedFromState.get() == fromState);
+	};
+	/* the branch of the first build: replayed this once, from a state of the second build after that */
+	CHECK(branches.count.get() == 1);
+	spoil();
+	loadIt(false);
+	/* a state of this build was stored in its place, whole */
+	CHECK(!readFile(branchFile(".state")).empty());
+	CHECK(readFile(branchFile(".note")) != firstNote && readFile(branchFile(".note")).find("frame " + std::to_string(end)) != std::string::npos);
+	spoil();
+	loadIt(true);
+	spoil();
+	loadIt(true);
+	/* the file at the second build's path is replaced by a third build while it
+	 * runs: a save names the build that runs, not the file now there */
+	fs::copy_file(b, b + ".kept");
+	fs::copy_file(c, b + ".new");
+	fs::rename(b + ".new", b);
+	CHECK(saveIt());
+	CHECK(pinOf(file) == std::make_pair(shaB, version));
+	fs::remove(b);
+	fs::rename(b + ".kept", b);
+	CHECK(openWith(b));
+	CHECK(session.status.get().find(note) == std::string::npos);
+	/* and the branch loads from its state in the new session as well */
+	session.run("seek", {int64_t{5}}, error);
+	CHECK(d.until([&] { return session.frame.get() == 5; }, 30));
+	loadIt(true);
+	removeTree(dir);
+	return true;
+}
+
 /* A project: the synthetic game's winning movie, played to its end, leaves
  * the machine's memory exactly as the witness's recorded run does; saved and
  * opened again, it holds the same inputs, and an edit survives the trip. */
@@ -12289,6 +12467,7 @@ int main(int argc, char **argv)
 			ranMachine = cacheManager(argv[1], argv[2]) && ranMachine;
 			ranMachine = tastudioSettings(argv[1], argv[2]) && ranMachine;
 			if (argc >= 5) ranMachine = project(argv[1], argv[2], argv[3], argv[4]) && ranMachine;
+			if (argc >= 5) ranMachine = otherBuild(argv[1], argv[2], argv[3]) && ranMachine;
 			else std::printf("SKIP the project tests: no movies and goldens folders given\n");
 			if (argc >= 6) ranMachine = openByKind(argv[1], argv[2], argv[5]) && ranMachine;
 			else std::printf("SKIP choosing between cores: no second package given\n");

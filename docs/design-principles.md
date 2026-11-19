@@ -16041,3 +16041,63 @@ docs/PLAN.md has the details), against this main:
 - Not proved: a real asset pack for TheXTech, and any part of Heroes II
   beyond the demo's map; Windows and macOS, where the packages are the same
   but were not run.
+
+## A save names the build it ran on, and a replayed branch gets a new state (user-decided, 2026-11-19, issue 614)
+
+A person opened a project made with an older build of a core that was no
+longer installed. Chimera opened it with the newer build and said "this is
+not the package the project was made with". The old greenzone and the
+branches' states were not used. Saving did not help: the project went on
+naming the older build, so every later open said the same, and a branch whose
+state came from the older build was replayed at every load.
+
+What was found. Chimera keeps the greenzone and each branch's state with a
+machine identity that includes the hash of the build that ran, so the
+greenzone made on the newer build already loaded the next time (which is why
+the reporter saw it load fine, but only from the branch loaded first). What
+was missing was in two places. docs/project.md already said a save re-pins
+the project to the build that ran, but nothing did it. And a branch's state
+was written only when the branch was made, never when a load had to replay it.
+
+Decided, both done:
+
+- **A save pins the build it runs on.** When a machine starts, the session
+  reads the package it opened once: its hash and its core version (the
+  "version" of waterbox.config, read by `ce_package_core_version` in the
+  engine, the one place that rule lives). Every save, and Stop Movie, sets
+  the project's core version and hash from those, with `ce_project_set_core`;
+  the core's name stays. A folder package has no hash, so the pin is left as
+  it was. The first version read the package file again at every save, which
+  costs reading and hashing it (127 MB for ScummVM) on the machine's thread
+  for every backup and autosave, and is wrong when a new build is dropped
+  into the Cores folder over the running one (issue 423): the save would name
+  the file now there, not the build that runs. The MCP server does the same:
+  it keeps the hash and version of the package its machine started on, and
+  its save uses them. There is no engine function that reads a package to pin
+  a project. `chimera-run` opens with `--allow-core-mismatch` but never saves
+  an opened project (it only writes a new one, already pinned to its
+  package), so it needed no change.
+- **What else depends on the pin, and was checked.** The pin is how Chimera
+  picks among several installed builds of a core, so after a save the project
+  opens on the build it was saved with, on purpose. The project's cache
+  folder is named by its id, not its pin. The machine identity uses the
+  running build's hash, and falls back to the pin only when no build is
+  given, so nothing keyed on it goes stale. The crash recovery copy is made
+  from the journal and keeps the pin it had, as the project that crashed.
+- **A replayed branch gets a fresh state.** When a branch is loaded by
+  replaying (its state is from another build, or is missing or unusable),
+  and the machine reaches the branch's frame, the branch's state and note
+  are written over for the running machine, as making the branch writes
+  them. A long replay (issue 595) does the same when it lands. A cancelled
+  replay, or one that stops short of the frame, writes nothing. The project
+  file holds only a branch's input, so there is no state in it to replace.
+  A branch with no state name (its state could not be written when it was
+  made) is not given one by a load; it gets one when it is made again.
+
+Tested in `source/ui/viewmodel/tests/test_vm.cpp` (`otherBuild`): a project
+made on one build, opened on another that differs only by one file in the
+package, says the note; its branch replays once and loads from its state
+twice after that; after a save the file names the second build and its
+version, and the next open says nothing. While the project runs on the second
+build a third is put in the second one's place; a save still names the second. Each check was broken on purpose
+once and seen to fail.

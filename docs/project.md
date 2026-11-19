@@ -37,8 +37,12 @@ Chimera refuses it with a sentence saying so and keeps no reader for it
 - **Core identity**: package name, version, hash - pinned at creation, and
   re-pinned by a save to the core that actually ran. Opening a project on
   another build warns and starts the greenzone empty (the cached states were
-  another machine's); saving then records the build in use, so the question is
-  asked once rather than at every open. The Chimera version is rewritten by
+  another machine's); saving then records the build in use (its version and
+  its hash, those of the package the session opened, read once when it
+  opened and not again at each save, so a file put in its place meanwhile is
+  not what a save names; the core's name stays), so the
+  question is asked once rather than at every open (issue 614: the save did
+  not do this before, and the note came back at every open). The Chimera version is rewritten by
   every save the same way, with the one that created the project kept beside it
   (`OriginalEmuVersion`).
 - **What the cached states are** (issue #115): `StateFormat`, the savestate
@@ -143,6 +147,13 @@ Not in the project:
   hashes) and is used only when the project still describes that machine:
   a savestate is the memory of one exact machine, and the sandbox checks
   only the core binary when it loads one.
+  A branch's state is kept the same way, in the cache folder (not in the
+  project file, which holds only the branch's input), with a note naming its
+  machine. A branch whose state is another machine's (made on another build
+  of the core) is replayed when loaded, and once the replay is on the
+  branch's frame a state of the running machine is stored over the old one,
+  so the next load comes from it. A replay that is cancelled or stops short
+  of the frame stores nothing (issue 614).
 - **Per-user preferences.** Keybinds, window positions, hotkeys and
   TAStudio's own preferences (font, autosave, scrolling) stay in user
   config; the project holds what affects sync and reproduction, and the

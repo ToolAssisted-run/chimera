@@ -47,6 +47,7 @@ struct ce_package
 	std::string entryNames;
 	bool assetsBuilt = false;
 	std::string sha1;
+	std::string coreVersion;
 
 	// directory form
 	std::string dir;
@@ -160,6 +161,22 @@ ce_package *ce_package_open(const char *path, const char **error_out)
 void ce_package_free(ce_package *p) { delete p; }
 
 const char *ce_package_sha1(const ce_package *p) { return p->sha1.empty() ? nullptr : p->sha1.c_str(); }
+
+const char *ce_package_core_version(ce_package *p)
+{
+	if (p->coreVersion.empty())
+	{
+		uint64_t len = 0;
+		if (const uint8_t *bytes = ce_package_entry(p, "waterbox.config", &len); bytes != nullptr)
+			if (cJSON *config = cJSON_ParseWithLength(reinterpret_cast<const char *>(bytes), static_cast<size_t>(len)))
+			{
+				const cJSON *v = cJSON_GetObjectItemCaseSensitive(config, "version");
+				if (cJSON_IsString(v) && v->valuestring != nullptr) p->coreVersion = v->valuestring;
+				cJSON_Delete(config);
+			}
+	}
+	return p->coreVersion.c_str();
+}
 
 int32_t ce_package_is_waterbox(const ce_package *p) { return p->isWaterbox ? 1 : 0; }
 
