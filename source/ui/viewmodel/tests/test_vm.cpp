@@ -5474,6 +5474,9 @@ bool otherBuild(const char *package, const char *rom, const std::string &movies)
 	session.run("seek", {int64_t{5}}, error);
 	CHECK(d.until([&] { return session.frame.get() == 5; }, 30));
 	loadIt(true);
+	/* closed before its folder goes: Windows keeps a file the session has open */
+	session.run("close", {}, error);
+	CHECK(d.until([&] { return !session.isOpen.get(); }, 20));
 	removeTree(dir);
 	return true;
 }
