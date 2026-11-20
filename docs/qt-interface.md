@@ -410,7 +410,20 @@ hotkeys' as before. The wheel and a trackpad keep what they turned short
 of a notch or a row for the next step, so a trackpad's small steps scroll
 the roll as they add up (issue 542). A click in the roll takes the keyboard back from a
 field such as the greenzone's period, so the hotkeys work again (issue
-462). A double click on a frame number opens the person's marker there
+462).
+An input roll with more columns than room scrolls along them, the frame
+numbers with them, by a scroll bar at its foot (at its right when turned on
+its side) or a sideways turn of the wheel. A click on a button's cell picks
+that frame as a click on its number does, Shift extending from where
+picking began, as the window of Chimera's TAStudio did. A drag that goes
+past the top or bottom of the roll, on a cell, a frame number or the thin
+column, scrolls the rows on while it is held, faster the further the pointer
+is past, and goes on setting what it reaches. The middle button plays or
+pauses, as the Play/Pause button's tooltip says (issue 621). A window the
+roll's hotkeys open (Go to Frame, Insert # Frames, Clone # Times, Auto-hold's
+value) has the keyboard at once, its box ready to type in (issue 621).
+TAStudio's Edit menu shows each item's keys beside it, as the main window's
+menus do, Copy, Cut and Paste with the fixed keys they use (issue 625). A double click on a frame number opens the person's marker there
 to edit its text, or sets a marker with no text where there is none
 (issue 436). A double click on a button's cell is two clicks, so the
 button changes twice and ends as it was (issue 582). A branch's or a marker's text is asked for in a small window

@@ -37,7 +37,7 @@ PianoRollItem::PianoRollItem(QQuickItem *parent) : QQuickPaintedItem(parent)
 {
 	setOpaquePainting(true);
 	setAntialiasing(false);
-	setAcceptedMouseButtons(Qt::LeftButton | Qt::RightButton);
+	setAcceptedMouseButtons(Qt::LeftButton | Qt::RightButton | Qt::MiddleButton);
 	/* Chimera's roll: the title under the pointer lit, an empty cell under it naming its column */
 	setAcceptHoverEvents(true);
 	connect(this, &PianoRollItem::lookChanged, this, [this] { widthsDirty_ = true; });
@@ -49,6 +49,40 @@ PianoRollItem::PianoRollItem(QQuickItem *parent) : QQuickPaintedItem(parent)
 		Q_EMIT contentExtentChanged();
 	});
 	connect(this, &PianoRollItem::lookChanged, this, &PianoRollItem::contentExtentChanged);
+	connect(this, &PianoRollItem::contentExtentChanged, this, &PianoRollItem::keepScrollInside);
+	connect(this, &PianoRollItem::visibleRowsChanged, this, &PianoRollItem::keepScrollInside);
+	dragTimer_ = new QTimer(this);
+	dragTimer_->setInterval(40);
+	connect(dragTimer_, &QTimer::timeout, this, &PianoRollItem::dragScroll);
+}
+
+void PianoRollItem::setScrollX(int pixels)
+{
+	pixels = std::clamp(pixels, 0, scrollMax());
+	if (pixels == scroll_) return;
+	scroll_ = pixels;
+	Q_EMIT scrollChanged();
+	update();
+}
+
+void PianoRollItem::setBarSpace(int pixels)
+{
+	pixels = std::max(0, pixels);
+	if (pixels == barSpace_) return;
+	barSpace_ = pixels;
+	Q_EMIT visibleRowsChanged();
+	update();
+}
+
+void PianoRollItem::keepScrollInside()
+{
+	/* the extent and the size may both have changed: the bar reads them again */
+	if (scroll_ > scrollMax())
+	{
+		scroll_ = scrollMax();
+		update();
+	}
+	Q_EMIT scrollChanged();
 }
 
 void PianoRollItem::setColors(const QString &json)
@@ -408,8 +442,10 @@ void PianoRollItem::paint(QPainter *p)
 	if (rows_ == nullptr) return;
 	/* drawn upright; turned on its side, x and y change places, and text is
 	 * drawn the right way round: names level, numbers turned, as Chimera's */
-	const int w = logicalWidth(), h = logicalHeight(), hs = headerSize();
+	const int w = logicalWidth() + scroll_, h = logicalHeight(), hs = headerSize();
 	if (horizontal_) p->setTransform(QTransform(0, 1, 1, 0, 0, 0));
+	/* scrolled along the columns: the frame numbers go with them */
+	p->translate(-scroll_, 0);
 	auto label = [&](const QRect &r, int flags, const QString &s, bool turn) {
 		if (!horizontal_)
 		{
@@ -418,7 +454,7 @@ void PianoRollItem::paint(QPainter *p)
 		}
 		p->save();
 		p->resetTransform();
-		const QRect at(r.y(), r.x(), r.height(), r.width());
+		const QRect at(r.y(), r.x() - scroll_, r.height(), r.width());
 		if (turn)
 		{
 			p->translate(at.left(), at.bottom() + 1);
@@ -723,7 +759,7 @@ void PianoRollItem::hoverMoveEvent(QHoverEvent *e)
 	/* a control's title come onto, or left */
 	const bool wasTitle = hoverTitles_ && hoverColumn_ >= 0, isTitle = titles && column >= 0 && rows_ != nullptr;
 	if (isTitle && (!wasTitle || column != hoverColumn_))
-		Q_EMIT titleHovered(QString::fromStdString(rows_->rows().columnName(column)), at.x(), at.y());
+		Q_EMIT titleHovered(QString::fromStdString(rows_->rows().columnName(column)), at.x() - scroll_, at.y());
 	else if (wasTitle && !isTitle)
 		Q_EMIT titleHovered(QString(), 0, 0);
 	hoverRow_ = row;
@@ -767,6 +803,13 @@ void PianoRollItem::mousePressEvent(QMouseEvent *e)
 	/* where it is in the roll as laid out upright */
 	const QPointF at = logical(e->position());
 	const int hs = headerSize();
+	/* the middle button plays or pauses, as the tooltip on TAStudio's button says */
+	if (e->button() == Qt::MiddleButton)
+	{
+		Q_EMIT middlePressed();
+		e->accept();
+		return;
+	}
 	/* the right button: a column's menu on its name, else for whoever is under the roll */
 	if (e->button() == Qt::RightButton)
 	{
@@ -788,6 +831,8 @@ void PianoRollItem::mousePressEvent(QMouseEvent *e)
 			rightDragRow_ = rightRow_;
 			const Qt::KeyboardModifiers keys = e->modifiers();
 			rightEditing_ = rightDragging_ && (keys & (Qt::ControlModifier | Qt::ShiftModifier | Qt::AltModifier));
+			dragAt_ = at;
+			if (rightDragging_) dragTimer_->start();
 			if (rightDragging_)
 				Q_EMIT rightDragStarted(rightRow_, (keys & Qt::ControlModifier) != 0, (keys & Qt::ShiftModifier) != 0, (keys & Qt::AltModifier) != 0);
 			e->accept();
@@ -809,6 +854,8 @@ void PianoRollItem::mousePressEvent(QMouseEvent *e)
 			/* the machine goes to the frame, and follows the pointer while it is held */
 			cursorDragging_ = true;
 			cursorDragRow_ = row;
+			dragAt_ = at;
+			dragTimer_->start();
 			Q_EMIT frameClicked(row);
 		}
 		else if ((e->modifiers() & Qt::AltModifier) && (rows_->rows().rowFlags(row) & 4))
@@ -821,6 +868,8 @@ void PianoRollItem::mousePressEvent(QMouseEvent *e)
 			/* Shift extends from where picking began; a drag picks what it passes */
 			if (!(e->modifiers() & Qt::ShiftModifier) || selectAnchor_ < 0) selectAnchor_ = row;
 			selecting_ = true;
+			dragAt_ = at;
+			dragTimer_->start();
 			Q_EMIT selectionRequested(std::min(selectAnchor_, row), std::max(selectAnchor_, row));
 		}
 		e->accept();
@@ -831,18 +880,31 @@ void PianoRollItem::mousePressEvent(QMouseEvent *e)
 		e->ignore();
 		return;
 	}
+	/* a press on a cell picks its frame, as a press on the frame number does
+	 * (Shift extends from where picking began) and as TAStudio did before this window */
+	if (!(e->modifiers() & Qt::ShiftModifier) || selectAnchor_ < 0) selectAnchor_ = row;
+	Q_EMIT selectionRequested(std::min(selectAnchor_, row), std::max(selectAnchor_, row));
 	dragColumn_ = column;
 	dragRow_ = row;
+	dragAt_ = at;
+	dragTimer_->start();
 	Q_EMIT cellPressed(row, column, (e->modifiers() & Qt::AltModifier) != 0);
 	e->accept();
 }
 
 void PianoRollItem::mouseMoveEvent(QMouseEvent *e)
 {
-	const QPointF where = logical(e->position());
+	dragAt_ = logical(e->position());
+	dragTo(dragAt_);
+}
+
+void PianoRollItem::dragTo(QPointF where)
+{
 	const int hs = headerSize();
+	/* the row under the pointer, the first or last in view when it is past the rows' top or bottom */
 	auto rowUnder = [&] {
-		return std::min(rowCount() - 1, rowOnLine(static_cast<qint64>(std::max(0.0, where.y() - hs) / rowHeight_)));
+		const double y = std::clamp(where.y(), static_cast<double>(hs), static_cast<double>(std::max(hs, logicalHeight() - 1)));
+		return std::min(rowCount() - 1, rowOnLine(static_cast<qint64>((y - hs) / rowHeight_)));
 	};
 	if (rightDragging_ && rows_ != nullptr)
 	{
@@ -866,24 +928,43 @@ void PianoRollItem::mouseMoveEvent(QMouseEvent *e)
 		return;
 	}
 	if (markerDrag_ >= 0) return;
-	if (selecting_ && rows_ != nullptr && where.y() >= hs)
+	if (selecting_ && rows_ != nullptr)
 	{
-		const qint64 row = std::min(rowCount() - 1, rowOnLine(static_cast<qint64>((where.y() - hs) / rowHeight_)));
+		const qint64 row = rowUnder();
 		if (row >= 0) Q_EMIT selectionRequested(std::min(selectAnchor_, row), std::max(selectAnchor_, row));
 		return;
 	}
-	if (dragColumn_ < 0) return;
+	if (dragColumn_ < 0 || rows_ == nullptr) return;
 	/* a drag stays in the column it began in, whatever the pointer's x */
-	const QPointF at(columnX(dragColumn_) + 1, where.y());
-	qint64 row = 0;
-	int column = 0;
-	if (cellAt(at, row, column) && row != dragRow_)
+	const qint64 row = rowUnder();
+	if (row >= 0 && row != dragRow_)
 	{
 		/* every row passed over, even when the pointer moved fast */
 		const qint64 step = row > dragRow_ ? 1 : -1;
 		for (qint64 r = dragRow_ + step; r != row + step; r += step) Q_EMIT cellDragged(r, dragColumn_);
 		dragRow_ = row;
 	}
+}
+
+void PianoRollItem::dragScroll()
+{
+	const bool dragging = rightDragging_ || cursorDragging_ || selecting_ || dragColumn_ >= 0;
+	if (!dragging || rows_ == nullptr)
+	{
+		dragTimer_->stop();
+		return;
+	}
+	const int hs = headerSize(), h = logicalHeight();
+	const double y = dragAt_.y();
+	qint64 step = 0;
+	/* a row at the edge, more the further the pointer is past it */
+	if (y < hs) step = -(1 + static_cast<qint64>((hs - y) / rowHeight_));
+	else if (y >= h) step = 1 + static_cast<qint64>((y - h) / rowHeight_);
+	if (step == 0) return;
+	const qint64 to = std::clamp<qint64>(top_ + step, 0, std::max<qint64>(0, rowCount() - 1));
+	if (to == top_) return;
+	Q_EMIT topRowRequested(to);
+	dragTo(dragAt_);
 }
 
 void PianoRollItem::mouseReleaseEvent(QMouseEvent *e)
@@ -895,6 +976,7 @@ void PianoRollItem::mouseReleaseEvent(QMouseEvent *e)
 		if (rightHeld_ && !rightWheeled_ && !(rightEditing_ && rightMoved_)) Q_EMIT rowMenuRequested(rightRow_);
 		rightHeld_ = false;
 		rightDragging_ = rightEditing_ = rightMoved_ = false;
+		dragTimer_->stop();
 		return;
 	}
 	cursorDragging_ = false;
@@ -909,6 +991,7 @@ void PianoRollItem::mouseReleaseEvent(QMouseEvent *e)
 	selecting_ = false;
 	dragColumn_ = -1;
 	dragRow_ = -1;
+	dragTimer_->stop();
 }
 
 bool PianoRollItem::navigate(int key, bool extend)
@@ -943,6 +1026,14 @@ void PianoRollItem::wheelEvent(QWheelEvent *e)
 {
 	/* a notch is 120; what is short of one is kept for the next step, as a
 	 * trackpad turns a little at a time (each step alone was 0, issue 542) */
+	/* a sideways turn (a tilting wheel, a trackpad's swipe) scrolls the columns */
+	if (e->angleDelta().x() != 0 || (e->angleDelta().y() == 0 && e->pixelDelta().x() != 0))
+	{
+		const int along = e->pixelDelta().x() != 0 ? e->pixelDelta().x() : e->angleDelta().x() / 2;
+		setScrollX(scroll_ - along);
+		e->accept();
+		return;
+	}
 	const int angle = e->angleDelta().y();
 	if ((angle > 0) != (wheelAngle_ > 0)) wheelAngle_ = 0;
 	wheelAngle_ += angle;

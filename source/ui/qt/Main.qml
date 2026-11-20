@@ -221,7 +221,11 @@ ApplicationWindow {
     // a menu item that shows the keys of the hotkey its action names
     Component {
         id: keyedMenuItem
-        KeyedMenuEntry { keys: action && action.hotkey ? (root.hotkeyKeys[action.hotkey] || "") : "" }
+        KeyedMenuEntry {
+            // a hotkey's keys, else the fixed keys an action names itself (TAStudio's Copy, Cut and Paste, issue 625)
+            keys: action && action.hotkey ? (root.hotkeyKeys[action.hotkey] || "")
+                : action && action.fixedKeys ? root.keyNamer.shown(action.fixedKeys, "") : ""
+        }
     }
     // Chimera asks before a project with changes is left - closed, another
     // opened, the program quit - and saves it first when told to

@@ -193,7 +193,7 @@ ApplicationWindow {
                 Action { property string hotkey: "Seek To..."; text: qsTrId("tastudio.go_to_frame_dialog"); enabled: tas.session.seekEnabled; onTriggered: seekDialog.open() }
                 MenuDivider {}
                 Action {
-                    text: qsTrId("common.copy"); shortcut: StandardKey.Copy; enabled: editMenu.picked
+                    property string fixedKeys: "Ctrl+C"; text: qsTrId("common.copy"); shortcut: StandardKey.Copy; enabled: editMenu.picked
                     onTriggered: {
                         tas.pianoRoll.run("copyFrames", [tas.pianoRoll.selectFirst, tas.pianoRoll.selectLast])
                         tas.clipboard.setText(tas.pianoRoll.clipboardText)
@@ -201,7 +201,7 @@ ApplicationWindow {
                 }
                 Action {
                     // the lines on the system's clipboard, as Chimera's Paste reads them
-                    text: qsTrId("tastudio.paste_mnemonic"); shortcut: StandardKey.Paste; enabled: tas.session.isOpen && tas.clipboard.hasText
+                    property string fixedKeys: "Ctrl+V"; text: qsTrId("tastudio.paste_mnemonic"); shortcut: StandardKey.Paste; enabled: tas.session.isOpen && tas.clipboard.hasText
                     onTriggered: tas.pianoRoll.run("pasteText", [Math.min(editMenu.at, tas.pianoRoll.frameCount), tas.clipboard.text(), false])
                 }
                 Action {
@@ -210,7 +210,7 @@ ApplicationWindow {
                     onTriggered: tas.pianoRoll.run("pasteText", [Math.min(editMenu.at, tas.pianoRoll.frameCount), tas.clipboard.text(), true])
                 }
                 Action {
-                    text: qsTrId("tastudio.cut"); shortcut: StandardKey.Cut; enabled: editMenu.picked
+                    property string fixedKeys: "Ctrl+X"; text: qsTrId("tastudio.cut"); shortcut: StandardKey.Cut; enabled: editMenu.picked
                     onTriggered: {
                         tas.pianoRoll.run("cutFrames", [tas.pianoRoll.selectFirst, tas.pianoRoll.selectLast])
                         tas.clipboard.setText(tas.pianoRoll.clipboardText)
@@ -375,10 +375,9 @@ ApplicationWindow {
                         if (question) {
                             holdValueDialog.name = columnMenu.name
                             holdValueDialog.question = question
-                            holdValueBox.from = tas.pianoRoll.autoHoldMin
-                            holdValueBox.to = tas.pianoRoll.autoHoldMax
-                            holdValueBox.value = tas.pianoRoll.autoHoldInitial
-                            holdValueDialog.open()
+                            holdValueDialog.from = tas.pianoRoll.autoHoldMin
+                            holdValueDialog.to = tas.pianoRoll.autoHoldMax
+                            holdValueDialog.openWith(tas.pianoRoll.autoHoldInitial)
                         } else tas.pianoRoll.run("toggleAutoHold", [columnMenu.name])
                     }
                 }
@@ -460,6 +459,29 @@ ApplicationWindow {
                         // Chimera's menu for the frames picked; nothing picked, no menu
                         onRowMenuRequested: (row) => { oneRoll.use(); if (tas.pianoRoll.selectFirst >= 0 && tas.pianoRoll.selectLast < tas.pianoRoll.frameCount) { rowMenu.row = row; rowMenu.popup() } }
                         onCellDragged: (row, column) => tas.pianoRoll.run("drag", [row, column])
+                        // the middle button plays or pauses, as the Play/Pause button's tooltip says
+                        onMiddlePressed: tas.session.run(tas.session.running ? "pause" : "play")
+                        // more columns than room: the roll scrolls along them (issue 621), the bar at its foot
+                        // (turned on its side, at its right)
+                        barSpace: columnBar.visible ? (tas.pianoRoll.horizontal ? columnBar.implicitWidth : columnBar.implicitHeight) : 0
+                        ScrollBar {
+                            id: columnBar
+                            objectName: "columnBar"
+                            // (not scrollMax: the bar's room is taken out of the roll, which would loop)
+                            visible: oneRoll.contentExtent > (tas.pianoRoll.horizontal ? oneRoll.height : oneRoll.width)
+                            orientation: tas.pianoRoll.horizontal ? Qt.Vertical : Qt.Horizontal
+                            policy: ScrollBar.AlwaysOn
+                            anchors {
+                                left: tas.pianoRoll.horizontal ? undefined : parent.left
+                                right: parent.right
+                                top: tas.pianoRoll.horizontal ? parent.top : undefined
+                                bottom: parent.bottom
+                            }
+                            size: oneRoll.viewExtent / Math.max(1, oneRoll.viewExtent + oneRoll.scrollMax)
+                            position: oneRoll.scrollX / Math.max(1, oneRoll.viewExtent + oneRoll.scrollMax)
+                            // only a drag of the bar moves the roll; the binding above moves the bar
+                            onPositionChanged: if (pressed) oneRoll.scrollX = Math.round(position * (oneRoll.viewExtent + oneRoll.scrollMax))
+                        }
                         onFrameClicked: (row) => { oneRoll.use(); tas.session.run("seekAsking", [row]) }
                         // a double click on a frame number sets a marker there, or edits the person's own (issue 436)
                         onFrameDoubleClicked: (row) => {
@@ -1069,26 +1091,20 @@ ApplicationWindow {
             source: tas.branches.picture("preview")
         }
     }
-    Dialog {
+    NumberPrompt {
         id: cloneDialog
         title: qsTrId("tastudio.clone_the_frames_picked_how_many")
         anchors.centerIn: parent
-        modal: true
-        standardButtons: Dialog.Ok | Dialog.Cancel
-        SpinBox { id: cloneTimes; from: 1; to: 100000; value: 1; editable: true }
-        onAccepted: tas.pianoRoll.run("cloneFrames", [tas.pianoRoll.selectFirst, tas.pianoRoll.selectLast, cloneTimes.value])
+        from: 1; to: 100000; value: 1
+        onAccepted: tas.pianoRoll.run("cloneFrames", [tas.pianoRoll.selectFirst, tas.pianoRoll.selectLast, cloneDialog.value])
     }
-    Dialog {
+    NumberPrompt {
         id: insertDialog
         title: qsTrId("tastudio.insert_frames")
+        question: qsTrId("tastudio.how_many")
         anchors.centerIn: parent
-        modal: true
-        standardButtons: Dialog.Ok | Dialog.Cancel
-        RowLayout {
-            Label { text: qsTrId("tastudio.how_many") }
-            SpinBox { id: insertCount; from: 1; to: 1000000; value: 1; editable: true }
-        }
-        onAccepted: tas.pianoRoll.run("insertFrames", [Math.min(editMenu.at, tas.pianoRoll.frameCount), insertCount.value])
+        from: 1; to: 1000000; value: 1
+        onAccepted: tas.pianoRoll.run("insertFrames", [Math.min(editMenu.at, tas.pianoRoll.frameCount), insertDialog.value])
     }
     // Chimera's Go to Frame: the machine paused, a frame index typed
     Dialog {
@@ -1097,7 +1113,9 @@ ApplicationWindow {
         anchors.centerIn: parent
         modal: true
         standardButtons: Dialog.Ok | Dialog.Cancel
-        onAboutToShow: { tas.session.run("pause"); seekTo.text = ""; seekTo.forceActiveFocus() }
+        onAboutToShow: { tas.session.run("pause"); seekTo.text = "" }
+        // the box takes the keyboard once the dialog is shown (before, it was not yet visible, issue 621)
+        onOpened: seekTo.forceActiveFocus()
         ColumnLayout {
             Label { text: qsTrId("tastudio.jump_seek_to_frame_index") }
             TextField {
@@ -1139,20 +1157,13 @@ ApplicationWindow {
         onOpened: { markerFrameText.forceActiveFocus(); markerFrameText.selectAll() }
         onAccepted: if (markerFrameText.text !== "") tas.pianoRoll.run("moveMarker", [markerFrameDialog.frame, parseInt(markerFrameText.text)])
     }
-    Dialog {
+    NumberPrompt {
         id: holdValueDialog
         objectName: "holdValueDialog"
         property string name: ""
-        property string question: ""
         title: qsTrId("tastudio.auto_hold")
         anchors.centerIn: parent
-        modal: true
-        standardButtons: Dialog.Ok | Dialog.Cancel
-        ColumnLayout {
-            Label { text: holdValueDialog.question }
-            SpinBox { id: holdValueBox; editable: true }
-        }
-        onAccepted: tas.pianoRoll.run("toggleAutoHold", [holdValueDialog.name, holdValueBox.value])
+        onAccepted: tas.pianoRoll.run("toggleAutoHold", [holdValueDialog.name, holdValueDialog.value])
     }
     FileDialog {
         id: saveMacroDialog

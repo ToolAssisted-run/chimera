@@ -69,6 +69,7 @@
     <file>WindowOptions.qml</file>
     <file>TAStudio.qml</file>
     <file>TextPrompt.qml</file>
+    <file>NumberPrompt.qml</file>
     <file>LongSeek.qml</file>
     <file>EncodeVideo.qml</file>
     <file>LuaForms.qml</file>

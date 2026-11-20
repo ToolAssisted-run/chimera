@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <functional>
 
 #include <QHash>
@@ -12,6 +13,7 @@
  * turns it into a command of the piano roll's view model. */
 
 #include <QPointer>
+#include <QTimer>
 #include <QQuickPaintedItem>
 
 namespace chimera::qt {
@@ -35,6 +37,15 @@ class PianoRollItem : public QQuickPaintedItem
 	/* how wide its columns are, all told (how tall turned on its side): an
 	 * input roll beside another takes this much, as Chimera does */
 	Q_PROPERTY(int contentExtent READ contentExtent NOTIFY contentExtentChanged)
+	/* how far the columns are scrolled along (pixels), and the most they can
+	 * be: an input roll with more columns than it has room for scrolls
+	 * across, the frame numbers with them */
+	Q_PROPERTY(int scrollX READ scrollX WRITE setScrollX NOTIFY scrollChanged)
+	Q_PROPERTY(int scrollMax READ scrollMax NOTIFY scrollChanged)
+	/* how much of the columns' length is in view (pixels), for the scroll bar's size */
+	Q_PROPERTY(int viewExtent READ viewExtent NOTIFY scrollChanged)
+	/* room the scroll bar along the columns takes from the rows' side (pixels) */
+	Q_PROPERTY(int barSpace READ barSpace WRITE setBarSpace NOTIFY visibleRowsChanged)
 	/* the rows a notch of the wheel scrolls */
 	Q_PROPERTY(int wheelRows MEMBER wheelRows_)
 	Q_PROPERTY(qint64 rowCount READ rowCount NOTIFY rowCountChanged)
@@ -94,6 +105,12 @@ public:
 	void paint(QPainter *painter) override;
 
 	int contentExtent() const;
+	int scrollX() const { return scroll_; }
+	void setScrollX(int pixels);
+	int scrollMax() const { return std::max(0, contentExtent() - logicalWidth()); }
+	int viewExtent() const { return logicalWidth(); }
+	int barSpace() const { return barSpace_; }
+	void setBarSpace(int pixels);
 	QString colors() const { return colors_; }
 	void setColors(const QString &json);
 	/* Chimera's twelve TAStudio colours as the theme has them, before the
@@ -132,6 +149,9 @@ public:
 
 Q_SIGNALS:
 	void lookChanged();
+	void scrollChanged();
+	/* the middle button went down on the roll (TAStudio plays or pauses) */
+	void middlePressed();
 	void viewChanged();
 	void contentExtentChanged();
 	void rowsChanged();
@@ -182,6 +202,13 @@ protected:
 
 private:
 	bool cellAt(QPointF p, qint64 &row, int &column) const;
+	/* a drag that has gone on to a place in the roll (as laid out upright, scrolled
+	 * along); the pointer past the rows' top or bottom picks the first or last in view */
+	void dragTo(QPointF where);
+	/* the scroll kept inside what the columns allow */
+	void keepScrollInside();
+	/* a drag held past the top or bottom scrolls the rows, on a timer */
+	void dragScroll();
 	int frameColumnWidth() const;
 	/* the narrow column before the frame numbers, as wide as Chimera's (a "10" and its padding) */
 	int cursorWidth() const;
@@ -252,9 +279,15 @@ private:
 	/* the icons a script named, read once each */
 	QHash<QString, QImage> icons_;
 	/* the roll is laid out as if upright; turned, x and y change places */
-	QPointF logical(QPointF physical) const { return horizontal_ ? QPointF(physical.y(), physical.x()) : physical; }
+	QPointF logical(QPointF physical) const
+	{
+		return (horizontal_ ? QPointF(physical.y(), physical.x()) : physical) + QPointF(scroll_, 0);
+	}
 	int logicalWidth() const { return static_cast<int>(horizontal_ ? height() : width()); }
-	int logicalHeight() const { return static_cast<int>(horizontal_ ? width() : height()); }
+	int logicalHeight() const { return static_cast<int>(horizontal_ ? width() : height()) - barSpace_; }
+	int scroll_ = 0, barSpace_ = 0;
+	QTimer *dragTimer_ = nullptr;
+	QPointF dragAt_;
 	/* the header's depth: a row upright; turned, room for the longest name */
 	int headerSize() const;
 	/* where a column starts and how wide it is: an analog control's column

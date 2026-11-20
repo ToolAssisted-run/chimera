@@ -726,6 +726,27 @@ endif
       cpp_args: ['-DQT_NO_KEYWORDS'],
     )
     test('roll double click', test_roll_double_click, env: ['QT_QPA_PLATFORM=offscreen', 'QT_QUICK_BACKEND=software'], timeout: 60)
+    # the piano roll scrolled along its columns, a cell press picking its
+    # frame, a drag past the edge scrolling the rows, the middle button
+    # (issue 621)
+    test_roll_scroll = executable(
+      'test-roll-scroll',
+      ['qt/tests/test_roll_scroll.cpp', 'qt/piano_roll_item.cpp', 'qt/qml_view_model.cpp', 'qt/theme_palette.cpp',
+        qt6.compile_moc(headers: ['qt/piano_roll_item.hpp', 'qt/qml_view_model.hpp', 'qt/theme_palette.hpp'], dependencies: [qt_dep])],
+      dependencies: [qt_test_dep, vm_dep, dl_dep],
+      override_options: ['cpp_std=c++20'],
+      cpp_args: ['-DQT_NO_KEYWORDS'],
+    )
+    test('roll scroll', test_roll_scroll, env: ['QT_QPA_PLATFORM=offscreen', 'QT_QUICK_BACKEND=software'], timeout: 60)
+    # a number prompt has the keyboard when it opens, whatever had it before,
+    # and Enter is OK (issue 621)
+    test_number_prompt = executable(
+      'test-number-prompt',
+      ['qt/tests/test_number_prompt.cpp', qt_rcc],
+      dependencies: [qt_test_dep],
+      override_options: ['cpp_std=c++20'],
+    )
+    test('number prompt', test_number_prompt, env: ['QT_QPA_PLATFORM=offscreen', 'QT_QUICK_BACKEND=software', 'QT_QUICK_CONTROLS_STYLE=Basic'], timeout: 60)
     # scripts dropped on the Lua Console opened and run, a session read,
     # other files left alone (issue 561)
     test_lua_console_drop = executable(
