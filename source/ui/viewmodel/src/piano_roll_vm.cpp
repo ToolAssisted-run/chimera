@@ -496,6 +496,9 @@ PianoRollViewModel::PianoRollViewModel(Dispatcher &dispatcher, InputLog &inputs,
 		});
 	maxStepsWatch_ = maxUndoSteps.changed.connect([this] { trimHistory(); });
 	expose("hiddenColumns", "the columns not shown, by control name, a line each", hiddenColumns);
+	expose("unboundColumns", "the columns of the players with no key, gamepad button or analog control bound in Controller "
+		"Config, by control name, a line each: not in the roll at all, though the movie keeps them, and shown again when the player "
+		"is bound or the movie has input for it", unboundColumns);
 	/* a column shown or hidden is a change of the project's, as Chimera flags it */
 	command("hideColumn", "a control's column no longer shown", {"name"}, [this](const Args &a, std::string &error) -> Value {
 		std::string name;
@@ -1341,7 +1344,9 @@ PianoRollViewModel::PianoRollViewModel(Dispatcher &dispatcher, InputLog &inputs,
 		groupRows_.reset.emit();
 		frames_.reset.emit();
 	});
+	unboundWatch_ = session_.boundPlayersChanged.connect([this] { refreshUnbound(); });
 	resetWatch_ = session_.inputsReset.connect([this] {
+		refreshUnbound();
 		frameCount.set(inputs_.size());
 		clampTop();
 		refreshRun(0);
@@ -1813,7 +1818,7 @@ void PianoRollViewModel::pushColumnHolds()
 	for (const std::string &name : autoHeld_)
 	{
 		/* a hidden column records nothing when hidden ones are not edited */
-		if (limited() && hidden_.count(name) != 0) continue;
+		if (limited() && notShown(name)) continue;
 		SessionViewModel::ColumnPattern cp;
 		const Pattern *own = nullptr;
 		int32_t pressed = 1, released = 0;
@@ -1930,9 +1935,12 @@ std::vector<std::string> PianoRollViewModel::columnGroups() const
 std::vector<std::string> PianoRollViewModel::groupNames() const
 {
 	std::vector<std::string> players, keys;
-	for (const std::string &g : columnGroups())
+	const std::vector<std::string> groups = columnGroups();
+	for (size_t c = 0; c < groups.size(); c++)
 	{
-		if (g.empty()) continue;
+		const std::string &g = groups[c];
+		/* a player with nothing bound has no group in the menu, as it has no columns (issue 622) */
+		if (g.empty() || unbound_.count(frames_.columnName(static_cast<int32_t>(c))) != 0) continue;
 		std::vector<std::string> &into = g.rfind("Keys (", 0) == 0 ? keys : players;
 		if (std::find(into.begin(), into.end(), g) == into.end()) into.push_back(g);
 	}
@@ -1967,7 +1975,7 @@ Value PianoRollViewModel::GroupRows::cell(int64_t row, int32_t column) const
 		{
 			const std::string &g = groups[static_cast<size_t>(c)];
 			const bool member = isKeys ? g.rfind("Keys (", 0) == 0 : g == name;
-			if (member && vm_.hidden_.count(vm_.frames_.columnName(c)) != 0) return false;
+			if (member && vm_.notShown(vm_.frames_.columnName(c))) return false;
 		}
 		return true;
 	}
@@ -2430,12 +2438,12 @@ Value PianoRollViewModel::PatternRows::cell(int64_t row, int32_t column) const
 bool PianoRollViewModel::Frames::columnHiddenIn(int64_t view, int32_t column) const
 {
 	if (view == vm_.activeRoll.get() || view < 0 || view >= static_cast<int64_t>(vm_.rolls_.size())) return columnHidden(column);
-	return vm_.rolls_[static_cast<size_t>(view)].count(columnName(column)) != 0;
+	return vm_.rolls_[static_cast<size_t>(view)].count(columnName(column)) != 0 || vm_.unbound_.count(columnName(column)) != 0;
 }
 
 bool PianoRollViewModel::limited() const
 {
-	return !agentEditing_ && !editHiddenColumns.get() && !hidden_.empty();
+	return !agentEditing_ && !editHiddenColumns.get() && (!hidden_.empty() || !unbound_.empty());
 }
 
 Buttons PianoRollViewModel::shownButtons() const
@@ -2443,14 +2451,14 @@ Buttons PianoRollViewModel::shownButtons() const
 	Buttons shown;
 	const std::vector<std::string> &names = session_.buttonNames();
 	for (size_t b = 0; b < names.size(); b++)
-		if (hidden_.count(names[b]) == 0) shown.set(b);
+		if (!notShown(names[b])) shown.set(b);
 	return shown;
 }
 
 std::vector<bool> PianoRollViewModel::shownAxes() const
 {
 	std::vector<bool> shown;
-	for (const SessionViewModel::Axis &ax : session_.axes()) shown.push_back(hidden_.count(ax.name) == 0);
+	for (const SessionViewModel::Axis &ax : session_.axes()) shown.push_back(!notShown(ax.name));
 	return shown;
 }
 
@@ -2665,6 +2673,50 @@ void PianoRollViewModel::framesRecorded(const std::vector<SessionViewModel::Reco
 		lastWasRecord_ = r.running;
 	}
 	recordingStep_ = false;
+}
+
+void PianoRollViewModel::refreshUnbound()
+{
+	std::set<std::string> now;
+	const std::set<int32_t> &players = session_.unboundPlayers();
+	if (!players.empty())
+	{
+		const std::vector<std::string> &buttons = session_.buttonNames();
+		const auto &axes = session_.axes();
+		/* a player the movie has input for keeps its columns: that input is never hidden from the person */
+		std::set<int32_t> used;
+		if (inputs_.bound() && inputs_.size() > 0)
+		{
+			std::map<int32_t, Buttons> masks;
+			for (size_t b = 0; b < buttons.size(); b++)
+				if (players.count(session_.playerOf(buttons[b])) != 0) masks[session_.playerOf(buttons[b])].set(b);
+			std::vector<int32_t> values(inputs_.axisCount());
+			for (int64_t f = 0; f < inputs_.size() && used.size() < players.size(); f++)
+			{
+				const Buttons held = inputs_.at(f);
+				for (const auto &[p, mask] : masks)
+					if (used.count(p) == 0 && (held & mask).any()) used.insert(p);
+				if (values.empty()) continue;
+				inputs_.axesAt(f, values.data());
+				for (size_t a = 0; a < axes.size() && a < values.size(); a++)
+					if (players.count(axes[a].player) != 0 && values[a] != axes[a].neutral) used.insert(axes[a].player);
+			}
+		}
+		for (const std::string &n : buttons)
+			if (players.count(session_.playerOf(n)) != 0 && used.count(session_.playerOf(n)) == 0) now.insert(n);
+		for (const SessionViewModel::Axis &a : axes)
+			if (players.count(a.player) != 0 && used.count(a.player) == 0) now.insert(a.name);
+	}
+	if (now == unbound_) return;
+	unbound_ = now;
+	std::string text;
+	for (const std::string &n : unbound_) text += (text.empty() ? "" : "\n") + n;
+	unboundColumns.set(text);
+	pushRecordMask();
+	pushColumnHolds();
+	columnRows_.reset.emit();
+	groupRows_.reset.emit();
+	frames_.reset.emit();
 }
 
 void PianoRollViewModel::setHiddenColumns(const std::set<std::string> &names)

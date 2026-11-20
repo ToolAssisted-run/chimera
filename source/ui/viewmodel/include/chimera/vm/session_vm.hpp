@@ -513,6 +513,12 @@ public:
 	const std::vector<bool> &buttonActive() const { return buttonActive_; }
 	/* a control's player by its name, 0 for the console's or one the machine lacks */
 	int32_t playerOf(const std::string &name) const;
+	/* the players (1 and up) that have no key, gamepad button or analog control bound (Config > Controllers, or the
+	 * package's defaults), as the TAStudio roll leaves their columns out (issue 622). Empty when no player at all
+	 * has anything bound: there is nothing then to tell them apart by. */
+	const std::set<int32_t> &unboundPlayers() const { return unboundPlayers_; }
+	/* unboundPlayers() changed */
+	Signal<> boundPlayersChanged;
 	/* the controller's name as the package declares it (Chimera's
 	 * ControllerDefinition name; "Waterbox Controller" when it says none) */
 	const std::string &controllerName() const { return controllerName_; }
@@ -1244,6 +1250,9 @@ private:
 	std::string mnemonics_;
 	std::vector<std::string> buttonHeaders_;
 	Bindings bindings_;
+	std::set<int32_t> unboundPlayers_;
+	/* force: say it changed even when the players are the same (a machine opened: the columns are other ones) */
+	void updateUnboundPlayers(bool force = false);
 	Bindings autofireBindings_;
 	std::vector<std::string> defaultAutofire_;
 	std::vector<AnalogBind> analogBinds_, defaultAnalog_;

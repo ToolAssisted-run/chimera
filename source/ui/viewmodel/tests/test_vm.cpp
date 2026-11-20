@@ -4342,6 +4342,99 @@ bool coreMenu(const char *package, const char *rom, const char *slotsPackage, co
 	return true;
 }
 
+/* The roll leaves out the columns of a player with nothing bound (issue 622): not hidden, not there; binding the
+ * player brings them back; a player the movie has input for keeps its columns; the movie itself keeps every control */
+bool unboundPlayers(const char *package, const char *rom)
+{
+	ManualDispatcher d;
+	InputLog inputs;
+	SessionViewModel session(d, inputs);
+	session.turboSeek.set(true);
+	PianoRollViewModel roll(d, inputs, session);
+	std::string error;
+	openGame(session, package, std::string(rom), error);
+	CHECK(d.until([&] { return session.isOpen.get() && roll.frames().columnCount() == 47; }, 60));
+	const std::vector<std::string> names = session.buttonNames();
+	auto columnOf = [&](const std::string &name) {
+		for (int32_t c = 0; c < roll.frames().columnCount(); c++)
+			if (roll.frames().columnName(c) == name) return c;
+		return -1;
+	};
+	/* the second player's buttons, and the first's */
+	std::vector<size_t> second, first;
+	for (size_t b = 0; b < names.size(); b++)
+	{
+		if (session.playerOf(names[b]) == 2) second.push_back(b);
+		if (session.playerOf(names[b]) == 1) first.push_back(b);
+	}
+	CHECK(!second.empty() && !first.empty());
+	if (second.empty() || first.empty()) return false;
+	const std::string p1 = names[first[0]], p2 = names[second[0]];
+	const int32_t c1 = columnOf(p1), c2 = columnOf(p2);
+	auto groupNames = [&] {
+		std::vector<std::string> out;
+		for (const auto &r : roll.rowLists())
+			if (r.name == "columnGroups")
+				for (int64_t i = 0; i < r.model->rowCount(); i++)
+				{
+					std::string t;
+					fromValue(r.model->cell(i, 0), t);
+					out.push_back(t);
+				}
+		return out;
+	};
+	auto has = [](const std::vector<std::string> &v, const std::string &x) { return std::find(v.begin(), v.end(), x) != v.end(); };
+	auto bindEverything = [&](bool player1, bool player2, const std::string &key = std::string()) {
+		std::vector<std::string> texts = session.bindingTexts();
+		texts.resize(names.size());
+		for (size_t b = 0; b < names.size(); b++)
+		{
+			const int32_t p = session.playerOf(names[b]);
+			if (p == 1) texts[b] = player1 ? (texts[b].empty() ? "F1" : texts[b]) : "";
+			if (p == 2) texts[b] = player2 ? (key.empty() ? "F2" : (b == second[0] ? key : texts[b])) : "";
+		}
+		session.setBindingTexts(texts);
+		std::vector<AnalogBind> binds = session.analogBinds();
+		binds.resize(session.axes().size());
+		for (size_t a = 0; a < binds.size(); a++)
+			if (session.axes()[a].player >= 1 && !(session.axes()[a].player == 1 ? player1 : player2)) binds[a] = AnalogBind();
+		session.setAnalogBinds(binds);
+	};
+	/* the first player bound, the second not: the second's columns are not in the roll, and not hidden by the person either */
+	bindEverything(true, false);
+	CHECK(roll.frames().columnHidden(c2) && !roll.frames().columnHidden(c1));
+	CHECK(roll.unboundColumns.get().find(p2) != std::string::npos && roll.unboundColumns.get().find(p1) == std::string::npos);
+	CHECK(roll.hiddenColumns.get().find(p2) == std::string::npos);
+	CHECK(!has(groupNames(), "Player 2") && has(groupNames(), "Player 1"));
+	/* the console's controls (player 0) are never left out */
+	for (int32_t c = 0; c < roll.frames().columnCount(); c++)
+		if (session.playerOf(roll.frames().columnName(c)) == 0) CHECK(roll.unboundColumns.get().find(roll.frames().columnName(c)) == std::string::npos);
+	/* the movie keeps every control: the same columns, in the same order */
+	CHECK(roll.frames().columnCount() == 47 && columnOf(p2) == c2);
+	/* what the person hid stays hidden whatever is bound */
+	CHECK(roll.run("hideColumn", {p1}, error).has_value() && roll.hiddenColumns.get().find(p1) != std::string::npos);
+	roll.run("showColumn", {p1}, error);
+	/* binding a button of the player brings every column of it back */
+	bindEverything(true, true);
+	CHECK(roll.unboundColumns.get().empty() && !roll.frames().columnHidden(c2) && has(groupNames(), "Player 2"));
+	/* nothing bound at all: nothing to tell the players apart by, so none is left out */
+	bindEverything(false, false);
+	CHECK(roll.unboundColumns.get().empty() && !roll.frames().columnHidden(c2) && !roll.frames().columnHidden(c1));
+	/* a player the movie has input for keeps its columns, though nothing is bound to it now */
+	bindEverything(true, true, "F9");
+	session.recordingMode.set(true);
+	session.key("F9", true);
+	session.run("frameAdvance", {}, error);
+	CHECK(d.until([&] { return session.frame.get() == 1; }, 10));
+	session.key("F9", false);
+	CHECK(inputs.size() == 1 && inputs.at(0).test(second[0]));
+	bindEverything(true, false);
+	CHECK(roll.unboundColumns.get().empty() && !roll.frames().columnHidden(c2));
+	session.run("close", {}, error);
+	CHECK(d.until([&] { return !session.isOpen.get(); }, 20));
+	return true;
+}
+
 /* The piano roll's Columns menu as Chimera's: the console's columns at the
  * top, a group a player, the keyboard keys thirty a group (hidden until
  * shown, as Chimera's piano roll has them); a group shown or hidden at once */
@@ -4356,6 +4449,14 @@ bool columnsMenu(const char *package, const char *rom)
 	openGame(session, package, std::string(rom), error);
 	/* the columns, and then the ones hidden at first, which come a moment after */
 	CHECK(d.until([&] { return session.isOpen.get() && roll.frames().columnCount() == 47 && !roll.hiddenColumns.get().empty(); }, 60));
+	/* every player has a key bound: a player with none has no columns (issue 622, tested in unboundPlayers) */
+	{
+		std::vector<std::string> texts = session.bindingTexts();
+		texts.resize(session.buttonNames().size());
+		for (size_t b = 0; b < texts.size(); b++)
+			if (session.playerOf(session.buttonNames()[b]) > 0 && texts[b].empty()) texts[b] = "F1";
+		session.setBindingTexts(texts);
+	}
 	RowModel *groups = nullptr, *columns = nullptr;
 	for (const auto &r : roll.rowLists())
 	{
@@ -12496,6 +12597,7 @@ int main(int argc, char **argv)
 			if (argc >= 9) ranMachine = customFirmware(argv[2], argv[7], argv[8]) && ranMachine;
 			else std::printf("SKIP custom firmware: no packages with a hashed firmware given\n");
 			if (argc >= 10) ranMachine = columnsMenu(argv[9], argv[2]) && ranMachine;
+			if (argc >= 10) ranMachine = unboundPlayers(argv[9], argv[2]) && ranMachine;
 			else std::printf("SKIP the Columns menu: no package with players and keys given\n");
 			if (argc >= 11) ranMachine = coreMenu(argv[1], argv[2], argv[6], argv[10]) && ranMachine;
 			else std::printf("SKIP the Emulator menu: no packages with tools of their own and that are games given\n");

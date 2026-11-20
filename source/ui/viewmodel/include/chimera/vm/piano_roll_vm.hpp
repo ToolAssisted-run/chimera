@@ -54,6 +54,9 @@ public:
 	/* the columns not shown, by control name, a line each (Chimera's
 	 * defaults hide the console's power and reset, keyboard keys...) */
 	Property<std::string> hiddenColumns;
+	/* the columns of players with no key, gamepad button or analog control bound, a line each: not in the roll at
+	 * all (issue 622). A player's input in the movie keeps its columns. */
+	Property<std::string> unboundColumns;
 	/* TAStudio's input rolls, as Chimera's: how many, the one the person
 	 * last used (its columns are the ones the menus show and edits keep
 	 * to), and whether they scroll together */
@@ -212,7 +215,7 @@ private:
 		int64_t rowCount() const override { return vm_.inputs_.bound() ? vm_.inputs_.size() + 1 : 0; }
 		int32_t columnCount() const override { return vm_.buttonCount() + static_cast<int32_t>(vm_.session_.axes().size()); }
 		bool columnIsNumber(int32_t column) const override { return column >= vm_.buttonCount(); }
-		bool columnHidden(int32_t column) const override { return vm_.hidden_.count(columnName(column)) != 0; }
+		bool columnHidden(int32_t column) const override { return vm_.notShown(columnName(column)); }
 		bool columnHiddenIn(int64_t view, int32_t column) const override;
 		bool columnEmphasized(int32_t column) const override { return vm_.autoHeld_.count(columnName(column)) != 0; }
 		int32_t columnPlayer(int32_t column) const override;
@@ -387,6 +390,12 @@ private:
 	/* editing hidden columns is off and some are hidden: the buttons shown
 	 * (a bit each) and the analog controls shown */
 	bool limited() const;
+	/* a column the person hid, or one of a player with nothing bound (issue 622) */
+	bool notShown(const std::string &name) const { return hidden_.count(name) != 0 || unbound_.count(name) != 0; }
+	/* the columns of the players with nothing bound and no input in the movie, from the bindings and the movie as they are */
+	void refreshUnbound();
+	std::set<std::string> unbound_;
+	Connection unboundWatch_;
 	Buttons shownButtons() const;
 	std::vector<bool> shownAxes() const;
 	/* the session told which columns recording may change */

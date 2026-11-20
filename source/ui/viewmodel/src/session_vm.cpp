@@ -2101,6 +2101,7 @@ void SessionViewModel::setAnalogBinds(std::vector<AnalogBind> binds)
 		return b.value == "WMouse X" || b.value == "WMouse Y" || b.value == "RMouse X" || b.value == "RMouse Y";
 	}));
 	submit([this, binds] { analogBindsM_ = binds; });
+	updateUnboundPlayers();
 }
 
 void SessionViewModel::setMouseSensitivity(int64_t percent)
@@ -2199,6 +2200,7 @@ void SessionViewModel::setBindingTexts(std::vector<std::string> texts)
 				if (b >= 0) held.set(static_cast<size_t>(b));
 	held_.set(std::move(held));
 	submit([this, texts] { bindingsM_.setTexts(texts); });
+	updateUnboundPlayers();
 }
 
 void SessionViewModel::submit(std::function<void()> job)
@@ -6814,6 +6816,7 @@ void SessionViewModel::adoptOnMachine(ce_session *s, const std::string &package,
 			analogBinds_ = keybinds.empty() ? std::vector<AnalogBind>(axes_.size()) : parseAnalogBinds(keybinds, axisNames, analogWhy, controller);
 			defaultAnalog_ = analogBinds_;
 		}
+		updateUnboundPlayers(true);
 		buttonCount.set(static_cast<int64_t>(names.size()));
 		coreName.set(coreText);
 		systemName.set(systemText);
@@ -6836,6 +6839,32 @@ void SessionViewModel::adoptOnMachine(ce_session *s, const std::string &package,
 		if (inputsReplaced) inputsReset.emit();
 		(void)frames;
 	});
+}
+
+void SessionViewModel::updateUnboundPlayers(bool force)
+{
+	std::set<int32_t> all, bound;
+	const std::vector<std::string> &texts = bindings_.texts();
+	for (size_t i = 0; i < buttonNames_.size(); i++)
+	{
+		const int32_t p = i < buttonPlayers_.size() ? buttonPlayers_[i] : 0;
+		if (p <= 0) continue;
+		all.insert(p);
+		if (i < texts.size() && !texts[i].empty()) bound.insert(p);
+	}
+	for (size_t i = 0; i < axes_.size(); i++)
+	{
+		if (axes_[i].player <= 0) continue;
+		all.insert(axes_[i].player);
+		if (i < analogBinds_.size() && !analogBinds_[i].empty()) bound.insert(axes_[i].player);
+	}
+	std::set<int32_t> unbound;
+	if (!bound.empty())
+		for (const int32_t p : all)
+			if (bound.count(p) == 0) unbound.insert(p);
+	if (unbound == unboundPlayers_ && !force) return;
+	unboundPlayers_ = unbound;
+	boundPlayersChanged.emit();
 }
 
 int32_t SessionViewModel::playerOf(const std::string &name) const

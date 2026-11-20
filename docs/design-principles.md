@@ -16152,3 +16152,60 @@ an addition (feature request approved by the owner, 2026-11-20).
 Tested: a window test that drops files on the window: a file that is not a
 list does nothing, a list opens at once when nothing is unsaved, with unsaved
 changes it asks, Escape keeps the list and No opens the file.
+
+## TAStudio's roll has no columns for a player nothing is bound to (user-decided, 2026-11-20, issue 622)
+
+A new project's roll showed every player's columns, and the person had to
+hide players 2 to 4 one by one in Controller Config, for a game one person
+plays. The owner decided "Bound players' columns":
+
+- A player with no key, no gamepad button and no analog control bound
+  (Config > Controllers, or the package's own defaults) has no columns in the
+  roll: not hidden, not there. Binding any control of the player adds all of
+  its columns.
+- The movie file is unchanged: it keeps every control the core declares, so
+  old movies, new movies and every core are unaffected, and the columns stay
+  in the same order. Only what the roll draws and what its edits touch
+  (as for a hidden column, edits keep to the columns shown) changes.
+- It is decided in the view models from the players the core declares, with
+  no core named. The console's own controls (player 0) are never left out.
+  The session view model works out the players with nothing bound
+  (`unboundPlayers`) when bindings change and when a machine opens; the roll
+  view model (`unboundColumns`) turns that into columns.
+- The person's own hiding is a separate list, kept in the project as before.
+  A player's columns left out for lack of a binding are not written there, so
+  binding the player later shows them. (A project that already has a saved
+  roll keeps the columns it hid.)
+
+What was decided on top of that, because the owner's rule leaves it open
+(chosen by the contributor working on it, for the owner to confirm):
+
+- **Input is never hidden.** If the movie has input on a control of an
+  unbound player (any button held, any analog control off its rest value),
+  that player's columns are shown. It is checked when a project or movie is
+  opened and when bindings change; input added to an unbound player's
+  columns afterwards by a script is not looked for until one of those
+  happens.
+- **No player bound at all.** When no player has anything bound there is
+  nothing to tell the players apart by, so none is left out (a core without
+  default keys would otherwise have a roll with no input columns).
+- **Lua and the MCP server** see the same: the `columns` list marks the
+  columns not shown, and the new `unboundColumns` property names the ones
+  left out for lack of a binding, as `hiddenColumns` names the hidden ones.
+  Showing a column with `showColumn` does not bring back one of an unbound
+  player; it is kept as the person's choice and shows when the player is
+  bound.
+- **The package's "tastudioColumns" list** (issue 544) still says which of
+  the columns that exist are shown at first; a player with nothing bound is
+  left out even if the list names its controls.
+
+Tested in `source/ui/viewmodel/tests/test_vm.cpp` (`unboundPlayers`), with the
+package that has players and keys: the second player's columns are left out
+(and its group is not in the Columns menu) while only the first is bound, are
+not in the hidden list, and return when a button of the player is bound;
+nothing bound at all leaves none out; a player recorded while bound keeps its
+columns after being unbound. Broken on purpose once: with the movie check
+removed and the group filter removed, the group check and the
+recorded-input check failed. The existing Columns menu test now binds every
+player first, as it expects every player's columns.
+
