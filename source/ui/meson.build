@@ -587,6 +587,15 @@ endif
       override_options: ['cpp_std=c++20'],
     )
     test('text prompt', test_text_prompt, env: ['QT_QPA_PLATFORM=offscreen', 'QT_QUICK_BACKEND=software', 'QT_QUICK_CONTROLS_STYLE=Basic'], timeout: 60)
+    # the Reproducible Media Maker after a folder is packed: no text over
+    # other text or the buttons, long text and large fonts too (issue 619)
+    test_media_maker = executable(
+      'test-media-maker',
+      ['qt/tests/test_media_maker.cpp', qt_rcc, qt_dialogs_rcc],
+      dependencies: [qt_test_dep],
+      override_options: ['cpp_std=c++20'],
+    )
+    test('media maker', test_media_maker, env: ['QT_QPA_PLATFORM=offscreen', 'QT_QUICK_BACKEND=software', 'QT_QUICK_CONTROLS_STYLE=Basic', 'CHIMERA_FILE_CHOOSER=builtin'], timeout: 60)
     # a long seek's dialogs: the question answered by Yes, No or Escape, the
     # progress shown and cancelled by Cancel or Escape (issue 595)
     test_long_seek = executable(

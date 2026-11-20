@@ -18,12 +18,16 @@ ApplicationWindow {
     required property QtObject vm
     property Window mainWindow: null
     title: qsTrId("media_maker.reproducible_media_maker")
+    // as wide as always, as tall as what is shown needs (the result may be
+    // lines long, the font large): never less than 380, so the form keeps its
+    // old look, and never text over the buttons (issue 619)
+    readonly property int wantedHeight: Math.max(380, Math.ceil(content.implicitHeight) + 2 * content.anchors.margins)
     width: 600
-    height: 380
+    height: win.wantedHeight
     minimumWidth: 600
     maximumWidth: 600
-    minimumHeight: 380
-    maximumHeight: 380
+    minimumHeight: win.wantedHeight
+    maximumHeight: win.wantedHeight
     modality: Qt.platform.os === "osx" ? Qt.WindowModal : Qt.ApplicationModal // a sheet on a Mac, which keeps an application-modal window over other apps (#541)
     transientParent: win.mainWindow
     flags: Qt.Dialog
@@ -52,9 +56,11 @@ ApplicationWindow {
 
     Shortcut { sequence: "Escape"; onActivated: win.close() }
 
-    component Caption: Label { Layout.preferredWidth: 80 }
+    component Caption: Label { Layout.minimumWidth: 80 }
 
     ColumnLayout {
+        id: content
+        objectName: "mediaForm"
         anchors.fill: parent
         anchors.margins: 12
         spacing: 6
@@ -62,7 +68,7 @@ ApplicationWindow {
             text: qsTrId("media_maker.a_folder_becomes_one_file_and")
             wrapMode: Text.WordWrap
             Layout.fillWidth: true
-            Layout.preferredHeight: 50
+            Layout.minimumHeight: 50
             verticalAlignment: Text.AlignTop
         }
         GridLayout {
@@ -88,7 +94,7 @@ ApplicationWindow {
                 Layout.row: 2
                 Layout.column: 1
                 Layout.fillWidth: true
-                Layout.preferredHeight: 36
+                Layout.minimumHeight: 36
                 verticalAlignment: Text.AlignTop
             }
             // what a core's recipe recognised the folder as; empty for most folders
@@ -98,7 +104,7 @@ ApplicationWindow {
                 Layout.row: 3
                 Layout.column: 1
                 Layout.fillWidth: true
-                Layout.preferredHeight: 36
+                Layout.minimumHeight: 36
                 verticalAlignment: Text.AlignTop
             }
             Caption { text: qsTrId("media_maker.save_as"); Layout.row: 4; Layout.column: 0 }
@@ -106,13 +112,13 @@ ApplicationWindow {
             Button { text: qsTrId("media_maker.save_as_dialog"); Layout.row: 4; Layout.column: 2; Layout.leftMargin: 8; Layout.preferredWidth: 96; onClicked: outputDialog.open() }
         }
         ProgressBar { Layout.fillWidth: true; Layout.topMargin: 6; from: 0; to: 1; value: win.vm.progress }
-        Label { text: win.vm.current; elide: Text.ElideRight; Layout.fillWidth: true; Layout.preferredHeight: 18 }
+        Label { text: win.vm.current; elide: Text.ElideRight; Layout.fillWidth: true; Layout.minimumHeight: 18 }
         Label {
             objectName: "mediaResult"
             text: win.vm.error !== "" ? win.vm.error : win.vm.result
             wrapMode: Text.WrapAnywhere
             Layout.fillWidth: true
-            Layout.preferredHeight: 36
+            Layout.minimumHeight: 36
             verticalAlignment: Text.AlignTop
         }
         Item { Layout.fillHeight: true }

@@ -16116,3 +16116,14 @@ click on the left button. A button the machine does have and the pointer's
 right button holds still keeps the menu away, as before; Shift opens it.
 
 Tested: a window test for the check with active, inactive and no list.
+
+## The Reproducible Media Maker grows with its text (2026-11-20, issue 619)
+
+The window was a fixed 600 by 380 pixels with a fixed height for each line
+of text, so a result with a long path, SHA1 and size ran over the buttons,
+and a larger font ran lines into each other. Its height now follows what it
+shows (never under 380), and its lines take the height their text needs.
+
+Tested: a window test that checks, for a long result, a long error and a
+long format help at 9, 12 and 16 point fonts, that no line overlaps another
+or the buttons and no text is cut by its box.
