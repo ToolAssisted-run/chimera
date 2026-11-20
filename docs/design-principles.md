@@ -16340,3 +16340,30 @@ repository of the core has no test for it that runs without a game); the two
 games above were run by hand. Windows was not run; the guards and the QML
 are the same code on every system, the test script of the first test is
 skipped there.
+
+## New Project asks the core again when any file changes (2026-11-20, #626)
+
+The owner decided this on 2026-11-20 (user-decided, 2026-11-20). Before, the
+New Project window asked a core for its suggested settings only when the game
+(the first file of the first slot that has one) changed. A core whose
+suggestions depend on a file in another slot - Cemu's graphic packs, which
+offer choices once the packs are in the Graphic Packs slot after the game -
+showed nothing in the window until the game was picked again.
+
+Now the window asks again whenever the list of picked files changes, in any
+slot. It is not a new declaration: the core is asked the same question it
+always was, and no core is named. Before the new answer is used:
+
+- what the core suggested last time and the person has not changed goes back
+  to its default, so a file taken out takes its suggestions with it (the game
+  settings it declared go too, because the new answer replaces them);
+- a value the person has set, including one they changed from a suggestion, is
+  left alone, and the new answer does not go over it.
+
+When the game itself changes the old rules stand (the earlier suggestions are
+all taken back, as in issue 214).
+
+Tested: the view-model test in `test_vm.cpp` (the synthetic core) puts the
+person's own fill value, adds a file to the Disk slot after the game (the
+core's note now says it sees the disk; the value stays), takes it out again
+(the note goes back), and does the same with an untouched value.

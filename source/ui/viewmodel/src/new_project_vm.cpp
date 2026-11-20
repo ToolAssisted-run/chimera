@@ -1881,6 +1881,9 @@ bool NewProjectViewModel::chooseCore(const std::string &name, std::string &error
 	suggests_ = cfg_.find("suggestSettings") != nullptr && cfg_.find("suggestSettings")->boolean;
 	suggestedFor_.clear();
 	suggestedKeys_.clear();
+	suggestedValues_.clear();
+	editedKept_.clear();
+	suggestedSig_.clear();
 	suggestion.set("");
 	/* another core: what the last one was asked is no longer this form's */
 	++suggestTicket_;
@@ -1949,10 +1952,39 @@ bool NewProjectViewModel::chooseCore(const std::string &name, std::string &error
 	return true;
 }
 
-void NewProjectViewModel::suggestFor(const std::string &game)
+static bool sameValue(const Json &a, const Json &b)
 {
+	if (a.kind == Json::Kind::Number && b.kind == Json::Kind::Number) return a.number() == b.number();
+	if (a.kind == Json::Kind::Bool && b.kind == Json::Kind::Bool) return a.boolean == b.boolean;
+	return a.kind == b.kind && a.text == b.text;
+}
+
+void NewProjectViewModel::suggestFor(const std::string &game, bool again)
+{
+	suggestedSig_ = filesSignature();
+	if (again)
+	{
+		/* the same game, another set of files: what the core suggested
+		 * and the person has not touched goes back to the default, to be
+		 * suggested again from the files as they are now; a value the person
+		 * moved is theirs, and the new answer does not go over it */
+		Json values = form_.values();
+		for (const auto &[k, v] : suggestedValues_)
+			for (auto it = values.members.begin(); it != values.members.end(); ++it)
+				if (it->first == k)
+				{
+					if (sameValue(it->second, v)) values.members.erase(it);
+					break;
+				}
+		form_.setValues(values);
+		form_.evaluate();
+		suggestedKeys_.clear();
+		suggestedValues_.clear();
+		editedKept_.clear();
+		for (const auto &m : values.members) editedKept_.push_back(m.first);
+	}
 	/* what the last game's suggestion set goes back to the default */
-	if (!suggestedKeys_.empty())
+	else if (!suggestedKeys_.empty())
 	{
 		Json values = form_.values();
 		for (const std::string &k : suggestedKeys_)
@@ -1964,11 +1996,13 @@ void NewProjectViewModel::suggestFor(const std::string &game)
 				}
 		form_.setValues(values);
 		suggestedKeys_.clear();
+		suggestedValues_.clear();
 	}
+	if (!again) editedKept_.clear();
 	/* and what the last game had of its own goes: its declarations now,
 	 * their values when another game comes (the same game back keeps them,
 	 * and a seeded project's game has them as its own) */
-	if (!gameSettings_.empty() || !gameFirmware_.items.empty())
+	if (!again && (!gameSettings_.empty() || !gameFirmware_.items.empty()))
 	{
 		ownNames_.clear();
 		for (const Json &d : gameSettings_)
@@ -1978,7 +2012,7 @@ void NewProjectViewModel::suggestFor(const std::string &game)
 		gameFirmware_ = Json();
 		declareSettings();
 	}
-	if (!game.empty() && game != ownFor_ && game != keptFor_ && !ownNames_.empty())
+	if (!again && !game.empty() && game != ownFor_ && game != keptFor_ && !ownNames_.empty())
 	{
 		Json values = form_.values();
 		for (const std::string &k : ownNames_)
@@ -2182,6 +2216,8 @@ void NewProjectViewModel::applySuggestion(const std::string &text, const std::st
 			const bool packages = std::any_of(form_.declarations().begin(), form_.declarations().end() - static_cast<std::ptrdiff_t>(gameSettings_.size()),
 				[&](const Json &d) { const Json *n = d.find("name"); return n != nullptr && n->text == name; });
 			if (!packages) continue;
+			/* a value the person already set, when the files changed under it */
+			if (std::find(editedKept_.begin(), editedKept_.end(), name) != editedKept_.end()) continue;
 			Value v;
 			switch (value.kind)
 			{
@@ -2194,6 +2230,7 @@ void NewProjectViewModel::applySuggestion(const std::string &text, const std::st
 			std::string e;
 			if (!form_.set(name, v, e)) continue;
 			suggestedKeys_.push_back(name);
+			suggestedValues_.emplace_back(name, value);
 			const Json *d = form_.declared(name);
 			const Json *label = d != nullptr ? d->find("display") : nullptr;
 			applied += (applied.empty() ? "" : ", ") + (label != nullptr ? label->text : name);
@@ -2205,6 +2242,15 @@ void NewProjectViewModel::applySuggestion(const std::string &text, const std::st
 	else if (kept) out += (out.empty() ? "" : "\n") + tr("new_project.own_settings_kept");
 	suggestion.set(out);
 	evaluate();
+}
+
+std::string NewProjectViewModel::filesSignature() const
+{
+	std::string out;
+	for (const Slot &sl : slots_)
+		if (auto it = files_.find(sl.id); it != files_.end())
+			for (const Picked &f : it->second) out += sl.id + '\x1f' + f.path + '\x1e';
+	return out;
 }
 
 std::string NewProjectViewModel::slotMap() const
@@ -2278,8 +2324,10 @@ void NewProjectViewModel::evaluate()
 				seededGame_ = game;
 				seededPackage_ = package_;
 			}
-			suggestFor(game);
+			suggestFor(game, false);
 		}
+		else if (!game.empty() && filesSignature() != suggestedSig_)
+			suggestFor(game, true);
 	}
 
 	const Json recorded = form_.recorded();

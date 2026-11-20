@@ -264,6 +264,13 @@ private:
 	 * to a question since withdrawn */
 	uint64_t suggestTicket_ = 0;
 	std::vector<std::string> suggestedKeys_;
+	/* what each was suggested as, to tell a value the person moved; the
+	 * files the last question was asked about; the settings the person had
+	 * set when the files changed (the new answer leaves them) */
+	std::vector<std::pair<std::string, json::Json>> suggestedValues_;
+	std::string suggestedSig_;
+	std::vector<std::string> editedKept_;
+	std::string filesSignature() const;
 	/* what the game's suggestion declared of the game's own */
 	std::vector<json::Json> gameSettings_;
 	json::Json gameFirmware_;
@@ -287,7 +294,7 @@ private:
 	std::vector<std::string> ownNames_;
 	std::string ownFor_;
 	/* asks for the game's suggestion when the game is another than last time */
-	void suggestFor(const std::string &game);
+	void suggestFor(const std::string &game, bool again);
 	void applySuggestion(const std::string &answer, const std::string &why);
 
 	std::string package_, packageSha1_, version_, slotsText_;

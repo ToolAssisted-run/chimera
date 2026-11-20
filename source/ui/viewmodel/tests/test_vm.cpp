@@ -9373,6 +9373,19 @@ bool newProjectWizard(const char *package, const char *rom, const char *slotsPac
 	/* the same game again: its setting as it was left */
 	CHECK(wizard.run("addFile", {std::string("rom"), game}, error).has_value() && fillNow() == 9);
 	CHECK(settingRow("gameLogo") >= 0 && firmwareRow("gamelogo") >= 0 && !wizard.ready.get());
+	/* a file put into another slot after the game: the core is asked again
+	 * with it (the note now counts the disk); what the person set stays, and
+	 * taking the file out asks again without it (#626) */
+	CHECK(wizard.run("set", {std::string("initFillByte"), int64_t{5}}, error).has_value() && fillNow() == 5);
+	CHECK(wizard.run("addFile", {std::string("disk"), (dir / "disk3.dsk").string()}, error).has_value());
+	CHECK(wizard.suggestion.get().find(" It sees 1 disk") != std::string::npos);
+	CHECK(fillNow() == 5 && settingRow("gameLogo") >= 0);
+	CHECK(wizard.run("removeFile", {std::string("disk"), int64_t{0}}, error).has_value());
+	CHECK(wizard.suggestion.get().find(" It sees") == std::string::npos && fillNow() == 5);
+	/* a value never touched is suggested again with the new files */
+	CHECK(wizard.run("set", {std::string("initFillByte"), int64_t{9}}, error).has_value());
+	CHECK(wizard.run("addFile", {std::string("disk"), (dir / "disk3.dsk").string()}, error).has_value() && fillNow() == 9);
+	CHECK(wizard.run("removeFile", {std::string("disk"), int64_t{0}}, error).has_value() && fillNow() == 9);
 	/* with its logo on, the game starts only with the logo given: the open
 	 * asks the core again what the game needs */
 	std::ofstream(dir / "mylogo.bin") << "a game's logo";
