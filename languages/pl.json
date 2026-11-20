@@ -1114,7 +1114,6 @@
 		"lua_console.guid": "GUID",
 		"lua_console.help": "&Pomoc",
 		"lua_console.insert_separator": "Wstaw separator",
-		"lua_console.insert_seperator": "Wstaw separator",
 		"lua_console.library": "Biblioteka",
 		"lua_console.lua_console": "Konsola Lua",
 		"lua_console.lua_functions": "Funkcje Lua",

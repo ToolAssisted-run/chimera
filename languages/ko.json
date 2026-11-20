@@ -1074,7 +1074,6 @@
 		"lua_console.guid": "Guid",
 		"lua_console.help": "도움말(&H)",
 		"lua_console.insert_separator": "구분선 삽입",
-		"lua_console.insert_seperator": "구분선 삽입",
 		"lua_console.library": "라이브러리",
 		"lua_console.lua_console": "Lua 콘솔",
 		"lua_console.lua_functions": "Lua 함수",

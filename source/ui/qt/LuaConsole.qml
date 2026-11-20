@@ -312,7 +312,7 @@ ApplicationWindow {
         MenuItem { text: qsTrId("lua_console.pause_or_resume"); icon.source: "qrc:/chimera/icons/Pause.png"; enabled: win.anyFile; onTriggered: win.vm.run("pause") }
         MenuItem { text: qsTrId("common.edit"); icon.source: "qrc:/chimera/icons/Cut.png"; enabled: win.anyFile; onTriggered: win.editFiles(win.vm.run("editPaths")) }
         MenuItem { text: qsTrId("common.remove_mnemonic"); icon.source: "qrc:/chimera/icons/Close.png"; enabled: win.anyRow; onTriggered: win.vm.run("remove") }
-        MenuItem { text: qsTrId("lua_console.insert_seperator"); icon.source: "qrc:/chimera/icons/InsertSeparator.png"; onTriggered: win.vm.run("insertSeparator") }
+        MenuItem { text: qsTrId("lua_console.insert_separator"); icon.source: "qrc:/chimera/icons/InsertSeparator.png"; onTriggered: win.vm.run("insertSeparator") }
         MenuDivider { visible: win.vm.anyEnabled; height: visible ? implicitHeight : 0 }
         MenuItem { action: stopAllAction; visible: win.vm.anyEnabled; height: visible ? implicitHeight : 0 }
         MenuItem { action: clearFunctionsAction }

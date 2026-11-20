@@ -1094,7 +1094,6 @@
 		"lua_console.guid": "Guid",
 		"lua_console.help": "&Help",
 		"lua_console.insert_separator": "Scheidingslijn invoegen",
-		"lua_console.insert_seperator": "Scheidingslijn invoegen",
 		"lua_console.library": "Bibliotheek",
 		"lua_console.lua_console": "Lua-console",
 		"lua_console.lua_functions": "Lua-functies",

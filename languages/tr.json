@@ -1094,7 +1094,6 @@
 		"lua_console.guid": "Guid",
 		"lua_console.help": "&Yardım",
 		"lua_console.insert_separator": "Ayırıcı Ekle",
-		"lua_console.insert_seperator": "Ayırıcı Ekle",
 		"lua_console.library": "Kitaplık",
 		"lua_console.lua_console": "Lua Konsolu",
 		"lua_console.lua_functions": "Lua İşlevleri",

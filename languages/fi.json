@@ -1094,7 +1094,6 @@
 		"lua_console.guid": "Guid",
 		"lua_console.help": "&Ohje",
 		"lua_console.insert_separator": "Lisää erotin",
-		"lua_console.insert_seperator": "Lisää erotin",
 		"lua_console.library": "Kirjasto",
 		"lua_console.lua_console": "Lua-konsoli",
 		"lua_console.lua_functions": "Lua-funktiot",

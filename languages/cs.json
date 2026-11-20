@@ -1114,7 +1114,6 @@
 		"lua_console.guid": "GUID",
 		"lua_console.help": "&Nápověda",
 		"lua_console.insert_separator": "Vložit oddělovač",
-		"lua_console.insert_seperator": "Vložit oddělovač",
 		"lua_console.library": "Knihovna",
 		"lua_console.lua_console": "Konzole Lua",
 		"lua_console.lua_functions": "Funkce Lua",

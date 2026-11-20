@@ -1074,7 +1074,6 @@
 		"lua_console.guid": "Guid",
 		"lua_console.help": "&Trợ giúp",
 		"lua_console.insert_separator": "Chèn dấu phân cách",
-		"lua_console.insert_seperator": "Chèn dấu phân cách",
 		"lua_console.library": "Thư viện",
 		"lua_console.lua_console": "Bảng điều khiển Lua",
 		"lua_console.lua_functions": "Các hàm Lua",

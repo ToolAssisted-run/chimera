@@ -1094,7 +1094,6 @@
 		"lua_console.guid": "Guid",
 		"lua_console.help": "A&juda",
 		"lua_console.insert_separator": "Inserir separador",
-		"lua_console.insert_seperator": "Inserir separador",
 		"lua_console.library": "Biblioteca",
 		"lua_console.lua_console": "Console Lua",
 		"lua_console.lua_functions": "Funções Lua",

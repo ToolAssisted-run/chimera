@@ -1074,7 +1074,6 @@
 		"lua_console.guid": "GUID",
 		"lua_console.help": "ヘルプ(&H)",
 		"lua_console.insert_separator": "区切りを挿入",
-		"lua_console.insert_seperator": "区切りを挿入",
 		"lua_console.library": "ライブラリ",
 		"lua_console.lua_console": "Lua コンソール",
 		"lua_console.lua_functions": "Lua 関数",

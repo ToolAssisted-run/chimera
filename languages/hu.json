@@ -1094,7 +1094,6 @@
 		"lua_console.guid": "Guid",
 		"lua_console.help": "&Súgó",
 		"lua_console.insert_separator": "Elválasztó beszúrása",
-		"lua_console.insert_seperator": "Elválasztó beszúrása",
 		"lua_console.library": "Könyvtár",
 		"lua_console.lua_console": "Lua-konzol",
 		"lua_console.lua_functions": "Lua-függvények",

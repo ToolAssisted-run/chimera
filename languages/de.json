@@ -1094,7 +1094,6 @@
 		"lua_console.guid": "GUID",
 		"lua_console.help": "&Hilfe",
 		"lua_console.insert_separator": "Trennlinie einfügen",
-		"lua_console.insert_seperator": "Trennlinie einfügen",
 		"lua_console.library": "Bibliothek",
 		"lua_console.lua_console": "Lua-Konsole",
 		"lua_console.lua_functions": "Lua-Funktionen",

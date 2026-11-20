@@ -1114,7 +1114,6 @@
 		"lua_console.guid": "GUID",
 		"lua_console.help": "&Довідка",
 		"lua_console.insert_separator": "Вставити роздільник",
-		"lua_console.insert_seperator": "Вставити роздільник",
 		"lua_console.library": "Бібліотека",
 		"lua_console.lua_console": "Консоль Lua",
 		"lua_console.lua_functions": "Функції Lua",

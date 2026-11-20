@@ -1074,7 +1074,6 @@
 		"lua_console.guid": "GUID",
 		"lua_console.help": "帮助(&H)",
 		"lua_console.insert_separator": "插入分隔线",
-		"lua_console.insert_seperator": "插入分隔线",
 		"lua_console.library": "库",
 		"lua_console.lua_console": "Lua 控制台",
 		"lua_console.lua_functions": "Lua 函数",

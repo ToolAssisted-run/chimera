@@ -1094,7 +1094,6 @@
 		"lua_console.guid": "Guid",
 		"lua_console.help": "&Hjælp",
 		"lua_console.insert_separator": "Indsæt skillelinje",
-		"lua_console.insert_seperator": "Indsæt skillelinje",
 		"lua_console.library": "Bibliotek",
 		"lua_console.lua_console": "Lua-konsol",
 		"lua_console.lua_functions": "Lua-funktioner",

@@ -1074,7 +1074,6 @@
 		"lua_console.guid": "Guid",
 		"lua_console.help": "&Bantuan",
 		"lua_console.insert_separator": "Sisipkan Pemisah",
-		"lua_console.insert_seperator": "Sisipkan Pemisah",
 		"lua_console.library": "Pustaka",
 		"lua_console.lua_console": "Konsol Lua",
 		"lua_console.lua_functions": "Fungsi Lua",

@@ -1094,7 +1094,6 @@
 		"lua_console.guid": "Guid",
 		"lua_console.help": "&Βοήθεια",
 		"lua_console.insert_separator": "Εισαγωγή διαχωριστικού",
-		"lua_console.insert_seperator": "Εισαγωγή διαχωριστικού",
 		"lua_console.library": "Βιβλιοθήκη",
 		"lua_console.lua_console": "Κονσόλα Lua",
 		"lua_console.lua_functions": "Συναρτήσεις Lua",

@@ -1094,7 +1094,6 @@
 		"lua_console.guid": "Guid",
 		"lua_console.help": "&Hjälp",
 		"lua_console.insert_separator": "Infoga avdelare",
-		"lua_console.insert_seperator": "Infoga avdelare",
 		"lua_console.library": "Bibliotek",
 		"lua_console.lua_console": "Lua-konsol",
 		"lua_console.lua_functions": "Lua-funktioner",
