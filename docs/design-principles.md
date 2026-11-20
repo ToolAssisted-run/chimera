@@ -16341,7 +16341,7 @@ games above were run by hand. Windows was not run; the guards and the QML
 are the same code on every system, the test script of the first test is
 skipped there.
 
-## New Project asks the core again when any file changes (2026-11-20, #626)
+## New Project asks the core again when any file changes (user-decided, 2026-11-20, issue 626)
 
 The owner decided this on 2026-11-20 (user-decided, 2026-11-20). Before, the
 New Project window asked a core for its suggested settings only when the game
