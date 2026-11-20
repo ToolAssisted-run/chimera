@@ -16177,18 +16177,16 @@ plays. The owner decided "Bound players' columns":
   binding the player later shows them. (A project that already has a saved
   roll keeps the columns it hid.)
 
-What was decided on top of that, because the owner's rule leaves it open
-(chosen by the contributor working on it, for the owner to confirm):
+The rule has no exceptions (owner, 2026-11-20). Two were proposed and
+declined: showing an unbound player's columns when the movie has input for
+that player, and leaving every player in when no player has anything bound.
+So a movie's input on a player with nothing bound stays in the movie but has
+no columns until the player is bound, and a core whose package binds no keys
+starts with no player columns until the person binds some.
 
-- **Input is never hidden.** If the movie has input on a control of an
-  unbound player (any button held, any analog control off its rest value),
-  that player's columns are shown. It is checked when a project or movie is
-  opened and when bindings change; input added to an unbound player's
-  columns afterwards by a script is not looked for until one of those
-  happens.
-- **No player bound at all.** When no player has anything bound there is
-  nothing to tell the players apart by, so none is left out (a core without
-  default keys would otherwise have a roll with no input columns).
+What else was decided, because the owner's rule leaves it open (chosen by the
+contributor working on it):
+
 - **Lua and the MCP server** see the same: the `columns` list marks the
   columns not shown, and the new `unboundColumns` property names the ones
   left out for lack of a binding, as `hiddenColumns` names the hidden ones.
@@ -16203,9 +16201,8 @@ Tested in `source/ui/viewmodel/tests/test_vm.cpp` (`unboundPlayers`), with the
 package that has players and keys: the second player's columns are left out
 (and its group is not in the Columns menu) while only the first is bound, are
 not in the hidden list, and return when a button of the player is bound;
-nothing bound at all leaves none out; a player recorded while bound keeps its
-columns after being unbound. Broken on purpose once: with the movie check
-removed and the group filter removed, the group check and the
-recorded-input check failed. The existing Columns menu test now binds every
+with nothing bound at all no player has columns; a player recorded while
+bound loses its columns when unbound, and its input stays in the movie.
+Broken on purpose once (the group filter removed): the group check failed. The existing Columns menu test now binds every
 player first, as it expects every player's columns.
 

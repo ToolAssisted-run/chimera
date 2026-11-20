@@ -4417,10 +4417,11 @@ bool unboundPlayers(const char *package, const char *rom)
 	/* binding a button of the player brings every column of it back */
 	bindEverything(true, true);
 	CHECK(roll.unboundColumns.get().empty() && !roll.frames().columnHidden(c2) && has(groupNames(), "Player 2"));
-	/* nothing bound at all: nothing to tell the players apart by, so none is left out */
+	/* nothing bound at all: no player has columns (owner, 2026-11-20: no exception) */
 	bindEverything(false, false);
-	CHECK(roll.unboundColumns.get().empty() && !roll.frames().columnHidden(c2) && !roll.frames().columnHidden(c1));
-	/* a player the movie has input for keeps its columns, though nothing is bound to it now */
+	CHECK(roll.frames().columnHidden(c2) && roll.frames().columnHidden(c1));
+	CHECK(roll.unboundColumns.get().find(p1) != std::string::npos && roll.unboundColumns.get().find(p2) != std::string::npos);
+	/* a player the movie has input for has no columns either once nothing is bound to it; the input stays in the movie */
 	bindEverything(true, true, "F9");
 	session.recordingMode.set(true);
 	session.key("F9", true);
@@ -4429,7 +4430,8 @@ bool unboundPlayers(const char *package, const char *rom)
 	session.key("F9", false);
 	CHECK(inputs.size() == 1 && inputs.at(0).test(second[0]));
 	bindEverything(true, false);
-	CHECK(roll.unboundColumns.get().empty() && !roll.frames().columnHidden(c2));
+	CHECK(roll.unboundColumns.get().find(p2) != std::string::npos && roll.frames().columnHidden(c2));
+	CHECK(inputs.size() == 1 && inputs.at(0).test(second[0]));
 	session.run("close", {}, error);
 	CHECK(d.until([&] { return !session.isOpen.get(); }, 20));
 	return true;

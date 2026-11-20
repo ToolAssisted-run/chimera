@@ -422,7 +422,7 @@ is past, and goes on setting what it reaches. The middle button plays or
 pauses, as the Play/Pause button's tooltip says (issue 621). A window the
 roll's hotkeys open (Go to Frame, Insert # Frames, Clone # Times, Auto-hold's
 value) has the keyboard at once, its box ready to type in (issue 621).
-The roll has no columns for a player nothing is bound to, whatever the core declares (issue 622): no key, gamepad button or analog control bound for the player in Controller Config, and its columns are left out, not hidden; binding one adds them all. The movie keeps every control. A player the movie has input for keeps its columns, and with no player bound at all none is left out. The `unboundColumns` property lists them for scripts and the MCP server. TAStudio's Edit menu shows each item's keys beside it, as the main window's
+The roll has no columns for a player nothing is bound to, whatever the core declares (issue 622): no key, gamepad button or analog control bound for the player in Controller Config, and its columns are left out, not hidden; binding one adds them all. The movie keeps every control. There is no exception: input the movie has for an unbound player stays in the movie without columns, and with nothing bound at all no player has columns (owner, 2026-11-20). The `unboundColumns` property lists them for scripts and the MCP server. TAStudio's Edit menu shows each item's keys beside it, as the main window's
 menus do, Copy, Cut and Paste with the fixed keys they use (issue 625). A double click on a frame number opens the person's marker there
 to edit its text, or sets a marker with no text where there is none
 (issue 436). A double click on a button's cell is two clicks, so the

@@ -6858,10 +6858,10 @@ void SessionViewModel::updateUnboundPlayers(bool force)
 		all.insert(axes_[i].player);
 		if (i < analogBinds_.size() && !analogBinds_[i].empty()) bound.insert(axes_[i].player);
 	}
+	/* every player with nothing bound, even when that is every player (owner, 2026-11-20) */
 	std::set<int32_t> unbound;
-	if (!bound.empty())
-		for (const int32_t p : all)
-			if (bound.count(p) == 0) unbound.insert(p);
+	for (const int32_t p : all)
+		if (bound.count(p) == 0) unbound.insert(p);
 	if (unbound == unboundPlayers_ && !force) return;
 	unboundPlayers_ = unbound;
 	boundPlayersChanged.emit();

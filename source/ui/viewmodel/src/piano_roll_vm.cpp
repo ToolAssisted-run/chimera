@@ -498,7 +498,7 @@ PianoRollViewModel::PianoRollViewModel(Dispatcher &dispatcher, InputLog &inputs,
 	expose("hiddenColumns", "the columns not shown, by control name, a line each", hiddenColumns);
 	expose("unboundColumns", "the columns of the players with no key, gamepad button or analog control bound in Controller "
 		"Config, by control name, a line each: not in the roll at all, though the movie keeps them, and shown again when the player "
-		"is bound or the movie has input for it", unboundColumns);
+		"is bound", unboundColumns);
 	/* a column shown or hidden is a change of the project's, as Chimera flags it */
 	command("hideColumn", "a control's column no longer shown", {"name"}, [this](const Args &a, std::string &error) -> Value {
 		std::string name;
@@ -2683,29 +2683,11 @@ void PianoRollViewModel::refreshUnbound()
 	{
 		const std::vector<std::string> &buttons = session_.buttonNames();
 		const auto &axes = session_.axes();
-		/* a player the movie has input for keeps its columns: that input is never hidden from the person */
-		std::set<int32_t> used;
-		if (inputs_.bound() && inputs_.size() > 0)
-		{
-			std::map<int32_t, Buttons> masks;
-			for (size_t b = 0; b < buttons.size(); b++)
-				if (players.count(session_.playerOf(buttons[b])) != 0) masks[session_.playerOf(buttons[b])].set(b);
-			std::vector<int32_t> values(inputs_.axisCount());
-			for (int64_t f = 0; f < inputs_.size() && used.size() < players.size(); f++)
-			{
-				const Buttons held = inputs_.at(f);
-				for (const auto &[p, mask] : masks)
-					if (used.count(p) == 0 && (held & mask).any()) used.insert(p);
-				if (values.empty()) continue;
-				inputs_.axesAt(f, values.data());
-				for (size_t a = 0; a < axes.size() && a < values.size(); a++)
-					if (players.count(axes[a].player) != 0 && values[a] != axes[a].neutral) used.insert(axes[a].player);
-			}
-		}
+		/* the rule has no exception, not even input the movie has for that player (owner, 2026-11-20) */
 		for (const std::string &n : buttons)
-			if (players.count(session_.playerOf(n)) != 0 && used.count(session_.playerOf(n)) == 0) now.insert(n);
+			if (players.count(session_.playerOf(n)) != 0) now.insert(n);
 		for (const SessionViewModel::Axis &a : axes)
-			if (players.count(a.player) != 0 && used.count(a.player) == 0) now.insert(a.name);
+			if (players.count(a.player) != 0) now.insert(a.name);
 	}
 	if (now == unbound_) return;
 	unbound_ = now;
