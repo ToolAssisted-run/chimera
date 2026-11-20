@@ -8649,6 +8649,7 @@ bool largeFileStep(const char *compilePackage, const char *hashedPackage)
 	CHECK(!wizard.hashing.get() && wizard.hashFile.get().empty());
 	const std::string stopped = "Stopped reading huge.testrom. It stays picked, marked not read; Create or Compile reads it again.";
 	CHECK(wizard.status.get() == stopped);
+	CHECK(!wizard.statusIsError.get()); /* progress and information are not errors (issue 620) */
 	RowModel *slots = nullptr;
 	for (const auto &r : wizard.rowLists())
 		if (r.name == "slots") slots = r.model;
@@ -8961,6 +8962,8 @@ bool newProjectWizard(const char *package, const char *rom, const char *slotsPac
 	/* a file of another kind is said, not refused, as Chimera's; more than the slot takes is said at Next */
 	CHECK(wizard.run("addFile", {std::string("rom"), (dir / "notes.txt").string()}, error).has_value() &&
 		wizard.status.get() == "notes.txt is not one of the formats this slot expects (.testrom)");
+	/* said, not refused: information, not in the error colour (issue 620) */
+	CHECK(!wizard.statusIsError.get());
 	/* and refused when the project is made, the engine's rule: the wizard is told why and that it was
 	 * for its files, and stays open until then (issue 422: the window closed and nothing was said) */
 	const int64_t madeBefore = wizard.made.get();
@@ -8971,6 +8974,7 @@ bool newProjectWizard(const char *package, const char *rom, const char *slotsPac
 		CHECK(d.until([&] { return !wizard.making.get(); }, 60));
 		CHECK(wizard.filesRefused.get() && wizard.made.get() == madeBefore && !fs::exists(refused));
 		CHECK(wizard.status.get() == "Not made: file 'notes.txt' is not a format slot 'rom' accepts");
+		CHECK(wizard.statusIsError.get());
 	}
 	CHECK(wizard.run("addFile", {std::string("rom"), game}, error).has_value() && wizard.filesComplaint.get() == "Game: takes exactly one, has 2");
 	CHECK(wizard.run("removeFile", {std::string("rom"), int64_t{0}}, error).has_value());

@@ -36,8 +36,11 @@ ApplicationWindow {
 
     // the page shown: 0 the core, 1 the files, 2 the settings, 3 the firmware
     property int page: 0
-    // what the wizard last had to say, in the error colour as Chimera's
+    // what the wizard last had to say; in the error colour only when it stops the
+    // wizard going on (the view model says which of its lines does, issue 620),
+    // and in the text colour when it is information or progress
     property string said: ""
+    property bool saidIsError: false
     property string slotFor: ""
     property int firmwarePicked: -1
     // a project was made the last time the window was open (the main window
@@ -60,16 +63,17 @@ ApplicationWindow {
     Connections {
         target: win.vm
         // a change made by the view model: QQmlPropertyMap sends valueChanged only for one made from QML
-        function onStatusChanged() { win.said = win.vm.status }
+        function onStatusChanged() { win.said = win.vm.status; win.saidIsError = win.vm.statusIsError }
+        function onStatusIsErrorChanged() { win.saidIsError = win.vm.statusIsError }
         // made: the window's work is done, as Chimera's closed once Create had made the project
         function onMadeChanged() { win.madeProject = true; win.close() }
         // refused for its files: the files page, with why, as Chimera's went back to it
-        function onFilesRefusedChanged() { if (win.vm.filesRefused) { win.showPage(1); win.said = win.vm.status } }
+        function onFilesRefusedChanged() { if (win.vm.filesRefused) { win.showPage(1); win.said = win.vm.status; win.saidIsError = true } }
     }
     // a command whose refusal is said on the wizard's line
     function run(command, args) {
         win.vm.run(command, args || [])
-        if (win.vm.error !== "") win.said = win.vm.error
+        if (win.vm.error !== "") { win.said = win.vm.error; win.saidIsError = true }
     }
     // files into a slot, from here: each one added builds the slots again, so a
     // loop in the slot that took a drop would end with it after the first (issue 425)
@@ -87,6 +91,7 @@ ApplicationWindow {
     function showPage(p) {
         win.page = p
         win.said = ""
+        win.saidIsError = false
         win.firmwarePicked = -1
         // the firmware is looked for again when its page is shown
         if (p === 3) win.vm.run("firmwarePage")
@@ -98,20 +103,22 @@ ApplicationWindow {
     }
     function advance() {
         if (win.page === 0) {
-            if (win.vm.core === "") { win.said = qsTrId("new_project.pick_a_core_none_in_the"); return }
+            if (win.vm.core === "") { win.said = qsTrId("new_project.pick_a_core_none_in_the"); win.saidIsError = true; return }
             if (win.applies(1)) { win.showPage(1); return }
         }
         if (win.page <= 1) {
-            if (win.vm.filesComplaint !== "") { win.said = win.vm.filesComplaint; return }
+            if (win.vm.filesComplaint !== "") { win.said = win.vm.filesComplaint; win.saidIsError = true; return }
             win.showPage(2)
             return
         }
         if (win.page === 3 && win.vm.firmwareMissing !== "") {
             win.said = qsTrId("new_project.is_required_and_not_provided").arg(win.vm.firmwareMissing)
+            win.saidIsError = true
             return
         }
         if (win.page === 4 && !win.vm.compileReady) {
             win.said = qsTrId("new_project.compile_this_game_s_code_first")
+            win.saidIsError = true
             return
         }
         const next = win.nextFrom(win.page)
@@ -630,7 +637,7 @@ ApplicationWindow {
             ScrollView {
                 Layout.fillWidth: true
                 Layout.preferredHeight: Math.min(wizardSaid.implicitHeight, 64)
-                Said { id: wizardSaid; objectName: "wizardStatus"; text: win.said; color: win.errorColor }
+                Said { id: wizardSaid; objectName: "wizardStatus"; text: win.said; color: win.saidIsError ? win.errorColor : palette.text }
             }
             Button { text: qsTrId("new_project.back"); Layout.preferredWidth: 84; enabled: win.page > 0 && !win.vm.making; onClicked: win.back() }
             Button {

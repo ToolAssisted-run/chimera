@@ -335,6 +335,7 @@ NewProjectViewModel::NewProjectViewModel(Dispatcher &dispatcher, SessionViewMode
 		"Pre-Compiled Modules' setting)", compileSessionGigabytes, true);
 	expose("ready", "the project can be made", ready);
 	expose("status", "what New Project last had to say", status);
+	expose("statusIsError", "what it said stops the wizard going on (shown in the error colour); information and progress are not", statusIsError);
 	expose("filesAsked", "the files page is asked: the package declares slots", filesAsked);
 	expose("filesComplaint", "what keeps the files page from going on, in Chimera's words (\"\" for nothing)", filesComplaint);
 	expose("firmwareAsked", "the firmware page is asked: the machine, files and settings call for firmware", firmwareAsked);
@@ -370,7 +371,7 @@ NewProjectViewModel::NewProjectViewModel(Dispatcher &dispatcher, SessionViewMode
 		for (size_t i = 0; i < skipped.size(); i++) none += (i == 0 ? "" : ", ") + skipped[i];
 		const std::string note = skipped.empty() ? tr("new_project.preset_applied", applied, {label})
 												 : tr("new_project.preset_applied_skipped", applied, {label, none});
-		status.set(note);
+		tell(note);
 		evaluate();
 		return {};
 	});
@@ -409,7 +410,7 @@ NewProjectViewModel::NewProjectViewModel(Dispatcher &dispatcher, SessionViewMode
 						if (!compileAfterHash_) return;
 						compileAfterHash_ = false;
 						std::string why;
-						if (ok && !run("compile", {}, why) && !why.empty()) status.set(why);
+						if (ok && !run("compile", {}, why) && !why.empty()) tellError(why);
 					});
 				}
 				evaluate();
@@ -670,7 +671,7 @@ NewProjectViewModel::NewProjectViewModel(Dispatcher &dispatcher, SessionViewMode
 		std::string formatsText;
 		for (const std::string &f : formats) formatsText += (formatsText.empty() ? "" : ", ") + (f.empty() ? tr("new_project.no_extension") : "." + f);
 		const bool expected = formats.empty() || std::find(formats.begin(), formats.end(), kind) != formats.end();
-		status.set(expected ? std::string() : tr("new_project.unexpected_format", {name, formatsText}));
+		tell(expected ? std::string() : tr("new_project.unexpected_format", {name, formatsText}));
 		evaluate();
 		return {};
 	});
@@ -739,7 +740,7 @@ NewProjectViewModel::NewProjectViewModel(Dispatcher &dispatcher, SessionViewMode
 					std::string why;
 					if (!ok) why = tr("new_project.cannot_read", {path});
 					else applyChosenFirmware(id, path, known, why);
-					if (!why.empty()) status.set(why);
+					if (!why.empty()) tellError(why);
 				});
 				return {};
 			case Hashed::Ready: break;
@@ -873,7 +874,7 @@ NewProjectViewModel::NewProjectViewModel(Dispatcher &dispatcher, SessionViewMode
 			}
 			seeding_ = false;
 			evaluate();
-			status.set(tr("new_project.last_answers"));
+			tell(tr("new_project.last_answers"));
 			return true;
 		});
 	command("create", "makes the project and opens it, as Chimera does: written nowhere until it is first saved, which "
@@ -915,7 +916,7 @@ NewProjectViewModel::NewProjectViewModel(Dispatcher &dispatcher, SessionViewMode
 								if (!createAfterHash_) return;
 								createAfterHash_ = false;
 								std::string why;
-								if (!run("create", a, why) && !why.empty()) status.set(why);
+								if (!run("create", a, why) && !why.empty()) tellError(why);
 							});
 						}
 				if (waits) return {};
@@ -981,7 +982,7 @@ NewProjectViewModel::NewProjectViewModel(Dispatcher &dispatcher, SessionViewMode
 			 * when it opens - now, before the open looks */
 			for (const Need &n : needs_)
 				if (n.how == "chosen" || n.how == "your own") cores_.rememberFirmware(coreName, n.id, n.path);
-			status.set(path.empty() ? tr("new_project.making") : tr("new_project.making_at", {path}));
+			tell(path.empty() ? tr("new_project.making") : tr("new_project.making_at", {path}));
 			making.set(true);
 			filesRefused.set(false);
 			session_.onMachine([=, this](ce_session *) {
@@ -1016,7 +1017,7 @@ NewProjectViewModel::NewProjectViewModel(Dispatcher &dispatcher, SessionViewMode
 					/* written nowhere: it opens as it is, and its first save
 					 * asks where it goes */
 					later([this] {
-						status.set(tr("new_project.made_unsaved"));
+						tell(tr("new_project.made_unsaved"));
 						madeOrNot({}, false);
 					});
 					session_.openMadeProjectOnMachine(p, package);
@@ -1027,11 +1028,11 @@ NewProjectViewModel::NewProjectViewModel(Dispatcher &dispatcher, SessionViewMode
 				later([this, why, forFiles, path, package, open] {
 					if (!why.empty())
 					{
-						status.set(tr("new_project.not_made", {why}));
+						tellError(tr("new_project.not_made", {why}));
 						madeOrNot(why, forFiles);
 						return;
 					}
-					status.set(tr("new_project.made", {path}));
+					tell(tr("new_project.made", {path}));
 					madeOrNot({}, false);
 					std::string e;
 					if (open) session_.run("openProject", {path, package}, e);
@@ -1403,7 +1404,7 @@ bool NewProjectViewModel::applyChosenFirmware(const std::string &id, const std::
 	}
 	chosenFirmware_[id] = {path, sha};
 	clearedFirmware_.erase(std::remove(clearedFirmware_.begin(), clearedFirmware_.end(), id), clearedFirmware_.end());
-	status.set(custom ? tr("new_project.own_firmware", {baseName(path), id, sha}) : std::string());
+	tell(custom ? tr("new_project.own_firmware", {baseName(path), id, sha}) : std::string());
 	evaluate();
 	return true;
 }
@@ -1512,7 +1513,7 @@ void NewProjectViewModel::hashFinished(const std::shared_ptr<HashRun> &run, int 
 	if (result != 1)
 	{
 		hashUnreadable_.push_back(path);
-		status.set(tr("new_project.cannot_read", {path}));
+		tellError(tr("new_project.cannot_read", {path}));
 	}
 	for (auto &w : waiting) w(result == 1, sha);
 	startNextHash();
@@ -1557,7 +1558,7 @@ void NewProjectViewModel::cancelHashing(bool say)
 		return;
 	}
 	evaluate();
-	if (say) status.set(tr("new_project.read_stopped", {baseName(first)}));
+	if (say) tell(tr("new_project.read_stopped", {baseName(first)}));
 }
 
 /* what a scanned folder's files answer for the firmware still missing: by hash
@@ -1630,7 +1631,7 @@ int64_t NewProjectViewModel::runScan()
 	evaluate();
 	const std::string scanned = tr("new_project.scanned", static_cast<int64_t>(scanFound_.size()));
 	const std::string result = filled == 0 ? tr("new_project.scan_nothing", {scanned}) : tr("new_project.scan_resolved", filled, {scanned});
-	status.set(scanStopped_.empty() ? result : tr("new_project.scan_stopped", {scanStopped_, result}));
+	tell(scanStopped_.empty() ? result : tr("new_project.scan_stopped", {scanStopped_, result}));
 	scanStopped_.clear();
 	return filled;
 }
@@ -1916,7 +1917,7 @@ bool NewProjectViewModel::chooseCore(const std::string &name, std::string &error
 	hashUnreadable_.clear();
 	core.set(name);
 	title.set("");
-	status.set(tr("new_project.a_new", {name}));
+	tell(tr("new_project.a_new", {name}));
 	if (chosen >= 0)
 	{
 		std::string e;

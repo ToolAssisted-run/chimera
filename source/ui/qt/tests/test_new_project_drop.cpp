@@ -17,6 +17,7 @@
 #include <cstdio>
 #include <filesystem>
 #include <functional>
+#include <fstream>
 #include <string>
 
 #include "chimera/vm/cores_vm.hpp"
@@ -141,6 +142,23 @@ int main(int argc, char **argv)
 			if (slotList->columnName(c) == "files") files = std::get<std::string>(slotList->cell(0, c));
 	CHECK(files == "one.testrom\ntwo.testrom\nthree.testrom");
 	if (files != "one.testrom\ntwo.testrom\nthree.testrom") std::fprintf(stderr, "  files: [%s]\n", files.c_str());
+
+	/* the line at the bottom: a file of another kind than the slot takes is said as
+	 * information, in the text colour; a file that cannot be read is an error, in
+	 * the error colour (issue 620) */
+	QQuickItem *line = window->findChild<QQuickItem *>(QStringLiteral("wizardStatus"));
+	CHECK(line != nullptr);
+	if (line == nullptr) return 1;
+	const QColor errorColor = window->property("errorColor").value<QColor>();
+	CHECK(errorColor.isValid());
+	std::ofstream(work / "notes.txt") << "not a game";
+	const QVariantList notes{QStringLiteral("rom"), QString::fromStdString((work / "notes.txt").string())};
+	QMetaObject::invokeMethod(window, "run", Q_ARG(QVariant, QStringLiteral("addFile")), Q_ARG(QVariant, notes));
+	CHECK(QTest::qWaitFor([&] { return !line->property("text").toString().isEmpty(); }, 3000));
+	CHECK(line->property("color").value<QColor>() != errorColor);
+	const QVariantList missing{QStringLiteral("rom"), QString::fromStdString((work / "missing.testrom").string())};
+	QMetaObject::invokeMethod(window, "run", Q_ARG(QVariant, QStringLiteral("addFile")), Q_ARG(QVariant, missing));
+	CHECK(QTest::qWaitFor([&] { return line->property("color").value<QColor>() == errorColor; }, 3000));
 
 	std::printf("%d checks, %d failed\n", checks, failures);
 	return failures == 0 ? 0 : 1;

@@ -16127,3 +16127,15 @@ shows (never under 380), and its lines take the height their text needs.
 Tested: a window test that checks, for a long result, a long error and a
 long format help at 9, 12 and 16 point fonts, that no line overlaps another
 or the buttons and no text is cut by its box.
+
+## New Project's last line is in the error colour only for an error (2026-11-20, issue 620)
+
+The line at the bottom of New Project was always in the error colour, even
+for "A new project for Mesen". Now the view model says which of its lines
+stops the wizard going on (`statusIsError`: a file that cannot be read, a
+project that was not made, a refused command) and the window colours the
+line from that; everything else is in the normal text colour. The window only
+shows the answer: the choice is not made in QML.
+
+Tested: view model checks (information is not an error, a refusal is) and a
+window check that the line's colour is the error colour only after a refusal.

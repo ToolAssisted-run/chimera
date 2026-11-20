@@ -69,6 +69,10 @@ public:
 	Property<std::string> problems{tr("new_project.choose_core")};
 	Property<bool> ready{false};
 	Property<std::string> status;
+	/* whether the line `status` says is something that stops the wizard going on (a file
+	 * that cannot be read, a project that was not made): shown in the error colour. What is
+	 * only information or progress ("Making...", "Made", what a scan found) is not (issue 620) */
+	Property<bool> statusIsError{false};
 	/* Chimera's wizard, a page at a time: whether the files page and the
 	 * firmware page are asked at all (a package with no slots, a machine
 	 * needing no firmware, skips them), what keeps the files page from going
@@ -169,6 +173,9 @@ public:
 	void completeForAgent(const AgentRequest &request, std::function<void(AgentOutcome)> done);
 
 private:
+	/* the line `status` shows: information and progress, or an error */
+	void tell(const std::string &text) { statusIsError.set(false); status.set(text); }
+	void tellError(const std::string &text) { statusIsError.set(true); status.set(text); }
 	/* completeForAgent after the core's suggestion for the game came in */
 	void finishForAgent(const AgentRequest &request, const std::function<void(AgentOutcome)> &done);
 	Connection agentWait_;
