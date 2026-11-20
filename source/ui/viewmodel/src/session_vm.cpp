@@ -6606,9 +6606,11 @@ void SessionViewModel::adoptOnMachine(ce_session *s, const std::string &package,
 
 	std::vector<std::string> names;
 	std::vector<int32_t> players;
+	std::vector<bool> active;
 	const int64_t count = ce_session_button_count(s);
 	for (int64_t i = 0; i < count; i++)
 	{
+		active.push_back(ce_session_button_active(s, i) != 0);
 		const char *n = ce_session_button_name(s, i);
 		names.emplace_back(n != nullptr ? n : "");
 		players.push_back(ce_session_player_of(s, names.back().c_str()));
@@ -6779,7 +6781,7 @@ void SessionViewModel::adoptOnMachine(ce_session *s, const std::string &package,
 	const int64_t frames = inputs_.size();
 	/* another game, or the same started again: another average, as Chimera's */
 	averageResetM_.store(true);
-	later([this, names, players, headers, axes, mnemonics, keybinds, coreText, systemText, systemIdText, rate, label, inputsReplaced, frames, controller,
+	later([this, names, players, active, headers, axes, mnemonics, keybinds, coreText, systemText, systemIdText, rate, label, inputsReplaced, frames, controller,
 			   picture, shownDeclared, shownColumns, gameCore, timer, package, registers, withOpen] {
 		hasRegisters.set(registers);
 		controllerName_ = controller;
@@ -6792,6 +6794,7 @@ void SessionViewModel::adoptOnMachine(ce_session *s, const std::string &package,
 		gameTimeText.set("");
 		averageFpsText.set("");
 		buttonNames_ = names;
+		buttonActive_ = active;
 		buttonPlayers_ = players;
 		axes_ = axes;
 		mnemonics_ = mnemonics;

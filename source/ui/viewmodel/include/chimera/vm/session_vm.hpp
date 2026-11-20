@@ -508,6 +508,9 @@ public:
 	/* each button's player (0 the console's), as the core declares it
 	 * (ce_session_player_of), in the buttons' order */
 	const std::vector<int32_t> &buttonPlayers() const { return buttonPlayers_; }
+	/* which of the declared buttons this machine has (the core's IsButtonActive): a package declares
+	 * the buttons of every device its ports can hold, and the machine has those of the ones plugged in */
+	const std::vector<bool> &buttonActive() const { return buttonActive_; }
 	/* a control's player by its name, 0 for the console's or one the machine lacks */
 	int32_t playerOf(const std::string &name) const;
 	/* the controller's name as the package declares it (Chimera's
@@ -1216,6 +1219,7 @@ private:
 
 	InputLog &inputs_;
 	std::vector<std::string> buttonNames_;
+	std::vector<bool> buttonActive_;
 	std::vector<int32_t> buttonPlayers_;
 	std::vector<Axis> axes_;
 	/* the package's "tastudioColumns": declared, and the controls it lists (issue 544) */

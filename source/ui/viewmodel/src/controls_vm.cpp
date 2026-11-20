@@ -120,6 +120,13 @@ std::string ControlsViewModel::groupsOf(const std::vector<std::string> &names) c
 	return json::write(list);
 }
 
+bool ControlsViewModel::keyHoldsActiveButton(const std::vector<std::string> &texts, const std::vector<bool> &active, const std::string &key)
+{
+	for (size_t b = 0; b < texts.size(); b++)
+		if ((active.empty() || (b < active.size() && active[b])) && hasKey(pieces(texts[b]), key)) return true;
+	return false;
+}
+
 ControlsViewModel::ControlsViewModel(Dispatcher &dispatcher, SessionViewModel &session, PianoRollViewModel *roll)
 	: ViewModel("controls", dispatcher), session_(session), roll_(roll)
 {
@@ -424,13 +431,12 @@ ControlsViewModel::ControlsViewModel(Dispatcher &dispatcher, SessionViewModel &s
 			return json::write(all);
 		});
 	command("hasBinding", "whether a key holds one of the machine's buttons now (as Chimera has it: a right click "
-		"bound to a button does not open the window's menu, a double click with the left one does not go full screen)",
+		"bound to a button of this machine does not open the window's menu, a double click with the left one does not "
+		"go full screen; a button of a device the machine does not have does not count)",
 		{"key"}, [this](const Args &a, std::string &error) -> Value {
 			std::string key;
 			if (!arg(a, 0, key, error)) return {};
-			for (const std::string &keys : session_.bindingTexts())
-				if (hasKey(pieces(keys), key)) return true;
-			return false;
+			return keyHoldsActiveButton(session_.bindingTexts(), session_.buttonActive(), key);
 		});
 	command("cancel", "the copy let go: the machine keeps its controls", {}, [this](const Args &, std::string &) -> Value {
 		editing.set(false);

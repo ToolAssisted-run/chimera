@@ -16101,3 +16101,18 @@ twice after that; after a save the file names the second build and its
 version, and the next open says nothing. While the project runs on the second
 build a third is put in the second one's place; a save still names the second. Each check was broken on purpose
 once and seen to fail.
+
+## A right click is kept from the menu only by a button the machine has (2026-11-20, issue 616)
+
+With the Mesen core, a right click on the picture opened no menu, though it
+did with ares. The cause was in Chimera, not in the core: Mesen declares the
+buttons of every device its ports can hold (a Super NES mouse's right button
+among them, bound to the pointer's right button) and tells Chimera, through
+`IsButtonActive`, which of them the machine has. Chimera counted the declared
+buttons, so the right button of a mouse nobody had plugged in took the click
+from the menu. It now counts only the buttons the machine has
+(`ControlsViewModel::keyHoldsActiveButton`). The same holds for the double
+click on the left button. A button the machine does have and the pointer's
+right button holds still keeps the menu away, as before; Shift opens it.
+
+Tested: a window test for the check with active, inactive and no list.

@@ -7441,6 +7441,17 @@ bool controlsAndHotkeys(const char *package, const char *rom)
 	/* what a key holds now, for the right click and the double click on the picture */
 	CHECK(controls.run("hasBinding", {std::string("K")}, error) == Value(true) &&
 		  controls.run("hasBinding", {std::string("WMouse R")}, error) == Value(false));
+	/* a key kept by a button of a device the machine does not have holds nothing (a core's IsButtonActive:
+	 * the right button of a mouse that is not plugged in must not take the right click from the menu) */
+	{
+		const std::vector<std::string> keys{"Z, J1 B1", "WMouse L", "WMouse R"};
+		CHECK(ControlsViewModel::keyHoldsActiveButton(keys, {}, "WMouse R"));
+		CHECK(ControlsViewModel::keyHoldsActiveButton(keys, {true, true, true}, "WMouse R"));
+		CHECK(!ControlsViewModel::keyHoldsActiveButton(keys, {true, true, false}, "WMouse R"));
+		CHECK(ControlsViewModel::keyHoldsActiveButton(keys, {true, true, false}, "WMouse L"));
+		CHECK(ControlsViewModel::keyHoldsActiveButton(keys, {true, true, false}, "J1 B1"));
+		CHECK(!ControlsViewModel::keyHoldsActiveButton(keys, {false, true, false}, "J1 B1"));
+	}
 	{
 		json::Json all;
 		CHECK(json::parse(controls.saved.get(), all, error) && all.find("Synth") != nullptr &&

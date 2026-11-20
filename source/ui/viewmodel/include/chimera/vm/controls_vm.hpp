@@ -32,6 +32,11 @@ public:
 	/* `roll`: TAStudio's piano roll, whose columns the window chooses (none: no column boxes) */
 	ControlsViewModel(Dispatcher &dispatcher, SessionViewModel &session, PianoRollViewModel *roll = nullptr);
 
+	/* whether `key` is in the keys of a button the machine has: `texts` are the buttons' keys and `active`
+	 * which buttons the machine has (empty: all). A package declares the buttons of every device its ports
+	 * can hold, so a key kept for one that is not plugged in holds nothing */
+	static bool keyHoldsActiveButton(const std::vector<std::string> &texts, const std::vector<bool> &active, const std::string &key);
+
 	/* what differs from the package, every core's: the buttons' keys and the
 	 * autofire keys as {"core": {"button": "keys"}}, the analog controls as
 	 * {"core": {"control": {"Value", "Mult", "Deadzone", "ButtonBindPositive",
