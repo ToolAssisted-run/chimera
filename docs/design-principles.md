@@ -16216,3 +16216,27 @@ bound loses its columns when unbound, and its input stays in the movie.
 Broken on purpose once (the group filter removed): the group check failed. The existing Columns menu test now binds every
 player first, as it expects every player's columns.
 
+
+## OpenGMK joins the official cores (user-decided, 2026-11-20, issue 604)
+
+Issue 604 asked for OpenGMK, the open GameMaker 8 runner (OpenGM, for
+GameMaker Studio, is not feasible: the sandbox has no .NET runtime). The owner
+decided to make it a game core that runs the person's own GameMaker 8.0 or
+8.1 game (its `.exe`), and to publish it as tested, though only on a small
+GameMaker 8 game that the core's own tests make (2026-11-17 and 2026-11-20).
+It is a game core (`"kind": "game"`) and publishes x86_64 only, so
+docs/platforms.md does not change.
+
+- `chimera-core-opengmk` runs OpenGMK (Rust, GPL-2.0-only, so the package is
+  too) at one upstream commit, built as the touchHLE and Ruffle cores are. The
+  picture is Mesa's softpipe, inside the core; the game's date and random
+  numbers come from two settings; the files a game writes stay in the
+  machine. It ships OpenGMK's default font data (`arimo.dat`) as OpenGMK
+  itself ships it (owner).
+- A game that calls a GameMaker function OpenGMK lacks stops with a sentence
+  naming it (owner). The sentence is English in every language for now,
+  because Chimera does not look up what a stopped core says in its package's
+  texts (owner: English for now).
+- Its first CI run and its first nightly, "Nightly 2026-11-20 (c189718b)",
+  passed on GitHub; Chimera's package checks pass on the package.
+- Not proved: any real GameMaker 8 game; Windows and macOS.

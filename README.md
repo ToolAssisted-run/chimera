@@ -125,6 +125,7 @@ One game each, run from the game's own files ([docs/game-cores.md](docs/game-cor
 | [Open4DBoxing](https://github.com/ToolAssisted-run/chimera-core-open4dboxing) | 4D Sports Boxing (DOS) |
 | [fheroes2](https://github.com/ToolAssisted-run/chimera-core-fheroes2) | Heroes of Might and Magic II (from your own game's data file, or its free demo's) |
 | [TheXTech](https://github.com/ToolAssisted-run/chimera-core-thextech) | Super Mario Bros. X (SMBX 1.3) and its episodes, with an asset pack you bring |
+| [OpenGMK](https://github.com/ToolAssisted-run/chimera-core-opengmk) | GameMaker 8.0 and 8.1 games, from your own game's .exe |
 
 ### Third-party cores
 

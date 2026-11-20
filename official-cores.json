@@ -776,6 +776,16 @@
       "kind": "game",
       "repo": "ToolAssisted-run/chimera-core-thextech",
       "tested": ""
+    },
+    {
+      "id": "opengmk",
+      "name": "OpenGMK",
+      "systems": [
+        { "id": "GameMaker8", "name": "GameMaker 8" }
+      ],
+      "kind": "game",
+      "repo": "ToolAssisted-run/chimera-core-opengmk",
+      "tested": ""
     }
   ]
 }
