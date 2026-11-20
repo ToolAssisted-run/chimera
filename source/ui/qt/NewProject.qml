@@ -570,6 +570,15 @@ ApplicationWindow {
                         clip: true
                         model: win.vm.rows("compiled")
                         ScrollBar.vertical: ScrollBar {}
+                        // while the sessions compile, the list follows them: the module stored last is in view,
+                        // until the person scrolls away from the end (issue 618)
+                        property bool follow: true
+                        onCountChanged: if (win.vm.compiling && follow) positionViewAtEnd()
+                        onMovementEnded: follow = atYEnd
+                        Connections {
+                            target: win.vm
+                            function onCompilingChanged() { if (win.vm.compiling) moduleList.follow = true }
+                        }
                         header: Row {
                             Repeater {
                                 model: [qsTrId("new_project.compiled_module"), qsTrId("new_project.sha1"), qsTrId("new_project.state")]
@@ -594,11 +603,13 @@ ApplicationWindow {
                     }
                 }
                 ProgressBar {
+                    objectName: "compileBar"
                     Layout.fillWidth: true
                     from: 0
                     to: Math.max(1, win.vm.compileTotal)
                     value: win.vm.compileDone
-                    indeterminate: win.vm.compiling && win.vm.compileTotal === 0
+                    // nothing finished yet (the first module may take minutes): the bar says it is busy, not stuck
+                    indeterminate: win.vm.compiling && win.vm.compileDone === 0
                     visible: win.vm.compiling || win.vm.compileTotal > 0
                 }
                 RowLayout {

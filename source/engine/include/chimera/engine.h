@@ -1016,6 +1016,12 @@ CE_API uint64_t ce_session_cache_fetched(const ce_session *s);
  * sessions side by side, in separate processes, each compile a share), and
  * reports when it is done. The caller pumps ce_session_frame_advance until
  * ce_session_precompile_done and reads the progress for its bar.
+ * The progress counts work to do, in whatever unit the core likes (a file, a
+ * module, a part of one: a smaller unit makes a bar that moves while one big
+ * module compiles). done is the work THIS session has finished, total is the
+ * whole game's, the same in every session, so what the sessions have done adds
+ * up to the total. A session may find more work as it goes, so its total may
+ * grow; it never goes down (issue 618).
  */
 /* Sessions this thread opens after this call are precompile sessions (count
  * 0: off). */

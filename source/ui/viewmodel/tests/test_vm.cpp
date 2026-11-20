@@ -8991,6 +8991,43 @@ bool compileStep(const char *compilePackage, const char *rom)
 		unsetenv("ALWAYS");
 		CHECK(!wizard.compileReady.get() && wizard.compileStatus.get().rfind("The computer ran out of memory while compiling. A compile session "
 			"needs about 1 GB", 0) == 0);
+		/* What the count says while sessions run (issue 618): sessions that
+		 * all count the modules they share as done, at first knowing only part
+		 * of what the game has, said "116 of 95". The numbers shown never have
+		 * more done than the game has, the game's count never goes down, and
+		 * there is progress before the end. */
+		const fs::path progressScript = dir / "progress.sh";
+		std::ofstream(progressScript) << "#!/bin/sh\n"
+			"out=; while [ $# -gt 0 ]; do case \"$1\" in --cache-dir) out=$2; shift;; esac; shift; done\n"
+			"mkdir -p \"$out/synth\"\n"
+			"echo 'Precompiled 0/0 modules'; echo 'Precompiled 0/4 modules'\n"
+			"for i in 0 1 2 3 4 5; do printf 'm%s' $i > \"$out/synth/module$i.bin\"; "
+			"echo \"[cache] stored synth/module$i.bin $(sha1sum \"$out/synth/module$i.bin\" | cut -d' ' -f1)\"; "
+			"[ $i -lt 3 ] && echo \"Precompiled $((i + 1))/4 modules\" || echo \"Precompiled $((i + 1))/6 modules\"; done\n";
+		fs::permissions(progressScript, fs::perms::owner_all);
+		wizard.compileRunner.set(progressScript.string());
+		fs::remove_all(dir / "compiled", ec);
+		CHECK(wizard.run("removeFile", {std::string("rom"), int64_t{0}}, error).has_value());
+		CHECK(wizard.run("addFile", {std::string("rom"), other.string()}, error).has_value());
+		std::vector<std::pair<int, int>> seen;
+		Connection watch = wizard.compileStatus.changed.connect([&] {
+			int done = 0, total = 0;
+			if (std::sscanf(wizard.compileStatus.get().c_str(), "Compiling %d of %d modules", &done, &total) == 2) seen.emplace_back(done, total);
+		});
+		CHECK(wizard.run("compile", {}, error).has_value());
+		CHECK(d.until([&] { return !wizard.compiling.get(); }, 60));
+		watch.disconnect();
+		bool never = true, grew = true;
+		int most = 0;
+		for (size_t k = 0; k < seen.size(); k++)
+		{
+			never = never && seen[k].first <= seen[k].second;
+			grew = grew && (k == 0 || seen[k].second >= seen[k - 1].second);
+			most = std::max(most, seen[k].first);
+		}
+		CHECK(seen.size() > 2 && never && grew && most > 0);
+		CHECK(wizard.compileDone.get() <= wizard.compileTotal.get() && wizard.compileTotal.get() == 6 && wizard.compileReady.get());
+		std::printf("compile progress said %zu times, the most done %d of %d\n", seen.size(), most, static_cast<int>(wizard.compileTotal.get()));
 	}
 #endif
 	fs::remove_all(dir, ec);

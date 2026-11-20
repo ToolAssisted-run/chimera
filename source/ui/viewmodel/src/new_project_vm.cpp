@@ -168,6 +168,7 @@ struct NewProjectViewModel::CompileJob
 		std::mutex m;
 		std::map<std::string, std::string> found;
 		std::string failure;
+		uint32_t shownTotal = 0;
 		/* A session the system killed took its share of the work with it, and a
 		 * manifest written from what the others managed would have holes in it:
 		 * as Chimera's, the answer is to want less at once - half the sessions,
@@ -190,10 +191,19 @@ struct NewProjectViewModel::CompileJob
 					else if (std::regex_search(line, g, progressLine))
 					{
 						std::lock_guard<std::mutex> lock(m);
-						done[static_cast<size_t>(i)] = static_cast<uint32_t>(std::stoul(g[1]));
+						/* lines can come in another order than they were said */
+						done[static_cast<size_t>(i)] = std::max(done[static_cast<size_t>(i)], static_cast<uint32_t>(std::stoul(g[1])));
 						total[static_cast<size_t>(i)] = static_cast<uint32_t>(std::stoul(g[2]));
 						uint32_t d = 0, t = 0;
 						for (size_t k = 0; k < done.size(); k++) d += done[k], t = std::max(t, total[k]);
+						/* A session may still be finding what the game has, so its
+						 * total can grow, and one that counts what the others also
+						 * count would add up to more than the game has ("116 of 95",
+						 * issue 618): the total shown never goes down, and what is
+						 * done is never more than it */
+						t = std::max(t, shownTotal);
+						shownTotal = t;
+						d = std::min(d, t);
 						post([progress, d, t] { progress(d, t); });
 					}
 				};
@@ -300,6 +310,16 @@ struct NewProjectViewModel::CompileJob
 			manifest.members.emplace_back("files", std::move(files));
 			std::ofstream(fs::path(dir) / "manifest.json", std::ios::binary) << json::write(manifest);
 			if (found.empty()) failure = tr("compile.stored_nothing");
+		}
+		/* every session ended well: whatever count they last said, the work is all done */
+		uint32_t all = 0;
+		{
+			std::lock_guard<std::mutex> lock(m);
+			all = shownTotal;
+		}
+		if (failure.empty() && all > 0)
+		{
+			post([progress, all] { progress(all, all); });
 		}
 		post([finished, failure] { finished(failure); });
 	}
@@ -476,8 +496,9 @@ NewProjectViewModel::NewProjectViewModel(Dispatcher &dispatcher, SessionViewMode
 					modules_.push_back({name, sha1, true});
 					moduleRows_.reset.emit();
 				}, [this](uint32_t done, uint32_t total) {
-					compileDone.set(done);
+					/* the total first: it only grows, so a bar never has more done than total, even between the two */
 					compileTotal.set(total);
+					compileDone.set(done);
 					compileStatus.set(tr("compile.progress", {std::to_string(done), std::to_string(total)}));
 				}, [this](const std::string &failure) {
 					compiling.set(false);

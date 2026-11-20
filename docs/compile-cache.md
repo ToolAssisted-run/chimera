@@ -85,6 +85,21 @@ guest threads are green threads on one host thread, but several sandboxes
 side by side, each a child process of the frontend compiling its share into
 the shared directory.
 
+The progress is work to do, counted in any unit the core chooses, and the
+window's bar and its "Compiling D of T modules" line are made from it. `done`
+is what this session has finished; `total` is the whole game's, the same in
+every session, so the shares the sessions finish add up to it. The total may
+grow while a session is still finding what the game has, and never goes
+down. Count something small enough that the bar moves while one big module
+compiles: RPCS3 counts each file of its sweep and each part of a module it
+compiles on its own (a game's main executable is hundreds of parts and
+minutes of work), not the modules (issue 618: it counted the executable once
+as total and once as done in each of four sessions, and a bar of modules sat at
+nothing for the minutes the executable took). The window does not trust it
+blindly: it adds up what the sessions say is done, takes the biggest total,
+never shows a total lower than one it showed, and never shows more done than
+total.
+
 ## Where it happens: a step in the wizard
 
 For a core whose package says `"precompile": true`, creating a project has one

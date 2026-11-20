@@ -16240,3 +16240,103 @@ docs/platforms.md does not change.
 - Its first CI run and its first nightly, "Nightly 2026-11-20 (c189718b)",
   passed on GitHub; Chimera's package checks pass on the package.
 - Not proved: any real GameMaker 8 game; Windows and macOS.
+
+## The compile page counts, moves and scrolls (user-decided, 2026-11-20, issue 618)
+
+A person compiling Sonic Unleashed (PlayStation 3, the RPCS3 core) in New Project
+saw three things wrong on the compile page: the count read "116 of 95", the bar
+looked frozen for minutes and moved only near the end, and the list of modules
+did not follow the module being compiled. Decided: reproduce it, and fix all
+three.
+
+Reproduced with `chimera-run --precompile I/4` (four compile sessions, as the
+window runs them) on the core as published (built 2026-11-19):
+
+- Bejeweled 3: the sessions ended at 39/98, 40/98, 40/98 and 40/98. The window
+  adds what is done (159) and takes the biggest total (98): "159 of 98".
+- Sonic Unleashed (a 7.6 GB `.pkg` and its `.rap`): all four sessions said
+  `Precompiled 0/1 modules` from the start until at least 11 minutes in (my
+  polls at 6, 9 and 11 minutes), and two of them were still at 0/1 after 22
+  minutes. The compile took 29 minutes in all. The sessions ended at 38, 39, 39
+  and 40, with totals from 88 to 98: 156 of 98.
+
+Where each fault came from:
+
+- The count was the core's, and the window did not guard against it. The core
+  counted a module as done in every session that compiled it, but as total
+  once, so the dones added up to more than the total. It also counted a file of
+  the sweep twice as done (once by the sweep, once by the module compile inside
+  it) and the total once per module on top of the file, so each session's total
+  differed (83 to 98) by the modules it had compiled itself. Some of these
+  updates came from several threads with a plain `++`.
+- The bar was the core's. It counted modules, and a big game's executable is
+  one module of hundreds of parts that takes minutes; the progress was only
+  told when a module finished. The core did keep a count of parts but never
+  reported it.
+- The list was the window's: nothing moved it, so new rows landed below the
+  visible part.
+
+Fixed:
+
+- The core (patch 0019 and its driver): the progress counts work to do, not
+  modules: each file of the sweep and each part of a module outside the sweep.
+  A part counts in the total of every session whether or not another session
+  has compiled it already (so the total does not depend on who was first), and
+  once however often a session initialises its module (the main module is in
+  the list of loaded modules too, so it was initialised twice); a
+  session counts as done the parts it owns by name, and a part it owns that was
+  already there counts at once. Counting is done with atomic additions. The
+  sweep's files are counted when the sweep starts, after the executable's parts,
+  so the total grows once, then holds. While there, the flag that says a
+  session is in the sweep now stays set through the executable worker too:
+  those executables are a session's own files, and splitting their parts by
+  name across sessions would have left the parts that hash elsewhere compiled
+  by nobody (found by reading the patch, not by a failing game: no game tried
+  has such an executable).
+- The window's view model: what the sessions say is added up (done) and the
+  biggest taken (total), as before, but a total never goes down, done is
+  never more than the total, a session's done never goes down when its lines
+  arrive in another order, and when all sessions end well the count is shown as
+  complete. The total is set before the done count, so a bar is never over
+  between the two. The window knows no core: this holds for any core.
+- The window (`NewProject.qml`): the bar is busy ("indeterminate") while compiling
+  until the first piece of work is done, and the list shows its newest row
+  while the sessions run, until the person scrolls up from the end; Compile
+  turns it back on.
+- `ce_session_precompile_progress`'s comment and `docs/compile-cache.md` say
+  what a core's numbers mean: done is this session's share, total is the whole
+  game's and the same in every session, in any unit, may grow, never goes down.
+
+Measured on the fixed core (four sessions, same games, the host busy with other
+work, so times are not comparable with the first runs):
+
+- Bejeweled 3: every session's total reads 16 at first, then 92 once its
+  sweep is counted, and stays. The sessions ended at 26, 22, 23 and 22, which
+  is 93 against 92: the window shows 92 of 92 (one done too many that I did not
+  find; the window's guard hides it). 114 objects stored, the same files and
+  bytes as the first run's.
+- Sonic Unleashed: the bar moves from the third minute (1 of 301 at 3 minutes,
+  then every few seconds), where it stood at 0 for 22 minutes or more. The total
+  is 301 for the executable's parts and grows once, to 377, when the sessions
+  reach the rest of the game. The sessions ended at 99, 94, 102 and 83, which
+  is 378 against 377 (shown 377 of 377). 399 objects stored, the same files and
+  bytes (100,033,577) as the first run's. It took 48 minutes with tests running
+  beside it, against 29 for the first run alone: the fix counts, it does not
+  speed anything up, and I did not time both under the same load.
+
+The total growing from 301 to 377 makes the bar go back a little when the
+second part is found; counting the rest of the game before the executable
+would need the core to scan its folders first, which it does not do today.
+
+Tested: the view models' test `compileStep` has a stand-in session that
+counts like the old core (every session says all six done, with totals that
+come in late); it was seen to fail with the window's guards taken out ("48 of
+6") and to pass with them. The window's test `compile page` (new, offscreen
+Qt) runs the compile page with a stand-in session that says `0 of 1` and
+waits, then stores eighty modules: it was seen to fail with the two QML lines
+taken out (the bar was not busy; the list stayed at its top with 80 rows) and
+to pass with them. Not tested by a script: the core's counting (the
+repository of the core has no test for it that runs without a game); the two
+games above were run by hand. Windows was not run; the guards and the QML
+are the same code on every system, the test script of the first test is
+skipped there.
