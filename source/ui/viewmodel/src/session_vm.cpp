@@ -6737,6 +6737,7 @@ void SessionViewModel::adoptOnMachine(ce_session *s, const std::string &package,
 			a.header = h != nullptr ? h : a.name;
 			a.neutral = ce_session_axis_neutral(s, i);
 			a.player = ce_session_player_of(s, a.name.c_str());
+			a.active = ce_session_axis_active(s, i) != 0;
 			if (const json::Json *d = declared(a.name))
 			{
 				if (const json::Json *v = d->find("min")) a.min = static_cast<int64_t>(v->number());
@@ -6841,27 +6842,37 @@ void SessionViewModel::adoptOnMachine(ce_session *s, const std::string &package,
 	});
 }
 
-void SessionViewModel::updateUnboundPlayers(bool force)
+std::set<int32_t> SessionViewModel::unboundPlayersOf(const std::vector<int32_t> &buttonPlayers, const std::vector<bool> &active,
+	const std::vector<std::string> &texts, const std::vector<Axis> &axes, const std::vector<AnalogBind> &analogBinds)
 {
 	std::set<int32_t> all, bound;
-	const std::vector<std::string> &texts = bindings_.texts();
-	for (size_t i = 0; i < buttonNames_.size(); i++)
+	for (size_t i = 0; i < buttonPlayers.size(); i++)
 	{
-		const int32_t p = i < buttonPlayers_.size() ? buttonPlayers_[i] : 0;
+		const int32_t p = buttonPlayers[i];
 		if (p <= 0) continue;
 		all.insert(p);
-		if (i < texts.size() && !texts[i].empty()) bound.insert(p);
+		/* a key on a button of a device that is not plugged in binds nothing (owner, 2026-11-20) */
+		const bool has = active.empty() || (i < active.size() && active[i]);
+		if (has && i < texts.size() && !texts[i].empty()) bound.insert(p);
 	}
-	for (size_t i = 0; i < axes_.size(); i++)
+	for (size_t i = 0; i < axes.size(); i++)
 	{
-		if (axes_[i].player <= 0) continue;
-		all.insert(axes_[i].player);
-		if (i < analogBinds_.size() && !analogBinds_[i].empty()) bound.insert(axes_[i].player);
+		if (axes[i].player <= 0) continue;
+		all.insert(axes[i].player);
+		if (axes[i].active && i < analogBinds.size() && !analogBinds[i].empty()) bound.insert(axes[i].player);
 	}
 	/* every player with nothing bound, even when that is every player (owner, 2026-11-20) */
 	std::set<int32_t> unbound;
 	for (const int32_t p : all)
 		if (bound.count(p) == 0) unbound.insert(p);
+	return unbound;
+}
+
+void SessionViewModel::updateUnboundPlayers(bool force)
+{
+	std::vector<int32_t> players(buttonNames_.size(), 0);
+	for (size_t i = 0; i < players.size() && i < buttonPlayers_.size(); i++) players[i] = buttonPlayers_[i];
+	const std::set<int32_t> unbound = unboundPlayersOf(players, buttonActive_, bindings_.texts(), axes_, analogBinds_);
 	if (unbound == unboundPlayers_ && !force) return;
 	unboundPlayers_ = unbound;
 	boundPlayersChanged.emit();

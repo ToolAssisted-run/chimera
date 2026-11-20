@@ -503,6 +503,8 @@ public:
 		int64_t min = -32768, max = 32767, neutral = 0;
 		/* its player, 0 the console's, as the core declares */
 		int32_t player = 0;
+		/* this machine has it (the core's IsAxisActive): a device not plugged in has its axes declared but absent */
+		bool active = true;
 	};
 	const std::vector<Axis> &axes() const { return axes_; }
 	/* each button's player (0 the console's), as the core declares it
@@ -517,6 +519,11 @@ public:
 	 * package's defaults), as the TAStudio roll leaves their columns out (issue 622). Empty when no player at all
 	 * has anything bound: there is nothing then to tell them apart by. */
 	const std::set<int32_t> &unboundPlayers() const { return unboundPlayers_; }
+	/* The rule behind unboundPlayers (issue 622): the players (1 and up) that have no binding on a
+	 * control this machine has. A binding on a button or axis of a device that is not plugged in (an
+	 * inactive control) does not make its player bound. `active` empty: every button is the machine's. */
+	static std::set<int32_t> unboundPlayersOf(const std::vector<int32_t> &buttonPlayers, const std::vector<bool> &active,
+		const std::vector<std::string> &texts, const std::vector<Axis> &axes, const std::vector<AnalogBind> &analogBinds);
 	/* unboundPlayers() changed */
 	Signal<> boundPlayersChanged;
 	/* the controller's name as the package declares it (Chimera's

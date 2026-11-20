@@ -16184,6 +16184,16 @@ So a movie's input on a player with nothing bound stays in the movie but has
 no columns until the player is bound, and a core whose package binds no keys
 starts with no player columns until the person binds some.
 
+Only a control the machine has counts as bound (owner, 2026-11-20). A
+package declares the controls of every device its ports can hold, and the
+core says which ones this machine has (its IsButtonActive and IsAxisActive,
+read by the engine after Init). A key bound to a control of a device that is
+not plugged in binds nothing for this rule. Without it, Mesen's default keys,
+which bind player 2's Zapper trigger and aim and its Power Pad, kept player 2's
+columns in every NES project, which is what the issue was about. The rule is
+`SessionViewModel::unboundPlayersOf`, tested on its own in `unboundPlayers`
+(a key on an inactive button or axis leaves its player unbound).
+
 What else was decided, because the owner's rule leaves it open (chosen by the
 contributor working on it):
 

@@ -4346,6 +4346,26 @@ bool coreMenu(const char *package, const char *rom, const char *slotsPackage, co
  * player brings them back; a player the movie has input for keeps its columns; the movie itself keeps every control */
 bool unboundPlayers(const char *package, const char *rom)
 {
+	/* the rule alone: a key on a control of a device that is not plugged in (a core's IsButtonActive and
+	 * IsAxisActive say so) does not make its player bound, as Mesen binds player 2's Zapper and Power Pad
+	 * by default (issue 622) */
+	{
+		using Axis = SessionViewModel::Axis;
+		const std::vector<int32_t> players{0, 1, 1, 2, 2};
+		const std::vector<std::string> texts{"Enter", "Z", "", "", "WMouse L"};
+		Axis x;
+		x.name = "P2 Zapper X";
+		x.player = 2;
+		std::vector<AnalogBind> analog(1);
+		CHECK((SessionViewModel::unboundPlayersOf(players, {}, texts, {}, {}) == std::set<int32_t>{}));
+		CHECK((SessionViewModel::unboundPlayersOf(players, {true, true, true, true, false}, texts, {}, {}) == std::set<int32_t>{2}));
+		analog[0].value = "WMouse X";
+		x.active = true;
+		CHECK((SessionViewModel::unboundPlayersOf(players, {true, true, true, true, false}, texts, {x}, analog) == std::set<int32_t>{}));
+		x.active = false;
+		CHECK((SessionViewModel::unboundPlayersOf(players, {true, true, true, true, false}, texts, {x}, analog) == std::set<int32_t>{2}));
+		CHECK((SessionViewModel::unboundPlayersOf(players, {true, false, true, true, false}, texts, {x}, analog) == std::set<int32_t>{1, 2}));
+	}
 	ManualDispatcher d;
 	InputLog inputs;
 	SessionViewModel session(d, inputs);
