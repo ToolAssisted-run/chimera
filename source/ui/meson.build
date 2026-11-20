@@ -738,6 +738,18 @@ endif
     )
     test('lua console drop', test_lua_console_drop, args: [meson.current_build_dir() / 'lua-console-drop-test'],
       env: ['QT_QPA_PLATFORM=offscreen', 'QT_QUICK_BACKEND=software', 'ALSOFT_DRIVERS=null'], timeout: 60)
+    # a .wch file dropped on RAM Watch opens as File > Open does, asking
+    # about unsaved changes first (issue 623)
+    test_ram_watch_drop = executable(
+      'test-ram-watch-drop',
+      ['qt/tests/test_ram_watch_drop.cpp', 'qt/qml_view_model.cpp',
+        qt6.compile_moc(headers: ['qt/qml_view_model.hpp'], dependencies: [qt_dep]), qt_rcc, qt_dialogs_rcc],
+      dependencies: [qt_test_dep, vm_dep, dl_dep],
+      override_options: ['cpp_std=c++20'],
+      cpp_args: ['-DQT_NO_KEYWORDS'],
+    )
+    test('ram watch drop', test_ram_watch_drop, args: [meson.current_build_dir() / 'ram-watch-drop-test'],
+      env: ['QT_QPA_PLATFORM=offscreen', 'QT_QUICK_BACKEND=software', 'CHIMERA_FILE_CHOOSER=builtin', 'ALSOFT_DRIVERS=null'], timeout: 60)
     # a core's own windows (issue 610): what their locked-down QML engine
     # lets a core's QML reach (core-windows.py writes the cases, listens for
     # anything that gets out), and the synthetic core's window over its view model

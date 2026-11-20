@@ -41,6 +41,7 @@ ApplicationWindow {
     }
     MessageDialog {
         id: askSave
+        objectName: "askSaveDialog"
         title: qsTrId("common.closing_with_unsaved_changes")
         text: qsTrId("ram_watch.save_watch_file")
         buttons: MessageDialog.Yes | MessageDialog.No | MessageDialog.Cancel
@@ -698,6 +699,23 @@ ApplicationWindow {
                 }
                 Button { text: qsTrId("common.cancel"); onClicked: propertyPicker.close() }
             }
+        }
+    }
+    // a .wch file dropped on the window opens as File > Open opens it: after
+    // asking about unsaved changes, and replacing the list. The first one of
+    // several is opened; other files are left alone (issue 623)
+    DropArea {
+        objectName: "watchDrop"
+        anchors.fill: parent
+        onEntered: (drag) => { drag.accepted = drag.hasUrls }
+        onDropped: (drop) => {
+            if (!drop.hasUrls) return
+            for (const url of drop.urls) {
+                if (!url.toString().toLowerCase().endsWith(".wch")) continue
+                win.leaveList(() => win.vm.run("open", [url, false]))
+                break
+            }
+            drop.accept()
         }
     }
 }

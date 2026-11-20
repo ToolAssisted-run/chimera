@@ -16139,3 +16139,16 @@ shows the answer: the choice is not made in QML.
 
 Tested: view model checks (information is not an error, a refusal is) and a
 window check that the line's colour is the error colour only after a refusal.
+
+## A .wch file dropped on RAM Watch opens (2026-11-20, issue 623)
+
+Dropping a watch list file on the RAM Watch window now opens it, as File >
+Open does: the window asks about unsaved changes first (Yes saves, No lets
+them go, Cancel leaves the list as it is), then replaces the list with the
+file's. Of several files dropped, the first .wch is opened; any other file is
+left alone. Chimera's own RAM Watch is a plain window with no drop, so this is
+an addition (feature request approved by the owner, 2026-11-20).
+
+Tested: a window test that drops files on the window: a file that is not a
+list does nothing, a list opens at once when nothing is unsaved, with unsaved
+changes it asks, Escape keeps the list and No opens the file.
