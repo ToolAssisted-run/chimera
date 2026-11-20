@@ -16367,3 +16367,23 @@ Tested: the view-model test in `test_vm.cpp` (the synthetic core) puts the
 person's own fill value, adds a file to the Disk slot after the game (the
 core's note now says it sees the disk; the value stays), takes it out again
 (the note goes back), and does the same with an untouched value.
+
+## Supermodel follows upstream and adds Sega Model 1 and Model 2 (user-decided, 2026-11-20, issue 627)
+
+Issue 627 said upstream Supermodel now emulates Sega Model 1 and Model 2 as
+well as Model 3. The owner decided to move the core to upstream's newest
+commit (596f154, 2026-11-19, 107 commits on) and to offer all three boards,
+saying plainly which were not tried with a real game. The core declares them
+as three machines of one package (a Machine setting, Model 3 the default), so
+the roster lists the systems Model3, Model2 and Model1.
+
+- Model 3: Scud Race replays an old movie to the same pictures, steps and
+  cycles; only the sound differs, as upstream changed the sound board.
+- Model 2: tested only with a test program written for the core (tile
+  layer, controls, backup RAM, sound). Model 1: a start-up test only. No
+  real Model 1 or Model 2 game was run.
+- The core now declares miniBox machine spec 3: under spec 2, llvmpipe's code
+  generator mapped memory over the core's picture buffer (Model 1 crashed on
+  its first frame). Other cores that carry llvmpipe are being checked for the
+  same exposure (owner, 2026-11-20).
+- Not run: Windows, macOS, a real graphics card.

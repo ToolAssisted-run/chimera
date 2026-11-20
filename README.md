@@ -59,7 +59,7 @@ Made, published and supported by this project. Report a problem with one in [Chi
 | [Genesis Plus GX](https://github.com/ToolAssisted-run/chimera-core-gpgx) | Mega Drive / Genesis, Sega CD / Mega CD, Master System, Game Gear, SG-1000, Sega Pico |
 | [Gearsystem](https://github.com/ToolAssisted-run/chimera-core-gearsystem) | Master System, Game Gear, SG-1000, Gear-to-Gear and Mark III links (two consoles joined by cable) |
 | [Flycast](https://github.com/ToolAssisted-run/chimera-core-flycast) | Dreamcast, Sega NAOMI / NAOMI 2 (arcade), Sammy Atomiswave (arcade) |
-| [Supermodel](https://github.com/ToolAssisted-run/chimera-core-supermodel) | Sega Model 3 (arcade) |
+| [Supermodel](https://github.com/ToolAssisted-run/chimera-core-supermodel) | Sega Model 3, Model 2 and Model 1 (arcade) |
 | [Mednafen](https://github.com/ToolAssisted-run/chimera-core-mednafen) | Sega Saturn, Sega ST-V (arcade), Virtual Boy, PC-FX, Atari Lynx |
 | [Geargrafx](https://github.com/ToolAssisted-run/chimera-core-geargrafx) | PC Engine / TurboGrafx-16, SuperGrafx, PC Engine CD |
 | [Gearlynx](https://github.com/ToolAssisted-run/chimera-core-gearlynx) | Atari Lynx, ComLynx (two to four Lynxes joined by cable) |

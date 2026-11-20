@@ -656,7 +656,9 @@
       "id": "supermodel",
       "name": "Supermodel",
       "systems": [
-        { "id": "Model3", "name": "Sega Model 3" }
+        { "id": "Model3", "name": "Sega Model 3" },
+        { "id": "Model2", "name": "Sega Model 2" },
+        { "id": "Model1", "name": "Sega Model 1" }
       ],
       "repo": "ToolAssisted-run/chimera-core-supermodel",
       "tested": ""
