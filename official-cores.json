@@ -797,6 +797,16 @@
       ],
       "repo": "ToolAssisted-run/chimera-core-xavixemu",
       "tested": ""
+    },
+    {
+      "id": "opensurge",
+      "name": "OpenSurge",
+      "systems": [
+        { "id": "OpenSurge", "name": "Open Surge Engine" }
+      ],
+      "kind": "game",
+      "repo": "ToolAssisted-run/chimera-core-opensurge",
+      "tested": ""
     }
   ]
 }

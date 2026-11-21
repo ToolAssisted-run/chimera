@@ -127,6 +127,7 @@ One game each, run from the game's own files ([docs/game-cores.md](docs/game-cor
 | [fheroes2](https://github.com/ToolAssisted-run/chimera-core-fheroes2) | Heroes of Might and Magic II (from your own game's data file, or its free demo's) |
 | [TheXTech](https://github.com/ToolAssisted-run/chimera-core-thextech) | Super Mario Bros. X (SMBX 1.3) and its episodes, with an asset pack you bring |
 | [OpenGMK](https://github.com/ToolAssisted-run/chimera-core-opengmk) | GameMaker 8.0 and 8.1 games, from your own game's .exe |
+| [OpenSurge](https://github.com/ToolAssisted-run/chimera-core-opensurge) | Surge the Rabbit (included) and games made with the Open Surge Engine |
 
 ### Third-party cores
 

@@ -16422,3 +16422,29 @@ declaring a pad (Up, Down, Left, Right, OK, Back, Pause), and to publish it
 - The package runs on Windows, Linux and macOS (x86_64) as other cores' do;
   only Linux was tried, and the core's README says so (owner).
 - Its CI and its first nightly, "Nightly 2026-11-21 (cac105e3)", passed.
+
+## OpenSurge joins the official cores (user-decided, 2026-11-21, issue 628)
+
+Issue 628 asked for the Open Surge Engine (C, GPL-3.0), a Sonic-like engine
+that ships Surge the Rabbit. Its graphics run only through Allegro 5 with
+OpenGL shaders, and Allegro has no way to run without a window system. A
+proof came first (owner): a 209-line Allegro display driver drawing through
+Mesa's software renderer into memory, with Allegro's timer driven by the
+frame, gave the same picture natively and in the sandbox. The owner then
+decided to build the core and publish it (2026-11-21).
+
+- `chimera-core-opensurge` ships Surge the Rabbit's files: every music,
+  sound and picture file has a free licence listed in the engine's own
+  credits table (CC-BY, CC-BY-SA, CC0, MIT, Apache-2.0, OFL, Allegro
+  Giftware), and the package carries the texts (owner). Another game made
+  with the engine is given as a zip.
+- It is slow: a drawn frame costs about 0.37 s of CPU in software OpenGL, so
+  it does not play in real time; frames not shown cost a few milliseconds.
+  Published with that said plainly (owner); drawing on the graphics card is
+  later work.
+- Its texts are translated as other cores' are (owner).
+- Proved on a 3000-step route through the first level: native and sandbox
+  the same, states every step, a state carried into a new process, and
+  undrawn frames changing nothing. Its CI and first nightly, "Nightly
+  2026-11-21 (2f0e2e70)", passed. Not tried: Windows, macOS, a gamepad, a
+  fan-made game.
