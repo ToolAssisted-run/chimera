@@ -3110,6 +3110,28 @@ bool customizeOptions(const char *package, const char *rom)
  * go; one whose writer no longer runs is rebuilt as a copy among the backups
  * and offered when the project opens again, its answer opening that work
  * unsaved or the project as saved */
+/* A copy of a recovery folder as a crash would leave it, taken while its
+ * writer still runs: a file being replaced is written as "<name>.new" and
+ * renamed over the old one, so a ".new" can vanish between listing and
+ * copying (seen on macOS CI: fs::copy threw and the test binary aborted).
+ * Such a file is a write in flight, which a crash would not have finished
+ * either, so it is left out; any other file that goes in between is too. */
+static void copyAsCrashed(const std::filesystem::path &from, const std::filesystem::path &to)
+{
+	namespace fs = std::filesystem;
+	std::error_code ec;
+	fs::create_directories(to, ec);
+	for (fs::recursive_directory_iterator it(from, ec), end; !ec && it != end; it.increment(ec))
+	{
+		const fs::path rel = fs::relative(it->path(), from, ec);
+		if (ec) { ec.clear(); continue; }
+		if (it->is_directory(ec)) { fs::create_directories(to / rel, ec); ec.clear(); continue; }
+		if (it->path().extension() == ".new") continue;
+		std::error_code copyError;
+		fs::copy_file(it->path(), to / rel, fs::copy_options::overwrite_existing, copyError);
+	}
+}
+
 bool crashRecovery(const char *package, const char *rom)
 {
 	namespace fs = std::filesystem;
@@ -3199,7 +3221,7 @@ bool crashRecovery(const char *package, const char *rom)
 	CHECK(lines(kept / "snapshot.chimeraProject") == 30);
 	auto crashed = [&](const fs::path &aside) {
 		fs::remove_all(aside);
-		fs::copy(kept, aside, fs::copy_options::recursive);
+		copyAsCrashed(kept, aside);
 		session.run("close", {}, error);
 		const bool closed = d.until([&] { return !session.isOpen.get(); }, 20);
 		const bool letGo = !fs::exists(kept);
@@ -8959,7 +8981,9 @@ bool compileStep(const char *compilePackage, const char *rom)
 			"[ -n \"$ALWAYS\" ] && exit 137\n"
 			"[ \"${spec#*/}\" != 1 ] && exit 137\n"
 			"mkdir -p \"$out/synth\"\n"
-			"for i in 0 1 2 3 4 5; do printf 'm%s' $i > \"$out/synth/module$i.bin\"; "
+			/* written whole and renamed into place: every session writes the same files, and
+			 * a sha1sum must not read another session's half-written one (seen under load) */
+			"for i in 0 1 2 3 4 5; do printf 'm%s' $i > \"$out/synth/module$i.bin.$$\"; mv -f \"$out/synth/module$i.bin.$$\" \"$out/synth/module$i.bin\"; "
 			"echo \"[cache] stored synth/module$i.bin $(sha1sum \"$out/synth/module$i.bin\" | cut -d' ' -f1)\"; done\n";
 		fs::permissions(script, fs::perms::owner_all);
 		const fs::path other = dir / "other.testrom";
@@ -9001,7 +9025,9 @@ bool compileStep(const char *compilePackage, const char *rom)
 			"out=; while [ $# -gt 0 ]; do case \"$1\" in --cache-dir) out=$2; shift;; esac; shift; done\n"
 			"mkdir -p \"$out/synth\"\n"
 			"echo 'Precompiled 0/0 modules'; echo 'Precompiled 0/4 modules'\n"
-			"for i in 0 1 2 3 4 5; do printf 'm%s' $i > \"$out/synth/module$i.bin\"; "
+			/* written whole and renamed into place: every session writes the same files, and
+			 * a sha1sum must not read another session's half-written one (seen under load) */
+			"for i in 0 1 2 3 4 5; do printf 'm%s' $i > \"$out/synth/module$i.bin.$$\"; mv -f \"$out/synth/module$i.bin.$$\" \"$out/synth/module$i.bin\"; "
 			"echo \"[cache] stored synth/module$i.bin $(sha1sum \"$out/synth/module$i.bin\" | cut -d' ' -f1)\"; "
 			"[ $i -lt 3 ] && echo \"Precompiled $((i + 1))/4 modules\" || echo \"Precompiled $((i + 1))/6 modules\"; done\n";
 		fs::permissions(progressScript, fs::perms::owner_all);
@@ -9026,7 +9052,11 @@ bool compileStep(const char *compilePackage, const char *rom)
 			most = std::max(most, seen[k].first);
 		}
 		CHECK(seen.size() > 2 && never && grew && most > 0);
-		CHECK(wizard.compileDone.get() <= wizard.compileTotal.get() && wizard.compileTotal.get() == 6 && wizard.compileReady.get());
+		/* "ready" is worked out after the sessions end, when the page looks at
+		 * the modules again: waited for, not read the moment compiling stops
+		 * (it failed that way under load) */
+		CHECK(d.until([&] { return wizard.compileReady.get(); }, 20));
+		CHECK(wizard.compileDone.get() <= wizard.compileTotal.get() && wizard.compileTotal.get() == 6);
 		std::printf("compile progress said %zu times, the most done %d of %d\n", seen.size(), most, static_cast<int>(wizard.compileTotal.get()));
 	}
 #endif
