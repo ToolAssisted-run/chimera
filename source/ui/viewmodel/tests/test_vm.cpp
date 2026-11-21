@@ -4078,8 +4078,11 @@ bool mediaMaker()
 		CHECK(plain.recognised.get().empty() && plain.run("make", {}, error).has_value());
 		CHECK(d.until([&] { return !plain.running.get(); }, 60) && plain.sha1.get().size() == 40 && plain.sha1.get() != maker.sha1.get());
 	}
-	/* a zip is not what the recipe writes */
+	/* a file inside the folder is refused as soon as Make is pressed, and nothing is written (issue 633) */
 	maker.format.set(0);
+	CHECK(make(game / "image.zip") && maker.result.get().find("lies inside the folder being packed") != std::string::npos &&
+		maker.sha1.get().empty() && !fs::exists(game / "image.zip"));
+	/* a zip is not what the recipe writes */
 	CHECK(maker.recognised.get().empty());
 	CHECK(!maker.run("setFolder", {}, error));
 	removeTree(dir);

@@ -268,6 +268,21 @@ void emitDirExtent(std::vector<uint8_t> &v, const Node &d, bool joliet, uint32_t
 	if (v.size() < want) v.resize(want, 0);
 }
 
+/* Whether a file's name says it is a disc image or an archive made earlier:
+ * the extensions .iso .zip .img .7z .rar, or "(Media Maker" in the name (what
+ * the Media Maker's own names suggest). Only used to word an error: such a
+ * file is still packed when it is small enough, as a game may hold one. */
+bool looksLikeEarlierImage(const std::string &rel)
+{
+	std::string name = rel.substr(rel.find_last_of('/') == std::string::npos ? 0 : rel.find_last_of('/') + 1);
+	for (char &c : name)
+		if (c >= 'A' && c <= 'Z') c = static_cast<char>(c - 'A' + 'a');
+	if (name.find("(media") != std::string::npos && name.find("maker") != std::string::npos) return true;
+	const size_t dot = name.rfind('.');
+	const std::string ext = dot == std::string::npos ? "" : name.substr(dot);
+	return ext == ".iso" || ext == ".zip" || ext == ".img" || ext == ".7z" || ext == ".rar";
+}
+
 } // namespace
 
 bool mediaWriteIso9660(const std::vector<MediaEntry> &files, const std::string &outPath,
@@ -278,7 +293,7 @@ bool mediaWriteIso9660(const std::vector<MediaEntry> &files, const std::string &
 	{
 		if (e.size >= k4GiB)
 		{
-			error = chimera::lang::tr("media.iso_too_big", {e.rel});
+			error = chimera::lang::tr(looksLikeEarlierImage(e.rel) ? "media.iso_too_big_image" : "media.iso_too_big", {e.rel});
 			return false;
 		}
 	}

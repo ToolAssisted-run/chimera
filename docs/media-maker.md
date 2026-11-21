@@ -60,6 +60,22 @@ silently dropped or truncated it would be a worse outcome than not being built.
 A 15 GB game made of ordinary-sized files is fine, and that is the case this was
 built for.
 
+When that file looks like an earlier image or archive (its name ends in .iso,
+.zip, .img, .7z or .rar, or holds "(Media Maker"), the message says so and asks
+for the file to be moved out of the folder, instead of advising a zip. The
+guess only words the message: such a file is still packed when it is under
+4 GiB, since a game may hold one. Most of these are an image the Media Maker
+wrote into the folder on an earlier run (issue 633).
+
+**The file is never written inside the folder.** For every shape, a file to write
+that lies inside the folder being packed is refused before anything is read,
+with a message naming both. Otherwise the new image would hold the old one, and
+itself. The two paths are compared in full after `..` and links are resolved
+(and with the case ignored on Windows), so `folder/../folder/x.zip` is caught and
+a sibling such as `folder2/x.zip` is not. The check is in the engine
+(`mediaMake`), so the window, Lua and the tests get it alike; the window shows
+the message in the result line as soon as Make is pressed.
+
 **FAT12 floppy (.img).** 2880 sectors of 512 bytes, two copies of a 12-bit
 allocation table of 9 sectors each, a root directory of exactly 224 entries, one
 sector per cluster, data from sector 33. Names are 8.3, made deterministically

@@ -16490,3 +16490,36 @@ says, with no further failure; a new budget is taken whole. With the halving put
 back, the same test saw 13 failures and a budget of 8,192 bytes, and failed on
 the check that the budget is no more than what was held. The warning's size rule
 is tested with figures (20 GB to spare and 20,096 MB set gives 15 GB).
+
+## The Media Maker names an old image in the folder, and never writes inside the folder (user-decided, 2026-11-21, issue 633)
+
+A person packed a PlayStation 3 folder as an ISO and was told a file was 4 GiB
+or larger and to use a zip instead. The file named was an image they had made
+earlier and saved inside the game folder, so the Media Maker tried to pack the
+old image into the new one. The limit is per file, not per image, but the
+message read as if it were per image, and the advice sent them to a zip.
+
+- A file written inside the folder being packed is refused, for every shape,
+  before any file is read: "lies inside the folder being packed", naming both
+  paths. The paths are compared in full after `..` and links are resolved, and
+  with the case ignored on Windows. This is in the engine (`mediaMake`), with no
+  new function in the C interface: the window runs the engine, which refuses at
+  once, and the result line shows it.
+- The 4 GiB message for a file whose name looks like an earlier image or
+  archive (.iso, .zip, .img, .7z, .rar, or "(Media Maker" in the name) says so
+  and asks for it to be moved out of the folder. Other big files keep the old
+  message. .bin is not on the list: it is common for real game data. The
+  guess only words the message; no file is skipped because of its name, so a
+  game's own small .iso or .zip is still packed.
+- Chosen over skipping such files silently, which would change the image
+  without a word, and over refusing every folder that holds one.
+- Both messages are in all 26 language tables.
+
+Tested: the engine test refuses an output inside the folder in all three
+shapes, written four ways (directly, deep, with `..`, with `.`), and with the
+folder itself spelt with `..`; a file beside the folder and one in a folder
+whose name only begins the same are packed. A 5 GiB sparse file named like a
+Media Maker image gives the new message, and a 5 GiB `movie.dat` the old one.
+The view model test presses Make with the file inside the folder and sees the
+message and no file. Each new test was broken once on purpose and failed.
+

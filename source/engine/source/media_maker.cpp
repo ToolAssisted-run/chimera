@@ -550,10 +550,53 @@ bool mediaRecipeApplies(const MediaRecipe &recipe, const std::string &folder)
 	return false;
 }
 
+namespace {
+
+/* Whether `file` lies inside `folder`. Compared as full paths with the file
+ * system's own view of them (weakly_canonical resolves ".." and links for
+ * the part that exists, and keeps the rest as written), and on Windows with
+ * the case ignored, since that file system does. A pack written inside the
+ * folder it packs would put the old image in the new one. */
+bool lyingInside(const std::string &folder, const std::string &file)
+{
+	namespace fs = std::filesystem;
+	std::error_code ec;
+	const fs::path root = fs::weakly_canonical(fs::absolute(fs::u8path(folder), ec), ec);
+	if (ec) return false;
+	const fs::path out = fs::weakly_canonical(fs::absolute(fs::u8path(file), ec), ec);
+	if (ec) return false;
+	auto parts = [](const fs::path &p) {
+		std::vector<std::string> v;
+		for (const fs::path &part : p.lexically_normal())
+		{
+			std::string name = part.u8string();
+			if (name.empty() || name == "." || name == "/" || name == "\\") continue;
+#if defined(_WIN32)
+			for (char &c : name)
+				if (c >= 'A' && c <= 'Z') c = static_cast<char>(c - 'A' + 'a');
+#endif
+			v.push_back(std::move(name));
+		}
+		return v;
+	};
+	const std::vector<std::string> a = parts(root), b = parts(out);
+	/* the file's own name is the last part, so it must be longer than the folder's path */
+	if (b.size() <= a.size()) return false;
+	return std::equal(a.begin(), a.end(), b.begin());
+}
+
+} // namespace
+
 bool mediaMake(const std::string &folder, const std::string &outPath, MediaFormat format,
 	const MediaProgress &progress, std::string &sha1Out, std::string &error,
 	const MediaRecipe *recipe)
 {
+	/* First, before any file is read: the answer is the same for every format. */
+	if (lyingInside(folder, outPath))
+	{
+		error = chimera::lang::tr("media.output_inside", {outPath, folder});
+		return false;
+	}
 	std::vector<MediaEntry> files;
 	if (!mediaCollect(folder, files, error)) return false;
 
