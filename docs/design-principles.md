@@ -16387,3 +16387,15 @@ the roster lists the systems Model3, Model2 and Model1.
   its first frame). Other cores that carry llvmpipe are being checked for the
   same exposure (owner, 2026-11-20).
 - Not run: Windows, macOS, a real graphics card.
+
+## A core request names the TAS it is for (user-decided, 2026-11-21)
+
+Core requests had started to ask for emulators and engines that nobody
+planned to make a tool-assisted speedrun with (a one-line link to an
+emulator, an engine with no game named). The owner decided that a core,
+system or game request must name its motivating TAS: the game someone plans
+to TAS and what it needs. The core request template asks for it first, as
+required. A request without one is closed with a reply inviting a new issue
+that names the TAS. The same reason was given when a one-line feature request
+(issue 630, the Wii Home Menu and SD card) was declined. Requests already
+open are not reclosed for this.

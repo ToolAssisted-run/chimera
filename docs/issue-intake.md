@@ -160,8 +160,11 @@ bursts around nightlies.
 - Feature requests: labelled `feature`, one triage comment ("what it would
   take, in a sentence"), then they wait for `decision` or a release theme.
   Not time-boxed. Closed only by Sergio ("won't do" with the reason, or done).
-- Core requests: `core-request` + the feasibility questions from the form; a
-  new core is a milestone, not an issue - once accepted it becomes a repo
+- Core requests: `core-request` + the feasibility questions from the form,
+  and the TAS it is for, which the form requires: the game someone plans to
+  make a tool-assisted speedrun of and what it needs. A request that names no
+  planned TAS is closed, inviting a new one that does (user-decided,
+  2026-11-21). A new core is a milestone, not an issue - once accepted it becomes a repo
   with its own PLAN.md and the issue closes pointing at it.
 
 **DECIDE 7a**: a GitHub Discussion board for feature ideas (keeps the issue
