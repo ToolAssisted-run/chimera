@@ -72,6 +72,8 @@ PianoRollViewModel::PianoRollViewModel(Dispatcher &dispatcher, InputLog &inputs,
 				if (names[i] == name) p = &buttonPatterns_[i], isButton = true;
 			for (size_t i = 0; i < session_.axes().size() && i < axisPatterns_.size(); i++)
 				if (session_.axes()[i].name == name) p = &axisPatterns_[i];
+			/* a control the machine lacks has no column, so no pattern to set (issue 635) */
+			if (inactive_.count(name) != 0) p = nullptr;
 			if (p == nullptr)
 			{
 				error = tr("piano_roll.no_control", {name});
@@ -195,7 +197,7 @@ PianoRollViewModel::PianoRollViewModel(Dispatcher &dispatcher, InputLog &inputs,
 		[this](const Args &a, std::string &error) -> Value {
 			std::string name;
 			if (!arg(a, 0, name, error)) return {};
-			if (autoHeld_.count(name) != 0 || patternKind.get() == "custom") return std::string();
+			if (autoHeld_.count(name) != 0 || patternKind.get() == "custom" || inactive_.count(name) != 0) return std::string();
 			const auto &axes = session_.axes();
 			for (size_t x = 0; x < axes.size(); x++)
 				if (axes[x].name == name)
@@ -503,6 +505,12 @@ PianoRollViewModel::PianoRollViewModel(Dispatcher &dispatcher, InputLog &inputs,
 	command("hideColumn", "a control's column no longer shown", {"name"}, [this](const Args &a, std::string &error) -> Value {
 		std::string name;
 		if (!arg(a, 0, name, error)) return {};
+		/* a control the machine lacks has no column to hide (issue 635) */
+		if (inactive_.count(name) != 0)
+		{
+			error = tr("piano_roll.no_column", {name});
+			return {};
+		}
 		hidden_.insert(name);
 		hiddenChanged();
 		session_.markChanged();
@@ -511,6 +519,12 @@ PianoRollViewModel::PianoRollViewModel(Dispatcher &dispatcher, InputLog &inputs,
 	command("showColumn", "a control's column shown again", {"name"}, [this](const Args &a, std::string &error) -> Value {
 		std::string name;
 		if (!arg(a, 0, name, error)) return {};
+		/* a control the machine lacks has no column to show (issue 635) */
+		if (inactive_.count(name) != 0)
+		{
+			error = tr("piano_roll.no_column", {name});
+			return {};
+		}
 		hidden_.erase(name);
 		hiddenChanged();
 		session_.markChanged();
@@ -824,11 +838,13 @@ PianoRollViewModel::PianoRollViewModel(Dispatcher &dispatcher, InputLog &inputs,
 			if (!arg(a, 0, f, error) || !arg(a, 1, b, error)) return {};
 			if (a.size() > 2 && !arg(a, 2, alt, error)) return {};
 			patternStroke_ = false;
+			/* a column of the roll, taken to its control's place among the buttons and then the analog controls */
+			b = frames_.dataColumn(b);
 			const std::string &mode = patternMode.get();
-			const bool byPattern = mode == "always" || (mode == "autofire" && autoHeld_.count(frames_.columnName(static_cast<int32_t>(b))) != 0);
+			const bool byPattern = mode == "always" || (mode == "autofire" && b >= 0 && autoHeld_.count(frames_.dataName(static_cast<int32_t>(b))) != 0);
 			if ((alt && b < buttonCount()) || byPattern)
 			{
-				if (f < 0 || b < 0 || b >= frames_.columnCount() || (b >= buttonCount() && f >= inputs_.size()))
+				if (f < 0 || b < 0 || (b >= buttonCount() && f >= inputs_.size()))
 				{
 					error = tr("piano_roll.no_frame_or_control");
 					return {};
@@ -867,6 +883,12 @@ PianoRollViewModel::PianoRollViewModel(Dispatcher &dispatcher, InputLog &inputs,
 		{"frame", "button"}, [this](const Args &a, std::string &error) -> Value {
 			int64_t f = 0, b = 0;
 			if (!arg(a, 0, f, error) || !arg(a, 1, b, error)) return {};
+			b = frames_.dataColumn(b);
+			if (b < 0)
+			{
+				error = tr("piano_roll.no_frame_or_control");
+				return {};
+			}
 			/* a pattern's stroke: every frame from where it began, the pattern counted from the first */
 			if (patternStroke_ && b == patternColumn_)
 			{
@@ -1054,6 +1076,7 @@ PianoRollViewModel::PianoRollViewModel(Dispatcher &dispatcher, InputLog &inputs,
 	expose("bindMarkers", "markers move with the frames when frames are put in or taken out", bindMarkers, true);
 	expose("pickedFrame", "the frame of the analog cell picked to edit, -1 for none", pickedFrame);
 	expose("pickedAxis", "the analog control picked to edit, by its place among the analog controls", pickedAxis);
+	expose("pickedColumn", "the column of the picked analog control, among the roll's columns (-1 for none)", pickedColumn);
 	expose("axisName", "the picked analog control's name", axisName);
 	expose("axisMin", "the picked analog control's least value", axisMin);
 	expose("axisMax", "the picked analog control's greatest value", axisMax);
@@ -1061,6 +1084,7 @@ PianoRollViewModel::PianoRollViewModel(Dispatcher &dispatcher, InputLog &inputs,
 	command("unpick", "no analog cell is picked for editing", {}, [this](const Args &, std::string &) -> Value {
 		pickedFrame.set(-1);
 		pickedAxis.set(-1);
+		pickedColumn.set(-1);
 		return {};
 	});
 	command("nudgeAxis", "the picked analog cell's value moved as Chimera's analog keys move it: \"up\", \"down\" (by "
@@ -1339,6 +1363,7 @@ PianoRollViewModel::PianoRollViewModel(Dispatcher &dispatcher, InputLog &inputs,
 		}
 		else if (controlNames() != patternNames_)
 			defaultPatterns();
+		rebuildColumns();
 		pushColumnHolds();
 		pushRecordMask();
 		groupRows_.reset.emit();
@@ -1408,7 +1433,7 @@ bool PianoRollViewModel::paint(int64_t first, int64_t last, int64_t b, std::opti
 	}
 	const int64_t before = inputs_.size();
 	Step step{{}, before, 0};
-	const std::string button = frames_.columnName(static_cast<int32_t>(b));
+	const std::string button = frames_.dataName(static_cast<int32_t>(b));
 	const std::string span = first == last ? std::to_string(first) : std::to_string(first) + "-" + std::to_string(last);
 	step.name = join ? tr("piano_roll.step_paint", {button, ""})
 		: held ? tr(*held ? "piano_roll.step_set_on" : "piano_roll.step_set_off", {button, span})
@@ -1780,7 +1805,7 @@ void PianoRollViewModel::overwrite(int64_t at, const std::vector<Row> &rows)
 {
 	if (rows.empty()) return;
 	const int64_t before = inputs_.size();
-	const bool shownOnly = limited();
+	const bool shownOnly = limited() || (!agentEditing_ && !inactive_.empty());
 	Step step;
 	step.sizeBefore = before;
 	for (size_t i = 0; i < rows.size(); i++)
@@ -1818,7 +1843,7 @@ void PianoRollViewModel::pushColumnHolds()
 	for (const std::string &name : autoHeld_)
 	{
 		/* a hidden column records nothing when hidden ones are not edited */
-		if (limited() && notShown(name)) continue;
+		if (inactive_.count(name) != 0 || (limited() && notShown(name))) continue;
 		SessionViewModel::ColumnPattern cp;
 		const Pattern *own = nullptr;
 		int32_t pressed = 1, released = 0;
@@ -2006,8 +2031,9 @@ std::vector<bool> PianoRollViewModel::playerEdges(const std::vector<int32_t> &pl
 	return edges;
 }
 
-int32_t PianoRollViewModel::Frames::columnPlayer(int32_t column) const
+int32_t PianoRollViewModel::Frames::columnPlayer(int32_t place) const
 {
+	const int32_t column = dataColumn(place);
 	const auto &players = vm_.session_.buttonPlayers();
 	const auto &names = vm_.session_.buttonNames();
 	if (column >= 0 && column < static_cast<int32_t>(names.size()))
@@ -2045,7 +2071,7 @@ std::string PianoRollViewModel::macroText(int64_t first, int64_t last, const std
 	/* the columns asked for, in the movie's order; none named is all of them */
 	std::vector<std::string> mine;
 	for (const std::string &k : keys)
-		if (columns.empty() || std::find(columns.begin(), columns.end(), k) != columns.end()) mine.push_back(k);
+		if (inactive_.count(k) == 0 && (columns.empty() || std::find(columns.begin(), columns.end(), k) != columns.end())) mine.push_back(k);
 	if (mine.empty())
 	{
 		error = tr("piano_roll.columns_not_movie");
@@ -2182,14 +2208,14 @@ bool PianoRollViewModel::placeMacroLines(int64_t at, std::vector<std::string> li
 				}
 				const int32_t v = static_cast<int32_t>(std::strtol(entry.substr(p, end - p).c_str(), nullptr, 10));
 				const size_t x = static_cast<size_t>(axis - axes.begin());
-				if (x < r.axes.size() && (!overlay || v != axis->neutral)) r.axes[x] = v;
+				if (x < r.axes.size() && (!overlay || v != axis->neutral) && inactive_.count(k) == 0) r.axes[x] = v;
 				p = end + 1;
 				continue;
 			}
 			const auto b = std::find(buttons.begin(), buttons.end(), k);
 			const bool pressed = entry[p] != '.';
 			p++;
-			if (b == buttons.end()) continue;
+			if (b == buttons.end() || inactive_.count(k) != 0) continue;
 			if (pressed || !overlay) r.buttons.set(static_cast<size_t>(b - buttons.begin()), pressed);
 		}
 		rows.push_back(std::move(r));
@@ -2219,6 +2245,21 @@ std::string PianoRollViewModel::movieKey() const
 	key.erase(std::remove(key.begin(), key.end(), '#'), key.end());
 	if (!key.empty() && key.back() == '|') key.pop_back();
 	return key;
+}
+
+std::vector<std::string> PianoRollViewModel::macroKeys() const
+{
+	std::vector<std::string> out;
+	const std::string key = movieKey();
+	for (size_t at = 0; !key.empty() && at <= key.size();)
+	{
+		const size_t bar = key.find('|', at);
+		const std::string k = key.substr(at, bar == std::string::npos ? std::string::npos : bar - at);
+		if (inactive_.count(k) == 0) out.push_back(k);
+		if (bar == std::string::npos) break;
+		at = bar + 1;
+	}
+	return out;
 }
 
 std::vector<std::string> PianoRollViewModel::controlNames() const
@@ -2382,7 +2423,7 @@ bool PianoRollViewModel::paintPattern(int64_t first, int64_t last, bool join, st
 		else ok = paintAxis(f, f, b - buttonCount(), v, joined, error);
 	}
 	if (!join && b < buttonCount() && !undo_.empty())
-		undo_.back().name = tr("piano_roll.step_paint", {frames_.columnName(static_cast<int32_t>(b)), std::to_string(first)});
+		undo_.back().name = tr("piano_roll.step_paint", {frames_.dataName(static_cast<int32_t>(b)), std::to_string(first)});
 	return ok;
 }
 
@@ -2406,9 +2447,19 @@ std::string PianoRollViewModel::PatternRows::columnName(int32_t column) const
 	return column >= 0 && column < 8 ? names[column] : "";
 }
 
-Value PianoRollViewModel::PatternRows::cell(int64_t row, int32_t column) const
+int64_t PianoRollViewModel::PatternRows::rowCount() const
 {
-	if (row < 0 || row >= rowCount()) return {};
+	int64_t n = 0;
+	for (const int32_t d : vm_.columnMap_)
+		if (static_cast<size_t>(d) < vm_.buttonPatterns_.size() + vm_.axisPatterns_.size()) n++;
+	return n;
+}
+
+Value PianoRollViewModel::PatternRows::cell(int64_t place, int32_t column) const
+{
+	if (place < 0 || place >= rowCount()) return {};
+	/* the row's control, by its place among the buttons and then the analog controls */
+	const int64_t row = vm_.columnMap_[static_cast<size_t>(place)];
 	const size_t buttons = vm_.buttonPatterns_.size();
 	const bool isButton = static_cast<size_t>(row) < buttons;
 	const Pattern &p = isButton ? vm_.buttonPatterns_[static_cast<size_t>(row)] : vm_.axisPatterns_[static_cast<size_t>(row) - buttons];
@@ -2451,14 +2502,14 @@ Buttons PianoRollViewModel::shownButtons() const
 	Buttons shown;
 	const std::vector<std::string> &names = session_.buttonNames();
 	for (size_t b = 0; b < names.size(); b++)
-		if (!notShown(names[b])) shown.set(b);
+		if (editable(names[b])) shown.set(b);
 	return shown;
 }
 
 std::vector<bool> PianoRollViewModel::shownAxes() const
 {
 	std::vector<bool> shown;
-	for (const SessionViewModel::Axis &ax : session_.axes()) shown.push_back(!notShown(ax.name));
+	for (const SessionViewModel::Axis &ax : session_.axes()) shown.push_back(editable(ax.name));
 	return shown;
 }
 
@@ -2584,6 +2635,7 @@ void PianoRollViewModel::pickAxis(int64_t frame, int64_t axis)
 	axisValue.set(static_cast<size_t>(axis) < values.size() ? values[static_cast<size_t>(axis)] : ax.neutral);
 	pickedFrame.set(frame);
 	pickedAxis.set(axis);
+	pickedColumn.set(columnOfData(buttonCount() + static_cast<int32_t>(axis)));
 }
 
 bool PianoRollViewModel::paintAxis(int64_t first, int64_t last, int64_t axis, int64_t value, bool join, std::string &error)
@@ -2651,7 +2703,7 @@ void PianoRollViewModel::edited(int64_t first, int64_t last, int64_t oldCount)
 
 void PianoRollViewModel::pushRecordMask()
 {
-	if (limited()) session_.setRecordMask(shownButtons(), shownAxes());
+	if (limited() || !inactive_.empty()) session_.setRecordMask(shownButtons(), shownAxes());
 	else session_.setRecordMask(std::nullopt);
 }
 
@@ -2675,8 +2727,27 @@ void PianoRollViewModel::framesRecorded(const std::vector<SessionViewModel::Reco
 	recordingStep_ = false;
 }
 
+void PianoRollViewModel::rebuildColumns()
+{
+	const std::vector<std::string> &buttons = session_.buttonNames();
+	const auto &axes = session_.axes();
+	inactive_ = session_.inactiveControls();
+	columnMap_.clear();
+	for (size_t i = 0; i < buttons.size() + axes.size(); i++)
+		if (inactive_.count(i < buttons.size() ? buttons[i] : axes[i - buttons.size()].name) == 0) columnMap_.push_back(static_cast<int32_t>(i));
+	if (pickedAxis.get() >= 0) pickedColumn.set(columnOfData(buttonCount() + static_cast<int32_t>(pickedAxis.get())));
+}
+
+int32_t PianoRollViewModel::columnOfData(int32_t data) const
+{
+	const auto at = std::find(columnMap_.begin(), columnMap_.end(), data);
+	return at == columnMap_.end() ? -1 : static_cast<int32_t>(at - columnMap_.begin());
+}
+
 void PianoRollViewModel::refreshUnbound()
 {
+	const std::vector<int32_t> columnsWere = columnMap_;
+	rebuildColumns();
 	std::set<std::string> now;
 	const std::set<int32_t> &players = session_.unboundPlayers();
 	if (!players.empty())
@@ -2685,11 +2756,11 @@ void PianoRollViewModel::refreshUnbound()
 		const auto &axes = session_.axes();
 		/* the rule has no exception, not even input the movie has for that player (owner, 2026-11-20) */
 		for (const std::string &n : buttons)
-			if (players.count(session_.playerOf(n)) != 0) now.insert(n);
+			if (players.count(session_.playerOf(n)) != 0 && inactive_.count(n) == 0) now.insert(n);
 		for (const SessionViewModel::Axis &a : axes)
-			if (players.count(a.player) != 0) now.insert(a.name);
+			if (players.count(a.player) != 0 && inactive_.count(a.name) == 0) now.insert(a.name);
 	}
-	if (now == unbound_) return;
+	if (now == unbound_ && columnMap_ == columnsWere) return;
 	unbound_ = now;
 	std::string text;
 	for (const std::string &n : unbound_) text += (text.empty() ? "" : "\n") + n;
@@ -2752,6 +2823,11 @@ Value PianoRollViewModel::ColumnRows::cell(int64_t row, int32_t column) const
 
 std::string PianoRollViewModel::Frames::columnName(int32_t column) const
 {
+	return dataName(dataColumn(column));
+}
+
+std::string PianoRollViewModel::Frames::dataName(int32_t column) const
+{
 	const auto &names = vm_.session_.buttonNames();
 	if (column >= 0 && column < static_cast<int32_t>(names.size())) return names[static_cast<size_t>(column)];
 	const auto &axes = vm_.session_.axes();
@@ -2759,8 +2835,9 @@ std::string PianoRollViewModel::Frames::columnName(int32_t column) const
 	return column >= 0 && axis < axes.size() ? axes[axis].name : std::string();
 }
 
-std::string PianoRollViewModel::Frames::columnShortName(int32_t column) const
+std::string PianoRollViewModel::Frames::columnShortName(int32_t place) const
 {
+	const int32_t column = dataColumn(place);
 	if (column >= vm_.buttonCount())
 	{
 		const size_t axis = static_cast<size_t>(column - vm_.buttonCount());
@@ -2770,7 +2847,7 @@ std::string PianoRollViewModel::Frames::columnShortName(int32_t column) const
 	/* as Chimera heads it: the package's header, else the button's letter */
 	const std::vector<std::string> &headers = vm_.session_.buttonHeaders();
 	if (column >= 0 && column < static_cast<int32_t>(headers.size())) return headers[static_cast<size_t>(column)];
-	return columnName(column);
+	return dataName(column);
 }
 
 uint32_t PianoRollViewModel::Frames::rowFlags(int64_t row) const
@@ -2961,10 +3038,11 @@ Value PianoRollViewModel::MarkerRows::cell(int64_t row, int32_t column) const
 	}
 }
 
-Value PianoRollViewModel::Frames::cell(int64_t row, int32_t column) const
+Value PianoRollViewModel::Frames::cell(int64_t row, int32_t place) const
 {
 	const int32_t buttons = vm_.buttonCount();
-	if (column < 0 || column >= columnCount()) return false;
+	const int32_t column = dataColumn(place);
+	if (column < 0) return false;
 	/* the row past the movie holds nothing */
 	if (row >= vm_.inputs_.size()) return column >= buttons ? Value() : Value(false);
 	if (row != cachedRow_)

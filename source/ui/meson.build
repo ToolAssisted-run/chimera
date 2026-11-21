@@ -257,11 +257,23 @@ synth_kept = custom_target(
   build_always_stale: true,
   build_by_default: false,
 )
+# a controller with devices that are not plugged in: the core says, through IsButtonActive and IsAxisActive,
+# that the first ten buttons and the first analog control are the machine's (issue 635)
+synth_unplugged = custom_target(
+  'synth-unplugged',
+  output: 'synth-unplugged.chimeraCore',
+  command: [find_program('python3'), files('viewmodel/tests/renamed-package.py'),
+    repo_root / 'build/Cores/synth-box.chimeraCore', 'Synth Unplugged', '@OUTPUT@', '', '', '', '["P2 A", "P2 B", "Power", "Key A", "Key B"]',
+    '', '', '', '', '', '',
+    '{"axes": [{"name": "P1 Dial", "min": -100, "max": 100, "neutral": 0, "header": "Dl"}, {"name": "P2 Dial", "min": -100, "max": 100, "neutral": 0, "header": "D2"}], "activeButtons": 10, "activeAxes": 1}'],
+  build_always_stale: true,
+  build_by_default: false,
+)
 test(
   'view models',
   test_vm,
   args: [repo_root / 'build/Cores/synth-box.chimeraCore', repo_root / 'tests/synth/roms/gridWalker.testrom',
-    repo_root / 'tests/synth/movies', repo_root / 'tests/synth/goldens', synth_again, synth_slots, synth_hashed, synth_game, synth_keys, synth_plain_game, synth_bios, synth_compile, synth_square, synth_48k, synth_wide, synth_shown, synth_kept],
+    repo_root / 'tests/synth/movies', repo_root / 'tests/synth/goldens', synth_again, synth_slots, synth_hashed, synth_game, synth_keys, synth_plain_game, synth_bios, synth_compile, synth_square, synth_48k, synth_wide, synth_shown, synth_kept, synth_unplugged],
   # OpenAL's device that plays to nowhere: the sound check runs with no speakers;
   # the ffmpeg the build ships, for the encode
   # and the headless runner, which compile sessions are

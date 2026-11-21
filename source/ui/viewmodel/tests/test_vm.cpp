@@ -11503,6 +11503,183 @@ bool shownColumns(const char *package, const char *plainPackage, const char *rom
 	return failures == before;
 }
 
+/* The roll makes no column for a control the core says the machine lacks (issue 635): not a hidden one. The
+ * package has thirteen buttons and two analog controls, of which the core says the first ten buttons and the
+ * first analog control are plugged in: Power, Key A, Key B and P2 Dial are not. What the movie holds for them
+ * stays in the movie, and no edit of the window writes there. */
+bool unpluggedControls(const char *package, const char *rom)
+{
+	namespace fs = std::filesystem;
+	std::error_code ec;
+	if (fs::file_size(package, ec) == 0 || ec)
+	{
+		std::printf("SKIP the controls not plugged in: no package that says which controls the machine has\n");
+		return true;
+	}
+	/* the rule alone: no answer from the core (an empty list) leaves every control a column */
+	{
+		using Axis = SessionViewModel::Axis;
+		Axis plugged, lacking;
+		plugged.name = "P1 Dial";
+		lacking.name = "P2 Dial";
+		lacking.active = false;
+		const std::vector<std::string> names{"A", "B", "C"};
+		CHECK((SessionViewModel::inactiveControlsOf(names, {}, {plugged}) == std::set<std::string>{}));
+		CHECK((SessionViewModel::inactiveControlsOf(names, {true, false, true}, {plugged, lacking}) == std::set<std::string>{"B", "P2 Dial"}));
+	}
+	const int before = failures;
+	ManualDispatcher d;
+	InputLog inputs;
+	SessionViewModel session(d, inputs);
+	PianoRollViewModel roll(d, inputs, session);
+	ControlsViewModel controls(d, session, &roll);
+	std::string error;
+	openGame(session, package, std::string(rom), error);
+	CHECK(d.until([&] { return session.isOpen.get() && roll.frames().columnCount() > 0; }, 60));
+	CHECK(session.buttonNames().size() == 13 && session.axes().size() == 2);
+	const std::set<std::string> lacking{"Power", "Key A", "Key B", "P2 Dial"};
+	CHECK(session.inactiveControls() == lacking);
+	/* player 2 has a key (a player with nothing bound has no columns, issue 622) */
+	{
+		std::vector<std::string> texts = session.bindingTexts();
+		texts.resize(session.buttonNames().size());
+		texts[8] = "F2";
+		session.setBindingTexts(texts);
+	}
+	auto names = [&] {
+		std::vector<std::string> out;
+		for (int32_t c = 0; c < roll.frames().columnCount(); c++) out.push_back(roll.frames().columnName(c));
+		return out;
+	};
+	auto has = [&](const std::string &n) {
+		const std::vector<std::string> all = names();
+		return std::find(all.begin(), all.end(), n) != all.end();
+	};
+	/* ten buttons and the one analog control: no column for the others, in the order of the rest */
+	CHECK(roll.frames().columnCount() == 11 && has("P1 Up") && has("P2 B") && has("P1 Dial"));
+	CHECK(!has("Power") && !has("Key A") && !has("Key B") && !has("P2 Dial"));
+	CHECK(names().front() == "P1 Up" && names().back() == "P1 Dial" && roll.frames().columnIsNumber(10) && !roll.frames().columnIsNumber(9));
+	for (int32_t c = 0; c < roll.frames().columnCount(); c++) CHECK(!roll.frames().columnHidden(c));
+	/* the lists of columns are of the ones there are: the menu's, the patterns, the groups, the macros' */
+	auto rowsOf = [&](const char *name) -> RowModel * {
+		for (const auto &r : roll.rowLists())
+			if (r.name == name) return r.model;
+		return nullptr;
+	};
+	auto textOf = [&](RowModel *m, int64_t row, int32_t column) {
+		std::string t;
+		fromValue(m->cell(row, column), t);
+		return t;
+	};
+	for (const char *list : {"columns", "patterns"})
+	{
+		RowModel *m = rowsOf(list);
+		CHECK(m != nullptr && m->rowCount() == 11);
+		if (m == nullptr) continue;
+		for (int64_t i = 0; i < m->rowCount(); i++) CHECK(lacking.count(textOf(m, i, 0)) == 0);
+		CHECK(textOf(m, 10, 0) == "P1 Dial");
+	}
+	/* a pattern's row is its own control's: the Dial's range, not a button's */
+	{
+		RowModel *m = rowsOf("patterns");
+		CHECK(m != nullptr && textOf(m, 9, 0) == "P2 B" && std::get<bool>(m->cell(9, 4)) && !std::get<bool>(m->cell(10, 4)) && textOf(m, 10, 0) == "P1 Dial");
+	}
+	{
+		RowModel *m = rowsOf("columnGroups");
+		bool any = false;
+		for (int64_t i = 0; m != nullptr && i < m->rowCount(); i++) any = any || textOf(m, i, 0).rfind("Keys (", 0) == 0;
+		CHECK(!any);
+	}
+	/* no column to hide, show, hold or give a pattern; the hidden set has nothing of them */
+	/* (the package's own defaults hide keyboard keys: that stays as it was) */
+	const std::string hiddenWas = roll.hiddenColumns.get();
+	CHECK(!roll.run("hideColumn", {std::string("Key A")}, error).has_value());
+	CHECK(!roll.run("toggleAutoHold", {std::string("Power")}, error).has_value());
+	CHECK(!roll.run("setPattern", {std::string("P2 Dial"), std::string("5 x1"), int64_t{0}}, error).has_value());
+	CHECK(roll.hiddenColumns.get() == hiddenWas);
+	/* a press goes by the column of the roll: the last column is the Dial, the one before it P2 B */
+	CHECK(roll.run("insertFrames", {int64_t{0}, int64_t{6}}, error).has_value());
+	CHECK(roll.run("press", {int64_t{1}, int64_t{10}, false}, error).has_value() && roll.pickedAxis.get() == 0 && roll.pickedColumn.get() == 10);
+	roll.run("unpick", {}, error);
+	CHECK(roll.pickedColumn.get() == -1);
+	CHECK(roll.run("press", {int64_t{2}, int64_t{9}, false}, error).has_value() && inputs.at(2).test(9) && !inputs.at(2).test(8));
+	CHECK(roll.run("drag", {int64_t{3}, int64_t{9}}, error).has_value() && inputs.at(3).test(9));
+	CHECK(!roll.run("press", {int64_t{2}, int64_t{11}, false}, error).has_value());
+	/* what the movie holds for a control that is not plugged in stays, whatever the window edits */
+	roll.run("toggle", {int64_t{4}, int64_t{10}}, error);   /* Power, by its place among the buttons */
+	roll.run("toggle", {int64_t{4}, int64_t{12}}, error);   /* Key B */
+	CHECK(inputs.at(4).test(10) && inputs.at(4).test(12));
+	roll.editHiddenColumns.set(true);
+	CHECK(roll.run("clearFrames", {int64_t{4}, int64_t{4}}, error).has_value());
+	CHECK(inputs.at(4).test(10) && inputs.at(4).test(12));
+	CHECK(roll.run("press", {int64_t{4}, int64_t{0}, false}, error).has_value());
+	CHECK(inputs.at(4).test(0) && inputs.at(4).test(10));
+	roll.run("clearFrames", {int64_t{2}, int64_t{3}}, error);
+	CHECK(!inputs.at(2).test(9) && !inputs.at(3).test(9) && inputs.at(4).test(10));
+	/* a frame recorded does not overwrite them either */
+	{
+		session.recordingMode.set(true);
+		session.run("seek", {int64_t{4}}, error);
+		CHECK(d.until([&] { return session.frame.get() == 4; }, 20));
+		session.run("frameAdvance", {}, error);
+		CHECK(d.until([&] { return session.frame.get() == 5; }, 20));
+		CHECK(inputs.at(4).test(10) && inputs.at(4).test(12));
+		session.recordingMode.set(false);
+	}
+	/* the macros' columns are the movie's that have one */
+	{
+		MacroToolViewModel macros(d, roll, session);
+		d.until([] { return false; }, 0.2);
+		const std::vector<std::string> keys = roll.macroKeys();
+		CHECK(keys.size() == 11 && std::find(keys.begin(), keys.end(), "Power") == keys.end() && std::find(keys.begin(), keys.end(), "P2 B") != keys.end());
+		const std::string macro = roll.macroText(0, 5, {}, false, true, error);
+		CHECK(!macro.empty() && macro.find("Power") == std::string::npos && macro.find("Key B") == std::string::npos && macro.find("P1 Dial") != std::string::npos);
+	}
+	/* what a project keeps by name is kept: a hidden column named for a control with no column stays in the set,
+	 * and no column takes its place; hiding a column that is there hides just it */
+	roll.setHiddenColumns({"Power", "P1 Up"});
+	CHECK(roll.hiddenColumns.get() == "P1 Up\nPower");
+	CHECK(roll.frames().columnCount() == 11 && roll.frames().columnHidden(0) && !roll.frames().columnHidden(1));
+	for (int32_t c = 1; c < roll.frames().columnCount(); c++) CHECK(!roll.frames().columnHidden(c));
+	CHECK(roll.run("newRoll", {}, error).has_value() && roll.rollCount.get() == 2);
+	/* the new roll shows what was hidden in the first (P1 Up) and hides the rest of the columns there are: by name, so
+	 * the Dial, the last column, is not taken for another control */
+	CHECK(roll.frames().columnCount() == 11 && !roll.frames().columnHiddenIn(0, 0) && roll.frames().columnHiddenIn(0, 1) &&
+		roll.frames().columnHiddenIn(0, 10) && roll.frames().columnHiddenIn(1, 0) && !roll.frames().columnHiddenIn(1, 1));
+	roll.run("deleteRoll", {}, error);
+	roll.run("showAllColumns", {}, error);
+	/* Config > Controllers: no box for a column that is not there, and none shown or hidden by a tab's */
+	{
+		RowModel *buttons = nullptr, *analog = nullptr;
+		for (const auto &r : controls.rowLists())
+		{
+			if (r.name == "buttons") buttons = r.model;
+			if (r.name == "analog") analog = r.model;
+		}
+		CHECK(buttons != nullptr && analog != nullptr && buttons->columnName(7) == "hasColumn" && analog->columnName(10) == "hasColumn");
+		if (buttons != nullptr && analog != nullptr)
+		{
+			auto flagOf = [&](RowModel *m, int64_t row, int32_t column) {
+				bool b = false;
+				fromValue(m->cell(row, column), b);
+				return b;
+			};
+			for (int64_t i = 0; i < buttons->rowCount(); i++) CHECK(flagOf(buttons, i, 7) == (lacking.count(textOf(buttons, i, 0)) == 0));
+			for (int64_t i = 0; i < analog->rowCount(); i++) CHECK(flagOf(analog, i, 10) == (lacking.count(textOf(analog, i, 0)) == 0));
+		}
+		CHECK(controls.run("edit", {}, error).has_value());
+		controls.run("showColumn", {std::string("Power"), false}, error);
+		controls.run("showColumns", {std::string("buttons"), std::string(""), false}, error);
+		controls.run("save", {}, error);
+		const std::string hidden = roll.hiddenColumns.get();
+		CHECK(hidden.find("Power") == std::string::npos && hidden.find("Key A") == std::string::npos && hidden.find("P1 Up") != std::string::npos);
+		roll.run("showAllColumns", {}, error);
+	}
+	session.run("close", {}, error);
+	CHECK(d.until([&] { return !session.isOpen.get(); }, 20));
+	return failures == before;
+}
+
 bool wideButtons(const char *package, const char *rom)
 {
 	namespace fs = std::filesystem;
@@ -12722,6 +12899,7 @@ int main(int argc, char **argv)
 			ranMachine = seekStopped(argv[1], argv[2]) && ranMachine;
 			ranMachine = longSeek(argv[1], argv[2]) && ranMachine;
 			if (argc >= 18) ranMachine = greenzoneNotKept(argv[1], argv[2], argv[17]) && ranMachine;
+			if (argc >= 19) ranMachine = unpluggedControls(argv[18], argv[2]) && ranMachine;
 			ranMachine = coreWindows(argv[1], argv[2]) && ranMachine;
 			if (argc >= 9) ranMachine = coreManager(argv[1], argv[6], argv[8]) && ranMachine;
 			ranMachine = elsewherePackages(argv[1]) && ranMachine;

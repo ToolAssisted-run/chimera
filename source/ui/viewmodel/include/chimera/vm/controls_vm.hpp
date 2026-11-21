@@ -89,7 +89,7 @@ private:
 	public:
 		KeyRows(ControlsViewModel &vm, Table table) : vm_(vm), table_(table) {}
 		int64_t rowCount() const override { return static_cast<int64_t>(vm_.session_.buttonNames().size()); }
-		int32_t columnCount() const override { return 7; }
+		int32_t columnCount() const override { return 8; }
 		std::string columnName(int32_t column) const override;
 		Value cell(int64_t row, int32_t column) const override;
 
@@ -102,7 +102,7 @@ private:
 	public:
 		explicit AnalogRows(ControlsViewModel &vm) : vm_(vm) {}
 		int64_t rowCount() const override { return static_cast<int64_t>(vm_.session_.axes().size()); }
-		int32_t columnCount() const override { return 10; }
+		int32_t columnCount() const override { return 11; }
 		std::string columnName(int32_t column) const override;
 		Value cell(int64_t row, int32_t column) const override;
 

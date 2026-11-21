@@ -504,7 +504,7 @@ ApplicationWindow {
                         seekRow: tas.session.seekingTo
                         // the analog cell being edited: its column is after the buttons
                         pickedRow: tas.pianoRoll.pickedFrame
-                        pickedColumn: tas.pianoRoll.pickedAxis < 0 ? -1 : tas.session.buttonCount + tas.pianoRoll.pickedAxis
+                        pickedColumn: tas.pianoRoll.pickedColumn
                         onSelectionRequested: (first, last) => { oneRoll.use(); tas.pianoRoll.run("select", [first, last]) }
                     }
                 }

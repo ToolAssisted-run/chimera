@@ -6874,6 +6874,17 @@ std::set<int32_t> SessionViewModel::unboundPlayersOf(const std::vector<int32_t> 
 	return unbound;
 }
 
+std::set<std::string> SessionViewModel::inactiveControlsOf(const std::vector<std::string> &buttonNames, const std::vector<bool> &active,
+	const std::vector<Axis> &axes)
+{
+	std::set<std::string> out;
+	for (size_t i = 0; i < buttonNames.size() && i < active.size(); i++)
+		if (!active[i]) out.insert(buttonNames[i]);
+	for (const Axis &a : axes)
+		if (!a.active) out.insert(a.name);
+	return out;
+}
+
 void SessionViewModel::updateUnboundPlayers(bool force)
 {
 	std::vector<int32_t> players(buttonNames_.size(), 0);

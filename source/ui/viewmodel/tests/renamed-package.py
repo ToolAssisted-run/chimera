@@ -30,6 +30,10 @@ shown = json.loads(sys.argv[12]) if len(sys.argv) > 12 and sys.argv[12] else Non
 # and declarations added to the package's video section, as JSON
 # ({"greenzoneSurvivesReload": true})
 video = json.loads(sys.argv[13]) if len(sys.argv) > 13 and sys.argv[13] else None
+# and the analog controls to declare, as JSON, and how many of the buttons and of the analog controls
+# the machine has ({"axes": [...], "activeButtons": 10, "activeAxes": 1}): a device not plugged in has its
+# controls declared and absent (issue 635)
+plugged = json.loads(sys.argv[14]) if len(sys.argv) > 14 and sys.argv[14] else None
 try:
     zin = zipfile.ZipFile(src)
 except OSError:
@@ -61,6 +65,11 @@ with zin, zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zout:
                 cfg["input"]["tastudioColumns"] = shown
             if video is not None:
                 cfg["video"].update(video)
+            if plugged is not None:
+                cfg["input"]["axes"] = plugged["axes"]
+                for key in ("activeButtons", "activeAxes"):
+                    cfg.setdefault("settings", []).append({"name": key, "display": "setting.initfillbyte", "description": "setting.initfillbyte.about",
+                        "type": "int", "min": 0, "max": 1000000, "default": plugged[key], "sync": True})
             if players_over is not None:
                 controls = cfg["input"]["buttons"] + [a["name"] for a in cfg["input"].get("axes", [])]
                 def player(n):

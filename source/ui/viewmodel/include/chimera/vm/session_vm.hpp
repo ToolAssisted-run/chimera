@@ -524,6 +524,12 @@ public:
 	 * inactive control) does not make its player bound. `active` empty: every button is the machine's. */
 	static std::set<int32_t> unboundPlayersOf(const std::vector<int32_t> &buttonPlayers, const std::vector<bool> &active,
 		const std::vector<std::string> &texts, const std::vector<Axis> &axes, const std::vector<AnalogBind> &analogBinds);
+	/* The names of the controls the core says this machine lacks (a button's IsButtonActive or an axis's
+	 * IsAxisActive is false): those of a device that is not plugged in. TAStudio makes no column for them
+	 * (issue 635). `active` empty: the core did not say, and every button is the machine's. */
+	static std::set<std::string> inactiveControlsOf(const std::vector<std::string> &buttonNames, const std::vector<bool> &active,
+		const std::vector<Axis> &axes);
+	std::set<std::string> inactiveControls() const { return inactiveControlsOf(buttonNames_, buttonActive_, axes_); }
 	/* unboundPlayers() changed */
 	Signal<> boundPlayersChanged;
 	/* the controller's name as the package declares it (Chimera's

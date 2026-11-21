@@ -125,13 +125,17 @@ ApplicationWindow {
                     required property string keys
                     required property string button
                     required property bool column
+                    required property bool hasColumn
                     visible: panel.shownHere(entry.group)
                     spacing: 5
                     function focusField() { entryBox.focusField() }
                     Component.onCompleted: if (visible) panel.labelWidth = Math.max(panel.labelWidth, entry.shown.length * 9)
                     // a column in TAStudio (the buttons' tab only: autofire is the same buttons)
+                    // (a control of a device that is not plugged in has no column: no box, its place kept so the rest line up)
                     CheckBox {
                         visible: panel.table === "normal"
+                        enabled: entry.hasColumn
+                        opacity: entry.hasColumn ? 1 : 0
                         padding: 0
                         topPadding: 2
                         checked: entry.column
@@ -185,6 +189,7 @@ ApplicationWindow {
                     required property string positive
                     required property string negative
                     required property bool column
+                    required property bool hasColumn
                     visible: apanel.everyGroup || bind.group === apanel.group
                     columns: 5
                     columnSpacing: 6
@@ -202,6 +207,8 @@ ApplicationWindow {
                         spacing: 2
                         Layout.preferredWidth: 112
                         CheckBox {
+                            enabled: bind.hasColumn
+                            opacity: bind.hasColumn ? 1 : 0
                             padding: 0
                             checked: bind.column
                             focusPolicy: Qt.NoFocus

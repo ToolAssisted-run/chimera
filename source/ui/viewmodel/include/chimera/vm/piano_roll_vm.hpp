@@ -137,6 +137,8 @@ public:
 	/* the movie's columns (its LogKey), as written and as a macro names them */
 	std::string movieKeyRaw() const;
 	std::string movieKey() const;
+	/* the movie's columns a macro may carry: those of the movie's key that have a column here (issue 635) */
+	std::vector<std::string> macroKeys() const;
 	/* the most undo steps kept, as Chimera's TAStudio setting has it */
 	Property<int64_t> maxUndoSteps{1000};
 	/* TAStudio's "include frame numbers when copying input" */
@@ -189,6 +191,8 @@ public:
 	 * the control's name and range, and the value there */
 	Property<int64_t> pickedFrame{-1};
 	Property<int64_t> pickedAxis{-1};
+	/* the column of the analog control picked (its place in the roll), -1 for none */
+	Property<int64_t> pickedColumn{-1};
 	Property<std::string> axisName;
 	Property<int64_t> axisMin{0};
 	Property<int64_t> axisMax{0};
@@ -213,8 +217,18 @@ private:
 		 * the machine sits at the movie's end, where a click goes to that
 		 * frame and a paint starts that makes the movie longer */
 		int64_t rowCount() const override { return vm_.inputs_.bound() ? vm_.inputs_.size() + 1 : 0; }
-		int32_t columnCount() const override { return vm_.buttonCount() + static_cast<int32_t>(vm_.session_.axes().size()); }
-		bool columnIsNumber(int32_t column) const override { return column >= vm_.buttonCount(); }
+		/* the columns there are: a control the core says the machine lacks has none (issue 635), so a
+		 * column's place here is not its control's place among the buttons and then the analog controls
+		 * (dataColumn gives that) */
+		int32_t columnCount() const override { return static_cast<int32_t>(vm_.columnMap_.size()); }
+		bool columnIsNumber(int32_t column) const override { return dataColumn(column) >= vm_.buttonCount(); }
+		/* a column's control, by its place among the buttons and then the analog controls; -1 when there is no such column */
+		int32_t dataColumn(int64_t column) const
+		{
+			return column >= 0 && column < static_cast<int64_t>(vm_.columnMap_.size()) ? vm_.columnMap_[static_cast<size_t>(column)] : -1;
+		}
+		/* the name of a control by its place among the buttons and then the analog controls, columns or not */
+		std::string dataName(int32_t data) const;
 		bool columnHidden(int32_t column) const override { return vm_.notShown(columnName(column)); }
 		bool columnHiddenIn(int64_t view, int32_t column) const override;
 		bool columnEmphasized(int32_t column) const override { return vm_.autoHeld_.count(columnName(column)) != 0; }
@@ -267,10 +281,8 @@ private:
 	{
 	public:
 		explicit PatternRows(PianoRollViewModel &vm) : vm_(vm) {}
-		int64_t rowCount() const override
-		{
-			return static_cast<int64_t>(vm_.buttonPatterns_.size() + vm_.axisPatterns_.size());
-		}
+		/* a control the machine lacks has no pattern row, as it has no column (issue 635) */
+		int64_t rowCount() const override;
 		int32_t columnCount() const override { return 8; }
 		std::string columnName(int32_t column) const override;
 		Value cell(int64_t row, int32_t column) const override;
@@ -392,6 +404,17 @@ private:
 	bool limited() const;
 	/* a column the person hid, or one of a player with nothing bound (issue 622) */
 	bool notShown(const std::string &name) const { return hidden_.count(name) != 0 || unbound_.count(name) != 0; }
+	/* The controls the core says the machine lacks: they have no column at all (issue 635), not a hidden one. What a movie
+	 * holds for them stays as it is: no edit of the window writes there, whatever "edit hidden columns" says. */
+	std::set<std::string> inactive_;
+	/* an edit of the window that writes some columns only (a paste over frames, a frame recorded) may change this
+	 * control's input: not one the machine lacks, and not a hidden column when limited() */
+	bool editable(const std::string &name) const { return (agentEditing_ || inactive_.count(name) == 0) && !(limited() && notShown(name)); }
+	/* each column's control, by its place among the buttons and then the analog controls, the columns in order */
+	std::vector<int32_t> columnMap_;
+	void rebuildColumns();
+	/* the column of a control by its place among the buttons and then the analog controls, -1 when it has none */
+	int32_t columnOfData(int32_t data) const;
 	/* the columns of the players with nothing bound and no input in the movie, from the bindings and the movie as they are */
 	void refreshUnbound();
 	std::set<std::string> unbound_;

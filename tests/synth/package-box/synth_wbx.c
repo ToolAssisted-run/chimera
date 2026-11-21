@@ -638,6 +638,13 @@ ECL_EXPORT void SetAxis(int32_t index, int32_t value)
 	if (index >= 0 && index < 8) g_axes[index] = value;
 }
 
+/* Which declared controls this machine has (issue 635): the first "activeButtons" buttons and the first
+ * "activeAxes" analog controls, by the settings of those names, which a package made from this one may
+ * declare. With none declared, every control is the machine's, as before. The answers are read once, after
+ * Init, as the engine asks. */
+ECL_EXPORT int32_t IsButtonActive(int32_t index) { return index < wbx_setting_long("activeButtons", 1 << 20); }
+ECL_EXPORT int32_t IsAxisActive(int32_t index) { return index < wbx_setting_long("activeAxes", 1 << 20); }
+
 /* A button past the 64 FrameAdvance's mask carries, as the engine hands one
  * over when it changes. The synthetic game reads none, so they are only
  * kept: the export is here so that a package made from this one may declare

@@ -292,6 +292,8 @@ ControlsViewModel::ControlsViewModel(Dispatcher &dispatcher, SessionViewModel &s
 				error = tr("piano_roll.no_control", {name});
 				return {};
 			}
+			/* no column to show or hide for a control of a device that is not plugged in (issue 635) */
+			if (session_.inactiveControls().count(name) != 0) return {};
 			begin();
 			if (shown) hiddenDraft_.erase(name);
 			else hiddenDraft_.insert(name);
@@ -314,9 +316,11 @@ ControlsViewModel::ControlsViewModel(Dispatcher &dispatcher, SessionViewModel &s
 				return {};
 			}
 			begin();
+			const std::set<std::string> lacking = session_.inactiveControls();
 			for (const std::string &n : names)
 			{
 				if (!group.empty() && groupOf(n) != group) continue;
+				if (lacking.count(n) != 0) continue;
 				if (shown) hiddenDraft_.erase(n);
 				else hiddenDraft_.insert(n);
 			}
@@ -627,8 +631,8 @@ void ControlsViewModel::changed()
 
 std::string ControlsViewModel::KeyRows::columnName(int32_t column) const
 {
-	static const char *const names[] = {"button", "shown", "group", "keys", "packageKeys", "changed", "column"};
-	return column >= 0 && column < 7 ? names[column] : "";
+	static const char *const names[] = {"button", "shown", "group", "keys", "packageKeys", "changed", "column", "hasColumn"};
+	return column >= 0 && column < 8 ? names[column] : "";
 }
 
 Value ControlsViewModel::KeyRows::cell(int64_t row, int32_t column) const
@@ -656,14 +660,16 @@ Value ControlsViewModel::KeyRows::cell(int64_t row, int32_t column) const
 	case 4: return package;
 	case 5: return keys != package;
 	case 6: return vm_.columnShown(name);
+	/* a control of a device that is not plugged in has no TAStudio column to show or hide (issue 635) */
+	case 7: return b >= vm_.session_.buttonActive().size() || vm_.session_.buttonActive()[b];
 	default: return {};
 	}
 }
 
 std::string ControlsViewModel::AnalogRows::columnName(int32_t column) const
 {
-	static const char *const names[] = {"axis", "group", "value", "mult", "deadzone", "positive", "negative", "changed", "header", "column"};
-	return column >= 0 && column < 10 ? names[column] : "";
+	static const char *const names[] = {"axis", "group", "value", "mult", "deadzone", "positive", "negative", "changed", "header", "column", "hasColumn"};
+	return column >= 0 && column < 11 ? names[column] : "";
 }
 
 Value ControlsViewModel::AnalogRows::cell(int64_t row, int32_t column) const
@@ -686,6 +692,7 @@ Value ControlsViewModel::AnalogRows::cell(int64_t row, int32_t column) const
 	case 7: return !sameBind(b, p);
 	case 8: return axis.header;
 	case 9: return vm_.columnShown(axis.name);
+	case 10: return axis.active;
 	default: return {};
 	}
 }

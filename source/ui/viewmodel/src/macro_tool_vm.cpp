@@ -239,7 +239,7 @@ void MacroToolViewModel::readColumns()
 {
 	json::Json cols;
 	cols.kind = json::Json::Kind::Array;
-	for (const std::string &c : split(roll_.movieKey(), '|')) cols.items.push_back(json::Json::string(c));
+	for (const std::string &c : roll_.macroKeys()) cols.items.push_back(json::Json::string(c));
 	const std::string text = json::write(cols);
 	if (text != movieColumns.get()) movieColumns.set(text);
 }

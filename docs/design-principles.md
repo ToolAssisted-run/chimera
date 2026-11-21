@@ -16523,3 +16523,56 @@ Media Maker image gives the new message, and a 5 GiB `movie.dat` the old one.
 The view model test presses Make with the file inside the folder and sees the
 message and no file. Each new test was broken once on purpose and failed.
 
+
+## A control of a device that is not plugged in has no TAStudio column (user-decided, 2026-11-21, issue 635)
+
+With the Mesen core on a Nintendo game, the piano roll showed dozens of
+columns for devices nobody plugged in (the expansion port's controllers, the
+mice, the keyboards). The core already says which controls the machine has
+(`IsButtonActive`, `IsAxisActive`), and the window used it only to keep a key
+on such a control from making its player count as bound (issue 622).
+
+Decided: a control the core says the machine lacks has no TAStudio column. Not
+a hidden column: it is left out of the roll's columns, the Columns menu, each
+input roll's columns, the patterns list, the macro tool's columns and the boxes
+beside each control in Config > Controllers. There is no exception for input
+the movie already holds on such a control (the same strict rule as issue 622).
+A core that gives no answer keeps all its columns, as before.
+
+How it is done:
+- The roll keeps a list of its columns, each a control's place among the
+  buttons and then the analog controls. A column's place in the roll is no
+  longer that control's place, so `press` and `drag` turn a column into its
+  control, and a new `pickedColumn` property gives the roll place of the picked
+  analog control. Lists of columns for scripts and the MCP server follow the
+  same list.
+- What the movie holds stays. The movie file and its format are not changed and
+  no data is dropped. A frame inserted or deleted moves it with the other
+  columns. But no edit of the window writes there: a paste or Clear over frames,
+  a macro placed, and a frame recorded while playing keep what the movie holds
+  for those controls (the same mask that keeps hidden columns when "edit hidden
+  columns" is off, always on for these). The MCP server's `set_input` is the
+  agent writing the movie's own lines and still writes anywhere.
+- Columns are kept by name in a project (hidden columns, each input roll's),
+  not by place, so a shrunken list shifts nothing. A name with no column stays in
+  the project, not shown, and is kept when the project is saved.
+- The `toggle` command and the Lua and MCP views name a button by its place
+  among the buttons, which is a control and not a column, and are left as they
+  are.
+- Chosen over keeping the columns and hiding them by default (the first idea in
+  the issue), which the owner declined: nothing is made for them, shown or hidden.
+
+Not changed: the key bindings list in Config > Controllers still lists every
+control the package declares (only the TAStudio-column box is left out for the
+ones the machine lacks), and the input display (the on-screen text of what is
+pressed, which is not a list of columns). Chimera has no virtual pad.
+
+Tested: the view model test `unpluggedControls`, with a new package made from
+the synthetic core (`synth-unplugged`: thirteen buttons and two analog
+controls, of which the core says ten buttons and one analog control are
+plugged in; the synthetic core now answers `IsButtonActive` and
+`IsAxisActive` from two settings, and says everything is plugged in when they
+are not set). It checks the columns, the menu's and patterns' lists, `press`
+and `drag` by column, that Clear, a paste, a macro and a recorded frame leave
+the unplugged controls' input as it was, the macros' columns, the project's
+hidden names and the Config > Controllers boxes.
