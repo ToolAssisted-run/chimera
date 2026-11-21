@@ -26,6 +26,13 @@
 #include "../qml_view_model.hpp"
 
 namespace fs = std::filesystem;
+
+/* the list's path names this file: compared as paths, since Windows writes it
+ * with '/' (from the dropped URL) where fs::path::string() has '\\' */
+static bool isFile(const std::string &path, const fs::path &file)
+{
+	return !path.empty() && fs::path(path).lexically_normal() == file.lexically_normal();
+}
 using namespace chimera;
 
 namespace {
@@ -134,7 +141,7 @@ int main(int argc, char **argv)
 	QTest::qWait(200);
 	CHECK(watches.path.get().empty() && watches.count.get() == 0 && !opened(ask));
 	dropOn(window, {urlOf(other), urlOf(two), urlOf(one)});
-	CHECK(QTest::qWaitFor([&] { return watches.path.get() == two.string(); }, 3000));
+	CHECK(QTest::qWaitFor([&] { return isFile(watches.path.get(), two); }, 3000));
 	CHECK(watches.count.get() == 2 && !opened(ask));
 	std::printf("dropped notes.txt, Two.WCH, one.wch: opened %s with %lld rows\n", watches.path.get().c_str(), static_cast<long long>(watches.count.get()));
 
@@ -143,11 +150,11 @@ int main(int argc, char **argv)
 	CHECK(watches.changed.get() && watches.count.get() == 3);
 	dropOn(window, {urlOf(one)});
 	CHECK(QTest::qWaitFor([&] { return opened(ask); }, 2000));
-	CHECK(watches.path.get() == two.string() && watches.count.get() == 3);
+	CHECK(isFile(watches.path.get(), two) && watches.count.get() == 3);
 	QTest::keyClick(window, Qt::Key_Escape);
 	CHECK(QTest::qWaitFor([&] { return !opened(ask); }, 2000));
 	QTest::qWait(200);
-	CHECK(watches.path.get() == two.string() && watches.count.get() == 3 && watches.changed.get());
+	CHECK(isFile(watches.path.get(), two) && watches.count.get() == 3 && watches.changed.get());
 
 	/* asked again: No lets the changes go and opens the file */
 	dropOn(window, {urlOf(one)});
@@ -159,7 +166,7 @@ int main(int argc, char **argv)
 		const QPointF centre = no->mapToScene(QPointF(no->width() / 2, no->height() / 2));
 		QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, centre.toPoint());
 	}
-	CHECK(QTest::qWaitFor([&] { return watches.path.get() == one.string(); }, 3000));
+	CHECK(QTest::qWaitFor([&] { return isFile(watches.path.get(), one); }, 3000));
 	CHECK(watches.count.get() == 1 && !watches.changed.get() && !opened(ask));
 	std::printf("changed list, dropped one.wch, No: opened %s with %lld row\n", watches.path.get().c_str(), static_cast<long long>(watches.count.get()));
 
