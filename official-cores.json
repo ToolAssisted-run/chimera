@@ -788,6 +788,15 @@
       "kind": "game",
       "repo": "ToolAssisted-run/chimera-core-opengmk",
       "tested": ""
+    },
+    {
+      "id": "xavixemu",
+      "name": "XaviXEmu",
+      "systems": [
+        { "id": "XAVIX", "name": "XaviX" }
+      ],
+      "repo": "ToolAssisted-run/chimera-core-xavixemu",
+      "tested": ""
     }
   ]
 }

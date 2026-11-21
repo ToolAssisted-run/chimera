@@ -16399,3 +16399,26 @@ required. A request without one is closed with a reply inviting a new issue
 that names the TAS. The same reason was given when a one-line feature request
 (issue 630, the Wii Home Menu and SD card) was declined. Requests already
 open are not reclosed for this.
+
+## XaviXEmu joins the official cores (user-decided, 2026-11-21, issue 631)
+
+Issue 631 asked for XaviXEmu, an open emulator (C, BSD-3-Clause) of the XaviX
+plug-and-play TV games. A study ran Excite Boxing (Japan, the owner's set)
+through the emulator's own code: two runs the same, a state carried into a
+fresh process the same, a state saved and loaded every frame the same. The
+owner decided to build a core for the XaviX games with plain controls,
+declaring a pad (Up, Down, Left, Right, OK, Back, Pause), and to publish it
+(2026-11-21).
+
+- `chimera-core-xavixemu` pins XaviXEmu's newest commit. It plays Excite
+  Boxing, MX Dirt Rebel and IDATEN Jump, the sets whose controls the
+  emulator's source reads as plain buttons; the last two are accepted though
+  not tried (owner). The other 25 sets it recognises (motion sensors, sticks,
+  keyboards, a card scanner, the XaviX 2 machine) are refused with a message
+  naming why.
+- Upstream's newest documents list 40 sets (release 0.4.1), but its
+  published source recognises 29; the core follows the source and will add
+  the others when it is published (owner: publish now).
+- The package runs on Windows, Linux and macOS (x86_64) as other cores' do;
+  only Linux was tried, and the core's README says so (owner).
+- Its CI and its first nightly, "Nightly 2026-11-21 (cac105e3)", passed.

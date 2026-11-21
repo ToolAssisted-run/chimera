@@ -66,6 +66,7 @@ Made, published and supported by this project. Report a problem with one in [Chi
 | [FBNeo](https://github.com/ToolAssisted-run/chimera-core-fbneo) | Capcom CPS-1 / CPS-2 / CPS-3 (arcade), Neo Geo MVS (arcade), Neo Geo CD, Sega System 16 (arcade) |
 | [MAME](https://github.com/ToolAssisted-run/chimera-core-mame) | Arcade (the arcade machines of MAME) |
 | [MAME Home Systems](https://github.com/ToolAssisted-run/chimera-core-mamehome) | Atari 7800, Intellivision, Vectrex, Odyssey 2 / Videopac, Channel F, Amstrad CPC / CPC+ / GX4000, TI-83, BBC Micro |
+| [XaviXEmu](https://github.com/ToolAssisted-run/chimera-core-xavixemu) | XaviX plug-and-play TV games with plain controls (Excite Boxing, MX Dirt Rebel, IDATEN Jump) |
 | [DuckStation](https://github.com/ToolAssisted-run/chimera-core-duckstation) | PlayStation, Namco System 11 (arcade), Konami GQ (arcade) |
 | [Pokket](https://github.com/ToolAssisted-run/chimera-core-pokket) | Sony PocketStation |
 | [PCSX2](https://github.com/ToolAssisted-run/chimera-core-pcsx2) | PlayStation 2 |
