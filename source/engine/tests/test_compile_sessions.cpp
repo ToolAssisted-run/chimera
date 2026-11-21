@@ -48,6 +48,20 @@ int main()
 	assert(ceCompileMemoryRanShort(3 * GB, 8 * GB));
 	assert(!ceCompileMemoryRanShort(3 * GB, 4 * GB));
 
+	/* The greenzone budget a computer can hold (issue 577): 20096 MB on a
+	 * computer with 20 GB to spare is too much, and 15 GB is what it suggests;
+	 * what the greenzone holds already counts as the computer's; a budget that
+	 * fits, or a computer that says nothing, gets no advice. */
+	{
+		const uint64_t MB = 1ull << 20;
+		assert(ceGreenzoneBudgetAdvice(20096 * MB, 20 * GB, 0) == 15 * GB);
+		assert(ceGreenzoneBudgetAdvice(20096 * MB, 10 * GB, 10 * GB) == 15 * GB);
+		assert(ceGreenzoneBudgetAdvice(8 * GB, 20 * GB, 0) == 0);
+		assert(ceGreenzoneBudgetAdvice(15 * GB, 20 * GB, 0) == 0);
+		assert(ceGreenzoneBudgetAdvice(20096 * MB, 0, 0) == 0);
+		assert(ceGreenzoneBudgetAdvice(10 * GB, 1 * MB, 0) == 64 * MB);
+	}
+
 	/* What can be spared is the smaller of free memory and of what the system
 	 * can still promise: a machine with 40 GB free and 9 GB of promises left
 	 * has 9. A figure the system would not give is left out, not taken for 0. */

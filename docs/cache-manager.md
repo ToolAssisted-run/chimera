@@ -173,7 +173,7 @@ recently - not the first row, which is the largest, and which once named a
 project nobody was working on (issue 369).
 
 It is not a reservation, and it is not a promise the machine has to keep:
-running out halves it and carries on (docs/state-manager.md).
+running out fits it to what was held and carries on (docs/state-manager.md).
 
 ## What it will never take
 

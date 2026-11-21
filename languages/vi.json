@@ -2206,7 +2206,8 @@
 		},
 		"session.greenzone_not_kept": "Đã đóng. Vùng xanh không được giữ lại: một card đồ họa đã vẽ trò chơi này, và core của nó không cho biết các trạng thái của nó tải được sau khi dự án đóng. Khi dự án mở lại, việc đi tới một khung sẽ phát lại phim từ khung 0.",
 		"session.greenzone_not_kept_last_time": "Vùng xanh không được giữ lại khi dự án này đóng lần trước: một card đồ họa đã vẽ trò chơi, và core của nó không cho biết các trạng thái của nó tải được sau khi dự án đóng. Việc đi tới một khung sẽ phát lại phim từ khung 0.",
-		"session.greenzone_out_of_memory": "Máy tính đã hết bộ nhớ, nên vùng xanh giờ chỉ giữ tối đa %1 MB trong %2 MB đã đặt và lược bớt khung hình cho vừa. \"Xóa vùng xanh\" trả lại cho nó toàn bộ ngân sách.",
+		"session.greenzone_budget_too_big": "Ngân sách vùng xanh %1 MB lớn hơn mức máy tính này có thể chứa, nên bộ nhớ có thể cạn. Ngân sách %2 MB sẽ vừa.",
+		"session.greenzone_out_of_memory": "Máy tính đã hết bộ nhớ, nên vùng xanh giờ chỉ giữ tối đa %1 MB trong %2 MB đã đặt và lược bớt khung hình cho vừa. \"Xóa vùng xanh\" giữ nguyên kích thước đó.",
 		"session.held": "Đang giữ: %1",
 		"session.long_branch_question": {
 			"other": "Nhánh này không có trạng thái nào tải được, nên tải nó sẽ phát lại phim của nó từ khung %3 đến khung %2, %1 khung. Ở %4 fps, việc này mất khoảng %5.\n\nTải ngay?"

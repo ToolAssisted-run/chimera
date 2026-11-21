@@ -59,6 +59,20 @@ inline uint64_t ceMemoryToSpare(const CeHostMemory &m)
 	return std::min(m.freePhysical, m.freeCommit);
 }
 
+/* The greenzone's memory budget a computer can hold (issue 577): three
+ * quarters of what can be spared now plus what the greenzone already holds
+ * (that memory is the computer's too, but is no longer free), rounded down to
+ * a whole megabyte; the rest is left for the game, the core and the system.
+ * Returns that figure when `budget` is more than it, which is when to warn,
+ * and 0 when the budget is fine or the computer will not say what it has. */
+inline uint64_t ceGreenzoneBudgetAdvice(uint64_t budget, uint64_t toSpare, uint64_t held)
+{
+	if (toSpare == 0) return 0;
+	const uint64_t mb = 1ull << 20;
+	const uint64_t suggested = std::max<uint64_t>((toSpare + held) / 4 * 3 / mb, 64) * mb;
+	return budget > suggested ? suggested : 0;
+}
+
 /* How many sessions run side by side: one per sessionBytes (0: the default,
  * kCompileSessionBytes) of what can be spared after kCompileReservedBytes,
  * never more than half the processors, never more than kCompileSessionsAtMost,

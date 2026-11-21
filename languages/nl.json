@@ -2247,7 +2247,8 @@
 		},
 		"session.greenzone_not_kept": "Gesloten. De groene zone is niet bewaard: een grafische kaart tekende dit spel, en de core ervan zegt niet dat de toestanden te laden zijn nadat het project is gesloten. Wanneer het project weer opent, speelt naar een frame gaan de film opnieuw af vanaf frame 0.",
 		"session.greenzone_not_kept_last_time": "De groene zone is niet bewaard toen dit project de laatste keer sloot: een grafische kaart tekende het spel, en de core ervan zegt niet dat de toestanden te laden zijn nadat het project is gesloten. Naar een frame gaan speelt de film opnieuw af vanaf frame 0.",
-		"session.greenzone_out_of_memory": "De computer had geen geheugen meer, dus de groene zone houdt nu hoogstens %1 MB van de ingestelde %2 MB vast en dunt haar frames uit om erin te passen. 'Groene zone wissen' geeft haar het hele budget terug.",
+		"session.greenzone_budget_too_big": "Het budget van de groene zone, %1 MB, is meer dan deze computer kan bevatten, dus het geheugen kan opraken. Een budget van %2 MB zou passen.",
+		"session.greenzone_out_of_memory": "De computer had geen geheugen meer, dus de groene zone houdt nu hoogstens %1 MB van de ingestelde %2 MB vast en dunt haar frames uit om erin te passen. 'Groene zone wissen' behoudt die grootte.",
 		"session.held": "Ingedrukt: %1",
 		"session.long_branch_question": {
 			"one": "Deze vertakking heeft geen toestand die geladen kan worden, dus laden speelt de film opnieuw af van frame %3 tot frame %2, %1 frame. Bij %4 fps duurt dat ongeveer %5.\n\nNu laden?",

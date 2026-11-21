@@ -2206,7 +2206,8 @@
 		},
 		"session.greenzone_not_kept": "已关闭。绿区没有保留：此游戏由显卡绘制，而其核心没有声明项目关闭后仍可加载其状态。项目再次打开时，跳到某一帧会从第 0 帧重新播放影片。",
 		"session.greenzone_not_kept_last_time": "此项目上次关闭时绿区没有保留：游戏由显卡绘制，而其核心没有声明项目关闭后仍可加载其状态。跳到某一帧会从第 0 帧重新播放影片。",
-		"session.greenzone_out_of_memory": "电脑内存不足，绿区现在最多只保留设定的 %2 MB 中的 %1 MB，并稀疏其帧以容纳。“清除绿区”会让它重新获得全部预算。",
+		"session.greenzone_budget_too_big": "绿区的预算 %1 MB 超过了这台电脑能容纳的量，内存可能会不足。%2 MB 的预算则可以容纳。",
+		"session.greenzone_out_of_memory": "电脑内存不足，绿区现在最多只保留设定的 %2 MB 中的 %1 MB，并稀疏其帧以容纳。“清除绿区”会保持这个大小。",
 		"session.held": "按住：%1",
 		"session.long_branch_question": {
 			"other": "此分支没有可加载的状态，因此加载它需要将其影片从第 %3 帧重新播放到第 %2 帧，共 %1 帧。按 %4 fps 计算约需 %5。\n\n现在加载吗？"

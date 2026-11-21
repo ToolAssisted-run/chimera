@@ -16448,3 +16448,45 @@ decided to build the core and publish it (2026-11-21).
   undrawn frames changing nothing. Its CI and first nightly, "Nightly
   2026-11-21 (2f0e2e70)", passed. Not tried: Windows, macOS, a gamepad, a
   fan-made game.
+
+## The greenzone fits its budget to the memory the computer has (user-decided, 2026-11-21, issue 577)
+
+The first fix (2026-11-14, above) gave the whole budget back at a clear. The
+reporter's next report, on a 32 GB computer with a 20,096 MB budget and a core
+with large savestates, showed why that was not enough: memory ran out again,
+the budget was halved five times within one capture to 628 MB, the greenzone
+kept one or two states, Clear Greenzone seemed to do nothing, and a reopened
+project held one greenzone frame, because the project is saved at the
+collapsed size.
+
+Decided:
+- On running out of memory the budget is set to what the history held when the
+  allocation failed, less one state (the largest anchor held), never below the
+  floor; the history evicts to fit and the capture is tried again. A second
+  failure goes down by the same rule, measured. No blind halving. The wait for
+  a pending save comes first, as before.
+- Clear Greenzone gives the budget back only up to that fit, for the rest of
+  the session. The fit is not written to the settings.
+- A raise is allowed only by the person: a different budget set in Cache
+  Manager replaces the fit and is taken whole, since they may have freed
+  memory; if it runs out again it is measured again. The same value applied
+  again (a stride or another setting changed) keeps the fit, so a setting that
+  re-applies budgets cannot undo it. Chosen over a time-based or automatic
+  raise, which would fill toward the limit and collapse again.
+- When the budget is set or a project opens, it is compared with the memory the
+  computer can spare plus what the greenzone holds; above three quarters of
+  that, the status line says so and suggests a size (`ce_greenzone_budget_advice`).
+  The three quarters leave the rest for the game, the core and the system.
+- The out-of-memory message no longer says Clear Greenzone gives the budget back.
+  All 26 language tables carry the new wording and the new warning's text (a
+  table must have every key English has).
+
+Tested: the engine test makes captures fail once the history holds a set number
+of bytes (a hook in the test's fake machine). With a 64 MB budget set on a
+"computer" that holds 2,000 bytes, memory ran out once and the budget went to
+1,941 bytes, one state under what was held; a clear and the same budget set
+again keep 1,941; the greenzone then stores every second frame, as its period
+says, with no further failure; a new budget is taken whole. With the halving put
+back, the same test saw 13 failures and a budget of 8,192 bytes, and failed on
+the check that the budget is no more than what was held. The warning's size rule
+is tested with figures (20 GB to spare and 20,096 MB set gives 15 GB).

@@ -1845,6 +1845,13 @@ CE_API void ce_session_greenzone_budget(ce_session *s, uint64_t budget_bytes);
  * the one set (issue 577). set_bytes, when not null, receives the one set,
  * read together with it. 0 (and 0 set) while the history is off. */
 CE_API uint64_t ce_session_greenzone_budget_now(const ce_session *s, uint64_t *set_bytes);
+/* The greenzone budget this computer can hold, when the one given is more than
+ * that: 0 when it is fine, or when the computer will not say how much memory
+ * it has. Looks at what the computer can spare now plus held_bytes, what the
+ * greenzone already holds (issue 577). */
+CE_API uint64_t ce_greenzone_budget_advice(uint64_t budget_bytes, uint64_t held_bytes);
+/* What the session's greenzone holds in memory now, bytes. 0 while it is off. */
+CE_API uint64_t ce_session_greenzone_held(const ce_session *s);
 CE_API int64_t ce_session_greenzone_count(const ce_session *s);
 
 /* Anchor spacing, and the density of what is SPILLED to disk, all in FRAMES

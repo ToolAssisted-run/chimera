@@ -2247,7 +2247,8 @@
 		},
 		"session.greenzone_not_kept": "Lukket. Greenzone blev ikke gemt: et grafikkort tegnede dette spil, og dets kerne siger ikke, at dets tilstande kan indlæses, efter projektet er lukket. Når projektet åbnes igen, afspiller et spring til et billede filmen igen fra billede 0.",
 		"session.greenzone_not_kept_last_time": "Greenzone blev ikke gemt, da dette projekt sidst blev lukket: et grafikkort tegnede spillet, og dets kerne siger ikke, at dets tilstande kan indlæses, efter projektet er lukket. Et spring til et billede afspiller filmen igen fra billede 0.",
-		"session.greenzone_out_of_memory": "Computeren løb tør for hukommelse, så Greenzone gemmer nu højst %1 MB af de %2 MB, der er sat, og tynder sine billeder ud for at være der. \"Ryd Greenzone\" giver den hele budgettet igen.",
+		"session.greenzone_budget_too_big": "Greenzone-budgettet på %1 MB er mere, end computeren kan rumme, så hukommelsen kan løbe tør. Et budget på %2 MB vil passe.",
+		"session.greenzone_out_of_memory": "Computeren løb tør for hukommelse, så Greenzone gemmer nu højst %1 MB af de %2 MB, der er sat, og tynder sine billeder ud for at være der. \"Ryd Greenzone\" beholder den størrelse.",
 		"session.held": "Holdt: %1",
 		"session.long_branch_question": {
 			"one": "Denne gren har ingen tilstand, der kan indlæses, så indlæsning afspiller dens film igen fra billede %3 til billede %2, %1 billede. Ved %4 b/s tager det cirka %5.\n\nIndlæs den nu?",

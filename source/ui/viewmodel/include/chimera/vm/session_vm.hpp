@@ -277,7 +277,7 @@ public:
 	/* machine states the greenzone holds */
 	Property<int64_t> greenzoneStates{0};
 	/* the memory budget the greenzone works to now, MB: budgetMbApplied, or
-	 * less once the computer ran out of memory and it was halved (issue 577) */
+	 * less once the computer ran out of memory and it was fitted (issue 577) */
 	Property<int64_t> greenzoneBudgetNowMb{0};
 	/* how many times the movie was changed over work already done, saved
 	 * with the project */

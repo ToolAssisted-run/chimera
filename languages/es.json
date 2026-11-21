@@ -2247,7 +2247,8 @@
 		},
 		"session.greenzone_not_kept": "Cerrado. La greenzone no se guardó: una tarjeta gráfica dibujó este juego y su núcleo no indica que sus estados se puedan cargar después de cerrar el proyecto. Cuando el proyecto se abra de nuevo, ir a un fotograma reproducirá de nuevo la película desde el fotograma 0.",
 		"session.greenzone_not_kept_last_time": "La greenzone no se guardó la última vez que se cerró este proyecto: una tarjeta gráfica dibujó el juego y su núcleo no indica que sus estados se puedan cargar después de cerrar el proyecto. Ir a un fotograma reproduce de nuevo la película desde el fotograma 0.",
-		"session.greenzone_out_of_memory": "El ordenador se quedó sin memoria, así que la greenzone guarda ahora como mucho %1 MB de los %2 MB fijados y espacia sus fotogramas para caber. «Borrar greenzone» le devuelve todo el presupuesto.",
+		"session.greenzone_budget_too_big": "El presupuesto de la greenzone, %1 MB, es mayor de lo que este ordenador puede guardar, así que la memoria podría agotarse. Un presupuesto de %2 MB cabría.",
+		"session.greenzone_out_of_memory": "El ordenador se quedó sin memoria, así que la greenzone guarda ahora como mucho %1 MB de los %2 MB fijados y espacia sus fotogramas para caber. «Borrar greenzone» mantiene ese tamaño.",
 		"session.held": "Mantenido: %1",
 		"session.long_branch_question": {
 			"one": "Esta rama no tiene un estado que se pueda cargar, así que cargarla reproduce de nuevo su película desde el fotograma %3 hasta el %2, %1 fotograma. A %4 fps, eso tarda unos %5.\n\n¿Cargarla ahora?",

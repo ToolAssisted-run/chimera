@@ -2288,7 +2288,8 @@
 		},
 		"session.greenzone_not_kept": "Zavřeno. Zelená zóna nebyla uložena: tuto hru vykreslovala grafická karta a její jádro neuvádí, že lze její stavy načíst i po zavření projektu. Až se projekt znovu otevře, přechod na snímek znovu přehraje film od snímku 0.",
 		"session.greenzone_not_kept_last_time": "Zelená zóna nebyla uložena, když se tento projekt naposledy zavřel: hru vykreslovala grafická karta a její jádro neuvádí, že lze její stavy načíst i po zavření projektu. Přechod na snímek znovu přehraje film od snímku 0.",
-		"session.greenzone_out_of_memory": "Počítači došla paměť, a tak zelená zóna teď drží nejvýš %1 MB z nastavených %2 MB a prořeďuje snímky, aby se vešla. „Vymazat zelenou zónu“ jí vrátí celý rozpočet.",
+		"session.greenzone_budget_too_big": "Rozpočet zelené zóny %1 MB je víc, než tento počítač unese, takže může dojít paměť. Rozpočet %2 MB by se vešel.",
+		"session.greenzone_out_of_memory": "Počítači došla paměť, a tak zelená zóna teď drží nejvýš %1 MB z nastavených %2 MB a prořeďuje snímky, aby se vešla. „Vymazat zelenou zónu“ tuto velikost ponechá.",
 		"session.held": "Drženo: %1",
 		"session.long_branch_question": {
 			"one": "Tato větev nemá stav, který lze načíst, takže její načtení znovu přehraje její film od snímku %3 po snímek %2, %1 snímek. Rychlostí %4 snímků/s to potrvá asi %5.\n\nNačíst ji teď?",

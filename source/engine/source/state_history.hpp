@@ -551,6 +551,9 @@ public:
 	/* The least a stretch's links must weigh before their weight may close it
 	 * (see hasRoom). 64 MB unless a test needs a machine small enough to see it. */
 	void anchorWalkFloor(uint64_t bytes) { m_anchorWalkFloor = bytes; }
+	/* The least a budget goes down to when memory runs out: 16 MB unless a test
+	 * needs a machine whose states are small enough to see the fit above it. */
+	void smallestBudget(uint64_t bytes) { m_smallestBudget = bytes; }
 private:
 	bool composeAvailable() const;
 	void evict();
@@ -614,13 +617,13 @@ private:
 	/* capture(), once. capture() itself is the loop that answers an allocation
 	 * failure by making the budget smaller and asking again. */
 	void captureOnce(int64_t frame, const uint8_t *note, size_t noteLen);
-	bool halveBudget();
+	bool fitBudget();
 
 	/* Under this a history cannot hold one anchor of anything, so halving past
 	 * it would spend allocations to store nothing. Not zero, which the engine
 	 * reads as "no history at all" - a machine short of memory still wants the
 	 * frames it can afford. */
-	static constexpr uint64_t kSmallestBudget = 16ull * 1024 * 1024;
+	uint64_t m_smallestBudget = 16ull * 1024 * 1024;
 
 	/* Holds the spill file under its budget by dropping the oldest stretches in
 	 * it, and reclaims what they held: the file is a queue - appended newest,
@@ -764,9 +767,14 @@ private:
 	const HostApi *m_host = nullptr;
 	void *m_obj = nullptr;
 	uint64_t m_budget = 0;
-	/* The budget as it was set. m_budget is halved below it when the machine
-	 * runs out of memory, and a clear gives it back (issue 577). */
+	/* The budget as it was set. m_budget is fitted below it when the machine
+	 * runs out of memory (issue 577). */
 	uint64_t m_budgetSet = 0;
+	/* What the computer was seen to hold: the budget after the last time memory
+	 * ran out, 0 if it has not. A clear and a re-applied budget go up to it and
+	 * no further; a new budget set by the person replaces it. Not saved, and
+	 * not written to settings (issue 577). */
+	uint64_t m_fit = 0;
 	uint64_t m_bytes = 0;
 	std::vector<Segment> m_segments;   /* ordered by anchorFrame, never overlapping */
 	bool m_epochOpen = false;          /* an epoch is marked and a delta is wanted */

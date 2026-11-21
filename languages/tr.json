@@ -2247,7 +2247,8 @@
 		},
 		"session.greenzone_not_kept": "Kapalı. Greenzone saklanmadı: bu oyunu bir ekran kartı çizdi ve çekirdeği, durumlarının proje kapandıktan sonra yüklenebileceğini belirtmiyor. Proje yeniden açıldığında bir kareye gitmek filmi 0. kareden yeniden oynatır.",
 		"session.greenzone_not_kept_last_time": "Bu proje en son kapandığında Greenzone saklanmadı: oyunu bir ekran kartı çizdi ve çekirdeği, durumlarının proje kapandıktan sonra yüklenebileceğini belirtmiyor. Bir kareye gitmek filmi 0. kareden yeniden oynatır.",
-		"session.greenzone_out_of_memory": "Bilgisayarın belleği tükendi; bu yüzden Greenzone artık ayarlanan %2 MB'lık bütçenin en fazla %1 MB'ını tutuyor ve sığmak için karelerini seyreltiyor. \"Greenzone'u Temizle\" ona bütçenin tamamını geri verir.",
+		"session.greenzone_budget_too_big": "Greenzone bütçesi olan %1 MB, bu bilgisayarın tutabileceğinden fazla; bu yüzden bellek tükenebilir. %2 MB'lık bir bütçe sığar.",
+		"session.greenzone_out_of_memory": "Bilgisayarın belleği tükendi; bu yüzden Greenzone artık ayarlanan %2 MB'lık bütçenin en fazla %1 MB'ını tutuyor ve sığmak için karelerini seyreltiyor. \"Greenzone'u Temizle\" bu boyutu korur.",
 		"session.held": "Basılı: %1",
 		"session.long_branch_question": {
 			"one": "Bu dalın yüklenebilecek bir durumu yok, bu yüzden yüklemek filmini %3. kareden %2. kareye kadar, %1 kare, yeniden oynatır. %4 kare/sn hızla bu yaklaşık %5 sürer.\n\nŞimdi yüklensin mi?",

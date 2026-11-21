@@ -2247,7 +2247,8 @@
 		},
 		"session.greenzone_not_kept": "Stängd. Grönzonen sparades inte: ett grafikkort ritade det här spelet, och dess kärna anger inte att dess tillstånd kan läsas in efter att projektet stängts. När projektet öppnas igen spelar ett hopp till en bildruta om filmen från bildruta 0.",
 		"session.greenzone_not_kept_last_time": "Grönzonen sparades inte när det här projektet senast stängdes: ett grafikkort ritade spelet, och dess kärna anger inte att dess tillstånd kan läsas in efter att projektet stängts. Ett hopp till en bildruta spelar om filmen från bildruta 0.",
-		"session.greenzone_out_of_memory": "Datorn fick slut på minne, så grönzonen håller nu högst %1 MB av de %2 MB som är inställda och glesar ut sina bildrutor för att få plats. ”Rensa grönzonen” ger den hela budgeten igen.",
+		"session.greenzone_budget_too_big": "Grönzonens budget på %1 MB är mer än den här datorn kan hålla, så minnet kan ta slut. En budget på %2 MB skulle rymmas.",
+		"session.greenzone_out_of_memory": "Datorn fick slut på minne, så grönzonen håller nu högst %1 MB av de %2 MB som är inställda och glesar ut sina bildrutor för att få plats. ”Rensa grönzonen” behåller den storleken.",
 		"session.held": "Hålls: %1",
 		"session.long_branch_question": {
 			"one": "Den här grenen har inget tillstånd som kan läsas in, så att läsa in den spelar om dess film från bildruta %3 till bildruta %2, %1 bildruta. Vid %4 bps tar det ungefär %5.\n\nLäsa in den nu?",

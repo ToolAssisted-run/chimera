@@ -92,3 +92,8 @@ extern "C" int32_t ce_compile_session_begins(void)
 	return 0;
 #endif
 }
+
+extern "C" uint64_t ce_greenzone_budget_advice(uint64_t budget_bytes, uint64_t held_bytes)
+{
+	return ceGreenzoneBudgetAdvice(budget_bytes, ceMemoryToSpare(ceReadHostMemory()), held_bytes);
+}

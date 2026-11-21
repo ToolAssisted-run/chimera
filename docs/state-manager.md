@@ -583,30 +583,42 @@ frame was a whole machine. The history file a project's close writes is written
 under a name of its own and moved over the old one when it is whole, so a write
 cut off by a crash or a full disk leaves the last good one.
 
-### Running out of memory halves the budget
+### Running out of memory fits the budget to what the computer holds
 
-The history is the biggest thing Chimera holds that it does not need, so it is
-where the end of memory is met first - and it is the one place that can answer.
-A capture that throws `std::bad_alloc` halves the budget, gives back what that
-frees, and tries again; repeatedly, because one halving of a budget the machine
-cannot afford is unlikely to be enough. Below sixteen megabytes it stops and the
-frame is simply not stored, which costs replaying to reach it.
+A capture that throws `std::bad_alloc` sets the budget to what the history
+held at that moment, less the size of one state, gives back what that frees
+(the oldest frames are thinned or given up), and tries again. If it fails
+again, the budget goes down by the same rule from what is held then: measured,
+not halved. Below sixteen megabytes it stops and the frame is simply not
+stored, which costs replaying to reach it. (It used to halve the budget, over
+and over within one capture: a 20 GB budget on a computer that held about
+13 GB ended at 628 MB, issue 577.)
 
-A greenzone that has quietly become half as deep is a run that continues. The
-alternative is a throw out of a capture and a session lost.
+A greenzone that has become shallower is a run that continues. The alternative
+is a throw out of a capture and a session lost.
 
-The halved figure is **not written back to the settings**. What a machine can
+The fitted figure is **not written back to the settings**. What a machine can
 spare this afternoon is not a decision somebody made, and it must not silently
-become one.
+become one. It lasts for the session:
 
-Nor is it kept for good (issue 577). A halving used to last until the project
-was opened again, so after Clear Greenzone had given the memory back the
-greenzone still thinned its frames to fit half the budget, while the budgets
-window showed the whole one. Now a clear gives back the budget that was set;
-if memory runs out again, it is halved again. Each halving is said in the
-status line ("the greenzone now keeps at most N MB of the M MB set"), as well
-as in the core log, and `ce_session_greenzone_budget_now` gives both figures
-(the session's `greenzoneBudgetNowMb`).
+- Clear Greenzone keeps the fit. It used to give back the whole budget that was
+  set, so the greenzone filled toward it, ran out again and collapsed again,
+  and the project was saved at the collapsed size.
+- The same budget applied again (another setting changed) keeps the fit.
+- A different budget set by the person, in Tools > Cache Manager > Greenzone
+  budgets, replaces the fit and is taken whole. They may have closed other
+  programs or added memory, and if memory runs out again it is measured again.
+- Opening a project starts without a fit.
+
+The fit is said in the status line, with both figures, and in the core log;
+`ce_session_greenzone_budget_now` gives both (the session's
+`greenzoneBudgetNowMb`).
+
+When a budget is set, or a project opens, it is also compared with what the
+computer can hold: three quarters of the memory it can spare now plus what the
+greenzone already holds (`ce_greenzone_budget_advice`, which reads the same
+figures the compile sessions do). A budget above that is said in the status
+line with a size that fits, before memory runs out.
 
 While a project's history is being saved in the background, the save holds
 everything the history gave up since it began, out of the budget's sight;
@@ -1779,7 +1791,7 @@ order, on the one thread that is allowed to change things.
 | switches a branch | a state load plus a different input log: generation bumps, everything speculative dies, the prefix is rebuilt from the new timeline |
 | scrubs the piano roll for ten seconds | a seek per position, each cancelling the last prefetch before it started - which costs nothing, because a cancelled speculation has by definition produced nothing anybody wanted |
 | saves the project | the writer takes a metadata snapshot and streams bodies; the loop continues; closing the project is the barrier that must finish |
-| runs out of memory | the drainer's pending bytes are counted in `m_bytes`, so the budget sees them; speculation is cancelled first, owed work is finished, and only then does `halveBudget` do what it does today |
+| runs out of memory | the drainer's pending bytes are counted in `m_bytes`, so the budget sees them; speculation is cancelled first, owed work is finished, and only then does `fitBudget` do what it does today |
 
 #### Why this cannot deadlock
 

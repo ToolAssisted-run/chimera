@@ -749,7 +749,7 @@ SessionViewModel::SessionViewModel(Dispatcher &dispatcher, InputLog &inputs)
 	expose("soundDropped", "sample pairs dropped because the machine ran ahead of the speakers", soundDropped);
 	expose("greenEnd", "frames before this one were run with the inputs they have now", greenEnd);
 	expose("greenzoneStates", "machine states the greenzone holds", greenzoneStates);
-	expose("greenzoneBudgetNowMb", "the memory budget the greenzone works to now, MB: the one applied, or less once the computer ran out of memory and it was halved (Clear Greenzone gives the one applied back)", greenzoneBudgetNowMb);
+	expose("greenzoneBudgetNowMb", "the memory budget the greenzone works to now, MB: the one applied, or less once the computer ran out of memory and it was fitted to what the computer held (Clear Greenzone keeps that fit; setting a new budget replaces it)", greenzoneBudgetNowMb);
 	expose("rerecords", "how many times the movie was changed over work already done (saved with the project)", rerecords);
 	expose("autoRestore", "after an edit before the current frame, run on to where the machine was", autoRestore, true);
 	expose("rewinding", "rewind is held: the machine goes back (Chimera's client.is_rewinding)", rewinding);
@@ -3831,11 +3831,17 @@ void SessionViewModel::applyBudgetsOnMachine(ce_session *s, bool opening)
 	ce_session_greenzone_max_near_stride(s, stride);
 	if (opening) ce_session_greenzone_enable(s, static_cast<uint64_t>(mb) * 1024 * 1024);
 	else ce_session_greenzone_budget(s, static_cast<uint64_t>(mb) * 1024 * 1024);
-	later([this, ownMb, ownStride, mb, stride] {
+	/* A budget the computer cannot hold is said now, with a size it can,
+	 * rather than found out when memory runs out (issue 577) */
+	const int64_t adviceMb = static_cast<int64_t>(
+		ce_greenzone_budget_advice(static_cast<uint64_t>(mb) * 1024 * 1024, ce_session_greenzone_held(s)) / (1024 * 1024));
+	later([this, ownMb, ownStride, mb, stride, adviceMb] {
 		projectBudgetMb.set(ownMb);
 		projectNearStride.set(ownStride);
 		budgetMbApplied.set(mb);
 		nearStrideApplied.set(stride);
+		if (adviceMb > 0)
+			status.set(tr("session.greenzone_budget_too_big", {std::to_string(mb), std::to_string(adviceMb)}));
 	});
 }
 
@@ -7738,8 +7744,8 @@ void SessionViewModel::tick()
 	greenEnd.set(green);
 	greenzoneStates.set(states);
 	{
-		/* The greenzone halves its budget when the computer runs out of
-		 * memory, and thins its frames to fit; nothing said so, and the
+		/* The greenzone lowers its budget to what it held when the computer
+		 * ran out of memory, and thins its frames to fit; nothing said so, and the
 		 * budgets window still showed the one set (issue 577). Said once
 		 * per drop, in the status line. */
 		const int64_t nowMb = static_cast<int64_t>(budgetNow / (1024 * 1024));

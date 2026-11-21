@@ -2288,7 +2288,8 @@
 		},
 		"session.greenzone_not_kept": "Zamknięto. Greenzone nie została zachowana: tę grę rysowała karta graficzna, a jej rdzeń nie deklaruje, że jej stany można wczytać po zamknięciu projektu. Gdy projekt zostanie ponownie otwarty, przejście do klatki odtworzy film ponownie od klatki 0.",
 		"session.greenzone_not_kept_last_time": "Greenzone nie została zachowana, gdy ten projekt był ostatnio zamykany: grę rysowała karta graficzna, a jej rdzeń nie deklaruje, że jej stany można wczytać po zamknięciu projektu. Przejście do klatki odtwarza film ponownie od klatki 0.",
-		"session.greenzone_out_of_memory": "Komputerowi zabrakło pamięci, więc greenzone trzyma teraz najwyżej %1 MB z ustawionych %2 MB i przerzedza klatki, żeby się zmieścić. „Wyczyść greenzone” oddaje jej cały budżet.",
+		"session.greenzone_budget_too_big": "Budżet greenzone, %1 MB, jest większy, niż ten komputer zdoła pomieścić, więc pamięć może się skończyć. Budżet %2 MB by się zmieścił.",
+		"session.greenzone_out_of_memory": "Komputerowi zabrakło pamięci, więc greenzone trzyma teraz najwyżej %1 MB z ustawionych %2 MB i przerzedza klatki, żeby się zmieścić. „Wyczyść greenzone” zachowuje ten rozmiar.",
 		"session.held": "Przytrzymane: %1",
 		"session.long_branch_question": {
 			"one": "Ta gałąź nie ma stanu, który można wczytać, więc jej wczytanie odtwarza ponownie jej film od klatki %3 do klatki %2, %1 klatkę. Przy %4 kl./s potrwa to około %5.\n\nWczytać ją teraz?",
