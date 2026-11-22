@@ -10754,32 +10754,38 @@ bool encodeFromPowerOn(const char *package, const char *rom)
 	session.borrowMachine(5, 9, [](ce_session *, std::string &) { return true; }, [] {}, [&](int e, std::string w) { ended = e; why = w; });
 	CHECK(d.until([&] { return ended >= 0; }, 120));
 	CHECK(ended == 0 && session.frame.get() == 21);
-	/* a machine that cannot be opened again: the encode fails, and says so */
-	fs::remove(dir / "walker.testrom");
-	ended = -1;
-	why.clear();
-	session.borrowMachine(0, 9, [](ce_session *, std::string &) { return true; }, [] {}, [&](int e, std::string w) { ended = e; why = w; });
-	CHECK(d.until([&] { return ended >= 0; }, 120));
-	CHECK(ended == 2 && !why.empty());
-	std::printf("encode from power-on, game missing: %s\n", why.c_str());
-	/* the project was saved before it was closed: its file holds the 30 frames of the run */
-	CHECK(why.find(project.string()) != std::string::npos);
+	/* a machine that cannot be opened again: the encode fails, and says so. Where an open
+	 * file cannot be deleted (Windows: the machine still has the game open) this is left out */
+	std::error_code gone;
+	if (!fs::remove(dir / "walker.testrom", gone))
+		std::printf("SKIP encode from power-on, game missing: the game file cannot be deleted while it is open (%s)\n", gone.message().c_str());
+	else
 	{
-		const char *err = nullptr;
-		ce_project *saved = ce_project_open(project.string().c_str(), &err);
-		CHECK(saved != nullptr);
-		if (saved != nullptr)
+		ended = -1;
+		why.clear();
+		session.borrowMachine(0, 9, [](ce_session *, std::string &) { return true; }, [] {}, [&](int e, std::string w) { ended = e; why = w; });
+		CHECK(d.until([&] { return ended >= 0; }, 120));
+		CHECK(ended == 2 && !why.empty());
+		std::printf("encode from power-on, game missing: %s\n", why.c_str());
+		/* the project was saved before it was closed: its file holds the 30 frames of the run */
+		CHECK(why.find(project.string()) != std::string::npos);
 		{
-			uint64_t len = 0;
-			const char *text = ce_project_log_text(saved, &len);
-			ce_movie_log *log = ce_movie_log_new();
-			if (text != nullptr) ce_movie_log_parse(log, text, len);
-			CHECK(ce_movie_log_count(log) == 30);
-			ce_movie_log_free(log);
-			ce_project_free(saved);
+			const char *err = nullptr;
+			ce_project *saved = ce_project_open(project.string().c_str(), &err);
+			CHECK(saved != nullptr);
+			if (saved != nullptr)
+			{
+				uint64_t len = 0;
+				const char *text = ce_project_log_text(saved, &len);
+				ce_movie_log *log = ce_movie_log_new();
+				if (text != nullptr) ce_movie_log_parse(log, text, len);
+				CHECK(ce_movie_log_count(log) == 30);
+				ce_movie_log_free(log);
+				ce_project_free(saved);
+			}
 		}
+		CHECK(d.until([&] { return !session.isOpen.get(); }, 20));
 	}
-	CHECK(d.until([&] { return !session.isOpen.get(); }, 20));
 	std::error_code ec;
 	fs::remove_all(dir, ec);
 	return true;
@@ -10939,9 +10945,10 @@ bool encodeVideo(const char *package, const char *rom)
 		CHECK(marked);
 		std::vector<std::string> said;
 		lua.onLog = [&](const std::string &l) { said.push_back(l); };
-		/* the wind to the first marker lands (a seek's landing is a frame's end), then ten frames,
-		 * then the frame given back lands too */
-		CHECK(lua.run("print(ended)", "ended", error) && !said.empty() && said.back() == "12");
+		/* an encode from frame 0 powers the machine on again rather than seeking (issue 639), so
+		 * there is no landing at the start: ten frames, then the frame given back lands (a seek's
+		 * landing is a frame's end) */
+		CHECK(lua.run("print(ended)", "ended", error) && !said.empty() && said.back() == "11");
 		/* Capture OSD: the picture as the window shows it, at the size of
 		 * its picture area, as Chimera's; the machine's 128x120 picture is
 		 * shown 256x240 */
