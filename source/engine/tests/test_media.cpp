@@ -698,6 +698,14 @@ static void aBigEarlierImageInTheFolderIsNamedAsOne()
 		std::printf("test_media: a 5 GiB file could not be made here (%s): skipped\n", ec.message().c_str());
 		return;
 	}
+	/* Some C++ libraries' resize_file keeps only the low 32 bits of the size on
+	 * Windows (on the Windows arm64 test runner, the "5 GiB" file came out small
+	 * and the image was made): a file that is not really 5 GiB tests nothing. */
+	if (fs::file_size(big, ec) != (5ull << 30) || ec)
+	{
+		std::printf("test_media: resize_file did not make a 5 GiB file here: skipped\n");
+		return;
+	}
 	std::string sha, err;
 	assert(!chimera::mediaMake(tree.string(), (workRoot() / "big.iso").string(), chimera::MediaFormat::Iso9660,
 		nullptr, sha, err));
@@ -709,6 +717,7 @@ static void aBigEarlierImageInTheFolderIsNamedAsOne()
 	const fs::path data = tree / "movie.dat";
 	put(data, "");
 	fs::resize_file(data, 5ull << 30, ec);
+	assert(!ec && fs::file_size(data) == (5ull << 30));
 	err.clear();
 	assert(!chimera::mediaMake(tree.string(), (workRoot() / "big.iso").string(), chimera::MediaFormat::Iso9660,
 		nullptr, sha, err));
