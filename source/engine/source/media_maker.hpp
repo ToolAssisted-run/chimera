@@ -98,6 +98,18 @@ using MediaProgress = std::function<bool(const char *file, uint64_t bytesDone, u
  * following one makes the output depend on something outside it. */
 bool mediaCollect(const std::string &folder, std::vector<MediaEntry> &out, std::string &error);
 
+/* Whether a file's name says it is a disc image or an archive made earlier:
+ * the extensions .iso .zip .img .7z .rar, or "(Media Maker" in the name (what
+ * the Media Maker's own names suggest). `.bin` is not on the list: games hold
+ * many. The one rule for the 4 GiB message and for the question asked before
+ * packing. */
+bool mediaLooksLikeEarlierImage(const std::string &rel);
+
+/* The names (relative, '/'-separated, sorted byte-wise) of the files of a
+ * folder, at any depth, that look like an earlier image. Empty when there are
+ * none or when the folder cannot be read (packing it says why). */
+std::vector<std::string> mediaEarlierImages(const std::string &folder);
+
 /* Packs `folder` into `outPath`. `sha1Out` receives the digest of what was
  * written, taken as it was written. Returns false on failure or cancel, with
  * `error` set ("cancelled" when it was cancelled). */

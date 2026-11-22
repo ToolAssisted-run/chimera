@@ -76,6 +76,26 @@ a sibling such as `folder2/x.zip` is not. The check is in the engine
 (`mediaMake`), so the window, Lua and the tests get it alike; the window shows
 the message in the result line as soon as Make is pressed.
 
+**A question before packing a folder that holds a packed game (issue 637).**
+When Make is pressed and the folder holds, at any depth, files whose names look
+like an earlier image or archive (the same rule as above: .iso, .zip, .img, .7z,
+.rar, or "(Media Maker" in the name; .bin is not on the list), nothing is written
+yet. The window asks: "This folder already holds files that look like a packed
+game", with the first five names and "and N more", "They will be packed inside
+the new file. Pack anyway?", and the buttons Pack anyway and Cancel. Cancel
+writes nothing. Pack anyway packs everything, those files included, as before:
+nothing is ever left out because of its name. When there are no such files, there
+is no question. The folder picker shows only folders, so a person could not see
+such a file there.
+
+The rule and the search are the engine's (`ce_media_earlier_images` in the C
+interface: the relative paths, sorted, one per line). The `mediaMaker` view
+model searches in its worker, so a big folder does not hold the window, and
+exposes `packQuestion` (the words, "" while none is asked); `answerPack` with
+true or false answers it. A script does the same: `make`, wait for `packQuestion`
+to be set, then `answerPack`. Choosing another folder, file or shape drops the
+question. The search skips links and reads no file, as packing does.
+
 **FAT12 floppy (.img).** 2880 sectors of 512 bytes, two copies of a 12-bit
 allocation table of 9 sectors each, a root directory of exactly 224 entries, one
 sector per cluster, data from sector 33. Names are 8.3, made deterministically

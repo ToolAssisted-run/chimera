@@ -5,7 +5,8 @@
  * by its SHA-1. The packing is the engine's (ce_media_make); an installed
  * core's recipe for its discs is handed over when the folder is one it was
  * written for. Here the folder, the shape, the name, how far it has got, and
- * stopping it. */
+ * stopping it. Before packing, a folder that holds what looks like a packed
+ * game is asked about. */
 
 #include <atomic>
 #include <functional>
@@ -42,9 +43,17 @@ public:
 	Property<std::string> current, result;
 	Property<double> progress{0.0};
 	Property<std::string> sha1;
+	/* Make found files in the folder that look like a disc image or an archive
+	 * made earlier (issue 637): the question, naming the first of them, and ""
+	 * while none is asked. Nothing is written until answerPack(true); false
+	 * writes nothing. */
+	Property<std::string> packQuestion;
 
 private:
 	void recognise();
+	/* starts the pack; unless `confirmed`, the files that look like an earlier image are looked for first */
+	void begin(bool confirmed, std::string &error);
+	static std::string questionText(const std::string &lines);
 	RecipeFinder recipes_;
 	std::string recipeJson_;
 	std::thread worker_;

@@ -725,6 +725,27 @@ static void aBigEarlierImageInTheFolderIsNamedAsOne()
 	assert(err.find("Move it out") == std::string::npos);
 }
 
+/* The files that look like an earlier image are found at any depth, by name
+ * alone, sorted; a .bin is not one (issue 637). */
+static void earlierImagesAreFoundAtAnyDepth()
+{
+	const fs::path tree = workRoot() / "earlier";
+	fs::remove_all(tree);
+	put(tree / "readme.txt", "hello");
+	put(tree / "data.bin", "bin");
+	assert(chimera::mediaEarlierImages(tree.string()).empty());
+	put(tree / "Old.ISO", "a");
+	put(tree / "deep" / "er" / "saves.zip", "b");
+	put(tree / "deep" / "Game (Media Maker 3).dat", "c");
+	put(tree / "disk.img", "d");
+	put(tree / "pack.7z", "e");
+	put(tree / "pack.rar", "f");
+	const std::vector<std::string> found = chimera::mediaEarlierImages(tree.string());
+	const std::vector<std::string> want = {"Old.ISO", "deep/Game (Media Maker 3).dat", "deep/er/saves.zip", "disk.img", "pack.7z", "pack.rar"};
+	assert(found == want);
+	assert(chimera::mediaEarlierImages((workRoot() / "nothing-here").string()).empty());
+}
+
 int main()
 {
 	fs::remove_all(workRoot());
@@ -748,6 +769,7 @@ int main()
 	pathTablesGoByParent();
 	anOutputInsideTheFolderIsRefused();
 	aBigEarlierImageInTheFolderIsNamedAsOne();
+	earlierImagesAreFoundAtAnyDepth();
 
 	fs::remove_all(workRoot());
 	std::printf("test_media: ok\n");

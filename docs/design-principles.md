@@ -16576,3 +16576,37 @@ are not set). It checks the columns, the menu's and patterns' lists, `press`
 and `drag` by column, that Clear, a paste, a macro and a recorded frame leave
 the unplugged controls' input as it was, the macros' columns, the project's
 hidden names and the Config > Controllers boxes.
+
+## The Media Maker asks before packing a folder that already holds a packed game (user-decided, 2026-11-22, issue 637)
+
+A person packed a game folder that already held an .iso made earlier, so the old
+image went inside the new file. The folder picker shows only folders, so they
+could not see it. Issue 633 already refuses to write the new file inside the
+folder and words the 4 GiB error for such a file; this is the case where nothing
+fails and the result is quietly wrong.
+
+- When Make is pressed and the folder holds, at any depth, files that look like
+  an earlier disc image or archive, the window asks first: the first five names
+  and "and N more", "They will be packed inside the new file. Pack anyway?", with
+  Pack anyway and Cancel. No question when there are none.
+- Warn and let them go on (chosen by the owner), not skip and not refuse:
+  nothing is left out of the image because of its name, and Pack anyway packs
+  everything as before.
+- One rule: the check for the 4 GiB message (issue 633) moved to
+  `mediaLooksLikeEarlierImage` in `media_maker.cpp` and the question uses it too.
+  .bin stays off the list.
+- The search is the engine's: `ce_media_earlier_images(folder)` returns the
+  relative paths, sorted, one per line. The view model runs it in its worker
+  (a big folder should not hold the window) and exposes `packQuestion` and the
+  command `answerPack`, the way the long seek question is exposed, so Lua and
+  the MCP server can answer too. The window shows a dialog while the question is
+  set.
+- The text is in all 26 language tables (four new keys).
+
+Tested: the engine test finds .iso, .zip, .img, .7z, .rar and "(Media Maker"
+names at any depth, sorted, and not a .bin. The view model test: a folder with
+only a .bin gives no question; with an .iso, Make asks and writes nothing;
+Cancel writes nothing; Pack anyway writes the file and it contains the .iso; nine
+such files show five names and "and 4 more"; choosing a folder drops the
+question. Each new test was broken once on purpose and failed. The window's
+dialog was checked by the window's tests passing, and was not looked at by eye.

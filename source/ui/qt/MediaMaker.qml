@@ -50,6 +50,34 @@ ApplicationWindow {
             win.close()
         }
     }
+    // Make found files that look like a packed game in the folder (issue 637):
+    // the view model asks, and Pack anyway or Cancel answers
+    Connections {
+        target: win.vm
+        function onPackQuestionChanged() { if (win.vm.packQuestion !== "") packAsk.open(); else packAsk.close() }
+    }
+    Dialog {
+        id: packAsk
+        objectName: "packAskDialog"
+        title: qsTrId("media_maker.reproducible_media_maker")
+        anchors.centerIn: parent
+        modal: true
+        focus: true
+        closePolicy: Popup.CloseOnEscape
+        Label {
+            objectName: "packAskText"
+            width: 440
+            wrapMode: Text.Wrap
+            text: win.vm.packQuestion
+        }
+        footer: DialogButtonBox {
+            Button { objectName: "packAnywayButton"; text: qsTrId("media_maker.pack_anyway"); DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole }
+            Button { objectName: "packCancelButton"; text: qsTrId("common.cancel"); DialogButtonBox.buttonRole: DialogButtonBox.RejectRole }
+        }
+        // closed by the view model (a new folder) is not an answer
+        onAccepted: if (win.vm.packQuestion !== "") win.vm.run("answerPack", [true])
+        onRejected: if (win.vm.packQuestion !== "") win.vm.run("answerPack", [false])
+    }
     // a path as a file dialog takes it
     function urlOf(path) { return localFiles.folderUrl(path) }
     readonly property var extensions: [".zip", ".iso", ".img"]

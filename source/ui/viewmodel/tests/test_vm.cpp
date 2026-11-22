@@ -4099,6 +4099,41 @@ bool mediaMaker()
 		maker.sha1.get().empty() && !fs::exists(game / "image.zip"));
 	/* a zip is not what the recipe writes */
 	CHECK(maker.recognised.get().empty());
+	/* no file that looks like an earlier image, a .bin among them: no question (issue 637) */
+	maker.run("setFolder", {game.string()}, error);
+	{
+		std::ofstream(game / "extra.bin") << "bin";
+	}
+	CHECK(make(dir / "plain.zip") && maker.packQuestion.get().empty() && fs::exists(dir / "plain.zip"));
+	/* an .iso in the folder: Make asks, naming it, and writes nothing */
+	{
+		std::ofstream(game / "data" / "Earlier.iso") << "old image";
+	}
+	const fs::path asked = dir / "asked.zip";
+	maker.output.set(asked.string());
+	CHECK(maker.run("make", {}, error).has_value());
+	CHECK(d.until([&] { return !maker.running.get(); }, 60));
+	CHECK(maker.packQuestion.get().find("look like a packed game:\n\ndata/Earlier.iso\n\nThey will be packed inside the new file. Pack anyway?") != std::string::npos);
+	CHECK(!fs::exists(asked) && maker.result.get().empty());
+	/* Cancel: the question goes, nothing is written */
+	CHECK(maker.run("answerPack", {Value(false)}, error).has_value() && maker.packQuestion.get().empty());
+	CHECK(d.until([&] { return !maker.running.get(); }, 5) && !fs::exists(asked));
+	CHECK(!maker.run("answerPack", {Value(true)}, error));
+	/* Pack anyway: everything is packed, the old image too */
+	CHECK(maker.run("make", {}, error).has_value() && d.until([&] { return !maker.packQuestion.get().empty(); }, 60));
+	CHECK(maker.run("answerPack", {Value(true)}, error).has_value() && maker.packQuestion.get().empty());
+	CHECK(d.until([&] { return !maker.running.get() && !maker.sha1.get().empty(); }, 60) && fs::exists(asked));
+	{
+		std::ifstream in(asked, std::ios::binary);
+		const std::string bytes((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+		CHECK(bytes.find("data/Earlier.iso") != std::string::npos);
+	}
+	/* more than five: the first five and how many more; a new folder drops the question */
+	for (int i = 0; i < 8; i++) std::ofstream(game / ("old" + std::to_string(i) + ".zip")) << "z";
+	CHECK(maker.run("make", {}, error).has_value() && d.until([&] { return !maker.packQuestion.get().empty(); }, 60));
+	CHECK(maker.packQuestion.get().find("\nand 4 more\n") != std::string::npos);
+	maker.run("setFolder", {game.string()}, error);
+	CHECK(maker.packQuestion.get().empty());
 	CHECK(!maker.run("setFolder", {}, error));
 	removeTree(dir);
 	return true;

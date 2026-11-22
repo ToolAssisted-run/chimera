@@ -355,6 +355,14 @@ CE_API int32_t ce_media_recipe_format(const char *recipe_json);
 CE_API int32_t ce_media_make_with(const char *folder, const char *out_path, const char *recipe_json,
 	ce_media_progress_fn progress, void *user);
 
+/* The files of `folder`, at any depth, whose names look like a disc image or an
+ * archive made earlier (.iso .zip .img .7z .rar, or "(Media Maker" in the name;
+ * .bin is not on the list), as their relative paths with '/', sorted, one per
+ * line; "" when there are none. Packing the folder would put them inside the
+ * new file, so a window asks first. The text is valid until the next call on
+ * this thread. */
+CE_API const char *ce_media_earlier_images(const char *folder);
+
 /* The SHA1 of what the last successful ce_media_make wrote - what a project
  * would record - or "" if it did not finish. */
 CE_API const char *ce_media_last_sha1(void);
