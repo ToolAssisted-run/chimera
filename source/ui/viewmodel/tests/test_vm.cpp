@@ -2029,23 +2029,38 @@ bool speedAndSound(const char *package, const char *rom)
 		CHECK(session.fastDrawOneIn.get() == 10);
 		session.fastDrawOneIn.set(3);
 		session.unthrottled.set(false);
-		/* fast forward at its own speed, 400%, not as fast as it goes, every frame drawn */
-		session.run("play", {}, error);
-		const uint64_t drawnBefore = serial();
-		session.holdFastForward(true);
-		const int64_t from = session.frame.get();
-		d.until([] { return false; }, 1.0);
-		const int64_t fast = session.frame.get() - from;
-		session.holdFastForward(false);
-		session.run("pause", {}, error);
-		CHECK(d.until([&] { return !session.running.get(); }, 5));
-		/* counted once the last frame's picture has arrived: read at once, a
-		 * slow machine's count was one short (CI, e47945e) */
-		d.until([] { return false; }, 0.1);
-		const int64_t fastDrawn = static_cast<int64_t>(serial() - drawnBefore);
-		CHECK(fastDrawn >= fast);
-		std::printf("fast forward: %lld frames in a second\n", static_cast<long long>(fast));
-		CHECK(fast >= 180 && fast <= 280);
+		/* fast forward at its own speed, 400% (240 frames a second), not as
+		 * fast as it goes, every frame drawn. The rate is taken over the time
+		 * the clock says passed, not the second asked for: on a busy test
+		 * runner the wait can run long or the machine can stall for a moment,
+		 * and the count over a "second" then fell outside 180-280 (macOS CI,
+		 * 41e2641f). Up to three tries; one inside the range is enough, since a
+		 * fast forward that is not held to its speed, or never reaches it, fails
+		 * all three. */
+		bool fastInRange = false;
+		for (int attempt = 0; attempt < 3 && !fastInRange; attempt++)
+		{
+			session.run("play", {}, error);
+			const uint64_t drawnBefore = serial();
+			session.holdFastForward(true);
+			const int64_t from = session.frame.get();
+			const auto began = std::chrono::steady_clock::now();
+			d.until([] { return false; }, 1.0);
+			const int64_t fast = session.frame.get() - from;
+			const double took = std::chrono::duration<double>(std::chrono::steady_clock::now() - began).count();
+			session.holdFastForward(false);
+			session.run("pause", {}, error);
+			CHECK(d.until([&] { return !session.running.get(); }, 5));
+			/* counted once the last frame's picture has arrived: read at once, a
+			 * slow machine's count was one short (CI, e47945e) */
+			d.until([] { return false; }, 0.1);
+			const int64_t fastDrawn = static_cast<int64_t>(serial() - drawnBefore);
+			CHECK(fastDrawn >= fast);
+			const double rate = took > 0 ? static_cast<double>(fast) / took : 0;
+			std::printf("fast forward: %lld frames in %.3f s, %.0f a second\n", static_cast<long long>(fast), took, rate);
+			fastInRange = rate >= 180 && rate <= 280;
+		}
+		CHECK(fastInRange);
 	}
 	/* Display Nothing: the frame runs and is not drawn */
 	{
