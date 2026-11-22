@@ -1408,6 +1408,15 @@ private:
 	uint64_t memoryStateCount_ = 0;
 	std::atomic<int64_t> borrowFramesM_{0};
 	int64_t borrowCount_ = 0;
+	/* an encode that starts on frame 0 powers the machine on again (issue 639):
+	 * the machine closed, without telling the window, and opened from the
+	 * project as it is in memory. The flags are those it was last opened with
+	 * (a core or file that differs from the project's, accepted by the person).
+	 * Both on the machine's thread; false, with why, when the machine did not
+	 * open (s_ is then null) */
+	uint32_t openFlagsM_ = 0;
+	void closeEngineOnMachine();
+	bool openEngineAgainOnMachine(const std::string &movieText, uint64_t rerecords, std::string &why);
 	PackageFinder findPackageM_;
 	FolderFinder firmwareFoldersM_;
 	std::map<std::string, std::string> runFirmwareM_;

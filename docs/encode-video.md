@@ -97,6 +97,21 @@ greenzone state is kept and no lag is written down for the frames that go by.
 A run of a hundred thousand frames costs no memory and leaves the project
 exactly as it was found - looking at something should not change it.
 
+An encode whose first frame is 0 does not load the state stored for frame 0: it
+powers the machine on again, as Restart does (issue 639). Some cores have a
+setting under which a saved state does not keep the picture, so after a load the
+first frames would show the picture that was on screen before the encode. A
+fresh power-on is exact for every core. An encode that starts later still loads
+the nearest state and plays on, so a core whose states keep no picture (its
+"fast" setting) can show an out-of-date picture for a frame or two at the start;
+use the core's exact setting for such an encode. Powering on costs one boot of
+the core, and the state history is written to a file and read back so that the
+project is as it was: only RAM Search's candidate list is cleared. If the machine
+cannot be powered on again, even on a second try, the encode says so, the inputs
+are saved to the project's file and the project is closed. While one of the
+core's own windows is open (issue 610) the machine cannot be closed, so an encode
+from frame 0 then loads the frame 0 state as an encode from a later frame does.
+
 Where the emulator was when the encode borrowed it is kept as a state file
 in the project's cache folder (`encode-restore-<id>.state`), written and read
 by the engine the way a branch's state is, and deleted when the emulator is

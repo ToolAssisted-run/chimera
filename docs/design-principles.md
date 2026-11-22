@@ -16610,3 +16610,72 @@ Cancel writes nothing; Pack anyway writes the file and it contains the .iso; nin
 such files show five names and "and 4 more"; choosing a folder drops the
 question. Each new test was broken once on purpose and failed. The window's
 dialog was checked by the window's tests passing, and was not looked at by eye.
+
+## An encode from frame 0 starts from a fresh power-on (user-decided, 2026-11-22, issue 639)
+
+A person encoded a video from frame 0 of a project and found the first frames of
+the video showing the picture that was on screen before the encode. The cause: an
+encode first winds the machine to its first frame by loading the state stored
+for it, and some cores have a setting (for example one called "Pictures in
+States") under which a saved state does not keep the picture. After the load the
+picture stays out of date until the game draws again, so the video recorded it.
+
+Decided by the owner: an encode whose first frame is 0 powers the machine on
+again, as Restart does, instead of loading the state of frame 0. Frame 0 is then
+exact for every core, whatever its picture setting. An encode that starts later
+is unchanged (it still loads the nearest state and plays on). A core whose states
+keep no picture will still show an out-of-date picture for a frame or two at the
+start of such an encode; that is what the core's own exact setting is for.
+
+- It applies to every core; nothing in it is specific to a system. It is in
+  `SessionViewModel::borrowMachine`.
+- Powering on means closing the engine's session and opening a new one from the
+  project in memory, which is what Restart does. An encode does less than
+  Restart so that nothing shows: the window is not told (no "opened" count, no
+  "restarted" notice, no inputs-reset signal, no new button list or key
+  bindings), the project, the movie, the rerecord count, the frozen addresses,
+  the greenzone settings and markers, and the scripts' input-poll and memory
+  callbacks are given to the new session by the same code a project open uses.
+  `client.encodingvideo` stays true from the start to the end.
+- The state history (greenzone) belongs to the engine's session, so closing the
+  session loses it. Before the encode it is written to a file beside the
+  restore state (`encode-restore-<id>.history`, by the same engine call the
+  project cache uses) and read back at the end into the new session, before the
+  restore state is loaded. If it cannot be written, the encode does not start
+  (the same message as when the restore state cannot be written). An empty
+  history is not written.
+- RAM Search is the one thing that cannot be kept: its candidate list points at
+  the closed session's memory, so it is cleared, as it is when the machine is
+  closed. Branches, markers, the piano roll, scripts and the windows are as
+  before.
+- If the machine does not open for the encode, the encode fails with "the machine
+  could not be powered on again", and the person's machine is opened again once
+  more and given back as usual. If that fails too, the project's inputs are saved
+  first and then the project is closed, and the message says where they were
+  saved: to the project's own file, or, for a project never saved to a file, to
+  `inputs-after-failed-encode.chimeraProject` in the folder where the session's
+  cache keeps that project (or the temporary folder when there is none). If the
+  save fails, the message says so. Four new texts in all 26 language tables.
+- Three answers of the owner (owner, 2026-11-22): the greenzone is kept by
+  writing it to the history file and reading it back, as above; RAM Search being
+  cleared is acceptable; and when the machine cannot be opened even the second
+  time, the inputs are saved before the project is closed.
+- Not while the core holds a frame because one of its own windows is open
+  (issue 610): the core's code is then on the window's thread and the machine
+  cannot be closed, so the frame 0 state is loaded as before. Chosen while
+  finishing the change, not asked of the owner.
+- The cost is one boot of the core, as Restart costs. Measured on the synthetic
+  core: an encode of 10 frames from power-on, with the machine given back, took
+  233 ms (jaffanator01, all 79 meson tests passing). A real core takes as long
+  as its own boot.
+
+Tested: a view model test (`encodeFromPowerOn`) sets the synthetic core to show a
+wrong picture for five frames after a state load, as a core whose states keep no
+picture does, plays 30 frames, seeks to frame 20, and encodes frames 0 to 9: the
+ten pictures equal those of a run from power-on; afterwards the machine is on
+frame 20 with the same saved-state hash, the same greenzone (the number of
+states and the nearest to frames 20 and 29), the same rerecord count, the same
+"opens" count and no restart notice; `borrowed` (client.encodingvideo) was true
+in every frame. An encode from frame 5 still works, and one over a project whose
+game file has been removed fails with a message and closes the project. The test
+was broken on purpose once (frame 0 wound by loading the state again) and failed.

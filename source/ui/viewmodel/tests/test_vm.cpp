@@ -10644,6 +10644,147 @@ tastudio.clearIconCache()
 	return true;
 }
 
+/* An encode that starts on frame 0 starts from the machine powered on, not from
+ * the state stored for frame 0 (issue 639). The synthetic core is set to show a
+ * wrong picture for five frames after any state is loaded, as a core whose
+ * states do not keep the picture does: the pictures of an encode from 0 must be
+ * the ones of a run from power-on, and the machine, its state history and its
+ * frame must come back as they were. No ffmpeg is needed: the frames are taken
+ * as the encoder is given them. */
+bool encodeFromPowerOn(const char *package, const char *rom)
+{
+	namespace fs = std::filesystem;
+	ManualDispatcher d;
+	InputLog inputs;
+	SessionViewModel session(d, inputs);
+	const fs::path dir = fs::temp_directory_path() / ("chimera-test-poweron-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+	fs::create_directories(dir);
+	fs::copy_file(rom, dir / "walker.testrom");
+	std::string error;
+	session.cacheFolder.set((dir / "cache").string());
+	const fs::path project = gameProject(package, (dir / "walker.testrom").string(), dir / "walker.chimeraProject");
+	{
+		const char *err = nullptr;
+		ce_project *p = ce_project_open(project.string().c_str(), &err);
+		CHECK(p != nullptr);
+		if (p == nullptr) return false;
+		ce_project_set_settings_text(p, "{\"garbleAfterLoad\":5}", &err);
+		ce_project_save(p, project.string().c_str(), &err);
+		ce_project_free(p);
+	}
+	session.run("openProject", {project.string(), std::string(package)}, error);
+	CHECK(d.until([&] { return session.isOpen.get(); }, 60));
+	auto hashOf = [](ce_session *s) {
+		uint64_t h = 1469598103934665603ull;
+		const uint32_t *px = ce_session_video(s);
+		const size_t n = static_cast<size_t>(ce_session_video_width(s)) * static_cast<size_t>(ce_session_video_height(s));
+		for (size_t i = 0; px != nullptr && i < n; i++) h = (h ^ px[i]) * 1099511628211ull;
+		return h;
+	};
+	auto stateHash = [&] {
+		uint64_t h = 1469598103934665603ull;
+		session.onMachineWait([&](ce_session *s) {
+			uint64_t len = 0;
+			const uint8_t *b = ce_session_save_state(s, &len);
+			for (uint64_t i = 0; b != nullptr && i < len; i++) h = (h ^ b[i]) * 1099511628211ull;
+		});
+		return h;
+	};
+	/* the pictures of a run from power-on: after frames 1 to 10 */
+	std::map<int64_t, uint64_t> fresh;
+	for (int64_t f = 1; f <= 30; f++)
+	{
+		session.run("frameAdvance", {}, error);
+		CHECK(d.until([&] { return session.frame.get() == f; }, 30));
+		if (f <= 10) session.onMachineWait([&](ce_session *s) { fresh[f] = hashOf(s); });
+	}
+	CHECK(session.run("saveProject", {project.string()}, error).has_value());
+	CHECK(d.until([&] { return session.hasProject.get() && !session.projectPath.get().empty(); }, 20));
+	/* the machine on frame 20 by a state load, with a picture the game has not drawn since */
+	session.run("seek", {int64_t{20}}, error);
+	CHECK(d.until([&] { return session.frame.get() == 20; }, 30));
+	const uint64_t stateBefore = stateHash();
+	int64_t greenCount = 0, greenNear = 0, greenFar = 0;
+	session.onMachineWait([&](ce_session *s) {
+		greenCount = ce_session_greenzone_count(s);
+		greenNear = ce_session_greenzone_nearest(s, 20);
+		greenFar = ce_session_greenzone_nearest(s, 29);
+	});
+	CHECK(greenCount > 10 && greenNear == 20);
+	const int64_t rerecords = session.rerecords.get();
+	const int64_t opens = session.opens.get();
+	std::vector<std::pair<int64_t, uint64_t>> got;
+	bool lentWhileRunning = true;
+	int ended = -1;
+	std::string why;
+	const auto began = std::chrono::steady_clock::now();
+	session.borrowMachine(0, 9, [&](ce_session *s, std::string &) {
+		got.emplace_back(ce_session_frame(s), hashOf(s));
+		lentWhileRunning = lentWhileRunning && session.run("borrowed", {}, error).has_value();
+		return true;
+	}, [] {}, [&](int e, std::string w) { ended = e; why = w; });
+	CHECK(d.until([&] { return ended >= 0; }, 120));
+	CHECK(ended == 0 && why.empty());
+	std::printf("encode of 10 frames from power-on, with the machine given back: %.0f ms\n",
+		std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - began).count());
+	CHECK(got.size() == 10);
+	/* every picture of the encode is the one a run from power-on drew */
+	int same = 0;
+	for (const auto &[f, h] : got)
+		if (fresh.count(f) != 0 && fresh[f] == h) same++;
+	CHECK(same == 10);
+	CHECK(lentWhileRunning);
+	/* handed back as it was: the frame, the state, the history, the counts; nothing said of a restart */
+	CHECK(session.frame.get() == 20 && !session.running.get() && session.isOpen.get());
+	CHECK(session.rerecords.get() == rerecords && inputs.size() == 30);
+	CHECK(session.opens.get() == opens && !session.restarted.get());
+	CHECK(stateHash() == stateBefore);
+	int64_t countAfter = 0, nearAfter = 0, farAfter = 0;
+	session.onMachineWait([&](ce_session *s) {
+		countAfter = ce_session_greenzone_count(s);
+		nearAfter = ce_session_greenzone_nearest(s, 20);
+		farAfter = ce_session_greenzone_nearest(s, 29);
+	});
+	CHECK(countAfter == greenCount && nearAfter == greenNear && farAfter == greenFar);
+	/* and it still plays on */
+	session.run("frameAdvance", {}, error);
+	CHECK(d.until([&] { return session.frame.get() == 21; }, 30));
+	/* an encode that starts later is as it was: from the stored state */
+	ended = -1;
+	session.borrowMachine(5, 9, [](ce_session *, std::string &) { return true; }, [] {}, [&](int e, std::string w) { ended = e; why = w; });
+	CHECK(d.until([&] { return ended >= 0; }, 120));
+	CHECK(ended == 0 && session.frame.get() == 21);
+	/* a machine that cannot be opened again: the encode fails, and says so */
+	fs::remove(dir / "walker.testrom");
+	ended = -1;
+	why.clear();
+	session.borrowMachine(0, 9, [](ce_session *, std::string &) { return true; }, [] {}, [&](int e, std::string w) { ended = e; why = w; });
+	CHECK(d.until([&] { return ended >= 0; }, 120));
+	CHECK(ended == 2 && !why.empty());
+	std::printf("encode from power-on, game missing: %s\n", why.c_str());
+	/* the project was saved before it was closed: its file holds the 30 frames of the run */
+	CHECK(why.find(project.string()) != std::string::npos);
+	{
+		const char *err = nullptr;
+		ce_project *saved = ce_project_open(project.string().c_str(), &err);
+		CHECK(saved != nullptr);
+		if (saved != nullptr)
+		{
+			uint64_t len = 0;
+			const char *text = ce_project_log_text(saved, &len);
+			ce_movie_log *log = ce_movie_log_new();
+			if (text != nullptr) ce_movie_log_parse(log, text, len);
+			CHECK(ce_movie_log_count(log) == 30);
+			ce_movie_log_free(log);
+			ce_project_free(saved);
+		}
+	}
+	CHECK(d.until([&] { return !session.isOpen.get(); }, 20));
+	std::error_code ec;
+	fs::remove_all(dir, ec);
+	return true;
+}
+
 /* Chimera's Encode Video: frames 5 to 14 of a project's run, both
  * included, written by the ffmpeg the build ships; the file holds exactly
  * those, counted by that ffmpeg; the machine is handed back on the frame it
@@ -12910,6 +13051,7 @@ int main(int argc, char **argv)
 			ranMachine = luaParity(argv[1], argv[2]) && ranMachine;
 			ranMachine = turboSeekCancel(argv[1], argv[2]) && ranMachine;
 			ranMachine = encodeVideo(argv[1], argv[2]) && ranMachine;
+			ranMachine = encodeFromPowerOn(argv[1], argv[2]) && ranMachine;
 			ranMachine = luaTastudio(argv[1], argv[2]) && ranMachine;
 			ranMachine = throttles(argv[1], argv[2]) && ranMachine;
 			ranMachine = autoholdAndAutofire(argv[1], argv[2]) && ranMachine;

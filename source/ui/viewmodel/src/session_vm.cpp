@@ -3577,6 +3577,106 @@ void SessionViewModel::setMarkers(std::vector<Marker> markers)
 	});
 }
 
+/* The machine closed for an encode that starts on frame 0 (issue 639): what
+ * freeSessionOnMachine does to the engine's session, and no more - the window
+ * is not told, the core's windows and the project stay. */
+void SessionViewModel::closeEngineOnMachine()
+{
+	if (s_ == nullptr) return;
+	turboSeekToM_ = -1;
+	if (longSeekM_) endLongSeekOnMachine();
+	dropQuestionOnMachine();
+	/* the tools that hold the machine's memory (RAM Search) let it go */
+	for (const Hooks &h : hooksM_)
+		if (h.closing) h.closing(s_);
+	inputs_.rebind(nullptr);
+	{
+		std::lock_guard<std::mutex> lock(seekStopLock_);
+		seekStopS_ = nullptr;
+	}
+	ce_session_history_save_wait(s_);
+	ce_session_free(s_);
+	s_ = nullptr;
+}
+
+/* The project as it is in memory opened again on frame 0, given the movie it
+ * had, as a restart does but with the window told nothing: the same buttons,
+ * the same project, no "opened" and no restart notice. Without a machine
+ * (s_ null) on return when it did not open, and why. */
+bool SessionViewModel::openEngineAgainOnMachine(const std::string &movieText, uint64_t rerecords, std::string &why)
+{
+	if (projectM_ == nullptr)
+	{
+		why = tr("session.no_machine");
+		return false;
+	}
+	ce_project *p = projectM_;
+	const std::string &package = package_;
+	Firmware fw;
+	{
+		uint64_t len = 0;
+		const char *slots = ce_project_slots_text(p, &len);
+		const std::string slotsText(slots != nullptr ? slots : "{}", slots != nullptr ? static_cast<size_t>(len) : 2);
+		const char *settings = ce_project_settings_text(p, &len);
+		const std::string settingsText(settings != nullptr ? settings : "{}", settings != nullptr ? static_cast<size_t>(len) : 2);
+		const char *pins = ce_project_firmware_text(p, &len);
+		const std::string pinsText(pins != nullptr ? pins : "", pins != nullptr ? static_cast<size_t>(len) : 0);
+		std::string game;
+		std::vector<std::pair<std::string, std::string>> files;
+		for (int32_t i = 0; i < ce_project_file_count(p); i++)
+		{
+			const char *name = ce_project_file_name(p, i), *source = ce_project_file_source_path(p, i);
+			if (name == nullptr || source == nullptr || *source == '\0') continue;
+			if (game.empty()) game = source;
+			files.emplace_back(name, source);
+		}
+		if (!firmwareOnMachine(package, slotsText, settingsText, pinsText, game, files, fw, why, nullptr)) return false;
+	}
+	std::vector<const char *> fwIds;
+	std::vector<const uint8_t *> fwData;
+	std::vector<uint64_t> fwLens;
+	for (size_t i = 0; i < fw.ids.size(); i++)
+	{
+		fwIds.push_back(fw.ids[i].c_str());
+		fwData.push_back(fw.data[i].data());
+		fwLens.push_back(fw.data[i].size());
+	}
+	compileCacheOnMachine(package, ce_project_file_count(p) > 0 && ce_project_file_source_path(p, 0) != nullptr ? ce_project_file_source_path(p, 0) : "",
+		ce_project_file_count(p) > 0 && ce_project_file_sha1(p, 0) != nullptr ? ce_project_file_sha1(p, 0) : "");
+	{
+		uint64_t len = 0;
+		const char *settings = ce_project_settings_text(p, &len);
+		requestGpu(package, settings != nullptr ? std::string(settings, static_cast<size_t>(len)) : std::string());
+	}
+	const char *error = nullptr;
+	ce_session *s = ce_session_open_project(package.c_str(), p, nullptr, fwIds.data(), fwData.data(), fwLens.data(),
+		static_cast<int32_t>(fwIds.size()), openFlagsM_, &error);
+	if (s == nullptr)
+	{
+		why = error != nullptr ? error : tr("common.no_reason");
+		return false;
+	}
+	s_ = s;
+	applyInputPollsOnMachine();
+	applyMemoryWatchesOnMachine();
+	diedM_ = false;
+	inputs_.rebind(s);
+	{
+		std::lock_guard<std::mutex> lock(seekStopLock_);
+		seekStopS_ = s;
+	}
+	frameM_ = 0;
+	loadMovieOnMachine(s, movieText);
+	ce_session_set_rerecords(s, rerecords);
+	ce_session_greenzone_picture_settle(s, static_cast<int32_t>(std::clamp<int64_t>(pictureSettleM_.load(), 0, 10)));
+	applyBudgetsOnMachine(s, true);
+	ce_session_greenzone_capture_period(s, periodM_.load());
+	pinMarkersOnMachine();
+	/* the frozen addresses go on with the new machine */
+	carryFreezesOnMachine(freezeGameM_);
+	return true;
+}
+
 void SessionViewModel::borrowMachine(int64_t from, int64_t to, BorrowFrame frame, std::function<void()> finishing,
 	std::function<void(int, std::string)> done)
 {
@@ -3605,7 +3705,30 @@ void SessionViewModel::borrowMachine(int64_t from, int64_t to, BorrowFrame frame
 		const fs::path restore = folder / ("encode-restore-" + std::to_string(++borrowCount_) + ".state");
 		if (ce_session_state_save_file(s_, branch_state::utf8(restore).c_str(), nullptr, 0) != 0)
 			return fail(tr("session.encode_no_state", {ce_session_last_error(s_)}));
+		/* frame 0 is the machine powered on, not a state loaded: a core whose states
+		 * do not keep the picture shows the old one for a while after a load (issue
+		 * 639). Powering on needs the machine opened again, which drops its state
+		 * history, so that is kept in a file too and put back at the end. Not while
+		 * the core holds a frame (one of its own windows is open, issue 610): its
+		 * code is on this thread's stack and the machine cannot close, so the
+		 * state is loaded as before */
+		const bool fresh = from == 0 && !ce_session_held(s_);
+		const fs::path historyFile = folder / ("encode-restore-" + std::to_string(borrowCount_) + ".history");
+		bool historyKept = false;
 		const int64_t was = ce_session_frame(s_);
+		const uint64_t rerecordsWas = ce_session_rerecords(s_);
+		const int64_t greenWas = greenEndM_;
+		const std::string movieWas = fresh ? movieTextOnMachine() : std::string();
+		if (fresh && ce_session_greenzone_held(s_) > 0)
+		{
+			if (ce_session_history_save(s_, branch_state::utf8(historyFile).c_str(), machineIdOnMachine().c_str()) != 0)
+			{
+				const std::string reason = ce_session_last_error(s_);
+				fs::remove(restore, ec);
+				return fail(tr("session.encode_no_state", {reason}));
+			}
+			historyKept = true;
+		}
 		const bool wasRunning = runningM_, wasRecording = recordingM_.load();
 		Picture::Frame shown;
 		screen.takeIfNewer(UINT64_MAX, shown);
@@ -3614,10 +3737,33 @@ void SessionViewModel::borrowMachine(int64_t from, int64_t to, BorrowFrame frame
 		/* a reproduction: nothing recorded over the movie, no state kept */
 		ce_session_greenzone_capture_period(s_, 0);
 		recordingM_ = true;
-		seekOnMachine(from, false);
 		int ended = 0;
 		std::string why;
-		while (s_ != nullptr)
+		bool play = true;
+		bool lost = false;
+		if (fresh)
+		{
+			closeEngineOnMachine();
+			if (!openEngineAgainOnMachine(movieWas, rerecordsWas, why))
+			{
+				/* the person's machine is still to be given back: tried once more, from the same project */
+				const std::string reason = why;
+				why = tr("session.encode_no_power_on", {reason});
+				ended = 2;
+				play = false;
+				std::string again;
+				if (!openEngineAgainOnMachine(movieWas, rerecordsWas, again))
+				{
+					lost = true;
+					why = tr("session.encode_not_put_back", {again});
+				}
+			}
+			else
+				ce_session_greenzone_capture_period(s_, 0);
+		}
+		else
+			seekOnMachine(from, false);
+		while (play && s_ != nullptr)
 		{
 			if (borrowStopM_.load())
 			{
@@ -3660,9 +3806,53 @@ void SessionViewModel::borrowMachine(int64_t from, int64_t to, BorrowFrame frame
 		if (finishing) finishing();
 		/* given back: the frame, its picture, the greenzone, running or not */
 		recordingM_ = wasRecording;
+		if (lost)
+		{
+			/* no machine to give back: the project is closed, as when a core stops for good,
+			 * but its inputs are saved first, to its own file or, for a project never
+			 * saved, beside where the session's cache keeps it (owner, 2026-11-22) */
+			if (projectM_ != nullptr)
+			{
+				ce_project_set_log_text(projectM_, movieWas.data(), movieWas.size());
+				ce_project_set_rerecords(projectM_, rerecordsWas);
+				fs::path target = projectPathM_.empty() ? fs::path() : fs::path(projectPathM_);
+				if (target.empty())
+				{
+					fs::path where = projectCacheOnMachine();
+					if (where.empty()) where = folder;
+					fs::create_directories(where, ec);
+					target = where / "inputs-after-failed-encode.chimeraProject";
+				}
+				const char *saveError = nullptr;
+				if (ce_project_save(projectM_, branch_state::utf8(target).c_str(), &saveError) == 0)
+					why += " " + tr("session.encode_inputs_saved", {target.string()});
+				else
+					why += " " + tr("session.encode_inputs_not_saved", {saveError != nullptr ? saveError : tr("common.no_reason")});
+			}
+			freeProjectOnMachine();
+			runningM_ = false;
+			screen.clear();
+			later([this, text = why] {
+				screenChanged.emit();
+				status.set(text);
+				openFailures.set(openFailures.get() + 1);
+				isOpen.set(false);
+				running.set(false);
+				projectPath.set("");
+				projectTitle.set("");
+				projectId.set("");
+				hasProject.set(false);
+				projectSwitched();
+			});
+		}
 		if (s_ != nullptr)
 		{
 			ce_session_greenzone_capture_period(s_, periodM_.load());
+			if (historyKept)
+			{
+				ce_session_history_load(s_, branch_state::utf8(historyFile).c_str(), machineIdOnMachine().c_str());
+				greenEndM_ = greenWas;
+			}
 			if (ce_session_state_load_file(s_, branch_state::utf8(restore).c_str(), nullptr, 0, nullptr) == 0 &&
 				ce_session_movie_at(s_, was) == 0)
 			{
@@ -3679,7 +3869,8 @@ void SessionViewModel::borrowMachine(int64_t from, int64_t to, BorrowFrame frame
 			later([this, wasRunning] { running.set(wasRunning); });
 		}
 		fs::remove(restore, ec);
-		report(-1, -1, -1, -1, -1);
+		fs::remove(historyFile, ec);
+		if (!lost) report(-1, -1, -1, -1, -1);
 		borrowedM_.store(false);
 		later([done, ended, why] { done(ended, why); });
 		/* the scripts' turn on the frame given back, as on the frame a seek lands
@@ -5769,6 +5960,7 @@ void SessionViewModel::bootProjectOnMachine(ce_project *p, const std::string &pa
 		fail(tr("session.machine_not_opened", {error != nullptr ? error : tr("common.no_reason")}));
 		return;
 	}
+	openFlagsM_ = flags;
 
 	/* the movie: the project's, given to the machine, which keeps it from
 	 * now on and writes every line of it - or, started again, the one it had */

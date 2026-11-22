@@ -250,4 +250,10 @@ void InputLog::bind(ce_session *s)
 	strokeCounts_ = movieCounts_ = true;
 }
 
+void InputLog::rebind(ce_session *s)
+{
+	std::unique_lock lock(m_);
+	s_ = s;
+}
+
 } // namespace chimera::vm

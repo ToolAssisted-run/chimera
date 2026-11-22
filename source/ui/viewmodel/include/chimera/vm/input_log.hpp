@@ -83,6 +83,8 @@ public:
 	/* the machine's thread: the machine whose movie this is, nullptr for
 	 * none - before it frees one */
 	void bind(ce_session *s);
+	/* the same movie on another machine (or none): nothing else changes */
+	void rebind(ce_session *s);
 
 private:
 	mutable std::shared_mutex m_;
