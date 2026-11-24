@@ -1026,16 +1026,23 @@ void PianoRollItem::wheelEvent(QWheelEvent *e)
 {
 	/* a notch is 120; what is short of one is kept for the next step, as a
 	 * trackpad turns a little at a time (each step alone was 0, issue 542) */
-	/* a sideways turn (a tilting wheel, a trackpad's swipe) scrolls the columns */
-	if (e->angleDelta().x() != 0 || (e->angleDelta().y() == 0 && e->pixelDelta().x() != 0))
+	/* a sideways turn (a tilting wheel, a trackpad's swipe) scrolls the columns;
+	 * a step that goes more down or up than sideways is a scroll of the rows.
+	 * A trackpad swipe is never quite straight, and a step with any sideways
+	 * part in it used to be taken as sideways only, so swipes up and down were
+	 * lost now and then */
+	const QPoint step = !e->pixelDelta().isNull() ? e->pixelDelta() : e->angleDelta();
+	if (std::abs(step.x()) > std::abs(step.y()))
 	{
 		const int along = e->pixelDelta().x() != 0 ? e->pixelDelta().x() : e->angleDelta().x() / 2;
 		setScrollX(scroll_ - along);
 		e->accept();
 		return;
 	}
+	/* what is kept is let go when the turn goes the other way; a step of
+	 * nothing (a trackpad's at the start and the end of a swipe) keeps it */
 	const int angle = e->angleDelta().y();
-	if ((angle > 0) != (wheelAngle_ > 0)) wheelAngle_ = 0;
+	if (angle != 0 && wheelAngle_ != 0 && (angle > 0) != (wheelAngle_ > 0)) wheelAngle_ = 0;
 	wheelAngle_ += angle;
 	const int notches = wheelAngle_ / 120;
 	wheelAngle_ -= notches * 120;
@@ -1055,7 +1062,7 @@ void PianoRollItem::wheelEvent(QWheelEvent *e)
 	if (!e->pixelDelta().isNull())
 	{
 		const int pixels = e->pixelDelta().y();
-		if ((pixels > 0) != (wheelPixels_ > 0)) wheelPixels_ = 0;
+		if (pixels != 0 && wheelPixels_ != 0 && (pixels > 0) != (wheelPixels_ > 0)) wheelPixels_ = 0;
 		wheelPixels_ += pixels;
 		const int rows = wheelPixels_ / std::max(1, rowHeight_);
 		wheelPixels_ -= rows * std::max(1, rowHeight_);

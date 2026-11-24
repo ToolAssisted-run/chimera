@@ -60,6 +60,31 @@ int main(int argc, char **argv)
 	roll.setTopRow(100);
 	for (int i = 0; i < 10 * h; i += 2) wheel(roll, QPoint(0, -2), QPoint(0, -2));
 	CHECK(roll.topRow() == 110);
+	/* a swipe that is not quite straight, a pixel sideways in every step:
+	 * still 10 rows down (it was taken as sideways only, and the rows did
+	 * not move) */
+	roll.setTopRow(100);
+	for (int i = 0; i < 10 * h; i += 2) wheel(roll, QPoint(1, -2), QPoint(1, -2));
+	CHECK(roll.topRow() == 110);
+	/* with the steps of nothing a trackpad sends at a swipe's start and end
+	 * between them: what was short of a row is kept */
+	roll.setTopRow(100);
+	for (int i = 0; i < 10 * h; i += 2)
+	{
+		wheel(roll, QPoint(0, -2), QPoint(0, -2));
+		wheel(roll, QPoint(), QPoint());
+	}
+	CHECK(roll.topRow() == 110);
+	/* a wheel's turn short of a notch is kept across a step of nothing too */
+	roll.setTopRow(100);
+	wheel(roll, QPoint(), QPoint(0, 60));
+	wheel(roll, QPoint(), QPoint());
+	wheel(roll, QPoint(), QPoint(0, 60));
+	CHECK(roll.topRow() == 94);
+	/* a swipe more sideways than up or down scrolls the columns, not the rows */
+	roll.setTopRow(100);
+	for (int i = 0; i < 20; i++) wheel(roll, QPoint(-3, 1), QPoint(-3, 1));
+	CHECK(roll.topRow() == 100);
 	/* never above the first row */
 	roll.setTopRow(1);
 	for (int i = 0; i < 5 * h; i++) wheel(roll, QPoint(0, 1), QPoint(0, 1));
