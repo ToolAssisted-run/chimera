@@ -187,5 +187,6 @@
     <file alias="RadioButton.qml">style/RadioButton.qml</file>
     <file alias="ScrollBar.qml">style/ScrollBar.qml</file>
     <file alias="ScrollView.qml">style/ScrollView.qml</file>
+    <file alias="SpinBox.qml">style/SpinBox.qml</file>
   </qresource>
 </RCC>
