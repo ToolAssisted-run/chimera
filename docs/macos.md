@@ -82,6 +82,16 @@ menus: an item's hotkey is not written beside it (a key given to an item as its
 shortcut is), the System and Emulator menus are greyed rather than left out
 while no game runs, and a tool window's menu bar colour setting has no effect.
 
+The Window menu's Move & Resize items and their keys (Fn-Control-arrows to
+tile, Fn-Control-C to centre, Fn-Control-F to fill) work in every window. AppKit
+puts them in the application's windows menu, which Qt makes once, hidden, in the
+first menu bar it shows: the main window's. When a window with a menu bar of its
+own came to the front (TAStudio, the RAM tools, the Hex Editor, the Lua Console),
+Qt showed that bar instead, the windows menu stayed behind in the main window's,
+and the keys did nothing. `source/ui/qt/mac_window_menu.mm` moves the windows
+menu into whichever menu bar is shown, each time a window comes to the front;
+the "mac windows menu" test checks it.
+
 Two things are different on a Mac and the tests know it: Qt's Control key is
 the Command key (Chimera's Ctrl is Qt's Meta there), and a Mac's menus have
 no Alt letters.
