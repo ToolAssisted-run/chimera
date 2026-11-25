@@ -370,6 +370,11 @@ if qt_dep.found()
     qt_rcc,
     qt_dialogs_rcc,
   ]
+  if host_machine.system() == 'darwin'
+    # the Window menu's Move & Resize keys for every window, AppKit's (qt/mac_window_menu.hpp)
+    add_languages('objcpp', native: false)
+    qt_sources += ['qt/mac_window_menu.mm']
+  endif
   if host_machine.system() == 'windows'
     # the window is a DLL in lib\ with everything it needs, and chimera.exe
     # a launcher that loads it from there (qt/launcher.c); qt.conf, built in,
@@ -407,6 +412,8 @@ if qt_dep.found()
       dependencies: [vm_dep, qt_dep, dl_dep, dependency('qt6', modules: ['Core', 'Gui'], private_headers: true)],
       # the view models have a Signal::emit; Qt's "emit" keyword would eat it
       cpp_args: ['-DQT_NO_KEYWORDS'] + qt_private_args,
+      objcpp_args: ['-std=c++20'],
+      link_args: host_machine.system() == 'darwin' ? ['-framework', 'AppKit'] : [],
       override_options: ['cpp_std=c++20'],
       install: true,
       install_dir: 'dll',
@@ -617,6 +624,17 @@ endif
       override_options: ['cpp_std=c++20'],
     )
     test('long seek', test_long_seek, env: ['QT_QPA_PLATFORM=offscreen', 'QT_QUICK_BACKEND=software', 'QT_QUICK_CONTROLS_STYLE=Basic'], timeout: 60)
+    if host_machine.system() == 'darwin'
+      # the Window menu's Move & Resize keys in every window's menu bar: the
+      # windows menu follows the menu bar shown (qt/mac_window_menu.hpp)
+      test_mac_windows_menu = executable(
+        'test-mac-windows-menu',
+        ['qt/tests/test_mac_windows_menu.mm', 'qt/mac_window_menu.mm'],
+        objcpp_args: ['-std=c++20'],
+        link_args: ['-framework', 'AppKit'],
+      )
+      test('mac windows menu', test_mac_windows_menu, timeout: 30)
+    endif
     # every modal window is a sheet on a Mac, not over other apps (issue 541)
     test('mac sheets', find_program('python3'), args: [files('qt/tests/mac-sheets.py'), meson.current_source_dir() / 'qt'])
     # a button clicked ends the editing of a box: a number typed is its value

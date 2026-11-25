@@ -129,6 +129,9 @@
 #include "single_instance.hpp"
 #include "headless_run.hpp"
 #include "key_filter.hpp"
+#ifdef __APPLE__
+#include "mac_window_menu.hpp"
+#endif
 #include "key_names.hpp"
 #include "menu_letters.hpp"
 #include "picture_item.hpp"
@@ -296,6 +299,10 @@ int main(int argc, char **argv)
 	if (!qEnvironmentVariableIsSet("QT_LOGGING_RULES"))
 		QLoggingCategory::setFilterRules(QStringLiteral("qt.qpa.wayland.textinput.warning=false"));
 	QGuiApplication app(argc, argv);
+#ifdef __APPLE__
+	/* the Window menu's Move & Resize keys in every window's menu bar, not the main window's alone */
+	chimera::qt::followWindowsMenu();
+#endif
 	/* Qt takes the person's locale for the C library too, and with a decimal
 	 * comma printf("%g") writes "0,5" into files read as "0.5": numbers stay
 	 * the C locale's, as Chimera's runtime keeps them (chimera issue 244) */
