@@ -777,6 +777,15 @@ endif
       override_options: ['cpp_std=c++20'],
     )
     test('number prompt', test_number_prompt, env: ['QT_QPA_PLATFORM=offscreen', 'QT_QUICK_BACKEND=software', 'QT_QUICK_CONTROLS_STYLE=Basic'], timeout: 60)
+    # a number box's value is a plain number, every digit of which can be
+    # deleted and typed over: no thousands separator in the way (style/SpinBox.qml)
+    test_spin_box = executable(
+      'test-spin-box',
+      ['qt/tests/test_spin_box.cpp', qt_rcc],
+      dependencies: [qt_test_dep],
+      override_options: ['cpp_std=c++20'],
+    )
+    test('spin box', test_spin_box, env: ['QT_QPA_PLATFORM=offscreen', 'QT_QUICK_BACKEND=software'], timeout: 60)
     # scripts dropped on the Lua Console opened and run, a session read,
     # other files left alone (issue 561)
     test_lua_console_drop = executable(

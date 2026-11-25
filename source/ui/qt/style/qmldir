@@ -8,4 +8,5 @@ MenuItem 6.0 MenuItem.qml
 RadioButton 6.0 RadioButton.qml
 ScrollBar 6.0 ScrollBar.qml
 ScrollView 6.0 ScrollView.qml
+SpinBox 6.0 SpinBox.qml
 import QtQuick.Controls.Fusion auto
