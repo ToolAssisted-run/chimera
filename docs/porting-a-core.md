@@ -415,6 +415,12 @@ Advice earned the hard way:
   list `nameHints`, pieces of a file name that mark it (`["7i"]`, `["nand"]`):
   when its `name` finds nothing, the one file of its `size` whose name holds a
   hint answers it, and with several the person chooses (issue 349).
+  An entry that pins a `sha1` may also list `sha1s`, the hashes of other dumps
+  of the same file (`"sha1s": ["DF5A0D2D..."]`), for a ROM that dumpers write
+  in more than one way: a file with any of them is found and is taken as the
+  core's own. `sha1` stays the one the core was tested with; the core must
+  then load every listed dump correctly (ares trims a Game Boy Color boot ROM
+  dumped with the cartridge header's gap).
 - **`package-licenses.json` is not optional.** Every component, its terms, its
   source link, and its licence text travel with the package; the bundle's
   LICENSES.md is computed from them, and a package that declares nothing stops

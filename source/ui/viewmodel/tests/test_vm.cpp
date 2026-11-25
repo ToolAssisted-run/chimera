@@ -656,6 +656,25 @@ void firmware()
 	f = findFirmware(decl(std::string(R"({"id":"a","sha1":")") + sha + "\"}"), custom, index, how);
 	CHECK(f != nullptr && f->name == "custom.rom" && how == "by the hash the project pins");
 	CHECK(findFirmware(decl(R"({"id":"a","sha1":"0000000000000000000000000000000000000000","name":"BIOS.BIN"})"), "", index, how) == nullptr);
+	/* an entry listing other dumps of the same file ("sha1s"): a file of any
+	 * of them is found by its hash, and is the core's own, not one of the
+	 * person's (ares' Game Boy Color boot ROM, dumped with and without the
+	 * cartridge header's gap) */
+	{
+		const std::string other = std::string(R"({"id":"a","sha1":"0000000000000000000000000000000000000000","sha1s":[")") + custom + "\"]}";
+		f = findFirmware(decl(other), "", index, how);
+		CHECK(f != nullptr && f->name == "custom.rom" && how == "by its hash");
+		const std::vector<std::string> accepted = acceptedSha1s(decl(other));
+		CHECK(accepted.size() == 2 && accepted[0] == "0000000000000000000000000000000000000000" && accepted[1] == custom);
+		CHECK(acceptsSha1(decl(other), custom) && !acceptsSha1(decl(other), sha));
+		/* one hash listed twice, or in lower case, is one */
+		std::string lowerCustom = custom;
+		for (char &c : lowerCustom) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+		CHECK(acceptedSha1s(decl(std::string(R"({"id":"a","sha1":")") + custom + R"(","sha1s":[")" + lowerCustom + "\"]}")).size() == 1);
+		/* an entry that pins a hash is never matched by its name hints alone */
+		CHECK(hintCandidates(decl(std::string(R"({"id":"c","size":16,"nameHints":["7i"],"sha1s":[")") + custom + "\"]}"), index).empty());
+		CHECK(acceptedSha1s(decl(R"({"id":"b","name":"bios.bin"})")).empty());
+	}
 	f = findFirmware(decl(R"({"id":"b","name":"bios.bin"})"), "", index, how);
 	CHECK(f != nullptr && f->name == "BIOS.BIN" && how == "by its name");
 	f = findFirmware(decl(R"({"id":"c","size":16,"nameHints":["7i"]})"), "", index, how);

@@ -98,6 +98,27 @@ const std::string &FirmwareFile::hash() const
 	return sha1;
 }
 
+std::vector<std::string> acceptedSha1s(const Json &decl)
+{
+	std::vector<std::string> out;
+	auto add = [&out](std::string h) {
+		for (char &c : h) c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+		if (!h.empty() && std::find(out.begin(), out.end(), h) == out.end()) out.push_back(std::move(h));
+	};
+	add(text(decl, "sha1"));
+	if (const Json *others = decl.find("sha1s"); others != nullptr && others->kind == Json::Kind::Array)
+		for (const Json &h : others->items)
+			if (h.kind == Json::Kind::String) add(h.text);
+	return out;
+}
+
+bool acceptsSha1(const Json &decl, const std::string &sha1)
+{
+	for (const std::string &h : acceptedSha1s(decl))
+		if (lower(h) == lower(sha1)) return true;
+	return false;
+}
+
 const FirmwareFile *findFirmware(const Json &decl, const std::string &pinnedSha1, const std::vector<FirmwareFile> &index,
 	std::string &how)
 {
@@ -106,11 +127,16 @@ const FirmwareFile *findFirmware(const Json &decl, const std::string &pinnedSha1
 	/* a hash, when one is pinned, is the only thing that counts; a pin the
 	 * project made of a file of another size (a custom one) is honoured
 	 * too, so only the package's own hash narrows by size */
-	const std::string sha = !pinnedSha1.empty() ? pinnedSha1 : text(decl, "sha1");
-	if (!sha.empty())
+	const std::vector<std::string> accepted = !pinnedSha1.empty() ? std::vector<std::string>{pinnedSha1} : acceptedSha1s(decl);
+	if (!accepted.empty())
 	{
+		auto wanted = [&accepted](const std::string &h) {
+			for (const std::string &a : accepted)
+				if (lower(a) == lower(h)) return true;
+			return false;
+		};
 		for (const FirmwareFile &f : index)
-			if ((!pinnedSha1.empty() || size == 0 || f.size == size) && lower(f.hash()) == lower(sha))
+			if ((!pinnedSha1.empty() || size == 0 || f.size == size) && wanted(f.hash()))
 			{
 				how = tr(pinnedSha1.empty() ? "firmware.by_hash" : "firmware.by_pinned_hash");
 				return &f;
@@ -138,7 +164,7 @@ std::vector<const FirmwareFile *> hintCandidates(const Json &decl, const std::ve
 {
 	std::vector<const FirmwareFile *> candidates;
 	const Json *hints = decl.find("nameHints");
-	if (!text(decl, "sha1").empty() || hints == nullptr || hints->kind != Json::Kind::Array || hints->items.empty()) return candidates;
+	if (!acceptedSha1s(decl).empty() || hints == nullptr || hints->kind != Json::Kind::Array || hints->items.empty()) return candidates;
 	const Json *sizeDecl = decl.find("size");
 	const int64_t size = sizeDecl != nullptr ? static_cast<int64_t>(sizeDecl->number()) : 0;
 	/* one dump in two places is one candidate */

@@ -4636,7 +4636,9 @@ std::string SessionViewModel::locateFirmwareOnMachine(MissingFirmware &m, const 
 		for (char &c : t) c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
 		return t;
 	};
-	if (!wanted.empty() && upper(wanted) != upper(sha))
+	const bool takes = !m.pinned.empty() ? upper(m.pinned) == upper(sha)
+		: std::find(m.accepted.begin(), m.accepted.end(), upper(sha)) != m.accepted.end();
+	if (!wanted.empty() && !takes)
 		return tr("session.wrong_firmware", {std::filesystem::path(path).filename().string(), upper(sha), upper(wanted)});
 	m.path = path;
 	m.sha1 = upper(sha);
@@ -5199,6 +5201,7 @@ bool SessionViewModel::firmwareOnMachine(const std::string &package, const std::
 				{
 					m.decl = decl.items[n.declIndex];
 					if (const json::Json *h = m.decl.find("sha1")) m.declared = h->text;
+					m.accepted = acceptedSha1s(m.decl);
 				}
 				for (const json::Json &pin : pinsJson.items)
 					if (const json::Json *id = pin.find("id"); id != nullptr && id->text == n.id)

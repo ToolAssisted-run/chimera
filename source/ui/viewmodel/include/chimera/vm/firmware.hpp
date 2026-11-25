@@ -55,6 +55,14 @@ private:
  * that file */
 std::vector<FirmwareFile> indexFirmware(const std::vector<std::string> &folders, bool recurse = true, size_t most = SIZE_MAX);
 
+/* the hashes a declared entry accepts, upper case: its "sha1" first, then
+ * each of its "sha1s", the other dumps of the same file (a ROM some dumpers
+ * write with a gap filled and others without, so its files hash differently).
+ * Empty when the entry pins no hash. */
+std::vector<std::string> acceptedSha1s(const json::Json &decl);
+/* whether a file of this hash is one the entry accepts; false when it pins none */
+bool acceptsSha1(const json::Json &decl, const std::string &sha1);
+
 /* the file that answers one declared entry, or nullptr; `how` says by what.
  * A declared size rules out every file of another size before any is read. */
 const FirmwareFile *findFirmware(const json::Json &decl, const std::string &pinnedSha1,

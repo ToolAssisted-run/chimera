@@ -1284,14 +1284,19 @@ void NewProjectViewModel::finishForAgent(const AgentRequest &request, const std:
 			if (n->declIndex < decls.items.size())
 			{
 				const Json &d = decls.items[n->declIndex];
-				Json file;
 				const Json *name = d.find("name");
 				const Json *size = d.find("size");
-				const Json *sha = d.find("sha1");
-				setMember(file, "file", Json::string(name != nullptr ? name->text : ""));
-				setMember(file, "size", size != nullptr ? *size : Json());
-				setMember(file, "sha1", Json::string(sha != nullptr ? sha->text : ""));
-				accepted.items.push_back(file);
+				/* one accepted file a hash: the entry's own, then the other dumps it lists */
+				std::vector<std::string> hashes = acceptedSha1s(d);
+				if (hashes.empty()) hashes.push_back("");
+				for (const std::string &h : hashes)
+				{
+					Json file;
+					setMember(file, "file", Json::string(name != nullptr ? name->text : ""));
+					setMember(file, "size", size != nullptr ? *size : Json());
+					setMember(file, "sha1", Json::string(h));
+					accepted.items.push_back(file);
+				}
 			}
 			setMember(item, "accepted", accepted);
 			o.missing.items.push_back(item);
@@ -1413,9 +1418,14 @@ bool NewProjectViewModel::applyChosenFirmware(const std::string &id, const std::
 	 * file of the person's own instead and the project pins its hash,
 	 * as Chimera's New Project does */
 	std::string declared;
+	bool custom = false;
 	if (const Json decls = firmwareDecls(); need->declIndex < decls.items.size())
-		if (const Json *h = decls.items[need->declIndex].find("sha1")) declared = h->text;
-	const bool custom = !declared.empty() && lower(declared) != lower(sha);
+	{
+		const Json &d = decls.items[need->declIndex];
+		const std::vector<std::string> accepted = acceptedSha1s(d);
+		if (!accepted.empty()) declared = accepted.front();
+		custom = !accepted.empty() && !acceptsSha1(d, sha);
+	}
 	const Json *kind = cfg_.find("kind");
 	const bool gameCore = kind != nullptr && lower(kind->text) == "game";
 	if (custom && !gameCore)
@@ -1618,7 +1628,7 @@ void NewProjectViewModel::matchScan(std::vector<std::string> &unread)
 	{
 		const Json *d = declOf(n);
 		if (!n.path.empty() || d == nullptr) continue;
-		if (const Json *sha = d->find("sha1"); sha != nullptr && !sha->text.empty())
+		if (!acceptedSha1s(*d).empty())
 		{
 			std::string how;
 			if (const FirmwareFile *f = findFirmware(*d, "", scanFound_, how))
@@ -2382,11 +2392,13 @@ void NewProjectViewModel::evaluate()
 		Need need{n.id, n.display.empty() ? n.id : n.display, n.path, n.how, n.sha1};
 		need.declIndex = n.declIndex;
 		std::string declared;
+		const Json *entry = nullptr;
 		/* the entry the engine chose: entries may share an id, one for each
 		 * version a setting picks, and only this one is wanted */
 		if (n.declIndex < firmwareDecl.items.size())
 		{
 			const Json &f = firmwareDecl.items[n.declIndex];
+			entry = &f;
 			if (const Json *h = f.find("sha1")) declared = h->text;
 			auto text = [&f](const char *k) { const Json *j = f.find(k); return j != nullptr ? j->text : std::string(); };
 			need.name = text("name");
@@ -2399,7 +2411,7 @@ void NewProjectViewModel::evaluate()
 		{
 			need.path = it->second.first;
 			need.sha1 = it->second.second;
-			need.how = !declared.empty() && lower(declared) != lower(need.sha1) ? "your own" : "chosen";
+			need.how = !declared.empty() && !(entry != nullptr && acceptsSha1(*entry, need.sha1)) ? "your own" : "chosen";
 		}
 		else if (need.path.empty())
 		{
@@ -2423,7 +2435,7 @@ void NewProjectViewModel::evaluate()
 				{
 					const Json *kind = cfg_.find("kind");
 					const bool gameCore = kind != nullptr && lower(kind->text) == "game";
-					const bool other = !declared.empty() && lower(declared) != lower(known->second);
+					const bool other = !declared.empty() && !(entry != nullptr && acceptsSha1(*entry, known->second));
 					if (!known->second.empty() && (!other || gameCore))
 					{
 						need.path = remembered;

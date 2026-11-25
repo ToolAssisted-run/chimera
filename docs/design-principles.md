@@ -16679,3 +16679,31 @@ states and the nearest to frames 20 and 29), the same rerecord count, the same
 in every frame. An encode from frame 5 still works, and one over a project whose
 game file has been removed fails with a message and closes the project. The test
 was broken on purpose once (frame 0 wound by loading the state again) and failed.
+
+## A firmware entry may list other dumps of the same file (user-decided, 2026-11-25, ares pull request 3)
+
+A firmware entry in a core's package pins one file by its SHA-1. Some ROMs are
+dumped in more than one way, so the same ROM has several hashes. The Game Boy
+Color's boot ROM is dumped as 2304 bytes, and dumps differ by revision (Rev 1,
+CGB-0); ares itself carries a 2048-byte copy with the 256-byte cartridge header
+gap taken out, which nobody has. A contributor's pull request to the ares core
+makes the core take either layout and lists the second dump in a new key,
+`sha1s`.
+
+The owner chose to make `sha1s` part of what a package can declare, rather than
+leave it to one fork of Chimera: an entry's `sha1` is the dump the core was
+tested with, and `sha1s` lists the other dumps it accepts. Chimera treats a file
+with any of these hashes as the core's own everywhere it compares a file with
+the declaration: finding firmware in the firmware folders (by hash, before
+names and name hints), the Firmware window's verdict (the engine's
+`ce_firmware_state` already took a list), New Project's choice of a file (not
+marked "your own"), its list of what is missing (one accepted file a hash), and
+locating a missing firmware when a project opens. A project still pins the
+exact file it was made with, so a movie replays with that dump. A package
+without the key is read as before, and an older Chimera ignores the key and
+matches `sha1` alone.
+
+Tested: the view model test `firmware` finds a file by a hash in `sha1s`, keeps
+the order (`sha1` first) and drops a hash listed twice in another case, and an
+entry with only `sha1s` is not matched by name hints. Broken on purpose once
+(the list left out of the lookup) and seen to fail.

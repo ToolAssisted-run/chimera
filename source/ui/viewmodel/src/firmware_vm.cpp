@@ -373,7 +373,9 @@ void FirmwareViewModel::survey()
 							{
 								r.actualSha1 = upper(hash);
 								/* the verdict is the engine's: 0 wrong size, 1 a dump it has never seen, 2 a match */
-								const int32_t v = ce_firmware_state(r.size, upper(r.sha1).c_str(), static_cast<int64_t>(size), r.actualSha1.c_str());
+								std::string accepted;
+								for (const std::string &h : acceptedSha1s(decl)) accepted += h + "\n";
+								const int32_t v = ce_firmware_state(r.size, accepted.c_str(), static_cast<int64_t>(size), r.actualSha1.c_str());
 								r.state = v == 0 ? Custom : v == 1 ? Unrecognised : Good;
 							}
 							r.where = underFolder(path, folder) ? FirmwareFolder : Chosen;

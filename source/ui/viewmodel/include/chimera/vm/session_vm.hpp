@@ -1436,6 +1436,7 @@ private:
 	struct MissingFirmware
 	{
 		std::string core, id, display, pinned, declared;
+		std::vector<std::string> accepted; /* every hash the entry accepts, `declared` first */
 		json::Json decl;
 		bool gameCore = false;
 		std::string path, sha1;
