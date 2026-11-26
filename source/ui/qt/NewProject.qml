@@ -293,7 +293,8 @@ ApplicationWindow {
                                 required property int max
                                 required property string cardinality
                                 required property bool shown
-                                property int picked: -1
+                                // the file picked in the list is the view model's, so it stays picked as files move
+                                required property int picked
                                 // a slot only settings open, which this machine closes, is not on the form
                                 visible: slot.shown
                                 enabled: slot.exposed
@@ -342,7 +343,7 @@ ApplicationWindow {
                                                         text: parent.modelData
                                                         color: parent.index === slot.picked ? palette.highlightedText : palette.text
                                                     }
-                                                    TapHandler { onTapped: slot.picked = parent.index }
+                                                    TapHandler { onTapped: win.run("pickFile", [slot.id, parent.index]) }
                                                 }
                                             }
                                             DropArea {
@@ -364,7 +365,7 @@ ApplicationWindow {
                                                 enabled: slot.picked > 0
                                                 ToolTip.visible: hovered
                                                 ToolTip.text: qsTrId("new_project.move_up_earlier_in_the_swap")
-                                                onClicked: { win.run("moveFile", [slot.id, slot.picked, slot.picked - 1]); slot.picked-- }
+                                                onClicked: { win.run("moveFile", [slot.id, slot.picked, slot.picked - 1]) }
                                             }
                                             Button {
                                                 text: "▼"
@@ -372,7 +373,7 @@ ApplicationWindow {
                                                 enabled: slot.picked >= 0 && slot.picked < fileList.count - 1
                                                 ToolTip.visible: hovered
                                                 ToolTip.text: qsTrId("new_project.move_down_later_in_the_swap")
-                                                onClicked: { win.run("moveFile", [slot.id, slot.picked, slot.picked + 1]); slot.picked++ }
+                                                onClicked: { win.run("moveFile", [slot.id, slot.picked, slot.picked + 1]) }
                                             }
                                         }
                                         ColumnLayout {
@@ -391,7 +392,7 @@ ApplicationWindow {
                                                 text: qsTrId("common.remove")
                                                 Layout.preferredWidth: 84
                                                 enabled: slot.picked >= 0
-                                                onClicked: { win.run("removeFile", [slot.id, slot.picked]); slot.picked = -1 }
+                                                onClicked: { win.run("removeFile", [slot.id, slot.picked]) }
                                             }
                                         }
                                     }

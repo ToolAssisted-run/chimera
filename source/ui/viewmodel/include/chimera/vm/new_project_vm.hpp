@@ -215,7 +215,7 @@ private:
 	public:
 		explicit SlotRows(NewProjectViewModel &vm) : vm_(vm) {}
 		int64_t rowCount() const override { return static_cast<int64_t>(vm_.slots_.size()); }
-		int32_t columnCount() const override { return 12; }
+		int32_t columnCount() const override { return 13; }
 		std::string columnName(int32_t column) const override;
 		Value cell(int64_t row, int32_t column) const override;
 
@@ -332,6 +332,8 @@ private:
 	std::vector<Slot> slots_;
 	std::vector<std::vector<std::string>> atLeastOneOf_;
 	std::map<std::string, std::vector<Picked>> files_;
+	/* the file picked in each slot's list, by index */
+	std::map<std::string, int64_t> picked_;
 	std::vector<Need> needs_;
 	/* firmware chosen by hand: id -> {path, sha1} */
 	std::map<std::string, std::pair<std::string, std::string>> chosenFirmware_;

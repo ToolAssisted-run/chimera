@@ -16743,3 +16743,18 @@ the clipboard.
 Tested: the view model test `project` checks that the branches' `status` is
 empty after another project opens and after the project closes. Broken on
 purpose once (the clearing removed) and seen to fail.
+
+## New Project's file list keeps a file picked (chosen by the owner, 2026-11-26, issue 657)
+
+After Up or Down on a file in a slot's list (the discs with Up, Down and
+Remove) the file moved stays picked, so the person can press again. After
+Remove a file stays picked: the one that took the removed file's place, or the
+last when it was the last (none when the list is empty). The window rebuilt the
+list on every change and lost the pick, which it held itself; the view model
+now holds it (`pickFile`, and the `picked` column of the slots' rows), and the
+window only shows it.
+
+Tested: the view model test `newProjectWizard` (the disk slot) checks the pick
+after `moveFile` both ways, after `removeFile` in the middle, at the end and
+down to an empty list, and a bad `pickFile`. Broken on purpose once (the pick
+not kept) and seen to fail.

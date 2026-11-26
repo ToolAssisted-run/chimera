@@ -9404,6 +9404,30 @@ bool newProjectWizard(const char *package, const char *rom, const char *slotsPac
 	CHECK(wizard.run("moveFile", {std::string("disk"), int64_t{1}, int64_t{0}}, error).has_value());
 	CHECK(wizard.suggestion.get().find(" It sees 2 disks and the track of disk1.cue, at disk speed 3.") != std::string::npos);
 	CHECK(wizard.run("moveFile", {std::string("disk"), int64_t{1}, int64_t{0}}, error).has_value() && text("slots", 1, 7) == "disk2.img\ndisk1.cue");
+	/* the file moved stays picked, and one removed leaves another picked (issue 657) */
+	auto pickedFile = [&] {
+		int64_t at = -2;
+		fromValue(cell("slots", 1, 12), at);
+		return at;
+	};
+	CHECK(pickedFile() == 0);
+	CHECK(wizard.run("pickFile", {std::string("disk"), int64_t{1}}, error).has_value() && pickedFile() == 1);
+	CHECK(!wizard.run("pickFile", {std::string("disk"), int64_t{5}}, error) && pickedFile() == 1);
+	CHECK(wizard.run("moveFile", {std::string("disk"), int64_t{1}, int64_t{0}}, error).has_value() && pickedFile() == 0 &&
+		text("slots", 1, 7) == "disk1.cue\ndisk2.img");
+	CHECK(wizard.run("moveFile", {std::string("disk"), int64_t{0}, int64_t{1}}, error).has_value() && pickedFile() == 1 &&
+		text("slots", 1, 7) == "disk2.img\ndisk1.cue");
+	/* removing leaves the one that took its place picked, the last when it was the last, none when the list is empty */
+	CHECK(wizard.run("pickFile", {std::string("disk"), int64_t{1}}, error).has_value());
+	CHECK(wizard.run("removeFile", {std::string("disk"), int64_t{1}}, error).has_value() && pickedFile() == 1 &&
+		text("slots", 1, 7) == "disk2.img\ndisk3.img\ndisk10.img\ndisk20.dsk");
+	CHECK(wizard.run("pickFile", {std::string("disk"), int64_t{3}}, error).has_value());
+	CHECK(wizard.run("removeFile", {std::string("disk"), int64_t{3}}, error).has_value() && pickedFile() == 2);
+	for (int i = 0; i < 3; i++) CHECK(wizard.run("removeFile", {std::string("disk"), int64_t{0}}, error).has_value());
+	CHECK(pickedFile() == -1 && text("slots", 1, 7).empty());
+	/* put back as they were for what follows */
+	CHECK(wizard.run("addFile", {std::string("disk"), (dir / "disk2.img").string()}, error).has_value());
+	CHECK(wizard.run("addFile", {std::string("disk"), (dir / "disk1.cue").string()}, error).has_value() && text("slots", 1, 7) == "disk2.img\ndisk1.cue");
 	/* the firmware found by scanning a folder: by the name it declares,
 	 * below the folder only when asked; a folder that has it becomes the
 	 * firmware folder when the one set is not there */

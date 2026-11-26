@@ -377,7 +377,7 @@ NewProjectViewModel::NewProjectViewModel(Dispatcher &dispatcher, SessionViewMode
 		});
 	form_.listMachineSetting(false);
 	form_.unlist("renderer");
-	rows("slots", "the kinds of file the project holds: id, title, min, max, formats, help, exposed, files, count, filter", slotRows_);
+	rows("slots", "the kinds of file the project holds: id, title, min, max, formats, help, exposed, files, count, filter, cardinality, shown, picked (the file picked in its list, -1 for none)", slotRows_);
 	rows("settings", "the settings that apply, as the Settings window lists them", settingRows_);
 	rows("presets", "the presets this machine is offered: id, label, description", presetRows_);
 	command("applyPreset", "writes a preset's values into the settings", {"id"}, [this](const Args &a, std::string &error) -> Value {
@@ -707,9 +707,27 @@ NewProjectViewModel::NewProjectViewModel(Dispatcher &dispatcher, SessionViewMode
 			return {};
 		}
 		it->second.erase(it->second.begin() + static_cast<long>(i));
+		/* a file stays picked: the one that took its place, else the last (issue 657) */
+		picked_[id] = std::min<int64_t>(i, static_cast<int64_t>(it->second.size()) - 1);
 		evaluate();
 		return {};
 	});
+	command("pickFile", "picks a file in a slot's list, the one Up, Down and Remove act on (-1: none)", {"slot", "index"},
+		[this](const Args &a, std::string &error) -> Value {
+			std::string id;
+			int64_t i = 0;
+			if (!arg(a, 0, id, error) || !arg(a, 1, i, error)) return {};
+			const auto it = files_.find(id);
+			const int64_t n = it == files_.end() ? 0 : static_cast<int64_t>(it->second.size());
+			if (i < -1 || i >= n)
+			{
+				error = tr("new_project.no_file_in", {std::to_string(i), id});
+				return {};
+			}
+			picked_[id] = i;
+			slotRows_.reset.emit();
+			return {};
+		});
 	command("moveFile", "moves a file within its slot (the order discs are swapped in)", {"slot", "from", "to"},
 		[this](const Args &a, std::string &error) -> Value {
 			std::string id;
@@ -725,6 +743,8 @@ NewProjectViewModel::NewProjectViewModel(Dispatcher &dispatcher, SessionViewMode
 			Picked f = it->second[static_cast<size_t>(from)];
 			it->second.erase(it->second.begin() + static_cast<long>(from));
 			it->second.insert(it->second.begin() + static_cast<long>(to), f);
+			/* the file moved stays picked, so Up or Down can be pressed again (issue 657) */
+			picked_[id] = to;
 			evaluate();
 			return {};
 		});
@@ -1937,6 +1957,7 @@ bool NewProjectViewModel::chooseCore(const std::string &name, std::string &error
 	machines.set(names);
 	machine.set(chosen);
 	files_.clear();
+	picked_.clear();
 	chosenFirmware_.clear();
 	gameSettings_.clear();
 	gameFirmware_ = Json();
@@ -2535,8 +2556,8 @@ void NewProjectViewModel::evaluate()
 std::string NewProjectViewModel::SlotRows::columnName(int32_t column) const
 {
 	static const char *const names[] = {"id", "title", "min", "max", "formats", "help", "exposed", "files", "count", "filter",
-		"cardinality", "shown"};
-	return column >= 0 && column < 12 ? names[column] : "";
+		"cardinality", "shown", "picked"};
+	return column >= 0 && column < 13 ? names[column] : "";
 }
 
 Value NewProjectViewModel::SlotRows::cell(int64_t row, int32_t column) const
@@ -2579,6 +2600,13 @@ Value NewProjectViewModel::SlotRows::cell(int64_t row, int32_t column) const
 	}
 	case 10: return cardinalityOf(s.min, s.max);
 	case 11: return !s.settingGatedOnly || s.machineHas;
+	case 12:
+	{
+		/* the file picked in the list, -1 for none; one a removal left behind is none */
+		const auto at = vm_.picked_.find(s.id);
+		const int64_t n = it == vm_.files_.end() ? 0 : static_cast<int64_t>(it->second.size());
+		return at != vm_.picked_.end() && at->second >= 0 && at->second < n ? at->second : int64_t{-1};
+	}
 	default: return {};
 	}
 }
