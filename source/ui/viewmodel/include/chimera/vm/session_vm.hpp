@@ -84,6 +84,9 @@ public:
 	Property<std::string> systemName;
 	/* the machine's id, as the core names it (Chimera's "Loaded core: name (id)") */
 	Property<std::string> systemId;
+	/* the open core's id: its package's file name without .chimeraCore (flycast for flycast.chimeraCore), never
+	 * its version; "" with none open. Where its own files go by default (Paths' Output) */
+	Property<std::string> coreId;
 	Property<int64_t> buttonCount{0};
 	/* the gamepads in use, or why there are none */
 	Property<std::string> gamepads{tr("session.no_gamepads_yet")};

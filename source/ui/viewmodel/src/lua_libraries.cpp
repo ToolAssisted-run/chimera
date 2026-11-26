@@ -1574,13 +1574,11 @@ local function canvasOf(form, box)
 	c.DrawString = c.DrawText
 	function c.GetMouseX() return forms.getMouseX(box) end
 	function c.GetMouseY() return forms.getMouseY(box) end
-	-- a relative path is in the system's Screenshots folder, as Chimera's
+	-- a relative path is in the open core's folder of the Output folder (output/<core id>)
 	function c.save_image_to_disk(path)
 		path = tostring(path)
 		if not (string.match(path, "^/") or string.match(path, "^%a:[/\\]") or string.match(path, "^\\\\")) then
-			local folder = C.paths.resolveFor(C.session.systemId, "Screenshots")
-			-- no system open: a system's own default, under the base
-			if folder == "" then folder = C.paths.absolute("./Screenshots", "") end
+			local folder = C.paths.outputFor(C.session.coreId)
 			path = folder .. "/" .. path
 		end
 		C.forms.saveImage(box, path)

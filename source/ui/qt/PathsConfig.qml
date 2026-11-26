@@ -1,9 +1,9 @@
 // Chimera's Path Configuration (Config > Paths), laid out as Chimera's
 // PathConfig: Always use recent path for ROMs and Special Commands at the
-// top; Global and by System (a system picked, its own folders) as tabs, a
-// row a folder (its path, a button to browse for it, its name); Save,
-// Defaults, OK and Cancel. The rows are a copy: Save or OK keeps them. It
-// opens on the system of the game open, as Chimera's does. Layout and
+// top; a row a folder (its path, a button to browse for it, its name); Save,
+// Defaults, OK and Cancel. The rows are a copy: Save or OK keeps them. One
+// list of folders: Chimera keeps none for a system (issue 655); Output is
+// where each core's own files go, in a folder of its id. Layout and
 // bindings only, over the paths view model.
 import QtQuick
 import QtQuick.Controls
@@ -26,50 +26,37 @@ ApplicationWindow {
     modality: Qt.platform.os === "osx" ? Qt.WindowModal : Qt.ApplicationModal // a sheet on a Mac, which keeps an application-modal window over other apps (#541)
     transientParent: win.mainWindow
 
-    readonly property var systemNames: JSON.parse(win.vm.systems)
-    // the rows as typed, "system|name" to the path; what is not here is the view model's
+    // the rows as typed, name to the path; what is not here is the view model's
     property var edits: ({})
     property bool recent: true
-    function keyOf(system, name) { return system + "|" + name }
     // what a person reads for a folder: its name is the setting's identifier
     function labelOf(name) { return qsTrId("paths.folder_" + name.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "")) }
-    function textOf(system, name, path) { const k = win.keyOf(system, name); return k in win.edits ? win.edits[k] : path }
-    function edit(system, name, text) {
+    function textOf(name, path) { return name in win.edits ? win.edits[name] : path }
+    function edit(name, text) {
         const now = Object.assign({}, win.edits)
-        now[win.keyOf(system, name)] = text
+        now[name] = text
         win.edits = now
     }
     function save() {
         win.vm.recentForRoms = win.recent
-        for (const k of Object.keys(win.edits)) {
-            const at = k.indexOf("|")
-            const system = k.substring(0, at), name = k.substring(at + 1)
-            if (system === "Global") win.vm.run("setPath", [name, win.edits[k]])
-            else win.vm.run("setSystemPath", [system, name, win.edits[k]])
-        }
+        for (const name of Object.keys(win.edits)) win.vm.run("setPath", [name, win.edits[name]])
         win.edits = {}
     }
     onVisibleChanged: if (visible) {
         win.edits = {}
         win.recent = win.vm.recentForRoms
-        // the system of the game open, when it has folders of its own
-        const sys = win.session ? win.session.systemId : ""
-        const at = win.systemNames.indexOf(sys)
-        systemBox.currentIndex = at >= 0 ? at : (win.systemNames.length > 0 ? 0 : -1)
-        tabs.currentIndex = at >= 0 ? 1 : 0
     }
 
-    // Chimera's defaults for every global folder (the by System tab keeps what it has)
+    // Chimera's defaults for every folder
     readonly property var chimeraGlobals: ({
         "Base": ".", "ROM": ".", "Firmware": "./Firmware", "Movies": "./Movies", "Movie backups": "./Movies/backup", "A/V Dumps": ".",
         "Tools": "./Tools", "Lua": "./Lua", "Themes": "./themes", "Watch (.wch)": ".", "Debug Logs": ".", "Bug reports": "./Reports",
-        "Macros": "./Movies/Macros", "Temp Files": ""
+        "Macros": "./Movies/Macros", "Output": "./output", "Temp Files": ""
     })
 
     // one tab's rows: the path, Browse, the name
     component PathRows: ScrollView {
         id: page
-        required property string system
         clip: true
         contentWidth: availableWidth
         ColumnLayout {
@@ -80,12 +67,9 @@ ApplicationWindow {
                 model: win.vm.rows("paths")
                 delegate: RowLayout {
                     id: row
-                    required property string system
                     required property string name
                     required property string path
-                    visible: row.system === page.system
                     Layout.fillWidth: true
-                    Layout.preferredHeight: visible ? implicitHeight : 0
                     Layout.leftMargin: 6
                     Layout.rightMargin: 6
                     // the ROM folder is not used while the recent one is, as Chimera's
@@ -94,8 +78,8 @@ ApplicationWindow {
                         id: box
                         objectName: "pathBox"
                         Layout.fillWidth: true
-                        text: win.textOf(row.system, row.name, row.path)
-                        onTextEdited: { win.edit(row.system, row.name, text); suggestions.refresh() }
+                        text: win.textOf(row.name, row.path)
+                        onTextEdited: { win.edit(row.name, text); suggestions.refresh() }
                         // Chimera's suggestions: the special words
                         Popup {
                             id: suggestions
@@ -116,7 +100,7 @@ ApplicationWindow {
                                         width: 118
                                         padding: 2
                                         text: modelData
-                                        onClicked: { box.text = modelData; win.edit(row.system, row.name, modelData); suggestions.close() }
+                                        onClicked: { box.text = modelData; win.edit(row.name, modelData); suggestions.close() }
                                     }
                                 }
                             }
@@ -127,13 +111,9 @@ ApplicationWindow {
                         Layout.preferredWidth: 26
                         Layout.preferredHeight: 23
                         onClicked: {
-                            // a base or a global folder is browsed from the global base, as Chimera's
-                            const forSystem = row.name === "Base" || row.system === "Global" ? "" : row.system
-                            folderDialog.system = row.system
                             folderDialog.name = row.name
-                            folderDialog.forSystem = forSystem
                             folderDialog.title = qsTrId("paths_config.set_the_directory_for").arg(win.labelOf(row.name))
-                            folderDialog.currentFolder = localFiles.folderUrl(win.vm.run("absolute", [box.text, forSystem]))
+                            folderDialog.currentFolder = localFiles.folderUrl(win.vm.run("absolute", [box.text]))
                             folderDialog.open()
                         }
                     }
@@ -160,33 +140,11 @@ ApplicationWindow {
             }
             Label { text: qsTrId("paths_config.special_commands") }
         }
-        TabBar {
-            id: tabs
-            Layout.fillWidth: true
-            TabButton { text: qsTrId("paths_config.global"); width: implicitWidth }
-            TabButton { text: qsTrId("paths_config.by_system"); width: implicitWidth }
-        }
         Frame {
             Layout.fillWidth: true
             Layout.fillHeight: true
             padding: 0
-            StackLayout {
-                anchors.fill: parent
-                currentIndex: tabs.currentIndex
-                PathRows { system: "Global" }
-                ColumnLayout {
-                    RowLayout {
-                        Layout.margins: 4
-                        Label { text: qsTrId("paths_config.system") }
-                        ComboBox { id: systemBox; model: win.systemNames; Layout.preferredWidth: 200 }
-                    }
-                    PathRows {
-                        system: systemBox.currentIndex >= 0 ? win.systemNames[systemBox.currentIndex] : ""
-                        Layout.fillWidth: true
-                        Layout.fillHeight: true
-                    }
-                }
-            }
+            PathRows { anchors.fill: parent }
         }
         RowLayout {
             Layout.fillWidth: true
@@ -195,7 +153,7 @@ ApplicationWindow {
                 text: qsTrId("paths_config.defaults")
                 onClicked: {
                     const now = Object.assign({}, win.edits)
-                    for (const n of Object.keys(win.chimeraGlobals)) now[win.keyOf("Global", n)] = win.chimeraGlobals[n]
+                    for (const n of Object.keys(win.chimeraGlobals)) now[n] = win.chimeraGlobals[n]
                     win.edits = now
                 }
             }
@@ -206,12 +164,10 @@ ApplicationWindow {
     }
     FolderDialog {
         id: folderDialog
-        property string system: ""
         property string name: ""
-        property string forSystem: ""
         onAccepted: {
             const local = localFiles.localPath(selectedFolder)
-            win.edit(folderDialog.system, folderDialog.name, win.vm.run("makeRelative", [local, folderDialog.forSystem]))
+            win.edit(folderDialog.name, win.vm.run("makeRelative", [local]))
         }
     }
 

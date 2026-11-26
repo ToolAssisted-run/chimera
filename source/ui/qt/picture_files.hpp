@@ -66,7 +66,8 @@ public:
 	}
 	std::function<void(const std::string &)> say;
 	/* where screenshots go: CHIMERA_SCREENSHOTS, else the Paths window's
-	 * Screenshots folder (folderFor), else Screenshots beside the program */
+	 * Output folder, in the folder of the core's id (folderFor), else output
+	 * beside the program */
 	static std::function<QString()> &folderFor()
 	{
 		static std::function<QString()> f;
@@ -77,7 +78,7 @@ public:
 		const QString folder = qEnvironmentVariable("CHIMERA_SCREENSHOTS");
 		if (!folder.isEmpty()) return folder;
 		if (folderFor()) return folderFor()();
-		return QCoreApplication::applicationDirPath() + QStringLiteral("/Screenshots");
+		return QCoreApplication::applicationDirPath() + QStringLiteral("/output");
 	}
 	/* a folder as a dialog's address; a file's path from its URL */
 	Q_INVOKABLE QUrl folderUrl(const QString &path) const { return path.isEmpty() ? QUrl() : QUrl::fromLocalFile(path); }
@@ -93,10 +94,9 @@ public:
 			QDateTime::currentDateTime().toString(QStringLiteral("yyyy-MM-dd HH.mm.ss"));
 	}
 	/* Screenshot As's first answer, as a file address for the save dialog;
-	 * the folder is made so the dialog can open in it */
+	 * the folder is not made: it is made when a file is written there */
 	Q_INVOKABLE QUrl screenshotSuggestion(const QString &game) const
 	{
-		QDir().mkpath(screenshotFolder());
 		return QUrl::fromLocalFile(screenshotBase(game) + QStringLiteral(".png"));
 	}
 	/* the game open, as the window names it ("" for none) */

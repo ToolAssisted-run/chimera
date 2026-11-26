@@ -14,6 +14,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
+#include <filesystem>
 #include <fstream>
 #include <future>
 #include <random>
@@ -326,6 +327,7 @@ SessionViewModel::SessionViewModel(Dispatcher &dispatcher, InputLog &inputs)
 	expose("coreName", "the open core", coreName);
 	expose("systemName", "the machine the core runs", systemName);
 	expose("systemId", "the machine's id, as the core names it", systemId);
+	expose("coreId", "the open core's id: its package's file name without .chimeraCore, never its version", coreId);
 	expose("buttonCount", "how many buttons the machine has", buttonCount);
 	expose("gamepads", "the gamepads in use, or why there are none", gamepads);
 	expose("padFaces", "what the open gamepads print on their face buttons, bottom, right, left and top "
@@ -7030,6 +7032,13 @@ void SessionViewModel::adoptOnMachine(ce_session *s, const std::string &package,
 		updateUnboundPlayers(true);
 		buttonCount.set(static_cast<int64_t>(names.size()));
 		coreName.set(coreText);
+		/* the package's file (or folder, in development) name without its ending */
+		{
+			std::filesystem::path file = std::filesystem::path(package).filename();
+			if (file.empty() && std::filesystem::path(package).has_parent_path()) file = std::filesystem::path(package).parent_path().filename();
+			if (file.extension() == ".chimeraCore") file.replace_extension();
+			coreId.set(file.string());
+		}
 		systemName.set(systemText);
 		systemId.set(systemIdText);
 		frame.set(0);

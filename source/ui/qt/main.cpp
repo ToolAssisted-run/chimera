@@ -1089,7 +1089,7 @@ int main(int argc, char **argv)
 	 * the backups and the firmware follow them */
 	vm::PathsViewModel paths(dispatcher);
 	paths.programFolder.set(ownFolder().toStdString());
-	for (const char *name : {"base", "changed", "systems", "systemChanged", "recentForRoms", "lastRomFolder"}) config.keep(paths, name);
+	for (const char *name : {"base", "changed", "recentForRoms", "lastRomFolder"}) config.keep(paths, name);
 	/* the temporary folder the system gave, put back when Temp Files is emptied */
 	struct TempWas
 	{
@@ -1126,10 +1126,9 @@ int main(int argc, char **argv)
 		std::string e;
 		paths.run("setPath", {std::string("Firmware"), cores.firmwareFolder.get()}, e);
 	});
-	/* screenshots go to the system's own folder, as Chimera does; a system opened gets its folders */
-	qt::PictureFiles::folderFor() = [&paths, &session] { return QString::fromStdString(paths.resolveFor(session.systemId.get(), "Screenshots")); };
+	/* screenshots go to the Output folder, in a folder of the open core's id (issue 655) */
+	qt::PictureFiles::folderFor() = [&paths, &session] { return QString::fromStdString(paths.outputFor(session.coreId.get())); };
 	qt::PictureFiles::gameFor() = [&session] { return QString::fromStdString(session.gameName.get()); };
-	vm::Connection systemFolders = session.opens.changed.connect([&paths, &session] { paths.useSystem(session.systemId.get()); });
 	qt::QmlViewModel pathsQml(paths);
 	vm::FirmwareViewModel firmware(dispatcher, cores);
 	config.keep(firmware, "shows");

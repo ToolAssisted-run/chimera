@@ -183,7 +183,7 @@ Script
 Global
 Base
 ROM
-Savestates
+Output
 A/V Dumps
 Watch (.wch)
 Debug Logs

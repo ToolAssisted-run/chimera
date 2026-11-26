@@ -16801,3 +16801,48 @@ bound to a real piano roll view model through QML, as TAStudio.qml does: a drag
 past the edge goes on setting the rows it passes; the view model moving the
 roll, directly or by following the current frame, ends the drawing). Broken on
 purpose once (the stop left out) and seen to fail.
+
+## One Output folder, a folder for each core in it, none for a system (user-decided, 2026-11-26, issue 655)
+
+Chimera made a folder beside the program for every system a game was opened
+for (CHIP8, N64, NES, PSV, TIC80, UZE, X360 and more), for example when a
+screenshot was saved, and Config > Paths let a person change four paths for
+each system (Base, ROM, Savestates, Screenshots). That meant Chimera knew the
+names of systems and grouped files by them.
+
+The owner decided: "Chimera needs to be entirely agnostic from the existence
+of systems. Have an "./output" (path reconfigurable) folder, not distributed
+but created on first use. Inside, any default outputs by a core is saved by
+core name (not version). e.g.: "output/flycast/"".
+
+What was done:
+
+- There is one new folder setting, Output, in Config > Paths, "./output" by
+  default (under the base, so beside the program). A person can change it like
+  any other path. It is not in any bundle, and nothing makes it until a file is
+  written there (the Screenshot As dialog no longer makes the folder when it
+  opens; saving makes it).
+- A core's default files go in a folder of the core's id inside Output: the
+  package's file name without `.chimeraCore` (`flycast` for
+  `flycast.chimeraCore`), never its version. The open core's id is the new
+  session property `coreId`; `paths.outputFor(core)` gives the folder. Screenshots
+  and Lua's `LuaCanvas.save_image_to_disk` (a relative path) use it. With no core
+  open, Output itself is used. Characters that a file name cannot hold are taken
+  out of the id, and "." and ".." give Output itself.
+- The per-system settings are gone: the by System tab, the properties `systems`
+  and `systemChanged`, and the commands `setSystemPath`, `useSystem` and
+  `resolveFor` (`absolute` and `makeRelative` lost their system argument). The
+  paths table lost its system column. Nothing in the engine or the interface
+  names a system for a folder any more. The Savestates path was never used by
+  anything and is gone with them.
+- Movies, Movie backups, Reports and the other global folders are not outputs of
+  a system, and stay where they were.
+- Folders and settings people already have are not touched. Their old
+  per-system folders stay on disk, and what they saved for a system stays in
+  their settings file; it is not read.
+
+Tested: view model tests check that Output resolves to `./output` under the
+base without being made, that `outputFor("flycast")` is `output/flycast`, that
+a changed Output moves it, that odd ids stay inside it, that the table has the
+new row and no system column, that the open core's `coreId` is its package's
+name and that a canvas picture saved from Lua goes to `output/<core id>/`.

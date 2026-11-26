@@ -1326,16 +1326,16 @@ void pathsConfig()
 	std::string name, folder;
 	for (int64_t i = 0; i < rows->rowCount(); i++)
 	{
-		fromValue(rows->cell(i, 1), name);
+		fromValue(rows->cell(i, 0), name);
 		if (name != "Movies") continue;
-		fromValue(rows->cell(i, 3), folder);
-		fromValue(rows->cell(i, 4), isDefault);
+		fromValue(rows->cell(i, 2), folder);
+		fromValue(rows->cell(i, 3), isDefault);
 	}
 	CHECK(folder == (dir / "runs").string() && !isDefault);
 	/* Chimera's global list, in its order, the base first and temporary files last */
-	fromValue(rows->cell(0, 1), name);
-	CHECK(name == "Base" && rows->rowCount() == 14);
-	fromValue(rows->cell(13, 1), name);
+	fromValue(rows->cell(0, 0), name);
+	CHECK(name == "Base" && rows->rowCount() == 15);
+	fromValue(rows->cell(14, 0), name);
 	CHECK(name == "Temp Files" && paths.resolve("Temp Files") == (dir / "program").string());
 	/* Chimera's words in a path: the program's folder, the last game's, and anything else is the program's folder */
 	CHECK(paths.run("setPath", {std::string("Lua"), std::string("%exe%/Scripts")}, error).has_value() &&
@@ -1353,26 +1353,23 @@ void pathsConfig()
 		paths.resolve("Movies") == (dir / "runs").string() && paths.resolve("Lua") == (dir / "elsewhere" / "Lua").string());
 	paths.run("setPath", {std::string("Base"), std::string(".")}, error);
 	CHECK(paths.base.get().empty());
-	/* a system's own folders, made when a game for it is opened: under its base, which is under the global one */
-	paths.useSystem("NES");
-	CHECK(paths.systems.get() == "[\"NES\"]" && rows->rowCount() == 18);
-	CHECK(paths.resolveFor("NES", "Screenshots") == (dir / "program" / "NES" / "Screenshots").string() &&
-		paths.resolveFor("NES", "ROM") == (dir / "program" / "NES").string() &&
-		paths.resolveFor("NES", "Savestates") == (dir / "program" / "NES" / "State").string());
-	/* a kind it has not falls back to its base */
-	CHECK(paths.resolveFor("NES", "Cheats") == (dir / "program" / "NES").string());
-	CHECK(fromValue(paths.run("setSystemPath", {std::string("NES"), std::string("Screenshots"), std::string("./Shots")}, error).value_or(Value()), got) &&
-		got == (dir / "program" / "NES" / "Shots").string());
-	CHECK(paths.run("setSystemPath", {std::string("NES"), std::string("Base"), (dir / "nes").string()}, error).has_value() &&
-		paths.resolveFor("NES", "Screenshots") == (dir / "nes" / "Shots").string());
-	CHECK(!paths.run("setSystemPath", {std::string("NES"), std::string("Movies"), std::string(".")}, error) && error == "no folder called Movies");
+	/* no folder per system (issue 655): one Output folder, "./output" under the base, not made, and a folder of the core's id in it */
+	CHECK(paths.resolve("Output") == (dir / "program" / "output").string() && !fs::exists(dir / "program" / "output"));
+	CHECK(paths.outputFor("flycast") == (dir / "program" / "output" / "flycast").string() && !fs::exists(dir / "program" / "output"));
+	CHECK(paths.outputFor("") == (dir / "program" / "output").string());
+	/* a name that is not a folder's name cannot leave the Output folder */
+	CHECK(paths.outputFor("..") == (dir / "program" / "output").string() && paths.outputFor("a/b:c") == (dir / "program" / "output" / "abc").string());
+	CHECK(paths.rowLists()[0].model->columnCount() == 4 && paths.properties().size() == 5);
+	/* the person can change it, as any folder; the base is where a relative one starts */
+	CHECK(fromValue(paths.run("setPath", {std::string("Output"), (dir / "elsewhere").string()}, error).value_or(Value()), got) && got == (dir / "elsewhere").string());
+	CHECK(paths.outputFor("pcsx2") == (dir / "elsewhere" / "pcsx2").string());
+	paths.run("setPath", {std::string("Output"), std::string("./shots")}, error);
+	CHECK(paths.outputFor("pcsx2") == (dir / "program" / "shots" / "pcsx2").string());
+	paths.run("setPath", {std::string("Output"), std::string("")}, error);
+	CHECK(paths.changed.get().find("Output") == std::string::npos && paths.outputFor("pcsx2") == (dir / "program" / "output" / "pcsx2").string());
 	/* a folder picked, made relative to the base it is under, as Chimera's */
-	CHECK(fromValue(paths.run("makeRelative", {(dir / "nes" / "pics").string(), std::string("NES")}, error).value_or(Value()), got) && got == "./pics");
-	CHECK(fromValue(paths.run("makeRelative", {(dir / "program" / "Lua").string(), std::string("")}, error).value_or(Value()), got) && got == "./Lua");
-	CHECK(fromValue(paths.run("makeRelative", {(dir / "other").string(), std::string("")}, error).value_or(Value()), got) && got == (dir / "other").string());
-	paths.run("setSystemPath", {std::string("NES"), std::string("Base"), std::string("")}, error);
-	paths.run("setSystemPath", {std::string("NES"), std::string("Screenshots"), std::string("")}, error);
-	CHECK(paths.systemChanged.get() == "{}");
+	CHECK(fromValue(paths.run("makeRelative", {(dir / "program" / "Lua").string()}, error).value_or(Value()), got) && got == "./Lua");
+	CHECK(fromValue(paths.run("makeRelative", {(dir / "other").string()}, error).value_or(Value()), got) && got == (dir / "other").string());
 	/* a dialog opens in the folder when it is there, else the nearest above it; nothing is made */
 	CHECK(fromValue(paths.run("dialogFolder", {std::string("Lua")}, error).value_or(Value()), got) && got == (dir / "program" / "Lua").string());
 	CHECK(fromValue(paths.run("dialogFolder", {std::string("Macros")}, error).value_or(Value()), got) && got == (dir / "program").string());
@@ -10392,12 +10389,23 @@ bool luaParity(const char *package, const char *rom)
 		std::string saveTo;
 		fromValue(formRows.cell(formRows.rowCount() - 1, 3), title);
 		fromValue(controls.cell(controls.rowCount() - 1, 19), saveTo);
-		CHECK(title == "Mine" && saveTo.size() > 11 && saveTo.substr(saveTo.size() - 11) == "/canvas.png" && saveTo.find("Screenshots") != std::string::npos);
+		CHECK(title == "Mine" && saveTo.size() > 11 && saveTo.substr(saveTo.size() - 11) == "/canvas.png" && saveTo.find("/output/") != std::string::npos && saveTo.find("Screenshots") == std::string::npos);
 	}
 	/* a game open */
 	openGame(session, package, (dir / "walker.testrom").string(), error);
 	CHECK(d.until([&] { return session.isOpen.get(); }, 60));
 	session.run("setLag", {int64_t{0}, int64_t{0}}, error);
+	/* the core's id is its package's file name without .chimeraCore; a canvas picture goes under output/<core id> (issue 655) */
+	{
+		std::string stem = std::filesystem::path(package).filename().string();
+		if (stem.size() > 12 && stem.substr(stem.size() - 12) == ".chimeraCore") stem.resize(stem.size() - 12);
+		CHECK(!stem.empty() && session.coreId.get() == stem);
+		std::string saveTo;
+		RowModel &controls = *forms.rowLists()[1].model;
+		CHECK(lua1("canvas.save_image_to_disk('id.png')") == "[]");
+		fromValue(controls.cell(controls.rowCount() - 1, 19), saveTo);
+		CHECK(saveTo == (dir / "output" / stem / "id.png").string());
+	}
 	CHECK(lua1("gameinfo.getstatus(), gameinfo.isstatusbad()") == "[\"NotInDatabase\", false]");
 	/* what the game calls its controls, beside their declared names (the roll's title tooltip) */
 	{
