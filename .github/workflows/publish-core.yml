@@ -92,7 +92,7 @@ jobs:
 
       - name: Fetch the gated package
         if: inputs.arches == ''
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           name: ${{ inputs.artifact }}
           path: package
@@ -100,7 +100,7 @@ jobs:
       - name: Fetch the gated packages, one per CPU
         # each into package/<artifact>-<arch>/
         if: inputs.arches != ''
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           pattern: ${{ inputs.artifact }}-*
           path: package

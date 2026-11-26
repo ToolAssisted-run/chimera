@@ -37,7 +37,7 @@ jobs:
             synth_cflags: -DSYNTH_NO_GUEST_FAULT_HANDLER
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: false
 
@@ -62,7 +62,7 @@ jobs:
         run: ./tests/synth/build-package.sh
 
       - name: Keep them for the macOS job
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: synth-core-${{ matrix.arch }}
           path: |
@@ -93,7 +93,7 @@ jobs:
     env:
       QT_VERSION: 6.12.0
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
 
@@ -103,7 +103,7 @@ jobs:
         run: brew install meson ninja cmake coreutils nasm pkg-config
 
       - name: Cache Qt
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/qt
           key: qt-6.12.0-macos-aqt-3.3.0
@@ -136,7 +136,7 @@ jobs:
         run: meson install -C build/meson-macos-${{ matrix.arch }}
 
       - name: Cache the ffmpeg the build ships
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           # tools/build-ffmpeg.sh keeps what it built under a name made from its
           # CPU and its own hash
@@ -147,7 +147,7 @@ jobs:
         run: tools/build-ffmpeg.sh macos build/${{ matrix.arch }}-macos/dll
 
       - name: The synthetic test core
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: synth-core-${{ matrix.arch }}
           path: .
@@ -188,13 +188,13 @@ jobs:
 
       - name: Upload test logs
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: macos-meson-logs-${{ matrix.arch }}
           path: build/meson-macos-${{ matrix.arch }}/meson-logs/
 
       - name: Cache Qt's source
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           # its licence texts go in the app's LICENSES.md
           path: ~/qt-src
@@ -225,7 +225,7 @@ jobs:
           build/Chimera.app/Contents/MacOS/chimera --version
 
       - name: Keep the app
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: Chimera-macos-${{ matrix.cpu }}
           path: Chimera-macos-${{ matrix.cpu }}.zip
