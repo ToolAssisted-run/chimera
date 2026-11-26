@@ -6089,7 +6089,10 @@ bool project(const char *package, const char *rom, const std::string &movies, co
 	session.run("saveProject", {std::string()}, error);
 	CHECK(d.until([&] { return session.status.get().rfind("Saved " + branched, 0) == 0; }, 20));
 	CHECK(fs::exists(history) && fs::last_write_time(history) == keptAt);
+	/* what the branches said of one project is not left on the line of another (issue 648) */
+	CHECK(!branches.status.get().empty());
 	CHECK(openIt(branched));
+	CHECK(d.until([&] { return branches.status.get().empty(); }, 20));
 	/* the machine says it is open a moment before the project's session marks itself running */
 	CHECK(d.until([&] { return fs::exists(history) && fs::exists(projectCache / "session.running"); }, 10));
 	CHECK(d.until([&] { return session.greenEnd.get() > 0; }, 10));
@@ -6100,8 +6103,10 @@ bool project(const char *package, const char *rom, const std::string &movies, co
 	CHECK(session.readDomain("RAM") == std::vector<uint8_t>(ram.begin(), ram.end()));
 	/* a session that did not end keeps nothing it wrote: the mark it
 	 * leaves while running is found, its greenzone is not loaded and goes */
+	branches.status.set("Said in this project");
 	session.run("close", {}, error);
 	CHECK(d.until([&] { return !session.isOpen.get(); }, 20));
+	CHECK(d.until([&] { return branches.status.get().empty(); }, 20));
 	CHECK(!fs::exists(projectCache / "session.running"));
 	std::ofstream(projectCache / "session.running") << "a session that never ended";
 	CHECK(openIt(branched));

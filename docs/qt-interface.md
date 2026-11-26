@@ -171,7 +171,8 @@ Chimera's window: Qt 6.12, QML views over C++ view models. The code is in
   before; Pause and Cancel Seek stop it where it has got to, as before; a
   script's or an agent's seek never asks),
   and the status line (what was said, a seek's progress, the frames picked,
-  states held and frames copied). The main window's status bar is Chimera's:
+  states held and frames copied; what the branches said goes when the
+  project closes or another opens, issue 648). The main window's status bar is Chimera's:
   icons for the movie (played back or recorded), paused or playing to a
   frame, a video being made, each drive's light with the image in it (cut
   in the middle, as Chimera's), frozen addresses, the sound and the key

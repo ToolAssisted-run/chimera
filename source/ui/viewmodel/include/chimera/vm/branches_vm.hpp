@@ -104,6 +104,7 @@ private:
 	std::vector<SessionViewModel::Branch> branches_;
 	Rows rows_{*this};
 	Connection loadedWatch_;
+	Connection closedWatch_;
 	uint64_t lastId_ = 0;
 };
 

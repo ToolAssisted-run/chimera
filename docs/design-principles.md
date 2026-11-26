@@ -16730,3 +16730,16 @@ on a keypad of "Key" buttons (none hidden), on keys with Reset and Power (none
 hidden), on keys with Reset and one other control (the keys and Reset hidden as
 before), and on a package's own list (kept). Broken on purpose once (the check
 for "everything hidden" removed) and seen to fail.
+
+## The message under TAStudio goes when the project changes (chosen by the owner, 2026-11-26, issue 648)
+
+After saving a branch ("starting test branch" and the like) the line at the
+bottom of TAStudio kept saying it when the project was closed or another one
+opened. The branches' view model now clears what it last said when a project
+opens (the new project's branches are loaded) and when the project closes, and
+the window shows "TAStudio engaged" again at once, also for a message from
+the clipboard.
+
+Tested: the view model test `project` checks that the branches' `status` is
+empty after another project opens and after the project closes. Broken on
+purpose once (the clearing removed) and seen to fail.

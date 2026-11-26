@@ -348,7 +348,11 @@ ApplicationWindow {
     }
     // the status line: what was last said here
     property string status: qsTrId("tastudio.tastudio_engaged")
-    Connections { target: tas.branches; function onStatusChanged() { if (tas.branches.status !== "") tas.status = tas.branches.status } }
+    // what the branches said is gone when they clear it (a project closed or another opened, issue 648);
+    // a clipboard refusal goes with the project it was said in too
+    Connections { target: tas.branches; function onStatusChanged() { tas.status = tas.branches.status !== "" ? tas.branches.status : qsTrId("tastudio.tastudio_engaged") } }
+    Connections { target: tas.session; function onHasProjectChanged() { tas.status = qsTrId("tastudio.tastudio_engaged") }
+                                        function onOpensChanged() { tas.status = qsTrId("tastudio.tastudio_engaged") } }
     Connections { target: tas.clipboard; function onFailed() { tas.status = qsTrId("common.clipboard_busy") } }
 
     SplitView {

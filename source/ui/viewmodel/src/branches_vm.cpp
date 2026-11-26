@@ -281,7 +281,9 @@ BranchesViewModel::BranchesViewModel(Dispatcher &dispatcher, InputLog &inputs, S
 	});
 
 	loadedWatch_ = session_.branchesLoaded.connect([this](const std::vector<SessionViewModel::Branch> &loaded) {
-		/* another project's branches: nothing of this one's to undo, show or ask */
+		/* another project's branches: nothing of this one's to undo, show or ask,
+		 * and nothing said of the last one's to keep saying (issue 648) */
+		status.set("");
 		dropBackup();
 		selected.set(-1);
 		previewing.set(-1);
@@ -291,6 +293,10 @@ BranchesViewModel::BranchesViewModel(Dispatcher &dispatcher, InputLog &inputs, S
 		for (SessionViewModel::Branch &b : branches_) b.id = ++lastId_;
 		count.set(static_cast<int64_t>(branches_.size()));
 		rows_.reset.emit();
+	});
+	/* a project closed has nothing to say */
+	closedWatch_ = session_.hasProject.changed.connect([this] {
+		if (!session_.hasProject.get()) status.set("");
 	});
 }
 
