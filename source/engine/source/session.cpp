@@ -106,7 +106,7 @@ extern "C" int32_t vectorWrite(uintptr_t userdata, const void *src, uintptr_t si
 struct SessionConfig
 {
 	std::string coreName, systemId, romFile;
-	/* the core's id, as its repository names it (see coreIdOf), for the folder its own files go in */
+	/* the core's id (see coreIdOf), the folder its own files go in */
 	std::string coreId;
 	/* which of the package's machines this is, -1 for a package that is one */
 	int32_t machineIndex = -1;
@@ -146,29 +146,22 @@ struct SessionConfig
  * shared by open and by a live re-apply */
 bool composeSettings(const std::string &defaultsJson, const char *overrides, std::string &out, std::string &error);
 
-/* A core's id: the <id> of its repository's address (".../chimera-core-<id>", a ".git" or a closing "/"
- * allowed), else its name, in both cases with what a file name cannot hold taken out. Never its version
+/* A core's id, the name of the folder its own files go in: its name in lower case, spaces turned into
+ * dashes, what a file name cannot hold taken out ("Genesis Plus GX" is genesis-plus-gx). Never its version
  * and never its package's file name, which carries both (issue 655). */
-std::string coreIdOf(std::string url, const std::string &coreName)
+std::string coreIdOf(const std::string &coreName)
 {
-	auto safe = [](const std::string &in) {
-		std::string out;
-		for (char c : in)
-			if (static_cast<unsigned char>(c) >= 32 && std::string("<>:\"/\\|?*").find(c) == std::string::npos) out += c;
-		while (!out.empty() && (out.back() == ' ' || out.back() == '.')) out.pop_back();
-		return out;
-	};
-	while (!url.empty() && url.back() == '/') url.pop_back();
-	if (url.size() > 4 && url.compare(url.size() - 4, 4, ".git") == 0) url.resize(url.size() - 4);
-	static const std::string marker = "/chimera-core-";
-	const size_t at = url.rfind(marker);
-	if (at != std::string::npos && url.find("://") != std::string::npos)
+	std::string out;
+	for (char c : coreName)
 	{
-		const std::string id = url.substr(at + marker.size());
-		if (!id.empty() && id.find('/') == std::string::npos && !safe(id).empty()) return safe(id);
+		if (static_cast<unsigned char>(c) < 32 || std::string("<>:\"/\\|?*").find(c) != std::string::npos) continue;
+		if (c == ' ') c = '-';
+		else if (c >= 'A' && c <= 'Z') c = static_cast<char>(c - 'A' + 'a');
+		out += c;
 	}
-	const std::string name = safe(coreName);
-	return name.empty() ? std::string("core") : name;
+	/* Windows drops a dot or a space at a name's end */
+	while (!out.empty() && (out.back() == '-' || out.back() == '.')) out.pop_back();
+	return out.empty() ? std::string("core") : out;
 }
 
 const char *strOf(const cJSON *obj, const char *key, const char *fallback = "")
@@ -272,7 +265,7 @@ bool parseConfig(const char *json, uint64_t len, const char *overrides, SessionC
 	}
 	const cJSON *machine = chooseMachine(root, overrides);
 	cfg.coreName = strOf(root, "coreName", "Waterbox");
-	cfg.coreId = coreIdOf(strOf(root, "url"), cfg.coreName);
+	cfg.coreId = coreIdOf(cfg.coreName);
 	cfg.systemId = machine != nullptr ? strOf(machine, "id") : strOf(root, "systemId");
 	cfg.machineIndex = -1;
 	if (machine != nullptr)
@@ -3112,10 +3105,10 @@ void ce_session_free(ce_session *s)
 
 const char *ce_session_core_name(const ce_session *s) { return s->cfg.coreName.c_str(); }
 const char *ce_session_core_id(const ce_session *s) { return s->cfg.coreId.c_str(); }
-const char *ce_core_id_of(const char *url, const char *core_name)
+const char *ce_core_id_of(const char *core_name)
 {
 	thread_local std::string id;
-	id = coreIdOf(url != nullptr ? url : "", core_name != nullptr ? core_name : "");
+	id = coreIdOf(core_name != nullptr ? core_name : "");
 	return id.c_str();
 }
 const char *ce_session_system_id(const ce_session *s) { return s->cfg.systemId.c_str(); }

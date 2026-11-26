@@ -35,6 +35,6 @@ with open(beside, "rb") as f:
 project_file.write(out, {
     "title": os.path.splitext(os.path.basename(game))[0],
     "core": {"name": cfg["coreName"], "version": cfg.get("version", ""), "sha1": ""},
-    "headers": {"MovieVersion": "Chimera Project File v1.1", "Platform": cfg.get("systemId", "")},
+    "headers": {"MovieVersion": "Chimera Project File v1.1"},
     "files": [{"name": os.path.basename(game), "sha1": sha1, "slot": slot}],
 })

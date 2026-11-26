@@ -16823,14 +16823,15 @@ What was done:
   written there (the Screenshot As dialog no longer makes the folder when it
   opens; saving makes it).
 - A core's default files go in a folder of the core's id inside Output. The
-  id is what the core's repository calls it: the `url` in the package's
-  `waterbox.config`, `https://github.com/ToolAssisted-run/chimera-core-<id>`
-  (a `.git` or a closing `/` is allowed), gives `<id>` (`flycast`). It is not
-  the package's file name, because a published package is named
-  `<id>-<version>-<architecture>.chimeraCore`, and never the version. With no
-  `url`, or one that does not end that way, the core's `coreName` is used,
-  with what a file name cannot hold taken out. A package in a folder (for
-  development) follows the same rule. The engine works it out
+  id is the core's `coreName` in lower case with dashes for spaces and what a
+  file name cannot hold taken out (owner, 2026-11-26): "Flycast" is `flycast`,
+  "Genesis Plus GX" is `genesis-plus-gx`, "bsnes v115" is `bsnes-v115`. It is
+  not the package's file name, because a published package is named
+  `<id>-<version>-<architecture>.chimeraCore`, and never the version. (A first
+  version of this change took the id from the package's `url`; most packages
+  give the upstream emulator's address there, so that rule was dropped.) A
+  package in a folder (for development) follows the same rule. The engine
+  works it out
   (`ce_session_core_id`). The open core's id is the new
   session property `coreId`; `paths.outputFor(core)` gives the folder. Screenshots
   and Lua's `LuaCanvas.save_image_to_disk` (a relative path) use it. With no core
@@ -16848,6 +16849,20 @@ What was done:
   per-system folders stay on disk and are never read (owner, 2026-11-26): the
   screenshot counter starts again in the new folder. What they saved for a
   system stays in their settings file and is ignored without a message.
+- The owner kept the system field where the interface shows it: "These are all
+  acceptable use cases for chimera system field". The window title, the "Loaded
+  core" menu entry, the hex editor's title, the core manager's Systems column,
+  Show Systems and its filter, the MCP fields and arguments, the "opened" event,
+  `about.json` and the crash notes still name the system, and so does the
+  machine choice of a core with several machines.
+- The BizHawk-compatible system ids were removed by the owner's decision
+  (2026-11-26): Lua's `emu.getsystemid()` (and its entry in the Lua functions
+  list), the `Platform` header of projects and movies (New Project, a new movie
+  made from a project, and `chimera-run` no longer write it), and the
+  `SystemID` line of `.wch` watch files and of RAM Search's saved list. What
+  still opens: a project or movie that has the `Platform` header (the header is
+  ignored), and a `.wch` file that starts with a `SystemID` line (the line is
+  skipped, as before). Scripts that call `emu.getcorename()` still work.
 - Output follows the base: with another Base set, it is under that base
   (owner, 2026-11-26).
 - The window scale (View > Window Size, Lua's `client.getwindowsize` and
@@ -16860,7 +16875,12 @@ What was done:
 Tested: view model tests check that Output resolves to `./output` under the
 base without being made, that `outputFor("flycast")` is `output/flycast`, that
 a changed Output moves it, that odd ids stay inside it, that the table has the
-new row and no system column, that the id comes from the `url` (with `.git`,
-a closing `/`, no address, an address that does not match, an odd name), that
-a core opened from a package named `synth-abc123-x86_64.chimeraCore` has the
+new row and no system column, that the id comes from the core's name ("Flycast",
+"Genesis Plus GX", "bsnes v115", odd characters, empty), that a core opened from a package named `synth-abc123-x86_64.chimeraCore` has the
 id `synth`, that the window scale is kept per core id, and that a canvas picture saved from Lua goes to `output/<core id>/`.
+
+The removals are tested too: a project made in a test has no `Platform` header,
+a saved watch list has no `SystemID` line while a file that has one still loads,
+`emu.getsystemid` is gone from the Lua tests, and the witness checks that made
+projects carry no `Platform` header while the projects it starts with one still
+run. Broken on purpose once (the id rule) and seen to fail.

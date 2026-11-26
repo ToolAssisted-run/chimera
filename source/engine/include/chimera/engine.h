@@ -894,11 +894,11 @@ CE_API const char *ce_core_log_error(void);
 
 /* config-derived facts (borrowed strings live as long as the session) */
 CE_API const char *ce_session_core_name(const ce_session *s);
-/* The core's id: the <id> of the "url" in its waterbox.config (.../chimera-core-<id>, optional .git or
- * trailing slash), else its name made safe for a file name. The same for every version and build. */
+/* The core's id, from its "coreName": lower case, spaces turned into dashes, what a file name cannot hold
+ * taken out ("Genesis Plus GX" is genesis-plus-gx). The same for every version and build. */
 CE_API const char *ce_session_core_id(const ce_session *s);
-/* The same rule on its own: the id for a "url" and a "coreName" (either may be NULL). Valid until the next call on this thread. */
-CE_API const char *ce_core_id_of(const char *url, const char *core_name);
+/* The same rule on its own (the name may be NULL). Valid until the next call on this thread. */
+CE_API const char *ce_core_id_of(const char *core_name);
 CE_API const char *ce_session_system_id(const ce_session *s);
 /* Which entry of the package's "machines" this session is, as its machine
  * setting chose it (several machines may share a system id: MAME's Amstrad

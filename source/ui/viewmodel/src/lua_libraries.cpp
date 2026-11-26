@@ -250,11 +250,6 @@ function emu.islagged() return C.session.lagFrame end
 -- the frame just run was a lag frame or not (true when not said), as its row in TAStudio says
 function emu.setislagged(value) C.session.setIsLagged(value == nil or value and true or false) end
 function emu.setlagcount(count) C.session.setLagCount(wholeNumber(count)) end
--- the machine's id, as Chimera's (the game's system); "NULL" with none open
-function emu.getsystemid()
-	local id = C.session.systemId
-	return (id == nil or id == "") and "NULL" or id
-end
 function emu.getcorename() return C.session.coreName end
 function emu.getboardname() return "" end
 function emu.getdisplaytype() return "" end

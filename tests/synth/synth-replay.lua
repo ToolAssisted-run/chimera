@@ -38,8 +38,8 @@ for line in io.lines(jobPath) do
 end
 meta.metaPath = job.meta
 
-if emu.getsystemid() ~= "Synth" then
-	finish("ERROR", "wrong system id: " .. tostring(emu.getsystemid()))
+if emu.getcorename() ~= "Synth" then
+	finish("ERROR", "wrong core name: " .. tostring(emu.getcorename()))
 end
 
 local frames = {}

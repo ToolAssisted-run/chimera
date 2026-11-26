@@ -1543,9 +1543,11 @@ MACHPY
 		mother="$(mfield machine-other settings)|$(mfield machine-other headers)"
 		mmake machine-named "$mmach" "$mdir/gridWalker.runner" --settings '{"model":"walker"}'
 		mnamed="$(mfield machine-named settings)|$(mfield machine-named headers)"
-		if [ "$mown" = '{"initFillByte": 0, "model": "walker"}|{"Platform": "Synth"}' ] \
-			&& [ "$mother" = '{"initFillByte": 0, "model": "runner"}|{"Platform": "SynthRunner"}' ] \
-			&& [ "$mnamed" = '{"initFillByte": 0, "model": "walker"}|{"Platform": "Synth"}' ]; then
+		# the machine shows in the settings; no Platform header is written any more (issue 655)
+		case "$mown$mother$mnamed" in *Platform*) mplat=1 ;; *) mplat=0 ;; esac
+		if [ "${mown%%|*}" = '{"initFillByte": 0, "model": "walker"}' ] \
+			&& [ "${mother%%|*}" = '{"initFillByte": 0, "model": "runner"}' ] \
+			&& [ "${mnamed%%|*}" = '{"initFillByte": 0, "model": "walker"}' ] && [ "$mplat" = 0 ]; then
 			report "E:made-project:machine" PASS "the game's kind of file picks the machine, and settings that name one are kept"
 		else
 			report "E:made-project:machine" FAIL "own: $mown; other: $mother; named: $mnamed (see work/made-project/machine-*.make.log)"

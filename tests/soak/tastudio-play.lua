@@ -50,7 +50,7 @@ local function say(line)
 	if logFile then logFile:write(line .. "\n"); logFile:flush() end
 end
 
-say("soak: system=" .. tostring(emu.getsystemid()) .. " frame=" .. emu.framecount())
+say("soak: system=" .. tostring(emu.getcorename()) .. " frame=" .. emu.framecount())
 
 if not tastudio.engaged() then
 	client.opentasstudio()

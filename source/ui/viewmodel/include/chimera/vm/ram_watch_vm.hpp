@@ -141,7 +141,6 @@ private:
 	int hooks_ = 0;
 	Connection opensWatch_, previousTypeWatch_, showWatch_, freezesWatch_;
 	bool frozen(const Watch &w) const;
-	std::string systemId_;
 	/* each domain's size, as the machine last said (the view's thread) */
 	std::map<std::string, int64_t> domainSizes_;
 	/* and whether it can be written */

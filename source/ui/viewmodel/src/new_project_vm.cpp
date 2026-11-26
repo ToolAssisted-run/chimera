@@ -1031,13 +1031,6 @@ NewProjectViewModel::NewProjectViewModel(Dispatcher &dispatcher, SessionViewMode
 			}
 			/* everything the project is, taken now: making it runs on the
 			 * machine's thread, since it reads and hashes every file */
-			std::string platform;
-			if (const Json *list = cfg_.find("machines"); list != nullptr && machine.get() >= 0 && machine.get() < static_cast<int64_t>(list->items.size()))
-			{
-				if (const Json *id = list->items[static_cast<size_t>(machine.get())].find("id")) platform = id->text;
-			}
-			else if (const Json *system = cfg_.find("systemId"))
-				platform = system->text;
 			std::vector<std::pair<std::string, Picked>> files;
 			for (const Slot &s : slots_)
 				if (auto it = files_.find(s.id); it != files_.end())
@@ -1084,7 +1077,6 @@ NewProjectViewModel::NewProjectViewModel(Dispatcher &dispatcher, SessionViewMode
 			session_.onMachine([=, this](ce_session *) {
 				ce_project *p = ce_project_new();
 				ce_project_set_core(p, coreName.c_str(), version.c_str(), sha.c_str());
-				if (!platform.empty()) ce_project_header_set(p, "Platform", platform.c_str());
 				const char *err = nullptr;
 				std::string why;
 				bool forFiles = false;

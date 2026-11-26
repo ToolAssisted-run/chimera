@@ -270,7 +270,6 @@ Project cache
 Unsaved work
 
 # RAM Search's .wch header, its hidden columns, ffmpeg arguments by their own names
-SystemID 
 Changes,Diff
 Infinity
 -Infinity

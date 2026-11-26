@@ -235,8 +235,7 @@ std::filesystem::path gameProject(const std::string &package, const std::string 
 	ce_project *p = ce_project_new();
 	const json::Json *coreName = cfg.find("coreName"), *version = cfg.find("version");
 	ce_project_set_core(p, coreName != nullptr ? coreName->text.c_str() : "", version != nullptr ? version->text.c_str() : "", sha.c_str());
-	if (const json::Json *system = cfg.find("systemId")) ce_project_header_set(p, "Platform", system->text.c_str());
-	const char *error = nullptr;
+		const char *error = nullptr;
 	ce_project_file_add(p, beside.filename().string().c_str(), slotId.c_str(), beside.string().c_str(), &error);
 	json::Json slotMap, files, recorded, none;
 	slotMap.kind = recorded.kind = none.kind = json::Json::Kind::Object;
@@ -1353,17 +1352,12 @@ void pathsConfig()
 		paths.resolve("Movies") == (dir / "runs").string() && paths.resolve("Lua") == (dir / "elsewhere" / "Lua").string());
 	paths.run("setPath", {std::string("Base"), std::string(".")}, error);
 	CHECK(paths.base.get().empty());
-	/* a core's id: the repository's name, never the version, the architecture or the package's file name */
+	/* a core's id: its name in lower case, dashes for spaces, file-name characters out; never the version or the package's file name */
 	{
-		auto id = [](const char *url, const char *name) { return std::string(ce_core_id_of(url, name)); };
-		CHECK(id("https://github.com/ToolAssisted-run/chimera-core-flycast", "Flycast") == "flycast");
-		CHECK(id("https://github.com/ToolAssisted-run/chimera-core-flycast.git", "Flycast") == "flycast");
-		CHECK(id("https://github.com/ToolAssisted-run/chimera-core-flycast/", "Flycast") == "flycast");
-		CHECK(id("https://example.org/x/chimera-core-quickerneshawk.git/", "") == "quickerneshawk");
-		/* no address, or none that ends in chimera-core-<id>: the name, made safe */
-		CHECK(id(nullptr, "Genesis Plus GX") == "Genesis Plus GX" && id("", "a/b:c") == "abc");
-		CHECK(id("https://github.com/someone/flycast", "Flycast") == "Flycast" && id("https://github.com/o/chimera-core-", "Flycast") == "Flycast");
-		CHECK(id(nullptr, "") == "core");
+		auto id = [](const char *name) { return std::string(ce_core_id_of(name)); };
+		CHECK(id("Flycast") == "flycast" && id("Genesis Plus GX") == "genesis-plus-gx" && id("bsnes v115") == "bsnes-v115");
+		CHECK(id("a/b:c") == "abc" && id("PCSX2") == "pcsx2" && id("Dolphin.") == "dolphin");
+		CHECK(id("") == "core" && id(nullptr) == "core" && id("///") == "core");
 	}
 	/* no folder per system (issue 655): one Output folder, "./output" under the base, not made, and a folder of the core's id in it */
 	CHECK(paths.resolve("Output") == (dir / "program" / "output").string() && !fs::exists(dir / "program" / "output"));
@@ -2727,7 +2721,7 @@ bool luaLibraries(const char *package, const char *rom)
 	/* a database in the test's temporary folder: Lua's os.tmpname names one in a Windows drive's root */
 	const std::string sqlDb = (std::filesystem::temp_directory_path() / ("chimera-test-sql-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()) + ".db")).generic_string();
 	console.run("openScript", {scriptFile(std::regex_replace(std::string(R"LUA(
-console.log("start", emu.framecount(), emu.getsystemid() ~= "")
+console.log("start", emu.framecount(), emu.getcorename() ~= "")
 mainmemory.write_u8(0x10, 0xAB)
 console.log("u8", mainmemory.read_u8(0x10), mainmemory.read_s8(0x10), mainmemory.readbyte(0x10))
 mainmemory.write_u16_be(0x20, 0x1234)
@@ -2919,7 +2913,7 @@ while true do emu.frameadvance() end
 	 * form's onClose run when its script closes it, no waiting inside an
 	 * event callback, and joypad.set taking 1 for pressed */
 	console.run("openScript", {scriptFile(R"LUA(
-console.log("review", emu.getsystemid(), emu.getregister("NOPE"), bit.bor(-1, 0), bit.lshift(1, 32), client.openproject("/no/such.chimeraProject"), movie.getinput(1000000000) == nil, bizstring.decode({[0] = 65, [1] = 66}))
+console.log("review", emu.getcorename(), emu.getregister("NOPE"), bit.bor(-1, 0), bit.lshift(1, 32), client.openproject("/no/such.chimeraProject"), movie.getinput(1000000000) == nil, bizstring.decode({[0] = 65, [1] = 66}))
 mainmemory.write_u8(0x50, 3.5)
 local closed = false
 local f = forms.newform(100, 100, "t", function() closed = true end)
@@ -6287,7 +6281,8 @@ bool newProject(const char *package, const char *rom)
 	session.run("saveProject", {}, error);
 	CHECK(d.until([&] { return session.status.get().rfind("Saved", 0) == 0; }, 20));
 	const std::string text = projectText(project);
-	CHECK(text.find("\"Platform\"") != std::string::npos && text.find("initFillByte") != std::string::npos &&
+	/* no Platform header is written any more (issue 655) */
+	CHECK(text.find("\"Platform\"") == std::string::npos && text.find("initFillByte") != std::string::npos &&
 		text.find("walker.testrom") != std::string::npos && text.find("Synth") != std::string::npos);
 	/* opened again in a new session (one machine at a time: the sandbox
 	 * puts each at the same address) */
@@ -6547,7 +6542,8 @@ bool ramWatch(const char *package, const char *rom)
 	const std::string nl = "\n";
 #endif
 	const std::string digits = watch::hex(at, watch::addressDigits(ramSize));
-	CHECK(saved.rfind("SystemID Synth" + nl + digits + "\tb\tu\t0\tRAM\tchanging byte" + nl, 0) == 0);
+	CHECK(saved.rfind(digits + "\tb\tu\t0\tRAM\tchanging byte" + nl, 0) == 0);
+	CHECK(saved.find("SystemID") == std::string::npos);
 	CHECK(saved.find(nl + "0\tS\t_\t1\t\tbelow" + nl) != std::string::npos);
 	CHECK(saved.find(watch::hex(a2, watch::addressDigits(ramSize)) + "\tw\th\t1\tRAM\tword, big end first" + nl) != std::string::npos);
 	CHECK(saved.size() > 2 * nl.size() && saved.substr(saved.size() - (nl.size() + 12 + nl.size())) == "OnScreen\t0,6" + nl + nl);
@@ -6698,7 +6694,7 @@ bool ramWatch(const char *package, const char *rom)
 	watches.run("setOnScreen", {int64_t{1}, true}, error);
 	CHECK(watches.onScreenText.get() == "Status: Playing");
 	CHECK(watches.run("save", {(dir / "props.wch").string()}, error).has_value());
-	CHECK(readFile(dir / "props.wch").find(nl + watch::hex(4, watch::addressDigits(ramSize)) + "\tp\tu\t0\tRAM\tSteps" + nl) != std::string::npos);
+	CHECK((nl + readFile(dir / "props.wch")).find(nl + watch::hex(4, watch::addressDigits(ramSize)) + "\tp\tu\t0\tRAM\tSteps" + nl) != std::string::npos);
 	watches.run("newList", {}, error);
 	CHECK(watches.run("open", {(dir / "props.wch").string()}, error).has_value() && watches.count.get() == 2);
 	CHECK(d.until([&] { return text(0, 1) == stepsNow() && text(1, 1) == "Playing"; }, 10));
@@ -8467,7 +8463,7 @@ event.onframeend(function()
 	if #seen > 0 and f ~= seen[#seen] + 1 then gaps = gaps + 1 end
 	seen[#seen + 1] = f
 	bytes = bytes + memory.readbyte(f % 64, "RAM")
-	system = emu.getsystemid()
+	system = emu.getcorename()
 end)
 )", "every-frame", error));
 	session.unthrottled.set(true);
@@ -9289,7 +9285,7 @@ bool newProjectWizard(const char *package, const char *rom, const char *slotsPac
 		const std::string project = projectText(plain);
 		CHECK(std::regex_search(project, std::regex("\"initFillByte\"\\s*:\\s*7[^0-9]")));
 		CHECK(project.find("down the corridor") != std::string::npos && project.find("walker.testrom") != std::string::npos);
-		CHECK(project.find("\"Platform\"") != std::string::npos);
+		CHECK(project.find("\"Platform\"") == std::string::npos);
 	}
 	CHECK(session.projectTitle.get() == "down the corridor" && session.coreName.get() == "Synth");
 	session.run("close", {}, error);
@@ -9483,7 +9479,7 @@ bool newProjectWizard(const char *package, const char *rom, const char *slotsPac
 		char sha[41];
 		uint64_t len = 0;
 		ce_sha1_file((dir / "mybios.bin").string().c_str(), sha, &len);
-		CHECK(project.find("SynthB") != std::string::npos && std::regex_search(project, std::regex("\"diskSpeed\"\\s*:\\s*3[^0-9]")));
+		CHECK(project.find("Platform") == std::string::npos && std::regex_search(project, std::regex("\"diskSpeed\"\\s*:\\s*3[^0-9]")));
 		CHECK(std::regex_search(project, std::regex("\"board\"\\s*:\\s*\"b\"")));
 		CHECK(project.find(sha) != std::string::npos || project.find(lower(sha)) != std::string::npos);
 		const size_t d2 = project.find("disk2.img"), d1 = project.find("disk1.cue"), track = project.find("disk1.bin");
@@ -10413,8 +10409,8 @@ bool luaParity(const char *package, const char *rom)
 	/* a canvas picture goes under output/<core id> (issue 655) */
 	{
 		const std::string stem = "synth";
-		/* the id is the repository's name for the core (the package's "url"), not its package's file name, which a
-		 * published package gives with a version and an architecture */
+		/* the id comes from the core's name ("Synth"), not its package's file name, which a published package gives
+		 * with a version and an architecture */
 		CHECK(session.coreId.get() == "synth");
 		std::string saveTo;
 		RowModel &controls = *forms.rowLists()[1].model;
@@ -10461,7 +10457,7 @@ bool luaParity(const char *package, const char *rom)
 	CHECK(lua1("emu.setislagged(true) return emu.islagged(), emu.lagcount()") == "[true, 51]");
 	CHECK(lua1("emu.setislagged(false) return emu.islagged(), emu.lagcount()") == "[false, 50]");
 	/* the movie */
-	CHECK(lua1("movie.startsfromsavestate(), movie.getheader().Platform ~= nil") == "[false, true]");
+	CHECK(lua1("movie.startsfromsavestate(), movie.getheader().Platform ~= nil") == "[false, false]");
 	/* comments and subtitles are gone from Chimera (owner, 2026-11-01, issue 440) */
 	CHECK(lua1("return movie.getcomments == nil, movie.getsubtitles == nil") == "[true, true]");
 	CHECK(lua1("movie.getinputasmnemonic(0), movie.getinputasmnemonic(100000)").rfind("[\"|", 0) == 0);

@@ -82,7 +82,7 @@ out = os.path.join(work, "plain.txt")
 r = run(proj, script("plain", f"""
 for i = 1, 30 do emu.frameadvance() end
 local f = io.open([[{out}]], "w")
-f:write(emu.getsystemid(), " ", emu.framecount(), " ", tostring(tastudio.engaged()))
+f:write(emu.getcorename(), " ", emu.framecount(), " ", tostring(tastudio.engaged()))
 f:close()
 client.exit()
 """))

@@ -560,27 +560,7 @@ static int newProject(const std::vector<std::string> &args)
 		return refuse(std::string("the files do not fit the package's slots: ") + (error != nullptr ? error : "?"));
 	}
 
-	/* the machine, as the engine chooses it: the machine setting's value */
-	std::string platform = text(config, "systemId");
-	if (cJSON_IsArray(machines) && machines->child != nullptr)
-	{
-		const cJSON *chosenValue = cJSON_GetObjectItemCaseSensitive(recorded, machineSetting.c_str());
-		const std::string chosen = cJSON_IsString(chosenValue) ? chosenValue->valuestring : "";
-		platform = text(machines->child, "id");
-		const cJSON *m = nullptr;
-		bool found = false;
-		cJSON_ArrayForEach(m, machines)
-		{
-			if (found) break;
-			const cJSON *when = cJSON_GetObjectItemCaseSensitive(m, "when"), *w = nullptr;
-			cJSON_ArrayForEach(w, when)
-				if (cJSON_IsString(w) && chosen == w->valuestring) found = true;
-			if (!cJSON_IsArray(when) && text(m, "id") == chosen) found = true;
-			if (found) platform = text(m, "id");
-		}
-	}
 	cJSON_Delete(recorded);
-	if (!platform.empty()) ce_project_header_set(p, "Platform", platform.c_str());
 
 	/* the firmware, each pinned by its hash */
 	if (!firmware.empty())

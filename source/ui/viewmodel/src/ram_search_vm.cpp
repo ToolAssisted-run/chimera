@@ -506,7 +506,7 @@ RamSearchViewModel::RamSearchViewModel(Dispatcher &dispatcher, SessionViewModel 
 				error = tr("ram_search.no_file");
 				return {};
 			}
-			std::string text = "SystemID " + session_.systemId.get() + kNewLine;
+			std::string text;
 			const int s = static_cast<int>(size.get());
 			{
 				std::lock_guard<std::mutex> lock(rsM_);

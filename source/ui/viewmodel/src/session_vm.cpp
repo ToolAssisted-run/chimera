@@ -327,7 +327,7 @@ SessionViewModel::SessionViewModel(Dispatcher &dispatcher, InputLog &inputs)
 	expose("coreName", "the open core", coreName);
 	expose("systemName", "the machine the core runs", systemName);
 	expose("systemId", "the machine's id, as the core names it", systemId);
-	expose("coreId", "the open core's id: its package's file name without .chimeraCore, never its version", coreId);
+	expose("coreId", "the open core's id: its name in lower case with dashes for spaces, never its version", coreId);
 	expose("buttonCount", "how many buttons the machine has", buttonCount);
 	expose("gamepads", "the gamepads in use, or why there are none", gamepads);
 	expose("padFaces", "what the open gamepads print on their face buttons, bottom, right, left and top "
@@ -1454,8 +1454,6 @@ SessionViewModel::SessionViewModel(Dispatcher &dispatcher, InputLog &inputs)
 				ce_project_set_core(p, ce_project_core_name(projectM_), ce_project_core_version(projectM_), ce_project_core_sha1(projectM_));
 				/* a new movie runs on the package this one runs on */
 				pinRunningPackageOnMachine(p);
-				if (const char *platform = ce_project_header_get(projectM_, "Platform"); platform != nullptr && *platform != '\0')
-					ce_project_header_set(p, "Platform", platform);
 				const char *error = nullptr;
 				std::string why;
 				for (int32_t i = 0; i < ce_project_file_count(projectM_) && why.empty(); i++)

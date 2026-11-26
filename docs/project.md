@@ -207,11 +207,14 @@ A package need not be one machine. Genesis Plus GX is a Mega Drive, a Master
 System, a Game Gear and an SG-1000 - the same `core.wbx` with different
 hardware selected - so its `waterbox.config` declares a `machines` array and
 names the setting that picks between them (`machineSetting`). Each machine
-carries what makes it a different machine: the system id the movie records,
-the controller it has, the picture it draws, and the rom extensions that
+carries what makes it a different machine: its id, the controller it has, the picture it draws, and the rom extensions that
 belong to it. What they share - the binary, the guest heap, and the audio
 rate unless a machine states its own - stays at the top level, and a package
 with no `machines` is one machine exactly as before.
+
+A project or movie no longer records the machine's id in a `Platform` header
+(owner, 2026-11-26, issue 655). One that has the header still opens; the header
+is ignored.
 
 A machine whose sound chip runs at another rate says so with `audioRate`, in
 Hz (issue 226). A Namco System 256 is a PlayStation 2 with every clock a

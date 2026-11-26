@@ -41,8 +41,8 @@ public:
 	/* a global folder as it is: its path made absolute; "" for a name that is not one */
 	std::string resolve(const std::string &name) const;
 	/* where a core's own files go by default: the Output folder, then a folder
-	 * named by the core's id (its repository's
-	 * name for it, never its version or its package's file name). The Output folder itself for "". Nothing is made. */
+	 * named by the core's id (its name in lower case,
+	 * dashes for spaces; never its version or its package's file name). The Output folder itself for "". Nothing is made. */
 	std::string outputFor(const std::string &core) const;
 	/* the Temp Files folder made absolute, "" while it is not set (the
 	 * system's own temporary folder is used then) */

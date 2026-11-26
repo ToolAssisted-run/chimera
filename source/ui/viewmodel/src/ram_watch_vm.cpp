@@ -735,7 +735,7 @@ RamWatchViewModel::RamWatchViewModel(Dispatcher &dispatcher, SessionViewModel &s
 void RamWatchViewModel::refreshDomains()
 {
 	session_.onMachine([this](ce_session *s) {
-		std::string names, system;
+		std::string names;
 		std::map<std::string, int64_t> sizes;
 		std::map<std::string, bool> writable;
 		if (s != nullptr)
@@ -748,9 +748,8 @@ void RamWatchViewModel::refreshDomains()
 				if (ce_session_domain_hidden(s, i) != 0) continue;
 				names += (names.empty() ? "" : ",") + n;
 			}
-			if (const char *id = ce_session_system_id(s)) system = id;
 		}
-		later([this, names, system, sizes, writable] {
+		later([this, names, sizes, writable] {
 			domainSizes_ = sizes;
 			domainWritable_ = writable;
 			/* Watches > Default Domain: the first, until one is chosen that this machine has */
@@ -759,7 +758,6 @@ void RamWatchViewModel::refreshDomains()
 				defaultDomain.set(names.substr(0, names.find(',')));
 			for (Watch &w : watches_) sizeFromDomain(w);
 			domains.set(names);
-			systemId_ = system;
 			if (!watches_.empty()) rows_.changed.emit(0, static_cast<int64_t>(watches_.size()) - 1);
 			selectionChanged();
 		});
@@ -990,7 +988,7 @@ void RamWatchViewModel::readOnMachine(ce_session *s, bool fresh)
 		});
 }
 
-/* Chimera's .wch: a SystemID line, a line a watch - address in hex, size
+/* Chimera's .wch: a line a watch - address in hex, size
  * letter, display letter, 1 for big endian, domain, note, split by tabs -
  * and an OnScreen line naming by place the watches shown over the picture.
  * Files from other emulators have a count first, a place number before
@@ -1016,6 +1014,7 @@ std::vector<RamWatchViewModel::Watch> RamWatchViewModel::readList(std::istream &
 			continue;
 		}
 		if (line.rfind("Domain", 0) == 0) ours = true;
+		/* files written before issue 655 start with a SystemID line, which is skipped */
 		if (line.rfind("SystemID", 0) == 0) continue;
 		if (line.rfind(kOnScreen, 0) == 0)
 		{
@@ -1113,7 +1112,7 @@ bool RamWatchViewModel::load(const std::string &file, bool append, std::string &
 
 bool RamWatchViewModel::save(const std::string &file, std::string &error)
 {
-	std::string text = "SystemID " + systemId_ + kNewLine;
+	std::string text;
 	std::string onScreen;
 	for (size_t i = 0; i < watches_.size(); i++)
 	{
