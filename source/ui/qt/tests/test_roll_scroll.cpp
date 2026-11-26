@@ -133,6 +133,29 @@ int main(int argc, char **argv)
 	CHECK(QTest::qWaitFor([&] { return roll.topRow() < 480; }, 3000));
 	QTest::mouseRelease(&window, Qt::LeftButton, Qt::NoModifier, QPoint(150, 0));
 
+	/* the roll moved by itself under a held press (it follows the current frame,
+	 * and a seek back after an edit sends that far up the roll): the pointer is
+	 * over other rows then, and the next move must not set every row between
+	 * the row pressed and the one now under it (issue 659) */
+	roll.setTopRow(500);
+	draggedTo = -1;
+	int dragged = 0;
+	QMetaObject::Connection counter = QObject::connect(&roll, &chimera::qt::PianoRollItem::cellDragged, &roll, [&](qint64, int) { dragged++; });
+	QTest::mousePress(&window, Qt::LeftButton, Qt::NoModifier, QPoint(150, y2));
+	CHECK(pressedRow == 502);
+	roll.setTopRow(100);
+	QTest::mouseMove(&window, QPoint(150, y2 + 1));
+	QTest::mouseMove(&window, QPoint(150, y2 + h));
+	CHECK(dragged == 0 && draggedTo == -1);
+	QTest::mouseRelease(&window, Qt::LeftButton, Qt::NoModifier, QPoint(150, y2 + h));
+	/* a drag that is not scrolled by itself goes on setting the rows it passes, as before */
+	roll.setTopRow(500);
+	QTest::mousePress(&window, Qt::LeftButton, Qt::NoModifier, QPoint(150, y2));
+	QTest::mouseMove(&window, QPoint(150, y2 + 2 * h));
+	CHECK(dragged == 2);
+	QTest::mouseRelease(&window, Qt::LeftButton, Qt::NoModifier, QPoint(150, y2 + 2 * h));
+	QObject::disconnect(counter);
+
 	std::printf("%d checks, %d failed\n", checks, failures);
 	return failures == 0 ? 0 : 1;
 }

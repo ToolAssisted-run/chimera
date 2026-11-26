@@ -295,6 +295,9 @@ private:
 	int columnX(int column) const;
 	int columnW(int column) const;
 	double lastPaintMs_ = 0;
+	/* true while a scroll the person asked for is being answered */
+	bool scrollAsked_ = false;
+	void askTop(qint64 row);
 	int dragColumn_ = -1;
 	qint64 dragRow_ = -1;
 };

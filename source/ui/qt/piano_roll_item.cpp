@@ -237,9 +237,26 @@ int PianoRollItem::headerSize() const
 	return widest + 12;
 }
 
+/* the person scrolled the roll (wheel, keys, a drag past its edge): the view model sets the top row in answer */
+void PianoRollItem::askTop(qint64 row)
+{
+	scrollAsked_ = true;
+	Q_EMIT topRowRequested(row);
+	scrollAsked_ = false;
+}
+
 void PianoRollItem::setTopRow(qint64 row)
 {
 	if (row == top_) return;
+	/* The roll moved on its own (it follows the current frame, which a seek back after an
+	 * edit sends far away): the pointer, held still, is over other rows now, and the next
+	 * move would set every cell between the old row and the new one (issue 659). The
+	 * drawing stops; the person presses again where they mean to draw. */
+	if (!scrollAsked_ && dragColumn_ >= 0)
+	{
+		dragColumn_ = -1;
+		dragRow_ = -1;
+	}
 	top_ = row;
 	Q_EMIT topRowChanged();
 	update();
@@ -963,7 +980,7 @@ void PianoRollItem::dragScroll()
 	if (step == 0) return;
 	const qint64 to = std::clamp<qint64>(top_ + step, 0, std::max<qint64>(0, rowCount() - 1));
 	if (to == top_) return;
-	Q_EMIT topRowRequested(to);
+	askTop(to);
 	dragTo(dragAt_);
 }
 
@@ -1017,8 +1034,8 @@ bool PianoRollItem::navigate(int key, bool extend)
 	Q_EMIT selectionRequested(std::min(selectAnchor_, to), std::max(selectAnchor_, to));
 	/* kept in view: at the top going up, at the bottom going down */
 	const qint64 shown = std::max(1, visibleRows());
-	if (to < top_) Q_EMIT topRowRequested(to);
-	else if (to >= top_ + shown) Q_EMIT topRowRequested(to - shown + 1);
+	if (to < top_) askTop(to);
+	else if (to >= top_ + shown) askTop(to - shown + 1);
 	return true;
 }
 
@@ -1066,11 +1083,11 @@ void PianoRollItem::wheelEvent(QWheelEvent *e)
 		wheelPixels_ += pixels;
 		const int rows = wheelPixels_ / std::max(1, rowHeight_);
 		wheelPixels_ -= rows * std::max(1, rowHeight_);
-		if (rows != 0) Q_EMIT topRowRequested(std::max<qint64>(0, top_ - rows));
+		if (rows != 0) askTop(std::max<qint64>(0, top_ - rows));
 		e->accept();
 		return;
 	}
-	if (notches != 0) Q_EMIT topRowRequested(std::max<qint64>(0, top_ - notches * std::max(1, wheelRows_)));
+	if (notches != 0) askTop(std::max<qint64>(0, top_ - notches * std::max(1, wheelRows_)));
 	e->accept();
 }
 
