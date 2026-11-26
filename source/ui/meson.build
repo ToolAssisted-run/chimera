@@ -768,6 +768,17 @@ endif
       cpp_args: ['-DQT_NO_KEYWORDS'],
     )
     test('roll scroll', test_roll_scroll, env: ['QT_QPA_PLATFORM=offscreen', 'QT_QUICK_BACKEND=software'], timeout: 60)
+    # the roll over the wiring TAStudio.qml uses: a scroll the person asks for is
+    # answered at once, one the view model makes ends a drag that was drawing (issue 659)
+    test_roll_wiring = executable(
+      'test-roll-wiring',
+      ['qt/tests/test_roll_wiring.cpp', 'qt/piano_roll_item.cpp', 'qt/qml_view_model.cpp', 'qt/theme_palette.cpp',
+        qt6.compile_moc(headers: ['qt/piano_roll_item.hpp', 'qt/qml_view_model.hpp', 'qt/theme_palette.hpp'], dependencies: [qt_dep])],
+      dependencies: [qt_test_dep, vm_dep, dl_dep],
+      override_options: ['cpp_std=c++20'],
+      cpp_args: ['-DQT_NO_KEYWORDS'],
+    )
+    test('roll wiring', test_roll_wiring, env: ['QT_QPA_PLATFORM=offscreen', 'QT_QUICK_BACKEND=software'], timeout: 60)
     # a number prompt has the keyboard when it opens, whatever had it before,
     # and Enter is OK (issue 621)
     test_number_prompt = executable(

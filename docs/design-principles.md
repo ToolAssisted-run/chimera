@@ -16773,3 +16773,31 @@ names in the wrong order and `naturalCompare` on "Disc 2" and "Disc 10", case,
 leading zeros and a name that is a prefix of another; the window test `new
 project drop` checks three files dropped together (one, two, three) come in as
 one, three, two. Broken on purpose once (the sort removed) and seen to fail.
+
+## A drag that was drawing stops when the roll scrolls by itself (user-decided, 2026-11-26, issue 659)
+
+A report: with TAStudio's Greenzone Off, an input drawn into the piano roll at
+an earlier frame ended up on many rows. The cause was not in the engine. An
+edit above the machine sends it back to the nearest saved state, which with
+the Greenzone Off is far up the roll, and with Follow cursor on the roll
+scrolls there at once, under a mouse button that is still held. The next mouse
+move then set every cell between the row the person pressed on and the row now
+under the pointer.
+
+The owner chose that the drawing stops. When the roll's top row changes and the
+person did not ask for it (the roll followed the current frame), the press that
+was drawing ends, and the person presses again where they mean to draw. A
+scroll the person asks for (wheel, trackpad, arrow keys, a drag past the roll's
+edge) does not stop it. The engine's seek is as it was: the machine goes back
+to the nearest saved state and plays forward from there.
+
+The roll tells the two apart by a flag set while it asks for a scroll: the
+answer (TAStudio.qml sets the view model's `topFrame`, and the roll's top row
+is bound to it) arrives while the request is still being made, so a change that
+arrives outside a request is not the person's.
+
+Tested: `test-roll-scroll` (the item alone) and `test-roll-wiring` (the roll
+bound to a real piano roll view model through QML, as TAStudio.qml does: a drag
+past the edge goes on setting the rows it passes; the view model moving the
+roll, directly or by following the current frame, ends the drawing). Broken on
+purpose once (the stop left out) and seen to fail.
