@@ -10397,6 +10397,8 @@ bool luaParity(const char *package, const char *rom)
 		std::string saveTo;
 		fromValue(formRows.cell(formRows.rowCount() - 1, 3), title);
 		fromValue(controls.cell(controls.rowCount() - 1, 19), saveTo);
+		/* on Windows the folder comes with backslashes and the name is put after a slash */
+		std::replace(saveTo.begin(), saveTo.end(), '\\', '/');
 		CHECK(title == "Mine" && saveTo.size() > 11 && saveTo.substr(saveTo.size() - 11) == "/canvas.png" && saveTo.find("/output/") != std::string::npos && saveTo.find("Screenshots") == std::string::npos);
 	}
 	/* a game open */
@@ -10416,7 +10418,8 @@ bool luaParity(const char *package, const char *rom)
 		RowModel &controls = *forms.rowLists()[1].model;
 		CHECK(lua1("canvas.save_image_to_disk('id.png')") == "[]");
 		fromValue(controls.cell(controls.rowCount() - 1, 19), saveTo);
-		CHECK(saveTo == (dir / "output" / stem / "id.png").string());
+		/* the same file, whichever separators the path was written with */
+		CHECK(std::filesystem::path(saveTo).lexically_normal() == (dir / "output" / stem / "id.png").lexically_normal());
 	}
 	CHECK(lua1("gameinfo.getstatus(), gameinfo.isstatusbad()") == "[\"NotInDatabase\", false]");
 	/* what the game calls its controls, beside their declared names (the roll's title tooltip) */
