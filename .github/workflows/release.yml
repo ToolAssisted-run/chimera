@@ -73,7 +73,7 @@ jobs:
       date: ${{ steps.what.outputs.date }}
       skip: ${{ steps.moved.outputs.skip == 'true' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
           # no submodules: nothing is built here. The whole history, for the
@@ -152,7 +152,7 @@ jobs:
     # the first run builds Qt (then cached): hours, not minutes
     timeout-minutes: 360
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ needs.what.outputs.sha }}
           # NOT recursive: the bundle carries no cores (docs/core-manager.md), so
@@ -178,7 +178,7 @@ jobs:
 
       - name: Cache Qt
         id: qt-cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           # the Linux Qt that ships, built here without the network module
           path: ~/qt-ship/linux
@@ -194,13 +194,13 @@ jobs:
 
       - name: Keep the Qt just built, even if a later step fails
         if: steps.qt-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: ~/qt-ship/linux
           key: ${{ steps.qt-cache.outputs.cache-primary-key }}
 
       - name: Cache the ffmpeg the bundle builds
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           # tools/build-ffmpeg.sh keeps what it built under a name made from its
           # CPU and its own hash
@@ -224,7 +224,7 @@ jobs:
           tar -C build --transform "s,^bundle-linux,chimera-linux-aarch64-$short," -czf "build/release/chimera-linux-aarch64-$short.tar.gz" bundle-linux
           ls -la build/release
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: bundle-linux-arm64
           path: build/release/chimera-linux-aarch64-${{ needs.what.outputs.short }}.tar.gz
@@ -245,7 +245,7 @@ jobs:
     # the first run builds Qt (then cached): hours, not minutes
     timeout-minutes: 360
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ needs.what.outputs.sha }}
           submodules: false
@@ -268,7 +268,7 @@ jobs:
 
       - name: Cache Qt
         id: qt-cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           # the Linux Qt (aqt) whose tools run during the build, and the
           # Windows on arm64 Qt that ships, built here without the network
@@ -280,7 +280,7 @@ jobs:
           key: qt-ship-6.12.0-windows-arm64-${{ hashFiles('tools/build-qt-windows.sh', 'tools/qt-patches/*', 'tools/fetch-qt-source.sh', 'tools/fetch-llvm-mingw.sh') }}
 
       - name: Cache the ffmpeg the bundle builds
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           # tools/build-ffmpeg.sh keeps what it built under a name made from its
           # CPU and its own hash; CI's Windows arm64 job uses the same (ci.yml)
@@ -302,7 +302,7 @@ jobs:
 
       - name: Keep the Qt just built, even if a later step fails
         if: steps.qt-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: |
             ~/qt/6.12.0/gcc_64
@@ -322,7 +322,7 @@ jobs:
           ( cd build/bundle-windows-arm64 && zip -qr "../release/chimera-win-aarch64-$short.zip" . )
           ls -la build/release
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: bundle-windows-arm64
           path: build/release/chimera-win-aarch64-${{ needs.what.outputs.short }}.zip
@@ -339,7 +339,7 @@ jobs:
     runs-on: windows-11-arm
     timeout-minutes: 15
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: bundle-windows-arm64
           path: .
@@ -378,7 +378,7 @@ jobs:
     env:
       QT_VERSION: 6.12.0
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ needs.what.outputs.sha }}
           submodules: false
@@ -391,7 +391,7 @@ jobs:
         run: brew install meson ninja cmake coreutils nasm pkg-config
 
       - name: Cache Qt
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/qt
           key: qt-6.12.0-macos-aqt-3.3.0
@@ -412,7 +412,7 @@ jobs:
           } > build/qt-macos-${{ matrix.arch }}.ini
 
       - name: Cache the ffmpeg the app ships
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: build/deps/ffmpeg-macos-${{ matrix.cpu }}-*
           key: ffmpeg-macos-${{ matrix.cpu }}-${{ hashFiles('tools/build-ffmpeg.sh') }}
@@ -426,7 +426,7 @@ jobs:
           tools/build-ffmpeg.sh macos build/${{ matrix.arch }}-macos/dll
 
       - name: Cache Qt's source
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           # its licence texts go in the app's LICENSES.md
           path: ~/qt-src
@@ -456,7 +456,7 @@ jobs:
           ditto -c -k --keepParent build/Chimera.app "build/release/chimera-macos-${{ matrix.arch }}-$short.zip"
           ls -la build/release
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: bundle-macos-${{ matrix.arch }}
           path: build/release/chimera-macos-${{ matrix.arch }}-${{ needs.what.outputs.short }}.zip
@@ -475,7 +475,7 @@ jobs:
     # the first run builds Qt for both platforms (each then cached): hours, not minutes
     timeout-minutes: 360
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ needs.what.outputs.sha }}
           # NOT recursive: the bundle carries no cores (docs/core-manager.md), so
@@ -505,7 +505,7 @@ jobs:
 
       - name: Cache the Linux Qt
         id: qt-linux-cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           # the Qt the Linux bundle ships, built here without the network module
           path: ~/qt-ship/linux
@@ -513,7 +513,7 @@ jobs:
 
       - name: Cache the Windows Qt
         id: qt-windows-cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           # the Linux Qt with its tools (aqt) for the Windows build's moc and
           # rcc, and the Qt the Windows bundle ships, built here without the
@@ -526,7 +526,7 @@ jobs:
 
       - name: Cache the ffmpeg the Linux bundle builds
         if: steps.moved.outputs.skip != 'true'
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           # tools/build-ffmpeg.sh keeps what it built under a name made from its
           # CPU and its own hash
@@ -535,7 +535,7 @@ jobs:
 
       - name: Cache the ffmpeg the Windows bundle builds
         if: steps.moved.outputs.skip != 'true'
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           # CI's Windows x64 job uses the same (ci.yml)
           path: build/deps/ffmpeg-windows-x64-*
@@ -551,7 +551,7 @@ jobs:
 
       - name: Keep the Qt just built, even if a later step fails
         if: steps.qt-linux-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: ~/qt-ship/linux
           key: ${{ steps.qt-linux-cache.outputs.cache-primary-key }}
@@ -568,7 +568,7 @@ jobs:
 
       - name: Keep the Qt just built, even if a later step fails
         if: steps.qt-windows-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: |
             ~/qt/6.12.0/gcc_64
@@ -605,7 +605,7 @@ jobs:
           ls -la build/release
 
       - name: The x64 Windows bundle, for the check that it starts on Windows
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: check-windows-x64
           path: build/release/chimera-win-x86_64-${{ needs.what.outputs.short }}.zip
@@ -613,7 +613,7 @@ jobs:
           retention-days: 1
 
       - name: The arm64 Linux bundle, the arm64 Windows bundle and the two Mac apps
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: bundle-*
           path: build/release
@@ -680,7 +680,7 @@ jobs:
 
       - name: A trial's bundles, kept for a week and published nowhere
         if: needs.what.outputs.kind == 'trial'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: trial-bundles-${{ needs.what.outputs.short }}
           path: build/release/
@@ -715,7 +715,7 @@ jobs:
     runs-on: windows-2025
     timeout-minutes: 15
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: check-windows-x64
           path: .

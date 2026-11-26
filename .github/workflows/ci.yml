@@ -45,7 +45,7 @@ jobs:
           - arch: arm64
             runner: ubuntu-26.04-arm
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           # only the waterbox host/toolchain is needed here, not the frontend's
           # native dependencies (SDL3, OpenAL, ...)
@@ -83,7 +83,7 @@ jobs:
 
       - name: Upload witness work dir on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: witness-level-a-work-${{ matrix.arch }}
           path: tests/synth/work/
@@ -118,14 +118,14 @@ jobs:
           - arch: arm64
             runner: ubuntu-26.04-arm
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           # only what the frontend is built from; the cores are separate
           # repositories now and this job never opens one (see published-cores)
           submodules: false
 
       - name: Cache Qt
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/qt
           key: qt-6.12.0-linux-${{ matrix.arch }}-aqt-3.3.0
@@ -142,7 +142,7 @@ jobs:
           ./tests/synth/build-package.sh
 
       - name: Cache the ffmpeg the build ships
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           # tools/build-ffmpeg.sh keeps what it built under a name made from its
           # CPU and its own hash
@@ -157,7 +157,7 @@ jobs:
 
       - name: Upload test logs
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: meson-logs-${{ matrix.arch }}
           path: build/meson-linux/meson-logs/
@@ -167,7 +167,7 @@ jobs:
 
       - name: Upload witness work dir on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: witness-full-work-${{ matrix.arch }}
           path: tests/synth/work/
@@ -190,7 +190,7 @@ jobs:
             runner: ubuntu-26.04-arm
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: false
 
@@ -213,7 +213,7 @@ jobs:
         run: ./tests/synth/build-package.sh
 
       - name: Keep them for the Windows job
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: synth-core-${{ matrix.arch }}
           path: |
@@ -252,7 +252,7 @@ jobs:
             cross: mingw-w64-qt-aarch64.ini
             qt: llvm_mingw_arm64
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: false
 
@@ -275,7 +275,7 @@ jobs:
 
       - name: Cache Qt
         id: qt-cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           # the release's (release.yml): the Linux Qt (aqt) whose tools run
           # during the build, and the Windows Qt that ships
@@ -298,7 +298,7 @@ jobs:
 
       - name: Keep the Qt just built, even if a later step fails
         if: steps.qt-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: |
             ~/qt/6.12.0/gcc_64
@@ -308,7 +308,7 @@ jobs:
 
       - name: Cache the ffmpeg the bundle ships (x64)
         if: matrix.cpu == 'x64'
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           # the release's (release.yml): tools/build-ffmpeg.sh keeps what it
           # built under a name made from its CPU and its own hash
@@ -317,7 +317,7 @@ jobs:
 
       - name: Cache the ffmpeg the bundle ships (arm64)
         if: matrix.cpu == 'arm64'
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: build/deps/ffmpeg-windows-arm64-*
           key: ffmpeg-windows-arm64-${{ hashFiles('tools/build-ffmpeg.sh', 'tools/fetch-llvm-mingw.sh') }}
@@ -326,7 +326,7 @@ jobs:
         run: tools/build-ffmpeg.sh windows build/ffmpeg-windows ${{ matrix.cpu }}
 
       - name: The synthetic test core, for this CPU
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: synth-core-${{ matrix.arch }}
           path: .
@@ -362,7 +362,7 @@ jobs:
             --font $fonts/DejaVuSans.ttf --font $fonts/DejaVuSans-Bold.ttf \
             --font $fonts/DejaVuSansMono.ttf --font $fonts/DejaVuSansMono-Bold.ttf
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: windows-tests-${{ matrix.cpu }}
           path: build/windows-tests/
@@ -387,12 +387,12 @@ jobs:
           - cpu: arm64
             runner: windows-11-arm
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: windows-tests-${{ matrix.cpu }}
           path: windows-tests
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
 
@@ -402,7 +402,7 @@ jobs:
 
       - name: Keep the tests' output
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: windows-test-logs-${{ matrix.cpu }}
           path: windows-tests/logs/
