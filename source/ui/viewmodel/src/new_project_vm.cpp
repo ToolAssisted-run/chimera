@@ -333,6 +333,38 @@ struct NewProjectViewModel::HashRun
 	std::atomic<bool> stop{false}, ended{false};
 };
 
+/* Natural order of two names: case does not matter and a run of digits is a
+ * number, so "Disc 2" comes before "Disc 10" (issue 658). */
+int NewProjectViewModel::naturalCompare(const std::string &a, const std::string &b)
+{
+	auto digit = [](char c) { return c >= '0' && c <= '9'; };
+	size_t i = 0, j = 0;
+	while (i < a.size() && j < b.size())
+	{
+		if (digit(a[i]) && digit(b[j]))
+		{
+			size_t ie = i, je = j;
+			while (ie < a.size() && digit(a[ie])) ie++;
+			while (je < b.size() && digit(b[je])) je++;
+			size_t is = i, js = j;
+			while (is + 1 < ie && a[is] == '0') is++;
+			while (js + 1 < je && b[js] == '0') js++;
+			if (ie - is != je - js) return ie - is < je - js ? -1 : 1;
+			if (const int c = a.compare(is, ie - is, b, js, je - js); c != 0) return c < 0 ? -1 : 1;
+			i = ie;
+			j = je;
+			continue;
+		}
+		const int x = std::tolower(static_cast<unsigned char>(a[i])), y = std::tolower(static_cast<unsigned char>(b[j]));
+		if (x != y) return x < y ? -1 : 1;
+		i++;
+		j++;
+	}
+	if (i < a.size()) return 1;
+	if (j < b.size()) return -1;
+	return 0;
+}
+
 NewProjectViewModel::NewProjectViewModel(Dispatcher &dispatcher, SessionViewModel &session, CoresViewModel &cores)
 	: ViewModel("newProject", dispatcher), session_(session), cores_(cores)
 {
@@ -726,6 +758,29 @@ NewProjectViewModel::NewProjectViewModel(Dispatcher &dispatcher, SessionViewMode
 			}
 			picked_[id] = i;
 			slotRows_.reset.emit();
+			return {};
+		});
+	command("addFiles", "puts files in a slot, the ones given together in the order of their names (\"Disc 2\" before \"Disc 10\")",
+		{"slot", "paths..."}, [this](const Args &a, std::string &error) -> Value {
+			std::string id;
+			if (!arg(a, 0, id, error)) return {};
+			std::vector<std::string> paths;
+			for (size_t i = 1; i < a.size(); i++)
+			{
+				std::string path;
+				if (!arg(a, i, path, error)) return {};
+				paths.push_back(path);
+			}
+			std::stable_sort(paths.begin(), paths.end(),
+				[](const std::string &x, const std::string &y) { return naturalCompare(baseName(x), baseName(y)) < 0; });
+			/* each is added as one, so every refusal is said; the last one is kept */
+			std::string last;
+			for (const std::string &path : paths)
+			{
+				std::string why;
+				if (!run("addFile", {id, path}, why).has_value() || !why.empty()) last = why;
+			}
+			error = last;
 			return {};
 		});
 	command("moveFile", "moves a file within its slot (the order discs are swapped in)", {"slot", "from", "to"},

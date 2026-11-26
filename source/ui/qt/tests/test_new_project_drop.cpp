@@ -131,7 +131,7 @@ int main(int argc, char **argv)
 	QCoreApplication::sendEvent(window, &let);
 	QCoreApplication::processEvents();
 
-	/* every file is in the slot, in the order dropped */
+	/* every file is in the slot, in the order of their names, not the order the system handed them over (issue 658) */
 	const vm::RowModel *slotList = nullptr;
 	for (const auto &list : wizard.rowLists())
 		if (list.name == "slots") slotList = list.model;
@@ -140,8 +140,8 @@ int main(int argc, char **argv)
 	if (slotList != nullptr && slotList->rowCount() == 1)
 		for (int32_t c = 0; c < slotList->columnCount(); c++)
 			if (slotList->columnName(c) == "files") files = std::get<std::string>(slotList->cell(0, c));
-	CHECK(files == "one.testrom\ntwo.testrom\nthree.testrom");
-	if (files != "one.testrom\ntwo.testrom\nthree.testrom") std::fprintf(stderr, "  files: [%s]\n", files.c_str());
+	CHECK(files == "one.testrom\nthree.testrom\ntwo.testrom");
+	if (files != "one.testrom\nthree.testrom\ntwo.testrom") std::fprintf(stderr, "  files: [%s]\n", files.c_str());
 
 	/* the line at the bottom: a file of another kind than the slot takes is said as
 	 * information, in the text colour; a file that cannot be read is an error, in

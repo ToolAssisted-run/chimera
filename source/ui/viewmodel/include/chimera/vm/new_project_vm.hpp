@@ -172,6 +172,10 @@ public:
 	/* done is told on the view's thread, once */
 	void completeForAgent(const AgentRequest &request, std::function<void(AgentOutcome)> done);
 
+	/* Natural order of two names: case does not matter and a run of digits is a number, so
+	 * "Disc 2" comes before "Disc 10". Negative, zero or positive, as strcmp (issue 658). */
+	static int naturalCompare(const std::string &a, const std::string &b);
+
 private:
 	/* the line `status` shows: information and progress, or an error */
 	void tell(const std::string &text) { statusIsError.set(false); status.set(text); }

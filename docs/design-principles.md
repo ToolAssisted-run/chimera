@@ -16758,3 +16758,18 @@ Tested: the view model test `newProjectWizard` (the disk slot) checks the pick
 after `moveFile` both ways, after `removeFile` in the middle, at the end and
 down to an empty list, and a bad `pickFile`. Broken on purpose once (the pick
 not kept) and seen to fail.
+
+## Files dropped together on New Project's list come in name order (chosen by the owner, 2026-11-26, issue 658)
+
+Files dropped on a slot's list (or chosen together in the Add... dialog) are
+added in the order of their names, not the order the system hands them over.
+Case does not matter and a run of digits is a number, so "Disc 2" comes before
+"Disc 10" ("natural order"). The command is `addFiles` and the sorting is the
+view model's (`naturalCompare`). Files added one at a time keep the order they
+are added in, and the order can still be changed with Up and Down.
+
+Tested: the view model test `newProjectWizard` checks `addFiles` given the
+names in the wrong order and `naturalCompare` on "Disc 2" and "Disc 10", case,
+leading zeros and a name that is a prefix of another; the window test `new
+project drop` checks three files dropped together (one, two, three) come in as
+one, three, two. Broken on purpose once (the sort removed) and seen to fail.

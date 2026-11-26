@@ -9417,6 +9417,14 @@ bool newProjectWizard(const char *package, const char *rom, const char *slotsPac
 		text("slots", 1, 7) == "disk1.cue\ndisk2.img");
 	CHECK(wizard.run("moveFile", {std::string("disk"), int64_t{0}, int64_t{1}}, error).has_value() && pickedFile() == 1 &&
 		text("slots", 1, 7) == "disk2.img\ndisk1.cue");
+	/* files given together are added in the order of their names, whatever order they came in (issue 658) */
+	for (const char *n : {"disk3.img", "disk10.img", "disk20.dsk"}) std::ofstream(dir / n) << n;
+	CHECK(wizard.run("addFiles", {std::string("disk"), (dir / "disk20.dsk").string(), (dir / "disk10.img").string(), (dir / "disk3.img").string()}, error)
+			  .has_value() &&
+		text("slots", 1, 7) == "disk2.img\ndisk1.cue\ndisk3.img\ndisk10.img\ndisk20.dsk");
+	CHECK(NewProjectViewModel::naturalCompare("Disc 2", "Disc 10") < 0 && NewProjectViewModel::naturalCompare("Disc 10", "Disc 2") > 0 &&
+		NewProjectViewModel::naturalCompare("disc 2", "DISC 2") == 0 && NewProjectViewModel::naturalCompare("a", "B") < 0 &&
+		NewProjectViewModel::naturalCompare("Disc 02", "Disc 10") < 0 && NewProjectViewModel::naturalCompare("Disc", "Disc 1") < 0);
 	/* removing leaves the one that took its place picked, the last when it was the last, none when the list is empty */
 	CHECK(wizard.run("pickFile", {std::string("disk"), int64_t{1}}, error).has_value());
 	CHECK(wizard.run("removeFile", {std::string("disk"), int64_t{1}}, error).has_value() && pickedFile() == 1 &&

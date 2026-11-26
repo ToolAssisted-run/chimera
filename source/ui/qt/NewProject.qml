@@ -77,8 +77,9 @@ ApplicationWindow {
     }
     // files into a slot, from here: each one added builds the slots again, so a
     // loop in the slot that took a drop would end with it after the first (issue 425)
+    // (the view model puts files given together in the order of their names, issue 658)
     function addFiles(slotId, files) {
-        for (const f of files) win.run("addFile", [slotId, f])
+        win.run("addFiles", [slotId].concat(Array.from(files)))
     }
 
     // the pages asked: the files when the package takes any, the firmware when the choices call for some
