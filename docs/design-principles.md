@@ -16822,9 +16822,16 @@ What was done:
   any other path. It is not in any bundle, and nothing makes it until a file is
   written there (the Screenshot As dialog no longer makes the folder when it
   opens; saving makes it).
-- A core's default files go in a folder of the core's id inside Output: the
-  package's file name without `.chimeraCore` (`flycast` for
-  `flycast.chimeraCore`), never its version. The open core's id is the new
+- A core's default files go in a folder of the core's id inside Output. The
+  id is what the core's repository calls it: the `url` in the package's
+  `waterbox.config`, `https://github.com/ToolAssisted-run/chimera-core-<id>`
+  (a `.git` or a closing `/` is allowed), gives `<id>` (`flycast`). It is not
+  the package's file name, because a published package is named
+  `<id>-<version>-<architecture>.chimeraCore`, and never the version. With no
+  `url`, or one that does not end that way, the core's `coreName` is used,
+  with what a file name cannot hold taken out. A package in a folder (for
+  development) follows the same rule. The engine works it out
+  (`ce_session_core_id`). The open core's id is the new
   session property `coreId`; `paths.outputFor(core)` gives the folder. Screenshots
   and Lua's `LuaCanvas.save_image_to_disk` (a relative path) use it. With no core
   open, Output itself is used. Characters that a file name cannot hold are taken
@@ -16838,11 +16845,22 @@ What was done:
 - Movies, Movie backups, Reports and the other global folders are not outputs of
   a system, and stay where they were.
 - Folders and settings people already have are not touched. Their old
-  per-system folders stay on disk, and what they saved for a system stays in
-  their settings file; it is not read.
+  per-system folders stay on disk and are never read (owner, 2026-11-26): the
+  screenshot counter starts again in the new folder. What they saved for a
+  system stays in their settings file and is ignored without a message.
+- Output follows the base: with another Base set, it is under that base
+  (owner, 2026-11-26).
+- The window scale (View > Window Size, Lua's `client.getwindowsize` and
+  `client.setwindowsize`) was also kept by system id. The owner said: "system
+  ids must disappear. Chimera should be entirely agnostic. It must be per
+  core." It is kept by core id now, in a new setting (`coreScales`; `scaleFor`
+  and `setScaleFor` take a core id). A scale saved for a system is not read, so
+  it starts again at 2.
 
 Tested: view model tests check that Output resolves to `./output` under the
 base without being made, that `outputFor("flycast")` is `output/flycast`, that
 a changed Output moves it, that odd ids stay inside it, that the table has the
-new row and no system column, that the open core's `coreId` is its package's
-name and that a canvas picture saved from Lua goes to `output/<core id>/`.
+new row and no system column, that the id comes from the `url` (with `.git`,
+a closing `/`, no address, an address that does not match, an odd name), that
+a core opened from a package named `synth-abc123-x86_64.chimeraCore` has the
+id `synth`, that the window scale is kept per core id, and that a canvas picture saved from Lua goes to `output/<core id>/`.

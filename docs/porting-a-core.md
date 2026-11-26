@@ -320,6 +320,12 @@ Advice earned the hard way:
   same value." or "It changes the picture only.".
 - **What things are called is yours to say.** Chimera keeps no table of
   systems or of controls; a package that says nothing is shown by its ids.
+  - `"url"` at the top - the core's repository, `https://github.com/ToolAssisted-run/chimera-core-<id>`.
+    Chimera takes the core's id from it (the `<id>`, a `.git` or closing `/`
+    allowed) for the folder the core's own files go in (`output/<id>/`) and for
+    what it keeps per core. With no `url`, or one not ending that way, the
+    `coreName` is used, so give the `url` of the core's own repository, not
+    the upstream emulator's (issue 655).
   - `"systemNames": { "PSV": "PlayStation Vita" }` at the top - the name of
     every system id the package answers to (its own and each machine's).
     The same names go in the core's row of `official-cores.json`, which

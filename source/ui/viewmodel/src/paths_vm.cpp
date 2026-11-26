@@ -128,7 +128,7 @@ PathsViewModel::PathsViewModel(Dispatcher &dispatcher) : ViewModel("paths", disp
 		return r;
 	});
 	command("outputFor", "where a core's own files go by default: the Output folder, then a folder named by the core's id "
-		"(the package's file name without .chimeraCore, never its version); the Output folder itself for \"\"; nothing is made",
+		"(its repository's name for it, never its version); the Output folder itself for \"\"; nothing is made",
 		{"core"}, [this](const Args &a, std::string &error) -> Value {
 			std::string core;
 			if (!arg(a, 0, core, error)) return {};

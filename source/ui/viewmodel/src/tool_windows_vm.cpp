@@ -91,7 +91,7 @@ ToolWindowsViewModel::ToolWindowsViewModel(Dispatcher &dispatcher) : ViewModel("
 			if (screenshotToClipboard) screenshotToClipboard();
 			return {};
 		});
-	command("resizeWindow", "the main window sized again to its system's scale, as a size asked for is (Chimera's "
+	command("resizeWindow", "the main window sized again to its core's scale, as a size asked for is (Chimera's "
 		"FrameBufferResized with the resize forced)", {}, [this](const Args &, std::string &) -> Value {
 			if (resizeWindow) resizeWindow();
 			return {};

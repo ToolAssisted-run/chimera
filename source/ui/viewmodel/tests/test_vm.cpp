@@ -1265,14 +1265,14 @@ void displayFit()
 		CHECK(display.fit().padLeft == 1 && display.fit().padBottom == 4 && display.fit().clientLeft == 5 && display.fit().clientBottom == 8);
 		CHECK(!display.run("setPadding", {std::string("emu"), int64_t{1}, int64_t{2}, int64_t{3}, int64_t{4}}, error));
 	}
-	/* Window Size, as Chimera's: each system's scale, 2 at first, 1 to 10, kept; the window follows the picture */
+	/* Window Size, as Chimera's: each core's scale (by its id), 2 at first, 1 to 10, kept; the window follows the picture */
 	{
 		std::string error;
-		CHECK(display.resizeWithPicture.get() && display.scaleFor("NES") == 2);
-		CHECK(display.run("setScaleFor", {std::string("NES"), int64_t{3}}, error) == Value(int64_t{3}));
-		CHECK(display.run("setScaleFor", {std::string("PSX"), int64_t{14}}, error) == Value(int64_t{10}));
-		CHECK(display.scaleFor("NES") == 3 && display.scaleFor("PSX") == 10 && display.scaleFor("GB") == 2);
-		CHECK(display.run("setScaleFor", {std::string("NES"), int64_t{0}}, error) == Value(int64_t{1}) && display.scaleFor("PSX") == 10);
+		CHECK(display.resizeWithPicture.get() && display.scaleFor("flycast") == 2);
+		CHECK(display.run("setScaleFor", {std::string("flycast"), int64_t{3}}, error) == Value(int64_t{3}));
+		CHECK(display.run("setScaleFor", {std::string("pcsx2"), int64_t{14}}, error) == Value(int64_t{10}));
+		CHECK(display.scaleFor("flycast") == 3 && display.scaleFor("pcsx2") == 10 && display.scaleFor("gpgx") == 2);
+		CHECK(display.run("setScaleFor", {std::string("flycast"), int64_t{0}}, error) == Value(int64_t{1}) && display.scaleFor("pcsx2") == 10);
 	}
 	/* the window's chrome starts as Chimera's: windowed with its menu, caption and thick frame; full
 	 * screen bare, the pointer hidden when still; double click full screen; titles not static */
@@ -1353,6 +1353,18 @@ void pathsConfig()
 		paths.resolve("Movies") == (dir / "runs").string() && paths.resolve("Lua") == (dir / "elsewhere" / "Lua").string());
 	paths.run("setPath", {std::string("Base"), std::string(".")}, error);
 	CHECK(paths.base.get().empty());
+	/* a core's id: the repository's name, never the version, the architecture or the package's file name */
+	{
+		auto id = [](const char *url, const char *name) { return std::string(ce_core_id_of(url, name)); };
+		CHECK(id("https://github.com/ToolAssisted-run/chimera-core-flycast", "Flycast") == "flycast");
+		CHECK(id("https://github.com/ToolAssisted-run/chimera-core-flycast.git", "Flycast") == "flycast");
+		CHECK(id("https://github.com/ToolAssisted-run/chimera-core-flycast/", "Flycast") == "flycast");
+		CHECK(id("https://example.org/x/chimera-core-quickerneshawk.git/", "") == "quickerneshawk");
+		/* no address, or none that ends in chimera-core-<id>: the name, made safe */
+		CHECK(id(nullptr, "Genesis Plus GX") == "Genesis Plus GX" && id("", "a/b:c") == "abc");
+		CHECK(id("https://github.com/someone/flycast", "Flycast") == "Flycast" && id("https://github.com/o/chimera-core-", "Flycast") == "Flycast");
+		CHECK(id(nullptr, "") == "core");
+	}
 	/* no folder per system (issue 655): one Output folder, "./output" under the base, not made, and a folder of the core's id in it */
 	CHECK(paths.resolve("Output") == (dir / "program" / "output").string() && !fs::exists(dir / "program" / "output"));
 	CHECK(paths.outputFor("flycast") == (dir / "program" / "output" / "flycast").string() && !fs::exists(dir / "program" / "output"));
@@ -10392,14 +10404,18 @@ bool luaParity(const char *package, const char *rom)
 		CHECK(title == "Mine" && saveTo.size() > 11 && saveTo.substr(saveTo.size() - 11) == "/canvas.png" && saveTo.find("/output/") != std::string::npos && saveTo.find("Screenshots") == std::string::npos);
 	}
 	/* a game open */
-	openGame(session, package, (dir / "walker.testrom").string(), error);
+	/* the package is named as a published one is: <id>-<version>-<architecture> */
+	const std::string published = (dir / "synth-abc123-x86_64.chimeraCore").string();
+	std::filesystem::copy_file(package, published, std::filesystem::copy_options::overwrite_existing);
+	openGame(session, published, (dir / "walker.testrom").string(), error);
 	CHECK(d.until([&] { return session.isOpen.get(); }, 60));
 	session.run("setLag", {int64_t{0}, int64_t{0}}, error);
-	/* the core's id is its package's file name without .chimeraCore; a canvas picture goes under output/<core id> (issue 655) */
+	/* a canvas picture goes under output/<core id> (issue 655) */
 	{
-		std::string stem = std::filesystem::path(package).filename().string();
-		if (stem.size() > 12 && stem.substr(stem.size() - 12) == ".chimeraCore") stem.resize(stem.size() - 12);
-		CHECK(!stem.empty() && session.coreId.get() == stem);
+		const std::string stem = "synth";
+		/* the id is the repository's name for the core (the package's "url"), not its package's file name, which a
+		 * published package gives with a version and an architecture */
+		CHECK(session.coreId.get() == "synth");
 		std::string saveTo;
 		RowModel &controls = *forms.rowLists()[1].model;
 		CHECK(lua1("canvas.save_image_to_disk('id.png')") == "[]");

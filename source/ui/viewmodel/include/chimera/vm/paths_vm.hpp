@@ -32,10 +32,6 @@ public:
 	Property<std::string> programFolder;
 	/* the global paths changed from Chimera's, {"Movies": "D:/runs", ...} */
 	Property<std::string> changed{"{}"};
-	/* the systems that have folders of their own (a game was opened for each), and
-	 * their paths changed from Chimera's: {"NES": {"Screenshots": "./Shots"}} */
-	Property<std::string> systems{"[]"};
-	Property<std::string> systemChanged{"{}"};
 	/* the game dialog opens where the last game came from */
 	Property<bool> recentForRoms{true};
 	Property<std::string> lastRomFolder;
@@ -45,8 +41,8 @@ public:
 	/* a global folder as it is: its path made absolute; "" for a name that is not one */
 	std::string resolve(const std::string &name) const;
 	/* where a core's own files go by default: the Output folder, then a folder
-	 * named by the core's id (its package's file name without .chimeraCore,
-	 * never its version). The Output folder itself for "". Nothing is made. */
+	 * named by the core's id (its repository's
+	 * name for it, never its version or its package's file name). The Output folder itself for "". Nothing is made. */
 	std::string outputFor(const std::string &core) const;
 	/* the Temp Files folder made absolute, "" while it is not set (the
 	 * system's own temporary folder is used then) */

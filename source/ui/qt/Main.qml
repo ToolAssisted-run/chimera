@@ -412,11 +412,11 @@ ApplicationWindow {
             }
             else if (action === "Encode Video") root.encodeVideo()
             else if (action === "Larger Window" || action === "Smaller Window") {
-                // as Chimera's: the system's scale one up or down (1 to 10), said, and the window sized to it
+                // as Chimera's: the core's scale one up or down (1 to 10), said, and the window sized to it
                 if (!root.session.isOpen) return
-                const was = root.display.run("scaleFor", [root.session.systemId]) || 2
+                const was = root.display.run("scaleFor", [root.session.coreId]) || 2
                 const n = Math.max(1, Math.min(10, was + (action === "Larger Window" ? 1 : -1)))
-                root.display.run("setScaleFor", [root.session.systemId, n])
+                root.display.run("setScaleFor", [root.session.coreId, n])
                 root.note(qsTrId("main.screensize_set_to_x").arg(n))
                 root.frameBufferResized(true)
             }
@@ -1647,7 +1647,7 @@ ApplicationWindow {
     // every message the window shows, for the log window; and the ones over the picture now
     ListModel { id: messageLog }
     ListModel { id: onScreenMessages }
-    // View > Window Size, as Chimera does: the picture times its system's scale (2 at first,
+    // View > Window Size, as Chimera does: the picture times its core's scale (2 at first,
     // remembered), a smaller one while the window would not fit the screen; the window follows the picture's
     // size unless Static Size is ticked, and a size asked for is taken whatever Static Size says
     property int windowScale: 2
@@ -1675,7 +1675,7 @@ ApplicationWindow {
         if (!root.display.resizeWithPicture && !force) return
         const pw = picture.pictureWidth, ph = picture.pictureHeight
         if (pw <= 0 || ph <= 0) return
-        let zoom = root.display.run("scaleFor", [root.session.systemId]) || 2
+        let zoom = root.display.run("scaleFor", [root.session.coreId]) || 2
         const bw = root.display.clientLeft + root.display.clientRight, bh = root.chromeHeight() + root.display.clientTop + root.display.clientBottom
         for (; zoom > 1; zoom--)
             if (pw * zoom + bw < Screen.desktopAvailableWidth && ph * zoom + bh < Screen.desktopAvailableHeight) break
@@ -1687,7 +1687,7 @@ ApplicationWindow {
         if (root.y + root.height > Screen.desktopAvailableHeight) root.y = Math.max(Screen.desktopAvailableHeight - root.height, 0)
     }
     function sizeWindow(n) {
-        root.display.run("setScaleFor", [root.session.systemId, n])
+        root.display.run("setScaleFor", [root.session.coreId, n])
         root.frameBufferResized(true)
     }
     Connections {

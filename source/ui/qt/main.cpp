@@ -1353,7 +1353,7 @@ int main(int argc, char **argv)
 			 "cropTop", "cropRight", "cropBottom", "finalFilter", "prescale", "autoPrescale", "scaleOsd", "osdFollowsWindow", "osdTextSize", "saveWindowPosition", "windowGeometry",
 			 "allowDoubleClickFullscreen", "menuWindowed", "captionWindowed", "frameWindowed", "menuFullscreen", "statusBarFullscreen",
 			 "autohideMouseFullscreen", "fullscreenHacks", "stayOnTop", "mouseCaptureForcesTop", "minimalDisplay", "staticWindowTitles", "titleSuffix", "resizeWithPicture",
-			 "windowScales"})
+			 "coreScales"})
 		config.keep(display, name);
 	qt::QmlViewModel displayQml(display);
 	qt::QmlViewModel branchesQml(branches);

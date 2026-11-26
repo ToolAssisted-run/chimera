@@ -6990,13 +6990,14 @@ void SessionViewModel::adoptOnMachine(ce_session *s, const std::string &package,
 	const char *system = ce_session_system_name(s);
 	const std::string coreText = core != nullptr ? core : "", systemText = system != nullptr ? system : "";
 	const char *sysId = ce_session_system_id(s);
+	const std::string coreIdText = ce_session_core_id(s) != nullptr ? ce_session_core_id(s) : "";
 	const std::string systemIdText = sysId != nullptr ? sysId : "";
 	const double rate = num > 0 && den > 0 ? static_cast<double>(num) / den : 0;
 
 	const int64_t frames = inputs_.size();
 	/* another game, or the same started again: another average, as Chimera's */
 	averageResetM_.store(true);
-	later([this, names, players, active, headers, axes, mnemonics, keybinds, coreText, systemText, systemIdText, rate, label, inputsReplaced, frames, controller,
+	later([this, names, players, active, headers, axes, mnemonics, keybinds, coreText, coreIdText, systemText, systemIdText, rate, label, inputsReplaced, frames, controller,
 			   picture, shownDeclared, shownColumns, gameCore, timer, package, registers, withOpen] {
 		hasRegisters.set(registers);
 		controllerName_ = controller;
@@ -7032,13 +7033,7 @@ void SessionViewModel::adoptOnMachine(ce_session *s, const std::string &package,
 		updateUnboundPlayers(true);
 		buttonCount.set(static_cast<int64_t>(names.size()));
 		coreName.set(coreText);
-		/* the package's file (or folder, in development) name without its ending */
-		{
-			std::filesystem::path file = std::filesystem::path(package).filename();
-			if (file.empty() && std::filesystem::path(package).has_parent_path()) file = std::filesystem::path(package).parent_path().filename();
-			if (file.extension() == ".chimeraCore") file.replace_extension();
-			coreId.set(file.string());
-		}
+		coreId.set(coreIdText);
 		systemName.set(systemText);
 		systemId.set(systemIdText);
 		frame.set(0);

@@ -955,11 +955,11 @@ local function videoSize() local w, h = string.match(C.session.videoSize(), "^(%
 function client.bufferwidth() local w = videoSize() return w end
 function client.bufferheight() local _, h = videoSize() return h end
 -- the window: its scale for the system open, and where it sits
-function client.getwindowsize() return C.display.scaleFor(C.session.systemId) end
+function client.getwindowsize() return C.display.scaleFor(C.session.coreId) end
 function client.setwindowsize(size)
 	local n = math.tointeger(tonumber(size))
 	if n == nil or n < 1 or n > 10 then print("Invalid window size") return end
-	C.display.setScaleFor(C.session.systemId, n)
+	C.display.setScaleFor(C.session.coreId, n)
 	C.toolWindows.resizeWindow()
 	C.gui.addMessage("Window size set to " .. n .. "x")
 end

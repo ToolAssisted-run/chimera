@@ -191,20 +191,20 @@ DisplayViewModel::DisplayViewModel(Dispatcher &dispatcher) : ViewModel("display"
 	expose("titleSuffix", "the words every main window title ends with (\"\" for \"Chimera\")", titleSuffix, true);
 	expose("windowGeometry", "the window's place and size kept, \"x,y,w,h\"", windowGeometry, true);
 	expose("resizeWithPicture", "the window follows the picture's size (View > Window Size > Static Size off)", resizeWithPicture, true);
-	expose("windowScales", "each system's window scale, {\"NES\": 3} (2 when a system has none)", windowScales, true);
-	command("scaleFor", "a system's window scale: the picture's size times it (2 at first, as Chimera's)", {"system"},
+	expose("coreScales", "each core's window scale by its id, {\"flycast\": 3} (2 when a core has none; scales kept per system before issue 655 are not read)", coreScales, true);
+	command("scaleFor", "a core's window scale: the picture's size times it (2 at first, as Chimera's)", {"core"},
 		[this](const Args &a, std::string &error) -> Value {
-			std::string system;
-			if (!arg(a, 0, system, error)) return {};
-			return scaleFor(system);
+			std::string core;
+			if (!arg(a, 0, core, error)) return {};
+			return scaleFor(core);
 		});
-	command("setScaleFor", "a system's window scale, 1 to 10, kept", {"system", "scale"}, [this](const Args &a, std::string &error) -> Value {
-		std::string system;
+	command("setScaleFor", "a core's window scale, 1 to 10, kept", {"core", "scale"}, [this](const Args &a, std::string &error) -> Value {
+		std::string core;
 		int64_t scale = 0;
-		if (!arg(a, 0, system, error) || !arg(a, 1, scale, error)) return {};
+		if (!arg(a, 0, core, error) || !arg(a, 1, scale, error)) return {};
 		json::Json all;
 		std::string why;
-		if (!json::parse(windowScales.get(), all, why) || all.kind != json::Json::Kind::Object)
+		if (!json::parse(coreScales.get(), all, why) || all.kind != json::Json::Kind::Object)
 		{
 			all = json::Json();
 			all.kind = json::Json::Kind::Object;
@@ -212,23 +212,23 @@ DisplayViewModel::DisplayViewModel(Dispatcher &dispatcher) : ViewModel("display"
 		json::Json n = json::Json::number(static_cast<double>(std::clamp<int64_t>(scale, 1, 10)));
 		bool found = false;
 		for (auto &[k, v] : all.members)
-			if (k == system)
+			if (k == core)
 			{
 				v = n;
 				found = true;
 			}
-		if (!found) all.members.emplace_back(system, n);
-		windowScales.set(json::write(all));
-		return scaleFor(system);
+		if (!found) all.members.emplace_back(core, n);
+		coreScales.set(json::write(all));
+		return scaleFor(core);
 	});
 }
 
-int64_t DisplayViewModel::scaleFor(const std::string &system) const
+int64_t DisplayViewModel::scaleFor(const std::string &core) const
 {
 	json::Json all;
 	std::string why;
-	if (json::parse(windowScales.get(), all, why))
-		if (const json::Json *v = all.find(system); v != nullptr && v->kind == json::Json::Kind::Number)
+	if (json::parse(coreScales.get(), all, why))
+		if (const json::Json *v = all.find(core); v != nullptr && v->kind == json::Json::Kind::Number)
 			return std::clamp<int64_t>(static_cast<int64_t>(v->number()), 1, 10);
 	return 2;
 }
