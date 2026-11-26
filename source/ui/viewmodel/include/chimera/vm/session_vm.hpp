@@ -626,6 +626,10 @@ public:
 	/* the controls Chimera's piano roll hides until shown (the console's
 	 * power and reset, keyboard keys, disk and tape controls...) */
 	static bool hiddenByDefault(const std::string &name);
+	/* the controls a project with no columns of its own hides: the package's own list of shown
+	 * ones, else hiddenByDefault, except that never every control (issue 654) */
+	static std::vector<std::string> defaultHiddenColumns(const std::vector<std::string> &controls, bool shownDeclared,
+		const std::set<std::string> &shown);
 	/* the movie's markers, from whoever edits them: saved with the project,
 	 * and the frames of those that keep a state pinned in the greenzone */
 	void setMarkers(std::vector<Marker> markers);

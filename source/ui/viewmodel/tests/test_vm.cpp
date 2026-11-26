@@ -2255,6 +2255,19 @@ bool pianoRollColumns(const char *package, const char *rom)
 		SessionViewModel::hiddenByDefault("Key A") && SessionViewModel::hiddenByDefault("Eject Disk") &&
 		SessionViewModel::hiddenByDefault("Play Tape") && SessionViewModel::hiddenByDefault("Tilt X") &&
 		!SessionViewModel::hiddenByDefault("P1 Up") && !SessionViewModel::hiddenByDefault("P1 Keyboard"));
+	/* issue 654: a keypad whose every button is named "Key ..." is not hidden whole */
+	{
+		using Names = std::vector<std::string>;
+		const Names keypad{"Key 0", "Key 1", "Key 2", "Key F"};
+		CHECK(SessionViewModel::defaultHiddenColumns(keypad, false, {}).empty());
+		CHECK(SessionViewModel::defaultHiddenColumns({"Key A", "Reset", "Power"}, false, {}).empty());
+		/* with one control that is not hidden by name, the rest are hidden as before */
+		CHECK((SessionViewModel::defaultHiddenColumns({"Key A", "Reset", "P1 Up"}, false, {}) == Names{"Key A", "Reset"}));
+		/* a package's own list is kept as it is, even an empty one */
+		CHECK((SessionViewModel::defaultHiddenColumns(keypad, true, {"Key 1"}) == Names{"Key 0", "Key 2", "Key F"}));
+		CHECK((SessionViewModel::defaultHiddenColumns(keypad, true, {}) == keypad));
+		CHECK(SessionViewModel::defaultHiddenColumns({}, false, {}).empty());
+	}
 	const fs::path dir = fs::temp_directory_path() / ("chimera-test-columns-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
 	fs::create_directories(dir);
 	fs::copy_file(rom, dir / "walker.testrom");

@@ -16707,3 +16707,26 @@ Tested: the view model test `firmware` finds a file by a hash in `sha1s`, keeps
 the order (`sha1` first) and drops a hash listed twice in another case, and an
 entry with only `sha1s` is not matched by name hints. Broken on purpose once
 (the list left out of the lookup) and seen to fail.
+
+## TAStudio shows a keypad whose buttons are all called "Key ..." (chosen by the owner, 2026-11-26, issue 654)
+
+With the Cadmium core (CHIP-8) a new project's TAStudio showed only the Frame
+column. The package declares one controller, "CHIP-8 Keypad", with buttons
+"Key 0" to "Key F", and binds all sixteen. The cause was not the rule about
+players with nothing bound (issue 622) nor the rule about controls the core
+lacks (issue 635): the keypad has no player, and the core says every button is
+there. It was the list of controls a project with no columns of its own hides
+at first (`hiddenByDefault`: Power, Reset, disc and tape controls, and any
+name starting with "Key ", which is for a computer's keyboard keys). Every
+button of the keypad starts with "Key ", so all sixteen were hidden.
+
+Decided: that list never hides every control. When it would, a project with no
+columns of its own shows them all. A package that lists its shown columns
+(`input.shown`) is still taken as it is, even if the list is empty. No core is
+named; a machine with other controls beside its keys hides them as before.
+
+Tested: the view model test `pianoRollColumns` checks `defaultHiddenColumns`
+on a keypad of "Key" buttons (none hidden), on keys with Reset and Power (none
+hidden), on keys with Reset and one other control (the keys and Reset hidden as
+before), and on a package's own list (kept). Broken on purpose once (the check
+for "everything hidden" removed) and seen to fail.

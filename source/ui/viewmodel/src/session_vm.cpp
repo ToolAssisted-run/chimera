@@ -6376,16 +6376,25 @@ bool SessionViewModel::hiddenByDefault(const std::string &n)
 		starts("Close") || ends("Tape") || ends("Disk") || ends("Block") || ends("Status");
 }
 
-void SessionViewModel::loadDefaultColumns()
+std::vector<std::string> SessionViewModel::defaultHiddenColumns(const std::vector<std::string> &controls, bool shownDeclared,
+	const std::set<std::string> &shown)
 {
 	/* the package's list when it has one: every control not in it hidden */
-	auto hide = [this](const std::string &n) { return shownDeclared_ ? shownColumns_.count(n) == 0 : hiddenByDefault(n); };
 	std::vector<std::string> hidden;
-	for (const std::string &n : buttonNames_)
-		if (hide(n)) hidden.push_back(n);
-	for (const Axis &a : axes_)
-		if (hide(a.name)) hidden.push_back(a.name);
-	hiddenColumnsLoaded.emit(hidden);
+	for (const std::string &n : controls)
+		if (shownDeclared ? shown.count(n) == 0 : hiddenByDefault(n)) hidden.push_back(n);
+	/* A name rule must not leave a roll with no input column at all: a keypad
+	 * whose every button is called "Key ..." has nothing else to show (issue 654).
+	 * A package that lists its shown columns is trusted as it is. */
+	if (!shownDeclared && !controls.empty() && hidden.size() == controls.size()) hidden.clear();
+	return hidden;
+}
+
+void SessionViewModel::loadDefaultColumns()
+{
+	std::vector<std::string> controls = buttonNames_;
+	for (const Axis &a : axes_) controls.push_back(a.name);
+	hiddenColumnsLoaded.emit(defaultHiddenColumns(controls, shownDeclared_, shownColumns_));
 }
 
 void SessionViewModel::setAutoHeldColumns(const std::vector<std::string> &names)
