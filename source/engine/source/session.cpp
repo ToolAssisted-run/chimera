@@ -1946,6 +1946,29 @@ void ce_session::greenzoneCapture()
  * ce_session_greenzone_restore, whose caller replays it itself. */
 bool ce_session::greenzoneRestore(int64_t to)
 {
+	/* Off, a branch's state kept in a file is a state to restore from, when
+	 * the history holds none of its own for that frame (issue 660) */
+	if (history.capturePeriod() == 0 && history.nearest(to) != to)
+	{
+		if (const std::string *file = history.externalAt(to))
+		{
+			const std::string path = *file;
+			if (ce_session_state_load_file(this, path.c_str(), nullptr, 0, nullptr) == 0 && ce_session_movie_at(this, to) == 0)
+			{
+				greenzoneLoaded(to);
+				return true;
+			}
+			/* a file that is gone or does not load is not used again; the
+			 * machine goes back on a state the history holds */
+			const std::string why = error;
+			history.forgetExternal(to);
+			const int64_t base = history.nearest(to);
+			if (base >= 0 && history.restore(base, error, nullptr)) greenzoneLoaded(base);
+			else lostMachine = tr("engine.greenzone_lost", {why});
+			error = why;
+			return false;
+		}
+	}
 	int64_t landed = -1;
 	if (!history.restore(to, error, &landed))
 	{
@@ -5112,7 +5135,22 @@ uint64_t ce_session_greenzone_budget_now(const ce_session *s, uint64_t *set_byte
 
 int64_t ce_session_greenzone_nearest(const ce_session *s, int64_t frame)
 {
-	return s->history.nearest(frame);
+	const int64_t held = s->history.nearest(frame);
+	/* Off, the states kept in files (a branch's) are places to restore from too */
+	if (s->history.capturePeriod() != 0) return held;
+	return std::max(held, s->history.externalNearest(frame));
+}
+
+void ce_session_greenzone_external_clear(ce_session *s)
+{
+	if (s == nullptr) return;
+	s->history.clearExternal();
+}
+
+void ce_session_greenzone_external_add(ce_session *s, int64_t frame, const char *utf8_path)
+{
+	if (s == nullptr || utf8_path == nullptr) return;
+	s->history.external(frame, utf8_path);
 }
 
 void ce_session_greenzone_invalidate(ce_session *s, int64_t after_frame)

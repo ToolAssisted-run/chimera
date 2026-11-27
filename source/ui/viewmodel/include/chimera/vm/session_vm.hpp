@@ -1201,6 +1201,7 @@ private:
 	 * to load from next time (issue 614): its .state and .note are written over, as making the
 	 * branch wrote them. Nothing when the machine is not on the branch's frame or the branch
 	 * has no state name. */
+	void offerBranchStatesOnMachine();
 	void refreshBranchStateOnMachine(const Branch &b, const Picture::Frame &fallback);
 	void loadBranchOnMachine(const Branch &b, const std::function<void(bool, std::string)> &done, const std::function<void()> &cancelled);
 	/* where two movies part (ce_movie_log_divergent_point), -1 for nowhere */

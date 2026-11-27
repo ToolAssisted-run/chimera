@@ -31,6 +31,7 @@
 #include <unordered_map>
 #include <functional>
 #include <set>
+#include <map>
 #include <string>
 #include <memory>
 #include <utility>
@@ -255,11 +256,12 @@ public:
 	 *      the way the stride skips them: the epoch stays open across them and
 	 *      the next delta describes them all, so a sparse history still costs
 	 *      a delta, not a whole state, per stored frame.
-	 *   0  off: beforeAdvance opens no epoch and capture stores nothing - no
-	 *      delta, no anchor, no thinning, no packing, no spill - and only notes
-	 *      where the machine stands, which keeps an edit made meanwhile from
-	 *      letting an old timeline's frames in later. The sandbox is asked for
-	 *      nothing, so it surveys no pages.
+	 *   0  off: beforeAdvance opens no epoch and capture stores nothing, but
+	 *      a pinned frame (a marker that keeps its state): that one is stored
+	 *      as a whole state (user-decided, 2026-11-27, issue 660). It only
+	 *      notes where the machine stands otherwise, which keeps an edit made
+	 *      meanwhile from letting an old timeline's frames in later. The
+	 *      sandbox is asked for nothing, so it surveys no pages.
 	 *
 	 * What is already stored stays whatever the period, and restore, pins and
 	 * invalidation work as ever. Leaving 0 makes the next frame that can be
@@ -312,6 +314,19 @@ public:
 	void pin(int64_t frame, bool pinned);
 	bool pinned(int64_t frame) const;
 	void unpinAll();
+
+	/* States kept in files outside the history (a branch's), which a seek may
+	 * restore from when the history is off (user-decided, 2026-11-27, issue
+	 * 660). The history only remembers the frame and the file's path; whether
+	 * the file's machine is the movie's machine at that frame is the caller's
+	 * to vouch for when it adds one, and an edit before the frame drops it
+	 * here as it drops a stored state (invalidateAfter, clear). */
+	void external(int64_t frame, const std::string &path);
+	void clearExternal();
+	/* the latest external frame at or before `frame`, or -1 */
+	int64_t externalNearest(int64_t frame) const;
+	const std::string *externalAt(int64_t frame) const;
+	void forgetExternal(int64_t frame);
 
 	/* Puts the machine back to `frame`, which must be one nearest() offered.
 	 * Restores that frame's segment anchor and walks its deltas forward.
@@ -825,6 +840,7 @@ private:
 
 
 	std::set<int64_t> m_pinned;
+	std::map<int64_t, std::string> m_external;
 
 	std::string m_spillDir;
 	int64_t m_newest = -1;             /* the last frame captured */

@@ -195,6 +195,7 @@ void StateHistory::clear()
 	m_mergeJobs.clear();
 	m_segments.clear();
 	m_holes.clear();
+	m_external.clear();
 	m_loadedOutside = false;
 	m_bytes = 0;
 	m_epochOpen = false;
@@ -1471,12 +1472,16 @@ void StateHistory::capture(int64_t frame, const uint8_t *note, size_t noteLen)
 	 * and it is the stored copy of that frame only if this capture stores it */
 	m_machineFrame = frame;
 	m_machineStored = false;
-	if (m_capturePeriod == 0)
+	if (m_capturePeriod == 0 && m_pinned.count(frame) == 0)
 	{
 		/* nothing stored; the edit bookkeeping is the restores' and the loads' */
 		m_epochOpen = false;
 		return;
 	}
+	/* Off, a pinned frame (a marker that keeps its state) is stored as a
+	 * whole state all the same (user-decided, 2026-11-27, issue 660): it is
+	 * the only kind of frame an off history stores, and it is what an edit far
+	 * behind the machine goes back to instead of frame 0. */
 	bool waitedForSave = false;
 	for (;;)
 	{
@@ -2257,6 +2262,8 @@ void StateHistory::releaseBytes(uint64_t n, const char *where)
 
 void StateHistory::invalidateAfter(int64_t frame)
 {
+	/* a state kept outside the history is as much a lie past an edit */
+	m_external.erase(m_external.upper_bound(frame), m_external.end());
 	/* the stretch being filled may be one of the ones about to go */
 	if (m_planPending && m_planFrame > frame) finishPlan();
 	/* The machine itself past the edit: what it plays from here is the old
@@ -2388,7 +2395,34 @@ void StateHistory::pin(int64_t frame, bool isPinned)
 	 * between its multiples (issue 578): the machine is there now, so the
 	 * frame is stored now, as a capture with no frame run stores one (a
 	 * branch made). Off, nothing is stored, pins included. */
-	if (isPinned && enabled() && m_capturePeriod != 0 && frame == m_machineFrame && nearest(frame) != frame) capture(frame);
+	if (isPinned && enabled() && frame == m_machineFrame && nearest(frame) != frame) capture(frame);
+}
+
+void StateHistory::external(int64_t frame, const std::string &path)
+{
+	if (frame >= 0 && !path.empty()) m_external[frame] = path;
+}
+
+void StateHistory::clearExternal()
+{
+	m_external.clear();
+}
+
+int64_t StateHistory::externalNearest(int64_t frame) const
+{
+	auto it = m_external.upper_bound(frame);
+	return it == m_external.begin() ? -1 : std::prev(it)->first;
+}
+
+const std::string *StateHistory::externalAt(int64_t frame) const
+{
+	const auto it = m_external.find(frame);
+	return it == m_external.end() ? nullptr : &it->second;
+}
+
+void StateHistory::forgetExternal(int64_t frame)
+{
+	m_external.erase(frame);
 }
 
 bool StateHistory::pinned(int64_t frame) const

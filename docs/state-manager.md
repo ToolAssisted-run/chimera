@@ -364,7 +364,7 @@ whole diagnosis.
 A pinned frame (a marker's) is stored whatever the greenzone's period ("every
 N frames") or the near band's stride; before, a pin only kept a state that
 happened to be stored, and with the greenzone every 20 frames a marker at 33
-had none. Off (period 0) nothing is stored, pins included. TAStudio
+had none. Off (period 0), only a pinned frame is stored (see below). TAStudio
 Settings' "Keep every marker's frame in the greenzone" (on at first,
 remembered) pins every marker; off, each marker's own "keeps its state"
 decides, as before.
@@ -376,6 +376,18 @@ marker had no state until then. Pinning the machine's own frame now stores
 it, as a branch made stores the frame it is made on; a marker set on any
 other frame still waits for that frame to be played, since going there would
 need a seek.
+
+With the greenzone off, the states a person chose to keep are still kept and
+used (user-decided, 2026-11-27, issue 660). A pinned frame (a marker that
+keeps its state) is stored as a whole state when the machine plays it, and the
+machine's own frame when it is pinned; nothing else is stored. A branch's own
+state file is offered as a place to restore from too, when the branch's input
+up to its frame is the movie's (`ce_session_greenzone_external_add`; the window
+offers them again whenever the branches, the period or the movie change). A
+seek or an edit then goes back to the nearest of these at or before its target,
+or to frame 0. An edit before such a frame drops it, as it drops a stored
+state. A branch's state file is used only while the greenzone is off; with it
+on, the history's own states serve.
 
 ## The policy: everything until the budget is full, then a doubling shape (user-decided, 2026-09-15)
 

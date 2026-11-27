@@ -568,8 +568,8 @@ int main(void)
 	{ // A marker set on the frame the machine stands on (issue 578): with a
 	  // period of 20 the machine on frame 45 has no state there, and pinning
 	  // 45 stores it at once, the machine restored there being frame 45's.
-	  // A pin of a frame the machine is not on stores nothing now, and
-	  // nothing is stored while the history is off (period 0).
+	  // A pin of a frame the machine is not on stores nothing now. Off
+	  // (period 0), a pin on the machine's frame stores it too (issue 660).
 		const chimera::HostApi api = fakeHost();
 		for (int pass = 0; pass < 2; pass++)
 		{
@@ -594,12 +594,9 @@ int main(void)
 			h.pin(33, true);
 			assert(h.nearest(33) != 33);
 			h.pin(45, true);
-			if (pass == 1)
-			{
-				assert(h.nearest(45) != 45);
-				continue;
-			}
+			if (pass == 1) assert(h.nearest(33) != 33);   /* off: 33 is not where the machine is */
 			assert(h.nearest(45) == 45);
+			if (pass == 1) continue;
 			/* the machine runs on from there as before, and 45 comes back as itself */
 			for (int64_t f = 46; f <= 60; f++)
 			{
@@ -616,6 +613,68 @@ int main(void)
 			assert(h.restore(60, error));
 			assert(std::memcmp(g_machine.cell, truth[60].data(), Machine::kCells) == 0);
 		}
+	}
+	{ // Off, a pinned frame is stored when the machine plays it, and nothing else
+	  // is (issue 660): an edit far behind the machine goes back to the nearest
+	  // pinned frame instead of frame 0. An edit before it drops it as it drops
+	  // any state, and playing it again stores it again. The bytes are counted.
+		const chimera::HostApi api = fakeHost();
+		g_machine = Machine{};
+		History h;
+		h.helpers(false);
+		h.configure(&api, nullptr, 64ull << 20);
+		std::vector<std::array<uint8_t, Machine::kCells>> truth(1);
+		std::memcpy(truth[0].data(), g_machine.cell, Machine::kCells);
+		auto step = [&](int64_t f) {
+			h.beforeAdvance();
+			advance(f);
+			std::array<uint8_t, Machine::kCells> at{};
+			std::memcpy(at.data(), g_machine.cell, Machine::kCells);
+			if (truth.size() <= static_cast<size_t>(f)) truth.resize(static_cast<size_t>(f) + 1);
+			truth[static_cast<size_t>(f)] = at;
+			h.capture(f);
+		};
+		h.capture(0);
+		h.capturePeriod(0);
+		h.pin(33, true);
+		h.pin(50, true);
+		const uint64_t bytesAtStart = h.bytes();
+		for (int64_t f = 1; f <= 60; f++) step(f);
+		assert(h.nearest(32) == 0);
+		assert(h.nearest(33) == 33);
+		assert(h.nearest(49) == 33);
+		assert(h.nearest(60) == 50);
+		assert(h.nearest(20) == 0);                   /* an unpinned frame is not stored */
+		assert(h.bytes() > bytesAtStart);             /* and what is stored is in the budget's count */
+		assert(h.restore(33, error));
+		assert(std::memcmp(g_machine.cell, truth[33].data(), Machine::kCells) == 0);
+		assert(h.restore(50, error));
+		assert(std::memcmp(g_machine.cell, truth[50].data(), Machine::kCells) == 0);
+		/* an edit at 40 keeps 33 and drops 50; playing 50 again stores it again */
+		h.invalidateAfter(40);
+		assert(h.nearest(60) == 33);
+		assert(h.restore(33, error));
+		for (int64_t f = 34; f <= 55; f++) step(f);
+		assert(h.nearest(55) == 50);
+		assert(h.restore(50, error));
+		assert(std::memcmp(g_machine.cell, truth[50].data(), Machine::kCells) == 0);
+		/* an edit at 20 drops both */
+		h.invalidateAfter(20);
+		assert(h.nearest(60) == 0);
+		/* states kept in files outside the history: the nearest at or before a
+		 * frame, dropped past an edit, gone when cleared */
+		h.external(30, "a.state");
+		h.external(45, "b.state");
+		assert(h.externalNearest(29) == -1);
+		assert(h.externalNearest(44) == 30);
+		assert(h.externalNearest(100) == 45);
+		assert(h.externalAt(45) != nullptr && *h.externalAt(45) == "b.state");
+		h.invalidateAfter(45);
+		assert(h.externalNearest(100) == 45);
+		h.invalidateAfter(44);
+		assert(h.externalNearest(100) == 30);
+		h.clearExternal();
+		assert(h.externalNearest(100) == -1);
 	}
 	{ // A budget changed while the history runs (issue 543): it keeps what
 	  // it holds, a smaller one thins it down to the new budget at once

@@ -16932,3 +16932,64 @@ the test filled by hand.
 - **Tested.** `core windows` unpacks a package made by the test (a
   `windows/Monitor.qml` and a `windows/kit/SaveData.qml`) and checks both
   files are where the window opens from. With the fix removed it fails.
+
+## With the greenzone off, markers and branches are still places to go back to (user-decided, 2026-11-27, issue 660)
+
+A report: with TAStudio's Greenzone set to Off (for cores too heavy to store
+states), an edit far behind the machine replays the whole movie from frame 0.
+The reporter asked for markers and branches to be rewind points then. The
+owner decided: keep them with the Greenzone Off. Two earlier decisions had left
+them out on purpose: "a marker's frame is always kept ... unless the greenzone
+is off" (2026-11-08) and "off stores nothing, pins included" (issue 578,
+2026-11-14). Both were about the greenzone's own storing; this one is about
+states the person chose, and costs nothing else.
+
+- A pinned frame (a marker that keeps its state, or every marker while "Keep
+  every marker's frame in the greenzone" is on) is stored as a whole state when
+  the machine plays it with the greenzone off, and at once when the marker is
+  set on the machine's own frame (StateHistory::capture and pin). No other
+  frame is stored, and the sandbox is still asked for no epoch. The state is in
+  the history's byte count, so the memory budget holds it as before, and an
+  edit before it drops it like any stored state; playing its frame again stores
+  it again.
+- A branch's own saved state (the file in the project's cache) is offered as a
+  place to restore from, but only when the branch's input up to its frame is the
+  movie's: the state of frame F comes from the inputs of frames 0 to F - 1. The
+  window checks that when the branches, the period or the movie change and
+  hands the engine the ones that fit; the engine drops one when an edit comes
+  before its frame (StateHistory::external, ce_session_greenzone_external_add).
+  A branch whose input differs is never used. A file that does not load is
+  forgotten and that one restore fails; the next goes from a state the history
+  holds. Used only while the greenzone is off.
+- A seek or an edit goes back to the nearest of these at or before its target,
+  or to frame 0 (ce_session_greenzone_nearest and greenzoneRestore).
+- The window's seek (Turbo seek off) and its way back after an edit first
+  "went to the state", by seeking to the state's own frame, which restores the
+  state before it: with a state 20 frames before the target and none before it,
+  that replayed from frame 0. They now go to the frame after the state, which
+  restores the state itself. This also changes a greenzone that stores every Nth
+  frame: a seek to frame 34 with states at 20 and 40 used to replay 20 frames
+  to reach 20 and then 14 more; it now restores 20 and plays 14.
+- Nothing is saved differently: the branch files are the ones branches already
+  have, and the project keeps no greenzone states with the greenzone off.
+
+Not decided and left as it is: a video's reproduction (Encode) runs with the
+greenzone off too, and now stores the pinned markers' states on its way.
+
+Tested: the engine's history test, with the history off: pinned frames 33 and
+50 are stored while 20 is not, restore to them gives their machines, the bytes
+grew, an edit at 40 drops 50 only and playing it stores it again, an edit at 20
+drops both; external states are found nearest-at-or-before, dropped past an
+edit and cleared. The view models' test (greenzoneOffRewind), with the
+greenzone off: a seek from 120 back to 60 with a marker at 40 replays about 20
+frames, not 60; with a branch at 80 a seek from 150 to 100 replays about 20;
+after an edit before the branch's frame the seek goes from the marker (about
+60) and still does after the greenzone is turned on and off, which offers the
+branches again (frames the machine ran, counted by the engine's frame watch:
+20, 20, 48 and 48). Broken on purpose twice and seen to fail: with the branch
+states left out of the nearest state, the branch seek ran 60 frames, not 20;
+with the window's check of the branch's input left out, the last seek ran 20
+frames, not 48. The older marker-frames test counted the session's
+lastSeekFrames, which now covers only the first part of a seek (1 frame, from
+the state, then the rest is played), so it counts the frames the machine runs
+too (14 and 1; it was 20 and 1).

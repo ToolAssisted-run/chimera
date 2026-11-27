@@ -903,6 +903,7 @@ SessionViewModel::SessionViewModel(Dispatcher &dispatcher, InputLog &inputs)
 		periodM_.store(p);
 		submit([this, p] {
 			if (s_ != nullptr) ce_session_greenzone_capture_period(s_, p);
+			offerBranchStatesOnMachine();
 		});
 	});
 	expose("lastSeekMs", "how long the last seek took, in milliseconds", lastSeekMs);
@@ -2622,7 +2623,10 @@ void SessionViewModel::seekAsAskedOnMachine(int64_t target)
 		const int64_t stored = target > 0 ? ce_session_greenzone_nearest(s_, target - 1) : 0;
 		if (stored < target - 1)
 		{
-			if (target < from || stored > from) seekOnMachine(std::max<int64_t>(stored, 0));
+			/* to the state itself: a seek lands a frame after the state it restores, so the one to go to
+			 * is the frame after it (a seek to the stored frame went back to the state before it, and
+			 * with the greenzone off, to frame 0 past a marker or a branch's state: issue 660) */
+			if (target < from || stored > from) seekOnMachine(std::max<int64_t>(stored + 1, 0));
 			const int64_t at = ce_session_frame(s_);
 			if (at == target) return;
 			if (at < target)
@@ -2684,7 +2688,7 @@ void SessionViewModel::restoreOnMachine(int64_t target)
 	 * rest */
 	if (stored < target - 1 && (!turboSeekM_.load() || target - 1 - std::max<int64_t>(stored, 0) > kTurboPieceFrames))
 	{
-		seekOnMachine(std::max<int64_t>(stored, 0), false);
+		seekOnMachine(std::max<int64_t>(stored + 1, 0), false);   /* the frame after the state: see seekAsAskedOnMachine */
 		const int64_t at = ce_session_frame(s_);
 		if (!turboSeekM_.load() && at < target)
 		{
@@ -3899,6 +3903,7 @@ void SessionViewModel::setBranches(std::vector<Branch> branches)
 {
 	submit([this, branches = std::move(branches)] {
 		branchesM_ = branches;
+		offerBranchStatesOnMachine();
 		journalMarksOnMachine();
 	});
 }
@@ -3932,7 +3937,37 @@ int64_t SessionViewModel::replaceMovieOnMachine(const std::string &text)
 		greenEndM_ = std::min(greenEndM_, from);
 		forgetGameTimeAfterOnMachine(from);
 	}
+	offerBranchStatesOnMachine();
 	return from;
+}
+
+/* With the greenzone off, a branch's own state is a place to go back to when
+ * an edit or a seek is far from the nearest state the greenzone holds (issue
+ * 660). It is only one when the branch's input up to its frame is the movie's:
+ * the state of frame F is made by the inputs of frames 0 to F - 1. The engine
+ * drops one when an edit comes before its frame; this offers again the ones
+ * that fit, when the branches, the period or the movie change. */
+void SessionViewModel::offerBranchStatesOnMachine()
+{
+	if (s_ == nullptr) return;
+	ce_session_greenzone_external_clear(s_);
+	if (periodM_.load() != 0 || branchesM_.empty()) return;
+	namespace fs = std::filesystem;
+	const fs::path dir = branchDirOnMachine();
+	if (dir.empty()) return;
+	const std::string now = movieTextOnMachine(), machine = machineIdOnMachine();
+	std::error_code ec;
+	for (const Branch &b : branchesM_)
+	{
+		const fs::path file = dir / (b.state + ".state");
+		branch_state::Note note;
+		if (b.state.empty() || b.frame <= 0 || !branch_state::readNote(dir / (b.state + ".note"), note) ||
+			note.frame != b.frame || note.machine != machine || !fs::exists(file, ec))
+			continue;
+		const int64_t parts = partsAt(now, b.text);
+		if (parts >= 0 && parts < b.frame) continue;
+		ce_session_greenzone_external_add(s_, b.frame, branch_state::utf8(file).c_str());
+	}
 }
 
 std::filesystem::path SessionViewModel::projectCacheOnMachine() const
@@ -6071,6 +6106,7 @@ void SessionViewModel::bootProjectOnMachine(ce_project *p, const std::string &pa
 	}
 	projectM_ = p;
 	projectPathM_ = path;
+	offerBranchStatesOnMachine();
 	/* a restart keeps the movie it had, which the file may not hold yet */
 	if (!keepInputs)
 	{

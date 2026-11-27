@@ -1990,6 +1990,18 @@ CE_API void ce_session_greenzone_max_near_stride(ce_session *s, int64_t max_stri
  * state at the current frame at once. */
 CE_API void ce_session_greenzone_capture_period(ce_session *s, int64_t period);
 
+/* States kept in files outside the greenzone (a branch's, written by
+ * ce_session_state_save_file), offered to ce_session_greenzone_nearest and
+ * restored by ce_session_greenzone_restore and ce_session_seek WHILE THE
+ * GREENZONE IS OFF (period 0), so that an edit far behind the machine goes back
+ * to the nearest of them instead of frame 0. The caller vouches that the file
+ * holds the movie's machine at `frame`; an edit before `frame` drops it here,
+ * as it drops a stored state. _clear forgets all of them. A file that does not
+ * load is forgotten and the restore fails, once. While the greenzone is off a
+ * pinned frame (ce_session_greenzone_pin) is stored when the machine plays it. */
+CE_API void ce_session_greenzone_external_add(ce_session *s, int64_t frame, const char *utf8_path);
+CE_API void ce_session_greenzone_external_clear(ce_session *s);
+
 /* How many snapshots each band of a full greenzone aims to hold, 32 by default.
  *
  * A greenzone keeps every frame it captures until its memory budget is full;

@@ -11686,15 +11686,110 @@ bool markerFrames(const char *package, const char *rom)
 		CHECK(roll.run("addMarker", {int64_t{33}, std::string("kept")}, error).has_value());
 		for (int i = 0; i < 60; i++) session.run("frameAdvance", {}, error);
 		CHECK(d.until([&] { return session.frame.get() == 60; }, 30));
+		/* the frames the machine runs for the seek, counted by the engine's frame watch (a seek goes
+		 * at once to the state it restores and plays the rest, so the session's own count of the
+		 * seek is the first part only) */
+		static std::atomic<int64_t> played{0};
+		session.onMachineWait([&](ce_session *s) {
+			if (s != nullptr) ce_session_add_frame_watch(s, [](void *, ce_session *) { played.fetch_add(1); }, nullptr);
+		});
+		played.store(0);
 		session.run("seek", {int64_t{34}}, error);
 		CHECK(d.until([&] { return session.frame.get() == 34; }, 30));
 		d.until([] { return false; }, 0.1);
-		replayed[on] = session.lastSeekFrames.get();
+		replayed[on] = played.load();
 		std::printf("marker frames %s: a seek to 34 replayed %lld frames\n", on ? "kept" : "not kept", static_cast<long long>(replayed[on]));
 		session.run("close", {}, error);
 		CHECK(d.until([&] { return !session.isOpen.get(); }, 20));
 	}
-	CHECK(replayed[0] >= 10 && replayed[1] >= 0 && replayed[1] <= 2);   /* measured: 20 and 1 */
+	CHECK(replayed[0] >= 10 && replayed[1] >= 0 && replayed[1] <= 2);   /* measured: 14 and 1 */
+	return failures == before;
+}
+
+/* With the greenzone off, the states a person chose to keep are the places an
+ * edit or a seek goes back to (owner, 2026-11-27, issue 660): a marker that
+ * keeps its state, and a branch whose input up to its frame is the movie's.
+ * A seek replays from the nearest of them at or before the target, else from
+ * frame 0; a branch the movie has since left behind is not one of them. */
+bool greenzoneOffRewind(const char *package, const char *rom)
+{
+	namespace fs = std::filesystem;
+	const int before = failures;
+	std::error_code ec;
+	const fs::path dir = fs::temp_directory_path() / ("chimera-test-off-rewind-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+	fs::create_directories(dir);
+	fs::copy_file(rom, dir / "walker.testrom");
+	ManualDispatcher d;
+	InputLog inputs;
+	SessionViewModel session(d, inputs);
+	PianoRollViewModel roll(d, inputs, session);
+	BranchesViewModel branches(d, inputs, session, roll);
+	std::string error;
+	session.cacheFolder.set((dir / "cache").string());
+	openGame(session, package, (dir / "walker.testrom").string(), error);
+	CHECK(d.until([&] { return session.isOpen.get(); }, 60));
+	const fs::path projectFile = dir / "walker.chimeraProject";
+	CHECK(session.run("saveProject", {projectFile.string()}, error).has_value());
+	CHECK(d.until([&] { return session.hasProject.get() && session.projectPath.get() == projectFile.string(); }, 20));
+	CHECK(roll.run("fill", {int64_t{300}}, error).has_value());
+	CHECK(d.until([&] { return roll.frameCount.get() >= 300; }, 20));
+	session.greenzonePeriod.set(0);
+	d.until([] { return false; }, 0.2);
+	/* the frames the machine runs, counted by the engine's frame watch */
+	static std::atomic<int64_t> played{0};
+	session.onMachineWait([&](ce_session *s) {
+		if (s != nullptr) ce_session_add_frame_watch(s, [](void *, ce_session *) { played.fetch_add(1); }, nullptr);
+	});
+	auto held = [&](int64_t frame) {
+		int64_t at = -2;
+		session.onMachineWait([&](ce_session *s) { if (s != nullptr) at = ce_session_greenzone_nearest(s, frame); });
+		return at;
+	};
+	auto seekTo = [&](int64_t frame) {
+		std::printf("  off-rewind: going to %lld, the nearest state before it is %lld\n", static_cast<long long>(frame), static_cast<long long>(held(frame - 1)));
+		played.store(0);
+		CHECK(session.run("seek", {frame}, error).has_value());
+		CHECK(d.until([&] { return session.frame.get() == frame && session.seekingTo.get() == -1; }, 30));
+		d.until([] { return false; }, 0.1);
+		std::printf("  off-rewind: reached %lld, the machine ran %lld frames (%s)\n", static_cast<long long>(frame), static_cast<long long>(played.load()), session.status.get().c_str());
+		return played.load();
+	};
+	/* a marker that keeps its state: played past once, it is where a seek back goes */
+	roll.markersKeepStates.set(true);
+	CHECK(roll.run("addMarker", {int64_t{40}, std::string("kept")}, error).has_value());
+	seekTo(120);
+	const int64_t fromMarker = seekTo(60);
+	/* a branch made at 80: a seek back to 100 goes from it, not from the marker at 40 */
+	seekTo(80);
+	CHECK(branches.run("create", {std::string("ok")}, error).has_value());
+	CHECK(d.until([&] { return branches.made.get() == 1; }, 30));
+	d.until([] { return false; }, 0.3);
+	seekTo(150);
+	const int64_t fromBranch = seekTo(100);
+	/* an edit before the branch's frame: it is no longer the movie's, and the
+	 * seek goes from the Last input marker the edit made, at 52 (the engine
+	 * dropped the branch's state at the edit) */
+	CHECK(roll.run("paint", {int64_t{50}, int64_t{52}, int64_t{3}, true}, error).has_value());
+	d.until([] { return false; }, 0.2);
+	seekTo(150);
+	const int64_t afterEdit = seekTo(100);
+	/* and offered again, the greenzone turned on and off, it is still not used: its input is not the movie's */
+	session.greenzonePeriod.set(1);
+	d.until([] { return false; }, 0.2);
+	session.greenzonePeriod.set(0);
+	d.until([] { return false; }, 0.2);
+	seekTo(150);
+	const int64_t again = seekTo(100);
+	std::printf("greenzone off: a seek back replayed %lld frames from a marker, %lld from a branch, %lld and %lld from the marker once the branch was left behind\n",
+		static_cast<long long>(fromMarker), static_cast<long long>(fromBranch), static_cast<long long>(afterEdit),
+		static_cast<long long>(again));
+	CHECK(fromMarker >= 15 && fromMarker <= 25);    /* 60 - 40, not 60 */
+	CHECK(fromBranch >= 15 && fromBranch <= 25);    /* 100 - 80, not 60 */
+	CHECK(afterEdit >= 40 && afterEdit <= 56);      /* 100 - 52: from the Last input marker the edit made, not from 80 */
+	CHECK(again >= 40 && again <= 56);
+	session.run("close", {}, error);
+	CHECK(d.until([&] { return !session.isOpen.get(); }, 20));
+	fs::remove_all(dir, ec);
 	return failures == before;
 }
 
@@ -13112,6 +13207,7 @@ int main(int argc, char **argv)
 		bool ran = false;
 		if (name == "coreWindows") ran = coreWindows(argv[1], argv[2]);
 		else if (name == "longSeek") ran = longSeek(argv[1], argv[2]);
+		else if (name == "greenzoneOffRewind") ran = greenzoneOffRewind(argv[1], argv[2]);
 		else std::printf("CHIMERA_TEST_ONLY: no test %s here\n", only);
 		std::printf("%s: %d checks failed\n", only, failures);
 		return ran && failures == 0 ? 0 : 1;
@@ -13223,6 +13319,7 @@ int main(int argc, char **argv)
 			if (argc >= 16) ranMachine = wideButtons(argv[15], argv[2]) && ranMachine;
 			if (argc >= 17) ranMachine = shownColumns(argv[16], argv[1], argv[2]) && ranMachine;
 			ranMachine = markerFrames(argv[1], argv[2]) && ranMachine;
+			ranMachine = greenzoneOffRewind(argv[1], argv[2]) && ranMachine;
 			ranMachine = listsWhilePlaying(argv[1], argv[2]) && ranMachine;
 			ranMachine = longMovie(argv[1], argv[2]) && ranMachine;
 			ranMachine = seekStopped(argv[1], argv[2]) && ranMachine;
