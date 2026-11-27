@@ -3367,6 +3367,65 @@ bool crashRecovery(const char *package, const char *rom)
 	return true;
 }
 
+/* A branch made while playing ahead, the project saved, closed and opened
+ * again, the branch loaded (issue 661). The reporter saw 4335/4334 in the
+ * frame counter and took the movie to be a frame short. It was not: the
+ * movie and the branch both held 4335 frames. The counter's second figure
+ * is the last frame with input counted from zero (issue 433), so a movie
+ * played to its end reads one past it; kept as it is (owner, 2026-11-27). */
+bool branchAfterReopen(const char *package, const char *rom)
+{
+	namespace fs = std::filesystem;
+	const fs::path dir = fs::temp_directory_path() / ("chimera-test-reopen-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+	fs::create_directories(dir);
+	fs::copy_file(rom, dir / "walker.testrom");
+	ManualDispatcher d;
+	InputLog inputs;
+	SessionViewModel session(d, inputs);
+	session.turboSeek.set(true);
+	PianoRollViewModel roll(d, inputs, session);
+	BranchesViewModel branches(d, inputs, session, roll);
+	std::string error;
+	session.cacheFolder.set((dir / "cache").string());
+	openGame(session, package, (dir / "walker.testrom").string(), error);
+	CHECK(d.until([&] { return session.isOpen.get(); }, 60));
+	session.recordingMode.set(true);
+	session.showFrameCounter.set(true);
+	const fs::path project = dir / "walker.chimeraProject";
+	CHECK(session.run("saveProject", {project.string()}, error).has_value());
+	CHECK(d.until([&] { return session.projectPath.get() == project.string() && session.hasProject.get(); }, 20));
+	/* played ahead, with a button held up to the last frame */
+	for (int i = 0; i < 6; i++) session.run("frameAdvance", {}, error);
+	session.key("Down", true);
+	for (int i = 0; i < 4; i++) session.run("frameAdvance", {}, error);
+	CHECK(d.until([&] { return session.frame.get() == 10; }, 20));
+	session.key("Down", false);
+	CHECK(roll.frameCount.get() == 10 && inputs.size() == 10);
+	CHECK(branches.run("create", {}, error).has_value());
+	CHECK(d.until([&] { return branches.made.get() >= 1; }, 20));
+	session.run("saveProject", {}, error);
+	CHECK(d.until([&] { return !session.unsaved.get(); }, 20));
+	session.run("close", {}, error);
+	CHECK(d.until([&] { return !session.isOpen.get(); }, 20));
+	const int64_t opens = session.opens.get();
+	session.run("openProject", {project.string(), std::string(package)}, error);
+	CHECK(d.until([&] { return session.opens.get() > opens && session.projectPath.get() == project.string(); }, 60));
+	CHECK(branches.count.get() == 1);
+	CHECK(branches.run("load", {int64_t{0}}, error).has_value());
+	CHECK(d.until([&] { return session.frame.get() == 10; }, 30));
+	d.until([] { return false; }, 0.3);
+	/* the movie holds the frames the machine ran, and the counter counts both the same way */
+	CHECK(roll.frameCount.get() == 10 && inputs.size() == 10);
+	CHECK(session.frame.get() <= roll.frameCount.get());
+	CHECK(session.frameCounterText.get() == "10/9 (Finished)");
+	session.recordingMode.set(true);
+	CHECK(session.frameCounterText.get() == "10/9");
+	session.run("close", {}, error);
+	CHECK(d.until([&] { return !session.isOpen.get(); }, 20));
+	removeTree(dir);
+	return true;
+}
+
 /* TAStudio's settings for playing, saving, copying, markers and branches,
  * and the project's changes not saved yet: marked by every kind of edit,
  * cleared by a save, saved by the autosave when it comes round */
@@ -13207,6 +13266,7 @@ int main(int argc, char **argv)
 		bool ran = false;
 		if (name == "coreWindows") ran = coreWindows(argv[1], argv[2]);
 		else if (name == "longSeek") ran = longSeek(argv[1], argv[2]);
+		else if (name == "branchAfterReopen") ran = branchAfterReopen(argv[1], argv[2]);
 		else if (name == "greenzoneOffRewind") ran = greenzoneOffRewind(argv[1], argv[2]);
 		else std::printf("CHIMERA_TEST_ONLY: no test %s here\n", only);
 		std::printf("%s: %d checks failed\n", only, failures);
@@ -13292,6 +13352,7 @@ int main(int argc, char **argv)
 			ranMachine = mediaMaker() && ranMachine;
 			ranMachine = cacheManager(argv[1], argv[2]) && ranMachine;
 			ranMachine = tastudioSettings(argv[1], argv[2]) && ranMachine;
+			ranMachine = branchAfterReopen(argv[1], argv[2]) && ranMachine;
 			if (argc >= 5) ranMachine = project(argv[1], argv[2], argv[3], argv[4]) && ranMachine;
 			if (argc >= 5) ranMachine = otherBuild(argv[1], argv[2], argv[3]) && ranMachine;
 			else std::printf("SKIP the project tests: no movies and goldens folders given\n");

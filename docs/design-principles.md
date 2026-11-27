@@ -16993,3 +16993,18 @@ frames, not 48. The older marker-frames test counted the session's
 lastSeekFrames, which now covers only the first part of a seek (1 frame, from
 the state, then the rest is played), so it counts the frames the machine runs
 too (14 and 1; it was 20 and 1).
+
+## The frame counter's second figure, reviewed and kept (2026-11-27, issue 661)
+
+A Vita3K project was played ahead, a branch saved, the project saved,
+closed and opened again, and the branch loaded. The frame counter said
+4335/4334 and the reporter took the movie to be a frame short. It was not:
+the report's project holds 4335 input lines in the movie and in the branch,
+and the branch's frame is 4335. Reproduced with the synthetic core, the
+movie, the piano roll and the branch agree after the reopen. The counter's
+second figure is the last frame with input counted from zero (issue 433), so
+a movie played to its end reads one past it. Reviewed and kept as it is
+(owner's decision, 2026-11-27).
+
+Tested: the view models test `branchAfterReopen` does the steps above and
+checks the movie's length, the piano roll and the counter (10/9).
