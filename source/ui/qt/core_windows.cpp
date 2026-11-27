@@ -261,6 +261,33 @@ QQuickWindow *CoreWindows::window(const QString &id) const
 	return it != open_.constEnd() ? it->window.data() : nullptr;
 }
 
+bool unpackWindowFiles(ce_package *pk, const QString &folder, QString &why)
+{
+	QDir(folder).removeRecursively();
+	const QString prefix = QStringLiteral("windows/");
+	const QString names = QString::fromUtf8(ce_package_entry_names(pk, prefix.toUtf8().constData()));
+	for (const QString &name : names.split(QLatin1Char('\n'), Qt::SkipEmptyParts))
+	{
+		/* the folder is the package's "windows/" folder: a window's declared
+		 * file "windows/kit/SaveData.qml" is <folder>/kit/SaveData.qml (the
+		 * window is opened from there). Written only inside the folder: a name
+		 * climbing out is not a window file */
+		const QString to = QDir::cleanPath(QDir(folder).filePath(name.mid(prefix.size())));
+		if (!to.startsWith(QDir::cleanPath(folder) + QLatin1Char('/'))) continue;
+		uint64_t len = 0;
+		const uint8_t *d = ce_package_entry(pk, name.toUtf8().constData(), &len);
+		if (d == nullptr) continue;
+		QDir().mkpath(QFileInfo(to).absolutePath());
+		QFile f(to);
+		if (!f.open(QIODevice::WriteOnly) || f.write(reinterpret_cast<const char *>(d), static_cast<qint64>(len)) != static_cast<qint64>(len))
+		{
+			why = f.errorString();
+			return false;
+		}
+	}
+	return true;
+}
+
 QString CoreWindows::unpack(QString &why)
 {
 	const std::string package = session_.packagePath();
@@ -275,24 +302,10 @@ QString CoreWindows::unpack(QString &why)
 	const QString base = QString::fromStdString(session_.cacheFolder.get());
 	const QString folder = QDir(base.isEmpty() ? QDir::tempPath() : base)
 		.filePath(QStringLiteral("core-windows/") + QString::fromUtf8(sha != nullptr ? sha : "folder"));
-	QDir(folder).removeRecursively();
-	const QString names = QString::fromUtf8(ce_package_entry_names(pk, "windows/"));
-	for (const QString &name : names.split(QLatin1Char('\n'), Qt::SkipEmptyParts))
+	if (!unpackWindowFiles(pk, folder, why))
 	{
-		/* written only inside the folder: a name climbing out is not a window file */
-		const QString to = QDir::cleanPath(QDir(folder).filePath(name));
-		if (!to.startsWith(QDir::cleanPath(folder) + QLatin1Char('/'))) continue;
-		uint64_t len = 0;
-		const uint8_t *d = ce_package_entry(pk, name.toUtf8().constData(), &len);
-		if (d == nullptr) continue;
-		QDir().mkpath(QFileInfo(to).absolutePath());
-		QFile f(to);
-		if (!f.open(QIODevice::WriteOnly) || f.write(reinterpret_cast<const char *>(d), static_cast<qint64>(len)) != static_cast<qint64>(len))
-		{
-			why = f.errorString();
-			ce_package_free(pk);
-			return {};
-		}
+		ce_package_free(pk);
+		return {};
 	}
 	/* the package's texts in the language in use, over its English, for the window's labels */
 	if (texts_ == nullptr) texts_ = new QQmlPropertyMap(this);

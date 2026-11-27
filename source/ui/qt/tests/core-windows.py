@@ -179,6 +179,19 @@ window = subprocess.run([program, "window", monitor], capture_output=True, text=
 print(window.stdout)
 print(window.stderr[-2000:])
 check(window.returncode == 0, "the synthetic core's window over its view model (exit %d)" % window.returncode)
+# a package's window files unpacked where the window is opened from (issue
+# 663): windows/kit/SaveData.qml must come out as <folder>/kit/SaveData.qml
+import zipfile
+with tempfile.TemporaryDirectory() as tmp:
+    package = os.path.join(tmp, "core.chimeraCore")
+    with zipfile.ZipFile(package, "w") as z:
+        z.writestr("core.wbx", "x")
+        z.writestr("waterbox.config", "{}")
+        z.writestr("windows/Monitor.qml", "import QtQuick\nItem {}\n")
+        z.writestr("windows/kit/SaveData.qml", "import QtQuick\nItem {}\n")
+    unpacked = subprocess.run([program, "unpack", package, os.path.join(tmp, "out")], capture_output=True, text=True, timeout=60)
+    print(unpacked.stdout)
+    check(unpacked.returncode == 0, "a package's window files are unpacked where the window opens from (exit %d)" % unpacked.returncode)
 server.shutdown()
 print("%d failed" % failures)
 sys.exit(1 if failures else 0)

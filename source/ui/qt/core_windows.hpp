@@ -15,6 +15,8 @@
  * make goes to a scheme nothing serves. What is refused is said once each on
  * standard error and kept for the tests. */
 
+#include "chimera/engine.h"
+
 #include <QHash>
 #include <QObject>
 #include <QPointer>
@@ -94,6 +96,12 @@ Q_SIGNALS:
 private:
 	QString window_;
 };
+
+/* writes the files of a package's "windows/" folder into folder, minus the
+ * "windows/" (the declared "windows/kit/SaveData.qml" becomes
+ * <folder>/kit/SaveData.qml, where CoreWindows::open loads it from); false
+ * with why when one cannot be written */
+bool unpackWindowFiles(ce_package *package, const QString &folder, QString &why);
 
 /* The windows of the core open: opened from the Emulator menu, each a window
  * of its own over its view model, closed when the machine goes */

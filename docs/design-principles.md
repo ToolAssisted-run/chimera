@@ -16912,3 +16912,23 @@ project's note passed over, a note reported already, the time from the file
 name) and through makeReport with a report saved between two notes and after
 both; Save as Zip sets the time.
 
+
+## A core's window files are unpacked where the window opens from (2026-11-27, issue 663)
+
+Emulator > Export Save Data (and the other windows a core ships) failed with
+"could not be opened: .../core-windows/<hash>/kit/SaveData.qml: No such file
+or directory", for every core that has a window, on every system. The cause
+was in Chimera: it unpacked the package's `windows/` folder keeping the
+`windows/` in each path (so `windows/kit/SaveData.qml` became
+`<cache>/windows/kit/SaveData.qml`), but opened the window from the declared
+path without it (`<cache>/kit/SaveData.qml`). The package itself was right
+(the published Mesen package holds `windows/kit/SaveData.qml` and declares
+it). Nothing tested the unpacking, only the window's QML loaded from a folder
+the test filled by hand.
+
+- **Fixed.** The `windows/` prefix is dropped when the files are written, so
+  the folder holds `kit/SaveData.qml` and `Monitor.qml` as the window loads
+  them. No core needs a rebuild.
+- **Tested.** `core windows` unpacks a package made by the test (a
+  `windows/Monitor.qml` and a `windows/kit/SaveData.qml`) and checks both
+  files are where the window opens from. With the fix removed it fails.

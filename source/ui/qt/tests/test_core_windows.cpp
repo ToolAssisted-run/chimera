@@ -204,19 +204,40 @@ static int window(const QString &qmlFile)
 	return 0;
 }
 
+/* a package's window files unpacked where the window is opened from: the
+ * declared "windows/kit/SaveData.qml" must be <folder>/kit/SaveData.qml
+ * (issue 663: it was written one folder deeper and Export Save Data could not
+ * be opened) */
+static int unpack(const QString &package, const QString &folder)
+{
+	const char *err = nullptr;
+	ce_package *pk = ce_package_open(package.toUtf8().constData(), &err);
+	CHECK(pk != nullptr);
+	if (pk == nullptr) return 1;
+	QString why;
+	CHECK(qt::unpackWindowFiles(pk, folder, why));
+	ce_package_free(pk);
+	CHECK(QFile::exists(QDir(folder).filePath(QStringLiteral("kit/SaveData.qml"))));
+	CHECK(QFile::exists(QDir(folder).filePath(QStringLiteral("Monitor.qml"))));
+	CHECK(!QFile::exists(QDir(folder).filePath(QStringLiteral("windows"))));
+	std::printf("%d failed\n", failures);
+	return failures == 0 ? 0 : 1;
+}
+
 int main(int argc, char **argv)
 {
 	qputenv("QT_QUICK_CONTROLS_STYLE", "Basic");
 	QGuiApplication app(argc, argv);
 	const QStringList args = app.arguments();
 	if (args.size() >= 3 && args[1] == QStringLiteral("cases")) return cases(args[2], args.mid(3));
+	if (args.size() == 4 && args[1] == QStringLiteral("unpack")) return unpack(args[2], args[3]);
 	if (args.size() >= 3 && args[1] == QStringLiteral("window"))
 	{
 		window(args[2]);
 		std::printf("%d failed\n", failures);
 		return failures == 0 ? 0 : 1;
 	}
-	std::fprintf(stderr, "usage: test_core_windows cases <folder> <case>... | window <Monitor.qml>\n");
+	std::fprintf(stderr, "usage: test_core_windows cases <folder> <case>... | window <Monitor.qml> | unpack <package> <folder>\n");
 	return 2;
 }
 
