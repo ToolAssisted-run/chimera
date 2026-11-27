@@ -664,6 +664,22 @@ NewProjectViewModel::NewProjectViewModel(Dispatcher &dispatcher, SessionViewMode
 		}
 		const std::string name = baseName(path), kind = kindOf(name);
 		const std::vector<std::string> formats = formatsFor(*s);
+		/* a file goes only in a slot that takes its kind (issue 664, user-decided
+		 * 2026-11-27: a disk in the disc slot was taken, and said nothing until
+		 * the machine changed). The refusal names the slot that takes it, when
+		 * one does, else the kinds this slot takes. */
+		if (!formats.empty() && std::find(formats.begin(), formats.end(), kind) == formats.end())
+		{
+			if (const Slot *other = slotTaking(kind, id); other != nullptr)
+				error = tr(other->exposed ? "new_project.goes_in_other_slot" : "new_project.goes_in_closed_slot", {name, s->title, other->title});
+			else
+			{
+				std::string formatsText;
+				for (const std::string &f : formats) formatsText += (formatsText.empty() ? "" : ", ") + (f.empty() ? tr("new_project.no_extension") : "." + f);
+				error = tr("new_project.takes_no_such_file", {name, s->title, formatsText});
+			}
+			return {};
+		}
 		if (!s->namePattern.empty())
 		{
 			bool matches = false;
@@ -718,13 +734,8 @@ NewProjectViewModel::NewProjectViewModel(Dispatcher &dispatcher, SessionViewMode
 					}
 		}
 		list.push_back({name, path});
-		/* A slot that names its formats has still not been given a rule: a
-		 * file of another kind is said, not refused, as Chimera's. More files
-		 * than a slot takes are said when the files page goes on. */
-		std::string formatsText;
-		for (const std::string &f : formats) formatsText += (formatsText.empty() ? "" : ", ") + (f.empty() ? tr("new_project.no_extension") : "." + f);
-		const bool expected = formats.empty() || std::find(formats.begin(), formats.end(), kind) != formats.end();
-		tell(expected ? std::string() : tr("new_project.unexpected_format", {name, formatsText}));
+		/* More files than a slot takes are said when the files page goes on. */
+		tell(std::string());
 		evaluate();
 		return {};
 	});
@@ -2370,6 +2381,16 @@ std::vector<std::string> NewProjectViewModel::formatsFor(const Slot &s) const
 	return claimed.empty() ? s.formats : claimed;
 }
 
+const NewProjectViewModel::Slot *NewProjectViewModel::slotTaking(const std::string &kind, const std::string &except) const
+{
+	auto in = [&](const std::vector<std::string> &list) { return std::find(list.begin(), list.end(), kind) != list.end(); };
+	for (const Slot &s : slots_)
+		if (s.id != except && s.exposed && in(formatsFor(s))) return &s;
+	for (const Slot &s : slots_)
+		if (s.id != except && !s.exposed && in(s.formats)) return &s;
+	return nullptr;
+}
+
 const NewProjectViewModel::Slot *NewProjectViewModel::slot(const std::string &id) const
 {
 	for (const Slot &s : slots_)
@@ -2534,7 +2555,35 @@ void NewProjectViewModel::evaluate()
 		const int64_t n = it == files_.end() ? 0 : static_cast<int64_t>(it->second.size());
 		if (!s.exposed)
 		{
-			if (n > 0) say(tr("new_project.take_files_out", {s.title}));
+			if (n == 0) continue;
+			/* what the slot holds, and where each kind goes: the slots of
+			 * this machine that take it (issue 664: a disk left in the disc
+			 * slot when the machine changed said only that it did not go) */
+			std::vector<std::pair<std::string, std::vector<std::string>>> goes; /* slot title, kinds */
+			std::string nowhere;
+			auto kindText = [&](const std::string &k) { return k.empty() ? tr("new_project.no_extension") : "." + k; };
+			std::vector<std::string> seen;
+			for (const Picked &f : it->second)
+			{
+				const std::string k = kindOf(f.name);
+				if (std::find(seen.begin(), seen.end(), k) != seen.end()) continue;
+				seen.push_back(k);
+				const Slot *to = slotTaking(k, s.id);
+				if (to != nullptr && to->exposed)
+				{
+					auto at = std::find_if(goes.begin(), goes.end(), [&](const auto &g) { return g.first == to->title; });
+					if (at == goes.end()) at = goes.insert(goes.end(), {to->title, {}});
+					at->second.push_back(kindText(k));
+				}
+				else nowhere += (nowhere.empty() ? "" : ", ") + kindText(k);
+			}
+			for (const auto &[title, kinds] : goes)
+			{
+				std::string list;
+				for (const std::string &k : kinds) list += (list.empty() ? "" : ", ") + k;
+				say(tr("new_project.files_go_elsewhere", {s.title, list, title}));
+			}
+			if (!nowhere.empty()) say(tr("new_project.files_go_nowhere", {s.title, nowhere}));
 			continue;
 		}
 		if (n < s.min) say(tr("new_project.files_needed", s.min, {s.title}));

@@ -248,6 +248,9 @@ private:
 	 * machine of the package claims, only this machine's (a slot this
 	 * machine claims none of is left as declared), as Chimera narrows them */
 	std::vector<std::string> formatsFor(const Slot &s) const;
+	/* the slot that takes this kind of file other than `except`: one the form
+	 * shows first, else one the machine chosen closes; null when none does */
+	const Slot *slotTaking(const std::string &kind, const std::string &except) const;
 	/* which slots, settings and firmware apply now, and what is missing */
 	void evaluate();
 

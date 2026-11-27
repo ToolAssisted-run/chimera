@@ -143,9 +143,9 @@ int main(int argc, char **argv)
 	CHECK(files == "one.testrom\nthree.testrom\ntwo.testrom");
 	if (files != "one.testrom\nthree.testrom\ntwo.testrom") std::fprintf(stderr, "  files: [%s]\n", files.c_str());
 
-	/* the line at the bottom: a file of another kind than the slot takes is said as
-	 * information, in the text colour; a file that cannot be read is an error, in
-	 * the error colour (issue 620) */
+	/* the line at the bottom: a file of another kind than the slot takes is refused
+	 * (issue 664), and a file that cannot be read is refused; both in the error colour
+	 * (issue 620 had the first as information, when it was added and said) */
 	QQuickItem *line = window->findChild<QQuickItem *>(QStringLiteral("wizardStatus"));
 	CHECK(line != nullptr);
 	if (line == nullptr) return 1;
@@ -155,7 +155,7 @@ int main(int argc, char **argv)
 	const QVariantList notes{QStringLiteral("rom"), QString::fromStdString((work / "notes.txt").string())};
 	QMetaObject::invokeMethod(window, "run", Q_ARG(QVariant, QStringLiteral("addFile")), Q_ARG(QVariant, notes));
 	CHECK(QTest::qWaitFor([&] { return !line->property("text").toString().isEmpty(); }, 3000));
-	CHECK(line->property("color").value<QColor>() != errorColor);
+	CHECK(QTest::qWaitFor([&] { return line->property("color").value<QColor>() == errorColor; }, 3000));
 	const QVariantList missing{QStringLiteral("rom"), QString::fromStdString((work / "missing.testrom").string())};
 	QMetaObject::invokeMethod(window, "run", Q_ARG(QVariant, QStringLiteral("addFile")), Q_ARG(QVariant, missing));
 	CHECK(QTest::qWaitFor([&] { return line->property("color").value<QColor>() == errorColor; }, 3000));

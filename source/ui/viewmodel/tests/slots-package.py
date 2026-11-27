@@ -22,6 +22,11 @@ slots = {
         {"id": "disk", "title": "Disks", "min": 0, "max": -1, "formats": ["cue", "img", "dsk"],
          "help": "Disks, in the order they are swapped.", "namePattern": "^disk[0-9]*\\.(cue|img|dsk)$",
          "nameHelp": "A disk is called disk, a number and .cue, .img or .dsk."},
+        # kinds that go with one board only, for the tests of where a file goes
+        {"id": "extra", "title": "Extras", "min": 0, "max": -1, "formats": ["testrom", "xtra"],
+         "help": "Board B's extras.", "exposedWhen": {"setting": "board", "is": "b"}},
+        {"id": "lone", "title": "Lone", "min": 0, "max": -1, "formats": ["lone"],
+         "help": "Board A's, which no other slot takes.", "exposedWhen": {"setting": "board", "is": "a"}},
     ],
     "atLeastOneOf": [["rom", "disk"]],
 }

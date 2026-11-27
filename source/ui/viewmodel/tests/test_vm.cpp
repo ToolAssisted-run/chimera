@@ -8876,12 +8876,12 @@ bool createForAgent(const char *package, const char *rom, const char *hashedPack
 	json::parse("{\"NoSuchSetting\": 1}", r.settings, error);
 	CHECK(ask(r).refusal == "Synth has no setting called 'NoSuchSetting'. describe_core lists its settings.");
 	r.settings = json::Json();
-	/* a file the slot does not take: refused when the project is made, and said so, not called made (issue 422) */
+	/* a file the slot does not take: refused, and said so, not called made (issues 422, 664) */
 	std::ofstream(dir / "notes.txt") << "not a game";
 	r.games.clear();
 	r.files = {{"rom", (dir / "notes.txt").string()}};
 	const auto wrongKind = ask(r);
-	CHECK(!wrongKind.made && wrongKind.refusal == "file 'notes.txt' is not a format slot 'rom' accepts");
+	CHECK(!wrongKind.made && wrongKind.refusal == "notes.txt is not a kind of file this core takes. Game takes .testrom files.");
 	r.files.clear();
 	r.games = {game};
 	/* by its package's file name; the firmware it pins found nowhere: listed, with where it was looked for */
@@ -9341,25 +9341,16 @@ bool newProjectWizard(const char *package, const char *rom, const char *slotsPac
 	CHECK(wizard.filesAsked.get() && wizard.filesComplaint.get() == "Game: needs exactly one, has 0" && text("slots", 0, 10) == "exactly one");
 	CHECK(!wizard.firmwareAsked.get() && wizard.firmwareMissing.get().empty());
 	std::ofstream(dir / "notes.txt") << "not a game";
-	/* a file of another kind is said, not refused, as Chimera's; more than the slot takes is said at Next */
-	CHECK(wizard.run("addFile", {std::string("rom"), (dir / "notes.txt").string()}, error).has_value() &&
-		wizard.status.get() == "notes.txt is not one of the formats this slot expects (.testrom)");
-	/* said, not refused: information, not in the error colour (issue 620) */
-	CHECK(!wizard.statusIsError.get());
-	/* and refused when the project is made, the engine's rule: the wizard is told why and that it was
-	 * for its files, and stays open until then (issue 422: the window closed and nothing was said) */
+	/* a file of a kind no slot takes is refused, saying what the slot takes (issue 664, user-decided 2026-11-27) */
+	CHECK(!wizard.run("addFile", {std::string("rom"), (dir / "notes.txt").string()}, error) &&
+		error == "notes.txt is not a kind of file this core takes. Game takes .testrom files.");
+	CHECK(wizard.filesComplaint.get() == "Game: needs exactly one, has 0");
 	const int64_t madeBefore = wizard.made.get();
-	{
-		const fs::path refused = dir / "refused.chimeraProject";
-		CHECK(wizard.ready.get() && wizard.run("create", {refused.string()}, error).has_value() && wizard.making.get());
-		CHECK(!wizard.run("create", {refused.string()}, error) && error == "Making the project...");
-		CHECK(d.until([&] { return !wizard.making.get(); }, 60));
-		CHECK(wizard.filesRefused.get() && wizard.made.get() == madeBefore && !fs::exists(refused));
-		CHECK(wizard.status.get() == "Not made: file 'notes.txt' is not a format slot 'rom' accepts");
-		CHECK(wizard.statusIsError.get());
-	}
-	CHECK(wizard.run("addFile", {std::string("rom"), game}, error).has_value() && wizard.filesComplaint.get() == "Game: takes exactly one, has 2");
-	CHECK(wizard.run("removeFile", {std::string("rom"), int64_t{0}}, error).has_value());
+	/* more than the slot takes is said at Next */
+	fs::copy_file(game, dir / "second.testrom");
+	CHECK(wizard.run("addFile", {std::string("rom"), game}, error).has_value());
+	CHECK(wizard.run("addFile", {std::string("rom"), (dir / "second.testrom").string()}, error).has_value() && wizard.filesComplaint.get() == "Game: takes exactly one, has 2");
+	CHECK(wizard.run("removeFile", {std::string("rom"), int64_t{1}}, error).has_value());
 	CHECK(wizard.ready.get() && wizard.problems.get().empty() && wizard.status.get().empty());
 	CHECK(wizard.filesComplaint.get().empty());
 	/* the same file again: nothing to do */
@@ -9467,9 +9458,8 @@ bool newProjectWizard(const char *package, const char *rom, const char *slotsPac
 	CHECK(wizard.run("chooseMachine", {int64_t{1}}, error).has_value() && wizard.machine.get() == 1);
 	CHECK(text("slots", 1, 4) == ".cue, .img");
 	std::ofstream(dir / "disk3.dsk") << "board A's kind of disk";
-	CHECK(wizard.run("addFile", {std::string("disk"), (dir / "disk3.dsk").string()}, error).has_value() &&
-		wizard.status.get() == "disk3.dsk is not one of the formats this slot expects (.cue, .img)");
-	CHECK(wizard.run("removeFile", {std::string("disk"), int64_t{0}}, error).has_value());
+	CHECK(!wizard.run("addFile", {std::string("disk"), (dir / "disk3.dsk").string()}, error) &&
+		error == "disk3.dsk is not a kind of file this core takes. Disks takes .cue, .img files.");
 	fromValue(cell("slots", 0, 6), exposed);
 	CHECK(!exposed && settingNames() == "initFillByte diskSpeed port ");
 	CHECK(portCell(3) == "none" && portCell(4) == "pad\nnone");
@@ -9483,6 +9473,28 @@ bool newProjectWizard(const char *package, const char *rom, const char *slotsPac
 	}
 	CHECK(!wizard.run("addFile", {std::string("rom"), game}, error) && error == "Cartridge does not go with the files or the machine chosen");
 	CHECK(rowCount("firmware") == 1 && text("firmware", 0, 1) == "Board B BIOS");
+	/* a file goes only in a slot that takes its kind, when another slot does
+	 * (issue 664): on board B the game is the Extras' kind; on board A the
+	 * Extras are closed and the disks do not take theirs */
+	CHECK(!wizard.run("addFile", {std::string("disk"), game}, error) && error == "walker.testrom does not go in Disks: Extras takes it. Add it to Extras.");
+	CHECK(wizard.run("addFile", {std::string("extra"), game}, error).has_value() && error.empty());
+	CHECK(wizard.run("removeFile", {std::string("extra"), int64_t{0}}, error).has_value());
+	CHECK(wizard.run("chooseMachine", {int64_t{0}}, error).has_value());
+	std::ofstream(dir / "thing.xtra") << "an extra";
+	std::ofstream(dir / "thing.lone") << "a lone one";
+	CHECK(!wizard.run("addFile", {std::string("disk"), (dir / "thing.xtra").string()}, error) &&
+		error == "thing.xtra does not go in Disks. It goes in Extras, which the machine chosen does not use.");
+	/* files left in a slot the machine closes: where they go, said in words */
+	CHECK(wizard.run("addFile", {std::string("rom"), game}, error).has_value());
+	CHECK(wizard.run("addFile", {std::string("lone"), (dir / "thing.lone").string()}, error).has_value());
+	CHECK(wizard.run("chooseMachine", {int64_t{1}}, error).has_value());
+	CHECK(wizard.problems.get().find("Cartridge holds .testrom files, which go in Extras: take them out of Cartridge and add them to Extras.") != std::string::npos);
+	CHECK(wizard.problems.get().find("Lone holds .lone files, which no slot of the machine chosen takes: take them out of Lone.") != std::string::npos);
+	CHECK(!wizard.run("create", {(dir / "stuck.chimeraProject").string()}, error) && error.rfind("The project cannot be made yet: ", 0) == 0);
+	CHECK(wizard.run("chooseMachine", {int64_t{0}}, error).has_value());
+	CHECK(wizard.run("removeFile", {std::string("rom"), int64_t{0}}, error).has_value());
+	CHECK(wizard.run("removeFile", {std::string("lone"), int64_t{0}}, error).has_value());
+	CHECK(wizard.run("chooseMachine", {int64_t{1}}, error).has_value());
 	CHECK(wizard.problems.get() == "One of these is needed: Disks\nBoard B BIOS: not found in the firmware folder; choose its file");
 	/* the firmware page: asked, its columns and what is missing in Chimera's words */
 	CHECK(wizard.firmwareAsked.get() && wizard.firmwareMissing.get() == "Board B BIOS");
@@ -9520,17 +9532,17 @@ bool newProjectWizard(const char *package, const char *rom, const char *slotsPac
 	CHECK(wizard.run("moveFile", {std::string("disk"), int64_t{0}, int64_t{1}}, error).has_value() && pickedFile() == 1 &&
 		text("slots", 1, 7) == "disk2.img\ndisk1.cue");
 	/* files given together are added in the order of their names, whatever order they came in (issue 658) */
-	for (const char *n : {"disk3.img", "disk10.img", "disk20.dsk"}) std::ofstream(dir / n) << n;
-	CHECK(wizard.run("addFiles", {std::string("disk"), (dir / "disk20.dsk").string(), (dir / "disk10.img").string(), (dir / "disk3.img").string()}, error)
+	for (const char *n : {"disk3.img", "disk10.img", "disk20.cue"}) std::ofstream(dir / n) << n;
+	CHECK(wizard.run("addFiles", {std::string("disk"), (dir / "disk20.cue").string(), (dir / "disk10.img").string(), (dir / "disk3.img").string()}, error)
 			  .has_value() &&
-		text("slots", 1, 7) == "disk2.img\ndisk1.cue\ndisk3.img\ndisk10.img\ndisk20.dsk");
+		text("slots", 1, 7) == "disk2.img\ndisk1.cue\ndisk3.img\ndisk10.img\ndisk20.cue");
 	CHECK(NewProjectViewModel::naturalCompare("Disc 2", "Disc 10") < 0 && NewProjectViewModel::naturalCompare("Disc 10", "Disc 2") > 0 &&
 		NewProjectViewModel::naturalCompare("disc 2", "DISC 2") == 0 && NewProjectViewModel::naturalCompare("a", "B") < 0 &&
 		NewProjectViewModel::naturalCompare("Disc 02", "Disc 10") < 0 && NewProjectViewModel::naturalCompare("Disc", "Disc 1") < 0);
 	/* removing leaves the one that took its place picked, the last when it was the last, none when the list is empty */
 	CHECK(wizard.run("pickFile", {std::string("disk"), int64_t{1}}, error).has_value());
 	CHECK(wizard.run("removeFile", {std::string("disk"), int64_t{1}}, error).has_value() && pickedFile() == 1 &&
-		text("slots", 1, 7) == "disk2.img\ndisk3.img\ndisk10.img\ndisk20.dsk");
+		text("slots", 1, 7) == "disk2.img\ndisk3.img\ndisk10.img\ndisk20.cue");
 	CHECK(wizard.run("pickFile", {std::string("disk"), int64_t{3}}, error).has_value());
 	CHECK(wizard.run("removeFile", {std::string("disk"), int64_t{3}}, error).has_value() && pickedFile() == 2);
 	for (int i = 0; i < 3; i++) CHECK(wizard.run("removeFile", {std::string("disk"), int64_t{0}}, error).has_value());
@@ -9801,7 +9813,7 @@ bool newProjectWizard(const char *package, const char *rom, const char *slotsPac
 	CHECK(text("slots", 0, 7) == "" && text("slots", 1, 7) == "disk4.dsk");
 	/* nothing to make until everything is there */
 	CHECK(wizard.run("chooseCore", {std::string("Synth")}, error).has_value());
-	CHECK(!wizard.run("create", {(dir / "never.chimeraProject").string()}, error) && error == "not yet: Game: a file is needed");
+	CHECK(!wizard.run("create", {(dir / "never.chimeraProject").string()}, error) && error == "The project cannot be made yet: Game: a file is needed");
 	removeTree(dir);
 	return true;
 }
@@ -13266,8 +13278,10 @@ int main(int argc, char **argv)
 		bool ran = false;
 		if (name == "coreWindows") ran = coreWindows(argv[1], argv[2]);
 		else if (name == "longSeek") ran = longSeek(argv[1], argv[2]);
+		else if (name == "newProjectWizard" && argc >= 7) ran = newProjectWizard(argv[1], argv[2], argv[6]);
 		else if (name == "branchAfterReopen") ran = branchAfterReopen(argv[1], argv[2]);
 		else if (name == "greenzoneOffRewind") ran = greenzoneOffRewind(argv[1], argv[2]);
+		else if (name == "newProjectWizard" && argc >= 7) ran = newProjectWizard(argv[1], argv[2], argv[6]);
 		else std::printf("CHIMERA_TEST_ONLY: no test %s here\n", only);
 		std::printf("%s: %d checks failed\n", only, failures);
 		return ran && failures == 0 ? 0 : 1;

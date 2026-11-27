@@ -17008,3 +17008,44 @@ a movie played to its end reads one past it. Reviewed and kept as it is
 
 Tested: the view models test `branchAfterReopen` does the steps above and
 checks the movie's length, the piano roll and the counter (10/9).
+
+## New Project says where a file goes (2026-11-27, issue 664)
+
+A person chose the Commodore Amiga machine in PUAE and could not make the
+project: "not yet: Disc does not go with the files or the machine chosen:
+take its files out". Their .ipf and .adf files were in the Disc slot, which
+takes .cue and .iso for the CD32 and CDTV machines. The files were fine; the
+message did not say where they belonged (the Disk slot).
+
+How they got there: Add... and a drop on a slot took a file of any kind and
+only said it was not one the slot expects ("said, not refused", as the old
+window did). With the CD32 machine chosen first, the Disc slot is the one
+shown, so a disk went into it; choosing the Amiga machine afterwards closed
+the Disc slot with the files still in it.
+
+Changes (user-decided, 2026-11-27, issue 664: "Refuse any wrong kind"):
+
+- A file whose kind the slot does not take is refused, always. This replaces
+  the older rule that such a file was added and said, as the old window did.
+  When another slot of the core takes the kind the refusal names that slot: "game.ipf does not go in Disc: Disk
+  takes it. Add it to Disk." (or, when the machine chosen closes that slot,
+  "... It goes in Disk, which the machine chosen does not use."). When no slot of the core takes it, the refusal says so and lists the kinds
+  this slot takes: "notes.txt is not a kind of file this core takes. Game
+  takes .testrom files." The window's drop on the main window picks the first
+  slot that takes the kind and refuses a kind no core takes, as before.
+- A slot the machine closes that still holds files says where they go:
+  "Disc holds .ipf files, which go in Disk: take them out of Disc and add them
+  to Disk." or, when no slot of the machine takes them, "Disc holds .cue
+  files, which no slot of the machine chosen takes: take them out of Disc."
+- Create's refusal no longer begins "not yet:" but "The project cannot be
+  made yet:".
+- The five new texts and the new wording are in all 26 language files
+  (translated by the contributor's agent, not reviewed by a native speaker);
+  the old "take its files out" and "not one of the formats this slot
+expects" texts are gone.
+
+Tested: the view models test `newProjectWizard`, with two slots added to the
+synthetic two-board package (Extras on board B, Lone on board A): a file for
+another slot is refused with both messages, and so is a kind no slot takes, files left in a closed slot say
+where they go and where none does, and Create is refused with the new
+opening. With the new rules switched off the three checks fail.
