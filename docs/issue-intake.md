@@ -29,11 +29,17 @@ Help > Report an Issue (issue 243) shows the link to these forms and fills
 in the first six fields below from the running session, ready to paste,
 each field a paragraph of its own as in the form (a field after a list was
 read as part of the list, issue 304) and one file written on the Game line
-itself. It also lists the project file, the newest crash note and the sandbox's log
+itself. It also lists the project file, a crash note and the sandbox's log
 when they exist, and saves the ticked ones as one zip with the text and the
 game's picture. It sends nothing: the person attaches the zip. Save as Zip
 opens in the Bug reports folder of Config > Paths, a Reports folder in
 Chimera's own by default (issue 340).
+
+The crash note listed is the newest one written since a report was last
+saved, and, while a project is open, one from that project; there is none
+when no note fits. A crash already reported, or one of another game, is not
+sent again (issue 659, where a report carried a ten-day-old note of another
+game and its memory dump).
 
 - *Chimera build: what Help > Copy Version Info copies (it copies the core's
   line too), the string from Help > About, or the release name

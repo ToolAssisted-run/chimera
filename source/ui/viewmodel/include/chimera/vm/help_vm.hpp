@@ -9,6 +9,7 @@
 #include <string>
 #include <vector>
 
+#include "chimera/vm/crash_notes.hpp"
 #include "chimera/vm/session_vm.hpp"
 #include "chimera/vm/settings_vm.hpp"
 #include "chimera/vm/view_model.hpp"
@@ -46,8 +47,24 @@ public:
 	Property<std::string> status;
 	/* where the program is: the sandbox's log is looked for there first */
 	Property<std::string> exeFolder;
-	/* where crash notes are: the newest goes with a report, its dump beside it */
+	/* where crash notes are: the newest one not reported yet goes with a
+	 * report, its dump beside it */
 	Property<std::string> crashFolder;
+	/* when a report was last saved, local time "yyyy-MM-dd HH:mm:ss" (kept
+	 * between sessions): a crash note older than it was reported already */
+	Property<std::string> lastReport;
+
+	/* Which of these notes (newest first) goes with a report, or -1: the
+	 * newest written after `lastReport` ("" for never), and, with a project
+	 * open, one from that project. A note of another project, or one already
+	 * reported, is not this report's (a report carried a ten-day-old note of
+	 * another game, issue 659). */
+	static int reportableNote(const std::vector<crash::Note> &newestFirst, const std::string &lastReport, bool projectOpen,
+		const std::string &projectPath);
+	/* when a note was written, as its time= line says, else as its file name does */
+	static std::string noteTime(const crash::Note &note);
+	/* the project a note names under "session:", "" for none */
+	static std::string noteProject(const crash::Note &note);
 
 	/* the core open and its version, as the Cores window words it ("" for none) */
 	std::string coreAndVersion() const;

@@ -921,6 +921,8 @@ int main(int argc, char **argv)
 	/* crash notes go to the data folder in use */
 	session.crashFolder.set(dataHome + "/Crashes");
 	help.crashFolder.set(dataHome + "/Crashes");
+	/* when a report was last saved: a crash note older than it is not attached again */
+	config.keep(help, "lastReport");
 	if (const std::string why = vm::crash::repoint(dataHome + "/Crashes"); !why.empty())
 		std::fprintf(stderr, "[crash] notes stay where they were: %s\n", why.c_str());
 	/* what a project can make again (its branches' states), a folder a

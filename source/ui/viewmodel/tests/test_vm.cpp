@@ -4243,7 +4243,42 @@ bool helpMenu(const char *package, const char *rom)
 		const std::string files = help.reportFiles.get();
 		CHECK(files.find("2026-10-27 10.00.00 pid2.txt") != std::string::npos && files.find("2026-10-27 10.00.00 pid2.dmp") != std::string::npos &&
 			files.find("pid1") == std::string::npos);
+		/* a report saved between the two: the newer note still goes; saved after both, neither does (issue 659) */
+		help.lastReport.set("2026-10-26 12:00:00");
+		CHECK(fromValue(help.run("makeReport", {}, error).value_or(Value()), text));
+		CHECK(help.reportFiles.get().find("pid2.txt") != std::string::npos && help.reportFiles.get().find("pid1") == std::string::npos);
+		help.lastReport.set("2026-10-27 10:00:00");
+		CHECK(fromValue(help.run("makeReport", {}, error).value_or(Value()), text));
+		CHECK(help.reportFiles.get().find("pid") == std::string::npos);
+		help.lastReport.set("");
 		help.crashFolder.set("");
+	}
+	/* which note a report takes: the newest not reported yet, of the project open when one is (issue 659) */
+	{
+		auto note = [](const std::string &time, const std::string &project) {
+			crash::Note n;
+			std::string text = "Chimera crash note\ntime=" + time + "\nprocess=7\n";
+			if (!project.empty()) text += "session:\n  project=" + project + "\n  system=X\n";
+			CHECK(crash::parse(text, "/notes/" + time + ".txt", n));
+			return n;
+		};
+		const std::vector<crash::Note> notes{note("2026-11-20 10:00:00", "G:/runs/one.chimeraProject"),
+			note("2026-11-13 23:10:20", "G:/runs/two.chimeraProject"), note("2026-11-01 08:00:00", "")};
+		CHECK(HelpViewModel::noteTime(notes[0]) == "2026-11-20 10:00:00");
+		CHECK(HelpViewModel::noteProject(notes[1]) == "G:/runs/two.chimeraProject" && HelpViewModel::noteProject(notes[2]).empty());
+		/* no project open, never reported: the newest */
+		CHECK(HelpViewModel::reportableNote(notes, "", false, "") == 0);
+		/* a project open: the newest of that project, another project's passed over */
+		CHECK(HelpViewModel::reportableNote(notes, "", true, "G:/runs/two.chimeraProject") == 1);
+		CHECK(HelpViewModel::reportableNote(notes, "", true, "G:/runs/three.chimeraProject") == -1);
+		/* that project's note was reported already (a report saved after it) */
+		CHECK(HelpViewModel::reportableNote(notes, "2026-11-14 00:00:00", true, "G:/runs/two.chimeraProject") == -1);
+		CHECK(HelpViewModel::reportableNote(notes, "2026-11-14 00:00:00", false, "") == 0);
+		CHECK(HelpViewModel::reportableNote(notes, "2026-11-21 00:00:00", false, "") == -1);
+		/* a note's time from its file name when it has no time= line */
+		crash::Note named;
+		CHECK(crash::parse("Chimera crash note\nprocess=1\n", "/notes/2026-11-13 23.10.20 pid63956.txt", named));
+		CHECK(HelpViewModel::noteTime(named) == "2026-11-13 23:10:20");
 	}
 	/* the sandbox's log where MINIBOX_LOG names it, as a Mac's window names
 	 * it in the data folder: that one goes with a report */
@@ -4318,7 +4353,10 @@ bool helpMenu(const char *package, const char *rom)
 		mz_zip_reader_end(&z);
 		return out;
 	};
+	help.lastReport.set("");
 	CHECK(help.run("saveReport", {zip.string(), picture.string()}, error).has_value());
+	/* a saved report says when, so the crash notes it could carry are not attached again */
+	CHECK(help.lastReport.get().size() == 19);
 	{
 		const auto in = entries(zip);
 		CHECK(in.count("report.md") == 1 && in.at("report.md") == text + "\n" && in.count("game.png") == 1 && in.at("game.png") == "\x89PNG not really");

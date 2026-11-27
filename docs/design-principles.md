@@ -16884,3 +16884,31 @@ a saved watch list has no `SystemID` line while a file that has one still loads,
 `emu.getsystemid` is gone from the Lua tests, and the witness checks that made
 projects carry no `Platform` header while the projects it starts with one still
 run. Broken on purpose once (the id rule) and seen to fail.
+
+## A report attaches only a crash note not reported yet, of the open project (2026-11-27, issue 659)
+
+Help > Report an Issue listed the newest crash note in the crash notes folder
+and its memory dump, whatever it was. The report attached to issue 659 (a
+DuckStation project, 2026-11-26) carried a note and dump from 2026-11-13 of a
+PC-98 project, and the person's earlier reports had carried the same one: a
+memory dump of an unrelated crash, sent again with every report.
+
+Now the note listed is the newest that was written after a report was last
+saved, and, while a project is open, one whose session names that project.
+When no note fits, none is listed. The owner left the rule to the
+contributor (2026-11-27: "you decide what's best"); it was chosen because a
+crash is reported once, right after it happens, in the project it happened in.
+
+- When a report was last saved is a new setting, help.lastReport (local time,
+  as a note gives its time), kept between sessions and set by Save as Zip.
+- A note's time is its time= line, else its file name, which begins with it.
+- A note's project is the project= line under "session:". Paths are compared
+  by their parts, in one case on Windows. A note with no project is not
+  listed while a project is open.
+- The files stay ticked as before, so the person still decides what goes.
+
+Tested: the view model test checks the rule on its own (no project, another
+project's note passed over, a note reported already, the time from the file
+name) and through makeReport with a report saved between two notes and after
+both; Save as Zip sets the time.
+

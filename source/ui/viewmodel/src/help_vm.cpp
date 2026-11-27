@@ -8,6 +8,7 @@
 #include <cctype>
 #include <cstdio>
 #include <cstdlib>
+#include <ctime>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
@@ -43,6 +44,31 @@ std::vector<std::string> linesOf(const std::string &text)
 		at = end == std::string::npos ? text.size() : end + 1;
 		if (!line.empty()) out.push_back(std::move(line));
 	}
+	return out;
+}
+
+/* now, local time, "yyyy-MM-dd HH:mm:ss", as a crash note gives its time */
+std::string localNow()
+{
+	const std::time_t t = std::time(nullptr);
+	std::tm local{};
+#ifdef _WIN32
+	localtime_s(&local, &t);
+#else
+	localtime_r(&t, &local);
+#endif
+	char out[32];
+	std::strftime(out, sizeof out, "%Y-%m-%d %H:%M:%S", &local);
+	return out;
+}
+
+/* a path as one to compare: its parts, with forward slashes (and, on Windows, in one case) */
+std::string comparable(const std::string &path)
+{
+	std::string out = std::filesystem::path(path).lexically_normal().generic_string();
+#ifdef _WIN32
+	for (char &c : out) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+#endif
 	return out;
 }
 
@@ -86,7 +112,8 @@ HelpViewModel::HelpViewModel(Dispatcher &dispatcher, SessionViewModel &session, 
 	expose("reportFiles", "the files worth attaching to it, a line each", reportFiles);
 	expose("status", "what Help last had to say (the window says here what it copied)", status, true);
 	expose("exeFolder", "where the program is: the sandbox's log is looked for there first", exeFolder, true);
-	expose("crashFolder", "where crash notes are: the newest, and its dump, go with a report", crashFolder, true);
+	expose("crashFolder", "where crash notes are: the newest one not reported yet, and its dump, go with a report", crashFolder, true);
+	expose("lastReport", "when a report was last saved (local time); a crash note older than it is not attached again", lastReport, true);
 
 	command("versionReport", "the build and the core open, in the words a bug report asks for them (Chimera's Copy Version Info)",
 		{}, [this](const Args &, std::string &) -> Value {
@@ -143,14 +170,15 @@ HelpViewModel::HelpViewModel(Dispatcher &dispatcher, SessionViewModel &session, 
 				list += (list.empty() ? "" : "\n") + log.string();
 				break;
 			}
-			/* the newest crash note and its memory dump */
+			/* the newest crash note not reported yet, of this project when one is open, and its memory dump */
 			if (!crashFolder.get().empty())
 			{
 				const std::vector<crash::Note> notes = crash::notesIn(crashFolder.get());
-				if (!notes.empty())
+				const int at = reportableNote(notes, lastReport.get(), session_.hasProject.get(), session_.projectPath.get());
+				if (at >= 0)
 				{
-					list += (list.empty() ? "" : "\n") + notes.front().path;
-					if (!notes.front().dump.empty()) list += "\n" + notes.front().dump;
+					list += (list.empty() ? "" : "\n") + notes[static_cast<size_t>(at)].path;
+					if (!notes[static_cast<size_t>(at)].dump.empty()) list += "\n" + notes[static_cast<size_t>(at)].dump;
 				}
 			}
 			/* the core's log, while Export Core Log is on */
@@ -241,8 +269,54 @@ HelpViewModel::HelpViewModel(Dispatcher &dispatcher, SessionViewModel &session, 
 			constexpr uint64_t kLimit = 25ull * 1024 * 1024;
 			if (size > kLimit) said += " " + tr("help.too_big");
 			status.set(said);
+			/* the crash notes written so far went with this report, or were left out of it on purpose */
+			lastReport.set(localNow());
 			return static_cast<int64_t>(size);
 		});
+}
+
+std::string HelpViewModel::noteTime(const crash::Note &note)
+{
+	if (!note.time.empty()) return note.time;
+	/* the file's name begins with the time: "2026-11-13 23.10.20 pid63956.txt" */
+	const std::string name = std::filesystem::path(note.path).filename().string();
+	if (name.size() < 19) return {};
+	std::string t = name.substr(0, 19);
+	for (size_t i = 11; i < t.size(); i++)
+		if (t[i] == '.') t[i] = ':';
+	return t;
+}
+
+std::string HelpViewModel::noteProject(const crash::Note &note)
+{
+	size_t at = 0;
+	while (at < note.session.size())
+	{
+		const size_t end = note.session.find('\n', at);
+		const std::string line = note.session.substr(at, end == std::string::npos ? std::string::npos : end - at);
+		if (line.rfind("project=", 0) == 0) return line.substr(8);
+		if (end == std::string::npos) break;
+		at = end + 1;
+	}
+	return {};
+}
+
+int HelpViewModel::reportableNote(const std::vector<crash::Note> &newestFirst, const std::string &lastReport, bool projectOpen,
+	const std::string &projectPath)
+{
+	for (size_t i = 0; i < newestFirst.size(); i++)
+	{
+		const std::string when = noteTime(newestFirst[i]);
+		/* newest first: from here on every note went with an earlier report, or was left out of it */
+		if (!lastReport.empty() && !when.empty() && when <= lastReport) return -1;
+		if (projectOpen)
+		{
+			const std::string of = noteProject(newestFirst[i]);
+			if (of.empty() || comparable(of) != comparable(projectPath)) continue;
+		}
+		return static_cast<int>(i);
+	}
+	return -1;
 }
 
 std::string HelpViewModel::coreAndVersion() const
